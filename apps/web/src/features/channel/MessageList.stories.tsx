@@ -1,6 +1,7 @@
 import { For } from "solid-js";
 
 import type { ChatMessage } from "@vibevalley/protocol";
+import { messageId } from "@vibevalley/protocol/schema";
 import { stories, story, type Story } from "@vibevalley/stories";
 
 import { MessageRow } from "./MessageList";
@@ -10,7 +11,7 @@ const min = 60_000;
 let n = 0;
 
 const msg = (fromKind: ChatMessage["fromKind"], from: string, name: string, text: string, more: Partial<ChatMessage> = {}): ChatMessage => ({
-  id: `m${++n}`,
+  id: messageId(`m${++n}`),
   number: n,
   channel: "general",
   from,

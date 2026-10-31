@@ -8,10 +8,6 @@ import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { orchestratorLookOf } from "@/base/agents";
-import { useCore, useFrames } from "@/base/frame";
-import { ready, useAgents } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
 import { Phone } from "@/farm/phone/Phone";
 import { PhoneButton } from "@/farm/phone/PhoneButton";
@@ -21,6 +17,10 @@ import { timeOfDay, useFarm } from "@/farm/ui";
 import { webRoutes } from "@/farm/world/places";
 import { nextClearing } from "@/farm/world/plots";
 import { unreadTotal } from "@/features/channel";
+import { orchestratorLookOf } from "@/infra/agents";
+import { useCore, useFrames } from "@/infra/frame";
+import { ready, useAgents } from "@/infra/query";
+import { useRouter } from "@/infra/router";
 import { CardColors, PixelCard, SpriteIcon } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";
 import { titleBar } from "@/ui/TitleBar";

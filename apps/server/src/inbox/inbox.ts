@@ -7,10 +7,10 @@ import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Stream } f
 import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 
-import { ServerConfig } from "@/base/config.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
+import { ServerConfig } from "@/infra/config.ts";
 
 import { forOwner } from "./away.ts";
 import { inbox } from "./items.ts";
@@ -73,7 +73,7 @@ const make = Effect.gen(function* () {
       const c = f.channel ?? chat.defaultChannel();
       byChannel.set(c, [...(byChannel.get(c) ?? []), f]);
     }
-    for (const [channel, notes] of byChannel) yield* PubSub.publish(overdueHub, { channel, notes });
+    yield* Effect.forEach(byChannel, ([channel, notes]) => PubSub.publish(overdueHub, { channel, notes }), { discard: true });
   });
 
   const shape = Inbox.of({

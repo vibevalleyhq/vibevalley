@@ -10,4 +10,5 @@ where issue.project = sqlc.arg(project) and issue.assignee is not null
 order by issue_session.started_at desc, issue_session.session desc limit 1;
 
 -- name: AllSessions :many
+-- bound: a row per issue and the session on it.
 select issue, session from issue_session order by started_at, session;

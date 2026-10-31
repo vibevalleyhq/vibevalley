@@ -5,10 +5,11 @@ import { createSignal, Loading } from "solid-js";
 import { LocaleValues } from "@vibevalley/i18n";
 import { StoriesApp, type Stories } from "@vibevalley/stories";
 
-import { FramesContext } from "./base/frame";
-import { queries } from "./base/query";
-import { RouterContext, type Router } from "./base/router";
-import { fakeFetch } from "./base/storyApi";
+import { FramesContext } from "./infra/frame";
+import { queries } from "./infra/query";
+import { RouterContext, type Router } from "./infra/router";
+import { fakeFetch } from "./infra/storyApi";
+import { createRegistry, RegistryContext } from "./state/atom";
 import { order } from "./storyLevels";
 
 import "./stories.css";
@@ -42,9 +43,11 @@ render(
       wrap={(story) => (
         <RouterContext value={still()}>
           <FramesContext value={{ frame: undefined, link: "open", count: 0 }}>
-            <QueryClientProvider client={queries}>
-              <Loading>{story()}</Loading>
-            </QueryClientProvider>
+            <RegistryContext value={createRegistry()}>
+              <QueryClientProvider client={queries}>
+                <Loading>{story()}</Loading>
+              </QueryClientProvider>
+            </RegistryContext>
           </FramesContext>
         </RouterContext>
       )}

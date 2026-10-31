@@ -79,7 +79,7 @@ export const SeenHandedResult = Schema.Struct({
 export type SeenHandedResult = typeof SeenHandedResult.Type
 
 
-export const SeenHandedSql = "-- name: SeenHanded :many\nupdate channel_delivery set state = 'seen', seen_at = $1\nwhere recipient_id = $2 and state = 'handed' and launch = $3\nreturning message_id;"
+export const SeenHandedSql = "-- name: SeenHanded :many\n-- bound: what one launch handed to one recipient.\nupdate channel_delivery set state = 'seen', seen_at = $1\nwhere recipient_id = $2 and state = 'handed' and launch = $3\nreturning message_id;"
 
 export const seenHanded = Effect.fn("SeenHanded")(function* (params: SeenHandedParams) {
   const sql = yield* SqlClient.SqlClient
@@ -102,7 +102,7 @@ export const RollbackHandedResult = Schema.Struct({
 export type RollbackHandedResult = typeof RollbackHandedResult.Type
 
 
-export const RollbackHandedSql = "-- name: RollbackHanded :many\nupdate channel_delivery set state = 'pending', launch = null where recipient_id = $1 and state = 'handed'\nreturning message_id;"
+export const RollbackHandedSql = "-- name: RollbackHanded :many\n-- bound: what is handed to one recipient and not seen yet.\nupdate channel_delivery set state = 'pending', launch = null where recipient_id = $1 and state = 'handed'\nreturning message_id;"
 
 export const rollbackHanded = Effect.fn("RollbackHanded")(function* (params: RollbackHandedParams) {
   const sql = yield* SqlClient.SqlClient
@@ -213,7 +213,7 @@ export const AgentWakesByChannelResult = Schema.Struct({
 export type AgentWakesByChannelResult = typeof AgentWakesByChannelResult.Type
 
 
-export const AgentWakesByChannelSql = "-- name: AgentWakesByChannel :many\n-- Agents waking agents in each channel since the owner last spoke there, held ones not counted: what the chat\n-- keeps in memory (channel/audience.ts) when it starts.\nselect m.channel_id, count(*)::int as n from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\njoin channel_participant r on r.id = d.recipient_id\nwhere m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = m.channel_id and u.sender_id = 'owner'), '')\n  and s.kind in ('session', 'orchestrator') and r.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null\ngroup by m.channel_id;"
+export const AgentWakesByChannelSql = "-- name: AgentWakesByChannel :many\n-- bound: a row per channel.\n-- Agents waking agents in each channel since the owner last spoke there, held ones not counted: what the chat\n-- keeps in memory (channel/audience.ts) when it starts.\nselect m.channel_id, count(*)::int as n from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\njoin channel_participant r on r.id = d.recipient_id\nwhere m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = m.channel_id and u.sender_id = 'owner'), '')\n  and s.kind in ('session', 'orchestrator') and r.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null\ngroup by m.channel_id;"
 
 export const agentWakesByChannel = Effect.fn("AgentWakesByChannel")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -237,7 +237,7 @@ export const LastAgentWakesResult = Schema.Struct({
 export type LastAgentWakesResult = typeof LastAgentWakesResult.Type
 
 
-export const LastAgentWakesSql = "-- name: LastAgentWakes :many\n-- When each recipient was last woken by an agent (channel/audience.ts).\nselect d.recipient_id, max(d.created_at)::float8 as at from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\nwhere s.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null\ngroup by d.recipient_id;"
+export const LastAgentWakesSql = "-- name: LastAgentWakes :many\n-- bound: a row per participant.\n-- When each recipient was last woken by an agent (channel/audience.ts).\nselect d.recipient_id, max(d.created_at)::float8 as at from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\nwhere s.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null\ngroup by d.recipient_id;"
 
 export const lastAgentWakes = Effect.fn("LastAgentWakes")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -282,7 +282,7 @@ export const AllOpenDeliveriesResult = Schema.Struct({
 export type AllOpenDeliveriesResult = typeof AllOpenDeliveriesResult.Type
 
 
-export const AllOpenDeliveriesSql = "-- name: AllOpenDeliveries :many\n-- The deliveries still open, with what an inbox shows of each: what the chat keeps in memory (channel/deliveries.ts).\nselect d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.channel_id, m.sender_id, m.kind, m.body,\n       m.meta, m.reply_number, m.created_at, p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere d.state in ('pending', 'announced', 'handed')\norder by m.id;"
+export const AllOpenDeliveriesSql = "-- name: AllOpenDeliveries :many\n-- bound: only open deliveries; each closes when seen, dropped or its message deleted.\n-- The deliveries still open, with what an inbox shows of each: what the chat keeps in memory (channel/deliveries.ts).\nselect d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.channel_id, m.sender_id, m.kind, m.body,\n       m.meta, m.reply_number, m.created_at, p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere d.state in ('pending', 'announced', 'handed')\norder by m.id;"
 
 export const allOpenDeliveries = Effect.fn("AllOpenDeliveries")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -305,7 +305,7 @@ export const DropOpenOfResult = Schema.Struct({
 export type DropOpenOfResult = typeof DropOpenOfResult.Type
 
 
-export const DropOpenOfSql = "-- name: DropOpenOf :many\n-- A message deleted: what it was still waiting to hand goes.\nupdate channel_delivery set state = 'dropped', dropped_why = 'deleted'\nwhere message_id = $1 and state in ('pending', 'announced', 'handed')\nreturning recipient_id;"
+export const DropOpenOfSql = "-- name: DropOpenOf :many\n-- bound: one message's open deliveries, one per recipient.\n-- A message deleted: what it was still waiting to hand goes.\nupdate channel_delivery set state = 'dropped', dropped_why = 'deleted'\nwhere message_id = $1 and state in ('pending', 'announced', 'handed')\nreturning recipient_id;"
 
 export const dropOpenOf = Effect.fn("DropOpenOf")(function* (params: DropOpenOfParams) {
   const sql = yield* SqlClient.SqlClient
@@ -328,7 +328,7 @@ export const WaitingOnResult = Schema.Struct({
 export type WaitingOnResult = typeof WaitingOnResult.Type
 
 
-export const WaitingOnSql = "-- name: WaitingOn :many\n-- Who a message is still waiting to be handed to.\nselect recipient_id from channel_delivery where message_id = $1 and state in ('pending', 'announced', 'handed');"
+export const WaitingOnSql = "-- name: WaitingOn :many\n-- bound: one message's open deliveries, one per recipient.\n-- Who a message is still waiting to be handed to.\nselect recipient_id from channel_delivery where message_id = $1 and state in ('pending', 'announced', 'handed');"
 
 export const waitingOn = Effect.fn("WaitingOn")(function* (params: WaitingOnParams) {
   const sql = yield* SqlClient.SqlClient

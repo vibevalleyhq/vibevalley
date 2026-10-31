@@ -37,6 +37,7 @@
     "@solidjs/vite-plugin": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",
+    "@vibevalley/testkit": "workspace:*",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

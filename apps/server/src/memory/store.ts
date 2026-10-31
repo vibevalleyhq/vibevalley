@@ -10,12 +10,13 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import type { Actor } from "@/base/actor.ts";
-import { Db } from "@/base/db.ts";
+import { clip } from "@/base/clip.ts";
 import { newId } from "@/base/ids.ts";
-import { bestEffort } from "@/base/log.ts";
+import { Db } from "@/infra/db.ts";
+import { bestEffort } from "@/infra/log.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
-import { clip, memoryIsNewNote, issueMemoryText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
+import { memoryIsNewNote, issueMemoryText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
 import { termsList, termsText, termsVersion } from "./terms.ts";
 
 /** One finished run, everything about it; each provider keeps what it uses. */
@@ -60,10 +61,10 @@ const recutBatch = 100;
 
 export const makeMemoryStore = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
-  const { attempt: db, run, attemptTx } = yield* Db;
+  const db = yield* Db;
 
   const list = (agent: string) =>
-    db(
+    db.attempt(
       Effect.map(q.memoriesOf({ agent }), (rows) =>
         rows.map((r): T.Memory => ({
           id: r.id,
@@ -84,7 +85,7 @@ export const makeMemoryStore = Effect.gen(function* () {
   const insertNote = Effect.fnUntraced(function* (agent: string, body: string, project: string | undefined, session: string | undefined, author: T.ActorKind) {
     const at = yield* Clock.currentTimeMillis;
     const id = newId();
-    yield* db(
+    yield* db.attempt(
       q.addNote({
         id,
         agent,
@@ -105,7 +106,7 @@ export const makeMemoryStore = Effect.gen(function* () {
     function* (agent: string, text: string) {
       const words = termsList(text);
       if (words.length === 0) return {};
-      const rows = yield* db(q.matchMemories({ words, agent }));
+      const rows = yield* db.attempt(q.matchMemories({ words, agent }));
       return Object.fromEntries(rows.map((r) => [r.id, r.score ?? 0]));
     },
     (effect, agent) =>
@@ -130,7 +131,7 @@ export const makeMemoryStore = Effect.gen(function* () {
   );
 
   const markRecalled = (ids: readonly string[]) =>
-    Effect.forEach(ids, (id) => db(q.recalled({ recalled_at: clock.currentTimeMillisUnsafe(), id })), { discard: true }).pipe(
+    Effect.forEach(ids, (id) => db.attempt(q.recalled({ recalled_at: clock.currentTimeMillisUnsafe(), id })), { discard: true }).pipe(
       bestEffort("a memory was recalled but not marked"),
     );
 
@@ -138,31 +139,33 @@ export const makeMemoryStore = Effect.gen(function* () {
   const keep = (run: FinishedRun) =>
     run.outcome === "interrupted"
       ? Effect.void
-      : attemptTx(
-          Effect.gen(function* () {
-            const known: Pick<T.Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
-            for (const note of memoryNotesOf(run.said)) {
-              const project = note.everywhere ? undefined : run.project;
-              if (!memoryIsNewNote(known, note.text, project)) continue;
-              yield* insertNote(run.agent, note.text, project, run.session, "session");
-              known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
-            }
-            const text = issueMemoryText(run.brief, run.summary, run.outcome);
-            yield* db(
-              q.keepIssueMemory({
-                id: newId(),
-                agent: run.agent,
-                body: text,
-                terms: termsText(text),
-                terms_of: termsVersion,
-                project: run.project,
-                session: run.session,
-                created_at: yield* Clock.currentTimeMillis,
-              }),
-            );
-            for (const id of nextForgotten(yield* list(run.agent), 0)) yield* db(q.forget({ agent: run.agent, id }));
-          }),
-        ).pipe(bestEffort(`what ${run.session} learned was not kept`));
+      : db
+          .attemptTx(
+            Effect.gen(function* () {
+              const known: Pick<T.Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
+              for (const note of memoryNotesOf(run.said)) {
+                const project = note.everywhere ? undefined : run.project;
+                if (!memoryIsNewNote(known, note.text, project)) continue;
+                yield* insertNote(run.agent, note.text, project, run.session, "session");
+                known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
+              }
+              const text = issueMemoryText(run.brief, run.summary, run.outcome);
+              yield* db.attempt(
+                q.keepIssueMemory({
+                  id: newId(),
+                  agent: run.agent,
+                  body: text,
+                  terms: termsText(text),
+                  terms_of: termsVersion,
+                  project: run.project,
+                  session: run.session,
+                  created_at: yield* Clock.currentTimeMillis,
+                }),
+              );
+              yield* Effect.forEach(nextForgotten(yield* list(run.agent), 0), (id) => db.attempt(q.forget({ agent: run.agent, id })), { discard: true });
+            }),
+          )
+          .pipe(bestEffort(`what ${run.session} learned was not kept`));
 
   const listed = Effect.fnUntraced(
     function* (agent: string) {
@@ -200,13 +203,13 @@ export const makeMemoryStore = Effect.gen(function* () {
     } satisfies T.Memory;
   });
 
-  const forget = (agent: string, id: string) => run(q.forget({ agent, id }));
+  const forget = (agent: string, id: string) => db.run(q.forget({ agent, id }));
 
   /** Cuts again what an older termsVersion cut, a batch at a time: the terms are an index derived from the body. */
   const recutTerms = Effect.gen(function* () {
     for (;;) {
-      const rows = yield* db(q.staleTerms({ version: termsVersion, n: recutBatch }));
-      for (const r of rows) yield* db(q.setTerms({ terms: termsText(r.body), version: termsVersion, id: r.id }));
+      const rows = yield* db.attempt(q.staleTerms({ version: termsVersion, n: recutBatch }));
+      yield* Effect.forEach(rows, (r) => db.attempt(q.setTerms({ terms: termsText(r.body), version: termsVersion, id: r.id })), { discard: true });
       if (rows.length < recutBatch) return;
     }
   }).pipe(bestEffort("memories were not cut again"));

@@ -2,7 +2,7 @@
  * The repository's own lint rules, loaded by vite.config.ts's lint.jsPlugins.
  *
  *   no-wall-clock: in the server, time is read and waited on through Effect's Clock (or the Time a class was handed,
- *   base/time.ts), so that a test's TestClock moves all of it. Date.now(), new Date() with no arguments, setTimeout and
+ *   infra/time.ts), so that a test's TestClock moves all of it. Date.now(), new Date() with no arguments, setTimeout and
  *   setInterval read or wait on the wall clock behind its back.
  *
  *   no-test-sleep: a test does not wait by the clock. What it waits for in the background it asks after with until or
@@ -37,8 +37,9 @@
  *   and Slider): a native <select>, checkbox, radio or range is drawn by the system, so it looks different on every
  *   machine and stays light in the dark theme. vite.config.ts says where it runs; the pixel skin draws its own.
  *
- *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base, ui, ui/pixel, the
- *   features (features/<concept>), the skins (farm, tree), app. A feature uses another only through its index.ts, so
+ *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base (pure ground), infra
+ *   (the server, the host, the browser), state (the middle layer), ui, ui/pixel, the features (features/<concept>), the
+ *   skins (farm, tree), app. A feature uses another only through its index.ts, so
  *   what is inside it can change; the features' graph has no cycle (layers.test.ts). docs/subsystems/app.md says why.
  *
  *   promise-boundary: the server is Effect; a Promise is only the one call into an outside library, made inside
@@ -63,7 +64,31 @@
  *   globalThis or self, and Object.assign or Object.defineProperty onto them; declare global outside a door is too
  *   (vite.config.ts lists the doors).
  *
- *   db-door: the server reaches the database through the Db service (apps/server/src/base/db.ts), which says what a
+ *   atom-door: the page's middle layer stands on Effect's Atom (effect/reactivity), whose API is marked unstable; only
+ *   apps/web/src/state imports it (atom.ts, intent.ts), and features read atoms through what state exports, so a change in
+ *   Atom is fixed in one folder. An import of effect/reactivity anywhere else under apps/web/src is reported, a type-only
+ *   one too: a type names the API as much as a call does; vite.config.ts says where the rule runs.
+ *
+ *   page-store: a value the page keeps for its life (a dialog opened from two places, the farm's overlays, a draft) is
+ *   an atom of the page's, made with state/'s helpers (defineAtom; defineStored for one kept on the machine), so it is
+ *   kept one way: read in Solid, heard by plain code, reset by a test. A createSignal or createStore made outside any
+ *   function, in apps/web/src/features, farm or ui, is reported; one made in a component or a function is its own.
+ *
+ *   stored-door: the browser's storage is reached only through state/stored.ts (defineStored), which decodes what it
+ *   reads with a Schema, survives a storage that throws, keeps every key under one namespace and tells every reader of a
+ *   change, this tab's and the others'. localStorage or sessionStorage named anywhere else under apps/web/src is reported.
+ *
+ *   act-door: what the owner does on the page goes through its middle layer: an Act (apps/web/src/ui/act.ts: busy until
+ *   it ends, a refusal in the error tone, nothing sent while the state stream is lost) or an intent (state/intent.ts, a
+ *   change shown before the server has it). In a component (a .tsx under features/ or farm/) a call of the API client
+ *   that changes something is reported unless it is made inside a function handed to some `x.run(…)`, an Act's. A call
+ *   changes something unless its method is a read: list, get, search, recall, validate or preview… (the client's verbs,
+ *   packages/protocol/src/client.ts). An intent's send is written in the feature's .ts, where the rule does not look.
+ *
+ *   failure-tone: a refusal is said in the error tone. toast(…) given a reason (reasonOf) without "bad" as its tone, and
+ *   the pixel toasts.add({ … }) given one without the error type, are reported; ui/act.ts says refusals so already.
+ *
+ *   db-door: the server reaches the database through the Db service (apps/server/src/infra/db.ts), which says what a
  *   failed query becomes: run and inTx make it a defect, attempt and attemptTx keep it for a caller that tells or retries
  *   it. A module that takes the SqlClient itself, or opens its own withTransaction, decides that again by hand, and
  *   the usual way back is to die and catchDefect the SqlError. A type-only import (a query's SqlClient requirement in a
@@ -127,7 +152,7 @@ const noWallClock = defineRule({
       wallClock: says(
         "this reads or waits on the wall clock, which a test's TestClock cannot move",
         "in Effect code `yield* Clock.currentTimeMillis` to read and `Effect.sleep` to wait; in a class, the `Time` it was handed (`time.now()`, `time.sleep(ms)`)",
-        "apps/server/src/base/time.ts",
+        "apps/server/src/infra/time.ts",
       ),
     },
   },
@@ -363,7 +388,7 @@ const nativeControl = defineRule({
 });
 
 // The page's layers, in order; a file may import from its own unit or one before it.
-const pageLayers = ["base", "ui", "ui/pixel", "features", "skin", "app", "root"] as const;
+const pageLayers = ["base", "infra", "state", "ui", "ui/pixel", "features", "skin", "app", "root"] as const;
 
 function pageUnit(path: string): { layer: (typeof pageLayers)[number]; unit: string } {
   const parts = path.split("/");
@@ -389,8 +414,8 @@ const pageLayersRule = defineRule({
   meta: {
     messages: {
       layer: says(
-        "{{from}} is before {{to}} in the page's layers (base, ui, ui/pixel, features, farm and tree, app), and a layer imports only its own and those before it",
-        "move what both need down into a layer before {{from}} (a pure function to base, a component to ui), or have {{to}} pass it in as a prop",
+        "{{from}} is before {{to}} in the page's layers (base, infra, state, ui, ui/pixel, features, farm and tree, app), and a layer imports only its own and those before it",
+        "move what both need down into a layer before {{from}} (a pure function to base, a talk with the outside to infra, a component to ui), or have {{to}} pass it in as a prop",
         "apps/web/README.md",
       ),
       index: says(
@@ -620,29 +645,387 @@ const dbDoor = defineRule({
     messages: {
       client: says(
         "a module that takes the SqlClient itself decides again what a failed query becomes, outside the Db service",
-        '`const { run, attempt, one, inTx, attemptTx } = yield* Db` and pass the generated query to it (`run(q.x(…))`); a type in a signature is `import type { SqlClient } from "effect/sql"`',
-        "apps/server/src/base/db.ts",
+        '`const db = yield* Db` and pass the generated query to it (`db.run(q.x(…))`); a type in a signature is `import type { SqlClient } from "effect/sql"`',
+        "apps/server/src/infra/db.ts",
+      ),
+      whole: says(
+        "Db taken apart can be renamed, and then run (a failure is a defect) and attempt (a failure stays) read alike",
+        "`const db = yield* Db` and `db.run(…)`, `db.attempt(…)`, `db.one(…)`, `db.inTx(…)`, `db.attemptTx(…)`",
+        "apps/server/src/infra/db.ts",
+      ),
+      runCaught: says(
+        "db.run turns the database's failure into a defect, so {{catcher}} around it never sees one",
+        "`db.attempt(…)` when the failure is told or retried, and catch its SqlError; keep db.run when a failure is a bug",
+        "apps/server/src/infra/db.ts",
       ),
       transaction: says(
         "a withTransaction of its own leaves the database's failure for each module to turn into a defect or a refusal by hand",
         '`inTx(work)` when a failure is a bug, `attemptTx(work)` when it is told to the owner or retried (`.pipe(Effect.catchTag("SqlError", …))`)',
-        "apps/server/src/base/db.ts",
+        "apps/server/src/infra/db.ts",
       ),
     },
   },
   create(context) {
-    if (context.filename.replaceAll("\\", "/").endsWith("apps/server/src/base/db.ts")) return {};
+    if (context.filename.replaceAll("\\", "/").endsWith("apps/server/src/infra/db.ts")) return {};
     return {
       ImportDeclaration(node) {
-        if (node.source.value !== "effect/sql" || node.importKind === "type") return;
+        const from = node.source.value;
+        if ((from !== "effect/sql" && from !== "effect/sql/SqlClient") || node.importKind === "type") return;
         for (const s of node.specifiers)
-          if (s.type === "ImportSpecifier" && s.importKind !== "type" && s.imported.type === "Identifier" && s.imported.name === "SqlClient")
+          // The whole namespace carries the SqlClient as well.
+          if (
+            s.type === "ImportNamespaceSpecifier" ||
+            (from === "effect/sql" &&
+              s.type === "ImportSpecifier" &&
+              s.importKind !== "type" &&
+              s.imported.type === "Identifier" &&
+              s.imported.name === "SqlClient")
+          )
             context.report({ node: s, messageId: "client" });
+      },
+      VariableDeclarator(node) {
+        const init = node.init;
+        if (
+          node.id.type === "ObjectPattern" &&
+          init?.type === "YieldExpression" &&
+          init.delegate &&
+          init.argument?.type === "Identifier" &&
+          init.argument.name === "Db"
+        )
+          context.report({ node, messageId: "whole" });
       },
       CallExpression(node) {
         const c = node.callee;
         if (c.type === "MemberExpression" && c.property.type === "Identifier" && c.property.name === "withTransaction")
           context.report({ node, messageId: "transaction" });
+        // Effect.result(db.run(…)) and its kin: a catcher around what cannot fail.
+        const first = node.arguments[0];
+        if (
+          c.type === "MemberExpression" &&
+          c.object.type === "Identifier" &&
+          c.object.name === "Effect" &&
+          c.property.type === "Identifier" &&
+          ["result", "catch", "catchTag", "orElseSucceed", "option", "exit"].includes(c.property.name) &&
+          first?.type === "CallExpression" &&
+          first.callee.type === "MemberExpression" &&
+          first.callee.object.type === "Identifier" &&
+          first.callee.object.name === "db" &&
+          first.callee.property.type === "Identifier" &&
+          first.callee.property.name === "run"
+        )
+          context.report({ node, messageId: "runCaught", data: { catcher: `Effect.${c.property.name}` } });
+      },
+    };
+  },
+});
+
+const yieldInLoop = defineRule({
+  meta: {
+    messages: {
+      loop: says(
+        "a for…of with yield* in its body runs the effects one by one without saying so, and hides a query per item",
+        "`yield* Effect.forEach(items, (x) => …, { discard: true })` (in order, one at a time, as the loop was), with `{ concurrency: n }` where the items do not wait on each other; a batch query for a query per row. A loop that leaves early (break, continue, return) stays a loop",
+        ".agents/skills/vv-effect/SKILL.md",
+      ),
+    },
+  },
+  create(context) {
+    /** Whether n, not counting functions inside it, holds a node of one of these types. */
+    const holds = (n: unknown, types: readonly string[]): boolean => {
+      if (n === null || typeof n !== "object") return false;
+      const node = n as { type?: unknown };
+      if (typeof node.type === "string") {
+        if (types.includes(node.type)) return true;
+        if (node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression" || node.type === "FunctionDeclaration") return false;
+      }
+      return Object.entries(n).some(([k, v]) => k !== "parent" && (Array.isArray(v) ? v.some((c) => holds(c, types)) : holds(v, types)));
+    };
+    return {
+      ForOfStatement(node) {
+        if (holds(node.body, ["YieldExpression"]) && !holds(node.body, ["BreakStatement", "ContinueStatement", "ReturnStatement"]))
+          context.report({ node, messageId: "loop" });
+      },
+    };
+  },
+});
+
+const scopedFibers = defineRule({
+  meta: {
+    messages: {
+      detached: says(
+        "Effect.{{name}} starts a fiber no scope owns: it outlives the service that started it, and a test's end does not stop it",
+        "`Effect.forkScoped` (the service's scope), `FiberSet.run` / `FiberMap.run` / `FiberHandle.run` for the service's own sets, `FiberSet.makeRuntime` for a callback; a fiber that must outlive its caller on purpose says why in a disable comment",
+        "docs/subsystems/foundation.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (
+          c.type === "MemberExpression" &&
+          c.object.type === "Identifier" &&
+          c.object.name === "Effect" &&
+          c.property.type === "Identifier" &&
+          ["forkDetach", "forkDaemon", "runFork", "runForkWith"].includes(c.property.name)
+        )
+          context.report({ node, messageId: "detached", data: { name: c.property.name } });
+      },
+    };
+  },
+});
+
+const clockInEffect = defineRule({
+  meta: {
+    messages: {
+      unsafe: says(
+        "currentTimeMillisUnsafe in an Effect generator reads the time outside Effect, where a test's Clock and the trace do not see it",
+        "`yield* Clock.currentTimeMillis`; currentTimeMillisUnsafe is for a synchronous callback (an outside library's, a timer's) that cannot yield",
+        "docs/subsystems/foundation.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type !== "MemberExpression" || c.property.type !== "Identifier" || c.property.name !== "currentTimeMillisUnsafe") return;
+        // The nearest function: a generator yields; any other is a callback, where the unsafe read is the way.
+        let at: ESTree.Node = node.parent;
+        while (at.type !== "FunctionExpression" && at.type !== "ArrowFunctionExpression" && at.type !== "FunctionDeclaration" && at.type !== "Program")
+          at = at.parent;
+        if ((at.type === "FunctionExpression" || at.type === "FunctionDeclaration") && at.generator) context.report({ node, messageId: "unsafe" });
+      },
+    };
+  },
+});
+
+const syncFs = defineRule({
+  meta: {
+    messages: {
+      sync: says(
+        "{{name}} holds the event loop while it reads or writes, so every helper's stream and every request waits on the disk",
+        "`yield* FileSystem.FileSystem` and its readFileString, writeFileString, rename, readDirectory…; a file the server keeps is a `keptFile` (infra/files.ts); a callback outside Effect uses node:fs/promises",
+        "apps/server/src/infra/files.ts",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value !== "node:fs" && node.source.value !== "fs") return;
+        for (const s of node.specifiers)
+          if (s.type === "ImportSpecifier" && s.imported.type === "Identifier" && s.imported.name.endsWith("Sync"))
+            context.report({ node: s, messageId: "sync", data: { name: s.imported.name } });
+      },
+    };
+  },
+});
+
+const droppedTimer = defineRule({
+  meta: {
+    messages: {
+      dropped: says(
+        "a timer whose handle is dropped cannot be cleared, so it still fires after the part that set it is gone",
+        "`useTimeout()` or `useInterval(fn, ms)` from `@/base/timer` in a component; in an effect, keep the handle and return `() => clearTimeout(t)`; a store that lives as long as the page keeps the handle too, or says why it need not with a disable comment",
+        "apps/web/src/base/timer.ts",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type !== "Identifier" || (c.name !== "setTimeout" && c.name !== "setInterval")) return;
+        if (node.parent.type === "ExpressionStatement") context.report({ node, messageId: "dropped" });
+      },
+    };
+  },
+});
+
+const childProcessDoor = defineRule({
+  meta: {
+    messages: {
+      spawn: says(
+        "a process started here is one more place that must kill its whole group on a timeout and keep what it printed, which the doors already do",
+        "git through `apps/server/src/project/git.ts` (tests: `gitSync`, `gitIn` in `apps/server/src/testing/git.ts`), a helper's command through `runtime/dsh.ts`; a new kind of process gets its own door, added to the list in vite.config.ts",
+        "docs/subsystems/foundation.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      ImportDeclaration(node) {
+        if ((node.source.value === "node:child_process" || node.source.value === "child_process") && node.importKind !== "type")
+          context.report({ node, messageId: "spawn" });
+      },
+    };
+  },
+});
+
+const atomDoor = defineRule({
+  meta: {
+    messages: {
+      atom: says(
+        "Atom's API is marked unstable, and only apps/web/src/state may stand on it, so that a change in it is fixed in one folder",
+        "read through state: `useAtom`, `useRegistry` (state/atom.ts), `defineIntent`, `useIntents` (state/intent.ts); a primitive state lacks goes into state",
+        "docs/subsystems/app.md",
+      ),
+    },
+  },
+  create(context) {
+    const file = context.filename.replaceAll("\\", "/");
+    if (!file.includes("/apps/web/src/") || file.includes("/apps/web/src/state/")) return {};
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value === "effect/reactivity" || node.source.value.startsWith("effect/reactivity/")) context.report({ node, messageId: "atom" });
+      },
+    };
+  },
+});
+
+const solidStores = new Set(["createSignal", "createStore"]);
+
+const pageStore = defineRule({
+  meta: {
+    messages: {
+      store: says(
+        "`{{call}}` outside any function is a store of the page's kept by hand: plain code cannot hear it, a test cannot reset it, and it is a second way of keeping what the page keeps in atoms",
+        "make it an atom of the page's: `const x = defineAtom(initial)` (state/atom.ts), read `x.get()` (it follows in Solid), write `x.set(v)` or `x.update(f)`; a choice kept on this machine is `defineStored(name, schema, fallback)` (state/stored.ts); a value one component owns is made in that component",
+        "apps/web/src/state/atom.ts",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type !== "Identifier" || !solidStores.has(c.name) || ownerOf(node)) return;
+        context.report({ node, messageId: "store", data: { call: c.name } });
+      },
+    };
+  },
+});
+
+const storages = new Set(["localStorage", "sessionStorage"]);
+
+const storedDoor = defineRule({
+  meta: {
+    messages: {
+      storage: says(
+        "`{{name}}` reached by hand: what it reads is not decoded, a storage that throws (a private window, a full one) breaks the page, the key is outside the page's namespace, and no other reader hears the change",
+        "keep the choice with `defineStored(name, schema, fallback)` (state/stored.ts) and read and set it like any page value; a struct whose fields fall back one by one uses `orFallback`",
+        "apps/web/src/state/stored.ts",
+      ),
+    },
+  },
+  create(context) {
+    const file = context.filename.replaceAll("\\", "/");
+    if (file.endsWith("/apps/web/src/state/stored.ts")) return {};
+    return {
+      Identifier(node) {
+        if (!storages.has(node.name)) return;
+        const parent = node.parent;
+        // A property named so on some other object (`x.localStorage` off window or globalThis still counts) or a key.
+        if (parent?.type === "MemberExpression" && parent.property === node && !parent.computed) {
+          const owner = parent.object;
+          if (!(owner.type === "Identifier" && (owner.name === "window" || owner.name === "globalThis" || owner.name === "self"))) return;
+        }
+        if (parent?.type === "Property" && parent.key === node && !parent.computed) return;
+        context.report({ node, messageId: "storage", data: { name: node.name } });
+      },
+    };
+  },
+});
+
+/** The client's methods that only read: everything else changes something on the server. */
+const readVerbs = new Set(["list", "get", "search", "recall", "validate"]);
+
+/** api.a.b.verb(…): the verb, when the chain starts at the identifier `api`. */
+function apiVerb(callee: ESTree.Node): string | undefined {
+  if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return undefined;
+  let at: ESTree.Node = callee.object;
+  while (at.type === "MemberExpression") at = at.object;
+  return at.type === "Identifier" && at.name === "api" ? callee.property.name : undefined;
+}
+
+/** A call x.run(…) given `fn` among its arguments. */
+const isRunOf = (call: unknown, fn: object): boolean => {
+  if (typeof call !== "object" || call === null || !("type" in call) || call.type !== "CallExpression") return false;
+  if (!("arguments" in call) || !Array.isArray(call.arguments) || !call.arguments.includes(fn) || !("callee" in call)) return false;
+  const callee = call.callee;
+  if (typeof callee !== "object" || callee === null || !("type" in callee) || callee.type !== "MemberExpression" || !("property" in callee)) return false;
+  const property = callee.property;
+  return typeof property === "object" && property !== null && "name" in property && property.name === "run";
+};
+
+/** Some function around the node is handed to x.run(…). */
+function insideRun(node: { parent?: unknown }): boolean {
+  for (let owner = ownerOf(node); owner; owner = ownerOf(owner.fn)) if (isRunOf(owner.parent, owner.fn)) return true;
+  return false;
+}
+
+const actDoor = defineRule({
+  meta: {
+    messages: {
+      act: says(
+        "`api.{{call}}` changes something on the server straight from a component: it has no busy, no refusal in the error tone, and goes out while the state stream is lost",
+        "hand it to an Act (`const act = createAct()` from ui/act.ts, `createPixelAct()` in a skin; `act.run(() => api.{{call}}(…))`), or, when the page shows the change before the server has it, send it through an intent defined in the feature's .ts (`defineIntent`, state/intent.ts) with an overlay of its own",
+        "apps/web/src/ui/act.ts",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const verb = apiVerb(node.callee);
+        if (verb === undefined || readVerbs.has(verb) || verb.startsWith("preview") || insideRun(node)) return;
+        context.report({
+          node,
+          messageId: "act",
+          data: {
+            call: context.sourceCode
+              .getText(node.callee)
+              .replaceAll(/\s+/gu, "")
+              .replace(/^api\./u, ""),
+          },
+        });
+      },
+    };
+  },
+});
+
+const failureTone = defineRule({
+  meta: {
+    messages: {
+      tone: says(
+        "a refusal said in the plain tone reads like news, and the owner misses that it did not happen",
+        'give the workbench\'s toast the error tone (`toast(reasonOf(e), "bad")`), the pixel one the error type (`toasts.add({ type: ToastType.error, … })`); or run the call through an Act (ui/act.ts), which says refusals so',
+        "apps/web/src/ui/act.ts",
+      ),
+    },
+  },
+  create(context) {
+    const saysReason = (n: ESTree.Node | undefined) => n !== undefined && /\breasonOf\(/u.test(context.sourceCode.getText(n));
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        const [first, second] = node.arguments;
+        if (c.type === "Identifier" && c.name === "toast") {
+          if (saysReason(first) && !(second?.type === "Literal" && second.value === "bad")) context.report({ node, messageId: "tone" });
+          return;
+        }
+        const pixel =
+          c.type === "MemberExpression" &&
+          c.object.type === "Identifier" &&
+          c.object.name === "toasts" &&
+          c.property.type === "Identifier" &&
+          c.property.name === "add";
+        if (!pixel || first?.type !== "ObjectExpression" || !saysReason(first)) return;
+        const type = first.properties.find((p) => p.type === "Property" && p.key.type === "Identifier" && p.key.name === "type");
+        const error = type?.type === "Property" && /^(?:ToastType\.error|"error")$/u.test(context.sourceCode.getText(type.value));
+        if (!error) context.report({ node, messageId: "tone" });
       },
     };
   },
@@ -814,7 +1197,19 @@ const serviceMethodNames = defineRule({
     const returns = new Map<Node, Node[]>();
     const services: { service: string; object: ESTree.ObjectExpression }[] = [];
 
-    const resolve = (n: Node): Node => (n.type === "Identifier" ? (consts.get(n.name) ?? n) : n);
+    /** A name's initialiser, or a member of an object literal a name holds in this file (`helpers.m`, a method handed
+     * over from a sibling object). */
+    const resolve = (n: Node): Node => {
+      if (n.type === "Identifier") return consts.get(n.name) ?? n;
+      if (n.type !== "MemberExpression" || n.computed || n.object.type !== "Identifier" || n.property.type !== "Identifier") return n;
+      const held = consts.get(n.object.name);
+      const name = n.property.name;
+      const member =
+        held?.type === "ObjectExpression"
+          ? held.properties.find((p) => p.type === "Property" && !p.computed && p.key.type === "Identifier" && p.key.name === name)
+          : undefined;
+      return member?.type === "Property" ? resolve(member.value) : n;
+    };
     const returnedBy = (fn: Node): Node[] => {
       if (fn.type === "ArrowFunctionExpression" && fn.body.type !== "BlockStatement") return [fn.body];
       return returns.get(fn) ?? [];
@@ -979,6 +1374,17 @@ export default definePlugin({
     "page-layers": pageLayersRule,
     "parent-import": parentImportRule,
     "db-door": dbDoor,
+    "child-process-door": childProcessDoor,
+    "dropped-timer": droppedTimer,
+    "sync-fs": syncFs,
+    "clock-in-effect": clockInEffect,
+    "scoped-fibers": scopedFibers,
+    "yield-in-loop": yieldInLoop,
+    "atom-door": atomDoor,
+    "page-store": pageStore,
+    "stored-door": storedDoor,
+    "act-door": actDoor,
+    "failure-tone": failureTone,
     "promise-boundary": promiseBoundary,
     "try-promise-catch": tryPromiseCatch,
     "one-absent": oneAbsent,

@@ -4,15 +4,18 @@
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Artifact, type ArtifactVersion, artifactPath } from "@vibevalley/protocol";
+import { type Artifact, type ArtifactVersion, artifactPath, type SayRequest } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
 import { ago } from "@/base/format";
-import { useCore } from "@/base/frame";
-import { queries, ready } from "@/base/query";
-import { useRouter, useSearch } from "@/base/router";
 import { Keyed, useNow } from "@/base/util";
+import { api, reasonOf } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { queries, ready } from "@/infra/query";
+import { useRouter, useSearch } from "@/infra/router";
+import { defineAtom } from "@/state/atom";
+import { type IntentType, sendOnce, useIntents } from "@/state/intent";
 import { A } from "@/ui/A";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Empty } from "@/ui/Empty";
 import { TextArea } from "@/ui/Field";
@@ -34,10 +37,14 @@ const messageHref = (at: { readonly channel: string; readonly number?: number })
   at.number !== undefined ? `/chat/${at.channel}?m=${at.number}` : `/chat/${at.channel}`;
 
 /** The one just made with 新建: its title is selected to be typed over when it opens. */
-const [justMade, setJustMade] = createSignal<string>();
+const justMade = defineAtom<string | undefined>(undefined);
 
 /** `rest` is the path after /artifacts/. */
-export function ArtifactsPage(props: { rest: string }) {
+/** The owner's lines in a channel (features/channel's chatSay), given by app/: the channel feature shows artifacts, so this
+ * one does not import it back. */
+export type ChatSay = IntentType<Omit<SayRequest, "sendKey">, void>;
+
+export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
   const router = useRouter();
   const now = useNow();
   const all = useArtifacts(() => ({}));
@@ -49,16 +56,14 @@ export function ArtifactsPage(props: { rest: string }) {
   };
   const id = () => (props.rest ? decodeURIComponent(props.rest) : undefined);
   const open = () => id() ?? list()[0]?.id;
-  const create = async () => {
-    try {
+  const making = createAct();
+  const create = () =>
+    making.run(async () => {
       const made = await api.artifact.create({ title: t("web.artifact.page.untitled") });
-      setJustMade(made.id);
+      justMade.set(made.id);
       await queries.invalidateQueries({ queryKey: ["artifacts"] });
       router.navigate(artifactHref(made.id));
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-    }
-  };
+    });
   return (
     <div class="flex h-full min-h-0 flex-col gap-3 p-3 lg:flex-row">
       <nav
@@ -78,7 +83,7 @@ export function ArtifactsPage(props: { rest: string }) {
               class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
             />
           </label>
-          <Button tone="primary" icon="add" data-testid="new-artifact" onClick={() => void create()}>
+          <Button tone="primary" icon="add" data-testid="new-artifact" disabled={making.busy()} onClick={() => void create()}>
             {t("web.artifact.page.new")}
           </Button>
         </div>
@@ -135,7 +140,7 @@ export function ArtifactsPage(props: { rest: string }) {
               <Empty
                 icon="artifacts"
                 action={
-                  <Button icon="add" onClick={() => void create()}>
+                  <Button icon="add" disabled={making.busy()} onClick={() => void create()}>
                     {t("web.artifact.page.new")}
                   </Button>
                 }
@@ -145,14 +150,14 @@ export function ArtifactsPage(props: { rest: string }) {
             </Show>
           }
         >
-          {(o) => <Keyed key={o()}>{() => <Opened id={o()} />}</Keyed>}
+          {(o) => <Keyed key={o()}>{() => <Opened id={o()} say={props.say} />}</Keyed>}
         </Show>
       </div>
     </div>
   );
 }
 
-function Opened(props: { id: string }) {
+function Opened(props: { id: string; say: ChatSay }) {
   const found = useArtifact(() => props.id);
   return (
     <Show
@@ -163,7 +168,7 @@ function Opened(props: { id: string }) {
         </Show>
       }
     >
-      {(a) => <Shown artifact={a()} />}
+      {(a) => <Shown artifact={a()} say={props.say} />}
     </Show>
   );
 }
@@ -172,21 +177,22 @@ function Opened(props: { id: string }) {
 function Title(props: { artifact: Artifact }) {
   const [text, setText] = createSignal(untrack(() => props.artifact.title));
   // Taken while the component is made: a ref runs where the props may not be read yet.
-  const initialFresh = untrack(justMade) === untrack(() => props.artifact.id);
+  const initialFresh = untrack(justMade.get) === untrack(() => props.artifact.id);
   let field!: HTMLInputElement;
+  const act = createAct();
   const save = async () => {
     const title = text().trim();
+    const id = props.artifact.id;
     if (!title || title === props.artifact.title) {
       setText(props.artifact.title);
       return;
     }
-    try {
-      await api.artifact.update({ id: props.artifact.id, title });
+    const done = await act.run(async () => {
+      await api.artifact.update({ id, title });
       void queries.invalidateQueries({ queryKey: ["artifacts"] });
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-      setText(props.artifact.title);
-    }
+      return true;
+    });
+    if (done !== true) setText(props.artifact.title);
   };
   return (
     <input
@@ -194,7 +200,7 @@ function Title(props: { artifact: Artifact }) {
         field = el;
         if (initialFresh)
           queueMicrotask(() => {
-            setJustMade(undefined);
+            justMade.set(undefined);
             field.focus();
             field.select();
           });
@@ -218,7 +224,7 @@ function Title(props: { artifact: Artifact }) {
   );
 }
 
-function Shown(props: { artifact: Artifact }) {
+function Shown(props: { artifact: Artifact; say: ChatSay }) {
   const search = useSearch();
   const router = useRouter();
   const core = useCore();
@@ -235,17 +241,16 @@ function Shown(props: { artifact: Artifact }) {
     await navigator.clipboard.writeText(location.origin + artifactHref(props.artifact.id));
     toast(t("web.artifact.page.copied"));
   };
-  const remove = async () => {
-    try {
-      const title = props.artifact.title;
-      await api.artifact.delete({ id: props.artifact.id });
+  const removing = createAct();
+  const remove = () => {
+    const { id, title } = props.artifact;
+    return removing.run(async () => {
+      await api.artifact.delete({ id });
       // Away first: refreshed, this view's own read fails and it is gone before it could move on.
       router.navigate("/artifacts");
       toast(t("web.artifact.page.deleted", { title }));
       void queries.invalidateQueries({ queryKey: ["artifacts"] });
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-    }
+    });
   };
   const openTab = () => {
     const v = version();
@@ -375,7 +380,7 @@ function Shown(props: { artifact: Artifact }) {
                     {t("web.artifact.talk.atMessage")}
                   </A>
                 </div>
-                <Reply at={at()} version={version()} />
+                <Reply at={at()} version={version()} say={props.say} />
               </div>
             )}
           </Show>
@@ -386,22 +391,19 @@ function Shown(props: { artifact: Artifact }) {
 }
 
 /** A reply under the message that announced it (or the version shown): what its maker is woken with. */
-function Reply(props: { at: { readonly channel: string; readonly number?: number }; version?: ArtifactVersion | undefined }) {
+function Reply(props: { at: { readonly channel: string; readonly number?: number }; version?: ArtifactVersion | undefined; say: ChatSay }) {
   const [text, setText] = createSignal("");
   const [busy, setBusy] = createSignal(false);
+  const says = useIntents(untrack(() => props.say));
   const send = async () => {
     const words = text().trim();
     if (!words || busy()) return;
     setBusy(true);
-    try {
-      await api.channel.message.send({ id: props.at.channel, text: words, ...(props.at.number !== undefined ? { replyTo: props.at.number } : {}) });
-      setText("");
-      toast(props.version ? t("web.artifact.talk.sentVersion", { version: props.version.version }) : t("web.artifact.talk.sent"));
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-    } finally {
-      setBusy(false);
-    }
+    const end = await sendOnce(says, { id: props.at.channel, text: words, ...(props.at.number !== undefined ? { replyTo: props.at.number } : {}) });
+    setBusy(false);
+    if (end?.status === "failed") return toast(end.reason ?? "", "bad");
+    setText("");
+    toast(props.version ? t("web.artifact.talk.sentVersion", { version: props.version.version }) : t("web.artifact.talk.sent"));
   };
   return (
     <form

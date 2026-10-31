@@ -7,6 +7,11 @@ import type { Brand } from "effect";
 export type IssueId = string & Brand.Brand<"IssueId">;
 /** A session's id: w1, w2…, for the whole life of the farm. */
 export type SessionId = string & Brand.Brand<"SessionId">;
+/** An artifact's id. */
+export type ArtifactId = string & Brand.Brand<"ArtifactId">;
+/** A block's id, within its artifact: a block op names the block it is for, never its artifact. */
+export type BlockId = string & Brand.Brand<"BlockId">;
+export type MessageId = string & Brand.Brand<"MessageId">;
 
 /** The built-in orchestrator's profile id: it cannot be deleted or made a helper, so a farm always has an orchestrator, and
  * what names none goes to it (the phone, a task graph's news, a channel with no orchestrator of its own). */
@@ -206,7 +211,7 @@ export interface Spent {
 }
 
 export interface ChatMessage {
-  id: string;
+  id: MessageId;
   number: number;
   channel: string;
   from: string;
@@ -287,7 +292,7 @@ export const artifactPath = (id: string, version: number) => `${artifactPrefix}$
 
 /** What a message says of the artifact it announces. */
 export interface ArtifactCard {
-  id: string;
+  id: ArtifactId;
   title: string;
   body: ArtifactBody;
   /** html: the version announced; blocks: 0. */
@@ -310,7 +315,7 @@ export interface ArtifactVersion {
 }
 
 export interface Artifact {
-  id: string;
+  id: ArtifactId;
   title: string;
   body: ArtifactBody;
   /** The channel or thread it was announced in; none for one the owner started on the page. */
@@ -343,7 +348,7 @@ export interface ArtifactRequest {
 }
 
 export interface ArtifactVersionRequest {
-  id: string;
+  id: ArtifactId;
   content: string;
   note?: string;
 }
@@ -355,7 +360,7 @@ export interface ArtifactListRequest {
 
 /** A version's words; the latest when version is absent. */
 export interface ArtifactReadRequest {
-  id: string;
+  id: ArtifactId;
   version?: number;
 }
 
@@ -391,7 +396,7 @@ export interface Channel {
   /** What of it counts for the owner; absent is all. */
   notify?: Notify;
   /** The message a thread hangs under, and its number there. */
-  root?: string;
+  root?: MessageId;
   rootNumber?: number;
   name?: string;
   description: string;
@@ -860,6 +865,9 @@ export interface FarmView {
 export type GameEffect = GameEffectReward | GameEffectPenalty | GameEffectLevelUp | GameEffectAchievement;
 
 export interface StateFrame {
+  /** Goes up by one with every commit the core folds (Core.apply that changed the state): this frame shows every fold up
+   * to it. A reply carrying a seq (AppliedIssue) is shown by the first frame whose seq is at least that one. */
+  seq: number;
   state: WorkspaceView;
   inbox: InboxItem[];
   graphs: TaskGraph[];
@@ -1146,6 +1154,9 @@ export type MemoryKind = (typeof MemoryKindValues)[number];
 export interface MemoryRequest {
   text: string;
   project?: string;
+  /** The client's key for this request: the same key again within a while returns the first one's result and does it
+   * once (a retry after a lost reply). At most 64 characters. */
+  requestKey?: string;
 }
 
 /** Where a memory holds: for every project, one project, or a source that does not say. */
@@ -1370,6 +1381,18 @@ export interface Issue {
   attention: IssueAttention;
 }
 
+/** A change with nothing to answer but when it shows (issue.comment.create): the seq of the core's fold read once it was
+ * made, so the first frame whose seq is at least this one shows whatever it changed. */
+export interface Applied {
+  seq: number;
+}
+
+/** An issue as a change left it (issue.create, issue.update, issue.status.update), with the seq of the core's fold that
+ * includes the change: the first frame whose seq is at least this one shows it. */
+export interface AppliedIssue extends Issue {
+  seq: number;
+}
+
 /** What an answer issue concludes, as its helper hands it back: the conclusion, what it rests on (files and lines, commands
  * and what they printed), what it is unsure of, and what to do next. */
 export interface IssueAnswer {
@@ -1534,6 +1557,9 @@ export interface IssueRequest {
   assignee?: string;
   priority?: Priority;
   deliver?: Deliverable;
+  /** The client's key for this request: the same key again within a while returns the first one's result and does it
+   * once (a retry after a lost reply). At most 64 characters. */
+  requestKey?: string;
 }
 
 /** What an issue delivers: a change (its branch, merged into the project or by a pull request), a change kept on its
@@ -2434,6 +2460,9 @@ export interface IssueStatusRequest {
   assignee?: string;
   /** Fields the owner changed and has not saved: saved first, so the act sees them. */
   edit?: IssueUpdate;
+  /** The client's key for this request: the same key again within a while returns the first one's result and does it
+   * once (a retry after a lost reply). At most 64 characters. */
+  requestKey?: string;
 }
 
 export interface GraphActRequest {
@@ -2551,8 +2580,8 @@ export interface BlockAttrs {
 
 /** The content and position decided by the author of a new block. */
 export interface BlockInput {
-  id: string;
-  parentId?: string;
+  id: BlockId;
+  parentId?: BlockId;
   orderKey: string;
   type: BlockType;
   attrs: BlockAttrs;
@@ -2560,7 +2589,7 @@ export interface BlockInput {
 }
 
 export interface Block extends BlockInput {
-  artifactId: string;
+  artifactId: ArtifactId;
   rev: number;
   deleted?: boolean;
   updatedBy: string;
@@ -2595,45 +2624,45 @@ export interface BlockOpInsertBlock {
 
 export interface BlockOpUpdateText {
   op: "update_text";
-  blockId: string;
+  blockId: BlockId;
   baseRev: number;
   text: TextSpan[];
 }
 
 export interface BlockOpSetAttrs {
   op: "set_attrs";
-  blockId: string;
+  blockId: BlockId;
   attrs: BlockAttrs;
   unset?: string[];
 }
 
 export interface BlockOpSetType {
   op: "set_type";
-  blockId: string;
+  blockId: BlockId;
   type: BlockType;
   attrs: BlockAttrs;
 }
 
 export interface BlockOpMoveBlock {
   op: "move_block";
-  blockId: string;
-  parentId?: string;
+  blockId: BlockId;
+  parentId?: BlockId;
   orderKey: string;
 }
 
 export interface BlockOpDeleteBlock {
   op: "delete_block";
-  blockId: string;
+  blockId: BlockId;
 }
 
 export interface BlockOpRestoreBlock {
   op: "restore_block";
-  blockId: string;
+  blockId: BlockId;
 }
 
 export interface BlockOpSplitBlock {
   op: "split_block";
-  blockId: string;
+  blockId: BlockId;
   baseRev: number;
   offset: number;
   newBlock: BlockInput;
@@ -2641,8 +2670,8 @@ export interface BlockOpSplitBlock {
 
 export interface BlockOpMergeBlocks {
   op: "merge_blocks";
-  targetId: string;
-  sourceId: string;
+  targetId: BlockId;
+  sourceId: BlockId;
 }
 
 export interface BlockSubmit {
@@ -2665,14 +2694,14 @@ export interface BlockCreate {
 
 /** A block's text rewritten against the rev it was read at: a newer rev is a conflict, not an overwrite. */
 export interface BlockUpdate {
-  block: string;
+  block: BlockId;
   baseRev: number;
   text: string;
 }
 
 export interface BlockOpResult {
   status: BlockOpStatus;
-  blockId: string;
+  blockId: BlockId;
   rev?: number;
   text?: TextSpan[];
   yours?: TextSpan[];
@@ -2687,7 +2716,7 @@ export interface BlockAck {
 }
 
 export interface MessageEdit {
-  id: string;
+  id: MessageId;
   text: string;
   /** The files it keeps: absent keeps them all, a shorter list takes the others off. */
   attachments?: string[];
@@ -2698,9 +2727,17 @@ export interface NotifyRequest {
   notify: Notify;
 }
 
-export interface ReactionToggle {
-  id: string;
+/** The owner's reaction on (added) or off (taken back); setting it as it already is changes nothing. */
+export interface ReactionSet {
+  id: MessageId;
   emoji: string;
+  on: boolean;
+}
+
+/** A channel archived (on), or not; setting it as it already is changes nothing. */
+export interface OnSet {
+  id: string;
+  on: boolean;
 }
 
 /** At most attachmentMax bytes, as base64. */

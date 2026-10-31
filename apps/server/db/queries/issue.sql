@@ -1,6 +1,7 @@
 -- Issues (issue/issue.ts).
 
 -- name: ListIssues :many
+-- bound: every issue, as the core holds them.
 select * from issue order by rank, created_at, id;
 
 -- name: GetIssue :one
@@ -66,6 +67,7 @@ where closed_at is null or id in (select id from latest) or parent in (select id
    or parent in (select id from issue where closed_at is null);
 
 -- name: Family :many
+-- bound: one issue and its sub-issues.
 -- An issue and its sub-issues.
 select * from issue where id = sqlc.arg(id) or parent = sqlc.arg(id);
 
@@ -81,6 +83,7 @@ on conflict (id) do update set
   graph = excluded.graph, task = excluded.task;
 
 -- name: GraphIDs :many
+-- bound: only issues that are a plan's graph.
 select id from issue where graph is not null;
 
 -- name: LatestOfCron :one
@@ -95,6 +98,7 @@ update issue set assignee = sqlc.arg(assignee) where id = sqlc.arg(id);
 update issue set closed_at = null, delivered = null, canceled = null, queued_at = null, checks = null, last_run = null where id = sqlc.arg(id);
 
 -- name: OpenOf :many
+-- bound: one assignee's open issues.
 select id, last_run from issue where assignee = sqlc.arg(assignee) and closed_at is null;
 
 -- name: SetIssueAnswer :exec

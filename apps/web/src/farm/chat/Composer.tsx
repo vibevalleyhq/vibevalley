@@ -1,23 +1,24 @@
 // The farm chat's input row, at the foot of the unfolded phone's right screen: who the next job goes to, the box (Enter
 // sends, Shift+Enter starts a line, @ names someone), dictation, and the stop button while the orchestrator thinks. Calling
-// the orchestrator is the phone's (its 管家), so the row has no call key. A failed
-// send keeps the draft and its key, so a retry is the same message, not a second one.
+// the orchestrator is the phone's (its 管家), so the row has no call key. A line sent shows in the window above
+// (ChatWindow) until it is in the channel; a failed one stays there with its key, to send again as the same message.
 
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 
-import { useAgent } from "@/base/agents";
-import { api } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { setPick, usePrefs } from "@/base/prefs";
-import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
-import { createComposer, draftOf, drafts, threadOwnerOf } from "@/features/channel";
+import { chatSay, createComposer, drafts, threadOwnerOf, useReplying } from "@/features/channel";
 import { DictationButton } from "@/features/voice";
+import { useAgent } from "@/infra/agents";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
+import { useIntents } from "@/state/intent";
+import { setPick, usePrefs } from "@/state/prefs";
 import { AgentFace } from "@/ui/Face";
-import { SpriteIcon } from "@/ui/pixel";
+import { createPixelAct, SpriteIcon } from "@/ui/pixel";
 import { toasts } from "@/ui/pixel/toasts";
 
 /** Who the next line goes to, with a button to stop picking. */
@@ -65,14 +66,14 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
 
   const router = useRouter();
 
+  const replying = useReplying(() => props.channel?.id);
   const box = createComposer(core, () => input, {
     target: () => {
-      const reply = draftOf(props.channel?.id).reply;
+      const reply = replying();
       const agent = props.thread || pick() === "auto" ? undefined : pick();
       return { id: props.channel?.id ?? "", ...(agent ? { agent } : {}), ...(reply ? { replyTo: reply.number } : {}) };
     },
-    // The farm's window draws the line at once (ChatWindow), so the box empties as it is sent.
-    echo: true,
+    says: useIntents(chatSay),
     failed: (reason) => props.onProblem(t("web.farm.chat.notSent", { why: reason })),
     told: (say) => toasts.add({ title: say }),
     opened: (path) => router.navigate(path),
@@ -82,7 +83,11 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
       if (id) drafts.reply(id, undefined);
     },
   });
-  const replying = () => draftOf(props.channel?.id).reply;
+  const stopping = createPixelAct();
+  const stop = () => {
+    const agent = box.here();
+    return stopping.run(() => api.orchestrator.stop({ agent }));
+  };
 
   return (
     <div data-testid="composer" data-key={props.channel?.id} class="relative flex flex-col border-t border-cream-200 p-1.5">
@@ -151,7 +156,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
               data-testid="stop"
               aria-label={t("web.farm.chat.stop")}
               title={t("web.farm.chat.stopHint")}
-              onClick={() => void api.orchestrator.stop({ agent: box.here() }).catch(() => {})}
+              onClick={() => void stop()}
               class="cursor-pointer p-1"
             >
               <SpriteIcon name="button-stop" size={24} />

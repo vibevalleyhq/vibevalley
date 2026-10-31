@@ -5,25 +5,30 @@ import { t } from "@vibevalley/i18n";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
 import { plainText } from "@vibevalley/protocol/rules";
 
-import { useAgent, useOrchestrators } from "@/base/agents";
-import { api } from "@/base/api";
 import { tookText, spentText } from "@/base/format";
-import { useCore } from "@/base/frame";
-import { useRouter } from "@/base/router";
 import { aria, useNow } from "@/base/util";
 import { ArtifactCard } from "@/features/artifact";
 import { RunSteps } from "@/features/session";
+import { useAgent, useOrchestrators } from "@/infra/agents";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
+import { useIntents } from "@/state/intent";
+import { useLatest } from "@/state/latest";
 import { A } from "@/ui/A";
-import { OrchestratorFace } from "@/ui/Face";
+import { OrchestratorFace, OwnerFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
 import type { IconName } from "@/ui/icons";
 import { Markdown } from "@/ui/Markdown";
 import { Tag, type TagTone } from "@/ui/Tag";
+import { toast } from "@/ui/toasts";
 
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots } from "./bits";
+import { chatSay, pendingLines } from "./composing";
 import { editingId, setEditingId } from "./draft";
 import { feedOf, orchestratorTyping, workbenchClock } from "./feed";
-import { followed, useFollowed, useMessage } from "./follow";
+import { followed, useMessage } from "./follow";
+import { useMarkedFollowed } from "./marks";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import { channelOf, messagePath, chatPath, parentAt } from "./places";
 import { phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
@@ -42,8 +47,11 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   const core = useCore();
   const router = useRouter();
   const id = () => props.channel?.id;
-  const said = useFollowed(id);
-  useMarkRead(() => props.channel);
+  const said = useMarkedFollowed(id);
+  useMarkRead(
+    () => props.channel,
+    (reason) => toast(reason, "bad"),
+  );
   let log: HTMLDivElement | undefined;
   // The message an address points at: older pages are read until it is among them, then it is scrolled to and lit up a
   // while. A string, so a change elsewhere in the list does not scroll again.
@@ -75,16 +83,27 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   const readTo = untrack(() => props.channel?.read ?? 0);
   const searching = () => (props.filter ?? "").trim() !== "";
   // A search is the server's, over the whole channel and its threads, not only the pages read here.
-  const [hits, setHits] = createSignal<readonly MessageHit[] | undefined>();
-  createEffect(
-    () => ({ text: (props.filter ?? "").trim(), at: id() }),
-    ({ text, at }) => {
-      setHits(undefined);
-      if (!text || !at) return;
-      const wait = setTimeout(() => void api.channel.message.search({ text, channel: at }).then(setHits, () => setHits([])), searchWaitMs);
-      return () => clearTimeout(wait);
+  const search = useLatest(
+    () => {
+      const text = (props.filter ?? "").trim();
+      const at = id();
+      // A string, so the same words in the same channel again ask nothing.
+      return text && at ? `${at}\n${text}` : undefined;
     },
+    (key) => {
+      const [channel = "", text = ""] = key.split("\n");
+      return api.channel.message.search({ text, channel });
+    },
+    searchWaitMs,
   );
+  const hits = (): readonly MessageHit[] | undefined => {
+    const a = search();
+    return a?.state === "done" ? a.value : undefined;
+  };
+  const searchFailed = () => {
+    const a = search();
+    return a?.state === "failed" ? a.reason : undefined;
+  };
   const items = createMemo(() =>
     searching()
       ? feedOf(
@@ -141,6 +160,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
         role="log"
         aria-label={t("web.channel.messages.label")}
         data-testid="messages"
+        data-read={props.channel?.read}
       >
         <div class="flex flex-col px-4 pt-3 pb-4">
           <div class="flex justify-center pb-2">
@@ -149,7 +169,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
               fallback={
                 <span class="text-xs text-muted">
                   {searching()
-                    ? hits() === undefined
+                    ? search()?.state !== "done" && searchFailed() === undefined
                       ? t("web.channel.messages.searching")
                       : t("web.channel.messages.containing", { text: (props.filter ?? "").trim() })
                     : t("web.channel.messages.start")}
@@ -168,7 +188,14 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
               </div>
             )}
           </Show>
-          <Show when={items().length === 0 && (!searching() || hits() !== undefined)}>
+          <Show when={searching() ? searchFailed() : said().error}>
+            {(why) => (
+              <p data-testid="messages-failed" class="py-8 text-center text-sm text-berry">
+                {searching() ? t("web.channel.messages.searchFailed", { why: why() }) : t("web.channel.messages.readFailed", { why: why() })}
+              </p>
+            )}
+          </Show>
+          <Show when={items().length === 0 && (searching() ? hits() !== undefined : !said().error)}>
             <p data-testid="messages-empty" class="py-8 text-center text-sm text-muted">
               {searching() ? t("web.channel.messages.notFound") : props.emptyText}
             </p>
@@ -218,6 +245,9 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
               </div>
             )}
           </For>
+          <Show when={!searching()}>
+            <PendingLines channel={id()} messages={said().messages} />
+          </Show>
           <Show when={typing()}>
             {(typer) => (
               <Frame
@@ -234,6 +264,50 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
         </div>
       </div>
     </div>
+  );
+}
+
+/** The owner's lines on their way here (composing.ts), under the messages: sending, or failed with a retry. */
+function PendingLines(props: { channel: string | undefined; messages: readonly ChatMessage[] }) {
+  const says = useIntents(chatSay);
+  const lines = createMemo(() => pendingLines(says.list(), props.channel, props.messages));
+  return (
+    <For each={lines()} keyed={(l) => l.key}>
+      {(l) => (
+        <div data-testid="pending-line" data-key={l().key} data-state={l().state} class={l().state === "sending" ? "opacity-60" : ""}>
+          <Frame
+            face={<OwnerFace size={36} />}
+            name={t("web.channel.messages.owner")}
+            meta={l().state === "sending" ? t("web.channel.messages.sending") : t("web.channel.messages.notSent")}
+          >
+            <p class="text-base break-words whitespace-pre-wrap">{l().text}</p>
+            <Show when={l().state === "failed"}>
+              <div class="mt-1 flex items-center gap-2 text-xs">
+                <span class="min-w-0 truncate text-berry">{l().reason ?? t("web.channel.messages.notSent")}</span>
+                <button
+                  type="button"
+                  data-testid="pending-retry"
+                  onClick={() => void says.retry(l().key)}
+                  class="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-muted hover:bg-hover hover:text-ink"
+                >
+                  <Icon name="retry" size={12} />
+                  {t("web.channel.messages.retrySend")}
+                </button>
+                <button
+                  type="button"
+                  data-testid="pending-drop"
+                  onClick={() => says.drop(l().key)}
+                  class="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-muted hover:bg-hover hover:text-ink"
+                >
+                  <Icon name="close" size={12} />
+                  {t("web.channel.messages.dropSend")}
+                </button>
+              </div>
+            </Show>
+          </Frame>
+        </div>
+      )}
+    </For>
   );
 }
 

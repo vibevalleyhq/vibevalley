@@ -1,8 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Layer, PubSub, type Scope, Stream } from "effect";
+import { Effect, Fiber, Layer, Metric, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type * as T from "@vibevalley/protocol";
@@ -12,9 +13,9 @@ import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import { head } from "@/base/clip.ts";
-import { ServerConfig } from "@/base/config.ts";
-import { Database, Db } from "@/base/db.ts";
 import { Core } from "@/core/core.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { dbQueries, Database, Db } from "@/infra/db.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { summaryOf } from "@/session/report.ts";
 import { sessionOnIssue } from "@/session/roster.ts";
@@ -138,6 +139,7 @@ const world = (x: FakeSessions, config: ServerConfig["Service"] = testConfig()) 
     Layer.provideMerge(Database),
     Layer.provideMerge(Layer.succeed(ServerConfig, c)),
     Layer.provideMerge(offline),
+    Layer.provideMerge(NodeServices.layer),
   );
 };
 
@@ -219,6 +221,21 @@ const run = <A, E>(
 };
 
 describe("the chat", () => {
+  // A budget, at what it takes today: one line from the owner in the general channel, written, delivered and told. A
+  // change that asks more fails here; one that asks less lowers it.
+  it.live("one line from the owner reads and writes the database a bounded number of times", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        yield* f.chat.say("先暖一下", undefined, "");
+        const before = (yield* Metric.value(dbQueries)).count;
+        yield* f.chat.say("今天进度怎么样", undefined, "");
+        const used = (yield* Metric.value(dbQueries)).count - before;
+        expect(used).toBeGreaterThan(0);
+        expect(used, `${used} queries`).toBeLessThanOrEqual(17);
+      }),
+    ),
+  );
+
   it.live("a dispatched issue opens a thread under its dispatch", () =>
     run((f, x) =>
       Effect.gen(function* () {
@@ -335,11 +352,17 @@ describe("the chat", () => {
         expect(f.channel(thread)?.title).toBe("细说");
         expect(yield* Effect.flip(f.chat.updateChannel(thread, { category: "x" }))).toMatchObject({ _tag: "Refused" });
 
-        yield* f.chat.archive(a);
-        expect(f.channel(a)?.archived).toBeDefined();
-        yield* f.chat.archive(a);
+        yield* f.chat.archive(a, true);
+        const archived = f.channel(a)?.archived;
+        expect(archived).toBeDefined();
+        // Set as it already is: nothing changes, not even when it was archived.
+        yield* f.chat.archive(a, true);
+        expect(f.channel(a)?.archived).toBe(archived);
+        yield* f.chat.archive(a, false);
         expect(f.channel(a)?.archived).toBeUndefined();
-        expect(yield* Effect.flip(f.chat.archive(f.chat.defaultChannel()))).toMatchObject({ _tag: "Refused" });
+        yield* f.chat.archive(a, false);
+        expect(f.channel(a)?.archived).toBeUndefined();
+        expect(yield* Effect.flip(f.chat.archive(f.chat.defaultChannel(), true))).toMatchObject({ _tag: "Refused" });
 
         yield* f.chat.speak(defaultOrchestrator, "随便说说", { target: "#前端", anyway: true, confirm: true });
         yield* f.chat.setNotify(a, "mentions");
@@ -364,6 +387,19 @@ describe("the chat", () => {
         expect((yield* f.chat.previewRemoveChannel(b)).does[0]).toContain("#bb");
         yield* f.chat.removeChannel(b);
         expect([f.channel(b), (yield* f.chat.channels()).map((c) => c.name)]).toEqual([undefined, ["general", "前端"]]);
+      }),
+    ),
+  );
+
+  it.effect("regression: deleting a channel forgets the last read of its child threads", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const channel = yield* f.chat.openChannel("temporary", "", "");
+        const root = (yield* f.chat.say("a thread", channel.id, "")).message;
+        yield* f.chat.threadUnder(root.id);
+        yield* f.chat.read(defaultOrchestrator, { target: `#temporary:${root.number}` });
+        yield* f.chat.removeChannel(channel.id);
+        expect((yield* f.chat.speak(defaultOrchestrator, "back here", { target: "#general", anyway: true })).kind).toBe("sent");
       }),
     ),
   );
@@ -715,10 +751,17 @@ describe("the chat", () => {
           expect([edited.text, edited.edited !== undefined, edited.revision > since]).toEqual(["改成这样", true, true]);
           const theirs = (yield* f.chat.speak(defaultOrchestrator, "我来看看", { anyway: true, confirm: true })).message!;
           expect(yield* Effect.flip(f.chat.edit(theirs.id, "不是你的"))).toMatchObject({ _tag: "Refused" });
-          const liked = yield* f.chat.react(theirs.id, "owner", "👍");
+          const liked = yield* f.chat.react(theirs.id, "owner", "👍", true);
           expect(liked.reactions).toEqual([{ emoji: "👍", by: ["owner"] }]);
-          expect((yield* f.chat.react(theirs.id, "owner", "👍")).reactions).toEqual([]);
-          expect((yield* f.chat.pin(reply.id)).pinned).toBeDefined();
+          // A set repeated (a retry) is no change: the same revision, the reaction once.
+          const again = yield* f.chat.react(theirs.id, "owner", "👍", true);
+          expect([again.reactions, again.revision]).toEqual([liked.reactions, liked.revision]);
+          const taken = yield* f.chat.react(theirs.id, "owner", "👍", false);
+          expect(taken.reactions).toEqual([]);
+          expect((yield* f.chat.react(theirs.id, "owner", "👍", false)).revision).toBe(taken.revision);
+          const pinned = yield* f.chat.pin(reply.id, true);
+          expect(pinned.pinned).toBeDefined();
+          expect((yield* f.chat.pin(reply.id, true)).revision).toBe(pinned.revision);
           expect((yield* f.chat.pins(general)).map((m) => m.id)).toEqual([reply.id]);
           expect((yield* f.chat.previewRemove(theirs.id)).does[0]).toContain(`第 ${theirs.number} 条`);
           yield* f.chat.remove(theirs.id);
@@ -754,13 +797,13 @@ describe("the chat", () => {
 
   it.live("regression: an attachment that cannot be kept is refused with the file system's own words", () => {
     const config = testConfig();
-    // A file where the attachments folder should be: making the folder fails with EEXIST.
+    // A file where the attachments folder should be: making the folder fails, already existing.
     writeFileSync(join(config.home, "attachments"), "");
     return run(
       (f) =>
         Effect.gen(function* () {
           const refusal = yield* Effect.flip(f.chat.attach({ name: "a.txt", type: "", data: Buffer.from("x").toString("base64") }));
-          expect(refusal).toMatchObject({ _tag: "Refused", reason: expect.stringContaining("EEXIST") });
+          expect(refusal).toMatchObject({ _tag: "Refused", reason: expect.stringContaining("AlreadyExists") });
         }),
       config,
     );

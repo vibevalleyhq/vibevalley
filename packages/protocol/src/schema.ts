@@ -11,9 +11,15 @@ type Codec<A> = Schema.Codec<A, Wire<A>>;
 
 export const IssueId: Codec<T.IssueId> = Schema.String.pipe(Schema.brand("IssueId"));
 export const SessionId: Codec<T.SessionId> = Schema.String.pipe(Schema.brand("SessionId"));
+export const ArtifactId: Codec<T.ArtifactId> = Schema.String.pipe(Schema.brand("ArtifactId"));
+export const BlockId: Codec<T.BlockId> = Schema.String.pipe(Schema.brand("BlockId"));
+export const MessageId: Codec<T.MessageId> = Schema.String.pipe(Schema.brand("MessageId"));
 /** An id minted, or taken from where the kind is known (a route, a row, a tool's argument for it). */
 export const issueId = Brand.nominal<T.IssueId>();
 export const sessionId = Brand.nominal<T.SessionId>();
+export const artifactId = Brand.nominal<T.ArtifactId>();
+export const blockId = Brand.nominal<T.BlockId>();
+export const messageId = Brand.nominal<T.MessageId>();
 
 export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
   installed: Schema.Boolean,
@@ -219,7 +225,7 @@ export const ArtifactBody: Codec<T.ArtifactBody> = Schema.Literals(T.ArtifactBod
 export const ArtifactKind: Codec<T.ArtifactKind> = Schema.Literals(T.ArtifactKindValues);
 
 export const ArtifactCard: Codec<T.ArtifactCard> = Schema.Struct({
-  id: Schema.String,
+  id: ArtifactId,
   title: Schema.String,
   body: ArtifactBody,
   version: Schema.Finite,
@@ -238,7 +244,7 @@ export const ArtifactVersion: Codec<T.ArtifactVersion> = Schema.Struct({
 });
 
 export const Artifact: Codec<T.Artifact> = Schema.Struct({
-  id: Schema.String,
+  id: ArtifactId,
   title: Schema.String,
   body: ArtifactBody,
   channel: Schema.optionalKey(Schema.String),
@@ -263,7 +269,7 @@ export const ArtifactRequest: Codec<T.ArtifactRequest> = Schema.Struct({
 });
 
 export const ArtifactVersionRequest: Codec<T.ArtifactVersionRequest> = Schema.Struct({
-  id: Schema.String,
+  id: ArtifactId,
   content: Schema.String,
   note: Schema.optionalKey(Schema.String),
 });
@@ -274,14 +280,14 @@ export const ArtifactListRequest: Codec<T.ArtifactListRequest> = Schema.Struct({
 });
 
 export const ArtifactReadRequest: Codec<T.ArtifactReadRequest> = Schema.Struct({
-  id: Schema.String,
+  id: ArtifactId,
   version: Schema.optionalKey(Schema.Finite),
 });
 
 export const ArtifactContent: Codec<T.ArtifactContent> = Schema.Struct({ version: Schema.Finite, content: Schema.String });
 
 export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
-  id: Schema.String,
+  id: MessageId,
   number: Schema.Finite,
   channel: Schema.String,
   from: Schema.String,
@@ -324,7 +330,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   position: Schema.optionalKey(Schema.Finite),
   archived: Schema.optionalKey(Schema.Finite),
   notify: Schema.optionalKey(Notify),
-  root: Schema.optionalKey(Schema.String),
+  root: Schema.optionalKey(MessageId),
   rootNumber: Schema.optionalKey(Schema.Finite),
   name: Schema.optionalKey(Schema.String),
   description: Schema.String,
@@ -721,7 +727,7 @@ export const IssueRun: Codec<T.IssueRun> = Schema.Struct({
 
 export const Deliverable: Codec<T.Deliverable> = Schema.Literals(T.DeliverableValues);
 
-export const Issue: Codec<T.Issue> = Schema.Struct({
+const issueFields = {
   id: IssueId,
   number: Schema.Finite,
   title: Schema.String,
@@ -755,7 +761,13 @@ export const Issue: Codec<T.Issue> = Schema.Struct({
   lastRun: Schema.optionalKey(IssueRun),
   answer: Schema.optionalKey(IssueAnswer),
   attention: IssueAttention,
-});
+};
+
+export const Issue: Codec<T.Issue> = Schema.Struct(issueFields);
+
+export const Applied: Codec<T.Applied> = Schema.Struct({ seq: Schema.Finite });
+
+export const AppliedIssue: Codec<T.AppliedIssue> = Schema.Struct({ ...issueFields, seq: Schema.Finite });
 
 export const ConnectorID: Codec<T.ConnectorID> = Schema.Literals(T.ConnectorIDValues);
 
@@ -1035,6 +1047,7 @@ export const GameEffectAchievement: Codec<T.GameEffectAchievement> = Schema.Stru
 export const GameEffect: Codec<T.GameEffect> = Schema.Union([GameEffectReward, GameEffectPenalty, GameEffectLevelUp, GameEffectAchievement]);
 
 export const StateFrame: Codec<T.StateFrame> = Schema.Struct({
+  seq: Schema.Finite,
   state: WorkspaceView,
   inbox: Schema.mutable(Schema.Array(InboxItem)),
   graphs: Schema.mutable(Schema.Array(TaskGraph)),
@@ -1373,6 +1386,7 @@ export const Memory: Codec<T.Memory> = Schema.Struct(memoryFields);
 export const MemoryRequest: Codec<T.MemoryRequest> = Schema.Struct({
   text: Schema.String,
   project: Schema.optionalKey(Schema.String),
+  requestKey: Schema.optionalKey(Schema.String),
 });
 
 export const MemoryScope: Codec<T.MemoryScope> = Schema.Union([
@@ -1468,6 +1482,7 @@ export const IssueRequest: Codec<T.IssueRequest> = Schema.Struct({
   assignee: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
   deliver: Schema.optionalKey(Deliverable),
+  requestKey: Schema.optionalKey(Schema.String),
 });
 
 export const RunTriggerKind: Codec<T.RunTriggerKind> = Schema.Literals(T.RunTriggerKindValues);
@@ -2003,6 +2018,7 @@ export const IssueStatusRequest: Codec<T.IssueStatusRequest> = Schema.Struct({
   text: Schema.optionalKey(Schema.String),
   assignee: Schema.optionalKey(Schema.String),
   edit: Schema.optionalKey(IssueUpdate),
+  requestKey: Schema.optionalKey(Schema.String),
 });
 
 export const GraphActRequest: Codec<T.GraphActRequest> = Schema.Struct({
@@ -2115,8 +2131,8 @@ export const BlockAttrs: Codec<T.BlockAttrs> = Schema.Struct({
 export const BlockType: Codec<T.BlockType> = Schema.Literals(T.BlockTypeValues);
 
 const blockInputFields = {
-  id: Schema.String,
-  parentId: Schema.optionalKey(Schema.String),
+  id: BlockId,
+  parentId: Schema.optionalKey(BlockId),
   orderKey: Schema.String,
   type: BlockType,
   attrs: BlockAttrs,
@@ -2127,7 +2143,7 @@ export const BlockInput: Codec<T.BlockInput> = Schema.Struct(blockInputFields);
 
 export const Block: Codec<T.Block> = Schema.Struct({
   ...blockInputFields,
-  artifactId: Schema.String,
+  artifactId: ArtifactId,
   rev: Schema.Finite,
   deleted: Schema.optionalKey(Schema.Boolean),
   updatedBy: Schema.String,
@@ -2150,45 +2166,45 @@ export const BlockOpInsertBlock: Codec<T.BlockOpInsertBlock> = Schema.Struct({
 
 export const BlockOpUpdateText: Codec<T.BlockOpUpdateText> = Schema.Struct({
   op: Schema.Literal("update_text"),
-  blockId: Schema.String,
+  blockId: BlockId,
   baseRev: Schema.Finite,
   text: Schema.mutable(Schema.Array(TextSpan)),
 });
 
 export const BlockOpSetAttrs: Codec<T.BlockOpSetAttrs> = Schema.Struct({
   op: Schema.Literal("set_attrs"),
-  blockId: Schema.String,
+  blockId: BlockId,
   attrs: BlockAttrs,
   unset: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
 });
 
 export const BlockOpSetType: Codec<T.BlockOpSetType> = Schema.Struct({
   op: Schema.Literal("set_type"),
-  blockId: Schema.String,
+  blockId: BlockId,
   type: BlockType,
   attrs: BlockAttrs,
 });
 
 export const BlockOpMoveBlock: Codec<T.BlockOpMoveBlock> = Schema.Struct({
   op: Schema.Literal("move_block"),
-  blockId: Schema.String,
-  parentId: Schema.optionalKey(Schema.String),
+  blockId: BlockId,
+  parentId: Schema.optionalKey(BlockId),
   orderKey: Schema.String,
 });
 
 export const BlockOpDeleteBlock: Codec<T.BlockOpDeleteBlock> = Schema.Struct({
   op: Schema.Literal("delete_block"),
-  blockId: Schema.String,
+  blockId: BlockId,
 });
 
 export const BlockOpRestoreBlock: Codec<T.BlockOpRestoreBlock> = Schema.Struct({
   op: Schema.Literal("restore_block"),
-  blockId: Schema.String,
+  blockId: BlockId,
 });
 
 export const BlockOpSplitBlock: Codec<T.BlockOpSplitBlock> = Schema.Struct({
   op: Schema.Literal("split_block"),
-  blockId: Schema.String,
+  blockId: BlockId,
   baseRev: Schema.Finite,
   offset: Schema.Finite,
   newBlock: BlockInput,
@@ -2196,8 +2212,8 @@ export const BlockOpSplitBlock: Codec<T.BlockOpSplitBlock> = Schema.Struct({
 
 export const BlockOpMergeBlocks: Codec<T.BlockOpMergeBlocks> = Schema.Struct({
   op: Schema.Literal("merge_blocks"),
-  targetId: Schema.String,
-  sourceId: Schema.String,
+  targetId: BlockId,
+  sourceId: BlockId,
 });
 
 export const BlockOp: Codec<T.BlockOp> = Schema.Union([
@@ -2227,14 +2243,14 @@ export const BlockCreate: Codec<T.BlockCreate> = Schema.Struct({
 });
 
 export const BlockUpdate: Codec<T.BlockUpdate> = Schema.Struct({
-  block: Schema.String,
+  block: BlockId,
   baseRev: Schema.Finite,
   text: Schema.String,
 });
 
 export const BlockOpResult: Codec<T.BlockOpResult> = Schema.Struct({
   status: BlockOpStatus,
-  blockId: Schema.String,
+  blockId: BlockId,
   rev: Schema.optionalKey(Schema.Finite),
   text: Schema.optionalKey(Schema.mutable(Schema.Array(TextSpan))),
   yours: Schema.optionalKey(Schema.mutable(Schema.Array(TextSpan))),
@@ -2249,14 +2265,16 @@ export const BlockAck: Codec<T.BlockAck> = Schema.Struct({
 });
 
 export const MessageEdit: Codec<T.MessageEdit> = Schema.Struct({
-  id: Schema.String,
+  id: MessageId,
   text: Schema.String,
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
 });
 
 export const NotifyRequest: Codec<T.NotifyRequest> = Schema.Struct({ id: Schema.String, notify: Notify });
 
-export const ReactionToggle: Codec<T.ReactionToggle> = Schema.Struct({ id: Schema.String, emoji: Schema.String });
+export const ReactionSet: Codec<T.ReactionSet> = Schema.Struct({ id: MessageId, emoji: Schema.String, on: Schema.Boolean });
+
+export const OnSet: Codec<T.OnSet> = Schema.Struct({ id: Schema.String, on: Schema.Boolean });
 
 export const AttachmentUpload: Codec<T.AttachmentUpload> = Schema.Struct({ name: Schema.String, type: Schema.String, data: Schema.String });
 

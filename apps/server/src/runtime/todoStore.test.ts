@@ -4,7 +4,7 @@ import { Effect, Layer } from "effect";
 import { add, finished, TodoError, update } from "@vibevalley/agent/todo";
 import { memoryStore } from "@vibevalley/agent/todoStore";
 
-import { Db } from "@/base/db.ts";
+import { Db } from "@/infra/db.ts";
 import { testDatabase } from "@/testing/layers.ts";
 
 import * as q from "../../db/generated/runtime_todo.sql.ts";

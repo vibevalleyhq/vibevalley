@@ -6,19 +6,21 @@ import { t } from "@vibevalley/i18n";
 import { ownerId } from "@vibevalley/protocol";
 import type { Channel } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
 import { DictationButton } from "@/features/voice";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
+import { useIntents } from "@/state/intent";
+import { createAct } from "@/ui/act";
 import { AttachmentTile } from "@/ui/AttachmentTile";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
 import { toast } from "@/ui/toasts";
 
 import { HelperFace } from "./bits";
-import { createComposer } from "./composing";
-import { attachFiles, draftOf, drafts, setEditingId, uploadsIn } from "./draft";
+import { chatSay, createComposer } from "./composing";
+import { attachFiles, draftOf, drafts, setEditingId, uploadsIn, useReplying } from "./draft";
 import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 
@@ -31,16 +33,19 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   let emojiButton: HTMLButtonElement | undefined;
   const draft = () => draftOf(props.channel?.id);
   const uploading = () => uploadsIn(props.channel?.id);
+  const replying = useReplying(() => props.channel?.id);
   // Built once for the channel (the page keys the box by it): it starts from the draft kept for it.
   const at = untrack(() => props.channel?.id);
   const router = useRouter();
   const box = createComposer(core, () => input, {
     ...(at ? { initial: untrack(() => draftOf(at).text) } : {}),
+    says: useIntents(chatSay),
     target: () => {
       const d = draft();
+      const reply = replying();
       return {
         id: props.channel?.id ?? "",
-        ...(d.reply ? { replyTo: d.reply.number } : {}),
+        ...(reply ? { replyTo: reply.number } : {}),
         ...(d.files.length > 0 ? { attachments: d.files.map((f) => f.id) } : {}),
       };
     },
@@ -86,7 +91,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           return;
         }
       }
-      if (e.key === "Escape" && draft().reply) {
+      if (e.key === "Escape" && replying()) {
         e.preventDefault();
         e.stopPropagation();
         drafts.reply(id, undefined);
@@ -96,7 +101,11 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     box.onKey(e);
   };
   let picker: HTMLInputElement | undefined;
-  const stop = () => api.orchestrator.stop({ agent: box.here() }).catch((e) => toast(reasonOf(e), "bad"));
+  const stopping = createAct();
+  const stop = () => {
+    const agent = box.here();
+    return stopping.run(() => api.orchestrator.stop({ agent }));
+  };
 
   return (
     <div data-testid="composer" data-key={props.channel?.id} class="border-t border-line px-4 pt-3 pb-4">
@@ -141,7 +150,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </p>
         )}
       </Show>
-      <Show when={draft().reply}>
+      <Show when={replying()}>
         {(m) => (
           <div data-testid="replying" data-key={m().number} class="mb-1.5 flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
             <Icon name="reply" size={12} />

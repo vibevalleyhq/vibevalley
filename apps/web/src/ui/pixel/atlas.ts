@@ -1,10 +1,12 @@
+import { Schema } from "effect";
+import { type Accessor, createSignal, onSettled } from "solid-js";
 // The village's pictures: /pixel/sprites.json (design/pixel/process.py writes it) and a PNG per name beside it. The
 // pictures are drawn `density` times denser than the village's art pixels, so a sprite's size in art pixels is its
 // manifest size over the density, which is the map's width over the level's (384).
 
-import { type Accessor, createSignal, onSettled } from "solid-js";
-
 import { omitUndefined } from "@vibevalley/protocol/rules";
+
+import { SpriteManifest } from "@/base/manifests";
 
 export interface SpriteInfo {
   readonly name: string;
@@ -23,14 +25,6 @@ export const levelWidth = 384;
 
 export const spriteUrl = (name: string) => `/pixel/${name}.png`;
 
-interface Raw {
-  readonly w: number;
-  readonly h: number;
-  readonly ax: number;
-  readonly ay: number;
-  readonly yard?: readonly number[];
-}
-
 export class SpriteAtlas {
   private readonly sprites: ReadonlyMap<string, SpriteInfo>;
   readonly density: number;
@@ -40,8 +34,7 @@ export class SpriteAtlas {
   }
 
   static parse(text: string): SpriteAtlas {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
-    const raw = JSON.parse(text) as Record<string, Raw>;
+    const raw = Schema.decodeSync(Schema.fromJsonString(SpriteManifest))(text);
     const map = raw.map;
     if (!map) throw new Error("sprites.json: no map");
     const d = map.w / levelWidth;

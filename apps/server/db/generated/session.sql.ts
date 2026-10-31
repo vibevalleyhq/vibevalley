@@ -87,6 +87,7 @@ export const sessionByID = Effect.fn("SessionByID")(function* (params: SessionBy
 
 export const EndedSessionsParams = Schema.Struct({
   ["agent"]: Schema.String,
+  ["n"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })
 export type EndedSessionsParams = typeof EndedSessionsParams.Type
 
@@ -111,14 +112,14 @@ export const EndedSessionsResult = Schema.Struct({
 export type EndedSessionsResult = typeof EndedSessionsResult.Type
 
 
-export const EndedSessionsSql = "-- name: EndedSessions :many\n-- Newest first; agent '' is every agent's.\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\" from session where ended_at is not null and ($1::text = '' or agent = $1) order by hired_at desc;"
+export const EndedSessionsSql = "-- name: EndedSessions :many\n-- Newest first, the newest n; agent '' is every agent's.\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\" from session where ended_at is not null and ($1::text = '' or agent = $1) order by hired_at desc limit $2::int;"
 
 export const endedSessions = Effect.fn("EndedSessions")(function* (params: EndedSessionsParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
     Request: EndedSessionsParams,
     Result: EndedSessionsResult,
-    execute: (p) => sql.unsafe(EndedSessionsSql, [p["agent"]]),
+    execute: (p) => sql.unsafe(EndedSessionsSql, [p["agent"], p["n"]]),
   })(params)
 })
 
@@ -134,7 +135,7 @@ export const SessionsEndedBeforeResult = Schema.Struct({
 export type SessionsEndedBeforeResult = typeof SessionsEndedBeforeResult.Type
 
 
-export const SessionsEndedBeforeSql = "-- name: SessionsEndedBefore :many\nselect id from session where ended_at < $1;"
+export const SessionsEndedBeforeSql = "-- name: SessionsEndedBefore :many\n-- bound: read to drop their trajectories, which then are gone.\nselect id from session where ended_at < $1;"
 
 export const sessionsEndedBefore = Effect.fn("SessionsEndedBefore")(function* (params: SessionsEndedBeforeParams) {
   const sql = yield* SqlClient.SqlClient
@@ -181,7 +182,7 @@ export const HandsResult = Schema.Struct({
 export type HandsResult = typeof HandsResult.Type
 
 
-export const HandsSql = "-- name: Hands :many\nselect id, place, oar_session, last_text, recalled from session where ended_at is null and place is not null;"
+export const HandsSql = "-- name: Hands :many\n-- bound: only sessions on the farm now.\nselect id, place, oar_session, last_text, recalled from session where ended_at is null and place is not null;"
 
 export const hands = Effect.fn("Hands")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -192,25 +193,25 @@ export const hands = Effect.fn("Hands")(function* () {
   })({})
 })
 
-export const SessionIDsParams = Schema.Struct({
+export const HighestSessionNumberParams = Schema.Struct({
 
 })
-export type SessionIDsParams = typeof SessionIDsParams.Type
+export type HighestSessionNumberParams = typeof HighestSessionNumberParams.Type
 
 
-export const SessionIDsResult = Schema.Struct({
-  ["id"]: Schema.String,
+export const HighestSessionNumberResult = Schema.Struct({
+  ["n"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
-export type SessionIDsResult = typeof SessionIDsResult.Type
+export type HighestSessionNumberResult = typeof HighestSessionNumberResult.Type
 
 
-export const SessionIDsSql = "-- name: SessionIDs :many\nselect id from session;"
+export const HighestSessionNumberSql = "-- name: HighestSessionNumber :one\n-- The highest n of the ids w<n>, 0 for none.\nselect coalesce(max(substring(id from '^w([0-9]+)$')::int), 0)::int as n from session;"
 
-export const sessionIDs = Effect.fn("SessionIDs")(function* () {
+export const highestSessionNumber = Effect.fn("HighestSessionNumber")(function* () {
   const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: SessionIDsParams,
-    Result: SessionIDsResult,
-    execute: () => sql.unsafe(SessionIDsSql, []),
+  return yield* SqlSchema.findOne({
+    Request: HighestSessionNumberParams,
+    Result: HighestSessionNumberResult,
+    execute: () => sql.unsafe(HighestSessionNumberSql, []),
   })({})
 })

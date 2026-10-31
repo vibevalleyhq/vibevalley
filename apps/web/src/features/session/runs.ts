@@ -1,3 +1,4 @@
+import { Predicate } from "effect";
 // A session's log by run (shownEvents, runsOf, spansOf, runMs), the work log's words and colours, the trajectory's
 // waterfall and totals, and how steps arriving live merge in (mergeSteps).
 
@@ -176,8 +177,8 @@ export function readableInput(step: SessionEvent) {
   if (!raw) return "";
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed === "object" && parsed !== null) {
-      const command = (parsed as { command?: unknown }).command;
+    if (Predicate.isObject(parsed)) {
+      const command = Predicate.hasProperty(parsed, "command") ? parsed.command : undefined;
       if (!Array.isArray(parsed) && typeof command === "string") return `$ ${command}`;
       return JSON.stringify(parsed, null, 2);
     }
@@ -372,5 +373,3 @@ export function tagOf(step: SessionEvent, asked?: string, issue = false): string
       return "";
   }
 }
-
-export const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();

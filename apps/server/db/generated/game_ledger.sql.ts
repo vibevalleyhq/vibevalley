@@ -18,7 +18,7 @@ export const LedgerEntriesResult = Schema.Struct({
 export type LedgerEntriesResult = typeof LedgerEntriesResult.Type
 
 
-export const LedgerEntriesSql = "-- The ledger the progress is folded from, oldest first (game/ledger.ts). Ids are made in time order.\n\n-- name: LedgerEntries :many\nselect kind, at, payload from game_ledger order by id;"
+export const LedgerEntriesSql = "-- The ledger the progress is folded from, oldest first (game/ledger.ts). Ids are made in time order.\n\n-- name: LedgerEntries :many\n-- bound: every entry: progress is folded from the whole ledger, again under changed rules (a few a day).\nselect kind, at, payload from game_ledger order by id;"
 
 export const ledgerEntries = Effect.fn("LedgerEntries")(function* () {
   const sql = yield* SqlClient.SqlClient

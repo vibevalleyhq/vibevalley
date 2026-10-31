@@ -2,7 +2,7 @@
 // archive/, the folded-away conversation word for word, so a summary that lost a detail can be looked up again.
 
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { appendFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { memory as memoryWords } from "./prompts.ts";
@@ -69,45 +69,52 @@ function snapshotOf(file: string, raw: string, updatedAt: number): MemorySnapsho
   };
 }
 
-export function readMemory(home: string): MemorySnapshot {
+/** A file's text, none when there is no such file; one that is there and cannot be read is an error. */
+const textOf = (path: string) =>
+  readFile(path, "utf8").catch((e: unknown) => {
+    if (e instanceof Error && "code" in e && e.code === "ENOENT") return undefined;
+    throw e;
+  });
+
+export async function readMemory(home: string): Promise<MemorySnapshot> {
   const file = memoryFile(home);
-  if (!existsSync(file)) return snapshotOf(file, "", 0);
-  return snapshotOf(file, readFileSync(file, "utf8"), statSync(file).mtimeMs);
+  const text = await textOf(file);
+  if (text === undefined) return snapshotOf(file, "", 0);
+  return snapshotOf(file, text, (await stat(file)).mtimeMs);
 }
 
 /** MEMORY.md's lines as the model is told them: neither blank nor headings, without their bullet. */
-export function memoryFileLines(home: string): string[] {
-  const file = memoryFile(home);
-  if (!existsSync(file)) return [];
-  return readFileSync(file, "utf8")
+export async function memoryFileLines(home: string): Promise<string[]> {
+  return ((await textOf(memoryFile(home))) ?? "")
     .split("\n")
     .map((l) => l.trim())
     .filter((t) => t !== "" && !t.startsWith("#"))
     .map((t) => t.replace(bulletHead, ""));
 }
 
-export function forgetLine(home: string, id: string) {
+export async function forgetLine(home: string, id: string) {
   const file = memoryFile(home);
-  if (!existsSync(file)) return;
-  const lines = readFileSync(file, "utf8").split("\n");
+  const text = await textOf(file);
+  if (text === undefined) return;
+  const lines = text.split("\n");
   const i = lines.findIndex((l) => l.trim() !== "" && lineID(l) === id);
-  if (i >= 0) writeFileSync(file, [...lines.slice(0, i), ...lines.slice(i + 1)].join("\n"));
+  if (i >= 0) await writeFile(file, [...lines.slice(0, i), ...lines.slice(i + 1)].join("\n"));
 }
 
 const localDate = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-export function remember(home: string, note: string, now: Date): MemoryLine {
-  mkdirSync(home, { recursive: true });
+export async function remember(home: string, note: string, now: Date): Promise<MemoryLine> {
+  await mkdir(home, { recursive: true });
   const line = `- ${localDate(now)} ${note.replace(/\s*\n\s*/gu, " ").trim()}`;
-  appendFileSync(memoryFile(home), line + "\n");
+  await appendFile(memoryFile(home), line + "\n");
   return memoryLine(line)!;
 }
 
-export function rewriteMemory(home: string, text: string): MemorySnapshot {
-  mkdirSync(home, { recursive: true });
+export async function rewriteMemory(home: string, text: string): Promise<MemorySnapshot> {
+  await mkdir(home, { recursive: true });
   const body = text.endsWith("\n") ? text : text + "\n";
-  writeFileSync(memoryFile(home), body);
-  return snapshotOf(memoryFile(home), body, statSync(memoryFile(home)).mtimeMs);
+  await writeFile(memoryFile(home), body);
+  return snapshotOf(memoryFile(home), body, (await stat(memoryFile(home))).mtimeMs);
 }
 
 const archiveDir = (home: string) => join(home, "archive");
@@ -115,14 +122,18 @@ const archiveDir = (home: string) => join(home, "archive");
 /** Date.toISOString with its colons and dot made dashes. */
 const isoStamp = (now: Date) => now.toISOString().replace(/[:.]/gu, "-");
 
-export function archive(home: string, session: string, text: string, now: Date): string {
-  mkdirSync(archiveDir(home), { recursive: true });
+export async function archive(home: string, session: string, text: string, now: Date): Promise<string> {
+  await mkdir(archiveDir(home), { recursive: true });
   const path = join(archiveDir(home), `${session}-${isoStamp(now)}.md`);
-  writeFileSync(path, text);
+  await writeFile(path, text);
   return path;
 }
 
-const archiveNames = (home: string) => (existsSync(archiveDir(home)) ? readdirSync(archiveDir(home)).filter((n) => n.endsWith(".md")) : []);
+const archiveNames = (home: string) =>
+  readdir(archiveDir(home)).then(
+    (names) => names.filter((n) => n.endsWith(".md")),
+    (): string[] => [],
+  );
 
 export interface ArchiveFile {
   readonly name: string;
@@ -136,34 +147,32 @@ export interface ArchiveHit {
   readonly text: string;
 }
 
-export function archiveFiles(home: string): ArchiveFile[] {
-  return archiveNames(home)
-    .map((name) => {
+export async function archiveFiles(home: string): Promise<ArchiveFile[]> {
+  const files = await Promise.all(
+    (await archiveNames(home)).map(async (name) => {
       const path = join(archiveDir(home), name);
-      return {
-        name,
-        at: Math.trunc(statSync(path).mtimeMs),
-        chars: readFileSync(path, "utf8").length,
-      };
-    })
-    .toSorted((a, b) => b.at - a.at);
+      const [info, text] = await Promise.all([stat(path), readFile(path, "utf8")]);
+      return { name, at: Math.trunc(info.mtimeMs), chars: text.length };
+    }),
+  );
+  return files.toSorted((a, b) => b.at - a.at);
 }
 
 /** A name with a path in it is none. */
-export function readArchive(home: string, name: string): string | undefined {
+export async function readArchive(home: string, name: string): Promise<string | undefined> {
   if (name !== basename(name) || !name.endsWith(".md")) return undefined;
-  const path = join(archiveDir(home), name);
-  return existsSync(path) ? readFileSync(path, "utf8") : undefined;
+  return textOf(join(archiveDir(home), name));
 }
 
 /** Any case; 20 hits when limit is 0. */
-export function searchArchive(home: string, query: string, limit = 0): ArchiveHit[] {
+export async function searchArchive(home: string, query: string, limit = 0): Promise<ArchiveHit[]> {
   const most = limit > 0 ? limit : 20;
   const q = query.trim().toLowerCase();
   const hits: ArchiveHit[] = [];
   if (q === "") return hits;
-  for (const file of archiveNames(home).toSorted().toReversed()) {
-    const lines = readFileSync(join(archiveDir(home), file), "utf8").split("\n");
+  for (const file of (await archiveNames(home)).toSorted().toReversed()) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- newest first, stopping once enough are found
+    const lines = (await readFile(join(archiveDir(home), file), "utf8")).split("\n");
     lines.forEach((l, i) => {
       if (hits.length < most && l.toLowerCase().includes(q))
         hits.push({

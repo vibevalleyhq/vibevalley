@@ -9,11 +9,12 @@ import { asTransport } from "@vibevalley/agent/mcpTransport";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { redact } from "@/base/redact.ts";
+import { head, clip } from "@/base/clip.ts";
+import { redact, type RedactedString, redactedHead } from "@/base/redact.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 
 import { recallWords } from "./prompts.ts";
-import { memoryNotesOf, recallCount, clip, type MemoryScope } from "./recall.ts";
+import { memoryNotesOf, recallCount, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 
 const app = "vibevalley";
@@ -23,15 +24,10 @@ const queryMost = 500;
 // What a recalled line carries of one of its memories, in UTF-16 units.
 const lineMost = 200;
 
-/** The first n UTF-16 units, without cutting a character in half. */
-const head = (s: string, n: number) => {
-  let out = "";
-  for (const ch of s) {
-    if (out.length + ch.length > n) break;
-    out += ch;
-  }
-  return out;
-};
+/** What goes to Nowledge: every free text in it redacted. */
+type Search = { readonly limit: number; readonly source_app: string; readonly query?: RedactedString | ""; readonly filter_labels?: string };
+type Add = { readonly content: RedactedString; readonly title: RedactedString; readonly labels: string; readonly source_app: string };
+type Detail = { readonly memory_id: string };
 
 /** Its labels are words without spaces or commas (the list is comma-separated). */
 const label = (kind: string, name: string) => `${app}-${kind}-${name.replace(/[\s,]+/gu, "-")}`;
@@ -118,7 +114,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     }));
 
   /** One tool call; its answer is the text of the result. A session that failed is dropped, so the next call opens another. */
-  const call = (tool: string, args: Record<string, unknown>) =>
+  const call = (tool: "memory_search" | "memory_add" | "get_memory_by_id", args: Search | Add | Detail) =>
     life.alive(
       Effect.gen(function* () {
         const session = yield* Effect.tryPromise({ try: open, catch: sourceError });
@@ -142,11 +138,15 @@ export function nowledge(c: MemorySourceConfig): Source {
 
   /** agent "" reads what the farm wrote for any profile; everything reads all that is in it. */
   const find = Effect.fnUntraced(function* (agent: string, query: string, limit: number, everything: boolean) {
-    const args: Record<string, unknown> = { limit: Math.max(1, Math.min(limit, most)), source_app: app };
     // Its search without a query lists nothing; filtered by labels, any query finds all they hold.
-    const q = head(redact(query).trim(), queryMost) || (everything ? "" : "*");
-    if (q !== "") args.query = q;
-    if (!everything) args.filter_labels = agent ? label("agent", agent) : app;
+    const asked = redactedHead(redact(query), queryMost);
+    const q = asked !== "" ? asked : everything ? "" : redact("*");
+    const args: Search = {
+      limit: Math.max(1, Math.min(limit, most)),
+      source_app: app,
+      ...(q !== "" ? { query: q } : {}),
+      ...(everything ? {} : { filter_labels: agent ? label("agent", agent) : app }),
+    };
     const text = yield* call("memory_search", args);
     return yield* Effect.mapBoth(Schema.decodeEffect(SearchResponse)(text), {
       onFailure: () => new SourceError({ message: "memory_search answered what it should not: " + head(text, 200) }),
@@ -156,7 +156,7 @@ export function nowledge(c: MemorySourceConfig): Source {
 
   const add = Effect.fnUntraced(function* (agent: string, text: string, project: string) {
     const body = redact(text);
-    const answer = yield* call("memory_add", { content: body, title: head(body, 60), labels: nowledgeLabels(agent, project), source_app: app });
+    const answer = yield* call("memory_add", { content: body, title: redactedHead(body, 60), labels: nowledgeLabels(agent, project), source_app: app });
     // The new memory's id, at the top or under memory; none when it found the same memory there already. An answer of
     // another shape is not taken for that: the note may not have been kept, and saying so lets the source's queue log it.
     const added = Option.getOrUndefined(Schema.decodeOption(AddedResponse)(answer));
@@ -228,7 +228,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     // The 「记住：」 lines; a stopped run leaves nothing here either.
     syncTurn: Effect.fnUntraced(function* (run) {
       if (c.write !== true || run.outcome === "interrupted") return;
-      for (const note of memoryNotesOf(run.said)) yield* add(run.agent, note.text, note.everywhere ? "" : run.project);
+      yield* Effect.forEach(memoryNotesOf(run.said), (note) => add(run.agent, note.text, note.everywhere ? "" : run.project), { discard: true });
     }),
     sessionEnded: () => Effect.void,
     add: Effect.fnUntraced(function* (n) {

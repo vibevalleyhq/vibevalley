@@ -13,11 +13,13 @@ update channel_delivery set state = 'handed', launch = sqlc.arg(launch), handed_
 where recipient_id = sqlc.arg(recipient_id) and message_id = sqlc.arg(message_id) and state in ('pending', 'announced');
 
 -- name: SeenHanded :many
+-- bound: what one launch handed to one recipient.
 update channel_delivery set state = 'seen', seen_at = sqlc.arg(seen_at)
 where recipient_id = sqlc.arg(recipient_id) and state = 'handed' and launch = sqlc.arg(launch)
 returning message_id;
 
 -- name: RollbackHanded :many
+-- bound: what is handed to one recipient and not seen yet.
 update channel_delivery set state = 'pending', launch = null where recipient_id = sqlc.arg(recipient_id) and state = 'handed'
 returning message_id;
 
@@ -42,6 +44,7 @@ update channel_delivery set state = 'dropped', dropped_why = sqlc.arg(dropped_wh
 where recipient_id = sqlc.arg(recipient_id) and state in ('pending', 'announced', 'handed');
 
 -- name: AgentWakesByChannel :many
+-- bound: a row per channel.
 -- Agents waking agents in each channel since the owner last spoke there, held ones not counted: what the chat
 -- keeps in memory (channel/audience.ts) when it starts.
 select m.channel_id, count(*)::int as n from channel_delivery d
@@ -53,6 +56,7 @@ where m.id > coalesce((select max(u.id) from channel_message u where u.channel_i
 group by m.channel_id;
 
 -- name: LastAgentWakes :many
+-- bound: a row per participant.
 -- When each recipient was last woken by an agent (channel/audience.ts).
 select d.recipient_id, max(d.created_at)::float8 as at from channel_delivery d
 join channel_message m on m.id = d.message_id
@@ -61,6 +65,7 @@ where s.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null
 group by d.recipient_id;
 
 -- name: AllOpenDeliveries :many
+-- bound: only open deliveries; each closes when seen, dropped or its message deleted.
 -- The deliveries still open, with what an inbox shows of each: what the chat keeps in memory (channel/deliveries.ts).
 select d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.channel_id, m.sender_id, m.kind, m.body,
        m.meta, m.reply_number, m.created_at, p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,
@@ -74,11 +79,13 @@ where d.state in ('pending', 'announced', 'handed')
 order by m.id;
 
 -- name: DropOpenOf :many
+-- bound: one message's open deliveries, one per recipient.
 -- A message deleted: what it was still waiting to hand goes.
 update channel_delivery set state = 'dropped', dropped_why = 'deleted'
 where message_id = sqlc.arg(message_id) and state in ('pending', 'announced', 'handed')
 returning recipient_id;
 
 -- name: WaitingOn :many
+-- bound: one message's open deliveries, one per recipient.
 -- Who a message is still waiting to be handed to.
 select recipient_id from channel_delivery where message_id = sqlc.arg(message_id) and state in ('pending', 'announced', 'handed');

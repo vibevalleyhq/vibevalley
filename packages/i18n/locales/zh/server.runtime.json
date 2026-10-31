@@ -33,5 +33,6 @@
   "piNoBalance": "{provider} 不报余额",
   "piNoModel": "pi 没有设默认模型",
   "piUnread": "没读到 DeepSeek 余额",
-  "effort": "{model} 没有 {effort} 这一档，可选：{levels}"
+  "effort": "{model} 没有 {effort} 这一档，可选：{levels}",
+  "piTimedOut": "问 DeepSeek 余额超时了"
 }

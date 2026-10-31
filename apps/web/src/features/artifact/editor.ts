@@ -6,6 +6,7 @@ import { t } from "@vibevalley/i18n";
 import {
   type Block,
   type BlockAttrs,
+  type BlockId,
   type BlockType,
   type BlockInput,
   type BlockOp,
@@ -13,11 +14,13 @@ import {
   type BlockSnapshot,
   type TextSpan,
   type Artifact,
+  type ArtifactId,
   type VibeValleyApi,
 } from "@vibevalley/protocol";
 import { keyBetween } from "@vibevalley/protocol/rules";
+import { blockId } from "@vibevalley/protocol/schema";
 
-import { reasonOf } from "@/base/api";
+import { reasonOf } from "@/infra/api";
 
 import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, normalSpans, plainOf, splitSpans } from "./blocks";
 
@@ -35,12 +38,12 @@ const busyPolls = 4;
 const writingPolls = 3;
 
 /** A uuid (v4) for a block this client inserts: block ids are the inserter's to make. */
-const newBlockId = () => crypto.randomUUID();
+const newBlockId = () => blockId(crypto.randomUUID());
 
 /** One block as the editor holds it: the server's last word on it (rev, who wrote it) and the owner's text as it is now. */
 export class EditBlock {
-  readonly id: string;
-  parentId: string | undefined;
+  readonly id: BlockId;
+  parentId: BlockId | undefined;
   orderKey: string;
   type: BlockType;
   attrs: BlockAttrs;
@@ -114,8 +117,8 @@ export class BlockEditor {
   version = 0;
 
   private readonly api: VibeValleyApi;
-  readonly artifactId: string;
-  constructor(api: VibeValleyApi, artifactId: string) {
+  readonly artifactId: ArtifactId;
+  constructor(api: VibeValleyApi, artifactId: ArtifactId) {
     this.api = api;
     this.artifactId = artifactId;
   }
@@ -509,7 +512,7 @@ export class BlockEditor {
             ops.push(next.build());
             for (const id of next.ids) ids.add(id);
           }
-          batch = this.inflight = { id: newBlockId(), ops, ids };
+          batch = this.inflight = { id: crypto.randomUUID(), ops, ids };
         }
         let ack;
         try {

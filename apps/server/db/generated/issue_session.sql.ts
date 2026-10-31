@@ -58,7 +58,7 @@ export const AllSessionsResult = Schema.Struct({
 export type AllSessionsResult = typeof AllSessionsResult.Type
 
 
-export const AllSessionsSql = "-- name: AllSessions :many\nselect issue, session from issue_session order by started_at, session;"
+export const AllSessionsSql = "-- name: AllSessions :many\n-- bound: a row per issue and the session on it.\nselect issue, session from issue_session order by started_at, session;"
 
 export const allSessions = Effect.fn("AllSessions")(function* () {
   const sql = yield* SqlClient.SqlClient

@@ -5,6 +5,7 @@ import { maybe } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { dayMs, memoryKeep } from "@vibevalley/protocol";
 
+import { clip } from "@/base/clip.ts";
 import { compare, or } from "@/base/order.ts";
 
 import { recallWords } from "./prompts.ts";
@@ -93,12 +94,6 @@ const notesPerRun = 5;
 /** A list mark or bold around it is fine; so is the marker in English (Remember, Remember (all projects)). */
 const noteLine =
   /^[\s\p{Z}]*(?:[-*•][\s\p{Z}]*)?(?:\*\*)?(?:记住|Remember)(（所有项目）|\(所有项目\)|[\s\p{Z}]*\(all projects\))?(?:\*\*)?[\s\p{Z}]*[:：][\s\p{Z}]*(?:\*\*)?[\s\p{Z}]*(.+?)[\s\p{Z}]*$/iu;
-
-/** s on one line (each run of white space one space, trimmed), at most max units with the ellipsis. */
-export const clip = (s: string, max: number) => {
-  const flat = s.replace(/\s+/gu, " ").trim();
-  return flat.length > max ? flat.slice(0, max - 1) + "…" : flat;
-};
 
 export interface MemoryNote {
   readonly text: string;

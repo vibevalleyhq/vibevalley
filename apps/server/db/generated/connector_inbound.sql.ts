@@ -36,7 +36,7 @@ export const PendingInboundResult = Schema.Struct({
 export type PendingInboundResult = typeof PendingInboundResult.Type
 
 
-export const PendingInboundSql = "-- name: PendingInbound :many\nselect ext_id, payload from connector_inbound where connector = $1 and not delivered order by seq;"
+export const PendingInboundSql = "-- name: PendingInbound :many\n-- bound: only what waits; each is settled once delivered.\nselect ext_id, payload from connector_inbound where connector = $1 and not delivered order by seq;"
 
 export const pendingInbound = Effect.fn("PendingInbound")(function* (params: PendingInboundParams) {
   const sql = yield* SqlClient.SqlClient
@@ -77,5 +77,21 @@ export const clearInbound = Effect.fn("ClearInbound")(function* (params: ClearIn
   return yield* SqlSchema.void({
     Request: ClearInboundParams,
     execute: (p) => sql.unsafe(ClearInboundSql, [p["connector"]]),
+  })(params)
+})
+
+export const PruneInboundParams = Schema.Struct({
+  ["before"]: Schema.Number,
+})
+export type PruneInboundParams = typeof PruneInboundParams.Type
+
+
+export const PruneInboundSql = "-- name: PruneInbound :exec\n-- A delivered message older than before: no app sends it again that late, and a reply that old is not looked up.\ndelete from connector_inbound where delivered and created_at < $1;"
+
+export const pruneInbound = Effect.fn("PruneInbound")(function* (params: PruneInboundParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: PruneInboundParams,
+    execute: (p) => sql.unsafe(PruneInboundSql, [p["before"]]),
   })(params)
 })

@@ -104,9 +104,20 @@ export interface Escapes {
   readonly ignored: number;
   /** An empty catch {}, or a promise's .catch(() => {}) that returns nothing: the error is swallowed. */
   readonly swallowed: number;
+  /** yield* Effect.result(x) then a branch on its _tag: a failure answered by hand, its error's type no longer read. */
+  readonly resultBranch: number;
 }
 
-export const escapeKinds = ["nonNull", "doubleCast", "cast", "lintOff", "orDie", "ignored", "swallowed"] as const satisfies readonly (keyof Escapes)[];
+export const escapeKinds = [
+  "nonNull",
+  "doubleCast",
+  "cast",
+  "lintOff",
+  "orDie",
+  "ignored",
+  "swallowed",
+  "resultBranch",
+] as const satisfies readonly (keyof Escapes)[];
 
 /** What to do instead of each escape: what --check says when one is new. */
 export const escapeAdvice: Record<keyof Escapes, string> = {
@@ -117,6 +128,7 @@ export const escapeAdvice: Record<keyof Escapes, string> = {
   orDie: "keep the error in the channel (declare it, or catchTag it where it can be answered) instead of turning it into a defect",
   ignored: 'answer the error where it is known (catchTag), or keep going with the failure logged: Effect.ignore({ log: "Warn" })',
   swallowed: "handle the error, or log it and say at the catch why it is safe to go on",
+  resultBranch: "answer the failure with Effect.catchTag / Effect.catch / Effect.match where it is known, so its type says what is handled",
 };
 
 type Node = { readonly type?: unknown; readonly [key: string]: unknown };
@@ -139,6 +151,7 @@ export function escapesIn(path: string, text: string): Escapes {
   let orDie = 0;
   let ignored = 0;
   let swallowed = 0;
+  let resultBranch = 0;
   // An ignore given { log } logs the failure it drops, so it is no escape: counted here and taken off below.
   let logged = 0;
   const visit = (value: unknown): void => {
@@ -159,6 +172,10 @@ export function escapesIn(path: string, text: string): Escapes {
       if (name === "ignore" || name === "ignoreCause") ignored++;
     }
     if (node.type === "CatchClause" && isEmpty({ body: node.body })) swallowed++;
+    if (node.type === "YieldExpression" && node.delegate === true) {
+      const call = nodeOf(nodeOf(node.argument).callee);
+      if (call.type === "MemberExpression" && nodeOf(call.object).name === "Effect" && nodeOf(call.property).name === "result") resultBranch++;
+    }
     if (node.type === "CallExpression") {
       const callee = nodeOf(node.callee);
       const ignoring =
@@ -178,7 +195,7 @@ export function escapesIn(path: string, text: string): Escapes {
   };
   visit(parsed.program);
   const lintOff = parsed.comments.filter((c) => /^\s*(?:oxlint|eslint)-disable/u.test(c.value)).length;
-  return { nonNull, doubleCast, cast, lintOff, orDie, ignored: ignored - logged, swallowed };
+  return { nonNull, doubleCast, cast, lintOff, orDie, ignored: ignored - logged, swallowed, resultBranch };
 }
 
 /** The escapes of the counted sources, summed by area, areas in order. */
@@ -187,7 +204,7 @@ export function escapesByArea(sources: readonly Source[], health: Pick<Health, "
   for (const s of sources) {
     if (!health.counted(s.path)) continue;
     const e = escapesIn(s.path, s.text);
-    const area = (out[health.areaOf(s.path)] ??= { nonNull: 0, doubleCast: 0, cast: 0, lintOff: 0, orDie: 0, ignored: 0, swallowed: 0 });
+    const area = (out[health.areaOf(s.path)] ??= { nonNull: 0, doubleCast: 0, cast: 0, lintOff: 0, orDie: 0, ignored: 0, swallowed: 0, resultBranch: 0 });
     for (const k of escapeKinds) area[k] += e[k];
   }
   return Object.fromEntries(Object.entries(out).toSorted(([a], [b]) => a.localeCompare(b)));

@@ -1,7 +1,7 @@
 // MCP servers' tools for the agent. Only initialize, tools/list (every page) and tools/call: no resources, prompts or
 // sampling. A server that cannot be reached is left out and said why; the others still come.
 
-import { existsSync, readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -219,8 +219,11 @@ const McpEntrySchema: Schema.Codec<McpEntry> = Schema.Struct({
 const McpConfigSchema = Schema.fromJsonString(Schema.Struct({ mcpServers: Schema.optionalKey(Schema.Record(Schema.String, McpEntrySchema)) }));
 
 /** A missing file has none; unreadable JSON or a wrong shape is an error. */
-export function readMcpConfig(path: string): McpServer[] {
-  const data = existsSync(path) ? readFileSync(path, "utf8") : "{}";
+export async function readMcpConfig(path: string): Promise<McpServer[]> {
+  const data = await readFile(path, "utf8").catch((e: unknown) => {
+    if (e instanceof Error && "code" in e && e.code === "ENOENT") return "{}";
+    throw e;
+  });
   if (data.trim() === "") throw new Error(mcpConfig.notJson(path));
   let config: { mcpServers?: Record<string, McpEntry> };
   try {

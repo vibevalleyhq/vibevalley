@@ -6,12 +6,12 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 
-import { useCore } from "@/base/frame";
-import { ready, useProjects } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { aria, useClickAway } from "@/base/util";
 import { farm } from "@/farm/store";
 import { createChannelForm, directsOf, topsOf, chatPath, unreadUnder } from "@/features/channel";
+import { useCore } from "@/infra/frame";
+import { ready, useProjects } from "@/infra/query";
+import { useRouter } from "@/infra/router";
 import { PxButton, PxTextInput, SpriteIcon } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";
 

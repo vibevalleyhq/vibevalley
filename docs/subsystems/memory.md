@@ -81,7 +81,7 @@
 - **工具（`tool`、`mcp`）**：管家和帮工的 `memory_search`、`memory_create` 调 `search`、`remember`，回话用 `foundText`。
 - **设置（`setting`）**：管理器每次用时读记性的来源设置。
 - **帮工的档案（`agent`）**：不填档案的检索要列出所有档案。
-- **管家（`packages/agent`）**：管家页经 `Memory` 读写 `MEMORY.md`（`readMemory`、`remember`、`forgetLine`）、列和搜旧账（`archiveFiles`、`readArchive`、`searchArchive`），和管家自己的工具用同一套；每个管家的家目录是 `agentHome`（`base/config.ts`），`orchestrator` 也用它。
+- **管家（`packages/agent`）**：管家页经 `Memory` 读写 `MEMORY.md`（`readMemory`、`remember`、`forgetLine`）、列和搜旧账（`archiveFiles`、`readArchive`、`searchArchive`），和管家自己的工具用同一套；每个管家的家目录是 `agentHome`（`infra/config.ts`），`orchestrator` 也用它。
 - **处理函数（`handlers.ts`）**：`memory.*`、`orchestrator.archive.list`、`orchestrator.archive.get` 只转发到 `Memory`。
 
 ## 为什么这样

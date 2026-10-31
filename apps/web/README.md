@@ -9,12 +9,22 @@ src/main.tsx        sends an unpaired remote browser to /pair, then renders App
 src/stories.tsx     the stories' page (stories.html, vite.stories.config.ts): every src/**/*.stories.tsx in packages/stories' viewer
 src/app/            the wiring: App (the routes, each place a feature's page), Root (router, state frames, the farm's store,
                     the query cache, <Loading>), the shell, places
-src/base/           what every layer stands on: the state stream (frames.ts, framework-free; frame.ts, its Solid store), the
-                    API client (api.ts), rooms (gateway.ts), the live stream, REST queries (query.ts, agents.ts), external.ts,
-                    the router, prefs, the host, saving settings, times and money in words (format.ts), the shared words
+src/base/           the pure ground, touching nothing outside: times and money in words (format.ts), ordering, matching
+                    (search.ts), the shortcut table, small Solid helpers (util.tsx; external.ts: a framework-free store as
+                    a signal)
+src/infra/          what talks to the outside: the state stream (frames.ts, framework-free, opened again when even the
+                    server's heartbeat stops coming; frame.ts, its Solid store), the API client (api.ts, with request keys), rooms (gateway.ts), the live stream, REST queries (query.ts,
+                    agents.ts), saving settings, the host, the app's updates, the router (the browser's history), the
+                    opening cover (opening.ts), the stories' fake server (storyApi.ts)
+src/state/          the middle layer on Effect's Atom: atom.ts (the page's registry, useAtom, the page's values as
+                    defineAtom, a choice in the address as useSearchParam, the frames as an atom), stored.ts (a choice
+                    kept on this machine: defineStored, the only door to the browser's storage), prefs.ts and
+                    appearance.ts (this machine's choices and the look they give), intent.ts (what the owner asked for
+                    until the frame shows it), the newest answer of a read asked again (latest.ts), the tests' registry
+                    (testing.ts)
 src/ui/             the workbench's pieces: Icon, Face, Button, Field, Dialog, Markdown, ToastHost, Segmented, Tabs, Qr, Chips, A
-                    (a link), the window strip, the list-and-detail layout (layout.tsx), a helper's look (cast.ts); each with its
-                    X.stories.tsx beside it
+                    (a link), an owner's act (act.ts), the window strip, the list-and-detail layout (layout.tsx), a
+                    helper's look (cast.ts); each with its X.stories.tsx beside it
 src/ui/pixel/       the pixel pieces every skin draws with (the farm, the tree, the project map, the catalog): windows, buttons,
                     fields, toasts, the atlas (atlas.ts), the sounds (sound.ts), a runtime's machine
 src/features/<x>/   one folder per concept, named as the server's module: issue, task, channel, session, agent, memory,
@@ -34,11 +44,44 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   (`packages/protocol/src/shapes.ts`, `api.ts`); never write a server shape here. A field the page needs and the frame lacks
   is added there and folded by the server.
 - **The page does not fold facts.** It reads the folded `StateFrame` (`useCore()`, `useFrames()`); REST reads go through
-  Solid Query (`base/query.ts`); a rule of the server (may this be dispatched, what a move means) is asked of the server,
+  Solid Query (`infra/query.ts`); a rule of the server (may this be dispatched, what a move means) is asked of the server,
   not rewritten here. Presentation rules (lanes, grouping, ordering, feed merging) are pure functions in the feature they
   belong to (`features/issue/display.ts`, `features/channel/unread.ts`), each with its test.
-- **Layers, one way.** `base` → `ui` → `ui/pixel` → `features` → the skins (`farm`, `tree`) → `app`: a file imports from
-  its own folder or a layer before it, never after (lint, `vibevalley/page-layers` in `scripts/oxlint-plugin.ts`). A
+- **What the owner does goes through the middle layer.** A change the page shows before the server has it is an
+  intent (`state/intent.ts`): `defineIntent({ send, confirmed, watch?, whileLost, timeoutMs })`, kept by its request key
+  in an atom family, so it outlives the component that made it. It settles when what the owner sees shows the change
+  (`bySeq`: a frame whose `seq` is at least the reply's; or the kind's own check, as a line's `sendKey` in its channel),
+  never on the reply or a timer; a timeout or a refusal leaves it `failed`, to retry with the same key or let go; while
+  the state stream is lost a keyed kind queues and sends once it is back. A feature shows its intents through a pure
+  overlay of its own that sets only the field the owner set (`features/issue/moves.ts`'s `movedCards`), with its test.
+  A setting changed again before the first showed replaces it (`sendReplacing`). A change with nothing to show before
+  the server has it is an Act (`createAct()` in `ui/act.ts`, `createPixelAct()` in `ui/pixel` for the skins): busy until
+  it ends however it ends, a refusal in the error tone, and while the state stream is lost it is not sent but refused
+  with that reason. A thing the owner may send again (a form's create) keeps one request key until it went through
+  (`createRequestKey`, `infra/api.ts`). In a component (a `.tsx` under `features/` or `farm/`) a call of the client that
+  changes something is made inside an Act's `run` or through an intent defined in the feature's `.ts` (lint
+  `vibevalley/act-door`), and a refusal toast without the error tone is reported (`vibevalley/failure-tone`). A read
+  asked again as the owner types or the place changes (a search, a channel's pins) shows only the answer to the newest
+  ask, a failure as a failure (`useLatest`, `state/latest.ts`); the REST reads are read again when the state stream comes
+  back (`refetchOnRelink`). Only `src/state` imports `effect/reactivity` (lint `vibevalley/atom-door`): its API is
+  unstable, so a change in it is fixed there. Why: docs/subsystems/app.md, 为什么这样.
+- **What the page keeps, it keeps one way.** A value that outlives a component (a dialog two places open, the farm's
+  overlays, a draft, the toasts) is an atom of the page's: `const x = defineAtom(initial)` (`state/atom.ts`), read with
+  `x.get()` anywhere (inside Solid it follows), written with `x.set`/`x.update`, heard from plain code with
+  `x.subscribe`. A choice kept on this machine is `defineStored(name, schema, fallback)` (`state/stored.ts`, on Atom's
+  `kvs`): the key is `vibevalley.<name>`, what does not decode reads as the fallback (`orFallback` per field of a
+  struct), a storage that throws keeps it for the page's life, and every reader, in this tab and the others, hears a
+  change. A choice worth a link or a reload goes in the address (`useSearchParam`, on `Atom.searchParam`: the board's
+  project and helper); a passing one (the words in a search box) stays a signal in its component. A `createSignal` or
+  `createStore` made outside any function in `features/`, `farm/` or `ui/` is reported (lint `vibevalley/page-store`),
+  and so is `localStorage` or `sessionStorage` anywhere but `state/stored.ts` (`vibevalley/stored-door`). What moves on
+  its own (the state stream's source, the live stream, the day clock, the textures loading, the phone's calls, the
+  call, dictation, the MOSS line, the block editor's queue) stays a framework-free store read through `createExternal`.
+- **Layers, one way.** `base` → `infra` → `state` → `ui` → `ui/pixel` → `features` → the skins (`farm`, `tree`) → `app`:
+  a file imports from its own folder or a layer before it, never after (lint, `vibevalley/page-layers` in
+  `scripts/oxlint-plugin.ts`). A file goes by what it is: pure (no server, host, browser history or storage) in `base`;
+  talking to the outside in `infra`; standing on Atom in `state`. A `base` file that needs an `infra` one moves up, or
+  what it needs moves down. A
   feature uses another only through its `index.ts`, named exports only, and the features' graph has no cycle
   (`src/layers.test.ts`). A piece two features both need (a word, a format, a query) goes down to the layer under both,
   or each keeps its own copy of a word; it does not make one feature reach into the other. The skins read features; no
@@ -58,7 +101,7 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   is its level (`src/storyLevels.ts`): 设计体系, 组件, 交互 (parts working together, in `src/stories/`), 界面 (a
   feature's view from made-up data, beside it in the feature). A part that answers the pointer has a `States` story
   with a `grid` (its variants × rest, hover, focus, pressed). There is no server behind the stories: a view that reads
-  one is answered by the open story (`answer` in `base/storyApi.ts`), and made-up data shared between stories is a
+  one is answered by the open story (`answer` in `infra/storyApi.ts`), and made-up data shared between stories is a
   `*.samples.ts` beside them (`features/issue/issue.samples.ts`); neither is imported by the product. A view tied to a
   device or a global (the microphone, a socket, the call) is split so its look takes props, and the stories draw that:
   `DictationMark`, `MossVerifyView`, `MossLineView`, `OrchestratorLine`. `vp run --filter
@@ -68,16 +111,16 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   `packages/stories`.
 - **App icons** are in `public/icons/`: `app-32.png`, `app-64.png` and `app-256.png`. The site build copies these packaged
   files; it does not keep another set.
-- **The host** (`@vibevalley/protocol/host`, found by `currentHost()` in `src/base/host.ts`) is the only way to the machine; a capability that is null is not drawn.
+- **The host** (`@vibevalley/protocol/host`, found by `currentHost()` in `src/infra/host.ts`) is the only way to the machine; a capability that is null is not drawn.
 - **Solid 2, not 1.x and not React.** The package ships its own guide (`node_modules/solid-js/CHEATSHEET.md` and
   `skills/`); `vp check` runs `eslint-plugin-solid`'s v2 rules over `src`. What this page adds to it:
-  - `base/query.ts` adapts TanStack's `QueryObserver` snapshots to Solid signals. Pending reads never suspend state-frame
+  - `infra/query.ts` adapts TanStack's `QueryObserver` snapshots to Solid signals. Pending reads never suspend state-frame
     updates. Read successful data through `ready(query, fallback)`; `placeholderData` controls a key switch's previous value.
   - A `<Show>` or `<Match>` function child gets an accessor that throws once the branch closes; a computation still
     settling then (a query in the branch) halts every update on the page. A branch holding queries is keyed by a plain
     value (`<Show when={x()?.id} keyed>`) and looks its object up itself, keeping the last one found.
   - A `ref` callback does not read a `<For>` item's accessor; read the key once (`untrack`) before.
-  - A framework-free store (the frames, the farm's store, toasts, the call) comes in through `createExternal`. Code that
+  - A framework-free store (the frames, the call, dictation) comes in through `createExternal`. Code that
     compares one frame with the one before (sounds, the canvas, the phone's calls) reads `rawFrame()`; the UI reads the
     store, reconciled by id, which updates only what changed.
   - A component runs once: what changes on its own (the window's size, the time) needs a signal (`useViewport`, `useNow`).

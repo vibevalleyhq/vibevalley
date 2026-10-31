@@ -30,7 +30,9 @@ const asked = (p: Option.Option<string>) => (Option.isSome(p) ? { p: p.value } :
 /** A conversation in the terminal. It takes Ctrl+C itself (stop the turn, again to quit), so the signal that interrupts
  * any other command must not end it: it runs uninterruptible and ends when the conversation does. */
 const chat = <E>(talk: Effect.Effect<void, E>) =>
-  // Detached and joined uninterruptibly: the conversation itself stays interruptible inside (a turn Ctrl+C stops).
+  // Detached and joined uninterruptibly: the conversation itself stays interruptible inside (a turn Ctrl+C stops). The
+  // command's own end is the conversation's, so nothing outlives it.
+  // oxlint-disable-next-line vibevalley/scoped-fibers -- a terminal conversation the process signal must not cut; joined at once
   Effect.uninterruptible(Effect.flatMap(Effect.forkDetach(talk), Fiber.join)).pipe(
     Effect.mapError((e) => new Failure({ code: exit.other, tag: "Chat", text: typeof e === "string" ? e : messageOf(e) })),
   );

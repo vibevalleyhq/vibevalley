@@ -1,6 +1,7 @@
 -- Crons (cron/cron.ts).
 
 -- name: Crons :many
+-- bound: a row per cron the owner or the orchestrator set.
 select * from cron order by id;
 
 -- name: AddCron :exec

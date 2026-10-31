@@ -1,4 +1,4 @@
-import { Layer } from "effect";
+import { Effect, Layer } from "effect";
 import { HttpRouter } from "effect/http";
 import { expect, it } from "vite-plus/test";
 
@@ -11,12 +11,11 @@ it("forwards a disconnect to the Web handler", async () => {
   let aborted = false;
   const handler = Mcp.of({
     handle: (request) =>
-      new Promise<Response>((resolve) => {
+      Effect.callback<Response>(() => {
         request.signal.addEventListener(
           "abort",
           () => {
             aborted = true;
-            resolve(new Response(null, { status: 499 }));
           },
           { once: true },
         );

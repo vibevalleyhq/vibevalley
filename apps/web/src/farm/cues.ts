@@ -91,5 +91,6 @@ export function inTurn(name: SoundName, hold: number) {
   const at = Math.max(now, floorFree);
   floorFree = at + hold;
   if (at === now) playSound(name);
+  // oxlint-disable-next-line vibevalley/dropped-timer -- a cue waits its turn for at most a moment, and plays once whatever is shown then
   else setTimeout(() => playSound(name), at - now);
 }

@@ -3,7 +3,8 @@ import { dirname, join, normalize, relative } from "node:path";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { importsOf, pyramid } from "@vibevalley/testkit/pyramid";
+import { pyramid } from "@vibevalley/testkit/pyramid";
+import { importsOf } from "@vibevalley/testkit/source";
 
 const root = join(import.meta.dirname, "../..");
 const { reach, layerOf } = pyramid(root);
@@ -26,7 +27,7 @@ describe("the test pyramid", () => {
     const crossing = all.flatMap((f) =>
       f.startsWith("src/flows/")
         ? []
-        : importsOf(readFileSync(join(root, f), "utf8"))
+        : importsOf(f, readFileSync(join(root, f), "utf8"))
             .filter((s) => s.startsWith(".") && resolve(f, s).startsWith("src/flows/"))
             .map((s) => `${f} imports ${s}`),
     );

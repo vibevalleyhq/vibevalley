@@ -35,4 +35,20 @@ describe("the audience", () => {
     expect(a.followers("t")).toEqual(["w1", "w3"]);
     expect(a.followers("other")).toEqual([]);
   });
+
+  it("forgets a session that left", () => {
+    const a = new Audience();
+    a.load(
+      [
+        { channel_id: "t", participant_id: "w3" },
+        { channel_id: "u", participant_id: "w3" },
+        { channel_id: "u", participant_id: "w1" },
+      ],
+      [],
+      [{ recipient_id: "w3", at: 9 }],
+      [],
+    );
+    a.left("w3");
+    expect([a.followers("t"), a.followers("u"), a.lastWake("w3")]).toEqual([[], ["w1"], 0]);
+  });
 });

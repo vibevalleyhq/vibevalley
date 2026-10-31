@@ -32,11 +32,11 @@ import {
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
 
-import { ServerConfig } from "@/base/config.ts";
-import { Db } from "@/base/db.ts";
 import { code as newCode, newId } from "@/base/ids.ts";
-import { callbackLog } from "@/base/log.ts";
 import { lookIn, messageOf, missing } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Db } from "@/infra/db.ts";
+import { callbackLog } from "@/infra/log.ts";
 
 import * as lanQ from "../../db/generated/lan.sql.ts";
 import * as q from "../../db/generated/lan_device.sql.ts";
@@ -156,7 +156,7 @@ const make = (options: LanOptions = {}) =>
     // What a request sets off (its forwarding, a write) belongs to this service: it ends with it and keeps its services.
     const forkHere = yield* FiberSet.makeRuntime();
     const config = yield* ServerConfig;
-    const { run: db } = yield* Db;
+    const db = yield* Db;
     const http = yield* HttpClient.HttpClient;
     const address = options.address ?? lanAddress;
     // Read in callbacks too: the Clock the service was built with.
@@ -164,7 +164,7 @@ const make = (options: LanOptions = {}) =>
     const now = () => clock.currentTimeMillisUnsafe();
 
     const devices = new Map<string, Device>();
-    for (const row of yield* db(q.lanDevices())) {
+    for (const row of yield* db.run(q.lanDevices())) {
       devices.set(row.id, {
         id: row.id,
         name: row.name,
@@ -175,7 +175,7 @@ const make = (options: LanOptions = {}) =>
       });
     }
     // No row yet is shut.
-    let open = Option.match(yield* db(Effect.catchNoSuchElement(lanQ.lanOpen())), {
+    let open = Option.match(yield* db.run(Effect.catchNoSuchElement(lanQ.lanOpen())), {
       onNone: () => false,
       onSome: (r) => r.open,
     });
@@ -225,7 +225,9 @@ const make = (options: LanOptions = {}) =>
       if (at - found.written >= seenEveryMs) {
         found.written = at;
         forkHere(
-          db(q.seenLanDevice({ last_seen: at, id: found.id })).pipe(Effect.catchCause((c) => Effect.logError(`vibevalley: lan access: ${Cause.pretty(c)}`))),
+          db
+            .run(q.seenLanDevice({ last_seen: at, id: found.id }))
+            .pipe(Effect.catchCause((c) => Effect.logError(`vibevalley: lan access: ${Cause.pretty(c)}`))),
         );
       }
       return found.id;
@@ -381,7 +383,7 @@ const make = (options: LanOptions = {}) =>
     const addDevice = Effect.fn("Lan.addDevice")(function* (name: string) {
       const key = randomBytes(32).toString("base64url");
       const d: Device = { id: newId(), name, pairedAt: now(), keyHash: hash(key), written: 0 };
-      yield* db(q.addLanDevice({ id: d.id, name: d.name, key_hash: d.keyHash, paired_at: d.pairedAt }));
+      yield* db.run(q.addLanDevice({ id: d.id, name: d.name, key_hash: d.keyHash, paired_at: d.pairedAt }));
       devices.set(d.id, d);
       logs.info(`vibevalley: lan access: "${name}" paired`);
       return { device: d.id, key, hostName: hostName() };
@@ -390,7 +392,7 @@ const make = (options: LanOptions = {}) =>
     return Lan.of({
       status,
       setOpen: Effect.fn("Lan.setOpen")(function* (want) {
-        yield* db(lanQ.setLanOpen({ open: want }));
+        yield* db.run(lanQ.setLanOpen({ open: want }));
         open = want;
         if (want) yield* listen;
         else {
@@ -454,7 +456,7 @@ const make = (options: LanOptions = {}) =>
       },
       forget: Effect.fn("Lan.forget")(function* (id) {
         yield* known(id);
-        yield* db(q.removeLanDevice({ id }));
+        yield* db.run(q.removeLanDevice({ id }));
         devices.delete(id);
         for (const cut of conns.get(id) ?? []) cut();
         conns.delete(id);

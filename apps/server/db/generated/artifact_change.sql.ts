@@ -54,3 +54,19 @@ export const addArtifactChange = Effect.fn("AddArtifactChange")(function* (param
     execute: (p) => sql.unsafe(AddArtifactChangeSql, [p["artifact_id"], p["seq"], p["batch_id"], p["actor"], p["block_ids"], p["results"], p["created_at"]]),
   })(params)
 })
+
+export const PruneArtifactChangesParams = Schema.Struct({
+  ["before"]: Schema.Number,
+})
+export type PruneArtifactChangesParams = typeof PruneArtifactChangesParams.Type
+
+
+export const PruneArtifactChangesSql = "-- name: PruneArtifactChanges :exec\n-- A batch older than before: a client sends a batch again within seconds, not days.\ndelete from artifact_change where created_at < $1;"
+
+export const pruneArtifactChanges = Effect.fn("PruneArtifactChanges")(function* (params: PruneArtifactChangesParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: PruneArtifactChangesParams,
+    execute: (p) => sql.unsafe(PruneArtifactChangesSql, [p["before"]]),
+  })(params)
+})

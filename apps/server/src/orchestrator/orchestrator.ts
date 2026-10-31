@@ -11,14 +11,15 @@ import { Agent } from "@/agent/agent.ts";
 import { modelClient, noDeepSeekKey } from "@/agent/model.ts";
 import { traitsOf } from "@/agent/prompts.ts";
 import { orchestrator } from "@/base/actor.ts";
-import { agentHome, projectsDir, ServerConfig } from "@/base/config.ts";
-import { localeMinute } from "@/base/time.ts";
 import { Channel, type OrchestratorNews, type SayMore } from "@/channel/chat.ts";
+import type { Picked } from "@/channel/wake.ts";
 import { Core } from "@/core/core.ts";
 import { Cron } from "@/cron/cron.ts";
 import { nextRun } from "@/cron/when.ts";
 import type { ApiError } from "@/errors.ts";
 import { Inbox, type Overdue } from "@/inbox/inbox.ts";
+import { agentHome, projectsDir, ServerConfig } from "@/infra/config.ts";
+import { localeMinute } from "@/infra/time.ts";
 import { Issue, type OrchestratorWork } from "@/issue/issue.ts";
 import { Project } from "@/project/project.ts";
 import { ownersLanguage } from "@/prompts.ts";
@@ -44,10 +45,7 @@ const keepEvents = 1000;
 const resumeWithinMs = 30 * 60_000;
 
 /** What the owner chose beside the words (the sowing form, the chat's profile pick); empty for none. */
-export interface Pick {
-  readonly agent?: string;
-  readonly project?: string;
-}
+export type Pick = Picked;
 
 /** Where an input's answer goes and what it is worth; kept with it in the transcript. */
 interface Route {
@@ -90,7 +88,7 @@ export class Orchestrator extends Context.Service<
     readonly brief: (line: string) => Effect.Effect<string, NotAnswered>;
     /** The orchestrator as orchestratorModel on a chat/completions endpoint: what is asked there is the owner's, as in the chat.
      * On the phone (the voice line) the words are said in the default channel too, and the answer is one to be read out. */
-    readonly answerer: (on: "phone" | "api") => (model: string) => Answer | undefined;
+    readonly answerer: (on: "phone" | "api") => (model: string) => Answer<NotAnswered> | undefined;
     /** The lines waiting for an orchestrator (the default one when none is named) are dropped with its run; the sessions
      * it sent keep working. */
     readonly stop: (agent?: string) => Effect.Effect<void>;
@@ -134,9 +132,6 @@ const make = (options: OrchestratorOptions = {}) =>
         const at = current();
         return { agent: id, session: "", project: "", here: at.channel, picked: at.agent ?? "", actor: orchestrator(at.owner ?? false) };
       });
-
-    /** What the owner picked beside a message (a profile, a project), until an orchestrator takes the message. */
-    const selected = new Map<string, Pick>();
 
     /** One orchestrator: its own host (conversation, queue, run), home, model, and what it was last shown and told. */
     interface Instance {
@@ -202,7 +197,6 @@ const make = (options: OrchestratorOptions = {}) =>
                 restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger } }),
                 keepEvents,
                 toolStart: tool.start,
-                notice: (level, text) => core.notice(level, text),
               })
               .pipe(Scope.provide(scope)),
           };
@@ -215,15 +209,20 @@ const make = (options: OrchestratorOptions = {}) =>
 
     const agentLines = Effect.gen(function* () {
       const lines: string[] = [];
-      for (const a of store.agents()) {
-        const assessed = yield* runtimes.assess(a);
-        const p = assessed.agent;
-        let line = situationWords.agent(p.name, p.id, runtimeLabel(p.runtime), traitsOf(p));
-        if (p.enabled && assessed.blocking.length === 0) line += situationWords.quota(quotaText(assessed.info));
-        else if (assessed.blocking.length > 0) line += situationWords.blocked(assessed.blocking[0]!.text);
-        else line += situationWords.disabled;
-        lines.push(line);
-      }
+      yield* Effect.forEach(
+        store.agents(),
+        (a) =>
+          Effect.gen(function* () {
+            const assessed = yield* runtimes.assess(a);
+            const p = assessed.agent;
+            let line = situationWords.agent(p.name, p.id, runtimeLabel(p.runtime), traitsOf(p));
+            if (p.enabled && assessed.blocking.length === 0) line += situationWords.quota(quotaText(assessed.info));
+            else if (assessed.blocking.length > 0) line += situationWords.blocked(assessed.blocking[0]!.text);
+            else line += situationWords.disabled;
+            lines.push(line);
+          }),
+        { discard: true },
+      );
       return lines;
     });
 
@@ -336,14 +335,8 @@ const make = (options: OrchestratorOptions = {}) =>
       Effect.suspend(() => {
         const fromPerson = n.messages.every((m) => m.from === ownerId);
         const owner = n.messages.some((m) => m.from === ownerId);
-        let picked: Pick = {};
-        for (const m of n.messages) {
-          const p = selected.get(m.id);
-          if (p) {
-            picked = p;
-            selected.delete(m.id);
-          }
-        }
+        // The latest pick among them: it goes with its message.
+        const picked: Pick = n.messages.findLast((m) => m.picked)?.picked ?? {};
         const line =
           fromPerson && (n.type === "direct" || n.channel === chat.defaultChannel())
             ? pickedNote(picked) + lineWords.owner(n.messages.map((m) => m.text).join("\n"))
@@ -369,26 +362,25 @@ const make = (options: OrchestratorOptions = {}) =>
 
     // One answer streams at a time, the call's or chat/completions', from the default orchestrator: a newer line ends the
     // one before.
-    const answer = (line: string, signal: AbortSignal): AsyncIterable<string> => {
-      const me = new Caller();
-      // A caller that already left (the request was cancelled before this ran) is not answered: no run starts for it.
-      if (signal.aborted) {
-        me.end();
-        return Stream.toAsyncIterable(me.words);
-      }
-      latestCall?.end();
-      latestCall = me;
-      signal.addEventListener(
-        "abort",
-        () => {
-          me.end();
-          if (latestCall === me) latestCall = undefined;
-        },
-        { once: true },
+    // The caller is made when the stream is first read: one that left before that starts no run. Its stream ending,
+    // or being interrupted (the caller hung up), ends it.
+    const answer = (line: string): Stream.Stream<string, NotAnswered> =>
+      Stream.unwrap(
+        Effect.sync(() => {
+          const me = new Caller();
+          latestCall?.end();
+          latestCall = me;
+          forkHere(take({ source: "owner", line, channel: chat.defaultChannel(), owner: true, caller: me }));
+          return me.words.pipe(
+            Stream.ensuring(
+              Effect.sync(() => {
+                me.end();
+                if (latestCall === me) latestCall = undefined;
+              }),
+            ),
+          );
+        }),
       );
-      forkHere(take({ source: "owner", line, channel: chat.defaultChannel(), owner: true, caller: me }));
-      return Stream.toAsyncIterable(me.words);
-    };
 
     const logged = <E>(what: string, effect: Effect.Effect<unknown, E>) =>
       effect.pipe(
@@ -414,10 +406,15 @@ const make = (options: OrchestratorOptions = {}) =>
         Stream.runForEach(yield* tasks.news, (line) => logged("a task graph's line", take({ source: "graph", line, channel: chat.defaultChannel() }))),
       );
       // Each orchestrator goes on with the run a stop cut off.
-      for (const a of store.orchestrators()) {
-        const me = yield* instanceOf(a.id);
-        if (me.host.unfinished() && (options.llm || settings.deepseekApiKey())) forkHere(me.host.resume(resumeWithinMs));
-      }
+      yield* Effect.forEach(
+        store.orchestrators(),
+        (a) =>
+          Effect.gen(function* () {
+            const me = yield* instanceOf(a.id);
+            if ((options.llm || settings.deepseekApiKey()) && (yield* me.host.unfinished)) forkHere(me.host.resume(resumeWithinMs));
+          }),
+        { discard: true },
+      );
     }
 
     yield* Effect.addFinalizer(() => Effect.forEach([...instances.values()], (me) => me.host.close, { concurrency: "unbounded", discard: true }));
@@ -435,8 +432,7 @@ const make = (options: OrchestratorOptions = {}) =>
         const a = pick.agent ? store.agent(pick.agent) : undefined;
         const picked: Pick = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
         yield* core.open();
-        const { message, again } = yield* chat.say(text, channel, sendKey, more);
-        if (!again && (picked.agent || picked.project)) selected.set(message.id, picked);
+        yield* chat.say(text, channel, sendKey, { ...more, ...(picked.agent || picked.project ? { picked } : {}) });
       }),
       heard: Effect.fn("Orchestrator.heard")(function* (text, agent, sendKey) {
         yield* core.open();
@@ -463,11 +459,14 @@ const make = (options: OrchestratorOptions = {}) =>
       }),
       answerer: (on) => (model) => {
         if (model !== orchestratorModel) return undefined;
-        if (on === "api") return (text, signal) => answer(lineWords.owner(text), signal);
-        return (text, signal) => {
-          forkHere(Effect.ignore(chat.spoken(ownerId, text, ""), { log: "Warn", message: "vibevalley: voice: the owner's spoken words were not kept" }));
-          return answer(voiceNote + "\n" + lineWords.owner(text), signal);
-        };
+        if (on === "api") return (text) => answer(lineWords.owner(text));
+        return (text) =>
+          Stream.unwrap(
+            Effect.sync(() => {
+              forkHere(Effect.ignore(chat.spoken(ownerId, text, ""), { log: "Warn", message: "vibevalley: voice: the owner's spoken words were not kept" }));
+              return answer(voiceNote + "\n" + lineWords.owner(text));
+            }),
+          );
       },
       stop: Effect.fn("Orchestrator.stop")(function* (agent) {
         const me = yield* target(agent);
@@ -479,9 +478,10 @@ const make = (options: OrchestratorOptions = {}) =>
           on,
           want,
           modelId(me.id),
-          [...toolsFor(me.id)(() => me.host.current().route), ...selfTools({ home: me.home, skills: () => [], memory: true, now: () => 0 })].map(
-            (item) => item.name,
-          ),
+          [
+            ...toolsFor(me.id)(() => me.host.current().route),
+            ...selfTools({ home: me.home, skills: () => Promise.resolve([]), memory: true, now: () => 0 }),
+          ].map((item) => item.name),
         );
       }),
     });

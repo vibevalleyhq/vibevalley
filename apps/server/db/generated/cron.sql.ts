@@ -30,7 +30,7 @@ export const CronsResult = Schema.Struct({
 export type CronsResult = typeof CronsResult.Type
 
 
-export const CronsSql = "-- Crons (cron/cron.ts).\n\n-- name: Crons :many\nselect \"cron\".\"id\", \"cron\".\"name\", \"cron\".\"body\", \"cron\".\"channel_id\", \"cron\".\"agent\", \"cron\".\"project\", \"cron\".\"spec\", \"cron\".\"tz\", \"cron\".\"enabled\", \"cron\".\"created_at\", \"cron\".\"last_run\", \"cron\".\"set_by\", \"cron\".\"pending\" from cron order by id;"
+export const CronsSql = "-- Crons (cron/cron.ts).\n\n-- name: Crons :many\n-- bound: a row per cron the owner or the orchestrator set.\nselect \"cron\".\"id\", \"cron\".\"name\", \"cron\".\"body\", \"cron\".\"channel_id\", \"cron\".\"agent\", \"cron\".\"project\", \"cron\".\"spec\", \"cron\".\"tz\", \"cron\".\"enabled\", \"cron\".\"created_at\", \"cron\".\"last_run\", \"cron\".\"set_by\", \"cron\".\"pending\" from cron order by id;"
 
 export const crons = Effect.fn("Crons")(function* () {
   const sql = yield* SqlClient.SqlClient

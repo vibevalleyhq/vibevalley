@@ -12,13 +12,13 @@ import * as S from "@vibevalley/protocol/schema";
 import { Agent } from "@/agent/agent.ts";
 import { actsForOwner, type Actor, session as sessionActor, system } from "@/base/actor.ts";
 import { clip } from "@/base/clip.ts";
-import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
-import { bestEffort } from "@/base/log.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { Core } from "@/core/core.ts";
 import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "@/errors.ts";
+import { causeMessage, Db } from "@/infra/db.ts";
+import { bestEffort } from "@/infra/log.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Project } from "@/project/project.ts";
 import { MergeFailure, type ProjectError } from "@/project/shapes.ts";
@@ -174,7 +174,7 @@ export const make = (options: TaskOptions = {}) =>
       handOver: live.handOver,
     };
     const projects: TaskGit = options.git ?? (yield* Project);
-    const { run: db, attempt } = yield* Db;
+    const db = yield* Db;
     /** A step's run ending and the person pressing a button must not both read the same graph and write over each other. */
     const lock = yield* Semaphore.make(1);
     const newsHub = yield* scopedPubSub<string>();
@@ -208,17 +208,19 @@ export const make = (options: TaskOptions = {}) =>
             ...(c.changes && c.changes.length > 0 ? { changes: c.changes } : {}),
             ...(c.commits && c.commits.length > 0 ? { commits: c.commits } : {}),
           };
-          return attempt(
-            q.addGraphEvent({
-              id: newId(),
-              graph_id: c.graph,
-              task_id: c.task ?? null,
-              kind: c.kind,
-              actor,
-              payload: JSON.stringify(payload),
-              created_at: clock.currentTimeMillisUnsafe(),
-            }),
-          ).pipe(bestEffort("vibevalley: a task graph event was not kept"));
+          return db
+            .attempt(
+              q.addGraphEvent({
+                id: newId(),
+                graph_id: c.graph,
+                task_id: c.task ?? null,
+                kind: c.kind,
+                actor,
+                payload: JSON.stringify(payload),
+                created_at: clock.currentTimeMillisUnsafe(),
+              }),
+            )
+            .pipe(bestEffort("vibevalley: a task graph event was not kept"));
         },
         { discard: true },
       );
@@ -426,7 +428,14 @@ export const make = (options: TaskOptions = {}) =>
               if (task) yield* taskFailed(withTask(graph, task.id, unmanned), task, t("server.task.notice.helperGone"));
             }
           } else return;
-          for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* cron(graph.id);
+          yield* Effect.forEach(
+            graphsOf(core.state()),
+            (graph) =>
+              Effect.gen(function* () {
+                if (graph.state === "running") yield* cron(graph.id);
+              }),
+            { discard: true },
+          );
         }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
       );
 
@@ -462,15 +471,34 @@ export const make = (options: TaskOptions = {}) =>
     // Run by the startup, after the sessions came back and marked the runs that stopped with the server.
     const comeBack = lock.withPermits(1)(
       Effect.gen(function* () {
-        for (const graph of graphsOf(core.state())) {
-          if (graph.state === "splitting") {
-            yield* putSystem(withNote({ ...graph, state: "abandoned" }, t("server.task.notice.restartedSplitting")));
-            for (const h of live.presentSessions()) if (h.graph?.id === graph.id && h.graph.task === undefined) yield* dismiss(h.id);
-          } else if (graph.state === "running" && graph.tasks.some((n) => n.state === "working")) {
-            yield* putSystem(withNote({ ...graph, state: "paused" }, t("server.task.notice.restarted")));
-          }
-        }
-        for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* cron(graph.id);
+        yield* Effect.forEach(
+          graphsOf(core.state()),
+          (graph) =>
+            Effect.gen(function* () {
+              if (graph.state === "splitting") {
+                yield* putSystem(withNote({ ...graph, state: "abandoned" }, t("server.task.notice.restartedSplitting")));
+                yield* Effect.forEach(
+                  live.presentSessions(),
+                  (h) =>
+                    Effect.gen(function* () {
+                      if (h.graph?.id === graph.id && h.graph.task === undefined) yield* dismiss(h.id);
+                    }),
+                  { discard: true },
+                );
+              } else if (graph.state === "running" && graph.tasks.some((n) => n.state === "working")) {
+                yield* putSystem(withNote({ ...graph, state: "paused" }, t("server.task.notice.restarted")));
+              }
+            }),
+          { discard: true },
+        );
+        yield* Effect.forEach(
+          graphsOf(core.state()),
+          (graph) =>
+            Effect.gen(function* () {
+              if (graph.state === "running") yield* cron(graph.id);
+            }),
+          { discard: true },
+        );
       }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
     );
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
@@ -609,7 +637,14 @@ export const make = (options: TaskOptions = {}) =>
             const splitter = splitters.get(graph.id);
             splitters.delete(graph.id);
             if (splitter) yield* dismiss(splitter);
-            for (const n of graph.tasks) if (n.state === "working" && n.session) yield* dismiss(n.session);
+            yield* Effect.forEach(
+              graph.tasks,
+              (n) =>
+                Effect.gen(function* () {
+                  if (n.state === "working" && n.session) yield* dismiss(n.session);
+                }),
+              { discard: true },
+            );
             return graph.branch
               ? t("server.task.act.abandonedKept", { title: graph.title, branch: graph.branch })
               : t("server.task.act.abandoned", { title: graph.title });
@@ -695,7 +730,7 @@ export const make = (options: TaskOptions = {}) =>
         };
       }),
       events: Effect.fn("Task.events")(function* (id) {
-        const rows = yield* db(q.graphEvents({ graph_id: id, n: readLimit }));
+        const rows = yield* db.run(q.graphEvents({ graph_id: id, n: readLimit }));
         const graph = get(id);
         const titleOf = (node: string) => (graph ? (taskOf(graph, node)?.title ?? node) : node);
         return rows.flatMap((row): T.GraphEvent[] => {

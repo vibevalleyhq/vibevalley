@@ -3,5 +3,6 @@
   "notPort": "{path}: {name} is not a port: {port}",
   "prPoll": "github.pr_poll_seconds must be above 0",
   "homeTaken": "The home {home} is used by another server: connect to that one, or stop it first",
-  "homeUnlocked": "Could not lock the home {home}"
+  "homeUnlocked": "Could not lock the home {home}",
+  "requestKeyLong": "requestKey is too long (at most {max} characters)"
 }

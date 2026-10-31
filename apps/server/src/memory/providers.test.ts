@@ -1,3 +1,4 @@
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
@@ -6,8 +7,8 @@ import type * as T from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner as ownerActor } from "@/base/actor.ts";
-import { ServerConfig } from "@/base/config.ts";
-import { Database, Db } from "@/base/db.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Database, Db } from "@/infra/db.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -88,6 +89,7 @@ const world = (build: BuildSource = () => undefined, timeoutMs = 50) =>
     Layer.provideMerge(Database),
     Layer.provideMerge(FetchHttpClient.layer),
     Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())),
+    Layer.provideMerge(NodeServices.layer),
   );
 
 const nowledgeOn: T.MemorySourceUpdate = { kind: "nowledge", url: "http://up/", enabled: true, read: true, write: true };
@@ -187,15 +189,15 @@ describe("memory sources", () => {
     return Effect.gen(function* () {
       const m = yield* Memory;
       yield* save({ ...nowledgeOn, url: "http://down/" });
-      let sources = m.sources();
+      let sources = yield* m.sources;
       expect([sources.length, sources[0]!.name, sources[0]!.on, sources[1]!.on, sources[1]!.off]).toEqual([2, localName, true, false, "no address"]);
       yield* save(nowledgeOn);
-      sources = m.sources();
+      sources = yield* m.sources;
       expect([sources[1]!.on, sources[1]!.label]).toEqual([true, "Nowledge Mem"]);
-      m.sources();
+      yield* m.sources;
       expect(built).toBe(2);
       yield* save({ ...nowledgeOn, enabled: false });
-      sources = m.sources();
+      sources = yield* m.sources;
       expect([sources[1]!.on, sources[1]!.off]).toEqual([false, "没打开"]);
     }).pipe(Effect.provide(world(build)));
   });
@@ -223,7 +225,7 @@ describe("memory sources", () => {
       yield* Effect.promise(() => until(() => events.includes("old:first")));
       yield* m.write(owner("lab", "second"));
       yield* save({ ...nowledgeOn, url: "http://new/" });
-      m.sources();
+      yield* m.sources;
       yield* Effect.promise(() => until(() => events.includes("old:stop")));
       yield* m.write(owner("lab", "third"));
       yield* Effect.promise(() => until(() => events.includes("new:third")));
@@ -272,7 +274,7 @@ describe("memory sources", () => {
         );
         yield* Effect.promise(() => until(() => entered));
         yield* save({ ...nowledgeOn, url: "http://new/" });
-        m.sources();
+        yield* m.sources;
         yield* Effect.promise(() => until(() => asked?.aborted === true));
         yield* Effect.promise(() => pending);
         yield* Effect.promise(() => until(() => stopped));

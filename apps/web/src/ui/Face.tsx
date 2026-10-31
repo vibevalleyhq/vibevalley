@@ -5,8 +5,8 @@ import { Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Look } from "@vibevalley/protocol";
 
-import { orchestratorLookOf } from "@/base/agents";
-import { ready, useAgents, useSprites } from "@/base/query";
+import { orchestratorLookOf } from "@/infra/agents";
+import { ready, useAgents, useSprites } from "@/infra/query";
 
 import { castPrefix } from "./cast";
 import { RuntimeBadge } from "./RuntimeBadge";

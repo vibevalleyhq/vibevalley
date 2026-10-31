@@ -9,14 +9,15 @@ import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
 
-import { useCore } from "@/base/frame";
-import { useRouter } from "@/base/router";
+import { useInterval } from "@/base/timer";
 import { ChatWindow } from "@/farm/chat/ChatWindow";
 import { farm } from "@/farm/store";
 import { padListening, phoneState, pressPad } from "@/farm/support";
 import { useFarm } from "@/farm/ui";
 import { unreadTotal } from "@/features/channel";
 import { voiceCall } from "@/features/voice";
+import { useCore } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
 import { playSound } from "@/ui/pixel/sound";
 
 import { missedOf, phoneCalls } from "./calls";
@@ -166,10 +167,7 @@ function Handset(props: {
   onHome: () => void;
 }) {
   const [now, setNow] = createSignal(new Date());
-  onSettled(() => {
-    const t = setInterval(() => setNow(new Date()), 15_000);
-    return () => clearInterval(t);
-  });
+  useInterval(() => setNow(new Date()), 15_000);
   onSettled(() => {
     // On the capture phase, so Esc folds or puts the phone away before the farm opens its menu; a dialog over it (the
     // channel menu) takes its Esc first.

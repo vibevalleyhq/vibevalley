@@ -7,7 +7,7 @@
 // the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
 
-import { lstatSync, readdirSync } from "node:fs";
+import { lstat, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, DateTime, Predicate } from "effect";
@@ -15,13 +15,13 @@ import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, D
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
+import { slice } from "@vibevalley/protocol/rules";
 
-import { slice } from "@/base/clip.ts";
-import { ServerConfig } from "@/base/config.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
 import { numberIn } from "@/base/number.ts";
 import { or } from "@/base/order.ts";
 import { messageOf } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
 
 import { git, type GitError, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { asFarm, repository } from "./repository.ts";
@@ -281,15 +281,27 @@ const make = (hooks: ProjectHooks = {}) =>
     const prProjects = new Set([...config.github.prProjects]);
     const gh = hooks.gh ?? runGitHub;
 
-    const queues = new Map<string, Semaphore.Semaphore>();
-    const serially = <A, E, R>(project: string, effect: Effect.Effect<A, E, R>) => {
-      let q = queues.get(project);
-      if (!q) {
-        q = Semaphore.makeUnsafe(1);
-        queues.set(project, q);
-      }
-      return q.withPermits(1)(effect);
-    };
+    // A project's lock lives while someone holds it or waits for it, so a removed project leaves none behind.
+    const queues = new Map<string, { readonly lock: Semaphore.Semaphore; users: number }>();
+    const serially = <A, E, R>(project: string, effect: Effect.Effect<A, E, R>) =>
+      Effect.suspend(() => {
+        let q = queues.get(project);
+        if (!q) {
+          q = { lock: Semaphore.makeUnsafe(1), users: 0 };
+          queues.set(project, q);
+        }
+        const held = q;
+        held.users++;
+        return held.lock
+          .withPermits(1)(effect)
+          .pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                if (--held.users === 0) queues.delete(project);
+              }),
+            ),
+          );
+      });
     const pending = new Set<string>();
     let status: T.GitHubStatus | undefined;
     let capabilities = new Map<string, T.PullRequestCapability>();
@@ -323,8 +335,9 @@ const make = (hooks: ProjectHooks = {}) =>
     const list = Effect.fn("Project.list")(function* () {
       if (!(yield* exists(root))) return [];
       const out: ProjectFolder[] = [];
-      // readdirSync for the entries' kinds, which FileSystem does not give: a link to a folder is not a project.
-      for (const e of readdirSync(root, { withFileTypes: true })) {
+      // node's readdir for the entries' kinds, which FileSystem does not give: a link to a folder is not a project.
+      const entries = yield* Effect.tryPromise({ try: () => readdir(root, { withFileTypes: true }), catch: reason }).pipe(Effect.orElseSucceed(() => []));
+      for (const e of entries) {
         if (!e.isDirectory() || e.name.startsWith(".") || pending.has(e.name)) continue;
         const real = yield* Effect.option(fs.realPath(join(root, e.name)));
         if (Option.isNone(real)) continue;
@@ -403,7 +416,7 @@ const make = (hooks: ProjectHooks = {}) =>
      * turn and with the check's time limit; one that fails is logged, and the helper starts all the same. */
     const projectSetup = Effect.fn("Project.projectSetup")(function* (cwd: string) {
       const file = join(cwd, ".vibevalley", "setup");
-      if (!lexists(file)) return;
+      if (!(yield* lexists(file))) return;
       const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
       if (r.code !== 0) yield* Effect.logWarning(`${file} exited ${r.code}${r.timedOut ? " (timed out)" : ""}: ${(r.stdout + r.stderr).slice(-2000)}`);
     });
@@ -411,7 +424,7 @@ const make = (hooks: ProjectHooks = {}) =>
     /** The project's own check: .vibevalley/check, run in the worktree, killed with everything it started when it runs too long. */
     const projectCheck = Effect.fn("Project.projectCheck")(function* (cwd: string) {
       const file = join(cwd, ".vibevalley", "check");
-      if (!lexists(file)) return;
+      if (!(yield* lexists(file))) return;
       const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
       if (r.code === 0) return;
       const why = r.timedOut
@@ -488,9 +501,9 @@ const make = (hooks: ProjectHooks = {}) =>
             if (problem) return yield* fail(problem);
             const path = join(root, req.name);
             // Exclusive creation also refuses existing empty folders and symlinks.
-            const madeDir = yield* Effect.result(fs.makeDirectory(path));
-            if (madeDir._tag === "Failure")
-              return yield* fail(madeDir.failure.reason._tag === "AlreadyExists" ? t("server.project.exists", { name: req.name }) : reason(madeDir.failure));
+            yield* fs
+              .makeDirectory(path)
+              .pipe(Effect.catch((e) => fail(e.reason._tag === "AlreadyExists" ? t("server.project.exists", { name: req.name }) : reason(e))));
             pending.add(req.name);
             const made = Effect.gen(function* () {
               if (req.github !== undefined) {
@@ -569,7 +582,7 @@ const make = (hooks: ProjectHooks = {}) =>
         const global = (yield* gitQuiet("", "config", "--global", "user.email")).toLowerCase();
         const seen = new Set<string>();
         const out: T.Repo[] = [];
-        for (const dir of repoDirs(root, 3)) {
+        for (const dir of yield* repoDirs(root, 3)) {
           // Worktrees share their repository's history: one count per repository.
           const common = yield* gitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir");
           if (common === "" || seen.has(common)) continue;
@@ -618,9 +631,10 @@ const make = (hooks: ProjectHooks = {}) =>
         // An issue worked in a profile's own folder has no project, and so no issue branch: none to read.
         if (!project) return undefined;
         const path = join(root, project);
-        const present = yield* Effect.result(repository(path).hasBranch(branch));
-        if (present._tag === "Failure") return yield* fail(t("server.project.noBranchRead", { branch, why: reason(present.failure) }));
-        if (!present.success) return undefined;
+        const present = yield* repository(path)
+          .hasBranch(branch)
+          .pipe(Effect.catch((e) => fail(t("server.project.noBranchRead", { branch, why: reason(e) }))));
+        if (!present) return undefined;
         return yield* describe(project, "", branch);
       }),
       changedFiles: Effect.fn("Project.changedFiles")(
@@ -808,26 +822,31 @@ const make = (hooks: ProjectHooks = {}) =>
       refreshGitHub: Effect.fn("Project.refreshGitHub")(function* () {
         const probed = yield* probeGitHub(gh);
         const next = new Map<string, T.PullRequestCapability>();
-        for (const p of yield* list()) {
-          let c: T.PullRequestCapability = { available: false, reason: probed.reason };
-          if (probed.loggedIn) {
-            const repo = githubOrigin(yield* repository(p.path).origin);
-            if (!p.git || repo === "") c = { available: false, reason: t("server.project.github.notGithub") };
-            else {
-              const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
-              const permission = view.ok
-                ? Option.getOrUndefined(yield* Effect.option(Effect.try({ try: () => repoView(view.out).viewerPermission, catch: messageOf })))
-                : undefined;
-              c =
-                permission === undefined
-                  ? { available: false, reason: t("server.project.github.noPermission") }
-                  : ["ADMIN", "MAINTAIN", "WRITE"].includes(permission ?? "")
-                    ? { available: true, reason: "" }
-                    : { available: false, reason: t("server.project.github.readOnly") };
-            }
-          }
-          next.set(p.name, c);
-        }
+        yield* Effect.forEach(
+          yield* list(),
+          (p) =>
+            Effect.gen(function* () {
+              let c: T.PullRequestCapability = { available: false, reason: probed.reason };
+              if (probed.loggedIn) {
+                const repo = githubOrigin(yield* repository(p.path).origin);
+                if (!p.git || repo === "") c = { available: false, reason: t("server.project.github.notGithub") };
+                else {
+                  const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
+                  const permission = view.ok
+                    ? Option.getOrUndefined(yield* Effect.option(Effect.try({ try: () => repoView(view.out).viewerPermission, catch: messageOf })))
+                    : undefined;
+                  c =
+                    permission === undefined
+                      ? { available: false, reason: t("server.project.github.noPermission") }
+                      : ["ADMIN", "MAINTAIN", "WRITE"].includes(permission ?? "")
+                        ? { available: true, reason: "" }
+                        : { available: false, reason: t("server.project.github.readOnly") };
+                }
+              }
+              next.set(p.name, c);
+            }),
+          { discard: true },
+        );
         status = probed;
         capabilities = next;
         return probed;
@@ -864,7 +883,7 @@ const make = (hooks: ProjectHooks = {}) =>
               catch: () => new ProjectError({ message: t("server.project.github.listUnread") }),
             });
             if (existing.length > 0) return { ...existing[0]!, state: "open" as const };
-            const check = lexists(join(place.cwd, ".vibevalley/check")) ? t("server.project.github.checked") : t("server.project.github.noCheck");
+            const check = (yield* lexists(join(place.cwd, ".vibevalley/check"))) ? t("server.project.github.checked") : t("server.project.github.noCheck");
             // The helper's own title and body when it wrote them (session/prompts.ts tells it where), else the issue's.
             const written = yield* gitQuiet(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", pullRequestFile);
             const given = written === "" ? undefined : pullRequestText(yield* fs.readFileString(written).pipe(Effect.orElseSucceed(() => "")));
@@ -932,28 +951,28 @@ const make = (hooks: ProjectHooks = {}) =>
     return shape;
   });
 
-const lexists = (path: string) => {
-  try {
-    lstatSync(path);
-    return true;
-  } catch {
-    return false;
-  }
-};
+/** Whether there is anything at path, a link included (which FileSystem's exists follows). */
+const lexists = (path: string) =>
+  Effect.tryPromise({ try: () => lstat(path), catch: () => false }).pipe(
+    Effect.as(true),
+    Effect.orElseSucceed(() => false),
+  );
 
 const skipDirs = new Set(["node_modules", ".git", ".venv", "vendor", "dist", "build", "target", ".next"]);
 
-function repoDirs(dir: string, depth: number): string[] {
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  if (entries.some((e) => e.name === ".git")) return [dir];
-  if (depth === 0) return [];
-  return entries.filter((e) => e.isDirectory() && !skipDirs.has(e.name)).flatMap((e) => repoDirs(join(dir, e.name), depth - 1));
-}
+/** The repositories under dir, at most depth folders down; a repository's own folders are not looked into. */
+const repoDirs = (dir: string, depth: number): Effect.Effect<string[]> =>
+  Effect.gen(function* () {
+    const entries = yield* Effect.tryPromise({ try: () => readdir(dir, { withFileTypes: true }), catch: () => [] }).pipe(Effect.orElseSucceed(() => []));
+    if (entries.some((e) => e.name === ".git")) return [dir];
+    if (depth === 0) return [];
+    const under = yield* Effect.forEach(
+      entries.filter((e) => e.isDirectory() && !skipDirs.has(e.name)),
+      (e) => repoDirs(join(dir, e.name), depth - 1),
+      { concurrency: 8 },
+    );
+    return under.flat();
+  });
 
 /** As the server starts: a first look at GitHub; the page asks again with github.refresh. */
 export const start = Layer.effectDiscard(Effect.flatMap(Project, (p) => Effect.forkScoped(p.refreshGitHub())));

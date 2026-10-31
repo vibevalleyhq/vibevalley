@@ -3,6 +3,8 @@
 import { t } from "@vibevalley/i18n";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
+import { defineAtom } from "@/state/atom";
+
 export const ToastType = { info: "info", warn: "warn", error: "error", achievement: "achievement" } as const;
 export type ToastType = (typeof ToastType)[keyof typeof ToastType];
 
@@ -28,12 +30,12 @@ export interface ToastInput {
   timeout?: number;
 }
 
+/** The list is a value of the page's (state/atom.ts); the timers, held while the pointer is over the stack, are the store's. */
 export class ToastStore {
-  private list: readonly ToastData[] = [];
+  private readonly list = defineAtom<readonly ToastData[]>([]);
   private readonly timers = new Map<number, ReturnType<typeof setTimeout>>();
   private readonly left = new Map<number, number>();
   private readonly started = new Map<number, number>();
-  private readonly listeners = new Set<() => void>();
   private next = 0;
   private paused = false;
 
@@ -43,24 +45,16 @@ export class ToastStore {
     this.limit = limit;
   }
 
-  /** Newest first. */
+  /** Newest first; read in a computation or a component, it follows them. */
   get toasts(): readonly ToastData[] {
-    return this.list;
+    return this.list.get();
   }
-
-  readonly subscribe = (listener: () => void) => {
-    this.listeners.add(listener);
-    return () => void this.listeners.delete(listener);
-  };
-
-  readonly snapshot = () => this.list;
 
   add({ type = "info", title, description, timeout = 5000 }: ToastInput): number {
     const t: ToastData = omitUndefined({ id: ++this.next, type, title, description, timeout });
-    this.list = [t, ...this.list];
     this.left.set(t.id, timeout);
     if (!this.paused) this.start(t.id);
-    this.emit();
+    this.list.update((list) => [t, ...list]);
     return t.id;
   }
 
@@ -69,9 +63,7 @@ export class ToastStore {
     this.timers.delete(id);
     this.left.delete(id);
     this.started.delete(id);
-    const before = this.list.length;
-    this.list = this.list.filter((t) => t.id !== id);
-    if (this.list.length !== before) this.emit();
+    if (this.list.get().some((t) => t.id === id)) this.list.update((list) => list.filter((t) => t.id !== id));
   }
 
   pause() {
@@ -90,7 +82,7 @@ export class ToastStore {
   resume() {
     if (!this.paused) return;
     this.paused = false;
-    for (const t of this.list) this.start(t.id);
+    for (const t of this.list.get()) this.start(t.id);
   }
 
   private start(id: number) {
@@ -101,10 +93,6 @@ export class ToastStore {
       id,
       setTimeout(() => this.close(id), left),
     );
-  }
-
-  private emit() {
-    for (const l of this.listeners) l();
   }
 }
 

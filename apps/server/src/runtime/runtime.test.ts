@@ -12,10 +12,11 @@ import { TestClock } from "effect/testing";
 import { setLocale, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
+import { waitFor } from "@vibevalley/testkit/until";
 
 import { Agent } from "@/agent/agent.ts";
-import { ServerConfig } from "@/base/config.ts";
 import { Core } from "@/core/core.ts";
+import { ServerConfig } from "@/infra/config.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { sampleAgent } from "@/testing/agents.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -84,6 +85,8 @@ const env = (name: string, value: string | undefined) => {
 };
 const envOf = (name: string) => process.env[name];
 
+const noPi = { provider: "", model: "" };
+
 describe("runtime", () => {
   it.live("what a runtime's probe said is said again in the farm's new language", () => {
     const registry = new RuntimeRegistry([
@@ -91,16 +94,16 @@ describe("runtime", () => {
     ]);
     return Effect.gen(function* () {
       const r = yield* make({ registry, background: false, usageOf: async () => null });
-      const reason = () => {
-        const got = r.list().find((x) => x.id === "pi")!.installation;
+      const reason = Effect.map(r.list(), (all) => {
+        const got = all.find((x) => x.id === "pi")!.installation;
         return got.status === "unsupported" ? got.reason : "";
-      };
+      });
       yield* r.refresh("pi");
-      const chinese = reason();
+      const chinese = yield* reason;
       setLocale("en");
       // The list shows what it held until the probe in English lands.
-      expect(reason()).toBe(chinese);
-      yield* Effect.promise(() => until(() => reason() === "oar does not know this runtime"));
+      expect(yield* reason).toBe(chinese);
+      yield* waitFor(reason, (r) => r === "oar does not know this runtime", "the reason in English");
       expect((yield* r.info("pi"))!.installation).toMatchObject({ reason: "oar does not know this runtime" });
     }).pipe(Effect.ensuring(Effect.sync(() => setLocale("zh"))), Effect.scoped, Effect.provide(world()));
   });
@@ -227,10 +230,10 @@ describe("runtime", () => {
       // A spend while the read is out pushes a new total, rebuilding the cached observation.
       const read = yield* Effect.forkChild(r.refreshUsage("pi"));
       yield* Effect.promise(() => until(() => out.length === 1));
-      const shown = r.cached.get("pi");
+      const shown = yield* r.cached("pi");
       r.spend("pi", 1);
       yield* TestClock.adjust(3_000);
-      yield* Effect.promise(() => until(() => r.cached.get("pi") !== shown));
+      yield* waitFor(r.cached("pi"), (now) => now !== shown, "the new total cached");
       out[0]!(used(40));
       yield* Fiber.join(read);
       expect((yield* r.info("pi"))!.usage).toEqual(used(40));
@@ -260,15 +263,15 @@ describe("runtime", () => {
           return probes === 1 ? first.promise : second.promise;
         },
       });
-      const pi = () => r.list().find((info) => info.id === "pi")!;
-      expect(pi().installation.status).toBe("checking");
+      const pi = Effect.map(r.list(), (all) => all.find((info) => info.id === "pi")!);
+      expect((yield* pi).installation.status).toBe("checking");
       yield* Effect.promise(() => until(() => probes === 1));
       first.reject(new Error("first probe failed"));
       // Asked again, the list tries again, and says checking until the second read answers.
-      yield* Effect.promise(() => until(() => pi().installation.status === "checking" && probes === 2));
-      expect(pi().installation.status).toBe("checking");
+      yield* waitFor(pi, (p) => p.installation.status === "checking" && probes === 2, "a second probe");
+      expect((yield* pi).installation.status).toBe("checking");
       second.resolve(yield* Effect.promise(() => notFound("pi")));
-      yield* Effect.promise(() => until(() => pi().installation.status === "not_found"));
+      yield* waitFor(pi, (p) => p.installation.status === "not_found", "the second probe landed");
       expect(probes).toBe(2);
     }).pipe(Effect.scoped, Effect.provide(world()));
   });
@@ -295,7 +298,7 @@ describe("runtime", () => {
       yield* Effect.promise(() => until(() => probes === 2));
       old.reject(new Error("old probe failed"));
       expect(yield* Effect.promise(() => oldResult)).toMatchObject({ status: "rejected" });
-      expect(r.list().find((info) => info.id === "pi")!.installation.status).toBe("checking");
+      expect((yield* r.list()).find((info) => info.id === "pi")!.installation.status).toBe("checking");
       latest.resolve(yield* Effect.promise(() => notFound("pi")));
       expect((yield* Effect.promise(() => latestResult))!.installation.status).toBe("not_found");
       // The old read's failure started no read of its own.
@@ -504,17 +507,11 @@ describe("runtime", () => {
       ]);
       const r = yield* make({ background: false, usageOf: async () => null, registry });
       // The first answer does not wait for a probe: every runtime is checking, already with its name, look and facts.
-      for (const info of r.list()) {
+      for (const info of yield* r.list()) {
         expect(info.installation.status).toBe("checking");
         expect(info.preset).toEqual(presetOf(info.id));
       }
-      let list: T.RuntimeInfo[] = [];
-      yield* Effect.promise(() =>
-        until(() => {
-          list = r.list();
-          return list.every((i) => i.installation.status !== "checking");
-        }),
-      );
+      const list = yield* waitFor(r.list(), (all) => all.every((i) => i.installation.status !== "checking"), "every runtime probed");
       expect(list.map((i) => i.id)).toEqual(runtimeIds());
       const byId = Object.fromEntries(list.map((i) => [i.id, i]));
       expect(byId.opencode!.installation.status).toBe("not_found");
@@ -660,14 +657,19 @@ describe("runtime", () => {
     const rate = inCny({ input: 1, output: 2, cacheRead: 0.1, cacheWrite: 1.5 }, 7);
     expect(rate.charge({ input: 1_000_000, output: 0, cacheRead: 400_000 })).toBe(0.64 * 7);
     expect(rate.charge({ input: 10, output: 0, cacheRead: 20 })).toBe((2.0 / 1_000_000) * 7);
-    expect(price("missing", "unknown")).toBeUndefined();
+    expect(price("missing", "unknown", noPi)).toBeUndefined();
+  });
+
+  it("pi prices the default its settings name when the model is left to it", () => {
+    expect(price("pi", "", noPi)).toBeUndefined();
+    expect(price("pi", "", { provider: "deepseek", model: "deepseek-chat" })).toEqual(price("pi", "deepseek/deepseek-chat", noPi));
   });
 
   it("dsh prices DeepSeek's own models", () => {
-    expect(price("dsh", "deepseek-official/deepseek-flash")?.input).toBe(0.14);
-    expect(price("dsh", "deepseek-official/deepseek-v4-flash")).toBeUndefined();
-    expect(price("dsh", "openrouter/deepseek-flash")).toBeUndefined();
-    expect(price("vibevalley", "")?.input).toBe(0.14);
+    expect(price("dsh", "deepseek-official/deepseek-flash", noPi)?.input).toBe(0.14);
+    expect(price("dsh", "deepseek-official/deepseek-v4-flash", noPi)).toBeUndefined();
+    expect(price("dsh", "openrouter/deepseek-flash", noPi)).toBeUndefined();
+    expect(price("vibevalley", "", noPi)?.input).toBe(0.14);
   });
 
   it("pi's balance, as pi configures DeepSeek", async () => {
@@ -710,30 +712,30 @@ describe("runtime", () => {
       delete process.env.DEEPSEEK_API_KEY;
       process.env.MY_DEEPSEEK = "sk-from-env";
       piHome(`{"providers":{"deepseek":{"apiKey":"$MY_DEEPSEEK","baseUrl":"${url}/v1/"}}}`, "");
-      expect(await piBalance({ defaultModel: "" })).toEqual(want);
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual(want);
       url = await balance("sk-auth");
       process.env.DEEPSEEK_API_KEY = "sk-env";
       piHome(`{"providers":{"deepseek":{"apiKey":"sk-models","baseUrl":"${url}"}}}`, `{"deepseek":{"type":"api_key","key":"sk-auth"}}`);
-      expect(await piBalance({ defaultModel: "" })).toEqual(want);
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual(want);
       url = await balance("sk-env");
       piHome(`{"providers":{"deepseek":{"apiKey":"sk-models","baseUrl":"${url}"}}}`, "");
-      expect(await piBalance({ defaultModel: "" })).toEqual(want);
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual(want);
       delete process.env.DEEPSEEK_API_KEY;
       piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
-      expect(await piBalance({ defaultModel: "" })).toEqual({ status: "login_required" });
-      expect(await piBalance({ defaultModel: "anthropic/claude" })).toEqual({
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual({ status: "login_required" });
+      expect(await Effect.runPromise(piBalance({ defaultModel: "anthropic/claude" }))).toEqual({
         status: "unavailable",
         reason: "anthropic 不报余额",
       });
       url = await balance("sk-bad", { is_available: true, balance_infos: {} });
       process.env.DEEPSEEK_API_KEY = "sk-bad";
       piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
-      expect(await piBalance({ defaultModel: "" })).toEqual({
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual({
         status: "unavailable",
         reason: "没读到 DeepSeek 余额",
       });
       piHome("", "", `{"defaultProvider":{}}`);
-      expect(await piBalance({ defaultModel: "" })).toEqual({
+      expect(await Effect.runPromise(piBalance({ defaultModel: "" }))).toEqual({
         status: "unavailable",
         reason: "pi 没有设默认模型",
       });

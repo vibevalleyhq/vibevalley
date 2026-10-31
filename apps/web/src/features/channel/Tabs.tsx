@@ -3,14 +3,14 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Channel, CronView } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { useRouter } from "@/base/router";
 import { aria, useNow } from "@/base/util";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Empty } from "@/ui/Empty";
 import { Icon } from "@/ui/Icon";
-import { toast } from "@/ui/toasts";
 
 import { HelperFace, PhaseGlyph } from "./bits";
 import { chatPath } from "./places";
@@ -92,9 +92,15 @@ export function Crons(props: { channel: Channel }) {
 
 export function CronCard(props: { s: CronView }) {
   const [deleting, setDeleting] = createSignal(false);
-  const act = (p: Promise<void>) => p.catch((e) => toast(reasonOf(e), "bad"));
-  const setEnabled = (enabled: boolean) => act(api.cron.update({ id: props.s.id, enabled }));
-  const remove = () => act(api.cron.delete({ id: props.s.id }));
+  const act = createAct();
+  const setEnabled = (enabled: boolean) => {
+    const id = props.s.id;
+    return act.run(() => api.cron.update({ id, enabled }));
+  };
+  const remove = () => {
+    const id = props.s.id;
+    return act.run(() => api.cron.delete({ id }));
+  };
   // The second press deletes; a press anywhere else takes the first back.
   createEffect(deleting, (on) => {
     if (!on) return;

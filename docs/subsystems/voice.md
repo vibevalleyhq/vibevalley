@@ -20,7 +20,7 @@
 - 形状和规则：`shapes.ts` 的 `VoiceSettings`（`VoiceASR`、`VoiceAnswer`、`VoiceTTS` 三个联合）、`SettingsUpdateVoice`、`AgoraGrant`、`Dictation`；数的范围是 `shapes.ts` 的 `voiceSilenceMsMin` 等常量；默认在 `setting/voice.ts`（`defaultVoice`）。保存前的检查和只存差异在 `setting/voice.ts`（`voiceProblem`、`voiceSettingsOver`、`voiceOverrides`）。
 - 接口：`voice.grant.create`、`voice.grant.renew`、`voice.call.start`、`voice.call.stop`、`voice.call.hear`、`voice.call.say`、`voice.dictate`、`voice.moss.verify`，没带通话 id 的 `voice.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的设备也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
 - 不存表：授予和通话只在进程里；设置在 `$VIBEVALLEY_HOME/settings.json` 的 `voice`、`dictation`（选了自己的地址才写 `via: "own"`，没写就是 MOSS）、`asrKey`、`llmKey`、`ttsKey`、`dictationKey`、`mossKey`、`agoraAppId`、`agoraAppCertificate`。
-- 配置：`agora.app_id`、`agora.app_certificate`（或环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`），`voice.id`（默认的 MiniMax 音色），`voice.line.port`（默认 8788，0 是空闲端口）、`voice.line.url`（`base/config.ts`）。
+- 配置：`agora.app_id`、`agora.app_certificate`（或环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`），`voice.id`（默认的 MiniMax 音色），`voice.line.port`（默认 8788，0 是空闲端口）、`voice.line.url`（`infra/config.ts`）。
 - 页面：`apps/web/src/features/voice/`（`call.ts` 的 `VoiceCall`、`VoiceCall`、`useCall`，`captions.ts` 的字幕拼块，`dictation.ts` 的录音和 WAV，`DictationButton.tsx` 的听写键，`createCall.ts` 的 `createCall`，各处读同一通电话）；打电话是农场手机的事（点「管家」就拨），田头和工作台的聊天输入框只有听写；设置页 `features/voice/VoiceForm.tsx`（`part` 是 `line` 或 `agent`，`line` 再按 `view` 分通话线路、MOSS Live、听写），路由 `/settings/call`、`/settings/moss`、`/settings/dictation` 和管家页的 `/orchestrator/voice`；样音 `apps/web/public/voice-samples/`。
 
 ## 模型和不变量
@@ -97,7 +97,7 @@
 - **频道（`channel`）**：快嘴的回答经 `spoken` 记成管家的话；主人的话和管家的回答由管家那边记。带 `spoken` 的消息不投给任何人。
 - **设置（`setting`）**：声网的凭据（每次现取，存的凭据不用重启）、语音设置和三段的 key、听写的设置。
 - **核心（`core`）**：`did`（账本的语音时刻）、`open`。
-- **配置（`base/config.ts`）**：语音线路的端口和隧道地址。
+- **配置（`infra/config.ts`）**：语音线路的端口和隧道地址。
 - **页面**：`VoiceCall` 只经 `api.voice.*` 和服务端说话；田头窗口、HUD、手机读它的阶段、字幕、两条音量和管家的状态，不持有 RTC 资源；桌面壳的 ⌥⇧Space 切换它。
 
 ## 为什么这样

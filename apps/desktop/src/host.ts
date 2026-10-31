@@ -1,11 +1,15 @@
+import { homedir } from "node:os";
+
 import { nativeTheme, Notification, shell } from "electron";
 
 import { serve } from "@vibevalley/bridge";
 import { currentLocale, setLocale } from "@vibevalley/i18n";
 import { desktopBridge, type TraySummary, type UpdateState } from "@vibevalley/protocol/host";
 
+import { revealable } from "./boundary";
 import { mainLink } from "./bridge";
 import { setAppMenu } from "./menu";
+import { farmHome } from "./paths";
 import { probe } from "./probe";
 import type { MainWindow } from "./window";
 
@@ -24,8 +28,11 @@ export function serveHost(o: { readonly window: MainWindow; readonly tray: (summ
         probe?.notices.push(notice);
         if (Notification.isSupported()) new Notification({ title: notice.title, body: notice.body }).show();
       },
-      // Only a path on this machine (the contract takes an absolute one), shown in Finder; never opened or run.
-      reveal: (path) => shell.showItemInFolder(path),
+      // Only a path under the person's home or the farm's, shown in Finder; never opened or run.
+      reveal: (path) => {
+        if (!revealable(path, [homedir(), farmHome()])) throw new Error(`not shown: ${path} is outside the home folders`);
+        shell.showItemInFolder(path);
+      },
       // The window's own parts (menus, scroll bars, the title strip) follow the theme the page chose.
       theme: (theme) => {
         nativeTheme.themeSource = theme;

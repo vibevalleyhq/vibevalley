@@ -1,5 +1,4 @@
 import { Clock, Effect, Semaphore, Predicate } from "effect";
-import type { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -8,6 +7,7 @@ import { ownerId } from "@vibevalley/protocol";
 import type { Channel } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
+import type { Db } from "@/infra/db.ts";
 import type { Project } from "@/project/project.ts";
 import { type Merged, MergeFailure, type ProjectError, type Workplace } from "@/project/shapes.ts";
 import type { NotTakenIn, Session } from "@/session/session.ts";
@@ -21,8 +21,7 @@ export interface MergeDeps {
   readonly sessions: Session["Service"];
   readonly projects: Project["Service"];
   readonly chat: Channel["Service"];
-  readonly db: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
-  readonly inTx: <A, E>(e: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+  readonly db: Db["Service"];
   readonly get: (ref: string) => Effect.Effect<T.Issue, ApiError>;
   readonly list: Effect.Effect<T.Issue[]>;
   /** The issue's latest session, refused when it was never sent. */
@@ -33,19 +32,17 @@ export interface MergeDeps {
 }
 
 export function merging(d: MergeDeps) {
-  const { core, sessions, projects, chat, db, inTx, get, list, latest, liveSession, publish } = d;
+  const { core, sessions, projects, chat, db, get, list, latest, liveSession, publish } = d;
   /** Merges by pull request and the poll of their states, one at a time. */
   const prLock = Semaphore.makeUnsafe(1);
 
   const notTaken = Effect.fnUntraced(function* (id: string, n: NotTakenIn) {
     let [owner, line] = [n.owner, n.notice];
     if (n.fix) {
-      const told = yield* Effect.result(chat.tellSession(ownerId, id, n.fix, ""));
-      if (told._tag === "Failure")
-        [owner, line] = [
-          owner + t("server.issue.merge.tellFailed", { why: reasonOf(told.failure) }),
-          line + t("server.issue.merge.tellFailed", { why: reasonOf(told.failure) }),
-        ];
+      const untold = yield* chat
+        .tellSession(ownerId, id, n.fix, "")
+        .pipe(Effect.match({ onSuccess: () => "", onFailure: (e) => t("server.issue.merge.tellFailed", { why: reasonOf(e) }) }));
+      [owner, line] = [owner + untold, line + untold];
     }
     yield* core.notice("warn", line);
     return refused(owner);
@@ -61,7 +58,8 @@ export function merging(d: MergeDeps) {
     return merged.text;
   });
 
-  const savePullRequest = (id: string, pr: T.PullRequest) => Effect.andThen(db(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) })), publish(id));
+  const savePullRequest = (id: string, pr: T.PullRequest) =>
+    Effect.andThen(db.run(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) })), publish(id));
 
   const pullRequestOf = Effect.fnUntraced(function* (place: Workplace, issue: T.Issue, said: string) {
     const pr = yield* projects
@@ -96,14 +94,14 @@ export function merging(d: MergeDeps) {
         .handOver(id, closed, (place) => projects.finishPullRequest(place.project, issue.number))
         .pipe(Effect.catchTag("NotTakenIn", (e) => Effect.fail(refused(e.failure.reasonText))));
     else yield* projects.finishPullRequest(issue.project!, issue.number).pipe(Effect.mapError((e) => refused(e.message)));
-    yield* inTx(
+    yield* db.inTx(
       Effect.andThen(
-        db(
+        db.run(
           state === "closed"
             ? q.cancelIssue({ id: issue.id, canceled: "dismissed", closed_at: yield* Clock.currentTimeMillis })
             : q.completeIssue({ id: issue.id, delivered: "pull_request", closed_at: yield* Clock.currentTimeMillis }),
         ),
-        db(q.setIssuePullRequest({ id: issue.id, pull_request: JSON.stringify({ ...issue.pullRequest, state }) })),
+        db.run(q.setIssuePullRequest({ id: issue.id, pull_request: JSON.stringify({ ...issue.pullRequest, state }) })),
       ),
     );
     yield* publish(issue.id);

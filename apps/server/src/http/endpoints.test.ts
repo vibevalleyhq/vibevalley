@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
 import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
+import { blockId } from "@vibevalley/protocol/schema";
 
 import { newId } from "@/base/ids.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -69,7 +70,7 @@ describe("the endpoints the agents' tools stand on", () => {
           id: made.id,
           batchId: newId(),
           lastSeq: 0,
-          ops: [{ op: "insert_block", block: { id: inserted, orderKey: "V", type: "paragraph", attrs: {}, text: [{ t: "你好世界", marks: {} }] } }],
+          ops: [{ op: "insert_block", block: { id: blockId(inserted), orderKey: "V", type: "paragraph", attrs: {}, text: [{ t: "你好世界", marks: {} }] } }],
         }),
       );
       const saved = (yield* call(() => api.artifact.block.list({ id: made.id }))).blocks[0]!;
@@ -91,7 +92,7 @@ describe("the endpoints the agents' tools stand on", () => {
               blockId: source.id,
               baseRev: source.rev,
               offset: 2,
-              newBlock: { id: split, orderKey: "W", type: "paragraph", attrs: {}, text: [] },
+              newBlock: { id: blockId(split), orderKey: "W", type: "paragraph", attrs: {}, text: [] },
             },
           ],
         }),
@@ -112,4 +113,32 @@ describe("the endpoints the agents' tools stand on", () => {
       expect([got.title, got.priority, got.status]).toEqual(["带着改动开工", "high", "backlog"]);
     }).pipe(Effect.scoped),
   );
+
+  it.live("refuses a body past its limit before reading it, and stops reading one that grows past it", () =>
+    Effect.gen(function* () {
+      let address = "";
+      yield* Layer.build(app(testConfig(), 0, (a) => Effect.sync(() => void (address = a)), quietApp));
+      const [declared, streamed] = yield* Effect.promise(() => postBig(`http://${address}/api/v1/channel/message/list`));
+      expect([declared, streamed]).toEqual([413, "cut"]);
+    }),
+  );
 });
+
+/** A body of 3 MB, once with its length said and once streamed without it: the status, or "cut" when the connection is. */
+async function postBig(url: string) {
+  const big = JSON.stringify({ id: "x".repeat(3 * 1024 * 1024) });
+  const declared = (await fetch(url, { method: "POST", body: big })).status;
+  const chunks = new ReadableStream<Uint8Array>({
+    start(c) {
+      c.enqueue(new TextEncoder().encode(big));
+      c.close();
+    },
+  });
+  // Node's fetch takes duplex for a streamed body.
+  const init = { method: "POST", body: chunks, duplex: "half" } as RequestInit;
+  const streamed = await fetch(url, init).then(
+    (r) => r.status,
+    () => "cut",
+  );
+  return [declared, streamed] as const;
+}

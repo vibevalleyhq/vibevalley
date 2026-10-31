@@ -44,8 +44,8 @@ export const refused = {
   ),
   useQuery: says(
     "solid-query's useQuery tracks what its fetch reads, so a signal read inside refetches",
-    'import { useQuery } from "@/base/query"',
-    "apps/web/src/base/query.ts",
+    'import { useQuery } from "@/infra/query"',
+    "apps/web/src/infra/query.ts",
   ),
 };
 
@@ -66,6 +66,7 @@ export default defineConfig({
         "vpx scripts/i18n.ts check",
         "vpx scripts/capabilities.ts --check",
         "vpx scripts/api-client.ts --check",
+        "vpx scripts/primitives.ts --check",
       ],
       "notes:verify": "vpx scripts/agent-notes.ts",
       "names:verify": "vpx scripts/stale-names.ts",
@@ -202,7 +203,7 @@ export default defineConfig({
       // or they could run together.
       "eslint/no-await-in-loop": "error",
       // ({ secret: _, ...rest }) leaves a field out.
-      "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "eslint/no-unused-vars": ["error", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
     overrides: [
       {
@@ -270,16 +271,16 @@ export default defineConfig({
         rules: { "eslint/no-await-in-loop": "off" },
       },
       {
-        // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives; so does
+        // The server logs through Effect (src/infra/log.ts for callbacks): levels, and the logger the layer gives; so does
         // the agent it runs on. The command line prints.
         files: ["apps/server/src/**", "packages/ai/src/**", "packages/agent/src/**"],
         rules: { "no-console": "error", "vibevalley/no-wall-clock": "error" },
       },
       {
-        // base/time.ts and the agent's realTime.ts are where the wall clock is allowed (wallTime, the real-time
+        // infra/time.ts and the agent's realTime.ts are where the wall clock is allowed (wallTime, the real-time
         // deadlines); tests drive time as they need.
         files: [
-          "apps/server/src/base/time.ts",
+          "apps/server/src/infra/time.ts",
           "packages/agent/src/realTime.ts",
           "apps/server/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
@@ -431,17 +432,16 @@ export default defineConfig({
         rules: { "vibevalley/no-object-guard": "error" },
       },
       {
-        // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls), the MCP
-        // SDK's request handlers, the fetch that the model client calls for the local chat/completions, and time.ts, the
-        // service's Clock as Promises for the code on those interfaces (oar's vibevalley runtime, the journal).
+        // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls, pi's own
+        // files), the MCP SDK's request handlers, and time.ts, the service's Clock as Promises for the code on those
+        // interfaces (oar's vibevalley runtime, the journal).
         files: [
           "apps/server/src/runtime/vibevalley.ts",
           "apps/server/src/runtime/dsh.ts",
           "apps/server/src/runtime/pi.ts",
           "apps/server/src/runtime/runtime.ts",
           "apps/server/src/mcp/mcp.ts",
-          "apps/server/src/orchestrator/openai.ts",
-          "apps/server/src/base/time.ts",
+          "apps/server/src/infra/time.ts",
         ],
         rules: { "vibevalley/promise-boundary": "off" },
       },
@@ -484,10 +484,97 @@ export default defineConfig({
         rules: { "vibevalley/protocol-namespace": "error" },
       },
       {
+        // Only the page's state/ stands on Effect's Atom, whose API is unstable (scripts/oxlint-plugin.ts, atom-door).
+        files: ["apps/web/src/**"],
+        rules: { "vibevalley/atom-door": "error" },
+      },
+      {
+        // A value the page keeps for its life is an atom of the page's, not a signal made outside any function (scripts/oxlint-plugin.ts, page-store).
+        files: ["apps/web/src/features/**", "apps/web/src/farm/**", "apps/web/src/ui/**"],
+        excludeFiles: ["apps/web/src/**/*.test.ts"],
+        rules: { "vibevalley/page-store": "error" },
+      },
+      {
+        // The browser's storage only through state/stored.ts (scripts/oxlint-plugin.ts, stored-door).
+        files: ["apps/web/src/**"],
+        rules: { "vibevalley/stored-door": "error" },
+      },
+      {
+        // What the owner does from a component goes through an Act or an intent (scripts/oxlint-plugin.ts, act-door).
+        files: ["apps/web/src/features/**/*.tsx", "apps/web/src/farm/**/*.tsx"],
+        excludeFiles: ["apps/web/src/**/*.stories.tsx"],
+        rules: { "vibevalley/act-door": "error" },
+      },
+      {
+        // A refusal is said in the error tone (scripts/oxlint-plugin.ts, failure-tone).
+        files: ["apps/web/src/**"],
+        rules: { "vibevalley/failure-tone": "error" },
+      },
+      {
         // The server reaches the database through Db, which decides what a failed query becomes (scripts/oxlint-plugin.ts, db-door).
         files: ["apps/server/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "vibevalley/db-door": "error" },
+      },
+      {
+        // Effects over a list go through Effect.forEach (scripts/oxlint-plugin.ts, yield-in-loop).
+        files: ["apps/server/src/**", "packages/agent/src/**"],
+        excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**", "apps/server/src/flows/**"],
+        rules: { "vibevalley/yield-in-loop": "error" },
+      },
+      {
+        // A fiber belongs to a scope, so none outlives its service or a test (scripts/oxlint-plugin.ts, scoped-fibers).
+        files: ["apps/server/src/**", "packages/agent/src/**"],
+        excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**"],
+        rules: { "vibevalley/scoped-fibers": "error" },
+      },
+      {
+        // An Effect generator reads the time with yield* Clock.currentTimeMillis (scripts/oxlint-plugin.ts, clock-in-effect).
+        files: ["apps/server/src/**", "packages/agent/src/**"],
+        rules: { "vibevalley/clock-in-effect": "error" },
+      },
+      {
+        // The server and the brain read and write files off the event loop (scripts/oxlint-plugin.ts, sync-fs). Before the
+        // services are up a sync call is fine: the home's lock, the database's folder and baseline, the locale the CLI
+        // starts in; and the evals' cases are read by a tool, not the server.
+        files: ["apps/server/src/**", "packages/agent/src/**"],
+        excludeFiles: [
+          "**/*.test.ts",
+          "apps/server/src/testing/**",
+          "packages/agent/src/testing.ts",
+          "apps/server/src/infra/lease.ts",
+          "apps/server/src/infra/db.ts",
+          "apps/server/src/infra/baseline.ts",
+          "apps/server/src/setting/setting.ts",
+          "apps/server/src/orchestrator/evals.ts",
+        ],
+        rules: { "vibevalley/sync-fs": "error" },
+      },
+      {
+        // A page timer keeps its handle, to be cleared when its part goes (scripts/oxlint-plugin.ts, dropped-timer).
+        files: ["apps/web/src/**"],
+        excludeFiles: ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.stories.tsx"],
+        rules: { "vibevalley/dropped-timer": "error" },
+      },
+      {
+        // A process is started only by its door: one per kind, which kills the group on a timeout (scripts/oxlint-plugin.ts, child-process-door).
+        files: ["apps/**", "packages/**"],
+        excludeFiles: [
+          "**/scripts/**",
+          "apps/server/src/project/git.ts",
+          "apps/server/src/runtime/dsh.ts",
+          "apps/server/src/voice/voice.ts",
+          "apps/server/src/testing/git.ts",
+          "apps/server/src/testing/helper.ts",
+          "apps/desktop/src/island.ts",
+          "apps/desktop/src/server.ts",
+          "apps/desktop/src/update.ts",
+          "apps/web/test/fixtures.ts",
+          "apps/web/test/global-setup.ts",
+          "packages/agent/src/coding.ts",
+          "packages/health/src/collect.ts",
+        ],
+        rules: { "vibevalley/child-process-door": "error" },
       },
       {
         // An import from outside its folder is written from src, as @/… (scripts/oxlint-plugin.ts, parent-import).

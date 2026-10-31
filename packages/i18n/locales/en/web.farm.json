@@ -63,7 +63,15 @@
     "ticked": "Checked",
     "noRuns": "No work yet.",
     "runCount": "{n, plural, one {# round} other {# rounds}}",
-    "conflict": "Merging into {base} would conflict: {files}"
+    "conflict": "Merging into {base} would conflict: {files}",
+    "moving": "Changing the status…",
+    "notMoved": "Not changed",
+    "moveAgain": "Again",
+    "letGo": "Let it go",
+    "sending": "Sending…",
+    "notSaid": "Not said",
+    "sayAgain": "Say it again",
+    "takeBack": "Back into the box"
   },
   "graph": {
     "name": "Planting plans",
@@ -366,7 +374,11 @@
     "spent": "This round spent {spent}",
     "newCount": "{n} new",
     "replyTo": "Replying to {name}",
-    "replyToText": "Replying to {name}: {text}"
+    "replyToText": "Replying to {name}: {text}",
+    "notSentLine": "Not sent",
+    "retrySend": "Send again",
+    "dropSend": "Drop it",
+    "unread": "Could not read the messages: {why}; trying again shortly"
   },
   "tool": {
     "hand": {

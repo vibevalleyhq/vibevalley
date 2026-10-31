@@ -5,6 +5,8 @@ import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import type { Phase, SessionAction } from "@vibevalley/protocol";
 
+import { useInterval } from "@/base/timer";
+
 /** A drawing from apps/web/public/pixel; decorative unless it has a label. */
 export function SpriteIcon(props: { name: string; size: number; label?: string; class?: JSX.ClassValue; style?: JSX.CSSProperties }) {
   return (
@@ -80,10 +82,7 @@ export function reducedMotion() {
 function Bob(props: { children: JSX.Element }) {
   const still = reducedMotion();
   const [up, setUp] = createSignal(false);
-  onSettled(() => {
-    const beat = setInterval(() => setUp((u) => !still() && !u), 450);
-    return () => clearInterval(beat);
-  });
+  useInterval(() => setUp((u) => !still() && !u), 450);
   return <span class={["inline-flex shrink-0", { "-translate-y-px": up() }]}>{props.children}</span>;
 }
 

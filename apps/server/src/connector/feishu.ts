@@ -4,7 +4,7 @@
 // API to the owner's open_id, with no reply window.
 
 import * as Lark from "@larksuiteoapi/node-sdk";
-import { Effect, FiberSet, Predicate, Schema } from "effect";
+import { Effect, FiberSet, Option, Predicate, Ref, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
@@ -123,19 +123,21 @@ export class FeishuClient implements FeishuApi {
     return Effect.gen({ self: this }, function* () {
       const reg = yield* this.register;
       yield* progress(reg.link);
-      const polling: Effect.Effect<LoginAccount, AppFailed> = Effect.gen({ self: this }, function* () {
-        let domain: Domain = "feishu";
-        for (;;) {
-          yield* Effect.sleep(reg.intervalMs);
-          const p: Polled = yield* this.poll(reg.deviceCode, domain);
-          if (p.status === "succeeded") {
-            if (!p.app.appId.trim() || !p.app.appSecret.trim()) return yield* failedWith(t("server.connector.feishu.incomplete"));
-            return { app: p.app, owner: p.owner };
-          }
-          if (p.status === "failed") return yield* failedWith(p.reason);
-          domain = p.domain;
+      // Asked every interval, on the domain the last answer named, until it is done one way or the other.
+      const domain = yield* Ref.make<Domain>("feishu");
+      const once = Effect.gen({ self: this }, function* () {
+        const p: Polled = yield* this.poll(reg.deviceCode, yield* Ref.get(domain));
+        if (p.status === "succeeded") {
+          if (!p.app.appId.trim() || !p.app.appSecret.trim()) return yield* failedWith(t("server.connector.feishu.incomplete"));
+          return Option.some<LoginAccount>({ app: p.app, owner: p.owner });
         }
+        if (p.status === "failed") return yield* failedWith(p.reason);
+        yield* Ref.set(domain, p.domain);
+        return Option.none<LoginAccount>();
       });
+      const polling: Effect.Effect<LoginAccount, AppFailed> = Effect.repeat(Effect.delay(once, reg.intervalMs), { until: Option.isSome }).pipe(
+        Effect.map(Option.getOrThrow),
+      );
       return yield* polling.pipe(
         Effect.timeoutOrElse({ duration: reg.expiresMs, orElse: () => Effect.fail(failedWith(t("server.connector.feishu.tooLong"))) }),
       );

@@ -1,9 +1,9 @@
 # src/farm
 
 The pixel farm at `/`. It is full-bleed, outside the workbench's shell; its 工作台 link goes to `/issues`, and the
-shell's 农场 link comes back. The farm is the server's (`useFrames()`, `useCore()` in `src/base/frame.ts`); this folder
+shell's 农场 link comes back. The farm is the server's (`useFrames()`, `useCore()` in `src/infra/frame.ts`); this folder
 only draws it and keeps the page's own state. Its Solid side reads the framework-free modules here through `ui.ts` and `frames.ts`
-(`useFarm`, `timeOfDay`, `commands`; the frames as they came are `base/frame.ts`'s `rawFrame`) and `support.ts` (the village, the keys, the phone's calls, the sounds,
+(`useFarm`, `timeOfDay`, `commands`; the frames as they came are `infra/frame.ts`'s `rawFrame`) and `support.ts` (the village, the keys, the phone's calls, the sounds,
 the pad).
 
 ## Its parts
@@ -39,8 +39,11 @@ Which part draws which overlay (`FarmUi.overlays`):
 
 ## The store (`store.ts`)
 
-`useFarm(select)` (`ui.ts`) reads a slice, an accessor that changes only when the slice does; `farmState()` reads it
-outside a component; `subscribeFarm(fn)` listens. Changes only through `farm.*`:
+The farm page's state is an atom of the page's (`defineAtom`, `state/atom.ts`): `farmState()` reads it anywhere and,
+read in a component or a computation, follows it; `useFarm(select)` (`ui.ts`) is a slice that changes only when the
+slice does; `subscribeFarm(fn)` listens from plain code. What this machine keeps (the title seen, the farm entered last,
+read by `farmProject()` and `lastFarmProject()`) is stored (`defineStored`, `state/stored.ts`). Changes only through
+`farm.*`:
 
 | Action | Does |
 |---|---|
@@ -54,7 +57,8 @@ outside a component; `subscribeFarm(fn)` listens. Changes only through `farm.*`:
 | `revealNames(on)` | Alt held: every name tag shows |
 | `chatOpen(open)`, `chatLarge(large)`, `showChat(channel \| undefined)` | the chat: unfolding takes the phone out, putting the phone away folds it; undefined is the general channel |
 | `phoneOpen(open)`, `friendsOpen(open)` | |
-| `closeTitle()`, `showTitle()` | the title screen; closing it marks this machine as seen (`localStorage` `vibevalley.title.seen`) |
+| `closeTitle()`, `showTitle()` | the title screen; closing it marks this machine as seen (stored as `vibevalley.title.seen`) |
+| `setProject(project)` | the farm on the page, set by the route; `/farm` opens it next (stored as `vibevalley.farm.project`) |
 | `bedFx(bed, kind, text?)` | a bed's effect for 2.2 s (`water`, `spray`, `harvest`, `shovel`, `note`); the commands call it |
 | `reward(effect)` | a reward for 4 s; FarmPage pushes each frame's rewards |
 | `setScreen(screen \| undefined)` | set by the canvas only (below) |
@@ -115,4 +119,4 @@ Served from `public/`: `/village.ldtk`, `/pixel/<name>.png` and `/pixel/sprites.
 
 `vp test run src/farm` (the world parsed from the real `village.ldtk` and `sprites.json`, the framing, the cues);
 `test/farm.spec.ts` (Playwright on a real server: the canvas, the links; a screenshot at `test-results/farm.png`).
-Playwright tests on the farm start past the title screen (`localStorage` `vibevalley.title.seen` = `true`).
+Playwright tests on the farm start past the title screen (`localStorage` `vibevalley.title.seen` = `true`, the JSON of `true`).

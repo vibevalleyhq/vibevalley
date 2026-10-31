@@ -90,7 +90,7 @@
 |---|---|---|
 | 接口 | `<模块>[.<名词>].<动词>`，单数；路径是 `POST /api/v1/<模块>[/<名词>]/<动词>` | `channel.message.send`、`issue.list` |
 | 接口的动词 | 先用这几个：`list`、`get`、`create`、`update`、`delete`、`previewDelete`、`set`、`toggle`、`start`、`stop`；别的动作用它在领域里的词 | `channel.markRead`、`lan.pair` |
-| 表 | `<模块>` 或 `<模块>_<概念>`，单数；索引以表名开头（`src/base/schema.test.ts` 查） | `issue`、`channel_message`、`session_run` |
+| 表 | `<模块>` 或 `<模块>_<概念>`，单数；索引以表名开头（`src/infra/schema.test.ts` 查） | `issue`、`channel_message`、`session_run` |
 | 词典的键 | `<宿主>.<模块>.…`，两边都说的在 `shared` | `web.issue.boardLabels.lane.todo`、`server.connector.qqKeys` |
 | 页面测试的标记 | `data-testid` 说它是什么，小写加连字符；状态写成属性 | `issue-card`、`desk-status`；`data-state` |
 | 分支 | `<类>/<主题>`，主题是英文小写加连字符 | `chore/repo-health` |

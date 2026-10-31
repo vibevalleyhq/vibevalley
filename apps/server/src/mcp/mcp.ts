@@ -12,17 +12,18 @@ import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { coerceArguments } from "@vibevalley/ai/tools";
 
 import { session } from "@/base/actor.ts";
-import { ServerConfig } from "@/base/config.ts";
 import { messageOf } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
 import { Session } from "@/session/session.ts";
-import { type Caller, Tool } from "@/tool/tool.ts";
+import type { Caller } from "@/tool/definition.ts";
+import { Tool } from "@/tool/tool.ts";
 
 import { failedCall, noTool, unknownCaller } from "./prompts.ts";
 
 export class Mcp extends Context.Service<
   Mcp,
   {
-    readonly handle: (request: Request) => Promise<Response>;
+    readonly handle: (request: Request) => Effect.Effect<Response>;
   }
 >()("vibevalley/Mcp") {
   static readonly layer = (options?: McpOptions) => Layer.effect(Mcp, make(options));
@@ -60,7 +61,7 @@ const make = (options: McpOptions = {}) =>
       }
     };
 
-    const handle = async (request: Request): Promise<Response> => {
+    const handle = Effect.fn("Mcp.handle")(function* (request: Request) {
       const header = request.headers.get("authorization") ?? "";
       const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
       const id = token ? who(token) : "";
@@ -70,26 +71,36 @@ const make = (options: McpOptions = {}) =>
       });
       // The tools come with JSON Schema and McpServer.registerTool takes zod only: the low-level Server is the SDK's
       // own exception for this.
-      // oxlint-disable-next-line typescript/no-deprecated
-      const server = new Server({ name: "vibevalley", version: config.version }, { capabilities: { tools: {} } });
-      server.setRequestHandler(ListToolsRequestSchema, async () => ({
-        tools: list.map((t) => ({ name: t.name, description: t.description, inputSchema: { ...t.parameters, type: "object" as const } })),
-      }));
-      server.setRequestHandler(CallToolRequestSchema, async (req) => {
-        const tool = list.find((t) => t.name === req.params.name);
-        if (!tool) return text(noTool(req.params.name));
-        // Tools are never called for a caller nobody knows.
-        if (!id) return text(failedCall(unknownCaller));
-        return text(await call(tool, req.params.arguments));
-      });
-      const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });
-      await server.connect(transport);
-      try {
-        return await transport.handleRequest(request);
-      } finally {
-        void server.close();
-      }
-    };
+      const made = () => {
+        // oxlint-disable-next-line typescript/no-deprecated
+        const server = new Server({ name: "vibevalley", version: config.version }, { capabilities: { tools: {} } });
+        server.setRequestHandler(ListToolsRequestSchema, async () => ({
+          tools: list.map((t) => ({ name: t.name, description: t.description, inputSchema: { ...t.parameters, type: "object" as const } })),
+        }));
+        server.setRequestHandler(CallToolRequestSchema, async (req) => {
+          const tool = list.find((t) => t.name === req.params.name);
+          if (!tool) return text(noTool(req.params.name));
+          // Tools are never called for a caller nobody knows.
+          if (!id) return text(failedCall(unknownCaller));
+          return text(await call(tool, req.params.arguments));
+        });
+        return server;
+      };
+      return yield* Effect.scoped(
+        Effect.gen(function* () {
+          const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });
+          yield* Effect.acquireRelease(
+            Effect.promise(async () => {
+              const server = made();
+              await server.connect(transport);
+              return server;
+            }),
+            (server) => Effect.ignore(Effect.tryPromise({ try: () => server.close(), catch: messageOf })),
+          );
+          return yield* Effect.promise(() => transport.handleRequest(request));
+        }),
+      );
+    });
 
     return Mcp.of({ handle });
   });

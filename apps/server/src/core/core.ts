@@ -6,15 +6,15 @@
 
 import { join } from "node:path";
 
-import { Cause, Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
+import { Clock, Context, Effect, Layer, PubSub, type Scope, Stream, SubscriptionRef } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { ServerConfig } from "@/base/config.ts";
-import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { jsonOf } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { keptFile, readOrSetAside } from "@/infra/files.ts";
 
 export const emptyWorkspaceState = (): T.WorkspaceState => ({
   call: "idle",
@@ -34,7 +34,8 @@ export class Projection extends Context.Service<
     readonly reduce: (state: T.WorkspaceState, fact: T.Fact) => [T.WorkspaceState, boolean];
     /** What a fact sets off on the farm, from the state before it. */
     readonly effects: (before: T.WorkspaceState, fact: T.Fact) => T.GameEffect[];
-    readonly frame: (state: T.WorkspaceState, effects?: T.GameEffect[]) => T.StateFrame;
+    /** seq: the core's count of folds the state includes (StateFrame.seq). */
+    readonly frame: (state: T.WorkspaceState, effects?: T.GameEffect[], seq?: number) => T.StateFrame;
     /** The state read back from state.json, made whole (the sessions' places on the farm). */
     readonly restore: (kept: T.WorkspaceState) => T.WorkspaceState;
   }
@@ -42,6 +43,8 @@ export class Projection extends Context.Service<
 
 /** A burst of facts is one write, and one frame. */
 const saveAfterMs = 500;
+/** The most changes one frame gathers: past it, the frame goes at once. */
+const burstMost = 1_000;
 export const stateEveryMs = 200;
 
 /** A fact as a service says it: the time is core's. */
@@ -64,6 +67,9 @@ export class Core extends Context.Service<
     readonly session: (id: string) => T.Session | undefined;
     /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
     readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
+    /** How many commits apply has folded: one more with each that changed the state. A reply read after its service
+     * applied its facts carries it, and the first frame whose seq is at least it shows the change. */
+    readonly seq: () => number;
     /** channel: where it thinks or writes, while it does. */
     readonly setOrchestrator: (agent: string, state: T.OrchestratorState, channel?: string) => Effect.Effect<void>;
     readonly setCommits: (commits: T.CommitCount) => Effect.Effect<void>;
@@ -128,39 +134,21 @@ const isFact = (e: T.SideEvent): e is T.Fact => {
 };
 
 const make = Effect.gen(function* () {
-  const clock = yield* Clock.Clock;
   const config = yield* ServerConfig;
   const { reduce, effects: effectsOf, frame: frameOf, restore } = yield* Projection;
   const file = join(config.home, "state.json");
   const read = jsonOf(S.WorkspaceState);
   const kept = { ...emptyWorkspaceState(), ...(yield* readOrSetAside(file, read, "the farm starts empty")) };
-  let state = restore(restarted(kept));
-  const disk = new FileWriter(file);
-  const body = () => JSON.stringify(toKeep(state));
-  let closed = false;
+  // The state and the number of folds that made it, changed only by apply, in one step each.
+  const held = yield* SubscriptionRef.make({ state: restore(restarted(kept)), seq: 0 });
+  const current = () => SubscriptionRef.getUnsafe(held);
   // A crash loses half a second at most: a write waits that long after the first change, and the changes after it join
-  // it rather than putting it off. The wait is a fiber of this service's, ended with it.
-  const saves = yield* FiberMap.make<"save">();
-  const later = yield* FiberMap.runtime(saves)();
-  const save = () => {
-    if (!closed)
-      later(
-        "save",
-        Effect.delay(
-          Effect.sync(() => disk.write(body)).pipe(
-            Effect.onError((cause) => (Cause.hasInterrupts(cause) ? Effect.void : Effect.logError("vibevalley: state.json could not be saved", cause))),
-          ),
-          saveAfterMs,
-        ),
-        { onlyIfMissing: true },
-      );
-  };
-  yield* Effect.addFinalizer(() =>
-    Effect.suspend(() => {
-      closed = true;
-      return FiberMap.clear(saves);
-    }).pipe(Effect.andThen(Effect.sync(() => disk.finish(body)))),
-  );
+  // it rather than putting it off.
+  const disk = yield* keptFile(file, { soonMs: saveAfterMs });
+  const body = () => JSON.stringify(toKeep(current().state));
+  const save = () => disk.soon(body);
+  // The state as the farm stops is written as it closes, after this.
+  yield* Effect.addFinalizer(() => Effect.sync(save));
 
   const events = yield* scopedPubSub<T.SideEvent>();
   const transitions = yield* scopedPubSub<Transition>();
@@ -173,54 +161,60 @@ const make = Effect.gen(function* () {
     if (isFact(e)) PubSub.publishUnsafe(changes, undefined);
   };
 
-  // Every fact goes through here: a span each would bury the traces in folds.
+  // Every fact goes through here: a span each would bury the traces in folds. The fold and what it tells happen in the
+  // one modify, so the transitions go out in the order the state changed.
   const apply = Effect.fnUntraced(function* (...facts: FactIn[]) {
-    yield* Effect.sync(() => {
-      let next = state;
+    const at = yield* Clock.currentTimeMillis;
+    yield* SubscriptionRef.modify(held, (h) => {
+      let next = h.state;
       const done: Transition[] = [];
       const made: T.GameEffect[] = [];
       for (const fact of facts) {
-        const f = { ...fact, at: clock.currentTimeMillisUnsafe() };
+        const f = { ...fact, at };
         const [after, changed] = reduce(next, f);
         if (!changed) continue;
         done.push({ before: next, fact: f, after });
         made.push(...effectsOf(next, f));
         next = after;
       }
-      if (done.length === 0) return;
-      state = next;
-      save();
-      for (const t of done) {
-        publish(t.fact);
-        PubSub.publishUnsafe(transitions, t);
-      }
-      for (const e of made) {
-        PubSub.publishUnsafe(changes, e);
-      }
-    });
+      if (done.length === 0) return [undefined, h] as const;
+      const updated = { state: next, seq: h.seq + 1 };
+      return [
+        () => {
+          save();
+          for (const t of done) {
+            publish(t.fact);
+            PubSub.publishUnsafe(transitions, t);
+          }
+          for (const e of made) PubSub.publishUnsafe(changes, e);
+        },
+        updated,
+      ] as const;
+    }).pipe(Effect.map((tell) => tell?.()));
   });
 
   const side = (e: T.SideEvent) => Effect.sync(() => publish(e));
 
-  const states = Stream.callback<T.StateFrame>((queue) =>
-    Effect.gen(function* () {
-      const sub = yield* PubSub.subscribe(changes);
-      Queue.offerUnsafe(queue, frameOf(state));
-      return yield* Effect.forever(
-        Effect.gen(function* () {
-          const first = yield* PubSub.take(sub);
-          yield* Effect.sleep(stateEveryMs);
-          const rest = yield* PubSub.takeUpTo(sub, Number.MAX_SAFE_INTEGER);
-          const gathered = [first, ...rest].filter((e): e is T.GameEffect => e !== undefined);
-          Queue.offerUnsafe(queue, frameOf(state, gathered));
-        }),
-      );
-    }),
+  // A frame now, then one for each burst of changes: the state as it is then, with the burst's effects.
+  const frameNow = (effects: readonly (T.GameEffect | undefined)[]) =>
+    frameOf(
+      current().state,
+      effects.filter((e): e is T.GameEffect => e !== undefined),
+      current().seq,
+    );
+  const states = Stream.unwrap(
+    Effect.map(PubSub.subscribe(changes), (sub) =>
+      Stream.concat(
+        Stream.sync(() => frameNow([])),
+        Stream.fromSubscription(sub).pipe(Stream.groupedWithin(burstMost, stateEveryMs), Stream.map(frameNow)),
+      ),
+    ),
   );
 
   const shape = Core.of({
-    state: () => state,
-    session: (id) => state.sessions.find((h) => h.id === id),
+    state: () => current().state,
+    seq: () => current().seq,
+    session: (id) => current().state.sessions.find((h) => h.id === id),
     apply,
     setOrchestrator: Effect.fn("Core.setOrchestrator")(function* (agent, orchestrator, channel) {
       return yield* apply({ type: "orchestrator", agent, state: orchestrator, ...(channel ? { channel } : {}) });
@@ -229,29 +223,32 @@ const make = Effect.gen(function* () {
       return yield* apply({ type: "commits", commits });
     }),
     open: Effect.fn("Core.open")(function* () {
-      if (state.call !== "live") yield* apply({ type: "call", state: "live", reason: "" });
+      if (current().state.call !== "live") yield* apply({ type: "call", state: "live", reason: "" });
     }),
     // A session's every line of output comes through here: a span each would bury the traces.
     sessionEvent: Effect.fnUntraced(function* (id, activity) {
-      return yield* side({ type: "event", at: clock.currentTimeMillisUnsafe(), id, activity });
+      return yield* side({ type: "event", at: yield* Clock.currentTimeMillis, id, activity });
     }),
     notice: Effect.fn("Core.notice")(function* (level, text) {
-      return yield* side({ type: "notice", at: clock.currentTimeMillisUnsafe(), level, text });
+      return yield* side({ type: "notice", at: yield* Clock.currentTimeMillis, level, text });
     }),
     runtime: Effect.fn("Core.runtime")(function* (info) {
-      return yield* side({ type: "runtime", at: clock.currentTimeMillisUnsafe(), info });
+      return yield* side({ type: "runtime", at: yield* Clock.currentTimeMillis, info });
     }),
     did: Effect.fn("Core.did")(function* (d) {
       yield* PubSub.publish(owner, d);
     }),
     transitions: Effect.gen(function* () {
       const sub = yield* PubSub.subscribe(transitions);
-      return [state, Stream.fromSubscription(sub)] as const;
+      return [current().state, Stream.fromSubscription(sub)] as const;
     }),
     events: Stream.unwrap(
       Effect.gen(function* () {
         const sub = yield* PubSub.subscribe(events);
-        return Stream.concat(Stream.succeed<T.SideEvent>({ type: "snapshot", at: yield* Clock.currentTimeMillis, state }), Stream.fromSubscription(sub));
+        return Stream.concat(
+          Stream.succeed<T.SideEvent>({ type: "snapshot", at: yield* Clock.currentTimeMillis, state: current().state }),
+          Stream.fromSubscription(sub),
+        );
       }),
     ),
     subscribe: Effect.map(PubSub.subscribe(events), Stream.fromSubscription),

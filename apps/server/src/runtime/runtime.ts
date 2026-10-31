@@ -13,7 +13,7 @@ import {
   type Runtime as OarRuntime,
   RuntimeRegistry,
 } from "@botiverse/oar";
-import { Clock, Context, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, Schedule, Schema } from "effect";
+import { Cache, Clock, Context, Effect, Exit, FiberMap, FiberSet, FileSystem, Layer, Option, Schedule, Schema } from "effect";
 
 import { Llm } from "@vibevalley/ai/llm";
 import { currentLocale, type Locale, t } from "@vibevalley/i18n";
@@ -21,18 +21,17 @@ import type * as T from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
 import { modelClient } from "@/agent/model.ts";
-import { projectsDir, ServerConfig } from "@/base/config.ts";
-import { FileWriter } from "@/base/files.ts";
 import { jsonOrNone } from "@/base/json.ts";
-import { callbackLog } from "@/base/log.ts";
-import { timeHere, withinRealTime } from "@/base/time.ts";
 import { Core } from "@/core/core.ts";
 import { type ApiError, messageOf, refused } from "@/errors.ts";
+import { projectsDir, ServerConfig } from "@/infra/config.ts";
+import { keptFile } from "@/infra/files.ts";
+import { timeHere, withinRealTime } from "@/infra/time.ts";
 import { Setting } from "@/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
 import { agentProblems, type Candidate, chooseAgent, sessionOptions } from "./fit.ts";
-import { piBalance } from "./pi.ts";
+import { piBalance, type PiDefault, piSettings } from "./pi.ts";
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "./presets.ts";
 import { inCny, price, type Rate } from "./price.ts";
 import { moneyStop, quotaOf } from "./quota.ts";
@@ -72,7 +71,7 @@ export class Runtime extends Context.Service<
   Runtime,
   {
     /** Answers at once: a runtime not looked at yet comes as checking, and its probe's answer follows as a runtime event. */
-    readonly list: () => T.RuntimeInfo[];
+    readonly list: () => Effect.Effect<T.RuntimeInfo[]>;
     readonly refresh: (id: string) => Effect.Effect<T.RuntimeInfo | undefined>;
     readonly info: (id: string) => Effect.Effect<T.RuntimeInfo | undefined>;
     readonly update: (id: string, s: T.RuntimeSettings) => Effect.Effect<T.RuntimeInfo | undefined, ApiError>;
@@ -210,8 +209,7 @@ const inventory = <T>(
       )
     : Effect.succeed(null);
 
-const defaultUsageOf: UsageOf = async (id, runtime, found, settings) => {
-  if (id === "pi") return piBalance(settings);
+const defaultUsageOf: UsageOf = async (_id, runtime, found) => {
   if (!runtime.accountUsage) return null;
   const usage = await withinRealTime(runtime.accountUsage(found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
   return usage ? fromOar(usage) : null;
@@ -223,7 +221,6 @@ export const make = (options: RuntimeOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
     const fs = yield* FileSystem.FileSystem;
-    const logs = yield* callbackLog;
     const config = yield* ServerConfig;
     const core = yield* Core;
     const store = yield* Agent;
@@ -233,16 +230,35 @@ export const make = (options: RuntimeOptions = {}) =>
     const emit = (e: Effect.Effect<void>) => void forkHere(e);
     /** null when the read fails. */
     const usageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) =>
-      Effect.orElseSucceed(Effect.tryPromise({ try: () => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings), catch: messageOf }), () => null);
+      !options.usageOf && id === "pi"
+        ? piBalance(settings)
+        : Effect.orElseSucceed(
+            Effect.tryPromise({ try: () => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings), catch: messageOf }),
+            () => null,
+          );
 
-    const cache = new Map<string, Observation>();
+    /** pi's own default model, read again whenever pi is looked at: what a quote for pi's default prices. */
+    const readPiDefault = Effect.promise(piSettings);
+    let piDefault: PiDefault = yield* readPiDefault;
+    /** Runtimes being looked at again in a new language: one probe each, the old words shown until it lands. */
     const relabeling = new Set<string>();
-    /**
-     * Each full probe takes the next number as it starts; the cache keeps the number of the probe it holds, and a probe
-     * that started before it is dropped, so a slow full refresh never overwrites a newer one. Usage reads merge into the
-     * observation of the full probe they started from (its number), and only while it is still the one held.
-     */
-    const reads = new Map<string, number>();
+    /** Each full probe's number, per runtime: a usage read merges into the probe it read from, only while that one is held. */
+    const probes = new Map<string, number>();
+    /** Runtimes with a probe out: a refresh's is not in the cache until it lands (the old value is shown meanwhile), so a
+     * list that finds nothing held asks for none of its own while one is out. */
+    const probing = new Map<string, number>();
+    const out = <A, E>(id: string, e: Effect.Effect<A, E>) =>
+      Effect.suspend(() => {
+        probing.set(id, (probing.get(id) ?? 0) + 1);
+        return Effect.ensuring(
+          e,
+          Effect.sync(() => {
+            const n = (probing.get(id) ?? 1) - 1;
+            if (n > 0) probing.set(id, n);
+            else probing.delete(id);
+          }),
+        );
+      });
     /** Usage reads asked and the latest one taken, per runtime: an older answer arriving late does not undo a newer. */
     const usageAsked = new Map<string, number>();
     const usageTaken = new Map<string, number>();
@@ -252,8 +268,9 @@ export const make = (options: RuntimeOptions = {}) =>
     let closed = false;
 
     const spendFile = join(config.home, "spend.json");
-    const disk = new FileWriter(spendFile);
-    let spent: Spent = { day: dayOf(clock.currentTimeMillisUnsafe()), byRuntime: {} };
+    // The tally is written a second after the first spend, the ones in between joining it, and as the service closes.
+    const disk = yield* keptFile(spendFile, { soonMs: 1000 });
+    let spent: Spent = { day: dayOf(yield* Clock.currentTimeMillis), byRuntime: {} };
     // An unreadable tally, or yesterday's, starts the day again.
     const kept = jsonOrNone(SpentSchema)(Option.getOrUndefined(yield* Effect.option(fs.readFileString(spendFile))));
     if (kept && kept.day === spent.day) spent = kept;
@@ -269,13 +286,7 @@ export const make = (options: RuntimeOptions = {}) =>
           closed = true;
           return FiberMap.clear(timers);
         }),
-        Effect.sync(() => {
-          try {
-            disk.finish(() => JSON.stringify(spent));
-          } catch (e) {
-            logs.warn(`vibevalley: could not save spend.json: ${String(e)}`);
-          }
-        }),
+        Effect.sync(() => disk.soon(() => JSON.stringify(spent))),
       ),
     );
 
@@ -295,23 +306,14 @@ export const make = (options: RuntimeOptions = {}) =>
       };
     }
 
-    const begin = (id: string) => {
-      const n = (reads.get(id) ?? 0) + 1;
-      reads.set(id, n);
-      return n;
+    /** What a probe found, as the farm shows it: its preset, facts and today's spend laid over. */
+    const shown = (next: Observation): Observation => {
+      const id = next.info.id;
+      return { ...next, info: withSpend({ ...next.info, preset: presetOf(id), facts: facts(id) }), locale: currentLocale() };
     };
 
-    function remember(next: Observation, read: number): T.RuntimeInfo {
-      const id = next.info.id;
-      const held = cache.get(id);
-      if (held && read < held.read) return held.info;
-      const info = withSpend({ ...next.info, preset: presetOf(id), facts: facts(id) });
-      cache.set(id, { ...next, info, read, locale: currentLocale() });
-      emit(core.runtime(info));
-      return info;
-    }
-
     const probe = Effect.fnUntraced(function* (id: string): Effect.fn.Return<Observation> {
+      if (id === "pi") piDefault = yield* readPiDefault;
       const settings = store.settings(id);
       const info: T.RuntimeInfo = {
         id,
@@ -325,7 +327,7 @@ export const make = (options: RuntimeOptions = {}) =>
         tools: null,
         stop: "",
         settings,
-        checkedAt: clock.currentTimeMillisUnsafe(),
+        checkedAt: yield* Clock.currentTimeMillis,
       };
       const runtime = registry.get(id);
       if (!runtime) {
@@ -403,33 +405,50 @@ export const make = (options: RuntimeOptions = {}) =>
 
     const known = (id: string) => runtimeIds().includes(id);
 
+    // One probe per runtime at a time, shared by whoever asks meanwhile; a refresh starts a new one, and the one started
+    // last is the one kept, so a slow full refresh never overwrites a newer one. A probe that failed is not kept: the
+    // next ask probes again.
+    const cache = yield* Cache.makeWith(
+      (id: string) =>
+        Effect.gen(function* () {
+          const read = (probes.get(id) ?? 0) + 1;
+          probes.set(id, read);
+          // The settings are the farm's own, whatever stands in for the machine.
+          const next = options.probe
+            ? yield* Effect.map(
+                Effect.promise(() => options.probe!(id)),
+                (i): Observation => ({ info: { ...i, settings: store.settings(id) }, read: 0 }),
+              )
+            : yield* probe(id);
+          const kept = shown({ ...next, read });
+          yield* core.runtime(kept.info);
+          return kept;
+        }),
+      { capacity: 64, timeToLive: (exit) => (Exit.isFailure(exit) ? 0 : Infinity) },
+    );
+    const held = (id: string) => Effect.map(Cache.getSuccess(cache, id), Option.getOrUndefined);
+    /** The observation held, laid over again (a new total spent, a usage read) and told. */
+    const keep = (next: Observation) =>
+      Effect.gen(function* () {
+        const kept = shown(next);
+        yield* Cache.set(cache, next.info.id, kept);
+        yield* core.runtime(kept.info);
+      });
+
     const refresh = Effect.fnUntraced(function* (id: string): Effect.fn.Return<T.RuntimeInfo | undefined> {
       if (!known(id) || closed) return undefined;
-      const read = begin(id);
-      // The settings are the farm's own, whatever stands in for the machine.
-      const looked = options.probe
-        ? Effect.map(
-            Effect.promise(() => options.probe!(id)),
-            (i): Observation => ({ info: { ...i, settings: store.settings(id) }, read: 0 }),
-          )
-        : probe(id);
-      return yield* Effect.ensuring(
-        Effect.map(looked, (next) => (closed ? undefined : remember(next, read))),
-        // A probe that failed leaves nothing cached: the next list asks again instead of showing "checking" for good.
-        Effect.sync(() => {
-          if (!cache.has(id) && reads.get(id) === read) reads.delete(id);
-        }),
-      );
+      const next = yield* out(id, Cache.refresh(cache, id));
+      return closed ? undefined : next.info;
     });
 
     const info = Effect.fnUntraced(function* (id: string) {
-      const hit = cache.get(id);
+      const hit = yield* held(id);
       return hit && hit.locale === currentLocale() ? withSpend(hit.info) : yield* refresh(id);
     });
 
     const refreshUsage = Effect.fnUntraced(function* (id: string) {
       const runtime = registry.get(id);
-      const before = cache.get(id);
+      const before = yield* held(id);
       // A runtime switched off is not asked: claude's reading, for one, calls its API every time.
       if (closed || !runtime || !before?.found || !before.info.settings.enabled) return;
       const asked = (usageAsked.get(id) ?? 0) + 1;
@@ -437,11 +456,11 @@ export const make = (options: RuntimeOptions = {}) =>
       const usage = yield* usageOf(id, runtime, before.found, before.info.settings);
       // Kept unless a newer full probe replaced the one it read from, or a usage read asked later already landed. The
       // cached observation itself may have been rebuilt meanwhile (a spend pushes a new total): that is no reason to drop it.
-      const now = cache.get(id);
+      const now = yield* held(id);
       if (closed || !now || now.read !== before.read || (usageTaken.get(id) ?? 0) > asked) return;
       usageTaken.set(id, asked);
       if (JSON.stringify(usage) === JSON.stringify(now.info.usage)) return;
-      remember({ ...now, info: { ...now.info, usage, checkedAt: clock.currentTimeMillisUnsafe() } }, now.read);
+      yield* keep({ ...now, info: { ...now.info, usage, checkedAt: yield* Clock.currentTimeMillis } });
     });
 
     const each = (f: (id: string) => Effect.Effect<unknown>) =>
@@ -469,37 +488,40 @@ export const make = (options: RuntimeOptions = {}) =>
     const candidates = Effect.suspend(() => Effect.forEach(store.agents(), (agent) => Effect.map(assess(agent), (a) => ({ agent, usable: usable(a) }))));
 
     const shape = Runtime.of({
-      list: () =>
-        runtimeIds().map((id) => {
-          const hit = cache.get(id);
-          // Shown as it was until the probe in the new language lands.
-          if (hit && hit.locale !== currentLocale() && !closed && !relabeling.has(id)) {
-            relabeling.add(id);
-            emit(
-              Effect.ensuring(
-                Effect.ignoreCause(refresh(id)),
-                Effect.sync(() => relabeling.delete(id)),
-              ),
-            );
-          }
-          if (hit) return withSpend(hit.info);
-          // In the service's own fiber set: a probe that fails is retried by the next list, and none outlives the service.
-          if (!closed && !reads.has(id)) emit(Effect.ignoreCause(refresh(id)));
-          return {
-            id,
-            preset: presetOf(id),
-            facts: facts(id),
-            installation: { status: "checking" },
-            models: null,
-            usage: null,
-            skills: null,
-            mcpServers: null,
-            tools: null,
-            stop: "",
-            settings: store.settings(id),
-            checkedAt: 0,
-          };
-        }),
+      list: Effect.fn("Runtime.list")(function* () {
+        return yield* Effect.forEach(runtimeIds(), (id) =>
+          Effect.gen(function* () {
+            const hit = yield* held(id);
+            // Shown as it was until the probe in the new language lands.
+            if (hit && hit.locale !== currentLocale() && !closed && !relabeling.has(id)) {
+              relabeling.add(id);
+              emit(
+                Effect.ensuring(
+                  Effect.ignoreCause(refresh(id)),
+                  Effect.sync(() => relabeling.delete(id)),
+                ),
+              );
+            }
+            if (hit) return withSpend(hit.info);
+            // In the service's own fiber set: one probe however many lists ask, and none outlives the service.
+            if (!closed && !probing.has(id)) emit(Effect.ignoreCause(out(id, Cache.get(cache, id))));
+            return {
+              id,
+              preset: presetOf(id),
+              facts: facts(id),
+              installation: { status: "checking" },
+              models: null,
+              usage: null,
+              skills: null,
+              mcpServers: null,
+              tools: null,
+              stop: "",
+              settings: store.settings(id),
+              checkedAt: 0,
+            } satisfies T.RuntimeInfo;
+          }),
+        );
+      }),
       refresh,
       info,
       update: Effect.fn("Runtime.update")(function* (id, s) {
@@ -524,7 +546,7 @@ export const make = (options: RuntimeOptions = {}) =>
         if (problem) return yield* Effect.fail(refused(t("server.runtime.cannotSend", { name: agent.name, why: problem.text })));
         if (missingModel)
           yield* core.notice("warn", t("server.runtime.defaultModel", { runtime: runtimeLabel(agent.runtime), model: missingModel, name: agent.name }));
-        const observed = cache.get(agent.runtime);
+        const observed = yield* held(agent.runtime);
         const installation = observed?.found && observed.info.settings.binPath === settings.binPath ? structuredClone(observed.found) : undefined;
         return {
           runtime,
@@ -537,33 +559,18 @@ export const make = (options: RuntimeOptions = {}) =>
       }),
       runtime: (id) => registry.get(id),
       quote: (id, model) => {
-        const p = price(id, model);
+        const p = price(id, model, piDefault);
         return p ? inCny(p, config.cnyPerUsd) : undefined;
       },
       spend: (id, cny) => {
         if (!(cny > 0) || closed) return;
         tally()[id] = (tally()[id] ?? 0) + cny;
-        // The tally is written a second after the last spend; the runtime's new total is pushed once per window.
-        later(
-          "save",
-          Effect.delay(
-            Effect.sync(() => {
-              try {
-                disk.write(() => JSON.stringify(spent));
-              } catch (e) {
-                logs.warn(`vibevalley: could not save spend.json: ${String(e)}`);
-              }
-            }),
-            1000,
-          ),
-        );
+        // The runtime's new total is pushed once per window.
+        disk.soon(() => JSON.stringify(spent));
         later(
           `push:${id}`,
           Effect.delay(
-            Effect.sync(() => {
-              const held = cache.get(id);
-              if (held && !closed) remember(held, held.read);
-            }),
+            Effect.flatMap(held(id), (hit) => (hit && !closed ? keep(hit) : Effect.void)),
             spendPushAfterMs,
           ),
           { onlyIfMissing: true },
@@ -576,7 +583,8 @@ export const make = (options: RuntimeOptions = {}) =>
     });
     return Object.assign(shape, {
       refreshUsage,
-      cached: cache,
+      /** The observation held for a runtime, none before its first probe lands. */
+      cached: held,
       spent: () => spent,
       setSpent: (s: Spent) => (spent = s),
     });

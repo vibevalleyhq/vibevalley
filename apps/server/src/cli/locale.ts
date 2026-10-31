@@ -4,7 +4,7 @@
 
 import { setLocale } from "@vibevalley/i18n";
 
-import { defaults } from "@/base/config.ts";
+import { defaults } from "@/infra/config.ts";
 import { savedLocale } from "@/setting/setting.ts";
 
 setLocale(savedLocale(process.env.VIBEVALLEY_HOME || defaults().home));

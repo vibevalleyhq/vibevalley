@@ -10,8 +10,8 @@ import { Effect, Layer } from "effect";
 
 import type { AccountUsage } from "@vibevalley/protocol";
 
-import { type ServerConfig } from "@/base/config.ts";
 import { Inbox } from "@/inbox/inbox.ts";
+import { type ServerConfig } from "@/infra/config.ts";
 import { Mcp } from "@/mcp/mcp.ts";
 import { type GitHubRun, type ProjectHooks } from "@/project/project.ts";
 import { registryOf } from "@/runtime/runtime.ts";
@@ -19,7 +19,6 @@ import { agentSessions, agents, collaboration, issuesBelowTaskGraphs, platform, 
 import { Task } from "@/task/task.ts";
 import { Tool } from "@/tool/tool.ts";
 
-import { clockLayer } from "./clock.ts";
 import { repo } from "./git.ts";
 import { installedOnly } from "./helper.ts";
 import { testConfig } from "./layers.ts";
@@ -45,8 +44,6 @@ export interface WorldOptions {
   /** Projects made before the farm starts, each a git repository with one commit. */
   readonly repos?: readonly string[];
   readonly stallMs?: number;
-  /** What now is for the whole farm (Effect's Clock, read by every service); the real time when absent. Sleeping stays real. */
-  readonly clock?: () => number;
   /** What a runtime's account says of its quota or balance; none when absent. */
   readonly usage?: () => AccountUsage | null;
   /** Who an MCP token names; the sessions' tokens when absent. */
@@ -70,7 +67,7 @@ export function worldBelowTasks(options: WorldOptions = {}) {
     ...(options.stallMs !== undefined ? { session: { stallMs: options.stallMs } } : {}),
     issue: { background: false, ...(options.talkIdleMs !== undefined ? { talkIdleMs: options.talkIdleMs } : {}) },
   };
-  const below = options.clock ? platform(config).pipe(Layer.provideMerge(clockLayer(options.clock))) : platform(config);
+  const below = platform(config);
   return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), collaboration(o), agentSessions(o), issuesBelowTaskGraphs(o));
 }
 

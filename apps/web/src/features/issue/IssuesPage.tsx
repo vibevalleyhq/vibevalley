@@ -5,50 +5,36 @@ import { list, t } from "@vibevalley/i18n";
 import type { Issue, Session } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { useOrchestrators } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { useRouter } from "@/base/router";
 import { variant } from "@/base/util";
+import { useOrchestrators } from "@/infra/agents";
+import { api, reasonOf } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
+import { useSearchParam } from "@/state/atom";
+import { useIntents } from "@/state/intent";
+import { createAct } from "@/ui/act";
 import { Select } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
 import { Segmented } from "@/ui/Segmented";
 import { toast } from "@/ui/toasts";
 
-import { run } from "./acts";
 import { IssueBoard } from "./Board";
 import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, noFilter } from "./cards";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
-import { type BoardLook, boardViews, defaultLook, lookFromList, lookToList, viewLabel } from "./display";
+import { type BoardLook, boardViews, viewLabel } from "./display";
 import { DisplayMenu } from "./DisplayMenu";
 import { issueIs } from "./issue";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { type Lane } from "./lanes";
+import { boardLook } from "./look";
+import { issueMove, movedCards, sendMove } from "./moves";
 import { useIssueHistory, useGraphs, useNameOf } from "./queries";
 import { TaskDetail } from "./TaskDetail";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
-import { writeIssue } from "./write";
+import { createWriteKey, writeIssue } from "./write";
 
-const lookKey = "vibevalley.board.look";
-
-function loadLook(): BoardLook {
-  try {
-    return lookFromList(JSON.parse(localStorage.getItem(lookKey) ?? "null"));
-  } catch {
-    return defaultLook;
-  }
-}
-
-function saveLook(look: BoardLook) {
-  try {
-    localStorage.setItem(lookKey, JSON.stringify(lookToList(look)));
-  } catch {
-    // No storage: the look lasts for this visit.
-  }
-}
-
-type Closing = { issue: Issue; session: Session; review: boolean };
+type Closing = { issue: Issue; session: Session; review: boolean; lane?: Lane };
 
 /** `rest` is the path after /issues/. */
 export function IssuesPage(props: { rest: string }) {
@@ -56,23 +42,38 @@ export function IssuesPage(props: { rest: string }) {
   const core = useCore();
   const graphs = useGraphs();
   const id = () => props.rest || undefined;
-  const [filter, setFilter] = createSignal<BoardFilter>(noFilter);
+  // The project and the helper are in the address, so a reload or a link keeps the board as filtered; the words typed
+  // are not, being half a thought.
+  const [project, setProject] = useSearchParam("project");
+  const [agent, setAgent] = useSearchParam("agent");
+  const [query, setQuery] = createSignal("");
+  const filter = (): BoardFilter => ({ query: query(), project: project(), agent: agent() });
+  const setFilter = (f: BoardFilter) => {
+    setQuery(f.query);
+    setProject(f.project);
+    setAgent(f.agent);
+  };
   const [older, setOlder] = createSignal(false);
-  const [look, setLookState] = createSignal(loadLook());
   const [closing, setClosing] = createSignal<Closing>();
-  const [reopening, setReopening] = createSignal<Issue>();
+  const [reopening, setReopening] = createSignal<{ issue: Issue; lane: Lane }>();
   const history = useIssueHistory(older);
 
-  const setLook = (l: BoardLook) => {
-    setLookState(l);
-    saveLook(l);
+  const look = boardLook.get;
+  const setLook = boardLook.set;
+  // The filter's part of the address goes along, so closing an issue comes back to the board as filtered.
+  const kept = () => {
+    const search = new URLSearchParams(Object.entries({ project: project(), agent: agent() }).filter(([, v]) => v !== "")).toString();
+    return search ? `?${search}` : "";
   };
-  const open = (to: string | undefined) => router.navigate(to === undefined ? "/issues" : `/issues/${encodeURIComponent(to)}`);
+  const open = (to: string | undefined) => router.navigate((to === undefined ? "/issues" : `/issues/${encodeURIComponent(to)}`) + kept());
   const notice = dispatchedNotice(open);
 
   const orchestrators = useOrchestrators();
   const orchestratorIds = createMemo(() => new Set(orchestrators().map((a) => a.id)));
-  const all = createMemo(() => buildCards(history.rows() ?? [], core(), graphs(), orchestratorIds()));
+  const moves = useIntents(issueMove);
+  const act = createAct();
+  const writeKey = createWriteKey();
+  const all = createMemo(() => movedCards(buildCards(history.rows() ?? [], core(), graphs(), orchestratorIds()), moves.list()));
   const shown = () => all().filter((c) => filterShows(filter(), c));
   const card = () => {
     const at = id();
@@ -81,7 +82,7 @@ export function IssuesPage(props: { rest: string }) {
 
   const place = async (c: BoardCard, before: string | undefined) => {
     if (c.id === before) return;
-    await run(() => api.issue.update(omitUndefined({ id: c.id, before })));
+    await act.run(() => api.issue.update(omitUndefined({ id: c.id, before })));
   };
 
   /** Asked about first where it cannot be undone. A 待办 dropped back on its own lane goes last. */
@@ -94,22 +95,29 @@ export function IssuesPage(props: { rest: string }) {
         toast(t("web.issue.page.pickFirst"));
         return;
       }
-      const got = await run(() => api.issue.status.update({ id: c.id, status: "todo" }));
-      if (got) notice(got);
-    } else if (move === "close" && c.kind === "issue" && c.session) setClosing({ issue: c.issue, session: c.session, review: false });
-    else if (move === "reopen" && c.kind === "issue") setReopening(() => c.issue);
+      const done = await sendMove(moves, { id: c.id, status: "todo", lane: to }).done;
+      if (done?.replied) notice(done.replied.reply);
+    } else if (move === "close" && c.kind === "issue" && c.session) setClosing({ issue: c.issue, session: c.session, review: false, lane: to });
+    else if (move === "reopen" && c.kind === "issue") setReopening({ issue: c.issue, lane: to });
   };
 
   const add = async (text: string, where: { project?: string; agent?: string } = {}) => {
     const f = filter();
-    const made = await run(() => writeIssue(text, where.agent || f.agent, where.project || f.project));
+    const words = text.trim();
+    const made = await act.run(() => writeIssue(text, where.agent || f.agent, where.project || f.project, writeKey.for(words)));
     if (!made) return;
+    writeKey.used();
     if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));
     // A line written in a lane stays on the board, among the others; only a blank one to write out opens its page.
     if (!text.trim()) open(made.issue.id);
   };
   const addInList: ListAdd = (text, where) => void add(text, where);
   const write = () => void add("");
+  const retry = async (c: BoardCard) => {
+    if (c.move?.state !== "failed") return;
+    const done = await moves.retry(c.move.key);
+    if (done?.replied) notice(done.replied.reply);
+  };
 
   // An issue is a page of its own (docs/style/design.md): the board and the list give way to it, and Escape or 工单 comes back.
   return (
@@ -151,6 +159,8 @@ export function IssuesPage(props: { rest: string }) {
                 onOlder={() => setOlder(!older())}
                 onOpen={open}
                 onDrop={(c, to) => void drop(c, to)}
+                onRetry={(c) => void retry(c)}
+                onPutBack={(c) => c.move && moves.drop(c.move.key)}
                 onPlace={(c, before) => void place(c, before)}
                 onAdd={(t) => void add(t)}
                 onWrite={write}
@@ -174,9 +184,11 @@ export function IssuesPage(props: { rest: string }) {
         )}
       </Show>
       <Show when={closing()}>
-        {(c) => <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} onClose={() => setClosing(undefined)} />}
+        {(c) => <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} lane={c().lane} onClose={() => setClosing(undefined)} />}
       </Show>
-      <Show when={reopening()}>{(issue) => <ReopenDialog issue={issue()} onClose={() => setReopening(undefined)} onReopened={() => open(issue().id)} />}</Show>
+      <Show when={reopening()}>
+        {(r) => <ReopenDialog issue={r().issue} lane={r().lane} onClose={() => setReopening(undefined)} onReopened={() => open(r().issue.id)} />}
+      </Show>
     </div>
   );
 }

@@ -1,14 +1,6 @@
-// Text as the farm measures it, which is JavaScript's own: lengths in UTF-16 units, whitespace as \s. A surrogate pair
-// cut in half becomes U+FFFD, so what is stored and sent is always valid UTF-8.
+// The server's cuts of text, on the shared measure (packages/protocol/src/rules/cut.ts).
 
-/** s.slice(start, end), a surrogate pair cut in half made U+FFFD. */
-export const slice = (s: string, start: number, end?: number) => s.slice(start, end).toWellFormed();
-
-/** s as it is when it fits in max units; else its first max units and an ellipsis. */
-export const cut = (s: string, max: number) => (s.length > max ? slice(s, 0, max) + "…" : s);
-
-/** Runs of white space are one space. */
-export const oneLine = (s: string) => s.replace(/\s+/gu, " ");
+import { oneLine, slice } from "@vibevalley/protocol/rules";
 
 /** s on one line and trimmed, at most max units with the ellipsis. */
 export const clip = (s: string, max: number) => {

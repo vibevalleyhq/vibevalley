@@ -9,6 +9,7 @@ on conflict (participant_id, channel_id) do update set read_number = greatest(ch
 select read_number from channel_read_cursor where participant_id = sqlc.arg(participant_id) and channel_id = sqlc.arg(channel_id);
 
 -- name: ReadCursorsOf :many
+-- bound: a row per channel.
 select channel_id, read_number from channel_read_cursor where participant_id = sqlc.arg(participant_id);
 
 -- name: DeleteCursorsIn :exec

@@ -1,6 +1,8 @@
 import type { JSX } from "@solidjs/web";
 import { type Accessor, createEffect, createSignal, For, onSettled, untrack } from "solid-js";
 
+import { useInterval } from "./timer";
+
 /** A ref that focuses its element once it is on the page: what React's autoFocus does on mount. */
 export function autofocus() {
   let el: HTMLElement | undefined;
@@ -13,10 +15,7 @@ export function autofocus() {
 /** The time, a new reading every `ms`: for "3 分钟前" that keeps up without anything else changing. */
 export function useNow(ms = 30_000): Accessor<number> {
   const [now, setNow] = createSignal(Date.now());
-  onSettled(() => {
-    const t = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(t);
-  });
+  useInterval(() => setNow(Date.now()), ms);
   return now;
 }
 

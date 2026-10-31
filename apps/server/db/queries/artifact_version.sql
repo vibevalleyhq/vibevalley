@@ -8,6 +8,7 @@ values (sqlc.arg(artifact_id), sqlc.arg(version), sqlc.arg(sha), sqlc.arg(size),
 update artifact_version set message_id = sqlc.arg(message_id) where artifact_id = sqlc.arg(artifact_id) and version = sqlc.arg(version);
 
 -- name: ArtifactVersions :many
+-- bound: one artifact's versions, each one the owner or a helper wrote.
 -- With the announcing message's channel and number, where its comments are.
 select v.*, m.channel_id as message_channel, m.number as message_number
 from artifact_version v left join channel_message m on m.id = v.message_id

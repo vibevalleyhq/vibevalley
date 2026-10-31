@@ -2,21 +2,21 @@
 // folded away.
 
 import type { JSX } from "@solidjs/web";
-import { createSignal, For, Show, untrack } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Memory, type MemorySourceInfo, memoryKeep } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api, reasonOf } from "@/base/api";
 import { ago } from "@/base/format";
-import { useCore } from "@/base/frame";
-import { queries, ready, useProjects, useQuery } from "@/base/query";
 import { aria, useNow } from "@/base/util";
+import { api, createRequestKey, reasonOf } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { queries, ready, useProjects, useQuery } from "@/infra/query";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Select, TextArea, TextInput } from "@/ui/Field";
 import { Quiet } from "@/ui/layout";
-import { toast } from "@/ui/toasts";
 
 /** Notes not tied to a project. */
 const everywhere = "*";
@@ -25,28 +25,17 @@ const item = "rounded-md border border-line bg-page";
 
 const useMemory = (agent: () => string) => useQuery(() => ({ queryKey: ["memory", agent()], queryFn: () => api.memory.list({ agent: agent() }) }));
 
-function memoryActions(agent: string) {
-  const reload = () => queries.invalidateQueries({ queryKey: ["memory", agent] });
-  return {
-    /** The refusal in words, or undefined once written. */
-    write: async (text: string, project?: string) => {
-      try {
-        await api.memory.create({ agent, text, ...(project ? { project } : {}) });
-        await reload();
-        return undefined;
-      } catch (e) {
-        return reasonOf(e);
-      }
-    },
-    forget: async (id: string) => {
-      try {
-        await api.memory.delete({ agent, memory: id });
-        await reload();
-      } catch (e) {
-        toast(reasonOf(e));
-      }
-    },
-  };
+const reload = (agent: string) => queries.invalidateQueries({ queryKey: ["memory", agent] });
+
+/** Forgetting a memory, from either panel: a refusal in the error tone. */
+function createForget(agent: () => string) {
+  const act = createAct();
+  return (id: string) =>
+    void act.run(async () => {
+      const at = agent();
+      await api.memory.delete({ agent: at, memory: id });
+      await reload(at);
+    });
 }
 
 /** A titled part of a panel, its count beside the title. */
@@ -92,7 +81,7 @@ export function MemoryPanel(props: { agent: string }) {
   const [shown, setShown] = createSignal("");
   const viewQuery = useMemory(() => props.agent);
   const view = () => ready(viewQuery, undefined);
-  const act = () => memoryActions(props.agent);
+  const forget = createForget(() => props.agent);
   const core = useCore();
   const now = useNow();
   const sessions = () => new Map<string, string>((core()?.sessions ?? []).map((h) => [h.id, h.name]));
@@ -137,7 +126,7 @@ export function MemoryPanel(props: { agent: string }) {
         </Show>
       </Section>
       <RecallPreview agent={props.agent} />
-      <WriteNote onWrite={(text, project) => act().write(text, project)} withProject />
+      <WriteNote agent={props.agent} withProject />
       <Section title={t("web.memory.memory.notes")} count={notes().length}>
         <Show when={projects().length > 0}>
           <div class="flex flex-wrap gap-1">
@@ -166,7 +155,7 @@ export function MemoryPanel(props: { agent: string }) {
                     <MemoryItem
                       memory={m()}
                       faded={m().fading === true}
-                      onForget={() => void act().forget(m().id)}
+                      onForget={() => forget(m().id)}
                       meta={[
                         m().project ?? t("web.memory.memory.allProjects"),
                         whose(m()),
@@ -180,7 +169,7 @@ export function MemoryPanel(props: { agent: string }) {
                   {(s) => (
                     <MemoryItem
                       memory={m()}
-                      onForget={s().canForget ? () => void act().forget(m().id) : undefined}
+                      onForget={s().canForget ? () => forget(m().id) : undefined}
                       meta={[
                         t("web.memory.memory.inSource", { source: s().label }),
                         ...(s().canForget ? [] : [t("web.memory.memory.forgetThere", { source: s().label })]),
@@ -270,8 +259,7 @@ function RecallPreview(props: { agent: string }) {
 export function OrchestratorMemoryPanel(props: { agent: string }) {
   const viewQuery = useMemory(() => props.agent);
   const view = () => ready(viewQuery, undefined);
-  // The page is made again for another orchestrator (OrchestratorPage keys it): the agent does not change here.
-  const act = memoryActions(untrack(() => props.agent));
+  const forget = createForget(() => props.agent);
   const now = useNow();
   return (
     <Show when={view()} fallback={<Quiet>{t("web.memory.memory.orchestratorReading")}</Quiet>}>
@@ -280,7 +268,7 @@ export function OrchestratorMemoryPanel(props: { agent: string }) {
         return (
           <div class="flex flex-col gap-4">
             <p class="text-sm text-muted">{t("web.memory.memory.orchestratorIntro")}</p>
-            <WriteNote onWrite={(text) => act.write(text)} />
+            <WriteNote agent={props.agent} />
             <Section title={t("web.memory.memory.notes")} count={v().memories.length} testid="notes">
               <Show when={v().memories.length > 0} fallback={<Quiet>{t("web.memory.memory.orchestratorNothing")}</Quiet>}>
                 <For each={v().memories} keyed={(m) => m.id}>
@@ -288,7 +276,7 @@ export function OrchestratorMemoryPanel(props: { agent: string }) {
                     <MemoryItem
                       memory={m()}
                       faded={i() >= carried()}
-                      onForget={() => void act.forget(m().id)}
+                      onForget={() => forget(m().id)}
                       meta={[m().session === props.agent ? t("web.memory.memory.orchestratorOwn") : t("web.memory.memory.told"), ago(m().at, now())]}
                       warning={i() >= carried() ? t("web.memory.memory.tooOld") : undefined}
                     />
@@ -391,15 +379,26 @@ export function ArchivePanel(props: { agent: string }) {
   );
 }
 
-function WriteNote(props: { onWrite: (text: string, project?: string) => Promise<string | undefined>; withProject?: boolean }) {
+function WriteNote(props: { agent: string; withProject?: boolean }) {
   const [text, setText] = createSignal("");
   const [project, setProject] = createSignal("");
   const [error, setError] = createSignal<string>();
   const projectsQuery = useProjects();
+  // A refusal shows under the box, where the words are; the key stays until a note went in, so a retry is that note.
+  const act = createAct(setError);
+  const key = createRequestKey();
   const write = async () => {
-    const refused = await props.onWrite(text(), project().trim() || undefined);
-    setError(refused);
-    if (!refused) setText("");
+    const agent = props.agent;
+    const words = text();
+    const at = props.withProject === true ? project().trim() || undefined : undefined;
+    setError(undefined);
+    const done = await act.run(async () => {
+      await api.memory.create(omitUndefined({ agent, text: words, project: at, requestKey: key.now() }));
+      key.used();
+      await reload(agent);
+      return true;
+    });
+    if (done === true) setText("");
   };
   return (
     <div class="flex flex-col gap-1">
@@ -426,7 +425,7 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
             <For each={ready(projectsQuery, [])}>{(p) => <option value={p.name} />}</For>
           </datalist>
         </Show>
-        <Button tone="primary" data-testid="note-write" disabled={!text().trim()} onClick={() => void write()}>
+        <Button tone="primary" data-testid="note-write" disabled={!text().trim() || act.busy()} onClick={() => void write()}>
           {t("web.base.write")}
         </Button>
       </div>

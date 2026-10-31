@@ -1,17 +1,16 @@
-// The long-lived event streams: the frames for the page, the side events and the live
-// events, as server-sent events with a ping every 20 s so a proxy does not close a quiet one.
+// The long-lived event streams: the frames for the page, the side events and the live events, as server-sent events
+// with a ping every streamHeartbeatMs, so a proxy does not close a quiet one and a reader can tell a quiet stream from a
+// dead one (packages/protocol/src/stream.ts).
 
 import { Effect, Metric, Schedule, type Schema, Stream } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
 
-import { eventsPath, livePath, statePath, type Streams } from "@vibevalley/protocol";
+import { eventsPath, livePath, statePath, streamHeartbeatMs, type Streams } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { wireJson } from "@/base/wire.ts";
 import { bounded } from "@/core/bounded.ts";
 import { Core } from "@/core/core.ts";
-
-const heartbeatMs = 20_000;
 
 /** Each stream's Schema: what readStream (packages/protocol/src/stream.ts) takes its payloads to be. */
 const schemas = { [statePath]: S.StateFrame, [eventsPath]: S.SideEvent, [livePath]: S.LiveEvent } satisfies {
@@ -34,7 +33,7 @@ function sse<A>(name: string, events: Stream.Stream<A>, schema: Schema.Codec<A>)
       ),
     ),
   );
-  const pings = Stream.fromSchedule(Schedule.spaced(heartbeatMs)).pipe(Stream.map(() => encoder.encode(": ping\n\n")));
+  const pings = Stream.fromSchedule(Schedule.spaced(streamHeartbeatMs)).pipe(Stream.map(() => encoder.encode(": ping\n\n")));
   const counted = open.pipe(Metric.withAttributes({ stream: name }));
   const body = Stream.unwrap(Effect.as(Metric.update(counted, 1), Stream.merge(data, pings, { haltStrategy: "left" }))).pipe(
     Stream.ensuring(Metric.update(counted, -1)),

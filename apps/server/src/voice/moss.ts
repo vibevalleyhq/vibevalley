@@ -5,10 +5,11 @@
 // protocol (JSON actions, and binary frames tagged 0x00 for audio), the server only adds the key.
 
 import { Effect, Queue, type Scope, Schema } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { Socket } from "effect/socket";
 
 import { jsonOrNone } from "@/base/json.ts";
-import { afterRealTime } from "@/base/time.ts";
+import { afterRealTime } from "@/infra/time.ts";
 
 const mossUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
 
@@ -43,8 +44,8 @@ export interface MossEvents {
 
 export interface MossTransport {
   readonly connect: (key: string, on: MossEvents) => MossLink;
-  /** The HTTP status of a plain request with the key and its body, or an error when nothing answers. */
-  readonly status: (key: string) => Promise<{ readonly code: number; readonly body: string }>;
+  /** The HTTP status of a plain request with the key and its body, or why nothing answered. */
+  readonly status: (key: string) => Effect.Effect<{ readonly code: number; readonly body: string }, string>;
 }
 
 const nodeTransport: MossTransport = {
@@ -61,8 +62,14 @@ const nodeTransport: MossTransport = {
     return { send: (text) => ws.send(text), close: () => ws.close() };
   },
   status: (key) =>
-    fetch(mossUrl.replace(/^wss:/u, "https:"), { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(deadlineMs) }).then((r) =>
-      r.text().then((body) => ({ code: r.status, body })),
+    Effect.gen(function* () {
+      const http = yield* HttpClient.HttpClient;
+      const r = yield* http.execute(HttpClientRequest.get(mossUrl.replace(/^wss:/u, "https:")).pipe(HttpClientRequest.bearerToken(key)));
+      return { code: r.status, body: yield* r.text };
+    }).pipe(
+      Effect.timeoutOrElse({ duration: deadlineMs, orElse: () => Effect.fail("timed out") }),
+      Effect.mapError(String),
+      Effect.provide(FetchHttpClient.layer),
     ),
 };
 
@@ -111,7 +118,7 @@ export const verifyMoss = (key: string, transport: MossTransport = nodeTransport
     if (got === "attached") return { kind: "ok" } as const;
     if (got === "silent") return { kind: "silent" } as const;
     if ("error" in got) return { kind: "failed", why: got.error } as const;
-    const asked = yield* Effect.tryPromise({ try: () => transport.status(key), catch: (e) => String(e) }).pipe(Effect.result);
+    const asked = yield* Effect.result(transport.status(key));
     if (asked._tag === "Failure") return { kind: "unreachable", why: got.down || asked.failure } as const;
     const { code, body } = asked.success;
     if (code === 401 || code === 403) return { kind: "refused", why: refusal(body) } as const;
@@ -129,17 +136,21 @@ export const relay = (page: Socket.Socket, key: string, transport: MossTransport
     const writer = yield* page.writer;
     let open = false;
     const waiting: (string | Uint8Array)[] = [];
-    const link = transport.connect(key, {
-      open: () => {
-        open = true;
-        for (const f of waiting.splice(0)) link.send(f);
-      },
-      text: (data) => Queue.offerUnsafe(down, data),
-      binary: (data) => Queue.offerUnsafe(down, data),
-      // 1011: MOSS went away; its reason, when it gave one, goes to the page.
-      down: (why) => Queue.offerUnsafe(down, new Socket.CloseEvent(1011, why.slice(0, 120))),
-    });
-    yield* Effect.addFinalizer(() => Effect.sync(() => link.close()));
+    const link: MossLink = yield* Effect.acquireRelease(
+      Effect.sync(() =>
+        transport.connect(key, {
+          open: () => {
+            open = true;
+            for (const f of waiting.splice(0)) link.send(f);
+          },
+          text: (data) => Queue.offerUnsafe(down, data),
+          binary: (data) => Queue.offerUnsafe(down, data),
+          // 1011: MOSS went away; its reason, when it gave one, goes to the page.
+          down: (why) => Queue.offerUnsafe(down, new Socket.CloseEvent(1011, why.slice(0, 120))),
+        }),
+      ),
+      (l) => Effect.sync(() => l.close()),
+    );
     const toPage = Effect.gen(function* () {
       for (;;) {
         const frame = yield* Queue.take(down);

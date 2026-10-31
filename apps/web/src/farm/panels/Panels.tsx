@@ -9,18 +9,17 @@ import { For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
 
-import { orchestratorLookOf } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { setPet, usePrefs } from "@/base/prefs";
-import { ready, useAgents } from "@/base/query";
 import { aria, Keyed } from "@/base/util";
 import { farm, type FarmOverlay, type FarmPanel } from "@/farm/store";
 import { useVillage } from "@/farm/support";
 import { useFarm } from "@/farm/ui";
 import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "@/features/orchestrator";
-import { FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
-import { toast } from "@/ui/toasts";
+import { orchestratorLookOf } from "@/infra/agents";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { ready, useAgents } from "@/infra/query";
+import { setPet, usePrefs } from "@/state/prefs";
+import { createPixelAct, FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
 
 import { Achievements } from "./Achievements";
 import { tint } from "./bits";
@@ -69,7 +68,7 @@ function Layer(props: { o: FarmOverlay }) {
   const byId = (id: string) => (core()?.sessions ?? []).find((s) => s.id === id);
   return (
     <Switch>
-      <Match when={props.o.kind === "review" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
+      <Match when={props.o.kind === "review" ? byId(props.o.sessionId) : undefined}>
         {(s) => (
           <FarmDialog
             title={t("web.farm.panel.harvest", { name: s().name })}
@@ -89,14 +88,14 @@ function Layer(props: { o: FarmOverlay }) {
           </FarmDialog>
         )}
       </Match>
-      <Match when={props.o.kind === "water" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
+      <Match when={props.o.kind === "water" ? byId(props.o.sessionId) : undefined}>
         {(s) => (
           <FarmDialog title={t("web.farm.panel.water", { name: s().name })} icon="icon-water" size="sm" testid="water" onClose={() => farm.water(undefined)}>
             <WaterForm session={s()} onDone={() => farm.water(undefined)} />
           </FarmDialog>
         )}
       </Match>
-      <Match when={props.o.kind === "panel" ? (props.o as { panel: FarmPanel }).panel : undefined}>
+      <Match when={props.o.kind === "panel" ? props.o.panel : undefined}>
         {(panel) => (
           <FarmDialog
             title={panelTitle[panel()][0]}
@@ -162,16 +161,16 @@ function OrchestratorLooks() {
   const agents = useAgents();
   const client = useQueryClient();
   const current = () => orchestratorLookOf(ready(agents, []));
-  const choose = async (look: OrchestratorLook) => {
-    const me = ready(agents, []).find((a) => a.id === defaultOrchestrator);
-    if (!me) return;
-    try {
+  const act = createPixelAct();
+  // The API saves a whole profile, and the cached one may be older than an edit made since (on the profile's page): it
+  // is read fresh just before, and only the look is changed.
+  const choose = (look: OrchestratorLook) =>
+    act.run(async () => {
+      const me = (await api.agent.list()).find((a) => a.id === defaultOrchestrator);
+      if (!me) return;
       await api.agent.update({ ...me, look: { ...me.look, orchestrator: look } });
       await client.invalidateQueries({ queryKey: ["agents"] });
-    } catch (e) {
-      toast(reasonOf(e));
-    }
-  };
+    });
   const pet = usePrefs((p) => p.pet);
   const has = (name: string) => loaded().village?.atlas.has(name) ?? false;
   return (

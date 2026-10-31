@@ -1,15 +1,16 @@
 import { Effect, Result, Schema, Semaphore } from "effect";
-import type { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { cut } from "@vibevalley/protocol/rules";
 
 import type { Agent } from "@/agent/agent.ts";
-import { cut, clip } from "@/base/clip.ts";
+import { clip } from "@/base/clip.ts";
 import { lastJsonBlock, misfitField } from "@/base/json.ts";
 import type { Channel } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, messageOf } from "@/errors.ts";
+import type { Db } from "@/infra/db.ts";
 import type { WorkplaceRelease } from "@/project/shapes.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
 import type { Runtime } from "@/runtime/runtime.ts";
@@ -28,9 +29,7 @@ export interface RefinementDeps {
   readonly runtimes: Runtime["Service"];
   readonly sessions: Session["Service"];
   readonly chat: Channel["Service"];
-  readonly db: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
-  readonly one: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A | undefined>;
-  readonly inTx: <A, E>(e: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+  readonly db: Db["Service"];
   readonly get: (ref: string) => Effect.Effect<T.Issue, ApiError>;
   /** The issue while it was never sent (no task graph's). */
   readonly unsent: (id: string) => Effect.Effect<T.Issue, ApiError>;
@@ -39,7 +38,7 @@ export interface RefinementDeps {
 }
 
 export function refinement(d: RefinementDeps) {
-  const { core, store, runtimes, sessions, chat, db, one, inTx, get, unsent, hire, publish } = d;
+  const { core, store, runtimes, sessions, chat, db, get, unsent, hire, publish } = d;
   /** One draft starts at a time: two clicks do not send two sessions. */
   const drafting = Semaphore.makeUnsafe(1);
 
@@ -51,7 +50,7 @@ export function refinement(d: RefinementDeps) {
       if (!store.agent(issue.assignee)) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: issue.assignee })));
       named = issue.assignee;
     } else if (issue.project) {
-      const last = (yield* one(qs.lastAssigneeIn({ project: issue.project })))?.assignee;
+      const last = (yield* db.one(qs.lastAssigneeIn({ project: issue.project })))?.assignee;
       if (last && candidates.some((c) => c.agent.id === last && c.usable)) named = last;
     }
     const chosen = chooseAgent(candidates, draftMatch(issue.title), named, "");
@@ -62,9 +61,9 @@ export function refinement(d: RefinementDeps) {
   const beforeRefinement = Effect.fnUntraced(function* (issue: T.Issue, word: string, agent: string, where: string) {
     let [title, description] = [issue.title, issue.description];
     if (word && issue.questions.length === 0 && !description && issue.criteria.length === 0) [title, description] = splitBrief(word);
-    yield* inTx(
+    yield* db.inTx(
       Effect.gen(function* () {
-        yield* db(
+        yield* db.run(
           q.editIssue({
             title,
             description,
@@ -76,7 +75,7 @@ export function refinement(d: RefinementDeps) {
             id: issue.id,
           }),
         );
-        if (word && issue.questions.length > 0) yield* db(q.setIssueQuestions({ id: issue.id, questions: null }));
+        if (word && issue.questions.length > 0) yield* db.run(q.setIssueQuestions({ id: issue.id, questions: null }));
       }),
     );
     yield* publish(issue.id);
@@ -85,7 +84,7 @@ export function refinement(d: RefinementDeps) {
   const refined = Effect.fnUntraced(function* (id: string, d: IssueRefinement, questions: readonly T.Question[] | undefined) {
     const criteria = kept(d.criteria);
     const open = openQuestions(questions);
-    yield* db(
+    yield* db.run(
       q.refineIssue({
         id,
         title: d.title,

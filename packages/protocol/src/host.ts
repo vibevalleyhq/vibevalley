@@ -1,6 +1,6 @@
 // What the page may ask of the program around it: the desktop's shell, the phone's, or none in a browser tab. Every host
 // gives the whole interface; a capability it lacks is null, and the page draws nothing for it. The page never asks which
-// host it is in (it finds its host in apps/web/src/base/host.ts). What a host carries to another program goes over a
+// host it is in (it finds its host in apps/web/src/infra/host.ts). What a host carries to another program goes over a
 // bridge (@vibevalley/bridge) by one of the contracts here: the desktop's preload to Electron's main (desktopBridge), the
 // phone's page to its shell (mobileBridge, whose page end is mobileHost).
 
@@ -147,11 +147,12 @@ export const desktopBridge = {
   notify: call({ input: Notice, output: Schema.Void }),
   tray: call({ input: TraySummary, output: Schema.Void }),
   locale: call({ input: LocaleSchema, output: Schema.Void }),
-  reveal: call({ input: Schema.String.check(Schema.isPattern(/^\//u)), output: Schema.Void }),
+  reveal: call({ input: Schema.String.check(Schema.isPattern(/^\/[^\0]*$/u)), output: Schema.Void }),
   theme: call({ input: ThemeChoice, output: Schema.Void }),
   updateState: call({ input: Schema.Void, output: UpdateState }),
-  updateCheck: call({ input: Schema.Void, output: Schema.Void }),
-  updateInstall: call({ input: Schema.Void, output: Schema.Void }),
+  // Both wait for a download.
+  updateCheck: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
+  updateInstall: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
   voiceShortcut: push(Schema.Void),
   update: push(UpdateState),
 };
@@ -160,8 +161,10 @@ const Line = { line: Schema.Finite };
 
 /** The phone's page asks its shell (apps/mobile); a call's events come back as pushes, each with the line it is for. */
 export const mobileBridge = {
-  notify: call({ input: Notice, output: Schema.Void }),
-  rtcJoin: call({ input: Schema.Struct({ ...Line, grant: AgoraGrantSchema }), output: Schema.Void }),
+  // The first one asks the person for permission.
+  notify: call({ input: Notice, output: Schema.Void, timeoutMs: Infinity }),
+  // Joining goes over the network to Agora.
+  rtcJoin: call({ input: Schema.Struct({ ...Line, grant: AgoraGrantSchema }), output: Schema.Void, timeoutMs: 60_000 }),
   rtcMute: call({ input: Schema.Struct({ ...Line, on: Schema.Boolean }), output: Schema.Void }),
   rtcRenew: call({ input: Schema.Struct({ ...Line, token: Schema.String }), output: Schema.Void }),
   rtcLeave: call({ input: Schema.Struct(Line), output: Schema.Void }),

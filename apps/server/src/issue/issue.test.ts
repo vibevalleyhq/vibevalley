@@ -1,11 +1,11 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Cause, Effect } from "effect";
+import { Cause, Effect, Metric } from "effect";
 import { SqlClient } from "effect/sql";
+import { TestClock } from "effect/testing";
 
 import type * as T from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
@@ -16,9 +16,12 @@ import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { Cron } from "@/cron/cron.ts";
 import { reasonOf } from "@/errors.ts";
+import { dbQueries } from "@/infra/db.ts";
+import { gitRuns } from "@/project/git.ts";
 import { Session } from "@/session/session.ts";
 import { freshTask } from "@/task/editing.ts";
 import { graphView } from "@/task/graph.ts";
+import { gitIn } from "@/testing/git.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { until, waitFor } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
@@ -38,7 +41,7 @@ const farm = (runtimes = [busy]) => {
   return { config: c, layer: world({ config: c, runtimes, repos: ["demo"] }) };
 };
 
-const git = (dir: string, ...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+const git = gitIn;
 
 const noWorktree = (root: string) => {
   const dir = join(root, "projects", "demo");
@@ -64,6 +67,23 @@ const occupied = (core: Core["Service"], runtime: string) =>
   });
 
 describe("issues", () => {
+  // A budget: a board of twenty issues is one read of the table, and asks git nothing.
+  it.live("listing twenty issues reads the database at most twice and runs no git", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const issues = yield* Issue;
+      const before = (yield* Metric.value(dbQueries)).count;
+      for (let n = 1; n <= 20; n++) yield* issues.add({ title: `第 ${n} 件`, project: "demo" });
+      // The counter counts: adding them asked the database.
+      expect((yield* Metric.value(dbQueries)).count).toBeGreaterThan(before);
+      const [queries, gits] = [(yield* Metric.value(dbQueries)).count, (yield* Metric.value(gitRuns)).count];
+      expect((yield* issues.list()).length).toBe(20);
+      const used = { queries: (yield* Metric.value(dbQueries)).count - queries, gits: (yield* Metric.value(gitRuns)).count - gits };
+      expect(used.queries, JSON.stringify(used)).toBeLessThanOrEqual(2);
+      expect(used.gits).toBe(0);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   it.live("a prompt that starts then fails keeps the unclosed startup reserved", () => {
     let turns = 0;
     let wrote = () => {};
@@ -558,8 +578,7 @@ describe("issues", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("a queued cron keeps its trigger and that it was missed", () => {
-    const clock = { now: 1_800_000_000_000 };
+  it.effect("a queued cron keeps its trigger and that it was missed", () => {
     const c = config();
     return Effect.gen(function* () {
       const issues = yield* Issue;
@@ -571,7 +590,7 @@ describe("issues", () => {
       const channel = yield* chat.openChannel("scheduled", "", "demo");
       yield* occupied(core, "pi");
       const sc = yield* crons.add({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, owner);
-      clock.now += 10 * 60_000;
+      yield* TestClock.adjust(10 * 60_000);
       yield* crons.tick;
       const issue = yield* waitFor(issues.ofCron(sc.id), (i) => i?.queuedAt !== undefined, "the cron queued");
       yield* core.apply({ type: "left", id: sessionId("occupied") });
@@ -580,7 +599,7 @@ describe("issues", () => {
       const [run] = yield* sessions.runs(issue!.id);
       expect(run!.triggeredBy).toEqual({ kind: "cron", cron: sc.id, missed: true });
       expect((yield* sessions.get(run!.session))?.channel).toBe(channel.id);
-    }).pipe(Effect.scoped, Effect.provide(world({ config: c, runtimes: [busy], repos: ["demo"], clock: () => clock.now })));
+    }).pipe(Effect.scoped, Effect.provide(world({ config: c, runtimes: [busy], repos: ["demo"] })));
   });
 
   it.live("a queued todo starts once there is room, and keeps its place until then", () => {

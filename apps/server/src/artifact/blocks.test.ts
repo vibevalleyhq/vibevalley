@@ -1,17 +1,19 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
+import { TestClock } from "effect/testing";
 
 import { t } from "@vibevalley/i18n";
-import type { BlockOp } from "@vibevalley/protocol";
+import type { ArtifactId, BlockOp } from "@vibevalley/protocol";
+import { artifactId, blockId, type Wire } from "@vibevalley/protocol/schema";
 
-import { ServerConfig } from "@/base/config.ts";
-import { Database, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { orMissing } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Database, Db } from "@/infra/db.ts";
 import { sampleAgent } from "@/testing/agents.ts";
 import { testConfig } from "@/testing/layers.ts";
-import { waitFor, whenTrue } from "@/testing/until.ts";
+import { waitFor } from "@/testing/until.ts";
 
 import * as qa from "../../db/generated/artifact.sql.ts";
 import { type BlockStoreOptions, makeBlockStore } from "./blocks.ts";
@@ -25,19 +27,19 @@ const on = (config: ServerConfig["Service"] = testConfig()) =>
 /** The blocks of artifacts made straight in the table: the rest of the Artifact service (channels, cards) is artifact.test.ts's. */
 const make = (options: BlockStoreOptions = {}) =>
   Effect.gen(function* () {
-    const { run: db, one } = yield* Db;
-    const row = (id: string) => one(qa.artifact({ id })).pipe(orMissing(id, []));
+    const db = yield* Db;
+    const row = (id: string) => db.one(qa.artifact({ id })).pipe(orMissing(id, []));
     const blocks = yield* makeBlockStore(row, options);
-    const get = (id: string) =>
+    const get = (id: ArtifactId) =>
       Effect.gen(function* () {
         const list = yield* blocks.blocks(id);
         const r = yield* row(id);
-        return { artifact: { id: r.id, title: r.title, seq: r.seq }, blocks: list };
+        return { artifact: { id: artifactId(r.id), title: r.title, seq: r.seq }, blocks: list };
       });
     const create = (title: string) =>
       Effect.gen(function* () {
-        const id = newId();
-        yield* db(
+        const id = artifactId(newId());
+        yield* db.run(
           qa.addArtifact({
             id,
             title: title.trim() || t("server.artifact.untitled"),
@@ -52,7 +54,7 @@ const make = (options: BlockStoreOptions = {}) =>
         );
         return yield* get(id);
       });
-    const list = () => db(qa.artifacts({ limit_n: 100n }));
+    const list = () => db.run(qa.artifacts({ limit_n: 100n }));
     const importMarkdown = (title: string, markdown: string, actor: string) =>
       Effect.gen(function* () {
         const made = yield* create(title);
@@ -64,16 +66,21 @@ const make = (options: BlockStoreOptions = {}) =>
 
 type Service = Effect.Success<ReturnType<typeof make>>;
 
-const submit = (s: Service, doc: string, batchId: string, ...ops: BlockOp[]) => s.submit(doc, "owner", { batchId, ops });
+const submit = (s: Service, doc: ArtifactId, batchId: string, ...ops: Wire<BlockOp>[]) => s.submit(doc, "owner", { batchId, ops: ops as BlockOp[] });
 
 const texts = (blocks: { text: { t: string }[] }[]) => blocks.map((b) => plain(b.text as never)).join("|");
 
 const helpers = (...list: [string, boolean][]) => list.map(([id, enabled]) => sampleAgent({ id, enabled }));
 
-const finished = (s: Service) => Effect.promise(() => whenTrue(() => !s.demoRunning(), "the demo finished", 10_000));
+const finished = (s: Service) =>
+  waitFor(
+    Effect.map(TestClock.adjust(1_000), () => s.demoRunning()),
+    (running) => !running,
+    "the demo finished",
+  );
 
 describe("a blocks artifact", () => {
-  it.live("what one person writes is there after the server starts again", () => {
+  it.effect("what one person writes is there after the server starts again", () => {
     const config = { ...testConfig(), db: "" };
     return Effect.gen(function* () {
       const id = yield* Effect.scoped(
@@ -99,7 +106,7 @@ describe("a blocks artifact", () => {
     });
   });
 
-  it.live("the same batch sent twice is taken once and answered the same", () =>
+  it.effect("the same batch sent twice is taken once and answered the same", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const s = yield* make();
@@ -111,21 +118,21 @@ describe("a blocks artifact", () => {
         expect([snap.artifact.seq, snap.blocks.length, snap.artifact.title]).toEqual([1, 1, t("server.artifact.untitled")]);
         const other = yield* s.create("另一篇");
         expect((yield* Effect.flip(submit(s, other.artifact.id, "same")))._tag).toBe("Refused");
-        expect((yield* Effect.flip(submit(s, "nope", "x")))._tag).toBe("Missing");
+        expect((yield* Effect.flip(submit(s, artifactId("nope"), "x")))._tag).toBe("Missing");
         // A block id is the doc's that has it.
         expect((yield* submit(s, other.artifact.id, "dup", { op: "insert_block", block: para("a", "V", "撞了") })).results[0]!.status).toBe("rejected");
       }),
     ).pipe(Effect.provide(on())),
   );
 
-  it.live("a stale update over someone else's change is a conflict, and mine is kept", () =>
+  it.effect("a stale update over someone else's change is a conflict, and mine is kept", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const s = yield* make();
         const sql = yield* SqlClient.SqlClient;
         const id = (yield* s.create("t")).artifact.id;
         yield* submit(s, id, "1", { op: "insert_block", block: para("a", "V", "原来") });
-        const [, r] = yield* s.updateText(id, "lab", "a", 1, "帮工改的");
+        const [, r] = yield* s.updateText(id, "lab", blockId("a"), 1, "帮工改的");
         expect([r!.status, r!.rev]).toEqual(["applied", 2]);
         const ack = yield* submit(s, id, "3", { op: "update_text", blockId: "a", baseRev: 1, text: [span("我改的")] });
         expect([ack.results[0]!.status, plain(ack.results[0]!.yours ?? []), ack.results[0]!.rev, ack.seq]).toEqual(["conflict", "我改的", 2, 3]);
@@ -140,7 +147,7 @@ describe("a blocks artifact", () => {
     ).pipe(Effect.provide(on())),
   );
 
-  it.live("attribute changes in the same batch do not conflict with a text edit", () =>
+  it.effect("attribute changes in the same batch do not conflict with a text edit", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const s = yield* make();
@@ -159,7 +166,7 @@ describe("a blocks artifact", () => {
     ).pipe(Effect.provide(on())),
   );
 
-  it.live("import and export", () =>
+  it.effect("import and export", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const s = yield* make();
@@ -170,7 +177,7 @@ describe("a blocks artifact", () => {
         const [b, r] = yield* s.append(snap.artifact.id, "lab", "paragraph", {}, "帮工写的 **一段**");
         expect([r!.status, b!.rev, b!.text.length]).toEqual(["applied", 1, 2]);
         expect(yield* s.markdown(snap.artifact.id)).toMatch(/### 结尾\n\n帮工写的 \*\*一段\*\*\n$/u);
-        expect((yield* Effect.flip(s.get("nope")))._tag).toBe("Missing");
+        expect((yield* Effect.flip(s.get(artifactId("nope"))))._tag).toBe("Missing");
         expect((yield* sql<{ n: number }>`select count(*)::int as n from artifact_change`)[0]!.n).toBe(2);
       }),
     ).pipe(Effect.provide(on())),
@@ -178,10 +185,10 @@ describe("a blocks artifact", () => {
 
   // The demo writes three sections at once, each by its own helper: a section's blocks stay together under its heading, a
   // second start while it runs is refused.
-  it.live("the demo writes three sections", () =>
+  it.effect("the demo writes three sections", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const s = yield* make({ tickMs: 1 });
+        const s = yield* make();
         const id = (yield* s.create("演示")).artifact.id;
         yield* submit(s, id, "mine", { op: "insert_block", block: para("first", "V", "主人先写的") });
         const all = helpers(["off", false], ["backend", true], ["tester", true], ["frontend", true], ["docs", true]);
@@ -206,16 +213,16 @@ describe("a blocks artifact", () => {
         yield* s.demo(id, all);
         yield* finished(s);
         expect((yield* Effect.flip(s.demo(id, helpers(["off", false]))))._tag).toBe("Refused");
-        expect((yield* Effect.flip(s.demo("nope", all)))._tag).toBe("Missing");
+        expect((yield* Effect.flip(s.demo(artifactId("nope"), all)))._tag).toBe("Missing");
       }),
     ).pipe(Effect.provide(on())),
   );
 
   // The owner writing in a paragraph the demo is growing keeps it: the demo's next piece is a conflict and it moves on.
-  it.live("the demo leaves the owner's block", () =>
+  it.effect("the demo leaves the owner's block", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const s = yield* make({ tickMs: 20 });
+        const s = yield* make();
         const id = (yield* s.create("演示")).artifact.id;
         yield* s.demo(id, helpers(["backend", true]));
         // The owner takes the second block over once the demo has written it twice: asked again until it holds.
@@ -226,7 +233,7 @@ describe("a blocks artifact", () => {
           const ack = yield* submit(s, id, "owner", { op: "update_text", blockId: b.id, baseRev: b.rev, text: [span("主人接手了")] });
           return ack.results[0]!.status === "applied" ? b.id : "";
         });
-        const taken = yield* waitFor(tryTaking, (item) => item !== "", "the owner taking the block over");
+        const taken = yield* waitFor(Effect.andThen(TestClock.adjust(500), tryTaking), (item) => item !== "", "the owner taking the block over");
         expect(taken).not.toBe("");
         yield* finished(s);
         const snap = yield* s.get(id);

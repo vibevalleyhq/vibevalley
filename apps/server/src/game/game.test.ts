@@ -32,7 +32,7 @@ const helper = (id: string, phase = { _tag: "working", since: 0, doing: { action
   ({ id, name: id, agent: "lab", runtime: "pi", brief: "试试", hiredAt: 0, runs: 0, phase, refining: false }) as Session;
 
 describe("the game", () => {
-  it.live("keeps a ledger the progress folds back from", () => {
+  it.effect("keeps a ledger the progress folds back from", () => {
     const config = { ...testConfig(), db: "" };
     return Effect.gen(function* () {
       const before = yield* Effect.gen(function* () {
@@ -57,7 +57,7 @@ describe("the game", () => {
     });
   });
 
-  it.live("malformed and infinite ledger entries stay out of the fold", () => {
+  it.effect("malformed and infinite ledger entries stay out of the fold", () => {
     const config = { ...testConfig(), db: "" };
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
@@ -80,7 +80,7 @@ describe("the game", () => {
   });
 
   // What the owner did reaches the ledger from the service it went through, whatever the entry point.
-  it.live("counts the owner's review and call", () =>
+  it.effect("counts the owner's review and call", () =>
     Effect.gen(function* () {
       const core = yield* Core;
       // The game hears the owner from its start: Core.owner is subscribed before the game's layer is built.
@@ -108,7 +108,7 @@ describe("the game", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(config)));
   });
 
-  it.live("puts the next helper on the planted plot", () =>
+  it.effect("puts the next helper on the planted plot", () =>
     Effect.gen(function* () {
       const game = yield* Game;
       const core = yield* Core;

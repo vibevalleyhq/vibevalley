@@ -9,15 +9,15 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, defaultOrchestrator, orchestratorRuntime, type OrchestratorLook, OrchestratorLookValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { api, reasonOf } from "@/base/api";
-import { useRouter } from "@/base/router";
 import { orchestratorHref, orchestratorLooks } from "@/features/orchestrator";
+import { api } from "@/infra/api";
+import { useRouter } from "@/infra/router";
 import { A } from "@/ui/A";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { ConfirmButton } from "@/ui/ConfirmButton";
 import { OrchestratorFace } from "@/ui/Face";
 import { Field, TextArea, TextInput } from "@/ui/Field";
-import { toast } from "@/ui/toasts";
 
 import { FromTemplate } from "./FromTemplate";
 
@@ -47,7 +47,8 @@ export function newOrchestrator(): Agent {
 export function OrchestratorProfile(props: { saved?: Agent | undefined; start: Agent; all: readonly Agent[] }) {
   const isNew = untrack(() => !props.saved);
   const [draft, setDraft] = createSignal(untrack(() => props.start));
-  const [saving, setSaving] = createSignal(false);
+  const saving = createAct();
+  const act = createAct();
   const router = useRouter();
   const client = useQueryClient();
   const dirty = () => isNew || !same(props.saved, draft());
@@ -55,35 +56,28 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
   const patch = (p: Partial<Agent>) => setDraft({ ...draft(), ...p });
   const setLook = (orchestrator: OrchestratorLook) => patch({ look: { ...draft().look, orchestrator } });
 
-  const save = async () => {
-    setSaving(true);
+  const save = () => {
     const d = draft();
     const body = { ...d, name: d.name.trim() || t("web.agent.orchestrator.newName") };
-    try {
+    return saving.run(async () => {
       const got = isNew ? await api.agent.create(body) : await api.agent.update(body);
       await client.invalidateQueries({ queryKey: ["agents"] });
       setDraft(got);
       if (isNew) router.navigate(`/agents/${encodeURIComponent(got.id)}`);
-    } catch (e) {
-      toast(reasonOf(e));
-    } finally {
-      setSaving(false);
-    }
+    });
   };
-  const remove = async () => {
-    try {
-      await api.agent.delete({ id: draft().id });
+  const remove = () => {
+    const id = draft().id;
+    return act.run(async () => {
+      await api.agent.delete({ id });
       await client.invalidateQueries({ queryKey: ["agents"] });
       router.navigate("/agents");
-    } catch (e) {
-      toast(reasonOf(e));
-    }
+    });
   };
-  const talk = () =>
-    void api.channel.direct
-      .create({ agent: draft().id })
-      .then((id) => router.navigate(`/chat/${id}`))
-      .catch((e) => toast(reasonOf(e), "bad"));
+  const talk = () => {
+    const agent = draft().id;
+    void act.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
+  };
 
   return (
     <div class="h-full overflow-y-auto px-4 pb-8">
@@ -116,7 +110,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
                       onConfirm={remove}
                     />
                   </Show>
-                  <Button icon="thread" data-testid="talk" onClick={talk}>
+                  <Button icon="thread" data-testid="talk" disabled={act.busy()} onClick={talk}>
                     {t("web.agent.talk")}
                   </Button>
                   <Show when={dirty()}>
@@ -127,8 +121,8 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
                 </>
               )}
             </Show>
-            <Button tone="primary" data-testid="save" disabled={!dirty() || saving() || nameTaken()} onClick={() => void save()}>
-              {saving() ? t("web.agent.saving") : isNew ? t("web.agent.create") : t("web.agent.save")}
+            <Button tone="primary" data-testid="save" disabled={!dirty() || saving.busy() || nameTaken()} onClick={() => void save()}>
+              {saving.busy() ? t("web.agent.saving") : isNew ? t("web.agent.create") : t("web.agent.save")}
             </Button>
           </span>
         </div>

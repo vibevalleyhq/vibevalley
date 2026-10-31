@@ -22,7 +22,7 @@ import {
 import { Predicate, Schema } from "effect";
 
 import { jsonOrNone } from "@/base/json.ts";
-import { afterRealTime } from "@/base/time.ts";
+import { afterRealTime } from "@/infra/time.ts";
 
 const dist = new URL(".", import.meta.resolve("@botiverse/oar"));
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oar's own modules, not in its exports; T names what we use of them

@@ -51,7 +51,7 @@ export const kinds = ["called", "notCalled", "silent", "says", "saysNot"] as con
 export const orchestratorToolNames = () => [
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- schemas has one key per Op and no more
   ...(Object.keys(schemas) as Op[]).map(toolName),
-  ...selfTools({ home: "", skills: () => [], memory: true, now: () => 0 }).map((t) => t.name),
+  ...selfTools({ home: "", skills: () => Promise.resolve([]), memory: true, now: () => 0 }).map((t) => t.name),
 ];
 
 type Checked =

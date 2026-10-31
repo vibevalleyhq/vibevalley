@@ -1,29 +1,28 @@
-// Each calls the server, then plays the bed's effect; a refusal is the server's to tell (a notice), so most callers fire
-// and forget (`fire`).
+// Each calls the server, then plays the bed's effect. A caller runs it through its Act (createPixelAct), which says a
+// refusal.
 
 import { t } from "@vibevalley/i18n";
 import type { IssueAct, Session, StateFrame } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api, newSendKey } from "@/base/api";
 import { actionOf, perform } from "@/features/issue";
+import { api, reasonOf } from "@/infra/api";
+import { toasts, ToastType } from "@/ui/pixel";
 
 import { farm, farmState } from "./store";
 import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type ToolResult } from "./tools";
 import { webRoutes, type YardPlace } from "./world/places";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
 
-/** A refusal is the server's to tell (a notice). */
-export const fire = (command: Promise<unknown>) => void command.catch(() => {});
-
-const fx = (s: Session, kind: BedFxKind, text?: string) => {
+/** The bed's effect for a helper's plot: what the farm plays once the server took an act on it. */
+export const playBedFx = (s: Session, kind: BedFxKind, text?: string) => {
   const bed = bedOfStation(stationOfSession(s));
   if (bed) farm.bedFx(bed.index, kind, text);
 };
 
 export interface FarmCommands {
-  /** Words for a helper; one at work hears them mid-turn. */
-  water(s: Session, text: string, sendKey?: string): Promise<void>;
+  /** Words for a helper; one at work hears them mid-turn. The key is the form's, kept until they went through. */
+  water(s: Session, text: string, sendKey: string): Promise<void>;
   /** The server tells it what its conflicts are and to settle them. */
   resolve(s: Session): Promise<void>;
   cure(s: Session): Promise<void>;
@@ -31,8 +30,9 @@ export interface FarmCommands {
   /** Stops one at work; asks one not at work to leave. */
   shovel(s: Session): Promise<void>;
   stop(s: Session): Promise<void>;
-  /** `station`: the plot it was sown on; `project`: the one chosen on the sowing form. The orchestrator is told to sow it. */
-  plant(text: string, o?: { station?: number; agent?: string; project?: string; sendKey?: string }): Promise<void>;
+  /** `station`: the plot it was sown on; `project`: the one chosen on the sowing form. The orchestrator is told to sow it.
+   * `sendKey` is the form's, so the same words sent again are said once. */
+  plant(text: string, sendKey: string, o?: { station?: number; agent?: string; project?: string }): Promise<void>;
   /** The pointer's tool, target and hint, read from one frame. */
   aim(bed: Bed): PlotAim;
   /** Acts on a click; a tool that does not apply says why over the bed. */
@@ -61,19 +61,19 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
   const commands: FarmCommands = {
     async water(s, text, sendKey) {
       await send(s, "tell", text, sendKey);
-      fx(s, "water");
+      playBedFx(s, "water");
     },
     async resolve(s) {
       await send(s, "resolve");
-      fx(s, "water");
+      playBedFx(s, "water");
     },
     async cure(s) {
       await send(s, "cure");
-      fx(s, "spray");
+      playBedFx(s, "spray");
     },
     async harvest(s) {
       await send(s, "complete");
-      fx(s, "harvest", t("web.farm.command.stored"));
+      playBedFx(s, "harvest", t("web.farm.command.stored"));
     },
     async shovel(s) {
       const act = actForTool(
@@ -82,17 +82,15 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
       );
       if (!act) throw new Error(t("web.farm.command.noShovel"));
       await send(s, act);
-      fx(s, "shovel");
+      playBedFx(s, "shovel");
     },
     stop: (s) => send(s, "stop"),
-    async plant(text, o = {}) {
+    async plant(text, sendKey, o = {}) {
       const said = text.trim();
       if (!said) return;
       const id = frame()?.state.chat?.channels.find((c) => c.default)?.id;
       if (!id) return;
-      await api.channel.message.send(
-        omitUndefined({ id, text: said, station: o.station, agent: o.agent, project: o.project, sendKey: o.sendKey ?? newSendKey() }),
-      );
+      await api.channel.message.send(omitUndefined({ id, text: said, station: o.station, agent: o.agent, project: o.project, sendKey }));
     },
     aim: (bed) => aimAt(bed, farmState().tool),
     async act({ bed, tool, session: pointed }) {
@@ -135,8 +133,8 @@ export async function clickBed(commands: FarmCommands, bed: Bed): Promise<PlotAi
   let got: ToolResult;
   try {
     got = await commands.act(aim);
-  } catch {
-    // The server said no: its notice says why.
+  } catch (e) {
+    toasts.add({ type: ToastType.error, title: aim.session?.name ?? t("web.farm.plot.failed"), description: reasonOf(e) });
     return aim;
   }
   switch (got.kind) {

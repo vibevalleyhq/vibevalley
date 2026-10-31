@@ -1,10 +1,11 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
-import { ServerConfig } from "@/base/config.ts";
+import { ServerConfig } from "@/infra/config.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import { Setting } from "./setting.ts";
@@ -13,7 +14,7 @@ const appId = "11111111111111111111111111111111";
 const cert = "22222222222222222222222222222222";
 
 const run = <A, E>(config: ServerConfig["Service"], body: Effect.Effect<A, E, Setting>) =>
-  body.pipe(Effect.provide(Setting.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config)))));
+  body.pipe(Effect.provide(Setting.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))));
 const file = (config: ServerConfig["Service"]) => JSON.parse(readFileSync(join(config.home, "settings.json"), "utf8")) as Record<string, unknown>;
 
 describe("settings", () => {

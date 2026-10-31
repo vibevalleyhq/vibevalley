@@ -84,7 +84,7 @@ export const OpenRunsResult = Schema.Struct({
 export type OpenRunsResult = typeof OpenRunsResult.Type
 
 
-export const OpenRunsSql = "-- name: OpenRuns :many\n-- What a restart finds still going: those runs stopped with the server.\nselect \"session_run\".\"id\", \"session_run\".\"session\", \"session_run\".\"issue\", \"session_run\".\"triggered_by\", \"session_run\".\"heard\", \"session_run\".\"started_at\", \"session_run\".\"ended_at\", \"session_run\".\"outcome\", \"session_run\".\"summary\", \"session_run\".\"spent\" from session_run where ended_at is null order by id;"
+export const OpenRunsSql = "-- name: OpenRuns :many\n-- bound: only runs still going, at most one per session.\n-- What a restart finds still going: those runs stopped with the server.\nselect \"session_run\".\"id\", \"session_run\".\"session\", \"session_run\".\"issue\", \"session_run\".\"triggered_by\", \"session_run\".\"heard\", \"session_run\".\"started_at\", \"session_run\".\"ended_at\", \"session_run\".\"outcome\", \"session_run\".\"summary\", \"session_run\".\"spent\" from session_run where ended_at is null order by id;"
 
 export const openRuns = Effect.fn("OpenRuns")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -116,7 +116,7 @@ export const RunsOfIssueResult = Schema.Struct({
 export type RunsOfIssueResult = typeof RunsOfIssueResult.Type
 
 
-export const RunsOfIssueSql = "-- name: RunsOfIssue :many\nselect \"session_run\".\"id\", \"session_run\".\"session\", \"session_run\".\"issue\", \"session_run\".\"triggered_by\", \"session_run\".\"heard\", \"session_run\".\"started_at\", \"session_run\".\"ended_at\", \"session_run\".\"outcome\", \"session_run\".\"summary\", \"session_run\".\"spent\" from session_run\nwhere session_run.issue = $1 or session_run.id in (select run from session_run_issue where session_run_issue.issue = $1)\norder by started_at, id;"
+export const RunsOfIssueSql = "-- name: RunsOfIssue :many\n-- bound: one issue's runs.\nselect \"session_run\".\"id\", \"session_run\".\"session\", \"session_run\".\"issue\", \"session_run\".\"triggered_by\", \"session_run\".\"heard\", \"session_run\".\"started_at\", \"session_run\".\"ended_at\", \"session_run\".\"outcome\", \"session_run\".\"summary\", \"session_run\".\"spent\" from session_run\nwhere session_run.issue = $1 or session_run.id in (select run from session_run_issue where session_run_issue.issue = $1)\norder by started_at, id;"
 
 export const runsOfIssue = Effect.fn("RunsOfIssue")(function* (params: RunsOfIssueParams) {
   const sql = yield* SqlClient.SqlClient
@@ -148,7 +148,7 @@ export const RunsOfSessionResult = Schema.Struct({
 export type RunsOfSessionResult = typeof RunsOfSessionResult.Type
 
 
-export const RunsOfSessionSql = "-- name: RunsOfSession :many\nselect \"session_run\".\"id\", \"session_run\".\"session\", \"session_run\".\"issue\", \"session_run\".\"triggered_by\", \"session_run\".\"heard\", \"session_run\".\"started_at\", \"session_run\".\"ended_at\", \"session_run\".\"outcome\", \"session_run\".\"summary\", \"session_run\".\"spent\" from session_run where session = $1 order by id;"
+export const RunsOfSessionSql = "-- name: RunsOfSession :many\n-- bound: one session's runs.\nselect \"session_run\".\"id\", \"session_run\".\"session\", \"session_run\".\"issue\", \"session_run\".\"triggered_by\", \"session_run\".\"heard\", \"session_run\".\"started_at\", \"session_run\".\"ended_at\", \"session_run\".\"outcome\", \"session_run\".\"summary\", \"session_run\".\"spent\" from session_run where session = $1 order by id;"
 
 export const runsOfSession = Effect.fn("RunsOfSession")(function* (params: RunsOfSessionParams) {
   const sql = yield* SqlClient.SqlClient
@@ -159,13 +159,13 @@ export const runsOfSession = Effect.fn("RunsOfSession")(function* (params: RunsO
   })(params)
 })
 
-export const RunsOfEndedSessionsParams = Schema.Struct({
-
+export const RunsOfSessionsParams = Schema.Struct({
+  ["sessions"]: Schema.Array(Schema.NullOr(Schema.String)),
 })
-export type RunsOfEndedSessionsParams = typeof RunsOfEndedSessionsParams.Type
+export type RunsOfSessionsParams = typeof RunsOfSessionsParams.Type
 
 
-export const RunsOfEndedSessionsResult = Schema.Struct({
+export const RunsOfSessionsResult = Schema.Struct({
   ["id"]: Schema.String,
   ["session"]: Schema.String,
   ["issue"]: Schema.NullOr(Schema.String),
@@ -177,16 +177,16 @@ export const RunsOfEndedSessionsResult = Schema.Struct({
   ["summary"]: Schema.NullOr(Schema.String),
   ["spent"]: Schema.NullOr(Schema.String),
 })
-export type RunsOfEndedSessionsResult = typeof RunsOfEndedSessionsResult.Type
+export type RunsOfSessionsResult = typeof RunsOfSessionsResult.Type
 
 
-export const RunsOfEndedSessionsSql = "-- name: RunsOfEndedSessions :many\nselect \"session_run\".\"id\", \"session_run\".\"session\", \"session_run\".\"issue\", \"session_run\".\"triggered_by\", \"session_run\".\"heard\", \"session_run\".\"started_at\", \"session_run\".\"ended_at\", \"session_run\".\"outcome\", \"session_run\".\"summary\", \"session_run\".\"spent\" from session_run where session in (select id from session where ended_at is not null) order by session, id;"
+export const RunsOfSessionsSql = "-- name: RunsOfSessions :many\n-- bound: the runs of the sessions given, which a list takes limited.\nselect \"session_run\".\"id\", \"session_run\".\"session\", \"session_run\".\"issue\", \"session_run\".\"triggered_by\", \"session_run\".\"heard\", \"session_run\".\"started_at\", \"session_run\".\"ended_at\", \"session_run\".\"outcome\", \"session_run\".\"summary\", \"session_run\".\"spent\" from session_run where session = any($1::text[]) order by session, id;"
 
-export const runsOfEndedSessions = Effect.fn("RunsOfEndedSessions")(function* () {
+export const runsOfSessions = Effect.fn("RunsOfSessions")(function* (params: RunsOfSessionsParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
-    Request: RunsOfEndedSessionsParams,
-    Result: RunsOfEndedSessionsResult,
-    execute: () => sql.unsafe(RunsOfEndedSessionsSql, []),
-  })({})
+    Request: RunsOfSessionsParams,
+    Result: RunsOfSessionsResult,
+    execute: (p) => sql.unsafe(RunsOfSessionsSql, [p["sessions"]]),
+  })(params)
 })

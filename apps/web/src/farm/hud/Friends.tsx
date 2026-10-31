@@ -7,15 +7,15 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
 
-import { useCore, useFrames } from "@/base/frame";
-import { setPick, usePrefs } from "@/base/prefs";
-import { ready, useAgents, useRuntimes } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { aria, useClickAway } from "@/base/util";
 import { farm } from "@/farm/store";
 import { useFarm } from "@/farm/ui";
 import { webRoutes } from "@/farm/world/places";
 import { bottleSprite, quotaOf } from "@/features/runtime";
+import { useCore, useFrames } from "@/infra/frame";
+import { ready, useAgents, useRuntimes } from "@/infra/query";
+import { useRouter } from "@/infra/router";
+import { setPick, usePrefs } from "@/state/prefs";
 import { AgentFace } from "@/ui/Face";
 import { PxButton, SpriteIcon } from "@/ui/pixel";
 

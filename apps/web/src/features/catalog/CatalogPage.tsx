@@ -1,13 +1,16 @@
 import type { JSX } from "@solidjs/web";
+import { Schema } from "effect";
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { Slider } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
 import { numberText } from "@/base/format";
-import { ready, useQuery } from "@/base/query";
-import { useRouter } from "@/base/router";
+import { SpriteManifest, CursorManifest } from "@/base/manifests";
+import { useTimeout } from "@/base/timer";
 import { aria } from "@/base/util";
+import { ready, useQuery } from "@/infra/query";
+import { useRouter } from "@/infra/router";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
@@ -53,8 +56,7 @@ function Img(props: { p: Picture; scale: number }) {
 const usePictures = () =>
   useQuery(() => ({
     queryKey: ["pictures"],
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
-    queryFn: async () => picturesOf((await (await fetch("/pixel/sprites.json")).json()) as Parameters<typeof picturesOf>[0]),
+    queryFn: async () => picturesOf(Schema.decodeUnknownSync(SpriteManifest)(await (await fetch("/pixel/sprites.json")).json())),
     staleTime: Infinity,
   }));
 
@@ -249,11 +251,12 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
 
 function Copy(props: { text: string }) {
   const [done, setDone] = createSignal(false);
+  const later = useTimeout();
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setDone(true);
-      setTimeout(() => setDone(false), 1200);
+      later(() => setDone(false), 1200);
     } catch {
       // No clipboard here: the text is on show to copy by hand.
     }
@@ -431,8 +434,7 @@ function Cursors(props: { tabs: JSX.Element }) {
     queryKey: ["cursors"],
     queryFn: async () => {
       const r = await fetch("/cursors/cursors.json");
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
-      return r.ok ? ((await r.json()) as Record<string, { hx: number; hy: number }>) : null;
+      return r.ok ? Schema.decodeUnknownSync(CursorManifest)(await r.json()) : null;
     },
     staleTime: Infinity,
   }));

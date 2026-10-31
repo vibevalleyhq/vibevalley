@@ -1,36 +1,46 @@
 import { createEffect, createMemo, deep } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Issue, type IssueHistory, defaultOrchestrator, type TaskGraph } from "@vibevalley/protocol";
+import { type Issue, type IssueHistory, defaultOrchestrator, type Session, type TaskGraph } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { useCore, useFrames } from "@/base/frame";
-import { queries, ready, useQuery, useAgents } from "@/base/query";
+import { api } from "@/infra/api";
+import { useCore, useFrames } from "@/infra/frame";
+import { queries, ready, useQuery, useAgents } from "@/infra/query";
 
-/** Every issue with its real sessions (issue.history), read again whenever the frame's issues change. */
+import { boardRows, historyKey } from "./rows";
+
+/** Every issue with its real sessions: the frame's issues as the frame has them, the history (issue.history.list) for the
+ * sessions that left and, with `older`, the issues the frame no longer keeps (rows.ts). */
 export function useIssueHistory(older: () => boolean) {
   const core = useCore();
-  // Any change inside them: the frames reconcile into a store, so an unchanged frame changes nothing here.
+  // Read again only when what it adds can have changed: a move or an edit is the frame's alone.
+  createEffect(
+    () => historyKey(core()),
+    () => void queries.invalidateQueries({ queryKey: ["issues", "history"] }),
+    { defer: true },
+  );
+  // An issue's changes follow its helper's work, which the frame's issues show; the frames reconcile into a store, so an
+  // unchanged frame changes nothing here.
   createEffect(
     () => {
       const issues = core()?.issues;
       return issues ? deep(issues) : undefined;
     },
-    () => void queries.invalidateQueries({ queryKey: ["issues"] }),
+    () => void queries.invalidateQueries({ queryKey: ["issues", "changes"] }),
     { defer: true },
   );
   const history = useQuery(() => ({ queryKey: ["issues", "history"], queryFn: () => api.issue.history.list() }));
-  // Without 更早的, only the issues the frame still keeps.
+  // A session that left the farm, as the frame last had it, until the history read again has it.
+  const seen = new Map<string, Session>();
   const rows = createMemo<IssueHistory[] | undefined>(() => {
-    const all = ready(history, undefined);
-    if (!all || older()) return all;
-    const kept = new Set((core()?.issues ?? []).map((i) => i.id));
-    return all.filter((r) => kept.has(r.issue.id));
+    const now = core();
+    for (const s of now?.sessions ?? []) seen.set(s.id, s);
+    return boardRows(now, ready(history, undefined), older(), seen);
   });
   return { rows, loading: () => history.isPending || core() === undefined, error: () => history.error };
 }
 
-// An issue's reads, keyed under "issues" so that whatever reloads the issues reads them again too.
+// An issue's reads, keyed under "issues".
 
 /** What completing the issue would merge; read only while it is shown. */
 export const useIssueChanges = (id: () => string, shown: () => boolean = () => true) =>
@@ -66,5 +76,3 @@ export function useNameOf(): () => (id: string) => string {
     return (id: string) => all.find((a) => a.id === id)?.name || (id === defaultOrchestrator ? t("web.issue.orchestrator") : id);
   });
 }
-
-export const reloadIssues = () => queries.invalidateQueries({ queryKey: ["issues"] });

@@ -9,7 +9,13 @@ export interface Call<I extends AnyCodec, O extends AnyCodec> {
   readonly kind: "call";
   readonly input: I;
   readonly output: O;
+  /** How long the asking side waits for the answer: callTimeoutMs when left out, none when Infinity (a call that waits
+   * for the person, or for a download). */
+  readonly timeoutMs?: number;
 }
+
+/** A side that does not answer in this long has hung: its call is refused so the caller and its entry do not wait forever. */
+export const callTimeoutMs = 15_000;
 
 export interface Push<P extends AnyCodec> {
   readonly kind: "push";
@@ -19,7 +25,10 @@ export interface Push<P extends AnyCodec> {
 export type Contract = Readonly<Record<string, Call<AnyCodec, AnyCodec> | Push<AnyCodec>>>;
 
 /** A call the asking side makes and the answering side answers once. */
-export const call = <I extends AnyCodec, O extends AnyCodec>(o: { readonly input: I; readonly output: O }): Call<I, O> => ({ kind: "call", ...o });
+export const call = <I extends AnyCodec, O extends AnyCodec>(o: { readonly input: I; readonly output: O; readonly timeoutMs?: number }): Call<I, O> => ({
+  kind: "call",
+  ...o,
+});
 
 /** What the answering side sends on its own, as often as it happens. */
 export const push = <P extends AnyCodec>(payload: P): Push<P> => ({ kind: "push", payload });
@@ -102,7 +111,10 @@ export function serve<C extends Contract>(contract: C, link: Link, handlers: Han
 export function connect<C extends Contract>(contract: C, link: Link) {
   let next = 1;
   let closed = false;
-  const waiting = new Map<number, { readonly output: AnyCodec; readonly resolve: (v: unknown) => void; readonly reject: (e: Error) => void }>();
+  const waiting = new Map<
+    number,
+    { readonly output: AnyCodec; readonly resolve: (v: unknown) => void; readonly reject: (e: Error) => void; readonly timer?: ReturnType<typeof setTimeout> }
+  >();
   const listeners = new Map<string, Set<(payload: unknown) => void>>();
 
   const stop = link.receive((raw) => {
@@ -112,13 +124,23 @@ export function connect<C extends Contract>(contract: C, link: Link) {
     if ("push" in m) {
       const entry = entryOf(contract, m.push);
       const decoded = entry?.kind === "push" ? Schema.decodeUnknownOption(entry.payload)(m.payload) : undefined;
-      if (decoded?._tag === "Some") for (const fn of listeners.get(m.push) ?? []) fn(decoded.value);
+      if (decoded?._tag !== "Some") return;
+      // One listener that throws does not keep the push from the others.
+      for (const fn of listeners.get(m.push) ?? [])
+        try {
+          fn(decoded.value);
+        } catch (e) {
+          queueMicrotask(() => {
+            throw e;
+          });
+        }
       return;
     }
     if (!("ok" in m)) return;
     const w = waiting.get(m.id);
     if (!w) return;
     waiting.delete(m.id);
+    clearTimeout(w.timer);
     if (!m.ok) return w.reject(new BridgeError(m.error));
     try {
       w.resolve(Schema.decodeUnknownSync(w.output)(m.output));
@@ -132,7 +154,15 @@ export function connect<C extends Contract>(contract: C, link: Link) {
       if (closed) return reject(new BridgeError("the bridge is closed"));
       const encoded = Schema.encodeUnknownSync(entry.input)(input);
       const id = next++;
-      waiting.set(id, { output: entry.output, resolve, reject });
+      const timeoutMs = entry.timeoutMs ?? callTimeoutMs;
+      const timer =
+        timeoutMs === Infinity
+          ? undefined
+          : setTimeout(() => {
+              if (!waiting.delete(id)) return;
+              reject(new BridgeError(`${name} was not answered in ${timeoutMs} ms`));
+            }, timeoutMs);
+      waiting.set(id, { output: entry.output, resolve, reject, ...(timer ? { timer } : {}) });
       link.send({ id, call: name, input: encoded });
     });
 
@@ -155,7 +185,10 @@ export function connect<C extends Contract>(contract: C, link: Link) {
     close: () => {
       closed = true;
       stop();
-      for (const w of waiting.values()) w.reject(new BridgeError("the bridge is closed"));
+      for (const w of waiting.values()) {
+        clearTimeout(w.timer);
+        w.reject(new BridgeError("the bridge is closed"));
+      }
       waiting.clear();
     },
   };

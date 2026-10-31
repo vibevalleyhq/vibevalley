@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
@@ -12,8 +13,8 @@ import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
-import { agentHome, ServerConfig } from "@/base/config.ts";
-import { Database, Db } from "@/base/db.ts";
+import { agentHome, ServerConfig } from "@/infra/config.ts";
+import { Database, Db } from "@/infra/db.ts";
 import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";
 
@@ -29,6 +30,7 @@ const world = (config = testConfig()) =>
     Layer.provideMerge(Database),
     Layer.provideMerge(FetchHttpClient.layer),
     Layer.provideMerge(Layer.succeed(ServerConfig, config)),
+    Layer.provideMerge(NodeServices.layer),
   );
 
 describe("memory", () => {
@@ -114,7 +116,7 @@ describe("memory", () => {
     return Effect.gen(function* () {
       const m = yield* Memory;
       expect((yield* m.memoriesOf("orchestrator")).memories).toEqual([]);
-      remember(folder, "主人喜欢早上收到汇报", new Date(2026, 9, 12, 9));
+      yield* Effect.promise(() => remember(folder, "主人喜欢早上收到汇报", new Date(2026, 9, 12, 9)));
       const written = yield* m.remember({ agent: "orchestrator", text: "  周末别派夜班\n真的  ", project: "", by: owner });
       expect([written.text, written.session]).toEqual(["周末别派夜班 真的", undefined]);
       expect(readFileSync(join(folder, "MEMORY.md"), "utf8")).toContain("主人交代：周末别派夜班 真的");
@@ -131,10 +133,10 @@ describe("memory", () => {
         _tag: "Refused",
         reason: "要记的话是空的",
       });
-      rewriteMemory(folder, ("- 2026-10-13 " + "字".repeat(100) + "\n").repeat(100));
+      yield* Effect.promise(() => rewriteMemory(folder, ("- 2026-10-13 " + "字".repeat(100) + "\n").repeat(100)));
       const carried = (yield* m.memoriesOf("orchestrator")).carried!;
       expect(carried > 0 && carried < 100).toBe(true);
-      rewriteMemory(folder, "# header\n- first\n* second\nplain third\n");
+      yield* Effect.promise(() => rewriteMemory(folder, "# header\n- first\n* second\nplain third\n"));
       expect((yield* m.memoriesOf("orchestrator")).carried).toBe(3);
       expect(yield* Effect.flip(m.recallOf("orchestrator", "", ""))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/整份记性/u) });
     }).pipe(Effect.provide(world(config)));
@@ -147,12 +149,12 @@ describe("memory", () => {
     writeFileSync(join(folder, "archive", "orchestrator-2026-10-12.md"), "主人：给 clock-in 加分页\n管家：派给老周了\n");
     return Effect.gen(function* () {
       const m = yield* Memory;
-      const listing = m.archive(defaultOrchestrator, "CLOCK-IN");
+      const listing = yield* m.archive(defaultOrchestrator, "CLOCK-IN");
       expect(listing.files.map((f) => f.name)).toEqual(["orchestrator-2026-10-12.md"]);
       expect(listing.hits.map((h) => [h.file, h.line])).toEqual([["orchestrator-2026-10-12.md", 1]]);
-      expect(m.archive(defaultOrchestrator, "").hits).toEqual([]);
-      expect(m.archiveFile(defaultOrchestrator, "orchestrator-2026-10-12.md")).toContain("派给老周");
-      expect(m.archiveFile(defaultOrchestrator, "../MEMORY.md")).toBeUndefined();
+      expect((yield* m.archive(defaultOrchestrator, "")).hits).toEqual([]);
+      expect(yield* m.archiveFile(defaultOrchestrator, "orchestrator-2026-10-12.md")).toContain("派给老周");
+      expect(yield* m.archiveFile(defaultOrchestrator, "../MEMORY.md")).toBeUndefined();
     }).pipe(Effect.provide(world(config)));
   });
 

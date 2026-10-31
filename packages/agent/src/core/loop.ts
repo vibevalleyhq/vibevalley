@@ -264,12 +264,17 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
         }
         const outcomes = yield* Effect.forEach(entries, (e) => (Effect.isEffect(e) ? e : Effect.succeed(e)), { concurrency: "unbounded" });
         const results: ToolResultMessage[] = [];
-        for (const o of outcomes) {
-          const m = yield* toolResultMessage(o.call, o.result, o.isError, o.durationMs);
-          yield* options.onEvent({ type: "message_start", message: m });
-          yield* emit({ type: "message_end", message: m });
-          results.push(m);
-        }
+        yield* Effect.forEach(
+          outcomes,
+          (o) =>
+            Effect.gen(function* () {
+              const m = yield* toolResultMessage(o.call, o.result, o.isError, o.durationMs);
+              yield* options.onEvent({ type: "message_start", message: m });
+              yield* emit({ type: "message_end", message: m });
+              results.push(m);
+            }),
+          { discard: true },
+        );
         return { results, terminate: outcomes.length > 0 && outcomes.every((o) => o.result.terminate === true) };
       });
 
@@ -277,15 +282,20 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
     const refuseTruncated = (calls: readonly ToolCall[]) =>
       Effect.gen(function* () {
         const results: ToolResultMessage[] = [];
-        for (const call of calls) {
-          yield* options.onEvent({ type: "tool_execution_start", toolCallId: call.id, toolName: call.name, args: call.arguments });
-          const result = errorResult(truncated(call.name));
-          yield* ended(call, result, true);
-          const m = yield* toolResultMessage(call, result, true);
-          yield* options.onEvent({ type: "message_start", message: m });
-          yield* emit({ type: "message_end", message: m });
-          results.push(m);
-        }
+        yield* Effect.forEach(
+          calls,
+          (call) =>
+            Effect.gen(function* () {
+              yield* options.onEvent({ type: "tool_execution_start", toolCallId: call.id, toolName: call.name, args: call.arguments });
+              const result = errorResult(truncated(call.name));
+              yield* ended(call, result, true);
+              const m = yield* toolResultMessage(call, result, true);
+              yield* options.onEvent({ type: "message_start", message: m });
+              yield* emit({ type: "message_end", message: m });
+              results.push(m);
+            }),
+          { discard: true },
+        );
         return { results, terminate: false };
       });
 
@@ -308,11 +318,16 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
               yield* options.onEvent({ type: "turn_start" });
             }
             first = false;
-            for (const m of pending) {
-              yield* options.onEvent({ type: "message_start", message: m });
-              yield* emit({ type: "message_end", message: m });
-              fresh.push(m);
-            }
+            yield* Effect.forEach(
+              pending,
+              (m) =>
+                Effect.gen(function* () {
+                  yield* options.onEvent({ type: "message_start", message: m });
+                  yield* emit({ type: "message_end", message: m });
+                  fresh.push(m);
+                }),
+              { discard: true },
+            );
             asked = [...asked, ...pending];
             pending = [];
             const prepared = options.prepareRequest
@@ -373,10 +388,15 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
           const fresh: AgentMessage<A>[] = [...prompts];
           yield* options.onEvent({ type: "agent_start" });
           yield* options.onEvent({ type: "turn_start" });
-          for (const m of prompts) {
-            yield* options.onEvent({ type: "message_start", message: m });
-            yield* emit({ type: "message_end", message: m });
-          }
+          yield* Effect.forEach(
+            prompts,
+            (m) =>
+              Effect.gen(function* () {
+                yield* options.onEvent({ type: "message_start", message: m });
+                yield* emit({ type: "message_end", message: m });
+              }),
+            { discard: true },
+          );
           yield* loop([...context, ...prompts], fresh, run.stop, steered);
           yield* options.onEvent({ type: "agent_end", messages: fresh });
         }).pipe(

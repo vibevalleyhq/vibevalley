@@ -1,11 +1,12 @@
 // What pi itself is set up with: its default model, the DeepSeek key and address it
 // uses, and its DeepSeek balance. pi keeps these in its agent folder; the farm only reads them.
 
-import { existsSync, readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import type { AccountUsage, RuntimeSettings } from "@vibevalley/protocol";
@@ -44,26 +45,31 @@ const BalanceResponse = Schema.Struct({
   balance_infos: Schema.optionalKey(Schema.Array(Schema.Struct({ currency: Schema.String, total_balance: Schema.String }))),
 });
 
-function readJson<T>(name: string, schema: Schema.Codec<T>): T | undefined {
-  const file = join(piAgentDir(), name);
-  if (!existsSync(file)) return undefined;
+/** One of pi's own files; none when it is not there or does not read. */
+async function readJson<T>(name: string, schema: Schema.Codec<T>): Promise<T | undefined> {
   try {
-    return jsonOf(schema)(readFileSync(file, "utf8"));
+    return jsonOf(schema)(await readFile(join(piAgentDir(), name), "utf8"));
   } catch {
     return undefined;
   }
 }
 
 /** pi's default provider and model, from its settings.json; "" when it has none. */
-export function piSettings(): { provider: string; model: string } {
-  const s = readJson("settings.json", SettingsFile);
+export async function piSettings(): Promise<PiDefault> {
+  const s = await readJson("settings.json", SettingsFile);
   return { provider: s?.defaultProvider ?? "", model: s?.defaultModel ?? "" };
 }
 
-function piProvider(settings: Pick<RuntimeSettings, "defaultModel">): string {
+/** pi's default provider and model, as its settings.json names them. */
+export interface PiDefault {
+  readonly provider: string;
+  readonly model: string;
+}
+
+async function piProvider(settings: Pick<RuntimeSettings, "defaultModel">): Promise<string> {
   const slash = settings.defaultModel.indexOf("/");
   const provider = slash >= 0 ? settings.defaultModel.slice(0, slash).trim() : "";
-  return provider || piSettings().provider;
+  return provider || (await piSettings()).provider;
 }
 
 const envName = /^\$?\{?([A-Z][A-Z0-9_]*)\}?$/u;
@@ -81,11 +87,11 @@ function piValue(value: string): string {
  * The DeepSeek key pi uses and where it sends DeepSeek's requests: the key in its auth.json, else DEEPSEEK_API_KEY, else
  * its models.json's providers.deepseek.apiKey; the base URL in models.json, else DeepSeek's own, without a trailing /v1.
  */
-function piDeepseek(): { key: string; base: string } {
-  const authKey = readJson("auth.json", AuthFile)?.deepseek?.key;
+async function piDeepseek(): Promise<{ key: string; base: string }> {
+  const authKey = (await readJson("auth.json", AuthFile))?.deepseek?.key;
   let key = authKey ? piValue(authKey) : (process.env.DEEPSEEK_API_KEY ?? "");
   let base = "https://api.deepseek.com";
-  const p = readJson("models.json", ModelsFile)?.providers?.deepseek;
+  const p = (await readJson("models.json", ModelsFile))?.providers?.deepseek;
   if (!key && p?.apiKey) key = piValue(p.apiKey);
   if (p?.baseUrl) base = p.baseUrl;
   base = base.replace(/\/$/u, "").replace(/\/v1$/u, "").replace(/\/$/u, "");
@@ -94,35 +100,29 @@ function piDeepseek(): { key: string; base: string } {
 
 const unavailable = (reason: string): AccountUsage => ({ status: "unavailable", reason });
 
-/** pi's balance at DeepSeek, when its default model is DeepSeek's; no other provider reports one. */
-export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">): Promise<AccountUsage> {
-  const provider = piProvider(settings);
-  if (provider !== "deepseek") return unavailable(provider ? t("server.runtime.piNoBalance", { provider }) : t("server.runtime.piNoModel"));
-  const { key, base } = piDeepseek();
-  if (!key) return { status: "login_required" };
-  let res: Response;
-  try {
-    res = await fetch(base + "/user/balance", {
-      headers: { authorization: "Bearer " + key },
-      signal: AbortSignal.timeout(readTimeoutMs),
-    });
-  } catch (e) {
-    return unavailable(messageOf(e));
-  }
-  if (!res.ok) return unavailable(`HTTP ${res.status}`);
-  let b: typeof BalanceResponse.Type;
-  try {
-    b = Schema.decodeUnknownSync(BalanceResponse)(await res.json());
-  } catch {
-    return unavailable(t("server.runtime.piUnread"));
-  }
-  return {
-    status: "balance",
-    provider: "DeepSeek",
-    available: b.is_available ?? true,
-    balances: (b.balance_infos ?? []).map((x) => ({
-      currency: x.currency,
-      amount: numberIn(x.total_balance),
-    })),
-  };
-}
+/** pi's balance at DeepSeek, when its default model is DeepSeek's; no other provider reports one. Whatever goes wrong is
+ * an unavailable reading, with why. */
+export const piBalance = (settings: Pick<RuntimeSettings, "defaultModel">): Effect.Effect<AccountUsage> =>
+  Effect.gen(function* () {
+    const provider = yield* Effect.promise(() => piProvider(settings));
+    if (provider !== "deepseek") return unavailable(provider ? t("server.runtime.piNoBalance", { provider }) : t("server.runtime.piNoModel"));
+    const { key, base } = yield* Effect.promise(piDeepseek);
+    if (!key) return { status: "login_required" } as const;
+    const http = yield* HttpClient.HttpClient;
+    const res = yield* http.execute(HttpClientRequest.get(base + "/user/balance").pipe(HttpClientRequest.bearerToken(key))).pipe(
+      Effect.timeoutOrElse({ duration: readTimeoutMs, orElse: () => Effect.fail(t("server.runtime.piTimedOut")) }),
+      Effect.mapError((e) => (typeof e === "string" ? e : messageOf(e))),
+    );
+    if (res.status < 200 || res.status >= 300) return unavailable(`HTTP ${res.status}`);
+    const b = yield* Effect.option(HttpClientResponse.schemaBodyJson(BalanceResponse)(res));
+    if (b._tag === "None") return unavailable(t("server.runtime.piUnread"));
+    return {
+      status: "balance",
+      provider: "DeepSeek",
+      available: b.value.is_available ?? true,
+      balances: (b.value.balance_infos ?? []).map((x) => ({ currency: x.currency, amount: numberIn(x.total_balance) })),
+    } satisfies AccountUsage;
+  }).pipe(
+    Effect.catch((why) => Effect.succeed(unavailable(why))),
+    Effect.provide(FetchHttpClient.layer),
+  );

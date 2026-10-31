@@ -1,6 +1,7 @@
 -- The ledger the progress is folded from, oldest first (game/ledger.ts). Ids are made in time order.
 
 -- name: LedgerEntries :many
+-- bound: every entry: progress is folded from the whole ledger, again under changed rules (a few a day).
 select kind, at, payload from game_ledger order by id;
 
 -- name: AddLedgerEntry :exec

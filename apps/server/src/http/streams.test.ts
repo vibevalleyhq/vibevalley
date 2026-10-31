@@ -1,18 +1,19 @@
+import { NodeServices } from "@effect/platform-node";
 import { Effect, Layer, Stream } from "effect";
 import { HttpRouter } from "effect/http";
 import { describe, expect, it } from "vite-plus/test";
 
 import type { LiveEvent, SideEvent, StateFrame } from "@vibevalley/protocol";
 
-import { ServerConfig } from "@/base/config.ts";
 import { Core } from "@/core/core.ts";
+import { ServerConfig } from "@/infra/config.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import { streams } from "./streams.ts";
 
 const appFor = (change: (core: Core["Service"]) => Core["Service"]) => {
-  const base = Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())));
+  const base = Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer));
   const custom = Layer.unwrap(Effect.map(Core, (core) => Layer.succeed(Core, Core.of(change(core))))).pipe(Layer.provide(base));
   return streams.pipe(Layer.provide(custom));
 };

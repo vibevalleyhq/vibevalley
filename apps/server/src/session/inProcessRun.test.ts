@@ -9,7 +9,7 @@ import { assistantMessage, text, thinking } from "@vibevalley/ai/testing";
 import { until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
-import { InProcessRun } from "./inProcessRun.ts";
+import { makeInProcessRun } from "./inProcessRun.ts";
 import { type RunFinished, type RunStore, runOf, Session, type SessionsInside, NotRecorded } from "./session.ts";
 const user = (words: string): CoreEvent => ({ type: "message_start", message: { role: "user", content: [text(words)], timestamp: 0 } });
 const said = (words: string, stopReason: StopReason = "stop", errorMessage?: string): CoreEvent => ({
@@ -39,8 +39,8 @@ describe("the orchestrator's runs", () => {
       yield* issue("i2");
       const finished: RunFinished[] = [];
       const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.finishedRuns, (r) => Effect.sync(() => finished.push(r))));
-      const journal = sessions.trajectories.openLog("orchestrator");
-      const x = new InProcessRun("orchestrator", journal, (tool) => ({ text: tool, action: "other", tool }), sessions.runStore);
+      const journal = yield* sessions.trajectories.openLog("orchestrator");
+      const x = yield* makeInProcessRun("orchestrator", journal, (tool) => ({ text: tool, action: "other", tool }), sessions.runStore);
 
       yield* x.observe(user("看看工单"), { issue: "i1", by: { kind: "issue" }, heard: ["m1"] });
       expect(sessions.currentRun("orchestrator")).not.toBe("");
@@ -85,13 +85,13 @@ describe("the orchestrator's runs", () => {
   it.live("close changes execution only when its effect runs", () =>
     Effect.gen(function* () {
       const sessions = (yield* Session) as SessionsInside;
-      const x = new InProcessRun(
+      const x = yield* makeInProcessRun(
         "orchestrator",
-        sessions.trajectories.openLog("orchestrator"),
+        yield* sessions.trajectories.openLog("orchestrator"),
         (tool) => ({ text: tool, action: "other", tool }),
         sessions.runStore,
       );
-      const closing = x.close();
+      const closing = x.close;
       yield* x.observe(user("still accepted"), { by: { kind: "comment" } });
       expect(sessions.currentRun("orchestrator")).not.toBe("");
       yield* closing;
@@ -126,7 +126,12 @@ describe("the orchestrator's runs", () => {
         ...sessions.runStore,
         finish: (...a) => (broken ? Effect.fail(new NotRecorded({ message: "disk full" })) : sessions.runStore.finish(...a)),
       };
-      const x = new InProcessRun("orchestrator", sessions.trajectories.openLog("orchestrator"), (tool) => ({ text: tool, action: "other", tool }), store);
+      const x = yield* makeInProcessRun(
+        "orchestrator",
+        yield* sessions.trajectories.openLog("orchestrator"),
+        (tool) => ({ text: tool, action: "other", tool }),
+        store,
+      );
       yield* x.observe(user("一"), { by: { kind: "comment" } });
       const first = sessions.currentRun("orchestrator");
       expect(yield* Effect.flip(x.observe(end()))).toBeInstanceOf(NotRecorded);

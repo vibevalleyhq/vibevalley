@@ -33,7 +33,7 @@ export const RunIssuesResult = Schema.Struct({
 export type RunIssuesResult = typeof RunIssuesResult.Type
 
 
-export const RunIssuesSql = "-- name: RunIssues :many\nselect issue from session_run_issue where run = $1 order by issue;"
+export const RunIssuesSql = "-- name: RunIssues :many\n-- bound: one run's issues.\nselect issue from session_run_issue where run = $1 order by issue;"
 
 export const runIssues = Effect.fn("RunIssues")(function* (params: RunIssuesParams) {
   const sql = yield* SqlClient.SqlClient

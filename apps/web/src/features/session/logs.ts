@@ -65,7 +65,7 @@ export class SessionLogs {
       log.reading.again = true;
       return;
     }
-    const reading = { during: [] as SessionEvent[], again: false };
+    const reading: NonNullable<Log["reading"]> = { during: [], again: false };
     log.reading = reading;
     try {
       const snapshot = await this.read(log.id);

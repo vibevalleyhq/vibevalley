@@ -7,7 +7,7 @@ import { Effect } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
-import { sessionId } from "@vibevalley/protocol/schema";
+import { blockId, sessionId } from "@vibevalley/protocol/schema";
 
 import { Artifact } from "@/artifact/artifact.ts";
 import { owner } from "@/base/actor.ts";
@@ -34,12 +34,18 @@ interface Answer {
 const client = (mcp: Mcp["Service"], token: string) => {
   let id = 0;
   const post = async (body: unknown) => {
-    const res = await mcp.handle(
-      new Request("http://127.0.0.1/mcp", {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...(token ? { authorization: "Bearer " + token } : {}) },
-        body: JSON.stringify(body),
-      }),
+    const res = await Effect.runPromise(
+      mcp.handle(
+        new Request("http://127.0.0.1/mcp", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            accept: "application/json, text/event-stream",
+            ...(token ? { authorization: "Bearer " + token } : {}),
+          },
+          body: JSON.stringify(body),
+        }),
+      ),
     );
     const raw = await res.text();
     return raw ? (JSON.parse(raw) as Answer) : {};
@@ -236,7 +242,7 @@ describe("mcp", () => {
       // The owner changes it in the editor; the helper's next rewrite was made against rev 2.
       yield* artifacts.submit(d.id, "owner", {
         batchId: "owner",
-        ops: [{ op: "update_text", blockId: block, baseRev: 2, text: [{ t: "主人改过的", marks: {} }] }],
+        ops: [{ op: "update_text", blockId: blockId(block), baseRev: 2, text: [{ t: "主人改过的", marks: {} }] }],
       });
       const stale = yield* tool("artifact_block_update", { id: d.id, block, baseRev: 2, text: "帮工又改" });
       expect(stale).toContain("没改：这一块刚被别人改过，现在是第 3 版");

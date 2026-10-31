@@ -3,7 +3,8 @@ import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Layer } from "effect";
+import { Clock, Effect, Fiber, Layer, Stream } from "effect";
+import { TestClock } from "effect/testing";
 
 import { messageText } from "@vibevalley/agent/messages";
 import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing";
@@ -13,16 +14,16 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
-import type { ServerConfig } from "@/base/config.ts";
 import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { Cron } from "@/cron/cron.ts";
 import { Inbox } from "@/inbox/inbox.ts";
+import type { ServerConfig } from "@/infra/config.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { Said } from "@/testing/said.ts";
-import { gate, untilGot as until, waitFor, whenTrue, within } from "@/testing/until.ts";
+import { aTurn, gate, untilGot as until, waitFor, whenTrue, within } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import type { EvalCase } from "./evals.ts";
@@ -31,7 +32,7 @@ import { deepseekModel, orchestratorModel } from "./model.ts";
 import { Orchestrator } from "./orchestrator.ts";
 
 /** Words said to the orchestrator on the phone, as the voice line asks them. */
-const onPhone = (o: Orchestrator["Service"], text: string) => o.answerer("phone")(orchestratorModel)!(text, new AbortController().signal);
+const onPhone = (o: Orchestrator["Service"], text: string) => Stream.toAsyncIterable(o.answerer("phone")(orchestratorModel)!(text));
 
 const userText = (m: Message) => (m.role === "user" ? messageText(m) : undefined);
 const lastInput = (c: Request) => c.messages.map(userText).findLast((t) => t !== undefined) ?? "";
@@ -76,13 +77,12 @@ const respond = (c: Request): Answer => {
 const pi = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") });
 
 /** The patrol runs by hand: heartbeatMinutes 0 leaves nothing to the timer. */
-const farm = (f: Reply = respond, config: ServerConfig["Service"] = testConfig(), clock?: () => number) => {
+const farm = (f: Reply = respond, config: ServerConfig["Service"] = testConfig()) => {
   const { llm, requests } = scriptedLLM(Array.from({ length: 100 }, () => f));
   const below = world({
     config: { ...config, patrol: { heartbeatMinutes: 0 } },
     runtimes: [pi],
     repos: ["demo", "notes"],
-    ...(clock ? { clock } : {}),
   });
   return { requests, layer: Orchestrator.layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
 };
@@ -136,10 +136,11 @@ describe("the orchestrator", () => {
       expect(lastInput(first)).toMatch(/^【现在】\d{4}\/\d+\/\d+ \d\d:\d\d\n\n【现状】[\s\S]*可以派的帮工：\n- /u);
       expect(first.system).not.toContain("【现状】");
       expect(lastLine(first)).toBe("[来源：主人]\n主人说：帮我在 demo 里加个 README");
-      const trail = yield* until(() => {
-        const events = (sessions.events(defaultOrchestrator) ?? []).filter((e) => e.type !== "llm/usage");
-        return events.length >= 6 && events.at(-1)!.type === "run/end" && events;
-      }, "its log");
+      const trail = yield* waitFor(
+        Effect.map(sessions.events(defaultOrchestrator), (all) => (all ?? []).filter((e) => e.type !== "llm/usage")),
+        (events) => events.length >= 6 && events.at(-1)!.type === "run/end",
+        "its log",
+      );
       const [ask, tool, result, answer] = trail.slice(-5, -1);
       expect(result).toMatchObject({ type: "tool/result", call: tool!.seq, ok: true });
       expect(ask!.type).toBe("user/message");
@@ -295,14 +296,9 @@ describe("the orchestrator", () => {
     const f = farm();
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
-      const words = orchestrator.answerer("api")(orchestratorModel)!("在吗", AbortSignal.abort());
-      const said = yield* Effect.promise(async () => {
-        let out = "";
-        for await (const w of words) out += w;
-        return out;
-      });
-      // Asked with a signal already off, it takes nothing: there is nothing to wait for.
-      expect(said).toBe("");
+      // A caller that left before reading: its answer was never read, so it never started.
+      void orchestrator.answerer("api")(orchestratorModel)!("在吗");
+      yield* aTurn;
       expect(f.requests).toHaveLength(0);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -324,7 +320,7 @@ describe("the orchestrator", () => {
       const orchestrator = yield* Orchestrator;
       const got = yield* Effect.promise(async () => {
         const words = (async () => {
-          for await (const _ of orchestrator.answerer("api")(orchestratorModel)!("在吗", new AbortController().signal)) void _;
+          for await (const _ of Stream.toAsyncIterable(orchestrator.answerer("api")(orchestratorModel)!("在吗"))) void _;
           return "ended";
         })().catch((e: Error) => e.message);
         return within(words, 3000, "the answer");
@@ -487,28 +483,23 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("lets a cron it sets unasked wait for the owner", () => {
+  it.effect("lets a cron it sets unasked wait for the owner", () => {
     const daily = { name: "每日测试", text: "跑一遍测试", when: { kind: "daily", time: "09:00" } };
-    let offset = 0;
-    const f = farm(
-      (c) => {
-        const result = answeredWith(c);
-        if (result !== undefined) return answer("定时任务：" + result);
-        const line = lastLine(c);
-        if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("cron_create", daily)]);
-        return respond(c);
-      },
-      testConfig(),
-      () => Date.now() + offset,
-    );
+    const f = farm((c) => {
+      const result = answeredWith(c);
+      if (result !== undefined) return answer("定时任务：" + result);
+      const line = lastLine(c);
+      if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("cron_create", daily)]);
+      return respond(c);
+    }, testConfig());
     return Effect.gen(function* () {
       const crons = yield* Cron;
       const orchestrator = yield* Orchestrator;
       const words = yield* said;
       // Woken by a cron, not the owner: what it sets to come back daily waits.
-      yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, owner);
+      yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: (yield* Clock.currentTimeMillis) + 50 } }, owner);
       // The farm's clock, not a wait, brings it due.
-      offset = 100;
+      yield* TestClock.adjust(100);
       yield* crons.tick;
       yield* until(() => words().some((w) => w.startsWith("定时任务：定好了，等主人同意才生效")), "the orchestrator told it waits");
       const mine = (enabled: boolean) => crons.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
@@ -521,15 +512,14 @@ describe("the orchestrator", () => {
   });
 
   // However its turn ends, the orchestrator's issue waits on the owner: a turn that did not fail is not an answer taken.
-  it.live("leaves its issue for the owner to take as done", () => {
-    let offset = 0;
-    const f = farm(respond, testConfig(), () => Date.now() + offset);
+  it.effect("leaves its issue for the owner to take as done", () => {
+    const f = farm(respond, testConfig());
     return Effect.gen(function* () {
       const crons = yield* Cron;
       const issues = yield* Issue;
-      const s = yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, owner);
+      const s = yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: (yield* Clock.currentTimeMillis) + 50 } }, owner);
       // The farm's clock, not a wait, brings it due.
-      offset = 100;
+      yield* TestClock.adjust(100);
       yield* crons.tick;
       const core = yield* Core;
       const handed = yield* until(() => core.state().issues.find((t) => t.cron === s.id && t.status === "in_review"), "handed back");
@@ -544,9 +534,8 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("hears the patrol once", () => {
-    let offset = 0;
-    const f = farm(respond, testConfig(), () => Date.now() + offset);
+  it.effect("hears the patrol once", () => {
+    const f = farm(respond, testConfig());
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
       const inbox = yield* Inbox;
@@ -558,11 +547,11 @@ describe("the orchestrator", () => {
       yield* inbox.patrol;
       yield* marked(f);
       expect(f.requests.some((c) => lastLine(c).includes("【巡查】"))).toBe(false);
-      offset = 3 * 3_600_000;
+      yield* TestClock.adjust(3 * 3_600_000);
       yield* inbox.patrol;
       const line = yield* until(() => f.requests.map(lastLine).find((l) => patrolLine.test(l)), "the patrol's news");
       expect(line).toMatch(/^\[来源：巡查\]\n【巡查】#general 里有几件事放着没人管：\n(- .+\n)*- .+（w\d+）的活做完 3 小时了还没人看：「加个 CHANGELOG」/u);
-      offset = 3.5 * 3_600_000;
+      yield* TestClock.adjust(0.5 * 3_600_000);
       yield* inbox.patrol;
       yield* marked(f);
       // Each request carries the whole channel: count this work's patrol lines in the latest.
@@ -580,7 +569,11 @@ describe("the orchestrator", () => {
       const words = yield* said;
       yield* orchestrator.say("地里怎么样", {}, undefined, "");
       yield* until(() => words().length >= 1, "its words");
-      const asked = yield* until(() => (sessions.events(defaultOrchestrator) ?? []).find((e) => e.type === "user/message"), "its log");
+      const asked = (yield* waitFor(
+        Effect.map(sessions.events(defaultOrchestrator), (all) => (all ?? []).find((e) => e.type === "user/message")),
+        (e) => e !== undefined,
+        "its log",
+      ))!;
       const made = yield* orchestrator.markWrong(asked.seq, "应该先看一眼地里");
       const saved = JSON.parse(readFileSync(made.file, "utf8")) as Record<keyof EvalCase, unknown> & {
         input: { customType: string };

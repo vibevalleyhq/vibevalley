@@ -1,6 +1,6 @@
 # 设置和配置
 
-服务端的值从三处来：配置（`base/config.ts` 的 `ServerConfig`，由 `loadConfig` 用 Effect 的 `Config` 读，开机读一次：环境变量在前，`VIBEVALLEY_` 加键名，DeepSeek 和声网的三把钥匙也认它们自己的名字；再是 `vibevalley.yaml`，最后是默认值）、「设置」（`Setting`，主人在工作台「设置」页 `/settings` 填的钥匙、语音、听写、记性的来源，存在 `$VIBEVALLEY_HOME/settings.json`），和代码里的默认值（`defaults()`）。设置里的钥匙比配置优先，每次用时现取，存了不用重启。服务端写出的每一行过一遍 `redact`，钥匙不进日志。
+服务端的值从三处来：配置（`infra/config.ts` 的 `ServerConfig`，由 `loadConfig` 用 Effect 的 `Config` 读，开机读一次：环境变量在前，`VIBEVALLEY_` 加键名，DeepSeek 和声网的三把钥匙也认它们自己的名字；再是 `vibevalley.yaml`，最后是默认值）、「设置」（`Setting`，主人在工作台「设置」页 `/settings` 填的钥匙、语音、听写、记性的来源，存在 `$VIBEVALLEY_HOME/settings.json`），和代码里的默认值（`defaults()`）。设置里的钥匙比配置优先，每次用时现取，存了不用重启。服务端写出的每一行过一遍 `redact`，钥匙不进日志。
 
 ## 管什么，不管什么
 
@@ -15,7 +15,7 @@
 
 ## 在哪
 
-- 配置：`apps/server/src/base/config.ts`（`ServerConfig`：接口和服务同名；`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`projectsDir`）。`src/main.ts` 用 `--config` 指一个别的文件；命令行只读家目录的。
+- 配置：`apps/server/src/infra/config.ts`（`ServerConfig`：接口和服务同名；`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`projectsDir`）。`src/main.ts` 用 `--config` 指一个别的文件；命令行只读家目录的。
 - 设置：`apps/server/src/setting`：`setting.ts`（`Setting`、`settings.json` 的形状、取钥匙的方法、交给别的服务的 `VoiceConfig`、`DictationConfig`、`MemorySourceConfig`）、`saving.ts`（`settingsProblem`）、`keys.ts`（`keyHint`，钥匙和地址的写法）、`memorySources.ts`（记性来源的校验和合并）、`voice.ts`（语音的校验和只存差异）。规则的黄金数据在 `setting/testdata/rules.jsonl.gz`。
 - 抹密钥：`apps/server/src/base/redact.ts`（`redact`、`redactOutput`）。
 - 接口：`setting.get`、`setting.validate`、`setting.update`（[capabilities.md](docs/reference/capabilities.md)），形状是 `SettingsStatus`、`SettingsUpdate`、`Check`、`KeyStatus`。
@@ -66,7 +66,7 @@
 
 **设置**：
 
-- **`settings.json` 只有你能读**（0600），由 `base/files.ts` 的 `FileWriter` 写：先写临时文件再改名，写到一半崩了也不留半个文件。开机按 `Stored` 的 Schema 读一次进内存，之后读内存；文件不存在就从空设置开始；读取、JSON 解析或形状校验失败，就改名成 `settings.json.unreadable-<毫秒>` 留着、从空设置开始并记日志：钥匙还在那份文件里，之后的保存写的是新文件，不会盖掉它；改不了名就不开机。
+- **`settings.json` 只有你能读**（0600），由 `infra/files.ts` 的 `keptFile` 写：先写临时文件再改名，写到一半崩了也不留半个文件。开机按 `Stored` 的 Schema 读一次进内存，之后读内存；文件不存在就从空设置开始；读取、JSON 解析或形状校验失败，就改名成 `settings.json.unreadable-<毫秒>` 留着、从空设置开始并记日志：钥匙还在那份文件里，之后的保存写的是新文件，不会盖掉它；改不了名就不开机。
 - **设置 > 配置**：`deepseekApiKey()`、`agora()` 每次被调时按「设置里有就用设置的，没有用配置的」取，App ID 和 Certificate 各取各的；两样凑不齐时 `agora()` 是 `undefined`，语音不可用，别的照常。来源（`KeyStatus.source`）只有 `settings` 和 `config` 两种。
 - **只在设置里有的**：语音服务的 ASR、LLM、TTS key，听写（地址、模型、key），记性的来源（地址、key、开关）。听写没填地址就是关着（`dictation()` 是 `undefined`）。
 - **钥匙不出服务端**：`status()` 对每把钥匙只给来源和末四位（`keyHint`：`…` 加最后 4 个 UTF-16 码元）；Agora 的 App ID 不算钥匙，整串给。
@@ -121,7 +121,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/base/config.test.ts`：默认、文件、环境变量依次覆盖；读不成的拒绝（找不到的 `--config`、读不成数字的端口）；主接口的地址总在回环上；提 PR 的配置。
+- `apps/server/src/infra/config.test.ts`：默认、文件、环境变量依次覆盖；读不成的拒绝（找不到的 `--config`、读不成数字的端口）；主接口的地址总在回环上；提 PR 的配置。
 - `setting/setting.test.ts`：这里存的钥匙比配置的优先、只露出末四位；格式不对什么都不存；语音只存和默认不同的、默认由配置定；语音服务的 key 只给提示；记性来源的 key 留到清掉。`setting/recorded.test.ts`：黄金数据和设置拒绝什么、语音只存差异、记性来源。
-- `base/base.test.ts`：钥匙从文字里抹掉、别的留着；服务端写出的字抹过钥匙；存的文件整份写、封住以后不再写；一个家目录一个服务端。
+- `base/base.test.ts`：钥匙从文字里抹掉、别的留着；服务端写出的字抹过钥匙。`infra/infra.test.ts`：存的文件整份写、封住以后不再写；一个家目录一个服务端。
 - 页面：`apps/web/test/settings.spec.ts`（DeepSeek 的钥匙存、只露末尾、清掉；记性的来源；声音页的两部分）。

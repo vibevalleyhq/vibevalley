@@ -50,7 +50,7 @@
 
 - **主监听（`http/app.ts`）**：「连接到本机」放行的请求原样转给它，带上设备头；`lan.me.get` 从这个头读出是哪台设备。
 - **`packages/protocol`**：`endpoints` 的 `can` 是放行表的唯一来源，同时写出能力表的「连接到本机」一列；`lanKeyCookie` 是页面和监听共用的 cookie 名。
-- **`base`**：`lan.port` 从配置来；配对码用 `code`，设备 id 用 `newId`。
+- **`base`、`infra`**：`lan.port` 从配置来；配对码用 `code`，设备 id 用 `newId`。
 - **页面**：没配对的远端浏览器去 `/pair`；同源的 `fetch` 自动带上 cookie，页面别处不用知道自己是不是连进来的（[客户端](docs/subsystems/app.md)）。
 
 ## 为什么这样

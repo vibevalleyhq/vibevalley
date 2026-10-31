@@ -27,7 +27,7 @@ const echo = () => {
         close: () => {},
       };
     },
-    status: () => Promise.resolve({ code: 400, body: "" }),
+    status: () => Effect.succeed({ code: 400, body: "" }),
   };
   return { transport, keys };
 };

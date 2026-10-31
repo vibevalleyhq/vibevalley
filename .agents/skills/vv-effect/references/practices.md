@@ -36,6 +36,19 @@ agent 写 Effect 时最常见的错，为什么会写出来，和这个仓库里
 | 服务带泛型参数 | 想做「通用仓库」 | 已拦：`genericEffectServices` |
 | Schema 用 v3 写法：`Schema.Literal("a", "b")`、`Schema.Union(A, B)`、`Schema.filter`、`Schema.transform` | 训练数据 | 已拦：类型、`schemaUnionOfLiterals` |
 
+**页面的中间层（`apps/web/src/state/`）**
+
+| 反模式 | 为什么会写出来 | 在这里 |
+|---|---|---|
+| 用 `Atom.optimistic` 或 Solid 2 的 `createOptimistic` 做乐观更新 | 现成，名字就叫乐观 | 审：它们在答复回来时就撤，我们要等帧，用 `defineIntent` |
+| 答复一回来就算成功，或者过几秒就把「发送中」去掉 | 最短的写法 | 审：结算看帧（`bySeq`、发送 key），超时标成失败，留着可重试 |
+| 覆盖层推算服务端的规则（工单的关注、能不能挪） | 想让画面「更对」 | 审：覆盖层只改主人改的那个字段，规则问服务端（「页面不折事实」） |
+| 每按一次生成一个新的请求 key | 写在点击里最顺手 | 审：key 跟着意图，重试用同一个（`sendOnce`、`createRequestKey`） |
+| feature 里 import `effect/reactivity` | 想直接用 Atom 的部件 | 已拦：`vibevalley/atom-door`；要的帮手加在 `state/` |
+| 模块级的信号当全局 store；直接读写 `localStorage` | 最短的写法 | 已拦：`vibevalley/page-store`、`vibevalley/stored-door` |
+| 组件里直接调修改类的接口、失败用普通提示 | 最短的写法 | 已拦：`vibevalley/act-door`、`vibevalley/failure-tone` |
+| 读 atom 时挂起（`Suspense`、异步读取） | 照 React 版 Atom 的写法 | 审：挂起的读取会拦住同页的帧，`useAtom` 不挂起 |
+
 ## 策略
 
 **服务和 layer。** 服务是 `Context.Service` 的类，依赖在 layer 里 `yield*`，方法签名里不带依赖；layer 只在入口叠一次（这里是 `services.ts`），v4 的 layer 跨 provide 也会复用，想要新实例写 `Layer.fresh`。

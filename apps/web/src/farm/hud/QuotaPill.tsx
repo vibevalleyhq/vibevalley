@@ -7,11 +7,11 @@ import { t } from "@vibevalley/i18n";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
 import { yuan } from "@/base/format";
-import { ready, useRuntimes } from "@/base/query";
 import { aria, useClickAway } from "@/base/util";
 import { commands } from "@/farm/frames";
 import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "@/features/runtime";
-import { CardColors, PxButton, SpriteIcon } from "@/ui/pixel";
+import { ready, useRuntimes } from "@/infra/query";
+import { CardColors, createPixelAct, PxButton, SpriteIcon } from "@/ui/pixel";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
 
 import { HudCard } from "./HudCard";
@@ -105,6 +105,7 @@ export function QuotaPill(props: { height: number }) {
   const all = useRuntimes();
   const runtimes = () => usableRuntimes(ready(all, []));
   const [open, setOpen] = createSignal(false);
+  const act = createPixelAct();
   const box = useClickAway(open, () => setOpen(false));
   const lowest = () => {
     const lefts = runtimes().flatMap((r) => (r.quota?.left === undefined ? [] : [r.quota.left]));
@@ -141,7 +142,11 @@ export function QuotaPill(props: { height: number }) {
               <PxButton
                 size="icon"
                 label={t("web.farm.quota.refresh")}
-                onClick={() => runtimes().forEach((r) => void commands.refreshRuntime(r.id).catch(() => {}))}
+                disabled={act.busy()}
+                onClick={() => {
+                  const ids = runtimes().map((r) => r.id);
+                  void act.run(() => Promise.all(ids.map((id) => commands.refreshRuntime(id))));
+                }}
               >
                 <SpriteIcon name="button-refresh" size={14} />
               </PxButton>

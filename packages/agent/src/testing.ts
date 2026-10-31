@@ -1,13 +1,13 @@
 import { rmSync } from "node:fs";
 
-import { Effect } from "effect";
+import { Effect, Stream } from "effect";
 
 import type { ModelClient } from "@vibevalley/ai/client";
 import type { Message } from "@vibevalley/ai/messages";
 import { type Reply, type Request, scriptedLlm, type Step, testModel } from "@vibevalley/ai/testing";
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { Brain, type BrainEvent, type BrainOptions } from "./brain.ts";
+import { type Brain, type BrainEvent, type BrainOptions, makeBrain } from "./brain.ts";
 import { codingTools } from "./coding.ts";
 import type { AgentClosed } from "./core/errors.ts";
 import { messageText, userMessage } from "./messages.ts";
@@ -66,16 +66,17 @@ export const withAgent = <A, E, R>(dir: string, steps: readonly Step[], body: (r
   Effect.scoped(
     Effect.gen(function* () {
       const { llm, requests, append, pending } = scriptedLLM(steps);
-      const agent = yield* Brain.make(testBrain(dir, llm, extra));
+      const agent = yield* makeBrain(testBrain(dir, llm, extra));
       const events: BrainEvent[] = [];
-      agent.subscribe((e) => Effect.sync(() => void events.push(e)));
+      yield* Effect.forkScoped(Stream.runForEach(yield* agent.events, (e) => Effect.sync(() => void events.push(e))));
       return yield* body({
         agent,
         events,
         requests,
         script: { append, pending },
         has: (type) => events.some((e) => e.type === type),
-        ask: (text) => agent.ask(userMessage(text, Date.now())),
+        // The events go out on a hub: the reader takes what was published before the answer once it has a turn.
+        ask: (text) => Effect.tap(agent.ask(userMessage(text, Date.now())), () => Effect.andThen(Effect.yieldNow, Effect.yieldNow)),
       });
     }),
   );

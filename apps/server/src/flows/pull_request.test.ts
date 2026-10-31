@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -12,13 +11,14 @@ import { owner } from "@/base/actor.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Project } from "@/project/project.ts";
 import { Session, type SessionsInside } from "@/session/session.ts";
+import { gitIn } from "@/testing/git.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import { farm, git, lab, watch } from "./farm.ts";
 
 const quiet = (cwd: string, ...args: string[]) => {
   try {
-    execFileSync("git", ["-c", "user.name=session", "-c", "user.email=session@vibevalley.test", ...args], { cwd, stdio: "ignore" });
+    gitIn(cwd, "-c", "user.name=session", "-c", "user.email=session@vibevalley.test", ...args);
     return true;
   } catch {
     return false;

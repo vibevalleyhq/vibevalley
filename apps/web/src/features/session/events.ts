@@ -4,9 +4,9 @@ import { type Accessor, createEffect, createSignal } from "solid-js";
 
 import type { SessionEvent } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { subscribeLive } from "@/base/live";
-import { queries } from "@/base/query";
+import { api } from "@/infra/api";
+import { subscribeLive } from "@/infra/live";
+import { queries } from "@/infra/query";
 
 import { SessionLogs } from "./logs";
 

@@ -69,9 +69,22 @@ const Hello = Schema.Struct({ heartbeat_interval: Schema.optionalKey(Schema.Fini
 const sendFailure = (status: number, message: string) =>
   new AppFailed({ kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed", message });
 
+/** QQ takes passive replies to a message for minutes only: the counts of the latest messages answered are enough. */
+const repliesKept = 256;
+
+/** The next msg_seq for a reply to msgId. Newest last: a message answered again moves to the end, and the oldest goes
+ * past the cap. */
+export const nextReplySeq = (seqs: Map<string, number>, msgId: string) => {
+  const next = (seqs.get(msgId) ?? 0) + 1;
+  seqs.delete(msgId);
+  seqs.set(msgId, next);
+  if (seqs.size > repliesKept) seqs.delete(seqs.keys().next().value!);
+  return next;
+};
+
 export class QQClient implements QQApi {
-  /** Tokens last about two hours: one per app, renewed a minute early. */
-  private readonly tokens = new Map<string, { token: string; until: number }>();
+  /** One active QQ account; changing its credentials evicts the previous token. */
+  private tokenCache: { readonly key: string; readonly token: string; readonly until: number } | undefined;
   /** QQ refuses the same (msg_id, msg_seq) twice. */
   private readonly replySeq = new Map<string, number>();
 
@@ -88,8 +101,8 @@ export class QQClient implements QQApi {
     return Effect.gen({ self: this }, function* () {
       const key = app.appId + "\u0000" + app.secret;
       const now = yield* Clock.currentTimeMillis;
-      const cached = this.tokens.get(key);
-      if (cached && cached.until > now) return cached.token;
+      const cached = this.tokenCache;
+      if (cached?.key === key && cached.until > now) return cached.token;
       const request = HttpClientRequest.bodyText(
         HttpClientRequest.post(this.tokenAt),
         JSON.stringify({ appId: app.appId, clientSecret: app.secret }),
@@ -103,7 +116,7 @@ export class QQClient implements QQApi {
       );
       if (!body.access_token) return yield* failedWith(t("server.connector.qq.auth", { why: body.message || t("server.connector.qq.badKeys") }));
       const seconds = typeof body.expires_in === "number" ? body.expires_in : numberIn(body.expires_in, 7200);
-      this.tokens.set(key, { token: body.access_token, until: now + (seconds - 60) * 1000 });
+      this.tokenCache = { key, token: body.access_token, until: now + (seconds - 60) * 1000 };
       return body.access_token;
     });
   }
@@ -195,8 +208,7 @@ export class QQClient implements QQApi {
       const token = yield* this.token(app).pipe(Effect.mapError((e) => sendFailure(401, e.message)));
       const payload: Record<string, unknown> = { content: text, msg_type: 0 };
       if (msgId) {
-        const next = (this.replySeq.get(msgId) ?? 0) + 1;
-        this.replySeq.set(msgId, next);
+        const next = nextReplySeq(this.replySeq, msgId);
         payload.msg_id = msgId;
         payload.msg_seq = next;
       }

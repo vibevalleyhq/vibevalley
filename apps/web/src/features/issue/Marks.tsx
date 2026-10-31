@@ -3,7 +3,7 @@ import { For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { IssueStatus, Priority } from "@vibevalley/protocol";
 
-import { useAgent } from "@/base/agents";
+import { useAgent } from "@/infra/agents";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 
 import type { BoardCard, Tone } from "./cards";

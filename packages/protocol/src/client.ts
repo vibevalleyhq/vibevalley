@@ -118,9 +118,9 @@ export class VibeValleyApi {
       /** The owner's own words, changed; nobody is told again. */
       update: (a: T.MessageEdit): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/message/update", a),
       /** Any message: its words go, its number stays, and what it still had to hand is dropped. */
-      delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/channel/message/delete", a),
+      delete: (a: { id: T.MessageId }): Promise<void> => this.call<void>("/api/v1/channel/message/delete", a),
       /** What channel.message.delete would do, refused as it would be; nothing changes. */
-      previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/channel/message/previewDelete", a),
+      previewDelete: (a: { id: T.MessageId }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/channel/message/previewDelete", a),
       search: (a: T.MessageSearch): Promise<T.MessageHit[]> => this.call<T.MessageHit[]>("/api/v1/channel/message/search", a),
     },
     default: {
@@ -128,21 +128,23 @@ export class VibeValleyApi {
       set: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/channel/default/set", a),
     },
     reaction: {
-      /** The owner's reaction added, or taken back when it is there. */
-      toggle: (a: T.ReactionToggle): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/reaction/toggle", a),
+      /** The owner's reaction on or off; as it already is, nothing changes. */
+      set: (a: T.ReactionSet): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/reaction/set", a),
     },
     pin: {
-      toggle: (a: { id: string }): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/pin/toggle", a),
+      /** The message pinned or not; as it already is, nothing changes. */
+      set: (a: { id: T.MessageId; on: boolean }): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/pin/set", a),
       /** A channel's pinned messages, newest pinned first. */
       list: (a: { id: string }): Promise<T.ChatMessage[]> => this.call<T.ChatMessage[]>("/api/v1/channel/pin/list", a),
     },
     thread: {
-      /** The thread under a message, made if it has none: its id. */
-      create: (a: { id: string }): Promise<string> => this.call<string>("/api/v1/channel/thread/create", a),
+      /** The thread under a message, made if it has none: its id. requestKey: as IssueRequest's. */
+      create: (a: { id: T.MessageId; requestKey?: string }): Promise<string> => this.call<string>("/api/v1/channel/thread/create", a),
     },
     archive: {
-      /** Out of the sidebar and the thread lists, or back; its messages and address stay. The default channel stays. */
-      toggle: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/channel/archive/toggle", a),
+      /** Out of the sidebar and the thread lists (on), or back; its messages and address stay. The default channel stays. As
+       * it already is, nothing changes. */
+      set: (a: T.OnSet): Promise<void> => this.call<void>("/api/v1/channel/archive/set", a),
     },
     direct: {
       /** The owner's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
@@ -198,8 +200,8 @@ export class VibeValleyApi {
     /** The issue becomes a task graph's parent and its tasks the issues under it, started at once. */
     split: (a: { id: string } & T.IssueSplitRequest): Promise<string> => this.call<string>("/api/v1/issue/split", a),
     get: (a: { id: string }): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/get", a),
-    create: (a: T.IssueRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/create", a),
-    update: (a: { id: string } & T.IssueUpdate): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/update", a),
+    create: (a: T.IssueRequest): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/create", a),
+    update: (a: { id: string } & T.IssueUpdate): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/update", a),
     delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/issue/delete", a),
     /** What issue.delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/issue/previewDelete", a),
@@ -208,7 +210,7 @@ export class VibeValleyApi {
     refine: (a: { id: string } & T.IssueRefineRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/refine", a),
     comment: {
       /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
-      create: (a: { id: string } & T.CommentRequest): Promise<void> => this.call<void>("/api/v1/issue/comment/create", a),
+      create: (a: { id: string } & T.CommentRequest): Promise<T.Applied> => this.call<T.Applied>("/api/v1/issue/comment/create", a),
     },
     diff: {
       get: (a: { id: string }): Promise<T.Changes> => this.call<T.Changes>("/api/v1/issue/diff/get", a),
@@ -228,7 +230,7 @@ export class VibeValleyApi {
       /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is
        * another round (the words are the findings; stuck, none takes the server's own); done is accepted and delivered as the
        * issue says; canceled sends its session home. Issue.moves lists where it may go. */
-      update: (a: { id: string } & T.IssueStatusRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/status/update", a),
+      update: (a: { id: string } & T.IssueStatusRequest): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/status/update", a),
       /** What issue.status.update would do with the same body, refused as it would be; nothing changes. */
       previewUpdate: (a: { id: string } & T.IssueStatusRequest): Promise<T.Preview> => this.call<T.Preview>("/api/v1/issue/status/previewUpdate", a),
     },
@@ -269,18 +271,18 @@ export class VibeValleyApi {
   readonly artifact = {
     /** The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given. */
     list: (a: T.ArtifactListRequest): Promise<T.Artifact[]> => this.call<T.Artifact[]>("/api/v1/artifact/list", a),
-    get: (a: { id: string }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/get", a),
+    get: (a: { id: T.ArtifactId }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/get", a),
     /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
     create: (a: T.ArtifactRequest): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/create", a),
     /** Its title, as the owner renames it. */
-    update: (a: { id: string; title: string }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/update", a),
-    delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/artifact/delete", a),
-    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/artifact/previewDelete", a),
+    update: (a: { id: T.ArtifactId; title: string }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/update", a),
+    delete: (a: { id: T.ArtifactId }): Promise<void> => this.call<void>("/api/v1/artifact/delete", a),
+    previewDelete: (a: { id: T.ArtifactId }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/artifact/previewDelete", a),
     /** A batch of ops, as the owner: taken in order, in one transaction, one batch at a time. */
-    submit: (a: { id: string } & T.BlockSubmit): Promise<T.BlockAck> => this.call<T.BlockAck>("/api/v1/artifact/submit", a),
+    submit: (a: { id: T.ArtifactId } & T.BlockSubmit): Promise<T.BlockAck> => this.call<T.BlockAck>("/api/v1/artifact/submit", a),
     /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
      * one already running is refused. */
-    demo: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/artifact/demo", a),
+    demo: (a: { id: T.ArtifactId }): Promise<void> => this.call<void>("/api/v1/artifact/demo", a),
     content: {
       /** Its words: an html one's version as made, a blocks one's Markdown now (its version is its seq). What an agent reads
        * to make the next one. */
@@ -293,14 +295,14 @@ export class VibeValleyApi {
     },
     block: {
       /** A blocks artifact and every live block (no tombstones), in order. */
-      list: (a: { id: string }): Promise<T.BlockSnapshot> => this.call<T.BlockSnapshot>("/api/v1/artifact/block/list", a),
+      list: (a: { id: T.ArtifactId }): Promise<T.BlockSnapshot> => this.call<T.BlockSnapshot>("/api/v1/artifact/block/list", a),
       /** One block appended, as one batch of one op. */
-      create: (a: { id: string } & T.BlockCreate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/create", a),
-      update: (a: { id: string } & T.BlockUpdate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/update", a),
+      create: (a: { id: T.ArtifactId } & T.BlockCreate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/create", a),
+      update: (a: { id: T.ArtifactId } & T.BlockUpdate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/update", a),
     },
     markdown: {
       /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
-      get: (a: { id: string }): Promise<T.ArtifactMarkdown> => this.call<T.ArtifactMarkdown>("/api/v1/artifact/markdown/get", a),
+      get: (a: { id: T.ArtifactId }): Promise<T.ArtifactMarkdown> => this.call<T.ArtifactMarkdown>("/api/v1/artifact/markdown/get", a),
     },
   };
 

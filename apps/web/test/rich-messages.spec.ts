@@ -1,10 +1,13 @@
 // What a message's words become (ui/richText.ts): code with its language, colours, a copy button and a fold; Mermaid
 // drawn by Pele with nothing in it that runs; only safe links; #12 to its issue; task lists; long messages folded.
 
+import { messageId } from "@vibevalley/protocol/schema";
+
 import { expect, test } from "./fixtures";
 
 const ts = ["```ts", ...Array.from({ length: 24 }, (_, i) => `const n${i}: number = ${i};`), "```"].join("\n");
 const flow = ["```mermaid", "flowchart LR", "  Owner --> Orchestrator --> Helper", "```"].join("\n");
+const kept = ["```ts", ...Array.from({ length: 24 }, (_, i) => `const kept${i}: number = ${i};`), "```"].join("\n");
 const broken = ["```mermaid", "flowchart LR", "  A -->", "```"].join("\n");
 
 test("a message's code, diagrams, links and lists", async ({ page, api }) => {
@@ -49,4 +52,20 @@ test("a long message starts folded and opens whole", async ({ page, api }) => {
   await expect(body).toHaveAttribute("data-folded", "");
   await page.getByTestId("message-more").click();
   await expect(body).not.toHaveAttribute("data-folded", "");
+});
+
+test("regression: an opened code block stays open when its message changes without its words", async ({ page, api }) => {
+  const general = (await api.channel.list()).find((c) => c.default)!;
+  await api.channel.message.send({ id: general.id, text: kept });
+  await page.goto("/chat");
+
+  const code = page.locator('[data-testid="code-block"][data-lang="ts"]').filter({ hasText: "kept0" });
+  await expect(code).toHaveAttribute("data-folded", "");
+  await code.getByTestId("code-more").click();
+  await expect(code).not.toHaveAttribute("data-folded", "");
+  const message = await code.locator("xpath=ancestor::*[@data-key][1]").getAttribute("data-key");
+  // A reaction gives the page a new copy of the message with the same words.
+  await api.channel.reaction.set({ id: messageId(message ?? ""), emoji: "👍", on: true });
+  await expect(page.locator(`[data-key="${message}"] [data-testid="reaction"]`).first()).toBeVisible();
+  await expect(code).not.toHaveAttribute("data-folded", "");
 });

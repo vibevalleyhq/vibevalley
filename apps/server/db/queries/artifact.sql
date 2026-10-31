@@ -11,11 +11,13 @@ select a.*, m.channel_id as said_channel, m.number as said_number
 from artifact a left join channel_message m on m.id = a.message_id where a.id = sqlc.arg(id);
 
 -- name: ArtifactsInChannel :many
+-- bound: one channel's artifacts, what its artifact list shows whole.
 select a.*, m.channel_id as said_channel, m.number as said_number
 from artifact a left join channel_message m on m.id = a.message_id
 where a.channel_id = sqlc.arg(channel_id) order by a.updated_at desc, a.id;
 
 -- name: ArtifactsForIssue :many
+-- bound: one issue's artifacts.
 select a.*, m.channel_id as said_channel, m.number as said_number
 from artifact a left join channel_message m on m.id = a.message_id
 where a.issue = sqlc.arg(issue) order by a.updated_at desc, a.id;

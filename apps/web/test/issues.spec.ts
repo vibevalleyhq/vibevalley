@@ -105,6 +105,28 @@ test("the search keeps only the cards it matches, and clearing it brings them ba
   await expect(card(todo, banana.id)).toBeVisible();
 });
 
+test("the board's filter by project and helper is in the address: a reload and an issue opened and closed keep it", async ({ page, api }) => {
+  const kept = await api.project.create({ name: "in-the-address" });
+  const inKept = await api.issue.create({ title: "one in the address", project: kept.name });
+  const other = await issue(api, "one elsewhere");
+  await page.goto("/issues");
+  const todo = lane(page, "todo");
+  await page.getByTestId("filter-project").click();
+  await page.locator(`[role="option"][data-key="${kept.name}"]`).click();
+  await expect(page).toHaveURL(/[?&]project=in-the-address/u);
+  await page.reload();
+  await expect(page.getByTestId("filter-project")).toHaveAttribute("data-value", kept.name);
+  await expect(card(todo, inKept.id)).toBeVisible();
+  await expect(card(todo, other.id)).toHaveCount(0);
+  await card(todo, inKept.id).click();
+  await expect(page).toHaveURL(new RegExp(`/issues/${inKept.id}\\?project=in-the-address$`, "u"));
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/\/issues\?project=in-the-address$/u);
+  await page.getByTestId("filter-clear").click();
+  await expect(page).not.toHaveURL(/project=/u);
+  await expect(card(todo, other.id)).toBeVisible();
+});
+
 test("a card shows only what differs from its lane, an empty lane is a place to drop, and a filter narrows the board", async ({ page, api }) => {
   const plain = await issue(api, "a plain draft");
   const urgent = await issue(api, "an urgent draft");

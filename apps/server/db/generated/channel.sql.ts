@@ -172,7 +172,7 @@ export const AllChannelsResult = Schema.Struct({
 export type AllChannelsResult = typeof AllChannelsResult.Type
 
 
-export const AllChannelsSql = "-- name: AllChannels :many\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\", \"channel\".\"revision\", \"channel\".\"category\", \"channel\".\"position\", \"channel\".\"archived_at\", \"channel\".\"notify\", \"channel\".\"orchestrator\" from channel order by id;"
+export const AllChannelsSql = "-- name: AllChannels :many\n-- bound: a row per channel, what the chat keeps in memory.\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\", \"channel\".\"revision\", \"channel\".\"category\", \"channel\".\"position\", \"channel\".\"archived_at\", \"channel\".\"notify\", \"channel\".\"orchestrator\" from channel order by id;"
 
 export const allChannels = Effect.fn("AllChannels")(function* () {
   const sql = yield* SqlClient.SqlClient

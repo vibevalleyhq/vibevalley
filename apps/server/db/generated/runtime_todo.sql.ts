@@ -30,7 +30,7 @@ export const OpenTodosResult = Schema.Struct({
 export type OpenTodosResult = typeof OpenTodosResult.Type
 
 
-export const OpenTodosSql = "-- The agents' own todos (runtime/todoStore.ts): the keeper is whoever keeps them, a session id or the orchestrator.\n\n-- name: OpenTodos :many\nselect \"runtime_todo\".\"graph\", \"runtime_todo\".\"keeper\", \"runtime_todo\".\"id\", \"runtime_todo\".\"position\", \"runtime_todo\".\"title\", \"runtime_todo\".\"brief\", \"runtime_todo\".\"after\", \"runtime_todo\".\"executor\", \"runtime_todo\".\"state\", \"runtime_todo\".\"result\", \"runtime_todo\".\"tries\", \"runtime_todo\".\"updated_at\", \"runtime_todo\".\"finished_at\" from runtime_todo where keeper = $1 and finished_at is null order by position;"
+export const OpenTodosSql = "-- The agents' own todos (runtime/todoStore.ts): the keeper is whoever keeps them, a session id or the orchestrator.\n\n-- name: OpenTodos :many\n-- bound: one keeper's open todos.\nselect \"runtime_todo\".\"graph\", \"runtime_todo\".\"keeper\", \"runtime_todo\".\"id\", \"runtime_todo\".\"position\", \"runtime_todo\".\"title\", \"runtime_todo\".\"brief\", \"runtime_todo\".\"after\", \"runtime_todo\".\"executor\", \"runtime_todo\".\"state\", \"runtime_todo\".\"result\", \"runtime_todo\".\"tries\", \"runtime_todo\".\"updated_at\", \"runtime_todo\".\"finished_at\" from runtime_todo where keeper = $1 and finished_at is null order by position;"
 
 export const openTodos = Effect.fn("OpenTodos")(function* (params: OpenTodosParams) {
   const sql = yield* SqlClient.SqlClient

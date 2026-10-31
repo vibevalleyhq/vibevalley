@@ -1,9 +1,10 @@
 // The API over HTTP: every endpoint in @vibevalley/protocol/api is a POST at its op's path, routed to its handler. An input
 // that does not decode is a 400 with why (an empty body is {}); no answer is a 204; a refusal is its tagged JSON at its status.
 
-import { Cause, Effect, Schema, Metric } from "effect";
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { ByteSize, Cause, Effect, Schema, Metric } from "effect";
+import { HttpIncomingMessage, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
+import { attachmentMax } from "@vibevalley/protocol";
 import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers, pathOf } from "@vibevalley/protocol/api";
 
 import { wireOf } from "@/base/wire.ts";
@@ -14,6 +15,11 @@ const isApiError = Schema.is(ApiError);
 
 const badRequest = (why: string) => HttpServerResponse.text(why + "\n", { status: 400 });
 
+/** The most a body may be, read before it is decoded: an attachment comes as base64 in JSON, everything else is small. */
+const bodyMax = 2 * 1024 * 1024;
+const attachmentBodyMax = Math.ceil(attachmentMax / 3) * 4 + 64 * 1024;
+const bodyMaxOf = (endpoint: Endpoint) => (endpoint.op === "channel.attachment.create" ? attachmentBodyMax : bodyMax);
+
 /** Each call of an endpoint, by its op and the status it answered. */
 const requests = Metric.counter("vibevalley.http.requests", { description: "Calls of an endpoint, by op and status", incremental: true });
 
@@ -22,7 +28,11 @@ function serve(endpoint: Endpoint, handle: (input: unknown) => Effect.Effect<unk
     const request = yield* HttpServerRequest.HttpServerRequest;
     let input: unknown;
     if (endpoint.input) {
-      const text = yield* request.text;
+      const max = bodyMaxOf(endpoint);
+      // A body that says it is too big is refused before it is read; one that grows past the limit on the way stops there.
+      const length = Number(request.headers["content-length"] ?? 0);
+      if (length > max) return HttpServerResponse.text(`the body is ${length} bytes, at most ${max}\n`, { status: 413 });
+      const text = yield* Effect.provideService(request.text, HttpIncomingMessage.MaxBodySize, ByteSize.bytes(max));
       const parsed = yield* Effect.result(Effect.try({ try: (): unknown => JSON.parse(text === "" ? "{}" : text), catch: messageOf }));
       if (parsed._tag === "Failure") return badRequest(parsed.failure);
       const json = parsed.success;

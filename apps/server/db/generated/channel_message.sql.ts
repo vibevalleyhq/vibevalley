@@ -169,7 +169,7 @@ export const OwnerMentionsResult = Schema.Struct({
 export type OwnerMentionsResult = typeof OwnerMentionsResult.Type
 
 
-export const OwnerMentionsSql = "-- name: OwnerMentions :many\n-- The owner's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join channel_read_cursor r on r.participant_id = 'owner' and r.channel_id = c.id\nwhere n.target_id = 'owner' and m.sender_id <> 'owner'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.channel_id = c.id and reply.sender_id = 'owner' and reply.number > m.number)\norder by m.id;"
+export const OwnerMentionsSql = "-- name: OwnerMentions :many\n-- bound: only the owner's unread mentions; reading or replying in the channel completes them.\n-- The owner's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join channel_read_cursor r on r.participant_id = 'owner' and r.channel_id = c.id\nwhere n.target_id = 'owner' and m.sender_id <> 'owner'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.channel_id = c.id and reply.sender_id = 'owner' and reply.number > m.number)\norder by m.id;"
 
 export const ownerMentions = Effect.fn("OwnerMentions")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -479,7 +479,7 @@ export const UnseenInResult = Schema.Struct({
 export type UnseenInResult = typeof UnseenInResult.Type
 
 
-export const UnseenInSql = "-- name: UnseenIn :many\n-- Newest first.\nselect m.id from channel_message m\nwhere m.channel_id = $1 and m.sender_id <> $2\n  and m.number > coalesce((select read_number from channel_read_cursor where participant_id = $2 and channel_id = $1), 0)\n  and not exists (select 1 from channel_seen_mark s where s.participant_id = $2 and s.message_id = m.id)\norder by m.number desc;"
+export const UnseenInSql = "-- name: UnseenIn :many\n-- bound: one participant's unread in one channel; the read cursor moves past them.\n-- Newest first.\nselect m.id from channel_message m\nwhere m.channel_id = $1 and m.sender_id <> $2\n  and m.number > coalesce((select read_number from channel_read_cursor where participant_id = $2 and channel_id = $1), 0)\n  and not exists (select 1 from channel_seen_mark s where s.participant_id = $2 and s.message_id = m.id)\norder by m.number desc;"
 
 export const unseenIn = Effect.fn("UnseenIn")(function* (params: UnseenInParams) {
   const sql = yield* SqlClient.SqlClient
@@ -567,7 +567,7 @@ export const OwnerLastMessagesResult = Schema.Struct({
 export type OwnerLastMessagesResult = typeof OwnerLastMessagesResult.Type
 
 
-export const OwnerLastMessagesSql = "-- name: OwnerLastMessages :many\n-- The owner's last message in each channel, from which agents waking agents are counted (channel/audience.ts).\nselect channel_id, max(id)::text as id from channel_message where sender_id = 'owner' group by channel_id;"
+export const OwnerLastMessagesSql = "-- name: OwnerLastMessages :many\n-- bound: a row per channel.\n-- The owner's last message in each channel, from which agents waking agents are counted (channel/audience.ts).\nselect channel_id, max(id)::text as id from channel_message where sender_id = 'owner' group by channel_id;"
 
 export const ownerLastMessages = Effect.fn("OwnerLastMessages")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -722,7 +722,7 @@ export const PinnedInResult = Schema.Struct({
 export type PinnedInResult = typeof PinnedInResult.Type
 
 
-export const PinnedInSql = "-- name: PinnedIn :many\n-- Newest pinned first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.pinned_at is not null order by m.pinned_at desc;"
+export const PinnedInSql = "-- name: PinnedIn :many\n-- bound: one channel's pins, each one pinned by hand.\n-- Newest pinned first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.pinned_at is not null order by m.pinned_at desc;"
 
 export const pinnedIn = Effect.fn("PinnedIn")(function* (params: PinnedInParams) {
   const sql = yield* SqlClient.SqlClient
@@ -798,6 +798,22 @@ export const deleteMessagesIn = Effect.fn("DeleteMessagesIn")(function* (params:
   return yield* SqlSchema.void({
     Request: DeleteMessagesInParams,
     execute: (p) => sql.unsafe(DeleteMessagesInSql, [p["id"]]),
+  })(params)
+})
+
+export const DeleteThreadMessagesInParams = Schema.Struct({
+  ["id"]: Schema.NullOr(Schema.String),
+})
+export type DeleteThreadMessagesInParams = typeof DeleteThreadMessagesInParams.Type
+
+
+export const DeleteThreadMessagesInSql = "-- name: DeleteThreadMessagesIn :exec\n-- Remove child messages before their channels, then the root messages those channels reference.\ndelete from channel_message where channel_id in (select t.id from channel t where t.parent_id = $1);"
+
+export const deleteThreadMessagesIn = Effect.fn("DeleteThreadMessagesIn")(function* (params: DeleteThreadMessagesInParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: DeleteThreadMessagesInParams,
+    execute: (p) => sql.unsafe(DeleteThreadMessagesInSql, [p["id"]]),
   })(params)
 })
 

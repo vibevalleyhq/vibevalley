@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -6,8 +5,8 @@ import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer } from "effect";
 
-import { ServerConfig } from "@/base/config.ts";
-import { gitSync, projectsDir, repo, write } from "@/testing/git.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { gitInEnv, gitSync, projectsDir, repo, write } from "@/testing/git.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { untilGot as until } from "@/testing/until.ts";
 
@@ -283,7 +282,7 @@ describe("projects", () => {
     writeFileSync(join(app, "main.ts"), "export const a = 1\n// a comment\n\nexport const b = 2\n");
     writeFileSync(join(app, "pnpm-lock.yaml"), "lockfileVersion: 9\n".repeat(500));
     gitSync(app, "add", ".");
-    const dated = (date: string, ...args: string[]) => execFileSyncEnv(app, { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }, ...args);
+    const dated = (date: string, ...args: string[]) => gitInEnv(app, { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }, ...args);
     dated("2026-10-01T10:00:00", "-c", "user.name=Me", "-c", "user.email=me@vibevalley.test", "commit", "-q", "-m", "first");
     gitSync(app, "checkout", "-q", "-b", "side");
     dated(
@@ -671,7 +670,3 @@ describe("projects", () => {
     );
   });
 });
-
-function execFileSyncEnv(cwd: string, env: Record<string, string>, ...args: string[]) {
-  execFileSync("git", args, { cwd, env: { ...process.env, ...env }, stdio: "ignore" });
-}

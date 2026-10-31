@@ -3,28 +3,29 @@ import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { Combobox } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
-import { useWorkAgents } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { useRouter } from "@/base/router";
 import { autofocus } from "@/base/util";
+import { useWorkAgents } from "@/infra/agents";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
+import { defineAtom } from "@/state/atom";
+import { createAct } from "@/ui/act";
 import { Dialog } from "@/ui/Dialog";
-import { toast } from "@/ui/toasts";
 
 import { Count } from "./bits";
 import { channelOf, chatPath } from "./places";
 import { type SwitchTarget, switchTargets } from "./switcher";
 
-const [shown, setShown] = createSignal(false);
+const shown = defineAtom(false);
 
 /** One switcher for the page: the shell's Ctrl+K and the chat sidebar's bar open the same one. */
-export const switcher = { show: () => setShown(true), toggle: () => setShown((s) => !s) };
+export const switcher = { show: () => shown.set(true), toggle: () => shown.update((s) => !s) };
 
 /** Ctrl+K: a channel, thread or direct channel by its name; a profile not yet talked with gets its direct channel. */
 export function QuickSwitcher() {
   return (
-    <Dialog open={shown()} onClose={() => setShown(false)} title={t("web.channel.switcher.title")} testid="switcher">
-      <SwitcherBody onClose={() => setShown(false)} />
+    <Dialog open={shown.get()} onClose={() => shown.set(false)} title={t("web.channel.switcher.title")} testid="switcher">
+      <SwitcherBody onClose={() => shown.set(false)} />
     </Dialog>
   );
 }
@@ -37,13 +38,13 @@ function SwitcherBody(props: { onClose: () => void }) {
   const targets = createMemo(() =>
     switchTargets(core()?.chat, query(), { issues: core()?.issues ?? [], sessions: core()?.sessions ?? [], profiles: profiles() }),
   );
+  // Made here, not in go: the dialog closes as the owner picks, and the act outlives it.
+  const act = createAct();
   const go = (t: SwitchTarget) => {
     untrack(() => props.onClose)();
     if (t.kind !== "profile") return router.navigate(chatPath(channelOf(untrack(core)?.chat, t.id)));
-    api.channel.direct
-      .create({ agent: t.id })
-      .then((id) => router.navigate(`/chat/${id}`))
-      .catch((e) => toast(reasonOf(e), "bad"));
+    const agent = t.id;
+    void act.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
   };
   return (
     <Combobox.Root inline autoHighlight inputValue={query()} onInputValueChange={setQuery}>

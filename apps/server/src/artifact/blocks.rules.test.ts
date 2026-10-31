@@ -2,22 +2,28 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { Block, BlockAttrs, BlockOp, BlockOpStatus, BlockType, TextSpan } from "@vibevalley/protocol";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
+import type { Wire } from "@vibevalley/protocol/schema";
 
 import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
 import { ordered, Page } from "./ops.ts";
 import { normal, plain, runeLen, sameText, splitAt } from "./spans.ts";
 import { bold, para, sample, span } from "./testing.ts";
 
-const block = (b: Partial<Block> & Pick<Block, "id" | "orderKey" | "type">): Block => ({
-  artifactId: "d",
-  attrs: {},
-  text: [],
-  rev: 1,
-  updatedBy: "owner",
-  updated: 0,
-  ...b,
-});
-const under = (b: Block, parent: string): Block => ({ ...b, parentId: parent });
+// The cases write ids as the wire has them; the page takes them as read.
+const branded = <A>(wire: Wire<A>): A => wire as A;
+const page = (actor: string, now: number, blocks: readonly Wire<Block>[]) =>
+  new Page(branded<Block["artifactId"]>("d"), actor, now, blocks.map(branded<Block>));
+const block = (b: Partial<Wire<Block>> & Pick<Wire<Block>, "id" | "orderKey" | "type">): Block =>
+  branded<Block>({
+    artifactId: "d",
+    attrs: {},
+    text: [],
+    rev: 1,
+    updatedBy: "owner",
+    updated: 0,
+    ...b,
+  });
+const under = (b: Block, parent: string): Block => branded<Block>({ ...b, parentId: parent });
 
 describe("text", () => {
   // Offsets are code points: 中 is one, 👍 one (two UTF-16 units), 👍🏽 two, é written as e and a combining accent two.
@@ -85,7 +91,7 @@ describe("order keys", () => {
   });
 
   it("two blocks with the same key sort by id", () => {
-    const p = new Page("d", "owner", 1, [
+    const p = page("owner", 1, [
       block({ id: "b2", orderKey: "V", type: "paragraph" }),
       block({ id: "b1", orderKey: "V", type: "paragraph" }),
       block({ id: "b0", orderKey: "U", type: "paragraph" }),
@@ -95,7 +101,14 @@ describe("order keys", () => {
 });
 
 describe("ops", () => {
-  const cases: { name: string; blocks: Block[]; history?: Record<string, Record<number, string>>; ops: BlockOp[]; status: BlockOpStatus[]; want: string }[] = [
+  const cases: {
+    name: string;
+    blocks: Wire<Block>[];
+    history?: Record<string, Record<number, string>>;
+    ops: Wire<BlockOp>[];
+    status: BlockOpStatus[];
+    want: string;
+  }[] = [
     { name: "insert", blocks: [para("a", "V", "一")], ops: [{ op: "insert_block", block: para("b", "W", "二") }], status: ["applied"], want: "a=一 b=二" },
     {
       name: "insert refused",
@@ -216,9 +229,9 @@ describe("ops", () => {
     },
   ];
   it.each(cases)("$name", (c) => {
-    const p = new Page("d", "lab", 9, c.blocks);
+    const p = page("lab", 9, c.blocks);
     p.base = (b, rev) => (c.history?.[b]?.[rev] !== undefined ? [span(c.history[b][rev])] : undefined);
-    c.ops.forEach((op, i) => expect(p.apply(op).status, `op ${i} (${op.op})`).toBe(c.status[i]));
+    c.ops.forEach((op, i) => expect(p.apply(branded<BlockOp>(op)).status, `op ${i} (${op.op})`).toBe(c.status[i]));
     expect(
       ordered([...p.blocks.values()])
         .map((b) => b.id + "=" + plain(b.text))
@@ -227,8 +240,8 @@ describe("ops", () => {
   });
 
   it("changed blocks carry their rev and writer", () => {
-    const p = new Page("d", "lab", 9, [para("a", "V", "你好")]);
-    p.apply({ op: "split_block", blockId: "a", baseRev: 1, offset: 1, newBlock: para("b", "W", "") });
+    const p = page("lab", 9, [para("a", "V", "你好")]);
+    p.apply(branded<BlockOp>({ op: "split_block", blockId: "a", baseRev: 1, offset: 1, newBlock: para("b", "W", "") }));
     const changed = p.changedBlocks();
     expect(changed.map((b) => [b.rev, b.updatedBy, b.updated])).toEqual([
       [2, "lab", 9],
@@ -255,7 +268,7 @@ describe("ops", () => {
     ] satisfies BlockOp["op"][];
     for (const op of ops)
       expect(
-        new Page("d", "owner", 1, []).apply({
+        page("owner", 1, []).apply({
           op,
           block: block({ id: "", orderKey: "", type: "" as BlockType }),
           newBlock: block({ id: "", orderKey: "", type: "" as BlockType }),
@@ -264,8 +277,8 @@ describe("ops", () => {
   });
 
   it("code has no marks", () => {
-    const p = new Page("d", "owner", 1, []);
-    p.apply({ op: "insert_block", block: { ...para("c", "V", ""), type: "code", text: [bold("x := 1")] } });
+    const p = page("owner", 1, []);
+    p.apply(branded<BlockOp>({ op: "insert_block", block: { ...para("c", "V", ""), type: "code", text: [bold("x := 1")] } }));
     expect(p.find("c")!.text).toEqual([{ t: "x := 1", marks: {} }]);
   });
 });

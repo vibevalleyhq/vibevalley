@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
 
-import { farm, farmState, overlayOf, resetFarm } from "./store";
+import { farm, farmProject, farmState, lastFarmProject, overlayOf, resetFarm } from "./store";
 import { aimTool, farmKey } from "./tools";
 import { beds } from "./world/plots";
 afterEach(() => {
@@ -39,4 +39,16 @@ test("Escape opens the menu with the hand and puts a tool down; an open layer ke
 test("a locked bed says when it clears; the hand sows an empty bed", () => {
   expect(aimTool("hand", beds[7]!, undefined, { crop: "locked" }, 3)).toEqual({ ok: false, text: "Lv.8 开垦这块地" });
   expect(aimTool("hand", beds[0]!, undefined, { crop: "empty" }, 3)).toEqual({ ok: true, text: "播种" });
+});
+
+test("the title, once closed, stays closed on this machine; the farm entered is the one /farm opens next", () => {
+  farm.showTitle();
+  farm.closeTitle();
+  resetFarm();
+  expect(farmState().titleOpen).toBe(false);
+  farm.setProject("clock-in");
+  expect(farmProject()).toBe("clock-in");
+  expect(lastFarmProject()).toBe("clock-in");
+  farm.setProject("");
+  expect(lastFarmProject()).toBe("");
 });

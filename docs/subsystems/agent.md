@@ -23,7 +23,7 @@
 - **农机的预设**：`apps/server/src/runtime/presets.json` 的 `defaultSettings`（农机设置的默认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`runtime/presets.ts` 读它（`factsOf`、`runtimeIds`、`presetOf`、`runtimeLabel`、`defaultSettings`）。页面不读它：农机的名字、长相和能做什么随 `runtime.list` 的每个 `RuntimeInfo` 给（`preset`、`facts`）。
 - **家目录**：`$VIBEVALLEY_HOME/config.json`（`agents`、`skills`、`settings` 三块）；今天的花费 `spend.json` 归[帮工](docs/subsystems/session.md)。
 - **接口**：`agent.list`、`agent.validate`、`agent.create`、`agent.update`、`agent.delete`，`agent.template.*`（`list`、`install`、`update`、`add`、`delete`），`skill.*`，`runtime.list`、`runtime.refresh`、`runtime.setting.update`（[capabilities.md](docs/reference/capabilities.md)）；处理函数在 `handlers.ts`。农机的新样子不进核心状态，经 `Core.runtime` 发一条侧事件，页面从窄事件流收到。命令行 `vibevalley runtime chat <农机>` 用同一张注册表。
-- **页面**：`apps/web/src/features/agent/`（档案列表 `AgentsPage.tsx`，管家在上、帮工在下；模板目录 `TemplatesPage.tsx`（`/agents/templates`）；档案页上的来源和更新 `FromTemplate.tsx`；捏帮工和帮工的档案页 `AgentPage.tsx`；管家的档案页 `OrchestratorProfile.tsx`，`/agents/new?role=orchestrator` 新建）、`features/runtime/RuntimesPage.tsx`（农具）、`features/runtime/SkillsPage.tsx`；数据在 `base/query.ts`（`useAgents`、`useRuntimes`）、`base/agents.ts`（`useWorkAgents` 是帮工、`useOrchestrators` 是管家、`orchestratorLookOf`、`useAgentProblems` 问 `agent.validate`）；`features/runtime/skills.ts`（`installedSkills`）、`ui/runtimes.ts`（`runtimeName`）、`ui/cast.ts`（`castOf`）。
+- **页面**：`apps/web/src/features/agent/`（档案列表 `AgentsPage.tsx`，管家在上、帮工在下；模板目录 `TemplatesPage.tsx`（`/agents/templates`）；档案页上的来源和更新 `FromTemplate.tsx`；捏帮工和帮工的档案页 `AgentPage.tsx`；管家的档案页 `OrchestratorProfile.tsx`，`/agents/new?role=orchestrator` 新建）、`features/runtime/RuntimesPage.tsx`（农具）、`features/runtime/SkillsPage.tsx`；数据在 `infra/query.ts`（`useAgents`、`useRuntimes`）、`infra/agents.ts`（`useWorkAgents` 是帮工、`useOrchestrators` 是管家、`orchestratorLookOf`、`useAgentProblems` 问 `agent.validate`）；`features/runtime/skills.ts`（`installedSkills`）、`ui/runtimes.ts`（`runtimeName`）、`ui/cast.ts`（`castOf`）。
 
 ## 模型和不变量
 
@@ -31,7 +31,7 @@
 - **职责（`duty`）和适合的活（`tags`）是两个字段，用法不同。**
   - `duty` 是一句话的「职责」（捏帮工「身份」页的栏名），给人和模型读：帮工栏、帮工列表、频道里帮工名字旁边显示它；管家的现状里每个能派的档案写成「- 名字（id …，农机）职责：<Duty>；适合的活：<Tags>」（`orchestrator/orchestrator.ts`），规划师的提示写成「- id：名字，职责：<Duty>；适合的活：<Tags>」（`session/report.ts`），没填的那半不写；管家的提示让它按「适合的活」挑，和 `chooseAgent` 是同一个字段。挑档案不读它。
   - `tags` 是「适合的活」，一组关键词：工单没点名谁来做、主人也没选定时任务，`chooseAgent` 把工单的字转小写，数每个能派的档案有几个关键词（转小写）出现在里面，取最多的，一样多取靠前的，都是 0 也取第一个能派的。
-- **档案、技能库、农机设置存在一个文件 `config.json`**，整份读进内存，`base.FileWriter` 写（先写临时文件再改名，同一个文件的写一个接一个）。每次改走 `change`：回调拿到一份完整独立的副本（嵌套的切片、字典、MCP 的参数和头、预算和上限的指针都复制），写盘成功后才换成当前版本；写盘失败当前版本不变。读出去的（`all`、`Agent`、`Settings`）也是副本，拿着它改不动服务端那份。
+- **档案、技能库、农机设置存在一个文件 `config.json`**，整份读进内存，`infra/files.ts` 的 `keptFile` 写（先写临时文件再改名，同一个文件的写一个接一个）。每次改走 `change`：回调拿到一份完整独立的副本（嵌套的切片、字典、MCP 的参数和头、预算和上限的指针都复制），写盘成功后才换成当前版本；写盘失败当前版本不变。读出去的（`all`、`Agent`、`Settings`）也是副本，拿着它改不动服务端那份。
 - **读不了或不符合形状的 `config.json` 不覆盖**：文件按档案、技能和农机设置的 Schema 读回；读取、解析或形状校验失败就改名成 `config.json.unreadable-<毫秒>` 留着，像新农场一样起；改不了名就不开机。
 - **删技能同时解除档案引用**：`removeSkill` 在同一次 `change` 中删除技能和所有档案（包括管家）的对应技能 id，写盘失败两边都不变；再建同名技能不会让旧档案自动带上它。
 - **新农场只有默认管家**：没有 `config.json` 时，档案只有从内置的 `orchestrator` 模板装的默认管家，加上配置 `agent.starters` 列出的内置模板（照列的次序，默认空；测试和沙箱用它装上全部内置的帮工），技能库空、农机设置空。帮工由主人在模板目录里挑着装。农机设置没存过的取 `defaultSettings`（启用、命令路径空、默认模型和思考强度空、无环境变量）。

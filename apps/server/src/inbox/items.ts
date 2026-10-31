@@ -5,9 +5,9 @@
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { needOf, omitUndefined } from "@vibevalley/protocol/rules";
+import { needOf, omitUndefined, cut, oneLine, slice } from "@vibevalley/protocol/rules";
 
-import { cut, oneLine, slice } from "@/base/clip.ts";
+import { clip } from "@/base/clip.ts";
 import { defaultOf } from "@/channel/folded.ts";
 import { graphsOf } from "@/task/issues.ts";
 
@@ -234,14 +234,9 @@ function wantOf(h: T.Session, state: T.WorkspaceState): Want | undefined {
   }
 }
 
-function clipLine(text: string, max = 140) {
-  const one = text.replace(/\s+/gu, " ").trim();
-  return one.length > max ? `${one.slice(0, max - 1)}…` : one;
-}
-
 function worded(item: Omit<T.InboxItem, "who" | "words">): T.InboxItem {
   const who = item.from.kind === "session" ? item.from.name : t("server.inbox.orchestrator");
-  return { ...item, who, words: inboxWords(item.kind, who, clipLine(item.text)) };
+  return { ...item, who, words: inboxWords(item.kind, who, clip(item.text, 140)) };
 }
 
 /** What the inbox says of an item: its label, its title, its body (the item's text unless the kind has its own) and the tray's line. */

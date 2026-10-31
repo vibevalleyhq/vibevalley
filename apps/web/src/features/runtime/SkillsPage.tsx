@@ -7,12 +7,13 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { list as listed, t } from "@vibevalley/i18n";
 import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
-import { ready, useAgents, useQuery, useRuntimes } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { matches } from "@/base/search";
 import { Keyed } from "@/base/util";
+import { api, reasonOf } from "@/infra/api";
+import { ready, useAgents, useQuery, useRuntimes } from "@/infra/query";
+import { useRouter } from "@/infra/router";
 import { A } from "@/ui/A";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { ConfirmButton } from "@/ui/ConfirmButton";
 import { Empty } from "@/ui/Empty";
@@ -21,7 +22,6 @@ import { Field, TextArea, TextInput } from "@/ui/Field";
 import { Card } from "@/ui/layout";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
 import { runtimeName } from "@/ui/runtimes";
-import { toast } from "@/ui/toasts";
 
 import { type InstalledSkill, installedSkills } from "./skills";
 
@@ -182,27 +182,18 @@ function SkillEditor(props: { skill?: Skill }) {
   // Keyed by the skill: the draft starts from the one it was opened on.
   const skill = untrack(() => props.skill);
   const [draft, setDraft] = createSignal(skill ?? empty);
-  const [busy, setBusy] = createSignal(false);
+  const act = createAct();
+  const busy = act.busy;
   const router = useRouter();
   const client = useQueryClient();
   const allAgents = useAgents();
   const agents = () => ready(allAgents, []).filter((a) => skill !== undefined && a.skills.includes(skill.id));
   const dirty = () => !skill || !same(skill, draft());
-  const act = async (f: () => Promise<void>) => {
-    setBusy(true);
-    try {
-      await f();
-    } catch (e) {
-      toast(reasonOf(e));
-    } finally {
-      setBusy(false);
-    }
-  };
   // Deleting a skill takes it off the profiles that carried it, so both lists come back.
   const refresh = () => Promise.all([client.invalidateQueries({ queryKey: ["skills"] }), client.invalidateQueries({ queryKey: ["agents"] })]);
   const save = () => {
     const body = { ...draft(), name: draft().name.trim() };
-    return act(async () => {
+    return act.run(async () => {
       const saved = skill ? await api.skill.update(body) : await api.skill.create(body);
       await refresh();
       setDraft(saved);
@@ -210,7 +201,7 @@ function SkillEditor(props: { skill?: Skill }) {
     });
   };
   const remove = (s: Skill) =>
-    act(async () => {
+    act.run(async () => {
       await api.skill.delete({ id: s.id });
       await refresh();
       router.navigate(skillPath());

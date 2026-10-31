@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -17,6 +16,7 @@ import type { LaunchActivity } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { Project } from "@/project/project.ts";
 import { MergeFailure } from "@/project/shapes.ts";
+import { gitIn } from "@/testing/git.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { until, waitFor } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
@@ -32,8 +32,8 @@ const worker = (turns: ScriptedTurn[]) =>
       turns.push(turn);
       await turn.tool("bash", JSON.stringify({ command: `cd ${turn.options.cwd} && touch done.txt` }), () => {
         writeFileSync(join(turn.options.cwd, `done-${turns.length}.txt`), "done\n");
-        execFileSync("git", ["-c", "user.name=w", "-c", "user.email=w@x", "add", "-A"], { cwd: turn.options.cwd });
-        execFileSync("git", ["-c", "user.name=w", "-c", "user.email=w@x", "commit", "-qm", `做完第 ${turns.length} 轮`], { cwd: turn.options.cwd });
+        gitIn(turn.options.cwd, "-c", "user.name=w", "-c", "user.email=w@x", "add", "-A");
+        gitIn(turn.options.cwd, "-c", "user.name=w", "-c", "user.email=w@x", "commit", "-qm", `做完第 ${turns.length} 轮`);
         return "ok";
       });
       turn.say(`改好了。\n\n记住：这个项目用 pnpm test\n\n结论：做完了第 ${turns.length} 轮`);
@@ -259,7 +259,7 @@ describe("sessions", () => {
       expect(turns[0]!.input).toContain("给打卡接口加分页");
       expect(turns[0]!.options.cwd).toBe((sessions as SessionsInside).place(id)!.cwd);
 
-      const events = sessions.events(id)!;
+      const events = (yield* sessions.events(id)) ?? [];
       expect(events.map((e) => e.type)).toEqual(
         expect.arrayContaining(["run/start", "user/message", "tool/call", "tool/result", "assistant/message", "run/end"]),
       );
@@ -310,7 +310,7 @@ describe("sessions", () => {
         id: sessionId("w1"),
         place: { project: "demo", cwd: "/nowhere" },
         access: Semaphore.makeUnsafe(1),
-        journal: s.trajectories.openLog("w1"),
+        journal: yield* s.trajectories.openLog("w1"),
         sess: undefined,
         oarSessionId: "",
         lastText: "",

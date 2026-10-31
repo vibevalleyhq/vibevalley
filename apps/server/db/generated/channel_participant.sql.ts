@@ -62,7 +62,7 @@ export const ParticipantsResult = Schema.Struct({
 export type ParticipantsResult = typeof ParticipantsResult.Type
 
 
-export const ParticipantsSql = "-- name: Participants :many\nselect id, kind, name, agent_id, runtime, joined_at, left_at from channel_participant order by joined_at, seq;"
+export const ParticipantsSql = "-- name: Participants :many\n-- bound: a row per participant: the owner, the orchestrators, profiles and the sessions hired.\nselect id, kind, name, agent_id, runtime, joined_at, left_at from channel_participant order by joined_at, seq;"
 
 export const participants = Effect.fn("Participants")(function* () {
   const sql = yield* SqlClient.SqlClient

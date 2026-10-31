@@ -11,10 +11,9 @@ import { t, setLocale } from "@vibevalley/i18n";
 import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { ServerConfig } from "@/base/config.ts";
-import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
-import { messageOf } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { keptFile, readOrSetAside } from "@/infra/files.ts";
 
 import { keyHint } from "./keys.ts";
 import { memorySourcesOver } from "./memorySources.ts";
@@ -129,7 +128,7 @@ const compact = (s: Record<string, unknown>) => Object.fromEntries(Object.entrie
 const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const file = join(config.home, "settings.json");
-  const disk = new FileWriter(file, 0o600);
+  const disk = yield* keptFile(file, { mode: 0o600 });
   const fromConfig = { deepseek: config.deepseek.apiKey, appId: config.agora.appId, certificate: config.agora.appCertificate };
   // 恢复默认 goes back to these.
   // In the farm's language, as it is when asked: the persona, greeting and failure line are words.
@@ -200,10 +199,9 @@ const make = Effect.gen(function* () {
     if (Predicate.isObject(next.voice) && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
     const kept = yield* Effect.orDie(Schema.decodeEffect(Stored)(compact(next)));
-    yield* Effect.try({
-      try: () => disk.write(() => JSON.stringify(kept, null, 2) + "\n"),
-      catch: (e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: messageOf(e) }), cause: e }),
-    });
+    yield* disk
+      .save(JSON.stringify(kept, null, 2) + "\n")
+      .pipe(Effect.mapError((e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: e.message }), cause: e })));
     stored = kept;
     setLocale(kept.locale ?? "zh");
     return status();

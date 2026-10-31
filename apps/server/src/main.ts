@@ -16,10 +16,10 @@ import { Otlp, OtlpSerialization } from "effect/observability";
 
 import type { ServerReady } from "@vibevalley/protocol";
 
-import { loadConfig, projectsDir } from "./base/config.ts";
-import { announce, leaseHome } from "./base/lease.ts";
 import { redactOutput } from "./base/redact.ts";
 import { app } from "./http/app.ts";
+import { loadConfig, projectsDir } from "./infra/config.ts";
+import { announce, leaseHome } from "./infra/lease.ts";
 
 const { values: flags } = parseArgs({
   options: {

@@ -12,12 +12,13 @@ import { type HttpClient, HttpClientRequest } from "effect/http";
 import { t } from "@vibevalley/i18n";
 import type { MemoryKind } from "@vibevalley/protocol";
 
+import { clip } from "@/base/clip.ts";
 import { newId } from "@/base/ids.ts";
-import { redact } from "@/base/redact.ts";
+import { redact, type RedactedString, redactedHead } from "@/base/redact.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 
 import { everosWords, recallWords } from "./prompts.ts";
-import { clip, recallCount, type MemoryScope } from "./recall.ts";
+import { recallCount, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 
 /** app_id on everything written, so its memories can be told from another app's. */
@@ -29,8 +30,16 @@ interface Message {
   readonly sender_id: string;
   readonly role: "user" | "assistant";
   readonly timestamp: number;
-  content: string;
+  readonly content: string;
 }
+
+/** What goes to EverOS: every message's words redacted. */
+type Sent = Omit<Message, "content"> & { readonly content: RedactedString };
+type Scoped = { readonly app_id: string; readonly project_id: string };
+type Body =
+  | (Scoped & { readonly session_id: string; readonly messages: Sent[] })
+  | (Scoped & { readonly session_id: string })
+  | (Scoped & { readonly query: RedactedString; readonly top_k: number; readonly user_id?: string; readonly agent_id?: string });
 
 interface FoundBody {
   readonly data?: {
@@ -87,7 +96,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
   const told = new Set<string>();
 
   /** The answer's text; closing: the flush as it stops, which its stop does not cut short. */
-  const post = (path: string, body: unknown, closing = false) => {
+  const post = (path: "add" | "flush" | "search", body: Body, closing = false) => {
     const request = HttpClientRequest.post(`${c.url.replace(/\/+$/u, "")}/api/v2/memory/${path}`).pipe(
       HttpClientRequest.bodyJsonUnsafe(body),
       c.key ? HttpClientRequest.bearerToken(c.key) : (r) => r,
@@ -102,8 +111,8 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
   };
 
   const add = Effect.fnUntraced(function* (session: string, project: string, messages: Message[]) {
-    for (const m of messages) m.content = redact(m.content);
-    yield* post("add", { session_id: session, messages, app_id: app, project_id: scopeOf(project) });
+    const sent: Sent[] = messages.map((m) => ({ ...m, content: redact(m.content) }));
+    yield* post("add", { session_id: session, messages: sent, app_id: app, project_id: scopeOf(project) });
     pending.set(session, project);
   });
 
@@ -116,7 +125,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     const body = {
       app_id: app,
       project_id: scope,
-      query: redact(query).trim().slice(0, 1000),
+      query: redactedHead(redact(query), 1000),
       top_k: Math.max(1, Math.min(limit, most)),
       ...(kind === "issue" ? { user_id: user } : { agent_id: agentOf(agent) }),
     };

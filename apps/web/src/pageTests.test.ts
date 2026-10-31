@@ -7,6 +7,8 @@ import { join } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
+import { edgesOf } from "@vibevalley/testkit/source";
+
 const dir = join(import.meta.dirname, "../test");
 const allowed = /^(\.\/[\w-]+|@playwright\/test(\/reporter)?|@axe-core\/playwright|@vibevalley\/protocol(\/schema)?|node:[\w/]+)$/u;
 
@@ -14,8 +16,8 @@ test("page tests reach the system only through the browser, Playwright and the p
   const crossing = readdirSync(dir)
     .filter((f) => f.endsWith(".ts"))
     .flatMap((f) =>
-      [...readFileSync(join(dir, f), "utf8").matchAll(/^\s*(?:import|export)\s+(?:type\s+)?(?:[^;'"]*?\s+from\s+)?"([^"]+)"/gmsu)]
-        .map((m) => m[1]!)
+      edgesOf(f, readFileSync(join(dir, f), "utf8"))
+        .map((e) => e.from)
         .filter((spec) => !allowed.test(spec))
         .map((spec) => `${f} imports ${spec}`),
     );

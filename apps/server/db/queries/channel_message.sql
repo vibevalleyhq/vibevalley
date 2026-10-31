@@ -17,6 +17,7 @@ select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send
 select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = sqlc.arg(sender_id) and m.send_key = sqlc.arg(send_key);
 
 -- name: OwnerMentions :many
+-- bound: only the owner's unread mentions; reading or replying in the channel completes them.
 -- The owner's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.
 select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,
        p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,
@@ -79,6 +80,7 @@ order by m.id desc
 limit 1;
 
 -- name: UnseenIn :many
+-- bound: one participant's unread in one channel; the read cursor moves past them.
 -- Newest first.
 select m.id from channel_message m
 where m.channel_id = sqlc.arg(channel) and m.sender_id <> sqlc.arg(participant)
@@ -96,6 +98,7 @@ select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send
 where m.channel_id = sqlc.arg(channel_id) and m.number = sqlc.arg(number);
 
 -- name: OwnerLastMessages :many
+-- bound: a row per channel.
 -- The owner's last message in each channel, from which agents waking agents are counted (channel/audience.ts).
 select channel_id, max(id)::text as id from channel_message where sender_id = 'owner' group by channel_id;
 
@@ -118,6 +121,7 @@ update channel_message set reactions = sqlc.narg(reactions), revision = sqlc.arg
 update channel_message set pinned_at = sqlc.narg(pinned_at), revision = sqlc.arg(revision) where id = sqlc.arg(id);
 
 -- name: PinnedIn :many
+-- bound: one channel's pins, each one pinned by hand.
 -- Newest pinned first.
 select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.channel_id = sqlc.arg(channel_id) and m.pinned_at is not null order by m.pinned_at desc;
@@ -145,6 +149,10 @@ order by m.id desc limit sqlc.arg(n)::int;
 -- name: DeleteMessagesIn :exec
 -- A channel deleted: what was said in it and its threads goes (their mentions, deliveries and seen marks with them).
 delete from channel_message where channel_id = sqlc.arg(id) or channel_id in (select t.id from channel t where t.parent_id = sqlc.arg(id));
+
+-- name: DeleteThreadMessagesIn :exec
+-- Remove child messages before their channels, then the root messages those channels reference.
+delete from channel_message where channel_id in (select t.id from channel t where t.parent_id = sqlc.arg(id));
 
 -- name: SetEmbeds :exec
 -- The previews read for its links, once they are: a change like any other.

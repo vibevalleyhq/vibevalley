@@ -6,7 +6,7 @@ import { getBuiltinModel, getBuiltinProviders } from "@earendil-works/pi-ai/prov
 
 import { getModel } from "@vibevalley/ai/models";
 
-import { piSettings } from "./pi.ts";
+import type { PiDefault } from "./pi.ts";
 
 export interface Price {
   readonly input: number;
@@ -63,15 +63,15 @@ function piPrice(model: string): Price | undefined {
   return undefined;
 }
 
-export function price(runtime: string, model: string): Price | undefined {
+/** pi: its settings.json's default, for a model left to it. */
+export function price(runtime: string, model: string, pi: PiDefault): Price | undefined {
   switch (runtime) {
     case vibevalleyRuntime:
       return priceOf(getModel("deepseek", model || defaultModel)?.cost);
     case "pi": {
       if (!model) {
-        const s = piSettings();
-        if (!s.provider || !s.model) return undefined;
-        model = s.provider + "/" + s.model;
+        if (!pi.provider || !pi.model) return undefined;
+        model = pi.provider + "/" + pi.model;
       }
       return piPrice(model);
     }

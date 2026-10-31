@@ -11,7 +11,7 @@ import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome,
 import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
 import { whenTrue } from "@vibevalley/testkit/until";
 
-import { wallTime } from "@/base/time.ts";
+import { wallTime } from "@/infra/time.ts";
 
 import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
 

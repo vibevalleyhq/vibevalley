@@ -8,11 +8,11 @@ import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, 
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { ServerConfig } from "@/base/config.ts";
-import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 import { Core } from "@/core/core.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Db } from "@/infra/db.ts";
 import { Project } from "@/project/project.ts";
 
 import * as q from "../../db/generated/game_ledger.sql.ts";
@@ -56,10 +56,10 @@ const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const core = yield* Core;
   const projects = yield* Project;
-  const { attempt: db, run } = yield* Db;
+  const db = yield* Db;
 
   // A row this code cannot read any more is left out of the fold.
-  const rows = yield* run(q.ledgerEntries());
+  const rows = yield* db.run(q.ledgerEntries());
   const entries: LedgerEntry[] = [];
   for (const row of rows) {
     const fields = payloadOf(row.payload);
@@ -77,7 +77,7 @@ const make = Effect.gen(function* () {
       const at = yield* Clock.currentTimeMillis;
       const entry = { ...input, at };
       const { kind, at: _, ...payload } = entry;
-      yield* db(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
+      yield* db.attempt(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
       const [next, news] = progressStep(folded, entry);
       folded = next;
       yield* core.apply({ type: "progress", progress: next.progress, ...((news.coins ?? 0) !== 0 || news.unlocked.length > 0 ? { news } : {}) });
@@ -118,7 +118,7 @@ const make = Effect.gen(function* () {
   let wanted: { station: number; until: number } | undefined;
 
   const [state, transitions] = yield* core.transitions;
-  for (const e of catchUp(state)) yield* record(e);
+  yield* Effect.forEach(catchUp(state), (e) => record(e), { discard: true });
   yield* Effect.forkScoped(
     Stream.runForEach(transitions, ({ before, fact, after }) =>
       Effect.gen(function* () {
@@ -129,7 +129,7 @@ const make = Effect.gen(function* () {
           wanted = undefined;
           if (wish && wish.until > fact.at) yield* core.apply({ type: "station", id: fact.session.id, station: wish.station });
         }
-        for (const e of entriesFor(before, fact, after)) yield* record(e);
+        yield* Effect.forEach(entriesFor(before, fact, after), (e) => record(e), { discard: true });
       }),
     ),
   );

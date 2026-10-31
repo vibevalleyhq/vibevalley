@@ -88,7 +88,7 @@ test("a message's address scrolls to it and lights it up, from the pins, a reply
   const all = [...(await api.channel.message.list({ id, before: 1000, limit: 100 })), ...(await api.channel.message.list({ id, before: 40, limit: 100 }))];
   const find = (text: string) => all.find((m) => m.text === text)!;
   const first = find("line 1");
-  await api.channel.pin.toggle({ id: first.id });
+  await api.channel.pin.set({ id: first.id, on: true });
   await api.channel.message.send({ id, text: "back to the start", replyTo: find("line 2").number });
 
   await page.goto(`/chat/${id}`);

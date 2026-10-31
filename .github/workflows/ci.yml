@@ -58,6 +58,10 @@ jobs:
           BODY: ${{ github.event.pull_request.body }}
           BRANCH: ${{ github.head_ref }}
         run: vpx scripts/commit-msg.ts --body "$BODY" && vpx scripts/commit-msg.ts --branch "$BRANCH"
+      - name: the contract this change touches
+        # For the reviewer: the protocol, schema, service interface and golden data lines it changes, in the summary.
+        if: github.event_name == 'pull_request'
+        run: vpx scripts/contract-diff.ts --base HEAD^1 >> "$GITHUB_STEP_SUMMARY"
       - name: regression tests
         # A pull request that removes or changes a test named "regression: …" names it in its body, and a fix adds one
         # (scripts/regression.ts). HEAD^1 is the base the merge commit was made on.

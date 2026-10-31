@@ -2,14 +2,15 @@
 // are meant to change things (not the orchestrator).
 
 import { spawn } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
 
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
-import { errnoOf, messageOf } from "./core/errors.ts";
+import { errnoOf, messageOf, toolFailed } from "./core/errors.ts";
 import type { Tool } from "./core/loop.ts";
-import { schemaTool, stopped } from "./core/tool.ts";
+import { schemaEffectTool, schemaTool, stopped } from "./core/tool.ts";
 import { coding as words } from "./prompts.ts";
 import { afterRealTime } from "./realTime.ts";
 
@@ -133,10 +134,10 @@ export function codingTools(o: CodingOptions): Tool[] {
     name: "read_file",
     description: words.readDescription,
     parameters: Schema.Struct({ path: Schema.String, offset: Schema.optionalKey(Schema.Int), limit: Schema.optionalKey(Schema.Int) }),
-    run: (p) => {
+    run: async (p) => {
       let data: string;
       try {
-        data = readFileSync(at(p.path), "utf8");
+        data = await readFile(at(p.path), "utf8");
       } catch (e) {
         throw new Error(words.cannotRead(p.path, why(e)), { cause: e });
       }
@@ -154,11 +155,11 @@ export function codingTools(o: CodingOptions): Tool[] {
     name: "write_file",
     description: words.writeDescription,
     parameters: Schema.Struct({ path: Schema.String, content: Schema.String }),
-    run: (p) => {
+    run: async (p) => {
       const file = at(p.path);
       try {
-        mkdirSync(dirname(file), { recursive: true });
-        writeFileSync(file, p.content);
+        await mkdir(dirname(file), { recursive: true });
+        await writeFile(file, p.content);
       } catch (e) {
         throw new Error(words.cannotWrite(p.path, why(e)), { cause: e });
       }
@@ -170,11 +171,11 @@ export function codingTools(o: CodingOptions): Tool[] {
     name: "edit_file",
     description: words.editDescription,
     parameters: Schema.Struct({ path: Schema.String, old_text: Schema.String, new_text: Schema.String, replace_all: Schema.optionalKey(Schema.Boolean) }),
-    run: (p) => {
+    run: async (p) => {
       const file = at(p.path);
       let text: string;
       try {
-        text = readFileSync(file, "utf8");
+        text = await readFile(file, "utf8");
       } catch (e) {
         throw new Error(words.cannotRead(p.path, why(e)), { cause: e });
       }
@@ -184,7 +185,7 @@ export function codingTools(o: CodingOptions): Tool[] {
       if (count > 1 && p.replace_all !== true) throw new Error(words.oldTextNotUnique(p.path, count));
       const next = p.replace_all === true ? text.split(p.old_text).join(p.new_text) : text.replace(p.old_text, () => p.new_text);
       try {
-        writeFileSync(file, next);
+        await writeFile(file, next);
       } catch (e) {
         throw new Error(words.cannotWrite(p.path, why(e)), { cause: e });
       }
@@ -196,22 +197,24 @@ export function codingTools(o: CodingOptions): Tool[] {
     name: "list_dir",
     description: words.listDirDescription,
     parameters: Schema.Struct({ path: Schema.optionalKey(Schema.String), depth: Schema.optionalKey(Schema.Int) }),
-    run: (p) => {
+    run: async (p) => {
       const path = p.path ?? ".";
       const depth = p.depth ?? 1;
       const out: string[] = [];
-      const walk = (dir: string, level: number) => {
-        const entries = readdirSync(dir, { withFileTypes: true }).toSorted((a, b) => localeLess(a.name, b.name));
+      // Depth first, in name order, as the listing reads.
+      const walk = async (dir: string, level: number): Promise<void> => {
+        const entries = (await readdir(dir, { withFileTypes: true })).toSorted((a, b) => localeLess(a.name, b.name));
         for (const e of entries) {
           if (out.length >= 500) return;
           if (e.name === ".git" || e.name === "node_modules") continue;
           const isDir = e.isDirectory();
           out.push("  ".repeat(level) + e.name + (isDir ? "/" : ""));
-          if (isDir && level + 1 < depth) walk(join(dir, e.name), level + 1);
+          // oxlint-disable-next-line eslint/no-await-in-loop -- a folder's entries come right after it
+          if (isDir && level + 1 < depth) await walk(join(dir, e.name), level + 1);
         }
       };
       try {
-        walk(at(path), 0);
+        await walk(at(path), 0);
       } catch (e) {
         throw new Error(words.cannotList(path, why(e)), { cause: e });
       }
@@ -267,26 +270,23 @@ export function codingTools(o: CodingOptions): Tool[] {
     },
   });
 
-  const fetchTool = schemaTool({
+  const fetchTool = schemaEffectTool({
     name: "web_fetch",
     description: words.webFetchDescription,
     parameters: Schema.Struct({ url: Schema.String }),
-    run: async (p, tc) => {
-      const timeoutSignal = AbortSignal.timeout(30_000);
-      let res: Response;
-      try {
-        res = await fetch(p.url, {
-          headers: { "user-agent": "vibevalley-agent/0.1" },
-          signal: AbortSignal.any([tc.signal, timeoutSignal]),
-        });
-      } catch (e) {
-        if (timeoutSignal.aborted) throw new Error(words.fetchTimedOut(p.url), { cause: e });
-        throw new Error(words.cannotFetch(p.url, why(e)), { cause: e });
-      }
-      let text = await res.text();
-      if ((res.headers.get("content-type") ?? "").includes("html")) text = htmlText(text);
-      return `${res.status} ${p.url}\n\n${text}`;
-    },
+    // A run stopped while it waits interrupts the request; the time limit is on the Clock.
+    run: (p) =>
+      Effect.gen(function* () {
+        const http = yield* HttpClient.HttpClient;
+        const res = yield* http.execute(HttpClientRequest.get(p.url).pipe(HttpClientRequest.setHeader("user-agent", "vibevalley-agent/0.1")));
+        let text = yield* res.text;
+        if ((res.headers["content-type"] ?? "").includes("html")) text = htmlText(text);
+        return `${res.status} ${p.url}\n\n${text}`;
+      }).pipe(
+        Effect.mapError((e) => toolFailed(new Error(words.cannotFetch(p.url, why(e)), { cause: e }))),
+        Effect.timeoutOrElse({ duration: "30 seconds", orElse: () => Effect.fail(toolFailed(new Error(words.fetchTimedOut(p.url)))) }),
+        Effect.provide(FetchHttpClient.layer),
+      ),
   });
 
   return [read, write, edit, list, grep, bash, fetchTool];
