@@ -83,8 +83,8 @@ export const nextReplySeq = (seqs: Map<string, number>, msgId: string) => {
 };
 
 export class QQClient implements QQApi {
-  /** Tokens last about two hours: one per app, renewed a minute early. */
-  private readonly tokens = new Map<string, { token: string; until: number }>();
+  /** One active QQ account; changing its credentials evicts the previous token. */
+  private tokenCache: { readonly key: string; readonly token: string; readonly until: number } | undefined;
   /** QQ refuses the same (msg_id, msg_seq) twice. */
   private readonly replySeq = new Map<string, number>();
 
@@ -101,8 +101,8 @@ export class QQClient implements QQApi {
     return Effect.gen({ self: this }, function* () {
       const key = app.appId + "\u0000" + app.secret;
       const now = yield* Clock.currentTimeMillis;
-      const cached = this.tokens.get(key);
-      if (cached && cached.until > now) return cached.token;
+      const cached = this.tokenCache;
+      if (cached?.key === key && cached.until > now) return cached.token;
       const request = HttpClientRequest.bodyText(
         HttpClientRequest.post(this.tokenAt),
         JSON.stringify({ appId: app.appId, clientSecret: app.secret }),
@@ -116,7 +116,7 @@ export class QQClient implements QQApi {
       );
       if (!body.access_token) return yield* failedWith(t("server.connector.qq.auth", { why: body.message || t("server.connector.qq.badKeys") }));
       const seconds = typeof body.expires_in === "number" ? body.expires_in : numberIn(body.expires_in, 7200);
-      this.tokens.set(key, { token: body.access_token, until: now + (seconds - 60) * 1000 });
+      this.tokenCache = { key, token: body.access_token, until: now + (seconds - 60) * 1000 };
       return body.access_token;
     });
   }

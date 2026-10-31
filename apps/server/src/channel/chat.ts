@@ -475,7 +475,7 @@ const make = Effect.gen(function* () {
     reach.load(
       yield* db.run(qf.allFollows()),
       yield* db.run(qd.agentWakesByChannel()),
-      yield* db.run(qd.lastAgentWakes()),
+      (yield* db.run(qd.lastAgentWakes())).filter((w) => model.participant(w.recipient_id)?.left_at === null),
       yield* db.run(qm.ownerLastMessages()),
     );
     open.load(yield* db.run(qd.allOpenDeliveries()));
@@ -1738,6 +1738,8 @@ const make = Effect.gen(function* () {
           : [...(yield* db.run(qm.messagesBefore({ channel_id: channel, number: opt.before ?? 2147483647, n: limit })))].toReversed();
       const newest = rows.at(-1);
       if (newest && (opt.before == null || opt.before === 0)) yield* readThrough(who, channel, newest.number);
+      for (const participant of lastRead.keys())
+        if (participant !== ownerId && !agents.isOrchestrator(participant) && helpers?.present(participant) !== true) lastRead.delete(participant);
       lastRead.set(who, target);
       const older = rows.length > 0 && (yield* db.run(qm.messagesBefore({ channel_id: channel, number: rows[0]!.number, n: 1 }))).length > 0;
       return { target, messages: rows.map((m) => inboxOf(m, target)), older };
@@ -1893,7 +1895,7 @@ const make = Effect.gen(function* () {
     }),
     removeChannel: Effect.fn("Channel.removeChannel")(function* (id) {
       yield* removable(id);
-      const gone = model.channel(id);
+      const gone = new Set([model.channel(id), ...model.threadsOf(id)].flatMap((c) => (c ? [targetOfChannel(c)] : [])));
       yield* tx(
         Effect.gen(function* () {
           yield* db.run(qm.deleteMessagesIn({ id }));
@@ -1904,7 +1906,7 @@ const make = Effect.gen(function* () {
         }),
       );
       yield* reload;
-      if (gone) for (const [who, target] of lastRead) if (target === targetOfChannel(gone)) lastRead.delete(who);
+      for (const [who, target] of lastRead) if (gone.has(target)) lastRead.delete(who);
       yield* core.apply({ type: "channelGone", id });
     }, locked),
     setNotify: Effect.fn("Channel.setNotify")(function* (id, notify) {

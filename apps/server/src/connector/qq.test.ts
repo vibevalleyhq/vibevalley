@@ -1,9 +1,10 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 
+import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { FetchHttpClient, HttpClient } from "effect/http";
-import { describe, expect, it } from "vite-plus/test";
+import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
+import { TestClock } from "effect/testing";
 
 import { decodeGatewayEvent, nextReplySeq, QQClient } from "./qq.ts";
 
@@ -28,6 +29,30 @@ describe("QQ gateway events", () => {
 });
 
 describe("QQ sign-in", () => {
+  it.effect("regression: rotating QQ credentials evicts the previous token and expired tokens refresh", () =>
+    Effect.gen(function* () {
+      let requests = 0;
+      const client = new QQClient(
+        HttpClient.make((request) =>
+          Effect.sync(() => {
+            requests++;
+            return HttpClientResponse.fromWeb(request, Response.json({ access_token: `token-${requests}`, expires_in: 120 }));
+          }),
+        ),
+      );
+      const first = { appId: "a", secret: "old" };
+      yield* client.check(first);
+      yield* client.check(first);
+      expect(requests).toBe(1);
+      yield* client.check({ appId: "a", secret: "new" });
+      yield* client.check(first);
+      expect(requests).toBe(3);
+      yield* TestClock.adjust(60_000);
+      yield* client.check(first);
+      expect(requests).toBe(4);
+    }),
+  );
+
   it("a refused AppID or secret says QQ's own reason", async () => {
     const server = createServer((_req, res) => {
       res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ code: 100016, message: "invalid appid or secret" }));

@@ -391,6 +391,19 @@ describe("the chat", () => {
     ),
   );
 
+  it.effect("regression: deleting a channel forgets the last read of its child threads", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const channel = yield* f.chat.openChannel("temporary", "", "");
+        const root = (yield* f.chat.say("a thread", channel.id, "")).message;
+        yield* f.chat.threadUnder(root.id);
+        yield* f.chat.read(defaultOrchestrator, { target: `#temporary:${root.number}` });
+        yield* f.chat.removeChannel(channel.id);
+        expect((yield* f.chat.speak(defaultOrchestrator, "back here", { target: "#general", anyway: true })).kind).toBe("sent");
+      }),
+    ),
+  );
+
   it.live("a search reads its filters, and an edit can take a message's files off", () =>
     run((f) =>
       Effect.gen(function* () {
