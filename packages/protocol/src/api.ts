@@ -119,7 +119,7 @@ export interface Handlers<R = never> {
   /** A line heard on the call that is on, without its id: refused unless one call is. */
   readonly "voice.hear": (a: { readonly text: string; readonly agent?: string; readonly sendKey?: string }) => Effect.Effect<void, ApiError, R>;
   /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
-  readonly "issue.comment.create": (a: { readonly id: string } & T.CommentRequest) => Effect.Effect<void, ApiError, R>;
+  readonly "issue.comment.create": (a: { readonly id: string } & T.CommentRequest) => Effect.Effect<T.Applied, ApiError, R>;
   readonly "issue.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
   /** Stops a session's turn; it stays, and a comment starts the next. */
   readonly "session.stop": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
@@ -139,15 +139,15 @@ export interface Handlers<R = never> {
   readonly "issue.run.list": (a: { readonly id: string }) => Effect.Effect<T.Run[], ApiError, R>;
   /** The issue's milestones, newest first, and what all its runs cost. */
   readonly "issue.timeline.get": (a: { readonly id: string }) => Effect.Effect<T.IssueTimeline, ApiError, R>;
-  readonly "issue.create": (a: T.IssueRequest) => Effect.Effect<T.Issue, ApiError, R>;
-  readonly "issue.update": (a: { readonly id: string } & T.IssueUpdate) => Effect.Effect<T.Issue, ApiError, R>;
+  readonly "issue.create": (a: T.IssueRequest) => Effect.Effect<T.AppliedIssue, ApiError, R>;
+  readonly "issue.update": (a: { readonly id: string } & T.IssueUpdate) => Effect.Effect<T.AppliedIssue, ApiError, R>;
   readonly "issue.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** What issue.delete would do, refused as it would be; nothing changes. */
   readonly "issue.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is
    * another round (the words are the findings; stuck, none takes the server's own); done is accepted and delivered as the
    * issue says; canceled sends its session home. Issue.moves lists where it may go. */
-  readonly "issue.status.update": (a: { readonly id: string } & T.IssueStatusRequest) => Effect.Effect<T.Issue, ApiError, R>;
+  readonly "issue.status.update": (a: { readonly id: string } & T.IssueStatusRequest) => Effect.Effect<T.AppliedIssue, ApiError, R>;
   /** What issue.status.update would do with the same body, refused as it would be; nothing changes. */
   readonly "issue.status.previewUpdate": (a: { readonly id: string } & T.IssueStatusRequest) => Effect.Effect<T.Preview, ApiError, R>;
   /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
@@ -173,13 +173,14 @@ export interface Handlers<R = never> {
   /** What channel.message.delete would do, refused as it would be; nothing changes. */
   readonly "channel.message.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "channel.message.search": (a: T.MessageSearch) => Effect.Effect<T.MessageHit[], ApiError, R>;
-  /** The owner's reaction added, or taken back when it is there. */
-  readonly "channel.reaction.toggle": (a: T.ReactionToggle) => Effect.Effect<T.ChatMessage, ApiError, R>;
-  readonly "channel.pin.toggle": (a: { readonly id: string }) => Effect.Effect<T.ChatMessage, ApiError, R>;
+  /** The owner's reaction on or off; as it already is, nothing changes. */
+  readonly "channel.reaction.set": (a: T.ReactionSet) => Effect.Effect<T.ChatMessage, ApiError, R>;
+  /** The message pinned or not; as it already is, nothing changes. */
+  readonly "channel.pin.set": (a: T.OnSet) => Effect.Effect<T.ChatMessage, ApiError, R>;
   /** A channel's pinned messages, newest pinned first. */
   readonly "channel.pin.list": (a: { readonly id: string }) => Effect.Effect<T.ChatMessage[], ApiError, R>;
-  /** The thread under a message, made if it has none: its id. */
-  readonly "channel.thread.create": (a: { readonly id: string }) => Effect.Effect<string, ApiError, R>;
+  /** The thread under a message, made if it has none: its id. requestKey: as IssueRequest's. */
+  readonly "channel.thread.create": (a: { readonly id: string; readonly requestKey?: string }) => Effect.Effect<string, ApiError, R>;
   readonly "channel.attachment.create": (a: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError, R>;
   /** The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given. */
   readonly "artifact.list": (a: T.ArtifactListRequest) => Effect.Effect<T.Artifact[], ApiError, R>;
@@ -208,8 +209,9 @@ export interface Handlers<R = never> {
   /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
    * one already running is refused. */
   readonly "artifact.demo": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
-  /** Out of the sidebar and the thread lists, or back; its messages and address stay. The default channel stays. */
-  readonly "channel.archive.toggle": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  /** Out of the sidebar and the thread lists (on), or back; its messages and address stay. The default channel stays. As
+   * it already is, nothing changes. */
+  readonly "channel.archive.set": (a: T.OnSet) => Effect.Effect<void, ApiError, R>;
   /** A channel nothing points at any more, with its threads and messages. */
   readonly "channel.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** What channel.delete would do, refused as it would be; nothing changes. */
@@ -483,7 +485,7 @@ export const endpoints: readonly Endpoint[] = [
     op: "issue.comment.create",
     about: ["id"],
     input: input({ id: Schema.String }, S.CommentRequest),
-    result: undefined,
+    result: S.Applied,
     can: ["owner", "remote", "orchestrator"],
   },
   {
@@ -574,14 +576,14 @@ export const endpoints: readonly Endpoint[] = [
     op: "issue.create",
     about: [],
     input: S.IssueRequest,
-    result: S.Issue,
+    result: S.AppliedIssue,
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "issue.update",
     about: ["id"],
     input: input({ id: Schema.String }, S.IssueUpdate),
-    result: S.Issue,
+    result: S.AppliedIssue,
     can: ["owner", "remote", "orchestrator"],
   },
   {
@@ -603,7 +605,7 @@ export const endpoints: readonly Endpoint[] = [
     op: "issue.status.update",
     about: ["id"],
     input: issueStatusUpdateInput,
-    result: S.Issue,
+    result: S.AppliedIssue,
     can: ["owner", "remote", "orchestrator"],
     dryRun: "issue.status.previewUpdate",
   },
@@ -708,16 +710,16 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "channel.reaction.toggle",
+    op: "channel.reaction.set",
     about: ["id"],
-    input: S.ReactionToggle,
+    input: S.ReactionSet,
     result: S.ChatMessage,
     can: ["owner", "remote"],
   },
   {
-    op: "channel.pin.toggle",
+    op: "channel.pin.set",
     about: ["id"],
-    input: messageInput,
+    input: S.OnSet,
     result: S.ChatMessage,
     can: ["owner", "remote"],
   },
@@ -731,14 +733,14 @@ export const endpoints: readonly Endpoint[] = [
   {
     op: "channel.thread.create",
     about: ["id"],
-    input: messageInput,
+    input: input({ id: Schema.String, requestKey: Schema.optionalKey(Schema.String) }),
     result: Schema.String,
     can: ["owner", "remote"],
   },
   {
-    op: "channel.archive.toggle",
+    op: "channel.archive.set",
     about: ["id"],
-    input: messageInput,
+    input: S.OnSet,
     result: undefined,
     can: ["owner", "remote"],
   },

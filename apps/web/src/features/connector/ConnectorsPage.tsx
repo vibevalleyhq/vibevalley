@@ -7,17 +7,17 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
 import { momentText, wallClockText } from "@/base/format";
-import { useCore } from "@/base/frame";
 import { Keyed } from "@/base/util";
 import { channelLabel, defaultOf, topsOf } from "@/features/channel";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Field, Select, TextInput } from "@/ui/Field";
 import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "@/ui/layout";
 import { SpriteIcon } from "@/ui/pixel";
 import { Qr } from "@/ui/Qr";
-import { toast } from "@/ui/toasts";
 
 const connectorLabel: Record<ConnectorID, string> = {
   weixin: t("web.connector.connectors.label.weixin"),
@@ -50,16 +50,6 @@ const stateLabel: Record<ConnectorState, string> = {
 };
 
 const dot = (s: ConnectorState | undefined) => (s === "connected" ? "bg-leaf" : s === "pairing" || s === "paused" ? "bg-wheat" : "bg-cream-300");
-
-/** A connector's action; what it changes comes back in the core state, where the connectors say each status. */
-async function act(call: () => Promise<ConnectorStatus>, quiet = false) {
-  try {
-    await call();
-  } catch (e) {
-    if (quiet) throw e;
-    toast(reasonOf(e));
-  }
-}
 
 export function ConnectorsPage(props: { id?: string | undefined }) {
   const core = useCore();
@@ -132,26 +122,20 @@ function Row(props: { label: string; children: JSX.Element }) {
 
 export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
   const core = useCore();
-  const [busy, setBusy] = createSignal(false);
-  const run = async (call: () => Promise<ConnectorStatus>) => {
-    setBusy(true);
-    try {
-      await act(call);
-    } finally {
-      setBusy(false);
-    }
-  };
+  // What an action changes comes back in the core state, where the connectors say each status.
+  const act = createAct();
+  const busy = act.busy;
   const login = (input: ConnectorLogin = {}) => {
     const id = props.id;
-    return run(() => api.connector.login({ id, ...input }));
+    return act.run(() => api.connector.login({ id, ...input }));
   };
   const logout = () => {
     const id = props.id;
-    return run(() => api.connector.logout({ id }));
+    return act.run(() => api.connector.logout({ id }));
   };
   const verify = (code: string) => {
     const id = props.id;
-    return run(() => api.connector.verify({ id, code }));
+    return act.run(() => api.connector.verify({ id, code }));
   };
   const label = () => connectorLabel[props.id];
   const disconnect = () => (
@@ -216,6 +200,8 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
 function ChannelPick(props: { id: ConnectorID; current: string }) {
   const core = useCore();
   const [error, setError] = createSignal<string>();
+  // A refusal shows beside the pick.
+  const act = createAct(setError);
   const options = () => {
     const all = topsOf(core()?.chat).map((c) => ({ value: c.name ?? "", label: channelLabel(c) }));
     // The one it is in, even before the farm's chat has come.
@@ -226,15 +212,18 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
     if (!channel) return;
     const id = props.id;
     setError(undefined);
-    try {
-      await act(() => api.connector.channel.set({ id, channel }), true);
-    } catch (e) {
-      setError(reasonOf(e));
-    }
+    await act.run(() => api.connector.channel.set({ id, channel }));
   };
   return (
     <span class="flex flex-wrap items-center gap-2">
-      <Select class="w-50" label={t("web.connector.connectors.whichChannel")} value={props.current} options={options()} onChange={(v) => void move(v)} />
+      <Select
+        class="w-50"
+        label={t("web.connector.connectors.whichChannel")}
+        value={props.current}
+        options={options()}
+        disabled={act.busy()}
+        onChange={(v) => void move(v)}
+      />
       <Show when={error()}>
         <span class="text-xs text-berry">{error()}</span>
       </Show>

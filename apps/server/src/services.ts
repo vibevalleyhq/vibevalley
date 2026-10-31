@@ -13,14 +13,14 @@ import { Llm } from "@vibevalley/ai/llm";
 
 import { Agent } from "./agent/agent.ts";
 import { Artifact, type ArtifactOptions } from "./artifact/artifact.ts";
-import { ServerConfig } from "./base/config.ts";
-import { Database, Db } from "./base/db.ts";
 import { Channel } from "./channel/chat.ts";
 import { Connector, type ConnectorOptions } from "./connector/connector.ts";
 import { Core } from "./core/core.ts";
 import { Cron, start as cronStart } from "./cron/cron.ts";
 import { Game, start as gameStart } from "./game/game.ts";
 import { Inbox, start as inboxReady } from "./inbox/inbox.ts";
+import { ServerConfig } from "./infra/config.ts";
+import { Database, Db } from "./infra/db.ts";
 import { Issue, type IssueOptions } from "./issue/issue.ts";
 import { Lan, type LanOptions } from "./lan/lan.ts";
 import { Mcp, type McpOptions } from "./mcp/mcp.ts";

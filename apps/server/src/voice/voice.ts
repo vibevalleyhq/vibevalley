@@ -18,13 +18,13 @@ import { t } from "@vibevalley/i18n";
 import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrchestrator, type VoiceCall, type VoiceSettings } from "@vibevalley/protocol";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 
-import { ServerConfig } from "@/base/config.ts";
-import { callbackLog, bestEffort } from "@/base/log.ts";
-import { afterRealTime } from "@/base/time.ts";
 import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { messageOf, errnoOf } from "@/errors.ts";
 import { Inbox } from "@/inbox/inbox.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { callbackLog, bestEffort } from "@/infra/log.ts";
+import { afterRealTime } from "@/infra/time.ts";
 import { orchestratorModel } from "@/orchestrator/model.ts";
 import { chatCompletions } from "@/orchestrator/openai.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";

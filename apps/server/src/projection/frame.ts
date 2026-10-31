@@ -20,7 +20,7 @@ const graphActionText = (): Record<GraphAction, string> => ({
   abandon: t("server.task.graphAction.abandon"),
   merge: t("server.task.graphAction.merge"),
 });
-export function frameOf(state: WorkspaceState, effects: GameEffect[] = []): StateFrame {
+export function frameOf(state: WorkspaceState, effects: GameEffect[] = [], seq = 0): StateFrame {
   const graphs = graphsOf(state).map((g) => {
     const graph = { ...g, stateTag: t(`server.task.graphTag.${g.state}`), actionText: graphActionText(), actions: graphActions(g) };
     if (graph.tasks.length === 0) return graph;
@@ -37,7 +37,7 @@ export function frameOf(state: WorkspaceState, effects: GameEffect[] = []): Stat
     });
     return graph;
   });
-  return { state: withWords(state), inbox: inbox(state), graphs, view: viewOf(state), effects };
+  return { seq, state: withWords(state), inbox: inbox(state), graphs, view: viewOf(state), effects };
 }
 
 function withWords(state: WorkspaceState): WorkspaceView {

@@ -5,19 +5,18 @@ import { For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Changes, Session } from "@vibevalley/protocol";
 
-import { reasonOf } from "@/base/api";
 import { ago } from "@/base/format";
-import { useCore, useFrames } from "@/base/frame";
-import { ready, useAgents } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { useNow } from "@/base/util";
-import { fire } from "@/farm/commands";
 import { commands } from "@/farm/frames";
 import { harvestedOf } from "@/farm/hud/readout";
 import { farm } from "@/farm/store";
 import { issueOf } from "@/farm/world/plots";
 import { changeKind, lineCounts, nothingChanged, issueTitle, useIssueChanges } from "@/features/issue";
-import { FarmSection, PxButton, SpriteIcon } from "@/ui/pixel";
+import { reasonOf } from "@/infra/api";
+import { useCore, useFrames } from "@/infra/frame";
+import { ready, useAgents } from "@/infra/query";
+import { useRouter } from "@/infra/router";
+import { createPixelAct, FarmSection, PxButton, SpriteIcon } from "@/ui/pixel";
 
 import { FarmEmpty, FarmTag, FileRow, PlusMinus, tint, Tinted } from "./bits";
 
@@ -57,15 +56,17 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
   const counts = () => lineCounts(props.changes);
   const empty = () => nothingChanged(props.changes);
   const conflicts = () => props.changes.conflicts;
+  const act = createPixelAct(t("web.farm.plot.failed"));
+  // The window stays until the server took it, so a refusal is said beside it and the press can be made again.
   const take = async () => {
     if (!acts().includes("complete")) return;
-    await commands.harvest(props.session);
-    props.onDone();
+    const session = props.session;
+    if ((await act.run(async () => (await commands.harvest(session), true))) === true) props.onDone();
   };
   const resolve = async () => {
     if (!acts().includes("resolve")) return;
-    await commands.resolve(props.session);
-    props.onDone();
+    const session = props.session;
+    if ((await act.run(async () => (await commands.resolve(session), true))) === true) props.onDone();
   };
   return (
     <div class="flex flex-col">
@@ -116,12 +117,12 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
       </Show>
       <div class="mt-3 flex flex-wrap gap-2">
         <Show when={acts().includes("complete")}>
-          <PxButton tone="primary" data-act="complete" onClick={() => fire(take())}>
+          <PxButton tone="primary" data-act="complete" disabled={act.busy()} onClick={() => void take()}>
             {empty() ? t("web.farm.harvest.letGo") : t("web.farm.harvest.take", { base: props.changes.base })}
           </PxButton>
         </Show>
         <Show when={acts().includes("resolve")}>
-          <PxButton tone="danger" data-act="resolve" onClick={() => fire(resolve())}>
+          <PxButton tone="danger" data-act="resolve" disabled={act.busy()} onClick={() => void resolve()}>
             {t("web.farm.harvest.resolve")}
           </PxButton>
         </Show>

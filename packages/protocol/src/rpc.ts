@@ -1,5 +1,5 @@
 // What a page subscribes to over its one WebSocket (rpcPath): the server implements Subscriptions
-// (apps/server/src/http/rpc.ts), the page calls it (apps/web/src/base/gateway.ts). Writes stay on the HTTP endpoints (api.ts).
+// (apps/server/src/http/rpc.ts), the page calls it (apps/web/src/infra/gateway.ts). Writes stay on the HTTP endpoints (api.ts).
 
 import { Schema } from "effect";
 import { Rpc, RpcGroup } from "effect/rpc";

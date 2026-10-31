@@ -11,10 +11,10 @@ import { t, setLocale } from "@vibevalley/i18n";
 import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { ServerConfig } from "@/base/config.ts";
-import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
 import { messageOf } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { FileWriter, readOrSetAside } from "@/infra/files.ts";
 
 import { keyHint } from "./keys.ts";
 import { memorySourcesOver } from "./memorySources.ts";

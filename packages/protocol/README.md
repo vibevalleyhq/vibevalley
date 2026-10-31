@@ -18,7 +18,7 @@ The golden cases of the fold and the frame are the server's (`apps/server/src/co
 ## The host
 
 Every host gives the whole `Host`; a capability it lacks is null, and the page draws by that, never by asking which host
-it is in. The page finds its host in `apps/web/src/base/host.ts` (`currentHost()`: the desktop preload's, the phone's built
+it is in. The page finds its host in `apps/web/src/infra/host.ts` (`currentHost()`: the desktop preload's, the phone's built
 over the bridge, `browserHost` otherwise).
 
 | Member | Desktop (`apps/desktop`) | Phone (`apps/mobile`) | Browser |

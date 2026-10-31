@@ -8,11 +8,11 @@ import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, 
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { ServerConfig } from "@/base/config.ts";
-import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 import { Core } from "@/core/core.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Db } from "@/infra/db.ts";
 import { Project } from "@/project/project.ts";
 
 import * as q from "../../db/generated/game_ledger.sql.ts";

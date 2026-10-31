@@ -12,8 +12,8 @@ import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { coerceArguments } from "@vibevalley/ai/tools";
 
 import { session } from "@/base/actor.ts";
-import { ServerConfig } from "@/base/config.ts";
 import { messageOf } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
 import { Session } from "@/session/session.ts";
 import { type Caller, Tool } from "@/tool/tool.ts";
 

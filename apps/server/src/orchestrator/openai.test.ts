@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { wallTime } from "@/base/time.ts";
+import { wallTime } from "@/infra/time.ts";
 
 import { type Answer, chatChunk, chatCompletions, newestUserText } from "./openai.ts";
 

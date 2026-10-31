@@ -5,8 +5,8 @@
 
 import { createEffect, createSignal, For, Show } from "solid-js";
 
-import { usePrefs } from "@/base/prefs";
-import { ready, useQuery } from "@/base/query";
+import { ready, useQuery } from "@/infra/query";
+import { usePrefs } from "@/state/prefs";
 
 import {
   chimney,

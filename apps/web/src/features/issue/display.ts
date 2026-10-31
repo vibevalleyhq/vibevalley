@@ -6,12 +6,12 @@ import { compareText, or } from "@/base/order";
 import { type Lane, lanes } from "./lanes";
 
 export type BoardView = "board" | "list";
-export const boardViews: BoardView[] = ["board", "list"];
+export const boardViews = ["board", "list"] as const satisfies readonly BoardView[];
 export const viewLabel: Record<BoardView, string> = { board: t("web.issue.boardLabels.view.board"), list: t("web.issue.boardLabels.view.list") };
 
 /** Groups of the list view. The board keeps its status lanes whatever this is: a drag between lanes moves status. */
 export type Grouping = "status" | "project" | "agent" | "none";
-export const groupings: Grouping[] = ["status", "project", "agent", "none"];
+export const groupings = ["status", "project", "agent", "none"] as const satisfies readonly Grouping[];
 export const groupingLabel: Record<Grouping, string> = {
   status: t("web.issue.boardLabels.grouping.status"),
   project: t("web.issue.boardLabels.grouping.project"),
@@ -21,7 +21,7 @@ export const groupingLabel: Record<Grouping, string> = {
 
 /** `manual` keeps the order the rows came in: the history's, which for 待办 is the owner's own order. */
 export type Ordering = "manual" | "priority" | "updated" | "created";
-export const orderings: Ordering[] = ["manual", "priority", "updated", "created"];
+export const orderings = ["manual", "priority", "updated", "created"] as const satisfies readonly Ordering[];
 export const orderingLabel: Record<Ordering, string> = {
   manual: t("web.issue.boardLabels.ordering.manual"),
   priority: t("web.issue.boardLabels.ordering.priority"),
@@ -36,19 +36,6 @@ export interface BoardLook {
 }
 
 export const defaultLook: BoardLook = { view: "board", grouping: "status", ordering: "manual" };
-
-/** Saved as three names; an unknown name falls back to its default. */
-export const lookToList = (look: BoardLook) => [look.view, look.grouping, look.ordering];
-
-export function lookFromList(raw: unknown): BoardLook {
-  const list = Array.isArray(raw) ? raw : [];
-  const pick = <T extends string>(all: T[], i: number, fallback: T) => all.find((v) => v === list[i]) ?? fallback;
-  return {
-    view: pick(boardViews, 0, defaultLook.view),
-    grouping: pick(groupings, 1, defaultLook.grouping),
-    ordering: pick(orderings, 2, defaultLook.ordering),
-  };
-}
 
 /** What grouping and ordering read from a row. A task has no priority of its own: undefined sorts after low. */
 export interface RowFacts {

@@ -7,10 +7,10 @@ import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Stream } f
 import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 
-import { ServerConfig } from "@/base/config.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
+import { ServerConfig } from "@/infra/config.ts";
 
 import { forOwner } from "./away.ts";
 import { inbox } from "./items.ts";

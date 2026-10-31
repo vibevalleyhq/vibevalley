@@ -1,7 +1,7 @@
 // Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/overview.ts.
 
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
+import { createMemo, createSignal, Errored, For, Loading, Show, untrack } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
 import {
@@ -17,14 +17,9 @@ import {
 } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
-import { useAgent } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
 import { tookText, wallClockText } from "@/base/format";
-import { useCore, useFrames } from "@/base/frame";
-import { ready } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { aria, useNow } from "@/base/util";
-import { commands } from "@/farm/frames";
+import { playBedFx } from "@/farm/commands";
 import { farmActWords } from "@/farm/labels";
 import { tint } from "@/farm/panels/bits";
 import { farm, overlayOf } from "@/farm/store";
@@ -35,6 +30,11 @@ import { issueThreadOf } from "@/features/channel";
 import {
   createIssueActs,
   changesLine,
+  issueDeliver,
+  issueMove,
+  issueMoveOf,
+  sendMove,
+  shownDeliver,
   type CriterionRow,
   issueState,
   nothingChanged,
@@ -46,8 +46,13 @@ import {
   useIssueTimeline,
 } from "@/features/issue";
 import { createSessionEvents, WorkLog } from "@/features/session";
+import { useAgent } from "@/infra/agents";
+import { useCore, useFrames } from "@/infra/frame";
+import { ready } from "@/infra/query";
+import { useRouter } from "@/infra/router";
+import { sendReplacing, useIntents } from "@/state/intent";
 import { castPrefix, outfitLabel, speciesLabel } from "@/ui/cast";
-import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
+import { createPixelAct, FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
 
 const tones: Record<string, string> = { berry: "#c84a3a", wheat: "#e5a93c", water: "#4f8fbd", leaf: "#74a046", faint: "#c8a46e", muted: "#9b7550" };
 const body = "text-[13px] leading-[1.5] text-bark-800";
@@ -77,6 +82,7 @@ export function IssueView() {
 function PlotDetail(props: { session: SessionView; onDone: () => void }) {
   const core = useCore();
   const router = useRouter();
+  const moves = useIntents(issueMove);
   const history = useIssueHistory(() => true);
   const id = () => issueOf(props.session);
   const issue = () => core()?.issues.find((i) => i.id === id());
@@ -96,7 +102,11 @@ function PlotDetail(props: { session: SessionView; onDone: () => void }) {
             farm.review(s.id);
             props.onDone();
           }}
-          onClose={(s) => api.issue.status.update({ id: issueOf(s), status: "canceled" }).then(() => props.onDone())}
+          onClose={(s) => {
+            // The plot stays open until the server took it, showing it on its way; a refusal shows there with a retry.
+            const done = props.onDone;
+            void sendMove(moves, { id: issueOf(s), status: "canceled" }).done.then((d) => d?.replied !== undefined && done());
+          }}
           onThread={
             hasThread()
               ? () => {
@@ -127,30 +137,19 @@ function IssueBody(props: {
   sessions: Session[];
   session: SessionView;
   onHarvest: (s: Session) => void;
-  onClose: (s: Session) => Promise<void>;
+  onClose: (s: Session) => void;
   onThread?: (() => void) | undefined;
   onNavigate: () => void;
   onTask?: (() => void) | undefined;
 }) {
   const frames = useFrames();
   const now = useNow();
-  // The farm carries out an answer, a word to the helper and the fixes with its own commands (and their effects).
-  const water = (words: string) => commands.water(props.session, words);
+  // The farm plays the bed's effect once the server took a word to the helper or a fix.
   const acts = createIssueActs(() => props.issue, {
-    run: async (f) => {
-      try {
-        await f();
-        return true;
-      } catch (e) {
-        toasts.add({ type: ToastType.warn, title: t("web.farm.plot.failed"), description: reasonOf(e) });
-        return false;
-      }
-    },
-    own: {
-      tell: water,
-      resolve: () => commands.resolve(props.session),
-      cure: () => commands.cure(props.session),
-      stop: () => commands.stop(props.session),
+    act: createPixelAct(t("web.farm.plot.failed")),
+    done: (a) => {
+      if (a === "tell" || a === "answer" || a === "resolve") playBedFx(props.session, "water");
+      else if (a === "cure") playBedFx(props.session, "spray");
     },
     complete: () => props.onHarvest(props.session),
     close: () => props.onClose(props.session),
@@ -176,10 +175,11 @@ function IssueBody(props: {
   const agent = useAgent(() => s().head.agent);
   const state = () => s().attention.state;
 
-  const setDeliver = (d: Deliverable) => {
-    const id = props.issue.id;
-    return acts.act(() => api.issue.update({ id, deliver: d }));
-  }; /** lead is read as it renders: the lead changes as the issue moves on. */
+  const delivers = useIntents(issueDeliver);
+  const deliver = () => shownDeliver(props.issue.id, props.issue.deliver, delivers.list());
+  const setDeliver = (d: Deliverable) => sendReplacing(delivers, { id: props.issue.id, deliver: d }, (a, b) => a.id === b.id);
+  const moves = useIntents(issueMove);
+  const move = () => issueMoveOf(props.issue.id, moves.list()); /** lead is read as it renders: the lead changes as the issue moves on. */
   const button = (a: IssueAct, lead: () => boolean) => (
     <PxButton
       data-act={a}
@@ -281,6 +281,41 @@ function IssueBody(props: {
             />
           </div>
         </Show>
+        <Show when={move()}>
+          {(m) => (
+            <div data-testid="issue-move" data-state={m().state} class="mt-2 flex items-center gap-1.5 text-[12px]">
+              <span class={["min-w-0 flex-1 truncate", m().state === "failed" ? "text-berry" : "text-bark-600"]} title={m().reason}>
+                {m().state === "moving" ? t("web.farm.plot.moving") : (m().reason ?? t("web.farm.plot.notMoved"))}
+              </span>
+              <Show when={m().state === "failed"}>
+                <PxButton size="sm" data-testid="move-retry" onClick={() => void moves.retry(untrack(m).key)}>
+                  {t("web.farm.plot.moveAgain")}
+                </PxButton>
+                <PxButton size="sm" data-testid="move-put-back" onClick={() => moves.drop(untrack(m).key)}>
+                  {t("web.farm.plot.letGo")}
+                </PxButton>
+              </Show>
+            </div>
+          )}
+        </Show>
+        <For each={acts.words()} keyed={(w) => w.key}>
+          {(w) => (
+            <div data-testid="issue-said" data-key={w().key} data-state={w().state} class="mt-2 flex items-center gap-1.5 text-[12px]">
+              <span class={["min-w-0 flex-1 truncate", body]}>{w().text}</span>
+              <span class={w().state === "failed" ? "text-berry" : "text-bark-600"} title={w().reason}>
+                {w().state === "sending" ? t("web.farm.plot.sending") : (w().reason ?? t("web.farm.plot.notSaid"))}
+              </span>
+              <Show when={w().state === "failed"}>
+                <PxButton size="sm" data-testid="said-retry" onClick={() => acts.sayAgain(untrack(w).key)}>
+                  {t("web.farm.plot.sayAgain")}
+                </PxButton>
+                <PxButton size="sm" data-testid="said-take-back" onClick={() => acts.takeBack(untrack(w).key)}>
+                  {t("web.farm.plot.takeBack")}
+                </PxButton>
+              </Show>
+            </div>
+          )}
+        </For>
         <div class="mt-3 flex flex-wrap gap-2">
           <Show when={s().ask && s().lead} keyed>
             {(lead) => button(lead, () => true)}
@@ -394,13 +429,13 @@ function IssueBody(props: {
               </Show>
               <Show when={!s().inTask}>
                 <Row label={t("web.farm.plot.deliver")}>
-                  <div class="flex flex-wrap items-center gap-1.5">
+                  <div class="flex flex-wrap items-center gap-1.5" data-testid="plot-deliver" data-value={deliver().value} data-state={deliver().state}>
                     <For each={DeliverableValues}>
                       {(d) => (
                         <PxButton
                           size="sm"
-                          tone={props.issue.deliver === d ? "primary" : "plain"}
-                          disabled={busy() || props.issue.deliver === d || !s().open}
+                          tone={deliver().value === d ? "primary" : "plain"}
+                          disabled={busy() || deliver().value === d || !s().open}
                           onClick={() => void setDeliver(d)}
                         >
                           {t(`shared.deliverable.${d}`)}

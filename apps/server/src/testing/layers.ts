@@ -10,8 +10,8 @@ import { tempDir } from "@vibevalley/testkit/temp";
 
 import { withCast } from "@/agent/agent.ts";
 import { builtInDir, builtInIds, profileOf, readTemplate } from "@/agent/template.ts";
-import { defaults, ServerConfig } from "@/base/config.ts";
-import { Database } from "@/base/db.ts";
+import { defaults, ServerConfig } from "@/infra/config.ts";
+import { Database } from "@/infra/db.ts";
 
 /** A built-in template as a farm whose agent.starters names it has it: under the template's own id. */
 export const starter = (id: string): Agent => {

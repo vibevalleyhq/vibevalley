@@ -11,8 +11,8 @@ import type * as T from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
-import { agentHome, ServerConfig } from "@/base/config.ts";
 import { messageOf, type ApiError, memoriesOf, missing, refused } from "@/errors.ts";
+import { agentHome, ServerConfig } from "@/infra/config.ts";
 import { Setting } from "@/setting/setting.ts";
 
 import { everos } from "./everos.ts";

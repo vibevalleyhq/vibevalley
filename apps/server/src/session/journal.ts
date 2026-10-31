@@ -12,8 +12,8 @@ import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibe
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 
 import { cut } from "@/base/clip.ts";
-import { FileWriter } from "@/base/files.ts";
-import type { Time } from "@/base/time.ts";
+import { FileWriter } from "@/infra/files.ts";
+import type { Time } from "@/infra/time.ts";
 
 import type { From, ToolStart } from "./facts.ts";
 

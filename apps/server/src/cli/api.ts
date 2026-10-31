@@ -13,7 +13,7 @@ import { eventsPath, type IssueStatusValues, statePath } from "@vibevalley/proto
 import { ApiError, type Endpoint, endpoints, type Handlers, kebab, pathOf, readsOnly } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
-import { announced, homeOf } from "@/base/lease.ts";
+import { announced, homeOf } from "@/infra/lease.ts";
 
 import { err, exit, Failure, out, printBody, stdinText } from "./output.ts";
 

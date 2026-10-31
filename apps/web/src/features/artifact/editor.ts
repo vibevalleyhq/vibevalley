@@ -17,7 +17,7 @@ import {
 } from "@vibevalley/protocol";
 import { keyBetween } from "@vibevalley/protocol/rules";
 
-import { reasonOf } from "@/base/api";
+import { reasonOf } from "@/infra/api";
 
 import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, normalSpans, plainOf, splitSpans } from "./blocks";
 

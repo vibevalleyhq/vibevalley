@@ -23,11 +23,12 @@ import {
   VoiceValues,
 } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
-import { ready, useQuery, useSettings } from "@/base/query";
-import { saveSettings } from "@/base/settings";
 import { variant, aria, createSettled, Keyed } from "@/base/util";
+import { api, reasonOf } from "@/infra/api";
+import { ready, useQuery, useSettings } from "@/infra/query";
+import { saveSettings } from "@/infra/settings";
 import { A } from "@/ui/A";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Select, TextArea, TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
@@ -105,7 +106,8 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
   const [secrets, setSecrets] = createSignal<Partial<Record<Key, string>>>({});
   const [cleared, setCleared] = createSignal<ReadonlySet<Key>>(new Set());
   const [error, setError] = createSignal<string>();
-  const [busy, setBusy] = createSignal(false);
+  const act = createAct(setError);
+  const busy = act.busy;
   // The settings as saved now: a save answers with them, and the form keeps the draft over them.
   const [base, setBase] = createSignal(start);
 
@@ -127,19 +129,14 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
     for (const [k, v] of Object.entries(secrets())) if (v.trim()) update[k] = v.trim();
     if (voiceDirty()) update.voice = withPart(props.part, base().voice, draft());
     if (dictationDirty()) update.dictation = { via: dictation().via, url: dictation().url.trim(), model: dictation().model.trim() };
-    setBusy(true);
     setError(undefined);
-    try {
+    await act.run(async () => {
       const now = await saveSettings(update);
       setBase(now);
       setSecrets({});
       setCleared(new Set<Key>());
       toast(t("web.voice.voice.saved"));
-    } catch (e) {
-      setError(reasonOf(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   };
   const undo = () => {
     setDraft(base().voice);

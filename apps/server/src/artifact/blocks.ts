@@ -9,10 +9,10 @@ import type * as T from "@vibevalley/protocol";
 import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOf } from "@/base/json.ts";
 import { type ApiError, lookIn, refused, messageOf } from "@/errors.ts";
+import { Db } from "@/infra/db.ts";
 
 import * as qa from "../../db/generated/artifact.sql.ts";
 import * as qb from "../../db/generated/artifact_block.sql.ts";

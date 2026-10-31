@@ -9,7 +9,7 @@ import { afterEach, describe, expect } from "vite-plus/test";
 import type { SessionEvent } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { timeHere, wallTime } from "@/base/time.ts";
+import { timeHere, wallTime } from "@/infra/time.ts";
 
 import { readJournal, Trajectories } from "./journal.ts";
 const open: Trajectories[] = [];
@@ -141,7 +141,7 @@ describe("a session's log", () => {
     }),
   );
 
-  // On the service's Clock (base/time.ts): the push and save windows are moved, not waited for.
+  // On the service's Clock (infra/time.ts): the push and save windows are moved, not waited for.
   it.effect("pushes a step 300 ms after it changes and saves 1.5 s after the last change, on the Clock it was given", () =>
     Effect.gen(function* () {
       const pushed: string[] = [];

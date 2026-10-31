@@ -17,8 +17,8 @@ import { models } from "@vibevalley/ai/models";
 import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
-import type { Time } from "@/base/time.ts";
 import { messageOf } from "@/errors.ts";
+import type { Time } from "@/infra/time.ts";
 
 import { helperInstructions } from "./prompts.ts";
 

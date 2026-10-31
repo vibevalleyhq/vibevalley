@@ -128,21 +128,23 @@ export class VibeValleyApi {
       set: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/channel/default/set", a),
     },
     reaction: {
-      /** The owner's reaction added, or taken back when it is there. */
-      toggle: (a: T.ReactionToggle): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/reaction/toggle", a),
+      /** The owner's reaction on or off; as it already is, nothing changes. */
+      set: (a: T.ReactionSet): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/reaction/set", a),
     },
     pin: {
-      toggle: (a: { id: string }): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/pin/toggle", a),
+      /** The message pinned or not; as it already is, nothing changes. */
+      set: (a: T.OnSet): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/pin/set", a),
       /** A channel's pinned messages, newest pinned first. */
       list: (a: { id: string }): Promise<T.ChatMessage[]> => this.call<T.ChatMessage[]>("/api/v1/channel/pin/list", a),
     },
     thread: {
-      /** The thread under a message, made if it has none: its id. */
-      create: (a: { id: string }): Promise<string> => this.call<string>("/api/v1/channel/thread/create", a),
+      /** The thread under a message, made if it has none: its id. requestKey: as IssueRequest's. */
+      create: (a: { id: string; requestKey?: string }): Promise<string> => this.call<string>("/api/v1/channel/thread/create", a),
     },
     archive: {
-      /** Out of the sidebar and the thread lists, or back; its messages and address stay. The default channel stays. */
-      toggle: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/channel/archive/toggle", a),
+      /** Out of the sidebar and the thread lists (on), or back; its messages and address stay. The default channel stays. As
+       * it already is, nothing changes. */
+      set: (a: T.OnSet): Promise<void> => this.call<void>("/api/v1/channel/archive/set", a),
     },
     direct: {
       /** The owner's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
@@ -198,8 +200,8 @@ export class VibeValleyApi {
     /** The issue becomes a task graph's parent and its tasks the issues under it, started at once. */
     split: (a: { id: string } & T.IssueSplitRequest): Promise<string> => this.call<string>("/api/v1/issue/split", a),
     get: (a: { id: string }): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/get", a),
-    create: (a: T.IssueRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/create", a),
-    update: (a: { id: string } & T.IssueUpdate): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/update", a),
+    create: (a: T.IssueRequest): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/create", a),
+    update: (a: { id: string } & T.IssueUpdate): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/update", a),
     delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/issue/delete", a),
     /** What issue.delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/issue/previewDelete", a),
@@ -208,7 +210,7 @@ export class VibeValleyApi {
     refine: (a: { id: string } & T.IssueRefineRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/refine", a),
     comment: {
       /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
-      create: (a: { id: string } & T.CommentRequest): Promise<void> => this.call<void>("/api/v1/issue/comment/create", a),
+      create: (a: { id: string } & T.CommentRequest): Promise<T.Applied> => this.call<T.Applied>("/api/v1/issue/comment/create", a),
     },
     diff: {
       get: (a: { id: string }): Promise<T.Changes> => this.call<T.Changes>("/api/v1/issue/diff/get", a),
@@ -228,7 +230,7 @@ export class VibeValleyApi {
       /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is
        * another round (the words are the findings; stuck, none takes the server's own); done is accepted and delivered as the
        * issue says; canceled sends its session home. Issue.moves lists where it may go. */
-      update: (a: { id: string } & T.IssueStatusRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/status/update", a),
+      update: (a: { id: string } & T.IssueStatusRequest): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/status/update", a),
       /** What issue.status.update would do with the same body, refused as it would be; nothing changes. */
       previewUpdate: (a: { id: string } & T.IssueStatusRequest): Promise<T.Preview> => this.call<T.Preview>("/api/v1/issue/status/previewUpdate", a),
     },

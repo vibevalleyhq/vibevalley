@@ -202,5 +202,9 @@
     "taskDone": "已完成",
     "taskOpen": "没完成"
   },
-  "updateReady": "{next} 已下好，去「关于」重启"
+  "updateReady": "{next} 已下好，去「关于」重启",
+  "intent": {
+    "timedOut": "等了太久没回音，可以重试",
+    "offline": "没连上农场，这一下没发出去"
+  }
 }

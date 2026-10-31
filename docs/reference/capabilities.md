@@ -49,11 +49,11 @@
 | `channel.message.delete` | `/api/v1/channel/message/delete` | ✓ | ✓ |   |   |
 | `channel.message.previewDelete` | `/api/v1/channel/message/previewDelete` | ✓ | ✓ |   |   |
 | `channel.message.search` | `/api/v1/channel/message/search` | ✓ | ✓ |   |   |
-| `channel.reaction.toggle` | `/api/v1/channel/reaction/toggle` | ✓ | ✓ |   |   |
-| `channel.pin.toggle` | `/api/v1/channel/pin/toggle` | ✓ | ✓ |   |   |
+| `channel.reaction.set` | `/api/v1/channel/reaction/set` | ✓ | ✓ |   |   |
+| `channel.pin.set` | `/api/v1/channel/pin/set` | ✓ | ✓ |   |   |
 | `channel.pin.list` | `/api/v1/channel/pin/list` | ✓ | ✓ |   |   |
 | `channel.thread.create` | `/api/v1/channel/thread/create` | ✓ | ✓ |   |   |
-| `channel.archive.toggle` | `/api/v1/channel/archive/toggle` | ✓ | ✓ |   |   |
+| `channel.archive.set` | `/api/v1/channel/archive/set` | ✓ | ✓ |   |   |
 | `channel.delete` | `/api/v1/channel/delete` | ✓ | ✓ |   |   |
 | `channel.previewDelete` | `/api/v1/channel/previewDelete` | ✓ | ✓ |   |   |
 | `channel.direct.create` | `/api/v1/channel/direct/create` | ✓ | ✓ |   |   |

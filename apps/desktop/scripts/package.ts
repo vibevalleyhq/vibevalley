@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { build, Platform } from "electron-builder";
 
-import { baselineHash } from "../../server/src/base/baseline.ts";
+import { baselineHash } from "../../server/src/infra/baseline.ts";
 import type { Release } from "../src/releases.ts";
 
 const desktop = join(import.meta.dirname, "..");

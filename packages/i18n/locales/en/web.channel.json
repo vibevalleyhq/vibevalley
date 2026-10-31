@@ -95,7 +95,13 @@
     "newBelow": "{n} new below",
     "toLatest": "Back to the newest",
     "roundFor": "{what} · {took}",
-    "sentTo": "Sent {who} on"
+    "sentTo": "Sent {who} on",
+    "sending": "Sending…",
+    "notSent": "Not sent",
+    "retrySend": "Send again",
+    "dropSend": "Drop it",
+    "searchFailed": "The search failed: {why}",
+    "readFailed": "Could not read the messages: {why}; trying again shortly"
   },
   "tools": {
     "label": "What this message offers",
@@ -113,7 +119,8 @@
   "pins": {
     "open": "Pinned messages",
     "title": "Pinned",
-    "none": "Nothing is pinned here yet"
+    "none": "Nothing is pinned here yet",
+    "failed": "Could not read the pins: {why}"
   },
   "members": {
     "open": "Members",
@@ -188,7 +195,8 @@
     "hint": "Find messages…",
     "filters": "from:owner  in:#channel  has:file / image / link  before: / after:2026-10-01",
     "none": "Nothing found",
-    "searching": "Searching…"
+    "searching": "Searching…",
+    "failed": "The search failed: {why}"
   },
   "direct": {
     "add": "New direct message",

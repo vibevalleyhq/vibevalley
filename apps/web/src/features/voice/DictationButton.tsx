@@ -5,7 +5,7 @@ import { onSettled } from "solid-js";
 import { t } from "@vibevalley/i18n";
 
 import { createExternal } from "@/base/external";
-import { ready, useSettings } from "@/base/query";
+import { ready, useSettings } from "@/infra/query";
 import { Icon, type IconSize } from "@/ui/Icon";
 import type { IconName } from "@/ui/icons";
 

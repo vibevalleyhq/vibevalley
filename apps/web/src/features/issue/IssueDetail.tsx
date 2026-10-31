@@ -15,13 +15,14 @@ import {
 } from "@vibevalley/protocol";
 import { plainText, closedText } from "@vibevalley/protocol/rules";
 
-import { useAgent } from "@/base/agents";
-import { api } from "@/base/api";
 import { tookText, wallClockText } from "@/base/format";
-import { ready } from "@/base/query";
 import { useNow } from "@/base/util";
 import { IssueArtifacts } from "@/features/artifact";
 import { createSessionEvents } from "@/features/session";
+import { useAgent } from "@/infra/agents";
+import { ready } from "@/infra/query";
+import { sendReplacing, useIntents } from "@/state/intent";
+import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Checkbox } from "@/ui/Checkbox";
 import { Dot } from "@/ui/Dot";
@@ -31,9 +32,12 @@ import type { IconName } from "@/ui/icons";
 import { Markdown } from "@/ui/Markdown";
 import { toast } from "@/ui/toasts";
 
-import { createIssueActs, perform, run } from "./acts";
+import { ActLines } from "./ActLines";
+import { createIssueActs, perform } from "./acts";
 import { changesLine } from "./changes";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
+import { issueDeliver, shownDeliver } from "./deliver";
+import { issueMove, issueMoveOf, movedIssue, sendMove } from "./moves";
 import { type CriterionRow, issueState, noStepsText, attentionTone } from "./overview";
 import { useGraphs, useIssueChanges, useIssueRuns, useIssueTimeline } from "./queries";
 import { runText } from "./runs";
@@ -52,16 +56,19 @@ export function IssueDetail(props: {
 }) {
   const graphs = useGraphs();
   const now = useNow();
-  const s = createMemo(() => issueState(props.issue, props.sessions, props.session, graphs()));
+  const moves = useIntents(issueMove);
+  const s = createMemo(() => issueState(movedIssue(props.issue, moves.list()), props.sessions, props.session, graphs()));
   const head = () => s().head;
   // The box under the block holds an answer, the findings of 打回, a word to the helper, or what a reopen asks for.
   const acts = createIssueActs(() => props.issue, {
-    run: async (f) => (await run(async () => (await f(), true))) === true,
+    act: createAct(),
     complete: () => props.onClose(props.session ?? head(), true),
     close: () => props.onClose(props.session ?? head(), false),
     told: (title, description) => toast(t("shared.join.labeled", { label: title, text: description })),
   });
-  const { busy, text, setText, box, setBox, go, act } = acts;
+  const { busy, text, setText, box, setBox, go } = acts;
+  const delivers = useIntents(issueDeliver);
+  const deliver = () => shownDeliver(props.issue.id, props.issue.deliver, delivers.list());
   const doAct = acts.send;
   const sayAct = acts.say;
   const agent = useAgent(() => head().agent);
@@ -116,6 +123,7 @@ export function IssueDetail(props: {
 
   const main = (
     <>
+      <ActLines issue={props.issue.id} words={acts.words()} onSayAgain={acts.sayAgain} onTakeBack={acts.takeBack} />
       <Show when={s().ask}>
         {(ask) => (
           <section aria-label={t("web.issue.detail.yours")} data-testid="issue-ask" class="mb-5">
@@ -334,11 +342,12 @@ export function IssueDetail(props: {
           <Pick
             label={t("web.issue.detail.deliver")}
             testid="issue-deliver"
-            value={props.issue.deliver}
+            value={deliver().value}
+            state={deliver().state}
             disabled={busy() || !s().open}
             onChange={(v) => {
               const id = props.issue.id;
-              void act(() => api.issue.update({ id, deliver: v }));
+              sendReplacing(delivers, { id, deliver: v }, (a, b) => a.id === b.id);
             }}
             options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
           />
@@ -545,19 +554,24 @@ function WorkLog(props: { steps: SessionEvent[] }) {
 /** An issue for the orchestrator: what it was asked, and its runs; the answers are in its channel. */
 export function OrchestratorIssueDetail(props: { issue: Issue }) {
   const tag = () => issueTag(props.issue);
-  const [busy, setBusy] = createSignal(false);
+  const act = createAct();
+  const moves = useIntents(issueMove);
+  const move = () => issueMoveOf(props.issue.id, moves.list());
+  const busy = () => act.busy() || move()?.state === "moving";
   // The orchestrator's answer is the owner's to take as done or put away; one that did not end well can only be put away.
-  const go = async (a: IssueAction) => {
+  const go = (a: IssueAction) => {
     const issue = props.issue;
-    setBusy(true);
-    await run(() => perform(issue, a));
-    setBusy(false);
+    if (a.does === "move") void sendMove(moves, { id: issue.id, status: a.status });
+    else void act.run(() => perform(issue, a));
   };
   return (
     <div>
       <div class="flex items-start gap-3 pr-10">
         <h1 class="flex-1 text-xl font-semibold">{props.issue.title}</h1>
         <span class="mt-1.5 text-xs text-muted">{tagText(props.issue)}</span>
+      </div>
+      <div class="mt-3">
+        <ActLines issue={props.issue.id} />
       </div>
       <Show when={props.issue.attention.acts.length > 0}>
         <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -566,7 +580,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
           </Show>
           <For each={props.issue.attention.acts}>
             {(a) => (
-              <Button data-act={a.act} tone={a.act === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
+              <Button data-act={a.act} tone={a.act === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => go(a)}>
                 {t(`shared.act.${a.act}`)}
               </Button>
             )}

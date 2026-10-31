@@ -2,13 +2,10 @@ import { For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { createExternal } from "@/base/external";
-
 import { toasts } from "./toasts";
 
 /** Draws the toasts (ui/toasts.ts) at the bottom of the page. */
 export function ToastHost() {
-  const shown = createExternal(toasts.subscribe, toasts.get);
   return (
     <div
       class="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex flex-col items-center gap-2"
@@ -16,7 +13,7 @@ export function ToastHost() {
       aria-label={t("web.base.toasts")}
       data-testid="toasts"
     >
-      <For each={shown()}>
+      <For each={toasts.get()}>
         {(t) => (
           <div
             data-testid="toast"

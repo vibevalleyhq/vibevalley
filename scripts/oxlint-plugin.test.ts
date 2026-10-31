@@ -92,16 +92,20 @@ tester.run("native-control", rule("native-control"), {
 
 tester.run("page-layers", rule("page-layers"), {
   valid: [
-    { code: "import { a } from '../base/router';", filename: page("ui/A.tsx") },
+    { code: "import { a } from '../infra/router';", filename: page("ui/A.tsx") },
     { code: "import { a } from '../issue';", filename: page("features/channel/Chat.tsx") },
     { code: "import { a } from './rules';", filename: page("features/issue/Board.tsx") },
     { code: "import { a } from '../../features/issue';", filename: page("farm/panels/Board.tsx") },
     { code: "import { a } from '../ui/A';", filename: "/repo/apps/server/src/x.ts" },
-    { code: "import { a } from '@/base/router';", filename: page("ui/A.tsx") },
+    { code: "import { a } from '@/infra/router';", filename: page("ui/A.tsx") },
     { code: "import { a } from '@/features/issue';", filename: page("farm/panels/Board.tsx") },
+    { code: "import { a } from '@/infra/frames';", filename: page("state/atom.ts") },
+    { code: "import { a } from '@/base/format';", filename: page("infra/api.ts") },
   ],
   invalid: [
     { code: "import { a } from '../features/issue';", filename: page("ui/A.tsx"), errors: [{ messageId: "layer" }] },
+    { code: "import { a } from '@/infra/api';", filename: page("base/format.ts"), errors: [{ messageId: "layer" }] },
+    { code: "import { a } from '@/state/atom';", filename: page("infra/frame.ts"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../../farm/scene';", filename: page("features/issue/Board.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "index" }] },
     { code: "export { a } from '../tree/x';", filename: page("farm/a.ts"), errors: [{ messageId: "sibling" }] },
@@ -114,16 +118,16 @@ tester.run("page-layers", rule("page-layers"), {
 tester.run("parent-import", rule("parent-import"), {
   valid: [
     { code: "import { a } from './rules';", filename: page("features/issue/Board.tsx") },
-    { code: "import { a } from '@/base/router';", filename: page("ui/A.tsx") },
+    { code: "import { a } from '@/infra/router';", filename: page("ui/A.tsx") },
     { code: "import { a } from '../../db/generated/x.ts';", filename: "/repo/apps/server/src/issue/issue.ts" },
     { code: "import { a } from '../x';", filename: "/repo/packages/agent/src/core/loop.ts" },
   ],
   invalid: [
     {
-      code: "import { a } from '../base/router';",
+      code: "import { a } from '../infra/router';",
       filename: page("ui/A.tsx"),
       errors: [{ messageId: "parent" }],
-      output: "import { a } from '@/base/router';",
+      output: "import { a } from '@/infra/router';",
     },
     {
       code: "export * from '../issue/rules.ts';",
@@ -183,12 +187,89 @@ tester.run("db-door", rule("db-door"), {
     { code: 'import { type SqlClient, SqlError } from "effect/sql";', filename: "/repo/apps/server/src/session/session.ts" },
     {
       code: 'import { SqlClient } from "effect/sql";\nconst t = sql.withTransaction(work);',
-      filename: "/repo/apps/server/src/base/db.ts",
+      filename: "/repo/apps/server/src/infra/db.ts",
     },
   ],
   invalid: [
     { code: 'import { SqlClient } from "effect/sql";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
     { code: "const t = sql.withTransaction(work);", filename: "/repo/apps/server/src/memory/store.ts", errors: [{ messageId: "transaction" }] },
+  ],
+});
+
+tester.run("atom-door", rule("atom-door"), {
+  valid: [
+    { code: 'import { Atom } from "effect/reactivity";', filename: page("state/atom.ts") },
+    { code: 'import { Atom, type AtomRegistry } from "effect/reactivity";', filename: page("state/intent.ts") },
+    { code: 'import { Effect } from "effect";', filename: page("features/issue/moves.ts") },
+    { code: 'import { Atom } from "effect/reactivity";', filename: "/repo/apps/server/src/core/core.ts" },
+  ],
+  invalid: [
+    { code: 'import { Atom } from "effect/reactivity";', filename: page("features/issue/moves.ts"), errors: [{ messageId: "atom" }] },
+    { code: 'import type { AtomRegistry } from "effect/reactivity";', filename: page("farm/store.ts"), errors: [{ messageId: "atom" }] },
+    { code: 'import * as Atom from "effect/reactivity/Atom";', filename: page("ui/act.ts"), errors: [{ messageId: "atom" }] },
+  ],
+});
+
+tester.run("page-store", rule("page-store"), {
+  valid: [
+    { code: "function Box() { const [open, setOpen] = createSignal(false); }", filename: page("features/channel/Composer.tsx") },
+    { code: "const make = () => { const [s, set] = createStore({}); return s; };", filename: page("farm/support.ts") },
+    { code: "const shown = defineAtom(false);", filename: page("features/channel/QuickSwitcher.tsx") },
+    { code: "class Line { private readonly words = defineAtom(''); }", filename: page("ui/pixel/toasts.ts") },
+  ],
+  invalid: [
+    { code: "const [shown, setShown] = createSignal(false);", filename: page("features/channel/QuickSwitcher.tsx"), errors: [{ messageId: "store" }] },
+    { code: "export const [all, setAll] = createStore({ items: [] });", filename: page("farm/store.ts"), errors: [{ messageId: "store" }] },
+  ],
+});
+
+tester.run("stored-door", rule("stored-door"), {
+  valid: [
+    { code: "const storage = KeyValueStore.layerStorage(() => localStorage);", filename: page("state/stored.ts") },
+    { code: "const look = defineStored('board.look', Look, fallback);", filename: page("features/issue/look.ts") },
+    { code: "const o = { localStorage: 1 }; o.localStorage;", filename: page("features/issue/look.ts") },
+  ],
+  invalid: [
+    { code: 'localStorage.getItem("vibevalley.prefs");', filename: page("state/prefs.ts"), errors: [{ messageId: "storage" }] },
+    { code: 'window.sessionStorage.setItem("k", "v");', filename: page("farm/store.ts"), errors: [{ messageId: "storage" }] },
+    { code: "const s = globalThis.localStorage;", filename: page("ui/pixel/sound.ts"), errors: [{ messageId: "storage" }] },
+  ],
+});
+
+tester.run("act-door", rule("act-door"), {
+  valid: [
+    { code: "act.run(() => api.issue.update({ id }));", filename: page("features/issue/IssueDetail.tsx") },
+    { code: "void act.run(async () => { const got = await api.skill.create(body); keep(got); });", filename: page("features/runtime/SkillsPage.tsx") },
+    { code: "act.run(() => Promise.all(xs.map((x) => api.session.stop({ id: x }))));", filename: page("farm/debug/DebugPanel.tsx") },
+    {
+      code: "api.channel.message.list({ id }); api.issue.diff.get({ id }); api.channel.previewDelete({ id }); api.memory.recall({ agent });",
+      filename: page("features/channel/ChatPage.tsx"),
+    },
+    { code: "client.issue.update({ id });", filename: page("features/issue/IssueDetail.tsx") },
+  ],
+  invalid: [
+    { code: "api.issue.update({ id, deliver });", filename: page("features/issue/IssueDetail.tsx"), errors: [{ messageId: "act" }] },
+    { code: "const run = (f) => f(); run(() => api.cron.delete({ id }));", filename: page("features/channel/Tabs.tsx"), errors: [{ messageId: "act" }] },
+    { code: "api.orchestrator.stop({ agent }).catch(() => {});", filename: page("farm/chat/Composer.tsx"), errors: [{ messageId: "act" }] },
+  ],
+});
+
+tester.run("failure-tone", rule("failure-tone"), {
+  valid: [
+    { code: 'toast(reasonOf(e), "bad");', filename: page("features/lan/LanPage.tsx") },
+    { code: 'toast(t("web.channel.more.copied"));', filename: page("features/channel/MessageParts.tsx") },
+    { code: "toasts.add({ type: ToastType.error, title, description: reasonOf(e) });", filename: page("farm/issue/IssueView.tsx") },
+    { code: "toasts.add({ type: ToastType.info, title: said });", filename: page("farm/chat/Composer.tsx") },
+  ],
+  invalid: [
+    { code: "toast(reasonOf(e));", filename: page("features/lan/LanPage.tsx"), errors: [{ messageId: "tone" }] },
+    { code: 'toast(t("x", { why: reasonOf(e) }), "info");', filename: page("features/lan/LanPage.tsx"), errors: [{ messageId: "tone" }] },
+    {
+      code: "toasts.add({ type: ToastType.warn, title, description: reasonOf(e) });",
+      filename: page("farm/issue/IssueView.tsx"),
+      errors: [{ messageId: "tone" }],
+    },
+    { code: "toasts.add({ title, description: reasonOf(e) });", filename: page("farm/panels/Panels.tsx"), errors: [{ messageId: "tone" }] },
   ],
 });
 

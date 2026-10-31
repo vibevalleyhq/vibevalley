@@ -7,6 +7,7 @@ import { IssueBoard } from "./Board";
 import type { BoardCard } from "./cards";
 import type { Ordering } from "./display";
 import { min, now, sampleIssue as issue, sampleSession as session, working } from "./issue.samples";
+import type { CardMove } from "./moves";
 
 const sample = (): BoardCard[] => {
   const w = session("w1", "老周", working(now - 3 * min), { spent: { cny: 0.42 } as NonNullable<Session["spent"]> });
@@ -21,6 +22,21 @@ const sample = (): BoardCard[] => {
       issue: issue(22, "看板拖拽的手感", "todo", "high", { assignee: "老周", project: "vibevalley", queuedAt: now - 5 * min }),
     },
     { kind: "missing", id: "i23", lane: "todo", issue: issue(23, "灵动岛的动画", "todo", "low"), missing: ["项目"] },
+    // Dropped on 进行中, the frame not there yet; and one the server refused, to retry or put back (moves.ts).
+    {
+      kind: "todo",
+      id: "i24",
+      lane: "working",
+      issue: issue(24, "首页的加载条", "todo", "medium", { assignee: "小林", project: "vibevalley" }),
+      move: { key: "k24", state: "moving" },
+    },
+    {
+      kind: "todo",
+      id: "i25",
+      lane: "working",
+      issue: issue(25, "换一个更短的标题", "todo", "medium", { assignee: "小林", project: "vibevalley" }),
+      move: { key: "k25", state: "failed", reason: "进行中满了：同时最多 3 件" },
+    },
     {
       kind: "issue",
       id: "i18",
@@ -50,12 +66,15 @@ const sample = (): BoardCard[] => {
   ];
 };
 
+const retried: CardMove = { key: "k", state: "moving" };
+const putBack = ({ move: _move, ...c }: BoardCard): BoardCard => ({ ...c, lane: "todo" });
+
 export default stories({
   title: "界面/工单/看板",
   stories: {
     Board: story({
       fill: true,
-      note: "四栏能拖；窄于 700 一次一栏、上面换栏（宽度换成 400 看）。卡片只标和这一栏默认不一样的。",
+      note: "四栏能拖；窄于 700 一次一栏、上面换栏（宽度换成 400 看）。卡片只标和这一栏默认不一样的。拖过去还没等到帧的是半透明的，被拒的下面有重试和放回去。",
       args: { loading: false, ordering: "manual" },
       controls: { ordering: { kind: "choice", options: ["manual", "priority", "updated", "created"] } },
       render: (a) => {
@@ -72,6 +91,8 @@ export default stories({
             onOlder={() => undefined}
             onOpen={setSelected}
             onDrop={(card, to) => setCards(cards().map((c) => (c.id === card.id ? { ...c, lane: to } : c)))}
+            onRetry={(card) => setCards(cards().map((c): BoardCard => (c.id === card.id ? { ...c, move: retried } : c)))}
+            onPutBack={(card) => setCards(cards().map((c): BoardCard => (c.id === card.id ? putBack(c) : c)))}
             onPlace={() => undefined}
             onAdd={(text) => {
               const n = next++;

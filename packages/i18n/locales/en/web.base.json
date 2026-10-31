@@ -202,5 +202,9 @@
     "taskDone": "Done",
     "taskOpen": "Not done"
   },
-  "updateReady": "{next} is ready: restart from About"
+  "updateReady": "{next} is ready: restart from About",
+  "intent": {
+    "timedOut": "No answer in time; try again",
+    "offline": "Not connected to the farm, so this was not sent"
+  }
 }

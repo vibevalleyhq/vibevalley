@@ -95,7 +95,13 @@
     "newBelow": "有 {n} 条新消息",
     "toLatest": "回到最新",
     "roundFor": "{what} · {took}",
-    "sentTo": "派 {who} 去做"
+    "sentTo": "派 {who} 去做",
+    "sending": "发送中…",
+    "notSent": "没发出去",
+    "retrySend": "再发一次",
+    "dropSend": "不发了",
+    "searchFailed": "没搜成：{why}",
+    "readFailed": "消息没读到：{why}，稍后再试"
   },
   "tools": {
     "label": "这条消息能做的",
@@ -113,7 +119,8 @@
   "pins": {
     "open": "置顶的消息",
     "title": "置顶",
-    "none": "这里还没有置顶的消息"
+    "none": "这里还没有置顶的消息",
+    "failed": "置顶没读到：{why}"
   },
   "members": {
     "open": "成员",
@@ -188,7 +195,8 @@
     "hint": "找消息…",
     "filters": "from:主人  in:#频道  has:file / image / link  before: / after:2026-10-01",
     "none": "没有找到",
-    "searching": "在找…"
+    "searching": "在找…",
+    "failed": "没搜成：{why}"
   },
   "direct": {
     "add": "开一个私聊",

@@ -69,6 +69,22 @@ describe("the modules", () => {
     ).toEqual([]);
   });
 
+  it("keep base pure: it imports nothing else under src", () => {
+    const found: string[] = [];
+    for (const file of files(join(src, "base"))) {
+      const from = rel(file);
+      for (const m of readFileSync(file, "utf8").matchAll(/from\s+"((?:\.{1,2}|@)\/[^"]+)"/gu)) {
+        const spec = m[1]!;
+        const to = spec.startsWith("@/") ? normalize(spec.slice(2)) : rel(normalize(join(dirname(file), spec)));
+        if (to.split("/")[0] !== "base") found.push(`${from} -> ${to}`);
+      }
+    }
+    expect(
+      found,
+      "a file in base imports something else under src, so the pure ground leans on what talks to the outside. Fix: move the file to infra (or the module it serves), or move what it needs down into base. See apps/server/src/modules.ts",
+    ).toEqual([]);
+  });
+
   it("read only their own part of the core state", () => {
     const found: string[] = [];
     for (const file of files(src)) {

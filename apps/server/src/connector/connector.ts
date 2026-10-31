@@ -18,13 +18,13 @@ import { t } from "@vibevalley/i18n";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 
-import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { Channel } from "@/channel/chat.ts";
 import { channelOf, defaultOf } from "@/channel/folded.ts";
 import { Core } from "@/core/core.ts";
 import { reasonOf } from "@/errors.ts";
 import { Inbox } from "@/inbox/inbox.ts";
+import { causeMessage, Db } from "@/infra/db.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 
 import * as accountQ from "../../db/generated/connector_account.sql.ts";

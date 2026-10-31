@@ -5,11 +5,11 @@ import { createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { api, reasonOf } from "@/base/api";
+import { reasonOf } from "@/infra/api";
 import { Button } from "@/ui/Button";
 import { Field, TextInput } from "@/ui/Field";
 
-import { deviceGuess, keyCookie } from "./device";
+import { deviceGuess, pair } from "./device";
 
 export function PairPage() {
   const given = new URLSearchParams(location.search).get("c") ?? "";
@@ -22,8 +22,7 @@ export function PairPage() {
     setAsking(true);
     setProblem("");
     try {
-      const paired = await api.lan.pair({ code: code().trim(), name: name().trim() });
-      document.cookie = keyCookie(paired.key);
+      await pair(code().trim(), name().trim());
       location.replace("/");
     } catch (e) {
       setProblem(reasonOf(e));

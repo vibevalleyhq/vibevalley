@@ -2,7 +2,7 @@ import { For, Show } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
-import { useRouter } from "@/base/router";
+import { useRouter } from "@/infra/router";
 import { Button } from "@/ui/Button";
 import { Dot, type DotTone } from "@/ui/Dot";
 import { Empty } from "@/ui/Empty";

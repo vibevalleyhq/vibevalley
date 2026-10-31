@@ -22,11 +22,11 @@ db/                migrations/0001_schema.up.sql (the one schema), queries/<tabl
 - **One service a module**, `Context.Service` with a `make` and a `layer`; a module uses only those before it in
   `services.ts`, and hears later ones through streams.
 - **Shapes and the endpoint table are `@vibevalley/protocol`'s**; `handlers.ts` fails to compile when it misses one.
-- **SQL only in `db/queries`**, one file a table, called through `db/generated`; `src/base/schema.test.ts` holds the
+- **SQL only in `db/queries`**, one file a table, called through `db/generated`; `src/infra/schema.test.ts` holds the
   names and the one baseline.
 - **Effects started from callback code run on the service's own runtime**: `FiberSet.makeRuntime` /
   `makeRuntimePromise` in `make`, not `Effect.runFork` / `runPromise`, so they end with the service and keep its
-  services; a line logged from a callback goes through `callbackLog` (`src/base/log.ts`): lint refuses `console.*`
+  services; a line logged from a callback goes through `callbackLog` (`src/infra/log.ts`): lint refuses `console.*`
   outside the command line.
 - **Facts are read typed**: a subscriber switches on `SideEvent`'s `type`, without casting its fields.
 - **Tests never reach a model or this machine's runtimes**: oar's `scriptedRuntime` plays the helpers, a scripted `Llm`

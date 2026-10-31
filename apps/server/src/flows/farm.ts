@@ -10,8 +10,8 @@ import { Effect, Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 
-import type { ServerConfig } from "@/base/config.ts";
 import { Core } from "@/core/core.ts";
+import type { ServerConfig } from "@/infra/config.ts";
 import { agentSessionsStart, gamification, inboxStart, taskGraphsStart } from "@/services.ts";
 import { type Hired } from "@/session/session.ts";
 import { helper } from "@/testing/helper.ts";

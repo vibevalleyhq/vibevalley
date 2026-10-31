@@ -6,7 +6,7 @@ import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer } from "effect";
 
-import { ServerConfig } from "@/base/config.ts";
+import { ServerConfig } from "@/infra/config.ts";
 import { gitSync, projectsDir, repo, write } from "@/testing/git.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { untilGot as until } from "@/testing/until.ts";

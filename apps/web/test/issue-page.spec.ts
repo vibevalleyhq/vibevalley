@@ -135,7 +135,7 @@ test("a helper waiting on a question: its options answer it, and nothing offers 
   let said: unknown;
   await page.route(`**${pathOf("issue.comment.create")}`, async (route) => {
     said = route.request().postDataJSON();
-    await route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(made) });
+    await route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ seq: 0 }) });
   });
   await view.locator(`[data-testid="answer-option"][data-key="${options[1]}"]`).click();
   await expect.poll(() => said as { text?: string } | undefined).toMatchObject({ text: options[1] });
@@ -177,4 +177,34 @@ test("work handed back: the server's acts lead, and sending it back needs what f
   await expect(reject).toBeDisabled();
   await words.fill("still logged in when unticked");
   await expect(reject).toBeEnabled();
+});
+
+test("words for the helper leave the box at once; refused, they stay under it, and said again carry the same key", async ({ page, server, api }) => {
+  const made = await api.issue.create({ title: "tell it twice" });
+  const now = Date.now();
+  const view = await openIssue(
+    page,
+    server,
+    made,
+    { state: "reviewing", since: now - minute, lead: "complete", acts: buttons("complete", "reject", "tell", "close") },
+    { status: "in_review" },
+    { lastRun: { outcome: "completed", summary: "done", at: now - minute } },
+    { milestones: [] },
+  );
+  const sent: { sendKey?: string; text?: string }[] = [];
+  await page.route(`**${pathOf("issue.comment.create")}`, async (route) => {
+    sent.push(route.request().postDataJSON());
+    if (sent.length === 1) return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ _tag: "Refused", reason: "busy" }) });
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ seq: 0 }) });
+  });
+  const ask = view.getByTestId("issue-ask");
+  await ask.locator('[data-act="tell"]').click();
+  await ask.getByTestId("issue-words").fill("look at the login page too");
+  await ask.locator('[data-act="tell"]').click();
+  const line = view.getByTestId("issue-said");
+  await expect(line).toHaveAttribute("data-state", "failed");
+  await line.getByTestId("said-retry").click();
+  await expect(line).toHaveCount(0);
+  expect(sent.map((s) => s.text)).toEqual(["look at the login page too", "look at the login page too"]);
+  expect(sent[1]?.sendKey).toBe(sent[0]?.sendKey);
 });

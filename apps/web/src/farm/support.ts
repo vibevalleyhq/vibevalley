@@ -7,7 +7,8 @@ import type { StateFrame } from "@vibevalley/protocol";
 
 import { createExternal } from "@/base/external";
 import { messageOf } from "@/base/format";
-import { isMuted, playSound, setMuted, subscribeMuted, unlockSound } from "@/ui/pixel/sound";
+import { defineAtom } from "@/state/atom";
+import { isMuted, playSound, setMuted, unlockSound } from "@/ui/pixel/sound";
 
 import { type FarmSoundInput, farmCues, inTurn } from "./cues";
 import { phoneCalls } from "./phone/calls";
@@ -97,7 +98,7 @@ export function feedPhoneCalls(raw: Accessor<StateFrame | undefined>) {
 }
 
 /** Whether the sounds are off, kept on this machine and followed across tabs. */
-export const muted = (): [Accessor<boolean>, (on: boolean) => void] => [createExternal(subscribeMuted, isMuted), setMuted];
+export const muted = (): [Accessor<boolean>, (on: boolean) => void] => [isMuted, setMuted];
 
 /** Plays what changed between one input and the next (ui/pixel/sound.ts farmCues); the first input is the farm as it was. */
 export function farmSounds(input: Accessor<FarmSoundInput>) {
@@ -120,17 +121,13 @@ export function farmSounds(input: Accessor<FarmSoundInput>) {
 
 // The phone's pad: which game has it, and its keys while it does.
 let current: PadHandler | undefined;
-const padListeners = new Set<() => void>();
-const tellPad = () => padListeners.forEach((l) => l());
+const padHeld = defineAtom(false);
+const tellPad = () => padHeld.set(current !== undefined);
 
 export const pressPad = (button: PadButton, down: boolean) => current?.(button, down);
 
 /** Whether a game has the pad: the keys under the screen dim when none does. */
-export const padListening = () =>
-  createExternal(
-    (l) => (padListeners.add(l), () => void padListeners.delete(l)),
-    () => current !== undefined,
-  );
+export const padListening = (): Accessor<boolean> => padHeld.get;
 
 /** Hands the pad and its keys to `handler` while the calling game is mounted. */
 export function usePad(handler: PadHandler) {
@@ -177,13 +174,6 @@ export function useTicks(on: Accessor<boolean>, tick: (ms: number) => void) {
 
 /** A value kept for this page's life: a game in progress and the best score survive putting the phone away. */
 export function kept<T>(initial: T) {
-  let value = initial;
-  const subs = new Set<() => void>();
-  const set = (next: T) => {
-    value = next;
-    subs.forEach((l) => l());
-  };
-  const get = () => value;
-  const use = (): [Accessor<T>, (next: T) => void] => [createExternal((l) => (subs.add(l), () => void subs.delete(l)), get, { always: true }), set];
-  return { get, set, use };
+  const value = defineAtom(initial);
+  return { get: value.get, set: value.set, use: (): [Accessor<T>, (next: T) => void] => [value.get, value.set] };
 }

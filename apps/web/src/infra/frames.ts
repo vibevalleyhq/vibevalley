@@ -1,4 +1,4 @@
-// The state stream as a store of its own, framework-free: the page reads it through base/frame.ts (a Solid store) and
+// The state stream as a store of its own, framework-free: the page reads it through infra/frame.ts (a Solid store) and
 // rawFrame() (the frames as they came).
 
 import { readStream, statePath, type StateFrame } from "@vibevalley/protocol";
@@ -12,6 +12,12 @@ export interface Frames {
   readonly count: number;
 }
 
+/** Where the frames come from: frames below, or a source of a test's own (infra/testing.ts). */
+export interface FramesSource {
+  readonly get: () => Frames;
+  readonly subscribe: (listener: () => void) => () => void;
+}
+
 let current: Frames = { frame: undefined, link: "connecting", count: 0 };
 const listeners = new Set<() => void>();
 let abort: AbortController | undefined;
@@ -21,7 +27,8 @@ function set(next: Frames) {
   for (const l of listeners) l();
 }
 
-// One stream while anyone listens; it reconnects a second after it drops and closes with the last listener.
+// One stream while anyone listens; it reconnects a second after it drops, or after it went silent past the server's
+// heartbeat (readStream), and closes with the last listener.
 function connect(signal: AbortSignal) {
   readStream("", statePath, (frame) => set({ frame, link: "open", count: current.count + 1 }), signal).catch(() => {
     if (signal.aborted) return;
@@ -30,7 +37,7 @@ function connect(signal: AbortSignal) {
   });
 }
 
-export const frames = {
+export const frames: FramesSource = {
   get: (): Frames => current,
   subscribe: (listener: () => void): (() => void) => {
     listeners.add(listener);

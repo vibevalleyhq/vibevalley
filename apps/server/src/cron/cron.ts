@@ -10,14 +10,14 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import type { Actor } from "@/base/actor.ts";
-import { ServerConfig } from "@/base/config.ts";
-import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Db } from "@/infra/db.ts";
 
 import * as q from "../../db/generated/cron.sql.ts";
 import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./due.ts";

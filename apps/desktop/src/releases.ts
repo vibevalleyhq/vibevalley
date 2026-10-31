@@ -19,7 +19,7 @@ export const Release = Schema.Struct({
   version: Schema.String,
   /** One line a change, the merged pull requests' titles. */
   notes: Schema.Array(Schema.String),
-  /** The baseline hash its server makes a database from (apps/server src/base/baseline.ts). */
+  /** The baseline hash its server makes a database from (apps/server src/infra/baseline.ts). */
   schema: Schema.String,
   /** The release's page, to download it by hand. */
   page: Schema.String,

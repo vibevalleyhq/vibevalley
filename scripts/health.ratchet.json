@@ -105,7 +105,7 @@
     "lintOff": 4,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 0
+    "swallowed": 1
   },
   "packages/stories": {
     "nonNull": 3,
@@ -227,11 +227,11 @@
   "web: base": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 3,
-    "lintOff": 4,
+    "cast": 2,
+    "lintOff": 2,
     "orDie": 0,
-    "ignored": 1,
-    "swallowed": 2
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: farm": {
     "nonNull": 67,
@@ -240,7 +240,7 @@
     "lintOff": 3,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 7
+    "swallowed": 1
   },
   "web: features/agent": {
     "nonNull": 3,
@@ -276,7 +276,7 @@
     "lintOff": 1,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 3
+    "swallowed": 0
   },
   "web: features/connector": {
     "nonNull": 0,
@@ -297,13 +297,13 @@
     "swallowed": 2
   },
   "web: features/issue": {
-    "nonNull": 20,
+    "nonNull": 19,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 3
+    "swallowed": 0
   },
   "web: features/lan": {
     "nonNull": 1,
@@ -386,6 +386,24 @@
     "ignored": 0,
     "swallowed": 6
   },
+  "web: infra": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 1,
+    "lintOff": 2,
+    "orDie": 0,
+    "ignored": 1,
+    "swallowed": 1
+  },
+  "web: state": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
+  },
   "web: tree": {
     "nonNull": 25,
     "doubleCast": 0,
@@ -402,6 +420,6 @@
     "lintOff": 5,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 3
+    "swallowed": 2
   }
 }

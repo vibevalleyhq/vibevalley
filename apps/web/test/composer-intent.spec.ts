@@ -1,6 +1,6 @@
-// The farm chat's sending, as far as the page wires it: the channel and helper picked go into the request, and a retry
-// after a lost reply is the same message. Which changes make a new send and which keep it is composing.test.ts's.
-import type { Locator, Page } from "@playwright/test";
+// The farm chat's sending, as far as the page wires it: the channel and helper picked go into the request, a lost reply
+// is the message the server took, and a retry is the same message. When a line settles is composing.test.ts's.
+import type { Page } from "@playwright/test";
 
 import { defaultOrchestrator, type SayRequest, pathOf } from "@vibevalley/protocol";
 
@@ -11,8 +11,8 @@ test.use({ farm: "composer-intent" });
 async function openFarmChat(page: Page) {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
   await page.goto("/farm/");
-  await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
-  // The farm chat is the farm phone's right screen: take the phone out and unfold it.
+  // The farm chat is the farm phone's right screen: take the phone out and unfold it. The phone is the HUD's, drawn
+  // without the canvas, so the village's loading (seconds under a parallel run) is not waited for.
   await page.getByTestId("phone-button").click();
   await page.getByTestId("phone-chat").click();
   return page.getByTestId("farm-chat").getByTestId("composer-input");
@@ -26,7 +26,7 @@ async function chooseChannel(page: Page, id: string) {
 async function loseFirstReply(page: Page) {
   const sent: SayRequest[] = [];
   await page.route(`**${pathOf("channel.message.send")}`, async (route) => {
-    sent.push(route.request().postDataJSON() as SayRequest);
+    sent.push(route.request().postDataJSON());
     if (sent.length > 1) return route.continue();
     await route.fetch();
     await route.abort("connectionclosed");
@@ -34,25 +34,42 @@ async function loseFirstReply(page: Page) {
   return sent;
 }
 
-async function sendAndLoseReply(page: Page, box: Locator, text: string) {
-  await box.fill(text);
-  await box.press("Enter");
-  await expect(page.getByTestId("farm-chat").getByTestId("chat-problem")).toBeVisible();
-  await expect(box).toHaveValue(text);
-}
-
-test("retrying the same words to the same channel reuses its accepted message", async ({ page, api }) => {
+test("a line whose reply was lost is the one the server took: it shows once and is not sent again", async ({ page, api }) => {
   const channel = await api.channel.create({ name: "retry-same" });
   const words = "retry this once";
   const sent = await loseFirstReply(page);
   const box = await openFarmChat(page);
   await chooseChannel(page, channel);
-  await sendAndLoseReply(page, box, words);
+  await box.fill(words);
   await box.press("Enter");
   await expect(box).toHaveValue("");
-  expect(sent.map((s) => s.id)).toEqual([channel, channel]);
-  expect(sent[1]!.sendKey).toBe(sent[0]!.sendKey);
+  const chat = page.getByTestId("farm-chat");
+  // The channel's copy carries the line's key: the line settles on it, without a second send.
+  await expect(chat.locator('[data-testid="message"][data-state]')).toHaveCount(0);
+  await expect(chat.locator('[data-testid="message"][data-from-kind="owner"]').filter({ hasText: words })).toHaveCount(1);
+  expect(sent.map((s) => s.id)).toEqual([channel]);
   expect((await api.channel.message.list({ id: channel })).filter((m) => m.text === words)).toHaveLength(1);
+});
+
+test("a failed line in the farm chat sent again is the same message", async ({ page, api }) => {
+  const channel = await api.channel.create({ name: "retry-failed" });
+  const words = "say it again";
+  const sent: SayRequest[] = [];
+  await page.route(`**${pathOf("channel.message.send")}`, async (route) => {
+    sent.push(route.request().postDataJSON());
+    if (sent.length > 1) return route.continue();
+    await route.abort("connectionfailed");
+  });
+  const box = await openFarmChat(page);
+  await chooseChannel(page, channel);
+  await box.fill(words);
+  await box.press("Enter");
+  const chat = page.getByTestId("farm-chat");
+  await expect(chat.getByTestId("chat-problem")).toBeVisible();
+  await chat.locator('[data-testid="message"][data-state="failed"]').getByTestId("pending-retry").click();
+  await expect(chat.locator('[data-testid="message"][data-state]')).toHaveCount(0);
+  await expect(chat.locator('[data-testid="message"][data-from-kind="owner"]').filter({ hasText: words })).toHaveCount(1);
+  expect(sent.map((s) => s.sendKey)).toEqual([sent[0]?.sendKey, sent[0]?.sendKey]);
 });
 
 test("the helper picked on the farm goes with the next send", async ({ page, api }) => {

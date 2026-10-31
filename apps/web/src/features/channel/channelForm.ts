@@ -7,7 +7,8 @@ import { createSignal, untrack } from "solid-js";
 import { type Channel, defaultOrchestrator, type Notify } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api, reasonOf } from "@/base/api";
+import { api } from "@/infra/api";
+import { createAct } from "@/ui/act";
 /** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
 export function createChannelForm(channel?: Channel) {
   const was = untrack(() => ({
@@ -24,37 +25,41 @@ export function createChannelForm(channel?: Channel) {
   const [category, setCategory] = createSignal(was.category);
   const [notify, setNotify] = createSignal<Notify>(was.notify);
   const [orchestrator, setOrchestrator] = createSignal(was.orchestrator);
-  const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
+  // A refusal is said in the form, beside what it refuses, rather than in a toast.
+  const act = createAct(setError);
+  const busy = act.busy;
 
   /** The channel's id once it went through; undefined, with the reason in error, when refused. */
-  const save = async (): Promise<string | undefined> => {
-    setBusy(true);
+  const save = (): Promise<string | undefined> => {
     setError(undefined);
-    try {
-      if (channel) {
-        // A direct channel has only its notifications to change.
-        if (channel.type === "channel")
-          await api.channel.update({
-            id: channel.id,
-            description: description(),
-            project: project(),
-            category: category().trim(),
-            ...(name().trim() !== was.name ? { name: name().trim() } : {}),
-            ...(orchestrator() !== was.orchestrator ? { orchestrator: orchestrator() } : {}),
-          });
-        if (notify() !== was.notify) await api.channel.notify.set({ id: channel.id, notify: notify() });
-        return channel.id;
-      }
-      return await api.channel.create(
-        omitUndefined({ name: name().trim(), description: description().trim() || undefined, project: project().trim() || undefined }),
-      );
-    } catch (e) {
-      setError(reasonOf(e));
-      return undefined;
-    } finally {
-      setBusy(false);
-    }
+    // Read as the owner saves: the form may change while the call waits.
+    const now = {
+      name: name().trim(),
+      description: description(),
+      project: project(),
+      category: category().trim(),
+      notify: notify(),
+      orchestrator: orchestrator(),
+    };
+    return act.run(async () => {
+      if (!channel)
+        return api.channel.create(
+          omitUndefined({ name: now.name, description: now.description.trim() || undefined, project: now.project.trim() || undefined }),
+        );
+      // A direct channel has only its notifications to change.
+      if (channel.type === "channel")
+        await api.channel.update({
+          id: channel.id,
+          description: now.description,
+          project: now.project,
+          category: now.category,
+          ...(now.name !== was.name ? { name: now.name } : {}),
+          ...(now.orchestrator !== was.orchestrator ? { orchestrator: now.orchestrator } : {}),
+        });
+      if (now.notify !== was.notify) await api.channel.notify.set({ id: channel.id, notify: now.notify });
+      return channel.id;
+    });
   };
 
   return {

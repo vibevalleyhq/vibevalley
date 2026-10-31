@@ -1,14 +1,15 @@
 // What is said in each channel the page shows, framework-free: its newest page read once (channel.message.list), then
-// followed from the newest revision it has (base/gateway.ts), older pages on asking. A channel stays read after nobody shows
-// it, and its follower comes back from where it left off. The farm's reports are a feed of their own.
+// followed from the newest revision it has (infra/gateway.ts), older pages on asking. A channel stays read after nobody shows
+// it, and its follower comes back from where it left off; only the few last shown are kept so, the rest let go. The
+// farm's reports are a feed of their own.
 
 import { type Accessor, createEffect, createSignal } from "solid-js";
 
 import type { ChatMessage, ChannelEvent } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api } from "@/base/api";
-import { followReports, followChannel } from "@/base/gateway";
+import { api, reasonOf } from "@/infra/api";
+import { followReports, followChannel } from "@/infra/gateway";
 
 import { chatPage } from "./feed";
 export interface Followed {
@@ -18,6 +19,8 @@ export interface Followed {
   readonly complete: boolean;
   /** The newest page has been read. */
   readonly ready: boolean;
+  /** Why the newest page could not be read; it is asked again a moment later, and this goes once it is in. */
+  readonly error?: string;
 }
 
 const empty: Followed = { messages: [], complete: false, ready: false };
@@ -48,10 +51,38 @@ interface Entry {
 
 const entries = new Map<string, Entry>();
 
+const singles = new Map<string, ChatMessage | undefined>();
+const unreadSingles = new Set<string>();
+const waiters = new Map<string, Set<() => void>>();
+const singleKey = (channel: string, number: number) => `${channel}:${number}`;
+/** The newest few roots read on their own; one read before those is read again when shown. */
+const singlesKept = 200;
+
+function keepSingle(key: string, message: ChatMessage | undefined) {
+  singles.set(key, message);
+  for (const old of singles.keys()) {
+    if (singles.size <= singlesKept) break;
+    singles.delete(old);
+  }
+}
+
+// Channels nobody shows now, the longest unshown first. A few stay read, so going back to one just left picks up where
+// it was without a page read again; past that each would keep every message it ever read for as long as the page is open.
+const idle: string[] = [];
+const idleKept = 8;
+
 const entryOf = (id: string) => {
   let e = entries.get(id);
   if (!e) entries.set(id, (e = { followed: empty, listeners: new Set(), epoch: 0, stop: undefined }));
   return e;
+};
+
+const leave = (id: string) => {
+  idle.push(id);
+  while (idle.length > idleKept) {
+    const gone = idle.shift();
+    if (gone !== undefined) entries.delete(gone);
+  }
 };
 
 const set = (e: Entry, followed: Followed) => {
@@ -76,6 +107,9 @@ function again(id: string, e: Entry) {
 function onEvent(id: string, e: Entry, ev: ChannelEvent) {
   switch (ev._tag) {
     case "Message": {
+      const single = singleKey(id, ev.message.number);
+      // A thread's root read once on its own: an edit or a delete heard here is its copy now.
+      if (singles.has(single)) singles.set(single, ev.message);
       // A change to a message older than the pages read is read with them when they are.
       const first = e.followed.messages[0]?.number;
       if (!e.followed.complete && first !== undefined && ev.message.number < first) return;
@@ -92,10 +126,16 @@ function onEvent(id: string, e: Entry, ev: ChannelEvent) {
 async function start(id: string, e: Entry) {
   const epoch = ++e.epoch;
   if (!e.followed.ready) {
-    const page = await api.channel.message.list({ id, limit: chatPage }).catch(() => undefined);
+    const page = await api.channel.message.list({ id, limit: chatPage }).then(
+      (got) => ({ got }),
+      (error: unknown) => ({ error: reasonOf(error) }),
+    );
     if (epoch !== e.epoch) return;
-    if (!page) return again(id, e);
-    set(e, { messages: merged(e.followed.messages, page), complete: page.length < chatPage, ready: true });
+    if ("error" in page) {
+      set(e, { ...e.followed, error: page.error });
+      return again(id, e);
+    }
+    set(e, { messages: merged(e.followed.messages, page.got), complete: page.got.length < chatPage, ready: true });
   }
   e.stop = followChannel(
     id,
@@ -110,38 +150,51 @@ export const followed = {
   /** Followed while anyone listens. */
   subscribe(id: string, listener: () => void): () => void {
     const e = entryOf(id);
+    const at = idle.indexOf(id);
+    if (at >= 0) idle.splice(at, 1);
     e.listeners.add(listener);
     if (e.listeners.size === 1) void start(id, e);
     return () => {
       e.listeners.delete(listener);
-      if (e.listeners.size === 0) halt(e);
+      if (e.listeners.size > 0) return;
+      halt(e);
+      leave(id);
     };
   },
   async loadOlder(id: string) {
     const e = entryOf(id);
     if (e.followed.complete) return;
-    const page = await api.channel.message.list(omitUndefined({ id, before: e.followed.messages[0]?.number, limit: chatPage }));
-    set(e, { ...e.followed, messages: merged(e.followed.messages, page), complete: page.length < chatPage });
+    const page = await api.channel.message.list(omitUndefined({ id, before: e.followed.messages[0]?.number, limit: chatPage })).then(
+      (got) => ({ got }),
+      (error: unknown) => ({ error: reasonOf(error) }),
+    );
+    if ("error" in page) return set(e, { ...e.followed, error: page.error });
+    const { error: _, ...was } = e.followed;
+    set(e, { ...was, messages: merged(e.followed.messages, page.got), complete: page.got.length < chatPage });
   },
   /** A message by its place, from a channel followed or read once for it: a thread's root. */
   message(channel: string, number: number, listener: () => void): ChatMessage | undefined {
     const shown = entries.get(channel)?.followed.messages.find((m) => m.number === number);
     if (shown) return shown;
-    const key = `${channel}:${number}`;
+    const key = singleKey(channel, number);
     // Everyone who asks while it is read is told once it is in, not only the first.
     const waiting = waiters.get(key);
     if (waiting) waiting.add(listener);
-    else if (!singles.has(key)) {
+    else if (!singles.has(key) && !unreadSingles.has(key)) {
       waiters.set(key, new Set([listener]));
       void api.channel.message
         .list({ id: channel, before: number + 1, limit: 1 })
         .then(
           (page) =>
-            singles.set(
+            keepSingle(
               key,
               page.find((m) => m.number === number),
             ),
-          () => {},
+          // Not kept as missing: asked again a moment later, not at once (the listeners told below would ask again).
+          () => {
+            unreadSingles.add(key);
+            setTimeout(() => unreadSingles.delete(key), againMs);
+          },
         )
         .finally(() => {
           const told = waiters.get(key) ?? new Set();
@@ -152,9 +205,6 @@ export const followed = {
     return singles.get(key);
   },
 };
-
-const singles = new Map<string, ChatMessage | undefined>();
-const waiters = new Map<string, Set<() => void>>();
 
 /** A channel's messages while it is shown; empty with none. */
 export function useFollowed(id: Accessor<string | undefined>): Accessor<Followed> {

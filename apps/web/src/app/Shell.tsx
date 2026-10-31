@@ -7,12 +7,12 @@ import { For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { useCore, useFrames } from "@/base/frame";
-import { useRouter } from "@/base/router";
 import { pressed } from "@/base/shortcuts";
-import { useUpdates } from "@/base/updates";
 import { QuickSwitcher, switcher } from "@/features/channel";
 import { waitingOnOwner } from "@/features/inbox";
+import { useCore, useFrames } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
+import { useUpdates } from "@/infra/updates";
 import { A } from "@/ui/A";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";

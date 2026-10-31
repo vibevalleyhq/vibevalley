@@ -6,10 +6,10 @@ import { For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
 
-import { useAgent } from "@/base/agents";
 import { spentText } from "@/base/format";
-import { useCore } from "@/base/frame";
 import { defaultOf, useFollowed, useReports } from "@/features/channel";
+import { useAgent } from "@/infra/agents";
+import { useCore } from "@/infra/frame";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { DashedLine, PxMarkdown } from "@/ui/pixel";
 

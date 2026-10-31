@@ -1,6 +1,6 @@
 // What the page may ask of the program around it: the desktop's shell, the phone's, or none in a browser tab. Every host
 // gives the whole interface; a capability it lacks is null, and the page draws nothing for it. The page never asks which
-// host it is in (it finds its host in apps/web/src/base/host.ts). What a host carries to another program goes over a
+// host it is in (it finds its host in apps/web/src/infra/host.ts). What a host carries to another program goes over a
 // bridge (@vibevalley/bridge) by one of the contracts here: the desktop's preload to Electron's main (desktopBridge), the
 // phone's page to its shell (mobileBridge, whose page end is mobileHost).
 

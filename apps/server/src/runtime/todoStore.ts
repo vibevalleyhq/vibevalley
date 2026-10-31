@@ -7,9 +7,9 @@ import { toolFailed } from "@vibevalley/agent/core/errors";
 import { finished, type Todo } from "@vibevalley/agent/todo";
 import type { TodoStore } from "@vibevalley/agent/todoStore";
 
-import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
+import { Db } from "@/infra/db.ts";
 
 import * as q from "../../db/generated/runtime_todo.sql.ts";
 

@@ -3,10 +3,10 @@ import { createSignal, For, Show } from "solid-js";
 import { list, t } from "@vibevalley/i18n";
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph, TaskState } from "@vibevalley/protocol";
 
-import { reasonOf } from "@/base/api";
 import { wallClockText } from "@/base/format";
-import { ready } from "@/base/query";
 import { type Answer, graphs, useGraphChanges } from "@/features/task";
+import { reasonOf } from "@/infra/api";
+import { ready } from "@/infra/query";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";
 import { Icon } from "@/ui/Icon";

@@ -6,8 +6,8 @@ import type * as T from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner as ownerActor } from "@/base/actor.ts";
-import { ServerConfig } from "@/base/config.ts";
-import { Database, Db } from "@/base/db.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Database, Db } from "@/infra/db.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";

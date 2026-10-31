@@ -9,18 +9,17 @@ import type { Agent } from "@vibevalley/protocol";
 
 import { createExternal } from "@/base/external";
 import { messageOf } from "@/base/format";
-import { frames } from "@/base/frames";
-import { ready, useAgents, useQuery } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { clickBed, openPlace } from "@/farm/commands";
 import { commands } from "@/farm/frames";
 import { farmFrameOf } from "@/farm/scope";
-import { farm, farmState, subscribeFarm } from "@/farm/store";
+import { farm, farmProject, farmState, subscribeFarm } from "@/farm/store";
 import { useVillage } from "@/farm/support";
-import { farmProject } from "@/farm/ui";
 import { yardPlace } from "@/farm/world/places";
 import { beds } from "@/farm/world/plots";
 import { textureProgress } from "@/farm/world/textures";
+import { frames } from "@/infra/frames";
+import { ready, useAgents, useQuery } from "@/infra/query";
+import { useRouter } from "@/infra/router";
 import { spriteUrl } from "@/ui/pixel/atlas";
 import { playSound } from "@/ui/pixel/sound";
 

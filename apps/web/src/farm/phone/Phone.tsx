@@ -9,14 +9,14 @@ import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
 
-import { useCore } from "@/base/frame";
-import { useRouter } from "@/base/router";
 import { ChatWindow } from "@/farm/chat/ChatWindow";
 import { farm } from "@/farm/store";
 import { padListening, phoneState, pressPad } from "@/farm/support";
 import { useFarm } from "@/farm/ui";
 import { unreadTotal } from "@/features/channel";
 import { voiceCall } from "@/features/voice";
+import { useCore } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
 import { playSound } from "@/ui/pixel/sound";
 
 import { missedOf, phoneCalls } from "./calls";

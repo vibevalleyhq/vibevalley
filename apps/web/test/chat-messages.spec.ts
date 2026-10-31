@@ -70,7 +70,7 @@ test("a change made elsewhere reaches the page as it happens", async ({ page, ap
   const said = await idOf(api, id, "look at this");
   await page.goto(`/chat/${id}`);
   await expect(row(page, said)).toBeVisible();
-  await api.channel.reaction.toggle({ id: said, emoji: "👍" });
+  await api.channel.reaction.set({ id: said, emoji: "👍", on: true });
   await expect(row(page, said).locator('[data-testid="reaction"][data-key="👍"]')).toHaveAttribute("data-count", "1");
   await api.channel.message.update({ id: said, text: "look at this, please" });
   await expect(row(page, said)).toContainText("look at this, please");

@@ -12,5 +12,6 @@ export { EarnedMedal } from "./medals";
 export { badgeColors, CardColors, type Piece } from "./card";
 export { PixelCard } from "./PixelCard";
 export { PxMarkdown } from "./PxMarkdown";
+export { createPixelAct } from "./act";
 export { noticeTitle, type ToastData, ToastType, toasts } from "./toasts";
 export { ToastViewport } from "./ToastViewport";
