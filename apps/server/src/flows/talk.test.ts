@@ -2,12 +2,12 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { Agents } from "@/agent/agent.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Agent } from "@/agent/agent.ts";
+import { Channel } from "@/channel/chat.ts";
 import { channelOf } from "@/channel/folded.ts";
 import { Core } from "@/core/core.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Sessions } from "@/session/session.ts";
+import { Issue } from "@/issue/issue.ts";
+import { Session } from "@/session/session.ts";
 import { Said } from "@/testing/said.ts";
 
 import { farm, lab, until } from "./farm.ts";
@@ -29,12 +29,12 @@ describe("a talk with a helper profile", () => {
       }),
     });
     return Effect.gen(function* () {
-      const issues = yield* Issues;
-      const channels = yield* Channels;
-      const sessions = yield* Sessions;
+      const issues = yield* Issue;
+      const channels = yield* Channel;
+      const sessions = yield* Session;
       const core = yield* Core;
       const { in: saidIn } = yield* Said;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       const dm = yield* issues.talkWith("lab");
       expect(yield* issues.talkWith("lab")).toBe(dm);
       const channel = channelOf(core.state().chat, dm)!;

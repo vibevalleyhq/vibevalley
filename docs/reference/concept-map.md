@@ -44,22 +44,22 @@
 | 概念 | 服务端 | 存储 | oar |
 |---|---|---|---|
 | Workspace | `base/config.ts` 的 `ServerConfig`；`services.ts` 把全部服务叠起来 | `VIBEVALLEY_WORK_ROOT`、`VIBEVALLEY_HOME` | |
-| 项目 | `Projects`（`project/project.ts`、`git.ts`、`stack.ts`） | 工作目录下的 git 仓库 | 会话的 `cwd` |
-| 档案、技能、档案模板 | `Agents`（模板的读法在 `agent/template.ts`） | `config.json`；内置模板 `apps/server/src/agent/templates/`，加进来的 `agent-templates/` | |
-| 农机 | `Runtimes` | `config.json` 里每台农机的设置、`spend.json` | `Runtime`、`RuntimeRegistry` |
-| 记性 | `Memories` | `memory` 表；管家的在 `agent/<档案 id>/MEMORY.md` | |
+| 项目 | `Project`（`project/project.ts`、`git.ts`、`stack.ts`） | 工作目录下的 git 仓库 | 会话的 `cwd` |
+| 档案、技能、档案模板 | `Agent`（模板的读法在 `agent/template.ts`） | `config.json`；内置模板 `apps/server/src/agent/templates/`，加进来的 `agent-templates/` | |
+| 农机 | `Runtime` | `config.json` 里每台农机的设置、`spend.json` | `Runtime`、`RuntimeRegistry` |
+| 记性 | `Memory` | `memory` 表；管家的在 `agent/<档案 id>/MEMORY.md` | |
 | 管家 | `Orchestrator`（每个管家一个宿主） | `agent/<档案 id>/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`packages/agent`） |
-| 工单 | `Issues`（`issue/issue.ts`；派给管家的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_session` 表（一行是一个帮工） | |
-| 计划 | `Tasks`（`task/task.ts`） | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_event` 表 | |
-| 帮工 | `Sessions`（`session/session.ts`） | `state.json`（在场帮工的核心状态）、`session` 表（工作目录、oar 会话 id、最后一轮原话和想起过的记性） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
-| 一轮（run） | `Sessions`（帮工的 run 在 `session/session.ts`；进程内 agent 的 run 在 `session/inProcessRun.ts`）；`session/facts.ts` 把会话事件读成事实 | `session_run` 表 | 帮工的一次 run 包着一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
-| 轨迹 | `Sessions`（`session/journal.ts` 的 `Journal`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |
-| 改动、完成 | `Issues`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 开 worktree 时的工单分支和 worktree；直接在项目目录干活的没有这两项 | |
-| 默认频道、频道、工单串 | `Channels`（`channel/chat.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tools`） | `channel`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
-| 定时任务 | `Crons` | `cron` 表 | |
+| 工单 | `Issue`（`issue/issue.ts`；派给管家的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_session` 表（一行是一个帮工） | |
+| 计划 | `Task`（`task/task.ts`） | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_event` 表 | |
+| 帮工 | `Session`（`session/session.ts`） | `state.json`（在场帮工的核心状态）、`session` 表（工作目录、oar 会话 id、最后一轮原话和想起过的记性） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
+| 一轮（run） | `Session`（帮工的 run 在 `session/session.ts`；进程内 agent 的 run 在 `session/inProcessRun.ts`）；`session/facts.ts` 把会话事件读成事实 | `session_run` 表 | 帮工的一次 run 包着一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
+| 轨迹 | `Session`（`session/journal.ts` 的 `Journal`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |
+| 改动、完成 | `Issue`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 开 worktree 时的工单分支和 worktree；直接在项目目录干活的没有这两项 | |
+| 默认频道、频道、工单串 | `Channel`（`channel/chat.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tool`） | `channel`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
+| 定时任务 | `Cron` | `cron` 表 | |
 | 巡查 | `Inbox`（`inbox/inbox.ts`；规则在 `inbox/patrol.ts`） | 不存：每轮从核心状态算 | |
 | 来电 | `Inbox`（`inbox/inbox.ts`、`inbox/items.ts`） | 不存：`StateFrame.inbox` 从核心状态现算 | |
-| 连接器 | `Connectors`；三家的接口在 `connector/weixin.ts`、`feishu.ts`、`qq.ts` | `connector_account`、`connector_inbound`、`connector_outbox` 表 | |
+| 连接器 | `Connector`；三家的接口在 `connector/weixin.ts`、`feishu.ts`、`qq.ts` | `connector_account`、`connector_inbound`、`connector_outbox` 表 | |
 | 「连接到本机」 | `Lan` | `lan`、`lan_device` 表 | |
 | 语音 | `Voice`（`voice/voice.ts`；声网的令牌和语音 agent 用 npm 的 `agora-token`、`agora-agents`） | `settings.json` | |
 | 钥匙和语音设置 | `Setting` | `settings.json`（只有你能读） | 会话的 `env` |
@@ -74,7 +74,7 @@ oar（`@botiverse/oar`）是驱动各家编码 agent 的运行时。它的术语
 
 | oar | 是什么 | 我们这边用在哪 |
 |---|---|---|
-| `Runtime`、`RuntimeRegistry` | 一种编码 agent 程序和它的安装 | `Runtimes` 探测、算额度和花费 |
+| `Runtime`、`RuntimeRegistry` | 一种编码 agent 程序和它的安装 | `Runtime` 探测、算额度和花费 |
 | session | 农机原生的一个会话，可以接着上回的 | 一个帮工的会话；会话 id 存在 `session.oar_session` |
 | turn | 会话里的一轮：一个 prompt 开始，农机说结束时结束，结果是完成、中止或失败 | 帮工的一次 run 包着一个 oar turn |
 | event | 一轮里的文字、思考、工具调用、用量、任务 | 读成事实和轨迹 |

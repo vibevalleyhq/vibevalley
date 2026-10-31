@@ -13,26 +13,8 @@ import { dirname, join, resolve } from "node:path";
 import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, DateTime, Predicate } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import {
-  type Changes,
-  type Validation,
-  type Conflict,
-  type DayCount,
-  type Author,
-  type GitHubStatus,
-  type Issue,
-  type LanguageCount,
-  maxRunning,
-  type NewProject,
-  type ProjectActivity,
-  type ProjectLanguages,
-  type ProjectStack,
-  type ProjectSummary,
-  type PullRequest,
-  type PullRequestCapability,
-  type PullRequestState,
-  type Repo,
-} from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { maxRunning } from "@vibevalley/protocol";
 
 import { slice } from "@/base/clip.ts";
 import { ServerConfig } from "@/base/config.ts";
@@ -46,7 +28,7 @@ import { asFarm, repository } from "./repository.ts";
 import {
   type Merged,
   MergeFailure,
-  type Project,
+  type ProjectFolder,
   ProjectError,
   pullRequestFile,
   pullRequestText,
@@ -75,7 +57,7 @@ export function githubRepository(input: string): { name: string; url: string } |
   return { name, url: `https://github.com/${m[1]}/${name}.git` };
 }
 
-export function projectProblem(req: NewProject): string {
+export function projectProblem(req: T.NewProject): string {
   if (!projectName.test(req.name)) return t("server.project.badName");
   if (req.github !== undefined && !githubRepository(req.github)) return t("server.project.badGithub");
   return "";
@@ -156,10 +138,10 @@ const tokeiOutput = jsonOrNone(
 );
 
 /** Its total, and languages with nothing but blank lines, left out; undefined when it is not tokei's output. */
-export function countsOf(output: string): LanguageCount[] | undefined {
+export function countsOf(output: string): T.LanguageCount[] | undefined {
   const raw = tokeiOutput(output);
   if (!raw) return undefined;
-  const out: LanguageCount[] = [];
+  const out: T.LanguageCount[] = [];
   for (const [name, l] of Object.entries(raw)) {
     if (name === "Total" || l.code + l.comments <= 0) continue;
     out.push({
@@ -176,7 +158,7 @@ export function countsOf(output: string): LanguageCount[] | undefined {
 /** The calendar day an instant falls on where the farm runs, as yyyy-mm-dd. */
 const localDay = (ms: number) => DateTime.formatIsoDate(DateTime.makeZonedUnsafe(ms, { timeZone: DateTime.zoneMakeLocal() }));
 
-export function activityOf(log: string, dayOf: (ms: number) => string = localDay): { days: DayCount[]; authors: Author[] } {
+export function activityOf(log: string, dayOf: (ms: number) => string = localDay): { days: T.DayCount[]; authors: T.Author[] } {
   const byDay = new Map<string, number>();
   const byAuthor = new Map<string, number>();
   for (const line of log.split("\n")) {
@@ -223,12 +205,12 @@ const runGitHub: GitHubRun = (...args) =>
     (r) => ({ out: r.stdout + r.stderr, ok: r.code === 0, missing: r.missing }),
   );
 
-export const probeGitHub = Effect.fn("Projects.probeGitHub")(function* (gh: GitHubRun) {
-  const s: GitHubStatus = { checkedAt: yield* Clock.currentTimeMillis, installed: false, loggedIn: false, reason: "" };
+export const probeGitHub = Effect.fn("Project.probeGitHub")(function* (gh: GitHubRun) {
+  const s: T.GitHubStatus = { checkedAt: yield* Clock.currentTimeMillis, installed: false, loggedIn: false, reason: "" };
   const version = yield* gh("--version");
   if (!version.ok) return { ...s, reason: version.missing ? t("server.project.gh.missing") : t("server.project.gh.failed") };
   const v = ghVersion.exec(version.out)?.[1];
-  const installed: GitHubStatus = { ...s, installed: true, ...(v ? { version: v } : {}) };
+  const installed: T.GitHubStatus = { ...s, installed: true, ...(v ? { version: v } : {}) };
   const auth = yield* gh("auth", "status", "--hostname", "github.com", "--active");
   if (!auth.ok) return { ...installed, reason: t("server.project.gh.signedOut") };
   const account = ghAccount.exec(auth.out)?.[1];
@@ -236,26 +218,26 @@ export const probeGitHub = Effect.fn("Projects.probeGitHub")(function* (gh: GitH
   return { ...installed, loggedIn: true, account };
 });
 
-export class Projects extends Context.Service<
-  Projects,
+export class Project extends Context.Service<
+  Project,
   {
     readonly root: string;
     readonly limit: number;
     readonly maxSessions: () => number;
-    readonly validate: (req: NewProject) => Validation;
-    readonly create: (req: NewProject) => Effect.Effect<Project, ProjectError>;
-    readonly list: () => Effect.Effect<Project[]>;
-    readonly summary: (p: Project) => Effect.Effect<ProjectSummary>;
-    readonly summaries: () => Effect.Effect<ProjectSummary[]>;
-    readonly stack: (name: string) => Effect.Effect<ProjectStack | undefined>;
-    readonly languages: (name: string) => Effect.Effect<ProjectLanguages | undefined, ProjectError>;
-    readonly activity: (name: string) => Effect.Effect<ProjectActivity | undefined>;
-    readonly contributions: (extra: readonly string[]) => Effect.Effect<Repo[]>;
+    readonly validate: (req: T.NewProject) => T.Validation;
+    readonly create: (req: T.NewProject) => Effect.Effect<ProjectFolder, ProjectError>;
+    readonly list: () => Effect.Effect<ProjectFolder[]>;
+    readonly summary: (p: ProjectFolder) => Effect.Effect<T.ProjectSummary>;
+    readonly summaries: () => Effect.Effect<T.ProjectSummary[]>;
+    readonly stack: (name: string) => Effect.Effect<T.ProjectStack | undefined>;
+    readonly languages: (name: string) => Effect.Effect<T.ProjectLanguages | undefined, ProjectError>;
+    readonly activity: (name: string) => Effect.Effect<T.ProjectActivity | undefined>;
+    readonly contributions: (extra: readonly string[]) => Effect.Effect<T.Repo[]>;
     readonly workplace: (project: string, issueNumber: number, worktree: boolean, baseBranch: string) => Effect.Effect<Workplace, ProjectError>;
-    readonly changes: (place: Workplace) => Effect.Effect<Changes, ProjectError>;
-    readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes | undefined, ProjectError>;
+    readonly changes: (place: Workplace) => Effect.Effect<T.Changes, ProjectError>;
+    readonly branchChanges: (project: string, branch: string) => Effect.Effect<T.Changes | undefined, ProjectError>;
     readonly changedFiles: (cwd: string, baseBranch: string) => Effect.Effect<string[], ProjectError>;
-    readonly conflict: (place: Workplace, baseBranch?: string) => Effect.Effect<Conflict | undefined>;
+    readonly conflict: (place: Workplace, baseBranch?: string) => Effect.Effect<T.Conflict | undefined>;
     readonly merge: (place: Workplace) => Effect.Effect<Merged, MergeFailure>;
     readonly mergeInto: (place: Workplace, target: string) => Effect.Effect<Merged, MergeFailure>;
     readonly mergeBranch: (project: string, branch: string) => Effect.Effect<string, MergeFailure>;
@@ -265,15 +247,15 @@ export class Projects extends Context.Service<
     readonly openBranch: (project: string, branch: string, from?: string) => Effect.Effect<void, ProjectError>;
     readonly run: (cwd: string, command: string) => Effect.Effect<{ readonly ok: boolean; readonly output: string }>;
     readonly houseRules: () => Effect.Effect<string>;
-    readonly githubStatus: () => GitHubStatus;
-    readonly refreshGitHub: () => Effect.Effect<GitHubStatus>;
+    readonly githubStatus: () => T.GitHubStatus;
+    readonly refreshGitHub: () => Effect.Effect<T.GitHubStatus>;
     readonly usesPullRequests: (name: string) => boolean;
-    readonly submitPullRequest: (place: Workplace, issue: Issue, conclusion: string) => Effect.Effect<PullRequest, MergeFailure | ProjectError>;
-    readonly pullRequestState: (name: string, n: number) => Effect.Effect<PullRequestState, ProjectError>;
+    readonly submitPullRequest: (place: Workplace, issue: T.Issue, conclusion: string) => Effect.Effect<T.PullRequest, MergeFailure | ProjectError>;
+    readonly pullRequestState: (name: string, n: number) => Effect.Effect<T.PullRequestState, ProjectError>;
     readonly finishPullRequest: (name: string, n: number) => Effect.Effect<Merged, ProjectError>;
   }
 >()("vibevalley/Project") {
-  static readonly layer = (hooks: ProjectHooks = {}) => Layer.effect(Projects, make(hooks));
+  static readonly layer = (hooks: ProjectHooks = {}) => Layer.effect(Project, make(hooks));
 }
 
 /** What tests change: gh, and git's network. */
@@ -309,10 +291,10 @@ const make = (hooks: ProjectHooks = {}) =>
       return q.withPermits(1)(effect);
     };
     const pending = new Set<string>();
-    let status: GitHubStatus | undefined;
-    let capabilities = new Map<string, PullRequestCapability>();
+    let status: T.GitHubStatus | undefined;
+    let capabilities = new Map<string, T.PullRequestCapability>();
 
-    const ensure = Effect.fn("Projects.ensure")(
+    const ensure = Effect.fn("Project.ensure")(
       function* (name: string) {
         if (!projectName.test(name)) return yield* fail(t("server.project.notProjectName", { name }));
         yield* Effect.orDie(fs.makeDirectory(join(root, name), { recursive: true }));
@@ -338,9 +320,9 @@ const make = (hooks: ProjectHooks = {}) =>
       Effect.mapError((e) => (Predicate.isTagged(e, "ProjectError") ? e : new ProjectError({ message: reason(e), cause: e }))),
     );
 
-    const list = Effect.fn("Projects.list")(function* () {
+    const list = Effect.fn("Project.list")(function* () {
       if (!(yield* exists(root))) return [];
-      const out: Project[] = [];
+      const out: ProjectFolder[] = [];
       // readdirSync for the entries' kinds, which FileSystem does not give: a link to a folder is not a project.
       for (const e of readdirSync(root, { withFileTypes: true })) {
         if (!e.isDirectory() || e.name.startsWith(".") || pending.has(e.name)) continue;
@@ -360,13 +342,13 @@ const make = (hooks: ProjectHooks = {}) =>
 
     const find = (name: string) => Effect.map(list(), (all) => all.find((p) => p.name === name));
 
-    const capability = (name: string): PullRequestCapability =>
+    const capability = (name: string): T.PullRequestCapability =>
       capabilities.get(name) ?? (status?.reason ? { available: false, reason: status.reason } : { available: false, reason: t("server.project.notChecked") });
 
     const maxSessions = () => (perProject <= 0 || perProject > maxRunning ? maxRunning : perProject);
 
-    const summary = Effect.fn("Projects.summary")(function* (p: Project) {
-      const s: ProjectSummary = {
+    const summary = Effect.fn("Project.summary")(function* (p: ProjectFolder) {
+      const s: T.ProjectSummary = {
         name: p.name,
         path: p.path,
         git: p.git,
@@ -387,7 +369,7 @@ const make = (hooks: ProjectHooks = {}) =>
     });
 
     /** Called under the project's turn. Failing keeps the local main branch as the next issue's base. */
-    const syncMain = Effect.fn("Projects.syncMain")(function* (name: string) {
+    const syncMain = Effect.fn("Project.syncMain")(function* (name: string) {
       const path = join(root, name);
       const remoteHead = yield* gitRun(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD");
       const main = remoteHead.code === 0 ? remoteHead.stdout.trim().replace(/^origin\//u, "") : yield* repository(path).mainOrNone;
@@ -419,7 +401,7 @@ const make = (hooks: ProjectHooks = {}) =>
 
     /** The project's own setup for a new worktree: .vibevalley/setup (installing what it needs), run outside the project's
      * turn and with the check's time limit; one that fails is logged, and the helper starts all the same. */
-    const projectSetup = Effect.fn("Projects.projectSetup")(function* (cwd: string) {
+    const projectSetup = Effect.fn("Project.projectSetup")(function* (cwd: string) {
       const file = join(cwd, ".vibevalley", "setup");
       if (!lexists(file)) return;
       const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
@@ -427,7 +409,7 @@ const make = (hooks: ProjectHooks = {}) =>
     });
 
     /** The project's own check: .vibevalley/check, run in the worktree, killed with everything it started when it runs too long. */
-    const projectCheck = Effect.fn("Projects.projectCheck")(function* (cwd: string) {
+    const projectCheck = Effect.fn("Project.projectCheck")(function* (cwd: string) {
       const file = join(cwd, ".vibevalley", "check");
       if (!lexists(file)) return;
       const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
@@ -446,7 +428,7 @@ const make = (hooks: ProjectHooks = {}) =>
     });
 
     /** Commit and check outside the project's turn; publication rechecks the head and conflicts in it. */
-    const checkMerge = Effect.fn("Projects.checkMerge")(function* (place: Workplace, target: string) {
+    const checkMerge = Effect.fn("Project.checkMerge")(function* (place: Workplace, target: string) {
       yield* repository(place.cwd).commitLeft(t("server.project.commit.leftOver"));
       const path = join(root, place.project);
       const into = target || (yield* repository(path).main);
@@ -457,7 +439,7 @@ const make = (hooks: ProjectHooks = {}) =>
       return checked;
     });
 
-    const checkLocalMerge = Effect.fn("Projects.checkLocalMerge")(function* (place: Workplace) {
+    const checkLocalMerge = Effect.fn("Project.checkLocalMerge")(function* (place: Workplace) {
       yield* repository(place.cwd).commitLeft(t("server.project.commit.leftOver"));
       const path = join(root, place.project);
       const main = yield* serially(
@@ -474,7 +456,7 @@ const make = (hooks: ProjectHooks = {}) =>
     });
 
     /** main: the branch checked out in the project, when the caller has just read it under the same turn. */
-    const mergeMain = Effect.fn("Projects.mergeMain")(function* (path: string, branch: string, kept: string, checkedOut?: string) {
+    const mergeMain = Effect.fn("Project.mergeMain")(function* (path: string, branch: string, kept: string, checkedOut?: string) {
       const main = checkedOut ?? (yield* repository(path).main);
       // A merge that would conflict is not tried: the session resolves it on its branch first.
       const conflicts = yield* repository(path).conflicts(main, branch);
@@ -493,12 +475,12 @@ const make = (hooks: ProjectHooks = {}) =>
 
     const toMergeFailure = <A, R>(e: Effect.Effect<A, MergeFailure | GitError | ProjectError, R>) => Effect.mapError(e, failed);
 
-    const shape = Projects.of({
+    const shape = Project.of({
       root,
       limit: perProject,
       maxSessions,
       validate: (req) => ({ problem: projectProblem(req) }),
-      create: Effect.fn("Projects.create")(function* (req) {
+      create: Effect.fn("Project.create")(function* (req) {
         return yield* serially(
           req.name,
           Effect.gen(function* () {
@@ -536,16 +518,16 @@ const make = (hooks: ProjectHooks = {}) =>
       }),
       list,
       summary,
-      summaries: Effect.fn("Projects.summaries")(function* () {
+      summaries: Effect.fn("Project.summaries")(function* () {
         return yield* Effect.forEach(yield* list(), summary);
       }),
-      stack: Effect.fn("Projects.stack")(function* (name) {
+      stack: Effect.fn("Project.stack")(function* (name) {
         const p = yield* find(name);
         if (!p) return undefined;
         const read = yield* Effect.forEach(stackFiles, (f) => Effect.map(Effect.option(fs.readFileString(join(p.path, f))), (body) => [f, body] as const));
         return stackOf(new Map(read.flatMap(([f, body]) => (Option.isSome(body) ? [[f, body.value] as const] : []))));
       }),
-      languages: Effect.fn("Projects.languages")(function* (name) {
+      languages: Effect.fn("Project.languages")(function* (name) {
         const p = yield* find(name);
         if (!p) return undefined;
         const r = yield* run(tokei, tokeiArgs(p.path), { timeoutMs: 60_000 });
@@ -555,11 +537,11 @@ const make = (hooks: ProjectHooks = {}) =>
         if (!languages) return yield* fail(t("server.project.tokeiUnread"));
         return { project: name, at: yield* Clock.currentTimeMillis, languages };
       }),
-      activity: Effect.fn("Projects.activity")(function* (name) {
+      activity: Effect.fn("Project.activity")(function* (name) {
         const p = yield* find(name);
         if (!p) return undefined;
         const now = yield* Clock.currentTimeMillis;
-        const out: ProjectActivity = {
+        const out: T.ProjectActivity = {
           project: name,
           at: now,
           days: [],
@@ -583,10 +565,10 @@ const make = (hooks: ProjectHooks = {}) =>
         if (last > 0) out.last = last;
         return out;
       }),
-      contributions: Effect.fn("Projects.contributions")(function* (extra) {
+      contributions: Effect.fn("Project.contributions")(function* (extra) {
         const global = (yield* gitQuiet("", "config", "--global", "user.email")).toLowerCase();
         const seen = new Set<string>();
-        const out: Repo[] = [];
+        const out: T.Repo[] = [];
         for (const dir of repoDirs(root, 3)) {
           // Worktrees share their repository's history: one count per repository.
           const common = yield* gitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir");
@@ -602,7 +584,7 @@ const make = (hooks: ProjectHooks = {}) =>
         }
         return out;
       }),
-      workplace: Effect.fn("Projects.workplace")(function* (project, issueNumber, worktree, baseBranch) {
+      workplace: Effect.fn("Project.workplace")(function* (project, issueNumber, worktree, baseBranch) {
         let made = false;
         return yield* serially(
           project,
@@ -629,10 +611,10 @@ const make = (hooks: ProjectHooks = {}) =>
           }),
         ).pipe(Effect.tap((place) => (made ? projectSetup(place.cwd) : Effect.void)));
       }),
-      changes: Effect.fn("Projects.changes")(function* (place) {
+      changes: Effect.fn("Project.changes")(function* (place) {
         return yield* describe(place.project, place.cwd, place.branch);
       }),
-      branchChanges: Effect.fn("Projects.branchChanges")(function* (project, branch) {
+      branchChanges: Effect.fn("Project.branchChanges")(function* (project, branch) {
         // An issue worked in a profile's own folder has no project, and so no issue branch: none to read.
         if (!project) return undefined;
         const path = join(root, project);
@@ -641,7 +623,7 @@ const make = (hooks: ProjectHooks = {}) =>
         if (!present.success) return undefined;
         return yield* describe(project, "", branch);
       }),
-      changedFiles: Effect.fn("Projects.changedFiles")(
+      changedFiles: Effect.fn("Project.changedFiles")(
         function* (cwd, baseBranch) {
           const fork = yield* git(cwd, "merge-base", baseBranch, "HEAD");
           const changed = yield* git(cwd, "diff", "--name-only", "--no-renames", fork);
@@ -650,7 +632,7 @@ const make = (hooks: ProjectHooks = {}) =>
         },
         Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })),
       ),
-      conflict: Effect.fn("Projects.conflict")(function* (place, baseBranch = "") {
+      conflict: Effect.fn("Project.conflict")(function* (place, baseBranch = "") {
         if (!place.branch) return undefined;
         const path = join(root, place.project);
         const base = baseBranch || (yield* repository(path).mainOrNone);
@@ -660,7 +642,7 @@ const make = (hooks: ProjectHooks = {}) =>
           .pipe(Effect.orElseSucceed(() => [] as string[]));
         return files.length > 0 ? { base, files } : undefined;
       }),
-      merge: Effect.fn("Projects.merge")(function* (place) {
+      merge: Effect.fn("Project.merge")(function* (place) {
         if (!place.branch) return { text: t("server.project.inProjectNoBranch"), commits: 0 };
         const path = join(root, place.project);
         const checked = yield* checkLocalMerge(place);
@@ -680,7 +662,7 @@ const make = (hooks: ProjectHooks = {}) =>
           }),
         );
       }, toMergeFailure),
-      mergeInto: Effect.fn("Projects.mergeInto")(function* (place, target) {
+      mergeInto: Effect.fn("Project.mergeInto")(function* (place, target) {
         const path = join(root, place.project);
         if (!place.branch) return yield* MergeFailure.error(t("server.project.inProjectNothing"));
         const checked = yield* checkMerge(place, target);
@@ -710,7 +692,7 @@ const make = (hooks: ProjectHooks = {}) =>
           }),
         );
       }, toMergeFailure),
-      mergeBranch: Effect.fn("Projects.mergeBranch")(function* (project, branch) {
+      mergeBranch: Effect.fn("Project.mergeBranch")(function* (project, branch) {
         return yield* serially(
           project,
           Effect.gen(function* () {
@@ -723,7 +705,7 @@ const make = (hooks: ProjectHooks = {}) =>
           }),
         );
       }, toMergeFailure),
-      release: Effect.fn("Projects.release")(function* (place) {
+      release: Effect.fn("Project.release")(function* (place) {
         return yield* serially<WorkplaceRelease, never, never>(
           place.project,
           Effect.gen(function* () {
@@ -752,7 +734,7 @@ const make = (hooks: ProjectHooks = {}) =>
           }),
         );
       }),
-      reset: Effect.fn("Projects.reset")(function* (place) {
+      reset: Effect.fn("Project.reset")(function* (place) {
         if (!place.branch) return yield* fail(t("server.project.clear.notWorktree", { cwd: place.cwd }));
         yield* serially(
           place.project,
@@ -763,7 +745,7 @@ const make = (hooks: ProjectHooks = {}) =>
           }).pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e }))),
         );
       }),
-      clear: Effect.fn("Projects.clear")(function* (project, issueNumber, work = "discard") {
+      clear: Effect.fn("Project.clear")(function* (project, issueNumber, work = "discard") {
         return yield* serially<WorkplaceRelease, never, never>(
           project,
           Effect.gen(function* () {
@@ -796,7 +778,7 @@ const make = (hooks: ProjectHooks = {}) =>
           }),
         );
       }),
-      openBranch: Effect.fn("Projects.openBranch")(function* (project, branch, from = "") {
+      openBranch: Effect.fn("Project.openBranch")(function* (project, branch, from = "") {
         return yield* serially(
           project,
           Effect.gen(function* () {
@@ -805,13 +787,13 @@ const make = (hooks: ProjectHooks = {}) =>
           }),
         );
       }),
-      run: Effect.fn("Projects.run")(function* (cwd, command) {
+      run: Effect.fn("Project.run")(function* (cwd, command) {
         const r = yield* run("sh", ["-c", command], { cwd, timeoutMs: runTimeoutMs });
         let output = (r.stdout + r.stderr).trimEnd();
         if (output.length > runOutput) output = "…" + slice(output, -runOutput);
         return { ok: r.code === 0, output };
       }),
-      houseRules: Effect.fn("Projects.houseRules")(function* () {
+      houseRules: Effect.fn("Project.houseRules")(function* () {
         return yield* Effect.orElseSucceed(fs.readFileString(join(work, "AGENTS.md")), () => "");
       }),
       githubStatus: () =>
@@ -822,12 +804,12 @@ const make = (hooks: ProjectHooks = {}) =>
               installed: false,
               loggedIn: false,
               reason: t("server.project.github.unchecked"),
-            } satisfies GitHubStatus),
-      refreshGitHub: Effect.fn("Projects.refreshGitHub")(function* () {
+            } satisfies T.GitHubStatus),
+      refreshGitHub: Effect.fn("Project.refreshGitHub")(function* () {
         const probed = yield* probeGitHub(gh);
-        const next = new Map<string, PullRequestCapability>();
+        const next = new Map<string, T.PullRequestCapability>();
         for (const p of yield* list()) {
-          let c: PullRequestCapability = { available: false, reason: probed.reason };
+          let c: T.PullRequestCapability = { available: false, reason: probed.reason };
           if (probed.loggedIn) {
             const repo = githubOrigin(yield* repository(p.path).origin);
             if (!p.git || repo === "") c = { available: false, reason: t("server.project.github.notGithub") };
@@ -851,7 +833,7 @@ const make = (hooks: ProjectHooks = {}) =>
         return probed;
       }),
       usesPullRequests,
-      submitPullRequest: Effect.fn("Projects.submitPullRequest")(function* (place, issue, conclusion) {
+      submitPullRequest: Effect.fn("Project.submitPullRequest")(function* (place, issue, conclusion) {
         if (place.branch !== issueBranch(issue.number)) return yield* fail(t("server.project.github.wrongBranch"));
         const checked = yield* toMergeFailure(checkMerge(place, ""));
         return yield* serially(
@@ -909,7 +891,7 @@ const make = (hooks: ProjectHooks = {}) =>
           }),
         );
       }),
-      pullRequestState: Effect.fn("Projects.pullRequestState")(function* (name, n) {
+      pullRequestState: Effect.fn("Project.pullRequestState")(function* (name, n) {
         const repo = githubOrigin(yield* repository(join(root, name)).origin);
         if (repo === "") return yield* fail(t("server.project.github.notGithub"));
         const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
@@ -923,7 +905,7 @@ const make = (hooks: ProjectHooks = {}) =>
         if (result.state === "CLOSED") return "closed" as const;
         return yield* fail(t("server.project.github.stateUnknown", { n }));
       }),
-      finishPullRequest: Effect.fn("Projects.finishPullRequest")(function* (name, n) {
+      finishPullRequest: Effect.fn("Project.finishPullRequest")(function* (name, n) {
         return yield* serially(
           name,
           Effect.gen(function* () {
@@ -974,4 +956,4 @@ function repoDirs(dir: string, depth: number): string[] {
 }
 
 /** As the server starts: a first look at GitHub; the page asks again with github.refresh. */
-export const start = Layer.effectDiscard(Effect.flatMap(Projects, (p) => Effect.forkScoped(p.refreshGitHub())));
+export const start = Layer.effectDiscard(Effect.flatMap(Project, (p) => Effect.forkScoped(p.refreshGitHub())));

@@ -51,7 +51,7 @@ packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型
 | | 管家 | 帮工（农机 `vibevalley`） | 命令行 | 帮手（`spawn_agent`） |
 |---|---|---|---|---|
 | 说明（`instructions`） | 管家的系统提示，[管家](docs/subsystems/orchestrator.md) | `helperInstructions`，加上档案的人设和技能（追加或替换） | 命令行的说明 | 派它的 agent 的名字和规矩 |
-| 农场的工具 | `Tools` 管家那张表 | 经 MCP 接 `/mcp`（帮工那张表） | 无 | 和派它的一样 |
+| 农场的工具 | `Tool` 管家那张表 | 经 MCP 接 `/mcp`（帮工那张表） | 无 | 和派它的一样 |
 | 编码工具 | 无 | 有 | 有 | 和派它的一样 |
 | 技能（扫目录） | 无（`noSkills`） | 有 | 有 | 和派它的一样 |
 | 记性 | 有 | 无 | 有 | 无 |

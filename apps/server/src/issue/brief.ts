@@ -1,12 +1,12 @@
 import { t } from "@vibevalley/i18n";
-import type { Deliverable, Issue } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 
 import { reportVerdict } from "@/session/report.ts";
 
 import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
 /** The criteria go last, so whoever works it checks each one before handing the work back; an answer issue's brief ends with the block parseAnswer reads. */
-export function issueBrief(pick: Pick<Issue, "title" | "description" | "criteria"> & { readonly deliver?: Deliverable }): string {
+export function issueBrief(pick: Pick<T.Issue, "title" | "description" | "criteria"> & { readonly deliver?: T.Deliverable }): string {
   let brief = pick.title;
   if (pick.description) brief += "\n\n" + pick.description;
   if (pick.criteria.length > 0) brief += "\n\n" + criteriaHead + "\n" + pick.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");

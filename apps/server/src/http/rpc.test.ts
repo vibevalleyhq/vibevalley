@@ -8,7 +8,7 @@ import { Socket } from "effect/socket";
 
 import { Subscriptions, rpcPath } from "@vibevalley/protocol/rpc";
 
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { quietApp } from "@/testing/world.ts";
 
@@ -19,7 +19,7 @@ import { fromTheFarm } from "./rpc.ts";
 const farm = Effect.gen(function* () {
   let address = "";
   const built = yield* Layer.build(app(testConfig(), 0, (a) => Effect.sync(() => void (address = a)), quietApp));
-  return { address, chat: Context.get(built, Channels) };
+  return { address, chat: Context.get(built, Channel) };
 });
 
 /** A client on the test's scope: its socket stays open until the test ends. */

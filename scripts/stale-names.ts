@@ -29,12 +29,12 @@ const RULES: readonly Rule[] = [
     name: "a document, now an artifact",
     pattern:
       /\bdoc_(get|block_\w+)\b|\bdoc\.(list|create|import|get|submit|block|markdown|demo)\b|\bDoc(Op|Submit|Ack|Span|Marks|Snapshot|Shape|Editor|sPage|BlockCreate|BlockUpdate|Request|Import)\w*\b|\bdocOwner\b|\/doc\/doc\b|features\/doc\b|["'`]\/docs\b/u,
-    says: "documents are artifacts with a blocks body (Artifacts, artifact.block.list, artifact_block_create, BlockOp, BlockSubmit, /artifacts)",
+    says: "documents are artifacts with a blocks body (Artifact, artifact.block.list, artifact_block_create, BlockOp, BlockSubmit, /artifacts)",
   },
   {
     name: "a cron under its old name",
     pattern: /[Rr]ecurrences?/u,
-    says: "a timed trigger is a Cron (Crons, CronWhen, cron.*, cron_create …); the page calls it 定时任务",
+    says: "a timed trigger is a Cron (the Cron service, CronWhen, cron.*, cron_create …); the page calls it 定时任务",
   },
   {
     name: "playbook or plan for a task",
@@ -142,7 +142,7 @@ const RULES: readonly Rule[] = [
     name: "an issue's cron under the schedule name",
     pattern:
       /\b(Schedules|ScheduleShape|ScheduleRequest|ScheduleWhen\w*|ScheduleBy|scheduleProblem|listSchedules|FactSchedule|FactUnschedule)\b|\bschedules?\.\w|"(un)?schedule"/u,
-    says: "Cron, Crons, CronRequest, CronWhen, cron.*; Effect's Schedule is another thing",
+    says: "Cron (the shape T.Cron and the service), CronRequest, CronWhen, cron.*; Effect's Schedule is another thing",
   },
   {
     name: "a helper's question under the ask name",
@@ -248,7 +248,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a place to talk under another name",
     pattern: /\b(Conversation\w*|conversation_id|channel_conversation|Rooms|RoomEvent|roomsPath|useRoom|followRoom)\b/u,
-    says: "Channel (channel_id, Channels): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
+    says: "Channel (channel_id, the Channel service): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
   },
   {
     name: "a business name in farm words",
@@ -305,7 +305,7 @@ const RULES: readonly Rule[] = [
   {
     name: "the text given to a helper as a task",
     pattern: /\breopenTask\b/u,
-    says: "the text a helper is given is its brief (reopenBrief, Sessions.send(agent, brief, …), Issues.hire(agent, brief, …), chooseAgent(candidates, brief, …))",
+    says: "the text a helper is given is its brief (reopenBrief, Session.send(agent, brief, …), Issue.hire(agent, brief, …), chooseAgent(candidates, brief, …))",
   },
   {
     name: "a runtime's preset read from the agent's seeds",
@@ -322,10 +322,17 @@ const RULES: readonly Rule[] = [
   {
     name: "a service not in Effect's default class form",
     pattern: /= Context\.Service<|\b[A-Z][A-Za-z]*Shape\b|^export const layer\b/mu,
-    says: 'a service is a class with its interface inline and its layer static (node_modules/effect/AGENTS.md): class Issues extends Context.Service<Issues, { … }>()("vibevalley/Issue") { static readonly layer = … }; its type is Issues["Service"]',
+    says: 'a service is a class with its interface inline and its layer static (node_modules/effect/AGENTS.md): class Issue extends Context.Service<Issue, { … }>()("vibevalley/Issue") { static readonly layer = … }; its type is Issue["Service"]',
     // Projection's interface is core's and its implementation the projection module's, above it (foundation.md): its layer
     // cannot sit on the class.
     except: /^apps\/server\/src\/projection\/projection\.ts$/u,
+  },
+  {
+    name: "a service under a plural name",
+    pattern:
+      /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Projects|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Projects|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,
+    says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Issue, Memory, Project, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/store.ts, makeMemoryStore) and BlockStore (makeBlockStore, BlockStoreOptions) (docs/style/naming.md)',
+    dirs: ["apps/server/src"],
   },
 ];
 

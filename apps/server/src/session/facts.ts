@@ -4,7 +4,7 @@ import type { Event, TokenTotals, ToolOutputPart } from "@botiverse/oar";
 import { classifyTool, type ToolActionKind } from "@botiverse/oar/observe";
 
 import { t } from "@vibevalley/i18n";
-import type { Session, SessionAction, SessionEventType, Spent, ToolAction, SessionId } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 
 import { clip } from "@/base/clip.ts";
@@ -24,7 +24,7 @@ export type From = readonly string[];
 
 export interface ToolStart {
   readonly text: string;
-  readonly action: ToolAction;
+  readonly action: T.ToolAction;
   readonly tool: string;
   readonly input?: string;
 }
@@ -36,13 +36,13 @@ export interface Tracking {
   /** The next report is counted from it. */
   readonly oarTokens?: TokenTotals;
   readonly rate?: Rate;
-  readonly runFrom?: Spent;
+  readonly runFrom?: T.Spent;
   /** The next word from it ends the quiet spell. */
   readonly quiet?: boolean;
 }
 
 export interface FactContext {
-  readonly id: SessionId;
+  readonly id: T.SessionId;
   readonly runtime: string;
   readonly cwd: string;
 }
@@ -52,7 +52,7 @@ export type Op =
   | { readonly type: "toolStarted"; readonly callId: string; readonly start: ToolStart; readonly from?: From }
   | { readonly type: "toolInput"; readonly callId: string; readonly input: string; readonly text: string; readonly from?: From }
   | { readonly type: "toolEnded"; readonly callId: string; readonly output: string; readonly ok: boolean; readonly from?: From }
-  | { readonly type: "note"; readonly kind: SessionEventType; readonly text: string; readonly from?: From };
+  | { readonly type: "note"; readonly kind: T.SessionEventType; readonly text: string; readonly from?: From };
 
 export interface Reaction {
   readonly tracking: Tracking;
@@ -63,7 +63,7 @@ export interface Reaction {
   readonly warn: string;
 }
 
-const actions: Partial<Record<ToolActionKind, ToolAction>> = {
+const actions: Partial<Record<ToolActionKind, T.ToolAction>> = {
   run_command: "run_command",
   read_file: "read_file",
   edit_file: "edit_file",
@@ -75,7 +75,7 @@ const actions: Partial<Record<ToolActionKind, ToolAction>> = {
 };
 
 /** What was spent from from to now; undefined when nothing was counted from. */
-export function since(now: Spent, from: Spent | undefined): Spent | undefined {
+export function since(now: T.Spent, from: T.Spent | undefined): T.Spent | undefined {
   if (!from) return undefined;
   return { tokens: now.tokens - from.tokens, ...(now.cny !== undefined ? { cny: now.cny - (from.cny ?? 0) } : {}) };
 }
@@ -101,7 +101,7 @@ function label(runtime: string, tool: string, input: string | undefined, cwd: st
   return { kind: action.kind, detail: detail ? near(cwd, detail) : "" };
 }
 
-export function eventFacts(event: Event, session: Session | undefined, tracking: Tracking, ctx: FactContext): Reaction {
+export function eventFacts(event: Event, session: T.Session | undefined, tracking: Tracking, ctx: FactContext): Reaction {
   const id = ctx.id;
   const facts: FactIn[] = [];
   let journal: Op[] = [];
@@ -112,7 +112,7 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
   const working = session?.phase._tag === "working" ? session.phase : undefined;
 
   // A fact only when something changed.
-  const doing = (action: SessionAction, text: string) => {
+  const doing = (action: T.SessionAction, text: string) => {
     if (!working || (working.doing.action === action && working.doing.label === text)) return;
     facts.push({ type: "doing", id, action, label: text });
   };

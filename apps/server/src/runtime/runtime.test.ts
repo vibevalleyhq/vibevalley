@@ -10,10 +10,10 @@ import { Effect, Fiber, Layer, Stream } from "effect";
 import { TestClock } from "effect/testing";
 
 import { setLocale, t } from "@vibevalley/i18n";
-import type { AccountUsage, Agent, RuntimeInfo, SideEvent } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Core } from "@/core/core.ts";
 import { layer as projection } from "@/projection/projection.ts";
@@ -33,7 +33,7 @@ const fake = (id: string, more: Partial<Parameters<typeof defineRuntime>[0]> = {
     ...more,
   });
 
-const notFound = async (id: string): Promise<RuntimeInfo> => ({
+const notFound = async (id: string): Promise<T.RuntimeInfo> => ({
   stop: "",
   id,
   preset: presetOf(id),
@@ -49,7 +49,7 @@ const notFound = async (id: string): Promise<RuntimeInfo> => ({
 });
 
 const world = (config: ServerConfig["Service"] = testConfig()) =>
-  Layer.mergeAll(Core.layer.pipe(Layer.provide(projection)), Agents.layer).pipe(
+  Layer.mergeAll(Core.layer.pipe(Layer.provide(projection)), Agent.layer).pipe(
     Layer.provideMerge(Layer.succeed(ServerConfig, config)),
     Layer.provideMerge(NodeServices.layer),
   );
@@ -57,7 +57,7 @@ const world = (config: ServerConfig["Service"] = testConfig()) =>
 /** A runtime service over the given runtimes, never asking this machine's. */
 const runtimes = (options: RuntimeOptions = {}) => make({ background: false, probe: notFound, usageOf: async () => null, ...options });
 
-const agent = (a: Partial<Agent>): Agent => sampleAgent({ id: "a", name: "小禾", ...a });
+const agent = (a: Partial<T.Agent>): T.Agent => sampleAgent({ id: "a", name: "小禾", ...a });
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
@@ -151,7 +151,7 @@ describe("runtime", () => {
         const runPromise = Effect.runPromiseWith(yield* Effect.context());
         let full = 0;
         let usageCalls = 0;
-        const changed: AccountUsage = { status: "ok", subscription: "pro", windows: [] };
+        const changed: T.AccountUsage = { status: "ok", subscription: "pro", windows: [] };
         const registry = new RuntimeRegistry([
           fake("pi", {
             installation: async (): Promise<InstallationSnapshot> => {
@@ -205,13 +205,13 @@ describe("runtime", () => {
 
   // The spend push waits spendPushAfterMs on the service's Clock: moved through, not waited for.
   it.effect("a usage read keeps its answer when a spend rebuilds what is shown meanwhile, and a late older one does not undo a newer", () => {
-    const out: ((u: AccountUsage) => void)[] = [];
+    const out: ((u: T.AccountUsage) => void)[] = [];
     const used = (usedPercent: number) =>
       ({
         status: "ok",
         subscription: "pro",
         windows: [{ label: "5 hours", usedPercent, resetsAt: null }],
-      }) as AccountUsage;
+      }) as T.AccountUsage;
     return Effect.gen(function* () {
       let calls = 0;
       const r = yield* make({
@@ -221,7 +221,7 @@ describe("runtime", () => {
           }),
         ]),
         background: false,
-        usageOf: async () => (++calls === 1 ? null : new Promise<AccountUsage>((answer) => out.push(answer))),
+        usageOf: async () => (++calls === 1 ? null : new Promise<T.AccountUsage>((answer) => out.push(answer))),
       });
       yield* r.refresh("pi");
       // A spend while the read is out pushes a new total, rebuilding the cached observation.
@@ -249,8 +249,8 @@ describe("runtime", () => {
   });
 
   it.live("a failed list probe is retried without changing the synchronous checking answer", () => {
-    const first = deferred<RuntimeInfo>();
-    const second = deferred<RuntimeInfo>();
+    const first = deferred<T.RuntimeInfo>();
+    const second = deferred<T.RuntimeInfo>();
     let probes = 0;
     return Effect.gen(function* () {
       const r = yield* runtimes({
@@ -274,8 +274,8 @@ describe("runtime", () => {
   });
 
   it.live("an old read's failure does not clear the newer read's checking marker", () => {
-    const old = deferred<RuntimeInfo>();
-    const latest = deferred<RuntimeInfo>();
+    const old = deferred<T.RuntimeInfo>();
+    const latest = deferred<T.RuntimeInfo>();
     let probes = 0;
     return Effect.gen(function* () {
       const runPromise = Effect.runPromiseWith(yield* Effect.context());
@@ -332,7 +332,7 @@ describe("runtime", () => {
 
   it.live("inherited session options are checked before a profile can be chosen", () =>
     Effect.gen(function* () {
-      const store = yield* Agents;
+      const store = yield* Agent;
       yield* store.saveSettings("antigravity", {
         ...store.settings("antigravity"),
         defaultEffort: "high",
@@ -356,7 +356,7 @@ describe("runtime", () => {
 
   it.live("model effort checks use the inherited effort and allow a profile override", () =>
     Effect.gen(function* () {
-      const store = yield* Agents;
+      const store = yield* Agent;
       yield* store.saveSettings("pi", {
         ...store.settings("pi"),
         defaultModel: "known",
@@ -382,7 +382,7 @@ describe("runtime", () => {
   for (const source of ["profile", "runtime"] as const)
     it.live(`an unknown ${source} model warns and checks effort against the actual fallback`, () =>
       Effect.gen(function* () {
-        const store = yield* Agents;
+        const store = yield* Agent;
         yield* store.saveSettings("pi", {
           ...store.settings("pi"),
           defaultModel: source === "runtime" ? "missing" : "configured",
@@ -437,7 +437,7 @@ describe("runtime", () => {
         },
       });
       yield* r.info("pi");
-      const store = yield* Agents;
+      const store = yield* Agent;
       const updating = runPromise(r.update("pi", { ...store.settings("pi"), defaultEffort: "high" }));
       yield* Effect.promise(() => until(() => waiting));
       const a = agent({});
@@ -461,7 +461,7 @@ describe("runtime", () => {
         });
         const a = agent({});
         expect(yield* r.problemsOf(a)).toEqual([]);
-        const store = yield* Agents;
+        const store = yield* Agent;
         yield* r.update("pi", {
           ...store.settings("pi"),
           ...(option === "effort" ? { defaultEffort: "high" } : { env: { NEW: "set" } }),
@@ -485,7 +485,7 @@ describe("runtime", () => {
           installation: { status: "available", via: "bundled", command: id, version: null },
         }),
       });
-      const store = yield* Agents;
+      const store = yield* Agent;
       yield* r.update("pi", { ...store.settings("pi"), enabled: false, dailyBudget: 1 });
       r.spend("pi", 1);
       const a = agent({ enabled: false });
@@ -508,7 +508,7 @@ describe("runtime", () => {
         expect(info.installation.status).toBe("checking");
         expect(info.preset).toEqual(presetOf(info.id));
       }
-      let list: RuntimeInfo[] = [];
+      let list: T.RuntimeInfo[] = [];
       yield* Effect.promise(() =>
         until(() => {
           list = r.list();
@@ -544,7 +544,7 @@ describe("runtime", () => {
     ]);
     const farm = (bin: string) =>
       Effect.gen(function* () {
-        yield* Effect.flatMap(Agents, (a) =>
+        yield* Effect.flatMap(Agent, (a) =>
           a.saveSettings("pi", {
             enabled: true,
             binPath: bin,
@@ -569,7 +569,7 @@ describe("runtime", () => {
   it.live("yesterday's spending does not stop today's work", () =>
     Effect.gen(function* () {
       const r = yield* runtimes({ probe: notFound });
-      const agents = yield* Agents;
+      const agents = yield* Agent;
       yield* agents.saveSettings("pi", { ...agents.settings("pi"), dailyBudget: 10 });
       yield* r.refresh("pi");
       r.setSpent({ day: "2000-01-01", byRuntime: { pi: 12 } });
@@ -621,13 +621,13 @@ describe("runtime", () => {
         ))._tag,
       ).toBe("Refused");
       expect(probed).toBe(false);
-      expect((yield* Agents).settings("pi").defaultModel).not.toBe("unsaved");
+      expect((yield* Agent).settings("pi").defaultModel).not.toBe("unsaved");
     }).pipe(Effect.scoped, Effect.provide(world(config)));
   });
 
   it.live("resolve owns the defaults, the overrides and the model's fallback", () =>
     Effect.gen(function* () {
-      yield* Effect.flatMap(Agents, (a) =>
+      yield* Effect.flatMap(Agent, (a) =>
         a.saveSettings("pi", {
           enabled: true,
           binPath: "",
@@ -647,7 +647,7 @@ describe("runtime", () => {
       const got = yield* r.resolve(a);
       expect([got.runtime.id, got.model, got.effort, got.env]).toEqual(["pi", "known", "default-effort", { base: "kept", override: "profile" }]);
       const core = yield* Core;
-      const notices: SideEvent[] = [];
+      const notices: T.SideEvent[] = [];
       // Subscribed before it returns: no wait for the reader to start.
       yield* Effect.forkScoped(Stream.runForEach(yield* core.subscribe, (e) => Effect.sync(() => notices.push(e))));
       const fallback = yield* r.resolve({ ...a, model: "unknown", effort: "profile-effort" });

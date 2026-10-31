@@ -10,7 +10,7 @@ import { until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import { InProcessRun } from "./inProcessRun.ts";
-import { type RunFinished, type RunStore, runOf, Sessions, type SessionsInside, NotRecorded } from "./session.ts";
+import { type RunFinished, type RunStore, runOf, Session, type SessionsInside, NotRecorded } from "./session.ts";
 const user = (words: string): CoreEvent => ({ type: "message_start", message: { role: "user", content: [text(words)], timestamp: 0 } });
 const said = (words: string, stopReason: StopReason = "stop", errorMessage?: string): CoreEvent => ({
   type: "message_end",
@@ -34,7 +34,7 @@ const issue = (id: string) =>
 describe("the orchestrator's runs", () => {
   it.live("one loop is one run; its inputs' issues are all linked; failures and stops are said", () =>
     Effect.gen(function* () {
-      const sessions = (yield* Sessions) as SessionsInside;
+      const sessions = (yield* Session) as SessionsInside;
       yield* issue("i1");
       yield* issue("i2");
       const finished: RunFinished[] = [];
@@ -84,7 +84,7 @@ describe("the orchestrator's runs", () => {
 
   it.live("close changes execution only when its effect runs", () =>
     Effect.gen(function* () {
-      const sessions = (yield* Sessions) as SessionsInside;
+      const sessions = (yield* Session) as SessionsInside;
       const x = new InProcessRun(
         "orchestrator",
         sessions.trajectories.openLog("orchestrator"),
@@ -120,7 +120,7 @@ describe("the orchestrator's runs", () => {
 
   it.live("a run whose end could not be written ends before the next starts", () =>
     Effect.gen(function* () {
-      const sessions = (yield* Sessions) as SessionsInside;
+      const sessions = (yield* Session) as SessionsInside;
       let broken = true;
       const store: RunStore = {
         ...sessions.runStore,

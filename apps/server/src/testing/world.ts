@@ -16,8 +16,8 @@ import { Mcp } from "@/mcp/mcp.ts";
 import { type GitHubRun, type ProjectHooks } from "@/project/project.ts";
 import { registryOf } from "@/runtime/runtime.ts";
 import { agentSessions, agents, collaboration, issuesBelowTaskGraphs, platform, type ServiceOptions, sourceControl } from "@/services.ts";
-import { Tasks } from "@/task/task.ts";
-import { Tools } from "@/tool/tool.ts";
+import { Task } from "@/task/task.ts";
+import { Tool } from "@/tool/tool.ts";
 
 import { clockLayer } from "./clock.ts";
 import { repo } from "./git.ts";
@@ -77,7 +77,7 @@ export function worldBelowTasks(options: WorldOptions = {}) {
 /** The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds
  * it). */
 export function world(options: WorldOptions = {}) {
-  return worldBelowTasks(options).pipe(on(Tasks.layer()), on(Inbox.layer), on(Tools.layer), on(Mcp.layer(options.who ? { who: options.who } : {})));
+  return worldBelowTasks(options).pipe(on(Task.layer()), on(Inbox.layer), on(Tool.layer), on(Mcp.layer(options.who ? { who: options.who } : {})));
 }
 
 const on =

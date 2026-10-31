@@ -11,7 +11,7 @@ import type { ServerConfig } from "@/base/config.ts";
 import { handlers } from "@/handlers.ts";
 import { Lan } from "@/lan/lan.ts";
 import { type ServiceOptions, services } from "@/services.ts";
-import { Sessions } from "@/session/session.ts";
+import { Session } from "@/session/session.ts";
 
 import { api } from "./api.ts";
 import { artifactContent } from "./artifact.ts";
@@ -42,7 +42,7 @@ const ready = (listening: (address: string) => Effect.Effect<void>) =>
       if (server.address._tag === "UnixPathAddress") return;
       const address = `127.0.0.1:${server.address.port}`;
       // A free port (0) is known only now: sessions opened from here on reach /mcp there.
-      (yield* Sessions).setAddress(address);
+      (yield* Session).setAddress(address);
       // What the lan listener lets through goes to here.
       (yield* Lan).setUpstream(address);
       yield* listening(address);

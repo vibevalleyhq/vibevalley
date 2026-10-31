@@ -7,10 +7,10 @@ import { Effect } from "effect";
 import { ownerId } from "@vibevalley/protocol";
 
 import { ServerConfig } from "@/base/config.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { worldBelowTasks } from "@/testing/world.ts";
 
-import { Artifacts } from "./artifact.ts";
+import { Artifact } from "./artifact.ts";
 import { artifactMax } from "./policy.ts";
 
 const owner = { from: ownerId, by: ownerId };
@@ -19,8 +19,8 @@ const page = (words: string) => `<!doctype html><title>${words}</title><p>${word
 describe("an artifact", () => {
   it.live("is announced with its card where it belongs, and a new version keeps the old ones readable", () =>
     Effect.gen(function* () {
-      const artifacts = yield* Artifacts;
-      const chat = yield* Channels;
+      const artifacts = yield* Artifact;
+      const chat = yield* Channel;
       const general = chat.defaultChannel();
       const made = yield* artifacts.create(owner, { title: " 详情：抽屉还是整页 ", kind: "html", content: page("抽屉"), note: "两种" });
       expect(made).toMatchObject({ title: "详情：抽屉还是整页", body: "html", channel: general, by: ownerId, version: 1 });
@@ -45,8 +45,8 @@ describe("an artifact", () => {
 
   it.live("handed in as Markdown is read into blocks to write on together, and takes no new version", () =>
     Effect.gen(function* () {
-      const artifacts = yield* Artifacts;
-      const chat = yield* Channels;
+      const artifacts = yield* Artifact;
+      const chat = yield* Channel;
       const made = yield* artifacts.create({ from: ownerId, by: "lab" }, { title: "调研", kind: "markdown", content: "# 结论\n\n用**抽屉**。", note: "初稿" });
       expect(made).toMatchObject({ body: "blocks", version: 0, seq: 1, versions: [] });
       expect((yield* chat.history(chat.defaultChannel())).at(-1)!.artifact).toEqual({ id: made.id, title: "调研", body: "blocks", version: 0, note: "初稿" });
@@ -65,8 +65,8 @@ describe("an artifact", () => {
 
   it.live("started on the page with a title is empty, announced nowhere, and an html one has no blocks", () =>
     Effect.gen(function* () {
-      const artifacts = yield* Artifacts;
-      const chat = yield* Channels;
+      const artifacts = yield* Artifact;
+      const chat = yield* Channel;
       const before = (yield* chat.history(chat.defaultChannel())).length;
       const blank = yield* artifacts.create(owner, { title: "周报" });
       expect(blank).toMatchObject({ body: "blocks", version: 0, seq: 0, by: ownerId });
@@ -81,7 +81,7 @@ describe("an artifact", () => {
 
   it.live("refuses what it cannot be, and says which", () =>
     Effect.gen(function* () {
-      const artifacts = yield* Artifacts;
+      const artifacts = yield* Artifact;
       const refusedFor = (title: string, kind: string, content: string) => Effect.flip(artifacts.create(owner, { title, kind: kind as "html", content }));
       expect(yield* refusedFor("", "html", page("a"))).toMatchObject({ _tag: "Refused" });
       expect(yield* refusedFor("a", "pdf", page("a"))).toMatchObject({ _tag: "Refused" });
@@ -97,8 +97,8 @@ describe("an artifact", () => {
 
   it.live("goes with its versions, and its content files go once no other artifact keeps them", () =>
     Effect.gen(function* () {
-      const artifacts = yield* Artifacts;
-      const chat = yield* Channels;
+      const artifacts = yield* Artifact;
+      const chat = yield* Channel;
       const dir = join((yield* ServerConfig).home, "artifacts");
       const same = page("同一页");
       const one = yield* artifacts.create(owner, { title: "一", kind: "html", content: same });

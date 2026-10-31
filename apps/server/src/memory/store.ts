@@ -5,7 +5,7 @@
 import { Clock, Effect, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import { type ActorKind, type Memory, type Outcome } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
@@ -24,7 +24,7 @@ export interface FinishedRun {
   readonly session: string;
   readonly project: string;
   readonly brief: string;
-  readonly outcome: Outcome;
+  readonly outcome: T.Outcome;
   readonly said: string;
   readonly summary: string;
 }
@@ -58,14 +58,14 @@ const fadingSoon = 10;
 
 const recutBatch = 100;
 
-export const makeMemories = Effect.gen(function* () {
+export const makeMemoryStore = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const { attempt: db, run, attemptTx } = yield* Db;
 
   const list = (agent: string) =>
     db(
       Effect.map(q.memoriesOf({ agent }), (rows) =>
-        rows.map((r): Memory => ({
+        rows.map((r): T.Memory => ({
           id: r.id,
           agent,
           kind: r.kind,
@@ -81,7 +81,7 @@ export const makeMemories = Effect.gen(function* () {
       ),
     );
 
-  const insertNote = Effect.fnUntraced(function* (agent: string, body: string, project: string | undefined, session: string | undefined, author: ActorKind) {
+  const insertNote = Effect.fnUntraced(function* (agent: string, body: string, project: string | undefined, session: string | undefined, author: T.ActorKind) {
     const at = yield* Clock.currentTimeMillis;
     const id = newId();
     yield* db(
@@ -126,7 +126,7 @@ export const makeMemories = Effect.gen(function* () {
       });
       return pick(all, picked);
     },
-    (effect, cue) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), [] as Memory[]))),
+    (effect, cue) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), [] as T.Memory[]))),
   );
 
   const markRecalled = (ids: readonly string[]) =>
@@ -140,7 +140,7 @@ export const makeMemories = Effect.gen(function* () {
       ? Effect.void
       : attemptTx(
           Effect.gen(function* () {
-            const known: Pick<Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
+            const known: Pick<T.Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
             for (const note of memoryNotesOf(run.said)) {
               const project = note.everywhere ? undefined : run.project;
               if (!memoryIsNewNote(known, note.text, project)) continue;
@@ -170,7 +170,7 @@ export const makeMemories = Effect.gen(function* () {
       const fading = new Set(nextForgotten(all, fadingSoon));
       return all.map((m) => ({ ...m, fading: fading.has(m.id) }));
     },
-    (effect, agent) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memories of ${agent}: ${String(e)}`), [] as Memory[]))),
+    (effect, agent) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memories of ${agent}: ${String(e)}`), [] as T.Memory[]))),
   );
 
   const write = Effect.fnUntraced(function* (n: Note) {
@@ -197,7 +197,7 @@ export const makeMemories = Effect.gen(function* () {
       fading: false,
       ...(project ? { project } : {}),
       ...(session ? { session: sessionId(session) } : {}),
-    } satisfies Memory;
+    } satisfies T.Memory;
   });
 
   const forget = (agent: string, id: string) => run(q.forget({ agent, id }));
@@ -214,4 +214,4 @@ export const makeMemories = Effect.gen(function* () {
   return { list, listed, matches, recallable, markRecalled, keep, write, forget, recutTerms };
 });
 
-export type Memories = Effect.Success<typeof makeMemories>;
+export type MemoryStore = Effect.Success<typeof makeMemoryStore>;

@@ -1,9 +1,9 @@
 import { t } from "@vibevalley/i18n";
-import type { Issue, IssueTimeline, Milestone, MilestoneKind, Run, RunTrigger, Spent } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { closedText, plainText } from "@vibevalley/protocol/rules";
 
 import { or } from "@/base/order.ts";
-function startWords(trigger: RunTrigger, first: boolean): [MilestoneKind, string] {
+function startWords(trigger: T.RunTrigger, first: boolean): [T.MilestoneKind, string] {
   switch (trigger.kind) {
     case "refine":
       return ["started", t("server.issue.timeline.refine")];
@@ -22,8 +22,8 @@ function startWords(trigger: RunTrigger, first: boolean): [MilestoneKind, string
 
 /** runs oldest first; names: a session's name by its id. The milestones come newest first, the questions it waits on now
  * with its last run. */
-export function milestonesOf(issue: Issue, runs: readonly Run[], names: ReadonlyMap<string, string>): IssueTimeline {
-  const out: Milestone[] = [{ at: issue.createdAt, kind: "opened", text: t("server.issue.timeline.opened") }];
+export function milestonesOf(issue: T.Issue, runs: readonly T.Run[], names: ReadonlyMap<string, string>): T.IssueTimeline {
+  const out: T.Milestone[] = [{ at: issue.createdAt, kind: "opened", text: t("server.issue.timeline.opened") }];
   const lastDone = runs.findLastIndex((r) => r.endedAt !== undefined);
   runs.forEach((r, i) => {
     const who = names.get(r.session);
@@ -69,7 +69,7 @@ export function milestonesOf(issue: Issue, runs: readonly Run[], names: Readonly
     .map((m, i) => [m, i] as const)
     .toSorted((a, b) => or(b[0].at - a[0].at, b[1] - a[1]))
     .map(([m]) => m);
-  const spent = runs.reduce<Spent | undefined>((sum, r) => {
+  const spent = runs.reduce<T.Spent | undefined>((sum, r) => {
     if (!r.spent) return sum;
     const cny = r.spent.cny === undefined ? sum?.cny : (sum?.cny ?? 0) + r.spent.cny;
     return { tokens: (sum?.tokens ?? 0) + r.spent.tokens, ...(cny !== undefined ? { cny } : {}) };

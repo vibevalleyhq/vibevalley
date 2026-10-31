@@ -6,14 +6,14 @@
 import { Cause, Clock, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Schema, Scope } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { messageOf } from "@/errors.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 
-import type { FinishedRun, Memories, Note, RecallCue } from "./memories.ts";
 import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabel } from "./recall.ts";
+import type { FinishedRun, MemoryStore, Note, RecallCue } from "./store";
 import { termsOf } from "./terms.ts";
 
 /** One line a source would have the agent recall, with how good a match it is (only to order one source's own). */
@@ -57,8 +57,8 @@ export interface Source {
   readonly syncTurn: (run: FinishedRun) => Effect.Effect<void, SourceError>;
   readonly sessionEnded: (s: EndedSession) => Effect.Effect<void, SourceError>;
   readonly search: (q: SearchQuery) => Effect.Effect<SourceSearch, SourceError>;
-  readonly list: (agent: string) => Effect.Effect<Memory[], SourceError>;
-  readonly add: (n: Note) => Effect.Effect<Memory | undefined, SourceError>;
+  readonly list: (agent: string) => Effect.Effect<T.Memory[], SourceError>;
+  readonly add: (n: Note) => Effect.Effect<T.Memory | undefined, SourceError>;
   readonly forget: (agent: string, id: string) => Effect.Effect<void, SourceError>;
   readonly can: Abilities;
 }
@@ -86,7 +86,7 @@ const writeTimeoutMs = 30_000;
 const writeQueue = 256;
 
 /** The local source: the memory table, picked by recall.ts. Nothing is marked recalled here: the caller marks those it keeps. */
-export function localSource(m: Memories, profiles: () => string[]): Source {
+export function localSource(m: MemoryStore, profiles: () => string[]): Source {
   const said = <A, E>(e: Effect.Effect<A, E>) => Effect.mapError(e, sourceError);
   return {
     name: localName,
@@ -95,7 +95,7 @@ export function localSource(m: Memories, profiles: () => string[]): Source {
     prefetch: (cue) =>
       said(
         Effect.gen(function* () {
-          let picked: Memory[];
+          let picked: T.Memory[];
           if (cue.peek === true) {
             if (cue.project === "") return [];
             const all = yield* m.list(cue.agent);
@@ -110,7 +110,7 @@ export function localSource(m: Memories, profiles: () => string[]): Source {
       said(
         Effect.gen(function* () {
           const agents = q.agent === "" ? profiles() : [q.agent];
-          const all: Memory[] = [];
+          const all: T.Memory[] = [];
           const matches: Record<string, number> = {};
           for (const agent of agents) {
             all.push(...(yield* m.list(agent)));
@@ -199,7 +199,7 @@ const within = <A>(e: Effect.Effect<A, SourceError>, ms: number) =>
 /** The sources as one setting made them. Its scope holds what it does: the operations still going and the writer. */
 interface Generation {
   readonly all: Source[];
-  readonly off: MemorySourceInfo[];
+  readonly off: T.MemorySourceInfo[];
   readonly scope: Scope.Closeable;
   readonly operations: FiberSet.FiberSet;
   /** Background writes, in order, taken by the writer. */
@@ -213,7 +213,7 @@ interface Generation {
 /** Owns source generations and every accepted operation, including retirement and shutdown. */
 export interface Sources {
   readonly prefetch: (cue: RecallCue) => Effect.Effect<RecalledLine[][]>;
-  readonly list: (agent: string) => Effect.Effect<{ memories: Memory[]; sources: MemorySourceInfo[] }>;
+  readonly list: (agent: string) => Effect.Effect<{ memories: T.Memory[]; sources: T.MemorySourceInfo[] }>;
   readonly search: (query: SearchQuery) => Effect.Effect<(SourceSearch & { source: string })[]>;
   /** Why the memory with this id cannot be forgotten here; forget refuses for the same reason. */
   readonly forgetProblem: (id: string) => string | undefined;
@@ -221,7 +221,7 @@ export interface Sources {
   readonly add: (note: Note) => void;
   readonly keep: (run: FinishedRun) => void;
   readonly endSession: (session: EndedSession) => void;
-  readonly info: () => MemorySourceInfo[];
+  readonly info: () => T.MemorySourceInfo[];
 }
 
 export interface SourcesOptions {
@@ -266,7 +266,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         }),
       ));
 
-    const generation = Effect.fnUntraced(function* (sources: Source[], off: MemorySourceInfo[]) {
+    const generation = Effect.fnUntraced(function* (sources: Source[], off: T.MemorySourceInfo[]) {
       const scope = yield* Scope.make();
       const operations = yield* Scope.provide(FiberSet.make(), scope);
       const writes = yield* Queue.dropping<Effect.Effect<void>, Cause.Done>(writeQueue);
@@ -281,7 +281,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       if (key === built) return current;
       if (current) retire(current, "memory sources changed; outside operation canceled");
       const all = [local];
-      const off: MemorySourceInfo[] = [];
+      const off: T.MemorySourceInfo[] = [];
       for (const c of now) {
         const name = c.kind;
         const isOff = (why: string) => off.push({ name, label: sourceLabel(name), on: false, canList: false, canForget: false, transcripts: false, off: why });
@@ -344,7 +344,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       }
     };
 
-    const infoOf = (g: Generation): MemorySourceInfo[] => [
+    const infoOf = (g: Generation): T.MemorySourceInfo[] => [
       ...g.all.map((one) => ({
         name: one.name,
         label: sourceLabel(one.name),

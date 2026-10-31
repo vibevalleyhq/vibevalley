@@ -3,7 +3,8 @@
 // once, wherever it is read.
 
 import { t } from "@vibevalley/i18n";
-import { type Issue, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { IssueStatusValues } from "@vibevalley/protocol";
 import { commandOf, type Next } from "@vibevalley/protocol/api";
 
 /** in_progress and in_review are the session's to reach, never the owner's. */
@@ -28,7 +29,7 @@ export type Move =
   | "drop";
 
 /** The whole table; the reason says why when there is no move. */
-export function statusMove(issue: Issue, to: IssueStatus): [Move, string] {
+export function statusMove(issue: T.Issue, to: T.IssueStatus): [Move, string] {
   const from = issue.status;
   if (issue.graph || issue.task || issue.delivered === "merged_into_parent") return ["none", t("server.issue.move.inGraph")];
   if (from === to) return ["none", t("server.issue.move.same")];
@@ -61,10 +62,10 @@ export function statusMove(issue: Issue, to: IssueStatus): [Move, string] {
   return ["none", t("server.issue.move.cannot", { from: t(`shared.status.${from}`), to: t(`shared.status.${to}`) })];
 }
 
-export const statusMoves = (issue: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(issue, to)[0] !== "none");
+export const statusMoves = (issue: T.Issue): T.IssueStatus[] => IssueStatusValues.filter((to) => statusMove(issue, to)[0] !== "none");
 
 /** One that needs the owner's words runs nothing and says which field takes them. */
-export function nextSteps(item: Issue): Next[] {
+export function nextSteps(item: T.Issue): Next[] {
   const n = String(item.number);
   const session = item.sessions.at(-1);
   const acts = item.attention.acts.flatMap((a): Next[] => {

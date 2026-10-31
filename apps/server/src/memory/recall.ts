@@ -2,7 +2,8 @@
 // turn, and the agent page shows the same pick ahead of time. Characters are UTF-16 units.
 
 import { maybe } from "@vibevalley/i18n";
-import { dayMs, type Memory, type MemoryFound, type MemoryKind, type MemoryScope, type MemorySearch, memoryKeep, type Outcome } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { dayMs, memoryKeep } from "@vibevalley/protocol";
 
 import { compare, or } from "@/base/order.ts";
 
@@ -31,7 +32,7 @@ const recallMatchWeight = 0.3;
 const recallSharedWeight = 0.5;
 
 /** Another project's note only when it plainly shares the turn's words; another project's issue never. */
-export function relevance(m: Memory, cue: PickCue, terms: ReadonlySet<string>): number | undefined {
+export function relevance(m: T.Memory, cue: PickCue, terms: ReadonlySet<string>): number | undefined {
   if (cue.skip?.has(m.id) === true || (m.session !== undefined && m.session === cue.session)) return undefined;
   const shared = termsInCommon(termsOf(m.text), terms);
   const here = m.project !== undefined && m.project === cue.project;
@@ -47,21 +48,21 @@ export function relevance(m: Memory, cue: PickCue, terms: ReadonlySet<string>): 
   return kind + place + Math.min(shared, 8) * recallSharedWeight + matched + Math.exp(-age / 30);
 }
 
-export function lineOf(m: Memory, project: string): string {
+export function lineOf(m: T.Memory, project: string): string {
   const w = recallWords;
   const where = m.project === undefined ? w.everywhere : m.project === project ? w.here : w.project(m.project);
   return m.kind === "issue" ? w.issue(where, m.text) : w.note(where, m.text);
 }
 
-export function pick(memories: readonly Memory[], cue: PickCue): Memory[] {
+export function pick(memories: readonly T.Memory[], cue: PickCue): T.Memory[] {
   const terms = termsOf(cue.text);
-  const ranked: { m: Memory; score: number }[] = [];
+  const ranked: { m: T.Memory; score: number }[] = [];
   for (const m of memories) {
     const score = relevance(m, cue, terms);
     if (score !== undefined) ranked.push({ m, score });
   }
   ranked.sort((a, b) => or(compare(b.score, a.score), compare(b.m.at, a.m.at)));
-  const picked: Memory[] = [];
+  const picked: T.Memory[] = [];
   let chars = 0;
   let issues = 0;
   for (const { m } of ranked) {
@@ -76,10 +77,10 @@ export function pick(memories: readonly Memory[], cue: PickCue): Memory[] {
 }
 
 /** The longest unused (last recalled, else written) go first. */
-export function nextForgotten(memories: readonly Memory[], coming: number): string[] {
+export function nextForgotten(memories: readonly T.Memory[], coming: number): string[] {
   const over = memories.length + coming - memoryKeep;
   if (over <= 0) return [];
-  const used = (m: Memory) => m.recalledAt ?? m.at;
+  const used = (m: T.Memory) => m.recalledAt ?? m.at;
   return [...memories]
     .toSorted((a, b) => compare(used(a), used(b)))
     .slice(0, over)
@@ -118,7 +119,7 @@ export function memoryNotesOf(said: string): MemoryNote[] {
   return notes;
 }
 
-export const issueMemoryText = (brief: string, summary: string, outcome: Outcome) =>
+export const issueMemoryText = (brief: string, summary: string, outcome: T.Outcome) =>
   recallWords.issueDone(clip(brief, 100), outcome !== "completed", clip(summary, 200));
 
 export function memoryLikeness(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
@@ -128,7 +129,7 @@ export function memoryLikeness(a: ReadonlySet<string>, b: ReadonlySet<string>): 
 }
 
 /** project undefined: every project. */
-export function memoryIsNewNote(memories: readonly Pick<Memory, "kind" | "text" | "project">[], text: string, project: string | undefined): boolean {
+export function memoryIsNewNote(memories: readonly Pick<T.Memory, "kind" | "text" | "project">[], text: string, project: string | undefined): boolean {
   const terms = termsOf(text);
   return !memories.some((m) => m.kind === "note" && m.project === project && (m.text === text || memoryLikeness(termsOf(m.text), terms) >= 0.8));
 }
@@ -140,21 +141,21 @@ export interface SearchQuery {
   readonly agent: string;
   readonly project: string;
   readonly text: string;
-  readonly kind: MemoryKind | "";
+  readonly kind: T.MemoryKind | "";
   readonly limit: number;
 }
 
 /** One memory a search found, with where it lives and how good a match it is within that source: the wire's shape. */
-export type Found = MemoryFound;
-export type SearchResult = MemorySearch;
-export type { MemoryScope };
+export type Found = T.MemoryFound;
+export type SearchResult = T.MemorySearch;
+export type { MemoryScope } from "@vibevalley/protocol";
 
 export interface SourceSearch {
   readonly found: Found[];
   readonly coverage?: string;
 }
 
-export const inProject = (scope: MemoryScope, project: string) =>
+export const inProject = (scope: T.MemoryScope, project: string) =>
   project === "" || scope.kind === "global" || (scope.kind === "project" && scope.project === project);
 
 export const searchLimit = 10;
@@ -164,13 +165,13 @@ export const localName = "local";
  * The memories matching q.text best first: the full-text index's rank, words in common, the whole query as written, then
  * this project's before the rest and the newest first. A query with no words lists the newest.
  */
-export function search(memories: readonly Memory[], q: SearchQuery, matches: Readonly<Record<string, number>>): Found[] {
+export function search(memories: readonly T.Memory[], q: SearchQuery, matches: Readonly<Record<string, number>>): Found[] {
   const limit = q.limit > 0 ? q.limit : searchLimit;
   const terms = termsOf(q.text);
   const whole = q.text.toLowerCase().trim();
   const out: Found[] = [];
   for (const m of memories) {
-    const scope: MemoryScope = m.project === undefined ? { kind: "global" } : { kind: "project", project: m.project };
+    const scope: T.MemoryScope = m.project === undefined ? { kind: "global" } : { kind: "project", project: m.project };
     if ((q.kind !== "" && m.kind !== q.kind) || !inProject(scope, q.project)) continue;
     let score = (matches[m.id] ?? 0) + termsInCommon(termsOf(m.text), terms) * recallSharedWeight;
     if (whole !== "" && m.text.toLowerCase().includes(whole)) score += 2;

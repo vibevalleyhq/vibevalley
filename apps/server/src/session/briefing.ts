@@ -1,18 +1,18 @@
 import type { McpServer } from "@botiverse/oar";
 
-import type { Agent, MCPServer, Skill } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
 import { recallHead, recallIntro } from "./prompts.ts";
 
 /** What the detail panel shows starts after it. */
 export const briefBreak = "\n\n---\n\n";
 
-export const toOarMcp = (server: MCPServer): McpServer =>
+export const toOarMcp = (server: T.MCPServer): McpServer =>
   server.type === "http"
     ? { name: server.name, type: "http", url: server.url, headers: server.headers }
     : { name: server.name, command: server.command, args: server.args, env: server.env };
 
-export function instructions(agent: Agent, library: readonly Skill[]): string {
+export function instructions(agent: T.Agent, library: readonly T.Skill[]): string {
   const parts = [agent.persona.trim()];
   for (const id of agent.skills) {
     const skill = library.find((s) => s.id === id);

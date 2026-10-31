@@ -8,14 +8,14 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { Context, Effect, FiberSet, Layer } from "effect";
 
-import type { Tool } from "@vibevalley/agent/core/loop";
+import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { coerceArguments } from "@vibevalley/ai/tools";
 
 import { session } from "@/base/actor.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { messageOf } from "@/errors.ts";
-import { Sessions } from "@/session/session.ts";
-import { type Caller, Tools } from "@/tool/tool.ts";
+import { Session } from "@/session/session.ts";
+import { type Caller, Tool } from "@/tool/tool.ts";
 
 import { failedCall, noTool, unknownCaller } from "./prompts.ts";
 
@@ -38,8 +38,8 @@ export interface McpOptions {
 const make = (options: McpOptions = {}) =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
-    const sessions = yield* Sessions;
-    const tools = yield* Tools;
+    const sessions = yield* Session;
+    const tools = yield* Tool;
     const who = options.who ?? sessions.who;
     // A call runs on this service's fibers: it ends with the service.
     const runHere = yield* FiberSet.makeRuntimePromise();
@@ -50,7 +50,7 @@ const make = (options: McpOptions = {}) =>
       return { agent: h?.agent ?? "", session: id, project: h?.project ?? "", here: "", picked: "", actor: session(id) };
     };
 
-    const call = async (tool: Tool, args: unknown): Promise<string> => {
+    const call = async (tool: LoopTool, args: unknown): Promise<string> => {
       try {
         // Coerced as the brain's calls are; each tool's Schema then reads or refuses them.
         const r = await runHere(tool.execute(coerceArguments(args ?? {}, tool.parameters), { id: "" }));

@@ -141,7 +141,7 @@ export interface AgentHost<R> {
   readonly markWrong: (on: number, want: string, model: string, tools: readonly string[]) => Effect.Effect<{ id: string; file: string }, ApiError>;
 }
 
-/** Made by Sessions.host in the owner's scope: the agent's own scope is a child of it, so the agent ends with the owner at
+/** Made by Session.host in the owner's scope: the agent's own scope is a child of it, so the agent ends with the owner at
  * the latest; its log and its runs are kept with the sessions'. */
 export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore): Effect.Effect<AgentHost<R>, never, Scope.Scope> =>
   Effect.gen(function* () {

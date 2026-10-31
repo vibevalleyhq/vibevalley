@@ -7,20 +7,20 @@ import { HttpClient } from "effect/http";
 
 import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "@vibevalley/agent/memory";
 import { t } from "@vibevalley/i18n";
-import { type ArchiveListing, type Memory, type MemoryList, type MemorySourceInfo, type Preview, type RecallPreview } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { agentHome, ServerConfig } from "@/base/config.ts";
 import { messageOf, type ApiError, memoriesOf, missing, refused } from "@/errors.ts";
 import { Setting } from "@/setting/setting.ts";
 
 import { everos } from "./everos.ts";
-import { type FinishedRun, makeMemories, type Note, type RecallCue } from "./memories.ts";
 import { nowledge } from "./nowledge.ts";
 import { fromOwner } from "./prompts.ts";
 import { clip, foundText, type Found, inProject, noteMaxChars, recallChars, searchLimit, type SearchQuery, type SearchResult, sourceLabel } from "./recall.ts";
 import { type EndedSession, interleave, localSource, makeSources, mergeRecalled, type Source } from "./sources.ts";
+import { type FinishedRun, makeMemoryStore, type Note, type RecallCue } from "./store";
 
 export type { EndedSession, FinishedRun, Found, Note, RecallCue, SearchQuery, SearchResult };
 export { foundText };
@@ -31,16 +31,16 @@ export interface Recalled {
   readonly lines: string[];
 }
 
-export class Memories extends Context.Service<
-  Memories,
+export class Memory extends Context.Service<
+  Memory,
   {
     /** An agent's memories: an orchestrator's are the lines of the MEMORY.md in its home; a helper's are rows and its sources'. */
-    readonly memoriesOf: (agent: string) => Effect.Effect<MemoryList>;
-    readonly remember: (n: Note) => Effect.Effect<Memory, ApiError>;
+    readonly memoriesOf: (agent: string) => Effect.Effect<T.MemoryList>;
+    readonly remember: (n: Note) => Effect.Effect<T.Memory, ApiError>;
     readonly forget: (agent: string, id: string) => Effect.Effect<void, ApiError>;
     /** What forget would do, refused as it would be; nothing changes. */
-    readonly previewForget: (agent: string, id: string) => Effect.Effect<Preview, ApiError>;
-    readonly recallOf: (agent: string, project: string, text: string) => Effect.Effect<RecallPreview, ApiError>;
+    readonly previewForget: (agent: string, id: string) => Effect.Effect<T.Preview, ApiError>;
+    readonly recallOf: (agent: string, project: string, text: string) => Effect.Effect<T.RecallPreview, ApiError>;
     /** What a run is told as it starts; only what is told is counted as recalled. */
     readonly recall: (cue: RecallCue) => Effect.Effect<Recalled>;
     /** Behind memory_search: every source's best, taken in turns, the same memory once. */
@@ -48,21 +48,21 @@ export class Memories extends Context.Service<
     /** The local rows keep the run before this returns; the other sources get it in the background. */
     readonly keep: (run: FinishedRun) => Effect.Effect<void>;
     readonly endSession: (s: EndedSession) => Effect.Effect<void>;
-    readonly write: (n: Note) => Effect.Effect<Memory, ApiError>;
-    readonly list: (agent: string) => Effect.Effect<Memory[]>;
-    readonly sources: () => MemorySourceInfo[];
+    readonly write: (n: Note) => Effect.Effect<T.Memory, ApiError>;
+    readonly list: (agent: string) => Effect.Effect<T.Memory[]>;
+    readonly sources: () => T.MemorySourceInfo[];
     /** An orchestrator's archive: what its compactions folded away. */
-    readonly archive: (agent: string, query: string) => ArchiveListing;
+    readonly archive: (agent: string, query: string) => T.ArchiveListing;
     readonly archiveFile: (agent: string, name: string) => string | undefined;
   }
 >()("vibevalley/Memory") {
   static readonly layer = Layer.effect(
-    Memories,
+    Memory,
     Effect.suspend(() => make()),
   );
 }
 
-const lineMemory = (agent: string, line: MemoryLine, fileTime: number): Memory => {
+const lineMemory = (agent: string, line: MemoryLine, fileTime: number): T.Memory => {
   const person = line.text.startsWith(fromOwner);
   let at = fileTime;
   if (line.date) {
@@ -78,7 +78,7 @@ const lineMemory = (agent: string, line: MemoryLine, fileTime: number): Memory =
     recalled: 0,
     fading: false,
     ...(person ? {} : { session: sessionId(agent) }),
-  } satisfies Memory;
+  } satisfies T.Memory;
 };
 
 /** Which outside source a configured one is; tests put their own. */
@@ -90,8 +90,8 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
     const setting = yield* Setting;
-    const agents = yield* Agents;
-    const local = yield* makeMemories;
+    const agents = yield* Agent;
+    const local = yield* makeMemoryStore;
     const http = yield* HttpClient.HttpClient;
     const sources = yield* makeSources({
       local: localSource(local, () => agents.agents().map((a) => a.id)),
@@ -105,11 +105,11 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     const inFile = (agent: string) => agents.isOrchestrator(agent);
     const homeOf = (agent: string) => agentHome(config, agent);
 
-    const list = Effect.fn("Memories.list")(function* (agent: string) {
+    const list = Effect.fn("Memory.list")(function* (agent: string) {
       return (yield* sources.list(agent)).memories;
     });
 
-    const write = Effect.fn("Memories.write")(function* (n: Note) {
+    const write = Effect.fn("Memory.write")(function* (n: Note) {
       const kept = yield* local.write(n).pipe(Effect.mapError((e) => refused(e.message)));
       sources.add(n);
       return kept;
@@ -117,7 +117,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     const forget = (agent: string, id: string) => Effect.mapError(sources.forget(agent, id), (e) => refused(e.message));
 
-    const writeOrchestrator = Effect.fn("Memories.writeOrchestrator")(function* (agent: string, text: string) {
+    const writeOrchestrator = Effect.fn("Memory.writeOrchestrator")(function* (agent: string, text: string) {
       const body = clip(text.replace(/\s*\n\s*/gu, " "), noteMaxChars);
       if (body === "") return yield* Effect.fail(refused(t("server.memory.empty")));
       const at = yield* Clock.currentTimeMillis;
@@ -128,7 +128,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       return lineMemory(agent, written, at);
     });
 
-    const orchestrator = (agent: string): MemoryList => {
+    const orchestrator = (agent: string): T.MemoryList => {
       const snapshot = readMemory(homeOf(agent));
       return {
         file: snapshot.file,
@@ -139,14 +139,14 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     };
 
     const preview = (agent: string, project: string, text: string) =>
-      Effect.map(sources.prefetch({ agent, project, text, peek: true }), (groups): RecallPreview => {
+      Effect.map(sources.prefetch({ agent, project, text, peek: true }), (groups): T.RecallPreview => {
         const lines = mergeRecalled(groups);
         return { lines: lines.map((l) => l.line), chars: lines.reduce((n, l) => n + l.line.length + 1, 0), limit: recallChars };
       });
 
     // forget and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
     const fileRefused = (e: unknown) => refused(messageOf(e));
-    const forgettable = Effect.fn("Memories.forgettable")(function* (agent: string, id: string) {
+    const forgettable = Effect.fn("Memory.forgettable")(function* (agent: string, id: string) {
       const problem = inFile(agent) ? undefined : sources.forgetProblem(id);
       if (problem) return yield* Effect.fail(refused(problem));
       const listed = inFile(agent) ? yield* Effect.try({ try: () => orchestrator(agent), catch: fileRefused }) : yield* sources.list(agent);
@@ -155,34 +155,34 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       return m;
     });
 
-    const shape = Memories.of({
-      memoriesOf: Effect.fn("Memories.memoriesOf")(function* (agent) {
+    const shape = Memory.of({
+      memoriesOf: Effect.fn("Memory.memoriesOf")(function* (agent) {
         return inFile(agent) ? orchestrator(agent) : yield* sources.list(agent);
       }),
-      remember: Effect.fn("Memories.remember")(function* (n) {
+      remember: Effect.fn("Memory.remember")(function* (n) {
         return inFile(n.agent) ? yield* writeOrchestrator(n.agent, n.text) : yield* write(n);
       }),
-      forget: Effect.fn("Memories.forget")(function* (agent, id) {
+      forget: Effect.fn("Memory.forget")(function* (agent, id) {
         yield* forgettable(agent, id);
         return inFile(agent) ? yield* Effect.try({ try: () => forgetLine(homeOf(agent), id), catch: fileRefused }) : yield* forget(agent, id);
       }),
-      previewForget: Effect.fn("Memories.previewForget")(function* (agent, id) {
+      previewForget: Effect.fn("Memory.previewForget")(function* (agent, id) {
         const m = yield* forgettable(agent, id);
         return {
           does: [inFile(agent) ? t("server.memory.forgetOrchestrator", { text: m.text }) : t("server.memory.forget", { agent, text: m.text })],
         };
       }),
-      recallOf: Effect.fn("Memories.recallOf")(function* (agent, project, text) {
+      recallOf: Effect.fn("Memory.recallOf")(function* (agent, project, text) {
         if (inFile(agent)) return yield* Effect.fail(refused(t("server.memory.orchestratorRecall")));
         return yield* preview(agent, project, text);
       }),
-      recall: Effect.fn("Memories.recall")(function* (cue) {
+      recall: Effect.fn("Memory.recall")(function* (cue) {
         const told = mergeRecalled(yield* sources.prefetch(cue));
         const ids = told.map((l) => l.id).filter((id) => id !== "");
         yield* local.markRecalled(ids.filter((id) => !id.includes(":")));
         return { ids, lines: told.map((l) => l.line) };
       }),
-      search: Effect.fn("Memories.search")(function* (q) {
+      search: Effect.fn("Memory.search")(function* (q) {
         const query = { ...q, limit: q.limit > 0 ? q.limit : searchLimit };
         const pages = yield* sources.search(query);
         const coverage = pages.flatMap((page) => {
@@ -197,11 +197,11 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         ).slice(0, query.limit);
         return { found, coverage };
       }),
-      keep: Effect.fn("Memories.keep")(function* (r) {
+      keep: Effect.fn("Memory.keep")(function* (r) {
         yield* local.keep(r);
         sources.keep(r);
       }),
-      endSession: Effect.fn("Memories.endSession")(function* (s) {
+      endSession: Effect.fn("Memory.endSession")(function* (s) {
         yield* Effect.sync(() => sources.endSession(s));
       }),
       write,

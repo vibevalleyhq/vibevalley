@@ -3,27 +3,13 @@
 import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, Stream, Predicate } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
-import type {
-  Agent,
-  Changes,
-  GraphAction,
-  ActorKind,
-  GraphEvent,
-  Preview,
-  Session,
-  SessionGraph,
-  Task,
-  TaskAction,
-  TaskDraft,
-  TaskEdit,
-  TaskGraph,
-} from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { commandOf } from "@vibevalley/protocol/api";
 import { isBusy } from "@vibevalley/protocol/rules";
 import type { Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { actsForOwner, type Actor, session as sessionActor, system } from "@/base/actor.ts";
 import { clip } from "@/base/clip.ts";
 import { causeMessage, Db } from "@/base/db.ts";
@@ -33,13 +19,13 @@ import { bestEffort } from "@/base/log.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { Core } from "@/core/core.ts";
 import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "@/errors.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Projects } from "@/project/project.ts";
+import { Issue } from "@/issue/issue.ts";
+import { Project } from "@/project/project.ts";
 import { MergeFailure, type ProjectError } from "@/project/shapes.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
-import { Runtimes } from "@/runtime/runtime.ts";
+import { Runtime } from "@/runtime/runtime.ts";
 import { sessionOf } from "@/session/roster.ts";
-import { type Hired, type HireOptions, type Roster, type SessionNews, Sessions } from "@/session/session.ts";
+import { type Hired, type HireOptions, type Roster, type SessionNews, Session } from "@/session/session.ts";
 
 import * as q from "../../db/generated/task_event.sql.ts";
 import { changeOf, graphChanges, graphEventText, renderedChanges } from "./changes.ts";
@@ -82,9 +68,9 @@ import { parseSplit } from "./splitting.ts";
 const readLimit = 1000;
 /** What an event row keeps beside its kind: only what it has (an empty list is left out). */
 interface EventPayload {
-  readonly session?: GraphEvent["session"];
+  readonly session?: T.GraphEvent["session"];
   readonly detail?: string;
-  readonly changes?: GraphEvent["changes"];
+  readonly changes?: T.GraphEvent["changes"];
   readonly commits?: string[];
 }
 const EventPayloadSchema: Schema.Codec<EventPayload, Wire<EventPayload>> = Schema.Struct({
@@ -95,35 +81,35 @@ const EventPayloadSchema: Schema.Codec<EventPayload, Wire<EventPayload>> = Schem
 });
 
 /** What the graph allows now, as the commands that do it: what a refusal of one of its acts offers instead. */
-const graphNext = (graph: TaskGraph): Next[] =>
+const graphNext = (graph: T.TaskGraph): Next[] =>
   graphActions(graph).map((action) => ({ say: t(`server.task.graphAction.${action}`), run: commandOf("graph.act", [graph.id], { action }) }));
 
 /** What the task allows now, as commands. */
-const taskNext = (graph: TaskGraph, task: Task): Next[] =>
+const taskNext = (graph: T.TaskGraph, task: T.Task): Next[] =>
   taskActions(graph, task).map((action) => ({
     say: t("server.task.act.stepAct", { action: t(`server.task.taskAction.${action}`), title: task.title }),
     run: commandOf("graph.task.act", [graph.id, task.id], { action }),
   }));
 
-export class Tasks extends Context.Service<
-  Tasks,
+export class Task extends Context.Service<
+  Task,
   {
     readonly split: (goal: string, project: string, agent: string, by: Actor) => Effect.Effect<string, ApiError>;
     /** A helper finds its issue is several people's work: the issue becomes the graph, its tasks the issues under it, and they start at once. */
-    readonly splitIssue: (session: string, title: string, tasks: readonly TaskDraft[]) => Effect.Effect<string, ApiError>;
+    readonly splitIssue: (session: string, title: string, tasks: readonly T.TaskDraft[]) => Effect.Effect<string, ApiError>;
     /** The same split, asked of the session working the issue now: it is that session's branch the graph opens from. */
-    readonly splitIssueOf: (issue: string, title: string, tasks: readonly TaskDraft[]) => Effect.Effect<string, ApiError>;
-    readonly act: (id: string, action: GraphAction, by: Actor) => Effect.Effect<string, ApiError>;
-    readonly taskAct: (id: string, task: string, action: TaskAction, by: Actor) => Effect.Effect<string, ApiError>;
-    readonly editTask: (id: string, task: string, edit: TaskEdit, by: Actor) => Effect.Effect<string, ApiError>;
+    readonly splitIssueOf: (issue: string, title: string, tasks: readonly T.TaskDraft[]) => Effect.Effect<string, ApiError>;
+    readonly act: (id: string, action: T.GraphAction, by: Actor) => Effect.Effect<string, ApiError>;
+    readonly taskAct: (id: string, task: string, action: T.TaskAction, by: Actor) => Effect.Effect<string, ApiError>;
+    readonly editTask: (id: string, task: string, edit: T.TaskEdit, by: Actor) => Effect.Effect<string, ApiError>;
     readonly removeTask: (id: string, task: string, by: Actor) => Effect.Effect<string, ApiError>;
     /** What removeTask would do, refused as it would be; nothing changes. */
-    readonly previewRemoveTask: (id: string, task: string) => Effect.Effect<Preview, ApiError>;
-    readonly events: (id: string) => Effect.Effect<GraphEvent[]>;
+    readonly previewRemoveTask: (id: string, task: string) => Effect.Effect<T.Preview, ApiError>;
+    readonly events: (id: string) => Effect.Effect<T.GraphEvent[]>;
     /** The task graphs now, as the board has them. */
-    readonly graphs: () => TaskGraph[];
-    readonly graph: (id: string) => Effect.Effect<TaskGraph, ApiError>;
-    readonly changes: (id: string) => Effect.Effect<Changes, ApiError>;
+    readonly graphs: () => T.TaskGraph[];
+    readonly graph: (id: string) => Effect.Effect<T.TaskGraph, ApiError>;
+    readonly changes: (id: string) => Effect.Effect<T.Changes, ApiError>;
     /** What the orchestrator is told about graphs, subscribed before it returns. */
     readonly news: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>;
     /** Once the sessions came back (Agent Sessions' startup): a graph cut off while splitting is abandoned, one cut off with
@@ -131,23 +117,23 @@ export class Tasks extends Context.Service<
     readonly comeBack: Effect.Effect<void>;
   }
 >()("vibevalley/Task") {
-  static readonly layer = (options?: TaskOptions) => Layer.effect(Tasks, make(options));
+  static readonly layer = (options?: TaskOptions) => Layer.effect(Task, make(options));
 }
 
-const withNote = (graph: TaskGraph, note: string): TaskGraph => ({ ...graph, note });
+const withNote = (graph: T.TaskGraph, note: string): T.TaskGraph => ({ ...graph, note });
 
-const unmanned = (n: Task): Task => {
+const unmanned = (n: T.Task): T.Task => {
   const { session: _, ...rest } = n;
   return rest;
 };
 
 /** The sessions a graph's steps are worked by; tests play them. */
 export interface TaskWork {
-  readonly hire: (agent: Agent, brief: string, project: string, opt: HireOptions) => Effect.Effect<Hired>;
+  readonly hire: (agent: T.Agent, brief: string, project: string, opt: HireOptions) => Effect.Effect<Hired>;
   readonly tell: (id: string, text: string) => Effect.Effect<string>;
-  readonly dismiss: Sessions["Service"]["dismiss"];
+  readonly dismiss: Session["Service"]["dismiss"];
   readonly find: (id: string) => Roster | undefined;
-  readonly handOver: Sessions["Service"]["handOver"];
+  readonly handOver: Session["Service"]["handOver"];
 }
 
 /** The git a graph's branches live in; tests play it. */
@@ -155,14 +141,14 @@ export interface TaskGit {
   readonly run: (cwd: string, command: string) => Effect.Effect<{ readonly ok: boolean; readonly output: string }>;
   readonly openBranch: (project: string, branch: string, from?: string) => Effect.Effect<void, ProjectError>;
   readonly mergeBranch: (project: string, branch: string) => Effect.Effect<string, MergeFailure>;
-  readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes | undefined, ProjectError>;
+  readonly branchChanges: (project: string, branch: string) => Effect.Effect<T.Changes | undefined, ProjectError>;
   readonly changedFiles: (cwd: string, base: string) => Effect.Effect<string[], ProjectError>;
-  readonly mergeInto: Projects["Service"]["mergeInto"];
+  readonly mergeInto: Project["Service"]["mergeInto"];
 }
 
 export interface TaskOptions {
   /** Whether a profile can work now; the runtimes say otherwise. */
-  readonly usable?: (a: Agent) => boolean;
+  readonly usable?: (a: T.Agent) => boolean;
   readonly work?: TaskWork;
   readonly git?: TaskGit;
 }
@@ -176,10 +162,10 @@ export const make = (options: TaskOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
     const core = yield* Core;
-    const issues = yield* Issues;
-    const store = yield* Agents;
-    const runtimes = yield* Runtimes;
-    const live = yield* Sessions;
+    const issues = yield* Issue;
+    const store = yield* Agent;
+    const runtimes = yield* Runtime;
+    const live = yield* Session;
     const work: TaskWork = options.work ?? {
       hire: issues.hire,
       tell: (id, text) => live.tell(id, text, { kind: "task" }),
@@ -187,7 +173,7 @@ export const make = (options: TaskOptions = {}) =>
       find: live.find,
       handOver: live.handOver,
     };
-    const projects: TaskGit = options.git ?? (yield* Projects);
+    const projects: TaskGit = options.git ?? (yield* Project);
     const { run: db, attempt } = yield* Db;
     /** A step's run ending and the person pressing a button must not both read the same graph and write over each other. */
     const lock = yield* Semaphore.make(1);
@@ -211,7 +197,7 @@ export const make = (options: TaskOptions = {}) =>
     });
 
     /** The history must never stop the graph itself: what cannot be written is logged. */
-    const record = (before: TaskGraph | undefined, after: TaskGraph, actor: ActorKind, why: string) =>
+    const record = (before: T.TaskGraph | undefined, after: T.TaskGraph, actor: T.ActorKind, why: string) =>
       Effect.forEach(
         graphChanges(before, after),
         (c) => {
@@ -237,7 +223,7 @@ export const make = (options: TaskOptions = {}) =>
         { discard: true },
       );
 
-    const put = Effect.fn("Tasks.put")(function* (graph: TaskGraph, by: Actor, why: string = "") {
+    const put = Effect.fn("Task.put")(function* (graph: T.TaskGraph, by: Actor, why: string = "") {
       const before = get(graph.id);
       yield* issues
         .putTask(graph)
@@ -245,9 +231,9 @@ export const make = (options: TaskOptions = {}) =>
       yield* record(before, graph, by.kind, why);
     });
 
-    const putSystem = (graph: TaskGraph) => put(graph, system);
+    const putSystem = (graph: T.TaskGraph) => put(graph, system);
 
-    const giveUp = Effect.fn("Tasks.giveUp")(function* (graph: TaskGraph, why: string) {
+    const giveUp = Effect.fn("Task.giveUp")(function* (graph: T.TaskGraph, why: string) {
       const splitter = splitters.get(graph.id);
       yield* putSystem(withNote({ ...graph, state: "abandoned" }, why));
       splitters.delete(graph.id);
@@ -256,7 +242,7 @@ export const make = (options: TaskOptions = {}) =>
       yield* tellOrchestrator(graphNews.notSplit(graph.id, graph.title, why));
     });
 
-    const split = Effect.fn("Tasks.split")(function* (graph: TaskGraph, session: Session, outcome: string, summary: string) {
+    const split = Effect.fn("Task.split")(function* (graph: T.TaskGraph, session: T.Session, outcome: string, summary: string) {
       if (graph.state !== "splitting") return;
       const tries = splitterTries.get(graph.id) ?? 0;
       if (outcome === "interrupted") return yield* giveUp(graph, t("server.task.notice.splitStopped"));
@@ -288,9 +274,9 @@ export const make = (options: TaskOptions = {}) =>
       for (const task of startable(graph)) {
         const agent = chooseAgent(yield* candidates, task.brief, task.agent ?? "", "");
         let refusal = t("server.task.notice.noHelper");
-        let hired: Session | undefined;
+        let hired: T.Session | undefined;
         if (agent) {
-          const tag: SessionGraph = { id: graph.id, task: task.id };
+          const tag: T.SessionGraph = { id: graph.id, task: task.id };
           const got = yield* work.hire(agent, taskBrief(graph, task), graph.project, {
             worktree: true,
             taskGraph: tag,
@@ -318,13 +304,13 @@ export const make = (options: TaskOptions = {}) =>
       }
     });
 
-    const taskFailed = Effect.fn("Tasks.taskFailed")(function* (graph: TaskGraph, task: Task, why: string) {
+    const taskFailed = Effect.fn("Task.taskFailed")(function* (graph: T.TaskGraph, task: T.Task, why: string) {
       yield* putSystem(withTask(graph, task.id, (n) => ({ ...n, state: "failed", conclusion: why, failures: (n.failures ?? 0) + 1 })));
       yield* notice("warn", t("server.task.notice.taskFailed", { graph: graph.title, task: task.title, why }));
       yield* tellOrchestrator(graphNews.taskFailed(graph.id, graph.title, task.title, task.id, why));
     });
 
-    const sendBack = Effect.fn("Tasks.sendBack")(function* (graph: TaskGraph, task: Task, session: string, text: string, why: string) {
+    const sendBack = Effect.fn("Task.sendBack")(function* (graph: T.TaskGraph, task: T.Task, session: string, text: string, why: string) {
       if (task.tries >= autoRetries) return yield* taskFailed(graph, task, why);
       yield* put(
         withTask(graph, task.id, (n) => ({ ...n, tries: n.tries + 1 })),
@@ -335,7 +321,7 @@ export const make = (options: TaskOptions = {}) =>
     });
 
     /** Runs while handOver holds the stopped session; a failed check is acted on after that hold ends. */
-    const verified = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, cwd: string) {
+    const verified = Effect.fnUntraced(function* (graph: T.TaskGraph, task: T.Task, cwd: string) {
       const rejected = (why: string, fix = ""): Verification => ({ frozen: [], rejected: { why, fix } });
       let changed: string[] = [];
       if (graph.branch && (isAcceptance(task) || acceptancesOf(graph, task).length > 0)) {
@@ -357,7 +343,7 @@ export const make = (options: TaskOptions = {}) =>
       return { frozen: [] };
     });
 
-    const taskDone = Effect.fn("Tasks.taskDone")(function* (graph: TaskGraph, task: Task, sessionId: string, conclusion: string) {
+    const taskDone = Effect.fn("Task.taskDone")(function* (graph: T.TaskGraph, task: T.Task, sessionId: string, conclusion: string) {
       const session = live.sessionOf(sessionId);
       if (!graph.branch) return yield* taskFailed(graph, task, t("server.task.notice.noBranch"));
       const target = graph.branch;
@@ -403,7 +389,7 @@ export const make = (options: TaskOptions = {}) =>
       }
     });
 
-    const taskEnded = Effect.fn("Tasks.taskEnded")(function* (graph: TaskGraph, task: Task, session: Session, outcome: string, summary: string) {
+    const taskEnded = Effect.fn("Task.taskEnded")(function* (graph: T.TaskGraph, task: T.Task, session: T.Session, outcome: string, summary: string) {
       if (outcome === "completed") return yield* taskDone(graph, task, session.id, summary);
       if (outcome === "failed") return yield* sendBack(graph, task, session.id, retryText(task), summary);
       if (graph.state !== "running") return;
@@ -444,7 +430,7 @@ export const make = (options: TaskOptions = {}) =>
         }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
       );
 
-    const resumeWorking = Effect.fn("Tasks.resumeWorking")(function* (id: string) {
+    const resumeWorking = Effect.fn("Task.resumeWorking")(function* (id: string) {
       for (const task of get(id)?.tasks ?? []) {
         if (task.state !== "working") continue;
         const graph = get(id);
@@ -460,13 +446,13 @@ export const make = (options: TaskOptions = {}) =>
       }
     });
 
-    const openBranch = Effect.fn("Tasks.openBranch")(function* (graph: TaskGraph, from: string = "") {
+    const openBranch = Effect.fn("Task.openBranch")(function* (graph: T.TaskGraph, from: string = "") {
       const branch = "vibevalley/task-" + graph.id + "-" + (yield* Clock.currentTimeMillis).toString(36);
       yield* projects.openBranch(graph.project, branch, from).pipe(Effect.mapError((e) => refused(e.message)));
       return branch;
     });
 
-    const edited = Effect.fn("Tasks.edited")(function* (id: string, change: (g: TaskGraph) => EditResult, by: Actor) {
+    const edited = Effect.fn("Task.edited")(function* (id: string, change: (g: T.TaskGraph) => EditResult, by: Actor) {
       const result = change(yield* need(id));
       if (!result.ok) return yield* Effect.fail(refused(result.problem));
       yield* put(result.graph, by);
@@ -489,8 +475,8 @@ export const make = (options: TaskOptions = {}) =>
     );
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
 
-    const shape = Tasks.of({
-      splitIssueOf: Effect.fn("Tasks.splitIssueOf")(function* (issue, title, drafts) {
+    const shape = Task.of({
+      splitIssueOf: Effect.fn("Task.splitIssueOf")(function* (issue, title, drafts) {
         return yield* shape.splitIssue(
           String(
             core
@@ -505,7 +491,7 @@ export const make = (options: TaskOptions = {}) =>
       graphs: () => graphsOf(core.state()),
       graph: need,
       comeBack,
-      split: Effect.fn("Tasks.split")(function* (goal, project, agent, by) {
+      split: Effect.fn("Task.split")(function* (goal, project, agent, by) {
         const where = project.trim();
         if (!goal.trim()) return yield* Effect.fail(refused(t("server.task.act.noGoal")));
         if (!where) return yield* Effect.fail(refused(t("server.task.act.noProject")));
@@ -513,7 +499,7 @@ export const make = (options: TaskOptions = {}) =>
         const chosen = chooseAgent(all, graphMatch(goal), agent, "");
         if (!chosen) return yield* Effect.fail(refused(t("server.task.act.noSplitter"), [lookIn.agent]));
         const id = yield* issues.nextTaskId();
-        const graph: TaskGraph = {
+        const graph: T.TaskGraph = {
           id,
           title: clip(goal, 24),
           goal: goal.trim(),
@@ -544,7 +530,7 @@ export const make = (options: TaskOptions = {}) =>
         splitters.set(graph.id, hired.session.id);
         return t("server.task.act.splittingBy", { name: hired.session.name, id: graph.id });
       }, lock.withPermits(1)),
-      splitIssue: Effect.fn("Tasks.splitIssue")(function* (sessionId, title, drafts) {
+      splitIssue: Effect.fn("Task.splitIssue")(function* (sessionId, title, drafts) {
         const state = core.state();
         const asked = sessionOf(state, sessionId);
         const split = splittable(asked, asked?.issue ? state.issues.find((item) => item.id === asked.issue) : undefined, store.isOrchestrator);
@@ -553,7 +539,7 @@ export const make = (options: TaskOptions = {}) =>
         const tasks = drafts.map(freshTask);
         const problems = graphProblems(tasks);
         if (problems.length > 0) return yield* Effect.fail(refused(t("server.task.act.stepsWrong", { problems: problems.join("\n- ") })));
-        let graph: TaskGraph = {
+        let graph: T.TaskGraph = {
           id: issue.id,
           title: title.trim() || issue.title,
           goal: issue.description,
@@ -575,7 +561,7 @@ export const make = (options: TaskOptions = {}) =>
         yield* tellOrchestrator(graphNews.split(session.name, graph.id, tasks.length, graphText(graph)));
         return graphTell.split(graph.title, tasks.length, branch);
       }, lock.withPermits(1)),
-      act: Effect.fn("Tasks.act")(function* (id, action, by) {
+      act: Effect.fn("Task.act")(function* (id, action, by) {
         const graph = yield* need(id);
         const not = () =>
           Effect.fail(
@@ -646,7 +632,7 @@ export const make = (options: TaskOptions = {}) =>
           }
         }
       }, lock.withPermits(1)),
-      taskAct: Effect.fn("Tasks.taskAct")(function* (id, taskId, action, by) {
+      taskAct: Effect.fn("Task.taskAct")(function* (id, taskId, action, by) {
         const graph = yield* need(id);
         const task = taskOf(graph, taskId);
         if (!task) return yield* Effect.fail(missing(t("server.task.act.noStep", { id: taskId }), [lookIn.graph]));
@@ -689,13 +675,13 @@ export const make = (options: TaskOptions = {}) =>
           }
         }
       }, lock.withPermits(1)),
-      editTask: Effect.fn("Tasks.editTask")(function* (id, task, edit, by) {
+      editTask: Effect.fn("Task.editTask")(function* (id, task, edit, by) {
         return yield* edited(id, (g) => editTask(g, task, edit), by);
       }),
-      removeTask: Effect.fn("Tasks.removeTask")(function* (id, task, by) {
+      removeTask: Effect.fn("Task.removeTask")(function* (id, task, by) {
         return yield* edited(id, (g) => removeTask(g, task), by);
       }),
-      previewRemoveTask: Effect.fn("Tasks.previewRemoveTask")(function* (id, task) {
+      previewRemoveTask: Effect.fn("Task.previewRemoveTask")(function* (id, task) {
         const graph = yield* need(id);
         const result = removeTask(graph, task);
         const gone = taskOf(graph, task);
@@ -708,13 +694,13 @@ export const make = (options: TaskOptions = {}) =>
           ],
         };
       }),
-      events: Effect.fn("Tasks.events")(function* (id) {
+      events: Effect.fn("Task.events")(function* (id) {
         const rows = yield* db(q.graphEvents({ graph_id: id, n: readLimit }));
         const graph = get(id);
         const titleOf = (node: string) => (graph ? (taskOf(graph, node)?.title ?? node) : node);
-        return rows.flatMap((row): GraphEvent[] => {
+        return rows.flatMap((row): T.GraphEvent[] => {
           const p: EventPayload = jsonOrNone(EventPayloadSchema)(row.payload) ?? {};
-          const e: GraphEvent = {
+          const e: T.GraphEvent = {
             id: row.id,
             graph: row.graph_id,
             ...(row.task_id ? { task: row.task_id } : {}),
@@ -738,7 +724,7 @@ export const make = (options: TaskOptions = {}) =>
           ];
         });
       }),
-      changes: Effect.fn("Tasks.changes")(function* (id) {
+      changes: Effect.fn("Task.changes")(function* (id) {
         const graph = yield* need(id);
         if (!graph.branch) return yield* Effect.fail(refused(t("server.task.act.notStarted", { title: graph.title })));
         const changes = yield* projects.branchChanges(graph.project, graph.branch).pipe(Effect.mapError((e) => refused(e.message)));
@@ -751,4 +737,4 @@ export const make = (options: TaskOptions = {}) =>
   });
 
 /** Issues' startup: the task graphs come back. */
-export const start = Layer.effectDiscard(Effect.flatMap(Tasks, (item) => item.comeBack));
+export const start = Layer.effectDiscard(Effect.flatMap(Task, (item) => item.comeBack));

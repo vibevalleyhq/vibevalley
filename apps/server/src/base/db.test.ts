@@ -108,7 +108,7 @@ const attempting: Readonly<Record<string, string>> = {
   "cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
   "game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",
   "issue/issue.ts": "an issue or a task graph that is not saved, or a session not linked to its issue, is told as a refusal",
-  "memory/memories.ts": "a memory read or write that fails is logged and taken as none",
+  "memory/store.ts": "a memory read or write that fails is logged and taken as none",
   "session/session.ts": "a session's record or run that is not kept is logged or told as NotRecorded, and the run goes on",
   "task/task.ts": "a task graph event that is not kept is logged, and the graph goes on",
 };

@@ -9,20 +9,20 @@ import { Cause, Clock, Effect, Exit, Fiber, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
-import type { Agent, Session } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import type { LaunchActivity } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { Projects } from "@/project/project.ts";
+import { Project } from "@/project/project.ts";
 import { MergeFailure } from "@/project/shapes.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { until, waitFor } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
-import { NotRecorded, Sessions, type SessionsInside, watchStalls } from "./session.ts";
-const lab = (): Agent => ({ ...starter("lab"), effort: "" });
+import { NotRecorded, Session, type SessionsInside, watchStalls } from "./session.ts";
+const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 
 /** A helper that writes a file, commits it and reports, as the farm's rules ask. */
 const worker = (turns: ScriptedTurn[]) =>
@@ -70,8 +70,8 @@ describe("sessions", () => {
       },
     };
     return Effect.gen(function* () {
-      const sessions = yield* Sessions;
-      yield* (yield* Agents).save(lab());
+      const sessions = yield* Session;
+      yield* (yield* Agent).save(lab());
       const sending = yield* Effect.forkChild(sessions.send(lab(), "interrupted", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true }));
       yield* Effect.promise(() => opening);
       const interrupting = yield* Effect.forkChild(Fiber.interrupt(sending));
@@ -105,9 +105,9 @@ describe("sessions", () => {
       },
     };
     return Effect.gen(function* () {
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       const core = yield* Core;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
@@ -170,9 +170,9 @@ describe("sessions", () => {
           await Promise.all(cleanups.map((cleanup) => cleanup()));
         }),
       );
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       const core = yield* Core;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
@@ -213,7 +213,7 @@ describe("sessions", () => {
     };
     return Effect.gen(function* () {
       yield* Effect.addFinalizer(() => Effect.promise(() => cleanup()));
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       const core = yield* Core;
       const sent = yield* sessions.send(lab(), "work", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
@@ -241,7 +241,7 @@ describe("sessions", () => {
   it.live("a session is sent, works its run, reports, takes a word and is merged", () => {
     const turns: ScriptedTurn[] = [];
     return Effect.gen(function* () {
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       const core = yield* Core;
       const seen: LaunchActivity[] = [];
       const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.launches, (a) => Effect.sync(() => seen.push(a))));
@@ -274,7 +274,7 @@ describe("sessions", () => {
       expect((yield* sessions.runs("i1")).map((r) => r.triggeredBy.kind)).toEqual(["issue", "comment"]);
       expect(seen.some((a) => a.kind === "ended" && a.id === id)).toBe(true);
 
-      const projects = yield* Projects;
+      const projects = yield* Project;
       const merged = yield* sessions.handOver(id, "merged", (place) => projects.merge(place));
       expect(merged.commits).toBe(2);
       expect(core.session(id)).toBeUndefined();
@@ -288,7 +288,7 @@ describe("sessions", () => {
 
   it.live("a turn asked for holds its room until it is working", () =>
     Effect.gen(function* () {
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       const core = yield* Core;
       const s = sessions as SessionsInside;
       yield* core.apply({
@@ -304,7 +304,7 @@ describe("sessions", () => {
           runs: 0,
           phase: { _tag: "done" },
           refining: false,
-        } as Session,
+        } as T.Session,
       });
       const h: Parameters<typeof s.expect>[0] = {
         id: sessionId("w1"),
@@ -385,7 +385,7 @@ describe("sessions", () => {
   it.live("a registration SQL failure is refused rather than hidden as a defect", () => {
     const config = testConfig();
     return Effect.gen(function* () {
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
       const got = yield* sessions.send(lab(), "another", "demo", {
         issue: { id: issueId("i2"), number: 2 },
@@ -398,7 +398,7 @@ describe("sessions", () => {
   it.live("a non-SQL registration defect is rethrown after the opened session is stopped", () => {
     const config = testConfig();
     return Effect.gen(function* () {
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       const exit = yield* Effect.exit(
         sessions.send(lab(), "another", "demo", { issue: { id: issueId("i2"), number: 2 }, hiring: () => Effect.die(new Error("registration bug")) }),
       );

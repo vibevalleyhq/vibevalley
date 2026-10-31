@@ -1,5 +1,5 @@
 import { maybe, t } from "@vibevalley/i18n";
-import type { Issue, IssueTemplate, ProjectStack, TemplateBlank, TemplateKind } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
 import type { WrittenKind, WrittenTemplate } from "@/agent/seed.ts";
 
@@ -9,7 +9,7 @@ const recentTitles = 5;
 /** A title longer than this is a long instruction, not one to send again. */
 const recentTitleLength = 60;
 
-export function sentTitles(all: readonly Issue[], project: string, orchestrator: (id: string) => boolean): string[] {
+export function sentTitles(all: readonly T.Issue[], project: string, orchestrator: (id: string) => boolean): string[] {
   const mine = all
     .filter(
       (i) =>
@@ -35,7 +35,7 @@ export function sentTitles(all: readonly Issue[], project: string, orchestrator:
 const commandHoles = /\s?\{(test|lint|build)\}\s?/gu;
 
 /** A known command goes in as code, spaced from the words around it; an unknown one is a plain word, unspaced as Chinese is. */
-export function filledTemplate(s: WrittenTemplate, stack: Partial<ProjectStack>): IssueTemplate {
+export function filledTemplate(s: WrittenTemplate, stack: Partial<T.ProjectStack>): T.IssueTemplate {
   const commands: Record<string, string | undefined> = { test: stack.test, lint: stack.lint, build: stack.build };
   const done = s.done.replace(commandHoles, (hole, name: string) =>
     commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : (maybe(`server.issue.template.commands.${name}`) ?? hole),
@@ -45,10 +45,10 @@ export function filledTemplate(s: WrittenTemplate, stack: Partial<ProjectStack>)
   return { id: s.id, title: s.title, done, text, ...(blank ? { blank } : {}) };
 }
 
-export const filledKinds = (kinds: readonly WrittenKind[], stack: Partial<ProjectStack>): TemplateKind[] =>
+export const filledKinds = (kinds: readonly WrittenKind[], stack: Partial<T.ProjectStack>): T.TemplateKind[] =>
   kinds.map((k) => ({ ...k, templates: k.templates.map((template) => filledTemplate(template, stack)) }));
 
-function firstBlank(text: string): TemplateBlank | undefined {
+function firstBlank(text: string): T.TemplateBlank | undefined {
   const m = /〔[^〕]*〕/u.exec(text);
   return m ? { start: m.index, end: m.index + m[0].length } : undefined;
 }

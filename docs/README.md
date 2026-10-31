@@ -71,7 +71,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 产出 | artifact | artifact（`Artifact`，正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的，或交上来按版本换的网页；交上来的带卡片挂在频道和工单上 | 文档（指产出时）、doc（指产出时） |
 | 项目 | project | project（`ProjectSummary`） | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
 | 大地图 | the map | `WorkspaceState`；目录是 `ServerConfig` 的 `workRoot`、`home` | 全部项目、工单、频道和档案；工作台「项目」页的「全部」 | 世界、全图 |
-| 空位 | spot | `ServerConfig.project.maxSessions`（配置 `project.max_sessions`）、`Sessions.makeRoom`；每台农机另有 `maxWorking` | 一个项目（和整个 VibeValley）同时能在做的工单数；满了的待办排队，有空位自动开工 | 并发位、空地 |
+| 空位 | spot | `ServerConfig.project.maxSessions`（配置 `project.max_sessions`）、`Session.makeRoom`；每台农机另有 `maxWorking` | 一个项目（和整个 VibeValley）同时能在做的工单数；满了的待办排队，有空位自动开工 | 并发位、空地 |
 | 档案模板 | profile template | `AgentTemplate`（`agent.template.*`） | 一份 agent 的配方：`agent.json` 加人设 `persona.md`；装一份就多一份档案，界面上在档案页叫「模板」 | 种子、预设 |
 | 工单模板 | ticket template | issue template（`IssueTemplate`、`project.template.list`） | 写工单的现成模板：一个标题和一行完成线，按项目的栈填好命令；代码里的 seed 只指种子数据（`seeds.json`） | seed |
 | 阶段 | what it is doing | phase（`Session.phase`） | 帮工到哪了：刚派出去、在干活、交回来了、没做成、歇着、走了 | 状态（指阶段时） |
@@ -95,12 +95,12 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 自己的任务 | todo | `Todo`（`runtime_todo` 表，工具 `todo_add`、`todo_update`、`todo_list`） | agent 给自己记的待办，不是工单 | |
 | 计划 | plan | task graph（`TaskGraph`，带 `graph` 的父工单） | 一件长活拆成的有先后的几件，按 DAG 推进；都做完了一次合进主分支 | 工作流、playbook、plan、种植计划 |
 | 一件 | task | task（`Task`，带 `task` 的子工单；拆出来的草稿是 `TaskDraft`） | 计划里的一件，一个帮工做 | 步骤、step（指一件时）、节点、node（指一件时） |
-| 派活 | dispatch | hire（`Issues.hire`、事实 `FactHired`） | 把一张工单交给一个档案、开一个帮工；工单挪到待办就是派活 | |
+| 派活 | dispatch | hire（`Issue.hire`、事实 `FactHired`） | 把一张工单交给一个档案、开一个帮工；工单挪到待办就是派活 | |
 | 起草 | refine | refine（`IssueRefinement`、`issue.refine`） | 一个帮工读代码，把待规划的工单写成标题、描述和验收标准，写完就走 | |
 | 主人 | owner | owner | 你 | |
 | 田头 | the farm chat | 默认频道（`Channel.default`） | 农场的皮对默认频道的叫法；工作台里写它的名字（`#general`） | 群（指默认频道时） |
 | 私聊 | direct message | direct | 你和一个管家两个人说话的地方，帮工不在 | 私信 |
-| 和帮工私聊 | talk | talk（串的 `subjectKind` 是 `talk`，`Issues.talkWith`） | 你和一个帮工的档案直接说话：派一个帮工答在私聊里，这张工单不上看板 | |
+| 和帮工私聊 | talk | talk（串的 `subjectKind` 是 `talk`，`Issue.talkWith`） | 你和一个帮工的档案直接说话：派一个帮工答在私聊里，这张工单不上看板 | |
 | 频道 | channel | channel（`Channel`） | 另开的说话的地方；微信、飞书、QQ 各接一个 | 群（指频道时）、群聊 |
 | 串 | thread | thread | 挂在一条消息下面的话题串；派活时开的叫工单串 | 子频道 |
 | 附件 | attachment | `Attachment`（`channel_attachment` 表） | 一条消息带的文件和图 | |
@@ -111,7 +111,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 巡查 | patrol | `patrolStep`（`Inbox.patrol`） | 定时看 Inbox，放久了叫醒管家 | |
 | 通话 | call | `VoiceCall`（`voice.call.*`） | 和管家打电话 | |
 | 听写 | dictation | dictation（`Dictation`） | 说话变成输入框里的字 | |
-| 连接器 | connector | `Connectors` | 把微信、飞书、QQ 各接到一个频道 | |
+| 连接器 | connector | `Connector` | 把微信、飞书、QQ 各接到一个频道 | |
 | 花费 | spending | `Spent`、`RuntimeQuota` | 农机花了多少钱、还剩多少额度 | |
 | 连接到本机 | connect to this machine | lan | 让局域网里的设备用这台电脑上的 VibeValley 的监听，默认关 | 远程模式 |
 

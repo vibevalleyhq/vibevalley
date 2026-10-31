@@ -16,8 +16,8 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/session`（`Sessions`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、只读一轮之后把 worktree 重置回主分支 `discardWork`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；纯函数按管的事分开：`report.ts` 的 `readReport`（一轮的结尾怎么读），`hiring.ts` 的 `noRoom`、`whoMakesRoom`（还能不能再来一个、谁回家腾地方），`briefing.ts`（交给帮工的说明、技能和想起来的），`takeIn.ts`（收活：冲突怎么说、没收进去是什么意思），`roster.ts`（核心状态里的帮工）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`inProcessRun.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
-- `apps/server/src/runtime`（`Runtimes`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `@vibevalley/ai/models`，pi 按 pi-ai 自带的价目）、今天的花费；`fit.ts` 的 `agentProblems`、`quota.ts` 的 `moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
+- 服务端 `apps/server/src/session`（`Session`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、只读一轮之后把 worktree 重置回主分支 `discardWork`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；纯函数按管的事分开：`report.ts` 的 `readReport`（一轮的结尾怎么读），`hiring.ts` 的 `noRoom`、`whoMakesRoom`（还能不能再来一个、谁回家腾地方），`briefing.ts`（交给帮工的说明、技能和想起来的），`takeIn.ts`（收活：冲突怎么说、没收进去是什么意思），`roster.ts`（核心状态里的帮工）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`inProcessRun.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
+- `apps/server/src/runtime`（`Runtime`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `@vibevalley/ai/models`，pi 按 pi-ai 自带的价目）、今天的花费；`fit.ts` 的 `agentProblems`、`quota.ts` 的 `moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
 - 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（oar 的原始记录）；核心状态里的 `WorkspaceState.sessions` 随 `state.json` 存。
 - 接口：`session.list`、`session.get`、`session.event.list`、`session.stop`、`issue.run.list`、`issue.history.list`、`runtime.*`、`agent.validate`（[capabilities.md](docs/reference/capabilities.md)）。
@@ -50,7 +50,7 @@
 - **每个 Session 一个 oar 的 `Subagents`**，深度上限 1：帮工不能经 oar 再派帮工；农机自己派的子 agent（claude 的 Task、codex 的子线程）的事件带 oar 的 agent 路径，记在派它的那次调用下面（`under`），工具调用按「哪个 agent 的、哪一个」认，不按调用编号认。
 - **没有权限确认、不开沙箱**：边界是 Session 只在 `VIBEVALLEY_WORK_ROOT` 下、档案配置的项目目录或工单 worktree 里开工，服务端只听 127.0.0.1（例外见根目录 [AGENTS.md](AGENTS.md)「帮工没有权限确认」）。帮工能在这台机器上执行任意命令，服务端不应对外。
 - **档案经 `spawn` 的选项进会话**：人设和技能拼成说明，`append` 放进追加的系统提示，`replace` 替换系统提示，`prompt` 写在交给它的活前面（中间隔 `jobBreak`）；档案的 MCP 服务器、禁用的工具、模型、思考强度、环境变量（农机设置的在前，档案的盖过它）一起交给 oar，不改共享的农机注册表。档案没写模型就用农机设置的默认模型；模型列表里没有的退回农机默认并提醒一次。
-- **农机的安装是显式的输入**：农机设置的 `binPath` 作为 oar 的安装选项交给探测，不写进进程的环境变量；`Runtimes.resolve` 带回探测时接受的那个安装，`spawn` 直接用它，不再探一次。指定的路径失效不会悄悄换一台。
+- **农机的安装是显式的输入**：农机设置的 `binPath` 作为 oar 的安装选项交给探测，不写进进程的环境变量；`Runtime.resolve` 带回探测时接受的那个安装，`spawn` 直接用它，不再探一次。指定的路径失效不会悄悄换一台。
 - **农场的规矩**（`workplaceRules`，每次开会话附上）：在哪个项目、哪个工作目录，开了 worktree 时还有哪个分支；只改这个目录，不切分支、不 push；做完一轮 `git add`、`git commit`，提交信息照项目的约定；工单太大、能分成几件各自验证的，先提交再用 `issue_split` 拆成子工单（[计划](docs/subsystems/task.md)）；汇报写 commit 号和怎么验证的，最后一段以「结论：」开头；缺信息的写「要问主人：」，学到的写「记住：」（所有项目都成立的写「记住（所有项目）：」）；在频道怎么 @、怎么用 `channel_message_send`；加上 `VIBEVALLEY_WORK_ROOT/AGENTS.md`（有的话）作为「这台机器上所有项目的约定」。
 - **Session 带一把 `/mcp` 的令牌**（`hb_<id>_<随机>`，只在内存里）：农场作为 MCP 服务器 `vibevalley` 交给它，`/mcp` 凭令牌认出是哪个 Session；令牌只用来分人，不是安全边界，收工时作废。
 - **一次 run 记着为什么开的**（`RunTrigger`）：`issue`（第一次派出去）、`comment`（带话，带着那条消息的号）、`task`（计划）、`cron`（带着哪个定时任务、是不是补跑）、`draft`（起草工单）；没人发话就开的一轮是 `runtime`（农机自己）。发话的一方先把触发放在 Session 上（`expect`），农机开了这一轮，run 取最早的那个。
@@ -70,7 +70,7 @@
 | 每台农机 | `RuntimeSettings.maxWorking`（不设不限） | 这台农机上有几个、最多几个 |
 | 每个项目 | `project.max_sessions`（默认 3） | 人多了容易改到同一个文件 |
 
-开一轮和发布它在同一把锁（`admission`）里，几个同时来的派活不会占到同一个空位。每个 Session 另有一把现场锁：带话、交接和离场互斥，合并和验收不占全局的准入锁，其他帮工仍能接话和叫停。带话先拿现场锁再拿准入锁，准入锁内不等已有 Session 的现场锁。地里满 6 个又来新活时，工单经 `Sessions.makeRoom` 请最早派出去的闲置帮工收工。
+开一轮和发布它在同一把锁（`admission`）里，几个同时来的派活不会占到同一个空位。每个 Session 另有一把现场锁：带话、交接和离场互斥，合并和验收不占全局的准入锁，其他帮工仍能接话和叫停。带话先拿现场锁再拿准入锁，准入锁内不等已有 Session 的现场锁。地里满 6 个又来新活时，工单经 `Session.makeRoom` 请最早派出去的闲置帮工收工。
 
 **派不出去**（`runtime/fit.ts` 的 `agentProblems`，派活前查、`agent.validate` 给页面）：档案停用、农机没装或停用、农机不接受档案的选项（人设方式、思考强度、环境变量、MCP、禁用工具）或模型没有这一档思考强度；以及钱的一条（`moneyStop`）：套餐的任一窗口用到 100%（写明几点重置）、余额用完、今天花到每日预算。正在干的会干完。
 
@@ -83,9 +83,9 @@
 
 **派出去**（`send`，由工单服务派活时调）：
 
-1. 接收工单服务给的完整工单身份（id 和编号），查上限；分一个编号 `w<n>`；`Projects` 按工单编号开或复用 worktree。
+1. 接收工单服务给的完整工单身份（id 和编号），查上限；分一个编号 `w<n>`；`Project` 按工单编号开或复用 worktree。
 2. 想起这个档案的记性（「【你记得的】」一段，和活之间隔 `jobBreak`）。
-3. `Runtimes.resolve` 定农机、模型、安装；`spawn` 开 oar 会话。开不成就放回 worktree、作废令牌，报「派不出去」。
+3. `Runtime.resolve` 定农机、模型、安装；`spawn` 开 oar 会话。开不成就放回 worktree、作废令牌，报「派不出去」。
 4. 调 `SendOptions.hiring`（工单服务记下既有工单和 Session 的关联）；失败就关闭会话，按项目的释放回执交代现场是否保留，不上地。关联登记遇到 SQL 错误时拒绝派活，其他 defect 保留原 Cause；两种退出都先关闭刚开的会话。关闭也失败时，帮工模块保留这次未发布的启动分配，继续占位置，拒绝再派同一张工单和清理它的工作区；关机时再尽力关闭。工单已经在开 worktree 以前写好，这里不补建。
 5. 写 `session` 表一行，施加 `hired`，接上事件（`Subagent` 的 follow）和没动静的计时，第一次 run 的触发默认是 `issue`。
 
@@ -140,8 +140,8 @@
 - **农机（`runtime`）**：定农机和安装、模型的价格、记花费、一轮结束后读额度、查档案能不能派。
 - **记性（`memory`）**：开一轮前想起，一轮结束记下，离开时收尾；同一个 Session 想起过的不再提，接不上换新会话时重新想起。
 - **核心状态（`core`）**：`apply` 施加 `hired`、`run`、`doing`、`quiet`、`retry`、`spent`、`report`、`conflict`、`left`；日志的事件推给页面；提醒经核心状态的 side event 发。
-- **管家（`orchestrator`）**：向 `Sessions.host` 要一个 `AgentHost`，给它提示、工具、路由和「话发到哪」；日志和记 run 的地方由 `Sessions` 配上，管家碰不到：run 和日志经 `inProcessRun.ts` 记，和帮工的放在一起（`session.event.list orchestrator`）。帮工和管家的 run 走同一组写法（开、听到、结束），管家一轮接了几张工单时另外连上每一张。
-- **`/mcp`（`mcp`）**：凭 `Sessions.who` 认出调工具的是哪个 Session。
+- **管家（`orchestrator`）**：向 `Session.host` 要一个 `AgentHost`，给它提示、工具、路由和「话发到哪」；日志和记 run 的地方由 `Session` 配上，管家碰不到：run 和日志经 `inProcessRun.ts` 记，和帮工的放在一起（`session.event.list orchestrator`）。帮工和管家的 run 走同一组写法（开、听到、结束），管家一轮接了几张工单时另外连上每一张。
+- **`/mcp`（`mcp`）**：凭 `Session.who` 认出调工具的是哪个 Session。
 
 ## 为什么这样
 

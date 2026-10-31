@@ -18,7 +18,7 @@
 | `state.ts`、`data.ts`、`hooks.ts` | 在框架里的角色 | 它管的东西：`groups.ts`、`calendar.ts`、`lanes.ts` |
 | `utils`、`helpers`、`common`、`misc`、`lib` | 没有归属 | 用它的概念；两个模块都用的，放进下层拥有它的模块 |
 | `text.ts` | 形式是文字 | 说给谁、说什么：`digest.ts`、`mentions.ts` |
-| `XManager`、`XHandler`、`XService`、`XUtil` | 角色 | 服务按它管的东西叫（`Issues`），函数按它做的事叫 |
+| `XManager`、`XHandler`、`XService`、`XUtil` | 角色 | 服务按它管的东西叫（`Issue`），函数按它做的事叫 |
 
 代码的技术性质不进名字，交给检查：
 
@@ -32,6 +32,20 @@
 名字说性质，说的是写的人怎么实现、怎么测，读的人要找的却是哪件事；性质变了，名字也跟着错。位置本身就是约定、而且有检查守着的，可以用：`prompts.ts`（对模型说的话，lint 在这里放行中文）、`index.ts`（一个 feature 对外的入口，`page-layers` 查）、`packages/protocol/src/rules`（两边都跑的，`contract.test.ts` 查）、`testing/` 和 `testing.ts`（测试用的，金字塔认它们）。
 
 **起不出名字就先拆。** 一个文件或函数只能用「和」连起来说，或只能用上表左边的词概括，说明它管了不止一件事：拆成几份，每份再起名。左边这些名字 `scripts/file-names.test.ts` 拦下，`apps/`、`packages/` 里一个也没有。
+
+## 单数和复数
+
+名字用单数，除非值本身是一组：数组、`Map`、`Set`、一张列表、一个数，或返回好几个的接口和函数。复数说的是「好几个」，读的人会照着去遍历它；一个对象、一样东西用复数，就让读的人以为手里是一组。
+
+| 复数是必要的 | 复数是多余的 |
+|---|---|
+| `issues: Issue[]`、`WorkspaceState.issues` | 服务 `Issue`（服务是一个，写 `Issue`） |
+| `issue.list`、`project.list`（返回好几个） | 管一张表的存取对象 `Memory`（写 `MemoryStore`） |
+| `runsOf(session)`、`questionsOf(issue)`（返回好几个） | 只放一样东西的文件 `memories.ts`（写 `store.ts`） |
+| 一个数：`maxTasks`、`keepClosedIssues`、`autoRetries` | 返回一样东西的函数用复数名 |
+| 在内存里装着一组的：`Deliveries`、`IssueSessions`、`Trajectories` | |
+
+几个有名字的取值拼成的一份（`HireOptions`、`BoardProps`、`VoiceSettings`、`RuntimeFacts`）照英语的习惯用复数：它确实是好几项。用语表里本身就是复数的词照用语表（`Changes` 是「改动」：一个分支上的提交和文件）。以 s 结尾的单数词（`Status`、`Progress`、`Alias`）是单数。
 
 ## 查询和命令
 
@@ -62,12 +76,13 @@
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
 | 测试和故事 | 挨着被测的文件 | `moves.test.ts`、`Board.stories.tsx` |
-| 服务 | 管一类东西的用复数，管一样东西的用单数；照 Effect 的默认写法是类，接口写在类型参数里、不另起名，`layer` 是静态成员；它的类型是 `Issues["Service"]` | `Issues`、`Channels`；`Core`、`Orchestrator` |
-| 服务的标签和 `Effect.fn` 的名字 | `vibevalley/<概念>`；`<服务>.<方法>` | `"vibevalley/Issue"`；`"Issues.edit"` |
+| 服务 | 概念的单数词，和模块的文件夹、表同一个词（照 Effect 自己的 `Database`）；照 Effect 的默认写法是类，接口写在类型参数里、不另起名，`layer` 是静态成员；它的类型是 `Issue["Service"]`（lint 的 `vibevalley/singular-service` 查） | `Issue`、`Channel`、`Session`；`Core`、`Orchestrator` |
+| 服务的标签和 `Effect.fn` 的名字 | `vibevalley/<概念>`；`<服务>.<方法>` | `"vibevalley/Issue"`；`"Issue.edit"` |
+| 服务端代码里和服务同名的线上形状 | 经命名空间读：`import type * as T from "@vibevalley/protocol"`，写 `T.Issue`；这样的文件里协议的类型都写成 `T.X`（lint 的 `vibevalley/protocol-namespace` 查） | `issue: T.Issue`、`(s: T.Session) => …` |
 | 带牌子的 id | `XId` | `IssueId`、`SessionId` |
 | 一组固定的取值 | 成员表 `XValues`，类型从它推；要每种都处理时用 `Record<X, …>` | `IssueStatusValues` |
 
-服务的接口不另起名：Effect 的默认写法把它写在 `Context.Service<Self, Shape>` 的类型参数里，`Shape` 只是这个参数的名字，要类型时写 `Issues["Service"]`。
+服务的接口不另起名：Effect 的默认写法把它写在 `Context.Service<Self, Shape>` 的类型参数里，`Shape` 只是这个参数的名字，要类型时写 `Issue["Service"]`。服务和线上的形状都用概念的词，撞了让形状退一步：服务在服务端处处用，形状经 `T.` 读一眼就知道是线上的那个；别的库撞名的，导入时起别名（oar 的 `Runtime` 是 `OarRuntime`，循环的 `Tool` 是 `LoopTool`）。
 
 ## 线上和存盘的形状
 

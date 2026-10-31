@@ -18,9 +18,9 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/artifact`（服务 `Artifacts`），归 Collaboration，排在 `channel` 后面：
+- 服务端 `apps/server/src/artifact`（服务 `Artifact`），归 Collaboration，排在 `channel` 后面：
   - `artifact.ts`：产出本身、网页的每一版（内容按 sha256 存在 `$VIBEVALLEY_HOME/artifacts/<sha256>`）、交上来时说的那句话。
-  - `blocks.ts`：一起写的那种的块，存取和提交（`Artifacts` 的一部分，不是单独的服务）。
+  - `blocks.ts`：一起写的那种的块，存取和提交（`Artifact` 的一部分，不是单独的服务）。
   - `ops.ts`：op 的规则（纯函数，在内存里的一组块上按顺序施加）；`spans.ts` 按码点切和接文字；`markdown.ts` 读写 Markdown；`demo.ts` 是演示的节奏。
   - `policy.ts`：标题、种类、大小的校验，网页内容的响应头。
   - 顺序键在 `packages/protocol/src/rules/order.ts`（`keyBetween`），服务端和页面用同一份。
@@ -28,7 +28,7 @@
 - 形状在 `packages/protocol/src/shapes.ts`：`Artifact`、`ArtifactCard`、`ArtifactVersion`；块那一套 `BlockInput`（作者给的新块）、`Block`、`BlockAttrs`、`TextSpan`、`SpanMarks`，op 是封闭的联合 `BlockOp`（按 `op` 区分），`BlockSubmit`、`BlockAck`、`BlockOpResult`、`BlockSnapshot`。块的类型是封闭的 `BlockType`（成员表 `BlockTypeValues`），接口解码时拒掉别的取值，服务端和页面都写带类型的字面量。
 - 接口：`artifact.*`（[capabilities.md](docs/reference/capabilities.md)）。网页一版的内容是 `GET /api/v1/artifact/<id>/<版本>`（`http/artifact.ts`，`artifactPath`）。主人和「连接到本机」写块时写的人记成 `owner`；`artifact.demo` 只有本机的主人能调。
 - 帮工和管家的工具照接口名来：`artifact_list`、`artifact_get`、`artifact_content_get`、`artifact_create`、`artifact_version_create`；帮工另有 `artifact_block_create`、`artifact_block_update`（`apps/server/src/tool/tool.ts`）。
-- 频道：`Channels.announce` 以作者的身份说那句带卡片的话，`Channels.placeOf` 把「在哪说」认成频道。
+- 频道：`Channel.announce` 以作者的身份说那句带卡片的话，`Channel.placeOf` 把「在哪说」认成频道。
 - 页面 `apps/web/src/features/artifact`：
   - `ArtifactsPage.tsx` 是「产出」页：左边是全部产出（按标题找、新建、按改动的先后），右边打开的那篇。上面是标题（就地改名，回车或离开就存，Esc 放回）、种类、网页正在看第几版、谁做的、为哪张工单，右上角的 ⋯ 是新标签页打开（网页）、复制链接、演示（一起写的）、删掉（在原处再问一遍）；网页的旁边是每一版，交上来的旁边是回到对话里那条消息和回复的框（⌘ 回车发）；窄屏只放一边。「新建」马上建一篇没起名的，选中标题等你打字。
   - `BlocksView.tsx` 是一起写的那种：块的画法、按键；`editor.ts` 的 `BlockEditor` 管本地的块、待发的 op、防抖和问别人写的；`blocks.ts` 只有码点偏移、编辑时保留 marks、编号和行首的 Markdown，不在别处重写规则。

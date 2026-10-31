@@ -10,7 +10,7 @@ import { TestClock } from "effect/testing";
 import { remember, rewriteMemory } from "@vibevalley/agent/memory";
 import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
 import { agentHome, ServerConfig } from "@/base/config.ts";
 import { Database, Db } from "@/base/db.ts";
@@ -18,12 +18,12 @@ import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
-import { Memories, make } from "./memory.ts";
+import { Memory, make } from "./memory.ts";
 import { memoryIsNewNote, issueMemoryText, memoryNotesOf, recallChars } from "./recall.ts";
 
 const world = (config = testConfig()) =>
-  Layer.effect(Memories, make()).pipe(
-    Layer.provideMerge(Agents.layer),
+  Layer.effect(Memory, make()).pipe(
+    Layer.provideMerge(Agent.layer),
     Layer.provideMerge(Setting.layer),
     Layer.provideMerge(Db.layer),
     Layer.provideMerge(Database),
@@ -66,7 +66,7 @@ describe("memory", () => {
 
   it.effect("runs are kept, recalled and counted; notes written and forgotten", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.keep({
         agent: "lab",
         session: "w1",
@@ -112,7 +112,7 @@ describe("memory", () => {
     const config = testConfig();
     const folder = agentHome(config, defaultOrchestrator);
     return Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       expect((yield* m.memoriesOf("orchestrator")).memories).toEqual([]);
       remember(folder, "主人喜欢早上收到汇报", new Date(2026, 9, 12, 9));
       const written = yield* m.remember({ agent: "orchestrator", text: "  周末别派夜班\n真的  ", project: "", by: owner });
@@ -146,7 +146,7 @@ describe("memory", () => {
     mkdirSync(join(folder, "archive"), { recursive: true });
     writeFileSync(join(folder, "archive", "orchestrator-2026-10-12.md"), "主人：给 clock-in 加分页\n管家：派给老周了\n");
     return Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       const listing = m.archive(defaultOrchestrator, "CLOCK-IN");
       expect(listing.files.map((f) => f.name)).toEqual(["orchestrator-2026-10-12.md"]);
       expect(listing.hits.map((h) => [h.file, h.line])).toEqual([["orchestrator-2026-10-12.md", 1]]);
@@ -158,7 +158,7 @@ describe("memory", () => {
 
   it.effect("a preview picks without counting, and the longest unused fade", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.write({ agent: "lab", text: "clock 的测试用 pnpm test", project: "clock", by: owner });
       yield* m.write({ agent: "lab", text: "提交前跑 lint", project: "", by: owner });
       const preview = yield* m.recallOf("lab", "clock", "");
@@ -173,7 +173,7 @@ describe("memory", () => {
 
   it.effect("the search index follows the table", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       const note = yield* m.write({ agent: "lab", text: "这个项目测试用 pnpm test", project: "demo", by: owner });
       yield* m.write({ agent: "other", text: "测试前先装依赖", project: "demo", by: owner });
       const found = (yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 })).found;
@@ -200,7 +200,7 @@ describe("memory", () => {
 
   it.effect("a run's notes go back when its issue memory cannot be written", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       const sql = yield* SqlClient.SqlClient;
       yield* sql.unsafe(`create function fail_write() returns trigger language plpgsql as $$ begin raise exception 'write failed'; end $$`);
       yield* sql.unsafe(`create trigger fail_write before insert on memory for each row when (new.kind = 'issue') execute function fail_write()`);
@@ -214,7 +214,7 @@ describe("memory", () => {
 
   it.effect("nearly the same notes in one run are kept once", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.keep(run("s1", "记住：use pnpm test\n记住：use pnpm test!"));
       expect(yield* m.list("lab")).toHaveLength(2);
     }).pipe(Effect.provide(world())),
@@ -224,7 +224,7 @@ describe("memory", () => {
     Effect.gen(function* () {
       // The rows below were written at 1; what is kept now is later, by the test's clock.
       yield* TestClock.setTime(Date.UTC(2026, 9, 1));
-      const m = yield* Memories;
+      const m = yield* Memory;
       for (let i = 0; i < memoryKeep; i++) {
         const id = `old-${String(i).padStart(3, "0")}`;
         if (i % 2 === 0)
@@ -245,7 +245,7 @@ describe("memory", () => {
     const config = testConfig();
     mkdirSync(join(agentHome(config, defaultOrchestrator), "MEMORY.md"), { recursive: true });
     return Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       expect((yield* Effect.flip(m.previewForget("orchestrator", "m1")))._tag).toBe("Refused");
       expect((yield* Effect.flip(m.forget("orchestrator", "m1")))._tag).toBe("Refused");
     }).pipe(Effect.provide(world(config)));

@@ -36,9 +36,9 @@ export interface RuntimeOptions {
   readonly llm: (model: string) => ModelClient;
   /** Where a session keeps its own todos; absent, it keeps none. */
   readonly todos?: (session: string) => TodoStore;
-  /** The sessions' clock: the Runtimes service's, or the wall clock on the command line. */
+  /** The sessions' clock: the Runtime service's, or the wall clock on the command line. */
   readonly time: Time;
-  /** Where the sessions' brains run: the Runtimes service's fibers and scope, or standaloneOwner on the command line. */
+  /** Where the sessions' brains run: the Runtime service's fibers and scope, or standaloneOwner on the command line. */
   readonly owner: BrainOwner;
 }
 

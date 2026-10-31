@@ -1,7 +1,7 @@
 import { Result, Schema, SchemaIssue } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import type { Task } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { TaskDraft } from "@vibevalley/protocol/schema";
 
 import { lastJsonBlock } from "@/base/json.ts";
@@ -9,7 +9,7 @@ import { messageOf } from "@/errors.ts";
 
 import { freshTask } from "./editing.ts";
 import { graphProblems } from "./graph.ts";
-export type ParsedSplit = { readonly ok: true; readonly title?: string; readonly tasks: Task[] } | { readonly ok: false; readonly problems: string[] };
+export type ParsedSplit = { readonly ok: true; readonly title?: string; readonly tasks: T.Task[] } | { readonly ok: false; readonly problems: string[] };
 
 /** The words for JSON that does not read say what Go's decoder would where they are the same failure. */
 function unparsedJson(e: unknown): string {

@@ -3,14 +3,14 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 
-import type { ChatMessage, Channel } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
-import { Agents } from "@/agent/agent.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Agent } from "@/agent/agent.ts";
+import { Channel } from "@/channel/chat.ts";
 import { channelOf } from "@/channel/folded.ts";
 import { Core } from "@/core/core.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Sessions } from "@/session/session.ts";
+import { Issue } from "@/issue/issue.ts";
+import { Session } from "@/session/session.ts";
 import { Said } from "@/testing/said.ts";
 
 import { await_, farm, lab, until } from "./farm.ts";
@@ -24,24 +24,24 @@ describe("an issue's thread", () => {
       runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做好了") }),
     });
     return Effect.gen(function* () {
-      const issues = yield* Issues;
-      const channels = yield* Channels;
-      const sessions = yield* Sessions;
+      const issues = yield* Issue;
+      const channels = yield* Channel;
+      const sessions = yield* Session;
       const core = yield* Core;
       const { in: saidIn } = yield* Said;
       const sql = yield* SqlClient.SqlClient;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({ title: "写打卡", project: "one-thread", assignee: "lab" });
       const sent = yield* issues.start(issue.id, "");
       const first = sent.session!;
       expect(first).toBeDefined();
       const thread = yield* await_(
         () => Effect.map(channels.threadOfSession(first), (id) => (id ? channelOf(core.state().chat, id) : undefined)),
-        (c): c is Channel => c !== undefined,
+        (c): c is T.Channel => c !== undefined,
         "the issue's thread",
       );
       expect([thread!.subjectKind, thread!.subjectId]).toEqual(["issue", issue.id]);
-      const inThread = (): ChatMessage[] => saidIn(thread!.id);
+      const inThread = (): T.ChatMessage[] => saidIn(thread!.id);
       const reportsBy = (session: string) => inThread().filter((m) => m.kind === "report" && m.from === session).length;
       yield* until(() => reportsBy(first) === 1, "the first session's report");
       yield* channels.say("把输出改成中文", thread!.id, "");
@@ -79,10 +79,10 @@ describe("an issue's thread", () => {
   it.live("hears the owner's words as a comment", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issues;
-      const channels = yield* Channels;
+      const issues = yield* Issue;
+      const channels = yield* Channel;
       const { in: saidIn } = yield* Said;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({
         title: "先问清楚，再写打卡",
         project: "clock",

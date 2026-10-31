@@ -12,7 +12,7 @@ import { ServerConfig } from "@/base/config.ts";
 import { gitSync, projectsDir, repo, write } from "@/testing/git.ts";
 import { testConfig } from "@/testing/layers.ts";
 
-import { Projects, githubOrigin, type GitHubRun, probeGitHub, type ProjectHooks } from "./project.ts";
+import { Project, githubOrigin, type GitHubRun, probeGitHub, type ProjectHooks } from "./project.ts";
 
 const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 const gh =
@@ -20,10 +20,10 @@ const gh =
   (...args) =>
     Effect.sync(() => ({ ok: true, missing: false, ...answer(args) }));
 
-const projects = <A, E>(root: string, body: Effect.Effect<A, E, Projects>, change: Partial<ServerConfig["Service"]> = {}, hooks: ProjectHooks = {}) =>
+const projects = <A, E>(root: string, body: Effect.Effect<A, E, Project>, change: Partial<ServerConfig["Service"]> = {}, hooks: ProjectHooks = {}) =>
   body.pipe(
     Effect.provide(
-      Projects.layer({ gh: noGitHub, ...hooks }).pipe(
+      Project.layer({ gh: noGitHub, ...hooks }).pipe(
         Layer.provide(Layer.merge(Layer.succeed(ServerConfig, testConfig({ workRoot: dirname(root), ...change })), NodeServices.layer)),
       ),
     ),
@@ -77,7 +77,7 @@ describe("GitHub", () => {
     return projects(
       projectsDir(),
       Effect.gen(function* () {
-        const p = yield* Projects;
+        const p = yield* Project;
         const made = yield* p.create({ name: "garden" });
         gitSync(made.path, "remote", "add", "origin", "git@github.com:owner/repo.git");
         for (const perm of ["WRITE", "ADMIN", "MAINTAIN", "READ", "TRIAGE"]) {
@@ -111,7 +111,7 @@ describe("GitHub", () => {
     return projects(
       projectsDir(),
       Effect.gen(function* () {
-        const p = yield* Projects;
+        const p = yield* Project;
         const made = yield* p.create({ name: "garden" });
         gitSync(made.path, "remote", "add", "origin", "https://github.com/owner/repo.git");
         yield* p.refreshGitHub();
@@ -144,7 +144,7 @@ describe("GitHub", () => {
       root,
       Effect.gen(function* () {
         expect(
-          (yield* (yield* Projects).create({
+          (yield* (yield* Project).create({
             name: "private",
             github: "https://github.com/owner/private",
           })).git,
@@ -159,7 +159,7 @@ describe("GitHub", () => {
     projects(
       projectsDir(),
       Effect.gen(function* () {
-        const p = yield* Projects;
+        const p = yield* Project;
         for (const name of ["enabled", "other"]) {
           const made = yield* p.create({ name });
           gitSync(made.path, "remote", "add", "origin", `https://github.com/owner/${name}.git`);
@@ -182,7 +182,7 @@ describe("GitHub", () => {
     return projects(
       projectsDir(),
       Effect.gen(function* () {
-        const p = yield* Projects;
+        const p = yield* Project;
         const place = yield* p.workplace("sample", 1, true, "");
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         mkdirSync(join(place.cwd, ".vibevalley"));
@@ -214,7 +214,7 @@ describe("GitHub", () => {
     return projects(
       projectsDir(),
       Effect.gen(function* () {
-        const p = yield* Projects;
+        const p = yield* Project;
         const place = yield* p.workplace("sample", 1, true, "");
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         expect((yield* Effect.flip(p.submitPullRequest(place, issue, "done"))).message).toBe("无法读取已有 PR");
@@ -235,7 +235,7 @@ describe("GitHub", () => {
         yield* projects(
           projectsDir(),
           Effect.gen(function* () {
-            const p = yield* Projects;
+            const p = yield* Project;
             const place = yield* p.workplace("sample", 1, true, "");
             gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
             if (hasCheck) {
@@ -264,7 +264,7 @@ describe("GitHub", () => {
     return projects(
       projectsDir(),
       Effect.gen(function* () {
-        const p = yield* Projects;
+        const p = yield* Project;
         const place = yield* p.workplace("sample", 1, true, "");
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         const file = gitSync(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", "vibevalley-pr.md").trim();
@@ -298,7 +298,7 @@ describe("GitHub", () => {
         yield* projects(
           root,
           Effect.gen(function* () {
-            const p = yield* Projects;
+            const p = yield* Project;
             yield* p.create({ name: "sample" });
             const path = join(root, "sample");
             const origin = join(tempDir("vibevalley-origin-"), "origin.git");
@@ -362,7 +362,7 @@ describe("GitHub", () => {
     return projects(
       root,
       Effect.gen(function* () {
-        const repos = yield* (yield* Projects).contributions([]);
+        const repos = yield* (yield* Project).contributions([]);
         expect(repos.map((r) => r.commits)).toEqual([2]);
       }),
     );

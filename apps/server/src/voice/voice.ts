@@ -21,7 +21,7 @@ import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley
 import { ServerConfig } from "@/base/config.ts";
 import { callbackLog, bestEffort } from "@/base/log.ts";
 import { afterRealTime } from "@/base/time.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { messageOf, errnoOf } from "@/errors.ts";
 import { Inbox } from "@/inbox/inbox.ts";
@@ -442,7 +442,7 @@ const make = (options: VoiceOptions = {}) =>
     const core = yield* Core;
     const inbox = yield* Inbox;
     const settings = yield* Setting;
-    const chat = yield* Channels;
+    const chat = yield* Channel;
     const orchestrator = yield* Orchestrator;
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;

@@ -8,33 +8,34 @@ import { resolve, sep } from "node:path";
 import { Clock, Context, Effect, Layer, Predicate, Schema } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
-import type { Tool } from "@vibevalley/agent/core/loop";
+import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { effectTool } from "@vibevalley/agent/core/tool";
 import type { JsonSchema } from "@vibevalley/ai/tools";
 import { maybe, t } from "@vibevalley/i18n";
-import { type Agent, DeliverableValues, type Issue, IssueStatusValues, defaultOrchestrator, type CronWhen, type TaskEdit } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { DeliverableValues, IssueStatusValues, defaultOrchestrator } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
 
-import { Agents } from "@/agent/agent.ts";
-import { Artifacts } from "@/artifact/artifact.ts";
+import { Agent } from "@/agent/agent.ts";
+import { Artifact } from "@/artifact/artifact.ts";
 import { artifactMax } from "@/artifact/policy.ts";
 import type { Actor } from "@/base/actor.ts";
 import { head } from "@/base/clip.ts";
-import { Channels, type Info, type Spoken } from "@/channel/chat.ts";
+import { Channel, type Info, type Spoken } from "@/channel/chat.ts";
 import { inboxLines } from "@/channel/prompts.ts";
-import { Crons } from "@/cron/cron.ts";
+import { Cron } from "@/cron/cron.ts";
 import { messageOf, type ApiError, reasonOf, refused } from "@/errors.ts";
-import { Issues } from "@/issue/issue.ts";
+import { Issue } from "@/issue/issue.ts";
 import { openFindings } from "@/issue/status.ts";
-import { foundText, Memories, type SearchQuery } from "@/memory/memory.ts";
-import { Projects } from "@/project/project.ts";
-import { Runtimes } from "@/runtime/runtime.ts";
+import { foundText, Memory, type SearchQuery } from "@/memory/memory.ts";
+import { Project } from "@/project/project.ts";
+import { Runtime } from "@/runtime/runtime.ts";
 import type { ToolStart } from "@/session/facts.ts";
-import { type Roster, Sessions } from "@/session/session.ts";
+import { type Roster, Session } from "@/session/session.ts";
 import { isOpen, maxTasks } from "@/task/graph.ts";
 import { graphText } from "@/task/prompts.ts";
-import { Tasks } from "@/task/task.ts";
+import { Task } from "@/task/task.ts";
 
 import {
   answers,
@@ -59,7 +60,7 @@ import { type Op, parameters, schemas, sessionParameters, sessionSchemas, toolNa
 
 /** A tool's arguments as its Schema reads them. */
 type Orchestrator<K extends keyof typeof parameters> = (typeof parameters)[K]["Type"];
-type Session<K extends keyof typeof sessionParameters> = (typeof sessionParameters)[K]["Type"];
+type SessionInput<K extends keyof typeof sessionParameters> = (typeof sessionParameters)[K]["Type"];
 /** The tools that name an issue and nothing else. */
 type IssueTool = "issue.get" | "issue.diff.get" | "session.stop";
 
@@ -81,20 +82,20 @@ export interface Caller {
 /** A throw here is told to the model as the tool's failure. */
 export type Who = () => Caller;
 
-export class Tools extends Context.Service<
-  Tools,
+export class Tool extends Context.Service<
+  Tool,
   {
     /** The orchestrator's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
-    readonly orchestrator: (who: Who) => Tool[];
+    readonly orchestrator: (who: Who) => LoopTool[];
     /** A session's tools, served on /mcp. */
-    readonly session: (who: Who) => Tool[];
+    readonly session: (who: Who) => LoopTool[];
     /** How a tool call reads in the orchestrator's trajectory: its label and the first naming argument. */
     readonly start: (name: string, args: unknown) => ToolStart;
     readonly sessionLine: (w: Roster) => string;
   }
 >()("vibevalley/Tool") {
   static readonly layer = Layer.effect(
-    Tools,
+    Tool,
     Effect.suspend(() => make),
   );
 }
@@ -141,16 +142,16 @@ const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefu
 
 const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
-  const agents = yield* Agents;
-  const projects = yield* Projects;
-  const memory = yield* Memories;
-  const run = yield* Sessions;
-  const runtimes = yield* Runtimes;
-  const chat = yield* Channels;
-  const cron = yield* Crons;
-  const issue = yield* Issues;
-  const tasks = yield* Tasks;
-  const artifacts = yield* Artifacts;
+  const agents = yield* Agent;
+  const projects = yield* Project;
+  const memory = yield* Memory;
+  const run = yield* Session;
+  const runtimes = yield* Runtime;
+  const chat = yield* Channel;
+  const cron = yield* Cron;
+  const issue = yield* Issue;
+  const tasks = yield* Task;
+  const artifacts = yield* Artifact;
 
   /** An answer, or "没成：" and why. */
   const answered = <E>(e: Effect.Effect<string, E>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(said(err))));
@@ -178,7 +179,7 @@ const make = Effect.gen(function* () {
   };
 
   // The orchestrator names an issue by its number (#41, 41), its id, or the name or id of a helper working it.
-  const findIssue = Effect.fnUntraced(function* (key: string): Effect.fn.Return<Issue | string> {
+  const findIssue = Effect.fnUntraced(function* (key: string): Effect.fn.Return<T.Issue | string> {
     const k = key.trim().replace(/^#/u, "");
     const all = yield* issue.list();
     if (/^\d+$/u.test(k)) return all.find((item) => item.number === Number(k)) ?? answers.noIssueNumber(k);
@@ -188,20 +189,20 @@ const make = Effect.gen(function* () {
     const of = w?.session.issue ? all.find((item) => item.id === w.session.issue) : undefined;
     return of ?? answers.noIssueOrAgent(k);
   });
-  const withIssue = <E>(key: string, f: (issue: Issue) => Effect.Effect<string, E>) =>
+  const withIssue = <E>(key: string, f: (issue: T.Issue) => Effect.Effect<string, E>) =>
     // findIssue's text is the refusal the model reads, a result like f's: not a failure to filter out.
     // @effect-diagnostics-next-line flatMapConditionalToFilterOrFail:off
     Effect.flatMap(findIssue(key), (item) => (typeof item === "string" ? Effect.succeed(item) : f(item)));
-  const issueTool = <E>(op: IssueTool, f: (issue: Issue) => Effect.Effect<string, E>) => tool(op, descriptions[op], (p) => withIssue(p.id, f));
+  const issueTool = <E>(op: IssueTool, f: (issue: T.Issue) => Effect.Effect<string, E>) => tool(op, descriptions[op], (p) => withIssue(p.id, f));
   /** The helper on the farm working the issue now, if any: its newest session. */
-  const workerOf = (issue: Issue) => {
+  const workerOf = (issue: T.Issue) => {
     const last = issue.sessions.at(-1);
     return last === undefined ? undefined : run.roster().find((w) => w.session.id === last);
   };
-  const whoOf = (issue: Issue) =>
+  const whoOf = (issue: T.Issue) =>
     workerOf(issue)?.session.name ??
     (issue.assignee === defaultOrchestrator ? ownerAgentWord : issue.assignee ? (agents.agent(issue.assignee)?.name ?? "") : "");
-  const nobodyOn = (issue: Issue) => answers.nobodyOn(issue.number);
+  const nobodyOn = (issue: T.Issue) => answers.nobodyOn(issue.number);
   const numberOf = (w: Roster) => (w.session.issue ? issue.onBoard().find((item) => item.id === w.session.issue)?.number : undefined);
 
   // Who reads and speaks in a channel: a session as itself, the orchestrator as the orchestrator.
@@ -209,7 +210,7 @@ const make = Effect.gen(function* () {
 
   // Which profile takes a brief: the one named (a profile's name or id, or a runtime), else the one the owner picked for
   // this input, else by the farm's rule. A name that matches none is said, not taken for "anyone".
-  const choose = Effect.fnUntraced(function* (brief: string, name: string, picked: string): Effect.fn.Return<Agent | string> {
+  const choose = Effect.fnUntraced(function* (brief: string, name: string, picked: string): Effect.fn.Return<T.Agent | string> {
     const key = name.trim();
     const a = yield* runtimes.choose(brief, key, picked);
     if (!a) return answers.noAgentToDispatch;
@@ -232,7 +233,7 @@ const make = Effect.gen(function* () {
   const projectList = tool(
     "project.list",
     descriptions["project.list"],
-    Effect.fn("Tools.projectList")(function* () {
+    Effect.fn("Tool.projectList")(function* () {
       const all = yield* projects.list();
       if (all.length === 0) return answers.projects.empty(projects.root);
       return all.map((p) => "- " + p.name + (p.git ? "" : answers.projects.notGitYet)).join("\n");
@@ -242,7 +243,7 @@ const make = Effect.gen(function* () {
   const channelList = tool(
     "channel.list",
     descriptions["channel.list"],
-    Effect.fn("Tools.channelList")(function* () {
+    Effect.fn("Tool.channelList")(function* () {
       return (yield* chat.channels()).map((c) => "- " + channelLine(c)).join("\n");
     }),
   );
@@ -256,7 +257,7 @@ const make = Effect.gen(function* () {
 
   const issueGet = issueTool(
     "issue.get",
-    Effect.fn("Tools.issueGet")(function* (item: Issue) {
+    Effect.fn("Tool.issueGet")(function* (item: T.Issue) {
       const w = workerOf(item);
       const timeline = yield* Effect.orElseSucceed(issue.timeline(item.id), () => undefined);
       const lines = [issueDetail(item, whoOf(item), timeline, clock.currentTimeMillisUnsafe())];
@@ -268,8 +269,8 @@ const make = Effect.gen(function* () {
   const issueDiff = (who: Who) =>
     issueTool(
       "issue.diff.get",
-      Effect.fn("Tools.issueDiff")(
-        function* (item: Issue) {
+      Effect.fn("Tool.issueDiff")(
+        function* (item: T.Issue) {
           const c = yield* callerOf(who);
           return changesText(yield* issue.changes(item.id, c.actor));
         },
@@ -317,7 +318,7 @@ const make = Effect.gen(function* () {
     sessionSchemaTool(
       "channel.message.send",
       sessionDescriptions["channel.message.send"],
-      Effect.fn("Tools.messageSend")(function* (p: Session<"channel.message.send">) {
+      Effect.fn("Tool.messageSend")(function* (p: SessionInput<"channel.message.send">) {
         const c = yield* callerOf(who);
         return spokenText(
           yield* chat.speak(participant(c), p.text, {
@@ -334,7 +335,7 @@ const make = Effect.gen(function* () {
     tool(
       "channel.message.list",
       descriptions["channel.message.list"],
-      Effect.fn("Tools.messageList")(function* (p: Orchestrator<"channel.message.list">) {
+      Effect.fn("Tool.messageList")(function* (p: Orchestrator<"channel.message.list">) {
         const c = yield* callerOf(who);
         let where = p.id ?? "";
         // A session's default is its own thread, which the channel service fills in.
@@ -359,7 +360,7 @@ const make = Effect.gen(function* () {
     sessionSchemaTool(
       "channel.unread.list",
       sessionDescriptions["channel.unread.list"],
-      Effect.fn("Tools.unreadList")(function* () {
+      Effect.fn("Tool.unreadList")(function* () {
         const c = yield* callerOf(who);
         const rows = yield* chat.unread(participant(c));
         if (rows.length === 0) return answers.channelInbox.empty;
@@ -374,7 +375,7 @@ const make = Effect.gen(function* () {
   const issueReview = tool(
     "issue.review",
     descriptions["issue.review"],
-    Effect.fn("Tools.issueReview")(function* (p: Orchestrator<"issue.review">) {
+    Effect.fn("Tool.issueReview")(function* (p: Orchestrator<"issue.review">) {
       return yield* withIssue(p.id, (item) =>
         issue.review(item.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }).pipe(
           Effect.map((done) => (p.pass ? answers.accept.passed(done.number) : answers.accept.failed(done.number, openFindings(done)))),
@@ -388,7 +389,7 @@ const make = Effect.gen(function* () {
     tool(
       "issue.comment.create",
       descriptions["issue.comment.create"],
-      Effect.fn("Tools.issueComment")(function* (p: Orchestrator<"issue.comment.create">) {
+      Effect.fn("Tool.issueComment")(function* (p: Orchestrator<"issue.comment.create">) {
         const c = yield* callerOf(who);
         return yield* withIssue(p.id, (item) => {
           const w = workerOf(item);
@@ -429,7 +430,7 @@ const make = Effect.gen(function* () {
     tool(
       "artifact.list",
       descriptions["artifact.list"],
-      Effect.fn("Tools.artifactList")(function* (p: Orchestrator<"artifact.list">) {
+      Effect.fn("Tool.artifactList")(function* (p: Orchestrator<"artifact.list">) {
         yield* callerOf(who);
         let issueId: string | undefined;
         if (p.issue) {
@@ -447,7 +448,7 @@ const make = Effect.gen(function* () {
     sessionSchemaTool(
       "artifact.list",
       sessionDescriptions["artifact.list"],
-      Effect.fn("Tools.artifactList")(function* (p: Session<"artifact.list">) {
+      Effect.fn("Tool.artifactList")(function* (p: SessionInput<"artifact.list">) {
         const c = yield* callerOf(who);
         const own = run.sessionOf(c.session)?.issue;
         const channel = p.channel ? yield* Effect.result(chat.placeOf(c.session, p.channel)) : undefined;
@@ -460,7 +461,7 @@ const make = Effect.gen(function* () {
     (table === "orchestrator" ? tool : sessionSchemaTool)(
       "artifact.get",
       (table === "orchestrator" ? descriptions : sessionDescriptions)["artifact.get"],
-      Effect.fn("Tools.artifactGet")(function* (p: { readonly id: string }) {
+      Effect.fn("Tool.artifactGet")(function* (p: { readonly id: string }) {
         yield* callerOf(who);
         return yield* artifactSaid(Effect.map(artifacts.get(p.id.trim()), answers.artifact.detail));
       }),
@@ -469,7 +470,7 @@ const make = Effect.gen(function* () {
     (table === "orchestrator" ? tool : sessionSchemaTool)(
       "artifact.content.get",
       (table === "orchestrator" ? descriptions : sessionDescriptions)["artifact.content.get"],
-      Effect.fn("Tools.artifactContent")(function* (p: { readonly id: string; readonly version?: number }) {
+      Effect.fn("Tool.artifactContent")(function* (p: { readonly id: string; readonly version?: number }) {
         yield* callerOf(who);
         return yield* artifactSaid(
           Effect.flatMap(artifacts.get(p.id.trim()), (a) =>
@@ -484,7 +485,7 @@ const make = Effect.gen(function* () {
     tool(
       "artifact.create",
       descriptions["artifact.create"],
-      Effect.fn("Tools.artifactCreate")(function* (p: Orchestrator<"artifact.create">) {
+      Effect.fn("Tool.artifactCreate")(function* (p: Orchestrator<"artifact.create">) {
         const c = yield* callerOf(who);
         let issueId: string | undefined;
         if (p.issue) {
@@ -515,7 +516,7 @@ const make = Effect.gen(function* () {
     sessionSchemaTool(
       "artifact.create",
       sessionDescriptions["artifact.create"],
-      Effect.fn("Tools.artifactCreate")(function* (p: Session<"artifact.create">) {
+      Effect.fn("Tool.artifactCreate")(function* (p: SessionInput<"artifact.create">) {
         const c = yield* callerOf(who);
         const own = run.sessionOf(c.session)?.issue;
         return yield* artifactSaid(
@@ -534,7 +535,7 @@ const make = Effect.gen(function* () {
     (table === "orchestrator" ? tool : sessionSchemaTool)(
       "artifact.version.create",
       (table === "orchestrator" ? descriptions : sessionDescriptions)["artifact.version.create"],
-      Effect.fn("Tools.artifactVersion")(function* (p: { readonly id: string; readonly content?: string; readonly file?: string; readonly note?: string }) {
+      Effect.fn("Tool.artifactVersion")(function* (p: { readonly id: string; readonly content?: string; readonly file?: string; readonly note?: string }) {
         const c = yield* callerOf(who);
         return yield* artifactSaid(
           Effect.gen(function* () {
@@ -552,8 +553,8 @@ const make = Effect.gen(function* () {
   const sessionStop = (who: Who) =>
     issueTool(
       "session.stop",
-      Effect.fn("Tools.sessionStop")(
-        function* (item: Issue) {
+      Effect.fn("Tool.sessionStop")(
+        function* (item: T.Issue) {
           yield* callerOf(who);
           yield* issue.stop(item.id);
           return answers.stop.stopped(item.number);
@@ -564,7 +565,7 @@ const make = Effect.gen(function* () {
   const issueList = tool(
     "issue.list",
     descriptions["issue.list"],
-    Effect.fn("Tools.issueList")(function* (p: Orchestrator<"issue.list">) {
+    Effect.fn("Tool.issueList")(function* (p: Orchestrator<"issue.list">) {
       const status = p.status ? statusOf(p.status) : undefined;
       if (p.status && !status) return noSuchStatus(p.status, IssueStatusValues);
       const { limit: _, status: __, ...rest } = p;
@@ -586,7 +587,7 @@ const make = Effect.gen(function* () {
     tool(
       "issue.create",
       descriptions["issue.create"],
-      Effect.fn("Tools.issueCreate")(function* (p: Orchestrator<"issue.create">) {
+      Effect.fn("Tool.issueCreate")(function* (p: Orchestrator<"issue.create">) {
         const c = yield* callerOf(who);
         if (p.draft === true && p.start === true) return answers.issueCreate.draftWithStartRefused;
         let channel: Info;
@@ -649,7 +650,7 @@ const make = Effect.gen(function* () {
     tool(
       "issue.update",
       descriptions["issue.update"],
-      Effect.fn("Tools.issueUpdate")(function* (p: Orchestrator<"issue.update">) {
+      Effect.fn("Tool.issueUpdate")(function* (p: Orchestrator<"issue.update">) {
         const c = yield* callerOf(who);
         return yield* withIssue(p.id, (item) => {
           const priority = p.priority ? priorityOf(p.priority) : undefined;
@@ -686,14 +687,14 @@ const make = Effect.gen(function* () {
     tool(
       "issue.status.update",
       descriptions["issue.status.update"],
-      Effect.fn("Tools.issueStatus")(function* (p: Orchestrator<"issue.status.update">) {
+      Effect.fn("Tool.issueStatus")(function* (p: Orchestrator<"issue.status.update">) {
         const c = yield* callerOf(who);
         const to = statusOf(p.status);
         if (!to) return noSuchStatus(p.status, ["backlog", "todo", "done", "canceled"]);
         return yield* withIssue(
           p.id,
           Effect.fnUntraced(
-            function* (item: Issue) {
+            function* (item: T.Issue) {
               // Sent out with nobody named yet: chosen by the farm's rule, the owner's pick first; another one named hands it over.
               let agent: string | undefined;
               if (p.assignee || (to === "todo" && item.status === "backlog" && !item.assignee)) {
@@ -717,7 +718,7 @@ const make = Effect.gen(function* () {
     tool(
       "cron.create",
       descriptions["cron.create"],
-      Effect.fn("Tools.cronCreate")(
+      Effect.fn("Tool.cronCreate")(
         function* (p: Orchestrator<"cron.create">) {
           const c = yield* callerOf(who);
           let channel = yield* chat.topOf(c.here);
@@ -727,7 +728,7 @@ const make = Effect.gen(function* () {
             channel = byName;
           }
           const w = p.when;
-          let when: CronWhen;
+          let when: T.CronWhen;
           switch (w.kind) {
             case "once": {
               const at = parseTime(w.at ?? "");
@@ -769,7 +770,7 @@ const make = Effect.gen(function* () {
   const cronList = tool(
     "cron.list",
     descriptions["cron.list"],
-    Effect.fn("Tools.cronList")(function* () {
+    Effect.fn("Tool.cronList")(function* () {
       const all = cron.list();
       if (all.length === 0) return answers.listCrons.none;
       const names = new Map((yield* chat.channels()).map((c) => [c.id, c.name]));
@@ -784,7 +785,7 @@ const make = Effect.gen(function* () {
   const channelCreate = tool(
     "channel.create",
     descriptions["channel.create"],
-    Effect.fn("Tools.channelCreate")(function* (p: Orchestrator<"channel.create">) {
+    Effect.fn("Tool.channelCreate")(function* (p: Orchestrator<"channel.create">) {
       const c = yield* chat.openChannel(p.name, p.description ?? "", p.project ?? "");
       return answers.openChannel.opened(c.name, c.project);
     }),
@@ -793,7 +794,7 @@ const make = Effect.gen(function* () {
   const channelUpdate = tool(
     "channel.update",
     descriptions["channel.update"],
-    Effect.fn("Tools.channelUpdate")(function* (p: Orchestrator<"channel.update">) {
+    Effect.fn("Tool.channelUpdate")(function* (p: Orchestrator<"channel.update">) {
       const c = (yield* chat.channelByName(p.id)) ?? (yield* chat.channels()).find((x) => x.id === p.id);
       if (!c) return yield* refuse(answers.channelSettings.noChannel(p.id));
       yield* chat.updateChannel(c.id, {
@@ -808,7 +809,7 @@ const make = Effect.gen(function* () {
     tool(
       "graph.split",
       descriptions["graph.split"],
-      Effect.fn("Tools.graphSplit")(function* (p: Orchestrator<"graph.split">) {
+      Effect.fn("Tool.graphSplit")(function* (p: Orchestrator<"graph.split">) {
         const c = yield* callerOf(who);
         return yield* answered(tasks.split(p.goal, p.project, p.agent ?? "", c.actor));
       }),
@@ -827,9 +828,9 @@ const make = Effect.gen(function* () {
     tool(
       "graph.task.update",
       descriptions["graph.task.update"],
-      Effect.fn("Tools.taskUpdate")(function* (p: Orchestrator<"graph.task.update">) {
+      Effect.fn("Tool.taskUpdate")(function* (p: Orchestrator<"graph.task.update">) {
         const by = (yield* callerOf(who)).actor;
-        const edit: TaskEdit = {
+        const edit: T.TaskEdit = {
           ...(p.title !== undefined ? { title: p.title } : {}),
           ...(p.brief !== undefined ? { brief: p.brief } : {}),
           ...(p.needs !== undefined ? { needs: p.needs } : {}),
@@ -844,7 +845,7 @@ const make = Effect.gen(function* () {
     tool(
       "graph.task.delete",
       descriptions["graph.task.delete"],
-      Effect.fn("Tools.taskDelete")(function* (p: Orchestrator<"graph.task.delete">) {
+      Effect.fn("Tool.taskDelete")(function* (p: Orchestrator<"graph.task.delete">) {
         const by = (yield* callerOf(who)).actor;
         return yield* answered(tasks.removeTask(p.id, p.task, by));
       }),
@@ -854,7 +855,7 @@ const make = Effect.gen(function* () {
     tool(
       "graph.act",
       descriptions["graph.act"],
-      Effect.fn("Tools.graphAct")(function* (p: Orchestrator<"graph.act">) {
+      Effect.fn("Tool.graphAct")(function* (p: Orchestrator<"graph.act">) {
         const c = yield* callerOf(who);
         return yield* answered(tasks.act(p.id, p.action, c.actor));
       }),
@@ -864,7 +865,7 @@ const make = Effect.gen(function* () {
     tool(
       "graph.task.act",
       descriptions["graph.task.act"],
-      Effect.fn("Tools.taskAct")(function* (p: Orchestrator<"graph.task.act">) {
+      Effect.fn("Tool.taskAct")(function* (p: Orchestrator<"graph.task.act">) {
         const c = yield* callerOf(who);
         return yield* answered(tasks.taskAct(p.id, p.task, p.action, c.actor));
       }),
@@ -874,7 +875,7 @@ const make = Effect.gen(function* () {
     sessionSchemaTool(
       "issue.split",
       sessionDescriptions["issue.split"](maxTasks),
-      Effect.fn("Tools.issueSplit")(function* (p: Session<"issue.split">) {
+      Effect.fn("Tool.issueSplit")(function* (p: SessionInput<"issue.split">) {
         const c = yield* callerOf(who);
         const drafts = p.tasks.map((item) => ({
           id: item.id,
@@ -898,7 +899,7 @@ const make = Effect.gen(function* () {
       ? tool(
           "memory.search",
           descriptions["memory.search"],
-          Effect.fn("Tools.memorySearch")(function* (p: Orchestrator<"memory.search">) {
+          Effect.fn("Tool.memorySearch")(function* (p: Orchestrator<"memory.search">) {
             const agent = (p.agent ?? "").trim() ? yield* profile(p.agent!) : "";
             const q = query({ text: p.text ?? "", project: (p.project ?? "").trim(), ...(agent ? { agent } : {}) });
             return foundText(yield* memory.search(q), q);
@@ -907,7 +908,7 @@ const make = Effect.gen(function* () {
       : sessionSchemaTool(
           "memory.search",
           sessionDescriptions["memory.search"],
-          Effect.fn("Tools.memorySearch")(function* (p: Session<"memory.search">) {
+          Effect.fn("Tool.memorySearch")(function* (p: SessionInput<"memory.search">) {
             const c = yield* callerOf(who);
             if (!c.agent) return yield* refuse(notWorking);
             const q = query({ agent: c.agent, project: sessionScope(c, p.project), text: p.text ?? "" });
@@ -920,7 +921,7 @@ const make = Effect.gen(function* () {
       ? tool(
           "memory.create",
           descriptions["memory.create"],
-          Effect.fn("Tools.memoryCreate")(function* (p: Orchestrator<"memory.create">) {
+          Effect.fn("Tool.memoryCreate")(function* (p: Orchestrator<"memory.create">) {
             const id = yield* profile(p.agent);
             const c = yield* callerOf(who);
             const m = yield* memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: c.actor });
@@ -930,7 +931,7 @@ const make = Effect.gen(function* () {
       : sessionSchemaTool(
           "memory.create",
           sessionDescriptions["memory.create"],
-          Effect.fn("Tools.memoryCreate")(function* (p: Session<"memory.create">) {
+          Effect.fn("Tool.memoryCreate")(function* (p: SessionInput<"memory.create">) {
             const c = yield* callerOf(who);
             if (!c.agent) return yield* refuse(notWorking);
             const m = yield* memory.remember({ agent: c.agent, text: p.text, project: sessionScope(c, p.project), by: c.actor });
@@ -946,7 +947,7 @@ const make = Effect.gen(function* () {
     sessionSchemaTool(
       "artifact.block.create",
       sessionDescriptions["artifact.block.create"],
-      Effect.fn("Tools.blockCreate")(function* (p: Session<"artifact.block.create">) {
+      Effect.fn("Tool.blockCreate")(function* (p: SessionInput<"artifact.block.create">) {
         const c = yield* callerOf(who);
         const { id, ...block } = p;
         const r = yield* artifacts.appendBlock(id.trim(), writer(c), block);
@@ -959,7 +960,7 @@ const make = Effect.gen(function* () {
     sessionSchemaTool(
       "artifact.block.update",
       sessionDescriptions["artifact.block.update"],
-      Effect.fn("Tools.blockUpdate")(function* (p: Session<"artifact.block.update">) {
+      Effect.fn("Tool.blockUpdate")(function* (p: SessionInput<"artifact.block.update">) {
         const c = yield* callerOf(who);
         const { id, ...block } = p;
         const r = yield* artifacts.updateBlock(id.trim(), writer(c), block);
@@ -973,7 +974,7 @@ const make = Effect.gen(function* () {
       }),
     );
 
-  return Tools.of({
+  return Tool.of({
     orchestrator: (who) => [
       issueList,
       issueGet,

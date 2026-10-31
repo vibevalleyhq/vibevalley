@@ -17,8 +17,8 @@
 
 ## 在哪
 
-- **`apps/server/src/agent/agent.ts`**（`Agents`）：读写 `config.json`、事务 `change`、默认管家（没有就从内置的 `orchestrator` 模板装上）、模板的装和更新、角色的规则（`roleProblem`，`orchestrators`、`isOrchestrator`）、新建档案和技能时分配 id、补外观（`withCast`、`castHash`）。`packages/agent` 是 VibeValley 自己的 agent（[VibeValley 自己的 agent](docs/subsystems/brain.md)）。
-- **`apps/server/src/runtime`**（`Runtimes`）：`runtime.ts` 注册表（`registryOf`）、探测、缓存、合并农机拒绝的选项、额度的定时任务读取、今天的花费、`assess`、`resolve`、`check`；`fit.ts` 的 `agentProblems`、`sessionOptions`、`chooseAgent`，`quota.ts` 的 `moneyStop` 和额度的字（纯函数，黄金数据 `testdata/rules.jsonl.gz`）；`price.ts` 价目；`dsh.ts` DeepSeek Harness；`pi.ts` 读 pi 自己的设置。
+- **`apps/server/src/agent/agent.ts`**（`Agent`）：读写 `config.json`、事务 `change`、默认管家（没有就从内置的 `orchestrator` 模板装上）、模板的装和更新、角色的规则（`roleProblem`，`orchestrators`、`isOrchestrator`）、新建档案和技能时分配 id、补外观（`withCast`、`castHash`）。`packages/agent` 是 VibeValley 自己的 agent（[VibeValley 自己的 agent](docs/subsystems/brain.md)）。
+- **`apps/server/src/runtime`**（`Runtime`）：`runtime.ts` 注册表（`registryOf`）、探测、缓存、合并农机拒绝的选项、额度的定时任务读取、今天的花费、`assess`、`resolve`、`check`；`fit.ts` 的 `agentProblems`、`sessionOptions`、`chooseAgent`，`quota.ts` 的 `moneyStop` 和额度的字（纯函数，黄金数据 `testdata/rules.jsonl.gz`）；`price.ts` 价目；`dsh.ts` DeepSeek Harness；`pi.ts` 读 pi 自己的设置。
 - **模板**：`apps/server/src/agent/template.ts` 读一个模板文件夹（`readTemplate`）、内置的目录（`builtInTemplates`，`templates/<id>/`，次序在 `templates/index.json`）、本机加进来的（`addedTemplates`，`$VIBEVALLEY_HOME/agent-templates/<id>/`），照模板做出档案（`profileOf`）和照模板更新（`updatedFrom`）。
 - **农机的预设**：`apps/server/src/runtime/presets.json` 的 `defaultSettings`（农机设置的默认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`runtime/presets.ts` 读它（`factsOf`、`runtimeIds`、`presetOf`、`runtimeLabel`、`defaultSettings`）。页面不读它：农机的名字、长相和能做什么随 `runtime.list` 的每个 `RuntimeInfo` 给（`preset`、`facts`）。
 - **家目录**：`$VIBEVALLEY_HOME/config.json`（`agents`、`skills`、`settings` 三块）；今天的花费 `spend.json` 归[帮工](docs/subsystems/session.md)。
@@ -109,12 +109,12 @@
 
 - **帮工（`session`）**：开会话前 `resolve`；拼说明时读 `Skills()`、档案（`Agent`）；同时干活的上限读农机设置的 `maxWorking`（`ServerConfig`）；记花费 `quote`、`spend`，一轮结束 `usageSoon`。
 - **工单（`issue`）**：`hire` 读档案、跑 `check`，有 `error` 就回「<档案> 派不出去：<原因>」；档案停用另回「<档案> 被停用了」。
-- **管家（`orchestrator`）、工具（`tool`）、计划（`task`）**：`Runtimes.candidates` 是每个档案和它现在能不能派（`assess`），`Runtimes.choose` 在其中按 `runtime/fit.ts` 的 `chooseAgent` 挑一个；管家、起草和计划都问它，不各自拼候选；管家把它们写进现状。
-- **记性（`memory`）**、**定时任务（`cron`）**：`Agents` 列档案（不填档案的检索、定时任务派给谁）。
+- **管家（`orchestrator`）、工具（`tool`）、计划（`task`）**：`Runtime.candidates` 是每个档案和它现在能不能派（`assess`），`Runtime.choose` 在其中按 `runtime/fit.ts` 的 `chooseAgent` 挑一个；管家、起草和计划都问它，不各自拼候选；管家把它们写进现状。
+- **记性（`memory`）**、**定时任务（`cron`）**：`Agent` 列档案（不填档案的检索、定时任务派给谁）。
 - **设置（`setting`）**：注册表里 VibeValley 自己的农机每次开会话取 DeepSeek 的钥匙。
 - **核心状态（`core`）**：`Core.runtime` 推农机的样子，`Core.notice` 发模型退回默认的提醒；档案和农机都不进 `WorkspaceState`。
 - **oar（`@botiverse/oar`）**：适配器的安装、`listModels`、账户用量、清单（技能、MCP、工具）、`refusedSessionOptions`。
-- **处理函数（`handlers.ts`）**：`agent.*`、`skill.*`、`runtime.*` 只转发；`agent.validate` 逐个调 `Runtimes.problemsOf`。
+- **处理函数（`handlers.ts`）**：`agent.*`、`skill.*`、`runtime.*` 只转发；`agent.validate` 逐个调 `Runtime.problemsOf`。
 
 ## 为什么这样
 

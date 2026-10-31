@@ -1,14 +1,13 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 // Nowledge Mem (https://mem.nowledge.co), a knowledge graph on this Mac, spoken to over MCP: memory_search reads, memory_add writes. It is the owner's own knowledge, and the farm only adds to it. What
 // the farm writes carries labels, vibevalley and the profile's, so that a profile reads back its own; with everything it
 // reads all that is in it. Whatever is sent is redacted: a run's words may carry a key.
-
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { Clock, Effect, Option, Predicate, Schema } from "effect";
 
 import { asTransport } from "@vibevalley/agent/mcpTransport";
 import { t } from "@vibevalley/i18n";
-import type { Memory } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
 import { redact } from "@/base/redact.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
@@ -224,7 +223,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     list: Effect.fnUntraced(function* (agent) {
       if (c.read !== true) return [];
       const hits = yield* find(agent, "", most, false);
-      return hits.map((h): Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0, fading: false }));
+      return hits.map((h): T.Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0, fading: false }));
     }),
     // The 「记住：」 lines; a stopped run leaves nothing here either.
     syncTurn: Effect.fnUntraced(function* (run) {
@@ -237,7 +236,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       const project = n.project.trim();
       const id = yield* add(n.agent, n.text, project);
       const at = yield* Clock.currentTimeMillis;
-      return { id, agent: n.agent, kind: "note", text: n.text, at, recalled: 0, fading: false, ...(project ? { project } : {}) } satisfies Memory;
+      return { id, agent: n.agent, kind: "note", text: n.text, at, recalled: 0, fading: false, ...(project ? { project } : {}) } satisfies T.Memory;
     }),
     forget: () => Effect.fail(new SourceError({ message: t("server.memory.nowledgeForget") })),
     can: { list: true, forget: false, transcripts: false },

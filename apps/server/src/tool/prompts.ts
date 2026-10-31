@@ -1,21 +1,8 @@
 // How the tools word what they found.
 
 import { t } from "@vibevalley/i18n";
-import {
-  type Artifact,
-  type Block,
-  type Changes,
-  type Issue,
-  type IssueStatus,
-  IssueStatusValues,
-  type IssueTimeline,
-  type Memory,
-  type Priority,
-  PriorityValues,
-  type Cron,
-  type Spent,
-  type UncommittedItem,
-} from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { IssueStatusValues, PriorityValues } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
 import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
 
@@ -29,7 +16,7 @@ import type { Roster } from "@/session/session.ts";
 
 const wan = (n: number) => (n >= 10_000 ? (n / 10_000).toFixed(n >= 100_000 ? 0 : 1) + " 万" : String(n));
 
-export const spentText = (spent: Spent) => {
+export const spentText = (spent: T.Spent) => {
   const tokens = wan(spent.tokens) + " token";
   return spent.cny !== undefined ? "约 " + yuan(spent.cny) + " · " + tokens : tokens;
 };
@@ -45,9 +32,9 @@ function tail(s: string, n: number): string {
   return s;
 }
 
-const paths = (items: readonly UncommittedItem[]) => items.map((f) => f.path).join("、");
+const paths = (items: readonly T.UncommittedItem[]) => items.map((f) => f.path).join("、");
 
-export function changesText(c: Changes): string {
+export function changesText(c: T.Changes): string {
   if (!c.branch) return `它直接在项目 ${c.project} 里干活，没有分支可合。没提交的改动：${c.uncommitted.length > 0 ? paths(c.uncommitted) : "没有"}`;
   const lines = [`${c.branch} → ${c.project} 的 ${c.base}：${c.commits.length} 个提交，改了 ${c.files.length} 个文件。`];
   for (const x of c.commits.slice(0, 10)) lines.push("- " + x.hash + " " + x.subject);
@@ -80,7 +67,7 @@ export function sessionLine(w: Roster, now: number, number?: number): string {
 }
 
 /** The words for a status: its label (wording().status), a few the owner says for it, and its own name. */
-const statusNames: Readonly<Record<string, IssueStatus>> = {
+const statusNames: Readonly<Record<string, T.IssueStatus>> = {
   ...Object.fromEntries(IssueStatusValues.map((s) => [t(`shared.status.${s}`), s])),
   草稿: "backlog",
   在做: "in_progress",
@@ -89,9 +76,9 @@ const statusNames: Readonly<Record<string, IssueStatus>> = {
   取消: "canceled",
   ...Object.fromEntries(IssueStatusValues.map((s) => [s, s])),
 };
-export const statusOf = (word: string): IssueStatus | undefined => statusNames[word.trim()];
+export const statusOf = (word: string): T.IssueStatus | undefined => statusNames[word.trim()];
 
-const priorityNames: Readonly<Record<string, Priority>> = {
+const priorityNames: Readonly<Record<string, T.Priority>> = {
   紧急: "urgent",
   高: "high",
   普通: "medium",
@@ -99,9 +86,9 @@ const priorityNames: Readonly<Record<string, Priority>> = {
   低: "low",
   ...Object.fromEntries(PriorityValues.map((p) => [p, p])),
 };
-export const priorityOf = (word: string): Priority | undefined => priorityNames[word.trim()];
+export const priorityOf = (word: string): T.Priority | undefined => priorityNames[word.trim()];
 
-export const noSuchStatus = (word: string, allowed: readonly IssueStatus[]) =>
+export const noSuchStatus = (word: string, allowed: readonly T.IssueStatus[]) =>
   "没有「" + word + "」这个状态：" + allowed.map((s) => t(`shared.status.${s}`)).join("、");
 export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => t(`shared.priority.${p}`)).join("、");
 
@@ -117,7 +104,7 @@ function spanWords(ms: number): string {
 }
 
 /** One line: its number and short title first, so the orchestrator names it by them; who is the one doing it, when any. */
-export function issueLine(issue: Issue, who: string, now: number): string {
+export function issueLine(issue: T.Issue, who: string, now: number): string {
   const st = issue.attention;
   const stuck = st.stuck ? "（" + t(`shared.stuck.${st.stuck}`) + "）" : "";
   const parts = [`#${issue.number}「${shortTitle(issue.title)}」${t(`shared.attention.${st.state}`)}${stuck}`];
@@ -129,7 +116,7 @@ export function issueLine(issue: Issue, who: string, now: number): string {
 }
 
 /** One issue in full: what it asks, its criteria as far as they got, what it waits on, and its story, newest first. */
-export function issueDetail(issue: Issue, who: string, timeline: IssueTimeline | undefined, now: number): string {
+export function issueDetail(issue: T.Issue, who: string, timeline: T.IssueTimeline | undefined, now: number): string {
   const lines = [issueLine(issue, who, now).slice(2)];
   if (issue.title !== shortTitle(issue.title) || issue.description) lines.push("要做的：" + head([issue.title, issue.description].join("\n").trim(), 600));
   const criteria = issue.criteria;
@@ -150,7 +137,7 @@ export function issueDetail(issue: Issue, who: string, timeline: IssueTimeline |
   return lines.join("\n");
 }
 
-export function cronLine(s: Cron, channel: string): string {
+export function cronLine(s: T.Cron, channel: string): string {
   const direct = s.agent ? "，直接派给 " + s.agent + (s.project ? " 去 " + s.project : "") : "";
   const next = s.enabled ? "下次 " + nextText(s) : nextText(s);
   return `- ${s.id} 号「${s.name}」#${channel} ${whenText(s.when, s.tz)}${direct}；${next}\n  ${s.text}`;
@@ -307,10 +294,10 @@ export const params = {
 export const ownerAgentWord = "管家";
 
 /** A blocks artifact's block in one line: its id, revision, type and text (artifact_content_get, artifact_block_update's conflict). */
-export const blockLine = (b: Block) => `- 〔${b.id} · 第 ${b.rev} 版 · ${b.type}〕${b.text.map((s) => s.t).join("")}`;
+export const blockLine = (b: T.Block) => `- 〔${b.id} · 第 ${b.rev} 版 · ${b.type}〕${b.text.map((s) => s.t).join("")}`;
 
 /** Where a memory applies, for the tools' answers. */
-export const memoryWhere = (m: Memory) => (m.project ? "项目 " + m.project : "所有项目");
+export const memoryWhere = (m: T.Memory) => (m.project ? "项目 " + m.project : "所有项目");
 
 /** The orchestrator's tools' descriptions, shown to the model alongside each name and parameters (tool.ts). */
 export const descriptions = {
@@ -396,18 +383,18 @@ export const sessionDescriptions = {
 export const answers = {
   failed: (why: string) => "没成：" + why,
   artifact: {
-    made: (a: Artifact) =>
+    made: (a: T.Artifact) =>
       a.body === "html"
         ? `做好了「${a.title}」第 ${a.version} 版（id=${a.id}），已经在对话里带着卡片说了，主人在工作台点开看；主人回复那张卡片就是评论`
         : `做好了「${a.title}」（id=${a.id}），读成了一块一块的，已经在对话里带着卡片说了；要改哪一段，先用 artifact_content_get 读到块的 id 和版本，再 artifact_block_update；主人回复那张卡片就是评论`,
-    versioned: (a: Artifact) => `「${a.title}」出了第 ${a.version} 版（id=${a.id}），已经在第一版说过的地方带着卡片说了`,
+    versioned: (a: T.Artifact) => `「${a.title}」出了第 ${a.version} 版（id=${a.id}），已经在第一版说过的地方带着卡片说了`,
     none: "还没有产出",
-    line: (a: Artifact) => {
+    line: (a: T.Artifact) => {
       const note = a.versions.at(-1)?.note;
       const what = a.body === "html" ? `网页 · 第 ${a.version} 版` : "一起写的";
       return `- 〔${a.id}〕「${a.title}」${what} · ${a.byName}${note ? " · " + note : ""}`;
     },
-    detail: (a: Artifact) =>
+    detail: (a: T.Artifact) =>
       [
         a.body === "html"
           ? `「${a.title}」（id=${a.id}）网页，${a.byName} 做的，最新是第 ${a.version} 版：`

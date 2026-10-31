@@ -53,7 +53,7 @@
 | | 满园春色（`full_house`） | 在干活的帮工从不到 6 个变成 6 个，每填满一次一条 | 一次 |
 
 - **称号**：只能挂拿到的档，新手任务的不能挂；别的取值（空的、没拿到的）都是摘掉称号。
-- **战绩**：`hired`、`harvested`、`failed` 三种条目带档案，折成 `Progress.Agents`（雇过、收成、没做成）。
+- **战绩**：`hired`、`harvested`、`failed` 三种条目带档案，折成 `Progress.agents`（雇过、收成、没做成）。
 - **等级**：从 Lv.n 升到 Lv.n+1 要 `10n` 个 commit（`xpToNext`）；`farmLevelOf` 给出等级、这一级的经验和要多少。commit 数一样时 `commits` 事实不改状态。
 - **升级横幅只给数出来的增长**：`levelUps` 每跨一级放一个 `levelUp`；农场第一次数出 commit 数（之前 `commits` 是空的）只定下等级，不放横幅，但账本照样记 `level`。开机时 `catchUp` 比较 commit 的等级和账本里的 `farm_level`，落下的补记一条。
 - **仓库是交付 `merged` 或 `pull_request` 的工单**，一张一格（整个计划也是一格），最近收的在前；不另存，页面从 `WorkspaceState.issues` 读。

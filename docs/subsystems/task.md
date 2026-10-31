@@ -18,7 +18,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`Todo`）�
 
 ## 在哪
 
-- 服务端 `apps/server/src/task`（`Tasks`）：`task.ts` 拆、调度、验证、动作、计划的经过和开机恢复；只有它用的纯函数：`splitting.ts` 读规划的回答（`parseSplit`），`editing.ts` 改步骤（`editTask`、`removeTask`、`freshTask`），`graph.ts` 计划本身（`startable`、冻结文件的判断），`prompts.ts` 交给帮工的几句话。
+- 服务端 `apps/server/src/task`（`Task`）：`task.ts` 拆、调度、验证、动作、计划的经过和开机恢复；只有它用的纯函数：`splitting.ts` 读规划的回答（`parseSplit`），`editing.ts` 改步骤（`editTask`、`removeTask`、`freshTask`），`graph.ts` 计划本身（`startable`、冻结文件的判断），`prompts.ts` 交给帮工的几句话。
 - 规则：只有服务端跑的，都在 `apps/server/src/task`：`changes.ts`（两版计划比出经过和它的说法，`changeOf`）、`graph.ts`（`readyTasks`、验收的几条、`defaultParallel`、`autoRetries`，出帧要的 `graphProblems`、`blockedBy`、`layersOf`、`graphActions`、`taskActions`、`canEditTask`、`maxTasks`）、`issues.ts`（`graphsOf` 从核心状态里的工单拼回计划、`graphFrom`、`graphOf`，`graphIssues` 把计划拆成一家工单）；边的规则在 `packages/agent/src/dag.ts`，和 `packages/agent` 自己的任务共用。工单状态怎么从计划算在 `issue/status.ts` 的 `issueStatusOf`。
 - 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`。
 - 接口：`graph.*`（`graph.split`、`graph.list`、`graph.get`、`graph.task.update`、`graph.task.delete`、`graph.act`、`graph.task.act`、`graph.diff.get`、`graph.event.list`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graph_list`、`graph_get`、`graph_task_update`、`graph_task_delete`、`graph_act`、`graph_task_act`，帮工的工具 `issue_split`（都在 `tool/tool.ts`）。

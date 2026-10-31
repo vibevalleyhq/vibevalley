@@ -2,41 +2,14 @@ import { Clock, Context, Effect, FiberMap, Layer, Option, PubSub, Schedule, Sche
 import type { SqlError } from "effect/sql";
 
 import { list, t } from "@vibevalley/i18n";
-import {
-  type Agent,
-  type Question,
-  type Changes,
-  type CriterionCheck,
-  type Finding,
-  type IssueRun,
-  type IssueAnswer,
-  type Outcome,
-  type Issue,
-  type Delivery,
-  type IssueCanceled,
-  type SessionClose,
-  type IssueHistory,
-  type IssueRequest,
-  type IssueStatus,
-  IssueStatusValues,
-  type IssueTimeline,
-  type IssueFilter,
-  type IssueUpdate,
-  type Preview,
-  ownerId,
-  type ProjectTemplates,
-  type RunTrigger,
-  type Cron,
-  type Session,
-  type SessionId,
-  type TaskGraph,
-} from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { IssueStatusValues, ownerId } from "@vibevalley/protocol";
 import { commandOf } from "@vibevalley/protocol/api";
 import { closedText, shortTitle, isOneOf, isBusy } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { templateCatalog } from "@/agent/seed.ts";
 import { actsForOwner, type Actor } from "@/base/actor.ts";
 import { cut } from "@/base/clip.ts";
@@ -46,17 +19,17 @@ import { newId } from "@/base/ids.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
 import { bestEffort } from "@/base/log.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { inboxLines } from "@/channel/prompts.ts";
 import { Core } from "@/core/core.ts";
-import { type Due, Crons } from "@/cron/cron.ts";
+import { type Due, Cron } from "@/cron/cron.ts";
 import { dueText } from "@/cron/due.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
-import { issueBranch, Projects } from "@/project/project.ts";
-import { Runtimes } from "@/runtime/runtime.ts";
+import { issueBranch, Project } from "@/project/project.ts";
+import { Runtime } from "@/runtime/runtime.ts";
 import { askedMax } from "@/session/journal.ts";
 import { parseAnswer } from "@/session/report.ts";
-import { type Hired, type HireOptions, NotRecorded, type SessionNews, Sessions } from "@/session/session.ts";
+import { type Hired, type HireOptions, NotRecorded, type SessionNews, Session } from "@/session/session.ts";
 import { conflictBrief } from "@/session/takeIn.ts";
 import { graphIssues } from "@/task/issues.ts";
 
@@ -77,71 +50,71 @@ import { filledKinds, sentTitles } from "./templates.ts";
 import { milestonesOf } from "./timeline.ts";
 
 export interface OrchestratorWork {
-  readonly issue: Issue;
+  readonly issue: T.Issue;
   readonly channel: string;
-  readonly by: RunTrigger;
-  readonly cron?: Cron;
+  readonly by: T.RunTrigger;
+  readonly cron?: T.Cron;
   /** What the owner said with it, asking again (another round, a reopen). */
   readonly said?: string;
 }
 
-export class Issues extends Context.Service<
-  Issues,
+export class Issue extends Context.Service<
+  Issue,
   {
     /** The issues on the board: a talk with a profile is not one. */
-    readonly list: () => Effect.Effect<Issue[]>;
+    readonly list: () => Effect.Effect<T.Issue[]>;
     /** The board's issues a filter picks (issue.list). */
-    readonly query: (f: IssueFilter) => Effect.Effect<Issue[]>;
+    readonly query: (f: T.IssueFilter) => Effect.Effect<T.Issue[]>;
     /** The issues the board holds now (open, and the latest closed). */
-    readonly onBoard: () => readonly Issue[];
-    readonly get: (id: string) => Effect.Effect<Issue, ApiError>;
-    readonly add: (req: IssueRequest) => Effect.Effect<Issue, ApiError>;
+    readonly onBoard: () => readonly T.Issue[];
+    readonly get: (id: string) => Effect.Effect<T.Issue, ApiError>;
+    readonly add: (req: T.IssueRequest) => Effect.Effect<T.Issue, ApiError>;
     /** On the owner's word only (actsForOwner). */
-    readonly edit: (id: string, upd: IssueUpdate, by: Actor) => Effect.Effect<Issue, ApiError>;
+    readonly edit: (id: string, upd: T.IssueUpdate, by: Actor) => Effect.Effect<T.Issue, ApiError>;
     readonly remove: (id: string) => Effect.Effect<void, ApiError>;
-    readonly queue: (id: string, queued: boolean) => Effect.Effect<Issue, ApiError>;
+    readonly queue: (id: string, queued: boolean) => Effect.Effect<T.Issue, ApiError>;
     readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
     readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
     /** agent: moving to todo, the profile (id or name) that takes it on; another than its own hands it over. On the owner's
      * word only (actsForOwner). */
-    readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Effect.Effect<Issue, ApiError>;
+    readonly setStatus: (id: string, to: T.IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Effect.Effect<T.Issue, ApiError>;
     /** Stops the turn of the session working it; the session stays, and a word starts the next. */
     readonly stop: (id: string) => Effect.Effect<void, ApiError>;
     /** What setStatus would do with the same request, refused as it would be; nothing changes. edit: the owner's unsaved
      * fields, as the move would see them once saved. */
-    readonly previewStatus: (id: string, to: IssueStatus, text: string, opt?: StatusOptions, edit?: IssueUpdate) => Effect.Effect<Preview, ApiError>;
+    readonly previewStatus: (id: string, to: T.IssueStatus, text: string, opt?: StatusOptions, edit?: T.IssueUpdate) => Effect.Effect<T.Preview, ApiError>;
     /** What remove would do, refused as it would be; nothing changes. */
-    readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
+    readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
     /** An issue's id from what the owner and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
     readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
     readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
     /** The owner's look counts for the game; anyone else's does not. */
-    readonly changes: (id: string, by: Actor) => Effect.Effect<Changes, ApiError>;
+    readonly changes: (id: string, by: Actor) => Effect.Effect<T.Changes, ApiError>;
     readonly merge: (id: string) => Effect.Effect<string, ApiError>;
     readonly cancel: (id: string) => Effect.Effect<void, ApiError>;
-    readonly review: (id: string, req: IssueReviewRequest) => Effect.Effect<Issue, ApiError>;
-    readonly refine: (id: string, word: string, channel: string) => Effect.Effect<Issue, ApiError>;
+    readonly review: (id: string, req: IssueReviewRequest) => Effect.Effect<T.Issue, ApiError>;
+    readonly refine: (id: string, word: string, channel: string) => Effect.Effect<T.Issue, ApiError>;
     /** The owner's direct channel with a helper profile (or the orchestrator), opened with its talk issue the first time. */
     readonly talkWith: (agent: string) => Effect.Effect<string, ApiError>;
-    readonly history: () => Effect.Effect<IssueHistory[]>;
-    readonly timeline: (id: string) => Effect.Effect<IssueTimeline, ApiError>;
-    readonly templates: (project: string) => Effect.Effect<ProjectTemplates, ApiError>;
+    readonly history: () => Effect.Effect<T.IssueHistory[]>;
+    readonly timeline: (id: string) => Effect.Effect<T.IssueTimeline, ApiError>;
+    readonly templates: (project: string) => Effect.Effect<T.ProjectTemplates, ApiError>;
     /** Sends a session for work that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the brief. */
-    readonly hire: (agent: Agent, brief: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
+    readonly hire: (agent: T.Agent, brief: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
     /** A session starts on an existing issue: open it and link the session in one write. */
-    readonly ran: (id: string, session: Session) => Effect.Effect<void, NotRecorded>;
+    readonly ran: (id: string, session: T.Session) => Effect.Effect<void, NotRecorded>;
     /** The issues of a task graph as the graph has them now, published as one commit once written; the database refusing
      * the write is kept, for the task to tell. */
-    readonly putTask: (graph: TaskGraph) => Effect.Effect<void, SqlError.SqlError>;
+    readonly putTask: (graph: T.TaskGraph) => Effect.Effect<void, SqlError.SqlError>;
     readonly nextTaskId: () => Effect.Effect<string>;
     /** Issues for the orchestrator, subscribed before it returns. */
     readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorWork>, never, Scope.Scope>;
-    readonly ofCron: (id: string) => Effect.Effect<Issue | undefined>;
+    readonly ofCron: (id: string) => Effect.Effect<T.Issue | undefined>;
     readonly refreshPullRequests: Effect.Effect<void>;
     readonly tryQueued: Effect.Effect<void>;
   }
 >()("vibevalley/Issue") {
-  static readonly layer = (options?: IssueOptions) => Layer.effect(Issues, make(options));
+  static readonly layer = (options?: IssueOptions) => Layer.effect(Issue, make(options));
 }
 
 export interface StatusOptions {
@@ -151,7 +124,7 @@ export interface StatusOptions {
 
 /** What starting an issue came to: the session sent, or why it waits in the queue. */
 export interface Dispatched {
-  readonly session?: SessionId;
+  readonly session?: T.SessionId;
   readonly queued?: string;
 }
 
@@ -181,10 +154,10 @@ const triggerOf = jsonOf(S.RunTrigger);
 
 /** Only while the issue is still open: a completion the owner chose (kept, none) is written before its session leaves,
  * and a task graph's step closes with its graph, so neither comes here. */
-const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | { canceled: IssueCanceled } =>
+const closingOf = (closed: T.SessionClose | undefined): { delivered: T.Delivery } | { canceled: T.IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
-function reopenBrief(issue: Issue, last: Session, text: string, previous: boolean, handedOver = false): string {
+function reopenBrief(issue: T.Issue, last: T.Session, text: string, previous: boolean, handedOver = false): string {
   const how = handedOver
     ? t("server.issue.brief.handedOver", { name: last.name, id: last.id })
     : t("server.issue.brief.reopened", { name: last.name, id: last.id });
@@ -198,7 +171,7 @@ function reopenBrief(issue: Issue, last: Session, text: string, previous: boolea
   return out + t("server.issue.brief.end");
 }
 
-function failedText(findings: readonly Finding[], text: string): string {
+function failedText(findings: readonly T.Finding[], text: string): string {
   let out = t("server.issue.brief.failedHead");
   let n = 0;
   for (const f of findings) if (!f.resolved) out += `\n${++n}. ${f.text}`;
@@ -223,12 +196,12 @@ const make = (options: IssueOptions = {}) =>
     const clock = yield* Clock.Clock;
     const config = yield* ServerConfig;
     const core = yield* Core;
-    const store = yield* Agents;
-    const projects = yield* Projects;
-    const runtimes = yield* Runtimes;
-    const sessions = yield* Sessions;
-    const chat = yield* Channels;
-    const crons = yield* Crons;
+    const store = yield* Agent;
+    const projects = yield* Project;
+    const runtimes = yield* Runtime;
+    const sessions = yield* Session;
+    const chat = yield* Channel;
+    const crons = yield* Cron;
     const { run: db, attempt, one, inTx, attemptTx } = yield* Db;
     const worked = new IssueSessions();
     /** After an issue is removed: its sessions' rows went with it, and its children's. */
@@ -238,7 +211,7 @@ const make = (options: IssueOptions = {}) =>
     /** One round of the queue at a time. */
     const trying = yield* Semaphore.make(1);
 
-    function issueOf(row: Row, runs: readonly string[] | undefined): Issue {
+    function issueOf(row: Row, runs: readonly string[] | undefined): T.Issue {
       const state = core.state();
       const graph = column.graph(row.graph);
       const task = column.task(row.task);
@@ -248,7 +221,7 @@ const make = (options: IssueOptions = {}) =>
       const pullRequest = column.pullRequest(row.pull_request);
       const lastRun = column.run(row.last_run);
       const answer = column.answer(row.answer);
-      const out: Issue = {
+      const out: T.Issue = {
         id: issueId(row.id),
         number: row.number,
         title: row.title,
@@ -296,7 +269,7 @@ const make = (options: IssueOptions = {}) =>
       return rows.map((r) => issueOf(r, worked.of(r.id))).toSorted(issueOrder);
     });
 
-    const idOf = Effect.fn("Issues.idOf")(function* (ref: string): Effect.fn.Return<string, ApiError> {
+    const idOf = Effect.fn("Issue.idOf")(function* (ref: string): Effect.fn.Return<string, ApiError> {
       const r = ref.trim();
       const number = /^#?(\d+)$/u.exec(r)?.[1];
       if (number !== undefined) {
@@ -307,7 +280,7 @@ const make = (options: IssueOptions = {}) =>
       return worked.issueOf(r) ?? r;
     });
 
-    const get = Effect.fn("Issues.get")(function* (ref: string): Effect.fn.Return<Issue, ApiError> {
+    const get = Effect.fn("Issue.get")(function* (ref: string): Effect.fn.Return<T.Issue, ApiError> {
       const issue = yield* idOf(ref);
       const row = yield* one(q.getIssue({ id: issue }));
       if (!row) return yield* Effect.fail(missing(t("server.issue.issueRef", { ref }), [lookIn.issue]));
@@ -343,7 +316,7 @@ const make = (options: IssueOptions = {}) =>
         (session) => missing(t("server.issue.helperRef", { id: session }), [lookIn.session]),
       );
 
-    const issueWords = (req: Pick<IssueRequest, "title" | "description">) => {
+    const issueWords = (req: Pick<T.IssueRequest, "title" | "description">) => {
       const [title, rest] = splitBrief(req.title);
       if (!title) return Effect.fail(refused(t("server.issue.noTitle")));
       let description = (req.description ?? "").trim();
@@ -352,7 +325,7 @@ const make = (options: IssueOptions = {}) =>
     };
 
     /** add, with the database refusing the row kept as a failure: hire tells it to the owner. */
-    const attemptAdd = Effect.fn("Issues.attemptAdd")(function* (req: IssueRequest, cron?: string, talk?: string) {
+    const attemptAdd = Effect.fn("Issue.attemptAdd")(function* (req: T.IssueRequest, cron?: string, talk?: string) {
       const [title, description] = yield* issueWords(req);
       const id = newId();
       yield* attempt(
@@ -374,16 +347,16 @@ const make = (options: IssueOptions = {}) =>
       return yield* get(id);
     });
 
-    const add = (req: IssueRequest, cron?: string, talk?: string) =>
+    const add = (req: T.IssueRequest, cron?: string, talk?: string) =>
       attemptAdd(req, cron, talk).pipe(Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }));
 
-    const complete = (id: string, delivered: Delivery) =>
+    const complete = (id: string, delivered: T.Delivery) =>
       Effect.andThen(db(q.completeIssue({ closed_at: clock.currentTimeMillisUnsafe(), delivered, id })), publish(id));
-    const cancelAs = (id: string, canceled: IssueCanceled) =>
+    const cancelAs = (id: string, canceled: T.IssueCanceled) =>
       Effect.andThen(db(q.cancelIssue({ closed_at: clock.currentTimeMillisUnsafe(), canceled, id })), publish(id));
 
     /** A run no session carries: an in-process agent's, the orchestrator's. */
-    const endRun = Effect.fn("Issues.endRun")(function* (id: string, outcome: Outcome) {
+    const endRun = Effect.fn("Issue.endRun")(function* (id: string, outcome: T.Outcome) {
       const item = yield* get(id);
       // A run cut off by a restart closed its issue as lost; the run it goes on in ends on it all the same.
       if (isClosed(item.status)) {
@@ -391,7 +364,7 @@ const make = (options: IssueOptions = {}) =>
         yield* db(q.reopenIssue({ id }));
       }
       const now = yield* Clock.currentTimeMillis;
-      const run: IssueRun = { startedAt: item.lastRun?.startedAt ?? now, endedAt: now, outcome };
+      const run: T.IssueRun = { startedAt: item.lastRun?.startedAt ?? now, endedAt: now, outcome };
       yield* db(q.setLastRun({ id, last_run: JSON.stringify(run) }));
       yield* publish(id);
     });
@@ -399,14 +372,14 @@ const make = (options: IssueOptions = {}) =>
     const reopenRow = (id: string) => Effect.andThen(db(q.reopenIssue({ id })), publish(id));
 
     /** What the session waits on the owner for, from its report; a report with none, or a comment, clears them. */
-    const asked = (id: string, questions: readonly Question[] | undefined) =>
+    const asked = (id: string, questions: readonly T.Question[] | undefined) =>
       Effect.andThen(db(q.setIssueQuestions({ id, questions: jsonOrNull(openQuestions(questions), openQuestions(questions).length > 0) })), publish(id));
 
     /** The helper's word on each criterion, from the newest report that gave one; a reopen clears it. */
-    const checked = (id: string, checks: readonly CriterionCheck[]) => db(q.setIssueChecks({ id, checks: jsonOrNull(checks, checks.length > 0) }));
+    const checked = (id: string, checks: readonly T.CriterionCheck[]) => db(q.setIssueChecks({ id, checks: jsonOrNull(checks, checks.length > 0) }));
 
     /** An answer issue's round: one that got through gives its conclusion (none readable leaves the issue stuck on it); whatever it changed goes, so the issue never delivers a change. */
-    const answered = Effect.fn("Issues.answered")(function* (id: string, session: string, outcome: Outcome, answer: IssueAnswer | undefined) {
+    const answered = Effect.fn("Issue.answered")(function* (id: string, session: string, outcome: T.Outcome, answer: T.IssueAnswer | undefined) {
       const item = yield* get(id);
       if (item.deliver !== "answer" || item.sessions.at(-1) !== session) return;
       // A talk has no conclusion to read: its words are in its channel. What the round changed goes all the same.
@@ -417,18 +390,18 @@ const make = (options: IssueOptions = {}) =>
     });
 
     /** at 0 is not accepted (a fail, or another round started); the findings are written as they stand. */
-    const judged = (id: string, at: number, findings: readonly Finding[]) =>
+    const judged = (id: string, at: number, findings: readonly T.Finding[]) =>
       Effect.andThen(db(q.reviewIssue({ id, reviewed_at: at > 0 ? at : null, findings: jsonOrNull(findings, findings.length > 0) })), publish(id));
 
     /** The owner's word answers what it asked, and starts a round that the last acceptance did not see. */
-    const ownerSaid = Effect.fn("Issues.ownerSaid")(function* (id: string) {
+    const ownerSaid = Effect.fn("Issue.ownerSaid")(function* (id: string) {
       yield* asked(id, []);
       const item = yield* get(id);
       if (item.reviewedAt !== undefined) yield* judged(id, 0, item.findings);
     });
 
     /** The issue already owns its number and workplace before its session starts. */
-    const ran = Effect.fn("Issues.ran")(function* (id: string, session: Session) {
+    const ran = Effect.fn("Issue.ran")(function* (id: string, session: T.Session) {
       yield* attemptTx(
         Effect.gen(function* () {
           yield* q.reopenIssue({ id });
@@ -442,7 +415,7 @@ const make = (options: IssueOptions = {}) =>
     });
 
     /** Queueing keeps the first dispatch context until the issue starts or leaves the queue. */
-    const queueRow = Effect.fn("Issues.queueRow")(function* (id: string, queued: boolean, channel: string, by?: RunTrigger) {
+    const queueRow = Effect.fn("Issue.queueRow")(function* (id: string, queued: boolean, channel: string, by?: T.RunTrigger) {
       yield* unsent(id);
       yield* inTx(
         queued
@@ -461,7 +434,7 @@ const make = (options: IssueOptions = {}) =>
         row ? Effect.succeed([row.channel, triggerOf(row.triggered_by)] as const) : Effect.fail(refused(t("server.issue.notQueued", { id }))),
       );
 
-    const drop = Effect.fn("Issues.drop")(function* (id: string) {
+    const drop = Effect.fn("Issue.drop")(function* (id: string) {
       yield* unsent(id);
       yield* inTx(
         Effect.all(
@@ -478,7 +451,7 @@ const make = (options: IssueOptions = {}) =>
       yield* publish(id);
     });
 
-    const hire = Effect.fn("Issues.hire")(function* (agent: Agent, brief: string, project: string, opt: HireOptions = {}) {
+    const hire = Effect.fn("Issue.hire")(function* (agent: T.Agent, brief: string, project: string, opt: HireOptions = {}) {
       if (store.isOrchestrator(agent.id)) return { refused: t("server.issue.orchestratorNotHelper") };
       if (!agent.enabled) return { refused: t("server.issue.disabled", { name: agent.name }) };
       for (const i of yield* runtimes.problemsOf(agent))
@@ -502,7 +475,7 @@ const make = (options: IssueOptions = {}) =>
       const hired = yield* sessions.send(agent, brief, where, {
         ...opt,
         issue,
-        ...(opt.refining !== true ? { hiring: (w: Session) => ran(issue.id, w) } : {}),
+        ...(opt.refining !== true ? { hiring: (w: T.Session) => ran(issue.id, w) } : {}),
       });
       if (!hired.session && !opt.issue && !hired.retainedWork) {
         yield* db(q.removeIssue({ id: issue.id }));
@@ -514,7 +487,7 @@ const make = (options: IssueOptions = {}) =>
     });
 
     /** Starting it and its dry run ask the same, so neither refuses what the other allows. */
-    const readyOf = Effect.fn("Issues.readyOf")(function* (issue: Issue) {
+    const readyOf = Effect.fn("Issue.readyOf")(function* (issue: T.Issue) {
       if (issue.refining) return yield* Effect.fail(refused(t("server.issue.drafting", { name: issue.refining.name })));
       const pick = [lookIn.agent, { say: t("server.issue.pickHint", { command: commandOf("issue.status.update", [String(issue.number)]).join(" ") }) }];
       if (!issue.assignee) return yield* Effect.fail(refused(t("server.issue.noAssignee"), pick));
@@ -525,22 +498,22 @@ const make = (options: IssueOptions = {}) =>
 
     const ready = (id: string) => Effect.flatMap(unsent(id), readyOf);
 
-    const send = (issue: Issue, agent: Agent, project: string, channel: string, by?: RunTrigger) =>
+    const send = (issue: T.Issue, agent: T.Agent, project: string, channel: string, by?: T.RunTrigger) =>
       Effect.flatMap(hire(agent, issueBrief(issue), project, { channel, issue: issue.id, ...(by ? { trigger: by } : {}) }), (hired) =>
         hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed"))),
       );
 
     /** Its run starts as it is handed over: the issue is in progress until the run ends on it (endRun). */
-    const toOrchestrator = Effect.fn("Issues.toOrchestrator")(function* (issue: Issue, channel: string, by: RunTrigger, due?: Cron, said?: string) {
+    const toOrchestrator = Effect.fn("Issue.toOrchestrator")(function* (issue: T.Issue, channel: string, by: T.RunTrigger, due?: T.Cron, said?: string) {
       if (isClosed(issue.status)) yield* db(q.reopenIssue({ id: issue.id }));
-      const run: IssueRun = { startedAt: yield* Clock.currentTimeMillis };
+      const run: T.IssueRun = { startedAt: yield* Clock.currentTimeMillis };
       yield* db(q.setLastRun({ id: issue.id, last_run: JSON.stringify(run) }));
       yield* publish(issue.id);
       PubSub.publishUnsafe(orchestratorHub, { issue, channel, by, ...(due ? { cron: due } : {}), ...(said ? { said } : {}) });
     });
 
     /** said: the owner's words with it, when it is asked again. */
-    const start = Effect.fn("Issues.start")(function* (id: string, channel: string, by?: RunTrigger, said?: string): Effect.fn.Return<Dispatched, ApiError> {
+    const start = Effect.fn("Issue.start")(function* (id: string, channel: string, by?: T.RunTrigger, said?: string): Effect.fn.Return<Dispatched, ApiError> {
       const mine = yield* Effect.option(get(id));
       if (Option.isSome(mine) && isForOrchestrator(mine.value, store.isOrchestrator)) {
         yield* toOrchestrator(mine.value, channel, by ?? { kind: "issue" }, undefined, said);
@@ -588,7 +561,7 @@ const make = (options: IssueOptions = {}) =>
     );
 
     /** to: another profile takes it on; else the one the last session worked as. */
-    const reopen = Effect.fn("Issues.reopen")(function* (id: string, text: string, channel: string, by: RunTrigger = { kind: "comment" }, to?: Agent) {
+    const reopen = Effect.fn("Issue.reopen")(function* (id: string, text: string, channel: string, by: T.RunTrigger = { kind: "comment" }, to?: T.Agent) {
       const issue = yield* get(id);
       if (issue.graph || issue.task || issue.delivered === "merged_into_parent") return yield* Effect.fail(refused(t("server.issue.graphRetry")));
       const newest = issue.sessions.at(-1);
@@ -614,10 +587,10 @@ const make = (options: IssueOptions = {}) =>
     });
 
     /** A cron has one issue, for the session it names or for the orchestrator; each time it comes due is a run of that issue. */
-    const scheduled = Effect.fn("Issues.scheduled")(function* (due: Due) {
+    const scheduled = Effect.fn("Issue.scheduled")(function* (due: Due) {
       const s = due.cron;
       const channel = yield* chat.topOf(s.channel);
-      const by: RunTrigger = { kind: "cron", cron: s.id, ...(due.missed ? { missed: true } : {}) };
+      const by: T.RunTrigger = { kind: "cron", cron: s.id, ...(due.missed ? { missed: true } : {}) };
       const found = yield* ofCron(s.id);
       let issue = found;
       if (!issue) {
@@ -647,7 +620,7 @@ const make = (options: IssueOptions = {}) =>
         yield* chat.notice(channel.id, t("server.issue.cronNoStart", { name: s.name, why: reasonOf(result.failure) }), "cron_refused");
     });
 
-    const ofCron = Effect.fn("Issues.ofCron")(function* (id: string) {
+    const ofCron = Effect.fn("Issue.ofCron")(function* (id: string) {
       const row = yield* one(q.latestOfCron({ cron: id }));
       if (!row) return undefined;
       return Option.getOrUndefined(yield* Effect.option(get(row.id)));
@@ -667,7 +640,7 @@ const make = (options: IssueOptions = {}) =>
       publish,
     });
 
-    const comment = Effect.fn("Issues.comment")(function* (id: string, text: string, sendKey: string = "") {
+    const comment = Effect.fn("Issue.comment")(function* (id: string, text: string, sendKey: string = "") {
       const issue = yield* get(id);
       if (isClosed(issue.status)) return yield* Effect.fail(refused(t("server.issue.closedReopen")));
       const session = yield* liveSession(id);
@@ -677,7 +650,7 @@ const make = (options: IssueOptions = {}) =>
     });
 
     /** The commits on the issue's branch that the main branch does not have; none for one without a project or branch. */
-    const commitsOf = (issue: Issue) =>
+    const commitsOf = (issue: T.Issue) =>
       issue.project
         ? Effect.mapBoth(projects.branchChanges(issue.project, issueBranch(issue.number)), {
             onFailure: (e) => refused(e.message),
@@ -687,7 +660,7 @@ const make = (options: IssueOptions = {}) =>
 
     /** The profile that takes an issue on as it moves to todo; undefined when it is the one it has. Refused before anything
      * moves, so a handover never leaves its session gone and no one sent. */
-    const takerOf = Effect.fn("Issues.takerOf")(function* (issue: Issue, to: IssueStatus, key: string) {
+    const takerOf = Effect.fn("Issue.takerOf")(function* (issue: T.Issue, to: T.IssueStatus, key: string) {
       const a = store.named(key.trim());
       if (!a) return yield* Effect.fail(refused(t("server.issue.noProfileNamed", { key }), [lookIn.agent]));
       if (a.id === issue.assignee) return undefined;
@@ -700,7 +673,7 @@ const make = (options: IssueOptions = {}) =>
     });
 
     /** Its session, if one is on the farm, goes home; an issue no session works on has nobody to send. */
-    const cancel = Effect.fn("Issues.cancel")(function* (id: string) {
+    const cancel = Effect.fn("Issue.cancel")(function* (id: string) {
       const item = yield* get(id);
       const last = item.sessions.at(-1);
       if (last === undefined || !sessions.find(last)) return;
@@ -709,7 +682,7 @@ const make = (options: IssueOptions = {}) =>
 
     /** The issue as a move would see it once the owner's unsaved fields are saved (issue.status saves them first);
      * refused as saving them would be: only how it is accepted and what it delivers change once it is sent. */
-    const withEdit = Effect.fn("Issues.withEdit")(function* (issue: Issue, edit: IssueUpdate | undefined) {
+    const withEdit = Effect.fn("Issue.withEdit")(function* (issue: T.Issue, edit: T.IssueUpdate | undefined) {
       if (!edit) return issue;
       const reworded = Object.keys(edit).some((k) => k !== "deliver");
       if (reworded) yield* unsent(issue.id);
@@ -718,7 +691,7 @@ const make = (options: IssueOptions = {}) =>
 
     /** The move and what it settles before anything changes; refused as the move itself would be. setStatus carries it out,
      * previewStatus says it in words: one judgment, so a dry run never promises what the move would refuse. */
-    const settledMove = Effect.fn("Issues.settledMove")(function* (issue: Issue, to: IssueStatus, text: string, opt: StatusOptions) {
+    const settledMove = Effect.fn("Issue.settledMove")(function* (issue: T.Issue, to: T.IssueStatus, text: string, opt: StatusOptions) {
       if (!isOneOf(IssueStatusValues, to)) return yield* Effect.fail(refused(t("server.issue.noStatus", { to })));
       const taker = opt.assignee ? yield* takerOf(issue, to, opt.assignee) : undefined;
       const [move, why] = statusMove(issue, to);
@@ -735,12 +708,12 @@ const make = (options: IssueOptions = {}) =>
       return { issue, to, move, said, taker, delivery, commits };
     });
 
-    const helperName = (issue: Issue) => {
+    const helperName = (issue: T.Issue) => {
       const last = issue.sessions.at(-1);
       return (last !== undefined ? sessions.sessionOf(last)?.name : undefined) ?? t("server.issue.helper");
     };
 
-    const stuckWords = Effect.fn("Issues.stuckWords")(function* (issue: Issue) {
+    const stuckWords = Effect.fn("Issue.stuckWords")(function* (issue: T.Issue) {
       const last = issue.sessions.at(-1);
       switch (issue.attention.stuck) {
         case "conflict": {
@@ -765,7 +738,7 @@ const make = (options: IssueOptions = {}) =>
     });
 
     /** A settled move in words, one step a line; what it reads to say so (who would go, the room, a merge's conflicts) is read, not changed. */
-    const movesWords = Effect.fn("Issues.movesWords")(function* (p: Effect.Success<ReturnType<typeof settledMove>>) {
+    const movesWords = Effect.fn("Issue.movesWords")(function* (p: Effect.Success<ReturnType<typeof settledMove>>) {
       const item = p.issue;
       const n = `#${item.number}`;
       switch (p.move) {
@@ -844,7 +817,7 @@ const make = (options: IssueOptions = {}) =>
       publish,
     });
 
-    const onSessionNews = Effect.fn("Issues.onSessionNews")(function* (n: SessionNews) {
+    const onSessionNews = Effect.fn("Issue.onSessionNews")(function* (n: SessionNews) {
       switch (n._tag) {
         case "left": {
           const e = n.left;
@@ -888,7 +861,7 @@ const make = (options: IssueOptions = {}) =>
     });
 
     /** The owner said something to a profile no session talks for now: one is sent, with the talk so far. */
-    const talkOn = Effect.fn("Issues.talkOn")(function* (item: Issue) {
+    const talkOn = Effect.fn("Issue.talkOn")(function* (item: T.Issue) {
       const agent = store.agent(item.assignee ?? "");
       if (!agent || !item.talk) return;
       const said = inboxLines(yield* chat.recent(item.talk, talkContext));
@@ -900,7 +873,7 @@ const make = (options: IssueOptions = {}) =>
       if (!hired.session) yield* chat.notice(item.talk, hired.refused ?? t("server.issue.sendFailed"), "talk_refused");
     });
 
-    const onOwnerInThread = Effect.fn("Issues.onOwnerInThread")(function* (thread: string) {
+    const onOwnerInThread = Effect.fn("Issue.onOwnerInThread")(function* (thread: string) {
       const issue = yield* Effect.option(get(thread));
       if (Option.isNone(issue)) return;
       const item = issue.value;
@@ -975,7 +948,7 @@ const make = (options: IssueOptions = {}) =>
     }
 
     /** On the board before another unsent issue, or last; only unsent issues have a place. */
-    const place = Effect.fn("Issues.place")(function* (id: string, before: string) {
+    const place = Effect.fn("Issue.place")(function* (id: string, before: string) {
       const order: string[] = (yield* everyIssue)
         .filter((item) => item.sessions.length === 0 && !item.graph && !item.task && item.id !== id)
         .map((item) => item.id);
@@ -985,7 +958,7 @@ const make = (options: IssueOptions = {}) =>
       for (const each of order) yield* publish(each);
     });
 
-    const timeline = Effect.fn("Issues.timeline")(function* (id: string) {
+    const timeline = Effect.fn("Issue.timeline")(function* (id: string) {
       const issue = yield* get(id);
       const runs = yield* sessions.runs(issue.id);
       const names = new Map<string, string>();
@@ -996,23 +969,23 @@ const make = (options: IssueOptions = {}) =>
       return milestonesOf(issue, runs, names);
     });
 
-    const shape = Issues.of({
+    const shape = Issue.of({
       onBoard: () => core.state().issues,
-      list: Effect.fn("Issues.list")(function* () {
+      list: Effect.fn("Issue.list")(function* () {
         return (yield* everyIssue).filter((item) => !item.talk);
       }),
-      query: Effect.fn("Issues.query")(function* (f) {
+      query: Effect.fn("Issue.query")(function* (f) {
         const all = (yield* everyIssue).filter((item) => !item.talk);
         return pickIssues(all, f, yield* Clock.currentTimeMillis);
       }),
       get,
       timeline,
-      add: Effect.fn("Issues.add")(function* (req) {
+      add: Effect.fn("Issue.add")(function* (req) {
         return yield* add(req);
       }),
       /** The words and who does it only before it is sent; how it is accepted and what it delivers while it is open: the
        * next round goes by them. */
-      edit: Effect.fn("Issues.edit")(function* (id, upd, by) {
+      edit: Effect.fn("Issue.edit")(function* (id, upd, by) {
         if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
         const whileOpen =
           upd.title === undefined &&
@@ -1022,7 +995,7 @@ const make = (options: IssueOptions = {}) =>
           upd.priority === undefined &&
           upd.criteria === undefined &&
           upd.before === undefined;
-        let was: Issue;
+        let was: T.Issue;
         if (whileOpen) {
           was = yield* get(id);
           if (isClosed(was.status)) return yield* Effect.fail(refused(t("server.issue.closed")));
@@ -1049,7 +1022,7 @@ const make = (options: IssueOptions = {}) =>
         else yield* publish(id);
         return yield* get(id);
       }),
-      remove: Effect.fn("Issues.remove")(function* (id) {
+      remove: Effect.fn("Issue.remove")(function* (id) {
         const item = yield* unsent(id);
         const cleared = yield* clearRefinement(item);
         if (cleared.kept) return yield* Effect.fail(refused(t("server.issue.cannotDelete", { n: item.number, why: cleared.reason })));
@@ -1057,10 +1030,10 @@ const make = (options: IssueOptions = {}) =>
         yield* reloadSessions;
         yield* core.apply({ type: "issueGone", id: issueId(id) });
       }),
-      queue: Effect.fn("Issues.queue")(function* (id, queued) {
+      queue: Effect.fn("Issue.queue")(function* (id, queued) {
         return yield* queueRow(id, queued, chat.defaultChannel());
       }),
-      // Untraced: they only drop the arguments the service does not take, and the call they make is named Issues.start / Issues.reopen.
+      // Untraced: they only drop the arguments the service does not take, and the call they make is named Issue.start / Issue.reopen.
       start: Effect.fnUntraced(function* (id, channel) {
         return yield* start(id, channel);
       }),
@@ -1068,10 +1041,10 @@ const make = (options: IssueOptions = {}) =>
         return yield* reopen(id, text, channel);
       }),
       idOf,
-      stop: Effect.fn("Issues.stop")(function* (id) {
+      stop: Effect.fn("Issue.stop")(function* (id) {
         yield* sessions.stop(yield* liveSession(id));
       }),
-      setStatus: Effect.fn("Issues.setStatus")(function* (ref, to, text, channel, by, opt = {}) {
+      setStatus: Effect.fn("Issue.setStatus")(function* (ref, to, text, channel, by, opt = {}) {
         if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
         const item = yield* get(ref);
         // Read by its number too: every write below goes by its id.
@@ -1139,11 +1112,11 @@ const make = (options: IssueOptions = {}) =>
         }
         return yield* get(id);
       }),
-      previewStatus: Effect.fn("Issues.previewStatus")(function* (id, to, text, opt = {}, edit) {
+      previewStatus: Effect.fn("Issue.previewStatus")(function* (id, to, text, opt = {}, edit) {
         const item = yield* withEdit(yield* get(id), edit);
         return { does: yield* movesWords(yield* settledMove(item, to, text, opt)) };
       }),
-      previewRemove: Effect.fn("Issues.previewRemove")(function* (id) {
+      previewRemove: Effect.fn("Issue.previewRemove")(function* (id) {
         const item = yield* unsent(id);
         return {
           does: [
@@ -1154,7 +1127,7 @@ const make = (options: IssueOptions = {}) =>
         };
       }),
       comment,
-      changes: Effect.fn("Issues.changes")(function* (id, by) {
+      changes: Effect.fn("Issue.changes")(function* (id, by) {
         const session = yield* liveSession(id);
         const changes = yield* sessions.changes(session);
         if (!changes) return yield* Effect.fail(missing(t("server.issue.helperRef", { id: session }), [lookIn.session]));
@@ -1163,7 +1136,7 @@ const make = (options: IssueOptions = {}) =>
       }),
       merge,
       cancel,
-      review: Effect.fn("Issues.review")(function* (id, req) {
+      review: Effect.fn("Issue.review")(function* (id, req) {
         const item = yield* get(id);
         const why = isForOrchestrator(item, store.isOrchestrator)
           ? t("server.issue.orchestratorAnswers")
@@ -1192,7 +1165,7 @@ const make = (options: IssueOptions = {}) =>
         return yield* get(id);
       }),
       refine: draft,
-      talkWith: Effect.fn("Issues.talkWith")(function* (ref) {
+      talkWith: Effect.fn("Issue.talkWith")(function* (ref) {
         const agent = store.named(ref.trim()) ?? store.agent(ref) ?? store.orchestrators().find((o) => o.name === ref.trim());
         if (!agent) return yield* Effect.fail(missing(t("server.issue.noProfileNamed", { key: ref }), [lookIn.agent]));
         // An orchestrator answers in its own direct channel; a helper profile's is its talk issue's thread.
@@ -1205,7 +1178,7 @@ const make = (options: IssueOptions = {}) =>
         return channel;
       }),
       /** A session with no record is named as missing, not given a phase. */
-      history: Effect.fn("Issues.history")(function* () {
+      history: Effect.fn("Issue.history")(function* () {
         const all = (yield* everyIssue).filter((item) => !item.talk);
         const byId = new Map((yield* sessions.list("")).map((s) => [s.id, s]));
         return all.map((issue) => ({
@@ -1217,15 +1190,15 @@ const make = (options: IssueOptions = {}) =>
           missingSessions: issue.sessions.filter((id) => !byId.has(id)),
         }));
       }),
-      templates: Effect.fn("Issues.templates")(function* (name) {
+      templates: Effect.fn("Issue.templates")(function* (name) {
         const stack = yield* projects.stack(name);
         if (!stack) return yield* Effect.fail(missing(t("server.issue.projectRef", { name }), [lookIn.project]));
         return { project: name, stack, recent: sentTitles(yield* everyIssue, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
       }),
       hire,
       ran,
-      putTask: Effect.fn("Issues.putTask")(function* (graph) {
-        const family = Effect.fn("Issues.family")(function* (id: string) {
+      putTask: Effect.fn("Issue.putTask")(function* (graph) {
+        const family = Effect.fn("Issue.family")(function* (id: string) {
           const rows = yield* db(q.family({ id }));
           return rows.map((r) => issueOf(r, worked.of(r.id)));
         });
@@ -1268,7 +1241,7 @@ const make = (options: IssueOptions = {}) =>
           ...updated.map((issue) => ({ type: "issue" as const, issue })),
         );
       }),
-      nextTaskId: Effect.fn("Issues.nextTaskId")(function* () {
+      nextTaskId: Effect.fn("Issue.nextTaskId")(function* () {
         const rows = yield* db(q.graphIDs());
         return nextTaskId(rows.map((r) => r.id));
       }),

@@ -5,11 +5,12 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 
-import { type ChatMessage, type Channel, defaultOrchestrator, type Session } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { defaultOrchestrator } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { head } from "@/base/clip.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Database, Db } from "@/base/db.ts";
@@ -24,7 +25,7 @@ import { until, waitFor } from "@/testing/until.ts";
 
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import { wakeBreaker } from "./audience.ts";
-import { Channels, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
+import { Channel, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
 import { channelOf, defaultOf } from "./folded.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 is held until release (unless holds is
@@ -96,7 +97,7 @@ const fakeHelpers = (x: FakeSessions) =>
   Layer.effectDiscard(
     Effect.gen(function* () {
       x.core = yield* Core;
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       x.launches = yield* PubSub.unbounded<LaunchActivity>();
       yield* Effect.addFinalizer(() =>
         Effect.sync(() => {
@@ -129,9 +130,9 @@ const fakeHelpers = (x: FakeSessions) =>
 const world = (x: FakeSessions, config: ServerConfig["Service"] = testConfig()) => {
   const c: ServerConfig["Service"] = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
   return fakeHelpers(x).pipe(
-    Layer.provideMerge(Channels.layer),
+    Layer.provideMerge(Channel.layer),
     Layer.provideMerge(said),
-    Layer.provideMerge(Agents.layer),
+    Layer.provideMerge(Agent.layer),
     Layer.provideMerge(Core.layer.pipe(Layer.provide(projection))),
     Layer.provideMerge(Db.layer),
     Layer.provideMerge(Database),
@@ -144,7 +145,7 @@ const world = (x: FakeSessions, config: ServerConfig["Service"] = testConfig()) 
 const farm = Effect.gen(function* () {
   const runPromise = Effect.runPromiseWith(yield* Effect.context());
   const core = yield* Core;
-  const chat = yield* Channels;
+  const chat = yield* Channel;
   const sql = yield* SqlClient.SqlClient;
   const messagesOf = (yield* Said).in;
   const channel = (id: string | undefined) => (id ? channelOf(core.state().chat, id) : undefined);
@@ -181,7 +182,7 @@ const hire = (f: Farm, x: FakeSessions, id: string, brief: string, project: stri
         ...(channel ? { channel } : {}),
         ...(issue ? { issue } : {}),
         refining: false,
-      } as Session,
+      } as T.Session,
     });
     const thread = yield* waitFor(Effect.map(f.chat.threadOfSession(id), f.channel), (c) => c !== undefined, "an issue thread");
     return thread!;
@@ -210,7 +211,7 @@ const news = (f: Farm) =>
   });
 
 const run = <A, E>(
-  body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channels | SqlClient.SqlClient | Scope.Scope>,
+  body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channel | SqlClient.SqlClient | Scope.Scope>,
   config?: ServerConfig["Service"],
 ) => {
   const x = new FakeSessions();
@@ -590,8 +591,8 @@ describe("the chat", () => {
 
   it.live("after a restart what was handed is given again", () => {
     const config = { ...testConfig(), db: "" };
-    let thread: Channel;
-    let said: ChatMessage;
+    let thread: T.Channel;
+    let said: T.ChatMessage;
     return Effect.gen(function* () {
       yield* run(
         (f, x) =>
@@ -866,7 +867,7 @@ describe("the chat", () => {
             runs: 0,
             phase: { _tag: "resting" },
             refining: false,
-          } as Session,
+          } as T.Session,
         });
         yield* waitFor(
           Effect.map(f.sql<{ n: string }>`select last_value::text as n from fail_owner_tries where is_called`.pipe(Effect.orDie), (rows) => rows.length),
@@ -888,7 +889,7 @@ describe("the chat", () => {
             runs: 0,
             phase: { _tag: "resting" },
             refining: false,
-          } as Session,
+          } as T.Session,
         });
         yield* until(() => f.messagesOf(f.chat.defaultChannel()).filter((m) => m.kind === "dispatch").length === 2, "both dispatched");
         const thread = (yield* f.chat.threadOfSession("w1"))!;

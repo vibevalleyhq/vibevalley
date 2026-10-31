@@ -14,7 +14,7 @@ import { testConfig } from "@/testing/layers.ts";
 import { waitFor, whenTrue } from "@/testing/until.ts";
 
 import * as qa from "../../db/generated/artifact.sql.ts";
-import { type BlocksOptions, makeBlocks } from "./blocks.ts";
+import { type BlockStoreOptions, makeBlockStore } from "./blocks.ts";
 import { demoPieces } from "./demo.ts";
 import { plain } from "./spans.ts";
 import { bold, para, sample, span } from "./testing.ts";
@@ -22,12 +22,12 @@ import { bold, para, sample, span } from "./testing.ts";
 const on = (config: ServerConfig["Service"] = testConfig()) =>
   Db.layer.pipe(Layer.provideMerge(Database), Layer.provideMerge(Layer.succeed(ServerConfig, config)));
 
-/** The blocks of artifacts made straight in the table: the rest of Artifacts (channels, cards) is artifact.test.ts's. */
-const make = (options: BlocksOptions = {}) =>
+/** The blocks of artifacts made straight in the table: the rest of the Artifact service (channels, cards) is artifact.test.ts's. */
+const make = (options: BlockStoreOptions = {}) =>
   Effect.gen(function* () {
     const { run: db, one } = yield* Db;
     const row = (id: string) => one(qa.artifact({ id })).pipe(orMissing(id, []));
-    const blocks = yield* makeBlocks(row, options);
+    const blocks = yield* makeBlockStore(row, options);
     const get = (id: string) =>
       Effect.gen(function* () {
         const list = yield* blocks.blocks(id);

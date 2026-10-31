@@ -2,18 +2,18 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Predicate, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 
-import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { orchestrator, owner } from "@/base/actor.ts";
 import { clip } from "@/base/clip.ts";
 import { Core } from "@/core/core.ts";
 import { inbox } from "@/inbox/items.ts";
-import { Issues } from "@/issue/issue.ts";
+import { Issue } from "@/issue/issue.ts";
 import { MergeFailure, type Workplace } from "@/project/shapes.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
-import { type Hired, type HireOptions, type Roster, NotTakenIn, type Sessions } from "@/session/session.ts";
+import { type Hired, type HireOptions, type Roster, NotTakenIn, type Session } from "@/session/session.ts";
 import { notTakenIn } from "@/session/takeIn.ts";
 import { sampleAgent } from "@/testing/agents.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -67,13 +67,13 @@ class FakeWork implements TaskWork {
   released = new Promise<void>((r) => (this.release = r));
 
   readonly core: Core["Service"];
-  readonly issues: Issues["Service"];
-  constructor(core: Core["Service"], issues: Issues["Service"]) {
+  readonly issues: Issue["Service"];
+  constructor(core: Core["Service"], issues: Issue["Service"]) {
     this.core = core;
     this.issues = issues;
   }
 
-  private async work(h: Session, input: string): Promise<[string, string]> {
+  private async work(h: T.Session, input: string): Promise<[string, string]> {
     if (!h.graph?.task) {
       const graph = input.includes("计划有问题") ? { title: "改好了", tasks: [step("fixed")] } : graphs[/要做的事：(\S+)/u.exec(input)?.[1] ?? ""];
       return ["completed", "读完了。\n\n```json\n" + JSON.stringify(graph, null, 2) + "\n```\n\n结论：拆好了。"];
@@ -123,7 +123,7 @@ class FakeWork implements TaskWork {
     await Effect.runPromise(this.core.apply({ type: "report", questions: [], checks: [], id: sessionId(id), outcome: outcome as never, summary, runs: 1 }));
   }
 
-  hire = (agent: Agent, brief: string, project: string, opt: HireOptions): Effect.Effect<Hired> => {
+  hire = (agent: T.Agent, brief: string, project: string, opt: HireOptions): Effect.Effect<Hired> => {
     const self = this;
     return Effect.gen(function* () {
       const id = `w${++self.n}`;
@@ -140,7 +140,7 @@ class FakeWork implements TaskWork {
         phase: { _tag: "working", doing: { action: "thinking", label: "" } },
         ...(opt.taskGraph ? { graph: opt.taskGraph } : {}),
         refining: false,
-      } as Session;
+      } as T.Session;
       yield* self.core.apply({ type: "hired", session: h });
       if (opt.issue) yield* self.issues.ran(opt.issue, h).pipe(Effect.orDie);
       void self.run(id, brief);
@@ -165,7 +165,7 @@ class FakeWork implements TaskWork {
     return session ? { session, place: { project: "", cwd: "" }, lastText: this.last.get(id) ?? "" } : undefined;
   };
 
-  handOver: Sessions["Service"]["handOver"] = (id, _closed, use, settle = "owner") =>
+  handOver: Session["Service"]["handOver"] = (id, _closed, use, settle = "owner") =>
     use({ project: "", cwd: "/wt/" + id }, this.last.get(id) ?? "").pipe(
       Effect.mapError((e) => {
         const failure = Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(String(e));
@@ -200,18 +200,18 @@ class FakeGit implements TaskGit {
     });
   mergeBranch = (project: string) => Effect.succeed("合进了 " + project + " 的 main");
   mergeInto = (place: Workplace) => Effect.succeed({ text: "", commits: 1, hashes: ["c0ffee-" + place.cwd.replace(/^\/wt\//u, "")] });
-  branchChanges = (project: string, branch: string) => Effect.succeed({ project, base: "main", branch } as unknown as Changes);
+  branchChanges = (project: string, branch: string) => Effect.succeed({ project, base: "main", branch } as unknown as T.Changes);
 }
 
 /** The farm with the task service on played sessions and git; the graph's states as each issue fact left them. */
 const farm = Effect.gen(function* () {
   const core = yield* Core;
-  const issues = yield* Issues;
-  const agents = yield* Agents;
+  const issues = yield* Issue;
+  const agents = yield* Agent;
   for (const a of agents.agents()) yield* agents.save({ ...a, effort: "" });
   const work = new FakeWork(core, issues);
   const git = new FakeGit(work);
-  const states: TaskGraph[] = [];
+  const states: T.TaskGraph[] = [];
   yield* Effect.forkScoped(
     Stream.runForEach(yield* core.subscribe, (e) =>
       Effect.sync(() => {
@@ -226,7 +226,7 @@ const farm = Effect.gen(function* () {
   yield* tasks.comeBack;
   const news: string[] = [];
   yield* Effect.forkScoped(Stream.runForEach(yield* tasks.news, (n) => Effect.sync(() => news.push(n))));
-  const until = (id: string, ready: (g: TaskGraph) => boolean) =>
+  const until = (id: string, ready: (g: T.TaskGraph) => boolean) =>
     untilGot(
       () => {
         const g = graphOf(core.state(), id);
@@ -239,9 +239,9 @@ const farm = Effect.gen(function* () {
   return { core, issues, tasks, work, git, states, news, until, split };
 });
 
-const state = (g: TaskGraph, id: string) => taskOf(g, id)?.state;
+const state = (g: T.TaskGraph, id: string) => taskOf(g, id)?.state;
 
-const run = <A, E>(body: (f: Effect.Success<typeof farm>) => Effect.Effect<A, E, Core | Issues | SqlClient.SqlClient | Scope.Scope>, config = testConfig()) =>
+const run = <A, E>(body: (f: Effect.Success<typeof farm>) => Effect.Effect<A, E, Core | Issue | SqlClient.SqlClient | Scope.Scope>, config = testConfig()) =>
   Effect.flatMap(farm, body).pipe(Effect.scoped, Effect.provide(worldBelowTasks({ config })));
 
 describe("task graphs", () => {
@@ -507,7 +507,7 @@ describe("task graphs", () => {
           runs: 0,
           phase: { _tag: "working", doing: { action: "thinking", label: "" } },
           refining: false,
-        } as Session;
+        } as T.Session;
         yield* f.core.apply({ type: "hired", session: helper });
         yield* f.issues.ran(issue.id, helper).pipe(Effect.orDie);
         const steps = [
@@ -547,7 +547,7 @@ describe("task graphs", () => {
             tasks: [{ ...freshTask({ id: "a", title: "步骤", brief: "做事" }), state: "failed", session: sessionId("w900") }],
             note: "",
             ...graphView(),
-          } satisfies TaskGraph;
+          } satisfies T.TaskGraph;
           yield* f.issues.putTask(graph);
           yield* f.core.apply({
             type: "hired",
@@ -561,7 +561,7 @@ describe("task graphs", () => {
               runs: 0,
               phase: { _tag: "resting" },
               refining: false,
-            } as Session,
+            } as T.Session,
           });
           yield* sql
             .unsafe(`create function fail_save() returns trigger language plpgsql as $$ begin raise exception 'injected write failure'; end $$`)

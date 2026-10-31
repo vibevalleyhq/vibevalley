@@ -9,7 +9,7 @@ import { freshOf } from "@vibevalley/protocol/rules";
 
 import { ServerConfig } from "@/base/config.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 
 import { forOwner } from "./away.ts";
@@ -45,7 +45,7 @@ export class Inbox extends Context.Service<
 
 const make = Effect.gen(function* () {
   const core = yield* Core;
-  const chat = yield* Channels;
+  const chat = yield* Channel;
 
   // Until the startup primes it nothing is news: what comes back with the sessions was there before the stop.
   let known: Set<string> | undefined;

@@ -86,7 +86,7 @@
 - **创建返回自己的身份**：服务端分配 id，和持久化在同一把锁里提交（`channel.create` 返回频道 id；`agent.create`、`skill.create` 拒绝非空 id，带 id 的 `update` 仍是 upsert）。
 - **查询带齐真实的关联**：`issue.history.list` 只给真有的帮工，找不到的明列在 `missingSessions`，不补造一个「歇着」的帮工。
 
-**开机顺序**：全部服务建好、开机的活（`start`、`ready` 这类 layer）跑过以后开始答 HTTP；开机就派出去的帮工要的 `/mcp` 地址在开始听之后才交给 `Sessions`（[地基](docs/subsystems/foundation.md)）。
+**开机顺序**：全部服务建好、开机的活（`start`、`ready` 这类 layer）跑过以后开始答 HTTP；开机就派出去的帮工要的 `/mcp` 地址在开始听之后才交给 `Session`（[地基](docs/subsystems/foundation.md)）。
 
 ## 怎么走
 

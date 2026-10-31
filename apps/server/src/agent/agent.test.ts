@@ -4,18 +4,19 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { Cause, Effect, Exit, Layer } from "effect";
 
-import { type Agent, defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 
 import { ServerConfig } from "@/base/config.ts";
 import { defaultSettings } from "@/runtime/presets.ts";
 import { testConfig, starter } from "@/testing/layers.ts";
 
-import { Agents, withCast } from "./agent.ts";
+import { Agent, withCast } from "./agent.ts";
 
-const run = <A, E>(config: ServerConfig["Service"], body: Effect.Effect<A, E, Agents>) =>
-  Effect.scoped(body.pipe(Effect.provide(Agents.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config))))));
+const run = <A, E>(config: ServerConfig["Service"], body: Effect.Effect<A, E, Agent>) =>
+  Effect.scoped(body.pipe(Effect.provide(Agent.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config))))));
 
-const draft = (change: Partial<Agent> = {}): Agent => ({
+const draft = (change: Partial<T.Agent> = {}): T.Agent => ({
   id: "",
   name: "同名",
   role: "helper",
@@ -44,7 +45,7 @@ describe("profiles", () => {
     return run(
       config,
       Effect.gen(function* () {
-        const s = yield* Agents;
+        const s = yield* Agent;
         const skill = yield* s.createSkill({
           id: "",
           name: "Transient Skill",
@@ -70,7 +71,7 @@ describe("profiles", () => {
         run(
           config,
           Effect.gen(function* () {
-            const s = yield* Agents;
+            const s = yield* Agent;
             expect(s.agent(profile)?.skills).toEqual(["other"]);
             expect(s.agent(defaultOrchestrator)?.skills).toEqual([]);
           }),
@@ -85,7 +86,7 @@ describe("profiles", () => {
     return run(
       config,
       Effect.gen(function* () {
-        expect((yield* Agents).agents().length).toBeGreaterThan(0);
+        expect((yield* Agent).agents().length).toBeGreaterThan(0);
         const kept = readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"));
         expect(kept).toHaveLength(1);
         expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe("{not json");
@@ -100,7 +101,7 @@ describe("profiles", () => {
     return run(
       config,
       Effect.gen(function* () {
-        expect((yield* Agents).agents().length).toBeGreaterThan(0);
+        expect((yield* Agent).agents().length).toBeGreaterThan(0);
         const kept = readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"));
         expect(kept).toHaveLength(1);
         expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe(raw);
@@ -121,7 +122,7 @@ describe("profiles", () => {
     return run(
       config,
       Effect.gen(function* () {
-        const agents = yield* Agents;
+        const agents = yield* Agent;
         expect(agents.agent("mine")?.look).toMatchObject({ build: "biped", head: "rounded" });
         expect(agents.skills().map((k) => k.id)).toEqual(["s1"]);
         expect(agents.settings("pi").defaultModel).toBe("deepseek-chat");
@@ -135,7 +136,7 @@ describe("profiles", () => {
     writeFileSync(join(config.home, "config.json"), "{not json");
     chmodSync(config.home, 0o555);
     return Effect.gen(function* () {
-      const exit = yield* Effect.exit(run(config, Agents));
+      const exit = yield* Effect.exit(run(config, Agent));
       chmodSync(config.home, 0o755);
       expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
       expect(readFileSync(join(config.home, "config.json"), "utf8")).toBe("{not json");
@@ -148,10 +149,10 @@ describe("profiles", () => {
       ["agent-7", "fox"],
       ["老周", "hedgehog"],
     ] as const) {
-      const got = withCast({ id } as Agent);
+      const got = withCast({ id } as T.Agent);
       expect([got.look.species, got.look.outfit]).toEqual([want, "farmer"]);
     }
-    const kept = withCast({ id: "backend", look: { species: "owl", outfit: "rain" } } as Agent);
+    const kept = withCast({ id: "backend", look: { species: "owl", outfit: "rain" } } as T.Agent);
     expect([kept.look.species, kept.look.outfit]).toEqual(["owl", "rain"]);
   });
 
@@ -160,7 +161,7 @@ describe("profiles", () => {
     return run(
       config,
       Effect.gen(function* () {
-        const s = yield* Agents;
+        const s = yield* Agent;
         const orchestrator = s.agent(defaultOrchestrator)!;
         expect([orchestrator.runtime, orchestrator.enabled]).toEqual([orchestratorRuntime, true]);
         expect(s.agents().some((a) => a.id === defaultOrchestrator)).toBe(false);
@@ -173,7 +174,7 @@ describe("profiles", () => {
       Effect.andThen(
         run(
           config,
-          Effect.map(Agents, (again) => expect(again.agent(defaultOrchestrator)?.model).toBe("deepseek-pro")),
+          Effect.map(Agent, (again) => expect(again.agent(defaultOrchestrator)?.model).toBe("deepseek-pro")),
         ),
       ),
     );
@@ -185,7 +186,7 @@ describe("profiles", () => {
     run(
       testConfig(),
       Effect.gen(function* () {
-        const s = yield* Agents;
+        const s = yield* Agent;
         expect((yield* Effect.flip(s.create(draft({ name: "外头的管家", role: "orchestrator", runtime: "claude" }))))._tag).toBe("Refused");
         const lead = yield* s.create(draft({ name: "前端组长", role: "orchestrator", runtime: orchestratorRuntime }));
         expect(s.orchestrators().map((a) => a.id)).toEqual([defaultOrchestrator, lead.id]);
@@ -203,14 +204,14 @@ describe("profiles", () => {
     run(
       testConfig({ agent: { model: "", starters: [] } }),
       Effect.gen(function* () {
-        const s = yield* Agents;
+        const s = yield* Agent;
         expect(s.all().map((a) => [a.id, a.from?.template])).toEqual([[defaultOrchestrator, defaultOrchestrator]]);
       }),
     ).pipe(
       Effect.andThen(
         run(
           testConfig({ agent: { model: "", starters: ["docs", "nobody", "lab"] } }),
-          Effect.map(Agents, (s) => expect(s.all().map((a) => a.id)).toEqual([defaultOrchestrator, "docs", "lab"])),
+          Effect.map(Agent, (s) => expect(s.all().map((a) => a.id)).toEqual([defaultOrchestrator, "docs", "lab"])),
         ),
       ),
     ),
@@ -220,7 +221,7 @@ describe("profiles", () => {
     run(
       testConfig(),
       Effect.gen(function* () {
-        const s = yield* Agents;
+        const s = yield* Agent;
         const second = yield* s.installTemplate("backend");
         expect([second.id, second.name, second.from]).toEqual(["backend-2", "后端老周 2", { template: "backend", version: 1 }]);
         expect(s.templates().find((t) => t.id === "backend")?.installed).toEqual(["backend", "backend-2"]);
@@ -248,7 +249,7 @@ describe("profiles", () => {
     return run(
       config,
       Effect.gen(function* () {
-        const s = yield* Agents;
+        const s = yield* Agent;
         expect(yield* Effect.flip(s.addTemplate(broken))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/Bad Id/u) });
         expect((yield* Effect.flip(s.addTemplate(join(config.home, "nowhere"))))._tag).toBe("Refused");
         const added = yield* s.addTemplate(folder);
@@ -270,7 +271,7 @@ describe("profiles", () => {
     run(
       testConfig(),
       Effect.gen(function* () {
-        const s = yield* Agents;
+        const s = yield* Agent;
         const ids = new Set<string>();
         const skills = new Set<string>();
         for (let i = 0; i < 12; i++) {
@@ -282,7 +283,7 @@ describe("profiles", () => {
         expect((yield* Effect.flip(s.create(draft({ id: "mine" }))))._tag).toBe("Refused");
         const saved = yield* s.save({
           ...draft({ id: "agent-7" }),
-          look: { body: "", trim: "", hat: "", eye: "" } as Agent["look"],
+          look: { body: "", trim: "", hat: "", eye: "" } as T.Agent["look"],
         });
         expect([saved.look.species, saved.look.outfit, saved.look.build, saved.look.head]).toEqual(["fox", "farmer", "biped", "rounded"]);
       }),
@@ -293,7 +294,7 @@ describe("profiles", () => {
     run(
       testConfig(),
       Effect.gen(function* () {
-        const s = yield* Agents;
+        const s = yield* Agent;
         const one = s.agents()[0]!;
         one.tags.push("changed");
         one.env.X = "y";

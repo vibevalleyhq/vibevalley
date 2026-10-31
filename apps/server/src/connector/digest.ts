@@ -1,13 +1,12 @@
+import { t } from "@vibevalley/i18n";
 // What the chat apps are sent: which farm messages reach the owner, as plain text, cut
 // to what each app takes; a digest of what waited; the pairing words.
-
-import { t } from "@vibevalley/i18n";
-import { type ChatMessage, type ConnectorID, type Channel } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
 import { slice } from "@/base/clip.ts";
 
 /** In UTF-16 units; longer ones are cut. */
-export const maxChars: Record<ConnectorID, number> = { weixin: 1800, feishu: 4000, qq: 2000 };
+export const maxChars: Record<T.ConnectorID, number> = { weixin: 1800, feishu: 4000, qq: 2000 };
 
 export const digestOver = 3;
 
@@ -26,7 +25,7 @@ export function plainText(markdown: string): string {
 }
 
 /** The owner sees one chat, the farm has many threads. */
-export function ownerLine(m: ChatMessage, where: Channel | undefined): string {
+export function ownerLine(m: T.ChatMessage, where: T.Channel | undefined): string {
   const who = m.fromKind === "orchestrator" ? t("server.connector.line.orchestrator") : m.name;
   const what =
     m.kind === "report"

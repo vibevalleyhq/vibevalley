@@ -6,17 +6,17 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber } from "effect";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Sessions } from "@/session/session.ts";
+import { Issue } from "@/issue/issue.ts";
+import { Session } from "@/session/session.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import { freshTask } from "./editing.ts";
 import { graphView } from "./graph.ts";
-import { Tasks } from "./task.ts";
+import { Task } from "./task.ts";
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 
 describe("a task's workplace", () => {
@@ -35,11 +35,11 @@ describe("a task's workplace", () => {
       },
     });
     return Effect.gen(function* () {
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
-      const tasks = yield* Tasks;
+      const issues = yield* Issue;
+      const sessions = yield* Session;
+      const tasks = yield* Task;
       const agent = starter("lab");
-      yield* (yield* Agents).save({ ...agent, effort: "" });
+      yield* (yield* Agent).save({ ...agent, effort: "" });
       yield* issues.putTask({
         id: "p1",
         title: "retry checked work",
@@ -82,11 +82,11 @@ describe("a task's workplace", () => {
       },
     });
     return Effect.gen(function* () {
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
-      const tasks = yield* Tasks;
+      const issues = yield* Issue;
+      const sessions = yield* Session;
+      const tasks = yield* Task;
       const agent = starter("lab");
-      yield* (yield* Agents).save({ ...agent, effort: "" });
+      yield* (yield* Agent).save({ ...agent, effort: "" });
       const other = (yield* issues.hire({ ...agent, effort: "" }, "other session", "other")).session!;
       yield* until(() => sessions.sessionOf(other.id)?.phase._tag === "done", "the other session's first report");
       yield* issues.putTask({

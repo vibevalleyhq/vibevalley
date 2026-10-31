@@ -16,7 +16,7 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/memory`（`Memories`）：`memory.ts` 对外的方法（管家的和帮工的分流）、每个管家 `MEMORY.md` 的口子；`sources.ts` 几个来源的管理器和一个来源的接口；`memories.ts` 本地来源（库里的读写、读「记住：」）；`recall.ts` 挑法和检索（纯函数）；`terms.ts` 切词，`gse.ts` 是 gse v1.1.0 的中文切法（词典 `data/zh_s.txt.gz` 和 HMM `data/hmm_emit.json.gz`，逐字对上 gse，黄金数据在 `testdata`）；`nowledge.ts`、`everos.ts` 两个外面的来源。
+- 服务端 `apps/server/src/memory`（`Memory`）：`memory.ts` 对外的方法（管家的和帮工的分流）、每个管家 `MEMORY.md` 的口子；`sources.ts` 几个来源的管理器和一个来源的接口；`store.ts` 本地来源的存取（`MemoryStore`：库里的读写、读「记住：」）；`recall.ts` 挑法和检索（纯函数）；`terms.ts` 切词，`gse.ts` 是 gse v1.1.0 的中文切法（词典 `data/zh_s.txt.gz` 和 HMM `data/hmm_emit.json.gz`，逐字对上 gse，黄金数据在 `testdata`）；`nowledge.ts`、`everos.ts` 两个外面的来源。
 - 表：`memory`（一条记忆一行，`terms` 是切好的词，`terms_vector` 是它的 `tsvector`，GIN 索引 `memory_by_terms`）；查询在 `db/queries/memory.sql`。
 - 接口：`memory.list`、`memory.recall`、`memory.create`、`memory.search`（在全部来源里找，不填档案就是全部档案的）、`memory.delete`，管家的旧账 `orchestrator.archive.list`、`orchestrator.archive.get`（带 `agent`，不填是默认管家）（[capabilities.md](docs/reference/capabilities.md)）。
 - 页面：`apps/web/src/features/memory/Memory.tsx`（帮工页和管家页的记性、管家的旧账）；来源在「设置」的「记性」（`features/setting/SettingsForm.tsx`）。农场 HUD 的「记忆树」按钮到 `/tree`（`apps/web/src/tree`）：所有档案的记性汇总成一棵树和一片星空，现在用的是假数据（[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)）。
@@ -81,8 +81,8 @@
 - **工具（`tool`、`mcp`）**：管家和帮工的 `memory_search`、`memory_create` 调 `search`、`remember`，回话用 `foundText`。
 - **设置（`setting`）**：管理器每次用时读记性的来源设置。
 - **帮工的档案（`agent`）**：不填档案的检索要列出所有档案。
-- **管家（`packages/agent`）**：管家页经 `Memories` 读写 `MEMORY.md`（`readMemory`、`remember`、`forgetLine`）、列和搜旧账（`archiveFiles`、`readArchive`、`searchArchive`），和管家自己的工具用同一套；每个管家的家目录是 `agentHome`（`base/config.ts`），`orchestrator` 也用它。
-- **处理函数（`handlers.ts`）**：`memory.*`、`orchestrator.archive.list`、`orchestrator.archive.get` 只转发到 `Memories`。
+- **管家（`packages/agent`）**：管家页经 `Memory` 读写 `MEMORY.md`（`readMemory`、`remember`、`forgetLine`）、列和搜旧账（`archiveFiles`、`readArchive`、`searchArchive`），和管家自己的工具用同一套；每个管家的家目录是 `agentHome`（`base/config.ts`），`orchestrator` 也用它。
+- **处理函数（`handlers.ts`）**：`memory.*`、`orchestrator.archive.list`、`orchestrator.archive.get` 只转发到 `Memory`。
 
 ## 为什么这样
 

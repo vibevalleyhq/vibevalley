@@ -13,7 +13,7 @@ import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 import { Core } from "@/core/core.ts";
-import { Projects } from "@/project/project.ts";
+import { Project } from "@/project/project.ts";
 
 import * as q from "../../db/generated/game_ledger.sql.ts";
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
@@ -55,7 +55,7 @@ const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const config = yield* ServerConfig;
   const core = yield* Core;
-  const projects = yield* Projects;
+  const projects = yield* Project;
   const { attempt: db, run } = yield* Db;
 
   // A row this code cannot read any more is left out of the fold.

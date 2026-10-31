@@ -1,6 +1,6 @@
 # 项目
 
-项目（`project`）是工作目录 `projects/` 下的一个 git 仓库，农场里是一座岛，岛上的地是它在做的工单。`apps/server/src/project`（`Projects`）管工作目录、项目的新建和导入、开了 worktree 时工单的 worktree 和分支，以及读改动、冲突预检、检查、合并、推送和 `gh` 这些 git 操作；什么时候做这些，由工单和计划决定。
+项目（`project`）是工作目录 `projects/` 下的一个 git 仓库，农场里是一座岛，岛上的地是它在做的工单。`apps/server/src/project`（`Project`）管工作目录、项目的新建和导入、开了 worktree 时工单的 worktree 和分支，以及读改动、冲突预检、检查、合并、推送和 `gh` 这些 git 操作；什么时候做这些，由工单和计划决定。
 
 ## 管什么，不管什么
 

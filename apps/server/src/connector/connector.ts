@@ -20,7 +20,7 @@ import { type ApiError } from "@vibevalley/protocol/api";
 
 import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { channelOf, defaultOf } from "@/channel/folded.ts";
 import { Core } from "@/core/core.ts";
 import { reasonOf } from "@/errors.ts";
@@ -73,8 +73,8 @@ const bridgeError = (e: SqlError.SqlError | Schema.SchemaError | Cause.NoSuchEle
 
 const Secrets = Schema.Record(Schema.String, Schema.String);
 
-export class Connectors extends Context.Service<
-  Connectors,
+export class Connector extends Context.Service<
+  Connector,
   {
     readonly list: () => Effect.Effect<ConnectorStatus[]>;
     readonly login: (id: ConnectorID, input: ConnectorLogin) => Effect.Effect<ConnectorStatus>;
@@ -83,7 +83,7 @@ export class Connectors extends Context.Service<
     readonly setChannel: (id: ConnectorID, name: string) => Effect.Effect<ConnectorStatus, ApiError>;
   }
 >()("vibevalley/Connector") {
-  static readonly layer = (options?: ConnectorOptions) => Layer.effect(Connectors, make(options));
+  static readonly layer = (options?: ConnectorOptions) => Layer.effect(Connector, make(options));
 }
 
 export interface ConnectorOptions {
@@ -94,7 +94,7 @@ export interface ConnectorOptions {
   readonly retryFirstMs?: number;
   readonly retryMostMs?: number;
   /** What the owner said, to the orchestrator; the orchestrator's say when absent. */
-  readonly say?: (text: string, channel: string | undefined, sendKey: string, chat: Channels["Service"]) => Effect.Effect<void, ApiError>;
+  readonly say?: (text: string, channel: string | undefined, sendKey: string, chat: Channel["Service"]) => Effect.Effect<void, ApiError>;
 }
 
 /** Until woken or ms on the Clock: "wake" or "timeout". The wake is registered each time it runs. */
@@ -113,7 +113,7 @@ const make = (options: ConnectorOptions = {}) =>
     const clock = yield* Clock.Clock;
     const now = () => clock.currentTimeMillisUnsafe();
     const { attempt: db, attemptTx } = yield* Db;
-    const chat = yield* Channels;
+    const chat = yield* Channel;
     const core = yield* Core;
     const inbox = yield* Inbox;
     const orchestrator = yield* Orchestrator;
@@ -669,23 +669,23 @@ const make = (options: ConnectorOptions = {}) =>
     );
 
     const off = (id: ConnectorID): ConnectorStatus => ({ id, state: "off", pending: 0, error: "", qr: "", pairCode: "" });
-    return Connectors.of({
-      list: Effect.fn("Connectors.list")(function* () {
+    return Connector.of({
+      list: Effect.fn("Connector.list")(function* () {
         return yield* Effect.forEach(bridges, (b) => b.status);
       }),
-      login: Effect.fn("Connectors.login")(function* (id, input) {
+      login: Effect.fn("Connector.login")(function* (id, input) {
         const b = bridge(id);
         return b ? yield* b.login(input) : off(id);
       }),
-      verify: Effect.fn("Connectors.verify")(function* (id, code) {
+      verify: Effect.fn("Connector.verify")(function* (id, code) {
         const b = bridge(id);
         return b ? yield* b.verify(code) : off(id);
       }),
-      logout: Effect.fn("Connectors.logout")(function* (id) {
+      logout: Effect.fn("Connector.logout")(function* (id) {
         const b = bridge(id);
         return b ? yield* b.logout : off(id);
       }),
-      setChannel: Effect.fn("Connectors.setChannel")(function* (id, name) {
+      setChannel: Effect.fn("Connector.setChannel")(function* (id, name) {
         const b = bridge(id);
         if (!b)
           return yield* Effect.fail<ApiError>({

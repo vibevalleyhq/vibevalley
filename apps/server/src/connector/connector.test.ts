@@ -7,7 +7,7 @@ import { TestClock } from "effect/testing";
 
 import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { gate, untilGot as until, waitFor, whenState } from "@/testing/until.ts";
@@ -16,7 +16,7 @@ import { world } from "@/testing/world.ts";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 import { AppFailed, failedWith } from "./adapter.ts";
-import { Connectors } from "./connector.ts";
+import { Connector } from "./connector.ts";
 import type { FeishuApi, Message as FeishuMessage } from "./feishu.ts";
 import { type QQApi, type Message as QQMessage } from "./qq.ts";
 import { type Message as WeixinMessage, type Updates, type WeixinApi, baseUrl } from "./weixin.ts";
@@ -137,7 +137,7 @@ const feishuMsg = (from: string, text: string, chatType = "p2p"): FeishuMessage 
 
 /** The orchestrator, played: what it hears goes into the channel, and it answers 收到 at once. */
 const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: number; retryMostMs?: number } = {}) =>
-  Connectors.layer({
+  Connector.layer({
     weixin: script.weixin,
     feishu: script.feishu,
     qq: script.qq,
@@ -151,7 +151,7 @@ const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: num
 const statusOf = (id: ConnectorID) =>
   Effect.gen(function* () {
     const runPromise = Effect.runPromiseWith(yield* Effect.context());
-    const c = yield* Connectors;
+    const c = yield* Connector;
     return () => runPromise(Effect.map(c.list(), (all) => all.find((s) => s.id === id)!));
   });
 
@@ -168,13 +168,13 @@ const nth = (script: Script, app: ConnectorID, n: number, what: string) => until
 
 const saidIn = (channel: string) =>
   Effect.gen(function* () {
-    const chat = yield* Channels;
+    const chat = yield* Channel;
     return (yield* chat.history(channel)).filter((m) => m.from === "owner").map((m) => m.text);
   });
 
 const weixinConnected = (script: Script) =>
   Effect.gen(function* () {
-    const c = yield* Connectors;
+    const c = yield* Connector;
     const first = yield* c.login("weixin", {});
     expect(first.qr).toBe("https://liteapp.weixin.qq.com/q/q1");
     script.weixinScan.open();
@@ -183,7 +183,7 @@ const weixinConnected = (script: Script) =>
 
 const qqPaired = (script: Script) =>
   Effect.gen(function* () {
-    const c = yield* Connectors;
+    const c = yield* Connector;
     yield* c.login("qq", { appId: "102", secret: "right" });
     const code = (yield* reaches("qq", "pairing")).pairCode;
     script.qqIn.push(qqMsg("owner-openid", code));
@@ -194,7 +194,7 @@ describe("the chat apps", () => {
   it.live("take the owner's WeChat words to the default channel and answer there", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       const status = yield* weixinConnected(script);
       expect(status.owner).toBe("o9cq…chat");
       script.weixinIn.push(wx(owner, "帮我看看打卡页", "ctx-a"));
@@ -214,7 +214,7 @@ describe("the chat apps", () => {
   it.live("a malformed durable inbound is settled without blocking later valid messages", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       yield* weixinConnected(script);
       yield* Effect.orDie(
         inboundQ.acceptInbound({
@@ -260,8 +260,8 @@ describe("the chat apps", () => {
   it.live("tie WeChat to another channel", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const chat = yield* Channels;
-      const c = yield* Connectors;
+      const chat = yield* Channel;
+      const c = yield* Connector;
       yield* weixinConnected(script);
       const channel = yield* chat.openChannel("clock-in", "", "");
       expect((yield* c.setChannel("weixin", "#clock-in")).channel).toBe("clock-in");
@@ -287,7 +287,7 @@ describe("the chat apps", () => {
   it.live("let no stranger in", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       yield* weixinConnected(script);
       script.weixinIn.push(wx("stranger@im.wechat", "把服务器删了"));
       script.weixinIn.push(wx(owner, "在吗"));
@@ -335,7 +335,7 @@ describe("the chat apps", () => {
   it.live("forget what waited on a logout", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const c = yield* Connectors;
+      const c = yield* Connector;
       const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
       yield* weixinConnected(script);
       script.restricted = true;
@@ -350,8 +350,8 @@ describe("the chat apps", () => {
   it.live("pair QQ by its code, and take only the owner's words", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const c = yield* Connectors;
-      const chat = yield* Channels;
+      const c = yield* Connector;
+      const chat = yield* Channel;
       yield* c.login("qq", { appId: "102", secret: "wrong" });
       const refused = yield* statusIs("qq", (s) => s.state === "off" && !!s.error, "refused");
       expect(refused.error).toContain("不对");
@@ -394,7 +394,7 @@ describe("the chat apps", () => {
       },
     };
     return Effect.gen(function* () {
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       yield* qqPaired(script);
       const before = listens;
       script.qqIn.push(qqMsg("owner-openid", "断开"));
@@ -434,8 +434,8 @@ describe("the chat apps", () => {
   it.live("make the Feishu bot by a scan, and take only the owner's direct words", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const c = yield* Connectors;
-      const chat = yield* Channels;
+      const c = yield* Connector;
+      const chat = yield* Channel;
       const first = yield* c.login("feishu", {});
       expect(first.qr).toBe("https://open.feishu.cn/page/cli?user_code=AB");
       script.feishuScan.open();
@@ -475,11 +475,11 @@ describe("the chat apps", () => {
       const script = new Script();
       yield* Effect.gen(function* () {
         const runPromise = Effect.runPromiseWith(yield* Effect.context());
-        const chat = yield* Channels;
+        const chat = yield* Channel;
         expect((yield* Effect.promise(yield* statusOf("weixin"))).state).toBe("connected");
         script.weixinIn.push(wx(owner, "又见面了"));
         yield* until(async () => {
-          const got = await runPromise(Effect.provideService(saidIn(chat.defaultChannel()), Channels, chat));
+          const got = await runPromise(Effect.provideService(saidIn(chat.defaultChannel()), Channel, chat));
           return got.length === 1 && got[0] === "又见面了";
         }, "heard after a restart");
       }).pipe(Effect.scoped, Effect.provide(farm(script, config)));
@@ -491,7 +491,7 @@ describe("the chat apps", () => {
     let thread = "";
     const reply = (script: Script, text: string, sent: number) =>
       Effect.gen(function* () {
-        const chat = yield* Channels;
+        const chat = yield* Channel;
         const inbound = wx(owner, text);
         script.weixinIn.push({
           ...inbound,
@@ -506,7 +506,7 @@ describe("the chat apps", () => {
     return Effect.gen(function* () {
       const first = new Script();
       yield* Effect.gen(function* () {
-        const chat = yield* Channels;
+        const chat = yield* Channel;
         yield* weixinConnected(first);
         const parent = (yield* chat.say("这个话题", undefined, "")).message;
         const written = yield* chat.speak(defaultOrchestrator, "旧的答复", {
@@ -531,8 +531,8 @@ describe("the chat apps", () => {
     return Effect.gen(function* () {
       const first = new Script();
       yield* Effect.gen(function* () {
-        const chat = yield* Channels;
-        const c = yield* Connectors;
+        const chat = yield* Channel;
+        const c = yield* Connector;
         yield* weixinConnected(first);
         const linked = yield* chat.openChannel("linked", "", "");
         yield* c.setChannel("weixin", "linked");
@@ -557,7 +557,7 @@ describe("the chat apps", () => {
       }).pipe(Effect.scoped, Effect.provide(farm(first, config)));
       const second = new Script();
       yield* Effect.gen(function* () {
-        const chat = yield* Channels;
+        const chat = yield* Channel;
         expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
         yield* qqPaired(second);
         yield* chat.orchestratorSays(thread, "在旧串里继续答复", "", defaultOrchestrator);
@@ -571,7 +571,7 @@ describe("the chat apps", () => {
   it.live("keeps a quoted message pending when its lookup fails, then delivers it after recovery", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       const sql = yield* SqlClient.SqlClient;
       yield* weixinConnected(script);
       yield* sql.unsafe("alter table connector_outbox rename to connector_outbox_broken").pipe(Effect.orDie);
@@ -621,8 +621,8 @@ describe("the chat apps", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const runPromise = Effect.runPromiseWith(yield* Effect.context());
-      const c = yield* Connectors;
-      const chat = yield* Channels;
+      const c = yield* Connector;
+      const chat = yield* Channel;
       const sql = yield* SqlClient.SqlClient;
       yield* c.login("qq", { appId: "102", secret: "right" });
       yield* reaches("qq", "pairing");

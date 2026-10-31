@@ -40,7 +40,7 @@ Status: proposed
 
 ### 下一步（接真数据）
 
-- **形状和接口**：`mock.ts` 的 `MemoryTree` 搬进 protocol（`shapes.ts`、`schema.ts`），加接口 `memory.tree`，由 `Memories` 汇总所有档案：各种类的条数、`fading` 的、最近长出的、星空要的每一条（种类、档案、项目、时间、想起次数）。页面打开 `/tree` 时读一次，不进核心状态。
+- **形状和接口**：`mock.ts` 的 `MemoryTree` 搬进 protocol（`shapes.ts`、`schema.ts`），加接口 `memory.tree`，由 `Memory` 汇总所有档案：各种类的条数、`fading` 的、最近长出的、星空要的每一条（种类、档案、项目、时间、想起次数）。页面打开 `/tree` 时读一次，不进核心状态。
 - **阶段由服务端算**：阶段的名字（芽、小苗、小树、大树、老树）和门槛是规则，归 `memory`，结论写进 `MemoryTree.stage`；页面只把累计轮数画成树的大小（`grow.ts` 的 `growthOf`），不算阶段。
 - **累计的数**：累计轮数、累计想起次数现在没有存（`recalled` 跟着条目，条目删了就没了），要在库里加一个只增不减的计数。
 - **EverOS**：现在只读回 cases 给检索用、不列（`Can().List` 为假）。要列出某个档案的 cases 和 skills，才能画果和种子；先确认 EverOS 有没有列的接口和 skill 的形状。

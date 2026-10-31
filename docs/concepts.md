@@ -42,7 +42,7 @@ Workspace（工作目录，一张大地图）
 | runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 oar 驱动 |
 | 项目 | `project` | 一个 git 仓库，和能同时在里面做的工单数（`project.max_sessions`，`ProjectSummary.maxSessions`） |
 | 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，主人挪状态就是派活；代码相关的开不开 worktree 由档案设置决定；每张都有验收，完成就是通过；关上的能重开 |
-| Session | `Session`（服务是 `Sessions`，派活是 `Issues` 的 `hire`） | 档案为一张工单接的活，在档案配置的项目目录或工单的 worktree 里干，直到工单完成或它收工；跨好几次 run，重启后还是同一个 |
+| Session | `Session`（服务是 `Session`，派活是 `Issue` 的 `hire`） | 档案为一张工单接的活，在档案配置的项目目录或工单的 worktree 里干，直到工单完成或它收工；跨好几次 run，重启后还是同一个 |
 | Run | `Run`（`session_run` 表）；核心状态里是 `run` 到 `report` 两个事实 | 一轮：一次触发到一次汇报；帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run |
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |
 | 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 |

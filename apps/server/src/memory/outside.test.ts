@@ -12,7 +12,7 @@ import { FetchHttpClient } from "effect/http";
 import { asTransport } from "@vibevalley/agent/mcpTransport";
 import type { MemorySourceUpdate } from "@vibevalley/protocol";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { owner, session } from "@/base/actor.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Database, Db } from "@/base/db.ts";
@@ -20,7 +20,7 @@ import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { until } from "@/testing/until.ts";
 
-import { foundText, Memories, make } from "./memory.ts";
+import { foundText, Memory, make } from "./memory.ts";
 import { nowledge, nowledgeLabels } from "./nowledge.ts";
 import { localName } from "./recall.ts";
 
@@ -192,8 +192,8 @@ class FakeEveros {
 // The fake source answers on this machine, but under a full parallel run it can take longer than the real 2 s: a test
 // about what a search finds is not one about its deadline (those give their own, like 100 ms).
 const world = (timeoutMs = 20_000) =>
-  Layer.effect(Memories, make(undefined, timeoutMs)).pipe(
-    Layer.provideMerge(Agents.layer),
+  Layer.effect(Memory, make(undefined, timeoutMs)).pipe(
+    Layer.provideMerge(Agent.layer),
     Layer.provideMerge(Setting.layer),
     Layer.provideMerge(Db.layer),
     Layer.provideMerge(Database),
@@ -214,7 +214,7 @@ describe("Nowledge Mem", () => {
         { id: "u", title: "", content: "测试 unknown", labels: [] },
       ];
       yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false, everything: true });
-      const m = yield* Memories;
+      const m = yield* Memory;
       const q = { agent: "lab", project: "demo", text: "测试", kind: "" as const, limit: 10 };
       const text = foundText(yield* m.search(q), q);
       expect(text).toContain("测试 project-a");
@@ -232,7 +232,7 @@ describe("Nowledge Mem", () => {
     Effect.gen(function* () {
       const fake = new FakeNowledge();
       yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: true });
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.keep({
         agent: "lab",
         session: "w1",
@@ -279,7 +279,7 @@ describe("Nowledge Mem", () => {
       fake.memories = [{ id: "own-1", title: "主人的偏好", content: "测试要写成可观察的结果", labels: [] }];
       const url = yield* Effect.promise(() => fake.serve());
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false });
-      const m = yield* Memories;
+      const m = yield* Memory;
       const q = { agent: "lab", project: "", text: "测试", kind: "" as const, limit: 0 };
       expect((yield* m.search(q)).found).toEqual([]);
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false, everything: true });
@@ -296,7 +296,7 @@ describe("Nowledge Mem", () => {
     Effect.gen(function* () {
       const url = yield* Effect.promise(() => listen(createServer(() => {})));
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false });
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.write({ agent: "lab", text: "迁移文件放 db/migrations", project: "demo", by: owner });
       const start = Date.now();
       expect((yield* m.recall({ agent: "lab", project: "demo", text: "迁移" })).lines).toHaveLength(1);
@@ -308,7 +308,7 @@ describe("Nowledge Mem", () => {
     Effect.gen(function* () {
       const fake = new FakeNowledge();
       yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
-      const m = yield* Memories;
+      const m = yield* Memory;
       const q = { agent: "lab", project: "", text: "有效", kind: "" as const, limit: 10 };
       fake.searchResult = { results: {} };
       expect((yield* m.search(q)).found).toEqual([]);
@@ -340,7 +340,7 @@ describe("EverOS", () => {
     Effect.gen(function* () {
       const fake = new FakeEveros();
       yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
-      const m = yield* Memories;
+      const m = yield* Memory;
       const q = { agent: "lab", project: "demo", text: "分页", kind: "" as const, limit: 10 };
       expect(foundText(yield* m.search(q), q)).toContain("给打卡接口加分页");
       expect(
@@ -364,7 +364,7 @@ describe("EverOS", () => {
     Effect.gen(function* () {
       const fake = new FakeEveros();
       yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
-      const m = yield* Memories;
+      const m = yield* Memory;
       const q = { agent: "lab", project: "demo", text: "分页", kind: "" as const, limit: 10 };
       fake.searchData = { data: { agent_cases: {} } };
       expect((yield* m.search(q)).found).toEqual([]);
@@ -387,7 +387,7 @@ describe("EverOS", () => {
         user: "lucas",
         key: "ev-key-1234",
       });
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.keep({
         agent: "lab",
         session: "w1",
@@ -445,7 +445,7 @@ describe("EverOS", () => {
     Effect.gen(function* () {
       const fake = new FakeEveros();
       yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: true });
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.write({ agent: "lab", text: "提交信息写中文", project: "", by: owner });
       yield* until(() => fake.seen("flush").length === 1);
       const add = fake.seen("add")[0]!;
@@ -460,7 +460,7 @@ describe("EverOS", () => {
       const url = yield* Effect.promise(() => fake.serve());
       yield* Effect.gen(function* () {
         yield* save({ kind: "everos", url, enabled: true, read: false, write: true });
-        const m = yield* Memories;
+        const m = yield* Memory;
         yield* m.keep({ agent: "lab", session: "w7", project: "demo", brief: "写文档", outcome: "completed", said: "写好了", summary: "" });
         yield* until(() => fake.seen("add").length === 1);
       }).pipe(Effect.provide(world()));

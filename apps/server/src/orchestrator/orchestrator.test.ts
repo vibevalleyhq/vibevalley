@@ -11,15 +11,15 @@ import type { Message } from "@vibevalley/ai/messages";
 import { type Answer, answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
 import type { ServerConfig } from "@/base/config.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { Crons } from "@/cron/cron.ts";
+import { Cron } from "@/cron/cron.ts";
 import { Inbox } from "@/inbox/inbox.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Sessions } from "@/session/session.ts";
+import { Issue } from "@/issue/issue.ts";
+import { Session } from "@/session/session.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { Said } from "@/testing/said.ts";
 import { gate, untilGot as until, waitFor, whenTrue, within } from "@/testing/until.ts";
@@ -98,7 +98,7 @@ const marked = (f: { readonly requests: readonly Request[] }) =>
   });
 
 const enableLab = Effect.gen(function* () {
-  const agents = yield* Agents;
+  const agents = yield* Agent;
   const lab = starter("lab");
   yield* agents.save({ ...lab, enabled: true, effort: "" });
   return lab;
@@ -106,7 +106,7 @@ const enableLab = Effect.gen(function* () {
 
 const said = Effect.gen(function* () {
   const { in: saidIn } = yield* Said;
-  const chat = yield* Channels;
+  const chat = yield* Channel;
   return () =>
     saidIn(chat.defaultChannel())
       .filter((m) => m.from === defaultOrchestrator && m.kind === "chat")
@@ -125,9 +125,9 @@ describe("the orchestrator", () => {
     const f = farm();
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       const { in: saidIn } = yield* Said;
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       yield* enableLab;
       const words = yield* said;
       yield* orchestrator.say("帮我在 demo 里加个 README", {}, undefined, "");
@@ -167,7 +167,7 @@ describe("the orchestrator", () => {
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
       const { in: saidIn } = yield* Said;
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       const direct = (yield* Core).state().chat!.channels.find((c) => c.type === "direct" && c.peer === defaultOrchestrator)!;
       yield* orchestrator.say("单独问你一句：地里怎么样", {}, direct.id, "");
       const answered = () => saidIn(direct.id).filter((m) => m.from === defaultOrchestrator);
@@ -183,11 +183,11 @@ describe("the orchestrator", () => {
     const config = testConfig();
     const f = farm(respond, config);
     return Effect.gen(function* () {
-      const agents = yield* Agents;
-      const issues = yield* Issues;
+      const agents = yield* Agent;
+      const issues = yield* Issue;
       const orchestrator = yield* Orchestrator;
       const { in: saidIn } = yield* Said;
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       const lead = yield* agents.create({ ...agents.agent(defaultOrchestrator)!, id: "", name: "阿青", persona: "你专管 notes。" });
       const from = (channel: string, who: string) => saidIn(channel).filter((m) => m.from === who && m.kind === "chat");
       const asked = (text: string) => f.requests.filter((c) => lastLine(c).includes(text));
@@ -236,7 +236,7 @@ describe("the orchestrator", () => {
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
       const { in: saidIn } = yield* Said;
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       const got = yield* Effect.promise(async () => {
         let out = "";
         for await (const piece of onPhone(orchestrator, "现在地里怎么样")) out += piece;
@@ -337,10 +337,10 @@ describe("the orchestrator", () => {
   it.live("says once why it cannot start", () => {
     const below = world({ config: { ...testConfig(), patrol: { heartbeatMinutes: 0 } } });
     return Effect.gen(function* () {
-      const agents = yield* Agents;
+      const agents = yield* Agent;
       const orchestrator = yield* Orchestrator;
       const { in: saidIn } = yield* Said;
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       const me = agents.agent(defaultOrchestrator)!;
       yield* agents.save({ ...me, model: "openai/gpt" });
       const pieces = (text: string) =>
@@ -399,9 +399,9 @@ describe("the orchestrator", () => {
   it.live("hears a long report cut", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issues;
+      const issues = yield* Issue;
       const { all: saidAll } = yield* Said;
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       const lab = yield* enableLab;
       const hired = yield* issues.hire({ ...lab, enabled: true, effort: "" }, "写一份长汇报", "notes");
       const id = hired.session!.id;
@@ -427,10 +427,10 @@ describe("the orchestrator", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
+      const issues = yield* Issue;
+      const sessions = yield* Session;
       const { in: saidIn } = yield* Said;
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       const orchestrator = yield* Orchestrator;
       const lab = yield* enableLab;
       const hired = yield* issues.hire({ ...lab, enabled: true, effort: "" }, "写个 hello", "notes");
@@ -446,7 +446,7 @@ describe("the orchestrator", () => {
       const merged = yield* waitFor(issues.get(hired.session!.issue!), (t) => t.closedAt !== undefined, "merged");
       // The helper said its words and committed nothing: done, with nothing to merge, and said so.
       expect(merged.delivered).toBe("none");
-      const general = (yield* Channels).defaultChannel();
+      const general = (yield* Channel).defaultChannel();
       yield* until(
         () => saidIn(general).some((m) => m.from === defaultOrchestrator && m.text === `合并：#${number} 已完成，没有改动要合`),
         "what it delivered said",
@@ -468,7 +468,7 @@ describe("the orchestrator", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
-      const issues = yield* Issues;
+      const issues = yield* Issue;
       const orchestrator = yield* Orchestrator;
       const words = yield* said;
       yield* enableLab;
@@ -502,7 +502,7 @@ describe("the orchestrator", () => {
       () => Date.now() + offset,
     );
     return Effect.gen(function* () {
-      const crons = yield* Crons;
+      const crons = yield* Cron;
       const orchestrator = yield* Orchestrator;
       const words = yield* said;
       // Woken by a cron, not the owner: what it sets to come back daily waits.
@@ -525,8 +525,8 @@ describe("the orchestrator", () => {
     let offset = 0;
     const f = farm(respond, testConfig(), () => Date.now() + offset);
     return Effect.gen(function* () {
-      const crons = yield* Crons;
-      const issues = yield* Issues;
+      const crons = yield* Cron;
+      const issues = yield* Issue;
       const s = yield* crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, owner);
       // The farm's clock, not a wait, brings it due.
       offset = 100;
@@ -550,7 +550,7 @@ describe("the orchestrator", () => {
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
       const inbox = yield* Inbox;
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       yield* enableLab;
       yield* orchestrator.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
       yield* until(() => sessions.roster().some((r) => r.session.brief === "加个 CHANGELOG" && r.session.phase._tag === "done"), "the work handed back");
@@ -576,7 +576,7 @@ describe("the orchestrator", () => {
     const f = farm(respond, config);
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       const words = yield* said;
       yield* orchestrator.say("地里怎么样", {}, undefined, "");
       yield* until(() => words().length >= 1, "its words");

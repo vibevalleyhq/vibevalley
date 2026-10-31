@@ -3,7 +3,7 @@ import { Context, Effect, Layer } from "effect";
 
 import { attachmentPath } from "@vibevalley/protocol";
 
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { quietApp } from "@/testing/world.ts";
 
@@ -12,7 +12,7 @@ import { app } from "./app.ts";
 const farm = Effect.gen(function* () {
   let address = "";
   const built = yield* Layer.build(app(testConfig(), 0, (a) => Effect.sync(() => void (address = a)), quietApp));
-  return { address, chat: Context.get(built, Channels) };
+  return { address, chat: Context.get(built, Channel) };
 });
 
 describe("an attachment", () => {

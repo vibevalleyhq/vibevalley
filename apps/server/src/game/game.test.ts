@@ -9,7 +9,7 @@ import type { Repo, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Core } from "@/core/core.ts";
-import { Projects } from "@/project/project.ts";
+import { Project } from "@/project/project.ts";
 import { sessionOf } from "@/session/roster.ts";
 import { gitSync, repo } from "@/testing/git.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -148,7 +148,7 @@ describe("the game", () => {
         });
         const config = testConfig();
         const projects = Layer.unwrap(
-          Effect.map(Projects, (current) => Layer.succeed(Projects, Projects.of({ ...current, contributions: () => contributions }))),
+          Effect.map(Project, (current) => Layer.succeed(Project, Project.of({ ...current, contributions: () => contributions }))),
         ).pipe(Layer.provideMerge(world({ config })));
         const app = gameStart.pipe(Layer.provideMerge(Game.layer), Layer.provideMerge(projects));
         yield* Effect.scoped(
