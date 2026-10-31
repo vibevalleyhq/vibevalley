@@ -34,14 +34,14 @@ import.meta.hot?.dispose(() => {
 function run<E>(
   stream: (c: SubscriptionsClient["Service"]) => Stream.Stream<E, RpcClientError.RpcClientError | ApiError>,
   on: (e: E) => void,
-  ended: () => void,
+  ended?: () => void,
 ): () => void {
   runtime ??= ManagedRuntime.make(SubscriptionsClient.layer);
   let stopped = false;
   const fiber = runtime.runFork(
     Effect.gen(function* () {
       yield* Stream.runForEach(stream(yield* SubscriptionsClient), (e) => Effect.sync(() => on(e)));
-    }).pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => void (stopped || ended())))),
+    }).pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => void (stopped || ended?.())))),
   );
   return () => {
     stopped = true;
@@ -62,5 +62,5 @@ export const followArtifact = (id: string, after: number, on: (e: ArtifactEvent)
   run((c) => c["artifact.follow"]({ id, after }), on, ended);
 
 /** An artifact's suggestions as they now are, then the whole list after each change. */
-export const followSuggestions = (id: string, on: (e: SuggestionEvent) => void, ended: () => void) =>
+export const followSuggestions = (id: string, on: (e: SuggestionEvent) => void, ended?: () => void) =>
   run((c) => c["artifact.suggestion.follow"]({ id }), on, ended);

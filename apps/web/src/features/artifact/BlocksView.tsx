@@ -71,15 +71,7 @@ export function BlocksView(props: { id: ArtifactId; onEditor?: (editor: BlockEdi
   onSettled(() => {
     let stop: (() => void) | undefined;
     let stopSuggestions: (() => void) | undefined;
-    void api.artifact.suggestion
-      .list({ id: props.id })
-      .then(setSuggestions)
-      .catch(() => {});
-    stopSuggestions = followSuggestions(
-      String(props.id),
-      (e) => setSuggestions(e.suggestions),
-      () => {},
-    );
+    stopSuggestions = followSuggestions(String(props.id), (e) => setSuggestions(e.suggestions));
     void editor.load().then(() => {
       if (editor.artifact === undefined) return;
       editor.setLive(true);
