@@ -60,16 +60,6 @@ const runtimes = (options: RuntimeOptions = {}) => make({ background: false, pro
 
 const agent = (a: Partial<T.Agent>): T.Agent => sampleAgent({ id: "a", name: "小禾", ...a });
 
-const deferred = <T>() => {
-  let resolve!: (value: T) => void;
-  let reject!: (reason: Error) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-};
-
 const until = (ok: () => boolean) => whenTrue(ok, "it");
 
 const servers: Server[] = [];
@@ -110,8 +100,7 @@ describe("runtime", () => {
 
   it.live("an accepted probe owns the installation its usage reads use, and a slow one does not overwrite a newer", () => {
     let n = 0;
-    let release!: () => void;
-    const held = new Promise<void>((r) => (release = r));
+    const { promise: held, resolve: release } = Promise.withResolvers<void>();
     const registry = new RuntimeRegistry([
       fake("pi", {
         installation: async (): Promise<InstallationSnapshot> => {
@@ -146,10 +135,8 @@ describe("runtime", () => {
 
   for (const first of ["full", "usage"] as const)
     it.live(`a changed usage cannot overwrite a newer full probe (${first} first)`, () => {
-      let releaseFull!: () => void;
-      let releaseUsage!: () => void;
-      const fullGate = new Promise<void>((resolve) => (releaseFull = resolve));
-      const usageGate = new Promise<void>((resolve) => (releaseUsage = resolve));
+      const { promise: fullGate, resolve: releaseFull } = Promise.withResolvers<void>();
+      const { promise: usageGate, resolve: releaseUsage } = Promise.withResolvers<void>();
       return Effect.gen(function* () {
         const runPromise = Effect.runPromiseWith(yield* Effect.context());
         let full = 0;
@@ -252,8 +239,8 @@ describe("runtime", () => {
   });
 
   it.live("a failed list probe is retried without changing the synchronous checking answer", () => {
-    const first = deferred<T.RuntimeInfo>();
-    const second = deferred<T.RuntimeInfo>();
+    const first = Promise.withResolvers<T.RuntimeInfo>();
+    const second = Promise.withResolvers<T.RuntimeInfo>();
     let probes = 0;
     return Effect.gen(function* () {
       const r = yield* runtimes({
@@ -277,8 +264,8 @@ describe("runtime", () => {
   });
 
   it.live("an old read's failure does not clear the newer read's checking marker", () => {
-    const old = deferred<T.RuntimeInfo>();
-    const latest = deferred<T.RuntimeInfo>();
+    const old = Promise.withResolvers<T.RuntimeInfo>();
+    const latest = Promise.withResolvers<T.RuntimeInfo>();
     let probes = 0;
     return Effect.gen(function* () {
       const runPromise = Effect.runPromiseWith(yield* Effect.context());
@@ -420,8 +407,7 @@ describe("runtime", () => {
 
   it.live("a saved configuration is checked while its refreshed probe is still running", () => {
     let waiting = false;
-    let release!: () => void;
-    const held = new Promise<void>((done) => (release = done));
+    const { promise: held, resolve: release } = Promise.withResolvers<void>();
     return Effect.gen(function* () {
       const runPromise = Effect.runPromiseWith(yield* Effect.context());
       let probes = 0;

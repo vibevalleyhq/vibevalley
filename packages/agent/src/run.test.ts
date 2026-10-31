@@ -121,8 +121,7 @@ describe("a run's receipt", () => {
 
   it.effect("says nothing for an ask a follow-up took over, when the run ends on tools", () =>
     Effect.gen(function* () {
-      let release!: () => void;
-      const released = new Promise<void>((r) => (release = r));
+      const { promise: released, resolve: release } = Promise.withResolvers<void>();
       let calls = 0;
       let entered = false;
       const slow = textTool<object>({

@@ -44,14 +44,8 @@ const phase = (core: Core["Service"], id: string) => core.session(id)?.phase._ta
 
 describe("sessions", () => {
   it.live("interrupting an opening disposes the late session and releases its allocation", () => {
-    let entered = () => {};
-    const opening = new Promise<void>((resolve) => {
-      entered = resolve;
-    });
-    let release = () => {};
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const { promise: opening, resolve: entered } = Promise.withResolvers<void>();
+    const { promise: gate, resolve: release } = Promise.withResolvers<void>();
     let disposed = 0;
     const base = worker([]);
     const runtime = {
@@ -126,10 +120,7 @@ describe("sessions", () => {
   it.live("a failed resume that cannot stop never falls back to a second writer", () => {
     let opens = 0;
     let turns = 0;
-    let wrote = () => {};
-    const written = new Promise<void>((resolve) => {
-      wrote = resolve;
-    });
+    const { promise: written, resolve: wrote } = Promise.withResolvers<void>();
     const cleanups: (() => Promise<void>)[] = [];
     const base = scriptedRuntime({
       id: "pi",

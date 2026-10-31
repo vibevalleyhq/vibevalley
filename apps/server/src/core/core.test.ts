@@ -5,6 +5,7 @@ import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Logger, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
+import { vi } from "vite-plus/test";
 
 import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
@@ -14,6 +15,7 @@ import { emptyProgress } from "@/game/progress.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { testConfig } from "@/testing/layers.ts";
+import { whenState } from "@/testing/until.ts";
 
 import { Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
 
@@ -30,6 +32,30 @@ const helper: Session = {
 };
 
 describe("core", () => {
+  it("regression: a successful state wait releases its real-time deadline", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const found = await Effect.runPromise(
+        Effect.gen(function* () {
+          const core = yield* Core;
+          const waiting = yield* Effect.forkChild(whenState((s) => s.call === "live", "live call", 60_000));
+          yield* Effect.yieldNow;
+          yield* core.open();
+          return yield* Fiber.join(waiting);
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(
+            Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer)),
+          ),
+        ),
+      );
+      expect(found).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it.effect("started again from state.json: idle, without the database's parts, the sessions at their stations", () => {
     const config = testConfig();
     const was: WorkspaceState = {

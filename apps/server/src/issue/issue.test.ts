@@ -86,10 +86,7 @@ describe("issues", () => {
 
   it.live("a prompt that starts then fails keeps the unclosed startup reserved", () => {
     let turns = 0;
-    let wrote = () => {};
-    const written = new Promise<void>((resolve) => {
-      wrote = resolve;
-    });
+    const { promise: written, resolve: wrote } = Promise.withResolvers<void>();
     const cleanups: (() => Promise<void>)[] = [];
     const base = scriptedRuntime({
       id: "pi",
@@ -144,10 +141,7 @@ describe("issues", () => {
 
   it.live("a refused dispatch whose runtime cannot close keeps its workplace reserved", () => {
     let turns = 0;
-    let wrote = () => {};
-    const written = new Promise<void>((resolve) => {
-      wrote = resolve;
-    });
+    const { promise: written, resolve: wrote } = Promise.withResolvers<void>();
     const cleanups: (() => Promise<void>)[] = [];
     const base = scriptedRuntime({
       id: "pi",
@@ -209,10 +203,7 @@ describe("issues", () => {
   it.live("a refused dispatch keeps the identity of any work it already wrote", () => {
     let turns = 0;
     let inherited = false;
-    let wrote = () => {};
-    const written = new Promise<void>((resolve) => {
-      wrote = resolve;
-    });
+    const { promise: written, resolve: wrote } = Promise.withResolvers<void>();
     const base = scriptedRuntime({
       id: "pi",
       turn: async (turn) => {
