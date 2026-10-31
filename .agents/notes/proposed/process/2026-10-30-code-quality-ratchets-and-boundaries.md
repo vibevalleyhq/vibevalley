@@ -28,7 +28,7 @@ Status: proposed
 
 - [x] **P1.1 整理提交与证据。** 按缺陷修复、简化、文档分组；100% 代码变更能关联行为或删除理由，0 个无归属文件；记录最终总代码、非空行、base/head，保存可重放的探针与验收结果。
 - [x] **P1.2 在实际合并目标上验证。** 比较当前 `0e8bb950` 与目标分支，逐个记录冲突和重复修复；0 个未裁决冲突，0 个误删目标分支功能。冲突解决后重新运行相关测试及隔离服务端主线，不能沿用旧 SHA 的结果。
-- [ ] **P1.3 PR、CI 与合并。** 按独立行为组织 PR；每个 PR 的必需 CI 全绿、必改评审项 0、代码累计净增量 ≤ 0，squash 合并后核对提交与证据一致，并按实际上线范围沉淀或删除 Note。
+- [ ] **P1.3 PR、CI 与合并。** 同一批工作合成一个 PR，用逻辑提交分组；每个 PR 的必需 CI 全绿、必改评审项 0、代码累计净增量 ≤ 0，squash 合并后核对提交与证据一致，并按实际上线范围沉淀或删除 Note。
 
 P1.1 证据：`refactor/current-convergence` 的 `0e8bb950..e2baf77b` 已分为 10 个提交，涵盖来源、数据库、Nowledge、出站取消、Cron、投影、引用解析、测试设施、lint、提案文档；工作树干净，累计代码仍为 +284/−292。补丁、11 份提案快照及 28 份探针/日志/统计保存在本机 `.git/convergence-evidence/`；不是 GitHub CI 的公开附件。
 
@@ -48,6 +48,8 @@ P1.2 新基线验收：保留 `abee3768` 的 Effect HTTP、Deferred 初始化、
 原生重建额外发现并修复两项基线问题：Agora 源码漏声明 base64-js（用 packageExtensions 和 catalog override 补齐）；Hermes 缺少 Intl.PluralRules 导致共享格式化器在导入时崩溃（仅手机入口加载标准 polyfill 及英文规则数据，新增回归测试先红后绿）。e2e 的旧 notice 字段也改为 BridgeMessage.input，原通知/重载断言保留。最终手机证据为 `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-LfI8z8`：配对、通知、页面重载、应用重启全过，code 0、stopped true。失败日志和 source map 定位保留于 `/tmp/vv-rebased-mobile-build.log`、`/tmp/vv-mobile-logcat-before-intl.log`、`/tmp/vv-mobile-intl-red.log`。
 
 本批次相对集成基线的代码统计 `/tmp/vv-rebased-lines.json`：157646 → 157581，净减 65 行；非空行净减 69 行。原始 `0e8bb950` 为 146703 行，上游完整树增量为 10943 行；之前基于 numstat 路径筛选的 11024 是初步数，重命名后以完整树统计为准。新增的手机运行时依赖和锁文件变化单列在交付里，不隐瞒为零依赖改动。
+
+主人新增交付偏好：尽量少 PR，同批次多个改动合并到一起。本批 #207 已合并，保留；#208–#216 收拢为一个汇总 PR，重新针对最新 main 验证并等 CI。原逐个 PR 合并计划停止，不再自动逐个合并。
 
 ### Phase 2：领域边界的量化核查（3 条，先验证）
 
@@ -207,7 +209,7 @@ P2.1 量化结论：不新增 facade。GitHub→PR 刷新只有 1 处编排（�
 ## Acceptance criteria
 
 - 每个实施项关联固定 base/head、行为测试和适用的真实程序验收证据。
-- 修复、产品能力、性能改动分别提交，不把后续候选作为第一轮合并条件。
+- 修复、产品能力、性能改动用逻辑提交区分，同批工作尽量一个 PR；不把后续候选作为第一轮合并条件。
 - 专项文档不再重复定义其他专项的任务；目录由 `notes:catalog` 生成。
 
 ## Risks
