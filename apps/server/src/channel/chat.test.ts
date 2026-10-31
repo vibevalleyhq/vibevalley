@@ -19,7 +19,7 @@ import { dbQueries, Database, Db } from "@/infra/db.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { summaryOf } from "@/session/report.ts";
 import { sessionOnIssue } from "@/session/roster.ts";
-import { newsOf, type SessionNews } from "@/session/session.ts";
+import { Session, newsOf, type SessionNews } from "@/session/session.ts";
 import type { InputConsumed } from "@/session/shapes.ts";
 import { testConfig, offline } from "@/testing/layers.ts";
 import { Said, said } from "@/testing/said.ts";
@@ -27,7 +27,7 @@ import { until, waitFor } from "@/testing/until.ts";
 
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import { wakeBreaker } from "./audience.ts";
-import { Channel, catchUpMax, type ChannelSessions, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
+import { Channel, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
 import { channelOf, defaultOf } from "./folded.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 is held until release (unless holds is
@@ -105,19 +105,19 @@ const channelLayer = (x: FakeSessions) =>
       x.launches = yield* PubSub.unbounded<LaunchActivity>();
       x.news = yield* PubSub.unbounded<SessionNews>();
       x.inputsConsumedHub = yield* PubSub.unbounded<InputConsumed>();
-      const sessions: ChannelSessions = {
-        present: (id) => x.core.session(id) !== undefined,
-        sessionOf: (id) => x.core.session(id),
+      const sessions = {
+        present: (id: string) => x.core.session(id) !== undefined,
+        sessionOf: (id: string) => x.core.session(id),
         presentSessions: () => x.core.state().sessions,
-        deliver: (id, text) => Effect.sync(() => x.deliver(id, text)),
+        deliver: (id: string, text: string) => Effect.sync(() => x.deliver(id, text)),
         runOf: () => undefined,
-        reportOf: (id) => summaryOf(x.last.get(id) ?? ""),
-        onIssue: (issue) => sessionOnIssue(x.core.state(), issue)?.id,
+        reportOf: (id: string) => summaryOf(x.last.get(id) ?? ""),
+        onIssue: (issue: string) => sessionOnIssue(x.core.state(), issue)?.id,
         launches: Effect.map(PubSub.subscribe(x.launches), Stream.fromSubscription),
         inputsConsumed: Effect.map(PubSub.subscribe(x.inputsConsumedHub), Stream.fromSubscription),
         news: Effect.map(PubSub.subscribe(x.news), Stream.fromSubscription),
       };
-      return Channel.layerWith(sessions);
+      return Channel.layer.pipe(Layer.provide(Layer.succeed(Session, sessions as unknown as Session["Service"])));
     }),
   );
 

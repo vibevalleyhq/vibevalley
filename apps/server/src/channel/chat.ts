@@ -98,12 +98,6 @@ import {
 } from "./contracts.ts";
 export type { Info, Spoken, SayMore, OrchestratorNews, Delivered, LaunchActivity } from "./contracts.ts";
 
-/** The part of Session the chat uses: the real service on the farm, a played one in tests. */
-export type ChannelSessions = Pick<
-  Session["Service"],
-  "present" | "sessionOf" | "presentSessions" | "deliver" | "runOf" | "reportOf" | "onIssue" | "launches" | "inputsConsumed" | "news"
->;
-
 export class Channel extends Context.Service<Channel, ChannelService>()("vibevalley/Channel") {
   static readonly layer = Layer.effect(
     Channel,
@@ -111,12 +105,9 @@ export class Channel extends Context.Service<Channel, ChannelService>()("vibeval
       return yield* make(yield* Session);
     }),
   );
-
-  /** The same chat over a played Session: what a test gives it instead of Agent Sessions. */
-  static readonly layerWith = (sessions: ChannelSessions) => Layer.effect(Channel, make(sessions));
 }
 
-const make = (sessions: ChannelSessions) =>
+const make = (sessions: Session["Service"]) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
     const config = yield* ServerConfig;
