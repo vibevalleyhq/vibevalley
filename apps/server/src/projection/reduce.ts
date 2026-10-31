@@ -13,7 +13,7 @@ const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag
 /** A fact that changes nothing says so (false), and is not sent; facts about sessions not on the farm change nothing. The issues' statuses follow whatever changed. */
 export function reduce(state: T.WorkspaceState, fact: T.Fact): [T.WorkspaceState, boolean] {
   const [next, changed] = fold(state, fact);
-  return changed && next.issues.length > 0 ? [withIssueStatuses(next), true] : [next, changed];
+  return changed && (next.issues !== state.issues || next.sessions !== state.sessions) ? [withIssueStatuses(next), true] : [next, changed];
 }
 
 function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
