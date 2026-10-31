@@ -106,6 +106,8 @@
 
 - 主人画像（`profile`）、管家的记性搬进表、干活的经过（`episode`）、`memory_replace`、`memory_remove`、搜索的种类交给模型、全文索引先取候选再排、画像拼进系统提示（`systemPromptBlock`）、来源自带的工具和按农机排除来源、EverOS 收整段干活（现在只有工单和最后的汇报）、对真的 Nowledge Mem 验证写入：[记忆都存在库里](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)。
 
+Nowledge 的并发调用共享一个连接；失败只清除该调用所属的当前连接，旧连接晚到的失败不能清掉已经重建的新连接。停止仍取消连接建立并关闭传输。
+
 ## 怎么验证
 
 - `apps/server/src/memory/memory.test.ts`：一轮的「记住：」怎么读；干活记下、想起、计数，笔记写下和忘掉；管家的 `MEMORY.md`（每一行、主人交代的、日期、忘掉）和旧账；预览挑而不计、最久没用的标 `fading`；全文索引跟着表走；提不出词的不同短句不算重复；做过的活写不进时这一轮的笔记退回；一轮里几乎一样的只记一次；标成 `fading` 的就是会删的。
