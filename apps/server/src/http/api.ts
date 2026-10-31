@@ -10,6 +10,8 @@ import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers, pathOf 
 import { wireOf } from "@/base/wire.ts";
 import { messageOf } from "@/errors.ts";
 
+import { fromTheFarm } from "./rpc.ts";
+
 // The same Schema the clients read it back with: a refusal that does not fit it is the server's bug, a 500.
 const isApiError = Schema.is(ApiError);
 
@@ -26,6 +28,7 @@ const requests = Metric.counter("vibevalley.http.requests", { description: "Call
 function serve(endpoint: Endpoint, handle: (input: unknown) => Effect.Effect<unknown, ApiError>) {
   return Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    if (!fromTheFarm(request.headers)) return HttpServerResponse.empty({ status: 403 });
     let input: unknown;
     if (endpoint.input) {
       const max = bodyMaxOf(endpoint);
@@ -33,10 +36,7 @@ function serve(endpoint: Endpoint, handle: (input: unknown) => Effect.Effect<unk
       const length = Number(request.headers["content-length"] ?? 0);
       if (length > max) return HttpServerResponse.text(`the body is ${length} bytes, at most ${max}\n`, { status: 413 });
       const text = yield* Effect.provideService(request.text, HttpIncomingMessage.MaxBodySize, ByteSize.bytes(max));
-      const parsed = yield* Effect.result(Effect.try({ try: (): unknown => JSON.parse(text === "" ? "{}" : text), catch: messageOf }));
-      if (parsed._tag === "Failure") return badRequest(parsed.failure);
-      const json = parsed.success;
-      const decoded = Schema.decodeUnknownExit(endpoint.input)(json);
+      const decoded = Schema.decodeExit(Schema.fromJsonString(endpoint.input))(text === "" ? "{}" : text);
       if (decoded._tag === "Failure") return badRequest(Cause.pretty(decoded.cause));
       input = decoded.value;
     }

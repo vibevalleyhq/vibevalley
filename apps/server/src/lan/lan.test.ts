@@ -29,10 +29,10 @@ const farm = (lanPort = 0) =>
     return Context.get(built, Lan);
   });
 
-const request = async (method: string, url: string, key: string, body?: unknown) => {
+const request = async (method: string, url: string, key: string, body?: unknown, headers: Record<string, string> = {}) => {
   const res = await fetch(url, {
     method,
-    headers: key ? { authorization: "Bearer " + key } : {},
+    headers: { ...(key ? { authorization: "Bearer " + key } : {}), ...headers },
     ...(body !== undefined && method !== "GET" ? { body: JSON.stringify(body) } : {}),
   });
   return { status: res.status, body: await res.text() };
@@ -98,7 +98,7 @@ describe("lan access", () => {
       expect((yield* Effect.promise(() => request("POST", addr + healthPath, ""))).status).toBe(401);
       // The page holds nothing of the farm's: a device not paired yet gets it, to pair on.
       for (const path of ["/", "/pair"]) {
-        const page = yield* Effect.promise(() => request("GET", addr + path, ""));
+        const page = yield* Effect.promise(() => request("GET", addr + path, "", undefined, { "sec-fetch-site": "cross-site" }));
         expect([path, page.status, page.body]).toEqual([path, 200, expect.stringContaining("VibeValley")]);
       }
       yield* lan.setOpen(false);
@@ -139,6 +139,10 @@ describe("lan access", () => {
       const s = lan.status();
       expect(s.pairing).toBeUndefined();
       expect(s.devices.map((d) => d.name)).toEqual(["小明的 iPhone"]);
+      for (const origin of [addr, "https://evil.example"]) {
+        const res = yield* Effect.promise(() => request("POST", addr + healthPath, "", undefined, { origin, cookie: `${lanKeyCookie}=${paired.key}` }));
+        expect(res.status).toBe(origin === addr ? 200 : 403);
+      }
       const health = yield* Effect.promise(() => request("POST", addr + healthPath, paired.key));
       expect([health.status, health.body]).toEqual([200, expect.stringContaining(`"ok":true`)]);
       const me = yield* Effect.promise(() => request("POST", addr + pathOf("lan.me.get"), paired.key));

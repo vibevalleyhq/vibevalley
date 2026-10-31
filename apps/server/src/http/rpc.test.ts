@@ -90,10 +90,10 @@ describe("the subscriptions", () => {
     }).pipe(Effect.scoped),
   );
 
-  it("takes the lan listener's word for what it hands on", () => {
+  it("checks origins even when a device header is present", () => {
     const at = (h: Record<string, string>) => fromTheFarm(Headers.fromInput(h));
     expect(at({ host: "192.168.1.20:8789", origin: "http://192.168.1.20:8789" })).toBe(false);
-    expect(at({ host: "127.0.0.1:8787", origin: "http://192.168.1.20:8789", "x-vibevalley-lan-device": "d1" })).toBe(true);
+    expect(at({ host: "127.0.0.1:8787", origin: "http://192.168.1.20:8789", "x-vibevalley-lan-device": "d1" })).toBe(false);
     expect(at({ host: "localhost:5173", origin: "http://localhost:5173" })).toBe(true);
   });
 });

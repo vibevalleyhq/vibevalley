@@ -92,6 +92,8 @@
 
 **开机顺序**：全部服务建好、开机的活（`start`、`ready` 这类 layer）跑过以后开始答 HTTP；开机就派出去的帮工要的 `/mcp` 地址在开始听之后才交给 `Session`（[地基](docs/subsystems/foundation.md)）。
 
+HTTP 命令入口与页面 WebSocket 共用来源判断：Host 应为回环地址，浏览器 Origin 应与 Host 同源，Fetch-Site 存在时只接受 same-origin 或 none；外部来源在解码和调用服务前返回 403。无浏览器来源头的本机 CLI 可调用；设备头不能跳过检查。LAN 入口先检查原来源，再按回环地址转发（[连接到本机](docs/subsystems/lan.md)）。
+
 ## 怎么走
 
 **一条事实**：
