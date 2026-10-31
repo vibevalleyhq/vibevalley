@@ -64,16 +64,25 @@ describe("the database", () => {
   );
 
   // In memory a farm's database is given back and kept for the next one (db.ts): it must be as good as new.
-  it.effect("a database given back is empty for the next farm, its identities from 1 again", () => {
-    const seqs = Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient;
-      const rows = yield* sql<{ count: number }>`SELECT count(*)::int AS count FROM channel_participant`.pipe(Effect.orDie);
-      yield* sql`INSERT INTO channel_participant (id, kind, name, joined_at) VALUES ('u', 'owner', '主人', 1)`.pipe(Effect.orDie);
-      const seq = yield* sql<{ seq: number }>`SELECT seq FROM channel_participant WHERE id = 'u'`.pipe(Effect.orDie);
-      return [rows[0]!.count, seq[0]!.seq];
-    });
+  it.effect("regression: a returned database resets data, identities and session settings", () => {
+    const seqs = (aborted: boolean) =>
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const rows = yield* sql<{
+          count: number;
+          app: string;
+        }>`SELECT count(*)::int AS count, current_setting('application_name') AS app FROM channel_participant`.pipe(Effect.orDie);
+        yield* sql`INSERT INTO channel_participant (id, kind, name, joined_at) VALUES ('u', 'owner', '主人', 1)`.pipe(Effect.orDie);
+        const seq = yield* sql<{ seq: number }>`SELECT seq FROM channel_participant WHERE id = 'u'`.pipe(Effect.orDie);
+        yield* sql`SET application_name = 'left-behind'`.pipe(Effect.orDie);
+        if (aborted) {
+          yield* sql.unsafe("BEGIN").pipe(Effect.orDie);
+          yield* sql.unsafe("SELECT 1/0").pipe(Effect.result);
+        }
+        return [rows[0]!.count, seq[0]!.seq, rows[0]!.app];
+      });
     return Effect.gen(function* () {
-      for (let farm = 0; farm < 3; farm++) expect(yield* seqs.pipe(Effect.provide(testDatabase()))).toEqual([0, 1]);
+      for (let farm = 0; farm < 4; farm++) expect(yield* seqs(farm === 2).pipe(Effect.provide(testDatabase()))).toEqual([0, 1, ""]);
     });
   });
 
