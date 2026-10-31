@@ -1,7 +1,10 @@
 // What a test may take, by its layer of the pyramid (pyramid.ts): a run ends with the pyramid's shape (each layer's
 // files, tests and time) and each test that took more than twice its layer's budget, slowest first. It does not fail
 // the run: times differ by machine, and a slow test is a design to look at (what it waits for, what it builds), not a
-// broken one.
+// broken one. On CI (GITHUB_STEP_SUMMARY set) the ten slowest files go in the job's summary too.
+
+import { appendFileSync } from "node:fs";
+import { basename } from "node:path";
 
 import type { Reporter, TestModule, Vitest } from "vite-plus/test/node";
 
@@ -19,17 +22,36 @@ export default class Budgets implements Reporter {
     const zero = () => ({ files: 0, tests: 0, ms: 0 });
     const shape: Record<Layer, { files: number; tests: number; ms: number }> = { rule: zero(), module: zero(), flow: zero() };
     const over: { ms: number; name: string; layer: Layer }[] = [];
+    const files: { ms: number; file: string; layer: Layer }[] = [];
     for (const m of modules) {
       const layer = layerOf(m.relativeModuleId);
       const at = shape[layer];
       at.files++;
+      let fileMs = 0;
       for (const t of m.children.allTests()) {
         const ms = t.diagnostic()?.duration ?? 0;
         at.tests++;
         at.ms += ms;
+        fileMs += ms;
         if (ms > 2 * budgetMs[layer]) over.push({ ms, name: `${m.relativeModuleId} > ${t.fullName}`, layer });
       }
+      files.push({ ms: fileMs, file: m.relativeModuleId, layer });
     }
+    const summary = process.env.GITHUB_STEP_SUMMARY;
+    if (summary)
+      appendFileSync(
+        summary,
+        [
+          `\n### The slowest test files (${basename(this.vitest?.config.root ?? process.cwd())})\n`,
+          "| ms | layer | file |",
+          "|---|---|---|",
+          ...files
+            .toSorted((a, b) => b.ms - a.ms)
+            .slice(0, 10)
+            .map((f) => `| ${Math.round(f.ms)} | ${f.layer} | \`${f.file}\` |`),
+          "",
+        ].join("\n"),
+      );
     const rows = layers.map((l) => {
       const s = shape[l];
       return `  ${l.padEnd(6)} ${String(s.files).padStart(4)} files ${String(s.tests).padStart(5)} tests ${(s.ms / 1000).toFixed(1).padStart(7)} s   budget ${budgetMs[l]} ms`;

@@ -719,6 +719,33 @@ const dbDoor = defineRule({
   },
 });
 
+const scopedFibers = defineRule({
+  meta: {
+    messages: {
+      detached: says(
+        "Effect.{{name}} starts a fiber no scope owns: it outlives the service that started it, and a test's end does not stop it",
+        "`Effect.forkScoped` (the service's scope), `FiberSet.run` / `FiberMap.run` / `FiberHandle.run` for the service's own sets, `FiberSet.makeRuntime` for a callback; a fiber that must outlive its caller on purpose says why in a disable comment",
+        "docs/subsystems/foundation.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (
+          c.type === "MemberExpression" &&
+          c.object.type === "Identifier" &&
+          c.object.name === "Effect" &&
+          c.property.type === "Identifier" &&
+          ["forkDetach", "forkDaemon", "runFork", "runForkWith"].includes(c.property.name)
+        )
+          context.report({ node, messageId: "detached", data: { name: c.property.name } });
+      },
+    };
+  },
+});
+
 const clockInEffect = defineRule({
   meta: {
     messages: {
@@ -1321,6 +1348,7 @@ export default definePlugin({
     "dropped-timer": droppedTimer,
     "sync-fs": syncFs,
     "clock-in-effect": clockInEffect,
+    "scoped-fibers": scopedFibers,
     "atom-door": atomDoor,
     "page-store": pageStore,
     "stored-door": storedDoor,

@@ -87,6 +87,19 @@ export function exportsOf(path: string, source: string): string[] {
   return out;
 }
 
+/** The values a file declares and exports itself (no types), each with where its export statement starts. */
+export function exportedValuesOf(path: string, source: string): { readonly name: string; readonly start: number }[] {
+  const out: { name: string; start: number }[] = [];
+  for (const statement of (programOf(path, source).body as Node[] | undefined) ?? []) {
+    if (statement.type !== "ExportNamedDeclaration" || isNode(statement.source)) continue;
+    const d = statement.declaration;
+    if (!isNode(d) || d.type === "TSTypeAliasDeclaration" || d.type === "TSInterfaceDeclaration") continue;
+    const names = d.type === "VariableDeclaration" ? (d.declarations as Node[]).map((v) => nameOf(v.id)) : [nameOf(d.id)];
+    for (const name of names) if (name !== undefined) out.push({ name, start: statement.start as number });
+  }
+  return out;
+}
+
 const isCallOf = (n: Node, object: string, method: string) =>
   n.type === "CallExpression" &&
   isNode(n.callee) &&

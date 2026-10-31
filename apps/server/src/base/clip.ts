@@ -1,4 +1,4 @@
-// The server's cuts of text, on the shared measure (packages/protocol/src/rules/text.ts).
+// The server's cuts of text, on the shared measure (packages/protocol/src/rules/cut.ts).
 
 import { oneLine, slice } from "@vibevalley/protocol/rules";
 

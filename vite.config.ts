@@ -66,6 +66,7 @@ export default defineConfig({
         "vpx scripts/i18n.ts check",
         "vpx scripts/capabilities.ts --check",
         "vpx scripts/api-client.ts --check",
+        "vpx scripts/primitives.ts --check",
       ],
       "notes:verify": "vpx scripts/agent-notes.ts",
       "names:verify": "vpx scripts/stale-names.ts",
@@ -514,6 +515,12 @@ export default defineConfig({
         files: ["apps/server/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "vibevalley/db-door": "error" },
+      },
+      {
+        // A fiber belongs to a scope, so none outlives its service or a test (scripts/oxlint-plugin.ts, scoped-fibers).
+        files: ["apps/server/src/**", "packages/agent/src/**"],
+        excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**"],
+        rules: { "vibevalley/scoped-fibers": "error" },
       },
       {
         // An Effect generator reads the time with yield* Clock.currentTimeMillis (scripts/oxlint-plugin.ts, clock-in-effect).

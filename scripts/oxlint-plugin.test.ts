@@ -204,6 +204,14 @@ tester.run("db-door", rule("db-door"), {
   ],
 });
 
+tester.run("scoped-fibers", rule("scoped-fibers"), {
+  valid: ["Effect.forkScoped(work)", "FiberSet.run(set, work)", "Effect.forkChild(work)"],
+  invalid: [
+    { code: "Effect.forkDetach(work)", errors: [{ messageId: "detached" }] },
+    { code: "Effect.runFork(work)", errors: [{ messageId: "detached" }] },
+  ],
+});
+
 tester.run("clock-in-effect", rule("clock-in-effect"), {
   valid: [
     "Effect.gen(function* () { const at = yield* Clock.currentTimeMillis; })",
