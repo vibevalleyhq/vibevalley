@@ -550,7 +550,7 @@ const make = (sessions: ChannelSessions) =>
           }),
         { discard: true },
       );
-      const written: Written = { id: row.id, number: row.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false, row };
+      const written: Written = { recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false, row };
       // The breaker is reset only after the message's transaction commits.
       if (row.sender_id === ownerId) written.resetWake = deliveries.filter((d) => d.wakes).map((d) => d.recipient);
       if (deliveries.some((d: Delivery) => d.heldBy === "hop_limit")) written.held = (yield* db.run(qm.holdNoticeSinceUser({ channel: ch.id }))).n === 0;
@@ -564,7 +564,7 @@ const make = (sessions: ChannelSessions) =>
         Effect.gen(function* () {
           if (w.sendKey) {
             const seen = yield* db.one(qm.messageBySendKey({ sender_id: w.from, send_key: w.sendKey }));
-            if (seen) return { id: seen.id, number: seen.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: true, row: seen };
+            if (seen) return { recipients: [], resetWake: [], absent: [], held: false, thread: "", again: true, row: seen };
           }
           // The row as MessageByID would read it back: the sender's name and kind are the participant's.
           const sender = model.participant(w.from);
@@ -1271,7 +1271,7 @@ const make = (sessions: ChannelSessions) =>
           ...(opt.reply !== undefined ? { replyTo: opt.reply } : {}),
           meta: run ? { run } : {},
         });
-        yield* setRead(from, channel, written.number, yield* Clock.currentTimeMillis);
+        yield* setRead(from, channel, written.row.number, yield* Clock.currentTimeMillis);
         return { kind: "sent", message: toMessage(written.row), target, absent: written.absent };
       }, locked),
       placeOf: Effect.fn("Channel.placeOf")(function* (from, channel) {
@@ -1291,7 +1291,7 @@ const make = (sessions: ChannelSessions) =>
           meta: { ...(run ? { run } : {}), artifact: card },
           ...(from === ownerId ? { readBy: ownerId } : {}),
         });
-        if (from !== ownerId) yield* setRead(from, where, written.number, yield* Clock.currentTimeMillis);
+        if (from !== ownerId) yield* setRead(from, where, written.row.number, yield* Clock.currentTimeMillis);
         return toMessage(written.row);
       }, locked),
       spoken: Effect.fn("Channel.spoken")(
