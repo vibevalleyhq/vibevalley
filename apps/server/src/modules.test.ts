@@ -7,6 +7,8 @@ import { dirname, join, normalize, relative } from "node:path";
 
 import { describe, expect, it } from "vite-plus/test";
 
+import { calls, edgesOf, readsOf } from "@vibevalley/testkit/source";
+
 import { moduleOf, modules, outside } from "./modules.ts";
 
 const src = import.meta.dirname;
@@ -39,6 +41,12 @@ const owners: Readonly<Record<string, string>> = {
 /** Reads of another module's part that stay, each with why: none. */
 const reads: Readonly<Record<string, string>> = {};
 
+/** What a file imports from under src, type-only imports too (they tie the modules all the same), as paths from src. */
+const localEdges = (file: string) =>
+  edgesOf(file, readFileSync(file, "utf8")).flatMap(({ from: spec }) =>
+    spec.startsWith("@/") ? [normalize(spec.slice(2))] : spec.startsWith("./") || spec.startsWith("../") ? [rel(normalize(join(dirname(file), spec)))] : [],
+  );
+
 describe("the modules", () => {
   it("hold every folder and file under src", () => {
     const tops = readdirSync(src).filter((f) => statSync(join(src, f)).isDirectory() || (f.endsWith(".ts") && !f.endsWith(".test.ts")));
@@ -53,11 +61,7 @@ describe("the modules", () => {
     for (const file of files(src)) {
       const from = rel(file);
       if (from.endsWith(".test.ts") || outside.includes(from.split("/")[0]!)) continue;
-      for (const m of readFileSync(file, "utf8").matchAll(/from\s+"((?:\.{1,2}|@)\/[^"]+)"/gu)) {
-        const spec = m[1]!;
-        const to = spec.startsWith("@/") ? normalize(spec.slice(2)) : rel(normalize(join(dirname(file), spec)));
-        if (moduleOf(to) !== moduleOf(from) && rank(to) > rank(from)) found.push(`${from} -> ${to}`);
-      }
+      for (const to of localEdges(file)) if (moduleOf(to) !== moduleOf(from) && rank(to) > rank(from)) found.push(`${from} -> ${to}`);
     }
     expect(
       found.filter((f) => !(f in pending)),
@@ -73,11 +77,7 @@ describe("the modules", () => {
     const found: string[] = [];
     for (const file of files(join(src, "base"))) {
       const from = rel(file);
-      for (const m of readFileSync(file, "utf8").matchAll(/from\s+"((?:\.{1,2}|@)\/[^"]+)"/gu)) {
-        const spec = m[1]!;
-        const to = spec.startsWith("@/") ? normalize(spec.slice(2)) : rel(normalize(join(dirname(file), spec)));
-        if (to.split("/")[0] !== "base") found.push(`${from} -> ${to}`);
-      }
+      for (const to of localEdges(file)) if (to.split("/")[0] !== "base") found.push(`${from} -> ${to}`);
     }
     expect(
       found,
@@ -92,8 +92,8 @@ describe("the modules", () => {
       const top = from.split("/")[0]!;
       if (from.endsWith(".test.ts") || outside.includes(top) || top === "core" || top === "projection") continue;
       const text = readFileSync(file, "utf8");
-      const parts = [...text.matchAll(/core\.state\(\)\??\.(\w+)/gu)].map((m) => m[1]!);
-      if (/core\.session\(/u.test(text)) parts.push("sessions");
+      const parts = readsOf(file, text, "core", "state");
+      if (calls(file, text, "core", "session")) parts.push("sessions");
       for (const part of new Set(parts)) {
         const owner = owners[part];
         if (owner && owner !== moduleOf(from)?.name) found.push(`${from} -> ${part}`);

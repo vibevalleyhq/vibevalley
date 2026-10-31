@@ -6,7 +6,8 @@
     "./*": "./src/*.ts"
   },
   "dependencies": {
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "vite": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

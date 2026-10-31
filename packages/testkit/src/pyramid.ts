@@ -7,6 +7,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
 
+import { importsOf } from "./source.ts";
+
 export type Layer = "rule" | "module" | "flow";
 
 export const layers: readonly Layer[] = ["rule", "module", "flow"];
@@ -16,14 +18,6 @@ export const budgetMs: Record<Layer, number> = { rule: 20, module: 300, flow: 2_
 
 /** Imports that leave the process: the database, child processes, the network. */
 const outside = /^(node:child_process|node:net|node:http|node:https|@electric-sql\/pglite|@effect\/sql-pglite|@effect\/platform-node)$/u;
-
-/** What a file imports for its values: import and export … from, side-effect and dynamic imports, not type-only ones. */
-export function importsOf(source: string): string[] {
-  const out: string[] = [];
-  for (const m of source.matchAll(/^\s*(?:import|export)\s+(type\s+)?(?:[^;'"]*?\s+from\s+)?"([^"]+)"/gmsu)) if (!m[1]) out.push(m[2]!);
-  for (const m of source.matchAll(/\bimport\(\s*"([^"]+)"\s*\)/gu)) out.push(m[1]!);
-  return out;
-}
 
 interface WorkspacePackage {
   readonly dir: string;
@@ -76,7 +70,7 @@ export function pyramid(root: string) {
     let got = sources.get(file);
     if (!got) {
       const at = join(root, file);
-      got = existsSync(at) ? importsOf(readFileSync(at, "utf8")) : [];
+      got = existsSync(at) ? importsOf(at, readFileSync(at, "utf8")) : [];
       sources.set(file, got);
     }
     return got;
