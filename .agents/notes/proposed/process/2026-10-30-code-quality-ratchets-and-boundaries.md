@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-实施基线固定为 `0e8bb950`，工作分支 `refactor/current-convergence`。原提案审查的 `f527d936` 只作历史参考；它新增的 Bridge 与桌面 serverKeeper 不移植到本轮。
+最初验证基线为 `0e8bb950`。主人随后要求 rebase 后继续，工作分支 `refactor/current-convergence` 已迁到 `abee3768`（PR #206）；保留上游的新实现，仅移植仍缺失的修复。旧基线的探针与行数作为历史证据，不代替新基线验收。
 
 原四十二项清单与六份专项提案重复，并把代码观察、故障假设和写法偏好混成可直接派单的缺陷。实施需要按独立行为拆分，避免在修复里同时改目录、接口和运行时。
 
@@ -18,7 +18,7 @@ Status: proposed
 
 ### 共同预算与证据
 
-代码累计预算继续以 `0e8bb950` 为基线，不在某个 Phase 合并后重新归零；生产、测试、脚本和生成代码全部计入。最近快照净减少 8 行，只证明已完成批次，不证明未来新功能能满足零增长。每个实现任务先列预计新增与可删除的重复实现；不得删除功能、断言、压行或移入忽略目录抵消新增。若无法满足，应记录预算缺口，不能标完成。
+最初的 `0e8bb950` 总量继续单列追踪。按主人「rebase 之后继续」的指示，本次补丁的累计预算对集成基线 `abee3768` 计算，不把上游已有功能算成本次新增，也不在后续 Phase 之间重新归零；生产、测试、脚本和生成代码全部计入。最近快照净减少 8 行，只证明已完成批次，不证明未来新功能能满足零增长。每个实现任务先列预计新增与可删除的重复实现；不得删除功能、断言、压行或移入忽略目录抵消新增。若无法满足，应记录预算缺口，不能标完成。
 
 性能对比固定 Node 版本、机器、数据集和 base/head，各预热 5 次、测量 30 次，记录 p50、p95、峰值 RSS 与相关 I/O 次数。正确性优先于耗时。每份证据包含命令、退出码、原始结果和负载；真实程序的证据还包括隔离服务地址与清理结果。测试数和行数不是正确性的替代指标。
 
@@ -27,14 +27,14 @@ Status: proposed
 当前源码已修改并做过本地验收，尚未提交或合并。规矩归 [PR](.agents/skills/vv-pr/SKILL.md)。
 
 - [x] **P1.1 整理提交与证据。** 按缺陷修复、简化、文档分组；100% 代码变更能关联行为或删除理由，0 个无归属文件；记录最终总代码、非空行、base/head，保存可重放的探针与验收结果。
-- [ ] **P1.2 在实际合并目标上验证。** 比较当前 `0e8bb950` 与目标分支，逐个记录冲突和重复修复；0 个未裁决冲突，0 个误删目标分支功能。冲突解决后重新运行相关测试及隔离服务端主线，不能沿用旧 SHA 的结果。
+- [x] **P1.2 在实际合并目标上验证。** 比较当前 `0e8bb950` 与目标分支，逐个记录冲突和重复修复；0 个未裁决冲突，0 个误删目标分支功能。冲突解决后重新运行相关测试及隔离服务端主线，不能沿用旧 SHA 的结果。
 - [ ] **P1.3 PR、CI 与合并。** 按独立行为组织 PR；每个 PR 的必需 CI 全绿、必改评审项 0、代码累计净增量 ≤ 0，squash 合并后核对提交与证据一致，并按实际上线范围沉淀或删除 Note。
 
 P1.1 证据：`refactor/current-convergence` 的 `0e8bb950..e2baf77b` 已分为 10 个提交，涵盖来源、数据库、Nowledge、出站取消、Cron、投影、引用解析、测试设施、lint、提案文档；工作树干净，累计代码仍为 +284/−292。补丁、11 份提案快照及 28 份探针/日志/统计保存在本机 `.git/convergence-evidence/`；不是 GitHub CI 的公开附件。
 
-P1.2 发现：最新目标为 `abee3768`（PR #206 已合并），相对原基线的源代码净增 11,024 行。其数据库、HttpClient、请求大小、Bridge 与静态检查已有新的实现；不得把旧版文件整份覆盖过去。独立目标工作树为 `/Users/lucasay/orca/projects/vibevalley-integration-audit`。原预算没有自动改口径；正在确认上游增量应单列、继续留在旧基线，还是整个目标也必须降回原总量。
+P1.2 发现：最新目标为 `abee3768`（PR #206 已合并），相对原基线的源代码净增 11,024 行。其数据库、HttpClient、请求大小、Bridge 与静态检查已有新的实现；不得把旧版文件整份覆盖过去。独立目标工作树为 `/Users/lucasay/orca/projects/vibevalley-integration-audit`。主人已指示 rebase 后继续：上游增量单列，本次补丁仍须净减；不删除上游功能抵消其增量。初步 numstat 统计为 11,024 行，逐文件完整树统计应作为最终口径（重命名会影响 numstat 的路径筛选）。
 
-当前目标上的隔离 HTTP 探针确认：外部 Origin 仍返回 200，处理函数执行 1 次；来源修复不是重复工作。Nowledge 旧请求失效、Cron 提示先于派发、whenState 超时回收等仍有静态差异，移植前继续逐项复验。P1.2/P1.3 尚未完成。
+当前目标上的隔离 HTTP 探针确认：外部 Origin 仍返回 200，处理函数执行 1 次；来源修复不是重复工作。Nowledge 旧请求失效、Cron 提示先于派发、whenState 超时回收等仍有静态差异，移植前继续逐项复验。P1.2 已完成；P1.3 的 PR/CI/合并尚未完成。
 
 P1.2 移植清单已经收敛为 8 组：HTTP/LAN 来源、Nowledge 连接代际、Cron 派发与提示隔离、whenState 定时器、测试库会话设置、工单投影、只读引用解析、lint 调用识别。附带的黄金比较器与 Promise 门闩复用可以保留。新目标已有出站 HttpClient 取消、Deferred 冷初始化、ROLLBACK/清理失败关闭、共享 head、MOSS JSON codec 和 warning 阻断，对应旧补丁不再移植。
 
@@ -43,13 +43,23 @@ P1.2 移植清单已经收敛为 8 组：HTTP/LAN 来源、Nowledge 连接代际
 目标请求体补充探针 `/tmp/vv-upstream-body-probe.mts`：普通请求 200、带 Content-Length 的超限请求 413、chunked 超限请求 ECONNRESET（服务端记录 maxBytes exceeded），业务处理只执行了普通请求一次。限制有效，但两种超限响应不同；P3.1 应包含这个实际路径，不把 PR 的「已限流」当作全部验收完成。
 
 
+P1.2 新基线验收：保留 `abee3768` 的 Effect HTTP、Deferred 初始化、退避、请求上限、字段与回执语义。服务端 681 通过、1 跳过；重点 10 文件 61 测试通过；页面检查、228 个 lint 用例、deadcode 和降低后的逃生口棘轮通过。服务端主线证据为 `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-R4iMJd`，code 0、stopped true。
+
+原生重建额外发现并修复两项基线问题：Agora 源码漏声明 base64-js（用 packageExtensions 和 catalog override 补齐）；Hermes 缺少 Intl.PluralRules 导致共享格式化器在导入时崩溃（仅手机入口加载标准 polyfill 及英文规则数据，新增回归测试先红后绿）。e2e 的旧 notice 字段也改为 BridgeMessage.input，原通知/重载断言保留。最终手机证据为 `/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-LfI8z8`：配对、通知、页面重载、应用重启全过，code 0、stopped true。失败日志和 source map 定位保留于 `/tmp/vv-rebased-mobile-build.log`、`/tmp/vv-mobile-logcat-before-intl.log`、`/tmp/vv-mobile-intl-red.log`。
+
+本批次相对集成基线的代码统计 `/tmp/vv-rebased-lines.json`：157646 → 157581，净减 65 行；非空行净减 69 行。原始 `0e8bb950` 为 146703 行，上游完整树增量为 10943 行；之前基于 numstat 路径筛选的 11024 是初步数，重命名后以完整树统计为准。新增的手机运行时依赖和锁文件变化单列在交付里，不隐瞒为零依赖改动。
+
 ### Phase 2：领域边界的量化核查（3 条，先验证）
 
 归 [深模块](.agents/notes/proposed/architecture/2026-10-31-deep-module-consolidation.md)、[模块边界](.agents/notes/proposed/architecture/2026-10-31-module-boundaries-and-decoupling.md) 与 [目录方案](.agents/notes/proposed/architecture/2026-10-31-monorepo-package-directory-blueprint.md)。已完成的只读引用解析不重复计入。
 
-- [ ] **P2.1 固定调用顺序与默认值。** 盘点 HTTP/工具两类入口的 GitHub 刷新→工单刷新、默认频道和写操作引用解析，列出全部调用点、跨服务步骤数与查询数。各跑成功和每个中间步骤失败的案例；只有能减少至少一处重复领域步骤、且失败结果和副作用次数不变的收口才实施，否则保留证据关闭该候选。
+- [x] **P2.1 固定调用顺序与默认值。** 盘点 HTTP/工具两类入口的 GitHub 刷新→工单刷新、默认频道和写操作引用解析，列出全部调用点、跨服务步骤数与查询数。各跑成功和每个中间步骤失败的案例；只有能减少至少一处重复领域步骤、且失败结果和副作用次数不变的收口才实施，否则保留证据关闭该候选。
 - [ ] **P2.2 启动恢复与集合生命周期。** 为各 Start 层记录订阅/恢复次序，空库与有在途任务的库各重启 10 次；创建/销毁频道、连接器、项目各 1,000 次。记录事件漏发/重复数、相关 Map/Set 大小及资源句柄数；漏发/重复为 0，无活跃实体后集合应回到基线或文档规定的有界缓存。超出时先复现再修复，不直接全量移层。
 - [ ] **P2.3 包出口与目录边界。** 枚举 ai/agent 的全部外部 import、包 exports 与依赖边；每个保留出口都有实际消费者或公开契约依据，私有入口被引用的情况为 0。选择一个候选边界比较调用方需了解的内部步骤与修改文件数；没有减少则不迁目录，不以包或文件数量作为收益。
+
+P2.1 量化结论：不新增 facade。GitHub→PR 刷新只有 1 处编排（工具中 0）；默认频道→动作有 2 个入口，已共享 edited；引用解析展开后有 9 个 HTTP 入口（8 写、1 读），工具侧 9 个入口共享一个 findIssue。工具解析支持在场帮工名字/句中名字并过滤 talk，HTTP 支持历史会话 ID，不能直接互换。
+
+实际 handler 探针覆盖 10 个成功/中间失败场景：GitHub 第一步失败时第二步调用 0 次；编辑失败时默认频道读取和动作均 0 次；动作失败保留 1 次已成功的编辑。真实 Db metric 各采样 30 次：UUID get 每次 1 条查询，数字和 #数字每次 2 条，list 为 1 条；工具 roster 是内存读取。没有找到新增 facade 能删除的重复领域步骤。证据 `/tmp/vv-p21-handlers.log`、`/tmp/vv-p21-tools.log`、`/tmp/vv-p21-query-count.log` 及同名脚本；原 HTTP 已有「编辑成功、动作拒绝仍保留编辑」的测试。
 
 ### Phase 3：协议、数据与客户端边界（4 条，先验证）
 
