@@ -7,8 +7,9 @@ import { afterEach, describe, expect, it } from "@effect/vitest";
 import { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { Effect, Layer } from "effect";
+import { Effect, Fiber, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
+import { TestClock } from "effect/testing";
 
 import { asTransport } from "@vibevalley/agent/mcpTransport";
 import type { MemorySourceUpdate } from "@vibevalley/protocol";
@@ -206,7 +207,7 @@ const world = (timeoutMs = 20_000) =>
 const save = (s: MemorySourceUpdate) => Effect.flatMap(Setting, (setting) => setting.save({ memorySources: [s] })).pipe(Effect.orDie);
 
 describe("Nowledge Mem", () => {
-  it.live("a project search proves source scope even when reading everything was requested", () =>
+  it.effect("a project search proves source scope even when reading everything was requested", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
       fake.memories = [
@@ -230,7 +231,7 @@ describe("Nowledge Mem", () => {
     }).pipe(Effect.provide(world())),
   );
 
-  it.live("a run's notes reach Nowledge and come back", () =>
+  it.effect("a run's notes reach Nowledge and come back", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
       yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: true });
@@ -275,7 +276,7 @@ describe("Nowledge Mem", () => {
     }).pipe(Effect.provide(world())),
   );
 
-  it.live("Nowledge reads everything only when told, and writes only when told", () =>
+  it.effect("Nowledge reads everything only when told, and writes only when told", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
       fake.memories = [{ id: "own-1", title: "主人的偏好", content: "测试要写成可观察的结果", labels: [] }];
@@ -288,25 +289,24 @@ describe("Nowledge Mem", () => {
       expect((yield* m.search(q)).found.map((f) => f.text)).toEqual(["主人的偏好：测试要写成可观察的结果"]);
       yield* m.write({ agent: "lab", text: "不写进去", project: "", by: owner });
       // A write would go out in the background; nothing to wait on shows that none does.
-      // oxlint-disable-next-line vibevalley/no-test-sleep
-      yield* Effect.sleep(50);
+      yield* TestClock.adjust(50);
       expect(fake.adds).toEqual([]);
     }).pipe(Effect.provide(world())),
   );
 
-  it.live("a Nowledge that does not answer is skipped", () =>
+  it.effect("a Nowledge that does not answer is skipped", () =>
     Effect.gen(function* () {
       const url = yield* Effect.promise(() => listen(createServer(() => {})));
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false });
       const m = yield* Memory;
       yield* m.write({ agent: "lab", text: "迁移文件放 db/migrations", project: "demo", by: owner });
-      const start = Date.now();
-      expect((yield* m.recall({ agent: "lab", project: "demo", text: "迁移" })).lines).toHaveLength(1);
-      expect(Date.now() - start).toBeLessThan(1000);
+      const recall = yield* Effect.forkChild(m.recall({ agent: "lab", project: "demo", text: "迁移" }));
+      yield* TestClock.adjust(100);
+      expect((yield* Fiber.join(recall)).lines).toHaveLength(1);
     }).pipe(Effect.provide(world(100))),
   );
 
-  it.live("malformed Nowledge responses degrade to no outside memories and can recover", () =>
+  it.effect("malformed Nowledge responses degrade to no outside memories and can recover", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
       yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
@@ -324,7 +324,7 @@ describe("Nowledge Mem", () => {
 });
 
 describe("EverOS", () => {
-  it.live("a memory_add answer that does not read is a failure, while one without an id is a note already there", () =>
+  it.effect("a memory_add answer that does not read is a failure, while one without an id is a note already there", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
       const source = nowledge({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: false, write: true });
@@ -338,7 +338,7 @@ describe("EverOS", () => {
     }),
   );
 
-  it.live("a project query asks the farm's project and global scopes and does not claim cross-project coverage", () =>
+  it.effect("a project query asks the farm's project and global scopes and does not claim cross-project coverage", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
       yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
@@ -362,7 +362,7 @@ describe("EverOS", () => {
     }).pipe(Effect.provide(world())),
   );
 
-  it.live("malformed EverOS responses degrade to no outside memories and can recover", () =>
+  it.effect("malformed EverOS responses degrade to no outside memories and can recover", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
       yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
@@ -377,7 +377,7 @@ describe("EverOS", () => {
     }).pipe(Effect.provide(world())),
   );
 
-  it.live("EverOS gets runs and extracts when the session ends", () =>
+  it.effect("EverOS gets runs and extracts when the session ends", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
       yield* save({
@@ -418,8 +418,7 @@ describe("EverOS", () => {
       yield* m.endSession({ agent: "lab", session: "w2", project: "demo" });
       yield* until(() => fake.seen("flush").length === 1);
       // The second session has nothing to flush; nothing to wait on shows it does not.
-      // oxlint-disable-next-line vibevalley/no-test-sleep
-      yield* Effect.sleep(50);
+      yield* TestClock.adjust(50);
       const flushes = fake.seen("flush");
       expect(flushes).toHaveLength(1);
       expect([flushes[0]!.body.session_id, flushes[0]!.body.project_id]).toEqual(["vibevalley-w1", everosProject("demo")]);
@@ -443,7 +442,7 @@ describe("EverOS", () => {
     }).pipe(Effect.provide(world())),
   );
 
-  it.live("a note outside a run is extracted at once", () =>
+  it.effect("a note outside a run is extracted at once", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
       yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: true });
@@ -456,7 +455,7 @@ describe("EverOS", () => {
     }).pipe(Effect.provide(world())),
   );
 
-  it.live("EverOS is told what is left when the farm stops", () =>
+  it.effect("EverOS is told what is left when the farm stops", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
       const url = yield* Effect.promise(() => fake.serve());

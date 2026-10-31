@@ -5,6 +5,7 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import { Cause, Effect, Metric } from "effect";
 import { SqlClient } from "effect/sql";
+import { TestClock } from "effect/testing";
 
 import type * as T from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
@@ -577,8 +578,7 @@ describe("issues", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("a queued cron keeps its trigger and that it was missed", () => {
-    const clock = { now: 1_800_000_000_000 };
+  it.effect("a queued cron keeps its trigger and that it was missed", () => {
     const c = config();
     return Effect.gen(function* () {
       const issues = yield* Issue;
@@ -590,7 +590,7 @@ describe("issues", () => {
       const channel = yield* chat.openChannel("scheduled", "", "demo");
       yield* occupied(core, "pi");
       const sc = yield* crons.add({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, owner);
-      clock.now += 10 * 60_000;
+      yield* TestClock.adjust(10 * 60_000);
       yield* crons.tick;
       const issue = yield* waitFor(issues.ofCron(sc.id), (i) => i?.queuedAt !== undefined, "the cron queued");
       yield* core.apply({ type: "left", id: sessionId("occupied") });
@@ -599,7 +599,7 @@ describe("issues", () => {
       const [run] = yield* sessions.runs(issue!.id);
       expect(run!.triggeredBy).toEqual({ kind: "cron", cron: sc.id, missed: true });
       expect((yield* sessions.get(run!.session))?.channel).toBe(channel.id);
-    }).pipe(Effect.scoped, Effect.provide(world({ config: c, runtimes: [busy], repos: ["demo"], clock: () => clock.now })));
+    }).pipe(Effect.scoped, Effect.provide(world({ config: c, runtimes: [busy], repos: ["demo"] })));
   });
 
   it.live("a queued todo starts once there is room, and keeps its place until then", () => {

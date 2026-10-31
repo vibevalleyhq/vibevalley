@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
+import { TestClock } from "effect/testing";
 
 import { ownerId } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
@@ -18,7 +19,7 @@ const owner = { from: ownerId, by: ownerId };
 const page = (words: string) => `<!doctype html><title>${words}</title><p>${words}</p>`;
 
 describe("an artifact", () => {
-  it.live("is announced with its card where it belongs, and a new version keeps the old ones readable", () =>
+  it.effect("is announced with its card where it belongs, and a new version keeps the old ones readable", () =>
     Effect.gen(function* () {
       const artifacts = yield* Artifact;
       const chat = yield* Channel;
@@ -37,6 +38,7 @@ describe("an artifact", () => {
       expect(yield* artifacts.content(made.id, 1)).toMatchObject({ version: 1, content: page("抽屉") });
       expect(yield* Effect.flip(artifacts.content(made.id, 3))).toMatchObject({ _tag: "Missing" });
 
+      yield* TestClock.adjust(1);
       const forIssue = yield* artifacts.create(owner, { title: "调研", kind: "markdown", content: "# 结论\n\n用抽屉。", issue: "issue-1" });
       expect((yield* artifacts.list({ issue: "issue-1" })).map((a) => a.id)).toEqual([forIssue.id]);
       expect((yield* artifacts.list({ channel: general })).map((a) => a.id)).toEqual([forIssue.id, made.id]);
@@ -44,7 +46,7 @@ describe("an artifact", () => {
     }).pipe(Effect.scoped, Effect.provide(worldBelowTasks())),
   );
 
-  it.live("handed in as Markdown is read into blocks to write on together, and takes no new version", () =>
+  it.effect("handed in as Markdown is read into blocks to write on together, and takes no new version", () =>
     Effect.gen(function* () {
       const artifacts = yield* Artifact;
       const chat = yield* Channel;
@@ -64,7 +66,7 @@ describe("an artifact", () => {
     }).pipe(Effect.scoped, Effect.provide(worldBelowTasks())),
   );
 
-  it.live("started on the page with a title is empty, announced nowhere, and an html one has no blocks", () =>
+  it.effect("started on the page with a title is empty, announced nowhere, and an html one has no blocks", () =>
     Effect.gen(function* () {
       const artifacts = yield* Artifact;
       const chat = yield* Channel;
@@ -80,7 +82,7 @@ describe("an artifact", () => {
     }).pipe(Effect.scoped, Effect.provide(worldBelowTasks())),
   );
 
-  it.live("refuses what it cannot be, and says which", () =>
+  it.effect("refuses what it cannot be, and says which", () =>
     Effect.gen(function* () {
       const artifacts = yield* Artifact;
       const refusedFor = (title: string, kind: string, content: string) => Effect.flip(artifacts.create(owner, { title, kind: kind as "html", content }));
@@ -96,7 +98,7 @@ describe("an artifact", () => {
     }).pipe(Effect.scoped, Effect.provide(worldBelowTasks())),
   );
 
-  it.live("goes with its versions, and its content files go once no other artifact keeps them", () =>
+  it.effect("goes with its versions, and its content files go once no other artifact keeps them", () =>
     Effect.gen(function* () {
       const artifacts = yield* Artifact;
       const chat = yield* Channel;

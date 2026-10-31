@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
+import { TestClock } from "effect/testing";
 
 import type * as T from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
@@ -252,9 +253,8 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("of a cron is one, told again and reopened", () => {
-    let now = Date.now();
-    const f = farm({ clock: () => now });
+  it.effect("of a cron is one, told again and reopened", () => {
+    const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
       const issues = yield* Issue;
@@ -271,10 +271,7 @@ describe("an issue", () => {
         },
         owner,
       );
-      const due = () => {
-        now += 5 * 60_000 + 1;
-        return crons.tick;
-      };
+      const due = () => Effect.andThen(TestClock.adjust(5 * 60_000 + 1), crons.tick);
       const ofCron = () => Effect.map(issues.ofCron(made.id), (i) => i!);
       const runs = () => Effect.flatMap(ofCron(), (i) => sessions.runs(i.id));
       yield* due();

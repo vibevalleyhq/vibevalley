@@ -140,6 +140,7 @@ const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: num
   Connector.layer({ weixin: script.weixin, feishu: script.feishu, qq: script.qq, ...retry }).pipe(
     Layer.provideMerge(echoing.pipe(Layer.provide(Orchestrator.layer({ listen: false })))),
     Layer.provideMerge(world({ config })),
+    Layer.provide(Layer.effectDiscard(TestClock.setTime(1_800_000_000_000))),
   );
 
 /** The orchestrator as the chat apps meet it here: what the owner says is written, and answered at once. */
@@ -201,7 +202,7 @@ const qqPaired = (script: Script) =>
   });
 
 describe("the chat apps", () => {
-  it.live("take the owner's WeChat words to the default channel and answer there", () => {
+  it.effect("take the owner's WeChat words to the default channel and answer there", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const chat = yield* Channel;
@@ -221,7 +222,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("a malformed durable inbound is settled without blocking later valid messages", () => {
+  it.effect("a malformed durable inbound is settled without blocking later valid messages", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const chat = yield* Channel;
@@ -244,7 +245,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("saved connector secrets must be a string map", () => {
+  it.effect("saved connector secrets must be a string map", () => {
     const config = { ...testConfig(), db: "" };
     const first = new Script();
     return Effect.gen(function* () {
@@ -267,7 +268,7 @@ describe("the chat apps", () => {
     });
   });
 
-  it.live("tie WeChat to another channel", () => {
+  it.effect("tie WeChat to another channel", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const chat = yield* Channel;
@@ -294,7 +295,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("let no stranger in", () => {
+  it.effect("let no stranger in", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const chat = yield* Channel;
@@ -306,7 +307,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("send what waited as a digest, with the owner's next words", () => {
+  it.effect("send what waited as a digest, with the owner's next words", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
@@ -325,7 +326,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("send what waited by themselves, later", () => {
+  it.effect("send what waited by themselves, later", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
@@ -334,15 +335,16 @@ describe("the chat apps", () => {
       script.weixinIn.push(wx(owner, "一", "ctx-1"));
       yield* status((s) => s.pending === 1, "held");
       script.restricted = false;
+      yield* TestClock.adjust(30_000);
       expect(yield* nth(script, "weixin", 0, "the held answer")).toMatchObject({
         text: "【管家】\n收到：一",
         reply: "ctx-1",
       });
       yield* status((s) => s.pending === 0, "nothing pending");
-    }).pipe(Effect.scoped, Effect.provide(farm(script, testConfig(), { retryFirstMs: 20, retryMostMs: 80 })));
+    }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("forget what waited on a logout", () => {
+  it.effect("forget what waited on a logout", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const c = yield* Connector;
@@ -357,7 +359,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("pair QQ by its code, and take only the owner's words", () => {
+  it.effect("pair QQ by its code, and take only the owner's words", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const c = yield* Connector;
@@ -424,7 +426,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("hold a refused QQ reply for the owner's next message", () => {
+  it.effect("hold a refused QQ reply for the owner's next message", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("qq", ok, what);
@@ -441,7 +443,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("make the Feishu bot by a scan, and take only the owner's direct words", () => {
+  it.effect("make the Feishu bot by a scan, and take only the owner's direct words", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const c = yield* Connector;
@@ -466,7 +468,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("send one farm message to every owner", () => {
+  it.effect("send one farm message to every owner", () => {
     const script = new Script();
     return Effect.gen(function* () {
       yield* weixinConnected(script);
@@ -477,7 +479,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("drops what came in and went through long ago, keeping what still waits", () => {
+  it.effect("drops what came in and went through long ago, keeping what still waits", () => {
     const config = { ...testConfig(), db: "" };
     return Effect.gen(function* () {
       const before = new Script();
@@ -499,7 +501,7 @@ describe("the chat apps", () => {
     });
   });
 
-  it.live("go on with an account after a restart", () => {
+  it.effect("go on with an account after a restart", () => {
     const config = { ...testConfig(), db: "" };
     return Effect.gen(function* () {
       const before = new Script();
@@ -518,7 +520,7 @@ describe("the chat apps", () => {
     });
   });
 
-  it.live("route quoted replies to an old thread before and after a restart", () => {
+  it.effect("route quoted replies to an old thread before and after a restart", () => {
     const config = { ...testConfig(), db: "" };
     let thread = "";
     const reply = (script: Script, text: string, sent: number) =>
@@ -557,7 +559,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
   });
 
-  it.live("send an old thread's answer only to its linked channel after a restart", () => {
+  it.effect("send an old thread's answer only to its linked channel after a restart", () => {
     const config = { ...testConfig(), db: "" };
     let thread = "";
     return Effect.gen(function* () {
@@ -600,7 +602,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
   });
 
-  it.live("keeps a quoted message pending when its lookup fails, then delivers it after recovery", () => {
+  it.effect("keeps a quoted message pending when its lookup fails, then delivers it after recovery", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const chat = yield* Channel;
@@ -618,12 +620,13 @@ describe("the chat apps", () => {
       expect(yield* saidIn(chat.defaultChannel())).toEqual([]);
       expect(yield* sql`select ext_id from connector_inbound where not delivered`.pipe(Effect.orDie)).toHaveLength(1);
       yield* sql.unsafe("alter table connector_outbox_broken rename to connector_outbox").pipe(Effect.orDie);
+      yield* TestClock.adjust(1_000);
       yield* nth(script, "weixin", 0, "the quoted message after recovery");
       expect(yield* saidIn(chat.defaultChannel())).toContain("引用读取失败");
-    }).pipe(Effect.scoped, Effect.provide(farm(script, testConfig(), { retryFirstMs: 20, retryMostMs: 80 })));
+    }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("backs off instead of spinning when a stale pause cannot be saved", () => {
+  it.effect("backs off instead of spinning when a stale pause cannot be saved", () => {
     const script = new Script();
     let polls = 0;
     return Effect.gen(function* () {
@@ -640,16 +643,15 @@ describe("the chat apps", () => {
         });
       script.weixinIn.end();
       yield* until(() => polls === 1, "the first stale poll");
-      // Nothing to wait on shows it does not spin: a loop would poll again within this, the backoff (80 ms) not.
-      // oxlint-disable-next-line vibevalley/no-test-sleep
-      yield* Effect.sleep(20);
+      yield* TestClock.adjust(29_999);
       expect(polls).toBe(1);
       yield* sql.unsafe("drop trigger fail_pause on connector_account").pipe(Effect.orDie);
+      yield* TestClock.adjust(1);
       yield* until(() => polls >= 2, "polling after the backoff");
-    }).pipe(Effect.scoped, Effect.provide(farm(script, testConfig(), { retryFirstMs: 20, retryMostMs: 80 })));
+    }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("keep the account when retiring what waited fails", () => {
+  it.effect("keep the account when retiring what waited fails", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const runPromise = Effect.runPromiseWith(yield* Effect.context());
