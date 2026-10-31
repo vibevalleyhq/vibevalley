@@ -15,13 +15,13 @@ import {
 } from "@vibevalley/protocol";
 import { plainText, closedText } from "@vibevalley/protocol/rules";
 
-import { useAgent } from "@/base/agents";
 import { tookText, wallClockText } from "@/base/format";
-import { sendReplacing, useIntents } from "@/base/intent";
-import { ready } from "@/base/query";
 import { useNow } from "@/base/util";
 import { IssueArtifacts } from "@/features/artifact";
 import { createSessionEvents } from "@/features/session";
+import { useAgent } from "@/infra/agents";
+import { ready } from "@/infra/query";
+import { sendReplacing, useIntents } from "@/state/intent";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Checkbox } from "@/ui/Checkbox";

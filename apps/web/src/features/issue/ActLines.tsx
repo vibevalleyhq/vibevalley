@@ -2,7 +2,7 @@ import { For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { useIntents } from "@/base/intent";
+import { useIntents } from "@/state/intent";
 import { Icon } from "@/ui/Icon";
 
 import { issueMove, issueMoveOf } from "./moves";

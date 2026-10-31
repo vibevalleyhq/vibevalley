@@ -11,10 +11,10 @@ import { Cause, Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Sco
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { ServerConfig } from "@/base/config.ts";
-import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { jsonOf } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { FileWriter, readOrSetAside } from "@/infra/files.ts";
 
 export const emptyWorkspaceState = (): T.WorkspaceState => ({
   call: "idle",

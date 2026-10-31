@@ -2,9 +2,9 @@ import { createRoot, flush } from "solid-js";
 import type * as solid from "solid-js";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 
-import { api } from "@/base/api";
-import { type Intent, intentsIn } from "@/base/intent";
-import { deferred, testRegistry } from "@/base/testing";
+import { api } from "@/infra/api";
+import { type Intent, intentsIn } from "@/state/intent";
+import { deferred, testRegistry } from "@/state/testing";
 
 import { chatSay, createComposer, type ComposerWays, pendingLines, type Said } from "./composing";
 import { followed } from "./follow";

@@ -17,16 +17,16 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import { head } from "@/base/clip.ts";
-import { ServerConfig } from "@/base/config.ts";
-import { Db } from "@/base/db.ts";
-import { writeOnce } from "@/base/files.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
-import { bestEffort } from "@/base/log.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { bounded } from "@/core/bounded.ts";
 import { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Db } from "@/infra/db.ts";
+import { writeOnce } from "@/infra/files.ts";
+import { bestEffort } from "@/infra/log.ts";
 
 import * as qc from "../../db/generated/channel.sql.ts";
 import * as qa from "../../db/generated/channel_attachment.sql.ts";

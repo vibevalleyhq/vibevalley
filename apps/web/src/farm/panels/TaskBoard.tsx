@@ -9,11 +9,7 @@ import { list, t } from "@vibevalley/i18n";
 import { type GraphAction, type GraphEvent, type GraphState, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { useAgent, useWorkAgents } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
 import { spentText } from "@/base/format";
-import { useCore, useFrames } from "@/base/frame";
-import { ready, useProjects, useQuery } from "@/base/query";
 import { aria, Keyed } from "@/base/util";
 import { doingOf } from "@/farm/hud/readout";
 import { farm } from "@/farm/store";
@@ -21,6 +17,10 @@ import { useFarm } from "@/farm/ui";
 import { stationOfSession } from "@/farm/world/plots";
 import { lineCounts } from "@/features/issue";
 import { type Answer, graphs, useGraphChanges } from "@/features/task";
+import { useAgent, useWorkAgents } from "@/infra/agents";
+import { api, reasonOf } from "@/infra/api";
+import { useCore, useFrames } from "@/infra/frame";
+import { ready, useProjects, useQuery } from "@/infra/query";
 import { AgentFace } from "@/ui/Face";
 import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "@/ui/pixel";
 

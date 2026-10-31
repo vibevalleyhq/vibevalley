@@ -3,12 +3,12 @@ import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "s
 import { t } from "@vibevalley/i18n";
 import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
 
-import { reasonOf } from "@/base/api";
 import { ago } from "@/base/format";
-import { useCore } from "@/base/frame";
-import { useIntents } from "@/base/intent";
-import { ready } from "@/base/query";
 import { aria, autofocus } from "@/base/util";
+import { reasonOf } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { ready } from "@/infra/query";
+import { useIntents } from "@/state/intent";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { highlight, type Tokens } from "@/ui/code/highlight";

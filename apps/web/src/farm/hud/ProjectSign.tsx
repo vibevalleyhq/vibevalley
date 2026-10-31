@@ -5,8 +5,8 @@ import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { useRouter } from "@/base/router";
 import { useFarm } from "@/farm/ui";
+import { useRouter } from "@/infra/router";
 import { playSound } from "@/ui/pixel/sound";
 
 /** Where the sign's post stands, in the village's pixels: on the grass right of the mast (village.ldtk: its top at 18, 73). */

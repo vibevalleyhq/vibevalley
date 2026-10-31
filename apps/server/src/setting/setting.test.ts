@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
-import { ServerConfig } from "@/base/config.ts";
+import { ServerConfig } from "@/infra/config.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import { Setting } from "./setting.ts";

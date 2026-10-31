@@ -1,5 +1,5 @@
 // What is said in each channel the page shows, framework-free: its newest page read once (channel.message.list), then
-// followed from the newest revision it has (base/gateway.ts), older pages on asking. A channel stays read after nobody shows
+// followed from the newest revision it has (infra/gateway.ts), older pages on asking. A channel stays read after nobody shows
 // it, and its follower comes back from where it left off; only the few last shown are kept so, the rest let go. The
 // farm's reports are a feed of their own.
 
@@ -8,8 +8,8 @@ import { type Accessor, createEffect, createSignal } from "solid-js";
 import type { ChatMessage, ChannelEvent } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api, reasonOf } from "@/base/api";
-import { followReports, followChannel } from "@/base/gateway";
+import { api, reasonOf } from "@/infra/api";
+import { followReports, followChannel } from "@/infra/gateway";
 
 import { chatPage } from "./feed";
 export interface Followed {

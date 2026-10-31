@@ -7,9 +7,8 @@ import type { Accessor } from "solid-js";
 import { type ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
+import { createExternal } from "@/base/external";
 import { recordOf } from "@/base/util";
-
-import { createExternal } from "./external";
 
 /** The workbench's size, in percent; the farm keeps its own whole-number scaling. */
 export const ScaleValues = [90, 100, 110, 125] as const;

@@ -1,33 +1,10 @@
-// For the rules' tests: a registry whose frames come from the test, not from a server.
+// For the rules' tests: a registry whose frames come from the test (infra/testing.ts), not from a server.
 
 import type { StateFrame } from "@vibevalley/protocol";
 
-import { createRegistry, type FramesSource, framesSource } from "./atom";
-import type { Frames } from "./frames";
+import { type TestFrames, testFrames } from "@/infra/testing";
 
-export interface TestFrames {
-  readonly source: FramesSource;
-  /** Changes the frames and tells whoever reads them. */
-  readonly set: (next: Partial<Frames>) => void;
-}
-
-export function testFrames(start: Partial<Frames> = {}): TestFrames {
-  let now: Frames = { frame: undefined, link: "open", count: 0, ...start };
-  const listeners = new Set<() => void>();
-  return {
-    source: {
-      get: () => now,
-      subscribe: (l) => {
-        listeners.add(l);
-        return () => void listeners.delete(l);
-      },
-    },
-    set: (next) => {
-      now = { ...now, ...next };
-      for (const l of listeners) l();
-    },
-  };
-}
+import { createRegistry, framesSource } from "./atom";
 
 export function testRegistry(frames: TestFrames = testFrames()) {
   const registry = createRegistry();

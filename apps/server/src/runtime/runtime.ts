@@ -21,13 +21,13 @@ import type * as T from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
 import { modelClient } from "@/agent/model.ts";
-import { projectsDir, ServerConfig } from "@/base/config.ts";
-import { FileWriter } from "@/base/files.ts";
 import { jsonOrNone } from "@/base/json.ts";
-import { callbackLog } from "@/base/log.ts";
-import { timeHere, withinRealTime } from "@/base/time.ts";
 import { Core } from "@/core/core.ts";
 import { type ApiError, messageOf, refused } from "@/errors.ts";
+import { projectsDir, ServerConfig } from "@/infra/config.ts";
+import { FileWriter } from "@/infra/files.ts";
+import { callbackLog } from "@/infra/log.ts";
+import { timeHere, withinRealTime } from "@/infra/time.ts";
 import { Setting } from "@/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";

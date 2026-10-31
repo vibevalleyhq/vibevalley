@@ -7,10 +7,10 @@ import { t } from "@vibevalley/i18n";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
 import { yuan } from "@/base/format";
-import { ready, useRuntimes } from "@/base/query";
 import { aria, useClickAway } from "@/base/util";
 import { commands } from "@/farm/frames";
 import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "@/features/runtime";
+import { ready, useRuntimes } from "@/infra/query";
 import { CardColors, createPixelAct, PxButton, SpriteIcon } from "@/ui/pixel";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
 

@@ -6,8 +6,8 @@ import { Effect } from "effect";
 
 import { ownerId } from "@vibevalley/protocol";
 
-import { ServerConfig } from "@/base/config.ts";
 import { Channel } from "@/channel/chat.ts";
+import { ServerConfig } from "@/infra/config.ts";
 import { worldBelowTasks } from "@/testing/world.ts";
 
 import { Artifact } from "./artifact.ts";

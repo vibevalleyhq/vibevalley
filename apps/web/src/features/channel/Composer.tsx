@@ -6,12 +6,12 @@ import { t } from "@vibevalley/i18n";
 import { ownerId } from "@vibevalley/protocol";
 import type { Channel } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { useIntents } from "@/base/intent";
-import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
 import { DictationButton } from "@/features/voice";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
+import { useIntents } from "@/state/intent";
 import { createAct } from "@/ui/act";
 import { AttachmentTile } from "@/ui/AttachmentTile";
 import { OrchestratorFace } from "@/ui/Face";

@@ -25,8 +25,6 @@ import {
 import { type Agent, type Crop, defaultOrchestrator, type Session, type StateFrame, type SessionId } from "@vibevalley/protocol";
 import { omitUndefined, plotKeyOf } from "@vibevalley/protocol/rules";
 
-import { orchestratorMood } from "@/base/frame";
-import { prefsNow } from "@/base/prefs";
 import { clock, farmState } from "@/farm/store";
 import { frameVillage } from "@/farm/world/framing";
 import { villageHitAt, type VillageHit } from "@/farm/world/hits";
@@ -48,6 +46,8 @@ import {
   type Stroll,
 } from "@/farm/world/world";
 import { orchestratorSprite } from "@/features/orchestrator";
+import { orchestratorMood } from "@/infra/frame";
+import { prefsNow } from "@/infra/prefs";
 import { castPrefix } from "@/ui/cast";
 import { playSound } from "@/ui/pixel/sound";
 

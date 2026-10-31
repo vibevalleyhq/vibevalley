@@ -1,5 +1,5 @@
 // A search answered out of order: only the answer to the newest words is shown. Which answer is kept is
-// base/latest.test.ts's; this checks the page is wired to it.
+// state/latest.test.ts's; this checks the page is wired to it.
 import type { Request } from "@playwright/test";
 
 import { pathOf, type MessageSearch } from "@vibevalley/protocol";

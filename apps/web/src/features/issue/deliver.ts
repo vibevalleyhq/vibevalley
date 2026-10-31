@@ -1,11 +1,11 @@
-// What an issue delivers, picked by the owner on its page: an intent (base/intent.ts) on issue.update, settled by the
+// What an issue delivers, picked by the owner on its page: an intent (state/intent.ts) on issue.update, settled by the
 // frame whose seq is the reply's. Until then the pick shows the owner's choice, not the frame's old one; a refused pick
 // shows the frame's again, marked failed.
 
 import type { AppliedIssue, Deliverable } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { bySeq, defineIntent, type Intent } from "@/base/intent";
+import { api } from "@/infra/api";
+import { bySeq, defineIntent, type Intent } from "@/state/intent";
 
 export interface DeliverPick {
   readonly id: string;

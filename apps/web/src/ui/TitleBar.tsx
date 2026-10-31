@@ -3,7 +3,7 @@
 
 import { Show } from "solid-js";
 
-import { currentHost } from "@/base/host";
+import { currentHost } from "@/infra/host";
 
 /** The strip's height, and where the window's buttons end along it; both 0 where the window has its own title bar. */
 export const titleBar = currentHost().titleBar ?? { top: 0, left: 0 };

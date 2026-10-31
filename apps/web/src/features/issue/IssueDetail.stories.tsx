@@ -2,7 +2,7 @@ import type { Changes, Issue, SessionView } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 import { stories, story, type Story } from "@vibevalley/stories";
 
-import { answer } from "@/base/storyApi";
+import { answer } from "@/infra/storyApi";
 import { ToastHost } from "@/ui/ToastHost";
 
 import { acts, min, now, sampleChanges, sampleIssue, sampleSession, working } from "./issue.samples";

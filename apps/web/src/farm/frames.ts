@@ -4,7 +4,7 @@ import type { StateFrame } from "@vibevalley/protocol";
 import { farmOf } from "@vibevalley/protocol/rules";
 
 import { createExternal } from "@/base/external";
-import { type Frames, frames } from "@/base/frames";
+import { type Frames, frames } from "@/infra/frames";
 
 import { farmCommands } from "./commands";
 import { farmFrameOf } from "./scope";

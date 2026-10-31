@@ -2,8 +2,9 @@ import { expect, test } from "vite-plus/test";
 
 import type { AppliedIssue } from "@vibevalley/protocol";
 
-import { bySeq, defineIntent, type Intent, intentsIn } from "@/base/intent";
-import { frameAt, testFrames, testRegistry } from "@/base/testing";
+import { testFrames } from "@/infra/testing";
+import { bySeq, defineIntent, type Intent, intentsIn } from "@/state/intent";
+import { frameAt, testRegistry } from "@/state/testing";
 
 import type { BoardCard } from "./cards";
 import { sampleIssue as issue } from "./issue.samples";

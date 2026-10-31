@@ -3,7 +3,7 @@
 import { type Issue, VibeValleyApiError } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api, newSendKey } from "@/base/api";
+import { api, newSendKey } from "@/infra/api";
 
 import { newIssueTitle } from "./titles";
 const pickKey = "vibevalley.board.pick";

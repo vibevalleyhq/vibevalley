@@ -9,10 +9,10 @@ import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api, reasonOf } from "@/base/api";
 import { ago } from "@/base/format";
-import { ready, useQuery } from "@/base/query";
 import { aria, autofocus, Keyed, useNow } from "@/base/util";
+import { api, reasonOf } from "@/infra/api";
+import { ready, useQuery } from "@/infra/query";
 import { createAct } from "@/ui/act";
 import { TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";

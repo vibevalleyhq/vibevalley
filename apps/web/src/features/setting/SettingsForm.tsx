@@ -16,9 +16,9 @@ import {
 } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api, reasonOf } from "@/base/api";
-import { ready, useQuery, useSettings } from "@/base/query";
-import { saveSettings } from "@/base/settings";
+import { api, reasonOf } from "@/infra/api";
+import { ready, useQuery, useSettings } from "@/infra/query";
+import { saveSettings } from "@/infra/settings";
 import { createAct } from "@/ui/act";
 import { TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";

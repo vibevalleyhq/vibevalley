@@ -1,5 +1,5 @@
 // The owner's marks on a message (a reaction, a pin) and on a channel (archived, how much of it notifies): each is a
-// set, sent as an intent (base/intent.ts), so the page shows it at once and keeps showing it until what the server
+// set, sent as an intent (state/intent.ts), so the page shows it at once and keeps showing it until what the server
 // tells shows it too: a message's mark in its channel's copy (followed), a channel's in the frame. A refused or
 // unanswered one is let go and said in the error tone; the overlay goes with it, and the server's state shows again.
 // Each overlay sets only the field the owner set.
@@ -8,9 +8,9 @@ import { type Accessor, createMemo } from "solid-js";
 
 import { type Channel, type Chat, type ChatMessage, type Notify, ownerId, type StateFrame } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "@/base/intent";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "@/state/intent";
 
 import { type Followed, followed, useFollowed } from "./follow";
 import { markedRead, type ReadMark, unreadMark } from "./reading";

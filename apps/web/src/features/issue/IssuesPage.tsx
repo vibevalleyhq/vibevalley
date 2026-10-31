@@ -5,12 +5,12 @@ import { list, t } from "@vibevalley/i18n";
 import type { Issue, Session } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { useOrchestrators } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { useIntents } from "@/base/intent";
-import { useRouter } from "@/base/router";
 import { variant } from "@/base/util";
+import { useOrchestrators } from "@/infra/agents";
+import { api, reasonOf } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
+import { useIntents } from "@/state/intent";
 import { createAct } from "@/ui/act";
 import { Select } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";

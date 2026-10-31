@@ -10,9 +10,9 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import type { Actor } from "@/base/actor.ts";
-import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
-import { bestEffort } from "@/base/log.ts";
+import { Db } from "@/infra/db.ts";
+import { bestEffort } from "@/infra/log.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
 import { clip, memoryIsNewNote, issueMemoryText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";

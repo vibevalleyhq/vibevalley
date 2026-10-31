@@ -8,11 +8,11 @@ import { t } from "@vibevalley/i18n";
 import { type Memory, type MemorySourceInfo, memoryKeep } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api, createRequestKey, reasonOf } from "@/base/api";
 import { ago } from "@/base/format";
-import { useCore } from "@/base/frame";
-import { queries, ready, useProjects, useQuery } from "@/base/query";
 import { aria, useNow } from "@/base/util";
+import { api, createRequestKey, reasonOf } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { queries, ready, useProjects, useQuery } from "@/infra/query";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Select, TextArea, TextInput } from "@/ui/Field";

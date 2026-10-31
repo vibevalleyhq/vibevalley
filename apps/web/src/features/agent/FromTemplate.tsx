@@ -7,8 +7,8 @@ import { Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { ready, useAgentTemplates } from "@/base/query";
+import { api } from "@/infra/api";
+import { ready, useAgentTemplates } from "@/infra/query";
 import { createAct } from "@/ui/act";
 import { ConfirmButton } from "@/ui/ConfirmButton";
 import { toast } from "@/ui/toasts";

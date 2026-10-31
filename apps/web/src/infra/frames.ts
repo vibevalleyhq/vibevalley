@@ -1,4 +1,4 @@
-// The state stream as a store of its own, framework-free: the page reads it through base/frame.ts (a Solid store) and
+// The state stream as a store of its own, framework-free: the page reads it through infra/frame.ts (a Solid store) and
 // rawFrame() (the frames as they came).
 
 import { readStream, statePath, type StateFrame } from "@vibevalley/protocol";
@@ -10,6 +10,12 @@ export interface Frames {
   readonly link: Link;
   /** Frames received since the page opened. */
   readonly count: number;
+}
+
+/** Where the frames come from: frames below, or a source of a test's own (infra/testing.ts). */
+export interface FramesSource {
+  readonly get: () => Frames;
+  readonly subscribe: (listener: () => void) => () => void;
 }
 
 let current: Frames = { frame: undefined, link: "connecting", count: 0 };
@@ -30,7 +36,7 @@ function connect(signal: AbortSignal) {
   });
 }
 
-export const frames = {
+export const frames: FramesSource = {
   get: (): Frames => current,
   subscribe: (listener: () => void): (() => void) => {
     listeners.add(listener);

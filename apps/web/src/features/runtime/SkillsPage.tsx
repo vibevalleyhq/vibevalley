@@ -7,11 +7,11 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { list as listed, t } from "@vibevalley/i18n";
 import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
-import { ready, useAgents, useQuery, useRuntimes } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { matches } from "@/base/search";
 import { Keyed } from "@/base/util";
+import { api, reasonOf } from "@/infra/api";
+import { ready, useAgents, useQuery, useRuntimes } from "@/infra/query";
+import { useRouter } from "@/infra/router";
 import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";

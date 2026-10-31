@@ -6,11 +6,11 @@ import { Toolbar } from "@vibevalley/base-ui";
 import { list, t } from "@vibevalley/i18n";
 import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { useIntents } from "@/base/intent";
-import { useRouter } from "@/base/router";
 import { aria, autofocus } from "@/base/util";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { useRouter } from "@/infra/router";
+import { useIntents } from "@/state/intent";
 import { createAct } from "@/ui/act";
 import { fileKind, sizeText } from "@/ui/AttachmentTile";
 import { Icon } from "@/ui/Icon";

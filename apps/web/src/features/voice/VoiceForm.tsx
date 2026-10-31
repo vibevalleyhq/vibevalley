@@ -23,10 +23,10 @@ import {
   VoiceValues,
 } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
-import { ready, useQuery, useSettings } from "@/base/query";
-import { saveSettings } from "@/base/settings";
 import { variant, aria, createSettled, Keyed } from "@/base/util";
+import { api, reasonOf } from "@/infra/api";
+import { ready, useQuery, useSettings } from "@/infra/query";
+import { saveSettings } from "@/infra/settings";
 import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";

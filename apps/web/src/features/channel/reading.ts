@@ -1,5 +1,5 @@
 // Where the owner has read to in a channel: moved on as a shown channel's messages are drawn (markRead), moved back by
-// 标为未读 (markUnread). Both are sets, sent as intents (base/intent.ts) that queue while the state stream is lost and
+// 标为未读 (markUnread). Both are sets, sent as intents (state/intent.ts) that queue while the state stream is lost and
 // settle when the frame's channel has its read where it was put. A failure is said in the error tone; a mark unread
 // that failed also lets go of its hold, so the channel reads as read again rather than looking marked when it is not.
 
@@ -7,8 +7,8 @@ import { type Accessor, createEffect, createSignal } from "solid-js";
 
 import type { Channel, StateFrame } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "@/base/intent";
+import { api } from "@/infra/api";
+import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "@/state/intent";
 
 import { newestUnread } from "./unread";
 

@@ -2,13 +2,13 @@ import type { JSX } from "@solidjs/web";
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { Loading, onSettled } from "solid-js";
 
-import { createRegistry, RegistryContext } from "@/base/atom";
-import { createFrames, FramesContext } from "@/base/frame";
-import { frames } from "@/base/frames";
-import { reveal } from "@/base/opening";
-import { queries, refetchOnRelink } from "@/base/query";
-import { createRouter, RouterContext } from "@/base/router";
 import { createFarmUi, FarmUiContext } from "@/farm/ui";
+import { createFrames, FramesContext } from "@/infra/frame";
+import { frames } from "@/infra/frames";
+import { reveal } from "@/infra/opening";
+import { queries, refetchOnRelink } from "@/infra/query";
+import { createRouter, RouterContext } from "@/infra/router";
+import { createRegistry, RegistryContext } from "@/state/atom";
 
 /** What every page has around it: the router, the state frames, the atoms' registry (intents), the farm's own state, the
  * query cache. */
@@ -32,7 +32,7 @@ export function Root(props: { children: JSX.Element }) {
   );
 }
 
-/** The page is up: the cover index.html started on (public/opening.html) goes once the page is ready (base/opening.ts).
+/** The page is up: the cover index.html started on (public/opening.html) goes once the page is ready (infra/opening.ts).
  * From then on the REST reads are read again whenever the state stream comes back. */
 function Opened() {
   onSettled(() => {

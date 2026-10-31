@@ -92,16 +92,20 @@ tester.run("native-control", rule("native-control"), {
 
 tester.run("page-layers", rule("page-layers"), {
   valid: [
-    { code: "import { a } from '../base/router';", filename: page("ui/A.tsx") },
+    { code: "import { a } from '../infra/router';", filename: page("ui/A.tsx") },
     { code: "import { a } from '../issue';", filename: page("features/channel/Chat.tsx") },
     { code: "import { a } from './rules';", filename: page("features/issue/Board.tsx") },
     { code: "import { a } from '../../features/issue';", filename: page("farm/panels/Board.tsx") },
     { code: "import { a } from '../ui/A';", filename: "/repo/apps/server/src/x.ts" },
-    { code: "import { a } from '@/base/router';", filename: page("ui/A.tsx") },
+    { code: "import { a } from '@/infra/router';", filename: page("ui/A.tsx") },
     { code: "import { a } from '@/features/issue';", filename: page("farm/panels/Board.tsx") },
+    { code: "import { a } from '@/infra/frames';", filename: page("state/atom.ts") },
+    { code: "import { a } from '@/base/format';", filename: page("infra/api.ts") },
   ],
   invalid: [
     { code: "import { a } from '../features/issue';", filename: page("ui/A.tsx"), errors: [{ messageId: "layer" }] },
+    { code: "import { a } from '@/infra/api';", filename: page("base/format.ts"), errors: [{ messageId: "layer" }] },
+    { code: "import { a } from '@/state/atom';", filename: page("infra/frame.ts"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../../farm/scene';", filename: page("features/issue/Board.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "index" }] },
     { code: "export { a } from '../tree/x';", filename: page("farm/a.ts"), errors: [{ messageId: "sibling" }] },
@@ -114,16 +118,16 @@ tester.run("page-layers", rule("page-layers"), {
 tester.run("parent-import", rule("parent-import"), {
   valid: [
     { code: "import { a } from './rules';", filename: page("features/issue/Board.tsx") },
-    { code: "import { a } from '@/base/router';", filename: page("ui/A.tsx") },
+    { code: "import { a } from '@/infra/router';", filename: page("ui/A.tsx") },
     { code: "import { a } from '../../db/generated/x.ts';", filename: "/repo/apps/server/src/issue/issue.ts" },
     { code: "import { a } from '../x';", filename: "/repo/packages/agent/src/core/loop.ts" },
   ],
   invalid: [
     {
-      code: "import { a } from '../base/router';",
+      code: "import { a } from '../infra/router';",
       filename: page("ui/A.tsx"),
       errors: [{ messageId: "parent" }],
-      output: "import { a } from '@/base/router';",
+      output: "import { a } from '@/infra/router';",
     },
     {
       code: "export * from '../issue/rules.ts';",
@@ -183,7 +187,7 @@ tester.run("db-door", rule("db-door"), {
     { code: 'import { type SqlClient, SqlError } from "effect/sql";', filename: "/repo/apps/server/src/session/session.ts" },
     {
       code: 'import { SqlClient } from "effect/sql";\nconst t = sql.withTransaction(work);',
-      filename: "/repo/apps/server/src/base/db.ts",
+      filename: "/repo/apps/server/src/infra/db.ts",
     },
   ],
   invalid: [
@@ -194,8 +198,8 @@ tester.run("db-door", rule("db-door"), {
 
 tester.run("atom-door", rule("atom-door"), {
   valid: [
-    { code: 'import { Atom } from "effect/reactivity";', filename: page("base/atom.ts") },
-    { code: 'import { Atom, type AtomRegistry } from "effect/reactivity";', filename: page("base/intent.ts") },
+    { code: 'import { Atom } from "effect/reactivity";', filename: page("state/atom.ts") },
+    { code: 'import { Atom, type AtomRegistry } from "effect/reactivity";', filename: page("state/intent.ts") },
     { code: 'import { Effect } from "effect";', filename: page("features/issue/moves.ts") },
     { code: 'import { Atom } from "effect/reactivity";', filename: "/repo/apps/server/src/core/core.ts" },
   ],

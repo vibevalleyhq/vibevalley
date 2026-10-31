@@ -4,10 +4,10 @@ import { For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { useRouter } from "@/base/router";
 import { farm } from "@/farm/store";
 import { muted } from "@/farm/support";
 import { webRoutes, yardPlaces } from "@/farm/world/places";
+import { useRouter } from "@/infra/router";
 import { FarmSection, PxButton } from "@/ui/pixel";
 
 const elsewhere = [

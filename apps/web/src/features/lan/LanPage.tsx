@@ -7,10 +7,10 @@ import { For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { LanPairing, LanStatus } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
 import { momentText } from "@/base/format";
-import { ready, useQuery } from "@/base/query";
 import { useNow } from "@/base/util";
+import { api, reasonOf } from "@/infra/api";
+import { ready, useQuery } from "@/infra/query";
 import { type Act, createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Card, Quiet } from "@/ui/layout";

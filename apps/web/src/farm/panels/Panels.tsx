@@ -9,16 +9,16 @@ import { For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
 
-import { orchestratorLookOf } from "@/base/agents";
-import { api } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { setPet, usePrefs } from "@/base/prefs";
-import { ready, useAgents } from "@/base/query";
 import { aria, Keyed } from "@/base/util";
 import { farm, type FarmOverlay, type FarmPanel } from "@/farm/store";
 import { useVillage } from "@/farm/support";
 import { useFarm } from "@/farm/ui";
 import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "@/features/orchestrator";
+import { orchestratorLookOf } from "@/infra/agents";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { setPet, usePrefs } from "@/infra/prefs";
+import { ready, useAgents } from "@/infra/query";
 import { createPixelAct, FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
 
 import { Achievements } from "./Achievements";

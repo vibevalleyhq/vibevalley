@@ -3,8 +3,8 @@
 
 import type { ArtifactListRequest } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { useQuery } from "@/base/query";
+import { api } from "@/infra/api";
+import { useQuery } from "@/infra/query";
 
 const fresh = 5_000;
 

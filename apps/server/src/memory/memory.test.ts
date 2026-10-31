@@ -12,8 +12,8 @@ import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
-import { agentHome, ServerConfig } from "@/base/config.ts";
-import { Database, Db } from "@/base/db.ts";
+import { agentHome, ServerConfig } from "@/infra/config.ts";
+import { Database, Db } from "@/infra/db.ts";
 import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";
 

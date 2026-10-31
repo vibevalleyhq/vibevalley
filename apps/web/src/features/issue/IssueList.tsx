@@ -4,8 +4,8 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { IssueStatus } from "@vibevalley/protocol";
 
-import { useOrchestrators } from "@/base/agents";
 import { ago } from "@/base/format";
+import { useOrchestrators } from "@/infra/agents";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
 import { IconButton } from "@/ui/IconButton";

@@ -7,11 +7,11 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
 import { momentText, wallClockText } from "@/base/format";
-import { useCore } from "@/base/frame";
 import { Keyed } from "@/base/util";
 import { channelLabel, defaultOf, topsOf } from "@/features/channel";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Field, Select, TextInput } from "@/ui/Field";

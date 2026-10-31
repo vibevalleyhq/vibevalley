@@ -10,8 +10,8 @@ import { Effect, Layer } from "effect";
 
 import type { AccountUsage } from "@vibevalley/protocol";
 
-import { type ServerConfig } from "@/base/config.ts";
 import { Inbox } from "@/inbox/inbox.ts";
+import { type ServerConfig } from "@/infra/config.ts";
 import { Mcp } from "@/mcp/mcp.ts";
 import { type GitHubRun, type ProjectHooks } from "@/project/project.ts";
 import { registryOf } from "@/runtime/runtime.ts";

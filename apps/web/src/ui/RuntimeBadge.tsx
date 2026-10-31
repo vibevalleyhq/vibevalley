@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
 
-import { ready, useRuntimes, useSprites } from "@/base/query";
+import { ready, useRuntimes, useSprites } from "@/infra/query";
 
 import { runtimeName } from "./runtimes";
 

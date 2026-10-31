@@ -13,11 +13,11 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
-import type { ServerConfig } from "@/base/config.ts";
 import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { Cron } from "@/cron/cron.ts";
 import { Inbox } from "@/inbox/inbox.ts";
+import type { ServerConfig } from "@/infra/config.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
 import { starter, testConfig } from "@/testing/layers.ts";

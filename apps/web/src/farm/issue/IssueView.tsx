@@ -17,12 +17,7 @@ import {
 } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
-import { useAgent } from "@/base/agents";
 import { tookText, wallClockText } from "@/base/format";
-import { useCore, useFrames } from "@/base/frame";
-import { sendReplacing, useIntents } from "@/base/intent";
-import { ready } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { aria, useNow } from "@/base/util";
 import { playBedFx } from "@/farm/commands";
 import { farmActWords } from "@/farm/labels";
@@ -51,6 +46,11 @@ import {
   useIssueTimeline,
 } from "@/features/issue";
 import { createSessionEvents, WorkLog } from "@/features/session";
+import { useAgent } from "@/infra/agents";
+import { useCore, useFrames } from "@/infra/frame";
+import { ready } from "@/infra/query";
+import { useRouter } from "@/infra/router";
+import { sendReplacing, useIntents } from "@/state/intent";
 import { castPrefix, outfitLabel, speciesLabel } from "@/ui/cast";
 import { createPixelAct, FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
 

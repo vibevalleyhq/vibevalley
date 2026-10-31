@@ -14,8 +14,8 @@ import type * as T from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { Agent } from "@/agent/agent.ts";
-import { ServerConfig } from "@/base/config.ts";
 import { Core } from "@/core/core.ts";
+import { ServerConfig } from "@/infra/config.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { sampleAgent } from "@/testing/agents.ts";
 import { testConfig } from "@/testing/layers.ts";

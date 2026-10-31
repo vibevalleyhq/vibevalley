@@ -5,7 +5,7 @@ import { createSignal, Match, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { api } from "@/base/api";
+import { api } from "@/infra/api";
 import { createAct } from "@/ui/act";
 import { Icon } from "@/ui/Icon";
 import { IconButton } from "@/ui/IconButton";

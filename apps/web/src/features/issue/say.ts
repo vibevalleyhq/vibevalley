@@ -1,12 +1,12 @@
-// Words for the helper on an issue (an answer, 打回's findings, a word mid-turn): an intent (base/intent.ts) keyed by
+// Words for the helper on an issue (an answer, 打回's findings, a word mid-turn): an intent (state/intent.ts) keyed by
 // the comment's sendKey, so a retry after a lost reply is said once. The box empties at once and the words show under it
 // until a frame at least as new as the reply comes (issue.comment.create answers the seq); a failed one stays there with
 // why, to say again with its key or take back into the box.
 
 import type { Applied } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { bySeq, defineIntent, type Intent } from "@/base/intent";
+import { api } from "@/infra/api";
+import { bySeq, defineIntent, type Intent } from "@/state/intent";
 
 export interface IssueSaid {
   readonly id: string;

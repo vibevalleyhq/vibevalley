@@ -8,9 +8,9 @@ import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
 import type { RtcLine } from "@vibevalley/protocol/host";
 
-import { api, reasonOf } from "@/base/api";
-import { currentHost } from "@/base/host";
-import { prefsNow } from "@/base/prefs";
+import { api, reasonOf } from "@/infra/api";
+import { currentHost } from "@/infra/host";
+import { prefsNow } from "@/infra/prefs";
 
 import { webRtc } from "./agora";
 import { LiveCaptions } from "./captions";

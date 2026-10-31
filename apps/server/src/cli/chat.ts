@@ -19,9 +19,9 @@ import { memoryStore } from "@vibevalley/agent/todoStore";
 import { t, currentLocale } from "@vibevalley/i18n";
 
 import { modelClient } from "@/agent/model.ts";
-import { loadConfig } from "@/base/config.ts";
-import { wallTime } from "@/base/time.ts";
 import { messageOf } from "@/errors.ts";
+import { loadConfig } from "@/infra/config.ts";
+import { wallTime } from "@/infra/time.ts";
 import { dshRuntime } from "@/runtime/dsh.ts";
 import { registryOf } from "@/runtime/runtime.ts";
 import { vibevalleyRuntimeOf } from "@/runtime/vibevalley.ts";

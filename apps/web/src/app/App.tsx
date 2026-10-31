@@ -4,9 +4,6 @@
 import type { JSX } from "@solidjs/web";
 import { Match, Show, Switch, untrack } from "solid-js";
 
-import { prefsNow } from "@/base/prefs";
-import { ready, useProjects } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { Keyed } from "@/base/util";
 import { FarmPage } from "@/farm/FarmPage";
 import { projectMap } from "@/farm/map/ProjectMap";
@@ -22,6 +19,9 @@ import { OrchestratorPage } from "@/features/orchestrator";
 import { ProjectsPage, sortProjects } from "@/features/project";
 import { RuntimesPage } from "@/features/runtime";
 import { SettingsPage } from "@/features/setting";
+import { prefsNow } from "@/infra/prefs";
+import { ready, useProjects } from "@/infra/query";
+import { useRouter } from "@/infra/router";
 import { TreePage } from "@/tree/TreePage";
 import { Navigate } from "@/ui/A";
 import { WindowStrip } from "@/ui/TitleBar";

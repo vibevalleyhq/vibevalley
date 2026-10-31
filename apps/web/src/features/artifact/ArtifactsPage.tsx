@@ -6,13 +6,13 @@ import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type Artifact, type ArtifactVersion, artifactPath, type SayRequest } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
 import { ago } from "@/base/format";
-import { useCore } from "@/base/frame";
-import { type IntentType, sendOnce, useIntents } from "@/base/intent";
-import { queries, ready } from "@/base/query";
-import { useRouter, useSearch } from "@/base/router";
 import { Keyed, useNow } from "@/base/util";
+import { api, reasonOf } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { queries, ready } from "@/infra/query";
+import { useRouter, useSearch } from "@/infra/router";
+import { type IntentType, sendOnce, useIntents } from "@/state/intent";
 import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";

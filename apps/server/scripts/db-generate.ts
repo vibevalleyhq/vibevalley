@@ -1,6 +1,6 @@
 // Writes db/generated from db/migrations and db/queries with effect-sqlc (the owner's generator, beside this repo in
 // ../effect-sqlc or at $EFFECT_SQLC), then fits it to this server: effect 4's stable path for the sql modules, and no
-// node-postgres pool (the server runs PGlite: src/base/db.ts). --check fails when db/generated is stale.
+// node-postgres pool (the server runs PGlite: src/infra/db.ts). --check fails when db/generated is stale.
 
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";

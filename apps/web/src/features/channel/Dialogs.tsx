@@ -6,11 +6,11 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Channel, Notify } from "@vibevalley/protocol";
 
-import { useOrchestrators } from "@/base/agents";
-import { api } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { ready, useProjects } from "@/base/query";
 import { autofocus } from "@/base/util";
+import { useOrchestrators } from "@/infra/agents";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { ready, useProjects } from "@/infra/query";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";

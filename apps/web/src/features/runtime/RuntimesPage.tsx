@@ -20,11 +20,11 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { useWorkAgents } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
 import { momentText, wallClockText, yuan } from "@/base/format";
-import { ready, useRuntimes } from "@/base/query";
 import { variant, Keyed } from "@/base/util";
+import { useWorkAgents } from "@/infra/agents";
+import { api, reasonOf } from "@/infra/api";
+import { ready, useRuntimes } from "@/infra/query";
 import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";

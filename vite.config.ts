@@ -44,8 +44,8 @@ export const refused = {
   ),
   useQuery: says(
     "solid-query's useQuery tracks what its fetch reads, so a signal read inside refetches",
-    'import { useQuery } from "@/base/query"',
-    "apps/web/src/base/query.ts",
+    'import { useQuery } from "@/infra/query"',
+    "apps/web/src/infra/query.ts",
   ),
 };
 
@@ -270,16 +270,16 @@ export default defineConfig({
         rules: { "eslint/no-await-in-loop": "off" },
       },
       {
-        // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives; so does
+        // The server logs through Effect (src/infra/log.ts for callbacks): levels, and the logger the layer gives; so does
         // the agent it runs on. The command line prints.
         files: ["apps/server/src/**", "packages/ai/src/**", "packages/agent/src/**"],
         rules: { "no-console": "error", "vibevalley/no-wall-clock": "error" },
       },
       {
-        // base/time.ts and the agent's realTime.ts are where the wall clock is allowed (wallTime, the real-time
+        // infra/time.ts and the agent's realTime.ts are where the wall clock is allowed (wallTime, the real-time
         // deadlines); tests drive time as they need.
         files: [
-          "apps/server/src/base/time.ts",
+          "apps/server/src/infra/time.ts",
           "packages/agent/src/realTime.ts",
           "apps/server/src/**/*.test.ts",
           "packages/*/src/**/*.test.ts",
@@ -441,7 +441,7 @@ export default defineConfig({
           "apps/server/src/runtime/runtime.ts",
           "apps/server/src/mcp/mcp.ts",
           "apps/server/src/orchestrator/openai.ts",
-          "apps/server/src/base/time.ts",
+          "apps/server/src/infra/time.ts",
         ],
         rules: { "vibevalley/promise-boundary": "off" },
       },
@@ -484,7 +484,7 @@ export default defineConfig({
         rules: { "vibevalley/protocol-namespace": "error" },
       },
       {
-        // Only the page's base/ stands on Effect's Atom, whose API is unstable (scripts/oxlint-plugin.ts, atom-door).
+        // Only the page's state/ stands on Effect's Atom, whose API is unstable (scripts/oxlint-plugin.ts, atom-door).
         files: ["apps/web/src/**"],
         rules: { "vibevalley/atom-door": "error" },
       },

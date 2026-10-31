@@ -1,6 +1,6 @@
 // A line said in the workbench, as far as the page wires it: it shows at once and once after, a failed one waits in its
 // channel with its key while the owner is elsewhere, and a line said while the state stream is down goes once it is back.
-// When a line settles is base/intent.test.ts's and features/channel/composing.test.ts's.
+// When a line settles is state/intent.test.ts's and features/channel/composing.test.ts's.
 import type { Page } from "@playwright/test";
 
 import { pathOf, readStream, type SayRequest, type StateFrame, statePath, type VibeValleyApi } from "@vibevalley/protocol";

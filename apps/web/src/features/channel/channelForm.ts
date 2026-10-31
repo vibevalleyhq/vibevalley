@@ -7,7 +7,7 @@ import { createSignal, untrack } from "solid-js";
 import { type Channel, defaultOrchestrator, type Notify } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api } from "@/base/api";
+import { api } from "@/infra/api";
 import { createAct } from "@/ui/act";
 /** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
 export function createChannelForm(channel?: Channel) {

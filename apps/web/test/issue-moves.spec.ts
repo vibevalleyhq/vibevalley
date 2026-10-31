@@ -1,6 +1,6 @@
 // Moving a card between lanes, as far as the page wires it: the card waits in the lane it was dropped on until a frame
 // shows the move, a refusal leaves it there failed, and a retry is the same request (its key). Which frame settles a
-// move is base/intent.test.ts's and features/issue/moves.test.ts's.
+// move is state/intent.test.ts's and features/issue/moves.test.ts's.
 import type { Page } from "@playwright/test";
 
 import { type Agent, type IssueStatusRequest, pathOf, type VibeValleyApi } from "@vibevalley/protocol";

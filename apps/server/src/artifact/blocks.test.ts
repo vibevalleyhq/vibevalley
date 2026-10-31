@@ -5,10 +5,10 @@ import { SqlClient } from "effect/sql";
 import { t } from "@vibevalley/i18n";
 import type { BlockOp } from "@vibevalley/protocol";
 
-import { ServerConfig } from "@/base/config.ts";
-import { Database, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { orMissing } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Database, Db } from "@/infra/db.ts";
 import { sampleAgent } from "@/testing/agents.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { waitFor, whenTrue } from "@/testing/until.ts";

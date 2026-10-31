@@ -13,12 +13,12 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 
-import { ServerConfig } from "@/base/config.ts";
-import { Db } from "@/base/db.ts";
-import { writeOnce } from "@/base/files.ts";
 import { newId } from "@/base/ids.ts";
 import { Channel } from "@/channel/chat.ts";
 import { type ApiError, lookIn, missing, refused } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Db } from "@/infra/db.ts";
+import { writeOnce } from "@/infra/files.ts";
 
 import * as qa from "../../db/generated/artifact.sql.ts";
 import * as qv from "../../db/generated/artifact_version.sql.ts";

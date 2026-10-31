@@ -4,13 +4,13 @@ import { t } from "@vibevalley/i18n";
 import { type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { useWorkAgents } from "@/base/agents";
-import { api } from "@/base/api";
 import { ago, wallClockText } from "@/base/format";
-import { useIntents } from "@/base/intent";
-import { ready, queries, useProjects } from "@/base/query";
 import { autofocus } from "@/base/util";
 import { IssueArtifacts } from "@/features/artifact";
+import { useWorkAgents } from "@/infra/agents";
+import { api } from "@/infra/api";
+import { ready, queries, useProjects } from "@/infra/query";
+import { useIntents } from "@/state/intent";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";

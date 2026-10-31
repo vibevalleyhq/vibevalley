@@ -23,7 +23,7 @@
 - 能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出，`docs:verify` 查它是不是最新。
 - 命令行 `apps/server/src/cli.ts`：每个接口一条命令（从 `endpoints` 来），`state`、`events`、`issue work`；`runtime chat` 和自己的 agent 不经服务端。
 - 「连接到本机」 `apps/server/src/lan/lan.ts` 的 `remoteMay`：从 `endpoints` 和三条流里挑 `can` 有 `remote` 的。
-- 页面 `apps/web/src/base/frames.ts`（读 `/state`）、`base/live.ts`（读 `/live`），命令用 `VibeValleyApi`。
+- 页面 `apps/web/src/infra/frames.ts`（读 `/state`）、`infra/live.ts`（读 `/live`），命令用 `VibeValleyApi`。
 - 文件：`$VIBEVALLEY_HOME/state.json`。
 
 ## 模型和不变量
@@ -43,9 +43,9 @@
 **`state.json`**
 
 - **存除了频道、进度、定时任务、工单以外的全部**（`toKeep` 清掉 `chat`、`progress`、`crons`、`issues`）：它们的家是库，开机由拥有者从库里放回核心状态。工单只放开着的和最近关的 50 家（`keepClosedIssues`）。接回要的工作目录、oar 会话 id、最后一轮原话和想起过的记性在 `session` 表（`place`、`oar_session`、`last_text`、`recalled`），轨迹、diff 这类大块的旁路数据不进核心状态。
-- **合并写**：从第一条变化起算 500 毫秒写一次，持续有事实也不推迟这一次；一次崩溃最多丢半秒。写的是临时文件再改名（`base/files.ts` 的 `FileWriter`），不会留下半个文件；写不了记日志，不停服务。
+- **合并写**：从第一条变化起算 500 毫秒写一次，持续有事实也不推迟这一次；一次崩溃最多丢半秒。写的是临时文件再改名（`infra/files.ts` 的 `FileWriter`），不会留下半个文件；写不了记日志，不停服务。
 - **关时写最后一份**：关的时候停掉等着的那次，写最后的状态并封住，已经在路上的定时任务回调写不进来。`core` 最先建、最后关，所以最后一份是所有服务都停下之后的。
-- **读回时**：读不了、解析不了或不符合 `WorkspaceState` 的 Schema，就改名成 `state.json.unreadable-<毫秒>` 留着（不会被之后的保存盖掉）、从空的开始并记日志；改不了名就不开机（`base/files.ts` 的 `readOrSetAside`，`config.json`、`settings.json` 同样）；通话回到 `idle`、没有通话原因、管家回到 `idle`（没人在通话上，管家也不在说话），帮工的地块按 `withStations` 重新排。
+- **读回时**：读不了、解析不了或不符合 `WorkspaceState` 的 Schema，就改名成 `state.json.unreadable-<毫秒>` 留着（不会被之后的保存盖掉）、从空的开始并记日志；改不了名就不开机（`infra/files.ts` 的 `readOrSetAside`，`config.json`、`settings.json` 同样）；通话回到 `idle`、没有通话原因、管家回到 `idle`（没人在通话上，管家也不在说话），帮工的地块按 `withStations` 重新排。
 
 **三条流**（`http/streams.ts`；「连接到本机」按同样的三个路径放行）
 
@@ -117,7 +117,7 @@
 
 ## 和谁打交道
 
-- **施加事实的**：工单、帮工、频道、定时任务、管家（`setOrchestrator`）；`orchestrator.open` 和主人说话经 `open` 让通话在线（主人从哪里说话都走 `Orchestrator.say`、`heard`，由它们开）；游戏（commit 数、`progress`、`station`）。它们都排在 `core` 后面，`core` 只用 `base` 和 `packages/protocol`：折法和拼帧要读它们的规则，由组装时交给它的 `Projection` 带进来。
+- **施加事实的**：工单、帮工、频道、定时任务、管家（`setOrchestrator`）；`orchestrator.open` 和主人说话经 `open` 让通话在线（主人从哪里说话都走 `Orchestrator.say`、`heard`，由它们开）；游戏（commit 数、`progress`、`station`）。它们都排在 `core` 后面，`core` 只用 `base`、`infra` 和 `packages/protocol`：折法和拼帧要读它们的规则，由组装时交给它的 `Projection` 带进来。
 - **订阅的**：游戏的账本和计划读 `transitions`；别的读 `facts`、`events`；账本另读 `owner`。
 - **读的**：任何服务用 `state()`、`session(id)` 读当前值；`http/streams.ts` 把三条流交给页面。
 - **外面**：页面读帧和窄流、调 `VibeValleyApi`；命令行按 `endpoints` 发 HTTP；「连接到本机」后的设备经同一套接口，由 `lan` 按 `can` 放行。

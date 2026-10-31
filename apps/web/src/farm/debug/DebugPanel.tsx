@@ -9,15 +9,15 @@ import { clockText } from "@vibevalley/engine/clock";
 import { t } from "@vibevalley/i18n";
 import type { Session, StateFrame } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
 import { createExternal } from "@/base/external";
-import { orchestratorMood, useCore, useFrames, rawFrame } from "@/base/frame";
-import { subscribeLive } from "@/base/live";
-import { ready, useQuery } from "@/base/query";
 import { aria } from "@/base/util";
 import { localEffects } from "@/farm/effects";
 import { clock, farm } from "@/farm/store";
 import { typing } from "@/farm/tools";
+import { api } from "@/infra/api";
+import { orchestratorMood, useCore, useFrames, rawFrame } from "@/infra/frame";
+import { subscribeLive } from "@/infra/live";
+import { ready, useQuery } from "@/infra/query";
 import { createPixelAct } from "@/ui/pixel";
 import { playSound, SOUND_GROUPS, SOUND_LABEL } from "@/ui/pixel/sound";
 

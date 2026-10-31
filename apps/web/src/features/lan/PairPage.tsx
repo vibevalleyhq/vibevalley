@@ -5,7 +5,7 @@ import { createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { reasonOf } from "@/base/api";
+import { reasonOf } from "@/infra/api";
 import { Button } from "@/ui/Button";
 import { Field, TextInput } from "@/ui/Field";
 

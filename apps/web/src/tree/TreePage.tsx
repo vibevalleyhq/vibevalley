@@ -11,8 +11,8 @@ import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
 import { ago } from "@/base/format";
-import { useRouter, useSearch } from "@/base/router";
 import { useNow, useViewport } from "@/base/util";
+import { useRouter, useSearch } from "@/infra/router";
 import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";
 import { toast } from "@/ui/toasts";

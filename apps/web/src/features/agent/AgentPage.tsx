@@ -26,14 +26,14 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { useAgentProblems } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
-import { ready, useAgents, useRuntimes, useSprites } from "@/base/query";
-import { useRouter, useSearch } from "@/base/router";
 import { aria } from "@/base/util";
 import { MemoryPanel } from "@/features/memory";
 import { useSkills } from "@/features/runtime";
 import { TrajectoryList } from "@/features/session";
+import { useAgentProblems } from "@/infra/agents";
+import { api, reasonOf } from "@/infra/api";
+import { ready, useAgents, useRuntimes, useSprites } from "@/infra/query";
+import { useRouter, useSearch } from "@/infra/router";
 import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";

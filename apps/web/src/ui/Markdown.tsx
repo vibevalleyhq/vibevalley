@@ -5,7 +5,7 @@ import remarkRehype from "remark-rehype";
 import { createMemo, onCleanup } from "solid-js";
 import { type Plugin, unified } from "unified";
 
-import { useRouter } from "@/base/router";
+import { useRouter } from "@/infra/router";
 
 import { markdownClass, remarkMentions } from "./mentions";
 import { remarkIssueRefs } from "./richRules";

@@ -1,6 +1,8 @@
 // The server's ten modules, lowest first: a module uses the ones before it and never one after
 // (docs/subsystems/foundation.md). Each entry is the folders and root files under src/ it
 // is made of; modules.test.ts reads every import against this table, and services.ts assembles the modules in this order.
+// Platform's ground is two folders: base (pure: ids, JSON, ordering, redaction) imports nothing else under src, and
+// infra (the config, the database, files, the home's lease, logs, time) talks to the process and the machine.
 
 export interface Module {
   readonly name: string;
@@ -9,7 +11,7 @@ export interface Module {
 }
 
 export const modules: readonly Module[] = [
-  { name: "Platform", parts: ["base", "core", "setting", "errors.ts", "words.ts", "prompts.ts"] },
+  { name: "Platform", parts: ["base", "infra", "core", "setting", "errors.ts", "words.ts", "prompts.ts"] },
   { name: "Agents", parts: ["agent", "runtime", "memory"] },
   { name: "Source Control", parts: ["project"] },
   { name: "Collaboration", parts: ["channel", "artifact"] },

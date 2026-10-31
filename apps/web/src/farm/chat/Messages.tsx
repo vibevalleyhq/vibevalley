@@ -9,13 +9,13 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
 import { spentText } from "@/base/format";
-import { useCore } from "@/base/frame";
-import { useIntents } from "@/base/intent";
 import { aria, autofocus } from "@/base/util";
 import { artifactHref } from "@/features/artifact";
 import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, reactionOn, reactionSet, sameReaction, setMark, useMessage } from "@/features/channel";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { useIntents } from "@/state/intent";
 import { A } from "@/ui/A";
 import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
 import { createPixelAct, noticeTitle, PxMarkdown, SpriteIcon, ToastType, toasts } from "@/ui/pixel";

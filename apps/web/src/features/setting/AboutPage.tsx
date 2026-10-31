@@ -4,9 +4,9 @@ import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { reasonOf } from "@/base/api";
-import { currentHost } from "@/base/host";
-import { ready, useSettings } from "@/base/query";
+import { reasonOf } from "@/infra/api";
+import { currentHost } from "@/infra/host";
+import { ready, useSettings } from "@/infra/query";
 import { IconButton } from "@/ui/IconButton";
 import { Quiet } from "@/ui/layout";
 import { SettingRow, SettingsGroup, SettingsPage } from "@/ui/settings";

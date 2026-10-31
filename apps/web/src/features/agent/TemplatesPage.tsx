@@ -7,10 +7,10 @@ import { createSignal, For, Show } from "solid-js";
 import { list, t } from "@vibevalley/i18n";
 import type { AgentTemplate, RuntimeInfo } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { ready, useAgentTemplates, useRuntimes } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
+import { api } from "@/infra/api";
+import { ready, useAgentTemplates, useRuntimes } from "@/infra/query";
+import { useRouter } from "@/infra/router";
 import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";

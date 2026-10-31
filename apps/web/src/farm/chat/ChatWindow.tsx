@@ -8,10 +8,6 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
 
-import { orchestratorMood, useCore } from "@/base/frame";
-import { sendOnce, useIntents } from "@/base/intent";
-import { ready, useAgents } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { useNow } from "@/base/util";
 import { farm } from "@/farm/store";
 import { useFarm } from "@/farm/ui";
@@ -35,6 +31,10 @@ import {
 } from "@/features/channel";
 import { RunSteps } from "@/features/session";
 import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "@/features/voice";
+import { orchestratorMood, useCore } from "@/infra/frame";
+import { ready, useAgents } from "@/infra/query";
+import { useRouter } from "@/infra/router";
+import { sendOnce, useIntents } from "@/state/intent";
 import { OrchestratorFace } from "@/ui/Face";
 import { noticeTitle, PxButton, SpriteIcon, ToastType, toasts } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";

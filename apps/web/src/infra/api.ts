@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
 
-import { messageOf } from "./format";
+import { messageOf } from "@/base/format";
 
 /** The page is served by the server it talks to: the same origin. */
 export const api = new VibeValleyApi("", async (url, init) => {

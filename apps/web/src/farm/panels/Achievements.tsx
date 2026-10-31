@@ -7,13 +7,13 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Achievement, AchievementCategory, AchievementStanding, Progress } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
-import { useCore, useFrames } from "@/base/frame";
-import { ready, useQuery } from "@/base/query";
 import { aria, useClickAway } from "@/base/util";
 import { commands } from "@/farm/frames";
 import { thousands } from "@/farm/hud/readout";
 import { beds } from "@/farm/world/plots";
+import { api } from "@/infra/api";
+import { useCore, useFrames } from "@/infra/frame";
+import { ready, useQuery } from "@/infra/query";
 import { createPixelAct, numberText, SpriteIcon } from "@/ui/pixel";
 
 import { tint, Tinted } from "./bits";

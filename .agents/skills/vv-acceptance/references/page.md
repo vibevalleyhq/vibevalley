@@ -8,7 +8,7 @@
 - 改了 `apps/web/public` 的贴图、字体、指针。
 - 改了形状，想看服务端的新字段在页面上画出来。
 
-不用它：只改了 `apps/web/src/base` 或 feature 里的请求、测试已经覆盖的；只改了测试。
+不用它：只改了 `apps/web/src/infra`、`apps/web/src/state` 或 feature 里的请求、测试已经覆盖的；只改了测试。
 
 ## 准备
 

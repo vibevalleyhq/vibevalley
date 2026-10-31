@@ -1,6 +1,6 @@
 // The farm page's own state: what is open, what is held, what the canvas shows the overlays. The farm itself is the
 // server's (useFrames/useCore); nothing here copies it: the overlays, the tool held, the chat window (open, large,
-// shown), the phone, and which project's farm `/` shows. The looks and who the next job goes to are base/prefs.ts.
+// shown), the phone, and which project's farm `/` shows. The looks and who the next job goes to are infra/prefs.ts.
 
 import { dayClock } from "@vibevalley/engine/clock";
 import type { GameEffectReward, SessionId } from "@vibevalley/protocol";

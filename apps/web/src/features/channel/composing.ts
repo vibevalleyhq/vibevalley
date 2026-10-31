@@ -1,6 +1,6 @@
 // The box for saying a sentence in a channel, as both chat windows carry it out: the workbench's
 // (features/channel/Composer.tsx) and the farm's (farm/chat/Composer.tsx). Enter sends, Shift+Enter starts a line, @ names
-// someone from a menu that follows the caret. A line sent is an intent (chatSay, base/intent.ts) keyed by its send key:
+// someone from a menu that follows the caret. A line sent is an intent (chatSay, state/intent.ts) keyed by its send key:
 // the box empties at once and the window shows the line until the channel has the owner's copy carrying the key. A
 // failed one stays in sight with its key, wherever the owner goes meanwhile, so a retry is the same message, not a second
 // one. A window only draws it and says where a line goes and how a failure shows.
@@ -9,10 +9,10 @@ import { createMemo, createSignal, flush, onSettled } from "solid-js";
 
 import { type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, type WorkspaceView } from "@vibevalley/protocol";
 
-import { useOrchestrators } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
-import { orchestratorMood } from "@/base/frame";
-import { defineIntent, type Intent, type Intents } from "@/base/intent";
+import { useOrchestrators } from "@/infra/agents";
+import { api, reasonOf } from "@/infra/api";
+import { orchestratorMood } from "@/infra/frame";
+import { defineIntent, type Intent, type Intents } from "@/state/intent";
 
 import { commandNameables, commandOf, runCommand, typedCommand } from "./commands";
 import { followed } from "./follow";

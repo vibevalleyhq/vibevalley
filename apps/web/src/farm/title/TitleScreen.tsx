@@ -7,11 +7,11 @@ import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { api } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { ready, useSettings } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { farm } from "@/farm/store";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { ready, useSettings } from "@/infra/query";
+import { useRouter } from "@/infra/router";
 import { createPixelAct } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";
 

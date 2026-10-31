@@ -11,9 +11,9 @@ import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { ServerConfig } from "@/base/config.ts";
-import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { FileWriter, readOrSetAside } from "@/infra/files.ts";
 import { defaultSettings } from "@/runtime/presets.ts";
 
 import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, TemplateProblem, updatedFrom } from "./template.ts";

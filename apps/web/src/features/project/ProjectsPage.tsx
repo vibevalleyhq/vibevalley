@@ -7,11 +7,11 @@ import { type Component, createMemo, createSignal, For, Match, Show, Switch, unt
 import { list, t } from "@vibevalley/i18n";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
 
-import { useWorkAgents } from "@/base/agents";
-import { api, reasonOf } from "@/base/api";
-import { ready, useProjects, useQuery } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { autofocus, useNow } from "@/base/util";
+import { useWorkAgents } from "@/infra/agents";
+import { api, reasonOf } from "@/infra/api";
+import { ready, useProjects, useQuery } from "@/infra/query";
+import { useRouter } from "@/infra/router";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Dialog } from "@/ui/Dialog";

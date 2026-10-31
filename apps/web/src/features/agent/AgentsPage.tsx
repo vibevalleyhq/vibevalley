@@ -9,12 +9,12 @@ import { createMemo, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type Agent, type AgentTally, defaultOrchestrator, type RuntimeInfo } from "@vibevalley/protocol";
 
-import { useAgentProblems, useOrchestrators, useWorkAgents } from "@/base/agents";
-import { api } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { ready, useRuntimes } from "@/base/query";
 import { orchestratorHref } from "@/features/orchestrator";
 import { useSkills } from "@/features/runtime";
+import { useAgentProblems, useOrchestrators, useWorkAgents } from "@/infra/agents";
+import { api } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { ready, useRuntimes } from "@/infra/query";
 import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
 import { hexColor } from "@/ui/cast";

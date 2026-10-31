@@ -3,7 +3,7 @@
 
 import type { OrchestratorEval } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
+import { api } from "@/infra/api";
 
 export const markWrongOf =
   (agent: string) =>

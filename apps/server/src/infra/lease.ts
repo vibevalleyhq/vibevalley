@@ -10,9 +10,8 @@ import { Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 
+import { jsonOrNone } from "@/base/json.ts";
 import { errnoOf } from "@/errors.ts";
-
-import { jsonOrNone } from "./json.ts";
 
 const alive = (pid: number) => {
   try {

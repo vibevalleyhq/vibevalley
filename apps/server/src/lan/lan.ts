@@ -32,11 +32,11 @@ import {
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
 
-import { ServerConfig } from "@/base/config.ts";
-import { Db } from "@/base/db.ts";
 import { code as newCode, newId } from "@/base/ids.ts";
-import { callbackLog } from "@/base/log.ts";
 import { lookIn, messageOf, missing } from "@/errors.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Db } from "@/infra/db.ts";
+import { callbackLog } from "@/infra/log.ts";
 
 import * as lanQ from "../../db/generated/lan.sql.ts";
 import * as q from "../../db/generated/lan_device.sql.ts";

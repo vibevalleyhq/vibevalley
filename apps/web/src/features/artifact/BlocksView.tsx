@@ -8,9 +8,9 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack }
 import { t } from "@vibevalley/i18n";
 import { type Agent, ownerId, type TextSpan } from "@vibevalley/protocol";
 
-import { api } from "@/base/api";
 import { createExternal } from "@/base/external";
-import { ready, useAgents } from "@/base/query";
+import { api } from "@/infra/api";
+import { ready, useAgents } from "@/infra/query";
 import { hexColor, swatches } from "@/ui/cast";
 import { Checkbox } from "@/ui/Checkbox";
 import { AgentFace } from "@/ui/Face";

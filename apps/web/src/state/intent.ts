@@ -12,9 +12,10 @@ import { t } from "@vibevalley/i18n";
 import type { StateFrame } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { newSendKey, reasonOf } from "./api";
+import { newSendKey, reasonOf } from "@/infra/api";
+import type { Frames, Link } from "@/infra/frames";
+
 import { framesAtom, useAtom, useRegistry } from "./atom";
-import type { Frames, Link } from "./frames";
 
 export type IntentStatus = "pending" | "failed";
 

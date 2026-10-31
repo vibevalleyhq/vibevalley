@@ -8,8 +8,8 @@ import { TestClock } from "effect/testing";
 import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { ServerConfig } from "@/base/config.ts";
 import { emptyProgress } from "@/game/progress.ts";
+import { ServerConfig } from "@/infra/config.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { testConfig } from "@/testing/layers.ts";
 

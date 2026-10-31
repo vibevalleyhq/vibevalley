@@ -3,8 +3,8 @@
 
 import type { GraphAction, GraphSplitRequest, TaskAction, TaskEdit } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/base/api";
-import { queries, useQuery } from "@/base/query";
+import { api, reasonOf } from "@/infra/api";
+import { queries, useQuery } from "@/infra/query";
 
 /** The server's answer to a task graph's call: ok, or the reason in its words. */
 export interface Answer {

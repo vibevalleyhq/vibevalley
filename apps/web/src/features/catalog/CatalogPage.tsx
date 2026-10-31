@@ -5,9 +5,9 @@ import { Slider } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
 import { numberText } from "@/base/format";
-import { ready, useQuery } from "@/base/query";
-import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
+import { ready, useQuery } from "@/infra/query";
+import { useRouter } from "@/infra/router";
 import { Button } from "@/ui/Button";
 import { TextInput } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";

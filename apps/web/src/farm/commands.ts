@@ -5,8 +5,8 @@ import { t } from "@vibevalley/i18n";
 import type { IssueAct, Session, StateFrame } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api, reasonOf } from "@/base/api";
 import { actionOf, perform } from "@/features/issue";
+import { api, reasonOf } from "@/infra/api";
 import { toasts, ToastType } from "@/ui/pixel";
 
 import { farm, farmState } from "./store";

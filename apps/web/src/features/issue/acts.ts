@@ -4,8 +4,8 @@ import { t } from "@vibevalley/i18n";
 import { type Issue, type IssueAct, type IssueAction, type IssueStatus } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api } from "@/base/api";
-import { useIntents } from "@/base/intent";
+import { api } from "@/infra/api";
+import { useIntents } from "@/state/intent";
 import type { Act } from "@/ui/act";
 
 import { issueMove, issueMoveOf, sendMove } from "./moves";

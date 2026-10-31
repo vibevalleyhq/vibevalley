@@ -227,11 +227,11 @@
   "web: base": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 3,
-    "lintOff": 4,
+    "cast": 2,
+    "lintOff": 2,
     "orDie": 0,
-    "ignored": 1,
-    "swallowed": 2
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: farm": {
     "nonNull": 67,
@@ -385,6 +385,24 @@
     "orDie": 0,
     "ignored": 0,
     "swallowed": 6
+  },
+  "web: infra": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 1,
+    "lintOff": 2,
+    "orDie": 0,
+    "ignored": 1,
+    "swallowed": 2
+  },
+  "web: state": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
   },
   "web: tree": {
     "nonNull": 25,

@@ -9,9 +9,9 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, defaultOrchestrator, orchestratorRuntime, type OrchestratorLook, OrchestratorLookValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { api } from "@/base/api";
-import { useRouter } from "@/base/router";
 import { orchestratorHref, orchestratorLooks } from "@/features/orchestrator";
+import { api } from "@/infra/api";
+import { useRouter } from "@/infra/router";
 import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";

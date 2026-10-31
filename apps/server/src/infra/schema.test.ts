@@ -36,7 +36,7 @@ describe("the schema", () => {
       for (const word of t.split("_"))
         expect(
           { table: t, plural: word.endsWith("s") && !singularInS.has(word) ? word : undefined },
-          "a table's name is singular: a row is one of it. Fix: drop the s (add the word to singularInS if it is singular already). See apps/server/src/base/schema.test.ts",
+          "a table's name is singular: a row is one of it. Fix: drop the s (add the word to singularInS if it is singular already). See apps/server/src/infra/schema.test.ts",
         ).toEqual({ table: t, plural: undefined });
     }
   });

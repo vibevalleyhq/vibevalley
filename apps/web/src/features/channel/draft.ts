@@ -7,8 +7,8 @@ import { t } from "@vibevalley/i18n";
 import { type Attachment, type ChatMessage, VibeValleyApi } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { reasonOf } from "@/base/api";
 import { recordOf } from "@/base/util";
+import { reasonOf } from "@/infra/api";
 
 export interface Draft {
   readonly text?: string;

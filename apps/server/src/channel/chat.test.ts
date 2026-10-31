@@ -12,9 +12,9 @@ import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import { head } from "@/base/clip.ts";
-import { ServerConfig } from "@/base/config.ts";
-import { Database, Db } from "@/base/db.ts";
 import { Core } from "@/core/core.ts";
+import { ServerConfig } from "@/infra/config.ts";
+import { Database, Db } from "@/infra/db.ts";
 import { layer as projection } from "@/projection/projection.ts";
 import { summaryOf } from "@/session/report.ts";
 import { sessionOnIssue } from "@/session/roster.ts";

@@ -2,7 +2,7 @@
  * The repository's own lint rules, loaded by vite.config.ts's lint.jsPlugins.
  *
  *   no-wall-clock: in the server, time is read and waited on through Effect's Clock (or the Time a class was handed,
- *   base/time.ts), so that a test's TestClock moves all of it. Date.now(), new Date() with no arguments, setTimeout and
+ *   infra/time.ts), so that a test's TestClock moves all of it. Date.now(), new Date() with no arguments, setTimeout and
  *   setInterval read or wait on the wall clock behind its back.
  *
  *   no-test-sleep: a test does not wait by the clock. What it waits for in the background it asks after with until or
@@ -37,8 +37,9 @@
  *   and Slider): a native <select>, checkbox, radio or range is drawn by the system, so it looks different on every
  *   machine and stays light in the dark theme. vite.config.ts says where it runs; the pixel skin draws its own.
  *
- *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base, ui, ui/pixel, the
- *   features (features/<concept>), the skins (farm, tree), app. A feature uses another only through its index.ts, so
+ *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base (pure ground), infra
+ *   (the server, the host, the browser), state (the middle layer), ui, ui/pixel, the features (features/<concept>), the
+ *   skins (farm, tree), app. A feature uses another only through its index.ts, so
  *   what is inside it can change; the features' graph has no cycle (layers.test.ts). docs/subsystems/app.md says why.
  *
  *   promise-boundary: the server is Effect; a Promise is only the one call into an outside library, made inside
@@ -64,12 +65,12 @@
  *   (vite.config.ts lists the doors).
  *
  *   atom-door: the page's middle layer stands on Effect's Atom (effect/reactivity), whose API is marked unstable; only
- *   apps/web/src/base imports it (atom.ts, intent.ts), and features read atoms through what base exports, so a change in
+ *   apps/web/src/state imports it (atom.ts, intent.ts), and features read atoms through what state exports, so a change in
  *   Atom is fixed in one folder. An import of effect/reactivity anywhere else under apps/web/src is reported, a type-only
  *   one too: a type names the API as much as a call does; vite.config.ts says where the rule runs.
  *
  *   act-door: what the owner does on the page goes through its middle layer: an Act (apps/web/src/ui/act.ts: busy until
- *   it ends, a refusal in the error tone, nothing sent while the state stream is lost) or an intent (base/intent.ts, a
+ *   it ends, a refusal in the error tone, nothing sent while the state stream is lost) or an intent (state/intent.ts, a
  *   change shown before the server has it). In a component (a .tsx under features/ or farm/) a call of the API client
  *   that changes something is reported unless it is made inside a function handed to some `x.run(…)`, an Act's. A call
  *   changes something unless its method is a read: list, get, search, recall, validate or preview… (the client's verbs,
@@ -78,7 +79,7 @@
  *   failure-tone: a refusal is said in the error tone. toast(…) given a reason (reasonOf) without "bad" as its tone, and
  *   the pixel toasts.add({ … }) given one without the error type, are reported; ui/act.ts says refusals so already.
  *
- *   db-door: the server reaches the database through the Db service (apps/server/src/base/db.ts), which says what a
+ *   db-door: the server reaches the database through the Db service (apps/server/src/infra/db.ts), which says what a
  *   failed query becomes: run and inTx make it a defect, attempt and attemptTx keep it for a caller that tells or retries
  *   it. A module that takes the SqlClient itself, or opens its own withTransaction, decides that again by hand, and
  *   the usual way back is to die and catchDefect the SqlError. A type-only import (a query's SqlClient requirement in a
@@ -142,7 +143,7 @@ const noWallClock = defineRule({
       wallClock: says(
         "this reads or waits on the wall clock, which a test's TestClock cannot move",
         "in Effect code `yield* Clock.currentTimeMillis` to read and `Effect.sleep` to wait; in a class, the `Time` it was handed (`time.now()`, `time.sleep(ms)`)",
-        "apps/server/src/base/time.ts",
+        "apps/server/src/infra/time.ts",
       ),
     },
   },
@@ -378,7 +379,7 @@ const nativeControl = defineRule({
 });
 
 // The page's layers, in order; a file may import from its own unit or one before it.
-const pageLayers = ["base", "ui", "ui/pixel", "features", "skin", "app", "root"] as const;
+const pageLayers = ["base", "infra", "state", "ui", "ui/pixel", "features", "skin", "app", "root"] as const;
 
 function pageUnit(path: string): { layer: (typeof pageLayers)[number]; unit: string } {
   const parts = path.split("/");
@@ -404,8 +405,8 @@ const pageLayersRule = defineRule({
   meta: {
     messages: {
       layer: says(
-        "{{from}} is before {{to}} in the page's layers (base, ui, ui/pixel, features, farm and tree, app), and a layer imports only its own and those before it",
-        "move what both need down into a layer before {{from}} (a pure function to base, a component to ui), or have {{to}} pass it in as a prop",
+        "{{from}} is before {{to}} in the page's layers (base, infra, state, ui, ui/pixel, features, farm and tree, app), and a layer imports only its own and those before it",
+        "move what both need down into a layer before {{from}} (a pure function to base, a talk with the outside to infra, a component to ui), or have {{to}} pass it in as a prop",
         "apps/web/README.md",
       ),
       index: says(
@@ -636,17 +637,17 @@ const dbDoor = defineRule({
       client: says(
         "a module that takes the SqlClient itself decides again what a failed query becomes, outside the Db service",
         '`const { run, attempt, one, inTx, attemptTx } = yield* Db` and pass the generated query to it (`run(q.x(…))`); a type in a signature is `import type { SqlClient } from "effect/sql"`',
-        "apps/server/src/base/db.ts",
+        "apps/server/src/infra/db.ts",
       ),
       transaction: says(
         "a withTransaction of its own leaves the database's failure for each module to turn into a defect or a refusal by hand",
         '`inTx(work)` when a failure is a bug, `attemptTx(work)` when it is told to the owner or retried (`.pipe(Effect.catchTag("SqlError", …))`)',
-        "apps/server/src/base/db.ts",
+        "apps/server/src/infra/db.ts",
       ),
     },
   },
   create(context) {
-    if (context.filename.replaceAll("\\", "/").endsWith("apps/server/src/base/db.ts")) return {};
+    if (context.filename.replaceAll("\\", "/").endsWith("apps/server/src/infra/db.ts")) return {};
     return {
       ImportDeclaration(node) {
         if (node.source.value !== "effect/sql" || node.importKind === "type") return;
@@ -667,15 +668,15 @@ const atomDoor = defineRule({
   meta: {
     messages: {
       atom: says(
-        "Atom's API is marked unstable, and only apps/web/src/base may stand on it, so that a change in it is fixed in one folder",
-        "read through base: `useAtom`, `useRegistry` (base/atom.ts), `defineIntent`, `useIntents` (base/intent.ts); a primitive base lacks goes into base",
+        "Atom's API is marked unstable, and only apps/web/src/state may stand on it, so that a change in it is fixed in one folder",
+        "read through state: `useAtom`, `useRegistry` (state/atom.ts), `defineIntent`, `useIntents` (state/intent.ts); a primitive state lacks goes into state",
         ".agents/notes/proposed/architecture/2026-10-31-client-state-on-atom.md",
       ),
     },
   },
   create(context) {
     const file = context.filename.replaceAll("\\", "/");
-    if (!file.includes("/apps/web/src/") || file.includes("/apps/web/src/base/")) return {};
+    if (!file.includes("/apps/web/src/") || file.includes("/apps/web/src/state/")) return {};
     return {
       ImportDeclaration(node) {
         if (node.source.value === "effect/reactivity" || node.source.value.startsWith("effect/reactivity/")) context.report({ node, messageId: "atom" });
@@ -716,7 +717,7 @@ const actDoor = defineRule({
     messages: {
       act: says(
         "`api.{{call}}` changes something on the server straight from a component: it has no busy, no refusal in the error tone, and goes out while the state stream is lost",
-        "hand it to an Act (`const act = createAct()` from ui/act.ts, `createPixelAct()` in a skin; `act.run(() => api.{{call}}(…))`), or, when the page shows the change before the server has it, send it through an intent defined in the feature's .ts (`defineIntent`, base/intent.ts) with an overlay of its own",
+        "hand it to an Act (`const act = createAct()` from ui/act.ts, `createPixelAct()` in a skin; `act.run(() => api.{{call}}(…))`), or, when the page shows the change before the server has it, send it through an intent defined in the feature's .ts (`defineIntent`, state/intent.ts) with an overlay of its own",
         "apps/web/src/ui/act.ts",
       ),
     },

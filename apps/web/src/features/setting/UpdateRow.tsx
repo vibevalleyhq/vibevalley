@@ -3,11 +3,11 @@ import { Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { isBusy } from "@vibevalley/protocol/rules";
 
-import { reasonOf } from "@/base/api";
-import { useCore } from "@/base/frame";
-import { currentHost } from "@/base/host";
-import { useUpdates } from "@/base/updates";
 import { variant } from "@/base/util";
+import { reasonOf } from "@/infra/api";
+import { useCore } from "@/infra/frame";
+import { currentHost } from "@/infra/host";
+import { useUpdates } from "@/infra/updates";
 import { Button } from "@/ui/Button";
 import { ConfirmButton } from "@/ui/ConfirmButton";
 import { SettingRow } from "@/ui/settings";

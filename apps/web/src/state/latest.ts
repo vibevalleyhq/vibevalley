@@ -4,7 +4,7 @@
 
 import { type Accessor, createEffect, createSignal } from "solid-js";
 
-import { reasonOf } from "./api";
+import { reasonOf } from "@/infra/api";
 
 export type Answer<T> = { readonly state: "waiting" } | { readonly state: "done"; readonly value: T } | { readonly state: "failed"; readonly reason: string };
 

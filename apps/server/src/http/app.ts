@@ -7,8 +7,8 @@ import { NodeHttpServer } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 
-import type { ServerConfig } from "@/base/config.ts";
 import { handlers } from "@/handlers.ts";
+import type { ServerConfig } from "@/infra/config.ts";
 import { Lan } from "@/lan/lan.ts";
 import { type ServiceOptions, services } from "@/services.ts";
 import { Session } from "@/session/session.ts";

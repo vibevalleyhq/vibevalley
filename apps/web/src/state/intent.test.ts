@@ -2,8 +2,10 @@ import { afterEach, expect, test, vi } from "vite-plus/test";
 
 import { VibeValleyApiError } from "@vibevalley/protocol";
 
+import { testFrames } from "@/infra/testing";
+
 import { bySeq, defineIntent, intentsIn, sendOnce, sendReplacing } from "./intent";
-import { deferred, frameAt, testFrames, testRegistry } from "./testing";
+import { deferred, frameAt, testRegistry } from "./testing";
 
 afterEach(() => vi.useRealTimers());
 
