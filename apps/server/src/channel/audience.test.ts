@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { Audience } from "./audience.ts";
-const wake = { recipient: "w2", senderKind: "session", recipientKind: "session", wakes: true, held: false, at: 5 };
+const wake = { recipient: "w2", senderKind: "session", recipientKind: "session", wakes: true, held: false, at: 5 } as const;
 
 describe("the audience", () => {
   it("counts agents waking agents since the owner last spoke, from the messages after their words", () => {
