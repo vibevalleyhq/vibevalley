@@ -8,9 +8,9 @@ import { Effect, Exit, FileSystem, Schema, Scope } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
+import { cut } from "@vibevalley/protocol/rules";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 
-import { cut } from "@/base/clip.ts";
 import { type KeptFile, keptFile } from "@/infra/files.ts";
 import { type Time, timeHere } from "@/infra/time.ts";
 

@@ -372,5 +372,3 @@ export function tagOf(step: SessionEvent, asked?: string, issue = false): string
       return "";
   }
 }
-
-export const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();

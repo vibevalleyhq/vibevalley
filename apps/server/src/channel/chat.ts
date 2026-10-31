@@ -11,7 +11,7 @@ import { HttpClient } from "effect/http";
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { everyone, defaultOrchestrator, ownerId, attachmentMax } from "@vibevalley/protocol";
-import { isBusy } from "@vibevalley/protocol/rules";
+import { isBusy, oneLine } from "@vibevalley/protocol/rules";
 import { sessionId, type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -68,7 +68,8 @@ const logKeep = 80;
 const threadTitleMax = 24;
 /** How much of a channel's newest message a list shows. */
 const lastMax = 80;
-const oneLine = (text: string, n: number) => head(text.replace(/\s+/gu, " ").trim(), n);
+/** The first n units of text, on one line. */
+const lineOf = (text: string, n: number) => head(oneLine(text).trim(), n);
 /** The client's key for one send, so a retry of it is the same message. */
 const sendKeyMax = 64;
 /** Sorts after every uuidv7, for "since the last thing said". */
@@ -613,7 +614,7 @@ const make = Effect.gen(function* () {
       ...(read !== undefined ? { read } : {}),
       ...(unread > 0 ? { unread } : {}),
       title: title,
-      ...(last ? { last: { from: last.sender_id, name: last.sender_name, text: oneLine(last.body, lastMax), at: last.created_at } } : {}),
+      ...(last ? { last: { from: last.sender_id, name: last.sender_name, text: lineOf(last.body, lastMax), at: last.created_at } } : {}),
       at: row.created_at,
     };
   };
@@ -634,7 +635,7 @@ const make = Effect.gen(function* () {
     else if (row.type === "direct" && row.peer_id) title = model.participant(row.peer_id)?.name ?? "";
     else if (row.type === "thread" && sk === "talk" && row.subject_id) title = model.participant(row.subject_id)?.name ?? "";
     // Any other thread (one opened under a message, with no session of its own) by the message it hangs under.
-    if (!title && row.type === "thread" && row.root_id) title = oneLine((yield* db.one(qm.messageByID({ id: row.root_id })))?.body ?? "", threadTitleMax);
+    if (!title && row.type === "thread" && row.root_id) title = lineOf((yield* db.one(qm.messageByID({ id: row.root_id })))?.body ?? "", threadTitleMax);
     const last =
       row.last_number != null && row.last_number !== 0 ? yield* db.one(qm.messageByNumber({ channel_id: row.id, number: row.last_number })) : undefined;
     return toChannel(row, n ?? 0, title, last);
@@ -1465,7 +1466,7 @@ const make = Effect.gen(function* () {
       const waiting = (yield* db.run(qd.waitingOn({ message_id: id }))).length;
       return {
         does: [
-          t("server.channel.deletes", { target: ch ? targetOfChannel(ch) : "", number: row.number, name: row.sender_name, text: oneLine(row.body, lastMax) }),
+          t("server.channel.deletes", { target: ch ? targetOfChannel(ch) : "", number: row.number, name: row.sender_name, text: lineOf(row.body, lastMax) }),
           ...(waiting > 0 ? [t("server.channel.deletesDeliveries", { n: waiting })] : []),
         ],
       };

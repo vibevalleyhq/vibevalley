@@ -11,6 +11,7 @@ import type * as T from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
+import { clip } from "@/base/clip.ts";
 import { messageOf, type ApiError, memoriesOf, missing, refused } from "@/errors.ts";
 import { agentHome, ServerConfig } from "@/infra/config.ts";
 import { Setting } from "@/setting/setting.ts";
@@ -19,7 +20,7 @@ import { everos } from "./everos.ts";
 import { loadSegmenter } from "./gse.ts";
 import { nowledge } from "./nowledge.ts";
 import { fromOwner } from "./prompts.ts";
-import { clip, foundText, type Found, inProject, noteMaxChars, recallChars, searchLimit, type SearchQuery, type SearchResult, sourceLabel } from "./recall.ts";
+import { foundText, type Found, inProject, noteMaxChars, recallChars, searchLimit, type SearchQuery, type SearchResult, sourceLabel } from "./recall.ts";
 import { type EndedSession, interleave, localSource, makeSources, mergeRecalled, type Source } from "./sources.ts";
 import { type FinishedRun, makeMemoryStore, type Note, type RecallCue } from "./store";
 

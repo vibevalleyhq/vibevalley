@@ -11,6 +11,7 @@ import { Effect, Option, Stream } from "effect";
 import { FetchHttpClient, HttpClient } from "effect/http";
 
 import type { Embed } from "@vibevalley/protocol";
+import { cut } from "@vibevalley/protocol/rules";
 /** At most this many links of a message get a preview. */
 const embedMax = 3;
 const timeoutMs = 3000;
@@ -82,7 +83,8 @@ export const reachable = (url: URL, resolve: Resolve = resolveAll): Effect.Effec
 
 const entities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " " };
 const decode = (s: string) => s.replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/gu, (_, e: string) => entities[e] ?? _).trim();
-const cut = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+/** At most n units, the ellipsis among them. */
+const upTo = (s: string, n: number) => cut(s, n - 1);
 
 /** What a page says of itself in its head: Open Graph first, then its title and description. */
 export function embedOf(url: string, html: string): Embed | undefined {
@@ -110,9 +112,9 @@ export function embedOf(url: string, html: string): Embed | undefined {
   }
   return {
     url,
-    title: cut(title, 200),
-    description: cut(description ?? "", 300),
-    site: cut(site ?? "", 80),
+    title: upTo(title, 200),
+    description: upTo(description ?? "", 300),
+    site: upTo(site ?? "", 80),
     image: imageUrl ?? "",
   };
 }

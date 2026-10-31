@@ -1,10 +1,10 @@
 import type * as T from "@vibevalley/protocol";
+import { slice } from "@vibevalley/protocol/rules";
 
 // What the task graphs say to models: the splitter's brief, a task's brief and what its helper is told when it is sent
 // back, the orchestrator's news of a task graph and the lines it reads one by, and the refusals of the tools only models call.
 // In Chinese whatever the owner's locale: the models answer in the owner's.
 import { traitsOf } from "@/agent/prompts.ts";
-import { slice } from "@/base/clip.ts";
 import { isForOrchestrator } from "@/issue/status.ts";
 
 import { blockedBy, isAcceptance, isSettled, maxTasks, taskOf, acceptanceChecks, frozenOf } from "./graph.ts";

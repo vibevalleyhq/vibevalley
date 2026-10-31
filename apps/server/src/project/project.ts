@@ -15,8 +15,8 @@ import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, D
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
+import { slice } from "@vibevalley/protocol/rules";
 
-import { slice } from "@/base/clip.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
 import { numberIn } from "@/base/number.ts";
 import { or } from "@/base/order.ts";

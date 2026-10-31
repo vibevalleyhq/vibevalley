@@ -7,7 +7,7 @@ import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Sw
 
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { omitUndefined, oneLine } from "@vibevalley/protocol/rules";
 
 import { ago } from "@/base/format";
 import { aria, autofocus, Keyed, useNow } from "@/base/util";
@@ -25,7 +25,6 @@ import {
   farmToolText,
   type Lane,
   lanes,
-  oneLine,
   readableInput,
   runsOf,
   secondsText,
@@ -281,7 +280,7 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
     >
       <button
         type="button"
-        aria-label={`${props.spec.tag} ${oneLine(step().text)}`}
+        aria-label={`${props.spec.tag} ${oneLine(step().text).trim()}`}
         aria-expanded={aria(props.open)}
         onClick={() => props.onToggle()}
         class="flex w-full cursor-pointer items-start text-left"
@@ -298,7 +297,7 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
           <Icon name="cross" size={12} class="mt-1 mr-1" />
         </Show>
         <span class={["min-w-0 flex-1 text-sm", { "text-berry": failed() }]}>
-          <Switch fallback={<span class="block truncate">{oneLine(step().text)}</span>}>
+          <Switch fallback={<span class="block truncate">{oneLine(step().text).trim()}</span>}>
             <Match when={tool()}>
               <ToolLine step={step()} />
             </Match>
@@ -323,8 +322,8 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
 
 /** `what {args} → result`, the args and result in the code font. */
 function ToolLine(props: { step: SessionEvent }) {
-  const args = () => oneLine(props.step.input ?? "");
-  const out = () => oneLine(props.step.output ?? "");
+  const args = () => oneLine(props.step.input ?? "").trim();
+  const out = () => oneLine(props.step.output ?? "").trim();
   return (
     <span class="block truncate">
       {farmToolText(props.step.text) ?? props.step.text}
@@ -561,7 +560,7 @@ export function TrajectoryList(props: { agent: string }) {
                             : t("web.session.trajectory.hiredAndLeft", { hired: ago(h().hiredAt, now()), left: ago(ended()!, now()) })}
                         </span>
                         <Show when={h().brief}>
-                          <span class="truncate text-xs">{oneLine(h().brief)}</span>
+                          <span class="truncate text-xs">{oneLine(h().brief).trim()}</span>
                         </Show>
                       </button>
                     </li>
@@ -573,7 +572,7 @@ export function TrajectoryList(props: { agent: string }) {
               <Show when={open()} fallback={<Quiet>{t("web.session.trajectory.pick")}</Quiet>}>
                 {(o) => (
                   <Keyed key={o().id}>
-                    {() => <TrajectoryLog id={o().id} title={o().brief ? `${o().name} · ${oneLine(o().brief)}` : o().name} about={o().brief} />}
+                    {() => <TrajectoryLog id={o().id} title={o().brief ? `${o().name} · ${oneLine(o().brief).trim()}` : o().name} about={o().brief} />}
                   </Keyed>
                 )}
               </Show>

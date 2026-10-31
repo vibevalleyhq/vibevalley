@@ -5,14 +5,13 @@ import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues, ownerId } from "@vibevalley/protocol";
 import { commandOf } from "@vibevalley/protocol/api";
-import { closedText, shortTitle, isOneOf, isBusy } from "@vibevalley/protocol/rules";
+import { closedText, shortTitle, isOneOf, isBusy, cut } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import { templateCatalog } from "@/agent/seed.ts";
 import { actsForOwner, type Actor } from "@/base/actor.ts";
-import { cut } from "@/base/clip.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";

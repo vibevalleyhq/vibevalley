@@ -12,12 +12,13 @@ import { type HttpClient, HttpClientRequest } from "effect/http";
 import { t } from "@vibevalley/i18n";
 import type { MemoryKind } from "@vibevalley/protocol";
 
+import { clip } from "@/base/clip.ts";
 import { newId } from "@/base/ids.ts";
 import { redact, type RedactedString, redactedHead } from "@/base/redact.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 
 import { everosWords, recallWords } from "./prompts.ts";
-import { clip, recallCount, type MemoryScope } from "./recall.ts";
+import { recallCount, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 
 /** app_id on everything written, so its memories can be told from another app's. */

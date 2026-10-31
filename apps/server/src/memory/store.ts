@@ -10,12 +10,13 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import type { Actor } from "@/base/actor.ts";
+import { clip } from "@/base/clip.ts";
 import { newId } from "@/base/ids.ts";
 import { Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
-import { clip, memoryIsNewNote, issueMemoryText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
+import { memoryIsNewNote, issueMemoryText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
 import { termsList, termsText, termsVersion } from "./terms.ts";
 
 /** One finished run, everything about it; each provider keeps what it uses. */

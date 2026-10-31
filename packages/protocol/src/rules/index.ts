@@ -12,3 +12,4 @@ export * from "./same";
 export * from "./plain";
 export * from "./omit";
 export * from "./oneOf";
+export * from "./text";

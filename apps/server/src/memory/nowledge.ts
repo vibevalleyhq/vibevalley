@@ -9,12 +9,12 @@ import { asTransport } from "@vibevalley/agent/mcpTransport";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { head } from "@/base/clip.ts";
+import { head, clip } from "@/base/clip.ts";
 import { redact, type RedactedString, redactedHead } from "@/base/redact.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 
 import { recallWords } from "./prompts.ts";
-import { memoryNotesOf, recallCount, clip, type MemoryScope } from "./recall.ts";
+import { memoryNotesOf, recallCount, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 
 const app = "vibevalley";

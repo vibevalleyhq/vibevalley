@@ -2,9 +2,10 @@ import { Effect, Result, Schema, Semaphore } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { cut } from "@vibevalley/protocol/rules";
 
 import type { Agent } from "@/agent/agent.ts";
-import { cut, clip } from "@/base/clip.ts";
+import { clip } from "@/base/clip.ts";
 import { lastJsonBlock, misfitField } from "@/base/json.ts";
 import type { Channel } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";

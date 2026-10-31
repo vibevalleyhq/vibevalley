@@ -6,8 +6,9 @@ import { Result, Schema } from "effect";
 
 import { maybe, t } from "@vibevalley/i18n";
 import type { Question, CheckResult, CriterionCheck, IssueAnswer, Outcome } from "@vibevalley/protocol";
+import { slice } from "@vibevalley/protocol/rules";
 
-import { clip, slice } from "@/base/clip.ts";
+import { clip } from "@/base/clip.ts";
 import { lastJsonBlock, misfitField } from "@/base/json.ts";
 import { messageOf } from "@/errors.ts";
 
