@@ -5,6 +5,7 @@ import { Slider } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
 import { numberText } from "@/base/format";
+import { useTimeout } from "@/base/timer";
 import { aria } from "@/base/util";
 import { ready, useQuery } from "@/infra/query";
 import { useRouter } from "@/infra/router";
@@ -249,11 +250,12 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
 
 function Copy(props: { text: string }) {
   const [done, setDone] = createSignal(false);
+  const later = useTimeout();
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setDone(true);
-      setTimeout(() => setDone(false), 1200);
+      later(() => setDone(false), 1200);
     } catch {
       // No clipboard here: the text is on show to copy by hand.
     }

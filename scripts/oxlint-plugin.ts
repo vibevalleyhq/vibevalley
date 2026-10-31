@@ -682,6 +682,27 @@ const dbDoor = defineRule({
   },
 });
 
+const droppedTimer = defineRule({
+  meta: {
+    messages: {
+      dropped: says(
+        "a timer whose handle is dropped cannot be cleared, so it still fires after the part that set it is gone",
+        "`useTimeout()` or `useInterval(fn, ms)` from `@/base/timer` in a component; in an effect, keep the handle and return `() => clearTimeout(t)`; a store that lives as long as the page keeps the handle too, or says why it need not with a disable comment",
+        "apps/web/src/base/timer.ts",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type !== "Identifier" || (c.name !== "setTimeout" && c.name !== "setInterval")) return;
+        if (node.parent.type === "ExpressionStatement") context.report({ node, messageId: "dropped" });
+      },
+    };
+  },
+});
+
 const childProcessDoor = defineRule({
   meta: {
     messages: {
@@ -1213,6 +1234,7 @@ export default definePlugin({
     "parent-import": parentImportRule,
     "db-door": dbDoor,
     "child-process-door": childProcessDoor,
+    "dropped-timer": droppedTimer,
     "atom-door": atomDoor,
     "page-store": pageStore,
     "stored-door": storedDoor,

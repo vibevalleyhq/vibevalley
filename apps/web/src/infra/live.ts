@@ -19,7 +19,9 @@ function connect(signal: AbortSignal) {
       return response;
     },
   ).catch(() => {
-    if (!signal.aborted) setTimeout(() => !signal.aborted && connect(signal), 1000);
+    if (signal.aborted) return;
+    const again = setTimeout(() => connect(signal), 1000);
+    signal.addEventListener("abort", () => clearTimeout(again), { once: true });
   });
 }
 

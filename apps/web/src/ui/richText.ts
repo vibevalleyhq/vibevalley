@@ -122,6 +122,7 @@ function codeBlock(pre: HTMLElement, code: Element, lang: string, text: string, 
     void navigator.clipboard.writeText(text).then(() => {
       copy.replaceChildren(iconOf("check"));
       copy.title = t("web.base.rich.copied");
+      // oxlint-disable-next-line vibevalley/dropped-timer -- it only changes its own button back, harmless once the button is gone
       setTimeout(() => {
         copy.replaceChildren(iconOf("copy"));
         copy.title = t("web.base.rich.copy");

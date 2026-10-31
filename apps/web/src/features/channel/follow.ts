@@ -193,6 +193,7 @@ export const followed = {
           // Not kept as missing: asked again a moment later, not at once (the listeners told below would ask again).
           () => {
             unreadSingles.add(key);
+            // oxlint-disable-next-line vibevalley/dropped-timer -- the follow's cache lives as long as the page
             setTimeout(() => unreadSingles.delete(key), againMs);
           },
         )

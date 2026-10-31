@@ -198,6 +198,19 @@ tester.run("db-door", rule("db-door"), {
   ],
 });
 
+tester.run("dropped-timer", rule("dropped-timer"), {
+  valid: [
+    "const t = setTimeout(f, 10); onCleanup(() => clearTimeout(t));",
+    "later(() => setDone(false), 1200);",
+    "const wait = new Promise((done) => setTimeout(done, 10));",
+    "e.retry = setTimeout(go, 10);",
+  ],
+  invalid: [
+    { code: "setTimeout(() => setDone(false), 1200);", errors: [{ messageId: "dropped" }] },
+    { code: "if (x) setInterval(tick, 100);", errors: [{ messageId: "dropped" }] },
+  ],
+});
+
 tester.run("child-process-door", rule("child-process-door"), {
   valid: [{ code: 'import type { ChildProcess } from "node:child_process";', filename: "/repo/apps/web/test/a.ts" }, 'import { join } from "node:path";'],
   invalid: [

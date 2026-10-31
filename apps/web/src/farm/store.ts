@@ -179,10 +179,12 @@ export const farm = {
   bedFx: (bed: number, kind: BedFxKind, text?: string) => {
     const fx: BedFx = omitUndefined({ id: ++nextFx, bed, kind, text });
     set((s) => ({ bedFx: [...s.bedFx, fx] }));
+    // oxlint-disable-next-line vibevalley/dropped-timer -- the farm's store lives as long as the page
     setTimeout(() => set((s) => ({ bedFx: s.bedFx.filter((f) => f !== fx) })), fxLinger);
   },
   reward: (r: GameEffectReward) => {
     set((s) => ({ rewards: [...s.rewards, r] }));
+    // oxlint-disable-next-line vibevalley/dropped-timer -- the farm's store lives as long as the page
     setTimeout(() => set((s) => ({ rewards: s.rewards.filter((x) => x !== r) })), rewardLinger);
   },
   setScreen: (screen: VillageScreen | undefined) => set({ screen }),

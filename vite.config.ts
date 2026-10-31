@@ -517,6 +517,12 @@ export default defineConfig({
         rules: { "vibevalley/db-door": "error" },
       },
       {
+        // A page timer keeps its handle, to be cleared when its part goes (scripts/oxlint-plugin.ts, dropped-timer).
+        files: ["apps/web/src/**"],
+        excludeFiles: ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.stories.tsx"],
+        rules: { "vibevalley/dropped-timer": "error" },
+      },
+      {
         // A process is started only by its door: one per kind, which kills the group on a timeout (scripts/oxlint-plugin.ts, child-process-door).
         files: ["apps/**", "packages/**"],
         excludeFiles: [

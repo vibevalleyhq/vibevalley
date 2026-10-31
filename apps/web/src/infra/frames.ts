@@ -33,7 +33,8 @@ function connect(signal: AbortSignal) {
   readStream("", statePath, (frame) => set({ frame, link: "open", count: current.count + 1 }), signal).catch(() => {
     if (signal.aborted) return;
     set({ ...current, link: "lost" });
-    setTimeout(() => !signal.aborted && connect(signal), 1000);
+    const again = setTimeout(() => connect(signal), 1000);
+    signal.addEventListener("abort", () => clearTimeout(again), { once: true });
   });
 }
 

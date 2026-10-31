@@ -9,6 +9,7 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
 
+import { useInterval } from "@/base/timer";
 import { variant, autofocus } from "@/base/util";
 import { chatSay, defaultOf } from "@/features/channel";
 import { writeIssue } from "@/features/issue";
@@ -194,12 +195,9 @@ const clouds = [
 function Clouds(props: { atlas: SpriteAtlas }) {
   const [t, setT] = createSignal(0);
   let box: HTMLDivElement | undefined;
-  onSettled(() => {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const start = performance.now();
-    const timer = setInterval(() => setT((performance.now() - start) / 1000), 100);
-    return () => clearInterval(timer);
-  });
+  const start = performance.now();
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  useInterval(() => !still && setT((performance.now() - start) / 1000), 100);
   return (
     <Show when={props.atlas.has("map-cloud") ? props.atlas.get("map-cloud") : undefined}>
       {(cloud) => {
