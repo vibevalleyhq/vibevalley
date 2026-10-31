@@ -3,7 +3,7 @@
 // all at once and takes their answers in turns; a source outside the farm that fails or is slow gives nothing, with a line
 // in the log; writes to one go in the background, in order.
 
-import { Cause, Clock, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Schema, Scope } from "effect";
+import { Cause, Clock, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Ref, Schema, Scope, SynchronizedRef } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -216,12 +216,12 @@ export interface Sources {
   readonly list: (agent: string) => Effect.Effect<{ memories: T.Memory[]; sources: T.MemorySourceInfo[] }>;
   readonly search: (query: SearchQuery) => Effect.Effect<(SourceSearch & { source: string })[]>;
   /** Why the memory with this id cannot be forgotten here; forget refuses for the same reason. */
-  readonly forgetProblem: (id: string) => string | undefined;
+  readonly forgetProblem: (id: string) => Effect.Effect<string | undefined>;
   readonly forget: (agent: string, id: string) => Effect.Effect<void, SourceError>;
-  readonly add: (note: Note) => void;
-  readonly keep: (run: FinishedRun) => void;
-  readonly endSession: (session: EndedSession) => void;
-  readonly info: () => T.MemorySourceInfo[];
+  readonly add: (note: Note) => Effect.Effect<void>;
+  readonly keep: (run: FinishedRun) => Effect.Effect<void>;
+  readonly endSession: (session: EndedSession) => Effect.Effect<void>;
+  readonly info: Effect.Effect<T.MemorySourceInfo[]>;
 }
 
 export interface SourcesOptions {
@@ -236,14 +236,14 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
   Effect.gen(function* () {
     const { local, configured, build } = options;
     const timeoutMs = options.timeoutMs ?? prefetchTimeoutMs;
-    // Generations are made and retired from synchronous calls (the settings changed under info): with the service's
-    // services (its logger, its Clock), on its fibers.
+    // A generation retired goes on stopping on the service's fibers, with its services (its logger, its Clock).
     const forkHere = yield* FiberSet.makeRuntime();
-    const runHere = Effect.runSyncWith(yield* Effect.context());
+    /** Every generation not yet stopped, the current one among them, for the service's end. */
     const generations = new Set<Generation>();
-    let current: Generation | undefined;
-    let built: string | undefined;
-    let stopped = false;
+    /** The current generation and the settings it was made for; none once the service has stopped. Changed in one
+     * step, so two asks after a change make one new generation. */
+    const held = yield* SynchronizedRef.make<{ readonly key: string; readonly gen: Generation } | undefined>(undefined);
+    const stopped = yield* Ref.make(false);
 
     const outside = (g: Generation) => g.all.filter((one) => one !== local);
 
@@ -274,40 +274,41 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       return { all: sources, off, scope, operations, writes, writer } satisfies Generation;
     });
 
-    const snapshot = (): Generation | undefined => {
-      if (stopped) return undefined;
-      const now = configured();
-      const key = JSON.stringify(now);
-      if (key === built) return current;
-      if (current) retire(current, "memory sources changed; outside operation canceled");
-      const all = [local];
-      const off: T.MemorySourceInfo[] = [];
-      for (const c of now) {
-        const name = c.kind;
-        const isOff = (why: string) => off.push({ name, label: sourceLabel(name), on: false, canList: false, canForget: false, transcripts: false, off: why });
-        if (c.enabled !== true) {
-          isOff(t("server.memory.off"));
-          continue;
+    const snapshot: Effect.Effect<Generation | undefined> = SynchronizedRef.modifyEffect(held, (h) =>
+      Effect.gen(function* () {
+        if (yield* Ref.get(stopped)) return [undefined, h] as const;
+        const now = configured();
+        const key = JSON.stringify(now);
+        if (h && h.key === key) return [h.gen, h] as const;
+        if (h) retire(h.gen, "memory sources changed; outside operation canceled");
+        const all = [local];
+        const off: T.MemorySourceInfo[] = [];
+        for (const c of now) {
+          const name = c.kind;
+          const isOff = (why: string) =>
+            off.push({ name, label: sourceLabel(name), on: false, canList: false, canForget: false, transcripts: false, off: why });
+          if (c.enabled !== true) {
+            isOff(t("server.memory.off"));
+            continue;
+          }
+          const one = build(c);
+          if (!one) {
+            isOff(t("server.memory.unknownSource"));
+            continue;
+          }
+          const why = one.unavailable();
+          if (why) {
+            yield* Effect.logWarning(`memory from ${name} is off: ${why}`).pipe(Effect.annotateLogs({ source: name }));
+            isOff(why);
+            continue;
+          }
+          all.push(one);
         }
-        const one = build(c);
-        if (!one) {
-          isOff(t("server.memory.unknownSource"));
-          continue;
-        }
-        const why = one.unavailable();
-        if (why) {
-          forkHere(Effect.logWarning(`memory from ${name} is off: ${why}`));
-          isOff(why);
-          continue;
-        }
-        all.push(one);
-      }
-      // Made at once: nothing in it waits.
-      current = runHere(generation(all, off));
-      generations.add(current);
-      built = key;
-      return current;
-    };
+        const gen = yield* generation(all, off);
+        generations.add(gen);
+        return [gen, { key, gen }] as const;
+      }),
+    );
 
     /** An operation of the generation's: retiring it interrupts the operation, which then fails with why. */
     const leased = <A>(g: Generation, operation: Effect.Effect<A, SourceError>): Effect.Effect<A, SourceError> =>
@@ -335,14 +336,22 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         },
       );
 
-    const enqueue = (what: string, write: (one: Source) => Effect.Effect<unknown, SourceError>) => {
-      const g = snapshot();
-      if (!g) return;
-      for (const one of g.all.slice(1)) {
-        const job = logged((why) => `${what} (${one.name}): ${why}`)(leased(g, within(Effect.asVoid(write(one)), writeTimeoutMs)), undefined);
-        if (!Queue.offerUnsafe(g.writes, job)) forkHere(Effect.logWarning(`${what}: too many writes waiting, dropped`));
-      }
-    };
+    const enqueue = (what: string, write: (one: Source) => Effect.Effect<unknown, SourceError>) =>
+      Effect.flatMap(snapshot, (g) =>
+        g
+          ? Effect.forEach(
+              g.all.slice(1),
+              (one) => {
+                const job = logged((why) => `${what} (${one.name}): ${why}`)(leased(g, within(Effect.asVoid(write(one)), writeTimeoutMs)), undefined);
+                return Queue.offer(g.writes, job).pipe(
+                  Effect.flatMap((taken) => (taken ? Effect.void : Effect.logWarning(`${what}: too many writes waiting, dropped`))),
+                  Effect.annotateLogs({ source: one.name }),
+                );
+              },
+              { discard: true },
+            )
+          : Effect.void,
+      );
 
     const infoOf = (g: Generation): T.MemorySourceInfo[] => [
       ...g.all.map((one) => ({
@@ -357,17 +366,17 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       ...g.off,
     ];
 
-    const forgetProblem = (id: string) => {
-      const g = snapshot();
-      if (!g) return t("server.memory.stopped");
-      const [one] = owner(g.all, id);
-      return one.can.forget ? undefined : t("server.memory.forgetThere", { source: sourceLabel(one.name) });
-    };
+    const forgetProblem = (id: string) =>
+      Effect.map(snapshot, (g): string | undefined => {
+        if (!g) return t("server.memory.stopped");
+        const [one] = owner(g.all, id);
+        return one.can.forget ? undefined : t("server.memory.forgetThere", { source: sourceLabel(one.name) });
+      });
 
     // The writes still waiting go first, for a moment; then every generation is retired and the local source stopped.
     yield* Effect.addFinalizer(() =>
       Effect.gen(function* () {
-        stopped = true;
+        yield* Ref.set(stopped, true);
         yield* Effect.forEach(
           [...generations],
           Effect.fnUntraced(function* (g) {
@@ -385,15 +394,13 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
 
     return {
       prefetch: (cue) =>
-        Effect.suspend(() => {
-          const g = snapshot();
+        Effect.flatMap(snapshot, (g) => {
           return g
             ? readAll(g, cue.agent, (one) => Effect.map(one.prefetch(cueFor(one, cue)), (lines) => lines.map((line) => ({ ...line, id: idOf(one, line.id) }))))
             : Effect.succeed([]);
         }),
       list: (agent) =>
-        Effect.suspend(() => {
-          const g = snapshot();
+        Effect.flatMap(snapshot, (g) => {
           if (!g) return Effect.succeed({ memories: [], sources: [] });
           const listing = g.all.filter((one) => one.can.list);
           return Effect.map(
@@ -408,8 +415,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
           );
         }),
       search: (query) =>
-        Effect.suspend(() => {
-          const g = snapshot();
+        Effect.flatMap(snapshot, (g) => {
           if (!g) return Effect.succeed([]);
           return Effect.map(
             readAll(g, "a search", (one) => Effect.map(one.search(query), (page) => [page])),
@@ -426,19 +432,16 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         }),
       forgetProblem,
       forget: (agent, id) =>
-        Effect.suspend(() => {
-          const problem = forgetProblem(id);
-          const g = snapshot();
-          if (problem || !g) return Effect.fail(new SourceError({ message: problem ?? t("server.memory.stopped") }));
+        Effect.gen(function* () {
+          const problem = yield* forgetProblem(id);
+          const g = yield* snapshot;
+          if (problem || !g) return yield* new SourceError({ message: problem ?? t("server.memory.stopped") });
           const [one, own] = owner(g.all, id);
-          return one === local ? one.forget(agent, own) : leased(g, within(one.forget(agent, own), writeTimeoutMs));
+          return yield* one === local ? one.forget(agent, own) : leased(g, within(one.forget(agent, own), writeTimeoutMs));
         }),
       add: (note) => enqueue(`a note for ${note.agent} did not reach its source`, (one) => one.add(note)),
       keep: (run) => enqueue(`what ${run.session} learned was not kept outside`, (one) => one.syncTurn(run)),
       endSession: (session) => enqueue(`the end of ${session.session} did not reach its source`, (one) => one.sessionEnded(session)),
-      info: () => {
-        const g = snapshot();
-        return g ? infoOf(g) : [];
-      },
+      info: Effect.map(snapshot, (g) => (g ? infoOf(g) : [])),
     } satisfies Sources;
   });

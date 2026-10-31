@@ -719,6 +719,31 @@ const dbDoor = defineRule({
   },
 });
 
+const clockInEffect = defineRule({
+  meta: {
+    messages: {
+      unsafe: says(
+        "currentTimeMillisUnsafe in an Effect generator reads the time outside Effect, where a test's Clock and the trace do not see it",
+        "`yield* Clock.currentTimeMillis`; currentTimeMillisUnsafe is for a synchronous callback (an outside library's, a timer's) that cannot yield",
+        "docs/subsystems/foundation.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type !== "MemberExpression" || c.property.type !== "Identifier" || c.property.name !== "currentTimeMillisUnsafe") return;
+        // The nearest function: a generator yields; any other is a callback, where the unsafe read is the way.
+        let at: ESTree.Node = node.parent;
+        while (at.type !== "FunctionExpression" && at.type !== "ArrowFunctionExpression" && at.type !== "FunctionDeclaration" && at.type !== "Program")
+          at = at.parent;
+        if ((at.type === "FunctionExpression" || at.type === "FunctionDeclaration") && at.generator) context.report({ node, messageId: "unsafe" });
+      },
+    };
+  },
+});
+
 const syncFs = defineRule({
   meta: {
     messages: {
@@ -1295,6 +1320,7 @@ export default definePlugin({
     "child-process-door": childProcessDoor,
     "dropped-timer": droppedTimer,
     "sync-fs": syncFs,
+    "clock-in-effect": clockInEffect,
     "atom-door": atomDoor,
     "page-store": pageStore,
     "stored-door": storedDoor,

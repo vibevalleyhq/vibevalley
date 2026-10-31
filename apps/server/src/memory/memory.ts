@@ -51,7 +51,7 @@ export class Memory extends Context.Service<
     readonly endSession: (s: EndedSession) => Effect.Effect<void>;
     readonly write: (n: Note) => Effect.Effect<T.Memory, ApiError>;
     readonly list: (agent: string) => Effect.Effect<T.Memory[]>;
-    readonly sources: () => T.MemorySourceInfo[];
+    readonly sources: Effect.Effect<T.MemorySourceInfo[]>;
     /** An orchestrator's archive: what its compactions folded away. */
     readonly archive: (agent: string, query: string) => Effect.Effect<T.ArchiveListing>;
     readonly archiveFile: (agent: string, name: string) => Effect.Effect<string | undefined>;
@@ -112,7 +112,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     const write = Effect.fn("Memory.write")(function* (n: Note) {
       const kept = yield* local.write(n).pipe(Effect.mapError((e) => refused(e.message)));
-      sources.add(n);
+      yield* sources.add(n);
       return kept;
     });
 
@@ -149,7 +149,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     // forget and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
     const forgettable = Effect.fn("Memory.forgettable")(function* (agent: string, id: string) {
-      const problem = inFile(agent) ? undefined : sources.forgetProblem(id);
+      const problem = inFile(agent) ? undefined : yield* sources.forgetProblem(id);
       if (problem) return yield* Effect.fail(refused(problem));
       const listed = inFile(agent) ? yield* orchestrator(agent) : yield* sources.list(agent);
       const m = listed.memories.find((x) => x.id === id);
@@ -201,14 +201,14 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       }),
       keep: Effect.fn("Memory.keep")(function* (r) {
         yield* local.keep(r);
-        sources.keep(r);
+        yield* sources.keep(r);
       }),
       endSession: Effect.fn("Memory.endSession")(function* (s) {
-        yield* Effect.sync(() => sources.endSession(s));
+        yield* sources.endSession(s);
       }),
       write,
       list,
-      sources: () => sources.info(),
+      sources: sources.info,
       archive: Effect.fn("Memory.archive")(function* (agent, query) {
         return {
           files: yield* Effect.promise(() => archiveFiles(homeOf(agent))),

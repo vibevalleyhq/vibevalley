@@ -517,6 +517,11 @@ export default defineConfig({
         rules: { "vibevalley/db-door": "error" },
       },
       {
+        // An Effect generator reads the time with yield* Clock.currentTimeMillis (scripts/oxlint-plugin.ts, clock-in-effect).
+        files: ["apps/server/src/**", "packages/agent/src/**"],
+        rules: { "vibevalley/clock-in-effect": "error" },
+      },
+      {
         // The server and the brain read and write files off the event loop (scripts/oxlint-plugin.ts, sync-fs). Before the
         // services are up a sync call is fine: the home's lock, the database's folder and baseline, the locale the CLI
         // starts in; and the evals' cases are read by a tool, not the server.

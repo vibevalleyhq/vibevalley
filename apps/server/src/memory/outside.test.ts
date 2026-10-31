@@ -432,7 +432,7 @@ describe("EverOS", () => {
       const found = (yield* m.search({ agent: "lab", project: "demo", text: "登录", kind: "issue", limit: 0 })).found;
       expect(found.some((f) => f.id === `everos:${everosProject("demo")}:ep-1` && f.text === "登录页：主人让修登录页，改完了")).toBe(true);
       expect((yield* m.search({ agent: "", project: "", text: "登录", kind: "", limit: 0 })).found.some((f) => f.source === "everos")).toBe(false);
-      const sources = m.sources();
+      const sources = yield* m.sources;
       expect([sources.length, sources[1]!.label, sources[1]!.canList, sources[1]!.canForget, sources[1]!.transcripts]).toEqual([
         2,
         "EverOS",

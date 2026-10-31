@@ -189,15 +189,15 @@ describe("memory sources", () => {
     return Effect.gen(function* () {
       const m = yield* Memory;
       yield* save({ ...nowledgeOn, url: "http://down/" });
-      let sources = m.sources();
+      let sources = yield* m.sources;
       expect([sources.length, sources[0]!.name, sources[0]!.on, sources[1]!.on, sources[1]!.off]).toEqual([2, localName, true, false, "no address"]);
       yield* save(nowledgeOn);
-      sources = m.sources();
+      sources = yield* m.sources;
       expect([sources[1]!.on, sources[1]!.label]).toEqual([true, "Nowledge Mem"]);
-      m.sources();
+      yield* m.sources;
       expect(built).toBe(2);
       yield* save({ ...nowledgeOn, enabled: false });
-      sources = m.sources();
+      sources = yield* m.sources;
       expect([sources[1]!.on, sources[1]!.off]).toEqual([false, "没打开"]);
     }).pipe(Effect.provide(world(build)));
   });
@@ -225,7 +225,7 @@ describe("memory sources", () => {
       yield* Effect.promise(() => until(() => events.includes("old:first")));
       yield* m.write(owner("lab", "second"));
       yield* save({ ...nowledgeOn, url: "http://new/" });
-      m.sources();
+      yield* m.sources;
       yield* Effect.promise(() => until(() => events.includes("old:stop")));
       yield* m.write(owner("lab", "third"));
       yield* Effect.promise(() => until(() => events.includes("new:third")));
@@ -274,7 +274,7 @@ describe("memory sources", () => {
         );
         yield* Effect.promise(() => until(() => entered));
         yield* save({ ...nowledgeOn, url: "http://new/" });
-        m.sources();
+        yield* m.sources;
         yield* Effect.promise(() => until(() => asked?.aborted === true));
         yield* Effect.promise(() => pending);
         yield* Effect.promise(() => until(() => stopped));

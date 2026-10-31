@@ -204,6 +204,15 @@ tester.run("db-door", rule("db-door"), {
   ],
 });
 
+tester.run("clock-in-effect", rule("clock-in-effect"), {
+  valid: [
+    "Effect.gen(function* () { const at = yield* Clock.currentTimeMillis; })",
+    "Effect.gen(function* () { emit(() => clock.currentTimeMillisUnsafe()); })",
+    "const now = () => clock.currentTimeMillisUnsafe();",
+  ],
+  invalid: [{ code: "Effect.gen(function* () { const at = clock.currentTimeMillisUnsafe(); })", errors: [{ messageId: "unsafe" }] }],
+});
+
 tester.run("sync-fs", rule("sync-fs"), {
   valid: ['import { readFile } from "node:fs/promises";', 'import { join } from "node:path";', 'import { constants } from "node:fs";'],
   invalid: [

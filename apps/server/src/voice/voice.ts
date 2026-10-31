@@ -682,7 +682,7 @@ const make = (options: VoiceOptions = {}) =>
     return Voice.of({
       session: Effect.fn("Voice.session")(function* () {
         const c = yield* creds();
-        const channel = newChannel(clock.currentTimeMillisUnsafe());
+        const channel = newChannel(yield* Clock.currentTimeMillis);
         const uid = newUid();
         const issued = yield* Effect.try({
           try: () => sign(c, channel, uid),

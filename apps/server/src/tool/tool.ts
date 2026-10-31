@@ -260,8 +260,8 @@ const make = Effect.gen(function* () {
     Effect.fn("Tool.issueGet")(function* (item: T.Issue) {
       const w = workerOf(item);
       const timeline = yield* Effect.orElseSucceed(issue.timeline(item.id), () => undefined);
-      const lines = [issueDetail(item, whoOf(item), timeline, clock.currentTimeMillisUnsafe())];
-      if (w) lines.push(sessionLine(w, clock.currentTimeMillisUnsafe(), item.number), answers.check.workdir(w.place.cwd), answers.check.lastReport(w.lastText));
+      const lines = [issueDetail(item, whoOf(item), timeline, yield* Clock.currentTimeMillis)];
+      if (w) lines.push(sessionLine(w, yield* Clock.currentTimeMillis, item.number), answers.check.workdir(w.place.cwd), answers.check.lastReport(w.lastText));
       return lines.join("\n");
     }),
   );
@@ -571,7 +571,7 @@ const make = Effect.gen(function* () {
       const { limit: _, status: __, ...rest } = p;
       const found = yield* issue.query({ ...rest, ...(status ? { status } : {}) });
       if (found.length === 0) return p.wantsOwner === true ? answers.issues.noneWaiting : answers.issues.none;
-      const now = clock.currentTimeMillisUnsafe();
+      const now = yield* Clock.currentTimeMillis;
       const limit = p.limit != null && p.limit > 0 ? Math.trunc(p.limit) : 20;
       const more = found.length > limit ? answers.issues.moreNote(found.length - limit) : "";
       return (
@@ -706,7 +706,7 @@ const make = Effect.gen(function* () {
               // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
               if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
               if (to === "done" && done.pullRequest?.state === "open") return answers.issueStatus.prOpenNote(done.number, done.pullRequest.url);
-              return answers.issueStatus.moved(issueLine(done, whoOf(done), clock.currentTimeMillisUnsafe()).slice(2));
+              return answers.issueStatus.moved(issueLine(done, whoOf(done), yield* Clock.currentTimeMillis).slice(2));
             },
             Effect.catch((e) => Effect.succeed(answers.issueStatus.notMoved(said(e)))),
           ),

@@ -152,7 +152,7 @@ export const handlers = Effect.gen(function* () {
           () => missing(t("server.archiveRef", { name }), [lookIn.archive]),
         ),
       ),
-    "runtime.list": () => Effect.sync(runtimes.list),
+    "runtime.list": () => runtimes.list(),
     "runtime.refresh": ({ id }) => runtimes.refresh(id).pipe(orMissing("runtime " + id, [lookIn.runtime])),
     "runtime.setting.update": ({ id, ...body }) => runtimes.update(id, body).pipe(orMissing("runtime " + id, [lookIn.runtime])),
     "agent.validate": (body) => Effect.forEach(body.agents, (agent) => Effect.map(runtimes.problemsOf(agent), (problems) => ({ id: agent.id, problems }))),

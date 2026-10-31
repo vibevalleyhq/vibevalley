@@ -12,6 +12,7 @@ import { TestClock } from "effect/testing";
 import { setLocale, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
+import { waitFor } from "@vibevalley/testkit/until";
 
 import { Agent } from "@/agent/agent.ts";
 import { Core } from "@/core/core.ts";
@@ -93,16 +94,16 @@ describe("runtime", () => {
     ]);
     return Effect.gen(function* () {
       const r = yield* make({ registry, background: false, usageOf: async () => null });
-      const reason = () => {
-        const got = r.list().find((x) => x.id === "pi")!.installation;
+      const reason = Effect.map(r.list(), (all) => {
+        const got = all.find((x) => x.id === "pi")!.installation;
         return got.status === "unsupported" ? got.reason : "";
-      };
+      });
       yield* r.refresh("pi");
-      const chinese = reason();
+      const chinese = yield* reason;
       setLocale("en");
       // The list shows what it held until the probe in English lands.
-      expect(reason()).toBe(chinese);
-      yield* Effect.promise(() => until(() => reason() === "oar does not know this runtime"));
+      expect(yield* reason).toBe(chinese);
+      yield* waitFor(reason, (r) => r === "oar does not know this runtime", "the reason in English");
       expect((yield* r.info("pi"))!.installation).toMatchObject({ reason: "oar does not know this runtime" });
     }).pipe(Effect.ensuring(Effect.sync(() => setLocale("zh"))), Effect.scoped, Effect.provide(world()));
   });
@@ -229,10 +230,10 @@ describe("runtime", () => {
       // A spend while the read is out pushes a new total, rebuilding the cached observation.
       const read = yield* Effect.forkChild(r.refreshUsage("pi"));
       yield* Effect.promise(() => until(() => out.length === 1));
-      const shown = r.cached.get("pi");
+      const shown = yield* r.cached("pi");
       r.spend("pi", 1);
       yield* TestClock.adjust(3_000);
-      yield* Effect.promise(() => until(() => r.cached.get("pi") !== shown));
+      yield* waitFor(r.cached("pi"), (now) => now !== shown, "the new total cached");
       out[0]!(used(40));
       yield* Fiber.join(read);
       expect((yield* r.info("pi"))!.usage).toEqual(used(40));
@@ -262,15 +263,15 @@ describe("runtime", () => {
           return probes === 1 ? first.promise : second.promise;
         },
       });
-      const pi = () => r.list().find((info) => info.id === "pi")!;
-      expect(pi().installation.status).toBe("checking");
+      const pi = Effect.map(r.list(), (all) => all.find((info) => info.id === "pi")!);
+      expect((yield* pi).installation.status).toBe("checking");
       yield* Effect.promise(() => until(() => probes === 1));
       first.reject(new Error("first probe failed"));
       // Asked again, the list tries again, and says checking until the second read answers.
-      yield* Effect.promise(() => until(() => pi().installation.status === "checking" && probes === 2));
-      expect(pi().installation.status).toBe("checking");
+      yield* waitFor(pi, (p) => p.installation.status === "checking" && probes === 2, "a second probe");
+      expect((yield* pi).installation.status).toBe("checking");
       second.resolve(yield* Effect.promise(() => notFound("pi")));
-      yield* Effect.promise(() => until(() => pi().installation.status === "not_found"));
+      yield* waitFor(pi, (p) => p.installation.status === "not_found", "the second probe landed");
       expect(probes).toBe(2);
     }).pipe(Effect.scoped, Effect.provide(world()));
   });
@@ -297,7 +298,7 @@ describe("runtime", () => {
       yield* Effect.promise(() => until(() => probes === 2));
       old.reject(new Error("old probe failed"));
       expect(yield* Effect.promise(() => oldResult)).toMatchObject({ status: "rejected" });
-      expect(r.list().find((info) => info.id === "pi")!.installation.status).toBe("checking");
+      expect((yield* r.list()).find((info) => info.id === "pi")!.installation.status).toBe("checking");
       latest.resolve(yield* Effect.promise(() => notFound("pi")));
       expect((yield* Effect.promise(() => latestResult))!.installation.status).toBe("not_found");
       // The old read's failure started no read of its own.
@@ -506,17 +507,11 @@ describe("runtime", () => {
       ]);
       const r = yield* make({ background: false, usageOf: async () => null, registry });
       // The first answer does not wait for a probe: every runtime is checking, already with its name, look and facts.
-      for (const info of r.list()) {
+      for (const info of yield* r.list()) {
         expect(info.installation.status).toBe("checking");
         expect(info.preset).toEqual(presetOf(info.id));
       }
-      let list: T.RuntimeInfo[] = [];
-      yield* Effect.promise(() =>
-        until(() => {
-          list = r.list();
-          return list.every((i) => i.installation.status !== "checking");
-        }),
-      );
+      const list = yield* waitFor(r.list(), (all) => all.every((i) => i.installation.status !== "checking"), "every runtime probed");
       expect(list.map((i) => i.id)).toEqual(runtimeIds());
       const byId = Object.fromEntries(list.map((i) => [i.id, i]));
       expect(byId.opencode!.installation.status).toBe("not_found");
