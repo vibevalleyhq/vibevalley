@@ -4,6 +4,7 @@
 insert into connector_outbox (id, connector, message_id, body, created_at) values (sqlc.arg(id), sqlc.arg(connector), sqlc.arg(message_id), sqlc.arg(body), sqlc.arg(created_at));
 
 -- name: PendingOutbox :many
+-- bound: only what waits; each is sent or dropped.
 select id, body from connector_outbox where connector = sqlc.arg(connector) and state = 'pending' order by id;
 
 -- name: CountPendingOutbox :one
@@ -24,3 +25,7 @@ select message_id from connector_outbox where connector_outbox.connector = sqlc.
 union all
 select message_id from connector_inbound where connector_inbound.connector = sqlc.arg(connector) and connector_inbound.ext_id = sqlc.arg(ext_id) and message_id is not null
 limit 1;
+
+-- name: PruneOutbox :exec
+-- A sent or dropped message older than before: what a reply that old points at is not looked up.
+delete from connector_outbox where state <> 'pending' and created_at < sqlc.arg(before);

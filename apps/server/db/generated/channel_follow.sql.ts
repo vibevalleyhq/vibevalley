@@ -38,7 +38,7 @@ export const AllFollowsResult = Schema.Struct({
 export type AllFollowsResult = typeof AllFollowsResult.Type
 
 
-export const AllFollowsSql = "-- name: AllFollows :many\nselect channel_id, participant_id from channel_follow where unfollowed_at is null;"
+export const AllFollowsSql = "-- name: AllFollows :many\n-- bound: a row per channel and follower.\nselect channel_id, participant_id from channel_follow where unfollowed_at is null;"
 
 export const allFollows = Effect.fn("AllFollows")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -62,5 +62,22 @@ export const deleteFollowsIn = Effect.fn("DeleteFollowsIn")(function* (params: D
   return yield* SqlSchema.void({
     Request: DeleteFollowsInParams,
     execute: (p) => sql.unsafe(DeleteFollowsInSql, [p["id"]]),
+  })(params)
+})
+
+export const UnfollowAllOfParams = Schema.Struct({
+  ["at"]: Schema.NullOr(Schema.Number),
+  ["participant_id"]: Schema.String,
+})
+export type UnfollowAllOfParams = typeof UnfollowAllOfParams.Type
+
+
+export const UnfollowAllOfSql = "-- name: UnfollowAllOf :exec\n-- A session that left follows nothing: its ids are never taken again.\nupdate channel_follow set unfollowed_at = $1 where participant_id = $2 and unfollowed_at is null;"
+
+export const unfollowAllOf = Effect.fn("UnfollowAllOf")(function* (params: UnfollowAllOfParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: UnfollowAllOfParams,
+    execute: (p) => sql.unsafe(UnfollowAllOfSql, [p["at"], p["participant_id"]]),
   })(params)
 })

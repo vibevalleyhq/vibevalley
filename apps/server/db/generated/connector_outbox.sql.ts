@@ -37,7 +37,7 @@ export const PendingOutboxResult = Schema.Struct({
 export type PendingOutboxResult = typeof PendingOutboxResult.Type
 
 
-export const PendingOutboxSql = "-- name: PendingOutbox :many\nselect id, body from connector_outbox where connector = $1 and state = 'pending' order by id;"
+export const PendingOutboxSql = "-- name: PendingOutbox :many\n-- bound: only what waits; each is sent or dropped.\nselect id, body from connector_outbox where connector = $1 and state = 'pending' order by id;"
 
 export const pendingOutbox = Effect.fn("PendingOutbox")(function* (params: PendingOutboxParams) {
   const sql = yield* SqlClient.SqlClient
@@ -144,5 +144,21 @@ export const messageOfExt = Effect.fn("MessageOfExt")(function* (params: Message
     Request: MessageOfExtParams,
     Result: MessageOfExtResult,
     execute: (p) => sql.unsafe(MessageOfExtSql, [p["connector"], p["ext_id"]]),
+  })(params)
+})
+
+export const PruneOutboxParams = Schema.Struct({
+  ["before"]: Schema.Number,
+})
+export type PruneOutboxParams = typeof PruneOutboxParams.Type
+
+
+export const PruneOutboxSql = "-- name: PruneOutbox :exec\n-- A sent or dropped message older than before: what a reply that old points at is not looked up.\ndelete from connector_outbox where state <> 'pending' and created_at < $1;"
+
+export const pruneOutbox = Effect.fn("PruneOutbox")(function* (params: PruneOutboxParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: PruneOutboxParams,
+    execute: (p) => sql.unsafe(PruneOutboxSql, [p["before"]]),
   })(params)
 })

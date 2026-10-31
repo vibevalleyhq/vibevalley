@@ -60,7 +60,7 @@ export const ReadCursorsOfResult = Schema.Struct({
 export type ReadCursorsOfResult = typeof ReadCursorsOfResult.Type
 
 
-export const ReadCursorsOfSql = "-- name: ReadCursorsOf :many\nselect channel_id, read_number from channel_read_cursor where participant_id = $1;"
+export const ReadCursorsOfSql = "-- name: ReadCursorsOf :many\n-- bound: a row per channel.\nselect channel_id, read_number from channel_read_cursor where participant_id = $1;"
 
 export const readCursorsOf = Effect.fn("ReadCursorsOf")(function* (params: ReadCursorsOfParams) {
   const sql = yield* SqlClient.SqlClient

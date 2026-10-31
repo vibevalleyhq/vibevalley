@@ -45,7 +45,7 @@ export const ListIssuesResult = Schema.Struct({
 export type ListIssuesResult = typeof ListIssuesResult.Type
 
 
-export const ListIssuesSql = "-- Issues (issue/issue.ts).\n\n-- name: ListIssues :many\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"talk\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\", \"issue\".\"answer\" from issue order by rank, created_at, id;"
+export const ListIssuesSql = "-- Issues (issue/issue.ts).\n\n-- name: ListIssues :many\n-- bound: every issue, as the core holds them.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"talk\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\", \"issue\".\"answer\" from issue order by rank, created_at, id;"
 
 export const listIssues = Effect.fn("ListIssues")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -503,7 +503,7 @@ export const FamilyResult = Schema.Struct({
 export type FamilyResult = typeof FamilyResult.Type
 
 
-export const FamilySql = "-- name: Family :many\n-- An issue and its sub-issues.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"talk\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\", \"issue\".\"answer\" from issue where id = $1 or parent = $1;"
+export const FamilySql = "-- name: Family :many\n-- bound: one issue and its sub-issues.\n-- An issue and its sub-issues.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"talk\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\", \"issue\".\"answer\" from issue where id = $1 or parent = $1;"
 
 export const family = Effect.fn("Family")(function* (params: FamilyParams) {
   const sql = yield* SqlClient.SqlClient
@@ -556,7 +556,7 @@ export const GraphIDsResult = Schema.Struct({
 export type GraphIDsResult = typeof GraphIDsResult.Type
 
 
-export const GraphIDsSql = "-- name: GraphIDs :many\nselect id from issue where graph is not null;"
+export const GraphIDsSql = "-- name: GraphIDs :many\n-- bound: only issues that are a plan's graph.\nselect id from issue where graph is not null;"
 
 export const graphIDs = Effect.fn("GraphIDs")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -663,7 +663,7 @@ export const OpenOfResult = Schema.Struct({
 export type OpenOfResult = typeof OpenOfResult.Type
 
 
-export const OpenOfSql = "-- name: OpenOf :many\nselect id, last_run from issue where assignee = $1 and closed_at is null;"
+export const OpenOfSql = "-- name: OpenOf :many\n-- bound: one assignee's open issues.\nselect id, last_run from issue where assignee = $1 and closed_at is null;"
 
 export const openOf = Effect.fn("OpenOf")(function* (params: OpenOfParams) {
   const sql = yield* SqlClient.SqlClient

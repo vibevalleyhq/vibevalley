@@ -51,3 +51,19 @@ export const artifactBlockRevision = Effect.fn("ArtifactBlockRevision")(function
     execute: (p) => sql.unsafe(ArtifactBlockRevisionSql, [p["block_id"], p["rev"]]),
   })(params)
 })
+
+export const PruneArtifactBlockRevisionsParams = Schema.Struct({
+  ["before"]: Schema.Number,
+})
+export type PruneArtifactBlockRevisionsParams = typeof PruneArtifactBlockRevisionsParams.Type
+
+
+export const PruneArtifactBlockRevisionsSql = "-- name: PruneArtifactBlockRevisions :exec\n-- A text older than before: an update stale by that long is not merged against its base.\ndelete from artifact_block_revision where created_at < $1;"
+
+export const pruneArtifactBlockRevisions = Effect.fn("PruneArtifactBlockRevisions")(function* (params: PruneArtifactBlockRevisionsParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: PruneArtifactBlockRevisionsParams,
+    execute: (p) => sql.unsafe(PruneArtifactBlockRevisionsSql, [p["before"]]),
+  })(params)
+})

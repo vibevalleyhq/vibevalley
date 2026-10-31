@@ -68,6 +68,43 @@ describe("the schema", () => {
       ).toEqual({ index: i.name, table: i.table, starts: true });
   });
 
+  it("indexes every foreign key", () => {
+    const sql = schema.replace(/--.*$/gmu, "");
+    // The columns an index can start from: a table's primary key, a unique column or list, an index's first column.
+    const leading = new Set<string>();
+    const keys: string[] = [];
+    for (const [, table, body] of sql.matchAll(/create table (\w+) \((.*?)\n\);/gisu))
+      for (const line of body!.split("\n").map((l) => l.trim())) {
+        const list = /^(?:primary key|unique)\s*\((\w+)/iu.exec(line);
+        if (list) leading.add(`${table}.${list[1]}`.toLowerCase());
+        const column = /^(\w+)\s+\w+/u.exec(line)?.[1]?.toLowerCase();
+        if (list || column === undefined || ["check", "primary", "unique"].includes(column)) continue;
+        if (/\b(?:primary key|unique)\b/iu.test(line)) leading.add(`${table}.${column}`.toLowerCase());
+        if (/\breferences\b/iu.test(line)) keys.push(`${table}.${column}`.toLowerCase());
+      }
+    for (const [, table, column] of sql.matchAll(/create (?:unique )?index \w+ on (\w+)(?: using \w+)? ?\((\w+)/giu))
+      leading.add(`${table}.${column}`.toLowerCase());
+    for (const [, table, column] of sql.matchAll(/alter table (\w+) add foreign key \((\w+)\)/giu)) keys.push(`${table}.${column}`.toLowerCase());
+    expect(keys.length).toBeGreaterThan(0);
+    expect(
+      keys.filter((k) => !leading.has(k)),
+      "a foreign key column has no index that starts with it: Postgres does not make one, so a cascading delete and a lookup by it scan the table. Fix: `CREATE INDEX <table>_by_<column> on <table> (<column>)` in 0001_schema.up.sql (add `where <column> is not null` for a nullable one). See docs/subsystems/foundation.md",
+    ).toEqual([]);
+  });
+
+  it("bounds every query that reads many rows", () => {
+    const unbounded: string[] = [];
+    for (const file of readdirSync(join(db, "queries")))
+      for (const block of readFileSync(join(db, "queries", file), "utf8").split(/\n\s*\n/u)) {
+        const name = /-- name: (\w+) :many/u.exec(block)?.[1];
+        if (name && !/\blimit\b/iu.test(block.replace(/--.*$/gmu, "")) && !/^-- bound: \S/mu.test(block)) unbounded.push(`${file}: ${name}`);
+      }
+    expect(
+      unbounded,
+      "a :many query reads every row it matches, and a table that only grows makes it slower each day. Fix: add `limit`, or say under its name what keeps it small in a `-- bound: <why>` line (one parent's rows, only open ones, pruned after n days). See docs/subsystems/foundation.md",
+    ).toEqual([]);
+  });
+
   it("keeps each table's SQL in a file of its own, and only there", () => {
     const queries = readdirSync(join(db, "queries")).map((f) => f.replace(/\.sql$/u, ""));
     for (const q of queries) expect({ file: q, table: tables.includes(q) }).toEqual({ file: q, table: true });

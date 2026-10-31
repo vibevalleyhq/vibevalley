@@ -452,5 +452,18 @@ CREATE TABLE artifact_change (
   primary key (artifact_id, seq)
 );
 
+-- Postgres does not index a foreign key; a delete that cascades and a lookup by it scan without one.
+CREATE INDEX channel_by_parent on channel (parent_id) where parent_id is not null;
+CREATE INDEX channel_follow_by_participant on channel_follow (participant_id);
+CREATE INDEX channel_read_cursor_by_channel on channel_read_cursor (channel_id);
+CREATE INDEX channel_seen_mark_by_message on channel_seen_mark (message_id);
+CREATE INDEX channel_delivery_by_message on channel_delivery (message_id);
+CREATE INDEX cron_by_channel on cron (channel_id);
+CREATE INDEX connector_account_by_channel on connector_account (channel_id) where channel_id is not null;
+CREATE INDEX connector_inbound_by_message on connector_inbound (message_id) where message_id is not null;
+CREATE INDEX connector_outbox_by_message on connector_outbox (message_id);
+CREATE INDEX artifact_by_message on artifact (message_id) where message_id is not null;
+CREATE INDEX artifact_version_by_message on artifact_version (message_id) where message_id is not null;
+
 -- A thread hangs under a message, which is made after its channel.
 ALTER TABLE channel ADD FOREIGN KEY (root_id) REFERENCES channel_message (id);

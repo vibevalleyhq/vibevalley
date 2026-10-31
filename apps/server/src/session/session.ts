@@ -74,6 +74,8 @@ import * as qi from "../../db/generated/session_run_issue.sql.ts";
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
 const closeWaitMs = 15_000;
+/** The ended sessions a list shows, newest first: their trajectories expire after days anyway. */
+const endedListed = 200;
 
 export interface Roster {
   readonly session: T.Session;
@@ -995,8 +997,10 @@ export const make = (options: SessionOptionsIn = {}) =>
       // Numbering goes on from the highest id seen, so a new session never takes an old one's steps.
       hired = Math.max(
         0,
-        ...[...(yield* db(qs.sessionIDs())).map((r) => r.id), ...core.state().sessions.map((s) => s.id)]
-          .map((id) => Number.parseInt(id.replace(/^w/u, ""), 10))
+        (yield* db(qs.highestSessionNumber())).n ?? 0,
+        ...core
+          .state()
+          .sessions.map((s) => Number.parseInt(s.id.replace(/^w/u, ""), 10))
           .filter((n) => Number.isFinite(n)),
       );
       for (const session of core.state().sessions) {
@@ -1280,8 +1284,8 @@ export const make = (options: SessionOptionsIn = {}) =>
       changes: changesOf,
       list: Effect.fn("Session.list")(function* (agent) {
         const out = core.state().sessions.filter((s) => !agent || s.agent === agent);
-        const rows = yield* db(qs.endedSessions({ agent }));
-        const runs = yield* db(qr.runsOfEndedSessions());
+        const rows = yield* db(qs.endedSessions({ agent, n: endedListed }));
+        const runs = yield* db(qr.runsOfSessions({ sessions: rows.map((r) => r.id) }));
         const bySession = Map.groupBy(runs, (r) => r.session);
         for (const r of rows) if (!out.some((s) => s.id === r.id)) out.push(endedSession(r, bySession.get(r.id) ?? []));
         return out.toSorted((a, b) => b.hiredAt - a.hiredAt);

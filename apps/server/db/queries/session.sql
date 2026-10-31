@@ -12,10 +12,11 @@ update session set ended_at = sqlc.arg(ended_at), closed = sqlc.arg(closed) wher
 select * from session where id = sqlc.arg(id);
 
 -- name: EndedSessions :many
--- Newest first; agent '' is every agent's.
-select * from session where ended_at is not null and (sqlc.arg(agent)::text = '' or agent = sqlc.arg(agent)) order by hired_at desc;
+-- Newest first, the newest n; agent '' is every agent's.
+select * from session where ended_at is not null and (sqlc.arg(agent)::text = '' or agent = sqlc.arg(agent)) order by hired_at desc limit sqlc.arg(n)::int;
 
 -- name: SessionsEndedBefore :many
+-- bound: read to drop their trajectories, which then are gone.
 select id from session where ended_at < sqlc.arg(before);
 
 -- name: KeepHand :exec
@@ -25,7 +26,9 @@ update session set place = sqlc.narg(place), oar_session = sqlc.narg(oar_session
 where id = sqlc.arg(id);
 
 -- name: Hands :many
+-- bound: only sessions on the farm now.
 select id, place, oar_session, last_text, recalled from session where ended_at is null and place is not null;
 
--- name: SessionIDs :many
-select id from session;
+-- name: HighestSessionNumber :one
+-- The highest n of the ids w<n>, 0 for none.
+select coalesce(max(substring(id from '^w([0-9]+)$')::int), 0)::int as n from session;

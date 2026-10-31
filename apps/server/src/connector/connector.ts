@@ -15,7 +15,7 @@ import { HttpClient } from "effect/http";
 import type { SqlClient, SqlError } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
-import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorStatus } from "@vibevalley/protocol";
+import { type ChatMessage, type ConnectorID, type ConnectorLogin, type ConnectorStatus, dayMs } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 
 import { newId } from "@/base/ids.ts";
@@ -38,6 +38,8 @@ import { type WeixinApi, WeixinClient, weixinAdapter } from "./weixin.ts";
 
 /** WeChat's official client rests this long too. */
 const stalePauseMs = 60 * 60_000;
+/** How long a message in or out is kept after it went through, for a reply to point at. */
+const keptDays = 30;
 
 const InboundSchema: Schema.Codec<Inbound> = Schema.Struct({
   id: Schema.String,
@@ -661,6 +663,13 @@ const make = (options: ConnectorOptions = {}) =>
       Stream.runForEach(yield* inbox.toOwner, (m) => Effect.forEach(bridges, (b) => b.offer(m), { concurrency: "unbounded", discard: true })),
     );
     for (const b of bridges) if (b.hasAccount()) forkHere(b.resume);
+    // What came in and went out is kept for a while for replies to point at, then dropped, once at start and daily.
+    const prune = Effect.gen(function* () {
+      const before = (yield* Clock.currentTimeMillis) - keptDays * dayMs;
+      yield* run(inboundQ.pruneInbound({ before }));
+      yield* run(outboxQ.pruneOutbox({ before }));
+    }).pipe(Effect.catch((e) => Effect.logWarning("vibevalley: connector history was not pruned", e)));
+    yield* Effect.forkScoped(Effect.repeat(prune, Schedule.spaced(Duration.days(1))));
     yield* Effect.addFinalizer(() =>
       Effect.suspend(() => {
         closing = true;

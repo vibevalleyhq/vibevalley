@@ -28,7 +28,7 @@ export const ArtifactBlocksResult = Schema.Struct({
 export type ArtifactBlocksResult = typeof ArtifactBlocksResult.Type
 
 
-export const ArtifactBlocksSql = "-- A blocks artifact's blocks (artifact/blocks.ts), tombstones included.\n\n-- name: ArtifactBlocks :many\nselect \"artifact_block\".\"id\", \"artifact_block\".\"artifact_id\", \"artifact_block\".\"parent_id\", \"artifact_block\".\"order_key\", \"artifact_block\".\"type\", \"artifact_block\".\"attrs\", \"artifact_block\".\"spans\", \"artifact_block\".\"rev\", \"artifact_block\".\"deleted\", \"artifact_block\".\"updated_by\", \"artifact_block\".\"updated_at\" from artifact_block where artifact_id = $1 order by order_key, id;"
+export const ArtifactBlocksSql = "-- A blocks artifact's blocks (artifact/blocks.ts), tombstones included.\n\n-- name: ArtifactBlocks :many\n-- bound: one artifact's blocks, what a page shows whole.\nselect \"artifact_block\".\"id\", \"artifact_block\".\"artifact_id\", \"artifact_block\".\"parent_id\", \"artifact_block\".\"order_key\", \"artifact_block\".\"type\", \"artifact_block\".\"attrs\", \"artifact_block\".\"spans\", \"artifact_block\".\"rev\", \"artifact_block\".\"deleted\", \"artifact_block\".\"updated_by\", \"artifact_block\".\"updated_at\" from artifact_block where artifact_id = $1 order by order_key, id;"
 
 export const artifactBlocks = Effect.fn("ArtifactBlocks")(function* (params: ArtifactBlocksParams) {
   const sql = yield* SqlClient.SqlClient

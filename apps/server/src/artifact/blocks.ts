@@ -2,9 +2,10 @@
 // their tools, all down the same pipeline. One batch at a time for every artifact: an artifact's batches are serial and
 // its seq goes up in order. Part of the Artifact service (artifact.ts), which owns the artifact's row.
 
-import { Clock, Effect, Option, Schema, Semaphore } from "effect";
+import { Clock, Duration, Effect, Option, Schedule, Schema, Semaphore } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
+import { dayMs } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
@@ -89,6 +90,9 @@ const spansOf = (type: string, text: string) => (type === "code" ? unmarked([{ t
 
 const blockIn = (ack: T.BlockAck, id: string) => ack.blocks.find((b) => b.id === id);
 
+/** How long a batch is kept to answer it again, and a block's text to merge a stale update against. */
+const keptDays = 30;
+
 /** How long a demo waits between pieces; tests make it short. */
 export interface BlockStoreOptions {
   readonly tickMs?: number;
@@ -101,6 +105,16 @@ export const makeBlockStore = (found: (id: string) => Effect.Effect<qa.ArtifactR
     const lock = yield* Semaphore.make(1);
     const scope = yield* Effect.scope;
     const tick = options.tickMs ?? 1000;
+    yield* Effect.forkScoped(
+      Effect.repeat(
+        Effect.gen(function* () {
+          const before = (yield* Clock.currentTimeMillis) - keptDays * dayMs;
+          yield* db(qc.pruneArtifactChanges({ before }));
+          yield* db(qr.pruneArtifactBlockRevisions({ before }));
+        }),
+        Schedule.spaced(Duration.days(1)),
+      ),
+    );
 
     const blocksOf = (id: string) => db(Effect.map(qb.artifactBlocks({ artifact_id: id }), (rows) => rows.map(blockOf)));
 

@@ -67,7 +67,7 @@ export const ArtifactVersionsResult = Schema.Struct({
 export type ArtifactVersionsResult = typeof ArtifactVersionsResult.Type
 
 
-export const ArtifactVersionsSql = "-- name: ArtifactVersions :many\n-- With the announcing message's channel and number, where its comments are.\nselect \"v\".\"artifact_id\", \"v\".\"version\", \"v\".\"sha\", \"v\".\"size\", \"v\".\"note\", \"v\".\"by_id\", \"v\".\"by_name\", \"v\".\"message_id\", \"v\".\"created_at\", m.channel_id as message_channel, m.number as message_number\nfrom artifact_version v left join channel_message m on m.id = v.message_id\nwhere v.artifact_id = $1 order by v.version;"
+export const ArtifactVersionsSql = "-- name: ArtifactVersions :many\n-- bound: one artifact's versions, each one the owner or a helper wrote.\n-- With the announcing message's channel and number, where its comments are.\nselect \"v\".\"artifact_id\", \"v\".\"version\", \"v\".\"sha\", \"v\".\"size\", \"v\".\"note\", \"v\".\"by_id\", \"v\".\"by_name\", \"v\".\"message_id\", \"v\".\"created_at\", m.channel_id as message_channel, m.number as message_number\nfrom artifact_version v left join channel_message m on m.id = v.message_id\nwhere v.artifact_id = $1 order by v.version;"
 
 export const artifactVersions = Effect.fn("ArtifactVersions")(function* (params: ArtifactVersionsParams) {
   const sql = yield* SqlClient.SqlClient

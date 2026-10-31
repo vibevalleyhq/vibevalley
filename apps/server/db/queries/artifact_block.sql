@@ -1,6 +1,7 @@
 -- A blocks artifact's blocks (artifact/blocks.ts), tombstones included.
 
 -- name: ArtifactBlocks :many
+-- bound: one artifact's blocks, what a page shows whole.
 select * from artifact_block where artifact_id = sqlc.arg(artifact_id) order by order_key, id;
 
 -- name: ArtifactBlockOwner :one

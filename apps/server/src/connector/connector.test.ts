@@ -467,6 +467,28 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
+  it.live("drops what came in and went through long ago, keeping what still waits", () => {
+    const config = { ...testConfig(), db: "" };
+    return Effect.gen(function* () {
+      const before = new Script();
+      yield* Effect.scoped(
+        Effect.provide(
+          Effect.gen(function* () {
+            for (const ext_id of ["old-done", "old-waiting"]) yield* inboundQ.acceptInbound({ connector: "weixin", ext_id, payload: "{}", created_at: 1 });
+            yield* inboundQ.deliverInbound({ connector: "weixin", ext_id: "old-done" });
+          }).pipe(Effect.orDie),
+          farm(before, config),
+        ),
+      );
+      yield* Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const left = Effect.orDie(sql<{ ext_id: string }>`select ext_id from connector_inbound order by ext_id`);
+        yield* waitFor(left, (rows) => rows.length === 1, "the old delivered row dropped at start");
+        expect(yield* left).toEqual([{ ext_id: "old-waiting" }]);
+      }).pipe(Effect.scoped, Effect.provide(farm(new Script(), config)));
+    });
+  });
+
   it.live("go on with an account after a restart", () => {
     const config = { ...testConfig(), db: "" };
     return Effect.gen(function* () {

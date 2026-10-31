@@ -36,6 +36,12 @@ export class Audience {
     else this.follows.set(channel, new Set([participant]));
   }
 
+  /** A session that left: it follows nothing and is woken no more, and its ids are never taken again. */
+  left(participant: string) {
+    for (const [channel, held] of this.follows) if (held.delete(participant) && held.size === 0) this.follows.delete(channel);
+    this.lastWakeOf.delete(participant);
+  }
+
   /** By id. */
   followers(channel: string): string[] {
     return [...(this.follows.get(channel) ?? [])].toSorted();

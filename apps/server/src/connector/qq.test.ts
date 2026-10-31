@@ -5,7 +5,7 @@ import { Effect } from "effect";
 import { FetchHttpClient, HttpClient } from "effect/http";
 import { describe, expect, it } from "vite-plus/test";
 
-import { decodeGatewayEvent, QQClient } from "./qq.ts";
+import { decodeGatewayEvent, nextReplySeq, QQClient } from "./qq.ts";
 
 const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));
 
@@ -40,5 +40,16 @@ describe("QQ sign-in", () => {
     } finally {
       server.close();
     }
+  });
+});
+
+describe("QQ reply numbers", () => {
+  it("counts each message's replies and keeps only the latest messages", () => {
+    const seqs = new Map<string, number>();
+    expect([nextReplySeq(seqs, "a"), nextReplySeq(seqs, "a"), nextReplySeq(seqs, "b")]).toEqual([1, 2, 1]);
+    for (let i = 0; i < 300; i++) nextReplySeq(seqs, `m${i}`);
+    expect(seqs.size).toBe(256);
+    expect(seqs.has("a")).toBe(false);
+    expect(nextReplySeq(seqs, "m299")).toBe(2);
   });
 });

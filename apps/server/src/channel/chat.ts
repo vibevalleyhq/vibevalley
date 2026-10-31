@@ -1175,6 +1175,9 @@ const make = Effect.gen(function* () {
       model.left(p.id, now);
       yield* db(qd.dropOpen({ dropped_why: "left", recipient_id: p.id }));
       open.dropped(p.id);
+      yield* db(qf.unfollowAllOf({ at: now, participant_id: p.id }));
+      reach.left(p.id);
+      lastRead.delete(p.id);
       yield* FiberMap.remove(waits, `notice:${p.id}`);
       breaker.reset(p.id);
     }
@@ -1806,6 +1809,7 @@ const make = Effect.gen(function* () {
     }),
     removeChannel: Effect.fn("Channel.removeChannel")(function* (id) {
       yield* removable(id);
+      const gone = model.channel(id);
       yield* tx(
         Effect.gen(function* () {
           yield* db(qm.deleteMessagesIn({ id }));
@@ -1816,6 +1820,7 @@ const make = Effect.gen(function* () {
         }),
       );
       yield* reload;
+      if (gone) for (const [who, target] of lastRead) if (target === targetOfChannel(gone)) lastRead.delete(who);
       yield* core.apply({ type: "channelGone", id });
     }, locked),
     setNotify: Effect.fn("Channel.setNotify")(function* (id, notify) {

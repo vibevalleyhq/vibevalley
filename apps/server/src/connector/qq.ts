@@ -69,6 +69,19 @@ const Hello = Schema.Struct({ heartbeat_interval: Schema.optionalKey(Schema.Fini
 const sendFailure = (status: number, message: string) =>
   new AppFailed({ kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed", message });
 
+/** QQ takes passive replies to a message for minutes only: the counts of the latest messages answered are enough. */
+const repliesKept = 256;
+
+/** The next msg_seq for a reply to msgId. Newest last: a message answered again moves to the end, and the oldest goes
+ * past the cap. */
+export const nextReplySeq = (seqs: Map<string, number>, msgId: string) => {
+  const next = (seqs.get(msgId) ?? 0) + 1;
+  seqs.delete(msgId);
+  seqs.set(msgId, next);
+  if (seqs.size > repliesKept) seqs.delete(seqs.keys().next().value!);
+  return next;
+};
+
 export class QQClient implements QQApi {
   /** Tokens last about two hours: one per app, renewed a minute early. */
   private readonly tokens = new Map<string, { token: string; until: number }>();
@@ -195,8 +208,7 @@ export class QQClient implements QQApi {
       const token = yield* this.token(app).pipe(Effect.mapError((e) => sendFailure(401, e.message)));
       const payload: Record<string, unknown> = { content: text, msg_type: 0 };
       if (msgId) {
-        const next = (this.replySeq.get(msgId) ?? 0) + 1;
-        this.replySeq.set(msgId, next);
+        const next = nextReplySeq(this.replySeq, msgId);
         payload.msg_id = msgId;
         payload.msg_seq = next;
       }

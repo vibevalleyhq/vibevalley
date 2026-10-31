@@ -91,7 +91,7 @@ export const ArtifactsInChannelResult = Schema.Struct({
 export type ArtifactsInChannelResult = typeof ArtifactsInChannelResult.Type
 
 
-export const ArtifactsInChannelSql = "-- name: ArtifactsInChannel :many\nselect \"a\".\"id\", \"a\".\"title\", \"a\".\"body\", \"a\".\"channel_id\", \"a\".\"message_id\", \"a\".\"issue\", \"a\".\"by_id\", \"a\".\"by_name\", \"a\".\"version\", \"a\".\"seq\", \"a\".\"created_at\", \"a\".\"updated_at\", m.channel_id as said_channel, m.number as said_number\nfrom artifact a left join channel_message m on m.id = a.message_id\nwhere a.channel_id = $1 order by a.updated_at desc, a.id;"
+export const ArtifactsInChannelSql = "-- name: ArtifactsInChannel :many\n-- bound: one channel's artifacts, what its artifact list shows whole.\nselect \"a\".\"id\", \"a\".\"title\", \"a\".\"body\", \"a\".\"channel_id\", \"a\".\"message_id\", \"a\".\"issue\", \"a\".\"by_id\", \"a\".\"by_name\", \"a\".\"version\", \"a\".\"seq\", \"a\".\"created_at\", \"a\".\"updated_at\", m.channel_id as said_channel, m.number as said_number\nfrom artifact a left join channel_message m on m.id = a.message_id\nwhere a.channel_id = $1 order by a.updated_at desc, a.id;"
 
 export const artifactsInChannel = Effect.fn("ArtifactsInChannel")(function* (params: ArtifactsInChannelParams) {
   const sql = yield* SqlClient.SqlClient
@@ -127,7 +127,7 @@ export const ArtifactsForIssueResult = Schema.Struct({
 export type ArtifactsForIssueResult = typeof ArtifactsForIssueResult.Type
 
 
-export const ArtifactsForIssueSql = "-- name: ArtifactsForIssue :many\nselect \"a\".\"id\", \"a\".\"title\", \"a\".\"body\", \"a\".\"channel_id\", \"a\".\"message_id\", \"a\".\"issue\", \"a\".\"by_id\", \"a\".\"by_name\", \"a\".\"version\", \"a\".\"seq\", \"a\".\"created_at\", \"a\".\"updated_at\", m.channel_id as said_channel, m.number as said_number\nfrom artifact a left join channel_message m on m.id = a.message_id\nwhere a.issue = $1 order by a.updated_at desc, a.id;"
+export const ArtifactsForIssueSql = "-- name: ArtifactsForIssue :many\n-- bound: one issue's artifacts.\nselect \"a\".\"id\", \"a\".\"title\", \"a\".\"body\", \"a\".\"channel_id\", \"a\".\"message_id\", \"a\".\"issue\", \"a\".\"by_id\", \"a\".\"by_name\", \"a\".\"version\", \"a\".\"seq\", \"a\".\"created_at\", \"a\".\"updated_at\", m.channel_id as said_channel, m.number as said_number\nfrom artifact a left join channel_message m on m.id = a.message_id\nwhere a.issue = $1 order by a.updated_at desc, a.id;"
 
 export const artifactsForIssue = Effect.fn("ArtifactsForIssue")(function* (params: ArtifactsForIssueParams) {
   const sql = yield* SqlClient.SqlClient

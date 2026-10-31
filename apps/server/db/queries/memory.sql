@@ -1,6 +1,7 @@
 -- What agents remember (memory/memories.ts).
 
 -- name: MemoriesOf :many
+-- bound: one agent's current memories; superseded ones are left out.
 -- An agent's own, the superseded ones left out.
 select id, kind, body, project, session, author, created_at, recalled, recalled_at
 from memory where agent = sqlc.arg(agent) and replaced_by is null order by created_at desc, id desc;
@@ -33,6 +34,7 @@ select id, body from memory where terms_of < sqlc.arg(version) order by created_
 update memory set terms = sqlc.arg(terms), terms_of = sqlc.arg(version) where id = sqlc.arg(id);
 
 -- name: MatchMemories :many
+-- bound: one agent's current memories that share a word.
 -- How well each of an agent's memories shares any of words, higher for a better match. The words go in as lexemes as
 -- they are, quoted, so none reads as an operator.
 select id, ts_rank(terms_vector, query)::float8 as score

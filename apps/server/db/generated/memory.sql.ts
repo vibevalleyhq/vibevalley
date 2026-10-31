@@ -26,7 +26,7 @@ export const MemoriesOfResult = Schema.Struct({
 export type MemoriesOfResult = typeof MemoriesOfResult.Type
 
 
-export const MemoriesOfSql = "-- What agents remember (memory/memories.ts).\n\n-- name: MemoriesOf :many\n-- An agent's own, the superseded ones left out.\nselect id, kind, body, project, session, author, created_at, recalled, recalled_at\nfrom memory where agent = $1 and replaced_by is null order by created_at desc, id desc;"
+export const MemoriesOfSql = "-- What agents remember (memory/memories.ts).\n\n-- name: MemoriesOf :many\n-- bound: one agent's current memories; superseded ones are left out.\n-- An agent's own, the superseded ones left out.\nselect id, kind, body, project, session, author, created_at, recalled, recalled_at\nfrom memory where agent = $1 and replaced_by is null order by created_at desc, id desc;"
 
 export const memoriesOf = Effect.fn("MemoriesOf")(function* (params: MemoriesOfParams) {
   const sql = yield* SqlClient.SqlClient
@@ -175,7 +175,7 @@ export const MatchMemoriesResult = Schema.Struct({
 export type MatchMemoriesResult = typeof MatchMemoriesResult.Type
 
 
-export const MatchMemoriesSql = "-- name: MatchMemories :many\n-- How well each of an agent's memories shares any of words, higher for a better match. The words go in as lexemes as\n-- they are, quoted, so none reads as an operator.\nselect id, ts_rank(terms_vector, query)::float8 as score\nfrom memory, (select array_to_string(array(select quote_literal(w) from unnest($1::text[]) as w), ' | ')::tsquery as query) as q\nwhere terms_vector @@ query and agent = $2 and replaced_by is null;"
+export const MatchMemoriesSql = "-- name: MatchMemories :many\n-- bound: one agent's current memories that share a word.\n-- How well each of an agent's memories shares any of words, higher for a better match. The words go in as lexemes as\n-- they are, quoted, so none reads as an operator.\nselect id, ts_rank(terms_vector, query)::float8 as score\nfrom memory, (select array_to_string(array(select quote_literal(w) from unnest($1::text[]) as w), ' | ')::tsquery as query) as q\nwhere terms_vector @@ query and agent = $2 and replaced_by is null;"
 
 export const matchMemories = Effect.fn("MatchMemories")(function* (params: MatchMemoriesParams) {
   const sql = yield* SqlClient.SqlClient

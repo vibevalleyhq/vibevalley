@@ -281,15 +281,27 @@ const make = (hooks: ProjectHooks = {}) =>
     const prProjects = new Set([...config.github.prProjects]);
     const gh = hooks.gh ?? runGitHub;
 
-    const queues = new Map<string, Semaphore.Semaphore>();
-    const serially = <A, E, R>(project: string, effect: Effect.Effect<A, E, R>) => {
-      let q = queues.get(project);
-      if (!q) {
-        q = Semaphore.makeUnsafe(1);
-        queues.set(project, q);
-      }
-      return q.withPermits(1)(effect);
-    };
+    // A project's lock lives while someone holds it or waits for it, so a removed project leaves none behind.
+    const queues = new Map<string, { readonly lock: Semaphore.Semaphore; users: number }>();
+    const serially = <A, E, R>(project: string, effect: Effect.Effect<A, E, R>) =>
+      Effect.suspend(() => {
+        let q = queues.get(project);
+        if (!q) {
+          q = { lock: Semaphore.makeUnsafe(1), users: 0 };
+          queues.set(project, q);
+        }
+        const held = q;
+        held.users++;
+        return held.lock
+          .withPermits(1)(effect)
+          .pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                if (--held.users === 0) queues.delete(project);
+              }),
+            ),
+          );
+      });
     const pending = new Set<string>();
     let status: T.GitHubStatus | undefined;
     let capabilities = new Map<string, T.PullRequestCapability>();

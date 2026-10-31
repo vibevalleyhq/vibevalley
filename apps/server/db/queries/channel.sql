@@ -27,6 +27,7 @@ insert into channel (id, type, root_id, root_number, subject_kind, subject_id, p
 values (sqlc.arg(id), 'thread', sqlc.arg(root_id), sqlc.arg(root_number), sqlc.narg(subject_kind), sqlc.narg(subject_id), sqlc.arg(parent_id), sqlc.arg(created_at));
 
 -- name: AllChannels :many
+-- bound: a row per channel, what the chat keeps in memory.
 -- What the chat keeps in memory (channel/model.ts), loaded when it starts.
 select * from channel order by id;
 

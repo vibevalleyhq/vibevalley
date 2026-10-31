@@ -1,6 +1,7 @@
 -- The agents' own todos (runtime/todoStore.ts): the keeper is whoever keeps them, a session id or the orchestrator.
 
 -- name: OpenTodos :many
+-- bound: one keeper's open todos.
 select * from runtime_todo where keeper = sqlc.arg(keeper) and finished_at is null order by position;
 
 -- name: ClearOpenTodos :exec
