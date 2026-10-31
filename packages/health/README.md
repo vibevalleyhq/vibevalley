@@ -7,3 +7,5 @@
 - `cli.ts`、`report.ts`：`vpx packages/health/src/cli.ts --config <配置>`，不带参数出 Markdown 报告，`--json` 出给 agent 读的，`--check` 对棘轮，`--write` 把今天的数记进棘轮。
 
 这个仓库里：`vp run health` 出报告，`vp run health:verify`（CI 的 check 里）跑本包的测试再对棘轮；逃生口少了也失败，跑 `vp run health:write` 把棘轮降下来，和改动一起提交。计划和还没做的几项见 [体检的 Note](.agents/notes/proposed/process/2026-10-29-repo-health-readings.md)。
+
+`resultBranch` 只数 `yield* Effect.result(...)`，不禁止普通 Result 值；改成 `catchTag` 或 `match` 后随同降低基线。文件拆分后仍按领域汇总，不能靠移动文件增加某个区的额度；确实需要的边界转换要在提交说明里解释。

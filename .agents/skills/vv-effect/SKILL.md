@@ -23,7 +23,7 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 | layer 的次序 | `apps/server/src/services.ts` 按次序叠，模块只用排在它前面的；开机要做的放在最后的 `start`、`ready` | [architecture.md](docs/architecture.md) |
 | 库 | 经 `Db` 服务（`run`、`attempt`、`one`、`inTx`、`attemptTx`），模块不自己 `provideService(SqlClient)`、`withTransaction`（lint `vibevalley/db-door`）；SQL 只写在 `db/queries/<表>.sql` | [地基](docs/subsystems/foundation.md) |
 | 文件、进程、外面的 HTTP | `FileSystem`、`ChildProcessSpawner`、`HttpClient`；不用 `node:fs/promises`、`fetch`（effect:check 的 `globalFetchInEffect`；测试像浏览器一样打服务端的，在那一行关掉并说为什么） | [地基](docs/subsystems/foundation.md) |
-| 时间 | `Clock`、`Effect.sleep`、`TestClock`；类里用它拿到的 `Time`（`apps/server/src/infra/time.ts`）；lint `vibevalley/no-wall-clock` | [地基](docs/subsystems/foundation.md) |
+| 时间 | `Clock`、`Effect.sleep`、`TestClock`；同步的外部回调用它拿到的 `Time`（`apps/server/src/infra/time.ts`）；lint `vibevalley/no-wall-clock` | [地基](docs/subsystems/foundation.md) |
 | Promise | 只在外面的库的一次调用上：`Effect.tryPromise({ try: (signal) => lib.call(…, { signal }), catch: (e) => new XError({ cause: e }) })`。不写 `catch` 的形式失败时只剩 `UnknownError`，原因丢了；lint `vibevalley/promise-boundary`、`vibevalley/try-promise-catch` | [地基](docs/subsystems/foundation.md) |
 | 错误 | 预期的错误是 `Schema.TaggedError`（字段写成 Schema，包住外面的失败时原样放进 `cause: Schema.Defect()`；`preferSchemaTaggedError`、`extendsNativeError`），按 `catchTag`、`catchTags` 接，分错误的函数收它的调用方传的联合、用 `Predicate.isTagged`，不用 `instanceof` 分（lint `vibevalley/no-instanceof-tagged`）；错误通道里不写 `unknown`：写出调用方传的联合或用泛型带过去，外面的库交来的失败在边界上包成带标签的错误、原样放进 `cause`（effect:check 的 `anyUnknownInErrorContext`）；抛错写 `return yield*`；`Effect.orDie`、不带 `{ log }` 的 `Effect.ignore`、空的 `catch` 在逃生口的棘轮上（`vp run health:verify`），要丢弃一个失败就 `Effect.ignore({ log: "Warn" })`；「出错了记一笔、接着做」（缺陷也记，打断照样往上走）用 `infra/log.ts` 的 `bestEffort(what)` | [地基](docs/subsystems/foundation.md)、`packages/health/README.md` |
 | 命名和追踪 | 服务的方法用 `Effect.fn("Issue.create")`（服务的类名加成员名），热路径和薄的取值用 `Effect.fnUntraced`；要加的锁、接错误这类组合子作为 `Effect.fn` 后面的参数，不 `.pipe` 它；不写只 `return Effect.gen(…)` 的函数；lint `vibevalley/service-method-names` | 官方指南「Writing Effect code」 |
@@ -52,7 +52,7 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 
 - **`vp run effect:check`**（`@effect/tsgo` 的语言服务，规则和级别在 `tsconfig.base.json` 的 `plugins`，警告也算失败）和 **`vp check` 里的 `effecttsgo/*`**（同一张表，`scripts/effect-lint.ts`）：漂着没运行的 Effect、少了 `return yield*`、`yield` 少了 `*`、v3 的旧 API、gen 里的 `try/catch`、Effect 里再 `run*` 一个 Effect、方法签名里漏出的依赖、服务没写成类、`Math.random`、`crypto.randomUUID`、`process.env`、`setTimeout`、`fetch`……开着哪些、为什么关着哪些，看那张表和[地基](docs/subsystems/foundation.md)的说明。真要在一行上违反一条时写 `// @effect-diagnostics-next-line <规则>:off`，上一行说为什么。
 - **`vibevalley/*` lint**：`promise-boundary`（async 和 `new Promise` 只在 `Effect.tryPromise`、`Effect.promise` 里，那里的 async 函数最多一个 `await`）、`try-promise-catch`（`Effect.tryPromise` 写 `{ try, catch }`，不只传函数）、`db-door`（`SqlClient`、`withTransaction` 只在 `infra/db.ts`）、`no-instanceof-tagged`（`x instanceof YError` 分带标签的错误：改成 `Predicate.isTagged` 或 `catchTag`）、`no-object-guard`（`typeof x === "object" && x !== null`：改成 `Predicate.isObject`）、`service-method-names`（`X.of({ … })` 里返回 Effect 的成员不是 `Effect.fn("X.m")` 或 `Effect.fnUntraced`，或 `Effect.fn` 的名字不是 `X.m`；只认得出语法上看得见的，看不见的在 `scripts/oxlint-plugin.ts` 开头）、`no-wall-clock`、`no-test-sleep`。
-- **逃生口的棘轮**：`as`、`!`、关 lint 的注释、`Effect.orDie`、不带 `{ log }` 的 `Effect.ignore`、空的 `catch`，按区只许减。
+- **逃生口的棘轮**：`as`、`!`、关 lint 的注释、`Effect.orDie`、不带 `{ log }` 的 `Effect.ignore`、空的 `catch`，`yield* Effect.result`（`resultBranch`），按区只许减；低于基线也要跑 `health:write` 固定下来。
 
 ## 4. 评审一段 Effect 代码
 
@@ -62,8 +62,9 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 2. **错误该不该变成缺陷**：`orDie` 的那个错误主人能不能处理（库写不进去、磁盘满了是要告诉主人的）。要先 die 再 `catchDefect` 接回来的，是错误类型没留住，改成在 `Effect` 的错误通道里传。
 3. **被丢弃的失败有没有人知道**：`Effect.ignore` 丢的如果是主人说的话、要发出去的消息，至少 `{ log: "Warn" }`。
 4. **fiber 归谁**：后台的 fiber 在服务的 `Scope` 里（`Effect.forkScoped`、`FiberSet`），服务关了它也停；给外面的回调用的 runtime 用 `FiberSet.makeRuntime*`，不用 `Effect.runForkWith` 了事。
-5. **资源和边界**：拿到的资源用 `acquireRelease` 配好释放；队列、`Stream` 的缓冲、并发有上限。
-6. **重试和轮询**：手写的 `while` 加 `sleep` 换成 `Effect.retry`、`Effect.repeat` 和 `Schedule`，时间才拨得动。
-7. **追踪**：服务方法的名字 lint 看得见的它查，它看不见的（从别的对象拿来的、解构出来的）读代码看；边界（接口、外部进程、库的写、队列的交接）上有 span。
+5. **状态和缓存**：异步读改写用锁或 `SynchronizedRef`；核心快照用 `SubscriptionRef`，探测缓存用 `Cache`；同步局部状态不为了形式换成 Ref。
+6. **资源和边界**：拿到的资源用 `acquireRelease` 配好释放；队列、`Stream` 的缓冲、并发有上限。
+7. **重试和轮询**：手写的 `while` 加 `sleep` 换成 `Effect.retry`、`Effect.repeat` 和 `Schedule`，时间才拨得动。
+8. **追踪**：服务方法的名字 lint 看得见的它查，它看不见的（从别的对象拿来的、解构出来的）读代码看；边界（接口、外部进程、库的写、队列的交接）上有 span。
 
 查到的照 [vv-simplify](.agents/skills/vv-simplify/SKILL.md) 的格式列出来：每处带文件和行号、怎么改、靠哪个测试证明没变坏。常见的反模式、它们为什么会被写出来、怎么发现，见 [references/practices.md](.agents/skills/vv-effect/references/practices.md)。

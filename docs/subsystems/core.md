@@ -43,7 +43,7 @@
 **`state.json`**
 
 - **存除了频道、进度、定时任务、工单以外的全部**（`toKeep` 清掉 `chat`、`progress`、`crons`、`issues`）：它们的家是库，开机由拥有者从库里放回核心状态。工单只放开着的和最近关的 50 家（`keepClosedIssues`）。接回要的工作目录、oar 会话 id、最后一轮原话和想起过的记性在 `session` 表（`place`、`oar_session`、`last_text`、`recalled`），轨迹、diff 这类大块的旁路数据不进核心状态。
-- **合并写**：从第一条变化起算 500 毫秒写一次，持续有事实也不推迟这一次；一次崩溃最多丢半秒。写的是临时文件再改名（`infra/files.ts` 的 `FileWriter`），不会留下半个文件；写不了记日志，不停服务。
+- **合并写**：从第一条变化起算 500 毫秒写一次，持续有事实也不推迟这一次；一次崩溃最多丢半秒。写的是临时文件再改名（`infra/files.ts` 的 `keptFile`），不会留下半个文件；写不了记日志，不停服务。
 - **关时写最后一份**：关的时候停掉等着的那次，写最后的状态并封住，已经在路上的定时任务回调写不进来。`core` 最先建、最后关，所以最后一份是所有服务都停下之后的。
 - **读回时**：读不了、解析不了或不符合 `WorkspaceState` 的 Schema，就改名成 `state.json.unreadable-<毫秒>` 留着（不会被之后的保存盖掉）、从空的开始并记日志；改不了名就不开机（`infra/files.ts` 的 `readOrSetAside`，`config.json`、`settings.json` 同样）；通话回到 `idle`、没有通话原因、管家回到 `idle`（没人在通话上，管家也不在说话），帮工的地块按 `withStations` 重新排。
 

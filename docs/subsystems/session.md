@@ -110,7 +110,7 @@
 - 做完的一轮里以「要问主人：」开头的行进 `report` 事实的 `questions`，工单服务记成问题（等你回答）。
 - 做完的一轮里最后一个读得出结论（`conclusion` 不空、`evidence` 至少一条）的 json 代码块进 `report` 事实的 `answer`（`parseAnswer`），折进 `lastRun.answer`：交付物是结论的工单看它判这一轮交没交出结论，不等工单服务写库。
 
-**没动静**：`session.ts` 的 `watchStalls` 用 oar 的 `reduceStatus`、`stallOf` 从这个会话的第一条记录起折出状态（oar 自己的 `observeStalls` 只听订阅以后的记录），一轮在干、超过 `session.stall_seconds`（默认 240 秒）没有任何记录时报一次。等待和计时使用同一个 Clock，到点读一次时间，`quiet.since` 由这一刻回推。Session 施加 `quiet`（地块干裂、挂「没动静」，管家的「农场现状」和 Inbox 里也会说），日志记一条 `run/error`，农场提醒一次（带最后在做什么）。下一个不是用量的事件结束它。不自动叫停。
+**没动静**：`session/stalls.ts` 的 `watchStalls` 用 oar 的 `reduceStatus`、`stallOf` 从这个会话的第一条记录起折出状态（oar 自己的 `observeStalls` 只听订阅以后的记录），一轮在干、超过 `session.stall_seconds`（默认 240 秒）没有任何记录时报一次。等待和计时使用同一个 Clock，到点读一次时间，`quiet.since` 由这一刻回推。Session 施加 `quiet`（地块干裂、挂「没动静」，管家的「农场现状」和 Inbox 里也会说），日志记一条 `run/error`，农场提醒一次（带最后在做什么）。下一个不是用量的事件结束它。不自动叫停。
 
 **叫停**（`session.stop`）：打断这一轮，Session 留在地里，带句话开下一轮。
 

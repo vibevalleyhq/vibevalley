@@ -108,7 +108,6 @@
 | `sampleAgent` | `agents.ts` |  |
 | `farm` | `cli.ts` | The whole farm on a free port; the command line is pointed at it. |
 | `cli` | `cli.ts` | One run, with a Stdio of its own and no environment: its exit code, what it put on stdout and on stderr, and the |
-| `clockLayer` | `clock.ts` | The farm's Clock, read from at. |
 | `gitSync` | `git.ts` | Runs git in dir as a test user; its output, trimmed. A failure throws with what git said. |
 | `gitIn` | `git.ts` | Runs git in dir as dir's own config says (no test user); its output, trimmed. A failure throws with what git said. |
 | `gitInEnv` | `git.ts` | gitIn with these in its environment (a commit's dates). |
@@ -147,6 +146,9 @@
 | `spentText` | `format.ts` |  |
 | `messageOf` | `format.ts` | What a thrown or rejected value says: an Error's message, anything else as text. |
 | `spanText` | `format.ts` | How long, in round words: 不到 1 分钟, 3 分钟, 2 小时, 4 天. |
+| `SpriteManifest` | `manifests.ts` |  |
+| `CursorManifest` | `manifests.ts` |  |
+| `TitleManifest` | `manifests.ts` |  |
 | `compareText` | `order.ts` |  |
 | `or` | `order.ts` |  |
 | `matches` | `search.ts` | Every word of the query is somewhere in the texts, ignoring case; an empty query matches everything. |
