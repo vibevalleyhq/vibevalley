@@ -18,6 +18,10 @@ Status: proposed
 
 `Helpers` 的 7 个成员里 6 个是只读的查询（在不在、地里的帮工、现在哪一轮、汇报的摘要、工单现在谁在做、按 id 找帮工），1 个是命令（`deliver`）。`Session` 已经公开了其中 3 个（`deliver` 184 行、`sessionOf` 199 行、`presentSessions` 200 行）和三条流（`launches`、`news`、`inputsConsumed`，222–226 行）。
 
+## 进度
+
+第一步的形状已经就位：`Delivered`、`LaunchActivity`、`InputConsumed`、`SessionNews` 搬进 `apps/server/src/session/shapes.ts`，`Session` 直接给出 `present`、`runOf`、`reportOf`、`onIssue`，`Channel` 不用再经 `Helpers` 才知道这些。剩下的还是第 1–4 个 PR 的主体：换模块顺序、`Channel` 直接 `yield* Session`、删 `Helpers`/`useHelpers`/`helpersBack`，再把 `chat.test.ts` 搭到 `world.ts` 上。换顺序时 `chat.test.ts` 要先有假的 `Session` 层，不能只靠 `useHelpers`。
+
 ## Proposal
 
 两件事分开做：先把 Collaboration 挪到 Agent Sessions 上面，`Channel` 直接读 `Session`，端口消失；再把「交话」拆成新模块 `mailbox` 的服务 `Mailbox`，排在 Collaboration 后面，`chat.ts` 只记话。行为不变：现有的测试、黄金数据和 flows 原样通过是每一步的门槛。
