@@ -51,153 +51,136 @@ export const readJournal = (file: string): Effect.Effect<SessionEvent[] | undefi
 const callKey = (from: From | undefined, callId: string) => (from ?? []).join("/") + "|" + callId;
 const who = (from: From | undefined) => (from ?? []).join("/");
 
-export class Journal {
-  private steps: SessionEvent[];
-  private next = 0;
-  /** Tool calls not yet returned; started is every call started (a sub-agent's steps go under the call that started it). */
-  private readonly calls = new Map<string, number>();
-  private readonly started = new Map<string, number>();
-  /** The step still being written: pushed live, but not in steps (nor on disk) until sealed. */
-  private draft: SessionEvent | undefined;
-  private draftWho = "";
-  private draftCall = "";
-  private dirty: number[] = [];
-  /** What cancels the pending push. */
-  private pushing: (() => void) | undefined;
-  private closed = false;
-  /** The open run the events belong to. */
-  private run: string | undefined;
-  /** events/<id>.json, written a moment after the steps change and once more as the log closes. */
-  private readonly disk: KeptFile;
-  private readonly push: (e: SessionEvent) => void;
-  /** The service's Clock: the steps' times and the push window. */
-  private readonly time: Time;
-  private readonly keep: number;
+export type Journal = ReturnType<typeof makeJournal>;
 
-  constructor(disk: KeptFile, initial: readonly SessionEvent[], push: (e: SessionEvent) => void, time: Time, keep: number = keepEvents) {
-    this.disk = disk;
-    this.push = push;
-    this.time = time;
-    this.keep = keep;
-    this.steps = [...initial];
-    const last = this.steps.at(-1);
-    if (last) this.next = last.seq + 1;
+function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e: SessionEvent) => void, time: Time, keep: number = keepEvents) {
+  let steps = [...initial];
+  let next = (steps.at(-1)?.seq ?? -1) + 1;
+  const calls = new Map<string, number>();
+  const started = new Map<string, number>();
+  let draft: SessionEvent | undefined;
+  let draftWho = "";
+  let draftCall = "";
+  let dirty: number[] = [];
+  let pushing: (() => void) | undefined;
+  let closed = false;
+  let run: string | undefined;
+
+  function events() {
+    return [...steps, ...(draft ? [{ ...draft }] : [])];
   }
 
-  events() {
-    return [...this.steps, ...(this.draft ? [{ ...this.draft }] : [])];
-  }
+  const body = () => JSON.stringify(steps);
 
-  private body = () => JSON.stringify(this.steps);
-
-  private flush = () => {
-    this.pushing?.();
-    this.pushing = undefined;
-    const out = this.dirty.flatMap((n) => {
-      const step = this.steps.findLast((s) => s.seq === n) ?? (this.draft?.seq === n ? this.draft : undefined);
+  const flush = () => {
+    pushing?.();
+    pushing = undefined;
+    const out = dirty.flatMap((n) => {
+      const step = steps.findLast((s) => s.seq === n) ?? (draft?.seq === n ? draft : undefined);
       return step ? [{ ...step }] : [];
     });
-    this.dirty = [];
-    for (const step of out) this.push(step);
+    dirty = [];
+    for (const step of out) push(step);
   };
 
-  private changed(n: number) {
-    if (this.closed) return;
-    if (!this.dirty.includes(n)) this.dirty.push(n);
-    this.pushing ??= this.time.after(pushAfterMs, this.flush);
-    this.disk.soon(this.body);
+  function changed(n: number) {
+    if (closed) return;
+    if (!dirty.includes(n)) dirty.push(n);
+    pushing ??= time.after(pushAfterMs, flush);
+    disk.soon(body);
   }
 
-  private under(from: From | undefined): number | undefined {
+  function parentOf(from: From | undefined): number | undefined {
     const call = from?.at(-1);
     if (!from || call === undefined) return undefined;
-    return this.started.get(callKey(from.slice(0, -1), call)) ?? -1;
+    return started.get(callKey(from.slice(0, -1), call)) ?? -1;
   }
 
   /** The next seq, the time, the call it is under and the open run. */
-  private stamp(step: Omit<SessionEvent, "seq" | "revision" | "time">, from: From | undefined): SessionEvent {
-    const under = this.under(from);
+  function stamp(step: Omit<SessionEvent, "seq" | "revision" | "time">, from: From | undefined): SessionEvent {
+    const under = parentOf(from);
     const out: SessionEvent = {
-      seq: this.next++,
+      seq: next++,
       revision: 0,
-      time: this.time.now(),
+      time: time.now(),
       ...step,
       ...(under !== undefined ? { under } : {}),
-      ...(this.run !== undefined ? { run: this.run } : {}),
+      ...(run !== undefined ? { run } : {}),
     };
     return out;
   }
 
   /** Writes the draft, as it is, after every event before it. */
-  private seal() {
-    if (!this.draft) return;
-    const d = this.draft;
-    this.draft = undefined;
-    this.draftWho = "";
-    this.draftCall = "";
-    this.append(d);
+  function seal() {
+    if (!draft) return;
+    const d = draft;
+    draft = undefined;
+    draftWho = "";
+    draftCall = "";
+    append(d);
   }
 
-  private add(step: Omit<SessionEvent, "seq" | "revision" | "time">, from?: From): number {
-    this.seal();
-    const s = this.stamp(step, from);
-    this.append(s);
+  function add(step: Omit<SessionEvent, "seq" | "revision" | "time">, from?: From): number {
+    seal();
+    const s = stamp(step, from);
+    append(s);
     return s.seq;
   }
 
-  private append(step: SessionEvent) {
-    this.steps.push(step);
-    if (this.steps.length > this.keep) this.steps = this.steps.slice(this.steps.length - this.keep);
-    this.changed(step.seq);
+  function append(step: SessionEvent) {
+    steps.push(step);
+    if (steps.length > keep) steps = steps.slice(steps.length - keep);
+    changed(step.seq);
   }
 
   /** Makes e the draft, sealing the one before; it is pushed live from now on. */
-  private makeDraft(e: Omit<SessionEvent, "seq" | "revision" | "time">, from: From | undefined, call: string) {
-    this.seal();
-    this.draft = this.stamp(e, from);
-    this.draftWho = who(from);
-    this.draftCall = call;
-    this.changed(this.draft.seq);
+  function makeDraft(e: Omit<SessionEvent, "seq" | "revision" | "time">, from: From | undefined, call: string) {
+    seal();
+    draft = stamp(e, from);
+    draftWho = who(from);
+    draftCall = call;
+    changed(draft.seq);
+    return draft.seq;
   }
 
   /** Opens run id: every event after it is the run's until runEnded closes it with how it ended. */
-  runStarted(id: string) {
-    this.run = id;
-    this.add({ type: "run/start", text: "" });
+  function runStarted(id: string) {
+    run = id;
+    add({ type: "run/start", text: "" });
   }
 
-  runEnded(id: string, outcome: Outcome) {
-    if (this.run !== id) return;
-    this.add({ type: "run/end", text: outcome });
-    this.run = undefined;
+  function runEnded(id: string, outcome: Outcome) {
+    if (run !== id) return;
+    add({ type: "run/end", text: outcome });
+    run = undefined;
   }
 
-  asked(text: string, from?: From) {
-    this.add({ type: "user/message", text: cut(text.trim(), askedMax) }, from);
+  function asked(text: string, from?: From) {
+    add({ type: "user/message", text: cut(text.trim(), askedMax) }, from);
   }
 
   /** Goes on with what is being said or thought, by the same one, in the draft; anything else starts a new one. */
-  private runOn(kind: SessionEventType, text: string, from?: From) {
+  function runOn(kind: SessionEventType, text: string, from?: From) {
     if (!text) return;
-    const d = this.draft;
-    if (d && d.type === kind && this.draftWho === who(from)) {
+    const d = draft;
+    if (d && d.type === kind && draftWho === who(from)) {
       d.text = cut(d.text + text, textMax);
       d.revision++;
-      this.changed(d.seq);
+      changed(d.seq);
       return;
     }
-    this.makeDraft({ type: kind, text: cut(text, textMax) }, from, "");
+    makeDraft({ type: kind, text: cut(text, textMax) }, from, "");
   }
 
-  said(text: string, from?: From) {
-    this.runOn("assistant/message", text, from);
+  function said(text: string, from?: From) {
+    runOn("assistant/message", text, from);
   }
 
-  thought(text: string, from?: From) {
-    this.runOn("assistant/thinking", text, from);
+  function thought(text: string, from?: From) {
+    runOn("assistant/thinking", text, from);
   }
 
-  toolStarted(callId: string, start: ToolStart, from?: From) {
+  function toolStarted(callId: string, start: ToolStart, from?: From) {
     const step: Omit<SessionEvent, "seq" | "revision" | "time"> = {
       type: "tool/call",
       text: start.text,
@@ -209,51 +192,52 @@ export class Journal {
     const key = callKey(from, callId);
     // Written once its input is known; one that came with it is.
     if (step.input !== undefined) {
-      const n = this.add(step, from);
-      this.calls.set(key, n);
-      this.started.set(key, n);
+      const n = add(step, from);
+      calls.set(key, n);
+      started.set(key, n);
       return;
     }
-    this.makeDraft(step, from, key);
-    this.calls.set(key, this.draft!.seq);
-    this.started.set(key, this.draft!.seq);
+    const n = makeDraft(step, from, key);
+    calls.set(key, n);
+    started.set(key, n);
   }
 
-  toolInput(callId: string, input: string, text: string, from?: From) {
+  function toolInput(callId: string, input: string, text: string, from?: From) {
     // Only the draft takes it: a call already written is not changed (its input came too late to be in it).
-    const d = this.draft;
-    if (d && this.draftCall === callKey(from, callId)) {
+    const d = draft;
+    if (d && draftCall === callKey(from, callId)) {
       d.input = cut(input, inputMax);
       if (text) d.text = text;
       d.revision++;
-      this.seal();
+      seal();
     }
   }
 
-  toolEnded(callId: string, output: string, ok: boolean, from?: From) {
+  function toolEnded(callId: string, output: string, ok: boolean, from?: From) {
     const key = callKey(from, callId);
-    const n = this.calls.get(key);
+    const n = calls.get(key);
     if (n === undefined) return;
-    this.calls.delete(key);
-    this.add({ type: "tool/result", text: "", call: n, ok, ...(output.trim() ? { output: clipOutput(output.trimEnd()) } : {}) }, from);
+    calls.delete(key);
+    add({ type: "tool/result", text: "", call: n, ok, ...(output.trim() ? { output: clipOutput(output.trimEnd()) } : {}) }, from);
   }
 
-  note(kind: SessionEventType, text: string, from?: From) {
-    this.add({ type: kind, text }, from);
+  function note(kind: SessionEventType, text: string, from?: From) {
+    add({ type: kind, text }, from);
   }
 
   /** An llm/usage: one model answer's tokens, with text to show for them. */
-  usage(tokens: EventTokens, text: string, from?: From) {
-    this.add({ type: "llm/usage", text, tokens }, from);
+  function usage(tokens: EventTokens, text: string, from?: From) {
+    add({ type: "llm/usage", text, tokens }, from);
   }
 
   /** Seals what is being written; the log's scope, closed after this, writes it out. */
-  close() {
-    this.seal();
-    this.flush();
-    this.disk.soon(this.body);
-    this.closed = true;
+  function close() {
+    seal();
+    flush();
+    disk.soon(body);
+    closed = true;
   }
+  return { events, runStarted, runEnded, asked, said, thought, toolStarted, toolInput, toolEnded, note, usage, close };
 }
 
 /** Nothing that leads out of the folder. */
@@ -303,7 +287,7 @@ export const makeTrajectories = (home: string, push: (id: string, e: SessionEven
           const own = yield* Scope.fork(logs);
           const disk = yield* keptFile(fileOf(id), { soonMs: saveAfterMs }).pipe(Scope.provide(own), withFs);
           const initial = (yield* withFs(readJournal(fileOf(id)))) ?? [];
-          const journal = new Journal(disk, initial, (e) => push(id, e), time, keep > 0 ? keep : keepEvents);
+          const journal = makeJournal(disk, initial, (e) => push(id, e), time, keep > 0 ? keep : keepEvents);
           open.set(id, { journal, scope: own });
           return journal;
         }),

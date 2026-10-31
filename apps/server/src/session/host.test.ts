@@ -58,7 +58,6 @@ describe("AgentHost", () => {
         fresh: () => {},
         restored: () => ({ by: { kind: "" } }),
         toolStart: (tool) => ({ text: tool, action: "other", tool }),
-        notice: () => Effect.void,
       });
       const caller = new Caller();
       const heard: string[] = [];
@@ -106,7 +105,6 @@ describe("AgentHost", () => {
         fresh: () => {},
         restored: () => ({ by: { kind: "" } }),
         toolStart: (tool) => ({ text: tool, action: "other", tool }),
-        notice: () => Effect.void,
       });
       const building = yield* Deferred.make<void>();
       const gate = yield* Deferred.make<void>();

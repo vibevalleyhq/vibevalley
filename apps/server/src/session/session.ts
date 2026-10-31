@@ -1326,7 +1326,10 @@ export const make = (options: SessionOptionsIn = {}) =>
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
       host: Effect.fn("Session.host")(function* <R>(o: HostOptions<R>) {
-        return yield* makeHost(o, yield* trajectories.openLog(o.name, o.keepEvents), runStore);
+        return yield* makeHost(o, yield* trajectories.openLog(o.name, o.keepEvents), runStore).pipe(
+          Effect.provideService(Core, core),
+          Effect.provideService(FileSystem.FileSystem, fs),
+        );
       }),
       restore,
     });

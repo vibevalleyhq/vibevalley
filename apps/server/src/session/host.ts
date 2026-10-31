@@ -2,10 +2,9 @@
 // An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so they go
 // to the route of the input taken last, and the tools read that route too.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { Cause, Clock, Deferred, Effect, Exit, Fiber, Queue, Schema, Scope, Semaphore, Stream } from "effect";
+import { Cause, Clock, Deferred, Effect, Exit, Fiber, FileSystem, Queue, Schema, Scope, Semaphore, Stream } from "effect";
 
 import { type Brain, type BrainEvent, makeBrain, sessionUnfinished } from "@vibevalley/agent/brain";
 import type { Tool } from "@vibevalley/agent/core/loop";
@@ -18,6 +17,7 @@ import { t } from "@vibevalley/i18n";
 import type { OrchestratorState } from "@vibevalley/protocol";
 
 import { newId } from "@/base/ids.ts";
+import { Core } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, refused } from "@/errors.ts";
 
 import type { ToolStart } from "./facts.ts";
@@ -114,7 +114,6 @@ export interface HostOptions<R> {
   /** How many events its log keeps; 0 keeps them all. */
   readonly keepEvents?: number;
   readonly toolStart: (tool: string, args: unknown) => ToolStart;
-  readonly notice: (level: "info" | "warn" | "error", text: string) => Effect.Effect<void>;
 }
 
 /** What makes an input's text once it is its turn: whether the agent is busy (an input may be taken after a later one),
@@ -143,8 +142,14 @@ export interface AgentHost<R> {
 
 /** Made by Session.host in the owner's scope: the agent's own scope is a child of it, so the agent ends with the owner at
  * the latest; its log and its runs are kept with the sessions'. */
-export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore): Effect.Effect<AgentHost<R>, never, Scope.Scope> =>
+export const makeHost = <R>(
+  o: HostOptions<R>,
+  journal: Journal,
+  runs: RunStore,
+): Effect.Effect<AgentHost<R>, never, Scope.Scope | Core | FileSystem.FileSystem> =>
   Effect.gen(function* () {
+    const core = yield* Core;
+    const fs = yield* FileSystem.FileSystem;
     const owner = yield* Effect.scope;
     const inProcess = yield* makeInProcessRun(o.name, journal, o.toolStart, runs);
     const transcript = join(o.home, o.name + ".jsonl");
@@ -239,7 +244,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
         )
           yield* inProcess
             .observe(e, run)
-            .pipe(Effect.catch((err) => o.notice("error", t("server.session.host.notRecorded", { label: o.label, why: err.message }))));
+            .pipe(Effect.catch((err) => core.notice("error", t("server.session.host.notRecorded", { label: o.label, why: err.message }))));
         switch (e.type) {
           case "message_start":
             if (isHosted(e.message, o.inputType)) {
@@ -269,7 +274,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
             noteUsage(m.usage);
             yield* done(messageText(m).trim());
             if (m.stopReason === "error")
-              yield* o.notice("error", t("server.session.host.failed", { label: o.label, why: m.errorMessage || t("server.agent.modelFailed") }));
+              yield* core.notice("error", t("server.session.host.failed", { label: o.label, why: m.errorMessage || t("server.agent.modelFailed") }));
             return;
           }
           case "compaction_end":
@@ -338,8 +343,8 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
               const why = messageOf(started.failure);
               const id = yield* inProcess
                 .failedStart(run, hosted.run.asked ?? "", t("server.session.host.cannotStart", { why }))
-                .pipe(Effect.catch((e) => Effect.as(o.notice("error", t("server.session.host.notRecorded", { label: o.label, why: e.message })), "")));
-              yield* o.notice("error", t("server.session.host.startFailed", { label: o.label, why }));
+                .pipe(Effect.catch((e) => Effect.as(core.notice("error", t("server.session.host.notRecorded", { label: o.label, why: e.message })), "")));
+              yield* core.notice("error", t("server.session.host.startFailed", { label: o.label, why }));
               hosted.caller?.push(t("server.session.host.callerStart", { why }));
               hosted.caller?.end();
               return { ok: false, why, run: id } as const;
@@ -404,7 +409,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
         const lines = yield* Effect.promise(() => readLines(transcript));
         const at = turnAt(lines, asked.text, asked.time, o.inputType);
         if (at < 0) return yield* Effect.fail(refused(t("server.session.host.notInConversation", { on, label: o.label })));
-        const memoryText = yield* Effect.tryPromise({ try: () => readFile(memoryFile(o.home), "utf8"), catch: messageOf }).pipe(Effect.orElseSucceed(() => ""));
+        const memoryText = yield* fs.readFileString(memoryFile(o.home)).pipe(Effect.orElseSucceed(() => ""));
         const id = newId();
         const evalCase = {
           id,
@@ -419,11 +424,8 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
           expect: [],
         };
         const file = join(o.home, "evals", id + ".json");
-        yield* Effect.tryPromise({ try: () => mkdir(join(o.home, "evals"), { recursive: true }), catch: (err) => refused(messageOf(err)) });
-        yield* Effect.tryPromise({
-          try: () => writeFile(file, JSON.stringify(evalCase, null, 2) + "\n", { mode: 0o600 }),
-          catch: (err) => refused(messageOf(err)),
-        });
+        yield* fs.makeDirectory(join(o.home, "evals"), { recursive: true }).pipe(Effect.mapError((err) => refused(messageOf(err))));
+        yield* fs.writeFileString(file, JSON.stringify(evalCase, null, 2) + "\n", { mode: 0o600 }).pipe(Effect.mapError((err) => refused(messageOf(err))));
         return { id, file };
       });
 

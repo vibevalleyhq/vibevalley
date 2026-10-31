@@ -197,7 +197,6 @@ const make = (options: OrchestratorOptions = {}) =>
                 restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger } }),
                 keepEvents,
                 toolStart: tool.start,
-                notice: (level, text) => core.notice(level, text),
               })
               .pipe(Scope.provide(scope)),
           };
