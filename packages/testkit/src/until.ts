@@ -1,20 +1,22 @@
-// Waiting in a test for what runs in the background: asked again every millisecond until it holds, or a defect that says
-// what it waited for. The asking is on real time, apart from Effect's Clock: a test that moves a TestClock still waits
+// Waiting in a test for what runs in the background: asked again until it holds, or a defect that says what it waited
+// for. The asks thin out (1, 2, 5, 15, then every 30 ms): a wait of a second asks some forty times, not a thousand, and
+// each ask may be a query on the one database connection the work itself needs. The asking is on real time, apart from Effect's Clock: a test that moves a TestClock still waits
 // this way for real work (git, a database, an agent's turn).
 
 import { Effect } from "effect";
 
-const aMoment = () => new Promise<void>((r) => setTimeout(r, 1));
+const gaps = [1, 2, 5, 15, 30];
+const aMoment = (asked: number) => new Promise<void>((r) => setTimeout(r, gaps[Math.min(asked, gaps.length - 1)]));
 
 /** What get answers once ok holds for it. what is said if it never does (a function: read when it is given up on). */
 export const waitFor = <A, E, R>(get: Effect.Effect<A, E, R>, ok: (a: A) => boolean, what: string | (() => string), ms = 5_000): Effect.Effect<A, E, R> =>
   Effect.gen(function* () {
     const until = performance.now() + ms;
-    for (;;) {
+    for (let asked = 0; ; asked++) {
       const a = yield* get;
       if (ok(a)) return a;
       if (performance.now() > until) return yield* Effect.die(new Error(`waited for ${typeof what === "string" ? what : what()}`));
-      yield* Effect.promise(aMoment);
+      yield* Effect.promise(() => aMoment(asked));
     }
   });
 
@@ -41,14 +43,14 @@ export const until = (ok: () => boolean | Promise<boolean>, what: string | (() =
     ),
   );
 
-/** until for a test written with promises (a fake runtime, a fake model): once ok holds, asked again every millisecond on
+/** until for a test written with promises (a fake runtime, a fake model): once ok holds, asked again as waitFor does on
  * real time, or rejected with what it waited for. */
 export const whenTrue = async (ok: () => boolean | Promise<boolean>, what: string, ms = 5_000): Promise<void> => {
   const deadline = performance.now() + ms;
   /* oxlint-disable eslint/no-await-in-loop -- a poll: each try waits for the one before */
-  while (!(await ok())) {
+  for (let asked = 0; !(await ok()); asked++) {
     if (performance.now() > deadline) throw new Error(`waited for ${what}`);
-    await aMoment();
+    await aMoment(asked);
     /* oxlint-enable eslint/no-await-in-loop */
   }
 };

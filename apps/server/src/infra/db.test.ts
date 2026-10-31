@@ -37,6 +37,22 @@ describe("the database", () => {
     }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
+  it.effect("a transaction inside a transaction is a savepoint: its rollback keeps the outer work", () =>
+    Effect.gen(function* () {
+      const db = yield* Db;
+      yield* db.inTx(
+        Effect.gen(function* () {
+          yield* db.run(addLanDevice({ id: "outer", name: "外层", key_hash: "a", paired_at: 1 }));
+          const inner = yield* Effect.exit(
+            db.attemptTx(Effect.andThen(db.run(addLanDevice({ id: "inner", name: "内层", key_hash: "b", paired_at: 2 })), Effect.fail("no"))),
+          );
+          expect(Exit.isFailure(inner)).toBe(true);
+        }),
+      );
+      expect((yield* db.run(lanDevices())).map((d) => d.id)).toEqual(["outer"]);
+    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
+  );
+
   it.effect("attemptTx keeps the database's failure as a value, and keeps none of the work", () =>
     Effect.gen(function* () {
       const db = yield* Db;

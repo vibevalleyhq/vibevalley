@@ -7,13 +7,16 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 import { PgliteClient, PgliteMigrator } from "@effect/sql-pglite";
 import { PGlite } from "@electric-sql/pglite";
-import { type Cause, Clock, Context, Effect, Layer, Option } from "effect";
+import { type Cause, Clock, Context, Deferred, Duration, Effect, Layer, Option } from "effect";
 import { SqlClient, type SqlError } from "effect/sql";
 
 import { messageOf } from "@/errors.ts";
 
 import { baselineHash, baselineSql } from "./baseline.ts";
 import { dbDir, ServerConfig } from "./config.ts";
+
+/** Longer than this, a transaction is said in the log: everything else waited for it. */
+const txLongMs = 500;
 
 /** A folder's database made from another baseline is moved aside, whole, to <folder>.<hash>-<time>: it is not
  * upgraded (AGENTS.md: no compatibility) and never deleted. The baseline it was made from is in <folder>.schema; a
@@ -32,7 +35,7 @@ export function setAsideStale(where: string, hash: string, now: number): string 
 /** Every new database after the first in memory starts from a copy of that one's files right after the baseline ran:
  * running the baseline is most of a test's setup (in memory about 570 ms against 110; a new folder on disk, as the tests'
  * restarts make, about 830 ms against 320). A server makes one database and no copy, so it runs the baseline. */
-let memoryBase: Promise<Blob> | undefined;
+let memoryBase: Deferred.Deferred<Blob> | undefined;
 
 /** In memory, a database given back is emptied and kept for the next farm: making a PGlite from the copy above takes
  * about 110 ms, emptying one about 1 ms. Each farm open at the same time has its own. Only one whose schema nobody
@@ -55,6 +58,8 @@ const changed = (pglite: PGlite) =>
  * mark is cleared after. */
 const giveBack = (pglite: PGlite) =>
   Effect.gen(function* () {
+    // A test cut off inside a transaction leaves it open, or aborted: rolled back first, so the emptying runs.
+    yield* Effect.promise(() => pglite.exec("ROLLBACK"));
     if (yield* changed(pglite)) return yield* Effect.promise(() => pglite.close());
     if (emptyAll === undefined) {
       const tables = yield* Effect.promise(() =>
@@ -74,7 +79,10 @@ const giveBack = (pglite: PGlite) =>
     const all = emptyAll;
     yield* Effect.promise(() => pglite.exec(all));
     spare.push(pglite);
-  });
+  }).pipe(
+    // One that cannot be emptied is not kept: it is closed, and the next farm makes another.
+    Effect.catchCause(() => Effect.promise(() => pglite.close().catch(() => undefined))),
+  );
 
 const migrate = (pglite: PGlite, client: SqlClient.SqlClient) =>
   PgliteMigrator.run({
@@ -92,25 +100,35 @@ export const Database = PgliteClient.layerFrom(
       const aside = setAsideStale(where, hash, yield* Clock.currentTimeMillis);
       if (aside) yield* Effect.logWarning(`vibevalley: the database was made from another schema; it is set aside at ${aside} and a new one is made`);
     }
-    // A folder that is not there yet is a new database: it can start from the copy too.
-    const base = memory || !existsSync(where) ? memoryBase : undefined;
-    const kept = memory ? spare.pop() : undefined;
-    const pglite = yield* Effect.acquireRelease(
-      Effect.gen(function* () {
-        if (kept) return kept;
-        const options = base ? { loadDataDir: yield* Effect.promise(() => base) } : undefined;
-        return yield* Effect.promise(() => (memory ? PGlite.create(options) : PGlite.create(where, options)));
-      }),
-      (db) => (memory ? giveBack(db) : Effect.promise(() => db.close())),
-    );
-    const client = yield* PgliteClient.fromClient({ liveClient: pglite });
-    if (!kept) yield* migrate(pglite, client);
-    // The first in memory watches for DDL before the copy is taken, so every copy does too.
-    if (memory && !kept && !base) yield* Effect.promise(() => pglite.exec(watchDdl));
-    if (memory && !kept) yield* Effect.promise(() => pglite.exec(unmark));
-    // Taken before anyone writes: the copy is the baseline alone.
-    if (memory && !base) memoryBase ??= Promise.resolve(yield* Effect.promise(() => pglite.dumpDataDir("none")));
-    if (!memory) writeFileSync(where + ".schema", hash + "\n");
+    // A folder that is not there yet is a new database: it can start from the copy too. The first in memory promises the
+    // copy at once, so another made meanwhile waits for it rather than running the baseline as well.
+    const promised = memory && memoryBase === undefined ? (memoryBase = Deferred.makeUnsafe<Blob>()) : undefined;
+    const failed = () => {
+      if (!promised) return;
+      memoryBase = undefined;
+      Deferred.doneUnsafe(promised, Effect.die(new Error("the first database in memory was not made")));
+    };
+    const base = !promised && (memory || !existsSync(where)) ? memoryBase : undefined;
+    const client = yield* Effect.gen(function* () {
+      const kept = memory ? spare.pop() : undefined;
+      const pglite = yield* Effect.acquireRelease(
+        Effect.gen(function* () {
+          if (kept) return kept;
+          const options = base ? { loadDataDir: yield* Deferred.await(base) } : undefined;
+          return yield* Effect.promise(() => (memory ? PGlite.create(options) : PGlite.create(where, options)));
+        }),
+        (db) => (memory ? giveBack(db) : Effect.promise(() => db.close())),
+      );
+      const client = yield* PgliteClient.fromClient({ liveClient: pglite });
+      if (!kept) yield* migrate(pglite, client);
+      // The first in memory watches for DDL before the copy is taken, so every copy does too.
+      if (memory && !kept && !base) yield* Effect.promise(() => pglite.exec(watchDdl));
+      if (memory && !kept) yield* Effect.promise(() => pglite.exec(unmark));
+      // Taken before anyone writes: the copy is the baseline alone.
+      if (promised) Deferred.doneUnsafe(promised, Effect.succeed(yield* Effect.promise(() => pglite.dumpDataDir("none"))));
+      if (!memory) writeFileSync(where + ".schema", hash + "\n");
+      return client;
+    }).pipe(Effect.onError(() => Effect.sync(failed)));
     return client;
   }),
 ).pipe(Layer.orDie);
@@ -155,6 +173,15 @@ export class Db extends Context.Service<
       const run = Effect.fnUntraced(function* <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>): Effect.fn.Return<A> {
         return yield* Effect.orDie(attempt(query));
       });
+      // One connection: a transaction holds every other query until it ends. One that holds it long has waited on
+      // something that is not the database (a file, the network, a helper) inside it, and is said with where it was.
+      const held = <A, E, R>(tx: Effect.Effect<A, E, R>) =>
+        Effect.timed(tx).pipe(
+          Effect.tap(([took]) =>
+            Duration.toMillis(took) > txLongMs ? Effect.logWarning(`vibevalley: a transaction held the database ${Duration.format(took)}`) : Effect.void,
+          ),
+          Effect.map(([, a]) => a),
+        );
       return Db.of({
         run,
         attempt,
@@ -163,10 +190,10 @@ export class Db extends Context.Service<
         }),
         inTx: Effect.fnUntraced(function* <A, E>(work: Effect.Effect<A, E>): Effect.fn.Return<A, Exclude<E, { _tag: "SqlError" }>> {
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- catchTag takes SqlError out of E; TypeScript cannot work that out for a generic E
-          return yield* sql.withTransaction(work).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+          return yield* held(sql.withTransaction(work)).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
         }),
         attemptTx: Effect.fnUntraced(function* <A, E>(work: Effect.Effect<A, E, SqlClient.SqlClient>): Effect.fn.Return<A, E | SqlError.SqlError> {
-          return yield* attempt(sql.withTransaction(work));
+          return yield* attempt(held(sql.withTransaction(work)));
         }),
       });
     }),
