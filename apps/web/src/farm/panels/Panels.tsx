@@ -68,7 +68,7 @@ function Layer(props: { o: FarmOverlay }) {
   const byId = (id: string) => (core()?.sessions ?? []).find((s) => s.id === id);
   return (
     <Switch>
-      <Match when={props.o.kind === "review" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
+      <Match when={props.o.kind === "review" ? byId(props.o.sessionId) : undefined}>
         {(s) => (
           <FarmDialog
             title={t("web.farm.panel.harvest", { name: s().name })}
@@ -88,14 +88,14 @@ function Layer(props: { o: FarmOverlay }) {
           </FarmDialog>
         )}
       </Match>
-      <Match when={props.o.kind === "water" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
+      <Match when={props.o.kind === "water" ? byId(props.o.sessionId) : undefined}>
         {(s) => (
           <FarmDialog title={t("web.farm.panel.water", { name: s().name })} icon="icon-water" size="sm" testid="water" onClose={() => farm.water(undefined)}>
             <WaterForm session={s()} onDone={() => farm.water(undefined)} />
           </FarmDialog>
         )}
       </Match>
-      <Match when={props.o.kind === "panel" ? (props.o as { panel: FarmPanel }).panel : undefined}>
+      <Match when={props.o.kind === "panel" ? props.o.panel : undefined}>
         {(panel) => (
           <FarmDialog
             title={panelTitle[panel()][0]}

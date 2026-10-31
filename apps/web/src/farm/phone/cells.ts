@@ -11,5 +11,5 @@ export const phoneCells = (lit: boolean): GlyphCell[] => [
   [5, 11, 1, 1, "#e2c995"],
   [3, 13, 3, 1, "#e2c995"],
   [8, 1, 1, 3, "#2f1f13"],
-  ...(lit ? ([[9, 0, 1, 1, "#c84a3a"]] as GlyphCell[]) : []),
+  ...(lit ? ([[9, 0, 1, 1, "#c84a3a"]] satisfies GlyphCell[]) : []),
 ];

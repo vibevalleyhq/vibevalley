@@ -1,7 +1,10 @@
 // QueryObserver owns cache, fetching and retry policy; this adapter publishes its settled snapshots without suspending
 // the state stream's updates while a REST read is in flight.
 import { QueryClient, QueryObserver, type QueryKey, type QueryObserverOptions, type QueryObserverResult } from "@tanstack/solid-query";
+import { Schema } from "effect";
 import { type Accessor, createEffect, createSignal, onSettled, untrack } from "solid-js";
+
+import { SpriteManifest } from "@/base/manifests";
 
 import { api } from "./api";
 import type { FramesSource } from "./frames";
@@ -63,8 +66,7 @@ export type Sprites = Record<string, { w: number; h: number; ax?: number; ay?: n
 export const useSprites = () =>
   useQuery(() => ({
     queryKey: ["sprites"],
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
-    queryFn: async () => (await (await fetch("/pixel/sprites.json")).json()) as Sprites,
+    queryFn: async () => Schema.decodeUnknownSync(SpriteManifest)(await (await fetch("/pixel/sprites.json")).json()),
     staleTime: Infinity,
   }));
 

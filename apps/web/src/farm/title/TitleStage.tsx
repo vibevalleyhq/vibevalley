@@ -1,10 +1,11 @@
+import { Schema } from "effect";
+import { createEffect, createSignal, For, Show } from "solid-js";
 // The title's picture, alive: the scene on a stage kept at its own 3:2 and covering the screen, slowly panning; on it,
 // in the scene's own coordinates (farm/title/layers.ts), clouds, chimney smoke, swaying plants, seeds off the
 // dandelions, fireflies at dusk and night, and on the hill the farmer (breathing; a lantern at night) with the chosen
 // pet. The motions are style.css's title-*.
 
-import { createEffect, createSignal, For, Show } from "solid-js";
-
+import { TitleManifest } from "@/base/manifests";
 import { ready, useQuery } from "@/infra/query";
 import { usePrefs } from "@/state/prefs";
 
@@ -35,8 +36,7 @@ const timing = (i: number) => `${-(i * puffSeconds) / puffs.length}s`;
 export function TitleStage(props: { scene: TitleScene }) {
   const sizesQuery = useQuery(() => ({
     queryKey: ["title-sprites"],
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
-    queryFn: async () => (await (await fetch("/title/sprites.json")).json()) as TitleSprites,
+    queryFn: async () => Schema.decodeUnknownSync(TitleManifest)(await (await fetch("/title/sprites.json")).json()),
     staleTime: Infinity,
   }));
   const lit = () => light[props.scene];

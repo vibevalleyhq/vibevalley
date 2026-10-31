@@ -140,7 +140,7 @@
     "resultBranch": 0
   },
   "server: Agent Sessions": {
-    "nonNull": 14,
+    "nonNull": 12,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 2,
@@ -160,7 +160,7 @@
     "resultBranch": 0
   },
   "server: Collaboration": {
-    "nonNull": 42,
+    "nonNull": 41,
     "doubleCast": 0,
     "cast": 1,
     "lintOff": 0,
@@ -262,8 +262,8 @@
   "web: farm": {
     "nonNull": 67,
     "doubleCast": 0,
-    "cast": 8,
-    "lintOff": 6,
+    "cast": 1,
+    "lintOff": 4,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 1,
@@ -292,8 +292,8 @@
   "web: features/catalog": {
     "nonNull": 11,
     "doubleCast": 0,
-    "cast": 2,
-    "lintOff": 2,
+    "cast": 0,
+    "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 1,
@@ -392,7 +392,7 @@
   "web: features/session": {
     "nonNull": 14,
     "doubleCast": 0,
-    "cast": 2,
+    "cast": 0,
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
@@ -432,8 +432,8 @@
   "web: infra": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 1,
-    "lintOff": 2,
+    "cast": 0,
+    "lintOff": 1,
     "orDie": 0,
     "ignored": 1,
     "swallowed": 1,
@@ -462,8 +462,8 @@
   "web: ui": {
     "nonNull": 16,
     "doubleCast": 4,
-    "cast": 1,
-    "lintOff": 7,
+    "cast": 0,
+    "lintOff": 6,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 2,

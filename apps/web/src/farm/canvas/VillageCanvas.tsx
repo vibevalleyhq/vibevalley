@@ -1,14 +1,15 @@
+import { Schema } from "effect";
+import { createEffect, createMemo, createSignal, Show, snapshot } from "solid-js";
 // The village on the farm page: starts the scene (farm/canvas/scene.ts) once the level is loaded, feeds it the latest
 // frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the
 // DOM over it (store screen), and wears the tool's cursor.
-
-import { createEffect, createMemo, createSignal, Show, snapshot } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
 
 import { createExternal } from "@/base/external";
 import { messageOf } from "@/base/format";
+import { CursorManifest } from "@/base/manifests";
 import { clickBed, openPlace } from "@/farm/commands";
 import { commands } from "@/farm/frames";
 import { farmFrameOf } from "@/farm/scope";
@@ -24,7 +25,7 @@ import { spriteUrl } from "@/ui/pixel/atlas";
 import { playSound } from "@/ui/pixel/sound";
 
 import { startScene, type Scene } from "./scene";
-import { background, cssCursor, holdTimeOfDay, type Hotspots, lightOn, screenOf } from "./screen";
+import { background, cssCursor, holdTimeOfDay, lightOn, screenOf } from "./screen";
 
 export function VillageCanvas() {
   let host!: HTMLDivElement;
@@ -35,8 +36,7 @@ export function VillageCanvas() {
   const agents = createMemo(() => new Map<string, Agent>(ready(agentsQuery, []).map((a) => [a.id, a])));
   const hotspotsQuery = useQuery(() => ({
     queryKey: ["cursors"],
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
-    queryFn: async () => (await (await fetch("/cursors/cursors.json")).json()) as Hotspots,
+    queryFn: async () => Schema.decodeUnknownSync(CursorManifest)(await (await fetch("/cursors/cursors.json")).json()),
     staleTime: Infinity,
   }));
   const hotspots = () => ready(hotspotsQuery, undefined);

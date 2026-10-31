@@ -596,7 +596,7 @@ function TaskLog(props: { graph: TaskGraph; only?: string | undefined; onAll: ()
   }));
   const titleOf = (id: string) => taskOf(props.graph, id)?.title ?? id;
   const shown = () =>
-    ready(events, [] as GraphEvent[])
+    ready(events, [])
       .filter((e) => !props.only || e.task === props.only)
       .toReversed();
   return (
