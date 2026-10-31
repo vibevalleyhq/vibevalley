@@ -1,150 +1,35 @@
-/**
- * The repository's own lint rules, loaded by vite.config.ts's lint.jsPlugins.
- *
- *   no-wall-clock: in the server, time is read and waited on through Effect's Clock (or the Time a class was handed,
- *   infra/time.ts), so that a test's TestClock moves all of it. Date.now(), new Date() with no arguments, setTimeout and
- *   setInterval read or wait on the wall clock behind its back.
- *
- *   no-test-sleep: a test does not wait by the clock. What it waits for in the background it asks after with until or
- *   whenState (apps/server/src/testing/until.ts), a window is moved through with TestClock, and a fake that should take
- *   a while is held until the test lets it go (testing/helper.ts's releaseHeld). setTimeout, setInterval, Effect.sleep
- *   and Playwright's waitForTimeout in a test are a guess at how long something takes: slow when it is quick, flaky when
- *   it is slow.
- *
- *   no-comment-divider: a comment does not title or fence off a stretch of code (docs/style/code.md). Only the divider
- *   is recognised (a run of ─ ━ ═, or a comment of nothing but -=*#~_/); the comments a pattern cannot judge are
- *   scripts/comment-review.ts's.
- *
- *   no-cjk-literal: what is said to the owner is in the catalogs, in Chinese and in English (packages/i18n/locales,
- *   read as t("key")), and what is said to a model in a prompts.ts; vite.config.ts turns the rule off for those files
- *   and the tests. A string, a template or JSX text with a Chinese character anywhere else is a word left out of the
- *   catalogs; so is Chinese punctuation joining words in code (list() joins a list). A regular expression is not: it
- *   reads what people and models write.
- *
- *   no-hex-color: the workbench's colours are the palette's in apps/web/src/style.css, named by what they are for, so
- *   they follow the theme (设置 › 外观); a colour written into a class (bg-[#…]) would stay as it is. The pixel skin and
- *   the avatars are drawn and keep theirs; vite.config.ts says where the rule runs.
- *
- *   no-copy-selector: a page test finds what it clicks and reads by data-testid and state attributes, not by the
- *   interface's words (getByText, getByRole's name, toHaveText…): words are the catalogs' to check, and a test that
- *   reads them breaks on every rewording. vite.config.ts says where it runs.
- *
- *   design-tokens: the workbench's corners, type sizes, motion, layers, disabled look and shadows are on the ladders of
- *   docs/style/design.md (scripts/design-tokens.ts says which classes are off them); the pixel skin and the avatars are
- *   drawn and keep their own values.
- *
- *   native-control: the workbench's choosers are its own (ui/Field.tsx's Select, ui/Checkbox.tsx, base-ui's RadioGroup
- *   and Slider): a native <select>, checkbox, radio or range is drawn by the system, so it looks different on every
- *   machine and stays light in the dark theme. vite.config.ts says where it runs; the pixel skin draws its own.
- *
- *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base (pure ground), infra
- *   (the server, the host, the browser), state (the middle layer), ui, ui/pixel, the features (features/<concept>), the
- *   skins (farm, tree), app. A feature uses another only through its index.ts, so
- *   what is inside it can change; the features' graph has no cycle (layers.test.ts). docs/subsystems/app.md says why.
- *
- *   promise-boundary: the server is Effect; a Promise is only the one call into an outside library, made inside
- *   Effect.tryPromise or Effect.promise (docs/subsystems/foundation.md, "Promise 只在外面的库的一次调用上"). An async
- *   function or a new Promise anywhere else is a loop, a wait or a queue written by hand. The async function such a
- *   wrapper is given holds at most one await: a second is a step that the first one's result decides, so the checks,
- *   branches and errors between them sit where interruption and typed errors do not reach. Counting awaits is the whole
- *   test; a body with one await and logic around it passes, and is the reviewer's to see. Where a library's own
- *   interface is Promises (oar's runtimes, the MCP SDK's handlers), vite.config.ts turns the rule off for that file and
- *   says why.
- *
- *   try-promise-catch: Effect.tryPromise is given { try, catch }, never a bare function. Given only the function, a
- *   rejection becomes Cause.UnknownError, whose message says nothing of what went wrong; catch makes it the module's
- *   own error from the real one.
- *
- *   one-absent: a type that admits null and undefined at once carries two words for one thing. Outside's null is taken in
- *   at the door (docs/style/code.md, "没有值"); vite.config.ts says where a door is.
- *
- *   global-doors: a property on window or globalThis is a contract between two worlds (a page and its shell, a test and
- *   the program it drives). It is declared once, in a door file (declare global, interface Window), and then read and
- *   set with its type; TypeScript refuses one that is not declared. What gets around that is reported: casting window,
- *   globalThis or self, and Object.assign or Object.defineProperty onto them; declare global outside a door is too
- *   (vite.config.ts lists the doors).
- *
- *   atom-door: the page's middle layer stands on Effect's Atom (effect/reactivity), whose API is marked unstable; only
- *   apps/web/src/state imports it (atom.ts, intent.ts), and features read atoms through what state exports, so a change in
- *   Atom is fixed in one folder. An import of effect/reactivity anywhere else under apps/web/src is reported, a type-only
- *   one too: a type names the API as much as a call does; vite.config.ts says where the rule runs.
- *
- *   page-store: a value the page keeps for its life (a dialog opened from two places, the farm's overlays, a draft) is
- *   an atom of the page's, made with state/'s helpers (defineAtom; defineStored for one kept on the machine), so it is
- *   kept one way: read in Solid, heard by plain code, reset by a test. A createSignal or createStore made outside any
- *   function, in apps/web/src/features, farm or ui, is reported; one made in a component or a function is its own.
- *
- *   stored-door: the browser's storage is reached only through state/stored.ts (defineStored), which decodes what it
- *   reads with a Schema, survives a storage that throws, keeps every key under one namespace and tells every reader of a
- *   change, this tab's and the others'. localStorage or sessionStorage named anywhere else under apps/web/src is reported.
- *
- *   act-door: what the owner does on the page goes through its middle layer: an Act (apps/web/src/ui/act.ts: busy until
- *   it ends, a refusal in the error tone, nothing sent while the state stream is lost) or an intent (state/intent.ts, a
- *   change shown before the server has it). In a component (a .tsx under features/ or farm/) a call of the API client
- *   that changes something is reported unless it is made inside a function handed to some `x.run(…)`, an Act's. A call
- *   changes something unless its method is a read: list, get, search, recall, validate or preview… (the client's verbs,
- *   packages/protocol/src/client.ts). An intent's send is written in the feature's .ts, where the rule does not look.
- *
- *   failure-tone: a refusal is said in the error tone. toast(…) given a reason (reasonOf) without "bad" as its tone, and
- *   the pixel toasts.add({ … }) given one without the error type, are reported; ui/act.ts says refusals so already.
- *
- *   db-door: the server reaches the database through the Db service (apps/server/src/infra/db.ts), which says what a
- *   failed query becomes: run and inTx make it a defect, attempt and attemptTx keep it for a caller that tells or retries
- *   it. A module that takes the SqlClient itself, or opens its own withTransaction, decides that again by hand, and
- *   the usual way back is to die and catchDefect the SqlError. A type-only import (a query's SqlClient requirement in a
- *   signature) touches no client and is not reported; vite.config.ts says where the rule runs.
- *
- *   parent-import: in an app's src (apps/web/src, apps/server/src) an import that climbs out of its folder is written
- *   from src, as @/x/y (the app's tsconfig.json paths), not ../../x/y: the same file reads the same from everywhere,
- *   and moving a file does not change what its imports say. Siblings and children stay ./x.
- *
- *   no-instanceof-tagged: an expected error is told apart by its _tag (Predicate.isTagged, catchTag), not by its class.
- *   instanceof narrows nothing in an error channel typed unknown, and it is how a function that sorts errors ends up
- *   taking unknown instead of the union its callers pass. Seen syntactically: x instanceof Y is reported when Y is a
- *   class declared at the top of the same file extending something written TaggedError (Data.TaggedError,
- *   Schema.TaggedError), or when Y's name ends in Error, Failed, Failure or Refused and is not one of JavaScript's own
- *   errors. A tagged class imported under another kind of name is not seen, and a plain Error subclass named that way
- *   is reported (rename it or make it tagged).
- *
- *   no-object-guard: typeof x === "object" && x !== null (either order, in any && chain) is Effect's Predicate.isObject
- *   written again, and the start of a hand-written decoder; Predicate.isObject, Predicate.hasProperty or a Schema say
- *   it once. The rule compares the two operands' text, so x and (x) are different things to it.
- *
- *   service-method-names: a server service's method that returns an Effect is Effect.fn("X.m") (X the service, m the
- *   member), so the OTLP traces show each call under the name it is called by, or Effect.fnUntraced on a hot path or a
- *   thin accessor. Inside X.of({ … }), a member that is a function, written there or a const of the same file, is
- *   reported when the syntax shows it returns an Effect: what it returns is a call of one of Effect's own functions, a
- *   pipe through them, a semaphore's withPermits, a call of a local function that does, or a ?: or ?? with one of those
- *   on a side. An Effect.fn whose name is not "X.m" is reported too. It cannot see past the file: a member that only
- *   calls something destructured (const { run } = yield* Db) or imported, a member taken from another object
- *   (blocks.markdown), and a name declared twice in the file are skipped, as are members that are an Effect or a Stream
- *   themselves; a function that returns a Stream, a Promise or a plain value is never reported.
- *
- *   singular-service: a server service takes its concept's singular word, the same as its module folder and table
- *   (Issue, Session), as Effect's own Database does; a plural says "many", and the service is one. A class extending
- *   Context.Service whose name ends in s is reported unless its last word is one of the singular words listed with the
- *   rule (Status, Progress …).
- *
- *   protocol-namespace: a protocol shape named like a server service (Issue, Session) is read as T.Issue through
- *   import type * as T from "@vibevalley/protocol", so the service keeps the bare name in every file. The service names
- *   are read from apps/server/src when the plugin loads; a named import of one of them from the protocol is reported.
- */
-
 import { existsSync, globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { definePlugin, defineRule, type ESTree } from "vite-plus/lint/plugins";
+import { definePlugin, defineRule, type ESTree, type Context, type Scope } from "vite-plus/lint/plugins";
 
 import { hexClass, offTokens, tokenAdvice, type TokenKind } from "./design-tokens.ts";
 
-/**
- * What a rule says when it fires, which is all an agent reads before its next try: what is wrong and why, what to write
- * instead, and a file in this repository that shows it (oxlint-plugin.test.ts checks the file is there). A message that
- * only says what is not allowed leaves the agent to guess, and a guess is often a way around the rule.
- */
+/** Diagnostics include a replacement rather than only a prohibition; the named See path is checked by tests. */
 export const says = (wrong: string, fix: string, see: string) => `${wrong}. Fix: ${fix}. See ${see}`;
 
 const repo = resolve(import.meta.dirname, "..");
+
+const clockCall = (node: ESTree.Node, context: Context): string | undefined => {
+  if (node.type === "MemberExpression") {
+    const owner = clockCall(node.object, context);
+    const key = !node.computed && node.property.type === "Identifier" ? node.property.name : node.property.type === "Literal" ? node.property.value : undefined;
+    return owner !== undefined && typeof key === "string" ? [owner, key].filter(Boolean).join(".") : undefined;
+  }
+  if (node.type !== "Identifier") return undefined;
+  for (let scope: Scope | null = context.sourceCode.getScope(node); scope; scope = scope.upper) {
+    const definition = scope.set.get(node.name)?.defs[0];
+    if (!definition) continue;
+    if (definition.type !== "ImportBinding" || definition.parent?.type !== "ImportDeclaration") return undefined;
+    const source = definition.parent.source.value;
+    if (!["effect", "effect/Effect", "node:timers", "timers", "node:timers/promises", "timers/promises"].includes(source)) return undefined;
+    const imported = definition.node;
+    const name = imported.type === "ImportSpecifier" ? (imported.imported.type === "Identifier" ? imported.imported.name : imported.imported.value) : "";
+    return [source === "effect/Effect" ? "Effect" : "", name].filter(Boolean).join(".");
+  }
+  return node.name === "globalThis" ? "" : node.name;
+};
+const timerCalls = new Set(["setTimeout", "setInterval"]);
 
 const noWallClock = defineRule({
   meta: {
@@ -159,19 +44,11 @@ const noWallClock = defineRule({
   create(context) {
     return {
       CallExpression(node) {
-        const c = node.callee;
-        if (
-          c.type === "MemberExpression" &&
-          c.object.type === "Identifier" &&
-          c.object.name === "Date" &&
-          c.property.type === "Identifier" &&
-          c.property.name === "now"
-        )
-          context.report({ node, messageId: "wallClock" });
-        else if (c.type === "Identifier" && (c.name === "setTimeout" || c.name === "setInterval")) context.report({ node, messageId: "wallClock" });
+        const name = clockCall(node.callee, context);
+        if (name === "Date.now" || timerCalls.has(name ?? "")) context.report({ node, messageId: "wallClock" });
       },
       NewExpression(node) {
-        if (node.callee.type === "Identifier" && node.callee.name === "Date" && node.arguments.length === 0) context.report({ node, messageId: "wallClock" });
+        if (clockCall(node.callee, context) === "Date" && node.arguments.length === 0) context.report({ node, messageId: "wallClock" });
       },
     };
   },
@@ -191,11 +68,11 @@ const noTestSleep = defineRule({
     return {
       CallExpression(node) {
         const c = node.callee;
-        if (c.type === "Identifier" && (c.name === "setTimeout" || c.name === "setInterval")) context.report({ node, messageId: "sleep" });
-        else if (
-          c.type === "MemberExpression" &&
-          c.property.type === "Identifier" &&
-          (c.property.name === "waitForTimeout" || (c.property.name === "sleep" && c.object.type === "Identifier" && c.object.name === "Effect"))
+        const name = clockCall(c, context);
+        if (
+          timerCalls.has(name ?? "") ||
+          name === "Effect.sleep" ||
+          (c.type === "MemberExpression" && c.property.type === "Identifier" && c.property.name === "waitForTimeout")
         )
           context.report({ node, messageId: "sleep" });
       },
@@ -223,7 +100,6 @@ const noCommentDivider = defineRule({
   },
 });
 
-/** Where a page test names what it looks for or what it expects to read. */
 const textArg = new Set(["getByText", "getByLabel", "getByPlaceholder", "getByTitle", "getByAltText", "toHaveText", "toContainText"]);
 
 /** Options that name the words: getByRole's name, filter's and locator's hasText. */
@@ -231,7 +107,6 @@ const textOption = new Set(["name", "hasText", "hasNotText"]);
 
 type ObjectProperty = { type: string; key?: { type: string; name?: string }; value?: Parameters<typeof chineseLiteral>[0] };
 
-/** A literal with Chinese in it: a string, a template, or a regular expression's pattern. */
 const chineseLiteral = (node: { type: string; value?: unknown; regex?: { pattern: string }; quasis?: { value: { raw: string } }[] } | undefined) =>
   !!node &&
   ((node.type === "Literal" && typeof node.value === "string" && han.test(node.value)) ||
@@ -474,7 +349,7 @@ function ownerOf(node: { parent?: unknown }): { fn: object; async: boolean; pare
   return undefined;
 }
 
-/** Effect.tryPromise(async …), Effect.tryPromise({ try: async … }) and Effect.promise(async …): the one place an async body is the boundary. */
+/** The one place an async body is the boundary. */
 function inEffectPromise(node: { parent?: unknown }): boolean {
   const isWrapper = (n: unknown): boolean => {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oxlint's ESTree node, typed loosely by its plugin API
@@ -927,7 +802,7 @@ const storedDoor = defineRule({
       Identifier(node) {
         if (!storages.has(node.name)) return;
         const parent = node.parent;
-        // A property named so on some other object (`x.localStorage` off window or globalThis still counts) or a key.
+        // User objects can have storage-like property names without accessing browser storage.
         if (parent?.type === "MemberExpression" && parent.property === node && !parent.computed) {
           const owner = parent.object;
           if (!(owner.type === "Identifier" && (owner.name === "window" || owner.name === "globalThis" || owner.name === "self"))) return;
@@ -942,7 +817,6 @@ const storedDoor = defineRule({
 /** The client's methods that only read: everything else changes something on the server. */
 const readVerbs = new Set(["list", "get", "search", "recall", "validate"]);
 
-/** api.a.b.verb(…): the verb, when the chain starts at the identifier `api`. */
 function apiVerb(callee: ESTree.Node): string | undefined {
   if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return undefined;
   let at: ESTree.Node = callee.object;
@@ -950,7 +824,6 @@ function apiVerb(callee: ESTree.Node): string | undefined {
   return at.type === "Identifier" && at.name === "api" ? callee.property.name : undefined;
 }
 
-/** A call x.run(…) given `fn` among its arguments. */
 const isRunOf = (call: unknown, fn: object): boolean => {
   if (typeof call !== "object" || call === null || !("type" in call) || call.type !== "CallExpression") return false;
   if (!("arguments" in call) || !Array.isArray(call.arguments) || !call.arguments.includes(fn) || !("callee" in call)) return false;
@@ -960,7 +833,6 @@ const isRunOf = (call: unknown, fn: object): boolean => {
   return typeof property === "object" && property !== null && "name" in property && property.name === "run";
 };
 
-/** Some function around the node is handed to x.run(…). */
 function insideRun(node: { parent?: unknown }): boolean {
   for (let owner = ownerOf(node); owner; owner = ownerOf(owner.fn)) if (isRunOf(owner.parent, owner.fn)) return true;
   return false;
@@ -1069,6 +941,7 @@ const parentImportRule = defineRule({
 const nativeErrors = new Set(["Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "EvalError", "URIError", "AggregateError", "DOMException"]);
 const taggedName = /(?:Error|Failed|Failure|Refused)$/u;
 
+/** Imported classes are recognized by error-like names; tagged classes imported under other names need review. */
 const noInstanceofTagged = defineRule({
   meta: {
     messages: {
@@ -1176,6 +1049,7 @@ const tracedAs = (n: Node): { name: string | undefined; at: Node } | "untraced" 
 
 const isFunction = (n: Node) => n.type === "ArrowFunctionExpression" || n.type === "FunctionExpression" || n.type === "FunctionDeclaration";
 
+/** Imported delegates and dynamic lookups hide their return type from this syntax-only check. */
 const serviceMethodNames = defineRule({
   meta: {
     messages: {
@@ -1214,8 +1088,7 @@ const serviceMethodNames = defineRule({
       if (fn.type === "ArrowFunctionExpression" && fn.body.type !== "BlockStatement") return [fn.body];
       return returns.get(fn) ?? [];
     };
-    /** Whether the syntax shows an Effect: one of Effect's makers, a pipe through Effect's combinators, a semaphore's
-     * withPermits, a call of a local function that returns one, or a conditional or ?? with one on either side. */
+    /** Whether the syntax alone shows an Effect. */
     const isEffect = (n: Node, seen: Set<Node>): boolean => {
       if (n.type === "TSAsExpression" || n.type === "TSSatisfiesExpression" || n.type === "TSNonNullExpression" || n.type === "ParenthesizedExpression")
         return isEffect(n.expression, seen);
