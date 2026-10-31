@@ -335,11 +335,17 @@ describe("the chat", () => {
         expect(f.channel(thread)?.title).toBe("细说");
         expect(yield* Effect.flip(f.chat.updateChannel(thread, { category: "x" }))).toMatchObject({ _tag: "Refused" });
 
-        yield* f.chat.archive(a);
-        expect(f.channel(a)?.archived).toBeDefined();
-        yield* f.chat.archive(a);
+        yield* f.chat.archive(a, true);
+        const archived = f.channel(a)?.archived;
+        expect(archived).toBeDefined();
+        // Set as it already is: nothing changes, not even when it was archived.
+        yield* f.chat.archive(a, true);
+        expect(f.channel(a)?.archived).toBe(archived);
+        yield* f.chat.archive(a, false);
         expect(f.channel(a)?.archived).toBeUndefined();
-        expect(yield* Effect.flip(f.chat.archive(f.chat.defaultChannel()))).toMatchObject({ _tag: "Refused" });
+        yield* f.chat.archive(a, false);
+        expect(f.channel(a)?.archived).toBeUndefined();
+        expect(yield* Effect.flip(f.chat.archive(f.chat.defaultChannel(), true))).toMatchObject({ _tag: "Refused" });
 
         yield* f.chat.speak(defaultOrchestrator, "随便说说", { target: "#前端", anyway: true, confirm: true });
         yield* f.chat.setNotify(a, "mentions");
@@ -715,10 +721,17 @@ describe("the chat", () => {
           expect([edited.text, edited.edited !== undefined, edited.revision > since]).toEqual(["改成这样", true, true]);
           const theirs = (yield* f.chat.speak(defaultOrchestrator, "我来看看", { anyway: true, confirm: true })).message!;
           expect(yield* Effect.flip(f.chat.edit(theirs.id, "不是你的"))).toMatchObject({ _tag: "Refused" });
-          const liked = yield* f.chat.react(theirs.id, "owner", "👍");
+          const liked = yield* f.chat.react(theirs.id, "owner", "👍", true);
           expect(liked.reactions).toEqual([{ emoji: "👍", by: ["owner"] }]);
-          expect((yield* f.chat.react(theirs.id, "owner", "👍")).reactions).toEqual([]);
-          expect((yield* f.chat.pin(reply.id)).pinned).toBeDefined();
+          // A set repeated (a retry) is no change: the same revision, the reaction once.
+          const again = yield* f.chat.react(theirs.id, "owner", "👍", true);
+          expect([again.reactions, again.revision]).toEqual([liked.reactions, liked.revision]);
+          const taken = yield* f.chat.react(theirs.id, "owner", "👍", false);
+          expect(taken.reactions).toEqual([]);
+          expect((yield* f.chat.react(theirs.id, "owner", "👍", false)).revision).toBe(taken.revision);
+          const pinned = yield* f.chat.pin(reply.id, true);
+          expect(pinned.pinned).toBeDefined();
+          expect((yield* f.chat.pin(reply.id, true)).revision).toBe(pinned.revision);
           expect((yield* f.chat.pins(general)).map((m) => m.id)).toEqual([reply.id]);
           expect((yield* f.chat.previewRemove(theirs.id)).does[0]).toContain(`第 ${theirs.number} 条`);
           yield* f.chat.remove(theirs.id);

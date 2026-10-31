@@ -9,12 +9,13 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
 
-import { api, newSendKey, reasonOf } from "@/base/api";
+import { reasonOf } from "@/base/api";
 import { useCore, useFrames } from "@/base/frame";
+import { sendOnce, useIntents } from "@/base/intent";
 import { ready, useAgents, useProjects } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { variant, autofocus } from "@/base/util";
-import { defaultOf } from "@/features/channel";
+import { chatSay, defaultOf } from "@/features/channel";
 import { writeIssue } from "@/features/issue";
 import { type ProjectsSkin, since } from "@/features/project";
 import { Button } from "@/ui/Button";
@@ -464,19 +465,16 @@ function SowHere(props: { project: string; onDone: () => void }) {
   const [busy, setBusy] = createSignal(false);
   const router = useRouter();
   const core = useCore();
+  const says = useIntents(chatSay);
+  // A line in the default channel, which shows it on its way; pressed again after a failure it is the same line.
   const send = async () => {
-    const project = props.project;
     const id = defaultOf(core()?.chat)?.id;
     if (!id) return;
     setBusy(true);
-    try {
-      await api.channel.message.send({ id, text: text().trim(), project, sendKey: newSendKey() });
-      props.onDone();
-    } catch (e) {
-      toast(reasonOf(e));
-    } finally {
-      setBusy(false);
-    }
+    const end = await sendOnce(says, { id, text: text().trim(), project: props.project });
+    setBusy(false);
+    if (end?.status === "failed") toast(end.reason ?? "", "bad");
+    else props.onDone();
   };
   const write = async () => {
     const project = props.project;

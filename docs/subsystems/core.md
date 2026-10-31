@@ -34,6 +34,7 @@
 - **`reduce(state, fact)` 是纯函数，返回新状态和「变没变」**。没变的事实不发、不存、不算特效；关于不在地里的帮工的事实什么也不改。变了且有工单时，工单的状态跟着重算（`withIssueStatuses`）。
 - **事实的时间由 `Core` 盖**：施加时把 `at` 改成当时的时钟，调用方给的不算。
 - **`Transition` 绑住一条事实和它改的那一份状态**：`before`、`fact`、`after`。消费晚了也不读当前状态去猜当时，消费者不再自己跑一遍 `reduce`。`transitions` 同一步里拿初始快照和订阅，中间不漏事实。`Transition` 拿着旧状态的引用，所以 **`reduce` 不改传进来的旧值**。
+- **`seq` 数提交**：`Core` 记着折过几次，`apply` 每一次真改了状态的提交（一批算一次，没变的事实不算）加一，`Core.seq()` 读当前值。出帧时和状态一起读，写进 `StateFrame.seq`：这一帧带着到这个号为止的每次折叠。
 - **一批是一次提交**（`apply(...facts)`）：先在局部状态上逐条折、收集 `Transition` 和特效，再一次换掉可见的状态、安排存盘，最后按原顺序逐条发事实、再发特效。每条 `Transition` 的 `after` 是这一条的结果，不是整批的最终状态；`state()` 和 `/state` 只看得到整批。HTTP 的事件格式不变，仍是一条一条的 `Fact`。计划的父子工单（工单服务一次写完的那组）走这条路。
 - **一批不代替数据库事务**：拥有者先提交数据库事务，再发核心状态；两者之间的恢复归拥有持久化的那个模块。
 - **主人做了、但不改状态的事不是事实**：看改动、语音接上，由经手的服务调 `Core.did`，只有游戏的账本听（`owner`）。
@@ -59,6 +60,7 @@
 - 三条 SSE 每个连接都有容量 64 的有界 relay。正常顺序不变；积压到上限的连接明确结束并记警告，源订阅释放，不静默丢帧，也不把发布者挡住。客户端重连取快照。内部的事实和 Transition 订阅不能靠重连补齐，不走这条会断开的 relay；Core 关闭时 shutdown 四个 PubSub。
 - 断线不补发：重连从一帧（或快照）重新开始。页面的状态流断了 1 秒后重连。
 - 命令的结果不走流：要么是 HTTP 的答复，要么是之后的事实或提醒。
+- **答复带 `seq`，帧对上它才算看见**：改帧里东西的接口在服务施加完事实以后读 `Core.seq()`，随答复带回；现在是工单的 `issue.create`、`issue.update`、`issue.status.update`，答复是 `AppliedIssue`（`Issue` 加 `seq`）。拥有者在返回前就施加了事实（同一个 Effect 里，不 fork），所以第一帧 `seq` 不小于答复的 `seq` 时就看得见这次改动：页面的意图照「`frame.seq ≥ reply.seq`」落定，不按答复、不按时钟（[客户端](docs/subsystems/app.md)）。号可能比改动本身大（中间别人也改了），只会多等一帧，不会早。
 
 **接口和能力表**
 
@@ -68,6 +70,8 @@
 - **都是 POST，路径就是操作名**：`POST /api/v1/<模块>[/<名词>]/<动词>`，操作名的点换成斜杠（`pathOf`），`issue.status.update` 在 `/api/v1/issue/status/update`。输入只有一份，是 JSON 请求体，id 也在里面（`{ "id": "12", … }`）；没有路径参数和查询参数，空的请求体是 `{}`。只有三条 SSE 流和聊天的附件用 GET（`statePath`、`eventsPath`、`livePath`、`attachmentPath`）：`<img src>` 发不了 POST。
 - **都在 `/api/v1` 下**，包括 `/api/v1/server/health/get` 和三条流。`pathOf` 给出的就是最终路径，页面的客户端、命令行、能力表和「连接到本机」都从它来，没有第二处拼前缀。不设 `/api/...` 的别名，旧客户端拿到 404。加字段、加接口留在 v1；不兼容的改动另起 `/api/v2`，v1 留到主人的设备都升上来。`/mcp` 不带版本：MCP 有自己的版本。
 - **命名**：第一段是概念，多是拥有它的 `apps/server/src` 文件夹（`issue`、`channel`、`lan`；计划是 `graph`）；名词是模块下面的一个子概念（`issue.comment`、`channel.message`、`lan.pairing`），说的就是模块本身时省掉；每个词都用单数，和库表一样（`api.test.ts` 查）。动词一套 `list`、`get`、`create`、`update`、`delete`；`set` 换掉一个取值（`channel.default.set`、`game.title.set`）；`check` 只校验；领域动词只给不是增删改查的（`channel.message.send`、`issue.dispatch`、`issue.act`）；试跑是 `preview<动词>`（`issue.previewDelete`、`issue.status.previewUpdate`，`api.test.ts` 查）。工单的生命周期挂在工单上（`issue.status.update`）；一个意图一个操作，不用布尔开关兼两件；`update` 只改给出的字段（档案和技能的 `update` 是带 id 的整份写入）。
+- **请求键：同一个键只做一次**：`issue.create`、`issue.status.update`、`channel.thread.create`、`memory.create` 收可选的 `requestKey`（最长 64 个字符，同聊天消息的 `sendKey`），页面一次意图一个键，重试用同一个。网关（`apps/server/src/http/requestKey.ts`）按操作记住每个键的结果：同一个键再来拿到第一次的答复、活只做一次；第一次还在做时到的那个等它；只记成功，被拒或失败的忘掉键，重试再做一遍。记在内存里，每个操作只留最近 500 个，重启就忘：答复丢了又碰上重启，重试会再做一次。聊天消息不走这里：`sendKey` 存在消息上，库里查重（[频道](docs/subsystems/channel.md)）。
+- **开关写成设值**：页面的重试会再发一次，开关发两次等于没发；所以表情、置顶、归档是 `channel.reaction.set`、`channel.pin.set`、`channel.archive.set`，带 `on`，设成已经是的样子什么也不改（不加修订、不推送）。
 - **一条规则，差别作为参数**：入口之间的差别传进服务，不写成两个方法。例：工单的改动收「谁在看」，主人看才算进游戏。
 
 **命令行是皮**
@@ -143,6 +147,7 @@
 
 ## 怎么验证
 
+- `apps/server/src/core/core.test.ts` 里另有：`seq` 每次改了状态的提交加一、没变的不加，帧带着它；`http/requestKey.test.ts`：同一个键只做一次、并发的等第一个、失败不记；`flows/request.test.ts`：经处理函数，工单的建和挪、开串、记一条记性同一个键只做一次，答复的 `seq` 由第一帧不小于它的帧看见，三个设值发两次只改一次。
 - `apps/server/src/core/core.test.ts`：从 `state.json` 读回（通话和管家回到 `idle`、不记得管家在哪个对话、库的部分不进文件、帮工回到各自的地）；每个管家的状态（`orchestrators`）带着它在哪个对话想和写，听着时不带，歇着就不在表里；形状不对的 `state.json` 原样留在一边、从空的开始；事实盖时间、发出，同样的再来一次不算新闻，关的时候写 `state.json`、不带给人看的话；一阵事实合成一帧；延迟保存失败记日志，文件恢复可写后关机仍能留下最后一份。
 - `apps/server/src/core/golden.test.ts`：几千个随机事实逐个比状态、特效和视图（`reduce.jsonl.gz`）；`cron/cron.test.ts` 查折法和出帧填的话。
 - `apps/server/src/cli.test.ts`：每个接口都有命令、调一个接口打出回答、失败时 stdout 是空的、退出码按种类、拒绝的 `next` 原样能跑、每个 `delete` 都有同形状的试跑且试跑不动东西、`lookIn` 的每条命令都在。`apps/server/src/cli/golden.test.ts`：帮助、典型的错误和试跑录在 `cli/testdata/cli.jsonl.gz`，改了 `vp run golden:update cli` 再看 diff。`scripts/verify-server.test.ts`：沙箱里只用命令行把一张工单派出去、交回来、试跑完成、完成。`lan/lan.test.ts`：「连接到本机」按 `can` 放行。

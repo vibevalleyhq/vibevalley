@@ -16,7 +16,10 @@
       "closed": "Completed and canceled tickets; drag one back to In progress to reopen it."
     },
     "whichLane": "Which column",
-    "spots": "{taken} / {of} spots"
+    "spots": "{taken} / {of} spots",
+    "moveFailed": "Not moved",
+    "retryMove": "Move it again",
+    "putBack": "Put it back"
   },
   "display": {
     "boardNote": "The board always has a column per status, and dragging changes the status; grouping is for the list.",

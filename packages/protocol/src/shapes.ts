@@ -860,6 +860,9 @@ export interface FarmView {
 export type GameEffect = GameEffectReward | GameEffectPenalty | GameEffectLevelUp | GameEffectAchievement;
 
 export interface StateFrame {
+  /** Goes up by one with every commit the core folds (Core.apply that changed the state): this frame shows every fold up
+   * to it. A reply carrying a seq (AppliedIssue) is shown by the first frame whose seq is at least that one. */
+  seq: number;
   state: WorkspaceView;
   inbox: InboxItem[];
   graphs: TaskGraph[];
@@ -1146,6 +1149,9 @@ export type MemoryKind = (typeof MemoryKindValues)[number];
 export interface MemoryRequest {
   text: string;
   project?: string;
+  /** The client's key for this request: the same key again within a while returns the first one's result and does it
+   * once (a retry after a lost reply). At most 64 characters. */
+  requestKey?: string;
 }
 
 /** Where a memory holds: for every project, one project, or a source that does not say. */
@@ -1370,6 +1376,12 @@ export interface Issue {
   attention: IssueAttention;
 }
 
+/** An issue as a change left it (issue.create, issue.update, issue.status.update), with the seq of the core's fold that
+ * includes the change: the first frame whose seq is at least this one shows it. */
+export interface AppliedIssue extends Issue {
+  seq: number;
+}
+
 /** What an answer issue concludes, as its helper hands it back: the conclusion, what it rests on (files and lines, commands
  * and what they printed), what it is unsure of, and what to do next. */
 export interface IssueAnswer {
@@ -1534,6 +1546,9 @@ export interface IssueRequest {
   assignee?: string;
   priority?: Priority;
   deliver?: Deliverable;
+  /** The client's key for this request: the same key again within a while returns the first one's result and does it
+   * once (a retry after a lost reply). At most 64 characters. */
+  requestKey?: string;
 }
 
 /** What an issue delivers: a change (its branch, merged into the project or by a pull request), a change kept on its
@@ -2434,6 +2449,9 @@ export interface IssueStatusRequest {
   assignee?: string;
   /** Fields the owner changed and has not saved: saved first, so the act sees them. */
   edit?: IssueUpdate;
+  /** The client's key for this request: the same key again within a while returns the first one's result and does it
+   * once (a retry after a lost reply). At most 64 characters. */
+  requestKey?: string;
 }
 
 export interface GraphActRequest {
@@ -2698,9 +2716,17 @@ export interface NotifyRequest {
   notify: Notify;
 }
 
-export interface ReactionToggle {
+/** The owner's reaction on (added) or off (taken back); setting it as it already is changes nothing. */
+export interface ReactionSet {
   id: string;
   emoji: string;
+  on: boolean;
+}
+
+/** A message pinned or a channel archived (on), or not; setting it as it already is changes nothing. */
+export interface OnSet {
+  id: string;
+  on: boolean;
 }
 
 /** At most attachmentMax bytes, as base64. */

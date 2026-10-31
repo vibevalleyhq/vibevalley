@@ -1,7 +1,7 @@
 // The farm chat's input row, at the foot of the unfolded phone's right screen: who the next job goes to, the box (Enter
 // sends, Shift+Enter starts a line, @ names someone), dictation, and the stop button while the orchestrator thinks. Calling
-// the orchestrator is the phone's (its 管家), so the row has no call key. A failed
-// send keeps the draft and its key, so a retry is the same message, not a second one.
+// the orchestrator is the phone's (its 管家), so the row has no call key. A line sent shows in the window above
+// (ChatWindow) until it is in the channel; a failed one stays there with its key, to send again as the same message.
 
 import { For, Show } from "solid-js";
 
@@ -11,10 +11,11 @@ import type { Channel } from "@vibevalley/protocol";
 import { useAgent } from "@/base/agents";
 import { api } from "@/base/api";
 import { useCore } from "@/base/frame";
+import { useIntents } from "@/base/intent";
 import { setPick, usePrefs } from "@/base/prefs";
 import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
-import { createComposer, draftOf, drafts, threadOwnerOf } from "@/features/channel";
+import { chatSay, createComposer, draftOf, drafts, threadOwnerOf } from "@/features/channel";
 import { DictationButton } from "@/features/voice";
 import { AgentFace } from "@/ui/Face";
 import { SpriteIcon } from "@/ui/pixel";
@@ -71,8 +72,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
       const agent = props.thread || pick() === "auto" ? undefined : pick();
       return { id: props.channel?.id ?? "", ...(agent ? { agent } : {}), ...(reply ? { replyTo: reply.number } : {}) };
     },
-    // The farm's window draws the line at once (ChatWindow), so the box empties as it is sent.
-    echo: true,
+    says: useIntents(chatSay),
     failed: (reason) => props.onProblem(t("web.farm.chat.notSent", { why: reason })),
     told: (say) => toasts.add({ title: say }),
     opened: (path) => router.navigate(path),

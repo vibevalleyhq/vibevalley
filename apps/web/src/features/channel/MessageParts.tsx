@@ -18,7 +18,7 @@ import { MoreMenu } from "@/ui/MoreMenu";
 import { toast } from "@/ui/toasts";
 
 import { drafts } from "./draft";
-import { quickReactions } from "./emoji";
+import { quickReactions, reactionOn } from "./emoji";
 import { EmojiPicker } from "./EmojiPicker";
 import { workbenchClock } from "./feed";
 import { useMessage } from "./follow";
@@ -229,7 +229,7 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
               data-count={r().by.length}
               aria-pressed={aria(mine())}
               title={t("web.channel.messages.reactedBy", { emoji: r().emoji, names: list(r().by.map(props.names)) })}
-              onClick={() => run(() => api.channel.reaction.toggle({ id: props.m.id, emoji: r().emoji }))}
+              onClick={() => run(() => api.channel.reaction.set({ id: props.m.id, emoji: r().emoji, on: !mine() }))}
               class={[
                 "flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs",
                 mine() ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover",
@@ -241,13 +241,13 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
           );
         }}
       </For>
-      <AddReaction id={props.m.id} />
+      <AddReaction m={props.m} />
     </div>
   );
 }
 
 /** A reaction picked from every emoji, for a message that has some already. */
-function AddReaction(props: { id: string }) {
+function AddReaction(props: { m: ChatMessage }) {
   const [open, setOpen] = createSignal(false);
   let button: HTMLButtonElement | undefined;
   return (
@@ -274,8 +274,8 @@ function AddReaction(props: { id: string }) {
           onClose={() => setOpen(false)}
           onPick={(emoji) => {
             setOpen(false);
-            const id = untrack(() => props.id);
-            run(() => api.channel.reaction.toggle({ id, emoji }));
+            const m = untrack(() => props.m);
+            run(() => api.channel.reaction.set({ id: m.id, emoji, on: reactionOn(m, emoji) }));
           }}
         />
       </Show>
@@ -326,8 +326,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
                 aria-label={emoji}
                 onClick={() => {
                   setPicking(false);
-                  const id = props.m.id;
-                  run(() => api.channel.reaction.toggle({ id, emoji }));
+                  const m = props.m;
+                  run(() => api.channel.reaction.set({ id: m.id, emoji, on: reactionOn(m, emoji) }));
                 }}
               >
                 {emoji}
@@ -354,8 +354,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           onPick={(emoji) => {
             setEveryEmoji(false);
             setPicking(false);
-            const id = untrack(() => props.m.id);
-            run(() => api.channel.reaction.toggle({ id, emoji }));
+            const m = untrack(() => props.m);
+            run(() => api.channel.reaction.set({ id: m.id, emoji, on: reactionOn(m, emoji) }));
           }}
         />
       </Show>
@@ -405,8 +405,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         title={props.m.pinned !== undefined ? t("web.channel.tools.unpin") : t("web.channel.tools.pin")}
         aria-pressed={aria(props.m.pinned !== undefined)}
         onClick={() => {
-          const id = props.m.id;
-          run(() => api.channel.pin.toggle({ id }));
+          const m = props.m;
+          run(() => api.channel.pin.set({ id: m.id, on: m.pinned === undefined }));
         }}
       >
         <Icon name="pin" size={16} class={props.m.pinned !== undefined ? "" : "opacity-60"} />

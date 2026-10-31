@@ -484,6 +484,11 @@ export default defineConfig({
         rules: { "vibevalley/protocol-namespace": "error" },
       },
       {
+        // Only the page's base/ stands on Effect's Atom, whose API is unstable (scripts/oxlint-plugin.ts, atom-door).
+        files: ["apps/web/src/**"],
+        rules: { "vibevalley/atom-door": "error" },
+      },
+      {
         // The server reaches the database through Db, which decides what a failed query becomes (scripts/oxlint-plugin.ts, db-door).
         files: ["apps/server/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],

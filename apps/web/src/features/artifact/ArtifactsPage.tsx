@@ -4,11 +4,12 @@
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Artifact, type ArtifactVersion, artifactPath } from "@vibevalley/protocol";
+import { type Artifact, type ArtifactVersion, artifactPath, type SayRequest } from "@vibevalley/protocol";
 
 import { api, reasonOf } from "@/base/api";
 import { ago } from "@/base/format";
 import { useCore } from "@/base/frame";
+import { type IntentType, sendOnce, useIntents } from "@/base/intent";
 import { queries, ready } from "@/base/query";
 import { useRouter, useSearch } from "@/base/router";
 import { Keyed, useNow } from "@/base/util";
@@ -37,7 +38,11 @@ const messageHref = (at: { readonly channel: string; readonly number?: number })
 const [justMade, setJustMade] = createSignal<string>();
 
 /** `rest` is the path after /artifacts/. */
-export function ArtifactsPage(props: { rest: string }) {
+/** The owner's lines in a channel (features/channel's chatSay), given by app/: the channel feature shows artifacts, so this
+ * one does not import it back. */
+export type ChatSay = IntentType<Omit<SayRequest, "sendKey">, void>;
+
+export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
   const router = useRouter();
   const now = useNow();
   const all = useArtifacts(() => ({}));
@@ -145,14 +150,14 @@ export function ArtifactsPage(props: { rest: string }) {
             </Show>
           }
         >
-          {(o) => <Keyed key={o()}>{() => <Opened id={o()} />}</Keyed>}
+          {(o) => <Keyed key={o()}>{() => <Opened id={o()} say={props.say} />}</Keyed>}
         </Show>
       </div>
     </div>
   );
 }
 
-function Opened(props: { id: string }) {
+function Opened(props: { id: string; say: ChatSay }) {
   const found = useArtifact(() => props.id);
   return (
     <Show
@@ -163,7 +168,7 @@ function Opened(props: { id: string }) {
         </Show>
       }
     >
-      {(a) => <Shown artifact={a()} />}
+      {(a) => <Shown artifact={a()} say={props.say} />}
     </Show>
   );
 }
@@ -218,7 +223,7 @@ function Title(props: { artifact: Artifact }) {
   );
 }
 
-function Shown(props: { artifact: Artifact }) {
+function Shown(props: { artifact: Artifact; say: ChatSay }) {
   const search = useSearch();
   const router = useRouter();
   const core = useCore();
@@ -375,7 +380,7 @@ function Shown(props: { artifact: Artifact }) {
                     {t("web.artifact.talk.atMessage")}
                   </A>
                 </div>
-                <Reply at={at()} version={version()} />
+                <Reply at={at()} version={version()} say={props.say} />
               </div>
             )}
           </Show>
@@ -386,22 +391,19 @@ function Shown(props: { artifact: Artifact }) {
 }
 
 /** A reply under the message that announced it (or the version shown): what its maker is woken with. */
-function Reply(props: { at: { readonly channel: string; readonly number?: number }; version?: ArtifactVersion | undefined }) {
+function Reply(props: { at: { readonly channel: string; readonly number?: number }; version?: ArtifactVersion | undefined; say: ChatSay }) {
   const [text, setText] = createSignal("");
   const [busy, setBusy] = createSignal(false);
+  const says = useIntents(untrack(() => props.say));
   const send = async () => {
     const words = text().trim();
     if (!words || busy()) return;
     setBusy(true);
-    try {
-      await api.channel.message.send({ id: props.at.channel, text: words, ...(props.at.number !== undefined ? { replyTo: props.at.number } : {}) });
-      setText("");
-      toast(props.version ? t("web.artifact.talk.sentVersion", { version: props.version.version }) : t("web.artifact.talk.sent"));
-    } catch (e) {
-      toast(reasonOf(e), "bad");
-    } finally {
-      setBusy(false);
-    }
+    const end = await sendOnce(says, { id: props.at.channel, text: words, ...(props.at.number !== undefined ? { replyTo: props.at.number } : {}) });
+    setBusy(false);
+    if (end?.status === "failed") return toast(end.reason ?? "", "bad");
+    setText("");
+    toast(props.version ? t("web.artifact.talk.sentVersion", { version: props.version.version }) : t("web.artifact.talk.sent"));
   };
   return (
     <form

@@ -192,6 +192,20 @@ tester.run("db-door", rule("db-door"), {
   ],
 });
 
+tester.run("atom-door", rule("atom-door"), {
+  valid: [
+    { code: 'import { Atom } from "effect/reactivity";', filename: page("base/atom.ts") },
+    { code: 'import { Atom, type AtomRegistry } from "effect/reactivity";', filename: page("base/intent.ts") },
+    { code: 'import { Effect } from "effect";', filename: page("features/issue/moves.ts") },
+    { code: 'import { Atom } from "effect/reactivity";', filename: "/repo/apps/server/src/core/core.ts" },
+  ],
+  invalid: [
+    { code: 'import { Atom } from "effect/reactivity";', filename: page("features/issue/moves.ts"), errors: [{ messageId: "atom" }] },
+    { code: 'import type { AtomRegistry } from "effect/reactivity";', filename: page("farm/store.ts"), errors: [{ messageId: "atom" }] },
+    { code: 'import * as Atom from "effect/reactivity/Atom";', filename: page("ui/act.ts"), errors: [{ messageId: "atom" }] },
+  ],
+});
+
 tester.run("one-absent", rule("one-absent"), {
   valid: [
     { code: "let a: string | undefined;", filename: "/repo/apps/server/src/a.ts" },

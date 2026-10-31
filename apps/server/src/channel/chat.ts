@@ -305,9 +305,10 @@ export class Channel extends Context.Service<
     /** Any message: its words, files and reactions go, its number stays, and what it had still to hand is dropped. */
     readonly remove: (id: string) => Effect.Effect<void, ApiError>;
     readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
-    /** A participant's reaction added, or taken back when it is there and add is not asked. */
-    readonly react: (id: string, who: string, emoji: string, add?: boolean) => Effect.Effect<T.ChatMessage, ApiError>;
-    readonly pin: (id: string) => Effect.Effect<T.ChatMessage, ApiError>;
+    /** A participant's reaction on or off; as it already is, the message is returned unchanged. */
+    readonly react: (id: string, who: string, emoji: string, on: boolean) => Effect.Effect<T.ChatMessage, ApiError>;
+    /** Pinned or not; as it already is, the message is returned unchanged. */
+    readonly pin: (id: string, on: boolean) => Effect.Effect<T.ChatMessage, ApiError>;
     readonly pins: (channel: string) => Effect.Effect<T.ChatMessage[], ApiError>;
     /** The thread under a channel's message, opened if it has none. */
     readonly threadUnder: (id: string) => Effect.Effect<string, ApiError>;
@@ -360,7 +361,8 @@ export class Channel extends Context.Service<
     /** description undefined or empty: as it was; project undefined: as it was, empty: none. */
     /** Each field given changes: a channel's description, project, name, group and place; a thread's title. */
     readonly updateChannel: (id: string, upd: T.ChannelUpdate) => Effect.Effect<void, ApiError>;
-    readonly archive: (id: string) => Effect.Effect<void, ApiError>;
+    /** Archived or not; as it already is, nothing changes. */
+    readonly archive: (id: string, on: boolean) => Effect.Effect<void, ApiError>;
     readonly removeChannel: (id: string) => Effect.Effect<void, ApiError>;
     readonly previewRemoveChannel: (id: string) => Effect.Effect<T.Preview, ApiError>;
     readonly setNotify: (id: string, notify: T.Notify) => Effect.Effect<void, ApiError>;
@@ -1319,17 +1321,16 @@ const make = Effect.gen(function* () {
   });
 
   /** add only adds: a reaction already there is then kept. */
-  const reacting = Effect.fnUntraced(function* (id: string, who: string, emoji: string, add: boolean) {
+  // Setting the reaction as it already is writes nothing: a retried set is no new revision for every follower.
+  const reacting = Effect.fnUntraced(function* (id: string, who: string, emoji: string, on: boolean) {
     const e = emoji.trim();
     if (!emojiPattern.test(e)) return yield* Effect.fail(refused(t("server.channel.badEmoji")));
     const row = yield* messageOf(id);
     if (row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.messageGone")));
     const r = reactionsOf(row.reactions);
     const by = r[e] ?? [];
-    if (by.includes(who)) {
-      if (add) return toMessage(row);
-      r[e] = by.filter((x) => x !== who);
-    } else r[e] = [...by, who];
+    if (by.includes(who) === on) return toMessage(row);
+    r[e] = on ? [...by, who] : by.filter((x) => x !== who);
     return yield* change(row, (revision) => db(qm.setReactions({ reactions: reactionsText(r), revision, id })));
   });
 
@@ -1451,13 +1452,14 @@ const make = Effect.gen(function* () {
         ],
       };
     }),
-    react: Effect.fn("Channel.react")(function* (id, who, emoji, add = false) {
-      return yield* locked(reacting(id, who, emoji, add));
+    react: Effect.fn("Channel.react")(function* (id, who, emoji, on) {
+      return yield* locked(reacting(id, who, emoji, on));
     }),
-    pin: Effect.fn("Channel.pin")(function* (id) {
+    pin: Effect.fn("Channel.pin")(function* (id, on) {
       const row = yield* messageOf(id);
       if (row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.messageGone")));
-      return yield* change(row, (revision, now) => db(qm.setPinned({ pinned_at: row.pinned_at === null ? now : null, revision, id })));
+      if ((row.pinned_at !== null) === on) return toMessage(row);
+      return yield* change(row, (revision, now) => db(qm.setPinned({ pinned_at: on ? now : null, revision, id })));
     }, locked),
     pins: Effect.fn("Channel.pins")(function* (channel) {
       if (!model.channel(channel)) return yield* Effect.fail(missing(t("server.channel.noChannel", { id: channel }), [lookIn.channel]));
@@ -1788,11 +1790,12 @@ const make = Effect.gen(function* () {
       // Its threads are looked after by the same orchestrator: they show the new one too.
       if (orchestrator !== row.orchestrator) for (const item of model.threadsOf(id)) yield* publishChannel(item.id);
     }, locked),
-    archive: Effect.fn("Channel.archive")(function* (id) {
+    archive: Effect.fn("Channel.archive")(function* (id, on) {
       const row = model.channel(id);
       if (!row || row.type === "direct") return yield* Effect.fail(missing(t("server.channel.noChannel", { id }), [lookIn.channel]));
+      if ((row.archived_at !== null) === on) return;
       if (row.is_default) return yield* Effect.fail(refused(t("server.channel.defaultStays")));
-      const archived_at = row.archived_at === null ? yield* Clock.currentTimeMillis : null;
+      const archived_at = on ? yield* Clock.currentTimeMillis : null;
       yield* db(qc.setArchived({ archived_at, id }));
       model.patched(id, { archived_at });
       yield* publishChannel(id);

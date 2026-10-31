@@ -6,7 +6,6 @@ import { type Issue, type IssueAct, type IssueAction } from "@vibevalley/protoco
 import { api, newSendKey, reasonOf } from "@/base/api";
 import { toast } from "@/ui/toasts";
 
-import { reloadIssues } from "./queries";
 // The owner's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx)
 // and the farm's (farm/issue/IssueView.tsx). What a button sends is the server's (Issue.attention.acts, perform); this
 // says which take words from the box, which open the box first, which open a dialog, what a reopen tells, and keeps the
@@ -137,14 +136,12 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
   };
 }
 
-/** undefined when refused: the refusal is said in a toast. The board is read again after either. */
+/** undefined when refused: the refusal is said in a toast. What it changed comes with the next frame. */
 export async function run<T>(act: () => Promise<T>): Promise<T | undefined> {
   try {
     return await act();
   } catch (e) {
     toast(reasonOf(e), "bad");
     return undefined;
-  } finally {
-    void reloadIssues();
   }
 }

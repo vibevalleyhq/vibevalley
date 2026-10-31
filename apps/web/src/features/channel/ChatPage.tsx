@@ -893,7 +893,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
             ? t("web.channel.threadList.unarchive", { title: props.title })
             : t("web.channel.threadList.archive", { title: props.title })
         }
-        onClick={() => run(() => api.channel.archive.toggle({ id: props.thread.id }))}
+        onClick={() => run(() => api.channel.archive.set({ id: props.thread.id, on: props.thread.archived === undefined }))}
       >
         <Icon name="archive" size={14} />
       </button>

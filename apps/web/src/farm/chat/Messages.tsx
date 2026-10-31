@@ -14,7 +14,7 @@ import { spentText } from "@/base/format";
 import { useCore } from "@/base/frame";
 import { aria, autofocus } from "@/base/util";
 import { artifactHref } from "@/features/artifact";
-import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, useMessage } from "@/features/channel";
+import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, reactionOn, useMessage } from "@/features/channel";
 import { A } from "@/ui/A";
 import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
 import { PxMarkdown, SpriteIcon } from "@/ui/pixel";
@@ -173,7 +173,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
                   data-key={emoji}
                   aria-label={emoji}
                   class="cursor-pointer px-1 text-[14px] hover:bg-leaf-300/40"
-                  onClick={() => run(() => api.channel.reaction.toggle({ id: props.m.id, emoji }))}
+                  onClick={() => run(() => api.channel.reaction.set({ id: props.m.id, emoji, on: reactionOn(props.m, emoji) }))}
                 >
                   {emoji}
                 </button>
@@ -238,8 +238,8 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
           anchor={plus}
           onClose={() => setEvery(false)}
           onPick={(emoji) => {
-            const id = untrack(() => props.m.id);
-            run(() => api.channel.reaction.toggle({ id, emoji }));
+            const m = untrack(() => props.m);
+            run(() => api.channel.reaction.set({ id: m.id, emoji, on: reactionOn(m, emoji) }));
           }}
         />
       </Show>

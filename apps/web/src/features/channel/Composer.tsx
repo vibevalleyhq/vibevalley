@@ -8,6 +8,7 @@ import type { Channel } from "@vibevalley/protocol";
 
 import { api, reasonOf } from "@/base/api";
 import { useCore } from "@/base/frame";
+import { useIntents } from "@/base/intent";
 import { useRouter } from "@/base/router";
 import { aria } from "@/base/util";
 import { DictationButton } from "@/features/voice";
@@ -17,7 +18,7 @@ import { Icon } from "@/ui/Icon";
 import { toast } from "@/ui/toasts";
 
 import { HelperFace } from "./bits";
-import { createComposer } from "./composing";
+import { chatSay, createComposer } from "./composing";
 import { attachFiles, draftOf, drafts, setEditingId, uploadsIn } from "./draft";
 import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
@@ -36,6 +37,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const router = useRouter();
   const box = createComposer(core, () => input, {
     ...(at ? { initial: untrack(() => draftOf(at).text) } : {}),
+    says: useIntents(chatSay),
     target: () => {
       const d = draft();
       return {

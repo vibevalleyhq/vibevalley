@@ -204,12 +204,12 @@ function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: ()
   const [error, setError] = createSignal<string>();
   const [busy, setBusy] = createSignal(false);
   const act = async (step: "archive" | "preview" | "delete") => {
-    const { id } = untrack(() => props.channel);
+    const { id, archived } = untrack(() => props.channel);
     setBusy(true);
     setError(undefined);
     try {
       if (step === "archive") {
-        await api.channel.archive.toggle({ id });
+        await api.channel.archive.set({ id, on: archived === undefined });
         untrack(() => props.onDone)();
       } else if (step === "preview") setDoes((await api.channel.previewDelete({ id })).does);
       else {

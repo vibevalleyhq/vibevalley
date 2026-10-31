@@ -14,7 +14,7 @@ import { farmState } from "@/farm/store";
 import { AgentsRoute } from "@/features/agent";
 import { ArtifactsPage } from "@/features/artifact";
 import { CatalogPage } from "@/features/catalog";
-import { ChatPage } from "@/features/channel";
+import { ChatPage, chatSay } from "@/features/channel";
 import { Follow } from "@/features/inbox";
 import { IssuesPage } from "@/features/issue";
 import { PairPage } from "@/features/lan";
@@ -46,7 +46,7 @@ const places: Record<string, (rest: Rest) => JSX.Element> = {
   runtimes: (rest) => <RuntimesPage rest={rest()} />,
   projects: (rest) => <ProjectsPage rest={rest()} skin={projectMap} />,
   catalog: (rest) => <CatalogPage rest={rest()} />,
-  artifacts: (rest) => <ArtifactsPage rest={rest()} />,
+  artifacts: (rest) => <ArtifactsPage rest={rest()} say={chatSay} />,
 };
 
 /**

@@ -721,7 +721,7 @@ export const IssueRun: Codec<T.IssueRun> = Schema.Struct({
 
 export const Deliverable: Codec<T.Deliverable> = Schema.Literals(T.DeliverableValues);
 
-export const Issue: Codec<T.Issue> = Schema.Struct({
+const issueFields = {
   id: IssueId,
   number: Schema.Finite,
   title: Schema.String,
@@ -755,7 +755,11 @@ export const Issue: Codec<T.Issue> = Schema.Struct({
   lastRun: Schema.optionalKey(IssueRun),
   answer: Schema.optionalKey(IssueAnswer),
   attention: IssueAttention,
-});
+};
+
+export const Issue: Codec<T.Issue> = Schema.Struct(issueFields);
+
+export const AppliedIssue: Codec<T.AppliedIssue> = Schema.Struct({ ...issueFields, seq: Schema.Finite });
 
 export const ConnectorID: Codec<T.ConnectorID> = Schema.Literals(T.ConnectorIDValues);
 
@@ -1035,6 +1039,7 @@ export const GameEffectAchievement: Codec<T.GameEffectAchievement> = Schema.Stru
 export const GameEffect: Codec<T.GameEffect> = Schema.Union([GameEffectReward, GameEffectPenalty, GameEffectLevelUp, GameEffectAchievement]);
 
 export const StateFrame: Codec<T.StateFrame> = Schema.Struct({
+  seq: Schema.Finite,
   state: WorkspaceView,
   inbox: Schema.mutable(Schema.Array(InboxItem)),
   graphs: Schema.mutable(Schema.Array(TaskGraph)),
@@ -1373,6 +1378,7 @@ export const Memory: Codec<T.Memory> = Schema.Struct(memoryFields);
 export const MemoryRequest: Codec<T.MemoryRequest> = Schema.Struct({
   text: Schema.String,
   project: Schema.optionalKey(Schema.String),
+  requestKey: Schema.optionalKey(Schema.String),
 });
 
 export const MemoryScope: Codec<T.MemoryScope> = Schema.Union([
@@ -1468,6 +1474,7 @@ export const IssueRequest: Codec<T.IssueRequest> = Schema.Struct({
   assignee: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
   deliver: Schema.optionalKey(Deliverable),
+  requestKey: Schema.optionalKey(Schema.String),
 });
 
 export const RunTriggerKind: Codec<T.RunTriggerKind> = Schema.Literals(T.RunTriggerKindValues);
@@ -2003,6 +2010,7 @@ export const IssueStatusRequest: Codec<T.IssueStatusRequest> = Schema.Struct({
   text: Schema.optionalKey(Schema.String),
   assignee: Schema.optionalKey(Schema.String),
   edit: Schema.optionalKey(IssueUpdate),
+  requestKey: Schema.optionalKey(Schema.String),
 });
 
 export const GraphActRequest: Codec<T.GraphActRequest> = Schema.Struct({
@@ -2256,7 +2264,9 @@ export const MessageEdit: Codec<T.MessageEdit> = Schema.Struct({
 
 export const NotifyRequest: Codec<T.NotifyRequest> = Schema.Struct({ id: Schema.String, notify: Notify });
 
-export const ReactionToggle: Codec<T.ReactionToggle> = Schema.Struct({ id: Schema.String, emoji: Schema.String });
+export const ReactionSet: Codec<T.ReactionSet> = Schema.Struct({ id: Schema.String, emoji: Schema.String, on: Schema.Boolean });
+
+export const OnSet: Codec<T.OnSet> = Schema.Struct({ id: Schema.String, on: Schema.Boolean });
 
 export const AttachmentUpload: Codec<T.AttachmentUpload> = Schema.Struct({ name: Schema.String, type: Schema.String, data: Schema.String });
 

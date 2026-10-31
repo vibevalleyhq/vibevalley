@@ -34,7 +34,8 @@ export class Projection extends Context.Service<
     readonly reduce: (state: T.WorkspaceState, fact: T.Fact) => [T.WorkspaceState, boolean];
     /** What a fact sets off on the farm, from the state before it. */
     readonly effects: (before: T.WorkspaceState, fact: T.Fact) => T.GameEffect[];
-    readonly frame: (state: T.WorkspaceState, effects?: T.GameEffect[]) => T.StateFrame;
+    /** seq: the core's count of folds the state includes (StateFrame.seq). */
+    readonly frame: (state: T.WorkspaceState, effects?: T.GameEffect[], seq?: number) => T.StateFrame;
     /** The state read back from state.json, made whole (the sessions' places on the farm). */
     readonly restore: (kept: T.WorkspaceState) => T.WorkspaceState;
   }
@@ -64,6 +65,9 @@ export class Core extends Context.Service<
     readonly session: (id: string) => T.Session | undefined;
     /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
     readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
+    /** How many commits apply has folded: one more with each that changed the state. A reply read after its service
+     * applied its facts carries it, and the first frame whose seq is at least it shows the change. */
+    readonly seq: () => number;
     /** channel: where it thinks or writes, while it does. */
     readonly setOrchestrator: (agent: string, state: T.OrchestratorState, channel?: string) => Effect.Effect<void>;
     readonly setCommits: (commits: T.CommitCount) => Effect.Effect<void>;
@@ -135,6 +139,7 @@ const make = Effect.gen(function* () {
   const read = jsonOf(S.WorkspaceState);
   const kept = { ...emptyWorkspaceState(), ...(yield* readOrSetAside(file, read, "the farm starts empty")) };
   let state = restore(restarted(kept));
+  let seq = 0;
   const disk = new FileWriter(file);
   const body = () => JSON.stringify(toKeep(state));
   let closed = false;
@@ -189,6 +194,7 @@ const make = Effect.gen(function* () {
       }
       if (done.length === 0) return;
       state = next;
+      seq += 1;
       save();
       for (const t of done) {
         publish(t.fact);
@@ -205,14 +211,14 @@ const make = Effect.gen(function* () {
   const states = Stream.callback<T.StateFrame>((queue) =>
     Effect.gen(function* () {
       const sub = yield* PubSub.subscribe(changes);
-      Queue.offerUnsafe(queue, frameOf(state));
+      Queue.offerUnsafe(queue, frameOf(state, [], seq));
       return yield* Effect.forever(
         Effect.gen(function* () {
           const first = yield* PubSub.take(sub);
           yield* Effect.sleep(stateEveryMs);
           const rest = yield* PubSub.takeUpTo(sub, Number.MAX_SAFE_INTEGER);
           const gathered = [first, ...rest].filter((e): e is T.GameEffect => e !== undefined);
-          Queue.offerUnsafe(queue, frameOf(state, gathered));
+          Queue.offerUnsafe(queue, frameOf(state, gathered, seq));
         }),
       );
     }),
@@ -220,6 +226,7 @@ const make = Effect.gen(function* () {
 
   const shape = Core.of({
     state: () => state,
+    seq: () => seq,
     session: (id) => state.sessions.find((h) => h.id === id),
     apply,
     setOrchestrator: Effect.fn("Core.setOrchestrator")(function* (agent, orchestrator, channel) {

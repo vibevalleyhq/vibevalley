@@ -366,7 +366,10 @@
     "spent": "This round spent {spent}",
     "newCount": "{n} new",
     "replyTo": "Replying to {name}",
-    "replyToText": "Replying to {name}: {text}"
+    "replyToText": "Replying to {name}: {text}",
+    "notSentLine": "Not sent",
+    "retrySend": "Send again",
+    "dropSend": "Drop it"
   },
   "tool": {
     "hand": {

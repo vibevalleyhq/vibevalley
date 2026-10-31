@@ -16,7 +16,10 @@
       "closed": "已完成、已取消的工单；拖回「处理中」重开。"
     },
     "whichLane": "看哪一列",
-    "spots": "{taken} / {of} 个空位"
+    "spots": "{taken} / {of} 个空位",
+    "moveFailed": "没挪过去",
+    "retryMove": "再挪一次",
+    "putBack": "放回原处"
   },
   "display": {
     "boardNote": "看板总按状态分列，拖过去就改状态；分组用在列表上。",

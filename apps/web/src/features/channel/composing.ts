@@ -1,43 +1,69 @@
 // The box for saying a sentence in a channel, as both chat windows carry it out: the workbench's
 // (features/channel/Composer.tsx) and the farm's (farm/chat/Composer.tsx). Enter sends, Shift+Enter starts a line, @ names
-// someone from a menu that follows the caret. A failed send keeps the draft and its key, so a retry is the same message,
-// not a second one. A window only draws it and says where a line goes and how a failure shows.
+// someone from a menu that follows the caret. A line sent is an intent (chatSay, base/intent.ts) keyed by its send key:
+// the box empties at once and the window shows the line until the channel has the owner's copy carrying the key. A
+// failed one stays in sight with its key, wherever the owner goes meanwhile, so a retry is the same message, not a second
+// one. A window only draws it and says where a line goes and how a failure shows.
 
 import { createMemo, createSignal, flush, onSettled } from "solid-js";
 
 import { type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, type WorkspaceView } from "@vibevalley/protocol";
-import { omitUndefined, same } from "@vibevalley/protocol/rules";
 
 import { useOrchestrators } from "@/base/agents";
-import { api, newSendKey, reasonOf } from "@/base/api";
+import { api, reasonOf } from "@/base/api";
 import { orchestratorMood } from "@/base/frame";
+import { defineIntent, type Intent, type Intents } from "@/base/intent";
 
 import { commandNameables, commandOf, runCommand, typedCommand } from "./commands";
+import { followed } from "./follow";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./mentions";
-export async function say(text: string, channel: Channel, sendKey: string, agent: string | undefined) {
-  await api.channel.message.send(omitUndefined({ id: channel.id, text, agent, sendKey }));
-}
 
-/** A line sent and not yet in its channel: a window shows it at once, until the server's copy comes (the
- * owner's line carrying the same send key). */
+/** A line as it is said: everything the server takes but its key, which is the intent's. */
+export type Said = Omit<SayRequest, "sendKey">;
+
+const arrived = (key: string, messages: readonly Pick<ChatMessage, "sendKey">[]) => messages.some((m) => m.sendKey === key);
+
+/** Every line the owner says in a channel: from either composer, the project map, an artifact's reply, a suggestion. */
+export const chatSay = defineIntent<Said, void>({
+  send: (body, key) => api.channel.message.send({ ...body, sendKey: key }),
+  // The channel is followed while the line is kept, so its copy is seen even after the window that sent it closed.
+  confirmed: (_frame, intent) => arrived(intent.key, followed.get(intent.input.id).messages),
+  watch: (body, changed) => followed.subscribe(body.id, changed),
+  whileLost: "queue",
+  timeoutMs: 20_000,
+});
+
+/** A line sent and not yet in its channel. */
 export interface PendingLine {
   readonly key: string;
-  readonly channel: string;
   readonly text: string;
+  readonly state: "sending" | "failed";
+  readonly reason?: string;
 }
 
-const [pendingLines, setPendingLines] = createSignal<readonly PendingLine[]>([]);
-export const pending = pendingLines;
-
-export const arrived = (p: PendingLine, messages: readonly ChatMessage[]) => messages.some((m) => m.sendKey === p.key);
+/** The lines said in a channel that its messages do not have yet, oldest first. */
+export function pendingLines(
+  says: readonly Intent<Said, void>[],
+  channel: string | undefined,
+  messages: readonly Pick<ChatMessage, "sendKey">[],
+): PendingLine[] {
+  if (!channel) return [];
+  return says
+    .filter((s) => s.input.id === channel && !arrived(s.key, messages))
+    .map((s) =>
+      s.status === "failed"
+        ? { key: s.key, text: s.input.text, state: "failed", ...(s.reason === undefined ? {} : { reason: s.reason }) }
+        : { key: s.key, text: s.input.text, state: "sending" },
+    );
+}
 
 export interface ComposerWays {
   /** Every routing field of the next message; its text and retry identity belong to the composer. */
   readonly target: () => Omit<SayRequest, "text" | "sendKey">;
+  /** The page's lines on their way (useIntents(chatSay)). */
+  readonly says: Intents<Said, void>;
   /** The words the box starts with: a draft kept from before. */
   readonly initial?: string;
-  /** The window draws pending lines (`pending`): a line shows at once and the box empties as it is sent. */
-  readonly echo?: boolean;
   readonly failed: (reason: string) => void;
   /** What a slash command came to, in words (commands.ts); a failed one goes to failed. */
   readonly told?: (say: string) => void;
@@ -45,7 +71,7 @@ export interface ComposerWays {
   readonly opened?: (path: string) => void;
   /** After every edit: the text and the caret. */
   readonly edited?: (value: string, at: number) => void;
-  /** Once a line went through: what it carried beside its words (a reply, files) is spent. */
+  /** Once a line is on its way: what it carried beside its words (a reply, files) is in the line now. */
   readonly sent?: () => void;
 }
 
@@ -55,14 +81,12 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
   const [active, setActive] = createSignal(0);
   const [closed, setClosed] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
-  let attempt: { body: Omit<SayRequest, "sendKey">; key: string } | undefined;
-  let edits = 0;
   let sending = false;
   let disposed = false;
   onSettled(() => () => {
     disposed = true;
   });
-  const intent = (): Omit<SayRequest, "sendKey"> => ({ ...ways.target(), text: text().trim() });
+  const intent = (): Said => ({ ...ways.target(), text: text().trim() });
   const channelOf = (id: string | undefined): Channel | undefined => {
     const all = core()?.chat?.channels ?? [];
     return id ? all.find((c) => c.id === id) : all.find((c) => c.default);
@@ -82,7 +106,6 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
   });
 
   const edit = (value: string, at: number) => {
-    edits++;
     setText(value);
     setCaret(at);
     setActive(0);
@@ -126,35 +149,12 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
     if (asked && !((ways.target().attachments?.length ?? 0) !== 0)) return command(asked);
     const body = intent();
     if (!body.text && !((body.attachments?.length ?? 0) !== 0)) return;
-    if (!attempt || !same(attempt.body, body)) attempt = { body, key: newSendKey() };
-    const sent = attempt;
-    const shown = ways.echo === true ? channelOf(body.id) : undefined;
-    if (shown) {
-      setPendingLines((all) => [...all.filter((p) => p.key !== sent.key), { key: sent.key, channel: shown.id, text: body.text }]);
-      // The box empties at once; a failure puts the line back, with its key, unless something was typed meanwhile.
-      edit("", 0);
-    }
-    const editedAt = edits;
-    sending = true;
-    setBusy(true);
-    try {
-      await api.channel.message.send({ ...sent.body, sendKey: sent.key });
-      attempt = undefined;
-      if (!disposed) ways.sent?.();
-      // The window hides it once its copy is in the channel; the list lets it go a while after.
-      if (shown) setTimeout(() => setPendingLines((all) => all.filter((p) => p.key !== sent.key)), 15_000);
-      // The user may have edited, or chosen another destination, while this response was in flight.
-      else if (!disposed && edits === editedAt && same(intent(), sent.body)) edit("", 0);
-    } catch (e) {
-      if (shown) {
-        setPendingLines((all) => all.filter((p) => p.key !== sent.key));
-        if (!disposed && edits === editedAt) edit(sent.body.text, sent.body.text.length);
-      }
-      if (!disposed) ways.failed(reasonOf(e));
-    } finally {
-      sending = false;
-      if (!disposed) setBusy(false);
-    }
+    // The default channel when the target names none: the line is kept, and followed, by the channel it is in.
+    const said = { ...body, id: channelOf(body.id)?.id ?? body.id };
+    edit("", 0);
+    ways.sent?.();
+    const end = await ways.says.send(said).done;
+    if (!disposed && end?.status === "failed") ways.failed(end.reason ?? "");
   };
 
   const onKey = (e: KeyboardEvent) => {

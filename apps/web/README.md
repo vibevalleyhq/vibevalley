@@ -10,6 +10,8 @@ src/stories.tsx     the stories' page (stories.html, vite.stories.config.ts): ev
 src/app/            the wiring: App (the routes, each place a feature's page), Root (router, state frames, the farm's store,
                     the query cache, <Loading>), the shell, places
 src/base/           what every layer stands on: the state stream (frames.ts, framework-free; frame.ts, its Solid store), the
+                    middle layer on Effect's Atom (atom.ts: the registry, useAtom, the frames as an atom; intent.ts: what
+                    the owner asked for until the frame shows it), the
                     API client (api.ts), rooms (gateway.ts), the live stream, REST queries (query.ts, agents.ts), external.ts,
                     the router, prefs, the host, saving settings, times and money in words (format.ts), the shared words
 src/ui/             the workbench's pieces: Icon, Face, Button, Field, Dialog, Markdown, ToastHost, Segmented, Tabs, Qr, Chips, A
@@ -37,6 +39,16 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   Solid Query (`base/query.ts`); a rule of the server (may this be dispatched, what a move means) is asked of the server,
   not rewritten here. Presentation rules (lanes, grouping, ordering, feed merging) are pure functions in the feature they
   belong to (`features/issue/display.ts`, `features/channel/unread.ts`), each with its test.
+- **What the owner does goes through the middle layer.** A change the page shows before the server has it is an
+  intent (`base/intent.ts`): `defineIntent({ send, confirmed, watch?, whileLost, timeoutMs })`, kept by its request key
+  in an atom family, so it outlives the component that made it. It settles when what the owner sees shows the change
+  (`bySeq`: a frame whose `seq` is at least the reply's; or the kind's own check, as a line's `sendKey` in its channel),
+  never on the reply or a timer; a timeout or a refusal leaves it `failed`, to retry with the same key or let go; while
+  the state stream is lost a keyed kind queues and sends once it is back. A feature shows its intents through a pure
+  overlay of its own that sets only the field the owner set (`features/issue/moves.ts`'s `movedCards`), with its test.
+  A change with nothing to show before the server has it is `createAct()` (`ui/act.ts`: busy until it ends, a refusal in
+  the error tone). Only `src/base` imports `effect/reactivity` (lint `vibevalley/atom-door`): its API is unstable, so a
+  change in it is fixed there. Why: .agents/notes/proposed/architecture/2026-10-31-client-state-on-atom.md.
 - **Layers, one way.** `base` → `ui` → `ui/pixel` → `features` → the skins (`farm`, `tree`) → `app`: a file imports from
   its own folder or a layer before it, never after (lint, `vibevalley/page-layers` in `scripts/oxlint-plugin.ts`). A
   feature uses another only through its `index.ts`, named exports only, and the features' graph has no cycle

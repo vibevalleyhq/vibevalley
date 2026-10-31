@@ -8,18 +8,16 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
 
-import { newSendKey } from "@/base/api";
-import { messageOf } from "@/base/format";
 import { orchestratorMood, useCore } from "@/base/frame";
+import { sendOnce, useIntents } from "@/base/intent";
 import { ready, useAgents } from "@/base/query";
 import { useRouter } from "@/base/router";
 import { useNow } from "@/base/util";
 import { farm } from "@/farm/store";
 import { useFarm } from "@/farm/ui";
 import {
-  arrived,
-  pending,
-  say,
+  chatSay,
+  pendingLines,
   topOf,
   channelOf,
   feedOf,
@@ -156,10 +154,9 @@ export function ChatWindow() {
     return current ? parentAt(chat(), current) : undefined;
   });
   const hasOlder = () => said().ready && !said().complete;
-  const sending = createMemo(() => {
-    const here = shown()?.id;
-    return pending().filter((p) => p.channel === here && !arrived(p, said().messages));
-  });
+  const says = useIntents(chatSay);
+  const sending = createMemo(() => pendingLines(says.list(), shown()?.id, said().messages));
+  const notSent = (reason: string | undefined) => setProblem(t("web.farm.chat.notSent", { why: reason ?? "" }));
   // What is being said on the call, drawn as it is said: the turns 田头 does not have as lines yet. A copy each time, so
   // the rows read the words they grew to.
   const tick = useNow(1000);
@@ -259,10 +256,41 @@ export function ChatWindow() {
             </For>
             <For each={sending()} keyed={(p) => p.key}>
               {(p) => (
-                <div class="opacity-70" aria-label={t("web.farm.chat.sending")} data-testid="message" data-from-kind="owner" data-state="sending">
-                  <ChatRow mine first title={t("web.farm.chat.sending")}>
+                <div
+                  class={p().state === "failed" ? "" : "opacity-70"}
+                  aria-label={p().state === "failed" ? t("web.farm.chat.notSentLine") : t("web.farm.chat.sending")}
+                  data-testid="message"
+                  data-key={p().key}
+                  data-from-kind="owner"
+                  data-state={p().state}
+                >
+                  <ChatRow mine first title={p().state === "failed" ? (p().reason ?? t("web.farm.chat.notSentLine")) : t("web.farm.chat.sending")}>
                     <span class="whitespace-pre-line">{p().text}</span>
                   </ChatRow>
+                  <Show when={p().state === "failed"}>
+                    <div class="flex justify-end gap-1.5 px-3 pb-1 text-[12px]">
+                      <span class="min-w-0 truncate text-berry">{p().reason ?? t("web.farm.chat.notSentLine")}</span>
+                      <button
+                        type="button"
+                        data-testid="pending-retry"
+                        onClick={() => {
+                          setProblem(undefined);
+                          void says.retry(p().key).then((end) => end?.status === "failed" && notSent(end.reason));
+                        }}
+                        class="cursor-pointer bg-cream-200 px-1.5 text-bark-800 hover:bg-leaf-300"
+                      >
+                        {t("web.farm.chat.retrySend")}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="pending-drop"
+                        onClick={() => says.drop(p().key)}
+                        class="cursor-pointer bg-cream-200 px-1.5 text-bark-800 hover:bg-cream-300"
+                      >
+                        {t("web.farm.chat.dropSend")}
+                      </button>
+                    </div>
+                  </Show>
                 </div>
               )}
             </For>
@@ -308,7 +336,7 @@ export function ChatWindow() {
                     setProblem(undefined);
                     const c = shown();
                     if (!c) return;
-                    void say(line, c, newSendKey(), undefined).catch((e: unknown) => setProblem(t("web.farm.chat.notSent", { why: messageOf(e) })));
+                    void sendOnce(says, { id: c.id, text: line }).then((end) => end?.status === "failed" && notSent(end.reason));
                   }}
                   class="max-w-40 shrink-0 cursor-pointer truncate bg-cream-200 px-2.5 py-0.5 text-[12px] text-bark-800 hover:bg-leaf-300 hover:text-bark-900"
                 >

@@ -26,6 +26,11 @@ interface Rule {
 
 const RULES: readonly Rule[] = [
   {
+    name: "a toggle, now an explicit set",
+    pattern: /\b(reaction|pin|archive)\.toggle\b|\bReactionToggle\b|\/(reaction|pin|archive)\/toggle\b/u,
+    says: "a retried toggle undoes itself; send the value the owner asked for: channel.reaction.set, channel.pin.set, channel.archive.set ({ on })",
+  },
+  {
     name: "a document, now an artifact",
     pattern:
       /\bdoc_(get|block_\w+)\b|\bdoc\.(list|create|import|get|submit|block|markdown|demo)\b|\bDoc(Op|Submit|Ack|Span|Marks|Snapshot|Shape|Editor|sPage|BlockCreate|BlockUpdate|Request|Import)\w*\b|\bdocOwner\b|\/doc\/doc\b|features\/doc\b|["'`]\/docs\b/u,

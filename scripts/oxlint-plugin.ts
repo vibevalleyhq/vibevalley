@@ -63,6 +63,11 @@
  *   globalThis or self, and Object.assign or Object.defineProperty onto them; declare global outside a door is too
  *   (vite.config.ts lists the doors).
  *
+ *   atom-door: the page's middle layer stands on Effect's Atom (effect/reactivity), whose API is marked unstable; only
+ *   apps/web/src/base imports it (atom.ts, intent.ts), and features read atoms through what base exports, so a change in
+ *   Atom is fixed in one folder. An import of effect/reactivity anywhere else under apps/web/src is reported, a type-only
+ *   one too: a type names the API as much as a call does; vite.config.ts says where the rule runs.
+ *
  *   db-door: the server reaches the database through the Db service (apps/server/src/base/db.ts), which says what a
  *   failed query becomes: run and inTx make it a defect, attempt and attemptTx keep it for a caller that tells or retries
  *   it. A module that takes the SqlClient itself, or opens its own withTransaction, decides that again by hand, and
@@ -648,6 +653,27 @@ const dbDoor = defineRule({
   },
 });
 
+const atomDoor = defineRule({
+  meta: {
+    messages: {
+      atom: says(
+        "Atom's API is marked unstable, and only apps/web/src/base may stand on it, so that a change in it is fixed in one folder",
+        "read through base: `useAtom`, `useRegistry` (base/atom.ts), `defineIntent`, `useIntents` (base/intent.ts); a primitive base lacks goes into base",
+        ".agents/notes/proposed/architecture/2026-10-31-client-state-on-atom.md",
+      ),
+    },
+  },
+  create(context) {
+    const file = context.filename.replaceAll("\\", "/");
+    if (!file.includes("/apps/web/src/") || file.includes("/apps/web/src/base/")) return {};
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value === "effect/reactivity" || node.source.value.startsWith("effect/reactivity/")) context.report({ node, messageId: "atom" });
+      },
+    };
+  },
+});
+
 const parentImportRule = defineRule({
   meta: {
     messages: {
@@ -979,6 +1005,7 @@ export default definePlugin({
     "page-layers": pageLayersRule,
     "parent-import": parentImportRule,
     "db-door": dbDoor,
+    "atom-door": atomDoor,
     "promise-boundary": promiseBoundary,
     "try-promise-catch": tryPromiseCatch,
     "one-absent": oneAbsent,

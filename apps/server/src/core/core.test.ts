@@ -124,6 +124,32 @@ describe("core", () => {
     }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig()))))),
   );
 
+  it.effect("seq goes up once per commit that changes the state, and a frame carries the seq of the state it shows", () =>
+    Effect.gen(function* () {
+      const core = yield* Core;
+      const frames = yield* Queue.unbounded<StateFrame>();
+      yield* core.states.pipe(
+        Stream.runForEach((f) => Queue.offer(frames, f)),
+        Effect.forkScoped,
+      );
+      expect((yield* Queue.take(frames)).seq).toBe(0);
+      yield* core.setOrchestrator("orchestrator", "thinking");
+      expect(core.seq()).toBe(1);
+      // The same again changes nothing: no fold, no seq.
+      yield* core.setOrchestrator("orchestrator", "thinking");
+      expect(core.seq()).toBe(1);
+      // A batch is one commit.
+      yield* core.apply({ type: "orchestrator", agent: "orchestrator", state: "speaking" }, { type: "orchestrator", agent: "lead", state: "thinking" });
+      const replied = core.seq();
+      expect(replied).toBe(2);
+      yield* TestClock.adjust(stateEveryMs);
+      const next = yield* Queue.take(frames);
+      // What a reply read after its change says (replied) is no later than the first frame that shows the change.
+      expect(next.seq).toBeGreaterThanOrEqual(replied);
+      expect(next.state.orchestrators.lead?.state).toBe("thinking");
+    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig()))))),
+  );
+
   it.effect("an internal subscriber keeps a whole burst while it works", () =>
     Effect.gen(function* () {
       const core = yield* Core;

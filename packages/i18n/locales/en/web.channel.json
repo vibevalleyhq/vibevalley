@@ -95,7 +95,11 @@
     "newBelow": "{n} new below",
     "toLatest": "Back to the newest",
     "roundFor": "{what} · {took}",
-    "sentTo": "Sent {who} on"
+    "sentTo": "Sent {who} on",
+    "sending": "Sending…",
+    "notSent": "Not sent",
+    "retrySend": "Send again",
+    "dropSend": "Drop it"
   },
   "tools": {
     "label": "What this message offers",

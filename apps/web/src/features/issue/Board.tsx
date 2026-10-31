@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { maxRunning } from "@vibevalley/protocol";
 
 import { autofocus } from "@/base/util";
+import { Icon } from "@/ui/Icon";
 import { Segmented } from "@/ui/Segmented";
 import { Hint } from "@/ui/Tip";
 
@@ -67,6 +68,9 @@ export interface BoardProps {
   onOlder: () => void;
   onOpen: (id: string) => void;
   onDrop: (card: BoardCard, to: Lane) => void;
+  /** A card whose move failed: sent again with the same key, or put back in the lane the frame gives it. */
+  onRetry: (card: BoardCard) => void;
+  onPutBack: (card: BoardCard) => void;
   onPlace: (card: BoardCard, before: string | undefined) => void;
   onAdd: (text: string) => void;
   onWrite: () => void;
@@ -178,6 +182,8 @@ function LaneView(props: {
                     card={c()}
                     selected={c().id === p().selected}
                     onOpen={p().onOpen}
+                    onRetry={p().onRetry}
+                    onPutBack={p().onPutBack}
                     drag={props.drag}
                     // Anything but manual hides the owner's order of 待办, so a card cannot be dropped between two there.
                     onPlace={c().kind === "todo" && p().ordering === "manual" ? (moved) => p().onPlace(moved, c().id) : undefined}
@@ -202,7 +208,15 @@ function LaneView(props: {
   );
 }
 
-function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: string) => void; drag: Drag; onPlace?: ((moved: BoardCard) => void) | undefined }) {
+function CardView(props: {
+  card: BoardCard;
+  selected: boolean;
+  onOpen: (id: string) => void;
+  onRetry: (card: BoardCard) => void;
+  onPutBack: (card: BoardCard) => void;
+  drag: Drag;
+  onPlace?: ((moved: BoardCard) => void) | undefined;
+}) {
   const nameOf = useNameOf();
   const graphs = useGraphs();
   const look = () => cardLook(props.card, nameOf(), graphs(), Date.now());
@@ -247,10 +261,16 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
         data-testid="issue-card"
         data-key={props.card.id}
         data-kind={props.card.kind}
+        data-state={props.card.move?.state}
+        aria-busy={props.card.move?.state === "moving" ? "true" : undefined}
         aria-label={look().title}
         aria-current={props.selected ? "true" : undefined}
         title={look().detail}
-        draggable={props.card.kind !== "task" && props.card.kind !== "orchestrator" && props.card.kind !== "missing" ? "true" : "false"}
+        draggable={
+          props.card.kind !== "task" && props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving"
+            ? "true"
+            : "false"
+        }
         onDragStart={(e) => {
           e.dataTransfer!.effectAllowed = "move";
           e.dataTransfer!.setData("text/plain", props.card.id);
@@ -267,7 +287,7 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
         class={[
           "group cursor-pointer rounded-lg border px-2.5 pt-2 pb-2 transition-colors",
           props.selected ? "border-line bg-selected" : "border-line bg-page hover:border-ink/18 hover:shadow-raise",
-          { "opacity-40": props.drag.dragging()?.id === props.card.id },
+          { "opacity-40": props.drag.dragging()?.id === props.card.id, "opacity-70": props.card.move?.state === "moving" },
         ]}
       >
         <Show when={where()}>
@@ -289,6 +309,35 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
           </div>
         </Show>
       </div>
+      <Show when={props.card.move?.state === "failed" ? props.card.move : undefined}>
+        {(m) => (
+          <div data-testid="move-failed" class="mt-1 flex items-center gap-1.5 px-1 text-xs text-berry">
+            <span class="min-w-0 flex-1 truncate" title={m().reason}>
+              {m().reason ?? t("web.issue.board.moveFailed")}
+            </span>
+            <button
+              type="button"
+              data-testid="move-retry"
+              aria-label={t("web.issue.board.retryMove")}
+              title={t("web.issue.board.retryMove")}
+              onClick={() => props.onRetry(props.card)}
+              class="inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-hover hover:text-ink"
+            >
+              <Icon name="retry" size={14} />
+            </button>
+            <button
+              type="button"
+              data-testid="move-put-back"
+              aria-label={t("web.issue.board.putBack")}
+              title={t("web.issue.board.putBack")}
+              onClick={() => props.onPutBack(props.card)}
+              class="inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-hover hover:text-ink"
+            >
+              <Icon name="undo" size={14} />
+            </button>
+          </div>
+        )}
+      </Show>
     </div>
   );
 }

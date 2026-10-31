@@ -68,6 +68,7 @@ function frame(attention: IssueAttention, session: SessionView = helper): StateF
     attention,
   };
   return {
+    seq: 0,
     state: { call: "idle", callReason: "", sessions: [session], issues: [issue], orchestrators: {}, crons: [], connectors: [] },
     inbox: [],
     graphs: [],

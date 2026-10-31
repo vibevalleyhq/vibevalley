@@ -366,7 +366,10 @@
     "spent": "这一轮花了 {spent}",
     "newCount": "{n} 新",
     "replyTo": "回复 {name}",
-    "replyToText": "回复 {name}：{text}"
+    "replyToText": "回复 {name}：{text}",
+    "notSentLine": "没发出去",
+    "retrySend": "再发",
+    "dropSend": "不发了"
   },
   "tool": {
     "hand": {

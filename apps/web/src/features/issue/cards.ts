@@ -8,6 +8,7 @@ import { matches } from "@/base/search";
 import { type Ordering, orderRows, type RowFacts } from "./display";
 import { endedAt, issueSession, isForOrchestrator } from "./issue";
 import { type Lane, laneOf, laneStatus, moveOf, type Move } from "./lanes";
+import type { CardMove } from "./moves";
 import { attentionTone } from "./overview";
 import { issueTag, type IssueTag, tagText, tagOpen } from "./tags";
 import { issueTitle, taskLine } from "./titles";
@@ -15,7 +16,8 @@ import { issueTitle, taskLine } from "./titles";
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";
 
-export type BoardCard =
+/** `move`: the owner's move of it on its way (moves.ts), laid over the lane the frame gives. */
+export type BoardCard = (
   | { kind: "todo"; id: string; lane: Lane; issue: Issue }
   /** `sessions` are the real live and ended ones, oldest first; `session` the one on the farm now. */
   | { kind: "issue"; id: string; lane: Lane; issue: Issue; sessions: Session[]; tag: IssueTag; session?: SessionView }
@@ -23,7 +25,8 @@ export type BoardCard =
   /** An issue for the orchestrator: open while the orchestrator works on it, closed once it has answered; never dragged. */
   | { kind: "orchestrator"; id: string; lane: Lane; issue: Issue }
   /** `issue` is the task's own issue: its number, when it was made and last moved. */
-  | { kind: "task"; id: string; lane: Lane; graph: TaskGraph; issue?: Issue };
+  | { kind: "task"; id: string; lane: Lane; graph: TaskGraph; issue?: Issue }
+) & { readonly move?: CardMove };
 
 export const cardProject = (c: BoardCard) => (c.kind === "task" ? c.graph.project : c.issue.project);
 export const cardAgent = (c: BoardCard) => (c.kind === "task" ? undefined : c.issue.assignee);
