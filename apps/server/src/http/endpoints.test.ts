@@ -67,6 +67,52 @@ describe("the endpoints the agents' tools stand on", () => {
         status: "conflict",
       });
       expect(yield* refusal(() => api.artifact.block.create({ id: doc.id, type: "divider", text: "" }))).toBe("Refused");
+      const second = yield* call(() => api.artifact.block.create({ id: doc.id, text: "第二" }));
+      yield* call(() => api.artifact.block.create({ id: doc.id, text: "中间", afterBlock: made.blockId }));
+      expect((yield* call(() => api.artifact.block.list({ id: doc.id }))).blocks.map((b) => b.text.map((x) => x.t).join(""))).toEqual([
+        "新的开头",
+        "中间",
+        "第二",
+      ]);
+      expect(yield* call(() => api.artifact.block.delete({ id: doc.id, block: second.blockId }))).toMatchObject({ status: "applied" });
+      expect((yield* call(() => api.artifact.block.list({ id: doc.id }))).blocks.map((b) => b.id)).not.toContain(second.blockId);
+      // A message pointing at a block carries its id, the version quoted, and how it reads now.
+      const general = channels.find((c) => c.default)!.id;
+      const current = (yield* call(() => api.artifact.block.list({ id: doc.id }))).blocks.find((b) => b.id === made.blockId)!;
+      yield* call(() => api.channel.message.send({ id: general, text: "看这块", blocks: [{ artifactId: doc.id, blockId: made.blockId, rev: 1 }] }));
+      const allMessages = yield* call(() => api.channel.message.list({ id: general, limit: 5 }));
+      const sent = allMessages.find((m) => m.text === "看这块")!;
+      console.log("QUOTED", JSON.stringify(sent));
+      expect(sent.blocks).toEqual([
+        {
+          artifactId: doc.id,
+          blockId: made.blockId,
+          rev: 1,
+          title: "说明",
+          type: current.type,
+          text: "新的开头",
+          nowRev: current.rev,
+        },
+      ]);
+      // Several blocks at once: one changed since, one deleted, and the prompt keeps both versions.
+      const third = yield* call(() => api.artifact.block.create({ id: doc.id, text: "要走" }));
+      yield* call(() => api.artifact.block.update({ id: doc.id, block: made.blockId, baseRev: current.rev, text: "又改了" }));
+      yield* call(() => api.artifact.block.delete({ id: doc.id, block: third.blockId }));
+      yield* call(() =>
+        api.channel.message.send({
+          id: general,
+          text: "两块一起看",
+          blocks: [
+            { artifactId: doc.id, blockId: made.blockId, rev: current.rev },
+            { artifactId: doc.id, blockId: third.blockId, rev: third.rev ?? 1 },
+          ],
+        }),
+      );
+      const many = (yield* call(() => api.channel.message.list({ id: general, limit: 5 }))).find((m) => m.text === "两块一起看")!;
+      expect(many.blocks).toMatchObject([
+        { blockId: made.blockId, rev: current.rev, text: "又改了" },
+        { blockId: third.blockId, rev: third.rev, deleted: true },
+      ]);
     }).pipe(Effect.scoped),
   );
 

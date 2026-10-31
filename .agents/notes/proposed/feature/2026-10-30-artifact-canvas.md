@@ -11,11 +11,15 @@ Status: proposed
 3. **agent 的块工具只能往末尾追加、不能插在中间或删块，且管家没有块工具。** `ops.ts` 支持全部 9 种 op，但暴露给模型的工具（`apps/server/src/tool/tool.ts`）只有 `artifact_block_create`（固定追加在顶层末尾）和 `artifact_block_update`（只能换字，不能改类型和属性），没有删块和移动，而且这两个工具只在 `session` 表里，管家（`orchestrator`）在私聊或频道里没法直接替主人改一块。
 4. **帮工改主人写过的块没有确认步骤。** 帮工拿到最新的 `baseRev` 调 `artifact_block_update` 时会直接换掉主人刚改过的字，主人来不及比对新旧两版。
 
+## 进度
+
+阶段一已经上线（同屏画布、指块带话、完整的块工具、`artifact.follow` 订阅），落在 `ArtifactCanvas.tsx`、`channel.message.send` 的 `blocks`、`artifact.block.create/update/delete` 和 RPC 的 `artifact.follow`；[产出](docs/subsystems/artifact.md) 已写进现在的样子。本 Note 只剩阶段二：建议修订、授权边界、版本冲突和差异界面。阶段一不承诺自动保护主人写过的块，也不把引用块当作新增的直接修改授权；阶段一的四条验收都有测试。
+
 ## Proposal
 
 ### 交付阶段
 
-第一阶段交付同屏画布、指块带话、完整块工具与订阅（下文第 1–3 项），保留现有块版本冲突检查。第二阶段才增加建议修订（第 4 项）；第一阶段不承诺自动保护主人写过的块，也不把引用块当作新增的直接修改授权。两阶段分别提交和验收，第二阶段未完成不阻塞第一阶段。
+阶段一已上线，保留现有块版本冲突检查。第二阶段增加建议修订（第 4 项）；第二阶段未完成不阻塞第一阶段，阶段一已验收的部分不再重复。
 
 
 不另起一套「画布」表或模块，直接在 `artifact`、`channel` 和 `tool` 上补齐下面四块。
@@ -80,11 +84,11 @@ Status: proposed
 
 ## Acceptance criteria
 
-- 在聊天页点开消息上的 `ArtifactCard`，右侧同屏展开画布，左侧消息流和输入框照常可用；在产出页打开一篇交上来的产出，右侧显示它所在串的消息流并可直接发消息。
-- 在块编辑器里点一块的「带话」发消息，管家或帮工收到唤醒时提示词里直接带有该块的 `id`、`rev` 和文字，不调 `artifact_content_get` 就能用 `artifact_block_update` 改好这块。
-- 管家和帮工都能用 `artifact_block_create` 的 `afterBlock` 在指定块后面插块、用 `artifact_block_update` 改块的文字、类型和待办勾选、用 `artifact_block_delete` 删块；页面经 `artifact.follow` 实时看到改动，不用等 4 秒轮询。
+- 阶段一已上线：在聊天页点开消息上的 `ArtifactCard`，右侧同屏展开画布，左侧消息流和输入框照常可用，窄屏盖住聊天、关掉后草稿还在；带一块到输入框、发出去以后消息上留下这一块的引用。
+- 阶段一已上线：块编辑器里点一块的「带话」发消息，管家或帮工收到唤醒时提示词里直接带有该块的 `id`、`rev` 和文字，不调 `artifact_content_get` 就能用 `artifact_block_update` 改好这块；一块变了、删了，提示里都说得出来。
+- 阶段一已上线：管家和帮工都能用 `artifact_block_create` 的 `afterBlock` 在指定块后面插块、用 `artifact_block_update` 改块的文字、类型和待办勾选、用 `artifact_block_delete` 删块；页面经 `artifact.follow` 看到改动，不再等 4 秒轮询。
 - 第二阶段：建议接受时校验 baseRev；主人后续编辑导致冲突时保留原字并显示冲突；接受、拒绝可重复请求，未处理建议重启后仍在。
-- `apps/server/src/artifact/blocks.test.ts` 和 `mcp/mcp.test.ts` 覆盖定点插入、删块、改类型；第二阶段另覆盖建议授权、版本冲突、删除建议、多建议并存和幂等分支；`apps/web/test/artifact.spec.ts` 和 `artifact-blocks.spec.ts` 覆盖第一阶段的聊天页同屏分栏、指块带话；第二阶段另验收接受与拒绝建议。
+- 阶段一已验证：`apps/server/src/artifact/blocks.test.ts` 和 `mcp/mcp.test.ts` 覆盖定点插入、删块、改类型、`artifact.follow`；`apps/web/test/artifact.spec.ts` 和 `artifact-blocks.spec.ts` 覆盖聊天页同屏分栏、指块带话和窄屏草稿。第二阶段另覆盖建议授权、版本冲突、删除建议、多建议并存和幂等分支，以及接受与拒绝建议。
 
 ## Risks
 

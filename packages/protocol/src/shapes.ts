@@ -245,6 +245,8 @@ export interface ChatMessage {
   embeds: Embed[];
   /** The artifact it announces, as it was at that version (docs/subsystems/artifact.md). */
   artifact?: ArtifactCard;
+  /** The blocks it points at, as they read when it was sent. */
+  blocks?: readonly QuotedBlock[];
 }
 
 export interface Embed {
@@ -1613,6 +1615,8 @@ export interface SayRequest {
   /** The channel it is said in. */
   id: string;
   text: string;
+  /** Blocks of a blocks artifact this message points at. */
+  blocks?: BlockRef[];
   /** The number of the message there it answers. */
   replyTo?: number;
   /** Ids from channel.attachment.create. */
@@ -2683,20 +2687,66 @@ export interface BlockSubmit {
 export const BlockOpStatusValues = ["applied", "merged", "conflict", "noop", "rejected"] as const;
 export type BlockOpStatus = (typeof BlockOpStatusValues)[number];
 
-/** A block appended at a document's end. */
+/** A block a message points at, by the version it was read at. */
+export interface BlockRef {
+  artifactId: ArtifactId;
+  blockId: BlockId;
+  rev: number;
+}
+
+/** The block as the prompt reads it: the version the message quoted, and how it reads now. */
+export interface QuotedBlock extends BlockRef {
+  title: string;
+  type?: string;
+  text?: string;
+  nowRev?: number;
+  deleted?: boolean;
+}
+
+/** A block inserted under a parent, next to a named sibling. */
 export interface BlockCreate {
   /** paragraph (the default), heading, bulleted, numbered, todo, quote or code. */
   type?: string;
   /** A heading's: 1 to 3, 2 when none. */
   level?: number;
+  /** A todo's. */
+  checked?: boolean;
+  /** A code block's language. */
+  language?: string;
   text: string;
+  /** Insert right after this sibling; "" is the first, absent is the end. */
+  afterBlock?: BlockId;
+  /** The parent to insert under; absent is the top level. */
+  parentId?: BlockId;
 }
 
-/** A block's text rewritten against the rev it was read at: a newer rev is a conflict, not an overwrite. */
+/** A block's words, type or attributes changed against the rev it was read at: a newer rev on changed words is a conflict. */
 export interface BlockUpdate {
   block: BlockId;
   baseRev: number;
-  text: string;
+  /** Its whole new text, not a delta. */
+  text?: string;
+  /** The new type; attrs say what the new type needs. */
+  type?: string;
+  /** A heading's level. */
+  level?: number;
+  /** A todo's checked state. */
+  checked?: boolean;
+  /** A code block's language. */
+  language?: string;
+}
+
+export interface BlockDelete {
+  block: BlockId;
+}
+
+/** A change to a blocks artifact, for a page following it: the blocks a batch changed, or Reset when it is too far behind. */
+export type ArtifactEvent = ArtifactEventBlocks | { readonly _tag: "Reset" };
+
+export interface ArtifactEventBlocks {
+  readonly _tag: "Blocks";
+  readonly seq: number;
+  readonly blocks: Block[];
 }
 
 export interface BlockOpResult {

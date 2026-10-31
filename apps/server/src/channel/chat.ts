@@ -1067,8 +1067,14 @@ const make = Effect.gen(function* () {
         sendKey,
         readBy: ownerId,
         ...(more.replyTo !== undefined ? { replyTo: more.replyTo } : {}),
-        ...(files.length > 0 || more.picked
-          ? { meta: { ...(files.length > 0 ? { attachments: files } : {}), ...(more.picked ? { picked: more.picked } : {}) } }
+        ...(files.length > 0 || more.picked || (more.blocks?.length ?? 0) > 0
+          ? {
+              meta: {
+                ...(files.length > 0 ? { attachments: files } : {}),
+                ...(more.picked ? { picked: more.picked } : {}),
+                ...((more.blocks?.length ?? 0) > 0 ? { blocks: more.blocks } : {}),
+              },
+            }
           : {}),
       });
       if (written.again) return { message: toMessage(written.row), again: true };

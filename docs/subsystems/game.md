@@ -98,7 +98,6 @@
 ## 还没做的
 
 - 商店和每日任务，让金币有用处：[提案](.agents/notes/proposed/feature/2026-10-09-shop-and-daily-tasks.md)。
-- 每个动作至少播完一小段，不让气泡和姿势闪：[提案](.agents/notes/proposed/feature/2026-10-09-action-queue.md)。
 
 ## 怎么验证
 

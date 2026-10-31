@@ -24,6 +24,7 @@
 - **存盘**：`apps/server/db/migrations/0001_schema.up.sql`、`db/queries/<表>.sql`、生成的 `db/generated/`，生成器的设置 `db/effect-sqlc.json`，脚本 `scripts/db-generate.ts`。
 - **测试工具**：`src/testing/layers.ts`（`testConfig`、`testDatabase`：临时家目录、内存库）、`world.ts`（`world`：一整座农场，农机和它的额度由测试给）、`git.ts`（真的 git 仓库）、`golden.ts`（按模块找黄金数据，读、比、更新在 `@vibevalley/testkit/golden`）；`src/flows/farm.ts`（流程测试的农场和帮工）；`@vibevalley/ai/testing`（照脚本回答的模型，大脑经 `packages/agent/src/testing.ts` 用它）。
 - **话**：对主人说的都在 `packages/i18n`（`@vibevalley/i18n`）：词典是 `locales/<语言>/<命名空间>.json`，命名空间是「宿主.模块」（`web.setting`、`server.issue`、`desktop`、`mobile`，两边都说的是 `shared`）；代码里写 `t("web.setting.keys.saved")`、`t("server.issue.does.merge", { base, commits, helper })`，按一个值取、值可能不对应词条时用 `maybe()`，列表用 `list()`，把两段话接起来（「标签：内容」「内容（旁注）」）用 `shared.join` 的几条；`src/catalogs.ts` 由 `vp run i18n:gen` 从词典写出（词条连同每条的参数类型）；语言是 `currentLocale`、`setLocale`。命令行 `vpx scripts/i18n.ts`：`scan` 列出每个键在哪用，`check`（在 `docs:verify` 里）查用到却没有的、没人用的、英文缺或多的、占位对不上的、英文里有汉字的、中英一字不差的（`same.json` 列出有意一样的，比如「中文」），`find <文字>` 按文字找键，`migrate` 是把旧的词表搬进来用的。对模型说的在模块的 `prompts.ts`（主人的语言是 `src/prompts.ts` 的 `ownersLanguage`）；种子和工单模板是 `agent/seeds.json`、`template_catalog.json`，农机的预设是 `runtime/presets.json`，各有 `.en.json`。
+- **静态检查只封已有规则的绕过，不按数量扩**：命名空间、别名和 `globalThis` 的调用识别、`no-unused-vars` 改成 error、MOSS 的 JSON 走 Schema 都已经做完；方法简写、多行导入和重导出当前规则已能捕获，不新增全面 AST 替换或额外的棘轮。日志关联字段和指标仍按治理 Note 的 P4.5 追踪。
 - **Effect 的诊断**：`@effect/tsgo` 的 `effect-tsgo diagnostics`（`vp run effect:check`，在 `server:check` 和 CI 里，警告也算失败），规则和级别写在 `tsconfig.base.json` 的 `plugins`，这张表是唯一调它们的地方：`vp check` 的 oxlint 也跑同一批规则（推荐预设叠上这张表，`scripts/effect-lint.ts`），和预设不同的都写在表里；抓 agent 常见错误、今天又是 0 处的那批开成 `error`（漂着的 Effect、少了 `return yield*`、v3 的旧 API、方法签名漏出依赖、服务没写成类……），以后写错当场就报，写法和评审看 [vv-effect](.agents/skills/vv-effect/SKILL.md)（`anyUnknownInErrorContext` 也开着：错误和依赖的通道里不写 `unknown`、`any`，在声明处写出调用方传的联合，或用泛型把它带过去；外面的库交来的、什么都可能的失败，在接它的地方包成带标签的错误，原样放进 `cause`）。编辑器里的诊断和快速修复要打过 Effect 补丁的 TypeScript：`vp install` 的 `prepare` 跑 `effect-tsgo patch --typescript --oxlint`，`.vscode/` 让 VS Code 用工作区的 TypeScript 7 并推荐扩展。补丁改的是 pnpm 全局虚拟仓库里那一份 `typescript` 和 `oxlint`，本机别的项目用同一版本时也会用到补过的（多了 Effect 的语言服务，不配插件时不生效）；换版本后 `vp install` 重新打。关掉的三条：`unstableApiUsage`（`effect/http`、`effect/sql`、`effect/cli` 在 v4 都标成不稳定，而它们是这里的地基）、`lazyEffect`（接口表 `Handlers` 每个接口都是「输入到 Effect」，没有输入的也一样）、`effectSucceedWithVoid`（`Effect.succeed(undefined)` 在这里都是有意义的「没有」，换成 `Effect.void` 类型就变了）。真要在一行上违反一条规则时写 `// @effect-diagnostics-next-line <规则>:off`，上一行说为什么。服务的 Effect 里「出错了记一笔、接着做」用 `infra/log.ts` 的 `bestEffort(what)`：失败和缺陷按 Warn 记下、返回 void，打断照样往上走，服务关的时候它起的活也停。
 - **可选就是没有**：`tsconfig.base.json` 开着 `exactOptionalPropertyTypes`，`x?: T` 只能不写，不能写成 `undefined`。什么时候必有、什么时候可选、`undefined` 和 `null` 各用在哪，照 [没有值](docs/style/code.md#没有值)；含着 `undefined` 的对象经 `omitUndefined`（`@vibevalley/protocol/rules`）去掉这些键再交出去，不一处处写条件展开；`state.json` 里归库的那几样（工单、定时任务、连接器）存成空的；存盘的只记有的，用自己的形状（任务图事件的 payload），读出来再补成必有的；组件转交上一层的可选属性时写 `x?: T | undefined`（JSX 没法按条件不写一个属性）。MCP SDK 自己的传输类不合它的 `Transport`，只在 `packages/agent/src/mcpTransport.ts` 的 `asTransport` 转一次。
 - **`@/` 是 src**：`apps/web`、`apps/server` 里出了自己文件夹的 import 从 src 写起（`@/issue/issue.ts`、`@/features/issue`），同一个文件在哪儿引都是一个写法，挪文件也不改别人的 import；同文件夹和下面的照旧写 `./`。lint 的 `vibevalley/parent-import` 拦 `../`，只放出了 src 的（服务端的 `db/generated`）。它是各自 `tsconfig.json` 的 `paths`：Vite 和 Vitest 经 `resolve.tsconfigPaths` 读，tsx 从工作目录找 tsconfig，所以服务端在 `apps/server` 里起（脚本、桌面版都这样；别处起要带 `--tsconfig`），打包的服务端写进同样的 `paths`。查边界的 `modules.test.ts`、`page-layers` 和测试金字塔都认它。
@@ -32,6 +33,8 @@
 ## 模型和不变量
 
 **仓库和包**
+
+- **目录跟着边界走，不跟着数量走**：只有深模块的真实调用方改动证明边界变了，才同步移动那一片文件；`ai`、`agent` 的出口只收紧已证明私有的，不为少一个包把 bridge 并进 protocol；服务端的模块分组和领域目录不要求一一对应，页面按主人看到的概念组织。没有边界变化就保留现有目录（[工单](docs/subsystems/issue.md)的读入口已经这样收过；调用方的改动是启动条件）。
 
 - **一门语言**：服务端、页面、桌面壳、规则都是 TypeScript。服务端在 Node 24 上用 tsx 直接跑源码，不打包；页面由 Vite 构建；脚本用 `vpx` 直接跑，单元测试用 `vp test`。
 - **`packages/protocol` 只有形状和纯函数**：不碰文件、网络和时钟以外的东西，服务端和页面都能 import；`effect` 是它唯一的依赖（Schema）。
@@ -46,6 +49,8 @@
 - **十个模块，有先后**：文件夹归进十个模块（`src/modules.ts`），从下往上 Platform、Agents、Source Control、Collaboration、Agent Sessions、Issues、Inbox、Orchestrator、Gamification、Gateway。一个模块只 import 排在它前面的，也不读核心状态里别的模块那一块，经那个模块的查询（`Session.sessionOf`、`Issue.onBoard`、`Task.graphs`、`Channel.now`）；`src/modules.test.ts` 扫 import 和 `core.state()` 查这两条。反方向的消息走带类型的流（`Session.news`、`Channel.ownerInThread`、`Inbox.news`），订阅的人自己读，发布的人不等；下面的模块要上面的东西时，由上面的在建的时候登记给它（频道的 `Helpers`）。`game` 只听别的服务的事实，业务的服务不调它。
 - **组装分两段**：`services.ts` 每个模块一个组装函数（`platform`、`agents`……`gateway`，`on(layer)` 是 `Layer.provideMerge`），先把十个模块都建好（建的时候订阅自己要跟的），再按模块顺序跑各自的开机（`sourceControlStart` 第一次看 GitHub，`agentSessionsStart` 把帮工请回来，`issuesStart` 整理被打断的计划、定时任务开始走，`notificationsStart` 记下 Inbox 里已有的、开始巡查，`gamificationStart` 数 commit）。测试的 `testing/world.ts` 用同一套组装函数。`http/app.ts` 先开始答 HTTP，再把地址告诉 `Session`（`/mcp`）和 `Lan`（转发），所以开机就派的帮工连得上 `/mcp`。
 - **折法和拼帧在组装那一层**：`projection/` 的 `reduce`、`frameOf` 读每个模块的规则，组装时以 `Projection` 交给 Platform 里的 `core`，`core` 不 import 上面的模块。
+- **帧按订阅者各拼一次，事件文件同步写**：6 个会话、50 张工单、3 个客户端、100 轮下，拼帧加序列化的 p95 是 0.28ms；一份状态约 19.6KB，六份同步写盘的 p95 是 1.48ms。当前负载不值得共享拼帧或异步写盘；负载变了重新测，别拿组合子数量当收益。
+- **出站 HTTP 的取消传到请求**：pi 余额、聊天预览、MOSS 状态查询用 `AbortSignal`；oar 的 `accountUsage` 只支持 `timeoutMs`，不编造取消参数。慢订阅由 `bounded` 截断并记警告，SDK 回调保留有界队列，不改成无界。
 - **一个家目录一个服务端**：`infra/lease.ts` 在家目录写 `.vibevalley.lock`（里面是进程号）；第二个服务端开不起来，锁着它的进程已经不在了就接过来（Node 没有 `flock`）。
 
 **Effect 的写法**
@@ -83,7 +88,8 @@
 - **一份表结构，不认旧数据**：`0001_schema.up.sql` 是整个库，改表直接改它，不另加迁移；`migrations/` 里只能有这一个文件。开机时 `PgliteMigrator` 在空库上跑它；旧库不升级：库的文件夹旁边 `db.schema` 记着建它的基线的哈希，对不上就把整个文件夹挪到 `db.<旧哈希>-<时间>`（不删）再新建一个，日志里说一句；没有 `db.schema` 的当作今天的。测试的库在内存里，由 `Database` 自己管：每个进程第一个库跑完基线就存一份文件，之后的库从这份文件起；一座农场关的时候它的库不关，关掉外键检查逐表 `DELETE`、序号从 1 重来，清空后留给下一座（同时开着的农场各拿一个；比 `TRUNCATE` 便宜，它要给每张表重建文件）。只有没人改过表结构的才留：第一个库装了一个事件触发器，任何 DDL 都在会话上打个记号（测试为了让写失败加的触发器、删改的表），有记号的库关掉。存盘的格式只有现在这一种：表、家目录里的文件、环境变量、存下的取值都只认今天的名字。
 - **运行时新建的行主键是 uuidv7**：`base/ids.ts` 的 `newId()`（带时间，同一毫秒里接着数，同一进程里单调），存成 `text`；协议里部分 id 带品牌，编码后仍是 `string`。不用 uuid 的：从文件来的自然键（档案、技能、项目、农机、连接器）、单例、几列组成的主键。工单另有从 1 数的 `number`，消息在对话里有从 1 数的 `number`。`code()` 是给人念的配对码，不是 id。
 
-- **数据库契约由真库验证**：系统目录检查外键索引，全部生成查询经 `EXPLAIN` 编译；不要求 `_at` 列是 `int8`，现有毫秒列用 `float8`。嵌套事务回滚测试证明外层行保留、内层行回滚，`Db` 没有事务上下文覆盖的缺陷。
+- **数据库契约由真库验证**：系统目录检查外键索引，全部生成查询经 `EXPLAIN` 编译；不要求 `_at` 列是 `int8`，现有毫秒列用 `float8`。11 个外键没有首列索引，10,000 行下代表查询走现有索引，不批量加索引（写成本和基线不变）。嵌套事务回滚和外层整体回滚都有测试：内层 savepoint 回滚后外层继续，外层失败时内层一起回滚，`Db` 没有事务上下文覆盖的缺陷。
+- **先提交自己的表，再施加事实**：模块在事务里写自己的表，提交后把事实交给 Core；中间断了，开机从各模块的表重放，页面在下一帧看到。没有跨存储的通用事务服务，投递、连接器发件和排队各自用 outbox；把它们统一成提交后副作用仍是[提案](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)。
 - **测试库只复用干净实例**：首份基线由 `Deferred` 合并并发初始化；归还先 `ROLLBACK`，再清数据和重置序号，有 DDL 或清理失败的实例关闭。单连接事务超过 500 毫秒记警告，事务内不等待外部 I/O。连接器已完成记录、产出旧版本和结束会话的查询有保留期或数量边界。
 - **文件写入按首个变化合并**：`infra/files.ts` 的 `keptFile` 使用 `FileSystem`、临时文件改名和作用域关闭时 flush；轨迹从首个变化起 1.5 秒保存，持续事件不推迟窗口。进程租约是同步文件接口的例外。
 

@@ -4,7 +4,7 @@ import { createSignal, flush, For, Show, untrack } from "solid-js";
 import { Progress } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 import { ownerId } from "@vibevalley/protocol";
-import type { Channel } from "@vibevalley/protocol";
+import type { BlockRef, Channel } from "@vibevalley/protocol";
 
 import { aria } from "@/base/util";
 import { DictationButton } from "@/features/voice";
@@ -25,7 +25,18 @@ import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 
 /** The box for saying a sentence in a channel: Enter sends, Shift+Enter starts a line, @ names someone. */
-export function Composer(props: { channel: Channel | undefined; placeholder: string }) {
+export interface QuotedBlockDraft {
+  readonly ref: BlockRef;
+  readonly text: string;
+}
+
+export function Composer(props: {
+  channel: Channel | undefined;
+  placeholder: string;
+  quoted?: readonly QuotedBlockDraft[] | undefined;
+  onClearQuote?: (() => void) | undefined;
+  onRemoveQuote?: ((blockId: string) => void) | undefined;
+}) {
   const core = useCore();
   let input: HTMLTextAreaElement | undefined;
   const [problem, setProblem] = createSignal<string>();
@@ -47,6 +58,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
         id: props.channel?.id ?? "",
         ...(reply ? { replyTo: reply.number } : {}),
         ...(d.files.length > 0 ? { attachments: d.files.map((f) => f.id) } : {}),
+        ...((props.quoted?.length ?? 0) > 0 ? { blocks: (props.quoted ?? []).map((q) => q.ref) } : {}),
       };
     },
     failed: (reason) => {
@@ -62,6 +74,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     sent: () => {
       const id = props.channel?.id;
       if (id) drafts.clear(id);
+      props.onClearQuote?.();
     },
   });
   const attach = (files: readonly File[]) => {
@@ -149,6 +162,28 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             {p()}
           </p>
         )}
+      </Show>
+      <Show when={(props.quoted?.length ?? 0) > 0}>
+        <div class="mb-1.5 flex flex-col gap-1">
+          <For each={props.quoted} keyed={(q) => q.ref.blockId}>
+            {(q) => (
+              <div data-testid="quoted-block" data-key={q().ref.blockId} class="flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
+                <Icon name="artifacts" size={12} />
+                <span class="min-w-0 flex-1 truncate">{t("web.channel.composer.quotedBlock", { text: q().text })}</span>
+                <button
+                  type="button"
+                  class="cursor-pointer rounded p-0.5 hover:bg-page"
+                  data-testid="quoted-block-remove"
+                  aria-label={t("web.channel.composer.cancelQuote")}
+                  title={t("web.channel.composer.cancelQuote")}
+                  onClick={() => props.onRemoveQuote?.(q().ref.blockId)}
+                >
+                  <Icon name="close" size={12} />
+                </button>
+              </div>
+            )}
+          </For>
+        </div>
       </Show>
       <Show when={replying()}>
         {(m) => (

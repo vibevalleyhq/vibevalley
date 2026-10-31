@@ -10,10 +10,12 @@ import { type Agent, type ArtifactId, ownerId, type TextSpan } from "@vibevalley
 
 import { createExternal } from "@/base/external";
 import { api } from "@/infra/api";
+import { followArtifact } from "@/infra/gateway";
 import { ready, useAgents } from "@/infra/query";
 import { hexColor, swatches } from "@/ui/cast";
 import { Checkbox } from "@/ui/Checkbox";
 import { AgentFace } from "@/ui/Face";
+import { Icon } from "@/ui/Icon";
 
 import { knownTypes } from "./blocks";
 import { BlockEditor, type EditBlock } from "./editor";
@@ -49,15 +51,41 @@ interface Row {
 
 /** Keyed by the id by its caller: one editor for the page's life, handed to onEditor for what the page's menu does
  * with it (the demo, which polls faster while it runs). */
-export function BlocksView(props: { id: ArtifactId; onEditor?: (editor: BlockEditor) => void }) {
+export interface QuoteTarget {
+  readonly id: string;
+  readonly rev: number;
+  readonly type: string;
+  readonly text: string;
+}
+
+export function BlocksView(props: { id: ArtifactId; onEditor?: (editor: BlockEditor) => void; onQuote?: ((block: QuoteTarget) => void) | undefined }) {
   const editor = new BlockEditor(
     api,
     untrack(() => props.id),
   );
   untrack(() => props.onEditor)?.(editor);
   onSettled(() => {
-    void editor.load();
-    return () => editor.dispose();
+    let stop: (() => void) | undefined;
+    void editor.load().then(() => {
+      if (editor.artifact === undefined) return;
+      editor.setLive(true);
+      stop = followArtifact(
+        String(props.id),
+        editor.artifact.seq,
+        (e) => {
+          if (e._tag === "Blocks") editor.receive(e);
+          else {
+            editor.setLive(false);
+            void editor.load();
+          }
+        },
+        () => editor.setLive(false),
+      );
+    });
+    return () => {
+      stop?.();
+      editor.dispose();
+    };
   });
   // The editor changes its blocks in place and bumps its version; each version is drawn as fresh rows, matched by id.
   const version = createExternal(editor.subscribe, () => editor.version);
@@ -116,7 +144,7 @@ export function BlocksView(props: { id: ArtifactId; onEditor?: (editor: BlockEdi
       </p>
       <div class="min-h-0 flex-1 overflow-y-auto pr-3">
         <For each={rows()} keyed={(r) => r.block.id}>
-          {(row) => <BlockRow editor={editor} row={row()} agent={agents().get(row().updatedBy)} />}
+          {(row) => <BlockRow editor={editor} row={row()} agent={agents().get(row().updatedBy)} onQuote={props.onQuote} />}
         </For>
         {/* Below the last block: a click starts a new paragraph. */}
         <button
@@ -135,7 +163,7 @@ export function BlocksView(props: { id: ArtifactId; onEditor?: (editor: BlockEdi
 
 const barHeight = (type: string) => (type === "divider" ? 16 : type === "heading" ? 28 : 20);
 
-function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefined }) {
+function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefined; onQuote?: ((block: QuoteTarget) => void) | undefined }) {
   const r = () => props.row;
   const writer = () => (r().updatedBy === ownerId ? t("web.artifact.blocks.owner") : (props.agent?.name ?? r().updatedBy));
   const mark = (): JSX.Element | undefined => {
@@ -167,7 +195,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
       data-block={r().block.id}
       data-type={r().type}
       data-writing={r().writing ? "" : undefined}
-      class={["flex items-start pb-0.5", r().type === "heading" ? "pt-2.5" : "pt-0.5"]}
+      class={["group/row flex items-start pb-0.5", r().type === "heading" ? "pt-2.5" : "pt-0.5"]}
     >
       <span class="w-[22px] shrink-0 pt-[3px]">
         <Show when={r().showFace}>
@@ -212,6 +240,18 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
           <p class="text-xs text-berry">{r().problem}</p>
         </Show>
       </div>
+      <Show when={props.onQuote}>
+        <button
+          type="button"
+          data-testid="artifact-quote-block"
+          aria-label={t("web.artifact.canvas.quote")}
+          title={t("web.artifact.canvas.quote")}
+          class="mt-0.5 ml-1 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted opacity-0 group-hover/row:opacity-100 hover:bg-hover focus-visible:opacity-100"
+          onClick={() => props.onQuote?.({ id: r().block.id, rev: r().block.rev, type: r().type, text: r().text })}
+        >
+          <Icon name="chat" size={14} />
+        </button>
+      </Show>
     </div>
   );
 }

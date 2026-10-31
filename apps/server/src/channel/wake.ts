@@ -1,4 +1,4 @@
-import type { ActorKind } from "@vibevalley/protocol";
+import type { ActorKind, QuotedBlock } from "@vibevalley/protocol";
 export interface UnreadRow {
   readonly target: string;
   readonly unread: number;
@@ -35,6 +35,8 @@ export interface InboxMessage {
   /** Files said with it, where they are on this computer. */
   readonly attachments?: readonly { readonly name: string; readonly path: string }[];
   readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
+  /** Blocks of a blocks artifact the message points at. */
+  readonly blocks?: readonly QuotedBlock[];
   /** Kept with the message, so whoever takes it sees it, whenever that is. */
   readonly picked?: Picked;
 }

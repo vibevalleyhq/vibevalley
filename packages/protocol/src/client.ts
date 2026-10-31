@@ -296,9 +296,13 @@ export class VibeValleyApi {
     block: {
       /** A blocks artifact and every live block (no tombstones), in order. */
       list: (a: { id: T.ArtifactId }): Promise<T.BlockSnapshot> => this.call<T.BlockSnapshot>("/api/v1/artifact/block/list", a),
-      /** One block appended, as one batch of one op. */
+      /** One block inserted, as one batch of one op. */
       create: (a: { id: T.ArtifactId } & T.BlockCreate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/create", a),
+      /** One block's words, type or attrs changed, as one batch. */
       update: (a: { id: T.ArtifactId } & T.BlockUpdate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/update", a),
+      /** One block and its children put in their tombstones. */
+      delete: (a: { id: T.ArtifactId } & T.BlockDelete): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/delete", a),
+      previewDelete: (a: { id: T.ArtifactId } & T.BlockDelete): Promise<T.Preview> => this.call<T.Preview>("/api/v1/artifact/block/previewDelete", a),
     },
     markdown: {
       /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */

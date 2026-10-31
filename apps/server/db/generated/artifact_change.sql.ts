@@ -70,3 +70,34 @@ export const pruneArtifactChanges = Effect.fn("PruneArtifactChanges")(function* 
     execute: (p) => sql.unsafe(PruneArtifactChangesSql, [p["before"]]),
   })(params)
 })
+
+export const ArtifactChangesAfterParams = Schema.Struct({
+  ["artifact_id"]: Schema.String,
+  ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["n"]: Schema.BigIntFromString.check(Schema.isBetweenBigInt({ minimum: -9223372036854775808n, maximum: 9223372036854775807n })),
+})
+export type ArtifactChangesAfterParams = typeof ArtifactChangesAfterParams.Type
+
+
+export const ArtifactChangesAfterResult = Schema.Struct({
+  ["artifact_id"]: Schema.String,
+  ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["batch_id"]: Schema.String,
+  ["actor"]: Schema.String,
+  ["block_ids"]: Schema.String,
+  ["results"]: Schema.String,
+  ["created_at"]: Schema.Number,
+})
+export type ArtifactChangesAfterResult = typeof ArtifactChangesAfterResult.Type
+
+
+export const ArtifactChangesAfterSql = "-- name: ArtifactChangesAfter :many\nselect \"artifact_change\".\"artifact_id\", \"artifact_change\".\"seq\", \"artifact_change\".\"batch_id\", \"artifact_change\".\"actor\", \"artifact_change\".\"block_ids\", \"artifact_change\".\"results\", \"artifact_change\".\"created_at\" from artifact_change where artifact_id = $1 and seq > $2 order by seq limit $3;"
+
+export const artifactChangesAfter = Effect.fn("ArtifactChangesAfter")(function* (params: ArtifactChangesAfterParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: ArtifactChangesAfterParams,
+    Result: ArtifactChangesAfterResult,
+    execute: (p) => sql.unsafe(ArtifactChangesAfterSql, [p["artifact_id"], p["seq"], p["n"]]),
+  })(params)
+})

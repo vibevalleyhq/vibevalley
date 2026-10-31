@@ -42,6 +42,9 @@ export interface SayMore {
   readonly replyTo?: number;
   readonly attachments?: readonly string[];
   readonly picked?: Picked;
+  /** The blocks the owner pointed at, to be read as they are now before the message is stored. */
+  readonly blockRefs?: readonly T.BlockRef[];
+  readonly blocks?: readonly T.QuotedBlock[];
 }
 
 export interface ReadOptions {
@@ -81,6 +84,8 @@ export interface Meta {
   embeds?: T.Embed[];
   /** The artifact it announces, as it was then (artifact/). */
   artifact?: T.ArtifactCard;
+  /** The blocks it points at, as they read when it was sent. */
+  blocks?: readonly T.QuotedBlock[];
   picked?: Picked;
 }
 
@@ -96,6 +101,7 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(S.Attachment))),
   embeds: Schema.optionalKey(Schema.mutable(Schema.Array(S.Embed))),
   artifact: Schema.optionalKey(S.ArtifactCard),
+  blocks: Schema.optionalKey(Schema.mutable(Schema.Array(S.QuotedBlock))),
   picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
 });
 
@@ -154,6 +160,7 @@ export function toMessage(row: MsgRow): T.ChatMessage {
     attachments: meta.attachments ?? [],
     embeds: meta.embeds ?? [],
     ...(meta.artifact && row.deleted_at === null ? { artifact: meta.artifact } : {}),
+    ...(meta.blocks && meta.blocks.length > 0 && row.deleted_at === null ? { blocks: meta.blocks } : {}),
   };
 }
 
@@ -173,6 +180,7 @@ export const inboxMore = (
     ...(meta.artifact && (row.deleted_at == null || row.deleted_at === 0)
       ? { artifact: { id: meta.artifact.id, title: meta.artifact.title, version: meta.artifact.version } }
       : {}),
+    ...(meta.blocks && meta.blocks.length > 0 && (row.deleted_at == null || row.deleted_at === 0) ? { blocks: meta.blocks } : {}),
     ...(meta.picked ? { picked: meta.picked } : {}),
   };
 };

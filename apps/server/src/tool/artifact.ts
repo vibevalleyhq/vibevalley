@@ -174,19 +174,88 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
         }),
       );
 
-    // A blocks artifact: a session appends blocks and rewrites a block's text against the rev it read (artifact_content_get),
-    // through the same op pipeline the owner's editor uses, written as its profile (its session id when it has none).
+    // A blocks artifact: the orchestrator's and a session's insert, rewrite and delete a block through the same op
+    // pipeline the owner's editor uses, written as the agent's profile (its session id when it has none).
     const writer = (c: Caller) => c.agent || c.session;
+
+    interface BlockCreateInput {
+      readonly id: string;
+      readonly type?: string;
+      readonly level?: number;
+      readonly checked?: boolean;
+      readonly language?: string;
+      readonly text: string;
+      readonly afterBlock?: string;
+      readonly parentId?: string;
+    }
+
+    interface BlockUpdateInput {
+      readonly id: string;
+      readonly block: string;
+      readonly baseRev: number;
+      readonly text?: string;
+      readonly type?: string;
+      readonly level?: number;
+      readonly checked?: boolean;
+      readonly language?: string;
+    }
+
+    const insert = (c: Caller, p: BlockCreateInput) =>
+      Effect.gen(function* () {
+        const r = yield* artifacts.insertBlock(S.artifactId(p.id.trim()), writer(c), {
+          text: p.text,
+          ...(p.type !== undefined ? { type: p.type } : {}),
+          ...(p.level !== undefined ? { level: p.level } : {}),
+          ...(p.checked !== undefined ? { checked: p.checked } : {}),
+          ...(p.language !== undefined ? { language: p.language } : {}),
+          ...(p.afterBlock !== undefined ? { afterBlock: S.blockId(p.afterBlock) } : {}),
+          ...(p.parentId !== undefined && p.parentId.trim() !== "" ? { parentId: S.blockId(p.parentId) } : {}),
+        });
+        if (r.status !== "applied") return yield* refuse(r.reason ?? "");
+        return answers.block.appended(r.blockId, r.rev ?? 0);
+      });
+
+    const update = (c: Caller, p: BlockUpdateInput) =>
+      Effect.gen(function* () {
+        const r = yield* artifacts.updateBlock(S.artifactId(p.id.trim()), writer(c), {
+          block: S.blockId(p.block),
+          baseRev: p.baseRev,
+          ...(p.text !== undefined ? { text: p.text } : {}),
+          ...(p.type !== undefined ? { type: p.type } : {}),
+          ...(p.level !== undefined ? { level: p.level } : {}),
+          ...(p.checked !== undefined ? { checked: p.checked } : {}),
+          ...(p.language !== undefined ? { language: p.language } : {}),
+        });
+        if (r.status === "applied") return answers.block.updated(r.blockId, r.rev);
+        if (r.status === "conflict") {
+          const now = yield* Effect.orElseSucceed(artifacts.blocks(S.artifactId(p.id.trim())), () => undefined);
+          const x = now?.blocks.find((b) => b.id === r.blockId);
+          return answers.block.notUpdated(r.reason, r.rev, x ? blockLine(x) : "");
+        }
+        return yield* refuse(r.reason ?? "");
+      });
+
+    const remove = (c: Caller, p: { readonly id: string; readonly block: string }) =>
+      Effect.gen(function* () {
+        const r = yield* artifacts.deleteBlock(S.artifactId(p.id.trim()), writer(c), { block: S.blockId(p.block) });
+        if (r.status === "applied") return answers.block.deleted(r.blockId);
+        if (r.status === "noop") return answers.block.alreadyDeleted(r.blockId);
+        return yield* refuse(r.reason ?? "");
+      });
 
     const blockCreate = (who: Who) =>
       sessionSchemaTool(
         "artifact.block.create",
         Effect.fn("Tool.blockCreate")(function* (p: SessionInput<"artifact.block.create">) {
-          const c = yield* callerOf(who);
-          const { id, ...block } = p;
-          const r = yield* artifacts.appendBlock(S.artifactId(id.trim()), writer(c), block);
-          if (r.status !== "applied") return yield* refuse(r.reason ?? "");
-          return answers.block.appended(r.blockId, r.rev ?? 0);
+          return yield* insert(yield* callerOf(who), p);
+        }),
+      );
+
+    const orchestratorBlockCreate = (who: Who) =>
+      tool(
+        "artifact.block.create",
+        Effect.fn("Tool.blockCreate")(function* (p: Orchestrator<"artifact.block.create">) {
+          return yield* insert(yield* callerOf(who), p);
         }),
       );
 
@@ -194,18 +263,34 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
       sessionSchemaTool(
         "artifact.block.update",
         Effect.fn("Tool.blockUpdate")(function* (p: SessionInput<"artifact.block.update">) {
-          const c = yield* callerOf(who);
-          const { id, ...block } = p;
-          const r = yield* artifacts.updateBlock(S.artifactId(id.trim()), writer(c), { ...block, block: S.blockId(block.block) });
-          if (r.status === "applied") return answers.block.updated(r.blockId, r.rev);
-          if (r.status === "conflict") {
-            const now = yield* Effect.orElseSucceed(artifacts.blocks(S.artifactId(id.trim())), () => undefined);
-            const x = now?.blocks.find((b) => b.id === r.blockId);
-            return answers.block.notUpdated(r.reason, r.rev, x ? blockLine(x) : "");
-          }
-          return yield* refuse(r.reason ?? "");
+          return yield* update(yield* callerOf(who), p);
         }),
       );
+
+    const orchestratorBlockUpdate = (who: Who) =>
+      tool(
+        "artifact.block.update",
+        Effect.fn("Tool.blockUpdate")(function* (p: Orchestrator<"artifact.block.update">) {
+          return yield* update(yield* callerOf(who), p);
+        }),
+      );
+
+    const blockDelete = (who: Who) =>
+      sessionSchemaTool(
+        "artifact.block.delete",
+        Effect.fn("Tool.blockDelete")(function* (p: SessionInput<"artifact.block.delete">) {
+          return yield* remove(yield* callerOf(who), p);
+        }),
+      );
+
+    const orchestratorBlockDelete = (who: Who) =>
+      tool(
+        "artifact.block.delete",
+        Effect.fn("Tool.blockDelete")(function* (p: Orchestrator<"artifact.block.delete">) {
+          return yield* remove(yield* callerOf(who), p);
+        }),
+      );
+
     return {
       artifactList,
       sessionArtifactList,
@@ -215,6 +300,10 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
       sessionArtifactCreate,
       artifactVersion,
       blockCreate,
+      orchestratorBlockCreate,
       blockUpdate,
+      orchestratorBlockUpdate,
+      blockDelete,
+      orchestratorBlockDelete,
     };
   });

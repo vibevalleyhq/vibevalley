@@ -5,7 +5,9 @@ import { type Headers, HttpRouter, HttpServerRequest, HttpServerResponse } from 
 import { RpcSerialization, RpcServer } from "effect/rpc";
 
 import { rpcPath, Subscriptions } from "@vibevalley/protocol/rpc";
+import * as S from "@vibevalley/protocol/schema";
 
+import { Artifact } from "@/artifact/artifact.ts";
 import { Channel } from "@/channel/chat.ts";
 import { sameOrigin } from "@/lan/lan.ts";
 
@@ -22,9 +24,11 @@ export const fromTheFarm = (headers: Headers.Headers): boolean => {
 const handlers = Subscriptions.toLayer(
   Effect.gen(function* () {
     const chat = yield* Channel;
+    const artifacts = yield* Artifact;
     return Subscriptions.of({
       "channel.follow": ({ id, after }) => chat.follow(id, after),
       "channel.reports": ({ after }) => chat.reports(after),
+      "artifact.follow": ({ id, after }) => artifacts.follow(S.artifactId(id), after),
     });
   }),
 );

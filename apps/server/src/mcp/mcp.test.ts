@@ -99,6 +99,7 @@ describe("mcp", () => {
       yield* Effect.promise(c.init);
       expect((yield* Effect.promise(c.list)).toSorted()).toEqual([
         "artifact_block_create",
+        "artifact_block_delete",
         "artifact_block_update",
         "artifact_content_get",
         "artifact_create",

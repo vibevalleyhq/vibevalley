@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Fiber, Layer, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
@@ -240,6 +240,76 @@ describe("a blocks artifact", () => {
         const mine = snap.blocks.find((b) => b.id === taken)!;
         expect([plain(mine.text), mine.updatedBy]).toEqual(["主人接手了", "owner"]);
         expect(snap.blocks).toHaveLength(4);
+      }),
+    ).pipe(Effect.provide(on())),
+  );
+  it.effect("inserts where asked, changes a block's type and attrs, and deletes it", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const s = yield* make();
+        const id = (yield* s.create("块")).artifact.id;
+        const a = yield* s.insertBlock(id, "owner", { text: "A" });
+        const c = yield* s.insertBlock(id, "owner", { text: "C" });
+        const b = yield* s.insertBlock(id, "owner", { text: "B", afterBlock: a.blockId });
+        yield* s.insertBlock(id, "owner", { text: "首", afterBlock: blockId("") });
+        const heading = yield* s.insertBlock(id, "owner", { text: "节", type: "heading", level: 1 });
+        const child = yield* s.insertBlock(id, "owner", { text: "子", parentId: heading.blockId });
+        const snap = yield* s.get(id);
+        expect(texts(snap.blocks)).toBe("首|A|B|C|节|子");
+        expect(snap.blocks.find((x) => x.id === child.blockId)!.parentId).toBe(heading.blockId);
+        const changed = yield* s.updateBlock(id, "owner", { block: b.blockId, baseRev: b.rev!, type: "todo", checked: true, text: "B2" });
+        expect(changed.status).toBe("applied");
+        const todo = (yield* s.get(id)).blocks.find((x) => x.id === b.blockId)!;
+        expect([todo.type, todo.attrs.checked, plain(todo.text)]).toEqual(["todo", true, "B2"]);
+        expect((yield* s.deleteBlock(id, "owner", { block: c.blockId })).status).toBe("applied");
+        expect((yield* s.deleteBlock(id, "owner", { block: c.blockId })).status).toBe("noop");
+        expect((yield* s.get(id)).blocks.some((x) => x.id === c.blockId)).toBe(false);
+      }),
+    ).pipe(Effect.provide(on())),
+  );
+
+  it.effect("follows a blocks artifact from after a seq, then live", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const s = yield* make();
+        const id = (yield* s.create("跟进")).artifact.id;
+        yield* s.insertBlock(id, "owner", { text: "一" });
+        yield* s.insertBlock(id, "owner", { text: "二" });
+        const caught = yield* Stream.runCollect(Stream.take(s.follow(id, 0), 2));
+        expect(caught.map((e) => (e._tag === "Blocks" ? e.seq : "Reset"))).toEqual([1, 2]);
+        expect(caught.flatMap((e) => (e._tag === "Blocks" ? e.blocks.map((b) => plain(b.text)) : []))).toEqual(["一", "二"]);
+        const live = yield* Effect.forkChild(Stream.runCollect(Stream.take(s.follow(id, 2), 1)));
+        yield* TestClock.adjust(1);
+        yield* s.insertBlock(id, "owner", { text: "三" });
+        const [event] = yield* Fiber.join(live);
+        expect(event!._tag).toBe("Blocks");
+        if (event!._tag === "Blocks") expect([event!.seq, event!.blocks.map((b) => plain(b.text))]).toEqual([3, ["三"]]);
+      }),
+    ).pipe(Effect.provide(on())),
+  );
+  it.effect("catches up a hundred batches and follows again after twenty reconnects", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const s = yield* make();
+        const id = (yield* s.create("压力")).artifact.id;
+        yield* Effect.forEach(
+          Array.from({ length: 100 }, (_, i) => i),
+          (i) => s.insertBlock(id, "owner", { text: `第 ${i} 块` }),
+          {
+            concurrency: 2,
+            discard: true,
+          },
+        );
+        const caught = yield* Stream.runCollect(Stream.take(s.follow(id, 0), 100));
+        expect(caught.map((e) => (e._tag === "Blocks" ? e.seq : -1))).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+        for (let i = 0; i < 20; i++) {
+          const live = yield* Effect.forkChild(Stream.runCollect(Stream.take(s.follow(id, 100 + i), 1)));
+          yield* TestClock.adjust(1);
+          yield* s.insertBlock(id, "owner", { text: `重连 ${i}` });
+          const [event] = yield* Fiber.join(live);
+          expect(event!._tag).toBe("Blocks");
+          if (event!._tag === "Blocks") expect(event!.seq).toBe(101 + i);
+        }
       }),
     ).pipe(Effect.provide(on())),
   );

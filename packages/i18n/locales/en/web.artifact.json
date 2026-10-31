@@ -65,6 +65,12 @@
     "image": "Image: {alt} {src}",
     "start": "Start writing here…"
   },
+  "canvas": {
+    "label": "Open artifact",
+    "close": "Close",
+    "openPage": "Open its page",
+    "quote": "Speak about it"
+  },
   "body": {
     "blocks": "Written together",
     "html": "Web page"

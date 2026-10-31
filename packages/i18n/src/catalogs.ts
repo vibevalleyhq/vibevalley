@@ -134,13 +134,23 @@ export const catalogs = {
       made: "做了「{title}」",
       versioned: "「{title}」出了第 {version} 版",
       withNote: "{said}：{note}",
-      preview: { remove: "删掉「{title}」和它的 {n} 版", cards: "对话里的卡片还在，点开说已经删掉了", removeBlocks: "删掉「{title}」和它的 {n} 块" },
+      preview: {
+        remove: "删掉「{title}」和它的 {n} 版",
+        cards: "对话里的卡片还在，点开说已经删掉了",
+        removeBlock: "删掉块 {id}",
+        removeChildren: "连同 {n} 个子块",
+        removeBlocks: "删掉「{title}」和它的 {n} 块",
+      },
       untitled: "没起名的产出",
       noBatch: "这批改动没有 batchId",
       demoNotInserted: "演示的块没插进去：{status}",
       noWriter: "没有能写的帮工：先在档案里打开一个",
       demoRunning: "演示正在写，写完再点",
       notApplied: "这一块没写进去",
+      attrNotForType: "这一块是 {type}，不用 {attr}",
+      parentDeleted: "父块 {id} 已经删掉了",
+      afterNotSibling: "没有块 {id}，或它不在这一层",
+      nothingToChange: "没说要改什么",
       op: {
         deleted: "这一块已经删掉了",
         noAttr: "没有属性 {name}",
@@ -1047,6 +1057,7 @@ export const catalogs = {
         memory_create: "替帮工记",
         artifact_block_create: "往产出里加一块",
         artifact_block_update: "改产出的一块",
+        artifact_block_delete: "删产出的一块",
       },
       about: "{label}：{about}",
     },
@@ -1390,6 +1401,7 @@ export const catalogs = {
         image: "图片：{alt} {src}",
         start: "从这里开始写……",
       },
+      canvas: { label: "打开的产出", close: "关掉", openPage: "在产出页打开", quote: "带话" },
       body: { blocks: "一起写的", html: "网页" },
     },
     "web.base": {
@@ -1624,6 +1636,8 @@ export const catalogs = {
         refuse: "不要",
       },
       messages: {
+        quotedBlock: "指着「{title}」的一块：{text}",
+        quotedGone: "已经删掉了",
         label: "消息",
         containing: "含「{text}」的消息",
         start: "消息的开头",
@@ -1682,6 +1696,8 @@ export const catalogs = {
         send: "发送",
         sendHint: "回车发送 · Shift+回车换行",
         replying: "回复 {name}",
+        quotedBlock: "指着这一块：{text}",
+        cancelQuote: "不指着这块了",
         cancelReply: "不回复了",
         attach: "附上文件",
         uploadFailed: "没传上去：{why}",
@@ -3734,6 +3750,8 @@ export const catalogs = {
       preview: {
         remove: 'Delete "{title}" and its {n} versions',
         cards: "Its cards stay in the conversation and say it was deleted when opened",
+        removeBlock: "Delete block {id}",
+        removeChildren: "and its {n} child blocks",
         removeBlocks: "Delete “{title}” and its {n} blocks",
       },
       untitled: "Untitled",
@@ -3742,6 +3760,10 @@ export const catalogs = {
       noWriter: "No helper can write: turn one on in the profiles first",
       demoRunning: "The demo is writing: try again when it is done",
       notApplied: "The block was not written",
+      attrNotForType: "A {type} block does not take {attr}",
+      parentDeleted: "The parent block {id} was deleted",
+      afterNotSibling: "There is no block {id}, or it is not at that level",
+      nothingToChange: "Nothing was said to change",
       op: {
         deleted: "This block was deleted",
         noAttr: "There is no attribute {name}",
@@ -4694,6 +4716,7 @@ export const catalogs = {
         memory_create: "Remember for a helper",
         artifact_block_create: "Add to an artifact",
         artifact_block_update: "Change an artifact's block",
+        artifact_block_delete: "Delete an artifact's block",
       },
       about: "{label}: {about}",
     },
@@ -5048,6 +5071,7 @@ export const catalogs = {
         image: "Image: {alt} {src}",
         start: "Start writing here…",
       },
+      canvas: { label: "Open artifact", close: "Close", openPage: "Open its page", quote: "Speak about it" },
       body: { blocks: "Written together", html: "Web page" },
     },
     "web.base": {
@@ -5306,6 +5330,8 @@ export const catalogs = {
         refuse: "Refuse",
       },
       messages: {
+        quotedBlock: "On a block of “{title}”: {text}",
+        quotedGone: "it was deleted",
         label: "Messages",
         containing: 'Messages with "{text}"',
         start: "The start of the messages",
@@ -5364,6 +5390,8 @@ export const catalogs = {
         send: "Send",
         sendHint: "Enter sends · Shift+Enter for a new line",
         replying: "Replying to {name}",
+        quotedBlock: "Pointing at: {text}",
+        cancelQuote: "Stop pointing at it",
         cancelReply: "Cancel the reply",
         attach: "Attach a file",
         uploadFailed: "Not uploaded: {why}",
@@ -7472,6 +7500,8 @@ export interface Messages {
   "server.agent.template.unreadable": { readonly file: string | number; readonly why: string | number };
   "server.agent.unequip": { readonly holders: string | number };
   "server.archiveRef": { readonly name: string | number };
+  "server.artifact.afterNotSibling": { readonly id: string | number };
+  "server.artifact.attrNotForType": { readonly attr: string | number; readonly type: string | number };
   "server.artifact.badBlockType": { readonly types: string | number };
   "server.artifact.badKind": { readonly kind: string | number; readonly kinds: string | number };
   "server.artifact.demo.0.heading": undefined;
@@ -7501,6 +7531,7 @@ export interface Messages {
   "server.artifact.notBlocks": { readonly title: string | number };
   "server.artifact.notHtml": { readonly title: string | number };
   "server.artifact.notKept": { readonly why: string | number };
+  "server.artifact.nothingToChange": undefined;
   "server.artifact.op.badKey": { readonly key: string | number };
   "server.artifact.op.changed": undefined;
   "server.artifact.op.deleted": undefined;
@@ -7517,9 +7548,12 @@ export interface Messages {
   "server.artifact.op.underSelf": undefined;
   "server.artifact.op.unknownType": { readonly type: string | number };
   "server.artifact.otherArtifact": { readonly batch: string | number };
+  "server.artifact.parentDeleted": { readonly id: string | number };
   "server.artifact.preview.cards": undefined;
   "server.artifact.preview.remove": { readonly n: string | number; readonly title: string | number };
+  "server.artifact.preview.removeBlock": { readonly id: string | number };
   "server.artifact.preview.removeBlocks": { readonly n: string | number; readonly title: string | number };
+  "server.artifact.preview.removeChildren": { readonly n: string | number };
   "server.artifact.tooBig": { readonly mb: string | number };
   "server.artifact.untitled": undefined;
   "server.artifact.versioned": { readonly title: string | number; readonly version: string | number };
@@ -8376,6 +8410,7 @@ export interface Messages {
   "server.task.taskState.working": undefined;
   "server.tool.about": { readonly about: string | number; readonly label: string | number };
   "server.tool.labels.artifact_block_create": undefined;
+  "server.tool.labels.artifact_block_delete": undefined;
   "server.tool.labels.artifact_block_update": undefined;
   "server.tool.labels.channel_create": undefined;
   "server.tool.labels.channel_list": undefined;
@@ -8719,6 +8754,10 @@ export interface Messages {
   "web.artifact.blocks.wrote": { readonly who: string | number };
   "web.artifact.body.blocks": undefined;
   "web.artifact.body.html": undefined;
+  "web.artifact.canvas.close": undefined;
+  "web.artifact.canvas.label": undefined;
+  "web.artifact.canvas.openPage": undefined;
+  "web.artifact.canvas.quote": undefined;
   "web.artifact.card.open": { readonly title: string | number };
   "web.artifact.card.version": { readonly version: string | number };
   "web.artifact.issue.title": undefined;
@@ -8993,9 +9032,11 @@ export interface Messages {
   "web.channel.commands.stop.needs": undefined;
   "web.channel.commands.stop.note": undefined;
   "web.channel.composer.attach": undefined;
+  "web.channel.composer.cancelQuote": undefined;
   "web.channel.composer.cancelReply": undefined;
   "web.channel.composer.mention": undefined;
   "web.channel.composer.notSent": { readonly why: string | number };
+  "web.channel.composer.quotedBlock": { readonly text: string | number };
   "web.channel.composer.replying": { readonly name: string | number };
   "web.channel.composer.send": undefined;
   "web.channel.composer.sendHint": undefined;
@@ -9107,6 +9148,8 @@ export interface Messages {
   "web.channel.messages.older": undefined;
   "web.channel.messages.owner": undefined;
   "web.channel.messages.pinned": undefined;
+  "web.channel.messages.quotedBlock": { readonly text: string | number; readonly title: string | number };
+  "web.channel.messages.quotedGone": undefined;
   "web.channel.messages.reactedBy": { readonly emoji: string | number; readonly names: string | number };
   "web.channel.messages.readFailed": { readonly why: string | number };
   "web.channel.messages.replyGone": undefined;

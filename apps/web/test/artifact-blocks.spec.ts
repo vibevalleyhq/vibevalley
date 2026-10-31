@@ -56,3 +56,54 @@ test("Backspace at a block's start joins it to the one before", async ({ page, a
   const id = (await api.artifact.list({})).find((a) => a.title === title)!.id;
   expect((await api.artifact.block.list({ id })).blocks.filter((b) => b.deleted !== true).map((b) => b.text.map((s) => s.t).join(""))).toEqual(["firstsecond"]);
 });
+
+test("a card opens the artifact beside the chat, and a block comes into the message as a reference", async ({ page, api }) => {
+  const title = `canvas ${Date.now() % 100000}`;
+  await api.artifact.create({ title, kind: "markdown", content: "# Hi\n\nbody" });
+  await page.goto("/chat");
+  await page.getByTestId("artifact-card").filter({ hasText: title }).click();
+  const canvas = page.getByTestId("artifact-canvas");
+  await expect(canvas).toBeVisible();
+  await expect(page).toHaveURL(/artifact=/u);
+  const heading = canvas.locator('[data-type="heading"]').first();
+  await heading.hover();
+  await heading.getByTestId("artifact-quote-block").click();
+  const paragraph = canvas.locator('[data-type="paragraph"]').first();
+  await paragraph.hover();
+  await paragraph.getByTestId("artifact-quote-block").click();
+  await expect(page.getByTestId("quoted-block")).toHaveCount(2);
+  await expect(page.getByTestId("quoted-block").first()).toContainText("Hi");
+  await page.getByTestId("composer-input").fill("look at these");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("quoted-block")).toHaveCount(0);
+  await expect(page.getByTestId("message-quoted-block")).toHaveCount(2);
+  const general = (await api.channel.list()).find((c) => c.default)!.id;
+  await expect.poll(async () => (await api.channel.message.list({ id: general, limit: 5 })).find((m) => m.text === "look at these")?.blocks?.length).toBe(2);
+});
+
+test("on a phone the canvas covers the chat, and closing it keeps what was typed", async ({ page, api }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const title = `canvas phone ${Date.now() % 100000}`;
+  await api.artifact.create({ title, kind: "markdown", content: "phone" });
+  await page.goto("/chat");
+  await page.getByTestId("composer-input").fill("kept while looking");
+  await page.getByTestId("artifact-card").filter({ hasText: title }).click();
+  await expect(page.getByTestId("artifact-canvas")).toBeVisible();
+  await page.getByTestId("artifact-canvas-close").click();
+  await expect(page.getByTestId("artifact-canvas")).toHaveCount(0);
+  await expect(page.getByTestId("composer-input")).toHaveValue("kept while looking");
+});
+
+test("the canvas keeps the same artifact open after a reload, in the owner's theme", async ({ page, api }) => {
+  await page.addInitScript(() => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: "dark" })));
+  const title = `canvas theme ${Date.now() % 100000}`;
+  await api.artifact.create({ title, kind: "markdown", content: "# Dark\n\nstill here" });
+  await page.goto("/chat");
+  await page.getByTestId("artifact-card").filter({ hasText: title }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByTestId("artifact-canvas")).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId("artifact-canvas")).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByTestId("artifact-canvas").locator('[data-type="heading"]')).toContainText("Dark");
+});

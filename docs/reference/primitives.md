@@ -192,6 +192,7 @@
 | `frames` | `frames.ts` |  |
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |
 | `followReports` | `gateway.ts` | The farm's reports after the one with this id (the newest when absent), then each from now on. |
+| `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
 | `currentHost` | `host.ts` |  |
 | `subscribeLive` | `live.ts` | Listens to the live stream (/api/v1/live); returns how to stop. Framework-free: the Solid side subscribes here too. |
 | `reveal` | `opening.ts` | Once the page has mounted: takes the cover away when the page is ready, in one fade. |
