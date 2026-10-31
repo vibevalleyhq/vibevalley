@@ -9,27 +9,45 @@ import { api } from "./api.ts";
 async function withRoutes(handlers: Partial<Handlers>, body: (handler: (request: Request) => Promise<Response>) => Promise<void>) {
   const { handler, dispose } = HttpRouter.toWebHandler(api(handlers as Handlers));
   try {
-    await body(handler);
+    await body((request) => handler(new Request(request, { headers: { host: new URL(request.url).host, ...Object.fromEntries(request.headers) } })));
   } finally {
     await dispose();
   }
 }
 
 describe("the HTTP contract", () => {
+  it("regression: rejects foreign origins and forged device headers before calling a handler", async () => {
+    let calls = 0;
+    await withRoutes({ "server.health.get": () => Effect.sync(() => ({ ok: true, version: String(++calls) })) }, async (handler) => {
+      await Promise.all(
+        [
+          { origin: "https://evil.example" },
+          { origin: "null" },
+          { "sec-fetch-site": "cross-site" },
+          { host: "evil.example" },
+          { origin: "https://evil.example", "x-vibevalley-lan-device": "fake" },
+        ].map(async (headers) => {
+          expect((await handler(new Request("http://127.0.0.1/api/v1/server/health/get", { method: "POST", headers }))).status).toBe(403);
+        }),
+      );
+      expect(calls).toBe(0);
+    });
+  });
+
   it("encodes success with the endpoint schema and turns an invalid success into a server error", async () => {
     await withRoutes({ "server.health.get": () => Effect.succeed({ ok: true, version: "test" }) }, async (handler) => {
-      const res = await handler(new Request("http://farm/api/v1/server/health/get", { method: "POST" }));
+      const res = await handler(new Request("http://127.0.0.1/api/v1/server/health/get", { method: "POST" }));
       expect([res.status, await res.json()]).toEqual([200, { ok: true, version: "test" }]);
     });
     await withRoutes({ "server.health.get": () => Effect.succeed({ ok: "yes", version: "test" } as never) }, async (handler) => {
-      const res = await handler(new Request("http://farm/api/v1/server/health/get", { method: "POST" }));
+      const res = await handler(new Request("http://127.0.0.1/api/v1/server/health/get", { method: "POST" }));
       expect(res.status).toBe(500);
     });
   });
 
   it("does not turn an interrupted handler into a 500 response", async () => {
     await withRoutes({ "server.health.get": () => Effect.interrupt }, async (handler) => {
-      const res = await handler(new Request("http://farm/api/v1/server/health/get", { method: "POST" }));
+      const res = await handler(new Request("http://127.0.0.1/api/v1/server/health/get", { method: "POST" }));
       expect([res.status, await res.text()]).toEqual([503, ""]);
     });
   });
@@ -44,12 +62,12 @@ describe("the HTTP contract", () => {
         },
       },
       async (handler) => {
-        const post = (body: string) => handler(new Request("http://farm/api/v1/channel/message/list", { method: "POST", body }));
+        const post = (body: string) => handler(new Request("http://127.0.0.1/api/v1/channel/message/list", { method: "POST", body }));
         expect((await post(JSON.stringify({ id: "general", limit: 20 }))).status).toBe(200);
         const wrong = await post(JSON.stringify({ id: "general", limit: "20" }));
         expect([wrong.status, await wrong.text()]).toEqual([400, expect.stringContaining("limit")]);
         expect((await post("{")).status).toBe(400);
-        expect((await handler(new Request("http://farm/api/v1/channel/message/list"))).status).toBe(404);
+        expect((await handler(new Request("http://127.0.0.1/api/v1/channel/message/list"))).status).toBe(404);
       },
     );
     expect(seen).toEqual([{ id: "general", limit: 20 }]);

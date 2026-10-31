@@ -5,6 +5,7 @@ import { Effect, Option, Stream } from "effect";
 import type { WorkspaceState } from "@vibevalley/protocol";
 
 import { Core } from "@/core/core.ts";
+import { afterRealTime } from "@/infra/time.ts";
 
 export { aTurn, gate, nextTurn, until, untilGot, waitFor, whenTrue, within } from "@vibevalley/testkit/until";
 
@@ -23,10 +24,10 @@ export const whenState = <A>(pick: (state: WorkspaceState) => A | undefined | fa
           (a): a is A => a !== undefined && a !== false,
         ),
       );
-      const late = Effect.as(
-        Effect.promise(() => new Promise<void>((r) => setTimeout(r, ms))),
-        Option.none<A>(),
-      );
+      const late = Effect.callback<Option.Option<A>>((resume) => {
+        const cancel = afterRealTime(ms, () => resume(Effect.succeedNone));
+        return Effect.sync(cancel);
+      });
       const got = yield* Effect.raceFirst(found, late);
       if (Option.isNone(got)) return yield* Effect.die(new Error(`waited for ${typeof what === "string" ? what : what()}`));
       return got.value;

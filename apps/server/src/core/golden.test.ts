@@ -9,6 +9,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import type { Channel, WorkspaceState, Fact, Issue, Cron, CronRequest, Session, TaskGraph } from "@vibevalley/protocol";
 import { phaseText, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { jsonDiff } from "@vibevalley/testkit/golden";
 
 import { targetOf } from "@/channel/folded.ts";
 import { cronProblem } from "@/cron/due.ts";
@@ -16,6 +17,7 @@ import { nextRun, nextText, whenText } from "@/cron/when.ts";
 import { effectsOf, viewOf } from "@/game/view.ts";
 import { inbox } from "@/inbox/items.ts";
 import { attentionOf } from "@/issue/attention.ts";
+import { withIssueStatuses } from "@/issue/status.ts";
 import { reduce } from "@/projection/reduce.ts";
 import { yuan } from "@/runtime/money.ts";
 import { graphChanges, graphEventText } from "@/task/changes.ts";
@@ -34,37 +36,6 @@ async function lines(name: string): Promise<Record<string, unknown>[]> {
     .map((l) => JSON.parse(l) as Record<string, unknown>);
 }
 
-/** Where got and want first differ, as JSON: undefined when they are the same. */
-function differ(got: unknown, want: unknown, path = ""): string | undefined {
-  const a: unknown = got === undefined ? null : JSON.parse(JSON.stringify(got));
-  return diff(a, want ?? null, path);
-}
-
-function diff(a: unknown, b: unknown, path: string): string | undefined {
-  if (a === b) return undefined;
-  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null || Array.isArray(a) !== Array.isArray(b))
-    return `${path || "."}: got ${JSON.stringify(a).slice(0, 300)}, want ${JSON.stringify(b).slice(0, 300)}`;
-  if (Array.isArray(a)) {
-    const y = b as unknown[];
-    if (a.length !== y.length)
-      return `${path}: got ${a.length} items, want ${y.length}: got ${JSON.stringify(a).slice(0, 300)}, want ${JSON.stringify(y).slice(0, 300)}`;
-    for (let i = 0; i < a.length; i++) {
-      const d = diff(a[i], y[i], `${path}[${i}]`);
-      if (d) return d;
-    }
-    return undefined;
-  }
-  const x = a as Record<string, unknown>;
-  const y = b as Record<string, unknown>;
-  for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
-    if (!(k in x)) return `${path}.${k}: missing, want ${JSON.stringify(y[k]).slice(0, 200)}`;
-    if (!(k in y)) return `${path}.${k}: got ${JSON.stringify(x[k]).slice(0, 200)}, want none`;
-    const d = diff(x[k], y[k], `${path}.${k}`);
-    if (d) return d;
-  }
-  return undefined;
-}
-
 /** With VIBEVALLEY_GOLDEN=update, a rule changed on purpose writes its answers back over the recorded ones (look at the
  * diff before keeping it). */
 const updating = process.env.VIBEVALLEY_GOLDEN === "update";
@@ -76,7 +47,7 @@ function failures(name: string, rows: Record<string, unknown>[]) {
   let changed = false;
   return {
     check(line: number, what: string, got: unknown, holder: Record<string, unknown>, key: string) {
-      const d = differ(got, holder[key]);
+      const d = jsonDiff(got, holder[key]);
       if (!d) return;
       if (updating) {
         holder[key] = JSON.parse(JSON.stringify(got ?? null));
@@ -106,6 +77,7 @@ describe("the golden files", () => {
       const fact = row.fact as Fact;
       const effects = effectsOf(state, fact);
       const [next, changed] = reduce(state, fact);
+      expect(next).toEqual(withIssueStatuses(next));
       f.check(line, `${fact.type} changed`, changed, row, "changed");
       f.check(line, `${fact.type} state`, next, row, "state");
       f.check(line, `${fact.type} effects`, effects, row, "effects");

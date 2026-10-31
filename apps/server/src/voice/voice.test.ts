@@ -44,8 +44,7 @@ afterEach(() => {
  * FetchHttpClient.Fetch, provided to the test. */
 const pendingDictation = () => {
   let seen: AbortSignal | undefined;
-  let entered!: () => void;
-  const started = new Promise<void>((done) => (entered = done));
+  const { promise: started, resolve: entered } = Promise.withResolvers<void>();
   const fetch: typeof globalThis.fetch = async (_input, init) => {
     const signal = init?.signal ?? undefined;
     seen = signal;
@@ -370,14 +369,8 @@ describe("voice", () => {
 
   it.live("interrupting a start releases the line and stops the late agent", () => {
     const capture = new Capture();
-    let arrived = () => {};
-    const requested = new Promise<void>((resolve) => {
-      arrived = resolve;
-    });
-    let release = () => {};
-    const answer = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const { promise: requested, resolve: arrived } = Promise.withResolvers<void>();
+    const { promise: answer, resolve: release } = Promise.withResolvers<void>();
     capture.before = (call) => {
       if (!call.endsWith("/join")) return undefined;
       arrived();
@@ -604,14 +597,8 @@ describe("voice", () => {
 
   it.live("hanging up between speech pieces sends no later piece", () => {
     const capture = new Capture();
-    let arrived = () => {};
-    const first = new Promise<void>((resolve) => {
-      arrived = resolve;
-    });
-    let release = () => {};
-    const held = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const { promise: first, resolve: arrived } = Promise.withResolvers<void>();
+    const { promise: held, resolve: release } = Promise.withResolvers<void>();
     // Counted from every request Agora got, so the count goes on after the hold below is lifted.
     const speaks = () => capture.urls.filter((u) => u.endsWith("/speak")).length;
     capture.before = (call) => {

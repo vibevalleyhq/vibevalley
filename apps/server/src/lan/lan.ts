@@ -133,7 +133,11 @@ const keyOf = (req: IncomingMessage) => {
 };
 
 /** Never handed on: the device's key stays at the listener, and only the listener says which device asks. */
-const dropped = new Set(["host", "connection", "cookie", "authorization", deviceHeader]);
+const dropped = new Set(["host", "connection", "cookie", "authorization", "origin", "sec-fetch-site", deviceHeader]);
+
+export const sameOrigin = (headers: Readonly<Record<string, string | string[] | undefined>> & { readonly host?: string | undefined }) =>
+  (headers.origin === undefined || headers.origin === `http://${headers.host ?? ""}`) &&
+  (headers["sec-fetch-site"] === undefined || headers["sec-fetch-site"] === "same-origin" || headers["sec-fetch-site"] === "none");
 
 /** The endpoints a device may call, the three streams and the files said in the chat; any other request is refused. */
 const remote = new Set([
@@ -268,6 +272,7 @@ const make = (options: LanOptions = {}) =>
       const path = new URL(req.url ?? "/", "http://lan").pathname;
       const handled = Effect.gen(function* () {
         if (!upstream) return refuseHttp(res, 503, t("server.lan.notUp"));
+        if (path.startsWith("/api/v1/") && !sameOrigin(req.headers)) return refuseHttp(res, 403, t("server.lan.notRemote"));
         if (req.method === "POST" && path === pathOf("lan.pair")) return yield* forward(req, res, "");
         if (!path.startsWith("/api/v1/")) {
           if ((req.method === "GET" || req.method === "HEAD") && path !== "/mcp" && !path.startsWith("/mcp/")) return yield* forward(req, res, "");
@@ -307,8 +312,8 @@ const make = (options: LanOptions = {}) =>
       if (new URL(req.url ?? "/", "http://lan").pathname !== rpcPath) return refuse("404 Not Found");
       const d = deviceOf(req);
       if (!d) return refuse("401 Unauthorized");
-      // Not left to the loopback server, which takes the device header as checked: only the farm's page, as there.
-      if (req.headers.origin !== undefined && req.headers.origin !== `http://${req.headers.host ?? ""}`) return refuse("403 Forbidden");
+      // Forwarding removes the browser origin: only this listener can check it.
+      if (!sameOrigin(req.headers)) return refuse("403 Forbidden");
       const [host, port] = [upstream.slice(0, upstream.lastIndexOf(":")), Number(upstream.slice(upstream.lastIndexOf(":") + 1))];
       const lines = [`GET ${req.url ?? rpcPath} HTTP/1.1`, `host: ${upstream}`, "connection: Upgrade", `${deviceHeader}: ${d}`];
       for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) for (const one of [v].flat()) lines.push(`${k}: ${one}`);

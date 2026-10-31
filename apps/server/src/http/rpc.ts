@@ -7,18 +7,16 @@ import { RpcSerialization, RpcServer } from "effect/rpc";
 import { rpcPath, Subscriptions } from "@vibevalley/protocol/rpc";
 
 import { Channel } from "@/channel/chat.ts";
-import { deviceHeader } from "@/lan/lan.ts";
+import { sameOrigin } from "@/lan/lan.ts";
 
 const loopback = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/u;
 
 /** A WebSocket is not held back by CORS: any page the owner opens could connect, so only the farm's own page may. The
  * host must be a loopback name too, or a page whose name is made to resolve here (DNS rebinding) would be its own origin.
- * What the lan listener hands on (the device header) it has checked itself. */
+ * The lan listener checks the browser origin before forwarding under the loopback origin. */
 export const fromTheFarm = (headers: Headers.Headers): boolean => {
-  if (headers[deviceHeader]) return true;
   const host = headers.host ?? "";
-  if (!loopback.test(host)) return false;
-  return headers.origin === undefined || headers.origin === `http://${host}`;
+  return loopback.test(host) && sameOrigin(headers);
 };
 
 const handlers = Subscriptions.toLayer(

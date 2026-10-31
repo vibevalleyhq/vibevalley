@@ -38,6 +38,7 @@
 - **一批是一次提交**（`apply(...facts)`）：先在局部状态上逐条折、收集 `Transition` 和特效，再一次换掉可见的状态、安排存盘，最后按原顺序逐条发事实、再发特效。每条 `Transition` 的 `after` 是这一条的结果，不是整批的最终状态；`state()` 和 `/state` 只看得到整批。HTTP 的事件格式不变，仍是一条一条的 `Fact`。计划的父子工单（工单服务一次写完的那组）走这条路。
 - **一批不代替数据库事务**：拥有者先提交数据库事务，再发核心状态；两者之间的恢复归拥有持久化的那个模块。
 - **主人做了、但不改状态的事不是事实**：看改动、语音接上，由经手的服务调 `Core.did`，只有游戏的账本听（`owner`）。
+- **工单派生状态跟着依赖重算**：`reduce` 只在工单或会话集合引用变化时重算工单状态、关注项和动作；聊天、通话等变化保留已有工单结果。会话的 `quiet` 和 `doing` 仍重算，分别显示卡住和恢复工作。
 - **给人看的话只在出帧时填**：`frameOf(state, effects)` 在状态的副本上填帮工在干什么（`phaseText`，在做的动作和这一轮每一步的 `actionText`）、定时任务什么时候跑、计划和节点的状态、动作叫什么、现在能做什么，再算 `inbox`、`graphs`、`view`（地块、等级、每个成就的进度）；`reduce` 和 `state.json` 里没有这些话。改的是副本：阶段和 `play` 的历史复制一份再填，`Transition` 拿着的旧状态不变。特效由 `effectsOf(折之前的状态, fact)` 算，到一档成就的特效带着它的说法。动作的说法（词典 `shared` 的 `action`，页面算 `phaseText` 也用它）页面不另拿一份：帧里的这两处，加上轨迹里每个 `tool/call` 写下时带的 `actionText`（[帮工](docs/subsystems/session.md)），就是它全部的来源。
 
 **`state.json`**
@@ -91,6 +92,8 @@
 - **查询带齐真实的关联**：`issue.history.list` 只给真有的帮工，找不到的明列在 `missingSessions`，不补造一个「歇着」的帮工。
 
 **开机顺序**：全部服务建好、开机的活（`start`、`ready` 这类 layer）跑过以后开始答 HTTP；开机就派出去的帮工要的 `/mcp` 地址在开始听之后才交给 `Session`（[地基](docs/subsystems/foundation.md)）。
+
+HTTP 命令入口与页面 WebSocket 共用来源判断：Host 应为回环地址，浏览器 Origin 应与 Host 同源，Fetch-Site 存在时只接受 same-origin 或 none；外部来源在解码和调用服务前返回 403。无浏览器来源头的本机 CLI 可调用；设备头不能跳过检查。LAN 入口先检查原来源，再按回环地址转发（[连接到本机](docs/subsystems/lan.md)）。
 
 ## 怎么走
 

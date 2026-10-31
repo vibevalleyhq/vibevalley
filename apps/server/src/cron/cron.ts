@@ -18,6 +18,7 @@ import { Core } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Db } from "@/infra/db.ts";
+import { bestEffort } from "@/infra/log.ts";
 
 import * as q from "../../db/generated/cron.sql.ts";
 import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./due.ts";
@@ -119,8 +120,8 @@ const make = Effect.gen(function* () {
               onSuccess: () =>
                 Effect.gen(function* () {
                   yield* core.apply({ type: "cron", cron: after });
-                  yield* chat.notice(s.channel, dueText(s, missed), "cron");
                   PubSub.publishUnsafe(dueHub, { cron: after, missed });
+                  yield* chat.notice(s.channel, dueText(s, missed), "cron").pipe(bestEffort("cron notice was not kept"));
                 }),
             }),
           );
