@@ -117,12 +117,13 @@ export function nowledge(c: MemorySourceConfig): Source {
   const call = (tool: "memory_search" | "memory_add" | "get_memory_by_id", args: Search | Add | Detail) =>
     life.alive(
       Effect.gen(function* () {
-        const session = yield* Effect.tryPromise({ try: open, catch: sourceError });
+        const pending = open();
+        const session = yield* Effect.tryPromise({ try: () => pending, catch: sourceError });
         const res = yield* Effect.tryPromise({
           try: (signal) => session.callTool({ name: tool, arguments: args }, undefined, { signal }),
           catch: (e) => {
             if (!life.stopped()) {
-              client = undefined;
+              if (client === pending) client = undefined;
               void session.close();
             }
             return sourceError(e);

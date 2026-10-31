@@ -206,8 +206,7 @@ describe("memory sources", () => {
     const old = new Fake("nowledge");
     const fresh = new Fake("nowledge");
     const events: string[] = [];
-    let release!: () => void;
-    const held = new Promise<void>((done) => (release = done));
+    const { promise: held, resolve: release } = Promise.withResolvers<void>();
     old.add = async (n) => {
       events.push("old:" + n.text);
       if (n.text === "first") await held;
@@ -244,8 +243,7 @@ describe("memory sources", () => {
       let entered = false;
       let stopped = false;
       let asked: AbortSignal | undefined;
-      let release!: () => void;
-      const held = new Promise<void>((done) => (release = done));
+      const { promise: held, resolve: release } = Promise.withResolvers<void>();
       const read = async (signal?: AbortSignal) => {
         asked = signal;
         entered = true;
