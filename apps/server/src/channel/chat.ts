@@ -5,7 +5,7 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, FiberMap, FiberSet, FileSystem, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { HttpClient } from "effect/http";
 
 import { list, t } from "@vibevalley/i18n";
@@ -47,7 +47,7 @@ import { ChatModel, type ChannelRow } from "./model.ts";
 import { busyNotice, wakeInput } from "./prompts.ts";
 import { parseSearch } from "./search.ts";
 import { channelNameProblem, parseChatTarget } from "./targets.ts";
-import { heldShown, type InboxMessage, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";
+import { heldShown, type InboxMessage, type Picked, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";
 
 /** The channel a new farm opens with. */
 const firstChannelName = "general";
@@ -103,6 +103,7 @@ export interface SpeakOptions {
 export interface SayMore {
   readonly replyTo?: number;
   readonly attachments?: readonly string[];
+  readonly picked?: Picked;
 }
 
 export interface ReadOptions {
@@ -142,6 +143,7 @@ interface Meta {
   embeds?: T.Embed[];
   /** The artifact it announces, as it was then (artifact/). */
   artifact?: T.ArtifactCard;
+  picked?: Picked;
 }
 
 const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
@@ -156,6 +158,7 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(S.Attachment))),
   embeds: Schema.optionalKey(Schema.mutable(Schema.Array(S.Embed))),
   artifact: Schema.optionalKey(S.ArtifactCard),
+  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
 });
 
 /** Anything unreadable is no meta. */
@@ -229,6 +232,7 @@ const inboxMore = (row: Pick<MsgRow, "meta" | "reply_number"> & { edited_at?: nu
     ...(meta.artifact && (row.deleted_at == null || row.deleted_at === 0)
       ? { artifact: { id: meta.artifact.id, title: meta.artifact.title, version: meta.artifact.version } }
       : {}),
+    ...(meta.picked ? { picked: meta.picked } : {}),
   };
 };
 
@@ -456,6 +460,7 @@ const make = Effect.gen(function* () {
   const agents = yield* Agent;
   let helpers: Helpers | undefined;
   const { run: db, one, inTx } = yield* Db;
+  const fs = yield* FileSystem.FileSystem;
   const model = new ChatModel();
   const reach = new Audience();
   const open = new Deliveries();
@@ -1409,7 +1414,9 @@ const make = Effect.gen(function* () {
         sendKey,
         readBy: ownerId,
         ...(more.replyTo !== undefined ? { replyTo: more.replyTo } : {}),
-        ...(files.length > 0 ? { meta: { attachments: files } } : {}),
+        ...(files.length > 0 || more.picked
+          ? { meta: { ...(files.length > 0 ? { attachments: files } : {}), ...(more.picked ? { picked: more.picked } : {}) } }
+          : {}),
       });
       if (written.again) return { message: toMessage(written.row), again: true };
       if (written.absent.length > 0)
@@ -1510,7 +1517,10 @@ const make = Effect.gen(function* () {
       if (bytes.length === 0) return yield* Effect.fail(refused(t("server.channel.emptyFile")));
       if (bytes.length > attachmentMax) return yield* Effect.fail(refused(t("server.channel.fileTooBig", { mb: Math.round(attachmentMax / 1024 / 1024) })));
       const id = createHash("sha256").update(bytes).digest("hex");
-      yield* writeOnce(filesAt(id), bytes).pipe(Effect.mapError((e) => refused(e.message)));
+      yield* writeOnce(filesAt(id), bytes).pipe(
+        Effect.mapError((e) => refused(e.message)),
+        Effect.provideService(FileSystem.FileSystem, fs),
+      );
       const type = upload.type.trim() || "application/octet-stream";
       yield* db(qa.insertAttachment({ id, name, type, size: bytes.length, created_at: yield* Clock.currentTimeMillis }));
       return { id, name, type, size: bytes.length };

@@ -15,6 +15,12 @@ export const retryWindowMs = 60_000;
 
 export const heldShown = 3;
 
+/** What the owner picked beside a message in the farm's form: the profile and the project the work is for. */
+export interface Picked {
+  readonly agent?: string;
+  readonly project?: string;
+}
+
 export interface InboxMessage {
   readonly id: string;
   readonly number: number;
@@ -29,4 +35,6 @@ export interface InboxMessage {
   /** Files said with it, where they are on this computer. */
   readonly attachments?: readonly { readonly name: string; readonly path: string }[];
   readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
+  /** Kept with the message, so whoever takes it sees it, whenever that is. */
+  readonly picked?: Picked;
 }

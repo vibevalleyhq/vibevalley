@@ -16,6 +16,7 @@ import { agentHome, ServerConfig } from "@/infra/config.ts";
 import { Setting } from "@/setting/setting.ts";
 
 import { everos } from "./everos.ts";
+import { loadSegmenter } from "./gse.ts";
 import { nowledge } from "./nowledge.ts";
 import { fromOwner } from "./prompts.ts";
 import { clip, foundText, type Found, inProject, noteMaxChars, recallChars, searchLimit, type SearchQuery, type SearchResult, sourceLabel } from "./recall.ts";
@@ -100,7 +101,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       ...(timeoutMs !== undefined ? { timeoutMs } : {}),
     });
     // What an older cut left is cut again in the background.
-    yield* Effect.forkScoped(local.recutTerms);
+    yield* Effect.forkScoped(Effect.andThen(loadSegmenter, local.recutTerms));
     // An orchestrator carries its whole MEMORY.md into every turn; a helper is reminded of rows by its runs' cues.
     const inFile = (agent: string) => agents.isOrchestrator(agent);
     const homeOf = (agent: string) => agentHome(config, agent);

@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { Clock, Context, Effect, Layer, Semaphore } from "effect";
+import { Clock, Context, Effect, FileSystem, Layer, Semaphore } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -75,6 +75,7 @@ const make = (options: ArtifactOptions = {}) =>
     const config = yield* ServerConfig;
     const chat = yield* Channel;
     const { run: db, one } = yield* Db;
+    const fs = yield* FileSystem.FileSystem;
     // One change of an artifact's row at a time: a version's number is the latest's plus one.
     const lock = yield* Semaphore.make(1);
     const dir = join(config.home, "artifacts");
@@ -83,6 +84,7 @@ const make = (options: ArtifactOptions = {}) =>
     const keep = (bytes: Buffer) => {
       const sha = createHash("sha256").update(bytes).digest("hex");
       return writeOnce(fileOf(sha), bytes).pipe(
+        Effect.provideService(FileSystem.FileSystem, fs),
         Effect.as(sha),
         Effect.mapError((e) => refused(t("server.artifact.notKept", { why: String(e.cause) }))),
       );

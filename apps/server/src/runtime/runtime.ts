@@ -25,14 +25,13 @@ import { jsonOrNone } from "@/base/json.ts";
 import { Core } from "@/core/core.ts";
 import { type ApiError, messageOf, refused } from "@/errors.ts";
 import { projectsDir, ServerConfig } from "@/infra/config.ts";
-import { FileWriter } from "@/infra/files.ts";
-import { callbackLog } from "@/infra/log.ts";
+import { keptFile } from "@/infra/files.ts";
 import { timeHere, withinRealTime } from "@/infra/time.ts";
 import { Setting } from "@/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
 import { agentProblems, type Candidate, chooseAgent, sessionOptions } from "./fit.ts";
-import { piBalance } from "./pi.ts";
+import { piBalance, type PiDefault, piSettings } from "./pi.ts";
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "./presets.ts";
 import { inCny, price, type Rate } from "./price.ts";
 import { moneyStop, quotaOf } from "./quota.ts";
@@ -223,7 +222,6 @@ export const make = (options: RuntimeOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
     const fs = yield* FileSystem.FileSystem;
-    const logs = yield* callbackLog;
     const config = yield* ServerConfig;
     const core = yield* Core;
     const store = yield* Agent;
@@ -235,6 +233,9 @@ export const make = (options: RuntimeOptions = {}) =>
     const usageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) =>
       Effect.orElseSucceed(Effect.tryPromise({ try: () => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings), catch: messageOf }), () => null);
 
+    /** pi's own default model, read again whenever pi is looked at: what a quote for pi's default prices. */
+    const readPiDefault = Effect.promise(piSettings);
+    let piDefault: PiDefault = yield* readPiDefault;
     const cache = new Map<string, Observation>();
     const relabeling = new Set<string>();
     /**
@@ -252,7 +253,8 @@ export const make = (options: RuntimeOptions = {}) =>
     let closed = false;
 
     const spendFile = join(config.home, "spend.json");
-    const disk = new FileWriter(spendFile);
+    // The tally is written a second after the first spend, the ones in between joining it, and as the service closes.
+    const disk = yield* keptFile(spendFile, { soonMs: 1000 });
     let spent: Spent = { day: dayOf(clock.currentTimeMillisUnsafe()), byRuntime: {} };
     // An unreadable tally, or yesterday's, starts the day again.
     const kept = jsonOrNone(SpentSchema)(Option.getOrUndefined(yield* Effect.option(fs.readFileString(spendFile))));
@@ -269,13 +271,7 @@ export const make = (options: RuntimeOptions = {}) =>
           closed = true;
           return FiberMap.clear(timers);
         }),
-        Effect.sync(() => {
-          try {
-            disk.finish(() => JSON.stringify(spent));
-          } catch (e) {
-            logs.warn(`vibevalley: could not save spend.json: ${String(e)}`);
-          }
-        }),
+        Effect.sync(() => disk.soon(() => JSON.stringify(spent))),
       ),
     );
 
@@ -312,6 +308,7 @@ export const make = (options: RuntimeOptions = {}) =>
     }
 
     const probe = Effect.fnUntraced(function* (id: string): Effect.fn.Return<Observation> {
+      if (id === "pi") piDefault = yield* readPiDefault;
       const settings = store.settings(id);
       const info: T.RuntimeInfo = {
         id,
@@ -537,26 +534,14 @@ export const make = (options: RuntimeOptions = {}) =>
       }),
       runtime: (id) => registry.get(id),
       quote: (id, model) => {
-        const p = price(id, model);
+        const p = price(id, model, piDefault);
         return p ? inCny(p, config.cnyPerUsd) : undefined;
       },
       spend: (id, cny) => {
         if (!(cny > 0) || closed) return;
         tally()[id] = (tally()[id] ?? 0) + cny;
-        // The tally is written a second after the last spend; the runtime's new total is pushed once per window.
-        later(
-          "save",
-          Effect.delay(
-            Effect.sync(() => {
-              try {
-                disk.write(() => JSON.stringify(spent));
-              } catch (e) {
-                logs.warn(`vibevalley: could not save spend.json: ${String(e)}`);
-              }
-            }),
-            1000,
-          ),
-        );
+        // The runtime's new total is pushed once per window.
+        disk.soon(() => JSON.stringify(spent));
         later(
           `push:${id}`,
           Effect.delay(

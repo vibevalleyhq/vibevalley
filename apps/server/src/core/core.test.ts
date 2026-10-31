@@ -1,12 +1,14 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Logger, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
 
 import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
+import { waitFor } from "@vibevalley/testkit/until";
 
 import { emptyProgress } from "@/game/progress.ts";
 import { ServerConfig } from "@/infra/config.ts";
@@ -47,7 +49,7 @@ describe("core", () => {
       expect([s.progress, s.crons, s.issues]).toEqual([undefined, [], []]);
       expect(s.sessions).toHaveLength(1);
       expect(s.sessions[0]!.play?.station).toBe(0);
-    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)))));
+    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))));
   });
 
   it.effect("valid JSON with the wrong state shape is kept aside untouched, and the farm starts empty", () => {
@@ -58,7 +60,9 @@ describe("core", () => {
       yield* Effect.scoped(
         Effect.gen(function* () {
           expect((yield* Core).state()).toEqual(emptyWorkspaceState());
-        }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config))))),
+        }).pipe(
+          Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))),
+        ),
       );
       // Closing wrote a new state.json; the owner's old one is kept as it was.
       const kept = readdirSync(config.home).filter((f) => f.startsWith("state.json.unreadable-"));
@@ -77,7 +81,7 @@ describe("core", () => {
       expect(core.state().call).toBe("idle");
       yield* reopen;
       expect(core.state().call).toBe("live");
-    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)))));
+    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))));
   });
 
   it.effect("a fact is stamped and sent; the same again is no news; state.json is written on close, without the words", () => {
@@ -96,7 +100,9 @@ describe("core", () => {
           const got = yield* Fiber.join(seen);
           expect(got.map((e) => e.type)).toEqual(["snapshot", "hired", "orchestrator", "progress"]);
           expect(got[2]!.at).toBeGreaterThan(0);
-        }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config))))),
+        }).pipe(
+          Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))),
+        ),
       );
       const kept = JSON.parse(readFileSync(join(config.home, "state.json"), "utf8")) as Record<string, unknown>;
       expect(kept.orchestrators).toEqual({ orchestrator: { state: "thinking", since: expect.any(Number) } });
@@ -121,7 +127,9 @@ describe("core", () => {
       expect([next.state.orchestrators.orchestrator?.state, next.state.commits?.total]).toEqual(["speaking", 2]);
       yield* TestClock.adjust(stateEveryMs * 2);
       expect(yield* Queue.size(frames)).toBe(0);
-    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig()))))),
+    }).pipe(
+      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
+    ),
   );
 
   it.effect("seq goes up once per commit that changes the state, and a frame carries the seq of the state it shows", () =>
@@ -147,7 +155,9 @@ describe("core", () => {
       // What a reply read after its change says (replied) is no later than the first frame that shows the change.
       expect(next.seq).toBeGreaterThanOrEqual(replied);
       expect(next.state.orchestrators.lead?.state).toBe("thinking");
-    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig()))))),
+    }).pipe(
+      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
+    ),
   );
 
   it.effect("an internal subscriber keeps a whole burst while it works", () =>
@@ -167,7 +177,9 @@ describe("core", () => {
       for (let i = 0; i < 128; i++) yield* core.setOrchestrator("orchestrator", i % 2 === 0 ? "thinking" : "speaking");
       yield* TestClock.adjust(200);
       expect(yield* Fiber.join(seen)).toBe(128);
-    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig()))))),
+    }).pipe(
+      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
+    ),
   );
 
   it.effect("a delayed save failure is logged and the final save still works", () => {
@@ -183,9 +195,16 @@ describe("core", () => {
           const core = yield* Core;
           yield* core.setOrchestrator("orchestrator", "thinking");
           yield* TestClock.adjust(600);
-          expect(messages.some((message) => String(message).includes("state.json could not be saved"))).toBe(true);
+          // The write is on the file system, after the clock's move.
+          yield* waitFor(
+            Effect.sync(() => messages.some((message) => String(message).includes("state.json could not be saved"))),
+            (logged) => logged,
+            "the failure logged",
+          );
           rmSync(join(config.home, "state.json"), { recursive: true });
-        }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config))))),
+        }).pipe(
+          Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))),
+        ),
       );
       expect(readFileSync(join(config.home, "state.json"), "utf8")).toContain("thinking");
     }).pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])));
@@ -210,7 +229,9 @@ describe("core", () => {
       yield* core.setOrchestrator("orchestrator", "idle");
       yield* core.setOrchestrator("lead", "idle");
       expect(core.state().orchestrators).toEqual({});
-    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig()))))),
+    }).pipe(
+      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
+    ),
   );
 
   it.effect("apply stays synchronous for oar callbacks", () =>
@@ -219,6 +240,8 @@ describe("core", () => {
       const core = yield* Core;
       yield* Effect.sync(() => runSync(core.apply({ type: "orchestrator", agent: "orchestrator", state: "thinking" })));
       expect(core.state().orchestrators.orchestrator?.state).toBe("thinking");
-    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig()))))),
+    }).pipe(
+      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
+    ),
   );
 });

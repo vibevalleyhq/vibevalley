@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
@@ -29,6 +30,7 @@ const world = (config = testConfig()) =>
     Layer.provideMerge(Database),
     Layer.provideMerge(FetchHttpClient.layer),
     Layer.provideMerge(Layer.succeed(ServerConfig, config)),
+    Layer.provideMerge(NodeServices.layer),
   );
 
 describe("memory", () => {

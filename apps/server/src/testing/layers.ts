@@ -1,5 +1,6 @@
 // What tests run the services on: a configuration in a temporary home and an in-memory database.
 
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { Effect, Layer } from "effect";
@@ -9,18 +10,19 @@ import { type Agent, defaultOrchestrator } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { withCast } from "@/agent/agent.ts";
-import { builtInDir, builtInIds, profileOf, readTemplate } from "@/agent/template.ts";
+import { builtInDir, profileOf, templateFrom } from "@/agent/template.ts";
 import { defaults, ServerConfig } from "@/infra/config.ts";
 import { Database } from "@/infra/db.ts";
 
 /** A built-in template as a farm whose agent.starters names it has it: under the template's own id. */
 export const starter = (id: string): Agent => {
-  const t = readTemplate(join(builtInDir, id), "builtIn");
+  const textOf = (path: string) => Effect.sync(() => (existsSync(path) ? readFileSync(path, "utf8") : undefined));
+  const t = Effect.runSync(templateFrom(textOf, join(builtInDir, id), "builtIn"));
   return withCast(profileOf(t, t.id, t.name));
 };
 
 /** Every built-in template's profile but the default orchestrator's, in their order: what a test farm starts with. */
-const starters = () => builtInIds().filter((id) => id !== defaultOrchestrator);
+const starters = () => (JSON.parse(readFileSync(join(builtInDir, "index.json"), "utf8")) as string[]).filter((id) => id !== defaultOrchestrator);
 
 export function testConfig(change: Partial<ServerConfig["Service"]> = {}): ServerConfig["Service"] {
   const home = tempDir("vibevalley-test-");

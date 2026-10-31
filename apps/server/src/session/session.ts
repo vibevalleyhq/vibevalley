@@ -50,7 +50,6 @@ import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/
 import { serverAddress, ServerConfig } from "@/infra/config.ts";
 import { causeMessage, Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
-import { timeHere } from "@/infra/time.ts";
 import { Memory } from "@/memory/memory.ts";
 import { Project } from "@/project/project.ts";
 import { type Merged, MergeFailure, type ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
@@ -60,7 +59,7 @@ import { instructions, briefBreak, recallBlock, toOarMcp, withRecall } from "./b
 import { eventFacts, type Op, since, type Tracking } from "./facts.ts";
 import { noRoom, type SessionLimits, sessionName, whoMakesRoom } from "./hiring.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
-import { type Journal, Trajectories } from "./journal.ts";
+import { type Journal, makeTrajectories } from "./journal.ts";
 import { restartedNote, workplaceRules } from "./prompts.ts";
 import { readReport, summaryOf } from "./report.ts";
 import { sessionOnIssue } from "./roster.ts";
@@ -202,7 +201,7 @@ export class Session extends Context.Service<
     readonly get: (id: string) => Effect.Effect<T.Session | undefined>;
     readonly runs: (issue: string) => Effect.Effect<T.Run[]>;
     /** A session's log, oldest first; a run's only when run is given. */
-    readonly events: (id: string, run?: string) => T.SessionEvent[] | undefined;
+    readonly events: (id: string, run?: string) => Effect.Effect<T.SessionEvent[] | undefined>;
     /** These four are subscribed before they return: nothing published after is missed. */
     readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
     /** A session hired, reported or gone, with the session as it stood after: what the issues and task graphs follow. */
@@ -415,14 +414,8 @@ export const make = (options: SessionOptionsIn = {}) =>
     const logDir = join(config.home, "logs");
     const stallMs = options.stallMs ?? config.session.stallSeconds * 1000;
     const clock = yield* Clock.Clock;
-    const time = yield* timeHere;
     let mcpUrl = `http://${serverAddress(config)}/mcp`;
-    const trajectories = new Trajectories(
-      config.home,
-      (id, e) => runSync(core.sessionEvent(id, e)),
-      (message) => fire(Effect.logWarning(message)),
-      time,
-    );
+    const trajectories = yield* makeTrajectories(config.home, (id, e) => runSync(core.sessionEvent(id, e)));
     // A hand is acquired before admission; no path holding admission waits for a hand.
     const admission = yield* Semaphore.make(1);
 
@@ -501,7 +494,8 @@ export const make = (options: SessionOptionsIn = {}) =>
     const ended = (id: string, closed: T.SessionClose) =>
       attempt(qs.endSession({ ended_at: clock.currentTimeMillisUnsafe(), closed, id })).pipe(bestEffort(`vibevalley: session ${id}'s end not kept`));
 
-    const logOf = (s: T.Session) => Effect.as(keep(s), trajectories.openLog(s.id));
+    /** The session kept, with its log. */
+    const logOf = (s: T.Session, journal: Journal) => Effect.as(keep(s), journal);
 
     // A run's record, the helpers' and the in-process agent's alike (inProcessRun.ts): one way to open, hear, link and end it.
     const runs = {
@@ -682,6 +676,11 @@ export const make = (options: SessionOptionsIn = {}) =>
       const stopReports = s.subagents.onReport((report) => {
         if (report.sessionId === session.id) queueMicrotask(() => !s.detached && applyReport(h, report));
       });
+      // A turn that ended before this line (the hand is made once its log is open, after the session started) left its
+      // report unread, with no one to hand it to: taken now, in order. The crew is this session's alone.
+      void s.subagents.wait({ timeoutMs: 0 }).then((early) => {
+        for (const report of early) if (report.sessionId === session.id && !s.detached) applyReport(h, report);
+      });
       const stopStalls = watchStalls(
         session,
         stallMs,
@@ -813,7 +812,7 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     const leave = Effect.fn("Session.leave")(function* (h: Hand, closed: T.SessionClose, merged: number) {
       release(h);
-      trajectories.finish(h.id);
+      yield* trajectories.finish(h.id);
       yield* ended(h.id, closed);
       closedLaunch(h);
       revokeToken(h.id);
@@ -985,7 +984,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const expireLogs = Effect.fn("Session.expireLogs")(function* (days: number) {
       if (days <= 0) return;
       const ids = yield* db(qs.sessionsEndedBefore({ before: (yield* Clock.currentTimeMillis) - days * dayMs }));
-      for (const r of ids) trajectories.forget(r.id);
+      yield* Effect.forEach(ids, (r) => trajectories.forget(r.id), { discard: true });
     });
 
     const restore = Effect.gen(function* () {
@@ -1008,7 +1007,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         const place = row?.place ? placeOf(row.place) : undefined;
         if (!row || !place || !(yield* Effect.orElseSucceed(fs.exists(place.cwd), () => false))) {
           yield* core.apply({ type: "left", id: session.id, closed: "lost" });
-          trajectories.finish(session.id);
+          yield* trajectories.finish(session.id);
           yield* ended(session.id, "lost");
           yield* core.notice(
             "warn",
@@ -1024,7 +1023,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           id: session.id,
           place: s.place,
           access: Semaphore.makeUnsafe(1),
-          journal: yield* logOf(session),
+          journal: yield* logOf(session, yield* trajectories.openLog(session.id)),
           sess: undefined,
           oarSessionId: s.oarSessionId,
           lastText: s.lastText,
@@ -1077,7 +1076,6 @@ export const make = (options: SessionOptionsIn = {}) =>
               { concurrency: "unbounded", discard: true },
             ).pipe(Effect.timeoutOption(closeWaitMs)),
           ),
-          Effect.andThen(Effect.sync(() => trajectories.close())),
         ),
       ),
     );
@@ -1138,6 +1136,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           };
           const refuseStart = (why: string, retained: boolean): Effect.Effect<Hired> =>
             Effect.gen(function* () {
+              yield* trajectories.finish(id);
               if (retained) return { refused: why, retainedWork: true };
               revokeToken(id);
               const result = yield* projects.release(place);
@@ -1145,12 +1144,15 @@ export const make = (options: SessionOptionsIn = {}) =>
               if (result.kept) yield* core.notice("warn", result.reason);
               return { refused: why, ...(result.kept ? { retainedWork: true as const } : {}) };
             });
+          // The log is open before the session starts: from the start to attach there is no wait, so nothing the session
+          // says or reports falls in between.
+          const journal = yield* trajectories.openLog(id);
           const opened = yield* open(agent, session, place, withRecall(recall, brief), "");
           if (!opened.session) return yield* refuseStart(t("server.session.life.cannotSend", { name: agent.name, why: opened.refused }), opened.retained);
           const registered = yield* Effect.result(
             Effect.gen(function* () {
               if (opt.hiring) yield* opt.hiring(session);
-              return yield* logOf(session);
+              return yield* logOf(session, journal);
             }),
           ).pipe(Effect.onError((cause) => failedOpening(opened.session, t("server.session.life.notRecorded", { name: agent.name, why: reasonText(cause) }))));
           if (registered._tag === "Failure") {
@@ -1190,6 +1192,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           Effect.onExit((exit) => {
             if (exit._tag === "Success" || committed || released) return Effect.void;
             return Effect.gen(function* () {
+              yield* trajectories.finish(id);
               const allocation = allocations.get(id);
               if (allocation?.attached === true) return;
               if (allocation) {
@@ -1311,7 +1314,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
       host: Effect.fn("Session.host")(function* <R>(o: HostOptions<R>) {
-        return yield* makeHost(o, trajectories.openLog(o.name, o.keepEvents), runStore);
+        return yield* makeHost(o, yield* trajectories.openLog(o.name, o.keepEvents), runStore);
       }),
       restore,
     });

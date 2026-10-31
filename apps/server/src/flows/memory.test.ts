@@ -103,7 +103,7 @@ describe("memory", () => {
         ["- （这个项目）这个项目用 pnpm test 跑测试", "- （所有项目）提交信息写中文", "- 做过（这个项目）：" + done.text].toSorted(),
       );
       yield* w.nextReport;
-      const steps = sessions.events(second.id)!;
+      const steps = (yield* sessions.events(second.id)) ?? [];
       expect(steps[0]!.type).toBe("run/start");
       expect([steps[1]!.type, steps[1]!.text, steps[2]!.type, steps[2]!.text]).toEqual([
         "user/message",

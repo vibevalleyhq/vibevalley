@@ -4,9 +4,12 @@
 // the HMM (CutSearch(text, true)) and the cut into every dictionary word (CutAll). The recorded cases
 // (terms.test.ts) hold the two to the same words.
 
+// oxlint-disable-next-line vibevalley/sync-fs -- readNow, the fallback before loadSegmenter has read the data; once per process
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
+
+import { Effect, FileSystem } from "effect";
 
 const dataDir = join(import.meta.dirname, "data");
 
@@ -34,9 +37,26 @@ interface Dictionary {
 
 let dictionary: Dictionary | undefined;
 
-function dict(): Dictionary {
-  if (dictionary) return dictionary;
-  const text = gunzipSync(readFileSync(join(dataDir, "zh_s.txt.gz"))).toString("utf8");
+/** The segmenter's two files, gunzipped. */
+const files = { dictionary: "zh_s.txt.gz", emit: "hmm_emit.json.gz" } as const;
+
+/** Reads a file of the segmenter's at once: only when a cut comes before load has (a rule's test, a cut as the server
+ * starts), and once. */
+const readNow = (file: string) => gunzipSync(readFileSync(join(dataDir, file))).toString("utf8");
+
+/** Reads the dictionary and the HMM's table on the file system, off the event loop: the memory service starts it, so a
+ * first cut does not hold the server for the 2 MB dictionary. */
+export const loadSegmenter = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const read = (file: string) => Effect.map(fs.readFile(join(dataDir, file)), (bytes) => gunzipSync(bytes).toString("utf8"));
+  dictionary ??= dictionaryOf(yield* read(files.dictionary));
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the segmenter's table, shipped with the package
+  emitTable ??= JSON.parse(yield* read(files.emit)) as Record<State, Record<string, number>>;
+}).pipe(Effect.orDie);
+
+const dict = (): Dictionary => (dictionary ??= dictionaryOf(readNow(files.dictionary)));
+
+function dictionaryOf(text: string): Dictionary {
   const freq = new Map<string, number>();
   let totalFreq = 0;
   for (const line of text.split("\n")) {
@@ -56,8 +76,7 @@ function dict(): Dictionary {
     freq.set(key, f);
     totalFreq += f;
   }
-  dictionary = { freq, sorted: [...freq.keys()].toSorted(), totalFreq };
-  return dictionary;
+  return { freq, sorted: [...freq.keys()].toSorted(), totalFreq };
 }
 
 /** strconv.ParseFloat's: a number written whole, or nothing. */
@@ -128,7 +147,7 @@ type State = "B" | "E" | "M" | "S";
 let emitTable: Record<State, Record<string, number>> | undefined;
 const emit = () =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the segmenter's table, shipped with the package
-  (emitTable ??= JSON.parse(gunzipSync(readFileSync(join(dataDir, "hmm_emit.json.gz"))).toString("utf8")) as Record<State, Record<string, number>>);
+  (emitTable ??= JSON.parse(readNow(files.emit)) as Record<State, Record<string, number>>);
 
 const minFloat = -3.14e100;
 const prevStatus: Record<State, readonly State[]> = { B: ["E", "S"], M: ["M", "B"], S: ["S", "E"], E: ["B", "M"] };

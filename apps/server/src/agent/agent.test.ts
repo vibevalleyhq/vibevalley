@@ -1,6 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Cause, Effect, Exit, Layer } from "effect";
 
@@ -14,7 +15,7 @@ import { testConfig, starter } from "@/testing/layers.ts";
 import { Agent, withCast } from "./agent.ts";
 
 const run = <A, E>(config: ServerConfig["Service"], body: Effect.Effect<A, E, Agent>) =>
-  Effect.scoped(body.pipe(Effect.provide(Agent.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config))))));
+  Effect.scoped(body.pipe(Effect.provide(Agent.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer)))));
 
 const draft = (change: Partial<T.Agent> = {}): T.Agent => ({
   id: "",
@@ -224,7 +225,7 @@ describe("profiles", () => {
         const s = yield* Agent;
         const second = yield* s.installTemplate("backend");
         expect([second.id, second.name, second.from]).toEqual(["backend-2", "后端老周 2", { template: "backend", version: 1 }]);
-        expect(s.templates().find((t) => t.id === "backend")?.installed).toEqual(["backend", "backend-2"]);
+        expect((yield* s.templates()).find((t) => t.id === "backend")?.installed).toEqual(["backend", "backend-2"]);
         expect((yield* Effect.flip(s.installTemplate("nobody")))._tag).toBe("Missing");
         // The owner's changes stay until the profile is made again from the template; the machine's stay after it too.
         yield* s.save({ ...second, name: "后端二号", persona: "我自己写的", env: { CI: "1" }, from: { template: "backend", version: 0 } });
@@ -261,7 +262,7 @@ describe("profiles", () => {
         expect((yield* s.previewRemoveTemplate("lead")).does[0]).toContain("1 份档案留着");
         expect((yield* Effect.flip(s.removeTemplate("backend")))._tag).toBe("Refused");
         yield* s.removeTemplate("lead");
-        expect(s.templates().some((t) => t.id === "lead")).toBe(false);
+        expect((yield* s.templates()).some((t) => t.id === "lead")).toBe(false);
         expect(s.agent(lead.id)?.from).toEqual({ template: "lead", version: 2 });
       }),
     );

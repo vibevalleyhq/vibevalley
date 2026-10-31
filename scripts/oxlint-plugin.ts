@@ -682,6 +682,28 @@ const dbDoor = defineRule({
   },
 });
 
+const syncFs = defineRule({
+  meta: {
+    messages: {
+      sync: says(
+        "{{name}} holds the event loop while it reads or writes, so every helper's stream and every request waits on the disk",
+        "`yield* FileSystem.FileSystem` and its readFileString, writeFileString, rename, readDirectory…; a file the server keeps is a `keptFile` (infra/files.ts); a callback outside Effect uses node:fs/promises",
+        "apps/server/src/infra/files.ts",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value !== "node:fs" && node.source.value !== "fs") return;
+        for (const s of node.specifiers)
+          if (s.type === "ImportSpecifier" && s.imported.type === "Identifier" && s.imported.name.endsWith("Sync"))
+            context.report({ node: s, messageId: "sync", data: { name: s.imported.name } });
+      },
+    };
+  },
+});
+
 const droppedTimer = defineRule({
   meta: {
     messages: {
@@ -1235,6 +1257,7 @@ export default definePlugin({
     "db-door": dbDoor,
     "child-process-door": childProcessDoor,
     "dropped-timer": droppedTimer,
+    "sync-fs": syncFs,
     "atom-door": atomDoor,
     "page-store": pageStore,
     "stored-door": storedDoor,

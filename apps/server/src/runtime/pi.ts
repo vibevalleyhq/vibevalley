@@ -1,7 +1,7 @@
 // What pi itself is set up with: its default model, the DeepSeek key and address it
 // uses, and its DeepSeek balance. pi keeps these in its agent folder; the farm only reads them.
 
-import { existsSync, readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -44,26 +44,31 @@ const BalanceResponse = Schema.Struct({
   balance_infos: Schema.optionalKey(Schema.Array(Schema.Struct({ currency: Schema.String, total_balance: Schema.String }))),
 });
 
-function readJson<T>(name: string, schema: Schema.Codec<T>): T | undefined {
-  const file = join(piAgentDir(), name);
-  if (!existsSync(file)) return undefined;
+/** One of pi's own files; none when it is not there or does not read. */
+async function readJson<T>(name: string, schema: Schema.Codec<T>): Promise<T | undefined> {
   try {
-    return jsonOf(schema)(readFileSync(file, "utf8"));
+    return jsonOf(schema)(await readFile(join(piAgentDir(), name), "utf8"));
   } catch {
     return undefined;
   }
 }
 
 /** pi's default provider and model, from its settings.json; "" when it has none. */
-export function piSettings(): { provider: string; model: string } {
-  const s = readJson("settings.json", SettingsFile);
+export async function piSettings(): Promise<PiDefault> {
+  const s = await readJson("settings.json", SettingsFile);
   return { provider: s?.defaultProvider ?? "", model: s?.defaultModel ?? "" };
 }
 
-function piProvider(settings: Pick<RuntimeSettings, "defaultModel">): string {
+/** pi's default provider and model, as its settings.json names them. */
+export interface PiDefault {
+  readonly provider: string;
+  readonly model: string;
+}
+
+async function piProvider(settings: Pick<RuntimeSettings, "defaultModel">): Promise<string> {
   const slash = settings.defaultModel.indexOf("/");
   const provider = slash >= 0 ? settings.defaultModel.slice(0, slash).trim() : "";
-  return provider || piSettings().provider;
+  return provider || (await piSettings()).provider;
 }
 
 const envName = /^\$?\{?([A-Z][A-Z0-9_]*)\}?$/u;
@@ -81,11 +86,11 @@ function piValue(value: string): string {
  * The DeepSeek key pi uses and where it sends DeepSeek's requests: the key in its auth.json, else DEEPSEEK_API_KEY, else
  * its models.json's providers.deepseek.apiKey; the base URL in models.json, else DeepSeek's own, without a trailing /v1.
  */
-function piDeepseek(): { key: string; base: string } {
-  const authKey = readJson("auth.json", AuthFile)?.deepseek?.key;
+async function piDeepseek(): Promise<{ key: string; base: string }> {
+  const authKey = (await readJson("auth.json", AuthFile))?.deepseek?.key;
   let key = authKey ? piValue(authKey) : (process.env.DEEPSEEK_API_KEY ?? "");
   let base = "https://api.deepseek.com";
-  const p = readJson("models.json", ModelsFile)?.providers?.deepseek;
+  const p = (await readJson("models.json", ModelsFile))?.providers?.deepseek;
   if (!key && p?.apiKey) key = piValue(p.apiKey);
   if (p?.baseUrl) base = p.baseUrl;
   base = base.replace(/\/$/u, "").replace(/\/v1$/u, "").replace(/\/$/u, "");
@@ -96,9 +101,9 @@ const unavailable = (reason: string): AccountUsage => ({ status: "unavailable", 
 
 /** pi's balance at DeepSeek, when its default model is DeepSeek's; no other provider reports one. */
 export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">): Promise<AccountUsage> {
-  const provider = piProvider(settings);
+  const provider = await piProvider(settings);
   if (provider !== "deepseek") return unavailable(provider ? t("server.runtime.piNoBalance", { provider }) : t("server.runtime.piNoModel"));
-  const { key, base } = piDeepseek();
+  const { key, base } = await piDeepseek();
   if (!key) return { status: "login_required" };
   let res: Response;
   try {

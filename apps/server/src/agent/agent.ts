@@ -4,19 +4,19 @@
 
 import { join } from "node:path";
 
-import { Context, Effect, FiberSet, Layer, Predicate, Schema } from "effect";
+import { Context, Effect, FileSystem, Layer, Predicate, Schema } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
+import { type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
-import { FileWriter, readOrSetAside } from "@/infra/files.ts";
+import { keptFile, readOrSetAside } from "@/infra/files.ts";
 import { defaultSettings } from "@/runtime/presets.ts";
 
-import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, TemplateProblem, updatedFrom } from "./template.ts";
+import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, updatedFrom } from "./template.ts";
 
 interface Stored {
   readonly agents: readonly T.Agent[];
@@ -102,7 +102,7 @@ export class Agent extends Context.Service<
     readonly previewRemoveSkill: (id: string) => Effect.Effect<T.Preview, ApiError>;
     readonly saveSettings: (runtime: string, s: T.RuntimeSettings) => Effect.Effect<T.RuntimeSettings, ApiError>;
     /** The built-in templates, then those added on this machine, each with the profiles installed from it. */
-    readonly templates: () => T.AgentTemplate[];
+    readonly templates: () => Effect.Effect<T.AgentTemplate[]>;
     readonly installTemplate: (id: string) => Effect.Effect<T.Agent, ApiError>;
     readonly updateFromTemplate: (agent: string) => Effect.Effect<T.Agent, ApiError>;
     readonly addTemplate: (path: string) => Effect.Effect<T.AgentTemplate, ApiError>;
@@ -147,9 +147,10 @@ const upsert = <T extends { id: string }>(list: readonly T[], item: T) =>
 const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const file = join(config.home, "config.json");
-  const disk = new FileWriter(file);
-  const forkHere = yield* FiberSet.makeRuntime();
-  const builtIn = builtInTemplates();
+  const fs = yield* FileSystem.FileSystem;
+  const withFs = Effect.provideService(FileSystem.FileSystem, fs);
+  const disk = yield* keptFile(file);
+  const builtIn = yield* builtInTemplates;
   const builtInOf = (id: string) => builtIn.find((item) => item.id === id);
   // A new farm: the starters the configuration names, in order; the default orchestrator is added below.
   const starters: T.Agent[] = [];
@@ -168,17 +169,14 @@ const make = Effect.gen(function* () {
     ? s.agents.map((a) => (a.id === defaultOrchestrator ? { ...a, role: "orchestrator" as const } : a))
     : [installed(orchestrator, s.agents, defaultOrchestrator), ...s.agents];
   s = { agents: agents.map(withCast), skills: s.skills, settings: s.settings };
-  disk.write(() => JSON.stringify(s));
+  yield* Effect.orDie(disk.save(JSON.stringify(s)));
 
   /** A change is kept only once it is on disk: one that cannot be written is refused and leaves the profiles as they were. */
   const change = (f: (s: Stored) => Stored) =>
-    Effect.try({
-      try: () => {
-        const next = structuredClone(f(structuredClone(s)));
-        disk.write(() => JSON.stringify(next));
-        s = next;
-      },
-      catch: (e) => refused(t("server.agent.notSaved", { file, why: messageOf(e) })),
+    Effect.gen(function* () {
+      const next = structuredClone(f(structuredClone(s)));
+      yield* disk.save(JSON.stringify(next)).pipe(Effect.mapError((e) => refused(t("server.agent.notSaved", { file, why: e.message }))));
+      s = next;
     });
 
   const all = () => structuredClone([...s.agents]);
@@ -204,20 +202,20 @@ const make = Effect.gen(function* () {
   };
 
   // Read again on every ask: an added template is a folder in the home, and copying one in or out changes the list.
-  const templates = (): T.AgentTemplate[] => {
-    const added = addedTemplates(config.home);
-    for (const why of added.problems) void forkHere(Effect.logWarning(`vibevalley: an added template is left out: ${why}`));
+  const templates = Effect.fn("Agent.templates")(function* () {
+    const added = yield* withFs(addedTemplates(config.home));
+    for (const why of added.problems) yield* Effect.logWarning(`vibevalley: an added template is left out: ${why}`);
     return [...builtIn, ...added.templates].map((item) => ({
       ...item,
       installed: s.agents.filter((a) => a.from?.template === item.id).map((a) => a.id),
     }));
-  };
-  const templateOf = (id: string) => templates().find((template) => template.id === id);
-  const deletableTemplate = (id: string) => {
-    const item = templateOf(id);
-    if (!item) return Effect.fail(missing(t("server.agent.template.noTemplate", { id }), [lookIn.template]));
-    return item.source === "builtIn" ? Effect.fail(refused(t("server.agent.template.builtIn", { id }))) : Effect.succeed(item);
-  };
+  });
+  const templateOf = (id: string) => Effect.map(templates(), (all) => all.find((template) => template.id === id));
+  const deletableTemplate = Effect.fnUntraced(function* (id: string) {
+    const item = yield* templateOf(id);
+    if (!item) return yield* Effect.fail(missing(t("server.agent.template.noTemplate", { id }), [lookIn.template]));
+    return item.source === "builtIn" ? yield* Effect.fail(refused(t("server.agent.template.builtIn", { id }))) : item;
+  });
 
   const shape = Agent.of({
     agents: () => sendable(),
@@ -297,7 +295,7 @@ const make = Effect.gen(function* () {
     }),
     templates,
     installTemplate: Effect.fn("Agent.installTemplate")(function* (id) {
-      const item = templateOf(id);
+      const item = yield* templateOf(id);
       if (!item) return yield* Effect.fail(missing(t("server.agent.template.noTemplate", { id }), [lookIn.template]));
       const made = withCast(installed(item, s.agents));
       yield* change((x) => ({ ...x, agents: [...x.agents, made] }));
@@ -307,31 +305,23 @@ const make = Effect.gen(function* () {
       const a = s.agents.find((x) => x.id === agent);
       if (!a) return yield* Effect.fail(missing(t("server.agent.noAgent", { id: agent }), [lookIn.agent]));
       if (!a.from) return yield* Effect.fail(refused(t("server.agent.template.notFrom", { name: a.name })));
-      const item = templateOf(a.from.template);
+      const item = yield* templateOf(a.from.template);
       if (!item) return yield* Effect.fail(refused(t("server.agent.template.gone", { name: a.name, template: a.from.template })));
       const next = withCast(updatedFrom(item, a));
       yield* change((x) => ({ ...x, agents: upsert(x.agents, next) }));
       return next;
     }),
     addTemplate: Effect.fn("Agent.addTemplate")(function* (path) {
-      const read = Effect.try({
-        try: () => readTemplate(path, "added"),
-        catch: (e) => refused(Schema.is(TemplateProblem)(e) ? e.message : String(e)),
-      });
-      const item = yield* read;
-      if (templateOf(item.id)) return yield* Effect.fail(refused(t("server.agent.template.taken", { id: item.id })));
-      yield* Effect.try({
-        try: () => copyTemplate(path, config.home, item.id),
-        catch: (e) => refused(t("server.agent.notSaved", { file: path, why: messageOf(e) })),
-      });
+      const item = yield* withFs(readTemplate(path, "added")).pipe(Effect.mapError((e) => refused(e.message)));
+      if (yield* templateOf(item.id)) return yield* Effect.fail(refused(t("server.agent.template.taken", { id: item.id })));
+      yield* withFs(copyTemplate(path, config.home, item.id)).pipe(Effect.mapError((e) => refused(t("server.agent.notSaved", { file: path, why: e.message }))));
       return { ...item, installed: [] };
     }),
     removeTemplate: Effect.fn("Agent.removeTemplate")(function* (id) {
       const item = yield* deletableTemplate(id);
-      return yield* Effect.try({
-        try: () => removeTemplate(config.home, item.id),
-        catch: (e) => refused(t("server.agent.notSaved", { file: id, why: messageOf(e) })),
-      });
+      return yield* withFs(removeTemplate(config.home, item.id)).pipe(
+        Effect.mapError((e) => refused(t("server.agent.notSaved", { file: id, why: e.message }))),
+      );
     }),
     previewRemoveTemplate: Effect.fn("Agent.previewRemoveTemplate")(function* (id) {
       const item = yield* deletableTemplate(id);

@@ -517,6 +517,22 @@ export default defineConfig({
         rules: { "vibevalley/db-door": "error" },
       },
       {
+        // The server and the brain read and write files off the event loop (scripts/oxlint-plugin.ts, sync-fs). Before the
+        // services are up a sync call is fine: the home's lock, the database's folder and baseline, the locale the CLI
+        // starts in; and the evals' cases are read by a tool, not the server.
+        files: ["apps/server/src/**"],
+        excludeFiles: [
+          "**/*.test.ts",
+          "apps/server/src/testing/**",
+          "apps/server/src/infra/lease.ts",
+          "apps/server/src/infra/db.ts",
+          "apps/server/src/infra/baseline.ts",
+          "apps/server/src/setting/setting.ts",
+          "apps/server/src/orchestrator/evals.ts",
+        ],
+        rules: { "vibevalley/sync-fs": "error" },
+      },
+      {
         // A page timer keeps its handle, to be cleared when its part goes (scripts/oxlint-plugin.ts, dropped-timer).
         files: ["apps/web/src/**"],
         excludeFiles: ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.stories.tsx"],

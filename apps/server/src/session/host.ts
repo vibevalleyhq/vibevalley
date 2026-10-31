@@ -2,7 +2,7 @@
 // An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so they go
 // to the route of the input taken last, and the tools read that route too.
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Cause, Clock, Deferred, Effect, Exit, Fiber, Queue, Schema, Scope, Semaphore, Stream } from "effect";
@@ -402,7 +402,7 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
         const lines = readLines(transcript);
         const at = turnAt(lines, asked.text, asked.time, o.inputType);
         if (at < 0) return yield* Effect.fail(refused(t("server.session.host.notInConversation", { on, label: o.label })));
-        const memoryText = yield* Effect.try(() => readFileSync(memoryFile(o.home), "utf8")).pipe(Effect.orElseSucceed(() => ""));
+        const memoryText = yield* Effect.tryPromise({ try: () => readFile(memoryFile(o.home), "utf8"), catch: messageOf }).pipe(Effect.orElseSucceed(() => ""));
         const id = newId();
         const evalCase = {
           id,
@@ -417,11 +417,9 @@ export const makeHost = <R>(o: HostOptions<R>, journal: Journal, runs: RunStore)
           expect: [],
         };
         const file = join(o.home, "evals", id + ".json");
-        yield* Effect.try({
-          try: () => {
-            mkdirSync(join(o.home, "evals"), { recursive: true });
-            writeFileSync(file, JSON.stringify(evalCase, null, 2) + "\n", { mode: 0o600 });
-          },
+        yield* Effect.tryPromise({ try: () => mkdir(join(o.home, "evals"), { recursive: true }), catch: (err) => refused(messageOf(err)) });
+        yield* Effect.tryPromise({
+          try: () => writeFile(file, JSON.stringify(evalCase, null, 2) + "\n", { mode: 0o600 }),
           catch: (err) => refused(messageOf(err)),
         });
         return { id, file };

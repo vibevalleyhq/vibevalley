@@ -6,7 +6,7 @@
 
 import { join } from "node:path";
 
-import { Cause, Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
+import { Clock, Context, Effect, Layer, PubSub, Queue, type Scope, Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -14,7 +14,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { jsonOf } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { ServerConfig } from "@/infra/config.ts";
-import { FileWriter, readOrSetAside } from "@/infra/files.ts";
+import { keptFile, readOrSetAside } from "@/infra/files.ts";
 
 export const emptyWorkspaceState = (): T.WorkspaceState => ({
   call: "idle",
@@ -140,31 +140,20 @@ const make = Effect.gen(function* () {
   const kept = { ...emptyWorkspaceState(), ...(yield* readOrSetAside(file, read, "the farm starts empty")) };
   let state = restore(restarted(kept));
   let seq = 0;
-  const disk = new FileWriter(file);
+  // A crash loses half a second at most: a write waits that long after the first change, and the changes after it join
+  // it rather than putting it off.
+  const disk = yield* keptFile(file, { soonMs: saveAfterMs });
   const body = () => JSON.stringify(toKeep(state));
   let closed = false;
-  // A crash loses half a second at most: a write waits that long after the first change, and the changes after it join
-  // it rather than putting it off. The wait is a fiber of this service's, ended with it.
-  const saves = yield* FiberMap.make<"save">();
-  const later = yield* FiberMap.runtime(saves)();
   const save = () => {
-    if (!closed)
-      later(
-        "save",
-        Effect.delay(
-          Effect.sync(() => disk.write(body)).pipe(
-            Effect.onError((cause) => (Cause.hasInterrupts(cause) ? Effect.void : Effect.logError("vibevalley: state.json could not be saved", cause))),
-          ),
-          saveAfterMs,
-        ),
-        { onlyIfMissing: true },
-      );
+    if (!closed) disk.soon(body);
   };
+  // The state as the farm stops is written as it closes, after this.
   yield* Effect.addFinalizer(() =>
-    Effect.suspend(() => {
+    Effect.sync(() => {
+      disk.soon(body);
       closed = true;
-      return FiberMap.clear(saves);
-    }).pipe(Effect.andThen(Effect.sync(() => disk.finish(body)))),
+    }),
   );
 
   const events = yield* scopedPubSub<T.SideEvent>();

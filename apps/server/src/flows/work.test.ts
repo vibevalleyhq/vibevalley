@@ -149,12 +149,12 @@ describe("a session's work", () => {
       const sessions = yield* Session;
       const session = mustHire(yield* issues.hire(lab(), "看看目录", "steps"));
       yield* w.nextReport;
-      const steps = sessions.events(session.id)!;
+      const steps = (yield* sessions.events(session.id)) ?? [];
       yield* sessions.dismiss(session.id);
       const after = (yield* sessions.get(session.id))!;
       expect([after.brief, after.agent, after.project, after.phase._tag]).toEqual(["看看目录", "lab", "steps", "closed"]);
       const want = ["run/start", "user/message", "tool/call", "tool/result", "assistant/message", "run/end"];
-      const kept = sessions.events(session.id)!;
+      const kept = (yield* sessions.events(session.id)) ?? [];
       expect(kept.map((e) => e.type)).toEqual(want);
       for (const e of kept) expect(e.run).toBe(kept[0]!.run);
       expect(kept.at(-1)!.text).toBe("completed");
@@ -196,7 +196,7 @@ describe("a session's work", () => {
       }, "the orchestrator sees it has been quiet half a second");
       yield* releaseHeld();
       yield* w.nextReport;
-      const steps = sessions.events(session.id)!;
+      const steps = (yield* sessions.events(session.id)) ?? [];
       yield* sessions.dismiss(session.id);
       expect(w.notes.some((s) => s.includes("没动静"))).toBe(true);
       expect(steps.some((s) => s.type === "run/error" && s.text.includes("没动静"))).toBe(true);

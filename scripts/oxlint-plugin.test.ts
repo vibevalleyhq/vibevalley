@@ -198,6 +198,14 @@ tester.run("db-door", rule("db-door"), {
   ],
 });
 
+tester.run("sync-fs", rule("sync-fs"), {
+  valid: ['import { readFile } from "node:fs/promises";', 'import { join } from "node:path";', 'import { constants } from "node:fs";'],
+  invalid: [
+    { code: 'import { readFileSync, writeFileSync } from "node:fs";', errors: [{ messageId: "sync" }, { messageId: "sync" }] },
+    { code: 'import { existsSync } from "fs";', errors: [{ messageId: "sync" }] },
+  ],
+});
+
 tester.run("dropped-timer", rule("dropped-timer"), {
   valid: [
     "const t = setTimeout(f, 10); onCleanup(() => clearTimeout(t));",

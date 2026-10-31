@@ -136,10 +136,11 @@ describe("the orchestrator", () => {
       expect(lastInput(first)).toMatch(/^【现在】\d{4}\/\d+\/\d+ \d\d:\d\d\n\n【现状】[\s\S]*可以派的帮工：\n- /u);
       expect(first.system).not.toContain("【现状】");
       expect(lastLine(first)).toBe("[来源：主人]\n主人说：帮我在 demo 里加个 README");
-      const trail = yield* until(() => {
-        const events = (sessions.events(defaultOrchestrator) ?? []).filter((e) => e.type !== "llm/usage");
-        return events.length >= 6 && events.at(-1)!.type === "run/end" && events;
-      }, "its log");
+      const trail = yield* waitFor(
+        Effect.map(sessions.events(defaultOrchestrator), (all) => (all ?? []).filter((e) => e.type !== "llm/usage")),
+        (events) => events.length >= 6 && events.at(-1)!.type === "run/end",
+        "its log",
+      );
       const [ask, tool, result, answer] = trail.slice(-5, -1);
       expect(result).toMatchObject({ type: "tool/result", call: tool!.seq, ok: true });
       expect(ask!.type).toBe("user/message");
@@ -580,7 +581,11 @@ describe("the orchestrator", () => {
       const words = yield* said;
       yield* orchestrator.say("地里怎么样", {}, undefined, "");
       yield* until(() => words().length >= 1, "its words");
-      const asked = yield* until(() => (sessions.events(defaultOrchestrator) ?? []).find((e) => e.type === "user/message"), "its log");
+      const asked = (yield* waitFor(
+        Effect.map(sessions.events(defaultOrchestrator), (all) => (all ?? []).find((e) => e.type === "user/message")),
+        (e) => e !== undefined,
+        "its log",
+      ))!;
       const made = yield* orchestrator.markWrong(asked.seq, "应该先看一眼地里");
       const saved = JSON.parse(readFileSync(made.file, "utf8")) as Record<keyof EvalCase, unknown> & {
         input: { customType: string };

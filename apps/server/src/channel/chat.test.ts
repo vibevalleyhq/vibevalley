@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
@@ -138,6 +139,7 @@ const world = (x: FakeSessions, config: ServerConfig["Service"] = testConfig()) 
     Layer.provideMerge(Database),
     Layer.provideMerge(Layer.succeed(ServerConfig, c)),
     Layer.provideMerge(offline),
+    Layer.provideMerge(NodeServices.layer),
   );
 };
 
@@ -767,13 +769,13 @@ describe("the chat", () => {
 
   it.live("regression: an attachment that cannot be kept is refused with the file system's own words", () => {
     const config = testConfig();
-    // A file where the attachments folder should be: making the folder fails with EEXIST.
+    // A file where the attachments folder should be: making the folder fails, already existing.
     writeFileSync(join(config.home, "attachments"), "");
     return run(
       (f) =>
         Effect.gen(function* () {
           const refusal = yield* Effect.flip(f.chat.attach({ name: "a.txt", type: "", data: Buffer.from("x").toString("base64") }));
-          expect(refusal).toMatchObject({ _tag: "Refused", reason: expect.stringContaining("EEXIST") });
+          expect(refusal).toMatchObject({ _tag: "Refused", reason: expect.stringContaining("AlreadyExists") });
         }),
       config,
     );

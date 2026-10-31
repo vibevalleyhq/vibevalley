@@ -259,7 +259,7 @@ describe("sessions", () => {
       expect(turns[0]!.input).toContain("给打卡接口加分页");
       expect(turns[0]!.options.cwd).toBe((sessions as SessionsInside).place(id)!.cwd);
 
-      const events = sessions.events(id)!;
+      const events = (yield* sessions.events(id)) ?? [];
       expect(events.map((e) => e.type)).toEqual(
         expect.arrayContaining(["run/start", "user/message", "tool/call", "tool/result", "assistant/message", "run/end"]),
       );
@@ -310,7 +310,7 @@ describe("sessions", () => {
         id: sessionId("w1"),
         place: { project: "demo", cwd: "/nowhere" },
         access: Semaphore.makeUnsafe(1),
-        journal: s.trajectories.openLog("w1"),
+        journal: yield* s.trajectories.openLog("w1"),
         sess: undefined,
         oarSessionId: "",
         lastText: "",

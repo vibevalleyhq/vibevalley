@@ -12,6 +12,7 @@ import { modelClient, noDeepSeekKey } from "@/agent/model.ts";
 import { traitsOf } from "@/agent/prompts.ts";
 import { orchestrator } from "@/base/actor.ts";
 import { Channel, type OrchestratorNews, type SayMore } from "@/channel/chat.ts";
+import type { Picked } from "@/channel/wake.ts";
 import { Core } from "@/core/core.ts";
 import { Cron } from "@/cron/cron.ts";
 import { nextRun } from "@/cron/when.ts";
@@ -44,10 +45,7 @@ const keepEvents = 1000;
 const resumeWithinMs = 30 * 60_000;
 
 /** What the owner chose beside the words (the sowing form, the chat's profile pick); empty for none. */
-export interface Pick {
-  readonly agent?: string;
-  readonly project?: string;
-}
+export type Pick = Picked;
 
 /** Where an input's answer goes and what it is worth; kept with it in the transcript. */
 interface Route {
@@ -134,9 +132,6 @@ const make = (options: OrchestratorOptions = {}) =>
         const at = current();
         return { agent: id, session: "", project: "", here: at.channel, picked: at.agent ?? "", actor: orchestrator(at.owner ?? false) };
       });
-
-    /** What the owner picked beside a message (a profile, a project), until an orchestrator takes the message. */
-    const selected = new Map<string, Pick>();
 
     /** One orchestrator: its own host (conversation, queue, run), home, model, and what it was last shown and told. */
     interface Instance {
@@ -336,14 +331,8 @@ const make = (options: OrchestratorOptions = {}) =>
       Effect.suspend(() => {
         const fromPerson = n.messages.every((m) => m.from === ownerId);
         const owner = n.messages.some((m) => m.from === ownerId);
-        let picked: Pick = {};
-        for (const m of n.messages) {
-          const p = selected.get(m.id);
-          if (p) {
-            picked = p;
-            selected.delete(m.id);
-          }
-        }
+        // The latest pick among them: it goes with its message.
+        const picked: Pick = n.messages.findLast((m) => m.picked)?.picked ?? {};
         const line =
           fromPerson && (n.type === "direct" || n.channel === chat.defaultChannel())
             ? pickedNote(picked) + lineWords.owner(n.messages.map((m) => m.text).join("\n"))
@@ -435,8 +424,7 @@ const make = (options: OrchestratorOptions = {}) =>
         const a = pick.agent ? store.agent(pick.agent) : undefined;
         const picked: Pick = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
         yield* core.open();
-        const { message, again } = yield* chat.say(text, channel, sendKey, more);
-        if (!again && (picked.agent || picked.project)) selected.set(message.id, picked);
+        yield* chat.say(text, channel, sendKey, { ...more, ...(picked.agent || picked.project ? { picked } : {}) });
       }),
       heard: Effect.fn("Orchestrator.heard")(function* (text, agent, sendKey) {
         yield* core.open();

@@ -84,6 +84,8 @@ const env = (name: string, value: string | undefined) => {
 };
 const envOf = (name: string) => process.env[name];
 
+const noPi = { provider: "", model: "" };
+
 describe("runtime", () => {
   it.live("what a runtime's probe said is said again in the farm's new language", () => {
     const registry = new RuntimeRegistry([
@@ -660,14 +662,19 @@ describe("runtime", () => {
     const rate = inCny({ input: 1, output: 2, cacheRead: 0.1, cacheWrite: 1.5 }, 7);
     expect(rate.charge({ input: 1_000_000, output: 0, cacheRead: 400_000 })).toBe(0.64 * 7);
     expect(rate.charge({ input: 10, output: 0, cacheRead: 20 })).toBe((2.0 / 1_000_000) * 7);
-    expect(price("missing", "unknown")).toBeUndefined();
+    expect(price("missing", "unknown", noPi)).toBeUndefined();
+  });
+
+  it("pi prices the default its settings name when the model is left to it", () => {
+    expect(price("pi", "", noPi)).toBeUndefined();
+    expect(price("pi", "", { provider: "deepseek", model: "deepseek-chat" })).toEqual(price("pi", "deepseek/deepseek-chat", noPi));
   });
 
   it("dsh prices DeepSeek's own models", () => {
-    expect(price("dsh", "deepseek-official/deepseek-flash")?.input).toBe(0.14);
-    expect(price("dsh", "deepseek-official/deepseek-v4-flash")).toBeUndefined();
-    expect(price("dsh", "openrouter/deepseek-flash")).toBeUndefined();
-    expect(price("vibevalley", "")?.input).toBe(0.14);
+    expect(price("dsh", "deepseek-official/deepseek-flash", noPi)?.input).toBe(0.14);
+    expect(price("dsh", "deepseek-official/deepseek-v4-flash", noPi)).toBeUndefined();
+    expect(price("dsh", "openrouter/deepseek-flash", noPi)).toBeUndefined();
+    expect(price("vibevalley", "", noPi)?.input).toBe(0.14);
   });
 
   it("pi's balance, as pi configures DeepSeek", async () => {

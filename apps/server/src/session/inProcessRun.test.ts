@@ -39,7 +39,7 @@ describe("the orchestrator's runs", () => {
       yield* issue("i2");
       const finished: RunFinished[] = [];
       const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.finishedRuns, (r) => Effect.sync(() => finished.push(r))));
-      const journal = sessions.trajectories.openLog("orchestrator");
+      const journal = yield* sessions.trajectories.openLog("orchestrator");
       const x = new InProcessRun("orchestrator", journal, (tool) => ({ text: tool, action: "other", tool }), sessions.runStore);
 
       yield* x.observe(user("看看工单"), { issue: "i1", by: { kind: "issue" }, heard: ["m1"] });
@@ -87,7 +87,7 @@ describe("the orchestrator's runs", () => {
       const sessions = (yield* Session) as SessionsInside;
       const x = new InProcessRun(
         "orchestrator",
-        sessions.trajectories.openLog("orchestrator"),
+        yield* sessions.trajectories.openLog("orchestrator"),
         (tool) => ({ text: tool, action: "other", tool }),
         sessions.runStore,
       );
@@ -126,7 +126,12 @@ describe("the orchestrator's runs", () => {
         ...sessions.runStore,
         finish: (...a) => (broken ? Effect.fail(new NotRecorded({ message: "disk full" })) : sessions.runStore.finish(...a)),
       };
-      const x = new InProcessRun("orchestrator", sessions.trajectories.openLog("orchestrator"), (tool) => ({ text: tool, action: "other", tool }), store);
+      const x = new InProcessRun(
+        "orchestrator",
+        yield* sessions.trajectories.openLog("orchestrator"),
+        (tool) => ({ text: tool, action: "other", tool }),
+        store,
+      );
       yield* x.observe(user("一"), { by: { kind: "comment" } });
       const first = sessions.currentRun("orchestrator");
       expect(yield* Effect.flip(x.observe(end()))).toBeInstanceOf(NotRecorded);

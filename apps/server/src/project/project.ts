@@ -7,7 +7,7 @@
 // the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
 
-import { lstatSync, readdirSync } from "node:fs";
+import { lstat, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, DateTime, Predicate } from "effect";
@@ -335,8 +335,9 @@ const make = (hooks: ProjectHooks = {}) =>
     const list = Effect.fn("Project.list")(function* () {
       if (!(yield* exists(root))) return [];
       const out: ProjectFolder[] = [];
-      // readdirSync for the entries' kinds, which FileSystem does not give: a link to a folder is not a project.
-      for (const e of readdirSync(root, { withFileTypes: true })) {
+      // node's readdir for the entries' kinds, which FileSystem does not give: a link to a folder is not a project.
+      const entries = yield* Effect.tryPromise({ try: () => readdir(root, { withFileTypes: true }), catch: reason }).pipe(Effect.orElseSucceed(() => []));
+      for (const e of entries) {
         if (!e.isDirectory() || e.name.startsWith(".") || pending.has(e.name)) continue;
         const real = yield* Effect.option(fs.realPath(join(root, e.name)));
         if (Option.isNone(real)) continue;
@@ -415,7 +416,7 @@ const make = (hooks: ProjectHooks = {}) =>
      * turn and with the check's time limit; one that fails is logged, and the helper starts all the same. */
     const projectSetup = Effect.fn("Project.projectSetup")(function* (cwd: string) {
       const file = join(cwd, ".vibevalley", "setup");
-      if (!lexists(file)) return;
+      if (!(yield* lexists(file))) return;
       const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
       if (r.code !== 0) yield* Effect.logWarning(`${file} exited ${r.code}${r.timedOut ? " (timed out)" : ""}: ${(r.stdout + r.stderr).slice(-2000)}`);
     });
@@ -423,7 +424,7 @@ const make = (hooks: ProjectHooks = {}) =>
     /** The project's own check: .vibevalley/check, run in the worktree, killed with everything it started when it runs too long. */
     const projectCheck = Effect.fn("Project.projectCheck")(function* (cwd: string) {
       const file = join(cwd, ".vibevalley", "check");
-      if (!lexists(file)) return;
+      if (!(yield* lexists(file))) return;
       const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
       if (r.code === 0) return;
       const why = r.timedOut
@@ -581,7 +582,7 @@ const make = (hooks: ProjectHooks = {}) =>
         const global = (yield* gitQuiet("", "config", "--global", "user.email")).toLowerCase();
         const seen = new Set<string>();
         const out: T.Repo[] = [];
-        for (const dir of repoDirs(root, 3)) {
+        for (const dir of yield* repoDirs(root, 3)) {
           // Worktrees share their repository's history: one count per repository.
           const common = yield* gitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir");
           if (common === "" || seen.has(common)) continue;
@@ -876,7 +877,7 @@ const make = (hooks: ProjectHooks = {}) =>
               catch: () => new ProjectError({ message: t("server.project.github.listUnread") }),
             });
             if (existing.length > 0) return { ...existing[0]!, state: "open" as const };
-            const check = lexists(join(place.cwd, ".vibevalley/check")) ? t("server.project.github.checked") : t("server.project.github.noCheck");
+            const check = (yield* lexists(join(place.cwd, ".vibevalley/check"))) ? t("server.project.github.checked") : t("server.project.github.noCheck");
             // The helper's own title and body when it wrote them (session/prompts.ts tells it where), else the issue's.
             const written = yield* gitQuiet(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", pullRequestFile);
             const given = written === "" ? undefined : pullRequestText(yield* fs.readFileString(written).pipe(Effect.orElseSucceed(() => "")));
@@ -944,28 +945,28 @@ const make = (hooks: ProjectHooks = {}) =>
     return shape;
   });
 
-const lexists = (path: string) => {
-  try {
-    lstatSync(path);
-    return true;
-  } catch {
-    return false;
-  }
-};
+/** Whether there is anything at path, a link included (which FileSystem's exists follows). */
+const lexists = (path: string) =>
+  Effect.tryPromise({ try: () => lstat(path), catch: () => false }).pipe(
+    Effect.as(true),
+    Effect.orElseSucceed(() => false),
+  );
 
 const skipDirs = new Set(["node_modules", ".git", ".venv", "vendor", "dist", "build", "target", ".next"]);
 
-function repoDirs(dir: string, depth: number): string[] {
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  if (entries.some((e) => e.name === ".git")) return [dir];
-  if (depth === 0) return [];
-  return entries.filter((e) => e.isDirectory() && !skipDirs.has(e.name)).flatMap((e) => repoDirs(join(dir, e.name), depth - 1));
-}
+/** The repositories under dir, at most depth folders down; a repository's own folders are not looked into. */
+const repoDirs = (dir: string, depth: number): Effect.Effect<string[]> =>
+  Effect.gen(function* () {
+    const entries = yield* Effect.tryPromise({ try: () => readdir(dir, { withFileTypes: true }), catch: () => [] }).pipe(Effect.orElseSucceed(() => []));
+    if (entries.some((e) => e.name === ".git")) return [dir];
+    if (depth === 0) return [];
+    const under = yield* Effect.forEach(
+      entries.filter((e) => e.isDirectory() && !skipDirs.has(e.name)),
+      (e) => repoDirs(join(dir, e.name), depth - 1),
+      { concurrency: 8 },
+    );
+    return under.flat();
+  });
 
 /** As the server starts: a first look at GitHub; the page asks again with github.refresh. */
 export const start = Layer.effectDiscard(Effect.flatMap(Project, (p) => Effect.forkScoped(p.refreshGitHub())));

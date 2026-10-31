@@ -1,3 +1,4 @@
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
@@ -88,6 +89,7 @@ const world = (build: BuildSource = () => undefined, timeoutMs = 50) =>
     Layer.provideMerge(Database),
     Layer.provideMerge(FetchHttpClient.layer),
     Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())),
+    Layer.provideMerge(NodeServices.layer),
   );
 
 const nowledgeOn: T.MemorySourceUpdate = { kind: "nowledge", url: "http://up/", enabled: true, read: true, write: true };
