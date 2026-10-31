@@ -7,7 +7,7 @@
     "range": "{min} 到 {max}，默认 {fallback}",
     "saved": "存好了，下一通电话就用上。",
     "answer": {
-      "orchestrator": "群聊里那个管家本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。",
+      "orchestrator": "频道里那个管家本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。",
       "agora": "声网托管的模型，不用别的 key。",
       "deepseek": "用设置里的 DeepSeek key（{from}）。",
       "noDeepseek": "用设置里的 DeepSeek key，现在还没有：去首页「设置」填。",
@@ -58,7 +58,7 @@
       "page": "页。",
       "open": "开口",
       "openParts": "人设 · 开场白",
-      "ownCall": "电话由管家自己接：它就是群聊里那个管家，用它自己的提示词，不另设人设。",
+      "ownCall": "电话由管家自己接：它就是频道里那个管家，用它自己的提示词，不另设人设。",
       "persona": "人设",
       "personaHint": "电话里先答话的模型是谁、怎么说话。它看不到现状，派活由本机的管家做；写明别编进度。",
       "greeting": "开场白",

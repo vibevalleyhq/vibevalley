@@ -11,7 +11,7 @@ import { emptyPatrol, type PatrolNote, patrolStep } from "./patrol.ts";
 describe("the patrol", () => {
   // Every fifth round the farm is empty: what was hanging is forgotten.
   it("find for the patrol what was recorded", () => {
-    const failed = checkCases(goldenCases("notice"), (c) => {
+    const failed = checkCases(goldenCases("inbox"), (c) => {
       if (c.fn !== "patrol") throw new Error(`unknown fn ${c.fn}`);
       const given = c.in as { state: WorkspaceState; nows: number[] };
       let memory = emptyPatrol();

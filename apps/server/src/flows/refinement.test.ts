@@ -4,13 +4,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import type { Issue } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
 import { Core } from "@/core/core.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Sessions } from "@/session/session.ts";
+import { Issue } from "@/issue/issue.ts";
+import { Session } from "@/session/session.ts";
 import { releaseHeld } from "@/testing/helper.ts";
 import { Said } from "@/testing/said.ts";
 
@@ -29,7 +29,7 @@ const hasBranch = (project: string, branch: string) => {
 
 /** Nothing a draft did stays: reset to main, its worktree is clean, so it goes with its refiner, and so does its branch,
  * which has nothing main does not. */
-const refinementLeftNothing = (work: string, issue: Issue) => {
+const refinementLeftNothing = (work: string, issue: T.Issue) => {
   const project = join(work, "projects", issue.project!);
   const tree = join(work, "worktrees", `${issue.project}.${issue.number}`);
   return until(() => !existsSync(tree) && !hasBranch(project, `vibevalley/issue-${issue.number}`), "its worktree and branch are gone");
@@ -42,10 +42,10 @@ describe("a refined issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
+      const issues = yield* Issue;
+      const sessions = yield* Session;
       const core = yield* Core;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       // It names no one: whoever was last sent to work in the project drafts it.
       const before = mustHire(yield* issues.hire(lab(), "看看项目", "board"));
       yield* w.nextReport;
@@ -99,9 +99,9 @@ describe("a refined issue", () => {
   it.live("leaves nothing behind", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issues;
+      const issues = yield* Issue;
       const core = yield* Core;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       let issue = yield* issues.add({ title: "新工单", project: "board", assignee: "lab" });
       yield* issues.refine(issue.id, "顺手提交：看板拖卡", "");
       issue = yield* await_(
@@ -130,10 +130,10 @@ describe("a refined issue", () => {
   it.live("that cannot be read changes nothing", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issues;
+      const issues = yield* Issue;
       const core = yield* Core;
       const { in: saidIn } = yield* Said;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({ title: "新工单", project: "board", assignee: "lab" });
       // Held until the issue's thread is open, as it is before any real draft hands back.
       const before = yield* issues.refine(issue.id, "慢慢乱写一通", "");

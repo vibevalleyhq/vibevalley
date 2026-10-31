@@ -3,6 +3,7 @@
 
 import { t } from "@vibevalley/i18n";
 import type { Crop, FarmView, PlotView, Session } from "@vibevalley/protocol";
+import { plotKeyOf } from "@vibevalley/protocol/rules";
 
 export interface Bed {
   readonly index: number;
@@ -42,7 +43,7 @@ export const nextClearing = (level: number) => beds.find((b) => b.unlockLevel !=
 
 const emptyPlot: PlotView = { crop: "empty" };
 
-export const plotOf = (view: FarmView, s: Session | undefined): PlotView => (s ? (view.plots[s.id] ?? emptyPlot) : emptyPlot);
+export const plotOf = (view: FarmView, s: Session | undefined): PlotView => (s ? (view.plots[plotKeyOf(s)] ?? emptyPlot) : emptyPlot);
 
 export const lockedPlot = (bed: Bed, level: number): PlotView => ({ crop: level >= (bed.unlockLevel ?? Infinity) ? "flowering" : "locked" });
 
@@ -54,7 +55,7 @@ export function cropOfBed(bed: Bed, sessions: readonly Session[], view: FarmView
   if (bed.unlockLevel !== undefined) return lockedPlot(bed, Math.round(view.level.level)).crop;
   const s = sessionAtStation(sessions, bed.station);
   if (!s) return leaving ? "harvested" : "empty";
-  return view.plots[s.id]?.crop ?? "sprout";
+  return view.plots[plotKeyOf(s)]?.crop ?? "sprout";
 }
 
 export const cropLabel: Record<Crop, string> = {

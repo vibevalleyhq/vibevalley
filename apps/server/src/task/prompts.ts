@@ -1,16 +1,15 @@
-// What the task graphs say to models: the splitter's brief, a step's job and what its helper is told when it is sent
+import type * as T from "@vibevalley/protocol";
+
+// What the task graphs say to models: the splitter's brief, a task's brief and what its helper is told when it is sent
 // back, the orchestrator's news of a task graph and the lines it reads one by, and the refusals of the tools only models call.
 // In Chinese whatever the owner's locale: the models answer in the owner's.
-
-import type { Agent, Issue, Session, Task, TaskGraph, GraphState, TaskState } from "@vibevalley/protocol";
-
 import { traitsOf } from "@/agent/prompts.ts";
 import { slice } from "@/base/clip.ts";
 import { isForOrchestrator } from "@/issue/status.ts";
 
 import { blockedBy, isAcceptance, isSettled, maxTasks, taskOf, acceptanceChecks, frozenOf } from "./graph.ts";
 /** A graph's and a step's state as the model reads them (only in Chinese: prompts are). */
-const graphStateText: Record<GraphState, string> = {
+const graphStateText: Record<T.GraphState, string> = {
   splitting: "在拆",
   draft: "等你看过再开工",
   running: "在做",
@@ -19,7 +18,7 @@ const graphStateText: Record<GraphState, string> = {
   done: "合进了主分支",
   abandoned: "放弃了",
 };
-const taskStateText: Record<TaskState, string> = { waiting: "等着", working: "在做", merged: "合进去了", failed: "没做成", skipped: "跳过了" };
+const taskStateText: Record<T.TaskState, string> = { waiting: "等着", working: "在做", merged: "合进去了", failed: "没做成", skipped: "跳过了" };
 export const startNeedsOwner = "计划开工要主人点头。这一轮不是主人叫你的：把拆好的计划给主人看，问要不要开工。";
 export const mergeNeedsOwner = "合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
 
@@ -28,14 +27,14 @@ export const graphNews = {
   head: "【计划】",
   notSplit: (id: string, title: string, why: string) => id + "「" + title + "」没拆成：" + why + "。问主人要不要换个说法再拆。",
   drafted: (id: string, graph: string) => id + " 拆好了，等主人看过再开工（graph_act start）。用一两句话告诉主人拆成了哪几步。\n" + graph,
-  stepFailed: (id: string, title: string, step: string, stepId: string, why: string) =>
+  taskFailed: (id: string, title: string, task: string, taskId: string, why: string) =>
     id +
     "「" +
     title +
     "」的「" +
-    step +
+    task +
     "」（" +
-    stepId +
+    taskId +
     "）没做成：" +
     why +
     "。它后面的步骤在等；问主人是重试（graph_task_act retry）、改工单，还是跳过（graph_task_act skip）。",
@@ -56,11 +55,11 @@ export const graphTell = {
     `拆好了：工单「${title}」下面 ${n} 张子工单，在分支 ${branch} 上开工了，每一步派给一个帮工。你这张工单的活交给它们了：别再改代码，用一两句话汇报拆成了哪几步，这一轮就结束，汇报完你就收工。`,
 };
 
-/** What a splitter's job is matched against the profiles' tags by (chooseAgent). */
+/** What a splitter's brief is matched against the profiles' tags by (chooseAgent). */
 export const graphMatch = (goal: string) => "规划 计划 拆分 " + goal;
 
-/** What a step's session is told: the task graph, its job, what came before it, and how it is judged. */
-export function taskBrief(graph: TaskGraph, task: Task): string {
+/** What a step's session is told: the task graph, its brief, what came before it, and how it is judged. */
+export function taskBrief(graph: T.TaskGraph, task: T.Task): string {
   const index = graph.tasks.findIndex((n) => n.id === task.id) + 1;
   const lines = [
     `这是计划「${graph.title}」里的一步：${task.title}（步骤 ${task.id}，第 ${index}/${graph.tasks.length} 步）。`,
@@ -107,17 +106,17 @@ export const acceptancePassedText = (check: string) =>
 export const frozenTouchedText = (files: readonly string[]) =>
   "你改了前面的验收留下的文件：" + files.join("、") + "。验收是冻结的：把它们恢复成计划分支上的样子，从代码上修，再提交。";
 
-export const retryText = (task: Task) => "上一轮没做成。看一下报错，接着把这一步做完：" + task.title + "。";
+export const retryText = (task: T.Task) => "上一轮没做成。看一下报错，接着把这一步做完：" + task.title + "。";
 
 /** Only the helper an issue was last sent to splits it, and only while it is a plain open issue. */
 /** A refusal's problem is said to the session. */
 export function splittable(
-  session: Session | undefined,
-  issue: Issue | undefined,
+  session: T.Session | undefined,
+  issue: T.Issue | undefined,
   orchestrator: (id: string) => boolean,
 ):
   | { readonly ok: false; readonly problem: string }
-  | { readonly ok: true; readonly session: Session; readonly issue: Issue; readonly project: string; readonly branch: string } {
+  | { readonly ok: true; readonly session: T.Session; readonly issue: T.Issue; readonly project: string; readonly branch: string } {
   const no = (problem: string) => ({ ok: false, problem }) as const;
   if (!session) return no("你已经不在场了");
   if (session.graph) return no("你在做计划里的一步：这一步不能再拆，太大就在结论里说，让主人改计划");
@@ -132,7 +131,7 @@ export function splittable(
   return { ok: true, session, issue, project: issue.project, branch: session.branch };
 }
 
-export function graphText(graph: TaskGraph): string {
+export function graphText(graph: T.TaskGraph): string {
   const tasks = graph.tasks;
   const merged = tasks.filter(isSettled).length;
   let head = "「" + graph.title + "」（" + graph.id + "，项目 " + graph.project;
@@ -156,7 +155,7 @@ export function graphText(graph: TaskGraph): string {
 }
 
 /** What a splitter is told: split goal into a task graph, as JSON, for the profiles there are. */
-export function splitBrief(goal: string, project: string, agents: readonly Agent[]): string {
+export function splitBrief(goal: string, project: string, agents: readonly T.Agent[]): string {
   const agent = agents[0]?.id ?? "lab";
   const example = {
     title: "按月查询打卡记录",

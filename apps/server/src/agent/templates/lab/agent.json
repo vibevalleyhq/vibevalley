@@ -1,7 +1,7 @@
 {
   "id": "lab",
   "version": 1,
-  "role": "worker",
+  "role": "helper",
   "name": "Pi 实验员",
   "duty": "写原型、试新做法",
   "tags": ["原型", "试试", "实验", "脚本"],

@@ -64,7 +64,7 @@
   "defaultEffort": "Default effort",
   "default": "Default",
   "maxWorking": "At most at once",
-  "maxWorkingHint": "How many helpers using it may work at once, useful when the provider limits concurrency. At the limit, new work waits until one finishes. Empty, only the workspace's limit applies (6 tickets at once).",
+  "maxWorkingHint": "How many helpers using it may work at once, useful when the provider limits concurrency. At the limit, new work waits until one finishes. Empty, only VibeValley's overall limit applies (6 tickets at once).",
   "noLimit": "No separate limit",
   "budget": "Daily budget (¥)",
   "budgetLabel": "Daily budget",

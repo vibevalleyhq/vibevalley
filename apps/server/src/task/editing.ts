@@ -1,21 +1,10 @@
 import { t } from "@vibevalley/i18n";
-import type { Task, TaskEdit, TaskGraph } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
 import { canEditTask, canRemoveTask, graphProblems, taskOf, taskView, withTask } from "./graph.ts";
 
-/** A step as whoever splits writes it: the splitting session in its json block, a helper through issue_split. */
-export interface StepDraft {
-  readonly id: string;
-  readonly title?: string;
-  readonly brief: string;
-  readonly needs?: readonly string[];
-  readonly agent?: string;
-  readonly check?: string;
-  readonly scope?: readonly string[];
-  readonly acceptance?: boolean;
-}
-
-export function freshTask(draft: StepDraft): Task {
+/** A task as whoever splits writes it: the splitting session in its json block, a helper through issue_split. */
+export function freshTask(draft: T.TaskDraft): T.Task {
   const id = draft.id.trim();
   const agent = (draft.agent ?? "").trim();
   const check = (draft.check ?? "").trim();
@@ -37,15 +26,15 @@ export function freshTask(draft: StepDraft): Task {
   };
 }
 
-export type EditResult = { readonly ok: true; readonly graph: TaskGraph } | { readonly ok: false; readonly problem: string };
+export type EditResult = { readonly ok: true; readonly graph: T.TaskGraph } | { readonly ok: false; readonly problem: string };
 
-const checked = (graph: TaskGraph): EditResult => {
+const checked = (graph: T.TaskGraph): EditResult => {
   const problems = graphProblems(graph.tasks);
   return problems.length > 0 ? { ok: false, problem: problems[0]! } : { ok: true, graph };
 };
 
 /** needs and scope count as given when there, as an empty JSON array decodes. */
-export function editTask(graph: TaskGraph, id: string, edit: TaskEdit): EditResult {
+export function editTask(graph: T.TaskGraph, id: string, edit: T.TaskEdit): EditResult {
   const task = taskOf(graph, id);
   if (!canEditTask(graph, task))
     return {
@@ -54,12 +43,12 @@ export function editTask(graph: TaskGraph, id: string, edit: TaskEdit): EditResu
         ? t("server.task.edit.taskSettled", { title: task.title, state: t(`server.task.taskState.${task.state}`) })
         : t("server.task.edit.graphSettled", { state: t(`server.task.graphState.${graph.state}`) }),
     };
-  const base: Task = task ?? freshTask({ id, brief: "" });
+  const base: T.Task = task ?? freshTask({ id, brief: "" });
   const agent = edit.agent !== undefined ? edit.agent.trim() : base.agent;
   const check = edit.check !== undefined ? edit.check.trim() : base.check;
   const scope = edit.scope ?? base.scope;
   const { agent: _a, check: _c, ...rest } = base;
-  const next: Task = {
+  const next: T.Task = {
     ...rest,
     ...(edit.title !== undefined ? { title: edit.title.trim() || id } : {}),
     ...(edit.brief !== undefined ? { brief: edit.brief.trim() } : {}),
@@ -72,7 +61,7 @@ export function editTask(graph: TaskGraph, id: string, edit: TaskEdit): EditResu
   return checked({ ...graph, tasks: [...graph.tasks, next] });
 }
 
-export function removeTask(graph: TaskGraph, id: string): EditResult {
+export function removeTask(graph: T.TaskGraph, id: string): EditResult {
   const task = taskOf(graph, id);
   if (!task) return { ok: false, problem: t("server.task.edit.noStep", { id }) };
   if (!canRemoveTask(graph, task))

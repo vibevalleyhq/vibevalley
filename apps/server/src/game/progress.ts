@@ -42,7 +42,7 @@ export const harvestCoins = (commits: number, streak: number) => Math.round((30 
 
 const taskCoins = (merged: number) => 30 + 10 * merged;
 
-/** Under this, a harvested job is cheap (一分钱一分货). */
+/** Under this, a harvested issue is cheap (一分钱一分货). */
 const cheapCNY = 0.05;
 
 export interface Seen {

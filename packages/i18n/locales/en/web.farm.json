@@ -92,7 +92,7 @@
     "commits": "Commits",
     "files": "Files",
     "harvest": "Harvest, merge into {base}",
-    "noSteps": "The plan has no steps yet.",
+    "noSteps": "The plan has no tasks yet.",
     "first": "First",
     "batch": "Batch {n}",
     "acceptanceHint": "Acceptance: must fail when written; the last step makes it pass",
@@ -100,8 +100,8 @@
     "edit": "Edit",
     "remove": "Delete",
     "story": "History",
-    "stepId": "Step id",
-    "stepIdHint": "Step id, such as docs",
+    "stepId": "Task id",
+    "stepIdHint": "Task id, such as docs",
     "title": "Title",
     "brief": "Ticket",
     "briefHint": "Ticket: the goal, where to change, what counts as done",
@@ -298,7 +298,7 @@
       "2": "How is it going?",
       "3": "Everyone, call it a day"
     },
-    "greeting": "This is the farm chat, where you, the manager and the helpers talk. Tell me a job to do, such as \"have the tester run the tests\".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each job has its ticket thread under it.",
+    "greeting": "This is the farm chat, where you, the manager and the helpers talk. Tell me something to do, such as \"have the tester run the tests\".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.",
     "phase": {
       "off": "Type or press the mic to open",
       "connecting": "Reaching the manager…",

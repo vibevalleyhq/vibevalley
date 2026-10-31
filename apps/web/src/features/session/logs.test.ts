@@ -3,7 +3,7 @@ import { expect, test } from "vite-plus/test";
 import type { LiveEvent, SessionEvent } from "@vibevalley/protocol";
 
 import { SessionLogs } from "./logs";
-import { stepLimit } from "./rounds";
+import { stepLimit } from "./runs";
 
 const step = (seq: number, revision = 0, text = `${seq}:${revision}`): SessionEvent => ({ seq, revision, time: seq, type: "assistant/message", text });
 

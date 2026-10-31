@@ -3,22 +3,22 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import type { Agent, Memory } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
 import { Core } from "@/core/core.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Memories } from "@/memory/memory.ts";
-import { jobBreak } from "@/session/briefing.ts";
+import { Issue } from "@/issue/issue.ts";
+import { Memory } from "@/memory/memory.ts";
+import { briefBreak } from "@/session/briefing.ts";
 import { recallHead } from "@/session/prompts.ts";
-import { Sessions } from "@/session/session.ts";
+import { Session } from "@/session/session.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import { await_, farm, type Farm, lab, mustHire, watch } from "./farm.ts";
 
-const scribe = (): Agent => ({ ...lab(), id: "scribe", name: "记录员" });
-const refiner = (): Agent => ({ ...lab(), id: "refiner", name: "起草员" });
+const scribe = (): T.Agent => ({ ...lab(), id: "scribe", name: "记录员" });
+const refiner = (): T.Agent => ({ ...lab(), id: "refiner", name: "起草员" });
 
 /** Each turn's input in order, as its session was prompted. */
 const prompts = (f: Farm) => {
@@ -29,18 +29,18 @@ const prompts = (f: Farm) => {
   };
 };
 
-/** What the input reminded the session of, and its job under it. */
+/** What the input reminded the session of, and its brief under it. */
 const reminded = (input: string): [string[], string] => {
-  const parts = input.split(jobBreak);
+  const parts = input.split(briefBreak);
   if (parts.length === 1) return [[], input];
   const lines = parts[0]!.split("\n");
-  if (parts.length !== 2 || !lines[0]!.startsWith(recallHead)) throw new Error("on top of the job is not just what it was reminded of: " + input);
+  if (parts.length !== 2 || !lines[0]!.startsWith(recallHead)) throw new Error("on top of the brief is not just what it was reminded of: " + input);
   return [lines.slice(1), parts[1]!];
 };
 
 /** A finished turn is kept in the background. */
 const kept = (agent: string, n: number) =>
-  Effect.flatMap(Memories, (m) =>
+  Effect.flatMap(Memory, (m) =>
     await_(
       () => m.list(agent),
       (got) => got.length >= n,
@@ -65,9 +65,9 @@ describe("memory", () => {
     const next = prompts(f);
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
-      const memories = yield* Memories;
+      const issues = yield* Issue;
+      const sessions = yield* Session;
+      const memories = yield* Memory;
       const core = yield* Core;
       const lastText = (id: string, summary: string) => sessions.find(id)?.lastText ?? summary;
 
@@ -81,14 +81,14 @@ describe("memory", () => {
 
       const mine = yield* kept("scribe", 3);
       expect(mine).toHaveLength(3);
-      const job = mine.find((m) => m.kind === "issue")!;
-      expect(job.text).toMatch(/^写上班打卡，记一笔 → /u);
-      const rows = (ms: Memory[]) => ms.map((m) => [m.kind, m.text, m.project ?? "所有项目", m.session ?? ""].join("|")).toSorted();
+      const done = mine.find((m) => m.kind === "issue")!;
+      expect(done.text).toMatch(/^写上班打卡，记一笔 → /u);
+      const rows = (ms: T.Memory[]) => ms.map((m) => [m.kind, m.text, m.project ?? "所有项目", m.session ?? ""].join("|")).toSorted();
       expect(rows(mine)).toEqual(
         [
           ["note", "这个项目用 pnpm test 跑测试", "memo", first.id],
           ["note", "提交信息写中文", "所有项目", first.id],
-          ["issue", job.text, "memo", first.id],
+          ["issue", done.text, "memo", first.id],
         ]
           .map((r) => r.join("|"))
           .toSorted(),
@@ -100,7 +100,7 @@ describe("memory", () => {
       let [recalled, asked] = reminded(yield* nextPrompt(f, next, 1));
       expect(asked).toBe("再加一个下班打卡");
       expect([...recalled].toSorted()).toEqual(
-        ["- （这个项目）这个项目用 pnpm test 跑测试", "- （所有项目）提交信息写中文", "- 做过（这个项目）：" + job.text].toSorted(),
+        ["- （这个项目）这个项目用 pnpm test 跑测试", "- （所有项目）提交信息写中文", "- 做过（这个项目）：" + done.text].toSorted(),
       );
       yield* w.nextReport;
       const steps = sessions.events(second.id)!;
@@ -147,10 +147,10 @@ describe("memory", () => {
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
         const w = yield* watch;
-        const issues = yield* Issues;
-        const sessions = yield* Sessions;
+        const issues = yield* Issue;
+        const sessions = yield* Session;
         // Waking after the restart reads the agent from the store, as in real use.
-        yield* (yield* Agents).save(scribe());
+        yield* (yield* Agent).save(scribe());
         const noted = mustHire(yield* issues.hire(scribe(), "写上班打卡，记一笔", "memo"));
         yield* nextPrompt(before, next, 0);
         yield* w.nextReport;
@@ -166,7 +166,7 @@ describe("memory", () => {
       const again = prompts(after);
       yield* Effect.gen(function* () {
         const w = yield* watch;
-        const sessions = yield* Sessions;
+        const sessions = yield* Session;
         yield* kept("scribe", 3);
         expect((yield* sessions.deliver(session, "顺手把下班打卡的测试也补上", { kind: "comment" })).kind).toBe("run");
         expect(yield* nextPrompt(after, again, 0)).toBe("顺手把下班打卡的测试也补上");

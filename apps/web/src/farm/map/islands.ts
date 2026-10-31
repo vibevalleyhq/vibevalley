@@ -2,10 +2,11 @@
 // waits for the farm to free up.
 
 import { t } from "@vibevalley/i18n";
-import { type Issue, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
-import { isBusy, phaseText, roomLeft } from "@vibevalley/protocol/rules";
+import { type Crop, type Issue, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
+import { isBusy, phaseText, plotKeyOf, roomLeft } from "@vibevalley/protocol/rules";
 
 import { compareText, or } from "@/base/order";
+import { type Recency, recencyOf } from "@/features/project";
 import type { Pose } from "@/ui/cast";
 
 export type Spot = { readonly kind: "taken"; readonly session: Session; readonly plot: PlotView } | { readonly kind: "open" } | { readonly kind: "shut" };
@@ -25,7 +26,7 @@ export const openOf = (i: Island) => i.spots.filter((s) => s.kind === "open").le
 const isFull = (i: Island) => i.working >= i.maxSessions;
 
 const queuedIn = (issues: readonly Issue[], project: string) =>
-  issues.filter((i) => i.project === project && i.status === "todo" && i.queuedAt !== undefined).toSorted((a, b) => a.queuedAt! - b.queuedAt!);
+  issues.filter((i) => i.project === project && i.status === "todo" && i.queuedAt !== undefined).toSorted((a, b) => (a.queuedAt ?? 0) - (b.queuedAt ?? 0));
 
 /** Peopled or waited on first, then the newest commit, then by name. */
 export function islandsOf({
@@ -52,7 +53,7 @@ export function islandsOf({
     const room = Math.max(0, Math.min(maxSessions > 0 ? left.project : 0, maxRunning - mine.length));
     const open = Math.min(room, left.farm);
     const spots: Spot[] = [
-      ...mine.map((h): Spot => ({ kind: "taken", session: h, plot: plots[h.id] ?? { crop: "seeded" } })),
+      ...mine.map((h): Spot => ({ kind: "taken", session: h, plot: plots[plotKeyOf(h)] ?? { crop: "seeded" } })),
       ...Array.from({ length: open }, (): Spot => ({ kind: "open" })),
       ...Array.from({ length: room - open }, (): Spot => ({ kind: "shut" })),
     ];
@@ -124,18 +125,18 @@ export function mapPose(h: Session): Pose {
 export function spotText(spot: Spot, now: number) {
   switch (spot.kind) {
     case "taken":
-      return `${spot.session.name} · ${phaseText(spot.session, now)}${spot.session.branch ? t("web.project.project.branch", { branch: spot.session.branch }) : ""}`;
+      return `${spot.session.name} · ${phaseText(spot.session, now)}${spot.session.branch ? t("web.farm.map.island.branch", { branch: spot.session.branch }) : ""}`;
     case "open":
-      return t("web.project.project.open");
+      return t("web.farm.map.island.open");
     case "shut":
-      return t("web.project.project.shut", { n: maxRunning });
+      return t("web.farm.map.island.shut", { n: maxRunning });
   }
 }
 
 export const islandText = (i: Island) =>
   [
-    !i.summary ? t("web.project.project.gone") : t("web.project.project.working", { n: i.working, of: i.maxSessions, full: isFull(i) }),
-    ...(i.queued.length > 0 ? [t("web.project.project.queued", { n: i.queued.length })] : []),
+    !i.summary ? t("web.farm.map.island.gone") : t("web.farm.map.island.working", { n: i.working, of: i.maxSessions, full: isFull(i) }),
+    ...(i.queued.length > 0 ? [t("web.farm.map.island.queued", { n: i.queued.length })] : []),
   ].join(" · ");
 
 export function islandScale(width: number, cell: number, gap: number) {
@@ -148,6 +149,14 @@ export const islandLooks = ["island-meadow", "island-orchard", "island-pond", "i
 
 export function islandLook(project: string) {
   let h = 0;
-  for (const c of project) h = (h * 31 + c.codePointAt(0)!) & 0x7fffffff;
-  return islandLooks[h % islandLooks.length]!;
+  for (const c of project) h = (h * 31 + (c.codePointAt(0) ?? 0)) & 0x7fffffff;
+  return islandLooks[h % islandLooks.length] ?? "island-meadow";
+}
+
+/** The crop a project's newest commit grows: the workbench's recency in the farm's picture and words. */
+const cropOf: Record<Recency, Crop> = { never: "empty", day: "flowering", week: "leafy", month: "sprout", quarter: "dry", older: "withered" };
+
+export function growthOf(last: number | undefined, now: number): { readonly crop: Crop; readonly label: string } {
+  const recency = recencyOf(last, now);
+  return { crop: cropOf[recency], label: t(`web.farm.map.crop.${recency}`) };
 }

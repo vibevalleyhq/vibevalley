@@ -17,7 +17,7 @@
   "create": "Done, save it",
   "save": "Save",
   "backToProfile": "← Back to the profile",
-  "trajectoriesHint": "Every helper sent from it, every step since it took the job: what it heard, every tool it used (click a row for the input and output), what it said. Steps are kept 30 days after it leaves; the helper itself stays listed.",
+  "trajectoriesHint": "Every helper sent from it, every step since it took the ticket: what it heard, every tool it used (click a row for the input and output), what it said. Steps are kept 30 days after it leaves; the helper itself stays listed.",
   "trajectories": "Trajectories",
   "remove": "Delete",
   "removeWhich": "Delete {name}?",
@@ -115,7 +115,7 @@
   "none": "None.",
   "role": {
     "orchestrator": "Manager",
-    "worker": "Helper"
+    "helper": "Helper"
   },
   "templates": {
     "title": "Templates",
@@ -159,7 +159,7 @@
     "title": "Profiles",
     "intro": "Each profile is an agent. Managers stay, lead and do no work themselves, and there may be several; helpers are runtimes set up: which runtime and model, what persona and skills, and which little animal they are on the farm. When a manager sends work, it sends a helper.",
     "orchestrators": "Managers",
-    "workers": "Helpers",
+    "helpers": "Helpers",
     "make": "Make a new helper",
     "makeOrchestrator": "Add a manager",
     "orchestratorLine": "Not a helper: sends work, watches progress, passes on results.",
@@ -169,7 +169,7 @@
     "enable": "Enable",
     "toggle": "{act} {name}",
     "here": "{n} here",
-    "tallyHint": "How many times helpers sent from this profile got work merged into main (the server's ledger)",
+    "tallyHint": "How many times helpers sent from this profile got work merged into main",
     "hired": "Hired",
     "merged": "Merged"
   },

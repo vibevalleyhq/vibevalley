@@ -9,7 +9,7 @@ import { aTurn, until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import { Caller } from "./host.ts";
-import { Sessions } from "./session.ts";
+import { Session } from "./session.ts";
 describe("Caller", () => {
   it.effect("keeps what came before its reader, then streams until it ends", () =>
     Effect.gen(function* () {
@@ -38,7 +38,7 @@ describe("AgentHost", () => {
   it.live("says each answer once, whole, while the caller gets its words as they grow", () => {
     const config = testConfig();
     return Effect.gen(function* () {
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       const { llm } = scriptedLLM([answer([text("我看一下"), toolCall("missing", {})]), answer("看完了，一切正常")]);
       const said: string[] = [];
       const states: string[] = [];
@@ -88,7 +88,7 @@ describe("AgentHost", () => {
   it.live("waits for an input build before closing, without delivering it late", () => {
     const config = testConfig();
     return Effect.gen(function* () {
-      const sessions = yield* Sessions;
+      const sessions = yield* Session;
       const { llm } = scriptedLLM();
       const host = yield* sessions.host({
         name: "orchestrator",

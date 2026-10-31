@@ -1,9 +1,8 @@
 import { list, t } from "@vibevalley/i18n";
 import type { AccountUsage, RuntimeInfo, RuntimeQuota } from "@vibevalley/protocol";
 
-import { runtimeLabel } from "@/agent/seed.ts";
-
 import { yuan } from "./money.ts";
+import { runtimeLabel } from "./presets.ts";
 
 const two = (n: number) => String(n).padStart(2, "0");
 

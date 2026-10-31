@@ -1,11 +1,11 @@
 // This farm's own memories, rows in the memory table: what each agent noted (its
-// 「记住：」 lines and the owner's notes) and one line for each job it did. A memory that cannot be read or written never
+// 「记住：」 lines and the owner's notes) and one line for each issue it worked. A memory that cannot be read or written never
 // stops a run: it is logged, and the run goes on without it.
 
 import { Clock, Effect, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import { type ActorKind, type Memory, type Outcome } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
@@ -15,7 +15,7 @@ import { newId } from "@/base/ids.ts";
 import { bestEffort } from "@/base/log.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
-import { clip, memoryIsNewNote, memoryJobText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
+import { clip, memoryIsNewNote, issueMemoryText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
 import { termsList, termsText, termsVersion } from "./terms.ts";
 
 /** One finished run, everything about it; each provider keeps what it uses. */
@@ -23,8 +23,8 @@ export interface FinishedRun {
   readonly agent: string;
   readonly session: string;
   readonly project: string;
-  readonly job: string;
-  readonly outcome: Outcome;
+  readonly brief: string;
+  readonly outcome: T.Outcome;
   readonly said: string;
   readonly summary: string;
 }
@@ -58,14 +58,14 @@ const fadingSoon = 10;
 
 const recutBatch = 100;
 
-export const makeMemories = Effect.gen(function* () {
+export const makeMemoryStore = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const { attempt: db, run, attemptTx } = yield* Db;
 
   const list = (agent: string) =>
     db(
       Effect.map(q.memoriesOf({ agent }), (rows) =>
-        rows.map((r): Memory => ({
+        rows.map((r): T.Memory => ({
           id: r.id,
           agent,
           kind: r.kind,
@@ -81,7 +81,7 @@ export const makeMemories = Effect.gen(function* () {
       ),
     );
 
-  const insertNote = Effect.fnUntraced(function* (agent: string, body: string, project: string | undefined, session: string | undefined, author: ActorKind) {
+  const insertNote = Effect.fnUntraced(function* (agent: string, body: string, project: string | undefined, session: string | undefined, author: T.ActorKind) {
     const at = yield* Clock.currentTimeMillis;
     const id = newId();
     yield* db(
@@ -126,7 +126,7 @@ export const makeMemories = Effect.gen(function* () {
       });
       return pick(all, picked);
     },
-    (effect, cue) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), [] as Memory[]))),
+    (effect, cue) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), [] as T.Memory[]))),
   );
 
   const markRecalled = (ids: readonly string[]) =>
@@ -140,20 +140,20 @@ export const makeMemories = Effect.gen(function* () {
       ? Effect.void
       : attemptTx(
           Effect.gen(function* () {
-            const known: Pick<Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
+            const known: Pick<T.Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
             for (const note of memoryNotesOf(run.said)) {
               const project = note.everywhere ? undefined : run.project;
               if (!memoryIsNewNote(known, note.text, project)) continue;
               yield* insertNote(run.agent, note.text, project, run.session, "session");
               known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
             }
-            const job = memoryJobText(run.job, run.summary, run.outcome);
+            const text = issueMemoryText(run.brief, run.summary, run.outcome);
             yield* db(
-              q.keepJob({
+              q.keepIssueMemory({
                 id: newId(),
                 agent: run.agent,
-                body: job,
-                terms: termsText(job),
+                body: text,
+                terms: termsText(text),
                 terms_of: termsVersion,
                 project: run.project,
                 session: run.session,
@@ -170,7 +170,7 @@ export const makeMemories = Effect.gen(function* () {
       const fading = new Set(nextForgotten(all, fadingSoon));
       return all.map((m) => ({ ...m, fading: fading.has(m.id) }));
     },
-    (effect, agent) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memories of ${agent}: ${String(e)}`), [] as Memory[]))),
+    (effect, agent) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memories of ${agent}: ${String(e)}`), [] as T.Memory[]))),
   );
 
   const write = Effect.fnUntraced(function* (n: Note) {
@@ -197,7 +197,7 @@ export const makeMemories = Effect.gen(function* () {
       fading: false,
       ...(project ? { project } : {}),
       ...(session ? { session: sessionId(session) } : {}),
-    } satisfies Memory;
+    } satisfies T.Memory;
   });
 
   const forget = (agent: string, id: string) => run(q.forget({ agent, id }));
@@ -214,4 +214,4 @@ export const makeMemories = Effect.gen(function* () {
   return { list, listed, matches, recallable, markRecalled, keep, write, forget, recutTerms };
 });
 
-export type Memories = Effect.Success<typeof makeMemories>;
+export type MemoryStore = Effect.Success<typeof makeMemoryStore>;

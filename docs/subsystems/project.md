@@ -1,6 +1,6 @@
 # 项目
 
-项目（`project`）是工作目录 `projects/` 下的一个 git 仓库，农场里是一座岛，岛上的地是它在做的工单。`apps/server/src/project`（`Projects`）管工作目录、项目的新建和导入、开了 worktree 时工单的 worktree 和分支，以及读改动、冲突预检、检查、合并、推送和 `gh` 这些 git 操作；什么时候做这些，由工单和计划决定。
+项目（`project`）是工作目录 `projects/` 下的一个 git 仓库，农场里是一座岛，岛上的地是它在做的工单。`apps/server/src/project`（`Project`）管工作目录、项目的新建和导入、开了 worktree 时工单的 worktree 和分支，以及读改动、冲突预检、检查、合并、推送和 `gh` 这些 git 操作；什么时候做这些，由工单和计划决定。
 
 ## 管什么，不管什么
 
@@ -21,7 +21,7 @@
 - 配置（`ServerConfig`，[设置和配置](docs/subsystems/setting.md#模型和不变量)）：`work_root`、`project.max_sessions`、`project.check_timeout_seconds`、`github.pr_projects`、`tokei`、`git_emails`。
 - 没有表：项目就是磁盘上的文件夹，PR 的回执记在工单上（`Issue.pullRequest`）。
 - 接口：`project.list`、`project.validate`、`project.create`、`project.language.list`、`project.activity.get`、`github.get`、`github.refresh`；工单的改动是 `issue.diff.get`（[capabilities.md](docs/reference/capabilities.md)）。
-- 页面：项目页 `apps/web/src/features/project/ProjectsPage.tsx`（新建、地契、语言、开垦日历），地图 `ProjectMap.tsx`；规则在 `apps/web/src/features/project/islands.ts`。
+- 页面：项目页 `apps/web/src/features/project/ProjectsPage.tsx`（新建、概况、语言、提交日历）；地图是农场的皮 `apps/web/src/farm/map/ProjectMap.tsx`，规则在 `farm/map/islands.ts`，由 `app/` 交给项目页（`ProjectsSkin`）。
 
 ## 模型和不变量
 
@@ -31,7 +31,7 @@
 - **一张工单一个 worktree、一条分支**（`issueBranch`）：`worktrees/<项目>.<工单号>`，分支 `vibevalley/issue-<工单号>`。worktree 在就复用；只剩分支就在原分支上重建 worktree；都没有就从基分支新开：计划给的基分支，或项目在 `github.pr_projects` 里且能提 PR 时先快进的主分支，否则 `HEAD`。新开的 worktree 在锁外跑一次仓库里的 `.vibevalley/setup`（比如装依赖；限时和检查一样，失败只记一条警告，帮工照常开工），帮工一来就能跑检查。即时派活也先取得工单号，不按帮工编号或时间创建另一种工作区。档案关掉 worktree（`Agent.worktree`）时帮工直接在项目文件夹里干活，没有分支，也就没有可合的。
 - **同一个项目里改仓库的操作串行**（`serially`，每个项目一把锁）：新建、开 worktree、合并、清理、开分支、结束 PR。检查在锁外跑，进锁以后再核对。
 - **释放回执区分现场是否仍在**（`WorkplaceRelease`）：`release`、`clear` 返回 `kept`，保留时带原因。未合的改动、分支或删除失败都不能被调用方当作已释放；工单只在现场释放后才能删掉身份。`clear` 默认丢弃工作区里的未提交文件，`preserve` 用在工单换项目前，未提交的也保留；两种都不丢弃未合的提交。
-- **留着和清掉**（`release`，帮工离开或派不出去时）：worktree 里有没提交的改动就整个留着；否则清掉 worktree；分支上有主分支没有的提交就留着，没有就删掉。合并成功以后强制删掉 worktree 和分支；删不掉只是一条警告，跟着成功的回执走，不把完成变成失败。起草完的 worktree 由执行停止写入后 `reset`：在锁里把工单分支 `checkout -f -B` 回主分支、`git clean -fd`，改的和提交的都不留，项目文件夹本身不重置；没开工就取消或删掉的工单 `clear`：强制删掉它的 worktree，分支上没有主分支没有的提交就删掉分支。
+- **留着和清掉**（`release`，帮工离开或派不出去时）：worktree 里有没提交的改动就整个留着；否则清掉 worktree；分支上有主分支没有的提交就留着，没有就删掉。合并成功以后强制删掉 worktree 和分支；删不掉只是一条警告，跟着成功的回执走，不把完成变成失败。起草完的 worktree 由帮工模块停止写入后 `reset`：在锁里把工单分支 `checkout -f -B` 回主分支、`git clean -fd`，改的和提交的都不留，项目文件夹本身不重置；没开工就取消或删掉的工单 `clear`：强制删掉它的 worktree，分支上没有主分支没有的提交就删掉分支。
 - **一个项目的上限**：`project.max_sessions`（默认 3）是同时在干活的帮工数，歇着的不算；`maxSessions` 把它夹在 1 到 6（`maxRunning`）之间，0 或比 6 大时是 6，跟着项目列表给页面（`ProjectSummary.maxSessions`）。它是配置，不进核心状态。
 - **改动**（`Changes`，只读）：主分支是项目克隆的当前分支；列出 `<主分支>..<分支>` 的提交、`<主分支>...<分支>` 改的文件（不认改名）和行数、worktree 里没提交的（`git status --porcelain`，`??` 记成新增）、主分支多了几个提交（`behind`）、会冲突的文件（`git merge-tree --write-tree --name-only`，不碰工作区）。每个文件的 diff 最多 400 行，全部 diff 最多 40 万个 UTF-16 单位，超了的文件不带 diff。
 - **合并失败分三种**（`mergeFailure.Kind`）：`conflict`（带主分支和冲突的文件）、`check`（检查没过、超时，或分支、主分支在检查后变了）、`error`（git 出错）。会冲突的合并不去试，交回帮工在自己的分支上解决。
@@ -118,4 +118,4 @@
 - `project/github.test.ts`：`gh` 在不在、登没登录（不记它打的字）；地址；权限在刷新时取、摘要不问 `gh`；登出或卸了丢掉权限；私有仓库用登录的 `gh` 克隆；PR 要项目打开、有权限；先检查再推送、已经开着的 PR 找回来；PR 的正文写检查跑没跑；新工单能快进时从 origin 的 main 开始；commit 每个仓库连同它的 worktree 只数一次。
 - `project/stack.test.ts`：每种标记文件、锁文件选包管理器。
 - `src/flows/pull_request.test.ts`：提 PR 的项目完成时推送、开 PR、主分支不动，第二轮只推送；重启以后 PR 合了或关了，工单关上，帮工、worktree 和分支清掉。
-- 页面：`apps/web/test/projects.spec.ts`（开一块新地、出现在地图上、打开地契；GitHub 地址先给名字）；`apps/web/src/features/project/projects.test.ts`（空位、锁住的地、排队只算排上队的）。
+- 页面：`apps/web/test/projects.spec.ts`（新建一个、出现在地图上、打开它；GitHub 地址先给名字）；`apps/web/src/features/project/projects.test.ts`（语言、提交日历、最近一次提交的远近）；`apps/web/src/farm/map/islands.test.ts`（空位、锁住的地、排队只算排上队的）。

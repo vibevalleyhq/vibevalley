@@ -8,7 +8,7 @@ const look: Look = { species: "bear", outfit: "farmer", build: "biped", head: "r
 const agent = (more: Partial<Agent> = {}): Agent => ({
   id: "backend",
   name: "后端老周",
-  role: "worker",
+  role: "helper",
   duty: "写接口、改 server、跑测试",
   enabled: true,
   runtime: "claude",

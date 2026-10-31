@@ -78,7 +78,7 @@ export const recalled = Effect.fn("Recalled")(function* (params: RecalledParams)
   })(params)
 })
 
-export const KeepJobParams = Schema.Struct({
+export const KeepIssueMemoryParams = Schema.Struct({
   ["id"]: Schema.String,
   ["agent"]: Schema.NullOr(Schema.String),
   ["body"]: Schema.String,
@@ -88,16 +88,16 @@ export const KeepJobParams = Schema.Struct({
   ["session"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
 })
-export type KeepJobParams = typeof KeepJobParams.Type
+export type KeepIssueMemoryParams = typeof KeepIssueMemoryParams.Type
 
 
-export const KeepJobSql = "-- name: KeepJob :exec\n-- One job memory for each session: written again as the session goes on.\ninsert into memory (id, scope, agent, kind, body, terms, terms_of, project, session, author, created_at, updated_at)\nvalues ($1, 'agent', $2, 'issue', $3, $4, $5, $6,\n        $7, 'system', $8, $8)\non conflict (agent, session) where kind = 'issue'\ndo update set body = excluded.body, terms = excluded.terms, terms_of = excluded.terms_of, project = excluded.project,\n              created_at = excluded.created_at, updated_at = excluded.updated_at;"
+export const KeepIssueMemorySql = "-- name: KeepIssueMemory :exec\n-- One issue memory for each session: written again as the session goes on.\ninsert into memory (id, scope, agent, kind, body, terms, terms_of, project, session, author, created_at, updated_at)\nvalues ($1, 'agent', $2, 'issue', $3, $4, $5, $6,\n        $7, 'system', $8, $8)\non conflict (agent, session) where kind = 'issue'\ndo update set body = excluded.body, terms = excluded.terms, terms_of = excluded.terms_of, project = excluded.project,\n              created_at = excluded.created_at, updated_at = excluded.updated_at;"
 
-export const keepJob = Effect.fn("KeepJob")(function* (params: KeepJobParams) {
+export const keepIssueMemory = Effect.fn("KeepIssueMemory")(function* (params: KeepIssueMemoryParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
-    Request: KeepJobParams,
-    execute: (p) => sql.unsafe(KeepJobSql, [p["id"], p["agent"], p["body"], p["terms"], p["terms_of"], p["project"], p["session"], p["created_at"]]),
+    Request: KeepIssueMemoryParams,
+    execute: (p) => sql.unsafe(KeepIssueMemorySql, [p["id"], p["agent"], p["body"], p["terms"], p["terms_of"], p["project"], p["session"], p["created_at"]]),
   })(params)
 })
 

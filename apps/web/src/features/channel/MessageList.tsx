@@ -12,7 +12,7 @@ import { useCore } from "@/base/frame";
 import { useRouter } from "@/base/router";
 import { aria, useNow } from "@/base/util";
 import { ArtifactCard } from "@/features/artifact";
-import { TurnSteps } from "@/features/session";
+import { RunSteps } from "@/features/session";
 import { A } from "@/ui/A";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
@@ -439,10 +439,10 @@ export function MessageRow(props: {
         )}
       </Show>
       <Show when={props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch"}>
-        <TurnSteps session={props.m.from} run={props.m.run} orchestrator />
+        <RunSteps session={props.m.from} run={props.m.run} orchestrator />
       </Show>
       <Show when={props.m.fromKind === "session" && props.m.kind === "report"}>
-        <TurnSteps session={props.m.from} run={props.m.run} />
+        <RunSteps session={props.m.from} run={props.m.run} />
       </Show>
       <Show when={props.thread}>{(thread) => <ThreadPreview thread={thread()} />}</Show>
     </Frame>
@@ -471,7 +471,7 @@ function ThreadPreview(props: { thread: Channel }) {
           {props.thread.replies > 0
             ? t("web.channel.replies", { n: props.thread.replies })
             : props.thread.subjectKind === "issue"
-              ? t("web.channel.jobs.thread")
+              ? t("web.channel.issues.thread")
               : t("web.channel.names.thread")}
         </span>
         <Show when={unread() > 0}>

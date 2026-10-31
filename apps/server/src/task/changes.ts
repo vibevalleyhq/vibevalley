@@ -1,8 +1,7 @@
+import { list, t } from "@vibevalley/i18n";
 // What changed in a task graph, step by step, and how each change is said. What is kept is the fact (a field's key, a
 // count), so the history reads in the locale of whoever reads it.
-
-import { list, t } from "@vibevalley/i18n";
-import type { GraphEventKind, Task, TaskFieldChange, TaskGraph, GraphEvent } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
 import { taskOf } from "./graph.ts";
 
@@ -10,17 +9,17 @@ import { taskOf } from "./graph.ts";
 export interface GraphChange {
   graph: string;
   task?: string;
-  kind: GraphEventKind;
+  kind: T.GraphEventKind;
   session?: string;
   detail?: string;
-  changes?: TaskFieldChange[];
+  changes?: T.TaskFieldChange[];
   commits?: string[];
 }
 
 /** A task's fields as a graph's history keeps them (TaskFieldChange.field): the key, said at read time. */
 export type TaskField = "title" | "brief" | "needs" | "agent" | "check" | "scope";
 
-const taskFields: readonly { field: TaskField; text: (n: Task) => string }[] = [
+const taskFields: readonly { field: TaskField; text: (n: T.Task) => string }[] = [
   { field: "title", text: (n) => n.title },
   { field: "brief", text: (n) => n.brief },
   { field: "needs", text: (n) => list(n.needs) },
@@ -32,11 +31,11 @@ const taskFields: readonly { field: TaskField; text: (n: Task) => string }[] = [
 const isField = (f: string): f is TaskField => taskFields.some((x) => x.field === f);
 
 /** The changes as they are shown: each field by its name. */
-export const renderedChanges = (changes: readonly TaskFieldChange[]): TaskFieldChange[] =>
+export const renderedChanges = (changes: readonly T.TaskFieldChange[]): T.TaskFieldChange[] =>
   changes.map((c) => ({ ...c, field: isField(c.field) ? t(`server.task.field.${c.field}`) : c.field }));
 
-function taskFieldChanges(was: Task, now: Task): TaskFieldChange[] {
-  const out: TaskFieldChange[] = [];
+function taskFieldChanges(was: T.Task, now: T.Task): T.TaskFieldChange[] {
+  const out: T.TaskFieldChange[] = [];
   for (const f of taskFields) {
     const from = f.text(was);
     const to = f.text(now);
@@ -46,9 +45,9 @@ function taskFieldChanges(was: Task, now: Task): TaskFieldChange[] {
 }
 
 /** Every write of a graph goes through here, so its history misses nothing. before undefined: a new graph. */
-export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): GraphChange[] {
+export function graphChanges(before: T.TaskGraph | undefined, after: T.TaskGraph): GraphChange[] {
   const out: GraphChange[] = [];
-  const graph = (kind: GraphEventKind, detail?: string) => out.push(detail ? { graph: after.id, kind, detail } : { graph: after.id, kind });
+  const graph = (kind: T.GraphEventKind, detail?: string) => out.push(detail ? { graph: after.id, kind, detail } : { graph: after.id, kind });
   if (!before) {
     graph("splitting", after.goal);
     return out;
@@ -82,7 +81,7 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
   }
   if (before.state === "splitting" || after.state === "abandoned") return out;
 
-  const step = (n: Task, kind: GraphEventKind, extra: Partial<GraphChange> = {}) => out.push({ ...extra, graph: after.id, task: n.id, kind });
+  const step = (n: T.Task, kind: T.GraphEventKind, extra: Partial<GraphChange> = {}) => out.push({ ...extra, graph: after.id, task: n.id, kind });
   for (const n of after.tasks) {
     const was = taskOf(before, n.id);
     if (!was) {
@@ -176,7 +175,7 @@ export function graphEventText(e: GraphChange, titleOf: (task: string) => string
   }
 }
 
-export const changeOf = (e: GraphEvent) => ({
+export const changeOf = (e: T.GraphEvent) => ({
   graph: e.graph,
   ...(e.task !== undefined ? { task: e.task } : {}),
   kind: e.kind,

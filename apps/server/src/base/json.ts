@@ -3,6 +3,8 @@
 
 import { Option, Result, Schema, type SchemaIssue } from "effect";
 
+import { currentLocale } from "@vibevalley/i18n";
+
 /** Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. */
 export const jsonOf = <T, E = T>(schema: Schema.Codec<T, E>) => Schema.decodeUnknownSync(Schema.fromJsonString(schema));
 
@@ -10,6 +12,18 @@ export const jsonOf = <T, E = T>(schema: Schema.Codec<T, E>) => Schema.decodeUnk
 export const jsonOrNone = <T, E = T>(schema: Schema.Codec<T, E>) => {
   const decode = Schema.decodeUnknownOption(Schema.fromJsonString(schema));
   return (text: string | null | undefined): T | undefined => (text == null ? undefined : Option.getOrUndefined(decode(text)));
+};
+
+/** A data file kept in each language (seeds.json and seeds.en.json), read once per language; one that does not fit its
+ * shape stops the server at its first use. */
+export const localizedJson = <A, I>(schema: Schema.Codec<A, I>, zh: unknown, en: unknown) => {
+  const kept = new Map<string, A>();
+  return (): A => {
+    const locale = currentLocale() === "en" ? "en" : "zh";
+    let got = kept.get(locale);
+    if (got === undefined) kept.set(locale, (got = Schema.decodeUnknownSync(schema)(locale === "en" ? en : zh)));
+    return got;
+  };
 };
 
 /** A fenced block, ```json or bare: models drop the language as often as they write it. */

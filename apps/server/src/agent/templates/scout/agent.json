@@ -1,7 +1,7 @@
 {
   "id": "scout",
   "version": 1,
-  "role": "worker",
+  "role": "helper",
   "name": "情报 Grok",
   "duty": "查资料、读外部文档、调研方案",
   "tags": ["查", "调研", "agora", "资料", "接口怎么调"],

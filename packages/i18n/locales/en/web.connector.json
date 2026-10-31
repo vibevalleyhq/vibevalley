@@ -29,7 +29,7 @@
         "2": "QQ lets a bot reply only for a short while after you speak. Reports after that wait, are retried later, and come with your next message."
       }
     },
-    "always": "Helpers can run commands on this computer, so only the owner counts; reply quoting a report and your words go to that job's ticket thread. VibeValley only connects out and opens no port.",
+    "always": "Helpers can run commands on this computer, so only the owner counts; reply quoting a report and your words go to that ticket's thread. VibeValley only connects out and opens no port.",
     "state": {
       "off": "Not connected",
       "waiting": "Waiting for your scan",

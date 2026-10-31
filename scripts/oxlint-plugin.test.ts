@@ -188,7 +188,7 @@ tester.run("db-door", rule("db-door"), {
   ],
   invalid: [
     { code: 'import { SqlClient } from "effect/sql";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
-    { code: "const t = sql.withTransaction(work);", filename: "/repo/apps/server/src/memory/memories.ts", errors: [{ messageId: "transaction" }] },
+    { code: "const t = sql.withTransaction(work);", filename: "/repo/apps/server/src/memory/store.ts", errors: [{ messageId: "transaction" }] },
   ],
 });
 
@@ -254,9 +254,9 @@ tester.run("no-object-guard", rule("no-object-guard"), {
 
 tester.run("service-method-names", rule("service-method-names"), {
   valid: [
-    'Issues.of({ create: Effect.fn("Issues.create")(function* (req) { return yield* add(req); }) })',
+    'Issue.of({ create: Effect.fn("Issue.create")(function* (req) { return yield* add(req); }) })',
     "Core.of({ apply: Effect.fnUntraced(function* (fact) { yield* fold(fact); }) })",
-    'const list = Effect.fn("Crons.list")(function* () { return []; });\nCrons.of({ list })',
+    'const list = Effect.fn("Cron.list")(function* () { return []; });\nCron.of({ list })',
     "Core.of({ state: () => state, follow: (id) => Stream.fromPubSub(events), events: Stream.empty, owner: Effect.map(sub, f) })",
     "Lan.of({ answer: (id) => lookup(id), me: () => Effect.runSync(read) })",
     "GitError.of(code, stderr)",
@@ -265,20 +265,63 @@ tester.run("service-method-names", rule("service-method-names"), {
   invalid: [
     { code: "Core.of({ open: () => Effect.suspend(() => go) })", errors: [{ messageId: "unnamed", data: { service: "Core", method: "open" } }] },
     { code: "Game.of({ count: () => projects.contributions(e).pipe(Effect.map(total)) })", errors: [{ messageId: "unnamed" }] },
-    { code: "Notices.of({ say(text) { if (!text) return Effect.void; return Effect.log(text); } })", errors: [{ messageId: "unnamed" }] },
+    { code: "Notice.of({ say(text) { if (!text) return Effect.void; return Effect.log(text); } })", errors: [{ messageId: "unnamed" }] },
     {
       code: "const apply = (f) => Effect.sync(() => f);\nCore.of({ apply, setCommits: (c) => apply(c) })",
       errors: [{ messageId: "unnamed" }, { messageId: "unnamed" }],
     },
     {
-      code: 'const changesOf = Effect.fn("Sessions.changesOf")(function* (id) { return id; });\nSessions.of({ changes: changesOf })',
+      code: 'const changesOf = Effect.fn("Session.changesOf")(function* (id) { return id; });\nSession.of({ changes: changesOf })',
       errors: [{ messageId: "name" }],
     },
-    { code: "Connectors.of({ login: (id) => bridge(id)?.login() ?? Effect.succeed(off(id)) })", errors: [{ messageId: "unnamed" }] },
-    { code: "const locked = (e) => lock.withPermits(1)(e);\nChannels.of({ pin: (id) => locked(pinning(id)) })", errors: [{ messageId: "unnamed" }] },
+    { code: "Connector.of({ login: (id) => bridge(id)?.login() ?? Effect.succeed(off(id)) })", errors: [{ messageId: "unnamed" }] },
+    { code: "const locked = (e) => lock.withPermits(1)(e);\nChannel.of({ pin: (id) => locked(pinning(id)) })", errors: [{ messageId: "unnamed" }] },
     {
-      code: "Tasks.of({ act: Effect.fn(function* (id) { return id; }) })",
-      errors: [{ messageId: "name", data: { service: "Tasks", method: "act", given: "nothing" } }],
+      code: "Task.of({ act: Effect.fn(function* (id) { return id; }) })",
+      errors: [{ messageId: "name", data: { service: "Task", method: "act", given: "nothing" } }],
+    },
+  ],
+});
+
+const server = "/repo/apps/server/src/a.ts";
+
+tester.run("singular-service", rule("singular-service"), {
+  valid: [
+    { code: 'class Issue extends Context.Service<Issue, { list: () => number }>()("vibevalley/Issue") {}', filename: server },
+    { code: 'class Progress extends Context.Service<Progress, {}>()("vibevalley/Progress") {}', filename: server },
+    { code: 'class SyncStatus extends Context.Service<SyncStatus, {}>()("vibevalley/SyncStatus") {}', filename: server },
+    { code: "class Issues extends Data.Class {}", filename: server },
+  ],
+  invalid: [
+    {
+      code: 'class Issues extends Context.Service<Issues, {}>()("vibevalley/Issue") {}',
+      filename: server,
+      errors: [{ messageId: "plural", data: { name: "Issues", singular: "Issue" } }],
+    },
+    {
+      code: 'export class Memories extends Context.Service<Memories, {}>()("vibevalley/Memory") {}',
+      filename: server,
+      errors: [{ messageId: "plural", data: { name: "Memories", singular: "Memory" } }],
+    },
+  ],
+});
+
+tester.run("protocol-namespace", rule("protocol-namespace"), {
+  valid: [
+    { code: 'import type * as T from "@vibevalley/protocol";', filename: server },
+    { code: 'import { type IssueStatus, ownerId } from "@vibevalley/protocol";', filename: server },
+    { code: 'import { Issue } from "@/issue/issue.ts";', filename: server },
+    { code: 'import * as S from "@vibevalley/protocol/schema";', filename: server },
+  ],
+  invalid: [
+    { code: 'import type { Issue } from "@vibevalley/protocol";', filename: server, errors: [{ messageId: "named", data: { name: "Issue" } }] },
+    {
+      code: 'import { type Session as Run, ownerId, type Channel } from "@vibevalley/protocol";',
+      filename: server,
+      errors: [
+        { messageId: "named", data: { name: "Session" } },
+        { messageId: "named", data: { name: "Channel" } },
+      ],
     },
   ],
 });

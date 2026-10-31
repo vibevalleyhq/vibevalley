@@ -10,7 +10,7 @@ import { Effect } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { openBrain, standaloneOwner } from "@vibevalley/agent/brain";
-import type { Tool } from "@vibevalley/agent/core/loop";
+import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { memoryFile } from "@vibevalley/agent/memory";
 import { type BrainMessage, transcript } from "@vibevalley/agent/messages";
 import { deepseek } from "@vibevalley/ai/client";
@@ -20,7 +20,7 @@ import { tempDir } from "@vibevalley/testkit/temp";
 import { orchestrator } from "@/base/actor.ts";
 import { standaloneLlm } from "@/cli/llm.ts";
 import { world } from "@/testing/world.ts";
-import { Tools } from "@/tool/tool.ts";
+import { Tool } from "@/tool/tool.ts";
 
 import { casesIn, check, committed, type EvalCase, isInput, stubbed } from "./evals.ts";
 import { agentPrompt, systemPrompt } from "./prompts.ts";
@@ -33,7 +33,7 @@ const orchestratorTools = () =>
   Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
-        const t = yield* Tools;
+        const t = yield* Tool;
         return t.orchestrator(() => ({ agent: defaultOrchestrator, session: "", project: "", here: "", picked: "", actor: orchestrator(true) }));
       }).pipe(Effect.provide(world())),
     ),
@@ -41,7 +41,7 @@ const orchestratorTools = () =>
 
 /** One sample: the brain as the orchestrator makes it, with the case's memory and channel; the turn the input begins, and
  * the tokens it took. */
-async function replay(c: EvalCase, model: string, tools: readonly Tool[]): Promise<{ turn: BrainMessage[]; tokens: number }> {
+async function replay(c: EvalCase, model: string, tools: readonly LoopTool[]): Promise<{ turn: BrainMessage[]; tokens: number }> {
   const home = tempDir("vibevalley-eval-");
   writeFileSync(memoryFile(home), c.memory);
   writeFileSync(join(home, defaultOrchestrator + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));

@@ -1,4 +1,4 @@
-// The profiles (orchestrators and workers), the skills and each runtime's settings: config.json in the home. A profile
+// The profiles (orchestrators and helpers), the skills and each runtime's settings: config.json in the home. A profile
 // is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
 // template when it is missing, so a farm always has one.
 
@@ -7,29 +7,21 @@ import { join } from "node:path";
 import { Context, Effect, FiberSet, Layer, Predicate, Schema } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
-import {
-  type Agent,
-  type AgentTemplate,
-  defaultOrchestrator,
-  orchestratorRuntime,
-  type Preview,
-  type RuntimeSettings,
-  type Skill,
-  SpeciesValues,
-} from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { defaultOrchestrator, orchestratorRuntime, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { ServerConfig } from "@/base/config.ts";
 import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
+import { defaultSettings } from "@/runtime/presets.ts";
 
-import { defaultSettings } from "./seed.ts";
 import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, TemplateProblem, updatedFrom } from "./template.ts";
 
 interface Stored {
-  readonly agents: readonly Agent[];
-  readonly skills: readonly Skill[];
-  readonly settings: Readonly<Record<string, RuntimeSettings>>;
+  readonly agents: readonly T.Agent[];
+  readonly skills: readonly T.Skill[];
+  readonly settings: Readonly<Record<string, T.RuntimeSettings>>;
 }
 
 // A profile's look may lack what withCast fills in (a build and a head): config.json from before those existed. They are
@@ -72,7 +64,7 @@ function castHash(s: string): number {
 }
 
 /** Missing appearance fields are filled on load and save: no enum reaches a client as an empty string. */
-export function withCast(a: Agent): Agent {
+export function withCast(a: T.Agent): T.Agent {
   const look = { ...a.look };
   look.build ||= "biped";
   look.head ||= "rounded";
@@ -83,43 +75,43 @@ export function withCast(a: Agent): Agent {
   return { ...a, look };
 }
 
-export class Agents extends Context.Service<
-  Agents,
+export class Agent extends Context.Service<
+  Agent,
   {
-    /** The profiles work is sent to: the workers. */
-    readonly agents: () => Agent[];
+    /** The profiles work is sent to: the helpers. */
+    readonly agents: () => T.Agent[];
     /** All the profiles, the orchestrators too. */
-    readonly all: () => Agent[];
-    readonly orchestrators: () => Agent[];
+    readonly all: () => T.Agent[];
+    readonly orchestrators: () => T.Agent[];
     /** A profile with this id is an orchestrator. */
     readonly isOrchestrator: (id: string) => boolean;
-    readonly agent: (id: string) => Agent | undefined;
+    readonly agent: (id: string) => T.Agent | undefined;
     /** A profile work is sent to, by its id or its name, as a person or a model says it. */
-    readonly named: (key: string) => Agent | undefined;
-    readonly skills: () => Skill[];
-    readonly settings: (runtime: string) => RuntimeSettings;
-    readonly save: (a: Agent) => Effect.Effect<Agent, ApiError>;
-    readonly create: (draft: Agent) => Effect.Effect<Agent, ApiError>;
+    readonly named: (key: string) => T.Agent | undefined;
+    readonly skills: () => T.Skill[];
+    readonly settings: (runtime: string) => T.RuntimeSettings;
+    readonly save: (a: T.Agent) => Effect.Effect<T.Agent, ApiError>;
+    readonly create: (draft: T.Agent) => Effect.Effect<T.Agent, ApiError>;
     readonly remove: (id: string) => Effect.Effect<void, ApiError>;
     /** What remove would do, refused as it would be; nothing changes. */
-    readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
-    readonly saveSkill: (s: Skill) => Effect.Effect<Skill, ApiError>;
-    readonly createSkill: (draft: Skill) => Effect.Effect<Skill, ApiError>;
+    readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
+    readonly saveSkill: (s: T.Skill) => Effect.Effect<T.Skill, ApiError>;
+    readonly createSkill: (draft: T.Skill) => Effect.Effect<T.Skill, ApiError>;
     readonly removeSkill: (id: string) => Effect.Effect<void, ApiError>;
     /** What removeSkill would do, refused as it would be; nothing changes. */
-    readonly previewRemoveSkill: (id: string) => Effect.Effect<Preview, ApiError>;
-    readonly saveSettings: (runtime: string, s: RuntimeSettings) => Effect.Effect<RuntimeSettings, ApiError>;
+    readonly previewRemoveSkill: (id: string) => Effect.Effect<T.Preview, ApiError>;
+    readonly saveSettings: (runtime: string, s: T.RuntimeSettings) => Effect.Effect<T.RuntimeSettings, ApiError>;
     /** The built-in templates, then those added on this machine, each with the profiles installed from it. */
-    readonly templates: () => AgentTemplate[];
-    readonly installTemplate: (id: string) => Effect.Effect<Agent, ApiError>;
-    readonly updateFromTemplate: (agent: string) => Effect.Effect<Agent, ApiError>;
-    readonly addTemplate: (path: string) => Effect.Effect<AgentTemplate, ApiError>;
+    readonly templates: () => T.AgentTemplate[];
+    readonly installTemplate: (id: string) => Effect.Effect<T.Agent, ApiError>;
+    readonly updateFromTemplate: (agent: string) => Effect.Effect<T.Agent, ApiError>;
+    readonly addTemplate: (path: string) => Effect.Effect<T.AgentTemplate, ApiError>;
     readonly removeTemplate: (id: string) => Effect.Effect<void, ApiError>;
-    readonly previewRemoveTemplate: (id: string) => Effect.Effect<Preview, ApiError>;
+    readonly previewRemoveTemplate: (id: string) => Effect.Effect<T.Preview, ApiError>;
   }
 >()("vibevalley/Agent") {
   static readonly layer = Layer.effect(
-    Agents,
+    Agent,
     Effect.suspend(() => make),
   );
 }
@@ -133,7 +125,7 @@ const free = (want: string, taken: readonly string[], join: string) => {
 };
 
 /** A template made into a new profile beside these: its own id and name when free. */
-const installed = (template: AgentTemplate, beside: readonly Agent[], id?: string): Agent =>
+const installed = (template: T.AgentTemplate, beside: readonly T.Agent[], id?: string): T.Agent =>
   profileOf(
     template,
     id ??
@@ -160,7 +152,7 @@ const make = Effect.gen(function* () {
   const builtIn = builtInTemplates();
   const builtInOf = (id: string) => builtIn.find((item) => item.id === id);
   // A new farm: the starters the configuration names, in order; the default orchestrator is added below.
-  const starters: Agent[] = [];
+  const starters: T.Agent[] = [];
   for (const id of config.agent.starters) {
     const builtIn = builtInOf(id);
     if (builtIn) starters.push(installed(builtIn, starters));
@@ -190,11 +182,11 @@ const make = Effect.gen(function* () {
     });
 
   const all = () => structuredClone([...s.agents]);
-  const sendable = () => all().filter((a) => a.role === "worker");
+  const sendable = () => all().filter((a) => a.role === "helper");
 
   /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it
    * stays and is reached on a call; the default one stays an orchestrator. "" when it can. */
-  const roleProblem = (a: Agent): string => {
+  const roleProblem = (a: T.Agent): string => {
     if (a.id === defaultOrchestrator && a.role !== "orchestrator") return t("server.agent.defaultStaysOrchestrator");
     if (a.role === "orchestrator" && a.runtime !== orchestratorRuntime) return t("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime });
     return "";
@@ -212,7 +204,7 @@ const make = Effect.gen(function* () {
   };
 
   // Read again on every ask: an added template is a folder in the home, and copying one in or out changes the list.
-  const templates = (): AgentTemplate[] => {
+  const templates = (): T.AgentTemplate[] => {
     const added = addedTemplates(config.home);
     for (const why of added.problems) void forkHere(Effect.logWarning(`vibevalley: an added template is left out: ${why}`));
     return [...builtIn, ...added.templates].map((item) => ({
@@ -227,7 +219,7 @@ const make = Effect.gen(function* () {
     return item.source === "builtIn" ? Effect.fail(refused(t("server.agent.template.builtIn", { id }))) : Effect.succeed(item);
   };
 
-  const shape = Agents.of({
+  const shape = Agent.of({
     agents: () => sendable(),
     all,
     agent: (id) => all().find((a) => a.id === id),
@@ -239,14 +231,14 @@ const make = Effect.gen(function* () {
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     orchestrators: () => all().filter((a) => a.role === "orchestrator"),
     isOrchestrator: (id) => s.agents.some((a) => a.id === id && a.role === "orchestrator"),
-    save: Effect.fn("Agents.save")(function* (a) {
+    save: Effect.fn("Agent.save")(function* (a) {
       const why = roleProblem(a);
       if (why) return yield* Effect.fail(refused(why));
       const cast = withCast(a);
       yield* change((x) => ({ ...x, agents: upsert(x.agents, cast) }));
       return cast;
     }),
-    create: Effect.fn("Agents.create")(function* (draft) {
+    create: Effect.fn("Agent.create")(function* (draft) {
       if (draft.id) return yield* Effect.fail(refused(t("server.agent.newAgentId")));
       const why = roleProblem(draft);
       if (why) return yield* Effect.fail(refused(why));
@@ -256,19 +248,19 @@ const make = Effect.gen(function* () {
       yield* change((x) => ({ ...x, agents: [...x.agents, created] }));
       return created;
     }),
-    remove: Effect.fn("Agents.remove")(function* (id) {
+    remove: Effect.fn("Agent.remove")(function* (id) {
       yield* deletableAgent(id);
       return yield* change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) }));
     }),
-    previewRemove: Effect.fn("Agents.previewRemove")(function* (id) {
+    previewRemove: Effect.fn("Agent.previewRemove")(function* (id) {
       const a = yield* deletableAgent(id);
       return { does: [t("server.agent.removeAgent", { name: a.name, id: a.id, runtime: a.runtime })] };
     }),
-    saveSkill: Effect.fn("Agents.saveSkill")(function* (skill) {
+    saveSkill: Effect.fn("Agent.saveSkill")(function* (skill) {
       yield* change((x) => ({ ...x, skills: upsert(x.skills, skill) }));
       return skill;
     }),
-    createSkill: Effect.fn("Agents.createSkill")(function* (draft) {
+    createSkill: Effect.fn("Agent.createSkill")(function* (draft) {
       if (draft.id) return yield* Effect.fail(refused(t("server.agent.newSkillId")));
       const stem =
         draft.name
@@ -281,7 +273,7 @@ const make = Effect.gen(function* () {
       yield* change((x) => ({ ...x, skills: [...x.skills, created] }));
       return created;
     }),
-    removeSkill: Effect.fn("Agents.removeSkill")(function* (id) {
+    removeSkill: Effect.fn("Agent.removeSkill")(function* (id) {
       yield* deletableSkill(id);
       return yield* change((x) => ({
         ...x,
@@ -289,7 +281,7 @@ const make = Effect.gen(function* () {
         agents: x.agents.map((a) => ({ ...a, skills: a.skills.filter((skill) => skill !== id) })),
       }));
     }),
-    previewRemoveSkill: Effect.fn("Agents.previewRemoveSkill")(function* (id) {
+    previewRemoveSkill: Effect.fn("Agent.previewRemoveSkill")(function* (id) {
       const k = yield* deletableSkill(id);
       const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => a.name);
       return {
@@ -299,19 +291,19 @@ const make = Effect.gen(function* () {
         ],
       };
     }),
-    saveSettings: Effect.fn("Agents.saveSettings")(function* (runtime, settings) {
+    saveSettings: Effect.fn("Agent.saveSettings")(function* (runtime, settings) {
       yield* change((x) => ({ ...x, settings: { ...x.settings, [runtime]: settings } }));
       return settings;
     }),
     templates,
-    installTemplate: Effect.fn("Agents.installTemplate")(function* (id) {
+    installTemplate: Effect.fn("Agent.installTemplate")(function* (id) {
       const item = templateOf(id);
       if (!item) return yield* Effect.fail(missing(t("server.agent.template.noTemplate", { id }), [lookIn.template]));
       const made = withCast(installed(item, s.agents));
       yield* change((x) => ({ ...x, agents: [...x.agents, made] }));
       return made;
     }),
-    updateFromTemplate: Effect.fn("Agents.updateFromTemplate")(function* (agent) {
+    updateFromTemplate: Effect.fn("Agent.updateFromTemplate")(function* (agent) {
       const a = s.agents.find((x) => x.id === agent);
       if (!a) return yield* Effect.fail(missing(t("server.agent.noAgent", { id: agent }), [lookIn.agent]));
       if (!a.from) return yield* Effect.fail(refused(t("server.agent.template.notFrom", { name: a.name })));
@@ -321,7 +313,7 @@ const make = Effect.gen(function* () {
       yield* change((x) => ({ ...x, agents: upsert(x.agents, next) }));
       return next;
     }),
-    addTemplate: Effect.fn("Agents.addTemplate")(function* (path) {
+    addTemplate: Effect.fn("Agent.addTemplate")(function* (path) {
       const read = Effect.try({
         try: () => readTemplate(path, "added"),
         catch: (e) => refused(Schema.is(TemplateProblem)(e) ? e.message : String(e)),
@@ -334,14 +326,14 @@ const make = Effect.gen(function* () {
       });
       return { ...item, installed: [] };
     }),
-    removeTemplate: Effect.fn("Agents.removeTemplate")(function* (id) {
+    removeTemplate: Effect.fn("Agent.removeTemplate")(function* (id) {
       const item = yield* deletableTemplate(id);
       return yield* Effect.try({
         try: () => removeTemplate(config.home, item.id),
         catch: (e) => refused(t("server.agent.notSaved", { file: id, why: messageOf(e) })),
       });
     }),
-    previewRemoveTemplate: Effect.fn("Agents.previewRemoveTemplate")(function* (id) {
+    previewRemoveTemplate: Effect.fn("Agent.previewRemoveTemplate")(function* (id) {
       const item = yield* deletableTemplate(id);
       return {
         does: [

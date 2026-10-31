@@ -5,16 +5,17 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { type Agent, ownerId, type Session } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { ownerId } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { Artifacts } from "@/artifact/artifact.ts";
+import { Artifact } from "@/artifact/artifact.ts";
 import { owner } from "@/base/actor.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Memories } from "@/memory/memory.ts";
-import { Sessions } from "@/session/session.ts";
+import { Issue } from "@/issue/issue.ts";
+import { Memory } from "@/memory/memory.ts";
+import { Session } from "@/session/session.ts";
 import { starter } from "@/testing/layers.ts";
 import { Said } from "@/testing/said.ts";
 import { until, waitFor } from "@/testing/until.ts";
@@ -22,7 +23,7 @@ import { world } from "@/testing/world.ts";
 
 import { Mcp } from "./mcp.ts";
 
-const lab = (): Agent => ({ ...starter("lab"), effort: "" });
+const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 
 interface Answer {
   readonly result?: { readonly content?: { readonly text: string }[]; readonly tools?: { readonly name: string }[] };
@@ -52,7 +53,7 @@ const client = (mcp: Mcp["Service"], token: string) => {
   };
 };
 
-const hired = (core: Core["Service"], s: Partial<Session> & { id: string }) =>
+const hired = (core: Core["Service"], s: Partial<T.Session> & { id: string }) =>
   core.apply({
     type: "hired",
     session: {
@@ -65,7 +66,7 @@ const hired = (core: Core["Service"], s: Partial<Session> & { id: string }) =>
       phase: { _tag: "working", doing: { action: "thinking", label: "" } },
       ...s,
       refining: false,
-    } as Session,
+    } as T.Session,
   });
 
 describe("mcp", () => {
@@ -80,14 +81,14 @@ describe("mcp", () => {
       },
     });
     return Effect.gen(function* () {
-      const issues = yield* Issues;
+      const issues = yield* Issue;
       const { in: saidIn } = yield* Said;
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       const mcp = yield* Mcp;
       const got = yield* issues.hire(lab(), "写 hello", "chat-j");
       const id = got.session!.id;
       yield* until(() => tokens.length > 0, "the session's token");
-      const thread = yield* waitFor(chat.jobThread(id), (t) => t !== undefined, "the session's thread");
+      const thread = yield* waitFor(chat.threadOfSession(id), (t) => t !== undefined, "the session's thread");
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);
       expect((yield* Effect.promise(c.list)).toSorted()).toEqual([
@@ -131,15 +132,15 @@ describe("mcp", () => {
       },
     });
     return Effect.gen(function* () {
-      const issues = yield* Issues;
-      const chat = yield* Channels;
+      const issues = yield* Issue;
+      const chat = yield* Channel;
       const mcp = yield* Mcp;
-      const sessions = yield* Sessions;
-      const artifacts = yield* Artifacts;
+      const sessions = yield* Session;
+      const artifacts = yield* Artifact;
       const got = yield* issues.hire(lab(), "画两种详情", "chat-j");
       const id = got.session!.id;
       yield* until(() => tokens.length > 0, "the session's token");
-      const thread = yield* waitFor(chat.jobThread(id), (t) => t !== undefined, "the session's thread");
+      const thread = yield* waitFor(chat.threadOfSession(id), (t) => t !== undefined, "the session's thread");
       const cwd = sessions.find(id)!.place.cwd;
       mkdirSync(join(cwd, "out"), { recursive: true });
       writeFileSync(join(cwd, "out", "two.html"), "<p>抽屉和整页</p>");
@@ -193,7 +194,7 @@ describe("mcp", () => {
     Effect.gen(function* () {
       const core = yield* Core;
       const mcp = yield* Mcp;
-      const memory = yield* Memories;
+      const memory = yield* Memory;
       yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab", project: "demo" });
       yield* memory.write({ agent: "scout", text: "这个项目测试用 make check", project: "demo", by: owner });
       const c = client(mcp, "w1");
@@ -219,7 +220,7 @@ describe("mcp", () => {
     Effect.gen(function* () {
       const core = yield* Core;
       const mcp = yield* Mcp;
-      const artifacts = yield* Artifacts;
+      const artifacts = yield* Artifact;
       yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab" });
       const d = yield* artifacts.create({ from: ownerId, by: ownerId }, { title: "周报" });
       const c = client(mcp, "w1");

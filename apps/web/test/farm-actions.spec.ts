@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 const scripted: Agent = {
   id: "",
   name: "fox",
-  role: "worker",
+  role: "helper",
   duty: "",
   enabled: true,
   runtime: "pi",

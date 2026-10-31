@@ -6,8 +6,6 @@ import { Effect, Exit, Fiber } from "effect";
 
 import { objectSchema, toolArguments } from "@vibevalley/ai/tools";
 
-import { memoryStore } from "./agentTaskStore.ts";
-import { taskTools } from "./agentTaskTools.ts";
 import { Brain } from "./brain.ts";
 import { codingTools, htmlText } from "./coding.ts";
 import { ToolFailed } from "./core/errors.ts";
@@ -19,6 +17,8 @@ import { describeReminder, dueReminders, nextRun, parseCron, type Reminder, Remi
 import { selfTools } from "./self.ts";
 import { frontMatter, readSkill, scanSkills, skillBody } from "./skills.ts";
 import { scriptedLLM, tempHome } from "./testing.ts";
+import { memoryStore } from "./todoStore.ts";
+import { todoTools } from "./todoTools.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -43,9 +43,9 @@ const call = Effect.fnUntraced(function* (tools: readonly Tool[], name: string, 
 const fails = (called: Effect.Effect<string, ToolFailed>) => Effect.map(Effect.flip(called), (e) => e.message);
 
 describe("the task tools", () => {
-  it.effect("task and mark the agent's own tasks", () =>
+  it.effect("task and mark the agent's own todos", () =>
     Effect.gen(function* () {
-      const tools = taskTools(memoryStore(), false, Effect.void);
+      const tools = todoTools(memoryStore(), false, Effect.void);
       expect(yield* call(tools, "todo_add", { tasks: [{ id: "fix", brief: "改", after: ["nope"] }] })).toMatch(/没收：「fix」要等的「nope」不存在/u);
       expect(yield* fails(call(tools, "todo_add", { tasks: [{ id: "x", brief: "查", by: "subagent" }] }))).toMatch(/by/u);
       const added = yield* call(tools, "todo_add", {

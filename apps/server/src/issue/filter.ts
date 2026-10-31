@@ -1,10 +1,10 @@
-import type { Issue, IssueFilter } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { attentionWantsOwner } from "@vibevalley/protocol/rules";
 const spaces = /\s+/u;
 
 /** The issues a filter picks, newest first: the open ones unless it asks for closed ones or names a closed status; waiting on
  * the owner, the longest waiting first. */
-export function pickIssues(all: readonly Issue[], f: IssueFilter, now: number): Issue[] {
+export function pickIssues(all: readonly T.Issue[], f: T.IssueFilter, now: number): T.Issue[] {
   const words = (f.text ?? "").split(spaces).filter(Boolean);
   const project = (f.project ?? "").trim();
   let found = all.filter(

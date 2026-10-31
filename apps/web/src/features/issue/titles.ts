@@ -1,11 +1,11 @@
 import { t } from "@vibevalley/i18n";
 import type { Issue, TaskGraph } from "@vibevalley/protocol";
 export function issueTitle(issue: Issue, graphs: TaskGraph[] = []) {
-  const job = issue.title.trim();
-  if (!job) return issue.id;
+  const title = issue.title.trim();
+  if (!title) return issue.id;
   const graph = issue.parent ? graphs.find((g) => g.id === issue.parent) : undefined;
-  if (graph) return `${graph.title} · ${job}`;
-  return job.split("\n")[0]!.trim();
+  if (graph) return `${graph.title} · ${title}`;
+  return title.split("\n")[0]!.trim();
 }
 
 export function taskLine(g: TaskGraph) {

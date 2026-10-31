@@ -1,7 +1,7 @@
 {
   "id": "docs",
   "version": 1,
-  "role": "worker",
+  "role": "helper",
   "name": "文档员 Kimi",
   "duty": "通读文档、写 README、整理说明",
   "tags": ["文档", "readme", "通读", "说明", "docs"],

@@ -2,18 +2,18 @@ import { Effect, Result, Schema, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
-import type { Agent, Question, Issue } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
-import type { Agents } from "@/agent/agent.ts";
+import type { Agent } from "@/agent/agent.ts";
 import { cut, clip } from "@/base/clip.ts";
 import { lastJsonBlock, misfitField } from "@/base/json.ts";
-import type { Channels } from "@/channel/chat.ts";
+import type { Channel } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, messageOf } from "@/errors.ts";
 import type { WorkplaceRelease } from "@/project/shapes.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
-import type { Runtimes } from "@/runtime/runtime.ts";
-import type { Hired, HireOptions, Sessions } from "@/session/session.ts";
+import type { Runtime } from "@/runtime/runtime.ts";
+import type { Hired, HireOptions, Session } from "@/session/session.ts";
 
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
@@ -24,17 +24,17 @@ import { jsonOrNull, nullText } from "./stored.ts";
 
 export interface RefinementDeps {
   readonly core: Core["Service"];
-  readonly store: Agents["Service"];
-  readonly runtimes: Runtimes["Service"];
-  readonly sessions: Sessions["Service"];
-  readonly chat: Channels["Service"];
+  readonly store: Agent["Service"];
+  readonly runtimes: Runtime["Service"];
+  readonly sessions: Session["Service"];
+  readonly chat: Channel["Service"];
   readonly db: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
   readonly one: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A | undefined>;
   readonly inTx: <A, E>(e: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
-  readonly get: (ref: string) => Effect.Effect<Issue, ApiError>;
+  readonly get: (ref: string) => Effect.Effect<T.Issue, ApiError>;
   /** The issue while it was never sent (no task graph's). */
-  readonly unsent: (id: string) => Effect.Effect<Issue, ApiError>;
-  readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired, ApiError>;
+  readonly unsent: (id: string) => Effect.Effect<T.Issue, ApiError>;
+  readonly hire: (agent: T.Agent, brief: string, project: string, opt?: HireOptions) => Effect.Effect<Hired, ApiError>;
   readonly publish: (id: string) => Effect.Effect<void>;
 }
 
@@ -44,7 +44,7 @@ export function refinement(d: RefinementDeps) {
   const drafting = Semaphore.makeUnsafe(1);
 
   /** Who drafts: its assignee; else whoever was last sent to work in its project, if they can work now; else chooseAgent. */
-  const refiner = Effect.fnUntraced(function* (issue: Issue) {
+  const refiner = Effect.fnUntraced(function* (issue: T.Issue) {
     const candidates = yield* runtimes.candidates;
     let named = "";
     if (issue.assignee) {
@@ -59,7 +59,7 @@ export function refinement(d: RefinementDeps) {
     return chosen;
   });
 
-  const beforeRefinement = Effect.fnUntraced(function* (issue: Issue, word: string, agent: string, where: string) {
+  const beforeRefinement = Effect.fnUntraced(function* (issue: T.Issue, word: string, agent: string, where: string) {
     let [title, description] = [issue.title, issue.description];
     if (word && issue.questions.length === 0 && !description && issue.criteria.length === 0) [title, description] = splitBrief(word);
     yield* inTx(
@@ -82,7 +82,7 @@ export function refinement(d: RefinementDeps) {
     yield* publish(issue.id);
   });
 
-  const refined = Effect.fnUntraced(function* (id: string, d: IssueRefinement, questions: readonly Question[] | undefined) {
+  const refined = Effect.fnUntraced(function* (id: string, d: IssueRefinement, questions: readonly T.Question[] | undefined) {
     const criteria = kept(d.criteria);
     const open = openQuestions(questions);
     yield* db(
@@ -97,7 +97,7 @@ export function refinement(d: RefinementDeps) {
     yield* publish(id);
   });
 
-  const draft = Effect.fn("Issues.refine")(
+  const draft = Effect.fn("Issue.refine")(
     function* (id: string, word: string, channel: string) {
       const item = yield* unsent(id);
       if (isForOrchestrator(item, store.isOrchestrator)) return yield* Effect.fail(refused(t("server.issue.refinement.orchestrator")));
@@ -122,13 +122,13 @@ export function refinement(d: RefinementDeps) {
     (effect) => drafting.withPermits(1)(effect),
   );
 
-  const handedBack = Effect.fn("Issues.handedBack")(function* (f: { id: string; outcome: string; summary: string; questions?: readonly Question[] }) {
+  const handedBack = Effect.fn("Issue.handedBack")(function* (f: { id: string; outcome: string; summary: string; questions?: readonly T.Question[] }) {
     const h = sessions.sessionOf(f.id);
     if (h?.refining !== true || !h.issue) return;
     const id = h.issue;
     const r = sessions.find(f.id);
     const said = r?.lastText ?? "";
-    const thread = yield* chat.jobThread(f.id);
+    const thread = yield* chat.threadOfSession(f.id);
     const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_refinement") : core.notice("warn", text));
     if (f.outcome === "completed") {
       const { draft: d, problem } = parseRefinement(said);
@@ -139,7 +139,7 @@ export function refinement(d: RefinementDeps) {
     yield* publish(id);
   });
 
-  const clearRefinement = Effect.fn("Issues.clearRefinement")(function* (issue: Issue): Effect.fn.Return<WorkplaceRelease, ApiError> {
+  const clearRefinement = Effect.fn("Issue.clearRefinement")(function* (issue: T.Issue): Effect.fn.Return<WorkplaceRelease, ApiError> {
     if (issue.refining) yield* sessions.dismiss(issue.refining.session, "discard");
     if (issue.project) {
       const kept = yield* sessions.clearWorkplace(issue.id, issue.project, issue.number);
@@ -164,7 +164,7 @@ export interface IssueRefinement {
 
 export const kept = (lines: readonly string[] | undefined) => (lines ?? []).map((l) => l.trim()).filter((l) => l !== "");
 
-export const openQuestions = (questions: readonly Question[] | undefined): Question[] => (questions ?? []).filter((a) => a.question.trim() !== "");
+export const openQuestions = (questions: readonly T.Question[] | undefined): T.Question[] => (questions ?? []).filter((a) => a.question.trim() !== "");
 
 const Text = Schema.optional(Schema.NullOr(Schema.String));
 const Lines = Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Array(Schema.String)])));

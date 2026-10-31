@@ -11,7 +11,7 @@ VibeValley 自己的 agent（代码里是 `Brain`）是农场里唯一一个从�
 | 对话文件、提示的开头、压缩、接着做被打断的一轮 | 一轮记成 Run 和日志、话写进哪个频道（`session/host.ts` 的 `AgentHost`，[帮工](docs/subsystems/session.md)） |
 | 自己带的工具：技能、记性、旧账、帮手、提醒、自己的任务、编码工具、MCP 客户端 | 农场的工具（派活、工单、频道……，`tool`，[管家](docs/subsystems/orchestrator.md)） |
 | 记性文件 `MEMORY.md` 和旧账 `archive/` 的读写 | 帮工档案的记性、外面的记性来源（[记性](docs/subsystems/memory.md)） |
-| | 包成 oar 的农机 `vibevalley`（server 的 `runtime/vibevalley.ts`）、`/v1/chat/completions`（`orchestrator/openai.ts`）、自己的任务存进库（`agent/taskStore.ts`）、给主人看的话；农机的探测、额度、花费（[档案和农机](docs/subsystems/agent.md)、[帮工](docs/subsystems/session.md)） |
+| | 包成 oar 的农机 `vibevalley`（server 的 `runtime/vibevalley.ts`）、`/v1/chat/completions`（`orchestrator/openai.ts`）、自己的任务存进库（`runtime/todoStore.ts`）、给主人看的话；农机的探测、额度、花费（[档案和农机](docs/subsystems/agent.md)、[帮工](docs/subsystems/session.md)） |
 
 ## 在哪
 
@@ -21,7 +21,7 @@ VibeValley 自己的 agent（代码里是 `Brain`）是农场里唯一一个从�
 apps/server  组装和适配（不在包里）：
              session/host.ts 的 AgentHost（管家）  runtime/vibevalley.ts（农机 vibevalley：帮工）
              cli/chat.ts（命令行）                 orchestrator/openai.ts（/v1/chat/completions）
-             agent/taskStore.ts（自己的任务存进库）  agent/model.ts（缺钥匙时对主人说的话）
+             runtime/todoStore.ts（自己的任务存进库）  agent/model.ts（缺钥匙时对主人说的话）
                │ Brain.make(BrainOptions)（管家，在 Effect 里），openBrain(owner, BrainOptions)（oar、命令行）
 packages/agent  Brain：对话文件、提示开头、压缩、自己的工具、帮手、提醒、自己的任务
                │
@@ -37,7 +37,7 @@ packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型
 - **`packages/agent/src`**：
   - `brain.ts`：`Brain`，以及给 Promise 代码（oar 的农机、命令行）用的 `openBrain`、`BrainHandle`、`standaloneOwner`。
   - `session.ts`：对话文件。`compaction.ts`：压缩。`prefix.ts`：开头按段算哈希。`messages.ts`：自己加的两种消息（`custom`、`compactionSummary`）。`run.ts`：一轮的用量和字（`RunResult` 只带模型自己说的错，主人看的话由宿主说）。
-  - 自己的工具：`self.ts`（`load_skill`、`remember`、`rewrite_memory`、`search_archive`、`spawn_agent`），`skills.ts`，`memory.ts`，`mcp.ts`（MCP 客户端和 `mcpServers` 配置），`reminders.ts`（`reminder`、`list_reminders`、`cancel_reminder`），`agentTask.ts`、`agentTaskStore.ts`（接口和内存里的存储）、`agentTaskTools.ts`（`todo_add`、`todo_update`、`todo_list`），`coding.ts`（`read_file`、`write_file`、`edit_file`、`list_dir`、`grep`、`bash`、`web_fetch`）。`coding.ts`、`mcp.ts` 要起子进程，只用 `core` 的地方不加载它们。
+  - 自己的工具：`self.ts`（`load_skill`、`remember`、`rewrite_memory`、`search_archive`、`spawn_agent`），`skills.ts`，`memory.ts`，`mcp.ts`（MCP 客户端和 `mcpServers` 配置），`reminders.ts`（`reminder`、`list_reminders`、`cancel_reminder`），`todo.ts`、`todoStore.ts`（接口和内存里的存储）、`todoTools.ts`（`todo_add`、`todo_update`、`todo_list`），`coding.ts`（`read_file`、`write_file`、`edit_file`、`list_dir`、`grep`、`bash`、`web_fetch`）。`coding.ts`、`mcp.ts` 要起子进程，只用 `core` 的地方不加载它们。
   - `dag.ts`：先后的规则（查环、分层），种植计划（`task/graph.ts`）也用。`realTime.ts`：杀子进程和 MCP 超时用的真实时间，包里唯一能碰墙上时钟的文件。
   - `prompts.ts`：对模型说的话，中文；`core/prompts.ts` 是工具结果的那几句。`testing.ts`：照脚本回答的大脑（`withAgent`、`scriptedLLM`）。
 - **家目录**（`BrainOptions.home`）：对话 `<session>.jsonl`、`MEMORY.md`、`archive/`、`reminders.json`、管家的 `evals/`。管家的在 `$VIBEVALLEY_HOME/agent/<档案 id>/`（`agentHome`），帮工的在 `$VIBEVALLEY_HOME/helpers/`（对话按 oar 的会话 id 分文件，不带记性），命令行的在 `~/.vibevalley/agent/<名字>/`。
@@ -51,7 +51,7 @@ packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型
 | | 管家 | 帮工（农机 `vibevalley`） | 命令行 | 帮手（`spawn_agent`） |
 |---|---|---|---|---|
 | 说明（`instructions`） | 管家的系统提示，[管家](docs/subsystems/orchestrator.md) | `helperInstructions`，加上档案的人设和技能（追加或替换） | 命令行的说明 | 派它的 agent 的名字和规矩 |
-| 农场的工具 | `Tools` 管家那张表 | 经 MCP 接 `/mcp`（帮工那张表） | 无 | 和派它的一样 |
+| 农场的工具 | `Tool` 管家那张表 | 经 MCP 接 `/mcp`（帮工那张表） | 无 | 和派它的一样 |
 | 编码工具 | 无 | 有 | 有 | 和派它的一样 |
 | 技能（扫目录） | 无（`noSkills`） | 有 | 有 | 和派它的一样 |
 | 记性 | 有 | 无 | 有 | 无 |
@@ -103,7 +103,7 @@ packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型
 - **技能**：扫 `skills` 给的目录（默认 `~/.agents/skills`、`~/.claude/skills`、工作目录的 `.agents/skills`），每个子目录一份 `SKILL.md`，读它 frontmatter 的 `name`、`description`，同名的取先扫到的。系统提示只列名字和说明（每条最多 160 字），正文等模型调 `load_skill` 时才读。档案在技能书里勾的技能不走这里，由帮工的说明带进去（[帮工](docs/subsystems/session.md)）。
 - **记性**：`remember` 往 `MEMORY.md` 加一行（带日期），`rewrite_memory` 整份重写，`search_archive` 在旧账里搜。
 - **帮手**（`spawn_agent`）：起一个同样配置的大脑，不带记性、对话文件和提醒，不能再派帮手，最多 30 步，把它最后说的话交回。
-- **自己的任务**（`AgentTask`，和计划里的一件不是一回事）：每件写明做什么（`brief`）、等哪几件（`after`）、谁做（`self` 或交给帮手的 `subagent`）、状态（`waiting`、`working`、`done`、`failed`、`skipped`）和结果。一张图最多 30 件；`todo_add` 整批收或整批不收，回给模型的话说清是哪一条；只有没开始和没做成的能改正文和先后。交给帮手的在它等的都做完以后自动派，最多三个同时做，结果交回；失败重来 1 次；叫回或进程没了，在做的退回等着。一轮停下时还有能做的，提醒它，图不变时最多提醒 3 次。存储：农机 `vibevalley` 的会话存在表 `agent_task`，按会话（`keeper`）分开，做完的盖上 `finished_at`；命令行的在内存里。它不进工单、不进核心状态。
+- **自己的任务**（`Todo`，和计划里的一件不是一回事）：每件写明做什么（`brief`）、等哪几件（`after`）、谁做（`self` 或交给帮手的 `subagent`）、状态（`waiting`、`working`、`done`、`failed`、`skipped`）和结果。一张图最多 30 件；`todo_add` 整批收或整批不收，回给模型的话说清是哪一条；只有没开始和没做成的能改正文和先后。交给帮手的在它等的都做完以后自动派，最多三个同时做，结果交回；失败重来 1 次；叫回或进程没了，在做的退回等着。一轮停下时还有能做的，提醒它，图不变时最多提醒 3 次。存储：农机 `vibevalley` 的会话存在表 `runtime_todo`，按会话（`keeper`）分开，做完的盖上 `finished_at`；命令行的在内存里。它不进工单、不进核心状态。
 - **提醒**：`reminders.json`，一次（`at`）、每隔几分钟（`every_minutes`）或 cron（本机时区）。每 20 秒看一次，到点的以 `custom` 消息经 `later` 交进来；不在的时候错过的，回来只跑一次。
 - **MCP**：照 Claude Code、Cursor 的 `mcpServers` 写法（`command`/`args`/`env` 或 `url`/`headers`），只用 `initialize`、`tools/list`、`tools/call`。连不上的那台不带，原因由 `mcpStatus` 说，别的照样带。工具名是 `<服务>__<工具>`（非字母数字换成 `_`，最多 64 字），说明前面写着来自哪台服务。
 
@@ -124,7 +124,7 @@ packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型
 - **宿主**：管家经 `AgentHost`（[帮工](docs/subsystems/session.md)），农机 `vibevalley` 经 oar，命令行经 `standaloneOwner`。宿主给说明、工具、MCP、家目录和工作目录，订阅事件（`subscribe`），决定输入怎么交、什么时候 `resume`。
 - **`@vibevalley/ai`**：`Llm` 服务。钥匙每次请求前现取（`ModelClient.apiKey`）。
 - **农场的工具**：管家的来自 `tool`；帮工的经 MCP 从 `/mcp` 来，和别的农机上的帮工一样。
-- **库**：只有自己的任务（`agent_task`）。对话、记性、提醒是家目录里的文件。
+- **库**：只有自己的任务（`runtime_todo`）。对话、记性、提醒是家目录里的文件。
 
 ## 为什么这样
 
@@ -151,5 +151,5 @@ packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型
 
 - `packages/agent/src/brain.test.ts`：跑工具、回结果、工具失败告诉模型为什么；`send` 插话、`later` 排队；步数上限；接着原来的会话；压长对话；技能；帮手同时干活；提醒到点叫醒；压缩之间系统提示不变、记性的变化放进输入；压缩后重做系统提示；叫停正在跑的一轮和正在跑的工具；工具变了算前缀变了；闲着时压缩开头一样；该写摘要却调了工具就再要一次；快被叫醒时不压；压缩留下最后几句；不给的工具在拼好以后才去掉。
 - `packages/agent/src/loop.test.ts`：循环的事件次序、截断的调用、没有的工具和不收的参数、一轮一句、一起跑的工具的次序。`core/loop.test.ts`：同样的情形，外加流里、工具里、准备请求时叫停，模型出错、回答被截断、请求被拒，跑着时再开一轮被拒。
-- `run.test.ts`：一轮的用量、字和失败。server 的 `runtime/vibevalley.test.ts`：农机 `vibevalley` 的一轮、插话、排队、撤回、中止、接着、MCP、失败；`orchestrator/openai.test.ts`：只取最新一句、照 OpenAI 的格式分块和结束；`agent/taskStore.test.ts`：自己的任务存进库。`agentTask.test.ts`：自己的任务。`declared.test.ts`、`tools.test.ts`：工具参数的 JSON Schema 逐字节不变。
+- `run.test.ts`：一轮的用量、字和失败。server 的 `runtime/vibevalley.test.ts`：农机 `vibevalley` 的一轮、插话、排队、撤回、中止、接着、MCP、失败；`orchestrator/openai.test.ts`：只取最新一句、照 OpenAI 的格式分块和结束；`runtime/todoStore.test.ts`：自己的任务存进库。`todo.test.ts`：自己的任务。`declared.test.ts`、`tools.test.ts`：工具参数的 JSON Schema 逐字节不变。
 - `packages/ai`：`deepseek.test.ts`、`tools.test.ts` 的请求体、流读出的消息、参数的改法，逐字对照从 pi-ai 录下的黄金数据（`testdata`，`vp run golden:update -- ai` 重写）；`llm.test.ts`：钥匙和地址、被拒的状态、断掉的流。

@@ -11,7 +11,7 @@ export const LinkRunIssueParams = Schema.Struct({
 export type LinkRunIssueParams = typeof LinkRunIssueParams.Type
 
 
-export const LinkRunIssueSql = "-- The issues a run took (session/execution.ts): an in-process agent's one run can take several.\n\n-- name: LinkRunIssue :exec\ninsert into session_run_issue (run, issue) values ($1, $2) on conflict do nothing;"
+export const LinkRunIssueSql = "-- The issues a run took (session/inProcessRun.ts): an in-process agent's one run can take several.\n\n-- name: LinkRunIssue :exec\ninsert into session_run_issue (run, issue) values ($1, $2) on conflict do nothing;"
 
 export const linkRunIssue = Effect.fn("LinkRunIssue")(function* (params: LinkRunIssueParams) {
   const sql = yield* SqlClient.SqlClient

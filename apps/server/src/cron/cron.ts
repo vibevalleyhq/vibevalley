@@ -1,21 +1,21 @@
-// Crons: the owner's and the orchestrator's, kept in the cron table and in the core state.
+// Cron: the owner's and the orchestrator's, kept in the cron table and in the core state.
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
 
 import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import type { Preview, Cron, CronRequest } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import type { Actor } from "@/base/actor.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
 
@@ -24,28 +24,28 @@ import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./d
 import { whenText } from "./when.ts";
 
 export interface Due {
-  readonly cron: Cron;
+  readonly cron: T.Cron;
   readonly missed: boolean;
 }
 
-export class Crons extends Context.Service<
-  Crons,
+export class Cron extends Context.Service<
+  Cron,
   {
-    readonly list: () => Cron[];
+    readonly list: () => T.Cron[];
     /** by is who asks, and on whose word (needsOK). */
-    readonly add: (req: CronRequest, by: Actor) => Effect.Effect<Cron, ApiError>;
+    readonly add: (req: T.CronRequest, by: Actor) => Effect.Effect<T.Cron, ApiError>;
     /** Turned on is the owner's yes. */
-    readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<Cron, ApiError>;
-    readonly remove: (id: string) => Effect.Effect<Cron, ApiError>;
+    readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<T.Cron, ApiError>;
+    readonly remove: (id: string) => Effect.Effect<T.Cron, ApiError>;
     /** What remove would do, refused as it would be; nothing changes. */
-    readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
+    readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
     readonly tick: Effect.Effect<void>;
     /** What comes due from now on, subscribed before it returns. */
     readonly due: Effect.Effect<Stream.Stream<Due>, never, Scope.Scope>;
   }
 >()("vibevalley/Cron") {
   static readonly layer = Layer.effect(
-    Crons,
+    Cron,
     Effect.suspend(() => make),
   );
 }
@@ -66,8 +66,8 @@ function localZone(): string {
 
 const make = Effect.gen(function* () {
   const core = yield* Core;
-  const store = yield* Agents;
-  const chat = yield* Channels;
+  const store = yield* Agent;
+  const chat = yield* Channel;
   const { run: db, attempt } = yield* Db;
   // Read in callbacks too: the Clock the service was built with (a test turns it by hand).
   const clock = yield* Clock.Clock;
@@ -80,7 +80,7 @@ const make = Effect.gen(function* () {
     const when = jsonOrNone(S.CronWhen)(row.spec);
     // A cron whose time or owner this code cannot read any more is left out.
     if (!when || !Schema.is(S.ActorKind)(row.set_by)) continue;
-    const s: Cron = {
+    const s: T.Cron = {
       id: row.id,
       name: row.name,
       text: row.body,
@@ -124,9 +124,9 @@ const make = Effect.gen(function* () {
     }),
   );
 
-  const shape = Crons.of({
+  const shape = Cron.of({
     list: () => [...core.state().crons],
-    add: Effect.fn("Crons.add")(function* (req, by) {
+    add: Effect.fn("Cron.add")(function* (req, by) {
       const at = now();
       const problem = cronProblem(req, at);
       if (problem) return yield* Effect.fail(refused(problem));
@@ -141,7 +141,7 @@ const make = Effect.gen(function* () {
       if (agent && !project && !channel.project) return yield* Effect.fail(refused(t("server.cron.noProject", { channel: channel.name })));
       const tz = req.tz ?? localZone();
       const pending = needsOK(req, by);
-      const s: Cron = {
+      const s: T.Cron = {
         id: newId(),
         name: req.name.trim(),
         text: req.text.trim(),
@@ -174,10 +174,10 @@ const make = Effect.gen(function* () {
       yield* core.apply({ type: "cron", cron: s });
       return s;
     }, lock.withPermits(1)),
-    setEnabled: Effect.fn("Crons.setEnabled")(function* (id, enabled) {
+    setEnabled: Effect.fn("Cron.setEnabled")(function* (id, enabled) {
       const was = yield* find(id);
       // Turned on is the owner's yes (only the owner may: cron.update); the queries clear pending the same way.
-      let s: Cron = { ...was, enabled, pending: was.pending && !enabled };
+      let s: T.Cron = { ...was, enabled, pending: was.pending && !enabled };
       // Switched back on: it counts from now, not from runs it skipped while off.
       if (enabled && !was.enabled && was.when.kind !== "once") {
         const at = now();
@@ -187,13 +187,13 @@ const make = Effect.gen(function* () {
       yield* core.apply({ type: "cron", cron: s });
       return s;
     }, lock.withPermits(1)),
-    remove: Effect.fn("Crons.remove")(function* (id) {
+    remove: Effect.fn("Cron.remove")(function* (id) {
       const was = yield* find(id);
       yield* db(q.removeCron({ id }));
       yield* core.apply({ type: "cronGone", id });
       return was;
     }, lock.withPermits(1)),
-    previewRemove: Effect.fn("Crons.previewRemove")(function* (id) {
+    previewRemove: Effect.fn("Cron.previewRemove")(function* (id) {
       const was = yield* find(id);
       return { does: [t("server.cron.removeWhen", { name: was.name, when: whenText(was.when, was.tz) })] };
     }),
@@ -207,7 +207,7 @@ const make = Effect.gen(function* () {
 export const start = Layer.effectDiscard(
   Effect.gen(function* () {
     const config = yield* ServerConfig;
-    const crons = yield* Crons;
+    const crons = yield* Cron;
     const every = Math.max(config.cron.tickMs, 1);
     yield* Effect.forkScoped(crons.tick.pipe(Effect.repeat(Schedule.spaced(every))));
   }),

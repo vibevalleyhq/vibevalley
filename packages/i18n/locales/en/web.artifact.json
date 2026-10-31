@@ -1,7 +1,7 @@
 {
   "place": {
     "label": "Artifacts",
-    "hint": "What you, the helpers and the orchestrator leave to be read: pages written together and web pages handed in"
+    "hint": "What you, the helpers and the manager leave to be read: pages written together and web pages handed in"
   },
   "card": {
     "version": "Version {version}",

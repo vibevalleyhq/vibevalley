@@ -64,7 +64,7 @@
   "words": {
     "general": "language start open workbench farm",
     "appearance": "theme dark light size zoom scale font",
-    "models": "DeepSeek key model orchestrator",
+    "models": "DeepSeek key model manager",
     "about": "version home folder settings file",
     "memory": "Nowledge EverOS memory recall",
     "skills": "skill library",
@@ -76,11 +76,11 @@
     "devices": "phone pairing connect to this machine LAN"
   },
   "scope": {
-    "farm": "For the whole farm",
+    "farm": "For all of VibeValley",
     "device": "This device only"
   },
   "general": {
-    "languageHint": "The page, the orchestrator and the helpers all speak it",
+    "languageHint": "The page, the manager and the helpers all speak it",
     "start": "Open on start",
     "startHint": "Where the app, or the home page, opens",
     "starts": {
@@ -101,18 +101,18 @@
     "scaleHint": "Scales the whole workbench; the farm keeps its whole-number scaling"
   },
   "models": {
-    "intro": "The models the orchestrator and VibeValley's own helpers use.",
-    "deepseekHint": "The orchestrator and VibeValley's own helpers use it"
+    "intro": "The models the manager and VibeValley's own helpers use.",
+    "deepseekHint": "The manager and VibeValley's own helpers use it"
   },
   "memory": {
-    "intro": "Helpers can also look things up in, and write to, memory outside the farm."
+    "intro": "Helpers can also look things up in, and write to, memory outside VibeValley."
   },
   "about": {
     "version": "Version",
     "versionHint": "The server on this machine",
     "files": "Files",
     "home": "Home folder",
-    "homeHint": "Everything of the farm is here",
+    "homeHint": "Everything VibeValley keeps is here",
     "settings": "Settings file",
     "settingsHint": "The keys and these pages' settings",
     "copy": "Copy the path",
@@ -124,7 +124,7 @@
     "checking": "Looking for a new version…",
     "downloading": "Downloading {next} ({percent}%)",
     "ready": "{next} is ready and goes in when you quit",
-    "readyNewFarm": "{next} is ready: it starts a new farm and keeps the old one aside",
+    "readyNewFarm": "{next} is ready: it starts from fresh data and keeps the old aside",
     "manual": {
       "diskImage": "{next} needs installing by hand: the app runs from its disk image; drag it to Applications first",
       "translocated": "{next} needs installing by hand: macOS runs the app from a temporary place; drag it to Applications and open it again",
@@ -136,7 +136,7 @@
     "restart": "Restart to update",
     "restartQuestion": "Restart into the new version?",
     "workingQuestion": "{n} helpers are working; restarting cuts them off. Restart now?",
-    "newFarmQuestion": "The new version starts a new farm; the old one stays in the home folder. Restart now?",
+    "newFarmQuestion": "The new version starts from fresh data; the old stays in the home folder. Restart now?",
     "download": "Download"
   }
 }

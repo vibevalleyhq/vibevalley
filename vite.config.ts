@@ -62,6 +62,7 @@ export default defineConfig({
         "vpx scripts/skills.ts",
         "vpx scripts/doc-links.ts",
         "vpx scripts/stale-names.ts",
+        "vpx scripts/glossary.ts",
         "vpx scripts/i18n.ts check",
         "vpx scripts/capabilities.ts --check",
         "vpx scripts/api-client.ts --check",
@@ -470,6 +471,17 @@ export default defineConfig({
         files: ["apps/server/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "vibevalley/service-method-names": "error" },
+      },
+      {
+        // A server service takes its concept's singular word (scripts/oxlint-plugin.ts, singular-service).
+        files: ["apps/server/src/**"],
+        rules: { "vibevalley/singular-service": "error" },
+      },
+      {
+        // A protocol shape named like a service is read as T.X, so the service keeps the name (scripts/oxlint-plugin.ts, protocol-namespace).
+        files: ["apps/server/src/**"],
+        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
+        rules: { "vibevalley/protocol-namespace": "error" },
       },
       {
         // The server reaches the database through Db, which decides what a failed query becomes (scripts/oxlint-plugin.ts, db-door).

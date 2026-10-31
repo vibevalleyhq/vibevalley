@@ -24,7 +24,7 @@
   "queuedStarted": "The queued \"{title}\" has started: {session}",
   "queuedStuck": "The queued \"{title}\" could not start: {why}; it could not go back to To do either, and stays in the queue",
   "queuedBack": "The queued \"{title}\" could not start and stays in To do: {why}",
-  "graphRetry": "This ticket belongs to a plan and follows it: retry the step in the plan, or reopen the whole plan",
+  "graphRetry": "This ticket belongs to a plan and follows it: retry the task in the plan, or reopen the whole plan",
   "neverStarted": "This ticket has never started: just start it",
   "stillOpen": "This ticket is still open: moving it back to To do is another round",
   "stillWorking": "{name} is still on this ticket: tell it directly",

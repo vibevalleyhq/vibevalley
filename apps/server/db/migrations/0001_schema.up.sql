@@ -355,9 +355,9 @@ CREATE TABLE issue_queue (
   channel text not null,
   triggered_by text not null
 );
-CREATE TYPE agent_task_executor AS ENUM ('self', 'subagent');
-CREATE TYPE agent_task_state AS ENUM ('waiting', 'working', 'done', 'failed', 'skipped');
-CREATE TABLE agent_task (
+CREATE TYPE runtime_todo_executor AS ENUM ('self', 'subagent');
+CREATE TYPE runtime_todo_state AS ENUM ('waiting', 'working', 'done', 'failed', 'skipped');
+CREATE TABLE runtime_todo (
   graph text not null,
   keeper text not null,
   id text not null,
@@ -365,15 +365,15 @@ CREATE TABLE agent_task (
   title text not null,
   brief text not null,
   after text not null,
-  executor agent_task_executor not null,
-  state agent_task_state not null,
+  executor runtime_todo_executor not null,
+  state runtime_todo_state not null,
   result text not null,
   tries integer not null,
   updated_at double precision not null,
   finished_at double precision,
   primary key (graph, id)
 );
-CREATE INDEX agent_task_by_keeper on agent_task (keeper, finished_at);
+CREATE INDEX runtime_todo_by_keeper on runtime_todo (keeper, finished_at);
 -- Artifacts (artifact/artifact.ts). A blocks one's blocks are a flat list, nested by parent_id and ordered by
 -- (order_key, id); every change is an op, and a batch of ops is one artifact_change with the artifact's next seq.
 CREATE TYPE artifact_body AS ENUM ('blocks', 'html');

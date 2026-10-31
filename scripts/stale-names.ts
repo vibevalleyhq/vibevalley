@@ -29,12 +29,12 @@ const RULES: readonly Rule[] = [
     name: "a document, now an artifact",
     pattern:
       /\bdoc_(get|block_\w+)\b|\bdoc\.(list|create|import|get|submit|block|markdown|demo)\b|\bDoc(Op|Submit|Ack|Span|Marks|Snapshot|Shape|Editor|sPage|BlockCreate|BlockUpdate|Request|Import)\w*\b|\bdocOwner\b|\/doc\/doc\b|features\/doc\b|["'`]\/docs\b/u,
-    says: "documents are artifacts with a blocks body (Artifacts, artifact.block.list, artifact_block_create, BlockOp, BlockSubmit, /artifacts)",
+    says: "documents are artifacts with a blocks body (Artifact, artifact.block.list, artifact_block_create, BlockOp, BlockSubmit, /artifacts)",
   },
   {
     name: "a cron under its old name",
     pattern: /[Rr]ecurrences?/u,
-    says: "a timed trigger is a Cron (Crons, CronWhen, cron.*, cron_create …); the page calls it 定时任务",
+    says: "a timed trigger is a Cron (the Cron service, CronWhen, cron.*, cron_create …); the page calls it 定时任务",
   },
   {
     name: "playbook or plan for a task",
@@ -46,8 +46,8 @@ const RULES: readonly Rule[] = [
   {
     name: "a task graph's task under its old name",
     pattern:
-      /\b(StepState|StepAction|StepEdit|StepActRequest|StepFieldChange|IssueStep|SessionTask|ReadySteps|CanEditStep|step_action|task_step)\b|\/steps\/\{/u,
-    says: "a task graph is TaskGraph (graph.*, GraphState, IssueGraph, SessionGraph); each of its nodes is a Task (TaskState, TaskAction, TaskEdit, IssueTask, graph_task_update, graph_task_act)",
+      /\b(StepState|StepAction|StepEdit|StepActRequest|StepFieldChange|IssueStep|SessionTask|ReadySteps|CanEditStep|step_action|task_step|StepDraft\w*|stepNext|stepFailed|actOnStep|stepIssues|stepTone)\b|\/steps\/\{/u,
+    says: "a task graph is TaskGraph (graph.*, GraphState, IssueGraph, SessionGraph); each of its nodes is a Task (TaskState, TaskAction, TaskEdit, TaskDraft, IssueTask, taskNext, taskFailed, actOnTask, taskIssues, taskTone, graph_task_update, graph_task_act); a step is one event of a trajectory",
   },
   {
     name: "an API path without its version",
@@ -93,8 +93,14 @@ const RULES: readonly Rule[] = [
   {
     name: "an old protocol name",
     // The browser's Worker (new Worker, a value typed : Worker) is not the old name.
-    pattern: /\b(FarmState|SiteFrame|SiteEvent|AgentProfile|WorkStep|CanMerge|Foreman|(?<!new |: )Worker)\b/u,
-    says: "CoreState, StateFrame, SideEvent, Agent, Activity, canHarvest, Manager, Session; a Web Worker stays (new Worker)",
+    pattern: /\b(FarmState|SiteFrame|SiteEvent|AgentProfile|WorkStep|ActionStep\w*|CanMerge|Foreman|(?<!new |: )Worker)\b/u,
+    says: "CoreState, StateFrame, SideEvent, Agent, Activity, PlayAction (a session play's history), canHarvest, Manager, Session; a Web Worker stays (new Worker)",
+  },
+  {
+    name: "a helper profile under the worker role",
+    // Playwright's per-worker fixtures ({ scope: "worker" }) and the browser's Worker are not the role.
+    pattern: /(?<!scope: )["'`]worker["'`]|\bagent\.role\.worker\b|\bagent\.list\.workers\b/u,
+    says: 'a profile\'s role is "orchestrator" or "helper" (AgentRoleValues); its words are web.agent.role.helper, web.agent.list.helpers',
   },
   {
     name: "an old home file or its mover",
@@ -136,7 +142,7 @@ const RULES: readonly Rule[] = [
     name: "an issue's cron under the schedule name",
     pattern:
       /\b(Schedules|ScheduleShape|ScheduleRequest|ScheduleWhen\w*|ScheduleBy|scheduleProblem|listSchedules|FactSchedule|FactUnschedule)\b|\bschedules?\.\w|"(un)?schedule"/u,
-    says: "Cron, Crons, CronRequest, CronWhen, cron.*; Effect's Schedule is another thing",
+    says: "Cron (the shape T.Cron and the service), CronRequest, CronWhen, cron.*; Effect's Schedule is another thing",
   },
   {
     name: "a helper's question under the ask name",
@@ -192,7 +198,7 @@ const RULES: readonly Rule[] = [
     pattern:
       /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|Attention|IssueAct|Delivery|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/u,
     says: "the shared catalog's words (packages/i18n/locales/*/shared.json: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
-    except: /^packages\/protocol\/src\/(rules|words)\//u,
+    except: /^packages\/protocol\/src\/rules\//u,
   },
 
   {
@@ -207,13 +213,19 @@ const RULES: readonly Rule[] = [
       "apps/server/src/orchestrator",
       "apps/server/src/channel",
       "apps/server/src/mcp",
-      "apps/server/src/notice",
+      "apps/server/src/inbox",
       "apps/web/src/features",
       "apps/web/src/base",
       "apps/web/src/ui",
     ],
     // What the owner types in a test is the owner's words; the pixel pieces are the skins' own.
     except: /\.test\.ts$|^apps\/web\/src\/ui\/pixel\//u,
+  },
+  {
+    name: "the project map's farm words in the workbench",
+    pattern: /\b(growthOf|Growth|TillingCalendar|Deed|Planted|logoInBed|SowHere|plotsIn|sessionInPlot|onSow)\b|web\.project\.(map|project|growth)\b/u,
+    says: "the projects page says recency (recencyOf, Recency), Overview, Languages, CommitCalendar, logoInBar; the map, its plots and its sowing are the farm's (apps/web/src/farm/map, web.farm.map.*), handed in as ProjectsSkin",
+    dirs: ["apps/web/src/features", "apps/web/src/base", "apps/web/src/ui"],
   },
   {
     name: "the one orchestrator under its old names",
@@ -236,12 +248,12 @@ const RULES: readonly Rule[] = [
   {
     name: "a place to talk under another name",
     pattern: /\b(Conversation\w*|conversation_id|channel_conversation|Rooms|RoomEvent|roomsPath|useRoom|followRoom)\b/u,
-    says: "Channel (channel_id, Channels): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
+    says: "Channel (channel_id, the Channel service): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
   },
   {
     name: "a business name in farm words",
     pattern: /\b(onFarm|OnFarm|notOnFarm|NotOnFarm|farmURL|FarmURL|farmRules|farmNow|putFarm|MemoryAuthorFarm)\b|MemoryAuthor\.farm\b/u,
-    says: "presentSessions, Present, Absent, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",
+    says: "presentSessions, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",
     // The client's onFarm is the skin it is on.
     dirs: ["apps/server/src", "apps/web/src/features", "apps/web/src/base", "apps/web/src/ui"],
   },
@@ -263,28 +275,76 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "an issue's text as a job",
-    pattern: /\b(issueJob|splitJob)\b|server\.issue\.job\./u,
-    says: "the text a helper gets is the issue's brief (issueBrief, splitBrief, server.issue.brief.*)",
+    pattern:
+      /\b(issueJob|splitJob|talkJob|jobBreak|memoryJobText|[Kk]eepJob|recallJobs|jobThread|jobThreadOf|openJob|jobOf|Jobs)\b|server\.issue\.job\.|tab\.jobs\b|\bjobs\.(empty|thread)\b|memory\.(jobs|noJobs)\b/u,
+    says: "the text a helper gets is the issue's brief (issueBrief, splitBrief, talkBrief, briefBreak, server.issue.brief.*); a finished issue's memory is issueMemoryText, keepIssueMemory, recallIssues; a session's thread is threadOfSession, sessionThreadOf, subjectOf, openThread; the channel's tab of them is Sessions, tab.issues",
+  },
+  {
+    name: "a run inside the server under the execution name",
+    pattern: /\b(AgentExecution|ExecutionBusy)\b|session\/execution(\.test)?\.ts/u,
+    says: "a run is a Run: the in-process agent's is InProcessRun (session/inProcessRun.ts), refused with RunBusy; 执行 is not a name for a helper (docs/README.md 用语)",
+  },
+  {
+    name: "the inbox module under the notice name",
+    pattern: /@\/notice\/|apps\/server\/src\/notice\b|\bNotices\b|"vibevalley\/Notice"|server\.notice\.|features\/notice\b|web\.notice\./u,
+    says: "the module is inbox (apps/server/src/inbox, the Inbox service, server.inbox.*; the page's features/inbox, web.inbox.*); a notice is Core.notice, a one-line word to the owner",
+  },
+  {
+    name: "the page's log split into rounds or turns of its own",
+    pattern:
+      /\b(Round|RoundView|roundsOf|roundLabel|roundMs|liveRound|failedRound|finishedRound|TurnSteps|turnLabel)\b|features\/session\/rounds\b|web\.session\.rounds\.|web\.session\.trajectory\.rounds?\b|web\.issue\.card\.turns?\b/u,
+    says: "the log shows the server's runs, one view each (runs.ts: RunView, runsOf, runTitle, runMs, RunSteps, runLabel; web.session.runs.*, web.issue.card.run(s)); 一轮 is the owner's word for a Run",
+    dirs: ["apps/web/src", "apps/web/test"],
+  },
+  {
+    name: "an agent's own todo under the task name",
+    pattern:
+      /\b(AgentTask|AgentTaskStore|AgentTaskRunner|AgentTaskError|makeTaskRunner|taskTools|tasks_changed)\b|agentTask(Store|Tools)?(\.ts)?["']|agent\/taskStore\b|"vibevalley\/tasks"|\bagent_task\w*|\b\w*AgentTasks?\b/u,
+    says: "an agent's own todo list is Todo (packages/agent todo.ts, todoStore.ts, todoTools.ts: TodoStore, TodoRunner, makeTodoRunner, todoTools, todos_changed); the server keeps it in runtime/todoStore.ts, table runtime_todo (queries OpenTodos, AddTodo, FinishTodos); a task is only a plan's (Task)",
+  },
+  {
+    name: "the text given to a helper as a task",
+    pattern: /\breopenTask\b/u,
+    says: "the text a helper is given is its brief (reopenBrief, Session.send(agent, brief, …), Issue.hire(agent, brief, …), chooseAgent(candidates, brief, …))",
+  },
+  {
+    name: "a runtime's preset read from the agent's seeds",
+    pattern: /\b(presetOf|factsOf|runtimeIds|runtimeLabel|defaultSettings)\b.*["']@\/agent\/seed(\.ts)?["']/u,
+    says: "the runtimes' presets, facts, order and default settings are runtime/presets.ts (presets.json); agent/seed.ts keeps the achievements and the issue templates",
+  },
+  {
+    name: "the orchestrator in a local called manager",
+    // The village's manager sprite and keys are strings (yard.manager.hint, "manager-face"); the English @manager alias is a
+    // key the owner types (channel/mentions.ts).
+    pattern: /\b(?:const|let|var|function)\s+manager\b|\(manager[,:)]|(?<![."\w-])manager\??\.[a-z]/u,
+    says: "orchestrator (or the profile's id): manager is only the English page's word for 管家",
   },
   {
     name: "a service not in Effect's default class form",
     pattern: /= Context\.Service<|\b[A-Z][A-Za-z]*Shape\b|^export const layer\b/mu,
-    says: 'a service is a class with its interface inline and its layer static (node_modules/effect/AGENTS.md): class Issues extends Context.Service<Issues, { … }>()("vibevalley/Issue") { static readonly layer = … }; its type is Issues["Service"]',
+    says: 'a service is a class with its interface inline and its layer static (node_modules/effect/AGENTS.md): class Issue extends Context.Service<Issue, { … }>()("vibevalley/Issue") { static readonly layer = … }; its type is Issue["Service"]',
     // Projection's interface is core's and its implementation the projection module's, above it (foundation.md): its layer
     // cannot sit on the class.
     except: /^apps\/server\/src\/projection\/projection\.ts$/u,
   },
+  {
+    name: "a service under a plural name",
+    pattern:
+      /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Projects|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Projects|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,
+    says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Issue, Memory, Project, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/store.ts, makeMemoryStore) and BlockStore (makeBlockStore, BlockStoreOptions) (docs/style/naming.md)',
+    dirs: ["apps/server/src"],
+  },
 ];
 
-// A word table (and the test that reads the English page) says what the owner reads, in the glossary's English column
+// A catalog (and the test that reads the English page) says what the owner reads, in the glossary's English column
 // (docs/README.md 用语: ticket, plan, manager…); only the rules about Chinese words look into it.
-const wordTable = /(?:^|\/)words(?:\.ts$|\/)|^apps\/web\/test\/english\.spec\.ts$/u;
+const ownerWords = (source: string) => source.startsWith("packages/i18n/locales/") || source === "apps/web/test/english.spec.ts";
 const han = /\p{Script=Han}/u;
 
-/** Where a catalog's words were said before they moved to packages/i18n: web.farm.phone is apps/web/src/farm/phone's,
- * web.setting apps/web/src/features/setting's, shared the protocol's. The rules about a place's words look there. */
+/** Where a catalog's words are said: web.farm.phone is apps/web/src/farm/phone's, web.setting apps/web/src/features/
+ * setting's, shared both sides'. The rules about a place's words look there. */
 function placeOf(ns: string): string {
-  if (ns === "shared") return "packages/protocol/src/words/zh.ts";
+  if (ns === "shared") return "packages/i18n/locales/shared.json";
   const [host, ...parts] = ns.split(".");
   const feature = `apps/${host}/src/features/${parts[0]}`;
   return parts.length > 0 && existsSync(resolve(root, feature))
@@ -302,7 +362,7 @@ for (const source of [...files, ...catalogs]) {
     for (const rule of RULES) {
       if (rule.dirs && !rule.dirs.some((dir) => file.startsWith(dir + "/"))) continue;
       if (rule.except?.test(file) === true) continue;
-      if (wordTable.test(file) && !han.test(rule.pattern.source)) continue;
+      if (ownerWords(source) && !han.test(rule.pattern.source)) continue;
       if (rule.pattern.test(line)) hits.push(`${source}:${i + 1}: ${rule.name} — ${rule.says}`);
     }
   }

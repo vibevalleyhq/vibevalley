@@ -5,13 +5,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import type { Issue } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
-import { Issues } from "@/issue/issue.ts";
-import { Projects } from "@/project/project.ts";
-import { Sessions, type SessionsInside } from "@/session/session.ts";
+import { Issue } from "@/issue/issue.ts";
+import { Project } from "@/project/project.ts";
+import { Session, type SessionsInside } from "@/session/session.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import { farm, git, lab, watch } from "./farm.ts";
@@ -43,7 +43,7 @@ describe("a pull request", () => {
       let creates = 0;
       let pushes = 0;
       let state = "OPEN";
-      let issue: Issue | undefined;
+      let issue: T.Issue | undefined;
       let branch = "";
       const gh = (...args: string[]) =>
         Effect.sync(() => {
@@ -73,10 +73,10 @@ describe("a pull request", () => {
       return Effect.gen(function* () {
         yield* Effect.gen(function* () {
           const w = yield* watch;
-          const issues = yield* Issues;
-          const sessions = yield* Sessions;
-          const projects = yield* Projects;
-          yield* (yield* Agents).save(lab());
+          const issues = yield* Issue;
+          const sessions = yield* Session;
+          const projects = yield* Project;
+          yield* (yield* Agent).save(lab());
           issue = yield* issues.add({ title: "写版本A", project: "clock", assignee: "lab" });
           yield* issues.start(issue.id, "");
           yield* w.nextReport;
@@ -107,9 +107,9 @@ describe("a pull request", () => {
 
         const after = farm({ config, projects: hooks });
         yield* Effect.gen(function* () {
-          const issues = yield* Issues;
-          const sessions = yield* Sessions;
-          yield* (yield* Projects).refreshGitHub();
+          const issues = yield* Issue;
+          const sessions = yield* Session;
+          yield* (yield* Project).refreshGitHub();
           const restored = yield* issues.get(issue!.id);
           expect(restored.pullRequest?.number).toBe(7);
           state = ending;

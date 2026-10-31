@@ -1,10 +1,9 @@
+import { Cron as EffectCron, DateTime } from "effect";
 // When a cron runs: what is due, whether it was missed, what a run leaves, and
 // whether a cron waits for the owner's yes.
 
-import { Cron as EffectCron, DateTime } from "effect";
-
 import { t } from "@vibevalley/i18n";
-import type { Cron, CronRequest } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
 import { actsForOwner, type Actor } from "@/base/actor.ts";
 
@@ -14,27 +13,27 @@ import { givenZone, minEveryMinutes, nextOf, nextRun, parseCron, cronTime } from
 const missedAfterMs = 5 * 60_000;
 
 /** Each once, however many runs it missed. */
-export const dueCrons = (all: readonly Cron[], now: number) =>
+export const dueCrons = (all: readonly T.Cron[], now: number) =>
   all.filter((s) => {
     const next = nextRun(s);
     return next !== undefined && next <= now;
   });
 
-export const isMissed = (s: Cron, now: number) => now - (nextRun(s) ?? now) > missedAfterMs;
+export const isMissed = (s: T.Cron, now: number) => now - (nextRun(s) ?? now) > missedAfterMs;
 
 /** A one-off runs once: then it is off. */
-export const afterRun = (s: Cron, now: number): Cron => ({ ...s, lastRun: now, enabled: s.when.kind === "once" ? false : s.enabled });
+export const afterRun = (s: T.Cron, now: number): T.Cron => ({ ...s, lastRun: now, enabled: s.when.kind === "once" ? false : s.enabled });
 
 /**
  * Whether a cron waits for the owner's yes before it can come due. One set on the owner's word never waits. Without
  * it, only a one-off follow-up for the asker itself goes ahead: one that comes back again, or sends a helper (who spends
  * money) straight away, waits.
  */
-export function needsOK(req: CronRequest, by: Actor): boolean {
+export function needsOK(req: T.CronRequest, by: Actor): boolean {
   return !actsForOwner(by) && (req.when.kind !== "once" || (req.agent ?? "").trim() !== "");
 }
 
-export function cronProblem(req: CronRequest, now: number): string {
+export function cronProblem(req: T.CronRequest, now: number): string {
   if (req.name.trim() === "") return t("server.cron.problem.noName");
   if (req.text.trim() === "") return t("server.cron.problem.noText");
   if (req.tz !== undefined && !givenZone(req.tz)) return t("server.cron.problem.zone", { tz: req.tz });
@@ -56,7 +55,7 @@ export function cronProblem(req: CronRequest, now: number): string {
   }
 }
 
-export function dueText(s: Cron, missed: boolean): string {
+export function dueText(s: T.Cron, missed: boolean): string {
   return t("server.cron.due", { name: s.name, missed, text: s.text });
 }
 

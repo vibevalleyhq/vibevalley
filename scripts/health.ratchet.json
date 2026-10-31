@@ -170,6 +170,15 @@
     "ignored": 5,
     "swallowed": 0
   },
+  "server: Inbox": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0
+  },
   "server: Issues": {
     "nonNull": 25,
     "doubleCast": 0,
@@ -178,15 +187,6 @@
     "orDie": 1,
     "ignored": 0,
     "swallowed": 1
-  },
-  "server: Notifications": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0
   },
   "server: Orchestrator": {
     "nonNull": 7,
@@ -287,6 +287,15 @@
     "ignored": 0,
     "swallowed": 0
   },
+  "web: features/inbox": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 2
+  },
   "web: features/issue": {
     "nonNull": 20,
     "doubleCast": 0,
@@ -314,15 +323,6 @@
     "ignored": 0,
     "swallowed": 0
   },
-  "web: features/notice": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 2
-  },
   "web: features/orchestrator": {
     "nonNull": 1,
     "doubleCast": 0,
@@ -333,7 +333,7 @@
     "swallowed": 0
   },
   "web: features/project": {
-    "nonNull": 22,
+    "nonNull": 14,
     "doubleCast": 0,
     "cast": 1,
     "lintOff": 1,

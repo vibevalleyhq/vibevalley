@@ -1,0 +1,238 @@
+{
+  "defaultSettings": {
+    "enabled": true,
+    "binPath": "",
+    "defaultModel": "",
+    "defaultEffort": "",
+    "env": {}
+  },
+  "fallbackPreset": {
+    "id": "",
+    "label": "",
+    "blurb": "A runtime VibeValley has no look of its own for yet.",
+    "look": {
+      "build": "biped",
+      "head": "rounded",
+      "body": "#f1e8d8",
+      "trim": "#5d5850",
+      "hat": "#f2b53a",
+      "eye": "#a6f4ff"
+    }
+  },
+  "runtimePresets": [
+    {
+      "id": "claude",
+      "label": "Claude Code",
+      "blurb": "Anthropic's command-line coding agent.",
+      "look": {
+        "eye": "#a6f4ff",
+        "build": "biped",
+        "head": "rounded",
+        "body": "#f3e9da",
+        "trim": "#d9774f",
+        "hat": "#e8804f"
+      }
+    },
+    {
+      "id": "codex",
+      "label": "Codex",
+      "blurb": "OpenAI's coding agent, through app-server.",
+      "look": {
+        "eye": "#a6f4ff",
+        "build": "treads",
+        "head": "terminal",
+        "body": "#3d434a",
+        "trim": "#d8dadc",
+        "hat": "#f4f3ee"
+      }
+    },
+    {
+      "id": "opencode",
+      "label": "opencode",
+      "blurb": "An open-source terminal coding agent, through ACP.",
+      "look": {
+        "eye": "#a6f4ff",
+        "build": "biped",
+        "head": "terminal",
+        "body": "#e9e6de",
+        "trim": "#24282d",
+        "hat": "#2f3438"
+      }
+    },
+    {
+      "id": "vibevalley",
+      "label": "vibevalley",
+      "blurb": "VibeValley's own agent (DeepSeek), running inside the server process.",
+      "look": {
+        "eye": "#a6f4ff",
+        "build": "hopper",
+        "head": "orb",
+        "body": "#fbe7c6",
+        "trim": "#4f9a5a",
+        "hat": "#f2b53a"
+      }
+    },
+    {
+      "id": "pi",
+      "label": "Pi",
+      "blurb": "A coding agent SDK running inside the server process.",
+      "look": {
+        "eye": "#a6f4ff",
+        "build": "hopper",
+        "head": "dome",
+        "body": "#f4e6d4",
+        "trim": "#b0503f",
+        "hat": "#d9534f"
+      }
+    },
+    {
+      "id": "cursor",
+      "label": "Cursor",
+      "blurb": "Cursor's agent SDK, running inside the server process.",
+      "look": {
+        "eye": "#a6f4ff",
+        "build": "wheel",
+        "head": "saucer",
+        "body": "#dfe4ea",
+        "trim": "#5b6470",
+        "hat": "#a9b4c2"
+      }
+    },
+    {
+      "id": "grok",
+      "label": "Grok",
+      "blurb": "xAI's grok CLI, through ACP.",
+      "look": {
+        "eye": "#a6f4ff",
+        "build": "wheel",
+        "head": "dome",
+        "body": "#b9c4d1",
+        "trim": "#3a404a",
+        "hat": "#4f86d9"
+      }
+    },
+    {
+      "id": "kimi",
+      "label": "Kimi",
+      "blurb": "Moonshot's kimi CLI, through ACP.",
+      "look": {
+        "eye": "#a6f4ff",
+        "build": "hopper",
+        "head": "orb",
+        "body": "#e7e6fb",
+        "trim": "#6c70d8",
+        "hat": "#9580e6"
+      }
+    },
+    {
+      "id": "antigravity",
+      "label": "Antigravity",
+      "blurb": "Google's Antigravity agent, through ACP.",
+      "look": {
+        "eye": "#a6f4ff",
+        "build": "hover",
+        "head": "saucer",
+        "body": "#d3efe8",
+        "trim": "#2f9d8f",
+        "hat": "#45bf8c"
+      }
+    },
+    {
+      "id": "dsh",
+      "label": "DeepSeek Harness",
+      "blurb": "DeepSeek's dsh, through ACP.",
+      "look": {
+        "eye": "#a6f4ff",
+        "build": "treads",
+        "head": "orb",
+        "body": "#dce6fb",
+        "trim": "#3b5bdb",
+        "hat": "#4d6bfe"
+      }
+    }
+  ],
+  "runtimeFacts": {
+    "claude": {
+      "steer": true,
+      "refused": {},
+      "capabilities": ["listModels", "accountUsage", "checkUpdate", "upgrade", "skills", "mcpServers", "tools"],
+      "inProcess": false
+    },
+    "vibevalley": {
+      "steer": true,
+      "refused": {},
+      "capabilities": ["listModels"],
+      "inProcess": true
+    },
+    "codex": {
+      "steer": true,
+      "refused": {},
+      "capabilities": ["listModels", "accountUsage", "checkUpdate", "upgrade", "skills", "mcpServers", "tools"],
+      "inProcess": false
+    },
+    "opencode": {
+      "steer": true,
+      "refused": {
+        "disallowedTools": "opencode ACP has no per-session tool blocklist"
+      },
+      "capabilities": ["listModels"],
+      "inProcess": false
+    },
+    "pi": {
+      "steer": true,
+      "refused": {},
+      "capabilities": ["listModels", "skills", "tools"],
+      "inProcess": true
+    },
+    "cursor": {
+      "steer": true,
+      "refused": {
+        "systemPrompt": "Cursor SDK's local agent cannot replace the system prompt",
+        "appendSystemPrompt": "Cursor SDK's local agent cannot append to the system prompt",
+        "env": "Cursor runs inside the server process, so its tools get no environment variables of their own",
+        "mcpServers": "oar does not connect MCP servers for cursor yet"
+      },
+      "capabilities": ["listModels"],
+      "inProcess": true
+    },
+    "grok": {
+      "steer": true,
+      "refused": {
+        "disallowedTools": "grok agent stdio does not pass a tool blocklist on"
+      },
+      "capabilities": ["listModels", "accountUsage", "checkUpdate", "upgrade", "skills", "mcpServers"],
+      "inProcess": false
+    },
+    "kimi": {
+      "steer": false,
+      "refused": {
+        "systemPrompt": "kimi acp has no per-session system prompt input",
+        "appendSystemPrompt": "kimi acp has no per-session system prompt append",
+        "disallowedTools": "kimi ACP has no per-session tool blocklist"
+      },
+      "capabilities": ["listModels", "accountUsage", "checkUpdate", "upgrade"],
+      "inProcess": false
+    },
+    "antigravity": {
+      "steer": false,
+      "refused": {
+        "systemPrompt": "Antigravity ACP cannot replace the system prompt",
+        "appendSystemPrompt": "Antigravity ACP cannot append to the system prompt",
+        "effort": "Antigravity has no channel for effort"
+      },
+      "capabilities": ["listModels", "checkUpdate"],
+      "inProcess": false
+    },
+    "dsh": {
+      "steer": false,
+      "refused": {
+        "systemPrompt": "dsh acp has no per-session system prompt input",
+        "appendSystemPrompt": "dsh acp has no per-session system prompt append",
+        "disallowedTools": "dsh acp has no per-session tool blocklist"
+      },
+      "capabilities": ["listModels"],
+      "inProcess": false
+    }
+  },
+  "runtimeIds": ["claude", "codex", "opencode", "vibevalley", "pi", "cursor", "grok", "kimi", "antigravity", "dsh"]
+}

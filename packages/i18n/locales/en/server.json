@@ -4,7 +4,6 @@
     "session": "List the helpers and find its id",
     "project": "List the projects and find its name",
     "runtime": "List the machines and find its id",
-    "doc": "List the docs and find its id",
     "agent": "List the profiles and find its id",
     "skill": "List the skills and find its id",
     "template": "List the templates and find its id",

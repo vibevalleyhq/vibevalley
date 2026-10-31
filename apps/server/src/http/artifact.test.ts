@@ -3,7 +3,7 @@ import { Context, Effect, Layer } from "effect";
 
 import { artifactPath, ownerId } from "@vibevalley/protocol";
 
-import { Artifacts } from "@/artifact/artifact.ts";
+import { Artifact } from "@/artifact/artifact.ts";
 import { htmlPolicy } from "@/artifact/policy.ts";
 import { remoteMay } from "@/lan/lan.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -14,7 +14,7 @@ import { app } from "./app.ts";
 const farm = Effect.gen(function* () {
   let address = "";
   const built = yield* Layer.build(app(testConfig(), 0, (a) => Effect.sync(() => void (address = a)), quietApp));
-  return { address, artifacts: Context.get(built, Artifacts) };
+  return { address, artifacts: Context.get(built, Artifact) };
 });
 
 describe("an artifact's content", () => {

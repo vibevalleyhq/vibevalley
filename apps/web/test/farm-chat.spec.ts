@@ -34,7 +34,7 @@ const row = (page: Page, id: string) => page.getByTestId("farm-chat").locator(`[
 const scripted: Agent = {
   id: "",
   name: "fox",
-  role: "worker",
+  role: "helper",
   duty: "",
   enabled: true,
   // The test server's pi is the scripted helper (fixtures.ts).

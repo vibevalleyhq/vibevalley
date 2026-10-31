@@ -4,12 +4,12 @@ import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
 import { Core } from "@/core/core.ts";
-import { emptyPatrol, patrolStep } from "@/notice/patrol.ts";
+import { emptyPatrol, patrolStep } from "@/inbox/patrol.ts";
 import { frameOf } from "@/projection/frame.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 
-import { Channels } from "./chat.ts";
+import { Channel } from "./chat.ts";
 const mentionIds = (core: Core["Service"]) =>
   frameOf(core.state())
     .inbox.filter((item) => item.kind === "mention")
@@ -29,7 +29,7 @@ it.live("an unresolved owner mention survives both history windows and restart u
   });
   return Effect.gen(function* () {
     yield* Effect.gen(function* () {
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       const core = yield* Core;
       const parent = (yield* chat.say("需要确认的话题", undefined, "")).message;
       const written = (yield* chat.speak("orchestrator", "@主人 请确认这份变更", { target: `#general:${parent.number}`, anyway: true })).message!;
@@ -44,7 +44,7 @@ it.live("an unresolved owner mention survives both history windows and restart u
       yield* standing;
     }).pipe(Effect.scoped, Effect.provide(world({ config })));
     yield* Effect.gen(function* () {
-      const chat = yield* Channels;
+      const chat = yield* Channel;
       const core = yield* Core;
       yield* standing;
       yield* chat.markRead(thread, number);
@@ -57,7 +57,7 @@ it.live("an unresolved owner mention survives both history windows and restart u
 it.live("only reading or replying in the mentioned channel completes an owner mention", () => {
   const config = testConfig();
   return Effect.gen(function* () {
-    const chat = yield* Channels;
+    const chat = yield* Channel;
     const core = yield* Core;
     const channel = yield* chat.openChannel("review", "", "");
     const first = (yield* chat.speak("orchestrator", "@主人 第一份变更", { target: "#review", anyway: true })).message!;

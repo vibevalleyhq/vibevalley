@@ -1,6 +1,6 @@
-// The map: every project an island on parchment, its plots its helpers'
-// worktrees, its empty plots room for more and the sacks at its gate what waits; a click opens the project, a helper's
-// plot its issue, an empty plot a seed for the project.
+// The projects page's map, the farm's skin over the workbench's projects (app/ hands it to ProjectsPage): every project an
+// island on parchment, its plots its helpers' worktrees, its empty plots room for more and the sacks at its gate what
+// waits; a click opens the project, a helper's plot its issue, an empty plot a seed for the project.
 
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
@@ -16,6 +16,7 @@ import { useRouter } from "@/base/router";
 import { variant, autofocus } from "@/base/util";
 import { defaultOf } from "@/features/channel";
 import { writeIssue } from "@/features/issue";
+import { type ProjectsSkin, since } from "@/features/project";
 import { Button } from "@/ui/Button";
 import { castOf, castSprite, cropSprite } from "@/ui/cast";
 import { Dialog } from "@/ui/Dialog";
@@ -28,8 +29,8 @@ import { badgeColors, CardColors } from "@/ui/pixel/card";
 import { PoseSprite } from "@/ui/PoseSprite";
 import { toast } from "@/ui/toasts";
 
-import { growthOf, since } from "./calendar";
 import {
+  growthOf,
   homeless,
   type Island,
   islandLook,
@@ -49,7 +50,7 @@ const gap = 24;
 const parchment = "#ebd9ae";
 
 /** The islands as the farm stands now. */
-export function useIslands(): () => Island[] {
+function useIslands(): () => Island[] {
   const core = useCore();
   const frames = useFrames();
   const projects = useProjects();
@@ -60,7 +61,7 @@ export function useIslands(): () => Island[] {
 
 const go = (navigate: (to: string) => void, id: string) => navigate(`/issues/${encodeURIComponent(id)}`);
 
-export function ProjectMap() {
+function ProjectMap() {
   const atlas = useAtlas();
   const islands = useIslands();
   const projects = useProjects();
@@ -68,10 +69,12 @@ export function ProjectMap() {
   const core = useCore();
   const [sowing, setSowing] = createSignal<string>();
   const [width, setWidth] = createSignal(0);
-  let box!: HTMLDivElement;
+  let box: HTMLDivElement | undefined;
   onSettled(() => {
-    const ro = new ResizeObserver(() => setWidth(box.clientWidth));
-    ro.observe(box);
+    const el = box;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    ro.observe(el);
     return () => ro.disconnect();
   });
   const cell = () => {
@@ -87,19 +90,19 @@ export function ProjectMap() {
       <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5">
         <span class="text-sm font-medium">
           {[
-            t("web.project.map.islands", { n: islands().length }),
-            t("web.project.map.peopled", { n: tally().peopled }),
-            t("web.project.map.working", { n: tally().working, of: maxRunning }),
-            ...(tally().queued > 0 ? [t("web.project.map.queued", { n: tally().queued })] : []),
+            t("web.farm.map.islands", { n: islands().length }),
+            t("web.farm.map.peopled", { n: tally().peopled }),
+            t("web.farm.map.working", { n: tally().working, of: maxRunning }),
+            ...(tally().queued > 0 ? [t("web.farm.map.queued", { n: tally().queued })] : []),
           ].join(" · ")}
         </span>
         <span class="flex flex-wrap gap-x-4 gap-y-1">
           <For
             each={
               [
-                ["map-stake", t("web.project.map.stake")],
-                ["plot-locked", t("web.project.map.locked")],
-                ["map-sack", t("web.project.map.sack")],
+                ["map-stake", t("web.farm.map.stake")],
+                ["plot-locked", t("web.farm.map.locked")],
+                ["map-sack", t("web.farm.map.sack")],
               ] as const
             }
           >
@@ -121,19 +124,24 @@ export function ProjectMap() {
         <div class="absolute inset-0 overflow-y-auto p-4">
           <Switch
             fallback={
-              <div class="flex flex-wrap justify-center" style={{ gap: `${gap}px` }}>
-                <For each={islands()} keyed={(i) => i.project}>
-                  {(i) => (
-                    <div style={{ width: `${cell().w * scale()}px` }}>
-                      <IslandView island={i()} atlas={atlas()!} scale={scale()} cellHeight={cell().h} onSow={() => setSowing(i().project)} />
-                    </div>
-                  )}
-                </For>
-              </div>
+              // Keyed by the atlas, loaded once: a plain value, so the islands' queries never read a closed branch.
+              <Show when={atlas()} keyed>
+                {(a) => (
+                  <div class="flex flex-wrap justify-center" style={{ gap: `${gap}px` }}>
+                    <For each={islands()} keyed={(i) => i.project}>
+                      {(i) => (
+                        <div style={{ width: `${cell().w * scale()}px` }}>
+                          <IslandView island={i()} atlas={a} scale={scale()} cellHeight={cell().h} onSow={() => setSowing(i().project)} />
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                )}
+              </Show>
             }
           >
             <Match when={!atlas() || (loading() && islands().length === 0)}>
-              <Quiet>{t("web.project.finding")}</Quiet>
+              <Quiet>{t("web.farm.map.finding")}</Quiet>
             </Match>
             <Match when={islands().length === 0}>
               <NoProjects />
@@ -144,7 +152,7 @@ export function ProjectMap() {
           </Show>
         </div>
       </div>
-      <Dialog open={sowing() !== undefined} onClose={() => setSowing(undefined)} title={t("web.project.map.send", { project: sowing() ?? "" })}>
+      <Dialog open={sowing() !== undefined} onClose={() => setSowing(undefined)} title={t("web.farm.map.send", { project: sowing() ?? "" })}>
         <Show when={sowing()}>{(p) => <SowHere project={p()} onDone={() => setSowing(undefined)} />}</Show>
       </Dialog>
     </div>
@@ -299,7 +307,10 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
         </button>
         <For each={props.island.spots} keyed={false}>
           {(spot, i) => {
-            const foot = () => ({ x: at()[i]!.x, y: at()[i]!.y + down() });
+            const foot = () => {
+              const p = at()[i] ?? { x: 0, y: 0 };
+              return { x: p.x, y: p.y + down() };
+            };
             const tip = () => spotText(spot(), Date.now());
             return (
               <Switch>
@@ -313,7 +324,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                     const visit = () => go(router.navigate, h().id);
                     return (
                       <>
-                        <Placed sp={bed()} foot={foot()} scale={s()} onClick={visit} tip={tip()} label={t("web.project.map.plot", { name: h().name })}>
+                        <Placed sp={bed()} foot={foot()} scale={s()} onClick={visit} tip={tip()} label={t("web.farm.map.plot", { name: h().name })}>
                           <Art sp={bed()} scale={s()} />
                         </Placed>
                         <Placed
@@ -353,7 +364,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                     scale={s()}
                     onClick={props.onSow}
                     tip={tip()}
-                    label={t("web.project.map.open", { project: props.island.project })}
+                    label={t("web.farm.map.open", { project: props.island.project })}
                   >
                     <Art sp={props.atlas.get("plot-empty")} scale={s()} />
                   </Placed>
@@ -362,7 +373,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                   </Placed>
                 </Match>
                 <Match when={spot().kind === "shut"}>
-                  <Placed sp={props.atlas.get("plot-locked")} foot={foot()} scale={s()} tip={tip()} label={t("web.project.map.wait")}>
+                  <Placed sp={props.atlas.get("plot-locked")} foot={foot()} scale={s()} tip={tip()} label={t("web.farm.map.wait")}>
                     <Art sp={props.atlas.get("plot-locked")} scale={s()} />
                   </Placed>
                 </Match>
@@ -381,8 +392,8 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                   foot={foot()}
                   scale={s()}
                   onClick={() => go(router.navigate, item.id)}
-                  tip={t("web.project.map.queuedTip", { title: item.title })}
-                  label={t("web.project.map.queuedLabel", { title: item.title })}
+                  tip={t("web.farm.map.queuedTip", { title: item.title })}
+                  label={t("web.farm.map.queuedLabel", { title: item.title })}
                 >
                   <Art sp={sack()} scale={s()} />
                 </Placed>
@@ -401,7 +412,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
         data-testid="enter-island"
         data-key={props.island.project}
         onClick={enter}
-        aria-label={t("web.project.map.enter", { project: props.island.project })}
+        aria-label={t("web.farm.map.enter", { project: props.island.project })}
         class="group cursor-pointer"
       >
         <PixelCard
@@ -412,7 +423,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
             [{ kind: "words", text: props.island.project, size: 14 }],
             [{ kind: "words", text: islandText(props.island), color: CardColors.muted }],
             [
-              { kind: "words", text: t("web.project.map.enterWord"), color: CardColors.good },
+              { kind: "words", text: t("web.farm.map.enterWord"), color: CardColors.good },
               ...(props.atlas.has("button-next") ? [{ kind: "icon" as const, sprite: props.atlas.get("button-next"), px: 12 }] : []),
             ],
           ]}
@@ -426,7 +437,7 @@ function Homeless(props: { sessions: Session[] }) {
   const router = useRouter();
   return (
     <div class="mx-auto mt-4 flex w-fit flex-wrap items-center gap-2 rounded-lg border border-line bg-page px-3 py-2">
-      <span class="text-xs text-muted">{t("web.project.map.homeless")}</span>
+      <span class="text-xs text-muted">{t("web.farm.map.homeless")}</span>
       <For each={props.sessions}>
         {(h) => (
           <button type="button" onClick={() => go(router.navigate, h.id)} class="flex cursor-pointer items-center gap-1 text-sm underline">
@@ -442,12 +453,12 @@ function Homeless(props: { sessions: Session[] }) {
 function NoProjects() {
   return (
     <div class="mx-auto flex w-fit flex-col items-center gap-3 rounded-lg border border-line bg-page p-4">
-      <p class="text-sm text-muted">{t("web.project.map.sea")}</p>
+      <p class="text-sm text-muted">{t("web.farm.map.sea")}</p>
     </div>
   );
 }
 
-/** A job for this project: sent now (the orchestrator sends a helper), or written down as a todo to fill in. */
+/** Work for this project: sent now (the orchestrator sends a helper), or written down as a todo to fill in. */
 function SowHere(props: { project: string; onDone: () => void }) {
   const [text, setText] = createSignal("");
   const [busy, setBusy] = createSignal(false);
@@ -472,7 +483,7 @@ function SowHere(props: { project: string; onDone: () => void }) {
     setBusy(true);
     try {
       const got = await writeIssue(text(), "", project);
-      if (got.refused) toast(t("web.project.map.notDrafted", { why: got.refused }));
+      if (got.refused) toast(t("web.farm.map.notDrafted", { why: got.refused }));
       props.onDone();
       go(router.navigate, got.issue.id);
     } catch (e) {
@@ -483,21 +494,21 @@ function SowHere(props: { project: string; onDone: () => void }) {
   };
   return (
     <div class="flex flex-col gap-3">
-      <p class="text-sm text-muted">{t("web.project.map.sowIntro", { project: props.project })}</p>
+      <p class="text-sm text-muted">{t("web.farm.map.sowIntro", { project: props.project })}</p>
       <TextArea
         ref={autofocus()}
-        aria-label={t("web.project.map.job")}
+        aria-label={t("web.farm.map.job")}
         rows={4}
-        placeholder={t("web.project.map.jobExample")}
+        placeholder={t("web.farm.map.jobExample")}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
       />
       <div class="flex justify-end gap-2">
         <Button disabled={busy() || !text().trim()} onClick={() => void write()}>
-          {t("web.project.map.todo")}
+          {t("web.farm.map.todo")}
         </Button>
         <Button tone="primary" disabled={busy() || !text().trim()} onClick={() => void send()}>
-          {t("web.project.map.sow")}
+          {t("web.farm.map.sow")}
         </Button>
       </div>
     </div>
@@ -505,11 +516,18 @@ function SowHere(props: { project: string; onDone: () => void }) {
 }
 
 /** One island: its worktrees, the room left, what waits. */
-export function IslandDetail(props: { island: Island }) {
+function IslandDetail(props: { island: Island }) {
   const router = useRouter();
   const now = () => Date.now();
   const last = () => props.island.summary?.last;
   const growth = () => growthOf(last(), now());
+  const growthText = () => {
+    const at = last();
+    if (!props.island.summary) return t("web.farm.map.gone");
+    return at !== undefined
+      ? t("web.farm.map.growthSince", { label: growth().label, since: since(at, now()) })
+      : t("web.farm.map.growth", { label: growth().label });
+  };
   const shut = () => props.island.spots.filter((s) => s.kind === "shut").length;
   const taken = () => props.island.spots.flatMap((s) => (s.kind === "taken" ? [s] : []));
   const open = () => openOf(props.island);
@@ -517,17 +535,11 @@ export function IslandDetail(props: { island: Island }) {
     <Card title={props.island.project} action={<span class="text-sm text-muted">{islandText(props.island)}</span>}>
       <div class="flex items-center gap-2.5">
         <SpriteIcon name={`plot-${growth().crop}`} size={36} />
-        <p class="text-sm text-muted">
-          {!props.island.summary
-            ? t("web.project.map.gone")
-            : last() !== undefined
-              ? t("web.project.map.growthSince", { label: growth().label, since: since(last()!, now()) })
-              : t("web.project.map.growth", { label: growth().label })}
-        </p>
+        <p class="text-sm text-muted">{growthText()}</p>
       </div>
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs font-semibold text-muted">{t("web.project.map.worktrees", { n: taken().length })}</span>
-        <Show when={taken().length > 0} fallback={<Quiet>{t("web.project.map.noHelpers")}</Quiet>}>
+        <span class="text-xs font-semibold text-muted">{t("web.farm.map.worktrees", { n: taken().length })}</span>
+        <Show when={taken().length > 0} fallback={<Quiet>{t("web.farm.map.noHelpers")}</Quiet>}>
           <For each={taken()}>
             {(slot) => (
               <button
@@ -557,17 +569,17 @@ export function IslandDetail(props: { island: Island }) {
         <SpriteIcon name={open() > 0 ? "map-stake" : "plot-locked"} size={24} />
         <p class="text-sm text-muted">
           {!props.island.summary
-            ? t("web.project.map.noMore")
+            ? t("web.farm.map.noMore")
             : open() > 0
-              ? t("web.project.map.canSend", { n: open(), of: props.island.maxSessions })
+              ? t("web.farm.map.canSend", { n: open(), of: props.island.maxSessions })
               : shut() > 0
-                ? t("web.project.map.shut", { n: maxRunning })
-                : t("web.project.map.full", { n: props.island.maxSessions })}
+                ? t("web.farm.map.shut", { n: maxRunning })
+                : t("web.farm.map.full", { n: props.island.maxSessions })}
         </p>
       </div>
       <Show when={props.island.queued.length > 0}>
         <div class="flex flex-col gap-1">
-          <span class="text-xs font-semibold text-muted">{t("web.project.map.queue", { n: props.island.queued.length })}</span>
+          <span class="text-xs font-semibold text-muted">{t("web.farm.map.queue", { n: props.island.queued.length })}</span>
           <For each={props.island.queued}>
             {(item) => (
               <div class="flex items-center gap-2">
@@ -575,8 +587,8 @@ export function IslandDetail(props: { island: Island }) {
                 <span class="min-w-0 flex-1 truncate text-sm">{item.title}</span>
                 <button
                   type="button"
-                  title={t("web.project.map.see")}
-                  aria-label={t("web.project.map.see")}
+                  title={t("web.farm.map.see")}
+                  aria-label={t("web.farm.map.see")}
                   onClick={() => go(router.navigate, item.id)}
                   class="cursor-pointer rounded p-1 hover:bg-hover"
                 >
@@ -590,3 +602,12 @@ export function IslandDetail(props: { island: Island }) {
     </Card>
   );
 }
+
+/** The head over one project's overview: its island, when it has one. */
+function IslandHead(props: { name: string }) {
+  const islands = useIslands();
+  const island = () => islands().find((i) => i.project === props.name);
+  return <Show when={island()}>{(i) => <IslandDetail island={i()} />}</Show>;
+}
+
+export const projectMap: ProjectsSkin = { Map: ProjectMap, Head: IslandHead, picture: islandLook };

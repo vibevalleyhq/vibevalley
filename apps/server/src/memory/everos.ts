@@ -83,7 +83,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
   const user = c.user || "owner";
   /** Sessions given messages and not yet told to extract; flushed when the session ends, or when the farm stops. */
   const pending = new Map<string, string>();
-  /** Sessions whose job it was given already: a later run sends only what the helper said. */
+  /** Sessions whose brief it was given already: a later run sends only what the helper said. */
   const told = new Set<string>();
 
   /** The answer's text; closing: the flush as it stops, which its stop does not cut short. */
@@ -186,12 +186,12 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       };
     }),
     list: () => Effect.fail(new SourceError({ message: t("server.memory.everosList") })),
-    // The job once per session, then what the helper said; a failed run says so. A stopped run leaves nothing.
+    // The brief once per session, then what the helper said; a failed run says so. A stopped run leaves nothing.
     syncTurn: Effect.fnUntraced(function* (run) {
       if (c.write !== true || run.outcome === "interrupted") return;
       const at = yield* Clock.currentTimeMillis;
       const messages: Message[] = [];
-      if (!told.has(run.session) && run.job.trim() !== "") messages.push({ sender_id: user, role: "user", timestamp: at, content: run.job });
+      if (!told.has(run.session) && run.brief.trim() !== "") messages.push({ sender_id: user, role: "user", timestamp: at, content: run.brief });
       let said = run.said.trim() === "" ? run.summary : run.said;
       if (run.outcome === "failed") said = everosWords.failed + said;
       if (said.trim() !== "") messages.push({ sender_id: agentOf(run.agent), role: "assistant", timestamp: at, content: said });

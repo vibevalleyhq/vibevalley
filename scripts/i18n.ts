@@ -3,7 +3,8 @@
 //   gen                 writes packages/i18n/src/catalogs.ts (the catalogs and every key's params) from locales/
 //   scan                lists each key used in code (t("…")) and where; a template key counts as its prefix
 //   check               fails on a key used but missing, a key nobody uses, a language with keys zh lacks or lacking
-//                       zh's, placeholders that differ, Han in English, English that is zh word for word, a stale gen
+//                       zh's, placeholders that differ, Han in English, English that is zh word for word, a stale gen,
+//                       and a word the glossary rules out (docs/README.md 用语: 不用, and the farm's words off the skins)
 //   find <text>         the keys whose zh or en contains text
 //   migrate <words.ts>  moves a word table into a catalog and its call sites to t("…"); what it cannot, it lists
 //
@@ -15,6 +16,7 @@ import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { format, placeholderKinds, placeholders } from "../packages/i18n/src/format.ts";
+import { readGlossary, wordProblems } from "./glossary.ts";
 
 const root = join(import.meta.dirname, "..");
 const pkg = join(root, "packages/i18n");
@@ -147,6 +149,8 @@ function check(): string[] {
   const prefixes = uses.filter((u) => u.prefix).map((u) => u.key);
   for (const u of uses) if (!u.prefix && !zh.has(u.key)) problems.push(`${u.file}:${u.line}: ${u.key} is not in the catalogs`);
   for (const k of zh.keys()) if (!used.has(k) && !prefixes.some((p) => k.startsWith(p))) problems.push(`unused: ${k}`);
+  const glossary = readGlossary(readFileSync(join(root, "docs/README.md"), "utf8"));
+  for (const locale of locales) problems.push(...wordProblems(glossary, locale, messages(locale)));
   if (!existsSync(catalogsFile) || readFileSync(catalogsFile, "utf8") !== formatted(generated()))
     problems.push("packages/i18n/src/catalogs.ts is stale: run vpx scripts/i18n.ts gen");
   return problems;

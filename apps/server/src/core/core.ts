@@ -8,21 +8,7 @@ import { join } from "node:path";
 
 import { Cause, Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
 
-import type {
-  CommitCount,
-  WorkspaceState,
-  Fact,
-  GameEffect,
-  LiveEvent,
-  OrchestratorState,
-  NoticeLevel,
-  RuntimeInfo,
-  Session,
-  SessionEvent,
-  SideEvent,
-  StateFrame,
-  SessionId,
-} from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { ServerConfig } from "@/base/config.ts";
@@ -30,7 +16,7 @@ import { FileWriter, readOrSetAside } from "@/base/files.ts";
 import { jsonOf } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 
-export const emptyWorkspaceState = (): WorkspaceState => ({
+export const emptyWorkspaceState = (): T.WorkspaceState => ({
   call: "idle",
   callReason: "",
   sessions: [],
@@ -45,12 +31,12 @@ export const emptyWorkspaceState = (): WorkspaceState => ({
 export class Projection extends Context.Service<
   Projection,
   {
-    readonly reduce: (state: WorkspaceState, fact: Fact) => [WorkspaceState, boolean];
+    readonly reduce: (state: T.WorkspaceState, fact: T.Fact) => [T.WorkspaceState, boolean];
     /** What a fact sets off on the farm, from the state before it. */
-    readonly effects: (before: WorkspaceState, fact: Fact) => GameEffect[];
-    readonly frame: (state: WorkspaceState, effects?: GameEffect[]) => StateFrame;
+    readonly effects: (before: T.WorkspaceState, fact: T.Fact) => T.GameEffect[];
+    readonly frame: (state: T.WorkspaceState, effects?: T.GameEffect[]) => T.StateFrame;
     /** The state read back from state.json, made whole (the sessions' places on the farm). */
-    readonly restore: (kept: WorkspaceState) => WorkspaceState;
+    readonly restore: (kept: T.WorkspaceState) => T.WorkspaceState;
   }
 >()("vibevalley/Projection") {}
 
@@ -59,46 +45,46 @@ const saveAfterMs = 500;
 export const stateEveryMs = 200;
 
 /** A fact as a service says it: the time is core's. */
-export type FactIn = Fact extends infer F ? (F extends Fact ? Omit<F, "at"> : never) : never;
+export type FactIn = T.Fact extends infer F ? (F extends T.Fact ? Omit<F, "at"> : never) : never;
 
 /** A fact with exactly the state it changed, even when it is read late. */
 export interface Transition {
-  readonly before: WorkspaceState;
-  readonly fact: Fact;
-  readonly after: WorkspaceState;
+  readonly before: T.WorkspaceState;
+  readonly fact: T.Fact;
+  readonly after: T.WorkspaceState;
 }
 
 /** What the owner did that changes no state (so it is no fact), said by the service it went through: the game counts some. */
-export type OwnerDid = { readonly kind: "reviewed"; readonly session: SessionId } | { readonly kind: "talked" };
+export type OwnerDid = { readonly kind: "reviewed"; readonly session: T.SessionId } | { readonly kind: "talked" };
 
 export class Core extends Context.Service<
   Core,
   {
-    readonly state: () => WorkspaceState;
-    readonly session: (id: string) => Session | undefined;
+    readonly state: () => T.WorkspaceState;
+    readonly session: (id: string) => T.Session | undefined;
     /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
     readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
     /** channel: where it thinks or writes, while it does. */
-    readonly setOrchestrator: (agent: string, state: OrchestratorState, channel?: string) => Effect.Effect<void>;
-    readonly setCommits: (commits: CommitCount) => Effect.Effect<void>;
+    readonly setOrchestrator: (agent: string, state: T.OrchestratorState, channel?: string) => Effect.Effect<void>;
+    readonly setCommits: (commits: T.CommitCount) => Effect.Effect<void>;
     /** The farm opens when the owner starts it or says something: the call goes live unless it is already. */
     readonly open: () => Effect.Effect<void>;
-    readonly sessionEvent: (id: string, activity: SessionEvent) => Effect.Effect<void>;
-    readonly notice: (level: NoticeLevel, text: string) => Effect.Effect<void>;
-    readonly runtime: (info: RuntimeInfo) => Effect.Effect<void>;
+    readonly sessionEvent: (id: string, activity: T.SessionEvent) => Effect.Effect<void>;
+    readonly notice: (level: T.NoticeLevel, text: string) => Effect.Effect<void>;
+    readonly runtime: (info: T.RuntimeInfo) => Effect.Effect<void>;
     readonly did: (d: OwnerDid) => Effect.Effect<void>;
     /** The state now, then the transitions from here on. */
-    readonly transitions: Effect.Effect<readonly [WorkspaceState, Stream.Stream<Transition>], never, Scope.Scope>;
+    readonly transitions: Effect.Effect<readonly [T.WorkspaceState, Stream.Stream<Transition>], never, Scope.Scope>;
     /** A snapshot of the state, then every side event. */
-    readonly events: Stream.Stream<SideEvent>;
+    readonly events: Stream.Stream<T.SideEvent>;
     /** Every side event from now on, subscribed before this returns: none applied after it is missed. */
-    readonly subscribe: Effect.Effect<Stream.Stream<SideEvent>, never, Scope.Scope>;
-    readonly facts: Stream.Stream<Fact>;
-    readonly live: Stream.Stream<LiveEvent>;
+    readonly subscribe: Effect.Effect<Stream.Stream<T.SideEvent>, never, Scope.Scope>;
+    readonly facts: Stream.Stream<T.Fact>;
+    readonly live: Stream.Stream<T.LiveEvent>;
     /** What the owner did from now on, subscribed before this returns: none said after it is missed. */
     readonly owner: Effect.Effect<Stream.Stream<OwnerDid>, never, Scope.Scope>;
     /** For the page, which folds no facts: the frame now, then one per burst of facts and effects. */
-    readonly states: Stream.Stream<StateFrame>;
+    readonly states: Stream.Stream<T.StateFrame>;
   }
 >()("vibevalley/Core") {
   static readonly layer = Layer.effect(
@@ -109,14 +95,14 @@ export class Core extends Context.Service<
 
 /** What state.json keeps: the chat, progress, crons and issues are the database's, the chat apps' their connectors'
  * (kept empty: they are filled from their homes). */
-const toKeep = ({ chat: _chat, progress: _progress, ...kept }: WorkspaceState): WorkspaceState => ({ ...kept, crons: [], issues: [], connectors: [] });
+const toKeep = ({ chat: _chat, progress: _progress, ...kept }: T.WorkspaceState): T.WorkspaceState => ({ ...kept, crons: [], issues: [], connectors: [] });
 
 /** Started again, nobody is on the call and the orchestrator is not mid-sentence. */
-const restarted = (kept: WorkspaceState): WorkspaceState => {
+const restarted = (kept: T.WorkspaceState): T.WorkspaceState => {
   return { ...toKeep(kept), orchestrators: {}, call: "idle", callReason: "" };
 };
 
-const liveOf = (e: SideEvent): LiveEvent | undefined => {
+const liveOf = (e: T.SideEvent): T.LiveEvent | undefined => {
   switch (e.type) {
     case "event":
       return { type: "event", at: e.at, id: e.id, activity: e.activity };
@@ -129,7 +115,7 @@ const liveOf = (e: SideEvent): LiveEvent | undefined => {
   }
 };
 
-const isFact = (e: SideEvent): e is Fact => {
+const isFact = (e: T.SideEvent): e is T.Fact => {
   switch (e.type) {
     case "snapshot":
     case "event":
@@ -137,7 +123,7 @@ const isFact = (e: SideEvent): e is Fact => {
     case "runtime":
       return false;
     default:
-      return (e satisfies Fact) !== undefined;
+      return (e satisfies T.Fact) !== undefined;
   }
 };
 
@@ -176,13 +162,13 @@ const make = Effect.gen(function* () {
     }).pipe(Effect.andThen(Effect.sync(() => disk.finish(body)))),
   );
 
-  const events = yield* scopedPubSub<SideEvent>();
+  const events = yield* scopedPubSub<T.SideEvent>();
   const transitions = yield* scopedPubSub<Transition>();
   const owner = yield* scopedPubSub<OwnerDid>();
   /** Each fact and effect, for the frames: a frame waits for the burst it starts. */
-  const changes = yield* scopedPubSub<GameEffect | undefined>();
+  const changes = yield* scopedPubSub<T.GameEffect | undefined>();
 
-  const publish = (e: SideEvent) => {
+  const publish = (e: T.SideEvent) => {
     PubSub.publishUnsafe(events, e);
     if (isFact(e)) PubSub.publishUnsafe(changes, undefined);
   };
@@ -192,7 +178,7 @@ const make = Effect.gen(function* () {
     yield* Effect.sync(() => {
       let next = state;
       const done: Transition[] = [];
-      const made: GameEffect[] = [];
+      const made: T.GameEffect[] = [];
       for (const fact of facts) {
         const f = { ...fact, at: clock.currentTimeMillisUnsafe() };
         const [after, changed] = reduce(next, f);
@@ -214,9 +200,9 @@ const make = Effect.gen(function* () {
     });
   });
 
-  const side = (e: SideEvent) => Effect.sync(() => publish(e));
+  const side = (e: T.SideEvent) => Effect.sync(() => publish(e));
 
-  const states = Stream.callback<StateFrame>((queue) =>
+  const states = Stream.callback<T.StateFrame>((queue) =>
     Effect.gen(function* () {
       const sub = yield* PubSub.subscribe(changes);
       Queue.offerUnsafe(queue, frameOf(state));
@@ -225,7 +211,7 @@ const make = Effect.gen(function* () {
           const first = yield* PubSub.take(sub);
           yield* Effect.sleep(stateEveryMs);
           const rest = yield* PubSub.takeUpTo(sub, Number.MAX_SAFE_INTEGER);
-          const gathered = [first, ...rest].filter((e): e is GameEffect => e !== undefined);
+          const gathered = [first, ...rest].filter((e): e is T.GameEffect => e !== undefined);
           Queue.offerUnsafe(queue, frameOf(state, gathered));
         }),
       );
@@ -265,14 +251,14 @@ const make = Effect.gen(function* () {
     events: Stream.unwrap(
       Effect.gen(function* () {
         const sub = yield* PubSub.subscribe(events);
-        return Stream.concat(Stream.succeed<SideEvent>({ type: "snapshot", at: yield* Clock.currentTimeMillis, state }), Stream.fromSubscription(sub));
+        return Stream.concat(Stream.succeed<T.SideEvent>({ type: "snapshot", at: yield* Clock.currentTimeMillis, state }), Stream.fromSubscription(sub));
       }),
     ),
     subscribe: Effect.map(PubSub.subscribe(events), Stream.fromSubscription),
     facts: Stream.fromPubSub(events).pipe(Stream.filter(isFact)),
     live: Stream.fromPubSub(events).pipe(
       Stream.map(liveOf),
-      Stream.filter((e): e is LiveEvent => e !== undefined),
+      Stream.filter((e): e is T.LiveEvent => e !== undefined),
     ),
     owner: Effect.map(PubSub.subscribe(owner), Stream.fromSubscription),
     states,

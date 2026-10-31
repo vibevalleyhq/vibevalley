@@ -42,8 +42,8 @@ import {
 } from "./places";
 import { phaseDot, phaseText } from "./presence";
 import { switcher } from "./QuickSwitcher";
-import { Jobs, Crons } from "./Tabs";
-import { jobThreadOf, threadOwnerOf, threadTitle } from "./threads";
+import { Crons, Sessions } from "./Tabs";
+import { sessionThreadOf, threadOwnerOf, threadTitle } from "./threads";
 import { unreadIn, unreadUnder } from "./unread";
 
 const head = "flex h-[66px] shrink-0 items-center border-b border-line";
@@ -114,11 +114,11 @@ function Chat() {
   );
 }
 
-type Tab = "chat" | "jobs" | "crons";
+type Tab = "chat" | "issues" | "crons";
 
 const tabs: { tab: Tab; icon: IconName; label: string }[] = [
   { tab: "chat", icon: "chat", label: t("web.channel.tab.chat") },
-  { tab: "jobs", icon: "issues", label: t("web.channel.tab.jobs") },
+  { tab: "issues", icon: "issues", label: t("web.channel.tab.issues") },
   { tab: "crons", icon: "clock", label: t("web.channel.tab.crons") },
 ];
 
@@ -265,8 +265,8 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
       <Show when={props.channel}>
         {(c) => (
           <>
-            <Show when={tab() === "jobs"}>
-              <Jobs channel={c()} />
+            <Show when={tab() === "issues"}>
+              <Sessions channel={c()} />
             </Show>
             <Show when={tab() === "crons"}>
               <Crons channel={c()} />
@@ -400,7 +400,7 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           <Show when={sessions().length === 0}>
             <p class="px-3 text-xs text-muted">{t("web.channel.noHelpers")}</p>
           </Show>
-          <For each={sessions()}>{(h) => <SessionRow h={h} active={!!props.thread && jobThreadOf(chat(), h)?.id === props.thread.id} onShow={go} />}</For>
+          <For each={sessions()}>{(h) => <SessionRow h={h} active={!!props.thread && sessionThreadOf(chat(), h)?.id === props.thread.id} onShow={go} />}</For>
         </Section>
         <Show when={archived().length > 0}>
           <Section title={t("web.channel.manage.archivedTitle")} item="archived" count={archived().length} closed>
@@ -545,7 +545,7 @@ function ChannelRow(props: {
 function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channel) => void }) {
   const core = useCore();
   const now = useNow();
-  const thread = () => jobThreadOf(core()?.chat, props.h);
+  const thread = () => sessionThreadOf(core()?.chat, props.h);
   const unread = () => {
     const current = thread();
     return current ? unreadIn(current) : 0;

@@ -1,6 +1,6 @@
 // A whole farm for the flow tests, which go through several services at once (an issue refined, sent, completed; a
 // memory kept by one session and recalled by the next). No binary, login or model: the helpers are oar's scripted
-// runtime over real git repositories in temporary folders, doing what the words of their job say (testing/helper.ts).
+// runtime over real git repositories in temporary folders, doing what the words of their brief say (testing/helper.ts).
 
 import { execFileSync } from "node:child_process";
 
@@ -8,11 +8,11 @@ import { type Runtime } from "@botiverse/oar";
 import type { ScriptedTurn } from "@botiverse/oar/testing";
 import { Effect, Stream } from "effect";
 
-import type { Agent, Fact, FactReport, Session } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
 import type { ServerConfig } from "@/base/config.ts";
 import { Core } from "@/core/core.ts";
-import { agentSessionsStart, gamification, notificationsStart, taskGraphsStart } from "@/services.ts";
+import { agentSessionsStart, gamification, inboxStart, taskGraphsStart } from "@/services.ts";
 import { type Hired } from "@/session/session.ts";
 import { helper } from "@/testing/helper.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
@@ -20,9 +20,9 @@ import { until as untilHeld, waitFor } from "@/testing/until.ts";
 import { world, type WorldOptions } from "@/testing/world.ts";
 
 /** The seed profile on pi, with no effort: the scripted runtime has no models, so no effort levels. */
-export const lab = (): Agent => ({ ...starter("lab"), effort: "" });
+export const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 
-const farmLayer = (options: WorldOptions) => world(options).pipe(gamification, agentSessionsStart, taskGraphsStart, notificationsStart);
+const farmLayer = (options: WorldOptions) => world(options).pipe(gamification, agentSessionsStart, taskGraphsStart, inboxStart);
 
 export interface Farm {
   readonly config: ServerConfig["Service"];
@@ -52,7 +52,7 @@ export function farm(
 /** Every fact and notice from now on, kept as they come. */
 export const watch = Effect.gen(function* () {
   const core = yield* Core;
-  const facts: Fact[] = [];
+  const facts: T.Fact[] = [];
   const notes: string[] = [];
   const events = yield* core.subscribe;
   yield* Effect.forkScoped(
@@ -66,9 +66,9 @@ export const watch = Effect.gen(function* () {
   let taken = 0;
   /** The next report not cut off by a stop, in order. */
   const nextReport = until(
-    () => facts.filter((f): f is FactReport => f.type === "report" && f.outcome !== "interrupted").length > taken,
+    () => facts.filter((f): f is T.FactReport => f.type === "report" && f.outcome !== "interrupted").length > taken,
     "the next report",
-  ).pipe(Effect.map(() => facts.filter((f): f is FactReport => f.type === "report" && f.outcome !== "interrupted")[taken++]!));
+  ).pipe(Effect.map(() => facts.filter((f): f is T.FactReport => f.type === "report" && f.outcome !== "interrupted")[taken++]!));
   return { facts, notes, nextReport };
 });
 
@@ -87,7 +87,7 @@ export const await_ = <A, E>(get: () => Effect.Effect<A, E> | A, ok: (a: A) => b
     10_000,
   );
 
-export const mustHire = (h: Hired): Session => {
+export const mustHire = (h: Hired): T.Session => {
   if (!h.session) throw new Error("refused: " + h.refused);
   return h.session;
 };

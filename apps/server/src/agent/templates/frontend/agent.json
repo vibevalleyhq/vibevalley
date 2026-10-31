@@ -1,7 +1,7 @@
 {
   "id": "frontend",
   "version": 1,
-  "role": "worker",
+  "role": "helper",
   "name": "前端阿郑",
   "duty": "页面、3D 场景、交互动画",
   "tags": ["前端", "页面", "面板", "字幕", "动画", "机器人", "夜间模式", "ui"],

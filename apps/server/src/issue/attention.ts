@@ -1,15 +1,15 @@
-import type { ActWords, WorkspaceState, Issue, IssueAct, IssueAction, IssueAttention, IssueStatus, Session } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
 import { sessionOf } from "@/session/roster.ts";
-const move = (act: IssueAct, status: IssueStatus, words: ActWords = "none"): IssueAction => ({ act, does: "move", status, words });
-const say = (act: IssueAct): IssueAction => ({ act, does: "say" });
-const stop: IssueAction = { act: "stop", does: "stop" };
+const move = (act: T.IssueAct, status: T.IssueStatus, words: T.ActWords = "none"): T.IssueAction => ({ act, does: "move", status, words });
+const say = (act: T.IssueAct): T.IssueAction => ({ act, does: "say" });
+const stop: T.IssueAction = { act: "stop", does: "stop" };
 const close = move("close", "canceled");
 
 /** session is the issue's newest one, undefined while none is on the farm. A task graph's issues stand with the graph: the owner acts on them there. */
-export function attentionOf(t: Issue, session: Session | undefined): IssueAttention {
+export function attentionOf(t: T.Issue, session: T.Session | undefined): T.IssueAttention {
   const followed = t.graph !== undefined || t.task !== undefined || t.parent !== undefined || session?.graph !== undefined;
-  const own = (s: IssueAttention): IssueAttention => (followed ? { state: s.state, ...at(s.since), ...(s.stuck ? { stuck: s.stuck } : {}), acts: [] } : s);
+  const own = (s: T.IssueAttention): T.IssueAttention => (followed ? { state: s.state, ...at(s.since), ...(s.stuck ? { stuck: s.stuck } : {}), acts: [] } : s);
   const last = session?.lastRun;
   // A profile's talk asks nothing of the owner: its words are in its channel, and it has no buttons.
   if (t.talk) return { state: session?.phase._tag === "working" ? "working" : "done", acts: [] };
@@ -70,7 +70,7 @@ export function attentionOf(t: Issue, session: Session | undefined): IssueAttent
       if (last?.outcome === "interrupted")
         return { state: "stuck", stuck: "interrupted", ...at(since), lead: "resume", acts: [move("resume", "todo"), finish, say("tell"), close] };
       // Completing is the acceptance. Sending it back takes the findings, unless the orchestrator already passed it.
-      const reject: IssueAction[] = t.reviewedAt === undefined ? [move("reject", "todo", "required")] : [];
+      const reject: T.IssueAction[] = t.reviewedAt === undefined ? [move("reject", "todo", "required")] : [];
       return { state: "reviewing", ...at(since), lead: finish.act, acts: [finish, ...reject, say("tell"), close] };
     }
   }
@@ -78,7 +78,7 @@ export function attentionOf(t: Issue, session: Session | undefined): IssueAttent
 
 const at = (since: number | undefined) => (since !== undefined ? { since } : {});
 
-export function attentionIn(t: Issue, state: WorkspaceState): IssueAttention {
+export function attentionIn(t: T.Issue, state: T.WorkspaceState): T.IssueAttention {
   const last = t.sessions.at(-1);
   return attentionOf(t, last === undefined ? undefined : sessionOf(state, last));
 }

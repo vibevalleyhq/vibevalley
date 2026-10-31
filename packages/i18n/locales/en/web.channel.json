@@ -1,7 +1,7 @@
 {
   "tab": {
     "chat": "Chat",
-    "jobs": "Jobs",
+    "issues": "Tickets",
     "crons": "Scheduled tasks"
   },
   "defaultProject": "default project {project}",
@@ -12,7 +12,7 @@
   "findMessages": "Find messages",
   "settings": "Channel settings",
   "inChannel": "In the channel",
-  "empty": "Nobody has spoken in {label}: tell the orchestrator something to do.",
+  "empty": "Nobody has spoken in {label}: tell the manager something to do.",
   "sendTo": "Message {label}",
   "side": "Channels and helpers",
   "channelsTitle": "Channels",
@@ -48,12 +48,12 @@
     "settingsOf": "Settings of # {name}",
     "save": "Save"
   },
-  "jobs": {
-    "empty": "No jobs in this channel yet. Tell the manager something to do in the chat; it sends a helper, and the job is listed here.",
+  "issues": {
+    "empty": "No tickets in this channel yet. Tell the manager something to do in the chat; it sends a helper, and the ticket is listed here.",
     "thread": "Ticket thread"
   },
   "crons": {
-    "empty": "No scheduled tasks: tell the orchestrator \"run the tests every day at nine\".",
+    "empty": "No scheduled tasks: tell the manager \"run the tests every day at nine\".",
     "next": "next {next}",
     "direct": "straight to {agent}",
     "byOrchestrator": "set by the manager",
@@ -183,8 +183,8 @@
     "keys": "{mac, select, true {⌘K} other {Ctrl K}}"
   },
   "farmSearch": {
-    "open": "Search the farm",
-    "title": "Search the farm",
+    "open": "Search everything",
+    "title": "Search everything",
     "hint": "Find messages…",
     "filters": "from:owner  in:#channel  has:file / image / link  before: / after:2026-10-01",
     "none": "Nothing found",

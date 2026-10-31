@@ -19,14 +19,14 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 
 | 约定 | 写法 | 家 |
 |---|---|---|
-| 服务 | `class Issues extends Context.Service<Issues, { … }>()("vibevalley/Issue") { static readonly layer = … }`，`make` 里 `yield*` 用到的服务，用 `Issues.of({ … })` 拼出来；要类型写 `Issues["Service"]` | [AGENTS.md](AGENTS.md#规矩)「服务端的服务」 |
+| 服务 | `class Issue extends Context.Service<Issue, { … }>()("vibevalley/Issue") { static readonly layer = … }`，`make` 里 `yield*` 用到的服务，用 `Issue.of({ … })` 拼出来；要类型写 `Issue["Service"]` | [AGENTS.md](AGENTS.md#规矩)「服务端的服务」 |
 | layer 的次序 | `apps/server/src/services.ts` 按次序叠，模块只用排在它前面的；开机要做的放在最后的 `start`、`ready` | [architecture.md](docs/architecture.md) |
 | 库 | 经 `Db` 服务（`run`、`attempt`、`one`、`inTx`、`attemptTx`），模块不自己 `provideService(SqlClient)`、`withTransaction`（lint `vibevalley/db-door`）；SQL 只写在 `db/queries/<表>.sql` | [地基](docs/subsystems/foundation.md) |
 | 文件、进程、外面的 HTTP | `FileSystem`、`ChildProcessSpawner`、`HttpClient`；不用 `node:fs/promises`、`fetch`（effect:check 的 `globalFetchInEffect`；测试像浏览器一样打服务端的，在那一行关掉并说为什么） | [地基](docs/subsystems/foundation.md) |
 | 时间 | `Clock`、`Effect.sleep`、`TestClock`；类里用它拿到的 `Time`（`apps/server/src/base/time.ts`）；lint `vibevalley/no-wall-clock` | [地基](docs/subsystems/foundation.md) |
 | Promise | 只在外面的库的一次调用上：`Effect.tryPromise({ try: (signal) => lib.call(…, { signal }), catch: (e) => new XError({ cause: e }) })`。不写 `catch` 的形式失败时只剩 `UnknownError`，原因丢了；lint `vibevalley/promise-boundary`、`vibevalley/try-promise-catch` | [地基](docs/subsystems/foundation.md) |
 | 错误 | 预期的错误是 `Schema.TaggedError`（字段写成 Schema，包住外面的失败时原样放进 `cause: Schema.Defect()`；`preferSchemaTaggedError`、`extendsNativeError`），按 `catchTag`、`catchTags` 接，分错误的函数收它的调用方传的联合、用 `Predicate.isTagged`，不用 `instanceof` 分（lint `vibevalley/no-instanceof-tagged`）；错误通道里不写 `unknown`：写出调用方传的联合或用泛型带过去，外面的库交来的失败在边界上包成带标签的错误、原样放进 `cause`（effect:check 的 `anyUnknownInErrorContext`）；抛错写 `return yield*`；`Effect.orDie`、不带 `{ log }` 的 `Effect.ignore`、空的 `catch` 在逃生口的棘轮上（`vp run health:verify`），要丢弃一个失败就 `Effect.ignore({ log: "Warn" })`；「出错了记一笔、接着做」（缺陷也记，打断照样往上走）用 `base/log.ts` 的 `bestEffort(what)` | [地基](docs/subsystems/foundation.md)、`packages/health/README.md` |
-| 命名和追踪 | 服务的方法用 `Effect.fn("Issues.create")`（服务的类名加成员名），热路径和薄的取值用 `Effect.fnUntraced`；要加的锁、接错误这类组合子作为 `Effect.fn` 后面的参数，不 `.pipe` 它；不写只 `return Effect.gen(…)` 的函数；lint `vibevalley/service-method-names` | 官方指南「Writing Effect code」 |
+| 命名和追踪 | 服务的方法用 `Effect.fn("Issue.create")`（服务的类名加成员名），热路径和薄的取值用 `Effect.fnUntraced`；要加的锁、接错误这类组合子作为 `Effect.fn` 后面的参数，不 `.pipe` 它；不写只 `return Effect.gen(…)` 的函数；lint `vibevalley/service-method-names` | 官方指南「Writing Effect code」 |
 | 并发 | `Effect.all`、`forEach` 默认一个接一个；要并发写明 `{ concurrency: n }`，用户给的数量不用 `"unbounded"` | 官方指南 |
 | 不信任的数据 | `Schema` 解码（Effect 里用 `decodeUnknownEffect`），不手写类型守卫、不 `as`；对象的判断用 `Predicate.isObject`、`Predicate.hasProperty`（lint `vibevalley/no-object-guard`）；模型回的话里最后一个 JSON 块用 `base/json.ts` 的 `lastJsonBlock(text, schema, words)` | 官方指南「Defining schemas」 |
 | 测试 | 服务端 `@effect/vitest` 的 `it.effect`；有时间窗口的拨 `TestClock`；等后台的事用 `until`、`waitFor`（`waitFor` 直接收一个 Effect），不睡固定时间 | [地基](docs/subsystems/foundation.md)的测试金字塔 |

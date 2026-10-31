@@ -2,9 +2,9 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 
-import type { Memory, MemorySourceUpdate } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { owner as ownerActor } from "@/base/actor.ts";
 import { ServerConfig } from "@/base/config.ts";
 import { Database, Db } from "@/base/db.ts";
@@ -13,14 +13,14 @@ import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { whenTrue } from "@/testing/until.ts";
 
-import { type BuildSource, type FinishedRun, foundText, type Found, Memories, make, type Note, type RecallCue, type SearchQuery } from "./memory.ts";
+import { type BuildSource, type FinishedRun, foundText, type Found, Memory, make, type Note, type RecallCue, type SearchQuery } from "./memory.ts";
 import { localName, recallChars, recallCount, searchLimit } from "./recall.ts";
 import { mergeRecalled, type RecalledLine, type Source, sourceError } from "./sources.ts";
 
 class Fake {
   available = true;
   lines: RecalledLine[] = [];
-  listed: Memory[] = [];
+  listed: T.Memory[] = [];
   found: Found[] = [];
   slow = false;
   failSync = false;
@@ -54,9 +54,9 @@ class Fake {
     return this.slow ? this.hang(signal) : { found: [...this.found] };
   };
   list = async (_: string, __: AbortSignal) => this.listed;
-  add = async (n: Note): Promise<Memory | undefined> => {
+  add = async (n: Note): Promise<T.Memory | undefined> => {
     this.added.push(n);
-    return { id: "n1" } as Memory;
+    return { id: "n1" } as T.Memory;
   };
   forget = async (_: string, id: string, __: AbortSignal) => {
     this.forgot.push(id);
@@ -81,8 +81,8 @@ const sourceOf = (f: Fake): Source => ({
 });
 
 const world = (build: BuildSource = () => undefined, timeoutMs = 50) =>
-  Layer.effect(Memories, make(build, timeoutMs)).pipe(
-    Layer.provideMerge(Agents.layer),
+  Layer.effect(Memory, make(build, timeoutMs)).pipe(
+    Layer.provideMerge(Agent.layer),
     Layer.provideMerge(Setting.layer),
     Layer.provideMerge(Db.layer),
     Layer.provideMerge(Database),
@@ -90,15 +90,15 @@ const world = (build: BuildSource = () => undefined, timeoutMs = 50) =>
     Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())),
   );
 
-const nowledgeOn: MemorySourceUpdate = { kind: "nowledge", url: "http://up/", enabled: true, read: true, write: true };
+const nowledgeOn: T.MemorySourceUpdate = { kind: "nowledge", url: "http://up/", enabled: true, read: true, write: true };
 
-const save = (s: MemorySourceUpdate) => Effect.flatMap(Setting, (setting) => setting.save({ memorySources: [s] }));
+const save = (s: T.MemorySourceUpdate) => Effect.flatMap(Setting, (setting) => setting.save({ memorySources: [s] }));
 
-/** Memories with the fake as its one source outside the farm. */
-const withFake = <A, E>(fake: Fake, body: (m: Memories["Service"]) => Effect.Effect<A, E>) =>
+/** The Memory service with the fake as its one source outside the farm. */
+const withFake = <A, E>(fake: Fake, body: (m: Memory["Service"]) => Effect.Effect<A, E>) =>
   Effect.gen(function* () {
     yield* save(nowledgeOn).pipe(Effect.orDie);
-    return yield* body(yield* Memories);
+    return yield* body(yield* Memory);
   }).pipe(Effect.provide(world(() => sourceOf(fake))));
 
 const owner = (agent: string, text: string, project = ""): Note => ({ agent, text, project, by: ownerActor });
@@ -108,7 +108,7 @@ const until = (ok: () => boolean) => whenTrue(ok, "it");
 describe("memory sources", () => {
   it.live("one source recalls as the preview shows", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.write(owner("lab", "这个项目测试用 pnpm test", "demo"));
       const preview = yield* m.recallOf("lab", "demo", "跑测试");
       const got = yield* m.recall({ agent: "lab", project: "demo", text: "跑测试" });
@@ -134,7 +134,7 @@ describe("memory sources", () => {
   it.live("another source's ids carry its name", () => {
     const fake = new Fake("nowledge");
     fake.lines = [{ id: "m9", line: "主人要中文的提交信息", score: 100 }];
-    fake.listed = [{ id: "m9", agent: "lab", kind: "note", text: "主人要中文的提交信息" } as Memory];
+    fake.listed = [{ id: "m9", agent: "lab", kind: "note", text: "主人要中文的提交信息" } as T.Memory];
     return withFake(fake, (m) =>
       Effect.gen(function* () {
         const local = yield* m.write(owner("lab", "这个项目测试用 pnpm test", "demo"));
@@ -160,7 +160,7 @@ describe("memory sources", () => {
           agent: "lab",
           session: "w1",
           project: "demo",
-          job: "修登录页",
+          brief: "修登录页",
           said: "改好了。\n记住：登录态统一走 refreshSession()",
           summary: "改好了",
           outcome: "completed",
@@ -185,7 +185,7 @@ describe("memory sources", () => {
       return sourceOf(fake);
     };
     return Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* save({ ...nowledgeOn, url: "http://down/" });
       let sources = m.sources();
       expect([sources.length, sources[0]!.name, sources[0]!.on, sources[1]!.on, sources[1]!.off]).toEqual([2, localName, true, false, "no address"]);
@@ -218,7 +218,7 @@ describe("memory sources", () => {
     };
     return Effect.gen(function* () {
       yield* save(nowledgeOn);
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.write(owner("lab", "first"));
       yield* Effect.promise(() => until(() => events.includes("old:first")));
       yield* m.write(owner("lab", "second"));
@@ -258,7 +258,7 @@ describe("memory sources", () => {
       return Effect.gen(function* () {
         const runPromise = Effect.runPromiseWith(yield* Effect.context());
         yield* save(nowledgeOn);
-        const m = yield* Memories;
+        const m = yield* Memory;
         const pending = runPromise(
           Effect.result(
             operation === "prefetch"
@@ -333,7 +333,7 @@ describe("memory sources", () => {
 
   it.live("search finds the agent's own best first", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       for (const [agent, text, project] of [
         ["lab", "这个项目测试用 pnpm test", "demo"],
         ["lab", "迁移文件放 db/migrations", "demo"],

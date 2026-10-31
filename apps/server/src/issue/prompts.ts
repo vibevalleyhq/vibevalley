@@ -1,8 +1,8 @@
+import type * as T from "@vibevalley/protocol";
+
 // What the issues say to models: the rules a helper's brief ends with (the criteria, an answer issue's, a draft's), and
 // the refusal the orchestrator gets for changing an issue the owner did not ask for. In Chinese whatever the owner's
 // locale: the helper answers in the owner's.
-
-import type { Issue, Question } from "@vibevalley/protocol";
 /** Changing an issue or moving it is the owner's call: the orchestrator asks for what it saw itself. */
 export const needsOwner = "改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
 
@@ -31,7 +31,7 @@ export const answerFormat = [
 ].join("\n");
 
 /** What a session sent to talk for a helper profile is told: the talk so far, the owner's newest words last. */
-export const talkJob = (name: string, said: string) =>
+export const talkBrief = (name: string, said: string) =>
   `主人在和你（档案「${name}」）私聊。像聊天一样回答主人，一两段就够；说到代码就带上文件和行号。这一轮你只读：读代码、跑只读的命令，不改文件、不提交；干活的规矩里提交、写 commit 号的那两条不用照做，你改了什么交回来以后都会被清掉。主人要你改代码，就建议他把这件事记成一张工单。\n\n私聊里最近说的（最后一条是主人刚说的）：\n` +
   said;
 
@@ -40,7 +40,7 @@ export const refinementOpening =
 
 /** The draft so far goes in when there is one: the owner may have edited it. */
 export function refinementBrief(
-  t: Pick<Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly Question[] },
+  t: Pick<T.Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly T.Question[] },
   word: string,
   project: string,
 ): string {

@@ -8,7 +8,8 @@ import { join } from "node:path";
 import { Schema } from "effect";
 
 import { t, currentLocale } from "@vibevalley/i18n";
-import { type Agent, type AgentTemplate, type AgentTemplateSource, AgentRoleValues, orchestratorRuntime, OrchestratorLookValues } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { AgentRoleValues, orchestratorRuntime, OrchestratorLookValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { messageOf } from "@/errors.ts";
@@ -72,7 +73,7 @@ const readText = (dir: string, file: string) => (existsSync(join(dir, file)) ? r
 
 /** A template folder read in the farm's language (English falls back to the Chinese file by file); it throws a
  * TemplateProblem when it is not one. installed is filled in by who lists it. */
-export function readTemplate(dir: string, source: AgentTemplateSource): AgentTemplate {
+export function readTemplate(dir: string, source: T.AgentTemplateSource): T.AgentTemplate {
   const item = readJson(TemplateFile, dir, "agent.json");
   if (!item) throw new TemplateProblem({ message: t("server.agent.template.noFile", { file: join(dir, "agent.json") }) });
   if (!idPattern.test(item.id)) throw new TemplateProblem({ message: t("server.agent.template.badId", { file: join(dir, "agent.json"), id: item.id }) });
@@ -80,7 +81,7 @@ export function readTemplate(dir: string, source: AgentTemplateSource): AgentTem
   // An orchestrator always runs on VibeValley's own agent: its template names no other runtime.
   if (item.role === "orchestrator" && item.runtime !== undefined && item.runtime !== orchestratorRuntime)
     throw new TemplateProblem({ message: t("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime }) });
-  if (item.role === "worker" && !item.runtime) throw new TemplateProblem({ message: t("server.agent.template.noRuntime", { file: join(dir, "agent.json") }) });
+  if (item.role === "helper" && !item.runtime) throw new TemplateProblem({ message: t("server.agent.template.noRuntime", { file: join(dir, "agent.json") }) });
   const en = currentLocale() === "en";
   const words = en ? readJson(WordsFile, dir, "agent.en.json") : undefined;
   const persona = (en ? readText(dir, "persona.en.md") : undefined) ?? readText(dir, "persona.md") ?? "";
@@ -96,7 +97,7 @@ export function readTemplate(dir: string, source: AgentTemplateSource): AgentTem
     model: item.model ?? "",
     effort: item.effort ?? "",
     personaMode: item.personaMode ?? "append",
-    worktree: item.worktree ?? item.role === "worker",
+    worktree: item.worktree ?? item.role === "helper",
     look: {
       ...look,
       build: look.build ?? "biped",
@@ -118,13 +119,13 @@ export const builtInIds = (): string[] => [
 ];
 
 /** Every built-in template; one that does not read is a broken build (templates.test.ts keeps them readable). */
-export const builtInTemplates = (): AgentTemplate[] => builtInIds().map((id) => readTemplate(join(builtInDir, id), "builtIn"));
+export const builtInTemplates = (): T.AgentTemplate[] => builtInIds().map((id) => readTemplate(join(builtInDir, id), "builtIn"));
 
 /** The templates added on this machine, by id; a folder that no longer reads (edited by hand) is left out and said why. */
-export function addedTemplates(home: string): { readonly templates: AgentTemplate[]; readonly problems: string[] } {
+export function addedTemplates(home: string): { readonly templates: T.AgentTemplate[]; readonly problems: string[] } {
   const root = addedDir(home);
   if (!existsSync(root)) return { templates: [], problems: [] };
-  const templates: AgentTemplate[] = [];
+  const templates: T.AgentTemplate[] = [];
   const problems: string[] = [];
   for (const name of readdirSync(root).toSorted()) {
     try {
@@ -146,7 +147,7 @@ export function copyTemplate(from: string, home: string, id: string) {
 export const removeTemplate = (home: string, id: string) => rmSync(join(addedDir(home), id), { recursive: true, force: true });
 
 /** A new profile from a template, under the id and name given (both free among the profiles). */
-export const profileOf = (item: AgentTemplate, id: string, name: string): Agent => ({
+export const profileOf = (item: T.AgentTemplate, id: string, name: string): T.Agent => ({
   id,
   name,
   role: item.role,
@@ -170,7 +171,7 @@ export const profileOf = (item: AgentTemplate, id: string, name: string): Agent 
 
 /** A profile made again from its template's version now: what the template says of the work (duty, tags, persona and
  * how it is given) is replaced; its name, look, machine and model, and what is this machine's, stay. */
-export const updatedFrom = (item: AgentTemplate, a: Agent): Agent => ({
+export const updatedFrom = (item: T.AgentTemplate, a: T.Agent): T.Agent => ({
   ...a,
   duty: item.duty,
   tags: [...item.tags],

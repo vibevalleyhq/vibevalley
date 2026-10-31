@@ -7,31 +7,31 @@ import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
 import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { modelClient, noDeepSeekKey } from "@/agent/model.ts";
 import { traitsOf } from "@/agent/prompts.ts";
-import { runtimeLabel } from "@/agent/seed.ts";
 import { orchestrator } from "@/base/actor.ts";
 import { agentHome, projectsDir, ServerConfig } from "@/base/config.ts";
 import { localeMinute } from "@/base/time.ts";
-import { Channels, type OrchestratorNews, type SayMore } from "@/channel/chat.ts";
+import { Channel, type OrchestratorNews, type SayMore } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { Crons } from "@/cron/cron.ts";
+import { Cron } from "@/cron/cron.ts";
 import { nextRun } from "@/cron/when.ts";
 import type { ApiError } from "@/errors.ts";
-import { Issues, type OrchestratorWork } from "@/issue/issue.ts";
-import { Notices, type Overdue } from "@/notice/notice.ts";
-import { Projects } from "@/project/project.ts";
+import { Inbox, type Overdue } from "@/inbox/inbox.ts";
+import { Issue, type OrchestratorWork } from "@/issue/issue.ts";
+import { Project } from "@/project/project.ts";
 import { ownersLanguage } from "@/prompts.ts";
-import { Runtimes } from "@/runtime/runtime.ts";
+import { runtimeLabel } from "@/runtime/presets.ts";
+import { Runtime } from "@/runtime/runtime.ts";
 import { type AgentHost, Caller, type NotAnswered } from "@/session/host.ts";
-import { Sessions } from "@/session/session.ts";
+import { Session } from "@/session/session.ts";
 import { Setting } from "@/setting/setting.ts";
 import { isOpen } from "@/task/graph.ts";
 import { graphText } from "@/task/prompts.ts";
-import { Tasks } from "@/task/task.ts";
+import { Task } from "@/task/task.ts";
 import { channelLine } from "@/tool/prompts.ts";
-import { Tools } from "@/tool/tool.ts";
+import { Tool } from "@/tool/tool.ts";
 
 import { intake, type Source } from "./intake.ts";
 import { deepseekModel, orchestratorModel } from "./model.ts";
@@ -112,17 +112,17 @@ const make = (options: OrchestratorOptions = {}) =>
     const clock = yield* Clock.Clock;
     const config = yield* ServerConfig;
     const core = yield* Core;
-    const store = yield* Agents;
+    const store = yield* Agent;
     const settings = yield* Setting;
-    const runtimes = yield* Runtimes;
-    const projects = yield* Projects;
-    const run = yield* Sessions;
-    const issue = yield* Issues;
-    const chat = yield* Channels;
-    const tasks = yield* Tasks;
-    const cron = yield* Crons;
-    const tool = yield* Tools;
-    const notices = yield* Notices;
+    const runtimes = yield* Runtime;
+    const projects = yield* Project;
+    const run = yield* Session;
+    const issue = yield* Issue;
+    const chat = yield* Channel;
+    const tasks = yield* Task;
+    const cron = yield* Cron;
+    const tool = yield* Tool;
+    const inbox = yield* Inbox;
 
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const service = yield* Llm;
@@ -401,7 +401,7 @@ const make = (options: OrchestratorOptions = {}) =>
       yield* Effect.forkScoped(Stream.runForEach(yield* chat.forOrchestrator, (n) => logged("a line", heardInChat(n))));
       yield* Effect.forkScoped(Stream.runForEach(yield* issue.forOrchestrator, (w) => logged("an issue", onWork(w))));
       yield* Effect.forkScoped(
-        Stream.runForEach(yield* notices.overdue, (o: Overdue) =>
+        Stream.runForEach(yield* inbox.overdue, (o: Overdue) =>
           logged(
             "the patrol",
             Effect.flatMap(chat.topOf(o.channel), (c) =>

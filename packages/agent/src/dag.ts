@@ -1,4 +1,4 @@
-// The graph both a task's steps and an agent's own tasks are: nodes that wait for
+// The graph both a task graph's tasks and an agent's own todos are: nodes that wait for
 // other nodes. What a node is, and what settles it, is the caller's; these say only what the edges allow.
 
 export interface DagNode {

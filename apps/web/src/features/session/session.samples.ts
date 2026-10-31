@@ -21,7 +21,10 @@ const tool = (s: number, took: number, action: ToolAction, tool: string, input: 
   return output === undefined ? [call] : [call, ev(s + took, "tool/result", "", { call: call.seq, output, ok })];
 };
 
-export const finishedRound: SessionEvent[] = [
+/** The server stamps every step between a run's bounds with the run's id. */
+const inRun = (run: string, log: SessionEvent[]): SessionEvent[] => log.map((e) => ({ ...e, run }));
+
+export const finishedRun: SessionEvent[] = inRun("run-1", [
   ev(0, "run/start", ""),
   ev(0, "user/message", "修好登录过期：过期就回到登录页，说清楚为什么。"),
   ev(1, "memory/recalled", "这个项目的测试用 vp test；会话的有效期在 session.ts。"),
@@ -43,20 +46,32 @@ export const finishedRound: SessionEvent[] = [
   ev(64, "llm/usage", "", { tokens: { input: 18_400, cacheRead: 12_100, output: 2_300 } }),
   ev(66, "assistant/message", "改好了：过期回到登录页，登录页说「登录过期了」。加了两条测试，都过了。"),
   ev(66, "run/end", ""),
-];
+]);
 
-export const liveRound: SessionEvent[] = [
+export const liveRun: SessionEvent[] = inRun("run-2", [
   ev(300, "run/start", ""),
   ev(300, "user/message", "再补一条跨过期限的测试。"),
   ev(302, "assistant/thinking", "在过期前一秒和后一秒各测一次。"),
   ...tool(306, 0, "run_command", "bash", "vp test run src/base/session.test.ts", undefined),
-];
+]);
 
-export const failedRound: SessionEvent[] = [
+export const failedRun: SessionEvent[] = inRun("run-3", [
   ev(500, "run/start", ""),
   ev(500, "user/message", "跑一遍全部测试。"),
   ...tool(502, 3, "run_command", "bash", "vp run web:check", "error: DEEPSEEK_API_KEY is not set", false),
   ev(506, "run/error", "这一轮没跑完：模型的钥匙没设（设置 › 模型）"),
-];
+]);
+
+/** A word carried to it while the run went on: still the same run. */
+export const toldTwiceRun: SessionEvent[] = inRun("run-4", [
+  ev(700, "run/start", ""),
+  ev(700, "user/message", "把登录页的提示改得短一点。"),
+  ev(702, "assistant/thinking", "提示在 LoginPage.tsx。"),
+  ...tool(704, 1, "edit_file", "edit", "apps/web/src/LoginPage.tsx", "+1 −1"),
+  ev(707, "user/message", "顺便把按钮的字也改成「重新登录」。"),
+  ...tool(709, 1, "edit_file", "edit", "apps/web/src/LoginPage.tsx", "+1 −1"),
+  ev(712, "assistant/message", "两处都改了：提示短了，按钮写「重新登录」。"),
+  ev(712, "run/end", ""),
+]);
 
 export const nowAfter = (log: readonly SessionEvent[]) => (log.at(-1)?.time ?? start) + 20_000;

@@ -2,7 +2,8 @@
 // reloads it with the model when a transaction fails.
 
 import { t } from "@vibevalley/i18n";
-import { type Channel, everyone, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { everyone, ownerId } from "@vibevalley/protocol";
 
 const agentLike = (kind: string) => kind === "session" || kind === "orchestrator";
 
@@ -78,10 +79,10 @@ export interface Delivery {
 
 export interface AudienceInput {
   readonly from: string;
-  readonly fromKind: ActorKind;
-  readonly kind: MessageKind;
+  readonly fromKind: T.ActorKind;
+  readonly kind: T.MessageKind;
   readonly mentions: readonly string[];
-  readonly channel: Pick<Channel, "type" | "peer">;
+  readonly channel: Pick<T.Channel, "type" | "peer">;
   /** The place's orchestrator, by its profile id: the one the owner's words there go to when they name no one else. */
   readonly orchestrator: string;
   /** Every orchestrator's profile id: each is always there to be named, and none cools down. */
@@ -95,7 +96,7 @@ export interface AudienceInput {
   readonly hops: number;
   readonly cooling: readonly string[];
   readonly broken: readonly string[];
-  readonly outcome?: Outcome;
+  readonly outcome?: T.Outcome;
   readonly forTask?: boolean;
   readonly spoken?: boolean;
 }

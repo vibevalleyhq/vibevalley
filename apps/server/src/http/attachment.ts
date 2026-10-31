@@ -5,7 +5,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { attachmentPath } from "@vibevalley/protocol";
 
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 
 const prefix = attachmentPath("");
 const inline = (type: string) => /^(image|video|audio)\//u.test(type) || type === "application/pdf";
@@ -15,7 +15,7 @@ export const attachments = HttpRouter.add(
   "GET",
   "/api/v1/attachment/:id",
   Effect.gen(function* () {
-    const chat = yield* Channels;
+    const chat = yield* Channel;
     const request = yield* HttpServerRequest.HttpServerRequest;
     const id = new URL(request.url, "http://farm").pathname.slice(prefix.length);
     if (!/^[0-9a-f]{64}$/u.test(id)) return notFound();

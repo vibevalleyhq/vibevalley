@@ -10,7 +10,7 @@ import { TestClock } from "effect/testing";
 import { remember, rewriteMemory } from "@vibevalley/agent/memory";
 import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
 import { agentHome, ServerConfig } from "@/base/config.ts";
 import { Database, Db } from "@/base/db.ts";
@@ -18,12 +18,12 @@ import { Setting } from "@/setting/setting.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
-import { Memories, make } from "./memory.ts";
-import { memoryIsNewNote, memoryJobText, memoryNotesOf, recallChars } from "./recall.ts";
+import { Memory, make } from "./memory.ts";
+import { memoryIsNewNote, issueMemoryText, memoryNotesOf, recallChars } from "./recall.ts";
 
 const world = (config = testConfig()) =>
-  Layer.effect(Memories, make()).pipe(
-    Layer.provideMerge(Agents.layer),
+  Layer.effect(Memory, make()).pipe(
+    Layer.provideMerge(Agent.layer),
     Layer.provideMerge(Setting.layer),
     Layer.provideMerge(Db.layer),
     Layer.provideMerge(Database),
@@ -56,8 +56,8 @@ describe("memory", () => {
       { text: "tests run with pnpm test", everywhere: false },
       { text: "commit messages in English", everywhere: true },
     ]);
-    expect(memoryJobText("给打卡接口加分页", "加好了（3f2a1bc）", "completed")).toBe("给打卡接口加分页 → 加好了（3f2a1bc）");
-    expect(memoryJobText("给打卡接口加分页", "pnpm test 没过", "failed")).toBe("给打卡接口加分页 → 没做成：pnpm test 没过");
+    expect(issueMemoryText("给打卡接口加分页", "加好了（3f2a1bc）", "completed")).toBe("给打卡接口加分页 → 加好了（3f2a1bc）");
+    expect(issueMemoryText("给打卡接口加分页", "pnpm test 没过", "failed")).toBe("给打卡接口加分页 → 没做成：pnpm test 没过");
     const known = [{ id: "1", agent: "lab", kind: "note", text: "这个项目用 pnpm test 跑测试", project: "clock", at: 0, recalled: 0 }] as never;
     expect(memoryIsNewNote(known, "这个项目用 pnpm test 跑测试", "clock")).toBe(false);
     expect(memoryIsNewNote(known, "这个项目用 pnpm test 跑测试", "blog")).toBe(true);
@@ -66,12 +66,12 @@ describe("memory", () => {
 
   it.effect("runs are kept, recalled and counted; notes written and forgotten", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.keep({
         agent: "lab",
         session: "w1",
         project: "clock",
-        job: "加分页",
+        brief: "加分页",
         outcome: "completed",
         said: "记住：这个项目用 pnpm test 跑测试\n记住（所有项目）：提交信息写中文\n结论：加好了",
         summary: "加好了",
@@ -80,12 +80,12 @@ describe("memory", () => {
         agent: "lab",
         session: "w1",
         project: "clock",
-        job: "加分页",
+        brief: "加分页",
         outcome: "failed",
         said: "记住：这个项目用 pnpm test 跑测试",
         summary: "测试没过",
       });
-      yield* m.keep({ agent: "lab", session: "w2", project: "clock", job: "不算", outcome: "interrupted", said: "记住：停下的不算", summary: "" });
+      yield* m.keep({ agent: "lab", session: "w2", project: "clock", brief: "不算", outcome: "interrupted", said: "记住：停下的不算", summary: "" });
       const all = yield* m.list("lab");
       expect(all.map((x) => `${x.kind}:${x.text}`).toSorted()).toEqual([
         "issue:加分页 → 没做成：测试没过",
@@ -112,7 +112,7 @@ describe("memory", () => {
     const config = testConfig();
     const folder = agentHome(config, defaultOrchestrator);
     return Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       expect((yield* m.memoriesOf("orchestrator")).memories).toEqual([]);
       remember(folder, "主人喜欢早上收到汇报", new Date(2026, 9, 12, 9));
       const written = yield* m.remember({ agent: "orchestrator", text: "  周末别派夜班\n真的  ", project: "", by: owner });
@@ -146,7 +146,7 @@ describe("memory", () => {
     mkdirSync(join(folder, "archive"), { recursive: true });
     writeFileSync(join(folder, "archive", "orchestrator-2026-10-12.md"), "主人：给 clock-in 加分页\n管家：派给老周了\n");
     return Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       const listing = m.archive(defaultOrchestrator, "CLOCK-IN");
       expect(listing.files.map((f) => f.name)).toEqual(["orchestrator-2026-10-12.md"]);
       expect(listing.hits.map((h) => [h.file, h.line])).toEqual([["orchestrator-2026-10-12.md", 1]]);
@@ -158,7 +158,7 @@ describe("memory", () => {
 
   it.effect("a preview picks without counting, and the longest unused fade", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.write({ agent: "lab", text: "clock 的测试用 pnpm test", project: "clock", by: owner });
       yield* m.write({ agent: "lab", text: "提交前跑 lint", project: "", by: owner });
       const preview = yield* m.recallOf("lab", "clock", "");
@@ -173,7 +173,7 @@ describe("memory", () => {
 
   it.effect("the search index follows the table", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       const note = yield* m.write({ agent: "lab", text: "这个项目测试用 pnpm test", project: "demo", by: owner });
       yield* m.write({ agent: "other", text: "测试前先装依赖", project: "demo", by: owner });
       const found = (yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 })).found;
@@ -196,17 +196,17 @@ describe("memory", () => {
     }
   });
 
-  const run = (session: string, said: string) => ({ agent: "lab", session, project: "demo", job: "work", said, summary: "", outcome: "completed" as const });
+  const run = (session: string, said: string) => ({ agent: "lab", session, project: "demo", brief: "work", said, summary: "", outcome: "completed" as const });
 
-  it.effect("a run's notes go back when its job cannot be written", () =>
+  it.effect("a run's notes go back when its issue memory cannot be written", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       const sql = yield* SqlClient.SqlClient;
-      yield* sql.unsafe(`create function fail_job() returns trigger language plpgsql as $$ begin raise exception 'write failed'; end $$`);
-      yield* sql.unsafe(`create trigger fail_job before insert on memory for each row when (new.kind = 'issue') execute function fail_job()`);
+      yield* sql.unsafe(`create function fail_write() returns trigger language plpgsql as $$ begin raise exception 'write failed'; end $$`);
+      yield* sql.unsafe(`create trigger fail_write before insert on memory for each row when (new.kind = 'issue') execute function fail_write()`);
       yield* m.keep(run("s1", "记住：不要覆盖用户改动"));
       expect(yield* m.list("lab")).toEqual([]);
-      yield* sql.unsafe(`drop trigger fail_job on memory`);
+      yield* sql.unsafe(`drop trigger fail_write on memory`);
       yield* m.keep(run("s1", "记住：不要覆盖用户改动"));
       expect(yield* m.list("lab")).toHaveLength(2);
     }).pipe(Effect.provide(world())),
@@ -214,7 +214,7 @@ describe("memory", () => {
 
   it.effect("nearly the same notes in one run are kept once", () =>
     Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       yield* m.keep(run("s1", "记住：use pnpm test\n记住：use pnpm test!"));
       expect(yield* m.list("lab")).toHaveLength(2);
     }).pipe(Effect.provide(world())),
@@ -224,12 +224,12 @@ describe("memory", () => {
     Effect.gen(function* () {
       // The rows below were written at 1; what is kept now is later, by the test's clock.
       yield* TestClock.setTime(Date.UTC(2026, 9, 1));
-      const m = yield* Memories;
+      const m = yield* Memory;
       for (let i = 0; i < memoryKeep; i++) {
         const id = `old-${String(i).padStart(3, "0")}`;
         if (i % 2 === 0)
           yield* q.addNote({ id, agent: "lab", body: id, terms: "", terms_of: 0, project: null, session: null, author: "session", created_at: 1 });
-        else yield* q.keepJob({ id, agent: "lab", body: id, terms: "", terms_of: 0, project: null, session: id, created_at: 1 });
+        else yield* q.keepIssueMemory({ id, agent: "lab", body: id, terms: "", terms_of: 0, project: null, session: id, created_at: 1 });
       }
       const before = yield* m.list("lab");
       const predicted = before.filter((x) => x.fading).map((x) => x.id);
@@ -245,7 +245,7 @@ describe("memory", () => {
     const config = testConfig();
     mkdirSync(join(agentHome(config, defaultOrchestrator), "MEMORY.md"), { recursive: true });
     return Effect.gen(function* () {
-      const m = yield* Memories;
+      const m = yield* Memory;
       expect((yield* Effect.flip(m.previewForget("orchestrator", "m1")))._tag).toBe("Refused");
       expect((yield* Effect.flip(m.forget("orchestrator", "m1")))._tag).toBe("Refused");
     }).pipe(Effect.provide(world(config)));

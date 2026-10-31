@@ -4,7 +4,7 @@
 export const catalogs = {
   zh: {
     desktop: {
-      open: "打开农场",
+      open: "打开 VibeValley",
       quit: "退出",
       cannotStart: "VibeValley 起不来",
       seeLog: "{reason}，日志在 {log}",
@@ -42,18 +42,18 @@ export const catalogs = {
       },
     },
     mobile: {
-      cannotRead: "读不出保存的农场：{why}",
+      cannotRead: "读不出保存的连接：{why}",
       unreachable: "连不上那台电脑：两台设备要在同一个网络里，那台电脑要允许连接",
       answered: "那台电脑答了 {status}",
       cannotSave: "保存配对失败：{why}",
-      cannotRestore: "恢复保存的农场失败：{why}",
-      cannotForget: "忘不掉保存的农场：{why}",
+      cannotRestore: "恢复保存的连接失败：{why}",
+      cannotForget: "忘不掉保存的连接：{why}",
       callEnded: "通话已结束",
       noNotify: "没有通知的权限：到系统设置里打开",
       noCamera: "没有相机的权限：到系统设置里打开，或者粘贴链接",
       stopScan: "不扫了",
-      title: "连进农场",
-      intro: "在跑农场的电脑上打开「设置」的「连接到本机」，点「添加设备」，扫它的二维码。配对要那台电脑上的主人点头。",
+      title: "连进 VibeValley",
+      intro: "在跑 VibeValley 的电脑上打开「设置」的「连接到本机」，点「添加设备」，扫它的二维码。配对要那台电脑上的主人点头。",
       scan: "扫二维码",
       paste: "或者粘贴配对链接",
       name: "这台手机叫",
@@ -73,7 +73,6 @@ export const catalogs = {
         session: "列出帮工，找它的 id",
         project: "列出项目，找它的名字",
         runtime: "列出农机，找它的 id",
-        doc: "列出文档，找它的 id",
         agent: "列出档案，找它的 id",
         skill: "列出技能，找它的 id",
         template: "列出模板，找它的 id",
@@ -95,7 +94,7 @@ export const catalogs = {
         noFile: "不是模板：没有 {file}",
         badId: "模板的 id「{id}」不行（{file}）：只能用小写字母、数字和 -，最多 32 个字",
         badVersion: "模板的 version 要是 1 以上的整数（{file}）",
-        noRuntime: "帮工的模板要写推荐的农机 runtime（{file}）",
+        noRuntime: "帮工的模板要写推荐的农机（{file}）",
         noTemplate: "没有 {id} 这个模板",
         taken: "已经有叫 {id} 的模板了",
         builtIn: "{id} 是内置的模板，删不了",
@@ -105,8 +104,8 @@ export const catalogs = {
         deleteKept: "删掉模板「{name}」：从它装的 {installed} 份档案留着",
       },
       notSaved: "没存下来：{file} 写不进去（{why}）",
-      orchestratorStays: "默认管家删不了：每个农场至少有一个管家",
-      defaultStaysOrchestrator: "默认管家只能是管家：每个农场至少有一个管家",
+      orchestratorStays: "默认管家删不了：至少要有一个管家",
+      defaultStaysOrchestrator: "默认管家只能是管家：至少要有一个管家",
       noAgent: "没有 {id} 这个档案",
       noSkill: "没有 {id} 这个技能",
       orchestratorRuntime: "管家只在 VibeValley 自己的 agent 上跑：农机要是 {runtime}",
@@ -398,6 +397,24 @@ export const catalogs = {
       tier: { silver: "银牌{title}", gold: "金牌{title}" },
       reached: { starter: "新手任务做完了", secret: "发现一个彩蛋", gold: "升到金牌", silver: "升到银牌", unlocked: "解锁成就" },
     },
+    "server.inbox": {
+      orchestrator: "管家",
+      conflictFiles: "{files} 个文件和主分支冲突",
+      step: "{graph}：{step}",
+      item: {
+        review: { label: "等你看", title: "{who} 做完了", tray: "{who} 做完了，等你看" },
+        ask: { label: "有问题问你", title: "{who} 有问题问你" },
+        fix: { label: "活没做成", title: "{who} 没做成", tray: "{who} 没做成" },
+        interrupted: { title: "{who} 停在了半路" },
+        conflict: { label: "合不进去", title: "{who} 的活合进主分支会冲突", tray: "{who} 的活会冲突" },
+        quiet: { label: "好久没动静", title: "{who} 好一阵没动静了", body: "可能在跑很久的命令，也可能卡住了：看看它的轨迹。", tray: "{who} 好一阵没动静" },
+        "graph-draft": { label: "计划拆好了", title: "计划「{text}」拆好了", body: "看过再开工", tray: "计划「{text}」等你看" },
+        "graph-ready": { label: "计划做完了", title: "计划「{text}」都做完了", body: "看看改动，合进主分支", tray: "计划「{text}」等你合进主分支" },
+        "task-failed": { label: "计划卡住了", title: "计划卡住了：{text}", body: "重试、改工单，或者跳过", tray: "计划「{text}」没做成" },
+        mention: { label: "找你", title: "{who} 叫你" },
+        "cron-ask": { label: "定时任务等你同意", title: "管家想定一个定时任务", body: "「{text}」：同意了才开始", tray: "定时任务「{text}」等你同意" },
+      },
+    },
     "server.issue": {
       issueNumbered: "工单 #{n}",
       issueRef: "工单 {ref}",
@@ -424,7 +441,7 @@ export const catalogs = {
       queuedStarted: "排队的「{title}」开工了：{session}",
       queuedStuck: "排队的「{title}」开不了工：{why}；也没能退回待办，还在队里",
       queuedBack: "排队的「{title}」开不了工，留在待办里：{why}",
-      graphRetry: "这是计划里的工单，跟着计划走：在计划里重试这一步，或者重开整个计划",
+      graphRetry: "这是计划里的工单，跟着计划走：在计划里重试这一件，或者重开整个计划",
       neverStarted: "这张工单还没开过工：直接开工",
       stillOpen: "这张工单还开着：挪回待办就是再来一轮",
       stillWorking: "{name} 还在做这张工单：直接给它带话",
@@ -603,24 +620,6 @@ export const catalogs = {
       forget: "从 {agent} 的记性里忘掉：「{text}」",
       orchestratorRecall: "管家不靠想起：它每次带着整份记性",
     },
-    "server.notice": {
-      orchestrator: "管家",
-      conflictFiles: "{files} 个文件和主分支冲突",
-      step: "{graph}：{step}",
-      item: {
-        review: { label: "等你看", title: "{who} 做完了", tray: "{who} 做完了，等你看" },
-        ask: { label: "有问题问你", title: "{who} 有问题问你" },
-        fix: { label: "活没做成", title: "{who} 没做成", tray: "{who} 没做成" },
-        interrupted: { title: "{who} 停在了半路" },
-        conflict: { label: "合不进去", title: "{who} 的活合进主分支会冲突", tray: "{who} 的活会冲突" },
-        quiet: { label: "好久没动静", title: "{who} 好一阵没动静了", body: "可能在跑很久的命令，也可能卡住了：看看它的干活过程。", tray: "{who} 好一阵没动静" },
-        "graph-draft": { label: "计划拆好了", title: "计划「{text}」拆好了", body: "看过再开工", tray: "计划「{text}」等你看" },
-        "graph-ready": { label: "计划做完了", title: "计划「{text}」都做完了", body: "看看改动，合进主分支", tray: "计划「{text}」等你合进主分支" },
-        "task-failed": { label: "计划卡住了", title: "计划卡住了：{text}", body: "重试、改工单，或者跳过", tray: "计划「{text}」没做成" },
-        mention: { label: "找你", title: "{who} 叫你" },
-        "cron-ask": { label: "定时任务等你同意", title: "管家想定一个定时任务", body: "「{text}」：同意了才开始", tray: "定时任务「{text}」等你同意" },
-      },
-    },
     "server.orchestrator": {
       label: "管家",
       noKey: "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。",
@@ -700,7 +699,7 @@ export const catalogs = {
       quotaGone: "{runtime} 的额度用完了（{window}）{resets}，到时候再派",
       resets: "，{when}重置",
       balanceGone: "{provider} 的余额用完了，充值以后再派",
-      budget: "今天已经花了 {spent}，到了每日预算 {budget}（在 Runtime 页面可以改）",
+      budget: "今天已经花了 {spent}，到了每日预算 {budget}（在「农机」页可以改）",
       quota: {
         none: "不报额度",
         signedOut: "没登录",
@@ -716,12 +715,12 @@ export const catalogs = {
       persona: "{refused}。把人设改成「写进工单开头」。",
       noModel: "{runtime} 的模型列表里没有 {model}",
       runtimeDefault: "{runtime} 默认用的 {model}",
-      unknownRuntime: "不认识的 runtime：{runtime}",
-      notInstalled: "这台机器上找不到这个 runtime",
-      disabled: "这个 runtime 在 Runtime 页面里被停用了",
-      noUsage: "这个 runtime 不报用量",
+      unknownRuntime: "不认识的农机：{runtime}",
+      notInstalled: "这台机器上找不到这台农机",
+      disabled: "这台农机在「农机」页里被停用了",
+      noUsage: "这台农机 不报用量",
       cursor: "Cursor 要单独装它的 SDK（@cursor/sdk），VibeValley 还没接",
-      oarUnknown: "oar 不认识这个 runtime",
+      oarUnknown: "oar 不认识这台农机",
       tools: "{n} 个工具",
       notSaved: "没存下 {id} 的设置：{why}",
       cannotDrive: "oar 驱动不了 {runtime}",
@@ -743,7 +742,7 @@ export const catalogs = {
         invalid_request: "请求被服务商拒绝了",
         overloaded: "服务商太忙",
         provider: "服务商出错了",
-        runtime_exited: "runtime 进程中途退出了",
+        runtime_exited: "农机进程中途退出了",
         unknown: "出错了",
       },
       failureNext: { userAction: "要你先处理一下", now: "可以让它再试一次", later: "过一阵再试" },
@@ -762,7 +761,7 @@ export const catalogs = {
       },
       noRoom: {
         farm: "已经有 {max} 个帮工在干活了",
-        runtime: "{runtime} 上已经有 {on} 个帮工在干活，最多同时 {max} 个（在 Runtime 页面可以改）",
+        runtime: "{runtime} 上已经有 {on} 个帮工在干活，最多同时 {max} 个（在「农机」页可以改）",
         project: "项目 {project} 里已经有 {on} 个帮工在干活，最多同时 {max} 个：人多了容易改到同一个文件",
       },
       notTaken: {
@@ -801,7 +800,7 @@ export const catalogs = {
       host: {
         stopped: "{label}已经停下",
         cannotStart: "起不来：{why}",
-        notRecorded: "{label}的执行没能记下：{why}",
+        notRecorded: "{label}的这一轮没能记下：{why}",
         startFailed: "{label}起不来：{why}",
         callerStart: "我这边起不来：{why}",
         failed: "{label}出错了：{why}",
@@ -814,13 +813,13 @@ export const catalogs = {
       life: {
         stoppedNeedsYou: "{name} 停下了：{why}",
         quietNotice: "{name} 已经 {span}没动静了{last}：点它的地看看过程，不对就叫停",
-        notStopped: "农机没能停止，工作区留着：{why}",
-        notReturned: "上一次农机还没交回工作区",
+        notStopped: "农机没能停止，工作目录留着：{why}",
+        notReturned: "上一次农机还没交回工作目录",
         agentGone: "{name} 的 agent 已经删掉了，叫不醒",
         cannotWake: "{name} 叫不醒：{why}",
         noHelper: "没有 {id} 这个帮工",
         helperRef: "帮工 {id}",
-        stillClosing: "{name} 的农机没能停止：工作区留着，不能再开一轮",
+        stillClosing: "{name} 的农机没能停止：工作目录留着，不能再开一轮",
         noRoom: "{name} 先不接着干：{full}",
         notReceived: "{name} 没收到：{why}",
         inGraph: "{name} 在做计划 {graph} 里的活：做完会自动合进计划的分支，整个计划合进主分支时再进主分支",
@@ -829,7 +828,7 @@ export const catalogs = {
         placeGone: "干活的目录不见了（{cwd}）",
         noRecord: "库里没有它的记录",
         restartedNotice: "VibeValley 重启过，{name} 那一轮停下了；给它带句话就能接着干",
-        issueNotReturned: "这张工单的农机还没交回工作区",
+        issueNotReturned: "这张工单的农机还没交回工作目录",
         noPlace: "{name} 没地方干活：{why}",
         cannotSend: "{name} 派不出去：{why}",
         notRecorded: "{name} 的工单没记下来：{why}",
@@ -901,13 +900,13 @@ export const catalogs = {
         taskRetried: "{step}重试",
         taskRequeued: "{step}没有帮工在做了，重新排上",
         taskSkipped: "{step}跳过了，后面的照做",
-        taskAdded: "加了一步{step}",
-        taskRemoved: "删了一步「{title}」",
+        taskAdded: "加了一件{step}",
+        taskRemoved: "删了一件「{title}」",
         step: "「{title}」",
         by: "（{session}）",
         why: "：{detail}",
         drafted: "拆好了，等主人看",
-        draftedSteps: "拆好了，{steps} 步，等主人看",
+        draftedSteps: "拆好了，{steps} 件，等主人看",
         started: "开工了",
         startedOn: "开工了，分支 {branch}",
         taskMerged: "{step}合进了计划分支{why}",
@@ -915,15 +914,15 @@ export const catalogs = {
         taskEdited: "改了{step}的{fields}",
       },
       problem: {
-        empty: "计划里一步都没有",
-        tooMany: "最多 {max} 步，这里有 {n} 步：把小的步骤合并",
-        badId: "「{id}」不能当步骤 id：用简短的英文，比如 api",
-        duplicate: "步骤 id「{id}」重复了",
+        empty: "计划里一件都没有",
+        tooMany: "最多 {max} 件，这里有 {n} 件：把小的几件合并",
+        badId: "「{id}」不能当一件的 id：用简短的英文，比如 api",
+        duplicate: "一件的 id「{id}」重复了",
         noBrief: "「{id}」没有工单",
-        noCheck: "验收步骤「{id}」没有检查命令：验收就是这条命令",
+        noCheck: "验收的那一件「{id}」没有检查命令：验收就是这条命令",
         self: "「{id}」不能等自己",
         missing: "「{id}」要等的「{other}」不存在",
-        circle: "这几步互相等，成了一个圈：{ids}",
+        circle: "这几件互相等，成了一个圈：{ids}",
       },
       parse: {
         object: "要一个对象",
@@ -938,10 +937,10 @@ export const catalogs = {
       },
       edit: {
         taskSettled: "「{title}」{state}，不能改了",
-        graphSettled: "计划{state}，不能加步骤了",
-        noStep: "计划里没有「{id}」这一步",
+        graphSettled: "计划{state}，不能再加一件了",
+        noStep: "计划里没有「{id}」这一件",
         cannotRemove: "「{title}」{state}，不能删了：可以跳过它",
-        remove: "从计划「{graph}」删掉「{step}」这一步",
+        remove: "从计划「{graph}」删掉「{step}」这一件",
         stopWaiting: "{steps}不再等它",
       },
       noGraph: "没有 {id} 这个计划",
@@ -951,19 +950,19 @@ export const catalogs = {
         splitStopped: "规划被叫停了",
         plannerFailed: "规划的帮工出错了：{summary}",
         noGraph: "没给出能用的计划：{problem}",
-        drafted: "计划「{title}」拆好了，{steps} 步：在「计划」里看过再开工",
+        drafted: "计划「{title}」拆好了，{steps} 件：在「计划」里看过再开工",
         noHelper: "没有能派的帮工",
         waits: "「{title}」先等着：{why}",
-        stepFailed: "计划「{graph}」的「{step}」没做成：{why}",
+        taskFailed: "计划「{graph}」的「{task}」没做成：{why}",
         unknownFiles: "看不出它改了哪些文件：{why}",
         acceptancePassed: "验收 {check} 现在就通过了",
         checkFailed: "做完跑 {check} 没通过",
         noBranch: "计划还没有分支",
-        stepNotSaved: "步骤「{title}」已合进计划分支，但完成状态没能保存：{why}",
+        stepNotSaved: "「{title}」这一件已合进计划分支，但完成状态没能保存：{why}",
         ready: "计划「{title}」都做完了：在「计划」里看看改动，合进主分支",
         stepStopped: "「{title}」被叫停了，计划先暂停；点继续接着做",
         plannerGone: "规划的帮工被请走了",
-        helperGone: "帮工被请走了，这一步没做完",
+        helperGone: "帮工被请走了，这一件没做完",
         done: "做完了",
         restartedSplitting: "VibeValley 重启了，规划停在了半路：再说一遍要做什么",
         restarted: "VibeValley 重启过，计划先暂停了；点继续接着做",
@@ -981,8 +980,8 @@ export const catalogs = {
         splittingBy: "{name} 去看代码、拆计划了（{id}）。拆好了会放在「计划」里，你看过再开工。",
         startNotSaved: "计划分支 {branch} 已创建，但开工状态没能保存：{why}",
         started: "计划「{title}」开工了，分支 {branch}",
-        pausedNote: "暂停了：正在做的做完，不开新的步骤",
-        paused: "计划「{title}」暂停了：正在做的步骤做完，不再开新的",
+        pausedNote: "暂停了：正在做的几件做完，不再开新的",
+        paused: "计划「{title}」暂停了：正在做的几件做完，不再开新的",
         resumed: "计划「{title}」接着做了",
         branchKeptNote: "；分支 {branch} 留着",
         abandonedNote: "放弃了{kept}",
@@ -990,19 +989,19 @@ export const catalogs = {
         notMerged: "没合进去：{why}。计划分支 {branch} 留着",
         mergeNotSaved: "计划分支已合进主分支，但完成状态没能保存：{why}",
         merged: "计划「{title}」合进去了：{text}",
-        noStep: "计划里没有「{id}」这一步",
+        noStep: "计划里没有「{id}」这一件",
         graphIs: "计划{state}",
         notFailed: "「{title}」没有失败，不用重试",
         retried: "{name} 接着做「{title}」",
         requeued: "「{title}」重新排上了",
         working: "「{title}」正在做，先叫停",
         finished: "「{title}」已经做完了",
-        skipped: "跳过了「{title}」，后面的步骤照常开工",
+        skipped: "跳过了「{title}」，后面的几件照常开工",
         stepAct: "{action}「{title}」",
         edited: "改好了",
         notStarted: "计划「{title}」还没开工，没有分支",
         branchGone: "计划「{title}」的分支不在了：先确认它是不是被删掉了",
-        stepsWrong: "步骤有问题，改好再拆：\n- {problems}",
+        stepsWrong: "拆出来的几件有问题，改好再拆：\n- {problems}",
         cannot: "计划「{title}」{state}，不能{action}",
         abandoned: "计划「{title}」放弃了",
         abandonedKept: "计划「{title}」放弃了，分支 {branch} 留着",
@@ -1165,7 +1164,7 @@ export const catalogs = {
       minutes: "{n} 分钟",
       join: { labeled: "{label}：{text}", aside: "{text}（{aside}）", sentence: "{text}。", and: "{a}，{b}", clauses: "{a}；{b}", separator: "、" },
     },
-    web: { opening: { waking: "叫醒农场……", label: "叫醒农场", cannotStart: "农场起不来：{why}" } },
+    web: { opening: { waking: "叫醒 VibeValley……", label: "叫醒 VibeValley", cannotStart: "VibeValley 起不来：{why}" } },
     "web.agent": {
       newName: "新的 {runtime}",
       noProfiles: "问不到服务端的档案：",
@@ -1185,7 +1184,8 @@ export const catalogs = {
       create: "捏好了，保存",
       save: "保存",
       backToProfile: "← 回到档案",
-      trajectoriesHint: "它派出去的每个帮工，从接活起的每一步：收到的话、用的每个工具（点一行看输入和输出）、说的话。收工以后步骤留 30 天，帮工本身一直列着。",
+      trajectoriesHint:
+        "它派出去的每个帮工，从接活起的每一步：收到的话、用的每个工具（点一行看输入和输出）、说的话。收工以后这些记录留 30 天，帮工本身一直列着。",
       trajectories: "轨迹",
       remove: "删除",
       removeWhich: "删掉 {name}？",
@@ -1194,7 +1194,7 @@ export const catalogs = {
       cannot: "派不出去：",
       random: "随机一个",
       looksAs: "在农场里是",
-      looksHint: "只是长相：同一个 runtime 可以是不同的动物。",
+      looksHint: "只是长相：同一台农机 可以是不同的动物。",
       wears: "穿什么",
       tab: { who: "身份", runtime: "能力", persona: "人设", skills: "技能", tools: "工具", env: "环境", memory: "记性" },
       tabs: "档案的",
@@ -1215,7 +1215,7 @@ export const catalogs = {
       worktree: "每个帮工一个 git worktree",
       worktreeHint: "每个帮工在自己的分支上改，几个帮工不会互相覆盖；完成时合进项目。关掉就直接在项目里改，没有分支可合。",
       env: "环境变量",
-      envHint: "叠加在 runtime 设置的环境变量之上。",
+      envHint: "叠加在 农机设置的环境变量之上。",
       machine: "农机",
       machineTip: "换农机会清掉模型和推理强度；长相（动物和衣服）不变。",
       readingMachines: "读取农机…",
@@ -1224,10 +1224,10 @@ export const catalogs = {
       checking: "检测中…",
       notHere: "这台机器上没有",
       model: "模型",
-      noModels: "这个 runtime 现在报不出模型列表。",
+      noModels: "这台农机 现在报不出模型列表。",
       modelLevels: "{name}（{n} 档推理）",
       effort: "推理强度",
-      effortDefault: "默认由 runtime 决定。",
+      effortDefault: "默认由农机决定。",
       defaultEffort: "默认",
       can: "{runtime} 能做什么",
       steer: "能在干活时接话（steer）",
@@ -1237,34 +1237,34 @@ export const catalogs = {
       refuses: "不接受 ",
       colon: "：",
       persona: {
-        append: { label: "追加到系统提示", detail: "保留 runtime 自带的工作方式，在后面加上人设。大多数情况选这个。" },
-        replace: { label: "替换系统提示", detail: "整段换掉 runtime 自带的系统提示。只有你清楚自己在做什么时才用。" },
-        prompt: { label: "写进工单开头", detail: "每张工单前面加上人设。所有 runtime 都能用，但会被长对话冲淡。" },
+        append: { label: "追加到系统提示", detail: "保留 农机自带的工作方式，在后面加上人设。大多数情况选这个。" },
+        replace: { label: "替换系统提示", detail: "整段换掉 农机自带的系统提示。只有你清楚自己在做什么时才用。" },
+        prompt: { label: "写进工单开头", detail: "每张工单前面加上人设。所有农机 都能用，但会被长对话冲淡。" },
       },
       personaLabel: "人设",
-      personaTip: "它是谁、怎么干活、什么不做。会按下面的方式交给 runtime。",
+      personaTip: "它是谁、怎么干活、什么不做。会按下面的方式交给农机。",
       personaHint: "你是一个谨慎的后端工程师。先读懂现有代码再动手……",
-      personaMode: "交给 runtime 的方式",
+      personaMode: "交给农机 的方式",
       library: "技能库",
       libraryTip: "选中的技能跟人设一起交给帮工，每个技能一节。",
       manageLibrary: "管理技能库 →",
       ownSkills: "{runtime} 自己装的技能",
-      ownSkillsTip: "runtime 自己报告的，在这台机器上已经能用，不用在这里勾。",
+      ownSkillsTip: "农机自己报告的，在这台机器上已经能用，不用在这里勾。",
       mcp: "MCP 服务器",
-      mcpHint: "开 session 时交给 runtime（oar 的 SessionOptions.mcpServers）。",
+      mcpHint: "派出帮工时交给农机（oar 的 SessionOptions.mcpServers）。",
       removeNamed: "删除 {name}",
       mcpKind: "MCP 的种类",
       mcpName: "MCP 名字",
       mcpTarget: "MCP 命令或地址",
       add: "添加",
       disallowed: "禁用的工具",
-      disallowedHint: "这些工具这个 agent 不能用。下面 runtime 报告的工具点一下就能加进来。",
+      disallowedHint: "这些工具这个 agent 不能用。下面农机报告的工具点一下就能加进来。",
       disallowedExample: "比如 WebSearch",
       ownMcp: "{runtime} 自己连的 MCP",
-      ownMcpTip: "runtime 自己报告的，和上面加的叠在一起。",
-      unreported: "这个 runtime 不报告这一项。",
+      ownMcpTip: "农机自己报告的，和上面加的叠在一起。",
+      unreported: "这台农机 不报告这一项。",
       none: "没有。",
-      role: { orchestrator: "管家", worker: "帮工" },
+      role: { orchestrator: "管家", helper: "帮工" },
       templates: {
         title: "模板",
         intro:
@@ -1296,7 +1296,7 @@ export const catalogs = {
         intro:
           "管家常驻、带队、自己不干活：听你说要做什么，派帮工去做，盯着进度，转告结果。它跑在 VibeValley 自己的 agent 上，有自己的私聊、记性和轨迹；把频道交给它照看，在那个频道里说话就是它回答。",
         page: "它的记性和轨迹 →",
-        nameTip: "群聊里叫这个名字；别人用 @它的档案 id 叫它。",
+        nameTip: "频道里叫这个名字；别人用 @它的档案 id 叫它。",
         model: "模型",
         modelTip: "DeepSeek 的模型，留空用默认的。",
         modelHint: "deepseek-v4-flash",
@@ -1308,9 +1308,9 @@ export const catalogs = {
       list: {
         title: "档案",
         intro:
-          "每份档案是一个 agent。管家常驻、带队、自己不干活，可以有好几个；帮工是配置好的 runtime：用哪个 runtime 和模型、带什么人设和技能，在农场里是哪种小动物。管家派活时派的就是帮工。",
+          "每份档案是一个 agent。管家常驻、带队、自己不干活，可以有好几个；帮工是配置好的农机：用哪台农机和模型、带什么人设和技能，在农场里是哪种小动物。管家派活时派的就是帮工。",
         orchestrators: "管家",
-        workers: "帮工",
+        helpers: "帮工",
         make: "捏一个新帮工",
         makeOrchestrator: "添一个管家",
         orchestratorLine: "不当帮工：派活、盯进度、转告结果。",
@@ -1320,17 +1320,17 @@ export const catalogs = {
         enable: "启用",
         toggle: "{act} {name}",
         here: "在场 {n}",
-        tallyHint: "从这份档案派出去的帮工，干的活收进主分支的次数（服务端的账本）",
+        tallyHint: "从这份档案派出去的帮工，干的活收进主分支的次数",
         hired: "雇过",
         merged: "合进",
       },
-      runtimeDefault: "runtime 默认",
-      runtimeDefaultModel: "runtime 默认（{model}）",
+      runtimeDefault: "农机默认",
+      runtimeDefaultModel: "农机默认（{model}）",
       noEffort: "这个模型没有推理强度可选。",
       noEffortModel: "{model}没有推理强度可选。",
     },
     "web.artifact": {
-      place: { label: "产出", hint: "你和帮工、管家留下要看的东西：一起写的文档、交上来的网页，都在这里" },
+      place: { label: "产出", hint: "你和帮工、管家留下要看的东西：一起写的产出、交上来的网页，都在这里" },
       card: { version: "第 {version} 版", open: "打开「{title}」" },
       page: {
         by: "{name} 做的",
@@ -1395,7 +1395,7 @@ export const catalogs = {
         chat: { label: "聊天", hint: "频道和串" },
         issues: { label: "工单", hint: "每张工单从写下到关上" },
         agents: { label: "档案", hint: "档案：管家和帮工" },
-        runtimes: { label: "农具", hint: "机器上的编码 agent" },
+        runtimes: { label: "农机", hint: "机器上的编码 agent" },
         projects: { label: "项目", hint: "每个项目一座岛" },
         catalog: { label: "图鉴", hint: "素材：农场用的每张图、每个指针、每个声音，和工作台的界面零件" },
         settings: { label: "设置", hint: "通用、外观、模型、记性、技能、语音、连接" },
@@ -1563,7 +1563,7 @@ export const catalogs = {
       },
     },
     "web.channel": {
-      tab: { chat: "聊天", jobs: "任务", crons: "定时任务" },
+      tab: { chat: "聊天", issues: "工单", crons: "定时任务" },
       defaultProject: "默认项目 {project}",
       channels: "频道列表",
       defaultHint: "默认的频道：你、管家和帮工都在这儿",
@@ -1603,7 +1603,7 @@ export const catalogs = {
         settingsOf: "# {name} 的设置",
         save: "保存",
       },
-      jobs: { empty: "这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。", thread: "工单串" },
+      issues: { empty: "这个频道里还没有工单。在聊天里跟管家说一件要做的事，它会派帮工，工单就列在这里。", thread: "工单串" },
       crons: {
         empty: "还没有定时任务：跟管家说「每天九点跑一遍测试」。",
         next: "下次 {next}",
@@ -1719,8 +1719,8 @@ export const catalogs = {
         keys: "{mac, select, true {⌘K} other {Ctrl K}}",
       },
       farmSearch: {
-        open: "搜全农场",
-        title: "搜全农场",
+        open: "全部搜索",
+        title: "全部搜索",
         hint: "找消息…",
         filters: "from:主人  in:#频道  has:file / image / link  before: / after:2026-10-01",
         none: "没有找到",
@@ -1859,7 +1859,7 @@ export const catalogs = {
         moreFiles: "还有 {n} 个文件",
         story: "怎么走到这一步",
         steps: "帮工的每一步",
-        runs: "每次干活",
+        runs: "每一轮",
         details: "详情",
         job: "要做的",
         who: "谁在做",
@@ -1913,7 +1913,7 @@ export const catalogs = {
         commits: "提交",
         files: "文件",
         harvest: "确认收获，合进 {base}",
-        noSteps: "计划里还没有步骤。",
+        noSteps: "计划里还没有一件。",
         first: "先做",
         batch: "第 {n} 批",
         acceptanceHint: "验收：写好时要不通过，最后一步让它通过",
@@ -1921,8 +1921,8 @@ export const catalogs = {
         edit: "改",
         remove: "删",
         story: "经过",
-        stepId: "步骤 id",
-        stepIdHint: "步骤 id，比如 docs",
+        stepId: "这一件的 id",
+        stepIdHint: "这一件的 id，比如 docs",
         title: "标题",
         brief: "工单",
         briefHint: "工单：目标、改哪里、做到什么程度算完",
@@ -2081,7 +2081,7 @@ export const catalogs = {
         deleted: "这条消息已删除",
         suggestions: { "0": "让阿郑做字幕面板", "1": "让小吴跑测试", "2": "进度怎么样？", "3": "大家收工" },
         greeting:
-          "这里是田头，你、管家和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每个活下面挂着它的工单串。",
+          "这里是田头，你、管家和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每张工单下面挂着它的工单串。",
         phase: {
           off: "打字或者按麦克风，就开工",
           connecting: "正在接通管家…",
@@ -2201,7 +2201,7 @@ export const catalogs = {
         signedOut: "没登录，额度读不到",
         unreadable: "读不到：{why}",
         balance: "{enough, select, true {按量计费 · {provider} 余额} other {按量计费 · {provider} 余额，不够用了}}",
-        all: "各 runtime 的剩余额度",
+        all: "各台农机 的剩余额度",
         lowest: "剩余额度，最少的还剩 {pct}%",
         quota: "额度",
         left: "剩余额度",
@@ -2294,6 +2294,52 @@ export const catalogs = {
         pause: "暂停",
         clear: "清空",
         copy: "复制 .jsonl",
+      },
+    },
+    "web.farm.map": {
+      finding: "在找……",
+      islands: "{n} 座岛",
+      peopled: "{n} 座有人",
+      working: "在做 {n}/{of} 张",
+      queued: "排队 {n}",
+      stake: "空位，点了派活",
+      locked: "空位都占着",
+      sack: "排队的活",
+      send: "派一件活 · {project}",
+      plot: "{name}的地",
+      open: "空位，派一件活到 {project}",
+      wait: "等地",
+      queuedTip: "排队：{title}",
+      queuedLabel: "排队的活：{title}",
+      enter: "进{project}的农场",
+      enterWord: "进岛",
+      homeless: "不在哪个项目里：",
+      sea: "工作目录下还没有项目，地图上还是一片海。",
+      notDrafted: "先没起草：{why}",
+      sowIntro: "种在 {project}：写一句要做的事，管家派帮工来干；或者先写成待办，看过再开工。",
+      job: "要做的事",
+      jobExample: "比如：登录页加一个「记住我」",
+      todo: "先写成待办",
+      sow: "种下",
+      gone: "工作目录里没有这个项目了，只剩还在岛上的帮工。",
+      worktrees: "worktree · {n} 个",
+      noHelpers: "岛上还没有帮工：每派一件活来，就多一个 worktree。",
+      noMore: "不再往这里派活。",
+      canSend: "还能再派 {n} 件活，马上开工（这个项目最多同时 {of} 个帮工）。",
+      shut: "已经有 {n} 张工单在做，派来的活先排队。",
+      full: "满了：{n} 个帮工都在干活，派来的活先排队。",
+      queue: "排队 · {n} 件",
+      see: "看这张工单",
+      growth: "长势 · {label}",
+      growthSince: "长势 · {label} · 最近一次提交：{since}",
+      crop: { never: "还没动过土", day: "正旺", week: "在长", month: "冒着芽", quarter: "有点干了", older: "荒了" },
+      island: {
+        branch: "\n分支 {branch}",
+        open: "空位：派一件活来，马上开工",
+        shut: "已经有 {n} 张工单在做，等有工单做完",
+        gone: "不在工作目录里了",
+        working: "{full, select, true {在干 {n}/{of}（满了）} other {在干 {n}/{of}}}",
+        queued: "排队 {n}",
       },
     },
     "web.farm.phone": {
@@ -2389,6 +2435,7 @@ export const catalogs = {
       },
       chatTab: "田头",
     },
+    "web.inbox": { tray: { working: "{n} 个帮工在干活", idle: "开工了，没有在干的活", off: "还没开工", unread: "频道 {n} 条没读" } },
     "web.issue": {
       reading: "在读……",
       never: "算了",
@@ -2435,7 +2482,7 @@ export const catalogs = {
         shown: "{shown} / {of} 张",
         clear: "清掉筛选",
         view: "看法",
-        missing: "执行记录缺失：{what}。执行动作暂不可用。",
+        missing: "这一轮的记录缺失：{what}。对它的操作暂不可用。",
         backToBoard: "工单",
       },
       marks: { priority: "优先级：{word}" },
@@ -2501,7 +2548,7 @@ export const catalogs = {
         unread: "读不到。",
         full: "要做的（完整说明）",
         steps: "帮工的每一步",
-        runs: "每次干活",
+        runs: "每一轮",
         time: "时间",
         opened: "开单",
         started: "开工",
@@ -2547,15 +2594,15 @@ export const catalogs = {
         unsure: "拿不准的",
         next: "建议接着做",
         conflict: "合进 {base} 会冲突：{files}",
-        graphStep: "计划「{graph}」的一步",
+        graphStep: "计划「{graph}」的一件",
         backToGraph: "回到计划",
       },
       task: {
         label: "计划",
-        steps: "{n} 步",
-        done: "做完 {done} / {of} 步",
-        waitsForYou: "有一步在等你：打开它回答或者验收。",
-        splitting: "管家在把它拆成步骤，拆好了会列在下面。",
+        steps: "{n} 件",
+        done: "做完 {done} / {of} 件",
+        waitsForYou: "有一件在等你：打开它回答或者验收。",
+        splitting: "管家在把它拆成几件，拆好了会列在下面。",
         ok: "好了。",
         check: "检查",
         scope: "改哪里",
@@ -2568,19 +2615,19 @@ export const catalogs = {
         state: "状态",
         project: "项目",
         progress: "进度",
-        progressLine: "{done} / {of} 步",
+        progressLine: "{done} / {of} 件",
         parallel: "同时做",
-        atMost: "至多 {n} 步",
+        atMost: "至多 {n} 件",
         written: "写于",
         note: "备注",
         abandonTitle: "{abandon}这个计划？",
-        abandonLine: "还没做完的步骤不再派出去；计划分支留着，做好的提交都还在。",
+        abandonLine: "还没做完的几件不再派出去；计划分支留着，做好的提交都还在。",
         abandon: "确定放弃",
         reading: "正在看计划分支改了什么…",
         behind: "这期间 {base} 多了 {n} 个提交",
         merge: "合进 {base}",
         layer: "第 {n} 批",
-        layerTogether: "第 {n} 批 · 这 {size} 步可以同时做",
+        layerTogether: "第 {n} 批 · 这 {size} 件可以同时做",
         waitsOn: "等「{steps}」",
         stepSeparator: "」「",
         conflict: "合进 {base} 会冲突：{files}。先不合，等 {base} 上的改动处理好。",
@@ -2640,9 +2687,9 @@ export const catalogs = {
         newIssue: "新工单",
       },
       graph: {
-        splitting: "在拆步骤",
+        splitting: "在拆成几件",
         draft: "拆好了，看过再开工",
-        running: "做到 {done} / {total} 步",
+        running: "做到 {done} / {total} 件",
         paused: "暂停了",
         ready: "都做完了，等你合进主分支",
         done: "合进了主分支",
@@ -2674,12 +2721,12 @@ export const catalogs = {
         nth: "第 {n} 次",
         open: "开了 {took}",
         used: "用了 {took}",
-        turn: "第 {n} 轮",
-        turns: "{n} 轮",
+        run: "第 {n} 轮",
+        runs: "{n} 轮",
         orchestratorWorking: "管家在做",
         missingFlag: "记录缺失",
         graph: "计划：{title}",
-        missing: "执行记录缺失：{what}",
+        missing: "这一轮的记录缺失：{what}",
       },
       issue: {
         asking: "{who}有 {n} 个问题要问你",
@@ -2695,7 +2742,7 @@ export const catalogs = {
         stuck: "卡住了",
         canceled: "已取消",
         reopenLine: "要它接着做就重开：写一句这次要做什么。",
-        inGraph: "这是计划里的一步，跟着计划走。",
+        inGraph: "这是计划里的一件，跟着计划走。",
         splitting: "在拆计划「{graph}」：只读代码，不改文件。",
         editing: "{who}在改代码",
         history: "{n} 次：{line}",
@@ -2703,8 +2750,8 @@ export const catalogs = {
         since: "{span}了",
         ran: "第 {n} 轮",
         used: "共用 {span}",
-        noSteps: "还没有步骤。",
-        stepsGone: "干活过程只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了。",
+        noSteps: "还什么都没做。",
+        stepsGone: "轨迹只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了。",
         change: { A: { mark: "新", label: "新增" }, M: { mark: "改", label: "修改" }, D: { mark: "删", label: "删除" } },
         and: "、",
         doing: "正在{action}",
@@ -2713,7 +2760,7 @@ export const catalogs = {
         whoRuntime: "{name}（{runtime}）",
         changes: "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
         changesUncommitted: "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
-        graphStep: "计划「{graph}」的一步：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。",
+        graphStep: "计划「{graph}」的一件：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。",
         justNow: "刚刚",
       },
     },
@@ -2722,7 +2769,7 @@ export const catalogs = {
         section: { label: "连接到本机" },
         open: "开着",
         closed: "关着",
-        intro: "打开以后，同一个局域网里的手机或另一台电脑扫码配对以后，就能用这台电脑上的 VibeValley：看帮工、派活、在群聊里说话。",
+        intro: "打开以后，同一个局域网里的手机或另一台电脑扫码配对以后，就能用这台电脑上的 VibeValley：看帮工、派活、在频道里说话。",
         allow: "允许连接",
         address: "地址",
         add: "添加设备",
@@ -2754,7 +2801,7 @@ export const catalogs = {
       devices: { android: "安卓手机", windows: "Windows 电脑", device: "一台设备" },
       pair: {
         title: "连进那台电脑",
-        intro: "这台设备连进那台电脑上的 VibeValley，和主人一样看帮工、派活、在群聊里说话。配对要那台电脑上的主人点头。",
+        intro: "这台设备连进那台电脑上的 VibeValley，和主人一样看帮工、派活、在频道里说话。配对要那台电脑上的主人点头。",
         code: "配对码",
         codeHint: "在那台电脑的「连接到本机」里点「添加设备」",
         name: "这台设备叫",
@@ -2771,8 +2818,8 @@ export const catalogs = {
         own: "它自己记的",
         intro:
           "这个 agent 派出去的帮工共用一份记性。每一轮开始，和这一轮有关的几条放在它收到的话前面；一轮结束，它在汇报里写的「记住：」那几行，和这件活做到哪了，记进来。",
-        jobs: "手上的活",
-        noJobs: "它的帮工还没做完过一轮。",
+        issues: "手上的工单",
+        noIssues: "它的帮工还没做完过一轮。",
         helper: "帮工",
         allProjects: "所有项目",
         notes: "记下的",
@@ -2826,7 +2873,6 @@ export const catalogs = {
         recalledLast: "想起过 {n} 次，上次 {last}",
       },
     },
-    "web.notice": { tray: { working: "{n} 个帮工在干活", idle: "开工了，没有在干的活", off: "还没开工", unread: "群聊 {n} 条没读" } },
     "web.orchestrator": {
       looks: {
         farmer: { name: "青年农夫", blurb: "草帽、背带裤，爱笑的年轻人。" },
@@ -2861,44 +2907,51 @@ export const catalogs = {
       allLine: "整张地图：每个项目一座岛",
       notGit: "还不是 git 仓库",
       finding: "在找……",
-      none: "工作目录下还没有项目。点「新增项目」开一块地，或从 GitHub 下载一个。",
+      none: "工作目录下还没有项目。点「新增项目」新建一个，或从 GitHub 下载一个。",
       copied: "复制好了：{path}",
       notCopied: "复制不了：选中路径自己复制吧。",
-      growth: "长势：{label}",
-      growthTag: "长势 · {label}",
-      broken: "开垦于",
-      neverDug: "还没动过土",
-      tilled: "耕作",
+      recency: {
+        label: "最近一次提交：{label}",
+        never: "还没有提交",
+        day: "一天内有提交",
+        week: "一周内有提交",
+        month: "一个月内有提交",
+        quarter: "三个月内有提交",
+        older: "三个月没有提交",
+      },
+      firstCommit: "第一次提交",
+      noCommits: "还没有提交",
+      commitCount: "提交",
       commits: "{n} 次提交",
-      crops: "庄稼",
+      code: "代码",
       lines: "{n} 行",
       uncounted: "没数",
-      planted: "种了",
-      kinds: "{n} 样",
+      languages: "语言",
+      kinds: "{n} 种",
       copyPath: "复制路径",
       counting: "在数……",
       recount: "重新统计",
       countedAgo: "{ago}数过",
-      whatPlanted: "种了什么",
+      whatLanguages: "用了哪些语言",
       byLines: "按行数，不算空行 · tokei 数的",
       linesAndFiles: "{lines} 行 · {files} 个文件",
-      empty: "这块地还空着：没有数得出来的代码。",
-      noTokei: "数庄稼要用 tokei，这台机器上还没有。",
+      empty: "还没有数得出来的代码。",
+      noTokei: "数代码行数要用 tokei，这台机器上还没有。",
       install: "在终端里装一个：",
       or: "（或 ",
       thenRecount: "），装好点上面的「重新统计」。",
-      level: { "0": "空地", "1": "撒了种", "2": "发了芽", "3": "长了叶", "4": "开了花" },
-      year: "过去一年 · 一格一天，提交越多长得越高",
+      level: { "0": "没有提交", "1": "少", "2": "一些", "3": "较多", "4": "很多" },
+      year: "过去一年 · 一格一天，提交越多格子越满",
       dayCommits: "{n} 次提交，{level}",
-      untouched: "没动土",
+      noCommitsThatDay: "没有提交",
       busiest: "最忙的一天：{day}，{n} 次提交",
-      calendar: "耕作日历",
+      calendar: "提交日历",
       inYear: "一年里",
-      daysWorked: "动过土的日子",
+      daysWorked: "有提交的日子",
       days: "{n} 天",
       longest: "最长连着干",
       current: "最近连着干",
-      yearLabel: "过去一年 {commits} 次提交，{days} 天动过土",
+      yearLabel: "过去一年 {commits} 次提交，{days} 天有提交",
       readingCommits: "在读提交",
       rows: { "0": "", "1": "一", "2": "", "3": "三", "4": "", "5": "五", "6": "" },
       fewer: "少",
@@ -2908,7 +2961,7 @@ export const catalogs = {
       times: "{n} 次",
       rest: "还有 {people} 位，一共 {commits} 次。",
       how: "怎么来",
-      fresh: "开一块新地",
+      fresh: "新建一个",
       github: "去别人家看看",
       githubAddress: "GitHub 地址",
       githubHint: "公开仓库的主页地址。下载到本地后，就能查看项目和安排帮工。",
@@ -2916,57 +2969,12 @@ export const catalogs = {
       nameHint: "保存在工作目录里；已有同名项目不会被覆盖。",
       nameExample: "比如 raft-source",
       downloading: "正在下载仓库… 大仓库需要多等一会儿，最多 3 分钟。",
-      making: "正在开地…",
+      making: "正在新建…",
       cancel: "取消",
       busy: "进行中…",
       download: "下载到工作目录",
       create: "创建项目",
-      map: {
-        islands: "{n} 座岛",
-        peopled: "{n} 座有人",
-        working: "在做 {n}/{of} 张",
-        queued: "排队 {n}",
-        stake: "空位，点了派活",
-        locked: "空位都占着",
-        sack: "排队的活",
-        send: "派一件活 · {project}",
-        plot: "{name}的地",
-        open: "空位，派一件活到 {project}",
-        wait: "等地",
-        queuedTip: "排队：{title}",
-        queuedLabel: "排队的活：{title}",
-        enter: "进{project}的农场",
-        enterWord: "进岛",
-        homeless: "不在哪个项目里：",
-        sea: "工作目录下还没有项目，地图上还是一片海。",
-        notDrafted: "先没起草：{why}",
-        sowIntro: "种在 {project}：写一句要做的事，管家派帮工来干；或者先写成待办，看过再开工。",
-        job: "要做的事",
-        jobExample: "比如：登录页加一个「记住我」",
-        todo: "先写成待办",
-        sow: "种下",
-        gone: "工作目录里没有这个项目了，只剩还在岛上的帮工。",
-        worktrees: "worktree · {n} 个",
-        noHelpers: "岛上还没有帮工：每派一件活来，就多一个 worktree。",
-        noMore: "不再往这里派活。",
-        canSend: "还能再派 {n} 件活，马上开工（这个项目最多同时 {of} 个帮工）。",
-        shut: "已经有 {n} 张工单在做，派来的活先排队。",
-        full: "满了：{n} 个帮工都在干活，派来的活先排队。",
-        queue: "排队 · {n} 件",
-        see: "看这张工单",
-        growth: "长势 · {label}",
-        growthSince: "长势 · {label} · 最近一次提交：{since}",
-      },
-      project: {
-        otherLang: "其他",
-        growth: { empty: "还没动过土", flowering: "正旺", leafy: "在长", sprout: "冒着芽", dry: "有点干了", withered: "荒了" },
-        branch: "\n分支 {branch}",
-        open: "空位：派一件活来，马上开工",
-        shut: "已经有 {n} 张工单在做，等有工单做完",
-        gone: "不在工作目录里了",
-        working: "{full, select, true {在干 {n}/{of}（满了）} other {在干 {n}/{of}}}",
-        queued: "排队 {n}",
-      },
+      otherLang: "其他",
     },
     "web.runtime": {
       capability: {
@@ -2984,8 +2992,8 @@ export const catalogs = {
       notFound: "没找到",
       checking: "检测中…",
       noRuntimes: "读不到农机：",
-      title: "农具",
-      list: "农具列表",
+      title: "农机",
+      list: "农机列表",
       intro: "机器上的编码 agent",
       usedBy: " · {n} 个 agent",
       reading: "读取中…",
@@ -3003,7 +3011,7 @@ export const catalogs = {
       makeAgent: "用它捏一个新 agent →",
       noneYet: "还没有。",
       afterInstall: "装好以后才能读到。",
-      noUsage: "这个 runtime 不报告账户用量。",
+      noUsage: "这台农机 不报告账户用量。",
       signedOut: "没登录。在这台机器上运行 {runtime} 登录一次。",
       unreadable: "读不到：{why}",
       balance: "{enough, select, true {按量计费，这里是 {provider} 账户余额。} other {按量计费，这里是 {provider} 账户余额，不够用了。}}",
@@ -3030,11 +3038,11 @@ export const catalogs = {
       auto: "自动查找",
       defaultModel: "默认模型",
       defaultModelHint: "agent 没指定模型时用它。",
-      ownDefault: "runtime 自己的默认",
+      ownDefault: "农机自己的默认",
       defaultEffort: "默认推理强度",
       default: "默认",
       maxWorking: "最多同时干活",
-      maxWorkingHint: "用它的帮工同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受整个工作区的上限（同时 6 张工单）。",
+      maxWorkingHint: "用它的帮工同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受 VibeValley 整体的上限（同时 6 张工单）。",
       noLimit: "不另设",
       budget: "每日预算（元）",
       budgetLabel: "每日预算",
@@ -3042,10 +3050,10 @@ export const catalogs = {
         "{pi, select, true {今天已经花了 {spent}（按 pi 的价目表估算）。到了预算就不再派新活，正在干的会干完。留空不设上限。} other {今天已经花了 {spent}（按模型的价目表估算）。到了预算就不再派新活，正在干的会干完。留空不设上限。}}",
       unlimited: "不设上限",
       env: "环境变量",
-      envHint: "叠加到这个 runtime 的每个 session 上；agent 自己的环境变量优先。",
+      envHint: "叠加到这台农机上的每个帮工；agent 自己的环境变量优先。",
       models: "模型",
       modelCount: "{n} 个",
-      noModels: "这个 runtime 不报告模型列表。",
+      noModels: "这台农机 不报告模型列表。",
       effort: "推理强度",
       unreported: "不报告。",
       none: "没有。",
@@ -3068,7 +3076,7 @@ export const catalogs = {
         nameLabel: "技能名字",
         nameHint: "比如：先写测试",
         when: "什么时候用",
-        whenHint: "一句话。按需加载技能的 runtime 先读这句，再决定要不要读正文。",
+        whenHint: "一句话。按需加载技能的农机 先读这句，再决定要不要读正文。",
         description: "技能说明",
         descriptionHint: "改行为之前，先补一个会失败的测试。",
         body: "正文",
@@ -3096,7 +3104,7 @@ export const catalogs = {
     "web.session": {
       log: {
         heard: "收到",
-        process: "干活过程",
+        process: "轨迹",
         fold: "收起这一轮",
         unfold: "展开这一轮",
         steps: "{n} 步 · {took}",
@@ -3111,7 +3119,7 @@ export const catalogs = {
         thought: "想了想",
         subagentSaid: "帮手说",
         said: "它说",
-        farm: "群聊",
+        farm: "频道",
         running: "进行中",
         ok: "成功",
         failed: "失败",
@@ -3119,38 +3127,39 @@ export const catalogs = {
         pending: "还没返回",
         noOutput: "没有输出",
       },
-      rounds: {
+      runs: {
         farm: {
-          channel_message_send: "在群聊里说话",
-          channel_message_list: "读群聊的消息",
+          channel_message_send: "在频道里说话",
+          channel_message_list: "读频道的消息",
           channel_unread_list: "看有没有找它的话",
-          session_list: "看群聊里都有谁",
-          other: "群聊：{tool}",
+          session_list: "看频道里都有谁",
+          other: "频道：{tool}",
         },
-        span: { heard: "收到", recalled: "想起", thinking: "思考", said: "说", retry: "重试", cache: "缓存", error: "出错", farm: "群聊", tool: "工具" },
-        earlier: "更早的步骤",
+        span: { heard: "收到", recalled: "想起", thinking: "思考", said: "说", retry: "重试", cache: "缓存", error: "出错", farm: "频道", tool: "工具" },
+        earlier: "更早的几步",
+        unasked: "自己起的一轮",
         subagentGot: "帮手接到",
-        job: "工单",
+        issue: "工单",
         told: "带话",
         usedTools: "用了 {n} 个工具",
-        process: "这一轮的干活过程",
+        process: "这一轮的轨迹",
         tag: { thought: "想了想", subagentThought: "帮手想了想", said: "它说", subagentSaid: "帮手说", usage: "用量" },
         thoughtFor: "想了 {took} · 用了 {n} 个工具",
       },
       trajectory: {
         lane: { asked: "收到", model: "模型", tool: "工具" },
-        rounds: "{n} 轮",
+        runs: "{n} 轮",
         steps: "{n} 步",
         modelTime: "模型用时 {took}",
         toolTime: "工具用时 {took}",
         cacheHit: "缓存命中 {pct}%",
         tokens: "输入 {input} / 输出 {output} token",
         quiet: "还没有动静。",
-        round: "第 {n} 轮",
+        run: "第 {n} 轮",
         earlier: "更早",
         search: "搜索轨迹",
         searchHint: "搜索",
-        noMatch: "没有对得上的步骤。",
+        noMatch: "没有对得上的一步。",
         pending: "还没返回",
         noOutput: "没有输出",
         tool: "工具 {name}",
@@ -3240,7 +3249,7 @@ export const catalogs = {
         chat: "微信 飞书 QQ 连接器 配对",
         devices: "手机 配对 连接到本机 局域网",
       },
-      scope: { farm: "对整个农场", device: "只对这台设备" },
+      scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
       general: {
         languageHint: "界面、管家和帮工说的话都用它",
         start: "启动时打开",
@@ -3262,7 +3271,7 @@ export const catalogs = {
         versionHint: "这台电脑上的服务端",
         files: "文件",
         home: "家目录",
-        homeHint: "农场的一切都在这里",
+        homeHint: "VibeValley 的一切都在这里",
         settings: "设置文件",
         settingsHint: "钥匙和这几页的设置",
         copy: "复制路径",
@@ -3274,7 +3283,7 @@ export const catalogs = {
         checking: "正在查有没有新版本…",
         downloading: "正在下载 {next}（{percent}%）",
         ready: "{next} 已下好，退出时装上",
-        readyNewFarm: "{next} 已下好：它会从一个新农场开始，旧的留在一边",
+        readyNewFarm: "{next} 已下好：它会从新的数据开始，旧的留在一边",
         manual: {
           diskImage: "{next} 要手动装：应用还在安装盘里运行，先拖进「应用程序」",
           translocated: "{next} 要手动装：macOS 把应用挪到了临时的地方运行，先拖进「应用程序」再打开",
@@ -3286,7 +3295,7 @@ export const catalogs = {
         restart: "重启更新",
         restartQuestion: "重启到新版本？",
         workingQuestion: "{n} 个帮工在干活，重启会打断它们。现在重启？",
-        newFarmQuestion: "新版本从一个新农场开始，旧的留在家目录里。现在重启？",
+        newFarmQuestion: "新版本从新的数据开始，旧的留在家目录里。现在重启？",
         download: "去下载",
       },
     },
@@ -3386,7 +3395,7 @@ export const catalogs = {
         saved: "存好了，下一通电话就用上。",
         answer: {
           orchestrator:
-            "群聊里那个管家本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。",
+            "频道里那个管家本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。",
           agora: "声网托管的模型，不用别的 key。",
           deepseek: "用设置里的 DeepSeek key（{from}）。",
           noDeepseek: "用设置里的 DeepSeek key，现在还没有：去首页「设置」填。",
@@ -3438,7 +3447,7 @@ export const catalogs = {
           page: "页。",
           open: "开口",
           openParts: "人设 · 开场白",
-          ownCall: "电话由管家自己接：它就是群聊里那个管家，用它自己的提示词，不另设人设。",
+          ownCall: "电话由管家自己接：它就是频道里那个管家，用它自己的提示词，不另设人设。",
           persona: "人设",
           personaHint: "电话里先答话的模型是谁、怎么说话。它看不到现状，派活由本机的管家做；写明别编进度。",
           greeting: "开场白",
@@ -3548,7 +3557,7 @@ export const catalogs = {
   },
   en: {
     desktop: {
-      open: "Open the farm",
+      open: "Open VibeValley",
       quit: "Quit",
       cannotStart: "VibeValley cannot start",
       seeLog: "{reason}; the log is at {log}",
@@ -3586,19 +3595,19 @@ export const catalogs = {
       },
     },
     mobile: {
-      cannotRead: "The saved farm cannot be read: {why}",
+      cannotRead: "The saved connection cannot be read: {why}",
       unreachable: "Cannot reach that computer: both devices must be on the same network, and that computer must allow connections",
       answered: "That computer answered {status}",
       cannotSave: "Saving the pairing failed: {why}",
-      cannotRestore: "Restoring the saved farm failed: {why}",
-      cannotForget: "The saved farm cannot be forgotten: {why}",
+      cannotRestore: "Restoring the saved connection failed: {why}",
+      cannotForget: "The saved connection cannot be forgotten: {why}",
       callEnded: "The call has ended",
       noNotify: "No permission for notifications: turn it on in the system settings",
       noCamera: "No permission for the camera: turn it on in the system settings, or paste the link",
       stopScan: "Stop scanning",
-      title: "Connect to the farm",
+      title: "Connect to VibeValley",
       intro:
-        "On the computer running the farm, open Connect to this machine under Settings, press Add a device, and scan its QR code. Pairing needs the owner's approval on that computer.",
+        "On the computer running VibeValley, open Connect to this machine under Settings, press Add a device, and scan its QR code. Pairing needs the owner's approval on that computer.",
       scan: "Scan the QR code",
       paste: "Or paste the pairing link",
       name: "This phone is called",
@@ -3626,7 +3635,6 @@ export const catalogs = {
         session: "List the helpers and find its id",
         project: "List the projects and find its name",
         runtime: "List the machines and find its id",
-        doc: "List the docs and find its id",
         agent: "List the profiles and find its id",
         skill: "List the skills and find its id",
         template: "List the templates and find its id",
@@ -3658,8 +3666,8 @@ export const catalogs = {
         deleteKept: 'Delete the template "{name}": the {installed} profiles installed from it stay',
       },
       notSaved: "Not saved: could not write {file} ({why})",
-      orchestratorStays: "The default manager cannot be deleted: every farm has at least one manager",
-      defaultStaysOrchestrator: "The default manager stays a manager: every farm has at least one",
+      orchestratorStays: "The default manager cannot be deleted: there is always at least one manager",
+      defaultStaysOrchestrator: "The default manager stays a manager: there is always at least one",
       noAgent: "There is no profile {id}",
       noSkill: "There is no skill {id}",
       orchestratorRuntime: "A manager runs only on VibeValley's own agent: its machine must be {runtime}",
@@ -3763,7 +3771,7 @@ export const catalogs = {
       notBack: "The helpers have not come back yet",
       breaker: "{name} failed {failed} times in a row as soon as it was woken, so it is not woken again for now; telling it something directly tries again.",
       dispatch: {
-        step: 'step "{task}" of the plan {graph}',
+        step: 'task "{task}" of the plan {graph}',
         split: "splitting the plan {graph}",
         draft: "reading the code and drafting this ticket",
         project: "the project",
@@ -3778,7 +3786,7 @@ export const catalogs = {
       channelGone: "The channel cannot be found",
       noHelper: "There is no helper {id}",
       noChannel: "There is no channel {id}",
-      notOrchestrator: "{id} is not an orchestrator's profile: only an orchestrator can look after a channel",
+      notOrchestrator: "{id} is not a manager's profile: only a manager can look after a channel",
       noMessageId: "There is no message {id}",
       threadOnlyTitle: "A thread can only get a title",
       defaultStays: "The default channel cannot be archived or deleted: make another one the default first",
@@ -3955,6 +3963,44 @@ export const catalogs = {
       tier: { silver: "Silver {title}", gold: "Gold {title}" },
       reached: { starter: "Starter task done", secret: "Found a secret", gold: "Up to gold", silver: "Up to silver", unlocked: "Achievement unlocked" },
     },
+    "server.inbox": {
+      orchestrator: "The manager",
+      conflictFiles: "{files, plural, one {# file conflicts with main} other {# files conflict with main}}",
+      step: "{graph}: {step}",
+      item: {
+        review: { label: "For you to see", title: "{who} is done", tray: "{who} is done, for you to see" },
+        ask: { label: "A question for you", title: "{who} has a question for you" },
+        fix: { label: "It failed", title: "{who} failed", tray: "{who} failed" },
+        interrupted: { title: "{who} stopped halfway" },
+        conflict: { label: "Won't merge", title: "{who}'s work would conflict with main", tray: "{who}'s work would conflict" },
+        quiet: {
+          label: "Quiet for a while",
+          title: "{who} has been quiet for a while",
+          body: "It may be running a long command, or it may be stuck: look at what it has been doing.",
+          tray: "{who} has gone quiet",
+        },
+        "graph-draft": {
+          label: "Plan drafted",
+          title: 'The plan "{text}" is drafted',
+          body: "Look it over before it starts",
+          tray: 'The plan "{text}" is for you to see',
+        },
+        "graph-ready": {
+          label: "Plan done",
+          title: 'The plan "{text}" is all done',
+          body: "Look over the changes and merge them into main",
+          tray: 'The plan "{text}" is ready to merge into main',
+        },
+        "task-failed": { label: "Plan stuck", title: "A plan is stuck: {text}", body: "Retry, edit the ticket, or skip it", tray: 'The plan "{text}" failed' },
+        mention: { label: "Calling you", title: "{who} is calling you" },
+        "cron-ask": {
+          label: "A scheduled task to approve",
+          title: "The manager wants to set a scheduled task",
+          body: '"{text}": it starts once you approve',
+          tray: 'The scheduled task "{text}" waits for your approval',
+        },
+      },
+    },
     "server.issue": {
       issueNumbered: "ticket #{n}",
       issueRef: "ticket {ref}",
@@ -3981,7 +4027,7 @@ export const catalogs = {
       queuedStarted: 'The queued "{title}" has started: {session}',
       queuedStuck: 'The queued "{title}" could not start: {why}; it could not go back to To do either, and stays in the queue',
       queuedBack: 'The queued "{title}" could not start and stays in To do: {why}',
-      graphRetry: "This ticket belongs to a plan and follows it: retry the step in the plan, or reopen the whole plan",
+      graphRetry: "This ticket belongs to a plan and follows it: retry the task in the plan, or reopen the whole plan",
       neverStarted: "This ticket has never started: just start it",
       stillOpen: "This ticket is still open: moving it back to To do is another round",
       stillWorking: "{name} is still on this ticket: tell it directly",
@@ -4159,44 +4205,6 @@ export const catalogs = {
       forgetOrchestrator: 'Delete this line from the manager\'s MEMORY.md: "{text}"',
       forget: 'Forget from {agent}\'s memory: "{text}"',
       orchestratorRecall: "The manager does not recall: it always carries its whole memory",
-    },
-    "server.notice": {
-      orchestrator: "The manager",
-      conflictFiles: "{files, plural, one {# file conflicts with main} other {# files conflict with main}}",
-      step: "{graph}: {step}",
-      item: {
-        review: { label: "For you to see", title: "{who} is done", tray: "{who} is done, for you to see" },
-        ask: { label: "A question for you", title: "{who} has a question for you" },
-        fix: { label: "It failed", title: "{who} failed", tray: "{who} failed" },
-        interrupted: { title: "{who} stopped halfway" },
-        conflict: { label: "Won't merge", title: "{who}'s work would conflict with main", tray: "{who}'s work would conflict" },
-        quiet: {
-          label: "Quiet for a while",
-          title: "{who} has been quiet for a while",
-          body: "It may be running a long command, or it may be stuck: look at what it has been doing.",
-          tray: "{who} has gone quiet",
-        },
-        "graph-draft": {
-          label: "Plan drafted",
-          title: 'The plan "{text}" is drafted',
-          body: "Look it over before it starts",
-          tray: 'The plan "{text}" is for you to see',
-        },
-        "graph-ready": {
-          label: "Plan done",
-          title: 'The plan "{text}" is all done',
-          body: "Look over the changes and merge them into main",
-          tray: 'The plan "{text}" is ready to merge into main',
-        },
-        "task-failed": { label: "Plan stuck", title: "A plan is stuck: {text}", body: "Retry, edit the ticket, or skip it", tray: 'The plan "{text}" failed' },
-        mention: { label: "Calling you", title: "{who} is calling you" },
-        "cron-ask": {
-          label: "A scheduled task to approve",
-          title: "The manager wants to set a scheduled task",
-          body: '"{text}": it starts once you approve',
-          tray: 'The scheduled task "{text}" waits for your approval',
-        },
-      },
     },
     "server.orchestrator": {
       label: "The manager",
@@ -4405,13 +4413,13 @@ export const catalogs = {
       life: {
         stoppedNeedsYou: "{name} stopped: {why}",
         quietNotice: "{name} has been quiet for {span}{last}: open its plot to see what it is doing, and stop it if it is wrong",
-        notStopped: "The machine did not stop, and its workspace is kept: {why}",
-        notReturned: "The machine has not handed the workspace back from last time",
+        notStopped: "The machine did not stop, and its working folder is kept: {why}",
+        notReturned: "The machine has not handed the working folder back from last time",
         agentGone: "{name}'s profile was deleted; it cannot be woken",
         cannotWake: "{name} cannot be woken: {why}",
         noHelper: "There is no helper {id}",
         helperRef: "helper {id}",
-        stillClosing: "{name}'s machine did not stop: its workspace is kept, and no new round can start",
+        stillClosing: "{name}'s machine did not stop: its working folder is kept, and no new round can start",
         noRoom: "{name} does not carry on for now: {full}",
         notReceived: "{name} did not get it: {why}",
         inGraph: "{name} is working on a step of the plan {graph}: it merges into the plan's branch when done, and into main with the whole plan",
@@ -4420,7 +4428,7 @@ export const catalogs = {
         placeGone: "its working folder is gone ({cwd})",
         noRecord: "there is no record of it",
         restartedNotice: "VibeValley restarted and {name}'s round stopped; tell it something to carry on",
-        issueNotReturned: "This ticket's machine has not handed the workspace back",
+        issueNotReturned: "This ticket's machine has not handed the working folder back",
         noPlace: "{name} has nowhere to work: {why}",
         cannotSend: "{name} cannot be sent: {why}",
         notRecorded: "{name}'s ticket was not recorded: {why}",
@@ -4504,13 +4512,13 @@ export const catalogs = {
         taskRetried: "{step} retried",
         taskRequeued: "{step} has no helper on it any more, queued again",
         taskSkipped: "{step} skipped, the rest go on",
-        taskAdded: "Added the step {step}",
-        taskRemoved: 'Removed the step "{title}"',
+        taskAdded: "Added the task {step}",
+        taskRemoved: 'Removed the task "{title}"',
         step: '"{title}"',
         by: " ({session})",
         why: ": {detail}",
         drafted: "Split, waiting for you",
-        draftedSteps: "Split into {steps} steps, waiting for you",
+        draftedSteps: "Split into {steps} tasks, waiting for you",
         started: "Started",
         startedOn: "Started on branch {branch}",
         taskMerged: "{step} merged into the plan's branch{why}",
@@ -4518,15 +4526,15 @@ export const catalogs = {
         taskEdited: "Changed {step}'s {fields}",
       },
       problem: {
-        empty: "The plan has no steps",
-        tooMany: "At most {max} steps, this has {n}: merge the small ones",
-        badId: '"{id}" cannot be a step id: use a short English word, such as api',
-        duplicate: 'The step id "{id}" is used twice',
+        empty: "The plan has no tasks",
+        tooMany: "At most {max} tasks, this has {n}: merge the small ones",
+        badId: '"{id}" cannot be a task id: use a short English word, such as api',
+        duplicate: 'The task id "{id}" is used twice',
         noBrief: '"{id}" has no ticket',
-        noCheck: 'The acceptance step "{id}" has no check command: the command is the acceptance',
+        noCheck: 'The acceptance task "{id}" has no check command: the command is the acceptance',
         self: '"{id}" cannot wait for itself',
         missing: '"{id}" waits for "{other}", which does not exist',
-        circle: "These steps wait for each other in a circle: {ids}",
+        circle: "These tasks wait for each other in a circle: {ids}",
       },
       parse: {
         object: "must be an object",
@@ -4541,10 +4549,10 @@ export const catalogs = {
       },
       edit: {
         taskSettled: '"{title}" is {state} and cannot be changed now',
-        graphSettled: "The plan is {state}; no steps can be added now",
-        noStep: 'The plan has no step "{id}"',
+        graphSettled: "The plan is {state}; no tasks can be added now",
+        noStep: 'The plan has no task "{id}"',
         cannotRemove: '"{title}" is {state} and cannot be removed: you can skip it',
-        remove: 'Remove the step "{step}" from the plan "{graph}"',
+        remove: 'Remove the task "{step}" from the plan "{graph}"',
         stopWaiting: "{steps} no longer wait for it",
       },
       noGraph: "There is no plan {id}",
@@ -4554,19 +4562,19 @@ export const catalogs = {
         splitStopped: "the planning was stopped",
         plannerFailed: "the planner failed: {summary}",
         noGraph: "it gave no usable plan: {problem}",
-        drafted: 'The plan "{title}" is split into {steps} steps: look it over under Plans before it starts',
+        drafted: 'The plan "{title}" is split into {steps} tasks: look it over under Plans before it starts',
         noHelper: "no helper can be sent",
         waits: '"{title}" waits for now: {why}',
-        stepFailed: 'In the plan "{graph}", "{step}" failed: {why}',
+        taskFailed: 'In the plan "{graph}", "{task}" failed: {why}',
         unknownFiles: "cannot tell which files it changed: {why}",
         acceptancePassed: "the acceptance {check} already passes",
-        checkFailed: "{check} failed after the step",
+        checkFailed: "{check} failed after the task",
         noBranch: "the plan has no branch yet",
-        stepNotSaved: 'The step "{title}" is merged into the plan\'s branch, but its done state could not be saved: {why}',
+        stepNotSaved: 'The task "{title}" is merged into the plan\'s branch, but its done state could not be saved: {why}',
         ready: 'The plan "{title}" is all done: look over the changes under Plans and merge them into main',
         stepStopped: '"{title}" was stopped and the plan is paused; resume to carry on',
         plannerGone: "the planner was sent home",
-        helperGone: "the helper was sent home before the step was done",
+        helperGone: "the helper was sent home before the task was done",
         done: "done",
         restartedSplitting: "VibeValley restarted while planning: say again what to do",
         restarted: "VibeValley restarted and the plan is paused; resume to carry on",
@@ -4584,8 +4592,8 @@ export const catalogs = {
         splittingBy: "{name} is reading the code and splitting the plan ({id}). It will be under Plans; look it over before it starts.",
         startNotSaved: "The plan's branch {branch} was made, but its start could not be saved: {why}",
         started: 'The plan "{title}" has started on branch {branch}',
-        pausedNote: "Paused: the steps under way finish, no new ones start",
-        paused: 'The plan "{title}" is paused: the steps under way finish, no new ones start',
+        pausedNote: "Paused: the tasks under way finish, no new ones start",
+        paused: 'The plan "{title}" is paused: the tasks under way finish, no new ones start',
         resumed: 'The plan "{title}" carries on',
         branchKeptNote: "; the branch {branch} is kept",
         abandonedNote: "Abandoned{kept}",
@@ -4593,19 +4601,19 @@ export const catalogs = {
         notMerged: "Not merged: {why}. The plan's branch {branch} is kept",
         mergeNotSaved: "The plan's branch is merged into main, but its done state could not be saved: {why}",
         merged: 'The plan "{title}" is merged: {text}',
-        noStep: 'The plan has no step "{id}"',
+        noStep: 'The plan has no task "{id}"',
         graphIs: "The plan is {state}",
         notFailed: '"{title}" did not fail; there is nothing to retry',
         retried: '{name} carries on with "{title}"',
         requeued: '"{title}" is queued again',
         working: '"{title}" is in progress: stop it first',
         finished: '"{title}" is already done',
-        skipped: 'Skipped "{title}"; the steps after it start as usual',
+        skipped: 'Skipped "{title}"; the tasks after it start as usual',
         stepAct: '{action} "{title}"',
         edited: "Changed",
         notStarted: 'The plan "{title}" has not started and has no branch',
         branchGone: 'The plan "{title}"\'s branch is gone: check whether it was deleted',
-        stepsWrong: "The steps have problems; fix them and split again:\n- {problems}",
+        stepsWrong: "The tasks have problems; fix them and split again:\n- {problems}",
         cannot: 'The plan "{title}" is {state}: it cannot {action}',
         abandoned: 'The plan "{title}" is abandoned',
         abandonedKept: 'The plan "{title}" is abandoned, the branch {branch} is kept',
@@ -4774,7 +4782,7 @@ export const catalogs = {
       minutes: "{n} min",
       join: { labeled: "{label}: {text}", aside: "{text} ({aside})", sentence: "{text}.", and: "{a}, {b}", clauses: "{a}; {b}", separator: ", " },
     },
-    web: { opening: { waking: "Waking the farm…", label: "Waking the farm", cannotStart: "The farm cannot start: {why}" } },
+    web: { opening: { waking: "Waking VibeValley…", label: "Waking VibeValley", cannotStart: "VibeValley cannot start: {why}" } },
     "web.agent": {
       newName: "New {runtime}",
       noProfiles: "The server's profiles could not be read: ",
@@ -4795,7 +4803,7 @@ export const catalogs = {
       save: "Save",
       backToProfile: "← Back to the profile",
       trajectoriesHint:
-        "Every helper sent from it, every step since it took the job: what it heard, every tool it used (click a row for the input and output), what it said. Steps are kept 30 days after it leaves; the helper itself stays listed.",
+        "Every helper sent from it, every step since it took the ticket: what it heard, every tool it used (click a row for the input and output), what it said. Steps are kept 30 days after it leaves; the helper itself stays listed.",
       trajectories: "Trajectories",
       remove: "Delete",
       removeWhich: "Delete {name}?",
@@ -4879,7 +4887,7 @@ export const catalogs = {
       ownMcpTip: "Reported by the runtime, together with those added above.",
       unreported: "This runtime does not report this.",
       none: "None.",
-      role: { orchestrator: "Manager", worker: "Helper" },
+      role: { orchestrator: "Manager", helper: "Helper" },
       templates: {
         title: "Templates",
         intro:
@@ -4925,7 +4933,7 @@ export const catalogs = {
         intro:
           "Each profile is an agent. Managers stay, lead and do no work themselves, and there may be several; helpers are runtimes set up: which runtime and model, what persona and skills, and which little animal they are on the farm. When a manager sends work, it sends a helper.",
         orchestrators: "Managers",
-        workers: "Helpers",
+        helpers: "Helpers",
         make: "Make a new helper",
         makeOrchestrator: "Add a manager",
         orchestratorLine: "Not a helper: sends work, watches progress, passes on results.",
@@ -4935,7 +4943,7 @@ export const catalogs = {
         enable: "Enable",
         toggle: "{act} {name}",
         here: "{n} here",
-        tallyHint: "How many times helpers sent from this profile got work merged into main (the server's ledger)",
+        tallyHint: "How many times helpers sent from this profile got work merged into main",
         hired: "Hired",
         merged: "Merged",
       },
@@ -4945,7 +4953,7 @@ export const catalogs = {
       noEffortModel: "{model} has no effort levels.",
     },
     "web.artifact": {
-      place: { label: "Artifacts", hint: "What you, the helpers and the orchestrator leave to be read: pages written together and web pages handed in" },
+      place: { label: "Artifacts", hint: "What you, the helpers and the manager leave to be read: pages written together and web pages handed in" },
       card: { version: "Version {version}", open: 'Open "{title}"' },
       page: {
         by: "Made by {name}",
@@ -5199,7 +5207,7 @@ export const catalogs = {
       },
     },
     "web.channel": {
-      tab: { chat: "Chat", jobs: "Jobs", crons: "Scheduled tasks" },
+      tab: { chat: "Chat", issues: "Tickets", crons: "Scheduled tasks" },
       defaultProject: "default project {project}",
       channels: "Channels",
       defaultHint: "The default channel: you, the manager and the helpers are all here",
@@ -5208,7 +5216,7 @@ export const catalogs = {
       findMessages: "Find messages",
       settings: "Channel settings",
       inChannel: "In the channel",
-      empty: "Nobody has spoken in {label}: tell the orchestrator something to do.",
+      empty: "Nobody has spoken in {label}: tell the manager something to do.",
       sendTo: "Message {label}",
       side: "Channels and helpers",
       channelsTitle: "Channels",
@@ -5239,12 +5247,12 @@ export const catalogs = {
         settingsOf: "Settings of # {name}",
         save: "Save",
       },
-      jobs: {
-        empty: "No jobs in this channel yet. Tell the manager something to do in the chat; it sends a helper, and the job is listed here.",
+      issues: {
+        empty: "No tickets in this channel yet. Tell the manager something to do in the chat; it sends a helper, and the ticket is listed here.",
         thread: "Ticket thread",
       },
       crons: {
-        empty: 'No scheduled tasks: tell the orchestrator "run the tests every day at nine".',
+        empty: 'No scheduled tasks: tell the manager "run the tests every day at nine".',
         next: "next {next}",
         direct: "straight to {agent}",
         byOrchestrator: "set by the manager",
@@ -5358,8 +5366,8 @@ export const catalogs = {
         keys: "{mac, select, true {⌘K} other {Ctrl K}}",
       },
       farmSearch: {
-        open: "Search the farm",
-        title: "Search the farm",
+        open: "Search everything",
+        title: "Search everything",
         hint: "Find messages…",
         filters: "from:owner  in:#channel  has:file / image / link  before: / after:2026-10-01",
         none: "Nothing found",
@@ -5425,7 +5433,7 @@ export const catalogs = {
           },
         },
         always:
-          "Helpers can run commands on this computer, so only the owner counts; reply quoting a report and your words go to that job's ticket thread. VibeValley only connects out and opens no port.",
+          "Helpers can run commands on this computer, so only the owner counts; reply quoting a report and your words go to that ticket's thread. VibeValley only connects out and opens no port.",
         state: {
           off: "Not connected",
           waiting: "Waiting for your scan",
@@ -5563,7 +5571,7 @@ export const catalogs = {
         commits: "Commits",
         files: "Files",
         harvest: "Harvest, merge into {base}",
-        noSteps: "The plan has no steps yet.",
+        noSteps: "The plan has no tasks yet.",
         first: "First",
         batch: "Batch {n}",
         acceptanceHint: "Acceptance: must fail when written; the last step makes it pass",
@@ -5571,8 +5579,8 @@ export const catalogs = {
         edit: "Edit",
         remove: "Delete",
         story: "History",
-        stepId: "Step id",
-        stepIdHint: "Step id, such as docs",
+        stepId: "Task id",
+        stepIdHint: "Task id, such as docs",
         title: "Title",
         brief: "Ticket",
         briefHint: "Ticket: the goal, where to change, what counts as done",
@@ -5742,7 +5750,7 @@ export const catalogs = {
           "3": "Everyone, call it a day",
         },
         greeting:
-          'This is the farm chat, where you, the manager and the helpers talk. Tell me a job to do, such as "have the tester run the tests".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each job has its ticket thread under it.',
+          'This is the farm chat, where you, the manager and the helpers talk. Tell me something to do, such as "have the tester run the tests".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.',
         phase: {
           off: "Type or press the mic to open",
           connecting: "Reaching the manager…",
@@ -5973,6 +5981,52 @@ export const catalogs = {
         copy: "Copy .jsonl",
       },
     },
+    "web.farm.map": {
+      finding: "Looking…",
+      islands: "{n, plural, one {# island} other {# islands}}",
+      peopled: "{n} with helpers",
+      working: "{n}/{of} being worked on",
+      queued: "{n} queued",
+      stake: "A free spot: click to send work",
+      locked: "Every spot taken",
+      sack: "Queued work",
+      send: "Send a ticket · {project}",
+      plot: "{name}'s plot",
+      open: "A free spot: send a ticket to {project}",
+      wait: "Waiting for a plot",
+      queuedTip: "Queued: {title}",
+      queuedLabel: "Queued work: {title}",
+      enter: "Enter {project}'s farm",
+      enterWord: "Enter",
+      homeless: "Not in any project: ",
+      sea: "No projects in the work folder yet: the map is all sea.",
+      notDrafted: "Not drafted: {why}",
+      sowIntro: "Planting in {project}: write a line on what to do, and the manager sends a helper; or write it as a to-do first and start it after a look.",
+      job: "What to do",
+      jobExample: "Such as: add Remember me to the sign-in page",
+      todo: "Write it as a to-do",
+      sow: "Plant it",
+      gone: "This project is no longer in the work folder; only the helpers still on the island are left.",
+      worktrees: "worktrees · {n}",
+      noHelpers: "No helpers on the island yet: each ticket sent here adds a worktree.",
+      noMore: "No more work is sent here.",
+      canSend: "{n} more tickets can start at once (this project takes at most {of} helpers at a time).",
+      shut: "{n} tickets are already being worked on: new work queues.",
+      full: "Full: all {n} helpers are working, so new work queues.",
+      queue: "Queued · {n}",
+      see: "See this ticket",
+      growth: "Growth · {label}",
+      growthSince: "Growth · {label} · last commit {since}",
+      crop: { never: "never dug", day: "thriving", week: "growing", month: "sprouting", quarter: "drying out", older: "gone wild" },
+      island: {
+        branch: "\nbranch {branch}",
+        open: "Free spot: send a ticket here and it starts at once",
+        shut: "{n} tickets are already being worked on: wait for one to finish",
+        gone: "no longer in the work folder",
+        working: "{full, select, true {working {n}/{of} (full)} other {working {n}/{of}}}",
+        queued: "{n} queued",
+      },
+    },
     "web.farm.phone": {
       ringing: "Incoming…",
       decline: "Decline",
@@ -6082,6 +6136,14 @@ export const catalogs = {
         next: "Next",
       },
       chatTab: "CHAT",
+    },
+    "web.inbox": {
+      tray: {
+        working: "{n, plural, one {# helper working} other {# helpers working}}",
+        idle: "Open, nothing being worked on",
+        off: "Not open yet",
+        unread: "{n} unread in the channels",
+      },
     },
     "web.issue": {
       reading: "Reading…",
@@ -6243,15 +6305,15 @@ export const catalogs = {
         unsure: "Not sure about",
         next: "Suggested next",
         conflict: "Merging into {base} would conflict: {files}",
-        graphStep: 'A step of the plan "{graph}"',
+        graphStep: 'A task of the plan "{graph}"',
         backToGraph: "Back to the plan",
       },
       task: {
         label: "Plan",
-        steps: "{n, plural, one {# step} other {# steps}}",
-        done: "{done} / {of} steps done",
-        waitsForYou: "A step is waiting for you: open it to answer or review.",
-        splitting: "The manager is splitting it into steps; they will be listed below.",
+        steps: "{n, plural, one {# task} other {# tasks}}",
+        done: "{done} / {of} tasks done",
+        waitsForYou: "A task is waiting for you: open it to answer or review.",
+        splitting: "The manager is splitting it into tasks; they will be listed below.",
         ok: "Done.",
         check: "Check",
         scope: "Where it changes",
@@ -6264,19 +6326,19 @@ export const catalogs = {
         state: "State",
         project: "Project",
         progress: "Progress",
-        progressLine: "{done} / {of} steps",
+        progressLine: "{done} / {of} tasks",
         parallel: "At once",
-        atMost: "at most {n} steps",
+        atMost: "at most {n} tasks",
         written: "Written",
         note: "Note",
         abandonTitle: "{abandon} this plan?",
-        abandonLine: "The steps not done yet are not sent out; the plan's branch stays, with every commit made so far.",
+        abandonLine: "The tasks not done yet are not sent out; the plan's branch stays, with every commit made so far.",
         abandon: "Abandon it",
         reading: "Looking at what the plan's branch changed…",
         behind: "Meanwhile {base} got {n} more commits",
         merge: "Merge into {base}",
         layer: "Batch {n}",
-        layerTogether: "Batch {n} · these {size} steps can run at once",
+        layerTogether: "Batch {n} · these {size} tasks can run at once",
         waitsOn: 'waiting for "{steps}"',
         stepSeparator: '", "',
         conflict: "Merging into {base} would conflict: {files}. Not merging until the changes on {base} are sorted out.",
@@ -6336,9 +6398,9 @@ export const catalogs = {
         newIssue: "New ticket",
       },
       graph: {
-        splitting: "splitting into steps",
+        splitting: "splitting into tasks",
         draft: "split: look it over, then start",
-        running: "{done} / {total} steps done",
+        running: "{done} / {total} tasks done",
         paused: "paused",
         ready: "all done, waiting for you to merge into main",
         done: "merged into main",
@@ -6370,8 +6432,8 @@ export const catalogs = {
         nth: "attempt {n}",
         open: "open for {took}",
         used: "took {took}",
-        turn: "round {n}",
-        turns: "{n, plural, one {# round} other {# rounds}}",
+        run: "round {n}",
+        runs: "{n, plural, one {# round} other {# rounds}}",
         orchestratorWorking: "the manager is on it",
         missingFlag: "Record missing",
         graph: "Plan: {title}",
@@ -6391,7 +6453,7 @@ export const catalogs = {
         stuck: "Stuck",
         canceled: "Canceled",
         reopenLine: "To have it carry on, reopen it: write a line on what to do this time.",
-        inGraph: "This is a step of a plan, and goes with the plan.",
+        inGraph: "This is a task of a plan, and goes with the plan.",
         splitting: 'Splitting the plan "{graph}": reading code only, changing no files.',
         editing: "{who} is changing the code",
         history: "{n} times: {line}",
@@ -6409,7 +6471,7 @@ export const catalogs = {
         whoRuntime: "{name} ({runtime})",
         changes: "{branch} → {base} · {commits} commits · +{added} -{removed}",
         changesUncommitted: "{branch} → {base} · {commits} commits · +{added} -{removed} · {uncommitted} uncommitted",
-        graphStep: 'A step of the plan "{graph}": {step}. When done it merges into the plan\'s branch by itself, and reaches main when the whole plan does.',
+        graphStep: 'A task of the plan "{graph}": {step}. When done it merges into the plan\'s branch by itself, and reaches main when the whole plan does.',
         justNow: "just now",
       },
     },
@@ -6419,7 +6481,7 @@ export const catalogs = {
         open: "On",
         closed: "Off",
         intro:
-          "Once on, a phone or another computer on the same local network can scan to pair, then use VibeValley on this computer: see helpers, send work, talk in the farm chat.",
+          "Once on, a phone or another computer on the same local network can scan to pair, then use VibeValley on this computer: see helpers, send work, talk in the channels.",
         allow: "Allow connections",
         address: "Address",
         add: "Add a device",
@@ -6452,7 +6514,7 @@ export const catalogs = {
       pair: {
         title: "Connect to that computer",
         intro:
-          "This device connects to VibeValley on that computer and, like the owner, sees helpers, sends work and talks in the farm chat. Pairing needs the owner's approval on that computer.",
+          "This device connects to VibeValley on that computer and, like the owner, sees helpers, sends work and talks in the channels. Pairing needs the owner's approval on that computer.",
         code: "Pairing code",
         codeHint: "On that computer, press Add a device under Connect to this machine",
         name: "This device is called",
@@ -6468,9 +6530,9 @@ export const catalogs = {
         sessions: "{name} remembered",
         own: "it remembered",
         intro:
-          'The helpers sent from this agent share one memory. At the start of each round, the few notes that bear on it go before what it hears; at the end, the "Remember:" lines in its report, and how far the job got, are kept.',
-        jobs: "Jobs in hand",
-        noJobs: "Its helpers have not finished a round yet.",
+          'The helpers sent from this agent share one memory. At the start of each round, the few notes that bear on it go before what it hears; at the end, the "Remember:" lines in its report, and how far the ticket got, are kept.',
+        issues: "Tickets in hand",
+        noIssues: "Its helpers have not finished a round yet.",
         helper: "Helper",
         allProjects: "All projects",
         notes: "Remembered",
@@ -6526,14 +6588,6 @@ export const catalogs = {
         recalledLast: "recalled {n} times, last {last}",
       },
     },
-    "web.notice": {
-      tray: {
-        working: "{n, plural, one {# helper working} other {# helpers working}}",
-        idle: "Open, nothing being worked on",
-        off: "Not open yet",
-        unread: "{n} unread in the chat",
-      },
-    },
     "web.orchestrator": {
       looks: {
         farmer: { name: "Young farmer", blurb: "Straw hat and overalls, always smiling." },
@@ -6568,40 +6622,47 @@ export const catalogs = {
       allLine: "The whole map: an island for each project",
       notGit: "Not a git repository yet",
       finding: "Looking…",
-      none: "No projects in the work folder yet. Press New project to break new ground, or download one from GitHub.",
+      none: "No projects in the work folder yet. Press New project to add one, or download one from GitHub.",
       copied: "Copied: {path}",
       notCopied: "Cannot copy: select the path and copy it yourself.",
-      growth: "Growth: {label}",
-      growthTag: "Growth · {label}",
-      broken: "Broken ground",
-      neverDug: "Never dug",
-      tilled: "Tilled",
+      recency: {
+        label: "Last commit: {label}",
+        never: "No commits yet",
+        day: "Committed in the last day",
+        week: "Committed in the last week",
+        month: "Committed in the last month",
+        quarter: "Committed in the last three months",
+        older: "No commits for three months",
+      },
+      firstCommit: "First commit",
+      noCommits: "No commits yet",
+      commitCount: "Commits",
       commits: "{n} commits",
-      crops: "Crops",
+      code: "Code",
       lines: "{n} lines",
       uncounted: "Not counted",
-      planted: "Planted",
-      kinds: "{n} kinds",
+      languages: "Languages",
+      kinds: "{n}",
       copyPath: "Copy the path",
       counting: "Counting…",
       recount: "Count again",
       countedAgo: "counted {ago}",
-      whatPlanted: "What is planted",
+      whatLanguages: "Languages used",
       byLines: "By lines, blank lines left out · counted by tokei",
       linesAndFiles: "{lines} lines · {files} files",
-      empty: "This plot is still bare: no code that can be counted.",
-      noTokei: "Counting crops needs tokei, which is not on this computer yet.",
+      empty: "No code that can be counted yet.",
+      noTokei: "Counting lines needs tokei, which is not on this computer yet.",
       install: "Install it in a terminal: ",
       or: " (or ",
       thenRecount: "), then press Count again above.",
-      level: { "0": "bare", "1": "seeded", "2": "sprouted", "3": "leafy", "4": "flowering" },
-      year: "The past year · a cell a day, taller with more commits",
+      level: { "0": "none", "1": "a few", "2": "some", "3": "many", "4": "the most" },
+      year: "The past year · a cell a day, fuller with more commits",
       dayCommits: "{n} commits, {level}",
-      untouched: "untouched",
+      noCommitsThatDay: "no commits",
       busiest: "Busiest day: {day}, {n} commits",
-      calendar: "Tilling calendar",
+      calendar: "Commit calendar",
       inYear: "In a year",
-      daysWorked: "Days worked",
+      daysWorked: "Days with commits",
       days: "{n, plural, one {# day} other {# days}}",
       longest: "Longest streak",
       current: "Current streak",
@@ -6615,7 +6676,7 @@ export const catalogs = {
       times: "{n}",
       rest: "{people} more, {commits} in all.",
       how: "How",
-      fresh: "Break new ground",
+      fresh: "Start empty",
       github: "Visit a neighbor",
       githubAddress: "GitHub address",
       githubHint: "A public repository's home page. Once downloaded, you can see the project and set helpers on it.",
@@ -6623,57 +6684,12 @@ export const catalogs = {
       nameHint: "Kept in the work folder; a project of the same name is never overwritten.",
       nameExample: "such as raft-source",
       downloading: "Downloading the repository… a big one takes longer, up to 3 minutes.",
-      making: "Breaking ground…",
+      making: "Creating…",
       cancel: "Cancel",
       busy: "Working…",
       download: "Download to the work folder",
       create: "Create the project",
-      map: {
-        islands: "{n, plural, one {# island} other {# islands}}",
-        peopled: "{n} with helpers",
-        working: "{n}/{of} being worked on",
-        queued: "{n} queued",
-        stake: "A free spot: click to send work",
-        locked: "Every spot taken",
-        sack: "Queued work",
-        send: "Send a job · {project}",
-        plot: "{name}'s plot",
-        open: "A free spot: send a job to {project}",
-        wait: "Waiting for a plot",
-        queuedTip: "Queued: {title}",
-        queuedLabel: "Queued work: {title}",
-        enter: "Enter {project}'s farm",
-        enterWord: "Enter",
-        homeless: "Not in any project: ",
-        sea: "No projects in the work folder yet: the map is all sea.",
-        notDrafted: "Not drafted: {why}",
-        sowIntro: "Planting in {project}: write a line on what to do, and the manager sends a helper; or write it as a to-do first and start it after a look.",
-        job: "What to do",
-        jobExample: "Such as: add Remember me to the sign-in page",
-        todo: "Write it as a to-do",
-        sow: "Plant it",
-        gone: "This project is no longer in the work folder; only the helpers still on the island are left.",
-        worktrees: "worktrees · {n}",
-        noHelpers: "No helpers on the island yet: each job sent here adds a worktree.",
-        noMore: "No more work is sent here.",
-        canSend: "{n} more jobs can start at once (this project takes at most {of} helpers at a time).",
-        shut: "{n} tickets are already being worked on: new work queues.",
-        full: "Full: all {n} helpers are working, so new work queues.",
-        queue: "Queued · {n}",
-        see: "See this ticket",
-        growth: "Growth · {label}",
-        growthSince: "Growth · {label} · last commit {since}",
-      },
-      project: {
-        otherLang: "Other",
-        growth: { empty: "never dug", flowering: "thriving", leafy: "growing", sprout: "sprouting", dry: "drying out", withered: "gone wild" },
-        branch: "\nbranch {branch}",
-        open: "Free spot: send a job here and it starts at once",
-        shut: "{n} tickets are already being worked on: wait for one to finish",
-        gone: "no longer in the work folder",
-        working: "{full, select, true {working {n}/{of} (full)} other {working {n}/{of}}}",
-        queued: "{n} queued",
-      },
+      otherLang: "Other",
     },
     "web.runtime": {
       capability: {
@@ -6743,7 +6759,7 @@ export const catalogs = {
       default: "Default",
       maxWorking: "At most at once",
       maxWorkingHint:
-        "How many helpers using it may work at once, useful when the provider limits concurrency. At the limit, new work waits until one finishes. Empty, only the workspace's limit applies (6 tickets at once).",
+        "How many helpers using it may work at once, useful when the provider limits concurrency. At the limit, new work waits until one finishes. Empty, only VibeValley's overall limit applies (6 tickets at once).",
       noLimit: "No separate limit",
       budget: "Daily budget (¥)",
       budgetLabel: "Daily budget",
@@ -6829,7 +6845,7 @@ export const catalogs = {
         pending: "Not returned yet",
         noOutput: "No output",
       },
-      rounds: {
+      runs: {
         farm: {
           channel_message_send: "speaking in the chat",
           channel_message_list: "reading the chat",
@@ -6849,8 +6865,9 @@ export const catalogs = {
           tool: "Tool",
         },
         earlier: "Earlier steps",
+        unasked: "A round it began itself",
         subagentGot: "Subagent got",
-        job: "Ticket",
+        issue: "Ticket",
         told: "Passed on",
         usedTools: "{n, plural, one {used # tool} other {used # tools}}",
         process: "This round's work",
@@ -6859,14 +6876,14 @@ export const catalogs = {
       },
       trajectory: {
         lane: { asked: "Heard", model: "Model", tool: "Tool" },
-        rounds: "{n, plural, one {# round} other {# rounds}}",
+        runs: "{n, plural, one {# round} other {# rounds}}",
         steps: "{n, plural, one {# step} other {# steps}}",
         modelTime: "model {took}",
         toolTime: "tools {took}",
         cacheHit: "cache hit {pct}%",
         tokens: "input {input} / output {output} tokens",
         quiet: "Nothing yet.",
-        round: "Round {n}",
+        run: "Round {n}",
         earlier: "Earlier",
         search: "Search the trajectory",
         searchHint: "Search",
@@ -6886,8 +6903,8 @@ export const catalogs = {
         neverSent: "Nothing sent out yet.",
         sent: "Helpers sent out",
         here: "Here",
-        hired: "took the job {ago}",
-        hiredAndLeft: "took the job {hired} · left {left}",
+        hired: "took the ticket {ago}",
+        hiredAndLeft: "took the ticket {hired} · left {left}",
         pick: "Pick a helper to see its trajectory.",
       },
     },
@@ -6949,7 +6966,7 @@ export const catalogs = {
       words: {
         general: "language start open workbench farm",
         appearance: "theme dark light size zoom scale font",
-        models: "DeepSeek key model orchestrator",
+        models: "DeepSeek key model manager",
         about: "version home folder settings file",
         memory: "Nowledge EverOS memory recall",
         skills: "skill library",
@@ -6960,9 +6977,9 @@ export const catalogs = {
         chat: "WeChat Feishu Lark QQ connectors pairing",
         devices: "phone pairing connect to this machine LAN",
       },
-      scope: { farm: "For the whole farm", device: "This device only" },
+      scope: { farm: "For all of VibeValley", device: "This device only" },
       general: {
-        languageHint: "The page, the orchestrator and the helpers all speak it",
+        languageHint: "The page, the manager and the helpers all speak it",
         start: "Open on start",
         startHint: "Where the app, or the home page, opens",
         starts: { workbench: "Workbench", farm: "Farm" },
@@ -6975,14 +6992,14 @@ export const catalogs = {
         scale: "Interface size",
         scaleHint: "Scales the whole workbench; the farm keeps its whole-number scaling",
       },
-      models: { intro: "The models the orchestrator and VibeValley's own helpers use.", deepseekHint: "The orchestrator and VibeValley's own helpers use it" },
-      memory: { intro: "Helpers can also look things up in, and write to, memory outside the farm." },
+      models: { intro: "The models the manager and VibeValley's own helpers use.", deepseekHint: "The manager and VibeValley's own helpers use it" },
+      memory: { intro: "Helpers can also look things up in, and write to, memory outside VibeValley." },
       about: {
         version: "Version",
         versionHint: "The server on this machine",
         files: "Files",
         home: "Home folder",
-        homeHint: "Everything of the farm is here",
+        homeHint: "Everything VibeValley keeps is here",
         settings: "Settings file",
         settingsHint: "The keys and these pages' settings",
         copy: "Copy the path",
@@ -6994,7 +7011,7 @@ export const catalogs = {
         checking: "Looking for a new version…",
         downloading: "Downloading {next} ({percent}%)",
         ready: "{next} is ready and goes in when you quit",
-        readyNewFarm: "{next} is ready: it starts a new farm and keeps the old one aside",
+        readyNewFarm: "{next} is ready: it starts from fresh data and keeps the old aside",
         manual: {
           diskImage: "{next} needs installing by hand: the app runs from its disk image; drag it to Applications first",
           translocated: "{next} needs installing by hand: macOS runs the app from a temporary place; drag it to Applications and open it again",
@@ -7006,7 +7023,7 @@ export const catalogs = {
         restart: "Restart to update",
         restartQuestion: "Restart into the new version?",
         workingQuestion: "{n} helpers are working; restarting cuts them off. Restart now?",
-        newFarmQuestion: "The new version starts a new farm; the old one stays in the home folder. Restart now?",
+        newFarmQuestion: "The new version starts from fresh data; the old stays in the home folder. Restart now?",
         download: "Download",
       },
     },
@@ -7106,7 +7123,7 @@ export const catalogs = {
         saved: "Saved: the next call uses it.",
         answer: {
           orchestrator:
-            "The manager of the farm chat itself takes the call: it sees how things are, sends work itself, and remembers what you said. Agora reaches one endpoint on this computer through a public address (voice.line.url in the configuration, such as Tailscale Funnel; cloudflared opened for the call when unset); only that endpoint is exposed, with a key per call.",
+            "The channel's manager itself takes the call: it sees how things are, sends work itself, and remembers what you said. Agora reaches one endpoint on this computer through a public address (voice.line.url in the configuration, such as Tailscale Funnel; cloudflared opened for the call when unset); only that endpoint is exposed, with a key per call.",
           agora: "A model hosted by Agora, no other key needed.",
           deepseek: "Uses the DeepSeek key in the settings ({from}).",
           noDeepseek: "Uses the DeepSeek key in the settings, which is not there yet: fill it in under Settings.",
@@ -7158,7 +7175,7 @@ export const catalogs = {
           page: "page.",
           open: "Opening",
           openParts: "Persona · greeting",
-          ownCall: "The manager takes the call itself: it is the manager of the farm chat, with its own prompt and no separate persona.",
+          ownCall: "The manager takes the call itself: it is the channel's manager, with its own prompt and no separate persona.",
           persona: "Persona",
           personaHint:
             "Who the model that answers first on the call is, and how it speaks. It cannot see how things are; the manager on this computer sends work. Tell it not to make up progress.",
@@ -7655,6 +7672,43 @@ export interface Messages {
   "server.game.tier.gold": { readonly title: string | number };
   "server.game.tier.silver": { readonly title: string | number };
   "server.helperRef": { readonly id: string | number };
+  "server.inbox.conflictFiles": { readonly files: number };
+  "server.inbox.item.ask.label": undefined;
+  "server.inbox.item.ask.title": { readonly who: string | number };
+  "server.inbox.item.conflict.label": undefined;
+  "server.inbox.item.conflict.title": { readonly who: string | number };
+  "server.inbox.item.conflict.tray": { readonly who: string | number };
+  "server.inbox.item.cron-ask.body": { readonly text: string | number };
+  "server.inbox.item.cron-ask.label": undefined;
+  "server.inbox.item.cron-ask.title": undefined;
+  "server.inbox.item.cron-ask.tray": { readonly text: string | number };
+  "server.inbox.item.fix.label": undefined;
+  "server.inbox.item.fix.title": { readonly who: string | number };
+  "server.inbox.item.fix.tray": { readonly who: string | number };
+  "server.inbox.item.graph-draft.body": undefined;
+  "server.inbox.item.graph-draft.label": undefined;
+  "server.inbox.item.graph-draft.title": { readonly text: string | number };
+  "server.inbox.item.graph-draft.tray": { readonly text: string | number };
+  "server.inbox.item.graph-ready.body": undefined;
+  "server.inbox.item.graph-ready.label": undefined;
+  "server.inbox.item.graph-ready.title": { readonly text: string | number };
+  "server.inbox.item.graph-ready.tray": { readonly text: string | number };
+  "server.inbox.item.interrupted.title": { readonly who: string | number };
+  "server.inbox.item.mention.label": undefined;
+  "server.inbox.item.mention.title": { readonly who: string | number };
+  "server.inbox.item.quiet.body": undefined;
+  "server.inbox.item.quiet.label": undefined;
+  "server.inbox.item.quiet.title": { readonly who: string | number };
+  "server.inbox.item.quiet.tray": { readonly who: string | number };
+  "server.inbox.item.review.label": undefined;
+  "server.inbox.item.review.title": { readonly who: string | number };
+  "server.inbox.item.review.tray": { readonly who: string | number };
+  "server.inbox.item.task-failed.body": undefined;
+  "server.inbox.item.task-failed.label": undefined;
+  "server.inbox.item.task-failed.title": { readonly text: string | number };
+  "server.inbox.item.task-failed.tray": { readonly text: string | number };
+  "server.inbox.orchestrator": undefined;
+  "server.inbox.step": { readonly graph: string | number; readonly step: string | number };
   "server.issue.brief.answer": { readonly conclusion: string | number };
   "server.issue.brief.answerUnread": { readonly problem: string | number };
   "server.issue.brief.closed": { readonly closed: string | number };
@@ -7831,7 +7885,6 @@ export interface Messages {
   "server.lookIn.channel": undefined;
   "server.lookIn.cron": undefined;
   "server.lookIn.device": undefined;
-  "server.lookIn.doc": undefined;
   "server.lookIn.graph": undefined;
   "server.lookIn.issue": undefined;
   "server.lookIn.memories": undefined;
@@ -7863,43 +7916,6 @@ export interface Messages {
   "server.memory.source.nowledge": undefined;
   "server.memory.stopped": undefined;
   "server.memory.unknownSource": undefined;
-  "server.notice.conflictFiles": { readonly files: number };
-  "server.notice.item.ask.label": undefined;
-  "server.notice.item.ask.title": { readonly who: string | number };
-  "server.notice.item.conflict.label": undefined;
-  "server.notice.item.conflict.title": { readonly who: string | number };
-  "server.notice.item.conflict.tray": { readonly who: string | number };
-  "server.notice.item.cron-ask.body": { readonly text: string | number };
-  "server.notice.item.cron-ask.label": undefined;
-  "server.notice.item.cron-ask.title": undefined;
-  "server.notice.item.cron-ask.tray": { readonly text: string | number };
-  "server.notice.item.fix.label": undefined;
-  "server.notice.item.fix.title": { readonly who: string | number };
-  "server.notice.item.fix.tray": { readonly who: string | number };
-  "server.notice.item.graph-draft.body": undefined;
-  "server.notice.item.graph-draft.label": undefined;
-  "server.notice.item.graph-draft.title": { readonly text: string | number };
-  "server.notice.item.graph-draft.tray": { readonly text: string | number };
-  "server.notice.item.graph-ready.body": undefined;
-  "server.notice.item.graph-ready.label": undefined;
-  "server.notice.item.graph-ready.title": { readonly text: string | number };
-  "server.notice.item.graph-ready.tray": { readonly text: string | number };
-  "server.notice.item.interrupted.title": { readonly who: string | number };
-  "server.notice.item.mention.label": undefined;
-  "server.notice.item.mention.title": { readonly who: string | number };
-  "server.notice.item.quiet.body": undefined;
-  "server.notice.item.quiet.label": undefined;
-  "server.notice.item.quiet.title": { readonly who: string | number };
-  "server.notice.item.quiet.tray": { readonly who: string | number };
-  "server.notice.item.review.label": undefined;
-  "server.notice.item.review.title": { readonly who: string | number };
-  "server.notice.item.review.tray": { readonly who: string | number };
-  "server.notice.item.task-failed.body": undefined;
-  "server.notice.item.task-failed.label": undefined;
-  "server.notice.item.task-failed.title": { readonly text: string | number };
-  "server.notice.item.task-failed.tray": { readonly text: string | number };
-  "server.notice.orchestrator": undefined;
-  "server.notice.step": { readonly graph: string | number; readonly step: string | number };
   "server.orchestrator.cannotStart": { readonly why: string | number };
   "server.orchestrator.label": undefined;
   "server.orchestrator.noKey": undefined;
@@ -8256,9 +8272,9 @@ export interface Messages {
   "server.task.notice.splitBy": { readonly name: string | number };
   "server.task.notice.splitNotSaved": { readonly branch: string | number; readonly why: string | number };
   "server.task.notice.splitStopped": undefined;
-  "server.task.notice.stepFailed": { readonly graph: string | number; readonly step: string | number; readonly why: string | number };
   "server.task.notice.stepNotSaved": { readonly title: string | number; readonly why: string | number };
   "server.task.notice.stepStopped": { readonly title: string | number };
+  "server.task.notice.taskFailed": { readonly graph: string | number; readonly task: string | number; readonly why: string | number };
   "server.task.notice.unknownFiles": { readonly why: string | number };
   "server.task.notice.waits": { readonly title: string | number; readonly why: string | number };
   "server.task.parse.array": { readonly at: string | number };
@@ -8479,6 +8495,7 @@ export interface Messages {
   "web.agent.libraryTip": undefined;
   "web.agent.list.disable": undefined;
   "web.agent.list.enable": undefined;
+  "web.agent.list.helpers": undefined;
   "web.agent.list.here": { readonly n: string | number };
   "web.agent.list.hired": undefined;
   "web.agent.list.intro": undefined;
@@ -8492,7 +8509,6 @@ export interface Messages {
   "web.agent.list.title": undefined;
   "web.agent.list.toggle": { readonly act: string | number; readonly name: string | number };
   "web.agent.list.voice": undefined;
-  "web.agent.list.workers": undefined;
   "web.agent.loading": undefined;
   "web.agent.looksAs": undefined;
   "web.agent.looksHint": undefined;
@@ -8552,8 +8568,8 @@ export interface Messages {
   "web.agent.remove": undefined;
   "web.agent.removeNamed": { readonly name: string | number };
   "web.agent.removeWhich": { readonly name: string | number };
+  "web.agent.role.helper": undefined;
   "web.agent.role.orchestrator": undefined;
-  "web.agent.role.worker": undefined;
   "web.agent.roleHint": undefined;
   "web.agent.runtimeDefault": undefined;
   "web.agent.runtimeDefaultModel": { readonly model: string | number };
@@ -8966,8 +8982,8 @@ export interface Messages {
   "web.channel.findMessages": undefined;
   "web.channel.helpers": undefined;
   "web.channel.inChannel": undefined;
-  "web.channel.jobs.empty": undefined;
-  "web.channel.jobs.thread": undefined;
+  "web.channel.issues.empty": undefined;
+  "web.channel.issues.thread": undefined;
   "web.channel.manage.archive": undefined;
   "web.channel.manage.archiveHint": undefined;
   "web.channel.manage.archivedTitle": undefined;
@@ -9067,7 +9083,7 @@ export interface Messages {
   "web.channel.switcher.title": undefined;
   "web.channel.tab.chat": undefined;
   "web.channel.tab.crons": undefined;
-  "web.channel.tab.jobs": undefined;
+  "web.channel.tab.issues": undefined;
   "web.channel.thread": undefined;
   "web.channel.threadEmpty": undefined;
   "web.channel.threadList.archive": { readonly title: string | number };
@@ -9438,6 +9454,53 @@ export interface Messages {
   "web.farm.log.said": undefined;
   "web.farm.log.spent": { readonly spent: string | number };
   "web.farm.log.you": undefined;
+  "web.farm.map.canSend": { readonly n: string | number; readonly of: string | number };
+  "web.farm.map.crop.day": undefined;
+  "web.farm.map.crop.month": undefined;
+  "web.farm.map.crop.never": undefined;
+  "web.farm.map.crop.older": undefined;
+  "web.farm.map.crop.quarter": undefined;
+  "web.farm.map.crop.week": undefined;
+  "web.farm.map.enter": { readonly project: string | number };
+  "web.farm.map.enterWord": undefined;
+  "web.farm.map.finding": undefined;
+  "web.farm.map.full": { readonly n: string | number };
+  "web.farm.map.gone": undefined;
+  "web.farm.map.growth": { readonly label: string | number };
+  "web.farm.map.growthSince": { readonly label: string | number; readonly since: string | number };
+  "web.farm.map.homeless": undefined;
+  "web.farm.map.island.branch": { readonly branch: string | number };
+  "web.farm.map.island.gone": undefined;
+  "web.farm.map.island.open": undefined;
+  "web.farm.map.island.queued": { readonly n: string | number };
+  "web.farm.map.island.shut": { readonly n: string | number };
+  "web.farm.map.island.working": { readonly full: boolean; readonly n: string | number; readonly of: string | number };
+  "web.farm.map.islands": { readonly n: number };
+  "web.farm.map.job": undefined;
+  "web.farm.map.jobExample": undefined;
+  "web.farm.map.locked": undefined;
+  "web.farm.map.noHelpers": undefined;
+  "web.farm.map.noMore": undefined;
+  "web.farm.map.notDrafted": { readonly why: string | number };
+  "web.farm.map.open": { readonly project: string | number };
+  "web.farm.map.peopled": { readonly n: string | number };
+  "web.farm.map.plot": { readonly name: string | number };
+  "web.farm.map.queue": { readonly n: string | number };
+  "web.farm.map.queued": { readonly n: string | number };
+  "web.farm.map.queuedLabel": { readonly title: string | number };
+  "web.farm.map.queuedTip": { readonly title: string | number };
+  "web.farm.map.sack": undefined;
+  "web.farm.map.sea": undefined;
+  "web.farm.map.see": undefined;
+  "web.farm.map.send": { readonly project: string | number };
+  "web.farm.map.shut": { readonly n: string | number };
+  "web.farm.map.sow": undefined;
+  "web.farm.map.sowIntro": { readonly project: string | number };
+  "web.farm.map.stake": undefined;
+  "web.farm.map.todo": undefined;
+  "web.farm.map.wait": undefined;
+  "web.farm.map.working": { readonly n: string | number; readonly of: string | number };
+  "web.farm.map.worktrees": { readonly n: string | number };
   "web.farm.menu.agents": undefined;
   "web.farm.menu.catalog": undefined;
   "web.farm.menu.chat": undefined;
@@ -9731,6 +9794,10 @@ export interface Messages {
   "web.farm.yard.taskBoard.label": undefined;
   "web.farm.yard.tasks.hint": undefined;
   "web.farm.yard.warehouse.hint": undefined;
+  "web.inbox.tray.idle": undefined;
+  "web.inbox.tray.off": undefined;
+  "web.inbox.tray.unread": { readonly n: string | number };
+  "web.inbox.tray.working": { readonly n: number };
   "web.issue.acts.carry": undefined;
   "web.issue.acts.goesOn": { readonly helper: string | number };
   "web.issue.acts.rejectWith": undefined;
@@ -9778,8 +9845,8 @@ export interface Messages {
   "web.issue.card.queued": undefined;
   "web.issue.card.quiet": { readonly took: string | number };
   "web.issue.card.refining": { readonly name: string | number };
-  "web.issue.card.turn": { readonly n: string | number };
-  "web.issue.card.turns": { readonly n: number };
+  "web.issue.card.run": { readonly n: string | number };
+  "web.issue.card.runs": { readonly n: number };
   "web.issue.card.used": { readonly took: string | number };
   "web.issue.card.waiting": { readonly ago: string | number };
   "web.issue.card.written": { readonly ago: string | number };
@@ -10125,12 +10192,12 @@ export interface Messages {
   "web.memory.memory.helper": undefined;
   "web.memory.memory.inSource": { readonly source: string | number };
   "web.memory.memory.intro": undefined;
-  "web.memory.memory.jobs": undefined;
+  "web.memory.memory.issues": undefined;
   "web.memory.memory.listed": undefined;
   "web.memory.memory.neverRecalled": undefined;
   "web.memory.memory.next": undefined;
   "web.memory.memory.noArchive": undefined;
-  "web.memory.memory.noJobs": undefined;
+  "web.memory.memory.noIssues": undefined;
   "web.memory.memory.noProjects": undefined;
   "web.memory.memory.note": undefined;
   "web.memory.memory.noteHint": undefined;
@@ -10166,10 +10233,6 @@ export interface Messages {
   "web.memory.memory.words": undefined;
   "web.memory.memory.wordsHint": undefined;
   "web.memory.memory.yours": undefined;
-  "web.notice.tray.idle": undefined;
-  "web.notice.tray.off": undefined;
-  "web.notice.tray.unread": { readonly n: string | number };
-  "web.notice.tray.working": { readonly n: number };
   "web.opening.cannotStart": { readonly why: string | number };
   "web.opening.label": undefined;
   "web.opening.waking": undefined;
@@ -10205,19 +10268,19 @@ export interface Messages {
   "web.project.add": undefined;
   "web.project.all": undefined;
   "web.project.allLine": undefined;
-  "web.project.broken": undefined;
   "web.project.busiest": { readonly day: string | number; readonly n: string | number };
   "web.project.busy": undefined;
   "web.project.byLines": undefined;
   "web.project.calendar": undefined;
   "web.project.cancel": undefined;
+  "web.project.code": undefined;
+  "web.project.commitCount": undefined;
   "web.project.commits": { readonly n: string | number };
   "web.project.copied": { readonly path: string | number };
   "web.project.copyPath": undefined;
   "web.project.countedAgo": { readonly ago: string | number };
   "web.project.counting": undefined;
   "web.project.create": undefined;
-  "web.project.crops": undefined;
   "web.project.current": undefined;
   "web.project.dayCommits": { readonly level: string | number; readonly n: string | number };
   "web.project.days": { readonly n: number };
@@ -10227,16 +10290,16 @@ export interface Messages {
   "web.project.empty": undefined;
   "web.project.fewer": undefined;
   "web.project.finding": undefined;
+  "web.project.firstCommit": undefined;
   "web.project.fresh": undefined;
   "web.project.github": undefined;
   "web.project.githubAddress": undefined;
   "web.project.githubHint": undefined;
-  "web.project.growth": { readonly label: string | number };
-  "web.project.growthTag": { readonly label: string | number };
   "web.project.how": undefined;
   "web.project.inYear": undefined;
   "web.project.install": undefined;
   "web.project.kinds": { readonly n: string | number };
+  "web.project.languages": undefined;
   "web.project.level.0": undefined;
   "web.project.level.1": undefined;
   "web.project.level.2": undefined;
@@ -10247,65 +10310,26 @@ export interface Messages {
   "web.project.list": undefined;
   "web.project.longest": undefined;
   "web.project.making": undefined;
-  "web.project.map.canSend": { readonly n: string | number; readonly of: string | number };
-  "web.project.map.enter": { readonly project: string | number };
-  "web.project.map.enterWord": undefined;
-  "web.project.map.full": { readonly n: string | number };
-  "web.project.map.gone": undefined;
-  "web.project.map.growth": { readonly label: string | number };
-  "web.project.map.growthSince": { readonly label: string | number; readonly since: string | number };
-  "web.project.map.homeless": undefined;
-  "web.project.map.islands": { readonly n: number };
-  "web.project.map.job": undefined;
-  "web.project.map.jobExample": undefined;
-  "web.project.map.locked": undefined;
-  "web.project.map.noHelpers": undefined;
-  "web.project.map.noMore": undefined;
-  "web.project.map.notDrafted": { readonly why: string | number };
-  "web.project.map.open": { readonly project: string | number };
-  "web.project.map.peopled": { readonly n: string | number };
-  "web.project.map.plot": { readonly name: string | number };
-  "web.project.map.queue": { readonly n: string | number };
-  "web.project.map.queued": { readonly n: string | number };
-  "web.project.map.queuedLabel": { readonly title: string | number };
-  "web.project.map.queuedTip": { readonly title: string | number };
-  "web.project.map.sack": undefined;
-  "web.project.map.sea": undefined;
-  "web.project.map.see": undefined;
-  "web.project.map.send": { readonly project: string | number };
-  "web.project.map.shut": { readonly n: string | number };
-  "web.project.map.sow": undefined;
-  "web.project.map.sowIntro": { readonly project: string | number };
-  "web.project.map.stake": undefined;
-  "web.project.map.todo": undefined;
-  "web.project.map.wait": undefined;
-  "web.project.map.working": { readonly n: string | number; readonly of: string | number };
-  "web.project.map.worktrees": { readonly n: string | number };
   "web.project.more": undefined;
   "web.project.name": undefined;
   "web.project.nameExample": undefined;
   "web.project.nameHint": undefined;
-  "web.project.neverDug": undefined;
+  "web.project.noCommits": undefined;
+  "web.project.noCommitsThatDay": undefined;
   "web.project.noTokei": undefined;
   "web.project.none": undefined;
   "web.project.notCopied": undefined;
   "web.project.notGit": undefined;
   "web.project.or": undefined;
-  "web.project.planted": undefined;
-  "web.project.project.branch": { readonly branch: string | number };
-  "web.project.project.gone": undefined;
-  "web.project.project.growth.dry": undefined;
-  "web.project.project.growth.empty": undefined;
-  "web.project.project.growth.flowering": undefined;
-  "web.project.project.growth.leafy": undefined;
-  "web.project.project.growth.sprout": undefined;
-  "web.project.project.growth.withered": undefined;
-  "web.project.project.open": undefined;
-  "web.project.project.otherLang": undefined;
-  "web.project.project.queued": { readonly n: string | number };
-  "web.project.project.shut": { readonly n: string | number };
-  "web.project.project.working": { readonly full: boolean; readonly n: string | number; readonly of: string | number };
+  "web.project.otherLang": undefined;
   "web.project.readingCommits": undefined;
+  "web.project.recency.day": undefined;
+  "web.project.recency.label": { readonly label: string | number };
+  "web.project.recency.month": undefined;
+  "web.project.recency.never": undefined;
+  "web.project.recency.older": undefined;
+  "web.project.recency.quarter": undefined;
+  "web.project.recency.week": undefined;
   "web.project.recount": undefined;
   "web.project.repos": undefined;
   "web.project.rest": { readonly commits: string | number; readonly people: string | number };
@@ -10317,12 +10341,10 @@ export interface Messages {
   "web.project.rows.5": undefined;
   "web.project.rows.6": undefined;
   "web.project.thenRecount": undefined;
-  "web.project.tilled": undefined;
   "web.project.times": { readonly n: string | number };
   "web.project.title": undefined;
   "web.project.uncounted": undefined;
-  "web.project.untouched": undefined;
-  "web.project.whatPlanted": undefined;
+  "web.project.whatLanguages": undefined;
   "web.project.who": undefined;
   "web.project.whoWhen": undefined;
   "web.project.year": undefined;
@@ -10472,32 +10494,33 @@ export interface Messages {
   "web.session.log.told": undefined;
   "web.session.log.tool": { readonly name: string | number };
   "web.session.log.unfold": undefined;
-  "web.session.rounds.earlier": undefined;
-  "web.session.rounds.farm.channel_message_list": undefined;
-  "web.session.rounds.farm.channel_message_send": undefined;
-  "web.session.rounds.farm.channel_unread_list": undefined;
-  "web.session.rounds.farm.other": { readonly tool: string | number };
-  "web.session.rounds.farm.session_list": undefined;
-  "web.session.rounds.job": undefined;
-  "web.session.rounds.process": undefined;
-  "web.session.rounds.span.cache": undefined;
-  "web.session.rounds.span.error": undefined;
-  "web.session.rounds.span.farm": undefined;
-  "web.session.rounds.span.heard": undefined;
-  "web.session.rounds.span.recalled": undefined;
-  "web.session.rounds.span.retry": undefined;
-  "web.session.rounds.span.said": undefined;
-  "web.session.rounds.span.thinking": undefined;
-  "web.session.rounds.span.tool": undefined;
-  "web.session.rounds.subagentGot": undefined;
-  "web.session.rounds.tag.said": undefined;
-  "web.session.rounds.tag.subagentSaid": undefined;
-  "web.session.rounds.tag.subagentThought": undefined;
-  "web.session.rounds.tag.thought": undefined;
-  "web.session.rounds.tag.usage": undefined;
-  "web.session.rounds.thoughtFor": { readonly n: string | number; readonly took: string | number };
-  "web.session.rounds.told": undefined;
-  "web.session.rounds.usedTools": { readonly n: number };
+  "web.session.runs.earlier": undefined;
+  "web.session.runs.farm.channel_message_list": undefined;
+  "web.session.runs.farm.channel_message_send": undefined;
+  "web.session.runs.farm.channel_unread_list": undefined;
+  "web.session.runs.farm.other": { readonly tool: string | number };
+  "web.session.runs.farm.session_list": undefined;
+  "web.session.runs.issue": undefined;
+  "web.session.runs.process": undefined;
+  "web.session.runs.span.cache": undefined;
+  "web.session.runs.span.error": undefined;
+  "web.session.runs.span.farm": undefined;
+  "web.session.runs.span.heard": undefined;
+  "web.session.runs.span.recalled": undefined;
+  "web.session.runs.span.retry": undefined;
+  "web.session.runs.span.said": undefined;
+  "web.session.runs.span.thinking": undefined;
+  "web.session.runs.span.tool": undefined;
+  "web.session.runs.subagentGot": undefined;
+  "web.session.runs.tag.said": undefined;
+  "web.session.runs.tag.subagentSaid": undefined;
+  "web.session.runs.tag.subagentThought": undefined;
+  "web.session.runs.tag.thought": undefined;
+  "web.session.runs.tag.usage": undefined;
+  "web.session.runs.thoughtFor": { readonly n: string | number; readonly took: string | number };
+  "web.session.runs.told": undefined;
+  "web.session.runs.unasked": undefined;
+  "web.session.runs.usedTools": { readonly n: number };
   "web.session.trajectory.cacheHit": { readonly pct: string | number };
   "web.session.trajectory.earlier": undefined;
   "web.session.trajectory.failed": undefined;
@@ -10518,9 +10541,9 @@ export interface Messages {
   "web.session.trajectory.pending": undefined;
   "web.session.trajectory.pick": undefined;
   "web.session.trajectory.quiet": undefined;
-  "web.session.trajectory.round": { readonly n: string | number };
-  "web.session.trajectory.rounds": { readonly n: number };
+  "web.session.trajectory.run": { readonly n: string | number };
   "web.session.trajectory.running": undefined;
+  "web.session.trajectory.runs": { readonly n: number };
   "web.session.trajectory.search": undefined;
   "web.session.trajectory.searchHint": undefined;
   "web.session.trajectory.sent": undefined;

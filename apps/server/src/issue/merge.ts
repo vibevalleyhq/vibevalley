@@ -2,14 +2,15 @@ import { Clock, Effect, Semaphore, Predicate } from "effect";
 import type { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
-import { type Issue, ownerId, type PullRequest, type PullRequestState } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { ownerId } from "@vibevalley/protocol";
 
-import type { Channels } from "@/channel/chat.ts";
+import type { Channel } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
-import type { Projects } from "@/project/project.ts";
+import type { Project } from "@/project/project.ts";
 import { type Merged, MergeFailure, type ProjectError, type Workplace } from "@/project/shapes.ts";
-import type { NotTakenIn, Sessions } from "@/session/session.ts";
+import type { NotTakenIn, Session } from "@/session/session.ts";
 
 import * as q from "../../db/generated/issue.sql.ts";
 import { pullRequestConclusion } from "./brief.ts";
@@ -17,13 +18,13 @@ import { statusMove } from "./moves.ts";
 
 export interface MergeDeps {
   readonly core: Core["Service"];
-  readonly sessions: Sessions["Service"];
-  readonly projects: Projects["Service"];
-  readonly chat: Channels["Service"];
+  readonly sessions: Session["Service"];
+  readonly projects: Project["Service"];
+  readonly chat: Channel["Service"];
   readonly db: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
   readonly inTx: <A, E>(e: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
-  readonly get: (ref: string) => Effect.Effect<Issue, ApiError>;
-  readonly list: Effect.Effect<Issue[]>;
+  readonly get: (ref: string) => Effect.Effect<T.Issue, ApiError>;
+  readonly list: Effect.Effect<T.Issue[]>;
   /** The issue's latest session, refused when it was never sent. */
   readonly latest: (id: string) => Effect.Effect<string, ApiError>;
   /** The issue's latest session while it is on the farm. */
@@ -52,7 +53,7 @@ export function merging(d: MergeDeps) {
   const handedOver = (id: string, use: (place: Workplace, said: string) => Effect.Effect<Merged, MergeFailure | ProjectError>) =>
     sessions.handOver(id, "merged", use).pipe(Effect.catchTag("NotTakenIn", (e) => Effect.flatMap(notTaken(id, e), Effect.fail)));
 
-  const mergeSession = Effect.fn("Issues.mergeSession")(function* (id: string) {
+  const mergeSession = Effect.fn("Issue.mergeSession")(function* (id: string) {
     const session = sessions.sessionOf(id);
     if (!session) return yield* Effect.fail(missing(t("server.issue.helperRef", { id }), [lookIn.session]));
     const merged = yield* handedOver(id, (place) => projects.merge(place));
@@ -60,9 +61,9 @@ export function merging(d: MergeDeps) {
     return merged.text;
   });
 
-  const savePullRequest = (id: string, pr: PullRequest) => Effect.andThen(db(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) })), publish(id));
+  const savePullRequest = (id: string, pr: T.PullRequest) => Effect.andThen(db(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) })), publish(id));
 
-  const pullRequestOf = Effect.fnUntraced(function* (place: Workplace, issue: Issue, said: string) {
+  const pullRequestOf = Effect.fnUntraced(function* (place: Workplace, issue: T.Issue, said: string) {
     const pr = yield* projects
       .submitPullRequest(place, issue, pullRequestConclusion(said))
       .pipe(Effect.mapError((e) => (Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(e.message))));
@@ -70,7 +71,7 @@ export function merging(d: MergeDeps) {
     return { pullRequest: pr, text: t("shared.join.labeled", { label: "PR", text: pr.url }), commits: 0 };
   });
 
-  const merge = Effect.fn("Issues.merge")(
+  const merge = Effect.fn("Issue.merge")(
     function* (id: string) {
       const issue = yield* get(id);
       // Whoever asks (the board, the command line, the orchestrator's tool) is held to the same table.
@@ -87,7 +88,7 @@ export function merging(d: MergeDeps) {
     (effect) => prLock.withPermits(1)(effect),
   );
 
-  const finishPullRequest = Effect.fnUntraced(function* (issue: Issue, state: PullRequestState) {
+  const finishPullRequest = Effect.fnUntraced(function* (issue: T.Issue, state: T.PullRequestState) {
     const closed = state === "closed" ? "dismissed" : "merged";
     const id = yield* latest(issue.id);
     if (sessions.find(id))

@@ -7,7 +7,7 @@
     "range": "{min} to {max}, default {fallback}",
     "saved": "Saved: the next call uses it.",
     "answer": {
-      "orchestrator": "The manager of the farm chat itself takes the call: it sees how things are, sends work itself, and remembers what you said. Agora reaches one endpoint on this computer through a public address (voice.line.url in the configuration, such as Tailscale Funnel; cloudflared opened for the call when unset); only that endpoint is exposed, with a key per call.",
+      "orchestrator": "The channel's manager itself takes the call: it sees how things are, sends work itself, and remembers what you said. Agora reaches one endpoint on this computer through a public address (voice.line.url in the configuration, such as Tailscale Funnel; cloudflared opened for the call when unset); only that endpoint is exposed, with a key per call.",
       "agora": "A model hosted by Agora, no other key needed.",
       "deepseek": "Uses the DeepSeek key in the settings ({from}).",
       "noDeepseek": "Uses the DeepSeek key in the settings, which is not there yet: fill it in under Settings.",
@@ -58,7 +58,7 @@
       "page": "page.",
       "open": "Opening",
       "openParts": "Persona · greeting",
-      "ownCall": "The manager takes the call itself: it is the manager of the farm chat, with its own prompt and no separate persona.",
+      "ownCall": "The manager takes the call itself: it is the channel's manager, with its own prompt and no separate persona.",
       "persona": "Persona",
       "personaHint": "Who the model that answers first on the call is, and how it speaks. It cannot see how things are; the manager on this computer sends work. Tell it not to make up progress.",
       "greeting": "Greeting",

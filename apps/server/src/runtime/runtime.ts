@@ -1,22 +1,26 @@
+import { join } from "node:path";
 // The runtimes the farm can run helpers on: oar's, VibeValley's own agent and DeepSeek Harness.
 // Each is probed for whether it is installed, its models, its account's quota and what it carries (skills, MCP servers,
 // tools); probing runs a runtime's own commands, so the answers are kept and asked again only on a refresh, the quota
 // every five minutes and soon after a run. What each runtime spent today is kept in spend.json, and a runtime past its
 // day's budget takes no work.
 
-import { join } from "node:path";
-
-import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
+import {
+  type AvailableInstallation,
+  defaultRuntimes,
+  type InstallationSnapshot,
+  type InventoryReader,
+  type Runtime as OarRuntime,
+  RuntimeRegistry,
+} from "@botiverse/oar";
 import { Clock, Context, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, Schedule, Schema } from "effect";
 
 import { Llm } from "@vibevalley/ai/llm";
 import { currentLocale, type Locale, t } from "@vibevalley/i18n";
-import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { modelClient } from "@/agent/model.ts";
-import { factsOf, presetOf, runtimeIds, runtimeLabel } from "@/agent/seed.ts";
-import { dbStores } from "@/agent/taskStore.ts";
 import { projectsDir, ServerConfig } from "@/base/config.ts";
 import { FileWriter } from "@/base/files.ts";
 import { jsonOrNone } from "@/base/json.ts";
@@ -29,8 +33,10 @@ import { Setting } from "@/setting/setting.ts";
 import { dshRuntime } from "./dsh.ts";
 import { agentProblems, type Candidate, chooseAgent, sessionOptions } from "./fit.ts";
 import { piBalance } from "./pi.ts";
+import { factsOf, presetOf, runtimeIds, runtimeLabel } from "./presets.ts";
 import { inCny, price, type Rate } from "./price.ts";
 import { moneyStop, quotaOf } from "./quota.ts";
+import { dbTodoStores } from "./todoStore.ts";
 import { vibevalleyRuntimeOf } from "./vibevalley.ts";
 
 /** Past this a probe counts as unknown. */
@@ -43,17 +49,17 @@ const spendPushAfterMs = 3_000;
 
 /** Dispatch eligibility with the runtime state that explains it. */
 export interface Assessment {
-  readonly agent: Agent;
-  readonly info: RuntimeInfo | undefined;
-  readonly problems: AgentProblem[];
-  readonly blocking: AgentProblem[];
+  readonly agent: T.Agent;
+  readonly info: T.RuntimeInfo | undefined;
+  readonly problems: T.AgentProblem[];
+  readonly blocking: T.AgentProblem[];
 }
 
 export const usable = (a: Assessment) => a.agent.enabled && a.blocking.length === 0;
 
 /** What a session needs once the profile's choices and the runtime's defaults are reconciled. */
 export interface Resolved {
-  readonly runtime: Runtime;
+  readonly runtime: OarRuntime;
   /** The installation the last probe found, when it was probed with the binary the settings name now. */
   readonly installation?: AvailableInstallation;
   readonly binPath: string;
@@ -62,24 +68,24 @@ export interface Resolved {
   readonly env: Record<string, string>;
 }
 
-export class Runtimes extends Context.Service<
-  Runtimes,
+export class Runtime extends Context.Service<
+  Runtime,
   {
     /** Answers at once: a runtime not looked at yet comes as checking, and its probe's answer follows as a runtime event. */
-    readonly list: () => RuntimeInfo[];
-    readonly refresh: (id: string) => Effect.Effect<RuntimeInfo | undefined>;
-    readonly info: (id: string) => Effect.Effect<RuntimeInfo | undefined>;
-    readonly update: (id: string, s: RuntimeSettings) => Effect.Effect<RuntimeInfo | undefined, ApiError>;
+    readonly list: () => T.RuntimeInfo[];
+    readonly refresh: (id: string) => Effect.Effect<T.RuntimeInfo | undefined>;
+    readonly info: (id: string) => Effect.Effect<T.RuntimeInfo | undefined>;
+    readonly update: (id: string, s: T.RuntimeSettings) => Effect.Effect<T.RuntimeInfo | undefined, ApiError>;
     /** The profile's problems as it would be dispatched now. */
-    readonly problemsOf: (agent: Agent) => Effect.Effect<AgentProblem[]>;
-    readonly assess: (agent: Agent) => Effect.Effect<Assessment>;
+    readonly problemsOf: (agent: T.Agent) => Effect.Effect<T.AgentProblem[]>;
+    readonly assess: (agent: T.Agent) => Effect.Effect<Assessment>;
     /** Every profile, and whether it can be sent now. */
     readonly candidates: Effect.Effect<Candidate[]>;
     /** Who the farm sends for a task now: chooseAgent over the candidates. */
-    readonly choose: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
+    readonly choose: (brief: string, named: string, picked: string) => Effect.Effect<T.Agent | undefined>;
     /** Validates the effective options on every opening; availability and spending only gate new work. */
-    readonly resolve: (agent: Agent) => Effect.Effect<Resolved, ApiError>;
-    readonly runtime: (id: string) => Runtime | undefined;
+    readonly resolve: (agent: T.Agent) => Effect.Effect<Resolved, ApiError>;
+    readonly runtime: (id: string) => OarRuntime | undefined;
     readonly quote: (id: string, model: string) => Rate | undefined;
     readonly spend: (id: string, cny: number) => void;
     /** Reads the runtime's quota a little after a run, several runs sharing one read. */
@@ -88,7 +94,7 @@ export class Runtimes extends Context.Service<
 >()("vibevalley/Runtime") {
   static readonly layer = (options: RuntimeOptions = {}) =>
     Layer.effect(
-      Runtimes,
+      Runtime,
       Effect.gen(function* () {
         if (options.registry) return yield* make(options);
         const config = yield* ServerConfig;
@@ -102,7 +108,7 @@ export class Runtimes extends Context.Service<
           llm: (model) => modelClient(model, keys.deepseekApiKey, service),
           time,
           owner: { run: yield* FiberSet.makeRuntimePromise(), scope: yield* Effect.scope },
-          tasks: yield* dbStores,
+          todos: yield* dbTodoStores,
         });
         return yield* make({ ...options, registry: registryOf([own, dshRuntime]) });
       }),
@@ -110,27 +116,27 @@ export class Runtimes extends Context.Service<
 }
 
 /** What reads a runtime's account usage; tests put their own. */
-export type UsageOf = (id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings) => Promise<AccountUsage | null>;
+export type UsageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) => Promise<T.AccountUsage | null>;
 
 export interface RuntimeOptions {
   /** The runtimes; oar's defaults when none. */
   registry?: RuntimeRegistry;
   /** Answers a probe without asking the runtime: tests never ask this machine's runtimes. */
-  probe?: (id: string) => Promise<RuntimeInfo>;
+  probe?: (id: string) => Promise<T.RuntimeInfo>;
   usageOf?: UsageOf;
   /** The background reads (the first probe of every runtime, the quota every five minutes); off in tests. */
   background?: boolean;
 }
 
 /** The farm's runtimes: oar's and those the farm adds (VibeValley's own agent, DeepSeek Harness); one added with oar's id takes its place. */
-export function registryOf(extra: readonly Runtime[] = []) {
+export function registryOf(extra: readonly OarRuntime[] = []) {
   const added = new Set(extra.map((r) => r.id));
   return new RuntimeRegistry([...defaultRuntimes.list().filter((r) => !added.has(r.id)), ...extra]);
 }
 
 /** One accepted probe owns both what is shown and the installation later reads of its usage use. */
 interface Observation {
-  info: RuntimeInfo;
+  info: T.RuntimeInfo;
   found?: AvailableInstallation;
   read: number;
   /** The info holds words (why a runtime is unsupported, its quota): one probed in another language is probed again. */
@@ -157,7 +163,7 @@ const dayOf = (now: number) => {
  * oar's installation probes read the binary from OAR_<ID>_BIN as they start: it is set for that moment only, so two
  * runtimes (or two farms in one process) never see each other's. An empty path looks on PATH, ignoring the variable.
  */
-export function probeInstallation(runtime: Runtime, binPath: string): Promise<InstallationSnapshot> {
+export function probeInstallation(runtime: OarRuntime, binPath: string): Promise<InstallationSnapshot> {
   if (!runtime.installation) return Promise.resolve({ kind: "not_found" });
   const name = `OAR_${runtime.id.toUpperCase()}_BIN`;
   const before = process.env[name];
@@ -170,7 +176,7 @@ export function probeInstallation(runtime: Runtime, binPath: string): Promise<In
   }
 }
 
-function fromOar(usage: Awaited<ReturnType<NonNullable<Runtime["accountUsage"]>>>): AccountUsage {
+function fromOar(usage: Awaited<ReturnType<NonNullable<OarRuntime["accountUsage"]>>>): T.AccountUsage {
   if (usage.kind === "reauth_required") return { status: "login_required" };
   if (usage.kind === "unsupported") return { status: "unavailable", reason: usage.reason || t("server.runtime.noUsage") };
   return {
@@ -195,8 +201,8 @@ const inventory = <T>(
   read: InventoryReader<T> | undefined,
   found: AvailableInstallation,
   cwd: string,
-  entry: (item: T) => InventoryEntry,
-): Effect.Effect<InventoryEntry[] | null> =>
+  entry: (item: T) => T.InventoryEntry,
+): Effect.Effect<T.InventoryEntry[] | null> =>
   read
     ? Effect.map(
         oarRead(() => read(found, { cwd, timeoutMs: probeTimeoutMs }), undefined),
@@ -220,13 +226,13 @@ export const make = (options: RuntimeOptions = {}) =>
     const logs = yield* callbackLog;
     const config = yield* ServerConfig;
     const core = yield* Core;
-    const store = yield* Agents;
+    const store = yield* Agent;
     const registry = options.registry ?? registryOf();
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const forkHere = yield* FiberSet.makeRuntime();
     const emit = (e: Effect.Effect<void>) => void forkHere(e);
     /** null when the read fails. */
-    const usageOf = (id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings) =>
+    const usageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) =>
       Effect.orElseSucceed(Effect.tryPromise({ try: () => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings), catch: messageOf }), () => null);
 
     const cache = new Map<string, Observation>();
@@ -273,10 +279,10 @@ export const make = (options: RuntimeOptions = {}) =>
       ),
     );
 
-    function withSpend(info: RuntimeInfo): RuntimeInfo {
+    function withSpend(info: T.RuntimeInfo): T.RuntimeInfo {
       const { spentToday: _, ...rest } = info;
       const cny = tally()[info.id];
-      const out: RuntimeInfo = { ...rest, ...(cny !== undefined ? { spentToday: cny } : {}) };
+      const out: T.RuntimeInfo = { ...rest, ...(cny !== undefined ? { spentToday: cny } : {}) };
       return { ...out, stop: moneyStop(out), quota: quotaOf(out.usage) };
     }
 
@@ -295,7 +301,7 @@ export const make = (options: RuntimeOptions = {}) =>
       return n;
     };
 
-    function remember(next: Observation, read: number): RuntimeInfo {
+    function remember(next: Observation, read: number): T.RuntimeInfo {
       const id = next.info.id;
       const held = cache.get(id);
       if (held && read < held.read) return held.info;
@@ -307,7 +313,7 @@ export const make = (options: RuntimeOptions = {}) =>
 
     const probe = Effect.fnUntraced(function* (id: string): Effect.fn.Return<Observation> {
       const settings = store.settings(id);
-      const info: RuntimeInfo = {
+      const info: T.RuntimeInfo = {
         id,
         preset: presetOf(id),
         facts: facts(id),
@@ -397,7 +403,7 @@ export const make = (options: RuntimeOptions = {}) =>
 
     const known = (id: string) => runtimeIds().includes(id);
 
-    const refresh = Effect.fnUntraced(function* (id: string): Effect.fn.Return<RuntimeInfo | undefined> {
+    const refresh = Effect.fnUntraced(function* (id: string): Effect.fn.Return<T.RuntimeInfo | undefined> {
       if (!known(id) || closed) return undefined;
       const read = begin(id);
       // The settings are the farm's own, whatever stands in for the machine.
@@ -454,7 +460,7 @@ export const make = (options: RuntimeOptions = {}) =>
         return { settings, info: observed ? withSpend({ ...observed, settings }) : undefined };
       });
 
-    const assess = Effect.fn("Runtimes.assess")(function* (agent: Agent): Effect.fn.Return<Assessment> {
+    const assess = Effect.fn("Runtime.assess")(function* (agent: T.Agent): Effect.fn.Return<Assessment> {
       const { info: i } = yield* configuration(agent.runtime);
       const problems = agentProblems(agent, i);
       return { agent, info: i, problems, blocking: problems.filter((x) => x.level === "error") };
@@ -462,7 +468,7 @@ export const make = (options: RuntimeOptions = {}) =>
 
     const candidates = Effect.suspend(() => Effect.forEach(store.agents(), (agent) => Effect.map(assess(agent), (a) => ({ agent, usable: usable(a) }))));
 
-    const shape = Runtimes.of({
+    const shape = Runtime.of({
       list: () =>
         runtimeIds().map((id) => {
           const hit = cache.get(id);
@@ -496,20 +502,20 @@ export const make = (options: RuntimeOptions = {}) =>
         }),
       refresh,
       info,
-      update: Effect.fn("Runtimes.update")(function* (id, s) {
+      update: Effect.fn("Runtime.update")(function* (id, s) {
         if (!known(id)) return undefined;
         yield* store.saveSettings(id, s).pipe(Effect.catchTag("Refused", (e) => Effect.fail(refused(t("server.runtime.notSaved", { id, why: e.reason })))));
         return yield* refresh(id);
       }),
-      problemsOf: Effect.fn("Runtimes.problemsOf")(function* (agent) {
+      problemsOf: Effect.fn("Runtime.problemsOf")(function* (agent) {
         return (yield* assess(agent)).problems;
       }),
       assess,
       candidates,
-      choose: Effect.fn("Runtimes.choose")(function* (task, named, picked) {
-        return chooseAgent(yield* candidates, task, named, picked);
+      choose: Effect.fn("Runtime.choose")(function* (brief, named, picked) {
+        return chooseAgent(yield* candidates, brief, named, picked);
       }),
-      resolve: Effect.fn("Runtimes.resolve")(function* (agent) {
+      resolve: Effect.fn("Runtime.resolve")(function* (agent) {
         const runtime = registry.get(agent.runtime);
         if (!runtime) return yield* Effect.fail(refused(t("server.runtime.cannotDrive", { runtime: agent.runtime })));
         const { info: i, settings } = yield* configuration(agent.runtime);

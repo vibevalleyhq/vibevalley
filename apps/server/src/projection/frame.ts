@@ -8,7 +8,7 @@ import { phaseWords } from "@vibevalley/protocol/rules";
 
 import { nextText, whenText } from "@/cron/when.ts";
 import { viewOf } from "@/game/view.ts";
-import { inbox } from "@/notice/inbox.ts";
+import { inbox } from "@/inbox/items.ts";
 import { canEditTask, canRemoveTask, graphActions, taskActions } from "@/task/graph.ts";
 import { graphsOf } from "@/task/issues.ts";
 

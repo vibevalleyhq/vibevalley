@@ -50,7 +50,7 @@
     "shown": "{shown} / {of} 张",
     "clear": "清掉筛选",
     "view": "看法",
-    "missing": "执行记录缺失：{what}。执行动作暂不可用。",
+    "missing": "这一轮的记录缺失：{what}。对它的操作暂不可用。",
     "backToBoard": "工单"
   },
   "marks": {
@@ -128,7 +128,7 @@
     "unread": "读不到。",
     "full": "要做的（完整说明）",
     "steps": "帮工的每一步",
-    "runs": "每次干活",
+    "runs": "每一轮",
     "time": "时间",
     "opened": "开单",
     "started": "开工",
@@ -178,15 +178,15 @@
     "unsure": "拿不准的",
     "next": "建议接着做",
     "conflict": "合进 {base} 会冲突：{files}",
-    "graphStep": "计划「{graph}」的一步",
+    "graphStep": "计划「{graph}」的一件",
     "backToGraph": "回到计划"
   },
   "task": {
     "label": "计划",
-    "steps": "{n} 步",
-    "done": "做完 {done} / {of} 步",
-    "waitsForYou": "有一步在等你：打开它回答或者验收。",
-    "splitting": "管家在把它拆成步骤，拆好了会列在下面。",
+    "steps": "{n} 件",
+    "done": "做完 {done} / {of} 件",
+    "waitsForYou": "有一件在等你：打开它回答或者验收。",
+    "splitting": "管家在把它拆成几件，拆好了会列在下面。",
     "ok": "好了。",
     "check": "检查",
     "scope": "改哪里",
@@ -199,19 +199,19 @@
     "state": "状态",
     "project": "项目",
     "progress": "进度",
-    "progressLine": "{done} / {of} 步",
+    "progressLine": "{done} / {of} 件",
     "parallel": "同时做",
-    "atMost": "至多 {n} 步",
+    "atMost": "至多 {n} 件",
     "written": "写于",
     "note": "备注",
     "abandonTitle": "{abandon}这个计划？",
-    "abandonLine": "还没做完的步骤不再派出去；计划分支留着，做好的提交都还在。",
+    "abandonLine": "还没做完的几件不再派出去；计划分支留着，做好的提交都还在。",
     "abandon": "确定放弃",
     "reading": "正在看计划分支改了什么…",
     "behind": "这期间 {base} 多了 {n} 个提交",
     "merge": "合进 {base}",
     "layer": "第 {n} 批",
-    "layerTogether": "第 {n} 批 · 这 {size} 步可以同时做",
+    "layerTogether": "第 {n} 批 · 这 {size} 件可以同时做",
     "waitsOn": "等「{steps}」",
     "stepSeparator": "」「",
     "conflict": "合进 {base} 会冲突：{files}。先不合，等 {base} 上的改动处理好。"
@@ -293,9 +293,9 @@
     "newIssue": "新工单"
   },
   "graph": {
-    "splitting": "在拆步骤",
+    "splitting": "在拆成几件",
     "draft": "拆好了，看过再开工",
-    "running": "做到 {done} / {total} 步",
+    "running": "做到 {done} / {total} 件",
     "paused": "暂停了",
     "ready": "都做完了，等你合进主分支",
     "done": "合进了主分支",
@@ -330,12 +330,12 @@
     "nth": "第 {n} 次",
     "open": "开了 {took}",
     "used": "用了 {took}",
-    "turn": "第 {n} 轮",
-    "turns": "{n} 轮",
+    "run": "第 {n} 轮",
+    "runs": "{n} 轮",
     "orchestratorWorking": "管家在做",
     "missingFlag": "记录缺失",
     "graph": "计划：{title}",
-    "missing": "执行记录缺失：{what}"
+    "missing": "这一轮的记录缺失：{what}"
   },
   "issue": {
     "asking": "{who}有 {n} 个问题要问你",
@@ -351,7 +351,7 @@
     "stuck": "卡住了",
     "canceled": "已取消",
     "reopenLine": "要它接着做就重开：写一句这次要做什么。",
-    "inGraph": "这是计划里的一步，跟着计划走。",
+    "inGraph": "这是计划里的一件，跟着计划走。",
     "splitting": "在拆计划「{graph}」：只读代码，不改文件。",
     "editing": "{who}在改代码",
     "history": "{n} 次：{line}",
@@ -359,8 +359,8 @@
     "since": "{span}了",
     "ran": "第 {n} 轮",
     "used": "共用 {span}",
-    "noSteps": "还没有步骤。",
-    "stepsGone": "干活过程只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了。",
+    "noSteps": "还什么都没做。",
+    "stepsGone": "轨迹只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了。",
     "change": {
       "A": {
         "mark": "新",
@@ -382,7 +382,7 @@
     "whoRuntime": "{name}（{runtime}）",
     "changes": "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
     "changesUncommitted": "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
-    "graphStep": "计划「{graph}」的一步：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。",
+    "graphStep": "计划「{graph}」的一件：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。",
     "justNow": "刚刚"
   }
 }

@@ -412,9 +412,9 @@ export const SessionGraph: Codec<T.SessionGraph> = Schema.Struct({
   task: Schema.optionalKey(Schema.String),
 });
 
-export const ActionStep: Codec<T.ActionStep> = Schema.Struct({ at: Schema.Finite, ...doingFields });
+export const PlayAction: Codec<T.PlayAction> = Schema.Struct({ at: Schema.Finite, ...doingFields });
 
-export const ActionStepView: Codec<T.ActionStepView> = Schema.Struct({ at: Schema.Finite, ...doingFields, actionText: Schema.String });
+export const PlayActionView: Codec<T.PlayActionView> = Schema.Struct({ at: Schema.Finite, ...doingFields, actionText: Schema.String });
 
 const playFields = {
   station: Schema.Finite,
@@ -425,9 +425,9 @@ const playFields = {
   runStartedAt: Schema.optionalKey(Schema.Finite),
 };
 
-export const SessionPlay: Codec<T.SessionPlay> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(ActionStep)) });
+export const SessionPlay: Codec<T.SessionPlay> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(PlayAction)) });
 
-export const SessionPlayView: Codec<T.SessionPlayView> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(ActionStepView)) });
+export const SessionPlayView: Codec<T.SessionPlayView> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(PlayActionView)) });
 
 const sessionFields = {
   id: SessionId,

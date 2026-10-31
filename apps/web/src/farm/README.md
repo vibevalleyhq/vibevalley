@@ -19,6 +19,7 @@ prop-less. The HUD mounts `Phone` (with the chat in it) over its button, giving 
 | The chat and the plot | `chat/`, `issue/` | 田头 (with the call and dictation buttons, `features/voice`), a plot's issue and its work log |
 | The phone and the title | `phone/`, `title/` | the farm's phone and its games, the title screen |
 | The debug console | `debug/` | ` opens it: the farm's calls, the clock, local effects, the frames seen |
+| The project map | `map/` | not on `/`: the islands on the workbench's projects page, which `app/` hands to `features/project` (`projectMap`, a `ProjectsSkin`) |
 
 Shared: `world/`, `store.ts`, `commands.ts`, `tools.ts`, `cues.ts`, `effects.ts` (effects made on the page), the pixel pieces
 (`src/ui/pixel`),

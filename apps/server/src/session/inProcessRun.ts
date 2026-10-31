@@ -20,7 +20,7 @@ import type { NotRecorded, RunStore } from "./session.ts";
 /** What an input starts a run with; attached only when the loop consumes it, not when it is queued. */
 
 /** A failed start asked while another run is still going: it is not recorded as its own run. */
-export class ExecutionBusy extends Schema.TaggedError<ExecutionBusy, { readonly brand: unique symbol }>()("ExecutionBusy", { message: Schema.String }) {}
+export class RunBusy extends Schema.TaggedError<RunBusy, { readonly brand: unique symbol }>()("RunBusy", { message: Schema.String }) {}
 
 export interface RunInput {
   readonly issue?: string;
@@ -33,7 +33,7 @@ export interface RunInput {
 /** A tool result's text. */
 const resultText = (result: ToolResult) => result.content.flatMap((p) => (p.type === "text" && p.text ? [p.text] : [])).join("\n");
 
-export class AgentExecution {
+export class InProcessRun {
   private run = "";
   private outcome: Outcome = "completed";
   private summary = "";
@@ -146,11 +146,11 @@ export class AgentExecution {
   }
 
   /** A rejected input as its own failed run, without consuming another input's work. */
-  failedStart(input: RunInput, text: string, reason: string): Effect.Effect<string, NotRecorded | ExecutionBusy> {
+  failedStart(input: RunInput, text: string, reason: string): Effect.Effect<string, NotRecorded | RunBusy> {
     const self = this;
     return Effect.gen(function* () {
       if (self.closed) return "";
-      if (self.run && !self.ending) return yield* new ExecutionBusy({ message: "another agent execution is still running" });
+      if (self.run && !self.ending) return yield* new RunBusy({ message: "another in-process run is still running" });
       yield* self.begin(input);
       self.journal.asked(text);
       self.outcome = "failed";

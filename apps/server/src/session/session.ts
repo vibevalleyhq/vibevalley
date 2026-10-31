@@ -8,7 +8,7 @@
 import { randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 
-import type { Event, Runtime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
+import type { Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
 import {
@@ -33,31 +33,14 @@ import {
 import type { SqlClient } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
-import {
-  type Agent,
-  type Changes,
-  dayMs,
-  type Fact,
-  type SessionClose,
-  type Issue,
-  maxRunning,
-  type Outcome,
-  type Run,
-  type RunTrigger,
-  type Session,
-  type SessionEvent,
-  type SessionGraph,
-  type Spent,
-  type WorkspaceState,
-  type IssueId,
-  type SessionId,
-} from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { dayMs, maxRunning } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { isBusy, omitUndefined } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { serverAddress, ServerConfig } from "@/base/config.ts";
 import { causeMessage, Db } from "@/base/db.ts";
 import { newId } from "@/base/ids.ts";
@@ -65,15 +48,15 @@ import { jsonOrNone } from "@/base/json.ts";
 import { bestEffort } from "@/base/log.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { timeHere } from "@/base/time.ts";
-import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
+import { Channel, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "@/channel/chat.ts";
 import { Core, type FactIn } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
-import { Memories } from "@/memory/memory.ts";
-import { Projects } from "@/project/project.ts";
+import { Memory } from "@/memory/memory.ts";
+import { Project } from "@/project/project.ts";
 import { type Merged, MergeFailure, type ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
-import { probeInstallation, Runtimes } from "@/runtime/runtime.ts";
+import { probeInstallation, Runtime } from "@/runtime/runtime.ts";
 
-import { instructions, jobBreak, recallBlock, toOarMcp, withRecall } from "./briefing.ts";
+import { instructions, briefBreak, recallBlock, toOarMcp, withRecall } from "./briefing.ts";
 import { eventFacts, type Op, since, type Tracking } from "./facts.ts";
 import { noRoom, type SessionLimits, sessionName, whoMakesRoom } from "./hiring.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
@@ -93,13 +76,13 @@ const saveAfterMs = 300;
 const closeWaitMs = 15_000;
 
 export interface Roster {
-  readonly session: Session;
+  readonly session: T.Session;
   readonly place: Workplace;
   readonly lastText: string;
 }
 
 export interface Hired {
-  readonly session?: Session;
+  readonly session?: T.Session;
   readonly refused?: string;
   /** Who was sent home to make room. */
   readonly evicted?: string;
@@ -111,30 +94,30 @@ export interface HireOptions {
   /** The branch its own branch starts from; empty: the project's main branch. */
   readonly base?: string;
   readonly worktree?: boolean;
-  readonly taskGraph?: SessionGraph;
+  readonly taskGraph?: T.SessionGraph;
   readonly channel?: string;
-  /** Empty: Issues writes one from the job before opening its session. */
+  /** Empty: the Issue service writes one from the issue before opening its session. */
   readonly issue?: string;
   /** What its first run is for; the issue sent out when none. */
-  readonly trigger?: RunTrigger;
+  readonly trigger?: T.RunTrigger;
   /** It drafts the issue rather than works it. */
   readonly refining?: boolean;
 }
 
 export interface SendOptions extends Omit<HireOptions, "issue"> {
-  readonly issue: Pick<Issue, "id" | "number">;
+  readonly issue: Pick<T.Issue, "id" | "number">;
   /** Links the session to its existing issue before the hired fact or any report can be seen. */
-  readonly hiring?: (s: Session) => Effect.Effect<void, NotRecorded>;
+  readonly hiring?: (s: T.Session) => Effect.Effect<void, NotRecorded>;
 }
 
 export interface RunFinished {
   readonly id: string;
-  readonly issues: IssueId[];
-  readonly outcome: Outcome;
+  readonly issues: T.IssueId[];
+  readonly outcome: T.Outcome;
 }
 
 interface Allocation {
-  readonly owner: Session;
+  readonly owner: T.Session;
   readonly subagents: Subagents;
   readonly resources: Set<RuntimeSession>;
   attached: boolean;
@@ -153,7 +136,7 @@ type OpenFailure = { readonly session?: never; readonly refused: string; readonl
 type Opened = { readonly session: OarSession; readonly refused?: never; readonly retained?: never } | OpenFailure;
 
 interface Hand {
-  readonly id: SessionId;
+  readonly id: T.SessionId;
   readonly place: Workplace;
   readonly access: Semaphore.Semaphore;
   readonly journal: Journal;
@@ -167,23 +150,23 @@ interface Hand {
   spoke: boolean;
   recalled: Set<string>;
   /** The triggers of the turns asked for and not opened yet, oldest first. */
-  triggers: RunTrigger[];
+  triggers: T.RunTrigger[];
   /** The open turn's run and what it heard. */
   run: string;
   heard: string[];
 }
 
-export class Sessions extends Context.Service<
-  Sessions,
+export class Session extends Context.Service<
+  Session,
   {
     readonly noRoom: (runtime: string, project: string) => string;
     /** Room for one more on runtime in project: refused when either is at its limit; a full farm sends home whoever has
      * been idle longest, and says who. */
     readonly makeRoom: (runtime: string, project: string) => Effect.Effect<{ readonly refused: string } | { readonly evicted?: string }>;
-    readonly send: (agent: Agent, task: string, where: string, opt: SendOptions) => Effect.Effect<Hired>;
-    readonly deliver: (id: string, text: string, by: RunTrigger) => Effect.Effect<Delivered>;
+    readonly send: (agent: T.Agent, brief: string, where: string, opt: SendOptions) => Effect.Effect<Hired>;
+    readonly deliver: (id: string, text: string, by: T.RunTrigger) => Effect.Effect<Delivered>;
     /** deliver, in words for whoever sent it. */
-    readonly tell: (id: string, text: string, by: RunTrigger) => Effect.Effect<string>;
+    readonly tell: (id: string, text: string, by: T.RunTrigger) => Effect.Effect<string>;
     readonly stop: (id: string) => Effect.Effect<boolean>;
     /** Discard resets its branch only after the runtime has stopped writing. */
     /** closed: how it leaves, "dismissed" unless its issue was completed without a merge ("completed"). */
@@ -196,8 +179,8 @@ export class Sessions extends Context.Service<
     readonly roster: () => Roster[];
     readonly find: (id: string) => Roster | undefined;
     /** A session on the farm now, as the core state has it: what another module reads a session by. */
-    readonly sessionOf: (id: string) => Session | undefined;
-    readonly presentSessions: () => readonly Session[];
+    readonly sessionOf: (id: string) => T.Session | undefined;
+    readonly presentSessions: () => readonly T.Session[];
     /** The session hands its workplace over and leaves as closed says: use takes the work in (Source Control's merge, pull
      * request, merge into a task graph's branch), given the workplace and the session's last words in full. Refused while
      * it works. Work that does not go in keeps the session and its branch, marks a conflict, and says in NotTakenIn what
@@ -205,19 +188,19 @@ export class Sessions extends Context.Service<
      * open keeps the session too. */
     readonly handOver: (
       id: string,
-      closed: SessionClose,
+      closed: T.SessionClose,
       use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | ProjectError>,
       settle?: Settle,
     ) => Effect.Effect<Merged, ApiError | NotTakenIn>;
     /** What the session's branch would bring now; the conflict it shows is kept on the session. */
-    readonly changes: (id: string) => Effect.Effect<Changes | undefined, ApiError>;
+    readonly changes: (id: string) => Effect.Effect<T.Changes | undefined, ApiError>;
     /** Every session of the agent, or of every agent when it is empty: on the farm and ended, newest first. */
-    readonly list: (agent: string) => Effect.Effect<Session[]>;
+    readonly list: (agent: string) => Effect.Effect<T.Session[]>;
     /** A session on the farm, or one that has ended. */
-    readonly get: (id: string) => Effect.Effect<Session | undefined>;
-    readonly runs: (issue: string) => Effect.Effect<Run[]>;
+    readonly get: (id: string) => Effect.Effect<T.Session | undefined>;
+    readonly runs: (issue: string) => Effect.Effect<T.Run[]>;
     /** A session's log, oldest first; a run's only when run is given. */
-    readonly events: (id: string, run?: string) => SessionEvent[] | undefined;
+    readonly events: (id: string, run?: string) => T.SessionEvent[] | undefined;
     /** These four are subscribed before they return: nothing published after is missed. */
     readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
     /** A session hired, reported or gone, with the session as it stood after: what the issues and task graphs follow. */
@@ -234,23 +217,23 @@ export class Sessions extends Context.Service<
     readonly restore: Effect.Effect<void>;
   }
 >()("vibevalley/Session") {
-  static readonly layer = (options?: SessionOptionsIn) => Layer.effect(Sessions, make(options));
+  static readonly layer = (options?: SessionOptionsIn) => Layer.effect(Session, make(options));
 }
 
-/** What execution.ts keeps runs with; a write that fails is an error the run retries. */
+/** What inProcessRun.ts keeps runs with; a write that fails is an error the run retries. */
 export interface RunStore {
-  readonly start: (id: string, session: string, issue: string, trigger: RunTrigger) => Effect.Effect<void, NotRecorded>;
+  readonly start: (id: string, session: string, issue: string, trigger: T.RunTrigger) => Effect.Effect<void, NotRecorded>;
   readonly link: (run: string, issue: string) => Effect.Effect<void, NotRecorded>;
   readonly heard: (run: string, heard: readonly string[]) => Effect.Effect<void, NotRecorded>;
-  readonly issues: (run: string) => Effect.Effect<IssueId[], NotRecorded>;
-  readonly finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) => Effect.Effect<void, NotRecorded>;
+  readonly issues: (run: string) => Effect.Effect<T.IssueId[], NotRecorded>;
+  readonly finish: (id: string, outcome: T.Outcome, summary: string, spent?: T.Spent) => Effect.Effect<void, NotRecorded>;
   readonly finished: (r: RunFinished) => void;
   readonly consumed: (c: InputConsumed) => void;
   readonly register: (session: string, currentRun: () => string) => void;
 }
 
 /** A session's own fact as news; the rest are not the sessions'. */
-export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefined {
+export function newsOf(fact: T.Fact, after: T.WorkspaceState): SessionNews | undefined {
   switch (fact.type) {
     case "hired": {
       const session = after.sessions.find((h) => h.id === fact.session.id);
@@ -265,8 +248,8 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
   }
 }
 
-/** The executions open now (a helper's runtime session, the orchestrator's), as a gauge. */
-const running = Metric.gauge("vibevalley.sessions.running", { description: "Executions open now" });
+/** The runtime sessions open now (a helper's, the orchestrator's), as a gauge. */
+const running = Metric.gauge("vibevalley.sessions.running", { description: "Runtime sessions open now (the helpers' and the orchestrators')" });
 
 /** A write of a session's own records (a run, the issue it works) that did not go through. */
 export class NotRecorded extends Schema.TaggedError<NotRecorded, { readonly brand: unique symbol }>()("NotRecorded", {
@@ -302,8 +285,8 @@ const placeOf = jsonOrNone(
   Schema.Struct({ project: Schema.String, cwd: Schema.String, branch: Schema.optionalKey(Schema.String) }) satisfies Schema.Codec<Workplace>,
 );
 
-export function runOf(r: qr.RunsOfSessionResult): Run {
-  const run: Run = {
+export function runOf(r: qr.RunsOfSessionResult): T.Run {
+  const run: T.Run = {
     id: r.id,
     session: sessionId(r.session),
     triggeredBy: triggerOf(r.triggered_by) ?? { kind: "runtime" },
@@ -322,9 +305,9 @@ export function runOf(r: qr.RunsOfSessionResult): Run {
 /** An ended session as the core state would have had it: its runs counted, its last one's word, what it spent in all. */
 
 /** A turn submitted and not opened yet, counted from since: its slot is taken, as one thinking. */
-const reserved = (since: number): Session["phase"] => ({ _tag: "working", since, doing: { action: "thinking", label: "" } });
-function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionResult[]): Session {
-  const s: Session = {
+const reserved = (since: number): T.Session["phase"] => ({ _tag: "working", since, doing: { action: "thinking", label: "" } });
+function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionResult[]): T.Session {
+  const s: T.Session = {
     id: sessionId(r.id),
     name: r.name,
     agent: r.agent,
@@ -404,11 +387,11 @@ export const make = (options: SessionOptionsIn = {}) =>
     const config = yield* ServerConfig;
     const core = yield* Core;
     const fs = yield* FileSystem.FileSystem;
-    const store = yield* Agents;
-    const memories = yield* Memories;
-    const chat = yield* Channels;
-    const projects = yield* Projects;
-    const runtimes = yield* Runtimes;
+    const store = yield* Agent;
+    const memories = yield* Memory;
+    const chat = yield* Channel;
+    const projects = yield* Project;
+    const runtimes = yield* Runtime;
     const { run: db, attempt } = yield* Db;
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const run = yield* FiberSet.makeRuntimePromise();
@@ -498,7 +481,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       later("save", Effect.delay(keepHands, saveAfterMs));
     };
 
-    const keep = (s: Session) =>
+    const keep = (s: T.Session) =>
       attempt(
         qs.keepSession({
           id: s.id,
@@ -513,25 +496,25 @@ export const make = (options: SessionOptionsIn = {}) =>
         }),
       ).pipe(bestEffort(`vibevalley: session ${s.id} not kept`));
 
-    const ended = (id: string, closed: SessionClose) =>
+    const ended = (id: string, closed: T.SessionClose) =>
       attempt(qs.endSession({ ended_at: clock.currentTimeMillisUnsafe(), closed, id })).pipe(bestEffort(`vibevalley: session ${id}'s end not kept`));
 
-    const logOf = (s: Session) => Effect.as(keep(s), trajectories.openLog(s.id));
+    const logOf = (s: T.Session) => Effect.as(keep(s), trajectories.openLog(s.id));
 
-    // A run's record, the helpers' and the in-process agent's alike (execution.ts): one way to open, hear, link and end it.
+    // A run's record, the helpers' and the in-process agent's alike (inProcessRun.ts): one way to open, hear, link and end it.
     const runs = {
-      start: (id: string, session: string, issue: string, trigger: RunTrigger) =>
+      start: (id: string, session: string, issue: string, trigger: T.RunTrigger) =>
         tried(qr.startRun({ id, session, issue: issue || null, triggered_by: JSON.stringify(trigger), started_at: clock.currentTimeMillisUnsafe() })),
       /** A run that takes several issues (the in-process agent's) is linked to each; session_run.issue is its first. */
       link: (r: string, issue: string) => tried(qi.linkRunIssue({ run: r, issue })),
       heard: (r: string, heard: readonly string[]) => tried(qr.heardInRun({ heard: JSON.stringify(heard), id: r })),
       issues: (r: string) => Effect.map(tried(qi.runIssues({ run: r })), (rows) => rows.map((x) => issueId(x.issue))),
-      finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
+      finish: (id: string, outcome: T.Outcome, summary: string, spent?: T.Spent) =>
         tried(qr.endRun({ ended_at: clock.currentTimeMillisUnsafe(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
     };
 
     /** Called before the input goes out, so the turn it opens finds it. */
-    const expect = (h: Hand, by: RunTrigger) => void h.triggers.push(by);
+    const expect = (h: Hand, by: T.RunTrigger) => void h.triggers.push(by);
     /** Undoes expect when the input did not open a turn. */
     const unexpect = (h: Hand) => void h.triggers.pop();
 
@@ -552,7 +535,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       fire(runs.heard(h.run, h.heard).pipe(bestEffort(`vibevalley: run ${h.run}`)));
     };
 
-    const endRun = (h: Hand, outcome: Outcome, summary: string, spent?: Spent) => {
+    const endRun = (h: Hand, outcome: T.Outcome, summary: string, spent?: T.Spent) => {
       const id = h.run;
       h.run = "";
       h.heard = [];
@@ -649,7 +632,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           agent: session.agent,
           session: h.id,
           project: h.place.project,
-          job: session.brief,
+          brief: session.brief,
           outcome: read.outcome,
           said: read.text,
           summary: read.summary,
@@ -761,7 +744,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     });
 
     /** Opens an oar session for the profile in place: its prompt, the farm's MCP server and its own, as a subagent. */
-    const open = Effect.fnUntraced(function* (agent: Agent, owner: Session, place: Workplace, input: string, resume: string): Effect.fn.Return<Opened> {
+    const open = Effect.fnUntraced(function* (agent: T.Agent, owner: T.Session, place: Workplace, input: string, resume: string): Effect.fn.Return<Opened> {
       const id = owner.id;
       const prior = allocations.get(id);
       if (prior) return { refused: prior.failure ?? t("server.session.life.notReturned"), retained: true };
@@ -784,7 +767,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       const base = r.runtime;
       const resources = new Set<RuntimeSession>();
       // The session's own copy: the installation it was resolved to, and what only it takes added to what oar opens.
-      const mine: Runtime = {
+      const mine: OarRuntime = {
         ...base,
         installation: () => (r.installation ? Promise.resolve(r.installation) : probeInstallation(base, r.binPath)),
         // oar's interface: the base runtime's one call, with what it opens kept to be closed.
@@ -801,13 +784,13 @@ export const make = (options: SessionOptionsIn = {}) =>
       allocations.set(id, allocation);
       yield* Metric.update(running, allocations.size);
       const opening = Effect.gen(function* () {
-        const task = text && agent.personaMode === "prompt" ? text + jobBreak + input : input;
+        const brief = text && agent.personaMode === "prompt" ? text + briefBreak + input : input;
         const spawned = yield* Effect.promise(() =>
           subagents
             .spawn({
               runtime: base.id,
               name: id,
-              task,
+              task: brief,
               cwd: place.cwd,
               ...(r.model ? { model: r.model } : {}),
               ...(r.effort ? { effort: r.effort } : {}),
@@ -826,7 +809,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       return yield* opening.pipe(Effect.onExit((exit) => (exit._tag === "Failure" ? Effect.ignore(stopOar(allocation)) : Effect.void)));
     });
 
-    const leave = Effect.fn("Sessions.leave")(function* (h: Hand, closed: SessionClose, merged: number) {
+    const leave = Effect.fn("Session.leave")(function* (h: Hand, closed: T.SessionClose, merged: number) {
       release(h);
       trajectories.finish(h.id);
       yield* ended(h.id, closed);
@@ -845,7 +828,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     };
 
     /** Lets the oar session go, keeping its id to resume. */
-    const rest = Effect.fn("Sessions.rest")(function* (h: Hand) {
+    const rest = Effect.fn("Session.rest")(function* (h: Hand) {
       const s = h.sess;
       yield* closeOar(h);
       if (!s) return;
@@ -856,7 +839,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       save();
     });
 
-    const capacity = (): Session[] => {
+    const capacity = (): T.Session[] => {
       const visible = core.state().sessions;
       return [
         ...visible.map((s) => {
@@ -878,14 +861,14 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     const roomFor = (runtime: string, project: string) => noRoom(capacity(), runtime, project.trim(), limits(runtime));
 
-    const remind = Effect.fn("Sessions.remind")(function* (agent: string, session: string, project: string, input: string, recalled: Set<string>) {
+    const remind = Effect.fn("Session.remind")(function* (agent: string, session: string, project: string, input: string, recalled: Set<string>) {
       const found = yield* memories.recall({ agent, session, project, text: input, skip: new Set(recalled) });
       for (const id of found.ids) recalled.add(id);
       if (found.ids.length > 0) save();
       return recallBlock(found.lines);
     });
 
-    const wake = Effect.fn("Sessions.wake")(function* (h: Hand, session: Session, input: string, recall: string): Effect.fn.Return<Delivered> {
+    const wake = Effect.fn("Session.wake")(function* (h: Hand, session: T.Session, input: string, recall: string): Effect.fn.Return<Delivered> {
       const agent = store.agent(session.agent);
       if (!agent) return { kind: "refused", reason: t("server.session.life.agentGone", { name: session.name }) };
       const stopped = yield* Effect.result(rest(h));
@@ -902,7 +885,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       return { kind: "run", launch: h.launch || h.id, woke: true };
     });
 
-    const deliver = Effect.fn("Sessions.deliver")(function* (id: string, text: string, by: RunTrigger): Effect.fn.Return<Delivered> {
+    const deliver = Effect.fn("Session.deliver")(function* (id: string, text: string, by: T.RunTrigger): Effect.fn.Return<Delivered> {
       const h = hands.get(id);
       if (!h) return { kind: "refused", reason: t("server.session.life.noHelper", { id }) };
       return yield* h.access.withPermits(1)(
@@ -944,9 +927,9 @@ export const make = (options: SessionOptionsIn = {}) =>
       );
     });
 
-    const handOver = Effect.fn("Sessions.handOver")(function* (
+    const handOver = Effect.fn("Session.handOver")(function* (
       id: string,
-      closed: SessionClose,
+      closed: T.SessionClose,
       use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | ProjectError>,
       settle: Settle = "owner",
     ) {
@@ -979,7 +962,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     });
 
     /** The freshest word on conflicts is a preview of the branch; the session's state follows it. */
-    const changesOf = Effect.fn("Sessions.changes")(function* (id: string) {
+    const changesOf = Effect.fn("Session.changes")(function* (id: string) {
       const place = hands.get(id)?.place;
       if (!place) return undefined;
       const changes = yield* projects.changes(place).pipe(Effect.mapError((e) => refused(e.message)));
@@ -989,7 +972,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       return changes;
     });
 
-    const recheck = Effect.fn("Sessions.recheck")(function* (id: string) {
+    const recheck = Effect.fn("Session.recheck")(function* (id: string) {
       const place = hands.get(id)?.place;
       const session = core.session(id);
       if (!place || !session) return;
@@ -997,7 +980,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       if (!sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id: session.id, ...(conflict ? { conflict } : {}) });
     });
 
-    const expireLogs = Effect.fn("Sessions.expireLogs")(function* (days: number) {
+    const expireLogs = Effect.fn("Session.expireLogs")(function* (days: number) {
       if (days <= 0) return;
       const ids = yield* db(qs.sessionsEndedBefore({ before: (yield* Clock.currentTimeMillis) - days * dayMs }));
       for (const r of ids) trajectories.forget(r.id);
@@ -1107,9 +1090,9 @@ export const make = (options: SessionOptionsIn = {}) =>
       consumed: (c) => PubSub.publishUnsafe(consumedHub, c),
       register: (session, current) => void executions.set(session, current),
     };
-    const shape = Sessions.of({
+    const shape = Session.of({
       noRoom: roomFor,
-      makeRoom: Effect.fn("Sessions.makeRoom")(function* (runtime, project) {
+      makeRoom: Effect.fn("Session.makeRoom")(function* (runtime, project) {
         const full = roomFor(runtime, project);
         if (full) return { refused: full };
         const oldest = whoMakesRoom(core.state().sessions, maxRunning);
@@ -1118,7 +1101,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         if (dismissed._tag === "Failure") return { refused: reasonOf(dismissed.failure) };
         return { evicted: oldest.name };
       }),
-      send: Effect.fn("Sessions.send")(function* (agent, task, where, opt) {
+      send: Effect.fn("Session.send")(function* (agent, brief, where, opt) {
         const unclosed = [...allocations.values()].find((a) => a.owner.issue === opt.issue.id);
         if (unclosed) return { refused: unclosed.failure ?? t("server.session.life.issueNotReturned"), retainedWork: true as const };
         const full = roomFor(agent.runtime, where);
@@ -1132,13 +1115,13 @@ export const make = (options: SessionOptionsIn = {}) =>
         let released = false;
         const starting = Effect.gen(function* () {
           const recalled = new Set<string>();
-          const recall = yield* remind(agent.id, id, place.project, task, recalled);
-          const session: Session = {
+          const recall = yield* remind(agent.id, id, place.project, brief, recalled);
+          const session: T.Session = {
             id,
             name: sessionName(core.state().sessions, agent.id, agent.name),
             agent: agent.id,
             runtime: agent.runtime,
-            brief: task,
+            brief,
             project: place.project,
             hiredAt: yield* Clock.currentTimeMillis,
             runs: 0,
@@ -1158,7 +1141,7 @@ export const make = (options: SessionOptionsIn = {}) =>
               if (result.kept) yield* core.notice("warn", result.reason);
               return { refused: why, ...(result.kept ? { retainedWork: true as const } : {}) };
             });
-          const opened = yield* open(agent, session, place, withRecall(recall, task), "");
+          const opened = yield* open(agent, session, place, withRecall(recall, brief), "");
           if (!opened.session) return yield* refuseStart(t("server.session.life.cannotSend", { name: agent.name, why: opened.refused }), opened.retained);
           const registered = yield* Effect.result(
             Effect.gen(function* () {
@@ -1220,7 +1203,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         );
       }, admission.withPermits(1)),
       deliver,
-      tell: Effect.fn("Sessions.tell")(function* (id, text, by) {
+      tell: Effect.fn("Session.tell")(function* (id, text, by) {
         const d = yield* deliver(id, text, by);
         const name = core.session(id)?.name ?? id;
         switch (d.kind) {
@@ -1235,7 +1218,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         }
         return d.reason ?? "";
       }),
-      stop: Effect.fn("Sessions.stop")(function* (id) {
+      stop: Effect.fn("Session.stop")(function* (id) {
         const s = hands.get(id)?.sess;
         if (!s || core.session(id)?.phase._tag !== "working") return false;
         const outcome = yield* Effect.promise(() => s.agent.interrupt().catch((e: unknown) => ({ kind: "failed" as const, reason: String(e) })));
@@ -1245,7 +1228,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         }
         return true;
       }),
-      dismiss: Effect.fn("Sessions.dismiss")(function* (id, work = "keep", closed = "dismissed") {
+      dismiss: Effect.fn("Session.dismiss")(function* (id, work = "keep", closed = "dismissed") {
         const h = hands.get(id);
         if (!h) return false;
         return yield* h.access.withPermits(1)(
@@ -1264,7 +1247,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           }),
         );
       }),
-      discardWork: Effect.fn("Sessions.discardWork")(function* (id) {
+      discardWork: Effect.fn("Session.discardWork")(function* (id) {
         const h = hands.get(id);
         if (!h?.place.branch) return;
         yield* h.access.withPermits(1)(
@@ -1276,7 +1259,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           }),
         );
       }),
-      clearWorkplace: Effect.fn("Sessions.clearWorkplace")(function* (issue, project, number, work) {
+      clearWorkplace: Effect.fn("Session.clearWorkplace")(function* (issue, project, number, work) {
         const unclosed = [...allocations.values()].find((a) => a.owner.issue === issue);
         if (unclosed) return yield* Effect.fail(refused(unclosed.failure ?? t("server.session.life.issueNotReturned")));
         if (core.state().sessions.some((s) => s.issue === issue)) return yield* Effect.fail(refused(t("server.session.life.stillHasHelper")));
@@ -1295,7 +1278,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       },
       handOver,
       changes: changesOf,
-      list: Effect.fn("Sessions.list")(function* (agent) {
+      list: Effect.fn("Session.list")(function* (agent) {
         const out = core.state().sessions.filter((s) => !agent || s.agent === agent);
         const rows = yield* db(qs.endedSessions({ agent }));
         const runs = yield* db(qr.runsOfEndedSessions());
@@ -1303,14 +1286,14 @@ export const make = (options: SessionOptionsIn = {}) =>
         for (const r of rows) if (!out.some((s) => s.id === r.id)) out.push(endedSession(r, bySession.get(r.id) ?? []));
         return out.toSorted((a, b) => b.hiredAt - a.hiredAt);
       }),
-      get: Effect.fn("Sessions.get")(function* (id) {
+      get: Effect.fn("Session.get")(function* (id) {
         const live = core.session(id);
         if (live) return live;
         const r = yield* db(Effect.catchNoSuchElement(qs.sessionByID({ id })));
         if (Option.isNone(r) || r.value.ended_at === null) return undefined;
         return endedSession(r.value, yield* db(qr.runsOfSession({ session: id })));
       }),
-      runs: Effect.fn("Sessions.runs")(function* (issue) {
+      runs: Effect.fn("Session.runs")(function* (issue) {
         const rows = yield* db(qr.runsOfIssue({ issue_id: issue }));
         return rows.map(runOf);
       }),
@@ -1323,7 +1306,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
-      host: Effect.fn("Sessions.host")(function* <R>(o: HostOptions<R>) {
+      host: Effect.fn("Session.host")(function* <R>(o: HostOptions<R>) {
         return yield* makeHost(o, trajectories.openLog(o.name, o.keepEvents), runStore);
       }),
       restore,
@@ -1363,4 +1346,4 @@ export const make = (options: SessionOptionsIn = {}) =>
 export type SessionsInside = Effect.Success<ReturnType<typeof make>>;
 
 /** Brings the sessions back once every service is built. */
-export const ready = Layer.effectDiscard(Effect.flatMap(Sessions, (s) => s.restore));
+export const ready = Layer.effectDiscard(Effect.flatMap(Session, (s) => s.restore));

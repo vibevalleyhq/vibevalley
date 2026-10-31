@@ -59,7 +59,7 @@ test("no page of an English farm shows Chinese of its own", async ({ page, api }
     `/issues/${issue.id}`,
     "/artifacts",
     "/agents",
-    `/agents/${agents.find((a) => a.role === "worker")!.id}`,
+    `/agents/${agents.find((a) => a.role === "helper")!.id}`,
     "/agents/templates",
     "/runtimes",
     "/projects",

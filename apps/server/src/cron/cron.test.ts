@@ -3,12 +3,12 @@ import { Effect, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { test } from "vite-plus/test";
 
-import type { Cron, CronRequest, CronWhen } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { CronWhenWeekly } from "@vibevalley/protocol/schema";
 
 import { orchestrator, owner } from "@/base/actor.ts";
 import { type ServerConfig } from "@/base/config.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -16,7 +16,7 @@ import { aTurn } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import * as q from "../../db/generated/cron.sql.ts";
-import { type Due, Crons } from "./cron.ts";
+import { type Due, Cron } from "./cron.ts";
 import { afterRun, dueCrons, isMissed, needsOK } from "./due.ts";
 import { nextText } from "./when.ts";
 
@@ -24,7 +24,7 @@ test("the recorded cases", () => {
   const cases = goldenCases("cron");
   expect(new Set(cases.map((c) => c.fn))).toEqual(new Set(["due"]));
   const failed = checkCases(cases, (c) => {
-    const i = c.in as { s: Cron; now: number };
+    const i = c.in as { s: T.Cron; now: number };
     return { due: dueCrons([i.s], i.now).length, missed: isMissed(i.s, i.now) };
   });
   expect(failed).toEqual([]);
@@ -44,7 +44,7 @@ test("due once, missed, and run", () => {
     created: at("2026-10-01T08:00:00"),
     lastRun: at("2026-10-09T09:00:00"),
     by: "owner",
-  } as Cron;
+  } as T.Cron;
   const now = at("2026-10-12T11:00:00");
   expect(dueCrons([s], now)).toEqual([s]);
   expect(isMissed(s, now)).toBe(true);
@@ -54,9 +54,9 @@ test("due once, missed, and run", () => {
 });
 
 test("what waits for the owner's yes", () => {
-  const once: CronWhen = { kind: "once", at: at("2026-10-12T12:00:00") };
-  const daily: CronWhen = { kind: "daily", time: "09:00" };
-  const req = (when: CronWhen, agent?: string) => ({ name: "", text: "", when, ...(agent !== undefined ? { agent } : {}) }) as CronRequest;
+  const once: T.CronWhen = { kind: "once", at: at("2026-10-12T12:00:00") };
+  const daily: T.CronWhen = { kind: "daily", time: "09:00" };
+  const req = (when: T.CronWhen, agent?: string) => ({ name: "", text: "", when, ...(agent !== undefined ? { agent } : {}) }) as T.CronRequest;
   expect(needsOK(req(daily, "lab"), owner)).toBe(false);
   expect(needsOK(req(daily, "lab"), orchestrator(true))).toBe(false);
   expect(needsOK(req(once), orchestrator(false))).toBe(false);
@@ -70,14 +70,14 @@ const farm = (config: ServerConfig["Service"], clock: { now: number }) => world(
 
 const collect = Effect.gen(function* () {
   const got: Due[] = [];
-  yield* Effect.forkScoped(Stream.runForEach(yield* (yield* Crons).due, (d) => Effect.sync(() => got.push(d))));
+  yield* Effect.forkScoped(Stream.runForEach(yield* (yield* Cron).due, (d) => Effect.sync(() => got.push(d))));
   return got;
 });
 
 /** What a tick makes due is published before the tick returns: a turn lets the collecting fiber take it. */
 const drained = aTurn;
 
-const req = (name: string, text: string, when: CronWhen, more: Partial<CronRequest> = {}): CronRequest => ({ name, text, when, ...more });
+const req = (name: string, text: string, when: T.CronWhen, more: Partial<T.CronRequest> = {}): T.CronRequest => ({ name, text, when, ...more });
 
 describe("crons", () => {
   it.live("come due, say so, are kept, and come back on", () => {
@@ -86,9 +86,9 @@ describe("crons", () => {
     let everyId = "";
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
-        const s = yield* Crons;
+        const s = yield* Cron;
         const core = yield* Core;
-        const chat = yield* Channels;
+        const chat = yield* Channel;
         const due = yield* collect;
         const general = chat.defaultChannel();
         const made = yield* s.add(req(" 看进度 ", "看看帮工们的进度", { kind: "once", at: clock.now + 150 }), owner);
@@ -121,7 +121,7 @@ describe("crons", () => {
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
 
       yield* Effect.gen(function* () {
-        const s = yield* Crons;
+        const s = yield* Cron;
         const core = yield* Core;
         const due = yield* collect;
         const got = core.state().crons;
@@ -144,7 +144,7 @@ describe("crons", () => {
   it.live("a run that cannot be written is not published, and runs on the next tick", () => {
     const clock = { now: 1_800_000_000_000 };
     return Effect.gen(function* () {
-      const s = yield* Crons;
+      const s = yield* Cron;
       const core = yield* Core;
       const sql = yield* SqlClient.SqlClient;
       const made = yield* s.add(req("retry", "work", { kind: "once", at: clock.now + 1 }), owner);
@@ -166,7 +166,7 @@ describe("crons", () => {
   it.live("weekly days are integers from zero to six", () => {
     const clock = { now: Date.now() };
     return Effect.gen(function* () {
-      const s = yield* Crons;
+      const s = yield* Cron;
       const bad = req(" fractional ", "work", { kind: "weekly", days: [1.5], time: "09:00" });
       expect((yield* Effect.flip(s.add(bad, owner)))._tag).toBe("Refused");
       expect(s.list()).toEqual([]);
@@ -185,12 +185,12 @@ describe("crons", () => {
     let id = "";
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
-        const s = yield* Crons;
+        const s = yield* Cron;
         id = (yield* s.add(req("早会", "看看昨天的活", { kind: "cron", expr: "0 9 * * 1-5" }, { tz: "Asia/Shanghai" }), owner)).id;
         expect((yield* Effect.flip(s.add(req("坏的", "t", { kind: "cron", expr: "0 9 * *" }), owner)))._tag).toBe("Refused");
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
-        expect((yield* Crons).list().map((x) => [x.id, x.when])).toEqual([[id, { kind: "cron", expr: "0 9 * * 1-5" }]]);
+        expect((yield* Cron).list().map((x) => [x.id, x.when])).toEqual([[id, { kind: "cron", expr: "0 9 * * 1-5" }]]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
     });
   });
@@ -200,7 +200,7 @@ describe("crons", () => {
     const clock = { now: Date.now() };
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
-        const channel = (yield* Channels).defaultChannel();
+        const channel = (yield* Channel).defaultChannel();
         for (const [id, spec] of [
           ["bad-spec", `{"kind":"weekly","days":[1.5],"time":"09:00"}`],
           ["good", `{"kind":"daily","time":"09:00"}`],
@@ -222,7 +222,7 @@ describe("crons", () => {
           );
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
-        expect((yield* Crons).list().map((r) => [r.id, r.when, r.by])).toEqual([["good", { kind: "daily", time: "09:00" }, "owner"]]);
+        expect((yield* Cron).list().map((r) => [r.id, r.when, r.by])).toEqual([["good", { kind: "daily", time: "09:00" }, "owner"]]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
     });
   });
@@ -233,7 +233,7 @@ describe("crons", () => {
     let id = "";
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
-        const s = yield* Crons;
+        const s = yield* Cron;
         const made = yield* s.add(req("每五分钟", "看看", { kind: "every", minutes: 5 }), orchestrator(false));
         expect([made.enabled, made.pending, made.by, nextText(made)]).toEqual([false, true, "orchestrator", "等主人同意"]);
         id = made.id;
@@ -244,13 +244,13 @@ describe("crons", () => {
         expect(due).toEqual([]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
-        const s = yield* Crons;
+        const s = yield* Cron;
         expect(s.list().map((x) => [x.enabled, x.pending, x.by])).toEqual([[false, true, "orchestrator"]]);
         const on = yield* s.setEnabled(id, true);
         expect([on.enabled, on.pending]).toEqual([true, false]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
-        const s = yield* Crons;
+        const s = yield* Cron;
         const due = yield* collect;
         expect(s.list().map((x) => [x.enabled, x.pending])).toEqual([[true, false]]);
         clock.now += 5 * 60_000;

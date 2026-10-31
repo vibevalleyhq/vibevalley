@@ -1,15 +1,14 @@
 // A task graph is issues: the graph's own and one per step.
-
-import type { WorkspaceState, Issue, TaskGraph, GraphState, Task, IssueId } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { compare, compareText, or } from "@/base/order.ts";
 
 import { asksForYou, blockedBy, graphSpent, graphView, isSettled, layersOf, taskView } from "./graph.ts";
-function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
+function graphFrom(parent: T.Issue, issues: readonly T.Issue[]): T.TaskGraph {
   const g = parent.graph!;
-  const graph: TaskGraph = omitUndefined({
+  const graph: T.TaskGraph = omitUndefined({
     id: parent.id,
     title: parent.title,
     goal: parent.description,
@@ -62,7 +61,7 @@ function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
   return graph;
 }
 
-export function graphsOf(state: WorkspaceState): TaskGraph[] {
+export function graphsOf(state: T.WorkspaceState): T.TaskGraph[] {
   const issues = state.issues;
   return issues
     .filter((t) => t.graph)
@@ -70,13 +69,13 @@ export function graphsOf(state: WorkspaceState): TaskGraph[] {
     .toSorted((a, b) => or(compare(a.createdAt, b.createdAt), compareText(a.id, b.id)));
 }
 
-export const taskIssueID = (graph: string, key: string): IssueId => issueId(graph + "." + key);
+export const taskIssueID = (graph: string, key: string): T.IssueId => issueId(graph + "." + key);
 
 /** An issue of a task graph as it is written down: what the graph says, and what only the issue knows from before. */
-export type GraphIssue = Draft & Pick<Issue, "priority" | "createdAt">;
+export type GraphIssue = Draft & Pick<T.Issue, "priority" | "createdAt">;
 
 /** What only the issues know (priority, when they were written down and closed) comes from before; one closing now closes at now. */
-export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): GraphIssue[] {
+export function graphIssues(graph: T.TaskGraph, before: readonly T.Issue[], now: number): GraphIssue[] {
   const was = new Map(before.map((item) => [item.id, item]));
   const keep = (draft: Draft, closed: Closing | undefined): GraphIssue => {
     const { delivered: _delivered, canceled: _canceled, closedAt: drafted, ...rest } = draft;
@@ -142,7 +141,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
   return out;
 }
 
-export function graphOf(state: WorkspaceState, id: string): TaskGraph | undefined {
+export function graphOf(state: T.WorkspaceState, id: string): T.TaskGraph | undefined {
   const issues = state.issues;
   const item = issues.find((issue) => issue.id === id && issue.graph !== undefined);
   return item ? graphFrom(item, issues) : undefined;
@@ -150,17 +149,17 @@ export function graphOf(state: WorkspaceState, id: string): TaskGraph | undefine
 
 type Closing = { readonly delivered: "merged" | "merged_into_parent" } | { readonly canceled: "dismissed" };
 
-const graphClosed = (s: GraphState): Closing | undefined =>
+const graphClosed = (s: T.GraphState): Closing | undefined =>
   s === "done" ? { delivered: "merged" } : s === "abandoned" ? { canceled: "dismissed" } : undefined;
 
-function taskClosed(graph: GraphState, n: Task): Closing | undefined {
+function taskClosed(graph: T.GraphState, n: T.Task): Closing | undefined {
   if (n.state === "merged") return { delivered: "merged_into_parent" };
   if (n.state === "skipped" || graph === "done" || graph === "abandoned") return { canceled: "dismissed" };
   return undefined;
 }
 
-// Criteria and checks are no graph's: the issues it writes carry none (Issues.putTask).
+// Criteria and checks are no graph's: the issues it writes carry none (Issue.putTask).
 type Draft = Omit<
-  Issue,
+  T.Issue,
   "number" | "priority" | "createdAt" | "sessions" | "status" | "moves" | "review" | "findings" | "questions" | "attention" | "criteria" | "checks"
 >;

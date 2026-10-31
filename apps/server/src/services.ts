@@ -11,28 +11,28 @@ import { FetchHttpClient } from "effect/http";
 
 import { Llm } from "@vibevalley/ai/llm";
 
-import { Agents } from "./agent/agent.ts";
-import { Artifacts, type ArtifactOptions } from "./artifact/artifact.ts";
+import { Agent } from "./agent/agent.ts";
+import { Artifact, type ArtifactOptions } from "./artifact/artifact.ts";
 import { ServerConfig } from "./base/config.ts";
 import { Database, Db } from "./base/db.ts";
-import { Channels } from "./channel/chat.ts";
-import { Connectors, type ConnectorOptions } from "./connector/connector.ts";
+import { Channel } from "./channel/chat.ts";
+import { Connector, type ConnectorOptions } from "./connector/connector.ts";
 import { Core } from "./core/core.ts";
-import { Crons, start as cronStart } from "./cron/cron.ts";
+import { Cron, start as cronStart } from "./cron/cron.ts";
 import { Game, start as gameStart } from "./game/game.ts";
-import { Issues, type IssueOptions } from "./issue/issue.ts";
+import { Inbox, start as inboxReady } from "./inbox/inbox.ts";
+import { Issue, type IssueOptions } from "./issue/issue.ts";
 import { Lan, type LanOptions } from "./lan/lan.ts";
 import { Mcp, type McpOptions } from "./mcp/mcp.ts";
-import { Memories } from "./memory/memory.ts";
-import { Notices, start as noticeStart } from "./notice/notice.ts";
+import { Memory } from "./memory/memory.ts";
 import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
-import { Projects, type ProjectHooks, start as projectStart } from "./project/project.ts";
+import { Project, type ProjectHooks, start as projectStart } from "./project/project.ts";
 import { layer as projection } from "./projection/projection.ts";
-import { type RuntimeOptions, Runtimes } from "./runtime/runtime.ts";
-import { Sessions, ready as sessionReady, type SessionOptionsIn } from "./session/session.ts";
+import { type RuntimeOptions, Runtime } from "./runtime/runtime.ts";
+import { Session, ready as sessionReady, type SessionOptionsIn } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
-import { Tasks, start as taskGraphStart, type TaskOptions } from "./task/task.ts";
-import { Tools } from "./tool/tool.ts";
+import { Task, start as taskGraphStart, type TaskOptions } from "./task/task.ts";
+import { Tool } from "./tool/tool.ts";
 import { Voice, type VoiceOptions } from "./voice/voice.ts";
 
 /** Builds layer on what is below it, keeping what is below. */
@@ -74,46 +74,46 @@ export const platform = (config: ServerConfig["Service"]) =>
 export const agents =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Agents.layer), on(Memories.layer), on(Runtimes.layer(o.runtime)));
+    below.pipe(on(Agent.layer), on(Memory.layer), on(Runtime.layer(o.runtime)));
 
 /** Source Control: repositories, worktrees, checks, merges and pull requests. */
 export const sourceControl =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Projects.layer(o.project)));
+    below.pipe(on(Project.layer(o.project)));
 
-/** Agent Sessions: an agent at work on a job in a workplace. */
+/** Agent Sessions: an agent at work on an issue in a workplace. */
 export const agentSessions =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Sessions.layer(o.session)));
+    below.pipe(on(Session.layer(o.session)));
 
 /** Collaboration: channels, threads, messages, documents; the sessions register as its helpers. */
 export const collaboration =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Channels.layer), on(Artifacts.layer(o.artifact)));
+    below.pipe(on(Channel.layer), on(Artifact.layer(o.artifact)));
 
 /** Issues without its task graphs: for a test that makes its own task service. */
 export const issuesBelowTaskGraphs =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Crons.layer), on(Issues.layer(o.issue)));
+    below.pipe(on(Cron.layer), on(Issue.layer(o.issue)));
 
 /** Issues: the issues, their task graphs and crons. */
 const issues =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    issuesBelowTaskGraphs(o)(below).pipe(on(Tasks.layer(o.task)));
+    issuesBelowTaskGraphs(o)(below).pipe(on(Task.layer(o.task)));
 
-/** Notifications: what in the inbox is news to the owner, and the patrol. */
-const notifications = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Notices.layer));
+/** Inbox: what in it is news to the owner, and the patrol. */
+const inbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Inbox.layer));
 
 /** Orchestrator: the agent that hands the owner's work to helpers, and its tools. */
 const orchestrator =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Tools.layer), on(Orchestrator.layer(o.orchestrator)));
+    below.pipe(on(Tool.layer), on(Orchestrator.layer(o.orchestrator)));
 
 /** Gamification: the ledger, progress and achievements, from events only. */
 export const gamification = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Game.layer));
@@ -122,7 +122,7 @@ export const gamification = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe
 const gateway =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Mcp.layer(o.mcp)), on(Lan.layer(o.lan)), on(Voice.layer(o.voice)), on(Connectors.layer(o.connector)));
+    below.pipe(on(Mcp.layer(o.mcp)), on(Lan.layer(o.lan)), on(Voice.layer(o.voice)), on(Connector.layer(o.connector)));
 
 /** Source Control's startup: the first look at GitHub. */
 const sourceControlStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(projectStart));
@@ -133,8 +133,8 @@ export const agentSessionsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => buil
 const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart), on(cronStart));
 /** Issues' startup without the crons' clock: for a test farm that ticks them by hand. */
 export const taskGraphsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart));
-/** Notifications' startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */
-export const notificationsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(noticeStart));
+/** Inbox's startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */
+export const inboxStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(inboxReady));
 /** Gamification's startup: commits start being counted. */
 const gamificationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(gameStart));
 
@@ -146,13 +146,13 @@ export const services = (config: ServerConfig["Service"], options: ServiceOption
     collaboration(options),
     agentSessions(options),
     issues(options),
-    notifications,
+    inbox,
     orchestrator(options),
     gamification,
     gateway(options),
     sourceControlStart,
     agentSessionsStart,
     issuesStart,
-    notificationsStart,
+    inboxStart,
     gamificationStart,
   );

@@ -1,7 +1,7 @@
 {
   "id": "night",
   "version": 1,
-  "role": "worker",
+  "role": "helper",
   "name": "夜班反重力",
   "duty": "杂活、小改动、夜里补班",
   "tags": ["杂活", "小改", "补"],

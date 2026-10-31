@@ -4,7 +4,6 @@
     "session": "列出帮工，找它的 id",
     "project": "列出项目，找它的名字",
     "runtime": "列出农机，找它的 id",
-    "doc": "列出文档，找它的 id",
     "agent": "列出档案，找它的 id",
     "skill": "列出技能，找它的 id",
     "template": "列出模板，找它的 id",

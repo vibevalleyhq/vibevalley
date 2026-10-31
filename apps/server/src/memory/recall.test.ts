@@ -60,16 +60,16 @@ test("notes: this project's, everyone's, and another's only when it plainly shar
   expect(ids(pick(memories, cue("分页接口加上 limit 和 offset 参数")))).toEqual(["other-related", "here", "everywhere"]);
 });
 
-test("jobs: this project's only, three at most, not its own session's", () => {
+test("issues: this project's only, three at most, not its own session's", () => {
   const memories = [
     ...Array.from({ length: 5 }, (_, i) =>
-      memory(`job${i}`, `第 ${i} 件活 → 做好了`, { kind: "issue", project: "clock", session: sessionId(`w${i}`), at: now - i * dayMs }),
+      memory(`issue${i}`, `第 ${i} 件活 → 做好了`, { kind: "issue", project: "clock", session: sessionId(`w${i}`), at: now - i * dayMs }),
     ),
     memory("note", "迁移文件在 db/migrations", { project: "clock" }),
-    memory("job-blog", "博客的活 → 做好了", { kind: "issue", project: "blog", session: sessionId("w8") }),
+    memory("issue-blog", "博客的活 → 做好了", { kind: "issue", project: "blog", session: sessionId("w8") }),
   ];
-  expect(ids(pick(memories, cue("随便做点什么")))).toEqual(["note", "job0", "job1", "job2"]);
-  expect(ids(pick(memories, cue("随便做点什么", { session: "w0", skip: new Set(["note"]) })))).toEqual(["job1", "job2", "job3"]);
+  expect(ids(pick(memories, cue("随便做点什么")))).toEqual(["note", "issue0", "issue1", "issue2"]);
+  expect(ids(pick(memories, cue("随便做点什么", { session: "w0", skip: new Set(["note"]) })))).toEqual(["issue1", "issue2", "issue3"]);
   const many = Array.from({ length: 20 }, (_, i) => memory(`n${i}`, `这个项目的第 ${i} 条约定`, { project: "clock" }));
   expect(pick(many, cue("做点什么"))).toHaveLength(8);
 });

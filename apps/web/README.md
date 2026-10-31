@@ -18,9 +18,10 @@ src/ui/             the workbench's pieces: Icon, Face, Button, Field, Dialog, M
 src/ui/pixel/       the pixel pieces every skin draws with (the farm, the tree, the project map, the catalog): windows, buttons,
                     fields, toasts, the atlas (atlas.ts), the sounds (sound.ts), a runtime's machine
 src/features/<x>/   one folder per concept, named as the server's module: issue, task, channel, session, agent, memory,
-                    orchestrator, project, runtime, doc, voice, lan, connector, notice, setting, catalog. A feature holds its
+                    orchestrator, project, runtime, artifact, voice, lan, connector, inbox, setting, catalog. A feature holds its
                     pages, its reads, its rules (pure, each with its test) and its words; index.ts is what the rest may use
 src/farm/           the pixel farm at /, outside the shell (its README: who owns which folder, the store, the canvas's screen)
+                    and map/, the projects page's map: app/ hands it to features/project as its ProjectsSkin
 src/tree/           the memory tree at /tree, outside the shell like the farm: the tree grown from the memories, its panel and the
                     memory sky, on one canvas; made-up
                     memories (mock.ts) until the server sums them up (.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
@@ -41,7 +42,8 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   feature uses another only through its `index.ts`, named exports only, and the features' graph has no cycle
   (`src/layers.test.ts`). A piece two features both need (a word, a format, a query) goes down to the layer under both,
   or each keeps its own copy of a word; it does not make one feature reach into the other. The skins read features; no
-  feature or piece knows a skin. Why: docs/subsystems/app.md, 为什么这样.
+  feature or piece knows a skin: a workbench page that shows a piece of a skin takes it as a prop, and `app/` passes
+  it in (`ProjectsSkin`, from `farm/map`). Why: docs/subsystems/app.md, 为什么这样.
 - **Words** are in `packages/i18n/locales/{zh,en}/web.<feature>.json`, read as `t("web.<feature>.…")`, following the glossary (docs/README.md#用语);
   farm words only in the skins and `ui/pixel`.
 - **Icons come in two sets.** The workbench's are reicon's line icons, one picture to a meaning in `src/ui/icons.ts`

@@ -2,8 +2,8 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { Issues } from "@/issue/issue.ts";
-import { Sessions, type SessionsInside } from "@/session/session.ts";
+import { Issue } from "@/issue/issue.ts";
+import { Session, type SessionsInside } from "@/session/session.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import { farm, lab, mustHire, watch } from "./farm.ts";
@@ -23,8 +23,8 @@ describe("a session", () => {
     const f = farm({ runtime, config: { ...testConfig(), port: 8787 } });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
+      const issues = yield* Issue;
+      const sessions = yield* Session;
       expect((sessions as SessionsInside).mcpUrl()).toBe("http://127.0.0.1:8787/mcp");
       const first = mustHire(yield* issues.hire(lab(), "看看", "reach"));
       yield* w.nextReport;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { ChatMessage, Channel } from "@vibevalley/protocol";
 
-import { forOwner } from "@/notice/away.ts";
+import { forOwner } from "@/inbox/away.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
 import { flushText, isPairing, ownerLine, plainText, shortId, splitText } from "./digest.ts";

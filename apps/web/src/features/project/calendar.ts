@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import { type Crop, dayMs } from "@vibevalley/protocol";
+import { dayMs } from "@vibevalley/protocol";
 
 const two = (n: number) => String(n).padStart(2, "0");
 
@@ -78,20 +78,20 @@ export function streaksOf(calendar: Calendar): Streaks {
   return { total: days.reduce((n, d) => n + d.commits, 0), days: days.filter((d) => d.commits > 0).length, longest, current, ...(busiest ? { busiest } : {}) };
 }
 
-export interface Growth {
-  readonly crop: Crop;
-  readonly label: string;
+/** How long ago the newest commit was, as the project list, its card and the map's crops show it. */
+export type Recency = "never" | "day" | "week" | "month" | "quarter" | "older";
+
+export function recencyOf(last: number | undefined, now: number): Recency {
+  if (last === undefined) return "never";
+  const days = (now - last) / dayMs;
+  if (days <= 1) return "day";
+  if (days <= 7) return "week";
+  if (days <= 30) return "month";
+  if (days <= 90) return "quarter";
+  return "older";
 }
 
-export function growthOf(last: number | undefined, now: number): Growth {
-  if (last === undefined) return { crop: "empty", label: t("web.project.project.growth.empty") };
-  const days = (now - last) / dayMs;
-  if (days <= 1) return { crop: "flowering", label: t("web.project.project.growth.flowering") };
-  if (days <= 7) return { crop: "leafy", label: t("web.project.project.growth.leafy") };
-  if (days <= 30) return { crop: "sprout", label: t("web.project.project.growth.sprout") };
-  if (days <= 90) return { crop: "dry", label: t("web.project.project.growth.dry") };
-  return { crop: "withered", label: t("web.project.project.growth.withered") };
-}
+export const recencyText = (r: Recency) => t(`web.project.recency.${r}`);
 
 export function since(at: number, now: number) {
   const minutes = Math.max(0, (now - at) / 60000);

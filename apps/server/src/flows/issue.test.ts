@@ -5,20 +5,20 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 
-import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { Agents } from "@/agent/agent.ts";
+import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { Crons } from "@/cron/cron.ts";
+import { Cron } from "@/cron/cron.ts";
 import { viewOf } from "@/game/view.ts";
-import { Issues } from "@/issue/issue.ts";
+import { Issue } from "@/issue/issue.ts";
 import { openFindings } from "@/issue/status.ts";
-import { Runtimes } from "@/runtime/runtime.ts";
-import { Sessions, type SessionsInside } from "@/session/session.ts";
+import { Runtime } from "@/runtime/runtime.ts";
+import { Session, type SessionsInside } from "@/session/session.ts";
 import { write } from "@/testing/git.ts";
 import { Said } from "@/testing/said.ts";
 
@@ -37,9 +37,9 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
-      yield* (yield* Agents).save(lab());
+      const issues = yield* Issue;
+      const sessions = yield* Session;
+      yield* (yield* Agent).save(lab());
       const project = join(f.config.workRoot, "projects", "clock");
       const closed = (id: string) =>
         await_(
@@ -87,10 +87,10 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
+      const issues = yield* Issue;
+      const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       const session = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock-in"));
       expect(session.issue).toBeTruthy();
       yield* w.nextReport;
@@ -138,9 +138,9 @@ describe("an issue", () => {
     const f = farm({ repos: ["board"] });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
+      const issues = yield* Issue;
       const me = { ...lab(), workdir: "board" };
-      yield* (yield* Agents).save(me);
+      yield* (yield* Agent).save(me);
       const issue = yield* issues.add({ title: "看看", assignee: me.id });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
@@ -156,10 +156,10 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
+      const issues = yield* Issue;
+      const sessions = yield* Session;
       const core = yield* Core;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       refusedWith(yield* Effect.flip(issues.add({ title: "  " })));
       let issue = yield* issues.add({ title: "写打卡并提交" });
       expect(issue.status).toBe("backlog");
@@ -178,7 +178,7 @@ describe("an issue", () => {
       refusedWith(yield* Effect.flip(issues.start(issue.id, "")));
       refusedWith(yield* Effect.flip(issues.edit(issue.id, { title: "改不了了" }, owner)));
 
-      const unsent = (all: Issue[]) => all.filter((i) => i.sessions.length === 0).map((i) => i.title);
+      const unsent = (all: T.Issue[]) => all.filter((i) => i.sessions.length === 0).map((i) => i.title);
       const a = yield* issues.add({ title: "一" });
       const b = yield* issues.add({ title: "二", priority: "urgent" });
       const c = yield* issues.add({ title: "三" });
@@ -198,10 +198,10 @@ describe("an issue", () => {
     const f = farm({ change: (c) => ({ ...c, project: { ...c.project, maxSessions: 1 } }) });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
+      const issues = yield* Issue;
+      const sessions = yield* Session;
       const core = yield* Core;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       yield* core.apply({
         type: "hired",
         session: {
@@ -215,7 +215,7 @@ describe("an issue", () => {
           runs: 0,
           phase: { _tag: "working", since: Date.now(), doing: { action: "none", label: "" } },
           refining: false,
-        } as Session,
+        } as T.Session,
       });
       const issue = yield* issues.add({ title: "等空位的活", project: "queue", assignee: "lab" });
       const got = yield* issues.start(issue.id, "");
@@ -242,11 +242,11 @@ describe("an issue", () => {
     return Effect.gen(function* () {
       const w = yield* watch;
       const session = mustHire(
-        yield* (yield* Issues).hire(lab(), "做一步", "split", {
+        yield* (yield* Issue).hire(lab(), "做一步", "split", {
           taskGraph: { id: "p1", task: "impl" },
         }),
       );
-      const head = (yield* (yield* Sessions).get(session.id))!;
+      const head = (yield* (yield* Session).get(session.id))!;
       expect(head.graph).toEqual({ id: "p1", task: "impl" });
       yield* w.nextReport;
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -257,10 +257,10 @@ describe("an issue", () => {
     const f = farm({ clock: () => now });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
-      const crons = yield* Crons;
-      yield* (yield* Agents).save({ ...lab(), enabled: true });
+      const issues = yield* Issue;
+      const sessions = yield* Session;
+      const crons = yield* Cron;
+      yield* (yield* Agent).save({ ...lab(), enabled: true });
       const made = yield* crons.add(
         {
           name: "巡检",
@@ -303,7 +303,7 @@ describe("an issue", () => {
   it.live("update changes only what it gives", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issues;
+      const issues = yield* Issue;
       let issue = yield* issues.add({
         title: "写打卡",
         description: "每天一次",
@@ -323,9 +323,9 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      yield* (yield* Agents).save(lab());
-      const move = (id: string, to: Issue["status"], text = "") => issues.setStatus(id, to, text, "", owner);
+      const issues = yield* Issue;
+      yield* (yield* Agent).save(lab());
+      const move = (id: string, to: T.Issue["status"], text = "") => issues.setStatus(id, to, text, "", owner);
       let issue = yield* issues.add({ title: "写打卡并提交", project: "clock", assignee: "lab" });
       expect(issue.moves).toEqual(["todo", "canceled"]);
       refusedWith(yield* Effect.flip(move(issue.id, "in_progress")));
@@ -353,9 +353,9 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
-      yield* (yield* Agents).save(lab());
+      const issues = yield* Issue;
+      const sessions = yield* Session;
+      yield* (yield* Agent).save(lab());
       const helper = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
       const place = (sessions as SessionsInside).place(helper.id)!;
@@ -381,9 +381,9 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      const sessions = yield* Sessions;
-      yield* (yield* Agents).save(lab());
+      const issues = yield* Issue;
+      const sessions = yield* Session;
+      yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({
         title: "写打卡并提交",
         project: "resume",
@@ -422,10 +422,10 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
+      const issues = yield* Issue;
       const { in: saidIn } = yield* Said;
-      const chat = yield* Channels;
-      yield* (yield* Agents).save(lab());
+      const chat = yield* Channel;
+      yield* (yield* Agent).save(lab());
       const drop = yield* issues.add({ title: "先放着", project: "acts", assignee: "lab" });
       const dropped = yield* issues.setStatus(drop.id, "canceled", "", "", owner);
       expect([dropped.status, dropped.attention.acts]).toEqual(["canceled", [{ act: "reopen", does: "move", status: "backlog", words: "none" }]]);
@@ -443,7 +443,7 @@ describe("an issue", () => {
       refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");
       expect((yield* issues.get(issue.id)).attention.acts[0]).toEqual({ act: "cure", does: "move", status: "todo", words: "none" });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
-      const thread = (yield* chat.jobThread((yield* issues.get(issue.id)).sessions.at(-1)!))!;
+      const thread = (yield* chat.threadOfSession((yield* issues.get(issue.id)).sessions.at(-1)!))!;
       yield* until(
         () => saidIn(thread).some((m) => m.from === "owner" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
         "the cure said once, by the server",
@@ -456,8 +456,8 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      yield* (yield* Agents).save(lab());
+      const issues = yield* Issue;
+      yield* (yield* Agent).save(lab());
       const project = join(f.config.workRoot, "projects", "clock");
       const committed = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
@@ -489,10 +489,10 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
+      const issues = yield* Issue;
       const { in: saidIn } = yield* Said;
-      const chat = yield* Channels;
-      yield* (yield* Agents).save(lab());
+      const chat = yield* Channel;
+      yield* (yield* Agent).save(lab());
       const project = join(f.config.workRoot, "projects", "clock");
       const asked = yield* issues.add({
         title: "查一下打卡为什么慢，顺手提交",
@@ -541,7 +541,7 @@ describe("an issue", () => {
       expect([stuck.answer, stuck.moves]).toEqual([undefined, ["todo", "canceled"]]);
       refusedWith(yield* Effect.flip(issues.setStatus(garbled.id, "done", "", "", owner)), "这一轮没做成");
       yield* issues.setStatus(garbled.id, "todo", "", "", owner);
-      const thread = (yield* chat.jobThread(stuck.sessions.at(-1)!))!;
+      const thread = (yield* chat.threadOfSession(stuck.sessions.at(-1)!))!;
       yield* until(
         () => saidIn(thread).some((m) => m.from === "owner" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没找到结论")),
         "what was wrong with it, said",
@@ -560,8 +560,8 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
-      yield* (yield* Agents).save(lab());
+      const issues = yield* Issue;
+      yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({ title: "这一单必败", project: "fails", assignee: "lab" });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
@@ -583,9 +583,9 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issues;
+      const issues = yield* Issue;
       const core = yield* Core;
-      yield* (yield* Agents).save(lab());
+      yield* (yield* Agent).save(lab());
       let issue = yield* issues.add({
         title: "先问清楚，再写打卡并提交",
         project: "clock",
@@ -599,10 +599,7 @@ describe("an issue", () => {
         "its question kept",
       );
       expect(issue.questions).toEqual([{ question: "用 8787 还是 8797？", options: [] }]);
-      const crop = () => {
-        const s = core.state().sessions.findLast((h) => h.issue === issue.id);
-        return s && viewOf(core.state()).plots[s.id]?.crop;
-      };
+      const crop = () => viewOf(core.state()).plots[issue.id]?.crop;
       yield* until(() => crop() === "dry", "the plot waiting on an answer");
 
       yield* issues.comment(issue.id, "用 8797");
@@ -638,12 +635,12 @@ describe("an issue", () => {
   });
 
   it.live("is not sent when the money runs out", () => {
-    let usage: AccountUsage | null = null;
+    let usage: T.AccountUsage | null = null;
     const f = farm({ usage: () => usage });
     return Effect.gen(function* () {
-      const issues = yield* Issues;
-      const runtimes = yield* Runtimes;
-      const agents = yield* Agents;
+      const issues = yield* Issue;
+      const runtimes = yield* Runtime;
+      const agents = yield* Agent;
       const hire = () => Effect.map(issues.hire(lab(), "随便做点什么", "money"), (h) => h.refused ?? "");
       const settings = agents.settings("pi");
 

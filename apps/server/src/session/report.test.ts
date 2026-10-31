@@ -8,7 +8,7 @@ import { clip } from "@/base/clip.ts";
 import { MergeFailure } from "@/project/shapes.ts";
 import { inCny } from "@/runtime/price.ts";
 
-import { jobBreak, withRecall } from "./briefing.ts";
+import { briefBreak, withRecall } from "./briefing.ts";
 import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
 import { noRoom, sessionName, whoMakesRoom } from "./hiring.ts";
 import { recallHead } from "./prompts.ts";
@@ -45,9 +45,9 @@ describe("an answer handed back", () => {
 });
 
 describe("a session's events", () => {
-  it("a run starts with the job and counts from what was spent", () => {
+  it("a run starts with the brief and counts from what was spent", () => {
     const h = { ...base(), spent: { tokens: 50, cny: 0.1 } };
-    const r = eventFacts(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + jobBreak + "加一个查询接口" }), h, none, ctx);
+    const r = eventFacts(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + briefBreak + "加一个查询接口" }), h, none, ctx);
     expect(r.facts).toEqual([{ type: "run", id: "w1" }]);
     expect(r.journal).toEqual([{ type: "prompt", text: "加一个查询接口" }]);
     expect(r.tracking.runFrom).toEqual({ tokens: 50, cny: 0.1 });
@@ -55,7 +55,7 @@ describe("a session's events", () => {
 
   it("a run is reminded of memories", () => {
     const block = recallHead + "你以前记下的……\n- （这个项目）测试用 pnpm test";
-    const r = eventFacts(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + jobBreak + withRecall(block, "加一个查询接口") }), base(), none, ctx);
+    const r = eventFacts(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + briefBreak + withRecall(block, "加一个查询接口") }), base(), none, ctx);
     expect(r.journal).toEqual([
       { type: "prompt", text: "加一个查询接口" },
       { type: "note", kind: "memory/recalled", text: "- （这个项目）测试用 pnpm test" },
@@ -271,7 +271,7 @@ describe("room and names", () => {
     expect(noRoom([h("w1", "pi", "a", true), h("w2", "claude", "b", true), h("w3", "codex", "c", true)], "pi", "a", limits)).toMatch(
       /已经有 3 个帮工在干活了/u,
     );
-    expect(noRoom([h("w1", "pi", "a", true), h("w2", "pi", "b", true)], "pi", "c", limits)).toMatch(/最多同时 2 个（在 Runtime 页面可以改）/u);
+    expect(noRoom([h("w1", "pi", "a", true), h("w2", "pi", "b", true)], "pi", "c", limits)).toMatch(/最多同时 2 个（在「农机」页可以改）/u);
     expect(noRoom([h("w1", "pi", "a", true), h("w2", "claude", "a", true)], "codex", "a", limits)).toMatch(/项目 a 里已经有 2 个帮工在干活/u);
     const two = [h("w1", "pi", "a", true), h("w2", "pi", "a", true)];
     expect(noRoom([h("w1", "pi", "a", false), h("w2", "pi", "a", false)], "pi", "a", limits)).toBe("");

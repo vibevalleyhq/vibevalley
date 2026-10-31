@@ -1,7 +1,7 @@
 {
   "id": "tester",
   "version": 1,
-  "role": "worker",
+  "role": "helper",
   "name": "测试小吴",
   "duty": "跑测试、修测试、盯 CI",
   "tags": ["测试", "test", "ci", "跑一遍", "挂"],

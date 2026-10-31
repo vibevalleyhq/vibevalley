@@ -8,7 +8,7 @@ import { expect, test } from "./fixtures";
 const fox: Agent = {
   id: "",
   name: "fox",
-  role: "worker",
+  role: "helper",
   duty: "",
   enabled: true,
   // The test server's pi is the scripted helper (fixtures.ts); 先问清楚 has it ask the owner.

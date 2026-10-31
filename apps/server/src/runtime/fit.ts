@@ -1,17 +1,16 @@
 // As oar's checks when a session opens: a profile it would refuse shows so before it is sent.
 
 import { list, t } from "@vibevalley/i18n";
-import type { Agent, AgentProblem, AgentProblemLevel, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { sessionAppendSystemPrompt, sessionDisallowedTools, sessionEffort, sessionEnv, sessionMcpServers, sessionSystemPrompt } from "@vibevalley/protocol";
 
-import { factsOf } from "@/agent/seed.ts";
-
+import { factsOf } from "./presets.ts";
 import { moneyStop } from "./quota.ts";
 
 const blank = (s: string | undefined) => (s ?? "").trim() === "";
 
 /** Both the dispatch check and session opening validate these choices; availability and spending only gate new work. */
-export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefined, runtime: RuntimeInfo | undefined) {
+export function sessionOptions(agent: T.Agent, settings: T.RuntimeSettings | undefined, runtime: T.RuntimeInfo | undefined) {
   const models = runtime?.models;
   const wanted = agent.model || settings?.defaultModel || "";
   const missingModel = wanted && models && !models.some((m) => m.id === wanted) ? wanted : "";
@@ -21,8 +20,8 @@ export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefin
     env: { ...settings?.env, ...agent.env },
     missingModel,
   };
-  const problems: AgentProblem[] = [];
-  const add = (field: string, level: AgentProblemLevel, text: string) => problems.push({ field, level, text });
+  const problems: T.AgentProblem[] = [];
+  const add = (field: string, level: T.AgentProblemLevel, text: string) => problems.push({ field, level, text });
   // The probed facts; seeds.json's for a runtime not probed.
   const facts = runtime?.facts.refused ? runtime.facts : factsOf(agent.runtime);
   const refused = facts.refused;
@@ -43,8 +42,8 @@ export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefin
   return { ...options, problems };
 }
 
-export function agentProblems(agent: Agent, runtime: RuntimeInfo | undefined): AgentProblem[] {
-  const problems: AgentProblem[] = [];
+export function agentProblems(agent: T.Agent, runtime: T.RuntimeInfo | undefined): T.AgentProblem[] {
+  const problems: T.AgentProblem[] = [];
   const add = (text: string) => problems.push({ field: "runtime", level: "error", text });
   if (!runtime) add(t("server.runtime.unknownRuntime", { runtime: agent.runtime }));
   else if (runtime.installation.status !== "available") add(t("server.runtime.notInstalled"));
@@ -55,12 +54,12 @@ export function agentProblems(agent: Agent, runtime: RuntimeInfo | undefined): A
 }
 
 export interface Candidate {
-  readonly agent: Agent;
+  readonly agent: T.Agent;
   readonly usable: boolean;
 }
 
-/** The profile named (by id or name, else a usable one on the runtime named), else the one picked, else the usable one whose tags the job names most. */
-export function chooseAgent(candidates: readonly Candidate[], task: string, named: string, picked: string): Agent | undefined {
+/** The profile named (by id or name, else a usable one on the runtime named), else the one picked, else the usable one whose tags the brief names most. */
+export function chooseAgent(candidates: readonly Candidate[], brief: string, named: string, picked: string): T.Agent | undefined {
   if (named) {
     const byName = candidates.find((c) => c.agent.id === named || c.agent.name === named) ?? candidates.find((c) => c.agent.runtime === named && c.usable);
     if (byName) return byName.agent;
@@ -69,8 +68,8 @@ export function chooseAgent(candidates: readonly Candidate[], task: string, name
     const chosen = candidates.find((c) => c.agent.id === picked);
     if (chosen) return chosen.agent;
   }
-  const text = task.toLowerCase();
-  let best: Agent | undefined;
+  const text = brief.toLowerCase();
+  let best: T.Agent | undefined;
   let bestScore = -1;
   for (const c of candidates) {
     if (!c.usable) continue;

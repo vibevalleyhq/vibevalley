@@ -1,18 +1,18 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
-import { add, finished, AgentTaskError, update } from "@vibevalley/agent/agentTask";
-import { memoryStore } from "@vibevalley/agent/agentTaskStore";
+import { add, finished, TodoError, update } from "@vibevalley/agent/todo";
+import { memoryStore } from "@vibevalley/agent/todoStore";
 
 import { Db } from "@/base/db.ts";
 import { testDatabase } from "@/testing/layers.ts";
 
-import * as q from "../../db/generated/agent_task.sql.ts";
-import { dbStores } from "./taskStore.ts";
+import * as q from "../../db/generated/runtime_todo.sql.ts";
+import { dbTodoStores } from "./todoStore.ts";
 
-describe("an agent's own tasks, kept", () => {
+describe("an agent's own todos, kept", () => {
   const database = Layer.provideMerge(Db.layer, testDatabase());
-  const stores = Effect.map(dbStores, (database) => ({ database, memory: (_: string) => memoryStore() }));
+  const stores = Effect.map(dbTodoStores, (database) => ({ database, memory: (_: string) => memoryStore() }));
 
   it.effect("a store keeps the graph and puts a finished one away", () =>
     Effect.gen(function* () {
@@ -28,11 +28,11 @@ describe("an agent's own tasks, kept", () => {
         expect(yield* s.load, name).toEqual(g);
         const refused = yield* Effect.flip(
           s.change(() => {
-            throw new AgentTaskError({ message: "不改了" });
+            throw new TodoError({ message: "不改了" });
           }),
         );
         expect(refused, name).toMatchObject({ _tag: "ToolFailed", message: "不改了" });
-        expect(refused.cause, name).toBeInstanceOf(AgentTaskError);
+        expect(refused.cause, name).toBeInstanceOf(TodoError);
         expect(yield* s.change(() => undefined), name).toBeUndefined();
         expect(yield* s.load, name).toEqual(g);
         const ended = yield* s.change((g) => update(update(g, "a", { state: "done" }), "c", { state: "skipped" }));
@@ -49,7 +49,7 @@ describe("an agent's own tasks, kept", () => {
         ["good", 1, `["bad"]`],
       ] as const)
         yield* Effect.orDie(
-          q.addAgentTask({
+          q.addTodo({
             graph: "g1",
             keeper: "s1",
             id,
@@ -64,7 +64,7 @@ describe("an agent's own tasks, kept", () => {
             updated_at: 0,
           }),
         );
-      const got = yield* (yield* dbStores)("s1").load;
+      const got = yield* (yield* dbTodoStores)("s1").load;
       expect(got.map((t) => [t.id, t.after])).toEqual([
         ["bad", []],
         ["good", ["bad"]],
@@ -74,7 +74,7 @@ describe("an agent's own tasks, kept", () => {
 
   it.effect("one keeper's tasks are not another's", () =>
     Effect.gen(function* () {
-      const open = yield* dbStores;
+      const open = yield* dbTodoStores;
       yield* open("s1").change((g) => add(g, [{ id: "a", brief: "b" }])[0]);
       expect(yield* open("s2").load).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(database)),

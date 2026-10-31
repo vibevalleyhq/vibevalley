@@ -76,7 +76,7 @@
     "devices": "手机 配对 连接到本机 局域网"
   },
   "scope": {
-    "farm": "对整个农场",
+    "farm": "对整个 VibeValley",
     "device": "只对这台设备"
   },
   "general": {
@@ -112,7 +112,7 @@
     "versionHint": "这台电脑上的服务端",
     "files": "文件",
     "home": "家目录",
-    "homeHint": "农场的一切都在这里",
+    "homeHint": "VibeValley 的一切都在这里",
     "settings": "设置文件",
     "settingsHint": "钥匙和这几页的设置",
     "copy": "复制路径",
@@ -124,7 +124,7 @@
     "checking": "正在查有没有新版本…",
     "downloading": "正在下载 {next}（{percent}%）",
     "ready": "{next} 已下好，退出时装上",
-    "readyNewFarm": "{next} 已下好：它会从一个新农场开始，旧的留在一边",
+    "readyNewFarm": "{next} 已下好：它会从新的数据开始，旧的留在一边",
     "manual": {
       "diskImage": "{next} 要手动装：应用还在安装盘里运行，先拖进「应用程序」",
       "translocated": "{next} 要手动装：macOS 把应用挪到了临时的地方运行，先拖进「应用程序」再打开",
@@ -136,7 +136,7 @@
     "restart": "重启更新",
     "restartQuestion": "重启到新版本？",
     "workingQuestion": "{n} 个帮工在干活，重启会打断它们。现在重启？",
-    "newFarmQuestion": "新版本从一个新农场开始，旧的留在家目录里。现在重启？",
+    "newFarmQuestion": "新版本从新的数据开始，旧的留在家目录里。现在重启？",
     "download": "去下载"
   }
 }

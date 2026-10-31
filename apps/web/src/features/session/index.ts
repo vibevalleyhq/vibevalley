@@ -1,3 +1,3 @@
 export { TrajectoryList, TrajectoryLog } from "./Trajectory";
-export { TurnSteps, WorkLog } from "./WorkLog";
+export { RunSteps, WorkLog } from "./WorkLog";
 export { createSessionEvents } from "./events";

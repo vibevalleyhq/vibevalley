@@ -1,4 +1,4 @@
-// Notifications: what in the inbox is news to the owner, and the patrol (what has waited past its kind's grace). The
+// The inbox: what in it is news to the owner, and the patrol (what has waited past its kind's grace). The
 // routes listen and say it their own way: on a call the orchestrator says the news (voice), the patrol's findings wake the
 // orchestrator, and the page rings, notifies and fills the tray from the same inbox in the frame, each item worded there.
 
@@ -9,11 +9,11 @@ import { freshOf } from "@vibevalley/protocol/rules";
 
 import { ServerConfig } from "@/base/config.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
-import { Channels } from "@/channel/chat.ts";
+import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 
 import { forOwner } from "./away.ts";
-import { inbox } from "./inbox.ts";
+import { inbox } from "./items.ts";
 import { emptyPatrol, type PatrolMemory, type PatrolNote, patrolStep } from "./patrol.ts";
 
 /** What has waited too long in one channel. */
@@ -22,8 +22,8 @@ export interface Overdue {
   readonly notes: readonly PatrolNote[];
 }
 
-export class Notices extends Context.Service<
-  Notices,
+export class Inbox extends Context.Service<
+  Inbox,
   {
     /** What came into the inbox, each item once; what stood when the farm came up is known, not news. */
     readonly news: Effect.Effect<Stream.Stream<readonly InboxItem[]>, never, Scope.Scope>;
@@ -36,16 +36,16 @@ export class Notices extends Context.Service<
     /** From here what the inbox holds is known: the startup's, after the sessions and issues came back. */
     readonly prime: Effect.Effect<void>;
   }
->()("vibevalley/Notice") {
+>()("vibevalley/Inbox") {
   static readonly layer = Layer.effect(
-    Notices,
+    Inbox,
     Effect.suspend(() => make),
   );
 }
 
 const make = Effect.gen(function* () {
   const core = yield* Core;
-  const chat = yield* Channels;
+  const chat = yield* Channel;
 
   // Until the startup primes it nothing is news: what comes back with the sessions was there before the stop.
   let known: Set<string> | undefined;
@@ -76,7 +76,7 @@ const make = Effect.gen(function* () {
     for (const [channel, notes] of byChannel) yield* PubSub.publish(overdueHub, { channel, notes });
   });
 
-  const shape = Notices.of({
+  const shape = Inbox.of({
     news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
     overdue: Effect.map(PubSub.subscribe(overdueHub), Stream.fromSubscription),
     toOwner: Effect.map(
@@ -97,9 +97,9 @@ const make = Effect.gen(function* () {
 export const start = Layer.effectDiscard(
   Effect.gen(function* () {
     const config = yield* ServerConfig;
-    const notices = yield* Notices;
-    yield* notices.prime;
+    const service = yield* Inbox;
+    yield* service.prime;
     const every = config.patrol.heartbeatMinutes * 60_000;
-    if (every > 0) yield* Effect.forkScoped(notices.patrol.pipe(Effect.repeat(Schedule.spaced(every)), Effect.delay(every)));
+    if (every > 0) yield* Effect.forkScoped(service.patrol.pipe(Effect.repeat(Schedule.spaced(every)), Effect.delay(every)));
   }),
 );

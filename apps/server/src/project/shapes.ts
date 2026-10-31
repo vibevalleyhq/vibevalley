@@ -17,7 +17,7 @@ export interface Workplace {
 export type WorkplaceRelease = { readonly kept: false } | { readonly kept: true; readonly reason: string };
 export type WorkplaceCleanup = "discard" | "preserve";
 
-export interface Project {
+export interface ProjectFolder {
   readonly name: string;
   readonly path: string;
   readonly git: boolean;

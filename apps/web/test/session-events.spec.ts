@@ -8,7 +8,7 @@ const second = "second round written while away";
 const profile: Agent = {
   id: "",
   name: "trajectory-tester",
-  role: "worker",
+  role: "helper",
   duty: "",
   enabled: true,
   runtime: "pi",

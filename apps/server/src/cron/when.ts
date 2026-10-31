@@ -1,12 +1,10 @@
+import { Cron as EffectCron, DateTime, Option } from "effect";
 // When a cron runs and how it is said. The next run is
 // the first matching minute strictly after the last run. A wall time skipped by a clock change is taken as the same time
 // before the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence.
 
-import { Cron as EffectCron, DateTime, Option } from "effect";
-
 import { list, t } from "@vibevalley/i18n";
-import type { Cron, CronWhen } from "@vibevalley/protocol";
-
+import type * as T from "@vibevalley/protocol";
 /** A day of the week by its number, Sunday 0. */
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a cron day of the week is 0 to 6
 const weekday = (d: number) => t(`server.cron.weekdays.${d as 0 | 1 | 2 | 3 | 4 | 5 | 6}`);
@@ -41,7 +39,7 @@ export function nextOf(cron: EffectCron.Cron, from: number): number | undefined 
   }
 }
 
-export function nextRun(s: Cron): number | undefined {
+export function nextRun(s: T.Cron): number | undefined {
   if (!s.enabled) return undefined;
   const from = s.lastRun ?? s.created;
   const w = s.when;
@@ -77,7 +75,7 @@ function clock(at: number, tz: string): string {
   return `${w.month}/${w.day} ${two(w.hour)}:${two(w.minute)}`;
 }
 
-export function whenText(when: CronWhen, tz: string): string {
+export function whenText(when: T.CronWhen, tz: string): string {
   switch (when.kind) {
     case "once":
       return t("server.cron.when.once", { clock: clock(when.at, tz) });
@@ -94,7 +92,7 @@ export function whenText(when: CronWhen, tz: string): string {
   }
 }
 
-export function nextText(s: Cron): string {
+export function nextText(s: T.Cron): string {
   const next = nextRun(s);
   if (next !== undefined) return clock(next, s.tz);
   if (s.enabled) return t("server.cron.next.never");

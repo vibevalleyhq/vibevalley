@@ -19,7 +19,7 @@ describe("the built-in templates", () => {
   it("start with the default orchestrator, on VibeValley's own agent; the rest are workers", () => {
     const [first, ...rest] = builtInTemplates();
     expect([first!.id, first!.role, first!.runtime]).toEqual([defaultOrchestrator, "orchestrator", orchestratorRuntime]);
-    expect(rest.every((t) => t.role === "worker" && t.runtime !== "")).toBe(true);
+    expect(rest.every((t) => t.role === "helper" && t.runtime !== "")).toBe(true);
   });
 
   it("say the same in English, in English words", () => {

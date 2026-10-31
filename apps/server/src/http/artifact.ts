@@ -5,7 +5,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { artifactPrefix as prefix } from "@vibevalley/protocol";
 
-import { Artifacts } from "@/artifact/artifact.ts";
+import { Artifact } from "@/artifact/artifact.ts";
 import { artifactHeaders } from "@/artifact/policy.ts";
 
 const notFound = () => HttpServerResponse.text("404 page not found\n", { status: 404 });
@@ -14,7 +14,7 @@ export const artifactContent = HttpRouter.add(
   "GET",
   "/api/v1/artifact/:id/:version",
   Effect.gen(function* () {
-    const artifacts = yield* Artifacts;
+    const artifacts = yield* Artifact;
     const request = yield* HttpServerRequest.HttpServerRequest;
     const [id = "", version = ""] = new URL(request.url, "http://farm").pathname.slice(prefix.length).split("/");
     if (!/^[0-9a-f-]{36}$/u.test(id) || !/^[1-9]\d*$/u.test(version)) return notFound();

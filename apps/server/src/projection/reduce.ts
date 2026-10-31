@@ -1,7 +1,6 @@
 // The farm's core state, in motion: reduce folds one fact into the state with each module's rules; the recorded runs of
 // facts (core/testdata/reduce.jsonl.gz) hold it to the same answers. It never changes what it is given.
-
-import type { WorkspaceState, Fact, OrchestratorState, Outcome, Phase, Session } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 
 import { withChannel, withMessage, withOwnerMentions } from "@/channel/folded.ts";
@@ -9,15 +8,15 @@ import { freeStation, playedDoing, playedRun, playOf, stationed } from "@/game/p
 import { withIssue, withIssueStatuses } from "@/issue/status.ts";
 import { sessionOf, whileWorking, withSession } from "@/session/roster.ts";
 
-const ended = (outcome: Outcome): Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
+const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 
 /** A fact that changes nothing says so (false), and is not sent; facts about sessions not on the farm change nothing. The issues' statuses follow whatever changed. */
-export function reduce(state: WorkspaceState, fact: Fact): [WorkspaceState, boolean] {
+export function reduce(state: T.WorkspaceState, fact: T.Fact): [T.WorkspaceState, boolean] {
   const [next, changed] = fold(state, fact);
   return changed && next.issues.length > 0 ? [withIssueStatuses(next), true] : [next, changed];
 }
 
-function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
+function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
   switch (f.type) {
     case "call": {
       if (state.call === f.state && state.callReason === f.reason) return [state, false];
@@ -29,7 +28,7 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       // At rest it leaves the map: idle is what an orchestrator not in it is.
       const { [f.agent]: _was, ...others } = state.orchestrators;
       // A round runs from its first thinking through its writing: its start stays while it goes on.
-      const busy = (s: OrchestratorState | undefined) => s === "thinking" || s === "speaking";
+      const busy = (s: T.OrchestratorState | undefined) => s === "thinking" || s === "speaking";
       const since = busy(f.state) ? (busy(was?.state) ? was.since : f.at) : undefined;
       const now =
         f.state === "idle" && !f.channel
@@ -55,7 +54,7 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
       const was = sessionOf(state, f.session.id);
       const play = was?.play ?? { ...playOf(f.session), station: freeStation(others, farmOf(f.session)) };
-      const h: Session = { ...f.session, play };
+      const h: T.Session = { ...f.session, play };
       return [{ ...state, sessions: [...others, h] }, true];
     }
     case "station":

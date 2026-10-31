@@ -10,7 +10,7 @@ const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => {
 export const issueThreadOf = (chat: Chat | undefined, issue: string) => findLast(chat?.channels, (c) => c.subjectKind === "issue" && c.subjectId === issue);
 
 /** The one way from a session to its thread: through its issue; a session sent for no issue has a talk thread of its own. */
-export function jobThreadOf(chat: Chat | undefined, session: Session) {
+export function sessionThreadOf(chat: Chat | undefined, session: Session) {
   if (session.issue) return issueThreadOf(chat, session.issue);
   return findLast(chat?.channels, (c) => c.subjectKind === "talk" && c.subjectId === session.id);
 }

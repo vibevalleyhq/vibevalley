@@ -9,8 +9,8 @@ import { assistantMessage, text, thinking } from "@vibevalley/ai/testing";
 import { until } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
-import { AgentExecution } from "./execution.ts";
-import { type RunFinished, type RunStore, runOf, Sessions, type SessionsInside, NotRecorded } from "./session.ts";
+import { InProcessRun } from "./inProcessRun.ts";
+import { type RunFinished, type RunStore, runOf, Session, type SessionsInside, NotRecorded } from "./session.ts";
 const user = (words: string): CoreEvent => ({ type: "message_start", message: { role: "user", content: [text(words)], timestamp: 0 } });
 const said = (words: string, stopReason: StopReason = "stop", errorMessage?: string): CoreEvent => ({
   type: "message_end",
@@ -34,13 +34,13 @@ const issue = (id: string) =>
 describe("the orchestrator's runs", () => {
   it.live("one loop is one run; its inputs' issues are all linked; failures and stops are said", () =>
     Effect.gen(function* () {
-      const sessions = (yield* Sessions) as SessionsInside;
+      const sessions = (yield* Session) as SessionsInside;
       yield* issue("i1");
       yield* issue("i2");
       const finished: RunFinished[] = [];
       const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.finishedRuns, (r) => Effect.sync(() => finished.push(r))));
       const journal = sessions.trajectories.openLog("orchestrator");
-      const x = new AgentExecution("orchestrator", journal, (tool) => ({ text: tool, action: "other", tool }), sessions.runStore);
+      const x = new InProcessRun("orchestrator", journal, (tool) => ({ text: tool, action: "other", tool }), sessions.runStore);
 
       yield* x.observe(user("看看工单"), { issue: "i1", by: { kind: "issue" }, heard: ["m1"] });
       expect(sessions.currentRun("orchestrator")).not.toBe("");
@@ -84,8 +84,8 @@ describe("the orchestrator's runs", () => {
 
   it.live("close changes execution only when its effect runs", () =>
     Effect.gen(function* () {
-      const sessions = (yield* Sessions) as SessionsInside;
-      const x = new AgentExecution(
+      const sessions = (yield* Session) as SessionsInside;
+      const x = new InProcessRun(
         "orchestrator",
         sessions.trajectories.openLog("orchestrator"),
         (tool) => ({ text: tool, action: "other", tool }),
@@ -120,13 +120,13 @@ describe("the orchestrator's runs", () => {
 
   it.live("a run whose end could not be written ends before the next starts", () =>
     Effect.gen(function* () {
-      const sessions = (yield* Sessions) as SessionsInside;
+      const sessions = (yield* Session) as SessionsInside;
       let broken = true;
       const store: RunStore = {
         ...sessions.runStore,
         finish: (...a) => (broken ? Effect.fail(new NotRecorded({ message: "disk full" })) : sessions.runStore.finish(...a)),
       };
-      const x = new AgentExecution("orchestrator", sessions.trajectories.openLog("orchestrator"), (tool) => ({ text: tool, action: "other", tool }), store);
+      const x = new InProcessRun("orchestrator", sessions.trajectories.openLog("orchestrator"), (tool) => ({ text: tool, action: "other", tool }), store);
       yield* x.observe(user("一"), { by: { kind: "comment" } });
       const first = sessions.currentRun("orchestrator");
       expect(yield* Effect.flip(x.observe(end()))).toBeInstanceOf(NotRecorded);

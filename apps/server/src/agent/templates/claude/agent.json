@@ -1,7 +1,7 @@
 {
   "id": "claude",
   "version": 1,
-  "role": "worker",
+  "role": "helper",
   "name": "Claude 师傅",
   "duty": "读大代码库、重构、查难缠的 bug",
   "tags": ["重构", "难", "bug", "排查", "根因", "架构", "claude"],

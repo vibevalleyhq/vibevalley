@@ -1,7 +1,7 @@
 {
   "opening": {
-    "waking": "Waking the farm…",
-    "label": "Waking the farm",
-    "cannotStart": "The farm cannot start: {why}"
+    "waking": "Waking VibeValley…",
+    "label": "Waking VibeValley",
+    "cannotStart": "VibeValley cannot start: {why}"
   }
 }

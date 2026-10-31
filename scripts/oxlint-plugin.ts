@@ -94,9 +94,18 @@
  *   calls something destructured (const { run } = yield* Db) or imported, a member taken from another object
  *   (blocks.markdown), and a name declared twice in the file are skipped, as are members that are an Effect or a Stream
  *   themselves; a function that returns a Stream, a Promise or a plain value is never reported.
+ *
+ *   singular-service: a server service takes its concept's singular word, the same as its module folder and table
+ *   (Issue, Session), as Effect's own Database does; a plural says "many", and the service is one. A class extending
+ *   Context.Service whose name ends in s is reported unless its last word is one of the singular words listed with the
+ *   rule (Status, Progress …).
+ *
+ *   protocol-namespace: a protocol shape named like a server service (Issue, Session) is read as T.Issue through
+ *   import type * as T from "@vibevalley/protocol", so the service keeps the bare name in every file. The service names
+ *   are read from apps/server/src when the plugin loads; a named import of one of them from the protocol is reported.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { definePlugin, defineRule, type ESTree } from "vite-plus/lint/plugins";
@@ -886,6 +895,77 @@ const serviceMethodNames = defineRule({
   },
 });
 
+const isContextService = (n: Node): boolean => {
+  if (n.type === "CallExpression") return isContextService(n.callee);
+  return (
+    n.type === "MemberExpression" &&
+    n.object.type === "Identifier" &&
+    n.object.name === "Context" &&
+    n.property.type === "Identifier" &&
+    n.property.name === "Service"
+  );
+};
+
+/** Words that end in s and still name one thing; a service named for one of them is singular. */
+const singularInS = new Set(["Status", "Alias", "Canvas", "Lens", "Progress", "Access", "Address"]);
+const lastWord = (name: string) => /[A-Z][a-z0-9]*$/u.exec(name)?.[0] ?? name;
+const looksPlural = (name: string) => name.endsWith("s") && !singularInS.has(lastWord(name));
+
+const singularService = defineRule({
+  meta: {
+    messages: {
+      plural: says(
+        "the service {{name}} has a plural name, but a service is one thing: the one that manages its concept",
+        "name it with the concept's singular word, the same as its module folder and table (`class {{singular}} extends Context.Service<{{singular}}, …>`); a protocol shape that would clash is read as `T.X` through `import type * as T`",
+        "docs/style/naming.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      ClassDeclaration(node) {
+        if (!node.id || !node.superClass || !isContextService(node.superClass) || !looksPlural(node.id.name)) return;
+        context.report({
+          node: node.id,
+          messageId: "plural",
+          data: { name: node.id.name, singular: node.id.name.replace(/(ies|s)$/u, (e) => (e === "ies" ? "y" : "")) },
+        });
+      },
+    };
+  },
+});
+
+/** The server's service classes, read once when the plugin loads. */
+const serviceNames = new Set(
+  globSync("apps/server/src/**/*.ts", { cwd: repo })
+    .filter((f) => !f.endsWith(".test.ts"))
+    .flatMap((f) => [...readFileSync(resolve(repo, f), "utf8").matchAll(/^export class (\w+) extends Context\.Service\b/gmu)].map((m) => m[1] ?? "")),
+);
+
+const protocolNamespace = defineRule({
+  meta: {
+    messages: {
+      named: says(
+        "{{name}} is both a protocol shape and a server service, so importing the shape by name takes the service's name in this file",
+        '`import type * as T from "@vibevalley/protocol"` and write `T.{{name}}` (the file\'s other protocol types too, so they read alike)',
+        "docs/style/naming.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value !== "@vibevalley/protocol") return;
+        for (const s of node.specifiers) {
+          if (s.type !== "ImportSpecifier") continue;
+          const name = s.imported.type === "Identifier" ? s.imported.name : s.imported.value;
+          if (serviceNames.has(name)) context.report({ node: s, messageId: "named", data: { name } });
+        }
+      },
+    };
+  },
+});
+
 export default definePlugin({
   meta: { name: "vibevalley" },
   rules: {
@@ -907,5 +987,7 @@ export default definePlugin({
     "no-instanceof-tagged": noInstanceofTagged,
     "no-object-guard": noObjectGuard,
     "service-method-names": serviceMethodNames,
+    "singular-service": singularService,
+    "protocol-namespace": protocolNamespace,
   },
 });

@@ -6,7 +6,9 @@ import { describe, expect, it } from "vite-plus/test";
 import type { Issue, IssueAttention, Session } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { plotOf } from "./view.ts";
+import { emptyWorkspaceState } from "@/core/core.ts";
+
+import { plotOf, viewOf } from "./view.ts";
 
 const session = (phase: Session["phase"]): Session => ({
   id: sessionId("w1"),
@@ -64,5 +66,17 @@ describe("a plot", () => {
     );
     expect(plotOf(working, t)).toEqual({ crop: "weeds", badge: { text: "除草中 1", tone: "bug" } });
     expect(plotOf(working, { ...t, findings: [{ id: "f", text: "再改", at: 1, resolved: true }] }).crop).toBe("sprout");
+  });
+
+  it("is its issue's: a reopened issue's new session works the same plot", () => {
+    const t = issue({ state: "working", acts: [{ act: "tell", does: "say" }] }, { status: "in_progress" });
+    const first = { ...session({ _tag: "working", since: 1, doing: { action: "none", label: "" } }), hiredAt: 1 };
+    const again = { ...session({ _tag: "arriving" }), id: sessionId("w2"), hiredAt: 2 };
+    const before = viewOf({ ...emptyWorkspaceState(), sessions: [first], issues: [t] }).plots;
+    const after = viewOf({ ...emptyWorkspaceState(), sessions: [again], issues: [t] }).plots;
+    expect([Object.keys(before), Object.keys(after)]).toEqual([["t1"], ["t1"]]);
+    expect(after["t1"]).toEqual({ crop: "seeded" });
+    // Both still here for a moment: the later hired is the one the plot pictures.
+    expect(viewOf({ ...emptyWorkspaceState(), sessions: [again, first], issues: [t] }).plots).toEqual(after);
   });
 });

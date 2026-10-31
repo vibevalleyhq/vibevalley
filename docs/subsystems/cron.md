@@ -1,6 +1,6 @@
 # 定时任务
 
-定时任务（`Cron`）是一张工单的一种触发：到点在频道里说一声，再开这张工单的一次干活（run），派给帮工的档案或管家。「每天早上九点在 #clock-in 跑一遍测试」是一个定时任务；它从头到尾只有一张工单，每次到点是这张工单的一次干活。定时任务是农场的，存在农场的表里，主人在页面上看得到、关得掉；管家只是用工具定它。
+定时任务（`Cron`）是一张工单的一种触发：到点在频道里说一声，再开这张工单的一轮（run），派给帮工的档案或管家。「每天早上九点在 #clock-in 跑一遍测试」是一个定时任务；它从头到尾只有一张工单，每次到点是这张工单的一轮。定时任务是农场的，存在农场的表里，主人在页面上看得到、关得掉；管家只是用工具定它。
 
 ## 管什么，不管什么
 
@@ -9,12 +9,12 @@
 | 定时任务的模型、五种时间写法、时区、下次什么时候 | 到点以后工单怎么派、重开、带话（[工单](docs/subsystems/issue.md)，`issue/issue.ts` 的 `scheduled`） |
 | 谁定的、要不要等主人同意 | 管家怎么接住到点的那句话、答完等主人点头（`orchestrator`，[管家](docs/subsystems/orchestrator.md)） |
 | 每隔一阵看一遍、到点先存再说再发布、错过的补一次 | 巡查：不调模型地看 Inbox、有事叫醒管家（`orchestrator/orchestrator.ts`，[管家](docs/subsystems/orchestrator.md)） |
-| 定时任务在核心状态里的一份（`WorkspaceState.Crons`） | 频道、频道的默认项目、提示怎么投递（[频道](docs/subsystems/channel.md)） |
+| 定时任务在核心状态里的一份（`WorkspaceState.crons`） | 频道、频道的默认项目、提示怎么投递（[频道](docs/subsystems/channel.md)） |
 | | VibeValley 自己的 agent 自带的提醒（`packages/agent/src/reminders.ts` 的 `reminders.json`，工具 `reminder`、`list_reminders`、`cancel_reminder`）：只有命令行的对话开着，当管家、当帮工时关掉（`reminders: false`） |
 
 ## 在哪
 
-- 服务端 `apps/server/src/cron`（`Crons`）：`cron.ts` 存取、开机读表、每次检查（`tick`）和到点发布（`due`，一条流）；`due.ts` 是只有它用的纯函数：`dueCrons`、`isMissed`、`afterRun`、`needsOK`、`cronProblem`。
+- 服务端 `apps/server/src/cron`（`Cron`）：`cron.ts` 存取、开机读表、每次检查（`tick`）和到点发布（`due`，一条流）；`due.ts` 是只有它用的纯函数：`dueCrons`、`isMissed`、`afterRun`、`needsOK`、`cronProblem`。
 - 几处都用的规则在 `apps/server/src/cron/when.ts`：`nextRun`、`cronProblem`、`whenText`、`nextText`、`dueText`，五段 cron 的解析、下次时间、说成话；下次时间用 Effect 的 `Cron.make`、`Cron.next` 和时区，解析和报错是自己的。
 - 表：`cron`（一个定时任务一行，时间写法存成 JSON 的 `spec`）；工单表的 `cron` 列指着它的定时任务。
 - 接口：`cron.create`、`cron.list`、`cron.update`、`cron.delete`（[capabilities.md](docs/reference/capabilities.md)）；`cron.update` 只有主人和「连接到本机」能调，管家不能。管家的工具 `cron_create`、`cron_list`、`cron_delete` 在 `tool/tool.ts`。
@@ -29,7 +29,7 @@
 - **谁定的**（`Cron.by`）：`owner` 是主人经接口、命令行定的，`orchestrator` 是管家用 `cron_create` 定的；列表里管家定的写着「管家定的」。
 - **等主人同意**（`needsOK`）：主人定的、管家在主人这一轮里（最新那条输入有主人的话）定的，当场生效。管家不是主人叫醒时定的，只有不派帮工的一次性回头看当场生效；会反复来的、直接派帮工的存成关着、`pending`，到点也不跑，在 Inbox 里是一条 `cron-ask`。主人点「同意」是 `cron.update` 打开，同时清掉 `pending`；点「不要」是 `cron.delete`。管家的工具对待批的回「定好了，等主人同意才生效：……」，它照实告诉主人。
 - **派给谁**：写了帮工的档案（按 id，再按名字找）的派给那个档案，这时要写项目或频道有默认项目，否则不收；没写的派给它频道的管家（频道设置里照看它的那个，没设是默认管家；工单的 `assignee` 就写那个管家的档案 id）。管家用的工具里不填频道就是它正在回话的频道，接口里不填是默认频道。
-- **一个定时任务一张工单**：`Issues.ofCron` 取指着这个定时任务的最近一张；每次到点是它的一次干活，触发是 `RunTrigger` 的 `cron`（带着哪个定时任务、是不是补跑）。
+- **一个定时任务一张工单**：`Issue.ofCron` 取指着这个定时任务的最近一张；每次到点是它的一轮，触发是 `RunTrigger` 的 `cron`（带着哪个定时任务、是不是补跑）。
 - **定时任务有一份**：表是家，开机读进核心状态（`cron` 事实），每次改先写表再施加事实，删掉施加 `cronGone`；`spec` 按 `CronWhen` 的 Schema 读，`set_by` 按 `CronBy` 读，读不了或形状不对的那行不进核心状态，别的行照常恢复。增、改、删和每次检查由一把锁排成一个一个来。
 
 ## 怎么走
@@ -58,15 +58,15 @@
 
 ## 和谁打交道
 
-- **工单（`issue`）**：订阅 `Due()`，一个定时任务一张工单，到点开它的一次干活；派活、排队、重开、带话都照工单的规则（[工单](docs/subsystems/issue.md)）。
+- **工单（`issue`）**：订阅 `Due()`，一个定时任务一张工单，到点开它的一轮；派活、排队、重开、带话都照工单的规则（[工单](docs/subsystems/issue.md)）。
 - **频道（`channel`）**：定时任务属于一个频道（`cron.channel_id`）；到点的提示和出错的提示都经 `notice` 说在这个频道里。
 - **档案（`agent`）**：定时任务只认存在的帮工的档案；没写的交给管家，是哪个管家问频道（`orchestratorOf`）。
 - **管家（`orchestrator`、`tool`）**：用 `cron_create`、`cron_list`、`cron_delete` 定、看、删，调不了 `cron.update`。系统提示里写着：主人说「每天」「到点」时定；派了活、答应了主人一件事、在等一个结果时，可以自己定一次性的回头看；会反复来的只在主人要的时候定。管家自己的定时任务（没写档案的）快到点时，它闲着也不压缩（`wakeSoon`）。
-- **Inbox（`apps/server/src/notice/inbox.ts`）**：待批的定时任务是一条 `cron-ask`，主人同意或删掉它就没了。
+- **Inbox（`apps/server/src/inbox/items.ts`）**：待批的定时任务是一条 `cron-ask`，主人同意或删掉它就没了。
 
 ## 为什么这样
 
-- **定时任务是一张工单的触发，一个定时任务一张工单。** 放弃了每次到点写一张新工单：一个「每 5 分钟」的定时任务一天写 288 张，看不出一个定时任务干过几次，也和「工单、带话都触发一次干活」的模型对不上。放弃了没写档案的定时任务直接对管家说一句话：两个出口靠两个订阅者各自看「有没有写档案」分工，交给管家的那一半不进看板、没有干活的记录。
+- **定时任务是一张工单的触发，一个定时任务一张工单。** 放弃了每次到点写一张新工单：一个「每 5 分钟」的定时任务一天写 288 张，看不出一个定时任务干过几次，也和「工单、带话都触发一轮」的模型对不上。放弃了没写档案的定时任务直接对管家说一句话：两个出口靠两个订阅者各自看「有没有写档案」分工，交给管家的那一半不进看板、没有干活的记录。
 - **管家的工单答完等主人点头，点了就完成（交付 `none`）。** 没记成不做了（`dismissed`）：收工是主人请帮工走，意思不一样，看板和统计会混在一起。答完不再自动关：一轮没崩不等于答上了（[工单](docs/subsystems/issue.md)「已完成只由主人点头」）。
 - **到点先在频道里说一声，再派活。** 主人在频道里看得到每次定时任务做了什么；写了档案的不经过管家，不花管家的一轮。这一点和 Raft 的提醒不同：Raft 到点只叫醒建它的 agent，频道里什么也不发，也只有 agent 能建。
 - **定时任务是农场的，不是 agent 的。** 存在农场的表里，页面能看、能关；VibeValley 自己的 agent 当管家时关掉它自带的定时任务，不留两份。
