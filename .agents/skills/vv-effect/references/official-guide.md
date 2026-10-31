@@ -12,7 +12,8 @@
 | Running Effect programs（`NodeRuntime.runMain`、`Layer.launch`） | 服务端的入口 `apps/server/src/main.ts`；命令行 `apps/server/src/cli.ts` |
 | Broadcasting messages with PubSub | 用在核心状态和事件往上走的流（下层经 `Stream` 告诉上层） |
 | Working with Streams | 用：SSE 的帧、帮工的事件、频道的消息；有界的 relay 见 [architecture.md](docs/architecture.md) |
-| Integrating Effect into existing applications（`ManagedRuntime`） | 少用：Promise 一侧只剩外面库的一次调用；桌面壳和页面不是 Effect |
+| Integrating Effect into existing applications（`ManagedRuntime`） | 少用：Promise 一侧只剩外面库的一次调用；桌面壳不是 Effect，页面只有中间层用 Effect（见下一行） |
+| （不在指南里）`effect/reactivity` 的 Atom、`AtomRegistry` | 页面的中间层（`apps/web/src/state/`）：自己写的 Solid 2 绑定、意图、存下来的选择、地址里的选择；只有 `state/` import 它；不用 `Atom.optimistic`（理由见 [SKILL.md](.agents/skills/vv-effect/SKILL.md#2b-页面里的-effect中间层)） |
 | Batching external requests（`RequestResolver`） | 不用：外面的请求没有批量的需要 |
 | Working with Schedules（`Effect.retry`、`Effect.repeat`） | 照做：语音的重试、隧道的探问是 `Schedule`；连接器收消息的循环按分支（暂停到某一刻、换代、失败的节奏）各等各的，留着手写 |
 | Working with DateTime | 时间经 `Clock`；格式化在需要的地方用 |

@@ -1,6 +1,6 @@
 ---
 name: vv-effect
-description: 在 VibeValley 里写、改、评审 Effect v4 的代码（apps/server、packages/agent、packages/ai，effect 4.0.5）：先读包里自带的官方指南，再照本仓库的约定写：服务是 Context.Service 的类、库经 Db、文件经 FileSystem、时间经 Clock、Promise 只在库的一次调用上且写 { try, catch }、错误打标签按 catchTag 接、服务的方法用 Effect.fn 命名、测试用 it.effect 和 TestClock；哪些已经由 effect:check、vp check 的 effecttsgo 规则、vibevalley/* lint 和逃生口的棘轮拦着。用在：写或改任何用到 Effect 的代码（服务、layer、错误、Stream、Schedule、Schema、测试）；评审一段 Effect 代码；effect:check 或 vp check 报了 effecttsgo 的诊断不知道怎么改；不确定一个 API 在 v4 叫什么（Context.Tag、Effect.Service、catchAll、Either、Layer.scoped 这些 v3 名字都不在了）；主人说「Effect 的最佳实践」「这段 Effect 写得对不对」。
+description: 在 VibeValley 里写、改、评审 Effect v4 的代码（apps/server、packages/agent、packages/ai，以及页面的中间层 apps/web/src/state 上的 Effect Atom，effect 4.0.5）：先读包里自带的官方指南，再照本仓库的约定写：服务是 Context.Service 的类、库经 Db、文件经 FileSystem、时间经 Clock、Promise 只在库的一次调用上且写 { try, catch }、错误打标签按 catchTag 接、服务的方法用 Effect.fn 命名、测试用 it.effect 和 TestClock；哪些已经由 effect:check、vp check 的 effecttsgo 规则、vibevalley/* lint 和逃生口的棘轮拦着。用在：写或改任何用到 Effect 的代码；页面上主人做一件事要先显示结果（乐观更新）、要等服务端确认、要记住一个选择、要一个全页面共享的值（意图、act()、defineStored、defineAtom，Atom 只在 state/）（服务、layer、错误、Stream、Schedule、Schema、测试）；评审一段 Effect 代码；effect:check 或 vp check 报了 effecttsgo 的诊断不知道怎么改；不确定一个 API 在 v4 叫什么（Context.Tag、Effect.Service、catchAll、Either、Layer.scoped 这些 v3 名字都不在了）；主人说「Effect 的最佳实践」「这段 Effect 写得对不对」。
 ---
 
 # 在这个仓库写 Effect
@@ -30,6 +30,21 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 | 并发 | `Effect.all`、`forEach` 默认一个接一个；要并发写明 `{ concurrency: n }`，用户给的数量不用 `"unbounded"` | 官方指南 |
 | 不信任的数据 | `Schema` 解码（Effect 里用 `decodeUnknownEffect`），不手写类型守卫、不 `as`；对象的判断用 `Predicate.isObject`、`Predicate.hasProperty`（lint `vibevalley/no-object-guard`）；模型回的话里最后一个 JSON 块用 `base/json.ts` 的 `lastJsonBlock(text, schema, words)` | 官方指南「Defining schemas」 |
 | 测试 | 服务端 `@effect/vitest` 的 `it.effect`；有时间窗口的拨 `TestClock`；等后台的事用 `until`、`waitFor`（`waitFor` 直接收一个 Effect），不睡固定时间 | [地基](docs/subsystems/foundation.md)的测试金字塔 |
+
+## 2b. 页面里的 Effect：中间层
+
+页面不是 Effect 写的，但它的中间层建在 Effect 的 Atom（`effect/reactivity`）上，在 `apps/web/src/state/`。理由和边界写在[客户端](docs/subsystems/app.md)的「为什么这样」，用法写在 `apps/web/README.md`；这里只列要照着做的。
+
+| 要做的事 | 用 | 不用 |
+|---|---|---|
+| 主人做的事要先显示结果，等服务端确认 | 一种意图（`state/intent.ts` 的 `defineIntent`）：按请求 key 存，画面经这个 feature 的纯函数覆盖层看（只改主人改的那个字段），帧显示了才结算（`bySeq` 比 `StateFrame.seq`），失败留着可重试（同一个 key），断线时排队 | Atom 自带的 `optimistic`、Solid 2 的 `createOptimistic`：它们答复一回来就撤，而我们的真相在之后的帧里，会先弹回去再跳过去 |
+| 其余调用接口的动作 | `ui/act.ts` 的 `createAct`：忙的计数一定清，拒绝用出错的语气，断线时拒绝 | 组件里直接 `api.…`（lint `vibevalley/act-door`）；`toast(reasonOf(e))` 不带出错的语气（`vibevalley/failure-tone`） |
+| 要记住的选择（本机的偏好、看板的样子、窗格宽度） | `state/stored.ts` 的 `defineStored(名字, Schema, 默认值)`：经 Schema 解码、按字段退回默认值、跨标签页跟着变 | 直接读写 `localStorage`（`vibevalley/stored-door`） |
+| 值得放进地址的选择（看板的筛选） | `useSearchParam` | 一个刷新就丢的信号 |
+| 全页面共享的值 | `state/atom.ts` 的 `defineAtom`，读的时候 `useAtom` 不挂起，帧照常流 | 模块级的 `createSignal`、`createStore`（`vibevalley/page-store`） |
+| 只有搜索、置顶这类最新一次的回答算数 | `state/latest.ts` 的 `useLatest` | 自己比对请求的先后 |
+
+只有 `state/` 能 import `effect/reactivity`（`vibevalley/atom-door`）：Atom 的 API 标着不稳定，换了只改这一层。传输和长时间运行的机器（帧的源、直播流、聊天的订阅、通话、听写）不包进 atom，它们的状态是连接和计时器推出来的。
 
 ## 3. 已经有检查拦着的
 
