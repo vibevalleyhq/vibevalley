@@ -92,7 +92,7 @@ describe("a refined issue", () => {
       expect(sessionIdsOf(issue)).toHaveLength(1);
       const session = sessionIdsOf(issue)[0];
       if (session === undefined) throw new Error("the issue has no execution session");
-      const brief = sessions.find(session)!.session.brief;
+      const brief = sessions.sessionOf(session)!.brief;
       for (const want of ["看板拖卡改用 8797 端口", "验收标准", "1. 拖到待办就开工\n2. 端口是 8797"]) expect(brief).toContain(want);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

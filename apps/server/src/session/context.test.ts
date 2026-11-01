@@ -56,7 +56,7 @@ describe("an agent's channel context", () => {
       const native = executor.find(session.id)?.sessionId;
       expect(yield* sessions.suspend(session.id)).toBe(true);
       expect(executor.find(session.id)).toBeUndefined();
-      expect(sessions.find(session.id)?.session.id).toBe(session.id);
+      expect(sessions.sessionOf(session.id)?.id).toBe(session.id);
       expect(readFileSync(join(cwd, "notes.txt"), "utf8")).toBe("turn 1\n");
       expect(yield* sessions.deliver(session.id, "continue", { kind: "comment", channel })).toMatchObject({ kind: "run", woke: true });
       yield* until(() => core.session(session.id)?.runs === 2, "the continued answer");
@@ -203,7 +203,7 @@ describe("an agent's channel context", () => {
         expect(id).not.toBe("");
         yield* until(() => core.session(id)?.phase._tag === "done", "the answer before restart");
         native = executor.find(id)?.sessionId;
-        cwd = sessions.find(id)?.place.cwd ?? "";
+        cwd = sessions.cwdOf(id) ?? "";
         yield* sessions.suspend(id);
       }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [runtime] })));
       yield* Effect.gen(function* () {

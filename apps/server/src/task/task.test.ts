@@ -14,7 +14,7 @@ import { inbox } from "@/inbox/items.ts";
 import { Issue } from "@/issue/issue.ts";
 import { MergeFailure, type Workplace } from "@/project/shapes.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
-import { type Hired, type HireOptions, type Roster, NotTakenIn, type Session } from "@/session/session.ts";
+import { type Hired, type HireOptions, NotTakenIn, type Session } from "@/session/session.ts";
 import type { Delivered } from "@/session/shapes.ts";
 import { notTakenIn } from "@/session/takeIn.ts";
 import { sampleAgent } from "@/testing/agents.ts";
@@ -162,10 +162,7 @@ class FakeWork implements TaskWork {
 
   dismiss = (id: string) => Effect.as(this.core.apply({ type: "left", id: sessionId(id) }), true);
 
-  find = (id: string): Roster | undefined => {
-    const session = this.core.session(id);
-    return session ? { session, place: { project: "", cwd: "" }, lastText: this.last.get(id) ?? "" } : undefined;
-  };
+  lastTextOf = (id: string) => this.last.get(id) ?? "";
 
   handOver: Session["Service"]["handOver"] = (id, _closed, use, settle = "owner") =>
     use({ project: "", cwd: "/wt/" + id }, this.last.get(id) ?? "").pipe(

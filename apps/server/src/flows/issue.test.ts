@@ -373,8 +373,8 @@ describe("an issue", () => {
       // Not done; the helper is already told what failed (issue/merge.ts notTaken) and may be at it (in_progress).
       expect((yield* issues.get(helper.issue!)).status).not.toBe("done");
       yield* until(() => {
-        const got = sessions.find(helper.id);
-        return got !== undefined && got.lastText.includes("merge-check-failed") && !isBusy(got.session);
+        const got = sessions.sessionOf(helper.id);
+        return got !== undefined && sessions.lastTextOf(helper.id).includes("merge-check-failed") && !isBusy(got);
       }, "the helper hears the check's output");
       expect((yield* issues.get(helper.issue!)).status).toBe("in_review");
       expect(git(project, "rev-parse", "main")).toBe(before);

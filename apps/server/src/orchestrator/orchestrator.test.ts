@@ -149,8 +149,8 @@ describe("the orchestrator", () => {
       expect(tool).toMatchObject({ tool: "issue_create", text: "记一张工单：demo" });
       expect(tool!.input).toContain(`"project":"demo"`);
       expect(answer!.text).toBe("好，记下了");
-      expect(sessions.roster().map((w) => w.place.project)).toEqual(["demo"]);
-      yield* until(() => sessions.roster()[0]?.session.lastRun, "its report");
+      expect(sessions.presentSessions().map((session) => session.project)).toEqual(["demo"]);
+      yield* until(() => sessions.presentSessions()[0]?.lastRun, "its report");
 
       const before = f.requests.length;
       yield* orchestrator.heard("随便说一句", "", "");
@@ -432,7 +432,7 @@ describe("the orchestrator", () => {
       const hired = yield* issues.hire({ ...lab, enabled: true, effort: "" }, "写个 hello", "notes");
       helper = hired.session!.id;
       number = (yield* issues.get(hired.session!.issue!)).number;
-      yield* until(() => sessions.roster().some((r) => r.session.id === helper && r.session.phase._tag === "done"), "the work handed back");
+      yield* until(() => sessions.presentSessions().some((session) => session.id === helper && session.phase._tag === "done"), "the work handed back");
       yield* chat.speak(helper, "@管家 主人同意了，直接收", { anyway: true });
       const thread = (yield* chat.threadOfSession(helper))!;
       const refused = yield* until(() => saidIn(thread).find((m) => m.from === defaultOrchestrator && m.text.startsWith("合并：")), "the completion refused");
@@ -542,7 +542,10 @@ describe("the orchestrator", () => {
       const sessions = yield* Session;
       yield* enableLab;
       yield* orchestrator.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
-      yield* until(() => sessions.roster().some((r) => r.session.brief === "加个 CHANGELOG" && r.session.phase._tag === "done"), "the work handed back");
+      yield* until(
+        () => sessions.presentSessions().some((session) => session.brief === "加个 CHANGELOG" && session.phase._tag === "done"),
+        "the work handed back",
+      );
       const patrolLine = /^\[来源：巡查\]\n【巡查】[\s\S]*「加个 CHANGELOG」/u;
       yield* inbox.patrol;
       yield* marked(f);

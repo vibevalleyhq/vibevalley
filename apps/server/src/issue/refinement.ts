@@ -130,8 +130,7 @@ export function refinement(d: RefinementDeps) {
     const h = sessions.sessionOf(f.id);
     if (h?.refining !== true || !h.issue) return;
     const id = h.issue;
-    const r = sessions.find(f.id);
-    const said = r?.lastText ?? "";
+    const said = sessions.lastTextOf(f.id);
     const thread = yield* chat.threadOfSession(f.id);
     const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_refinement") : core.notice("warn", text));
     if (f.outcome === "completed") {

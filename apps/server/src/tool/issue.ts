@@ -10,7 +10,7 @@ import { Channel, type Info } from "@/channel/chat.ts";
 import { Issue } from "@/issue/issue.ts";
 import { openFindings } from "@/issue/status.ts";
 import { Runtime } from "@/runtime/runtime.ts";
-import { type Roster, Session } from "@/session/session.ts";
+import { Session } from "@/session/session.ts";
 
 import { type Who, type Orchestrator, said, callerOf, participant, tool, sessionSchemaTool } from "./definition.ts";
 import { answers, changesText, issueDetail, issueLine, noSuchPriority, noSuchStatus, ownerAgentWord, priorityOf, sessionLine, statusOf } from "./prompts.ts";
@@ -28,8 +28,8 @@ export const issueTools = Effect.gen(function* () {
 
   // The orchestrator may name a session by its id, its name, or words that contain its name.
   const findSession = (key: string) => {
-    const all = run.roster();
-    return all.find((w) => w.session.id === key) ?? all.find((w) => w.session.name === key) ?? all.find((w) => key.includes(w.session.name));
+    const all = run.presentSessions();
+    return all.find((session) => session.id === key) ?? all.find((session) => session.name === key) ?? all.find((session) => key.includes(session.name));
   };
 
   // The orchestrator names an issue by its number (#41, 41), its id, or the name or id of a helper working it.
@@ -39,8 +39,8 @@ export const issueTools = Effect.gen(function* () {
     if (/^\d+$/u.test(k)) return all.find((item) => item.number === Number(k)) ?? answers.noIssueNumber(k);
     const byId = all.find((item) => item.id === k);
     if (byId) return byId;
-    const w = findSession(k);
-    const of = w?.session.issue ? all.find((item) => item.id === w.session.issue) : undefined;
+    const session = findSession(k);
+    const of = session?.issue ? all.find((item) => item.id === session.issue) : undefined;
     return of ?? answers.noIssueOrAgent(k);
   });
 
@@ -54,17 +54,17 @@ export const issueTools = Effect.gen(function* () {
   /** The helper on the farm working the issue now, if any: its newest session. */
   const workerOf = (issue: T.Issue) => {
     const last = latestSessionIdOf(issue);
-    return last === undefined ? undefined : run.roster().find((w) => w.session.id === last);
+    return last === undefined ? undefined : run.sessionOf(last);
   };
 
   const whoOf = (issue: T.Issue) => {
     const agent = assignedAgentOf(issue);
-    return workerOf(issue)?.session.name ?? (agent === defaultOrchestrator ? ownerAgentWord : agent ? (agents.agent(agent)?.name ?? "") : "");
+    return workerOf(issue)?.name ?? (agent === defaultOrchestrator ? ownerAgentWord : agent ? (agents.agent(agent)?.name ?? "") : "");
   };
 
   const nobodyOn = (issue: T.Issue) => answers.nobodyOn(issue.number);
 
-  const numberOf = (w: Roster) => (w.session.issue ? issue.onBoard().find((item) => item.id === w.session.issue)?.number : undefined);
+  const numberOf = (session: T.Session) => (session.issue ? issue.onBoard().find((item) => item.id === session.issue)?.number : undefined);
 
   // Which profile takes a brief: the one named (a profile's name or id, or a runtime), else the one the owner picked for
   // this input, else by the farm's rule. A name that matches none is said, not taken for "anyone".
@@ -78,8 +78,10 @@ export const issueTools = Effect.gen(function* () {
 
   const roster = tool("session.list", () =>
     Effect.sync(() => {
-      const all = run.roster();
-      return all.length === 0 ? answers.roster.empty : all.map((w) => sessionLine(w, clock.currentTimeMillisUnsafe(), numberOf(w))).join("\n");
+      const all = run.presentSessions();
+      return all.length === 0
+        ? answers.roster.empty
+        : all.map((session) => sessionLine(session, clock.currentTimeMillisUnsafe(), numberOf(session))).join("\n");
     }),
   );
 
@@ -109,7 +111,12 @@ export const issueTools = Effect.gen(function* () {
       const w = workerOf(item);
       const timeline = yield* Effect.orElseSucceed(issue.timeline(item.id), () => undefined);
       const lines = [issueDetail(item, whoOf(item), timeline, yield* Clock.currentTimeMillis)];
-      if (w) lines.push(sessionLine(w, yield* Clock.currentTimeMillis, item.number), answers.check.workdir(w.place.cwd), answers.check.lastReport(w.lastText));
+      if (w)
+        lines.push(
+          sessionLine(w, yield* Clock.currentTimeMillis, item.number),
+          answers.check.workdir(run.cwdOf(w.id) ?? ""),
+          answers.check.lastReport(run.lastTextOf(w.id)),
+        );
       return lines.join("\n");
     }),
   );
@@ -148,8 +155,8 @@ export const issueTools = Effect.gen(function* () {
         return yield* withIssue(p.id, (item) => {
           const w = workerOf(item);
           if (!w) return Effect.succeed(nobodyOn(item));
-          return chat.tellSession(participant(c), w.session.id, p.text, "").pipe(
-            Effect.as(answers.tell.told(item.number, w.session.name)),
+          return chat.tellSession(participant(c), w.id, p.text, "").pipe(
+            Effect.as(answers.tell.told(item.number, w.name)),
             Effect.catch((e) => Effect.succeed(answers.tell.failed(said(e)))),
           );
         });
@@ -232,7 +239,7 @@ export const issueTools = Effect.gen(function* () {
           if (started._tag === "Failure") return answers.issueCreate.queuedNoStart(noted, said(started.failure));
           const sent = started.success;
           if (sent.queued) return answers.issueCreate.queuedInChannel(noted, channel.name, sent.queued);
-          const h = sent.session ? run.find(sent.session)?.session : undefined;
+          const h = sent.session ? run.sessionOf(sent.session) : undefined;
           const branch = h?.branch ? answers.issueCreate.branchNote(h.branch) : "";
           return answers.issueCreate.dispatched(
             noted,

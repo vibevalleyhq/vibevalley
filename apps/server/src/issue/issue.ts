@@ -242,7 +242,7 @@ const make = (options: IssueOptions = {}) =>
     const liveSession = (id: string) =>
       Effect.filterOrFail(
         latest(id),
-        (session) => sessions.find(session) !== undefined,
+        (session) => sessions.present(session),
         (session) => missing(t("server.issue.helperRef", { id: session }), [lookIn.session]),
       );
 
@@ -634,7 +634,7 @@ const make = (options: IssueOptions = {}) =>
     const cancel = Effect.fn("Issue.cancel")(function* (id: string) {
       const item = yield* get(id);
       const last = latestSessionIdOf(item);
-      if (last === undefined || !sessions.find(last)) return;
+      if (last === undefined || !sessions.present(last)) return;
       if (!(yield* sessions.dismiss(last))) return yield* Effect.fail(missing(t("server.issue.helperRef", { id: last }), [lookIn.session]));
     });
 
@@ -696,7 +696,7 @@ const make = (options: IssueOptions = {}) =>
           const lastRun = last !== undefined ? sessions.sessionOf(last)?.lastRun : undefined;
           const unread = issue.deliver === "answer" && lastRun?.outcome === "completed" && !lastRun.answer;
           return unread
-            ? answerCureWords(parseAnswer(sessions.find(last ?? "")?.lastText ?? "").problem)
+            ? answerCureWords(parseAnswer(sessions.lastTextOf(last ?? "")).problem)
             : cureWords((last !== undefined ? sessions.sessionOf(last)?.brief : undefined) ?? issue.title);
         }
         case "interrupted":
@@ -1044,7 +1044,7 @@ const make = (options: IssueOptions = {}) =>
               // Written down before its session goes home, so that leaving does not take it for canceled.
               yield* complete(id, delivery);
               const last = latestSessionIdOf(item);
-              if (last !== undefined && sessions.find(last)) yield* sessions.dismiss(last, "keep", "completed");
+              if (last !== undefined && sessions.present(last)) yield* sessions.dismiss(last, "keep", "completed");
               break;
             }
             // The session's leaving closes the issue too, but later: closed here, the answer already says so.

@@ -69,7 +69,7 @@ describe("memory", () => {
       const sessions = yield* Session;
       const memories = yield* Memory;
       const core = yield* Core;
-      const lastText = (id: string, summary: string) => sessions.find(id)?.lastText ?? summary;
+      const lastText = (id: string, summary: string) => sessions.lastTextOf(id) || summary;
 
       const first = mustHire(yield* issues.hire(scribe(), "写上班打卡，记一笔", "memo"));
       expect(yield* nextPrompt(f, next, 0)).toBe("写上班打卡，记一笔");

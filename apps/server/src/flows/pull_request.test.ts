@@ -117,7 +117,7 @@ describe("a pull request", () => {
           yield* issues.refreshPullRequests;
           const closed = yield* issues.get(issue!.id);
           expect([closed.delivered, closed.canceled]).toEqual(ending === "MERGED" ? ["pull_request", undefined] : [undefined, "dismissed"]);
-          expect(sessions.find(id)).toBeUndefined();
+          expect(sessions.sessionOf(id)).toBeUndefined();
           expect(existsSync(cwd)).toBe(false);
           expect(quiet(path, "show-ref", "--verify", "refs/heads/" + branch)).toBe(false);
         }).pipe(Effect.scoped, Effect.provide(after.layer));

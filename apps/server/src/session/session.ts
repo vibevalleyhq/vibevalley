@@ -51,12 +51,6 @@ const saveAfterMs = 300;
 /** The ended sessions a list shows, newest first: their trajectories expire after days anyway. */
 const endedListed = 200;
 
-export interface Roster {
-  readonly session: T.Session;
-  readonly place: Workplace;
-  readonly lastText: string;
-}
-
 export interface Hired {
   readonly session?: T.Session;
   readonly refused?: string;
@@ -133,13 +127,15 @@ export class Session extends Context.Service<
     readonly discardWork: (id: string) => Effect.Effect<void, ApiError>;
     /** Removes an issue's unused workplace; an active or unclosed startup still owns it. */
     readonly clearWorkplace: (issue: string, project: string, number: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease, ApiError>;
-    readonly roster: () => Roster[];
-    readonly find: (id: string) => Roster | undefined;
     /** A session on the farm now, as the core state has it: what another module reads a session by. */
     readonly sessionOf: (id: string) => T.Session | undefined;
     readonly presentSessions: () => readonly T.Session[];
     /** On the farm now: it can be handed a message. */
     readonly present: (id: string) => boolean;
+    /** Its complete last answer, kept out of the core frame. */
+    readonly lastTextOf: (id: string) => string;
+    /** Its host-local working directory, kept out of the protocol shape. */
+    readonly cwdOf: (id: string) => string | undefined;
     /** The run it is in now; undefined between runs. */
     readonly runOf: (id: string) => string | undefined;
     /** Its report, from what it last said in full. */
@@ -831,11 +827,6 @@ export const make = (options: SessionOptionsIn = {}) =>
       ),
     );
 
-    const view = (h: Hand): Roster | undefined => {
-      const session = core.session(h.id);
-      return session ? { session, place: h.place, lastText: h.lastText } : undefined;
-    };
-
     const currentRun = (id: string) => hands.get(id)?.run ?? executions.get(id)?.() ?? "";
     const runStore: RunStore = {
       ...runs,
@@ -1044,17 +1035,6 @@ export const make = (options: SessionOptionsIn = {}) =>
         if (core.state().sessions.some((s) => s.issue === issue)) return yield* Effect.fail(refused(t("server.session.life.stillHasHelper")));
         return yield* projects.clear(project, number, work);
       }, admission.withPermits(1)),
-      roster: () =>
-        [...hands.values()]
-          .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-          .flatMap((h) => {
-            const r = view(h);
-            return r ? [r] : [];
-          }),
-      find: (id) => {
-        const h = hands.get(id);
-        return h ? view(h) : undefined;
-      },
       handOver,
       changes: changesOf,
       list: Effect.fn("Session.list")(function* (agent) {
@@ -1080,6 +1060,8 @@ export const make = (options: SessionOptionsIn = {}) =>
       sessionOf: (id) => core.session(id),
       presentSessions: () => core.state().sessions,
       present: (id) => hands.has(id),
+      lastTextOf: (id) => hands.get(id)?.lastText ?? "",
+      cwdOf: (id) => hands.get(id)?.place.cwd,
       runOf: (id) => {
         const run = hands.get(id)?.run ?? executions.get(id)?.() ?? "";
         return run === "" ? undefined : run;

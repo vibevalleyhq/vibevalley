@@ -212,7 +212,7 @@ describe("sessions", () => {
       const sent = yield* sessions.send(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the report");
-      const before = sessions.find(id)!;
+      const before = { lastText: sessions.lastTextOf(id), cwd: sessions.cwdOf(id)! };
       for (let n = 0; n < 2; n++) {
         const result = yield* Effect.result(
           sessions.handOver(id, "merged", () =>
@@ -224,8 +224,8 @@ describe("sessions", () => {
         );
         expect(result._tag).toBe("Failure");
         expect(JSON.stringify(result)).toContain("did not stop");
-        expect(sessions.find(id)?.lastText).toBe(before.lastText);
-        expect(existsSync(before.place.cwd)).toBe(true);
+        expect(sessions.lastTextOf(id)).toBe(before.lastText);
+        expect(existsSync(before.cwd)).toBe(true);
       }
       expect(used).toBe(false);
       expect(closes).toBe(1);

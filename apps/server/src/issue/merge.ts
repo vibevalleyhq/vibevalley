@@ -89,7 +89,7 @@ export function merging(d: MergeDeps) {
   const finishPullRequest = Effect.fnUntraced(function* (issue: T.Issue, state: T.PullRequestState) {
     const closed = state === "closed" ? "dismissed" : "merged";
     const id = yield* latest(issue.id);
-    if (sessions.find(id))
+    if (sessions.present(id))
       yield* sessions
         .handOver(id, closed, (place) => projects.finishPullRequest(place.project, issue.number))
         .pipe(Effect.catchTag("NotTakenIn", (e) => Effect.fail(refused(e.failure.reasonText))));

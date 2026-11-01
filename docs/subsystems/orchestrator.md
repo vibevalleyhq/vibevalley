@@ -96,7 +96,7 @@
 
 - **频道（`channel`）**：经 `forOrchestrator` 收话、`orchestratorDigest` 取这期间的汇报（读了不算已读，消费后才提交回执）、`orchestratorSays` 把字写进频道；`say`、`spoken` 把主人的话写进频道，带 `sendKey` 的重发不再交给管家（[频道](docs/subsystems/channel.md)的「重发不成两条」）。
 - **工单（`issue`）**：派给管家的工单和管家的定时任务经 `forOrchestrator` 交来；管家这一轮结束（答完、没答成、叫停），工单都进「等你看」、记下结局，主人点头才关（完成，交付 `none`）（[工单](docs/subsystems/issue.md)）。`issue_list`、`issue_create`、`issue_update`、`issue_status_update`、`issue_review`、`issue_diff_get` 是工单服务的方法（`list`、`add`、`start`、`draft`、`edit`、`setStatus`……）。
-- **帮工（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志，`Roster` 给现状和工具找帮工。挑档案归 `Runtime.choose`。
+- **帮工（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志；现状和工具经 `Session.presentSessions`、`Session.sessionOf` 找帮工。挑档案归 `Runtime.choose`。
 - **语音（`voice`）**：电话里的每句经 `answerer("phone")`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完）。`brief` 是一个 Effect：打断它只结束这次等回答（通话结束时语音就这样做），不取消大家共享的 run；提交失败时这次 `brief` 失败。
 - **定时任务（`cron`）**：管家的 `cron_create` 工具经 `Cron.Add(req, orchestrator, owner)`；`wakeSoon` 读定时任务决定空闲时压不压。
 - **计划（`task`）**：`news` 交来提醒；`graph_split`、`graph_act`、`graph_task_update`、`graph_task_delete`、`graph_task_act` 调它。

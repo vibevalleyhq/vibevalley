@@ -25,7 +25,7 @@ import { MergeFailure, type ProjectError } from "@/project/shapes.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
 import { Runtime } from "@/runtime/runtime.ts";
 import { sessionOf } from "@/session/roster.ts";
-import { type Hired, type HireOptions, type Roster, type SessionNews, Session } from "@/session/session.ts";
+import { type Hired, type HireOptions, type SessionNews, Session } from "@/session/session.ts";
 import type { Delivered } from "@/session/shapes.ts";
 
 import * as q from "../../db/generated/task_event.sql.ts";
@@ -133,7 +133,7 @@ export interface TaskWork {
   readonly hire: (agent: T.Agent, brief: string, project: string, opt: HireOptions) => Effect.Effect<Hired>;
   readonly deliver: (id: string, text: string) => Effect.Effect<Delivered>;
   readonly dismiss: Session["Service"]["dismiss"];
-  readonly find: (id: string) => Roster | undefined;
+  readonly lastTextOf: (id: string) => string;
   readonly handOver: Session["Service"]["handOver"];
 }
 
@@ -171,7 +171,7 @@ export const make = (options: TaskOptions = {}) =>
       hire: issues.hire,
       deliver: (id, text) => live.deliver(id, text, { kind: "task" }),
       dismiss: live.dismiss,
-      find: live.find,
+      lastTextOf: live.lastTextOf,
       handOver: live.handOver,
     };
     const projects: TaskGit = options.git ?? (yield* Project);
@@ -255,7 +255,7 @@ export const make = (options: TaskOptions = {}) =>
         if (delivered.kind === "refused") return yield* giveUp(graph, delivered.reason ?? "");
         return;
       }
-      const parsed = parseSplit(work.find(session.id)?.lastText ?? "");
+      const parsed = parseSplit(work.lastTextOf(session.id));
       if (!parsed.ok) {
         if (tries >= 1) return yield* giveUp(graph, t("server.task.notice.noGraph", { problem: parsed.problems[0] ?? "" }));
         splitterTries.set(graph.id, tries + 1);

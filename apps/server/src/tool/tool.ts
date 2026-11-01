@@ -2,11 +2,11 @@ import { Clock, Context, Effect, Layer, Predicate } from "effect";
 
 import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { maybe, t } from "@vibevalley/i18n";
+import type * as T from "@vibevalley/protocol";
 
 import { head } from "@/base/clip.ts";
 import { Project } from "@/project/project.ts";
 import type { ToolStart } from "@/session/facts.ts";
-import { type Roster } from "@/session/session.ts";
 
 import { artifactTools } from "./artifact.ts";
 import { channelTools } from "./channel.ts";
@@ -26,7 +26,7 @@ export class Tool extends Context.Service<
     readonly session: (who: Who) => LoopTool[];
     /** How a tool call reads in the orchestrator's trajectory: its label and the first naming argument. */
     readonly start: (name: string, args: unknown) => ToolStart;
-    readonly sessionLine: (w: Roster) => string;
+    readonly sessionLine: (session: T.Session) => string;
   }
 >()("vibevalley/Tool") {
   static readonly layer = Layer.effect(

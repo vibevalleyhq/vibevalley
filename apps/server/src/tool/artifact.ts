@@ -37,7 +37,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
         if (content !== undefined && file !== undefined) return yield* Effect.fail(refused(answers.artifact.both));
         if (content !== undefined) return content;
         if (file === undefined || file.trim() === "") return yield* Effect.fail(refused(answers.artifact.noContent));
-        const cwd = c.session ? run.find(c.session)?.place.cwd : undefined;
+        const cwd = c.session ? run.cwdOf(c.session) : undefined;
         if (!cwd) return yield* Effect.fail(refused(answers.artifact.noPlace));
         const unread = (e: unknown) => refused(messageOf(e));
         const root = yield* Effect.tryPromise({ try: () => realpath(cwd), catch: unread });

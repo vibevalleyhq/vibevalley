@@ -234,10 +234,10 @@ const make = (options: OrchestratorOptions = {}) =>
     const situation = (channel: string) =>
       Effect.gen(function* () {
         const sessions = yield* agentLines;
-        const roster = run.roster();
+        const roster = run.presentSessions();
         const here = yield* chat.addressOf(channel);
         const byChannel = (yield* chat.channels()).map((c) => {
-          const theirs = roster.filter((w) => (w.session.channel ?? chat.defaultChannel()) === c.id).map((w) => tool.sessionLine(w));
+          const theirs = roster.filter((session) => (session.channel ?? chat.defaultChannel()) === c.id).map((session) => tool.sessionLine(session));
           const head = channelLine(c);
           return head + "\n" + (theirs.length > 0 ? theirs.join("\n") : situationWords.noHelpers);
         });

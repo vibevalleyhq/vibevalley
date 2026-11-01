@@ -149,7 +149,7 @@ describe("mcp", () => {
       const id = got.session!.id;
       yield* until(() => tokens.length > 0, "the session's token");
       const thread = yield* waitFor(chat.threadOfSession(id), (t) => t !== undefined, "the session's thread");
-      const cwd = sessions.find(id)!.place.cwd;
+      const cwd = sessions.cwdOf(id)!;
       mkdirSync(join(cwd, "out"), { recursive: true });
       writeFileSync(join(cwd, "out", "two.html"), "<p>抽屉和整页</p>");
       const c = client(mcp, tokens[0]!);

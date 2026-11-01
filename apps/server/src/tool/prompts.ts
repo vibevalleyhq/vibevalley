@@ -12,7 +12,6 @@ import { yuan } from "@/runtime/money.ts";
 import { runtimeLabel } from "@/runtime/presets.ts";
 
 type Op = keyof Handlers;
-import type { Roster } from "@/session/session.ts";
 
 const wan = (n: number) => (n >= 10_000 ? (n / 10_000).toFixed(n >= 100_000 ? 0 : 1) + " 万" : String(n));
 
@@ -53,13 +52,13 @@ export function changesText(c: T.Changes): string {
 }
 
 /** How a session reads to the orchestrator, in its situation as session_list gives it; number is its issue's. */
-export function sessionLine(w: Roster, now: number, number?: number): string {
-  const h = w.session;
+export function sessionLine(h: T.Session, now: number, number?: number): string {
   let last = "";
   if (h.lastRun) {
     last = "；上一轮" + t(`shared.outcome.${h.lastRun.outcome}`) + "：" + head(h.lastRun.summary, 80);
   }
-  const where = w.place.branch ? "在 " + w.place.project + " 的 " + w.place.branch : "在 " + w.place.project;
+  const project = h.project ?? "";
+  const where = h.branch ? "在 " + project + " 的 " + h.branch : "在 " + project;
   const task = h.graph ? (h.graph.task ? "，做计划 " + h.graph.id + " 的步骤 " + h.graph.task : "，在拆计划 " + h.graph.id) : "";
   const spent = h.spent ? "；花了" + spentText(h.spent) : "";
   const issue = number !== undefined ? `#${number} ` : "";

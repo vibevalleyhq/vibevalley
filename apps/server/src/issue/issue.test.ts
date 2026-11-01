@@ -454,7 +454,7 @@ describe("issues", () => {
       yield* until(() => started, "the writer");
       expect((yield* issues.get(issue.id)).assignments.map((a) => [a.agent, a.executions])).toEqual([["lab", []]]);
       const id = (yield* issues.get(issue.id)).refining!.session;
-      const cwd = sessions.find(id)!.place.cwd;
+      const cwd = sessions.cwdOf(id)!;
       for (let n = 0; n < 2; n++) {
         const result = yield* Effect.result(issues.setStatus(issue.id, "canceled", "", "", owner));
         expect(result._tag).toBe("Failure");
@@ -562,7 +562,7 @@ describe("issues", () => {
       expect(refused.refused).toContain("startup refused");
       expect(yield* issues.list()).toEqual([]);
       expect(core.state().issues).toEqual([]);
-      expect(sessions.roster()).toEqual([]);
+      expect(sessions.presentSessions()).toEqual([]);
       noWorktree(f.config.workRoot);
 
       const existing = yield* issues.add({ title: "already queued", project: "demo", agent: agent.id });
@@ -588,7 +588,7 @@ describe("issues", () => {
       const got = yield* issues.hire({ ...lab(), worktree: true }, "test", "demo");
       expect(got.refused).toContain("test write failure");
       expect(got.session).toBeUndefined();
-      expect([core.state().sessions.length, sessions.roster().length]).toEqual([0, 0]);
+      expect([core.state().sessions.length, sessions.presentSessions().length]).toEqual([0, 0]);
       noWorktree(f.config.workRoot);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -691,9 +691,9 @@ describe("issues", () => {
       expect(second.session).toBeDefined();
       yield* issues.changes(id, owner);
       expect((yield* Effect.exit(issues.merge(id)))._tag).toBe("Failure");
-      expect(sessions.find(second.session!.id)).toBeDefined();
+      expect(sessions.sessionOf(second.session!.id)).toBeDefined();
       yield* issues.cancel(id);
-      expect(sessions.find(second.session!.id)).toBeUndefined();
+      expect(sessions.sessionOf(second.session!.id)).toBeUndefined();
       expect((yield* Effect.exit(issues.changes(id, owner)))._tag).toBe("Failure");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -796,7 +796,7 @@ describe("issues", () => {
       const handed = yield* issues.setStatus(issue.id, "todo", "接着写", chat.defaultChannel(), owner, { agent: "Lab Two" });
       expect([assignedAgentOf(handed), sessionIdsOf(handed).length, handed.closedAt]).toEqual(["lab2", 2, undefined]);
       if (first === undefined) throw new Error("the issue has no first execution session");
-      expect(sessions.find(first)).toBeUndefined();
+      expect(sessions.sessionOf(first)).toBeUndefined();
       const next = sessionIdsOf(handed)[1];
       if (next === undefined) throw new Error("the issue has no second execution session");
       const second = (yield* sessions.get(next))!;
