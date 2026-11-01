@@ -1,11 +1,11 @@
 import type * as T from "@vibevalley/protocol";
-import { isBusy, omitUndefined, same } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, isBusy, latestSessionIdOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 
 import { compare, compareText, or } from "@/base/order.ts";
 import { sessionOf } from "@/session/roster.ts";
 
-import { attentionIn } from "./attention.ts";
 import { statusMoves } from "./moves.ts";
+import { issueStageIn } from "./stage.ts";
 
 /** One rule whoever does the work: a session on the farm says where its issue stands; an issue run by no session (an
  * in-process agent's, the orchestrator's) is in progress while its latest run goes on and waits on the owner once it
@@ -46,9 +46,9 @@ export function issueStatusOf(t: T.Issue, state: T.WorkspaceState): T.IssueStatu
     }
     return "canceled";
   }
-  const sessions = t.sessions;
-  if (sessions.length > 0) {
-    const h = sessionOf(state, sessions[sessions.length - 1]!);
+  const latestSession = latestSessionIdOf(t);
+  if (latestSession !== undefined) {
+    const h = sessionOf(state, latestSession);
     return !h ? "canceled" : isBusy(h) ? "in_progress" : "in_review";
   }
   if (t.lastRun) return t.lastRun.endedAt === undefined ? "in_progress" : "in_review";
@@ -58,8 +58,8 @@ export function issueStatusOf(t: T.Issue, state: T.WorkspaceState): T.IssueStatu
 export const keepClosedIssues = 50;
 
 export function issueOrder(a: T.Issue, b: T.Issue): number {
-  const sentA = a.sessions.length > 0;
-  const sentB = b.sessions.length > 0;
+  const sentA = executionsOf(a).length > 0;
+  const sentB = executionsOf(b).length > 0;
   if (!sentA && !sentB) return or(compare(a.rank ?? 0, b.rank ?? 0), compare(a.createdAt, b.createdAt), compareText(a.id, b.id));
   if (!sentA) return -1;
   if (!sentB) return 1;
@@ -90,12 +90,12 @@ export function withIssueStatuses(state: T.WorkspaceState): T.WorkspaceState {
   state.issues.forEach((t, i) => {
     const status = issueStatusOf(t, state);
     const drafting = issueRefiningOf(t, state);
-    const attention = attentionIn(omitUndefined({ ...t, status, refining: drafting }), state);
-    // The moves read the attention: a round that failed is not completed, from the moment it fails.
-    const moves = statusMoves(omitUndefined({ ...t, status, refining: drafting, attention }));
-    if (status === t.status && same(drafting, t.refining) && same(attention, t.attention) && same(moves, t.moves)) return;
+    const stage = issueStageIn(omitUndefined({ ...t, status, refining: drafting }), state);
+    // The moves read the stage: a round that failed is not completed, from the moment it fails.
+    const moves = statusMoves(omitUndefined({ ...t, status, refining: drafting, stage }));
+    if (status === t.status && same(drafting, t.refining) && same(stage, t.stage) && same(moves, t.moves)) return;
     next ??= [...state.issues];
-    next[i] = omitUndefined({ ...t, status, refining: drafting, attention, moves });
+    next[i] = omitUndefined({ ...t, status, refining: drafting, stage, moves });
   });
   return next ? { ...state, issues: next } : state;
 }
@@ -104,6 +104,6 @@ export function withIssueStatuses(state: T.WorkspaceState): T.WorkspaceState {
 export const openFindings = (t: T.Issue) => t.findings.filter((f) => !f.resolved).length;
 
 /** Assigned to an orchestrator (orchestrator: whether a profile id is one's): it answers it, no session works it. */
-export const isForOrchestrator = (t: T.Issue, orchestrator: (id: string) => boolean) => orchestrator(t.assignee ?? "");
+export const isForOrchestrator = (t: T.Issue, orchestrator: (id: string) => boolean) => orchestrator(assignedAgentOf(t) ?? "");
 
 export const isClosed = (s: T.IssueStatus) => s === "done" || s === "canceled";

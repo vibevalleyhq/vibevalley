@@ -49,7 +49,7 @@
   },
   "doneWith": "Done, {what}",
   "canceledFor": "Canceled, {why}",
-  "attention": {
+  "stage": {
     "draft": "Draft",
     "queued": "Queued",
     "working": "Working",

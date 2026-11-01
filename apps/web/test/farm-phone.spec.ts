@@ -9,7 +9,7 @@ import type { InboxItem, StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { expect, test } from "./fixtures";
+import { expect, test, withIssueSession } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
@@ -85,7 +85,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   };
   const base: StateFrame = {
     ...frame,
-    state: { ...frame.state, sessions: [session], issues: [{ ...made, sessions: [sessionId("w1")], status: "in_review", moves: ["done", "canceled"] }] },
+    state: { ...frame.state, sessions: [session], issues: [withIssueSession({ ...made, status: "in_review", moves: ["done", "canceled"] }, sessionId("w1"))] },
     view: { ...frame.view, plots: { [made.id]: { crop: "wheat" } } },
   };
   let served = 0;

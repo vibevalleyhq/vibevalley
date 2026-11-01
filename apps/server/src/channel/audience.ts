@@ -130,8 +130,7 @@ export function whoHears(i: AudienceInput): Delivery[] {
     out.push({ recipient, reason, wakes });
   };
 
-  // With an orchestrator, the owner's words go to it; with a helper profile, to the session talking for it now (none
-  // between its rounds: the talk's issue hears the words and sends one).
+  // A profile's direct conversation has its own session; the channel starts it after the first owner's message commits.
   if (i.channel.type === "direct") {
     const peer = i.channel.peer ?? "";
     const to = i.orchestrators.includes(peer) ? peer : (i.threadOwner ?? "");

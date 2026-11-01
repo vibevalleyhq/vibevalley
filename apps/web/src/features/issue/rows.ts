@@ -3,6 +3,7 @@
 // does not keep: the sessions that have left, and with 更早的 the older closed issues. An issue is held once, by the frame.
 
 import type { IssueHistory, Session, WorkspaceView } from "@vibevalley/protocol";
+import { sessionIdsOf } from "@vibevalley/protocol/rules";
 
 /**
  * Each issue the frame keeps, its sessions found on the farm, in the history, or (one that left after the history was
@@ -21,8 +22,8 @@ export function boardRows(
     const row = read.get(issue.id);
     return {
       issue,
-      sessions: issue.sessions.flatMap((id) => present.get(id) ?? row?.sessions.find((s) => s.id === id) ?? seen.get(id) ?? []),
-      missingSessions: (row?.missingSessions ?? []).filter((id) => issue.sessions.includes(id) && !present.has(id)),
+      sessions: sessionIdsOf(issue).flatMap((id) => present.get(id) ?? row?.sessions.find((s) => s.id === id) ?? seen.get(id) ?? []),
+      missingSessions: (row?.missingSessions ?? []).filter((id) => sessionIdsOf(issue).includes(id) && !present.has(id)),
     };
   });
   if (!older || !history) return live;
@@ -37,7 +38,7 @@ export function boardRows(
 export const historyKey = (core: WorkspaceView | undefined): string =>
   core
     ? `${core.issues
-        .filter((i) => i.sessions.length > 0)
-        .map((i) => `${i.id}:${i.sessions.join(",")}`)
+        .filter((i) => sessionIdsOf(i).length > 0)
+        .map((i) => `${i.id}:${sessionIdsOf(i).join(",")}`)
         .join(";")}|${core.sessions.map((s) => s.id).join(",")}`
     : "";

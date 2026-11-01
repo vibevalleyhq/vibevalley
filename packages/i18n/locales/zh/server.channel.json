@@ -51,5 +51,8 @@
   "noDirect": "{target}：你和对方之间没有私聊",
   "noChannelNamed": "没有叫 #{name} 的频道。有：{tags}",
   "absent": "{who} 不在场，没送到",
-  "fileTooBig": "文件太大了：至多 {mb} MB"
+  "fileTooBig": "文件太大了：至多 {mb} MB",
+  "noProfileNamed": "没有叫 {key} 的档案",
+  "talkFailed": "没有接上这个会话：{why}",
+  "profileDisabled": "{name}已停用"
 }

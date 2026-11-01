@@ -163,6 +163,7 @@ export const handlers = Effect.gen(function* () {
     "session.stop": ({ id }) => (sessions.find(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session]))),
     "session.list": ({ agent }) => sessions.list(agent ?? ""),
     "session.get": ({ id }) => sessions.get(id).pipe(orMissing(t("server.helperRef", { id }), [lookIn.session])),
+    "session.run.list": ({ id }) => sessions.runs(id),
     "session.event.list": ({ id, run }) => Effect.map(sessions.events(id, run ?? ""), (events) => events ?? []),
     "channel.create": (body) => Effect.map(channels.openChannel(body.name, body.description ?? "", body.project ?? ""), (c) => c.id),
     "channel.update": ({ id, ...body }) => channels.updateChannel(id, body),
@@ -170,7 +171,7 @@ export const handlers = Effect.gen(function* () {
     "channel.delete": ({ id }) => channels.removeChannel(id),
     "channel.previewDelete": ({ id }) => channels.previewRemoveChannel(id),
     "channel.notify.set": ({ id, notify }) => channels.setNotify(id, notify),
-    "channel.direct.create": ({ agent }) => issues.talkWith(agent),
+    "channel.direct.create": ({ agent }) => channels.direct(agent),
     "channel.markUnread": ({ id, number }) => channels.markUnread(id, number),
     "channel.list": () => channels.list(),
     "channel.unread.list": () => channels.unread(ownerId),
@@ -222,21 +223,21 @@ export const handlers = Effect.gen(function* () {
     "issue.split": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => tasks.splitIssueOf(id, body.title ?? "", body.tasks)),
     "issue.history.list": () => issues.history(),
     "issue.get": ({ id }) => issues.get(id),
-    "issue.run.list": ({ id }) => Effect.flatMap(issues.get(id), (issue) => sessions.runs(issue.id)),
+    "issue.run.list": ({ id }) => Effect.flatMap(issues.get(id), (issue) => sessions.issueRuns(issue.id)),
     "issue.timeline.get": ({ id }) => issues.timeline(id),
     "issue.create": ({ requestKey, ...body }) => createOnce(requestKey, applied(issues.add(body))),
     "issue.update": ({ id: ref, ...body }) => applied(Effect.flatMap(issues.idOf(ref), (id) => issues.edit(id, body, owner))),
     "issue.delete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.remove(id)),
     "issue.previewDelete": ({ id }) => issues.previewRemove(id),
     "issue.status.previewUpdate": ({ id, ...body }) =>
-      issues.previewStatus(id, body.status, body.text ?? "", body.assignee ? { assignee: body.assignee } : {}, body.edit),
+      issues.previewStatus(id, body.status, body.text ?? "", body.agent ? { agent: body.agent } : {}, body.edit),
     "issue.refine": ({ id: ref, ...body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.refine(id, body.text ?? "", channels.defaultChannel())),
     "issue.status.update": ({ id: ref, ...body }) =>
       statusOnce(
         body.requestKey,
         applied(
           Effect.flatMap(edited(ref, body.edit), (id) =>
-            issues.setStatus(id, body.status, body.text ?? "", channels.defaultChannel(), owner, body.assignee ? { assignee: body.assignee } : {}),
+            issues.setStatus(id, body.status, body.text ?? "", channels.defaultChannel(), owner, body.agent ? { agent: body.agent } : {}),
           ),
         ),
       ),

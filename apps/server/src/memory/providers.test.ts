@@ -161,6 +161,7 @@ describe("memory sources", () => {
         const run: FinishedRun = {
           agent: "lab",
           session: "w1",
+          issue: "i1",
           project: "demo",
           brief: "修登录页",
           said: "改好了。\n记住：登录态统一走 refreshSession()",

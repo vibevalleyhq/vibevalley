@@ -151,7 +151,7 @@ export function Friends(props: { height: number }) {
     );
   };
   const busy = () => statuses().filter((s) => s === "busy").length;
-  const attention = (): FriendStatus | undefined => (statuses().includes("bug") ? "bug" : statuses().includes("ripe") ? "ripe" : undefined);
+  const stage = (): FriendStatus | undefined => (statuses().includes("bug") ? "bug" : statuses().includes("ripe") ? "ripe" : undefined);
   const box = useClickAway(open, () => farm.friendsOpen(false));
   return (
     <div ref={box} class="pointer-events-auto relative" aria-label={t("web.farm.friends.helpers")} role="group" data-testid="friends">
@@ -191,7 +191,7 @@ export function Friends(props: { height: number }) {
           </Show>
           <SpriteIcon name="button-next" size={12} class={open() ? "-rotate-90" : "rotate-90"} />
         </HudCard>
-        <Show when={attention()}>
+        <Show when={stage()}>
           {(a) => <span class="absolute -top-1 -left-1 h-2.5 w-2.5 border-2 border-cream-300" style={{ background: status[a()].dot }} />}
         </Show>
       </button>

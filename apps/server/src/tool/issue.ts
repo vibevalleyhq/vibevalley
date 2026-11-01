@@ -2,7 +2,7 @@ import { Clock, Effect } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { DeliverableValues, IssueStatusValues, defaultOrchestrator } from "@vibevalley/protocol";
-import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, closedText, latestSessionIdOf, phaseText, shortTitle } from "@vibevalley/protocol/rules";
 
 import { Agent } from "@/agent/agent.ts";
 import { head } from "@/base/clip.ts";
@@ -53,13 +53,14 @@ export const issueTools = Effect.gen(function* () {
 
   /** The helper on the farm working the issue now, if any: its newest session. */
   const workerOf = (issue: T.Issue) => {
-    const last = issue.sessions.at(-1);
+    const last = latestSessionIdOf(issue);
     return last === undefined ? undefined : run.roster().find((w) => w.session.id === last);
   };
 
-  const whoOf = (issue: T.Issue) =>
-    workerOf(issue)?.session.name ??
-    (issue.assignee === defaultOrchestrator ? ownerAgentWord : issue.assignee ? (agents.agent(issue.assignee)?.name ?? "") : "");
+  const whoOf = (issue: T.Issue) => {
+    const agent = assignedAgentOf(issue);
+    return workerOf(issue)?.session.name ?? (agent === defaultOrchestrator ? ownerAgentWord : agent ? (agents.agent(agent)?.name ?? "") : "");
+  };
 
   const nobodyOn = (issue: T.Issue) => answers.nobodyOn(issue.number);
 
@@ -206,18 +207,18 @@ export const issueTools = Effect.gen(function* () {
         if (p.priority && !priority) return noSuchPriority(p.priority);
         const deliver = p.deliver ? DeliverableValues.find((d) => d === p.deliver) : undefined;
         if (p.deliver && !deliver) return answers.issueCreate.noDeliver;
-        let assignee: string | undefined;
-        if (p.assignee || p.start === true) {
-          const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.assignee ?? "", p.start === true ? c.picked : "");
+        let agent: string | undefined;
+        if (p.agent || p.start === true) {
+          const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.agent ?? "", p.start === true ? c.picked : "");
           if (typeof a === "string") return answers.issueCreate.notRecorded(a);
-          assignee = a.id;
+          agent = a.id;
         }
         const added = yield* Effect.result(
           issue.add({
             title: p.title,
             ...(p.description ? { description: p.description } : {}),
             ...(project ? { project } : {}),
-            ...(assignee ? { assignee } : {}),
+            ...(agent ? { agent } : {}),
             ...(priority ? { priority } : {}),
             ...(deliver ? { deliver } : {}),
           }),
@@ -258,11 +259,11 @@ export const issueTools = Effect.gen(function* () {
         return yield* withIssue(p.id, (item) => {
           const priority = p.priority ? priorityOf(p.priority) : undefined;
           if (p.priority && !priority) return Effect.succeed(noSuchPriority(p.priority));
-          let assignee: string | undefined;
-          if (p.assignee) {
-            const a = agents.named(p.assignee);
-            if (!a) return Effect.succeed(answers.noProfileNamed(p.assignee));
-            assignee = a.id;
+          let agent: string | undefined;
+          if (p.agent) {
+            const a = agents.named(p.agent);
+            if (!a) return Effect.succeed(answers.noProfileNamed(p.agent));
+            agent = a.id;
           }
           return issue
             .edit(
@@ -271,7 +272,7 @@ export const issueTools = Effect.gen(function* () {
                 ...(p.title !== undefined ? { title: p.title } : {}),
                 ...(p.description !== undefined ? { description: p.description } : {}),
                 ...(p.project !== undefined ? { project: p.project } : {}),
-                ...(assignee ? { assignee } : {}),
+                ...(agent ? { agent } : {}),
                 ...(priority ? { priority } : {}),
                 ...(p.deliver ? { deliver: p.deliver } : {}),
                 ...(p.criteria !== undefined ? { criteria: p.criteria } : {}),
@@ -299,12 +300,12 @@ export const issueTools = Effect.gen(function* () {
             function* (item: T.Issue) {
               // Sent out with nobody named yet: chosen by the farm's rule, the owner's pick first; another one named hands it over.
               let agent: string | undefined;
-              if (p.assignee || (to === "todo" && item.status === "backlog" && !item.assignee)) {
-                const chosen = yield* choose(item.title + "\n" + item.description, p.assignee ?? "", p.assignee ? "" : c.picked);
+              if (p.agent || (to === "todo" && item.status === "backlog" && !assignedAgentOf(item))) {
+                const chosen = yield* choose(item.title + "\n" + item.description, p.agent ?? "", p.agent ? "" : c.picked);
                 if (typeof chosen === "string") return answers.issueStatus.notMoved(chosen);
                 agent = chosen.id;
               }
-              const done = yield* issue.setStatus(item.id, to, p.text ?? "", c.here, c.actor, agent ? { assignee: agent } : {});
+              const done = yield* issue.setStatus(item.id, to, p.text ?? "", c.here, c.actor, agent ? { agent: agent } : {});
               // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
               if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
               if (to === "done" && done.pullRequest?.state === "open") return answers.issueStatus.prOpenNote(done.number, done.pullRequest.url);

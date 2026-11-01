@@ -84,7 +84,7 @@
 
 - **一个 PGlite 库**：`infra/db.ts` 在家目录的库文件夹里开 PGlite（编成 WASM 的 Postgres，在服务端进程里），测试用内存库。一条连接，所以行的先后就是提交的先后（消息的编号靠它）。时间存毫秒的 `float8`，与 JavaScript 的 `number` 对齐。 内存测试库归还时先检查 DDL 污染，再重置会话设置并清空数据；结构污染或清理失败的实例不回池。
 - **SQL 只在 effect-sqlc**：查询在 `db/queries/<表>.sql`，一张表一个文件，只写这张表（联查别的表可以，写不行）；服务里不手写 SQL，只调 `db/generated` 的函数，再把行读成自己的形状。改完跑 `vp run --filter @vibevalley/server db:generate`，`server:check` 跑 `db:check` 查生成的是不是最新。
-- **表名是 `<模块>` 或 `<模块>_<概念>`**，单数，模块是拥有它的 `src` 文件夹（`issue`、`issue_session`、`channel_message`、`session_run`、`game_ledger`、`lan_device`）。索引名以表名开头。
+- **表名是 `<模块>` 或 `<模块>_<概念>`**，单数，模块是拥有它的 `src` 文件夹（`issue`、`issue_assignment`、`channel_message`、`session_run`、`game_ledger`、`lan_device`）。索引名以表名开头。
 - **一份表结构，不认旧数据**：`0001_schema.up.sql` 是整个库，改表直接改它，不另加迁移；`migrations/` 里只能有这一个文件。开机时 `PgliteMigrator` 在空库上跑它；旧库不升级：库的文件夹旁边 `db.schema` 记着建它的基线的哈希，对不上就把整个文件夹挪到 `db.<旧哈希>-<时间>`（不删）再新建一个，日志里说一句；没有 `db.schema` 的当作今天的。测试的库在内存里，由 `Database` 自己管：每个进程第一个库跑完基线就存一份文件，之后的库从这份文件起；一座农场关的时候它的库不关，关掉外键检查逐表 `DELETE`、序号从 1 重来，清空后留给下一座（同时开着的农场各拿一个；比 `TRUNCATE` 便宜，它要给每张表重建文件）。只有没人改过表结构的才留：第一个库装了一个事件触发器，任何 DDL 都在会话上打个记号（测试为了让写失败加的触发器、删改的表），有记号的库关掉。存盘的格式只有现在这一种：表、家目录里的文件、环境变量、存下的取值都只认今天的名字。
 - **运行时新建的行主键是 uuidv7**：`base/ids.ts` 的 `newId()`（带时间，同一毫秒里接着数，同一进程里单调），存成 `text`；协议里部分 id 带品牌，编码后仍是 `string`。不用 uuid 的：从文件来的自然键（档案、技能、项目、农机、连接器）、单例、几列组成的主键。工单另有从 1 数的 `number`，消息在对话里有从 1 数的 `number`。`code()` 是给人念的配对码，不是 id。
 
@@ -166,7 +166,7 @@
 
 - **按领域切成十个模块，不平铺。** 原来十九个服务一层层叠，只有顺序没有边界：开机的规矩靠层的先后撑着（帮工挂着不存在的工单就是这一类），频道调帮工模块、合并写在帮工模块里、什么要找主人散在四处，管家的工具和接口是两套动作。按限界上下文切（同一个原因改的放一起），依赖只朝下，用一个测试守住。放弃了：维持平铺只加 lint（挡得住新的越界，挡不住放错的）；并成五个大模块（帮工模块同时被工单、频道、管家用，是真 seam，并掉以后使用方又伸进内部）；把核心状态单独当模块（它是投影，单独成模块会继续被当成模块之间互相读数据的通道）。
 - **端口只在有两个适配器、或方向必须倒过来时才立。** 频道现在在帮工模块上面，直接读 `Session` 的查询、订阅它的流，不再立 `Helpers`；送达的路（通话、手机、系统通知）各自订阅。大服务只拆有真 seam 的（工单的起草和合并）；帮工模块和频道的几块共用同一份状态，拆开只是把状态传来传去。
-- **代码用行业的词，只在旧词有歧义时才改。** 改过的：Cron（`Schedule` 和 Effect 的撞名）、Refinement（`draft` 同时指表单、计划、消息的草稿）、Review、Question、Attention、WorkspaceState、Orchestrator（管家：收活、派给帮工、盯进度、转告，行业里编排者的位置）；`scripts/stale-names.ts` 拦旧名字。没改的：task graph、project、fact、`SessionEvent`：改名只换说法，牵涉接口路径、表、存盘的值和皮的素材，有的还会和现有的名字撞上。管家的美术素材和地图实体来自美术仓库，名字不跟着改。文件夹也不按模块挪：归属写在 `modules.ts`，挪了只换路径。
+- **代码用行业的词，只在旧词有歧义时才改。** 改过的：Cron（`Schedule` 和 Effect 的撞名）、Refinement（`draft` 同时指表单、计划、消息的草稿）、Review、Question、IssueStage、WorkspaceState、Orchestrator（管家：收活、派给帮工、盯进度、转告，行业里编排者的位置）；`scripts/stale-names.ts` 拦旧名字。没改的：task graph、project、fact、`SessionEvent`：改名只换说法，牵涉接口路径、表、存盘的值和皮的素材，有的还会和现有的名字撞上。管家的美术素材和地图实体来自美术仓库，名字不跟着改。文件夹也不按模块挪：归属写在 `modules.ts`，挪了只换路径。
 - **一门语言到底。** 服务端是 Go、客户端是 Flutter 时，规则写两遍、形状靠生成器在两门语言间搬，驱动编码 agent 的 oar 还得维护一份 Go 的移植。换成 TypeScript 以后，oar 和各家编码 agent 的 SDK 直接用 npm 的，规则在服务端和页面之间共用，agent 只要写好一门。放弃了「服务端留在 Go，只换客户端」：跨语言的成本还在，smith 还要追 oar。
 - **Effect v4。** 服务之间的依赖、资源的生命周期、错误类型由它管：`Context.Service` 和 layer 让依赖写在 `make` 上、开停的顺序从叠法里来，Schema 让形状和解码是一份，`effect/http`、`effect/sql` 不用另找。能用 Effect 自己的模块就用（`Cron`、`DateTime`、`Schema`、`HttpRouter`、`PubSub`、`Stream`），不再写一份。
 - **状态、资源和适配器分开。** `Core` 的状态由 `SubscriptionRef` 持有，农机探测用 `Cache` 合并并发查询和控制有效期；同步回调中的局部读改写保留闭包。`makeBrain`、`makeJournal`、`makeTrajectories`、`makeInProcessRun` 一次构造出完整对象。Journal 的方法同步执行，oar 的回调按事件顺序写它；保存由作用域里的异步文件组件合并。`Host` 从 Effect 环境取 `Core` 和 `FileSystem`；路由、模型、工具和恢复回调仍是实例的策略，避免 Session 反向依赖 Orchestrator。`vibevalleyRuntimeOf` 遵守 oar 的 Promise 接口。

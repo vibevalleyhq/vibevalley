@@ -3,7 +3,8 @@
 import { For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import type { Changes, Session } from "@vibevalley/protocol";
+import type { Changes, Issue, Session } from "@vibevalley/protocol";
+import { assignedAgentOf } from "@vibevalley/protocol/rules";
 
 import { ago } from "@/base/format";
 import { useNow } from "@/base/util";
@@ -52,7 +53,7 @@ export function HarvestReview(props: { session: Session; onDone: () => void }) {
 function ReadyView(props: { session: Session; changes: Changes; onDone: () => void }) {
   const now = useNow();
   const core = useCore();
-  const acts = () => (core()?.issues.find((i) => i.id === issueOf(props.session))?.attention.acts ?? []).map((a) => a.act);
+  const acts = () => (core()?.issues.find((i) => i.id === issueOf(props.session))?.stage.acts ?? []).map((a) => a.act);
   const counts = () => lineCounts(props.changes);
   const empty = () => nothingChanged(props.changes);
   const conflicts = () => props.changes.conflicts;
@@ -162,6 +163,10 @@ export function Warehouse() {
   const router = useRouter();
   const now = useNow();
   const agents = () => new Map(ready(agentsQuery, []).map((a) => [a.id, a]));
+  const agentName = (issue: Issue) => {
+    const id = assignedAgentOf(issue);
+    return id ? (agents().get(id)?.name ?? id) : undefined;
+  };
   const stored = () => harvestedOf(core());
   const graphs = () => frames.frame?.graphs ?? [];
   return (
@@ -184,7 +189,7 @@ export function Warehouse() {
                 <span class={["mt-1 block", xs]}>
                   {[
                     i.graph ? t("web.farm.harvest.graph") : undefined,
-                    i.assignee ? (agents().get(i.assignee)?.name ?? i.assignee) : undefined,
+                    agentName(i),
                     i.project,
                     i.closedAt !== undefined ? t("web.farm.harvest.taken", { ago: ago(i.closedAt, now()) }) : undefined,
                   ]

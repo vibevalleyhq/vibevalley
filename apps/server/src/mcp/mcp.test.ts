@@ -9,6 +9,7 @@ import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import { blockId, sessionId } from "@vibevalley/protocol/schema";
 
+import { Agent } from "@/agent/agent.ts";
 import { Artifact } from "@/artifact/artifact.ts";
 import { owner } from "@/base/actor.ts";
 import { Channel } from "@/channel/chat.ts";
@@ -172,6 +173,45 @@ describe("mcp", () => {
       expect(yield* Effect.promise(() => c.tool("artifact_create", { title: "两个都给", kind: "html", file: "out/two.html", content: "x" }))).toContain("没成");
       expect((yield* artifacts.list({ issue })).length).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi], repos: ["chat-j"] })));
+  });
+
+  it.live("regression: a channel context lists and creates artifacts only in its own channel", () => {
+    const tokens: string[] = [];
+    const pi = scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        for (const s of turn.options.mcpServers ?? [])
+          if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers.authorization ?? "").replace(/^Bearer /u, ""));
+        turn.say("在呢");
+      },
+    });
+    return Effect.gen(function* () {
+      const agents = yield* Agent;
+      const artifacts = yield* Artifact;
+      const chat = yield* Channel;
+      const mcp = yield* Mcp;
+      yield* agents.save(lab());
+      const outside = yield* artifacts.create(
+        { from: ownerId, by: ownerId },
+        {
+          title: "别处的产出",
+          kind: "html",
+          content: "outside",
+          channel: chat.defaultChannel(),
+        },
+      );
+      const direct = yield* chat.direct("lab");
+      yield* chat.say("在这里做一份", direct, "");
+      yield* until(() => tokens.length > 0, "the channel context's token");
+      const c = client(mcp, tokens[0]!);
+      yield* Effect.promise(c.init);
+      expect(yield* Effect.promise(() => c.tool("artifact_create", { title: "这里的产出", kind: "html", content: "inside" }))).toContain("做好了");
+      const [inside] = yield* artifacts.list({ channel: direct });
+      expect(inside).toMatchObject({ title: "这里的产出", channel: direct, by: "lab" });
+      const listed = yield* Effect.promise(() => c.tool("artifact_list"));
+      expect(listed).toContain(inside!.id);
+      expect(listed).not.toContain(outside.id);
+    }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi] })));
   });
 
   it.live("lists sessions by their phase", () =>

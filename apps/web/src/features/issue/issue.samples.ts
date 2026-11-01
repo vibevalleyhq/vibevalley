@@ -1,10 +1,10 @@
 // For the stories only; the product never imports it.
 
-import type { Changes, Issue, IssueAction, IssueAttention, IssueId, IssueStatus, Priority, SessionId, PhaseView, SessionView } from "@vibevalley/protocol";
+import type { Changes, Issue, IssueAction, IssueStage, IssueId, IssueStatus, Priority, SessionId, PhaseView, SessionView } from "@vibevalley/protocol";
 export const now = Date.now();
 export const min = 60_000;
 
-const attentionOf: Record<IssueStatus, IssueAttention["state"]> = {
+const issueStageOf: Record<IssueStatus, IssueStage["state"]> = {
   backlog: "draft",
   todo: "queued",
   in_progress: "working",
@@ -13,25 +13,43 @@ const attentionOf: Record<IssueStatus, IssueAttention["state"]> = {
   canceled: "canceled",
 };
 
-export const sampleIssue = (number: number, title: string, status: IssueStatus, priority: Priority, more: Partial<Issue> = {}): Issue => ({
-  id: `i${number}` as IssueId,
-  number,
-  title,
-  priority,
-  status,
-  createdAt: now - number * 37 * min,
-  sessions: [],
-  moves: [],
-  deliver: "change",
-  findings: [],
-  questions: [],
-  description: "",
-  blockedBy: [],
-  criteria: [],
-  checks: [],
-  attention: { state: attentionOf[status], acts: [] },
-  ...more,
-});
+export type SampleIssue = Omit<Partial<Issue>, "assignments"> & { readonly agent?: string | null; readonly sessionIds?: SessionId[] };
+
+export const sampleIssue = (number: number, title: string, status: IssueStatus, priority: Priority, more: SampleIssue = {}): Issue => {
+  const id = `i${number}` as IssueId;
+  const { agent, sessionIds = [], ...fields } = more;
+  const assignments =
+    agent || sessionIds.length > 0
+      ? [
+          {
+            id: `a${number}`,
+            issue: id,
+            agent: agent ?? "sample",
+            assignedAt: now - number * 37 * min,
+            executions: sessionIds.map((session) => ({ kind: "session" as const, session, startedAt: now - 20 * min })),
+          },
+        ]
+      : [];
+  return {
+    id,
+    number,
+    title,
+    priority,
+    status,
+    createdAt: now - number * 37 * min,
+    assignments,
+    moves: [],
+    deliver: "change",
+    findings: [],
+    questions: [],
+    description: "",
+    blockedBy: [],
+    criteria: [],
+    checks: [],
+    stage: { state: issueStageOf[status], acts: [] },
+    ...fields,
+  };
+};
 
 export const sampleSession = (id: string, agent: string, phase: PhaseView, more: Partial<SessionView> = {}): SessionView => ({
   id: id as SessionId,
@@ -54,7 +72,7 @@ export const working = (since: number, quietSince?: number): PhaseView => ({
   ...(quietSince === undefined ? {} : { quietSince }),
 });
 
-// The buttons as the server gives them for each state (apps/server/src/issue/attention.ts): data here, not a rule.
+// The buttons as the server gives them for each state (apps/server/src/issue/stage.ts): data here, not a rule.
 const move = (act: IssueAction["act"], status: IssueStatus, words: "none" | "required" = "none"): IssueAction => ({ act, does: "move", status, words });
 export const acts = {
   start: move("start", "todo"),

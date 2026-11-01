@@ -27,7 +27,9 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`Todo`）�
 
 ## 模型和不变量
 
-- **计划是父工单，每一件是子工单。** 父工单的 id 是计划的 id：管家起的是 `p1`、`p2`……（`issue/stored.ts` 的 `nextTaskId`），帮工拆的就是原来那张工单的 id。标题和说明是计划的标题和目标；父工单原来的编号、帮工（assignee）、优先级、验收标准和干活记录都留着，`graphIssues` 不重写它们。`graph`（`IssueGraph`）存状态、计划分支、并行数、一句说明。子工单的 id 是 `<计划>.<件>`（`p1.api`，`taskIssueID`），`parent` 指父工单，`blockedBy` 是它要等的子工单，标题和说明是这件的标题和工单，`task`（`IssueTask`）存其余：状态、检查命令、该改的地方（`scope`）、是不是验收、冻结的文件、谁在做、结论、提交、花费、重试和失败的次数。
+带话使用 `Session.deliver` 的结构化结果。手动重试先保存再投递；明确被拒时恢复该件原来的失败状态和重试计数，保留拒绝原因并返回失败。自动重试或恢复被拒时将该件标为失败，规划重试被拒时放弃计划。被拒的投递不算新一轮。
+
+- **计划是父工单，每一件是子工单。** 父工单的 id 是计划的 id：管家起的是 `p1`、`p2`……（`issue/stored.ts` 的 `nextTaskId`），帮工拆的就是原来那张工单的 id。标题和说明是计划的标题和目标；父工单原来的编号、帮工（agent）、优先级、验收标准和干活记录都留着，`graphIssues` 不重写它们。`graph`（`IssueGraph`）存状态、计划分支、并行数、一句说明。子工单的 id 是 `<计划>.<件>`（`p1.api`，`taskIssueID`），`parent` 指父工单，`blockedBy` 是它要等的子工单，标题和说明是这件的标题和工单，`task`（`IssueTask`）存其余：状态、检查命令、该改的地方（`scope`）、是不是验收、冻结的文件、谁在做、结论、提交、花费、重试和失败的次数。
 - **一次写整家**：每写一次计划，`issue.PutTask` 在一个事务里写父工单和全部子工单，提交后一次施加（`applyBatch`），先子工单、后父工单；计划在核心状态里总是完整的。核心状态只留最近 50 家关了的工单时，只数没有父工单的，子工单跟着父工单留、跟着父工单走。
 - **计划的状态**：`splitting`、`draft`、`running`、`paused`、`ready`（都做完了，等合进主分支）、`done`、`abandoned`。**每一件**：`waiting`、`working`、`merged`、`failed`、`skipped`；`merged`、`skipped` 算定下了，等它的件能开工。
 - **工单的状态跟着计划算**，不另存：父工单在拆、在做是 `in_progress`，草稿、暂停、都做完了是 `in_review`，合进主分支了是完成、交付 `merged`，放弃了是不做了（`dismissed`）。子工单等着是 `backlog`，帮工在干是 `in_progress`，帮工停着或没做成是 `in_review`，合进去了是完成、交付 `merged_into_parent`，跳过或计划结束了是不做了（`dismissed`）。
@@ -91,7 +93,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`Todo`）�
 ## 和谁打交道
 
 - **工单（`issue`）**：`putTask` 写整家工单，`nextTaskId` 给下一个计划号，`hire` 派帮工（查档案、地满没满）；工单服务的转换表不管计划里的工单（[工单](docs/subsystems/issue.md)）。
-- **帮工（`session`）**：派规划的、做件的帮工，`tell` 带话（触发是 `task`），`dismiss` 请走，`mergeInto` 在合并动作里停住写入、合并、离场；正在干或有待开始的一轮时不能合。计划听核心状态的事实：`report`（一轮结束）和 `left`（帮工离开）。
+- **帮工（`session`）**：派规划的、做件的帮工，`deliver` 带话（触发是 `task`），`dismiss` 请走，`mergeInto` 在合并动作里停住写入、合并、离场；正在干或有待开始的一轮时不能合。计划听核心状态的事实：`report`（一轮结束）和 `left`（帮工离开）。
 - **项目（`project`）**：`openBranch`、`mergeBranch`、`branchChanges`（`graph.diff.get` 的改动）、`changedFiles`（冻结文件的判断）、`Run`（检查命令）。
 - **管家（`orchestrator`、`tool`）**：七个工具起头、看、改、删、动作；计划的新闻进管家的输入（来源 `graph`）；管家的现状写着开着的计划。
 - **频道（`channel`）**：计划里帮工的汇报标 `forTask`，不投给管家。

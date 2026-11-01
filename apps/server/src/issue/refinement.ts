@@ -1,8 +1,8 @@
-import { Effect, Result, Schema, Semaphore } from "effect";
+import { Clock, Effect, Result, Schema, Semaphore } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { cut } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, cut } from "@vibevalley/protocol/rules";
 
 import type { Agent } from "@/agent/agent.ts";
 import { clip } from "@/base/clip.ts";
@@ -17,7 +17,8 @@ import type { Runtime } from "@/runtime/runtime.ts";
 import type { Hired, HireOptions, Session } from "@/session/session.ts";
 
 import * as q from "../../db/generated/issue.sql.ts";
-import * as qs from "../../db/generated/issue_session.sql.ts";
+import * as qs from "../../db/generated/issue_assignment.sql.ts";
+import { assignTo, type Assignments } from "./assignment.ts";
 import { splitBrief } from "./brief.ts";
 import { draftMatch, refinementBrief } from "./prompts.ts";
 import { isForOrchestrator } from "./status.ts";
@@ -35,6 +36,7 @@ export interface RefinementDeps {
   readonly unsent: (id: string) => Effect.Effect<T.Issue, ApiError>;
   readonly hire: (agent: T.Agent, brief: string, project: string, opt?: HireOptions) => Effect.Effect<Hired, ApiError>;
   readonly publish: (id: string) => Effect.Effect<void>;
+  readonly assignments: Assignments;
 }
 
 export function refinement(d: RefinementDeps) {
@@ -42,15 +44,16 @@ export function refinement(d: RefinementDeps) {
   /** One draft starts at a time: two clicks do not send two sessions. */
   const drafting = Semaphore.makeUnsafe(1);
 
-  /** Who drafts: its assignee; else whoever was last sent to work in its project, if they can work now; else chooseAgent. */
+  /** Who drafts: its current assignment; else whoever last worked in its project, if available; else chooseAgent. */
   const refiner = Effect.fnUntraced(function* (issue: T.Issue) {
     const candidates = yield* runtimes.candidates;
     let named = "";
-    if (issue.assignee) {
-      if (!store.agent(issue.assignee)) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: issue.assignee })));
-      named = issue.assignee;
+    const agent = assignedAgentOf(issue);
+    if (agent) {
+      if (!store.agent(agent)) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: agent })));
+      named = agent;
     } else if (issue.project) {
-      const last = (yield* db.one(qs.lastAssigneeIn({ project: issue.project })))?.assignee;
+      const last = (yield* db.one(qs.lastAssigneeIn({ project: issue.project })))?.agent;
       if (last && candidates.some((c) => c.agent.id === last && c.usable)) named = last;
     }
     const chosen = chooseAgent(candidates, draftMatch(issue.title), named, "");
@@ -61,23 +64,25 @@ export function refinement(d: RefinementDeps) {
   const beforeRefinement = Effect.fnUntraced(function* (issue: T.Issue, word: string, agent: string, where: string) {
     let [title, description] = [issue.title, issue.description];
     if (word && issue.questions.length === 0 && !description && issue.criteria.length === 0) [title, description] = splitBrief(word);
-    yield* db.inTx(
-      Effect.gen(function* () {
-        yield* db.run(
-          q.editIssue({
+    const at = yield* Clock.currentTimeMillis;
+    const assignment = yield* db.inTx(
+      db.run(
+        Effect.gen(function* () {
+          yield* q.editIssue({
             title,
             description,
             project: nullText(issue.project ?? where),
-            assignee: nullText(issue.assignee ?? agent),
             priority: issue.priority,
             criteria: jsonOrNull(issue.criteria, issue.criteria.length > 0),
             deliver: issue.deliver,
             id: issue.id,
-          }),
-        );
-        if (word && issue.questions.length > 0) yield* db.run(q.setIssueQuestions({ id: issue.id, questions: null }));
-      }),
+          });
+          if (word && issue.questions.length > 0) yield* q.setIssueQuestions({ id: issue.id, questions: null });
+          return yield* assignTo(issue.id, assignedAgentOf(issue) ?? agent, at);
+        }),
+      ),
     );
+    d.assignments.changed(assignment.changed);
     yield* publish(issue.id);
   });
 

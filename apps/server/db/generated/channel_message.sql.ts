@@ -264,6 +264,48 @@ export const messagesAfter = Effect.fn("MessagesAfter")(function* (params: Messa
   })(params)
 })
 
+export const MissingDirectDeliveriesParams = Schema.Struct({
+  ["channel_id"]: Schema.String,
+  ["after_number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["recipient_id"]: Schema.String,
+})
+export type MissingDirectDeliveriesParams = typeof MissingDirectDeliveriesParams.Type
+
+
+export const MissingDirectDeliveriesResult = Schema.Struct({
+  ["id"]: Schema.String,
+  ["channel_id"]: Schema.String,
+  ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["sender_id"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
+  ["body"]: Schema.String,
+  ["meta"]: Schema.NullOr(Schema.String),
+  ["send_key"]: Schema.NullOr(Schema.String),
+  ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
+  ["sender_name"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
+  ["sender_agent"]: Schema.NullOr(Schema.String),
+})
+export type MissingDirectDeliveriesResult = typeof MissingDirectDeliveriesResult.Type
+
+
+export const MissingDirectDeliveriesSql = "-- name: MissingDirectDeliveries :many\n-- bound: owner messages committed after a direct session's startup snapshot, without a delivery to that session.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent\nfrom channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2\n  and m.sender_id = 'owner' and m.kind = 'chat' and m.deleted_at is null\n  and not exists (select 1 from channel_delivery d where d.recipient_id = $3 and d.message_id = m.id)\norder by m.number;"
+
+export const missingDirectDeliveries = Effect.fn("MissingDirectDeliveries")(function* (params: MissingDirectDeliveriesParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: MissingDirectDeliveriesParams,
+    Result: MissingDirectDeliveriesResult,
+    execute: (p) => sql.unsafe(MissingDirectDeliveriesSql, [p["channel_id"], p["after_number"], p["recipient_id"]]),
+  })(params)
+})
+
 export const RecentReportsParams = Schema.Struct({
   ["n"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })

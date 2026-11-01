@@ -145,7 +145,7 @@ export const parameters = {
     text: Schema.String.annotate({ description: params.issueComment.text }),
   }).annotate({ requiredOrder: ["id", "text"] }),
   "issue.create": Schema.Struct({
-    assignee: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.assignee })),
+    agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.agent })),
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.channel })),
     deliver: Schema.optionalKey(
       Schema.Literals(["change", "branch", "answer"]).annotate({
@@ -180,13 +180,13 @@ export const parameters = {
     text: Schema.optionalKey(Schema.String.annotate({ description: params.issueReview.text })),
   }).annotate({ requiredOrder: ["id", "pass"] }),
   "issue.status.update": Schema.Struct({
-    assignee: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.assignee })),
+    agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.agent })),
     id: Schema.String.annotate({ description: params.issueNumber }),
     status: Schema.String.annotate({ description: params.issueStatus.status }),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.text })),
   }).annotate({ requiredOrder: ["id", "status"] }),
   "issue.update": Schema.Struct({
-    assignee: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.assignee })),
+    agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.agent })),
     criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.issueUpdate.criteria })),
     deliver: Schema.optionalKey(Schema.Literals(["change", "branch", "answer"]).annotate({ description: params.issueUpdate.deliver })),
     description: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.description })),

@@ -29,10 +29,14 @@ const profile: Agent = {
 async function finishedIssue(api: VibeValleyApi) {
   const agent = await api.agent.create(profile);
   const project = await api.project.create({ name: `log-${Date.now()}` });
-  const issue = await api.issue.create({ title: first, project: project.name, assignee: agent.id });
+  const issue = await api.issue.create({ title: first, project: project.name, agent: agent.id });
   await api.issue.status.update({ id: issue.id, status: "todo" });
-  await expect.poll(async () => (await api.issue.get({ id: issue.id })).attention.state).toBe("reviewing");
-  const session = (await api.issue.get({ id: issue.id })).sessions.at(-1)!;
+  await expect.poll(async () => (await api.issue.get({ id: issue.id })).stage.state).toBe("reviewing");
+  const sessions = (await api.issue.get({ id: issue.id })).assignments.flatMap((assignment) =>
+    assignment.executions.flatMap((execution) => (execution.kind === "session" ? [execution.session] : [])),
+  );
+  const session = sessions.at(-1);
+  if (session === undefined) throw new Error("the issue has no execution session");
   return { agent, issue, session };
 }
 

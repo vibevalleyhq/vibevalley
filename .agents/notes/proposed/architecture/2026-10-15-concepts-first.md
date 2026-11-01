@@ -57,7 +57,7 @@ VibeValley 是 AI 版的 Linear，穿农场的皮。概念收成下面几样，�
 
 - 工单状态：`backlog`（写下没派）、`todo`（排队等空地）、`in_progress`、`in_review`（等你看）、`done`、`canceled`；关单的原因（收获、合进计划、收工、丢了）留着，从它算出 `done` 还是 `canceled`；
 - 优先级的 `normal` 改叫 `medium`；
-- `Issue.agent` 改叫 `assignee`；
+- 工单的责任归属是 `Assignment.agent`，不在 `Issue` 上另存负责人字段；
 - `AgentProfile` 改叫 `Agent`，`Helper` 改叫 `Run`，`WorkStep` 改叫 `Activity`（`asked` → `prompt`、`said` → `response`、`tool` → `action`、`problem` → `error`）；
 - `IncomingCall` 改叫 `InboxItem`（已经改了，见第 5 步），`Merges.Harvest` 改叫 `Merge`（已经改了，现在是 `Issue.Merge`），`Foreman` 改叫 `Orchestrator`。
 

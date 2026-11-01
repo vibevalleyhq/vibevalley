@@ -22,7 +22,7 @@ Status: proposed
 
 ```bash
 vv project create --json '{"name":"vibevalley","github":"https://github.com/vibevalleyhq/vibevalley"}'
-vv issue create --json '{"title":"…","description":"要做什么、怎么算做完、跑哪些检查","project":"vibevalley","assignee":"codex"}'
+vv issue create --json '{"title":"…","description":"要做什么、怎么算做完、跑哪些检查","project":"vibevalley","agent":"codex"}'
 vv issue work <issue>                                            # 挪到待办，等它交回来，打出改动
 vv issue status update <issue> --json '{"status":"todo","text":"…"}'   # 不满意：再干一轮
 vv issue act <issue> --json '{"act":"accept"}'                  # 验收

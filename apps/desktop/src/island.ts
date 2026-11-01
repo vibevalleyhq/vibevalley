@@ -8,8 +8,8 @@ import { existsSync } from "node:fs";
 import { Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import { type Attention, readStream, type StateFrame, statePath } from "@vibevalley/protocol";
-import { attentionWantsOwner, phaseText } from "@vibevalley/protocol/rules";
+import { type IssueStageKind, readStream, type StateFrame, statePath } from "@vibevalley/protocol";
+import { latestSessionIdOf, phaseText, stageWantsOwner } from "@vibevalley/protocol/rules";
 
 import { jsonLines } from "./lines";
 
@@ -36,7 +36,7 @@ export interface Glance {
 }
 
 /** Which issues the island shows, and how; the rest are not in flight. */
-const toneOf: Record<Attention, Tone | undefined> = {
+const toneOf: Record<IssueStageKind, Tone | undefined> = {
   draft: undefined,
   queued: undefined,
   working: "working",
@@ -50,12 +50,12 @@ const toneOf: Record<Attention, Tone | undefined> = {
 export function glanceOf(frame: StateFrame, now: number): Glance {
   const rows: (IslandRow & { first: boolean })[] = [];
   for (const issue of frame.state.issues) {
-    const { state, stuck } = issue.attention;
+    const { state, stuck } = issue.stage;
     const tone = toneOf[state];
     if (!tone) continue;
-    const head = frame.state.sessions.find((h) => h.id === issue.sessions.at(-1));
-    const doing = tone === "working" && head ? `${head.name} · ${phaseText(head, now)}` : stuck ? t(`shared.stuck.${stuck}`) : t(`shared.attention.${state}`);
-    rows.push({ issue: issue.id, number: issue.number, title: issue.title, doing, tone, first: attentionWantsOwner(state) });
+    const head = frame.state.sessions.find((h) => h.id === latestSessionIdOf(issue));
+    const doing = tone === "working" && head ? `${head.name} · ${phaseText(head, now)}` : stuck ? t(`shared.stuck.${stuck}`) : t(`shared.stage.${state}`);
+    rows.push({ issue: issue.id, number: issue.number, title: issue.title, doing, tone, first: stageWantsOwner(state) });
   }
   rows.sort((a, b) => (b.first !== a.first ? Number(b.first) - Number(a.first) : a.number - b.number));
   const working = rows.filter((r) => r.tone === "working").length;

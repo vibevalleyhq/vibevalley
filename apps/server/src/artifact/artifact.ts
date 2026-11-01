@@ -23,7 +23,7 @@ import { writeOnce } from "@/infra/files.ts";
 
 import * as qa from "../../db/generated/artifact.sql.ts";
 import * as qv from "../../db/generated/artifact_version.sql.ts";
-import { type BlockStoreOptions, makeBlockStore } from "./blocks.ts";
+import { makeBlockStore } from "./blocks.ts";
 import { artifactProblem } from "./policy.ts";
 
 /** Who makes it. from: who says so in the channel (the owner, a session, an orchestrator); by: who it is kept as made by
@@ -70,17 +70,18 @@ export class Artifact extends Context.Service<
     readonly demo: (id: T.ArtifactId, helpers: readonly T.Agent[]) => Effect.Effect<void, ApiError>;
   }
 >()("vibevalley/Artifact") {
-  static readonly layer = (options?: ArtifactOptions) => Layer.effect(Artifact, make(options));
+  static readonly layer = Layer.effect(
+    Artifact,
+    Effect.suspend(() => make()),
+  );
 }
-
-export type ArtifactOptions = BlockStoreOptions;
 
 /** How many the farm-wide list shows. */
 const listedMax = 200;
 
 const missingArtifact = (id: T.ArtifactId) => missing(t("server.artifact.missing", { id }), [lookIn.artifact]);
 
-const make = (options: ArtifactOptions = {}) =>
+const make = () =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
     const chat = yield* Channel;
@@ -140,7 +141,7 @@ const make = (options: ArtifactOptions = {}) =>
       return row;
     });
 
-    const blocks = yield* makeBlockStore(foundBlocks, options);
+    const blocks = yield* makeBlockStore(foundBlocks);
 
     const words = (base: string, note: string | undefined) => (note ? t("server.artifact.withNote", { said: base, note }) : base);
 

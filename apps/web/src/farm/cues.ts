@@ -15,8 +15,8 @@ export interface FarmSoundInput {
   effects?: readonly GameEffect[];
   /** Absent until the page has the core state; the first state is the farm as it already was. */
   sessions?: readonly Session[];
-  /** Where each issue stands (Issue.attention): its plot ripens or gets bugs as it does. */
-  issues?: readonly Pick<Issue, "id" | "attention">[];
+  /** Where each issue stands (Issue.stage): its plot ripens or gets bugs as it does. */
+  issues?: readonly Pick<Issue, "id" | "stage">[];
   call?: { phase: CallPhase; problem?: string };
 }
 
@@ -60,11 +60,11 @@ export function farmCues(prev: FarmSoundInput, next: FarmSoundInput): Cue[] {
   // Ripe and bug follow where the issue stands, as its plot does: a round handed back with a conflict or a question is
   // neither.
   if (prev.issues && next.issues && next.issues !== prev.issues) {
-    const before = new Map(prev.issues.map((t) => [t.id, t.attention]));
+    const before = new Map(prev.issues.map((t) => [t.id, t.stage]));
     for (const t of next.issues) {
       const was = before.get(t.id);
       if (!was) continue;
-      const now = t.attention;
+      const now = t.stage;
       if (now.state === "reviewing" && was.state !== "reviewing") cues.push({ name: "ripe", hold: 220 });
       else if (now.state === "stuck" && (now.stuck === "failed" || now.stuck === "conflict") && (was.state !== "stuck" || was.stuck !== now.stuck))
         cues.push({ name: "bug" });

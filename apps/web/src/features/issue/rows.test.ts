@@ -21,7 +21,7 @@ const gone = session("s1", "老周", { _tag: "done" });
 const here = session("s2", "小林", { _tag: "resting" });
 
 test("an issue the frame keeps is the frame's, with its sessions from the farm or the history", () => {
-  const live = issue(1, "修好登录", "in_review", "medium", { sessions: [sessionId("s1"), sessionId("s2")] });
+  const live = issue(1, "修好登录", "in_review", "medium", { sessionIds: [sessionId("s1"), sessionId("s2")] });
   const read: IssueHistory[] = [{ issue: { ...live, title: "旧标题" }, sessions: [gone], missingSessions: [] }];
   expect(boardRows(core({ issues: [live], sessions: [here] }), read, false)).toEqual([{ issue: live, sessions: [gone, here], missingSessions: [] }]);
 });
@@ -39,7 +39,7 @@ test("the older closed issues come from the history only with 更早的, and not
 });
 
 test("a session that left after the history was read is the one the frame last had", () => {
-  const live = issue(1, "修好登录", "in_review", "medium", { sessions: [sessionId("s1")] });
+  const live = issue(1, "修好登录", "in_review", "medium", { sessionIds: [sessionId("s1")] });
   expect(boardRows(core({ issues: [live] }), [], false, new Map([["s1", gone]]))?.[0]?.sessions).toEqual([gone]);
 });
 
@@ -47,8 +47,7 @@ test("the history is read again when an issue gets a session or one leaves the f
   const a = issue(1, "a", "todo", "medium");
   const before = historyKey(core({ issues: [a] }));
   expect(historyKey(core({ issues: [{ ...a, status: "in_progress", title: "b" }] }))).toBe(before);
-  expect(historyKey(core({ issues: [{ ...a, sessions: [sessionId("s2")] }], sessions: [here] }))).not.toBe(before);
-  expect(historyKey(core({ issues: [{ ...a, sessions: [sessionId("s2")] }] }))).not.toBe(
-    historyKey(core({ issues: [{ ...a, sessions: [sessionId("s2")] }], sessions: [here] })),
-  );
+  const assigned = issue(1, "a", "todo", "medium", { sessionIds: [sessionId("s2")] });
+  expect(historyKey(core({ issues: [assigned], sessions: [here] }))).not.toBe(before);
+  expect(historyKey(core({ issues: [assigned] }))).not.toBe(historyKey(core({ issues: [assigned], sessions: [here] })));
 });

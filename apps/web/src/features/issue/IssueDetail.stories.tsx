@@ -5,7 +5,7 @@ import { stories, story, type Story } from "@vibevalley/stories";
 import { answer } from "@/infra/storyApi";
 import { ToastHost } from "@/ui/ToastHost";
 
-import { acts, min, now, sampleChanges, sampleIssue, sampleSession, working } from "./issue.samples";
+import { acts, min, now, sampleChanges, sampleIssue, sampleSession, type SampleIssue, working } from "./issue.samples";
 import { AnswerView, IssueDetail } from "./IssueDetail";
 import { TodoDetail } from "./TodoDetail";
 
@@ -25,34 +25,28 @@ const resting = (more: Partial<SessionView> = {}) =>
 
 const lastRun = (outcome: "completed" | "failed" | "interrupted", summary: string) => ({ outcome, summary, at: now - 6 * min });
 
-const base = (more: { [K in keyof Issue]?: Issue[K] | undefined }) =>
-  sampleIssue(
-    18,
-    "修好登录过期",
-    "in_review",
-    "high",
-    omitUndefined({ description, criteria, project: "vibevalley", assignee: "老周", sessions: [], ...more }),
-  );
+const base = (more: SampleIssue) =>
+  sampleIssue(18, "修好登录过期", "in_review", "high", omitUndefined({ description, criteria, project: "vibevalley", agent: "老周", ...more }));
 
-// Each state as the server sends it; the buttons follow apps/server/src/issue/attention.ts.
+// Each state as the server sends it; the buttons follow apps/server/src/issue/stage.ts.
 const pages: Record<string, Page> = {
   草稿: {
     note: "写下来还没派：主动作是开始。",
     issue: base({
       status: "backlog",
-      assignee: undefined,
-      attention: { state: "draft", since: now - 20 * min, lead: "start", acts: [acts.start, acts.close] },
+      agent: null,
+      stage: { state: "draft", since: now - 20 * min, lead: "start", acts: [acts.start, acts.close] },
     }),
   },
   排队: {
     note: "派了，等一个空位。",
-    issue: base({ status: "todo", queuedAt: now - 3 * min, attention: { state: "queued", since: now - 3 * min, acts: [acts.close] } }),
+    issue: base({ status: "todo", queuedAt: now - 3 * min, stage: { state: "queued", since: now - 3 * min, acts: [acts.close] } }),
   },
   在做: (() => {
     const s = sampleSession("w1", "老周", working(now - 4 * min), { project: "vibevalley", branch: "issue-18-login" });
     return {
       note: "帮工在干：能说一句、叫停或关掉。",
-      issue: base({ status: "in_progress", sessions: [s.id], attention: { state: "working", since: now - 4 * min, acts: [acts.tell, acts.stop, acts.close] } }),
+      issue: base({ status: "in_progress", sessionIds: [s.id], stage: { state: "working", since: now - 4 * min, acts: [acts.tell, acts.stop, acts.close] } }),
       sessions: [s],
       session: s,
     };
@@ -63,8 +57,8 @@ const pages: Record<string, Page> = {
       note: "在做，可是十几分钟没动静：主动作是叫停。",
       issue: base({
         status: "in_progress",
-        sessions: [s.id],
-        attention: { state: "stuck", stuck: "quiet", since: now - 12 * min, lead: "stop", acts: [acts.stop, acts.tell, acts.close] },
+        sessionIds: [s.id],
+        stage: { state: "stuck", stuck: "quiet", since: now - 12 * min, lead: "stop", acts: [acts.stop, acts.tell, acts.close] },
       }),
       sessions: [s],
       session: s,
@@ -75,9 +69,9 @@ const pages: Record<string, Page> = {
     return {
       note: "帮工有问题要你答：主动作是回答。",
       issue: base({
-        sessions: [s.id],
+        sessionIds: [s.id],
         questions: [{ question: "过期以后回登录页，还是原地弹一个登录框？", options: ["回登录页", "原地弹框"] }],
-        attention: { state: "asking", since: now - 6 * min, lead: "answer", acts: [acts.answer, acts.close] },
+        stage: { state: "asking", since: now - 6 * min, lead: "answer", acts: [acts.answer, acts.close] },
       }),
       sessions: [s],
       session: s,
@@ -88,13 +82,13 @@ const pages: Record<string, Page> = {
     return {
       note: "交活了：看改动和验收标准，完成或打回。",
       issue: base({
-        sessions: [s.id],
+        sessionIds: [s.id],
         checks: [
           { criterion: 0, result: "met", proof: "session.test.ts 覆盖了" },
           { criterion: 1, result: "met", proof: "" },
           { criterion: 2, result: "unsure", proof: "只测了过期前后各一秒" },
         ],
-        attention: { state: "reviewing", since: now - 6 * min, lead: "complete", acts: [acts.complete, acts.reject, acts.tell, acts.close] },
+        stage: { state: "reviewing", since: now - 6 * min, lead: "complete", acts: [acts.complete, acts.reject, acts.tell, acts.close] },
       }),
       sessions: [s],
       session: s,
@@ -106,9 +100,9 @@ const pages: Record<string, Page> = {
     return {
       note: "这一轮失败了：主动作是补救。",
       issue: base({
-        sessions: [s.id],
+        sessionIds: [s.id],
         findings: [{ id: "f1", text: "登录页的文案没改", at: now - 30 * min, resolved: false }],
-        attention: { state: "stuck", stuck: "failed", since: now - 6 * min, lead: "cure", acts: [acts.cure, acts.tell, acts.close] },
+        stage: { state: "stuck", stuck: "failed", since: now - 6 * min, lead: "cure", acts: [acts.cure, acts.tell, acts.close] },
       }),
       sessions: [s],
       session: s,
@@ -122,8 +116,8 @@ const pages: Record<string, Page> = {
     return {
       note: "和主分支冲突：主动作是解决。",
       issue: base({
-        sessions: [s.id],
-        attention: { state: "stuck", stuck: "conflict", since: now - 6 * min, lead: "resolve", acts: [acts.resolve, acts.tell, acts.close] },
+        sessionIds: [s.id],
+        stage: { state: "stuck", stuck: "conflict", since: now - 6 * min, lead: "resolve", acts: [acts.resolve, acts.tell, acts.close] },
       }),
       sessions: [s],
       session: s,
@@ -141,10 +135,10 @@ const pages: Record<string, Page> = {
       note: "合进了主分支；还能重开。",
       issue: base({
         status: "done",
-        sessions: [s.id],
+        sessionIds: [s.id],
         closedAt: now - 60 * min,
         delivered: "merged",
-        attention: { state: "done", since: now - 60 * min, acts: [acts.reopen] },
+        stage: { state: "done", since: now - 60 * min, acts: [acts.reopen] },
       }),
       sessions: [s],
       changes: sampleChanges,
@@ -156,7 +150,7 @@ const pages: Record<string, Page> = {
       status: "canceled",
       canceled: "dismissed",
       closedAt: now - 90 * min,
-      attention: { state: "canceled", since: now - 90 * min, lead: "reopen", acts: [acts.reopen] },
+      stage: { state: "canceled", since: now - 90 * min, lead: "reopen", acts: [acts.reopen] },
     }),
   },
 };

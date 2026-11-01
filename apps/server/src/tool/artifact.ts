@@ -25,6 +25,11 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
     // and announced in its issue thread, the orchestrator's where it is answering.
     const artifactSaid = (e: Effect.Effect<string, ApiError>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(reasonOf(err))));
 
+    const sessionArtifactScope = (session: string): { readonly channel?: string; readonly issue?: string } => {
+      const own = run.sessionOf(session);
+      return own?.issue ? { issue: own.issue } : own?.channel ? { channel: own.channel } : {};
+    };
+
     /** A version's words: given as they are, or read from a file in the session's working directory. The path is resolved
      * with its links, so neither .. nor a link leads out of the directory. */
     const artifactWords = (c: Caller, content: string | undefined, file: string | undefined) =>
@@ -72,10 +77,9 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
         "artifact.list",
         Effect.fn("Tool.artifactList")(function* (p: SessionInput<"artifact.list">) {
           const c = yield* callerOf(who);
-          const own = run.sessionOf(c.session)?.issue;
           const listed = (where: { readonly channel?: string; readonly issue?: string }) =>
             Effect.map(artifacts.list(where), (all) => (all.length === 0 ? answers.artifact.none : all.map(answers.artifact.line).join("\n")));
-          if (!p.channel) return yield* listed(own ? { issue: own } : {});
+          if (!p.channel) return yield* listed(sessionArtifactScope(c.session));
           return yield* chat
             .placeOf(c.session, p.channel)
             .pipe(Effect.matchEffect({ onFailure: (e) => Effect.succeed(answers.failed(reasonOf(e))), onSuccess: (channel) => listed({ channel }) }));
@@ -142,13 +146,12 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
         "artifact.create",
         Effect.fn("Tool.artifactCreate")(function* (p: SessionInput<"artifact.create">) {
           const c = yield* callerOf(who);
-          const own = run.sessionOf(c.session)?.issue;
           return yield* artifactSaid(
             Effect.gen(function* () {
               const content = yield* artifactWords(c, p.content, p.file);
               const made = yield* artifacts.create(
                 { from: c.session, by: c.agent },
-                { title: p.title, kind: p.kind, content, ...(p.note ? { note: p.note } : {}), ...(own ? { issue: own } : {}) },
+                { title: p.title, kind: p.kind, content, ...(p.note ? { note: p.note } : {}), ...sessionArtifactScope(c.session) },
               );
               return answers.artifact.made(made);
             }),

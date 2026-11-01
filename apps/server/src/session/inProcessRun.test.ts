@@ -42,7 +42,7 @@ describe("the orchestrator's runs", () => {
       const journal = yield* sessions.trajectories.openLog("orchestrator");
       const x = yield* makeInProcessRun("orchestrator", journal, (tool) => ({ text: tool, action: "other", tool }), sessions.runStore);
 
-      yield* x.observe(user("看看工单"), { issue: "i1", by: { kind: "issue" }, heard: ["m1"] });
+      yield* x.observe(user("看看工单"), { issue: "i1", by: { kind: "issue", channel: "general", message: "m1" }, heard: ["m1"] });
       expect(sessions.currentRun("orchestrator")).not.toBe("");
       yield* x.observe(tool("c1"));
       yield* x.observe(toolEnd("c1"));
@@ -52,7 +52,8 @@ describe("the orchestrator's runs", () => {
       expect(sessions.currentRun("orchestrator")).toBe("");
       yield* until(() => finished.length === 1, "the first run finished");
       expect(finished).toEqual([{ id: expect.any(String), issues: ["i1", "i2"], outcome: "completed" }]);
-      const runs = yield* sessions.runs("i2");
+      const runs = yield* sessions.issueRuns("i2");
+      expect(runs[0]?.triggeredBy).toEqual({ kind: "issue", channel: "general", message: "m1" });
       expect(runs.map((r) => [r.issue, r.outcome, r.summary, r.heard])).toEqual([["i1", "completed", "看完了", ["m1"]]]);
       expect(journal.events().map((e) => e.type)).toEqual([
         "run/start",
@@ -77,7 +78,7 @@ describe("the orchestrator's runs", () => {
       expect(finished.at(-1)!.outcome).toBe("interrupted");
 
       const failed = yield* x.failedStart({ by: { kind: "issue" }, issue: "i1" }, "派不出去的", "钥匙没填");
-      expect((yield* sessions.runs("i1")).find((r) => r.id === failed)?.outcome).toBe("failed");
+      expect((yield* sessions.issueRuns("i1")).find((r) => r.id === failed)?.outcome).toBe("failed");
       yield* Fiber.interrupt(following);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );

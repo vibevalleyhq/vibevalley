@@ -160,7 +160,7 @@
     "resultBranch": 0
   },
   "server: Collaboration": {
-    "nonNull": 40,
+    "nonNull": 38,
     "doubleCast": 0,
     "cast": 1,
     "lintOff": 0,
@@ -200,7 +200,7 @@
     "resultBranch": 0
   },
   "server: Issues": {
-    "nonNull": 25,
+    "nonNull": 24,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 2,

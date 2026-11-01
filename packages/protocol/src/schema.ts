@@ -701,7 +701,7 @@ export const CriterionCheck: Codec<T.CriterionCheck> = Schema.Struct({
   proof: Schema.String,
 });
 
-export const Attention: Codec<T.Attention> = Schema.Literals(T.AttentionValues);
+export const IssueStageKind: Codec<T.IssueStageKind> = Schema.Literals(T.IssueStageKindValues);
 export const StuckReason: Codec<T.StuckReason> = Schema.Literals(T.StuckReasonValues);
 export const IssueAct: Codec<T.IssueAct> = Schema.Literals(T.IssueActValues);
 
@@ -713,8 +713,8 @@ export const IssueAction: Codec<T.IssueAction> = Schema.Union([
   Schema.Struct({ act: IssueAct, does: Schema.Literal("stop") }),
 ]);
 
-export const IssueAttention: Codec<T.IssueAttention> = Schema.Struct({
-  state: Attention,
+export const IssueStage: Codec<T.IssueStage> = Schema.Struct({
+  state: IssueStageKind,
   since: Schema.optionalKey(Schema.Finite),
   stuck: Schema.optionalKey(StuckReason),
   lead: Schema.optionalKey(IssueAct),
@@ -747,18 +747,33 @@ export const IssueRun: Codec<T.IssueRun> = Schema.Struct({
 
 export const Deliverable: Codec<T.Deliverable> = Schema.Literals(T.DeliverableValues);
 
+export const Assignment: Codec<T.Assignment> = Schema.Struct({
+  id: Schema.String,
+  issue: IssueId,
+  agent: Schema.String,
+  assignedAt: Schema.Finite,
+  endedAt: Schema.optionalKey(Schema.Finite),
+  executions: Schema.mutable(
+    Schema.Array(
+      Schema.Union([
+        Schema.Struct({ kind: Schema.Literal("session"), session: SessionId, startedAt: Schema.Finite }),
+        Schema.Struct({ kind: Schema.Literal("orchestrator"), session: Schema.String, startedAt: Schema.Finite }),
+      ]),
+    ),
+  ),
+});
+
 const issueFields = {
   id: IssueId,
   number: Schema.Finite,
   title: Schema.String,
   description: Schema.String,
   project: Schema.optionalKey(Schema.String),
-  assignee: Schema.optionalKey(Schema.String),
+  assignments: Schema.mutable(Schema.Array(Assignment)),
   priority: Priority,
   rank: Schema.optionalKey(Schema.Finite),
   createdAt: Schema.Finite,
   queuedAt: Schema.optionalKey(Schema.Finite),
-  sessions: Schema.mutable(Schema.Array(SessionId)),
   closedAt: Schema.optionalKey(Schema.Finite),
   delivered: Schema.optionalKey(Delivery),
   canceled: Schema.optionalKey(IssueCanceled),
@@ -771,7 +786,6 @@ const issueFields = {
   moves: Schema.mutable(Schema.Array(IssueStatus)),
   pullRequest: Schema.optionalKey(PullRequest),
   deliver: Deliverable,
-  talk: Schema.optionalKey(Schema.String),
   reviewedAt: Schema.optionalKey(Schema.Finite),
   findings: Schema.mutable(Schema.Array(Finding)),
   questions: Schema.mutable(Schema.Array(Question)),
@@ -780,7 +794,7 @@ const issueFields = {
   refining: Schema.optionalKey(IssueRefining),
   lastRun: Schema.optionalKey(IssueRun),
   answer: Schema.optionalKey(IssueAnswer),
-  attention: IssueAttention,
+  stage: IssueStage,
 };
 
 export const Issue: Codec<T.Issue> = Schema.Struct(issueFields);
@@ -1322,7 +1336,7 @@ export const IssueUpdate: Codec<T.IssueUpdate> = Schema.Struct({
   title: Schema.optionalKey(Schema.String),
   description: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
-  assignee: Schema.optionalKey(Schema.String),
+  agent: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   deliver: Schema.optionalKey(Deliverable),
@@ -1499,7 +1513,7 @@ export const IssueRequest: Codec<T.IssueRequest> = Schema.Struct({
   title: Schema.String,
   description: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
-  assignee: Schema.optionalKey(Schema.String),
+  agent: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
   deliver: Schema.optionalKey(Deliverable),
   requestKey: Schema.optionalKey(Schema.String),
@@ -1510,6 +1524,7 @@ export const RunTriggerKind: Codec<T.RunTriggerKind> = Schema.Literals(T.RunTrig
 export const RunTrigger: Codec<T.RunTrigger> = Schema.Struct({
   kind: RunTriggerKind,
   message: Schema.optionalKey(Schema.String),
+  channel: Schema.optionalKey(Schema.String),
   cron: Schema.optionalKey(Schema.String),
   missed: Schema.optionalKey(Schema.Boolean),
 });
@@ -2037,7 +2052,7 @@ export const IssueSplitRequest: Codec<T.IssueSplitRequest> = Schema.Struct({
 export const IssueStatusRequest: Codec<T.IssueStatusRequest> = Schema.Struct({
   status: IssueStatus,
   text: Schema.optionalKey(Schema.String),
-  assignee: Schema.optionalKey(Schema.String),
+  agent: Schema.optionalKey(Schema.String),
   edit: Schema.optionalKey(IssueUpdate),
   requestKey: Schema.optionalKey(Schema.String),
 });

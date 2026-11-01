@@ -290,7 +290,7 @@ export interface ChannelService {
   /** A message's durable location; the recent state may hold neither the message nor its thread. */
   readonly messageLocation: (id: T.MessageId) => Effect.Effect<{ readonly channel: T.Channel; readonly top: string } | undefined>;
   readonly markRead: (channel: string, seq: number) => Effect.Effect<void, ApiError>;
-  /** The thread of the issue the session works (a talk thread of its own when it works none). */
+  /** Its direct conversation, issue thread, or standalone talk thread. */
   readonly threadOfSession: (session: string) => Effect.Effect<string | undefined>;
   /** The channels the core state holds now. */
   readonly now: () => T.Chat | undefined;
@@ -320,13 +320,10 @@ export interface ChannelService {
   readonly notifyOf: (id: string) => T.Notify;
   /** The owner's direct channel with a profile (a helper's, or an orchestrator's), made if there is none. */
   readonly openDirect: (agent: { readonly id: string; readonly name: string }) => Effect.Effect<string>;
-  /** An orchestrator's direct channel with the owner; "" when it has none yet. */
-  readonly orchestratorDirect: (agent: string) => string;
+  readonly direct: (agent: string) => Effect.Effect<string, ApiError>;
   /** The orchestrator a place is looked after by: a channel's own, its thread's channel's, a direct channel's peer when
    * that is an orchestrator, else the default one. */
   readonly orchestratorOf: (channel: string) => string;
-  /** A profile's direct channel is its talk issue's thread from now on. */
-  readonly linkTalk: (channel: string, issue: string) => Effect.Effect<void>;
   /** The newest messages of a channel, oldest first, as an agent reads them. */
   readonly recent: (channel: string, n: number) => Effect.Effect<InboxMessage[]>;
   readonly markUnread: (channel: string, number: number) => Effect.Effect<void, ApiError>;

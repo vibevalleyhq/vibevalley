@@ -49,7 +49,7 @@ export const useIssueChanges = (id: () => string, shown: () => boolean = () => t
 /** The issue's timeline, read again as it moves on: where it stands, its helper's rounds, the findings it was sent back with. */
 export const useIssueTimeline = (issue: () => Issue, rounds: () => number) =>
   useQuery(() => ({
-    queryKey: ["issues", "timeline", issue().id, issue().attention.state, rounds(), issue().findings.length],
+    queryKey: ["issues", "timeline", issue().id, issue().stage.state, rounds(), issue().findings.length],
     queryFn: () => api.issue.timeline.get({ id: issue().id }),
     placeholderData: <T>(prev: T) => prev,
   }));

@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "vite-plus/test";
 
-import type { Issue, IssueAct, IssueAction, IssueAttention, StateFrame, SessionView } from "@vibevalley/protocol";
+import type { Issue, IssueAct, IssueAction, IssueStage, StateFrame, SessionView } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { farmCommands } from "./commands";
@@ -48,7 +48,7 @@ const helper: SessionView = {
   play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
 };
 
-function frame(attention: IssueAttention, session: SessionView = helper): StateFrame {
+function frame(stage: IssueStage, session: SessionView = helper): StateFrame {
   const issue: Issue = {
     id: issueId("clock"),
     number: 1,
@@ -56,7 +56,9 @@ function frame(attention: IssueAttention, session: SessionView = helper): StateF
     priority: "medium",
     deliver: "change",
     createdAt: 0,
-    sessions: [session.id],
+    assignments: [
+      { id: "a1", issue: issueId("clock"), agent: session.agent, assignedAt: 0, executions: [{ kind: "session", session: session.id, startedAt: 0 }] },
+    ],
     status: "in_review",
     moves: [],
     findings: [],
@@ -65,7 +67,7 @@ function frame(attention: IssueAttention, session: SessionView = helper): StateF
     blockedBy: [],
     criteria: [],
     checks: [],
-    attention,
+    stage,
   };
   return {
     seq: 0,
@@ -85,7 +87,7 @@ const aim = (f: StateFrame, tool: Tool) => {
 test("a crop is harvested exactly when the issue offers completing it", () => {
   const f = frame({ state: "asking", lead: "answer", acts: buttons("answer", "close") });
   expect(aim(f, "harvest").aim.ok).toBe(false);
-  f.state.issues[0]!.attention = { state: "reviewing", lead: "complete", acts: buttons("complete", "tell", "close") };
+  f.state.issues[0]!.stage = { state: "reviewing", lead: "complete", acts: buttons("complete", "tell", "close") };
   expect(aim(f, "harvest").aim.ok).toBe(true);
 });
 
@@ -114,6 +116,6 @@ test("a click is refused when the issue stops allowing its action after aiming",
   farm.hold("harvest");
   const commands = farmCommands(() => f);
   const pointed = commands.aim(beds[0]!);
-  f.state.issues[0]!.attention = { state: "asking", acts: buttons("answer", "close") };
+  f.state.issues[0]!.stage = { state: "asking", acts: buttons("answer", "close") };
   expect((await commands.act(pointed)).kind).toBe("refused");
 });

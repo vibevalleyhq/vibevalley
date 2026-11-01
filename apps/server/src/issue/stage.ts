@@ -1,4 +1,5 @@
 import type * as T from "@vibevalley/protocol";
+import { executionsOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { sessionOf } from "@/session/roster.ts";
 const move = (act: T.IssueAct, status: T.IssueStatus, words: T.ActWords = "none"): T.IssueAction => ({ act, does: "move", status, words });
@@ -7,17 +8,15 @@ const stop: T.IssueAction = { act: "stop", does: "stop" };
 const close = move("close", "canceled");
 
 /** session is the issue's newest one, undefined while none is on the farm. A task graph's issues stand with the graph: the owner acts on them there. */
-export function attentionOf(t: T.Issue, session: T.Session | undefined): T.IssueAttention {
+export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.IssueStage {
   const followed = t.graph !== undefined || t.task !== undefined || t.parent !== undefined || session?.graph !== undefined;
-  const own = (s: T.IssueAttention): T.IssueAttention => (followed ? { state: s.state, ...at(s.since), ...(s.stuck ? { stuck: s.stuck } : {}), acts: [] } : s);
+  const own = (s: T.IssueStage): T.IssueStage => (followed ? { state: s.state, ...at(s.since), ...(s.stuck ? { stuck: s.stuck } : {}), acts: [] } : s);
   const last = session?.lastRun;
-  // A profile's talk asks nothing of the owner: its words are in its channel, and it has no buttons.
-  if (t.talk) return { state: session?.phase._tag === "working" ? "working" : "done", acts: [] };
   // Completing follows what the issue delivers, not who did the work: an answer is taken (知道了), a change completed
   // (merged, or kept on its branch).
   const finish = move(t.deliver === "answer" ? "acknowledge" : "complete", "done");
   // Sent before, it is taken up again with what to do this time; never sent, it goes back to the backlog.
-  const sent = t.sessions.length > 0 || t.lastRun !== undefined;
+  const sent = executionsOf(t).length > 0 || t.lastRun !== undefined;
   const reopen = sent ? move("reopen", "todo", "required") : move("reopen", "backlog");
   switch (t.status) {
     case "done":
@@ -78,7 +77,7 @@ export function attentionOf(t: T.Issue, session: T.Session | undefined): T.Issue
 
 const at = (since: number | undefined) => (since !== undefined ? { since } : {});
 
-export function attentionIn(t: T.Issue, state: T.WorkspaceState): T.IssueAttention {
-  const last = t.sessions.at(-1);
-  return attentionOf(t, last === undefined ? undefined : sessionOf(state, last));
+export function issueStageIn(t: T.Issue, state: T.WorkspaceState): T.IssueStage {
+  const last = latestSessionIdOf(t);
+  return issueStageOf(t, last === undefined ? undefined : sessionOf(state, last));
 }

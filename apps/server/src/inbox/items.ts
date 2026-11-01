@@ -5,7 +5,7 @@
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { needOf, omitUndefined, cut, oneLine, slice } from "@vibevalley/protocol/rules";
+import { latestSessionIdOf, needOf, omitUndefined, cut, oneLine, slice } from "@vibevalley/protocol/rules";
 
 import { clip } from "@/base/clip.ts";
 import { defaultOf } from "@/channel/folded.ts";
@@ -185,10 +185,10 @@ type Want =
   | { readonly kind: "review" | "fix" | "interrupted" | "conflict" }
   | { readonly kind: "quiet"; readonly since: number };
 
-/** What a session questions of the owner. Its issue's attention says it, the one the issue page and the phone both read; a
+/** What a session questions of the owner. Its issue's stage says it, the one the issue page and the phone both read; a
  * session whose issue the state does not hold says it by its phase. */
 function wantOf(h: T.Session, state: T.WorkspaceState): Want | undefined {
-  const issue = h.issue === undefined ? undefined : state.issues.find((item) => item.id === h.issue && item.sessions.at(-1) === h.id);
+  const issue = h.issue === undefined ? undefined : state.issues.find((item) => item.id === h.issue && latestSessionIdOf(item) === h.id);
   if (!issue) {
     const need = needOf(h);
     switch (need?.kind) {
@@ -205,7 +205,7 @@ function wantOf(h: T.Session, state: T.WorkspaceState): Want | undefined {
         return { kind: "quiet", since: need.since };
     }
   }
-  const st = issue.attention;
+  const st = issue.stage;
   switch (st.state) {
     case "asking":
       return { kind: "ask", questions: issue.questions };

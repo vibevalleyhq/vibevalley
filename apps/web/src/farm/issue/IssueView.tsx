@@ -1,4 +1,4 @@
-// Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/overview.ts.
+// Where it stands and what may be done is the server's Issue.stage, worded by src/features/issue/overview.ts.
 
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, Errored, For, Loading, Show, untrack } from "solid-js";
@@ -15,7 +15,7 @@ import {
   type IssueAct,
   type Session,
 } from "@vibevalley/protocol";
-import { isOneOf } from "@vibevalley/protocol/rules";
+import { isOneOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { tookText, wallClockText } from "@/base/format";
 import { aria, useNow } from "@/base/util";
@@ -173,7 +173,7 @@ function IssueBody(props: {
     () => true,
   );
   const agent = useAgent(() => s().head.agent);
-  const state = () => s().attention.state;
+  const state = () => s().stage.state;
 
   const delivers = useIntents(issueDeliver);
   const deliver = () => shownDeliver(props.issue.id, props.issue.deliver, delivers.list());
@@ -193,7 +193,7 @@ function IssueBody(props: {
   /** The block asks for the lead and its own others; the rest go in the row at the bottom. */
   const blockActs = () => (s().ask ? s().others.filter((a) => a !== "close" && a !== "stop") : []);
   const rowActs = () => {
-    const all = s().attention.acts.map((a) => a.act);
+    const all = s().stage.acts.map((a) => a.act);
     return s().ask ? all.filter((a) => a === "close" || a === "stop") : all;
   };
   const boxShown = () => state() === "asking" || state() === "canceled" || box() !== undefined;
@@ -213,10 +213,10 @@ function IssueBody(props: {
         </div>
         <p
           class="mt-1 text-[13px]"
-          style={{ color: s().attention.state === "stuck" ? tones.berry : "#5a3d26" }}
+          style={{ color: s().stage.state === "stuck" ? tones.berry : "#5a3d26" }}
           aria-label={t("web.farm.plot.now")}
           data-testid="issue-now"
-          data-state={s().attention.state}
+          data-state={s().stage.state}
         >
           {s().statusLine(now(), timeline()?.spent?.cny)}
         </p>
@@ -410,7 +410,7 @@ function IssueBody(props: {
             </Show>
           </Fold>
           <Fold label={t("web.farm.plot.runs")}>
-            <Runs issue={props.issue.id} version={`${props.issue.sessions.length}:${s().head.runs}:${s().head.phase._tag}`} />
+            <Runs issue={props.issue.id} version={`${sessionIdsOf(props.issue).length}:${s().head.runs}:${s().head.phase._tag}`} />
           </Fold>
           <Fold label={t("web.farm.plot.details")}>
             <div class="flex flex-col">

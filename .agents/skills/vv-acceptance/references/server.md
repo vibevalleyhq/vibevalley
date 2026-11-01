@@ -38,7 +38,7 @@
    vpx scripts/verify-server.ts --scripted-helper -- sh -c '
      vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
      set -e
-     vv issue create --json "{\"title\":\"写打卡并提交\",\"project\":\"clock\",\"assignee\":\"docs\"}"
+     vv issue create --json "{\"title\":\"写打卡并提交\",\"project\":\"clock\",\"agent\":\"docs\"}"
      vv issue work 1
      vv issue status update 1 --dry-run --json "{\"status\":\"done\"}"
      vv issue status update 1 --json "{\"status\":\"done\"}"

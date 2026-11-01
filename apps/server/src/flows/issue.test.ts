@@ -7,7 +7,7 @@ import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
 import type * as T from "@vibevalley/protocol";
-import { isBusy } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, isBusy, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
@@ -116,7 +116,7 @@ describe("an issue", () => {
       const again = yield* issues.reopen(session.id, "打卡还要记下时区", "");
       yield* w.nextReport;
       const issue = yield* issues.get(again);
-      expect([issue.id, issue.sessions, issue.delivered, issue.canceled, issue.closedAt]).toEqual([
+      expect([issue.id, sessionIdsOf(issue), issue.delivered, issue.canceled, issue.closedAt]).toEqual([
         session.issue,
         [session.id, again],
         undefined,
@@ -142,7 +142,7 @@ describe("an issue", () => {
       const issues = yield* Issue;
       const me = { ...lab(), workdir: "board" };
       yield* (yield* Agent).save(me);
-      const issue = yield* issues.add({ title: "看看", assignee: me.id });
+      const issue = yield* issues.add({ title: "看看", agent: me.id });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
       expect((yield* issues.get(issue.id)).project ?? "").toBe("");
@@ -167,19 +167,22 @@ describe("an issue", () => {
       const inState = (id: string) => core.state().issues.find((x) => x.id === id);
       expect(inState(issue.id)?.title).toBe("写打卡并提交");
       refusedWith(yield* Effect.flip(issues.start(issue.id, "")));
-      issue = yield* issues.edit(issue.id, { project: "backlog", assignee: "lab" }, owner);
-      expect([issue.project, issue.assignee]).toEqual(["backlog", "lab"]);
+      issue = yield* issues.edit(issue.id, { project: "backlog", agent: "lab" }, owner);
+      expect([issue.project, assignedAgentOf(issue)]).toEqual(["backlog", "lab"]);
       const got = yield* issues.start(issue.id, "");
       expect(got.session).toBeDefined();
       yield* w.nextReport;
       expect((yield* sessions.get(got.session!))!.brief).toBe("写打卡并提交");
       const started = yield* issues.get(issue.id);
-      expect([started.sessions, started.status]).toEqual([[got.session], "in_review"]);
-      yield* until(() => inState(issue.id)?.sessions.length === 1 && inState(issue.id)?.status === "in_review", "the core state follows its run");
+      expect([sessionIdsOf(started), started.status]).toEqual([[got.session], "in_review"]);
+      yield* until(() => {
+        const current = inState(issue.id);
+        return current !== undefined && executionsOf(current).length === 1 && current.status === "in_review";
+      }, "the core state follows its run");
       refusedWith(yield* Effect.flip(issues.start(issue.id, "")));
       refusedWith(yield* Effect.flip(issues.edit(issue.id, { title: "改不了了" }, owner)));
 
-      const unsent = (all: T.Issue[]) => all.filter((i) => i.sessions.length === 0).map((i) => i.title);
+      const unsent = (all: T.Issue[]) => all.filter((i) => executionsOf(i).length === 0).map((i) => i.title);
       const a = yield* issues.add({ title: "一" });
       const b = yield* issues.add({ title: "二", priority: "urgent" });
       const c = yield* issues.add({ title: "三" });
@@ -218,7 +221,7 @@ describe("an issue", () => {
           refining: false,
         } as T.Session,
       });
-      const issue = yield* issues.add({ title: "等空位的活", project: "queue", assignee: "lab" });
+      const issue = yield* issues.add({ title: "等空位的活", project: "queue", agent: "lab" });
       const got = yield* issues.start(issue.id, "");
       expect(got.session).toBeUndefined();
       expect(got.queued).toContain("排上队了");
@@ -273,16 +276,16 @@ describe("an issue", () => {
       );
       const due = () => Effect.andThen(TestClock.adjust(5 * 60_000 + 1), crons.tick);
       const ofCron = () => Effect.map(issues.ofCron(made.id), (i) => i!);
-      const runs = () => Effect.flatMap(ofCron(), (i) => sessions.runs(i.id));
+      const runs = () => Effect.flatMap(ofCron(), (i) => sessions.issueRuns(i.id));
       yield* due();
       yield* w.nextReport;
       const first = yield* ofCron();
-      expect(first.sessions).toHaveLength(1);
+      expect(sessionIdsOf(first)).toHaveLength(1);
 
       yield* due();
       yield* w.nextReport;
       expect((yield* ofCron()).id).toBe(first.id);
-      expect((yield* ofCron()).sessions).toHaveLength(1);
+      expect(sessionIdsOf(yield* ofCron())).toHaveLength(1);
       const two = yield* await_(runs, (r) => r.length === 2 && r[1]!.endedAt !== undefined, "a second run");
       expect(two[1]!.triggeredBy.kind).toBe("cron");
 
@@ -291,7 +294,7 @@ describe("an issue", () => {
       yield* due();
       yield* w.nextReport;
       expect((yield* ofCron()).id).toBe(first.id);
-      expect((yield* ofCron()).sessions).toHaveLength(2);
+      expect(sessionIdsOf(yield* ofCron())).toHaveLength(2);
       const three = yield* await_(runs, (r) => r.length === 3, "a third run");
       expect(three[2]!.triggeredBy.kind).toBe("cron");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -305,13 +308,19 @@ describe("an issue", () => {
         title: "写打卡",
         description: "每天一次",
         project: "demo",
-        assignee: "lab",
+        agent: "lab",
         priority: "high",
       });
       issue = yield* issues.edit(issue.id, { title: "写打卡并提交" }, owner);
-      expect([issue.title, issue.description, issue.project, issue.assignee, issue.priority]).toEqual(["写打卡并提交", "每天一次", "demo", "lab", "high"]);
+      expect([issue.title, issue.description, issue.project, assignedAgentOf(issue), issue.priority]).toEqual([
+        "写打卡并提交",
+        "每天一次",
+        "demo",
+        "lab",
+        "high",
+      ]);
       issue = yield* issues.edit(issue.id, { project: "" }, owner);
-      expect([issue.project, issue.assignee]).toEqual([undefined, "lab"]);
+      expect([issue.project, assignedAgentOf(issue)]).toEqual([undefined, "lab"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -323,7 +332,7 @@ describe("an issue", () => {
       const issues = yield* Issue;
       yield* (yield* Agent).save(lab());
       const move = (id: string, to: T.Issue["status"], text = "") => issues.setStatus(id, to, text, "", owner);
-      let issue = yield* issues.add({ title: "写打卡并提交", project: "clock", assignee: "lab" });
+      let issue = yield* issues.add({ title: "写打卡并提交", project: "clock", agent: "lab" });
       expect(issue.moves).toEqual(["todo", "canceled"]);
       refusedWith(yield* Effect.flip(move(issue.id, "in_progress")));
       issue = yield* move(issue.id, "todo");
@@ -384,7 +393,7 @@ describe("an issue", () => {
       const issue = yield* issues.add({
         title: "写打卡并提交",
         project: "resume",
-        assignee: "lab",
+        agent: "lab",
       });
       const sent = yield* issues.start(issue.id, "");
       yield* w.nextReport;
@@ -423,28 +432,42 @@ describe("an issue", () => {
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
       yield* (yield* Agent).save(lab());
-      const drop = yield* issues.add({ title: "先放着", project: "acts", assignee: "lab" });
+      const drop = yield* issues.add({ title: "先放着", project: "acts", agent: "lab" });
       const dropped = yield* issues.setStatus(drop.id, "canceled", "", "", owner);
-      expect([dropped.status, dropped.attention.acts]).toEqual(["canceled", [{ act: "reopen", does: "move", status: "backlog", words: "none" }]]);
+      expect([dropped.status, dropped.stage.acts]).toEqual(["canceled", [{ act: "reopen", does: "move", status: "backlog", words: "none" }]]);
       // Never sent: a reopen is back to the backlog, with nothing to tell.
       expect((yield* issues.setStatus("#" + drop.number, "backlog", "", "", owner)).status).toBe("backlog");
 
-      const issue = yield* issues.add({ title: "这一单必败", project: "acts", assignee: "lab" });
+      const issue = yield* issues.add({ title: "这一单必败", project: "acts", agent: "lab" });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
       yield* await_(
         () => issues.get(issue.id),
-        (i) => i.attention.stuck === "failed",
+        (i) => i.stage.stuck === "failed",
         "stuck: failed",
       );
       refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");
-      expect((yield* issues.get(issue.id)).attention.acts[0]).toEqual({ act: "cure", does: "move", status: "todo", words: "none" });
+      expect((yield* issues.get(issue.id)).stage.acts[0]).toEqual({ act: "cure", does: "move", status: "todo", words: "none" });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
-      const thread = (yield* chat.threadOfSession((yield* issues.get(issue.id)).sessions.at(-1)!))!;
+      const running = latestSessionIdOf(yield* issues.get(issue.id));
+      if (running === undefined) throw new Error("the issue has no execution session");
+      const thread = (yield* chat.threadOfSession(running))!;
       yield* until(
         () => saidIn(thread).some((m) => m.from === "owner" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
         "the cure said once, by the server",
       );
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("regression: a dry run reads an unsaved agent through an Assignment", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const issues = yield* Issue;
+      yield* (yield* Agent).save(lab());
+      const issue = yield* issues.add({ title: "先选人再开工" });
+      const preview = yield* issues.previewStatus(issue.id, "todo", "", {}, { agent: "lab" });
+      expect(preview.does.join("\n")).toContain(lab().name);
+      expect((yield* issues.get(issue.id)).assignments).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -494,7 +517,7 @@ describe("an issue", () => {
       const asked = yield* issues.add({
         title: "查一下打卡为什么慢，顺手提交",
         project: "clock",
-        assignee: "lab",
+        agent: "lab",
         deliver: "answer",
       });
       expect(asked.deliver).toBe("answer");
@@ -502,7 +525,7 @@ describe("an issue", () => {
       yield* w.nextReport;
       const answered = yield* await_(
         () => issues.get(asked.id),
-        (i) => i.answer !== undefined && i.attention.state === "reviewing",
+        (i) => i.answer !== undefined && i.stage.state === "reviewing",
         "its conclusion",
       );
       expect(answered.answer).toEqual({
@@ -511,7 +534,7 @@ describe("an issue", () => {
         unsure: [],
         next: ["把配置读一次缓存起来"],
       });
-      expect(answered.attention.acts.map((a) => a.act)).toEqual(["acknowledge", "reject", "tell", "close"]);
+      expect(answered.stage.acts.map((a) => a.act)).toEqual(["acknowledge", "reject", "tell", "close"]);
       const branch = `vibevalley/issue-${answered.number}`;
       yield* until(() => git(project, "rev-parse", branch) === git(project, "rev-parse", "main"), "what it committed gone");
       yield* issues.setStatus(asked.id, "done", "", "", owner);
@@ -525,20 +548,22 @@ describe("an issue", () => {
       const garbled = yield* issues.add({
         title: "查一下 乱写",
         project: "clock",
-        assignee: "lab",
+        agent: "lab",
         deliver: "answer",
       });
       yield* issues.setStatus(garbled.id, "todo", "", "", owner);
       yield* w.nextReport;
       const stuck = yield* await_(
         () => issues.get(garbled.id),
-        (i) => i.attention.stuck === "failed",
+        (i) => i.stage.stuck === "failed",
         "stuck: no answer read",
       );
       expect([stuck.answer, stuck.moves]).toEqual([undefined, ["todo", "canceled"]]);
       refusedWith(yield* Effect.flip(issues.setStatus(garbled.id, "done", "", "", owner)), "这一轮没做成");
       yield* issues.setStatus(garbled.id, "todo", "", "", owner);
-      const thread = (yield* chat.threadOfSession(stuck.sessions.at(-1)!))!;
+      const running = latestSessionIdOf(stuck);
+      if (running === undefined) throw new Error("the issue has no execution session");
+      const thread = (yield* chat.threadOfSession(running))!;
       yield* until(
         () => saidIn(thread).some((m) => m.from === "owner" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没找到结论")),
         "what was wrong with it, said",
@@ -546,7 +571,7 @@ describe("an issue", () => {
       yield* w.nextReport;
       yield* await_(
         () => issues.get(garbled.id),
-        (i) => i.answer !== undefined && i.attention.state === "reviewing",
+        (i) => i.answer !== undefined && i.stage.state === "reviewing",
         "answered the second time",
       );
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -559,12 +584,12 @@ describe("an issue", () => {
       const w = yield* watch;
       const issues = yield* Issue;
       yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({ title: "这一单必败", project: "fails", assignee: "lab" });
+      const issue = yield* issues.add({ title: "这一单必败", project: "fails", agent: "lab" });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
       const failed = yield* await_(
         () => issues.get(issue.id),
-        (i) => i.attention.stuck === "failed",
+        (i) => i.stage.stuck === "failed",
         "stuck: failed",
       );
       expect(failed.status).toBe("in_review");
@@ -586,7 +611,7 @@ describe("an issue", () => {
       let issue = yield* issues.add({
         title: "先问清楚，再写打卡并提交",
         project: "clock",
-        assignee: "lab",
+        agent: "lab",
       });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;

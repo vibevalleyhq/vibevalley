@@ -14,7 +14,7 @@ export const modules: readonly Module[] = [
   { name: "Platform", parts: ["base", "infra", "core", "setting", "errors.ts", "words.ts", "prompts.ts"] },
   { name: "Agents", parts: ["agent", "runtime", "memory"] },
   { name: "Source Control", parts: ["project"] },
-  { name: "Agent Sessions", parts: ["session"] },
+  { name: "Agent Sessions", parts: ["executor", "session"] },
   { name: "Collaboration", parts: ["channel", "artifact"] },
   { name: "Issues", parts: ["issue", "task", "cron"] },
   { name: "Inbox", parts: ["inbox"] },

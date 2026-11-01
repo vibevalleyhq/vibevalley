@@ -1,5 +1,6 @@
 import { maybe, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { executionsOf } from "@vibevalley/protocol/rules";
 
 import type { WrittenKind, WrittenTemplate } from "@/agent/seed.ts";
 
@@ -14,7 +15,7 @@ export function sentTitles(all: readonly T.Issue[], project: string, orchestrato
     .filter(
       (i) =>
         i.project === project &&
-        i.sessions.length > 0 &&
+        executionsOf(i).length > 0 &&
         !i.graph &&
         !i.task &&
         i.parent === undefined &&

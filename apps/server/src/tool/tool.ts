@@ -35,7 +35,7 @@ export class Tool extends Context.Service<
   );
 }
 
-const named = ["id", "agent", "assignee", "session", "project", "name", "title", "text", "note", "goal"];
+const named = ["id", "agent", "session", "project", "name", "title", "text", "note", "goal"];
 
 export function toolStart(name: string, args: unknown): ToolStart {
   let about = "";

@@ -43,6 +43,16 @@ where m.channel_id = sqlc.arg(channel_id) and m.number < sqlc.arg(number) order 
 select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.channel_id = sqlc.arg(channel_id) and m.number > sqlc.arg(number) order by m.number limit sqlc.arg(n)::int;
 
+-- name: MissingDirectDeliveries :many
+-- bound: owner messages committed after a direct session's startup snapshot, without a delivery to that session.
+select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,
+       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent
+from channel_message m join channel_participant p on p.id = m.sender_id
+where m.channel_id = sqlc.arg(channel_id) and m.number > sqlc.arg(after_number)
+  and m.sender_id = 'owner' and m.kind = 'chat' and m.deleted_at is null
+  and not exists (select 1 from channel_delivery d where d.recipient_id = sqlc.arg(recipient_id) and d.message_id = m.id)
+order by m.number;
+
 -- name: RecentReports :many
 -- Newest first: the turn reports anywhere on the farm, for its log.
 select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id

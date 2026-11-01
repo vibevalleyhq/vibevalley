@@ -3,6 +3,7 @@ import { Effect, Predicate, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type * as T from "@vibevalley/protocol";
+import { assignedAgentOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
@@ -14,6 +15,7 @@ import { Issue } from "@/issue/issue.ts";
 import { MergeFailure, type Workplace } from "@/project/shapes.ts";
 import { chooseAgent } from "@/runtime/fit.ts";
 import { type Hired, type HireOptions, type Roster, NotTakenIn, type Session } from "@/session/session.ts";
+import type { Delivered } from "@/session/shapes.ts";
 import { notTakenIn } from "@/session/takeIn.ts";
 import { sampleAgent } from "@/testing/agents.ts";
 import { testConfig } from "@/testing/layers.ts";
@@ -148,13 +150,13 @@ class FakeWork implements TaskWork {
     });
   };
 
-  tell = (id: string, text: string): Effect.Effect<string> => {
+  deliver = (id: string, text: string): Effect.Effect<Delivered> => {
     const self = this;
     return Effect.gen(function* () {
       self.told.set(id, [...(self.told.get(id) ?? []), text]);
       yield* self.core.apply({ type: "run", id: sessionId(id) });
       void self.run(id, text);
-      return "说了";
+      return { kind: "run" as const };
     });
   };
 
@@ -382,6 +384,56 @@ describe("task graphs", () => {
     ),
   );
 
+  it.live("regression: a refused manual retry leaves the step failed and returns the delivery refusal", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const id = yield* f.split("有坏步", "shaky");
+        yield* f.until(id, (g) => g.state === "draft");
+        yield* f.tasks.act(id, "start", owner);
+        const stuck = yield* f.until(id, (g) => state(g, "boom") === "failed" && state(g, "flaky") === "merged");
+        const before = taskOf(stuck, "boom")!;
+        const attempts = f.work.attempts.get("boom");
+        f.work.deliver = () => Effect.succeed({ kind: "refused", reason: "delivery rejected" });
+        expect(yield* Effect.flip(f.tasks.taskAct(id, "boom", "retry", owner))).toMatchObject({
+          _tag: "Refused",
+          reason: "delivery rejected",
+        });
+        expect(taskOf(yield* f.tasks.graph(id), "boom")).toEqual({ ...before, conclusion: "delivery rejected" });
+        expect(f.work.attempts.get("boom")).toBe(attempts);
+        expect((yield* f.tasks.events(id)).at(-1)).toMatchObject({ kind: "task_failed", task: "boom", detail: "delivery rejected" });
+      }),
+    ),
+  );
+
+  it.live("regression: a refused automatic retry fails the step instead of leaving it working", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const id = yield* f.split("有坏步", "shaky");
+        yield* f.until(id, (g) => g.state === "draft");
+        f.work.deliver = () => Effect.succeed({ kind: "refused", reason: "delivery rejected" });
+        yield* f.tasks.act(id, "start", owner);
+        const stuck = yield* f.until(id, (g) => state(g, "boom") === "failed" && state(g, "flaky") === "failed");
+        expect(taskOf(stuck, "boom")).toMatchObject({ state: "failed", tries: 1, conclusion: "delivery rejected" });
+        expect(taskOf(stuck, "flaky")).toMatchObject({ state: "failed", tries: 1, conclusion: "delivery rejected" });
+        expect(f.work.attempts.get("boom")).toBe(1);
+        expect(f.work.attempts.get("flaky")).toBe(1);
+        expect(f.news.some((news) => news.includes("delivery rejected"))).toBe(true);
+      }),
+    ),
+  );
+
+  it.live("regression: a refused splitter retry abandons the task graph with its reason", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        f.work.deliver = () => Effect.succeed({ kind: "refused", reason: "delivery rejected" });
+        const id = yield* f.split("先给个圈", "circle");
+        const graph = yield* f.until(id, (g) => g.state === "abandoned");
+        expect(graph.note).toBe("delivery rejected");
+        expect(f.news.some((news) => news.includes("delivery rejected"))).toBe(true);
+      }),
+    ),
+  );
+
   it.live("a task graph with a problem is sent back once", () =>
     run((f) =>
       Effect.gen(function* () {
@@ -471,7 +523,7 @@ describe("task graphs", () => {
         const id = yield* f.split("菱形", "diamond");
         yield* f.until(id, (g) => g.state === "draft");
         const parent = yield* f.issues.get(id);
-        expect([parent.graph !== undefined, parent.title, parent.sessions.length, parent.status]).toEqual([true, "菱形", 1, "in_review"]);
+        expect([parent.graph !== undefined, parent.title, sessionIdsOf(parent).length, parent.status]).toEqual([true, "菱形", 1, "in_review"]);
         const d = yield* f.issues.get(taskIssueID(id, "d"));
         expect([d.parent, d.blockedBy, d.status]).toEqual([id, [id + ".b", id + ".c"], "backlog"]);
         expect((yield* Effect.flip(f.issues.edit(d.id, { title: "改" }, owner)))._tag).toBe("Refused");
@@ -479,8 +531,10 @@ describe("task graphs", () => {
         yield* f.tasks.act(id, "start", owner);
         yield* f.until(id, (g) => g.state === "ready");
         const a = yield* f.issues.get(taskIssueID(id, "a"));
-        expect([a.sessions.length, a.delivered]).toEqual([1, "merged_into_parent"]);
-        expect((yield* f.issues.get(a.sessions[0]!)).id).toBe(a.id);
+        expect([sessionIdsOf(a).length, a.delivered]).toEqual([1, "merged_into_parent"]);
+        const session = sessionIdsOf(a)[0];
+        if (session === undefined) throw new Error("the task issue has no execution session");
+        expect((yield* f.issues.get(session)).id).toBe(a.id);
         expect((yield* Effect.flip(f.issues.reopen(a.id, "", "")))._tag).toBe("Refused");
         yield* f.tasks.act(id, "merge", owner);
         yield* waitFor(f.issues.get(id), (i) => i.delivered === "merged", "the graph's issue closed as merged");
@@ -491,7 +545,7 @@ describe("task graphs", () => {
   it.live("a helper splits its issue, and its steps start at once", () =>
     run((f) =>
       Effect.gen(function* () {
-        const issue = yield* f.issues.add({ title: "整个看板重做", description: "像 Linear 那样", project: "board", assignee: "lab" });
+        const issue = yield* f.issues.add({ title: "整个看板重做", description: "像 Linear 那样", project: "board", agent: "lab" });
         yield* f.issues.edit(issue.id, { criteria: ["卡片紧凑"] }, owner);
         const helper = {
           id: "h1",
@@ -520,7 +574,7 @@ describe("task graphs", () => {
         expect([graph.title, graph.goal, graph.project]).toEqual(["整个看板重做", "像 Linear 那样", "board"]);
         expect(f.git.from.get(graph.branch!)).toBe("vibevalley/issue-1");
         const parent = yield* f.issues.get(issue.id);
-        expect([parent.number, parent.assignee, parent.criteria, parent.sessions[0]]).toEqual([issue.number, "lab", ["卡片紧凑"], "h1"]);
+        expect([parent.number, assignedAgentOf(parent), parent.criteria, sessionIdsOf(parent)[0]]).toEqual([issue.number, "lab", ["卡片紧凑"], "h1"]);
         expect((yield* f.issues.get(taskIssueID(issue.id, "c"))).parent).toBe(issue.id);
         expect((yield* Effect.exit(f.tasks.splitIssue("h1", "", steps)))._tag).toBe("Failure");
         yield* f.core.apply({ type: "report", questions: [], checks: [], id: sessionId("h1"), outcome: "completed", summary: "拆成了三步", runs: 1 });

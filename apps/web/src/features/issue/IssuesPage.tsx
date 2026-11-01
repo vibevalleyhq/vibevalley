@@ -3,7 +3,7 @@ import { createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-
 
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, Session } from "@vibevalley/protocol";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, omitUndefined } from "@vibevalley/protocol/rules";
 
 import { variant } from "@/base/util";
 import { useOrchestrators } from "@/infra/agents";
@@ -90,7 +90,7 @@ export function IssuesPage(props: { rest: string }) {
     if (c.kind === "todo" && to === "todo") return place(c, undefined);
     const move = cardMove(c, to);
     if (move === "start" && c.kind === "todo") {
-      if (!c.issue.assignee || !c.issue.project) {
+      if (!assignedAgentOf(c.issue) || !c.issue.project) {
         open(c.id);
         toast(t("web.issue.page.pickFirst"));
         return;
@@ -229,7 +229,7 @@ function Detail(props: {
   };
   const taskIssuesOf = (graph: string) => {
     const got: Record<string, string> = {};
-    for (const r of props.rows) if (r.issue.parent === graph && r.issue.task && r.issue.sessions.length > 0) got[r.issue.task.key] = r.issue.id;
+    for (const r of props.rows) if (r.issue.parent === graph && r.issue.task && executionsOf(r.issue).length > 0) got[r.issue.task.key] = r.issue.id;
     return got;
   };
   return (

@@ -11,6 +11,7 @@ import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing
 import type { Message } from "@vibevalley/ai/messages";
 import { type Answer, answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
+import { executionsOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
@@ -67,7 +68,7 @@ const respond = (c: Request): Answer => {
     return answer([
       toolCall(
         "issue_create",
-        want.includes("CHANGELOG") ? { title: want, project: "notes", assignee: "lab", start: true } : { title: want, project: "demo", start: true },
+        want.includes("CHANGELOG") ? { title: want, project: "notes", agent: "lab", start: true } : { title: want, project: "demo", start: true },
       ),
     ]);
   if (lastLine(c).includes("定时任务")) return answer("到点了，看了一眼");
@@ -185,7 +186,6 @@ describe("the orchestrator", () => {
     const f = farm(respond, config);
     return Effect.gen(function* () {
       const agents = yield* Agent;
-      const issues = yield* Issue;
       const orchestrator = yield* Orchestrator;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
@@ -193,8 +193,8 @@ describe("the orchestrator", () => {
       const from = (channel: string, who: string) => saidIn(channel).filter((m) => m.from === who && m.kind === "chat");
       const asked = (text: string) => f.requests.filter((c) => lastLine(c).includes(text));
 
-      const direct = yield* issues.talkWith(lead.name);
-      expect(direct).not.toBe(chat.orchestratorDirect(defaultOrchestrator));
+      const direct = yield* chat.direct(lead.name);
+      expect(direct).not.toBe(chat.defaultChannel());
       yield* orchestrator.say("私下问你", {}, direct, "");
       expect((yield* until(() => from(direct, lead.id)[0], "its answer in its direct channel")).name).toBe("阿青");
       expect(asked("私下问你")[0]!.system).toContain("你是管家「阿青」");
@@ -458,7 +458,7 @@ describe("the orchestrator", () => {
       const result = answeredWith(c);
       if (result !== undefined) return answer("工单：" + result);
       const line = lastLine(c);
-      if (line.includes("记一下")) return answer([toolCall("issue_create", { title: "首页偶尔白屏", project: "demo", assignee: "lab" })]);
+      if (line.includes("记一下")) return answer([toolCall("issue_create", { title: "首页偶尔白屏", project: "demo", agent: "lab" })]);
       if (line.includes("开工")) return answer([toolCall("issue_status_update", { id: "#" + number, status: "待办" })]);
       if (line.includes("在等我")) return answer([toolCall("issue_list", { wantsOwner: true })]);
       return respond(c);
@@ -473,7 +473,7 @@ describe("the orchestrator", () => {
       const issue = (yield* issues.list()).find((t) => t.title === "首页偶尔白屏")!;
       number = issue.number;
       expect(noted).toBe(`工单：记下了：#${number}「首页偶尔白屏」，在备选里，没开工`);
-      expect([issue.status, issue.sessions]).toEqual(["backlog", []]);
+      expect([issue.status, executionsOf(issue)]).toEqual(["backlog", []]);
       yield* orchestrator.say(`#${number} 开工`, {}, undefined, "");
       yield* until(() => words().some((w) => w.startsWith("工单：挪好了")), "started");
       yield* waitFor(issues.get(issue.id), (i) => i.status === "in_review", "handed back");
@@ -526,7 +526,7 @@ describe("the orchestrator", () => {
       const id = handed.id;
       expect(handed.closedAt).toBeUndefined();
       expect([handed.deliver, handed.lastRun?.outcome]).toEqual(["answer", "completed"]);
-      expect(handed.attention).toMatchObject({ state: "reviewing", lead: "acknowledge" });
+      expect(handed.stage).toMatchObject({ state: "reviewing", lead: "acknowledge" });
       // One table whoever did the work: asked again (todo), taken (done), or put away (canceled).
       expect(handed.moves).toEqual(["todo", "done", "canceled"]);
       const done = yield* issues.setStatus(id, "done", "", "", owner);

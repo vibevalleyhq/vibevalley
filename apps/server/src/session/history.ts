@@ -50,6 +50,7 @@ export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSe
     refining: false,
     ...(r.project !== null ? { project: r.project } : {}),
     ...(r.issue !== null ? { issue: issueId(r.issue) } : {}),
+    ...(r.channel !== null ? { channel: r.channel } : {}),
   };
   const graph = graphOf(r.graph);
   if (graph) s.graph = graph;

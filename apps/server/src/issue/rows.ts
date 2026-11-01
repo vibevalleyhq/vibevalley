@@ -1,15 +1,16 @@
 import { Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import { sessionIdsOf } from "@vibevalley/protocol/rules";
+import { issueId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOrNone } from "@/base/json.ts";
 import { type Core } from "@/core/core.ts";
 
 import type * as q from "../../db/generated/issue.sql.ts";
-import { attentionIn } from "./attention.ts";
 import { statusMoves } from "./moves.ts";
+import { issueStageIn } from "./stage.ts";
 import { issueRefiningOf, issueStatusOf } from "./status.ts";
 
 type Row = q.GetIssueResult;
@@ -27,7 +28,7 @@ export const column = {
 };
 
 export function issueRows(core: Core["Service"]) {
-  return function issueOf(row: Row, runs: readonly string[] | undefined): T.Issue {
+  return function issueOf(row: Row, assignments: readonly T.Assignment[]): T.Issue {
     const state = core.state();
     const graph = column.graph(row.graph);
     const task = column.task(row.task);
@@ -43,11 +44,10 @@ export function issueRows(core: Core["Service"]) {
       title: row.title,
       description: row.description,
       ...(row.project !== null ? { project: row.project } : {}),
-      ...(row.assignee !== null ? { assignee: row.assignee } : {}),
+      assignments: [...assignments],
       priority: row.priority,
       createdAt: row.created_at,
       ...(row.queued_at !== null ? { queuedAt: row.queued_at } : {}),
-      sessions: (runs ?? []).map((s) => sessionId(s)),
       ...(row.closed_at !== null ? { closedAt: row.closed_at } : {}),
       ...(row.delivered !== null ? { delivered: row.delivered } : {}),
       ...(row.canceled !== null ? { canceled: row.canceled } : {}),
@@ -60,7 +60,6 @@ export function issueRows(core: Core["Service"]) {
       moves: [],
       ...(pullRequest ? { pullRequest } : {}),
       deliver: row.deliver,
-      ...(row.talk !== null ? { talk: row.talk } : {}),
       ...(row.reviewed_at !== null ? { reviewedAt: row.reviewed_at } : {}),
       findings: column.findings(row.findings) ?? [],
       questions: column.questions(row.questions) ?? [],
@@ -68,14 +67,14 @@ export function issueRows(core: Core["Service"]) {
       checks: checks ?? [],
       ...(lastRun ? { lastRun } : {}),
       ...(answer ? { answer } : {}),
-      attention: { state: "draft", acts: [] },
+      stage: { state: "draft", acts: [] },
     };
-    if ((out.sessions.length === 0 || out.task) && row.rank !== 0) out.rank = row.rank;
+    if ((sessionIdsOf(out).length === 0 || out.task) && row.rank !== 0) out.rank = row.rank;
     out.status = issueStatusOf(out, state);
     const refiner = issueRefiningOf(out, state);
     if (refiner) out.refining = refiner;
-    // The moves read the attention: a round that failed is not completed.
-    out.attention = attentionIn(out, state);
+    // The moves read the stage: a round that failed is not completed.
+    out.stage = issueStageIn(out, state);
     out.moves = statusMoves(out);
     return out;
   };

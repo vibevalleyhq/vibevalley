@@ -58,16 +58,16 @@ const badgeQuiet = (): T.Badge => ({ text: t("shared.stuck.quiet"), tone: "stuck
 const badgeHalfway = (): T.Badge => ({ text: t("shared.stuck.interrupted"), tone: "stuck" });
 const badgeRetrying = (): T.Badge => ({ text: t("server.game.badge.retrying"), tone: "stuck" });
 const badgeRest = (): T.Badge => ({ text: t("server.game.badge.rest"), tone: "rest" });
-const badgeReview = (): T.Badge => ({ text: t("shared.attention.reviewing"), tone: "wait" });
-const badgeQuestions = (): T.Badge => ({ text: t("shared.attention.asking"), tone: "wait" });
+const badgeReview = (): T.Badge => ({ text: t("shared.stage.reviewing"), tone: "wait" });
+const badgeQuestions = (): T.Badge => ({ text: t("shared.stage.asking"), tone: "wait" });
 
 /**
- * A plot is a picture of its issue's attention, never a second reading of it: the crop and the badge say where the
- * issue stands (attentionOf decides that, and in what order); the session only adds how far this round has grown.
+ * A plot is a picture of its issue's stage, never a second reading of it: the crop and the badge say where the
+ * issue stands (issueStageOf decides that, and in what order); the session only adds how far this round has grown.
  */
 export function plotOf(h: T.Session, issue: T.Issue | undefined): T.PlotView {
   if (!issue) return plotOfSession(h);
-  const a = issue.attention;
+  const a = issue.stage;
   switch (a.state) {
     case "draft":
     case "queued":

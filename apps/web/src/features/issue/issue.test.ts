@@ -15,7 +15,7 @@ const issue = (over: Partial<Issue>): Issue =>
     title: "",
     priority: "none",
     createdAt: 0,
-    sessions: [],
+    assignments: [],
     status: "todo",
     moves: [],
     findings: [],

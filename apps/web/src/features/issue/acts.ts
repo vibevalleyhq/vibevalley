@@ -2,7 +2,7 @@ import { createSignal } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Issue, type IssueAct, type IssueAction, type IssueStatus } from "@vibevalley/protocol";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { latestSessionIdOf, omitUndefined } from "@vibevalley/protocol/rules";
 
 import { api } from "@/infra/api";
 import { useIntents } from "@/state/intent";
@@ -12,7 +12,7 @@ import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { issueSay, pendingWords } from "./say";
 
 // The owner's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx)
-// and the farm's (farm/issue/IssueView.tsx). What a button sends is the server's (Issue.attention.acts); a move and words
+// and the farm's (farm/issue/IssueView.tsx). What a button sends is the server's (Issue.stage.acts); a move and words
 // go as intents (moves.ts, say.ts), shown on the page until the frame has them, and the rest through the page's Act.
 // This says which take words from the box, which open the box first, which open a dialog, what a reopen tells, and keeps
 // the box and its words. A page only says how it runs a button its own way (the farm's commands with their effects).
@@ -28,13 +28,13 @@ export function perform(issue: Issue, a: IssueAction, words = "", sendKey = ""):
     case "say":
       return api.issue.comment.create({ id: issue.id, text: words, ...(sendKey ? { sendKey } : {}) });
     case "stop": {
-      const session = issue.sessions.at(-1);
+      const session = latestSessionIdOf(issue);
       return session === undefined ? Promise.resolve() : api.session.stop({ id: session });
     }
   }
 }
 
-export const actionOf = (issue: Issue, act: IssueAct) => issue.attention.acts.find((a) => a.act === act);
+export const actionOf = (issue: Issue, act: IssueAct) => issue.stage.acts.find((a) => a.act === act);
 
 /** The box under an issue's ask: the findings of 打回, or a word to the helper. */
 export type ActBox = "reject" | "tell";
@@ -116,7 +116,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
     if (action?.does !== "move") return;
     const words = text().trim();
     void sendMove(moves, omitUndefined({ id: current.id, status: action.status, text: words || undefined })).done.then((done) => {
-      const helper = done?.replied?.reply.sessions.at(-1);
+      const helper = done?.replied ? latestSessionIdOf(done.replied.reply) : undefined;
       if (!helper) return;
       setText("");
       ways.told(t("web.issue.acts.reopened"), t("web.issue.acts.goesOn", { helper }));

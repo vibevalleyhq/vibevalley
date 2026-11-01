@@ -78,7 +78,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
     async shovel(s) {
       const act = actForTool(
         "shovel",
-        (issue(s)?.attention.acts ?? []).map((a) => a.act),
+        (issue(s)?.stage.acts ?? []).map((a) => a.act),
       );
       if (!act) throw new Error(t("web.farm.command.noShovel"));
       await send(s, act);

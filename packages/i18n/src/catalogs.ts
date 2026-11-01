@@ -263,6 +263,9 @@ export const catalogs = {
       noChannelNamed: "没有叫 #{name} 的频道。有：{tags}",
       absent: "{who} 不在场，没送到",
       fileTooBig: "文件太大了：至多 {mb} MB",
+      noProfileNamed: "没有叫 {key} 的档案",
+      talkFailed: "没有接上这个会话：{why}",
+      profileDisabled: "{name}已停用",
     },
     "server.cli": {
       flag: {
@@ -452,7 +455,7 @@ export const catalogs = {
       notRecorded: "{name} 的工单没记下来：{why}",
       workKept: "{refused}；工单 #{n} 和它的改动留着，可以接着派这张工单",
       drafting: "{name} 正在起草：等它交回来再开工",
-      pickHint: "挑好以后挪到待办时带上它：{command}，--json 带 status「todo」和 assignee（档案的 id）",
+      pickHint: "挑好以后挪到待办时带上它：{command}，--json 带 status「todo」和 agent（档案的 id）",
       noAssignee: "还没选派给哪个帮工",
       profileGone: "档案 {id} 不在了",
       sendFailed: "派不出去",
@@ -468,12 +471,10 @@ export const catalogs = {
       cronNoIssue: "定时任务「{name}」写不了工单：{why}",
       cronNoStart: "定时任务「{name}」开不了工：{why}",
       closedReopen: "这张工单关上了：带一句话重开它",
-      noProfileNamed: "没有叫 {key} 的档案",
       handOverOnTodo: "换人是挪到待办时的事：挪到待办，填上谁来接手",
       stopFirst: "#{n} 还在干这一轮：先叫停，等它停下再换人",
       noStatus: "没有这个状态：{to}",
       roundNeedsWords: "再干一轮要说一句：这一轮要它做什么",
-      talkTitle: "和{name}私聊",
       closed: "这张工单关上了",
       cannotMoveProject: "工单 #{n} 还不能换项目：{why}",
       cannotDelete: "工单 #{n} 还不能删：{why}",
@@ -589,6 +590,7 @@ export const catalogs = {
         notDoing: "不做的：",
         files: "可能涉及：",
       },
+      noProfileNamed: "没有叫 {key} 的档案",
     },
     "server.lan": {
       aDevice: "一台设备",
@@ -852,14 +854,14 @@ export const catalogs = {
         noPlace: "{name} 没地方干活：{why}",
         cannotSend: "{name} 派不出去：{why}",
         notRecorded: "{name} 的工单没记下来：{why}",
-        steered: "{name} 正在干，话已经插进去了",
-        queued: "{name} 这一轮做完再看这句话",
-        started: "{woke, select, true {{name} 醒了，开始新的一轮} other {{name} 开始新的一轮}}",
         notReset: "{name} 的工作目录没能重置：{why}",
         left: "{name} 收工了：{why}",
         stillHasHelper: "这张工单还有帮工，不能清掉工作目录",
         seconds: "{n} 秒",
         minutes: "{n} 分钟",
+        noIssue: "这个会话不关联工单，不能交付或清理工单的改动。",
+        contextKept: "上下文目录保留在 {cwd}：{why}",
+        contextHasFiles: "目录里已有文件",
       },
       conflictBrief:
         "把 {base} 合进你的分支时有冲突（{files}）。请在你的分支上运行 git merge {base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。",
@@ -1140,16 +1142,7 @@ export const catalogs = {
       canceled: { dismissed: "取消了", lost: "干活的目录丢了" },
       doneWith: "已完成，{what}",
       canceledFor: "已取消，{why}",
-      attention: {
-        draft: "草稿",
-        queued: "排队",
-        working: "在做",
-        asking: "等你回答",
-        reviewing: "等你验收",
-        stuck: "卡住了",
-        done: "已完成",
-        canceled: "已取消",
-      },
+      stage: { draft: "草稿", queued: "排队", working: "在做", asking: "等你回答", reviewing: "等你验收", stuck: "卡住了", done: "已完成", canceled: "已取消" },
       stuck: { conflict: "有冲突", failed: "没做成", interrupted: "停在半路", quiet: "没动静" },
       act: {
         start: "开工",
@@ -3911,6 +3904,9 @@ export const catalogs = {
       noChannelNamed: "There is no channel #{name}. There are: {tags}",
       absent: "{n, plural, one {{who} is} other {{who} are}} not here; not delivered",
       fileTooBig: "The file is too big: {mb} MB at most",
+      noProfileNamed: "No profile is named {key}",
+      talkFailed: "Could not start this conversation: {why}",
+      profileDisabled: "{name} is disabled",
     },
     "server.cli": {
       flag: {
@@ -4120,7 +4116,7 @@ export const catalogs = {
       notRecorded: "{name}'s ticket was not recorded: {why}",
       workKept: "{refused}; ticket #{n} and its changes are kept, and it can be sent again",
       drafting: "{name} is drafting it: start it once the draft comes back",
-      pickHint: 'Once picked, give it when moving to To do: {command}, with --json status "todo" and assignee (the profile\'s id)',
+      pickHint: 'Once picked, give it when moving to To do: {command}, with --json status "todo" and agent (the profile\'s id)',
       noAssignee: "No helper has been picked yet",
       profileGone: "The profile {id} is gone",
       sendFailed: "It could not be sent",
@@ -4136,12 +4132,10 @@ export const catalogs = {
       cronNoIssue: 'The scheduled task "{name}" could not write its ticket: {why}',
       cronNoStart: 'The scheduled task "{name}" could not start: {why}',
       closedReopen: "This ticket is closed: reopen it with a few words",
-      noProfileNamed: "There is no profile called {key}",
       handOverOnTodo: "Handing over happens when moving to To do: move it there and say who takes over",
       stopFirst: "#{n} is still in this round: stop it, and hand it over once it has stopped",
       noStatus: "There is no such status: {to}",
       roundNeedsWords: "Another round needs a few words: what it should do this round",
-      talkTitle: "Talking with {name}",
       closed: "This ticket is closed",
       cannotMoveProject: "Ticket #{n} cannot change project yet: {why}",
       cannotDelete: "Ticket #{n} cannot be deleted yet: {why}",
@@ -4257,6 +4251,7 @@ export const catalogs = {
         notDoing: "Not doing:",
         files: "May touch:",
       },
+      noProfileNamed: "No profile is named {key}",
     },
     "server.lan": {
       aDevice: "A device",
@@ -4534,14 +4529,14 @@ export const catalogs = {
         noPlace: "{name} has nowhere to work: {why}",
         cannotSend: "{name} cannot be sent: {why}",
         notRecorded: "{name}'s ticket was not recorded: {why}",
-        steered: "{name} is at work; the words were put in",
-        queued: "{name} reads this once this round is done",
-        started: "{woke, select, true {{name} woke up and starts a new round} other {{name} starts a new round}}",
         notReset: "{name}'s working folder could not be reset: {why}",
         left: "{name} has left: {why}",
         stillHasHelper: "This ticket still has a helper; its working folder cannot be cleared",
         seconds: "{n} s",
         minutes: "{n} min",
+        noIssue: "This session has no issue whose changes can be delivered or discarded.",
+        contextKept: "Context directory kept at {cwd}: {why}",
+        contextHasFiles: "The directory already contains files",
       },
       conflictBrief:
         "Merging {base} into your branch conflicts ({files}). On your branch, run git merge {base}, resolve the conflicts, run the tests, and commit. In your conclusion, say how each conflict was settled.",
@@ -4840,7 +4835,7 @@ export const catalogs = {
       canceled: { dismissed: "canceled", lost: "its working folder is gone" },
       doneWith: "Done, {what}",
       canceledFor: "Canceled, {why}",
-      attention: {
+      stage: {
         draft: "Draft",
         queued: "Queued",
         working: "Working",
@@ -7692,10 +7687,13 @@ export interface Messages {
   "server.channel.noHelper": { readonly id: string | number };
   "server.channel.noMessage": { readonly n: string | number };
   "server.channel.noMessageId": { readonly id: string | number };
+  "server.channel.noProfileNamed": { readonly key: string | number };
   "server.channel.notOrchestrator": { readonly id: string | number };
   "server.channel.notYours": undefined;
+  "server.channel.profileDisabled": { readonly name: string | number };
   "server.channel.queuedThere": { readonly n: string | number };
   "server.channel.sendKeyLong": undefined;
+  "server.channel.talkFailed": { readonly why: string | number };
   "server.channel.threadOnlyInChannel": undefined;
   "server.channel.threadOnlyTitle": undefined;
   "server.cli.and": undefined;
@@ -8017,7 +8015,6 @@ export interface Messages {
   "server.issue.stillOpen": undefined;
   "server.issue.stillWorking": { readonly name: string | number };
   "server.issue.stopFirst": { readonly n: string | number };
-  "server.issue.talkTitle": { readonly name: string | number };
   "server.issue.template.commands.build": undefined;
   "server.issue.template.commands.lint": undefined;
   "server.issue.template.commands.test": undefined;
@@ -8246,12 +8243,15 @@ export interface Messages {
   "server.session.life.agentGone": { readonly name: string | number };
   "server.session.life.cannotSend": { readonly name: string | number; readonly why: string | number };
   "server.session.life.cannotWake": { readonly name: string | number; readonly why: string | number };
+  "server.session.life.contextHasFiles": undefined;
+  "server.session.life.contextKept": { readonly cwd: string | number; readonly why: string | number };
   "server.session.life.helperRef": { readonly id: string | number };
   "server.session.life.inGraph": { readonly graph: string | number; readonly name: string | number };
   "server.session.life.issueNotReturned": undefined;
   "server.session.life.left": { readonly name: string | number; readonly why: string | number };
   "server.session.life.minutes": { readonly n: string | number };
   "server.session.life.noHelper": { readonly id: string | number };
+  "server.session.life.noIssue": undefined;
   "server.session.life.noPlace": { readonly name: string | number; readonly why: string | number };
   "server.session.life.noRecord": undefined;
   "server.session.life.noRoom": { readonly full: string | number; readonly name: string | number };
@@ -8262,12 +8262,9 @@ export interface Messages {
   "server.session.life.notReturned": undefined;
   "server.session.life.notStopped": { readonly why: string | number };
   "server.session.life.placeGone": { readonly cwd: string | number };
-  "server.session.life.queued": { readonly name: string | number };
   "server.session.life.quietNotice": { readonly last: string | number; readonly name: string | number; readonly span: string | number };
   "server.session.life.restartedNotice": { readonly name: string | number };
   "server.session.life.seconds": { readonly n: string | number };
-  "server.session.life.started": { readonly name: string | number; readonly woke: boolean };
-  "server.session.life.steered": { readonly name: string | number };
   "server.session.life.stillClosing": { readonly name: string | number };
   "server.session.life.stillHasHelper": undefined;
   "server.session.life.stillWorking": { readonly name: string | number };
@@ -8587,14 +8584,6 @@ export interface Messages {
   "shared.action.thinking": undefined;
   "shared.action.wait": undefined;
   "shared.action.web": undefined;
-  "shared.attention.asking": undefined;
-  "shared.attention.canceled": undefined;
-  "shared.attention.done": undefined;
-  "shared.attention.draft": undefined;
-  "shared.attention.queued": undefined;
-  "shared.attention.reviewing": undefined;
-  "shared.attention.stuck": undefined;
-  "shared.attention.working": undefined;
   "shared.canceled.dismissed": undefined;
   "shared.canceled.lost": undefined;
   "shared.canceledFor": { readonly why: string | number };
@@ -8637,6 +8626,14 @@ export interface Messages {
   "shared.priority.urgent": undefined;
   "shared.seconds": { readonly n: string | number };
   "shared.serverAnswered": { readonly status: string | number };
+  "shared.stage.asking": undefined;
+  "shared.stage.canceled": undefined;
+  "shared.stage.done": undefined;
+  "shared.stage.draft": undefined;
+  "shared.stage.queued": undefined;
+  "shared.stage.reviewing": undefined;
+  "shared.stage.stuck": undefined;
+  "shared.stage.working": undefined;
   "shared.status.backlog": undefined;
   "shared.status.canceled": undefined;
   "shared.status.done": undefined;

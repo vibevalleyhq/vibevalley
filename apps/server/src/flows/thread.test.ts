@@ -31,7 +31,7 @@ describe("an issue's thread", () => {
       const { in: saidIn } = yield* Said;
       const sql = yield* SqlClient.SqlClient;
       yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({ title: "写打卡", project: "one-thread", assignee: "lab" });
+      const issue = yield* issues.add({ title: "写打卡", project: "one-thread", agent: "lab" });
       const sent = yield* issues.start(issue.id, "");
       const first = sent.session!;
       expect(first).toBeDefined();
@@ -86,7 +86,7 @@ describe("an issue's thread", () => {
       const issue = yield* issues.add({
         title: "先问清楚，再写打卡",
         project: "clock",
-        assignee: "lab",
+        agent: "lab",
       });
       const sent = yield* issues.start(issue.id, "");
       const thread = (yield* await_(

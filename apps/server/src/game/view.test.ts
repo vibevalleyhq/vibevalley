@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vite-plus/test";
 
-import type { Issue, IssueAttention, Session } from "@vibevalley/protocol";
+import type { Issue, IssueStage, Session } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { emptyWorkspaceState } from "@/core/core.ts";
@@ -22,13 +22,13 @@ const session = (phase: Session["phase"]): Session => ({
   refining: false,
   issue: issueId("t1"),
 });
-const issue = (attention: IssueAttention, more: Partial<Issue> = {}): Issue =>
-  ({ id: "t1", sessions: ["w1"], findings: [], questions: [], status: "in_review", attention, ...more }) as unknown as Issue;
+const issue = (stage: IssueStage, more: Partial<Issue> = {}): Issue =>
+  ({ id: "t1", sessions: ["w1"], findings: [], questions: [], status: "in_review", stage, ...more }) as unknown as Issue;
 const done = session({ _tag: "done" });
 
 describe("a plot", () => {
-  it("pictures its issue's attention, not its session's phase", () => {
-    const cases: [IssueAttention, Partial<Issue>, string, string | undefined][] = [
+  it("pictures its issue's stage, not its session's phase", () => {
+    const cases: [IssueStage, Partial<Issue>, string, string | undefined][] = [
       [{ state: "asking", acts: [{ act: "answer", does: "say" }] }, {}, "dry", "等你回答"],
       [{ state: "reviewing", lead: "complete", acts: [{ act: "complete", does: "say" }] }, {}, "flowering", "等你验收"],
       [{ state: "reviewing", lead: "complete", acts: [{ act: "complete", does: "say" }] }, { reviewedAt: 5 }, "carrot", "可收获"],
@@ -47,9 +47,9 @@ describe("a plot", () => {
       [{ state: "stuck", stuck: "failed", lead: "cure", acts: [{ act: "cure", does: "say" }] }, { deliver: "answer" }, "withered", "有虫"],
       [{ state: "stuck", stuck: "quiet", lead: "stop", acts: [{ act: "stop", does: "say" }] }, {}, "dry", "没动静"],
     ];
-    for (const [attention, more, crop, badge] of cases) {
-      const plot = plotOf(done, issue(attention, more));
-      expect({ attention, crop: plot.crop, badge: plot.badge?.text }).toEqual({ attention, crop, badge });
+    for (const [stage, more, crop, badge] of cases) {
+      const plot = plotOf(done, issue(stage, more));
+      expect({ stage, crop: plot.crop, badge: plot.badge?.text }).toEqual({ stage, crop, badge });
     }
   });
 

@@ -1,5 +1,5 @@
 import type * as T from "@vibevalley/protocol";
-import { attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { stageWantsOwner } from "@vibevalley/protocol/rules";
 const spaces = /\s+/u;
 
 /** The issues a filter picks, newest first: the open ones unless it asks for closed ones or names a closed status; waiting on
@@ -10,10 +10,10 @@ export function pickIssues(all: readonly T.Issue[], f: T.IssueFilter, now: numbe
   let found = all.filter(
     (item) =>
       (f.status ? item.status === f.status : f.closed === true || (item.status !== "done" && item.status !== "canceled")) &&
-      (f.wantsOwner !== true || attentionWantsOwner(item.attention.state)) &&
+      (f.wantsOwner !== true || stageWantsOwner(item.stage.state)) &&
       (!project || item.project === project) &&
       words.every((w) => (item.title + "\n" + item.description).includes(w)),
   );
-  if (f.wantsOwner === true) found = found.toSorted((a, b) => (a.attention.since ?? now) - (b.attention.since ?? now));
+  if (f.wantsOwner === true) found = found.toSorted((a, b) => (a.stage.since ?? now) - (b.stage.since ?? now));
   return f.limit != null && f.limit > 0 ? found.slice(0, Math.trunc(f.limit)) : found;
 }

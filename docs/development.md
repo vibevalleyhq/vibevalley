@@ -85,7 +85,7 @@ git tag v0.2.0 && git push origin v0.2.0   # 发布：release.yml 打包、建�
 1. 建工单。把 `…` 换成标题和项目，用返回的工单 ID 替换后面的 `<id>`。
 
    ```bash
-   vibevalley issue create --json '{"title":"…","project":"…","assignee":"codex"}'
+   vibevalley issue create --json '{"title":"…","project":"…","agent":"codex"}'
    ```
 
 2. 派活。命令把备选挪到待办，等帮工交回来，再打出改动。

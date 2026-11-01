@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（28 篇）
+## proposed（29 篇）
 
 ### feature
 
@@ -19,6 +19,7 @@
 
 ### architecture
 
+- 2026-10-31 [架构质量提升（七）：领域术语（Ubiquitous Language）与用语门禁的去伪存真完整方案](.agents/notes/proposed/architecture/2026-10-31-ubiquitous-language-and-glossary-refinement.md)
 - 2026-10-31 [频道只记话，信箱把话交给 agent：从 `Channel` 拆出 `Mailbox`，去掉 `useHelpers`](.agents/notes/proposed/architecture/2026-10-31-mailbox-out-of-channels.md)
 - 2026-10-28 [agent 带什么：工具集（toolsets）和技能（skill 模块），主人用 `/` 叫它们](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)
 - 2026-10-27 [页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md)

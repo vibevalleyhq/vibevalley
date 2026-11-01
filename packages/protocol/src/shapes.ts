@@ -1328,6 +1328,16 @@ export interface GraphSplitRequest {
   agent?: string;
 }
 
+/** Responsibility for an issue, retained across execution contexts and ended only by reassignment or unassignment. */
+export interface Assignment {
+  id: string;
+  issue: IssueId;
+  agent: string;
+  assignedAt: number;
+  endedAt?: number;
+  executions: ({ kind: "session"; session: SessionId; startedAt: number } | { kind: "orchestrator"; session: string; startedAt: number })[];
+}
+
 export interface IssueHistory {
   issue: Issue;
   sessions: Session[];
@@ -1349,12 +1359,11 @@ export interface Issue {
   title: string;
   description: string;
   project?: string;
-  assignee?: string;
+  assignments: Assignment[];
   priority: Priority;
   rank?: number;
   createdAt: number;
   queuedAt?: number;
-  sessions: SessionId[];
   closedAt?: number;
   /** Done: what it delivered. Its verdict is the status; how its work went in is this. */
   delivered?: Delivery;
@@ -1369,8 +1378,6 @@ export interface Issue {
   moves: IssueStatus[];
   pullRequest?: PullRequest;
   deliver: Deliverable;
-  /** A helper profile's talk with the owner: the direct channel it is said in. It is kept off the board. */
-  talk?: string;
   reviewedAt?: number;
   findings: Finding[];
   questions: Question[];
@@ -1382,7 +1389,7 @@ export interface Issue {
   lastRun?: IssueRun;
   /** An answer issue's conclusion, read from what its latest round handed back; none when that round gave none it could read. */
   answer?: IssueAnswer;
-  attention: IssueAttention;
+  stage: IssueStage;
 }
 
 /** A change with nothing to answer but when it shows (issue.comment.create): the seq of the core's fold read once it was
@@ -1435,8 +1442,8 @@ export interface CriterionCheck {
 }
 
 /** Where an issue stands for the owner, the one set of states the board, the farm and the page all say. */
-export const AttentionValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "done", "canceled"] as const;
-export type Attention = (typeof AttentionValues)[number];
+export const IssueStageKindValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "done", "canceled"] as const;
+export type IssueStageKind = (typeof IssueStageKindValues)[number];
 
 export const StuckReasonValues = ["failed", "conflict", "interrupted", "quiet"] as const;
 export type StuckReason = (typeof StuckReasonValues)[number];
@@ -1449,8 +1456,8 @@ export type IssueAct = (typeof IssueActValues)[number];
 
 /** since: when it came to stand so, when known. lead is the one thing the owner is asked to do, if any; acts are all
  * it can do, lead first. */
-export interface IssueAttention {
-  state: Attention;
+export interface IssueStage {
+  state: IssueStageKind;
   since?: number;
   stuck?: StuckReason;
   lead?: IssueAct;
@@ -1538,7 +1545,7 @@ export interface IssueUpdate {
   title?: string;
   description?: string;
   project?: string;
-  assignee?: string;
+  agent?: string;
   priority?: Priority;
   criteria?: string[];
   deliver?: Deliverable;
@@ -1558,7 +1565,7 @@ export interface IssueRequest {
   title: string;
   description?: string;
   project?: string;
-  assignee?: string;
+  agent?: string;
   priority?: Priority;
   deliver?: Deliverable;
   /** The client's key for this request: the same key again within a while returns the first one's result and does it
@@ -1591,6 +1598,8 @@ export type RunTriggerKind = (typeof RunTriggerKindValues)[number];
 export interface RunTrigger {
   kind: RunTriggerKind;
   message?: string;
+  /** Where the input was said and its reply belongs. */
+  channel?: string;
   cron?: string;
   missed?: boolean;
 }
@@ -2463,7 +2472,7 @@ export interface IssueStatusRequest {
   text?: string;
   /** Moving to todo: the profile that takes it on. Another than its own hands it over: the last session leaves, its branch
    * kept, and this one goes on in the same issue. */
-  assignee?: string;
+  agent?: string;
   /** Fields the owner changed and has not saved: saved first, so the act sees them. */
   edit?: IssueUpdate;
   /** The client's key for this request: the same key again within a while returns the first one's result and does it

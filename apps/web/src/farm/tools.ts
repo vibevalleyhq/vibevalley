@@ -66,9 +66,9 @@ export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot
   const crop = plot.crop;
   const act = actForTool(
     tool,
-    (issue?.attention.acts ?? []).map((a) => a.act),
+    (issue?.stage.acts ?? []).map((a) => a.act),
   );
-  const unavailable = issue ? t("web.farm.aim.unavailable", { state: t(`shared.attention.${issue.attention.state}`).toLowerCase() }) : t("web.farm.aim.unread");
+  const unavailable = issue ? t("web.farm.aim.unavailable", { state: t(`shared.stage.${issue.stage.state}`).toLowerCase() }) : t("web.farm.aim.unread");
   switch (tool) {
     case "hand":
       return { ok: true, text: session ? t("web.farm.aim.look") : t("web.farm.aim.sow") };

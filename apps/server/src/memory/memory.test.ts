@@ -72,6 +72,7 @@ describe("memory", () => {
       yield* m.keep({
         agent: "lab",
         session: "w1",
+        issue: "i1",
         project: "clock",
         brief: "加分页",
         outcome: "completed",
@@ -81,13 +82,23 @@ describe("memory", () => {
       yield* m.keep({
         agent: "lab",
         session: "w1",
+        issue: "i1",
         project: "clock",
         brief: "加分页",
         outcome: "failed",
         said: "记住：这个项目用 pnpm test 跑测试",
         summary: "测试没过",
       });
-      yield* m.keep({ agent: "lab", session: "w2", project: "clock", brief: "不算", outcome: "interrupted", said: "记住：停下的不算", summary: "" });
+      yield* m.keep({
+        agent: "lab",
+        session: "w2",
+        issue: "i2",
+        project: "clock",
+        brief: "不算",
+        outcome: "interrupted",
+        said: "记住：停下的不算",
+        summary: "",
+      });
       const all = yield* m.list("lab");
       expect(all.map((x) => `${x.kind}:${x.text}`).toSorted()).toEqual([
         "issue:加分页 → 没做成：测试没过",
@@ -198,7 +209,37 @@ describe("memory", () => {
     }
   });
 
-  const run = (session: string, said: string) => ({ agent: "lab", session, project: "demo", brief: "work", said, summary: "", outcome: "completed" as const });
+  const run = (session: string, said: string) => ({
+    agent: "lab",
+    session,
+    issue: "i1",
+    project: "demo",
+    brief: "work",
+    said,
+    summary: "",
+    outcome: "completed" as const,
+  });
+
+  it.effect("regression: a chat run keeps explicit notes without recording work on an issue", () =>
+    Effect.gen(function* () {
+      const m = yield* Memory;
+      yield* m.keep({ agent: "lab", session: "chat", project: "demo", brief: "解释一下测试", outcome: "completed", said: "解释好了", summary: "解释好了" });
+      expect(yield* m.list("lab")).toEqual([]);
+      yield* m.keep({
+        agent: "lab",
+        session: "chat",
+        project: "",
+        brief: "记住测试约定",
+        outcome: "completed",
+        said: "记住：这个项目用 pnpm test 跑测试",
+        summary: "记下了",
+      });
+      expect((yield* m.list("lab")).map(({ kind, text, session }) => ({ kind, text, session }))).toEqual([
+        { kind: "note", text: "这个项目用 pnpm test 跑测试", session: "chat" },
+      ]);
+      expect((yield* m.list("lab"))[0]?.project).toBeUndefined();
+    }).pipe(Effect.provide(world())),
+  );
 
   it.effect("a run's notes go back when its issue memory cannot be written", () =>
     Effect.gen(function* () {

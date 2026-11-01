@@ -1,6 +1,6 @@
 // A task graph is issues: the graph's own and one per step.
 import type * as T from "@vibevalley/protocol";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { compare, compareText, or } from "@/base/order.ts";
@@ -32,7 +32,7 @@ function graphFrom(parent: T.Issue, issues: readonly T.Issue[]): T.TaskGraph {
         title: t.title,
         brief: t.description,
         needs: t.blockedBy.map((b) => (b.startsWith(parent.id + ".") ? b.slice(parent.id.length + 1) : b)),
-        agent: t.assignee,
+        agent: assignedAgentOf(t),
         check: s.check,
         scope: s.scope,
         acceptance: s.acceptance,
@@ -72,7 +72,7 @@ export function graphsOf(state: T.WorkspaceState): T.TaskGraph[] {
 export const taskIssueID = (graph: string, key: string): T.IssueId => issueId(graph + "." + key);
 
 /** An issue of a task graph as it is written down: what the graph says, and what only the issue knows from before. */
-export type GraphIssue = Draft & Pick<T.Issue, "priority" | "createdAt">;
+export type GraphIssue = Draft & Pick<T.Issue, "priority" | "createdAt"> & { readonly agent?: string };
 
 /** What only the issues know (priority, when they were written down and closed) comes from before; one closing now closes at now. */
 export function graphIssues(graph: T.TaskGraph, before: readonly T.Issue[], now: number): GraphIssue[] {
@@ -90,6 +90,7 @@ export function graphIssues(graph: T.TaskGraph, before: readonly T.Issue[], now:
     };
   };
   const project = graph.project;
+  const parent = was.get(issueId(graph.id));
   const out = [
     keep(
       omitUndefined({
@@ -98,7 +99,7 @@ export function graphIssues(graph: T.TaskGraph, before: readonly T.Issue[], now:
         description: graph.goal,
         project,
         // A helper's issue split under it keeps who it was given to.
-        assignee: was.get(issueId(graph.id))?.assignee,
+        agent: parent ? assignedAgentOf(parent) : undefined,
         deliver: "change" as const,
         blockedBy: [],
         graph: omitUndefined({ state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note || undefined }),
@@ -115,7 +116,7 @@ export function graphIssues(graph: T.TaskGraph, before: readonly T.Issue[], now:
           description: n.brief,
           project,
           deliver: "change" as const,
-          assignee: n.agent,
+          agent: n.agent,
           rank: i > 0 ? i : undefined,
           parent: issueId(graph.id),
           blockedBy: n.needs.map((need) => taskIssueID(graph.id, need)),
@@ -161,5 +162,5 @@ function taskClosed(graph: T.GraphState, n: T.Task): Closing | undefined {
 // Criteria and checks are no graph's: the issues it writes carry none (Issue.putTask).
 type Draft = Omit<
   T.Issue,
-  "number" | "priority" | "createdAt" | "sessions" | "status" | "moves" | "review" | "findings" | "questions" | "attention" | "criteria" | "checks"
+  "number" | "priority" | "createdAt" | "assignments" | "status" | "moves" | "review" | "findings" | "questions" | "stage" | "criteria" | "checks"
 >;

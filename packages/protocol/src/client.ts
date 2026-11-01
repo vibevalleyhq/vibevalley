@@ -241,6 +241,10 @@ export class VibeValleyApi {
     stop: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/session/stop", a),
     list: (a: { agent?: string }): Promise<T.Session[]> => this.call<T.Session[]>("/api/v1/session/list", a),
     get: (a: { id: string }): Promise<T.Session> => this.call<T.Session>("/api/v1/session/get", a),
+    run: {
+      /** The runs of an execution context, including those not associated with an issue. */
+      list: (a: { id: string }): Promise<T.Run[]> => this.call<T.Run[]>("/api/v1/session/run/list", a),
+    },
     event: {
       /** Its log, oldest first; run gives one run's only. The orchestrator's log is session orchestrator's. */
       list: (a: { id: string; run?: string }): Promise<T.SessionEvent[]> => this.call<T.SessionEvent[]>("/api/v1/session/event/list", a),

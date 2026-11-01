@@ -51,5 +51,8 @@
   "noDirect": "{target}: there is no direct channel between you",
   "noChannelNamed": "There is no channel #{name}. There are: {tags}",
   "absent": "{n, plural, one {{who} is} other {{who} are}} not here; not delivered",
-  "fileTooBig": "The file is too big: {mb} MB at most"
+  "fileTooBig": "The file is too big: {mb} MB at most",
+  "noProfileNamed": "No profile is named {key}",
+  "talkFailed": "Could not start this conversation: {why}",
+  "profileDisabled": "{name} is disabled"
 }

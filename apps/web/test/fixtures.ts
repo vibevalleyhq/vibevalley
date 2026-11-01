@@ -9,7 +9,7 @@ import { createInterface } from "node:readline";
 
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
-import { type IssueAct, type IssueAction, readStream, type StateFrame, statePath, VibeValleyApi } from "@vibevalley/protocol";
+import { type Issue, type IssueAct, type IssueAction, readStream, type SessionId, type StateFrame, statePath, VibeValleyApi } from "@vibevalley/protocol";
 
 interface Server {
   url: string;
@@ -147,7 +147,7 @@ export async function defaultChannel(api: VibeValleyApi): Promise<string> {
   return frame.state.chat?.channels.find((c) => c.default)?.id ?? "";
 }
 
-/** An issue's buttons by name, as the server sends them (Issue.attention.acts). */
+/** An issue's buttons by name, as the server sends them (Issue.stage.acts). */
 export const buttons = (...names: IssueAct[]): IssueAction[] =>
   names.map((act): IssueAction => {
     switch (act) {
@@ -171,6 +171,19 @@ export const buttons = (...names: IssueAct[]): IssueAction[] =>
         return { act, does: "move", status: "todo", words: "none" };
     }
   });
+
+export function withIssueSession(issue: Issue, session: SessionId, agent = "lab"): Issue {
+  const current = issue.assignments.findLast((assignment) => assignment.endedAt === undefined);
+  const execution = { kind: "session" as const, session, startedAt: Date.now() };
+  return {
+    ...issue,
+    assignments: current
+      ? issue.assignments.map((assignment) =>
+          assignment.id === current.id ? { ...assignment, executions: [...assignment.executions, execution] } : assignment,
+        )
+      : [...issue.assignments, { id: `fixture-${session}`, issue: issue.id, agent, assignedAt: Date.now(), executions: [execution] }],
+  };
+}
 
 /** Picks a value in the workbench's Select (ui/Field.tsx): its button opens the list, the option is found by its value. */
 export async function choose(trigger: Locator, value: string) {

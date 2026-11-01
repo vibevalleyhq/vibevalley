@@ -16,7 +16,7 @@
   "notRecorded": "{name} 的工单没记下来：{why}",
   "workKept": "{refused}；工单 #{n} 和它的改动留着，可以接着派这张工单",
   "drafting": "{name} 正在起草：等它交回来再开工",
-  "pickHint": "挑好以后挪到待办时带上它：{command}，--json 带 status「todo」和 assignee（档案的 id）",
+  "pickHint": "挑好以后挪到待办时带上它：{command}，--json 带 status「todo」和 agent（档案的 id）",
   "noAssignee": "还没选派给哪个帮工",
   "profileGone": "档案 {id} 不在了",
   "sendFailed": "派不出去",
@@ -32,12 +32,10 @@
   "cronNoIssue": "定时任务「{name}」写不了工单：{why}",
   "cronNoStart": "定时任务「{name}」开不了工：{why}",
   "closedReopen": "这张工单关上了：带一句话重开它",
-  "noProfileNamed": "没有叫 {key} 的档案",
   "handOverOnTodo": "换人是挪到待办时的事：挪到待办，填上谁来接手",
   "stopFirst": "#{n} 还在干这一轮：先叫停，等它停下再换人",
   "noStatus": "没有这个状态：{to}",
   "roundNeedsWords": "再干一轮要说一句：这一轮要它做什么",
-  "talkTitle": "和{name}私聊",
   "closed": "这张工单关上了",
   "cannotMoveProject": "工单 #{n} 还不能换项目：{why}",
   "cannotDelete": "工单 #{n} 还不能删：{why}",
@@ -162,5 +160,6 @@
     "todo": "要做的：",
     "notDoing": "不做的：",
     "files": "可能涉及："
-  }
+  },
+  "noProfileNamed": "没有叫 {key} 的档案"
 }

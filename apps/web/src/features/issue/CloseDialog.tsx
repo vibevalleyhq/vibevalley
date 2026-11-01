@@ -28,7 +28,7 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
   const [reviewing, setReviewing] = createSignal(untrack(() => props.review ?? false));
   const core = useCore();
   const live = () => core()?.issues.find((i) => i.id === props.issue.id);
-  const acts = () => (live()?.attention.acts ?? []).map((a) => a.act);
+  const acts = () => (live()?.stage.acts ?? []).map((a) => a.act);
   const working = () => acts().includes("stop");
   const presses = createPresses(() => props.lane);
   const cancel = async () => {
@@ -92,7 +92,7 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
   const changes = useIssueChanges(() => props.issue);
   const core = useCore();
   const live = () => core()?.issues.find((i) => i.id === props.issue);
-  const acts = () => (live()?.attention.acts ?? []).map((a) => a.act);
+  const acts = () => (live()?.stage.acts ?? []).map((a) => a.act);
   const presses = createPresses(() => props.lane);
   const take = async () => {
     if (await presses.press(live(), "complete")) props.onDone();

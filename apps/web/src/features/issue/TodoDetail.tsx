@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 
 import { ago, wallClockText } from "@/base/format";
 import { autofocus } from "@/base/util";
@@ -39,7 +39,7 @@ const draftOf = (i: Issue): Draft => ({
   description: i.description,
   criteria: i.criteria.join("\n"),
   project: i.project ?? "",
-  agent: i.assignee ?? "",
+  agent: assignedAgentOf(i) ?? "",
   priority: i.priority,
   deliver: i.deliver,
 });
@@ -91,7 +91,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       title: x.title,
       description: x.description,
       project: x.project,
-      assignee: x.agent,
+      agent: x.agent,
       priority: x.priority,
       deliver: x.deliver,
       criteria: criteriaList(x.criteria),

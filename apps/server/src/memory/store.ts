@@ -23,6 +23,7 @@ import { termsList, termsText, termsVersion } from "./terms.ts";
 export interface FinishedRun {
   readonly agent: string;
   readonly session: string;
+  readonly issue?: string;
   readonly project: string;
   readonly brief: string;
   readonly outcome: T.Outcome;
@@ -144,24 +145,26 @@ export const makeMemoryStore = Effect.gen(function* () {
             Effect.gen(function* () {
               const known: Pick<T.Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
               for (const note of memoryNotesOf(run.said)) {
-                const project = note.everywhere ? undefined : run.project;
+                const project = note.everywhere ? undefined : run.project.trim() || undefined;
                 if (!memoryIsNewNote(known, note.text, project)) continue;
                 yield* insertNote(run.agent, note.text, project, run.session, "session");
                 known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
               }
-              const text = issueMemoryText(run.brief, run.summary, run.outcome);
-              yield* db.attempt(
-                q.keepIssueMemory({
-                  id: newId(),
-                  agent: run.agent,
-                  body: text,
-                  terms: termsText(text),
-                  terms_of: termsVersion,
-                  project: run.project,
-                  session: run.session,
-                  created_at: yield* Clock.currentTimeMillis,
-                }),
-              );
+              if (run.issue) {
+                const text = issueMemoryText(run.brief, run.summary, run.outcome);
+                yield* db.attempt(
+                  q.keepIssueMemory({
+                    id: newId(),
+                    agent: run.agent,
+                    body: text,
+                    terms: termsText(text),
+                    terms_of: termsVersion,
+                    project: run.project,
+                    session: run.session,
+                    created_at: yield* Clock.currentTimeMillis,
+                  }),
+                );
+              }
               yield* Effect.forEach(nextForgotten(yield* list(run.agent), 0), (id) => db.attempt(q.forget({ agent: run.agent, id })), { discard: true });
             }),
           )

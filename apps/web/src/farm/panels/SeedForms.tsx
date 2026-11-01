@@ -262,7 +262,7 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
   const canTell = () =>
     core()
       ?.issues.find((i) => i.id === issueOf(props.session))
-      ?.attention.acts.some((a) => a.act === "tell") ?? false;
+      ?.stage.acts.some((a) => a.act === "tell") ?? false;
   const [text, setText] = createSignal("");
   const sendKey = newSendKey();
   const [refused, setRefused] = createSignal<string>();

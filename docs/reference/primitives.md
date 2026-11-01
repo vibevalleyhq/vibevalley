@@ -8,11 +8,15 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `attentionWantsOwner` | `attention.ts` | Questions the owner for something: the page leads with it, the board flags it. |
 | `slice` | `cut.ts` | s.slice(start, end), a surrogate pair cut in half made U+FFFD (what String.prototype.toWellFormed does, which the |
 | `cut` | `cut.ts` | s as it is when it fits in max units; else its first max units and an ellipsis. |
 | `oneLine` | `cut.ts` | Runs of white space are one space. |
 | `freshOf` | `inbox.ts` | The items of now that are news to known: undefined known is the first look, which knows them all and has no news. |
+| `assignmentOf` | `issues.ts` | The responsibility in force now. |
+| `assignedAgentOf` | `issues.ts` |  |
+| `executionsOf` | `issues.ts` | Every execution, in assignment and start order. |
+| `sessionIdsOf` | `issues.ts` | The external helper contexts that executed it, in order. |
+| `latestSessionIdOf` | `issues.ts` |  |
 | `shortTitle` | `issues.ts` | One short line for a title: its first line, and of a long one, the first sentence, else up to its last pause that fits; |
 | `closedText` | `issues.ts` | What its close says: done with what it delivered, or canceled and why. |
 | `omitUndefined` | `omit.ts` |  |
@@ -29,6 +33,7 @@
 | `farmOf` | `play.ts` | The farm a session's bed is on: each project has its own, and the sessions without one share one. |
 | `plotKeyOf` | `play.ts` | The plot a session works, the key of `FarmView.plots`: its issue, so a reopened issue keeps its plot; one with no issue is its own. |
 | `same` | `same.ts` |  |
+| `stageWantsOwner` | `stage.ts` | Questions the owner for something: the page leads with it, the board flags it. |
 
 ## `apps/server/src/base`
 

@@ -18,9 +18,9 @@ import { scopedPubSub } from "@/base/pubsub.ts";
 import { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
+import { causeMessage, Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
-import { Session } from "@/session/session.ts";
+import { NotRecorded, Session } from "@/session/session.ts";
 
 import * as qc from "../../db/generated/channel.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
@@ -39,7 +39,7 @@ import { keepChannels, targetOf } from "./folded.ts";
 import { mentionOf, mentionsIn } from "./mentions.ts";
 import { ChatModel, type ChannelRow } from "./model.ts";
 import { messageMutations } from "./mutations.ts";
-import { busyNotice, wakeInput } from "./prompts.ts";
+import { busyNotice, inboxLines, talkBrief, wakeInput } from "./prompts.ts";
 import { parseSearch } from "./search.ts";
 import { channelStreams } from "./streams.ts";
 import { channelNameProblem, parseChatTarget } from "./targets.ts";
@@ -50,6 +50,8 @@ const firstChannelName = "general";
 
 const reportMax = 1500;
 const searchMax = 50;
+const talkContext = 12;
+const talkIdleMs = 10 * 60_000;
 /** A helper profile as the chat knows it: apart from the orchestrator and its sessions. */
 const profileId = (agent: string) => `profile:${agent}`;
 /** What a participant says by reacting when a message that wakes it is handed to it. */
@@ -141,6 +143,8 @@ const make = (sessions: Session["Service"]) =>
     const orchestratorHub = yield* scopedPubSub<OrchestratorNews>();
     // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
     const said = yield* scopedPubSub<T.ChatMessage>();
+    const talkStarts = yield* FiberMap.make<string>();
+    const idleTalks = yield* FiberMap.make<string>();
 
     /** Nothing is slipped in while a session compacts its context. */
     const compacting = new Set<string>();
@@ -228,7 +232,12 @@ const make = (sessions: Session["Service"]) =>
         .flatMap((c) => (c.name !== null ? [c] : []))
         .toSorted((a, b) => (a.id < b.id ? -1 : 1))
         .map((c) => "#" + c.name);
-    const channelOfSession = (h: T.Session) => (h.channel && channelName(h.channel) !== undefined ? h.channel : defaultId);
+    const directOfSession = (h: T.Session) => {
+      const ch = h.channel ? model.channel(h.channel) : undefined;
+      return !h.issue && ch?.type === "direct" && ch.peer_id === profileId(h.agent) ? ch.id : undefined;
+    };
+    const talkSession = (channel: string) => presentSessions().find((h) => directOfSession(h) === channel);
+    const channelOfSession = (h: T.Session) => directOfSession(h) ?? (h.channel && channelName(h.channel) !== undefined ? h.channel : defaultId);
     const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? row.parent_id! : row.id);
     /** Where the owner talks with peer alone, from either side. */
     const directWith = (who: string, other: string) => {
@@ -332,14 +341,14 @@ const make = (sessions: Session["Service"]) =>
 
     const threadOf = (subject: ThreadSubject) => Effect.sync(() => model.threadOfSubject(subject.kind, subject.id));
 
-    /** The one way from a session to its thread: through the issue it works, never by its own id, since the thread outlives it. */
     const threadOfSession = Effect.fnUntraced(function* (session: string) {
       const h = sessionOf(session);
-      return h ? yield* threadOf(subjectOf(h)) : undefined;
+      return h ? (directOfSession(h) ?? (yield* threadOf(subjectOf(h)))) : undefined;
     });
 
     /** Who a thread's words are for, worked out now rather than kept: the session on the issue, or a talk thread's own session. */
     const ownerOf = (ch: ChannelRow): string => {
+      if (ch.type === "direct") return talkSession(ch.id)?.id ?? "";
       if (ch.type === "channel" || !ch.subject_id) return "";
       if (ch.subject_kind === "issue") return sessions.onIssue(ch.subject_id) ?? "";
       if (ch.subject_kind === "talk") return sessionOf(ch.subject_id) ? ch.subject_id : "";
@@ -703,8 +712,8 @@ const make = (sessions: Session["Service"]) =>
       return out;
     });
 
-    const deliver = (recipient: string, text: string, message: string): Effect.Effect<Delivered> =>
-      sessions.deliver(recipient, text, { kind: "comment", message });
+    const deliver = (recipient: string, text: string, message: string, channel: string): Effect.Effect<Delivered> =>
+      sessions.deliver(recipient, text, { kind: "comment", message, channel });
 
     const kick = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
       const rows = open.of(recipient);
@@ -749,10 +758,11 @@ const make = (sessions: Session["Service"]) =>
         if (rows.some((r) => r.state === "pending" && r.held_by === null)) later(`notice:${recipient}`, config.chat.noticeBatchMs, () => notify(recipient));
         return;
       }
-      if (waking.length === 0 || breaker.isOpen(recipient)) return;
+      const firstWake = waking[0];
+      if (firstWake === undefined || breaker.isOpen(recipient)) return;
       const messages = waking.map(asInbox);
       const others = (yield* inboxRows(recipient)).filter((o) => !messages.some((m) => m.target === o.target));
-      const delivered = yield* deliver(recipient, wakeInput(messages, others), waking[0]!.message_id);
+      const delivered = yield* deliver(recipient, wakeInput(messages, others), firstWake.message_id, firstWake.channel_id);
       if (delivered.kind === "refused") return yield* Effect.logInfo(`chat: ${recipient} not woken: ${delivered.reason}`);
       const now = yield* Clock.currentTimeMillis;
       yield* Effect.forEach(
@@ -773,8 +783,9 @@ const make = (sessions: Session["Service"]) =>
       if (!session) return;
       if (!isBusy(session)) return yield* kick(recipient);
       const rows = open.of(recipient).filter((r) => r.state === "pending" && r.held_by === null);
-      if (rows.length === 0) return;
-      const delivered = yield* deliver(recipient, busyNotice(groupRows(rows)), rows[0]!.message_id);
+      const firstPending = rows[0];
+      if (firstPending === undefined) return;
+      const delivered = yield* deliver(recipient, busyNotice(groupRows(rows)), firstPending.message_id, firstPending.channel_id);
       if (delivered.kind === "refused") return;
       const now = yield* Clock.currentTimeMillis;
       yield* Effect.forEach(
@@ -844,6 +855,94 @@ const make = (sessions: Session["Service"]) =>
         { discard: true },
       );
 
+    const registerTalk = (session: T.Session, launch: string, snapshot: readonly MsgRow[]) =>
+      locked(
+        Effect.gen(function* () {
+          const joined: qp.UpsertParticipantParams = {
+            id: session.id,
+            kind: "session",
+            name: session.name,
+            agent_id: session.agent,
+            runtime: session.runtime,
+            joined_at: yield* Clock.currentTimeMillis,
+          };
+          const pending = yield* db.attemptTx(
+            Effect.gen(function* () {
+              yield* qp.upsertParticipant(joined);
+              yield* Effect.forEach(
+                snapshot.filter((m) => m.sender_id === ownerId && m.kind === "chat" && m.deleted_at === null),
+                (row) =>
+                  Effect.gen(function* () {
+                    yield* qd.insertDelivery({
+                      recipient_id: session.id,
+                      message_id: row.id,
+                      reason: "direct",
+                      wakes: true,
+                      held_by: null,
+                      created_at: joined.joined_at,
+                    });
+                    yield* qd.markHanded({ recipient_id: session.id, message_id: row.id, launch, handed_at: joined.joined_at });
+                  }),
+                { discard: true },
+              );
+              return yield* qd.allOpenDeliveries();
+            }),
+          );
+          model.joined(joined);
+          open.load(pending);
+        }).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause }))),
+      );
+
+    const startTalk = Effect.fnUntraced(function* (channel: string, agentId: string) {
+      if (talkSession(channel)) return;
+      const place = model.channel(channel);
+      if (place?.type !== "direct") return;
+      const agent = agents.agent(agentId);
+      if (!agent) return;
+      const problem = !agent.enabled
+        ? t("server.channel.profileDisabled", { name: agent.name })
+        : yield* Effect.map(sessions.makeRoom(agent.runtime, ""), (room) => ("refused" in room ? room.refused : undefined));
+      if (problem) return yield* shape.notice(channel, t("server.channel.talkFailed", { why: problem }), "talk_refused");
+      const snapshot = yield* locked(db.run(qm.messagesBefore({ channel_id: channel, number: 2147483647, n: talkContext })));
+      const ordered = snapshot.toReversed();
+      const last = ordered.at(-1);
+      const owner = ordered.findLast((m) => m.sender_id === ownerId && m.kind === "chat" && m.deleted_at === null);
+      if (!owner) return;
+      const target = targetOfChannel(place);
+      const hired = yield* sessions.send(agent, talkBrief(agent.name, inboxLines(ordered.map((m) => inboxOf(m, target)))), "", {
+        context: { kind: "channel", channel },
+        trigger: { kind: "comment", channel, message: owner.id },
+        hiring: (session, launch) => registerTalk(session, launch, ordered),
+      });
+      if (!hired.session) {
+        yield* locked(sessionsLeft);
+        return yield* shape.notice(channel, t("server.channel.talkFailed", { why: hired.refused ?? "" }), "talk_refused");
+      }
+      const recipient = hired.session.id;
+      yield* locked(
+        Effect.gen(function* () {
+          const missed = yield* db.run(qm.missingDirectDeliveries({ channel_id: channel, recipient_id: recipient, after_number: last?.number ?? 0 }));
+          yield* tx(Effect.forEach(missed, (row) => settle(row), { discard: true }));
+          yield* kick(recipient);
+        }),
+      );
+    });
+
+    const onDirectMessage = Effect.fnUntraced(function* (message: T.ChatMessage) {
+      if (message.fromKind !== "owner" || message.kind !== "chat") return;
+      const channel = model.channel(message.channel);
+      const peer = channel?.peer_id ? model.participant(channel.peer_id) : undefined;
+      if (channel?.type !== "direct" || peer?.kind !== "profile" || !peer.agent_id) return;
+      const session = talkSession(channel.id);
+      if (session) return yield* FiberMap.remove(idleTalks, session.id);
+      yield* FiberMap.run(talkStarts, channel.id, startTalk(channel.id, peer.agent_id).pipe(bestEffort("chat: opening a direct context")), {
+        onlyIfMissing: true,
+      });
+    });
+
+    const idleTalk = (session: string) =>
+      FiberMap.run(idleTalks, session, Effect.delay(sessions.suspend(session), talkIdleMs).pipe(bestEffort(`chat: suspending ${session}`)));
+
     const openThread = Effect.fn("Channel.openThread")(function* (h: T.Session) {
       const joined: qp.UpsertParticipantParams = {
         id: h.id,
@@ -855,6 +954,8 @@ const make = (sessions: Session["Service"]) =>
       };
       yield* db.run(qp.upsertParticipant(joined));
       model.joined(joined);
+      const direct = directOfSession(h);
+      if (direct) return yield* handedOn(h, direct);
       const subject = subjectOf(h);
       const thread = yield* threadOf(subject);
       if (thread) return yield* handedOn(h, thread);
@@ -967,6 +1068,10 @@ const make = (sessions: Session["Service"]) =>
           }
         }),
       ).pipe(bestEffort(`chat: after ${n._tag}`));
+      if (n._tag === "reported") {
+        const session = sessionOf(n.report.id);
+        if (session && directOfSession(session)) yield* idleTalk(session.id);
+      } else if (n._tag === "left") yield* FiberMap.remove(idleTalks, n.left.id);
     });
     // Once the helpers are back: each present one has its thread, and whatever was waiting for one goes to it.
     const start = locked(
@@ -1197,7 +1302,8 @@ const make = (sessions: Session["Service"]) =>
         if (!thread) {
           // Sent with no channel, so no thread to say it in: the session hears it straight.
           if (!sessions.present(session)) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
-          yield* sessions.deliver(session, text.trim(), { kind: "comment" });
+          const channel = sessionOf(session)?.channel;
+          yield* sessions.deliver(session, text.trim(), { kind: "comment", ...(channel ? { channel } : {}) });
           return undefined;
         }
         const run = sessions.runOf(from);
@@ -1535,13 +1641,13 @@ const make = (sessions: Session["Service"]) =>
         yield* publishChannel(id);
         return id;
       }, locked),
-      orchestratorDirect: (agent) => model.channels("direct").find((c) => c.peer_id === agent)?.id ?? "",
       orchestratorOf: (channel) => orchestratorOfRow(model.channel(channel)),
-      linkTalk: Effect.fn("Channel.linkTalk")(function* (channel, issue) {
-        yield* db.run(qc.setSubject({ subject_id: issue, id: channel }));
-        yield* reload;
-        yield* publishChannel(channel);
-      }, locked),
+      direct: Effect.fn("Channel.direct")(function* (ref) {
+        const name = ref.trim();
+        const agent = agents.named(name) ?? agents.agent(name) ?? agents.orchestrators().find((o) => o.name === name);
+        if (!agent) return yield* Effect.fail(missing(t("server.channel.noProfileNamed", { key: ref }), [lookIn.agent]));
+        return yield* shape.openDirect(agent);
+      }),
       recent: Effect.fn("Channel.recent")(function* (channel, n) {
         const row = model.channel(channel);
         if (!row) return [];
@@ -1603,6 +1709,7 @@ const make = (sessions: Session["Service"]) =>
       Stream.runForEach(yield* sessions.inputsConsumed, (c) => locked(consumed(c)).pipe(bestEffort(`chat: input consumed by ${c.session}`))),
     );
     yield* Effect.forkScoped(Stream.runForEach(yield* sessions.news, onSessionNews));
+    yield* Effect.forkScoped(Stream.runForEach(Stream.fromSubscription(yield* PubSub.subscribe(said)), onDirectMessage));
     return shape;
   });
 

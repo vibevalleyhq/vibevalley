@@ -6,7 +6,7 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 
 ```
 apps/server/               服务端（Effect v4，Node 24 上用 tsx 跑）：src/ 里一块业务一个文件夹，名字用单数，每个导出一个服务
-                           （Context.Service）：core、setting、agent、project、memory、artifact、runtime、session、channel、cron、issue、
+                           （Context.Service）：core、setting、agent、project、memory、artifact、runtime、executor、session、channel、cron、issue、
                            task、inbox、tool、mcp、orchestrator、lan、voice、connector、game；projection 是核心状态的折法和拼帧（读各模块的
                            规则，组装时交给 core）；VibeValley 自己的 agent 在 packages/agent，这里只组装它（runtime/vibevalley.ts 是
                            oar 的 vibevalley runtime）；base 是不碰外面的地基（id、JSON、排序、脱敏），infra 是和进程、机器打交道的
@@ -113,7 +113,7 @@ list are in the [vv-effect](.agents/skills/vv-effect/SKILL.md) skill.
 - **核心状态只有一份**：帮工或农场的新状态，在 `packages/protocol/src/shapes.ts` 里加字段或事实，在 `apps/server/src/projection/reduce.ts` 的 `reduce` 里折，只由服务端 `Core.apply` 施加。不要在服务端、页面里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
 - **`packages/protocol` 只放契约**：线上的形状写在 `shapes.ts`，每个形状在 `schema.ts` 有一个由它定类型的 Schema（`Codec<T.X>`：两边对不上就编不过），接口写在 `api.ts`；`src/rules` 只放页面和服务端都要跑的纯函数，只有服务端跑的规则归拥有它的模块（`apps/server/src/<模块>`），结论写进帧给页面，页面不为了展示去调规则（`rules/contract.test.ts` 查每个导出都有服务端以外的包在用）；黄金数据（`apps/server/src/<模块>/testdata/*.jsonl.gz`）跟着规则走，有意改了规则就 `vp run golden:update` 重写，看过 diff 再留（[理由](docs/subsystems/foundation.md)）。
 - **生成的不手改**：`apps/server/db/generated` 由 effect-sqlc 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`packages/i18n/src/catalogs.ts` 由 `vp run i18n:gen` 写，`docs:verify` 查它们（[理由](docs/subsystems/foundation.md)）。
-- **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `apps/server/src` 文件夹（`issue`、`issue_session`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `db/queries/<表>.sql`，一张表一个文件，代码里只调生成的；`src/infra/schema.test.ts` 查这几条（[理由](docs/subsystems/foundation.md)）。
+- **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `apps/server/src` 文件夹（`issue`、`issue_assignment`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `db/queries/<表>.sql`，一张表一个文件，代码里只调生成的；`src/infra/schema.test.ts` 查这几条（[理由](docs/subsystems/foundation.md)）。
 - **内部不留兼容**：架构还在成形，不为兼容少走一步：改名、改形状、改存盘的格式（库里的表、家目录的文件、环境变量、存下的取值）都直接改，不写兼容层，不在读的地方兜底旧数据，也不写数据搬运；表结构直接改 `db/migrations/0001_schema.up.sql`，不另加迁移（`schema.test.ts` 查这条），本机的旧库和旧文件作废（库由服务端开机时挪到一边、新建一个），旧文件删掉重建；启动时只认今天的名字（[理由](docs/subsystems/foundation.md)）。对外 HTTP 的版本是唯一例外，v1 留到主人的设备都升上来（[接口版本](docs/subsystems/core.md#为什么这样)）。
 - **页面不折事实**：它读 `GET /api/v1/state` 折好的 `StateFrame`（`useCore()`、`useFrames()`）；要新的数据就加进 protocol 的字段和 `reduce`，页面里只写跟着时钟走的画面和摆法（各 feature 里的纯函数）；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在页面里重写，加一个字段或接口问服务端（[理由](docs/subsystems/app.md)）。
 - **封闭的联合穷尽处理**：按 `_tag`、`kind`、`type` 分支的地方，`switch` 覆盖每一种，或用 `default` 说明其余的有意不管（lint 的 `switch-exhaustiveness-check` 查）；成员表（`XValues`）要每种都处理时用 `Record<X, …>`，加新成员时编不过。

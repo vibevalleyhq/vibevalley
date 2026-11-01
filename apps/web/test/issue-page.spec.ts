@@ -4,11 +4,11 @@
 
 import type { Page, Route } from "@playwright/test";
 
-import type { Agent, Changes, Issue, IssueHistory, IssueAttention, IssueTimeline, StateFrame, SessionView } from "@vibevalley/protocol";
+import type { Agent, Changes, Issue, IssueHistory, IssueStage, IssueTimeline, StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { buttons, expect, test } from "./fixtures";
+import { buttons, expect, test, withIssueSession } from "./fixtures";
 
 async function firstFrame(url: string): Promise<StateFrame> {
   const abort = new AbortController();
@@ -28,7 +28,7 @@ async function openIssue(
   page: Page,
   server: { url: string },
   made: Issue,
-  attention: IssueAttention,
+  stage: IssueStage,
   more: Partial<Issue>,
   helper: Partial<SessionView>,
   timeline: IssueTimeline,
@@ -51,8 +51,8 @@ async function openIssue(
     branch: "vibevalley/1",
     ...helper,
   };
-  const closed = attention.state === "done" || attention.state === "canceled";
-  const issue: Issue = { ...made, sessions: [sessionId("w1")], project: "farm-site", attention, ...more };
+  const closed = stage.state === "done" || stage.state === "canceled";
+  const issue: Issue = withIssueSession({ ...made, project: "farm-site", stage, ...more }, sessionId("w1"));
   const fixture: StateFrame = { ...frame, state: { ...frame.state, sessions: closed ? [] : [session], issues: [issue] } };
   const history: IssueHistory[] = [
     { issue, sessions: [closed ? { ...session, phase: { _tag: "closed", at: now, closed: "merged" } } : session], missingSessions: [] },
@@ -99,7 +99,7 @@ const answer = "用 8797";
 test("a real round: the helper asks with options, one click answers, and it hands back with its word on each criterion", async ({ page, api }) => {
   const fox = await api.agent.create(scripted);
   const project = await api.project.create({ name: "clock" });
-  const made = await api.issue.create({ title: asksWithOptions, project: project.name, assignee: fox.id });
+  const made = await api.issue.create({ title: asksWithOptions, project: project.name, agent: fox.id });
   await api.issue.update({ id: made.id, criteria: ["clock-in works"] });
   await api.issue.status.update({ id: made.id, status: "todo" });
   await page.goto(`/issues/${made.id}`);

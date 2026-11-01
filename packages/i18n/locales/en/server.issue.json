@@ -16,7 +16,7 @@
   "notRecorded": "{name}'s ticket was not recorded: {why}",
   "workKept": "{refused}; ticket #{n} and its changes are kept, and it can be sent again",
   "drafting": "{name} is drafting it: start it once the draft comes back",
-  "pickHint": "Once picked, give it when moving to To do: {command}, with --json status \"todo\" and assignee (the profile's id)",
+  "pickHint": "Once picked, give it when moving to To do: {command}, with --json status \"todo\" and agent (the profile's id)",
   "noAssignee": "No helper has been picked yet",
   "profileGone": "The profile {id} is gone",
   "sendFailed": "It could not be sent",
@@ -32,12 +32,10 @@
   "cronNoIssue": "The scheduled task \"{name}\" could not write its ticket: {why}",
   "cronNoStart": "The scheduled task \"{name}\" could not start: {why}",
   "closedReopen": "This ticket is closed: reopen it with a few words",
-  "noProfileNamed": "There is no profile called {key}",
   "handOverOnTodo": "Handing over happens when moving to To do: move it there and say who takes over",
   "stopFirst": "#{n} is still in this round: stop it, and hand it over once it has stopped",
   "noStatus": "There is no such status: {to}",
   "roundNeedsWords": "Another round needs a few words: what it should do this round",
-  "talkTitle": "Talking with {name}",
   "closed": "This ticket is closed",
   "cannotMoveProject": "Ticket #{n} cannot change project yet: {why}",
   "cannotDelete": "Ticket #{n} cannot be deleted yet: {why}",
@@ -162,5 +160,6 @@
     "todo": "To do:",
     "notDoing": "Not doing:",
     "files": "May touch:"
-  }
+  },
+  "noProfileNamed": "No profile is named {key}"
 }

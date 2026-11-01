@@ -52,8 +52,7 @@ CREATE TABLE channel (
   check ((type = 'direct') = (peer_id is not null)),
   check (type <> 'direct' or name is null),
   check ((type = 'thread') = (parent_id is not null)),
-  -- A direct channel with a helper profile is its talk issue's thread too.
-  check ((subject_kind is null) or type in ('thread', 'direct')),
+  check ((subject_kind is null) or type = 'thread'),
   check (not is_default or type = 'channel'),
   check (not is_default or archived_at is null),
   check (orchestrator is null or type = 'channel')
@@ -148,7 +147,6 @@ CREATE TABLE issue (
   title       text not null default '',
   description text not null,
   project     text,
-  assignee    text,
   priority    issue_priority not null default 'medium',
   rank        integer not null default 0,
   parent      text references issue (id) on delete cascade,
@@ -164,8 +162,6 @@ CREATE TABLE issue (
   canceled    issue_canceled,
   pull_request text,
   deliver issue_deliver not null default 'change',
-  -- A profile's talk with the owner: the direct channel it is said in. Off the board; read-only, its rounds' leftovers go.
-  talk    text unique,
   reviewed_at double precision,
   findings    text,
   questions        text,
@@ -178,10 +174,20 @@ CREATE TABLE issue (
   check (delivered is null or canceled is null)
 );
 CREATE INDEX issue_by_parent on issue (parent);
-CREATE TABLE issue_session (
-  session         text primary key,
+CREATE TABLE issue_assignment (
+  id              text primary key,
   issue           text not null references issue (id) on delete cascade,
-  started_at      double precision not null
+  agent           text not null,
+  assigned_at     double precision not null,
+  ended_at        double precision
+);
+CREATE TYPE issue_assignment_execution_executor_kind AS ENUM ('session', 'orchestrator');
+CREATE TABLE issue_assignment_execution (
+  assignment      text not null references issue_assignment (id) on delete cascade,
+  executor_kind   issue_assignment_execution_executor_kind not null,
+  executor        text not null,
+  started_at      double precision not null,
+  primary key (assignment, executor_kind, executor)
 );
 CREATE TYPE session_run_outcome AS ENUM ('completed', 'failed', 'interrupted');
 CREATE TABLE session_run (
@@ -314,7 +320,9 @@ CREATE TABLE lan_device (
   paired_at  double precision not null,
   last_seen  double precision
 );
-CREATE INDEX issue_session_by_issue on issue_session (issue, started_at);
+CREATE INDEX issue_assignment_by_issue on issue_assignment (issue, assigned_at, id);
+CREATE UNIQUE INDEX issue_assignment_current on issue_assignment (issue) where ended_at is null;
+CREATE UNIQUE INDEX issue_assignment_execution_by_executor on issue_assignment_execution (executor) where executor_kind = 'session';
 CREATE UNIQUE INDEX channel_by_name on channel (name) where name is not null;
 CREATE INDEX channel_by_subject on channel (subject_kind, subject_id);
 CREATE UNIQUE INDEX channel_one_default on channel (is_default) where is_default;
@@ -334,6 +342,7 @@ CREATE TABLE session (
   brief     text not null,
   project   text,
   issue     text,
+  channel   text,
   graph     text,
   hired_at  double precision not null,
   ended_at  double precision,

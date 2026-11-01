@@ -5,7 +5,7 @@ import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, S
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { commandOf } from "@vibevalley/protocol/api";
-import { isBusy } from "@vibevalley/protocol/rules";
+import { isBusy, latestSessionIdOf } from "@vibevalley/protocol/rules";
 import type { Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -26,6 +26,7 @@ import { chooseAgent } from "@/runtime/fit.ts";
 import { Runtime } from "@/runtime/runtime.ts";
 import { sessionOf } from "@/session/roster.ts";
 import { type Hired, type HireOptions, type Roster, type SessionNews, Session } from "@/session/session.ts";
+import type { Delivered } from "@/session/shapes.ts";
 
 import * as q from "../../db/generated/task_event.sql.ts";
 import { changeOf, graphChanges, graphEventText, renderedChanges } from "./changes.ts";
@@ -130,7 +131,7 @@ const unmanned = (n: T.Task): T.Task => {
 /** The sessions a graph's steps are worked by; tests play them. */
 export interface TaskWork {
   readonly hire: (agent: T.Agent, brief: string, project: string, opt: HireOptions) => Effect.Effect<Hired>;
-  readonly tell: (id: string, text: string) => Effect.Effect<string>;
+  readonly deliver: (id: string, text: string) => Effect.Effect<Delivered>;
   readonly dismiss: Session["Service"]["dismiss"];
   readonly find: (id: string) => Roster | undefined;
   readonly handOver: Session["Service"]["handOver"];
@@ -168,7 +169,7 @@ export const make = (options: TaskOptions = {}) =>
     const live = yield* Session;
     const work: TaskWork = options.work ?? {
       hire: issues.hire,
-      tell: (id, text) => live.tell(id, text, { kind: "task" }),
+      deliver: (id, text) => live.deliver(id, text, { kind: "task" }),
       dismiss: live.dismiss,
       find: live.find,
       handOver: live.handOver,
@@ -181,7 +182,6 @@ export const make = (options: TaskOptions = {}) =>
     const splitters = new Map<string, string>();
     const splitterTries = new Map<string, number>();
 
-    const tell = (id: string, text: string) => work.tell(id, text);
     const dismiss = (id: string) => Effect.asVoid(work.dismiss(id));
     const notice = (level: "info" | "warn", text: string) => core.notice(level, text);
     const tellOrchestrator = (text: string) => Effect.asVoid(PubSub.publish(newsHub, graphNews.head + text));
@@ -251,14 +251,16 @@ export const make = (options: TaskOptions = {}) =>
       if (outcome === "failed") {
         if (tries >= 1) return yield* giveUp(graph, t("server.task.notice.plannerFailed", { summary }));
         splitterTries.set(graph.id, tries + 1);
-        yield* tell(session.id, graphTell.retrySplit);
+        const delivered = yield* work.deliver(session.id, graphTell.retrySplit);
+        if (delivered.kind === "refused") return yield* giveUp(graph, delivered.reason ?? "");
         return;
       }
       const parsed = parseSplit(work.find(session.id)?.lastText ?? "");
       if (!parsed.ok) {
         if (tries >= 1) return yield* giveUp(graph, t("server.task.notice.noGraph", { problem: parsed.problems[0] ?? "" }));
         splitterTries.set(graph.id, tries + 1);
-        yield* tell(session.id, graphTell.fixGraph(parsed.problems));
+        const delivered = yield* work.deliver(session.id, graphTell.fixGraph(parsed.problems));
+        if (delivered.kind === "refused") return yield* giveUp(graph, delivered.reason ?? "");
         return;
       }
       const draft = withNote({ ...graph, title: parsed.title ?? "", tasks: parsed.tasks, state: "draft" }, "");
@@ -314,12 +316,10 @@ export const make = (options: TaskOptions = {}) =>
 
     const sendBack = Effect.fn("Task.sendBack")(function* (graph: T.TaskGraph, task: T.Task, session: string, text: string, why: string) {
       if (task.tries >= autoRetries) return yield* taskFailed(graph, task, why);
-      yield* put(
-        withTask(graph, task.id, (n) => ({ ...n, tries: n.tries + 1 })),
-        system,
-        why,
-      );
-      yield* tell(session, text);
+      const retry = withTask(graph, task.id, (n) => ({ ...n, tries: n.tries + 1 }));
+      yield* put(retry, system, why);
+      const delivered = yield* work.deliver(session, text);
+      if (delivered.kind === "refused") yield* taskFailed(retry, task, delivered.reason ?? "");
     });
 
     /** Runs while handOver holds the stopped session; a failed check is acted on after that hold ends. */
@@ -451,7 +451,10 @@ export const make = (options: TaskOptions = {}) =>
         }
         if (isBusy(session)) continue;
         if (session.phase._tag === "done") yield* taskDone(graph, task, session.id, session.lastRun?.summary ?? t("server.task.notice.done"));
-        else yield* tell(session.id, graphTell.carryOn(task.title));
+        else {
+          const delivered = yield* work.deliver(session.id, graphTell.carryOn(task.title));
+          if (delivered.kind === "refused") yield* taskFailed(graph, task, delivered.reason ?? "");
+        }
       }
     });
 
@@ -505,16 +508,8 @@ export const make = (options: TaskOptions = {}) =>
 
     const shape = Task.of({
       splitIssueOf: Effect.fn("Task.splitIssueOf")(function* (issue, title, drafts) {
-        return yield* shape.splitIssue(
-          String(
-            core
-              .state()
-              .issues.find((item) => item.id === issue)
-              ?.sessions.at(-1) ?? "",
-          ),
-          title,
-          drafts,
-        );
+        const item = core.state().issues.find((item) => item.id === issue);
+        return yield* shape.splitIssue(String(item ? (latestSessionIdOf(item) ?? "") : ""), title, drafts);
       }),
       graphs: () => graphsOf(core.state()),
       graph: need,
@@ -683,7 +678,14 @@ export const make = (options: TaskOptions = {}) =>
                 withTask(graph, task.id, (n) => ({ ...n, state: "working", tries: 0 })),
                 by,
               );
-              yield* tell(session.id, graphTell.retry(retryText(task), task.brief));
+              const delivered = yield* work.deliver(session.id, graphTell.retry(retryText(task), task.brief));
+              if (delivered.kind === "refused") {
+                yield* put(
+                  withTask(yield* need(id), task.id, () => ({ ...task, conclusion: delivered.reason ?? "" })),
+                  by,
+                );
+                return yield* Effect.fail(refused(delivered.reason ?? "", taskNext(graph, task)));
+              }
               return t("server.task.act.retried", { name: session.name, title: task.title });
             }
             yield* put(

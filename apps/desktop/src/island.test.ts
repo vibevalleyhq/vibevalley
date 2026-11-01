@@ -4,8 +4,25 @@ import type { Issue, Session, StateFrame } from "@vibevalley/protocol";
 
 import { glanceOf } from "./island";
 
-const issue = (number: number, state: Issue["attention"]["state"], more: Partial<Issue["attention"]> = {}, sessions: string[] = []) =>
-  ({ id: `i${number}`, number, title: `第 ${number} 张`, sessions, attention: { state, acts: [], ...more } }) as unknown as Issue;
+const issue = (number: number, state: Issue["stage"]["state"], more: Partial<Issue["stage"]> = {}, sessions: string[] = []) =>
+  ({
+    id: `i${number}`,
+    number,
+    title: `第 ${number} 张`,
+    assignments:
+      sessions.length > 0
+        ? [
+            {
+              id: `a${number}`,
+              issue: `i${number}`,
+              agent: "lab",
+              assignedAt: 0,
+              executions: sessions.map((session) => ({ kind: "session", session, startedAt: 0 })),
+            },
+          ]
+        : [],
+    stage: { state, acts: [], ...more },
+  }) as unknown as Issue;
 
 const working = (id: string, name: string, label: string) =>
   ({ id, name, phase: { _tag: "working", since: 0, doing: { action: "run_command", label } } }) as unknown as Session;

@@ -81,7 +81,7 @@ const agentsZh: MemoryAgent[] = [
 const projectsZh = ["vibevalley", "字幕面板", "官网", "billing"];
 
 const notesZh = [
-  "表名用单数：issue、issue_session",
+  "表名用单数：issue、issue_assignment",
   "改完 db/queries 要跑 vp run db:generate",
   "主人不要兼容层，旧数据直接作废",
   "页面不折事实，要新数据就加 protocol 字段",
@@ -135,7 +135,7 @@ const agentsEn: MemoryAgent[] = [
 const projectsEn = ["vibevalley", "subtitle-panel", "site", "billing"];
 
 const notesEn = [
-  "Table names are singular: issue, issue_session",
+  "Table names are singular: issue, issue_assignment",
   "After changing db/queries, run vp run db:generate",
   "The owner wants no compatibility layers; old data is dropped",
   "The page folds no facts; new data is a protocol field",

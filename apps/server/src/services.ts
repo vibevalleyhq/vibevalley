@@ -12,11 +12,12 @@ import { FetchHttpClient } from "effect/http";
 import { Llm } from "@vibevalley/ai/llm";
 
 import { Agent } from "./agent/agent.ts";
-import { Artifact, type ArtifactOptions } from "./artifact/artifact.ts";
+import { Artifact } from "./artifact/artifact.ts";
 import { Channel, start as channelStart } from "./channel/chat.ts";
 import { Connector, type ConnectorOptions } from "./connector/connector.ts";
 import { Core } from "./core/core.ts";
 import { Cron, start as cronStart } from "./cron/cron.ts";
+import { Executor } from "./executor/executor.ts";
 import { Game, start as gameStart } from "./game/game.ts";
 import { Inbox, start as inboxReady } from "./inbox/inbox.ts";
 import { ServerConfig } from "./infra/config.ts";
@@ -45,7 +46,6 @@ const on =
 export interface ServiceOptions {
   readonly runtime?: RuntimeOptions;
   readonly project?: ProjectHooks;
-  readonly artifact?: ArtifactOptions;
   readonly session?: SessionOptionsIn;
   readonly issue?: IssueOptions;
   readonly task?: TaskOptions;
@@ -86,13 +86,13 @@ export const sourceControl =
 export const agentSessions =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Session.layer(o.session)));
+    below.pipe(on(Executor.layer), on(Session.layer(o.session)));
 
 /** Collaboration: channels, threads, messages, documents; the sessions register as its helpers. */
 export const collaboration =
-  (o: ServiceOptions = {}) =>
+  (_o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Channel.layer), on(Artifact.layer(o.artifact)));
+    below.pipe(on(Channel.layer), on(Artifact.layer));
 
 /** Issues without its task graphs: for a test that makes its own task service. */
 export const issuesBelowTaskGraphs =

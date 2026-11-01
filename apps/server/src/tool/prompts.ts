@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues, PriorityValues } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
-import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { phaseText, shortTitle, stageWantsOwner } from "@vibevalley/protocol/rules";
 
 import { head } from "@/base/clip.ts";
 import { nextText, whenText } from "@/cron/when.ts";
@@ -105,13 +105,13 @@ function spanWords(ms: number): string {
 
 /** One line: its number and short title first, so the orchestrator names it by them; who is the one doing it, when any. */
 export function issueLine(issue: T.Issue, who: string, now: number): string {
-  const st = issue.attention;
+  const st = issue.stage;
   const stuck = st.stuck ? "（" + t(`shared.stuck.${st.stuck}`) + "）" : "";
-  const parts = [`#${issue.number}「${shortTitle(issue.title)}」${t(`shared.attention.${st.state}`)}${stuck}`];
+  const parts = [`#${issue.number}「${shortTitle(issue.title)}」${t(`shared.stage.${st.state}`)}${stuck}`];
   if (issue.project) parts.push(issue.project);
   if (who) parts.push(who);
   if (issue.priority !== "medium") parts.push(t(`shared.priority.${issue.priority}`) + "优先级");
-  if (attentionWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
+  if (stageWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
   return "- " + parts.join(" · ");
 }
 
@@ -191,7 +191,7 @@ export const params = {
     goal: "要做的事，照主人的原话",
   },
   issueCreate: {
-    assignee: "谁来做：帮工的名字、id 或 runtime；不填，开工时按挑帮工的规则挑",
+    agent: "谁来做：帮工的名字、id 或 runtime；不填，开工时按挑帮工的规则挑",
     channel: "工单串开在哪个频道，比如 #clock-in；不填就是你正在回话的频道",
     deliver:
       "交付什么：change 是改代码、合进项目（不填就是它）；branch 是改代码但分支留着不合（主人说「先别合」「分支留着」）；answer 是只查清楚、交回一份带依据的结论，不改代码（「查一下」「看看为什么」「是不是」）",
@@ -203,13 +203,13 @@ export const params = {
     title: "一句话的标题",
   },
   issueStatus: {
-    assignee: "挪到待办时谁来做：填另一个帮工的名字、id 或 runtime 就是换人接手，上一个收工、分支留着",
+    agent: "挪到待办时谁来做：填另一个帮工的名字、id 或 runtime 就是换人接手，上一个收工、分支留着",
     text: "带给帮工的一句话：从等你看挪回待办（再干一轮，等验收时就是验收意见，一行一条）、重开时必填；卡住了（没做成、冲突、被打断）不填就照原因接着修、解决冲突、接着做；换人时写接手的接着做什么",
     status: "挪到：备选、待办、已完成、已取消",
   },
   issueUpdate: {
     deliver: "交付方式：change（合进项目）、branch（分支留着不合）、answer（只交结论）",
-    assignee: "谁来做：帮工的名字或 id（派出去以前才能改）",
+    agent: "谁来做：帮工的名字或 id（派出去以前才能改）",
     criteria: "验收标准，一条一个主人能照着验的点；给空列表就是清掉（派出去以前才能改）",
     description: "说明（派出去以前才能改）",
     priority: "紧急、高、普通、低",
@@ -330,7 +330,7 @@ export const descriptions = {
   "issue.update":
     "改一张工单：优先级、交付方式随时能改；标题、说明、项目、谁来做、验收标准只在派出去以前能改。只在主人叫你改时用：你自己看出来该改的，先在频道里问主人。",
   "issue.status.update":
-    "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空位就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮，卡住了不带话就照原因接着修、解决冲突、接着做；已完成、已取消挪回待办是带一句话重开；挪到待办时 assignee 填另一个帮工就是换人接手（在干的要先 session_stop）；等你看挪到已完成是完成，也就是验收通过：照工单的交付方式，有提交就合进主分支或开 PR，branch 的分支留着不合，没有改动不碰 git（主人要分支留着，先用 issue_update 把 deliver 改成 branch）；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
+    "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空位就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮，卡住了不带话就照原因接着修、解决冲突、接着做；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 session_stop）；等你看挪到已完成是完成，也就是验收通过：照工单的交付方式，有提交就合进主分支或开 PR，branch 的分支留着不合，没有改动不碰 git（主人要分支留着，先用 issue_update 把 deliver 改成 branch）；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
   "cron.create":
     "定一件按时间来的事：到点时频道里出现一条「⏰ 定时任务」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。when.kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）、cron（expr 填五段：分 时 日 月 周几，比如工作日 9 点是 0 9 * * 1-5，每月 1 号 10 点是 0 10 1 * *；前四种说不清的才用它）。text 写清楚到时候做什么、做完告诉谁。",
   "cron.list": "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。",

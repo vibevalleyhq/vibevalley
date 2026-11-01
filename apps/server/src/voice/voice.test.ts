@@ -218,7 +218,15 @@ const issueOf = (id: string, number: number, session: string) =>
     priority: "medium",
     deliver: "change",
     createdAt: Date.now(),
-    sessions: [sessionId(session)],
+    assignments: [
+      {
+        id: `a-${id}`,
+        issue: issueId(id),
+        agent: "lab",
+        assignedAt: Date.now(),
+        executions: [{ kind: "session", session: sessionId(session), startedAt: Date.now() }],
+      },
+    ],
     status: "in_progress",
     moves: [],
     findings: [],
@@ -227,7 +235,7 @@ const issueOf = (id: string, number: number, session: string) =>
     blockedBy: [],
     criteria: [],
     checks: [],
-    attention: { state: "working", acts: [] },
+    stage: { state: "working", acts: [] },
   }) satisfies Issue;
 
 const credentials = (voice?: Partial<VoiceSettings>) =>

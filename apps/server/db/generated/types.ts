@@ -49,6 +49,9 @@ export type Pg_public_connector_account_connector_b578f4ff6726 = typeof Pg_publi
 export const Pg_public_cron_set_by_b6fe14629be3 = Schema.Literals(["owner","orchestrator","session","system"])
 export type Pg_public_cron_set_by_b6fe14629be3 = typeof Pg_public_cron_set_by_b6fe14629be3.Type
 
+export const Pg_public_issue_assignment_execution_executor_kind_cc79defb700e = Schema.Literals(["session","orchestrator"])
+export type Pg_public_issue_assignment_execution_executor_kind_cc79defb700e = typeof Pg_public_issue_assignment_execution_executor_kind_cc79defb700e.Type
+
 export const Pg_public_issue_canceled_7f990c847aae = Schema.Literals(["dismissed","lost"])
 export type Pg_public_issue_canceled_7f990c847aae = typeof Pg_public_issue_canceled_7f990c847aae.Type
 

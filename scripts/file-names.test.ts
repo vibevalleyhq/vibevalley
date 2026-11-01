@@ -15,6 +15,6 @@ test("no source file under apps/ or packages/ has a name that would fit any modu
   const named = new RegExp(`/(?:${vague.join("|")})(?:\\.test|\\.stories)?\\.tsx?$`, "u");
   expect(
     files.filter((f) => named.test(f)),
-    "a file named rules, state, utils… says what kind of code it holds, not what it decides, so everything ends up in it. Fix: name it for what it decides (issue/attention.ts, not issue/rules.ts). See docs/style/naming.md",
+    "a file named rules, state, utils… says what kind of code it holds, not what it decides, so everything ends up in it. Fix: name it for what it decides (issue/stage.ts, not issue/rules.ts). See docs/style/naming.md",
   ).toEqual([]);
 });

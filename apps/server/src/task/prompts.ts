@@ -1,5 +1,5 @@
 import type * as T from "@vibevalley/protocol";
-import { slice } from "@vibevalley/protocol/rules";
+import { latestSessionIdOf, slice } from "@vibevalley/protocol/rules";
 
 // What the task graphs say to models: the splitter's brief, a task's brief and what its helper is told when it is sent
 // back, the orchestrator's news of a task graph and the lines it reads one by, and the refusals of the tools only models call.
@@ -126,7 +126,7 @@ export function splittable(
   if (issue.closedAt !== undefined) return no("这张工单已经关了");
   if (isForOrchestrator(issue, orchestrator)) return no("这是派给管家的工单");
   if (!issue.project) return no("这张工单没有项目，没法开分支");
-  if (issue.sessions.at(-1) !== session.id) return no("这张工单现在不归你做");
+  if (latestSessionIdOf(issue) !== session.id) return no("这张工单现在不归你做");
   if (!session.branch) return no("你直接在项目里干活，没有自己的分支：拆了没处开计划的分支");
   return { ok: true, session, issue, project: issue.project, branch: session.branch };
 }

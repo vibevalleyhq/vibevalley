@@ -1,7 +1,7 @@
-// Where it stands (and what the owner may do) is the server's Issue.attention: this only words it.
+// Where it stands (and what the owner may do) is the server's Issue.stage: this only words it.
 
 import { t } from "@vibevalley/i18n";
-import type { Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph, DoingView, SessionView } from "@vibevalley/protocol";
+import type { Issue, IssueStage, Session, SessionEvent, IssueStageKind, TaskGraph, DoingView, SessionView } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 
 import { tookText, spanText } from "@/base/format";
@@ -12,7 +12,7 @@ import { issueTitle } from "./titles";
 /** An action's words as a sentence starts them (English capitalizes; Chinese has no case). */
 const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export const attentionTone: Record<Attention, Tone> = {
+export const stageTone: Record<IssueStageKind, Tone> = {
   draft: "faint",
   queued: "faint",
   working: "water",
@@ -49,10 +49,10 @@ function criteriaRows(issue: Issue): CriterionRow[] {
 }
 
 /** The one thing the owner is asked for, worded; undefined when nothing is asked of the owner. */
-function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): OwnerQuestion | undefined {
+function ownerQuestion(stage: IssueStage, issue: Issue, head: Session): OwnerQuestion | undefined {
   const who = head.name;
   const said = head.lastRun?.summary;
-  switch (attention.state) {
+  switch (stage.state) {
     case "asking":
       return { head: t("web.issue.issue.asking", { who, n: issue.questions.length }), line: t("web.issue.issue.askingLine"), tone: "wheat" };
     case "reviewing":
@@ -60,7 +60,7 @@ function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): 
         ? { head: t("web.issue.issue.reviewed"), ...(said ? { line: said } : {}), tone: "leaf" }
         : { head: t("web.issue.issue.handedBack", { who }), ...(said ? { line: said } : {}), tone: "wheat" };
     case "stuck":
-      switch (attention.stuck) {
+      switch (stage.stuck) {
         case "conflict":
           return {
             head: t("web.issue.issue.conflict", { base: head.conflict?.base ?? t("web.issue.issue.main") }),
@@ -78,7 +78,7 @@ function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): 
           return { head: t("web.issue.issue.stuck"), tone: "berry" };
       }
     case "canceled":
-      return attention.lead === "reopen" ? { head: t("web.issue.issue.canceled"), line: t("web.issue.issue.reopenLine"), tone: "faint" } : undefined;
+      return stage.lead === "reopen" ? { head: t("web.issue.issue.canceled"), line: t("web.issue.issue.reopenLine"), tone: "faint" } : undefined;
     case "draft":
     case "queued":
     case "working":
@@ -94,7 +94,7 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
   const graph = graphId === undefined ? undefined : graphs.find((g) => g.id === graphId);
   const step = head.graph?.task;
   const node = step === undefined || !graph ? undefined : graph.tasks.find((item) => item.id === step);
-  const attention = issue.attention;
+  const stage = issue.stage;
   const current = session ? doingOf(session) : nothing;
   const rows = criteriaRows(issue);
   // Each helper once, the first time it worked the issue.
@@ -107,9 +107,9 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
     issue,
     head,
     session,
-    attention,
+    stage,
     inTask: issueInTask(issue, session),
-    open: attention.state !== "done" && attention.state !== "canceled",
+    open: stage.state !== "done" && stage.state !== "canceled",
     title,
     /** The whole of a title too long for the page's first line goes with the description. */
     description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
@@ -119,14 +119,14 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
       : !node
         ? t("web.issue.issue.splitting", { graph: graph.title })
         : t("web.issue.issue.graphStep", { graph: graph.title, step: node.title }),
-    ask: ownerQuestion(attention, issue, head),
+    ask: ownerQuestion(stage, issue, head),
     /** The lead act and the rest the owner may do, as the server says. */
-    lead: attention.lead,
-    others: attention.acts.map((a) => a.act).filter((a) => a !== attention.lead),
+    lead: stage.lead,
+    others: stage.acts.map((a) => a.act).filter((a) => a !== stage.lead),
     criteria: rows,
     met: rows.filter((r) => r.result === "met").length,
     doing:
-      attention.state === "working" && current.action !== "none"
+      stage.state === "working" && current.action !== "none"
         ? current.label
           ? t("web.issue.issue.doingLabel", { action: capitalized(current.actionText), label: current.label })
           : t("web.issue.issue.doing", { action: capitalized(current.actionText) })
@@ -148,10 +148,10 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
     statusLine(now: number, cny?: number) {
       const s = session ?? head;
       const runs = Math.round(s.runs);
-      const waited = attention.since !== undefined ? now - attention.since : undefined;
+      const waited = stage.since !== undefined ? now - stage.since : undefined;
       const used = (endedAt(head) ?? now) - sessions[0]!.hiredAt;
       return [
-        t(`shared.attention.${attention.state}`),
+        t(`shared.stage.${stage.state}`),
         ...(waited === undefined ? [] : [waited < 60_000 ? t("web.issue.issue.justNow") : t("web.issue.issue.since", { span: spanText(waited) })]),
         head.name,
         ...(runs > 0 ? [t("web.issue.issue.ran", { n: runs })] : []),
@@ -170,7 +170,7 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
       ].join(" · ");
     },
     /** What it made, while there is a worktree to read it from. */
-    showsChanges: session !== undefined && attention.state !== "done" && attention.state !== "canceled",
+    showsChanges: session !== undefined && stage.state !== "done" && stage.state !== "canceled",
   };
 }
 

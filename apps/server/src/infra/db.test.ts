@@ -145,6 +145,7 @@ describe("the database", () => {
 
 /** Where a failed query is a value, not a defect (Db.attempt, Db.attemptTx), and why. */
 const attempting: Readonly<Record<string, string>> = {
+  "channel/chat.ts": "a direct context whose initial delivery cannot be kept is refused as NotRecorded before its events are attached",
   "connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
   "cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
   "game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",

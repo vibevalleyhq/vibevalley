@@ -14,19 +14,20 @@ export const KeepSessionParams = Schema.Struct({
   ["brief"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
+  ["channel"]: Schema.NullOr(Schema.String),
   ["graph"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
 })
 export type KeepSessionParams = typeof KeepSessionParams.Type
 
 
-export const KeepSessionSql = "-- Every session, on the farm or ended (session/sessions.ts).\n\n-- name: KeepSession :exec\ninsert into session (id, agent, name, runtime, brief, project, issue, graph, hired_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, $9)\non conflict (id) do nothing;"
+export const KeepSessionSql = "-- Every session, on the farm or ended (session/sessions.ts).\n\n-- name: KeepSession :exec\ninsert into session (id, agent, name, runtime, brief, project, issue, channel, graph, hired_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\non conflict (id) do nothing;"
 
 export const keepSession = Effect.fn("KeepSession")(function* (params: KeepSessionParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: KeepSessionParams,
-    execute: (p) => sql.unsafe(KeepSessionSql, [p["id"], p["agent"], p["name"], p["runtime"], p["brief"], p["project"], p["issue"], p["graph"], p["hired_at"]]),
+    execute: (p) => sql.unsafe(KeepSessionSql, [p["id"], p["agent"], p["name"], p["runtime"], p["brief"], p["project"], p["issue"], p["channel"], p["graph"], p["hired_at"]]),
   })(params)
 })
 
@@ -62,6 +63,7 @@ export const SessionByIDResult = Schema.Struct({
   ["brief"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
+  ["channel"]: Schema.NullOr(Schema.String),
   ["graph"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
@@ -74,7 +76,7 @@ export const SessionByIDResult = Schema.Struct({
 export type SessionByIDResult = typeof SessionByIDResult.Type
 
 
-export const SessionByIDSql = "-- name: SessionByID :one\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\" from session where id = $1;"
+export const SessionByIDSql = "-- name: SessionByID :one\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"channel\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\" from session where id = $1;"
 
 export const sessionByID = Effect.fn("SessionByID")(function* (params: SessionByIDParams) {
   const sql = yield* SqlClient.SqlClient
@@ -100,6 +102,7 @@ export const EndedSessionsResult = Schema.Struct({
   ["brief"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
+  ["channel"]: Schema.NullOr(Schema.String),
   ["graph"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
@@ -112,7 +115,7 @@ export const EndedSessionsResult = Schema.Struct({
 export type EndedSessionsResult = typeof EndedSessionsResult.Type
 
 
-export const EndedSessionsSql = "-- name: EndedSessions :many\n-- Newest first, the newest n; agent '' is every agent's.\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\" from session where ended_at is not null and ($1::text = '' or agent = $1) order by hired_at desc limit $2::int;"
+export const EndedSessionsSql = "-- name: EndedSessions :many\n-- Newest first, the newest n; agent '' is every agent's.\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"channel\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\" from session where ended_at is not null and ($1::text = '' or agent = $1) order by hired_at desc limit $2::int;"
 
 export const endedSessions = Effect.fn("EndedSessions")(function* (params: EndedSessionsParams) {
   const sql = yield* SqlClient.SqlClient

@@ -5,6 +5,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
 import type * as T from "@vibevalley/protocol";
+import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
@@ -77,11 +78,11 @@ describe("a pull request", () => {
           const sessions = yield* Session;
           const projects = yield* Project;
           yield* (yield* Agent).save(lab());
-          issue = yield* issues.add({ title: "写版本A", project: "clock", assignee: "lab" });
+          issue = yield* issues.add({ title: "写版本A", project: "clock", agent: "lab" });
           yield* issues.start(issue.id, "");
           yield* w.nextReport;
           issue = yield* issues.get(issue.id);
-          id = issue.sessions.at(-1)!;
+          id = latestSessionIdOf(issue)!;
           const place = (sessions as SessionsInside).place(id)!;
           [branch, cwd] = [place.branch!, place.cwd];
           git(work, "init", "--bare", bare);

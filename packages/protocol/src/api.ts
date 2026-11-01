@@ -125,6 +125,8 @@ export interface Handlers<R = never> {
   readonly "session.stop": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   readonly "session.list": (a: { readonly agent?: string }) => Effect.Effect<T.Session[], ApiError, R>;
   readonly "session.get": (a: { readonly id: string }) => Effect.Effect<T.Session, ApiError, R>;
+  /** The runs of an execution context, including those not associated with an issue. */
+  readonly "session.run.list": (a: { readonly id: string }) => Effect.Effect<T.Run[], ApiError, R>;
   /** Its log, oldest first; run gives one run's only. The orchestrator's log is session orchestrator's. */
   readonly "session.event.list": (a: { readonly id: string; readonly run?: string }) => Effect.Effect<T.SessionEvent[], ApiError, R>;
   /** One joined read of issues and their real sessions, including explicit missing records. */
@@ -527,6 +529,13 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: input({ id: Schema.String }),
     result: S.Session,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "session.run.list",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: Schema.mutable(Schema.Array(S.Run)),
     can: ["owner", "remote"],
   },
   {

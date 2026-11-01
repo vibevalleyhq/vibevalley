@@ -49,7 +49,15 @@ describe("an issue as a brief", () => {
       priority: "medium",
       deliver: "change",
       createdAt: 100,
-      sessions: [sessionId("w1")],
+      assignments: [
+        {
+          id: "a1",
+          issue: issueId("t1"),
+          agent: "lab",
+          assignedAt: 150,
+          executions: [{ kind: "session", session: sessionId("w1"), startedAt: 200 }],
+        },
+      ],
       status: "in_review",
       moves: [],
       findings: [{ id: "f1", text: "少了测试", at: 400, resolved: false }],
@@ -58,7 +66,7 @@ describe("an issue as a brief", () => {
       blockedBy: [],
       criteria: [],
       checks: [],
-      attention: { state: "asking", acts: [] },
+      stage: { state: "asking", acts: [] },
     } satisfies Issue;
     const runs: Run[] = [
       {
@@ -209,8 +217,8 @@ describe("templates", () => {
 
   it("issue.list's filter keeps the open ones by default, and what waits on the owner the longest waiting first", () => {
     const issue = (title: string, status: Issue["status"], more: Partial<Issue> = {}) =>
-      ({ title, status, project: "app", attention: { state: "working", acts: [] }, ...more }) as Issue;
-    const waiting = (since: number) => ({ attention: { state: "reviewing" as const, acts: [], since } });
+      ({ title, status, project: "app", stage: { state: "working", acts: [] }, ...more }) as Issue;
+    const waiting = (since: number) => ({ stage: { state: "reviewing" as const, acts: [], since } });
     const all = [
       issue("修登录 按钮", "in_review", waiting(5)),
       issue("加打卡", "todo"),
@@ -228,17 +236,28 @@ describe("templates", () => {
   });
 
   it("recent titles are the project's own sent issues", () => {
-    const issue = (title: string, project: string, at: number, more: Partial<Issue> = {}) =>
-      ({ title, project, createdAt: at, sessions: ["s"], ...more }) as Issue;
+    const issue = (title: string, project: string, at: number, more: Partial<Issue> & { readonly sent?: boolean; readonly agent?: string } = {}) => {
+      const { sent = true, agent = "lab", ...fields } = more;
+      const id = issueId(`i-${at}-${title}`);
+      return {
+        title,
+        project,
+        createdAt: at,
+        assignments: sent
+          ? [{ id: `a-${at}-${title}`, issue: id, agent, assignedAt: at, executions: [{ kind: "session", session: sessionId("s"), startedAt: at }] }]
+          : [],
+        ...fields,
+      } as Issue;
+    };
     const all = [
       issue("修登录", "app", 1),
       issue("  加  打卡 ", "app", 5),
       issue("修登录", "app", 4),
       issue("别的项目", "web", 9),
-      issue("没派过", "app", 8, { sessions: [] }),
+      issue("没派过", "app", 8, { sent: false }),
       issue("计划里的一步", "app", 8, { parent: issueId("g") }),
       issue("定时任务", "app", 8, { cron: "s1" }),
-      issue("给管家", "app", 8, { assignee: defaultOrchestrator }),
+      issue("给管家", "app", 8, { agent: defaultOrchestrator }),
       issue("长".repeat(61), "app", 8),
       issue("三", "app", 3),
       issue("二", "app", 2),

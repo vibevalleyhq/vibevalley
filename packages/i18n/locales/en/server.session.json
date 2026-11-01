@@ -109,14 +109,14 @@
     "noPlace": "{name} has nowhere to work: {why}",
     "cannotSend": "{name} cannot be sent: {why}",
     "notRecorded": "{name}'s ticket was not recorded: {why}",
-    "steered": "{name} is at work; the words were put in",
-    "queued": "{name} reads this once this round is done",
-    "started": "{woke, select, true {{name} woke up and starts a new round} other {{name} starts a new round}}",
     "notReset": "{name}'s working folder could not be reset: {why}",
     "left": "{name} has left: {why}",
     "stillHasHelper": "This ticket still has a helper; its working folder cannot be cleared",
     "seconds": "{n} s",
-    "minutes": "{n} min"
+    "minutes": "{n} min",
+    "noIssue": "This session has no issue whose changes can be delivered or discarded.",
+    "contextKept": "Context directory kept at {cwd}: {why}",
+    "contextHasFiles": "The directory already contains files"
   },
   "conflictBrief": "Merging {base} into your branch conflicts ({files}). On your branch, run git merge {base}, resolve the conflicts, run the tests, and commit. In your conclusion, say how each conflict was settled."
 }

@@ -63,7 +63,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 叫法 | English | 代码里 | 意思 | 不用 |
 |---|---|---|---|---|
 | 管家 | manager | orchestrator（角色是 `orchestrator` 的档案） | 你直接说话的 agent，替你派活；可以有好几个，内置的是默认管家 | 工头（指管家时）、主 agent |
-| 帮工 | helper | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 一个档案为一张工单接的活，跨好几轮；重开的工单换一个帮工，工单不换 | 工人、子 agent、worker、执行（指帮工时） |
+| 帮工 | helper | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 一个档案工作的执行上下文；工单里的画成帮工，私聊的关联频道，跨多轮保留身份 | 工人、子 agent、worker、执行（指帮工时） |
 | 在场 | here | `presentSessions`（核心状态里的 `sessions`） | 现在还在的帮工：在干活或歇着，没走 | 地里 |
 | 一轮 | a round of work | `Run`（`session_run` 表） | 一次触发到一次汇报：派出去、带话、计划、定时任务、农机自己 | 一次干活、turn（指一轮时） |
 | 档案 | profile | agent（`Agent`） | 一份 agent：农机、模型、人设、技能、长相；角色（`role`）是管家（`orchestrator`）或帮工（`helper`） | 帮工档案、角色（指档案时） |
@@ -97,11 +97,13 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 计划 | plan | task graph（`TaskGraph`，带 `graph` 的父工单） | 一件长活拆成的有先后的几件，按 DAG 推进；都做完了一次合进主分支 | 工作流、playbook、plan、种植计划 |
 | 一件 | task | task（`Task`，带 `task` 的子工单；拆出来的草稿是 `TaskDraft`） | 计划里的一件，一个帮工做 | 步骤、step（指一件时）、节点、node（指一件时） |
 | 派活 | dispatch | hire（`Issue.hire`、事实 `FactHired`） | 把一张工单交给一个档案、开一个帮工；工单挪到待办就是派活 | |
+| 派工关联 | assignment | `Assignment`（`issue_assignment`） | 一张工单由哪个档案负责，执行上下文挂在这条关系下 | |
+| 执行器 | executor | `Executor` | 创建、投递、中断和释放 oar 的执行实例 | |
 | 起草 | refine | refine（`IssueRefinement`、`issue.refine`） | 一个帮工读代码，把待规划的工单写成标题、描述和验收标准，写完就走 | |
 | 主人 | owner | owner | 你 | |
 | 田头 | the farm chat | 默认频道（`Channel.default`） | 农场的皮对默认频道的叫法；工作台里写它的名字（`#general`） | 群（指默认频道时） |
 | 私聊 | direct message | direct | 你和一个管家两个人说话的地方，帮工不在 | 私信 |
-| 和帮工私聊 | talk | talk（串的 `subjectKind` 是 `talk`，`Issue.talkWith`） | 你和一个帮工的档案直接说话：派一个帮工答在私聊里，这张工单不上看板 | |
+| 和帮工私聊 | talk | `Channel.direct`、`Session.channel` | 和一个档案直接说话，Session 回到原私聊，闲置时休眠，不创建工单 | |
 | 频道 | channel | channel（`Channel`） | 另开的说话的地方；微信、飞书、QQ 各接一个 | 群（指频道时）、群聊 |
 | 串 | thread | thread | 挂在一条消息下面的话题串；派活时开的叫工单串 | 子频道 |
 | 附件 | attachment | `Attachment`（`channel_attachment` 表） | 一条消息带的文件和图 | |

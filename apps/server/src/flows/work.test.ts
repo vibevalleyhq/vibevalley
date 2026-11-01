@@ -112,7 +112,7 @@ describe("a session's work", () => {
         expect(back).toBeDefined();
         expect(back.session.phase._tag).toBe("done");
         expect(back.place.branch).toBe(session!.branch);
-        expect(yield* sessions.tell(session!.id, "再加一句并提交", { kind: "comment" })).toMatch(/醒了/u);
+        expect(yield* sessions.deliver(session!.id, "再加一句并提交", { kind: "comment" })).toMatchObject({ kind: "run", woke: true });
         yield* w.nextReport;
         expect(yield* (yield* Issue).merge(session!.issue!)).toMatch(/个提交合进了 survivor 的 main/u);
       }).pipe(Effect.scoped, Effect.provide(after.layer));
@@ -324,28 +324,28 @@ describe("a session's work", () => {
         yield* (yield* Agent).save(lab());
         session = mustHire(yield* (yield* Issue).hire(lab(), "写打卡并提交", "runs"));
         yield* w.nextReport;
-        expect(yield* sessions.tell(session.id, "再看看", said)).toMatch(/新的一轮/u);
+        expect((yield* sessions.deliver(session.id, "再看看", said)).kind).toBe("run");
         yield* w.nextReport;
         const got = yield* await_(
-          () => sessions.runs(session!.issue!),
+          () => sessions.issueRuns(session!.issue!),
           (r) => r.length === 2 && r[1]!.endedAt !== undefined,
           "two runs ended",
         );
         expect([got[0]!.triggeredBy.kind, got[0]!.outcome]).toEqual(["issue", "completed"]);
         expect(got[1]!.triggeredBy).toEqual(said);
-        yield* sessions.tell(session.id, "发呆一会儿", { kind: "comment" });
+        yield* sessions.deliver(session.id, "发呆一会儿", { kind: "comment" });
         yield* await_(
-          () => sessions.runs(session!.issue!),
+          () => sessions.issueRuns(session!.issue!),
           (r) => r.length === 3,
           "a third run going",
         );
         expect((yield* sessions.deliver(session.id, "顺便看看", { kind: "comment", message: "m43" })).kind).toBe("steered");
-        expect((yield* sessions.runs(session.issue!))[2]!.heard).toEqual(["m43"]);
+        expect((yield* sessions.issueRuns(session.issue!))[2]!.heard).toEqual(["m43"]);
       }).pipe(Effect.scoped, Effect.provide(before.layer));
       const after = farm({ config });
       yield* Effect.gen(function* () {
         const sessions = yield* Session;
-        expect((yield* sessions.runs(session!.issue!))[2]!.outcome).toBe("interrupted");
+        expect((yield* sessions.issueRuns(session!.issue!))[2]!.outcome).toBe("interrupted");
       }).pipe(Effect.scoped, Effect.provide(after.layer));
     });
   });

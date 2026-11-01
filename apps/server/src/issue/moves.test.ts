@@ -1,16 +1,26 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import type { Fact, Issue, IssueStatus, Session } from "@vibevalley/protocol";
-import { sessionId } from "@vibevalley/protocol/schema";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { emptyWorkspaceState } from "@/core/core.ts";
 import { reduce } from "@/projection/reduce.ts";
 
-import { attentionOf } from "./attention.ts";
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
+import { issueStageOf } from "./stage.ts";
+const assigned = (sessions: string[] = ["w1"]) =>
+  [
+    {
+      id: "a1",
+      issue: issueId("t1"),
+      agent: "lab",
+      assignedAt: 0,
+      executions: sessions.map((session) => ({ kind: "session" as const, session: sessionId(session), startedAt: 0 })),
+    },
+  ] satisfies Issue["assignments"];
 describe("status moves", () => {
   const issue = (status: IssueStatus, sent: boolean, more: Partial<Issue> = {}) =>
-    ({ status, sessions: sent ? ["w1"] : [], attention: { state: "reviewing", acts: [] }, ...more }) as Issue;
+    ({ status, assignments: sent ? assigned() : [], stage: { state: "reviewing", acts: [] }, ...more }) as Issue;
   it("where each status may go", () => {
     for (const [from, sent, to] of [
       ["backlog", false, ["todo", "canceled"]],
@@ -34,36 +44,36 @@ describe("status moves", () => {
   });
 
   it("a round that failed is not completed, from the board, the command line or the orchestrator alike", () => {
-    const failed = issue("in_review", true, { attention: { state: "stuck", stuck: "failed", acts: [] } });
+    const failed = issue("in_review", true, { stage: { state: "stuck", stuck: "failed", acts: [] } });
     expect(statusMoves(failed)).toEqual(["todo", "canceled"]);
     expect(statusMove(failed, "done")).toEqual(["none", "这一轮没做成：带句话再干一轮，或者关掉"]);
-    expect(statusMoves(issue("in_review", true, { attention: { state: "stuck", stuck: "interrupted", acts: [] } }))).toEqual(["todo", "done", "canceled"]);
+    expect(statusMoves(issue("in_review", true, { stage: { state: "stuck", stuck: "interrupted", acts: [] } }))).toEqual(["todo", "done", "canceled"]);
   });
 
   it("an issue run by no session goes by the same table", () => {
     const ran = (status: IssueStatus, more: Partial<Issue>) => issue(status, false, { lastRun: { startedAt: 1, endedAt: 2, outcome: "completed" }, ...more });
     expect(statusMoves(ran("in_review", {}))).toEqual(["todo", "done", "canceled"]);
     expect(statusMove(ran("in_review", {}), "done")).toEqual(["complete", ""]);
-    expect(statusMoves(ran("in_review", { attention: { state: "stuck", stuck: "failed", acts: [] } }))).toEqual(["todo", "canceled"]);
+    expect(statusMoves(ran("in_review", { stage: { state: "stuck", stuck: "failed", acts: [] } }))).toEqual(["todo", "canceled"]);
     expect(statusMoves(ran("done", { delivered: "none" }))).toEqual(["todo"]);
     expect(statusMoves(ran("canceled", { canceled: "dismissed" }))).toEqual(["todo"]);
   });
 });
 
-describe("moves and the attention", () => {
+describe("moves and the stage", () => {
   const session = (lastRun: "completed" | "failed" | "interrupted") =>
     ({ id: "w1", phase: { _tag: "done" }, lastRun: { outcome: lastRun, summary: "", at: 1 } }) as unknown as Session;
-  const base = { status: "in_review", sessions: ["w1"], questions: [], findings: [], createdAt: 0 } as unknown as Issue;
+  const base = { status: "in_review", assignments: assigned(), questions: [], findings: [], createdAt: 0 } as unknown as Issue;
   const answeredSession = {
     ...session("completed"),
     lastRun: { outcome: "completed", summary: "", at: 1, answer: { conclusion: "慢在读配置", evidence: ["clock.ts:1"], unsure: [], next: [] } },
   } as Session;
   it("an answer issue waits on a conclusion it can read", () => {
     const answerIssue = { ...base, deliver: "answer" } as Issue;
-    expect(attentionOf(answerIssue, session("completed"))).toMatchObject({ state: "stuck", stuck: "failed", lead: "cure" });
-    const answered = attentionOf(answerIssue, answeredSession);
+    expect(issueStageOf(answerIssue, session("completed"))).toMatchObject({ state: "stuck", stuck: "failed", lead: "cure" });
+    const answered = issueStageOf(answerIssue, answeredSession);
     expect([answered.state, answered.lead, answered.acts.map((a) => a.act)]).toEqual(["reviewing", "acknowledge", ["acknowledge", "reject", "tell", "close"]]);
-    expect(attentionOf({ ...base, deliver: "change" }, session("completed"))).toMatchObject({ state: "reviewing", lead: "complete" });
+    expect(issueStageOf({ ...base, deliver: "change" }, session("completed"))).toMatchObject({ state: "reviewing", lead: "complete" });
   });
   it("a button that moves is a move the table allows, and done is offered exactly when the move to done is", () => {
     const cases: [Partial<Issue>, Session | undefined][] = [
@@ -74,17 +84,17 @@ describe("moves and the attention", () => {
       [{ deliver: "branch" }, session("completed")],
       [{ deliver: "answer" }, session("completed")],
       [{ deliver: "answer" }, answeredSession],
-      [{ sessions: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "completed" } }, undefined],
-      [{ sessions: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "failed" } }, undefined],
-      [{ sessions: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "interrupted" } }, undefined],
+      [{ assignments: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "completed" } }, undefined],
+      [{ assignments: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "failed" } }, undefined],
+      [{ assignments: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "interrupted" } }, undefined],
     ];
     for (const [more, s] of cases) {
       const t = { ...base, ...more };
-      const attention = attentionOf(t, s);
-      const moves = statusMoves({ ...t, attention });
-      const offered = attention.acts.some((a) => a.does === "move" && a.status === "done");
+      const stage = issueStageOf(t, s);
+      const moves = statusMoves({ ...t, stage });
+      const offered = stage.acts.some((a) => a.does === "move" && a.status === "done");
       expect({ more, offered }).toEqual({ more, offered: moves.includes("done") });
-      for (const a of attention.acts) if (a.does === "move") expect({ more, act: a.act, allowed: moves.includes(a.status) }).toMatchObject({ allowed: true });
+      for (const a of stage.acts) if (a.does === "move") expect({ more, act: a.act, allowed: moves.includes(a.status) }).toMatchObject({ allowed: true });
     }
   });
 
@@ -109,7 +119,7 @@ describe("moves and the attention", () => {
       priority: "medium",
       status: "in_progress",
       moves: ["canceled"],
-      attention: { state: "working", acts: [] },
+      stage: { state: "working", acts: [] },
     } as unknown as Issue;
     let state = emptyWorkspaceState();
     for (const fact of [
@@ -124,9 +134,9 @@ describe("moves and the attention", () => {
     expect(state.issues).toBe(issues);
     state = reduce(state, { type: "run", id: hired.id, at: 2 })[0];
     state = reduce(state, { type: "quiet", id: hired.id, since: 2, at: 2 })[0];
-    expect(state.issues[0]!.attention).toMatchObject({ state: "stuck", stuck: "quiet", since: 2 });
+    expect(state.issues[0]!.stage).toMatchObject({ state: "stuck", stuck: "quiet", since: 2 });
     state = reduce(state, { type: "doing", id: hired.id, action: "thinking", label: "", at: 2 })[0];
-    expect(state.issues[0]!.attention.state).toBe("working");
+    expect(state.issues[0]!.stage.state).toBe("working");
     state = reduce(state, { type: "report", questions: [], checks: [], at: 3, id: sessionId("w1"), outcome: "failed", summary: "没做成", runs: 2 })[0];
     expect(state.issues[0]!.moves).toEqual(["todo", "canceled"]);
   });
@@ -137,8 +147,8 @@ describe("next steps after a refusal", () => {
     const t = {
       number: 41,
       status: "in_review",
-      sessions: ["w1"],
-      attention: {
+      assignments: assigned(),
+      stage: {
         state: "reviewing",
         lead: "complete",
         acts: [

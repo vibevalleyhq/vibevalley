@@ -1,6 +1,6 @@
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph, SessionView, WorkspaceView } from "@vibevalley/protocol";
-import { attentionWantsOwner, omitUndefined, shortTitle } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, stageWantsOwner, omitUndefined, shortTitle } from "@vibevalley/protocol/rules";
 
 import { ago, tookText } from "@/base/format";
 import { matches } from "@/base/search";
@@ -9,7 +9,7 @@ import { type Ordering, orderRows, type RowFacts } from "./display";
 import { endedAt, issueSession, isForOrchestrator } from "./issue";
 import { type Lane, laneOf, laneStatus, moveOf, type Move } from "./lanes";
 import type { CardMove } from "./moves";
-import { attentionTone } from "./overview";
+import { stageTone } from "./overview";
 import { issueTag, type IssueTag, tagText, tagOpen } from "./tags";
 import { issueTitle, taskLine } from "./titles";
 
@@ -29,7 +29,7 @@ export type BoardCard = (
 ) & { readonly move?: CardMove };
 
 export const cardProject = (c: BoardCard) => (c.kind === "task" ? c.graph.project : c.issue.project);
-export const cardAgent = (c: BoardCard) => (c.kind === "task" ? undefined : c.issue.assignee);
+export const cardAgent = (c: BoardCard) => (c.kind === "task" ? undefined : assignedAgentOf(c.issue));
 
 /** A task is its own card; a step of one is on the board once a helper has worked it. */
 export function buildCards(rows: IssueHistory[], core: WorkspaceView | undefined, graphs: TaskGraph[], orchestrators: ReadonlySet<string>): BoardCard[] {
@@ -38,8 +38,8 @@ export function buildCards(rows: IssueHistory[], core: WorkspaceView | undefined
     const issue = row.issue;
     const base = { id: issue.id, lane: laneOf(issue.status), issue };
     if (isForOrchestrator(issue, orchestrators)) cards.push({ kind: "orchestrator", ...base });
-    else if (issue.graph === undefined && (issue.parent === undefined || issue.sessions.length > 0)) {
-      if (issue.sessions.length === 0) cards.push({ kind: "todo", ...base, lane: "todo" });
+    else if (issue.graph === undefined && (issue.parent === undefined || executionsOf(issue).length > 0)) {
+      if (executionsOf(issue).length === 0) cards.push({ kind: "todo", ...base, lane: "todo" });
       else if (row.missingSessions.length > 0 || row.sessions.length === 0) cards.push({ kind: "missing", ...base, missing: row.missingSessions });
       else cards.push(omitUndefined({ kind: "issue" as const, ...base, sessions: row.sessions, tag: issueTag(issue), session: issueSession(core, issue) }));
     }
@@ -93,7 +93,7 @@ export function rowFacts(c: BoardCard): RowFacts {
         createdAt: c.issue.createdAt,
         updatedAt: issueUpdated(c.issue),
         project: c.issue.project,
-        agent: c.issue.assignee,
+        agent: assignedAgentOf(c.issue),
       });
     case "issue":
       return omitUndefined({
@@ -102,7 +102,7 @@ export function rowFacts(c: BoardCard): RowFacts {
         createdAt: c.issue.createdAt,
         updatedAt: Math.max(issueUpdated(c.issue), ...c.sessions.flatMap((s) => [s.hiredAt, s.lastRun?.at ?? 0, endedAt(s) ?? 0])),
         project: c.issue.project,
-        agent: c.issue.assignee,
+        agent: assignedAgentOf(c.issue),
       });
     case "task":
       return {
@@ -139,8 +139,9 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       else if (item.status === "backlog") flags.push({ text: t("web.issue.card.draft"), tone: "wheat" });
       if (item.queuedAt !== undefined) flags.push({ text: t("web.issue.card.queued"), tone: "water" });
       if (item.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
-      lines.push(item.assignee === undefined ? t("web.issue.card.noHelper") : nameOf(item.assignee));
-      if (item.assignee === undefined || item.project === undefined) lines.push(t("web.issue.card.pickFirst"));
+      const agent = assignedAgentOf(item);
+      lines.push(agent === undefined ? t("web.issue.card.noHelper") : nameOf(agent));
+      if (agent === undefined || item.project === undefined) lines.push(t("web.issue.card.pickFirst"));
       lines.push(
         item.queuedAt !== undefined
           ? t("web.issue.card.waiting", { ago: ago(item.queuedAt, now) })
@@ -153,15 +154,15 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       const head = sessions[sessions.length - 1]!;
       const phase = session?.phase;
       const now0 = session ?? head;
-      // The board says what the page says: the attention, when it waits on the owner.
+      // The board says what the page says: the stage, when it waits on the owner.
       // A stuck issue says why on the board as on its page (有冲突, 没做成…).
-      const st = issue.attention;
-      if (attentionWantsOwner(st.state))
+      const st = issue.stage;
+      if (stageWantsOwner(st.state))
         flags.push({
           text: st.stuck
-            ? t("shared.join.labeled", { label: t(`shared.attention.${st.state}`), text: t(`shared.stuck.${st.stuck}`) })
-            : t(`shared.attention.${st.state}`),
-          tone: attentionTone[st.state],
+            ? t("shared.join.labeled", { label: t(`shared.stage.${st.state}`), text: t(`shared.stuck.${st.stuck}`) })
+            : t(`shared.stage.${st.state}`),
+          tone: stageTone[st.state],
         });
       if (issue.canceled === "lost") flags.push({ text: t("web.issue.card.lost"), tone: "berry" });
       if (issue.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });

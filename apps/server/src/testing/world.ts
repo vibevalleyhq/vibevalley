@@ -48,8 +48,6 @@ export interface WorldOptions {
   readonly usage?: () => AccountUsage | null;
   /** Who an MCP token names; the sessions' tokens when absent. */
   readonly who?: (token: string) => string;
-  /** How long a talk with a helper profile waits idle before its session goes home; issue.ts's when absent. */
-  readonly talkIdleMs?: number;
 }
 
 /** The farm below the task graphs: for a test that makes its own task service. */
@@ -65,7 +63,7 @@ export function worldBelowTasks(options: WorldOptions = {}) {
     runtime: { registry: registryOf(given), background: false, probe: installedOnly(given, options.usage), usageOf: async () => options.usage?.() ?? null },
     project: { gh: noGitHub, ...options.projects },
     ...(options.stallMs !== undefined ? { session: { stallMs: options.stallMs } } : {}),
-    issue: { background: false, ...(options.talkIdleMs !== undefined ? { talkIdleMs: options.talkIdleMs } : {}) },
+    issue: { background: false },
   };
   const below = platform(config);
   return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), agentSessions(o), collaboration(o), issuesBelowTaskGraphs(o));

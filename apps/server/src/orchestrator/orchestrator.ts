@@ -6,6 +6,7 @@ import { Llm } from "@vibevalley/ai/llm";
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, QuotedBlock, RunTrigger } from "@vibevalley/protocol";
 import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
+import { assignedAgentOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "@/agent/agent.ts";
 import { modelClient, noDeepSeekKey } from "@/agent/model.ts";
@@ -196,7 +197,7 @@ const make = (options: OrchestratorOptions = {}) =>
                 fresh: () => {
                   me.shown = "";
                 },
-                restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger } }),
+                restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger, channel: r.channel } }),
                 keepEvents,
                 toolStart: tool.start,
               })
@@ -297,7 +298,11 @@ const make = (options: OrchestratorOptions = {}) =>
                 .join("\n\n");
               return { text, heard: ids };
             }),
-          { route, run: { ...(i.issue ? { issue: i.issue } : {}), by: i.by ?? { kind: rule.trigger }, asked }, ...(i.caller ? { caller: i.caller } : {}) },
+          {
+            route,
+            run: { ...(i.issue ? { issue: i.issue } : {}), by: { ...(i.by ?? { kind: rule.trigger }), channel: i.channel }, asked },
+            ...(i.caller ? { caller: i.caller } : {}),
+          },
           rule.now,
         );
         if (taken.ok) {
@@ -357,8 +362,8 @@ const make = (options: OrchestratorOptions = {}) =>
           const missed = w.by.missed === true ? lineWords.missed : "";
           line = lineWords.cron(s.name, missed, s.text, channel.name, s.id);
         }
-        // The issue's assignee is the orchestrator it is for; a cron that names none is its channel's orchestrator's.
-        const to = w.issue.assignee || chat.orchestratorOf(channel.id);
+        // The issue's current assignment names its orchestrator; a cron that names none uses the channel's.
+        const to = assignedAgentOf(w.issue) || chat.orchestratorOf(channel.id);
         return yield* take({ to, source: s ? "cron" : "issue", line, channel: channel.id, issue: w.issue.id, by: w.by });
       });
 
