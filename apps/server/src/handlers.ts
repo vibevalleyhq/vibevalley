@@ -163,7 +163,6 @@ export const handlers = Effect.gen(function* () {
     "session.stop": ({ id }) => (sessions.find(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session]))),
     "session.list": ({ agent }) => sessions.list(agent ?? ""),
     "session.get": ({ id }) => sessions.get(id).pipe(orMissing(t("server.helperRef", { id }), [lookIn.session])),
-    "session.run.list": ({ id }) => sessions.runs(id),
     "session.event.list": ({ id, run }) => Effect.map(sessions.events(id, run ?? ""), (events) => events ?? []),
     "channel.create": (body) => Effect.map(channels.openChannel(body.name, body.description ?? "", body.project ?? ""), (c) => c.id),
     "channel.update": ({ id, ...body }) => channels.updateChannel(id, body),

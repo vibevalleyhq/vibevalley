@@ -1166,6 +1166,31 @@ const make = (sessions: Session["Service"]) =>
       return { target: targetOfChannel(row), threads: threads.length, said };
     });
 
+    const openDirect = Effect.fn("Channel.openDirect")(function* (agent: { readonly id: string; readonly name: string }) {
+      const mine = agents.isOrchestrator(agent.id);
+      const peer = mine ? agent.id : profileId(agent.id);
+      if (mine) yield* seat(agent.id);
+      else {
+        const joined: qp.UpsertParticipantParams = {
+          id: peer,
+          kind: "profile",
+          name: agent.name,
+          agent_id: agent.id,
+          runtime: null,
+          joined_at: yield* Clock.currentTimeMillis,
+        };
+        yield* db.run(qp.upsertParticipant(joined));
+        model.joined(joined);
+      }
+      const had = model.channels("direct").find((c) => c.peer_id === peer);
+      if (had) return had.id;
+      const id = newId();
+      yield* db.run(qc.createDirect({ id, peer_id: peer, created_at: yield* Clock.currentTimeMillis }));
+      yield* reload;
+      yield* publishChannel(id);
+      return id;
+    }, locked);
+
     const shape = Channel.of({
       now: () => core.state().chat,
       ...channelStreams(db, model, said),
@@ -1616,37 +1641,12 @@ const make = (sessions: Session["Service"]) =>
         yield* publishChannel(id);
         yield* publishOwnerMentions;
       }, locked),
-      openDirect: Effect.fn("Channel.openDirect")(function* (agent) {
-        // An orchestrator is its own participant everywhere; a helper profile is one only here, apart from its sessions.
-        const mine = agents.isOrchestrator(agent.id);
-        const peer = mine ? agent.id : profileId(agent.id);
-        if (mine) yield* seat(agent.id);
-        else {
-          const joined: qp.UpsertParticipantParams = {
-            id: peer,
-            kind: "profile",
-            name: agent.name,
-            agent_id: agent.id,
-            runtime: null,
-            joined_at: yield* Clock.currentTimeMillis,
-          };
-          yield* db.run(qp.upsertParticipant(joined));
-          model.joined(joined);
-        }
-        const had = model.channels("direct").find((c) => c.peer_id === peer);
-        if (had) return had.id;
-        const id = newId();
-        yield* db.run(qc.createDirect({ id, peer_id: peer, created_at: yield* Clock.currentTimeMillis }));
-        yield* reload;
-        yield* publishChannel(id);
-        return id;
-      }, locked),
       orchestratorOf: (channel) => orchestratorOfRow(model.channel(channel)),
       direct: Effect.fn("Channel.direct")(function* (ref) {
         const name = ref.trim();
         const agent = agents.named(name) ?? agents.agent(name) ?? agents.orchestrators().find((o) => o.name === name);
         if (!agent) return yield* Effect.fail(missing(t("server.channel.noProfileNamed", { key: ref }), [lookIn.agent]));
-        return yield* shape.openDirect(agent);
+        return yield* openDirect(agent);
       }),
       recent: Effect.fn("Channel.recent")(function* (channel, n) {
         const row = model.channel(channel);

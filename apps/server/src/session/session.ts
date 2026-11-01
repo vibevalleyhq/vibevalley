@@ -164,7 +164,6 @@ export class Session extends Context.Service<
     /** A session on the farm, or one that has ended. */
     readonly get: (id: string) => Effect.Effect<T.Session | undefined>;
     readonly issueRuns: (issue: string) => Effect.Effect<T.Run[]>;
-    readonly runs: (session: string) => Effect.Effect<T.Run[]>;
     /** A session's log, oldest first; a run's only when run is given. */
     readonly events: (id: string, run?: string) => Effect.Effect<T.SessionEvent[] | undefined>;
     /** These four are subscribed before they return: nothing published after is missed. */
@@ -1075,10 +1074,6 @@ export const make = (options: SessionOptionsIn = {}) =>
       }),
       issueRuns: Effect.fn("Session.issueRuns")(function* (issue) {
         const rows = yield* db.run(qr.runsOfIssue({ issue_id: issue }));
-        return rows.map(runOf);
-      }),
-      runs: Effect.fn("Session.runs")(function* (session) {
-        const rows = yield* db.run(qr.runsOfSession({ session }));
         return rows.map(runOf);
       }),
       events: (id, r) => trajectories.events(id, r),

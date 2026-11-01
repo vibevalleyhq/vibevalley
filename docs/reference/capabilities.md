@@ -115,7 +115,6 @@
 | `session.stop` | `/api/v1/session/stop` | ✓ | ✓ | ✓ |   |
 | `session.list` | `/api/v1/session/list` | ✓ | ✓ | ✓ | ✓ |
 | `session.get` | `/api/v1/session/get` | ✓ | ✓ |   |   |
-| `session.run.list` | `/api/v1/session/run/list` | ✓ | ✓ |   |   |
 | `session.event.list` | `/api/v1/session/event/list` | ✓ | ✓ |   |   |
 
 ## graph

@@ -60,15 +60,14 @@ describe("an agent's channel context", () => {
       expect(readFileSync(join(cwd, "notes.txt"), "utf8")).toBe("turn 1\n");
       expect(yield* sessions.deliver(session.id, "continue", { kind: "comment", channel })).toMatchObject({ kind: "run", woke: true });
       yield* until(() => core.session(session.id)?.runs === 2, "the continued answer");
-      const runs = yield* waitFor(
-        sessions.runs(session.id),
-        (rows) => rows.length === 2 && rows.every((row) => row.endedAt !== undefined),
-        "the context's runs",
+      const kept = yield* waitFor(
+        Effect.map(sessions.events(session.id), (events) => events ?? []),
+        (events) => events.filter((event) => event.type === "run/end").length === 2,
+        "the context's run ends",
       );
-      expect(runs.map((row) => [row.issue, row.triggeredBy.kind, row.triggeredBy.channel])).toEqual([
-        [undefined, "comment", channel],
-        [undefined, "comment", channel],
-      ]);
+      const starts = kept.filter((event) => event.type === "run/start");
+      const ends = kept.filter((event) => event.type === "run/end");
+      expect([starts.length, ends.length, new Set(starts.map((event) => event.run)).size]).toEqual([2, 2, 2]);
       expect(turns[1]?.options.resume).toBe(native);
       expect(turns[1]?.options.cwd).toBe(cwd);
       let merged = false;

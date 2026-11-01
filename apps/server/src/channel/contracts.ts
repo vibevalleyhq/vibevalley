@@ -318,8 +318,6 @@ export interface ChannelService {
   readonly setNotify: (id: string, notify: T.Notify) => Effect.Effect<void, ApiError>;
   /** How much of a place counts for the owner: none when it or its channel is set to none, else its own level, else its channel's. */
   readonly notifyOf: (id: string) => T.Notify;
-  /** The owner's direct channel with a profile (a helper's, or an orchestrator's), made if there is none. */
-  readonly openDirect: (agent: { readonly id: string; readonly name: string }) => Effect.Effect<string>;
   readonly direct: (agent: string) => Effect.Effect<string, ApiError>;
   /** The orchestrator a place is looked after by: a channel's own, its thread's channel's, a direct channel's peer when
    * that is an orchestrator, else the default one. */
