@@ -4,8 +4,10 @@ import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type * as T from "@vibevalley/protocol";
+import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "@/agent/agent.ts";
+import { owner } from "@/base/actor.ts";
 import { Channel } from "@/channel/chat.ts";
 import { channelOf } from "@/channel/folded.ts";
 import { Core } from "@/core/core.ts";
@@ -59,7 +61,8 @@ describe("an issue's thread", () => {
       }>`select count(*)::int as n from channel_delivery where message_id = ${kept.message.id}`.pipe(Effect.orDie);
       expect(woken[0]!.n).toBe(0);
 
-      const second = yield* issues.reopen(issue.id, "接着做", "");
+      const second = latestSessionIdOf(yield* issues.setStatus(issue.id, "todo", "接着做", "", owner));
+      if (second === undefined) throw new Error("the issue has no reopened session");
       yield* until(() => reportsBy(second) === 1, "the second session's report in the same thread");
       expect(yield* channels.threadOfSession(second)).toBe(thread!.id);
       const handed = inThread().find((m) => m.kind === "dispatch" && m.session === second);

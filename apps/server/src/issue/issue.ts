@@ -72,7 +72,6 @@ export class Issue extends Context.Service<
     readonly remove: (id: string) => Effect.Effect<void, ApiError>;
     readonly queue: (id: string, queued: boolean) => Effect.Effect<T.Issue, ApiError>;
     readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
-    readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
     /** agent: moving to todo, the profile (id or name) that takes it on; another than its own hands it over. On the owner's
      * word only (actsForOwner). */
     readonly setStatus: (id: string, to: T.IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Effect.Effect<T.Issue, ApiError>;
@@ -105,7 +104,6 @@ export class Issue extends Context.Service<
     readonly nextTaskId: () => Effect.Effect<string>;
     /** Issues for the orchestrator, subscribed before it returns. */
     readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorWork>, never, Scope.Scope>;
-    readonly ofCron: (id: string) => Effect.Effect<T.Issue | undefined>;
     readonly refreshPullRequests: Effect.Effect<void>;
     readonly tryQueued: Effect.Effect<void>;
   }
@@ -985,12 +983,9 @@ const make = (options: IssueOptions = {}) =>
       queue: Effect.fn("Issue.queue")(function* (id, queued) {
         return yield* queueRow(id, queued, chat.defaultChannel());
       }),
-      // Untraced: they only drop the arguments the service does not take, and the call they make is named Issue.start / Issue.reopen.
+      // Untraced: it only drops the arguments the service does not take, and the call it makes is named Issue.start.
       start: Effect.fnUntraced(function* (id, channel) {
         return yield* start(id, channel);
-      }),
-      reopen: Effect.fnUntraced(function* (id, text, channel) {
-        return yield* reopen(id, text, channel);
       }),
       idOf,
       stop: Effect.fn("Issue.stop")(function* (id) {
@@ -1204,7 +1199,6 @@ const make = (options: IssueOptions = {}) =>
         return nextTaskId(rows.map((r) => r.id));
       }),
       forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),
-      ofCron,
       refreshPullRequests,
       tryQueued,
     });

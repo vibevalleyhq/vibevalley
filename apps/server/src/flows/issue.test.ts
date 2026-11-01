@@ -31,6 +31,18 @@ const refusedWith = (e: unknown, words = "") => {
   if (words) expect(tagged.reason).toContain(words);
 };
 
+const latest = (issue: T.Issue) => {
+  const id = latestSessionIdOf(issue);
+  if (id === undefined) throw new Error("the issue has no execution session");
+  return id;
+};
+
+const withCron = (issues: readonly T.Issue[], cron: string) => {
+  const issue = issues.find((item) => item.cron === cron);
+  if (!issue) throw new Error("the cron has no issue");
+  return issue;
+};
+
 describe("an issue", () => {
   // Done is the owner's verdict; what it delivers follows the issue: nothing to take in touches no git, a branch can be
   // kept unmerged, and only commits go into the main branch.
@@ -95,7 +107,7 @@ describe("an issue", () => {
       const session = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock-in"));
       expect(session.issue).toBeTruthy();
       yield* w.nextReport;
-      refusedWith(yield* Effect.flip(issues.reopen(session.id, "", "")));
+      refusedWith(yield* Effect.flip(issues.setStatus(session.id, "todo", "", "", owner)));
       yield* issues.merge(session.issue!);
       const ended = (yield* sessions.get(session.id))!;
       expect([ended.phase._tag === "closed" && ended.phase.closed, ended.lastRun?.outcome, !!ended.lastRun?.summary, ended.runs, ended.issue]).toEqual([
@@ -113,7 +125,7 @@ describe("an issue", () => {
         );
       yield* closedAs("merged");
 
-      const again = yield* issues.reopen(session.id, "打卡还要记下时区", "");
+      const again = latest(yield* issues.setStatus(session.id, "todo", "打卡还要记下时区", "", owner));
       yield* w.nextReport;
       const issue = yield* issues.get(again);
       expect([issue.id, sessionIdsOf(issue), issue.delivered, issue.canceled, issue.closedAt]).toEqual([
@@ -126,12 +138,12 @@ describe("an issue", () => {
       const reopened = (yield* sessions.get(again))!;
       expect(reopened.brief).toMatch(new RegExp(`^打卡还要记下时区\\n\\n（这张工单重开了，上一次是 .+（${session.id}）做的。）`, "u"));
       expect(reopened.brief).toMatch(/这张工单原来是：写打卡并提交\n它是怎么关的：已完成，合进了主分支/u);
-      refusedWith(yield* Effect.flip(issues.reopen(session.issue!, "", "")));
-      expect((yield* Effect.flip(issues.reopen("w404", "", "")))._tag).toBe("Missing");
+      refusedWith(yield* Effect.flip(issues.setStatus(session.issue!, "todo", "", "", owner)));
+      expect((yield* Effect.flip(issues.setStatus("w404", "todo", "", "", owner)))._tag).toBe("Missing");
       yield* sessions.dismiss(again);
       yield* closedAs("dismissed");
       yield* sql`update issue set delivered = 'merged_into_parent', canceled = null, closed_at = ${Date.now()} where id = ${issue.id}`.pipe(Effect.orDie);
-      refusedWith(yield* Effect.flip(issues.reopen(issue.id, "", "")), "计划里的工单");
+      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "todo", "", "", owner)), "计划里的工单");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -147,7 +159,7 @@ describe("an issue", () => {
       yield* w.nextReport;
       expect((yield* issues.get(issue.id)).project ?? "").toBe("");
       yield* issues.setStatus(issue.id, "canceled", "", "", owner);
-      const again = yield* Effect.result(issues.reopen(issue.id, "再看看", ""));
+      const again = yield* Effect.result(issues.setStatus(issue.id, "todo", "再看看", "", owner));
       expect(again._tag).toBe("Success");
       yield* w.nextReport;
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -275,7 +287,7 @@ describe("an issue", () => {
         owner,
       );
       const due = () => Effect.andThen(TestClock.adjust(5 * 60_000 + 1), crons.tick);
-      const ofCron = () => Effect.map(issues.ofCron(made.id), (i) => i!);
+      const ofCron = () => Effect.map(issues.list(), (all) => withCron(all, made.id));
       const runs = () => Effect.flatMap(ofCron(), (i) => sessions.issueRuns(i.id));
       yield* due();
       yield* w.nextReport;
@@ -406,7 +418,7 @@ describe("an issue", () => {
         (i) => i.closedAt !== undefined,
         "cancelled",
       );
-      let again = yield* issues.reopen(issue.id, "接着做", "");
+      let again = latest(yield* issues.setStatus(issue.id, "todo", "接着做", "", owner));
       yield* w.nextReport;
       const reopened = (yield* sessions.get(again))!;
       expect([reopened.branch, reopened.worktree]).toEqual([first.branch, first.worktree]);
@@ -418,7 +430,7 @@ describe("an issue", () => {
         (i) => i.delivered === "merged",
         "merged",
       );
-      again = yield* issues.reopen(issue.id, "再看看", "");
+      again = latest(yield* issues.setStatus(issue.id, "todo", "再看看", "", owner));
       yield* w.nextReport;
       expect((yield* sessions.get(again))!.brief).not.toContain("这条分支上已经有上次的提交，接着做。");
     }).pipe(Effect.scoped, Effect.provide(f.layer));

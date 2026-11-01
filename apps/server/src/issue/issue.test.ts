@@ -9,7 +9,7 @@ import { TestClock } from "effect/testing";
 
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator } from "@vibevalley/protocol";
-import { assignedAgentOf, sessionIdsOf } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
@@ -524,7 +524,8 @@ describe("issues", () => {
       const commit = git(first.worktree!, "rev-parse", "HEAD").trim();
       yield* issues.cancel(issue.id);
       yield* waitFor(issues.get(issue.id), (i) => i.status === "canceled", "the canceled issue");
-      const again = yield* issues.reopen(issue.id, "keep going", "");
+      const again = latestSessionIdOf(yield* issues.setStatus(issue.id, "todo", "keep going", "", owner));
+      if (again === undefined) throw new Error("the issue has no reopened session");
       const reopened = sessions.sessionOf(again)!;
       expect([reopened.branch, reopened.worktree]).toEqual([first.branch, first.worktree]);
       expect(git(reopened.worktree!, "rev-parse", "HEAD").trim()).toBe(commit);
@@ -743,7 +744,11 @@ describe("issues", () => {
       const sc = yield* crons.add({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, owner);
       yield* TestClock.adjust(10 * 60_000);
       yield* crons.tick;
-      const issue = yield* waitFor(issues.ofCron(sc.id), (i) => i?.queuedAt !== undefined, "the cron queued");
+      const issue = yield* waitFor(
+        Effect.map(issues.list(), (all) => all.find((item) => item.cron === sc.id)),
+        (item) => item?.queuedAt !== undefined,
+        "the cron queued",
+      );
       yield* core.apply({ type: "left", id: sessionId("occupied") });
       yield* issues.tryQueued;
       yield* waitFor(sessions.issueRuns(issue!.id), (r) => r.length > 0, "the scheduled run");

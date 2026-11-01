@@ -532,7 +532,7 @@ describe("task graphs", () => {
         const session = sessionIdsOf(a)[0];
         if (session === undefined) throw new Error("the task issue has no execution session");
         expect((yield* f.issues.get(session)).id).toBe(a.id);
-        expect((yield* Effect.flip(f.issues.reopen(a.id, "", "")))._tag).toBe("Refused");
+        expect((yield* Effect.flip(f.issues.setStatus(a.id, "todo", "", "", owner)))._tag).toBe("Refused");
         yield* f.tasks.act(id, "merge", owner);
         yield* waitFor(f.issues.get(id), (i) => i.delivered === "merged", "the graph's issue closed as merged");
       }),
