@@ -4,7 +4,7 @@ import type * as T from "@vibevalley/protocol";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 
 import { withChannel, withMessage, withOwnerMentions } from "@/channel/folded.ts";
-import { freeStation, playedDoing, playedRun, playOf, stationed } from "@/game/play.ts";
+import { emptyPlay, freeStation, playedDoing, playedRun, playOf, stationed } from "@/game/play.ts";
 import { withIssue, withIssueStatuses } from "@/issue/status.ts";
 import { sessionOf, withSession } from "@/session/roster.ts";
 
@@ -32,22 +32,24 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
           (f.brief === undefined || f.brief === session.brief))
       )
         return [state, false];
-      return withSession(state, f.id, (h) => {
-        const play =
-          f.phase._tag === "working"
-            ? h.phase._tag === "working"
-              ? playedDoing(playOf(h), { at: f.at, action: f.phase.doing.action, label: f.phase.doing.label })
-              : playedRun(playOf(h), f.at)
-            : playOf(h);
-        return omitUndefined({
+      const [after] = withSession(state, f.id, (h) =>
+        omitUndefined({
           ...h,
           phase: f.phase,
           channel: f.channel,
           brief: f.brief ?? h.brief,
-          play,
           ...(f.spent ? { spent: f.spent } : {}),
-        });
-      });
+        }),
+      );
+      const plays = state.plays ?? {};
+      const before = playOf(plays, f.id);
+      const play =
+        f.phase._tag === "working"
+          ? session.phase._tag === "working"
+            ? playedDoing(before, { at: f.at, action: f.phase.doing.action, label: f.phase.doing.label })
+            : playedRun(before, f.at)
+          : before;
+      return [{ ...after, plays: { ...plays, [f.id]: play } }, true];
     }
     case "message": {
       const [chat, news] = withMessage(state.chat, f.message);
@@ -67,9 +69,9 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
       const was = sessionOf(state, f.session.id);
       if (f.session.role === "orchestrator") return [{ ...state, sessions: [...others, f.session] }, true];
-      const play = was?.play ?? { ...playOf(f.session), station: freeStation(others, farmOf(f.session)) };
-      const h: T.Session = { ...f.session, play };
-      return [{ ...state, sessions: [...others, h] }, true];
+      const plays = state.plays ?? {};
+      const play = was ? playOf(plays, f.session.id) : { ...emptyPlay(), station: freeStation(plays, others, farmOf(f.session)) };
+      return [{ ...state, sessions: [...others, f.session], plays: { ...plays, [f.session.id]: play } }, true];
     }
     case "sessionReport":
       if (!sessionOf(state, f.id)) return [state, false];
@@ -82,8 +84,11 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
         }))[0],
         true,
       ];
-    case "sessionGone":
-      return [{ ...state, sessions: state.sessions.filter((h) => h.id !== f.id) }, true];
+    case "sessionGone": {
+      const plays = { ...state.plays };
+      delete plays[f.id];
+      return [{ ...state, sessions: state.sessions.filter((h) => h.id !== f.id), plays }, true];
+    }
     case "gameProgress": {
       let next = state;
       let changed = false;

@@ -148,8 +148,8 @@ function IssueBody(props: {
   const acts = createIssueActs(() => props.issue, {
     act: createPixelAct(t("web.farm.plot.failed")),
     done: (a) => {
-      if (a === "tell" || a === "answer" || a === "resolve") playBedFx(props.session, "water");
-      else if (a === "cure") playBedFx(props.session, "spray");
+      if (a === "tell" || a === "answer" || a === "resolve") playBedFx(props.session, frames.frame?.view.plays, "water");
+      else if (a === "cure") playBedFx(props.session, frames.frame?.view.plays, "spray");
     },
     complete: () => props.onHarvest(props.session),
     close: () => props.onClose(props.session),
@@ -543,7 +543,9 @@ function Aside(props: { session: Session; agent?: Agent | undefined }) {
       <p class={["text-center", xs]}>
         {labelOf(speciesLabel, SpeciesValues, kind()[0] ?? "")} · {labelOf(outfitLabel, OutfitValues, kind()[1] ?? "")}
       </p>
-      <p class={xs}>{t("web.farm.plot.where", { plot: stationOfSession(props.session) + 1, round: Math.round(props.session.runs) })}</p>
+      <p class={xs}>
+        {t("web.farm.plot.where", { plot: stationOfSession(props.session, frames.frame?.view.plays) + 1, round: Math.round(props.session.runs) })}
+      </p>
     </div>
   );
 }

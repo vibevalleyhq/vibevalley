@@ -133,7 +133,7 @@ describe("the game", () => {
       const stationOf = (id: string) =>
         Effect.sync(() => {
           const h = sessionOf(core.state(), id);
-          return h ? playOf(h).station : -2;
+          return h ? playOf(core.state().plays, id).station : -2;
         });
       const starting: Session["phase"] = { _tag: "working", since: 0, doing: { action: "none", label: "" } };
       game.want(4);

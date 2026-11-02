@@ -402,7 +402,6 @@ const make = (options: SessionOptionsIn = {}) =>
         Effect.gen(function* () {
           const session = restoredSession(row);
           yield* core.apply({ type: "session", session });
-          if (session.play) yield* core.apply({ type: "gameProgress", station: { id: session.id, station: session.play.station } });
         }),
       { discard: true },
     );

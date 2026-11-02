@@ -8,6 +8,7 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { emptyWorkspaceState } from "@/core/core.ts";
 
+import { emptyPlay } from "./play.ts";
 import { plotOf, viewOf } from "./view.ts";
 
 const session = (phase: Session["phase"]): Session => ({
@@ -49,13 +50,17 @@ describe("a plot", () => {
       [{ state: "stuck", stuck: "quiet", lead: "stop", acts: [{ act: "stop", does: "say" }] }, {}, "dry", "没动静"],
     ];
     for (const [stage, more, crop, badge] of cases) {
-      const plot = plotOf(done, issue(stage, more));
+      const plot = plotOf(done, issue(stage, more), emptyPlay());
       expect({ stage, crop: plot.crop, badge: plot.badge?.text }).toEqual({ stage, crop, badge });
     }
   });
 
   it("stopped halfway grows where it got to, and says so", () => {
-    const plot = plotOf(session({ _tag: "resting" }), issue({ state: "stuck", stuck: "interrupted", lead: "resume", acts: [{ act: "resume", does: "say" }] }));
+    const plot = plotOf(
+      session({ _tag: "resting" }),
+      issue({ state: "stuck", stuck: "interrupted", lead: "resume", acts: [{ act: "resume", does: "say" }] }),
+      emptyPlay(),
+    );
     expect([plot.crop, plot.badge?.text]).toEqual(["sprout", "停在半路"]);
   });
 
@@ -65,8 +70,8 @@ describe("a plot", () => {
       { state: "working", acts: [{ act: "tell", does: "say" }] },
       { status: "in_progress", findings: [{ id: "f", text: "再改", at: 1, resolved: false }] },
     );
-    expect(plotOf(working, t)).toEqual({ crop: "weeds", badge: { text: "除草中 1", tone: "bug" } });
-    expect(plotOf(working, { ...t, findings: [{ id: "f", text: "再改", at: 1, resolved: true }] }).crop).toBe("sprout");
+    expect(plotOf(working, t, emptyPlay())).toEqual({ crop: "weeds", badge: { text: "除草中 1", tone: "bug" } });
+    expect(plotOf(working, { ...t, findings: [{ id: "f", text: "再改", at: 1, resolved: true }] }, emptyPlay()).crop).toBe("sprout");
   });
 
   it("is its issue's: a reopened issue's new session works the same plot", () => {

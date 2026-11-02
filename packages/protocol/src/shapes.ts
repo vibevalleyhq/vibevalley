@@ -511,15 +511,13 @@ export interface Session {
   lastRun?: LastRun;
   spent?: Spent;
   channel?: string;
-  play?: SessionPlay;
   issue?: IssueId;
   refining: boolean;
 }
 
 /** reduce never sees these: the words are the frame's (projection/frame.ts). */
-export interface SessionView extends Omit<Session, "phase" | "play"> {
+export interface SessionView extends Omit<Session, "phase"> {
   phase: PhaseView;
-  play?: SessionPlayView;
   phaseText: string;
 }
 
@@ -671,6 +669,8 @@ export interface WorkspaceState {
   callReason: string;
   /** Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle. */
   sessions: Session[];
+  /** The farm's pixel-only station and step history, by session; no business rule reads it. */
+  plays?: Record<string, SessionPlay>;
   chat?: Chat;
   commits?: CommitCount;
   progress?: Progress;
@@ -680,7 +680,7 @@ export interface WorkspaceState {
   connectors: ConnectorStatus[];
 }
 
-export interface WorkspaceView extends Omit<WorkspaceState, "sessions" | "crons"> {
+export interface WorkspaceView extends Omit<WorkspaceState, "sessions" | "crons" | "plays"> {
   sessions: SessionView[];
   crons: CronView[];
 }
@@ -840,6 +840,8 @@ export interface FarmView {
   level: FarmLevel;
   /** Each issue's plot, by the issue's id (`plotKeyOf`): a reopened issue's new session draws on the same one. */
   plots: Record<string, PlotView>;
+  /** Each session's station and step history, by the session's id; the farm reads only this. */
+  plays: Record<string, SessionPlayView>;
   achievements: AchievementStanding[];
 }
 

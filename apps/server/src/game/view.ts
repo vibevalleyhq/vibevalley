@@ -9,7 +9,7 @@ import { type AchievementDef, achievements } from "@/agent/seed.ts";
 import { openFindings } from "@/issue/status.ts";
 import { sessionOf } from "@/session/roster.ts";
 
-import { playOf } from "./play.ts";
+import { emptyPlay, playOf } from "./play.ts";
 
 const xpToNext = (level: number) => 10 * level;
 
@@ -38,8 +38,7 @@ function fnv32a(s: string): number {
 /** The same session ripens to the same crop every time. */
 const ripeCrop = (h: T.Session): T.Crop => (fnv32a(h.id) % 2 === 1 ? "carrot" : "wheat");
 
-function growth(h: T.Session): T.Crop {
-  const play = playOf(h);
+function growth(h: T.Session, play: T.SessionPlay): T.Crop {
   const since = play.runStartedAt ?? h.hiredAt;
   let crop: T.Crop = "sprout";
   for (const played of play.history) {
@@ -65,17 +64,17 @@ const badgeQuestions = (): T.Badge => ({ text: t("shared.stage.asking"), tone: "
  * A plot is a picture of its issue's stage, never a second reading of it: the crop and the badge say where the
  * issue stands (issueStageOf decides that, and in what order); the session only adds how far this round has grown.
  */
-export function plotOf(h: T.Session, issue: T.Issue | undefined): T.PlotView {
-  if (!issue) return plotOfSession(h);
+export function plotOf(h: T.Session, issue: T.Issue | undefined, play: T.SessionPlay): T.PlotView {
+  if (!issue) return plotOfSession(h, play);
   const a = issue.stage;
   switch (a.state) {
     case "draft":
     case "queued":
     case "working": {
-      if (h.phase._tag === "working" && h.phase.retry !== undefined) return { crop: growth(h), badge: badgeRetrying() };
+      if (h.phase._tag === "working" && h.phase.retry !== undefined) return { crop: growth(h, play), badge: badgeRetrying() };
       // Another round after a failed acceptance: it works on what the review said.
       const open = openFindings(issue);
-      return open > 0 ? { crop: "weeds", badge: { text: t("server.game.badge.weeding", { n: open }), tone: "bug" } } : { crop: growth(h) };
+      return open > 0 ? { crop: "weeds", badge: { text: t("server.game.badge.weeding", { n: open }), tone: "bug" } } : { crop: growth(h, play) };
     }
     case "asking":
       return { crop: "dry", badge: badgeQuestions() };
@@ -91,7 +90,7 @@ export function plotOf(h: T.Session, issue: T.Issue | undefined): T.PlotView {
         case undefined:
           return { crop: "withered", badge: badgeBugs() };
         case "interrupted":
-          return { crop: growth(h), badge: badgeHalfway() };
+          return { crop: growth(h, play), badge: badgeHalfway() };
         case "quiet":
           return { crop: "dry", badge: badgeQuiet() };
       }
@@ -100,24 +99,24 @@ export function plotOf(h: T.Session, issue: T.Issue | undefined): T.PlotView {
     case "canceled":
       break;
   }
-  return plotOfSession(h);
+  return plotOfSession(h, play);
 }
 
 /** A session that works no issue (a draft, the one splitting a task graph): its own phase is all there is. */
-function plotOfSession(h: T.Session): T.PlotView {
+function plotOfSession(h: T.Session, play: T.SessionPlay): T.PlotView {
   const need = needOf(h);
   const conflict = need?.kind === "conflict";
   switch (h.phase._tag) {
     case "working":
       if (need?.kind === "quiet") return { crop: "dry", badge: badgeQuiet() };
-      if (need?.kind === "retrying") return { crop: growth(h), badge: badgeRetrying() };
-      return { crop: growth(h) };
+      if (need?.kind === "retrying") return { crop: growth(h, play), badge: badgeRetrying() };
+      return { crop: growth(h, play) };
     case "done":
       return { crop: ripeCrop(h), badge: conflict ? badgeConflict() : badgeRipe() };
     case "failed":
       return { crop: "withered", badge: badgeBugs() };
     case "resting":
-      return { crop: growth(h), badge: conflict ? badgeConflict() : badgeRest() };
+      return { crop: growth(h, play), badge: conflict ? badgeConflict() : badgeRest() };
     case "closed":
       break;
   }
@@ -165,12 +164,19 @@ export function viewOf(state: T.WorkspaceState): T.FarmView {
     if (!was || h.hiredAt >= was.hiredAt) latest.set(key, h);
   }
   const plots: Record<string, T.PlotView> = {};
+  const plays = state.plays ?? {};
   for (const [key, h] of latest)
     plots[key] = plotOf(
       h,
       state.issues.find((item) => item.id === h.issue),
+      playOf(plays, h.id),
     );
-  return { level: farmLevelOf(state), plots, achievements: standingsOf(state.progress) };
+  const played: Record<string, T.SessionPlayView> = {};
+  for (const h of state.sessions) {
+    const play = plays[h.id] ?? emptyPlay();
+    played[h.id] = { ...play, history: play.history.map((step) => ({ ...step, actionText: t(`shared.action.${step.action}`) })) };
+  }
+  return { level: farmLevelOf(state), plots, plays: played, achievements: standingsOf(state.progress) };
 }
 
 export function achievementInWords(a: AchievementDef): T.Achievement {

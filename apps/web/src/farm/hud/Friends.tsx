@@ -142,7 +142,7 @@ export function Friends(props: { height: number }) {
   };
   const statuses = () => {
     const sessions = frames.frame?.state.sessions ?? [];
-    const view = frames.frame?.view ?? { level: { level: 1, xp: 0, need: 10 }, plots: {}, achievements: [] };
+    const view = frames.frame?.view ?? { level: { level: 1, xp: 0, need: 10 }, plots: {}, plays: {}, achievements: [] };
     return sorted().map((a) =>
       statusOf(
         sessions.filter((s) => s.agent === a.id),

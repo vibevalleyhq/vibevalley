@@ -4,7 +4,7 @@ import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
 import { farmOf } from "@vibevalley/protocol/rules";
 
-import { sessionOf, withSession } from "@/session/roster.ts";
+import { sessionOf } from "@/session/roster.ts";
 
 const historyLimit = 30;
 
@@ -12,12 +12,18 @@ const fileLimit = 24;
 
 const commandLimit = 12;
 
-/** One saved before plays were kept has an empty one, with no bed. */
-export const playOf = (h: T.Session): T.SessionPlay => h.play ?? { station: -1, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] };
+export const emptyPlay = (): T.SessionPlay => ({ station: -1, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] });
+
+export const playOf = (plays: Readonly<Record<string, T.SessionPlay>> | undefined, id: string): T.SessionPlay => plays?.[id] ?? emptyPlay();
 
 /** A free bed on `project`'s farm: `prefer` when it is free there, else the first free one, else -1. */
-export function freeStation(sessions: readonly T.Session[], project: string, prefer?: number): number {
-  const taken = new Set(sessions.filter((h) => farmOf(h) === project).map((h) => playOf(h).station));
+export function freeStation(
+  plays: Readonly<Record<string, T.SessionPlay>> | undefined,
+  sessions: readonly T.Session[],
+  project: string,
+  prefer?: number,
+): number {
+  const taken = new Set(sessions.filter((h) => farmOf(h) === project).map((h) => playOf(plays, h.id).station));
   if (prefer !== undefined && prefer >= 0 && prefer < maxRunning && !taken.has(prefer)) return prefer;
   for (let i = 0; i < maxRunning; i++) if (!taken.has(i)) return i;
   return -1;
@@ -64,8 +70,10 @@ export function playedDoing(p: T.SessionPlay, f: { readonly at: number; readonly
 /** Only to a bed that is free on its own farm; a session already there, or a bed taken, changes nothing. */
 export function stationed(state: T.WorkspaceState, f: { readonly id: T.SessionId; readonly station: number }): [T.WorkspaceState, boolean] {
   const h = sessionOf(state, f.id);
-  if (!h || playOf(h).station === f.station) return [state, false];
+  const plays = state.plays ?? {};
+  const play = playOf(plays, f.id);
+  if (!h || play.station === f.station) return [state, false];
   const others = state.sessions.filter((x) => x.id !== f.id);
-  if (freeStation(others, farmOf(h), f.station) !== f.station) return [state, false];
-  return withSession(state, f.id, (h) => ({ ...h, play: { ...playOf(h), station: f.station } }));
+  if (freeStation(state.plays, others, farmOf(h), f.station) !== f.station) return [state, false];
+  return [{ ...state, plays: { ...plays, [f.id]: { ...play, station: f.station } } }, true];
 }

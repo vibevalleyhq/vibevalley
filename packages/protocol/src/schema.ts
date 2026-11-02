@@ -459,12 +459,11 @@ const sessionFields = {
   refining: Schema.Boolean,
 };
 
-export const Session: Codec<T.Session> = Schema.Struct({ ...sessionFields, phase: Phase, play: Schema.optionalKey(SessionPlay) });
+export const Session: Codec<T.Session> = Schema.Struct({ ...sessionFields, phase: Phase });
 
 export const SessionView: Codec<T.SessionView> = Schema.Struct({
   ...sessionFields,
   phase: PhaseView,
-  play: Schema.optionalKey(SessionPlayView),
   phaseText: Schema.String,
 });
 
@@ -772,6 +771,7 @@ export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
   ...workspaceFields,
   sessions: Schema.mutable(Schema.Array(Session)),
   crons: Schema.mutable(Schema.Array(Cron)),
+  plays: Schema.optionalKey(Schema.Record(Schema.String, SessionPlay)),
 });
 
 export const WorkspaceView: Codec<T.WorkspaceView> = Schema.Struct({
@@ -983,6 +983,7 @@ export const PlotView: Codec<T.PlotView> = Schema.Struct({
 export const FarmView: Codec<T.FarmView> = Schema.Struct({
   level: FarmLevel,
   plots: Schema.Record(Schema.String, PlotView),
+  plays: Schema.Record(Schema.String, SessionPlayView),
   achievements: Schema.mutable(Schema.Array(AchievementStanding)),
 });
 

@@ -527,7 +527,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       const { bed } = p;
       const leaving =
         bed.unlockLevel === undefined &&
-        !state.sessions.some((s) => stationOfSession(s) === bed.station) &&
+        !state.sessions.some((s) => stationOfSession(s, view.plays) === bed.station) &&
         [...actors.values()].some((a) => a.leftAt !== undefined && a.station === bed.station);
       const crop = cropOfBed(bed, state.sessions, view, leaving);
       p.ripe = bed.unlockLevel === undefined && isRipe(crop);
@@ -558,7 +558,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     const crowd = (key: string) => counts.get(key) ?? 0;
     let queued = 0;
     for (const s of state.sessions.filter((s) => s.role === "worker").toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
-      const station = stationOfSession(s);
+      const station = stationOfSession(s, view.plays);
       const crop = cropOf(s);
       const pose = poseOf(s, crop);
       const calls = plotCalls(crop);
@@ -614,7 +614,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       const a = actors.get(id);
       if (a?.bed) return a.bed.index;
       const s = present.get(id);
-      return s ? bedOfStation(stationOfSession(s))?.index : undefined;
+      return s ? bedOfStation(stationOfSession(s, view.plays))?.index : undefined;
     };
     fx.update(dt, store.bedFx, store.rewards, bedOfSession);
 

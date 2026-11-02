@@ -686,9 +686,13 @@ const make = (options: ConnectorOptions = {}) =>
       Effect.map(Effect.all({ outbox: Queue.sliding<void>(1), inbox: Queue.sliding<void>(1) }), (mail) => bridgeOf(a, mail)),
     );
     yield* Effect.forEach(bridges, (b) => Effect.orDie(b.load), { discard: true });
-    inbox.attachExternalChange(() => {
-      for (const bridge of bridges) bridge.changed();
-    });
+    yield* Effect.forkScoped(
+      Stream.runForEach(yield* inbox.externalChanges, () =>
+        Effect.sync(() => {
+          for (const bridge of bridges) bridge.changed();
+        }),
+      ),
+    );
     const bridge = (id: ConnectorID) => bridges.find((b) => b.id === id);
 
     // What the owner hears off the farm (the inbox says what) goes out on every app the owner has, each checking it is

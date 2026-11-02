@@ -197,7 +197,7 @@ describe("a talk with a helper profile", () => {
         yield* channels.start;
         expect(yield* channels.direct("lab")).toBe(first.dm);
         expect(sessions.presentSessions().find((s) => s.channel === first.dm)?.id).toBe(first.session);
-        expect(sessions.sessionOf(first.session)?.play?.station).toBe(3);
+        expect((yield* Core).state().plays?.[first.session]?.station).toBe(0);
         yield* channels.say("重启之后", first.dm, "");
         yield* until(() => said(first.dm).some((m) => m.kind === "report"), "the answer after restart");
         expect(resumes[1]).toBeTruthy();

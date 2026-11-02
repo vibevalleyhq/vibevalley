@@ -173,7 +173,6 @@ test("a click on a helper's plot opens its issue: its state, the acts and the fo
     phaseText: "",
     issue: made.id,
     lastRun: { outcome: "completed", summary: "done, tests pass", at: Date.now() - 60_000 } as never,
-    play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
   };
   // What the server would say of an issue handed back: it may be completed (done) or canceled.
   const issue: Issue = withIssueSession(
@@ -189,7 +188,11 @@ test("a click on a helper's plot opens its issue: its state, the acts and the fo
   const fixture: StateFrame = {
     ...frame,
     state: { ...frame.state, sessions: [session], issues: [issue] },
-    view: { ...frame.view, plots: { [made.id]: { crop: "wheat" } } },
+    view: {
+      ...frame.view,
+      plots: { [made.id]: { crop: "wheat" } },
+      plays: { w1: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } },
+    },
   };
   await page.route("**/api/v1/state", (route) =>
     route.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: `data: ${JSON.stringify(fixture)}\n\n` }),

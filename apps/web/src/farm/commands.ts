@@ -2,7 +2,7 @@
 // refusal.
 
 import { t } from "@vibevalley/i18n";
-import type { IssueAct, Session, StateFrame } from "@vibevalley/protocol";
+import type { IssueAct, Session, SessionPlayView, StateFrame } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { actionOf, perform } from "@/features/issue";
@@ -15,8 +15,8 @@ import { webRoutes, type YardPlace } from "./world/places";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
 
 /** The bed's effect for a helper's plot: what the farm plays once the server took an act on it. */
-export const playBedFx = (s: Session, kind: BedFxKind, text?: string) => {
-  const bed = bedOfStation(stationOfSession(s));
+export const playBedFx = (s: Session, plays: Record<string, SessionPlayView> | undefined, kind: BedFxKind, text?: string) => {
+  const bed = bedOfStation(stationOfSession(s, plays));
   if (bed) farm.bedFx(bed.index, kind, text);
 };
 
@@ -52,7 +52,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
   };
   const aimAt = (bed: Bed, tool: Tool): PlotAim => {
     const f = frame();
-    const session = f ? sessionAtStation(f.state.sessions, bed.station) : undefined;
+    const session = f ? sessionAtStation(f.state.sessions, bed.station, f.view.plays) : undefined;
     const level = f ? Math.round(f.view.level.level) : 1;
     const plot = f ? plotOf(f.view, session) : { crop: "empty" as const };
     const current = session ? f?.state.issues.find((i) => i.id === issueOf(session)) : undefined;
@@ -61,19 +61,19 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
   const commands: FarmCommands = {
     async water(s, text, sendKey) {
       await send(s, "tell", text, sendKey);
-      playBedFx(s, "water");
+      playBedFx(s, frame()?.view.plays, "water");
     },
     async resolve(s) {
       await send(s, "resolve");
-      playBedFx(s, "water");
+      playBedFx(s, frame()?.view.plays, "water");
     },
     async cure(s) {
       await send(s, "cure");
-      playBedFx(s, "spray");
+      playBedFx(s, frame()?.view.plays, "spray");
     },
     async harvest(s) {
       await send(s, "complete");
-      playBedFx(s, "harvest", t("web.farm.command.stored"));
+      playBedFx(s, frame()?.view.plays, "harvest", t("web.farm.command.stored"));
     },
     async shovel(s) {
       const act = actForTool(
@@ -82,7 +82,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
       );
       if (!act) throw new Error(t("web.farm.command.noShovel"));
       await send(s, act);
-      playBedFx(s, "shovel");
+      playBedFx(s, frame()?.view.plays, "shovel");
     },
     stop: (s) => send(s, "stop"),
     async plant(text, sendKey, o = {}) {

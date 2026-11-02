@@ -16,12 +16,12 @@ export function frameOf(state: WorkspaceState, effects: GameEffect[] = [], seq =
 
 function withWords(state: WorkspaceState): WorkspaceView {
   const doing = (d: Doing): DoingView => ({ ...d, actionText: t(`shared.action.${d.action}`) });
+  const { plays: _plays, ...rest } = state;
   return {
-    ...state,
-    sessions: state.sessions.map(({ phase, play, ...h }) => ({
+    ...rest,
+    sessions: state.sessions.map(({ phase, ...h }) => ({
       ...h,
       phase: phase._tag === "working" ? { ...phase, doing: doing(phase.doing) } : phase,
-      ...(play ? { play: { ...play, history: play.history.map((s) => ({ ...s, ...doing(s) })) } } : {}),
       phaseText: phaseWords({ ...h, phase }, state.issues.find((issue) => issue.id === h.issue)?.conflict),
     })),
     crons: state.crons.map((s) => ({ ...s, whenText: whenText(s.when, s.tz), nextText: nextText(s) })),

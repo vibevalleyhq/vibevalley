@@ -46,7 +46,6 @@ const helper: SessionView = {
   refining: false,
   phaseText: "",
   issue: issueId("clock"),
-  play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
 };
 
 function frame(stage: IssueStage, session: SessionView = helper): StateFrame {
@@ -76,7 +75,12 @@ function frame(stage: IssueStage, session: SessionView = helper): StateFrame {
     state: { call: "idle", callReason: "", sessions: [session], issues: [issue], crons: [], connectors: [] },
     inbox: [],
     effects: [],
-    view: { level: { level: 1, xp: 0, need: 100 }, plots: { clock: { crop: "wheat" } }, achievements: [] },
+    view: {
+      level: { level: 1, xp: 0, need: 100 },
+      plots: { clock: { crop: "wheat" } },
+      plays: { helper: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } },
+      achievements: [],
+    },
   };
 }
 

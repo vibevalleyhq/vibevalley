@@ -23,7 +23,7 @@ const session = (id: string, project?: string): Session => ({
 });
 
 const hire = (state = emptyWorkspaceState(), h: Session) => reduce(state, { type: "session", at: 0, session: h })[0];
-const bed = (state: ReturnType<typeof emptyWorkspaceState>, id: string) => playOf(state.sessions.find((h) => h.id === id)!).station;
+const bed = (state: ReturnType<typeof emptyWorkspaceState>, id: string) => playOf(state.plays, id).station;
 
 test("each project's farm has its own beds: the first of each is on bed 0", () => {
   let s = hire(undefined, session("a1", "alpha"));
@@ -45,10 +45,10 @@ test("a bed taken on another project's farm is free on this one, and taken on it
 });
 
 test("a saved bed another session of its farm holds moves to a free one", () => {
-  const on = (h: Session, station: number): Session => ({ ...h, play: { ...playOf(h), station } });
   let s = emptyWorkspaceState();
-  for (const h of [on(session("a1", "alpha"), 3), on(session("a2", "alpha"), 3), on(session("b1", "beta"), 0)]) {
-    s = reduce(hire(s, h), { type: "gameProgress", at: 0, station: { id: h.id, station: playOf(h).station } })[0];
-  }
-  expect(s.sessions.map((h) => playOf(h).station)).toEqual([3, 0, 0]);
+  for (const h of [session("a1", "alpha"), session("a2", "alpha"), session("b1", "beta")]) s = hire(s, h);
+  s = reduce(s, { type: "gameProgress", at: 0, station: { id: sessionId("a1"), station: 3 } })[0];
+  s = reduce(s, { type: "gameProgress", at: 0, station: { id: sessionId("a2"), station: 3 } })[0];
+  s = reduce(s, { type: "gameProgress", at: 0, station: { id: sessionId("b1"), station: 0 } })[0];
+  expect(["a1", "a2", "b1"].map((id) => bed(s, id))).toEqual([3, 1, 0]);
 });

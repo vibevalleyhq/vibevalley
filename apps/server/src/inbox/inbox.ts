@@ -34,8 +34,8 @@ export class Inbox extends Context.Service<
     /** One round of the patrol, now. */
     readonly patrol: Effect.Effect<void>;
     readonly handoffState: (message: string) => Effect.Effect<"unseen" | "seen" | undefined>;
-    /** A later connector registers one invalidation callback for pending external deliveries. */
-    readonly attachExternalChange: (notify: () => void) => void;
+    /** Pending external deliveries changed: a later connector rereads them. */
+    readonly externalChanges: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>;
     /** From here what the inbox holds is known: the startup's, after the sessions and issues came back. */
     readonly prime: Effect.Effect<void>;
   }
@@ -54,7 +54,7 @@ const make = Effect.gen(function* () {
   const ingress = yield* Ingress;
   const db = yield* Db;
   const turn = yield* Semaphore.make(1);
-  let externalChanged: () => void = () => {};
+  const externalHub = yield* scopedPubSub<void>();
 
   const handoffState = Effect.fn("Inbox.handoffState")(function* (id: string) {
     const row = yield* db.one(q.messageByID({ id }));
@@ -82,7 +82,7 @@ const make = Effect.gen(function* () {
       turn.withPermits(1)(
         Effect.gen(function* () {
           if (event.type === "message" && (yield* handoffState(event.message.id)) === "unseen") yield* PubSub.publish(toOwnerHub, event.message);
-          if (event.type === "message" || event.type === "sessionReport" || event.type === "issue") externalChanged();
+          if (event.type === "message" || event.type === "sessionReport" || event.type === "issue") yield* PubSub.publish(externalHub, undefined);
           if (!primed) return;
           const news = freshOf(known, inbox(core.state()));
           known = news.known;
@@ -91,7 +91,7 @@ const make = Effect.gen(function* () {
       ),
     ),
   );
-  yield* Effect.forkScoped(Stream.runForEach(yield* chat.ownerReads, () => Effect.sync(externalChanged)));
+  yield* Effect.forkScoped(Stream.runForEach(yield* chat.ownerReads, () => PubSub.publish(externalHub, undefined)));
 
   let memory: PatrolMemory = emptyPatrol();
   const patrol = Effect.gen(function* () {
@@ -137,9 +137,7 @@ const make = Effect.gen(function* () {
     toOwner: Effect.map(PubSub.subscribe(toOwnerHub), Stream.fromSubscription),
     patrol,
     handoffState,
-    attachExternalChange: (notify) => {
-      externalChanged = notify;
-    },
+    externalChanges: Effect.map(PubSub.subscribe(externalHub), Stream.fromSubscription),
     prime: turn.withPermits(1)(
       Effect.sync(() => {
         const state = core.state();

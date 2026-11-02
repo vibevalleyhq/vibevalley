@@ -117,12 +117,14 @@ export function Overlay() {
 
     for (const bed of beds) {
       const p = world.plotAt(bed.index);
-      const session = bed.unlockLevel === undefined ? sessionAtStation(state.sessions, bed.station) : undefined;
+      const session = bed.unlockLevel === undefined ? sessionAtStation(state.sessions, bed.station, view.plays) : undefined;
       const plot = bed.unlockLevel !== undefined ? lockedPlot(bed, level) : plotOf(view, session);
       let card: Card | undefined;
       let where: "above" | "rail" | "middle" = "rail";
       const reward =
-        bed.station < 0 ? undefined : rewards().findLast((r) => state.sessions.some((h) => h.id === r.sessionId && stationOfSession(h) === bed.station));
+        bed.station < 0
+          ? undefined
+          : rewards().findLast((r) => state.sessions.some((h) => h.id === r.sessionId && stationOfSession(h, view.plays) === bed.station));
       const note = bedFx().findLast((f) => f.bed === bed.index && (f.kind === "note" || f.kind === "harvest"));
       if (hoverBed() === bed.index) {
         const issue = session ? state.issues.find((i) => i.id === issueOf(session)) : undefined;

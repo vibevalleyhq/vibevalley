@@ -44,5 +44,5 @@ select * from session where ended_at is null order by hired_at, id;
 
 -- name: KeepSessionState :exec
 update session set phase = sqlc.arg(phase), refining = sqlc.arg(refining), runs = sqlc.arg(runs),
-  last_run = sqlc.narg(last_run), spent = sqlc.narg(spent), play = sqlc.narg(play), channel = sqlc.narg(channel)
+  last_run = sqlc.narg(last_run), spent = sqlc.narg(spent), channel = sqlc.narg(channel)
 where id = sqlc.arg(id) and ended_at is null;

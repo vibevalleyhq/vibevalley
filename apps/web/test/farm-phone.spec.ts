@@ -72,7 +72,6 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
     phaseText: "",
     issue: made.id,
     lastRun: { outcome: "completed", summary: "done, tests pass", at: Date.now() - 60_000 } as never,
-    play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
   };
   const call: InboxItem = {
     id: "merge-w1-1",
@@ -87,7 +86,11 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   const base: StateFrame = {
     ...frame,
     state: { ...frame.state, sessions: [session], issues: [withIssueSession({ ...made, status: "in_review", moves: ["done", "canceled"] }, sessionId("w1"))] },
-    view: { ...frame.view, plots: { [made.id]: { crop: "wheat" } } },
+    view: {
+      ...frame.view,
+      plots: { [made.id]: { crop: "wheat" } },
+      plays: { w1: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } },
+    },
   };
   let served = 0;
   await page.route("**/api/v1/state", (route) => {

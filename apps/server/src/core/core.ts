@@ -8,6 +8,7 @@ export const emptyWorkspaceState = (): T.WorkspaceState => ({
   call: "idle",
   callReason: "",
   sessions: [],
+  plays: {},
   crons: [],
   issues: [],
   connectors: [],

@@ -78,7 +78,6 @@ export function sessionState(s: T.Session): qs.KeepSessionStateParams {
     runs: s.runs,
     last_run: s.lastRun ? JSON.stringify(s.lastRun) : null,
     spent: s.spent ? JSON.stringify(s.spent) : null,
-    play: s.play ? JSON.stringify(s.play) : null,
     channel: s.channel ?? null,
   };
 }
@@ -87,7 +86,6 @@ export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
   const phase = Schema.decodeSync(Schema.fromJsonString(S.Phase))(row.phase);
   const lastRun = row.last_run === null ? undefined : Schema.decodeSync(Schema.fromJsonString(S.LastRun))(row.last_run);
   const spent = row.spent === null ? undefined : Schema.decodeSync(Schema.fromJsonString(S.Spent))(row.spent);
-  const play = row.play === null ? undefined : Schema.decodeSync(Schema.fromJsonString(S.SessionPlay))(row.play);
   const place = row.place === null ? undefined : placeOf(row.place);
   return {
     id: sessionId(row.id),
@@ -106,6 +104,5 @@ export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
     ...(place?.branch ? { branch: place.branch, worktree: place.cwd } : {}),
     ...(lastRun ? { lastRun } : {}),
     ...(spent ? { spent } : {}),
-    ...(play ? { play } : {}),
   };
 }

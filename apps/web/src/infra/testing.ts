@@ -34,5 +34,5 @@ export const frameAt = (seq: number): StateFrame => ({
   state: { call: "idle", callReason: "", sessions: [], issues: [], crons: [], connectors: [] },
   inbox: [],
   effects: [],
-  view: { level: { level: 1, xp: 0, need: 100 }, plots: {}, achievements: [] },
+  view: { level: { level: 1, xp: 0, need: 100 }, plots: {}, plays: {}, achievements: [] },
 });

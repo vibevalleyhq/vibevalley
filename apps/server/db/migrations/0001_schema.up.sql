@@ -207,8 +207,7 @@ CREATE TABLE session (
   refining boolean not null default false,
   runs integer not null default 0,
   last_run text,
-  spent text,
-  play text
+  spent text
 );
 CREATE TABLE issue_assignment_execution (
   assignment text not null references issue_assignment(id) on delete cascade,
