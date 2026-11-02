@@ -145,7 +145,6 @@ const channelLayer = (x: FakeSessions) =>
       x.inputsConsumedHub = yield* PubSub.unbounded<InputConsumed>();
       x.inputsReturnedHub = yield* PubSub.unbounded<InputReturned>();
       const sessions = {
-        attachInputRegistrar: () => {},
         present: (id: string) => x.core.session(id) !== undefined,
         sessionOf: (id: string) => x.core.session(id),
         presentSessions: () => x.core.state().sessions,

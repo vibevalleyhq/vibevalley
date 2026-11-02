@@ -102,7 +102,10 @@ export class Issue extends Context.Service<
     readonly pendingDispatches: Effect.Effect<readonly IssueDispatch[]>;
     readonly acknowledgeDispatch: (id: string) => Effect.Effect<void>;
     readonly refreshPullRequests: Effect.Effect<void>;
-    readonly tryQueued: (inputs: readonly QueuedInput[]) => Effect.Effect<void>;
+    readonly tryQueued: (
+      inputs: readonly QueuedInput[],
+      hiring?: (session: T.Session, launch: string, inputs: readonly T.Trigger[]) => Effect.Effect<void, NotRecorded>,
+    ) => Effect.Effect<void>;
     readonly submitPullRequest: (session: string, summary?: string) => Effect.Effect<string, ApiError>;
   }
 >()("vibevalley/Issue") {
@@ -470,7 +473,11 @@ const make = (options: IssueOptions = {}) =>
         ...opt,
         ...(base ? { base, worktree: true } : {}),
         context: { kind: "issue", issue },
-        ...(opt.refining !== true ? { hiring: (w: T.Session) => ran(issue.id, w) } : {}),
+        hiring: (w: T.Session, launch: string) =>
+          Effect.gen(function* () {
+            if (opt.refining !== true) yield* ran(issue.id, w);
+            if (opt.hiring) yield* opt.hiring(w, launch);
+          }),
       });
       if (!hired.session && !opt.issue && !hired.retainedWork) {
         yield* db.run(q.removeIssue({ id: issue.id }));
@@ -493,9 +500,18 @@ const make = (options: IssueOptions = {}) =>
 
     const ready = (id: string) => Effect.flatMap(unsent(id), readyOf);
 
-    const send = (issue: T.Issue, agent: T.Agent, project: string, channel: string, by?: T.RunTrigger, inputs: readonly T.Trigger[] = []) =>
-      Effect.flatMap(hire(agent, issueBrief(issue), project, { channel, issue: issue.id, inputs, ...(by ? { trigger: by } : {}) }), (hired) =>
-        hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed"))),
+    const send = (
+      issue: T.Issue,
+      agent: T.Agent,
+      project: string,
+      channel: string,
+      by?: T.RunTrigger,
+      inputs: readonly T.Trigger[] = [],
+      hiring?: (s: T.Session, launch: string) => Effect.Effect<void, NotRecorded>,
+    ) =>
+      Effect.flatMap(
+        hire(agent, issueBrief(issue), project, { channel, issue: issue.id, inputs, ...(by ? { trigger: by } : {}), ...(hiring ? { hiring } : {}) }),
+        (hired) => (hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")))),
       );
 
     /** Its run starts as it is handed over: the issue is in progress until the run ends on it (endRun). */
@@ -753,7 +769,10 @@ const make = (options: IssueOptions = {}) =>
     );
 
     /** In the board's order: one that cannot go any more leaves the queue. */
-    const tryQueued = Effect.fn("Issue.tryQueued")(function* (inputs: readonly QueuedInput[]) {
+    const tryQueued = Effect.fn("Issue.tryQueued")(function* (
+      inputs: readonly QueuedInput[],
+      hiring?: (session: T.Session, launch: string, inputs: readonly T.Trigger[]) => Effect.Effect<void, NotRecorded>,
+    ) {
       yield* joinChildren.pipe(bestEffort("vibevalley: child issues could not be merged"));
       const all = yield* everyIssue;
       for (const issue of all) {
@@ -767,7 +786,15 @@ const make = (options: IssueOptions = {}) =>
             const input = inputs.find((input) => input.issue === issue.id)?.trigger;
             if (!input) return "";
             const by: T.RunTrigger = { ...(triggerOf(JSON.stringify(input.meta.trigger)) ?? { kind: "issue" }), message: input.id };
-            return yield* send(issue, agent, project, input.replyChannel ?? chat.defaultChannel(), by, [input]);
+            return yield* send(
+              issue,
+              agent,
+              project,
+              input.replyChannel ?? chat.defaultChannel(),
+              by,
+              [input],
+              hiring ? (s, launch) => hiring(s, launch, [input]) : undefined,
+            );
           }),
         );
         if (sent._tag === "Success") {

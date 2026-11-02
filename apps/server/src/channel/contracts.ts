@@ -1,4 +1,4 @@
-import { type Effect, Schema, type Scope, type Stream } from "effect";
+import { type Deferred, type Effect, Schema, type Scope, type Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
@@ -322,20 +322,33 @@ export interface ChannelHandoffSubject {
   readonly id: string;
 }
 
-export interface ChannelDeliveryPort {
-  readonly restore: Effect.Effect<void>;
-  readonly registerTalk: (session: string, launch: string, at: number, rows: readonly ChannelEnvelopeRow[]) => Effect.Effect<void>;
-  readonly dropSession: (session: string) => Effect.Effect<void>;
-  readonly kick: (session: string) => Effect.Effect<void>;
-  readonly dropEnvelope: (envelope: string) => Effect.Effect<readonly string[]>;
-  readonly waitingOn: (envelope: string) => Effect.Effect<number>;
-  readonly deliverDirect: (session: string, text: string, channel: string | undefined, byOwner: boolean) => Effect.Effect<void>;
-}
+export type ChannelDelivery =
+  | { readonly kind: "restore"; readonly reply: Deferred.Deferred<void> }
+  | {
+      readonly kind: "registerTalk";
+      readonly session: string;
+      readonly launch: string;
+      readonly at: number;
+      readonly rows: readonly ChannelEnvelopeRow[];
+      readonly reply: Deferred.Deferred<void>;
+    }
+  | { readonly kind: "dropSession"; readonly session: string; readonly reply: Deferred.Deferred<void> }
+  | { readonly kind: "kick"; readonly session: string; readonly reply: Deferred.Deferred<void> }
+  | { readonly kind: "dropEnvelope"; readonly envelope: string; readonly reply: Deferred.Deferred<readonly string[]> }
+  | { readonly kind: "waitingOn"; readonly envelope: string; readonly reply: Deferred.Deferred<number> }
+  | {
+      readonly kind: "deliverDirect";
+      readonly session: string;
+      readonly text: string;
+      readonly channel: string | undefined;
+      readonly byOwner: boolean;
+      readonly reply: Deferred.Deferred<void>;
+    };
 
 export interface ChannelService {
   readonly attachIngress: (route: (fact: ChannelRouteFact) => Effect.Effect<ChannelRouteResult>) => void;
-  /** Mailbox is assembled after Collaboration and registers the one delivery port before startup. */
-  readonly attachDelivery: (port: ChannelDeliveryPort) => void;
+  /** Mailbox is assembled after Collaboration and reads the delivery calls before startup. */
+  readonly delivery: Effect.Effect<Stream.Stream<ChannelDelivery>, never, Scope.Scope>;
   readonly replayDelivery: (row: ChannelEnvelopeRow) => Effect.Effect<void>;
   readonly deliveryMessage: (row: ChannelEnvelopeRow) => InboxMessage;
   readonly deliveryUnread: (session: string) => Effect.Effect<UnreadRow[]>;

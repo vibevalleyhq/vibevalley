@@ -33,11 +33,12 @@ export const issueInputs = Effect.fn("Ingress.issueInputs")(function* (accept: I
         }).pipe(bestEffort(`ingress: issue dispatch ${dispatch.id}`)),
       { discard: true },
     );
-    if (pending.length > 0) yield* issues.tryQueued(yield* mailbox.queuedInputs);
+    if (pending.length > 0)
+      yield* issues.tryQueued(yield* mailbox.queuedInputs, (session, launch, inputs) => mailbox.registerInitialInputs(session, launch, inputs));
   }).pipe(lock.withPermits(1));
   const refresh = Effect.gen(function* () {
     yield* drain;
-    yield* issues.tryQueued(yield* mailbox.queuedInputs);
+    yield* issues.tryQueued(yield* mailbox.queuedInputs, (session, launch, inputs) => mailbox.registerInitialInputs(session, launch, inputs));
   });
   yield* Effect.forkScoped(Stream.runForEach(yield* core.subscribe, (fact) => (fact.type === "issue" ? drain : Effect.void)));
   return { refresh };

@@ -93,6 +93,8 @@ export interface HireOptions {
   readonly trigger?: T.RunTrigger;
   /** It drafts the issue rather than works it. */
   readonly refining?: boolean;
+  /** The caller's transaction after the session row is kept, before any report can be seen. */
+  readonly hiring?: (s: T.Session, launch: string) => Effect.Effect<void, NotRecorded>;
 }
 
 export interface SendOptions extends Omit<HireOptions, "issue"> {
@@ -136,15 +138,9 @@ interface Hand {
   settling?: { readonly report: SubagentReport; readonly completedBefore: number };
 }
 
-export interface InitialInputs {
-  readonly prepare: (issue: string | undefined, inputs: readonly T.Trigger[]) => Effect.Effect<readonly T.Trigger[], NotRecorded>;
-  readonly register: (session: T.Session, launch: string, inputs: readonly T.Trigger[]) => Effect.Effect<void, NotRecorded>;
-}
-
 export class Session extends Context.Service<
   Session,
   {
-    readonly attachInputRegistrar: (registrar: InitialInputs) => void;
     readonly attachPullRequestPolicy: (follows: (issue: string) => boolean) => void;
     readonly noRoom: (runtime: string, project: string) => string;
     /** Room for one more on runtime in project: refused when either is at its limit; a full farm sends home whoever has
@@ -344,7 +340,6 @@ const make = (options: SessionOptionsIn = {}) =>
     const signal = (a: LaunchActivity) => PubSub.publishUnsafe(launchesHub, a);
 
     const hands = new Map<string, Hand>();
-    let registerInputs: InitialInputs | undefined;
     let followsPullRequest = (_issue: string) => false;
     const executions = new Map<string, () => string>();
     const tokens = new Map<string, string>();
@@ -1057,9 +1052,6 @@ const make = (options: SessionOptionsIn = {}) =>
       register: (session, current) => void executions.set(session, current),
     };
     const shape = Session.of({
-      attachInputRegistrar: (register) => {
-        registerInputs = register;
-      },
       attachPullRequestPolicy: (follows) => {
         followsPullRequest = follows;
       },
@@ -1137,16 +1129,7 @@ const make = (options: SessionOptionsIn = {}) =>
               return { refused: why, ...(result.kept ? { retainedWork: true as const } : {}) };
             });
           const journal = yield* trajectories.openLog(id);
-          const preparedInputs = yield* Effect.result(
-            registerInputs
-              ? registerInputs.prepare(issue?.id, opt.inputs ?? [])
-              : (opt.inputs?.length ?? 0) === 0
-                ? Effect.succeed<readonly T.Trigger[]>([])
-                : Effect.fail(new NotRecorded({ message: "No initial input registrar is attached" })),
-          );
-          if (preparedInputs._tag === "Failure")
-            return yield* refuseStart(t("server.session.life.notRecorded", { name: agent.name, why: preparedInputs.failure.message }), false);
-          const initial = preparedInputs.success;
+          const initial = opt.inputs ?? [];
           const initialText = initial.map((input) => `${input.id}\n${input.card.summary}\n${input.card.readUri}`).join("\n\n");
           const source = issue?.mandate?.originTriggerId;
           const prompt = [brief, source ? sourceBrief(source) : "", initialText].filter(Boolean).join("\n\n");
@@ -1174,10 +1157,6 @@ const make = (options: SessionOptionsIn = {}) =>
               }),
             );
             registeredRow = true;
-            if (initial.length > 0) {
-              if (!registerInputs) return yield* new NotRecorded({ message: "No initial input registrar is attached" });
-              yield* registerInputs.register(session, launch, initial);
-            }
             if (opt.hiring) yield* opt.hiring(session, launch);
             const h: Hand = {
               id,

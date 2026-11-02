@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
+import { Clock, Context, Deferred, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
 import type { SqlError } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
@@ -11,7 +11,6 @@ import { newId } from "@/base/ids.ts";
 import { Channel } from "@/channel/chat.ts";
 import {
   channelType,
-  type ChannelDeliveryPort,
   type ChannelEnvelopeRow,
   type ChannelRouteFact,
   type ChannelRouteResult,
@@ -22,7 +21,7 @@ import {
 import { wakeInput } from "@/channel/prompts.ts";
 import type { InboxMessage } from "@/channel/wake.ts";
 import { Core } from "@/core/core.ts";
-import { type ApiError, refused, missing, lookIn, reasonOf } from "@/errors.ts";
+import { type ApiError, refused, missing, lookIn } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { causeMessage, Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
@@ -94,6 +93,7 @@ export class Mailbox extends Context.Service<
   Mailbox,
   {
     readonly queuedInputs: Effect.Effect<readonly QueuedInput[]>;
+    readonly registerInitialInputs: (session: T.Session, launch: string, inputs: readonly T.Trigger[]) => Effect.Effect<void, NotRecorded>;
     readonly registered: (trigger: string) => Effect.Effect<boolean>;
     readonly receive: (trigger: T.Trigger) => Effect.Effect<void, ApiError>;
     readonly subscribe: (issue: string, threads: readonly string[]) => Effect.Effect<void, ApiError>;
@@ -298,9 +298,45 @@ export class Mailbox extends Context.Service<
       );
 
       let start: Effect.Effect<void> = Effect.void;
+      const registerInitialInputs = Effect.fn("Mailbox.registerInitialInputs")(function* (session: T.Session, launch: string, inputs: readonly T.Trigger[]) {
+        const at = yield* Clock.currentTimeMillis;
+        const rows: DeliveryDraft[] = inputs.map((trigger) => ({
+          envelope_id: trigger.id,
+          scope: deliveryScope(trigger.replyChannel ?? session.channel ?? channel.defaultChannel(), session.issue),
+          message_id: null,
+          channel_id: trigger.replyChannel ?? session.channel ?? channel.defaultChannel(),
+          source: trigger.source,
+          urgency: "queue",
+          reason: "initial",
+          wakes: true,
+          held_by: null,
+          state: "handed",
+          launch,
+          created_at: at,
+          payload: triggerPayload(trigger, session.issue),
+        }));
+        const committed = yield* db
+          .attemptTx(
+            Effect.forEach(rows, (row) =>
+              Effect.gen(function* () {
+                if (session.issue) yield* qi.holdIssueTrigger({ trigger_id: row.envelope_id, issue_id: session.issue, created_at: at });
+                const added = yield* writeDelivery({ session: session.id, row });
+                yield* qd.markHanded({ session_id: session.id, envelope_id: row.envelope_id, launch, handed_at: at });
+                if (session.issue) yield* qi.forwardIssueInput({ trigger_id: row.envelope_id, session_id: session.id });
+                const receipt = yield* markRoute({ session: session.id, row });
+                return { added, receipt, row };
+              }),
+            ),
+          )
+          .pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+        for (const entry of committed) received(entry.receipt);
+        for (const entry of committed) for (const added of entry.added) stored(session.id, { ...entry.row, position: added.position });
+      }, writtenLocked);
+
       const api = Mailbox.of({
         registered: work.registered,
         queuedInputs: work.queuedInputs,
+        registerInitialInputs,
         receive: Effect.fnUntraced(
           function* (trigger: T.Trigger) {
             return yield* work.receive(trigger);
@@ -538,9 +574,9 @@ export class Mailbox extends Context.Service<
         retryWakeMs: config.chat.retryWakeMs,
       });
 
-      const port: ChannelDeliveryPort = {
+      const port = {
         restore: api.restore,
-        registerTalk: (session, launch, at, rows) =>
+        registerTalk: (session: string, launch: string, at: number, rows: readonly ChannelEnvelopeRow[]) =>
           Effect.orDie(
             Effect.forEach(
               rows,
@@ -579,7 +615,7 @@ export class Mailbox extends Context.Service<
               { discard: true },
             ),
           ),
-        dropSession: (session) =>
+        dropSession: (session: string) =>
           Effect.andThen(
             api.dropSession(session, "left"),
             Effect.sync(() => {
@@ -587,10 +623,10 @@ export class Mailbox extends Context.Service<
               breaker.reset(session);
             }),
           ),
-        kick: (session) => Effect.sync(() => later(`kick:${session}`, 0, () => pump.kick(session))),
+        kick: (session: string) => Effect.sync(() => later(`kick:${session}`, 0, () => pump.kick(session))),
         dropEnvelope: api.dropEnvelope,
         waitingOn: api.waitingOn,
-        deliverDirect: (session, text, replyChannel, byOwner) =>
+        deliverDirect: (session: string, text: string, replyChannel: string | undefined, byOwner: boolean) =>
           Effect.asVoid(
             sessions.deliver(session, text, {
               trigger: { kind: "comment", ...(replyChannel ? { channel: replyChannel } : {}) },
@@ -599,47 +635,41 @@ export class Mailbox extends Context.Service<
             }),
           ),
       };
-      sessions.attachInputRegistrar({
-        prepare: Effect.fn("Mailbox.prepareInitialInputs")(function* (issue, inputs) {
-          return yield* work.initial(issue, inputs).pipe(Effect.mapError((cause) => new NotRecorded({ message: reasonOf(cause), cause })));
-        }),
-        register: Effect.fn("Mailbox.registerInitialInputs")(function* (session, launch, inputs) {
-          const at = yield* Clock.currentTimeMillis;
-          const rows: DeliveryDraft[] = inputs.map((trigger) => ({
-            envelope_id: trigger.id,
-            scope: deliveryScope(trigger.replyChannel ?? session.channel ?? channel.defaultChannel(), session.issue),
-            message_id: null,
-            channel_id: trigger.replyChannel ?? session.channel ?? channel.defaultChannel(),
-            source: trigger.source,
-            urgency: "queue",
-            reason: "initial",
-            wakes: true,
-            held_by: null,
-            state: "handed",
-            launch,
-            created_at: at,
-            payload: triggerPayload(trigger, session.issue),
-          }));
-          const committed = yield* db
-            .attemptTx(
-              Effect.forEach(rows, (row) =>
-                Effect.gen(function* () {
-                  if (session.issue) yield* qi.holdIssueTrigger({ trigger_id: row.envelope_id, issue_id: session.issue, created_at: at });
-                  const added = yield* writeDelivery({ session: session.id, row });
-                  yield* qd.markHanded({ session_id: session.id, envelope_id: row.envelope_id, launch, handed_at: at });
-                  if (session.issue) yield* qi.forwardIssueInput({ trigger_id: row.envelope_id, session_id: session.id });
-                  const receipt = yield* markRoute({ session: session.id, row });
-                  return { added, receipt, row };
-                }),
-              ),
-            )
-            .pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
-          for (const entry of committed) received(entry.receipt);
-          for (const entry of committed) for (const added of entry.added) stored(session.id, { ...entry.row, position: added.position });
-        }, writtenLocked),
-      });
 
-      channel.attachDelivery(port);
+      yield* Effect.forkScoped(
+        Stream.runForEach(yield* channel.delivery, (call) =>
+          Effect.gen(function* () {
+            switch (call.kind) {
+              case "restore":
+                yield* port.restore;
+                yield* Deferred.succeed(call.reply, undefined);
+                break;
+              case "registerTalk":
+                yield* port.registerTalk(call.session, call.launch, call.at, call.rows);
+                yield* Deferred.succeed(call.reply, undefined);
+                break;
+              case "dropSession":
+                yield* port.dropSession(call.session);
+                yield* Deferred.succeed(call.reply, undefined);
+                break;
+              case "kick":
+                yield* port.kick(call.session);
+                yield* Deferred.succeed(call.reply, undefined);
+                break;
+              case "dropEnvelope":
+                yield* Deferred.succeed(call.reply, yield* port.dropEnvelope(call.envelope));
+                break;
+              case "waitingOn":
+                yield* Deferred.succeed(call.reply, yield* port.waitingOn(call.envelope));
+                break;
+              case "deliverDirect":
+                yield* port.deliverDirect(call.session, call.text, call.channel, call.byOwner);
+                yield* Deferred.succeed(call.reply, undefined);
+                break;
+            }
+          }),
+        ),
+      );
 
       yield* Effect.forkScoped(
         Stream.runForEach(yield* sessions.launches, (activity) =>

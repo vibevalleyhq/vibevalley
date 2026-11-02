@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Semaphore, Stream } from "effect";
+import { Clock, Context, Deferred, Effect, FiberMap, FiberSet, Layer, PubSub, Semaphore, Stream } from "effect";
 // Every message is written to the database first. Mailbox is assembled after Collaboration and registers the delivery
 // port that turns the committed message fact into durable Session deliveries. Everything that changes the chat runs one
 // at a time.
@@ -87,7 +87,7 @@ import {
   type Write,
   type Written,
   type ChannelService,
-  type ChannelDeliveryPort,
+  type ChannelDelivery,
   type ChannelEnvelopeRow,
   type ChannelRouteFact,
   type ChannelRouteResult,
@@ -134,11 +134,13 @@ const make = (sessions: Session["Service"]) =>
     const lastRead = new Map<string, string>();
     let closed = false;
     let ingress: ((fact: ChannelRouteFact) => Effect.Effect<ChannelRouteResult>) | undefined;
-    let delivery: ChannelDeliveryPort | undefined;
-    const deliveryPort = () => {
-      if (!delivery) throw new Error("Mailbox delivery port is not attached");
-      return delivery;
-    };
+    const deliveryHub = yield* scopedPubSub<ChannelDelivery>();
+    const ask = <A>(build: (reply: Deferred.Deferred<A>) => ChannelDelivery): Effect.Effect<A> =>
+      Effect.gen(function* () {
+        const reply = yield* Deferred.make<A>();
+        yield* PubSub.publish(deliveryHub, build(reply));
+        return yield* Deferred.await(reply);
+      });
     // Work set off by a timer belongs to this service: it ends with it and keeps its services.
     const forkHere = yield* FiberSet.makeRuntime();
 
@@ -672,14 +674,14 @@ const make = (sessions: Session["Service"]) =>
             joined_at: yield* Clock.currentTimeMillis,
           };
           yield* db.attempt(qp.upsertParticipant(joined));
-          yield* deliveryPort()
-            .registerTalk(
-              session.id,
-              launch,
-              joined.joined_at,
-              snapshot.filter((message) => message.sender_id === ownerId && message.kind === "chat" && message.deleted_at === null).map(channelEnvelope),
-            )
-            .pipe(Effect.onError(() => Effect.ignoreCause(deliveryPort().restore)));
+          yield* ask<void>((reply) => ({
+            kind: "registerTalk",
+            session: session.id,
+            launch,
+            at: joined.joined_at,
+            rows: snapshot.filter((message) => message.sender_id === ownerId && message.kind === "chat" && message.deleted_at === null).map(channelEnvelope),
+            reply,
+          })).pipe(Effect.onError(() => Effect.ignoreCause(ask<void>((reply) => ({ kind: "restore", reply })))));
           model.joined(joined);
         }).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause }))),
       );
@@ -717,7 +719,7 @@ const make = (sessions: Session["Service"]) =>
         Effect.gen(function* () {
           const missed = yield* db.run(qm.missingDirectDeliveries({ channel_id: channel, recipient_id: recipient, after_number: last?.number ?? 0 }));
           yield* Effect.forEach(missed, (row) => settle(row), { discard: true });
-          yield* deliveryPort().kick(recipient);
+          yield* ask<void>((reply) => ({ kind: "kick", session: recipient, reply }));
         }),
       );
     });
@@ -796,7 +798,7 @@ const make = (sessions: Session["Service"]) =>
         if (p.kind !== "session" || p.left_at !== null || on.has(p.id)) continue;
         yield* db.run(qp.participantLeft({ left_at: now, id: p.id }));
         model.left(p.id, now);
-        yield* deliveryPort().dropSession(p.id);
+        yield* ask<void>((reply) => ({ kind: "dropSession", session: p.id, reply }));
         yield* db.run(qf.unfollowAllOf({ at: now, participant_id: p.id }));
         follows.left(p.id);
         lastRead.delete(p.id);
@@ -1000,10 +1002,7 @@ const make = (sessions: Session["Service"]) =>
         if (ingress) throw new Error("Channel ingress is already attached");
         ingress = route;
       },
-      attachDelivery: (port) => {
-        if (delivery) throw new Error("Mailbox delivery port is already attached");
-        delivery = port;
-      },
+      delivery: Effect.map(PubSub.subscribe(deliveryHub), Stream.fromSubscription),
       replayDelivery: Effect.fn("Channel.replayDelivery")(function* (row) {
         const written = yield* settle(messageRow(row));
         yield* Effect.forEach(
@@ -1088,7 +1087,7 @@ const make = (sessions: Session["Service"]) =>
         yield* change(row, (revision, now) =>
           Effect.gen(function* () {
             yield* db.run(qm.deleteMessage({ at: now, revision, id }));
-            yield* deliveryPort().dropEnvelope(id);
+            yield* ask<readonly string[]>((reply) => ({ kind: "dropEnvelope", envelope: id, reply }));
           }),
         );
       }, locked),
@@ -1096,7 +1095,7 @@ const make = (sessions: Session["Service"]) =>
         const row = yield* messageOf(id);
         if (row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.messageGone")));
         const ch = model.channel(row.channel_id);
-        const waiting = yield* deliveryPort().waitingOn(id);
+        const waiting = yield* ask<number>((reply) => ({ kind: "waitingOn", envelope: id, reply }));
         return {
           does: [
             t("server.channel.deletes", { target: ch ? targetOfChannel(ch) : "", number: row.number, name: row.sender_name, text: lineOf(row.body, lastMax) }),
@@ -1180,7 +1179,7 @@ const make = (sessions: Session["Service"]) =>
           // Sent with no channel, so no thread to say it in: the session hears it straight.
           if (!sessions.present(session)) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
           const channel = sessionOf(session)?.channel;
-          yield* deliveryPort().deliverDirect(session, text.trim(), channel, from === ownerId);
+          yield* ask<void>((reply) => ({ kind: "deliverDirect", session, text: text.trim(), channel, byOwner: from === ownerId, reply }));
           return undefined;
         }
         const run = sessions.runOf(from);
