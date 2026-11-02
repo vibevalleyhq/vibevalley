@@ -78,7 +78,7 @@ changes). Everything is in the farm page's CSS pixels, its top left at 0, 0:
 - `onFrame(fn)`: called after every drawn frame, for DOM that follows a walker (a name tag, a bubble). Move such DOM
   with a `transform` in the callback; do not set a signal every frame.
 
-The framing (`world/framing.ts`, `frameVillage`): a whole scale, at most 5% cut off the sides and 8% off
+The framing (`world/world.ts`, `frameVillage`): a whole scale, at most 5% cut off the sides and 8% off
 the top and bottom, bars filled with the dimmed map. The rule is `@vibevalley/engine/framing`'s `frameWhole`; the
 village's size and the cuts are `farmFraming` in `@vibevalley/protocol/host`, which the desktop sizes its window by.
 

@@ -20,7 +20,7 @@
 - 核心状态里的游戏字段：`WorkspaceState.progress`、`commits`、`plays`（像素农场专用，按 Session 存地块和最近动作）；帧里是 `view`（地块、`plays`、等级、每个成就的进度 `achievements`）和 `effects`。`progress` 只在账本里有。
 - 表：`game_ledger`（`id` 是 UUIDv7，`kind`、`at`、其余字段放进 `payload` 的 JSON），查询在 `db/queries/game_ledger.sql`。
 - 接口：`game.achievement.list`（成就的说法，页面的顺序）、`game.title.set`（[capabilities.md](docs/reference/capabilities.md)）；点空地是 `channel.message.send` 带的 `station`。
-- 页面：`apps/web/src/farm/panels/Achievements.tsx`（任务与成就页、奖章，读一次 `game.achievement.list` 的说法和帧里的进度）、`farm/panels/Panels.tsx`（仓库）、`farm/hud/FxLayer.tsx`（把特效画成飘字、横幅、提示上的奖章）、`farm/effects.ts`（页面自己放的特效）。
+- 页面：`apps/web/src/farm/panels/Achievements.tsx`（任务与成就页、奖章，读一次 `game.achievement.list` 的说法和帧里的进度）、`farm/panels/Panels.tsx`（仓库）、`farm/hud/FxLayer.tsx`（把特效画成飘字、横幅、提示上的奖章）、`farm/frames.ts`（页面自己放的特效）。
 
 ## 模型和不变量
 

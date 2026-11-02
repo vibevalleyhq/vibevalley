@@ -20,11 +20,10 @@ import { isOneOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "@/base/format";
 import { aria, useNow } from "@/base/util";
 import { playBedFx } from "@/farm/commands";
-import { farmActWords } from "@/farm/labels";
 import { tint } from "@/farm/panels/bits";
 import { farm, overlayOf } from "@/farm/store";
 import { useVillage } from "@/farm/support";
-import { useFarm } from "@/farm/ui";
+import { farmActWords, useFarm } from "@/farm/ui";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "@/farm/world/plots";
 import { issueThreadOf } from "@/features/channel";
 import {

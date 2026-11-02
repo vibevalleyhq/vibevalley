@@ -7,7 +7,7 @@ import { variant } from "@/base/util";
 import { reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { currentHost } from "@/infra/host";
-import { useUpdates } from "@/infra/updates";
+import { useUpdates } from "@/infra/settings";
 import { Button } from "@/ui/Button";
 import { ConfirmButton } from "@/ui/ConfirmButton";
 import { SettingRow } from "@/ui/settings";

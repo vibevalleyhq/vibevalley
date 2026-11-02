@@ -1,8 +1,12 @@
 // The orchestrators' looks (an orchestrator's profile keeps its own) and the pets the owner can pick (state/prefs.ts
-// keeps the choice), and their sprites.
+// keeps the choice), and their sprites; and the owner's "this round went wrong" on the orchestrator's trajectory, kept
+// as an eval case: handed to the trajectory, whose mark runs it in its Act (features/session's Markable), so its busy and
+// refusal are said there.
 
 import { t } from "@vibevalley/i18n";
-import type { OrchestratorLook } from "@vibevalley/protocol";
+import type { OrchestratorEval, OrchestratorLook } from "@vibevalley/protocol";
+
+import { api } from "@/infra/api";
 
 /** The orchestrators' looks: sprite manager-<id>, the plain one is farmer. */
 export const orchestratorLooks: readonly { readonly id: OrchestratorLook; readonly name: string; readonly blurb: string }[] = [
@@ -25,3 +29,8 @@ export const petName: Record<string, string> = {
   ragdoll: t("web.orchestrator.pet.ragdoll"),
   bluecat: t("web.orchestrator.pet.bluecat"),
 };
+
+export const markWrongOf =
+  (agent: string) =>
+  (on: number, want: string): Promise<OrchestratorEval> =>
+    api.orchestrator.eval.create({ agent, on, want });

@@ -2,7 +2,7 @@ import { createSignal, For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { splitChips } from "./chips";
+import { splitChips } from "./cells";
 import { SpriteIcon } from "./icons";
 import { pxFocus, pxRing, pxText } from "./style";
 

@@ -1,16 +1,44 @@
 import { type Accessor, createMemo } from "solid-js";
 
-import type { StateFrame } from "@vibevalley/protocol";
+import type { GameEffect, StateFrame } from "@vibevalley/protocol";
 import { farmOf } from "@vibevalley/protocol/rules";
 
 import { rawFrame } from "@/infra/frame";
 import { type Frames, frames } from "@/infra/frames";
 
 import { farmCommands } from "./commands";
-import { farmFrameOf } from "./scope";
 import { farmProject } from "./store";
 
-/** The frame as sent, with only this farm's sessions: for the canvas, the sounds and the effects (scope.ts). */
+// One project's farm: the frame with only that project's sessions on it (protocol's farmOf), for what the farm page
+// draws and does with its beds. The rest of the frame (the inbox, the chat, the level, the effects) is the whole farm's.
+const made = new WeakMap<StateFrame, { project: string; frame: StateFrame }>();
+
+/** The same frame and project give back the same object, so a reader comparing frames sees no change. */
+export function farmFrameOf(frame: StateFrame | undefined, project: string): StateFrame | undefined {
+  if (!frame) return undefined;
+  const was = made.get(frame);
+  if (was?.project === project) return was.frame;
+  const scoped = { ...frame, state: { ...frame.state, sessions: frame.state.sessions.filter((h) => farmOf(h) === project) } };
+  made.set(frame, { project, frame: scoped });
+  return scoped;
+}
+
+// Effects made on this page, not by the server: the debug console's level-up and achievement, which earn nothing.
+const listeners = new Set<(e: GameEffect) => void>();
+
+export const localEffects = {
+  add: (e: GameEffect) => {
+    for (const f of listeners) f(e);
+  },
+  subscribe: (f: (e: GameEffect) => void) => {
+    listeners.add(f);
+    return () => {
+      listeners.delete(f);
+    };
+  },
+};
+
+/** The frame as sent, with only this farm's sessions: for the canvas, the sounds and the effects. */
 export function rawFarmFrame(): Accessor<StateFrame | undefined> {
   const raw = rawFrame();
   return createMemo(() => farmFrameOf(raw(), farmProject()));

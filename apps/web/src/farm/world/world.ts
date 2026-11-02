@@ -1,7 +1,9 @@
-// The village's named positions, read from the level, and where a helper stands.
+// The village's named positions, read from the level, where a helper stands, and how the village sits in a window.
 
+import { type Framing, frameWhole, type Rect, type Size } from "@vibevalley/engine/framing";
 import { navMap, type NavMap } from "@vibevalley/engine/nav";
 import type { Crop, Session, SessionAction } from "@vibevalley/protocol";
+import { farmFraming } from "@vibevalley/protocol/host";
 
 import { add, type Box, inBox, type Level, type Point } from "./level";
 import { yardPlaces } from "./places";
@@ -246,3 +248,13 @@ export interface Stroll {
   readonly rest: number;
   readonly until: number;
 }
+
+// The village in a window (@vibevalley/engine/framing): a whole number of screen pixels for each art pixel, at most 5% of
+// its width cut off on each side and 8% of its height above and below (farmFraming); a window it cannot fill keeps bars.
+
+export type { Rect };
+
+export const villageCutAcross = farmFraming.cut.across;
+export const villageCutDown = farmFraming.cut.down;
+
+export const frameVillage = (window: Size, village: Size): Framing => frameWhole(window, village, farmFraming.cut);

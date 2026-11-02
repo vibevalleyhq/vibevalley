@@ -12,9 +12,9 @@ import { defineAtom } from "@/state/atom";
 import { defineStored } from "@/state/stored";
 
 import type { BedFxKind, Tool } from "./tools";
-import type { Rect } from "./world/framing";
 import type { Point } from "./world/level";
 import type { FarmPanel } from "./world/places";
+import type { Rect } from "./world/world";
 export type { FarmPanel } from "./world/places";
 
 /**

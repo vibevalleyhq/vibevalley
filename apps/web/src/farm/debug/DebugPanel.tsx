@@ -11,7 +11,7 @@ import type { Session, StateFrame } from "@vibevalley/protocol";
 
 import { createExternal } from "@/base/external";
 import { aria } from "@/base/util";
-import { localEffects } from "@/farm/effects";
+import { localEffects } from "@/farm/frames";
 import { clock, farm } from "@/farm/store";
 import { typing } from "@/farm/tools";
 import { api } from "@/infra/api";

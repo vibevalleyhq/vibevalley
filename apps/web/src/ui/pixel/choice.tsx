@@ -3,9 +3,9 @@ import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js"
 import { aria } from "@/base/util";
 
 import { PxWindow } from "./base";
+import { type PickOption, pickItems } from "./cells";
 import { PxTip } from "./field";
 import { SpriteIcon } from "./icons";
-import { type PickOption, pickItems } from "./pick";
 import { pxDrop, pxFocus, pxRing, pxText } from "./style";
 
 interface SegmentOption<T> {

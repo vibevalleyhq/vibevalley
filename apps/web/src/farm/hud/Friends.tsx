@@ -5,12 +5,13 @@
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import type { Agent } from "@vibevalley/protocol";
+import type { Agent, FarmView, Session } from "@vibevalley/protocol";
 
 import { aria, useClickAway } from "@/base/util";
 import { farm } from "@/farm/store";
 import { useFarm } from "@/farm/ui";
 import { webRoutes } from "@/farm/world/places";
+import { isBusy, isRipe, plotOf } from "@/farm/world/plots";
 import { bottleSprite, quotaOf } from "@/features/runtime";
 import { useCore, useFrames } from "@/infra/frame";
 import { ready, useAgents, useRuntimes } from "@/infra/query";
@@ -19,8 +20,17 @@ import { setPick, usePrefs } from "@/state/prefs";
 import { AgentFace } from "@/ui/Face";
 import { PxButton, SpriteIcon } from "@/ui/pixel";
 
-import { statusOf, type FriendStatus } from "./friendStatus";
 import { HudCard } from "./HudCard";
+
+type FriendStatus = "bug" | "ripe" | "busy" | "rest" | "away";
+
+function statusOf(mine: readonly Session[], view: FarmView): FriendStatus {
+  const crops = mine.map((s) => plotOf(view, s).crop);
+  if (crops.includes("withered")) return "bug";
+  if (crops.some(isRipe)) return "ripe";
+  if (mine.some(isBusy)) return "busy";
+  return mine.length > 0 ? "rest" : "away";
+}
 
 const status: Record<FriendStatus, { dot: string; label: string }> = {
   bug: { dot: "#c84a3a", label: t("web.farm.friends.status.bug") },

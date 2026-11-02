@@ -16,8 +16,7 @@ import { A } from "@/ui/A";
 import { OrchestratorFace } from "@/ui/Face";
 import { Tabs } from "@/ui/Tabs";
 
-import { markWrongOf } from "./evals";
-import { orchestratorLooks } from "./looks";
+import { markWrongOf, orchestratorLooks } from "./looks";
 
 const tabs = [
   { id: "memory", label: t("web.orchestrator.orchestrator.tab.memory") },

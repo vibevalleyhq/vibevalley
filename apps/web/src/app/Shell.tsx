@@ -12,7 +12,7 @@ import { QuickSwitcher, switcher } from "@/features/channel";
 import { waitingOnOwner } from "@/features/inbox";
 import { useCore, useFrames } from "@/infra/frame";
 import { useRouter } from "@/infra/router";
-import { useUpdates } from "@/infra/updates";
+import { useUpdates } from "@/infra/settings";
 import { A } from "@/ui/A";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";

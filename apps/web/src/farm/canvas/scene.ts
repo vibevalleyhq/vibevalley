@@ -26,13 +26,13 @@ import { type Agent, type Crop, defaultOrchestrator, type Session, type StateFra
 import { omitUndefined, plotKeyOf } from "@vibevalley/protocol/rules";
 
 import { clock, farmState } from "@/farm/store";
-import { frameVillage } from "@/farm/world/framing";
 import { villageHitAt, type VillageHit } from "@/farm/world/hits";
 import type { Box, Point } from "@/farm/world/level";
 import type { Village } from "@/farm/world/load";
 import { bedOfStation, beds, cropOfBed, isRipe, stationOfSession, type Bed } from "@/farm/world/plots";
 import { PoseHold } from "@/farm/world/pose";
 import {
+  frameVillage,
   placeOfAction,
   plotCalls,
   plotH,
