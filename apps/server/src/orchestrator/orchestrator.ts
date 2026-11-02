@@ -7,8 +7,7 @@ import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, ownerId } from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { modelClient, noDeepSeekKey } from "@/agent/model.ts";
+import { Agent, modelClient, noDeepSeekKey } from "@/agent/agent.ts";
 import { traitsOf } from "@/agent/prompts.ts";
 import { orchestrator } from "@/base/actor.ts";
 import { Channel, type OrchestratorNews } from "@/channel/chat.ts";

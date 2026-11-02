@@ -18,7 +18,7 @@ import { ServerConfig } from "@/infra/config.ts";
 import { dbQueries, Database, Db } from "@/infra/db.ts";
 import { wakeBreaker } from "@/mailbox/brakes.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
-import { layer as projection } from "@/projection/projection.ts";
+import { layer as projection } from "@/projection/frame.ts";
 import { restoredSession, sessionState } from "@/session/history.ts";
 import { summaryOf } from "@/session/report.ts";
 import { sessionOnIssue } from "@/session/roster.ts";

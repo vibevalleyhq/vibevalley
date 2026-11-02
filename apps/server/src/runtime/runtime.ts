@@ -18,8 +18,7 @@ import { Llm } from "@vibevalley/ai/llm";
 import { currentLocale, type Locale, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { modelClient } from "@/agent/model.ts";
+import { Agent, modelClient } from "@/agent/agent.ts";
 import { Core } from "@/core/core.ts";
 import { type ApiError, messageOf, refused } from "@/errors.ts";
 import { projectsDir, ServerConfig } from "@/infra/config.ts";

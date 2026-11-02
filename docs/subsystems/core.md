@@ -68,7 +68,7 @@ Session 的身份、阶段、最近报告和资源恢复字段只在 session 表
 - **都是 POST，路径就是操作名**：`POST /api/v1/<模块>[/<名词>]/<动词>`，操作名的点换成斜杠（`pathOf`），`issue.status.update` 在 `/api/v1/issue/status/update`。输入只有一份，是 JSON 请求体，id 也在里面（`{ "id": "12", … }`）；没有路径参数和查询参数，空的请求体是 `{}`。只有三条 SSE 流和聊天的附件用 GET（`statePath`、`eventsPath`、`livePath`、`attachmentPath`）：`<img src>` 发不了 POST。
 - **都在 `/api/v1` 下**，包括 `/api/v1/server/health/get` 和三条流。`pathOf` 给出的就是最终路径，页面的客户端、命令行、能力表和「连接到本机」都从它来，没有第二处拼前缀。不设 `/api/...` 的别名，旧客户端拿到 404。加字段、加接口留在 v1；不兼容的改动另起 `/api/v2`，v1 留到主人的设备都升上来。`/mcp` 不带版本：MCP 有自己的版本。
 - **命名**：第一段是概念，多是拥有它的 `apps/server/src` 文件夹（`issue`、`channel`、`lan`；计划是 `graph`）；名词是模块下面的一个子概念（`issue.comment`、`channel.message`、`lan.pairing`），说的就是模块本身时省掉；每个词都用单数，和库表一样（`api.test.ts` 查）。动词一套 `list`、`get`、`create`、`update`、`delete`；`set` 换掉一个取值（`channel.default.set`、`game.title.set`）；`check` 只校验；领域动词只给不是增删改查的（`channel.message.send`、`issue.dispatch`、`issue.act`）；试跑是 `preview<动词>`（`issue.previewDelete`、`issue.status.previewUpdate`，`api.test.ts` 查）。工单的生命周期挂在工单上（`issue.status.update`）；一个意图一个操作，不用布尔开关兼两件；`update` 只改给出的字段（档案和技能的 `update` 是带 id 的整份写入）。
-- **请求键：同一个键只做一次**：`issue.create`、`issue.status.update`、`channel.thread.create`、`memory.create` 收可选的 `requestKey`（最长 64 个字符，同聊天消息的 `sendKey`），页面一次意图一个键，重试用同一个。网关（`apps/server/src/http/requestKey.ts`）按操作记住每个键的结果：同一个键再来拿到第一次的答复、活只做一次；第一次还在做时到的那个等它；只记成功，被拒或失败的忘掉键，重试再做一遍。记在内存里，每个操作只留最近 500 个，重启就忘：答复丢了又碰上重启，重试会再做一次。聊天消息不走这里：`sendKey` 存在消息上，库里查重（[频道](docs/subsystems/channel.md)）。
+- **请求键：同一个键只做一次**：`issue.create`、`issue.status.update`、`channel.thread.create`、`memory.create` 收可选的 `requestKey`（最长 64 个字符，同聊天消息的 `sendKey`），页面一次意图一个键，重试用同一个。网关（`apps/server/src/http/api.ts` 的 `requestKeys`）按操作记住每个键的结果：同一个键再来拿到第一次的答复、活只做一次；第一次还在做时到的那个等它；只记成功，被拒或失败的忘掉键，重试再做一遍。记在内存里，每个操作只留最近 500 个，重启就忘：答复丢了又碰上重启，重试会再做一次。聊天消息不走这里：`sendKey` 存在消息上，库里查重（[频道](docs/subsystems/channel.md)）。
 - **开关写成设值**：页面的重试会再发一次，开关发两次等于没发；所以表情、置顶、归档是 `channel.reaction.set`、`channel.pin.set`、`channel.archive.set`，带 `on`，设成已经是的样子什么也不改（不加修订、不推送）。
 - **一条规则，差别作为参数**：入口之间的差别传进服务，不写成两个方法。例：工单的改动收「谁在看」，主人看才算进游戏。
 
@@ -147,7 +147,7 @@ HTTP 命令入口与页面 WebSocket 共用来源判断：Host 应为回环地�
 
 ## 怎么验证
 
-- `apps/server/src/core/core.test.ts` 里另有：`seq` 每次改了状态的提交加一、没变的不加，帧带着它；`http/requestKey.test.ts`：同一个键只做一次、并发的等第一个、失败不记；`flows/request.test.ts`：经处理函数，工单的建和挪、开串、记一条记性同一个键只做一次，答复的 `seq` 由第一帧不小于它的帧看见，三个设值发两次只改一次。
+- `apps/server/src/core/core.test.ts` 里另有：`seq` 每次改了状态的提交加一、没变的不加，帧带着它；`http/api.test.ts` 的「a request key」：同一个键只做一次、并发的等第一个、失败不记；`flows/request.test.ts`：经处理函数，工单的建和挪、开串、记一条记性同一个键只做一次，答复的 `seq` 由第一帧不小于它的帧看见，三个设值发两次只改一次。
 - `apps/server/src/core/core.test.ts`：旧 state.json 不参与恢复且不被改写；事实盖时间、去重、阶段独立更新和合帧。Session 与私聊流程验证数据库恢复、资源上下文和位置保留。
 - `apps/server/src/core/golden.test.ts`：几千个随机事实逐个比状态、特效和视图（`reduce.jsonl.gz`）；`cron/cron.test.ts` 查折法和出帧填的话。
 - `apps/server/src/cli.test.ts`：每个接口都有命令、调一个接口打出回答、失败时 stdout 是空的、退出码按种类、拒绝的 `next` 原样能跑、每个 `delete` 都有同形状的试跑且试跑不动东西、`lookIn` 的每条命令都在。`apps/server/src/cli/golden.test.ts`：帮助、典型的错误和试跑录在 `cli/testdata/cli.jsonl.gz`，改了 `vp run golden:update cli` 再看 diff。`scripts/verify-server.test.ts`：沙箱里只用命令行把一张工单派出去、交回来、试跑完成、完成。`lan/lan.test.ts`：「连接到本机」按 `can` 放行。

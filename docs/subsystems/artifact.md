@@ -26,7 +26,7 @@
   - 顺序键在 `packages/protocol/src/rules/order.ts`（`keyBetween`），服务端和页面用同一份。
 - 表：`artifact`（一篇一行：正文的种类、在哪说的、第一次说它的那条消息、为哪张工单、谁做的、网页的最新版本、块的 `seq`）、`artifact_version`（网页的每一版）、`artifact_block`（每一块，含墓碑）、`artifact_block_revision`（每一块每一版的字，`kind` 是 `normal` 或 `conflict`）、`artifact_change`（每一批：`seq`、`batch_id`、谁、改了哪些块、每个 op 的结果）、`artifact_suggestion`（主人写过的块上，agent 提的改动：谁、对着哪一版、改什么、接受还是拒绝）。
 - 形状在 `packages/protocol/src/shapes.ts`：`Artifact`、`ArtifactCard`、`ArtifactVersion`；块那一套 `BlockInput`（作者给的新块）、`Block`、`BlockAttrs`、`TextSpan`、`SpanMarks`，op 是封闭的联合 `BlockOp`（按 `op` 区分），`BlockSubmit`、`BlockAck`、`BlockOpResult`、`BlockSnapshot`；建议那一套 `Suggestion`、`SuggestionChange`、`SuggestionEvent`。块的类型是封闭的 `BlockType`（成员表 `BlockTypeValues`），接口解码时拒掉别的取值，服务端和页面都写带类型的字面量。
-- 接口：`artifact.*`（[capabilities.md](docs/reference/capabilities.md)）。网页一版的内容是 `GET /api/v1/artifact/<id>/<版本>`（`http/artifact.ts`，`artifactPath`）。主人和「连接到本机」写块时写的人记成 `owner`；`artifact.demo` 只有本机的主人能调。
+- 接口：`artifact.*`（[capabilities.md](docs/reference/capabilities.md)）。网页一版的内容是 `GET /api/v1/artifact/<id>/<版本>`（`http/api.ts`，`artifactPath`）。主人和「连接到本机」写块时写的人记成 `owner`；`artifact.demo` 只有本机的主人能调。
 - 帮工和管家的工具照接口名来：`artifact_list`、`artifact_get`、`artifact_content_get`、`artifact_create`、`artifact_version_create`；两边都有 `artifact_block_create`、`artifact_block_update`、`artifact_block_delete`（`apps/server/src/tool/tool.ts`），管家也能直接替主人改一块。
 - 频道：`Channel.announce` 以作者的身份说那句带卡片的话，`Channel.placeOf` 把「在哪说」认成频道。
 - 页面 `apps/web/src/features/artifact`：

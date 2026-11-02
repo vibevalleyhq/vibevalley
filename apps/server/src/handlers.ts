@@ -17,7 +17,7 @@ import { Core } from "./core/core.ts";
 import { Cron } from "./cron/cron.ts";
 import { missing, lookIn, reasonOf, refused, orMissing } from "./errors.ts";
 import { Game } from "./game/game.ts";
-import { requestKeys } from "./http/requestKey.ts";
+import { requestKeys } from "./http/api.ts";
 import { ServerConfig } from "./infra/config.ts";
 import { Ingress } from "./ingress/ingress.ts";
 import { explicitMandate } from "./issue/creation.ts";

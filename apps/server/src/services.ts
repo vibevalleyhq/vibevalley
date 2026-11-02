@@ -30,7 +30,7 @@ import { Mcp, type McpOptions } from "./mcp/mcp.ts";
 import { Memory } from "./memory/memory.ts";
 import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
 import { Project, type ProjectHooks, start as projectStart } from "./project/project.ts";
-import { layer as projection } from "./projection/projection.ts";
+import { layer as projection } from "./projection/frame.ts";
 import { Resource } from "./resource/resource.ts";
 import { type RuntimeOptions, Runtime } from "./runtime/runtime.ts";
 import { Session, ready as sessionReady } from "./session/session.ts";

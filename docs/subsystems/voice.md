@@ -15,7 +15,7 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/voice/moss.ts`：MOSS Live（`wss://api.mosi.cn/v1/realtime`，模型 `moss-live-1.0`）的连接、对 key 的检查（`verifyMoss`）和页面的线路（`relay`）；`http/moss.ts` 把线路挂在 `mossLinePath`（`GET /api/v1/voice/moss/line`，WebSocket）。打电话还没接它，「设置 › MOSS Live」是单独试它的地方。
+- 服务端 `apps/server/src/voice/moss.ts`：MOSS Live（`wss://api.mosi.cn/v1/realtime`，模型 `moss-live-1.0`）的连接、对 key 的检查（`verifyMoss`）和页面的线路（`relay`）；`http/api.ts` 把线路挂在 `mossLinePath`（`GET /api/v1/voice/moss/line`，WebSocket）。打电话还没接它，「设置 › MOSS Live」是单独试它的地方。
 - 服务端 `apps/server/src/voice/voice.ts`（`Voice`）：RTC 授予（签发、认领、续签、撤销）、通话（开始、停、`heard`、`said`）、把语音设置翻成声网的 vendors（`vendorsFor`、`agentFor`）、语音线路和隧道、听写。声网的令牌用 npm 的 `agora-token`，请 agent 进出用 `agora-agents`（声网的 ConvoAI SDK）。
 - 形状和规则：`shapes.ts` 的 `VoiceSettings`（`VoiceASR`、`VoiceAnswer`、`VoiceTTS` 三个联合）、`SettingsUpdateVoice`、`AgoraGrant`、`Dictation`；数的范围是 `shapes.ts` 的 `voiceSilenceMsMin` 等常量；默认在 `setting/voice.ts`（`defaultVoice`）。保存前的检查和只存差异在 `setting/voice.ts`（`voiceProblem`、`voiceSettingsOver`、`voiceOverrides`）。
 - 接口：`voice.grant.create`、`voice.grant.renew`、`voice.call.start`、`voice.call.stop`、`voice.call.hear`、`voice.call.say`、`voice.dictate`、`voice.moss.verify`，没带通话 id 的 `voice.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的设备也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。

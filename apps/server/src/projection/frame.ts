@@ -2,13 +2,22 @@
 // whenText and nextText, the graphs' actions) are said here and only here, on a copy: reduce keeps the facts, so the
 // words never reach the saved state.
 
+import { Layer } from "effect";
+
 import { t } from "@vibevalley/i18n";
 import { type Doing, type DoingView, type GameEffect, type StateFrame, type WorkspaceState, type WorkspaceView } from "@vibevalley/protocol";
 import { phaseWords } from "@vibevalley/protocol/rules";
 
+import { Projection } from "@/core/core.ts";
 import { nextText, whenText } from "@/cron/when.ts";
-import { viewOf } from "@/game/view.ts";
+import { effectsOf, viewOf } from "@/game/view.ts";
 import { inbox } from "@/inbox/items.ts";
+
+import { reduce } from "./reduce.ts";
+
+// The core state's projection, given to the core at assembly: the fold, the effects and the frame read every module's
+// rules, so they sit with the assembly, above every module.
+export const layer = Layer.succeed(Projection, { reduce, effects: effectsOf, frame: frameOf });
 
 export function frameOf(state: WorkspaceState, effects: GameEffect[] = [], seq = 0): StateFrame {
   return { seq, state: withWords(state), inbox: inbox(state), view: viewOf(state), effects };

@@ -20,7 +20,7 @@ import { memoryStore } from "@vibevalley/agent/todoStore";
 import { type Llm, make } from "@vibevalley/ai/llm";
 import { t, currentLocale } from "@vibevalley/i18n";
 
-import { modelClient } from "@/agent/model.ts";
+import { modelClient } from "@/agent/agent.ts";
 import { messageOf } from "@/errors.ts";
 import { loadConfig } from "@/infra/config.ts";
 import { dshRuntime } from "@/runtime/dsh.ts";

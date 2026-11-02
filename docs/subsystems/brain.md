@@ -21,7 +21,7 @@ VibeValley 自己的 agent（代码里是 `Brain`）是农场里唯一一个从�
 apps/server  组装和适配（不在包里）：
              session/host.ts 的 AgentHost（管家）  runtime/vibevalley.ts（农机 vibevalley：帮工）
              cli/chat.ts（命令行）                 orchestrator/openai.ts（/v1/chat/completions）
-             runtime/todoStore.ts（自己的任务存进库）  agent/model.ts（缺钥匙时对主人说的话）
+             runtime/todoStore.ts（自己的任务存进库）  agent/agent.ts（缺钥匙时对主人说的话）
                │ makeBrain(BrainOptions)（Effect 接口，oar 在适配器内运行）
 packages/agent  Brain：对话文件、提示开头、压缩、自己的工具、帮手、提醒、自己的任务
                │
@@ -32,7 +32,7 @@ packages/ai  DeepSeek chat/completions：请求体、流、工具参数、模型
 
 两个包都按文件导出（`package.json` 的 `"./*": "./src/*.ts"`）：`@vibevalley/ai/messages`、`@vibevalley/agent/core/loop`、`@vibevalley/agent/brain`。
 
-- **`packages/ai`**：`models.ts` 模型表和价格；`client.ts` 的 `ModelClient`（模型、传输的服务、每次请求前现取的钥匙）、`deepseek`、`complete`、`defaultModel`，没钥匙时抛 `MissingKey`（服务端的 `agent/model.ts` 把它说成主人看得懂的话）；`llm.ts` 的 `Llm` 服务发请求、读流；`request.ts` 拼请求、`response.ts` 读流，都是纯函数；`messages.ts` 消息和事件的形状，照 pi-ai；`tools.ts` 由 Effect Schema 生成给模型看的 JSON Schema（`parametersOf`），先改正模型给的参数类型（`coerceArguments`）再交给 Schema 读。`testing.ts` 是照脚本回答的 `Llm`。黄金数据在 `testdata/`。
+- **`packages/ai`**：`models.ts` 模型表和价格；`client.ts` 的 `ModelClient`（模型、传输的服务、每次请求前现取的钥匙）、`deepseek`、`complete`、`defaultModel`，没钥匙时抛 `MissingKey`（服务端的 `agent/agent.ts` 把它说成主人看得懂的话）；`llm.ts` 的 `Llm` 服务发请求、读流；`request.ts` 拼请求、`response.ts` 读流，都是纯函数；`messages.ts` 消息和事件的形状，照 pi-ai；`tools.ts` 由 Effect Schema 生成给模型看的 JSON Schema（`parametersOf`），先改正模型给的参数类型（`coerceArguments`）再交给 Schema 读。`testing.ts` 是照脚本回答的 `Llm`。黄金数据在 `testdata/`。
 - **`packages/agent/src/core`**：`loop.ts` 是循环（`make`）。一轮是 agent 作用域里的一条纤程。叫停是一个 `Deferred`，模型的流、`prepareRequest` 和工具都和它赛跑；一次回答里的几个工具同时跑。事件的种类和次序照 pi-agent-core 的 `Agent`。`tool.ts` 把 Schema 写的工具接到循环上（`schemaTool`、`effectTool`），农场的工具表（`tool`）也用它。
 - **`packages/agent/src`**：
   - `brain.ts`：`makeBrain`、`Brain`，只提供 Effect 接口；oar 的 Promise 接口由服务端适配。
