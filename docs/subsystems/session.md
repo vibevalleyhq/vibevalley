@@ -96,7 +96,7 @@ PR 在途的普通成功回合以及 prSubmit=true 的提交报告在结束时�
 **额度和花费**（`runtime`）：
 
 - 有套餐的农机读 oar 的账户用量；pi 用它自己配置的 DeepSeek 钥匙读 `GET /user/balance`（只读）；VibeValley 自己的农机不报额度。开机读一遍，之后每 5 分钟读一次；一轮结束后 20 秒再读一次（几轮共用一次）。剩不到 15%（`quotaLow`）的，管家的「农场现状」标「快用完了」，管家尽量换人。
-- 花费按价目折成人民币（估算，汇率 `cny_per_usd`）：pi 按 pi-ai 自带的价目（不含 pi 配置里自加的模型），VibeValley 自己的农机和 dsh 的 DeepSeek 模型按 `@vibevalley/ai/models` 的价格；claude、codex 等按套餐计费的只记 token，没有每日预算。每天的预算计数在 `runtime_spend`，按本地日期和农机分行；写库合并 1 秒，推给页面合并 3 秒。增量提交后才从待写集合移除，写失败保留重试，关闭时写完剩余增量；午夜切换只重置当前日的显示，不丢掉前一天未写的增量。非法金额被拒绝，旧 spend.json 不参与恢复。每轮汇总仍在 session_run；日预算按金额发生日期记账，不能把跨午夜的一整轮都算到结束那天。pi 的 settings/auth/models 和 DeepSeek 余额回答也按形状读；本机配置读不了按缺省处理，余额形状不对回「没读到 DeepSeek 余额」，不在解析成功以后才炸开。
+- 花费按价目折成人民币（估算，汇率 `cny_per_usd`）：pi 按 pi-ai 自带的价目（不含 pi 配置里自加的模型），VibeValley 自己的农机和 dsh 的 DeepSeek 模型按 `@vibevalley/ai/models` 的价格；claude、codex 等按套餐计费的只记 token，没有每日预算。每天的预算计数在 `runtime_spend`，按本地日期和农机分行；写库合并 1 秒，推给页面合并 3 秒。增量提交后才从待写集合移除，写失败保留重试，关闭时写完剩余增量；午夜切换只重置当前日的显示，不丢掉前一天未写的增量。非法金额被拒绝，旧的日预算文件不参与恢复。每轮汇总仍在 session_run；日预算按金额发生日期记账，不能把跨午夜的一整轮都算到结束那天。pi 的 settings/auth/models 和 DeepSeek 余额回答也按形状读；本机配置读不了按缺省处理，余额形状不对回「没读到 DeepSeek 余额」，不在解析成功以后才炸开。
 
 ## 怎么走
 

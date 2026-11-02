@@ -46,12 +46,12 @@
 | Workspace | `infra/config.ts` 的 `ServerConfig`；`services.ts` 把全部服务叠起来 | `VIBEVALLEY_WORK_ROOT`、`VIBEVALLEY_HOME` | |
 | 项目 | `Project`（`project/project.ts`、`git.ts`、`stack.ts`） | 工作目录下的 git 仓库 | 会话的 `cwd` |
 | 档案、技能、档案模板 | `Agent`（模板的读法在 `agent/template.ts`） | `config.json`；内置模板 `apps/server/src/agent/templates/`，加进来的 `agent-templates/` | |
-| 农机 | `Runtime` | `config.json` 里每台农机的设置、`spend.json` | `Runtime`、`RuntimeRegistry` |
+| 农机 | `Runtime` | `config.json` 里每台农机的设置、`runtime_spend` 表 | `Runtime`、`RuntimeRegistry` |
 | 记性 | `Memory` | `memory` 表；管家的在 `agent/<档案 id>/MEMORY.md` | |
 | 管家 | `Orchestrator`（每个管家一个宿主） | `agent/<档案 id>/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`packages/agent`） |
 | 工单 | `Issue`（`issue/issue.ts`；派给管家的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_assignment`（责任关系）、`issue_assignment_execution`（执行上下文） | |
 | 父子依赖 | `Issue`（`issue/dependencies.ts`） | `issue.parent`、`blocked_by`、`constraints` | 通用 DAG 算法在 `packages/agent/src/dag.ts` |
-| 执行上下文 | `Session`（`session/session.ts`），执行资源归 `Executor`；工单里的上下文画成帮工，私聊的通过 `channel` 关联频道 | `state.json`（在场帮工的核心状态）、`session` 表（工作目录、oar 会话 id、最后一轮原话和想起过的记性） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
+| 执行上下文 | `Session`（`session/session.ts`），执行资源归 `Executor`；工单里的上下文画成帮工，私聊的通过 `channel` 关联频道 | `session` 表（工作目录、oar 会话 id、最后一轮原话、阶段和想起过的记性） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
 | 一轮（run） | `Session`（帮工的 run 在 `session/session.ts`；进程内 agent 的 run 在 `session/inProcessRun.ts`）；`session/facts.ts` 把会话事件读成事实 | `session_run` 表 | 帮工的一次 run 包着一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
 | 轨迹 | `Session`（`session/journal.ts` 的 `Journal`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |
 | 改动、完成 | `Issue`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 开 worktree 时的工单分支和 worktree；直接在项目目录干活的没有这两项 | |
@@ -64,9 +64,9 @@
 | 语音 | `Voice`（`voice/voice.ts`；声网的令牌和语音 agent 用 npm 的 `agora-token`、`agora-agents`） | `settings.json` | |
 | 钥匙和语音设置 | `Setting` | `settings.json`（只有你能读） | 会话的 `env` |
 | 进度、成就 | `Game`（`game/game.ts`、`progress.ts`） | `game_ledger` 表；进度从它折出来 | |
-| 等级 | `Game` | `state.json` 里的 commit 数 | |
-| 地 | `Game`；规则在 `apps/server/src/game/play.ts` | `state.json` 里的 `play.station` | |
-| 核心状态 | `Core` | `state.json`（聊天、进度、定时任务和工单除外） | |
+| 等级 | `Game` | `game_ledger` 折出的 commit 数 | |
+| 地 | `Game`；规则在 `apps/server/src/game/play.ts` | `session` 表里的 `play`（`play.station`） | |
+| 核心状态 | `Core` | 内存里的一份投影，从 PGlite 的 `session` 表和各模块表恢复 | |
 
 ## oar 那一层
 

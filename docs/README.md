@@ -16,6 +16,9 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 内容 |
 |---|---|
 | [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、收获 |
+| [ingress.md](docs/subsystems/ingress.md) | Ingress：把七种来源标准化成一张 Trigger，去重、存载荷、交给信箱 |
+| [mailbox.md](docs/subsystems/mailbox.md) | 信箱：谁该听到、三道刹车、投递状态机、叫醒与工单蓄水池 |
+| [resource.md](docs/subsystems/resource.md) | Resource：只读、分页、按会话权限裁剪的 `resource_read` |
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
 | [project.md](docs/subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测、地契 |
 | [artifact.md](docs/subsystems/artifact.md) | 产出：主人和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
