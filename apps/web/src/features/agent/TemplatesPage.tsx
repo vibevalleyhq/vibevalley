@@ -17,7 +17,7 @@ import { Button } from "@/ui/Button";
 import { ConfirmButton } from "@/ui/ConfirmButton";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { TextInput } from "@/ui/Field";
-import { runtimeName } from "@/ui/runtimes";
+import { runtimeName } from "@/ui/RuntimeBadge";
 import { Hint } from "@/ui/Tip";
 import { toast } from "@/ui/toasts";
 

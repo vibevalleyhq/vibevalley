@@ -24,8 +24,7 @@ import { Segmented } from "@/ui/Segmented";
 import { toast } from "@/ui/toasts";
 
 import { calendarOf, type CalendarDay, dateText, dayText, type Recency, recencyOf, recencyText, since, streaksOf } from "./calendar";
-import { langIcon, languageShares } from "./languages";
-import { githubRepository, number, percent, sortProjects } from "./projects";
+import { githubRepository, langIcon, languageShares, number, percent, sortProjects } from "./projects";
 
 type Asked<A> = QueryObserverResult<A>;
 

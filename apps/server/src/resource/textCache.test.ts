@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { TextCache } from "./textCache.ts";
+import { TextCache } from "./resource.ts";
 
 describe("resource text snapshots", () => {
   it("evicts the least recently read snapshot by UTF-8 bytes", () => {

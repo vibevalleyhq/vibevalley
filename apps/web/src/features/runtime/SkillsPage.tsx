@@ -21,9 +21,9 @@ import { AgentFace } from "@/ui/Face";
 import { Field, TextArea, TextInput } from "@/ui/Field";
 import { Card } from "@/ui/layout";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
-import { runtimeName } from "@/ui/runtimes";
+import { runtimeName } from "@/ui/RuntimeBadge";
 
-import { type InstalledSkill, installedSkills } from "./skills";
+import { type InstalledSkill, installedSkills } from "./quota";
 
 const installedPrefix = "installed:";
 const skillPath = (id?: string) => (id === undefined ? "/settings/skills" : `/settings/skills/${encodeURIComponent(id)}`);

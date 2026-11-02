@@ -1,8 +1,10 @@
 import { t } from "@vibevalley/i18n";
+import type { RuntimeInfo } from "@vibevalley/protocol";
 
 import { ready, useRuntimes, useSprites } from "@/infra/query";
 
-import { runtimeName } from "./runtimes";
+/** The catalog's label for it; the runtime's id when the catalog does not list it. */
+export const runtimeName = (catalog: readonly RuntimeInfo[], runtime: string) => catalog.find((r) => r.id === runtime)?.preset.label ?? runtime;
 
 /** The execution tool named by a profile or session, using the server's catalog label. */
 export function RuntimeBadge(props: { runtime: string; size: number }) {

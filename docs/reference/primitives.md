@@ -234,11 +234,11 @@
 | `createRouter` | `router.ts` |  |
 | `useSearch` | `router.ts` | The query string of the path the page is at, read again when it moves. |
 | `saveSettings` | `settings.ts` | Saves, and the settings the server answers with are the cached ones from then on. |
+| `useUpdates` | `settings.ts` | The desktop's own update as it is now and as it changes (Host.update); undefined where the host is not updated from |
 | `answer` | `storyApi.ts` | What the server answers while this story is open, by the path after /api/v1/ ("issue/diff/get"). Unanswered calls |
 | `fakeFetch` | `storyApi.ts` |  |
 | `testFrames` | `testing.ts` |  |
 | `frameAt` | `testing.ts` | An empty farm's frame at this seq. |
-| `useUpdates` | `updates.ts` |  |
 
 ## `apps/web/src/state`
 

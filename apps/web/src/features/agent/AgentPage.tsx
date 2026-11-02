@@ -46,7 +46,7 @@ import { Icon } from "@/ui/Icon";
 import { Toggle } from "@/ui/layout";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
 import { PoseSprite } from "@/ui/PoseSprite";
-import { runtimeName } from "@/ui/runtimes";
+import { runtimeName } from "@/ui/RuntimeBadge";
 import { Segmented } from "@/ui/Segmented";
 import { Tabs } from "@/ui/Tabs";
 import { Hint } from "@/ui/Tip";

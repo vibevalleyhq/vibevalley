@@ -34,8 +34,7 @@ import { linksIn, readEmbed } from "./embeds.ts";
 import { channelInput, keepChannels, parseSearch, targetOf } from "./folded.ts";
 import { channelNameProblem, mentionOf, mentionsIn, parseChatTarget } from "./mentions.ts";
 import { ChatModel, type ChannelRow } from "./model.ts";
-import { channelAttachments, messageMutations } from "./mutations.ts";
-import { channelStreams } from "./streams.ts";
+import { channelAttachments, channelStreams, messageMutations } from "./mutations.ts";
 
 /** The channel a new farm opens with. */
 const firstChannelName = "general";
@@ -49,7 +48,7 @@ const profileId = (agent: string) => `profile:${agent}`;
 const handedEmoji = "👀";
 const readLimit = 30;
 /** A follower further behind than this reads the room's newest page instead of every message since. */
-export { catchUpMax } from "./streams.ts";
+export { catchUpMax } from "./mutations.ts";
 /** The reports a new reader of the farm's log starts from. */
 
 /** A thread named by the message it hangs under shows this much of it. */

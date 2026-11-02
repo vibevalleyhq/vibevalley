@@ -360,7 +360,7 @@ const RULES: readonly Rule[] = [
     says: 'a service is a class with its interface inline and its layer static (node_modules/effect/AGENTS.md): class Issue extends Context.Service<Issue, { … }>()("vibevalley/Issue") { static readonly layer = … }; its type is Issue["Service"]',
     // Projection's interface is core's and its implementation the projection module's, above it (foundation.md): its layer
     // cannot sit on the class.
-    except: /^apps\/server\/src\/projection\/projection\.ts$/u,
+    except: /^apps\/server\/src\/projection\/frame\.ts$/u,
   },
   {
     name: "a service under a plural name",
