@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, Effect, Schema, Stream } from "effect";
-import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 import { test } from "vite-plus/test";
 
@@ -140,40 +139,6 @@ describe("crons", () => {
         expect(core.state().crons).toHaveLength(1);
       }).pipe(Effect.scoped, Effect.provide(farm(config)));
     });
-  });
-
-  it.effect("regression: an occurrence write failure rolls back the schedule and retries once", () => {
-    const now = 1_800_000_000_000;
-    return Effect.andThen(
-      TestClock.setTime(now),
-      Effect.gen(function* () {
-        const s = yield* Cron;
-        const core = yield* Core;
-        const sql = yield* SqlClient.SqlClient;
-        const made = yield* s.add(req("retry", "work", { kind: "once", at: now + 1 }), owner);
-        const due = yield* collect;
-        yield* sql.unsafe(`create function fail_run() returns trigger language plpgsql as $$ begin raise exception 'write failed'; end $$`).pipe(Effect.orDie);
-        yield* sql.unsafe(`create trigger fail_run before update of last_run on cron for each row execute function fail_run()`).pipe(Effect.orDie);
-        yield* TestClock.adjust(1);
-        yield* s.tick;
-        yield* drained;
-        const after = core.state().crons.find((x) => x.id === made.id)!;
-        expect([after.enabled, after.lastRun, due]).toEqual([true, undefined, []]);
-        yield* sql.unsafe(`drop trigger fail_run on cron`).pipe(Effect.orDie);
-        yield* sql.unsafe(`create trigger fail_occurrence before insert on cron_occurrence for each row execute function fail_run()`).pipe(Effect.orDie);
-        yield* s.tick;
-        yield* drained;
-        expect(core.state().crons.find((x) => x.id === made.id)?.lastRun).toBeUndefined();
-        expect(due).toEqual([]);
-        yield* sql.unsafe(`drop trigger fail_occurrence on cron_occurrence`).pipe(Effect.orDie);
-        yield* s.tick;
-        yield* drained;
-        expect(due.map((d) => d.cron.id)).toEqual([made.id]);
-        yield* s.tick;
-        yield* drained;
-        expect(due.map((d) => d.cron.id)).toEqual([made.id]);
-      }).pipe(Effect.scoped, Effect.provide(farm(testConfig()))),
-    );
   });
 
   it.effect("weekly days are integers from zero to six", () => {

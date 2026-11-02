@@ -63,7 +63,7 @@ export const UnroutedTriggersResult = Schema.Struct({
 export type UnroutedTriggersResult = typeof UnroutedTriggersResult.Type
 
 
-export const UnroutedTriggersSql = "-- name: UnroutedTriggers :many\nselect t.id, t.seq, t.trigger_json from ingress_trigger t\nwhere t.seq > $1\n  and t.payload_json::jsonb->'data'->>'kind' is distinct from 'channel_message'\n  and t.routed_at is null\n  and not exists (select 1 from cron_occurrence c where t.source = 'cron' and c.id = t.source_key)\norder by t.seq limit 1000;"
+export const UnroutedTriggersSql = "-- name: UnroutedTriggers :many\nselect t.id, t.seq, t.trigger_json from ingress_trigger t\nwhere t.seq > $1\n  and t.payload_json::jsonb->'data'->>'kind' is distinct from 'channel_message'\n  and t.routed_at is null\norder by t.seq limit 1000;"
 
 export const unroutedTriggers = Effect.fn("UnroutedTriggers")(function* (params: UnroutedTriggersParams) {
   const sql = yield* SqlClient.SqlClient

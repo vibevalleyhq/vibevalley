@@ -285,15 +285,6 @@ CREATE TABLE session_run (
   summary      text,
   spent        text
 );
-CREATE TABLE cron_occurrence (
-  id text PRIMARY KEY,
-  cron_id text NOT NULL,
-  cron_json text NOT NULL,
-  missed boolean NOT NULL,
-  created_at double precision NOT NULL
-);
-CREATE INDEX cron_occurrence_by_created ON cron_occurrence(created_at, id);
-
 CREATE TABLE cron (
   id          text primary key,
   name        text not null,

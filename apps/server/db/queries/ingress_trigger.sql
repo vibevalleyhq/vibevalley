@@ -11,7 +11,6 @@ select t.id, t.seq, t.trigger_json from ingress_trigger t
 where t.seq > sqlc.arg(after)
   and t.payload_json::jsonb->'data'->>'kind' is distinct from 'channel_message'
   and t.routed_at is null
-  and not exists (select 1 from cron_occurrence c where t.source = 'cron' and c.id = t.source_key)
 order by t.seq limit 1000;
 
 -- name: KnownGitHubEvents :many
