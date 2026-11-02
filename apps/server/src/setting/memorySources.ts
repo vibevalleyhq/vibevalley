@@ -6,9 +6,9 @@ import { voiceProblem, voiceURL } from "./voice.ts";
 
 export const keyHint = (key: string) => "…" + key.slice(-4);
 
-export const agoraID = /^[0-9a-fA-F]{32}$/u;
+const agoraID = /^[0-9a-fA-F]{32}$/u;
 
-export const hasSpace = (s: string) => /\s/u.test(s);
+const hasSpace = (s: string) => /\s/u.test(s);
 
 /** A memory source as settings.json keeps it, with its key: read together, so an address is never paired with another one's key. */
 export interface MemorySourceConfig {

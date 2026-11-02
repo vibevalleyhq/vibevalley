@@ -13,7 +13,7 @@ import type { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, messageOf } from "@/errors.ts";
 import type { Db } from "@/infra/db.ts";
 import type { WorkplaceRelease } from "@/project/shapes.ts";
-import { chooseAgent } from "@/runtime/fit.ts";
+import { chooseAgent } from "@/runtime/presets.ts";
 import type { Runtime } from "@/runtime/runtime.ts";
 import type { Hired, HireOptions, Session } from "@/session/session.ts";
 

@@ -65,7 +65,7 @@
 | 钥匙和语音设置 | `Setting` | `settings.json`（只有你能读） | 会话的 `env` |
 | 进度、成就 | `Game`（`game/game.ts`、`progress.ts`） | `game_ledger` 表；进度从它折出来 | |
 | 等级 | `Game` | `game_ledger` 折出的 commit 数 | |
-| 地 | `Game`；规则在 `apps/server/src/game/play.ts` | `session` 表里的 `play`（`play.station`） | |
+| 地 | `Game`；规则在 `apps/server/src/game/view.ts` | `session` 表里的 `play`（`play.station`） | |
 | 核心状态 | `Core` | 内存里的一份投影，从 PGlite 的 `session` 表和各模块表恢复 | |
 
 ## oar 那一层

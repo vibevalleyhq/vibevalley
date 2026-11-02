@@ -26,11 +26,10 @@ import { timeHere, withinRealTime } from "@/infra/time.ts";
 import { Setting } from "@/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
-import { agentProblems, type Candidate, chooseAgent, sessionOptions } from "./fit.ts";
 import { piBalance, type PiDefault, piSettings } from "./pi.ts";
-import { factsOf, presetOf, runtimeIds, runtimeLabel } from "./presets.ts";
+import { agentProblems, type Candidate, chooseAgent, factsOf, moneyStop, presetOf, runtimeIds, runtimeLabel, sessionOptions } from "./presets.ts";
 import { inCny, price, type Rate } from "./price.ts";
-import { moneyStop, quotaOf } from "./quota.ts";
+import { quotaOf } from "./quota.ts";
 import { spending } from "./spending.ts";
 import { dbTodoStores } from "./todoStore.ts";
 import { vibevalleyRuntimeOf } from "./vibevalley.ts";

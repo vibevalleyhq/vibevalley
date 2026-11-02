@@ -11,7 +11,7 @@
 
 ## 在哪
 
-- `apps/server/src/resource/resource.ts` 是服务，`textCache.ts` 是会话级 LRU 快照；`tool/resource.ts` 是给会话的 `resource_read` 工具。
+- `apps/server/src/resource/resource.ts` 是服务，`textCache.ts` 是会话级 LRU 快照；`tool/tool.ts` 是给会话的 `resource_read` 工具。
 - 入口是 `Resource.read(session, { uri, offset?, limit? })`；协议形状在 `packages/protocol/src/shapes.ts` 的 `ResourcePage`。
 
 ## 模型和不变量

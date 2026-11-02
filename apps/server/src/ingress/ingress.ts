@@ -16,8 +16,7 @@ import { triggerOf } from "@/mailbox/payload.ts";
 import type { ProjectError } from "@/project/shapes.ts";
 
 import * as q from "../../db/generated/ingress_trigger.sql.ts";
-import type { GitHubPullIngress } from "./github-source.ts";
-import { githubInputs } from "./github.ts";
+import { githubInputs, type GitHubPullIngress } from "./github.ts";
 
 interface OwnerInput {
   readonly source: "connector" | "voice";

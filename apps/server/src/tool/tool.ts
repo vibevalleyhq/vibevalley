@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Layer, Predicate } from "effect";
+import { Clock, Context, Effect, Layer, Predicate, Schema } from "effect";
 
 import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { maybe, t } from "@vibevalley/i18n";
@@ -6,16 +6,18 @@ import type * as T from "@vibevalley/protocol";
 
 import { head } from "@/base/clip.ts";
 import { Project } from "@/project/project.ts";
+import { resourceWords } from "@/resource/prompts.ts";
+import { Resource, ResourceRequest } from "@/resource/resource.ts";
 import type { ToolStart } from "@/session/facts.ts";
 
 import { artifactTools } from "./artifact.ts";
 import { channelTools } from "./channel.ts";
 import { cronTools } from "./cron.ts";
-import { type Who, tool } from "./definition.ts";
+import { callerOf, customTool, type Who, tool } from "./definition.ts";
 import { issueTools } from "./issue.ts";
 import { memoryTools } from "./memory.ts";
 import { answers, sessionLine } from "./prompts.ts";
-import { resourceTools } from "./resource.ts";
+import { toolParameters } from "./schemas.ts";
 
 export class Tool extends Context.Service<
   Tool,
@@ -55,6 +57,21 @@ export function toolStart(name: string, args: unknown): ToolStart {
     input: args === undefined || args === null ? "{}" : JSON.stringify(args),
   };
 }
+
+const resourceTools = Effect.gen(function* () {
+  const resource = yield* Resource;
+  return (who: Who) =>
+    customTool(
+      "resource_read",
+      resourceWords.description,
+      toolParameters(ResourceRequest),
+      Schema.decodeUnknownEffect(ResourceRequest),
+      Effect.fn("Tool.resourceRead")(function* (input) {
+        const caller = yield* callerOf(who);
+        return JSON.stringify(yield* resource.read(caller.session || caller.agent, input));
+      }),
+    );
+});
 
 const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;

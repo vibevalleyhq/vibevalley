@@ -18,7 +18,7 @@ import { world } from "@/testing/world.ts";
 
 import * as q from "../../db/generated/game_ledger.sql.ts";
 import { Game, start as gameStart } from "./game.ts";
-import { playOf } from "./play.ts";
+import { playOf } from "./view.ts";
 
 const farm = (config = testConfig()) => Game.layer.pipe(Layer.provideMerge(world({ config })));
 

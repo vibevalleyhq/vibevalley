@@ -9,7 +9,7 @@ import type { Issue } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { ServerConfig } from "@/infra/config.ts";
-import { githubSnapshot } from "@/ingress/github-source.ts";
+import { githubSnapshot } from "@/ingress/github.ts";
 import { gitSync, projectsDir, repo, write } from "@/testing/git.ts";
 import { testConfig } from "@/testing/layers.ts";
 

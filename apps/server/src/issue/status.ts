@@ -6,7 +6,7 @@ import { sessionOf } from "@/session/roster.ts";
 
 import { statusMoves } from "./moves.ts";
 
-export const awaitsPullRequest = (issue: Pick<T.Issue, "pullRequest">, session: Pick<T.Session, "phase" | "lastRun"> | undefined) =>
+const awaitsPullRequest = (issue: Pick<T.Issue, "pullRequest">, session: Pick<T.Session, "phase" | "lastRun"> | undefined) =>
   issue.pullRequest?.state === "open" && session?.phase._tag === "resting" && session.lastRun?.outcome === "completed";
 
 /** The conflict a preview of the issue's branch shows; none when it goes in clean. */

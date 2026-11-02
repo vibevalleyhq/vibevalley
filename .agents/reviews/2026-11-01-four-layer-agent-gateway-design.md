@@ -282,7 +282,7 @@ flowchart TB
 - **精确修改文件清单**：
   1. `packages/protocol/src/shapes.ts`、`packages/protocol/src/schema.ts`：从 `Session` / `SessionView` 移出 `play`，加到 `FarmView.plays: Record<string, SessionPlayView>`。
   2. `apps/server/db/migrations/0001_schema.up.sql`、`apps/server/db/queries/session.sql`：删除 `play` 列，运行 `vp run --filter @vibevalley/server db:generate`。
-  3. `apps/server/src/game/play.ts`、`apps/server/src/game/view.ts`、`apps/server/src/projection/frame.ts`、`apps/web/src/farm/`：将 `play` 的读写改走 `FarmView.plays`。
+  3. `apps/server/src/game/view.ts`、`apps/server/src/game/view.ts`、`apps/server/src/projection/frame.ts`、`apps/web/src/farm/`：将 `play` 的读写改走 `FarmView.plays`。
 - **脚本 + 测试 + 文档验收命令**：
   ```bash
   ! rg '\bplay\b' apps/server/db/migrations/0001_schema.up.sql apps/server/db/queries/session.sql

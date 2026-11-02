@@ -167,7 +167,7 @@
 
 **PR 的结局**：Issue 每 `github.pr_poll_seconds` 秒读取 PR 合并／关闭状态，合了就完成、交付 `pull_request`，没合就关掉是不做了（`dismissed`）。Ingress 独立读取 CI、Reviews 和行内评论，按事件身份生成不可变 Trigger；CI 变化用 `ingress_github` 的指纹和修订号，评论不使用不透明 ID 排序游标。事件进入 Mailbox 工单蓄水，等主人时 held，机器人评审超额时 reason 为 budget；新主人输入可释放这批挂起项。
 
-GitHub 读取在 `ingress/github-source.ts`，归一化与投递在 `ingress/github.ts`。检查、评审、普通评论和评审线程分别通过 [gh 的分页接口](https://cli.github.com/manual/gh_api) 读取；线程内超过 100 条的评论从最后一个 cursor 继续读取。使用 GraphQL 节点 ID 关联评审，行内评论保留 fullDatabaseId、路径、行号、diff hunk 和线程 ID。任一集合读取失败就拒绝本次快照，不把缺失数据当作空列表保存。
+GitHub 读取在 `ingress/github.ts`，归一化与投递在 `ingress/github.ts`。检查、评审、普通评论和评审线程分别通过 [gh 的分页接口](https://cli.github.com/manual/gh_api) 读取；线程内超过 100 条的评论从最后一个 cursor 继续读取。使用 GraphQL 节点 ID 关联评审，行内评论保留 fullDatabaseId、路径、行号、diff hunk 和线程 ID。任一集合读取失败就拒绝本次快照，不把缺失数据当作空列表保存。
 
 一次评审及其多条行内评论共用 botRoundKey，轮次从已存 Trigger 推导；后来到达的同轮评论不重复消耗额度。没有评审关联的独立机器人评论各算一轮。已存来源但未登记信箱的事件在下次轮询继续投递。`vv://github/<项目>/pulls/<编号>/thread/<评论或线程 ID>` 返回完整线程；评论可按节点 ID 或可精确表示的数据库编号定位。
 
