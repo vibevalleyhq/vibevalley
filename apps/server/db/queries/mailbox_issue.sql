@@ -43,3 +43,7 @@ update mailbox_issue m set state = 'returned', reason = 'unqueued'
 from ingress_trigger t
 where m.trigger_id = t.id and m.issue_id = sqlc.arg(issue_id) and m.state = 'held'
   and t.trigger_json::jsonb->'meta'->>'dispatch' = 'true';
+
+-- name: RetireHeldInputs :exec
+update mailbox_issue set state = 'returned', reason = sqlc.narg(reason)
+where issue_id = sqlc.arg(issue_id) and trigger_id <> sqlc.arg(trigger_id) and state = 'held';

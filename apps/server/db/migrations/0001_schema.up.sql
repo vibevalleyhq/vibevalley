@@ -259,6 +259,16 @@ CREATE TABLE mailbox_issue (
   created_at double precision not null
 );
 CREATE INDEX mailbox_issue_by_issue on mailbox_issue(issue_id, state, created_at);
+-- At most one held input per issue: a newer hold replaces the older one.
+CREATE FUNCTION mailbox_issue_one_held() RETURNS trigger AS $$
+BEGIN
+  DELETE FROM mailbox_issue WHERE issue_id = NEW.issue_id AND trigger_id <> NEW.trigger_id AND state = 'held'
+    AND EXISTS (SELECT 1 FROM ingress_trigger t WHERE t.id = NEW.trigger_id AND t.source = 'cron');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER mailbox_issue_one_held BEFORE INSERT OR UPDATE OF state ON mailbox_issue
+  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION mailbox_issue_one_held();
 
 CREATE INDEX ingress_trigger_route_order on ingress_trigger (routing_scope, routing_position) where routed_at is not null;
 CREATE INDEX mailbox_delivery_scope_position on mailbox_delivery (scope, position);

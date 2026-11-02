@@ -185,3 +185,21 @@ export const retireQueuedDispatches = Effect.fn("RetireQueuedDispatches")(functi
     execute: (p) => sql.unsafe(RetireQueuedDispatchesSql, [p["issue_id"]]),
   })(params)
 })
+
+export const RetireHeldInputsParams = Schema.Struct({
+  ["reason"]: Schema.NullOr(Schema.String),
+  ["issue_id"]: Schema.String,
+  ["trigger_id"]: Schema.String,
+})
+export type RetireHeldInputsParams = typeof RetireHeldInputsParams.Type
+
+
+export const RetireHeldInputsSql = "-- name: RetireHeldInputs :exec\nupdate mailbox_issue set state = 'returned', reason = $1\nwhere issue_id = $2 and trigger_id <> $3 and state = 'held';"
+
+export const retireHeldInputs = Effect.fn("RetireHeldInputs")(function* (params: RetireHeldInputsParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: RetireHeldInputsParams,
+    execute: (p) => sql.unsafe(RetireHeldInputsSql, [p["reason"], p["issue_id"], p["trigger_id"]]),
+  })(params)
+})
