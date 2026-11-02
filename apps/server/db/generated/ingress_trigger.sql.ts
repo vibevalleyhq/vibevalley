@@ -150,3 +150,20 @@ export const isRouted = Effect.fn("IsRouted")(function* (params: IsRoutedParams)
     execute: (p) => sql.unsafe(IsRoutedSql, [p["envelope_id"]]),
   })(params)
 })
+
+export const RetireIssueDispatchesParams = Schema.Struct({
+  ["issue_id"]: Schema.String,
+  ["at"]: Schema.Number,
+})
+export type RetireIssueDispatchesParams = typeof RetireIssueDispatchesParams.Type
+
+
+export const RetireIssueDispatchesSql = "-- name: RetireIssueDispatches :exec\n-- A session started on the issue: the assignment's own dispatch is not a second brief for it.\nupdate ingress_trigger set\n  routing_position = coalesce(routing_position, nextval('mailbox_order')),\n  routing_scope = coalesce(routing_scope, 'issue:' || $1),\n  routed_at = coalesce(routed_at, $2)\nwhere routed_at is null\n  and trigger_json::jsonb->'meta'->>'dispatch' = 'true'\n  and trigger_json::jsonb->'meta'->>'issue' = $1;"
+
+export const retireIssueDispatches = Effect.fn("RetireIssueDispatches")(function* (params: RetireIssueDispatchesParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: RetireIssueDispatchesParams,
+    execute: (p) => sql.unsafe(RetireIssueDispatchesSql, [p["issue_id"], p["at"]]),
+  })(params)
+})

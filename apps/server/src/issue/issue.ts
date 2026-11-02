@@ -32,6 +32,7 @@ import { type ApiError, Inconsistent, missing, lookIn, reasonOf, refused } from 
 import { ServerConfig } from "@/infra/config.ts";
 import { causeMessage, Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
+import { Mailbox } from "@/mailbox/mailbox.ts";
 import { issueBranch, Project } from "@/project/project.ts";
 import { MergeFailure, type Workplace } from "@/project/shapes.ts";
 import { Runtime } from "@/runtime/runtime.ts";
@@ -39,10 +40,10 @@ import { askedMax } from "@/session/journal.ts";
 import { type Hired, type HireOptions, NotRecorded, type SessionNews, Session } from "@/session/session.ts";
 import { conflictBrief } from "@/session/takeIn.ts";
 
+import * as qr from "../../db/generated/ingress_trigger.sql.ts";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qs from "../../db/generated/issue_assignment.sql.ts";
 import * as qe from "../../db/generated/issue_assignment_execution.sql.ts";
-import * as dispatchQ from "../../db/generated/issue_dispatch.sql.ts";
 import * as qi from "../../db/generated/mailbox_issue.sql.ts";
 import { assignTo, Assignments } from "./assignment.ts";
 import { answerCureWords, cureWords, findingsOf, issueBrief, resumeWords, splitBrief } from "./brief.ts";
@@ -60,6 +61,7 @@ import { isForOrchestrator, issueOrder, keepClosedIssues, isClosed } from "./sta
 import { jsonOrNull, nullText } from "./stored.ts";
 import { filledKinds, sentTitles } from "./templates.ts";
 import { milestonesOf } from "./timeline.ts";
+import { recordTrigger } from "./trigger.ts";
 import { acceptanceAncestors, verifyChild } from "./verification.ts";
 
 export class Issue extends Context.Service<
@@ -100,8 +102,6 @@ export class Issue extends Context.Service<
     readonly templates: (project: string) => Effect.Effect<T.ProjectTemplates, ApiError>;
     /** Sends a session for work that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the brief. */
     readonly hire: (agent: T.Agent, brief: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
-    readonly pendingDispatches: Effect.Effect<readonly IssueDispatch[]>;
-    readonly acknowledgeDispatch: (id: string) => Effect.Effect<void>;
     readonly refreshPullRequests: Effect.Effect<void>;
     readonly tryQueued: (
       inputs: readonly QueuedInput[],
@@ -116,16 +116,6 @@ export class Issue extends Context.Service<
 export interface QueuedInput {
   readonly issue: string;
   readonly trigger: T.Trigger;
-}
-
-export interface IssueDispatch {
-  readonly id: string;
-  readonly issue: string;
-  readonly agent: string;
-  readonly channel: string;
-  readonly text: string;
-  readonly by: T.RunTrigger;
-  readonly at: number;
 }
 
 export interface StatusOptions {
@@ -190,6 +180,7 @@ const make = (options: IssueOptions = {}) =>
     const runtimes = yield* Runtime;
     const sessions = yield* Session;
     const chat = yield* Channel;
+    const mailbox = yield* Mailbox;
     const db = yield* Db;
     const worked = new Assignments();
     sessions.attachPullRequestPolicy((id) => core.state().issues.find((issue) => issue.id === id)?.pullRequest?.state === "open");
@@ -367,6 +358,12 @@ const make = (options: IssueOptions = {}) =>
       if (item.reviewedAt !== undefined) yield* judged(id, 0, item.findings);
     });
 
+    const retireDispatches = (id: string, at: number) =>
+      Effect.gen(function* () {
+        yield* db.run(qr.retireIssueDispatches({ issue_id: id, at }));
+        yield* db.run(qi.retireQueuedDispatches({ issue_id: id }));
+      });
+
     /** The issue already owns its number and workplace before its session starts. */
     const ran = Effect.fn("Issue.ran")(function* (id: string, session: T.Session) {
       const linked = yield* db
@@ -380,7 +377,7 @@ const make = (options: IssueOptions = {}) =>
               executor: session.id,
               started_at: session.hiredAt,
             });
-            yield* dispatchQ.cancelDispatches({ issue_id: id });
+            yield* retireDispatches(id, session.hiredAt);
             return { assignment, execution };
           }),
         )
@@ -393,28 +390,30 @@ const make = (options: IssueOptions = {}) =>
     const queueRow = Effect.fn("Issue.queueRow")(function* (id: string, queued: boolean, channel: string, by?: T.RunTrigger, source?: T.Trigger) {
       const item = yield* unsent(id);
       const at = yield* Clock.currentTimeMillis;
+      let dispatch: T.Trigger | undefined;
       yield* db.inTx(
         Effect.gen(function* () {
           if (!queued) {
-            yield* db.run(dispatchQ.cancelDispatches({ issue_id: id }));
+            yield* retireDispatches(id, at);
             yield* db.run(q.unqueueIssue({ id }));
             return;
           }
           const changed = yield* db.run(q.queueIssue({ at, id }));
           if (changed.length > 0 && !source)
-            yield* db.run(
-              dispatchQ.enqueueDispatch({
-                id: newId(),
-                issue_id: id,
-                agent: assignedAgentOf(item) ?? "",
-                channel,
-                body: issueBrief(item),
-                trigger_json: JSON.stringify(by ?? { kind: "issue" }),
-                created_at: at,
-              }),
-            );
+            dispatch = yield* recordTrigger(db, {
+              source: "workbench",
+              key: newId(),
+              actor: { kind: "system", id: "system" },
+              text: issueBrief(item),
+              threads: [`issue:${id}`],
+              addressed: "thread_owner",
+              replyChannel: channel,
+              meta: { ingressRecipient: assignedAgentOf(item) ?? "", issue: id, trigger: by ?? { kind: "issue" }, dispatch: true },
+              at,
+            });
         }),
       );
+      if (dispatch) yield* mailbox.receive(dispatch).pipe(Effect.orDie);
       yield* publish(id);
       return yield* get(id);
     });
@@ -424,7 +423,7 @@ const make = (options: IssueOptions = {}) =>
       yield* db.inTx(
         Effect.all(
           [
-            db.run(dispatchQ.cancelDispatches({ issue_id: id })),
+            retireDispatches(id, yield* Clock.currentTimeMillis),
             db.run(q.unqueueIssue({ id })),
             db.run(q.cancelIssue({ closed_at: yield* Clock.currentTimeMillis, canceled: "dismissed", id })),
           ],
@@ -530,6 +529,7 @@ const make = (options: IssueOptions = {}) =>
           .pipe(Effect.mapError((error) => refused(error.message)));
       }
       const assignedAt = yield* Clock.currentTimeMillis;
+      let dispatch: T.Trigger | undefined;
       const linked = yield* db.run(
         db.attemptTx(
           Effect.gen(function* () {
@@ -543,19 +543,22 @@ const make = (options: IssueOptions = {}) =>
               started_at: assignedAt,
             });
             if (input)
-              yield* dispatchQ.enqueueDispatch({
-                id: newId(),
-                issue_id: issue.id,
-                agent,
-                channel,
-                body: input.text,
-                trigger_json: JSON.stringify(input.by),
-                created_at: assignedAt,
+              dispatch = yield* recordTrigger(db, {
+                source: "workbench",
+                key: newId(),
+                actor: { kind: "system", id: "system" },
+                text: input.text,
+                threads: [`issue:${issue.id}`],
+                addressed: "thread_owner",
+                replyChannel: channel,
+                meta: { ingressRecipient: agent, issue: issue.id, trigger: input.by, dispatch: true },
+                at: assignedAt,
               });
             return { assignment, execution };
           }),
         ),
       );
+      if (dispatch) yield* mailbox.receive(dispatch).pipe(Effect.orDie);
       worked.changed(linked.assignment.changed);
       worked.executed(issue.id, linked.execution);
       yield* publish(issue.id);
@@ -680,6 +683,7 @@ const make = (options: IssueOptions = {}) =>
       }
       const channel = (yield* chat.topOf(session ? (sessions.sessionOf(session)?.channel ?? "") : "")).id;
       const at = yield* Clock.currentTimeMillis;
+      const dispatches: T.Trigger[] = [];
       const assignments = yield* db
         .attemptTx(
           Effect.gen(function* () {
@@ -699,15 +703,19 @@ const make = (options: IssueOptions = {}) =>
             return yield* Effect.forEach(rows, (row) =>
               Effect.gen(function* () {
                 yield* q.addIssue(issueRow(row.id, row.req, parent.mandate, at));
-                yield* dispatchQ.enqueueDispatch({
-                  id: newId(),
-                  issue_id: row.id,
-                  agent: row.req.agent ?? "",
-                  channel,
-                  body: [row.req.title, row.req.description].filter(Boolean).join("\n\n"),
-                  trigger_json: JSON.stringify({ kind: "issue" }),
-                  created_at: at,
-                });
+                dispatches.push(
+                  yield* recordTrigger(db, {
+                    source: "workbench",
+                    key: newId(),
+                    actor: { kind: "system", id: "system" },
+                    text: [row.req.title, row.req.description].filter(Boolean).join("\n\n"),
+                    threads: [`issue:${row.id}`],
+                    addressed: "thread_owner",
+                    replyChannel: channel,
+                    meta: { ingressRecipient: row.req.agent ?? "", issue: row.id, trigger: { kind: "issue" }, dispatch: true },
+                    at,
+                  }),
+                );
                 yield* q.queueIssue({ id: row.id, at });
                 return yield* assignTo(row.id, row.req.agent, at);
               }),
@@ -722,6 +730,7 @@ const make = (options: IssueOptions = {}) =>
           }),
         );
       for (const assignment of assignments) worked.changed(assignment.changed);
+      yield* Effect.forEach(dispatches, (dispatch) => mailbox.receive(dispatch).pipe(Effect.orDie), { discard: true });
       yield* Effect.forEach(rows, (row) => publish(row.id), { discard: true });
       yield* publish(id);
       return (
@@ -1228,6 +1237,15 @@ const make = (options: IssueOptions = {}) =>
       return milestonesOf(issue, runs, names);
     });
 
+    yield* Effect.forkScoped(
+      Stream.runForEach(yield* core.subscribe, (fact) =>
+        Effect.gen(function* () {
+          if (fact.type !== "issue" && fact.type !== "sessionGone" && !(fact.type === "session" && fact.session.issue !== undefined)) return;
+          yield* tryQueued(yield* mailbox.queuedInputs, (session, launch, inputs) => mailbox.registerInitialInputs(session, launch, inputs));
+        }).pipe(Effect.ignore),
+      ),
+    );
+
     const shape = Issue.of({
       scheduled,
       submitPullRequest,
@@ -1452,22 +1470,6 @@ const make = (options: IssueOptions = {}) =>
         return { project: name, stack, recent: sentTitles(yield* everyIssue, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
       }),
       hire,
-      pendingDispatches: Effect.flatMap(db.run(dispatchQ.pendingDispatches()), (rows) =>
-        Effect.forEach(rows, (row) =>
-          Effect.map(Schema.decodeEffect(Schema.fromJsonString(S.RunTrigger))(row.trigger_json), (by): IssueDispatch => ({
-            id: row.id,
-            issue: row.issue_id,
-            agent: row.agent,
-            channel: row.channel,
-            text: row.body,
-            by,
-            at: row.created_at,
-          })),
-        ),
-      ).pipe(Effect.orDie),
-      acknowledgeDispatch: Effect.fn("Issue.acknowledgeDispatch")(function* (id) {
-        yield* db.run(dispatchQ.acknowledgeDispatch({ id }));
-      }),
       refreshPullRequests,
       tryQueued,
     });

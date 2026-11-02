@@ -14,9 +14,13 @@ import { Core } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Db } from "@/infra/db.ts";
+import { bestEffort } from "@/infra/log.ts";
+import { Issue } from "@/issue/issue.ts";
+import { recordTrigger } from "@/issue/trigger.ts";
+import { Mailbox } from "@/mailbox/mailbox.ts";
 
 import * as q from "../../db/generated/cron.sql.ts";
-import { afterRun, dueCrons, isMissed, needsOK, cronProblem } from "./due.ts";
+import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./due.ts";
 import { whenText } from "./when.ts";
 
 export interface Due {
@@ -65,6 +69,8 @@ const make = Effect.gen(function* () {
   const core = yield* Core;
   const store = yield* Agent;
   const chat = yield* Channel;
+  const issues = yield* Issue;
+  const mailbox = yield* Mailbox;
   const db = yield* Db;
   // Read in callbacks too: the Clock the service was built with (a test turns it by hand).
   const clock = yield* Clock.Clock;
@@ -102,6 +108,32 @@ const make = Effect.gen(function* () {
 
   const ran = (id: string, at: number, enabled: boolean) => db.run(q.cronRan({ last_run: at, enabled, id }));
 
+  const handle = (due: Due) =>
+    Effect.gen(function* () {
+      const s = due.cron;
+      const thread = `cron:${s.id}`;
+      const trigger = yield* recordTrigger(db, {
+        source: "cron",
+        key: due.id,
+        actor: { kind: "system", id: s.id },
+        text: dueText(s, due.missed),
+        threads: [thread],
+        addressed: "thread_owner",
+        replyChannel: s.channel,
+        meta: { cron: s.id, trigger: { kind: "cron", cron: s.id, ...(due.missed ? { missed: true } : {}) } },
+        at: s.lastRun ?? s.created,
+        data: s,
+      });
+      if (!(yield* mailbox.registered(trigger.id))) {
+        const issue = yield* issues.scheduled(due, trigger);
+        yield* mailbox.subscribe(issue.id, [thread]);
+        yield* mailbox.receive(trigger);
+      } else {
+        const issue = yield* mailbox.ownerOf(trigger.id);
+        if (issue) yield* mailbox.subscribe(issue, [thread]);
+      }
+    }).pipe(bestEffort(`cron occurrence ${due.id}`));
+
   const tick = lock.withPermits(1)(
     Effect.gen(function* () {
       const at = now();
@@ -118,6 +150,7 @@ const make = Effect.gen(function* () {
                 Effect.gen(function* () {
                   yield* core.apply({ type: "cron", cron: after });
                   PubSub.publishUnsafe(dueHub, occurrence);
+                  yield* handle(occurrence);
                 }),
             }),
           );

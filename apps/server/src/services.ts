@@ -102,7 +102,7 @@ export const mailbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(M
 export const issues =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Cron.layer), on(Issue.layer(o.issue)));
+    below.pipe(on(Issue.layer(o.issue)), on(Cron.layer));
 
 /** Ingress: immutable source events and their compact cards. */
 export const ingress = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Ingress.layer));
@@ -151,9 +151,9 @@ export const services = (config: ServerConfig["Service"], options: ServiceOption
       agents(options),
       sourceControl(options),
       agentSessions(options),
+      mailbox,
       collaboration(options),
       issues(options),
-      mailbox,
       ingress,
       resources,
       inbox,
@@ -161,4 +161,4 @@ export const services = (config: ServerConfig["Service"], options: ServiceOption
       gamification,
       gateway(options),
     )
-    .pipe(sourceControlStart, agentSessionsStart, collaborationStart, mailboxReady, ingressReady, on(ingressStart), issuesStart, inboxStart, gamificationStart);
+    .pipe(sourceControlStart, agentSessionsStart, mailboxReady, collaborationStart, ingressReady, on(ingressStart), issuesStart, inboxStart, gamificationStart);

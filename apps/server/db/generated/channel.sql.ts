@@ -401,6 +401,33 @@ export const setOrchestrator = Effect.fn("SetOrchestrator")(function* (params: S
   })(params)
 })
 
+export const ChannelForRoutingParams = Schema.Struct({
+  ["id"]: Schema.String,
+})
+export type ChannelForRoutingParams = typeof ChannelForRoutingParams.Type
+
+
+export const ChannelForRoutingResult = Schema.Struct({
+  ["id"]: Schema.String,
+  ["type"]: Pg_public_channel_type_653a6aa2de49,
+  ["peer_id"]: Schema.NullOr(Schema.String),
+  ["parent_id"]: Schema.NullOr(Schema.String),
+  ["orchestrator"]: Schema.NullOr(Schema.String),
+})
+export type ChannelForRoutingResult = typeof ChannelForRoutingResult.Type
+
+
+export const ChannelForRoutingSql = "-- name: ChannelForRouting :one\n-- What Mailbox needs to name the orchestrator a place answers to, without reading the chat's model.\nselect id, type, peer_id, parent_id, orchestrator from channel where id = $1;"
+
+export const channelForRouting = Effect.fn("ChannelForRouting")(function* (params: ChannelForRoutingParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findOne({
+    Request: ChannelForRoutingParams,
+    Result: ChannelForRoutingResult,
+    execute: (p) => sql.unsafe(ChannelForRoutingSql, [p["id"]]),
+  })(params)
+})
+
 export const ChannelInUseParams = Schema.Struct({
   ["id"]: Schema.String,
 })
@@ -416,7 +443,7 @@ export const ChannelInUseResult = Schema.Struct({
 export type ChannelInUseResult = typeof ChannelInUseResult.Type
 
 
-export const ChannelInUseSql = "-- name: ChannelInUse :one\n-- What still points at a channel, so deleting it would take it from under them.\nselect (select count(*) from cron r where r.channel_id = $1)::int as crons,\n       (select count(*) from connector_account a where a.channel_id = $1)::int as connectors,\n       (select count(distinct i.id) from issue i\n        left join issue_dispatch d on d.issue_id = i.id\n        left join mailbox_issue m on m.issue_id = i.id and m.state = 'held'\n        left join ingress_trigger t on t.id = m.trigger_id\n        where i.queued_at is not null and (d.channel = $1 or t.trigger_json::jsonb->>'replyChannel' = $1))::int as queued,\n       (select count(*) from channel t where t.parent_id = $1 and t.subject_kind = 'issue')::int as issue_threads;"
+export const ChannelInUseSql = "-- name: ChannelInUse :one\n-- What still points at a channel, so deleting it would take it from under them.\nselect (select count(*) from cron r where r.channel_id = $1)::int as crons,\n       (select count(*) from connector_account a where a.channel_id = $1)::int as connectors,\n       (select count(distinct i.id) from issue i\n        left join mailbox_issue m on m.issue_id = i.id and m.state = 'held'\n        left join ingress_trigger t on t.id = m.trigger_id\n        where i.queued_at is not null and (t.trigger_json::jsonb->>'replyChannel' = $1))::int as queued,\n       (select count(*) from channel t where t.parent_id = $1 and t.subject_kind = 'issue')::int as issue_threads;"
 
 export const channelInUse = Effect.fn("ChannelInUse")(function* (params: ChannelInUseParams) {
   const sql = yield* SqlClient.SqlClient

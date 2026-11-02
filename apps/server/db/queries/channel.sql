@@ -81,15 +81,19 @@ update channel set notify = sqlc.arg(notify) where id = sqlc.arg(id);
 -- name: SetOrchestrator :exec
 update channel set orchestrator = sqlc.narg(orchestrator) where id = sqlc.arg(id) and type = 'channel';
 
+-- name: ChannelForRouting :one
+-- What Mailbox needs to name the orchestrator a place answers to, without reading the chat's model.
+select id, type, peer_id, parent_id, orchestrator from channel where id = sqlc.arg(id);
+
+
 -- name: ChannelInUse :one
 -- What still points at a channel, so deleting it would take it from under them.
 select (select count(*) from cron r where r.channel_id = sqlc.arg(id))::int as crons,
        (select count(*) from connector_account a where a.channel_id = sqlc.arg(id))::int as connectors,
        (select count(distinct i.id) from issue i
-        left join issue_dispatch d on d.issue_id = i.id
         left join mailbox_issue m on m.issue_id = i.id and m.state = 'held'
         left join ingress_trigger t on t.id = m.trigger_id
-        where i.queued_at is not null and (d.channel = sqlc.arg(id) or t.trigger_json::jsonb->>'replyChannel' = sqlc.arg(id)))::int as queued,
+        where i.queued_at is not null and (t.trigger_json::jsonb->>'replyChannel' = sqlc.arg(id)))::int as queued,
        (select count(*) from channel t where t.parent_id = sqlc.arg(id) and t.subject_kind = 'issue')::int as issue_threads;
 
 -- name: DeleteThreadsOf :exec

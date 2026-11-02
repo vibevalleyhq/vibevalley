@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Context, Effect, Layer, Schedule, Schema } from "effect";
+import { Context, Effect, Layer, Schedule, Schema, Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -15,15 +15,13 @@ import type { ApiError } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
+import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import type { ProjectError } from "@/project/shapes.ts";
 
 import * as q from "../../db/generated/ingress_trigger.sql.ts";
-import { channelInputs } from "./channel.ts";
-import { cronInputs } from "./cron.ts";
 import type { GitHubPullIngress } from "./github-source.ts";
 import { githubInputs } from "./github.ts";
-import { issueInputs } from "./issue.ts";
 
 export interface OwnerInput {
   readonly source: "connector" | "voice";
@@ -84,6 +82,7 @@ const make = Effect.gen(function* () {
   const artifacts = yield* Artifact;
   const chat = yield* Channel;
   const core = yield* Core;
+  const issues = yield* Issue;
   const mailbox = yield* Mailbox;
   const encodeTrigger = Schema.encodeEffect(Schema.fromJsonString(S.Trigger));
   const decodeTrigger = Schema.decodeUnknownEffect(Schema.fromJsonString(S.Trigger));
@@ -130,10 +129,24 @@ const make = Effect.gen(function* () {
     if (trigger) yield* mailbox.receive(trigger);
     return trigger;
   });
-  yield* channelInputs;
   const github = yield* githubInputs(accept);
-  const { refresh: refreshCron } = yield* cronInputs(record);
-  const { refresh: refreshIssues } = yield* issueInputs(accept);
+  /** Triggers written but never routed (a crash between the write and the hand-off): route them now. */
+  const replay = Effect.gen(function* () {
+    let after = 0;
+    while (true) {
+      const rows = yield* db.run(q.unroutedTriggers({ after }));
+      if (rows.length === 0) return;
+      yield* Effect.forEach(rows, (row) => Effect.flatMap(decodeTrigger(row.trigger_json), mailbox.receive).pipe(bestEffort(`ingress: replay ${row.id}`)), {
+        discard: true,
+      });
+      after = rows.at(-1)!.seq;
+    }
+  });
+  const refreshIssues = Effect.gen(function* () {
+    yield* replay;
+    yield* issues.tryQueued(yield* mailbox.queuedInputs, (session, launch, inputs) => mailbox.registerInitialInputs(session, launch, inputs));
+  });
+  yield* Effect.forkScoped(Stream.runForEach(yield* core.subscribe, (fact) => (fact.type === "issue" ? refreshIssues : Effect.void)));
   /** What the blocks the owner pointed at read now: the version quoted, and whether they changed or went. */
   const quote = (refs: SayMore["blockRefs"]): Effect.Effect<T.QuotedBlock[]> =>
     Effect.forEach(refs ?? [], (ref) =>
@@ -173,24 +186,12 @@ const make = Effect.gen(function* () {
     }),
     accept,
     refreshGitHub: github.refresh,
-    refreshCron,
+    refreshCron: replay,
     refreshIssues,
     githubSnapshot: github.snapshot,
     read,
     record,
-    start: Effect.gen(function* () {
-      yield* refreshIssues;
-      yield* refreshCron;
-      let after = 0;
-      while (true) {
-        const rows = yield* db.run(q.unroutedTriggers({ after }));
-        if (rows.length === 0) return;
-        yield* Effect.forEach(rows, (row) => Effect.flatMap(decodeTrigger(row.trigger_json), mailbox.receive).pipe(bestEffort(`ingress: replay ${row.id}`)), {
-          discard: true,
-        });
-        after = rows.at(-1)!.seq;
-      }
-    }),
+    start: refreshIssues,
   });
 });
 

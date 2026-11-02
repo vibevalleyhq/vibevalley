@@ -1,7 +1,6 @@
-import { Clock, Context, Deferred, Effect, FiberMap, FiberSet, Layer, PubSub, Semaphore, Stream } from "effect";
-// Every message is written to the database first. Mailbox is assembled after Collaboration and registers the delivery
-// port that turns the committed message fact into durable Session deliveries. Everything that changes the chat runs one
-// at a time.
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, Semaphore, Stream } from "effect";
+// Every message is written to the database first. Mailbox is handed each committed message directly: it turns the
+// message into durable Session deliveries. Everything that changes the chat runs one at a time.
 import { HttpClient } from "effect/http";
 
 import { list, t } from "@vibevalley/i18n";
@@ -19,6 +18,8 @@ import { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
 import { causeMessage, Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
+import { Mailbox } from "@/mailbox/mailbox.ts";
+import { inputContext } from "@/mailbox/payload.ts";
 import { NotRecorded, Session } from "@/session/session.ts";
 
 import * as qc from "../../db/generated/channel.sql.ts";
@@ -27,6 +28,7 @@ import * as qmn from "../../db/generated/channel_mention.sql.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import * as qp from "../../db/generated/channel_participant.sql.ts";
 import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
+import * as qt from "../../db/generated/ingress_trigger.sql.ts";
 import { channelAttachments } from "./attachments.ts";
 import { Follows } from "./audience.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
@@ -35,6 +37,7 @@ import { mentionOf, mentionsIn } from "./mentions.ts";
 import { ChatModel, type ChannelRow } from "./model.ts";
 import { messageMutations } from "./mutations.ts";
 import { inboxLines, talkBrief } from "./prompts.ts";
+import { channelInput } from "./route.ts";
 import { parseSearch } from "./search.ts";
 import { channelStreams } from "./streams.ts";
 import { channelNameProblem, parseChatTarget } from "./targets.ts";
@@ -87,11 +90,8 @@ import {
   type Write,
   type Written,
   type ChannelService,
-  type ChannelDelivery,
-  type ChannelRoute,
   type ChannelEnvelopeRow,
   type ChannelRouteFact,
-  type ChannelRouteResult,
   type SessionNews,
 } from "./contracts.ts";
 export type { Info, Spoken, SayMore, OrchestratorNews, Delivered, LaunchActivity } from "./contracts.ts";
@@ -100,17 +100,18 @@ export class Channel extends Context.Service<Channel, ChannelService>()("vibeval
   static readonly layer = Layer.effect(
     Channel,
     Effect.gen(function* () {
-      return yield* make(yield* Session);
+      return yield* make(yield* Session, yield* Mailbox);
     }),
   );
 }
 
-const make = (sessions: Session["Service"]) =>
+const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
   Effect.gen(function* () {
     const core = yield* Core;
     const http = yield* HttpClient.HttpClient;
     const agents = yield* Agent;
     const db = yield* Db;
+    const encodeTrigger = Schema.encodeEffect(Schema.fromJsonString(S.Trigger));
     const model = new ChatModel();
     const follows = new Follows();
     const follow = (channel: string, participant: string, reason: qf.FollowParams["reason"], from: number) =>
@@ -133,21 +134,8 @@ const make = (sessions: Session["Service"]) =>
     const talkStarts = yield* FiberMap.make<string>();
 
     const lastRead = new Map<string, string>();
+    const publishedLast = new Map<string, number>();
     let closed = false;
-    const routingHub = yield* scopedPubSub<ChannelRoute>();
-    const deliveryHub = yield* scopedPubSub<ChannelDelivery>();
-    const ask = <A>(build: (reply: Deferred.Deferred<A>) => ChannelDelivery): Effect.Effect<A> =>
-      Effect.gen(function* () {
-        const reply = yield* Deferred.make<A>();
-        yield* PubSub.publish(deliveryHub, build(reply));
-        return yield* Deferred.await(reply);
-      });
-    const route = (fact: ChannelRouteFact): Effect.Effect<ChannelRouteResult> =>
-      Effect.gen(function* () {
-        const reply = yield* Deferred.make<ChannelRouteResult>();
-        yield* PubSub.publish(routingHub, { fact, reply });
-        return yield* Deferred.await(reply);
-      });
     // Work set off by a timer belongs to this service: it ends with it and keeps its services.
     const forkHere = yield* FiberSet.makeRuntime();
 
@@ -299,7 +287,14 @@ const make = (sessions: Session["Service"]) =>
 
     const publishChannel = Effect.fnUntraced(function* (id: string) {
       const row = model.channel(id);
-      if (row) yield* core.apply({ type: "channel", channel: yield* counted(row) });
+      if (row) {
+        const channel = yield* counted(row);
+        // A metadata change can read a message's number before the message's own fact is applied; keep the state's
+        // last number at what was published, so that fact is still news.
+        const published = publishedLast.get(id);
+        const last = published !== undefined && (channel.lastNumber ?? 0) > published ? published : channel.lastNumber;
+        yield* core.apply({ type: "channel", channel: { ...channel, ...(last === undefined ? {} : { lastNumber: last }) } });
+      }
     });
 
     const publishOwnerMentions = Effect.gen(function* () {
@@ -321,6 +316,7 @@ const make = (sessions: Session["Service"]) =>
       const thread = ch?.type !== "channel" && ch?.subject_kind === "issue" && ch.subject_id ? ch.subject_id : undefined;
       const message = toMessage(row);
       yield* core.apply({ type: "message", message, ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
+      publishedLast.set(row.channel_id, Math.max(publishedLast.get(row.channel_id) ?? 0, row.number));
       yield* PubSub.publish(said, message);
     });
 
@@ -493,7 +489,21 @@ const make = (sessions: Session["Service"]) =>
         kinds: Object.fromEntries(recipients.map((recipient) => [recipient, senderKind(model.participant(recipient)?.kind ?? "")])),
         ...(meta.outcome === undefined ? {} : { outcome: meta.outcome }),
       };
-      const routed = yield* route(fact);
+      const { trigger, mail } = channelInput(fact, inputContext(asInbox(fact.row)));
+      yield* db.run(
+        qt.recordTrigger({
+          id: trigger.id,
+          source: trigger.source,
+          source_key: fact.row.envelope_id,
+          occurred_at: trigger.at,
+          trigger_json: yield* encodeTrigger(trigger).pipe(Effect.orDie),
+          payload_json: JSON.stringify({
+            text: fact.row.body,
+            data: { kind: "channel_message", message: fact.row.envelope_id, channel: fact.row.channel_id },
+          }),
+        }),
+      );
+      const routed = yield* mailbox.receive(trigger, mail).pipe(Effect.orDie);
       const written: Written = { absent: [], heldNotice: "", received: routed.received, thread: "", again: false, row };
       if (routed.heldNotice && (yield* db.run(qm.holdNoticeSinceUser({ channel: ch.id }))).n === 0) written.heldNotice = routed.heldNotice;
       written.absent = named.filter((m) => m.how !== "delivered").map((m) => m.id);
@@ -680,14 +690,17 @@ const make = (sessions: Session["Service"]) =>
             joined_at: yield* Clock.currentTimeMillis,
           };
           yield* db.attempt(qp.upsertParticipant(joined));
-          yield* ask<void>((reply) => ({
-            kind: "registerTalk",
-            session: session.id,
+          yield* mailbox.registerTalk(
+            session.id,
             launch,
-            at: joined.joined_at,
-            rows: snapshot.filter((message) => message.sender_id === ownerId && message.kind === "chat" && message.deleted_at === null).map(channelEnvelope),
-            reply,
-          })).pipe(Effect.onError(() => Effect.ignoreCause(ask<void>((reply) => ({ kind: "restore", reply })))));
+            joined.joined_at,
+            snapshot
+              .filter((message) => message.sender_id === ownerId && message.kind === "chat" && message.deleted_at === null)
+              .map((message) => {
+                const row = channelEnvelope(message);
+                return { row, context: inputContext(asInbox(row)) };
+              }),
+          );
           model.joined(joined);
         }).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause }))),
       );
@@ -725,7 +738,7 @@ const make = (sessions: Session["Service"]) =>
         Effect.gen(function* () {
           const missed = yield* db.run(qm.missingDirectDeliveries({ channel_id: channel, recipient_id: recipient, after_number: last?.number ?? 0 }));
           yield* Effect.forEach(missed, (row) => settle(row), { discard: true });
-          yield* ask<void>((reply) => ({ kind: "kick", session: recipient, reply }));
+          yield* mailbox.kick(recipient);
         }),
       );
     });
@@ -804,7 +817,7 @@ const make = (sessions: Session["Service"]) =>
         if (p.kind !== "session" || p.left_at !== null || on.has(p.id)) continue;
         yield* db.run(qp.participantLeft({ left_at: now, id: p.id }));
         model.left(p.id, now);
-        yield* ask<void>((reply) => ({ kind: "dropSession", session: p.id, reply }));
+        yield* mailbox.dropSession(p.id, "left");
         yield* db.run(qf.unfollowAllOf({ at: now, participant_id: p.id }));
         follows.left(p.id);
         lastRead.delete(p.id);
@@ -857,7 +870,14 @@ const make = (sessions: Session["Service"]) =>
       ).pipe(bestEffort(`chat: after ${n._tag}`));
     });
     // Once the helpers are back, Collaboration restores their threads; Mailbox wakes them after its own recovery.
-    const start = locked(Effect.forEach(presentSessions(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), { discard: true }));
+    const start = Effect.gen(function* () {
+      yield* locked(Effect.forEach(presentSessions(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), { discard: true }));
+      while (true) {
+        const rows = yield* db.run(qm.unroutedChannelMessages());
+        if (rows.length === 0) break;
+        yield* Effect.forEach(rows, (row) => shape.replayDelivery(row).pipe(bestEffort(`chat: route ${row.envelope_id}`)), { discard: true });
+      }
+    });
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         closed = true;
@@ -1004,8 +1024,6 @@ const make = (sessions: Session["Service"]) =>
     });
 
     const shape = Channel.of({
-      routing: Effect.map(PubSub.subscribe(routingHub), Stream.fromSubscription),
-      delivery: Effect.map(PubSub.subscribe(deliveryHub), Stream.fromSubscription),
       replayDelivery: Effect.fn("Channel.replayDelivery")(function* (row) {
         const written = yield* settle(messageRow(row));
         yield* Effect.forEach(
@@ -1016,12 +1034,6 @@ const make = (sessions: Session["Service"]) =>
         if (written.heldNotice)
           yield* write({ channel: row.channel_id, from: "system", kind: "notice", text: written.heldNotice, meta: { code: "hop_limit" } });
       }, locked),
-      deliveryMessage: asInbox,
-      deliveryUnread: inboxRows,
-      deliveryReceived: Effect.fn("Channel.deliveryReceived")(
-        (session, envelope) => reacting(envelope, session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${envelope}`)),
-        locked,
-      ),
       ownerReads: Effect.map(PubSub.subscribe(ownerReadHub), Stream.fromSubscription),
       handoffSubject: Effect.fn("Channel.handoffSubject")(function* (message) {
         const row = yield* db.one(qm.messageByID({ id: message }));
@@ -1088,13 +1100,13 @@ const make = (sessions: Session["Service"]) =>
         const row = yield* messageOf(id);
         if (row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.messageGone")));
         yield* change(row, (revision, now) => db.run(qm.deleteMessage({ at: now, revision, id })));
-        yield* ask<readonly string[]>((reply) => ({ kind: "dropEnvelope", envelope: id, reply }));
+        yield* mailbox.dropEnvelope(id);
       }, locked),
       previewRemove: Effect.fn("Channel.previewRemove")(function* (id) {
         const row = yield* messageOf(id);
         if (row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.messageGone")));
         const ch = model.channel(row.channel_id);
-        const waiting = yield* ask<number>((reply) => ({ kind: "waitingOn", envelope: id, reply }));
+        const waiting = yield* mailbox.waitingOn(id);
         return {
           does: [
             t("server.channel.deletes", { target: ch ? targetOfChannel(ch) : "", number: row.number, name: row.sender_name, text: lineOf(row.body, lastMax) }),
@@ -1178,7 +1190,7 @@ const make = (sessions: Session["Service"]) =>
           // Sent with no channel, so no thread to say it in: the session hears it straight.
           if (!sessions.present(session)) return yield* Effect.fail(missing(t("server.channel.noHelper", { id: session }), [lookIn.session]));
           const channel = sessionOf(session)?.channel;
-          yield* ask<void>((reply) => ({ kind: "deliverDirect", session, text: text.trim(), channel, byOwner: from === ownerId, reply }));
+          yield* mailbox.deliverDirect(session, text.trim(), channel, from === ownerId);
           return undefined;
         }
         const run = sessions.runOf(from);
@@ -1541,6 +1553,20 @@ const make = (sessions: Session["Service"]) =>
     });
     yield* Effect.forkScoped(Stream.runForEach(yield* sessions.news, onSessionNews));
     yield* Effect.forkScoped(Stream.runForEach(Stream.fromSubscription(yield* PubSub.subscribe(said)), onDirectMessage));
+    yield* Effect.forkScoped(
+      Stream.runForEach(yield* mailbox.consumed, ({ session, message }) =>
+        reacting(message, session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${message}`)),
+      ),
+    );
+    yield* Effect.forkScoped(
+      Stream.runForEach(yield* mailbox.breakerNotices, ({ session, failed }) =>
+        Effect.gen(function* () {
+          const where = (yield* shape.threadOfSession(session)) ?? defaultId;
+          const name = sessions.sessionOf(session)?.name ?? session;
+          yield* shape.notice(where, t("server.channel.breaker", { name, failed }), "wake_breaker");
+        }).pipe(bestEffort(`chat: wake breaker for ${session}`)),
+      ),
+    );
     return shape;
   });
 

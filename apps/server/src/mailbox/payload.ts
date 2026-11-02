@@ -3,8 +3,8 @@ import { Schema } from "effect";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { metaOf, senderKind } from "@/channel/contracts.ts";
-import type { InboxMessage } from "@/channel/wake.ts";
+import { metaOf, senderKind } from "@/base/chat.ts";
+import type { InboxMessage } from "@/base/chat.ts";
 
 export type InputContext = Omit<InboxMessage, "id" | "from" | "fromKind" | "name" | "text" | "originTrigger">;
 export interface DeliveryPayload {

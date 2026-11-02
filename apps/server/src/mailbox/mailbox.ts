@@ -1,35 +1,39 @@
-import { Clock, Context, Deferred, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
+import { join } from "node:path";
+
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
 import type { SqlError } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
+import { defaultOrchestrator } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
-import type { Trigger } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
-import { newId } from "@/base/ids.ts";
-import { Channel } from "@/channel/chat.ts";
 import {
-  channelType,
+  type ChannelAudience,
   type ChannelEnvelopeRow,
-  type ChannelRouteFact,
   type ChannelRouteResult,
+  channelType,
+  type InboxMessage,
+  inboxMore,
+  type Meta,
   metaOf,
   type OrchestratorNews,
   senderKind,
-} from "@/channel/contracts.ts";
-import { wakeInput } from "@/channel/prompts.ts";
-import type { InboxMessage } from "@/channel/wake.ts";
+  summaryChannels,
+  targetOf,
+  type UnreadRow,
+} from "@/base/chat.ts";
+import { newId } from "@/base/ids.ts";
 import { Core } from "@/core/core.ts";
 import { type ApiError, refused, missing, lookIn } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { causeMessage, Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
-import { waitsForHuman } from "@/issue/followup.ts";
-import { Issue, type QueuedInput } from "@/issue/issue.ts";
 import { Caller } from "@/session/host.ts";
 import { NotRecorded, Session } from "@/session/session.ts";
 
+import * as qc from "../../db/generated/channel.sql.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import * as qr from "../../db/generated/ingress_trigger.sql.ts";
 import * as qd from "../../db/generated/mailbox_delivery.sql.ts";
@@ -37,7 +41,9 @@ import * as qi from "../../db/generated/mailbox_issue.sql.ts";
 import { agentWakeCooldownMs, brakes, type Delivery, type HeldDelivery, hopLimit, hopLimitText } from "./brakes.ts";
 import { WakeBreaker } from "./breaker.ts";
 import { Deliveries, type DeliveryRow, type DeliveryDraft } from "./deliveries.ts";
-import { inputOf, inputContext, triggerPayload, deliveryScope } from "./payload.ts";
+import { waitsForHuman } from "./issue.ts";
+import { inputOf, inputContext, triggerPayload, deliveryScope, type InputContext } from "./payload.ts";
+import { wakeInput } from "./prompts.ts";
 import { makePump } from "./pump.ts";
 import { Reach } from "./reach.ts";
 import { whoHears } from "./routing.ts";
@@ -53,17 +59,28 @@ const RoutePosition = Schema.Struct({ scope: Schema.String, position: Schema.Int
 const readRouteReceipt = Schema.decodeUnknownSync(Schema.Struct({ ...RoutePosition.fields, from_owner: Schema.Boolean }));
 const readOwnerRoutes = Schema.decodeUnknownSync(Schema.Array(RoutePosition));
 
-export interface HearChannel {
-  readonly envelope: Trigger;
+export interface QueuedInput {
+  readonly issue: string;
+  readonly trigger: T.Trigger;
+}
+
+/** What Collaboration hands Mailbox with a message it committed: who hears it and how it is answered. */
+export interface ChannelMail {
   readonly row: ChannelEnvelopeRow;
-  readonly audience: ChannelRouteFact["audience"];
+  readonly audience: ChannelAudience;
   readonly addressed?: Delivery;
   readonly roles: Readonly<Record<string, T.AgentRole>>;
   readonly kinds: Readonly<Record<string, T.ActorKind>>;
   readonly outcome?: T.Outcome;
 }
 
-const eventOf = (input: HearChannel, delivery: Delivery): UrgencyInput["event"] => {
+/** A message already said in a direct channel, with what the reader sees of it, for the talk's first request. */
+export interface TalkRow {
+  readonly row: ChannelEnvelopeRow;
+  readonly context: InputContext;
+}
+
+const eventOf = (input: ChannelMail, delivery: Delivery): UrgencyInput["event"] => {
   if (input.row.kind === "report") return input.outcome === "failed" || input.outcome === "interrupted" ? "report_attention" : "report_progress";
   if (input.row.sender_kind === "owner") return "conversation";
   switch (delivery.reason) {
@@ -75,7 +92,7 @@ const eventOf = (input: HearChannel, delivery: Delivery): UrgencyInput["event"] 
   }
 };
 
-const orchestratorSource = (source: ChannelRouteFact["purpose"]): OrchestratorNews["source"] => {
+const orchestratorSource = (source: NonNullable<Meta["ingressSource"]> | undefined): OrchestratorNews["source"] => {
   switch (source) {
     case "issue":
     case "cron":
@@ -95,7 +112,7 @@ export class Mailbox extends Context.Service<
     readonly queuedInputs: Effect.Effect<readonly QueuedInput[]>;
     readonly registerInitialInputs: (session: T.Session, launch: string, inputs: readonly T.Trigger[]) => Effect.Effect<void, NotRecorded>;
     readonly registered: (trigger: string) => Effect.Effect<boolean>;
-    readonly receive: (trigger: T.Trigger) => Effect.Effect<void, ApiError>;
+    readonly receive: (trigger: T.Trigger, mail?: ChannelMail) => Effect.Effect<ChannelRouteResult, ApiError>;
     readonly subscribe: (issue: string, threads: readonly string[]) => Effect.Effect<void, ApiError>;
     readonly flushIssue: (issue: string, human?: boolean) => Effect.Effect<void, ApiError>;
     readonly ownerOf: (trigger: string) => Effect.Effect<string | undefined>;
@@ -110,9 +127,13 @@ export class Mailbox extends Context.Service<
     readonly start: Effect.Effect<void>;
     readonly restore: Effect.Effect<void>;
     readonly insert: (input: InsertDelivery) => Effect.Effect<void, SqlError.SqlError | Schema.SchemaError>;
-    readonly routeChannel: (input: HearChannel) => Effect.Effect<ChannelRouteResult>;
-    readonly hearChannel: (input: HearChannel) => Effect.Effect<readonly HeldDelivery[], SqlError.SqlError | Schema.SchemaError>;
-    readonly unroutedChannel: Effect.Effect<readonly ChannelEnvelopeRow[]>;
+    /** A direct conversation's first request: its recent messages, already written, are handed with it. */
+    readonly registerTalk: (session: string, launch: string, at: number, rows: readonly TalkRow[]) => Effect.Effect<void>;
+    /** What a message's 👀 reaction is for, as the pump sees each input consumed. */
+    readonly consumed: Effect.Effect<Stream.Stream<{ readonly session: string; readonly message: string }>, never, Scope.Scope>;
+    /** A session that failed every wake: Channel writes the notice where it talks. */
+    readonly breakerNotices: Effect.Effect<Stream.Stream<{ readonly session: string; readonly failed: number }>, never, Scope.Scope>;
+    readonly kick: (session: string) => Effect.Effect<void>;
     readonly hand: (session: string, envelope: string, launch: string, at: number) => Effect.Effect<void, SqlError.SqlError | Schema.SchemaError>;
     readonly consume: (session: string, envelope: string, at: number) => Effect.Effect<void>;
     readonly returnHanded: (session: string) => Effect.Effect<readonly string[]>;
@@ -122,6 +143,8 @@ export class Mailbox extends Context.Service<
     readonly waitingOn: (envelope: string) => Effect.Effect<number>;
     readonly deliveryChannel: (session: string, envelope: string) => Effect.Effect<string | undefined>;
     readonly returnInput: (session: string, envelope: string, reason: string) => Effect.Effect<void, ApiError>;
+    /** A session given words outside its thread. */
+    readonly deliverDirect: (session: string, text: string, replyChannel: string | undefined, byOwner: boolean) => Effect.Effect<void>;
     readonly sessionLeft: (session: string) => void;
     readonly breakerSpoke: (session: string) => void;
     readonly breakerFailed: (session: string) => { readonly count: number; readonly tripped: boolean };
@@ -133,12 +156,59 @@ export class Mailbox extends Context.Service<
     Mailbox,
     Effect.gen(function* () {
       const db = yield* Db;
-      const channel = yield* Channel;
       const core = yield* Core;
-      const issues = yield* Issue;
       const sessions = yield* Session;
       const agents = yield* Agent;
       const config = yield* ServerConfig;
+      /** The issues Mailbox holds inputs for, from the facts it already gets; seeded from the core when it starts. */
+      const board = new Map<string, T.Issue>();
+      const filesAt = (id: string) => join(config.home, "attachments", id);
+      const targetOfRow = (type: string, rootNumber: number | null, name: string | null, channelNameOf: string | null) => {
+        const ch = { type: channelType(type), ...(rootNumber !== null ? { rootNumber } : {}), ...(name !== null ? { name } : {}) };
+        return targetOf(ch, channelNameOf ?? "");
+      };
+      const asInbox = (r: ChannelEnvelopeRow): InboxMessage => ({
+        id: r.envelope_id,
+        number: r.number,
+        target: targetOfRow(r.channel_type, r.root_number, null, r.channel_name || null),
+        from: r.sender_id,
+        fromKind: senderKind(r.sender_kind),
+        name: r.name,
+        text: r.body,
+        ...inboxMore(r, filesAt),
+      });
+      const defaultChannelOf = Effect.gen(function* () {
+        return (yield* db.one(qc.defaultID()))?.id ?? "";
+      });
+      const orchestratorOf = (channel: string): Effect.Effect<string> =>
+        Effect.gen(function* () {
+          const row = yield* db.one(qc.channelForRouting({ id: channel }));
+          if (!row) return defaultOrchestrator;
+          if (row.type === "thread") return row.parent_id ? yield* orchestratorOf(row.parent_id) : defaultOrchestrator;
+          const own = row.type === "direct" ? row.peer_id : row.orchestrator;
+          return own && agents.isOrchestrator(own) ? own : defaultOrchestrator;
+        });
+      const deliveryUnread = Effect.fn("Mailbox.deliveryUnread")(function* (who: string) {
+        const h = sessions.sessionOf(who);
+        const channel = h?.channel ?? (yield* defaultChannelOf);
+        const rows = yield* db.run(qc.inboxOf({ participant: who, channel }));
+        const out: UnreadRow[] = [];
+        yield* Effect.forEach(
+          rows.slice(0, summaryChannels),
+          (r) =>
+            Effect.gen(function* () {
+              const latest = yield* db.one(qm.messageByNumber({ channel_id: r.id, number: r.latest ?? 0 }));
+              out.push({
+                target: targetOfRow(r.type, r.root_number, null, r.channel_name || null),
+                unread: r.unread ?? 0,
+                mentionsYou: !(r.mentions_you !== true),
+                ...(latest ? { latest: latest.sender_name } : {}),
+              });
+            }),
+          { discard: true },
+        );
+        return out;
+      });
       const open = new Deliveries();
       const reach = new Reach();
       const received = (row: qr.MarkRoutedResult) => {
@@ -160,6 +230,8 @@ export class Mailbox extends Context.Service<
       };
       const breaker = new WakeBreaker();
       const orchestratorHub = yield* PubSub.unbounded<OrchestratorNews>();
+      const consumedHub = yield* PubSub.unbounded<{ readonly session: string; readonly message: string }>();
+      const breakerHub = yield* PubSub.unbounded<{ readonly session: string; readonly failed: number }>();
       const responses = new Map<string, Caller>();
       let latestResponse = "";
       const routeLock = yield* Semaphore.make(1);
@@ -225,7 +297,7 @@ export class Mailbox extends Context.Service<
           yield* sessions
             .register({ id: profile.id, agent: profile.id, name: profile.name, role: profile.role, runtime: profile.runtime, brief: profile.duty })
             .pipe(Effect.mapError((error) => refused(error.message)));
-        const destination = trigger.replyChannel ?? sessions.sessionOf(input.session)?.channel ?? channel.defaultChannel();
+        const destination = trigger.replyChannel ?? sessions.sessionOf(input.session)?.channel ?? (yield* defaultChannelOf);
         const scope = deliveryScope(destination, input.issue);
         const event = triggerEvent(trigger);
         const urgency =
@@ -270,11 +342,14 @@ export class Mailbox extends Context.Service<
           if (trigger.actor.kind === "owner") breaker.reset(input.session);
         }
       }, writtenLocked);
-      const work = yield* makeWorkMailbox(
+      const work = yield* makeWorkMailbox({
         forward,
-        (session) => later(`trigger:${session}`, 0, () => pump.kick(session)),
-        (receipt) => writtenLocked(Effect.sync(() => received(receipt))),
-      );
+        dispatch: (session) => later(`trigger:${session}`, 0, () => pump.kick(session)),
+        received: (receipt) => writtenLocked(Effect.sync(() => received(receipt))),
+        issueOf: (id) => board.get(id),
+        defaultChannel: defaultChannelOf,
+        orchestratorOf,
+      });
       const restore = writtenLocked(
         Effect.gen(function* () {
           const snapshot = yield* db.inTx(
@@ -300,11 +375,13 @@ export class Mailbox extends Context.Service<
       let start: Effect.Effect<void> = Effect.void;
       const registerInitialInputs = Effect.fn("Mailbox.registerInitialInputs")(function* (session: T.Session, launch: string, inputs: readonly T.Trigger[]) {
         const at = yield* Clock.currentTimeMillis;
+        const fallback = yield* defaultChannelOf;
+        const destination = (trigger: T.Trigger) => trigger.replyChannel ?? session.channel ?? fallback;
         const rows: DeliveryDraft[] = inputs.map((trigger) => ({
           envelope_id: trigger.id,
-          scope: deliveryScope(trigger.replyChannel ?? session.channel ?? channel.defaultChannel(), session.issue),
+          scope: deliveryScope(destination(trigger), session.issue),
           message_id: null,
-          channel_id: trigger.replyChannel ?? session.channel ?? channel.defaultChannel(),
+          channel_id: destination(trigger),
           source: trigger.source,
           urgency: "queue",
           reason: "initial",
@@ -333,13 +410,101 @@ export class Mailbox extends Context.Service<
         for (const entry of committed) for (const added of entry.added) stored(session.id, { ...entry.row, position: added.position });
       }, writtenLocked);
 
+      /** A message said in a channel: every recipient the chat's audience names gets its own delivery. */
+      const hear = Effect.fn("Mailbox.hear")(function* (trigger: T.Trigger, input: ChannelMail) {
+        const at = yield* Clock.currentTimeMillis;
+        const candidates = (input.addressed ? [input.addressed] : whoHears(input.audience)).filter(
+          (delivery) =>
+            input.row.subject_kind !== "issue" ||
+            input.audience.fromKind !== "owner" ||
+            delivery.recipient === input.audience.threadOwner ||
+            input.addressed !== undefined,
+        );
+        const meta = metaOf(input.row.meta);
+        const scope = deliveryScope(input.row.channel_id, input.row.subject_kind === "issue" ? (input.row.subject_id ?? undefined) : meta.issue);
+        const deliveries = brakes(candidates, {
+          fromKind: input.audience.fromKind,
+          orchestrators: input.audience.orchestrators,
+          hops: reach.hops(scope),
+          cooling: input.audience.sessions.filter((session) => at - reach.lastWake(session) < agentWakeCooldownMs),
+          broken: breaker.tripped(),
+        });
+        const entries = deliveries.map((delivery): InsertDelivery & { readonly delivery: HeldDelivery } => {
+          const event = eventOf(input, delivery);
+          const urgency = urgencyOf({
+            source: trigger.source,
+            actor: input.audience.fromKind,
+            recipient: input.roles[delivery.recipient] ?? "worker",
+            event,
+            canSteer: true,
+          });
+          return {
+            delivery,
+            session: delivery.recipient,
+            row: {
+              envelope_id: input.row.envelope_id,
+              scope,
+              message_id: input.row.envelope_id,
+              channel_id: input.row.channel_id,
+              source: trigger.source,
+              urgency,
+              reason: delivery.reason,
+              wakes: delivery.wakes,
+              held_by: delivery.heldBy ?? null,
+              state: "pending",
+              launch: null,
+              created_at: at,
+              payload: {
+                trigger,
+                context: inputContext(asInbox(input.row)),
+                channelType: channelType(input.row.channel_type),
+              },
+            },
+          };
+        });
+        const committed = yield* db.attemptTx(
+          Effect.gen(function* () {
+            const added = yield* Effect.forEach(entries, (entry) =>
+              Effect.map(writeDelivery(entry), (rows) => rows.map((row) => ({ ...entry, row: { ...entry.row, position: row.position } }))),
+            );
+            const receipt = yield* qr
+              .markRouted({ envelope_id: input.row.envelope_id, scope, routed_at: at })
+              .pipe(Effect.catchTag("NoSuchElementError", Effect.die));
+            return { entries: added.flat(), receipt };
+          }),
+        );
+        received(committed.receipt);
+        for (const entry of committed.entries) stored(entry.session, entry.row);
+        if (input.audience.fromKind === "owner") for (const delivery of deliveries) if (delivery.wakes) breaker.reset(delivery.recipient);
+        const acceptedRoutes: { session: string; envelope: string }[] = [];
+        yield* Effect.forEach(
+          new Set(deliveries.filter((delivery) => delivery.heldBy === undefined).map((delivery) => delivery.recipient)),
+          (recipient) => Effect.sync(() => later(`route:${input.row.envelope_id}:${recipient}`, 0, () => pump.kick(recipient))),
+          { discard: true },
+        );
+        return { heldNotice: deliveries.some((delivery) => delivery.heldBy === "hop_limit") ? hopLimitText(hopLimit) : "", received: acceptedRoutes };
+      }, writtenLocked);
+
+      /** One way in: a channel message fans out to its audience; everything else enters the issue pool. */
+      const route = Effect.fn("Mailbox.receive")(function* (trigger: T.Trigger, mail?: ChannelMail) {
+        if (mail) {
+          if (mail.row.subject_kind === "issue" && mail.audience.fromKind === "owner") {
+            yield* Effect.orDie(work.receive(trigger));
+            return { heldNotice: "", received: [] };
+          }
+          return yield* hear(trigger, mail).pipe(Effect.orDie);
+        }
+        yield* work.receive(trigger);
+        return { heldNotice: "", received: [] };
+      });
+
       const api = Mailbox.of({
         registered: work.registered,
         queuedInputs: work.queuedInputs,
         registerInitialInputs,
         receive: Effect.fnUntraced(
-          function* (trigger: T.Trigger) {
-            return yield* work.receive(trigger);
+          function* (trigger: T.Trigger, mail?: ChannelMail) {
+            return yield* route(trigger, mail);
           },
           (effect) => routeLocked(Effect.uninterruptible(effect)),
         ),
@@ -379,92 +544,56 @@ export class Mailbox extends Context.Service<
         start: Effect.suspend(() => start),
         restore,
         insert,
-        unroutedChannel: db.run(qm.unroutedChannelMessages()),
-        routeChannel: Effect.fn("Mailbox.routeChannel")(
-          function* (input) {
-            if (input.row.subject_kind === "issue" && input.audience.fromKind === "owner") {
-              yield* Effect.orDie(work.receive(input.envelope));
-              return { heldNotice: "", received: [] };
-            }
-            const deliveries = yield* Effect.orDie(api.hearChannel(input));
-            if (input.audience.fromKind === "owner") for (const delivery of deliveries) if (delivery.wakes) breaker.reset(delivery.recipient);
-            const received: { session: string; envelope: string }[] = [];
-            yield* Effect.forEach(
-              new Set([...deliveries.filter((delivery) => delivery.heldBy === undefined).map((delivery) => delivery.recipient)]),
-              (recipient) => Effect.sync(() => later(`route:${input.row.envelope_id}:${recipient}`, 0, () => pump.kick(recipient))),
-              { discard: true },
-            );
-            return { heldNotice: deliveries.some((delivery) => delivery.heldBy === "hop_limit") ? hopLimitText(hopLimit) : "", received };
-          },
-          Effect.uninterruptible,
-          routeLocked,
-        ),
-        hearChannel: Effect.fn("Mailbox.hearChannel")(function* (input) {
-          const at = yield* Clock.currentTimeMillis;
-          const candidates = (input.addressed ? [input.addressed] : whoHears(input.audience)).filter(
-            (delivery) =>
-              input.row.subject_kind !== "issue" ||
-              input.audience.fromKind !== "owner" ||
-              delivery.recipient === input.audience.threadOwner ||
-              input.addressed !== undefined,
-          );
-          const meta = metaOf(input.row.meta);
-          const scope = deliveryScope(input.row.channel_id, input.row.subject_kind === "issue" ? (input.row.subject_id ?? undefined) : meta.issue);
-          const deliveries = brakes(candidates, {
-            fromKind: input.audience.fromKind,
-            orchestrators: input.audience.orchestrators,
-            hops: reach.hops(scope),
-            cooling: input.audience.sessions.filter((session) => at - reach.lastWake(session) < agentWakeCooldownMs),
-            broken: breaker.tripped(),
+        registerTalk: Effect.fn("Mailbox.registerTalk")(function* (session, launch, at, rows) {
+          yield* Effect.forEach(
+            rows,
+            (talk) =>
+              Effect.gen(function* () {
+                const recorded = yield* db.one(qr.triggerById({ id: talk.row.envelope_id }));
+                if (!recorded) return yield* Effect.die(new Error("Private message trigger is missing"));
+                const trigger = yield* Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(recorded.trigger_json);
+                const urgency = urgencyOf({ source: trigger.source, actor: "owner", recipient: "worker", event: "conversation", canSteer: true });
+                yield* Effect.andThen(
+                  api.insert({
+                    session,
+                    row: {
+                      envelope_id: talk.row.envelope_id,
+                      scope: deliveryScope(talk.row.channel_id, talk.row.subject_kind === "issue" ? (talk.row.subject_id ?? undefined) : undefined),
+                      message_id: talk.row.envelope_id,
+                      channel_id: talk.row.channel_id,
+                      source: trigger.source,
+                      urgency,
+                      reason: "direct",
+                      wakes: true,
+                      held_by: null,
+                      state: "pending",
+                      launch: null,
+                      created_at: at,
+                      payload: {
+                        trigger,
+                        context: talk.context,
+                        channelType: channelType(talk.row.channel_type),
+                      },
+                    },
+                  }),
+                  api.hand(session, talk.row.envelope_id, launch, at),
+                );
+              }),
+            { discard: true },
+          ).pipe(Effect.orDie);
+        }),
+        consumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
+        breakerNotices: Effect.map(PubSub.subscribe(breakerHub), Stream.fromSubscription),
+        kick: Effect.fn("Mailbox.kick")(function* (session) {
+          yield* Effect.sync(() => later(`kick:${session}`, 0, () => pump.kick(session)));
+        }),
+        deliverDirect: Effect.fn("Mailbox.deliverDirect")(function* (session, text, replyChannel, byOwner) {
+          yield* sessions.deliver(session, text, {
+            trigger: { kind: "comment", ...(replyChannel ? { channel: replyChannel } : {}) },
+            envelopeIds: [],
+            byOwnerComment: byOwner,
           });
-          const entries = deliveries.map((delivery): InsertDelivery & { readonly delivery: HeldDelivery } => {
-            const event = eventOf(input, delivery);
-            const urgency = urgencyOf({
-              source: input.envelope.source,
-              actor: input.audience.fromKind,
-              recipient: input.roles[delivery.recipient] ?? "worker",
-              event,
-              canSteer: true,
-            });
-            return {
-              delivery,
-              session: delivery.recipient,
-              row: {
-                envelope_id: input.row.envelope_id,
-                scope,
-                message_id: input.row.envelope_id,
-                channel_id: input.row.channel_id,
-                source: input.envelope.source,
-                urgency,
-                reason: delivery.reason,
-                wakes: delivery.wakes,
-                held_by: delivery.heldBy ?? null,
-                state: "pending",
-                launch: null,
-                created_at: at,
-                payload: {
-                  trigger: input.envelope,
-                  context: inputContext(channel.deliveryMessage(input.row)),
-                  channelType: channelType(input.row.channel_type),
-                },
-              },
-            };
-          });
-          const committed = yield* db.attemptTx(
-            Effect.gen(function* () {
-              const added = yield* Effect.forEach(entries, (entry) =>
-                Effect.map(writeDelivery(entry), (rows) => rows.map((row) => ({ ...entry, row: { ...entry.row, position: row.position } }))),
-              );
-              const receipt = yield* qr
-                .markRouted({ envelope_id: input.row.envelope_id, scope, routed_at: at })
-                .pipe(Effect.catchTag("NoSuchElementError", Effect.die));
-              return { entries: added.flat(), receipt };
-            }),
-          );
-          received(committed.receipt);
-          for (const entry of committed.entries) stored(entry.session, entry.row);
-          return committed.entries.map((entry) => entry.delivery);
-        }, writtenLocked),
+        }),
         hand: Effect.fn("Mailbox.hand")(function* (session, envelope, launch, at) {
           yield* db.attempt(qd.markHanded({ session_id: session, envelope_id: envelope, launch, handed_at: at }));
           open.handed(session, envelope, launch);
@@ -485,6 +614,8 @@ export class Mailbox extends Context.Service<
         dropSession: Effect.fn("Mailbox.dropSession")(function* (session, why) {
           yield* db.run(qd.dropOpen({ session_id: session, dropped_why: why }));
           open.dropped(session);
+          reach.left(session);
+          breaker.reset(session);
         }, writtenLocked),
         dropEnvelope: Effect.fn("Mailbox.dropEnvelope")(function* (envelope) {
           const rows = yield* db.run(qd.dropOpenOf({ message_id: envelope }));
@@ -511,12 +642,12 @@ export class Mailbox extends Context.Service<
       });
 
       const publishOrchestrator = (recipient: string, messages: readonly InboxMessage[], primary: DeliveryRow) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
           const meta = metaOf(JSON.stringify(primary.payload.trigger.meta));
           const source = orchestratorSource(meta.ingressSource);
           PubSub.publishUnsafe(orchestratorHub, {
             agent: recipient,
-            channel: primary.channel_id ?? channel.defaultChannel(),
+            channel: primary.channel_id ?? (yield* defaultChannelOf),
             type: primary.payload.channelType,
             target: inputOf(primary).target,
             messages: [...messages],
@@ -528,21 +659,20 @@ export class Mailbox extends Context.Service<
       const pump = makePump<InboxMessage>(sessions, api, {
         readyInputs: (recipient, rows) => {
           const current = sessions.sessionOf(recipient)?.issue;
-          const all = new Map<string, T.Issue>(issues.onBoard().map((issue) => [issue.id, issue]));
-          const issueOf = (row: DeliveryRow) => {
+          const itemOf = (row: DeliveryRow) => {
             const id = row.payload.trigger.meta.issue;
-            return all.get(typeof id === "string" ? id : (current ?? ""));
+            return board.get(typeof id === "string" ? id : (current ?? ""));
           };
           const answered = new Set(
             rows
               .filter((row) => row.payload.trigger.actor.kind === "owner" && row.state === "pending")
               .flatMap((row) => {
-                const issue = issueOf(row);
+                const issue = itemOf(row);
                 return issue && issue.status !== "done" && issue.status !== "canceled" ? [issue.id] : [];
               }),
           );
           return rows.filter((row) => {
-            const issue = issueOf(row);
+            const issue = itemOf(row);
             return (
               !issue ||
               (issue.status !== "done" &&
@@ -555,121 +685,22 @@ export class Mailbox extends Context.Service<
         isOrchestrator: agents.isOrchestrator,
         message: (row) => inputOf(row),
         wakeInput: (recipient, _rows, messages) =>
-          Effect.map(channel.deliveryUnread(recipient), (all) =>
+          Effect.map(deliveryUnread(recipient), (all) =>
             wakeInput(
               [...messages],
               all.filter((other) => !messages.some((message) => message.target === other.target)),
             ),
           ),
         publishOrchestrator,
-        consumedMessages: (recipient, messages) => Effect.forEach(messages, (id) => channel.deliveryReceived(recipient, id), { discard: true }),
-        breakerNotice: (recipient, failed) =>
-          Effect.gen(function* () {
-            const where = (yield* channel.threadOfSession(recipient)) ?? channel.defaultChannel();
-            const name = sessions.sessionOf(recipient)?.name ?? recipient;
-            yield* channel.notice(where, t("server.channel.breaker", { name, failed }), "wake_breaker");
+        consumedMessages: (recipient, messages) =>
+          Effect.sync(() => {
+            for (const message of messages) PubSub.publishUnsafe(consumedHub, { session: recipient, message });
           }),
+        breakerNotice: (recipient, failed) => Effect.sync(() => PubSub.publishUnsafe(breakerHub, { session: recipient, failed })),
         later,
         noticeBatchMs: config.chat.noticeBatchMs,
         retryWakeMs: config.chat.retryWakeMs,
       });
-
-      const port = {
-        restore: api.restore,
-        registerTalk: (session: string, launch: string, at: number, rows: readonly ChannelEnvelopeRow[]) =>
-          Effect.orDie(
-            Effect.forEach(
-              rows,
-              (row) =>
-                Effect.gen(function* () {
-                  const recorded = yield* db.one(qr.triggerById({ id: row.envelope_id }));
-                  if (!recorded) return yield* Effect.die(new Error("Private message trigger is missing"));
-                  const trigger = yield* Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(recorded.trigger_json);
-                  const urgency = urgencyOf({ source: trigger.source, actor: "owner", recipient: "worker", event: "conversation", canSteer: true });
-                  return yield* Effect.andThen(
-                    api.insert({
-                      session,
-                      row: {
-                        envelope_id: row.envelope_id,
-                        scope: deliveryScope(row.channel_id, row.subject_kind === "issue" ? (row.subject_id ?? undefined) : undefined),
-                        message_id: row.envelope_id,
-                        channel_id: row.channel_id,
-                        source: trigger.source,
-                        urgency,
-                        reason: "direct",
-                        wakes: true,
-                        held_by: null,
-                        state: "pending",
-                        launch: null,
-                        created_at: at,
-                        payload: {
-                          trigger,
-                          context: inputContext(channel.deliveryMessage(row)),
-                          channelType: channelType(row.channel_type),
-                        },
-                      },
-                    }),
-                    api.hand(session, row.envelope_id, launch, at),
-                  );
-                }),
-              { discard: true },
-            ),
-          ),
-        dropSession: (session: string) =>
-          Effect.andThen(
-            api.dropSession(session, "left"),
-            Effect.sync(() => {
-              reach.left(session);
-              breaker.reset(session);
-            }),
-          ),
-        kick: (session: string) => Effect.sync(() => later(`kick:${session}`, 0, () => pump.kick(session))),
-        dropEnvelope: api.dropEnvelope,
-        waitingOn: api.waitingOn,
-        deliverDirect: (session: string, text: string, replyChannel: string | undefined, byOwner: boolean) =>
-          Effect.asVoid(
-            sessions.deliver(session, text, {
-              trigger: { kind: "comment", ...(replyChannel ? { channel: replyChannel } : {}) },
-              envelopeIds: [],
-              byOwnerComment: byOwner,
-            }),
-          ),
-      };
-
-      yield* Effect.forkScoped(
-        Stream.runForEach(yield* channel.delivery, (call) =>
-          Effect.gen(function* () {
-            switch (call.kind) {
-              case "restore":
-                yield* port.restore;
-                yield* Deferred.succeed(call.reply, undefined);
-                break;
-              case "registerTalk":
-                yield* port.registerTalk(call.session, call.launch, call.at, call.rows);
-                yield* Deferred.succeed(call.reply, undefined);
-                break;
-              case "dropSession":
-                yield* port.dropSession(call.session);
-                yield* Deferred.succeed(call.reply, undefined);
-                break;
-              case "kick":
-                yield* port.kick(call.session);
-                yield* Deferred.succeed(call.reply, undefined);
-                break;
-              case "dropEnvelope":
-                yield* Deferred.succeed(call.reply, yield* port.dropEnvelope(call.envelope));
-                break;
-              case "waitingOn":
-                yield* Deferred.succeed(call.reply, yield* port.waitingOn(call.envelope));
-                break;
-              case "deliverDirect":
-                yield* port.deliverDirect(call.session, call.text, call.channel, call.byOwner);
-                yield* Deferred.succeed(call.reply, undefined);
-                break;
-            }
-          }),
-        ),
-      );
 
       yield* Effect.forkScoped(
         Stream.runForEach(yield* sessions.launches, (activity) =>
@@ -689,33 +720,34 @@ export class Mailbox extends Context.Service<
 
       const bindIssue = (issue: T.Issue) =>
         work.subscribe(issue.id, [`issue:${issue.id}`, ...(issue.project && issue.pullRequest ? [`github:${issue.project}#${issue.pullRequest.number}`] : [])]);
-      yield* Effect.forkScoped(
-        Stream.runForEach(yield* core.subscribe, (fact) =>
-          Effect.gen(function* () {
-            if (fact.type === "issue") {
-              yield* bindIssue(fact.issue);
-              if (fact.issue.status === "done" || fact.issue.status === "canceled") {
-                yield* api.flushIssue(fact.issue.id);
-              } else later(`issue:${fact.issue.id}`, 0, () => api.flushIssue(fact.issue.id).pipe(bestEffort(`mailbox: inputs of ${fact.issue.id}`)));
-            } else if (fact.type === "session" && fact.session.issue && issues.onBoard().some((item) => item.id === fact.session.issue)) {
-              const issue = fact.session.issue;
-              later(`issue:${issue}`, 0, () => api.flushIssue(issue).pipe(bestEffort(`mailbox: inputs of ${issue}`)));
-            } else if (
-              fact.type === "channel" &&
-              fact.channel.subjectKind === "issue" &&
-              fact.channel.subjectId &&
-              issues.onBoard().some((item) => item.id === fact.channel.subjectId)
-            ) {
-              yield* work.subscribe(fact.channel.subjectId, [`channel:${fact.channel.id}`]);
-            }
-          }).pipe(bestEffort("mailbox: issue routing")),
-        ),
-      );
+      const onFact = (fact: T.SideEvent) =>
+        Effect.gen(function* () {
+          if (fact.type === "issue") {
+            board.set(fact.issue.id, fact.issue);
+            yield* bindIssue(fact.issue);
+            if (fact.issue.status === "done" || fact.issue.status === "canceled") {
+              yield* api.flushIssue(fact.issue.id);
+            } else later(`issue:${fact.issue.id}`, 0, () => api.flushIssue(fact.issue.id).pipe(bestEffort(`mailbox: inputs of ${fact.issue.id}`)));
+          } else if (fact.type === "issueGone") {
+            board.delete(fact.id);
+          } else if (fact.type === "session" && fact.session.issue && board.has(fact.session.issue)) {
+            const issue = fact.session.issue;
+            later(`issue:${issue}`, 0, () => api.flushIssue(issue).pipe(bestEffort(`mailbox: inputs of ${issue}`)));
+          } else if (fact.type === "channel" && fact.channel.subjectKind === "issue" && fact.channel.subjectId && board.has(fact.channel.subjectId)) {
+            yield* work.subscribe(fact.channel.subjectId, [`channel:${fact.channel.id}`]);
+          }
+        }).pipe(bestEffort("mailbox: issue routing"));
+
+      const [initial, transitions] = yield* core.transitions;
+      for (const issue of initial.issues) board.set(issue.id, issue);
+      yield* Effect.forkScoped(Stream.runForEach(transitions, ({ fact }) => onFact(fact)));
 
       start = Effect.gen(function* () {
+        const [initial] = yield* Effect.scoped(core.transitions);
+        for (const issue of initial.issues) board.set(issue.id, issue);
         yield* api.restore;
         yield* Effect.forEach(
-          yield* issues.list(),
+          [...board.values()],
           (issue) =>
             Effect.gen(function* () {
               yield* bindIssue(issue);
@@ -723,11 +755,6 @@ export class Mailbox extends Context.Service<
             }).pipe(bestEffort(`mailbox: restore issue ${issue.id}`)),
           { discard: true },
         );
-        while (true) {
-          const rows = yield* api.unroutedChannel;
-          if (rows.length === 0) break;
-          yield* Effect.forEach(rows, channel.replayDelivery, { discard: true });
-        }
         yield* Effect.forEach(sessions.presentSessions(), (session) => pumpLocked(pump.kick(session.id)), { discard: true });
       });
       yield* Effect.addFinalizer(() =>

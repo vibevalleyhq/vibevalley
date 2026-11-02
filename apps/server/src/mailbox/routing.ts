@@ -1,6 +1,6 @@
 import { everyone, ownerId } from "@vibevalley/protocol";
 
-import type { ChannelAudience } from "@/channel/contracts.ts";
+import type { ChannelAudience } from "@/base/chat.ts";
 
 import type { Delivery, DeliveryReason } from "./brakes.ts";
 

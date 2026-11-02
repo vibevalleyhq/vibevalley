@@ -541,18 +541,6 @@ CREATE INDEX artifact_version_by_message on artifact_version (message_id) where 
 -- A thread hangs under a message, which is made after its channel.
 ALTER TABLE channel ADD FOREIGN KEY (root_id) REFERENCES channel_message (id);
 
-CREATE TABLE issue_dispatch (
-  id text PRIMARY KEY,
-  issue_id text NOT NULL REFERENCES issue(id) ON DELETE CASCADE,
-  agent text NOT NULL,
-  channel text NOT NULL,
-  body text NOT NULL,
-  trigger_json text NOT NULL,
-  created_at double precision NOT NULL
-);
-CREATE INDEX issue_dispatch_by_created ON issue_dispatch(created_at, id);
-CREATE INDEX issue_dispatch_by_issue ON issue_dispatch(issue_id);
-
 CREATE VIEW mailbox_owner_route AS
 select routing_scope as scope, routing_position as position from ingress_trigger
 where routed_at is not null and trigger_json::jsonb->'actor'->>'kind' = 'owner'

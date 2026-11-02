@@ -6,17 +6,16 @@ import { assignedAgentOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
-import { Channel } from "@/channel/chat.ts";
-import { type ApiError, refused } from "@/errors.ts";
+import { type ApiError, missing, lookIn, refused } from "@/errors.ts";
 import { Db } from "@/infra/db.ts";
-import { waitsForHuman } from "@/issue/followup.ts";
-import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
 
 import * as qr from "../../db/generated/ingress_trigger.sql.ts";
+import * as qissue from "../../db/generated/issue.sql.ts";
 import * as qd from "../../db/generated/mailbox_delivery.sql.ts";
 import * as qi from "../../db/generated/mailbox_issue.sql.ts";
 import * as qs from "../../db/generated/mailbox_subscription.sql.ts";
+import { waitsForHuman } from "./issue.ts";
 import { readPayload, deliveryScope } from "./payload.ts";
 import { handbackWords, releasedInputWords } from "./prompts.ts";
 import type { Urgency } from "./urgency.ts";
@@ -33,22 +32,26 @@ export interface Transfer {
   readonly commit: Effect.Effect<void>;
 }
 
+export interface WorkOptions {
+  readonly forward: (input: Transfer) => Effect.Effect<void, ApiError>;
+  readonly dispatch: (session: string) => void;
+  readonly received: (receipt: qr.MarkRoutedResult) => Effect.Effect<void>;
+  readonly issueOf: (id: string) => T.Issue | undefined;
+  readonly defaultChannel: Effect.Effect<string>;
+  readonly orchestratorOf: (channel: string) => Effect.Effect<string>;
+}
+
 const readTrigger = Schema.decodeUnknownSync(Schema.fromJsonString(S.Trigger));
 
-export const makeWorkMailbox = (
-  forward: (input: Transfer) => Effect.Effect<void, ApiError>,
-  dispatch: (session: string) => void,
-  received: (receipt: qr.MarkRoutedResult) => Effect.Effect<void>,
-) =>
+export const makeWorkMailbox = (options: WorkOptions) =>
   Effect.gen(function* () {
     const db = yield* Db;
-    const issues = yield* Issue;
     const sessions = yield* Session;
     const agents = yield* Agent;
-    const chat = yield* Channel;
+    const { forward, dispatch, received, issueOf, defaultChannel, orchestratorOf } = options;
 
     const subscribe = Effect.fn("Mailbox.subscribe")(function* (issue: string, threads: readonly string[]) {
-      yield* issues.get(issue);
+      if (!issueOf(issue)) return yield* Effect.fail(missing(t("server.issue.issueRef", { ref: issue }), [lookIn.issue]));
       yield* db.inTx(
         Effect.forEach(
           new Set(threads),
@@ -71,7 +74,7 @@ export const makeWorkMailbox = (
     ) {
       const addressed = trigger.meta.ingressRecipient;
       const recipient =
-        typeof addressed === "string" && agents.isOrchestrator(addressed) ? addressed : chat.orchestratorOf(trigger.replyChannel ?? chat.defaultChannel());
+        typeof addressed === "string" && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorOf(trigger.replyChannel ?? (yield* defaultChannel));
       yield* forward({
         trigger,
         session: recipient,
@@ -96,12 +99,11 @@ export const makeWorkMailbox = (
     });
 
     const flush = Effect.fn("Mailbox.flushIssue")(function* (id: string, human: boolean = false) {
-      const issue = yield* issues.get(id);
+      const issue = issueOf(id);
+      yield* Effect.logInfo(`flush ${id} known=${issue !== undefined} status=${issue?.status}`);
+      if (!issue) return;
       const inputs = yield* db.run(qi.issueInputs({ issue_id: id }));
-      if (issue.status === "backlog") {
-        yield* db.run(qi.retireQueuedDispatches({ issue_id: id }));
-        return;
-      }
+      if (issue.status === "backlog") return;
       if (issue.status === "done" || (issue.status === "canceled" && issue.canceled !== "lost")) {
         yield* Effect.forEach(
           inputs,
@@ -174,13 +176,16 @@ export const makeWorkMailbox = (
         trigger.threads.filter((thread) => thread.startsWith("issue:")),
         (thread) =>
           Effect.gen(function* () {
-            const issue = yield* Effect.option(issues.get(thread.slice(6)));
-            if (issue._tag === "Some") ids.add(issue.value.id);
+            const id = thread.slice(6);
+            const issue = issueOf(id);
+            if (issue) ids.add(issue.id);
+            else if (yield* db.one(qissue.issueExists({ id }))) ids.add(id);
           }),
         { discard: true },
       );
       if (ids.size > 1) return yield* Effect.fail(refused(t("server.mailbox.ambiguous")));
       const issue = ids.values().next().value;
+      yield* Effect.logInfo(`receive issue=${issue} known=${issue ? issueOf(issue) !== undefined : false}`);
       if (issue) {
         const at = yield* Clock.currentTimeMillis;
         const receipt = yield* db.inTx(
@@ -191,7 +196,7 @@ export const makeWorkMailbox = (
               qr.markRouted({
                 envelope_id: trigger.id,
                 routed_at: at,
-                scope: deliveryScope(trigger.replyChannel ?? chat.defaultChannel(), issue),
+                scope: deliveryScope(trigger.replyChannel ?? (yield* defaultChannel), issue),
               }),
             );
           }),
@@ -202,7 +207,7 @@ export const makeWorkMailbox = (
       }
       const addressed = trigger.meta.ingressRecipient;
       const recipient =
-        typeof addressed === "string" && agents.isOrchestrator(addressed) ? addressed : chat.orchestratorOf(trigger.replyChannel ?? chat.defaultChannel());
+        typeof addressed === "string" && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorOf(trigger.replyChannel ?? (yield* defaultChannel));
       yield* forward({ trigger, session: recipient, commit: Effect.void });
       dispatch(recipient);
     });
@@ -214,14 +219,17 @@ export const makeWorkMailbox = (
       const input = yield* db.one(qi.existingIssueInput({ trigger_id: trigger.id }));
       if (!input) return false;
       if (input.session_id !== session) return yield* Effect.fail(refused(t("server.mailbox.notOwned")));
-      if (input.state !== "returned") yield* retire(yield* issues.get(input.issue_id), trigger, session, reason, false);
+      const issue = issueOf(input.issue_id);
+      if (!issue) return false;
+      if (input.state !== "returned") yield* retire(issue, trigger, session, reason, false);
       return true;
     });
     const initial = Effect.fn("Mailbox.initialInputs")(function* (issue: string | undefined, explicit: readonly T.Trigger[]) {
       if (!issue) return explicit;
       const inputs = yield* db.run(qi.issueInputs({ issue_id: issue }));
       if (inputs.length === 0) return explicit;
-      const item = yield* issues.get(issue);
+      const item = issueOf(issue);
+      if (!item) return explicit;
       const accepted = new Map<string, T.Trigger>();
       const consumed = new Set<string>();
       const human = explicit.some((trigger) => trigger.actor.kind === "owner");

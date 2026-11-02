@@ -1,18 +1,63 @@
-import { type Deferred, type Effect, Schema, type Scope, type Stream } from "effect";
+import { type Effect, type Scope, type Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
-import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOrNone } from "@/base/json.ts";
+import { type ChannelEnvelopeRow, type InboxMessage, type Meta, messageKind, metaOf, type Picked, reactionsOf, senderKind } from "@/base/chat.ts";
 import { type ApiError } from "@/errors.ts";
 
 import type * as qm from "../../db/generated/channel_message.sql.ts";
 import { type ChannelRow } from "./model.ts";
-import { type InboxMessage, type Picked, type UnreadRow } from "./wake.ts";
 
+export type {
+  ChannelAudience,
+  ChannelEnvelopeRow,
+  ChannelRouteFact,
+  ChannelRouteResult,
+  IngressPurpose,
+  Meta,
+  OrchestratorNews,
+  UnreadRow,
+} from "@/base/chat.ts";
+export type { InboxMessage, Picked } from "@/base/chat.ts";
+export { channelType, inboxMore, messageKind, metaOf, metaText, notifyOf, reactionsOf, reactionsText, senderKind, subjectKind } from "@/base/chat.ts";
 export type { Delivered, LaunchActivity, SessionNews } from "@/session/shapes.ts";
+
+export type MsgRow = qm.MessageByIDResult;
+
+export function toMessage(row: MsgRow): T.ChatMessage {
+  const meta = metaOf(row.meta);
+  return {
+    id: S.messageId(row.id),
+    number: row.number,
+    channel: row.channel_id,
+    from: row.sender_id,
+    fromKind: senderKind(row.sender_kind),
+    name: row.sender_name,
+    ...(row.sender_agent ? { agent: row.sender_agent } : {}),
+    kind: messageKind(row.kind),
+    text: row.body,
+    mentions: meta.mentions ?? [],
+    ...(meta.session ? { session: meta.session } : {}),
+    ...(meta.run ? { run: meta.run } : {}),
+    ...(meta.outcome ? { outcome: meta.outcome } : {}),
+    ...(meta.spent ? { spent: meta.spent } : {}),
+    spoken: meta.spoken ?? false,
+    ...(row.send_key && row.sender_id === ownerId ? { sendKey: row.send_key } : {}),
+    at: row.created_at,
+    revision: row.revision,
+    ...(row.reply_number !== null ? { replyTo: row.reply_number } : {}),
+    ...(row.edited_at !== null ? { edited: row.edited_at } : {}),
+    ...(row.deleted_at !== null ? { deleted: row.deleted_at } : {}),
+    ...(row.pinned_at !== null ? { pinned: row.pinned_at } : {}),
+    reactions: Object.entries(reactionsOf(row.reactions)).map(([emoji, by]) => ({ emoji, by })),
+    attachments: meta.attachments ?? [],
+    embeds: meta.embeds ?? [],
+    ...(meta.artifact && row.deleted_at === null ? { artifact: meta.artifact } : {}),
+    ...(meta.blocks && meta.blocks.length > 0 && row.deleted_at === null ? { blocks: meta.blocks } : {}),
+  };
+}
 
 export interface Info {
   readonly id: string;
@@ -72,148 +117,6 @@ export interface EnvelopeResource {
   readonly around: readonly T.ChatMessage[];
 }
 
-/** What came to an orchestrator in one channel, to wake it with. */
-export interface OrchestratorNews {
-  /** The orchestrator it came to, by its profile id. */
-  readonly agent: string;
-  readonly channel: string;
-  readonly type: T.ChannelType;
-  readonly target: string;
-  readonly messages: InboxMessage[];
-  readonly source?: "issue" | "cron" | "patrol";
-  readonly issue?: string;
-  readonly by?: T.RunTrigger;
-}
-
-export type IngressPurpose = "issue" | "cron" | "patrol" | "connector" | "voice" | "github";
-
-export interface Meta {
-  run?: string;
-  mentions?: string[];
-  session?: T.SessionId;
-  outcome?: T.Outcome;
-  spent?: T.Spent;
-  code?: string;
-  /** Said on a call: the orchestrator heard it there, so it wakes no one here. */
-  spoken?: boolean;
-  attachments?: T.Attachment[];
-  embeds?: T.Embed[];
-  /** The artifact it announces, as it was then (artifact/). */
-  artifact?: T.ArtifactCard;
-  /** The blocks it points at, as they read when it was sent. */
-  blocks?: readonly T.QuotedBlock[];
-  picked?: Picked;
-  ingressSource?: IngressPurpose;
-  ingressRecipient?: string;
-  issue?: string;
-  trigger?: T.RunTrigger;
-  responsePort?: string;
-  voiceMode?: "dictated" | "conversation" | "api";
-}
-
-const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
-  run: Schema.optionalKey(Schema.String),
-  mentions: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  session: Schema.optionalKey(S.SessionId),
-  outcome: Schema.optionalKey(S.Outcome),
-  spent: Schema.optionalKey(S.Spent),
-  code: Schema.optionalKey(Schema.String),
-  spoken: Schema.optionalKey(Schema.Boolean),
-  attachments: Schema.optionalKey(Schema.mutable(Schema.Array(S.Attachment))),
-  embeds: Schema.optionalKey(Schema.mutable(Schema.Array(S.Embed))),
-  artifact: Schema.optionalKey(S.ArtifactCard),
-  blocks: Schema.optionalKey(Schema.mutable(Schema.Array(S.QuotedBlock))),
-  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
-  ingressSource: Schema.optionalKey(Schema.Literals(["issue", "cron", "patrol", "connector", "voice", "github"])),
-  ingressRecipient: Schema.optionalKey(Schema.String),
-  issue: Schema.optionalKey(Schema.String),
-  trigger: Schema.optionalKey(S.RunTrigger),
-  responsePort: Schema.optionalKey(Schema.String),
-  voiceMode: Schema.optionalKey(Schema.Literals(["dictated", "conversation", "api"])),
-});
-
-/** Anything unreadable is no meta. */
-export const metaOf = (raw: string | null): Meta => jsonOrNone(MetaSchema)(raw) ?? {};
-
-/** As Go's omitempty writes it: nothing empty kept. */
-export const metaText = (m: Meta | undefined) =>
-  m === undefined
-    ? null
-    : JSON.stringify(
-        Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== "" && v !== false && !(Array.isArray(v) && v.length === 0))),
-      );
-
-export type MsgRow = qm.MessageByIDResult;
-
-/** {"emoji": [participant, …]}, as a message keeps them; anything unreadable is none. */
-const ReactionsSchema = Schema.Record(Schema.String, Schema.mutable(Schema.Array(Schema.String)));
-export const reactionsOf = (raw: string | null): Record<string, string[]> => jsonOrNone(ReactionsSchema)(raw) ?? {};
-export const reactionsText = (r: Record<string, string[]>) => {
-  const kept = Object.entries(r).filter(([, by]) => by.length > 0);
-  return kept.length > 0 ? JSON.stringify(Object.fromEntries(kept)) : null;
-};
-
-export const senderKind = (kind: string): T.ActorKind => (kind === "owner" || kind === "orchestrator" || kind === "session" ? kind : "system");
-export const messageKind = (kind: string): T.MessageKind => (kind === "dispatch" || kind === "report" || kind === "notice" ? kind : "chat");
-export const channelType = (type: string): T.ChannelType => (type === "thread" || type === "direct" ? type : "channel");
-export const subjectKind = (kind: string | null): T.SubjectKind | undefined => (kind === "issue" || kind === "talk" ? kind : undefined);
-
-export function toMessage(row: MsgRow): T.ChatMessage {
-  const meta = metaOf(row.meta);
-  return {
-    id: S.messageId(row.id),
-    number: row.number,
-    channel: row.channel_id,
-    from: row.sender_id,
-    fromKind: senderKind(row.sender_kind),
-    name: row.sender_name,
-    ...(row.sender_agent ? { agent: row.sender_agent } : {}),
-    kind: messageKind(row.kind),
-    text: row.body,
-    mentions: meta.mentions ?? [],
-    ...(meta.session ? { session: meta.session } : {}),
-    ...(meta.run ? { run: meta.run } : {}),
-    ...(meta.outcome ? { outcome: meta.outcome } : {}),
-    ...(meta.spent ? { spent: meta.spent } : {}),
-    spoken: meta.spoken ?? false,
-    ...(row.send_key && row.sender_id === ownerId ? { sendKey: row.send_key } : {}),
-    at: row.created_at,
-    revision: row.revision,
-    ...(row.reply_number !== null ? { replyTo: row.reply_number } : {}),
-    ...(row.edited_at !== null ? { edited: row.edited_at } : {}),
-    ...(row.deleted_at !== null ? { deleted: row.deleted_at } : {}),
-    ...(row.pinned_at !== null ? { pinned: row.pinned_at } : {}),
-    reactions: Object.entries(reactionsOf(row.reactions)).map(([emoji, by]) => ({ emoji, by })),
-    attachments: meta.attachments ?? [],
-    embeds: meta.embeds ?? [],
-    ...(meta.artifact && row.deleted_at === null ? { artifact: meta.artifact } : {}),
-    ...(meta.blocks && meta.blocks.length > 0 && row.deleted_at === null ? { blocks: meta.blocks } : {}),
-  };
-}
-
-export const notifyOf = (n: string): T.Notify => (n === "mentions" || n === "none" ? n : "all");
-
-export const inboxMore = (
-  row: Pick<MsgRow, "meta" | "reply_number"> & { edited_at?: number | null; deleted_at?: number | null },
-  filesAt: (id: string) => string,
-) => {
-  const meta = metaOf(row.meta);
-  const files = meta.attachments ?? [];
-  return {
-    ...(row.reply_number !== null ? { replyTo: row.reply_number } : {}),
-    ...(row.edited_at != null && row.edited_at !== 0 ? { edited: true } : {}),
-    ...(row.deleted_at != null && row.deleted_at !== 0 ? { deleted: true } : {}),
-    ...(files.length > 0 ? { attachments: files.map((f) => ({ name: f.name, path: filesAt(f.id) })) } : {}),
-    ...(meta.artifact && (row.deleted_at == null || row.deleted_at === 0)
-      ? { artifact: { id: meta.artifact.id, title: meta.artifact.title, version: meta.artifact.version } }
-      : {}),
-    ...(meta.blocks && meta.blocks.length > 0 && (row.deleted_at == null || row.deleted_at === 0) ? { blocks: meta.blocks } : {}),
-    ...(meta.picked ? { picked: meta.picked } : {}),
-    ...(meta.responsePort ? { responsePort: meta.responsePort } : {}),
-    ...(meta.voiceMode ? { voiceMode: meta.voiceMode } : {}),
-  };
-};
-
 export const infoOf = (row: Pick<ChannelRow, "id" | "name" | "description" | "project" | "is_default">): Info => ({
   id: row.id,
   name: row.name ?? "",
@@ -265,99 +168,13 @@ export interface Written {
   row: MsgRow;
 }
 
-export interface ChannelEnvelopeRow {
-  readonly envelope_id: string;
-  readonly number: number;
-  readonly channel_id: string;
-  readonly sender_id: string;
-  readonly kind: MsgRow["kind"];
-  readonly body: string;
-  readonly meta: string | null;
-  readonly reply_number: number | null;
-  readonly created_at: number;
-  readonly name: string;
-  readonly sender_kind: MsgRow["sender_kind"];
-  readonly channel_type: ChannelRow["type"];
-  readonly root_id: string | null;
-  readonly root_number: number | null;
-  readonly subject_kind: ChannelRow["subject_kind"];
-  readonly subject_id: string | null;
-  readonly channel_name: string | null;
-}
-
-/** Collaboration facts from which Mailbox computes audience, brakes, urgency and the durable deliveries. */
-export interface ChannelAudience {
-  readonly from: string;
-  readonly fromKind: T.ActorKind;
-  readonly kind: T.MessageKind;
-  readonly mentions: readonly string[];
-  readonly channel: Pick<T.Channel, "type" | "peer">;
-  readonly orchestrator: string;
-  readonly orchestrators: readonly string[];
-  readonly threadOwner?: string;
-  readonly sessions: readonly string[];
-  readonly present?: readonly string[] | null;
-  readonly followers: readonly string[];
-  readonly outcome?: T.Outcome;
-  readonly spoken?: boolean;
-}
-
-export interface ChannelRouteFact {
-  readonly purpose?: NonNullable<Meta["ingressSource"]>;
-  readonly row: ChannelEnvelopeRow;
-  readonly audience: ChannelAudience;
-  readonly addressed?: string;
-  readonly roles: Readonly<Record<string, T.AgentRole>>;
-  readonly kinds: Readonly<Record<string, T.ActorKind>>;
-  readonly outcome?: T.Outcome;
-}
-
-export interface ChannelRouteResult {
-  readonly heldNotice: string;
-  readonly received: readonly { readonly session: string; readonly envelope: string }[];
-}
-
 export interface ChannelHandoffSubject {
   readonly kind: "issue" | "session" | "chat";
   readonly id: string;
 }
 
-export type ChannelDelivery =
-  | { readonly kind: "restore"; readonly reply: Deferred.Deferred<void> }
-  | {
-      readonly kind: "registerTalk";
-      readonly session: string;
-      readonly launch: string;
-      readonly at: number;
-      readonly rows: readonly ChannelEnvelopeRow[];
-      readonly reply: Deferred.Deferred<void>;
-    }
-  | { readonly kind: "dropSession"; readonly session: string; readonly reply: Deferred.Deferred<void> }
-  | { readonly kind: "kick"; readonly session: string; readonly reply: Deferred.Deferred<void> }
-  | { readonly kind: "dropEnvelope"; readonly envelope: string; readonly reply: Deferred.Deferred<readonly string[]> }
-  | { readonly kind: "waitingOn"; readonly envelope: string; readonly reply: Deferred.Deferred<number> }
-  | {
-      readonly kind: "deliverDirect";
-      readonly session: string;
-      readonly text: string;
-      readonly channel: string | undefined;
-      readonly byOwner: boolean;
-      readonly reply: Deferred.Deferred<void>;
-    };
-
-export interface ChannelRoute {
-  readonly fact: ChannelRouteFact;
-  readonly reply: Deferred.Deferred<ChannelRouteResult>;
-}
-
 export interface ChannelService {
-  readonly routing: Effect.Effect<Stream.Stream<ChannelRoute>, never, Scope.Scope>;
-  /** Mailbox is assembled after Collaboration and reads the delivery calls before startup. */
-  readonly delivery: Effect.Effect<Stream.Stream<ChannelDelivery>, never, Scope.Scope>;
   readonly replayDelivery: (row: ChannelEnvelopeRow) => Effect.Effect<void>;
-  readonly deliveryMessage: (row: ChannelEnvelopeRow) => InboxMessage;
-  readonly deliveryUnread: (session: string) => Effect.Effect<UnreadRow[]>;
-  readonly deliveryReceived: (session: string, envelope: string) => Effect.Effect<void>;
   readonly ownerReads: Effect.Effect<Stream.Stream<{ readonly channel: string; readonly number: number; readonly at: number }>, never, Scope.Scope>;
   readonly handoffSubject: (message: string) => Effect.Effect<ChannelHandoffSubject | undefined>;
   /** The channel what names none goes to (ChatMessage.channel, a connector's, a call's). */

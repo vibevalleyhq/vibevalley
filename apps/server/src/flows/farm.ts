@@ -21,7 +21,7 @@ import { world, type WorldOptions } from "@/testing/world.ts";
 /** The seed profile on pi, with no effort: the scripted runtime has no models, so no effort levels. */
 export const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 
-const farmLayer = (options: WorldOptions) => world(options).pipe(gamification, agentSessionsStart, collaborationStart, mailboxReady, ingressReady, inboxStart);
+const farmLayer = (options: WorldOptions) => world(options).pipe(gamification, agentSessionsStart, mailboxReady, collaborationStart, ingressReady, inboxStart);
 
 export interface Farm {
   readonly config: ServerConfig["Service"];

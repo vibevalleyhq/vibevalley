@@ -114,6 +114,29 @@ export const getIssue = Effect.fn("GetIssue")(function* (params: GetIssueParams)
   })(params)
 })
 
+export const IssueExistsParams = Schema.Struct({
+  ["id"]: Schema.String,
+})
+export type IssueExistsParams = typeof IssueExistsParams.Type
+
+
+export const IssueExistsResult = Schema.Struct({
+  ["id"]: Schema.String,
+})
+export type IssueExistsResult = typeof IssueExistsResult.Type
+
+
+export const IssueExistsSql = "-- name: IssueExists :one\n-- Whether an issue is there at all, for Mailbox routing before the core fact reaches it.\nselect id from issue where id = $1;"
+
+export const issueExists = Effect.fn("IssueExists")(function* (params: IssueExistsParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findOne({
+    Request: IssueExistsParams,
+    Result: IssueExistsResult,
+    execute: (p) => sql.unsafe(IssueExistsSql, [p["id"]]),
+  })(params)
+})
+
 export const IssueByNumberParams = Schema.Struct({
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })

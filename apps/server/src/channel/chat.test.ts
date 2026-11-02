@@ -16,8 +16,6 @@ import { head } from "@/base/clip.ts";
 import { Core } from "@/core/core.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { dbQueries, Database, Db } from "@/infra/db.ts";
-import { channelInputs } from "@/ingress/channel.ts";
-import { Issue } from "@/issue/issue.ts";
 import { wakeBreaker } from "@/mailbox/brakes.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { layer as projection } from "@/projection/projection.ts";
@@ -173,7 +171,7 @@ const channelLayer = (x: FakeSessions) =>
           ),
         news: Effect.map(PubSub.subscribe(x.news), Stream.fromSubscription),
       };
-      return Channel.layer.pipe(Layer.provideMerge(Layer.succeed(Session, sessions as unknown as Session["Service"])));
+      return Channel.layer.pipe(Layer.provideMerge(Mailbox.layer), Layer.provideMerge(Layer.succeed(Session, sessions as unknown as Session["Service"])));
     }),
   );
 
@@ -201,7 +199,6 @@ const fakeNews = (x: FakeSessions) =>
           }),
         ),
       );
-      yield* channelInputs;
       yield* chat.start;
       yield* mailbox.start;
     }),
@@ -209,10 +206,7 @@ const fakeNews = (x: FakeSessions) =>
 
 const world = (x: FakeSessions, config: ServerConfig["Service"] = testConfig()) => {
   const c: ServerConfig["Service"] = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
-  const delivery = Mailbox.layer.pipe(
-    Layer.provide(Layer.mock(Issue, { list: () => Effect.succeed([]), onBoard: () => [] })),
-    Layer.provideMerge(channelLayer(x)),
-  );
+  const delivery = channelLayer(x);
   return fakeNews(x).pipe(
     Layer.provideMerge(delivery),
     Layer.provideMerge(said),
@@ -709,6 +703,7 @@ describe("the chat", () => {
         expect(ours().map((m) => [m.text, m.mentions])).toEqual([["好的，我叫 @w11 去看看", ["w11"]]]);
         yield* until(() => x.runsOf("w11").length >= 2 && x.runsOf("w11")[1]!.includes("我叫 @w11 去看看"), "w11 woken");
         yield* f.chat.notice(general, "定时任务到了", "cron");
+        yield* until(() => f.messagesOf(general).some((m) => m.kind === "notice" && m.text === "定时任务到了"), "the notice");
         const last = f.messagesOf(general).at(-1)!;
         expect([last.kind, last.from]).toEqual(["notice", "system"]);
         expect((yield* Effect.promise(() => f.deliveries("w11"))).at(-1)?.envelope_id).not.toBe(last.id);

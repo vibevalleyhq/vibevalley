@@ -32,3 +32,14 @@ returning routing_position as position, routing_scope as scope,
 
 -- name: IsRouted :one
 select exists (select 1 from ingress_trigger where id = sqlc.arg(envelope_id) and routed_at is not null) as routed;
+
+-- name: RetireIssueDispatches :exec
+-- A session started on the issue: the assignment's own dispatch is not a second brief for it.
+update ingress_trigger set
+  routing_position = coalesce(routing_position, nextval('mailbox_order')),
+  routing_scope = coalesce(routing_scope, 'issue:' || sqlc.arg(issue_id)),
+  routed_at = coalesce(routed_at, sqlc.arg(at))
+where routed_at is null
+  and trigger_json::jsonb->'meta'->>'dispatch' = 'true'
+  and trigger_json::jsonb->'meta'->>'issue' = sqlc.arg(issue_id);
+

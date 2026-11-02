@@ -1,8 +1,9 @@
 // The chat in the core state.
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
 
 import { compareText, or } from "@/base/order.ts";
+
+export { targetOf } from "@/base/chat.ts";
 /** The database keeps them all; the state these many. What is said in them is the rooms' (Channel.follow). */
 export const keepChannels = 100;
 
@@ -34,14 +35,6 @@ export function withChannel(chat: T.Chat | undefined, c: T.Channel): T.Chat {
   const keep = new Set(ranked.slice(0, keepChannels).map((x) => x.id));
   all = all.filter((x) => keep.has(x.id)).toSorted(byID);
   return { ...base, channels: all };
-}
-
-/** A channel is #<name> (#general), a thread #<its channel's name>:<the number of the message it hangs under>, and a
- * direct channel @owner: only its peer reads an address, and the one there with it is the owner. */
-export function targetOf(c: Pick<T.Channel, "type" | "rootNumber" | "name">, channelName: string): string {
-  if (c.type === "direct") return "@" + ownerId;
-  if (c.type === "thread" && c.rootNumber !== undefined) return "#" + channelName + ":" + c.rootNumber;
-  return "#" + (c.name ?? channelName);
 }
 
 export const defaultOf = (chat: T.Chat | undefined) => chat?.channels.find((c) => c.default);

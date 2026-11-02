@@ -65,7 +65,7 @@ export function worldBelowIngress(options: WorldOptions = {}) {
     issue: { background: false },
   };
   const below = platform(config);
-  return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), agentSessions(o), collaboration(o), issues(o), mailbox);
+  return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), agentSessions(o), mailbox, collaboration(o), issues(o));
 }
 
 /** The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds

@@ -21,6 +21,10 @@ from issue left join lateral (
   order by r.started_at desc, r.id desc limit 1
 ) latest_run on true where id = sqlc.arg(id);
 
+-- name: IssueExists :one
+-- Whether an issue is there at all, for Mailbox routing before the core fact reaches it.
+select id from issue where id = sqlc.arg(id);
+
 -- name: IssueByNumber :one
 select issue.*, latest_run.started_at as run_started_at, latest_run.ended_at as run_ended_at, latest_run.outcome as run_outcome
 from issue left join lateral (
