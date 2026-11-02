@@ -1,7 +1,7 @@
 import type * as T from "@vibevalley/protocol";
 
+import { explicitMandate } from "@/issue/creation.ts";
 import type { Issue } from "@/issue/issue.ts";
-import { explicitMandate } from "@/issue/mandate.ts";
 
 export const testIssues = (issues: Issue["Service"]) => ({
   ...issues,

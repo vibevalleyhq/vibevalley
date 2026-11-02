@@ -10,8 +10,7 @@ import { type Core } from "@/core/core.ts";
 
 import type * as q from "../../db/generated/issue.sql.ts";
 import { statusMoves } from "./moves.ts";
-import { issueStageIn } from "./stage.ts";
-import { issueRefiningOf, issueStatusOf } from "./status.ts";
+import { issueRefiningOf, issueStageIn, issueStatusOf } from "./status.ts";
 
 export const nullText = (s: string | undefined) => {
   const text = (s ?? "").trim();

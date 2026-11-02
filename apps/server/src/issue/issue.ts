@@ -45,21 +45,15 @@ import * as q from "../../db/generated/issue.sql.ts";
 import * as qs from "../../db/generated/issue_assignment.sql.ts";
 import * as qe from "../../db/generated/issue_assignment_execution.sql.ts";
 import { assignTo, Assignments } from "./assignment.ts";
-import { answerCureWords, cureWords, findingsOf, issueBrief, resumeWords, splitBrief } from "./brief.ts";
-import { issueRow, maxChildren } from "./creation.ts";
-import { blockedIssues, dependencyProblems } from "./dependencies.ts";
-import { pickIssues } from "./filter.ts";
-import { explicitMandate, inferredMandate } from "./mandate.ts";
-import { merging } from "./merge.ts";
+import { answerCureWords, cureWords, findingsOf, issueBrief, milestonesOf, resumeWords, splitBrief } from "./brief.ts";
+import { explicitMandate, filledKinds, inferredMandate, issueRow, maxChildren, sentTitles } from "./creation.ts";
+import { acceptanceAncestors, blockedIssues, dependencyProblems } from "./dependencies.ts";
+import { merging, verifyChild } from "./merge.ts";
 import { nextSteps, statusMove } from "./moves.ts";
 import { workConstraints, needsOwner } from "./prompts.ts";
 import { kept, openQuestions, refinement } from "./refinement.ts";
 import { issueRows, jsonOrNull, nullText } from "./rows.ts";
-import { conflictOf } from "./stage.ts";
-import { isForOrchestrator, issueOrder, keepClosedIssues, isClosed } from "./status.ts";
-import { filledKinds, sentTitles } from "./templates.ts";
-import { milestonesOf } from "./timeline.ts";
-import { acceptanceAncestors, verifyChild } from "./verification.ts";
+import { conflictOf, isClosed, isForOrchestrator, issueOrder, keepClosedIssues, pickIssues } from "./status.ts";
 
 export class Issue extends Context.Service<
   Issue,

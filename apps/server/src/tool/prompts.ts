@@ -8,7 +8,7 @@ import { phaseText, shortTitle, stageWantsOwner } from "@vibevalley/protocol/rul
 
 import { head } from "@/base/clip.ts";
 import { nextText, whenText } from "@/cron/when.ts";
-import { mandateNoteWordLimit } from "@/issue/mandate.ts";
+import { mandateNoteWordLimit } from "@/issue/creation.ts";
 import { yuan } from "@/runtime/money.ts";
 import { runtimeLabel } from "@/runtime/presets.ts";
 

@@ -5,17 +5,16 @@ import type { Doing, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { clip } from "@/base/clip.ts";
-import { conflictOf } from "@/issue/stage.ts";
+import { conflictOf } from "@/issue/status.ts";
 import { MergeFailure } from "@/project/shapes.ts";
 import { inCny } from "@/runtime/price.ts";
 
-import { briefBreak, withRecall } from "./briefing.ts";
 import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
 import { noRoom, sessionName, whoMakesRoom } from "./hiring.ts";
 import { recallHead } from "./prompts.ts";
 import { readReport, summaryOf } from "./report.ts";
 import { shellCommand } from "./shell.ts";
-import { conflictBrief, notTakenIn } from "./takeIn.ts";
+import { briefBreak, conflictBrief, notTakenIn, withRecall } from "./takeIn.ts";
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
 const ctx: FactContext = { id: sessionId("w1"), runtime: "pi", cwd: "/work/clock-in" };
 const base = (): Session =>

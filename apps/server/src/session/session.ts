@@ -49,7 +49,6 @@ import { Project } from "@/project/project.ts";
 import { type Merged, MergeFailure, type ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
 import { Runtime } from "@/runtime/runtime.ts";
 
-import { instructions, briefBreak, recallBlock, toOarMcp, withRecall } from "./briefing.ts";
 import { eventFacts, phaseFact, type Op, since, type Tracking } from "./facts.ts";
 import { noRoom, type SessionLimits, sessionName, whoMakesRoom } from "./hiring.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
@@ -59,8 +58,8 @@ import { recording, NotRecorded } from "./recording.ts";
 import { handsToOwner, readReport, summaryOf } from "./report.ts";
 import { sessionOnIssue } from "./roster.ts";
 import type { Delivered, DeliveryInput, InputConsumed, InputReturned, LaunchActivity, SessionIdentity, SessionNews } from "./shapes.ts";
-import { notTakenIn, type Settle } from "./takeIn.ts";
-import { contextPlace, releaseContextPlace } from "./workspace.ts";
+import { contextPlace, releaseContextPlace } from "./shell.ts";
+import { briefBreak, instructions, notTakenIn, recallBlock, type Settle, toOarMcp, withRecall } from "./takeIn.ts";
 
 export type { SessionNews };
 export { NotRecorded };

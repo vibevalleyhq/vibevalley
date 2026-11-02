@@ -1,6 +1,6 @@
 import { Clock, Effect, Semaphore, Predicate } from "effect";
 
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
@@ -9,12 +9,13 @@ import type { Channel } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import type { Db } from "@/infra/db.ts";
-import type { Project } from "@/project/project.ts";
+import { issueBranch, type Project } from "@/project/project.ts";
 import { type Merged, MergeFailure, type ProjectError, type Workplace } from "@/project/shapes.ts";
 import type { NotTakenIn, Session } from "@/session/session.ts";
 
 import * as q from "../../db/generated/issue.sql.ts";
 import { pullRequestConclusion } from "./brief.ts";
+import { acceptanceAncestors } from "./dependencies.ts";
 import { statusMove } from "./moves.ts";
 
 interface MergeDeps {
@@ -164,3 +165,40 @@ export function merging(d: MergeDeps) {
 
   return { merge, refreshPullRequests, submit };
 }
+
+export const verifyChild = Effect.fn("Issue.verifyChild")(function* (
+  projects: Project["Service"],
+  child: T.Issue,
+  parent: T.Issue,
+  all: readonly T.Issue[],
+  place: Workplace,
+) {
+  const constraints = child.constraints;
+  const inherited = acceptanceAncestors(child, all);
+  const changed = () => projects.changedFiles(place.cwd, issueBranch(parent.number)).pipe(Effect.mapError((error) => MergeFailure.error(error.message)));
+  if (constraints?.acceptance === true) {
+    if (!constraints.check) return yield* MergeFailure.failedCheck(t("server.issue.verification.acceptanceNeedsCheck"));
+    if ((yield* projects.run(place.cwd, constraints.check)).ok)
+      return yield* MergeFailure.failedCheck(t("server.issue.verification.acceptancePassed", { check: constraints.check }));
+    return { ...constraints, frozen: yield* changed() };
+  }
+  const frozen = new Set(inherited.flatMap((item) => item.constraints?.frozen ?? []));
+  const checkFrozen = Effect.gen(function* () {
+    const touched = (yield* changed()).filter((file) => frozen.has(file));
+    if (touched.length > 0) return yield* MergeFailure.failedCheck(t("server.issue.verification.frozen", { files: list(touched) }));
+  });
+  if (frozen.size > 0) yield* checkFrozen;
+  const leaf = !all.some((item) => item.parent === child.parent && item.status !== "canceled" && item.blockedBy.includes(child.id));
+  const checks = new Set([constraints?.check, ...(leaf ? inherited.map((item) => item.constraints?.check) : [])].flatMap((check) => (check ? [check] : [])));
+  yield* Effect.forEach(
+    checks,
+    (check) =>
+      Effect.gen(function* () {
+        const result = yield* projects.run(place.cwd, check);
+        if (!result.ok) return yield* MergeFailure.failedCheck(t("server.issue.verification.failed", { check, output: result.output }));
+      }),
+    { discard: true },
+  );
+  if (frozen.size > 0) yield* checkFrozen;
+  return constraints;
+});

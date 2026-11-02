@@ -68,7 +68,7 @@
 - **一轮只认结构化报告**：`issue_report` 提供结果、问题、验收凭据、answer、记性和 prSubmit，没有独立报告状态。PR 在途时，普通成功回合或 prSubmit=true 的提交报告结束后，Session 使用 resting，工单保持 in_progress，自动跟随 CI/评审并释放干活槽位；prSubmit=false 的显式交接使用 done，工单进入 reviewing。报告提出问题、未满足的验收项或运行失败仍等主人。未结束的报告暂存于 session.pending_report；正文不解析成状态。
 
 父工单可以没有自己的 Session；其 PR 合并或关闭后直接清理父分支和 worktree，再记录完成或取消，不要求存在一轮帮工执行。
-- **找和看**：`issue.list` 带过滤（状态、字、项目、条数、关上的、等主人的），默认只列开着的；规则是 `issue/filter.ts` 的 `pickIssues`，管家的 `issue_list` 和命令行用同一条。验收是 `issue.review`（过了只记下验过，完成仍是挪到已完成）；`issue.split` 让在做这张的帮工把它拆成计划（[计划](docs/subsystems/issue.md)）。
+- **找和看**：`issue.list` 带过滤（状态、字、项目、条数、关上的、等主人的），默认只列开着的；规则是 `issue/status.ts` 的 `pickIssues`，管家的 `issue_list` 和命令行用同一条。验收是 `issue.review`（过了只记下验过，完成仍是挪到已完成）；`issue.split` 让在做这张的帮工把它拆成计划（[计划](docs/subsystems/issue.md)）。
 - **写只有两个：挪状态、说话**（`issue.status.update`、`issue.comment.create`）。挪是什么由工单现在的处境定，带给帮工的话在服务端拼：等你验收时带话挪回待办是打回（话一行一条成为验收意见），卡住了不带话挪回待办是照原因接着修（`cureWords`）、交代冲突（`conflictBrief`）或接着做（`resumeWords`），挪到已完成是验收通过并照交付方式交付。叫停一轮是帮工的事（`session.stop`）。其余是改字段（`issue.update`，排先后是它的 `before`）、建、删和起草。
 - **按钮是皮**：站位给出的每个按钮（`IssueAction`）带着按下去发什么：挪到哪个状态、话必填、可填还是不收（`move`），对帮工说一句（`say`），或叫停（`stop`）。页面（`apps/web/src/features/issue/acts.ts` 的 `perform`）、农具和命令行的下一步都照它发，不自己判断；页面只决定哪个按钮先开输入框、先开改动或关单对话框。
 - **工单认编号**（`Issue.idOf`）：接口里的工单可以写 `#41`、`41`、工单 id 或干过它的帮工 id；命令行、管家的工具都用编号。

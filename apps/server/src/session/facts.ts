@@ -11,10 +11,10 @@ import { clip } from "@/base/clip.ts";
 import type { FactIn } from "@/core/core.ts";
 import type { Rate } from "@/runtime/price.ts";
 
-import { briefBreak, recalledIn } from "./briefing.ts";
 import { failureText } from "./report.ts";
 import { doingOf } from "./roster.ts";
 import { shellCommand } from "./shell.ts";
+import { briefBreak, recalledIn } from "./takeIn.ts";
 
 /** The bubble over a session's head holds about this much. */
 const labelMax = 40;

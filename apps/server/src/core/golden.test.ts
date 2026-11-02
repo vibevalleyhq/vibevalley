@@ -16,8 +16,7 @@ import { cronProblem } from "@/cron/due.ts";
 import { nextRun, nextText, whenText } from "@/cron/when.ts";
 import { effectsOf, viewOf } from "@/game/view.ts";
 import { inbox } from "@/inbox/items.ts";
-import { issueStageOf } from "@/issue/stage.ts";
-import { withIssueStatuses } from "@/issue/status.ts";
+import { issueStageOf, withIssueStatuses } from "@/issue/status.ts";
 import { reduce } from "@/projection/reduce.ts";
 import { yuan } from "@/runtime/money.ts";
 

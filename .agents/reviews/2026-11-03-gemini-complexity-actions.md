@@ -173,8 +173,8 @@
 | apps/server/src/channel/targets.ts | 并入 `apps/server/src/channel/mentions.ts` |
 | apps/server/src/channel/prompts.ts | 并入 `apps/server/src/mailbox/prompts.ts` |
 | apps/server/src/session/usage.ts | 并入 `apps/server/src/session/report.ts` |
-| apps/server/src/issue/conflict.ts | 并入 `apps/server/src/issue/stage.ts` |
-| apps/server/src/issue/followup.ts | 并入 `apps/server/src/issue/stage.ts` |
+| apps/server/src/issue/conflict.ts | 并入 `apps/server/src/issue/status.ts` |
+| apps/server/src/issue/followup.ts | 并入 `apps/server/src/issue/status.ts` |
 | apps/server/src/issue/stored.ts | 并入 `apps/server/src/issue/rows.ts` |
 | apps/server/src/inbox/away.ts | 并入 `apps/server/src/inbox/items.ts` |
 | apps/server/src/artifact/testing.ts | 迁到 `apps/server/src/testing/artifact.ts` |

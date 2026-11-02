@@ -7,7 +7,7 @@ import { emptyWorkspaceState } from "@/core/core.ts";
 import { reduce } from "@/projection/reduce.ts";
 
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
-import { issueStageOf } from "./stage.ts";
+import { issueStageOf } from "./status.ts";
 const assigned = (sessions: string[] = ["w1"]) =>
   [
     {

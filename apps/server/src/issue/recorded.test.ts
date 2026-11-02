@@ -5,12 +5,11 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { templateCatalog } from "@/agent/seed.ts";
 
-import { pullRequestConclusion, issueBrief, splitBrief } from "./brief.ts";
-import { pickIssues } from "./filter.ts";
+import { pullRequestConclusion, issueBrief, milestonesOf, splitBrief } from "./brief.ts";
+import { filledKinds, filledTemplate, mandateNoteFits, sentTitles } from "./creation.ts";
 import { answerOpening, criteriaHead, refinementBrief, refinementOpening } from "./prompts.ts";
 import { refinementDescription, kept, parseRefinement } from "./refinement.ts";
-import { filledKinds, filledTemplate, sentTitles } from "./templates.ts";
-import { milestonesOf } from "./timeline.ts";
+import { pickIssues } from "./status.ts";
 
 describe("an issue as a brief", () => {
   it("title and brief", () => {
@@ -253,5 +252,15 @@ describe("templates", () => {
     ];
     expect(sentTitles(all, "app", (id) => id === defaultOrchestrator)).toEqual(["加 打卡", "修登录", "三", "二", "零"]);
     expect(sentTitles(all, "none", (id) => id === defaultOrchestrator)).toEqual([]);
+  });
+});
+
+describe("a mandate", () => {
+  it("limits manager notes by words across English and Chinese", () => {
+    expect(mandateNoteFits("word ".repeat(30))).toBe(true);
+    expect(mandateNoteFits("word ".repeat(31))).toBe(false);
+    expect(mandateNoteFits("工作，".repeat(30))).toBe(true);
+    expect(mandateNoteFits("工作，".repeat(31))).toBe(false);
+    expect(mandateNoteFits(" \n … ")).toBe(true);
   });
 });

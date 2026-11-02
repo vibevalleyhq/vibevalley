@@ -10,8 +10,8 @@ import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "@/agent/agent.ts";
 import { Ingress } from "@/ingress/ingress.ts";
+import { explicitMandate } from "@/issue/creation.ts";
 import { Issue } from "@/issue/issue.ts";
-import { explicitMandate } from "@/issue/mandate.ts";
 import { Project } from "@/project/project.ts";
 import { Session } from "@/session/session.ts";
 import { testConfig } from "@/testing/layers.ts";

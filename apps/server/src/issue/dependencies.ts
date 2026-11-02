@@ -13,3 +13,15 @@ export function blockedIssues(issue: Pick<T.Issue, "blockedBy">, issues: readonl
   const settled = new Set<string>(issues.filter((item) => item.status === "done" || item.status === "canceled").map((item) => item.id));
   return issue.blockedBy.filter((id) => !settled.has(id));
 }
+
+export function acceptanceAncestors(issue: T.Issue, all: readonly T.Issue[]): T.Issue[] {
+  const byId = new Map<string, T.Issue>(all.map((item) => [item.id, item]));
+  const visited = new Set<string>();
+  const visit = (id: string) => {
+    if (visited.has(id)) return;
+    visited.add(id);
+    for (const before of byId.get(id)?.blockedBy ?? []) visit(before);
+  };
+  for (const id of issue.blockedBy) visit(id);
+  return all.filter((item) => visited.has(item.id) && item.status === "done" && item.constraints?.acceptance === true);
+}
