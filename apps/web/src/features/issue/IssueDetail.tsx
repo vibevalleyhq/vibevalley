@@ -57,7 +57,8 @@ export function IssueDetail(props: {
   const issues = useIssues();
   const now = useNow();
   const moves = useIntents(issueMove);
-  const s = createMemo(() => issueState(movedIssue(props.issue, moves.list()), props.sessions, props.session, issues()));
+  const live = () => issues().find((item) => item.id === props.issue.id) ?? props.issue;
+  const s = createMemo(() => issueState(movedIssue(live(), moves.list()), props.sessions, props.session, issues()));
   const head = () => s().head;
   // The box under the block holds an answer, the findings of 打回, a word to the helper, or what a reopen asks for.
   const acts = createIssueActs(() => props.issue, {

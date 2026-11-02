@@ -61,7 +61,8 @@
 | `compare` | `order.ts` |  |
 | `or` | `order.ts` |  |
 | `scopedPubSub` | `pubsub.ts` | An unbounded PubSub shut down when the scope that made it (its service's layer) closes, so a subscriber's stream ends |
-| `questionsFromText` | `questions.ts` | The questions a report's 要问主人 lines ask, one per line; a line's 选项 tail gives the options (at least two). |
+| `checksFromText` | `questions.ts` | The helper's text checks, one per 标准 line; explicit issue_report.checks still win. |
+| `questionsFromText` | `questions.ts` |  |
 | `redact` | `redact.ts` |  |
 | `redactedHead` | `redact.ts` | Its first n UTF-16 units, trimmed: cut after redacting, as a secret cut first may no longer look like one. |
 | `redactOutput` | `redact.ts` | Everything the process writes to stream goes through redact first: the server's log, and what a library prints. A |

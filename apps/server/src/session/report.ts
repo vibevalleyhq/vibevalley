@@ -8,7 +8,7 @@ import type { Question, CriterionCheck, Outcome, IssueReport } from "@vibevalley
 import { slice } from "@vibevalley/protocol/rules";
 
 import { clip } from "@/base/clip.ts";
-import { questionsFromText } from "@/base/questions.ts";
+import { checksFromText, questionsFromText } from "@/base/questions.ts";
 
 const summaryMax = 160;
 
@@ -75,6 +75,6 @@ export function readReport(outcome: TurnOutcome, said: string): SessionRead {
     failure: failed,
     needsYou: outcome.kind === "failed" && needsYou.has(outcome.failure),
     questions: questionsFromText(text),
-    checks: [],
+    checks: checksFromText(text),
   };
 }
