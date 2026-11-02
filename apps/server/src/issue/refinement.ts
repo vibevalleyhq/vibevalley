@@ -7,6 +7,7 @@ import { assignedAgentOf, cut } from "@vibevalley/protocol/rules";
 import type { Agent } from "@/agent/agent.ts";
 import { clip } from "@/base/clip.ts";
 import { lastJsonBlock, misfitField } from "@/base/json.ts";
+import { questionsFromText } from "@/base/questions.ts";
 import type { Channel } from "@/channel/chat.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, messageOf } from "@/errors.ts";
@@ -136,7 +137,7 @@ export function refinement(d: RefinementDeps) {
     if (f.outcome === "completed") {
       const { draft: d, problem } = parseRefinement(said);
       if (!d) yield* tell(t("server.issue.refinement.unread", { name: h.name, problem }));
-      else yield* refined(id, d, f.questions && f.questions.length > 0 ? f.questions : draftQuestions(said));
+      else yield* refined(id, d, f.questions && f.questions.length > 0 ? f.questions : questionsFromText(said));
     } else yield* tell(t("server.issue.refinement.unfinished", { name: h.name, summary: f.summary }));
     yield* sessions.dismiss(f.id, "discard");
     yield* publish(id);
@@ -168,21 +169,6 @@ export interface IssueRefinement {
 export const kept = (lines: readonly string[] | undefined) => (lines ?? []).map((l) => l.trim()).filter((l) => l !== "");
 
 export const openQuestions = (questions: readonly T.Question[] | undefined): T.Question[] => (questions ?? []).filter((a) => a.question.trim() !== "");
-
-const draftQuestion = /^[\s>*#_-]*(?:\*\*)?要问主人(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/u;
-const draftOptions = /\s*[（(]\s*选项\s*[:：]\s*(.+?)\s*[)）]\s*$/u;
-const draftQuestions = (said: string): T.Question[] =>
-  said.split("\n").flatMap((line) => {
-    const raw = draftQuestion.exec(line)?.[1]?.replace(/\*\*$/u, "").trim();
-    if (!raw) return [];
-    const tail = draftOptions.exec(raw);
-    const question = tail ? raw.slice(0, tail.index).trim() : raw;
-    const options = (tail?.[1] ?? "")
-      .split(/[｜|]/u)
-      .map((option) => option.trim())
-      .filter(Boolean);
-    return [{ question, options: options.length >= 2 ? options : [] }];
-  });
 
 const Text = Schema.optional(Schema.NullOr(Schema.String));
 const Lines = Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Array(Schema.String)])));

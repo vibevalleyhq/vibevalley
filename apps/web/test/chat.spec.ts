@@ -9,7 +9,7 @@ test("the default channel opens first, with the orchestrator resting", async ({ 
   await page.goto("/chat");
   const side = page.getByTestId("channels-side");
   await expect(side.locator(`[data-testid="channel-row"][data-key="${general}"]`)).toHaveAttribute("aria-current", "page");
-  await expect(page.getByTestId("channel-orchestrator-line")).toHaveAttribute("data-state", "idle");
+  await expect(page.getByTestId("channel-orchestrator-line")).toHaveAttribute("data-state", "listening");
   await expect(tab(page, "chat")).toHaveAttribute("aria-selected", "true");
 });
 

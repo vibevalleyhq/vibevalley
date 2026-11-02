@@ -8,6 +8,7 @@ import type { Question, CriterionCheck, Outcome, IssueReport } from "@vibevalley
 import { slice } from "@vibevalley/protocol/rules";
 
 import { clip } from "@/base/clip.ts";
+import { questionsFromText } from "@/base/questions.ts";
 
 const summaryMax = 160;
 
@@ -38,7 +39,7 @@ function conclusion(text: string, min: number): string {
   return tail;
 }
 
-/** What an undeclared report says in short. State, questions and checks come only from issue_report. */
+/** What an undeclared report says in short. Questions may also come from its 要问主人 lines. */
 export const summaryOf = (text: string) => conclusion(text, 80);
 
 /** A pull request's description: the verdict, else the whole reply. */
@@ -73,7 +74,7 @@ export function readReport(outcome: TurnOutcome, said: string): SessionRead {
     summary: clip(summary, summaryMax),
     failure: failed,
     needsYou: outcome.kind === "failed" && needsYou.has(outcome.failure),
-    questions: [],
+    questions: questionsFromText(text),
     checks: [],
   };
 }
