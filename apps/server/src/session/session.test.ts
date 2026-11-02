@@ -14,7 +14,7 @@ import { issueId } from "@vibevalley/protocol/schema";
 import { Agent } from "@/agent/agent.ts";
 import type { LaunchActivity } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
-import { watchStalls } from "@/executor/stalls.ts";
+import { watchStalls } from "@/executor/executor.ts";
 import { Project } from "@/project/project.ts";
 import { MergeFailure } from "@/project/shapes.ts";
 import { gitIn } from "@/testing/git.ts";

@@ -26,9 +26,9 @@ import { ServerConfig } from "@/infra/config.ts";
 import { callbackLog, bestEffort } from "@/infra/log.ts";
 import { afterRealTime } from "@/infra/time.ts";
 import { Ingress } from "@/ingress/ingress.ts";
-import { orchestratorModel } from "@/orchestrator/model.ts";
 import { chatCompletions } from "@/orchestrator/openai.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+import { orchestratorModel } from "@/orchestrator/situation.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
 
 import { verifyMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";

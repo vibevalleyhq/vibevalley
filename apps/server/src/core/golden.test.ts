@@ -18,7 +18,7 @@ import { effectsOf, viewOf } from "@/game/view.ts";
 import { inbox } from "@/inbox/items.ts";
 import { issueStageOf, withIssueStatuses } from "@/issue/status.ts";
 import { reduce } from "@/projection/reduce.ts";
-import { yuan } from "@/runtime/money.ts";
+import { yuan } from "@/runtime/quota.ts";
 
 import { emptyWorkspaceState } from "./core.ts";
 

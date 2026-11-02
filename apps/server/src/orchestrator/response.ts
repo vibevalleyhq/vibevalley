@@ -7,8 +7,8 @@ import { type Channel } from "@/channel/chat.ts";
 import { type Ingress } from "@/ingress/ingress.ts";
 import { Caller, type NotAnswered } from "@/session/host.ts";
 
-import { orchestratorModel } from "./model.ts";
 import type { Answer } from "./openai.ts";
+import { orchestratorModel } from "./situation.ts";
 
 /** The live API/phone responses, from opening a port to dropping it once its words are read. */
 export const makeResponses = (ingress: Ingress["Service"], channel: Channel["Service"]) => {

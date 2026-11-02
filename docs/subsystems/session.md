@@ -129,7 +129,7 @@ PR 在途的普通成功回合以及 prSubmit=true 的提交报告在结束时�
 - `issue_report.questions`、`checks` 和 `answer` 进入 `sessionReport` 事实；正文不进入这些字段。
 - 结构化 `answer` 折进 `lastRun.answer`；结论工单用它判断是否交出了结论。工单阶段由运行结果、问题、冲突和交付事实推导。
 
-**没动静**：`executor/stalls.ts` 的 `watchStalls` 用 oar 的 `reduceStatus`、`stallOf` 从这个会话的第一条记录起折出状态（oar 自己的 `observeStalls` 只听订阅以后的记录），一轮在干、超过 `session.stall_seconds`（默认 240 秒）没有任何记录时报一次。等待和计时使用同一个 Clock，到点读一次时间，`quiet.since` 由这一刻回推。Session 施加 `quiet`（地块干裂、挂「没动静」，管家的「农场现状」和 Inbox 里也会说），日志记一条 `run/error`，农场提醒一次（带最后在做什么）。下一个不是用量的事件结束它。不自动叫停。
+**没动静**：`executor/executor.ts` 的 `watchStalls` 用 oar 的 `reduceStatus`、`stallOf` 从这个会话的第一条记录起折出状态（oar 自己的 `observeStalls` 只听订阅以后的记录），一轮在干、超过 `session.stall_seconds`（默认 240 秒）没有任何记录时报一次。等待和计时使用同一个 Clock，到点读一次时间，`quiet.since` 由这一刻回推。Session 施加 `quiet`（地块干裂、挂「没动静」，管家的「农场现状」和 Inbox 里也会说），日志记一条 `run/error`，农场提醒一次（带最后在做什么）。下一个不是用量的事件结束它。不自动叫停。
 
 **叫停**（`session.stop`）：打断这一轮，Session 留在地里，带句话开下一轮。
 

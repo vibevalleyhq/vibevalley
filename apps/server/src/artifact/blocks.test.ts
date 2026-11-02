@@ -18,7 +18,7 @@ import { waitFor } from "@/testing/until.ts";
 
 import * as qa from "../../db/generated/artifact.sql.ts";
 import { makeBlockStore } from "./blocks.ts";
-import { demoPieces } from "./demo.ts";
+import { demoPieces } from "./policy.ts";
 import { plain } from "./spans.ts";
 
 const on = (config: ServerConfig["Service"] = testConfig()) =>

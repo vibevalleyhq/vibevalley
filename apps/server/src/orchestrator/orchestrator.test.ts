@@ -32,10 +32,9 @@ import { Said } from "@/testing/said.ts";
 import { aTurn, gate, untilGot as until, waitFor, whenTrue, within } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
-import { intake } from "./intake.ts";
-import { deepseekModel, orchestratorModel } from "./model.ts";
 import { Orchestrator } from "./orchestrator.ts";
 import { makeResponses } from "./response.ts";
+import { deepseekModel, intake, orchestratorModel } from "./situation.ts";
 
 /** Words said to the orchestrator on the phone, as the voice line asks them. */
 const onPhone = (orchestrator: Orchestrator["Service"], text: string) => Stream.toAsyncIterable(orchestrator.answerer("phone")(orchestratorModel)!(text));

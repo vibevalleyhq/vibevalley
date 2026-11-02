@@ -30,12 +30,10 @@ import { Setting } from "@/setting/setting.ts";
 import { channelLine } from "@/tool/prompts.ts";
 import { Tool } from "@/tool/tool.ts";
 
-import { intake, type Source } from "./intake.ts";
-import { deepseekModel } from "./model.ts";
 import type { Answer } from "./openai.ts";
 import { agentPrompt, identityNote, lineWords, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { makeResponses } from "./response.ts";
-import { orchestratorInboxLines, quotaText, situationDelta } from "./situation.ts";
+import { deepseekModel, intake, orchestratorInboxLines, quotaText, situationDelta, type Source } from "./situation.ts";
 
 const keepEvents = 1000;
 /** A run cut off longer ago than this is left: what it was for has likely moved on. */

@@ -2,7 +2,7 @@ import { join, resolve } from "node:path";
 
 import type { ControlOutcome, Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
-import { applyTaskEvent, initialTasks, observeSessionView, type TaskMap } from "@botiverse/oar/observe";
+import { applyTaskEvent, initialStatus, initialTasks, observeSessionView, reduceStatus, stallOf, type TaskMap } from "@botiverse/oar/observe";
 import { Clock, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -12,8 +12,6 @@ import { maxRunning } from "@vibevalley/protocol";
 import { type ApiError, messageOf, reasonOf, refused } from "@/errors.ts";
 import { projectsDir, ServerConfig } from "@/infra/config.ts";
 import { probeInstallation, Runtime } from "@/runtime/runtime.ts";
-
-import { watchStalls } from "./stalls.ts";
 
 type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "project" | "issue" | "channel">;
 
@@ -75,6 +73,42 @@ interface Allocation extends Omit<Execution, "pendingTasks"> {
 const notClosed = (cause: unknown) => new NotClosed({ message: messageOf(cause), cause });
 const running = Metric.gauge("vibevalley.sessions.running", { description: "Runtime sessions open now (the helpers' and the orchestrators')" });
 const closeWaitMs = 15_000;
+
+/** Calls onStall once a turn has had no record for stallMs, folded from the session's first record as its events are:
+ * oar's observeStalls hears only records from when it subscribes, and misses a turn that went quiet before that. */
+export function watchStalls(
+  session: RuntimeSession,
+  stallMs: number,
+  onStall: (silentForMs: number, at: number) => void,
+  timer: (wait: Effect.Effect<void>) => void,
+  now: () => number,
+) {
+  let status = initialStatus;
+  // The timer is one keyed fiber of the service's: arming again replaces it, Effect.void disarms it.
+  const disarm = () => timer(Effect.void);
+  const stop = session.rawEvents(
+    (record) => {
+      status = reduceStatus(status, record, session.id);
+      if (status.kind !== "running") return disarm();
+      timer(
+        Effect.sleep(stallMs).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              const at = now();
+              const stall = stallOf(status, at, stallMs);
+              if (stall !== null) onStall(stall.silentForMs, at);
+            }),
+          ),
+        ),
+      );
+    },
+    { sessionId: session.id, afterSeq: -1 },
+  );
+  return () => {
+    disarm();
+    stop();
+  };
+}
 
 const pendingTasks = (allocation: Allocation) =>
   [...allocation.tasks.values()].filter((task) => task.ambient !== true && (task.status === "running" || task.status === "pending" || task.status === "paused"))
