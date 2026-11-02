@@ -50,16 +50,27 @@ import { type Merged, MergeFailure, type ProjectError, type Workplace, type Work
 import { Runtime } from "@/runtime/runtime.ts";
 
 import { eventFacts, phaseFact, type Op, since, type Tracking } from "./facts.ts";
-import { noRoom, type SessionLimits, sessionName, whoMakesRoom } from "./hiring.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
+import { NotRecorded, recording } from "./inProcessRun.ts";
 import { type Journal, makeTrajectories } from "./journal.ts";
 import { channelRules, restartedContextNote, restartedNote, sourceBrief, workplaceRules } from "./prompts.ts";
-import { recording, NotRecorded } from "./recording.ts";
 import { handsToOwner, readReport, summaryOf } from "./report.ts";
 import { sessionOnIssue } from "./roster.ts";
 import type { Delivered, DeliveryInput, InputConsumed, InputReturned, LaunchActivity, SessionIdentity, SessionNews } from "./shapes.ts";
 import { contextPlace, releaseContextPlace } from "./shell.ts";
-import { briefBreak, instructions, notTakenIn, recallBlock, type Settle, toOarMcp, withRecall } from "./takeIn.ts";
+import {
+  briefBreak,
+  instructions,
+  noRoom,
+  notTakenIn,
+  recallBlock,
+  type SessionLimits,
+  sessionName,
+  type Settle,
+  toOarMcp,
+  whoMakesRoom,
+  withRecall,
+} from "./takeIn.ts";
 
 export type { SessionNews };
 export { NotRecorded };

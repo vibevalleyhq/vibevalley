@@ -2,20 +2,25 @@
 // that takes inputs for several issues keeps the first in session_run.issue and links all of them in session_run_issue.
 // An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
 
-import { Effect, Schema } from "effect";
+import { Clock, Effect, Schema } from "effect";
+import type { SqlClient } from "effect/sql";
 
 import type { CoreEvent } from "@vibevalley/agent/brain";
 import type { ToolResult } from "@vibevalley/agent/core/loop";
 import { messageText } from "@vibevalley/agent/messages";
 import { t } from "@vibevalley/i18n";
-import type { Outcome, RunTrigger } from "@vibevalley/protocol";
+import type { Outcome, RunTrigger, Spent } from "@vibevalley/protocol";
+import { issueId } from "@vibevalley/protocol/schema";
 
 import { newId } from "@/base/ids.ts";
 import { Inconsistent } from "@/errors.ts";
+import { causeMessage, Db } from "@/infra/db.ts";
 
+import * as qr from "../../db/generated/session_run.sql.ts";
+import * as qi from "../../db/generated/session_run_issue.sql.ts";
 import type { ToolStart } from "./facts.ts";
 import type { Journal } from "./journal.ts";
-import type { NotRecorded, RunStore } from "./session.ts";
+import type { RunStore } from "./session.ts";
 
 /** What an input starts a run with; attached only when the loop consumes it, not when it is queued. */
 
@@ -176,3 +181,24 @@ export const makeInProcessRun = (
       currentRun,
     } satisfies InProcessRun;
   });
+
+export class NotRecorded extends Schema.TaggedError<NotRecorded, { readonly brand: unique symbol }>()("NotRecorded", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
+
+export const recording = Effect.gen(function* () {
+  const db = yield* Db;
+  const clock = yield* Clock.Clock;
+  const tried = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
+    db.attempt(effect).pipe(Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })));
+  return {
+    start: (id: string, session: string, issue: string, trigger: RunTrigger) =>
+      tried(qr.startRun({ id, session, issue: issue || null, triggered_by: JSON.stringify(trigger), started_at: clock.currentTimeMillisUnsafe() })),
+    link: (run: string, issue: string) => tried(qi.linkRunIssue({ run, issue })),
+    heard: (id: string, heard: readonly string[]) => tried(qr.heardInRun({ heard: JSON.stringify(heard), id })),
+    issues: (run: string) => Effect.map(tried(qi.runIssues({ run })), (rows) => rows.map((row) => issueId(row.issue))),
+    finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
+      tried(qr.endRun({ ended_at: clock.currentTimeMillisUnsafe(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
+  };
+});

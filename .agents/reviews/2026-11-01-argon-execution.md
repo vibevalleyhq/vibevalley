@@ -18,7 +18,7 @@
 | Issue 写入口收拢 | [工单单元测试](apps/server/src/issue/issue.test.ts)、[工单流程](apps/server/src/flows/issue.test.ts)、[工作流程](apps/server/src/flows/work.test.ts) 保留合并通知、git 结果、账本、拒绝、现场保留、排队和取消覆盖。排队由容量限制及 setStatus(todo) 形成 |
 | Task 假派工不再写 Assignment | 两项关系测试从 Task 单元测试迁到真实流程（历史实现，已移除）。脚本农机在真实 Session 和 git worktree 上运行，验证父子关系、每个步骤的 Assignment、会话反查工单、分支祖先、拆单者离场与父工单合并；FakeWork 继续覆盖 DAG 调度 |
 | Session 内部状态不再泄露 | 工作目录、分支、当前 run 用公开查询；MCP token 从农机实际收到的配置读取，并验证离场后失效；地址验证保留两次真实派活的 URL |
-| 进程内轮次 | [recording.ts](apps/server/src/session/recording.ts) 抽出同一份生产持久化，没有复制 SQL 或新增服务。[轮次测试](apps/server/src/session/inProcessRun.test.ts) 保留真实库、日志与终结失败重试；[宿主测试](apps/server/src/session/host.test.ts) 验证 finishedRuns、inputsConsumed 和 runOf 的公开接线。Db.attempt 清单随持久化文件移动更新 |
+| 进程内轮次 | [recording.ts](apps/server/src/session/inProcessRun.ts) 抽出同一份生产持久化，没有复制 SQL 或新增服务。[轮次测试](apps/server/src/session/inProcessRun.test.ts) 保留真实库、日志与终结失败重试；[宿主测试](apps/server/src/session/host.test.ts) 验证 finishedRuns、inputsConsumed 和 runOf 的公开接线。Db.attempt 清单随持久化文件移动更新 |
 | 占槽与清理 | [Session 测试](apps/server/src/session/session.test.ts) 经脚本农机缓冲事件，验证接受请求但尚未开始时占槽、拒绝交接与另一张派工，真实事件放行后继续验证；新增登记缺陷加关闭失败只通知一次的回归测试 |
 | 执行器快照与 stop | [Executor 回归测试](apps/server/src/executor/executor.test.ts) 保留取消关闭调用方后资源仍被释放、只释放一次的断言；增加快照不随内部变化、未 attached 与 closing 时 stop 不调用底层 abort 的断言 |
 

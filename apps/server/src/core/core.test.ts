@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Clock, Effect, Fiber, Layer, Queue, Stream } from "effect";
+import { Clock, Effect, Fiber, Layer, PubSub, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { vi } from "vite-plus/test";
 
@@ -16,7 +16,7 @@ import { layer as projection } from "@/projection/frame.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { whenState } from "@/testing/until.ts";
 
-import { Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
+import { bounded, Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
 
 const helper: Session = {
   id: sessionId("w1"),
@@ -255,6 +255,31 @@ describe("core", () => {
       expect(core.session(helper.id)?.phase).toEqual(phaseOf("thinking"));
     }).pipe(
       Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
+    ),
+  );
+});
+
+describe("bounded streams", () => {
+  it.effect("keeps the source order", () =>
+    Effect.gen(function* () {
+      expect(yield* bounded(Stream.make(1, 2, 3), "test").pipe(Stream.runCollect)).toEqual([1, 2, 3]);
+    }),
+  );
+
+  it.effect("ends the slow subscription and runs the source finalizer once", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const pubsub = yield* PubSub.unbounded<number>();
+        let finalized = 0;
+        const source = Stream.fromPubSub(pubsub).pipe(Stream.ensuring(Effect.sync(() => finalized++)));
+        const fiber = yield* Effect.forkChild(Stream.runDrain(bounded(source, "test", 2)));
+        yield* TestClock.adjust(5);
+        yield* PubSub.publish(pubsub, 1);
+        yield* PubSub.publish(pubsub, 2);
+        yield* PubSub.publish(pubsub, 3);
+        yield* Fiber.await(fiber);
+        expect(finalized).toBe(1);
+      }),
     ),
   );
 });

@@ -305,7 +305,7 @@ VibeValley 在提案 [状态先提交，副作用由 worker 在提交之后做](
 
 ### P2：执行器特权槽、后台任务守候与 `core_job` 持久化副作用队列
 
-5. **在 `session/hiring.ts` 与 `executor` 中引入「人类唤醒 `+1` 特权槽」与「验收期保留预览服务」**：
+5. **在 `session/takeIn.ts` 与 `executor` 中引入「人类唤醒 `+1` 特权槽」与「验收期保留预览服务」**：
    - 主人在工单串里主动发话唤醒歇着的帮工时（`RunTrigger.kind === "comment"` 且来自 `owner`），在 `noRoom` 判断中允许突破常规并发上限使用 1 个特权空位，确保主人的交互永不被后台排队的新工单卡住。
 6. **落地 `core_job` 提案时直接采用 `dsh-superagent` 的 `Effects` 模型**：
    - 实施 [状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md) 时，直接采用 `(kind, key)` 唯一约束合并、`generation` 版本号防并发完成误删、`Later` 延后异常不计入失败次数、`ordered` 保序队列以及连续 3 次失败才发错误通知的完整设计（`dsh-superagent:src/app/effects.ts:60-160`）。

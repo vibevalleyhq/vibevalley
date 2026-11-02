@@ -18,8 +18,7 @@ import { world } from "@/testing/world.ts";
 
 import * as q from "../../db/generated/cron.sql.ts";
 import { type Due, Cron } from "./cron.ts";
-import { afterRun, dueCrons, isMissed, needsOK } from "./due.ts";
-import { nextText } from "./when.ts";
+import { afterRun, dueCrons, isMissed, needsOK, nextText } from "./when.ts";
 
 test("the recorded cases", () => {
   const cases = goldenCases("cron");

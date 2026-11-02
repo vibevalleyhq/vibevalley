@@ -112,7 +112,7 @@ Nowledge 的并发调用共享一个连接；失败只清除该调用所属的�
 
 - `apps/server/src/memory/memory.test.ts`：显式笔记与工单记忆的写入、召回、计数和忘掉；管家的数据库条目、作者保留和真实 Brain 读写；预览与 `fading`；索引和容量。
 - `memory/recall.test.ts`：黄金数据（词、相关度、挑选）、项目范围、工单记忆、行的写法和淘汰顺序。
-- `memory/terms.test.ts`：词照 gse 的黄金数据；英文和代码按整词。
+- `memory/recall.test.ts`：词照 gse 的黄金数据；英文和代码按整词。
 - `memory/providers.test.ts`：一个来源的想起和预览一样；慢的来源不拖住一轮或一次检索；别的来源的 id 带名字；一个来源记不住不影响别的；来源跟着设置；只有告诉了的才算想起；忘不掉的来源不问；合并按名次在预算里取最好的、不重复；检索先给自己档案最好的，轮流问每个来源。
 - `memory/outside.test.ts`（本机假的 Nowledge 和 EverOS）：一轮的笔记到 Nowledge 再读回来；Nowledge 只在说了时读全部、写；不答的 Nowledge 跳过；EverOS 收整段、会话结束时提炼；一轮之外的笔记马上提炼；农场停下时告诉 EverOS 剩下的。
 - `src/flows/memory.test.ts`：`issue_report.remember` 写下 project/all 两种 note，同档案跨 Session、跨项目、跨重启召回，已经给过同一 Session 的不重复注入。

@@ -3,7 +3,7 @@ import { Effect, PubSub, Stream } from "effect";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { bounded } from "@/core/bounded.ts";
+import { bounded } from "@/core/core.ts";
 import { refused } from "@/errors.ts";
 import type { Db } from "@/infra/db.ts";
 

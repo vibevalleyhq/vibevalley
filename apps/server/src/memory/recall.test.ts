@@ -5,8 +5,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
-import { lineOf, nextForgotten, pick, type PickCue, relevance } from "./recall.ts";
-import { termsOf } from "./terms.ts";
+import { lineOf, nextForgotten, pick, type PickCue, relevance, termsList, termsOf } from "./recall.ts";
 
 // Go's math.Exp on arm64 (where the cases were recorded) is its own assembly, with fused multiply-adds; V8's is fdlibm's.
 // They can differ in the last bit, so a relevance within 1e-12 of the Go's is the same one; the picks must agree exactly.
@@ -81,4 +80,29 @@ test("lines, and what goes first when there are too many", () => {
   expect(nextForgotten(many, 1)).toEqual([]);
   const recalled = many.map((m) => (m.id === `n${memoryKeep - 2}` ? { ...m, recalledAt: now } : m));
   expect(nextForgotten(recalled, 3)).toEqual([`n${memoryKeep - 3}`, `n${memoryKeep - 4}`]);
+});
+
+test("the words are gse's, as recorded", () => {
+  const failed: string[] = [];
+  for (const c of goldenCases("memory")) {
+    const cue = (c.in as { cue: { text: string } }).cue;
+    const got = [...termsOf(cue.text)].toSorted();
+    const want = (c.out as { terms: string[] }).terms;
+    if (JSON.stringify(got) !== JSON.stringify(want) && failed.length < 10)
+      failed.push(`line ${c.line} ${JSON.stringify(cue.text)}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  }
+  expect(failed).toEqual([]);
+});
+
+test("words, and code whole", () => {
+  for (const [text, want] of [
+    ["这个项目测试用 pnpm test", ["项目", "测试", "pnpm", "test"]],
+    ["迁移文件在 db/migrations", ["迁移", "文件", "db/migrations"]],
+    ["登录态统一走 refreshSession()", ["登录", "统一", "refreshsession"]],
+    ["表名单数", ["名单", "单数"]],
+    ["v1.2.3 发布", ["发布", "v1.2.3"]],
+  ] as const) {
+    const got = termsList(text);
+    for (const w of want) expect(got, text).toContain(w);
+  }
 });

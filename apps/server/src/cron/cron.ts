@@ -20,8 +20,7 @@ import { Mailbox } from "@/mailbox/mailbox.ts";
 import { recordTrigger, unroutedCronTriggers } from "@/mailbox/payload.ts";
 
 import * as q from "../../db/generated/cron.sql.ts";
-import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./due.ts";
-import { whenText } from "./when.ts";
+import { afterRun, cronProblem, dueCrons, dueText, isMissed, needsOK, whenText } from "./when.ts";
 
 export interface Due {
   readonly id: string;

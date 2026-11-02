@@ -2,8 +2,10 @@ import type { McpServer } from "@botiverse/oar";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { isBusy, roomLeft } from "@vibevalley/protocol/rules";
 
 import type { MergeFailure } from "@/project/shapes.ts";
+import { runtimeLabel } from "@/runtime/presets.ts";
 
 import { recallHead, recallIntro } from "./prompts.ts";
 
@@ -42,6 +44,44 @@ export const conflictBrief = (base: string, files: readonly string[]) => t("serv
 /** Who settles a conflict when the work does not go in: the owner (an issue: told what to tell the helper), or the helper
  * at once (a task graph's step). */
 export type Settle = "owner" | "helper";
+
+export interface SessionLimits {
+  readonly workspace: number;
+  readonly perRuntime: number;
+  readonly perProject: number;
+}
+
+/** Why one more cannot start; except is a session about to work again, which does not count against itself. */
+export function noRoom(
+  sessions: readonly Pick<T.Session, "id" | "runtime" | "project" | "phase">[],
+  runtime: string,
+  project: string,
+  limits: SessionLimits,
+  except = "",
+  byOwnerComment = false,
+): string {
+  const room = roomLeft(sessions, project, limits.workspace + (byOwnerComment ? 1 : 0), limits.perProject, except);
+  if (room.farm === 0) return t("server.session.noRoom.farm", { max: limits.workspace });
+  const onRuntime = sessions.filter((h) => isBusy(h) && h.id !== except && h.runtime === runtime).length;
+  if (limits.perRuntime > 0 && onRuntime >= limits.perRuntime)
+    return t("server.session.noRoom.runtime", { runtime: runtimeLabel(runtime), on: onRuntime, max: limits.perRuntime });
+  if (room.project === 0) return t("server.session.noRoom.project", { project, on: room.inProject, max: limits.perProject });
+  return "";
+}
+
+export function sessionName(sessions: readonly Pick<T.Session, "agent">[], agentId: string, agentName: string): string {
+  const same = sessions.filter((h) => h.agent === agentId).length;
+  return same === 0 ? agentName : `${agentName} ${same + 1}`;
+}
+
+/** Who goes home so one more can come, when the farm holds max: whoever has been idle longest; none while there is room,
+ * or when every one is at work. */
+export function whoMakesRoom(sessions: readonly T.Session[], max: number): T.Session | undefined {
+  if (sessions.length < max) return undefined;
+  // Idle since its last run ended, or since it came when it has not run.
+  const idleSince = (s: T.Session) => s.lastRun?.at ?? s.hiredAt;
+  return sessions.filter((s) => !isBusy(s)).toSorted((a, b) => idleSince(a) - idleSince(b))[0];
+}
 
 /** What a take-in that did not go through means. The session stays with its branch and worktree either way. fix: what
  * the helper is sent back with ("" when it is left to the owner); owner: what the owner is told; notice: the farm's line;

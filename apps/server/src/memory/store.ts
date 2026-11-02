@@ -16,8 +16,7 @@ import { Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
-import { issueMemoryText, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
-import { termsList, termsText, termsVersion } from "./terms.ts";
+import { issueMemoryText, nextForgotten, noteMaxChars, pick, type PickCue, termsList, termsText, termsVersion } from "./recall.ts";
 
 /** One finished run, everything about it; each provider keeps what it uses. */
 export interface FinishedRun {

@@ -11,10 +11,9 @@ import { Db } from "@/infra/db.ts";
 import { world } from "@/testing/world.ts";
 
 import * as qs from "../../db/generated/session.sql.ts";
-import { makeInProcessRun } from "./inProcessRun.ts";
+import { makeInProcessRun, NotRecorded, recording } from "./inProcessRun.ts";
 import { makeTrajectories } from "./journal.ts";
-import { recording } from "./recording.ts";
-import { type RunFinished, type RunStore, runOf, Session, NotRecorded } from "./session.ts";
+import { type RunFinished, type RunStore, runOf, Session } from "./session.ts";
 const user = (words: string): CoreEvent => ({ type: "message_start", message: { role: "user", content: [text(words)], timestamp: 0 } });
 const said = (words: string, stopReason: StopReason = "stop", errorMessage?: string): CoreEvent => ({
   type: "message_end",
