@@ -1084,12 +1084,8 @@ const make = (sessions: Session["Service"]) =>
       remove: Effect.fn("Channel.remove")(function* (id) {
         const row = yield* messageOf(id);
         if (row.deleted_at !== null) return yield* Effect.fail(refused(t("server.channel.messageGone")));
-        yield* change(row, (revision, now) =>
-          Effect.gen(function* () {
-            yield* db.run(qm.deleteMessage({ at: now, revision, id }));
-            yield* ask<readonly string[]>((reply) => ({ kind: "dropEnvelope", envelope: id, reply }));
-          }),
-        );
+        yield* change(row, (revision, now) => db.run(qm.deleteMessage({ at: now, revision, id })));
+        yield* ask<readonly string[]>((reply) => ({ kind: "dropEnvelope", envelope: id, reply }));
       }, locked),
       previewRemove: Effect.fn("Channel.previewRemove")(function* (id) {
         const row = yield* messageOf(id);

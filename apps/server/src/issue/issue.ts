@@ -43,6 +43,7 @@ import * as q from "../../db/generated/issue.sql.ts";
 import * as qs from "../../db/generated/issue_assignment.sql.ts";
 import * as qe from "../../db/generated/issue_assignment_execution.sql.ts";
 import * as dispatchQ from "../../db/generated/issue_dispatch.sql.ts";
+import * as qi from "../../db/generated/mailbox_issue.sql.ts";
 import { assignTo, Assignments } from "./assignment.ts";
 import { answerCureWords, cureWords, findingsOf, issueBrief, resumeWords, splitBrief } from "./brief.ts";
 import { conflictOf } from "./conflict.ts";
@@ -564,6 +565,11 @@ const make = (options: IssueOptions = {}) =>
     });
 
     /** said: the owner's words with it, when it is asked again. */
+    const queuedFor = Effect.fn("Issue.queuedFor")(function* (id: string) {
+      const rows = yield* db.run(qi.issueInputs({ issue_id: id }));
+      return rows.map((row) => Schema.decodeSync(Schema.fromJsonString(S.Trigger))(row.trigger_json));
+    });
+
     const start = Effect.fn("Issue.start")(function* (
       id: string,
       channel: string,
@@ -572,6 +578,7 @@ const make = (options: IssueOptions = {}) =>
       inputs: readonly T.Trigger[] = [],
     ): Effect.fn.Return<Dispatched, ApiError> {
       const mine = yield* Effect.option(get(id));
+      const initial = inputs.length > 0 || mine._tag === "None" ? inputs : yield* queuedFor(id);
       if (Option.isSome(mine)) {
         const children = (yield* everyIssue).filter((child) => child.parent === mine.value.id);
         if (children.length > 0) {
@@ -582,7 +589,7 @@ const make = (options: IssueOptions = {}) =>
               channel,
               issue: id,
               trigger: by,
-              inputs,
+              inputs: initial,
               worktree: true,
             });
             if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")));
@@ -607,14 +614,14 @@ const make = (options: IssueOptions = {}) =>
       const full = sessions.noRoom(agent.runtime, project);
       const blocked = issue.blockedBy.length > 0 ? blockedIssues(issue, yield* everyIssue) : [];
       if (blocked.length > 0) {
-        yield* queueRow(issue.id, true, (yield* chat.topOf(where)).id, trigger, inputs[0]);
+        yield* queueRow(issue.id, true, (yield* chat.topOf(where)).id, trigger, initial[0]);
         return { queued: t("server.issue.dependencies.waiting", { issues: list(blocked) }) };
       }
       if (full) {
-        yield* queueRow(issue.id, true, (yield* chat.topOf(where)).id, trigger, inputs[0]);
+        yield* queueRow(issue.id, true, (yield* chat.topOf(where)).id, trigger, initial[0]);
         return { queued: t("server.issue.queued", { full }) };
       }
-      return { session: yield* send(issue, agent, project, where, trigger, inputs) };
+      return { session: yield* send(issue, agent, project, where, trigger, initial) };
     });
 
     const splitting = yield* Semaphore.make(1);
