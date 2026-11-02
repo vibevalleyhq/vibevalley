@@ -177,7 +177,7 @@ const make = Effect.gen(function* () {
     apply,
 
     setCommits: Effect.fn("Core.setCommits")(function* (commits) {
-      return yield* apply({ type: "commits", commits });
+      return yield* apply({ type: "gameProgress", commits });
     }),
     open: Effect.fn("Core.open")(function* () {
       if (current().state.call !== "live") yield* apply({ type: "voiceCall", state: "live", reason: "" });

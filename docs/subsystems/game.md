@@ -27,7 +27,7 @@
 - **奖结果，不奖消耗。** 金币、连胜和收成类的成就只认「收进主分支的活」：帮工离开（`sessionGone` 事实）时工单关成 `merged` 且合进去的提交数大于 0，记一条 `harvested`。一轮做完、命令数、读写次数、花的 token 不进任何规则。回报只有金币和称号，地块和派活的规则不看它们。
 - **账本是唯一的家。** 一条一行、按 `id` 的顺序折；`Progress` 每次都是整本折出来的结果，不另存计数。开机整本重折，规则改了重启就按新规则算；`kind` 和 `payload` 合成一条后按 `LedgerEntry` 的 Schema 解码，折不回来的行（`kind` 不认识、解不开、形状不对或数值不是有限数）跳过。一次记一条（`ledger.mu`），表里的顺序就是折的顺序。
 - **记不下来不挡农场。** 写库失败只记日志，那一条少了，农场照常。
-- **记一条就施加一个 `progress` 事实**；这一条带来金币或到了某一档时带上 `news`（多少金币、给哪个帮工、到了哪几档）。账本自己施加的 `progress` 不再回到账本。
+- **记一条就施加一个 `gameProgress` 事实**；这一条带来金币或到了某一档时带上 `news`（多少金币、给哪个帮工、到了哪几档）。账本自己施加的纯 `gameProgress.progress` 不再回到账本。
 - **金币**：
   - 收进一件活：`round((30 + min(提交数 × 5, 30)) × 连胜倍率)`，倍率 `min(2, 1 + 0.1 × (连胜 − 1))`；取整是 JavaScript 的 `Math.round`，`1 + 0.1 × 7` 是 `1.7000000000000002`。
   - 完成一个父子工单（`family` 条目）：`30 + 10 × 合进去的件数`。
@@ -54,11 +54,11 @@
 
 - **称号**：只能挂拿到的档，新手任务的不能挂；别的取值（空的、没拿到的）都是摘掉称号。
 - **战绩**：`hired`、`harvested`、`failed` 三种条目带档案，折成 `Progress.agents`（雇过、收成、没做成）。
-- **等级**：从 Lv.n 升到 Lv.n+1 要 `10n` 个 commit（`xpToNext`）；`farmLevelOf` 给出等级、这一级的经验和要多少。commit 数一样时 `commits` 事实不改状态。
+- **等级**：从 Lv.n 升到 Lv.n+1 要 `10n` 个 commit（`xpToNext`）；`farmLevelOf` 给出等级、这一级的经验和要多少。commit 数一样时 `gameProgress.commits` 不改状态。
 - **升级横幅只给数出来的增长**：`levelUps` 每跨一级放一个 `levelUp`；农场第一次数出 commit 数（之前 `commits` 是空的）只定下等级，不放横幅，但账本照样记 `level`。开机时 `catchUp` 比较 commit 的等级和账本里的 `farm_level`，落下的补记一条。
 - **仓库是交付 `merged` 或 `pull_request` 的工单**，一张一格（整个计划也是一格），最近收的在前；不另存，页面从 `WorkspaceState.issues` 读。
-- **地块号**：`SessionPlay.station` 是 0–5（`maxRunning` 6），`-1` 是不在地里。新雇的帮工站第一块空着的地；已经有 `play` 的帮工再雇不换地；读回的 `session` 表里没有地块的帮工由 `withStations` 补上。`station` 事实只挪到空着的地：帮工不在、已经在那块地、那块地有人、超出范围都不改状态。
-- **特效是纯函数** `EffectsOf(折之前的状态, 事实)`：`commits` 给 `levelUp`；`progress` 的 `news` 给 `reward`（金币、帮工、连胜）和每档一个 `achievement`（带着这一档的说法：叫什么、到了叫什么、成就的介绍、金币、是不是一次性的）；一个已知帮工的 `sessionReport` 是 `failed` 给 `penalty`。
+- **地块号**：`SessionPlay.station` 是 0–5（`maxRunning` 6），`-1` 是不在地里。新雇的帮工站第一块空着的地；已经有 `play` 的帮工再雇不换地；读回的 `session` 表里没有地块的帮工由 `withStations` 补上。`gameProgress.station` 只挪到空着的地：帮工不在、已经在那块地、那块地有人、超出范围都不改状态。
+- **特效是纯函数** `EffectsOf(折之前的状态, 事实)`：`gameProgress.commits` 给 `levelUp`；`gameProgress.news` 给 `reward`（金币、帮工、连胜）和每档一个 `achievement`（带着这一档的说法：叫什么、到了叫什么、成就的介绍、金币、是不是一次性的）；一个已知帮工的 `sessionReport` 是 `failed` 给 `penalty`。
 - **成就的说法**（`achievementsInWords`）：每档的称号是 `tierTitles` 里的，没有就是成就名，第二、三档前面加「银牌」「金牌」；到了一档叫「新手任务做完了」（新手任务）、「发现一个彩蛋」（彩蛋）、「升到金牌」「升到银牌」「解锁成就」；新手任务以外的都能当称号（`wearable`）。说法不进帧，页面读一次 `game.achievement.list`；每帧的 `view.achievements` 只有进度（成就、档、计数、下一档要多少，全到了就没有下一档），和说法一样按页面的顺序。
 
 ## 怎么走
@@ -66,13 +66,13 @@
 **记账**（`ledger.OnStart`）：
 
 1. 订阅 `core.Transitions()`，先对当时的状态跑 `catchUp`。
-2. 每个事实连同折之前、折之后的状态交给 `entriesFor`，读出要记的条目：`sessionReport` 失败 → `failed`；`issue.conflict` 新增或换负责会话 → `conflicted`；`voiceCall` 变成 `live` → `opened`；`session`（Worker）→ `hired`；首次出现子工单 → `split`，父工单完成 → `family`（已合入子单数及依赖分层）；`sessionGone` 关成 `merged` 且有提交 → `harvested`；频道的新消息：主人在工单串里说的 → `told`，主人 @ 的帮工 → `called`，帮工回别人的 → `handoff`；`commits` 跨了级 → `level`；6 块地填满 → `busy6`。
+2. 每个事实连同折之前、折之后的状态交给 `entriesFor`，读出要记的条目：`sessionReport` 失败 → `failed`；`issue.conflict` 新增或换负责会话 → `conflicted`；`voiceCall` 变成 `live` → `opened`；`session`（Worker）→ `hired`；首次出现子工单 → `split`，父工单完成 → `family`（已合入子单数及依赖分层）；`sessionGone` 关成 `merged` 且有提交 → `harvested`；频道的新消息：主人在工单串里说的 → `told`，主人 @ 的帮工 → `called`，帮工回别人的 → `handoff`；`gameProgress.commits` 跨了级 → `level`；6 块地填满 → `busy6`。
 3. 主人在应用里做的、不改状态的事由经手的服务说给 `core.Did`，账本订阅 `core.owner`（返回前就订上：开机后主人马上做的也不漏）记：主人看收成清单（`issue` 的 `changesFor`，管家看的不算）→ `reviewed`；语音接通（`voice.Start`）→ `voice`。挑称号由 HTTP 调 `Game.chooseTitle` 记 `titled`。
-4. 每条写进 `game_ledger`，`progressStep` 折一步，施加 `progress` 事实；`Core.apply` 同时用 `effectsOf` 算出特效，和帧一起发。
+4. 每条写进 `game_ledger`，`progressStep` 折一步，施加 `gameProgress` 事实；`Core.apply` 同时用 `effectsOf` 算出特效，和帧一起发。
 
-**数 commit**（`commits`）：开机就绪后数一次，之后每 2 分钟一次；每个 `sessionReport` 事实（一轮结束）后 15 秒再数一次，几轮共用一次。数和写回由 `counting` 锁成一次一个，旧的数不会盖掉新的；停机以后数完的不写。结果经 `Core.setCommits` 施加 `commits` 事实。
+**数 commit**（`commits`）：开机就绪后数一次，之后每 2 分钟一次；每个 `sessionReport` 事实（一轮结束）后 15 秒再数一次，几轮共用一次。数和写回由 `counting` 锁成一次一个，旧的数不会盖掉新的；停机以后数完的不写。结果经 `Core.setCommits` 施加 `gameProgress.commits`。
 
-**点空地**（`game.ts`）：主人点一块空地再说话，`channel.message.send` 带上这块地的 `station`，`Game.want` 记下这块地 10 秒。这期间雇的第一个帮工先由 `session` 站到第一块空地，`game` 听到 `session` 再施加 `station` 把它挪过去；地已有人就不挪。记下的地用一次就清掉，不管挪没挪成。两个事实相隔不到 200 毫秒，通常在同一帧里。
+**点空地**（`game.ts`）：主人点一块空地再说话，`channel.message.send` 带上这块地的 `station`，`Game.want` 记下这块地 10 秒。这期间雇的第一个帮工先由 `session` 站到第一块空地，`game` 听到 `session` 再施加 `gameProgress.station` 把它挪过去；地已有人就不挪。记下的地用一次就清掉，不管挪没挪成。两个事实相隔不到 200 毫秒，通常在同一帧里。
 
 ## 和谁打交道
 

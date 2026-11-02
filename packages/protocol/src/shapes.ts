@@ -2087,15 +2087,11 @@ export type Fact =
   | FactChannelGone
   | FactOwnerMentions
   | FactSession
-  | FactStation
-  | FactRun
-  | FactDoing
   | FactSessionReport
   | FactSessionGone
-  | FactCommits
+  | FactGameProgress
   | FactIssue
   | FactIssueGone
-  | FactProgress
   | FactCron
   | FactCronGone
   | FactConnector;
@@ -2114,6 +2110,7 @@ export interface FactSessionPhase {
   phase: Phase;
   channel?: string;
   spent?: Spent;
+  brief?: string;
 }
 
 export interface FactMessage {
@@ -2149,28 +2146,6 @@ export interface FactSession {
   session: Session;
 }
 
-export interface FactStation {
-  type: "station";
-  at: number;
-  id: SessionId;
-  station: number;
-}
-
-export interface FactRun {
-  type: "run";
-  at: number;
-  id: SessionId;
-  brief?: string;
-}
-
-export interface FactDoing {
-  type: "doing";
-  at: number;
-  id: SessionId;
-  action: SessionAction;
-  label: string;
-}
-
 export interface FactSessionReport {
   type: "sessionReport";
   at: number;
@@ -2195,12 +2170,6 @@ export interface FactSessionGone {
   merged?: number;
 }
 
-export interface FactCommits {
-  type: "commits";
-  at: number;
-  commits: CommitCount;
-}
-
 export interface FactIssue {
   type: "issue";
   at: number;
@@ -2213,11 +2182,13 @@ export interface FactIssueGone {
   id: IssueId;
 }
 
-export interface FactProgress {
-  type: "progress";
+export interface FactGameProgress {
+  type: "gameProgress";
   at: number;
-  progress: Progress;
+  progress?: Progress;
   news?: ProgressNews;
+  commits?: CommitCount;
+  station?: { readonly id: SessionId; readonly station: number };
 }
 
 export interface FactConnector {
@@ -2247,15 +2218,11 @@ export type SideEvent =
   | FactChannelGone
   | FactOwnerMentions
   | FactSession
-  | FactStation
-  | FactRun
-  | FactDoing
   | FactSessionReport
   | FactSessionGone
-  | FactCommits
+  | FactGameProgress
   | FactIssue
   | FactIssueGone
-  | FactProgress
   | FactCron
   | FactCronGone
   | FactConnector

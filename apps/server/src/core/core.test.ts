@@ -131,15 +131,15 @@ describe("core", () => {
       yield* Effect.scoped(
         Effect.gen(function* () {
           const core = yield* Core;
-          const seen = yield* core.events.pipe(Stream.take(5), Stream.runCollect, Effect.forkScoped);
+          const seen = yield* core.events.pipe(Stream.take(6), Stream.runCollect, Effect.forkScoped);
           yield* TestClock.adjust(5);
           yield* core.apply({ type: "session", session: { ...helper, phase: { _tag: "working", since: 5, doing: { action: "none", label: "" } } } });
           yield* activity(core, "orchestrator", "thinking");
           yield* activity(core, "orchestrator", "thinking");
-          yield* core.apply({ type: "progress", progress: emptyProgress() });
+          yield* core.apply({ type: "gameProgress", progress: emptyProgress() });
           yield* core.setCommits({ total: 1, today: 0, week: 0 } as never);
           const got = yield* Fiber.join(seen);
-          expect(got.map((e) => e.type)).toEqual(["snapshot", "session", "session", "sessionPhase", "progress"]);
+          expect(got.map((e) => e.type)).toEqual(["snapshot", "session", "session", "sessionPhase", "gameProgress", "gameProgress"]);
           expect(got[2]!.at).toBeGreaterThan(0);
         }).pipe(
           Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))),
@@ -190,7 +190,7 @@ describe("core", () => {
       // A batch is one commit.
       yield* core.apply(
         { type: "sessionPhase", id: sessionId("orchestrator"), phase: phaseOf("speaking") },
-        { type: "commits", commits: { total: 3, repos: [] } },
+        { type: "gameProgress", commits: { total: 3, repos: [] } },
       );
       const replied = core.seq();
       expect(replied).toBe(2);

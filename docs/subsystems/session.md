@@ -41,7 +41,7 @@ Session 服务只返回声明的接口，不附带 Hand、令牌生成器和日�
 | 层 | 代码里 | 是什么 |
 |---|---|---|
 | Session | `Session`（`shapes.ts`）、`session` 表 | 一个档案的上下文：工单按配置使用项目目录或 worktree；聊天使用自身目录并关联频道，跨好几次 run；编号 `w<n>`，接着已有的最大号往下排，新 Session 不会撞上旧日志 |
-| Run | `Run`、`session_run` | 一次触发到一次汇报：帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run；核心状态里是 `run` 到 `sessionReport` 两个事实 |
+| Run | `Run`、`session_run` | 一次触发到一次汇报：帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run；核心状态里是 `sessionPhase` 到 `sessionReport` 两个事实 |
 | oar 会话 | oar 的会话、`Subagent` | 农机的一条可续的记录流；重启或接不上时换一个 |
 
 - **核心状态只放在地里的**：`WorkspaceState.sessions` 是在地里的 Session；`sessionReport` 事实按结果折成 `done`（做完）、`failed`、`resting`（叫停、重启打断）。走了的从 `session` 表读，阶段是 `closed`（什么时候、怎么走的，`SessionClose`：`merged`（合进了主分支）、`completed`（它的工单完成了、没合进主分支：分支留着、没有改动、计划的一步合进计划的分支）、`dismissed`、`lost`），轮数、最后一轮的结果和花费从 `session_run` 算，不另存。`triggered_by`、`heard`、`spent`、计划、工作目录和想起过的记性各自按 Schema 读回；某个字段读不了只按那个字段原有的空值处理，坏工作目录仍按接不回来处理。

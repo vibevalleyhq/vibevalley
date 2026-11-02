@@ -131,7 +131,7 @@ describe("moves and the stage", () => {
     const issues = state.issues;
     state = reduce(state, { type: "voiceCall", state: "live", reason: "", at: 2 })[0];
     expect(state.issues).toBe(issues);
-    state = reduce(state, { type: "run", id: hired.id, at: 2 })[0];
+    state = reduce(state, { type: "sessionPhase", id: hired.id, at: 2, phase: { _tag: "working", since: 2, doing: { action: "thinking", label: "" } } })[0];
     state = reduce(state, {
       type: "sessionPhase",
       id: hired.id,
@@ -139,7 +139,7 @@ describe("moves and the stage", () => {
       at: 2,
     })[0];
     expect(state.issues[0]!.stage).toMatchObject({ state: "stuck", stuck: "quiet", since: 2 });
-    state = reduce(state, { type: "doing", id: hired.id, action: "thinking", label: "", at: 2 })[0];
+    state = reduce(state, { type: "sessionPhase", id: hired.id, at: 2, phase: { _tag: "working", since: 2, doing: { action: "thinking", label: "" } } })[0];
     expect(state.issues[0]!.stage.state).toBe("working");
     state = reduce(state, {
       type: "sessionReport",

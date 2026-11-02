@@ -26,6 +26,11 @@ interface Rule {
 
 const RULES: readonly Rule[] = [
   {
+    name: "a fact split from sessionPhase or gameProgress",
+    pattern: /\b(FactHired|FactLeft|FactRun|FactDoing|FactStation|FactCommits|FactProgress)\b/u,
+    says: "a run or a step is sessionPhase (brief, phase.doing); a station, commits or the ledger is gameProgress",
+  },
+  {
     name: "a toggle, now an explicit set",
     pattern: /\b(reaction|pin|archive)\.toggle\b|\bReactionToggle\b|\/(reaction|pin|archive)\/toggle\b/u,
     says: "a retried toggle undoes itself; send the value the owner asked for: channel.reaction.set, channel.pin.set, channel.archive.set ({ on })",

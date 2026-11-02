@@ -19,10 +19,4 @@ export function withSession(state: T.WorkspaceState, id: string, change: (h: T.S
   return [{ ...state, sessions }, true];
 }
 
-export function whileWorking(state: T.WorkspaceState, id: string, change: (p: T.PhaseWorking) => T.PhaseWorking): [T.WorkspaceState, boolean] {
-  const phase = sessionOf(state, id)?.phase;
-  if (phase?._tag !== "working") return [state, false];
-  return withSession(state, id, (h) => ({ ...h, phase: change(phase) }));
-}
-
 export const doingOf = (h: T.Session): T.Doing => (h.phase._tag === "working" ? h.phase.doing : { action: "none", label: "" });

@@ -136,15 +136,15 @@ function levelUps(before: number | undefined, after: number): T.GameEffect[] {
 
 export function effectsOf(before: T.WorkspaceState, fact: T.Fact): T.GameEffect[] {
   switch (fact.type) {
-    case "commits":
-      return levelUps(before.commits?.total, fact.commits.total);
-    case "progress": {
-      const news = fact.news;
-      if (!news) return [];
+    case "gameProgress": {
       const out: T.GameEffect[] = [];
-      if (news.coins != null && news.coins !== 0)
-        out.push({ kind: "reward", ...(news.session ? { sessionId: news.session } : {}), coins: news.coins, streak: fact.progress.streak });
-      for (const u of news.unlocked) out.push(achievementEffect(u.id, u.tier));
+      if (fact.commits) out.push(...levelUps(before.commits?.total, fact.commits.total));
+      const news = fact.news;
+      if (news && fact.progress) {
+        if (news.coins != null && news.coins !== 0)
+          out.push({ kind: "reward", ...(news.session ? { sessionId: news.session } : {}), coins: news.coins, streak: fact.progress.streak });
+        for (const u of news.unlocked) out.push(achievementEffect(u.id, u.tier));
+      }
       return out;
     }
     case "sessionReport":

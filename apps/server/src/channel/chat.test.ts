@@ -72,7 +72,13 @@ class FakeSessions {
     const fresh = `${id}-${++this.n}`;
     this.running.set(id, fresh);
     this.inputs.set(id, [...this.runsOf(id), text]);
-    this.apply({ type: "run", id: sessionId(id) });
+    const channel = this.core.session(id)?.channel;
+    this.apply({
+      type: "sessionPhase",
+      id: sessionId(id),
+      ...(channel !== undefined ? { channel } : {}),
+      phase: { _tag: "working", since: Date.now(), doing: { action: "thinking", label: "" } },
+    });
     void this.run(id, fresh, text);
     return { kind: "run", launch: fresh, woke: true };
   };

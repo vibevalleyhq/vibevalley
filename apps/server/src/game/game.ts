@@ -68,7 +68,7 @@ const make = Effect.gen(function* () {
     if (Option.isSome(entry)) entries.push(entry.value);
   }
   let folded: Folded = progressFold(entries);
-  yield* core.apply({ type: "progress", progress: folded.progress });
+  yield* core.apply({ type: "gameProgress", progress: folded.progress });
 
   // One entry at a time, so the order in the table is the order of the fold.
   const one = yield* Semaphore.make(1);
@@ -80,7 +80,7 @@ const make = Effect.gen(function* () {
       yield* db.attempt(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
       const [next, news] = progressStep(folded, entry);
       folded = next;
-      yield* core.apply({ type: "progress", progress: next.progress, ...((news.coins ?? 0) !== 0 || news.unlocked.length > 0 ? { news } : {}) });
+      yield* core.apply({ type: "gameProgress", progress: next.progress, ...((news.coins ?? 0) !== 0 || news.unlocked.length > 0 ? { news } : {}) });
     },
     (effect, input) => Effect.catchCause(effect, (cause) => Effect.logError(`vibevalley: a ledger entry (${input.kind}) was not kept`, cause)),
     one.withPermits(1),
@@ -122,12 +122,12 @@ const make = Effect.gen(function* () {
   yield* Effect.forkScoped(
     Stream.runForEach(transitions, ({ before, fact, after }) =>
       Effect.gen(function* () {
-        if (fact.type === "progress") return;
+        if (fact.type === "gameProgress" && fact.commits === undefined && fact.station === undefined) return;
         if (fact.type === "sessionReport") yield* soon;
         if (fact.type === "session" && fact.session.role === "worker") {
           const wish = wanted;
           wanted = undefined;
-          if (wish && wish.until > fact.at) yield* core.apply({ type: "station", id: fact.session.id, station: wish.station });
+          if (wish && wish.until > fact.at) yield* core.apply({ type: "gameProgress", station: { id: fact.session.id, station: wish.station } });
         }
         yield* Effect.forEach(entriesFor(before, fact, after), (e) => record(e), { discard: true });
       }),

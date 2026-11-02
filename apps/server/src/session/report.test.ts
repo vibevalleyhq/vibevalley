@@ -28,7 +28,7 @@ const base = (): Session =>
     project: "clock-in",
     phase: { _tag: "working", since: 0, doing: { action: "none", label: "" } },
   }) as Session;
-const working = (doing: Doing): Session => ({ ...base(), phase: { _tag: "working", doing } }) as Session;
+const working = (doing: Doing): Session => ({ ...base(), phase: { _tag: "working", since: 0, doing } });
 const thinking: Doing = { action: "thinking", label: "" };
 const none: Tracking = {};
 
@@ -36,7 +36,7 @@ describe("a session's events", () => {
   it("a run starts with the brief and counts from what was spent", () => {
     const h = { ...base(), spent: { tokens: 50, cny: 0.1 } };
     const r = eventFacts(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + briefBreak + "加一个查询接口" }), h, none, ctx);
-    expect(r.facts).toEqual([{ type: "run", id: "w1" }]);
+    expect(r.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
     expect(r.journal).toEqual([{ type: "prompt", text: "加一个查询接口" }]);
     expect(r.tracking.runFrom).toEqual({ tokens: 50, cny: 0.1 });
   });
@@ -57,7 +57,9 @@ describe("a session's events", () => {
       none,
       ctx,
     );
-    expect(started.facts).toEqual([{ type: "doing", id: "w1", action: "run_command", label: "pnpm test" }]);
+    expect(started.facts).toEqual([
+      { type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "run_command", label: "pnpm test" } } },
+    ]);
     expect(started.journal[0]!.type).toBe("toolStarted");
     expect(started.tracking.shownCall).toEqual({ id: "c1", tool: "bash" });
     const same = eventFacts(
@@ -74,7 +76,7 @@ describe("a session's events", () => {
       ctx,
     );
     expect(failed.journal).toEqual([{ type: "toolEnded", callId: "c1", output: "1 failing", ok: false }]);
-    expect(failed.facts).toEqual([{ type: "doing", id: "w1", action: "thinking", label: "" }]);
+    expect(failed.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
   });
 
   it("the full input names the target better", () => {
@@ -86,7 +88,7 @@ describe("a session's events", () => {
       ctx,
     );
     expect(r.journal).toEqual([{ type: "toolInput", callId: "c1", input, text: "src/http.ts" }]);
-    expect(r.facts).toEqual([{ type: "doing", id: "w1", action: "read_file", label: "src/http.ts" }]);
+    expect(r.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "read_file", label: "src/http.ts" } } }]);
   });
 
   it("reasoning is a step when shown", () => {
@@ -97,7 +99,7 @@ describe("a session's events", () => {
       ctx,
     );
     expect(r.journal).toEqual([{ type: "thought", text: "先看看路由在哪" }]);
-    expect(r.facts).toEqual([{ type: "doing", id: "w1", action: "thinking", label: "" }]);
+    expect(r.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
     expect(eventFacts(ev({ kind: "reasoning", content: { kind: "redacted" } }), working(thinking), none, ctx).journal).toEqual([]);
   });
 
@@ -138,8 +140,8 @@ describe("a session's events", () => {
     const word = eventFacts(ev({ kind: "text_delta", text: "构建完了" }), working(doing), { quiet: true }, ctx);
     expect(word.tracking.quiet).toBe(false);
     expect(word.facts).toEqual([
-      { type: "doing", id: "w1", ...doing },
-      { type: "doing", id: "w1", action: "speaking_text", label: "" },
+      { type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing } },
+      { type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "speaking_text", label: "" } } },
     ]);
   });
 

@@ -402,7 +402,7 @@ const make = (options: SessionOptionsIn = {}) =>
         Effect.gen(function* () {
           const session = restoredSession(row);
           yield* core.apply({ type: "session", session });
-          if (session.play) yield* core.apply({ type: "station", id: session.id, station: session.play.station });
+          if (session.play) yield* core.apply({ type: "gameProgress", station: { id: session.id, station: session.play.station } });
         }),
       { discard: true },
     );
@@ -585,14 +585,10 @@ const make = (options: SessionOptionsIn = {}) =>
       const reaction = eventFacts(event, core.session(h.id), h.tracking, { id: h.id, runtime, cwd: h.place.cwd });
       h.tracking = reaction.tracking;
       if (reaction.model) h.tracking = omitUndefined({ ...h.tracking, rate: runtimes.quote(runtime, reaction.model) });
-      if (opened) {
-        for (const fact of reaction.facts) if (fact.type === "run") apply(fact);
-        startRun(h);
-      }
+      if (opened) startRun(h);
       for (const a of signals) signal(a);
       for (const op of reaction.journal) record(h.journal, op);
       for (const fact of reaction.facts) {
-        if (opened && fact.type === "run") continue;
         if (fact.type === "sessionReport") {
           const report = h.run ? { ...fact, run: h.run } : fact;
           apply(report);
@@ -610,7 +606,13 @@ const make = (options: SessionOptionsIn = {}) =>
     const applyReport = (h: Hand, report: SubagentReport, completedBefore: number) => {
       if (report.outcome.kind === "completed" && !handsToOwner(h.report) && (executor.find(h.id)?.pendingTasks ?? 0) > 0) {
         h.settling = { report, completedBefore };
-        apply({ type: "doing", id: h.id, action: "wait", label: "" });
+        const channel = core.session(h.id)?.channel;
+        apply({
+          type: "sessionPhase",
+          id: h.id,
+          ...(channel !== undefined ? { channel } : {}),
+          phase: { _tag: "working", since: clock.currentTimeMillisUnsafe(), doing: { action: "wait", label: "" } },
+        });
         signal({ kind: "settling", id: h.id, launch: h.launch });
         return;
       }

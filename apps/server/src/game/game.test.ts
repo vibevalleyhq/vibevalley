@@ -62,7 +62,7 @@ describe("the game", () => {
           summary: "坏了",
           runs: 1,
         });
-        yield* core.apply({ type: "commits", commits: { total: 1000, repos: [] } });
+        yield* core.apply({ type: "gameProgress", commits: { total: 1000, repos: [] } });
         yield* until(kinds, (k) => k.join() === "harvested,hired,failed,level", "the ledger");
         return core.state().progress!;
       }).pipe(Effect.scoped, Effect.provide(farm(config)));

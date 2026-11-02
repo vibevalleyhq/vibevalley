@@ -6,7 +6,7 @@ import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 import { withChannel, withMessage, withOwnerMentions } from "@/channel/folded.ts";
 import { freeStation, playedDoing, playedRun, playOf, stationed } from "@/game/play.ts";
 import { withIssue, withIssueStatuses } from "@/issue/status.ts";
-import { sessionOf, whileWorking, withSession } from "@/session/roster.ts";
+import { sessionOf, withSession } from "@/session/roster.ts";
 
 const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 
@@ -24,9 +24,30 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
     }
     case "sessionPhase": {
       const session = sessionOf(state, f.id);
-      if (!session || (same(session.phase, f.phase) && session.channel === f.channel && (f.spent === undefined || same(session.spent, f.spent))))
+      if (
+        !session ||
+        (same(session.phase, f.phase) &&
+          session.channel === f.channel &&
+          (f.spent === undefined || same(session.spent, f.spent)) &&
+          (f.brief === undefined || f.brief === session.brief))
+      )
         return [state, false];
-      return withSession(state, f.id, (h) => omitUndefined({ ...h, phase: f.phase, channel: f.channel, ...(f.spent ? { spent: f.spent } : {}) }));
+      return withSession(state, f.id, (h) => {
+        const play =
+          f.phase._tag === "working"
+            ? h.phase._tag === "working"
+              ? playedDoing(playOf(h), { at: f.at, action: f.phase.doing.action, label: f.phase.doing.label })
+              : playedRun(playOf(h), f.at)
+            : playOf(h);
+        return omitUndefined({
+          ...h,
+          phase: f.phase,
+          channel: f.channel,
+          brief: f.brief ?? h.brief,
+          play,
+          ...(f.spent ? { spent: f.spent } : {}),
+        });
+      });
     }
     case "message": {
       const [chat, news] = withMessage(state.chat, f.message);
@@ -50,20 +71,6 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
       const h: T.Session = { ...f.session, play };
       return [{ ...state, sessions: [...others, h] }, true];
     }
-    case "station":
-      return stationed(state, f);
-    case "run":
-      return withSession(state, f.id, (h) => ({
-        ...h,
-        brief: f.brief ? f.brief : h.brief,
-        phase: { _tag: "working", since: f.at, doing: { action: "thinking", label: "" } },
-        play: playedRun(playOf(h), f.at),
-      }));
-    case "doing": {
-      const [after, changed] = whileWorking(state, f.id, (p) => ({ _tag: "working", since: p.since, doing: { action: f.action, label: f.label } }));
-      if (!changed) return [state, false];
-      return withSession(after, f.id, (h) => ({ ...h, play: playedDoing(playOf(h), f) }));
-    }
     case "sessionReport":
       if (!sessionOf(state, f.id)) return [state, false];
       return [
@@ -77,12 +84,26 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
       ];
     case "sessionGone":
       return [{ ...state, sessions: state.sessions.filter((h) => h.id !== f.id) }, true];
-    case "commits":
-      if (state.commits && same(state.commits, f.commits)) return [state, false];
-      return [{ ...state, commits: f.commits }, true];
-    case "progress":
-      if (state.progress && same(state.progress, f.progress)) return [state, false];
-      return [{ ...state, progress: f.progress }, true];
+    case "gameProgress": {
+      let next = state;
+      let changed = false;
+      if (f.commits !== undefined && !same(next.commits, f.commits)) {
+        next = { ...next, commits: f.commits };
+        changed = true;
+      }
+      if (f.progress !== undefined && !same(next.progress, f.progress)) {
+        next = { ...next, progress: f.progress };
+        changed = true;
+      }
+      if (f.station !== undefined) {
+        const [stationedState, moved] = stationed(next, f.station);
+        if (moved) {
+          next = stationedState;
+          changed = true;
+        }
+      }
+      return [next, changed];
+    }
     case "cron": {
       const all = [...state.crons];
       const i = all.findIndex((x) => x.id === f.cron.id);

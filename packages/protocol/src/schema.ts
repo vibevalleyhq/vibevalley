@@ -1682,6 +1682,7 @@ export const FactSessionPhase: Codec<T.FactSessionPhase> = Schema.Struct({
   phase: Phase,
   channel: Schema.optionalKey(Schema.String),
   spent: Schema.optionalKey(Spent),
+  brief: Schema.optionalKey(Schema.String),
 });
 
 export const FactMessage: Codec<T.FactMessage> = Schema.Struct({
@@ -1710,28 +1711,6 @@ export const FactSession: Codec<T.FactSession> = Schema.Struct({
   session: Session,
 });
 
-export const FactStation: Codec<T.FactStation> = Schema.Struct({
-  type: Schema.Literal("station"),
-  at: Schema.Finite,
-  id: SessionId,
-  station: Schema.Finite,
-});
-
-export const FactRun: Codec<T.FactRun> = Schema.Struct({
-  type: Schema.Literal("run"),
-  at: Schema.Finite,
-  id: SessionId,
-  brief: Schema.optionalKey(Schema.String),
-});
-
-export const FactDoing: Codec<T.FactDoing> = Schema.Struct({
-  type: Schema.Literal("doing"),
-  at: Schema.Finite,
-  id: SessionId,
-  action: SessionAction,
-  label: Schema.String,
-});
-
 export const FactSessionReport: Codec<T.FactSessionReport> = Schema.Struct({
   type: Schema.Literal("sessionReport"),
   at: Schema.Finite,
@@ -1755,12 +1734,6 @@ export const FactSessionGone: Codec<T.FactSessionGone> = Schema.Struct({
   merged: Schema.optionalKey(Schema.Finite),
 });
 
-export const FactCommits: Codec<T.FactCommits> = Schema.Struct({
-  type: Schema.Literal("commits"),
-  at: Schema.Finite,
-  commits: CommitCount,
-});
-
 export const FactIssue: Codec<T.FactIssue> = Schema.Struct({
   type: Schema.Literal("issue"),
   at: Schema.Finite,
@@ -1779,11 +1752,13 @@ export const FactIssueGone: Codec<T.FactIssueGone> = Schema.Struct({
   id: IssueId,
 });
 
-export const FactProgress: Codec<T.FactProgress> = Schema.Struct({
-  type: Schema.Literal("progress"),
+export const FactGameProgress: Codec<T.FactGameProgress> = Schema.Struct({
+  type: Schema.Literal("gameProgress"),
   at: Schema.Finite,
-  progress: Progress,
+  progress: Schema.optionalKey(Progress),
   news: Schema.optionalKey(ProgressNews),
+  commits: Schema.optionalKey(CommitCount),
+  station: Schema.optionalKey(Schema.Struct({ id: SessionId, station: Schema.Finite })),
 });
 
 export const FactCron: Codec<T.FactCron> = Schema.Struct({
@@ -1811,16 +1786,12 @@ export const Fact: Codec<T.Fact> = Schema.Union([
   FactChannel,
   FactOwnerMentions,
   FactSession,
-  FactStation,
-  FactRun,
-  FactDoing,
   FactSessionReport,
   FactSessionGone,
-  FactCommits,
+  FactGameProgress,
   FactIssue,
   FactIssueGone,
   FactChannelGone,
-  FactProgress,
   FactCron,
   FactCronGone,
   FactConnector,
@@ -1859,16 +1830,12 @@ export const SideEvent: Codec<T.SideEvent> = Schema.Union([
   FactChannel,
   FactOwnerMentions,
   FactSession,
-  FactStation,
-  FactRun,
-  FactDoing,
   FactSessionReport,
   FactSessionGone,
-  FactCommits,
+  FactGameProgress,
   FactIssue,
   FactIssueGone,
   FactChannelGone,
-  FactProgress,
   FactCron,
   FactCronGone,
   FactConnector,

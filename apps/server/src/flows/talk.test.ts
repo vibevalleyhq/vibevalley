@@ -186,7 +186,7 @@ describe("a talk with a helper profile", () => {
         );
         const context = sessions.presentSessions().find((s) => s.channel === dm);
         if (!context) throw new Error("the conversation has no session");
-        yield* (yield* Core).apply({ type: "station", id: context.id, station: 3 });
+        yield* (yield* Core).apply({ type: "gameProgress", station: { id: context.id, station: 3 } });
         return { dm, session: context.id };
       }).pipe(Effect.scoped, Effect.provide(farm({ config, runtime }).layer));
       expect(existsSync(join(config.home, "state.json"))).toBe(false);

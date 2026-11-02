@@ -237,10 +237,12 @@ export function entriesFor(before: T.WorkspaceState, fact: T.Fact, after: T.Work
       } else if (fact.message.fromKind === "session" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });
       break;
     }
-    case "commits": {
-      const [level] = levelForCommits(fact.commits.total);
-      const [was] = levelForCommits(before.commits?.total ?? 0);
-      if (level > was) out.push({ kind: "level", level });
+    case "gameProgress": {
+      if (fact.commits) {
+        const [level] = levelForCommits(fact.commits.total);
+        const [was] = levelForCommits(before.commits?.total ?? 0);
+        if (level > was) out.push({ kind: "level", level });
+      }
       break;
     }
     default:

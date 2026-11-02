@@ -48,7 +48,7 @@ export const playedRun = (p: T.SessionPlay, at: number): T.SessionPlay => ({
   history: lastN([...p.history, { at, action: "thinking", label: "" }], historyLimit),
 });
 
-export function playedDoing(p: T.SessionPlay, f: T.FactDoing): T.SessionPlay {
+export function playedDoing(p: T.SessionPlay, f: { readonly at: number; readonly action: T.SessionAction; readonly label: string }): T.SessionPlay {
   const history = p.history;
   const last = history[history.length - 1];
   if (last && last.action === f.action && last.label === f.label) return p;
@@ -62,7 +62,7 @@ export function playedDoing(p: T.SessionPlay, f: T.FactDoing): T.SessionPlay {
 }
 
 /** Only to a bed that is free on its own farm; a session already there, or a bed taken, changes nothing. */
-export function stationed(state: T.WorkspaceState, f: T.FactStation): [T.WorkspaceState, boolean] {
+export function stationed(state: T.WorkspaceState, f: { readonly id: T.SessionId; readonly station: number }): [T.WorkspaceState, boolean] {
   const h = sessionOf(state, f.id);
   if (!h || playOf(h).station === f.station) return [state, false];
   const others = state.sessions.filter((x) => x.id !== f.id);

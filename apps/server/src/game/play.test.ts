@@ -36,10 +36,10 @@ test("each project's farm has its own beds: the first of each is on bed 0", () =
 test("a bed taken on another project's farm is free on this one, and taken on its own is not", () => {
   let s = hire(undefined, session("a1", "alpha"));
   s = hire(s, session("b1", "beta"));
-  const [moved, changed] = reduce(s, { type: "station", at: 0, id: sessionId("b1"), station: 3 });
+  const [moved, changed] = reduce(s, { type: "gameProgress", at: 0, station: { id: sessionId("b1"), station: 3 } });
   expect(changed).toBe(true);
   // b1 holds bed 3 on beta's farm: b2 cannot take it, and stays on beta's first free bed.
-  const [again, took] = reduce(hire(moved, session("b2", "beta")), { type: "station", at: 0, id: sessionId("b2"), station: 3 });
+  const [again, took] = reduce(hire(moved, session("b2", "beta")), { type: "gameProgress", at: 0, station: { id: sessionId("b2"), station: 3 } });
   expect(took).toBe(false);
   expect(bed(again, "b2")).toBe(0);
 });
@@ -48,7 +48,7 @@ test("a saved bed another session of its farm holds moves to a free one", () => 
   const on = (h: Session, station: number): Session => ({ ...h, play: { ...playOf(h), station } });
   let s = emptyWorkspaceState();
   for (const h of [on(session("a1", "alpha"), 3), on(session("a2", "alpha"), 3), on(session("b1", "beta"), 0)]) {
-    s = reduce(hire(s, h), { type: "station", at: 0, id: h.id, station: playOf(h).station })[0];
+    s = reduce(hire(s, h), { type: "gameProgress", at: 0, station: { id: h.id, station: playOf(h).station } })[0];
   }
   expect(s.sessions.map((h) => playOf(h).station)).toEqual([3, 0, 0]);
 });

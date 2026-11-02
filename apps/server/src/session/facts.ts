@@ -118,13 +118,24 @@ export function eventFacts(event: Event, session: T.Session | undefined, trackin
   // A fact only when something changed.
   const doing = (action: T.SessionAction, text: string) => {
     if (!working || (working.doing.action === action && working.doing.label === text)) return;
-    facts.push({ type: "doing", id, action, label: text });
+    facts.push({
+      type: "sessionPhase",
+      id,
+      ...(session?.channel !== undefined ? { channel: session.channel } : {}),
+      phase: { _tag: "working", since: working.since, doing: { action, label: text } },
+    });
   };
 
   // Any word from it ends a quiet spell: the same doing again says so.
   if (tracking.quiet === true && event.kind !== "usage") {
     next = { ...next, quiet: false };
-    if (working) facts.push({ type: "doing", id, action: working.doing.action, label: working.doing.label });
+    if (working)
+      facts.push({
+        type: "sessionPhase",
+        id,
+        ...(session?.channel !== undefined ? { channel: session.channel } : {}),
+        phase: { _tag: "working", since: working.since, doing: { action: working.doing.action, label: working.doing.label } },
+      });
   }
 
   switch (event.kind) {
@@ -136,7 +147,12 @@ export function eventFacts(event: Event, session: T.Session | undefined, trackin
       journal.push({ type: "prompt", text: at >= 0 ? event.input.slice(at + briefBreak.length) : event.input });
       const recalled = recalledIn(event.input);
       if (recalled) journal.push({ type: "note", kind: "memory/recalled", text: recalled });
-      facts.push({ type: "run", id });
+      facts.push({
+        type: "sessionPhase",
+        id,
+        ...(session?.channel !== undefined ? { channel: session.channel } : {}),
+        phase: { _tag: "working", since: event.receivedAt, doing: { action: "thinking", label: "" } },
+      });
       break;
     }
     case "reasoning":

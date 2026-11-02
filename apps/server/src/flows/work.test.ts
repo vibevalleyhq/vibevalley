@@ -40,8 +40,12 @@ describe("a session's work", () => {
       // The farm's other news (its commits, the issue, the default channel and the owner's mentions in it) comes and goes beside the session's own.
       const mine = w.facts.filter((x) => !["commits", "issue", "message", "channel", "ownerMentions", "progress"].includes(x.type));
       expect([mine[0]!.type, mine.at(-1)!.type]).toEqual(["session", "sessionGone"]);
-      expect(mine.some((x) => x.type === "run")).toBe(true);
-      expect(mine.some((x: T.Fact) => x.type === "doing" && x.action === "run_command" && x.label === "echo hi")).toBe(true);
+      expect(mine.some((x) => x.type === "sessionPhase" && x.phase._tag === "working")).toBe(true);
+      expect(
+        mine.some(
+          (x) => x.type === "sessionPhase" && x.phase._tag === "working" && x.phase.doing.action === "run_command" && x.phase.doing.label === "echo hi",
+        ),
+      ).toBe(true);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
