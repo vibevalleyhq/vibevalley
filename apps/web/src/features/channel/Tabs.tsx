@@ -13,9 +13,8 @@ import { Empty } from "@/ui/Empty";
 import { Icon } from "@/ui/Icon";
 
 import { HelperFace, PhaseGlyph } from "./bits";
-import { chatPath } from "./places";
+import { chatPath, sessionThreadOf } from "./places";
 import { phaseText } from "./presence";
-import { sessionThreadOf } from "./threads";
 
 const card = "rounded-lg border border-line bg-page p-3";
 

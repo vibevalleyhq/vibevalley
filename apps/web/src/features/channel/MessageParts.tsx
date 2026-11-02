@@ -24,9 +24,8 @@ import { quickReactions, reactionOn } from "./emoji";
 import { EmojiPicker } from "./EmojiPicker";
 import { workbenchClock } from "./feed";
 import { useMessage } from "./follow";
-import { type LinkedMessage, linkedMessages } from "./links";
 import { pinSet, reactionSet, sameMessage, sameReaction, setMark, markUnread, unreadMark } from "./marks";
-import { channelLabel, channelOf, messagePath } from "./places";
+import { type LinkedMessage, channelLabel, channelOf, linkedMessages, messagePath } from "./places";
 
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 

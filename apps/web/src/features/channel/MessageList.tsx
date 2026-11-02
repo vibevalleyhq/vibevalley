@@ -30,10 +30,8 @@ import { feedOf, orchestratorTyping, workbenchClock } from "./feed";
 import { followed, useMessage } from "./follow";
 import { useMarkedFollowed, useMarkRead } from "./marks";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
-import { channelOf, messagePath, chatPath, parentAt } from "./places";
+import { channelOf, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "./places";
 import { phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
-import { threadOwnerOf } from "./threads";
-import { unreadIn } from "./unread";
 
 const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName }> = {
   completed: { label: t("shared.outcome.completed"), tone: "ok", icon: "check" },

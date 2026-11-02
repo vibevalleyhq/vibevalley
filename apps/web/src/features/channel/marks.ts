@@ -14,7 +14,7 @@ import { defineAtom } from "@/state/atom";
 import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "@/state/intent";
 
 import { type Followed, followed, useFollowed } from "./follow";
-import { newestUnread } from "./unread";
+import { newestUnread } from "./places";
 
 export interface ReactionMark {
   /** The message's channel: the copy that shows the reaction is followed there. */

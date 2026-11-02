@@ -4,8 +4,7 @@ import type { Channel, Session, WorkspaceState } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { orchestratorTyping } from "./feed";
-import { linkedMessages } from "./links";
-import { archivedOf, groupsOf, messagePath, pointedAt, threadsIn, topsOf } from "./places";
+import { archivedOf, groupsOf, linkedMessages, messagePath, pointedAt, threadsIn, topsOf } from "./places";
 import { switchTargets } from "./switcher";
 const at = (id: string): Channel => ({ id, type: "channel", default: false, category: "", description: "", title: "", replies: 0, at: 0 });
 const orchestratorSession = (action: "thinking" | "speaking_text" | "none", channel?: string, agent = "orchestrator", since = 0): Session => ({

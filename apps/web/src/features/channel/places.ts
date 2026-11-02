@@ -1,4 +1,5 @@
-import { type Chat, type Channel } from "@vibevalley/protocol";
+import { t } from "@vibevalley/i18n";
+import { type Chat, type Channel, type Issue, type Session } from "@vibevalley/protocol";
 const isTop = (c: Channel) => c.type !== "thread";
 
 export const defaultOf = (chat: Chat | undefined) => chat?.channels.find((c) => c.default);
@@ -69,4 +70,83 @@ export function parentAt(chat: Chat | undefined, thread: Channel) {
   if (thread.type !== "thread" || thread.rootNumber === undefined) return undefined;
   const channel = thread.parent ?? defaultOf(chat)?.id;
   return channel ? { channel, number: thread.rootNumber } : undefined;
+}
+
+export interface LinkedMessage {
+  readonly channel: string;
+  readonly number: number;
+}
+
+const farmLink = /https?:\/\/([^/\s]+)\/chat(?:\/([0-9a-f-]{36}))?\?m=(\d+)/gu;
+
+/** The farm messages a text links to, once each, at most three: a link to a channel the chat knows, from any address the
+ * farm is reached at (a phone has its own); the default channel's, which names none, only at the page's own host. */
+export function linkedMessages(text: string, chat: Chat | undefined, host: string): LinkedMessage[] {
+  const out: LinkedMessage[] = [];
+  for (const m of text.matchAll(farmLink)) {
+    const channel = m[2] ? channelOf(chat, m[2])?.id : m[1] === host ? defaultOf(chat)?.id : undefined;
+    const number = Number(m[3]);
+    if (channel && !out.some((l) => l.channel === channel && l.number === number)) out.push({ channel, number });
+  }
+  return out.slice(0, 3);
+}
+
+export const unreadIn = (c: Channel) => c.unread ?? 0;
+
+export const unreadTotal = (chat: Chat | undefined) => (chat?.channels ?? []).reduce((n, c) => n + unreadIn(c), 0);
+
+/** The number a receipt for this channel carries, or undefined with nothing unread. */
+export const newestUnread = (c: Channel) => (unreadIn(c) > 0 ? c.lastNumber : undefined);
+
+export const unreadUnder = (chat: Chat | undefined, channel: Channel) =>
+  (chat?.channels ?? []).filter((c) => c.id === channel.id || c.parent === channel.id).reduce((n, c) => n + unreadIn(c), 0);
+
+const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => {
+  if (!xs) return undefined;
+  for (let i = xs.length - 1; i >= 0; i--) if (test(xs[i]!)) return xs[i];
+  return undefined;
+};
+
+/** One thread per issue, kept across the sessions that work it. */
+export const issueThreadOf = (chat: Chat | undefined, issue: string) => findLast(chat?.channels, (c) => c.subjectKind === "issue" && c.subjectId === issue);
+
+/** The one way from a session to its thread: through its issue; a session sent for no issue has a talk thread of its own. */
+export function sessionThreadOf(chat: Chat | undefined, session: Session) {
+  if (session.issue) return issueThreadOf(chat, session.issue);
+  return findLast(chat?.channels, (c) => c.subjectKind === "talk" && c.subjectId === session.id);
+}
+
+export function threadOwnerOf<S extends Session>(thread: Channel, sessions: readonly S[]): S | undefined {
+  switch (thread.subjectKind) {
+    case "issue":
+      return findLast(sessions, (h) => h.issue === thread.subjectId);
+    case "talk":
+      return sessions.find((h) => h.id === thread.subjectId);
+    // Only issues and talks have an owner.
+    default:
+      return undefined;
+  }
+}
+
+const head = (text: string) => {
+  const flat = text.replace(/\s+/gu, " ");
+  return flat.length > 24 ? flat.slice(0, 24) : flat;
+};
+
+/** Named by the issue, so the name holds after its sessions leave. */
+export function threadTitle(thread: Channel, issues: Issue[] = [], sessions: Session[] = []) {
+  switch (thread.subjectKind) {
+    case "issue": {
+      const issue = issues.find((i) => i.id === thread.subjectId);
+      return issue ? head(issue.title) : t("web.channel.names.issueThread");
+    }
+    case "talk":
+    default: {
+      if (thread.subjectKind === "talk" && thread.subjectId) {
+        const session = sessions.find((h) => h.id === thread.subjectId);
+        return t("web.channel.names.talkThread", { who: session?.name || thread.title || (thread.subjectId ?? "") });
+      }
+      return thread.title || t("web.channel.names.thread");
+    }
+  }
 }

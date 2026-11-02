@@ -8,8 +8,8 @@ import { Select } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
 
 import type { Tone } from "./cards";
+import { type Stage, stageLabel, stages } from "./issue";
 import { toneVar } from "./Marks";
-import { type Stage, stageLabel, stages } from "./stages";
 
 /** An issue laid out as a page: what it is and the talk about it on the left, its properties and actions on the right.
  * Too narrow for two, the properties come after it: what is asked of the owner stays on the first screen. */

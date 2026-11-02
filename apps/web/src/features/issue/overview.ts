@@ -7,8 +7,7 @@ import { shortTitle } from "@vibevalley/protocol/rules";
 import { tookText, spanText } from "@/base/format";
 
 import type { Tone } from "./cards";
-import { endedAt } from "./issue";
-import { issueTitle } from "./titles";
+import { endedAt, issueTitle } from "./issue";
 /** An action's words as a sentence starts them (English capitalizes; Chinese has no case). */
 const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 

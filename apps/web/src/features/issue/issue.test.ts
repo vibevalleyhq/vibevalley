@@ -4,11 +4,8 @@ import { IssueStatusValues, type Issue, type IssueStatus } from "@vibevalley/pro
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { buildCards } from "./cards";
-import { isRefined } from "./issue";
+import { isRefined, issueTag, issueTitle, stageOf } from "./issue";
 import { laneOf, lanes, laneStatus, moveOf, ownStatus } from "./lanes";
-import { stageOf } from "./stages";
-import { issueTag } from "./tags";
-import { issueTitle } from "./titles";
 const issue = (over: Partial<Issue>): Issue =>
   ({
     id: issueId("i1"),

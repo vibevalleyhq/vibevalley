@@ -6,12 +6,10 @@ import { ago, tookText } from "@/base/format";
 import { matches } from "@/base/search";
 
 import { type Ordering, orderRows, type RowFacts } from "./display";
-import { endedAt, issueSession, isForOrchestrator } from "./issue";
+import { endedAt, issueSession, isForOrchestrator, issueTag, type IssueTag, issueTitle, tagText, tagOpen } from "./issue";
 import { type Lane, laneOf, moveOf, type Move } from "./lanes";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
-import { issueTag, type IssueTag, tagText, tagOpen } from "./tags";
-import { issueTitle } from "./titles";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";

@@ -1,7 +1,10 @@
+import { Schema } from "effect";
+
 import { t } from "@vibevalley/i18n";
 import type { Priority } from "@vibevalley/protocol";
 
 import { compareText, or } from "@/base/order";
+import { defineStored, orFallback } from "@/state/stored";
 
 import { type Lane, lanes } from "./lanes";
 
@@ -36,6 +39,17 @@ export interface BoardLook {
 }
 
 export const defaultLook: BoardLook = { view: "board", grouping: "status", ordering: "manual" };
+
+// How the board looks on this machine: kept across reloads (state/stored.ts), each part falling back on its own.
+export const boardLook = defineStored(
+  "board.look",
+  Schema.Struct({
+    view: orFallback(Schema.Literals(boardViews), defaultLook.view),
+    grouping: orFallback(Schema.Literals(groupings), defaultLook.grouping),
+    ordering: orFallback(Schema.Literals(orderings), defaultLook.ordering),
+  }),
+  defaultLook,
+);
 
 /** What grouping and ordering read from a row. A task has no priority of its own: undefined sorts after low. */
 export interface RowFacts {

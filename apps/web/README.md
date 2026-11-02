@@ -46,7 +46,7 @@ test/               Playwright against a real server per worker (fixtures.ts); s
 - **The page does not fold facts.** It reads the folded `StateFrame` (`useCore()`, `useFrames()`); REST reads go through
   Solid Query (`infra/query.ts`); a rule of the server (may this be dispatched, what a move means) is asked of the server,
   not rewritten here. Presentation rules (lanes, grouping, ordering, feed merging) are pure functions in the feature they
-  belong to (`features/issue/display.ts`, `features/channel/unread.ts`), each with its test.
+  belong to (`features/issue/display.ts`, `features/channel/places.ts`), each with its test.
 - **What the owner does goes through the middle layer.** A change the page shows before the server has it is an
   intent (`state/intent.ts`): `defineIntent({ send, confirmed, watch?, whileLost, timeoutMs })`, kept by its request key
   in an atom family, so it outlives the component that made it. It settles when what the owner sees shows the change

@@ -1,12 +1,13 @@
 // Writing an issue from a sentence: framework-free, for the board and the farm. The last pick is the prefs' (state/prefs.ts).
 
-import { type Issue, VibeValleyApiError } from "@vibevalley/protocol";
+import { type AppliedIssue, type Deliverable, type Issue, VibeValleyApiError } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { api, newSendKey } from "@/infra/api";
+import { bySeq, defineIntent, type Intent } from "@/state/intent";
 import { prefsNow } from "@/state/prefs";
 
-import { newIssueTitle } from "./titles";
+import { newIssueTitle } from "./issue";
 /**
  * The request key of the issue a box writes: the same words written again after a failure (a lost reply) are the same
  * issue, made once; other words, or the same once it went through, are another.
@@ -37,4 +38,32 @@ export async function writeIssue(text: string, agent: string, project: string, r
     if (e instanceof VibeValleyApiError) return { issue: made, refused: e.reason };
     throw e;
   }
+}
+
+// What an issue delivers, picked by the owner on its page: an intent (state/intent.ts) on issue.update, settled by the
+// frame whose seq is the reply's. Until then the pick shows the owner's choice, not the frame's old one; a refused pick
+// shows the frame's again, marked failed.
+
+export interface DeliverPick {
+  readonly id: string;
+  readonly deliver: Deliverable;
+}
+
+export const issueDeliver = defineIntent<DeliverPick, AppliedIssue>({
+  // A set: sent twice, it is set once, so it needs no request key.
+  send: (p) => api.issue.update({ id: p.id, deliver: p.deliver }),
+  confirmed: bySeq,
+  whileLost: "queue",
+  timeoutMs: 20_000,
+});
+
+/** The deliverable the pick shows, and whether the owner's choice is on its way or was refused. */
+export function shownDeliver(
+  id: string,
+  frame: Deliverable,
+  picks: readonly Intent<DeliverPick, AppliedIssue>[],
+): { readonly value: Deliverable; readonly state?: "pending" | "failed" } {
+  const p = picks.findLast((x) => x.input.id === id);
+  if (!p) return { value: frame };
+  return p.status === "failed" ? { value: frame, state: "failed" } : { value: p.input.deliver, state: "pending" };
 }

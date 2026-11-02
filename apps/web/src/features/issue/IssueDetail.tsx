@@ -36,13 +36,12 @@ import { ActLines } from "./ActLines";
 import { createIssueActs, perform } from "./acts";
 import { changesLine } from "./changes";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
-import { issueDeliver, shownDeliver } from "./deliver";
+import { issueTag, runText, tagOpen, tagText } from "./issue";
 import { issueMove, issueMoveOf, movedIssue, sendMove } from "./moves";
 import { type CriterionRow, issueState, noStepsText, stageTone } from "./overview";
 import { useIssues, useIssueChanges, useIssueRuns, useIssueTimeline } from "./queries";
-import { runText } from "./runs";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
-import { issueTag, tagOpen, tagText } from "./tags";
+import { issueDeliver, shownDeliver } from "./write";
 
 /** The workbench's issue page, answering the owner top to bottom: what it is, where it stands, the one thing asked of
  * the owner (only when there is one), how far it is against its criteria, what it made, and how it got here; the

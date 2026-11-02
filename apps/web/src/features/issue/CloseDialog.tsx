@@ -17,11 +17,11 @@ import { TextArea } from "@/ui/Field";
 
 import { actionOf, perform } from "./acts";
 import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./changes";
+import { issueTitle } from "./issue";
 import { type Lane } from "./lanes";
 import { issueMove, sendMove } from "./moves";
 import { useIssueChanges } from "./queries";
 import { Note } from "./Sheet";
-import { issueTitle } from "./titles";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
 export function CloseIssueDialog(props: { issue: Issue; session?: Session | undefined; review?: boolean; lane?: Lane | undefined; onClose: () => void }) {

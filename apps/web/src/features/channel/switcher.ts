@@ -3,9 +3,7 @@ import { type Chat, type Channel, type Issue, type Session } from "@vibevalley/p
 
 import { compareText, or } from "@/base/order";
 
-import { channelLabel, channelName, topOf } from "./places";
-import { threadTitle } from "./threads";
-import { unreadIn, unreadUnder } from "./unread";
+import { channelLabel, channelName, topOf, threadTitle, unreadIn, unreadUnder } from "./places";
 
 export interface SwitchTarget {
   readonly kind: "channel" | "direct" | "thread" | "profile";

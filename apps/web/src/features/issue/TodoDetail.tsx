@@ -19,10 +19,9 @@ import { TextArea, TextInput } from "@/ui/Field";
 import { toast } from "@/ui/toasts";
 
 import { ActLines } from "./ActLines";
-import { isRefined } from "./issue";
+import { isRefined, newIssueTitle } from "./issue";
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
-import { newIssueTitle } from "./titles";
 
 interface Draft {
   title: string;

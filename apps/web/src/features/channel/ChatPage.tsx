@@ -45,12 +45,15 @@ import {
   chatPath,
   channelOf,
   defaultOf,
+  sessionThreadOf,
+  threadOwnerOf,
+  threadTitle,
+  unreadIn,
+  unreadUnder,
 } from "./places";
 import { phaseDot, phaseText } from "./presence";
 import { switcher } from "./QuickSwitcher";
 import { Crons, Sessions } from "./Tabs";
-import { sessionThreadOf, threadOwnerOf, threadTitle } from "./threads";
-import { unreadIn, unreadUnder } from "./unread";
 
 const bad = (reason: string) => toast(reason, "bad");
 
