@@ -15,13 +15,12 @@ import { issueRefiningOf, issueStatusOf } from "./status.ts";
 
 type Row = q.GetIssueResult;
 const strings = Schema.mutable(Schema.Array(Schema.String));
-export const column = {
-  graph: jsonOrNone(S.IssueGraph),
-  task: jsonOrNone(S.IssueTask),
+const column = {
+  constraints: jsonOrNone(S.IssueConstraints),
+  conflict: jsonOrNone(S.Conflict),
   strings: jsonOrNone(strings),
   checks: jsonOrNone(Schema.mutable(Schema.Array(S.CriterionCheck))),
   pullRequest: jsonOrNone(S.PullRequest),
-  run: jsonOrNone(S.IssueRun),
   answer: jsonOrNone(S.IssueAnswer),
   findings: jsonOrNone(Schema.mutable(Schema.Array(S.Finding))),
   questions: jsonOrNone(Schema.mutable(Schema.Array(S.Question))),
@@ -30,19 +29,34 @@ export const column = {
 export function issueRows(core: Core["Service"]) {
   return function issueOf(row: Row, assignments: readonly T.Assignment[]): T.Issue {
     const state = core.state();
-    const graph = column.graph(row.graph);
-    const task = column.task(row.task);
     const blockedBy = column.strings(row.blocked_by);
     const criteria = column.strings(row.criteria);
     const checks = column.checks(row.checks);
     const pullRequest = column.pullRequest(row.pull_request);
-    const lastRun = column.run(row.last_run);
+    const lastRun =
+      row.run_started_at === null
+        ? undefined
+        : {
+            startedAt: row.run_started_at,
+            ...(row.run_ended_at === null ? {} : { endedAt: row.run_ended_at }),
+            ...(row.run_outcome === null ? {} : { outcome: row.run_outcome }),
+          };
     const answer = column.answer(row.answer);
+    const constraints = column.constraints(row.constraints);
+    const conflict = column.conflict(row.conflict);
     const out: T.Issue = {
       id: issueId(row.id),
       number: row.number,
       title: row.title,
+      ...(constraints ? { constraints } : {}),
+      ...(conflict ? { conflict } : {}),
       description: row.description,
+      mandate: {
+        ...(row.origin_trigger_id === null ? {} : { originTriggerId: row.origin_trigger_id }),
+        strength: row.mandate_strength,
+        maxBotReviewRounds: row.max_bot_review_rounds,
+        autoSubmitPr: row.auto_submit_pr,
+      },
       ...(row.project !== null ? { project: row.project } : {}),
       assignments: [...assignments],
       priority: row.priority,
@@ -53,8 +67,6 @@ export function issueRows(core: Core["Service"]) {
       ...(row.canceled !== null ? { canceled: row.canceled } : {}),
       ...(row.parent !== null ? { parent: issueId(row.parent) } : {}),
       blockedBy: blockedBy ?? [],
-      ...(graph ? { graph } : {}),
-      ...(task ? { task } : {}),
       ...(row.cron !== null ? { cron: row.cron } : {}),
       status: "backlog",
       moves: [],
@@ -69,7 +81,7 @@ export function issueRows(core: Core["Service"]) {
       ...(answer ? { answer } : {}),
       stage: { state: "draft", acts: [] },
     };
-    if ((sessionIdsOf(out).length === 0 || out.task) && row.rank !== 0) out.rank = row.rank;
+    if (sessionIdsOf(out).length === 0 && row.rank !== 0) out.rank = row.rank;
     out.status = issueStatusOf(out, state);
     const refiner = issueRefiningOf(out, state);
     if (refiner) out.refining = refiner;

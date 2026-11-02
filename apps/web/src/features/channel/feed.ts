@@ -56,9 +56,11 @@ export function orchestratorTyping(
   channel: Channel | undefined,
 ): { readonly agent: string; readonly mood: "thinking" | "speaking"; readonly since?: number } | undefined {
   if (!channel) return undefined;
-  for (const [agent, now] of Object.entries(state?.orchestrators ?? {}))
-    if (now.channel === channel.id && (now.state === "thinking" || now.state === "speaking"))
-      return { agent, mood: now.state, ...(now.since !== undefined ? { since: now.since } : {}) };
+  for (const session of state?.sessions ?? []) {
+    const phase = session.phase;
+    if (session.role === "orchestrator" && session.channel === channel.id && phase._tag === "working")
+      return { agent: session.agent, mood: phase.doing.action === "speaking_text" ? "speaking" : "thinking", since: phase.since };
+  }
   return undefined;
 }
 

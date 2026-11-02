@@ -443,6 +443,7 @@ tester.run("singular-service", rule("singular-service"), {
   valid: [
     { code: 'class Issue extends Context.Service<Issue, { list: () => number }>()("vibevalley/Issue") {}', filename: server },
     { code: 'class Progress extends Context.Service<Progress, {}>()("vibevalley/Progress") {}', filename: server },
+    { code: 'class Ingress extends Context.Service<Ingress, {}>()("vibevalley/Ingress") {}', filename: server },
     { code: 'class SyncStatus extends Context.Service<SyncStatus, {}>()("vibevalley/SyncStatus") {}', filename: server },
     { code: "class Issues extends Data.Class {}", filename: server },
   ],

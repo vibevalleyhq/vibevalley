@@ -32,7 +32,7 @@ export type Move =
 /** The whole table; the reason says why when there is no move. */
 export function statusMove(issue: T.Issue, to: T.IssueStatus): [Move, string] {
   const from = issue.status;
-  if (issue.graph || issue.task || issue.delivered === "merged_into_parent") return ["none", t("server.issue.move.inGraph")];
+  if (issue.delivered === "merged_into_parent") return ["none", t("server.issue.move.inGraph")];
   if (from === to) return ["none", t("server.issue.move.same")];
   if (to === "in_progress" || to === "in_review") return ["none", t("server.issue.move.byHelpers")];
   // Run before: by a session, or by an in-process agent (the orchestrator), whoever it was.

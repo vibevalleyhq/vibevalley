@@ -1,14 +1,34 @@
 {
+  "waitingDispatch": "已排队，正在等待派发。",
+  "split": {
+    "notCurrent": "只有当前负责这张工单的帮工可以拆单。",
+    "already": "工单已经关闭或已有子工单。",
+    "invalid": "请提供 1–{max} 张子工单，短 ID 唯一合法，依赖只引用这次拆单且不能成环。",
+    "agent": "每张子工单需要指定已启用、角色为帮工的档案：{agent}",
+    "commitFirst": "请先提交父工单的改动，再拆成子工单。",
+    "needsBranch": "父工单需要独立工作分支才能拆单；当前帮工直接在项目目录工作。",
+    "created": "已在 #{n} 下创建 {count} 张子工单。"
+  },
+  "verification": {
+    "acceptanceNeedsCheck": "验收工单必须填写检查命令。",
+    "acceptancePassed": "实现之前验收检查就已经通过：{check}",
+    "frozen": "修改了冻结的验收文件：{files}",
+    "failed": "检查未通过：{check}\n{output}"
+  },
+  "dependencies": {
+    "closedParent": "父工单已经关闭，不能再加子工单",
+    "project": "子工单必须和父工单使用同一个项目",
+    "invalid": "工单依赖不能成环，也不能引用不存在的工单",
+    "waiting": "等待前置工单完成：{issues}"
+  },
   "issueNumbered": "工单 #{n}",
   "issueRef": "工单 {ref}",
   "helperRef": "帮工 {id}",
   "projectRef": "项目 {name}",
   "helper": "帮工",
   "notStarted": "这张工单还没开工",
-  "inGraph": "这是计划里的工单：在计划里改",
   "started": "这张工单已经开工了",
   "noTitle": "工单没有标题",
-  "notQueued": "工单 {id} 不在队里",
   "orchestratorNotHelper": "管家不当帮工：派给一个帮工",
   "disabled": "{name} 被停用了",
   "cannotSend": "{name} 派不出去：{why}",
@@ -24,13 +44,11 @@
   "queuedStarted": "排队的「{title}」开工了：{session}",
   "queuedStuck": "排队的「{title}」开不了工：{why}；也没能退回待办，还在队里",
   "queuedBack": "排队的「{title}」开不了工，留在待办里：{why}",
-  "graphRetry": "这是计划里的工单，跟着计划走：在计划里重试这一件，或者重开整个计划",
+  "mergedChildRetry": "这张子工单已经合入父工单，请通过父工单继续安排工作。",
   "neverStarted": "这张工单还没开过工：直接开工",
   "stillOpen": "这张工单还开着：挪回待办就是再来一轮",
   "stillWorking": "{name} 还在做这张工单：直接给它带话",
   "senderGone": "派它的档案 {id} 不在了",
-  "cronNoIssue": "定时任务「{name}」写不了工单：{why}",
-  "cronNoStart": "定时任务「{name}」开不了工：{why}",
   "closedReopen": "这张工单关上了：带一句话重开它",
   "handOverOnTodo": "换人是挪到待办时的事：挪到待办，填上谁来接手",
   "stopFirst": "#{n} 还在干这一轮：先叫停，等它停下再换人",
@@ -41,7 +59,6 @@
   "cannotDelete": "工单 #{n} 还不能删：{why}",
   "noConflict": "{name} 和主分支没有冲突",
   "orchestratorAnswers": "这是派给管家的工单：管家答完就关",
-  "graphAcceptance": "这是计划里的工单，跟着计划走：在计划里验收",
   "nothingToAccept": "还没交回来，没有东西可验收",
   "failNeedsFindings": "没过验收要说哪里不行：至少写一条意见",
   "does": {
@@ -126,7 +143,6 @@
     "told": "你带了话，接着做一轮",
     "start": "开工",
     "restart": "重开，接着做",
-    "graph": "照计划开工",
     "cron": "{missed, select, true {定时开工（补跑）} other {定时开工}}",
     "runtime": "农机自己接着做",
     "refined": "起草好了",
@@ -161,5 +177,8 @@
     "notDoing": "不做的：",
     "files": "可能涉及："
   },
-  "noProfileNamed": "没有叫 {key} 的档案"
+  "noProfileNamed": "没有叫 {key} 的档案",
+  "prSubmitNotAllowed": "这张工单没有主人明确授予的自行提交 PR 权限",
+  "prSubmitNotCurrent": "只有当前处理这张工单的帮工能提交 PR",
+  "prSubmitUnavailable": "这张工单的项目没有启用 PR 交付"
 }

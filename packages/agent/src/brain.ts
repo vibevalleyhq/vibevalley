@@ -6,7 +6,7 @@
 
 import { join } from "node:path";
 
-import { Clock, Deferred, Effect, Exit, Fiber, FiberHandle, FiberSet, PubSub, Ref, Scope, Stream } from "effect";
+import { Clock, Deferred, Effect, FiberHandle, FiberSet, PubSub, Ref, type Scope, Stream } from "effect";
 
 import type { ModelClient } from "@vibevalley/ai/client";
 import type { ToolCall, ToolDeclaration, Usage } from "@vibevalley/ai/messages";
@@ -17,7 +17,7 @@ import { AgentClosed, type AgentFailed, agentFailed, toolFailed } from "./core/e
 import { type Agent, type AgentEvent, make, type Tool } from "./core/loop.ts";
 import { stopped } from "./core/tool.ts";
 import { type McpServer, connectAll } from "./mcp.ts";
-import { memoryFileLines, readMemory } from "./memory.ts";
+import { fileMemory, type MemoryPort } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, type CustomMessage, customMessage, messageText, requestContext, userMessage } from "./messages.ts";
 import { changedParts, joinParts, prefixHashes, type PromptPart } from "./prefix.ts";
 import { agent as words } from "./prompts.ts";
@@ -71,6 +71,7 @@ export interface BrainOptions {
   readonly skills?: readonly string[];
   readonly noSkills?: boolean;
   readonly noMemory?: boolean;
+  readonly memory?: MemoryPort;
   /** 40 when absent. */
   readonly maxSteps?: number;
   /** Tokens (estimated) past which the older part is folded; 120 000 when absent. */
@@ -235,7 +236,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
     /** What the request under way starts with. */
     let requestPrefix = "";
     let requestTools: ToolDeclaration[] = [];
-    /** The lines of MEMORY.md the model knows: the snapshot's, then as memoryNews told it. */
+    /** The memory snapshot the model knows, then as memoryNews updated it. */
     let knownMemory: string[] = [];
     // Made below, before anything can call the brain: the loop needs the tools, and some tools need the loop.
     let core: Agent<Own> | undefined;
@@ -243,7 +244,8 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
     let todos: TodoRunner | undefined;
 
     const hostTools = [...(options.tools ?? []), ...mcp.tools];
-    const own = selfTools({ now, home: options.home, skills: scanned, memory: options.noMemory !== true });
+    const memoryPort = options.noMemory === true ? undefined : (options.memory ?? fileMemory(options.home, now));
+    const own = selfTools({ now, home: options.home, skills: scanned, memory: memoryPort ?? false });
     const subagent: Subagent | undefined =
       options.noSubagents === true
         ? undefined
@@ -287,7 +289,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
     /** The parts of the system prompt, in order, named instructions, env, skills, memory; an empty one is left out. */
     const promptParts = Effect.gen(function* () {
       const found = yield* Effect.promise(scanned);
-      const memory = options.noMemory === true ? "" : (yield* Effect.promise(() => readMemory(options.home))).prompt;
+      const memory = memoryPort ? (yield* Effect.promise(() => memoryPort.read())).prompt : "";
       const all: PromptPart[] = [
         { name: "instructions", text: options.instructions.trim() },
         { name: "env", text: words.envSection(options.cwd) },
@@ -296,7 +298,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
       if (memory) all.push({ name: "memory", text: words.memorySection(memory) });
       return all.filter((p) => p.text !== "");
     });
-    const memoryLines = options.noMemory === true ? Effect.succeed<string[]>([]) : Effect.promise(() => memoryFileLines(options.home));
+    const memoryLines = memoryPort ? Effect.promise(async () => [...(await memoryPort.read()).lines]) : Effect.succeed<string[]>([]);
 
     /** When the agent starts and after a fold: the prompt changes only where the cache is lost anyway. */
     const refreshPrefix = Effect.gen(function* () {
@@ -588,91 +590,3 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
         }),
     } satisfies Brain;
   });
-
-/** Where Promise code (oar's runtime, the orchestrator's host, the command line) keeps a brain: the fibers its Effects
- * run on, and the scope the brain's own is a child of, so that it ends with the owner's at the latest. */
-export interface BrainOwner {
-  readonly run: <A, E>(effect: Effect.Effect<A, E>) => Promise<A>;
-  readonly scope: Scope.Scope;
-}
-
-export interface BrainHandle {
-  readonly brain: Brain;
-  readonly send: (message: BrainMessage) => Promise<void>;
-  readonly later: (message: BrainMessage) => Promise<void>;
-  readonly ask: (message: BrainMessage) => Promise<string>;
-  readonly stop: () => Promise<void>;
-  readonly resume: (maxAgeMs: number) => Promise<boolean>;
-  readonly queued: () => Promise<boolean>;
-  readonly reset: () => Promise<void>;
-  /** In order with the events, each once it is published: the handle subscribed as it opened, so none is missed. */
-  readonly subscribe: (listener: (e: BrainEvent) => void) => () => void;
-  /** Closes the brain's scope; every caller waits for the one close. */
-  readonly close: () => Promise<void>;
-  readonly history: () => BrainMessage[];
-  readonly busy: () => boolean;
-  readonly progress: () => RunSnapshot;
-  readonly tools: () => readonly Tool[];
-  readonly skills: () => Promise<SkillInfo[]>;
-  readonly mcpStatus: () => McpStatus;
-  readonly memoryNews: () => Promise<string>;
-}
-
-export async function openBrain(owner: BrainOwner, options: BrainOptions): Promise<BrainHandle> {
-  const run = owner.run;
-  const scope = await run(Scope.fork(owner.scope));
-  // Listeners are Promise code's: one reader, opened with the brain, hands each event to all of them. It is a fiber of
-  // the owner's, not the brain's: it reads on to agent_closed, so what closing the brain says is heard too.
-  const listeners = new Set<(e: BrainEvent) => void>();
-  const reading = await run(Scope.fork(owner.scope));
-  let brain: Brain;
-  let reader: Fiber.Fiber<void>;
-  try {
-    brain = await run(Scope.provide(makeBrain(options), scope));
-    reader = await run(
-      Scope.provide(
-        Effect.flatMap(brain.events, (events) =>
-          Effect.forkScoped(
-            Stream.runForEach(events, (e) =>
-              Effect.sync(() => {
-                for (const l of listeners) l(e);
-              }),
-            ),
-          ),
-        ),
-        reading,
-      ),
-    );
-  } catch (e) {
-    await run(Effect.andThen(Scope.close(scope, Exit.void), Scope.close(reading, Exit.void)));
-    throw e;
-  }
-  let closing: Promise<void> | undefined;
-  return {
-    brain,
-    send: (m) => run(brain.send(m)),
-    later: (m) => run(brain.later(m)),
-    ask: (m) => run(brain.ask(m)),
-    stop: () => run(brain.stop),
-    resume: (maxAgeMs) => run(brain.resume(maxAgeMs)),
-    queued: () => run(brain.queued),
-    reset: () => run(brain.reset),
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => void listeners.delete(listener);
-    },
-    // The reader ends on agent_closed, or was interrupted with the owner's scope: either way it is done.
-    close: () => (closing ??= run(Effect.andThen(Effect.andThen(Scope.close(scope, Exit.void), Fiber.await(reader)), Scope.close(reading, Exit.void)))),
-    history: () => brain.history(),
-    busy: () => brain.busy(),
-    progress: () => brain.progress(),
-    tools: () => brain.tools(),
-    skills: () => run(brain.skills),
-    mcpStatus: () => brain.mcpStatus(),
-    memoryNews: () => run(brain.memoryNews),
-  };
-}
-
-/** For code with no service behind it (the command line, a test): fibers of its own, and a scope only the brain's close
- * ends. */
-export const standaloneOwner = (): BrainOwner => ({ run: (effect) => Effect.runPromise(effect), scope: Scope.makeUnsafe() });

@@ -101,6 +101,10 @@ function label(runtime: string, tool: string, input: string | undefined, cwd: st
   return { kind: action.kind, detail: detail ? near(cwd, detail) : "" };
 }
 
+export function phaseFact(session: Pick<T.Session, "id" | "channel">, phase: T.Phase, spent?: T.Spent): Omit<T.FactSessionPhase, "at"> {
+  return { type: "sessionPhase", id: session.id, phase, ...(session.channel !== undefined ? { channel: session.channel } : {}), ...(spent ? { spent } : {}) };
+}
+
 export function eventFacts(event: Event, session: T.Session | undefined, tracking: Tracking, ctx: FactContext): Reaction {
   const id = ctx.id;
   const facts: FactIn[] = [];
@@ -184,7 +188,13 @@ export function eventFacts(event: Event, session: T.Session | undefined, trackin
         (event.delayMs != null && event.delayMs !== 0 ? t("server.session.log.retryIn", { s: Math.ceil(event.delayMs / 1000) }) : "") +
         (event.reason ? t("server.session.log.retryWhy", { reason: clip(event.reason, 160) }) : "");
       journal.push({ type: "note", kind: "llm/retry", text });
-      facts.push({ type: "retry", id, attempt: event.attempt, ...(event.maxAttempts != null && event.maxAttempts !== 0 ? { of: event.maxAttempts } : {}) });
+      if (session && working)
+        facts.push(
+          phaseFact(session, {
+            ...working,
+            retry: { attempt: event.attempt, ...(event.maxAttempts != null && event.maxAttempts !== 0 ? { of: event.maxAttempts } : {}) },
+          }),
+        );
       break;
     }
     case "usage": {
@@ -203,7 +213,7 @@ export function eventFacts(event: Event, session: T.Session | undefined, trackin
       const cny = tracking.rate?.charge(delta);
       const before = session.spent ?? { tokens: 0 };
       const total = before.cny !== undefined || cny !== undefined ? (before.cny ?? 0) + (cny ?? 0) : undefined;
-      facts.push({ type: "spent", id, spent: { tokens: before.tokens + delta.input + delta.output, ...(total !== undefined ? { cny: total } : {}) } });
+      facts.push(phaseFact(session, session.phase, { tokens: before.tokens + delta.input + delta.output, ...(total !== undefined ? { cny: total } : {}) }));
       if (cny != null && cny !== 0) spentCny = cny;
       break;
     }
@@ -219,7 +229,7 @@ export function eventFacts(event: Event, session: T.Session | undefined, trackin
           event.code !== null
             ? t("server.session.log.exitedCode", { runtime: ctx.runtime, code: event.code })
             : t("server.session.log.exited", { runtime: ctx.runtime });
-        facts.push({ type: "report", id, outcome: "failed", summary: why, runs: session.runs, questions: [], checks: [] });
+        facts.push({ type: "sessionReport", id, outcome: "failed", summary: why, runs: session.runs, questions: [], checks: [] });
         warn = t("server.session.log.exitedNotice", { name: session.name, why });
       }
       break;
@@ -227,7 +237,7 @@ export function eventFacts(event: Event, session: T.Session | undefined, trackin
       break;
   }
 
-  // A sub-agent's steps (a claude TaskGraph, a codex sub-thread) say whose they are.
+  // Native sub-agent paths keep journal entries attributed to their caller.
   if (event.agentPath.length > 0) journal = journal.map((op) => ({ ...op, from: [...event.agentPath] }));
   return { tracking: next, facts, journal, spentCny, model, warn };
 }

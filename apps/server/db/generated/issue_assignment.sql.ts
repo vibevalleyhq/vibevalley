@@ -75,7 +75,7 @@ export const LastAssigneeInResult = Schema.Struct({
 export type LastAssigneeInResult = typeof LastAssigneeInResult.Type
 
 
-export const LastAssigneeInSql = "-- name: LastAssigneeIn :one\n-- Who actually worked in a project, even after the issue was assigned to another profile.\nselect issue_assignment.agent from issue_assignment\njoin issue on issue.id = issue_assignment.issue\njoin issue_assignment_execution on issue_assignment_execution.assignment = issue_assignment.id\nwhere issue.project = $1 and issue_assignment_execution.executor_kind = 'session'\norder by issue_assignment_execution.started_at desc, issue_assignment_execution.executor desc limit 1;"
+export const LastAssigneeInSql = "-- name: LastAssigneeIn :one\n-- Who actually worked in a project, even after the issue was assigned to another profile.\nselect issue_assignment.agent from issue_assignment\njoin issue on issue.id = issue_assignment.issue\njoin issue_assignment_execution on issue_assignment_execution.assignment = issue_assignment.id\njoin session on session.id = issue_assignment_execution.executor\nwhere issue.project = $1 and session.role = 'worker'\norder by issue_assignment_execution.started_at desc, issue_assignment_execution.executor desc limit 1;"
 
 export const lastAssigneeIn = Effect.fn("LastAssigneeIn")(function* (params: LastAssigneeInParams) {
   const sql = yield* SqlClient.SqlClient

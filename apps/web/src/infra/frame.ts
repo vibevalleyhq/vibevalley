@@ -1,6 +1,6 @@
 import { type Accessor, createContext, createStore, onSettled, reconcile, useContext } from "solid-js";
 
-import { defaultOrchestrator, type OrchestratorState, type StateFrame, type WorkspaceState, type WorkspaceView } from "@vibevalley/protocol";
+import { defaultOrchestrator, type StateFrame, type WorkspaceState, type WorkspaceView } from "@vibevalley/protocol";
 
 import { createExternal } from "@/base/external";
 
@@ -42,9 +42,17 @@ export function useCore(): () => WorkspaceView | undefined {
   return () => f.frame?.state;
 }
 
-/** An orchestrator's mood; one the state does not list is idle. */
-export const orchestratorMood = (state: WorkspaceState | undefined, agent = defaultOrchestrator): OrchestratorState =>
-  state?.orchestrators[agent]?.state ?? "idle";
+export type OrchestratorMood = "idle" | "listening" | "thinking" | "speaking";
+
+export const orchestratorSession = (state: WorkspaceState | undefined, agent = defaultOrchestrator) =>
+  state?.sessions.find((session) => session.role === "orchestrator" && session.agent === agent);
+
+export function orchestratorMood(state: WorkspaceState | undefined, agent = defaultOrchestrator): OrchestratorMood {
+  const phase = orchestratorSession(state, agent)?.phase;
+  if (!phase || phase._tag === "closed") return "idle";
+  if (phase._tag !== "working") return "listening";
+  return phase.doing.action === "speaking_text" ? "speaking" : "thinking";
+}
 
 /**
  * The frame as the stream sent it: a new object each time, for code that compares the one before with the one after

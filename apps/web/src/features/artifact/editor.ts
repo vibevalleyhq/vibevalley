@@ -29,14 +29,12 @@ import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes
 const idleWaitMs = 500;
 const maxWaitMs = 2000;
 
-/** How often an open blocks artifact asks for what others (helpers) wrote while nothing of the owner's waits: every pollFastMs
- * while another writer was heard in the last busyPolls asks (or the demo was just started), else pollEveryMs. */
+/** Socket fallback: ask faster while another writer was heard recently. */
 const pollEveryMs = 4000;
 const pollFastMs = 1000;
-const busyPolls = 4;
+const busyMs = 4000;
 
-/** A block another writer changed shows as being written for this many asks after the change was heard. */
-const writingPolls = 3;
+const writingMs = 3000;
 
 /** A uuid (v4) for a block this client inserts: block ids are the inserter's to make. */
 const newBlockId = () => blockId(crypto.randomUUID());
@@ -54,7 +52,7 @@ export class EditBlock {
   updatedBy: string;
   /** The text in its field. */
   text: string;
-  /** The ask that last brought another writer's change to this block (display only: it shows as being written). */
+  /** When another writer's newer revision was received, including one held while focused. */
   heardAt: number | undefined = undefined;
   /** The text the server has, as far as this client knows: an update is sent only when the owner's differs. */
   sent: TextSpan[];
@@ -110,11 +108,10 @@ export class BlockEditor {
   private disposed = false;
   // Following the farm over the socket instead of asking every few seconds.
   private live = false;
-  // Questions made for what others wrote, and the one that last brought another writer's change.
-  private polls = 0;
+  private writingTimer?: ReturnType<typeof setTimeout>;
   private heardAt?: number;
-  // Blocks another writer changed while the owner was in them: not replaced, asked for again once the owner has left.
-  private readonly held = new Set<string>();
+  // Keep the newest remote block without rebasing text the owner has not sent.
+  private readonly held = new Map<string, Block>();
   private readonly listeners = new Set<() => void>();
   /** Bumped on every change: what useSyncExternalStore reads. */
   version = 0;
@@ -143,17 +140,31 @@ export class BlockEditor {
 
   /** Someone other than the owner changed the artifact lately (or the demo was just started). */
   get othersWriting() {
-    return this.heardAt !== undefined && this.polls - this.heardAt < busyPolls;
+    return this.heardAt !== undefined && Date.now() - this.heardAt < busyMs;
   }
 
-  /** A helper is writing it now: its change came in one of the last writingPolls questions. */
+  /** A helper's changed block stays highlighted for a short interval. */
   writing(b: EditBlock) {
-    return b.updatedBy !== ownerId && b.heardAt !== undefined && this.polls - b.heardAt < writingPolls;
+    return b.updatedBy !== ownerId && b.heardAt !== undefined && Date.now() - b.heardAt < writingMs;
+  }
+
+  private armWriting() {
+    clearTimeout(this.writingTimer);
+    if (this.disposed) return;
+    const now = Date.now();
+    const ends = [...this.byId.values()].flatMap((block) => (block.updatedBy !== ownerId && block.heardAt !== undefined ? [block.heardAt + writingMs] : []));
+    if (this.heardAt !== undefined) ends.push(this.heardAt + busyMs);
+    const next = ends.filter((end) => end > now).toSorted((a, b) => a - b)[0];
+    if (next === undefined) return;
+    this.writingTimer = setTimeout(() => {
+      this.changed();
+      this.armWriting();
+    }, next - now);
   }
 
   async load() {
     try {
-      this.take(await this.api.artifact.block.list({ id: this.artifactId }), true);
+      this.take(await this.api.artifact.block.list({ id: this.artifactId }), true, this.artifact !== undefined);
       this.error = undefined;
     } catch (e) {
       this.error = reasonOf(e);
@@ -171,10 +182,10 @@ export class BlockEditor {
   /** A batch another page or agent took, pushed over the subscription. */
   receive(ack: Pick<BlockAck, "seq" | "blocks">) {
     if (this.disposed) return;
-    this.polls++;
     this.seq = Math.max(this.seq, ack.seq);
     for (const b of ack.blocks) this.put(b, true);
     this.reorder();
+    this.armWriting();
     this.changed();
   }
 
@@ -191,8 +202,7 @@ export class BlockEditor {
     let redraw = this.othersWriting || this.blocks.some((b) => this.writing(b));
     try {
       const snap = await this.api.artifact.block.list({ id: this.artifactId });
-      this.polls++;
-      if ((snap.artifact.seq !== this.seq || this.held.size > 0) && !this.busy) {
+      if (snap.artifact.seq > this.seq && !this.busy) {
         this.take(snap, true, true);
         redraw = true;
       }
@@ -207,7 +217,8 @@ export class BlockEditor {
     try {
       await this.api.artifact.demo({ id: this.artifactId });
       this.error = undefined;
-      this.heardAt = this.polls;
+      this.heardAt = Date.now();
+      this.armWriting();
       this.cron();
     } catch (e) {
       this.error = reasonOf(e);
@@ -216,16 +227,22 @@ export class BlockEditor {
   }
 
   private take(snap: BlockSnapshot, replace: boolean, heard = false) {
+    if (snap.artifact.seq < this.seq) return;
     this.artifact = snap.artifact;
     this.seq = snap.artifact.seq;
-    this.held.clear();
     const seen = new Set<string>();
     for (const b of snap.blocks) {
       seen.add(b.id);
       this.put(b, heard);
     }
-    if (replace) for (const id of [...this.byId.keys()]) if (!seen.has(id) && !this.dirty.has(id)) this.byId.delete(id);
+    if (replace)
+      for (const id of [...this.byId.keys()])
+        if (!seen.has(id) && !this.dirty.has(id) && !this.queued(id)) {
+          this.byId.delete(id);
+          this.held.delete(id);
+        }
     this.reorder();
+    this.armWriting();
   }
 
   /** The server's block over the client's: all of it, but the text of one the owner has unsent words in or is composing
@@ -235,27 +252,32 @@ export class BlockEditor {
     const mine = this.byId.get(b.id);
     const went = this.gone.get(b.id);
     if (went) {
-      went.rev = b.rev;
-      if (b.deleted === true) this.gone.delete(b.id);
+      went.rev = Math.max(went.rev, b.rev);
+      if (b.deleted === true && b.rev >= went.rev) this.gone.delete(b.id);
       return;
     }
+    if (mine && b.rev < mine.rev) return;
     if (b.deleted === true) {
+      this.held.delete(b.id);
       this.byId.delete(b.id);
       return;
     }
-    const news = heard && b.updatedBy !== ownerId && (!mine || mine.rev !== b.rev);
-    if (news) this.heardAt = this.polls;
+    const news = heard && b.updatedBy !== ownerId && b.rev > Math.max(mine?.rev ?? 0, this.held.get(b.id)?.rev ?? 0);
+    if (news) {
+      this.heardAt = Date.now();
+      if (mine) mine.heardAt = this.heardAt;
+    }
     if (!mine) {
       const added = new EditBlock(b);
-      if (news) added.heardAt = this.polls;
+      if (news) added.heardAt = this.heardAt;
       this.byId.set(b.id, added);
       return;
     }
-    if (heard && mine.focused && mine.rev !== b.rev) {
-      this.held.add(b.id);
+    if (heard && b.rev > mine.rev && (mine.focused || mine.composing || this.dirty.has(b.id) || this.queued(b.id))) {
+      if (b.rev > (this.held.get(b.id)?.rev ?? 0)) this.held.set(b.id, b);
       return;
     }
-    if (news) mine.heardAt = this.polls;
+    if ((this.held.get(b.id)?.rev ?? 0) <= b.rev) this.held.delete(b.id);
     mine.parentId = b.parentId;
     mine.orderKey = b.orderKey;
     mine.type = b.type;
@@ -266,6 +288,24 @@ export class BlockEditor {
     if (this.dirty.has(b.id) || mine.composing || this.queued(b.id)) return;
     mine.spans = b.text;
     mine.text = plainOf(b.text);
+  }
+
+  private applyHeld() {
+    if (this.disposed) return;
+    let changed = false;
+    for (const [id, remote] of this.held) {
+      const mine = this.byId.get(id);
+      if (mine && (mine.focused || mine.composing || this.dirty.has(id) || this.queued(id))) continue;
+      this.held.delete(id);
+      if (!mine || remote.rev < mine.rev) continue;
+      this.put(remote);
+      changed = true;
+    }
+    if (changed) {
+      this.reorder();
+      this.armWriting();
+      this.changed();
+    }
   }
 
   private queued(id: string) {
@@ -512,6 +552,7 @@ export class BlockEditor {
       else if (b.composing) this.arm();
       else this.textOp(b);
     }
+    this.applyHeld();
     void this.send();
   }
 
@@ -546,7 +587,7 @@ export class BlockEditor {
         }
         this.inflight = undefined;
         this.error = undefined;
-        this.seq = ack.seq;
+        this.seq = Math.max(this.seq, ack.seq);
         for (const r of ack.results) {
           const b = this.byId.get(r.blockId);
           if (!b) continue;
@@ -562,7 +603,7 @@ export class BlockEditor {
         for (const r of ack.results.filter((r) => r.status === "conflict")) {
           const b = this.byId.get(r.blockId);
           const server = ack.blocks.find((x) => x.id === r.blockId);
-          if (b && server && !b.composing) {
+          if (b && server && server.rev >= b.rev && !b.composing) {
             b.spans = b.sent = server.text;
             b.text = plainOf(server.text);
             b.caret = b.text.length;
@@ -573,6 +614,7 @@ export class BlockEditor {
       }
     } finally {
       this.sending = false;
+      this.applyHeld();
     }
   }
 
@@ -581,6 +623,7 @@ export class BlockEditor {
     clearTimeout(this.idle);
     clearTimeout(this.max);
     clearTimeout(this.poll);
+    clearTimeout(this.writingTimer);
     this.listeners.clear();
   }
 }

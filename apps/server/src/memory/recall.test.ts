@@ -5,7 +5,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
-import { lineOf, memoryNotesOf, nextForgotten, pick, type PickCue, relevance } from "./recall.ts";
+import { lineOf, nextForgotten, pick, type PickCue, relevance } from "./recall.ts";
 import { termsOf } from "./terms.ts";
 
 // Go's math.Exp on arm64 (where the cases were recorded) is its own assembly, with fused multiply-adds; V8's is fdlibm's.
@@ -81,11 +81,4 @@ test("lines, and what goes first when there are too many", () => {
   expect(nextForgotten(many, 1)).toEqual([]);
   const recalled = many.map((m) => (m.id === `n${memoryKeep - 2}` ? { ...m, recalledAt: now } : m));
   expect(nextForgotten(recalled, 3)).toEqual([`n${memoryKeep - 3}`, `n${memoryKeep - 4}`]);
-});
-
-test("the 记住 lines a run said", () => {
-  expect(memoryNotesOf("做完了。\n- **记住**：测试用 pnpm test\n记住（所有项目）: 提交信息写中文\n记住：测试用 pnpm test")).toEqual([
-    { text: "测试用 pnpm test", everywhere: false },
-    { text: "提交信息写中文", everywhere: true },
-  ]);
 });

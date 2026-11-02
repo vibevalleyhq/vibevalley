@@ -1,0 +1,67 @@
+模型：opencode-go/gemini-4-argon
+原建议；HTTP兜底的删除尚未采纳，已要求复核。
+
+### 一、对客户端字段级意图（`state/intent.ts` 与 `channel` / `issue` 各意图）的核查结论
+
+逐一核对 `apps/web/src/state/intent.ts`（267 行）、`features/channel/{marks,reading,composing}.ts`、`features/issue/{deliver,moves,say}.ts` 及其测试与 `docs/subsystems/app.md:107`（「意图只在画面上看见了才结算」）后，结论如下：
+
+1. **通用机制早已收口在 `state/intent.ts`，各业务文件并非重复造轮子**：
+   - `state/intent.ts` 的 `defineIntent`、`bySeq`、`sendOnce`、`sendReplacing` 已经集中承载了按请求键存 Atom family、断线排队（`whileLost: "queue"`）并在 `framesAtom` 重连时自动重发、20 秒超时、重试 attempt 隔离、`watch` 外部流订阅与 `confirmed` 结算。
+   - 分布在 `channel` 与 `issue` 下的 10 个 `defineIntent` 之所以各自有 15～40 行叠加与派发代码，是因为它们的**确认源（ack）、去重覆盖策略、失败交互语义实质不同**，不能硬合成一套通用字段框架：
+     - **确认源不同**：`issueMove` / `issueSay` / `issueDeliver` 的接口返回 `{ seq }`，靠 `bySeq` 等 `StateFrame.seq` 追上；`archiveSet` / `notifySet` / `readMark` / `unreadMark` 的接口返回 `void`，靠比对 `frame.state.chat.channels` 里的目標字段结算；`reactionSet` / `pinSet` / `chatSay` 的消息不在 `StateFrame` 里，靠 `watch: followed.subscribe` 比对 `followed.get(channel).messages` 结算（其中 `chatSay` 还能在 HTTP 答复到达前先由 WebSocket 里的 `sendKey` 确认）。
+     - **去重策略不同**：`chatSay` / `issueSay` 是追加型（每次生成新 `sendKey`，同实体多条并存）；`issueMove`（`sendMove`）是「同目标同参数重用/重试、同目标异参数覆盖」；其余 6 个是「同目标后发覆盖先发」（`sendReplacing`）。
+     - **失败展示语义不同**：`chatSay` / `issueSay` / `issueMove` 失败后**留在原位**，供用户点「重试」或「放回 / 撤回输入框」；`issueDeliver` 失败后值退回 `frame`，但保留 `state: "failed"` 让选择器画红框；而 `marks.ts` 与 `reading.ts` 的 6 个频道/消息标记则是**失败即 `drop` 回退为服务端状态并弹错误提示**（`setMark`）。
+2. **因此撤回「用通用字段意图工厂合并 `marks` / `reading` / `deliver` / `moves` / `say`」的设想**。该层唯一真正的重复只是 `features/channel/reading.ts` 把 `marks.ts` 的 `setMark` 与 `channelIn` 手抄了两遍（见下方候选 2）；更有价值的「整套重复机制消除」在 `features/artifact` 的块编辑器同步层（见下方候选 1）。
+
+---
+
+### 二、第 5 轮可执行精简候选（至多 2 项，均不涉及 Agent DAG / 配置 / 工单生命周期）
+
+#### 候选 1（首选）：消除 `BlockEditor` 中与 `artifact.follow` WebSocket 并存的旧 HTTP 轮询机制（并修复 WebSocket 下「帮工在写」卡死与断线不重连）
+
+- **具体重复证据**：
+  1. `docs/subsystems/artifact.md` 内部自相矛盾：
+     - 第 66 行与第 137 行写着：「别人写的块经 `artifact.follow` 推过来，不再每 4 秒问一次」「块的广播走页面已有的 WebSocket」；
+     - 第 96–98 行却还保留着广播上线前的旧说明：「别人（帮工）写的：还没有广播，页面开着时问 `artifact.block.list`……平时每 4 秒问一次；最近 4 次里问到过别人写的改动，或刚点了演示，就每秒问一次……之后 3 次问之内算『在写』」。
+  2. `apps/web/src/features/artifact/editor.ts` 与 `BlocksView.tsx` 同时维护着**两套远端同步状态机**：
+     - `BlocksView.tsx:77` 在 `editor.load()` 后立即调用 `editor.setLive(true)` 并开启 `followArtifact` WebSocket 订阅（推送 `editor.receive(e)`）。
+     - 但 `editor.ts` 仍完整保留着旧的 HTTP 轮询状态机（`pollEveryMs = 4000`、`pollFastMs = 1000`、`busyPolls = 4`、`writingPolls = 3`、`this.poll`、`this.live`、`this.polls`、`cron()`、`refresh()`、`setLive()`）。
+  3. **两套机制并存导致的 3 个实际缺陷**：
+     - **「帮工在写」状态永久卡死**：当 `this.live === true` 时，`cron()` 直接返回不再按周期递增 `this.polls`，只有 `receive(ack)` 到达时才 `this.polls++` 并把 `this.heardAt` / `b.heardAt` 设为当前 `this.polls`。一旦帮工写完最后一块不再推新批次，`this.polls - this.heardAt` 永远停在 `0`（最后 3 块也停在 `0..2 < writingPolls`），导致顶栏「帮工在写」和块左侧呼吸条**永远不消失**！
+     - **焦点块暂缓的远端更新（`this.held`）在失焦后不生效**：`put(b, true)` 在主人聚焦某块时把远端改动记入 `this.held`（`editor.ts:254`），原本靠下一次 HTTP `refresh()` 刷回；在 `this.live === true` 下 `refresh()` 不跑，主人离开该块（`focus(b, false)`）若未打字，该块永远停留在旧内容。
+     - **WebSocket 断开后退回 4 秒轮询且永不重连**：`BlocksView.tsx:88` 在 `followArtifact` 断开时调 `editor.setLive(false)` 退回 HTTP 轮询，没有像 `features/channel/follow.ts` 那样 1 秒后从 `editor.seq` 重新订阅 WebSocket。
+- **删除什么**：
+  - `apps/web/src/features/artifact/editor.ts`：删除 `pollEveryMs`、`pollFastMs`、`busyPolls`、`writingPolls` 常量；删除 `poll`、`live`、`polls` 字段；删除 `cron()`、`refresh()`、`setLive()` 方法。
+  - `apps/web/src/features/artifact/BlocksView.tsx`：删除全部 3 处 `editor.setLive(...)` 调用。
+  - `docs/subsystems/artifact.md`：删除第 96–98 行过时的「还没有广播，页面开着时问 `artifact.block.list`……平时每 4 秒问一次」描述。
+- **新增 / 替换什么**：
+  - `editor.ts`：
+    - 「帮工在写」改为单一定时器（`writingMs = 3000`）：`heardAt` 记时间戳，收到非 owner 改动或点 `demo()` 时启动/顺延一个 `setTimeout` 到期触发 `this.changed()`，自然消退。
+    - `held` 改为 `Map<string, Block>` 保存聚焦期间收到的最新远端 `Block`；在 `focus(b, false)` 的 `this.flush()` 之后，若 `this.held.has(b.id)` 则直接在内存里调用 `this.put(held, true)` 并 `reorder()` + `changed()`，无需发 HTTP `block.list`。
+  - `BlocksView.tsx`：`followArtifact` 在 `ended` 时照 `features/channel/follow.ts` 的 `againMs = 1000` 从 `editor.seq` 自动重连；收到 `Reset` 时重新 `editor.load()` 后继续 `followArtifact`。
+- **净复杂度**：
+  - 消除 `BlockEditor` 的第二套同步机制（HTTP 轮询状态机与 `live/polls` 双模式切换），净减约 25 行代码，消除 `artifact.md` 文档自相矛盾，同时修复 WebSocket 下的呼吸态卡死与 `held` 失焦不更新问题。
+- **验证方法**：
+  - 在 `apps/web/src/features/artifact/blocks.test.ts` 新增 `BlockEditor` 单元测试（覆盖：`receive` 推入帮工改动后 `othersWriting`/`writing(b)` 为 `true`，3 秒后自动归 `false`；聚焦块收到帮工改动暂缓替换，失焦后立即应用远端块）。
+  - 跑 `vp test apps/web/src/features/artifact/blocks.test.ts && vp run web:check && vp run docs:verify`。
+
+---
+
+#### 候选 2（次选 / 可同批）：在 `features/channel/{marks,reading}.ts` 内复用 `setMark` 与 `channelIn`
+
+- **具体重复证据**：
+  - `apps/web/src/features/channel/marks.ts` 已 import `./reading`（第 16 行），且测试都在同一个 `marks.test.ts` 中。
+  - `reading.ts:21` 的 `readIn(frame, id)` 与 `marks.ts:72` 的 `channelIn(frame, id)` 重复查找 `frame?.state.chat?.channels.find((c) => c.id === id)`。
+  - `reading.ts:49-54`（`markUnread`）和 `reading.ts:84-88`（`useMarkRead`）手写了两遍与 `marks.ts:95-101`（`setMark`）完全一致的 `sendReplacing(...).done.then((end) => { if (end?.status !== "failed") return; intents.drop(end.key); ... say(end.reason ?? ""); })`。
+- **删除什么**：
+  - `apps/web/src/features/channel/reading.ts`：删除手写的两处 `sendReplacing(...).done.then(...)` 失败回退样板（第 49–54、84–88 行）。
+- **新增 / 替换什么**：
+  - `setMark` 支持可选的失败回调（或 `reading.ts` 直接复用 `setMark`），`useMarkRead` 与 `markUnread` 直接调用 `setMark`。
+- **净复杂度**：
+  - 净减约 12 行重复样板代码，不新增任何概念或文件，频道内所有「覆盖发送 + 失败自动回退并报错」的标记走同一个 `setMark` 入口。
+- **验证方法**：
+  - `vp test apps/web/src/features/channel/marks.test.ts && vp run web:check`
+
+---
+
+**建议拍板**：本轮建议执行 **候选 1 + 候选 2**（或单独执行 **候选 1**）。请指示。

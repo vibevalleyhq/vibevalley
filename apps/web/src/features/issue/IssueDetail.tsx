@@ -39,7 +39,7 @@ import { ChangesBody, ChangesHead } from "./CloseDialog";
 import { issueDeliver, shownDeliver } from "./deliver";
 import { issueMove, issueMoveOf, movedIssue, sendMove } from "./moves";
 import { type CriterionRow, issueState, noStepsText, stageTone } from "./overview";
-import { useGraphs, useIssueChanges, useIssueRuns, useIssueTimeline } from "./queries";
+import { useIssues, useIssueChanges, useIssueRuns, useIssueTimeline } from "./queries";
 import { runText } from "./runs";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { issueTag, tagOpen, tagText } from "./tags";
@@ -52,12 +52,12 @@ export function IssueDetail(props: {
   sessions: Session[];
   session?: SessionView | undefined;
   onClose: (session: Session, review: boolean) => void;
-  onTask?: (() => void) | undefined;
+  onParent?: (() => void) | undefined;
 }) {
-  const graphs = useGraphs();
+  const issues = useIssues();
   const now = useNow();
   const moves = useIntents(issueMove);
-  const s = createMemo(() => issueState(movedIssue(props.issue, moves.list()), props.sessions, props.session, graphs()));
+  const s = createMemo(() => issueState(movedIssue(props.issue, moves.list()), props.sessions, props.session, issues()));
   const head = () => s().head;
   // The box under the block holds an answer, the findings of 打回, a word to the helper, or what a reopen asks for.
   const acts = createIssueActs(() => props.issue, {
@@ -94,14 +94,14 @@ export function IssueDetail(props: {
     </Button>
   );
 
-  const parent = () => graphs().find((g) => g.id === props.issue.parent);
+  const parent = () => issues().find((item) => item.id === props.issue.parent);
   const tone = () => stageTone[s().stage.state];
   const heading = (
     <div class="pr-10">
-      <Show when={s().inTask ? props.onTask : undefined}>
-        {(onTask) => (
-          <button type="button" onClick={() => onTask()()} class="mb-1.5 cursor-pointer text-xs text-water hover:underline">
-            ‹ {parent()?.title ? t("web.issue.detail.graphStep", { graph: parent()!.title }) : t("web.issue.detail.backToGraph")}
+      <Show when={s().inFamily ? props.onParent : undefined}>
+        {(onParent) => (
+          <button type="button" data-testid="parent-issue" onClick={() => onParent()()} class="mb-1.5 cursor-pointer text-xs text-water hover:underline">
+            ‹ {parent()?.title ?? t("web.issue.family.parent")}
           </button>
         )}
       </Show>
@@ -217,8 +217,8 @@ export function IssueDetail(props: {
         <Show when={s().doing}>
           <div class="mb-1.5 text-sm text-water">{s().doing}</div>
         </Show>
-        <Show when={s().inTask}>
-          <div class="mb-1.5 text-xs text-muted">{s().taskText}</div>
+        <Show when={s().inFamily}>
+          <div class="mb-1.5 text-xs text-muted">{s().parentText}</div>
         </Show>
         <Show
           when={s().criteria.length > 0}
@@ -337,7 +337,7 @@ export function IssueDetail(props: {
       <Show when={agent()?.model}>
         <Property label={t("web.issue.detail.model")}>{agent()!.model}</Property>
       </Show>
-      <Show when={!s().inTask}>
+      <Show when={!s().inFamily}>
         <Property label={t("web.issue.detail.deliver")}>
           <Pick
             label={t("web.issue.detail.deliver")}

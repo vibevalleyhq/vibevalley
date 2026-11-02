@@ -111,11 +111,11 @@ const pages: Record<string, Page> = {
   有冲突: (() => {
     const s = resting({
       lastRun: lastRun("completed", "做完了，但主分支动了同一个文件。"),
-      conflict: { base: "main", files: ["apps/web/src/base/session.ts"] },
     });
     return {
       note: "和主分支冲突：主动作是解决。",
       issue: base({
+        conflict: { base: "main", files: ["apps/web/src/base/session.ts"] },
         sessionIds: [s.id],
         stage: { state: "stuck", stuck: "conflict", since: now - 6 * min, lead: "resolve", acts: [acts.resolve, acts.tell, acts.close] },
       }),

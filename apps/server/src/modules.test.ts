@@ -42,10 +42,12 @@ const owners: Readonly<Record<string, string>> = {
 const reads: Readonly<Record<string, string>> = {};
 
 /** What a file imports from under src, type-only imports too (they tie the modules all the same), as paths from src. */
-const localEdges = (file: string) =>
-  edgesOf(file, readFileSync(file, "utf8")).flatMap(({ from: spec }) =>
+const localEdges = (file: string, source = readFileSync(file, "utf8")) =>
+  edgesOf(file, source).flatMap(({ from: spec }) =>
     spec.startsWith("@/") ? [normalize(spec.slice(2))] : spec.startsWith("./") || spec.startsWith("../") ? [rel(normalize(join(dirname(file), spec)))] : [],
   );
+
+const readsSessionSnapshot = (file: string, source: string) => calls(file, source, "core", "state") && localEdges(file, source).includes("session/roster.ts");
 
 describe("the modules", () => {
   it("hold every folder and file under src", () => {
@@ -94,6 +96,7 @@ describe("the modules", () => {
       const text = readFileSync(file, "utf8");
       const parts = readsOf(file, text, "core", "state");
       if (calls(file, text, "core", "session")) parts.push("sessions");
+      if (readsSessionSnapshot(file, text)) parts.push("sessions");
       for (const part of new Set(parts)) {
         const owner = owners[part];
         if (owner && owner !== moduleOf(from)?.name) found.push(`${from} -> ${part}`);
@@ -107,5 +110,13 @@ describe("the modules", () => {
       Object.keys(reads).filter((r) => !found.includes(r)),
       "a read listed in reads is gone. Fix: drop it from reads. See apps/server/src/modules.test.ts",
     ).toEqual([]);
+  });
+
+  it("regression: session snapshot helpers cannot hide a service's cross-module read", () => {
+    const file = join(src, "issue/issue.ts");
+    expect(readsSessionSnapshot(file, 'import { sessionOf } from "@/session/roster.ts"; const state = core.state(); sessionOf(state, id);')).toBe(true);
+    expect(readsSessionSnapshot(file, 'import { sessionOf } from "../session/roster.ts"; sessionOf(core.state(), id);')).toBe(true);
+    expect(readsSessionSnapshot(file, 'import { sessionOf } from "@/session/roster.ts"; export const rule = (state, id) => sessionOf(state, id);')).toBe(false);
+    expect(readsSessionSnapshot(file, "const state = core.state(); live.sessionOf(id); state.issues.find(item => item.id === id);")).toBe(false);
   });
 });

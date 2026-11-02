@@ -3,7 +3,7 @@
 
 import { t } from "@vibevalley/i18n";
 
-export type FarmPanel = "shop" | "warehouse" | "graphs" | "log" | "orchestrator" | "taskBoard";
+export type FarmPanel = "shop" | "warehouse" | "graphs" | "log" | "orchestrator";
 
 export interface YardPlace {
   readonly id: string;
@@ -20,7 +20,7 @@ export const yardPlaces: readonly YardPlace[] = [
   { id: "warehouse", label: t("web.farm.panel.warehouse"), hint: t("web.farm.yard.warehouse.hint"), panel: "warehouse" },
   { id: "tasks", label: t("web.farm.panel.graphs"), hint: t("web.farm.yard.tasks.hint"), panel: "graphs" },
   { id: "log", label: t("web.farm.panel.log"), hint: t("web.farm.yard.log.hint"), panel: "log" },
-  { id: "taskBoard", label: t("web.farm.yard.taskBoard.label"), hint: t("web.farm.yard.taskBoard.hint"), panel: "taskBoard" },
+  { id: "taskBoard", label: t("web.farm.menu.issues"), hint: t("web.farm.yard.taskBoard.hint"), route: "/issues" },
   { id: "agents", label: t("web.farm.menu.agents"), hint: t("web.farm.yard.agents.hint"), route: "/agents" },
   // Changing its look is the HUD's face (换管家的样子); the orchestrator in the yard is someone to talk to.
   { id: "manager", label: t("web.farm.orchestrator"), hint: t("web.farm.yard.manager.hint"), chat: true },

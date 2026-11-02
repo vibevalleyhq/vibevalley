@@ -17,8 +17,10 @@ import { until, waitFor } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import { NotRecorded, Session } from "./session.ts";
+import type { DeliveryInput } from "./shapes.ts";
 
 const profile = () => ({ ...starter("lab"), effort: "" });
+const delivery = (trigger: DeliveryInput["trigger"]): DeliveryInput => ({ trigger, envelopeIds: [], byOwnerComment: false });
 
 describe("an agent's channel context", () => {
   it.live("regression: a channel context resumes without an issue or a project checkout", () => {
@@ -58,7 +60,7 @@ describe("an agent's channel context", () => {
       expect(executor.find(session.id)).toBeUndefined();
       expect(sessions.sessionOf(session.id)?.id).toBe(session.id);
       expect(readFileSync(join(cwd, "notes.txt"), "utf8")).toBe("turn 1\n");
-      expect(yield* sessions.deliver(session.id, "continue", { kind: "comment", channel })).toMatchObject({ kind: "run", woke: true });
+      expect(yield* sessions.deliver(session.id, "continue", delivery({ kind: "comment", channel }))).toMatchObject({ kind: "run", woke: true });
       yield* until(() => core.session(session.id)?.runs === 2, "the continued answer");
       const kept = yield* waitFor(
         Effect.map(sessions.events(session.id), (events) => events ?? []),
@@ -213,7 +215,7 @@ describe("an agent's channel context", () => {
         expect(sessions.sessionOf(id)?.channel).toBe(channel);
         expect(sessions.sessionOf(id)?.issue).toBeUndefined();
         expect(existsSync(join(cwd, "kept.txt"))).toBe(true);
-        expect(yield* sessions.deliver(id, "after restart", { kind: "comment", channel })).toMatchObject({ kind: "run", woke: true });
+        expect(yield* sessions.deliver(id, "after restart", delivery({ kind: "comment", channel }))).toMatchObject({ kind: "run", woke: true });
         yield* until(() => core.session(id)?.runs === 2, "the answer after restart");
         expect(turns[1]?.options.resume).toBe(native);
         yield* sessions.dismiss(id);

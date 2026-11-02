@@ -10,9 +10,9 @@ import { type ApiError } from "@/errors.ts";
 
 import type * as qm from "../../db/generated/channel_message.sql.ts";
 import { type ChannelRow } from "./model.ts";
-import { type InboxMessage, type Picked } from "./wake.ts";
+import { type InboxMessage, type Picked, type UnreadRow } from "./wake.ts";
 
-export type { Delivered, InputConsumed, LaunchActivity, SessionNews } from "@/session/shapes.ts";
+export type { Delivered, LaunchActivity, SessionNews } from "@/session/shapes.ts";
 
 export interface Info {
   readonly id: string;
@@ -41,6 +41,9 @@ export interface SpeakOptions {
 }
 
 export interface SayMore {
+  readonly source?: "connector" | "voice";
+  readonly responsePort?: string;
+  readonly voiceMode?: "dictated" | "conversation" | "api";
   readonly replyTo?: number;
   readonly attachments?: readonly string[];
   readonly picked?: Picked;
@@ -62,6 +65,13 @@ export interface ReadResult {
   readonly older: boolean;
 }
 
+export interface EnvelopeResource {
+  readonly message: T.ChatMessage;
+  readonly attachments: readonly { readonly name: string; readonly path: string }[];
+  readonly parent?: T.ChatMessage;
+  readonly around: readonly T.ChatMessage[];
+}
+
 /** What came to an orchestrator in one channel, to wake it with. */
 export interface OrchestratorNews {
   /** The orchestrator it came to, by its profile id. */
@@ -70,7 +80,12 @@ export interface OrchestratorNews {
   readonly type: T.ChannelType;
   readonly target: string;
   readonly messages: InboxMessage[];
+  readonly source?: "issue" | "cron" | "patrol";
+  readonly issue?: string;
+  readonly by?: T.RunTrigger;
 }
+
+export type IngressPurpose = "issue" | "cron" | "patrol" | "connector" | "voice" | "github";
 
 export interface Meta {
   run?: string;
@@ -78,7 +93,6 @@ export interface Meta {
   session?: T.SessionId;
   outcome?: T.Outcome;
   spent?: T.Spent;
-  forTask?: boolean;
   code?: string;
   /** Said on a call: the orchestrator heard it there, so it wakes no one here. */
   spoken?: boolean;
@@ -89,6 +103,12 @@ export interface Meta {
   /** The blocks it points at, as they read when it was sent. */
   blocks?: readonly T.QuotedBlock[];
   picked?: Picked;
+  ingressSource?: IngressPurpose;
+  ingressRecipient?: string;
+  issue?: string;
+  trigger?: T.RunTrigger;
+  responsePort?: string;
+  voiceMode?: "dictated" | "conversation" | "api";
 }
 
 const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
@@ -97,7 +117,6 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   session: Schema.optionalKey(S.SessionId),
   outcome: Schema.optionalKey(S.Outcome),
   spent: Schema.optionalKey(S.Spent),
-  forTask: Schema.optionalKey(Schema.Boolean),
   code: Schema.optionalKey(Schema.String),
   spoken: Schema.optionalKey(Schema.Boolean),
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(S.Attachment))),
@@ -105,6 +124,12 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   artifact: Schema.optionalKey(S.ArtifactCard),
   blocks: Schema.optionalKey(Schema.mutable(Schema.Array(S.QuotedBlock))),
   picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
+  ingressSource: Schema.optionalKey(Schema.Literals(["issue", "cron", "patrol", "connector", "voice", "github"])),
+  ingressRecipient: Schema.optionalKey(Schema.String),
+  issue: Schema.optionalKey(Schema.String),
+  trigger: Schema.optionalKey(S.RunTrigger),
+  responsePort: Schema.optionalKey(Schema.String),
+  voiceMode: Schema.optionalKey(Schema.Literals(["dictated", "conversation", "api"])),
 });
 
 /** Anything unreadable is no meta. */
@@ -131,7 +156,7 @@ export const reactionsText = (r: Record<string, string[]>) => {
 export const senderKind = (kind: string): T.ActorKind => (kind === "owner" || kind === "orchestrator" || kind === "session" ? kind : "system");
 export const messageKind = (kind: string): T.MessageKind => (kind === "dispatch" || kind === "report" || kind === "notice" ? kind : "chat");
 export const channelType = (type: string): T.ChannelType => (type === "thread" || type === "direct" ? type : "channel");
-export const subjectKind = (kind: string | null): T.SubjectKind | undefined => (kind === "issue" || kind === "graph" || kind === "talk" ? kind : undefined);
+export const subjectKind = (kind: string | null): T.SubjectKind | undefined => (kind === "issue" || kind === "talk" ? kind : undefined);
 
 export function toMessage(row: MsgRow): T.ChatMessage {
   const meta = metaOf(row.meta);
@@ -184,6 +209,8 @@ export const inboxMore = (
       : {}),
     ...(meta.blocks && meta.blocks.length > 0 && (row.deleted_at == null || row.deleted_at === 0) ? { blocks: meta.blocks } : {}),
     ...(meta.picked ? { picked: meta.picked } : {}),
+    ...(meta.responsePort ? { responsePort: meta.responsePort } : {}),
+    ...(meta.voiceMode ? { voiceMode: meta.voiceMode } : {}),
   };
 };
 
@@ -228,10 +255,9 @@ export interface Write {
 }
 
 export interface Written {
-  recipients: string[];
-  resetWake: string[];
   absent: string[];
-  held: boolean;
+  heldNotice: string;
+  received: readonly { readonly session: string; readonly envelope: string }[];
   thread: string;
   /** A send with a key already written: nothing new is written or delivered. */
   again: boolean;
@@ -239,7 +265,83 @@ export interface Written {
   row: MsgRow;
 }
 
+export interface ChannelEnvelopeRow {
+  readonly envelope_id: string;
+  readonly number: number;
+  readonly channel_id: string;
+  readonly sender_id: string;
+  readonly kind: MsgRow["kind"];
+  readonly body: string;
+  readonly meta: string | null;
+  readonly reply_number: number | null;
+  readonly created_at: number;
+  readonly name: string;
+  readonly sender_kind: MsgRow["sender_kind"];
+  readonly channel_type: ChannelRow["type"];
+  readonly root_id: string | null;
+  readonly root_number: number | null;
+  readonly subject_kind: ChannelRow["subject_kind"];
+  readonly subject_id: string | null;
+  readonly channel_name: string | null;
+}
+
+/** Collaboration facts from which Mailbox computes audience, brakes, urgency and the durable deliveries. */
+export interface ChannelAudience {
+  readonly from: string;
+  readonly fromKind: T.ActorKind;
+  readonly kind: T.MessageKind;
+  readonly mentions: readonly string[];
+  readonly channel: Pick<T.Channel, "type" | "peer">;
+  readonly orchestrator: string;
+  readonly orchestrators: readonly string[];
+  readonly threadOwner?: string;
+  readonly sessions: readonly string[];
+  readonly present?: readonly string[] | null;
+  readonly followers: readonly string[];
+  readonly outcome?: T.Outcome;
+  readonly spoken?: boolean;
+}
+
+export interface ChannelRouteFact {
+  readonly purpose?: NonNullable<Meta["ingressSource"]>;
+  readonly row: ChannelEnvelopeRow;
+  readonly audience: ChannelAudience;
+  readonly addressed?: string;
+  readonly roles: Readonly<Record<string, T.AgentRole>>;
+  readonly kinds: Readonly<Record<string, T.ActorKind>>;
+  readonly outcome?: T.Outcome;
+}
+
+export interface ChannelRouteResult {
+  readonly heldNotice: string;
+  readonly received: readonly { readonly session: string; readonly envelope: string }[];
+}
+
+export interface ChannelHandoffSubject {
+  readonly kind: "issue" | "session" | "chat";
+  readonly id: string;
+}
+
+export interface ChannelDeliveryPort {
+  readonly restore: Effect.Effect<void>;
+  readonly registerTalk: (session: string, launch: string, at: number, rows: readonly ChannelEnvelopeRow[]) => Effect.Effect<void>;
+  readonly dropSession: (session: string) => Effect.Effect<void>;
+  readonly kick: (session: string) => Effect.Effect<void>;
+  readonly dropEnvelope: (envelope: string) => Effect.Effect<readonly string[]>;
+  readonly waitingOn: (envelope: string) => Effect.Effect<number>;
+  readonly deliverDirect: (session: string, text: string, channel: string | undefined, byOwner: boolean) => Effect.Effect<void>;
+}
+
 export interface ChannelService {
+  readonly attachIngress: (route: (fact: ChannelRouteFact) => Effect.Effect<ChannelRouteResult>) => void;
+  /** Mailbox is assembled after Collaboration and registers the one delivery port before startup. */
+  readonly attachDelivery: (port: ChannelDeliveryPort) => void;
+  readonly replayDelivery: (row: ChannelEnvelopeRow) => Effect.Effect<void>;
+  readonly deliveryMessage: (row: ChannelEnvelopeRow) => InboxMessage;
+  readonly deliveryUnread: (session: string) => Effect.Effect<UnreadRow[]>;
+  readonly deliveryReceived: (session: string, envelope: string) => Effect.Effect<void>;
+  readonly ownerReads: Effect.Effect<Stream.Stream<{ readonly channel: string; readonly number: number; readonly at: number }>, never, Scope.Scope>;
+  readonly handoffSubject: (message: string) => Effect.Effect<ChannelHandoffSubject | undefined>;
   /** The channel what names none goes to (ChatMessage.channel, a connector's, a call's). */
   readonly defaultChannel: () => string;
   readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
@@ -262,6 +364,8 @@ export interface ChannelService {
   readonly pins: (channel: string) => Effect.Effect<T.ChatMessage[], ApiError>;
   /** The thread under a channel's message, opened if it has none. */
   readonly threadUnder: (id: T.MessageId) => Effect.Effect<string, ApiError>;
+  readonly issueThread: (issue: string, title: string, channel?: string) => Effect.Effect<string, ApiError>;
+  readonly issueMessages: (issue: string) => Effect.Effect<InboxMessage[]>;
   readonly search: (text: string, channel?: string) => Effect.Effect<T.MessageHit[], ApiError>;
   readonly attach: (upload: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError>;
   readonly attachment: (id: string) => Effect.Effect<{ readonly path: string; readonly type: string; readonly name: string } | undefined>;
@@ -289,6 +393,7 @@ export interface ChannelService {
   readonly history: (channel: string, before?: number, limit?: number) => Effect.Effect<T.ChatMessage[]>;
   /** A message's durable location; the recent state may hold neither the message nor its thread. */
   readonly messageLocation: (id: T.MessageId) => Effect.Effect<{ readonly channel: T.Channel; readonly top: string } | undefined>;
+  readonly envelopeResource: (id: T.MessageId) => Effect.Effect<EnvelopeResource | undefined>;
   readonly markRead: (channel: string, seq: number) => Effect.Effect<void, ApiError>;
   /** Its direct conversation, issue thread, or standalone talk thread. */
   readonly threadOfSession: (session: string) => Effect.Effect<string | undefined>;
@@ -299,13 +404,9 @@ export interface ChannelService {
   readonly follow: (channel: string, after: number) => Stream.Stream<T.ChannelEvent, ApiError>;
   /** The turn reports anywhere after the one with this id, or the newest logKeep when absent, then each from now on. */
   readonly reports: (after?: string) => Stream.Stream<T.ChannelEvent>;
-  /** Subscribed before it returns. */
-  readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorNews>, never, Scope.Scope>;
   /** The owner's words said in full in a thread, whatever path they took in: what an issue hears its owner by.
    * Subscribed before it returns. */
   readonly ownerInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: T.ChatMessage }>, never, Scope.Scope>;
-  /** What came to the orchestrator and does not wake it. */
-  readonly orchestratorDigest: (agent: string) => Effect.Effect<InboxMessage[]>;
   readonly channels: () => Effect.Effect<Info[]>;
   readonly openChannel: (name: string, description: string, project: string) => Effect.Effect<Info, ApiError>;
   /** description undefined or empty: as it was; project undefined: as it was, empty: none. */

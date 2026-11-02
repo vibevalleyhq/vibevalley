@@ -106,7 +106,7 @@ export const makeInProcessRun = (
         if (input.heard && input.heard.length > 0) {
           heard = [...new Set([...heard, ...input.heard])];
           yield* store.heard(run, heard);
-          store.consumed({ session, messages: [...input.heard] });
+          store.consumed({ session, envelopeIds: [...input.heard] });
         }
         journal.asked(input.asked || messageText(e.message));
       }

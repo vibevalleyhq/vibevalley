@@ -1,10 +1,10 @@
 import { createEffect, createMemo, deep } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Issue, type IssueHistory, defaultOrchestrator, type Session, type TaskGraph } from "@vibevalley/protocol";
+import { type Issue, type IssueHistory, defaultOrchestrator, type Session } from "@vibevalley/protocol";
 
 import { api } from "@/infra/api";
-import { useCore, useFrames } from "@/infra/frame";
+import { useCore } from "@/infra/frame";
 import { queries, ready, useQuery, useAgents } from "@/infra/query";
 
 import { boardRows, historyKey } from "./rows";
@@ -62,11 +62,11 @@ export const useIssueRuns = (id: () => string, version: () => string) =>
     placeholderData: <T>(prev: T) => prev,
   }));
 
-const noGraphs: TaskGraph[] = [];
+const noIssues: Issue[] = [];
 
-export function useGraphs(): () => TaskGraph[] {
-  const frames = useFrames();
-  return () => frames.frame?.graphs ?? noGraphs;
+export function useIssues(): () => Issue[] {
+  const core = useCore();
+  return () => core()?.issues ?? noIssues;
 }
 
 export function useNameOf(): () => (id: string) => string {

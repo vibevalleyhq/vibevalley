@@ -1,9 +1,12 @@
 -- Every session, on the farm or ended (session/sessions.ts).
 
 -- name: KeepSession :exec
-insert into session (id, agent, name, runtime, brief, project, issue, channel, graph, hired_at)
-values (sqlc.arg(id), sqlc.arg(agent), sqlc.arg(name), sqlc.arg(runtime), sqlc.arg(brief), sqlc.narg(project), sqlc.narg(issue), sqlc.narg(channel), sqlc.narg(graph), sqlc.arg(hired_at))
+insert into session (id, role, agent, name, runtime, brief, project, issue, channel, hired_at)
+values (sqlc.arg(id), sqlc.arg(role), sqlc.arg(agent), sqlc.arg(name), sqlc.arg(runtime), sqlc.arg(brief), sqlc.narg(project), sqlc.narg(issue), sqlc.narg(channel), sqlc.arg(hired_at))
 on conflict (id) do nothing;
+
+-- name: ForgetSession :exec
+delete from session where id = sqlc.arg(id);
 
 -- name: EndSession :exec
 update session set ended_at = sqlc.arg(ended_at), closed = sqlc.arg(closed) where id = sqlc.arg(id);
@@ -25,10 +28,21 @@ select id from session where ended_at < sqlc.arg(before);
 update session set place = sqlc.narg(place), oar_session = sqlc.narg(oar_session), last_text = sqlc.narg(last_text), recalled = sqlc.narg(recalled)
 where id = sqlc.arg(id);
 
--- name: Hands :many
--- bound: only sessions on the farm now.
-select id, place, oar_session, last_text, recalled from session where ended_at is null and place is not null;
+-- name: SetPendingReport :exec
+update session set pending_report = sqlc.arg(report) where id = sqlc.arg(id) and ended_at is null;
+
+-- name: ClearPendingReport :exec
+update session set pending_report = null where id = sqlc.arg(id);
 
 -- name: HighestSessionNumber :one
 -- The highest n of the ids w<n>, 0 for none.
 select coalesce(max(substring(id from '^w([0-9]+)$')::int), 0)::int as n from session;
+
+-- name: ActiveSessions :many
+-- bound: all sessions retained for startup.
+select * from session where ended_at is null order by hired_at, id;
+
+-- name: KeepSessionState :exec
+update session set phase = sqlc.arg(phase), refining = sqlc.arg(refining), runs = sqlc.arg(runs),
+  last_run = sqlc.narg(last_run), spent = sqlc.narg(spent), play = sqlc.narg(play), channel = sqlc.narg(channel)
+where id = sqlc.arg(id) and ended_at is null;

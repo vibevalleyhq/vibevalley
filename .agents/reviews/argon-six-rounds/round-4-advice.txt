@@ -1,0 +1,65 @@
+模型：opencode-go/gemini-4-argon
+状态：建议待裁决，用户要求先重新判断 agent DAG 的领域归属；尚未执行。
+
+### 一、对 E4（机械将 `Issue.start` 并入 `Issue.setStatus`）的复核与撤回
+
+经核对 `apps/server/src/tool/issue.ts`、`apps/server/src/base/actor.ts`、`apps/server/src/issue/issue.ts` 及 [docs/subsystems/orchestrator.md](docs/subsystems/orchestrator.md#模型和不变量) 第 51 行，**明确撤回「把 `Issue.start` 机械合并进 `Issue.setStatus`」的建议**：
+
+1. **授权边界实质不同（`actsForOwner`）**：
+   - [orchestrator.md](docs/subsystems/orchestrator.md#模型和不变量) 明确规定：「改工单和挪状态（`issue_update`、`issue_status_update`，完成也是挪状态）要这一轮最新那条输入有主人的话（`actsForOwner`）……**派活、带话、叫停、收工、验收不挡**。」
+   - 当管家在非主人直接唤醒的回合（如巡查 `patrol`、定时任务、帮工失败汇报 `forOwner === false`）调 `issue_create({ ..., start: true })` 派活时，`Issue.start` 允许执行；而 `Issue.setStatus` 第一行就是 `if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));`（`issue.ts:987`）。
+   - 若将 `issue_create(start: true)` 改调 `setStatus`，要么在 `forOwner: false` 时破坏管家自主建单派活的能力，要么伪造 `owner` Actor 或放松 `setStatus` 守卫（违反防提示注入的安全边界）。
+2. **返回信息不同**：
+   - `Issue.start` 在满员入队时返回 `{ queued: t("server.issue.queued", { full }) }`（携带具体是农机满、项目满还是全场满的 `full` 原因），`tool/issue.ts:241` 据此向模型返回 `answers.issueCreate.queuedInChannel(noted, channel.name, sent.queued)`；而 `setStatus` 返回 `T.Issue`，其 `queuedAt` 只是时间戳，不含 `noRoom` 给出的具体满额原因字符串。
+
+因此，**保留 `Issue.start` 的授权语义与排队原因返回**，不与 `Issue.setStatus` 强行合并。
+
+---
+
+### 二、本轮可执行候选方案（至多 2 项，消除真实冗余概念）
+
+以下提供两个边界清晰、零协议/权限破坏的候选（建议优先执行 **候选 1**，或 **候选 1 + 候选 2** 同批执行）：
+
+---
+
+#### 候选 1（首选，即 E5）：消除 `packages/agent` 中的 `openBrain` / `BrainHandle` / `BrainOwner` Promise 平行包装层
+
+- **现有概念及路径**：
+  - `packages/agent/src/brain.ts`：第 592–678 行 `export interface BrainOwner`、`export interface BrainHandle`、`export async function openBrain`、`export const standaloneOwner`（共 87 行）。
+  - `apps/server/src/runtime/vibevalley.ts`：第 10、42、72 行。
+  - `apps/server/src/cli/chat.ts`：第 14、217 行。
+  - `docs/subsystems/foundation.md`：第 59 行。
+- **消除了什么概念 / 职责（而非搬代码）**：
+  1. **消除 `Brain` 的第二套 Promise 镜像接口 `BrainHandle`**：`makeBrain` 已经返回完整的 Effect 服务接口 `Brain`（13 个成员）。`BrainHandle` 把这 13 个成员原样复制成 Promise 方法（其中 `later`、`ask`、`resume`、`queued`、`reset`、`history`、`busy`、`tools`、`skills`、`mcpStatus`、`memoryNews` 共 **11 个方法全仓 0 处调用**！）。
+  2. **消除 `openBrain` 的双子 Scope 与手动 Listener 广播器**：在 `vibevalley.ts` 中，原本只需要在一个子 `Scope` 内 `makeBrain` 并 `Stream.runForEach(events, ...)` 推给 `oar` 的 `kernel.frame`，却因为隔了一层 `openBrain`，先 fork 一个 `scope` 跑 `makeBrain`，再 fork 第二个 `reading` scope 把 `Stream` 转成 `Set<listener>` 回调，到了 `vibevalley.ts:124` 又用 `agent.subscribe(...)` 接回来。
+  3. **消除 `standaloneOwner`**：`cli/chat.ts:122` 的 `ownChat` 早已在 Effect 中直接 `yield* makeBrain`；只有 `runtimeChat` 在第 217 行传了一个 `standaloneOwner()` 给 `vibevalleyRuntimeOf`，而 `vibevalleyRuntimeOf` 只需要 `{ run: <A, E>(effect: Effect.Effect<A, E>) => Promise<A>; scope: Scope.Scope }`。
+- **具体修改**：
+  1. **`packages/agent/src/brain.ts`**：删除 `BrainOwner`、`BrainHandle`、`openBrain`、`standaloneOwner`（第 592–678 行）。`packages/agent` 保持 100% 纯粹的 Effect 接口，不再维护 Promise 句柄。
+  2. **`apps/server/src/runtime/vibevalley.ts`**：
+     - `RuntimeOptions.owner` 类型直接写为 `{ readonly run: <A, E>(effect: Effect.Effect<A, E>) => Promise<A>; readonly scope: Scope.Scope }`（或保留导出 `BrainOwner` 仅含这两个字段）。
+     - 在 `start` 中直接通过 `owner.run` 在子 `Scope` 中启动 `makeBrain` 并订阅 `brain.events`（收到事件直接调用本地 `onEvent(e: BrainEvent)` 分发给 `frame()` / `end()`），`prompt`/`steer`/`abort`/`dispose` 直接 `owner.run(brain.send(...))` / `owner.run(brain.stop)` / `owner.run(Scope.close(...))`。
+  3. **`apps/server/src/cli/chat.ts`**：第 217 行直接写 `owner: { run: Effect.runPromise, scope: yield* Effect.scope }`（因为 `runtimeChat` 本身就在 `Effect.gen` + `Effect.scoped` 内！原先用 `standaloneOwner()` 的 `Scope.makeUnsafe()` 反而是脱离了 `runtimeChat` 的 `Effect.scoped` 的野 Scope！）。
+  4. **`docs/subsystems/foundation.md`**：第 59 行删掉过时的「oar 和终端经 `openBrain`（`packages/agent/src/brain.ts`）把大脑的 Effect 跑成 Promise；」，改为「oar 的 `vibevalley` 农机经运行器把大脑的 Effect 跑在服务的作用域上；终端和管家的宿主直接调用 `makeBrain`。」
+- **行为保持与验收**：
+  - `vp test packages/agent/ apps/server/src/runtime/ apps/server/src/cli.test.ts`
+  - `vp run server:check && vp run docs:verify && vp run deadcode`
+
+---
+
+#### 候选 2（可同批或次选，即 N2 + N4）：消除 `Task.cron` 双关命名与 `Session.onIssue` 歧义查询名
+
+- **现有概念及路径**：
+  1. `apps/server/src/task/task.ts:242`：内部函数 `const cron = Effect.fnUntraced(...)`（及文件内 7 处调用）与 `docs/subsystems/task.md:62`。
+  2. `apps/server/src/session/session.ts:142,1042`：`readonly onIssue: (issue: string) => string | undefined;` 与唯一调用处 `apps/server/src/channel/chat.ts:352`（及 `docs/subsystems/session.md:146`、`docs/subsystems/channel.md:131`）。
+- **消除了什么概念混淆 / 歧义**：
+  1. **`Task.cron` → `Task.advance`**：消除与定时任务服务 `Cron` 的双关碰撞，与 `packages/agent/src/todoTools.ts` 的 DAG 推进函数 `advance` 统一。
+  2. **`Session.onIssue` → `Session.presentSessionIdOf`（或直接删掉 `Session.onIssue`，因为 `Channel` 已经有 `sessions.presentSessions()`，或者复用 `sessionOnIssue`）**：
+     - 看 `apps/server/src/session/session.ts:1042`：`onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id`。
+     - 全仓只有 `apps/server/src/channel/chat.ts:352` 一处调用了 `sessions.onIssue(ch.subject_id)`！而在 `chat.ts` 里，第 248 行本来就已经有 `const presentSessions = () => sessions.presentSessions();`（且第 239、440、480、1008、1061、1079 行全都在遍历 `presentSessions()`）！
+     - 更进一步：如果将 `Session.onIssue` 改名为含义明确的 `Session.onIssue` → 在 `chat.ts` 中直接查或改名，不仅消除了 `onIssue` 返回 `string | undefined`（SessionId）而非 `boolean` / `Session` 的歧义，还能让 `Session` 服务接口更干净。
+- **验收**：
+  - `vp run server:check && vp run docs:verify`
+
+---
+
+**建议拍板**：第 4 轮优先执行 **候选 1（消除 `openBrain` / `BrainHandle` / `standaloneOwner`）**；若希望同批顺手清理 `Task.cron` → `advance`，可一并纳入。请指示。

@@ -169,7 +169,7 @@ describe("memory sources", () => {
           outcome: "completed",
         };
         yield* m.keep(run);
-        expect(yield* m.list("lab")).toHaveLength(2);
+        expect(yield* m.list("lab")).toHaveLength(1);
         yield* Effect.promise(() => until(() => fake.synced.length === 1));
         expect(fake.synced[0]!.said).toBe(run.said);
         yield* m.write(owner("lab", "替它记一条"));

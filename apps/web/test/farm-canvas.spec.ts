@@ -25,6 +25,7 @@ async function firstFrame(url: string): Promise<StateFrame> {
 const helper = (id: string, station: number, phase: SessionView["phase"], crop: string): { session: SessionView; crop: string } => ({
   session: {
     id: sessionId(id),
+    role: "worker",
     name: `帮工${id}`,
     agent: `agent-${id}`,
     runtime: "nobody",

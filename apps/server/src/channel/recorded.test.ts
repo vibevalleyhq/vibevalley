@@ -1,15 +1,33 @@
 import { expect, test } from "vite-plus/test";
 
+import type { ChannelAudience } from "@/channel/contracts.ts";
+import { brakes, type BrakeInput } from "@/mailbox/brakes.ts";
+import { whoHears } from "@/mailbox/routing.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
-import { type AudienceInput, chatAudience } from "./audience.ts";
 import { mentionsIn } from "./mentions.ts";
-import { busyNotice, wakeInput } from "./prompts.ts";
+import { wakeInput } from "./prompts.ts";
 import { channelNameProblem, parseChatTarget } from "./targets.ts";
 import type { InboxMessage, UnreadRow } from "./wake.ts";
+const chatAudience = (input: ChannelAudience & BrakeInput) => brakes(whoHears(input), input);
+
+test("regression: a delivery batch includes every acknowledged card", () => {
+  const messages: InboxMessage[] = Array.from({ length: 5 }, (_, i) => ({
+    id: `delivery-${i}`,
+    number: i + 1,
+    target: "#room",
+    from: "owner",
+    fromKind: "owner",
+    name: "owner",
+    text: `body-text-${i}`,
+  }));
+  const input = wakeInput(messages, []);
+  for (const message of messages) expect(input).toContain(message.text);
+});
+
 test("the recorded cases", () => {
   const cases = goldenCases("channel");
-  expect(new Set(cases.map((c) => c.fn)).size).toBe(6);
+  expect(new Set(cases.map((c) => c.fn)).size).toBe(5);
   const failed = checkCases(cases, (c) => {
     switch (c.fn) {
       case "mentionsIn":
@@ -24,13 +42,11 @@ test("the recorded cases", () => {
         return channelNameProblem(i.name, i.taken ?? []) || null;
       }
       case "audienceOf":
-        return chatAudience(c.in as AudienceInput);
+        return brakes(whoHears(c.in as ChannelAudience), c.in as BrakeInput);
       case "wakeInput": {
         const i = c.in as { messages: InboxMessage[] | null; others: UnreadRow[] | null };
         return wakeInput(i.messages ?? [], i.others ?? []);
       }
-      case "busyNotice":
-        return busyNotice((c.in as UnreadRow[] | null) ?? []);
       default:
         throw new Error(`line ${c.line}: no rule ${c.fn}`);
     }
@@ -43,7 +59,7 @@ test("with several orchestrators: the place's hears the owner, 管家 is the pla
   expect(mentionsIn("@管家 看看，@agent-12 也看看，@agent-1", names)).toEqual(["lead", "agent-12", "agent-1"]);
   expect(mentionsIn("@orchestrator 你呢 `@lead`", names)).toEqual(["orchestrator"]);
   expect(mentionsIn("@lead 在吗")).toEqual([]);
-  const base: AudienceInput = {
+  const base: ChannelAudience & BrakeInput = {
     from: "owner",
     fromKind: "owner",
     kind: "chat",

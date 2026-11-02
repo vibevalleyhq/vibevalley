@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import { Clock, Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
+import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
@@ -12,6 +13,7 @@ import { sessionId, issueId } from "@vibevalley/protocol/schema";
 
 import { Core } from "@/core/core.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+import { OrchestratorResponse } from "@/orchestrator/response.ts";
 import { inboxStart } from "@/services.ts";
 import { NotAnswered } from "@/session/host.ts";
 import { Setting } from "@/setting/setting.ts";
@@ -181,17 +183,21 @@ describe("a call's agent", () => {
 });
 
 /** The farm with a voice service, its line on a free port behind a line of its own. */
-const farm = (capture: Capture, brief?: Orchestrator["Service"]["brief"]) => {
+const farm = (capture: Capture, brief?: OrchestratorResponse["Service"]["brief"]) => {
   const config = {
     ...testConfig(),
     voice: { id: "", line: { port: 0, url: "https://line.example.com" } },
   };
-  const answering = Orchestrator.layer({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(inboxStart)));
+  const answering = Orchestrator.layer().pipe(Layer.provideMerge(world({ config }).pipe(inboxStart)));
+  const responding = OrchestratorResponse.layer.pipe(Layer.provideMerge(answering));
   const chosen = brief
-    ? Layer.unwrap(Effect.map(Orchestrator, (current) => Layer.succeed(Orchestrator, Orchestrator.of({ ...current, brief })))).pipe(
-        Layer.provideMerge(answering),
+    ? Layer.merge(
+        Layer.unwrap(Effect.map(OrchestratorResponse, (current) => Layer.succeed(OrchestratorResponse, OrchestratorResponse.of({ ...current, brief })))).pipe(
+          Layer.provide(responding),
+        ),
+        answering,
       )
-    : answering;
+    : responding;
   return Voice.layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(Layer.provideMerge(chosen));
 };
 
@@ -217,6 +223,7 @@ const issueOf = (id: string, number: number, session: string) =>
     title: "写打卡",
     priority: "medium",
     deliver: "change",
+    mandate: { strength: "explicit", maxBotReviewRounds: 3, autoSubmitPr: false },
     createdAt: Date.now(),
     assignments: [
       {
@@ -375,6 +382,22 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
+  it.live("keeps a quick model's transcript as a durable voice envelope", () => {
+    const capture = new Capture();
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      yield* credentials({ answer: { vendor: "agora", model: "gpt-4.1-mini" } });
+      const grant = yield* voice.session();
+      const agent = yield* voice.start(grant.channel, grant.uid);
+      yield* voice.heard(agent.agentId, "语音消息", "", "voice-1");
+      const sql = yield* SqlClient.SqlClient;
+      expect(
+        yield* sql<{ source: string; meta: string | null }>`select d.source::text, m.meta from mailbox_delivery d
+          join channel_message m on m.id = d.message_id where m.body = '语音消息'`,
+      ).toEqual([{ source: "voice", meta: `{"ingressSource":"voice","spoken":true}` }]);
+    }).pipe(Effect.scoped, Effect.provide(farm(capture)));
+  });
+
   it.live("interrupting a start releases the line and stops the late agent", () => {
     const capture = new Capture();
     const { promise: requested, resolve: arrived } = Promise.withResolvers<void>();
@@ -446,10 +469,10 @@ describe("voice", () => {
       expect(yield* voice.speak("没人在听")).toBe(false);
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "hired", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "session", session: helperOn("w1", "t1") });
       yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
-        type: "report",
+        type: "sessionReport",
         questions: [],
         checks: [],
         id: sessionId("w1"),
@@ -494,11 +517,11 @@ describe("voice", () => {
         ["w1", "t1", 41],
         ["w2", "t2", 42],
       ] as const) {
-        yield* core.apply({ type: "hired", session: helperOn(w, t) });
+        yield* core.apply({ type: "session", session: helperOn(w, t) });
         yield* core.apply({ type: "issue", issue: issueOf(t, n, w) });
       }
       yield* core.apply({
-        type: "report",
+        type: "sessionReport",
         questions: [],
         checks: [],
         id: sessionId("w1"),
@@ -507,7 +530,7 @@ describe("voice", () => {
         runs: 1,
       });
       yield* core.apply({
-        type: "report",
+        type: "sessionReport",
         questions: [],
         checks: [],
         id: sessionId("w2"),
@@ -538,10 +561,10 @@ describe("voice", () => {
       yield* credentials({ answer: { vendor: "orchestrator" } });
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "hired", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "session", session: helperOn("w1", "t1") });
       yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
-        type: "report",
+        type: "sessionReport",
         questions: [],
         checks: [],
         id: sessionId("w1"),
@@ -550,10 +573,10 @@ describe("voice", () => {
         runs: 1,
       });
       yield* until(() => asks === 1, "the failed brief");
-      yield* core.apply({ type: "hired", session: helperOn("w2", "t2") });
+      yield* core.apply({ type: "session", session: helperOn("w2", "t2") });
       yield* core.apply({ type: "issue", issue: issueOf("t2", 42, "w2") });
       yield* core.apply({
-        type: "report",
+        type: "sessionReport",
         questions: [],
         checks: [],
         id: sessionId("w2"),
@@ -584,10 +607,10 @@ describe("voice", () => {
       yield* Effect.provide(credentials({ answer: { vendor: "orchestrator" } }), context);
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "hired", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "session", session: helperOn("w1", "t1") });
       yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
-        type: "report",
+        type: "sessionReport",
         questions: [],
         checks: [],
         id: sessionId("w1"),
@@ -620,10 +643,10 @@ describe("voice", () => {
       yield* credentials({ answer: { vendor: "orchestrator" } });
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "hired", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "session", session: helperOn("w1", "t1") });
       yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
-        type: "report",
+        type: "sessionReport",
         questions: [],
         checks: [],
         id: sessionId("w1"),

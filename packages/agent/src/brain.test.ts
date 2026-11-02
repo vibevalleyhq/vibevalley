@@ -7,9 +7,9 @@ import { TestClock } from "effect/testing";
 
 import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
-import { aTurn, gate, until, waitFor, whenTrue } from "@vibevalley/testkit/until";
+import { gate, until, waitFor, whenTrue } from "@vibevalley/testkit/until";
 
-import { type BrainEvent, openBrain, resumedUnknown, sessionUnfinished, standaloneOwner } from "./brain.ts";
+import { makeBrain, resumedUnknown, sessionUnfinished } from "./brain.ts";
 import { cutPoint, summaryInPlace, summaryInstructions } from "./compaction.ts";
 import { stopped, textTool } from "./core/tool.ts";
 import { forgetLine, memoryFile, readMemory, remember } from "./memory.ts";
@@ -83,44 +83,6 @@ describe("the agent", () => {
     );
   });
 
-  it.effect("shares the actual close with every concurrent caller", () =>
-    Effect.gen(function* () {
-      const release = gate();
-      const { llm } = scriptedLLM();
-      const held = {
-        ...llm,
-        service: { ...llm.service, stream: () => Stream.fromEffect(Effect.uninterruptible(Effect.promise(() => release.opened))).pipe(Stream.drain) },
-      };
-      const agent = yield* Effect.promise(() => openBrain(standaloneOwner(), testBrain(home(), held)));
-      const events: BrainEvent[] = [];
-      agent.subscribe((e) => events.push(e));
-      yield* Effect.gen(function* () {
-        yield* Effect.promise(() => agent.send(userMessage("说", Date.now())));
-        yield* until(() => events.some((e) => e.type === "message_end"), 'r.has("message_end")');
-        const first = agent.close();
-        const second = agent.close();
-        expect(second).toBe(first);
-        let done = false;
-        void second.then(() => {
-          done = true;
-        });
-        // A close that did not wait for the gate would have ended by the next turn.
-        yield* aTurn;
-        expect(done).toBe(false);
-        release.open();
-        yield* Effect.promise(() => Promise.all([first, second]));
-        expect(done).toBe(true);
-      }).pipe(
-        Effect.ensuring(
-          Effect.andThen(
-            Effect.sync(() => release.open()),
-            Effect.promise(() => agent.close()),
-          ),
-        ),
-      );
-    }),
-  );
-
   it.effect("cuts off a run under way when its owner's scope closes", () =>
     Effect.gen(function* () {
       let [started, cut] = [false, false];
@@ -134,13 +96,14 @@ describe("the agent", () => {
         () => Effect.sync(() => (cut = true)),
       );
       const held = { ...llm, service: { ...llm.service, stream: () => Stream.fromEffect(asked) } };
-      const agent = yield* Effect.promise(() => openBrain({ run: standaloneOwner().run, scope: owner }, testBrain(home(), held)));
+      const scope = yield* Scope.fork(owner);
+      const agent = yield* Scope.provide(makeBrain(testBrain(home(), held)), scope);
       yield* Effect.gen(function* () {
-        void agent.send(userMessage("说", Date.now()));
+        yield* agent.send(userMessage("说", Date.now()));
         yield* until(() => started, "started");
         yield* Scope.close(owner, Exit.void);
         yield* until(() => cut, "cut");
-      }).pipe(Effect.ensuring(Effect.promise(() => agent.close())));
+      }).pipe(Effect.ensuring(Scope.close(owner, Exit.void)));
     }),
   );
 

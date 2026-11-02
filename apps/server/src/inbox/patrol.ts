@@ -13,7 +13,6 @@ const patrolGrace: Partial<Record<InboxKind, number>> = {
   quiet: 20 * 60_000,
   review: 2 * 60 * 60_000,
   conflict: 2 * 60 * 60_000,
-  "task-failed": 30 * 60_000,
 };
 
 const reportAgainMs = 4 * 60 * 60_000;
@@ -32,16 +31,22 @@ export interface PatrolMemory {
 export const emptyPatrol = (): PatrolMemory => ({ firstSeen: {}, reported: {} });
 
 /** Things no longer hanging are forgotten, so if they come back they are new. */
-export function patrolStep(state: WorkspaceState, now: number, memory: PatrolMemory): [PatrolNote[], PatrolMemory] {
+export function patrolStep(
+  state: WorkspaceState,
+  now: number,
+  memory: PatrolMemory,
+  ownerSeen: Readonly<Record<string, number>> = {},
+): [PatrolNote[], PatrolMemory] {
   const next = emptyPatrol();
   const report: PatrolNote[] = [];
   for (const e of inboxEntries(state)) {
-    const grace = patrolGrace[e.item.kind];
-    if (grace === undefined) continue;
     const key = e.item.id;
+    const seenAt = ownerSeen[key];
+    const grace = seenAt === undefined ? patrolGrace[e.item.kind] : Math.max(patrolGrace[e.item.kind] ?? 0, 2 * 60 * 60_000);
+    if (grace === undefined) continue;
     const seen = memory.firstSeen[key] ?? now;
     next.firstSeen[key] = seen;
-    const since = e.since ?? seen;
+    const since = Math.max(e.since ?? seen, seenAt ?? 0);
     const last = memory.reported[key];
     if (last !== undefined) next.reported[key] = last;
     if (now - since < grace) continue;

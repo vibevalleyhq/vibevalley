@@ -4,7 +4,7 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
-import { Pg_public_issue_canceled_7f990c847aae, Pg_public_issue_deliver_dea8d59ad1da, Pg_public_issue_delivered_5565b9f35912, Pg_public_issue_priority_7a8aa16ed3e5 } from "./types.js"
+import { Pg_public_issue_canceled_7f990c847aae, Pg_public_issue_deliver_dea8d59ad1da, Pg_public_issue_delivered_5565b9f35912, Pg_public_issue_mandate_strength_ed059c82398b, Pg_public_issue_priority_7a8aa16ed3e5, Pg_public_session_run_outcome_e9d3bd4d227e } from "./types.js"
 
 export const ListIssuesParams = Schema.Struct({
 
@@ -17,13 +17,16 @@ export const ListIssuesResult = Schema.Struct({
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["title"]: Schema.String,
   ["description"]: Schema.String,
+  ["origin_trigger_id"]: Schema.NullOr(Schema.String),
+  ["mandate_strength"]: Pg_public_issue_mandate_strength_ed059c82398b,
+  ["max_bot_review_rounds"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["auto_submit_pr"]: Schema.Boolean,
   ["project"]: Schema.NullOr(Schema.String),
   ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
-  ["graph"]: Schema.NullOr(Schema.String),
-  ["task"]: Schema.NullOr(Schema.String),
+  ["constraints"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
@@ -37,13 +40,16 @@ export const ListIssuesResult = Schema.Struct({
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["last_run"]: Schema.NullOr(Schema.String),
+  ["conflict"]: Schema.NullOr(Schema.String),
   ["answer"]: Schema.NullOr(Schema.String),
+  ["run_started_at"]: Schema.NullOr(Schema.Number),
+  ["run_ended_at"]: Schema.NullOr(Schema.Number),
+  ["run_outcome"]: Schema.NullOr(Pg_public_session_run_outcome_e9d3bd4d227e),
 })
 export type ListIssuesResult = typeof ListIssuesResult.Type
 
 
-export const ListIssuesSql = "-- Issues (issue/issue.ts).\n\n-- name: ListIssues :many\n-- bound: every issue, as the core holds them.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\", \"issue\".\"answer\" from issue order by rank, created_at, id;"
+export const ListIssuesSql = "-- Issues (issue/issue.ts).\n\n-- name: ListIssues :many\n-- bound: every issue, as the core holds them.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"origin_trigger_id\", \"issue\".\"mandate_strength\", \"issue\".\"max_bot_review_rounds\", \"issue\".\"auto_submit_pr\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"constraints\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"conflict\", \"issue\".\"answer\", latest_run.started_at as run_started_at, latest_run.ended_at as run_ended_at, latest_run.outcome as run_outcome\nfrom issue left join lateral (\n  select r.started_at, r.ended_at, r.outcome from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) latest_run on true order by rank, created_at, id;"
 
 export const listIssues = Effect.fn("ListIssues")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -65,13 +71,16 @@ export const GetIssueResult = Schema.Struct({
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["title"]: Schema.String,
   ["description"]: Schema.String,
+  ["origin_trigger_id"]: Schema.NullOr(Schema.String),
+  ["mandate_strength"]: Pg_public_issue_mandate_strength_ed059c82398b,
+  ["max_bot_review_rounds"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["auto_submit_pr"]: Schema.Boolean,
   ["project"]: Schema.NullOr(Schema.String),
   ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
-  ["graph"]: Schema.NullOr(Schema.String),
-  ["task"]: Schema.NullOr(Schema.String),
+  ["constraints"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
@@ -85,13 +94,16 @@ export const GetIssueResult = Schema.Struct({
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["last_run"]: Schema.NullOr(Schema.String),
+  ["conflict"]: Schema.NullOr(Schema.String),
   ["answer"]: Schema.NullOr(Schema.String),
+  ["run_started_at"]: Schema.NullOr(Schema.Number),
+  ["run_ended_at"]: Schema.NullOr(Schema.Number),
+  ["run_outcome"]: Schema.NullOr(Pg_public_session_run_outcome_e9d3bd4d227e),
 })
 export type GetIssueResult = typeof GetIssueResult.Type
 
 
-export const GetIssueSql = "-- name: GetIssue :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\", \"issue\".\"answer\" from issue where id = $1;"
+export const GetIssueSql = "-- name: GetIssue :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"origin_trigger_id\", \"issue\".\"mandate_strength\", \"issue\".\"max_bot_review_rounds\", \"issue\".\"auto_submit_pr\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"constraints\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"conflict\", \"issue\".\"answer\", latest_run.started_at as run_started_at, latest_run.ended_at as run_ended_at, latest_run.outcome as run_outcome\nfrom issue left join lateral (\n  select r.started_at, r.ended_at, r.outcome from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) latest_run on true where id = $1;"
 
 export const getIssue = Effect.fn("GetIssue")(function* (params: GetIssueParams) {
   const sql = yield* SqlClient.SqlClient
@@ -113,13 +125,16 @@ export const IssueByNumberResult = Schema.Struct({
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["title"]: Schema.String,
   ["description"]: Schema.String,
+  ["origin_trigger_id"]: Schema.NullOr(Schema.String),
+  ["mandate_strength"]: Pg_public_issue_mandate_strength_ed059c82398b,
+  ["max_bot_review_rounds"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["auto_submit_pr"]: Schema.Boolean,
   ["project"]: Schema.NullOr(Schema.String),
   ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
-  ["graph"]: Schema.NullOr(Schema.String),
-  ["task"]: Schema.NullOr(Schema.String),
+  ["constraints"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
@@ -133,13 +148,16 @@ export const IssueByNumberResult = Schema.Struct({
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["last_run"]: Schema.NullOr(Schema.String),
+  ["conflict"]: Schema.NullOr(Schema.String),
   ["answer"]: Schema.NullOr(Schema.String),
+  ["run_started_at"]: Schema.NullOr(Schema.Number),
+  ["run_ended_at"]: Schema.NullOr(Schema.Number),
+  ["run_outcome"]: Schema.NullOr(Pg_public_session_run_outcome_e9d3bd4d227e),
 })
 export type IssueByNumberResult = typeof IssueByNumberResult.Type
 
 
-export const IssueByNumberSql = "-- name: IssueByNumber :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\", \"issue\".\"answer\" from issue where number = $1;"
+export const IssueByNumberSql = "-- name: IssueByNumber :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"origin_trigger_id\", \"issue\".\"mandate_strength\", \"issue\".\"max_bot_review_rounds\", \"issue\".\"auto_submit_pr\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"constraints\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"conflict\", \"issue\".\"answer\", latest_run.started_at as run_started_at, latest_run.ended_at as run_ended_at, latest_run.outcome as run_outcome\nfrom issue left join lateral (\n  select r.started_at, r.ended_at, r.outcome from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) latest_run on true where number = $1;"
 
 export const issueByNumber = Effect.fn("IssueByNumber")(function* (params: IssueByNumberParams) {
   const sql = yield* SqlClient.SqlClient
@@ -154,22 +172,46 @@ export const AddIssueParams = Schema.Struct({
   ["id"]: Schema.String,
   ["title"]: Schema.String,
   ["description"]: Schema.String,
+  ["origin_trigger_id"]: Schema.NullOr(Schema.String),
+  ["mandate_strength"]: Pg_public_issue_mandate_strength_ed059c82398b,
+  ["max_bot_review_rounds"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["auto_submit_pr"]: Schema.Boolean,
   ["project"]: Schema.NullOr(Schema.String),
   ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["created_at"]: Schema.Number,
   ["cron"]: Schema.NullOr(Schema.String),
   ["deliver"]: Pg_public_issue_deliver_dea8d59ad1da,
+  ["parent"]: Schema.NullOr(Schema.String),
+  ["blocked_by"]: Schema.NullOr(Schema.String),
+  ["constraints"]: Schema.NullOr(Schema.String),
 })
 export type AddIssueParams = typeof AddIssueParams.Type
 
 
-export const AddIssueSql = "-- name: AddIssue :exec\ninsert into issue (id, number, title, description, project, priority, rank, created_at, cron, deliver)\nvalues ($1, (select coalesce(max(number), 0) + 1 from issue), $2, $3, $4,\n        $5, (select coalesce(max(rank), 0) + 1 from issue), $6, $7, $8);"
+export const AddIssueSql = "-- name: AddIssue :exec\ninsert into issue (id, number, title, description, origin_trigger_id, mandate_strength, max_bot_review_rounds, auto_submit_pr,\n                   project, priority, rank, created_at, cron, deliver, parent, blocked_by, constraints)\nvalues ($1, (select coalesce(max(number), 0) + 1 from issue), $2, $3, $4,\n        $5, $6, $7, $8, $9,\n        (select coalesce(max(rank), 0) + 1 from issue), $10, $11, $12, $13, $14, $15);"
 
 export const addIssue = Effect.fn("AddIssue")(function* (params: AddIssueParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: AddIssueParams,
-    execute: (p) => sql.unsafe(AddIssueSql, [p["id"], p["title"], p["description"], p["project"], p["priority"], p["created_at"], p["cron"], p["deliver"]]),
+    execute: (p) => sql.unsafe(AddIssueSql, [p["id"], p["title"], p["description"], p["origin_trigger_id"], p["mandate_strength"], p["max_bot_review_rounds"], p["auto_submit_pr"], p["project"], p["priority"], p["created_at"], p["cron"], p["deliver"], p["parent"], p["blocked_by"], p["constraints"]]),
+  })(params)
+})
+
+export const SetIssueConstraintsParams = Schema.Struct({
+  ["constraints"]: Schema.NullOr(Schema.String),
+  ["id"]: Schema.String,
+})
+export type SetIssueConstraintsParams = typeof SetIssueConstraintsParams.Type
+
+
+export const SetIssueConstraintsSql = "-- name: SetIssueConstraints :exec\nupdate issue set constraints = $1 where id = $2;"
+
+export const setIssueConstraints = Effect.fn("SetIssueConstraints")(function* (params: SetIssueConstraintsParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: SetIssueConstraintsParams,
+    execute: (p) => sql.unsafe(SetIssueConstraintsSql, [p["constraints"], p["id"]]),
   })(params)
 })
 
@@ -267,6 +309,24 @@ export const setIssueChecks = Effect.fn("SetIssueChecks")(function* (params: Set
   })(params)
 })
 
+export const SetIssueReportParams = Schema.Struct({
+  ["questions"]: Schema.NullOr(Schema.String),
+  ["checks"]: Schema.NullOr(Schema.String),
+  ["id"]: Schema.String,
+})
+export type SetIssueReportParams = typeof SetIssueReportParams.Type
+
+
+export const SetIssueReportSql = "-- name: SetIssueReport :exec\nupdate issue set questions = $1, checks = $2 where id = $3;"
+
+export const setIssueReport = Effect.fn("SetIssueReport")(function* (params: SetIssueReportParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: SetIssueReportParams,
+    execute: (p) => sql.unsafe(SetIssueReportSql, [p["questions"], p["checks"], p["id"]]),
+  })(params)
+})
+
 export const RemoveIssueParams = Schema.Struct({
   ["id"]: Schema.String,
 })
@@ -301,18 +361,25 @@ export const placeIssue = Effect.fn("PlaceIssue")(function* (params: PlaceIssueP
 })
 
 export const QueueIssueParams = Schema.Struct({
-  ["at"]: Schema.Number,
+  ["at"]: Schema.NullOr(Schema.Number),
   ["id"]: Schema.String,
 })
 export type QueueIssueParams = typeof QueueIssueParams.Type
 
 
-export const QueueIssueSql = "-- name: QueueIssue :exec\nupdate issue set queued_at = coalesce(queued_at, $1) where id = $2;"
+export const QueueIssueResult = Schema.Struct({
+  ["id"]: Schema.String,
+})
+export type QueueIssueResult = typeof QueueIssueResult.Type
+
+
+export const QueueIssueSql = "-- name: QueueIssue :many\n-- bound: at most one newly queued issue.\nupdate issue set queued_at = $1 where id = $2 and queued_at is null returning id;"
 
 export const queueIssue = Effect.fn("QueueIssue")(function* (params: QueueIssueParams) {
   const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
+  return yield* SqlSchema.findAll({
     Request: QueueIssueParams,
+    Result: QueueIssueResult,
     execute: (p) => sql.unsafe(QueueIssueSql, [p["at"], p["id"]]),
   })(params)
 })
@@ -416,13 +483,16 @@ export const KeptIssuesResult = Schema.Struct({
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["title"]: Schema.String,
   ["description"]: Schema.String,
+  ["origin_trigger_id"]: Schema.NullOr(Schema.String),
+  ["mandate_strength"]: Pg_public_issue_mandate_strength_ed059c82398b,
+  ["max_bot_review_rounds"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["auto_submit_pr"]: Schema.Boolean,
   ["project"]: Schema.NullOr(Schema.String),
   ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
-  ["graph"]: Schema.NullOr(Schema.String),
-  ["task"]: Schema.NullOr(Schema.String),
+  ["constraints"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
@@ -436,13 +506,16 @@ export const KeptIssuesResult = Schema.Struct({
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["last_run"]: Schema.NullOr(Schema.String),
+  ["conflict"]: Schema.NullOr(Schema.String),
   ["answer"]: Schema.NullOr(Schema.String),
+  ["run_started_at"]: Schema.NullOr(Schema.Number),
+  ["run_ended_at"]: Schema.NullOr(Schema.Number),
+  ["run_outcome"]: Schema.NullOr(Pg_public_session_run_outcome_e9d3bd4d227e),
 })
 export type KeptIssuesResult = typeof KeptIssuesResult.Type
 
 
-export const KeptIssuesSql = "-- name: KeptIssues :many\n-- What the core state keeps: the open issues and the latest closed ones, each with its sub-issues.\nwith latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit $1::int)\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\", \"issue\".\"answer\" from issue\nwhere closed_at is null or id in (select id from latest) or parent in (select id from latest)\n   or parent in (select id from issue where closed_at is null);"
+export const KeptIssuesSql = "-- name: KeptIssues :many\n-- What the core state keeps: the open issues and the latest closed ones, each with its sub-issues.\nwith latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit $1::int)\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"origin_trigger_id\", \"issue\".\"mandate_strength\", \"issue\".\"max_bot_review_rounds\", \"issue\".\"auto_submit_pr\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"constraints\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"conflict\", \"issue\".\"answer\", latest_run.started_at as run_started_at, latest_run.ended_at as run_ended_at, latest_run.outcome as run_outcome\nfrom issue left join lateral (\n  select r.started_at, r.ended_at, r.outcome from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) latest_run on true\nwhere closed_at is null or id in (select id from latest) or parent in (select id from latest)\n   or parent in (select id from issue where closed_at is null);"
 
 export const keptIssues = Effect.fn("KeptIssues")(function* (params: KeptIssuesParams) {
   const sql = yield* SqlClient.SqlClient
@@ -464,13 +537,16 @@ export const FamilyResult = Schema.Struct({
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["title"]: Schema.String,
   ["description"]: Schema.String,
+  ["origin_trigger_id"]: Schema.NullOr(Schema.String),
+  ["mandate_strength"]: Pg_public_issue_mandate_strength_ed059c82398b,
+  ["max_bot_review_rounds"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["auto_submit_pr"]: Schema.Boolean,
   ["project"]: Schema.NullOr(Schema.String),
   ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
-  ["graph"]: Schema.NullOr(Schema.String),
-  ["task"]: Schema.NullOr(Schema.String),
+  ["constraints"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
@@ -484,13 +560,16 @@ export const FamilyResult = Schema.Struct({
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["last_run"]: Schema.NullOr(Schema.String),
+  ["conflict"]: Schema.NullOr(Schema.String),
   ["answer"]: Schema.NullOr(Schema.String),
+  ["run_started_at"]: Schema.NullOr(Schema.Number),
+  ["run_ended_at"]: Schema.NullOr(Schema.Number),
+  ["run_outcome"]: Schema.NullOr(Pg_public_session_run_outcome_e9d3bd4d227e),
 })
 export type FamilyResult = typeof FamilyResult.Type
 
 
-export const FamilySql = "-- name: Family :many\n-- bound: one issue and its sub-issues.\n-- An issue and its sub-issues.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\", \"issue\".\"answer\" from issue where id = $1 or parent = $1;"
+export const FamilySql = "-- name: Family :many\n-- bound: one issue and its sub-issues.\n-- An issue and its sub-issues.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"origin_trigger_id\", \"issue\".\"mandate_strength\", \"issue\".\"max_bot_review_rounds\", \"issue\".\"auto_submit_pr\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"constraints\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"conflict\", \"issue\".\"answer\", latest_run.started_at as run_started_at, latest_run.ended_at as run_ended_at, latest_run.outcome as run_outcome\nfrom issue left join lateral (\n  select r.started_at, r.ended_at, r.outcome from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) latest_run on true where id = $1 or parent = $1;"
 
 export const family = Effect.fn("Family")(function* (params: FamilyParams) {
   const sql = yield* SqlClient.SqlClient
@@ -499,58 +578,6 @@ export const family = Effect.fn("Family")(function* (params: FamilyParams) {
     Result: FamilyResult,
     execute: (p) => sql.unsafe(FamilySql, [p["id"]]),
   })(params)
-})
-
-export const PutIssueParams = Schema.Struct({
-  ["id"]: Schema.String,
-  ["title"]: Schema.String,
-  ["description"]: Schema.String,
-  ["project"]: Schema.NullOr(Schema.String),
-  ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
-  ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["created_at"]: Schema.Number,
-  ["closed_at"]: Schema.NullOr(Schema.Number),
-  ["delivered"]: Schema.NullOr(Pg_public_issue_delivered_5565b9f35912),
-  ["canceled"]: Schema.NullOr(Pg_public_issue_canceled_7f990c847aae),
-  ["parent"]: Schema.NullOr(Schema.String),
-  ["blocked_by"]: Schema.NullOr(Schema.String),
-  ["graph"]: Schema.NullOr(Schema.String),
-  ["task"]: Schema.NullOr(Schema.String),
-})
-export type PutIssueParams = typeof PutIssueParams.Type
-
-
-export const PutIssueSql = "-- name: PutIssue :exec\n-- An issue as its task graph has it now; its sessions and its queue are not the graph's.\ninsert into issue (id, number, title, description, project, priority, rank, created_at, closed_at, delivered, canceled, parent, blocked_by, graph, task)\nvalues ($1, (select coalesce(max(number), 0) + 1 from issue), $2, $3, $4,\n        $5, $6, $7, $8, $9, $10, $11, $12,\n        $13, $14)\non conflict (id) do update set\n  title = excluded.title, description = excluded.description, project = excluded.project, rank = excluded.rank,\n  closed_at = excluded.closed_at, delivered = excluded.delivered, canceled = excluded.canceled, parent = excluded.parent, blocked_by = excluded.blocked_by,\n  graph = excluded.graph, task = excluded.task;"
-
-export const putIssue = Effect.fn("PutIssue")(function* (params: PutIssueParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: PutIssueParams,
-    execute: (p) => sql.unsafe(PutIssueSql, [p["id"], p["title"], p["description"], p["project"], p["priority"], p["rank"], p["created_at"], p["closed_at"], p["delivered"], p["canceled"], p["parent"], p["blocked_by"], p["graph"], p["task"]]),
-  })(params)
-})
-
-export const GraphIDsParams = Schema.Struct({
-
-})
-export type GraphIDsParams = typeof GraphIDsParams.Type
-
-
-export const GraphIDsResult = Schema.Struct({
-  ["id"]: Schema.String,
-})
-export type GraphIDsResult = typeof GraphIDsResult.Type
-
-
-export const GraphIDsSql = "-- name: GraphIDs :many\n-- bound: only issues that are a plan's graph.\nselect id from issue where graph is not null;"
-
-export const graphIDs = Effect.fn("GraphIDs")(function* () {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: GraphIDsParams,
-    Result: GraphIDsResult,
-    execute: () => sql.unsafe(GraphIDsSql, []),
-  })({})
 })
 
 export const LatestOfCronParams = Schema.Struct({
@@ -564,13 +591,16 @@ export const LatestOfCronResult = Schema.Struct({
   ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["title"]: Schema.String,
   ["description"]: Schema.String,
+  ["origin_trigger_id"]: Schema.NullOr(Schema.String),
+  ["mandate_strength"]: Pg_public_issue_mandate_strength_ed059c82398b,
+  ["max_bot_review_rounds"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["auto_submit_pr"]: Schema.Boolean,
   ["project"]: Schema.NullOr(Schema.String),
   ["priority"]: Pg_public_issue_priority_7a8aa16ed3e5,
   ["rank"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
-  ["graph"]: Schema.NullOr(Schema.String),
-  ["task"]: Schema.NullOr(Schema.String),
+  ["constraints"]: Schema.NullOr(Schema.String),
   ["cron"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["queued_at"]: Schema.NullOr(Schema.Number),
@@ -584,13 +614,16 @@ export const LatestOfCronResult = Schema.Struct({
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["last_run"]: Schema.NullOr(Schema.String),
+  ["conflict"]: Schema.NullOr(Schema.String),
   ["answer"]: Schema.NullOr(Schema.String),
+  ["run_started_at"]: Schema.NullOr(Schema.Number),
+  ["run_ended_at"]: Schema.NullOr(Schema.Number),
+  ["run_outcome"]: Schema.NullOr(Pg_public_session_run_outcome_e9d3bd4d227e),
 })
 export type LatestOfCronResult = typeof LatestOfCronResult.Type
 
 
-export const LatestOfCronSql = "-- name: LatestOfCron :one\n-- A cron's issue: the one it made last.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\", \"issue\".\"answer\" from issue where cron = $1 order by created_at desc, id desc limit 1;"
+export const LatestOfCronSql = "-- name: LatestOfCron :one\n-- A cron's issue: the one it made last.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"origin_trigger_id\", \"issue\".\"mandate_strength\", \"issue\".\"max_bot_review_rounds\", \"issue\".\"auto_submit_pr\", \"issue\".\"project\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"constraints\", \"issue\".\"cron\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"conflict\", \"issue\".\"answer\", latest_run.started_at as run_started_at, latest_run.ended_at as run_ended_at, latest_run.outcome as run_outcome\nfrom issue left join lateral (\n  select r.started_at, r.ended_at, r.outcome from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) latest_run on true where cron = $1 order by created_at desc, id desc limit 1;"
 
 export const latestOfCron = Effect.fn("LatestOfCron")(function* (params: LatestOfCronParams) {
   const sql = yield* SqlClient.SqlClient
@@ -607,37 +640,13 @@ export const ReopenIssueParams = Schema.Struct({
 export type ReopenIssueParams = typeof ReopenIssueParams.Type
 
 
-export const ReopenIssueSql = "-- name: ReopenIssue :exec\nupdate issue set closed_at = null, delivered = null, canceled = null, queued_at = null, checks = null, last_run = null where id = $1;"
+export const ReopenIssueSql = "-- name: ReopenIssue :exec\nupdate issue set closed_at = null, delivered = null, canceled = null, queued_at = null, checks = null where id = $1;"
 
 export const reopenIssue = Effect.fn("ReopenIssue")(function* (params: ReopenIssueParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: ReopenIssueParams,
     execute: (p) => sql.unsafe(ReopenIssueSql, [p["id"]]),
-  })(params)
-})
-
-export const OpenOfParams = Schema.Struct({
-  ["agent"]: Schema.String,
-})
-export type OpenOfParams = typeof OpenOfParams.Type
-
-
-export const OpenOfResult = Schema.Struct({
-  ["id"]: Schema.String,
-  ["last_run"]: Schema.NullOr(Schema.String),
-})
-export type OpenOfResult = typeof OpenOfResult.Type
-
-
-export const OpenOfSql = "-- name: OpenOf :many\n-- bound: one agent's open issues.\nselect issue.id, issue.last_run from issue\njoin issue_assignment on issue_assignment.issue = issue.id and issue_assignment.ended_at is null\nwhere issue_assignment.agent = $1 and issue.closed_at is null;"
-
-export const openOf = Effect.fn("OpenOf")(function* (params: OpenOfParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: OpenOfParams,
-    Result: OpenOfResult,
-    execute: (p) => sql.unsafe(OpenOfSql, [p["agent"]]),
   })(params)
 })
 
@@ -658,23 +667,6 @@ export const setIssueAnswer = Effect.fn("SetIssueAnswer")(function* (params: Set
   })(params)
 })
 
-export const SetLastRunParams = Schema.Struct({
-  ["last_run"]: Schema.NullOr(Schema.String),
-  ["id"]: Schema.String,
-})
-export type SetLastRunParams = typeof SetLastRunParams.Type
-
-
-export const SetLastRunSql = "-- name: SetLastRun :exec\nupdate issue set last_run = $1 where id = $2;"
-
-export const setLastRun = Effect.fn("SetLastRun")(function* (params: SetLastRunParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: SetLastRunParams,
-    execute: (p) => sql.unsafe(SetLastRunSql, [p["last_run"], p["id"]]),
-  })(params)
-})
-
 export const SetIssuePullRequestParams = Schema.Struct({
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
@@ -689,5 +681,22 @@ export const setIssuePullRequest = Effect.fn("SetIssuePullRequest")(function* (p
   return yield* SqlSchema.void({
     Request: SetIssuePullRequestParams,
     execute: (p) => sql.unsafe(SetIssuePullRequestSql, [p["pull_request"], p["id"]]),
+  })(params)
+})
+
+export const SetIssueConflictParams = Schema.Struct({
+  ["conflict"]: Schema.NullOr(Schema.String),
+  ["id"]: Schema.String,
+})
+export type SetIssueConflictParams = typeof SetIssueConflictParams.Type
+
+
+export const SetIssueConflictSql = "-- name: SetIssueConflict :exec\nupdate issue set conflict = $1 where id = $2;"
+
+export const setIssueConflict = Effect.fn("SetIssueConflict")(function* (params: SetIssueConflictParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: SetIssueConflictParams,
+    execute: (p) => sql.unsafe(SetIssueConflictSql, [p["conflict"], p["id"]]),
   })(params)
 })

@@ -26,6 +26,9 @@ do update set body = excluded.body, terms = excluded.terms, terms_of = excluded.
 -- name: Forget :exec
 delete from memory where agent = sqlc.arg(agent) and id = sqlc.arg(id);
 
+-- name: ClearManagedNotes :exec
+delete from memory where agent = sqlc.arg(agent) and kind = 'note' and author <> 'owner';
+
 -- name: StaleTerms :many
 -- What an older cut left; memory.recutTerms cuts it again.
 select id, body from memory where terms_of < sqlc.arg(version) order by created_at, id limit sqlc.arg(n)::int;

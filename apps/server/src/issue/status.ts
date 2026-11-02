@@ -4,53 +4,27 @@ import { assignedAgentOf, executionsOf, isBusy, latestSessionIdOf, omitUndefined
 import { compare, compareText, or } from "@/base/order.ts";
 import { sessionOf } from "@/session/roster.ts";
 
+import { awaitsPullRequest } from "./followup.ts";
 import { statusMoves } from "./moves.ts";
 import { issueStageIn } from "./stage.ts";
 
-/** One rule whoever does the work: a session on the farm says where its issue stands; an issue run by no session (an
- * in-process agent's, the orchestrator's) is in progress while its latest run goes on and waits on the owner once it
- * ended, however it ended: only the owner closes it. */
 export function issueStatusOf(t: T.Issue, state: T.WorkspaceState): T.IssueStatus {
   // Closed, the verdict is written down: done with what it delivered, else canceled (a close that does not say how too).
   if (t.delivered !== undefined || t.canceled !== undefined || t.closedAt !== undefined) return t.delivered !== undefined ? "done" : "canceled";
-  if (t.graph) {
-    switch (t.graph.state) {
-      case "splitting":
-      case "running":
-        return "in_progress";
-      case "draft":
-      case "paused":
-      case "ready":
-        return "in_review";
-      case "done":
-        return "done";
-      case "abandoned":
-        break;
-    }
-    return "canceled";
-  }
-  if (t.task) {
-    switch (t.task.state) {
-      case "waiting":
-        return "backlog";
-      case "failed":
-        return "in_review";
-      case "working": {
-        const h = t.task.session !== undefined ? sessionOf(state, t.task.session) : undefined;
-        return h && isBusy(h) ? "in_progress" : "in_review";
-      }
-      case "merged":
-        return "done";
-      case "skipped":
-        break;
-    }
-    return "canceled";
+  const active = latestSessionIdOf(t);
+  if (active && sessionOf(state, active)?.phase._tag === "working") return "in_progress";
+  const children = state.issues.filter((child) => child.parent === t.id);
+  if (children.length > 0) {
+    const statuses = children.map((child) => issueStatusOf(child, state));
+    if (statuses.every((status) => status === "done" || status === "canceled")) return "in_review";
+    if (statuses.some((status) => status !== "backlog")) return "in_progress";
   }
   const latestSession = latestSessionIdOf(t);
   if (latestSession !== undefined) {
     const h = sessionOf(state, latestSession);
-    return !h ? "canceled" : isBusy(h) ? "in_progress" : "in_review";
+    return !h ? "todo" : isBusy(h) || awaitsPullRequest(t, h) ? "in_progress" : "in_review";
   }
+  if (t.queuedAt !== undefined) return "todo";
   if (t.lastRun) return t.lastRun.endedAt === undefined ? "in_progress" : "in_review";
   return t.queuedAt !== undefined ? "todo" : "backlog";
 }

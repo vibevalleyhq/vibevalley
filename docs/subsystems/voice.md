@@ -31,7 +31,7 @@
 - **一份授予只有一个启动者**：启动时认领（`starting`），重复启动回「这通电话已经在接通」；启动失败撤销授予；成功后授予归通话，直到挂断。
 - **一通电话记下建立时的决定**：通话存它用的 Agora client、语音线路的释放函数、是不是快嘴（`quick`）和开场白。之后改「谁接电话」、区域、凭据都不改这通电话：字幕怎么分流、停止请求发到哪个区域都按建立时的。
 - **挂断一开始，字幕资格就终止**：挂断先删授予、把通话标成 `ending`，此后 `heard`、`said` 回 `VoiceCallFailed`（「这通电话已经挂了」）；声网停止失败时保留原 client 供重试，但不再接字幕。
-- **电话里的每句话由服务端记进默认频道**，带 `spoken`，不叫醒任何人：主人的话快嘴模式下由 `Orchestrator.heard` 记，管家模式下由 `Orchestrator.answerer("phone")` 记；管家的回答照常进默认频道；快嘴的回答由页面交 `/voice/agent/said`，只在快嘴模式、通话没挂时记，开场白不记。
+- **电话里的每句话由服务端记进默认频道**，带 `spoken`：快嘴模式的字幕经 `Channel.ownerIngress` 写成 `source=voice` 的信封，带「语音那边已经回答了」的模式；管家模式的 OpenAI 请求也先写同类信封，并多带进程内 `responsePort`。管家的回答照常进默认频道；快嘴的回答由页面交 `/voice/agent/said`，只在快嘴模式、通话没挂时记，开场白不记。
 - **农场只有一通电话**：页面的 `voiceCall`，点手机的「管家」、它通话屏上的「打给管家」和接听来电都开它、挂它；服务端的 `calls` 里没在挂断的那一通就是「正在通话」。
 - **管家能主动在电话里说**（`Voice.speak`）：有一通电话就经它建立时的会话说（`session.say`，声网的 `agents.speak`，带这个会话自己的 ConvoAI token；直接调 `client.agents.speak` 不带 token，声网回 401，管家的话进了默认频道却念不出来），`priority: APPEND`（排在正在说的这句之后，不打断主人）、`interruptable`（主人能插话）；一次最多 512 字节，长的在句末切成几段（`speakPieces`，每段不超过 480 字节）。没有电话回 false。念不出来只记日志。
 - **一句话只处理一次**：管家模式下 `/agent/heard` 收下但不转给管家（语音线路已经交过）；`heard` 带 `sendKey`，同一个键再交是已经听过的那句。
@@ -60,7 +60,7 @@
 
 **字幕**：页面从 data stream 收分块的消息，`captions.ts` 拼齐一轮再解，只留最近几轮。说着的时候就画在田头最下面（`liveCaptions`，淡色、带光标）：主人这一轮还在说的字随说随长；这一轮说完了留着，等田头有了同样的字（`spoken` 的那一条）就换成它，最多留 `captionLinger`（8 秒）。管家的字两种模式都画：不管谁接电话，它的话都要一段说完才进田头。
 
-- 主人的一句定稿时，连同 `agentId`、档案选择和 `sendKey` 交 `POST /api/v1/voice/call/hear`。快嘴模式下服务端把农场设成开着、交给 `Orchestrator.heard`：记成主人在主频道的发言，提示管家「语音那边已经回答了」，派了活才说一句派给了谁。管家模式下收下不转。
+- 主人的一句定稿时，连同 `agentId`、档案选择和 `sendKey` 交 `POST /api/v1/voice/call/hear`。快嘴模式下服务端经 `Channel.ownerIngress` 记成主人在主频道的 `source=voice` 发言，提示管家「语音那边已经回答了」，派了活才说一句派给了谁。管家模式下 Agora 的 OpenAI 请求自己形成信封，这个接口收下不重复转。
 - 快嘴的一轮说完或被打断时（`turn_status` 不为 0），页面把说到的部分交 `POST /api/v1/voice/call/say`，服务端经频道的 `spoken` 记成管家的话。
 - `/voice/agent` 返回前收到的字幕，页面暂存到拿到 `agentId` 再发；取消通话清掉它们。
 - `POST /api/v1/voice/hear` 没有 `agentId`：只有一通没在挂的电话时绑定到它；一通都没有回「没有正在接通的电话」，有几通回「请升级客户端后重试」。
@@ -69,13 +69,13 @@
 
 1. 监听开在 `voice.line.port`（默认 8788，只听 127.0.0.1）；端口被占时只记日志，农场照常，打给管家的电话回原因。
 2. 隧道：设了 `voice.line.url` 就用它（去掉结尾的 `/`），地址固定、第一通不用等，比如 Tailscale Funnel（`tailscale funnel --bg 8788`，把它给的 `https://<机器>.<tailnet>.ts.net` 设成 `voice.line.url`；只放这条线路的端口，农场的 8787 不放）；没设时第一通电话开 cloudflared 临时隧道（`cloudflared tunnel --url`），30 秒内给不出 `trycloudflare.com` 地址就失败，没装就提示 `brew install cloudflared` 或设 `voice.line.url`；拿到地址后每 2 秒探一次，最多 60 秒，线路回 401 算通了，到时还不通也接着打，只记日志。最后一通挂了 10 分钟后关隧道，其间再打就复用。
-3. 每通电话一个随机的通话 id 和钥匙；Agora 每说完一句就来一个请求。协议由 `orchestrator/openai.ts` 处理：只取 `messages` 里最后一条 `user`，交给 `Orchestrator.answerer("phone")`（先记进默认频道，再带「电话里说的、要口语」的提示问管家），管家的字边长边以 SSE 流回去念。没有主人的话时回一句「嗯？我没听清，你再说一遍？」。
+3. 每通电话一个随机的通话 id 和钥匙；Agora 每说完一句就来一个请求。协议由 `orchestrator/openai.ts` 处理：只取 `messages` 里最后一条 `user`；`OrchestratorResponse` 开一个进程内 Caller，把它的随机 id 随 `source=voice` 信封写进默认频道，Mailbox 叫醒管家后由管家取走端口，字边长边以 SSE 流回去念。服务重启会失去 Caller，但信封仍处理、回答仍写频道。没有主人的话时回一句「嗯？我没听清，你再说一遍？」。
 4. Agora 在主人插话时挂掉请求：请求断了就不再送字；同一通电话的新一句结束上一句的流；管家这一轮照常跑完。
 
 **管家打电话找主人**：
 
 1. 什么时候找：Inbox 里刚来一件（[Inbox](docs/subsystems/inbox.md)的 `Inbox.news`，开机时已经在的不算，同一个 id 只算一次）；`voice` 订阅它，交给管家的是每件的 `title：body`。
-2. 正在通话：要说的事进一个队列，从不挤着说。队列里第一件到了先等 3 秒（`gatherMs`），这期间到的一起写成一条「【要告诉主人】……这 N 件合成一段说」交给管家（`Orchestrator.brief`，来源是工单，排在管家手上这一轮之后，不打断电话里正在答的那句）；管家照常在默认频道回答，答完整段经 `speak` 念出来，念的请求排在正在说的话之后。这一段交出去以前不再问管家；其间来的事攒着，下一次合成一条。管家答这件事时插进来别的话（主人在电话里又问了一句），这件的回答就此结束，已经说出来的照样念；一个字都没有的放回队列再问，连着三次没字就作罢。队列是 Voice 作用域里的 Effect 循环，等待和 brief 都能被服务关闭中断；挂断会中止这通电话的 brief 等待，但不停管家共享的 run，每段 `say` 前再查通话是否还在。brief 失败记日志并结束这一轮，不盲目重发管家可能已经收到的输入；之后来的事能再开一轮。挂断以后队列清空：这些事还在手机的未接和 Inbox 里。
+2. 正在通话：要说的事进一个队列，从不挤着说。队列里第一件到了先等 3 秒（`gatherMs`），这期间到的一起写成一条「【要告诉主人】……这 N 件合成一段说」；`OrchestratorResponse.brief` 给它开独立 response port，经 `Ingress.accept` 保存独立 workbench Trigger，排在管家手上这一轮之后，不打断电话里正在答的那句。管家照常在默认频道回答，答完整段经 `speak` 念出来，念的请求排在正在说的话之后。这一段交出去以前不再问管家；其间来的事攒着，下一次合成一条。管家答这件事时插进来别的话，这件的 Caller 就此结束，已经说出来的照样念；一个字都没有的放回队列再问，连着三次没字就作罢。等待和 response port 都归 Voice/Mailbox 的作用域；挂断会中止等待但不停管家共享的 run。失败记日志并结束这一轮，不盲目重发管家可能已经收到的信封。
 3. 没在通话：页面的手机照 Inbox 响铃（工单交回来带着问题的是一种「有问题问你」`ask`）。接听就是开电话：`VoiceCall.start(about)`，`about` 是响的那件事；服务端这通电话不念开场白，agent 进来后经同一个队列把「主人接起了你打的电话，你打电话是为了这件事：……（这期间又有：……）」交给管家，回答念出来作为第一句。通话中手机不响铃，来的事由第 2 步在电话里说。
 
 **挂断**（`VoiceCall.end` → `POST /api/v1/voice/call/stop`）：终止字幕资格、撤销授予，用建立时的 client 请 Agora 离开（它已经在走、回 404 也算成功），释放语音线路的钥匙。失败回 `VoiceCallFailed`，通话留着可以再停。不认识的 `agentId` 用当前凭据和区域去停。服务停止时清空授予、关线路和隧道。
@@ -93,7 +93,7 @@
 
 ## 和谁打交道
 
-- **管家（`orchestrator`）**：快嘴模式的主人字幕经 `heard`；语音线路的每句经 `answerer("phone")`，回一个字的流；它和本机 `/v1/chat/completions` 的 `answerer("api")` 共用一个回答的流，同一时间只流一个。要告诉主人的事经 `brief`：一个自己的回答流，不结束电话的那个，整段回来以后念出来。
+- **管家（`orchestrator`）**：只消费 Mailbox 信封；`OrchestratorResponse` 管语音线路、本机 `/v1/chat/completions` 和电话通知的 response port。交互请求共用 latest 语义，新请求结束上一个 Caller；通知 brief 用独立 Caller。Caller 从不持久化，信封只存随机端口 id。
 - **频道（`channel`）**：快嘴的回答经 `spoken` 记成管家的话；主人的话和管家的回答由管家那边记。带 `spoken` 的消息不投给任何人。
 - **设置（`setting`）**：声网的凭据（每次现取，存的凭据不用重启）、语音设置和三段的 key、听写的设置。
 - **核心（`core`）**：`did`（账本的语音时刻）、`open`。

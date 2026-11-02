@@ -1,13 +1,13 @@
 // Where it stands (and what the owner may do) is the server's Issue.stage: this only words it.
 
 import { t } from "@vibevalley/i18n";
-import type { Issue, IssueStage, Session, SessionEvent, IssueStageKind, TaskGraph, DoingView, SessionView } from "@vibevalley/protocol";
+import type { Issue, IssueStage, Session, SessionEvent, IssueStageKind, DoingView, SessionView } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 
 import { tookText, spanText } from "@/base/format";
 
 import type { Tone } from "./cards";
-import { endedAt, issueInTask } from "./issue";
+import { endedAt } from "./issue";
 import { issueTitle } from "./titles";
 /** An action's words as a sentence starts them (English capitalizes; Chinese has no case). */
 const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -63,8 +63,8 @@ function ownerQuestion(stage: IssueStage, issue: Issue, head: Session): OwnerQue
       switch (stage.stuck) {
         case "conflict":
           return {
-            head: t("web.issue.issue.conflict", { base: head.conflict?.base ?? t("web.issue.issue.main") }),
-            ...(head.conflict ? { line: head.conflict.files.join(t("web.issue.issue.and")) } : {}),
+            head: t("web.issue.issue.conflict", { base: issue.conflict?.base ?? t("web.issue.issue.main") }),
+            ...(issue.conflict ? { line: issue.conflict.files.join(t("web.issue.issue.and")) } : {}),
             tone: "berry",
           };
         case "failed":
@@ -88,19 +88,16 @@ function ownerQuestion(stage: IssueStage, issue: Issue, head: Session): OwnerQue
 }
 
 /** `sessions` oldest first; `session` the one on the farm now, if any. */
-export function issueState(issue: Issue, sessions: Session[], session: SessionView | undefined, graphs: TaskGraph[]) {
+export function issueState(issue: Issue, sessions: Session[], session: SessionView | undefined, issues: Issue[]) {
   const head = session ?? sessions[sessions.length - 1]!;
-  const graphId = head.graph?.id ?? issue.parent ?? (issue.graph ? issue.id : undefined);
-  const graph = graphId === undefined ? undefined : graphs.find((g) => g.id === graphId);
-  const step = head.graph?.task;
-  const node = step === undefined || !graph ? undefined : graph.tasks.find((item) => item.id === step);
+  const parent = issues.find((item) => item.id === issue.parent);
   const stage = issue.stage;
   const current = session ? doingOf(session) : nothing;
   const rows = criteriaRows(issue);
   // Each helper once, the first time it worked the issue.
   const crew = sessions.filter((s, i) => !sessions.slice(0, i).some((x) => x.agent === s.agent));
   const hand = head.worktree !== undefined ? session : undefined;
-  const fullTitle = issueTitle(issue, graphs);
+  const fullTitle = issueTitle(issue, issues);
   const title = shortTitle(fullTitle);
 
   return {
@@ -108,17 +105,13 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
     head,
     session,
     stage,
-    inTask: issueInTask(issue, session),
+    inFamily: issue.parent !== undefined,
     open: stage.state !== "done" && stage.state !== "canceled",
     title,
     /** The whole of a title too long for the page's first line goes with the description. */
     description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
     project: issue.project ?? head.project,
-    taskText: !graph
-      ? t("web.issue.issue.inGraph")
-      : !node
-        ? t("web.issue.issue.splitting", { graph: graph.title })
-        : t("web.issue.issue.graphStep", { graph: graph.title, step: node.title }),
+    parentText: parent?.title ?? issue.parent ?? "",
     ask: ownerQuestion(stage, issue, head),
     /** The lead act and the rest the owner may do, as the server says. */
     lead: stage.lead,

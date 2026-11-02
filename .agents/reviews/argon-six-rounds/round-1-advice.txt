@@ -1,0 +1,51 @@
+模型：opencode-go/gemini-4-argon
+会话：ses_e69d7fcd7ffei46xqVUD5nDmzg
+
+### 第 1 轮方案：移除 `Runtime` 的 `Object.assign` 内部后门与 `make` 导出
+
+#### 一、生产代码删除与收口（`apps/server/src/runtime/runtime.ts`）
+
+1. **删除 `Object.assign` 后门**（第 584–590 行）：
+   - 删除 `refreshUsage`、`cached`、`spent`、`setSpent` 四个附加属性，第 490 行的 `const shape = Runtime.of({ ... })` 直接 `return Runtime.of({ ... });`。
+2. **取消 `make` 的导出**（第 220 行）：
+   - `export const make = ...` 改为模块内私有 `const make = ...`。外部统一通过 `Runtime.layer(options)` 装配并经 `yield* Runtime` 获取公开服务（与 `Session`、`Issue` 一致）。
+   - *注*：`Runtime.layer`（第 98 行）已有 `if (options.registry) return yield* make(options);`，只需把判定放宽为 `if (options.registry || options.probe || options.usageOf) return yield* make(options);`（或把 `Setting` / `Llm` 仅在未提供 `registry` 且未提供 `probe` 时按需获取），这样 `runtime.test.ts` 的 `world()` 层无需额外挂载 `Setting` 与 `Llm` 就能直接 `Runtime.layer(...)`。
+
+---
+
+#### 二、四个内部属性在 `apps/server/src/runtime/runtime.test.ts` 中的接缝迁移
+
+| 原内部后门 | 原测试调用位置 | 迁移后的公开接口 / Clock / 磁盘接缝 |
+|---|---|---|
+| **`spent`** | 全仓 **0 处调用**（纯死代码） | 直接删除，无需替代。 |
+| **`setSpent`** | 第 552–566 行：`yesterday's spending does not stop today's work`（原测试用 `r.setSpent({ day: "2000-01-01", byRuntime: { pi: 12 } })` 伪造昨日账本） | **接缝：`r.spend` + `TestClock.adjust`（加 `spend.json` 磁盘恢复）**：<br>1. 改为 `it.effect`，先调公开接口 `r.spend("pi", 12)`，断言当日 `(yield* r.info("pi"))!.stop` 触发每日预算限制（`¥10.00`）；<br>2. 调 `yield* TestClock.adjust("24 hours")` 拨过一天；<br>3. 再调 `yield* r.info("pi")`，验证 `tally()` 走真实 `Clock` 跨日清零：`[got!.spentToday, got!.stop]` 变为 `[undefined, ""]`；再 `r.spend("pi", 3)` 验证新一天从 3 开始累加。 |
+| **`cached`** | 第 220–223 行：等待 `r.spend("pi", 1)` 在 `spendPushAfterMs`（3,000ms）后重建缓存并推送 runtime 事件 | **接缝：`Core.subscribe`（公开的 runtime 旁路事件流）**：<br>`keep()` 重建缓存的唯一外部可观察动作是 `yield* core.runtime(kept.info)`（第 435 行）。在测试中订阅 `yield* core.subscribe`，执行 `r.spend("pi", 1)` + `yield* TestClock.adjust(3_000)` 后，等待收到 `e.type === "runtime" && e.info.id === "pi" && e.info.spentToday === 1`，即证明 `keep(hit)` 已在缓存上完成原地重建。 |
+| **`refreshUsage`** | 1. 第 131 行（验证用的是新 probe 的 installation）<br>2. 第 168 行（验证 usage 与新 full probe 并发时不覆盖新 probe）<br>3. 第 218、229、231 行（验证 spend 重建缓存不丢在途 usage，且晚发起的 usage 覆盖早发起的） | **接缝：`r.usageSoon("pi")` + `TestClock.adjust(20_000)`**：<br>1. `r.usageSoon("pi")` 是 `Runtime` 公开接口（第 91、579 行），它在服务 `Clock` 上延迟 `usageAfterRunMs`（20,000ms）触发 `refreshUsage("pi")`。单次触发只需 `r.usageSoon("pi")` + `yield* TestClock.adjust(20_000)`。<br>2. 第 229–231 行需要**两个并发在途的 `refreshUsage`**：第一次 `r.usageSoon("pi")` + `TestClock.adjust(20_000)` 让第一个 `usageOf` 挂在 `out[1]` 上（此时 `timers` 中的 `"usage:pi"` fiber 已进入 `usageOf` 并在等待 Promise，或可在 `later` 执行完 delay 后再次触发下一次 `usageSoon("pi")` + `TestClock.adjust(20_000)`）。<br>*注意见下方「提醒事项 2」*。 |
+
+---
+
+#### 三、提醒：可能涉及的跨日、刷新与持久化行为细节
+
+1. **跨日时区基准（`dayOf` 与 `TestClock`）**：
+   - `runtime.ts:156` 的 `dayOf(now)` 使用 `new Date(now)` 的本地年月日。`TestClock` 默认从纪元 `0`（1970-01-01）起步，无论测试运行在哪个时区，`TestClock.adjust("24 hours")`（或 `dayMs`）都会精确跨入下一自然日，触发 `spent.day !== dayOf(...)` 清零内存账本。
+   - 同时，开机读取磁盘 `spend.json` 时（第 276 行：`if (kept && kept.day === spent.day)`），若磁盘里存的是昨天的 `day`，开机即被忽略并从今日空账开始——这两条路径合在一起就是完整的「昨日花费不挡今日」。
+2. **`usageSoon` 的 `FiberMap` 键生命周期（并发 `refreshUsage` 的触发方式）**：
+   - `runtime.ts:581` 写的是：
+     ```ts
+     later("usage:pi", Effect.delay(Effect.ignoreCause(refreshUsage(id)), usageAfterRunMs), { onlyIfMissing: true });
+     ```
+   - 因为 `onlyIfMissing: true` 且 `Effect.delay` 包在整个 `refreshUsage(id)` 外面，当第一个 `refreshUsage("pi")` 正在等待慢 `usageOf` Promise 时，`"usage:pi"` 这个 fiber 还在 `timers` Map 里没结束，此时再调 `usageSoon("pi")` 会因为 `onlyIfMissing: true` 被忽略！
+   - **而生产代码之所以在 `runtime.ts:255` 专门写了 `usageAsked` 和 `usageTaken` 序号防倒挂**，是因为生产中有两条触发源：**后台每 5 分钟的定时轮询（`background: true` 的 `Schedule.spaced(usageEveryMs)`，第 472 行）** 与 **轮次结束后的 `usageSoon`（第 581 行）** 可以同时在途！
+   - 因此在 `runtime.test.ts:197`（测两个并发 usage 读取乱序返回）中，开启 `background: true`（或让 `usageEveryMs` 走 `TestClock.adjust(5 * 60_000)` 触发后台轮询，同时用 `r.usageSoon("pi")` + `TestClock.adjust(20_000)` 触发第二条），就能在**完全不改生产逻辑、不暴露私有 `refreshUsage`** 的前提下，100% 真实复现「后台定时读取 vs `usageSoon` 读取」两个并发请求乱序返回的场景。
+3. **测试层改成 `it.effect` 后的异步门控**：
+   - 第 101、137 行原先是 `it.live`，若保持 `it.live` 配合 `r.usageSoon("pi")`，真实时钟等 20 秒会超测试预算；将它们改为 `it.effect`（像第 197 行一样使用 `TestClock`），用 `Deferred` 或 `Promise.withResolvers` 做门控、用 `TestClock.adjust(20_000)` 瞬时跨过 `usageAfterRunMs`，测试耗时可从几十毫秒降至几毫秒。
+
+---
+
+#### 四、验证命令
+
+```bash
+vp test apps/server/src/runtime/runtime.test.ts
+vp run server:check
+vp run deadcode
+```

@@ -16,6 +16,3 @@ export function issueSession(core: WorkspaceView | undefined, issue: Issue): Ses
 }
 
 export const isRefined = (issue: Issue) => issue.description !== "" || issue.criteria.length > 0;
-
-export const issueInTask = (issue: Issue, session: Session | undefined) =>
-  issue.graph !== undefined || issue.parent !== undefined || session?.graph !== undefined || issue.delivered === "merged_into_parent";

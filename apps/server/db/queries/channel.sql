@@ -54,7 +54,7 @@ left join channel_follow f on f.channel_id = c.id and f.participant_id = sqlc.ar
 where m.sender_id <> sqlc.arg(participant) and m.kind <> 'notice'
   and (c.id = sqlc.arg(channel) or f.participant_id is not null)
   and m.number > greatest(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))
-  and not exists (select 1 from channel_seen_mark s where s.participant_id = sqlc.arg(participant) and s.message_id = m.id)
+  and not exists (select 1 from mailbox_delivery d where d.session_id = sqlc.arg(participant) and d.message_id = m.id and d.consumed_at is not null)
 group by c.id, ch.name
 order by max(m.number) desc
 limit 20;
@@ -85,7 +85,11 @@ update channel set orchestrator = sqlc.narg(orchestrator) where id = sqlc.arg(id
 -- What still points at a channel, so deleting it would take it from under them.
 select (select count(*) from cron r where r.channel_id = sqlc.arg(id))::int as crons,
        (select count(*) from connector_account a where a.channel_id = sqlc.arg(id))::int as connectors,
-       (select count(*) from issue_queue q where q.channel = sqlc.arg(id))::int as queued,
+       (select count(distinct i.id) from issue i
+        left join issue_dispatch d on d.issue_id = i.id
+        left join mailbox_issue m on m.issue_id = i.id and m.state = 'held'
+        left join ingress_trigger t on t.id = m.trigger_id
+        where i.queued_at is not null and (d.channel = sqlc.arg(id) or t.trigger_json::jsonb->>'replyChannel' = sqlc.arg(id)))::int as queued,
        (select count(*) from channel t where t.parent_id = sqlc.arg(id) and t.subject_kind = 'issue')::int as issue_threads;
 
 -- name: DeleteThreadsOf :exec

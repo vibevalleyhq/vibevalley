@@ -1,14 +1,7 @@
 import { list, t } from "@vibevalley/i18n";
-import type { Conflict } from "@vibevalley/protocol";
 
 import type { MergeFailure } from "@/project/shapes.ts";
 export const conflictBrief = (base: string, files: readonly string[]) => t("server.session.conflictBrief", { base, files: list(files) });
-
-/** The conflict a preview of the session's branch shows; none when it goes in clean. */
-export const conflictOf = (changes: { readonly base: string; readonly conflicts?: readonly string[] }): Conflict | undefined =>
-  changes.conflicts && changes.conflicts.length > 0 ? { base: changes.base, files: [...changes.conflicts] } : undefined;
-
-export const sameConflict = (a: Conflict | undefined, b: Conflict | undefined) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /** Who settles a conflict when the work does not go in: the owner (an issue: told what to tell the helper), or the helper
  * at once (a task graph's step). */

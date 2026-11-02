@@ -35,6 +35,7 @@ const buttons = (...names: IssueAct[]): IssueAction[] =>
 
 const helper: SessionView = {
   id: sessionId("helper"),
+  role: "worker",
   name: "阿狐",
   agent: "fox",
   runtime: "pi",
@@ -55,6 +56,7 @@ function frame(stage: IssueStage, session: SessionView = helper): StateFrame {
     title: "提交打卡页",
     priority: "medium",
     deliver: "change",
+    mandate: { strength: "explicit", maxBotReviewRounds: 3, autoSubmitPr: false },
     createdAt: 0,
     assignments: [
       { id: "a1", issue: issueId("clock"), agent: session.agent, assignedAt: 0, executions: [{ kind: "session", session: session.id, startedAt: 0 }] },
@@ -71,9 +73,8 @@ function frame(stage: IssueStage, session: SessionView = helper): StateFrame {
   };
   return {
     seq: 0,
-    state: { call: "idle", callReason: "", sessions: [session], issues: [issue], orchestrators: {}, crons: [], connectors: [] },
+    state: { call: "idle", callReason: "", sessions: [session], issues: [issue], crons: [], connectors: [] },
     inbox: [],
-    graphs: [],
     effects: [],
     view: { level: { level: 1, xp: 0, need: 100 }, plots: { clock: { crop: "wheat" } }, achievements: [] },
   };
@@ -97,11 +98,8 @@ test("a failed round can be cured even before its crop image catches up", () => 
   expect(aim(f, "harvest").aim.ok).toBe(false);
 });
 
-test("an issue in a task graph offers no farm actions even while its helper is working", () => {
-  const f = frame(
-    { state: "working", acts: [] },
-    { ...helper, phase: { _tag: "working", since: 0, doing: { action: "none", label: "", actionText: "" } }, graph: { id: "graph" } },
-  );
+test("an issue with no allowed actions offers no farm actions even while its helper is working", () => {
+  const f = frame({ state: "working", acts: [] }, { ...helper, phase: { _tag: "working", since: 0, doing: { action: "none", label: "", actionText: "" } } });
   for (const tool of ["water", "bug", "harvest", "shovel"] as const) expect(aim(f, tool).aim.ok, tool).toBe(false);
   expect(aim(f, "hand").aim.ok).toBe(true);
 });

@@ -224,8 +224,6 @@ export const catalogs = {
       hopLimit: "帮工之间已经来回 {limit} 次了，先停一停：等主人说一句再接着叫人。",
       breaker: "{name} 连续 {failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。",
       dispatch: {
-        step: "做计划 {graph} 的「{task}」",
-        split: "拆计划 {graph}",
         draft: "看代码，起草这张工单",
         project: "项目",
         sent: "派 @{id}（{name}）去 {project}：{what}",
@@ -422,7 +420,6 @@ export const catalogs = {
     "server.inbox": {
       orchestrator: "管家",
       conflictFiles: "{files} 个文件和主分支冲突",
-      step: "{graph}：{step}",
       item: {
         review: { label: "等你看", title: "{who} 做完了", tray: "{who} 做完了，等你看" },
         ask: { label: "有问题问你", title: "{who} 有问题问你" },
@@ -430,24 +427,41 @@ export const catalogs = {
         interrupted: { title: "{who} 停在了半路" },
         conflict: { label: "合不进去", title: "{who} 的活合进主分支会冲突", tray: "{who} 的活会冲突" },
         quiet: { label: "好久没动静", title: "{who} 好一阵没动静了", body: "可能在跑很久的命令，也可能卡住了：看看它的轨迹。", tray: "{who} 好一阵没动静" },
-        "graph-draft": { label: "计划拆好了", title: "计划「{text}」拆好了", body: "看过再开工", tray: "计划「{text}」等你看" },
-        "graph-ready": { label: "计划做完了", title: "计划「{text}」都做完了", body: "看看改动，合进主分支", tray: "计划「{text}」等你合进主分支" },
-        "task-failed": { label: "计划卡住了", title: "计划卡住了：{text}", body: "重试、改工单，或者跳过", tray: "计划「{text}」没做成" },
         mention: { label: "找你", title: "{who} 叫你" },
         "cron-ask": { label: "定时任务等你同意", title: "管家想定一个定时任务", body: "「{text}」：同意了才开始", tray: "定时任务「{text}」等你同意" },
       },
     },
     "server.issue": {
+      waitingDispatch: "已排队，正在等待派发。",
+      split: {
+        notCurrent: "只有当前负责这张工单的帮工可以拆单。",
+        already: "工单已经关闭或已有子工单。",
+        invalid: "请提供 1–{max} 张子工单，短 ID 唯一合法，依赖只引用这次拆单且不能成环。",
+        agent: "每张子工单需要指定已启用、角色为帮工的档案：{agent}",
+        commitFirst: "请先提交父工单的改动，再拆成子工单。",
+        needsBranch: "父工单需要独立工作分支才能拆单；当前帮工直接在项目目录工作。",
+        created: "已在 #{n} 下创建 {count} 张子工单。",
+      },
+      verification: {
+        acceptanceNeedsCheck: "验收工单必须填写检查命令。",
+        acceptancePassed: "实现之前验收检查就已经通过：{check}",
+        frozen: "修改了冻结的验收文件：{files}",
+        failed: "检查未通过：{check}\n{output}",
+      },
+      dependencies: {
+        closedParent: "父工单已经关闭，不能再加子工单",
+        project: "子工单必须和父工单使用同一个项目",
+        invalid: "工单依赖不能成环，也不能引用不存在的工单",
+        waiting: "等待前置工单完成：{issues}",
+      },
       issueNumbered: "工单 #{n}",
       issueRef: "工单 {ref}",
       helperRef: "帮工 {id}",
       projectRef: "项目 {name}",
       helper: "帮工",
       notStarted: "这张工单还没开工",
-      inGraph: "这是计划里的工单：在计划里改",
       started: "这张工单已经开工了",
       noTitle: "工单没有标题",
-      notQueued: "工单 {id} 不在队里",
       orchestratorNotHelper: "管家不当帮工：派给一个帮工",
       disabled: "{name} 被停用了",
       cannotSend: "{name} 派不出去：{why}",
@@ -463,13 +477,11 @@ export const catalogs = {
       queuedStarted: "排队的「{title}」开工了：{session}",
       queuedStuck: "排队的「{title}」开不了工：{why}；也没能退回待办，还在队里",
       queuedBack: "排队的「{title}」开不了工，留在待办里：{why}",
-      graphRetry: "这是计划里的工单，跟着计划走：在计划里重试这一件，或者重开整个计划",
+      mergedChildRetry: "这张子工单已经合入父工单，请通过父工单继续安排工作。",
       neverStarted: "这张工单还没开过工：直接开工",
       stillOpen: "这张工单还开着：挪回待办就是再来一轮",
       stillWorking: "{name} 还在做这张工单：直接给它带话",
       senderGone: "派它的档案 {id} 不在了",
-      cronNoIssue: "定时任务「{name}」写不了工单：{why}",
-      cronNoStart: "定时任务「{name}」开不了工：{why}",
       closedReopen: "这张工单关上了：带一句话重开它",
       handOverOnTodo: "换人是挪到待办时的事：挪到待办，填上谁来接手",
       stopFirst: "#{n} 还在干这一轮：先叫停，等它停下再换人",
@@ -480,7 +492,6 @@ export const catalogs = {
       cannotDelete: "工单 #{n} 还不能删：{why}",
       noConflict: "{name} 和主分支没有冲突",
       orchestratorAnswers: "这是派给管家的工单：管家答完就关",
-      graphAcceptance: "这是计划里的工单，跟着计划走：在计划里验收",
       nothingToAccept: "还没交回来，没有东西可验收",
       failNeedsFindings: "没过验收要说哪里不行：至少写一条意见",
       does: {
@@ -558,7 +569,6 @@ export const catalogs = {
         told: "你带了话，接着做一轮",
         start: "开工",
         restart: "重开，接着做",
-        graph: "照计划开工",
         cron: "{missed, select, true {定时开工（补跑）} other {定时开工}}",
         runtime: "农机自己接着做",
         refined: "起草好了",
@@ -591,6 +601,9 @@ export const catalogs = {
         files: "可能涉及：",
       },
       noProfileNamed: "没有叫 {key} 的档案",
+      prSubmitNotAllowed: "这张工单没有主人明确授予的自行提交 PR 权限",
+      prSubmitNotCurrent: "只有当前处理这张工单的帮工能提交 PR",
+      prSubmitUnavailable: "这张工单的项目没有启用 PR 交付",
     },
     "server.lan": {
       aDevice: "一台设备",
@@ -616,6 +629,11 @@ export const catalogs = {
       cut: "断开它连着的 {n} 条连接",
       local: "这里就是跑着 VibeValley 的本机，不是连进来的设备",
     },
+    "server.mailbox": {
+      notOwned: "这条输入不归当前会话处理，不能退回",
+      subscriptionTaken: "话题 {thread} 已归属于另一张工单",
+      ambiguous: "这条输入同时对应多张工单，需要明确归属",
+    },
     "server.memory": {
       source: { local: "本地", nowledge: "Nowledge Mem", everos: "EverOS" },
       noUrl: "没填地址",
@@ -635,11 +653,8 @@ export const catalogs = {
       nowledgeForget: "Nowledge Mem 里的记忆到 Nowledge Mem 里删",
       empty: "要记的话是空的",
       dbFailed: "没记下来：数据库写不进去",
-      fileFailed: "没记下来：MEMORY.md 写不进去",
       noMemory: "{agent} 的记性里没有 {id}",
-      forgetOrchestrator: "从管家的 MEMORY.md 删掉这一行：「{text}」",
       forget: "从 {agent} 的记性里忘掉：「{text}」",
-      orchestratorRecall: "管家不靠想起：它每次带着整份记性",
     },
     "server.orchestrator": {
       label: "管家",
@@ -648,6 +663,8 @@ export const catalogs = {
       onlyDeepseek: "管家只接 DeepSeek 的模型：管家档案的模型设成 deepseek/<模型> 或直接写模型名，{configured} 用不了",
     },
     "server.project": {
+      parentBranchChanged: "父工单工作目录已切换分支，不能自动合入",
+      parentHasChanges: "父工单还有未提交的改动，提交后再合入子工单",
       badName: "项目名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符",
       badGithub: "请填 GitHub 仓库地址，例如 https://github.com/botiverse/raft-source",
       branchMoved: "分支在检查以后又变了，请重新检查再合",
@@ -697,6 +714,7 @@ export const catalogs = {
         noPermission: "无法检测 GitHub 仓库权限",
         readOnly: "没有写权限",
         wrongBranch: "工单分支不匹配",
+        changedDuringCheck: "检查期间工作目录发生了变化，提交改动后再提交 PR",
         pushFailed: "推送工单分支失败，请检查 origin 和登录后重试",
         listFailed: "查询已有 PR 失败；分支已推送，可重试",
         listUnread: "无法读取已有 PR",
@@ -708,6 +726,7 @@ export const catalogs = {
         viewFailed: "查询 PR #{n} 失败",
         stateUnread: "无法读取 PR #{n} 状态",
         stateUnknown: "无法识别 PR #{n} 状态",
+        resolveFailed: "解决 GitHub Review 讨论失败",
         worktreeLeft: "PR 已结束，清理 worktree 失败：{why}",
         branchLeft: "PR 已结束，清理本地分支失败：{why}",
       },
@@ -773,14 +792,7 @@ export const catalogs = {
       failureThen: "。{next}",
       done: "做完了",
       unfinished: "没做完",
-      answer: {
-        lines: "{field}：要是字符串或字符串的数组",
-        noBlock: "没找到结论：要用一个 json 代码块给出",
-        notObject: "要是一个对象",
-        unreadable: "json 读不了：{why}",
-        empty: "结论是空的",
-        noEvidence: "结论没有依据：evidence 至少一条",
-      },
+      answer: { noBlock: "没有通过 issue_report 交结构化 answer" },
       noRoom: {
         farm: "已经有 {max} 个帮工在干活了",
         runtime: "{runtime} 上已经有 {on} 个帮工在干活，最多同时 {max} 个（在「农机」页可以改）",
@@ -844,7 +856,6 @@ export const catalogs = {
         stillClosing: "{name} 的农机没能停止：工作目录留着，不能再开一轮",
         noRoom: "{name} 先不接着干：{full}",
         notReceived: "{name} 没收到：{why}",
-        inGraph: "{name} 在做计划 {graph} 里的活：做完会自动合进计划的分支，整个计划合进主分支时再进主分支",
         stillWorking: "{name} 还在干活：等这一轮做完，或者先叫停，再收",
         notBack: "{name} 没接回来：{why}",
         placeGone: "干活的目录不见了（{cwd}）",
@@ -893,143 +904,6 @@ export const catalogs = {
       defaults: { failureMessage: "我这边卡了一下，你再说一遍？" },
       notSaved: "存不进 {file}：{why}",
     },
-    "server.task": {
-      graphState: {
-        splitting: "在拆",
-        draft: "等你看过再开工",
-        running: "在做",
-        paused: "暂停了",
-        ready: "都做完了，等你合进主分支",
-        done: "合进了主分支",
-        abandoned: "放弃了",
-      },
-      graphTag: { splitting: "在拆", draft: "等你看", running: "在做", paused: "暂停了", ready: "等你合", done: "合进了", abandoned: "放弃了" },
-      graphAction: { start: "开工", pause: "暂停", resume: "继续", abandon: "放弃", merge: "合进主分支" },
-      taskState: { waiting: "等着", working: "在做", merged: "合进去了", failed: "没做成", skipped: "跳过了" },
-      taskAction: { retry: "重试", skip: "跳过" },
-      actor: { owner: "主人", orchestrator: "管家", session: "帮工", system: "VibeValley" },
-      field: { title: "标题", brief: "工单", needs: "要等的", agent: "谁来做", check: "检查", scope: "该改的地方" },
-      event: {
-        splitting: "要拆一张计划{why}",
-        paused: "暂停了{why}",
-        resumed: "接着做了",
-        ready: "都做完了，等主人合进主分支",
-        merged: "合进了主分支",
-        abandoned: "放弃了{why}",
-        taskStarted: "{step}开工{by}",
-        taskSentBack: "{step}退回去重做{by}{why}",
-        taskFailed: "{step}没做成{why}",
-        taskRetried: "{step}重试",
-        taskRequeued: "{step}没有帮工在做了，重新排上",
-        taskSkipped: "{step}跳过了，后面的照做",
-        taskAdded: "加了一件{step}",
-        taskRemoved: "删了一件「{title}」",
-        step: "「{title}」",
-        by: "（{session}）",
-        why: "：{detail}",
-        drafted: "拆好了，等主人看",
-        draftedSteps: "拆好了，{steps} 件，等主人看",
-        started: "开工了",
-        startedOn: "开工了，分支 {branch}",
-        taskMerged: "{step}合进了计划分支{why}",
-        taskMergedCommits: "{step}合进了计划分支（{commits}）{why}",
-        taskEdited: "改了{step}的{fields}",
-      },
-      problem: {
-        empty: "计划里一件都没有",
-        tooMany: "最多 {max} 件，这里有 {n} 件：把小的几件合并",
-        badId: "「{id}」不能当一件的 id：用简短的英文，比如 api",
-        duplicate: "一件的 id「{id}」重复了",
-        noBrief: "「{id}」没有工单",
-        noCheck: "验收的那一件「{id}」没有检查命令：验收就是这条命令",
-        self: "「{id}」不能等自己",
-        missing: "「{id}」要等的「{other}」不存在",
-        circle: "这几件互相等，成了一个圈：{ids}",
-      },
-      parse: {
-        object: "要一个对象",
-        string: "{at} 要是字符串",
-        array: "{at} 要是数组",
-        stepObject: "{at} 要是对象",
-        missing: "{at} 缺了",
-        boolean: "{at} 要是布尔值",
-        noBlock: "没找到计划：要用一个 json 代码块给出",
-        unreadable: "json 读不了：{why}",
-        shape: "计划的格式不对：{why}",
-      },
-      edit: {
-        taskSettled: "「{title}」{state}，不能改了",
-        graphSettled: "计划{state}，不能再加一件了",
-        noStep: "计划里没有「{id}」这一件",
-        cannotRemove: "「{title}」{state}，不能删了：可以跳过它",
-        remove: "从计划「{graph}」删掉「{step}」这一件",
-        stopWaiting: "{steps}不再等它",
-      },
-      noGraph: "没有 {id} 这个计划",
-      notSaved: "计划「{title}」没能保存：{why}",
-      notice: {
-        notSplit: "计划「{title}」没拆成：{why}",
-        splitStopped: "规划被叫停了",
-        plannerFailed: "规划的帮工出错了：{summary}",
-        noGraph: "没给出能用的计划：{problem}",
-        drafted: "计划「{title}」拆好了，{steps} 件：在「计划」里看过再开工",
-        noHelper: "没有能派的帮工",
-        waits: "「{title}」先等着：{why}",
-        taskFailed: "计划「{graph}」的「{task}」没做成：{why}",
-        unknownFiles: "看不出它改了哪些文件：{why}",
-        acceptancePassed: "验收 {check} 现在就通过了",
-        checkFailed: "做完跑 {check} 没通过",
-        noBranch: "计划还没有分支",
-        stepNotSaved: "「{title}」这一件已合进计划分支，但完成状态没能保存：{why}",
-        ready: "计划「{title}」都做完了：在「计划」里看看改动，合进主分支",
-        stepStopped: "「{title}」被叫停了，计划先暂停；点继续接着做",
-        plannerGone: "规划的帮工被请走了",
-        helperGone: "帮工被请走了，这一件没做完",
-        done: "做完了",
-        restartedSplitting: "VibeValley 重启了，规划停在了半路：再说一遍要做什么",
-        restarted: "VibeValley 重启过，计划先暂停了；点继续接着做",
-        split: "{name} 把工单「{title}」拆成了 {n} 张子工单，开工了",
-        splitBy: "{name} 拆的",
-        splitNotSaved: "计划分支 {branch} 已创建，但拆好的工单没能保存：{why}",
-        frozenTouched: "改了冻结的验收：{files}",
-      },
-      act: {
-        noGoal: "没说要做什么",
-        noProject: "没说在哪个项目里做：项目是工作目录下的一个文件夹",
-        noSplitter: "没有能派的帮工来拆计划",
-        notSent: "没派出去",
-        plannerNotSent: "规划的帮工派不出去：{why}",
-        splittingBy: "{name} 去看代码、拆计划了（{id}）。拆好了会放在「计划」里，你看过再开工。",
-        startNotSaved: "计划分支 {branch} 已创建，但开工状态没能保存：{why}",
-        started: "计划「{title}」开工了，分支 {branch}",
-        pausedNote: "暂停了：正在做的几件做完，不再开新的",
-        paused: "计划「{title}」暂停了：正在做的几件做完，不再开新的",
-        resumed: "计划「{title}」接着做了",
-        branchKeptNote: "；分支 {branch} 留着",
-        abandonedNote: "放弃了{kept}",
-        notMergedNote: "没合进去：{why}",
-        notMerged: "没合进去：{why}。计划分支 {branch} 留着",
-        mergeNotSaved: "计划分支已合进主分支，但完成状态没能保存：{why}",
-        merged: "计划「{title}」合进去了：{text}",
-        noStep: "计划里没有「{id}」这一件",
-        graphIs: "计划{state}",
-        notFailed: "「{title}」没有失败，不用重试",
-        retried: "{name} 接着做「{title}」",
-        requeued: "「{title}」重新排上了",
-        working: "「{title}」正在做，先叫停",
-        finished: "「{title}」已经做完了",
-        skipped: "跳过了「{title}」，后面的几件照常开工",
-        stepAct: "{action}「{title}」",
-        edited: "改好了",
-        notStarted: "计划「{title}」还没开工，没有分支",
-        branchGone: "计划「{title}」的分支不在了：先确认它是不是被删掉了",
-        stepsWrong: "拆出来的几件有问题，改好再拆：\n- {problems}",
-        cannot: "计划「{title}」{state}，不能{action}",
-        abandoned: "计划「{title}」放弃了",
-        abandonedKept: "计划「{title}」放弃了，分支 {branch} 留着",
-        conflict: "合进 {base} 会冲突（{files}）：{base} 在这期间变了",
-      },
-    },
     "server.tool": {
       labels: {
         project_list: "项目",
@@ -1052,13 +926,6 @@ export const catalogs = {
         issue_create: "记一张工单",
         issue_update: "改工单",
         issue_status_update: "挪工单",
-        graph_split: "拆计划",
-        graph_list: "看计划",
-        graph_get: "看计划",
-        graph_task_update: "改计划",
-        graph_task_delete: "删计划的一件",
-        graph_act: "计划",
-        graph_task_act: "计划的一件",
         issue_split: "拆工单",
         remember: "记一条",
         rewrite_memory: "整理记性",
@@ -1159,7 +1026,6 @@ export const catalogs = {
         reopen: "重开",
       },
       phase: {
-        arriving: "刚派出去，正在开工",
         quiet: "{what}（已经 {span}没动静了）",
         done: "这一轮做完了，等你看{conflict}",
         failed: "这一轮没做成",
@@ -1278,7 +1144,7 @@ export const catalogs = {
       ownMcpTip: "农机自己报告的，和上面加的叠在一起。",
       unreported: "这台农机 不报告这一项。",
       none: "没有。",
-      role: { orchestrator: "管家", helper: "帮工" },
+      role: { orchestrator: "管家", worker: "帮工" },
       templates: {
         title: "模板",
         intro:
@@ -1792,7 +1658,6 @@ export const catalogs = {
       },
       names: {
         issueThread: "工单串",
-        planThread: "计划 {id}",
         talkThread: "{who}的串",
         thread: "串",
         mention: { orchestrator: "@管家", owner: "@主人", everyone: "@所有人" },
@@ -1879,7 +1744,6 @@ export const catalogs = {
     "web.farm": {
       reading: "在读……",
       unread: "读不到。",
-      never: "算了",
       notNow: "先不收",
       orchestrator: "管家",
       plotOf: "{name}的地",
@@ -1918,7 +1782,6 @@ export const catalogs = {
         job: "要做的",
         who: "谁在做",
         crew: "地上的人",
-        review: "验收",
         deliver: "交付",
         reviewed: "已验收 {clock}",
         weeded: "拔了的草",
@@ -1931,7 +1794,6 @@ export const catalogs = {
         history: "做过",
         took: "用时",
         thread: "看工单串",
-        graph: "看计划",
         where: "第 {plot} 块地 · 第 {round} 轮",
         result: { met: "它说做到了", unmet: "它说没做到", unsure: "它说不确定" },
         ticked: "看过了",
@@ -1947,67 +1809,7 @@ export const catalogs = {
         sayAgain: "再说一次",
         takeBack: "放回输入框",
       },
-      graph: {
-        name: "种植计划",
-        new: "新计划",
-        intro:
-          "一件很长的活：先派一个帮工读代码，把它拆成几步，每步交给一个帮工，有先后。拆好了你看过、改过再开工；每步做完合进计划自己的分支，全做完你再一次收进主分支。",
-        goal: "要做什么",
-        goalExample: "比如：给 clock-in 加按月查询打卡记录，带一个页面，要有测试",
-        project: "在哪个项目",
-        splitter: "谁来拆",
-        byRule: "按规则挑",
-        split: "拆计划",
-        steps: "{done}/{of} 步",
-        spent: "花了 {spent}",
-        projectTag: "项目 {project}",
-        running: "每步做完合进这条分支；收获时整条合进主分支",
-        addStep: "加一步",
-        review: "看改动，{merge}…",
-        abandon: "{abandon}这个计划",
-        abandonSure: "确定放弃？分支会留着",
-        splitting: "帮工在读代码、拆计划。拆好了会出现在这里，你看过再开工。",
-        no: "不了",
-        readingChanges: "正在看计划分支改了什么…",
-        unreadable: "看不了改动：",
-        summary: "{branch} → {project} 的 {base}：{commits} 个提交，{files} 个文件，",
-        behind: "；这期间 {base} 多了 {n} 个提交",
-        commits: "提交",
-        files: "文件",
-        harvest: "确认收获，合进 {base}",
-        noSteps: "计划里还没有一件。",
-        first: "先做",
-        batch: "第 {n} 批",
-        acceptanceHint: "验收：写好时要不通过，最后一步让它通过",
-        checkHint: "做完跑 {check}",
-        edit: "改",
-        remove: "删",
-        story: "经过",
-        stepId: "这一件的 id",
-        stepIdHint: "这一件的 id，比如 docs",
-        title: "标题",
-        brief: "工单",
-        briefHint: "工单：目标、改哪里、做到什么程度算完",
-        whoHint: "谁来做：按规则挑",
-        who: "谁来做",
-        check: "检查命令",
-        checkExample: "做完跑的检查，比如 pnpm test（可空）",
-        waitFor: "等这些做完：",
-        done: "改好了",
-        add: "加上",
-        storyOf: "「{title}」的经过",
-        wholeStory: "看整个计划的经过",
-        nothing: "还没有记下什么。",
-        readingStory: "正在读…",
-        beforeAfter: "改前改后",
-        empty: "（空）",
-        conflict: "合进 {base} 会冲突：{files}。先不收，等 {base} 上的改动处理好。",
-        frozen: "验收，冻结了：{files}",
-        waits: "等 {titles}",
-        after: "接在 {titles} 后面",
-        onPlot: "{name} · 第 {plot} 块地",
-        onPlotDoing: "{name} · 第 {plot} 块地 · 在{doing}",
-      },
+      graph: { unreadable: "看不了改动：", commits: "提交" },
       achievements: {
         tier: { "1": "铜", "2": "银", "3": "金" },
         category: { starter: "新手任务", harvest: "收成", craft: "手艺", thrift: "精打细算", team: "协作", secret: "彩蛋" },
@@ -2081,7 +1883,6 @@ export const catalogs = {
         resolve: "让它解决冲突",
         files: "改了的文件",
         empty: "仓库还空着。收获进主分支的活会放在这里。",
-        graph: "种植计划",
         taken: "{ago}收的",
       },
       panel: {
@@ -2090,7 +1891,6 @@ export const catalogs = {
         graphs: "任务与成就",
         log: "农场日志",
         orchestrator: "管家和宠物",
-        taskBoard: "种植计划",
         harvest: "收获{name}的地",
         sow: "播种 · 第 {plot} 块地",
         water: "给{name}浇水",
@@ -2314,7 +2114,7 @@ export const catalogs = {
         warehouse: { hint: "收进来的成果" },
         tasks: { hint: "新手任务、开垦、成就墙" },
         log: { hint: "说过的话和收成，按时间倒着排" },
-        taskBoard: { label: "种植计划", hint: "一件长活拆成几步，交给几个帮工" },
+        taskBoard: { hint: "一件长活拆成几步，交给几个帮工" },
         agents: { hint: "每个帮工用哪台农机、带什么人设和技能、长什么样" },
         manager: { hint: "跟管家说话" },
         runtimes: { label: "工坊 · 农具", hint: "每台农机是一种 runtime：装没装、用量" },
@@ -2429,7 +2229,7 @@ export const catalogs = {
       },
       manager: "管家",
       hangUp: "挂断",
-      app: { missed: "未接", channels: "频道", graphs: "计划", games: "游戏" },
+      app: { missed: "未接", channels: "频道", games: "游戏" },
       game: { blocks: "方块", sokoban: "推箱子", dino: "小恐龙", bugs: "贪吃虫", merge: "种田 2048" },
       phone: "手机",
       phoneRinging: "手机：来电",
@@ -2503,6 +2303,7 @@ export const catalogs = {
     },
     "web.inbox": { tray: { working: "{n} 个帮工在干活", idle: "开工了，没有在干的活", off: "还没开工", unread: "频道 {n} 条没读" } },
     "web.issue": {
+      family: { children: "子工单", parent: "父工单" },
       reading: "在读……",
       never: "算了",
       later: "先放着",
@@ -2673,44 +2474,8 @@ export const catalogs = {
         unsure: "拿不准的",
         next: "建议接着做",
         conflict: "合进 {base} 会冲突：{files}",
-        graphStep: "计划「{graph}」的一件",
-        backToGraph: "回到计划",
       },
-      task: {
-        label: "计划",
-        steps: "{n} 件",
-        done: "做完 {done} / {of} 件",
-        waitsForYou: "有一件在等你：打开它回答或者验收。",
-        splitting: "管家在把它拆成几件，拆好了会列在下面。",
-        ok: "好了。",
-        check: "检查",
-        scope: "改哪里",
-        conclusion: "结论",
-        spent: "花了",
-        tried: "试了",
-        tries: "{n} 次",
-        open: "打开这张工单",
-        review: "看改动，{merge}…",
-        state: "状态",
-        project: "项目",
-        progress: "进度",
-        progressLine: "{done} / {of} 件",
-        parallel: "同时做",
-        atMost: "至多 {n} 件",
-        written: "写于",
-        note: "备注",
-        abandonTitle: "{abandon}这个计划？",
-        abandonLine: "还没做完的几件不再派出去；计划分支留着，做好的提交都还在。",
-        abandon: "确定放弃",
-        reading: "正在看计划分支改了什么…",
-        behind: "这期间 {base} 多了 {n} 个提交",
-        merge: "合进 {base}",
-        layer: "第 {n} 批",
-        layerTogether: "第 {n} 批 · 这 {size} 件可以同时做",
-        waitsOn: "等「{steps}」",
-        stepSeparator: "」「",
-        conflict: "合进 {base} 会冲突：{files}。先不合，等 {base} 上的改动处理好。",
-      },
+      task: { project: "项目", written: "写于" },
       todo: {
         queued: "排上队了：空位都满了，有空位就自动开工。",
         refining: "{who}在起草",
@@ -2765,20 +2530,10 @@ export const catalogs = {
         stage: { talk: "聊清楚", work: "安排活", finish: "完成" },
         newIssue: "新工单",
       },
-      graph: {
-        splitting: "在拆成几件",
-        draft: "拆好了，看过再开工",
-        running: "做到 {done} / {total} 件",
-        paused: "暂停了",
-        ready: "都做完了，等你合进主分支",
-        done: "合进了主分支",
-        abandoned: "放弃了",
-      },
       trigger: {
         issue: "派出去",
         comment: "带话",
         commentNumbered: "带话（#{id}）",
-        task: "计划",
         cron: "定时任务",
         missed: "定时任务（补跑）",
         refine: "起草",
@@ -2804,7 +2559,6 @@ export const catalogs = {
         runs: "{n} 轮",
         orchestratorWorking: "管家在做",
         missingFlag: "记录缺失",
-        graph: "计划：{title}",
         missing: "这一轮的记录缺失：{what}",
       },
       issue: {
@@ -2821,8 +2575,6 @@ export const catalogs = {
         stuck: "卡住了",
         canceled: "已取消",
         reopenLine: "要它接着做就重开：写一句这次要做什么。",
-        inGraph: "这是计划里的一件，跟着计划走。",
-        splitting: "在拆计划「{graph}」：只读代码，不改文件。",
         editing: "{who}在改代码",
         history: "{n} 次：{line}",
         historyItem: "{name}（{id}）",
@@ -2839,7 +2591,6 @@ export const catalogs = {
         whoRuntime: "{name}（{runtime}）",
         changes: "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
         changesUncommitted: "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
-        graphStep: "计划「{graph}」的一件：{step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。",
         justNow: "刚刚",
       },
     },
@@ -2931,7 +2682,6 @@ export const catalogs = {
         orchestratorNothing: "还没记下什么。跟管家说「记住……」，或者你在上面替它记。",
         orchestratorOwn: "管家自己记的",
         told: "你交代的",
-        tooOld: "太旧了，带不进系统提示",
         archiveIntro: "对话太长时，管家把前面的部分压成一段摘要，原文一字不改地存在这里。摘要里缺了细节，它自己会用 search_archive 来翻；你也可以在这里翻。",
         search: "在旧账里搜",
         searchHint: "搜一个词",
@@ -3865,8 +3615,6 @@ export const catalogs = {
       hopLimit: "The helpers have gone back and forth {limit} times: they pause here until you say something.",
       breaker: "{name} failed {failed} times in a row as soon as it was woken, so it is not woken again for now; telling it something directly tries again.",
       dispatch: {
-        step: 'task "{task}" of the plan {graph}',
-        split: "splitting the plan {graph}",
         draft: "reading the code and drafting this ticket",
         project: "the project",
         sent: "Sent @{id} ({name}) to {project}: {what}",
@@ -4063,7 +3811,6 @@ export const catalogs = {
     "server.inbox": {
       orchestrator: "The manager",
       conflictFiles: "{files, plural, one {# file conflicts with main} other {# files conflict with main}}",
-      step: "{graph}: {step}",
       item: {
         review: { label: "For you to see", title: "{who} is done", tray: "{who} is done, for you to see" },
         ask: { label: "A question for you", title: "{who} has a question for you" },
@@ -4076,19 +3823,6 @@ export const catalogs = {
           body: "It may be running a long command, or it may be stuck: look at what it has been doing.",
           tray: "{who} has gone quiet",
         },
-        "graph-draft": {
-          label: "Plan drafted",
-          title: 'The plan "{text}" is drafted',
-          body: "Look it over before it starts",
-          tray: 'The plan "{text}" is for you to see',
-        },
-        "graph-ready": {
-          label: "Plan done",
-          title: 'The plan "{text}" is all done',
-          body: "Look over the changes and merge them into main",
-          tray: 'The plan "{text}" is ready to merge into main',
-        },
-        "task-failed": { label: "Plan stuck", title: "A plan is stuck: {text}", body: "Retry, edit the ticket, or skip it", tray: 'The plan "{text}" failed' },
         mention: { label: "Calling you", title: "{who} is calling you" },
         "cron-ask": {
           label: "A scheduled task to approve",
@@ -4099,16 +3833,36 @@ export const catalogs = {
       },
     },
     "server.issue": {
+      waitingDispatch: "Queued and waiting for dispatch.",
+      split: {
+        notCurrent: "Only the helper currently assigned to this issue can split it.",
+        already: "This issue is closed or already has child issues.",
+        invalid: "Provide 1–{max} child issues with unique valid IDs and acyclic dependencies within this split.",
+        agent: "Choose an enabled helper profile for each child issue: {agent}",
+        commitFirst: "Commit the parent issue's changes before splitting it.",
+        needsBranch: "The parent issue needs its own working branch before splitting; its helper is currently working directly in the project directory.",
+        created: "Created {count} child issues under #{n}.",
+      },
+      verification: {
+        acceptanceNeedsCheck: "An acceptance issue needs a check command.",
+        acceptancePassed: "The acceptance check already passes before implementation: {check}",
+        frozen: "Frozen acceptance files were changed: {files}",
+        failed: "Check failed: {check}\n{output}",
+      },
+      dependencies: {
+        closedParent: "A closed parent issue cannot accept child issues",
+        project: "A child issue must use its parent's project",
+        invalid: "Issue dependencies must be acyclic and refer to existing issues",
+        waiting: "Waiting for prerequisite issues: {issues}",
+      },
       issueNumbered: "ticket #{n}",
       issueRef: "ticket {ref}",
       helperRef: "helper {id}",
       projectRef: "project {name}",
       helper: "the helper",
       notStarted: "This ticket has not started yet",
-      inGraph: "This ticket belongs to a plan: change it in the plan",
       started: "This ticket has already started",
       noTitle: "The ticket has no title",
-      notQueued: "Ticket {id} is not in the queue",
       orchestratorNotHelper: "The manager is not a helper: send it to a helper",
       disabled: "{name} is disabled",
       cannotSend: "{name} cannot be sent: {why}",
@@ -4124,13 +3878,11 @@ export const catalogs = {
       queuedStarted: 'The queued "{title}" has started: {session}',
       queuedStuck: 'The queued "{title}" could not start: {why}; it could not go back to To do either, and stays in the queue',
       queuedBack: 'The queued "{title}" could not start and stays in To do: {why}',
-      graphRetry: "This ticket belongs to a plan and follows it: retry the task in the plan, or reopen the whole plan",
+      mergedChildRetry: "This child issue has already merged into its parent. Continue work through the parent issue.",
       neverStarted: "This ticket has never started: just start it",
       stillOpen: "This ticket is still open: moving it back to To do is another round",
       stillWorking: "{name} is still on this ticket: tell it directly",
       senderGone: "The profile it was sent to, {id}, is gone",
-      cronNoIssue: 'The scheduled task "{name}" could not write its ticket: {why}',
-      cronNoStart: 'The scheduled task "{name}" could not start: {why}',
       closedReopen: "This ticket is closed: reopen it with a few words",
       handOverOnTodo: "Handing over happens when moving to To do: move it there and say who takes over",
       stopFirst: "#{n} is still in this round: stop it, and hand it over once it has stopped",
@@ -4141,7 +3893,6 @@ export const catalogs = {
       cannotDelete: "Ticket #{n} cannot be deleted yet: {why}",
       noConflict: "{name} has no conflict with main",
       orchestratorAnswers: "This ticket is the manager's: it closes once the manager answers",
-      graphAcceptance: "This ticket belongs to a plan and follows it: accept it in the plan",
       nothingToAccept: "Nothing has been handed back yet, so there is nothing to accept",
       failNeedsFindings: "Failing the acceptance needs what is wrong: write at least one point",
       does: {
@@ -4219,7 +3970,6 @@ export const catalogs = {
         told: "You told it something; another round",
         start: "Started",
         restart: "Reopened, carrying on",
-        graph: "Started by the plan",
         cron: "{missed, select, true {Started on schedule (made up)} other {Started on schedule}}",
         runtime: "The machine carried on by itself",
         refined: "Drafted",
@@ -4252,6 +4002,9 @@ export const catalogs = {
         files: "May touch:",
       },
       noProfileNamed: "No profile is named {key}",
+      prSubmitNotAllowed: "The owner did not explicitly authorize this ticket to submit its own pull request",
+      prSubmitNotCurrent: "Only the helper currently handling this ticket can submit its pull request",
+      prSubmitUnavailable: "Pull-request delivery is not enabled for this ticket's project",
     },
     "server.lan": {
       aDevice: "A device",
@@ -4277,6 +4030,11 @@ export const catalogs = {
       cut: "Cut its {n} open connections",
       local: "This is the machine running VibeValley, not a connected device",
     },
+    "server.mailbox": {
+      notOwned: "This input does not belong to the current session and cannot be returned",
+      subscriptionTaken: "Thread {thread} already belongs to another issue",
+      ambiguous: "This input matches multiple issues and needs an explicit owner",
+    },
     "server.memory": {
       source: { local: "Local", nowledge: "Nowledge Mem", everos: "EverOS" },
       noUrl: "no address",
@@ -4296,11 +4054,8 @@ export const catalogs = {
       nowledgeForget: "Nowledge Mem memories are deleted in Nowledge Mem",
       empty: "There is nothing to remember",
       dbFailed: "Not remembered: the database could not be written",
-      fileFailed: "Not remembered: MEMORY.md could not be written",
       noMemory: "{agent}'s memory has no {id}",
-      forgetOrchestrator: 'Delete this line from the manager\'s MEMORY.md: "{text}"',
       forget: 'Forget from {agent}\'s memory: "{text}"',
-      orchestratorRecall: "The manager does not recall: it always carries its whole memory",
     },
     "server.orchestrator": {
       label: "The manager",
@@ -4311,6 +4066,8 @@ export const catalogs = {
         "The manager runs only on DeepSeek models: set the manager profile's model to deepseek/<model> or just the model's name; {configured} cannot be used",
     },
     "server.project": {
+      parentBranchChanged: "The parent worktree changed branches; the child cannot be merged automatically",
+      parentHasChanges: "Commit the parent's outstanding changes before merging the child",
       badName: "A project name starts with a letter or a digit and has only letters, digits, -, _ and ., up to 64 characters",
       badGithub: "Give a GitHub repository address, such as https://github.com/botiverse/raft-source",
       branchMoved: "The branch changed after the check: check again before merging",
@@ -4371,6 +4128,7 @@ export const catalogs = {
         noPermission: "The repository's permissions could not be checked",
         readOnly: "No write permission",
         wrongBranch: "The ticket's branch does not match",
+        changedDuringCheck: "The worktree changed during validation; commit the changes before submitting the PR again",
         pushFailed: "Pushing the ticket's branch failed: check origin and the sign-in, then retry",
         listFailed: "Looking up existing PRs failed; the branch is pushed, so it can be retried",
         listUnread: "The existing PRs could not be read",
@@ -4382,6 +4140,7 @@ export const catalogs = {
         viewFailed: "Looking up PR #{n} failed",
         stateUnread: "PR #{n}'s state could not be read",
         stateUnknown: "PR #{n}'s state is not one VibeValley knows",
+        resolveFailed: "Could not resolve the GitHub review thread",
         worktreeLeft: "The PR is over, but clearing the worktree failed: {why}",
         branchLeft: "The PR is over, but clearing the local branch failed: {why}",
       },
@@ -4447,14 +4206,7 @@ export const catalogs = {
       failureThen: ". {next}",
       done: "done",
       unfinished: "unfinished",
-      answer: {
-        lines: "{field}: must be a string or an array of strings",
-        noBlock: "No answer found: it goes in a json code block",
-        notObject: "it must be an object",
-        unreadable: "the json cannot be read: {why}",
-        empty: "the conclusion is empty",
-        noEvidence: "the conclusion rests on nothing: give at least one piece of evidence",
-      },
+      answer: { noBlock: "No structured answer was submitted through issue_report" },
       noRoom: {
         farm: "{max} helpers are already at work",
         runtime: "{on} helpers are already at work on {runtime}, at most {max} at once (the Runtimes page can change it)",
@@ -4519,7 +4271,6 @@ export const catalogs = {
         stillClosing: "{name}'s machine did not stop: its working folder is kept, and no new round can start",
         noRoom: "{name} does not carry on for now: {full}",
         notReceived: "{name} did not get it: {why}",
-        inGraph: "{name} is working on a step of the plan {graph}: it merges into the plan's branch when done, and into main with the whole plan",
         stillWorking: "{name} is still working: wait for this round to finish, or stop it first, then collect it",
         notBack: "{name} did not come back: {why}",
         placeGone: "its working folder is gone ({cwd})",
@@ -4572,151 +4323,6 @@ export const catalogs = {
       defaults: { failureMessage: "I got stuck for a moment. Could you say that again?" },
       notSaved: "Could not save {file}: {why}",
     },
-    "server.task": {
-      graphState: {
-        splitting: "being split",
-        draft: "waiting for you to look it over before it starts",
-        running: "in progress",
-        paused: "paused",
-        ready: "all done, waiting for you to merge it into main",
-        done: "merged into main",
-        abandoned: "abandoned",
-      },
-      graphTag: {
-        splitting: "Splitting",
-        draft: "For you to see",
-        running: "In progress",
-        paused: "Paused",
-        ready: "To merge",
-        done: "Merged",
-        abandoned: "Abandoned",
-      },
-      graphAction: { start: "Start", pause: "Pause", resume: "Resume", abandon: "Abandon", merge: "Merge into main" },
-      taskState: { waiting: "waiting", working: "in progress", merged: "merged", failed: "failed", skipped: "skipped" },
-      taskAction: { retry: "Retry", skip: "Skip" },
-      actor: { owner: "You", orchestrator: "Manager", session: "Helper", system: "VibeValley" },
-      field: { title: "title", brief: "ticket", needs: "waits for", agent: "who does it", check: "check", scope: "where to change" },
-      event: {
-        splitting: "A plan is to be split{why}",
-        paused: "Paused{why}",
-        resumed: "Resumed",
-        ready: "All done, waiting for you to merge it into main",
-        merged: "Merged into main",
-        abandoned: "Abandoned{why}",
-        taskStarted: "{step} started{by}",
-        taskSentBack: "{step} sent back to redo{by}{why}",
-        taskFailed: "{step} failed{why}",
-        taskRetried: "{step} retried",
-        taskRequeued: "{step} has no helper on it any more, queued again",
-        taskSkipped: "{step} skipped, the rest go on",
-        taskAdded: "Added the task {step}",
-        taskRemoved: 'Removed the task "{title}"',
-        step: '"{title}"',
-        by: " ({session})",
-        why: ": {detail}",
-        drafted: "Split, waiting for you",
-        draftedSteps: "Split into {steps} tasks, waiting for you",
-        started: "Started",
-        startedOn: "Started on branch {branch}",
-        taskMerged: "{step} merged into the plan's branch{why}",
-        taskMergedCommits: "{step} merged into the plan's branch ({commits}){why}",
-        taskEdited: "Changed {step}'s {fields}",
-      },
-      problem: {
-        empty: "The plan has no tasks",
-        tooMany: "At most {max} tasks, this has {n}: merge the small ones",
-        badId: '"{id}" cannot be a task id: use a short English word, such as api',
-        duplicate: 'The task id "{id}" is used twice',
-        noBrief: '"{id}" has no ticket',
-        noCheck: 'The acceptance task "{id}" has no check command: the command is the acceptance',
-        self: '"{id}" cannot wait for itself',
-        missing: '"{id}" waits for "{other}", which does not exist',
-        circle: "These tasks wait for each other in a circle: {ids}",
-      },
-      parse: {
-        object: "must be an object",
-        string: "{at} must be a string",
-        array: "{at} must be an array",
-        stepObject: "{at} must be an object",
-        missing: "{at} is missing",
-        boolean: "{at} must be a boolean",
-        noBlock: "No plan found: it goes in a json code block",
-        unreadable: "the json cannot be read: {why}",
-        shape: "the plan's format is wrong: {why}",
-      },
-      edit: {
-        taskSettled: '"{title}" is {state} and cannot be changed now',
-        graphSettled: "The plan is {state}; no tasks can be added now",
-        noStep: 'The plan has no task "{id}"',
-        cannotRemove: '"{title}" is {state} and cannot be removed: you can skip it',
-        remove: 'Remove the task "{step}" from the plan "{graph}"',
-        stopWaiting: "{steps} no longer wait for it",
-      },
-      noGraph: "There is no plan {id}",
-      notSaved: 'The plan "{title}" could not be saved: {why}',
-      notice: {
-        notSplit: 'The plan "{title}" could not be split: {why}',
-        splitStopped: "the planning was stopped",
-        plannerFailed: "the planner failed: {summary}",
-        noGraph: "it gave no usable plan: {problem}",
-        drafted: 'The plan "{title}" is split into {steps} tasks: look it over under Plans before it starts',
-        noHelper: "no helper can be sent",
-        waits: '"{title}" waits for now: {why}',
-        taskFailed: 'In the plan "{graph}", "{task}" failed: {why}',
-        unknownFiles: "cannot tell which files it changed: {why}",
-        acceptancePassed: "the acceptance {check} already passes",
-        checkFailed: "{check} failed after the task",
-        noBranch: "the plan has no branch yet",
-        stepNotSaved: 'The task "{title}" is merged into the plan\'s branch, but its done state could not be saved: {why}',
-        ready: 'The plan "{title}" is all done: look over the changes under Plans and merge them into main',
-        stepStopped: '"{title}" was stopped and the plan is paused; resume to carry on',
-        plannerGone: "the planner was sent home",
-        helperGone: "the helper was sent home before the task was done",
-        done: "done",
-        restartedSplitting: "VibeValley restarted while planning: say again what to do",
-        restarted: "VibeValley restarted and the plan is paused; resume to carry on",
-        split: '{name} split the ticket "{title}" into {n} sub-tickets and started them',
-        splitBy: "split by {name}",
-        splitNotSaved: "The plan's branch {branch} was made, but the split tickets could not be saved: {why}",
-        frozenTouched: "it changed the frozen acceptance: {files}",
-      },
-      act: {
-        noGoal: "Nothing was said to do",
-        noProject: "No project was named: a project is a folder in the work folder",
-        noSplitter: "No helper can be sent to split the plan",
-        notSent: "it was not sent",
-        plannerNotSent: "The planner could not be sent: {why}",
-        splittingBy: "{name} is reading the code and splitting the plan ({id}). It will be under Plans; look it over before it starts.",
-        startNotSaved: "The plan's branch {branch} was made, but its start could not be saved: {why}",
-        started: 'The plan "{title}" has started on branch {branch}',
-        pausedNote: "Paused: the tasks under way finish, no new ones start",
-        paused: 'The plan "{title}" is paused: the tasks under way finish, no new ones start',
-        resumed: 'The plan "{title}" carries on',
-        branchKeptNote: "; the branch {branch} is kept",
-        abandonedNote: "Abandoned{kept}",
-        notMergedNote: "Not merged: {why}",
-        notMerged: "Not merged: {why}. The plan's branch {branch} is kept",
-        mergeNotSaved: "The plan's branch is merged into main, but its done state could not be saved: {why}",
-        merged: 'The plan "{title}" is merged: {text}',
-        noStep: 'The plan has no task "{id}"',
-        graphIs: "The plan is {state}",
-        notFailed: '"{title}" did not fail; there is nothing to retry',
-        retried: '{name} carries on with "{title}"',
-        requeued: '"{title}" is queued again',
-        working: '"{title}" is in progress: stop it first',
-        finished: '"{title}" is already done',
-        skipped: 'Skipped "{title}"; the tasks after it start as usual',
-        stepAct: '{action} "{title}"',
-        edited: "Changed",
-        notStarted: 'The plan "{title}" has not started and has no branch',
-        branchGone: 'The plan "{title}"\'s branch is gone: check whether it was deleted',
-        stepsWrong: "The tasks have problems; fix them and split again:\n- {problems}",
-        cannot: 'The plan "{title}" is {state}: it cannot {action}',
-        abandoned: 'The plan "{title}" is abandoned',
-        abandonedKept: 'The plan "{title}" is abandoned, the branch {branch} is kept',
-        conflict: "Merging into {base} would conflict ({files}): {base} changed meanwhile",
-      },
-    },
     "server.tool": {
       labels: {
         project_list: "Projects",
@@ -4739,13 +4345,6 @@ export const catalogs = {
         issue_create: "Write a ticket",
         issue_update: "Change a ticket",
         issue_status_update: "Move a ticket",
-        graph_split: "Split a plan",
-        graph_list: "See the plans",
-        graph_get: "See a plan",
-        graph_task_update: "Change a plan",
-        graph_task_delete: "Delete a plan's task",
-        graph_act: "Plan",
-        graph_task_act: "A plan's task",
         issue_split: "Split a ticket",
         remember: "Remember",
         rewrite_memory: "Tidy the memory",
@@ -4861,7 +4460,6 @@ export const catalogs = {
         reopen: "Reopen",
       },
       phase: {
-        arriving: "just sent, getting started",
         quiet: "{what} (quiet for {span})",
         done: "this round is done, for you to see{conflict}",
         failed: "this round failed",
@@ -4985,7 +4583,7 @@ export const catalogs = {
       ownMcpTip: "Reported by the runtime, together with those added above.",
       unreported: "This runtime does not report this.",
       none: "None.",
-      role: { orchestrator: "Manager", helper: "Helper" },
+      role: { orchestrator: "Manager", worker: "Helper" },
       templates: {
         title: "Templates",
         intro:
@@ -5527,7 +5125,6 @@ export const catalogs = {
       },
       names: {
         issueThread: "Ticket thread",
-        planThread: "Plan {id}",
         talkThread: "{who}'s thread",
         thread: "Thread",
         mention: { orchestrator: "@manager", owner: "@owner", everyone: "@everyone" },
@@ -5620,7 +5217,6 @@ export const catalogs = {
     "web.farm": {
       reading: "Reading…",
       unread: "Cannot be read.",
-      never: "Never mind",
       notNow: "Not yet",
       orchestrator: "Manager",
       plotOf: "{name}'s plot",
@@ -5660,7 +5256,6 @@ export const catalogs = {
         job: "To do",
         who: "Who",
         crew: "On the plot",
-        review: "Acceptance",
         deliver: "Delivers",
         reviewed: "Accepted {clock}",
         weeded: "Weeds pulled",
@@ -5673,7 +5268,6 @@ export const catalogs = {
         history: "Worked by",
         took: "Took",
         thread: "See the ticket thread",
-        graph: "See the plan",
         where: "Plot {plot} · round {round}",
         result: { met: "It says this is met", unmet: "It says this is not met", unsure: "It is not sure" },
         ticked: "Checked",
@@ -5689,67 +5283,7 @@ export const catalogs = {
         sayAgain: "Say it again",
         takeBack: "Back into the box",
       },
-      graph: {
-        name: "Planting plans",
-        new: "New plan",
-        intro:
-          "A long job: first a helper reads the code and splits it into steps, each for a helper, in order. You look over and edit the split before starting; each step merges into the plan's own branch when done, and when all are done you bring the whole into main at once.",
-        goal: "What to do",
-        goalExample: "Such as: add monthly check-in lookups to clock-in, with a page and tests",
-        project: "Which project",
-        splitter: "Who splits it",
-        byRule: "Picked by the rules",
-        split: "Split it",
-        steps: "{done}/{of} steps",
-        spent: "spent {spent}",
-        projectTag: "Project {project}",
-        running: "Each step merges into this branch when done; the harvest merges the whole branch into main",
-        addStep: "Add a step",
-        review: "See the changes, {merge}…",
-        abandon: "{abandon} this plan",
-        abandonSure: "Abandon it? The branch stays",
-        splitting: "A helper is reading the code and splitting the plan. The split appears here for you to look over before starting.",
-        no: "No",
-        readingChanges: "Looking at what the plan's branch changed…",
-        unreadable: "The changes cannot be read: ",
-        summary: "{branch} → {project}'s {base}: {commits} commits, {files} files, ",
-        behind: "; meanwhile {base} got {n} more commits",
-        commits: "Commits",
-        files: "Files",
-        harvest: "Harvest, merge into {base}",
-        noSteps: "The plan has no tasks yet.",
-        first: "First",
-        batch: "Batch {n}",
-        acceptanceHint: "Acceptance: must fail when written; the last step makes it pass",
-        checkHint: "Runs {check} when done",
-        edit: "Edit",
-        remove: "Delete",
-        story: "History",
-        stepId: "Task id",
-        stepIdHint: "Task id, such as docs",
-        title: "Title",
-        brief: "Ticket",
-        briefHint: "Ticket: the goal, where to change, what counts as done",
-        whoHint: "Who does it: picked by the rules",
-        who: "Who does it",
-        check: "Check command",
-        checkExample: "The check run when done, such as pnpm test (optional)",
-        waitFor: "Wait for these first:",
-        done: "Save",
-        add: "Add",
-        storyOf: 'History of "{title}"',
-        wholeStory: "See the whole plan's history",
-        nothing: "Nothing recorded yet.",
-        readingStory: "Reading…",
-        beforeAfter: "Before and after",
-        empty: "(empty)",
-        conflict: "Merging into {base} would conflict: {files}. Not bringing it in until the changes on {base} are sorted out.",
-        frozen: "Acceptance, frozen: {files}",
-        waits: "Waiting for {titles}",
-        after: "After {titles}",
-        onPlot: "{name} · plot {plot}",
-        onPlotDoing: "{name} · plot {plot} · {doing}",
-      },
+      graph: { unreadable: "The changes cannot be read: ", commits: "Commits" },
       achievements: {
         tier: { "1": "Bronze", "2": "Silver", "3": "Gold" },
         category: { starter: "Starter tasks", harvest: "Harvest", craft: "Craft", thrift: "Thrift", team: "Teamwork", secret: "Secrets" },
@@ -5823,7 +5357,6 @@ export const catalogs = {
         resolve: "Have it resolve the conflict",
         files: "Changed files",
         empty: "The warehouse is empty. Work harvested into main is kept here.",
-        graph: "Planting plan",
         taken: "harvested {ago}",
       },
       panel: {
@@ -5832,7 +5365,6 @@ export const catalogs = {
         graphs: "Tasks and achievements",
         log: "Farm log",
         orchestrator: "Manager and pets",
-        taskBoard: "Planting plans",
         harvest: "Harvest {name}'s plot",
         sow: "Sow · plot {plot}",
         water: "Water {name}",
@@ -6083,7 +5615,7 @@ export const catalogs = {
         warehouse: { hint: "What was harvested" },
         tasks: { hint: "Starter tasks, clearing, the wall of achievements" },
         log: { hint: "What was said and harvested, newest first" },
-        taskBoard: { label: "Planting plans", hint: "A long job split into steps for several helpers" },
+        taskBoard: { hint: "A long job split into steps for several helpers" },
         agents: { hint: "Which machine each helper uses, its persona and skills, how it looks" },
         manager: { hint: "Talk to the manager" },
         runtimes: { label: "Workshop · machines", hint: "Each machine is a runtime: installed or not, usage" },
@@ -6198,7 +5730,7 @@ export const catalogs = {
       },
       manager: "Manager",
       hangUp: "Hang up",
-      app: { missed: "Missed", channels: "Chat", graphs: "Plans", games: "Games" },
+      app: { missed: "Missed", channels: "Chat", games: "Games" },
       game: { blocks: "Blocks", sokoban: "Sokoban", dino: "Dino", bugs: "Bug snake", merge: "Farm 2048" },
       phone: "Phone",
       phoneRinging: "Phone: incoming call",
@@ -6296,6 +5828,7 @@ export const catalogs = {
       },
     },
     "web.issue": {
+      family: { children: "Child issues", parent: "Parent issue" },
       reading: "Reading…",
       never: "Never mind",
       later: "Leave it for now",
@@ -6468,44 +6001,8 @@ export const catalogs = {
         unsure: "Not sure about",
         next: "Suggested next",
         conflict: "Merging into {base} would conflict: {files}",
-        graphStep: 'A task of the plan "{graph}"',
-        backToGraph: "Back to the plan",
       },
-      task: {
-        label: "Plan",
-        steps: "{n, plural, one {# task} other {# tasks}}",
-        done: "{done} / {of} tasks done",
-        waitsForYou: "A task is waiting for you: open it to answer or review.",
-        splitting: "The manager is splitting it into tasks; they will be listed below.",
-        ok: "Done.",
-        check: "Check",
-        scope: "Where it changes",
-        conclusion: "Conclusion",
-        spent: "Spent",
-        tried: "Tried",
-        tries: "{n} times",
-        open: "Open this ticket",
-        review: "See the changes, {merge}…",
-        state: "State",
-        project: "Project",
-        progress: "Progress",
-        progressLine: "{done} / {of} tasks",
-        parallel: "At once",
-        atMost: "at most {n} tasks",
-        written: "Written",
-        note: "Note",
-        abandonTitle: "{abandon} this plan?",
-        abandonLine: "The tasks not done yet are not sent out; the plan's branch stays, with every commit made so far.",
-        abandon: "Abandon it",
-        reading: "Looking at what the plan's branch changed…",
-        behind: "Meanwhile {base} got {n} more commits",
-        merge: "Merge into {base}",
-        layer: "Batch {n}",
-        layerTogether: "Batch {n} · these {size} tasks can run at once",
-        waitsOn: 'waiting for "{steps}"',
-        stepSeparator: '", "',
-        conflict: "Merging into {base} would conflict: {files}. Not merging until the changes on {base} are sorted out.",
-      },
+      task: { project: "Project", written: "Written" },
       todo: {
         queued: "Queued: every spot is taken, and it starts by itself when one frees up.",
         refining: "{who} is drafting",
@@ -6560,20 +6057,10 @@ export const catalogs = {
         stage: { talk: "Talk it through", work: "Get it worked", finish: "Finish" },
         newIssue: "New ticket",
       },
-      graph: {
-        splitting: "splitting into tasks",
-        draft: "split: look it over, then start",
-        running: "{done} / {total} tasks done",
-        paused: "paused",
-        ready: "all done, waiting for you to merge into main",
-        done: "merged into main",
-        abandoned: "abandoned",
-      },
       trigger: {
         issue: "sent out",
         comment: "a word passed on",
         commentNumbered: "a word passed on (#{id})",
-        task: "plan",
         cron: "scheduled task",
         missed: "scheduled task (made up)",
         refine: "drafting",
@@ -6599,7 +6086,6 @@ export const catalogs = {
         runs: "{n, plural, one {# round} other {# rounds}}",
         orchestratorWorking: "the manager is on it",
         missingFlag: "Record missing",
-        graph: "Plan: {title}",
         missing: "The run's record is missing: {what}",
       },
       issue: {
@@ -6616,8 +6102,6 @@ export const catalogs = {
         stuck: "Stuck",
         canceled: "Canceled",
         reopenLine: "To have it carry on, reopen it: write a line on what to do this time.",
-        inGraph: "This is a task of a plan, and goes with the plan.",
-        splitting: 'Splitting the plan "{graph}": reading code only, changing no files.',
         editing: "{who} is changing the code",
         history: "{n} times: {line}",
         historyItem: "{name} ({id})",
@@ -6634,7 +6118,6 @@ export const catalogs = {
         whoRuntime: "{name} ({runtime})",
         changes: "{branch} → {base} · {commits} commits · +{added} -{removed}",
         changesUncommitted: "{branch} → {base} · {commits} commits · +{added} -{removed} · {uncommitted} uncommitted",
-        graphStep: 'A task of the plan "{graph}": {step}. When done it merges into the plan\'s branch by itself, and reaches main when the whole plan does.',
         justNow: "just now",
       },
     },
@@ -6729,7 +6212,6 @@ export const catalogs = {
         orchestratorNothing: 'Nothing remembered yet. Tell the manager "Remember…", or write one for it above.',
         orchestratorOwn: "the manager remembered",
         told: "you told it",
-        tooOld: "Too old to go into the system prompt",
         archiveIntro:
           "When the conversation grows too long, the manager compacts the earlier part into a summary and keeps the original here word for word. When the summary misses a detail, it looks it up with search_archive; you can look here too.",
         search: "Search the archive",
@@ -7665,8 +7147,6 @@ export interface Messages {
     readonly project: string | number;
     readonly what: string | number;
   };
-  "server.channel.dispatch.split": { readonly graph: string | number };
-  "server.channel.dispatch.step": { readonly graph: string | number; readonly task: string | number };
   "server.channel.empty": undefined;
   "server.channel.emptyFile": undefined;
   "server.channel.fileTooBig": { readonly mb: string | number };
@@ -7864,14 +7344,6 @@ export interface Messages {
   "server.inbox.item.fix.label": undefined;
   "server.inbox.item.fix.title": { readonly who: string | number };
   "server.inbox.item.fix.tray": { readonly who: string | number };
-  "server.inbox.item.graph-draft.body": undefined;
-  "server.inbox.item.graph-draft.label": undefined;
-  "server.inbox.item.graph-draft.title": { readonly text: string | number };
-  "server.inbox.item.graph-draft.tray": { readonly text: string | number };
-  "server.inbox.item.graph-ready.body": undefined;
-  "server.inbox.item.graph-ready.label": undefined;
-  "server.inbox.item.graph-ready.title": { readonly text: string | number };
-  "server.inbox.item.graph-ready.tray": { readonly text: string | number };
   "server.inbox.item.interrupted.title": { readonly who: string | number };
   "server.inbox.item.mention.label": undefined;
   "server.inbox.item.mention.title": { readonly who: string | number };
@@ -7882,12 +7354,7 @@ export interface Messages {
   "server.inbox.item.review.label": undefined;
   "server.inbox.item.review.title": { readonly who: string | number };
   "server.inbox.item.review.tray": { readonly who: string | number };
-  "server.inbox.item.task-failed.body": undefined;
-  "server.inbox.item.task-failed.label": undefined;
-  "server.inbox.item.task-failed.title": { readonly text: string | number };
-  "server.inbox.item.task-failed.tray": { readonly text: string | number };
   "server.inbox.orchestrator": undefined;
-  "server.inbox.step": { readonly graph: string | number; readonly step: string | number };
   "server.issue.brief.answer": { readonly conclusion: string | number };
   "server.issue.brief.answerUnread": { readonly problem: string | number };
   "server.issue.brief.closed": { readonly closed: string | number };
@@ -7910,8 +7377,10 @@ export interface Messages {
   "server.issue.cannotSend": { readonly name: string | number; readonly why: string | number };
   "server.issue.closed": undefined;
   "server.issue.closedReopen": undefined;
-  "server.issue.cronNoIssue": { readonly name: string | number; readonly why: string | number };
-  "server.issue.cronNoStart": { readonly name: string | number; readonly why: string | number };
+  "server.issue.dependencies.closedParent": undefined;
+  "server.issue.dependencies.invalid": undefined;
+  "server.issue.dependencies.project": undefined;
+  "server.issue.dependencies.waiting": { readonly issues: string | number };
   "server.issue.disabled": { readonly name: string | number };
   "server.issue.does.cancel": { readonly n: string | number };
   "server.issue.does.cancelLeaves": { readonly helper: string | number };
@@ -7948,16 +7417,14 @@ export interface Messages {
   "server.issue.does.unqueue": { readonly n: string | number };
   "server.issue.drafting": { readonly name: string | number };
   "server.issue.failNeedsFindings": undefined;
-  "server.issue.graphAcceptance": undefined;
-  "server.issue.graphRetry": undefined;
   "server.issue.handOverOnTodo": undefined;
   "server.issue.helper": undefined;
   "server.issue.helperRef": { readonly id: string | number };
-  "server.issue.inGraph": undefined;
   "server.issue.issueNumbered": { readonly n: string | number };
   "server.issue.issueRef": { readonly ref: string | number };
   "server.issue.merge.merged": { readonly name: string | number; readonly text: string | number };
   "server.issue.merge.tellFailed": { readonly why: string | number };
+  "server.issue.mergedChildRetry": undefined;
   "server.issue.move.byHelpers": undefined;
   "server.issue.move.cannot": { readonly from: string | number; readonly to: string | number };
   "server.issue.move.drafting": { readonly name: string | number };
@@ -7977,13 +7444,15 @@ export interface Messages {
   "server.issue.noProject": undefined;
   "server.issue.noStatus": { readonly to: string | number };
   "server.issue.noTitle": undefined;
-  "server.issue.notQueued": { readonly id: string | number };
   "server.issue.notRecorded": { readonly name: string | number; readonly why: string | number };
   "server.issue.notStarted": undefined;
   "server.issue.nothingToAccept": undefined;
   "server.issue.orchestratorAnswers": undefined;
   "server.issue.orchestratorNotHelper": undefined;
   "server.issue.pickHint": { readonly command: string | number };
+  "server.issue.prSubmitNotAllowed": undefined;
+  "server.issue.prSubmitNotCurrent": undefined;
+  "server.issue.prSubmitUnavailable": undefined;
   "server.issue.profileGone": { readonly id: string | number };
   "server.issue.projectRef": { readonly name: string | number };
   "server.issue.queued": { readonly full: string | number };
@@ -8011,6 +7480,13 @@ export interface Messages {
   "server.issue.roundNeedsWords": undefined;
   "server.issue.sendFailed": undefined;
   "server.issue.senderGone": { readonly id: string | number };
+  "server.issue.split.agent": { readonly agent: string | number };
+  "server.issue.split.already": undefined;
+  "server.issue.split.commitFirst": undefined;
+  "server.issue.split.created": { readonly count: string | number; readonly n: string | number };
+  "server.issue.split.invalid": { readonly max: string | number };
+  "server.issue.split.needsBranch": undefined;
+  "server.issue.split.notCurrent": undefined;
   "server.issue.started": undefined;
   "server.issue.stillOpen": undefined;
   "server.issue.stillWorking": { readonly name: string | number };
@@ -8022,7 +7498,6 @@ export interface Messages {
   "server.issue.timeline.accepted": undefined;
   "server.issue.timeline.asked": { readonly questions: string | number };
   "server.issue.timeline.cron": { readonly missed: boolean };
-  "server.issue.timeline.graph": undefined;
   "server.issue.timeline.opened": undefined;
   "server.issue.timeline.refine": undefined;
   "server.issue.timeline.refined": undefined;
@@ -8034,6 +7509,11 @@ export interface Messages {
   "server.issue.timeline.said": { readonly summary: string | number };
   "server.issue.timeline.start": undefined;
   "server.issue.timeline.told": undefined;
+  "server.issue.verification.acceptanceNeedsCheck": undefined;
+  "server.issue.verification.acceptancePassed": { readonly check: string | number };
+  "server.issue.verification.failed": { readonly check: string | number; readonly output: string | number };
+  "server.issue.verification.frozen": { readonly files: string | number };
+  "server.issue.waitingDispatch": undefined;
   "server.issue.workKept": { readonly n: string | number; readonly refused: string | number };
   "server.lan.aDevice": undefined;
   "server.lan.anotherAsking": undefined;
@@ -8071,6 +7551,9 @@ export interface Messages {
   "server.lookIn.session": undefined;
   "server.lookIn.skill": undefined;
   "server.lookIn.template": undefined;
+  "server.mailbox.ambiguous": undefined;
+  "server.mailbox.notOwned": undefined;
+  "server.mailbox.subscriptionTaken": { readonly thread: string | number };
   "server.memory.coverage.everosAcross": undefined;
   "server.memory.coverage.everosAgent": undefined;
   "server.memory.coverage.failed": undefined;
@@ -8080,15 +7563,12 @@ export interface Messages {
   "server.memory.empty": undefined;
   "server.memory.everosForget": undefined;
   "server.memory.everosList": undefined;
-  "server.memory.fileFailed": undefined;
   "server.memory.forget": { readonly agent: string | number; readonly text: string | number };
-  "server.memory.forgetOrchestrator": { readonly text: string | number };
   "server.memory.forgetThere": { readonly source: string | number };
   "server.memory.noMemory": { readonly agent: string | number; readonly id: string | number };
   "server.memory.noUrl": undefined;
   "server.memory.nowledgeForget": undefined;
   "server.memory.off": undefined;
-  "server.memory.orchestratorRecall": undefined;
   "server.memory.source.everos": undefined;
   "server.memory.source.local": undefined;
   "server.memory.source.nowledge": undefined;
@@ -8126,6 +7606,7 @@ export interface Messages {
   "server.project.gh.signedOut": undefined;
   "server.project.github.body": { readonly check: string | number; readonly conclusion: string | number; readonly n: string | number };
   "server.project.github.branchLeft": { readonly why: string | number };
+  "server.project.github.changedDuringCheck": undefined;
   "server.project.github.checked": undefined;
   "server.project.github.createFailed": undefined;
   "server.project.github.listFailed": undefined;
@@ -8135,6 +7616,7 @@ export interface Messages {
   "server.project.github.notGithub": undefined;
   "server.project.github.pushFailed": undefined;
   "server.project.github.readOnly": undefined;
+  "server.project.github.resolveFailed": undefined;
   "server.project.github.stateUnknown": { readonly n: string | number };
   "server.project.github.stateUnread": { readonly n: string | number };
   "server.project.github.unchecked": undefined;
@@ -8167,6 +7649,8 @@ export interface Messages {
   "server.project.nothingNew": undefined;
   "server.project.nothingNewInPlan": undefined;
   "server.project.outside": undefined;
+  "server.project.parentBranchChanged": undefined;
+  "server.project.parentHasChanges": undefined;
   "server.project.tokeiFailed": { readonly why: string | number };
   "server.project.tokeiUnread": undefined;
   "server.projectRef": { readonly id: string | number };
@@ -8204,12 +7688,7 @@ export interface Messages {
   "server.runtime.runtimeDefault": { readonly model: string | number; readonly runtime: string | number };
   "server.runtime.tools": { readonly n: number };
   "server.runtime.unknownRuntime": { readonly runtime: string | number };
-  "server.session.answer.empty": undefined;
-  "server.session.answer.lines": { readonly field: string | number };
   "server.session.answer.noBlock": undefined;
-  "server.session.answer.noEvidence": undefined;
-  "server.session.answer.notObject": undefined;
-  "server.session.answer.unreadable": { readonly why: string | number };
   "server.session.conflictBrief": { readonly base: string | number; readonly files: string | number };
   "server.session.done": undefined;
   "server.session.failure.auth": undefined;
@@ -8246,7 +7725,6 @@ export interface Messages {
   "server.session.life.contextHasFiles": undefined;
   "server.session.life.contextKept": { readonly cwd: string | number; readonly why: string | number };
   "server.session.life.helperRef": { readonly id: string | number };
-  "server.session.life.inGraph": { readonly graph: string | number; readonly name: string | number };
   "server.session.life.issueNotReturned": undefined;
   "server.session.life.left": { readonly name: string | number; readonly why: string | number };
   "server.session.life.minutes": { readonly n: string | number };
@@ -8337,150 +7815,6 @@ export interface Messages {
   "server.setting.voice.url": undefined;
   "server.setting.voice.voiceId": undefined;
   "server.setting.voiceKeySpace": undefined;
-  "server.task.act.abandoned": { readonly title: string | number };
-  "server.task.act.abandonedKept": { readonly branch: string | number; readonly title: string | number };
-  "server.task.act.abandonedNote": { readonly kept: string | number };
-  "server.task.act.branchGone": { readonly title: string | number };
-  "server.task.act.branchKeptNote": { readonly branch: string | number };
-  "server.task.act.cannot": { readonly action: string | number; readonly state: string | number; readonly title: string | number };
-  "server.task.act.conflict": { readonly base: string | number; readonly files: string | number };
-  "server.task.act.edited": undefined;
-  "server.task.act.finished": { readonly title: string | number };
-  "server.task.act.graphIs": { readonly state: string | number };
-  "server.task.act.mergeNotSaved": { readonly why: string | number };
-  "server.task.act.merged": { readonly text: string | number; readonly title: string | number };
-  "server.task.act.noGoal": undefined;
-  "server.task.act.noProject": undefined;
-  "server.task.act.noSplitter": undefined;
-  "server.task.act.noStep": { readonly id: string | number };
-  "server.task.act.notFailed": { readonly title: string | number };
-  "server.task.act.notMerged": { readonly branch: string | number; readonly why: string | number };
-  "server.task.act.notMergedNote": { readonly why: string | number };
-  "server.task.act.notSent": undefined;
-  "server.task.act.notStarted": { readonly title: string | number };
-  "server.task.act.paused": { readonly title: string | number };
-  "server.task.act.pausedNote": undefined;
-  "server.task.act.plannerNotSent": { readonly why: string | number };
-  "server.task.act.requeued": { readonly title: string | number };
-  "server.task.act.resumed": { readonly title: string | number };
-  "server.task.act.retried": { readonly name: string | number; readonly title: string | number };
-  "server.task.act.skipped": { readonly title: string | number };
-  "server.task.act.splittingBy": { readonly id: string | number; readonly name: string | number };
-  "server.task.act.startNotSaved": { readonly branch: string | number; readonly why: string | number };
-  "server.task.act.started": { readonly branch: string | number; readonly title: string | number };
-  "server.task.act.stepAct": { readonly action: string | number; readonly title: string | number };
-  "server.task.act.stepsWrong": { readonly problems: string | number };
-  "server.task.act.working": { readonly title: string | number };
-  "server.task.actor.orchestrator": undefined;
-  "server.task.actor.owner": undefined;
-  "server.task.actor.session": undefined;
-  "server.task.actor.system": undefined;
-  "server.task.edit.cannotRemove": { readonly state: string | number; readonly title: string | number };
-  "server.task.edit.graphSettled": { readonly state: string | number };
-  "server.task.edit.noStep": { readonly id: string | number };
-  "server.task.edit.remove": { readonly graph: string | number; readonly step: string | number };
-  "server.task.edit.stopWaiting": { readonly steps: string | number };
-  "server.task.edit.taskSettled": { readonly state: string | number; readonly title: string | number };
-  "server.task.event.abandoned": { readonly why: string | number };
-  "server.task.event.by": { readonly session: string | number };
-  "server.task.event.drafted": undefined;
-  "server.task.event.draftedSteps": { readonly steps: string | number };
-  "server.task.event.merged": undefined;
-  "server.task.event.paused": { readonly why: string | number };
-  "server.task.event.ready": undefined;
-  "server.task.event.resumed": undefined;
-  "server.task.event.splitting": { readonly why: string | number };
-  "server.task.event.started": undefined;
-  "server.task.event.startedOn": { readonly branch: string | number };
-  "server.task.event.step": { readonly title: string | number };
-  "server.task.event.taskAdded": { readonly step: string | number };
-  "server.task.event.taskEdited": { readonly fields: string | number; readonly step: string | number };
-  "server.task.event.taskFailed": { readonly step: string | number; readonly why: string | number };
-  "server.task.event.taskMerged": { readonly step: string | number; readonly why: string | number };
-  "server.task.event.taskMergedCommits": { readonly commits: string | number; readonly step: string | number; readonly why: string | number };
-  "server.task.event.taskRemoved": { readonly title: string | number };
-  "server.task.event.taskRequeued": { readonly step: string | number };
-  "server.task.event.taskRetried": { readonly step: string | number };
-  "server.task.event.taskSentBack": { readonly by: string | number; readonly step: string | number; readonly why: string | number };
-  "server.task.event.taskSkipped": { readonly step: string | number };
-  "server.task.event.taskStarted": { readonly by: string | number; readonly step: string | number };
-  "server.task.event.why": { readonly detail: string | number };
-  "server.task.field.agent": undefined;
-  "server.task.field.brief": undefined;
-  "server.task.field.check": undefined;
-  "server.task.field.needs": undefined;
-  "server.task.field.scope": undefined;
-  "server.task.field.title": undefined;
-  "server.task.graphAction.abandon": undefined;
-  "server.task.graphAction.merge": undefined;
-  "server.task.graphAction.pause": undefined;
-  "server.task.graphAction.resume": undefined;
-  "server.task.graphAction.start": undefined;
-  "server.task.graphState.abandoned": undefined;
-  "server.task.graphState.done": undefined;
-  "server.task.graphState.draft": undefined;
-  "server.task.graphState.paused": undefined;
-  "server.task.graphState.ready": undefined;
-  "server.task.graphState.running": undefined;
-  "server.task.graphState.splitting": undefined;
-  "server.task.graphTag.abandoned": undefined;
-  "server.task.graphTag.done": undefined;
-  "server.task.graphTag.draft": undefined;
-  "server.task.graphTag.paused": undefined;
-  "server.task.graphTag.ready": undefined;
-  "server.task.graphTag.running": undefined;
-  "server.task.graphTag.splitting": undefined;
-  "server.task.noGraph": { readonly id: string | number };
-  "server.task.notSaved": { readonly title: string | number; readonly why: string | number };
-  "server.task.notice.acceptancePassed": { readonly check: string | number };
-  "server.task.notice.checkFailed": { readonly check: string | number };
-  "server.task.notice.done": undefined;
-  "server.task.notice.drafted": { readonly steps: string | number; readonly title: string | number };
-  "server.task.notice.frozenTouched": { readonly files: string | number };
-  "server.task.notice.helperGone": undefined;
-  "server.task.notice.noBranch": undefined;
-  "server.task.notice.noGraph": { readonly problem: string | number };
-  "server.task.notice.noHelper": undefined;
-  "server.task.notice.notSplit": { readonly title: string | number; readonly why: string | number };
-  "server.task.notice.plannerFailed": { readonly summary: string | number };
-  "server.task.notice.plannerGone": undefined;
-  "server.task.notice.ready": { readonly title: string | number };
-  "server.task.notice.restarted": undefined;
-  "server.task.notice.restartedSplitting": undefined;
-  "server.task.notice.split": { readonly n: string | number; readonly name: string | number; readonly title: string | number };
-  "server.task.notice.splitBy": { readonly name: string | number };
-  "server.task.notice.splitNotSaved": { readonly branch: string | number; readonly why: string | number };
-  "server.task.notice.splitStopped": undefined;
-  "server.task.notice.stepNotSaved": { readonly title: string | number; readonly why: string | number };
-  "server.task.notice.stepStopped": { readonly title: string | number };
-  "server.task.notice.taskFailed": { readonly graph: string | number; readonly task: string | number; readonly why: string | number };
-  "server.task.notice.unknownFiles": { readonly why: string | number };
-  "server.task.notice.waits": { readonly title: string | number; readonly why: string | number };
-  "server.task.parse.array": { readonly at: string | number };
-  "server.task.parse.boolean": { readonly at: string | number };
-  "server.task.parse.missing": { readonly at: string | number };
-  "server.task.parse.noBlock": undefined;
-  "server.task.parse.object": undefined;
-  "server.task.parse.shape": { readonly why: string | number };
-  "server.task.parse.stepObject": { readonly at: string | number };
-  "server.task.parse.string": { readonly at: string | number };
-  "server.task.parse.unreadable": { readonly why: string | number };
-  "server.task.problem.badId": { readonly id: string | number };
-  "server.task.problem.circle": { readonly ids: string | number };
-  "server.task.problem.duplicate": { readonly id: string | number };
-  "server.task.problem.empty": undefined;
-  "server.task.problem.missing": { readonly id: string | number; readonly other: string | number };
-  "server.task.problem.noBrief": { readonly id: string | number };
-  "server.task.problem.noCheck": { readonly id: string | number };
-  "server.task.problem.self": { readonly id: string | number };
-  "server.task.problem.tooMany": { readonly max: string | number; readonly n: string | number };
-  "server.task.taskAction.retry": undefined;
-  "server.task.taskAction.skip": undefined;
-  "server.task.taskState.failed": undefined;
-  "server.task.taskState.merged": undefined;
-  "server.task.taskState.skipped": undefined;
-  "server.task.taskState.waiting": undefined;
-  "server.task.taskState.working": undefined;
   "server.tool.about": { readonly about: string | number; readonly label: string | number };
   "server.tool.labels.artifact_block_create": undefined;
   "server.tool.labels.artifact_block_delete": undefined;
@@ -8494,13 +7828,6 @@ export interface Messages {
   "server.tool.labels.cron_create": undefined;
   "server.tool.labels.cron_delete": undefined;
   "server.tool.labels.cron_list": undefined;
-  "server.tool.labels.graph_act": undefined;
-  "server.tool.labels.graph_get": undefined;
-  "server.tool.labels.graph_list": undefined;
-  "server.tool.labels.graph_split": undefined;
-  "server.tool.labels.graph_task_act": undefined;
-  "server.tool.labels.graph_task_delete": undefined;
-  "server.tool.labels.graph_task_update": undefined;
   "server.tool.labels.issue_comment_create": undefined;
   "server.tool.labels.issue_create": undefined;
   "server.tool.labels.issue_diff_get": undefined;
@@ -8609,7 +7936,6 @@ export interface Messages {
   "shared.outcome.completed": undefined;
   "shared.outcome.failed": undefined;
   "shared.outcome.interrupted": undefined;
-  "shared.phase.arriving": undefined;
   "shared.phase.conflict": { readonly base: string | number; readonly files: string | number };
   "shared.phase.done": { readonly conflict: string | number };
   "shared.phase.failed": undefined;
@@ -8748,8 +8074,8 @@ export interface Messages {
   "web.agent.remove": undefined;
   "web.agent.removeNamed": { readonly name: string | number };
   "web.agent.removeWhich": { readonly name: string | number };
-  "web.agent.role.helper": undefined;
   "web.agent.role.orchestrator": undefined;
+  "web.agent.role.worker": undefined;
   "web.agent.roleHint": undefined;
   "web.agent.runtimeDefault": undefined;
   "web.agent.runtimeDefaultModel": { readonly model: string | number };
@@ -9278,7 +8604,6 @@ export interface Messages {
   "web.channel.names.mention.orchestrator": undefined;
   "web.channel.names.mention.owner": undefined;
   "web.channel.names.orchestratorNote": undefined;
-  "web.channel.names.planThread": { readonly id: string | number };
   "web.channel.names.talkThread": { readonly who: string | number };
   "web.channel.names.thread": undefined;
   "web.channel.newChannel": undefined;
@@ -9582,76 +8907,13 @@ export interface Messages {
   "web.farm.fx.level": { readonly level: string | number };
   "web.farm.fx.levelUp": { readonly level: string | number };
   "web.farm.fx.notice": undefined;
-  "web.farm.graph.abandon": { readonly abandon: string | number };
-  "web.farm.graph.abandonSure": undefined;
-  "web.farm.graph.acceptanceHint": undefined;
-  "web.farm.graph.add": undefined;
-  "web.farm.graph.addStep": undefined;
-  "web.farm.graph.after": { readonly titles: string | number };
-  "web.farm.graph.batch": { readonly n: string | number };
-  "web.farm.graph.beforeAfter": undefined;
-  "web.farm.graph.behind": { readonly base: string | number; readonly n: string | number };
-  "web.farm.graph.brief": undefined;
-  "web.farm.graph.briefHint": undefined;
-  "web.farm.graph.byRule": undefined;
-  "web.farm.graph.check": undefined;
-  "web.farm.graph.checkExample": undefined;
-  "web.farm.graph.checkHint": { readonly check: string | number };
   "web.farm.graph.commits": undefined;
-  "web.farm.graph.conflict": { readonly base: string | number; readonly files: string | number };
-  "web.farm.graph.done": undefined;
-  "web.farm.graph.edit": undefined;
-  "web.farm.graph.empty": undefined;
-  "web.farm.graph.files": undefined;
-  "web.farm.graph.first": undefined;
-  "web.farm.graph.frozen": { readonly files: string | number };
-  "web.farm.graph.goal": undefined;
-  "web.farm.graph.goalExample": undefined;
-  "web.farm.graph.harvest": { readonly base: string | number };
-  "web.farm.graph.intro": undefined;
-  "web.farm.graph.name": undefined;
-  "web.farm.graph.new": undefined;
-  "web.farm.graph.no": undefined;
-  "web.farm.graph.noSteps": undefined;
-  "web.farm.graph.nothing": undefined;
-  "web.farm.graph.onPlot": { readonly name: string | number; readonly plot: string | number };
-  "web.farm.graph.onPlotDoing": { readonly doing: string | number; readonly name: string | number; readonly plot: string | number };
-  "web.farm.graph.project": undefined;
-  "web.farm.graph.projectTag": { readonly project: string | number };
-  "web.farm.graph.readingChanges": undefined;
-  "web.farm.graph.readingStory": undefined;
-  "web.farm.graph.remove": undefined;
-  "web.farm.graph.review": { readonly merge: string | number };
-  "web.farm.graph.running": undefined;
-  "web.farm.graph.spent": { readonly spent: string | number };
-  "web.farm.graph.split": undefined;
-  "web.farm.graph.splitter": undefined;
-  "web.farm.graph.splitting": undefined;
-  "web.farm.graph.stepId": undefined;
-  "web.farm.graph.stepIdHint": undefined;
-  "web.farm.graph.steps": { readonly done: string | number; readonly of: string | number };
-  "web.farm.graph.story": undefined;
-  "web.farm.graph.storyOf": { readonly title: string | number };
-  "web.farm.graph.summary": {
-    readonly base: string | number;
-    readonly branch: string | number;
-    readonly commits: string | number;
-    readonly files: string | number;
-    readonly project: string | number;
-  };
-  "web.farm.graph.title": undefined;
   "web.farm.graph.unreadable": undefined;
-  "web.farm.graph.waitFor": undefined;
-  "web.farm.graph.waits": { readonly titles: string | number };
-  "web.farm.graph.who": undefined;
-  "web.farm.graph.whoHint": undefined;
-  "web.farm.graph.wholeStory": undefined;
   "web.farm.harvest.behind": { readonly base: string | number; readonly n: string | number };
   "web.farm.harvest.conflict": { readonly base: string | number };
   "web.farm.harvest.counts": { readonly commits: string | number; readonly files: string | number };
   "web.farm.harvest.empty": undefined;
   "web.farm.harvest.files": undefined;
-  "web.farm.harvest.graph": undefined;
   "web.farm.harvest.letGo": undefined;
   "web.farm.harvest.none": undefined;
   "web.farm.harvest.project": { readonly project: string | number };
@@ -9740,7 +9002,6 @@ export interface Messages {
   "web.farm.menu.soundOff": undefined;
   "web.farm.menu.soundOn": undefined;
   "web.farm.menu.yard": undefined;
-  "web.farm.never": undefined;
   "web.farm.notNow": undefined;
   "web.farm.orchestrator": undefined;
   "web.farm.overlay.bare": { readonly plot: string | number };
@@ -9770,7 +9031,6 @@ export interface Messages {
   "web.farm.panel.shopItems.seeds.name": undefined;
   "web.farm.panel.shopItems.seeds.note": undefined;
   "web.farm.panel.sow": { readonly plot: string | number };
-  "web.farm.panel.taskBoard": undefined;
   "web.farm.panel.warehouse": undefined;
   "web.farm.panel.water": { readonly name: string | number };
   "web.farm.phone.again": undefined;
@@ -9778,7 +9038,6 @@ export interface Messages {
   "web.farm.phone.answered": undefined;
   "web.farm.phone.app.channels": undefined;
   "web.farm.phone.app.games": undefined;
-  "web.farm.phone.app.graphs": undefined;
   "web.farm.phone.app.missed": undefined;
   "web.farm.phone.blocks.best": undefined;
   "web.farm.phone.blocks.help": undefined;
@@ -9896,7 +9155,6 @@ export interface Messages {
   "web.farm.plot.details": undefined;
   "web.farm.plot.evidence": { readonly line: string | number };
   "web.farm.plot.failed": undefined;
-  "web.farm.plot.graph": undefined;
   "web.farm.plot.history": undefined;
   "web.farm.plot.job": undefined;
   "web.farm.plot.letGo": undefined;
@@ -9925,7 +9183,6 @@ export interface Messages {
   "web.farm.plot.result.met": undefined;
   "web.farm.plot.result.unmet": undefined;
   "web.farm.plot.result.unsure": undefined;
-  "web.farm.plot.review": undefined;
   "web.farm.plot.reviewed": { readonly clock: string | number };
   "web.farm.plot.runCount": { readonly n: number };
   "web.farm.plot.runs": undefined;
@@ -10024,7 +9281,6 @@ export interface Messages {
   "web.farm.yard.skills.hint": undefined;
   "web.farm.yard.skills.label": undefined;
   "web.farm.yard.taskBoard.hint": undefined;
-  "web.farm.yard.taskBoard.label": undefined;
   "web.farm.yard.tasks.hint": undefined;
   "web.farm.yard.warehouse.hint": undefined;
   "web.inbox.tray.idle": undefined;
@@ -10073,7 +9329,6 @@ export interface Messages {
   "web.issue.boardLabels.view.list": undefined;
   "web.issue.card.cron": undefined;
   "web.issue.card.draft": undefined;
-  "web.issue.card.graph": { readonly title: string | number };
   "web.issue.card.lost": undefined;
   "web.issue.card.missing": { readonly what: string | number };
   "web.issue.card.missingFlag": undefined;
@@ -10117,7 +9372,6 @@ export interface Messages {
   "web.issue.detail.answer": undefined;
   "web.issue.detail.answerTo": { readonly question: string | number };
   "web.issue.detail.answered": undefined;
-  "web.issue.detail.backToGraph": undefined;
   "web.issue.detail.branch": undefined;
   "web.issue.detail.changedFiles": undefined;
   "web.issue.detail.changesUnread": undefined;
@@ -10131,7 +9385,6 @@ export interface Messages {
   "web.issue.detail.from": undefined;
   "web.issue.detail.fromCron": undefined;
   "web.issue.detail.full": undefined;
-  "web.issue.detail.graphStep": { readonly graph: string | number };
   "web.issue.detail.helper": undefined;
   "web.issue.detail.job": undefined;
   "web.issue.detail.made": undefined;
@@ -10194,13 +9447,8 @@ export interface Messages {
   "web.issue.display.orderNote": undefined;
   "web.issue.display.reset": undefined;
   "web.issue.display.show": undefined;
-  "web.issue.graph.abandoned": undefined;
-  "web.issue.graph.done": undefined;
-  "web.issue.graph.draft": undefined;
-  "web.issue.graph.paused": undefined;
-  "web.issue.graph.ready": undefined;
-  "web.issue.graph.running": { readonly done: string | number; readonly total: string | number };
-  "web.issue.graph.splitting": undefined;
+  "web.issue.family.children": undefined;
+  "web.issue.family.parent": undefined;
   "web.issue.issue.and": undefined;
   "web.issue.issue.asking": { readonly n: number; readonly who: string | number };
   "web.issue.issue.askingLine": undefined;
@@ -10231,11 +9479,9 @@ export interface Messages {
   "web.issue.issue.doingLabel": { readonly action: string | number; readonly label: string | number };
   "web.issue.issue.editing": { readonly who: string | number };
   "web.issue.issue.failed": undefined;
-  "web.issue.issue.graphStep": { readonly graph: string | number; readonly step: string | number };
   "web.issue.issue.handedBack": { readonly who: string | number };
   "web.issue.issue.history": { readonly line: string | number; readonly n: string | number };
   "web.issue.issue.historyItem": { readonly id: string | number; readonly name: string | number };
-  "web.issue.issue.inGraph": undefined;
   "web.issue.issue.interrupted": undefined;
   "web.issue.issue.justNow": undefined;
   "web.issue.issue.main": undefined;
@@ -10246,7 +9492,6 @@ export interface Messages {
   "web.issue.issue.reopenLine": undefined;
   "web.issue.issue.reviewed": undefined;
   "web.issue.issue.since": { readonly span: string | number };
-  "web.issue.issue.splitting": { readonly graph: string | number };
   "web.issue.issue.stepsGone": undefined;
   "web.issue.issue.stuck": undefined;
   "web.issue.issue.used": { readonly span: string | number };
@@ -10291,38 +9536,7 @@ export interface Messages {
   "web.issue.sheet.less": undefined;
   "web.issue.sheet.more": undefined;
   "web.issue.sheet.stageDone": { readonly stage: string | number };
-  "web.issue.task.abandon": undefined;
-  "web.issue.task.abandonLine": undefined;
-  "web.issue.task.abandonTitle": { readonly abandon: string | number };
-  "web.issue.task.atMost": { readonly n: string | number };
-  "web.issue.task.behind": { readonly base: string | number; readonly n: string | number };
-  "web.issue.task.check": undefined;
-  "web.issue.task.conclusion": undefined;
-  "web.issue.task.conflict": { readonly base: string | number; readonly files: string | number };
-  "web.issue.task.done": { readonly done: string | number; readonly of: string | number };
-  "web.issue.task.label": undefined;
-  "web.issue.task.layer": { readonly n: string | number };
-  "web.issue.task.layerTogether": { readonly n: string | number; readonly size: string | number };
-  "web.issue.task.merge": { readonly base: string | number };
-  "web.issue.task.note": undefined;
-  "web.issue.task.ok": undefined;
-  "web.issue.task.open": undefined;
-  "web.issue.task.parallel": undefined;
-  "web.issue.task.progress": undefined;
-  "web.issue.task.progressLine": { readonly done: string | number; readonly of: string | number };
   "web.issue.task.project": undefined;
-  "web.issue.task.reading": undefined;
-  "web.issue.task.review": { readonly merge: string | number };
-  "web.issue.task.scope": undefined;
-  "web.issue.task.spent": undefined;
-  "web.issue.task.splitting": undefined;
-  "web.issue.task.state": undefined;
-  "web.issue.task.stepSeparator": undefined;
-  "web.issue.task.steps": { readonly n: number };
-  "web.issue.task.tried": undefined;
-  "web.issue.task.tries": { readonly n: string | number };
-  "web.issue.task.waitsForYou": undefined;
-  "web.issue.task.waitsOn": { readonly steps: string | number };
   "web.issue.task.written": undefined;
   "web.issue.todo.againHint": undefined;
   "web.issue.todo.answerHint": undefined;
@@ -10375,7 +9589,6 @@ export interface Messages {
   "web.issue.trigger.missed": undefined;
   "web.issue.trigger.refine": undefined;
   "web.issue.trigger.runtime": undefined;
-  "web.issue.trigger.task": undefined;
   "web.lan.devices.android": undefined;
   "web.lan.devices.device": undefined;
   "web.lan.devices.windows": undefined;
@@ -10467,7 +9680,6 @@ export interface Messages {
   "web.memory.memory.sources": undefined;
   "web.memory.memory.sourcesNote": undefined;
   "web.memory.memory.told": undefined;
-  "web.memory.memory.tooOld": undefined;
   "web.memory.memory.transcripts": undefined;
   "web.memory.memory.unlisted": undefined;
   "web.memory.memory.where": undefined;

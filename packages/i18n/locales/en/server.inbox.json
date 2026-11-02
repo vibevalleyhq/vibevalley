@@ -1,7 +1,6 @@
 {
   "orchestrator": "The manager",
   "conflictFiles": "{files, plural, one {# file conflicts with main} other {# files conflict with main}}",
-  "step": "{graph}: {step}",
   "item": {
     "review": {
       "label": "For you to see",
@@ -30,24 +29,6 @@
       "title": "{who} has been quiet for a while",
       "body": "It may be running a long command, or it may be stuck: look at what it has been doing.",
       "tray": "{who} has gone quiet"
-    },
-    "graph-draft": {
-      "label": "Plan drafted",
-      "title": "The plan \"{text}\" is drafted",
-      "body": "Look it over before it starts",
-      "tray": "The plan \"{text}\" is for you to see"
-    },
-    "graph-ready": {
-      "label": "Plan done",
-      "title": "The plan \"{text}\" is all done",
-      "body": "Look over the changes and merge them into main",
-      "tray": "The plan \"{text}\" is ready to merge into main"
-    },
-    "task-failed": {
-      "label": "Plan stuck",
-      "title": "A plan is stuck: {text}",
-      "body": "Retry, edit the ticket, or skip it",
-      "tray": "The plan \"{text}\" failed"
     },
     "mention": {
       "label": "Calling you",

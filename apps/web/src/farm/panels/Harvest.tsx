@@ -10,11 +10,10 @@ import { ago } from "@/base/format";
 import { useNow } from "@/base/util";
 import { commands } from "@/farm/frames";
 import { harvestedOf } from "@/farm/hud/readout";
-import { farm } from "@/farm/store";
 import { issueOf } from "@/farm/world/plots";
 import { changeKind, lineCounts, nothingChanged, issueTitle, useIssueChanges } from "@/features/issue";
 import { reasonOf } from "@/infra/api";
-import { useCore, useFrames } from "@/infra/frame";
+import { useCore } from "@/infra/frame";
 import { ready, useAgents } from "@/infra/query";
 import { useRouter } from "@/infra/router";
 import { createPixelAct, FarmSection, PxButton, SpriteIcon } from "@/ui/pixel";
@@ -158,7 +157,6 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
 
 export function Warehouse() {
   const core = useCore();
-  const frames = useFrames();
   const agentsQuery = useAgents();
   const router = useRouter();
   const now = useNow();
@@ -168,7 +166,7 @@ export function Warehouse() {
     return id ? (agents().get(id)?.name ?? id) : undefined;
   };
   const stored = () => harvestedOf(core());
-  const graphs = () => frames.frame?.graphs ?? [];
+  const issues = () => core()?.issues ?? [];
   return (
     <Show when={stored().length > 0} fallback={<FarmEmpty text={t("web.farm.harvest.empty")} />}>
       <div class="grid gap-2 sm:grid-cols-2">
@@ -176,23 +174,17 @@ export function Warehouse() {
           {(i) => (
             <button
               type="button"
-              aria-label={issueTitle(i, graphs())}
+              aria-label={issueTitle(i, issues())}
               onClick={() => {
-                if (i.graph) farm.openTaskBoard(i.id);
-                else router.navigate(`/issues/${encodeURIComponent(i.id)}`);
+                router.navigate(`/issues/${encodeURIComponent(i.id)}`);
               }}
               class="flex cursor-pointer items-start gap-3 bg-cream-100 p-3 text-left hover:bg-cream-200"
             >
-              <SpriteIcon name={i.graph ? "icon-task-board" : "icon-harvest"} size={40} />
+              <SpriteIcon name="icon-harvest" size={40} />
               <span class="min-w-0 flex-1">
-                <span class="line-clamp-2 text-[13px]">{issueTitle(i, graphs())}</span>
+                <span class="line-clamp-2 text-[13px]">{issueTitle(i, issues())}</span>
                 <span class={["mt-1 block", xs]}>
-                  {[
-                    i.graph ? t("web.farm.harvest.graph") : undefined,
-                    agentName(i),
-                    i.project,
-                    i.closedAt !== undefined ? t("web.farm.harvest.taken", { ago: ago(i.closedAt, now()) }) : undefined,
-                  ]
+                  {[agentName(i), i.project, i.closedAt !== undefined ? t("web.farm.harvest.taken", { ago: ago(i.closedAt, now()) }) : undefined]
                     .filter(Boolean)
                     .join(" · ")}
                 </span>

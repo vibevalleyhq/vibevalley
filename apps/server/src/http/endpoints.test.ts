@@ -53,8 +53,6 @@ describe("the endpoints the agents' tools stand on", () => {
       expect(yield* refusal(() => api.issue.review({ id: `#${open.number}`, pass: true }))).toBe("Refused");
       expect(yield* refusal(() => api.issue.split({ id: open.id, tasks: [{ id: "a", brief: "前端" }] }))).toBe("Refused");
 
-      expect(yield* call(() => api.graph.list())).toEqual([]);
-      expect(yield* refusal(() => api.graph.get({ id: "nope" }))).toBe("Missing");
       expect(yield* call(() => api.memory.search({ text: "登录" }))).toMatchObject({ found: [] });
 
       const doc = yield* call(() => api.artifact.create({ title: "说明" }));

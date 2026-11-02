@@ -185,7 +185,7 @@ const make = Effect.gen(function* () {
     });
 
   const all = () => structuredClone([...s.agents]);
-  const sendable = () => all().filter((a) => a.role === "helper");
+  const sendable = () => all().filter((a) => a.role === "worker");
 
   /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it
    * stays and is reached on a call; the default one stays an orchestrator. "" when it can. */

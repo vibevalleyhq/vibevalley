@@ -11,7 +11,6 @@ const core = (over: Partial<WorkspaceView>): WorkspaceView => ({
   callReason: "",
   sessions: [],
   issues: [],
-  orchestrators: {},
   crons: [],
   connectors: [],
   ...over,

@@ -38,6 +38,7 @@ async function openIssue(
   const frame = await firstFrame(server.url);
   const session: SessionView = {
     id: sessionId("w1"),
+    role: "worker",
     name: "阿狐",
     agent: "fox",
     runtime: "nobody",
@@ -72,7 +73,7 @@ async function openIssue(
 const scripted: Agent = {
   id: "",
   name: "fox",
-  role: "helper",
+  role: "worker",
   duty: "",
   enabled: true,
   // The test server's pi is the scripted helper (fixtures.ts).

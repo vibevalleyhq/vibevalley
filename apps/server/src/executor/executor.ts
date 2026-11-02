@@ -1,7 +1,8 @@
 import { join, resolve } from "node:path";
 
 import type { ControlOutcome, Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
-import { createSubagents, type SendResult, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
+import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
+import { applyTaskEvent, initialTasks, observeSessionView, type TaskMap } from "@botiverse/oar/observe";
 import { Clock, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -14,18 +15,21 @@ import { probeInstallation, Runtime } from "@/runtime/runtime.ts";
 
 import { watchStalls } from "./stalls.ts";
 
+export type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "project" | "issue" | "channel">;
+
 /** An acquired execution remains present until every runtime resource confirms disposal. */
 export interface Execution {
-  readonly owner: T.Session;
+  readonly owner: ExecutionOwner;
   readonly sessionId: string;
   readonly attached: boolean;
   readonly closing: boolean;
+  readonly pendingTasks: number;
   readonly failure?: string;
 }
 
 export interface StartExecution {
   readonly agent: T.Agent;
-  readonly owner: T.Session;
+  readonly owner: ExecutionOwner;
   readonly cwd: string;
   readonly input: string;
   readonly resume: string;
@@ -34,10 +38,17 @@ export interface StartExecution {
 
 export interface ExecutionObserver {
   readonly event: (event: Event) => void;
+  readonly input: (input: ExecutionInput) => void;
   readonly report: (report: SubagentReport) => void;
+  readonly tasksChanged: (pending: number) => void;
   readonly stalled: (silentForMs: number, at: number) => void;
   readonly stallMs: number;
 }
+
+export type ExecutionInput = { readonly kind: "consumed" | "returned"; readonly inputId: string };
+export type DeliveredInput =
+  | { readonly kind: "accepted"; readonly landed: "prompted" | "steered" | "queued"; readonly inputId?: string }
+  | { readonly kind: "rejected"; readonly code: string; readonly reason: string };
 
 export type StartFailure = { readonly execution?: never; readonly refused: string; readonly retained: boolean };
 export type Started = { readonly execution: Execution; readonly refused?: never; readonly retained?: never } | StartFailure;
@@ -47,7 +58,8 @@ class NotClosed extends Schema.TaggedError<NotClosed, { readonly brand: unique s
   cause: Schema.Defect(),
 }) {}
 
-interface Allocation extends Execution {
+interface Allocation extends Omit<Execution, "pendingTasks"> {
+  tasks: TaskMap;
   readonly subagents: Subagents;
   readonly resources: Set<RuntimeSession>;
   agent?: Subagent;
@@ -64,11 +76,24 @@ const notClosed = (cause: unknown) => new NotClosed({ message: messageOf(cause),
 const running = Metric.gauge("vibevalley.sessions.running", { description: "Runtime sessions open now (the helpers' and the orchestrators')" });
 const closeWaitMs = 15_000;
 
+const pendingTasks = (allocation: Allocation) =>
+  [...allocation.tasks.values()].filter((task) => task.ambient !== true && (task.status === "running" || task.status === "pending" || task.status === "paused"))
+    .length;
+
+const view = (allocation: Allocation): Execution => ({
+  owner: { ...allocation.owner },
+  sessionId: allocation.sessionId,
+  attached: allocation.attached,
+  closing: allocation.closing,
+  pendingTasks: pendingTasks(allocation),
+  ...(allocation.failure === undefined ? {} : { failure: allocation.failure }),
+});
+
 export class Executor extends Context.Service<
   Executor,
   {
     readonly start: (input: StartExecution) => Effect.Effect<Started>;
-    readonly deliver: (id: string, text: string) => Effect.Effect<SendResult>;
+    readonly deliver: (id: string, text: string, inputId: string) => Effect.Effect<DeliveredInput>;
     readonly interrupt: (id: string) => Effect.Effect<ControlOutcome | { readonly kind: "failed"; readonly reason: string }>;
     readonly close: (id: string) => Effect.Effect<void, ApiError>;
     readonly failed: (id: string, why: string) => Effect.Effect<StartFailure>;
@@ -212,7 +237,23 @@ const make = Effect.gen(function* () {
         cwd: resolve(projectsDir(config)),
         logDir: join(config.home, "logs"),
       });
-      const allocation: Allocation = { owner, subagents, resources, sessionId: "", attached: false, detached: false, closing: false };
+      const allocation: Allocation = {
+        tasks: initialTasks,
+        owner: {
+          id,
+          agent: owner.agent,
+          runtime: owner.runtime,
+          ...(owner.project === undefined ? {} : { project: owner.project }),
+          ...(owner.issue === undefined ? {} : { issue: owner.issue }),
+          ...(owner.channel === undefined ? {} : { channel: owner.channel }),
+        },
+        subagents,
+        resources,
+        sessionId: "",
+        attached: false,
+        detached: false,
+        closing: false,
+      };
       allocations.set(id, allocation);
       yield* Metric.update(running, allocations.size);
       const opening = Effect.gen(function* () {
@@ -236,16 +277,33 @@ const make = Effect.gen(function* () {
         const verb = resume ? "woke" : "sent";
         const how = r.model ? ", model " + r.model : ", the runtime's default model";
         yield* Effect.logInfo(`vibevalley: ${verb} ${id} (${agent.name}): ${agent.runtime}${how}, in ${cwd}`);
-        return { execution: allocation };
+        return { execution: view(allocation) };
       });
       return yield* opening.pipe(Effect.onExit((exit) => (exit._tag === "Failure" ? Effect.ignore(closeOwned(allocation)) : Effect.void)));
     }),
-    deliver: Effect.fn("Executor.deliver")(function* (id, text) {
+    deliver: Effect.fn("Executor.deliver")(function* (id, text, inputId) {
       const agent = allocations.get(id)?.agent;
       if (!agent) return { kind: "rejected", code: "closed", reason: t("server.session.life.noHelper", { id }) };
-      return yield* Effect.promise(() =>
-        agent.send(text, "followup").catch((e: unknown) => ({ kind: "rejected" as const, code: "send_failed", reason: messageOf(e) })),
+      if (agent.session.status().value.kind === "idle") {
+        return yield* Effect.tryPromise({
+          try: () => agent.send(text, "followup"),
+          catch: (cause) => ({ kind: "rejected", code: "send_failed", reason: messageOf(cause) }) as const,
+        }).pipe(Effect.catch((rejected) => Effect.succeed(rejected)));
+      }
+      const attempted = yield* Effect.tryPromise({
+        try: () => agent.session.deliver(text, { inputId }),
+        catch: (cause) => ({ kind: "rejected", code: "send_failed", reason: messageOf(cause) }) as const,
+      }).pipe(
+        Effect.match({
+          onFailure: (rejected) => ({ _tag: "Failed", rejected }) as const,
+          onSuccess: (delivered) => ({ _tag: "Delivered", delivered }) as const,
+        }),
       );
+      if (attempted._tag === "Failed") return attempted.rejected;
+      const delivered = attempted.delivered;
+      return delivered.landed === "rejected"
+        ? ({ kind: "rejected", code: delivered.code, reason: delivered.reason } as const)
+        : ({ kind: "accepted", landed: delivered.landed, inputId: delivered.inputId } as const);
     }),
     interrupt: Effect.fn("Executor.interrupt")(function* (id) {
       const agent = allocations.get(id)?.agent;
@@ -261,10 +319,53 @@ const make = Effect.gen(function* () {
       allocation.detached = false;
       allocation.attached = true;
       const session = allocation.agent.session;
-      const stopEvents = session.events((event) => !allocation.detached && observer.event(event), { cursor: { sessionId: session.id, afterSeq: -1 } });
+      const stopEvents = session.events(
+        (event) => {
+          if (allocation.detached) return;
+          const before = pendingTasks(allocation);
+          switch (event.kind) {
+            case "task_started":
+            case "task_updated":
+            case "task_ended":
+              allocation.tasks = applyTaskEvent(allocation.tasks, event, event);
+              break;
+            case "exited":
+              allocation.tasks = initialTasks;
+              break;
+            default:
+              break;
+          }
+          observer.event(event);
+          const after = pendingTasks(allocation);
+          if (after !== before) observer.tasksChanged(after);
+        },
+        { cursor: { sessionId: session.id, afterSeq: -1 } },
+      );
+      const inputStates = new Map<string, ExecutionInput["kind"]>();
+      const stopInputs = observeSessionView(session, (view) => {
+        if (allocation.detached) return;
+        const placed = new Set(
+          view.messages.flatMap((message) => (message.kind === "input" && message.input.inputId !== undefined ? [message.input.inputId] : [])),
+        );
+        for (const input of view.conversation.inputs.values()) {
+          if (input.inputId === undefined) continue;
+          const next =
+            input.state === "dropped" || input.state === "withdrawn" || input.state === "rejected"
+              ? "returned"
+              : placed.has(input.inputId) && (input.state === "accepted" || input.state === "untracked")
+                ? "consumed"
+                : undefined;
+          if (next === undefined || inputStates.get(input.inputId) === next) continue;
+          inputStates.set(input.inputId, next);
+          observer.input({ kind: next, inputId: input.inputId });
+        }
+      });
       // The turn's other event readers run before its report is folded into the domain.
       const stopReports = allocation.subagents.onReport((report) => {
-        if (report.sessionId === session.id) queueMicrotask(() => !allocation.detached && observer.report(report));
+        if (report.sessionId === session.id)
+          queueMicrotask(() => {
+            if (!allocation.detached) observer.report(report);
+          });
       });
       // A turn can finish between spawn and observation; its unread report still belongs to this execution.
       void allocation.subagents.wait({ timeoutMs: 0 }).then((early) => {
@@ -279,12 +380,16 @@ const make = Effect.gen(function* () {
       );
       allocation.stop = () => {
         stopEvents();
+        stopInputs();
         stopReports();
         stopStalls();
       };
     },
     detach,
-    find: (id) => allocations.get(id),
-    all: () => [...allocations.values()],
+    find: (id) => {
+      const allocation = allocations.get(id);
+      return allocation ? view(allocation) : undefined;
+    },
+    all: () => [...allocations.values()].map(view),
   });
 });

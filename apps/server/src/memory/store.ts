@@ -1,5 +1,5 @@
 // This farm's own memories, rows in the memory table: what each agent noted (its
-// 「记住：」 lines and the owner's notes) and one line for each issue it worked. A memory that cannot be read or written never
+// explicit notes (from issue_report or the owner) and one line for each issue it worked. A memory that cannot be read or written never
 // stops a run: it is logged, and the run goes on without it.
 
 import { Clock, Effect, Schema } from "effect";
@@ -16,7 +16,7 @@ import { Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
-import { memoryIsNewNote, issueMemoryText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
+import { issueMemoryText, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
 import { termsList, termsText, termsVersion } from "./terms.ts";
 
 /** One finished run, everything about it; each provider keeps what it uses. */
@@ -143,13 +143,6 @@ export const makeMemoryStore = Effect.gen(function* () {
       : db
           .attemptTx(
             Effect.gen(function* () {
-              const known: Pick<T.Memory, "kind" | "text" | "project">[] = [...(yield* list(run.agent))];
-              for (const note of memoryNotesOf(run.said)) {
-                const project = note.everywhere ? undefined : run.project.trim() || undefined;
-                if (!memoryIsNewNote(known, note.text, project)) continue;
-                yield* insertNote(run.agent, note.text, project, run.session, "session");
-                known.push({ kind: "note", text: note.text, ...(project ? { project } : {}) });
-              }
               if (run.issue) {
                 const text = issueMemoryText(run.brief, run.summary, run.outcome);
                 yield* db.attempt(
@@ -208,6 +201,15 @@ export const makeMemoryStore = Effect.gen(function* () {
 
   const forget = (agent: string, id: string) => db.run(q.forget({ agent, id }));
 
+  const rewrite = (agent: string, texts: readonly string[], by: Actor) =>
+    db.attemptTx(
+      Effect.gen(function* () {
+        yield* q.clearManagedNotes({ agent });
+        yield* Effect.forEach(texts, (text) => write({ agent, text, project: "", by }), { discard: true });
+        return texts.length;
+      }),
+    );
+
   /** Cuts again what an older termsVersion cut, a batch at a time: the terms are an index derived from the body. */
   const recutTerms = Effect.gen(function* () {
     for (;;) {
@@ -217,7 +219,7 @@ export const makeMemoryStore = Effect.gen(function* () {
     }
   }).pipe(bestEffort("memories were not cut again"));
 
-  return { list, listed, matches, recallable, markRecalled, keep, write, forget, recutTerms };
+  return { list, listed, matches, recallable, markRecalled, keep, write, rewrite, forget, recutTerms };
 });
 
 export type MemoryStore = Effect.Success<typeof makeMemoryStore>;

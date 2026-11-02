@@ -89,31 +89,6 @@ export function nextForgotten(memories: readonly T.Memory[], coming: number): st
 }
 
 const noteMax = 300;
-const notesPerRun = 5;
-
-/** A list mark or bold around it is fine; so is the marker in English (Remember, Remember (all projects)). */
-const noteLine =
-  /^[\s\p{Z}]*(?:[-*•][\s\p{Z}]*)?(?:\*\*)?(?:记住|Remember)(（所有项目）|\(所有项目\)|[\s\p{Z}]*\(all projects\))?(?:\*\*)?[\s\p{Z}]*[:：][\s\p{Z}]*(?:\*\*)?[\s\p{Z}]*(.+?)[\s\p{Z}]*$/iu;
-
-export interface MemoryNote {
-  readonly text: string;
-  readonly everywhere: boolean;
-}
-
-/** The 「记住：」 lines a run said: the notes it leaves itself. */
-export function memoryNotesOf(said: string): MemoryNote[] {
-  const notes: MemoryNote[] = [];
-  for (const line of said.split("\n")) {
-    const found = noteLine.exec(line);
-    if (!found) continue;
-    const text = clip(found[2]!, noteMax);
-    if (text === "" || notes.some((n) => n.text === text)) continue;
-    notes.push({ text, everywhere: found[1] !== undefined });
-    if (notes.length === notesPerRun) break;
-  }
-  return notes;
-}
-
 export const issueMemoryText = (brief: string, summary: string, outcome: T.Outcome) =>
   recallWords.issueDone(clip(brief, 100), outcome !== "completed", clip(summary, 200));
 

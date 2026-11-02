@@ -71,6 +71,8 @@ export const orchestratorInboxLines = (messages: readonly InboxMessage[]) =>
   messages
     .map((m) => {
       const text = m.text.trim();
-      return messageLine(m.from !== ownerId && text.length > lineMax ? { ...m, text: head(text, lineMax) + lineWords.cut(text.length, m.target) } : m);
+      return messageLine(
+        m.number !== 0 && m.from !== ownerId && text.length > lineMax ? { ...m, text: head(text, lineMax) + lineWords.cut(text.length, m.target) } : m,
+      );
     })
     .join("\n");

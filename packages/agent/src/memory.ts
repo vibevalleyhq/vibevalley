@@ -10,7 +10,7 @@ import { memory as memoryWords } from "./prompts.ts";
 /** Cut from the top when the prompt carries it: the newest notes matter most. */
 const memoryPromptChars = 8_000;
 
-/** Where an agent with this home keeps its memory; the orchestrator page reads it there. */
+/** The standalone agent's file adapter; hosted agents can inject another MemoryPort. */
 export const memoryFile = (home: string) => join(home, "MEMORY.md");
 
 /** `- YYYY-MM-DD note`, or whatever the agent wrote when it tidied. id is stable while the line is unchanged. */
@@ -29,6 +29,26 @@ export interface MemorySnapshot {
   readonly updatedAt: number;
   readonly lineCount: number;
 }
+
+export interface MemoryPort {
+  readonly read: () => Promise<{ readonly prompt: string; readonly lines: readonly string[] }>;
+  readonly remember: (note: string) => Promise<void>;
+  readonly rewrite: (content: string) => Promise<number>;
+}
+
+export const fileMemory = (home: string, now: () => number): MemoryPort => ({
+  read: async () => ({ prompt: (await readMemory(home)).prompt, lines: await memoryFileLines(home) }),
+  remember: async (note) => {
+    await remember(home, note, new Date(now()));
+  },
+  rewrite: async (content) => (await rewriteMemory(home, content)).lineCount,
+});
+
+export const parseMemoryLines = (text: string): MemoryLine[] =>
+  text.split("\n").flatMap((line) => {
+    const parsed = memoryLine(line);
+    return parsed ? [parsed] : [];
+  });
 
 const datedLine = /^\s*[-*]\s+(\d{4}-\d{2}-\d{2})\s+(.+?)\s*$/u;
 const bulletHead = /^[-*]\s+/u;
@@ -84,7 +104,7 @@ export async function readMemory(home: string): Promise<MemorySnapshot> {
 }
 
 /** MEMORY.md's lines as the model is told them: neither blank nor headings, without their bullet. */
-export async function memoryFileLines(home: string): Promise<string[]> {
+async function memoryFileLines(home: string): Promise<string[]> {
   return ((await textOf(memoryFile(home))) ?? "")
     .split("\n")
     .map((l) => l.trim())
@@ -110,7 +130,7 @@ export async function remember(home: string, note: string, now: Date): Promise<M
   return memoryLine(line)!;
 }
 
-export async function rewriteMemory(home: string, text: string): Promise<MemorySnapshot> {
+async function rewriteMemory(home: string, text: string): Promise<MemorySnapshot> {
   await mkdir(home, { recursive: true });
   const body = text.endsWith("\n") ? text : text + "\n";
   await writeFile(memoryFile(home), body);

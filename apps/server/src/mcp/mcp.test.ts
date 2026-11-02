@@ -15,6 +15,7 @@ import { owner } from "@/base/actor.ts";
 import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { Issue } from "@/issue/issue.ts";
+import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Memory } from "@/memory/memory.ts";
 import { Session } from "@/session/session.ts";
 import { starter } from "@/testing/layers.ts";
@@ -62,28 +63,31 @@ const client = (mcp: Mcp["Service"], token: string) => {
 
 const hired = (core: Core["Service"], s: Partial<T.Session> & { id: string }) =>
   core.apply({
-    type: "hired",
+    type: "session",
     session: {
       name: s.id,
+      role: "worker",
       agent: "",
       runtime: "pi",
       brief: "",
       hiredAt: 0,
       runs: 0,
-      phase: { _tag: "working", doing: { action: "thinking", label: "" } },
+      phase: { _tag: "working", since: 0, doing: { action: "thinking", label: "" } },
       ...s,
       refining: false,
-    } as T.Session,
+    },
   });
 
 describe("mcp", () => {
   it.live("gives a session its tools, as itself", () => {
     const tokens: string[] = [];
+    const proceed = Promise.withResolvers<void>();
     const pi = scriptedRuntime({
       id: "pi",
       turn: async (turn) => {
         for (const s of turn.options.mcpServers ?? [])
           if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers.authorization ?? "").replace(/^Bearer /u, ""));
+        await proceed.promise;
         turn.say("做完了");
       },
     });
@@ -110,11 +114,28 @@ describe("mcp", () => {
         "channel_message_list",
         "channel_message_send",
         "channel_unread_list",
+        "issue_handback",
+        "issue_pr_submit",
+        "issue_report",
         "issue_split",
         "memory_create",
         "memory_search",
+        "resource_read",
         "session_list",
       ]);
+      const extra = (yield* chat.say("顺手做另一件事", thread, "extra")).message;
+      const mailbox = yield* Mailbox;
+      yield* waitFor(mailbox.deliveryChannel(id, extra.id), (channel) => channel === thread, "the mailbox handoff");
+      expect(yield* Effect.promise(() => c.tool("issue_handback", { envelope: extra.id, reason: "不是当前工单" }))).toContain("重新分流");
+      expect(mailbox.pending(id).some((input) => input.envelope_id === extra.id)).toBe(false);
+      expect(yield* Effect.promise(() => c.tool("issue_pr_submit"))).toContain("没有主人明确授予");
+      expect(
+        yield* Effect.promise(() => c.tool("issue_report", { summary: "需要端口", questions: [{ question: "端口用哪个？", options: ["8787", "8788"] }] })),
+      ).toContain("报告已记录");
+      proceed.resolve();
+      const issue = got.session!.issue!;
+      yield* waitFor(issues.get(issue), (item) => item.questions.length > 0, "the structured report");
+      expect((yield* issues.get(issue)).questions).toEqual([{ question: "端口用哪个？", options: ["8787", "8788"] }]);
       const who = yield* Effect.promise(() => c.tool("session_list"));
       expect(who).toMatch(new RegExp(`^- ${id} `, "mu"));
       // Names are listed without an @: models copy a wake.
@@ -220,9 +241,9 @@ describe("mcp", () => {
       const mcp = yield* Mcp;
       yield* hired(core, { id: sessionId("failed"), name: "失败的", phase: { _tag: "failed" } });
       yield* hired(core, { id: sessionId("resting"), name: "歇着的", phase: { _tag: "resting" } });
-      yield* hired(core, { id: sessionId("clash"), name: "冲突的", phase: { _tag: "done" }, conflict: { base: "main", files: ["a.go"] } });
+      yield* hired(core, { id: sessionId("done"), name: "交活的", phase: { _tag: "done" } });
       const text = yield* Effect.promise(() => client(mcp, "token").tool("session_list"));
-      for (const want of ["这一轮没做成", "歇着（上一轮没做完）", "合进 main 会冲突（a.go）"]) expect(text).toContain(want);
+      for (const want of ["这一轮没做成", "歇着（上一轮没做完）", "交活的"]) expect(text).toContain(want);
     }).pipe(Effect.scoped, Effect.provide(world({ who: () => "caller" }))),
   );
 

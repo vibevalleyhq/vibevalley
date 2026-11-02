@@ -16,11 +16,14 @@ import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { Cron } from "@/cron/cron.ts";
 import { viewOf } from "@/game/view.ts";
+import { Ingress } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";
 import { openFindings } from "@/issue/status.ts";
 import { Runtime } from "@/runtime/runtime.ts";
-import { Session, type SessionsInside } from "@/session/session.ts";
+import { Session } from "@/session/session.ts";
 import { write } from "@/testing/git.ts";
+import { helper } from "@/testing/helper.ts";
+import { testIssues } from "@/testing/issues.ts";
 import { Said } from "@/testing/said.ts";
 
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
@@ -50,7 +53,7 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
       const project = join(f.config.workRoot, "projects", "clock");
@@ -100,7 +103,7 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
       yield* (yield* Agent).save(lab());
@@ -108,7 +111,7 @@ describe("an issue", () => {
       expect(session.issue).toBeTruthy();
       yield* w.nextReport;
       refusedWith(yield* Effect.flip(issues.setStatus(session.id, "todo", "", "", owner)));
-      yield* issues.merge(session.issue!);
+      yield* issues.setStatus(session.issue!, "done", "", "", owner);
       const ended = (yield* sessions.get(session.id))!;
       expect([ended.phase._tag === "closed" && ended.phase.closed, ended.lastRun?.outcome, !!ended.lastRun?.summary, ended.runs, ended.issue]).toEqual([
         "merged",
@@ -151,7 +154,7 @@ describe("an issue", () => {
     const f = farm({ repos: ["board"] });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const me = { ...lab(), workdir: "board" };
       yield* (yield* Agent).save(me);
       const issue = yield* issues.add({ title: "看看", agent: me.id });
@@ -169,7 +172,7 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
@@ -214,14 +217,15 @@ describe("an issue", () => {
     const f = farm({ change: (c) => ({ ...c, project: { ...c.project, maxSessions: 1 } }) });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
       yield* core.apply({
-        type: "hired",
+        type: "session",
         session: {
           id: "w90",
+          role: "worker",
           name: "占地的",
           agent: "lab",
           runtime: "pi",
@@ -239,40 +243,25 @@ describe("an issue", () => {
       expect(got.queued).toContain("排上队了");
       const status = () => Effect.map(issues.get(issue.id), (i) => i.status);
       expect(yield* status()).toBe("todo");
-      yield* issues.tryQueued;
+      yield* (yield* Ingress).refreshIssues;
       expect(yield* status()).toBe("todo");
-      yield* core.apply({ type: "left", id: sessionId("w90") });
-      yield* issues.tryQueued;
+      const other = yield* issues.add({ title: "别排了", project: "queue", agent: "lab" });
+      const queued = yield* issues.setStatus(other.id, "todo", "", "", owner);
+      const unqueued = yield* issues.setStatus(other.id, "backlog", "", "", owner);
+      expect([queued.queuedAt !== undefined, unqueued.queuedAt]).toEqual([true, undefined]);
+      yield* core.apply({ type: "sessionGone", id: sessionId("w90") });
+      yield* (yield* Ingress).refreshIssues;
       yield* w.nextReport;
       expect(yield* status()).toBe("in_review");
       expect((yield* sessions.list("lab")).some((s) => s.brief === "等空位的活")).toBe(true);
-      const other = yield* issues.add({ title: "别排了" });
-      const queued = yield* issues.queue(other.id, true);
-      const unqueued = yield* issues.queue(other.id, false);
-      expect([queued.queuedAt !== undefined, unqueued.queuedAt]).toEqual([true, undefined]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("knows its task", () => {
+  it.effect("regression: cron inputs wait for human review and reopen the same completed issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const session = mustHire(
-        yield* (yield* Issue).hire(lab(), "做一步", "split", {
-          taskGraph: { id: "p1", task: "impl" },
-        }),
-      );
-      const head = (yield* (yield* Session).get(session.id))!;
-      expect(head.graph).toEqual({ id: "p1", task: "impl" });
-      yield* w.nextReport;
-    }).pipe(Effect.scoped, Effect.provide(f.layer));
-  });
-
-  it.effect("of a cron is one, told again and reopened", () => {
-    const f = farm();
-    return Effect.gen(function* () {
-      const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const crons = yield* Cron;
       yield* (yield* Agent).save({ ...lab(), enabled: true });
@@ -286,36 +275,41 @@ describe("an issue", () => {
         },
         owner,
       );
-      const due = () => Effect.andThen(TestClock.adjust(5 * 60_000 + 1), crons.tick);
+      const ingress = yield* Ingress;
+      const due = () => Effect.andThen(TestClock.adjust(5 * 60_000 + 1), crons.tick).pipe(Effect.andThen(ingress.refreshCron));
       const ofCron = () => Effect.map(issues.list(), (all) => withCron(all, made.id));
       const runs = () => Effect.flatMap(ofCron(), (i) => sessions.issueRuns(i.id));
       yield* due();
       yield* w.nextReport;
       const first = yield* ofCron();
       expect(sessionIdsOf(first)).toHaveLength(1);
+      expect(f.turns[0]!.input).toContain("vv://trigger/");
 
       yield* due();
-      yield* w.nextReport;
       expect((yield* ofCron()).id).toBe(first.id);
       expect(sessionIdsOf(yield* ofCron())).toHaveLength(1);
-      const two = yield* await_(runs, (r) => r.length === 2 && r[1]!.endedAt !== undefined, "a second run");
-      expect(two[1]!.triggeredBy.kind).toBe("cron");
+      expect(yield* runs()).toHaveLength(1);
+      const sql = yield* SqlClient.SqlClient;
+      const held = yield* sql
+        .unsafe<{ state: string }>("select state from mailbox_issue where issue_id = $1 and state = 'held'", [first.id])
+        .pipe(Effect.orDie);
+      expect(held).toHaveLength(1);
 
-      yield* issues.merge(first.id);
+      yield* issues.setStatus(first.id, "done", "", "", owner);
       yield* await_(ofCron, (i) => i.status === "done", "merged");
       yield* due();
       yield* w.nextReport;
       expect((yield* ofCron()).id).toBe(first.id);
       expect(sessionIdsOf(yield* ofCron())).toHaveLength(2);
-      const three = yield* await_(runs, (r) => r.length === 3, "a third run");
-      expect(three[2]!.triggeredBy.kind).toBe("cron");
+      const two = yield* await_(runs, (r) => r.length === 2, "a second run");
+      expect(two[1]!.triggeredBy.kind).toBe("cron");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
   it.live("update changes only what it gives", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       let issue = yield* issues.add({
         title: "写打卡",
         description: "每天一次",
@@ -341,7 +335,7 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       yield* (yield* Agent).save(lab());
       const move = (id: string, to: T.Issue["status"], text = "") => issues.setStatus(id, to, text, "", owner);
       let issue = yield* issues.add({ title: "写打卡并提交", project: "clock", agent: "lab" });
@@ -371,14 +365,14 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
       const helper = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
-      const place = (sessions as SessionsInside).place(helper.id)!;
-      mkdirSync(join(place.cwd, ".vibevalley"), { recursive: true });
-      write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\necho merge-check-failed\nexit 1\n", 0o755);
+      const cwd = sessions.cwdOf(helper.id)!;
+      mkdirSync(join(cwd, ".vibevalley"), { recursive: true });
+      write(join(cwd, ".vibevalley/check"), "#!/bin/sh\necho merge-check-failed\nexit 1\n", 0o755);
       const project = join(f.config.workRoot, "projects", "clock");
       const before = git(project, "rev-parse", "main");
       refusedWith(yield* Effect.flip(issues.setStatus(helper.issue!, "done", "", "", owner)), "merge-check-failed");
@@ -390,8 +384,8 @@ describe("an issue", () => {
       }, "the helper hears the check's output");
       expect((yield* issues.get(helper.issue!)).status).toBe("in_review");
       expect(git(project, "rev-parse", "main")).toBe(before);
-      expect(existsSync(place.cwd)).toBe(true);
-      git(project, "rev-parse", "--verify", place.branch!);
+      expect(existsSync(cwd)).toBe(true);
+      git(project, "rev-parse", "--verify", helper.branch!);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -399,7 +393,7 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({
@@ -424,7 +418,7 @@ describe("an issue", () => {
       expect([reopened.branch, reopened.worktree]).toEqual([first.branch, first.worktree]);
       expect(git(reopened.worktree!, "rev-parse", "HEAD")).toBe(before);
       expect(reopened.brief).toContain("这条分支上已经有上次的提交，接着做。");
-      yield* issues.merge(issue.id);
+      yield* issues.setStatus(issue.id, "done", "", "", owner);
       yield* await_(
         () => issues.get(issue.id),
         (i) => i.delivered === "merged",
@@ -440,7 +434,7 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
       yield* (yield* Agent).save(lab());
@@ -474,7 +468,7 @@ describe("an issue", () => {
   it.live("regression: a dry run reads an unsaved agent through an Assignment", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({ title: "先选人再开工" });
       const preview = yield* issues.previewStatus(issue.id, "todo", "", {}, { agent: "lab" });
@@ -488,7 +482,7 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       yield* (yield* Agent).save(lab());
       const project = join(f.config.workRoot, "projects", "clock");
       const committed = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
@@ -518,10 +512,13 @@ describe("an issue", () => {
   // An answer issue is read only: its conclusion is read into the issue, whatever the round changed goes, and completing it
   // delivers nothing. An answer that cannot be read is a round not done: 接着修 says what was wrong with it.
   it.live("answers with a conclusion and leaves nothing on its branch", () => {
-    const f = farm();
+    const gates = [Promise.withResolvers<void>(), Promise.withResolvers<void>(), Promise.withResolvers<void>()];
+    const turns: NonNullable<Parameters<typeof helper>[0]> = [];
+    const f = farm({ runtime: helper(turns, async (_turn, _input, n) => gates[n]?.promise ?? Promise.resolve()) });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
+      const sessions = yield* Session;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
       yield* (yield* Agent).save(lab());
@@ -534,6 +531,22 @@ describe("an issue", () => {
       });
       expect(asked.deliver).toBe("answer");
       yield* issues.setStatus(asked.id, "todo", "", "", owner);
+      yield* until(() => turns.length >= 1, "the answer run");
+      const firstSession = latestSessionIdOf(yield* issues.get(asked.id))!;
+      yield* sessions.report(firstSession, {
+        summary: "查清楚了",
+        questions: [],
+        checks: [],
+        remember: [],
+        prSubmit: false,
+        answer: {
+          conclusion: "打卡慢是因为每次都重读配置",
+          evidence: ["clock.ts:1 每次调用都读一遍配置"],
+          unsure: [],
+          next: ["把配置读一次缓存起来"],
+        },
+      });
+      gates[0]!.resolve();
       yield* w.nextReport;
       const answered = yield* await_(
         () => issues.get(asked.id),
@@ -564,6 +577,8 @@ describe("an issue", () => {
         deliver: "answer",
       });
       yield* issues.setStatus(garbled.id, "todo", "", "", owner);
+      yield* until(() => turns.length >= 2, "the unstructured answer run");
+      gates[1]!.resolve();
       yield* w.nextReport;
       const stuck = yield* await_(
         () => issues.get(garbled.id),
@@ -577,9 +592,24 @@ describe("an issue", () => {
       if (running === undefined) throw new Error("the issue has no execution session");
       const thread = (yield* chat.threadOfSession(running))!;
       yield* until(
-        () => saidIn(thread).some((m) => m.from === "owner" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没找到结论")),
+        () => saidIn(thread).some((m) => m.from === "owner" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没有通过 issue_report")),
         "what was wrong with it, said",
       );
+      yield* until(() => turns.length >= 3, "the corrected answer run");
+      yield* sessions.report(running, {
+        summary: "查清楚了",
+        questions: [],
+        checks: [],
+        remember: [],
+        prSubmit: false,
+        answer: {
+          conclusion: "打卡慢是因为每次都重读配置",
+          evidence: ["clock.ts:1 每次调用都读一遍配置"],
+          unsure: [],
+          next: ["把配置读一次缓存起来"],
+        },
+      });
+      gates[2]!.resolve();
       yield* w.nextReport;
       yield* await_(
         () => issues.get(garbled.id),
@@ -594,7 +624,7 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({ title: "这一单必败", project: "fails", agent: "lab" });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
@@ -607,18 +637,21 @@ describe("an issue", () => {
       expect(failed.status).toBe("in_review");
       expect(failed.moves).toEqual(["todo", "canceled"]);
       refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");
-      refusedWith(yield* Effect.flip(issues.merge(issue.id)), "这一轮没做成");
+      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");
       expect((yield* issues.get(issue.id)).closedAt).toBeUndefined();
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
   // A question in a report leaves the plot short of fertilizer until the owner answers.
   it.live("grows through its acceptance", () => {
-    const f = farm();
+    const first = Promise.withResolvers<void>();
+    const turns: NonNullable<Parameters<typeof helper>[0]> = [];
+    const f = farm({ runtime: helper(turns, async (_turn, _input, n) => (n === 0 ? first.promise : Promise.resolve())) });
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const core = yield* Core;
+      const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
       let issue = yield* issues.add({
         title: "先问清楚，再写打卡并提交",
@@ -626,6 +659,16 @@ describe("an issue", () => {
         agent: "lab",
       });
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
+      yield* until(() => turns.length >= 1, "the asking run");
+      const firstSession = latestSessionIdOf(yield* issues.get(issue.id))!;
+      yield* sessions.report(firstSession, {
+        summary: "需要端口",
+        questions: [{ question: "用 8787 还是 8797？", options: [] }],
+        checks: [],
+        remember: [],
+        prSubmit: false,
+      });
+      first.resolve();
       yield* w.nextReport;
       issue = yield* await_(
         () => issues.get(issue.id),

@@ -26,7 +26,7 @@ export interface RecalledLine {
 export interface Abilities {
   readonly list: boolean;
   readonly forget: boolean;
-  /** It wants whole runs (EverOS), not only the 「记住：」 lines. */
+  /** It wants whole runs (EverOS), in addition to explicit notes. */
   readonly transcripts: boolean;
 }
 

@@ -230,7 +230,6 @@
   },
   "names": {
     "issueThread": "工单串",
-    "planThread": "计划 {id}",
     "talkThread": "{who}的串",
     "thread": "串",
     "mention": {

@@ -11,8 +11,15 @@ export interface SessionLimits {
 }
 
 /** Why one more cannot start; except is a session about to work again, which does not count against itself. */
-export function noRoom(sessions: readonly T.Session[], runtime: string, project: string, limits: SessionLimits, except = ""): string {
-  const room = roomLeft(sessions, project, limits.workspace, limits.perProject, except);
+export function noRoom(
+  sessions: readonly Pick<T.Session, "id" | "runtime" | "project" | "phase">[],
+  runtime: string,
+  project: string,
+  limits: SessionLimits,
+  except = "",
+  byOwnerComment = false,
+): string {
+  const room = roomLeft(sessions, project, limits.workspace + (byOwnerComment ? 1 : 0), limits.perProject, except);
   if (room.farm === 0) return t("server.session.noRoom.farm", { max: limits.workspace });
   const onRuntime = sessions.filter((h) => isBusy(h) && h.id !== except && h.runtime === runtime).length;
   if (limits.perRuntime > 0 && onRuntime >= limits.perRuntime)
@@ -21,7 +28,7 @@ export function noRoom(sessions: readonly T.Session[], runtime: string, project:
   return "";
 }
 
-export function sessionName(sessions: readonly T.Session[], agentId: string, agentName: string): string {
+export function sessionName(sessions: readonly Pick<T.Session, "agent">[], agentId: string, agentName: string): string {
   const same = sessions.filter((h) => h.agent === agentId).length;
   return same === 0 ? agentName : `${agentName} ${same + 1}`;
 }

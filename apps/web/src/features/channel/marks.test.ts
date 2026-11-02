@@ -21,8 +21,11 @@ import {
   reactionSet,
   sameReaction,
   setMark,
+  markedRead,
+  markUnread,
+  unreadMark,
+  type ReadMark,
 } from "./marks";
-import { markedRead, type ReadMark } from "./reading";
 
 // A mark's channel is followed while the mark is kept; these tests have no server to follow.
 beforeEach(() => void vi.spyOn(followed, "subscribe").mockReturnValue(() => {}));
@@ -138,6 +141,19 @@ test("a refused mark is let go and said, so the overlay goes and the server's st
   expect(intents.all()).toHaveLength(1);
   expect(await said.promise).toBe("没有这个频道");
   expect(intents.all()).toEqual([]);
+});
+
+test("a refused unread mark drops its overlay and reports the reason through the shared mark path", async () => {
+  const frame = frameAt(0);
+  const frames = testFrames({ frame: { ...frame, state: { ...frame.state, chat: { channels: [channel({ read: 10 })], ownerMentions: [] } } } });
+  vi.spyOn(api.channel, "markUnread").mockRejectedValue(new VibeValleyApiError(409, "Refused", "not now"));
+  const intents = intentsIn(testRegistry(frames), unreadMark);
+  const said = deferred<string>();
+  markUnread(intents, { channel: "c", number: 5 }, said.resolve);
+  expect(markedRead(channel({ read: 10 }), intents.all()).read).toBe(4);
+  expect(await said.promise).toBe("not now");
+  expect(intents.all()).toEqual([]);
+  expect(markedRead(channel({ read: 10 }), intents.all()).read).toBe(10);
 });
 
 test("a level picked again before the first showed replaces it, and settles on the frame's level", async () => {

@@ -12,16 +12,7 @@ const recentTitleLength = 60;
 
 export function sentTitles(all: readonly T.Issue[], project: string, orchestrator: (id: string) => boolean): string[] {
   const mine = all
-    .filter(
-      (i) =>
-        i.project === project &&
-        executionsOf(i).length > 0 &&
-        !i.graph &&
-        !i.task &&
-        i.parent === undefined &&
-        i.cron === undefined &&
-        !isForOrchestrator(i, orchestrator),
-    )
+    .filter((i) => i.project === project && executionsOf(i).length > 0 && i.parent === undefined && i.cron === undefined && !isForOrchestrator(i, orchestrator))
     .toSorted((a, b) => b.createdAt - a.createdAt);
   const out: string[] = [];
   for (const i of mine) {

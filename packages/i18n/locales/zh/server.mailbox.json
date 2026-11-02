@@ -1,0 +1,5 @@
+{
+  "notOwned": "这条输入不归当前会话处理，不能退回",
+  "subscriptionTaken": "话题 {thread} 已归属于另一张工单",
+  "ambiguous": "这条输入同时对应多张工单，需要明确归属"
+}

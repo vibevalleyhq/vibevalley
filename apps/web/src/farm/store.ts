@@ -76,7 +76,6 @@ export interface FarmUi {
   readonly phoneOpen: boolean;
   readonly friendsOpen: boolean;
   /** The task graph the task board shows; null is the newest still open. */
-  readonly graphShown: string | undefined;
   readonly titleOpen: boolean;
   readonly bedFx: readonly BedFx[];
   /** Rewards shown in the FX layer for a few seconds each. */
@@ -101,7 +100,6 @@ const farmUi = defineAtom<FarmUi>({
   chatShown: undefined,
   phoneOpen: false,
   friendsOpen: false,
-  graphShown: undefined,
   titleOpen: !titleSeen.get(),
   bedFx: [],
   rewards: [],
@@ -154,11 +152,6 @@ export const farm = {
     replace(top.kind, undefined);
     return true;
   },
-  openTaskBoard: (graph?: string) => {
-    if (graph) set({ graphShown: graph });
-    replace("panel", { kind: "panel", panel: "taskBoard" });
-  },
-  showGraph: (graph: string | undefined) => set({ graphShown: graph }),
   hold: (tool: Tool) => set({ tool }),
   hover: (bed: number | undefined, spot: string | undefined) => set({ hoverBed: bed, hoverSpot: spot }),
   revealNames: (on: boolean) => set({ revealNames: on }),
@@ -204,7 +197,6 @@ export function resetFarm() {
     chatShown: undefined,
     phoneOpen: false,
     friendsOpen: false,
-    graphShown: undefined,
     bedFx: [],
     rewards: [],
     screen: undefined,

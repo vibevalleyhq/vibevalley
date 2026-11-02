@@ -1,26 +1,13 @@
-// The state changes in one place only: apply folds a fact in with reduce, then sends it.
-// state.json keeps the state but the chat, progress, crons and issues, whose home is the database, and the chat apps'
-// statuses, which their connectors say again when they start. Each fact is sent
-// on the side events, the facts and (as the page wants it) a frame stream; a transition carries the state each fact
-// changed, so a reader that comes late needs no second fold.
-
-import { join } from "node:path";
-
 import { Clock, Context, Effect, Layer, PubSub, type Scope, Stream, SubscriptionRef } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOf } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { keptFile, readOrSetAside } from "@/infra/files.ts";
 
 export const emptyWorkspaceState = (): T.WorkspaceState => ({
   call: "idle",
   callReason: "",
   sessions: [],
-  orchestrators: {},
   crons: [],
   issues: [],
   connectors: [],
@@ -36,13 +23,9 @@ export class Projection extends Context.Service<
     readonly effects: (before: T.WorkspaceState, fact: T.Fact) => T.GameEffect[];
     /** seq: the core's count of folds the state includes (StateFrame.seq). */
     readonly frame: (state: T.WorkspaceState, effects?: T.GameEffect[], seq?: number) => T.StateFrame;
-    /** The state read back from state.json, made whole (the sessions' places on the farm). */
-    readonly restore: (kept: T.WorkspaceState) => T.WorkspaceState;
   }
 >()("vibevalley/Projection") {}
 
-/** A burst of facts is one write, and one frame. */
-const saveAfterMs = 500;
 /** The most changes one frame gathers: past it, the frame goes at once. */
 const burstMost = 1_000;
 export const stateEveryMs = 200;
@@ -70,8 +53,6 @@ export class Core extends Context.Service<
     /** How many commits apply has folded: one more with each that changed the state. A reply read after its service
      * applied its facts carries it, and the first frame whose seq is at least it shows the change. */
     readonly seq: () => number;
-    /** channel: where it thinks or writes, while it does. */
-    readonly setOrchestrator: (agent: string, state: T.OrchestratorState, channel?: string) => Effect.Effect<void>;
     readonly setCommits: (commits: T.CommitCount) => Effect.Effect<void>;
     /** The farm opens when the owner starts it or says something: the call goes live unless it is already. */
     readonly open: () => Effect.Effect<void>;
@@ -99,15 +80,6 @@ export class Core extends Context.Service<
   );
 }
 
-/** What state.json keeps: the chat, progress, crons and issues are the database's, the chat apps' their connectors'
- * (kept empty: they are filled from their homes). */
-const toKeep = ({ chat: _chat, progress: _progress, ...kept }: T.WorkspaceState): T.WorkspaceState => ({ ...kept, crons: [], issues: [], connectors: [] });
-
-/** Started again, nobody is on the call and the orchestrator is not mid-sentence. */
-const restarted = (kept: T.WorkspaceState): T.WorkspaceState => {
-  return { ...toKeep(kept), orchestrators: {}, call: "idle", callReason: "" };
-};
-
 const liveOf = (e: T.SideEvent): T.LiveEvent | undefined => {
   switch (e.type) {
     case "event":
@@ -134,21 +106,9 @@ const isFact = (e: T.SideEvent): e is T.Fact => {
 };
 
 const make = Effect.gen(function* () {
-  const config = yield* ServerConfig;
-  const { reduce, effects: effectsOf, frame: frameOf, restore } = yield* Projection;
-  const file = join(config.home, "state.json");
-  const read = jsonOf(S.WorkspaceState);
-  const kept = { ...emptyWorkspaceState(), ...(yield* readOrSetAside(file, read, "the farm starts empty")) };
-  // The state and the number of folds that made it, changed only by apply, in one step each.
-  const held = yield* SubscriptionRef.make({ state: restore(restarted(kept)), seq: 0 });
+  const { reduce, effects: effectsOf, frame: frameOf } = yield* Projection;
+  const held = yield* SubscriptionRef.make({ state: emptyWorkspaceState(), seq: 0 });
   const current = () => SubscriptionRef.getUnsafe(held);
-  // A crash loses half a second at most: a write waits that long after the first change, and the changes after it join
-  // it rather than putting it off.
-  const disk = yield* keptFile(file, { soonMs: saveAfterMs });
-  const body = () => JSON.stringify(toKeep(current().state));
-  const save = () => disk.soon(body);
-  // The state as the farm stops is written as it closes, after this.
-  yield* Effect.addFinalizer(() => Effect.sync(save));
 
   const events = yield* scopedPubSub<T.SideEvent>();
   const transitions = yield* scopedPubSub<Transition>();
@@ -181,7 +141,6 @@ const make = Effect.gen(function* () {
       const updated = { state: next, seq: h.seq + 1 };
       return [
         () => {
-          save();
           for (const t of done) {
             publish(t.fact);
             PubSub.publishUnsafe(transitions, t);
@@ -216,14 +175,12 @@ const make = Effect.gen(function* () {
     seq: () => current().seq,
     session: (id) => current().state.sessions.find((h) => h.id === id),
     apply,
-    setOrchestrator: Effect.fn("Core.setOrchestrator")(function* (agent, orchestrator, channel) {
-      return yield* apply({ type: "orchestrator", agent, state: orchestrator, ...(channel ? { channel } : {}) });
-    }),
+
     setCommits: Effect.fn("Core.setCommits")(function* (commits) {
       return yield* apply({ type: "commits", commits });
     }),
     open: Effect.fn("Core.open")(function* () {
-      if (current().state.call !== "live") yield* apply({ type: "call", state: "live", reason: "" });
+      if (current().state.call !== "live") yield* apply({ type: "voiceCall", state: "live", reason: "" });
     }),
     // A session's every line of output comes through here: a span each would bury the traces.
     sessionEvent: Effect.fnUntraced(function* (id, activity) {

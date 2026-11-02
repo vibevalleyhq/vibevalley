@@ -22,7 +22,6 @@
   "app": {
     "missed": "未接",
     "channels": "频道",
-    "graphs": "计划",
     "games": "游戏"
   },
   "game": {

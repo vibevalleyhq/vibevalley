@@ -19,7 +19,7 @@ describe("the tray", () => {
   const state = (call: WorkspaceState["call"], working: number) =>
     ({
       call,
-      sessions: Array.from({ length: working }, (_, i) => ({ id: `w${i}`, phase: { _tag: "working" } }) as unknown as Session),
+      sessions: Array.from({ length: working }, (_, i) => ({ id: `w${i}`, role: "worker", phase: { _tag: "working" } }) as unknown as Session),
       chat: undefined,
     }) as unknown as WorkspaceState;
 

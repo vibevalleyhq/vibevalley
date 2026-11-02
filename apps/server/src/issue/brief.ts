@@ -2,10 +2,8 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 
-import { reportVerdict } from "@/session/report.ts";
-
 import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
-/** The criteria go last, so whoever works it checks each one before handing the work back; an answer issue's brief ends with the block parseAnswer reads. */
+/** The criteria go last, so whoever works it checks each one before handing the work back; an answer issue reports its answer through issue_report. */
 export function issueBrief(pick: Pick<T.Issue, "title" | "description" | "criteria"> & { readonly deliver?: T.Deliverable }): string {
   let brief = pick.title;
   if (pick.description) brief += "\n\n" + pick.description;
@@ -50,5 +48,5 @@ export const findingsOf = (text: string) =>
     .map((l) => l.trim())
     .filter(Boolean);
 
-/** A pull request's description: the session's conclusion (its 结论： part), else all it last said. */
-export const pullRequestConclusion = (text: string) => reportVerdict(text) || text;
+/** The structured issue_report carries the short result; the PR fallback keeps the worker's complete last answer. */
+export const pullRequestConclusion = (text: string) => text.trim();

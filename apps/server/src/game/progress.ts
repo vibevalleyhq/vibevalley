@@ -2,36 +2,24 @@
 // Outcomes earn, not effort: what counts is work that went into the main branch, never commands run or tokens spent
 // (docs/subsystems/game.md). Nothing here changes what it is given.
 
-import {
-  type Achievement,
-  type WorkspaceState,
-  everyone,
-  type Fact,
-  type LedgerEntry,
-  defaultOrchestrator,
-  ownerId,
-  type Progress,
-  type ProgressNews,
-  type TaskGraph,
-  type Unlock,
-  type SessionId,
-} from "@vibevalley/protocol";
+import { dagLayers } from "@vibevalley/agent/dag";
+import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { type AchievementDef, achievements } from "@/agent/seed.ts";
 import { sessionOf, sessionOnIssue } from "@/session/roster.ts";
-import { layersOf } from "@/task/graph.ts";
-import { graphOf } from "@/task/issues.ts";
 
 import { achievementInWords, levelForCommits } from "./view.ts";
 
 /** An entry as a fact makes it: when is the clock's, set as it is written. */
-export type Entry = LedgerEntry extends infer E ? (E extends LedgerEntry ? Omit<E, "at"> : never) : never;
+export type Entry = T.LedgerEntry extends infer E ? (E extends T.LedgerEntry ? Omit<E, "at"> : never) : never;
 
 const achievementOf = (id: string) => achievements().find((a) => a.id === id);
 
 const isTitle = (a: AchievementDef) => a.category !== "starter";
 
-const tierOf = (p: Progress, id: string) => p.unlocked.reduce((t, u) => (u.id === id && u.tier > t ? u.tier : t), 0);
+const tierOf = (p: T.Progress, id: string) => p.unlocked.reduce((t, u) => (u.id === id && u.tier > t ? u.tier : t), 0);
 
 /** What reaching that tier (from 1) pays: seeds.json says, for each achievement. */
 const tierCoins = (a: AchievementDef, tier: number) => (tier < 1 || tier > a.coins.length ? 0 : a.coins[tier - 1]!);
@@ -54,11 +42,11 @@ export interface Seen {
 }
 
 export interface Folded {
-  readonly progress: Progress;
+  readonly progress: T.Progress;
   readonly seen: Seen;
 }
 
-export const emptyProgress = (): Progress => ({ coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], multiplier: 1, agents: {} });
+export const emptyProgress = (): T.Progress => ({ coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], multiplier: 1, agents: {} });
 
 export const emptyFolded = (): Folded => ({ progress: emptyProgress(), seen: { told: [], failed: [], conflicted: [], reviewed: [], runtimes: [] } });
 
@@ -66,7 +54,7 @@ const added = (list: readonly string[], item: string): readonly string[] => (lis
 const bump = (counts: Record<string, number>, id: string, by: number) => ({ ...counts, [id]: (counts[id] ?? 0) + by });
 const atLeast = (counts: Record<string, number>, id: string, value: number) => ((counts[id] ?? 0) >= value ? counts : { ...counts, [id]: value });
 
-function tallied(p: Progress, e: LedgerEntry): Progress {
+function tallied(p: T.Progress, e: T.LedgerEntry): T.Progress {
   const field = e.kind === "hired" ? "hired" : e.kind === "harvested" ? "harvested" : e.kind === "failed" ? "failed" : undefined;
   const agent = field && "agent" in e ? e.agent : undefined;
   if (!field || !agent) return p;
@@ -75,12 +63,12 @@ function tallied(p: Progress, e: LedgerEntry): Progress {
 }
 
 /** Night and weekend are told in the server's own time zone, as JavaScript's Date does. */
-export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, ProgressNews] {
+export function progressStep(folded: Folded, entry: T.LedgerEntry): [Folded, T.ProgressNews] {
   let p = folded.progress;
   let seen = folded.seen;
   let counts = p.counts;
   let coins = 0;
-  let session: SessionId | undefined;
+  let session: T.SessionId | undefined;
   const at = entry.at;
   switch (entry.kind) {
     case "harvested": {
@@ -117,7 +105,7 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
     case "reviewed":
       seen = { ...seen, reviewed: added(seen.reviewed, entry.session) };
       break;
-    case "graph":
+    case "family":
       coins += taskCoins(entry.merged);
       counts = atLeast(counts, "big_graph", entry.merged);
       if (entry.parallel) counts = bump(counts, "parallel_graph", 1);
@@ -159,7 +147,7 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
   counts = atLeast(counts, "steady", p.bestStreak);
 
   // Tiers reached by this entry: each earns its coins once.
-  const unlocked: Unlock[] = [];
+  const unlocked: T.Unlock[] = [];
   for (const a of achievements()) {
     const count = counts[a.id] ?? 0;
     const had = tierOf(p, a.id);
@@ -171,55 +159,56 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
       }
     });
   }
-  const next: Progress = { ...tallied(p, entry), coins: p.coins + coins, counts, unlocked: [...p.unlocked, ...unlocked] };
+  const next: T.Progress = { ...tallied(p, entry), coins: p.coins + coins, counts, unlocked: [...p.unlocked, ...unlocked] };
   next.multiplier = streakMultiplier(next.streak);
-  const news: ProgressNews = { ...(coins !== 0 ? { coins } : {}), ...(session ? { session } : {}), unlocked };
+  const news: T.ProgressNews = { ...(coins !== 0 ? { coins } : {}), ...(session ? { session } : {}), unlocked };
   return [{ progress: next, seen }, news];
 }
 
-export const progressFold = (entries: readonly LedgerEntry[], from: Folded = emptyFolded()) => entries.reduce((f, e) => progressStep(f, e)[0], from);
+export const progressFold = (entries: readonly T.LedgerEntry[], from: Folded = emptyFolded()) => entries.reduce((f, e) => progressStep(f, e)[0], from);
 
 const fullHouse = 6;
 
-const working = (state: WorkspaceState) => state.sessions.filter((h) => h.phase._tag === "working").length;
+const working = (state: T.WorkspaceState) => state.sessions.filter((h) => h.role === "worker" && h.phase._tag === "working").length;
 
-function graphEntry(graph: TaskGraph): Entry {
-  const merged = new Set(graph.tasks.filter((n) => n.state === "merged").map((n) => n.id));
-  const parallel = layersOf(graph.tasks).some((layer) => layer.filter((id) => merged.has(id)).length >= 2);
-  return { kind: "graph", graph: graph.id, merged: merged.size, parallel };
+function familyEntry(id: string, children: readonly T.Issue[]): Entry {
+  const merged = new Set<string>(children.filter((issue) => issue.delivered === "merged_into_parent").map((issue) => issue.id));
+  const parallel = dagLayers(children.map((issue) => ({ id: issue.id, after: issue.blockedBy }))).some(
+    (layer) => layer.filter((id) => merged.has(id)).length >= 2,
+  );
+  return { kind: "family", issue: id, merged: merged.size, parallel };
 }
 
 /** Only what the person does in the app (a voice call, a review, a title) is recorded where it happens: everything the
  * farm does is told by its facts. */
-export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceState): Entry[] {
+export function entriesFor(before: T.WorkspaceState, fact: T.Fact, after: T.WorkspaceState): Entry[] {
   const out: Entry[] = [];
   switch (fact.type) {
-    case "report": {
+    case "sessionReport": {
       const h = sessionOf(after, fact.id) ?? sessionOf(before, fact.id);
+      if (h?.role === "orchestrator") break;
       if (fact.outcome === "failed") out.push({ kind: "failed", session: fact.id, ...(h?.agent ? { agent: h.agent } : {}) });
       break;
     }
-    case "conflict":
-      if (fact.conflict) out.push({ kind: "conflicted", session: fact.id });
-      break;
-    case "call":
+    case "voiceCall":
       if (fact.state === "live") out.push({ kind: "opened" });
       break;
-    case "hired":
-      out.push({ kind: "hired", session: fact.session.id, agent: fact.session.agent });
+    case "session":
+      if (fact.session.role === "worker") out.push({ kind: "hired", session: fact.session.id, agent: fact.session.agent });
       break;
     case "issue": {
-      if (!fact.issue.graph) break;
-      const was = graphOf(before, fact.issue.id)?.state;
-      const now = fact.issue.graph.state;
-      if (now === "draft" && was === "splitting") out.push({ kind: "split" });
-      if (now === "done" && was !== "done") {
-        const graph = graphOf(after, fact.issue.id);
-        if (graph) out.push(graphEntry(graph));
+      const issue = fact.issue;
+      const previous = before.issues.find((item) => item.id === issue.id);
+      const session = latestSessionIdOf(issue);
+      if (issue.conflict && session && (!previous?.conflict || latestSessionIdOf(previous) !== session)) out.push({ kind: "conflicted", session });
+      if (issue.parent && !before.issues.some((item) => item.parent === issue.parent)) out.push({ kind: "split" });
+      const children = after.issues.filter((item) => item.parent === issue.id);
+      if (issue.status === "done" && before.issues.find((item) => item.id === issue.id)?.status !== "done" && children.length > 0) {
+        out.push(familyEntry(issue.id, children));
       }
       break;
     }
-    case "left": {
+    case "sessionGone": {
       // Harvested: only when something went into the main branch, which is what earns.
       const h = sessionOf(before, fact.id);
       if (h && fact.closed === "merged" && fact.merged != null && fact.merged > 0)
@@ -263,11 +252,11 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
 }
 
 /** A farm level the ledger has not told yet, from commits counted before it. */
-export function catchUp(state: WorkspaceState): Entry[] {
+export function catchUp(state: T.WorkspaceState): Entry[] {
   const [level] = levelForCommits(state.commits?.total ?? 0);
   const known = state.progress?.counts.farm_level ?? 1;
   return level > known ? [{ kind: "level", level }] : [];
 }
 
 /** Every achievement, in the page's order. */
-export const achievementsInWords = (): Achievement[] => achievements().map(achievementInWords);
+export const achievementsInWords = (): T.Achievement[] => achievements().map(achievementInWords);

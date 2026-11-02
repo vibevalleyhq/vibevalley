@@ -4,7 +4,7 @@ export { DashedLine, PxWindow } from "./base";
 export { PxButton } from "./button";
 export { PxPick } from "./choice";
 export { FarmDialog, type FarmDialogSize, FarmSection } from "./dialog";
-export { PxField, PxTextArea, PxTextInput } from "./field";
+export { PxTextArea, PxTextInput } from "./field";
 export { reducedMotion, SpriteIcon } from "./icons";
 export { numberText } from "@/base/format";
 export { plainText } from "./markdown";

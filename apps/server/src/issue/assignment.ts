@@ -21,7 +21,7 @@ export const assignTo = Effect.fnUntraced(function* (issue: string, agent: strin
 });
 
 const executionOf = (row: qe.AddExecutionResult): T.Assignment["executions"][number] =>
-  row.executor_kind === "session"
+  row.role === "worker"
     ? { kind: "session", session: sessionId(row.executor), startedAt: row.started_at }
     : { kind: "orchestrator", session: row.executor, startedAt: row.started_at };
 
@@ -53,12 +53,12 @@ export class Assignments {
 
   executed(issue: string, row: qe.AddExecutionResult) {
     const existing = this.executions.get(row.assignment) ?? [];
-    if (!existing.some((e) => e.kind === row.executor_kind && e.session === row.executor))
+    if (!existing.some((e) => e.session === row.executor))
       this.executions.set(
         row.assignment,
         [...existing, executionOf(row)].toSorted((a, b) => a.startedAt - b.startedAt),
       );
-    if (row.executor_kind === "session") this.issueOfSession.set(row.executor, issue);
+    if (row.role === "worker") this.issueOfSession.set(row.executor, issue);
   }
 
   issueOf(session: string): string | undefined {

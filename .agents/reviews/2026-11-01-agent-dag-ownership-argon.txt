@@ -1,0 +1,90 @@
+模型：opencode-go/gemini-4-argon
+会话：ses_e69a3d682ffe5TybTA2VrL9uO1
+状态：归属分析原文；迁移范围待用户决定。
+
+### 1. 当前代码库中的 DAG / 任务能力全景与四段链路
+
+当前代码库中实际存在 **2 套 DAG 能力 + 1 套底层单层子代理池**，它们只在 `packages/agent/src/dag.ts` 共用纯拓扑校验（`dagProblems`、`dagLayers`、`dagIDValid`），其余链路完全分离：
+
+| 维度 | 能力 A：进程内 Agent 的自驱 DAG（现名 `Todo`，原名 `AgentTask` / `task/engine`） | 能力 B：跨会话多帮工协作 DAG（现名 `Task` / `TaskGraph`，原名 `Playbook`） | 附：底层单步子代理池（`Executor` 内嵌的 `@botiverse/oar/agents` `Subagents`） |
+|---|---|---|---|
+| **所在文件** | `packages/agent/src/{todo,todoTools,todoStore,brain}.ts`、`apps/server/src/runtime/{vibevalley,todoStore}.ts` | `apps/server/src/task/{task,graph,issues,splitting,editing,changes,prompts}.ts`、`apps/server/src/tool/graph.ts` | `packages/agent/src/self.ts`（`spawn_agent`）；`apps/server/src/executor/executor.ts`（`createSubagents`） |
+| **1. 配置入口** | **按 Runtime 写死，未挂在 `Agent`（档案）上**：<br>• `runtime/vibevalley.ts:71`：仅 `vibevalley` 农机的帮工会话注入 `todos: options.todos?.(kernel.sessionId)`（开启 `todo_add`/`todo_update`/`todo_list` + `subagent`）；<br>• `cli/chat.ts`：命令行会话注入内存 `memoryStore()`；<br>• `session/host.ts:313`：管家固定 `noSubagents: true` 且不传 `todos`；<br>• 外部农机（`claude`/`codex`/`pi`）拿不到这套工具。`Agent` 协议形状（`shapes.ts:1203`）只有 `disallowedTools`，没有任何 DAG 开关或并发配置字段。 | **按调用身份（`Caller`）写死在接口/MCP 表，未挂在 `Agent`（档案）上**：<br>• `api.ts` 与 `tool/tool.ts`：管家固定拥有 `graph_split`、`graph_list`、`graph_get`、`graph_task_update`、`graph_task_delete`、`graph_act`、`graph_task_act`；<br>• 所有工单 Session 固定通过 `/mcp` 拥有 `issue_split`（`session/prompts.ts:22` 无条件提示所有工单帮工「一个人做太大就用 `issue_split`」）。 | • `packages/agent` 内置 `spawn_agent`（受 `BrainOptions.noSubagents` 控制）；<br>• `Executor.start`（`executor.ts:218`）为每个 Session 调 `createSubagents({ maxRunning: 6, maxDepth: 1 })`，但仅用来 `spawn` 该 Session 自己的主进程（1:1 包装），并未向帮工暴露跨農机的子代理工具。 |
+| **2. 调用入口** | 模型在自身 Loop 内调内置工具 `todo_add`（参数名仍叫 `tasks`）、`todo_update`、`todo_list`。 | 三扇门：<br>1. 主人/管家/计划板调 `graph.split`（派规划帮工读代码输出 JSON 代码块，`parseSplit` 解析）；<br>2. 在做工单的帮工经 `/mcp` 调 `issue_split`（传入 `tasks: TaskDraft[]`）；<br>3. 主人/管家调 `graph.act` / `graph.task.act` / `graph.task.update`。 | `vibevalley` 农机帮工在自身 Loop 内调 `spawn_agent(brief, label)` 同步等待单步返回。 |
+| **3. 执行与生命周期** | `makeTodoRunner`（`todoTools.ts:104`）：<br>• `by: "self"`：一轮停下时若 `readyTodos` 非空，通过 `nudge` 自动发 `custom("task")` 消息唤醒自己继续做（最多 3 次）；<br>• `by: "subagent"`：`after` 满足后自动在后台 `FiberSet` 并发起无会话 `makeBrain`（最多 `maxSubagents = 3`），失败自动重试 1 次，结果以 `〔任务〕…帮手做完了` 插回主 Brain 的 `later` 队列；<br>• 压缩时自动把未完 DAG 拼在摘要末尾（`folding.append`）；`stop` 叫停所有在跑帮手并退回 `waiting`。 | `Task` 服务（`task/task.ts`）：<br>• 状态机：`splitting → draft → running ⇄ paused → ready → done / abandoned`；节点：`waiting → working → merged / failed / skipped`；<br>• 调度（`cron`）：`needs` 全部 `merged`/`skipped` 后，在 `parallel`（默认 3）内按 `chooseAgent` 挑档案，从计划分支（`vibevalley/task-<id>-<ts>`）开独立 git worktree 并派 Session；<br>• 节点交回（`taskDone`）：占住帮工跑 `verified`（验收步必须先红并冻结文件、后续步禁改冻结文件、收尾步跑上游验收命令）→ `projects.mergeInto` 合进计划分支 → 关掉该步帮工；失败自动打回最多 2 次；<br>• 全部节点定下后进 `ready`，主人点头后 `mergeBranch` 一次合进主分支。 | `Brain` 内 `subagentTool` 在当前 Fiber 同步 `h.ask()`，最多 30 步，无独立分支，无持久化。 |
+| **4. 持久化与展示链** | • **持久化**：表 `runtime_todo`（`0001_schema.up.sql:369`，原名 `task_graph` → `agent_task`），按 `keeper`（oar 会话 id）存打开的图，全部完成后盖 `finished_at`；<br>• **展示**：发 `BrainEvent("todos_changed")` → `runtime/vibevalley.ts:168` 记入 oar 原始记录帧 `frame("vibevalley/todos")`；**不进 `Core`、不进 `StateFrame`、页面（`apps/web`）完全没有消费或渲染**。 | • **持久化**：没有独立的 `task_graph` 主表！通过 `Issue.putTask(graph)`（`issue.ts:1125`）调 `graphIssues` 拆成 1 张父 `issue`（存 `graph` JSON 列）+ N 张子 `issue`（id 为 `<graph>.<task>`，存 `parent`、`blocked_by`、`task` JSON 列），外加审计表 `task_event`；<br>• **展示**：`StateFrame.graphs`（由 `graphsOf(state)` 从 `WorkspaceState.issues` 现算），在像素农场渲染为院子里的图纸桌 `TaskBoard.tsx`，在工作台看板渲染为父工单卡片与 `TaskDetail.tsx`。 | 无独立持久化；工具调用作为一次普通 `tool/call`、`tool/result` 记入所在 Session 的 `events/<id>.json`。 |
+
+---
+
+### 2. 归属证据辨析：哪些证明 DAG 属于 Agent 能力，哪些只是工单载体/投影，哪些是真实耦合
+
+#### （1）支持「DAG 本质是 Agent 能力（规划、分派子任务、自检推进）」的代码与历史证据
+1. **核心抽象源于 Agent package**：DAG 的拓扑定义与分层算法 `packages/agent/src/dag.ts` 位于 `@vibevalley/agent` 包内；其文件头注释（`dag.ts:1`）和早期提交 `74b10145`（`Tasks are DAGs: the farm's task graph, the agent's own task graph, one module`）明确记录：最初设计就是把「Agent 把一件活拆成有依赖关系的几步、按依赖并发派发执行并回收结果」作为统一的能力（当时统一叫 `Task`，表名叫 `task_graph` / `agent_task`）。
+2. **`issue_split` 与 `graph.split` 的发起与决策主体都是 Agent**：
+   - 在 `graph.split` 中，拆图不是人填表建子工单，而是派一个作为「规划师」的 Agent 读仓库代码产出 DAG（`task/prompts.ts:159`）；
+   - 在 `issue_split`（`task/task.ts:522`）中，更是正在干活的 Agent 自己发现任务太大，主动调用工具将当前任务裂变为一张并发执行的 DAG，且**无需主人审批直接进入 `running` 自动调度**。
+3. **两套状态机与推进语义高度同构**：
+   - 对比 `packages/agent/src/todo.ts` 与 `apps/server/src/task/graph.ts`：节点状态同为 `waiting | working | done(merged) | failed | skipped`；推进条件同为上游全部 `done(merged) | skipped`；都有并发槽位控制（`maxSubagents = 3` vs `defaultParallel = 3`）、失败自动打回重试（`retries = 1` vs `autoRetries = 2`）、中断/重启退回或暂停恢复。
+4. **演进过程中的命名漂移痕迹**：
+   - 在提交 `f527d936`（#204，用语表批量对齐）中，为了满足「一个词只指一样东西」，机械地将 `packages/agent` 里的 `agentTask.ts` 改名为 `todo.ts`、表 `agent_task`（最初叫 `task_graph`）改名为 `runtime_todo`，并把 `apps/server/src/agent/taskStore.ts` 挪到了 `runtime/todoStore.ts`；但 `todo_add` 的模型参数至今仍叫 `tasks`（`todoTools.ts:30`），提示词仍写「把一件要分几步、有先后的活写成任务」（`prompts.ts:132`）。这说明它从一开始就不是普通的勾选项 Todo，而是给 Agent 配的 DAG 任务分解与子代理调度能力。
+   - 同时，未完成的架构提案 `.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md`（第 53–66 行）明确写道：**工具能力应作为 `Agent.toolsets` 配置在 Agent 档案上**（「给一个帮工加上 `issue`/`graph`，它就是能拆子工单的领班」），而不是像现在这样按 `role` 硬编码给所有工单帮工。
+
+#### （2）哪些只是「工单作为任务载体或看板投影视图」
+- 在 `apps/server/src/task/issues.ts` 中，`graphIssues(graph, before, now)` 将 `GraphSpec` 映射为父子 `Issue` 行，`graphFrom(parent, issues)` 再从 `WorkspaceState.issues` 拼回 `T.TaskGraph`。
+- 历史 Note（`2026-10-15-tasks-are-parent-issues.md`）写得很清楚：早先 `Task`（当时叫 `Playbook`）是独立存在 `state.json` 的 `tasks` 字段里的，后来为了**避免看板上同一件事既有计划卡又有散落工单、且能复用核心状态同步与看板展示**，才把 `TaskGraph` 的持久化压进了 `issue` 表的 `graph` / `task` JSON 列。
+- 换言之：**子工单（`p1.api`）在看板上不可手动挪状态（`moves: []`）、不可单独完成、不可单独重开（`issue/status.ts`、`issue/moves.ts`），它根本没有独立的 `Issue` 生命周期**；它只是把 `issue` 表借来当作 DAG 节点的持久化行与 UI 钻取视图（点开看某个节点的帮工轨迹）。
+
+#### （3）当前代码里「把 `Task` 焊死在 `Issue` 上」的真实耦合点
+当前 `apps/server/src/task/task.ts` 并非纯粹借用 `Issue` 做存储，而是在以下 4 处形成了对 `Issue` 服务的深度反向耦合：
+1. **写路径耦合（`Task.put` → `Issue.putTask`）**：`Task` 自己没有表读写（除 `task_event` 外），每次状态变化都必须构造整棵 `GraphSpec` 调 `issues.putTask(graph)`，触发 `issue`、`issue_assignment` 全家重写。
+2. **执行派发耦合（`Task.cron` / `Task.split` → `Issue.hire`）**：`Task` 派规划师和派每个 DAG 节点帮工时，调的不是 `Session.send`，而是 `issues.hire(agent, brief, project, { issue: taskIssueID(graph.id, task.id), taskGraph: tag, ... })`（`task.ts:251, 504`）。这迫使每个 DAG 节点都必须先是一张拥有 `Issue` 编号、`issue_assignment` 和 `issue_assignment_execution` 记录的工单。
+3. **拆单入口耦合（`issue.split` 挂在 `issue` 命名空间下）**：协议接口叫 `issue.split`（`api.ts:137`），帮工工具叫 `issue_split`，且 `splittable`（`task/prompts.ts:114`）强制要求调用方必须绑定在一张 open `Issue` 上（频道私聊 Session 或无工单的 Agent 根本无法使用 DAG 拆解能力）。
+4. **`Issue` 状态机被迫到处给 `graph` / `task` 写特判逃生口**：
+   - `issue.ts` 中 `unsent`（L228）、`reopen`（L519）、`onSessionNews`（L791）、`place`（L887）、`review`（L1081）全部要写 `if (issue.graph || issue.task) return refused(...)`；
+   - `issue/status.ts` 和 `issue/moves.ts` 被迫内置一套平行的「当 `issue.graph` 或 `issue.task` 存在时，如何从 DAG 状态反推伪造一个 `IssueStatus` 并清空 `moves`」的规则。
+
+---
+
+### 3. 前 2 / 3 轮精简的复盘：哪些混淆了能力归属与工单存储，哪些仍正确，哪些应撤回或重做
+
+对照当前工作区 `git diff HEAD` 与第 1～3 轮修改记录，基于真实代码差异逐项判定：
+
+| 轮次与改动项 | 涉及文件 | 判定 | 基于代码差异的具体理由 |
+|---|---|---|---|
+| **第 1 轮**：移除 `Runtime` 的 `Object.assign` 内部缓存后门 | `apps/server/src/runtime/runtime.ts`, `runtime.test.ts` | **完全正确，保留** | 纯粹清理 `Runtime` 探测与花费缓存的测试后门，与 `Task` / `Issue` 归属无关，且收紧了服务边界。 |
+| **第 2 轮（一半）**：移除 `TaskGit` 测试端口与 `FakeGit`，改用真实 `Project` + 真实 git worktree | `apps/server/src/task/task.ts`, `flows/task-control.test.ts` | **正确，保留** | 跨帮工 DAG 节点的验证（`verified` 查冻结文件、跑 check）和合入计划分支（`projects.mergeInto`）本就应该调真实的 `Project` 服务并在真实 git 仓库上验证，`FakeGit` 纯属冗余替身。 |
+| **第 2 轮（另一半）+ 前序提交 `caaccd41`**：移除 `TaskWork`，把 `work.hire` 直接硬编码替换为 `issues.hire`，并新增 `flows/task.test.ts` 专门断言子工单的 `Issue` 身份与 `Assignment` | `apps/server/src/task/task.ts`（L251, L504）, `apps/server/src/flows/task.test.ts` | **方向错误（混淆了能力归属与工单存储），应撤回/重做** | 1. 原先 `Task` 通过 `work.hire` / `work.deliver` / `work.dismiss` / `work.handOver` 抽象了「派一个执行上下文跑 DAG 节点」；第 2 轮删除 `TaskWork` 时，没有让 `Task` 依赖执行上下文层（`Session`），反而把 `issues.hire(...)` 直接焊死进了 `Task.cron` 和 `Task.split`；<br>2. 新增的 `apps/server/src/flows/task.test.ts`（第 40–73 行）把「每个 DAG 节点必须生成子工单 `Assignment`、可以通过 `issues.get(session)` 反查子工单、不能调 `issues.setStatus`」当成了核心业务不变量来测，这正是用户指出的**「把给 Agent 配置的 DAG 能力当成了工单的能力（父子工单）」**的典型体现；<br>3. `docs/subsystems/task.md` 第 30–37 行新写入的「Task 直接依赖 Issue… TaskGraph 是从父子工单现算的完整读取形状」把临时存储妥协固化成了领域法则，应当撤回。 |
+| **第 3 轮**：删除 `graphView()` / `taskView()` 假空值占位，分离内部写形状 `GraphSpec` / `TaskSpec` 与外部完整读形状 `T.TaskGraph` | `apps/server/src/task/{graph,issues,editing,task}.ts`, `projection/frame.ts` | **前半（删除 `graphView`/`taskView`、区分 `GraphSpec` 与 `T.TaskGraph`）正确保留；后半（把 `graphFrom(parentIssue, issues)` 当作唯一读源）需随存储归属重做** | • 消除 `...graphView()` / `...taskView()` 空字符串占位、让 `GraphSpec` 只含领域字段而 `T.TaskGraph` 含完整派生字段，这是健康的读写模型分离，无论 DAG 归属给谁都成立，且修复了 `graph.get` / `graph.list` 返回空 `actions: []` 的真实 bug；<br>• 但第 3 轮将展示派生逻辑塞进 `task/issues.ts` 的 `graphFrom(parent: T.Issue, issues: readonly T.Issue[])`，前提依然是「DAG 活在 `Issue[]` 里」。如果补齐派生字段的纯函数放在 `task/graph.ts`（例如 `completeGraph(spec: GraphSpec): T.TaskGraph`），就不依赖它从 `Issue[]` 还是从 Agent/Task 自己的存储读出来。 |
+
+---
+
+### 4. 保持用户行为的目标模型（职责、边界与命名，不新增框架）
+
+要在不破坏现有页面（`TaskBoard.tsx`、`TaskDetail.tsx`、`StateFrame.graphs`）和用户可感知行为的前提下，把 DAG 归还给 **Agent 能力**，同时解开与 `Issue` 的错位耦合，目标模型应当只用现有模块，按以下职责收口：
+
+| 概念 / 模块 | 职责归属（管什么） | 明确不管什么（交给谁） | 关键命名与边界修正 |
+|---|---|---|---|
+| **`Agent`（AgentProfile，档案）** | **能力的配置主体**：<br>决定该档案是否开启 DAG 能力、允许哪种执行模式（进程内子代理 vs 跨 worktree 派帮工）、默认并发度与工具集（与 `2026-10-28-toolsets-and-skills.md` 的 `toolsets` 对齐）。 | 不管运行期某次具体的图状态；不管工单流转。 | 在 `Agent` 配置上显式表达能力（如 `toolsets` 中的 `graph` / `task`，或档案的 DAG 配置项），而不是在 `tool.ts` 按 `role` 一刀切给所有 session 塞 `issue_split`、或在 `runtime/vibevalley.ts` 暗自塞 `todos`。 |
+| **`TaskGraph` / `Task`（Agent 的 DAG 定义与运行实例）** | **Agent 执行复杂任务的 DAG 编排器**：<br>1. 承接 Agent 发起的拆解（规划师拆图，或执行中的 Agent 自拆当前任务）与主人的启停/合并控制；<br>2. 维护 DAG 节点拓扑（共用 `@vibevalley/agent/dag`）、节点状态（`waiting / working / done|merged / failed / skipped`）、并发度、重试计数、验收步冻结文件与计划分支合并；<br>3. `completeGraph(spec: GraphSpec): T.TaskGraph` 纯函数在 `task/graph.ts` 一次性算齐分层、阻塞、花费与可执行动作。 | **不再把每个节点伪装成完整生命周期的 `Issue`**：节点执行直接调 `Session`（开分支 worktree 会话、带话、交接合并），不再绕道 `Issue.hire` 造假工单。 | • 模块仍叫 `Task`（`apps/server/src/task`），协议形状仍叫 `T.TaskGraph` / `T.Task`（保持 `StateFrame.graphs` 和 `graph.*` API 契约稳定）；<br>• 调度函数 `cron` 改名为 `advance`（消除与定时任务 `Cron` 的同名异义）；<br>• 帮工自拆工具从 `issue.split` 收归 `graph` / `task` 语义（对外 v1 HTTP 路由可保留别名转发）。 |
+| **`Issue`（工单）** | **主人与工作台的任务单 / 需求契约**：<br>管一张工单从 `backlog → todo → in_progress → in_review → done / canceled` 的状态机、起草（`refine`）、问题（`questions`）、验收标准（`criteria`）、责任指派（`Assignment`）及最终交付（`merged / pull_request / kept / none`）。 | **不管 DAG 内部节点的调度、不给每个 DAG 步骤维护一套残废的 `Issue` 状态机**。 | 当一张 `Issue` 交给配置了 DAG 能力的 Agent 执行（或帮工在执行该 `Issue` 时触发 DAG 拆解）时，**整张 `Issue` 只关联这一个 `TaskGraph`（1:1 关联或作为该 Issue 的执行图）**，而不是在 `issue` 表里裂变出 12 张 `moves: []` 的假子工单。`Issue` 自身的 `statusMove`、`unsent`、`reopen` 彻底删掉针对子工单 `issue.task` 的特判分支。 |
+| **`Session`（帮工会话）** | **Agent 档案的一次持续执行上下文**：<br>持有工作目录/worktree（`Workplace`）、轨迹日志（`Journal`）、Run 记录（`session_run`）、记忆召回与通道对话。既可为一张 `Issue` 服务，也可为 `TaskGraph` 的一个节点（`task`）服务，或为频道私聊服务。 | 不管工单的业务验收；不管 DAG 的拓扑排序。 | `Session.send` 是派发帮工会话的唯一正式入口：`Issue` 开工调 `Session.send`，`Task` 调度节点也直接调 `Session.send`（经 `Session.makeRoom` 共享工作区/项目/农机并发上限），不再让 `Task` 倒过来调 `Issue.hire`。 |
+| **`Executor`（执行器）** | **底层 oar 会话进程/纤程的资源生命周期**：<br>管 `Runtime.resolve`、oar 会话 `spawn`/`send`/`interrupt`/`dispose`、卡死检测（`watchStalls`）与未释放资源占槽。 | 不认识 `Issue`、不认识 `TaskGraph`。 | 保持上一轮已收敛的窄快照边界不变。 |
+
+---
+
+### 5. 代码无法独自证明的原始产品意图与唯一澄清点
+
+#### 代码中缺失的证据（矛盾现场）
+在当前仓库中，关于用户所说的**「专门给 agent 配置的 DAG 能力」**，代码存在两处无法仅靠静态阅读定案的断层：
+1. **配置层断层**：`packages/protocol/src/shapes.ts` 的 `Agent`（第 1203 行）、`apps/server/src/agent/templates/*/agent.json` 以及前端捏帮工页 `apps/web/src/features/agent/AgentPage.tsx` 中，**目前没有任何字段用于给某个 Agent 开启/关闭或配置 DAG 能力**。唯一提到给 Agent 配 `graph` 能力的地方是未实现的提案 `.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md`（`Agent.toolsets`）。
+2. **两套实现的定位断层**：代码里同时躺着：
+   - 一套在 `packages/agent/src/todo.ts` + `runtime/todoStore.ts`（进程内 `vibevalley` 农机专用，带后台 `subagent` 并发跑节点，原名 `agentTask` / `task_graph`，在 `#204` 被改名为 `Todo` / `runtime_todo`，页面不可见）；
+   - 一套在 `apps/server/src/task/task.ts`（跨农机 worktree 派 `Session` 跑节点、带 git 分支检查与合并，被压成了父子 `Issue`，在 `TaskBoard` 和看板展示）；
+   - 以及一篇写了一半的提案 `.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md`（提议把两套合成一个 `Task` 引擎，但仍保留父子工单存储）。
+
+#### 唯一影响架构决策的澄清点
+在动手调整前，只需向用户确认这一个问题：
+
+> **您说的「专门给 agent 配置的 DAG 能力」，在目标形态中指的是哪一种？**
+> - **方向 1（Agent 级多 worktree 拆解编排，去子工单化）**：指现在的 `TaskGraph`（拆图、按依赖开分支派帮工、跑检查合入计划分支），但它应该是**配置在 Agent 档案上的能力**（只有开启了该能力的 Agent / 领班才能把活拆成 DAG 图并驱动执行），且 **DAG 的节点就是 `Task` 节点本身，不再在 `issue` 表和看板上裂变生成一堆父子工单**（工单只挂这张图，看板只看工单，图在计划板/工单详情的图视图里看）；
+> - **方向 2（统一进程内 `todo.ts` 与跨会话 `task.ts` 为单一 Agent DAG 能力）**：不仅去掉父子工单耦合，还要把被改名成 `Todo`（`runtime_todo`）的那套 Agent 内部 DAG 重新与 `Task` 合一，作为 Agent 档案可配置的同一种 DAG 能力（按配置决定节点是派进程内 `subagent` 还是派带 worktree 的 `Session`）。

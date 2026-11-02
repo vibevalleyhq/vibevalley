@@ -2,7 +2,7 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, type OrchestratorState, ownerId, type SessionView } from "@vibevalley/protocol";
+import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, ownerId, type SessionView } from "@vibevalley/protocol";
 import { artifactId as brandArtifactId, blockId as brandBlockId } from "@vibevalley/protocol/schema";
 
 import { tookText } from "@/base/format";
@@ -10,7 +10,7 @@ import { aria, autofocus, Keyed, useNow } from "@/base/util";
 import { ArtifactCanvas, type QuoteTarget } from "@/features/artifact";
 import { useAgent, useOrchestrators } from "@/infra/agents";
 import { api } from "@/infra/api";
-import { orchestratorMood, useCore } from "@/infra/frame";
+import { orchestratorMood, orchestratorSession, type OrchestratorMood, useCore } from "@/infra/frame";
 import { ready, useAgents } from "@/infra/query";
 import { useRouter } from "@/infra/router";
 import { useIntents } from "@/state/intent";
@@ -635,7 +635,7 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
   );
 }
 
-const mood: Record<OrchestratorState, string> = {
+const mood: Record<OrchestratorMood, string> = {
   idle: t("web.channel.mood.idle"),
   listening: t("web.channel.mood.listening"),
   thinking: t("web.channel.mood.thinking"),
@@ -711,7 +711,7 @@ function Members(props: { channel: Channel }) {
   const helpers = () => {
     if (props.channel.type === "direct") return [];
     const fallback = defaultOf(core()?.chat)?.id;
-    return (core()?.sessions ?? []).filter((h) => (h.channel ?? fallback) === props.channel.id);
+    return (core()?.sessions ?? []).filter((h) => h.role === "worker" && (h.channel ?? fallback) === props.channel.id);
   };
   return (
     <aside
@@ -767,9 +767,12 @@ function Members(props: { channel: Channel }) {
 function OrchestratorLine(props: { agent: string }) {
   const core = useCore();
   const profile = useAgent(() => props.agent);
-  const now = (): OrchestratorState => orchestratorMood(core(), props.agent);
+  const now = (): OrchestratorMood => orchestratorMood(core(), props.agent);
   const clock = useNow();
-  const since = () => core()?.orchestrators[props.agent]?.since;
+  const since = () => {
+    const phase = orchestratorSession(core(), props.agent)?.phase;
+    return phase?._tag === "working" ? phase.since : undefined;
+  };
   return (
     <div
       data-testid="channel-orchestrator-line"

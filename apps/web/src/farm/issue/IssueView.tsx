@@ -117,11 +117,11 @@ function PlotDetail(props: { session: SessionView; onDone: () => void }) {
               : undefined
           }
           onNavigate={() => router.navigate(`/issues/${encodeURIComponent(id())}`)}
-          onTask={
-            props.session.graph
+          onParent={
+            i().parent
               ? () => {
-                  const graph = props.session.graph;
-                  if (graph) farm.openTaskBoard(graph.id);
+                  const parent = i().parent;
+                  if (parent) router.navigate(`/issues/${encodeURIComponent(parent)}`);
                   props.onDone();
                 }
               : undefined
@@ -140,7 +140,7 @@ function IssueBody(props: {
   onClose: (s: Session) => void;
   onThread?: (() => void) | undefined;
   onNavigate: () => void;
-  onTask?: (() => void) | undefined;
+  onParent?: (() => void) | undefined;
 }) {
   const frames = useFrames();
   const now = useNow();
@@ -157,7 +157,7 @@ function IssueBody(props: {
     told: (title, description) => toasts.add({ type: ToastType.info, title, description }),
   });
   const { busy, text, setText, box, go } = acts;
-  const s = createMemo(() => issueState(props.issue, props.sessions, props.session, frames.frame?.graphs ?? []));
+  const s = createMemo(() => issueState(props.issue, props.sessions, props.session, frames.frame?.state.issues ?? []));
   const changes = useIssueChanges(
     () => props.issue.id,
     () => s().showsChanges,
@@ -331,8 +331,8 @@ function IssueBody(props: {
           <Show when={s().doing}>
             <p class={[body, "text-water-500"]}>{s().doing}</p>
           </Show>
-          <Show when={s().inTask}>
-            <p class={xs}>{s().taskText}</p>
+          <Show when={s().inFamily}>
+            <p class={xs}>{s().parentText}</p>
           </Show>
           <Show when={s().criteria.length > 0} fallback={<p class={xs}>{t("web.farm.plot.noCriteria", { answer: props.issue.deliver === "answer" })}</p>}>
             <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.reviewedAt === undefined} />
@@ -427,7 +427,7 @@ function IssueBody(props: {
                   <p class={body}>{s().crewLine}</p>
                 </Row>
               </Show>
-              <Show when={!s().inTask}>
+              <Show when={!s().inFamily}>
                 <Row label={t("web.farm.plot.deliver")}>
                   <div class="flex flex-wrap items-center gap-1.5" data-testid="plot-deliver" data-value={deliver().value} data-state={deliver().state}>
                     <For each={DeliverableValues}>
@@ -499,9 +499,9 @@ function IssueBody(props: {
                     {t("web.farm.plot.thread")}
                   </PxButton>
                 </Show>
-                <Show when={s().inTask && props.onTask}>
-                  <PxButton size="sm" onClick={() => props.onTask?.()}>
-                    {t("web.farm.plot.graph")}
+                <Show when={s().inFamily && props.onParent}>
+                  <PxButton size="sm" onClick={() => props.onParent?.()}>
+                    {t("web.issue.family.parent")}
                   </PxButton>
                 </Show>
               </div>

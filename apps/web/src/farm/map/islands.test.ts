@@ -124,6 +124,6 @@ describe("the yard", () => {
     expect(mapPose(hired("a", "p", { _tag: "working", since: 0, doing: { action: "thinking", label: "" } }))).toBe("think");
     expect(mapPose(hired("a", "p", { _tag: "done" }))).toBe("cheer");
     expect(mapPose(hired("a", "p", { _tag: "failed" }))).toBe("worry");
-    expect(mapPose(hired("a", "p", { _tag: "resting" }, 0, { conflict: { base: "main", files: ["a.ts"] } }))).toBe("worry");
+    expect(mapPose(hired("a", "p", { _tag: "resting" }), true)).toBe("worry");
   });
 });

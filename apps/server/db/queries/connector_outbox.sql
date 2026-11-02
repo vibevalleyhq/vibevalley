@@ -5,7 +5,11 @@ insert into connector_outbox (id, connector, message_id, body, created_at) value
 
 -- name: PendingOutbox :many
 -- bound: only what waits; each is sent or dropped.
-select id, body from connector_outbox where connector = sqlc.arg(connector) and state = 'pending' order by id;
+select id, body, message_id from connector_outbox where connector = sqlc.arg(connector) and state = 'pending' order by id;
+
+-- name: DropPendingOutboxForMessage :exec
+update connector_outbox set state = 'dropped', error = 'withdrawn'
+where message_id = sqlc.arg(message_id) and state = 'pending';
 
 -- name: CountPendingOutbox :one
 select count(*)::int as n from connector_outbox where connector = sqlc.arg(connector) and state = 'pending';

@@ -230,7 +230,6 @@
   },
   "names": {
     "issueThread": "Ticket thread",
-    "planThread": "Plan {id}",
     "talkThread": "{who}'s thread",
     "thread": "Thread",
     "mention": {

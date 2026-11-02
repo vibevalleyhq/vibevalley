@@ -11,7 +11,7 @@ import { promptAndWait } from "@botiverse/oar/observe";
 import { NodeServices } from "@effect/platform-node";
 import { Clock, Effect, Fiber, FiberHandle, Option, Predicate, Queue, Schema, Stream } from "effect";
 
-import { type BrainEvent, makeBrain, standaloneOwner } from "@vibevalley/agent/brain";
+import { type BrainEvent, makeBrain } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
 import { readMcpConfig } from "@vibevalley/agent/mcp";
 import { userMessage } from "@vibevalley/agent/messages";
@@ -21,10 +21,8 @@ import { t, currentLocale } from "@vibevalley/i18n";
 import { modelClient } from "@/agent/model.ts";
 import { messageOf } from "@/errors.ts";
 import { loadConfig } from "@/infra/config.ts";
-import { wallTime } from "@/infra/time.ts";
 import { dshRuntime } from "@/runtime/dsh.ts";
 import { registryOf } from "@/runtime/runtime.ts";
-import { vibevalleyRuntimeOf } from "@/runtime/vibevalley.ts";
 
 import { standaloneLlm } from "./llm.ts";
 import { instructions } from "./prompts.ts";
@@ -207,17 +205,7 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
   id === "vibevalley"
     ? ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) })
     : Effect.gen(function* () {
-        const config = yield* loadConfig().pipe(Effect.provide(NodeServices.layer));
-        const service = standaloneLlm();
-        const registry = registryOf([
-          vibevalleyRuntimeOf({
-            home: () => config.home,
-            llm: (model) => modelClient(model, config.deepseek.apiKey, service),
-            time: wallTime,
-            owner: standaloneOwner(),
-          }),
-          dshRuntime,
-        ]);
+        const registry = registryOf([dshRuntime]);
         const runtime = registry.get(id);
         if (!runtime) return yield* Effect.fail(t("server.cli.chat.noRuntime", { id }));
         const installation = runtime.installation;

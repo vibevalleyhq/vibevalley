@@ -318,7 +318,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                   {(taken) => {
                     const h = () => taken().session;
                     const cast = () => castOf(agents().get(h().agent)?.look, h().agent);
-                    const pose = () => mapPose(h());
+                    const pose = () => mapPose(h(), taken().issue?.conflict !== undefined);
                     const body = () => props.atlas.get(castSprite(cast(), pose(), has));
                     const bed = () => props.atlas.first([cropSprite(taken().plot.crop), "plot-seeded"]);
                     const visit = () => go(router.navigate, h().id);

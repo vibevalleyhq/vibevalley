@@ -1,9 +1,10 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { IssueStatusValues, type Issue, type IssueStatus, type TaskGraph } from "@vibevalley/protocol";
+import { IssueStatusValues, type Issue, type IssueStatus } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
-import { isRefined, issueInTask } from "./issue";
+import { buildCards } from "./cards";
+import { isRefined } from "./issue";
 import { laneOf, lanes, laneStatus, moveOf, ownStatus } from "./lanes";
 import { stageOf } from "./stages";
 import { issueTag } from "./tags";
@@ -69,13 +70,13 @@ describe("moves between lanes", () => {
 });
 
 describe("titles", () => {
-  const graph = { id: "g1", title: "Paging" } as TaskGraph;
+  const parent = issue({ id: issueId("g1"), title: "Paging" });
 
-  test("the first line, the id when empty, the graph's title before a step", () => {
+  test("the first line, the id when empty, the parent's title before a child", () => {
     expect(issueTitle(issue({ title: "  Fix login\nmore words" }))).toBe("Fix login");
     expect(issueTitle(issue({ title: "  " }))).toBe("i1");
-    expect(issueTitle(issue({ title: "Add a cursor", parent: issueId("g1") }), [graph])).toBe("Paging · Add a cursor");
-    expect(issueTitle(issue({ title: "Add a cursor", parent: issueId("g9") }), [graph])).toBe("Add a cursor");
+    expect(issueTitle(issue({ title: "Add a cursor", parent: issueId("g1") }), [parent])).toBe("Paging · Add a cursor");
+    expect(issueTitle(issue({ title: "Add a cursor", parent: issueId("g9") }), [parent])).toBe("Add a cursor");
   });
 });
 
@@ -86,8 +87,16 @@ test("refined: a description or criteria, not just a title", () => {
   expect(isRefined(issue({ criteria: [] }))).toBe(false);
 });
 
-test("in a task: by its graph, its parent, its session's graph, or a merge into its parent", () => {
-  expect(issueInTask(issue({}), undefined)).toBe(false);
-  expect(issueInTask(issue({ parent: issueId("g1") }), undefined)).toBe(true);
-  expect(issueInTask(issue({ delivered: "merged_into_parent" }), undefined)).toBe(true);
+test("regression: a parent without sessions keeps its review lane and unsent children remain visible", () => {
+  const parent = issue({ id: issueId("parent"), status: "in_review" });
+  const child = issue({ id: issueId("child"), parent: parent.id, status: "backlog" });
+  const cards = buildCards(
+    [parent, child].map((issue) => ({ issue, sessions: [], missingSessions: [] })),
+    undefined,
+    new Set(),
+  );
+  expect(cards.map((card) => [card.id, card.kind, card.lane])).toEqual([
+    [parent.id, "family", "waiting"],
+    [child.id, "todo", "todo"],
+  ]);
 });

@@ -517,7 +517,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     const store = farmState();
     if (!frame) return;
     const { state, view } = frame;
-    const present = new Map(state.sessions.map((s) => [s.id, s]));
+    const present = new Map(state.sessions.filter((s) => s.role === "worker").map((s) => [s.id, s]));
     // What is under a still pointer is found again as things move under it.
     if (pointerAt && !downOn) setHover(hitAt(pointerAt));
     const hovered = store.hoverBed;
@@ -557,7 +557,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     const counts = new Map<string, number>();
     const crowd = (key: string) => counts.get(key) ?? 0;
     let queued = 0;
-    for (const s of [...state.sessions].toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+    for (const s of state.sessions.filter((s) => s.role === "worker").toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
       const station = stationOfSession(s);
       const crop = cropOf(s);
       const pose = poseOf(s, crop);

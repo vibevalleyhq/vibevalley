@@ -2,6 +2,8 @@ import type * as T from "@vibevalley/protocol";
 import { executionsOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { sessionOf } from "@/session/roster.ts";
+
+import { awaitsPullRequest } from "./followup.ts";
 const move = (act: T.IssueAct, status: T.IssueStatus, words: T.ActWords = "none"): T.IssueAction => ({ act, does: "move", status, words });
 const say = (act: T.IssueAct): T.IssueAction => ({ act, does: "say" });
 const stop: T.IssueAction = { act: "stop", does: "stop" };
@@ -9,8 +11,6 @@ const close = move("close", "canceled");
 
 /** session is the issue's newest one, undefined while none is on the farm. A task graph's issues stand with the graph: the owner acts on them there. */
 export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.IssueStage {
-  const followed = t.graph !== undefined || t.task !== undefined || t.parent !== undefined || session?.graph !== undefined;
-  const own = (s: T.IssueStage): T.IssueStage => (followed ? { state: s.state, ...at(s.since), ...(s.stuck ? { stuck: s.stuck } : {}), acts: [] } : s);
   const last = session?.lastRun;
   // Completing follows what the issue delivers, not who did the work: an answer is taken (知道了), a change completed
   // (merged, or kept on its branch).
@@ -20,33 +20,25 @@ export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.Issu
   const reopen = sent ? move("reopen", "todo", "required") : move("reopen", "backlog");
   switch (t.status) {
     case "done":
-      return own({ state: "done", ...at(t.closedAt), acts: t.delivered === "merged_into_parent" ? [] : [reopen] });
+      return { state: "done", ...at(t.closedAt), acts: t.delivered === "merged_into_parent" ? [] : [reopen] };
     case "canceled":
-      return own({ state: "canceled", ...at(t.closedAt), lead: "reopen", acts: [reopen] });
+      return { state: "canceled", ...at(t.closedAt), lead: "reopen", acts: [reopen] };
     case "backlog":
-      if (t.task?.state === "waiting") return own({ state: "queued", since: t.createdAt, acts: [] });
-      return own(
-        t.refining
-          ? { state: "draft", since: t.createdAt, acts: [] }
-          : { state: "draft", since: t.createdAt, lead: "start", acts: [move("start", "todo"), close] },
-      );
+      return t.refining
+        ? { state: "draft", since: t.createdAt, acts: [] }
+        : { state: "draft", since: t.createdAt, lead: "start", acts: [move("start", "todo"), close] };
     case "todo":
-      return own({ state: "queued", since: t.queuedAt ?? t.createdAt, acts: [close] });
+      return { state: "queued", since: t.queuedAt ?? t.createdAt, acts: [close] };
     case "in_progress": {
+      if (awaitsPullRequest(t, session)) return { state: "working", ...at(last?.at), lead: "tell", acts: [say("tell"), close] };
       // Run by no session on the farm: nobody to tell or stop from here; it can still be closed.
-      if (!session && t.lastRun) return own({ state: "working", ...at(t.lastRun.startedAt), acts: [close] });
+      if (session?.phase._tag !== "working") return { state: "working", ...at(t.lastRun?.startedAt ?? t.createdAt), acts: [close] };
       const phase = session?.phase;
       if (phase?._tag === "working" && phase.quietSince !== undefined)
-        return own({ state: "stuck", stuck: "quiet", since: phase.quietSince, lead: "stop", acts: [stop, say("tell"), close] });
-      return own({ state: "working", ...at(phase?._tag === "working" ? phase.since : undefined), acts: [say("tell"), stop, close] });
+        return { state: "stuck", stuck: "quiet", since: phase.quietSince, lead: "stop", acts: [stop, say("tell"), close] };
+      return { state: "working", ...at(phase?._tag === "working" ? phase.since : undefined), acts: [say("tell"), stop, close] };
     }
     case "in_review": {
-      if (followed)
-        return own({
-          state: t.task?.state === "failed" ? "stuck" : "reviewing",
-          ...(t.task?.state === "failed" ? { stuck: "failed" as const } : {}),
-          acts: [],
-        });
       // Run by no session on the farm (an in-process agent's): its latest run says how it ended. A failed one cannot be taken
       // as done; another round is the issue moved back to todo.
       if (!session && t.lastRun) {
@@ -59,7 +51,7 @@ export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.Issu
       }
       const since = last?.at;
       // Stuck, moving it back to todo with no words is the server's own for why: settle the conflict, mend, go on.
-      if (session?.conflict) return { state: "stuck", stuck: "conflict", ...at(since), lead: "resolve", acts: [move("resolve", "todo"), say("tell"), close] };
+      if (t.conflict) return { state: "stuck", stuck: "conflict", ...at(since), lead: "resolve", acts: [move("resolve", "todo"), say("tell"), close] };
       if (t.questions.length > 0) return { state: "asking", ...at(since), lead: "answer", acts: [say("answer"), close] };
       // An answer issue's round that handed back no answer it could read did not get it done either.
       const unread = t.deliver === "answer" && last?.outcome === "completed" && last.answer === undefined;

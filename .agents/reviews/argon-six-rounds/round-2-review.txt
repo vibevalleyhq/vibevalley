@@ -1,0 +1,27 @@
+模型：opencode-go/gemini-4-argon
+会话：ses_e69d7fcd7ffei46xqVUD5nDmzg
+
+### 第 2 轮复审结论
+
+**未发现覆盖损失、伪造替身、角色越界或跨 Scope 状态泄漏问题（0 项必须修正）。**
+
+逐项核查结论如下：
+
+1. **彻底消除了替身机制而非换名**：
+   - `task.ts` 已删除 `TaskWork`、`TaskGit`、`TaskOptions` 及 `make` 导出，`Task.layer` 改为无参静态层，内部直接调用 `Issue`、`Session`、`Project`、`Runtime` 四个正式服务。
+   - `flows/task-control.test.ts` 不再手搓任何 `core.apply({ type: "hired" | "run" | "report" | "left" })` 事实，全部经 `scriptedRuntime` + 真实 Git worktree + `Session` / `Executor` / `Issue` / `Project` 走通。
+
+2. **原测试覆盖与回归断言完整保留**：
+   - 16 项流程测试（坏 payload 解码、菱形图并行与合并、验收先行与冻结保护、失败打回/重试/跳过、3 个 `regression: a refused ... retry`、环路打回修复、真实重启恢复、无会话回报时的 `comeBack` 重启文案、6 个动作在数据库保存失败时的零副作用回滚）与 `task/prompts.test.ts` 的纯规则测试一一对应，无任何断言弱化。
+   - 3 个 `regression` 拒绝测试通过包装 `base.session` 的 `prompt` 对已有 `cwd` 抛出 `new Error("delivery rejected")`，经真实 `Executor.deliver` → `Session.deliver` 包装为 `refused` 返回给 `Task`，同时验证了错误原因传播、`attempts` 计数不变及 `task_failed` 事件记录。
+
+3. **触发原因 `{ kind: "task" }` 与角色边界完整保留**：
+   - `task.ts` 中全部 4 处 `live.deliver`（规划师重试 `L220`、规划师改图 `L228`、步骤打回 `L287`、暂停继续 `L421`、手动重试 `L647`）以及 2 处 `issues.hire`（`L254`、`L512`）均显式传入 `{ kind: "task" }`。
+   - `actsForOwner` 角色守卫（`start`、`merge`、`editTask` 的 `orchestrator(true)` 与 `owner`）全部按原样验证。
+
+4. **恢复测试跨两次 farm Scope 的 `driver` 状态准确性**：
+   - 在 `a graph working when the farm stopped is paused, and goes on when resumed`（`L380-413`）中，两次 `run(..., config, driver)` 共享同一个 `driver`：
+     - 第一次 `run` 启动 `slow` 时，`steps.set(cwd, "slow")` 且 `attempts.get("slow") === 1`，随后在 `L83` 挂起等待 `turn.signal` 的 `abort`；退出第一次 `run` 的 `Scope` 时，`Session` / `Executor` finalizer 中断底层会话，触发 `abort` 结束第 1 轮。
+     - 第二次 `run` 在同一 `config`（磁盘 DB 与同一 `worktree` 路径 `cwd`）上启动，`agentSessionsStart`（`Session.restore`）将 `w1` 恢复到 `resting` 并产生 `interrupted` 汇报；当调用 `f.tasks.act(id, "resume", owner)` 时，`resumeWorking` 发送 `接着把这一步做完：步骤 slow`（不含首次派工标题正则），`driver` 通过 `steps.get(cwd)` 准确识别出仍是 `"slow"` 步骤，并将 `attempts` 推进到 `n = 2`，跳过 `if (id === "slow" && n === 1)` 分支，在真实 worktree 下写入 `steps/slow.txt`、提交并完成合并。跨 Scope 的状态衔接严密准确。
+
+可以直接进入第 3 轮。

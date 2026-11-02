@@ -1,0 +1,102 @@
+模型：opencode-go/gemini-4-argon
+会话：ses_e69d7fcd7ffei46xqVUD5nDmzg
+
+### 第 3 轮审计与方案：彻底消除 `graphView()` / `taskView()` 空值占位，且**不新增 `TaskGraphView` / `TaskView` 平行类型**
+
+#### 一、真实消费点核验与对「新增 `TaskGraphView`」的反证
+
+核查全仓 `T.TaskGraph`、`T.Task`、`StateFrame.graphs`、`graph.list`、`graph.get` 的全部消费点后，得出一个关键事实：
+
+1. **`TaskGraph` 与 `Session` / `Cron` 在持久化架构上根本不同**：
+   - `Session` 和 `Cron` 直接存在于 `WorkspaceState.sessions` 和 `WorkspaceState.crons` 中（`Session` 会原样写进 `state.json`，`FactHired` / `FactCron` 也在 `reduce.jsonl.gz` 中记录）。因此它们必须有不含展示文案的 `Session` / `Cron` 和出帧填文案的 `SessionView` / `CronView`。
+   - **而 `TaskGraph` 根本不在 `WorkspaceState` 里，也从不写进 `state.json` 或 `Fact`！**
+   - 计划的持久化形态是 `WorkspaceState.issues` 里的父子 `T.Issue`（存 `IssueGraph` 和 `IssueTask`，两者本来就只有纯领域字段，没有任何文案字段）。
+   - `T.TaskGraph` 本身就是由 `graphsOf(state)`（`apps/server/src/task/issues.ts:9-70`）从 `Issue[]` 现算出来的聚合结构，只用于三个出口：
+     1. `StateFrame.graphs`（给页面）
+     2. `graph.list` / `graph.get`（给 CLI / HTTP 调用方）
+     3. 服务端 `task/`、`inbox/`、`orchestrator/` 内部读取
+2. **为什么会出现 `graphView()` / `taskView()` 空值占位？**
+   - 因为现在的派生计算被**人为劈成了两半**：
+     - 一半在 `task/issues.ts` 的 `graphFrom`（第 51–61 行）算了 `settled`、`blockedBy`、`layers`、`asksForYou`、`spent`，却对 `stateTag`、`actions`、`actionText`、`stateText`、`canEdit`、`canRemove` 调用了 `...graphView()` 和 `...taskView()` 塞假空值；
+     - 另一半又跑到 `projection/frame.ts`（第 24–39 行）把 `graphsOf(state)` 遍历一遍，填入 `stateTag`、`actions`、`actionText`、`stateText`、`canEdit`、`canRemove`。
+   - 这导致两个荒谬后果：
+     - **Bug 级不一致**：通过 HTTP / CLI 调 `graph.list` 或 `graph.get`（`handlers.ts:256-257` 调 `tasks.graphs` / `tasks.graph`），拿到的 `TaskGraph` 未经过 `frame.ts`，里面的 `stateTag`、`actions`、`actionText`、`stateText`、`canEdit`、`canRemove` **全都是 `""`、`[]`、`{}`、`false` 假空值**！
+     - 服务端在 `task.ts`（`split`、`splitIssue`）、`editing.ts`（`freshTask`）和所有测试里构造还没落库的草稿图时，因为共用 `T.TaskGraph` / `T.Task` 类型，被迫到处写 `...graphView()` / `...taskView()`。
+3. **反证：如果新增 `TaskView` / `TaskGraphView` 会怎样？**
+   - 会在 `shapes.ts` 和 `schema.ts` 新增 2 个接口 + 2 个 Schema，净增约 60 行协议代码，且 `graph.list` / `graph.get` 仍需改返回类型。这违反了「不净增概念」的原则。
+
+---
+
+#### 二、更好的消除方案：合一派生出口 + 内部写模型收窄（净删概念、零协议膨胀）
+
+**核心思想**：`T.TaskGraph` 和 `T.Task` 就是完整的计划读取形状（含 `actions` 和文案），**在 `graphFrom`（`task/issues.ts`）一处一次性算齐全部派生字段**；而服务端内部在 `putTask` 之前构造/编辑的写模型，用窄类型（或直接在 `graphFrom` 生成派生字段），彻底删除 `graphView()` 和 `taskView()`！
+
+##### 1. 在 `apps/server/src/task/issues.ts` 的 `graphFrom` 中一次算齐，`projection/frame.ts` 直接调 `graphsOf(state)`
+- 将原本散落在 `projection/frame.ts:15-39` 的 `graphActionText()`、`stateTag`、`actions`、`stateText`、`actionText`、`canEdit`、`canRemove` 移入 `task/issues.ts` 的 `graphFrom`（与原本就在 `graphFrom` 第 51–61 行的 `settled`、`blockedBy`、`layers`、`asksForYou`、`spent` 放在一起）。
+- **收益 1**：`apps/server/src/projection/frame.ts` 的第 15–40 行直接简化为一行：
+  ```ts
+  export function frameOf(state: WorkspaceState, effects: GameEffect[] = [], seq = 0): StateFrame {
+    return { seq, state: withWords(state), inbox: inbox(state), graphs: graphsOf(state), view: viewOf(state), effects };
+  }
+  ```
+- **收益 2**：`graph.list` 和 `graph.get`（`tasks.graphs()` / `tasks.graph(id)`）返回的 `TaskGraph` 自动带齐真实的 `actions`、`stateTag`、`stateText`、`canEdit`、`canRemove`，消除了此前 CLI / HTTP 调 `graph.get` 拿到空 `actions: []` 和空 `stateTag: ""` 的缺陷！
+- **收益 3**：完全不 touched `state.json` 和 `reduce`（因为 `graphsOf` 只在读取 / 出帧时从 `state.issues` 派生，从不写回 `WorkspaceState`）。
+
+##### 2. 删除 `graphView()` 和 `taskView()`，收窄服务端内部的写/编辑入参
+为什么 `editing.ts`、`task.ts`、`issue.test.ts` 之前要调 `...graphView()` 和 `...taskView()`？因为 `Issue.putTask(graph)`、`editTask`、`freshTask` 把入参类型写成了完整的 `T.TaskGraph` / `T.Task`，而实际上 `graphIssues(graph, before, now)`（`task/issues.ts:78-143`）在把计划拆成 `Issue[]` 落库时，**根本不读**任何派生字段（不读 `stateTag`、`actionText`、`actions`、`layers`、`asksForYou`、`settled`、`blockedBy`、`stateText`、`canEdit`、`canRemove`）！
+- 在 `apps/server/src/task/graph.ts` 中：
+  - **彻底删除 `taskView` 和 `graphView` 两个函数**（第 7–23 行）。
+  - 将内部写操作接收的类型定义为不含派生视图字段的领域输入（或将 `T.Task` / `T.TaskGraph` 的派生字段在内部写模型中通过 `withGraphView(draft)` 纯函数在 `freshTask` / 构建处计算，或者更直接：定义服务端内部类型 `TaskNode` / `GraphSpec`，或者让 `Issue.putTask`、`graphIssues`、`editTask`、`removeTask` 接收无需派生字段的结构）。
+  - **更干净的做法（连内部窄类型都不必多套一层）**：
+    看哪些函数真的构造了 `Task` 或 `TaskGraph`：
+    1. `freshTask(draft: T.TaskDraft)`（`editing.ts:7`）
+    2. `graphFrom(parent, issues)`（`issues.ts:9`）
+    3. `task.ts` 中的 `split`（第 491 行）和 `splitIssue`（第 531 行）
+    4. 测试中的 4 处 `putTask({ ... })` fixture
+    如果把 `graphFrom` 里补齐派生字段的纯函数抽成 `task/graph.ts` 的 **`completeGraph(spec): T.TaskGraph`**（给定 `{ id, title, goal, project, branch?, state, parallel, createdAt, note, tasks: TaskSpec[] }`，算出真正的 `layers`、`blockedBy`、`settled`、`asksForYou`、`spent`、`actions`、`stateTag`、`stateText`、`canEdit`、`canRemove`），那么：
+    - 没有任何地方塞假空值 `""` / `[]`；
+    - `Issue.putTask` 接收 `GraphSpec`（只含持久化所需的领域字段：`id, title, goal, project, branch?, state, parallel, createdAt, note, tasks: TaskSpec[]`），`T.TaskGraph`（即 `GraphSpec` 的子类型）自然可以直接传给 `putTask`！
+    - `task.ts` 的 `split`、`splitIssue` 以及测试里的 `issues.putTask({ id: "p1", title: ..., tasks: [freshTask(...)] })` **直接不写 `...graphView()` 和 `...taskView()`**，就能直接传给 `put` / `putTask`！
+
+---
+
+#### 三、逐文件改动清单
+
+1. **`apps/server/src/task/graph.ts`**：
+   - 删除 `taskView` 与 `graphView`（第 7–23 行）。
+   - 导出 `TaskSpec`（`Omit<T.Task, "blockedBy" | "stateText" | "actions" | "actionText" | "canEdit" | "canRemove">`）与 `GraphSpec`（`Omit<T.TaskGraph, "stateTag" | "actionText" | "actions" | "layers" | "asksForYou" | "spent" | "settled" | "tasks"> & { readonly tasks: readonly TaskSpec[] }`）；由于 `T.Task extends TaskSpec`、`T.TaskGraph extends GraphSpec`，任何拿 `T.TaskGraph` 的地方都能无缝赋给 `GraphSpec`。
+   - 将 `graphProblems`、`graphActions`、`taskActions`、`canEditTask`、`canRemoveTask`、`blockedBy`、`isSettled`、`allSettled`、`withTask`、`taskOf`、`graphSpent`、`asksForYou`、`acceptanceChecks`、`frozenOf`、`frozenTouched`、`readyTasks`、`startable` 的参数类型放宽为 `GraphSpec` / `TaskSpec`。
+2. **`apps/server/src/task/issues.ts`**：
+   - `graphFrom` 直接构造含真实 `settled`、`blockedBy`、`layers`、`asksForYou`、`spent`、`stateTag`、`actionText`、`actions`、`stateText`、`canEdit`、`canRemove` 的完整 `T.TaskGraph`，删除 `...graphView()` 和 `...taskView()`。
+   - `graphIssues` 的第一个参数类型改为 `GraphSpec`。
+3. **`apps/server/src/projection/frame.ts`**：
+   - 删除第 15–39 行的 `graphActionText` 和 `graphs` 二次 map 循环，直接写 `graphs: graphsOf(state)`。
+4. **`apps/server/src/task/editing.ts`**：
+   - `freshTask(draft: T.TaskDraft): TaskSpec` 删除 `...taskView()`。
+   - `editTask` 和 `removeTask` 接收 `GraphSpec` 返回 `EditResult`（`graph: GraphSpec`）。
+5. **`apps/server/src/issue/issue.ts` 与 `apps/server/src/task/task.ts`**：
+   - `Issue.putTask` 参数改为 `GraphSpec`；`Task.put` / `putSystem` 参数改为 `GraphSpec`。
+   - `task.ts` 第 501、541 行删除 `...graphView()`。
+6. **测试文件清理**：
+   - `apps/server/src/issue/issue.test.ts`（第 25、176、634 行）、`apps/server/src/task/lifecycle.test.ts`（第 18、53、110 行）、`apps/server/src/flows/task-control.test.ts`（第 19、428、453 行）全部删除 `graphView` 导入与 `...graphView()` 调用。
+
+---
+
+#### 四、纯规则、黄金数据与行为验收
+
+1. **黄金数据影响核查**：
+   - `apps/server/src/core/golden.test.ts`：
+     - `reduce.jsonl.gz`：`inbox(next)` 读 `graphsOf(state)` 的 `id`、`title`、`createdAt`、`state`、`tasks`，不受 `graphFrom` 补齐 `stateTag`/`actions` 影响；`viewOf(next)` 不读 `graphsOf`。因此 `reduce.jsonl.gz` **零变化**。
+     - `play.jsonl.gz`：测试直接把 JSON 反序列化的 `input.task` 传给 `graphProblems`、`layersOf`、`readyTasks`、`asksForYou`、`graphSpent`、`graphText`、`blockedBy`、`acceptanceChecks`、`graphChanges`，输出完全不变，**零变化**。
+   - `apps/server/src/task/recorded.test.ts`（`task/testdata/rules.jsonl.gz`）：
+     - **唯一变化点**：第 19 行 `split` case 的 `parseSplit` 返回 `tasks: got.tasks`（原先每个 task 带着 `taskView()` 塞的 6 个空假字段：`stateText: ""`、`blockedBy: []`、`actions: []`、`actionText: {}`、`canEdit: false`、`canRemove: false`），以及第 31–32 行 `editTask` / `removeTask` 新增节点时不再塞这 6 个假空值字段。运行 `vp run golden:update task` 更新 `task/testdata/rules.jsonl.gz` 并核对 diff 只少掉这 6 个空占位键。
+2. **页面与接口行为保持**：
+   - `StateFrame.graphs` 的 JSON 载荷与改动前 **100% 字节级一致**，工作台 `TaskDetail.tsx` 与像素农场 `TaskBoard.tsx` 的按钮、文案、状态标签零变化。
+   - `graph.list` 与 `graph.get` 接口返回的值从原先的「空字符串占位」升级为「与 `StateFrame.graphs` 一致的真实文案与可执行动作」。
+3. **验证命令**：
+   ```bash
+   vp run golden:update task
+   vp run server:check
+   vp run web:check
+   vp run deadcode
+   ```

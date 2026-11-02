@@ -123,8 +123,8 @@ const make = Effect.gen(function* () {
     Stream.runForEach(transitions, ({ before, fact, after }) =>
       Effect.gen(function* () {
         if (fact.type === "progress") return;
-        if (fact.type === "report") yield* soon;
-        if (fact.type === "hired") {
+        if (fact.type === "sessionReport") yield* soon;
+        if (fact.type === "session" && fact.session.role === "worker") {
           const wish = wanted;
           wanted = undefined;
           if (wish && wish.until > fact.at) yield* core.apply({ type: "station", id: fact.session.id, station: wish.station });

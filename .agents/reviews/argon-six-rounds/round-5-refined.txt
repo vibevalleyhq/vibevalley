@@ -1,0 +1,97 @@
+模型：opencode-go/gemini-4-argon
+范围：第4轮测试修正复核、第5轮保留HTTP兜底的执行方案。
+
+### 一、核验第 4 轮测试修正：`orchestrator.test.ts` 的 `hears a send key once`
+
+**结论：完全符合 `Brain` 与 `agentLoop`「单轮循环可合并消费多条入队输入」的语义，且消除了全套并发下的竞态假超时。**
+
+- **原写法超时的根因**：`orchestrator.say` 与 `orchestrator.heard` 均经 `fire(b.send(...))` 异步投递。全套测试高负载时，第二条不同键的输入（`"电话里问一句"`，`k2`）往往在第一条（`"地里怎么样"`，`k1`）的 `agentLoop` 尚未结算前就进入了 `queued` 队列；`Brain` 在同一轮或紧接着的循环中一次性排空 `queued` 并把两条用户消息放进同一次模型请求里回答，因此管家只会产出一个回合答复（1 条频道消息），原测试死等 2 条频道消息必然超时。
+- **新写法的严密性**：
+  1. `until` 等待两条唯一输入都出现在 `f.requests` 的模型请求上下文里；
+  2. `yield* marked(f)` 发送屏障消息并等待其回答落盘，确保前面 4 次调用（`k1`×2、`k2`×2）若有任何重复穿透，必定在屏障回合前已进入会话历史；
+  3. 对 `f.requests.at(-1)!.messages`（屏障回合发给模型的完整会话历史）严格计数 `expect(heard).toEqual({ 地里怎么样: 1, 电话里问一句: 1 })`，既证明了 `k1`、`k2` 各自精确去重为 1 次，又证明了没有丢消息。
+
+---
+
+### 二、第 5 轮方案（校正版）：消除 `BlockEditor` 的 `polls` 假时钟与残缺 `held` 集合，保留 HTTP Polling Fallback
+
+候选 2（将 `reading.ts` 合入 `marks.ts` 消除循环依赖并直接复用 `setMark` 的 `say` 回调）按指示留待下一轮；本轮聚焦 **候选 1 的最小安全改动**。
+
+#### 1. 净消除的状态 vs 必须保留的状态
+
+- **删除的状态与常量（假时钟）**：
+  - 删除 `busyPolls = 4`、`writingPolls = 3`
+  - 删除 `private polls = 0`（以及 `receive`、`refresh` 里的 `this.polls++`）
+- **替换 / 升级的状态（真实时间 + 完整暂存块）**：
+  - 新增时间窗口常量：`const busyMs = 4000;`（原 `4 * 1000ms`）、`const writingMs = 3000;`（原 `3 * 1000ms`）。
+  - `EditBlock.heardAt?: number` 与 `BlockEditor.heardAt?: number` 改为存真实时间戳（`Date.now()`）。
+  - 新增单一到期定时器 `private writingTimer?: ReturnType<typeof setTimeout>`：在最早一个未到期的 `this.heardAt + busyMs` 或 `b.heardAt + writingMs` 时刻触发 `this.changed()` 并重算下一次到期（若还在 `live === false` 且 `othersWriting` 刚结束，同步触发 `this.cron()` 切回慢轮询），`dispose()` 中 `clearTimeout(this.writingTimer)`。
+  - `private readonly held` 从 `Set<string>` 改为 `Map<string, Block>`：保存聚焦期间收到的最新远端 `Block` 快照，而不仅是 `id`。
+- **必须保留的状态与机制**：
+  - **保留 HTTP Polling Fallback**：保留 `pollEveryMs = 4000`、`pollFastMs = 1000`、`this.poll`、`this.live`、`setLive(on)`、`cron()`、`refresh()`，以及 `BlocksView.tsx` 中的 `setLive(true)` / `setLive(false)`。当 WebSocket 断开或不可用时，编辑器自动退回 `cron()` 轮询（有外部写入或刚点 `demo()` 的 `busyMs` 内每 `1s` 问一次，平时每 `4s` 问一次）。
+  - **保留编辑防抖、批次与冲突状态**：保留 `dirty`、`queue`、`inflight`、`gone`、`sending`、`idle`、`max`、`seq`、`EditBlock.rev/sent/spans/text/composing/focused/problem`。
+
+---
+
+#### 2. `put` / `focus` / `flush` / `send` / `take` 的精确交互与边界守卫
+
+1. **`put(b: Block, heard = false)`（不倒退 `rev`，不覆盖本地未提交文字，维护 `held`）**：
+   - **清理已过时的 `held`**：若 `const prev = this.held.get(b.id)` 存在且 `b.rev >= prev.rev`（例如本地批次 `send()` 拿到了更新的 `ack`，或 `take(snap, true, false)` 重新加载），若不再处于需暂缓状态则更新或移除它。
+   - **`rev` 单调性守卫（防晚到 ack / 乱序包倒退）**：若 `mine && b.rev < mine.rev`，直接 `return`，绝不用旧版本覆盖新版本。
+   - **焦点块暂缓（`heard && mine.focused && b.rev > mine.rev`）**：
+     - 仅当 `b.rev > (this.held.get(b.id)?.rev ?? mine.rev)` 时写入 `this.held.set(b.id, b)`，然后 `return`。
+     - 保持 `mine.rev`、`mine.spans`、`mine.text` 原封不动：既不打断主人光标，又保证主人若在失焦前打字，生成的 `update_text` / `split_block` 仍携带主人看到的旧 `baseRev: mine.rev` 去触发服务端冲突保护。
+   - **记录 `heardAt` 并调度到期通知**：
+     - 当 `news`（`heard && b.updatedBy !== ownerId && (!mine || mine.rev !== b.rev)`）为真时，设 `const now = Date.now(); this.heardAt = now;`（以及 `added.heardAt = now` 或 `mine.heardAt = now`），并调用 `this.armWriting()`。
+   - **应用了远端块后清理 `held`**：当 `put` 走到更新 `mine.rev = b.rev` 时，若 `(this.held.get(b.id)?.rev ?? 0) <= b.rev`，执行 `this.held.delete(b.id)`。
+   - **本地未发文字与 IME 保护不变**：`if (this.dirty.has(b.id) || mine.composing || this.queued(b.id)) return;` 保持不变，绝不覆盖正在拼字、防抖待发或在途批次中的块正文。
+
+2. **`focus(b: EditBlock, on: boolean)` 与 `flush()`（失焦即应用 `held`，且绝不污染待发 op 的 `baseRev`）**：
+   - 当 `on === false`（失焦）时：
+     ```ts
+     focus(b: EditBlock, on: boolean) {
+       b.focused = on;
+       if (on) return;
+       this.flush();
+       const deferred = this.held.get(b.id);
+       if (!deferred) return;
+       if (this.dirty.has(b.id) || b.composing || this.queued(b.id)) return;
+       this.held.delete(b.id);
+       this.put(deferred, true);
+       this.reorder();
+       this.changed();
+     }
+     ```
+   - **为什么必须在 `this.dirty.has(b.id) || b.composing || this.queued(b.id)` 时跳过 `put(deferred, true)`？**
+     - 因为 `textOp(b)` 入队的 `build: () => ({ op: "update_text", blockId: b.id, baseRev: b.rev, text: spans })` 是惰性读取 `b.rev` 的！
+     - 若此时前一个批次还在路上（`this.sending === true`），`this.flush()` 把 `b` 的改动放进 `this.queue` 后尚未执行 `build()`；如果此时把 `b.rev` 改成 `deferred.rev`，等前一批次返回后 `build()` 就会用新的 `deferred.rev` 当作 `baseRev` 发出去，吞掉本应报出的版本冲突！
+     - 而只要 `b` 有待发/在途改动，跳过 `deferred` 后，`send()` 收到服务端 `ack` 时会用服务端权威的 `ack.blocks`（含冲突回退或最新 `rev`）更新 `b` 并清理 `this.held`。
+
+3. **`take(snap: BlockSnapshot, replace: boolean, heard = false)` 与 `refresh()`（防旧快照倒退 `seq`）**：
+   - 在 `refresh()` 中：若 `snap.artifact.seq < this.seq`，忽略该过期快照；
+   - 在 `take()` 中：`this.seq = Math.max(this.seq, snap.artifact.seq)`；只清理不再聚焦或版本已被追上的 `held` 项（若某个块仍在 `mine.focused`，`put(b, heard)` 会把 `snap` 里更新的 `b` 重新写进 `this.held`）。
+
+4. **`demo()`**：
+   - 将 `this.heardAt = this.polls;` 改为 `this.heardAt = Date.now(); this.armWriting(); this.cron();`。
+
+---
+
+#### 3. 关键回归测试场景（5 条，补入 `apps/web/src/features/artifact/blocks.test.ts`）
+
+使用 `vi.useFakeTimers()` 针对 `BlockEditor` 补充以下 5 条纯单元测试：
+
+1. **WebSocket 推送后「帮工在写」按真实时间消退**：`receive()` 收到非 `owner` 的块更新后，`editor.othersWriting` 与 `editor.writing(b)` 立即为 `true`；即使后续没有任何 `receive()` 或 `refresh()`，推进定时器 `3000ms` 后 `editor.writing(b)` 自动变为 `false`并通知订阅者，推进到 `4000ms` 后 `editor.othersWriting` 自动变为 `false`。
+2. **聚焦块收到远端更新暂缓，失焦且未改字时立即应用**：主人 `focus(b, true)` 期间 `receive()` 推来 `rev: 2` 的远端改动，`b.text` 与 `b.rev`（`1`）保持不变；调用 `focus(b, false)` 后，无需等待任何轮询请求，`b.text` 与 `b.rev`（`2`）立即更新并触发 `changed`。
+3. **聚焦块收到远端更新后主人改字并失焦，保留旧 `baseRev` 触发冲突**：主人 `focus(b, true)`（`rev: 1`）期间 `receive()` 推来 `rev: 2`（暂存在 `held`）；主人修改文字后 `focus(b, false)`（即使此时有前序批次在途 `sending === true`），发出的 `update_text` 仍携带 `baseRev: 1` 而非 `2`，服务端返回 `conflict` 后编辑器展示服务端最新文本与冲突提示。
+4. **IME 拼字中（`composing = true`）收到远端更新或失焦不丢字**：`composition(b, true, ...)` 期间收到的远端块不覆盖本地正在拼的字，拼字提交后按正常防抖发出。
+5. **乱序 / 晚到的旧版本不倒退 `rev` 与 `seq`**：本地 `submit` 已将块推进到 `rev: 3, seq: 3` 后，迟到的 `receive({ seq: 2, blocks: [{ ..., rev: 2 }] })` 不会将 `editor.seq` 或 `b.rev` / `b.text` 倒退回 `2`。
+
+---
+
+#### 4. 验证命令
+
+```bash
+vp test apps/web/src/features/artifact/blocks.test.ts
+vp run web:check
+vp run docs:verify
+```

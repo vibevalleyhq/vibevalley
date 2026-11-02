@@ -198,8 +198,6 @@ export function spotsFor(s: Session, crop: Crop, pose: Pose): readonly StrollSpo
   if (isRipe(crop) || crop === "dry") return ["front"];
   if (crop === "withered") return ["front", "left", "right"];
   switch (s.phase._tag) {
-    case "arriving":
-      return ["right"];
     case "working":
       return pose === "work" ? ["front", "right", "left"] : ["left", "back", "right"];
     case "resting":

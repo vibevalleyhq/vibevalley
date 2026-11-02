@@ -165,6 +165,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const criteria = () => criteriaList(d().criteria);
   const heading = (
     <div>
+      <Show when={props.item.parent}>
+        {(parent) => (
+          <button
+            type="button"
+            data-testid="parent-issue"
+            class="mb-2 cursor-pointer text-xs text-water hover:underline"
+            onClick={() => props.onDone(parent())}
+          >
+            {t("web.issue.family.parent")}
+          </button>
+        )}
+      </Show>
       <Show when={backlog()}>
         <div class="mb-4 pr-10">
           <Stages at="talk" />

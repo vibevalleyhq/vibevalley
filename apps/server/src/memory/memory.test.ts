@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
@@ -8,11 +8,10 @@ import { FetchHttpClient } from "effect/http";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
-import { remember, rewriteMemory } from "@vibevalley/agent/memory";
 import { defaultOrchestrator, memoryKeep } from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
-import { owner } from "@/base/actor.ts";
+import { owner, session } from "@/base/actor.ts";
 import { agentHome, ServerConfig } from "@/infra/config.ts";
 import { Database, Db } from "@/infra/db.ts";
 import { Setting } from "@/setting/setting.ts";
@@ -20,7 +19,7 @@ import { testConfig } from "@/testing/layers.ts";
 
 import * as q from "../../db/generated/memory.sql.ts";
 import { Memory, make } from "./memory.ts";
-import { memoryIsNewNote, issueMemoryText, memoryNotesOf, recallChars } from "./recall.ts";
+import { memoryIsNewNote, issueMemoryText, recallChars } from "./recall.ts";
 
 const world = (config = testConfig()) =>
   Layer.effect(Memory, make()).pipe(
@@ -34,30 +33,7 @@ const world = (config = testConfig()) =>
   );
 
 describe("memory", () => {
-  it("the 记住 lines of a run", () => {
-    const said = [
-      "改好了，测试也过了。",
-      "",
-      "记住：这个项目用 pnpm test 跑测试，不要用 npm",
-      "- 记住：迁移文件在 db/migrations",
-      "**记住（所有项目）：** 主人要提交信息写中文",
-      "记住：这个项目用 pnpm test 跑测试，不要用 npm",
-      "要记住的是别的事",
-      "记住：",
-      "",
-      "结论：加好了分页（3f2a1bc）。",
-    ].join("\n");
-    expect(memoryNotesOf(said)).toEqual([
-      { text: "这个项目用 pnpm test 跑测试，不要用 npm", everywhere: false },
-      { text: "迁移文件在 db/migrations", everywhere: false },
-      { text: "主人要提交信息写中文", everywhere: true },
-    ]);
-    expect(memoryNotesOf(Array.from({ length: 9 }, (_, i) => `记住：第 ${i} 条`).join("\n"))).toHaveLength(5);
-    expect(memoryNotesOf("结论：做完了。")).toEqual([]);
-    expect(memoryNotesOf("Remember: tests run with pnpm test\n- **Remember (all projects):** commit messages in English")).toEqual([
-      { text: "tests run with pnpm test", everywhere: false },
-      { text: "commit messages in English", everywhere: true },
-    ]);
+  it("builds issue memories and compares explicit notes", () => {
     expect(issueMemoryText("给打卡接口加分页", "加好了（3f2a1bc）", "completed")).toBe("给打卡接口加分页 → 加好了（3f2a1bc）");
     expect(issueMemoryText("给打卡接口加分页", "pnpm test 没过", "failed")).toBe("给打卡接口加分页 → 没做成：pnpm test 没过");
     const known = [{ id: "1", agent: "lab", kind: "note", text: "这个项目用 pnpm test 跑测试", project: "clock", at: 0, recalled: 0 }] as never;
@@ -69,6 +45,8 @@ describe("memory", () => {
   it.effect("runs are kept, recalled and counted; notes written and forgotten", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
+      yield* m.write({ agent: "lab", text: "这个项目用 pnpm test 跑测试", project: "clock", by: session("w1") });
+      yield* m.write({ agent: "lab", text: "提交信息写中文", project: "", by: session("w1") });
       yield* m.keep({
         agent: "lab",
         session: "w1",
@@ -121,35 +99,23 @@ describe("memory", () => {
     }).pipe(Effect.provide(world())),
   );
 
-  it.effect("the orchestrator's MEMORY.md: its lines, the owner's marked, dated, forgotten", () => {
+  it.effect("regression: orchestrator memory uses database rows and rewriting preserves the owner's notes", () => {
     const config = testConfig();
-    const folder = agentHome(config, defaultOrchestrator);
     return Effect.gen(function* () {
       const m = yield* Memory;
-      expect((yield* m.memoriesOf("orchestrator")).memories).toEqual([]);
-      yield* Effect.promise(() => remember(folder, "主人喜欢早上收到汇报", new Date(2026, 9, 12, 9)));
-      const written = yield* m.remember({ agent: "orchestrator", text: "  周末别派夜班\n真的  ", project: "", by: owner });
-      expect([written.text, written.session]).toEqual(["周末别派夜班 真的", undefined]);
-      expect(readFileSync(join(folder, "MEMORY.md"), "utf8")).toContain("主人交代：周末别派夜班 真的");
-      const view = yield* m.memoriesOf("orchestrator");
-      expect(view.memories.map((x) => [x.text, x.session])).toEqual([
-        ["周末别派夜班 真的", undefined],
-        ["主人喜欢早上收到汇报", "orchestrator"],
-      ]);
-      expect(view.memories[1]!.at).toBe(new Date(2026, 9, 12).getTime());
-      expect(view.carried).toBe(2);
-      yield* m.forget("orchestrator", view.memories[1]!.id);
-      expect((yield* m.memoriesOf("orchestrator")).memories.map((x) => x.text)).toEqual(["周末别派夜班 真的"]);
-      expect(yield* Effect.flip(m.remember({ agent: "orchestrator", text: "  ", project: "", by: owner }))).toMatchObject({
-        _tag: "Refused",
-        reason: "要记的话是空的",
-      });
-      yield* Effect.promise(() => rewriteMemory(folder, ("- 2026-10-13 " + "字".repeat(100) + "\n").repeat(100)));
-      const carried = (yield* m.memoriesOf("orchestrator")).carried!;
-      expect(carried > 0 && carried < 100).toBe(true);
-      yield* Effect.promise(() => rewriteMemory(folder, "# header\n- first\n* second\nplain third\n"));
-      expect((yield* m.memoriesOf("orchestrator")).carried).toBe(3);
-      expect(yield* Effect.flip(m.recallOf("orchestrator", "", ""))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/整份记性/u) });
+      const port = m.forAgent(defaultOrchestrator, defaultOrchestrator);
+      yield* Effect.promise(() => port.remember("agent note"));
+      const written = yield* m.remember({ agent: defaultOrchestrator, text: "owner note", project: "", by: owner });
+      expect((yield* m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.author)).toEqual(["owner", "orchestrator"]);
+      expect((yield* Effect.promise(() => port.read())).prompt).toContain("主人交代：owner note");
+      yield* Effect.promise(() => port.rewrite("# notes\n- replacement note\n- 主人交代：owner note"));
+      const notes = (yield* m.memoriesOf(defaultOrchestrator)).memories;
+      expect(notes.map((note) => note.text)).toEqual(["replacement note", "owner note"]);
+      expect(notes.find((note) => note.author === "owner")?.id).toBe(written.id);
+      expect(existsSync(join(agentHome(config, defaultOrchestrator), "MEMORY.md"))).toBe(false);
+      expect((yield* m.recallOf(defaultOrchestrator, "demo", "replacement")).lines.join("\n")).toContain("replacement note");
+      yield* m.forget(defaultOrchestrator, written.id);
+      expect((yield* m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.text)).toEqual(["replacement note"]);
     }).pipe(Effect.provide(world(config)));
   });
 
@@ -225,15 +191,7 @@ describe("memory", () => {
       const m = yield* Memory;
       yield* m.keep({ agent: "lab", session: "chat", project: "demo", brief: "解释一下测试", outcome: "completed", said: "解释好了", summary: "解释好了" });
       expect(yield* m.list("lab")).toEqual([]);
-      yield* m.keep({
-        agent: "lab",
-        session: "chat",
-        project: "",
-        brief: "记住测试约定",
-        outcome: "completed",
-        said: "记住：这个项目用 pnpm test 跑测试",
-        summary: "记下了",
-      });
+      yield* m.write({ agent: "lab", text: "这个项目用 pnpm test 跑测试", project: "", by: session("chat") });
       expect((yield* m.list("lab")).map(({ kind, text, session }) => ({ kind, text, session }))).toEqual([
         { kind: "note", text: "这个项目用 pnpm test 跑测试", session: "chat" },
       ]);
@@ -251,14 +209,15 @@ describe("memory", () => {
       expect(yield* m.list("lab")).toEqual([]);
       yield* sql.unsafe(`drop trigger fail_write on memory`);
       yield* m.keep(run("s1", "记住：不要覆盖用户改动"));
-      expect(yield* m.list("lab")).toHaveLength(2);
+      expect(yield* m.list("lab")).toHaveLength(1);
     }).pipe(Effect.provide(world())),
   );
 
-  it.effect("nearly the same notes in one run are kept once", () =>
+  it.effect("explicit notes are independent records", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
-      yield* m.keep(run("s1", "记住：use pnpm test\n记住：use pnpm test!"));
+      yield* m.write({ agent: "lab", text: "use pnpm test", project: "demo", by: session("s1") });
+      yield* m.write({ agent: "lab", text: "use pnpm test", project: "demo", by: session("s1") });
       expect(yield* m.list("lab")).toHaveLength(2);
     }).pipe(Effect.provide(world())),
   );
@@ -276,21 +235,28 @@ describe("memory", () => {
       }
       const before = yield* m.list("lab");
       const predicted = before.filter((x) => x.fading).map((x) => x.id);
-      yield* m.keep(run("0", "记住：apple\n记住：banana\n记住：cherry\n记住：durian"));
-      yield* m.keep(run("1", "记住：elephant\n记住：flamingo\n记住：giraffe\n记住：hamster"));
+      yield* Effect.forEach(
+        ["apple", "banana", "cherry", "durian", "elephant", "flamingo", "giraffe", "hamster"],
+        (text, index) => m.write({ agent: "lab", text, project: "", by: session(String(index)) }),
+        { discard: true },
+      );
+      yield* m.keep(run("0", ""));
+      yield* m.keep(run("1", ""));
       const after = new Set((yield* m.list("lab")).map((x) => x.id));
       expect(predicted).toHaveLength(10);
       expect(before.filter((x) => !after.has(x.id)).map((x) => x.id)).toEqual(predicted);
     }).pipe(Effect.provide(world())),
   );
 
-  it.effect("forget and its preview turn file failures into Refused", () => {
+  it.effect("regression: a legacy memory path cannot interfere with database memory", () => {
     const config = testConfig();
     mkdirSync(join(agentHome(config, defaultOrchestrator), "MEMORY.md"), { recursive: true });
     return Effect.gen(function* () {
       const m = yield* Memory;
-      expect((yield* Effect.flip(m.previewForget("orchestrator", "m1")))._tag).toBe("Refused");
-      expect((yield* Effect.flip(m.forget("orchestrator", "m1")))._tag).toBe("Refused");
+      const note = yield* m.remember({ agent: defaultOrchestrator, text: "database memory", project: "", by: owner });
+      expect((yield* m.memoriesOf(defaultOrchestrator)).memories[0]?.id).toBe(note.id);
+      expect((yield* Effect.flip(m.previewForget("orchestrator", "m1")))._tag).toBe("Missing");
+      expect((yield* Effect.flip(m.forget("orchestrator", "m1")))._tag).toBe("Missing");
     }).pipe(Effect.provide(world(config)));
   });
 });

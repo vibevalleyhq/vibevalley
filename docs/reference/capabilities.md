@@ -117,21 +117,6 @@
 | `session.get` | `/api/v1/session/get` | ✓ | ✓ |   |   |
 | `session.event.list` | `/api/v1/session/event/list` | ✓ | ✓ |   |   |
 
-## graph
-
-| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
-|---|---|---|---|---|---|
-| `graph.split` | `/api/v1/graph/split` | ✓ | ✓ | ✓ |   |
-| `graph.task.update` | `/api/v1/graph/task/update` | ✓ | ✓ | ✓ |   |
-| `graph.task.delete` | `/api/v1/graph/task/delete` | ✓ | ✓ | ✓ |   |
-| `graph.task.previewDelete` | `/api/v1/graph/task/previewDelete` | ✓ | ✓ | ✓ |   |
-| `graph.act` | `/api/v1/graph/act` | ✓ | ✓ | ✓ |   |
-| `graph.task.act` | `/api/v1/graph/task/act` | ✓ | ✓ | ✓ |   |
-| `graph.diff.get` | `/api/v1/graph/diff/get` | ✓ | ✓ |   |   |
-| `graph.event.list` | `/api/v1/graph/event/list` | ✓ | ✓ |   |   |
-| `graph.list` | `/api/v1/graph/list` | ✓ | ✓ | ✓ |   |
-| `graph.get` | `/api/v1/graph/get` | ✓ | ✓ | ✓ |   |
-
 ## artifact
 
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |

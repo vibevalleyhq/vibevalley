@@ -22,7 +22,6 @@ export function threadOwnerOf<S extends Session>(thread: Channel, sessions: read
     case "talk":
       return sessions.find((h) => h.id === thread.subjectId);
     // Only issues and talks have an owner.
-    case "graph":
     default:
       return undefined;
   }
@@ -40,8 +39,6 @@ export function threadTitle(thread: Channel, issues: Issue[] = [], sessions: Ses
       const issue = issues.find((i) => i.id === thread.subjectId);
       return issue ? head(issue.title) : t("web.channel.names.issueThread");
     }
-    case "graph":
-      return t("web.channel.names.planThread", { id: thread.subjectId ?? "" });
     case "talk":
     default: {
       if (thread.subjectKind === "talk" && thread.subjectId) {

@@ -124,7 +124,6 @@ const yearDays = 53 * 7;
 const repoView = jsonOf(Schema.Struct({ viewerPermission: Schema.optional(Schema.NullOr(Schema.String)) }));
 const openPullRequests = jsonOf(Schema.Array(Schema.Struct({ url: Schema.String, number: Schema.Int })));
 const pullRequestView = jsonOf(Schema.Struct({ state: Schema.String, mergedAt: Schema.optional(Schema.NullOr(Schema.String)) }));
-
 /** Close to JavaScript's localeCompare for names, as the Go has it: case ignored first, then by bytes. */
 const localeCompare = (a: string, b: string) => {
   const x = a.toLowerCase();
@@ -239,7 +238,7 @@ export class Project extends Context.Service<
     readonly changedFiles: (cwd: string, baseBranch: string) => Effect.Effect<string[], ProjectError>;
     readonly conflict: (place: Workplace, baseBranch?: string) => Effect.Effect<T.Conflict | undefined>;
     readonly merge: (place: Workplace) => Effect.Effect<Merged, MergeFailure>;
-    readonly mergeInto: (place: Workplace, target: string) => Effect.Effect<Merged, MergeFailure>;
+    readonly mergeInto: (place: Workplace, target: string, targetCwd?: string) => Effect.Effect<Merged, MergeFailure>;
     readonly mergeBranch: (project: string, branch: string) => Effect.Effect<string, MergeFailure>;
     readonly release: (place: Workplace) => Effect.Effect<WorkplaceRelease>;
     readonly reset: (place: Workplace) => Effect.Effect<void, ProjectError>;
@@ -252,6 +251,9 @@ export class Project extends Context.Service<
     readonly usesPullRequests: (name: string) => boolean;
     readonly submitPullRequest: (place: Workplace, issue: T.Issue, conclusion: string) => Effect.Effect<T.PullRequest, MergeFailure | ProjectError>;
     readonly pullRequestState: (name: string, n: number) => Effect.Effect<T.PullRequestState, ProjectError>;
+    readonly githubRequest: GitHubRun;
+    readonly githubRemote: (name: string) => Effect.Effect<string, ProjectError>;
+    readonly resolveReviewThread: (name: string, thread: string) => Effect.Effect<void, ProjectError>;
     readonly finishPullRequest: (name: string, n: number) => Effect.Effect<Merged, ProjectError>;
   }
 >()("vibevalley/Project") {
@@ -676,7 +678,7 @@ const make = (hooks: ProjectHooks = {}) =>
           }),
         );
       }, toMergeFailure),
-      mergeInto: Effect.fn("Project.mergeInto")(function* (place, target) {
+      mergeInto: Effect.fn("Project.mergeInto")(function* (place, target, targetCwd) {
         const path = join(root, place.project);
         if (!place.branch) return yield* MergeFailure.error(t("server.project.inProjectNothing"));
         const checked = yield* checkMerge(place, target);
@@ -684,6 +686,10 @@ const make = (hooks: ProjectHooks = {}) =>
           place.project,
           Effect.gen(function* () {
             yield* unchangedBranch(path, place.branch!, checked);
+            if (targetCwd) {
+              if ((yield* repository(targetCwd).main) !== target) return yield* MergeFailure.error(t("server.project.parentBranchChanged"));
+              if ((yield* git(targetCwd, "status", "--porcelain")) !== "") return yield* MergeFailure.failedCheck(t("server.project.parentHasChanges"));
+            }
             const conflicts = yield* repository(path).conflicts(target, place.branch!);
             if (conflicts.length > 0) return yield* MergeFailure.conflict(target, conflicts);
             const brought = (yield* git(path, "log", "--reverse", "--format=%h", `${target}..${place.branch}`)).split("\n").filter((s) => s !== "");
@@ -694,7 +700,8 @@ const make = (hooks: ProjectHooks = {}) =>
                 ? theirs
                 : yield* repository(path).mergeCommit(ours, theirs, t("server.project.commit.merge", { branch: place.branch! }));
               // Only from where it was: a target moved meanwhile is not written over.
-              yield* git(path, "update-ref", "refs/heads/" + target, next, ours);
+              if (targetCwd) yield* git(targetCwd, "merge", "--ff-only", "--no-edit", next);
+              else yield* git(path, "update-ref", "refs/heads/" + target, next, ours);
             }
             const warning = yield* cleanupMerged(place, path);
             return {
@@ -860,6 +867,7 @@ const make = (hooks: ProjectHooks = {}) =>
           Effect.gen(function* () {
             const path = join(root, place.project);
             yield* toMergeFailure(unchangedBranch(path, place.branch!, checked));
+            if ((yield* toMergeFailure(git(place.cwd, "status", "--porcelain"))) !== "") return yield* fail(t("server.project.github.changedDuringCheck"));
             const repo = githubOrigin(yield* repository(path).origin);
             if (repo === "") return yield* fail(t("server.project.github.notGithub"));
             const main = yield* repository(path).main.pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })));
@@ -923,6 +931,27 @@ const make = (hooks: ProjectHooks = {}) =>
         if (result.state === "OPEN") return "open" as const;
         if (result.state === "CLOSED") return "closed" as const;
         return yield* fail(t("server.project.github.stateUnknown", { n }));
+      }),
+      githubRequest: Effect.fn("Project.githubRequest")(function* (...args: string[]) {
+        return yield* gh(...args);
+      }),
+      githubRemote: Effect.fn("Project.githubRemote")(function* (name) {
+        const repo = githubOrigin(yield* repository(join(root, name)).origin);
+        if (repo === "") return yield* fail(t("server.project.github.notGithub"));
+        return repo;
+      }),
+      resolveReviewThread: Effect.fn("Project.resolveReviewThread")(function* (name, thread) {
+        const repo = githubOrigin(yield* repository(join(root, name)).origin);
+        if (repo === "") return yield* fail(t("server.project.github.notGithub"));
+        const resolved = yield* gh(
+          "api",
+          "graphql",
+          "-f",
+          "query=mutation($thread:ID!){resolveReviewThread(input:{threadId:$thread}){thread{id isResolved}}}",
+          "-F",
+          `thread=${thread}`,
+        );
+        if (!resolved.ok) return yield* fail(t("server.project.github.resolveFailed"));
       }),
       finishPullRequest: Effect.fn("Project.finishPullRequest")(function* (name, n) {
         return yield* serially(

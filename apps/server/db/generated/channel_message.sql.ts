@@ -4,7 +4,7 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
-import { Pg_public_channel_message_kind_c6d35b7b1ae3, Pg_public_channel_participant_kind_4fff83732556, Pg_public_channel_type_653a6aa2de49 } from "./types.js"
+import { Pg_public_channel_message_kind_c6d35b7b1ae3, Pg_public_channel_participant_kind_4fff83732556, Pg_public_channel_subject_kind_387f28ce6303, Pg_public_channel_type_653a6aa2de49 } from "./types.js"
 
 export const InsertMessageParams = Schema.Struct({
   ["id"]: Schema.String,
@@ -295,7 +295,7 @@ export const MissingDirectDeliveriesResult = Schema.Struct({
 export type MissingDirectDeliveriesResult = typeof MissingDirectDeliveriesResult.Type
 
 
-export const MissingDirectDeliveriesSql = "-- name: MissingDirectDeliveries :many\n-- bound: owner messages committed after a direct session's startup snapshot, without a delivery to that session.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent\nfrom channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2\n  and m.sender_id = 'owner' and m.kind = 'chat' and m.deleted_at is null\n  and not exists (select 1 from channel_delivery d where d.recipient_id = $3 and d.message_id = m.id)\norder by m.number;"
+export const MissingDirectDeliveriesSql = "-- name: MissingDirectDeliveries :many\n-- bound: owner messages committed after a direct session's startup snapshot, without a delivery to that session.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent\nfrom channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2\n  and m.sender_id = 'owner' and m.kind = 'chat' and m.deleted_at is null\n  and not exists (select 1 from mailbox_delivery d where d.session_id = $3 and d.message_id = m.id)\norder by m.number;"
 
 export const missingDirectDeliveries = Effect.fn("MissingDirectDeliveries")(function* (params: MissingDirectDeliveriesParams) {
   const sql = yield* SqlClient.SqlClient
@@ -521,7 +521,7 @@ export const UnseenInResult = Schema.Struct({
 export type UnseenInResult = typeof UnseenInResult.Type
 
 
-export const UnseenInSql = "-- name: UnseenIn :many\n-- bound: one participant's unread in one channel; the read cursor moves past them.\n-- Newest first.\nselect m.id from channel_message m\nwhere m.channel_id = $1 and m.sender_id <> $2\n  and m.number > coalesce((select read_number from channel_read_cursor where participant_id = $2 and channel_id = $1), 0)\n  and not exists (select 1 from channel_seen_mark s where s.participant_id = $2 and s.message_id = m.id)\norder by m.number desc;"
+export const UnseenInSql = "-- name: UnseenIn :many\n-- bound: one participant's unread in one channel; the read cursor moves past them.\n-- Oldest first, so a partial read can advance the cursor without skipping messages.\nselect m.id from channel_message m\nwhere m.channel_id = $1 and m.sender_id <> $2\n  and m.number > coalesce((select read_number from channel_read_cursor where participant_id = $2 and channel_id = $1), 0)\n  and not exists (select 1 from mailbox_delivery d where d.session_id = $2 and d.message_id = m.id and d.consumed_at is not null)\norder by m.number;"
 
 export const unseenIn = Effect.fn("UnseenIn")(function* (params: UnseenInParams) {
   const sql = yield* SqlClient.SqlClient
@@ -594,30 +594,6 @@ export const messageByNumber = Effect.fn("MessageByNumber")(function* (params: M
     Result: MessageByNumberResult,
     execute: (p) => sql.unsafe(MessageByNumberSql, [p["channel_id"], p["number"]]),
   })(params)
-})
-
-export const OwnerLastMessagesParams = Schema.Struct({
-
-})
-export type OwnerLastMessagesParams = typeof OwnerLastMessagesParams.Type
-
-
-export const OwnerLastMessagesResult = Schema.Struct({
-  ["channel_id"]: Schema.String,
-  ["id"]: Schema.NullOr(Schema.String),
-})
-export type OwnerLastMessagesResult = typeof OwnerLastMessagesResult.Type
-
-
-export const OwnerLastMessagesSql = "-- name: OwnerLastMessages :many\n-- bound: a row per channel.\n-- The owner's last message in each channel, from which agents waking agents are counted (channel/audience.ts).\nselect channel_id, max(id)::text as id from channel_message where sender_id = 'owner' group by channel_id;"
-
-export const ownerLastMessages = Effect.fn("OwnerLastMessages")(function* () {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: OwnerLastMessagesParams,
-    Result: OwnerLastMessagesResult,
-    execute: () => sql.unsafe(OwnerLastMessagesSql, []),
-  })({})
 })
 
 export const MessagesChangedAfterParams = Schema.Struct({
@@ -875,4 +851,92 @@ export const setEmbeds = Effect.fn("SetEmbeds")(function* (params: SetEmbedsPara
     Request: SetEmbedsParams,
     execute: (p) => sql.unsafe(SetEmbedsSql, [p["meta"], p["revision"], p["id"]]),
   })(params)
+})
+
+export const NotificationReceiptParams = Schema.Struct({
+  ["id"]: Schema.String,
+})
+export type NotificationReceiptParams = typeof NotificationReceiptParams.Type
+
+
+export const NotificationReceiptResult = Schema.Struct({
+  ["read_at"]: Schema.NullOr(Schema.Number),
+  ["superseded"]: Schema.Boolean,
+})
+export type NotificationReceiptResult = typeof NotificationReceiptResult.Type
+
+
+export const NotificationReceiptSql = "-- name: NotificationReceipt :one\nselect r.updated_at as read_at,\n  exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.number > m.number\n    and n.deleted_at is null and (n.sender_id = 'owner' or (m.kind = 'report' and n.kind = 'report' and n.sender_id = m.sender_id))) as superseded\nfrom channel_message m\nleft join channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'owner' and r.read_number >= m.number\nwhere m.id = $1;"
+
+export const notificationReceipt = Effect.fn("NotificationReceipt")(function* (params: NotificationReceiptParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findOne({
+    Request: NotificationReceiptParams,
+    Result: NotificationReceiptResult,
+    execute: (p) => sql.unsafe(NotificationReceiptSql, [p["id"]]),
+  })(params)
+})
+
+export const OwnerReadReportsParams = Schema.Struct({
+
+})
+export type OwnerReadReportsParams = typeof OwnerReadReportsParams.Type
+
+
+export const OwnerReadReportsResult = Schema.Struct({
+  ["sender_id"]: Schema.String,
+  ["created_at"]: Schema.Number,
+  ["updated_at"]: Schema.Number,
+})
+export type OwnerReadReportsResult = typeof OwnerReadReportsResult.Type
+
+
+export const OwnerReadReportsSql = "-- name: OwnerReadReports :many\n-- bound: the latest report per session.\nselect m.sender_id, m.created_at, r.updated_at\nfrom channel_message m\njoin channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'owner' and r.read_number >= m.number\nwhere m.kind = 'report' and m.deleted_at is null\n  and not exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.sender_id = m.sender_id and n.kind = 'report' and n.number > m.number);"
+
+export const ownerReadReports = Effect.fn("OwnerReadReports")(function* () {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: OwnerReadReportsParams,
+    Result: OwnerReadReportsResult,
+    execute: () => sql.unsafe(OwnerReadReportsSql, []),
+  })({})
+})
+
+export const UnroutedChannelMessagesParams = Schema.Struct({
+
+})
+export type UnroutedChannelMessagesParams = typeof UnroutedChannelMessagesParams.Type
+
+
+export const UnroutedChannelMessagesResult = Schema.Struct({
+  ["envelope_id"]: Schema.String,
+  ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["channel_id"]: Schema.String,
+  ["sender_id"]: Schema.String,
+  ["kind"]: Pg_public_channel_message_kind_c6d35b7b1ae3,
+  ["body"]: Schema.String,
+  ["meta"]: Schema.NullOr(Schema.String),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["created_at"]: Schema.Number,
+  ["name"]: Schema.String,
+  ["sender_kind"]: Pg_public_channel_participant_kind_4fff83732556,
+  ["channel_type"]: Pg_public_channel_type_653a6aa2de49,
+  ["root_id"]: Schema.NullOr(Schema.String),
+  ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["subject_kind"]: Schema.NullOr(Pg_public_channel_subject_kind_387f28ce6303),
+  ["subject_id"]: Schema.NullOr(Schema.String),
+  ["channel_name"]: Schema.NullOr(Schema.String),
+})
+export type UnroutedChannelMessagesResult = typeof UnroutedChannelMessagesResult.Type
+
+
+export const UnroutedChannelMessagesSql = "-- name: UnroutedChannelMessages :many\nselect m.id as envelope_id, m.number, m.channel_id, m.sender_id, m.kind, m.body, m.meta, m.reply_number, m.created_at,\n       p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join ingress_trigger r on r.id = m.id\nwhere r.routed_at is null and m.deleted_at is null\norder by m.channel_id, m.number\nlimit 1000;"
+
+export const unroutedChannelMessages = Effect.fn("UnroutedChannelMessages")(function* () {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: UnroutedChannelMessagesParams,
+    Result: UnroutedChannelMessagesResult,
+    execute: () => sql.unsafe(UnroutedChannelMessagesSql, []),
+  })({})
 })

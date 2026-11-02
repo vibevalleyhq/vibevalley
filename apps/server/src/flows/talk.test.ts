@@ -16,6 +16,7 @@ import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { Said } from "@/testing/said.ts";
+import { waitFor } from "@/testing/until.ts";
 
 import { farm, lab, until } from "./farm.ts";
 
@@ -51,7 +52,8 @@ describe("a talk with a helper profile", () => {
         };
       },
     };
-    const f = farm({ runtime });
+    const config = testConfig();
+    const f = farm({ runtime, config: { ...config, chat: { ...config.chat, noticeBatchMs: 1 } } });
     return Effect.gen(function* () {
       const issues = yield* Issue;
       const channels = yield* Channel;
@@ -134,19 +136,23 @@ describe("a talk with a helper profile", () => {
       const before = yield* db.run(
         sql<{
           state: string;
-        }>`select d.state from channel_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm} order by m.number`,
+        }>`select d.state from mailbox_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm} order by m.number`,
       );
       expect(before[0]?.state).toBe("handed");
       releaseFirst.resolve();
       yield* until(() => said(dm).filter((m) => m.kind === "report").length === 2, "both inputs answered");
       expect(starts).toBe(1);
       expect(inputs.some((input) => input.includes("启动中的第二句"))).toBe(true);
-      const after = yield* db.run(
-        sql<{
-          state: string;
-        }>`select d.state from channel_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm} order by m.number`,
+      const after = yield* waitFor(
+        db.run(
+          sql<{
+            state: string;
+          }>`select d.state from mailbox_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm} order by m.number`,
+        ),
+        (rows) => rows.length === 2 && rows.every((row) => row.state === "consumed"),
+        "both inputs consumed",
       );
-      expect(after.map((d) => d.state)).toEqual(["seen", "seen"]);
+      expect(after.map((d) => d.state)).toEqual(["consumed", "consumed"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -171,8 +177,19 @@ describe("a talk with a helper profile", () => {
         const dm = yield* channels.direct("lab");
         yield* channels.say("重启之前", dm, "");
         yield* until(() => said(dm).some((m) => m.kind === "report"), "the first report");
-        return { dm, session: sessions.presentSessions().find((s) => s.channel === dm)?.id };
+        const db = yield* Db;
+        const sql = yield* SqlClient.SqlClient;
+        yield* waitFor(
+          db.run(sql<{ state: string }>`select d.state from mailbox_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm}`),
+          (rows) => rows.length === 1 && rows[0]?.state === "consumed",
+          "the input receipt persisted before restart",
+        );
+        const context = sessions.presentSessions().find((s) => s.channel === dm);
+        if (!context) throw new Error("the conversation has no session");
+        yield* (yield* Core).apply({ type: "station", id: context.id, station: 3 });
+        return { dm, session: context.id };
       }).pipe(Effect.scoped, Effect.provide(farm({ config, runtime }).layer));
+      expect(existsSync(join(config.home, "state.json"))).toBe(false);
       yield* Effect.gen(function* () {
         const channels = yield* Channel;
         const sessions = yield* Session;
@@ -180,6 +197,7 @@ describe("a talk with a helper profile", () => {
         yield* channels.start;
         expect(yield* channels.direct("lab")).toBe(first.dm);
         expect(sessions.presentSessions().find((s) => s.channel === first.dm)?.id).toBe(first.session);
+        expect(sessions.sessionOf(first.session)?.play?.station).toBe(3);
         yield* channels.say("重启之后", first.dm, "");
         yield* until(() => said(first.dm).some((m) => m.kind === "report"), "the answer after restart");
         expect(resumes[1]).toBeTruthy();
@@ -229,10 +247,12 @@ describe("a talk with a helper profile", () => {
         "both conversations answered",
       );
       expect(starts).toBe(2);
-      const delivered = yield* db.run(
-        sql<{ state: string }>`select d.state from channel_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${starting}`,
+      const delivered = yield* waitFor(
+        db.run(sql<{ state: string }>`select d.state from mailbox_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${starting}`),
+        (rows) => rows.length === 1 && rows[0]?.state === "consumed",
+        "the initial delivery seen",
       );
-      expect(delivered.map((d) => d.state)).toEqual(["seen"]);
+      expect(delivered.map((d) => d.state)).toEqual(["consumed"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 });

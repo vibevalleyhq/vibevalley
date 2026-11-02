@@ -8,7 +8,7 @@ import { ActionGlyph, Marked, PhaseGlyph, SpriteIcon } from "./icons";
 const sprites = ["icon-seeds", "icon-shovel", "icon-water", "icon-bell", "icon-coin", "icon-shed", "icon-tree", "icon-bug", "icon-trophy", "icon-wrench"];
 const working = (action: SessionAction) => ({ _tag: "working", since: 0, doing: { action } }) as Phase;
 const phases: [string, Phase][] = [
-  ["arriving", { _tag: "arriving" }],
+  ["starting", working("none")],
   ["working", working("edit_file")],
   ["done", { _tag: "done" }],
   ["failed", { _tag: "failed" }],

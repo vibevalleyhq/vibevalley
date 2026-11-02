@@ -115,7 +115,7 @@
   "none": "None.",
   "role": {
     "orchestrator": "Manager",
-    "helper": "Helper"
+    "worker": "Helper"
   },
   "templates": {
     "title": "Templates",

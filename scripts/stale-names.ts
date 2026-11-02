@@ -102,10 +102,15 @@ const RULES: readonly Rule[] = [
     says: "CoreState, StateFrame, SideEvent, Agent, Activity, PlayAction (a session play's history), canHarvest, Manager, Session; a Web Worker stays (new Worker)",
   },
   {
-    name: "a helper profile under the worker role",
-    // Playwright's per-worker fixtures ({ scope: "worker" }) and the browser's Worker are not the role.
-    pattern: /(?<!scope: )["'`]worker["'`]|\bagent\.role\.worker\b|\bagent\.list\.workers\b/u,
-    says: 'a profile\'s role is "orchestrator" or "helper" (AgentRoleValues); its words are web.agent.role.helper, web.agent.list.helpers',
+    name: "the old helper agent role",
+    pattern: /\brole\s*(?::|===?|!==?)\s*["'`]helper["'`]|\bagent\.role\.helper\b/u,
+    says: 'an agent role is "orchestrator" or "worker" (AgentRoleValues); its words are web.agent.role.worker',
+  },
+  {
+    name: "channel-owned delivery storage",
+    pattern: /\bchannel_delivery\b/u,
+    says: "mailbox_delivery: delivery belongs to the Mailbox module",
+    dirs: ["apps/server/src"],
   },
   {
     name: "an old home file or its mover",

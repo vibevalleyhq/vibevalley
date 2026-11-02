@@ -35,7 +35,7 @@ export interface EvalCase {
   readonly createdAt: number;
   readonly model: string;
   readonly want: string;
-  /** The whole MEMORY.md when the turn was marked, not necessarily as it was in the turn. */
+  /** The memory snapshot when the turn was marked, not necessarily as it was in the turn. */
   readonly memory: string;
   readonly tools: readonly string[];
   readonly before: readonly BrainMessage[];

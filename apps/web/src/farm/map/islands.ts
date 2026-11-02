@@ -9,7 +9,10 @@ import { compareText, or } from "@/base/order";
 import { type Recency, recencyOf } from "@/features/project";
 import type { Pose } from "@/ui/cast";
 
-export type Spot = { readonly kind: "taken"; readonly session: Session; readonly plot: PlotView } | { readonly kind: "open" } | { readonly kind: "shut" };
+export type Spot =
+  | { readonly kind: "taken"; readonly session: Session; readonly plot: PlotView; readonly issue?: Issue }
+  | { readonly kind: "open" }
+  | { readonly kind: "shut" };
 
 export interface Island {
   readonly project: string;
@@ -53,7 +56,10 @@ export function islandsOf({
     const room = Math.max(0, Math.min(maxSessions > 0 ? left.project : 0, maxRunning - mine.length));
     const open = Math.min(room, left.farm);
     const spots: Spot[] = [
-      ...mine.map((h): Spot => ({ kind: "taken", session: h, plot: plots[plotKeyOf(h)] ?? { crop: "seeded" } })),
+      ...mine.map((h): Spot => {
+        const issue = issues.find((issue) => issue.id === h.issue);
+        return { kind: "taken", session: h, plot: plots[plotKeyOf(h)] ?? { crop: "seeded" }, ...(issue ? { issue } : {}) };
+      }),
       ...Array.from({ length: open }, (): Spot => ({ kind: "open" })),
       ...Array.from({ length: room - open }, (): Spot => ({ kind: "shut" })),
     ];
@@ -110,8 +116,8 @@ export const sessionInPlot = { x: 0, y: -10 };
 
 const handedBack = (h: Session) => h.phase._tag === "done" || h.phase._tag === "resting";
 
-export function mapPose(h: Session): Pose {
-  if ((handedBack(h) && h.conflict) || h.phase._tag === "failed") return "worry";
+export function mapPose(h: Session, conflict = false): Pose {
+  if ((handedBack(h) && conflict) || h.phase._tag === "failed") return "worry";
   switch (h.phase._tag) {
     case "working":
       return h.phase.doing.action === "thinking" || h.phase.doing.action === "speaking_text" ? "think" : "work";
@@ -125,7 +131,7 @@ export function mapPose(h: Session): Pose {
 export function spotText(spot: Spot, now: number) {
   switch (spot.kind) {
     case "taken":
-      return `${spot.session.name} · ${phaseText(spot.session, now)}${spot.session.branch ? t("web.farm.map.island.branch", { branch: spot.session.branch }) : ""}`;
+      return `${spot.session.name} · ${phaseText(spot.session, now, spot.issue?.conflict)}${spot.session.branch ? t("web.farm.map.island.branch", { branch: spot.session.branch }) : ""}`;
     case "open":
       return t("web.farm.map.island.open");
     case "shut":

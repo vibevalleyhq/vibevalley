@@ -17,7 +17,7 @@ export type SampleIssue = Omit<Partial<Issue>, "assignments"> & { readonly agent
 
 export const sampleIssue = (number: number, title: string, status: IssueStatus, priority: Priority, more: SampleIssue = {}): Issue => {
   const id = `i${number}` as IssueId;
-  const { agent, sessionIds = [], ...fields } = more;
+  const { agent, sessionIds = [], mandate = { strength: "explicit", maxBotReviewRounds: 3, autoSubmitPr: false }, ...fields } = more;
   const assignments =
     agent || sessionIds.length > 0
       ? [
@@ -38,6 +38,7 @@ export const sampleIssue = (number: number, title: string, status: IssueStatus, 
     status,
     createdAt: now - number * 37 * min,
     assignments,
+    mandate,
     moves: [],
     deliver: "change",
     findings: [],
@@ -53,6 +54,7 @@ export const sampleIssue = (number: number, title: string, status: IssueStatus, 
 
 export const sampleSession = (id: string, agent: string, phase: PhaseView, more: Partial<SessionView> = {}): SessionView => ({
   id: id as SessionId,
+  role: "worker",
   name: agent,
   agent,
   runtime: "claude",

@@ -93,7 +93,7 @@ export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplat
     // An orchestrator always runs on VibeValley's own agent: its template names no other runtime.
     if (item.role === "orchestrator" && item.runtime !== undefined && item.runtime !== orchestratorRuntime)
       return yield* problem(t("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime }));
-    if (item.role === "helper" && !item.runtime) return yield* problem(t("server.agent.template.noRuntime", { file: join(dir, "agent.json") }));
+    if (item.role === "worker" && !item.runtime) return yield* problem(t("server.agent.template.noRuntime", { file: join(dir, "agent.json") }));
     const en = currentLocale() === "en";
     const words = en ? yield* readJson(textOf, WordsFile, dir, "agent.en.json") : undefined;
     const text = (file: string) => Effect.map(textOf(join(dir, file)), (x) => x?.trim());
@@ -110,7 +110,7 @@ export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplat
       model: item.model ?? "",
       effort: item.effort ?? "",
       personaMode: item.personaMode ?? "append",
-      worktree: item.worktree ?? item.role === "helper",
+      worktree: item.worktree ?? item.role === "worker",
       look: {
         ...look,
         build: look.build ?? "biped",

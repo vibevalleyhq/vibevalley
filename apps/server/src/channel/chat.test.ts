@@ -9,24 +9,29 @@ import { SqlClient } from "effect/sql";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { sessionId } from "@vibevalley/protocol/schema";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import { head } from "@/base/clip.ts";
 import { Core } from "@/core/core.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { dbQueries, Database, Db } from "@/infra/db.ts";
+import { channelInputs } from "@/ingress/channel.ts";
+import { Issue } from "@/issue/issue.ts";
+import { wakeBreaker } from "@/mailbox/brakes.ts";
+import { Mailbox } from "@/mailbox/mailbox.ts";
 import { layer as projection } from "@/projection/projection.ts";
+import { restoredSession, sessionState } from "@/session/history.ts";
 import { summaryOf } from "@/session/report.ts";
 import { sessionOnIssue } from "@/session/roster.ts";
 import { Session, newsOf, type SessionNews } from "@/session/session.ts";
-import type { InputConsumed } from "@/session/shapes.ts";
+import type { InputConsumed, InputReturned } from "@/session/shapes.ts";
 import { testConfig, offline } from "@/testing/layers.ts";
 import { Said, said } from "@/testing/said.ts";
 import { until, waitFor } from "@/testing/until.ts";
 
 import * as qm from "../../db/generated/channel_message.sql.ts";
-import { wakeBreaker } from "./audience.ts";
+import * as qsession from "../../db/generated/session.sql.ts";
 import { Channel, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
 import { channelOf, defaultOf } from "./folded.ts";
 
@@ -49,6 +54,7 @@ class FakeSessions {
   launches!: PubSub.PubSub<LaunchActivity>;
   news!: PubSub.PubSub<SessionNews>;
   inputsConsumedHub!: PubSub.PubSub<InputConsumed>;
+  inputsReturnedHub!: PubSub.PubSub<InputReturned>;
   consumed = (c: InputConsumed) => void PubSub.publishUnsafe(this.inputsConsumedHub, c);
 
   runsOf = (id: string) => [...(this.inputs.get(id) ?? [])];
@@ -84,15 +90,23 @@ class FakeSessions {
     const runs = this.runsOf(id).length;
     if (input.includes("必败")) {
       this.running.delete(id);
-      this.apply({ type: "report", questions: [], checks: [], id: sessionId(id), outcome: "failed", summary: "provider said no", runs });
+      this.apply({
+        type: "sessionReport",
+        questions: [],
+        checks: [],
+        id: sessionId(id),
+        outcome: "failed",
+        summary: "provider said no",
+        runs,
+      });
       this.publish({ kind: "ended", id, launch, outcome: "failed", spoke: false });
       return;
     }
     const line = input.split("\n").find((l) => l.startsWith("[target=")) ?? head(input, 20);
-    this.last.set(id, "结论：收到了（" + line + "）");
+    this.last.set(id, "收到了（" + line + "）");
     this.publish({ kind: "spoke", id, launch });
     this.running.delete(id);
-    this.apply({ type: "report", questions: [], checks: [], id: sessionId(id), outcome: "completed", summary: "收到了", runs });
+    this.apply({ type: "sessionReport", questions: [], checks: [], id: sessionId(id), outcome: "completed", summary: "收到了", runs });
     this.publish({ kind: "ended", id, launch, outcome: "completed", spoke: true });
   }
 }
@@ -102,22 +116,59 @@ const channelLayer = (x: FakeSessions) =>
   Layer.unwrap(
     Effect.gen(function* () {
       x.core = yield* Core;
+      const db = yield* Db;
+      yield* Effect.forEach(yield* db.run(qsession.activeSessions()), (row) => x.core.apply({ type: "session", session: restoredSession(row) }), {
+        discard: true,
+      });
+      yield* db.run(
+        qsession.keepSession({
+          id: defaultOrchestrator,
+          role: "orchestrator",
+          agent: defaultOrchestrator,
+          name: "管家",
+          runtime: "vibevalley",
+          brief: "",
+          project: null,
+          issue: null,
+          channel: null,
+          hired_at: 0,
+        }),
+      );
       x.launches = yield* PubSub.unbounded<LaunchActivity>();
       x.news = yield* PubSub.unbounded<SessionNews>();
       x.inputsConsumedHub = yield* PubSub.unbounded<InputConsumed>();
+      x.inputsReturnedHub = yield* PubSub.unbounded<InputReturned>();
       const sessions = {
+        attachInputRegistrar: () => {},
         present: (id: string) => x.core.session(id) !== undefined,
         sessionOf: (id: string) => x.core.session(id),
         presentSessions: () => x.core.state().sessions,
-        deliver: (id: string, text: string) => Effect.sync(() => x.deliver(id, text)),
+        deliver: (id: string, text: string, input: Parameters<Session["Service"]["deliver"]>[2]) =>
+          Effect.sync(() => {
+            const delivered = x.deliver(id, text);
+            if ((delivered.kind === "run" || delivered.kind === "steered") && !text.includes("必败"))
+              x.consumed({ session: id, envelopeIds: [...input.envelopeIds] });
+            return delivered;
+          }),
         runOf: () => undefined,
         reportOf: (id: string) => summaryOf(x.last.get(id) ?? ""),
         onIssue: (issue: string) => sessionOnIssue(x.core.state(), issue)?.id,
         launches: Effect.map(PubSub.subscribe(x.launches), Stream.fromSubscription),
         inputsConsumed: Effect.map(PubSub.subscribe(x.inputsConsumedHub), Stream.fromSubscription),
+        inputsReturned: Effect.map(PubSub.subscribe(x.inputsReturnedHub), Stream.fromSubscription),
+        register: (session: Parameters<Session["Service"]["register"]>[0]) =>
+          db.run(
+            qsession.keepSession({
+              ...session,
+              project: null,
+              issue: null,
+              channel: null,
+              hired_at: 0,
+            }),
+          ),
         news: Effect.map(PubSub.subscribe(x.news), Stream.fromSubscription),
       };
-      return Channel.layer.pipe(Layer.provide(Layer.succeed(Session, sessions as unknown as Session["Service"])));
+      return Channel.layer.pipe(Layer.provideMerge(Layer.succeed(Session, sessions as unknown as Session["Service"])));
     }),
   );
 
@@ -126,27 +177,39 @@ const fakeNews = (x: FakeSessions) =>
   Layer.effectDiscard(
     Effect.gen(function* () {
       const chat = yield* Channel;
+      const mailbox = yield* Mailbox;
+      const db = yield* Db;
       yield* Effect.addFinalizer(() =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
+          yield* Effect.forEach(x.core.state().sessions, (session) => db.run(qsession.keepSessionState(sessionState(session))), { discard: true });
           x.stopped = true;
           x.release();
         }),
       );
       const [, moves] = yield* x.core.transitions;
       yield* Effect.forkScoped(
-        Stream.runForEach(moves, ({ fact, after }) => {
-          const n = newsOf(fact, after);
-          return n ? PubSub.publish(x.news, n) : Effect.void;
-        }),
+        Stream.runForEach(moves, ({ fact, after }) =>
+          Effect.gen(function* () {
+            if (fact.type === "sessionGone") yield* db.run(qsession.endSession({ id: fact.id, closed: fact.closed ?? "dismissed", ended_at: fact.at }));
+            const n = newsOf(fact, after);
+            if (n) yield* PubSub.publish(x.news, n);
+          }),
+        ),
       );
+      yield* channelInputs;
       yield* chat.start;
+      yield* mailbox.start;
     }),
   );
 
 const world = (x: FakeSessions, config: ServerConfig["Service"] = testConfig()) => {
   const c: ServerConfig["Service"] = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
-  return fakeNews(x).pipe(
+  const delivery = Mailbox.layer.pipe(
+    Layer.provide(Layer.mock(Issue, { list: () => Effect.succeed([]), onBoard: () => [] })),
     Layer.provideMerge(channelLayer(x)),
+  );
+  return fakeNews(x).pipe(
+    Layer.provideMerge(delivery),
     Layer.provideMerge(said),
     Layer.provideMerge(Agent.layer),
     Layer.provideMerge(Core.layer.pipe(Layer.provide(projection))),
@@ -163,43 +226,53 @@ const farm = Effect.gen(function* () {
   const runPromise = Effect.runPromiseWith(yield* Effect.context());
   const core = yield* Core;
   const chat = yield* Channel;
+  const mailbox = yield* Mailbox;
   const sql = yield* SqlClient.SqlClient;
   const messagesOf = (yield* Said).in;
   const channel = (id: string | undefined) => (id ? channelOf(core.state().chat, id) : undefined);
   const deliveries = (recipient: string) =>
     runPromise(
       sql<{
-        message_id: string;
+        envelope_id: string;
         reason: string;
         wakes: boolean;
         held_by: string;
         state: string;
-      }>`select message_id, reason, wakes, coalesce(held_by::text, '') as held_by, state from channel_delivery where recipient_id = ${recipient} order by message_id`,
+      }>`select envelope_id, reason, wakes, coalesce(held_by::text, '') as held_by, state from mailbox_delivery where session_id = ${recipient} order by envelope_id`,
     );
-  const deliveryOf = async (recipient: string, message: string) => (await deliveries(recipient)).find((d) => d.message_id === message);
-  return { core, chat, sql, messagesOf, channel, deliveries, deliveryOf };
+  const deliveryOf = async (recipient: string, message: string) => (await deliveries(recipient)).find((d) => d.envelope_id === message);
+  return { core, chat, mailbox, sql, messagesOf, channel, deliveries, deliveryOf };
 });
 
 type Farm = Effect.Success<typeof farm>;
 
+const keepSession = (f: Farm, session: T.Session) =>
+  f.sql`insert into session (id, role, agent, name, runtime, brief, project, issue, channel, hired_at, phase, refining, runs)
+        values (${session.id}, ${session.role}, ${session.agent}, ${session.name}, ${session.runtime}, ${session.brief}, ${session.project ?? null},
+                ${session.issue ?? null}, ${session.channel ?? null}, ${session.hiredAt}, ${JSON.stringify(session.phase)}, ${session.refining}, ${session.runs})
+        on conflict (id) do nothing`;
+
 const hire = (f: Farm, x: FakeSessions, id: string, brief: string, project: string, channel?: string, issue?: string) =>
   Effect.gen(function* () {
+    const session: T.Session = {
+      id: sessionId(id),
+      role: "worker",
+      name: "帮工" + id,
+      agent: "lab",
+      runtime: "pi",
+      brief,
+      project,
+      hiredAt: Date.now(),
+      runs: 0,
+      phase: { _tag: "resting" },
+      ...(channel ? { channel } : {}),
+      ...(issue ? { issue: issueId(issue) } : {}),
+      refining: false,
+    };
+    yield* keepSession(f, session);
     yield* f.core.apply({
-      type: "hired",
-      session: {
-        id,
-        name: "帮工" + id,
-        agent: "lab",
-        runtime: "pi",
-        brief,
-        project,
-        hiredAt: Date.now(),
-        runs: 0,
-        phase: { _tag: "resting" },
-        ...(channel ? { channel } : {}),
-        ...(issue ? { issue } : {}),
-        refining: false,
-      } as T.Session,
+      type: "session",
+      session,
     });
     const thread = yield* waitFor(Effect.map(f.chat.threadOfSession(id), f.channel), (c) => c !== undefined, "an issue thread");
     return thread!;
@@ -217,7 +290,7 @@ const hireAndRun = (f: Farm, x: FakeSessions, id: string, brief: string, project
 const news = (f: Farm) =>
   Effect.gen(function* () {
     const heard: OrchestratorNews[] = [];
-    yield* Effect.forkScoped(Stream.runForEach(yield* f.chat.forOrchestrator, (n) => Effect.sync(() => heard.push(n))));
+    yield* Effect.forkScoped(Stream.runForEach(yield* f.mailbox.forOrchestrator, (n) => Effect.sync(() => heard.push(n))));
     return {
       of: (message: string) =>
         Effect.gen(function* () {
@@ -228,7 +301,7 @@ const news = (f: Farm) =>
   });
 
 const run = <A, E>(
-  body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channel | SqlClient.SqlClient | Scope.Scope>,
+  body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channel | Mailbox | SqlClient.SqlClient | Scope.Scope>,
   config?: ServerConfig["Service"],
 ) => {
   const x = new FakeSessions();
@@ -236,6 +309,44 @@ const run = <A, E>(
 };
 
 describe("the chat", () => {
+  it.live("regression: freshness pages advance the read cursor without skipping older messages", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        yield* hireAndRun(f, x, "w-page", "work", "paging-project");
+        const channel = yield* f.chat.openChannel("paging", "", "");
+        for (const text of ["first", "second", "third", "fourth", "fifth"]) yield* f.chat.say(text, channel.id, "");
+        const options = { target: "#paging", confirm: true };
+        const first = yield* f.chat.speak("w-page", "reply", options);
+        expect(first.shown?.map((message) => message.text)).toEqual(["first", "second", "third"]);
+        expect(first.more).toBe(2);
+        expect(yield* f.sql`select read_number from channel_read_cursor where participant_id = 'w-page' and channel_id = ${channel.id}`).toEqual([
+          { read_number: 3 },
+        ]);
+        const second = yield* f.chat.speak("w-page", "reply", options);
+        expect(second.shown?.map((message) => message.text)).toEqual(["fourth", "fifth"]);
+        expect(second.more).toBe(0);
+        expect((yield* f.chat.speak("w-page", "reply", options)).kind).toBe("sent");
+      }),
+    ),
+  );
+  it.live("regression: publishing to the orchestrator does not acknowledge model consumption", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const heard = yield* news(f);
+        const message = (yield* f.chat.say("等实际入模", undefined, "")).message;
+        yield* heard.of(message.id);
+        expect((yield* Effect.promise(() => f.deliveryOf(defaultOrchestrator, message.id)))?.state).toBe("handed");
+        expect((yield* f.chat.history(f.chat.defaultChannel())).find((item) => item.id === message.id)?.reactions).toEqual([]);
+        yield* f.chat.read(defaultOrchestrator, { target: "#general" });
+        expect((yield* Effect.promise(() => f.deliveryOf(defaultOrchestrator, message.id)))?.state).toBe("handed");
+        x.consumed({ session: defaultOrchestrator, envelopeIds: [message.id] });
+        yield* until(async () => (await f.deliveryOf(defaultOrchestrator, message.id))?.state === "consumed", "the model consumption receipt");
+        expect((yield* f.chat.history(f.chat.defaultChannel())).find((item) => item.id === message.id)?.reactions).toEqual([
+          { emoji: "👀", by: [defaultOrchestrator] },
+        ]);
+      }),
+    ),
+  );
   // A budget, at what it takes today: one line from the owner in the general channel, written, delivered and told. A
   // change that asks more fails here; one that asks less lowers it.
   it.live("one line from the owner reads and writes the database a bounded number of times", () =>
@@ -289,7 +400,7 @@ describe("the chat", () => {
         const { message: said } = yield* f.chat.say("把输出改成中文", thread.id, "");
         yield* until(() => x.runsOf("w2").length >= 2, "a second turn");
         expect(x.runsOf("w2")[1]).toContain(`[target=#general:${thread.rootNumber} msg=${said.number} from=主人] 把输出改成中文`);
-        yield* until(async () => (await f.deliveryOf("w2", said.id))?.state === "seen", "seen");
+        yield* until(async () => (await f.deliveryOf("w2", said.id))?.state === "consumed", "consumed");
         yield* until(() => f.messagesOf(thread.id).filter((m) => m.kind === "report").length >= 2, "its reply in the thread");
       }),
     ),
@@ -307,7 +418,7 @@ describe("the chat", () => {
         // Who is handed what is settled before say returns: a session not woken by now is not woken by it.
         expect(x.runsOf("w3")).toHaveLength(before);
         expect(yield* Effect.promise(() => f.deliveryOf("w3", said.id))).toMatchObject({ reason: "channel", wakes: false });
-        expect(yield* Effect.promise(() => f.deliveryOf(defaultOrchestrator, said.id))).toMatchObject({ state: "seen" });
+        expect(yield* Effect.promise(() => f.deliveryOf(defaultOrchestrator, said.id))).toMatchObject({ state: "handed" });
       }),
     ),
   );
@@ -484,7 +595,7 @@ describe("the chat", () => {
     ),
   );
 
-  it.live("a busy session gets one notice for a burst", () =>
+  it.live("regression: a busy session gets the full input burst in one steer", () =>
     run((f, x) =>
       Effect.gen(function* () {
         const thread = yield* hire(f, x, "w6", "慢慢做一个大活", "chat-d");
@@ -492,16 +603,30 @@ describe("the chat", () => {
         expect(isBusy(f.core.session("w6")!)).toBe(true);
         yield* f.chat.say("补充：顺便写测试", thread.id, "");
         yield* f.chat.say("还有：写 README", thread.id, "");
-        // Still busy when the burst's one notice comes in; then the turn may finish.
-        yield* until(() => x.steersOf("w6").some((s) => s.startsWith("[群聊提示]")), "the burst's notice");
+        yield* until(() => x.steersOf("w6").some((s) => s.includes("顺便写测试") && s.includes("写 README")), "the full input burst");
+        expect(x.steersOf("w6")).toHaveLength(1);
+        yield* until(async () => (await f.deliveries("w6")).every((row) => row.state === "consumed"), "the steered inputs consumed");
         x.release();
-        yield* until(() => x.runsOf("w6").length >= 2, "a second turn");
-        const notices = x.steersOf("w6").filter((s) => s.startsWith("[群聊提示]"));
-        expect(notices).toHaveLength(1);
-        expect(notices[0]).toContain("2 条");
-        expect(notices[0]).not.toContain("写测试");
-        expect(x.runsOf("w6")[1]).toContain("补充：顺便写测试");
-        expect(x.runsOf("w6")[1]).toContain("还有：写 README");
+        expect(x.runsOf("w6")).toHaveLength(1);
+      }),
+    ),
+  );
+
+  it.live("regression: speaking before turn end does not consume an unacknowledged input", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const thread = yield* hire(f, x, "w6", "work", "unconsumed");
+        const acknowledge = x.consumed;
+        x.consumed = () => {};
+        const message = (yield* f.chat.say("followup without a model receipt", thread.id, "")).message;
+        yield* until(
+          async () => x.runsOf("w6").length > 0 && (await f.deliveryOf("w6", message.id))?.state === "pending",
+          "the spoken but unconsumed input returned",
+        );
+        x.consumed = acknowledge;
+        yield* until(async () => (await f.deliveryOf("w6", message.id))?.state === "consumed", "the retried input consumed");
+        expect(x.runsOf("w6").length).toBeGreaterThan(1);
+        expect(x.runsOf("w6").at(-1)).toContain("followup without a model receipt");
       }),
     ),
   );
@@ -581,7 +706,7 @@ describe("the chat", () => {
         yield* f.chat.notice(general, "定时任务到了", "cron");
         const last = f.messagesOf(general).at(-1)!;
         expect([last.kind, last.from]).toEqual(["notice", "system"]);
-        expect((yield* Effect.promise(() => f.deliveries("w11"))).at(-1)?.message_id).not.toBe(last.id);
+        expect((yield* Effect.promise(() => f.deliveries("w11"))).at(-1)?.envelope_id).not.toBe(last.id);
       }),
     ),
   );
@@ -602,7 +727,7 @@ describe("the chat", () => {
         expect((yield* Effect.flip(f.chat.markRead("nope", 1)))._tag).toBe("Missing");
         expect(defaultOf(f.core.state().chat)?.read).toBe(seqs[4]);
         expect((yield* Effect.flip(f.chat.say("  ", undefined, "")))._tag).toBe("Refused");
-        expect(yield* f.chat.orchestratorDigest(defaultOrchestrator)).toEqual([]);
+        expect(yield* f.mailbox.orchestratorDigest(defaultOrchestrator)).toEqual([]);
       }),
     ),
   );
@@ -611,12 +736,12 @@ describe("the chat", () => {
     run((f, x) =>
       Effect.gen(function* () {
         const thread = yield* hireAndRun(f, x, "w12", "写 hello", "chat-l");
-        const digest = yield* f.chat.orchestratorDigest(defaultOrchestrator);
+        const digest = yield* f.mailbox.orchestratorDigest(defaultOrchestrator);
         expect(digest.map((d) => [d.from, d.target])).toEqual([["w12", `#general:${thread.rootNumber}`]]);
-        expect(yield* f.chat.orchestratorDigest(defaultOrchestrator)).toHaveLength(1);
+        expect(yield* f.mailbox.orchestratorDigest(defaultOrchestrator)).toHaveLength(1);
         // Taken as input by the orchestrator's run, as its execution says once it took it.
-        x.consumed({ session: defaultOrchestrator, messages: [digest[0]!.id] });
-        expect(yield* f.chat.orchestratorDigest(defaultOrchestrator)).toEqual([]);
+        x.consumed({ session: defaultOrchestrator, envelopeIds: [digest[0]!.id] });
+        yield* waitFor(f.mailbox.orchestratorDigest(defaultOrchestrator), (rows) => rows.length === 0, "the digest input consumed");
         yield* f.chat.say("大家看一下", f.chat.defaultChannel(), "");
         const unread = yield* f.chat.unread("w12");
         expect(unread).toEqual([{ channel: "#general", unread: 2, mentionsYou: true, latest: "主人" }]);
@@ -632,7 +757,7 @@ describe("the chat", () => {
         yield* hireAndRun(f, x, "w13", "写 hello", "chat-m");
         yield* until(() => !isBusy(f.core.session("w13")!), "resting");
         yield* f.chat.say("随便说说", f.chat.defaultChannel(), "");
-        yield* f.core.apply({ type: "left", id: sessionId("w13") });
+        yield* f.core.apply({ type: "sessionGone", id: sessionId("w13") });
         yield* until(async () => (await f.deliveries("w13")).at(-1)?.state === "dropped", "dropped");
         const left = yield* f.sql<{ left_at: number | null }>`select left_at from channel_participant where id = 'w13'`;
         expect(left[0]?.left_at).not.toBeNull();
@@ -659,8 +784,16 @@ describe("the chat", () => {
           Effect.gen(function* () {
             y.holds = false;
             expect(g.core.session("w14")).toBeDefined();
-            yield* g.core.apply({ type: "report", questions: [], checks: [], id: sessionId("w14"), outcome: "interrupted", summary: "重启了", runs: 1 });
-            yield* until(async () => (await g.deliveryOf("w14", said.id))?.state === "seen", "seen after the restart");
+            yield* g.core.apply({
+              type: "sessionReport",
+              questions: [],
+              checks: [],
+              id: sessionId("w14"),
+              outcome: "interrupted",
+              summary: "重启了",
+              runs: 1,
+            });
+            yield* until(async () => (await g.deliveryOf("w14", said.id))?.state === "consumed", "seen after the restart");
             expect(y.runsOf("w14").at(-1)).toContain("再加一个文件");
             expect(yield* g.chat.threadOfSession("w14")).toBe(thread.id);
             // The new farm has heard nothing yet: what was said before is in the room's history.
@@ -671,9 +804,37 @@ describe("the chat", () => {
     });
   });
 
-  it("a report's summary is its verdict", () => {
-    expect(summaryOf("先看看。\n\n**结论：** 改好了，测试通过。\n\n备注：无")).toBe("改好了，测试通过。");
-    expect(summaryOf("做了一些事\n\n- 结论：好了")).toBe("好了");
+  it.live("regression: a committed message without a route receipt is routed after restart", () => {
+    const config = { ...testConfig(), db: "" };
+    let thread: T.Channel;
+    let message: T.ChatMessage;
+    return Effect.gen(function* () {
+      yield* run(
+        (f, x) =>
+          Effect.gen(function* () {
+            x.holds = false;
+            thread = yield* hireAndRun(f, x, "w15", "write route", "chat-route");
+            message = (yield* f.chat.say("recover this input", thread.id, "route-gap")).message;
+            yield* until(async () => (await f.deliveryOf("w15", message.id))?.state === "consumed", "the first route");
+            yield* f.sql`delete from mailbox_delivery where envelope_id = ${message.id}`;
+            yield* f.sql`update ingress_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${message.id}`;
+          }),
+        config,
+      );
+      yield* run(
+        (_f, x) =>
+          Effect.gen(function* () {
+            x.holds = false;
+            yield* until(() => x.runsOf("w15").some((input) => input.includes("recover this input")), "the recovered route");
+          }),
+        config,
+      );
+    });
+  });
+
+  it("an undeclared report's summary does not parse prose markers", () => {
+    expect(summaryOf("先看看。\n\n**结论：** 改好了，测试通过。\n\n备注：无")).toContain("备注：无");
+    expect(summaryOf("做了一些事\n\n- 结论：好了")).toBe("做了一些事\n\n- 结论：好了");
     expect(summaryOf("第一段\n\n第二段")).toBe("第一段\n\n第二段");
     expect(head("😀abc", 1)).toBe("");
   });
@@ -703,7 +864,7 @@ describe("the chat", () => {
         ]);
         yield* hireAndRun(f, x, "run-helper", "test run metadata", "chat-k");
         yield* f.core.apply({
-          type: "report",
+          type: "sessionReport",
           questions: [],
           checks: [],
           id: sessionId("run-helper"),
@@ -729,7 +890,6 @@ describe("the chat", () => {
       Effect.gen(function* () {
         const general = f.chat.defaultChannel();
         for (const text of ["一", "二", "三"]) yield* f.chat.say(text, undefined, "");
-        // Caught up by revision: from where 一 now stands (the orchestrator's 👀 on it is a change too).
         const one = (yield* f.chat.history(general)).find((m) => m.text === "一")!;
         const following = yield* Effect.forkChild(Stream.runCollect(Stream.take(f.chat.follow(general, one.revision), 3)));
         // What is said elsewhere is not this room's.
@@ -756,7 +916,7 @@ describe("the chat", () => {
         Effect.gen(function* () {
           const general = f.chat.defaultChannel();
           const first = (yield* f.chat.say("先这样", undefined, "")).message;
-          expect((yield* f.chat.history(general))[0]!.reactions).toEqual([{ emoji: "👀", by: [defaultOrchestrator] }]);
+          expect((yield* f.chat.history(general))[0]!.reactions).toEqual([]);
           const reply = (yield* f.chat.say("补一句", undefined, "", { replyTo: first.number })).message;
           expect(reply.replyTo).toBe(first.number);
           expect(yield* Effect.flip(f.chat.say("没有这条", undefined, "", { replyTo: 99 }))).toMatchObject({ _tag: "Refused" });
@@ -890,8 +1050,7 @@ describe("the chat", () => {
         const general = f.chat.defaultChannel();
         yield* f.chat.orchestratorSays(general, "hello", "", defaultOrchestrator);
         const [message] = yield* f.chat.history(general);
-        yield* f.sql`insert into channel_seen_mark (participant_id, message_id) values ('owner', ${message!.id})`.pipe(Effect.orDie);
-        yield* trigger(f.sql, "fail_receipt", "before delete on channel_seen_mark");
+        yield* trigger(f.sql, "fail_receipt", "before insert on channel_read_cursor");
         expect((yield* Effect.exit(f.chat.markRead(general, message!.number)))._tag).toBe("Failure");
         expect(yield* f.sql`select read_number from channel_read_cursor where participant_id = 'owner' and channel_id = ${general}`.pipe(Effect.orDie)).toEqual(
           [],
@@ -899,7 +1058,7 @@ describe("the chat", () => {
         // Nor is it read in what the chat shows next: what it kept in memory is read again from the database.
         yield* f.chat.notice(general, "动静", "test");
         expect(f.channel(general)?.read).toBeUndefined();
-        yield* drop(f.sql, "fail_receipt", "channel_seen_mark");
+        yield* drop(f.sql, "fail_receipt", "channel_read_cursor");
         yield* f.chat.markRead(general, message!.number);
         expect(yield* f.sql`select read_number from channel_read_cursor where participant_id = 'owner' and channel_id = ${general}`.pipe(Effect.orDie)).toEqual(
           [{ read_number: message!.number }],
@@ -913,19 +1072,22 @@ describe("the chat", () => {
     run((f) =>
       Effect.gen(function* () {
         yield* trigger(f.sql, "fail_owner", "before insert on channel_follow", "when (new.reason = 'owner')");
+        const first: T.Session = {
+          id: sessionId("w1"),
+          role: "worker",
+          name: "helper",
+          agent: "lab",
+          runtime: "pi",
+          brief: "work",
+          hiredAt: Date.now(),
+          runs: 0,
+          phase: { _tag: "resting" },
+          refining: false,
+        };
+        yield* keepSession(f, first);
         yield* f.core.apply({
-          type: "hired",
-          session: {
-            id: "w1",
-            name: "helper",
-            agent: "lab",
-            runtime: "pi",
-            brief: "work",
-            hiredAt: Date.now(),
-            runs: 0,
-            phase: { _tag: "resting" },
-            refining: false,
-          } as T.Session,
+          type: "session",
+          session: first,
         });
         yield* waitFor(
           Effect.map(f.sql<{ n: string }>`select last_value::text as n from fail_owner_tries where is_called`.pipe(Effect.orDie), (rows) => rows.length),
@@ -935,19 +1097,22 @@ describe("the chat", () => {
         expect(yield* f.chat.history(f.chat.defaultChannel())).toEqual([]);
         yield* drop(f.sql, "fail_owner", "channel_follow");
         // Another hire opens every present session's thread again.
+        const second: T.Session = {
+          id: sessionId("w2"),
+          role: "worker",
+          name: "other",
+          agent: "lab",
+          runtime: "pi",
+          brief: "more",
+          hiredAt: Date.now(),
+          runs: 0,
+          phase: { _tag: "resting" },
+          refining: false,
+        };
+        yield* keepSession(f, second);
         yield* f.core.apply({
-          type: "hired",
-          session: {
-            id: "w2",
-            name: "other",
-            agent: "lab",
-            runtime: "pi",
-            brief: "more",
-            hiredAt: Date.now(),
-            runs: 0,
-            phase: { _tag: "resting" },
-            refining: false,
-          } as T.Session,
+          type: "session",
+          session: second,
         });
         yield* until(() => f.messagesOf(f.chat.defaultChannel()).filter((m) => m.kind === "dispatch").length === 2, "both dispatched");
         const thread = (yield* f.chat.threadOfSession("w1"))!;

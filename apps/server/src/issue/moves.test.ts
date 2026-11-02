@@ -40,7 +40,6 @@ describe("status moves", () => {
     }
     expect(statusMoves(issue("backlog", false, { refining: { session: sessionId("w2"), name: "试验田" } }))).toEqual(["canceled"]);
     expect(statusMoves(issue("in_progress", false, { lastRun: { startedAt: 1 } }))).toEqual(["canceled"]);
-    expect(statusMoves(issue("in_review", false, { graph: { state: "draft" } as never }))).toEqual([]);
   });
 
   it("a round that failed is not completed, from the board, the command line or the orchestrator alike", () => {
@@ -123,21 +122,35 @@ describe("moves and the stage", () => {
     } as unknown as Issue;
     let state = emptyWorkspaceState();
     for (const fact of [
-      { type: "hired", at: 1, session: hired },
+      { type: "session", at: 1, session: hired },
       { type: "issue", at: 1, issue },
-      { type: "report", questions: [], checks: [], at: 2, id: "w1", outcome: "completed", summary: "做完了", runs: 1 },
+      { type: "sessionReport", questions: [], checks: [], at: 2, id: "w1", outcome: "completed", summary: "做完了", runs: 1 },
     ] as Fact[])
       state = reduce(state, fact)[0];
     expect(state.issues[0]!.moves).toContain("done");
     const issues = state.issues;
-    state = reduce(state, { type: "call", state: "live", reason: "", at: 2 })[0];
+    state = reduce(state, { type: "voiceCall", state: "live", reason: "", at: 2 })[0];
     expect(state.issues).toBe(issues);
     state = reduce(state, { type: "run", id: hired.id, at: 2 })[0];
-    state = reduce(state, { type: "quiet", id: hired.id, since: 2, at: 2 })[0];
+    state = reduce(state, {
+      type: "sessionPhase",
+      id: hired.id,
+      phase: { _tag: "working", since: 2, doing: { action: "thinking", label: "" }, quietSince: 2 },
+      at: 2,
+    })[0];
     expect(state.issues[0]!.stage).toMatchObject({ state: "stuck", stuck: "quiet", since: 2 });
     state = reduce(state, { type: "doing", id: hired.id, action: "thinking", label: "", at: 2 })[0];
     expect(state.issues[0]!.stage.state).toBe("working");
-    state = reduce(state, { type: "report", questions: [], checks: [], at: 3, id: sessionId("w1"), outcome: "failed", summary: "没做成", runs: 2 })[0];
+    state = reduce(state, {
+      type: "sessionReport",
+      questions: [],
+      checks: [],
+      at: 3,
+      id: sessionId("w1"),
+      outcome: "failed",
+      summary: "没做成",
+      runs: 2,
+    })[0];
     expect(state.issues[0]!.moves).toEqual(["todo", "canceled"]);
   });
 });

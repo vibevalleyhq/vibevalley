@@ -1,14 +1,34 @@
 {
+  "waitingDispatch": "Queued and waiting for dispatch.",
+  "split": {
+    "notCurrent": "Only the helper currently assigned to this issue can split it.",
+    "already": "This issue is closed or already has child issues.",
+    "invalid": "Provide 1–{max} child issues with unique valid IDs and acyclic dependencies within this split.",
+    "agent": "Choose an enabled helper profile for each child issue: {agent}",
+    "commitFirst": "Commit the parent issue's changes before splitting it.",
+    "needsBranch": "The parent issue needs its own working branch before splitting; its helper is currently working directly in the project directory.",
+    "created": "Created {count} child issues under #{n}."
+  },
+  "verification": {
+    "acceptanceNeedsCheck": "An acceptance issue needs a check command.",
+    "acceptancePassed": "The acceptance check already passes before implementation: {check}",
+    "frozen": "Frozen acceptance files were changed: {files}",
+    "failed": "Check failed: {check}\n{output}"
+  },
+  "dependencies": {
+    "closedParent": "A closed parent issue cannot accept child issues",
+    "project": "A child issue must use its parent's project",
+    "invalid": "Issue dependencies must be acyclic and refer to existing issues",
+    "waiting": "Waiting for prerequisite issues: {issues}"
+  },
   "issueNumbered": "ticket #{n}",
   "issueRef": "ticket {ref}",
   "helperRef": "helper {id}",
   "projectRef": "project {name}",
   "helper": "the helper",
   "notStarted": "This ticket has not started yet",
-  "inGraph": "This ticket belongs to a plan: change it in the plan",
   "started": "This ticket has already started",
   "noTitle": "The ticket has no title",
-  "notQueued": "Ticket {id} is not in the queue",
   "orchestratorNotHelper": "The manager is not a helper: send it to a helper",
   "disabled": "{name} is disabled",
   "cannotSend": "{name} cannot be sent: {why}",
@@ -24,13 +44,11 @@
   "queuedStarted": "The queued \"{title}\" has started: {session}",
   "queuedStuck": "The queued \"{title}\" could not start: {why}; it could not go back to To do either, and stays in the queue",
   "queuedBack": "The queued \"{title}\" could not start and stays in To do: {why}",
-  "graphRetry": "This ticket belongs to a plan and follows it: retry the task in the plan, or reopen the whole plan",
+  "mergedChildRetry": "This child issue has already merged into its parent. Continue work through the parent issue.",
   "neverStarted": "This ticket has never started: just start it",
   "stillOpen": "This ticket is still open: moving it back to To do is another round",
   "stillWorking": "{name} is still on this ticket: tell it directly",
   "senderGone": "The profile it was sent to, {id}, is gone",
-  "cronNoIssue": "The scheduled task \"{name}\" could not write its ticket: {why}",
-  "cronNoStart": "The scheduled task \"{name}\" could not start: {why}",
   "closedReopen": "This ticket is closed: reopen it with a few words",
   "handOverOnTodo": "Handing over happens when moving to To do: move it there and say who takes over",
   "stopFirst": "#{n} is still in this round: stop it, and hand it over once it has stopped",
@@ -41,7 +59,6 @@
   "cannotDelete": "Ticket #{n} cannot be deleted yet: {why}",
   "noConflict": "{name} has no conflict with main",
   "orchestratorAnswers": "This ticket is the manager's: it closes once the manager answers",
-  "graphAcceptance": "This ticket belongs to a plan and follows it: accept it in the plan",
   "nothingToAccept": "Nothing has been handed back yet, so there is nothing to accept",
   "failNeedsFindings": "Failing the acceptance needs what is wrong: write at least one point",
   "does": {
@@ -126,7 +143,6 @@
     "told": "You told it something; another round",
     "start": "Started",
     "restart": "Reopened, carrying on",
-    "graph": "Started by the plan",
     "cron": "{missed, select, true {Started on schedule (made up)} other {Started on schedule}}",
     "runtime": "The machine carried on by itself",
     "refined": "Drafted",
@@ -161,5 +177,8 @@
     "notDoing": "Not doing:",
     "files": "May touch:"
   },
-  "noProfileNamed": "No profile is named {key}"
+  "noProfileNamed": "No profile is named {key}",
+  "prSubmitNotAllowed": "The owner did not explicitly authorize this ticket to submit its own pull request",
+  "prSubmitNotCurrent": "Only the helper currently handling this ticket can submit its pull request",
+  "prSubmitUnavailable": "Pull-request delivery is not enabled for this ticket's project"
 }

@@ -1,0 +1,119 @@
+模型：opencode-go/gemini-4-argon
+会话：ses_e69d7fcd7ffei46xqVUD5nDmzg
+
+### 第 4 轮完整方案：消除 `packages/agent` 的 Promise 镜像层（`BrainHandle` / `openBrain` / `standaloneOwner`）及 `cli/chat.ts` 死路径
+
+#### 一、全仓调用方盘点与 `cli/chat.ts` 死路径确认
+
+1. **确认 `apps/server/src/cli/chat.ts:212-218` 是 100% 死路径**：
+   - 在 `cli/chat.ts:207`：
+     ```ts
+     export const runtimeChat = (id: string, values: RuntimeChat) =>
+       id === "vibevalley"
+         ? ownChat(...)
+         : Effect.gen(function* () { ... })
+     ```
+   - 当 `id === "vibevalley"` 时已经在三元表达式的第一分支直接走了 `ownChat`；进入 `else` 分支时 **`id` 绝对不可能是 `"vibevalley"`**！
+   - 而在 `else` 分支的第 212–221 行，为了 `registry.get(id)`，竟然调用了 `loadConfig()`、`standaloneLlm()`、`vibevalleyRuntimeOf({ ..., owner: standaloneOwner() })` 去构造了一个永远不会被 `registry.get(id)` 命中的 `"vibevalley"` runtime！
+   - **清理**：`cli/chat.ts` 的 `else` 分支只需 `const registry = registryOf([dshRuntime]);`，直接删除 `vibevalleyRuntimeOf`、`standaloneOwner`、`modelClient`、`wallTime`、`loadConfig`、`standaloneLlm` 在该分支的冗余调用与导入。
+
+2. **全仓所有 `openBrain` / `BrainHandle` / `BrainOwner` / `standaloneOwner` 真实调用方（共 6 个文件）**：
+   - `packages/agent/src/brain.ts`（定义处，第 592–678 行）
+   - `apps/server/src/runtime/vibevalley.ts`（唯一生产调用处，唯一真正處于 `oar` Promise SPI 边界的适配器）
+   - `apps/server/src/cli/chat.ts`（死路径，删除）
+   - `apps/server/src/orchestrator/evals.live.test.ts`（第 44–85 行 `replay` 函数：本来就可以直接用 `Effect.runPromise(Effect.scoped(...))` 调 `makeBrain`）
+   - `packages/agent/src/run.test.ts`（第 169–206 行 `keeps an answer cut off by closing, with what it used`：唯一测 `Scope.close` 时保留半截回答用量的测试，同文件其他测试全都用 `makeBrain`）
+   - `packages/agent/src/brain.test.ts`（第 86–145 行的两项测试：`shares the actual close with every concurrent caller` 和 `cuts off a run under way when its owner's scope closes`）
+   - `apps/server/src/runtime/vibevalley.test.ts`（第 43、165、174 行，给 `vibevalleyRuntimeOf` 传 `owner`）
+
+---
+
+#### 二、如何在不搬移 `BrainHandle` 镜像的前提下，在 `vibevalley.ts` 保留全部 5 项并发与 Scope 保证
+
+`vibevalley.ts` 只需要 `Brain` 的 **4 个操作**（`send`、`stop`、`progress`、`events`）加 `close`，根本不需要 `BrainHandle` 那 13 个方法的 Promise 镜像类和 `Set<listener>` 广播器。
+
+在 `apps/server/src/runtime/vibevalley.ts` 中：
+
+1. **定义窄 `BrainOwner`（或保留在 `vibevalley.ts`）**：
+   ```ts
+   export interface BrainOwner {
+     readonly run: <A, E>(effect: Effect.Effect<A, E>) => Promise<A>;
+     readonly scope: Scope.Scope;
+   }
+   ```
+   （当 `options.owner` 在单测 `vibevalley.test.ts` 中未传时，默认 `{ run: Effect.runPromise, scope: Scope.makeUnsafe() }`，这样 `vibevalley.test.ts` 连 `standaloneOwner()` 都不需要传！）
+2. **在 `vibevalley.ts` 的 `start` 中直接用 `owner.run` 走双子 Scope 与排空关闭**（约 25 行，直接把事件传给本地 `onBrainEvent` 函数，零 `BrainHandle` 包装、零 `Set<listener>`）：
+   ```ts
+   const { run, scope: parentScope } = options.owner ?? { run: Effect.runPromise, scope: Scope.makeUnsafe() };
+   const scope = await run(Scope.fork(parentScope));
+   const reading = await run(Scope.fork(parentScope));
+   let brain: Brain;
+   let reader: Fiber.Fiber<void>;
+   try {
+     brain = await run(Scope.provide(makeBrain({ ... }), scope));
+     reader = await run(
+       Scope.provide(
+         Effect.flatMap(brain.events, (events) =>
+           Effect.forkScoped(Stream.runForEach(events, (e) => Effect.sync(() => onBrainEvent(e)))),
+         ),
+         reading,
+       ),
+     );
+   } catch (e) {
+     await run(Effect.andThen(Scope.close(scope, Exit.void), Scope.close(reading, Exit.void)));
+     throw e;
+   }
+   let closing: Promise<void> | undefined;
+   const closeBrain = () =>
+     (closing ??= run(
+       Effect.andThen(Effect.andThen(Scope.close(scope, Exit.void), Fiber.await(reader)), Scope.close(reading, Exit.void)),
+     ));
+   ```
+   核对 5 项保证：
+   - **双子 Scope**：`scope`（跑 `makeBrain`）与 `reading`（跑 `brain.events` 消费纤程）都是 `parentScope` 的子 Scope。
+   - **父 Scope 关闭自动中断**：当 `Runtime` 服务关闭 `parentScope` 时，`scope` 与 `reading` 作为子 Scope 自动关闭并打断在途运行。
+   - **关闭排空到 `agent_closed`**：`closeBrain()` 先关 `scope`（触发 `makeBrain` 的 finalizer 停止运行、结算未完回合、最后发布 `agent_closed`），再 `Fiber.await(reader)` 等 `Stream.takeUntil(e => e.type === "agent_closed")` 读完包括最后一条 `agent_settled` 在内的全部事件，最后关 `reading`。
+   - **并发 `close` 幂等**：`closing ??= ...` 保证多次并发调用共享同一个 Promise。
+   - **初始化失败清理**：`try / catch` 在 `makeBrain` 或订阅失败时关闭 `scope` 和 `reading` 并重抛异常。
+
+---
+
+#### 三、四个测试文件的迁移方式（不重建 `BrainHandle`）
+
+1. **`apps/server/src/orchestrator/evals.live.test.ts`（第 44–85 行）**：
+   - 删除 `openBrain, standaloneOwner` 导入，改导 `makeBrain`。
+   - `replay` 直接用 `Effect.runPromise(Effect.scoped(Effect.gen(function* () { ... })))`：
+     - `const brain = yield* makeBrain({ ... });`
+     - 从 `yield* brain.events` 用 `Stream.takeUntil((e) => e.type === "agent_settled")` 收集 `turn` 与 `tokens`，并发执行 `yield* brain.send(c.input)`，外层加 `Effect.timeoutFail({ duration: "5 minutes", ... })`。比原来手写 `new Promise` + `setTimeout` + `try/finally brain.close()` 更短、更符合 Effect 规范！
+2. **`packages/agent/src/run.test.ts`（第 169–206 行 `keeps an answer cut off by closing, with what it used`）**：
+   - 删除 `openBrain, standaloneOwner` 导入，直接用 `makeBrain` + `Scope.make()`：
+     ```ts
+     const scope = yield* Scope.make();
+     const agent = yield* Scope.provide(makeBrain({ ... }), scope);
+     const events: BrainEvent[] = [];
+     const reader = yield* Effect.forkScoped(Stream.runForEach(yield* agent.events, (e) => Effect.sync(() => void events.push(e))));
+     yield* agent.send(userMessage("start", Date.now()));
+     yield* until(() => events.some((e) => e.type === "message_update" && messageText(e.message) === "partial"), "partial update");
+     expect(agent.progress().current.settled).toBe(false);
+     yield* Effect.all(Array.from({ length: 8 }, () => Scope.close(scope, Exit.void)), { concurrency: "unbounded" });
+     yield* Fiber.join(reader);
+     ```
+     直接在 `Scope.close(scope, Exit.void)` + `Fiber.join(reader)`（等待 `agent_closed` 结束流）上验证并发关闭与截断回答的 `agent_settled` 账单！
+3. **`packages/agent/src/brain.test.ts`（第 86–145 行的两项测试）**：
+   - 第 124–145 行（`cuts off a run under way when its owner's scope closes`）：原本测的就是父 `Scope` 关闭时 `Scope.fork(owner)` 的子 Scope 随之关闭打断在途流，直接用 `const owner = yield* Scope.make(); const scope = yield* Scope.fork(owner); const agent = yield* Scope.provide(makeBrain(testBrain(home(), held)), scope);` 验证 `Scope.close(owner, Exit.void)` 打断运行。
+   - 第 86–122 行（`shares the actual close with every concurrent caller`）：这测的是 `vibevalley.ts` 中 `session.dispose()` / `closeBrain()` 等待在途运行结束且并发调用共享同一次关闭的行为。将其用 `makeBrain` + `Scope.close(scope, Exit.void)` 验证并发 `Scope.close` 等待 finalizer 门控释放后才双双完成（或在 `vibevalley.test.ts` 中验证并发 `session.dispose()`）。
+4. **`apps/server/src/runtime/vibevalley.test.ts`**：
+   - 删除 `standaloneOwner` 导入；`vibevalleyRuntimeOf` 的 `owner` 设为可选（缺省在 `vibevalley.ts` 内使用 `{ run: Effect.runPromise, scope: Scope.makeUnsafe() }`），`vibevalley.test.ts` 第 43、165、174 行直接省去 `owner: standaloneOwner()`。
+
+---
+
+#### 四、文档与检查同步
+
+- `docs/subsystems/foundation.md` 第 59 行：删除 `openBrain` 提及，更新为 `vibevalley` 农机经 `BrainOwner` 在服务作用域上运行 `makeBrain`，终端与管家宿主直接调用 `makeBrain`。
+- 验证命令：
+  ```bash
+  vp test packages/agent/ apps/server/src/runtime/vibevalley.test.ts apps/server/src/cli.test.ts
+  vp run server:check
+  vp run docs:verify
+  vp run deadcode
+  ```

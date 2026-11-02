@@ -15,7 +15,7 @@ import { type BoardCard, cardAgent, cardLook, cardProject, laneOrder, rowFacts }
 import { type Grouping, groupRows, type Ordering, orderRows, type RowGroup } from "./display";
 import { closedShown, laneLabel, laneStatus } from "./lanes";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
-import { useGraphs, useNameOf } from "./queries";
+import { useIssues, useNameOf } from "./queries";
 
 /** The quick add, with the group's project or helper when grouped by one. */
 export type ListAdd = (text: string, where: { project?: string; agent?: string }) => void;
@@ -154,9 +154,9 @@ function Row(props: {
   onOpen: (id: string) => void;
   nameOf: (id: string) => string;
 }) {
-  const graphs = useGraphs();
+  const issues = useIssues();
   const now = () => Date.now();
-  const look = () => cardLook(props.card, props.nameOf, graphs(), now());
+  const look = () => cardLook(props.card, props.nameOf, issues(), now());
   const project = () => cardProject(props.card);
   return (
     <div

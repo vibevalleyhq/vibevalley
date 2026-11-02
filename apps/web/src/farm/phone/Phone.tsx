@@ -58,8 +58,8 @@ export function Phone(props: { room: { w: number; h: number } }) {
     switch (call.target.kind) {
       case "session":
         return farm.select(call.target.id);
-      case "graph":
-        return farm.openTaskBoard(call.target.graph);
+      case "issue":
+        return router.navigate(`/issues/${call.target.id}`);
       case "chat":
         return router.navigate(`/chat/${call.target.channel}`);
     }
@@ -109,9 +109,9 @@ export function Phone(props: { room: { w: number; h: number } }) {
                   put();
                   router.navigate("/chat");
                 }}
-                onTaskBoard={() => {
+                onIssues={() => {
                   put();
-                  farm.openTaskBoard();
+                  router.navigate("/issues");
                 }}
               />
             </Match>

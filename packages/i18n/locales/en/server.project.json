@@ -1,4 +1,6 @@
 {
+  "parentBranchChanged": "The parent worktree changed branches; the child cannot be merged automatically",
+  "parentHasChanges": "Commit the parent's outstanding changes before merging the child",
   "badName": "A project name starts with a letter or a digit and has only letters, digits, -, _ and ., up to 64 characters",
   "badGithub": "Give a GitHub repository address, such as https://github.com/botiverse/raft-source",
   "branchMoved": "The branch changed after the check: check again before merging",
@@ -58,6 +60,7 @@
     "noPermission": "The repository's permissions could not be checked",
     "readOnly": "No write permission",
     "wrongBranch": "The ticket's branch does not match",
+    "changedDuringCheck": "The worktree changed during validation; commit the changes before submitting the PR again",
     "pushFailed": "Pushing the ticket's branch failed: check origin and the sign-in, then retry",
     "listFailed": "Looking up existing PRs failed; the branch is pushed, so it can be retried",
     "listUnread": "The existing PRs could not be read",
@@ -69,6 +72,7 @@
     "viewFailed": "Looking up PR #{n} failed",
     "stateUnread": "PR #{n}'s state could not be read",
     "stateUnknown": "PR #{n}'s state is not one VibeValley knows",
+    "resolveFailed": "Could not resolve the GitHub review thread",
     "worktreeLeft": "The PR is over, but clearing the worktree failed: {why}",
     "branchLeft": "The PR is over, but clearing the local branch failed: {why}"
   },

@@ -25,7 +25,7 @@ describe("the built-in templates", () => {
     Effect.gen(function* () {
       const [first, ...rest] = yield* builtInTemplates;
       expect([first!.id, first!.role, first!.runtime]).toEqual([defaultOrchestrator, "orchestrator", orchestratorRuntime]);
-      expect(rest.every((t) => t.role === "helper" && t.runtime !== "")).toBe(true);
+      expect(rest.every((t) => t.role === "worker" && t.runtime !== "")).toBe(true);
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 

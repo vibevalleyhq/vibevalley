@@ -6,8 +6,6 @@ function runTriggerText(trigger: RunTrigger) {
       return t("web.issue.trigger.issue");
     case "comment":
       return trigger.message ? t("web.issue.trigger.commentNumbered", { id: trigger.message.slice(0, 8) }) : t("web.issue.trigger.comment");
-    case "task":
-      return t("web.issue.trigger.task");
     case "cron":
       return trigger.missed === true ? t("web.issue.trigger.missed") : t("web.issue.trigger.cron");
     case "refine":

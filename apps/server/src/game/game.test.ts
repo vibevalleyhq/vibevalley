@@ -28,8 +28,18 @@ const kinds = Effect.gen(function* () {
   return rows.map((r) => r.kind);
 });
 
-const helper = (id: string, phase = { _tag: "working", since: 0, doing: { action: "thinking", label: "" } } as Session["phase"]) =>
-  ({ id, name: id, agent: "lab", runtime: "pi", brief: "试试", hiredAt: 0, runs: 0, phase, refining: false }) as Session;
+const helper = (id: string, phase: Session["phase"] = { _tag: "working", since: 0, doing: { action: "thinking", label: "" } }): Session => ({
+  id: sessionId(id),
+  role: "worker",
+  name: id,
+  agent: "lab",
+  runtime: "pi",
+  brief: "试试",
+  hiredAt: 0,
+  runs: 0,
+  phase,
+  refining: false,
+});
 
 describe("the game", () => {
   it.effect("keeps a ledger the progress folds back from", () => {
@@ -42,8 +52,16 @@ describe("the game", () => {
         const p = core.state().progress!;
         expect(p.coins).toBeGreaterThanOrEqual(35);
         expect(p.counts.harvests).toBe(1);
-        yield* core.apply({ type: "hired", session: helper("w2") });
-        yield* core.apply({ type: "report", questions: [], checks: [], id: sessionId("w2"), outcome: "failed", summary: "坏了", runs: 1 });
+        yield* core.apply({ type: "session", session: helper("w2") });
+        yield* core.apply({
+          type: "sessionReport",
+          questions: [],
+          checks: [],
+          id: sessionId("w2"),
+          outcome: "failed",
+          summary: "坏了",
+          runs: 1,
+        });
         yield* core.apply({ type: "commits", commits: { total: 1000, repos: [] } });
         yield* until(kinds, (k) => k.join() === "harvested,hired,failed,level", "the ledger");
         return core.state().progress!;
@@ -117,16 +135,16 @@ describe("the game", () => {
           const h = sessionOf(core.state(), id);
           return h ? playOf(h).station : -2;
         });
-      const arriving = { _tag: "arriving" } as Session["phase"];
+      const starting: Session["phase"] = { _tag: "working", since: 0, doing: { action: "none", label: "" } };
       game.want(4);
-      yield* core.apply({ type: "hired", session: helper("w1", arriving) });
+      yield* core.apply({ type: "session", session: helper("w1", starting) });
       yield* until(stationOf("w1"), (s) => s === 4, "w1 on station 4");
-      yield* core.apply({ type: "hired", session: helper("w2", arriving) });
+      yield* core.apply({ type: "session", session: helper("w2", starting) });
       yield* until(stationOf("w2"), (s) => s === 0, "w2 on the first free station");
       game.want(4);
-      yield* core.apply({ type: "hired", session: helper("w3", arriving) });
+      yield* core.apply({ type: "session", session: helper("w3", starting) });
       yield* until(stationOf("w3"), (s) => s >= 0, "w3 hired");
-      yield* core.apply({ type: "hired", session: helper("w4", arriving) });
+      yield* core.apply({ type: "session", session: helper("w4", starting) });
       yield* until(stationOf("w4"), (s) => s >= 0, "w4 hired");
       expect(yield* stationOf("w1")).toBe(4);
       // A taken station is not given again, and the wish is used once.
@@ -154,8 +172,16 @@ describe("the game", () => {
         yield* Effect.scoped(
           Effect.gen(function* () {
             const core = yield* Core;
-            yield* core.apply({ type: "hired", session: helper("w1") });
-            yield* core.apply({ type: "report", questions: [], checks: [], id: sessionId("w1"), outcome: "failed", summary: "", runs: 1 });
+            yield* core.apply({ type: "session", session: helper("w1") });
+            yield* core.apply({
+              type: "sessionReport",
+              questions: [],
+              checks: [],
+              id: sessionId("w1"),
+              outcome: "failed",
+              summary: "",
+              runs: 1,
+            });
             yield* Effect.yieldNow.pipe(Effect.repeat({ times: 10 }));
             yield* TestClock.adjust(15_000);
             if (secondFirst) {

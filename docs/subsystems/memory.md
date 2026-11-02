@@ -1,6 +1,6 @@
 # 记性
 
-每个帮工的档案（`Agent`）一份记性（memory），从它派出去的帮工（Session）共用，跨项目、跨重启：帮工每开新的一轮，农场从记性里挑几条放在它的话前面；一轮结束，农场把它汇报里「记住：」开头的行和这件活记下。记性默认存在农场自己的库里，也能同时接外面的记忆服务（Nowledge Mem、EverOS）。农场里不画它，主人在帮工页、管家页的「记性」页签上看和管。
+每个 Agent 档案一份记性，旗下 Session 共用、跨项目、跨重启：新一轮开始前按任务召回；Worker 通过 `issue_report.remember` 明确提交要记的事实，服务端另记一条做过的工单。记性默认在本地库，也能同步 Nowledge Mem、EverOS。
 
 ## 管什么，不管什么
 
@@ -10,13 +10,13 @@
 | 开工想起什么（`pick`），和「下回开工会想起什么」的预览 | 什么时候算新的一轮、同一个会话想起过哪些（`session`，存在库里它那一行） |
 | 管理器：本地和外面的来源一起读、一起写，合并、去重、超时 | 外面来源的地址和 key 怎么存、怎么校验（`setting`，`settings.json` 的 `memorySources`） |
 | `memory_search`、`memory_create` 背后的检索和写入，回给模型的话（`foundText`） | 工具的参数、谁能用、范围由谁定（`apps/server/src/tool`；帮工经 `/mcp`，`mcp`） |
-| 管家的 `MEMORY.md` 和旧账 `archive/` 给页面的读写口子 | 管家怎么把 `MEMORY.md` 带进系统提示、`remember` 和 `search_archive` 工具（`packages/agent/src/memory.ts`；[管家](docs/subsystems/orchestrator.md)） |
+| 管家与帮工共用 memory 表，旧账 archive/ 保留原文 | Brain 经 MemoryPort 读取提示与调用记忆工具；独立命令行可选择文件存储 |
 | 送往外面来源之前抹密钥 | 抹密钥的规则本身（`base/redact.ts`，和服务端日志同一份；[设置](docs/subsystems/setting.md)） |
 | | 技能书（程序性的「记性」走技能书，[档案和农机](docs/subsystems/agent.md)） |
 
 ## 在哪
 
-- 服务端 `apps/server/src/memory`（`Memory`）：`memory.ts` 对外的方法（管家的和帮工的分流）、每个管家 `MEMORY.md` 的口子；`sources.ts` 几个来源的管理器和一个来源的接口；`store.ts` 本地来源的存取（`MemoryStore`：库里的读写、读「记住：」）；`recall.ts` 挑法和检索（纯函数）；`terms.ts` 切词，`gse.ts` 是 gse v1.1.0 的中文切法（词典 `data/zh_s.txt.gz` 和 HMM `data/hmm_emit.json.gz`，逐字对上 gse，黄金数据在 `testdata`）；`nowledge.ts`、`everos.ts` 两个外面的来源。
+- 服务端 `apps/server/src/memory`（`Memory`）：`memory.ts` 对外的方法、所有档案共用的数据库记忆入口；`sources.ts` 管来源；`store.ts` 存显式 note 与工单记忆；`recall.ts` 挑法和检索；`terms.ts`、`gse.ts` 切词；`nowledge.ts`、`everos.ts` 接外部来源。
 - 表：`memory`（一条记忆一行，`terms` 是切好的词，`terms_vector` 是它的 `tsvector`，GIN 索引 `memory_by_terms`）；查询在 `db/queries/memory.sql`。
 - 接口：`memory.list`、`memory.recall`、`memory.create`、`memory.search`（在全部来源里找，不填档案就是全部档案的）、`memory.delete`，管家的旧账 `orchestrator.archive.list`、`orchestrator.archive.get`（带 `agent`，不填是默认管家）（[capabilities.md](docs/reference/capabilities.md)）。
 - 页面：`apps/web/src/features/memory/Memory.tsx`（帮工页和管家页的记性、管家的旧账）；来源在「设置」的「记性」（`features/setting/SettingsForm.tsx`）。农场 HUD 的「记忆树」按钮到 `/tree`（`apps/web/src/tree`）：所有档案的记性汇总成一棵树和一片星空，现在用的是假数据（[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)）。
@@ -24,8 +24,8 @@
 ## 模型和不变量
 
 - **记性的键是帮工的档案的 id**，不是帮工：同一个档案的帮工共用一份；删了档案，记性还在库里，同 id 再建接着用。不进核心状态，页面打开时经接口读。
-- **本地的一条是两种之一**：`note`（记下的一句话：帮工汇报里的「记住：」、主人在页签上替它记的、`memory_create` 记的）和 `issue`（做过的活：工单前 100 字 + 「 → 」+ 最后一轮的结论前 200 字，没做成的写「没做成：」）。`project` 为空是所有项目的。每条记着谁写的（`author`）：`owner` 是主人在页签上记的，`session` 是帮工自己（「记住：」或它的 `memory_create`，带着是哪个 Session），`orchestrator` 是管家替它记的，`system` 是服务端记下的做过的活；页签照它写「你记的」「某某 记的」「管家替它记的」。外面来源和管家的 `MEMORY.md` 不知道是谁写的，`author` 为空。做过的活一个 Session 一条，每轮改写（`memory_one_issue` 唯一索引）。表里的 `scope = owner`、`profile`、`episode`、`replaced_by`、`title`、`labels`、`importance` 是给[记忆都存在 SQLite](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)留的，代码现在只写 `scope = agent` 的 `note`、`issue`，读时跳过 `replaced_by` 不为空的和不认识的种类。
-- **上限**：每个档案最多 300 条（`memoryKeep`），超了先删最久没用的（最后想起的时间，没想起过按写下的时间，`nextForgotten`）；页签上离上限不到 10 条时把最先会删的标成 `fading`，和真删的顺序是同一个函数。一句话最多 300 个字符（UTF-16），一轮最多读 5 条「记住：」。
+- **本地的一条是两种之一**：`note` 来自 `issue_report.remember`、主人页签或 `memory_create`；`issue` 是服务端自动记录的做过的活。`remember.scope` 是 `project` 或 `all`，落盘时 `project` 为空表示所有项目。每条保留 author 和 Session；工单记忆一个 Session 一条。
+- **上限**：每个档案最多 300 条（`memoryKeep`），超了先删最久没用的；页签提前标出最先会删的 10 条。一句话最多 300 个 UTF-16 字符；一轮由结构化 report 明确提交，召回仍受字符预算控制。
 - **一轮的笔记、做过的活和超额的清理在一个事务里**，失败不留下半份。
 - **几乎一样的不重复记**：同一个范围（同项目或都是所有项目）里已有一样的，或词的重合度（`memoryLikeness`，交集比并集）≥ 0.8 的，就不记；提不出词的不同短句重合度是 0，分别留着。
 - **词**（`terms.ts`）：中文用 gse 的 `cutSearch` 和 `cutAll` 的并集（「表名单数」两种切法都有，「单数」也算），只留两个字以上含汉字的词；英文、数字、路径、版本号按整词（`db/migrations`、`v1.2.3` 各是一个词），小写；去掉停用词。每条写入时切好存进 `terms` 列，`terms_of` 记是第几版切法；切法或词典变了就把 `termsVersion` 加一，本地来源开机后在后台把 `terms_of` 旧的一批一百行重切。词典第一次用时加载。
@@ -36,7 +36,7 @@
 - **检索**（`recall.ts`，`memory_search` 的本地那一半）：`ts_rank` + 共有的词 × 0.5 + 整句出现加 2，给了项目时这个项目的再加 0.5；给了项目只查这个项目的和所有项目的；一个词也不中的不要；没有查询词就按新旧列出；默认 10 条。
 - **id**：本地的照原样，外面来源的带名字（`nowledge:<id>`、`everos:<id>`），「忘掉」照前缀找到那一家。
 - **记不住不拦着干活**：读不出、写不进、外面的来源慢或出错，都只记日志，那一轮照常。Nowledge 的 `memory_search`、`memory_add`、`get_memory_by_id` 和 EverOS 的 `memory/search` 回答先按形状解码，解析或形状校验失败按读不出处理；详情的范围认不出来时仍是未知，不猜成全局。
-- **管家不在这张表里**：每个管家的记性是它家目录 `agent/<档案 id>/MEMORY.md` 的一行一条，按这一行的 hash 认；主人替它记的写成「主人交代：……」。`memoriesOf`、`remember`、`forget` 按档案是不是管家（`isOrchestrator`）分流；管家没有「想起」，问它的预览被拒（它每次带着整份记性）。删除预览读不了这份文件、删除写不回时都返回 `Refused`，不把文件错误当成程序员 defect。
+- **所有档案共用数据库记忆**：memoriesOf、remember、forget 和召回不按角色分流。Session.host 注入 MemoryPort，管家的系统提示、remember、rewrite_memory 和页面都读写 memory 表。作者由 author 保存，主人的条目在提示中带「主人交代」；Agent 整理记性只替换自己管理的 note，保留主人条目的身份与内容。旧 MEMORY.md 不参与读取或恢复。
 
 ## 怎么走
 
@@ -51,8 +51,8 @@
 **记下**（一轮结束，`session` 在后台调 `keep`，汇报不等它）：
 
 1. 叫停的一轮什么也不记，哪个来源都不送。
-2. 本地当场记：读汇报里「记住：」开头的行（前面可以有列表符号、加粗）记成这个项目的，「记住（所有项目）：」记成所有项目的；Session 关联真实工单时才改写「做过的活」，聊天 Session 只记明确留下的笔记；删超额的。一个事务。
-3. 外面的来源放进后台的一条队列，一个接一个地送（每个最多 30 秒，队列满 256 个就丢掉、记日志）。Nowledge Mem 收「记住：」的行（`memory_add`）；EverOS 收这一轮（`memory/add`：第一轮带上工单作主人的话，每一轮带上帮工最后的汇报，没做成的写明）。
+2. `Session` 消费 `issue_report.remember` 后逐条调用 `Memory.write`，本地和外部来源收到同一份显式 note；工单轮次另经 `Memory.keep` 改写做过的活。正文不会被扫描成记性。
+3. 外部来源在后台队列串行写入；Nowledge Mem 收显式 note，EverOS 仍收完整轮次，保留对话型记忆能力。
 4. Session 离开农场时 `session` 调 `endSession`，后台告诉外面的来源；EverOS 这时 `memory/flush`。农场停下时，EverOS 把送过却还没 flush 的各 flush 一次（每个最多 2 秒）。
 
 **一轮之外记一句**（页签上主人替它记、管家或帮工的 `memory_create`）：本地当场写好、回给调用方；外面的放进同一条队列。EverOS 把它当成主人和档案的两句对话，马上 flush。
@@ -81,14 +81,14 @@
 - **工具（`tool`、`mcp`）**：管家和帮工的 `memory_search`、`memory_create` 调 `search`、`remember`，回话用 `foundText`。
 - **设置（`setting`）**：管理器每次用时读记性的来源设置。
 - **帮工的档案（`agent`）**：不填档案的检索要列出所有档案。
-- **管家（`packages/agent`）**：管家页经 `Memory` 读写 `MEMORY.md`（`readMemory`、`remember`、`forgetLine`）、列和搜旧账（`archiveFiles`、`readArchive`、`searchArchive`），和管家自己的工具用同一套；每个管家的家目录是 `agentHome`（`infra/config.ts`），`orchestrator` 也用它。
+- **管家（`packages/agent`）**：Brain 的 MemoryPort 由 Session 注入。服务端用数据库；独立命令行的文件存储通过同一个接口接入。压缩后的原文 archive/ 仍可列出、搜索和读取。
 - **处理函数（`handlers.ts`）**：`memory.*`、`orchestrator.archive.list`、`orchestrator.archive.get` 只转发到 `Memory`。
 
 ## 为什么这样
 
 - **记性跟着档案，不跟着帮工，不进核心状态。** 帮工收工就没了，记下的留不到下次派出去的同一个档案；核心状态每个快照都要带上所有档案的记性，又只有页签用得到。
 - **每一轮开头放在输入前面，不放系统提示。** 系统提示只在会话打开时给一次，被叫醒、接着原会话的帮工拿不到新记下的。
-- **帮工自己写「记住：」，农场不另调模型总结。** 另调一次每轮多花一次钱，还要选模型、管额度；帮工本来就在写汇报，记什么也由最了解这一轮的它来定。做过的活由农场记，不靠它写。
+- **帮工自己在 `issue_report.remember` 选择记什么，农场不另调模型总结。** 结构化字段消除了正文解析歧义；做过的活仍由农场自动记。
 - **挑法是纯函数，页签的预览问服务端。** 不调模型、可以用黄金数据测；预览和开工走同一条路（只是不计想起），页面里没有第二份挑法。
 - **自动想起和工具两条都留。** 只给工具就要靠帮工记得去查，接不了 MCP 的农机就没有记性；只给自动想起，干到一半想查没有办法。
 - **中文用 gse 的切法，只带简体词典。** Postgres 自带的分词把一串中文当一个词；两个字一组（CJK bigram）零依赖，但切得不准；装 zhparser 一类的扩展 PGlite 带不了。所以词在写入前由 `gse.ts` 切好（照 gse v1.1.0 的词典和 HMM，逐字对上它），存成 `tsvector`，每个词原样当一个词位。只带简体那一份词典：日文、繁体、idf 词典用不上。英文和代码不交给 gse：它把 `v1.2.3` 切成几段，一个版本号就算三个共有的词。
@@ -98,23 +98,23 @@
 - **外面的读最多等 2 秒，写在后台排队。** 开工等它就是主人在等；收工和记一条不等外面的服务，送不成只记日志。只给真放进话里的本地记忆记想起，被合并挤掉的不算。
 - **来源自带的工具不给 agent。** Nowledge 一家就有 70 多个工具，全给会撑满工具表，也说不清该用哪个。
 - **本地不用 Markdown 文件。** 字段多一行写不下，几个帮工同时收工没有事务，检索还得另建索引；页签本来就能看、能写、能删。
-- **管家的记性留在 `MEMORY.md`，页面直接读写那个文件。** 管家的 `remember`、`rewrite_memory` 和系统提示都写死了这个文件，`brain` 又是能单独用的命令行 agent；搬进表要先改它的记性模型（[记忆都存在库里](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)）。
+- **存储由宿主提供**：Brain 不绑定服务端数据库，Session 为它注入 MemoryPort；服务端不再维护管家文件与帮工表两套记性。
 - **Nowledge 用 label 隔开档案，不用 `agent_id`；只加不删。** 它不认识的 `agent_id` 退回默认空间，隔不开；它是主人自己的知识库，农场只往里加。EverOS 的 `agent_id`、`session_id` 带 `vibevalley-` 前缀：同一个 EverOS 里还有别的应用的 agent，Session 编号也只在一个家目录里不重。
 - **送出去先抹密钥，和服务端日志同一份规则。** 帮工的汇报里可能有 key，漏了就存进别人的库；规则只有一份，修一处两边都好。
 
 ## 还没做的
 
-- 主人画像（`profile`）、管家的记性搬进表、干活的经过（`episode`）、`memory_replace`、`memory_remove`、搜索的种类交给模型、全文索引先取候选再排、画像拼进系统提示（`systemPromptBlock`）、来源自带的工具和按农机排除来源、EverOS 收整段干活（现在只有工单和最后的汇报）、对真的 Nowledge Mem 验证写入：[记忆都存在库里](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)。
+- 主人画像（`profile`）、干活的经过（`episode`）、`memory_replace`、`memory_remove`、搜索的种类交给模型、全文索引先取候选再排、画像拼进系统提示（`systemPromptBlock`）、来源自带的工具和按农机排除来源、EverOS 收整段干活（现在只有工单和最后的汇报）、对真的 Nowledge Mem 验证写入：[记忆都存在库里](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)。
 
 Nowledge 的并发调用共享一个连接；失败只清除该调用所属的当前连接，旧连接晚到的失败不能清掉已经重建的新连接。停止仍取消连接建立并关闭传输。
 
 ## 怎么验证
 
-- `apps/server/src/memory/memory.test.ts`：一轮的「记住：」怎么读；干活记下、想起、计数，笔记写下和忘掉；管家的 `MEMORY.md`（每一行、主人交代的、日期、忘掉）和旧账；预览挑而不计、最久没用的标 `fading`；全文索引跟着表走；提不出词的不同短句不算重复；做过的活写不进时这一轮的笔记退回；一轮里几乎一样的只记一次；标成 `fading` 的就是会删的。
-- `memory/recall.test.ts`：黄金数据（词、每条的相关度、挑出来的）；太常见的词不算；别的项目的笔记要共有词才算；做过的活只算这个项目的、最多三件、不算自己这个会话的；行的写法和太多时先删哪条；一轮说的「记住：」。
+- `apps/server/src/memory/memory.test.ts`：显式笔记与工单记忆的写入、召回、计数和忘掉；管家的数据库条目、作者保留和真实 Brain 读写；预览与 `fading`；索引和容量。
+- `memory/recall.test.ts`：黄金数据（词、相关度、挑选）、项目范围、工单记忆、行的写法和淘汰顺序。
 - `memory/terms.test.ts`：词照 gse 的黄金数据；英文和代码按整词。
 - `memory/providers.test.ts`：一个来源的想起和预览一样；慢的来源不拖住一轮或一次检索；别的来源的 id 带名字；一个来源记不住不影响别的；来源跟着设置；只有告诉了的才算想起；忘不掉的来源不问；合并按名次在预算里取最好的、不重复；检索先给自己档案最好的，轮流问每个来源。
 - `memory/outside.test.ts`（本机假的 Nowledge 和 EverOS）：一轮的笔记到 Nowledge 再读回来；Nowledge 只在说了时读全部、写；不答的 Nowledge 跳过；EverOS 收整段、会话结束时提炼；一轮之外的笔记马上提炼；农场停下时告诉 EverOS 剩下的。
-- `src/flows/memory.test.ts`：帮工写「记住：」，同一个档案的下一个帮工在同一个项目里想起，别的项目只想起所有项目的，别的档案什么也想不起，新写的才再提；重启后接着原来的会话不再提一遍。
+- `src/flows/memory.test.ts`：`issue_report.remember` 写下 project/all 两种 note，同档案跨 Session、跨项目、跨重启召回，已经给过同一 Session 的不重复注入。
 - `mcp/mcp.test.ts`：帮工只查、只写自己的记性。
 - 页面：`apps/web/test/agents.spec.ts`、`orchestrator.spec.ts`（记性和旧账）、`settings.spec.ts`（记性的来源）。

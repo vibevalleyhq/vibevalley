@@ -16,7 +16,8 @@ returning *;
 select issue_assignment.agent from issue_assignment
 join issue on issue.id = issue_assignment.issue
 join issue_assignment_execution on issue_assignment_execution.assignment = issue_assignment.id
-where issue.project = sqlc.arg(project) and issue_assignment_execution.executor_kind = 'session'
+join session on session.id = issue_assignment_execution.executor
+where issue.project = sqlc.arg(project) and session.role = 'worker'
 order by issue_assignment_execution.started_at desc, issue_assignment_execution.executor desc limit 1;
 
 -- name: AllAssignments :many

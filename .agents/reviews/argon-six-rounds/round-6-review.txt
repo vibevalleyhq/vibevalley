@@ -1,0 +1,33 @@
+模型：opencode-go/gemini-4-argon
+第6轮与六轮整体复盘。
+
+### 第 6 轮复审结论
+
+**未发现任何必须修正的问题（0 项修正）。**
+
+#### 1. 第 6 轮实现逐项核对
+
+- **模块初始化顺序与依赖方向**：
+  - `apps/web/src/features/channel/reading.ts` 已删除，代码与文档（`docs/subsystems/app.md:38`）无任何残留引用。
+  - `marks.ts` 单向依赖 `./follow` 与 `./unread`，无反向导入或循环依赖；`setMark` 为函数声明，供 `markUnread` 与 `useMarkRead` 在调用期使用，无初始化顺序 / TDZ 风险。
+- **`held` 作用域、清理与端到端证明**：
+  - `held` 保持为 `marks.ts` 模块内私有的 `defineAtom<ReadonlySet<string>>(new Set())`，未向测试暴露内部后门。
+  - 离开频道时由 `useMarkRead` 的 `createEffect` 清理回调执行 `release(id)`；`markUnread` 被拒或超时时经 `setMark` 的 `say` 回调执行 `release(mark.channel)` 再报错。
+  - `apps/web/test/chat-unread-rollback.spec.ts:42-45` 在 `markUnread` 409 回退后，通过外部 `api.channel.markUnread` 触发帧更新并断言页面自动重发 `channel.markRead`，从真实用户行为证明了 `held` 已释放。
+- **离线排队、确认与失败回退语义**：
+  - `readMark` 与 `unreadMark` 保持 `whileLost: "queue"`、`timeoutMs: 20_000`，复用 `channelIn(frame, i.input.channel)?.read` 判断结算；失败时经 `setMark` 先 `intents.drop(end.key)` 移除乐观叠加、再调用 `say(end.reason ?? "")`，语义与合并前完全一致。
+
+---
+
+#### 2. 六轮整体复盘核对（无误读引入的新概念或半成品）
+
+| 轮次 | 落地结果 | 是否引入新概念 / 后门 |
+|---|---|---|
+| 第 1 轮 | 删除 `Runtime` 的 `Object.assign` 测试后门（`refreshUsage`/`cached`/`spent`/`setSpent`）与 `export const make`，测试改走 `Runtime.layer` + `Core.subscribe` + `TestClock` | 无 |
+| 第 2 轮 | 删除 `TaskWork`/`TaskGit`/`TaskOptions`/`FakeWork`/`FakeGit` 平行测试端口，16 项控制流测试迁入真实 `scriptedRuntime` + Git worktree | 无 |
+| 第 3 轮 | 删除 `graphView()`/`taskView()` 空占位函数，用仅服务端内部窄写类型 `GraphSpec`/`TaskSpec` + `graphFrom` 单一读投影替代，协议零新增 | 无 |
+| 第 4 轮 | 保留 `Issue.start` 的非 owner 派工授权与满额排队原因；删除 `packages/agent` 的 `BrainHandle`/`openBrain`/`BrainOwner`/`standaloneOwner` Promise 镜像及 `cli/chat.ts` 死分支 | 无 |
+| 第 5 轮 | 删除 `BlockEditor` 的 `polls`/`busyPolls`/`writingPolls` 假时钟，改为真实时间到期重画 + `held: Map<string, Block>` 失焦即用，保留 HTTP 轮询兜底与惰性 `baseRev` 冲突保护 | 无 |
+| 第 6 轮 | 删除 `features/channel/reading.ts`，合入 `marks.ts` 并复用 `channelIn` 与 `setMark`，无新增 hook 或通用意图工厂 | 无 |
+
+全部 6 轮概念精简与复审均已闭环，未触碰待用户决策的 Agent DAG 归属范围。

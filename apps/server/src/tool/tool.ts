@@ -12,10 +12,10 @@ import { artifactTools } from "./artifact.ts";
 import { channelTools } from "./channel.ts";
 import { cronTools } from "./cron.ts";
 import { type Who, tool } from "./definition.ts";
-import { graphTools } from "./graph.ts";
 import { issueTools } from "./issue.ts";
 import { memoryTools } from "./memory.ts";
 import { answers, sessionLine } from "./prompts.ts";
+import { resourceTools } from "./resource.ts";
 
 export class Tool extends Context.Service<
   Tool,
@@ -72,6 +72,10 @@ const make = Effect.gen(function* () {
     issueCreate,
     issueUpdate,
     issueStatus,
+    issueReport,
+    issueHandback,
+    issuePrSubmit,
+    issueSplit,
     findIssue,
   } = yield* issueTools;
   const { channelList, messageSend, messageList, unreadList, channelCreate, channelUpdate } = yield* channelTools;
@@ -90,9 +94,9 @@ const make = Effect.gen(function* () {
     blockDelete,
     orchestratorBlockDelete,
   } = yield* artifactTools(findIssue);
-  const { graphSplit, graphList, graphGet, taskUpdate, taskDelete, graphAct, taskAct, issueSplit } = yield* graphTools;
   const { memorySearch, memoryCreate } = yield* memoryTools;
   const { cronCreate, cronList, cronDelete } = yield* cronTools;
+  const resourceRead = yield* resourceTools;
 
   const projectList = tool(
     "project.list",
@@ -112,6 +116,7 @@ const make = Effect.gen(function* () {
       issueComment(who),
       issueReview,
       issueDiff(who),
+      resourceRead(who),
       roster,
       sessionStop(who),
       messageList(who),
@@ -122,13 +127,6 @@ const make = Effect.gen(function* () {
       cronCreate(who),
       cronList,
       cronDelete,
-      graphSplit(who),
-      graphList,
-      graphGet,
-      taskUpdate(who),
-      taskDelete(who),
-      graphAct(who),
-      taskAct(who),
       memorySearch(who, true),
       memoryCreate(who, true),
       artifactList(who),
@@ -142,6 +140,7 @@ const make = Effect.gen(function* () {
     ],
     session: (who) => [
       messageSend(who),
+      resourceRead(who),
       messageList(who),
       unreadList(who),
       sessionList,
@@ -151,6 +150,9 @@ const make = Effect.gen(function* () {
       blockUpdate(who),
       blockDelete(who),
       issueSplit(who),
+      issueReport(who),
+      issueHandback(who),
+      issuePrSubmit(who),
       sessionArtifactList(who),
       artifactGet("session")(who),
       artifactContent("session")(who),

@@ -22,17 +22,20 @@ import { Game, start as gameStart } from "./game/game.ts";
 import { Inbox, start as inboxReady } from "./inbox/inbox.ts";
 import { ServerConfig } from "./infra/config.ts";
 import { Database, Db } from "./infra/db.ts";
+import { Ingress, ready as ingressRestore, start as ingressStart } from "./ingress/ingress.ts";
 import { Issue, type IssueOptions } from "./issue/issue.ts";
 import { Lan, type LanOptions } from "./lan/lan.ts";
+import { Mailbox, start as mailboxStart } from "./mailbox/mailbox.ts";
 import { Mcp, type McpOptions } from "./mcp/mcp.ts";
 import { Memory } from "./memory/memory.ts";
 import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
+import { OrchestratorResponse } from "./orchestrator/response.ts";
 import { Project, type ProjectHooks, start as projectStart } from "./project/project.ts";
 import { layer as projection } from "./projection/projection.ts";
+import { Resource } from "./resource/resource.ts";
 import { type RuntimeOptions, Runtime } from "./runtime/runtime.ts";
 import { Session, ready as sessionReady, type SessionOptionsIn } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
-import { Task, start as taskGraphStart, type TaskOptions } from "./task/task.ts";
 import { Tool } from "./tool/tool.ts";
 import { Voice, type VoiceOptions } from "./voice/voice.ts";
 
@@ -48,7 +51,6 @@ export interface ServiceOptions {
   readonly project?: ProjectHooks;
   readonly session?: SessionOptionsIn;
   readonly issue?: IssueOptions;
-  readonly task?: TaskOptions;
   readonly orchestrator?: OrchestratorOptions;
   readonly mcp?: McpOptions;
   readonly lan?: LanOptions;
@@ -94,17 +96,19 @@ export const collaboration =
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
     below.pipe(on(Channel.layer), on(Artifact.layer));
 
-/** Issues without its task graphs: for a test that makes its own task service. */
-export const issuesBelowTaskGraphs =
+/** Mailbox: delivery priority, durable per-Session input and the execution pump. */
+export const mailbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Mailbox.layer));
+
+export const issues =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
     below.pipe(on(Cron.layer), on(Issue.layer(o.issue)));
 
-/** Issues: the issues, their task graphs and crons. */
-const issues =
-  (o: ServiceOptions = {}) =>
-  <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    issuesBelowTaskGraphs(o)(below).pipe(on(Task.layer(o.task)));
+/** Ingress: immutable source events and their compact cards. */
+export const ingress = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Ingress.layer));
+
+/** Resource: authorized, paged reads over stable per-session snapshots. */
+export const resources = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Resource.layer));
 
 /** Inbox: what in it is news to the owner, and the patrol. */
 const inbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Inbox.layer));
@@ -113,7 +117,7 @@ const inbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Inbox.laye
 const orchestrator =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Tool.layer), on(Orchestrator.layer(o.orchestrator)));
+    below.pipe(on(Tool.layer), on(Orchestrator.layer(o.orchestrator)), on(OrchestratorResponse.layer));
 
 /** Gamification: the ledger, progress and achievements, from events only. */
 export const gamification = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Game.layer));
@@ -129,12 +133,12 @@ const sourceControlStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(
 /** Agent Sessions' startup: the sessions on the farm when it stopped are taken up again, or let go. */
 export const agentSessionsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(sessionReady));
 /** Collaboration's startup, after the sessions came back: their threads, and what waited for them. */
-const collaborationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(channelStart));
-/** Issues' startup, after the sessions came back: the task graphs cut off by the stop are settled, then the crons start
- * coming due. */
-const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart), on(cronStart));
+export const collaborationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(channelStart));
+/** Mailbox's startup: restore open deliveries, replay committed messages without a route receipt, then wake sessions. */
+export const mailboxReady = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(mailboxStart));
+export const ingressReady = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(ingressRestore));
+const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(cronStart));
 /** Issues' startup without the crons' clock: for a test farm that ticks them by hand. */
-export const taskGraphsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart));
 /** Inbox's startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */
 export const inboxStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(inboxReady));
 /** Gamification's startup: commits start being counted. */
@@ -142,20 +146,19 @@ const gamificationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(o
 
 /** The whole farm: every module built, then every startup in module order. */
 export const services = (config: ServerConfig["Service"], options: ServiceOptions = {}) =>
-  platform(config).pipe(
-    agents(options),
-    sourceControl(options),
-    agentSessions(options),
-    collaboration(options),
-    issues(options),
-    inbox,
-    orchestrator(options),
-    gamification,
-    gateway(options),
-    sourceControlStart,
-    agentSessionsStart,
-    collaborationStart,
-    issuesStart,
-    inboxStart,
-    gamificationStart,
-  );
+  platform(config)
+    .pipe(
+      agents(options),
+      sourceControl(options),
+      agentSessions(options),
+      collaboration(options),
+      issues(options),
+      mailbox,
+      ingress,
+      resources,
+      inbox,
+      orchestrator(options),
+      gamification,
+      gateway(options),
+    )
+    .pipe(sourceControlStart, agentSessionsStart, collaborationStart, mailboxReady, ingressReady, on(ingressStart), issuesStart, inboxStart, gamificationStart);

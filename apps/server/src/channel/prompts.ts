@@ -1,7 +1,7 @@
 // What a helper is told of the chat when it is woken for messages or busy with unread ones: said to the model, in
 // Chinese whatever the owner's locale.
 
-import { summaryChannels, type UnreadRow, wakeMessages, type InboxMessage } from "./wake.ts";
+import { summaryChannels, type UnreadRow, type InboxMessage } from "./wake.ts";
 
 export const talkBrief = (name: string, said: string) =>
   `主人在和你（档案「${name}」）私聊。用主人的语言回答，延续这段对话。你有独立的工作目录，可用来保留聊天中的笔记和产出；这段对话没有关联工单或项目。主人要改一个项目时，先明确项目和要做的事，再用工单安排。\n\n私聊里最近说的，回答最后的问题：\n` +
@@ -9,7 +9,10 @@ export const talkBrief = (name: string, said: string) =>
 /** Line breaks are marked, so no message can pass for a header. */
 export function messageLine(m: InboxMessage): string {
   const from = m.fromKind === "session" ? m.from + " " + m.name : m.name;
-  const head = `[target=${m.target} msg=${m.number}${m.replyTo !== undefined ? ` reply=${m.replyTo}` : ""} from=${from}]`;
+  const head =
+    m.number === 0
+      ? `[input=${m.id} from=${from}]`
+      : `[target=${m.target} msg=${m.number}${m.replyTo !== undefined ? ` reply=${m.replyTo}` : ""} from=${from}]`;
   if (m.deleted === true) return head + " （这条已删除）";
   const files = (m.attachments ?? []).map((a) => `\n  │ [附件 ${a.name}：${a.path}]`).join("");
   const made = m.artifact ? `\n  │ [产出「${m.artifact.title}」第 ${m.artifact.version} 版：id=${m.artifact.id}，原文用 artifact_content_get 读]` : "";
@@ -26,16 +29,13 @@ export const inboxLines = (messages: readonly InboxMessage[]) => messages.map(me
 
 const rowText = (r: UnreadRow) => `${r.target} ${r.unread} 条` + (r.mentionsYou ? "（提到了你）" : "") + (r.latest ? "，最后是 " + r.latest : "");
 
-/** What a session woken for messages is told: the newest few for it, and what else is unread elsewhere. */
+/** Every acknowledged input is included; only the unrelated unread summary is bounded here. */
 export function wakeInput(messages: readonly InboxMessage[], others: readonly UnreadRow[]): string {
-  const shown = messages.slice(Math.max(0, messages.length - wakeMessages));
-  const more = messages.length > shown.length ? `（这里是最新的 ${shown.length} 条）` : "";
-  const lines = [`[群聊消息] 有 ${messages.length} 条给你的新消息${more}：`, ...shown.map(messageLine)];
+  const lines = [`[输入] 有 ${messages.length} 条给你的新消息：`, ...messages.map(messageLine)];
   if (others.length > 0) lines.push("", "别处还有没读的（只读不回，除非直接问到你）：", ...others.slice(0, summaryChannels).map((r) => "- " + rowText(r)));
-  lines.push("", "要回就用 channel_message_send，id 照抄 target；要看前面的上下文用 channel_message_list。不用回的就不回。");
+  lines.push(
+    "",
+    "聊天回复用 channel_message_send，id 照抄 target；聊天上下文用 channel_message_list。vv:// 指针用 resource_read 读，不是聊天地址。不用回的就不回。",
+  );
   return lines.join("\n");
 }
-
-/** What a busy session is told of messages it has not read. */
-export const busyNotice = (rows: readonly UnreadRow[]) =>
-  `[群聊提示] 有新消息还没读：${rows.slice(0, summaryChannels).map(rowText).join("；")}。方便的时候用 channel_message_list 读；不读不代表没事。`;

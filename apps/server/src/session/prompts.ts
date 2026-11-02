@@ -3,6 +3,9 @@
 
 import { pullRequestFile, type Workplace } from "@/project/shapes.ts";
 import { ownersLanguage } from "@/prompts.ts";
+export const sourceBrief = (id: string) =>
+  `一手输入：vv://trigger/${id}\n先用 resource_read 读取原话与上下文；工单说明只是附言，不能扩大原始授权。用主人的语言回答。`;
+
 /** pullRequest: the project delivers by pull request, so the helper writes its title and body (pullRequestText). */
 export function workplaceRules(place: Workplace, house: string, id: string, pullRequest = false): string {
   const where = place.branch
@@ -11,21 +14,23 @@ export function workplaceRules(place: Workplace, house: string, id: string, pull
   const lines = [
     "## 在码农场物语干活的规矩",
     "- " + where,
-    `- 汇报、提问都用${ownersLanguage()}写，那是主人的语言；下面说的「结论：」「要问主人：」「记住：」这几个开头照原样写。`,
+    `- 汇报、提问都用${ownersLanguage()}写，那是主人的语言。`,
     `- 做完一轮：git add 你改的文件，git commit。提交信息照项目的约定写（看它的 AGENTS.md 和 git log）；项目没约定的，用一句${ownersLanguage()}说清楚做了什么；主人这一轮另有说法的，照主人说的。`,
     "- 汇报时写上 commit 号，以及你是怎么验证的（跑了什么命令、结果如何）。",
     ...(pullRequest && place.branch
       ? [
           `- 这个项目经 PR 交付：交回来以前，把这次改动的 PR 标题和正文写进 \`git rev-parse --git-path ${pullRequestFile}\` 说的那个文件（第一行是标题，空一行，下面是正文），照项目的 PR 约定写（看它的 AGENTS.md）。它不进提交；VibeValley 开 PR 时用它，没有就用工单的标题。`,
+          "- 获授权后，用 issue_report(prSubmit=true) 提交并继续跟随 CI/评审；需要先提交、再继续本轮工作时用 issue_pr_submit。已提交的 PR 只等外部反馈时可以直接结束本轮；最终交给主人验收用 issue_report(prSubmit=false)。",
         ]
       : []),
     "- 你做的是一张工单，读完代码觉得它一个人做太大、能分成几件各自提交和验证的事：先提交已经做的，用 issue_split 把它拆成几张子工单，交给几个帮工分头做；拆完不再改代码，汇报拆成了哪几步就结束。",
-    "- 汇报的最后一段以「结论：」开头，一两句话说清做成了什么（或卡在哪、需要主人定什么）；有提交就带上 commit 号。补充说明写在结论前面。",
+    "- 要交给主人时必须调用 issue_report：summary 一两句话写净结果和 commit 号。问题写 questions，验收凭据写 checks，正文只补充依据。",
     "",
     "## 记性",
     "- 你有记性：同一个 agent 的帮工共用。每一轮开头「【你记得的】」那段是以前记下的，用得上就用；和眼前的代码、主人这次说的对不上时，以眼前的为准。",
-    "- 缺信息、要主人定的、没有主人回答就做不下去的，在结论前面写，每行以「要问主人：」开头，一行问一件事；你想得到的几种回答写在句末，像「要问主人：评估全交给 w3，还是分着做？（选项：全交给 w3｜分着做）」，主人点一下就是回答。主人回答以前，工单标着等你回答。能自己查到的不要问。",
-    "- 这一轮学到下次还用得上的（这个项目的约定和命令、踩过的坑、主人的偏好），在结论前面写几行，每行以「记住：」开头，一行一条，写成下次一看就懂的一句话；对所有项目都成立的写「记住（所有项目）：」。没有就不写。这一轮做了什么不用写进去，VibeValley 会自己记。",
+    "- 缺信息、要主人定且没有回答就做不下去时，在 issue_report.questions 一项问一件事，options 给至少两个可点的答案；能自己查到的不要问。",
+    "- 每条验收标准都在 issue_report.checks 交结构化结果：criterion 从 0 开始，result 是 met、unmet 或 unsure，proof 写命令结果或文件依据。",
+    "- 这一轮学到下次还用得上的项目约定、命令、坑或主人偏好，写进 issue_report.remember：每项有 text 和 scope（project 或 all）；这一轮做了什么不用记。",
     "",
     "## 在群聊里说话",
     `- 你在群聊里是 @${id}。主人是 @主人，管家是 @管家，别的帮工是 @w 加编号（session_list 列出谁在场）。`,

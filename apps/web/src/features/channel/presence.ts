@@ -15,7 +15,6 @@ export type DotTone = "leaf" | "berry" | "wheat";
 export function phaseDot(p: Phase): DotTone {
   switch (p._tag) {
     case "working":
-    case "arriving":
       return "leaf";
     case "failed":
       return "berry";
@@ -29,8 +28,6 @@ export function phaseDot(p: Phase): DotTone {
 /** The sprite for a phase; undefined draws nothing. */
 export function phaseIcon(p: Phase): IconName | undefined {
   switch (p._tag) {
-    case "arriving":
-      return "send";
     case "working":
       return p.doing.action === "none" ? undefined : actionIcon[p.doing.action];
     case "done":

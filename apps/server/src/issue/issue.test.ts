@@ -19,11 +19,11 @@ import { Core } from "@/core/core.ts";
 import { Cron } from "@/cron/cron.ts";
 import { reasonOf } from "@/errors.ts";
 import { Db, dbQueries } from "@/infra/db.ts";
+import { Ingress } from "@/ingress/ingress.ts";
 import { gitRuns } from "@/project/git.ts";
 import { Session } from "@/session/session.ts";
-import { freshTask } from "@/task/editing.ts";
-import { graphView } from "@/task/graph.ts";
 import { gitIn } from "@/testing/git.ts";
+import { testIssues } from "@/testing/issues.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { until, waitFor } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
@@ -53,9 +53,10 @@ const noWorktree = (root: string) => {
 
 const occupied = (core: Core["Service"], runtime: string) =>
   core.apply({
-    type: "hired",
+    type: "session",
     session: {
-      id: "occupied",
+      id: sessionId("occupied"),
+      role: "worker",
       name: "occupied",
       agent: "x",
       runtime,
@@ -63,16 +64,16 @@ const occupied = (core: Core["Service"], runtime: string) =>
       project: "demo",
       hiredAt: 0,
       runs: 0,
-      phase: { _tag: "working", doing: { action: "thinking", label: "" } },
+      phase: { _tag: "working", since: 0, doing: { action: "thinking", label: "" } },
       refining: false,
-    } as T.Session,
+    },
   });
 
 describe("issues", () => {
   it.effect("regression: responsibility starts before execution and changes only when the agent changes", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const issue = yield* issues.add({ title: "unstarted responsibility", agent: " lab ", project: "demo" });
       const original = (yield* issues.get(issue.id)).assignments;
       expect(original).toHaveLength(1);
@@ -98,7 +99,7 @@ describe("issues", () => {
   it.live("regression: an orchestrator owns several issues and repeated delivery keeps each responsibility", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const chat = yield* Channel;
       const first = yield* issues.add({ title: "first responsibility", agent: defaultOrchestrator });
       const second = yield* issues.add({ title: "second responsibility", agent: defaultOrchestrator });
@@ -121,7 +122,7 @@ describe("issues", () => {
   it.live("regression: a rejected responsibility change keeps both the agent and assignment history", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sql = yield* SqlClient.SqlClient;
       const issue = yield* issues.add({ title: "atomic responsibility", agent: "lab" });
       const before = (yield* issues.get(issue.id)).assignments;
@@ -139,7 +140,7 @@ describe("issues", () => {
   it.live("regression: completion and cancellation keep responsibility across new execution contexts", () => {
     const f = farm([scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("结论：做完了") })]);
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const chat = yield* Channel;
       yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({ title: "continued responsibility", agent: "lab", project: "demo" });
@@ -161,50 +162,10 @@ describe("issues", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("regression: task assignments survive reload and changing a step preserves its previous responsibility", () => {
-    const c = testConfig({ db: "" });
-    const graph: T.TaskGraph = {
-      id: "p1",
-      title: "responsibilities",
-      goal: "responsibilities",
-      project: "demo",
-      state: "draft",
-      parallel: 1,
-      createdAt: 1,
-      note: "",
-      tasks: [freshTask({ id: "a", title: "first", brief: "first", agent: "lab" })],
-      ...graphView(),
-    };
-    return Effect.gen(function* () {
-      const saved = yield* Effect.gen(function* () {
-        const issues = yield* Issue;
-        yield* issues.putTask(graph);
-        const first = (yield* issues.get("p1.a")).assignments;
-        expect(first.map((a) => [a.agent, a.executions])).toEqual([["lab", []]]);
-        yield* issues.putTask(graph);
-        expect((yield* issues.get("p1.a")).assignments).toEqual(first);
-        yield* issues.putTask({ ...graph, tasks: [freshTask({ id: "a", title: "first", brief: "first", agent: "lab2" })] });
-        const changed = (yield* issues.get("p1.a")).assignments;
-        expect(changed.map((a) => [a.agent, a.endedAt !== undefined])).toEqual([
-          ["lab", true],
-          ["lab2", false],
-        ]);
-        return changed;
-      }).pipe(Effect.scoped, Effect.provide(world({ config: c })));
-      yield* Effect.gen(function* () {
-        const issues = yield* Issue;
-        expect((yield* issues.get("p1.a")).assignments).toEqual(saved);
-        expect(assignedAgentOf(yield* issues.get("p1.a"))).toBe("lab2");
-        yield* issues.putTask({ ...graph, tasks: [] });
-        expect((yield* Effect.flip(issues.get("p1.a")))._tag).toBe("Missing");
-      }).pipe(Effect.scoped, Effect.provide(world({ config: c })));
-    });
-  });
-
   it.live("regression: deleting another issue while reassigning cannot restore a stale responsibility snapshot", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const issue = yield* issues.add({ title: "concurrent responsibility", agent: "lab" });
       for (let n = 0; n < 10; n++) {
         const disposable = yield* issues.add({ title: "discarded" });
@@ -222,7 +183,7 @@ describe("issues", () => {
   it.live("listing twenty issues reads the database at most twice and runs no git", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const before = (yield* Metric.value(dbQueries)).count;
       for (let n = 1; n <= 20; n++) yield* issues.add({ title: `第 ${n} 件`, project: "demo" });
       // The counter counts: adding them asked the database.
@@ -276,7 +237,7 @@ describe("issues", () => {
           await Promise.all(cleanups.map((cleanup) => cleanup()));
         }),
       );
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const agent = { ...lab(), worktree: true };
       const first = yield* issues.hire(agent, "first work", "demo");
@@ -331,7 +292,7 @@ describe("issues", () => {
           await Promise.all(cleanups.map((cleanup) => cleanup()));
         }),
       );
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
       yield* sql.unsafe("create function reject_link() returns trigger language plpgsql as $$ begin raise exception 'link refused'; end $$").pipe(Effect.orDie);
@@ -387,7 +348,7 @@ describe("issues", () => {
     };
     const f = farm([worker]);
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sql = yield* SqlClient.SqlClient;
       yield* sql.unsafe("create function reject_link() returns trigger language plpgsql as $$ begin raise exception 'link refused'; end $$").pipe(Effect.orDie);
       yield* sql
@@ -446,7 +407,7 @@ describe("issues", () => {
     const f = farm([worker]);
     return Effect.gen(function* () {
       yield* Effect.addFinalizer(() => Effect.promise(() => cleanup()));
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({ title: "draft", project: "demo", agent: "lab" });
@@ -485,7 +446,7 @@ describe("issues", () => {
     });
     const f = farm([worker]);
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({ title: "draft", project: "demo", agent: "lab" });
       yield* issues.refine(issue.id, "read the project", "");
@@ -512,7 +473,7 @@ describe("issues", () => {
     });
     const f = farm([worker]);
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
       const hired = yield* issues.hire({ ...lab(), worktree: true }, "keep my work", "demo");
@@ -522,7 +483,7 @@ describe("issues", () => {
       const issue = yield* issues.get(first.issue!);
       expect([first.branch, firstBranch]).toEqual([`vibevalley/issue-${issue.number}`, `vibevalley/issue-${issue.number}`]);
       const commit = git(first.worktree!, "rev-parse", "HEAD").trim();
-      yield* issues.cancel(issue.id);
+      yield* issues.setStatus(issue.id, "canceled", "", "", owner);
       yield* waitFor(issues.get(issue.id), (i) => i.status === "canceled", "the canceled issue");
       const again = latestSessionIdOf(yield* issues.setStatus(issue.id, "todo", "keep going", "", owner));
       if (again === undefined) throw new Error("the issue has no reopened session");
@@ -555,7 +516,7 @@ describe("issues", () => {
       },
     ]);
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const core = yield* Core;
       const agent = { ...lab(), worktree: true };
@@ -567,7 +528,10 @@ describe("issues", () => {
       noWorktree(f.config.workRoot);
 
       const existing = yield* issues.add({ title: "already queued", project: "demo", agent: agent.id });
-      const queued = yield* issues.queue(existing.id, true);
+      yield* occupied(core, "pi");
+      yield* (yield* Agent).save(agent);
+      const queued = yield* issues.setStatus(existing.id, "todo", "", "", owner);
+      yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
       expect((yield* issues.hire(agent, "new attempt", "demo", { issue: existing.id })).refused).toContain("startup refused");
       const kept = yield* issues.get(existing.id);
       expect([kept.number, kept.queuedAt, sessionIdsOf(kept)]).toEqual([existing.number, queued.queuedAt, []]);
@@ -578,7 +542,7 @@ describe("issues", () => {
   it.live("an issue that cannot be written publishes no session and keeps none", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const core = yield* Core;
       const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
@@ -589,7 +553,7 @@ describe("issues", () => {
       const got = yield* issues.hire({ ...lab(), worktree: true }, "test", "demo");
       expect(got.refused).toContain("test write failure");
       expect(got.session).toBeUndefined();
-      expect([core.state().sessions.length, sessions.presentSessions().length]).toEqual([0, 0]);
+      expect([core.state().sessions.filter((s) => s.role === "worker").length, sessions.presentSessions().length]).toEqual([0, 0]);
       noWorktree(f.config.workRoot);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -608,41 +572,14 @@ describe("issues", () => {
       );
       expect(got.filter((h) => h.session !== undefined).length).toBe(1);
       expect(got.every((h) => h.session !== undefined || h.refused !== undefined)).toBe(true);
-      expect(core.state().sessions).toHaveLength(1);
-    }).pipe(Effect.scoped, Effect.provide(f.layer));
-  });
-
-  it.live("moving an issue leaves a task's ranks alone", () => {
-    const f = farm();
-    return Effect.gen(function* () {
-      const issues = yield* Issue;
-      const sql = yield* SqlClient.SqlClient;
-      const one = yield* issues.add({ title: "one" });
-      const graph: T.TaskGraph = {
-        id: "p1",
-        title: "task",
-        goal: "task",
-        project: "demo",
-        state: "draft",
-        parallel: 1,
-        createdAt: 0,
-        note: "",
-        tasks: [freshTask({ id: "a", title: "first", brief: "first" }), freshTask({ id: "b", title: "second", brief: "second", needs: ["a"] })],
-        ...graphView(),
-      };
-      yield* issues.putTask(graph);
-      const ranks = () => sql<{ id: string; rank: number }>`select id, rank from issue where id = 'p1' or parent = 'p1' order by id`.pipe(Effect.orDie);
-      const before = yield* ranks();
-      expect(before.length).toBeGreaterThan(0);
-      yield* issues.edit(one.id, { before: "" }, owner);
-      expect(yield* ranks()).toEqual(before);
+      expect(core.state().sessions.filter((s) => s.role === "worker")).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
   it.live("an optional SQL row hides only absence, never a database failure", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sql = yield* SqlClient.SqlClient;
       const issue = yield* issues.add({ title: "read errors" });
       expect((yield* Effect.flip(issues.get("not-there")))._tag).toBe("Missing");
@@ -665,7 +602,7 @@ describe("issues", () => {
     });
     const f = farm([worker]);
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const chat = yield* Channel;
       yield* (yield* Agent).save(lab());
@@ -683,7 +620,7 @@ describe("issues", () => {
   it.live("an issue's actions act on its latest session", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const first = yield* issues.hire(lab(), "first", "demo");
       const id = first.session!.issue!;
@@ -691,9 +628,9 @@ describe("issues", () => {
       const second = yield* issues.hire(lab(), "second", "demo", { issue: id });
       expect(second.session).toBeDefined();
       yield* issues.changes(id, owner);
-      expect((yield* Effect.exit(issues.merge(id)))._tag).toBe("Failure");
+      expect((yield* Effect.exit(issues.setStatus(id, "done", "", "", owner)))._tag).toBe("Failure");
       expect(sessions.sessionOf(second.session!.id)).toBeDefined();
-      yield* issues.cancel(id);
+      yield* issues.setStatus(id, "canceled", "", "", owner);
       expect(sessions.sessionOf(second.session!.id)).toBeUndefined();
       expect((yield* Effect.exit(issues.changes(id, owner)))._tag).toBe("Failure");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -702,7 +639,7 @@ describe("issues", () => {
   it.live("a queued issue keeps the channel it was first sent from", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const core = yield* Core;
       const chat = yield* Channel;
       const sessions = yield* Session;
@@ -713,12 +650,15 @@ describe("issues", () => {
       yield* occupied(core, "pi");
       const issue = yield* issues.add({ title: "queued", agent: "lab", project: "demo" });
       for (const channel of [first.id, second.id]) expect((yield* issues.start(issue.id, channel)).queued).toBeDefined();
-      expect((yield* sql<{ channel: string }>`select channel from issue_queue where issue = ${issue.id}`.pipe(Effect.orDie)).map((r) => r.channel)).toEqual([
-        first.id,
-      ]);
-      yield* core.apply({ type: "left", id: sessionId("occupied") });
+      yield* (yield* Ingress).refreshIssues;
+      expect(
+        (yield* sql<{ channel: string }>`select t.trigger_json::jsonb->>'replyChannel' as channel
+        from mailbox_issue m join ingress_trigger t on t.id = m.trigger_id where m.issue_id = ${issue.id} and m.state = 'held'`).map((r) => r.channel),
+      ).toEqual([first.id]);
+      yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
       const started = yield* issues.start(issue.id, second.id);
-      expect(started.session).toBeDefined();
+      expect(started.queued).toBeDefined();
+      yield* (yield* Ingress).refreshIssues;
       const got = yield* issues.get(issue.id);
       expect(sessionIdsOf(got)).toHaveLength(1);
       const queuedSession = sessionIdsOf(got)[0];
@@ -726,14 +666,52 @@ describe("issues", () => {
       expect((yield* sessions.get(queuedSession))?.channel).toBe(first.id);
       yield* waitFor(sessions.issueRuns(issue.id), (r) => r.length > 0, "the queued run");
       expect((yield* sessions.issueRuns(issue.id))[0]!.triggeredBy.kind).toBe("issue");
-      expect(yield* sql`select 1 from issue_queue where issue = ${issue.id}`.pipe(Effect.orDie)).toEqual([]);
+      expect(yield* sql`select 1 from mailbox_issue where issue_id = ${issue.id} and state = 'held'`).toEqual([]);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("regression: requeueing uses the new source and retires the previous dispatch", () => {
+    const inputs: string[] = [];
+    const f = farm([
+      scriptedRuntime({
+        id: "pi",
+        turn: async (turn) => {
+          inputs.push(turn.input);
+          turn.say("done");
+        },
+      }),
+    ]);
+    return Effect.gen(function* () {
+      const issues = testIssues(yield* Issue);
+      const ingress = yield* Ingress;
+      const core = yield* Core;
+      const chat = yield* Channel;
+      const sessions = yield* Session;
+      yield* (yield* Agent).save(lab());
+      const first = yield* chat.openChannel("queue-old", "", "demo");
+      const second = yield* chat.openChannel("queue-new", "", "demo");
+      yield* occupied(core, "pi");
+      const item = yield* issues.add({ title: "queued", description: "old-dispatch-context", agent: "lab", project: "demo" });
+      yield* issues.start(item.id, first.id);
+      yield* ingress.refreshIssues;
+      yield* issues.setStatus(item.id, "backlog", "", "", owner);
+      yield* issues.edit(item.id, { description: "new-dispatch-context" }, owner);
+      yield* issues.start(item.id, second.id);
+      yield* ingress.refreshIssues;
+      yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
+      yield* ingress.refreshIssues;
+      yield* until(() => inputs.length > 0, "the requeued input");
+      expect(inputs[0]).toContain("new-dispatch-context");
+      expect(inputs[0]).not.toContain("old-dispatch-context");
+      const session = sessionIdsOf(yield* issues.get(item.id))[0]!;
+      expect((yield* sessions.get(session))?.channel).toBe(second.id);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
   it.effect("a queued cron keeps its trigger and that it was missed", () => {
     const c = config();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const core = yield* Core;
       const chat = yield* Channel;
       const sessions = yield* Session;
@@ -749,11 +727,11 @@ describe("issues", () => {
         (item) => item?.queuedAt !== undefined,
         "the cron queued",
       );
-      yield* core.apply({ type: "left", id: sessionId("occupied") });
-      yield* issues.tryQueued;
+      yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
+      yield* (yield* Ingress).refreshIssues;
       yield* waitFor(sessions.issueRuns(issue!.id), (r) => r.length > 0, "the scheduled run");
       const [run] = yield* sessions.issueRuns(issue!.id);
-      expect(run!.triggeredBy).toEqual({ kind: "cron", cron: sc.id, missed: true });
+      expect(run!.triggeredBy).toEqual({ kind: "cron", cron: sc.id, missed: true, message: issue!.mandate.originTriggerId });
       expect((yield* sessions.get(run!.session))?.channel).toBe(channel.id);
     }).pipe(Effect.scoped, Effect.provide(world({ config: c, runtimes: [busy], repos: ["demo"] })));
   });
@@ -761,7 +739,7 @@ describe("issues", () => {
   it.live("a queued todo starts once there is room, and keeps its place until then", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const core = yield* Core;
       const chat = yield* Channel;
       yield* (yield* Agent).save(lab());
@@ -769,11 +747,11 @@ describe("issues", () => {
       const issue = yield* issues.add({ title: "queued", agent: "lab", project: "demo" });
       expect((yield* issues.start(issue.id, chat.defaultChannel())).queued).toBeDefined();
       const queued = yield* issues.get(issue.id);
-      yield* issues.tryQueued;
+      yield* (yield* Ingress).refreshIssues;
       const stillQueued = yield* issues.get(issue.id);
       expect([stillQueued.queuedAt, sessionIdsOf(stillQueued)]).toEqual([queued.queuedAt, []]);
-      yield* core.apply({ type: "left", id: sessionId("occupied") });
-      yield* issues.tryQueued;
+      yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
+      yield* (yield* Ingress).refreshIssues;
       expect(sessionIdsOf(yield* issues.get(issue.id))).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -781,7 +759,7 @@ describe("issues", () => {
   it.live("an issue handed over goes on in the same issue with another profile", () => {
     const f = farm([scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") })]);
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const chat = yield* Channel;
       const agents = yield* Agent;
@@ -820,7 +798,7 @@ describe("issues", () => {
   it.live("an issue still being worked is not handed over", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const chat = yield* Channel;
       const agents = yield* Agent;
       yield* agents.save(lab());
@@ -835,41 +813,28 @@ describe("issues", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("history joins live and ended sessions, and names the missing", () => {
-    const f = farm();
+  it.live("history joins live and ended sessions", () => {
+    const f = farm([scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("done") })]);
     return Effect.gen(function* () {
-      const issues = yield* Issue;
-      const core = yield* Core;
-      const sql = yield* SqlClient.SqlClient;
-      const issue = yield* issues.add({ title: "history" });
-      yield* sql`insert into session (id, agent, name, runtime, brief, hired_at, ended_at, closed) values ('ended', 'lab', 'old', 'pi', 'history', 1, 2, 'merged')`.pipe(
-        Effect.orDie,
-      );
-      const live = {
-        id: "live",
-        agent: "lab",
-        name: "current",
-        runtime: "pi",
-        brief: "history",
-        hiredAt: 3,
-        runs: 0,
-        phase: { _tag: "done" },
-        refining: false,
-      } as T.Session;
-      yield* core.apply({ type: "hired", session: live });
-      // Through the issues, as a send records them: they are the only writer of issue_assignment.
-      for (const [id, at] of [
-        ["ended", 1],
-        ["live", 3],
-        ["missing", 4],
-      ] as const)
-        yield* issues.ran(issue.id, { ...live, id: sessionId(id), hiredAt: at });
+      const issues = testIssues(yield* Issue);
+      const sessions = yield* Session;
+      const issue = yield* issues.add({ title: "history", project: "demo", agent: "lab" });
+      const first = (yield* issues.hire(lab(), "first", "demo", { issue: issue.id })).session!;
+      yield* until(() => sessions.sessionOf(first.id)?.phase._tag === "done", "the first report");
+      yield* sessions.dismiss(first.id);
+      const live = (yield* issues.hire(lab(), "second", "demo", { issue: issue.id })).session!;
+      yield* until(() => sessions.sessionOf(live.id)?.phase._tag === "done", "the live report");
+      yield* sessions.suspend(live.id);
+      const missing = (yield* issues.hire(lab(), "third", "demo", { issue: issue.id })).session!;
+      yield* until(() => sessions.sessionOf(missing.id)?.phase._tag === "done", "the third report");
+      yield* sessions.dismiss(missing.id);
       const [got] = yield* issues.history();
       expect(got!.sessions.map((s) => [s.id, s.phase._tag])).toEqual([
-        ["ended", "closed"],
-        ["live", "done"],
+        [first.id, "closed"],
+        [live.id, "done"],
+        [missing.id, "closed"],
       ]);
-      expect(got!.missingSessions).toEqual(["missing"]);
+      expect(got!.missingSessions).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 });

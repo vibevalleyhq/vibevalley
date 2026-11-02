@@ -28,11 +28,10 @@ import { chatSay, pendingLines } from "./composing";
 import { editingId, setEditingId } from "./draft";
 import { feedOf, orchestratorTyping, workbenchClock } from "./feed";
 import { followed, useMessage } from "./follow";
-import { useMarkedFollowed } from "./marks";
+import { useMarkedFollowed, useMarkRead } from "./marks";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import { channelOf, messagePath, chatPath, parentAt } from "./places";
 import { phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
-import { useMarkRead } from "./reading";
 import { threadOwnerOf } from "./threads";
 import { unreadIn } from "./unread";
 

@@ -11,8 +11,6 @@ function startWords(trigger: T.RunTrigger, first: boolean): [T.MilestoneKind, st
       return ["told", t("server.issue.timeline.told")];
     case "issue":
       return ["started", first ? t("server.issue.timeline.start") : t("server.issue.timeline.restart")];
-    case "task":
-      return ["started", t("server.issue.timeline.graph")];
     case "cron":
       return ["started", t("server.issue.timeline.cron", { missed: trigger.missed ?? false })];
     case "runtime":

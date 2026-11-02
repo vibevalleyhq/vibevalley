@@ -19,7 +19,9 @@ import { missing, lookIn, reasonOf, refused, orMissing } from "./errors.ts";
 import { Game } from "./game/game.ts";
 import { requestKeys } from "./http/requestKey.ts";
 import { ServerConfig } from "./infra/config.ts";
+import { Ingress } from "./ingress/ingress.ts";
 import { Issue } from "./issue/issue.ts";
+import { explicitMandate } from "./issue/mandate.ts";
 import { deviceHeader, Lan } from "./lan/lan.ts";
 import { Memory } from "./memory/memory.ts";
 import { Orchestrator } from "./orchestrator/orchestrator.ts";
@@ -27,7 +29,6 @@ import { Project } from "./project/project.ts";
 import { Runtime } from "./runtime/runtime.ts";
 import { Session } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
-import { Task } from "./task/task.ts";
 import { Voice } from "./voice/voice.ts";
 
 export const handlers = Effect.gen(function* () {
@@ -43,7 +44,7 @@ export const handlers = Effect.gen(function* () {
   const artifacts = yield* Artifact;
   const crons = yield* Cron;
   const issues = yield* Issue;
-  const tasks = yield* Task;
+  const ingress = yield* Ingress;
   const orchestrator = yield* Orchestrator;
   const game = yield* Game;
   const lan = yield* Lan;
@@ -96,7 +97,7 @@ export const handlers = Effect.gen(function* () {
     "channel.message.send": (body) =>
       Effect.andThen(
         Effect.sync(() => body.station !== undefined && game.want(body.station)),
-        orchestrator.say(
+        ingress.say(
           body.text,
           { ...(body.agent ? { agent: body.agent } : {}), ...(body.project ? { project: body.project } : {}) },
           body.id,
@@ -220,12 +221,12 @@ export const handlers = Effect.gen(function* () {
     "cron.previewDelete": ({ id }) => crons.previewRemove(id),
     "issue.list": (filter) => issues.query(filter),
     "issue.review": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.review(id, body)),
-    "issue.split": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => tasks.splitIssueOf(id, body.title ?? "", body.tasks)),
+    "issue.split": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.split(id, body.title ?? "", body.tasks, owner)),
     "issue.history.list": () => issues.history(),
     "issue.get": ({ id }) => issues.get(id),
     "issue.run.list": ({ id }) => Effect.flatMap(issues.get(id), (issue) => sessions.issueRuns(issue.id)),
     "issue.timeline.get": ({ id }) => issues.timeline(id),
-    "issue.create": ({ requestKey, ...body }) => createOnce(requestKey, applied(issues.add(body))),
+    "issue.create": ({ requestKey, autoSubmitPr, ...body }) => createOnce(requestKey, applied(issues.add(body, explicitMandate("", autoSubmitPr ?? false)))),
     "issue.update": ({ id: ref, ...body }) => applied(Effect.flatMap(issues.idOf(ref), (id) => issues.edit(id, body, owner))),
     "issue.delete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.remove(id)),
     "issue.previewDelete": ({ id }) => issues.previewRemove(id),
@@ -245,16 +246,6 @@ export const handlers = Effect.gen(function* () {
       Effect.flatMap(issues.idOf(ref), (id) => Effect.map(issues.comment(id, body.text, body.sendKey ?? ""), (): T.Applied => ({ seq: core.seq() }))),
     "issue.diff.get": ({ id }) => issues.changes(id, owner),
     "project.template.list": ({ id }) => issues.templates(id),
-    "graph.split": (body) => tasks.split(body.goal, body.project, body.agent ?? "", owner),
-    "graph.task.update": ({ id, task, ...body }) => tasks.editTask(id, task, body, owner),
-    "graph.task.delete": ({ id, task }) => tasks.removeTask(id, task, owner),
-    "graph.task.previewDelete": ({ id, task }) => tasks.previewRemoveTask(id, task),
-    "graph.act": ({ id, ...body }) => tasks.act(id, body.action, owner),
-    "graph.task.act": ({ id, task, ...body }) => tasks.taskAct(id, task, body.action, owner),
-    "graph.diff.get": ({ id }) => tasks.changes(id),
-    "graph.event.list": ({ id }) => tasks.events(id),
-    "graph.list": () => Effect.sync(tasks.graphs),
-    "graph.get": ({ id }) => tasks.graph(id),
   };
   return done;
 });

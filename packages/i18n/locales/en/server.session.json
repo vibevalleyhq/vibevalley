@@ -23,12 +23,7 @@
   "done": "done",
   "unfinished": "unfinished",
   "answer": {
-    "lines": "{field}: must be a string or an array of strings",
-    "noBlock": "No answer found: it goes in a json code block",
-    "notObject": "it must be an object",
-    "unreadable": "the json cannot be read: {why}",
-    "empty": "the conclusion is empty",
-    "noEvidence": "the conclusion rests on nothing: give at least one piece of evidence"
+    "noBlock": "No structured answer was submitted through issue_report"
   },
   "noRoom": {
     "farm": "{max} helpers are already at work",
@@ -99,7 +94,6 @@
     "stillClosing": "{name}'s machine did not stop: its working folder is kept, and no new round can start",
     "noRoom": "{name} does not carry on for now: {full}",
     "notReceived": "{name} did not get it: {why}",
-    "inGraph": "{name} is working on a step of the plan {graph}: it merges into the plan's branch when done, and into main with the whole plan",
     "stillWorking": "{name} is still working: wait for this round to finish, or stop it first, then collect it",
     "notBack": "{name} did not come back: {why}",
     "placeGone": "its working folder is gone ({cwd})",

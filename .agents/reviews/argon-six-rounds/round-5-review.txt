@@ -1,0 +1,26 @@
+模型：opencode-go/gemini-4-argon
+两项修正均已先补失败测试再实现。
+
+### 第 5 轮复审结论
+
+整体实现与文档（`docs/subsystems/artifact.md:96-98`）、7 项单测（`editor.test.ts`）和 2 项 Playwright 回归（`artifact-blocks.spec.ts`）结构清晰，真实时间到期通知、单调 `seq`/`rev` 守卫、IME 与惰性 `baseRev` 冲突保护均已到位。
+
+核查出 **2 项边界修正**（无其他必须改动）：
+
+#### 1. 在途批次（`this.sending === true`）期间失焦未改动的块，`applyHeld()` 会被延后或跳过
+- **路径**：`apps/web/src/features/artifact/editor.ts`（第 545–556 行 `flush()` 与第 559 行 `send()`）
+- **原因**：当前 `this.applyHeld()` 只放在 `send()` 的 `finally`（第 616 行）。当块 A 的批次正在网络上等待 `submit` 返回（`this.sending === true`）时，若主人点击并离开另一个**未改字**但有 `held` 更新的块 B（`focus(b, false)` → `this.flush()` → `void this.send()`），`send()` 在第 559 行 `if (this.sending || this.disposed) return;` 直接返回，不进 `try/finally`，导致块 B 在失焦当下无法应用 `held`。
+- **修复**：在 `flush()` 的 `for (const id of [...this.dirty])` 循环结束后、`void this.send()` 之前加一行 `this.applyHeld();`。此时改过字的块已由 `this.textOp(b)` 移入 `this.queue`（`this.queued(id) === true`），仍会被 `applyHeld()` 保护跳过；而未改字的失焦块无论 `this.sending` 是否为真都能当场同步应用 `held`（`send()` 的 `finally` 里仍保留 `this.applyHeld()` 供在途批次结算后兜底）。
+
+#### 2. `take(snap, true)` 全量替换时未守卫 `this.queued(id)`，可能误删在途的新增块
+- **路径**：`apps/web/src/features/artifact/editor.ts`（第 240 行）
+- **原因**：`append()` 或 `enter()` 新建本地块 `nb` 时，直接入队 `this.queue` 并调用 `send()`，此时 `this.dirty.has(nb.id)` 为 `false` 而 `this.queued(nb.id)` 为 `true`。若在 `submit` 返回前触发了 `load()` → `take(snap, true)`（如收到 `Reset` 重载且 `snap.artifact.seq >= this.seq`），第 240 行 `if (!seen.has(id) && !this.dirty.has(id))` 会把尚未落库的本地新块从 `this.byId` 中删掉。
+- **修复**：将第 240 行改为 `if (!seen.has(id) && !this.dirty.has(id) && !this.queued(id))`。
+
+---
+
+### 其余核查项（均通过）
+
+- **新旧 `rev` / `seq` 单调性**：`take`（`snap.artifact.seq < this.seq`）、`receive`（`Math.max`）、`send`（`Math.max`）、`put`（`mine && b.rev < mine.rev`）与 `gone`（`Math.max(went.rev, b.rev)`）均严格单调，晚到 ack 与旧快照不会倒退状态。
+- **惰性 `baseRev` 与冲突合并**：`put` 在 `heard && b.rev > mine.rev && (mine.focused || mine.composing || this.dirty.has(b.id) || this.queued(b.id))` 时只更新 `this.held` 而不提前改写 `mine.rev`，确保排队批次 `build()` 仍取主人编辑时看到的 `baseRev`；冲突返回后仅当 `server.rev >= b.rev && !b.composing` 才用服务端文本替换。
+- **定时器与 `dispose`**：`armWriting()` 只重画并重排下一个未到期时间点，不触发额外网络请求；`dispose()` 清空了 `idle`、`max`、`poll`、`writingTimer` 四类定时器，`editor.test.ts:152` 已验证 `vi.getTimerCount() === 0`。

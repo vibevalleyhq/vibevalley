@@ -1,15 +1,14 @@
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Layer, Logger, Queue, Stream } from "effect";
+import { Clock, Effect, Fiber, Layer, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { vi } from "vite-plus/test";
 
 import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
-import { waitFor } from "@vibevalley/testkit/until";
 
 import { emptyProgress } from "@/game/progress.ts";
 import { ServerConfig } from "@/infra/config.ts";
@@ -21,6 +20,7 @@ import { Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
 
 const helper: Session = {
   id: sessionId("w1"),
+  role: "worker",
   name: "帮工",
   agent: "lab",
   runtime: "pi",
@@ -30,6 +30,23 @@ const helper: Session = {
   phase: { _tag: "done" },
   refining: false,
 };
+
+const phaseOf = (action: "thinking" | "speaking", since = 0): Session["phase"] => ({
+  _tag: "working",
+  since,
+  doing: { action: action === "speaking" ? "speaking_text" : "thinking", label: "" },
+});
+const activity = Effect.fnUntraced(function* (core: Core["Service"], agent: string, action: "thinking" | "speaking", channel?: string) {
+  const id = sessionId(agent);
+  const had = core.session(id);
+  const since = had?.phase._tag === "working" ? had.phase.since : yield* Clock.currentTimeMillis;
+  yield* core.apply(...(had ? [] : [{ type: "session" as const, session: { ...helper, id, agent, role: "orchestrator" as const } }]), {
+    type: "sessionPhase",
+    id,
+    phase: phaseOf(action, since),
+    ...(channel ? { channel } : {}),
+  });
+});
 
 describe("core", () => {
   it("regression: a successful state wait releases its real-time deadline", async () => {
@@ -56,13 +73,12 @@ describe("core", () => {
     }
   });
 
-  it.effect("started again from state.json: idle, without the database's parts, the sessions at their stations", () => {
+  it.effect("regression: the core ignores legacy state.json and starts from its empty projection", () => {
     const config = testConfig();
     const was: WorkspaceState = {
       ...emptyWorkspaceState(),
       call: "live",
       callReason: "挂了",
-      orchestrators: { orchestrator: { state: "speaking", channel: "c1" } },
       sessions: [helper],
       progress: emptyProgress(),
       crons: [],
@@ -71,16 +87,16 @@ describe("core", () => {
     writeFileSync(join(config.home, "state.json"), JSON.stringify(was));
     return Effect.gen(function* () {
       const s = (yield* Core).state();
-      expect([s.call, s.callReason, s.orchestrators]).toEqual(["idle", "", {}]);
+      expect([s.call, s.callReason]).toEqual(["idle", ""]);
       expect([s.progress, s.crons, s.issues]).toEqual([undefined, [], []]);
-      expect(s.sessions).toHaveLength(1);
-      expect(s.sessions[0]!.play?.station).toBe(0);
+      expect(s.sessions).toEqual([]);
+      expect(readFileSync(join(config.home, "state.json"), "utf8")).toBe(JSON.stringify(was));
     }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))));
   });
 
-  it.effect("valid JSON with the wrong state shape is kept aside untouched, and the farm starts empty", () => {
+  it.effect("regression: a legacy state file is neither decoded nor rewritten", () => {
     const config = testConfig();
-    const raw = JSON.stringify({ call: "idle", orchestrators: {}, sessions: {} });
+    const raw = JSON.stringify({ call: "idle", sessions: {} });
     writeFileSync(join(config.home, "state.json"), raw);
     return Effect.gen(function* () {
       yield* Effect.scoped(
@@ -90,10 +106,9 @@ describe("core", () => {
           Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))),
         ),
       );
-      // Closing wrote a new state.json; the owner's old one is kept as it was.
       const kept = readdirSync(config.home).filter((f) => f.startsWith("state.json.unreadable-"));
-      expect(kept).toHaveLength(1);
-      expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe(raw);
+      expect(kept).toHaveLength(0);
+      expect(readFileSync(join(config.home, "state.json"), "utf8")).toBe(raw);
     });
   });
 
@@ -103,37 +118,34 @@ describe("core", () => {
       const core = yield* Core;
       yield* core.open();
       const reopen = core.open();
-      yield* core.apply({ type: "call", state: "idle", reason: "" });
+      yield* core.apply({ type: "voiceCall", state: "idle", reason: "" });
       expect(core.state().call).toBe("idle");
       yield* reopen;
       expect(core.state().call).toBe("live");
     }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))));
   });
 
-  it.effect("a fact is stamped and sent; the same again is no news; state.json is written on close, without the words", () => {
+  it.effect("a fact is stamped and sent without creating a file snapshot", () => {
     const config = testConfig();
     return Effect.gen(function* () {
       yield* Effect.scoped(
         Effect.gen(function* () {
           const core = yield* Core;
-          const seen = yield* core.events.pipe(Stream.take(4), Stream.runCollect, Effect.forkScoped);
+          const seen = yield* core.events.pipe(Stream.take(5), Stream.runCollect, Effect.forkScoped);
           yield* TestClock.adjust(5);
-          yield* core.apply({ type: "hired", session: { ...helper, phase: { _tag: "arriving" } } });
-          yield* core.setOrchestrator("orchestrator", "thinking");
-          yield* core.setOrchestrator("orchestrator", "thinking");
+          yield* core.apply({ type: "session", session: { ...helper, phase: { _tag: "working", since: 5, doing: { action: "none", label: "" } } } });
+          yield* activity(core, "orchestrator", "thinking");
+          yield* activity(core, "orchestrator", "thinking");
           yield* core.apply({ type: "progress", progress: emptyProgress() });
           yield* core.setCommits({ total: 1, today: 0, week: 0 } as never);
           const got = yield* Fiber.join(seen);
-          expect(got.map((e) => e.type)).toEqual(["snapshot", "hired", "orchestrator", "progress"]);
+          expect(got.map((e) => e.type)).toEqual(["snapshot", "session", "session", "sessionPhase", "progress"]);
           expect(got[2]!.at).toBeGreaterThan(0);
         }).pipe(
           Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))),
         ),
       );
-      const kept = JSON.parse(readFileSync(join(config.home, "state.json"), "utf8")) as Record<string, unknown>;
-      expect(kept.orchestrators).toEqual({ orchestrator: { state: "thinking", since: expect.any(Number) } });
-      expect(kept.progress).toBeUndefined();
-      expect(JSON.stringify(kept)).not.toMatch(/phaseText|whenText/u);
+      expect(existsSync(join(config.home, "state.json"))).toBe(false);
     });
   });
 
@@ -145,12 +157,15 @@ describe("core", () => {
         Stream.runForEach((f) => Queue.offer(frames, f)),
         Effect.forkScoped,
       );
-      expect((yield* Queue.take(frames)).state.orchestrators).toEqual({});
-      yield* core.setOrchestrator("orchestrator", "speaking");
+      expect((yield* Queue.take(frames)).state.sessions).toEqual([]);
+      yield* activity(core, "orchestrator", "speaking");
       yield* core.setCommits({ total: 2 } as never);
       yield* TestClock.adjust(stateEveryMs);
       const next = yield* Queue.take(frames);
-      expect([next.state.orchestrators.orchestrator?.state, next.state.commits?.total]).toEqual(["speaking", 2]);
+      expect([next.state.sessions.find((s) => s.id === "orchestrator")?.phase, next.state.commits?.total]).toMatchObject([
+        phaseOf("speaking", expect.any(Number)),
+        2,
+      ]);
       yield* TestClock.adjust(stateEveryMs * 2);
       expect(yield* Queue.size(frames)).toBe(0);
     }).pipe(
@@ -167,20 +182,23 @@ describe("core", () => {
         Effect.forkScoped,
       );
       expect((yield* Queue.take(frames)).seq).toBe(0);
-      yield* core.setOrchestrator("orchestrator", "thinking");
+      yield* activity(core, "orchestrator", "thinking");
       expect(core.seq()).toBe(1);
       // The same again changes nothing: no fold, no seq.
-      yield* core.setOrchestrator("orchestrator", "thinking");
+      yield* activity(core, "orchestrator", "thinking");
       expect(core.seq()).toBe(1);
       // A batch is one commit.
-      yield* core.apply({ type: "orchestrator", agent: "orchestrator", state: "speaking" }, { type: "orchestrator", agent: "lead", state: "thinking" });
+      yield* core.apply(
+        { type: "sessionPhase", id: sessionId("orchestrator"), phase: phaseOf("speaking") },
+        { type: "commits", commits: { total: 3, repos: [] } },
+      );
       const replied = core.seq();
       expect(replied).toBe(2);
       yield* TestClock.adjust(stateEveryMs);
       const next = yield* Queue.take(frames);
       // What a reply read after its change says (replied) is no later than the first frame that shows the change.
       expect(next.seq).toBeGreaterThanOrEqual(replied);
-      expect(next.state.orchestrators.lead?.state).toBe("thinking");
+      expect(next.state.commits?.total).toBe(3);
     }).pipe(
       Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
     ),
@@ -189,6 +207,7 @@ describe("core", () => {
   it.effect("an internal subscriber keeps a whole burst while it works", () =>
     Effect.gen(function* () {
       const core = yield* Core;
+      yield* activity(core, "orchestrator", "speaking");
       const incoming = yield* core.subscribe;
       const seen = yield* Effect.forkScoped(
         incoming.pipe(
@@ -200,7 +219,7 @@ describe("core", () => {
         ),
       );
       yield* TestClock.adjust(5);
-      for (let i = 0; i < 128; i++) yield* core.setOrchestrator("orchestrator", i % 2 === 0 ? "thinking" : "speaking");
+      for (let i = 0; i < 128; i++) yield* activity(core, "orchestrator", i % 2 === 0 ? "thinking" : "speaking");
       yield* TestClock.adjust(200);
       expect(yield* Fiber.join(seen)).toBe(128);
     }).pipe(
@@ -208,53 +227,20 @@ describe("core", () => {
     ),
   );
 
-  it.effect("a delayed save failure is logged and the final save still works", () => {
-    const config = testConfig();
-    const messages: unknown[] = [];
-    const logger = Logger.make((options) => {
-      messages.push(options.message);
-    });
-    return Effect.gen(function* () {
-      yield* Effect.scoped(
-        Effect.gen(function* () {
-          mkdirSync(join(config.home, "state.json"));
-          const core = yield* Core;
-          yield* core.setOrchestrator("orchestrator", "thinking");
-          yield* TestClock.adjust(600);
-          // The write is on the file system, after the clock's move.
-          yield* waitFor(
-            Effect.sync(() => messages.some((message) => String(message).includes("state.json could not be saved"))),
-            (logged) => logged,
-            "the failure logged",
-          );
-          rmSync(join(config.home, "state.json"), { recursive: true });
-        }).pipe(
-          Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))),
-        ),
-      );
-      expect(readFileSync(join(config.home, "state.json"), "utf8")).toContain("thinking");
-    }).pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])));
-  });
-
-  it.effect("each orchestrator's state says where it thinks and writes, forgets it once it listens, and leaves at rest", () =>
+  it.effect("session phases update independently and keep their supplied run start", () =>
     Effect.gen(function* () {
       const core = yield* Core;
-      yield* core.setOrchestrator("orchestrator", "thinking", "c1");
-      yield* core.setOrchestrator("lead", "speaking", "c2");
-      expect(core.state().orchestrators).toEqual({
-        orchestrator: { state: "thinking", channel: "c1", since: expect.any(Number) },
-        lead: { state: "speaking", channel: "c2", since: expect.any(Number) },
-      });
-      // A round begins when it starts thinking and goes on while it writes.
-      const began = core.state().orchestrators.orchestrator!.since;
+      yield* activity(core, "orchestrator", "thinking", "c1");
+      yield* activity(core, "lead", "speaking", "c2");
+      const began = core.session("orchestrator")!.phase;
       yield* TestClock.adjust(5_000);
-      yield* core.setOrchestrator("orchestrator", "speaking", "c1");
-      expect(core.state().orchestrators.orchestrator?.since).toBe(began);
-      yield* core.setOrchestrator("orchestrator", "listening");
-      expect(core.state().orchestrators.orchestrator).toEqual({ state: "listening" });
-      yield* core.setOrchestrator("orchestrator", "idle");
-      yield* core.setOrchestrator("lead", "idle");
-      expect(core.state().orchestrators).toEqual({});
+      yield* activity(core, "orchestrator", "speaking", "c1");
+      expect(core.session("orchestrator")?.phase).toMatchObject({ _tag: "working", since: began._tag === "working" ? began.since : 0 });
+      expect(core.session("lead")?.channel).toBe("c2");
+      yield* core.apply({ type: "sessionPhase", id: sessionId("orchestrator"), phase: { _tag: "resting" } });
+      expect(core.session("orchestrator")).toMatchObject({ phase: { _tag: "resting" } });
+      expect(core.session("orchestrator")?.channel).toBeUndefined();
+      expect(core.session("lead")?.phase).toEqual(phaseOf("speaking", expect.any(Number)));
     }).pipe(
       Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
     ),
@@ -264,8 +250,9 @@ describe("core", () => {
     Effect.gen(function* () {
       const runSync = Effect.runSyncWith(yield* Effect.context());
       const core = yield* Core;
-      yield* Effect.sync(() => runSync(core.apply({ type: "orchestrator", agent: "orchestrator", state: "thinking" })));
-      expect(core.state().orchestrators.orchestrator?.state).toBe("thinking");
+      yield* core.apply({ type: "session", session: helper });
+      yield* Effect.sync(() => runSync(core.apply({ type: "sessionPhase", id: helper.id, phase: phaseOf("thinking") })));
+      expect(core.session(helper.id)?.phase).toEqual(phaseOf("thinking"));
     }).pipe(
       Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
     ),

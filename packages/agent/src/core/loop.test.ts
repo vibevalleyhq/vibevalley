@@ -129,11 +129,11 @@ describe("an agent's loop", () => {
     }),
   );
 
-  it.effect("takes the lines sent while it works one a turn, and a follow-up only when it would stop", () =>
+  it.effect("takes every line waiting at a step boundary in one turn, and a follow-up only when it would stop", () =>
     Effect.gen(function* () {
       const [napping, wake] = [yield* Deferred.make<void>(), yield* Deferred.make<void>()];
       const r = yield* rig(
-        [answer([toolCall("nap", {})]), (q) => answer("听到" + lastUser(q)), (q) => answer("听到" + lastUser(q)), (q) => answer("听到" + lastUser(q))],
+        [answer([toolCall("nap", {})]), (q) => answer("听到" + lastUser(q)), (q) => answer("听到" + lastUser(q))],
         [held("nap", napping, wake, "醒了")],
       );
       yield* r.agent.prompt([user("开始")]);
@@ -148,12 +148,13 @@ describe("an agent's loop", () => {
         "assistant:",
         "toolResult:醒了",
         "user:甲",
-        "assistant:听到user:甲",
         "user:乙",
         "assistant:听到user:乙",
         "user:完了再说",
         "assistant:听到user:完了再说",
       ]);
+      expect(r.requests).toHaveLength(3);
+      expect(r.requests[1]!.messages.filter((m) => m.role === "user").map(words)).toEqual(["user:开始", "user:甲", "user:乙"]);
     }),
   );
 

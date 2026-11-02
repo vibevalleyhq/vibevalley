@@ -80,7 +80,6 @@
     "reopen": "重开"
   },
   "phase": {
-    "arriving": "刚派出去，正在开工",
     "quiet": "{what}（已经 {span}没动静了）",
     "done": "这一轮做完了，等你看{conflict}",
     "failed": "这一轮没做成",

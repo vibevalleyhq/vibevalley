@@ -13,6 +13,7 @@ import { Core } from "@/core/core.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
 import { releaseHeld } from "@/testing/helper.ts";
+import { testIssues } from "@/testing/issues.ts";
 import { Said } from "@/testing/said.ts";
 
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
@@ -43,7 +44,7 @@ describe("a refined issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
@@ -102,7 +103,7 @@ describe("a refined issue", () => {
   it.live("leaves nothing behind", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
       let issue = yield* issues.add({ title: "新工单", project: "board", agent: "lab" });
@@ -133,7 +134,7 @@ describe("a refined issue", () => {
   it.live("that cannot be read changes nothing", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const issues = yield* Issue;
+      const issues = testIssues(yield* Issue);
       const core = yield* Core;
       const { in: saidIn } = yield* Said;
       yield* (yield* Agent).save(lab());

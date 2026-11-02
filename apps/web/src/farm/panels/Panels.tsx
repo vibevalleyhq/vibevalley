@@ -27,7 +27,6 @@ import { FarmLog } from "./FarmLog";
 import { HarvestReview, Warehouse } from "./Harvest";
 import { Menu } from "./Menu";
 import { SowForm, WaterForm } from "./SeedForms";
-import { TaskBoard } from "./TaskBoard";
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {
   shop: [t("web.farm.panel.shop"), "icon-shop", "sm"],
@@ -35,7 +34,6 @@ const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDial
   graphs: [t("web.farm.panel.graphs"), "icon-tasks", "lg"],
   log: [t("web.farm.panel.log"), "icon-log", "lg"],
   orchestrator: [t("web.farm.panel.orchestrator"), "manager-face", "wide"],
-  taskBoard: [t("web.farm.panel.taskBoard"), "machine-seeder", "lg"],
 };
 
 /** Each layer is drawn by its kind; one of a kind replaced by another (another plot, another panel) is built anew. */
@@ -104,7 +102,7 @@ function Layer(props: { o: FarmOverlay }) {
             testid={panel()}
             onClose={() => farm.panel(undefined)}
           >
-            <Switch fallback={<TaskBoard />}>
+            <Switch>
               <Match when={panel() === "warehouse"}>
                 <Warehouse />
               </Match>

@@ -81,7 +81,7 @@ const drained = aTurn;
 const req = (name: string, text: string, when: T.CronWhen, more: Partial<T.CronRequest> = {}): T.CronRequest => ({ name, text, when, ...more });
 
 describe("crons", () => {
-  it.effect("come due, say so, are kept, and come back on", () => {
+  it.effect("come due, are kept, and come back on", () => {
     const config = { ...testConfig(), db: "" };
     const now = Date.UTC(2026, 9, 13, 8);
     let everyId = "";
@@ -103,8 +103,7 @@ describe("crons", () => {
         yield* s.tick;
         yield* drained;
         expect(due.map((d) => [d.cron.id, d.missed, d.cron.enabled])).toEqual([[made.id, false, false]]);
-        const last = (yield* chat.history(general)).at(-1)!;
-        expect([last.kind, last.text]).toEqual(["notice", "⏰ 定时任务「看进度」到点了：看看帮工们的进度"]);
+        expect((yield* chat.history(general)).some((message) => message.text.includes("⏰"))).toBe(false);
         expect(s.list()[0]!.enabled).toBe(false);
         yield* s.tick;
         expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "lab" }), owner))).toMatchObject({
@@ -143,7 +142,7 @@ describe("crons", () => {
     });
   });
 
-  it.effect("regression: a failed run write retries while a failed notice neither loses nor repeats the run", () => {
+  it.effect("regression: an occurrence write failure rolls back the schedule and retries once", () => {
     const now = 1_800_000_000_000;
     return Effect.andThen(
       TestClock.setTime(now),
@@ -161,7 +160,12 @@ describe("crons", () => {
         const after = core.state().crons.find((x) => x.id === made.id)!;
         expect([after.enabled, after.lastRun, due]).toEqual([true, undefined, []]);
         yield* sql.unsafe(`drop trigger fail_run on cron`).pipe(Effect.orDie);
-        yield* sql.unsafe(`create trigger fail_notice before insert on channel_message for each row execute function fail_run()`).pipe(Effect.orDie);
+        yield* sql.unsafe(`create trigger fail_occurrence before insert on cron_occurrence for each row execute function fail_run()`).pipe(Effect.orDie);
+        yield* s.tick;
+        yield* drained;
+        expect(core.state().crons.find((x) => x.id === made.id)?.lastRun).toBeUndefined();
+        expect(due).toEqual([]);
+        yield* sql.unsafe(`drop trigger fail_occurrence on cron_occurrence`).pipe(Effect.orDie);
         yield* s.tick;
         yield* drained;
         expect(due.map((d) => d.cron.id)).toEqual([made.id]);

@@ -15,8 +15,7 @@ import { type ServerConfig } from "@/infra/config.ts";
 import { Mcp } from "@/mcp/mcp.ts";
 import { type GitHubRun, type ProjectHooks } from "@/project/project.ts";
 import { registryOf } from "@/runtime/runtime.ts";
-import { agentSessions, agents, collaboration, issuesBelowTaskGraphs, platform, type ServiceOptions, sourceControl } from "@/services.ts";
-import { Task } from "@/task/task.ts";
+import { agentSessions, agents, collaboration, ingress, issues, mailbox, platform, resources, type ServiceOptions, sourceControl } from "@/services.ts";
 import { Tool } from "@/tool/tool.ts";
 
 import { repo } from "./git.ts";
@@ -50,8 +49,8 @@ export interface WorldOptions {
   readonly who?: (token: string) => string;
 }
 
-/** The farm below the task graphs: for a test that makes its own task service. */
-export function worldBelowTasks(options: WorldOptions = {}) {
+/** Services below Ingress for module tests. */
+export function worldBelowIngress(options: WorldOptions = {}) {
   const config = options.config ?? testConfig();
   for (const name of options.repos ?? []) {
     const dir = join(config.workRoot, "projects", name);
@@ -66,13 +65,13 @@ export function worldBelowTasks(options: WorldOptions = {}) {
     issue: { background: false },
   };
   const below = platform(config);
-  return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), agentSessions(o), collaboration(o), issuesBelowTaskGraphs(o));
+  return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), agentSessions(o), collaboration(o), issues(o), mailbox);
 }
 
 /** The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds
  * it). */
 export function world(options: WorldOptions = {}) {
-  return worldBelowTasks(options).pipe(on(Task.layer()), on(Inbox.layer), on(Tool.layer), on(Mcp.layer(options.who ? { who: options.who } : {})));
+  return worldBelowIngress(options).pipe(ingress, resources, on(Inbox.layer), on(Tool.layer), on(Mcp.layer(options.who ? { who: options.who } : {})));
 }
 
 const on =

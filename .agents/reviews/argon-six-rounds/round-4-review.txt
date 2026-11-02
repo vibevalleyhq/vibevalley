@@ -1,0 +1,25 @@
+模型：opencode-go/gemini-4-argon
+会话：ses_e69d7fcd7ffei46xqVUD5nDmzg
+
+### 第 4 轮复审结论
+
+**未发现生命周期、事件顺序或镜像残留问题；有 1 处小修正建议（`evals.live.test.ts` 的 `Effect.timeout` 失败处理）。**
+
+#### 1. 建议修正项（1 项）
+
+- **路径**：`apps/server/src/orchestrator/evals.live.test.ts`（第 74、80 行）
+- **机制**：
+  1. 在 Effect v4 中，`Effect.timeout("5 minutes")` 超时会使 Effect 以 `TimeoutError` 进入错误通道，这一点符合预期；但在第 74 行 `Stream.runForEach` 的 `Effect.sync` 回调内部写 `throw new Error("the model: ...")` 产生的是 **Defect（`Cause.die`）** 而非 typed failure，虽然最终也会让外层 `Effect.runPromise` reject，但建议用 `Effect.flatMap` + `Effect.fail` 或保留原语义，且将 `Effect.timeout("5 minutes")` 明确写清超时错误文案 `new Error("the turn took too long")`。
+  2. 这处属于极小细节，不阻塞主线。
+
+#### 2. 其余重点项核查（均通过）
+
+- **非搬移镜像**：`packages/agent/src/brain.ts` 已彻底删除 88 行的 `BrainOwner`、`BrainHandle`、`openBrain`、`standaloneOwner`；`vibevalley.ts` 没有重建 `BrainHandle` 或 `Set<listener>`，只直接运行 `makeBrain` 及其 `send`、`stop`、`progress`、`events`。
+- **初始化、父 Scope 关闭、并发 `dispose` 与最终事件顺序**：
+  - `vibevalley.ts:78-79` 从 `parent` 派生 `scope` 和 `reading` 两个子 Scope；初始化失败时 `catch` 块经 `Scope.close(scope, Exit.void).pipe(Effect.ensuring(Scope.close(reading, Exit.void)))` 保证两个子 Scope 均被关闭。
+  - `dispose`（第 251–262 行）通过 `closing ??= run(...)` 共享同一个关闭 Promise，不会重复发起 `kernel.request("toRuntime", { kind: "dispose" })`；先 `queued.length = 0`、再 `yield* agent.stop`、再 `Scope.close(scope)` 并 `Fiber.await(reader)` 排空到 `agent_closed`（确保在途回合的 `agent_settled` 先触发 `end({ kind: "aborted" })` 写出 `turn_ended` 和 `usage`），最后 `ensuring` 关闭 `reading` 并回应 `{ kind: "exited", code: 0 }`。
+- **测试覆盖与显式 Scope 管理**：
+  - `vibevalley.test.ts` 拒绝了裸 `Scope.makeUnsafe()`，通过 `afterEach` 统一回收 `scopes`；新增的 `shares the actual close with every concurrent caller` 与 `cuts off a runtime's active model when its owner's scope closes` 直接在真实 `vibevalleyRuntimeOf` 会话上验证了并发 `dispose`（只发一次 `turn_ended` 和 `exited`）及父 Scope 中断。
+  - `run.test.ts` 和 `brain.test.ts` 均直接在 `makeBrain` + `Scope` 上验证了截断回答的用量结算与父 Scope 中断。
+
+可以直接进入第 5 轮。

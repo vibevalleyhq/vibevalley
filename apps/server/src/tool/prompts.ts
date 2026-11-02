@@ -8,6 +8,7 @@ import { phaseText, shortTitle, stageWantsOwner } from "@vibevalley/protocol/rul
 
 import { head } from "@/base/clip.ts";
 import { nextText, whenText } from "@/cron/when.ts";
+import { mandateNoteWordLimit } from "@/issue/mandate.ts";
 import { yuan } from "@/runtime/money.ts";
 import { runtimeLabel } from "@/runtime/presets.ts";
 
@@ -59,10 +60,9 @@ export function sessionLine(h: T.Session, now: number, number?: number): string 
   }
   const project = h.project ?? "";
   const where = h.branch ? "在 " + project + " 的 " + h.branch : "在 " + project;
-  const task = h.graph ? (h.graph.task ? "，做计划 " + h.graph.id + " 的步骤 " + h.graph.task : "，在拆计划 " + h.graph.id) : "";
   const spent = h.spent ? "；花了" + spentText(h.spent) : "";
   const issue = number !== undefined ? `#${number} ` : "";
-  return `- ${h.name}（${h.id}，${runtimeLabel(h.runtime)}，${where}${task}）工单 ${issue}「${head(h.brief, 60)}」，${phaseText(h, now)}${last}${spent}`;
+  return `- ${h.name}（${h.id}，${runtimeLabel(h.runtime)}，${where}）工单 ${issue}「${head(h.brief, 60)}」，${phaseText(h, now)}${last}${spent}`;
 }
 
 /** The words for a status: its label (wording().status), a few the owner says for it, and its own name. */
@@ -153,7 +153,6 @@ export function parseTime(s: string): number | undefined {
 // Parameter descriptions shared by several tools' schemas (tool/schemas.ts).
 const issueOrAgent = "工单编号（#41 或 41）；也可以写在做它的帮工的名字";
 const issueNumber = "工单编号（#41 或 41）";
-const planId = "计划 id";
 const projectFolder = "项目文件夹名";
 const agentProfile = "帮工档案的名字或 id";
 const searchText = "要找什么，几个词或一句话；不填就列出最新的";
@@ -174,7 +173,6 @@ export const params = {
   },
   issueOrAgent,
   issueNumber,
-  planId,
   projectFolder,
   agentProfile,
   searchText,
@@ -185,16 +183,13 @@ export const params = {
     pass: "验收过了就是 true",
     text: "没过时，还要交代的话",
   },
-  graphSplit: {
-    agent: "让谁来拆：帮工名字或 id；不填按规则挑",
-    goal: "要做的事，照主人的原话",
-  },
   issueCreate: {
     agent: "谁来做：帮工的名字、id 或 runtime；不填，开工时按挑帮工的规则挑",
+    autoSubmitPr: "主人明确允许帮工在检查通过后自行开立或更新 PR 时才填 true；推送分支不等于合并主分支",
     channel: "工单串开在哪个频道，比如 #clock-in；不填就是你正在回话的频道",
     deliver:
       "交付什么：change 是改代码、合进项目（不填就是它）；branch 是改代码但分支留着不合（主人说「先别合」「分支留着」）；answer 是只查清楚、交回一份带依据的结论，不改代码（「查一下」「看看为什么」「是不是」）",
-    description: "说明：主人说的原话和你补的背景；主人没说的写成建议或待定，不写成要求",
+    description: `给帮工的附言，最多 ${mandateNoteWordLimit} 词（中英文都按词分段）。一手原话自动绑定来源，让帮工用 resource_read 读取；不复述原话，不替帮工编实施方案。`,
     draft: "要不要让帮工读过代码起草（写成标题、说明、验收标准）；会花钱，主人只是随口记一句时不用",
     priority: "紧急、高、普通、低；不填是普通",
     project: "项目文件夹名；频道有默认项目时可以不填；新项目起一个简短的英文名，开工时会新建",
@@ -241,14 +236,6 @@ export const params = {
     tz: "时区，比如 Asia/Shanghai；不填是这台电脑的",
     when: "什么时候：kind 是 once（填 at）、every（填 minutes）、daily（填 time）、weekly（填 days 和 time）、cron（填 expr）",
   },
-  graphTask: {
-    agent: "帮工档案 id；空字符串表示按规则挑",
-    brief: "工单",
-    check: "做完跑的检查命令；空字符串表示不跑",
-    needs: "要等哪几件做完",
-    task: "这件的 id",
-    newTask: "这件的 id（新加的就起一个简短的英文 id）",
-  },
   issueComment: {
     text: "要带的话",
   },
@@ -289,19 +276,28 @@ export const params = {
     tasksDescription: "子工单，每张一个帮工在自己的分支上做完、提交、单独验证",
     task: {
       acceptance: "这张只写现在会失败的测试，别的都等它，合进去以后冻结",
-      agent: "帮工档案 id；不填按规则挑",
+      agent: "帮工档案 id 或名字；不填继承父工单的帮工",
       brief: "这张子工单：目标、改哪里、做到什么算完、留给后面的步骤什么；做它的帮工只看得到它和前面步骤的结论",
       check: "做完在它的分支上跑的检查命令，比如 go test ./...",
       id: "简短的英文小写 id，比如 schema、api",
       needs: "要等哪几张做完（填 id）；不互相依赖的会同时做",
       scope: "它要改的文件或目录；同时做的几张尽量不重叠",
     },
-    title: "拆完的计划叫什么；不填照工单的标题",
+    title: "父工单的新标题；不填保留原标题",
   },
 };
 
 /** Who the orchestrator is, as a tool answer names it. */
 export const ownerAgentWord = "管家";
+
+export const issueReportDescription =
+  "结构化报告当前工单的一轮：summary 是净结果。prSubmit=true 提交 PR 后继续跟随 CI/评审；最终交给主人验收用 prSubmit=false。有问题或未满足的验收项则等主人。问题、验收凭据和记性只认这些字段，不从正文猜。用主人的语言填写。";
+export const issueReportRecorded = (recorded: boolean) => (recorded ? "报告已记录；现在用简短正文说明结果。" : "当前不是正在处理工单的帮工会话，不能交回。 ");
+export const issueHandbackDescription = "把当前工单收到、但超出这张工单授权范围的一条输入退回网关；envelope 填输入卡片的 ID，reason 说明为什么应重新分流。";
+export const issueHandbackRecorded = "已退回管家重新分流。";
+export const issuePrSubmitDescription =
+  "在当前工单获主人明确授权、项目启用 PR 且本地检查通过后，在本轮运行中推送分支并开立或更新 PR。summary 可填写这次实际改动，作为 PR 说明。它不会合并主分支或结束当前会话。";
+export const issuePrSubmitted = (result: string) => "PR 已提交：" + result;
 
 /** A blocks artifact's block in one line: its id, revision, type and text (artifact_content_get, artifact_block_update's conflict). */
 export const blockLine = (b: T.Block) => `- 〔${b.id} · 第 ${b.rev} 版 · ${b.type}〕${b.text.map((s) => s.t).join("")}`;
@@ -337,16 +333,6 @@ export const descriptions = {
   "channel.create":
     "开一个新频道：一件长期的事、一个项目，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，project 是它的默认项目（在这里派的活默认在这个项目里干）。主人要求了才开。",
   "channel.update": "改一个频道是做什么的（description），或它的默认项目（project，写空字符串就是不要默认项目）。",
-  "graph.split":
-    "起一个计划：派一个帮工读代码，把一件很长的活拆成几件，有先后（每件一个帮工），拆好了等主人看过再开工。goal 是主人要做的事，照他的原话写全；project 是项目文件夹名。",
-  "graph.list": "列出还没合进主分支的计划：每件的状态、谁在做、结论。",
-  "graph.get": "看一个计划：每件的状态、谁在做、结论。",
-  "graph.task.update":
-    "改计划里的一件：工单、标题、要等的、谁来做、做完跑的检查命令；没有这一件就加上。没开工的计划什么都能改；开工以后只能改还没开始或没做成的。",
-  "graph.task.delete": "从计划里删掉一件：没开工的计划都能删；开工以后只能删还没开始的。",
-  "graph.act":
-    "对整个计划：start 开工（主人看过、同意了才用），pause 暂停（正在做的做完，不开新的），resume 继续，abandon 放弃（分支留着），merge 合进主分支（都做完以后，把计划的分支合进主分支）。",
-  "graph.task.act": "对计划里的一件：retry 重试没做成的，skip 跳过它（后面的照常开工）。",
   "memory.search":
     "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；project 只找那个项目的和所有项目都用的。派活前想知道某个项目有什么约定、谁做过类似的活时用。",
   "memory.create":
@@ -500,6 +486,7 @@ export const answers = {
   },
   issueCreate: {
     draftWithStartRefused: "没记：起草交回来以前开不了工。要马上做就不起草；要起草就先不开工。",
+    noteTooLong: `没记：附言最多 ${mandateNoteWordLimit} 词。一手输入已自动绑定，删去复述和实施方案后再提交。`,
     noChannel: (name: string) => "没有 " + name + " 这个频道：先用 channel_list 看看有哪些，或者用 channel_create 开一个。",
     noDefaultProject: (channel: string) => "#" + channel + " 没有默认项目：填上 project。",
     noDeliver: "没记：deliver 是 change（改代码）、branch（改代码，分支留着）或 answer（只查、交结论）",
@@ -547,10 +534,6 @@ export const answers = {
   channelSettings: {
     noChannel: (name: string) => "没有 " + name + " 这个频道",
     updated: (name: string) => "改好了 #" + name + "。",
-  },
-  graphs: {
-    noGraphNamed: (id: string) => "没有 " + id + " 这个计划",
-    none: "现在没有计划。",
   },
   memory: {
     rememberedFor: (id: string, where: string, memId: string) => "替 " + id + " 记下了（" + where + "）〔" + memId + "〕",

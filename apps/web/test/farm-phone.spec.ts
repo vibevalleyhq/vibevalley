@@ -60,6 +60,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   const frame = await firstFrame(server.url);
   const session: SessionView = {
     id: sessionId("w1"),
+    role: "worker",
     name: "fox",
     agent: "fox",
     runtime: "nobody",

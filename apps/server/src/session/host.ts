@@ -8,13 +8,14 @@ import { Cause, Clock, Deferred, Effect, Exit, Fiber, FileSystem, Queue, Schema,
 
 import { type Brain, type BrainEvent, makeBrain, sessionUnfinished } from "@vibevalley/agent/brain";
 import type { Tool } from "@vibevalley/agent/core/loop";
-import { memoryFile } from "@vibevalley/agent/memory";
+import { type MemoryPort } from "@vibevalley/agent/memory";
 import { type BrainMessage, type CustomMessage, customMessage, messageText } from "@vibevalley/agent/messages";
 import { readLines, replay } from "@vibevalley/agent/session";
 import type { ModelClient } from "@vibevalley/ai/client";
 import type { Usage } from "@vibevalley/ai/messages";
 import { t } from "@vibevalley/i18n";
-import type { OrchestratorState } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { newId } from "@/base/ids.ts";
 import { Core } from "@/core/core.ts";
@@ -24,6 +25,7 @@ import type { ToolStart } from "./facts.ts";
 import { makeInProcessRun, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
+import type { SessionIdentity } from "./shapes.ts";
 import { tokensOf, usageText } from "./usage.ts";
 
 /** The input a caller waited on was not taken; cause is whatever stopped it, a defect included. */
@@ -85,10 +87,7 @@ export interface Hosted<R> {
 }
 
 export interface HostOptions<R> {
-  /** Its id: its transcript's and log's name. */
-  readonly name: string;
-  /** How the owner calls it, in what the host says. */
-  readonly label: string;
+  readonly session: SessionIdentity;
   /** The custom message type its inputs are kept under in its transcript. */
   readonly inputType: string;
   readonly home: string;
@@ -106,7 +105,7 @@ export interface HostOptions<R> {
   /** Where words go: each of the model's answers in full, as one message; the caller has them as they grow. */
   readonly say: (route: R, text: string, run: string) => Effect.Effect<void>;
   /** route: the input it works for, once it has taken one in this run; its words go there. */
-  readonly state: (state: OrchestratorState, route?: R) => Effect.Effect<void>;
+  readonly channel: (route: R) => string | undefined;
   /** The agent started, or folded its conversation: what the model saw before is gone from it. */
   readonly fresh: () => void;
   /** The run an input found in the transcript after a restart goes on with: its issue and trigger, from its route. */
@@ -143,7 +142,7 @@ export interface AgentHost<R> {
 /** Made by Session.host in the owner's scope: the agent's own scope is a child of it, so the agent ends with the owner at
  * the latest; its log and its runs are kept with the sessions'. */
 export const makeHost = <R>(
-  o: HostOptions<R>,
+  o: HostOptions<R> & { readonly memory: MemoryPort },
   journal: Journal,
   runs: RunStore,
 ): Effect.Effect<AgentHost<R>, never, Scope.Scope | Core | FileSystem.FileSystem> =>
@@ -151,8 +150,8 @@ export const makeHost = <R>(
     const core = yield* Core;
     const fs = yield* FileSystem.FileSystem;
     const owner = yield* Effect.scope;
-    const inProcess = yield* makeInProcessRun(o.name, journal, o.toolStart, runs);
-    const transcript = join(o.home, o.name + ".jsonl");
+    const inProcess = yield* makeInProcessRun(o.session.id, journal, o.toolStart, runs);
+    const transcript = join(o.home, o.session.id + ".jsonl");
     const local = new WeakMap<BrainMessage, Hosted<R>>();
     let input: Hosted<R> = { route: o.first, run: { by: { kind: "" } } };
     let toCaller = 0;
@@ -164,9 +163,9 @@ export const makeHost = <R>(
     let brain: { readonly brain: Brain; readonly scope: Scope.Closeable; readonly following: Fiber.Fiber<void> } | undefined;
     /** Held from building an input to handing it over, so that each input's text follows the one before. */
     const inputs = yield* Semaphore.make(1);
-    const stopped = () => t("server.session.host.stopped", { label: o.label });
+    const stopped = () => t("server.session.host.stopped", { label: o.session.name });
     /** Every line this host logs says whose it is. */
-    const own = Effect.annotateLogs({ agent: o.name });
+    const own = Effect.annotateLogs({ agent: o.session.id });
     const log = (text: string) => own(Effect.logError(`vibevalley: ${text}`));
 
     const current = (): Hosted<R> => {
@@ -186,6 +185,19 @@ export const makeHost = <R>(
 
     // The caller (a call's line, the local chat/completions) gets the words as they grow; the chat gets the answer once
     // it is whole, and meanwhile only that it is being written.
+    const activity = Effect.fn("Session.activity")(function* (action: T.SessionAction, route?: R) {
+      const id = sessionId(o.session.id);
+      const session = core.session(id);
+      if (!session) return;
+      const phase = session.phase;
+      yield* core.apply({
+        type: "sessionPhase",
+        id,
+        phase: { _tag: "working", since: phase._tag === "working" ? phase.since : yield* Clock.currentTimeMillis, doing: { action, label: "" } },
+        ...(route === undefined || o.channel(route) === undefined ? {} : { channel: o.channel(route)! }),
+      });
+    });
+
     const grow = (text: string) =>
       Effect.suspend(() => {
         const at = input;
@@ -195,7 +207,7 @@ export const makeHost = <R>(
         }
         if (open) return Effect.void;
         open = true;
-        return o.state("speaking", at.route);
+        return activity("speaking_text", at.route);
       });
 
     const done = (text: string) =>
@@ -208,7 +220,7 @@ export const makeHost = <R>(
         open = false;
         if (text && !o.quiet(at.route)) yield* o.say(at.route, text, inProcess.currentRun());
         // The run goes on (its tools, another answer) until it settles.
-        if (wrote) yield* o.state("thinking", at.route);
+        if (wrote) yield* activity("thinking", at.route);
       });
 
     // Only stop aborts a run while the farm is up; the settle close publishes is the farm stopping.
@@ -218,7 +230,7 @@ export const makeHost = <R>(
         input.caller?.end();
         input = { route: input.route, run: input.run };
         open = false;
-        return o.state("listening");
+        return Effect.void;
       });
 
     // An answer that failed before any token came has none to tell.
@@ -244,7 +256,7 @@ export const makeHost = <R>(
         )
           yield* inProcess
             .observe(e, run)
-            .pipe(Effect.catch((err) => core.notice("error", t("server.session.host.notRecorded", { label: o.label, why: err.message }))));
+            .pipe(Effect.catch((err) => core.notice("error", t("server.session.host.notRecorded", { label: o.session.name, why: err.message }))));
         switch (e.type) {
           case "message_start":
             if (isHosted(e.message, o.inputType)) {
@@ -256,12 +268,12 @@ export const makeHost = <R>(
               input = next;
               toCaller = 0;
               // It works for this input from here on, wherever the run began.
-              yield* o.state("thinking", next.route);
+              yield* activity("thinking", next.route);
             }
             return;
           case "agent_start":
             // The input it starts on is taken next (message_start), and says where.
-            return yield* o.state("thinking");
+            return yield* activity("thinking");
           case "message_update": {
             if (e.message.role !== "assistant") return;
             const text = messageText(e.message);
@@ -274,7 +286,7 @@ export const makeHost = <R>(
             noteUsage(m.usage);
             yield* done(messageText(m).trim());
             if (m.stopReason === "error")
-              yield* core.notice("error", t("server.session.host.failed", { label: o.label, why: m.errorMessage || t("server.agent.modelFailed") }));
+              yield* core.notice("error", t("server.session.host.failed", { label: o.session.name, why: m.errorMessage || t("server.agent.modelFailed") }));
             return;
           }
           case "compaction_end":
@@ -302,8 +314,9 @@ export const makeHost = <R>(
       const llm = yield* Effect.try({ try: o.llm, catch: (e) => new CannotStart({ message: messageOf(e), cause: e }) });
       const scope = yield* Scope.fork(owner);
       const made = yield* makeBrain({
-        name: o.name,
+        name: o.session.id,
         instructions: o.instructions,
+        memory: o.memory,
         llm,
         home: o.home,
         cwd: o.cwd,
@@ -343,8 +356,10 @@ export const makeHost = <R>(
               const why = messageOf(started.failure);
               const id = yield* inProcess
                 .failedStart(run, hosted.run.asked ?? "", t("server.session.host.cannotStart", { why }))
-                .pipe(Effect.catch((e) => Effect.as(core.notice("error", t("server.session.host.notRecorded", { label: o.label, why: e.message })), "")));
-              yield* core.notice("error", t("server.session.host.startFailed", { label: o.label, why }));
+                .pipe(
+                  Effect.catch((e) => Effect.as(core.notice("error", t("server.session.host.notRecorded", { label: o.session.name, why: e.message })), "")),
+                );
+              yield* core.notice("error", t("server.session.host.startFailed", { label: o.session.name, why }));
               hosted.caller?.push(t("server.session.host.callerStart", { why }));
               hosted.caller?.end();
               return { ok: false, why, run: id } as const;
@@ -404,12 +419,13 @@ export const makeHost = <R>(
         const w = want.trim();
         if (!w) return yield* Effect.fail(refused(t("server.session.host.markNeedsWords")));
         const asked = journal.events().find((e) => e.seq === on);
-        if (!asked) return yield* Effect.fail(missing(t("server.session.host.noStep", { label: o.label, on }), [{ say: t("server.session.host.stepHint") }]));
-        if (asked.type !== "user/message") return yield* Effect.fail(refused(t("server.session.host.notAsked", { on, label: o.label })));
+        if (!asked)
+          return yield* Effect.fail(missing(t("server.session.host.noStep", { label: o.session.name, on }), [{ say: t("server.session.host.stepHint") }]));
+        if (asked.type !== "user/message") return yield* Effect.fail(refused(t("server.session.host.notAsked", { on, label: o.session.name })));
         const lines = yield* Effect.promise(() => readLines(transcript));
         const at = turnAt(lines, asked.text, asked.time, o.inputType);
-        if (at < 0) return yield* Effect.fail(refused(t("server.session.host.notInConversation", { on, label: o.label })));
-        const memoryText = yield* fs.readFileString(memoryFile(o.home)).pipe(Effect.orElseSucceed(() => ""));
+        if (at < 0) return yield* Effect.fail(refused(t("server.session.host.notInConversation", { on, label: o.session.name })));
+        const memoryText = (yield* Effect.promise(() => o.memory.read())).prompt;
         const id = newId();
         const evalCase = {
           id,

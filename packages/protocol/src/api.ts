@@ -153,13 +153,7 @@ export interface Handlers<R = never> {
   /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
    * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
   readonly "issue.refine": (a: { readonly id: string } & T.IssueRefineRequest) => Effect.Effect<T.Issue, ApiError, R>;
-  readonly "graph.split": (a: T.GraphSplitRequest) => Effect.Effect<string, ApiError, R>;
-  readonly "graph.task.update": (a: { readonly id: string; readonly task: string } & T.TaskEdit) => Effect.Effect<string, ApiError, R>;
-  readonly "graph.task.delete": (a: { readonly id: string; readonly task: string }) => Effect.Effect<string, ApiError, R>;
   /** What deleteTask would do, refused as it would be; nothing changes. */
-  readonly "graph.task.previewDelete": (a: { readonly id: string; readonly task: string }) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "graph.act": (a: { readonly id: string } & T.GraphActRequest) => Effect.Effect<string, ApiError, R>;
-  readonly "graph.task.act": (a: { readonly id: string; readonly task: string } & T.TaskActRequest) => Effect.Effect<string, ApiError, R>;
   readonly "channel.message.list": (a: {
     readonly id: string;
     readonly before?: number;
@@ -236,11 +230,7 @@ export interface Handlers<R = never> {
   readonly "channel.list": () => Effect.Effect<T.Channel[], ApiError, R>;
   /** The places the caller has not read all of, the newest first. */
   readonly "channel.unread.list": () => Effect.Effect<T.ChannelUnread[], ApiError, R>;
-  readonly "graph.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
-  readonly "graph.event.list": (a: { readonly id: string }) => Effect.Effect<T.GraphEvent[], ApiError, R>;
   /** Every task graph, as the board has them. */
-  readonly "graph.list": () => Effect.Effect<T.TaskGraph[], ApiError, R>;
-  readonly "graph.get": (a: { readonly id: string }) => Effect.Effect<T.TaskGraph, ApiError, R>;
   readonly "game.achievement.list": () => Effect.Effect<T.Achievement[], ApiError, R>;
   readonly "game.title.set": (a: T.ChooseTitleRequest) => Effect.Effect<void, ApiError, R>;
   readonly "runtime.list": () => Effect.Effect<T.RuntimeInfo[], ApiError, R>;
@@ -270,10 +260,9 @@ export interface Handlers<R = never> {
   readonly "agent.template.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** What deleting the template would do, refused as it would be; nothing changes. */
   readonly "agent.template.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
-  /** An agent's memories: an orchestrator's are the lines of its MEMORY.md, with the file and how many of the newest
-   * its prompt carries; every other agent's are rows. */
+  /** An agent's memories from the database and its configured sources. */
   readonly "memory.list": (a: { readonly agent: string }) => Effect.Effect<T.MemoryList, ApiError, R>;
-  /** What the agent would be reminded of on its next start; the orchestrator is not reminded, it carries its whole file. */
+  /** What the agent would recall for this project and input. */
   readonly "memory.recall": (a: { readonly agent: string; readonly project?: string; readonly text?: string }) => Effect.Effect<T.RecallPreview, ApiError, R>;
   readonly "memory.create": (a: { readonly agent: string } & T.MemoryRequest) => Effect.Effect<T.Memory, ApiError, R>;
   /** Memories whose words match, from every source the agent has; none named is every profile's. */
@@ -371,7 +360,6 @@ const issueDeleteInput = input({ id: Schema.String });
 const messageInput = input({ id: S.MessageId });
 const channelInput = input({ id: Schema.String });
 const issueStatusUpdateInput = input({ id: Schema.String }, S.IssueStatusRequest);
-const graphTaskDeleteInput = input({ id: Schema.String, task: Schema.String });
 const agentDeleteInput = input({ id: Schema.String });
 const memoryDeleteInput = input({ agent: Schema.String, memory: Schema.String });
 const skillDeleteInput = input({ id: Schema.String });
@@ -635,49 +623,6 @@ export const endpoints: readonly Endpoint[] = [
     input: input({ id: Schema.String }, S.IssueRefineRequest),
     result: S.Issue,
     can: ["owner", "remote"],
-  },
-  {
-    op: "graph.split",
-    about: [],
-    input: S.GraphSplitRequest,
-    result: Schema.String,
-    can: ["owner", "remote", "orchestrator"],
-  },
-  {
-    op: "graph.task.update",
-    about: ["id", "task"],
-    input: input({ id: Schema.String, task: Schema.String }, S.TaskEdit),
-    result: Schema.String,
-    can: ["owner", "remote", "orchestrator"],
-  },
-  {
-    op: "graph.task.delete",
-    about: ["id", "task"],
-    input: graphTaskDeleteInput,
-    result: Schema.String,
-    can: ["owner", "remote", "orchestrator"],
-    dryRun: "graph.task.previewDelete",
-  },
-  {
-    op: "graph.task.previewDelete",
-    about: ["id", "task"],
-    input: graphTaskDeleteInput,
-    result: S.Preview,
-    can: ["owner", "remote", "orchestrator"],
-  },
-  {
-    op: "graph.act",
-    about: ["id"],
-    input: input({ id: Schema.String }, S.GraphActRequest),
-    result: Schema.String,
-    can: ["owner", "remote", "orchestrator"],
-  },
-  {
-    op: "graph.task.act",
-    about: ["id", "task"],
-    input: input({ id: Schema.String, task: Schema.String }, S.TaskActRequest),
-    result: Schema.String,
-    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "channel.message.list",
@@ -955,34 +900,6 @@ export const endpoints: readonly Endpoint[] = [
     input: input({ id: S.ArtifactId }),
     result: undefined,
     can: ["owner"],
-  },
-  {
-    op: "graph.diff.get",
-    about: ["id"],
-    input: input({ id: Schema.String }),
-    result: S.Changes,
-    can: ["owner", "remote"],
-  },
-  {
-    op: "graph.event.list",
-    about: ["id"],
-    input: input({ id: Schema.String }),
-    result: Schema.mutable(Schema.Array(S.GraphEvent)),
-    can: ["owner", "remote"],
-  },
-  {
-    op: "graph.list",
-    about: [],
-    input: undefined,
-    result: Schema.mutable(Schema.Array(S.TaskGraph)),
-    can: ["owner", "remote", "orchestrator"],
-  },
-  {
-    op: "graph.get",
-    about: ["id"],
-    input: input({ id: Schema.String }),
-    result: S.TaskGraph,
-    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "game.achievement.list",

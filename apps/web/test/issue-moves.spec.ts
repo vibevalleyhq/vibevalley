@@ -12,7 +12,7 @@ test.use({ farm: "issue-moves" });
 const fox: Agent = {
   id: "",
   name: "fox",
-  role: "helper",
+  role: "worker",
   duty: "",
   enabled: true,
   runtime: "pi",

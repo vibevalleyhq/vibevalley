@@ -72,7 +72,6 @@ export function plotOf(h: T.Session, issue: T.Issue | undefined): T.PlotView {
     case "draft":
     case "queued":
     case "working": {
-      if (h.phase._tag === "arriving") return { crop: "seeded" };
       if (h.phase._tag === "working" && h.phase.retry !== undefined) return { crop: growth(h), badge: badgeRetrying() };
       // Another round after a failed acceptance: it works on what the review said.
       const open = openFindings(issue);
@@ -109,8 +108,6 @@ function plotOfSession(h: T.Session): T.PlotView {
   const need = needOf(h);
   const conflict = need?.kind === "conflict";
   switch (h.phase._tag) {
-    case "arriving":
-      return { crop: "seeded" };
     case "working":
       if (need?.kind === "quiet") return { crop: "dry", badge: badgeQuiet() };
       if (need?.kind === "retrying") return { crop: growth(h), badge: badgeRetrying() };
@@ -150,8 +147,8 @@ export function effectsOf(before: T.WorkspaceState, fact: T.Fact): T.GameEffect[
       for (const u of news.unlocked) out.push(achievementEffect(u.id, u.tier));
       return out;
     }
-    case "report":
-      return fact.outcome === "failed" && sessionOf(before, fact.id) ? [{ kind: "penalty", sessionId: fact.id }] : [];
+    case "sessionReport":
+      return fact.outcome === "failed" && sessionOf(before, fact.id)?.role === "worker" ? [{ kind: "penalty", sessionId: fact.id }] : [];
     default:
       break;
   }
@@ -162,6 +159,7 @@ export function effectsOf(before: T.WorkspaceState, fact: T.Fact): T.GameEffect[
 export function viewOf(state: T.WorkspaceState): T.FarmView {
   const latest = new Map<string, T.Session>();
   for (const h of state.sessions) {
+    if (h.role === "orchestrator") continue;
     const key = plotKeyOf(h);
     const was = latest.get(key);
     if (!was || h.hiredAt >= was.hiredAt) latest.set(key, h);

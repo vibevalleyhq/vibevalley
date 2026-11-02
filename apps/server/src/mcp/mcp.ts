@@ -48,7 +48,7 @@ const make = (options: McpOptions = {}) =>
     // A session no longer in the fields still talks; its profile and project are empty.
     const callerOf = (id: string): Caller => {
       const h = sessions.sessionOf(id);
-      return { agent: h?.agent ?? "", session: id, project: h?.project ?? "", here: "", picked: "", actor: session(id) };
+      return { agent: h?.agent ?? "", session: id, project: h?.project ?? "", here: "", picked: "", envelope: "", actor: session(id) };
     };
 
     const call = async (tool: LoopTool, args: unknown): Promise<string> => {

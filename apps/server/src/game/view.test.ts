@@ -12,6 +12,7 @@ import { plotOf, viewOf } from "./view.ts";
 
 const session = (phase: Session["phase"]): Session => ({
   id: sessionId("w1"),
+  role: "worker",
   name: "阿狐",
   agent: "lab",
   runtime: "pi",
@@ -71,11 +72,11 @@ describe("a plot", () => {
   it("is its issue's: a reopened issue's new session works the same plot", () => {
     const t = issue({ state: "working", acts: [{ act: "tell", does: "say" }] }, { status: "in_progress" });
     const first = { ...session({ _tag: "working", since: 1, doing: { action: "none", label: "" } }), hiredAt: 1 };
-    const again = { ...session({ _tag: "arriving" }), id: sessionId("w2"), hiredAt: 2 };
+    const again = { ...session({ _tag: "working", since: 2, doing: { action: "none", label: "" } }), id: sessionId("w2"), hiredAt: 2 };
     const before = viewOf({ ...emptyWorkspaceState(), sessions: [first], issues: [t] }).plots;
     const after = viewOf({ ...emptyWorkspaceState(), sessions: [again], issues: [t] }).plots;
     expect([Object.keys(before), Object.keys(after)]).toEqual([["t1"], ["t1"]]);
-    expect(after["t1"]).toEqual({ crop: "seeded" });
+    expect(after["t1"]).toEqual({ crop: "sprout" });
     // Both still here for a moment: the later hired is the one the plot pictures.
     expect(viewOf({ ...emptyWorkspaceState(), sessions: [again, first], issues: [t] }).plots).toEqual(after);
   });

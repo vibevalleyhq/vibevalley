@@ -194,9 +194,6 @@ export type RuntimeCapability = (typeof RuntimeCapabilityValues)[number];
 export const CallStateValues = ["idle", "connecting", "live", "ending", "error"] as const;
 export type CallState = (typeof CallStateValues)[number];
 
-export const OrchestratorStateValues = ["idle", "listening", "thinking", "speaking"] as const;
-export type OrchestratorState = (typeof OrchestratorStateValues)[number];
-
 /** Who did a thing, as it is kept: the owner, the orchestrator, a session (a helper at work), or the farm itself; also who said a message. */
 export const ActorKindValues = ["owner", "orchestrator", "session", "system"] as const;
 export type ActorKind = (typeof ActorKindValues)[number];
@@ -376,7 +373,7 @@ export interface ArtifactContent {
 export const ChannelTypeValues = ["channel", "direct", "thread"] as const;
 export type ChannelType = (typeof ChannelTypeValues)[number];
 
-export const SubjectKindValues = ["issue", "graph", "talk"] as const;
+export const SubjectKindValues = ["issue", "talk"] as const;
 export type SubjectKind = (typeof SubjectKindValues)[number];
 
 export interface Channel {
@@ -469,7 +466,7 @@ export interface DoingView extends Doing {
 }
 
 /** Told apart by `_tag`. */
-export type Phase = PhaseArriving | PhaseWorking | PhaseDone | PhaseFailed | PhaseResting | PhaseClosed;
+export type Phase = PhaseWorking | PhaseDone | PhaseFailed | PhaseResting | PhaseClosed;
 
 export interface LastRun {
   outcome: Outcome;
@@ -478,11 +475,6 @@ export interface LastRun {
   spent?: Spent;
   /** The conclusion it handed back in the block an answer issue asks for, when one could be read. */
   answer?: IssueAnswer;
-}
-
-export interface SessionGraph {
-  id: string;
-  task?: string;
 }
 
 export interface PlayAction extends Doing {
@@ -505,6 +497,7 @@ export interface SessionPlay {
 
 export interface Session {
   id: SessionId;
+  role: AgentRole;
   name: string;
   agent: string;
   runtime: string;
@@ -512,13 +505,11 @@ export interface Session {
   project?: string;
   branch?: string;
   worktree?: string;
-  conflict?: Conflict;
   hiredAt: number;
   runs: number;
   phase: Phase;
   lastRun?: LastRun;
   spent?: Spent;
-  graph?: SessionGraph;
   channel?: string;
   play?: SessionPlay;
   issue?: IssueId;
@@ -545,57 +536,6 @@ export interface SessionPlayView extends Omit<SessionPlay, "history"> {
 export interface CommitCount {
   total: number;
   repos: Repo[];
-}
-
-export const GraphStateValues = ["splitting", "draft", "running", "paused", "ready", "done", "abandoned"] as const;
-export type GraphState = (typeof GraphStateValues)[number];
-
-export const TaskStateValues = ["waiting", "working", "merged", "failed", "skipped"] as const;
-export type TaskState = (typeof TaskStateValues)[number];
-
-export interface Task {
-  id: string;
-  title: string;
-  brief: string;
-  needs: string[];
-  agent?: string;
-  check?: string;
-  scope: string[];
-  acceptance: boolean;
-  frozen: string[];
-  state: TaskState;
-  session?: SessionId;
-  conclusion: string;
-  commits: string[];
-  spent?: Spent;
-  tries: number;
-  failures?: number;
-  blockedBy: string[];
-  stateText: string;
-  actions: TaskAction[];
-  actionText: Record<string, string>;
-  canEdit: boolean;
-  canRemove: boolean;
-}
-
-export interface TaskGraph {
-  id: string;
-  title: string;
-  goal: string;
-  project: string;
-  branch?: string;
-  state: GraphState;
-  stateTag: string;
-  actionText: Record<string, string>;
-  actions: GraphAction[];
-  tasks: Task[];
-  parallel: number;
-  note: string;
-  createdAt: number;
-  layers: string[][];
-  asksForYou: boolean;
-  spent?: Spent;
-  settled?: number;
 }
 
 export interface Unlock {
@@ -657,6 +597,57 @@ export interface OwnerMention {
   address: string;
 }
 
+export const TriggerSourceValues = ["workbench", "channel", "connector", "voice", "github", "cron", "patrol"] as const;
+export type TriggerSource = (typeof TriggerSourceValues)[number];
+
+export const TriggerActorKindValues = ["owner", "collaborator", "bot", "ci", "session", "orchestrator", "system"] as const;
+export type TriggerActorKind = (typeof TriggerActorKindValues)[number];
+
+export type TriggerAddressing = "direct" | "mention" | "thread_owner" | "unaddressed";
+
+export interface TriggerActor {
+  readonly kind: TriggerActorKind;
+  readonly id: string;
+  readonly name?: string;
+}
+
+export interface CardAttachment {
+  readonly id: string;
+  readonly name: string;
+  readonly mimeType: string;
+  readonly readUri: string;
+}
+
+export interface ParentPreview {
+  readonly id: string;
+  readonly from: string;
+  readonly preview: string;
+  readonly readUri: string;
+}
+
+export interface CompactCard {
+  readonly summary: string;
+  readonly totalChars: number;
+  readonly truncated: boolean;
+  readonly readUri: string;
+  readonly attachments?: readonly CardAttachment[];
+  readonly parentPreview?: ParentPreview;
+}
+
+export interface Trigger {
+  readonly id: string;
+  readonly source: TriggerSource;
+  readonly actor: TriggerActor;
+  readonly addressed: TriggerAddressing;
+  readonly threads: readonly string[];
+  readonly replyTo?: string;
+  readonly replyChannel?: string;
+  readonly picked?: { readonly agent?: string; readonly project?: string };
+  readonly card: CompactCard;
+  readonly meta: Readonly<Record<string, unknown>>;
+  readonly at: number;
+}
+
 /** The channels, not what is said in them: a page follows a channel for that (rpc.ts). */
 export interface Chat {
   channels: Channel[];
@@ -679,7 +670,6 @@ export interface WorkspaceState {
   call: CallState;
   callReason: string;
   /** Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle. */
-  orchestrators: Record<string, OrchestratorNow>;
   sessions: Session[];
   chat?: Chat;
   commits?: CommitCount;
@@ -805,26 +795,14 @@ export interface FarmLevel {
   need: number;
 }
 
-export const InboxKindValues = [
-  "review",
-  "ask",
-  "fix",
-  "interrupted",
-  "conflict",
-  "quiet",
-  "graph-draft",
-  "graph-ready",
-  "task-failed",
-  "mention",
-  "cron-ask",
-] as const;
+export const InboxKindValues = ["review", "ask", "fix", "interrupted", "conflict", "quiet", "mention", "cron-ask"] as const;
 export type InboxKind = (typeof InboxKindValues)[number];
 
 /** Told apart by `kind`. */
 export type InboxFrom = InboxFromSession | InboxFromOrchestrator;
 
 /** Told apart by `kind`. */
-export type InboxTarget = InboxTargetSession | InboxTargetGraph | InboxTargetChat;
+export type InboxTarget = InboxTargetSession | InboxTargetIssue | InboxTargetChat;
 
 /** What an item says on each route the owner hears it on: the phone's label after who, the system notice, the tray's
  * line (none for a mention: it is counted with the unread). */
@@ -874,7 +852,6 @@ export interface StateFrame {
   seq: number;
   state: WorkspaceView;
   inbox: InboxItem[];
-  graphs: TaskGraph[];
   view: FarmView;
   effects: GameEffect[];
 }
@@ -886,57 +863,13 @@ export type LedgerEntry =
   | LedgerEntryConflicted
   | LedgerEntryTold
   | LedgerEntryReviewed
-  | LedgerEntryGraph
+  | LedgerEntryFamily
   | LedgerEntryHandoff
   | LedgerEntryCalled
   | LedgerEntryHired
   | LedgerEntryMoment
   | LedgerEntryLevel
   | LedgerEntryTitled;
-
-export const GraphEventKindValues = [
-  "splitting",
-  "drafted",
-  "started",
-  "paused",
-  "resumed",
-  "ready",
-  "merged",
-  "abandoned",
-  "noted",
-  "task_started",
-  "task_sent_back",
-  "task_merged",
-  "task_failed",
-  "task_retried",
-  "task_requeued",
-  "task_skipped",
-  "task_edited",
-  "task_added",
-  "task_removed",
-] as const;
-export type GraphEventKind = (typeof GraphEventKindValues)[number];
-
-export interface TaskFieldChange {
-  field: string;
-  from: string;
-  to: string;
-}
-
-export interface GraphEvent {
-  id: string;
-  graph: string;
-  task?: string;
-  kind: GraphEventKind;
-  actor: ActorKind;
-  session?: SessionId;
-  detail: string;
-  changes: TaskFieldChange[];
-  commits: string[];
-  at: number;
-  text: string;
-  actorText: string;
-}
 
 export interface LanDevice {
   id: string;
@@ -1182,8 +1115,6 @@ export interface MemorySearch {
 export interface MemoryList {
   memories: Memory[];
   sources: MemorySourceInfo[];
-  file?: string;
-  carried?: number;
 }
 
 export interface MemorySourceInfo {
@@ -1196,8 +1127,8 @@ export interface MemorySourceInfo {
   transcripts: boolean;
 }
 
-/** What a profile is: an orchestrator (管家) stays, leads and does no work itself; a helper (帮工) is sent on an issue. */
-export const AgentRoleValues = ["orchestrator", "helper"] as const;
+/** What a profile is: an orchestrator (管家) stays and coordinates; a worker (帮工) is sent on an issue. */
+export const AgentRoleValues = ["orchestrator", "worker"] as const;
 export type AgentRole = (typeof AgentRoleValues)[number];
 
 export interface Agent {
@@ -1307,27 +1238,6 @@ export interface ChangedFile {
   patch?: string;
 }
 
-export const TaskActionValues = ["retry", "skip"] as const;
-export type TaskAction = (typeof TaskActionValues)[number];
-
-export const GraphActionValues = ["start", "pause", "resume", "abandon", "merge"] as const;
-export type GraphAction = (typeof GraphActionValues)[number];
-
-export interface TaskEdit {
-  title?: string;
-  brief?: string;
-  needs?: string[];
-  agent?: string;
-  check?: string;
-  scope?: string[];
-}
-
-export interface GraphSplitRequest {
-  goal: string;
-  project: string;
-  agent?: string;
-}
-
 /** Responsibility for an issue, retained across execution contexts and ended only by reassignment or unassignment. */
 export interface Assignment {
   id: string;
@@ -1353,11 +1263,45 @@ export interface PullRequest {
   state: PullRequestState;
 }
 
+export const MandateStrengthValues = ["explicit", "inferred"] as const;
+export type MandateStrength = (typeof MandateStrengthValues)[number];
+
+export interface IssueMandate {
+  originTriggerId?: string;
+  strength: MandateStrength;
+  maxBotReviewRounds: number;
+  autoSubmitPr: boolean;
+}
+
+export interface IssueReportMemory {
+  text: string;
+  scope: "project" | "all";
+}
+
+export interface IssueReport {
+  summary: string;
+  questions: Question[];
+  checks: CriterionCheck[];
+  remember: IssueReportMemory[];
+  prSubmit: boolean;
+  answer?: IssueAnswer;
+}
+
+export interface IssueConstraints {
+  check?: string;
+  scope: string[];
+  acceptance: boolean;
+  frozen: string[];
+}
+
 export interface Issue {
   id: IssueId;
   number: number;
   title: string;
   description: string;
+  mandate: IssueMandate;
+  constraints?: IssueConstraints;
+  conflict?: Conflict;
   project?: string;
   assignments: Assignment[];
   priority: Priority;
@@ -1371,8 +1315,6 @@ export interface Issue {
   canceled?: IssueCanceled;
   parent?: IssueId;
   blockedBy: string[];
-  graph?: IssueGraph;
-  task?: IssueTask;
   cron?: string;
   status: IssueStatus;
   moves: IssueStatus[];
@@ -1386,7 +1328,7 @@ export interface Issue {
   refining?: IssueRefining;
   /** Its latest run as the issue keeps it, for a run no session on the farm carries (an in-process agent's, the
    * orchestrator's): going on while it has no end; ended, the issue waits on the owner. */
-  lastRun?: IssueRun;
+  lastRun?: Pick<Run, "startedAt" | "endedAt" | "outcome">;
   /** An answer issue's conclusion, read from what its latest round handed back; none when that round gave none it could read. */
   answer?: IssueAnswer;
   stage: IssueStage;
@@ -1417,12 +1359,6 @@ export interface IssueAnswer {
 export interface Preview {
   /** What it would do, in order, one step a line. */
   does: string[];
-}
-
-export interface IssueRun {
-  startedAt: number;
-  endedAt?: number;
-  outcome?: Outcome;
 }
 
 /** A question the helper is waiting on the owner for; options are the answers it thought of, each one a reply as it is. */
@@ -1513,28 +1449,6 @@ export interface IssueRefineRequest {
   edit?: IssueUpdate;
 }
 
-export interface IssueGraph {
-  state: GraphState;
-  branch?: string;
-  parallel: number;
-  note?: string;
-}
-
-export interface IssueTask {
-  key: string;
-  state: TaskState;
-  check?: string;
-  scope: string[];
-  acceptance: boolean;
-  frozen: string[];
-  session?: SessionId;
-  conclusion?: string;
-  commits: string[];
-  spent?: Spent;
-  tries: number;
-  failures?: number;
-}
-
 export const IssueStatusValues = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
 export type IssueStatus = (typeof IssueStatusValues)[number];
 
@@ -1563,11 +1477,15 @@ export interface Finding {
 
 export interface IssueRequest {
   title: string;
+  parent?: IssueId;
+  blockedBy?: IssueId[];
+  constraints?: IssueConstraints;
   description?: string;
   project?: string;
   agent?: string;
   priority?: Priority;
   deliver?: Deliverable;
+  autoSubmitPr?: boolean;
   /** The client's key for this request: the same key again within a while returns the first one's result and does it
    * once (a retry after a lost reply). At most 64 characters. */
   requestKey?: string;
@@ -1592,7 +1510,7 @@ export type IssueCanceled = (typeof IssueCanceledValues)[number];
 export const SessionCloseValues = ["merged", "completed", "dismissed", "lost"] as const;
 export type SessionClose = (typeof SessionCloseValues)[number];
 
-export const RunTriggerKindValues = ["issue", "comment", "task", "cron", "refine", "runtime"] as const;
+export const RunTriggerKindValues = ["issue", "comment", "cron", "refine", "runtime"] as const;
 export type RunTriggerKind = (typeof RunTriggerKindValues)[number];
 
 export interface RunTrigger {
@@ -1779,10 +1697,6 @@ export interface Health {
   version: string;
 }
 
-export interface PhaseArriving {
-  _tag: "arriving";
-}
-
 export interface Retry {
   attempt: number;
   of?: number;
@@ -1911,9 +1825,9 @@ export interface InboxTargetSession {
   id: string;
 }
 
-export interface InboxTargetGraph {
-  kind: "graph";
-  graph: string;
+export interface InboxTargetIssue {
+  kind: "issue";
+  id: string;
 }
 
 export interface InboxTargetChat {
@@ -1992,10 +1906,10 @@ export interface LedgerEntryReviewed {
   session: SessionId;
 }
 
-export interface LedgerEntryGraph {
-  kind: "graph";
+export interface LedgerEntryFamily {
+  kind: "family";
   at: number;
-  graph: string;
+  issue: string;
   merged: number;
   parallel: boolean;
 }
@@ -2166,22 +2080,18 @@ export type SettingsUpdateVoice = Partial<VoiceSettings>;
 
 /** Told apart by `type`. */
 export type Fact =
-  | FactCall
-  | FactOrchestrator
+  | FactVoiceCall
+  | FactSessionPhase
   | FactMessage
   | FactChannel
   | FactChannelGone
   | FactOwnerMentions
-  | FactHired
+  | FactSession
   | FactStation
   | FactRun
   | FactDoing
-  | FactQuiet
-  | FactRetry
-  | FactSpent
-  | FactReport
-  | FactConflict
-  | FactLeft
+  | FactSessionReport
+  | FactSessionGone
   | FactCommits
   | FactIssue
   | FactIssueGone
@@ -2190,30 +2100,20 @@ export type Fact =
   | FactCronGone
   | FactConnector;
 
-export interface FactCall {
-  type: "call";
+export interface FactVoiceCall {
+  type: "voiceCall";
   at: number;
   state: CallState;
   reason: string;
 }
 
-/** What an orchestrator is doing now. */
-export interface OrchestratorNow {
-  state: OrchestratorState;
-  /** The channel it is thinking or writing in; absent while it listens, or works for what is not said in the chat. */
-  channel?: string;
-  /** When its round began (it started thinking), kept while it thinks and writes; absent while it listens. */
-  since?: number;
-}
-
-export interface FactOrchestrator {
-  type: "orchestrator";
+export interface FactSessionPhase {
+  type: "sessionPhase";
   at: number;
-  /** Its profile id. */
-  agent: string;
-  state: OrchestratorState;
-  /** The channel it is thinking or writing in; absent while it listens, or works for what is not said in the chat. */
+  id: SessionId;
+  phase: Phase;
   channel?: string;
+  spent?: Spent;
 }
 
 export interface FactMessage {
@@ -2243,8 +2143,8 @@ export interface FactOwnerMentions {
   mentions: OwnerMention[];
 }
 
-export interface FactHired {
-  type: "hired";
+export interface FactSession {
+  type: "session";
   at: number;
   session: Session;
 }
@@ -2271,34 +2171,14 @@ export interface FactDoing {
   label: string;
 }
 
-export interface FactQuiet {
-  type: "quiet";
-  at: number;
-  id: SessionId;
-  since: number;
-}
-
-export interface FactRetry {
-  type: "retry";
-  at: number;
-  id: SessionId;
-  attempt: number;
-  of?: number;
-}
-
-export interface FactSpent {
-  type: "spent";
-  at: number;
-  id: SessionId;
-  spent: Spent;
-}
-
-export interface FactReport {
-  type: "report";
+export interface FactSessionReport {
+  type: "sessionReport";
   at: number;
   id: SessionId;
   run?: string;
   outcome: Outcome;
+  /** A successful turn can rest for external feedback without handing off to the owner. */
+  phase?: PhaseResting;
   summary: string;
   runs: number;
   spent?: Spent;
@@ -2307,15 +2187,8 @@ export interface FactReport {
   answer?: IssueAnswer;
 }
 
-export interface FactConflict {
-  type: "conflict";
-  at: number;
-  id: SessionId;
-  conflict?: Conflict;
-}
-
-export interface FactLeft {
-  type: "left";
+export interface FactSessionGone {
+  type: "sessionGone";
   at: number;
   id: SessionId;
   closed?: SessionClose;
@@ -2367,22 +2240,18 @@ export interface FactCronGone {
 
 /** Told apart by `type`. */
 export type SideEvent =
-  | FactCall
-  | FactOrchestrator
+  | FactVoiceCall
+  | FactSessionPhase
   | FactMessage
   | FactChannel
   | FactChannelGone
   | FactOwnerMentions
-  | FactHired
+  | FactSession
   | FactStation
   | FactRun
   | FactDoing
-  | FactQuiet
-  | FactRetry
-  | FactSpent
-  | FactReport
-  | FactConflict
-  | FactLeft
+  | FactSessionReport
+  | FactSessionGone
   | FactCommits
   | FactIssue
   | FactIssueGone
@@ -2447,7 +2316,7 @@ export interface IssueFilter {
 }
 
 /** One task of an issue split into several people's work: an issue under the graph the issue becomes. */
-export interface TaskDraft {
+export interface IssueChildDraft {
   id: string;
   title?: string;
   brief: string;
@@ -2462,7 +2331,7 @@ export interface TaskDraft {
 
 export interface IssueSplitRequest {
   title?: string;
-  tasks: TaskDraft[];
+  tasks: IssueChildDraft[];
 }
 
 export interface IssueStatusRequest {
@@ -2478,14 +2347,6 @@ export interface IssueStatusRequest {
   /** The client's key for this request: the same key again within a while returns the first one's result and does it
    * once (a retry after a lost reply). At most 64 characters. */
   requestKey?: string;
-}
-
-export interface GraphActRequest {
-  action: GraphAction;
-}
-
-export interface TaskActRequest {
-  action: TaskAction;
 }
 
 export interface ChatReadRequest {

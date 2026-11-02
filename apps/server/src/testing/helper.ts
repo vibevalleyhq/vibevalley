@@ -105,13 +105,14 @@ async function answer(turn: ScriptedTurn, input: string) {
  * 必败 fails; 发呆 is held (releaseHeld); 写版本X commits same.ts as X; 有冲突 merges main and settles same.ts; 提交 commits
  * clock.ts; 先问清楚 asks the owner until 用 8797 is said (给选项: with 用 8787 and 用 8797 to pick); 记一笔 notes two
  * memories. It answers with its brief and persona, and says of each numbered criterion that it was met. */
-export const helper = (turns: ScriptedTurn[] = []): Runtime =>
+export const helper = (turns: ScriptedTurn[] = [], before?: (turn: ScriptedTurn, input: string, turnNumber: number) => Promise<void>): Runtime =>
   scriptedRuntime({
     id: "pi",
     turn: async (turn) => {
       turns.push(turn);
       const parts = turn.input.split(briefBreak);
       const input = parts[parts.length - 1]!;
+      if (before) await before(turn, input, turns.length - 1);
       if (input.includes("只起草工单")) return draft(turn, input);
       if (input.includes(answerOpening) || input.includes("结论读不出来")) return answer(turn, input);
       if (input.includes("必败")) throw new Error("provider said no");
@@ -152,7 +153,6 @@ export const helper = (turns: ScriptedTurn[] = []): Runtime =>
       let notes = "";
       if (input.includes("先问清楚") && !input.includes("用 8797"))
         notes += "\n\n要问主人：用 8787 还是 8797？" + (input.includes("给选项") ? "（选项：用 8787｜用 8797）" : "");
-      if (input.includes("记一笔")) notes = "\n\n记住：这个项目用 pnpm test 跑测试\n记住（所有项目）：提交信息写中文";
       const criteria = input.includes(criteriaHead)
         ? input
             .slice(input.indexOf(criteriaHead))

@@ -1,22 +1,54 @@
-import { Clock, Effect } from "effect";
+import { Clock, Effect, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { DeliverableValues, IssueStatusValues, defaultOrchestrator } from "@vibevalley/protocol";
 import { assignedAgentOf, closedText, latestSessionIdOf, phaseText, shortTitle } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
+import { actsForOwner } from "@/base/actor.ts";
 import { head } from "@/base/clip.ts";
 import { Channel, type Info } from "@/channel/chat.ts";
 import { Issue } from "@/issue/issue.ts";
+import { explicitMandate, inferredMandate, mandateNoteFits } from "@/issue/mandate.ts";
 import { openFindings } from "@/issue/status.ts";
+import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Runtime } from "@/runtime/runtime.ts";
 import { Session } from "@/session/session.ts";
 
-import { type Who, type Orchestrator, said, callerOf, participant, tool, sessionSchemaTool } from "./definition.ts";
-import { answers, changesText, issueDetail, issueLine, noSuchPriority, noSuchStatus, ownerAgentWord, priorityOf, sessionLine, statusOf } from "./prompts.ts";
+import { type Who, type Orchestrator, type SessionInput, said, answered, callerOf, customTool, participant, tool, sessionSchemaTool } from "./definition.ts";
+import {
+  answers,
+  changesText,
+  issueDetail,
+  issueLine,
+  issueHandbackDescription,
+  issueHandbackRecorded,
+  issuePrSubmitDescription,
+  issuePrSubmitted,
+  issueReportDescription,
+  issueReportRecorded,
+  noSuchPriority,
+  noSuchStatus,
+  ownerAgentWord,
+  priorityOf,
+  sessionLine,
+  statusOf,
+} from "./prompts.ts";
+import { toolParameters } from "./schemas.ts";
 
 type IssueTool = "issue.get" | "issue.diff.get" | "session.stop";
 const spaces = /\s+/gu;
+const IssueReportInput = Schema.Struct({
+  summary: Schema.String,
+  questions: Schema.optionalKey(Schema.mutable(Schema.Array(S.Question))),
+  checks: Schema.optionalKey(Schema.mutable(Schema.Array(S.CriterionCheck))),
+  remember: Schema.optionalKey(Schema.mutable(Schema.Array(S.IssueReportMemory))),
+  prSubmit: Schema.optionalKey(Schema.Boolean),
+  answer: Schema.optionalKey(S.IssueAnswer),
+});
+const IssueHandbackInput = Schema.Struct({ envelope: Schema.String, reason: Schema.String });
+const IssuePrSubmitInput = Schema.Struct({ summary: Schema.optionalKey(Schema.String) });
 
 export const issueTools = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
@@ -25,6 +57,7 @@ export const issueTools = Effect.gen(function* () {
   const runtimes = yield* Runtime;
   const chat = yield* Channel;
   const issue = yield* Issue;
+  const mailbox = yield* Mailbox;
 
   // The orchestrator may name a session by its id, its name, or words that contain its name.
   const findSession = (key: string) => {
@@ -104,6 +137,52 @@ export const issueTools = Effect.gen(function* () {
       return lines.join("\n");
     }),
   );
+
+  const issueReport = (who: Who) =>
+    customTool(
+      "issue_report",
+      issueReportDescription,
+      toolParameters(IssueReportInput),
+      Schema.decodeUnknownEffect(IssueReportInput),
+      Effect.fn("Tool.issueReport")(function* (report) {
+        const caller = yield* callerOf(who);
+        if (!caller.session) return issueReportRecorded(false);
+        if (report.prSubmit === true) yield* issue.submitPullRequest(caller.session, report.summary);
+        yield* run.report(caller.session, {
+          ...report,
+          questions: report.questions ?? [],
+          checks: report.checks ?? [],
+          remember: report.remember ?? [],
+          prSubmit: report.prSubmit ?? false,
+        });
+        return issueReportRecorded(true);
+      }),
+    );
+
+  const issueHandback = (who: Who) =>
+    customTool(
+      "issue_handback",
+      issueHandbackDescription,
+      toolParameters(IssueHandbackInput),
+      Schema.decodeUnknownEffect(IssueHandbackInput),
+      Effect.fn("Tool.issueHandback")(function* ({ envelope, reason }) {
+        const caller = yield* callerOf(who);
+        yield* mailbox.returnInput(caller.session, envelope, reason);
+        return issueHandbackRecorded;
+      }),
+    );
+
+  const issuePrSubmit = (who: Who) =>
+    customTool(
+      "issue_pr_submit",
+      issuePrSubmitDescription,
+      toolParameters(IssuePrSubmitInput),
+      Schema.decodeUnknownEffect(IssuePrSubmitInput),
+      Effect.fn("Tool.issuePrSubmit")(function* ({ summary }) {
+        const caller = yield* callerOf(who);
+        return issuePrSubmitted(yield* issue.submitPullRequest(caller.session, summary));
+      }),
+    );
 
   const issueGet = issueTool(
     "issue.get",
@@ -202,33 +281,41 @@ export const issueTools = Effect.gen(function* () {
       Effect.fn("Tool.issueCreate")(function* (p: Orchestrator<"issue.create">) {
         const c = yield* callerOf(who);
         if (p.draft === true && p.start === true) return answers.issueCreate.draftWithStartRefused;
+        if (!mandateNoteFits(p.description ?? "")) return answers.issueCreate.noteTooLong;
         let channel: Info;
         if (p.channel) {
           const byName = yield* chat.channelByName(p.channel);
           if (!byName) return answers.issueCreate.noChannel(p.channel);
           channel = byName;
         } else channel = yield* chat.topOf(c.here);
-        const project = (p.project ?? "").trim() || channel.project;
+        const parent = p.parent ? yield* issue.get(yield* issue.idOf(p.parent)) : undefined;
+        const blockedBy = yield* Effect.forEach(p.blockedBy ?? [], (ref) => Effect.map(issue.idOf(ref), S.issueId));
+        const project = (p.project ?? parent?.project ?? "").trim() || channel.project;
         if (p.start === true && !project) return answers.issueCreate.noDefaultProject(channel.name);
         const priority = p.priority ? priorityOf(p.priority) : undefined;
         if (p.priority && !priority) return noSuchPriority(p.priority);
         const deliver = p.deliver ? DeliverableValues.find((d) => d === p.deliver) : undefined;
         if (p.deliver && !deliver) return answers.issueCreate.noDeliver;
-        let agent: string | undefined;
+        let agent: string | undefined = parent ? assignedAgentOf(parent) : undefined;
         if (p.agent || p.start === true) {
-          const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.agent ?? "", p.start === true ? c.picked : "");
+          const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.agent ?? agent ?? "", p.start === true ? c.picked : "");
           if (typeof a === "string") return answers.issueCreate.notRecorded(a);
           agent = a.id;
         }
         const added = yield* Effect.result(
-          issue.add({
-            title: p.title,
-            ...(p.description ? { description: p.description } : {}),
-            ...(project ? { project } : {}),
-            ...(agent ? { agent } : {}),
-            ...(priority ? { priority } : {}),
-            ...(deliver ? { deliver } : {}),
-          }),
+          issue.add(
+            {
+              title: p.title,
+              ...(parent ? { parent: parent.id } : {}),
+              ...(blockedBy.length > 0 ? { blockedBy } : {}),
+              ...(p.description ? { description: p.description } : {}),
+              ...(project ? { project } : {}),
+              ...(agent ? { agent } : {}),
+              ...(priority ? { priority } : {}),
+              ...(deliver ? { deliver } : {}),
+            },
+            actsForOwner(c.actor) ? explicitMandate(c.envelope, p.autoSubmitPr ?? false) : inferredMandate(c.envelope),
+          ),
         );
         if (added._tag === "Failure") return answers.issueCreate.notRecordedFailed(said(added.failure));
         const item = added.success;
@@ -323,8 +410,19 @@ export const issueTools = Effect.gen(function* () {
         );
       }),
     );
+  const issueSplit = (who: Who) =>
+    sessionSchemaTool(
+      "issue.split",
+      Effect.fn("Tool.issueSplit")(function* (p: SessionInput<"issue.split">) {
+        const caller = yield* callerOf(who);
+        const drafts = p.tasks.map((item) => ({ ...item, needs: item.needs ?? [], scope: item.scope ?? [] }));
+        return yield* answered(Effect.flatMap(issue.idOf(caller.session), (id) => issue.split(id, p.title ?? "", drafts, caller.actor)));
+      }),
+    );
+
   return {
     numberOf,
+    issueSplit,
     roster,
     sessionList,
     issueGet,
@@ -336,6 +434,9 @@ export const issueTools = Effect.gen(function* () {
     issueCreate,
     issueUpdate,
     issueStatus,
+    issueReport,
+    issueHandback,
+    issuePrSubmit,
     findIssue,
   };
 });

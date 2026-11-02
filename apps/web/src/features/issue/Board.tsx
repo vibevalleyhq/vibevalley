@@ -13,7 +13,7 @@ import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, laneOrder }
 import type { Ordering } from "./display";
 import { closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./lanes";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
-import { useGraphs, useNameOf } from "./queries";
+import { useIssues, useNameOf } from "./queries";
 
 /** One sentence, enter, and it is a 待办: the board's lane and the list's groups both use it. */
 export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTMLInputElement) => void; autofocus?: boolean }) {
@@ -218,8 +218,8 @@ function CardView(props: {
   onPlace?: ((moved: BoardCard) => void) | undefined;
 }) {
   const nameOf = useNameOf();
-  const graphs = useGraphs();
-  const look = () => cardLook(props.card, nameOf(), graphs(), Date.now());
+  const issues = useIssues();
+  const look = () => cardLook(props.card, nameOf(), issues(), Date.now());
   const [before, setBefore] = createSignal(false);
   const where = () => [look().number, cardProject(props.card)].filter(Boolean).join(" · ");
   const loud = () => {
@@ -266,11 +266,7 @@ function CardView(props: {
         aria-label={look().title}
         aria-current={props.selected ? "true" : undefined}
         title={look().detail}
-        draggable={
-          props.card.kind !== "task" && props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving"
-            ? "true"
-            : "false"
-        }
+        draggable={props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving" ? "true" : "false"}
         onDragStart={(e) => {
           e.dataTransfer!.effectAllowed = "move";
           e.dataTransfer!.setData("text/plain", props.card.id);

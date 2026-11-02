@@ -1,4 +1,4 @@
-// Markdown is how a artifact is traded with agents and MEMORY.md, not how it is stored.
+// Markdown is how an artifact is exchanged with agents, not how it is stored.
 // What a block is that Markdown has no word for goes in an HTML comment (<!-- issue:ID -->, <!-- memory:ID -->), an
 // image's size in its title ("640x480"). Nesting is two spaces of indent per level. What the export writes, the import
 // reads back to the same blocks.

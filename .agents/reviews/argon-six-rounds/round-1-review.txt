@@ -1,0 +1,23 @@
+模型：opencode-go/gemini-4-argon
+会话：ses_e69d7fcd7ffei46xqVUD5nDmzg
+
+### 第 1 轮复审结论
+
+**未发现丢失覆盖、Scope 生命期问题或异步负断言缺陷（0 项必须修正）。**
+
+逐项核查如下：
+
+1. **覆盖完整性**：
+   - `runtime.ts` 已移除 `Object.assign` 的四个内部属性（`refreshUsage`、`cached`、`spent`、`setSpent`）及 `make` 的导出，未改动 `Runtime.layer` 的初始化条件。
+   - 原 `cached` 断言已改为订阅 `Core.subscribe` 的公开 `runtime` 事件流，明确观察到 `info.id === "pi" && info.spentToday === 1` 的缓存重建推送后再解封在途 `usageOf`。
+   - 原并发 `refreshUsage` 竞态已改为通过 `background: true` 的 5 分钟周期轮询（`TestClock.adjust(300_000)`）与 `usageSoon("pi")`（`TestClock.adjust(20_000)`）两条真实生产路径并发触发。
+   - 原 `setSpent` 跨日测试已改为走 `r.spend` + `TestClock.adjust("24 hours")`，并新增了同日关闭 `Scope` 触发 finalizer 落盘 `spend.json`、重启恢复、次日忽略的端到端测试（第 594–613 行）。
+
+2. **`Scope` 生命期**：
+   - `makeRuntime` 中的 `Layer.build(Runtime.layer(...))` 直接绑定在当前 `Effect.Scope` 上：普通测试随外层 `.pipe(Effect.scoped, ...)` 結束时自动执行 `Runtime` 的 finalizer（清理 `timers` 并刷新 `disk`）；新增的重启恢复测试（第 597、603 行）通过内层 `Effect.scoped` 在同一 `world(config)` 下精确控制第一次 `Runtime` 实例的关闭落盘与第二次实例的读取。
+
+3. **异步负断言可靠性**：
+   - 在 `a changed usage cannot overwrite a newer full probe`（第 182、185 行）与 `a late older one does not undo a newer`（第 246 行）中，`releaseUsage()` / `out[1]!(used(70))` 解决的是 `Effect.tryPromise` 包装的原生 `Promise`。
+   - `yield* Effect.promise(nextTurn)`（底层为 `setImmediate`）会在当前微任务队列排空、Promise 回调唤醒 Effect 纤程并同步跑完 `refreshUsage` 剩余的纯内存检查（`held` → `now.read !== before.read` 或 `(usageTaken.get(id) ?? 0) > asked`）之后才返回，中间不再经过任何真实定时器或 I/O，因此负断言是确定且可靠的。
+
+可以直接进入第 2 轮。

@@ -34,7 +34,7 @@ const row = (page: Page, id: string) => page.getByTestId("farm-chat").locator(`[
 const scripted: Agent = {
   id: "",
   name: "fox",
-  role: "helper",
+  role: "worker",
   duty: "",
   enabled: true,
   // The test server's pi is the scripted helper (fixtures.ts).
@@ -161,6 +161,7 @@ test("a click on a helper's plot opens its issue: its state, the acts and the fo
   const frame = await firstFrame(server.url);
   const session: SessionView = {
     id: sessionId("w1"),
+    role: "worker",
     name: "fox",
     agent: "fox",
     runtime: "nobody",

@@ -6,8 +6,6 @@ export interface UnreadRow {
   readonly latest?: string;
 }
 
-export const wakeMessages = 3;
-
 export const summaryChannels = 20;
 
 /** The same words from the same sender in the same place this soon again are a retry, not a new message. */
@@ -23,6 +21,7 @@ export interface Picked {
 
 export interface InboxMessage {
   readonly id: string;
+  readonly originTrigger?: string;
   readonly number: number;
   readonly target: string;
   readonly from: string;
@@ -39,4 +38,7 @@ export interface InboxMessage {
   readonly blocks?: readonly QuotedBlock[];
   /** Kept with the message, so whoever takes it sees it, whenever that is. */
   readonly picked?: Picked;
+  /** Process-local response route; absent after a restart, while the durable message still runs. */
+  readonly responsePort?: string;
+  readonly voiceMode?: "dictated" | "conversation" | "api";
 }

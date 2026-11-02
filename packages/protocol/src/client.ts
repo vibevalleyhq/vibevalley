@@ -114,6 +114,7 @@ export class VibeValleyApi {
     list: (): Promise<T.Channel[]> => this.call<T.Channel[]>("/api/v1/channel/list", undefined),
     message: {
       send: (a: T.SayRequest): Promise<void> => this.call<void>("/api/v1/channel/message/send", a),
+      /** What deleteTask would do, refused as it would be; nothing changes. */
       list: (a: { id: string; before?: number; limit?: number }): Promise<T.ChatMessage[]> => this.call<T.ChatMessage[]>("/api/v1/channel/message/list", a),
       /** The owner's own words, changed; nobody is told again. */
       update: (a: T.MessageEdit): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/message/update", a),
@@ -247,27 +248,6 @@ export class VibeValleyApi {
     },
   };
 
-  readonly graph = {
-    split: (a: T.GraphSplitRequest): Promise<string> => this.call<string>("/api/v1/graph/split", a),
-    act: (a: { id: string } & T.GraphActRequest): Promise<string> => this.call<string>("/api/v1/graph/act", a),
-    /** Every task graph, as the board has them. */
-    list: (): Promise<T.TaskGraph[]> => this.call<T.TaskGraph[]>("/api/v1/graph/list", undefined),
-    get: (a: { id: string }): Promise<T.TaskGraph> => this.call<T.TaskGraph>("/api/v1/graph/get", a),
-    task: {
-      update: (a: { id: string; task: string } & T.TaskEdit): Promise<string> => this.call<string>("/api/v1/graph/task/update", a),
-      delete: (a: { id: string; task: string }): Promise<string> => this.call<string>("/api/v1/graph/task/delete", a),
-      /** What deleteTask would do, refused as it would be; nothing changes. */
-      previewDelete: (a: { id: string; task: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/graph/task/previewDelete", a),
-      act: (a: { id: string; task: string } & T.TaskActRequest): Promise<string> => this.call<string>("/api/v1/graph/task/act", a),
-    },
-    diff: {
-      get: (a: { id: string }): Promise<T.Changes> => this.call<T.Changes>("/api/v1/graph/diff/get", a),
-    },
-    event: {
-      list: (a: { id: string }): Promise<T.GraphEvent[]> => this.call<T.GraphEvent[]>("/api/v1/graph/event/list", a),
-    },
-  };
-
   readonly artifact = {
     /** The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given. */
     list: (a: T.ArtifactListRequest): Promise<T.Artifact[]> => this.call<T.Artifact[]>("/api/v1/artifact/list", a),
@@ -321,6 +301,7 @@ export class VibeValleyApi {
 
   readonly game = {
     achievement: {
+      /** Every task graph, as the board has them. */
       list: (): Promise<T.Achievement[]> => this.call<T.Achievement[]>("/api/v1/game/achievement/list", undefined),
     },
     title: {
@@ -369,10 +350,9 @@ export class VibeValleyApi {
   };
 
   readonly memory = {
-    /** An agent's memories: an orchestrator's are the lines of its MEMORY.md, with the file and how many of the newest
-     * its prompt carries; every other agent's are rows. */
+    /** An agent's memories from the database and its configured sources. */
     list: (a: { agent: string }): Promise<T.MemoryList> => this.call<T.MemoryList>("/api/v1/memory/list", a),
-    /** What the agent would be reminded of on its next start; the orchestrator is not reminded, it carries its whole file. */
+    /** What the agent would recall for this project and input. */
     recall: (a: { agent: string; project?: string; text?: string }): Promise<T.RecallPreview> => this.call<T.RecallPreview>("/api/v1/memory/recall", a),
     create: (a: { agent: string } & T.MemoryRequest): Promise<T.Memory> => this.call<T.Memory>("/api/v1/memory/create", a),
     /** Memories whose words match, from every source the agent has; none named is every profile's. */

@@ -207,7 +207,6 @@ export function CardFace(props: { card: BoardCard; size?: number }) {
         </Show>
       }
     >
-      <Match when={props.card.kind === "task"}>{null}</Match>
       <Match when={props.card.kind === "orchestrator"}>
         <OrchestratorFace size={size()} />
       </Match>

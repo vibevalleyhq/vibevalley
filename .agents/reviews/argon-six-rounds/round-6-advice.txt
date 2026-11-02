@@ -1,0 +1,57 @@
+模型：opencode-go/gemini-4-argon
+包含第5轮修正复核与第6轮建议。
+
+### 一、第 5 轮修正简短复核
+
+- **`flush()` 先 `applyHeld()` 再 `send()`**（`editor.ts:555`）：改过字的块经第 553 行 `this.textOp(b)` 已进入 `this.queue`（`this.queued(id) === true`），仍受 `applyHeld()` 保护；未改字而失焦的块即使在别的批次 `this.sending === true` 期间也能当场同步应用 `held`。
+- **`take(snap, true)` 守卫 `!this.queued(id)`**（`editor.ts:240`）：`append()` / `enter()` 新建且在途的本地块（`rev: 0`）不会被重置快照误删。
+- **非首次 `load()` 传 `heard = this.artifact !== undefined`**（`editor.ts:167`）：收到 `Reset` 重新 `load()` 时，正在聚焦、拼字或有本地脏字的块同样走 `put(b, true)` 的 `held` 暂存保护，不会改写本地 `baseRev` 或吃掉冲突。
+- **结论**：第 5 轮 10 项单测与实现完全闭环，0 项遗留问题。
+
+---
+
+### 二、第 6 轮落地清单：将 `features/channel/reading.ts` 合入 `marks.ts`
+
+#### 1. 删除什么与合入什么
+
+- **删除文件**：`apps/web/src/features/channel/reading.ts`（91 行）。
+- **删除的重复代码**：
+  1. 删除 `reading.ts:21` 的 `readIn(frame, id)`，直接复用 `marks.ts:72` 已有的 `channelIn(frame, id)?.read`。
+  2. 删除 `reading.ts:49-54`（`markUnread`）和 `reading.ts:84-88`（`useMarkRead`）手写的两处 `sendReplacing(...).done.then(...)` 失败 `drop` 样板，直接调用 `marks.ts:95` 的 `setMark`：
+     - `useMarkRead`：`setMark(reads, { channel: id, number: Number(n) }, sameChannel, say);`
+     - `markUnread`：直接复用 `setMark` 的 `say` 回调释放 `held`，不给 `setMark` 加新参数或新 hook：
+       ```ts
+       export function markUnread(intents: Intents<ReadMark, void>, mark: ReadMark, say: (reason: string) => void) {
+         held.update((h) => new Set([...h, mark.channel]));
+         setMark(intents, mark, sameChannel, (reason) => {
+           release(mark.channel);
+           say(reason);
+         });
+       }
+       ```
+- **合入 `apps/web/src/features/channel/marks.ts` 的内容**：
+  - 从 `./unread` 导入 `newestUnread`，从 `@/state/atom` 导入 `defineAtom`，从 `solid-js` 补导入 `createEffect`。
+  - 合入 `ReadMark`、`unreadUpTo`、`readMark`、`unreadMark`、`sameChannel`、`held`、`release`、`markUnread`、`markedRead`、`useMarkRead`。
+
+#### 2. 调用方与文档更新（共 5 处）
+
+1. `apps/web/src/features/channel/MessageList.tsx:31,35`：`useMarkRead` 改从 `./marks` 导入。
+2. `apps/web/src/features/channel/MessageParts.tsx:28,30`：`markUnread, unreadMark` 改从 `./marks` 导入。
+3. `apps/web/src/features/channel/index.ts:5-6`：`useMarkRead` 改从 `./marks` 导出。
+4. `apps/web/src/features/channel/marks.test.ts:25`：`markedRead, type ReadMark` 改从 `./marks` 导入；补一条 `markUnread` 失败时释放 `held` 并调用 `say` 的单测。
+5. `docs/subsystems/app.md:38`：将「表情、置顶、归档串、提醒级别（`features/channel/marks.ts`）和标未读、标已读（`reading.ts`）」合写为「表情、置顶、归档串、提醒级别、标未读和标已读（`features/channel/marks.ts`）」。
+
+#### 3. 关键不变量核对
+
+- **无循环依赖与初始化顺序安全**：`marks.ts` 仅依赖 `./follow`（无反向依赖）与 `./unread`（纯函数，仅依赖 `@vibevalley/protocol`）；`held = defineAtom<ReadonlySet<string>>(new Set())` 与 6 个 `defineIntent` 均为模块顶层惰性 Atom 定义，无求值顺序耦合。
+- **`held` 跨组件生命周期不变**：`held` 仍在 `pageRegistry` 的 `defineAtom` 中，主人标未读后留在当前频道期间 `useMarkRead` 不自动标回已读；离开该频道（`useMarkRead` 清理函数触发 `release(id)`）或 `markUnread` 失败回退（`say` 回调触发 `release(mark.channel)`）时释放。
+- **断线排队、帧确认与失败回退不变**：`readMark` 与 `unreadMark` 仍为 `whileLost: "queue"`、`timeoutMs: 20_000`，按 `channelIn(frame, i.input.channel)?.read` 确认；失败均经 `setMark` 先 `intents.drop(end.key)` 撤掉乐观叠加、再调用 `say(end.reason ?? "")`。
+
+#### 4. 验证方法
+
+```bash
+vp test apps/web/src/features/channel/marks.test.ts apps/web/src/layers.test.ts
+vp run web:check
+vp run docs:verify
+vp run deadcode
+```

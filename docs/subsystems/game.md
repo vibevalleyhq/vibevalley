@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 账本：哪些事实记一笔、一笔怎么折成金币、连胜、成就、称号、战绩 | 工单的状态、验收、收获本身（[工单](docs/subsystems/issue.md)）；计划怎么推进（[种植计划](docs/subsystems/task.md)） |
+| 账本：哪些事实记一笔、一笔怎么折成金币、连胜、成就、称号、战绩 | 工单的状态、验收、收获本身（[工单](docs/subsystems/issue.md)）；计划怎么推进（[种植计划](docs/subsystems/issue.md)） |
 | 等级：commit 数怎么换成等级、什么时候放升级横幅 | 怎么数 commit（`project.Contributions`，[项目](docs/subsystems/project.md)「数 commit」） |
 | 主人点的空地：下一个帮工挪过去 | 雇谁、派给谁（[管家](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
 | 特效：金币、升级、成就、没做成的惩罚 | 特效、庄稼、奖章怎么画，横幅和提示怎么放（[farm-ui.md](docs/reference/farm-ui.md)、[农场的皮](docs/subsystems/farm.md)） |
@@ -24,13 +24,13 @@
 
 ## 模型和不变量
 
-- **奖结果，不奖消耗。** 金币、连胜和收成类的成就只认「收进主分支的活」：帮工离开（`left` 事实）时工单关成 `merged` 且合进去的提交数大于 0，记一条 `harvested`。一轮做完、命令数、读写次数、花的 token 不进任何规则。回报只有金币和称号，地块和派活的规则不看它们。
+- **奖结果，不奖消耗。** 金币、连胜和收成类的成就只认「收进主分支的活」：帮工离开（`sessionGone` 事实）时工单关成 `merged` 且合进去的提交数大于 0，记一条 `harvested`。一轮做完、命令数、读写次数、花的 token 不进任何规则。回报只有金币和称号，地块和派活的规则不看它们。
 - **账本是唯一的家。** 一条一行、按 `id` 的顺序折；`Progress` 每次都是整本折出来的结果，不另存计数。开机整本重折，规则改了重启就按新规则算；`kind` 和 `payload` 合成一条后按 `LedgerEntry` 的 Schema 解码，折不回来的行（`kind` 不认识、解不开、形状不对或数值不是有限数）跳过。一次记一条（`ledger.mu`），表里的顺序就是折的顺序。
 - **记不下来不挡农场。** 写库失败只记日志，那一条少了，农场照常。
 - **记一条就施加一个 `progress` 事实**；这一条带来金币或到了某一档时带上 `news`（多少金币、给哪个帮工、到了哪几档）。账本自己施加的 `progress` 不再回到账本。
 - **金币**：
   - 收进一件活：`round((30 + min(提交数 × 5, 30)) × 连胜倍率)`，倍率 `min(2, 1 + 0.1 × (连胜 − 1))`；取整是 JavaScript 的 `Math.round`，`1 + 0.1 × 7` 是 `1.7000000000000002`。
-  - 收获一个种植计划（`graph` 条目）：`30 + 10 × 合进去的件数`。
+  - 完成一个父子工单（`family` 条目）：`30 + 10 × 合进去的件数`。
   - 到一档成就：`seeds.json` 里每档的 `coins`（新手任务 20，计数的铜、银、金 10、30、60，彩蛋 50）；每档只给一次。
 - **连胜**：每收进一件 +1，`bestStreak` 记最长；有帮工一轮没做成（`failed`）清零。`Progress.multiplier` 是现在的倍率。
 - **成就**：计数在 `Progress.counts`，每档到了记一个 `Unlock`（成就、档、日期），按顺序各一次。各计数从哪来：
@@ -58,7 +58,7 @@
 - **升级横幅只给数出来的增长**：`levelUps` 每跨一级放一个 `levelUp`；农场第一次数出 commit 数（之前 `commits` 是空的）只定下等级，不放横幅，但账本照样记 `level`。开机时 `catchUp` 比较 commit 的等级和账本里的 `farm_level`，落下的补记一条。
 - **仓库是交付 `merged` 或 `pull_request` 的工单**，一张一格（整个计划也是一格），最近收的在前；不另存，页面从 `WorkspaceState.issues` 读。
 - **地块号**：`SessionPlay.station` 是 0–5（`maxRunning` 6），`-1` 是不在地里。新雇的帮工站第一块空着的地；已经有 `play` 的帮工再雇不换地；读回的 `state.json` 里没有地块的帮工由 `withStations` 补上。`station` 事实只挪到空着的地：帮工不在、已经在那块地、那块地有人、超出范围都不改状态。
-- **特效是纯函数** `EffectsOf(折之前的状态, 事实)`：`commits` 给 `levelUp`；`progress` 的 `news` 给 `reward`（金币、帮工、连胜）和每档一个 `achievement`（带着这一档的说法：叫什么、到了叫什么、成就的介绍、金币、是不是一次性的）；一个已知帮工的 `report` 是 `failed` 给 `penalty`。
+- **特效是纯函数** `EffectsOf(折之前的状态, 事实)`：`commits` 给 `levelUp`；`progress` 的 `news` 给 `reward`（金币、帮工、连胜）和每档一个 `achievement`（带着这一档的说法：叫什么、到了叫什么、成就的介绍、金币、是不是一次性的）；一个已知帮工的 `sessionReport` 是 `failed` 给 `penalty`。
 - **成就的说法**（`achievementsInWords`）：每档的称号是 `tierTitles` 里的，没有就是成就名，第二、三档前面加「银牌」「金牌」；到了一档叫「新手任务做完了」（新手任务）、「发现一个彩蛋」（彩蛋）、「升到金牌」「升到银牌」「解锁成就」；新手任务以外的都能当称号（`wearable`）。说法不进帧，页面读一次 `game.achievement.list`；每帧的 `view.achievements` 只有进度（成就、档、计数、下一档要多少，全到了就没有下一档），和说法一样按页面的顺序。
 
 ## 怎么走
@@ -66,13 +66,13 @@
 **记账**（`ledger.OnStart`）：
 
 1. 订阅 `core.Transitions()`，先对当时的状态跑 `catchUp`。
-2. 每个事实连同折之前、折之后的状态交给 `entriesFor`，读出要记的条目：`report` 失败 → `failed`；`conflict` 有冲突 → `conflicted`；`call` 变成 `live` → `opened`；`hired` → `hired`；`issue` 的计划从 `splitting` 到 `draft` → `split`，到 `done` → `graph`；`left` 关成 `merged` 且有提交 → `harvested`；频道的新消息：主人在工单串里说的 → `told`，主人 @ 的帮工 → `called`，帮工回别人的 → `handoff`；`commits` 跨了级 → `level`；6 块地填满 → `busy6`。
+2. 每个事实连同折之前、折之后的状态交给 `entriesFor`，读出要记的条目：`sessionReport` 失败 → `failed`；`issue.conflict` 新增或换负责会话 → `conflicted`；`voiceCall` 变成 `live` → `opened`；`session`（Worker）→ `hired`；首次出现子工单 → `split`，父工单完成 → `family`（已合入子单数及依赖分层）；`sessionGone` 关成 `merged` 且有提交 → `harvested`；频道的新消息：主人在工单串里说的 → `told`，主人 @ 的帮工 → `called`，帮工回别人的 → `handoff`；`commits` 跨了级 → `level`；6 块地填满 → `busy6`。
 3. 主人在应用里做的、不改状态的事由经手的服务说给 `core.Did`，账本订阅 `core.owner`（返回前就订上：开机后主人马上做的也不漏）记：主人看收成清单（`issue` 的 `changesFor`，管家看的不算）→ `reviewed`；语音接通（`voice.Start`）→ `voice`。挑称号由 HTTP 调 `Game.chooseTitle` 记 `titled`。
 4. 每条写进 `game_ledger`，`progressStep` 折一步，施加 `progress` 事实；`Core.apply` 同时用 `effectsOf` 算出特效，和帧一起发。
 
-**数 commit**（`commits`）：开机就绪后数一次，之后每 2 分钟一次；每个 `report` 事实（一轮结束）后 15 秒再数一次，几轮共用一次。数和写回由 `counting` 锁成一次一个，旧的数不会盖掉新的；停机以后数完的不写。结果经 `Core.setCommits` 施加 `commits` 事实。
+**数 commit**（`commits`）：开机就绪后数一次，之后每 2 分钟一次；每个 `sessionReport` 事实（一轮结束）后 15 秒再数一次，几轮共用一次。数和写回由 `counting` 锁成一次一个，旧的数不会盖掉新的；停机以后数完的不写。结果经 `Core.setCommits` 施加 `commits` 事实。
 
-**点空地**（`game.ts`）：主人点一块空地再说话，`channel.message.send` 带上这块地的 `station`，`Game.want` 记下这块地 10 秒。这期间雇的第一个帮工先由 `hired` 站到第一块空地，`game` 听到 `hired` 再施加 `station` 把它挪过去；地已有人就不挪。记下的地用一次就清掉，不管挪没挪成。两个事实相隔不到 200 毫秒，通常在同一帧里。
+**点空地**（`game.ts`）：主人点一块空地再说话，`channel.message.send` 带上这块地的 `station`，`Game.want` 记下这块地 10 秒。这期间雇的第一个帮工先由 `session` 站到第一块空地，`game` 听到 `session` 再施加 `station` 把它挪过去；地已有人就不挪。记下的地用一次就清掉，不管挪没挪成。两个事实相隔不到 200 毫秒，通常在同一帧里。
 
 ## 和谁打交道
 
@@ -88,7 +88,7 @@
 - **一本账本，在服务端，折出结果。** 在页面里算，页面关着时的事漏掉，几个客户端各算一份互相覆盖。直接存计数最简单，但规则一改旧数就对不上，也说不清某一档是哪天、因为哪件活拿到的；账本按顺序折，结果总能重算，还带着每档的日期。
 - **哪些事实记账是一个纯函数 `entriesFor`，游戏只听事实。** 写在各个业务里记，业务就认识了游戏；收获、带话、点名、交接都从帮工离开和频道消息的事实里读出来。只有主人做的、不改状态的事从 `core.Did` 来，经手的服务说一声，不管从哪个入口进来都记得到。
 - **服务收在 `game` 一个包。** 名字只叫 `ledger` 时，它装的其实是全部游戏；`game` 也是主人和概念里的词。地块、特效这类拼帧要用的规则放在 `game` 自己的文件里，折法和拼帧那层（`projection`）import 它们；账本的折法只有 `game` 读，所以在 `game/progress.ts`。
-- **核心状态不替游戏做决定。** 主人点的地要经过管家（模型）才雇到帮工，中间隔着一句话和 10 秒；把地块一路带过管家和派活（`hired` 带地块），业务就认识了游戏。所以 `game` 听到 `hired` 再施加 `station`，代价是分在两帧时页面上帮工挪一下。
+- **核心状态不替游戏做决定。** 主人点的地要经过管家（模型）才雇到帮工，中间隔着一句话和 10 秒；把地块一路带过管家和派活（`session` 带地块），业务就认识了游戏。所以 `game` 听到 `session` 再施加 `station`，代价是分在两帧时页面上帮工挪一下。
 - **特效在 `Core.apply` 里算，不搬进 `game`。** `effectsOf` 要折之前的状态：`game` 要么自己存一份，违反核心状态只有一份；要么等事件发出再算，特效晚一帧。`Core` 只跑一个纯函数，不做游戏的决定。
 - **经验只算工作目录里你名下的 commit。** 算这台机器上所有仓库会把和 VibeValley 无关的工作算进来，算所有作者会把别人的提交算成你的；代价是要定期扫目录、跑 git。
 - **仓库装收获了的工单，不装每一轮的汇报。** 汇报在看板、轨迹、工单串里都有；收获需要一个看得见的去处，看板的「已关」里还有没收就收工的。读工单，不另存。

@@ -324,7 +324,7 @@ export function HomeScreen(props: {
   onOpen: (app: PhoneApp) => void;
   onOrchestrator: () => void;
   onChannels: () => void;
-  onTaskBoard: () => void;
+  onIssues: () => void;
 }) {
   const apps: App[] = [
     {
@@ -337,7 +337,7 @@ export function HomeScreen(props: {
     { id: "log", label: t("web.farm.phone.log"), icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
     { id: "orchestrator", label: t("web.farm.phone.manager"), icon: () => <OrchestratorFace size={28} />, go: () => props.onOrchestrator() },
     { id: "channels", label: t("web.farm.phone.app.channels"), icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
-    { id: "graphs", label: t("web.farm.phone.app.graphs"), icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
+    { id: "issues", label: t("web.farm.menu.issues"), icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onIssues() },
     { id: "games", label: t("web.farm.phone.app.games"), icon: GamesIcon, go: () => props.onOpen("games") },
   ];
   return <AppGrid apps={apps} />;

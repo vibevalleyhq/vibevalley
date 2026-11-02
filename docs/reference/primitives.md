@@ -46,6 +46,7 @@
 | `orchestrator` | `actor.ts` | forOwner: the owner's own words are in the run it acts in. |
 | `session` | `actor.ts` |  |
 | `actsForOwner` | `actor.ts` | On the owner's word: the owner, or the orchestrator in a run the owner's words are in. |
+| `compactCard` | `card.ts` |  |
 | `clip` | `clip.ts` | s on one line and trimmed, at most max units with the ellipsis. |
 | `head` | `clip.ts` | The first n UTF-16 units of s, never half a surrogate pair. |
 | `newId` | `ids.ts` |  |
@@ -81,7 +82,7 @@
 | `dbDir` | `config.ts` | The database's folder, or "memory". |
 | `serverAddress` | `config.ts` | The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. |
 | `projectsDir` | `config.ts` | Where the projects are: each folder in it is one. |
-| `agentHome` | `config.ts` | A profile's own folder, an orchestrator's conversation, MEMORY.md, archive and evals among what it keeps there. |
+| `agentHome` | `config.ts` | A profile's folder for conversation logs, archives and evals; memory rows live in the database. |
 | `dbQueries` | `db.ts` | Every query run: what a test holds a hot path's budget to, and a reading of the farm's load. |
 | `setAsideStale` | `db.ts` | A folder's database made from another baseline is moved aside, whole, to <folder>.<hash>-<time>: it is not |
 | `Database` | `db.ts` | The database as an SqlClient, with the schema in place. |
@@ -89,7 +90,7 @@
 | `Db` | `db.ts` | The farm's database as the services use it: a generated query (db/generated) run against it. The database is in this |
 | `NotWritten` | `files.ts` |  |
 | `writeOnce` | `files.ts` | Writes a file named by its bytes (their hash), making its folder: the same bytes are the same file, so one already |
-| `readOrSetAside` | `files.ts` | An owner's file (config.json, settings.json, state.json) read by read. One that does not read (not JSON, or not the |
+| `readOrSetAside` | `files.ts` | An owner's file (config.json, settings.json) read by read. One that does not read (not JSON, or not the |
 | `keptFile` | `files.ts` | soonMs: how long a soon write waits after the first change, so a burst is one write and a crash loses no more. |
 | `HomeTaken` | `lease.ts` |  |
 | `leaseHome` | `lease.ts` | Takes the home, or throws HomeTaken; the function it returns gives it back. |
@@ -123,6 +124,7 @@
 | `releaseHeld` | `helper.ts` | Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. |
 | `helper` | `helper.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). 只起草工单 drafts; |
 | `installedOnly` | `helper.ts` | A probe that finds every runtime given, bundled, and no other. |
+| `testIssues` | `issues.ts` |  |
 | `starter` | `layers.ts` | A built-in template as a farm whose agent.starters names it has it: under the template's own id. |
 | `testConfig` | `layers.ts` |  |
 | `testDatabase` | `layers.ts` |  |
@@ -131,7 +133,7 @@
 | `said` | `said.ts` |  |
 | `whenState` | `until.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. It |
 | `quietApp` | `world.ts` | For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. No runtime is |
-| `worldBelowTasks` | `world.ts` | The farm below the task graphs: for a test that makes its own task service. |
+| `worldBelowIngress` | `world.ts` | Services below Ingress for module tests. |
 | `world` | `world.ts` | The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds |
 
 ## `apps/web/src/base`
@@ -192,7 +194,8 @@
 | `createFrames` | `frame.ts` | The state stream (infra/frames.ts) as a store: each frame reconciles in by id, so only what changed updates. |
 | `useFrames` | `frame.ts` |  |
 | `useCore` | `frame.ts` | The folded state; undefined until the first frame. Read it inside JSX or a memo. |
-| `orchestratorMood` | `frame.ts` | An orchestrator's mood; one the state does not list is idle. |
+| `orchestratorSession` | `frame.ts` |  |
+| `orchestratorMood` | `frame.ts` |  |
 | `rawFrame` | `frame.ts` | The frame as the stream sent it: a new object each time, for code that compares the one before with the one after |
 | `frames` | `frames.ts` |  |
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |

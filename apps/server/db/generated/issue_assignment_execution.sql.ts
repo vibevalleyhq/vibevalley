@@ -4,11 +4,10 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
-import { Pg_public_issue_assignment_execution_executor_kind_cc79defb700e } from "./types.js"
+import { Pg_public_session_role_337e49368aee } from "./types.js"
 
 export const AddExecutionParams = Schema.Struct({
   ["assignment"]: Schema.String,
-  ["executor_kind"]: Pg_public_issue_assignment_execution_executor_kind_cc79defb700e,
   ["executor"]: Schema.String,
   ["started_at"]: Schema.Number,
 })
@@ -17,21 +16,21 @@ export type AddExecutionParams = typeof AddExecutionParams.Type
 
 export const AddExecutionResult = Schema.Struct({
   ["assignment"]: Schema.String,
-  ["executor_kind"]: Pg_public_issue_assignment_execution_executor_kind_cc79defb700e,
   ["executor"]: Schema.String,
   ["started_at"]: Schema.Number,
+  ["role"]: Pg_public_session_role_337e49368aee,
 })
 export type AddExecutionResult = typeof AddExecutionResult.Type
 
 
-export const AddExecutionSql = "-- name: AddExecution :one\ninsert into issue_assignment_execution (assignment, executor_kind, executor, started_at)\nvalues ($1, $2, $3, $4)\non conflict (assignment, executor_kind, executor) do update set assignment = issue_assignment_execution.assignment\nreturning \"issue_assignment_execution\".\"assignment\", \"issue_assignment_execution\".\"executor_kind\", \"issue_assignment_execution\".\"executor\", \"issue_assignment_execution\".\"started_at\";"
+export const AddExecutionSql = "-- name: AddExecution :one\nwith recorded as (\n  insert into issue_assignment_execution (assignment, executor, started_at)\n  values ($1, $2, $3)\n  on conflict (assignment, executor) do update set assignment = issue_assignment_execution.assignment\n  returning \"issue_assignment_execution\".\"assignment\", \"issue_assignment_execution\".\"executor\", \"issue_assignment_execution\".\"started_at\"\n)\nselect \"recorded\".\"assignment\", \"recorded\".\"executor\", \"recorded\".\"started_at\", session.role from recorded join session on session.id = recorded.executor;"
 
 export const addExecution = Effect.fn("AddExecution")(function* (params: AddExecutionParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findOne({
     Request: AddExecutionParams,
     Result: AddExecutionResult,
-    execute: (p) => sql.unsafe(AddExecutionSql, [p["assignment"], p["executor_kind"], p["executor"], p["started_at"]]),
+    execute: (p) => sql.unsafe(AddExecutionSql, [p["assignment"], p["executor"], p["started_at"]]),
   })(params)
 })
 
@@ -43,15 +42,15 @@ export type AllExecutionsParams = typeof AllExecutionsParams.Type
 
 export const AllExecutionsResult = Schema.Struct({
   ["assignment"]: Schema.String,
-  ["executor_kind"]: Pg_public_issue_assignment_execution_executor_kind_cc79defb700e,
   ["executor"]: Schema.String,
   ["started_at"]: Schema.Number,
   ["issue"]: Schema.String,
+  ["role"]: Pg_public_session_role_337e49368aee,
 })
 export type AllExecutionsResult = typeof AllExecutionsResult.Type
 
 
-export const AllExecutionsSql = "-- name: AllExecutions :many\n-- bound: execution contexts retained with each responsibility assignment.\nselect \"issue_assignment_execution\".\"assignment\", \"issue_assignment_execution\".\"executor_kind\", \"issue_assignment_execution\".\"executor\", \"issue_assignment_execution\".\"started_at\", issue_assignment.issue from issue_assignment_execution\njoin issue_assignment on issue_assignment.id = issue_assignment_execution.assignment\norder by started_at, executor;"
+export const AllExecutionsSql = "-- name: AllExecutions :many\n-- bound: execution contexts retained with each responsibility assignment.\nselect \"issue_assignment_execution\".\"assignment\", \"issue_assignment_execution\".\"executor\", \"issue_assignment_execution\".\"started_at\", issue_assignment.issue, session.role from issue_assignment_execution\njoin issue_assignment on issue_assignment.id = issue_assignment_execution.assignment\njoin session on session.id = issue_assignment_execution.executor\norder by started_at, executor;"
 
 export const allExecutions = Effect.fn("AllExecutions")(function* () {
   const sql = yield* SqlClient.SqlClient

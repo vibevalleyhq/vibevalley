@@ -39,7 +39,6 @@
     "orchestratorNothing": "还没记下什么。跟管家说「记住……」，或者你在上面替它记。",
     "orchestratorOwn": "管家自己记的",
     "told": "你交代的",
-    "tooOld": "太旧了，带不进系统提示",
     "archiveIntro": "对话太长时，管家把前面的部分压成一段摘要，原文一字不改地存在这里。摘要里缺了细节，它自己会用 search_archive 来翻；你也可以在这里翻。",
     "search": "在旧账里搜",
     "searchHint": "搜一个词",

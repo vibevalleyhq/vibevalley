@@ -109,43 +109,15 @@ export const parameters = {
     id: Schema.String.annotate({ description: params.channelRef }),
     project: Schema.optionalKey(Schema.String),
   }),
-  "graph.act": Schema.Struct({
-    action: Schema.Literals(["start", "pause", "resume", "abandon", "merge"]),
-    id: Schema.String.annotate({ description: params.planId }),
-  }).annotate({ requiredOrder: ["id", "action"] }),
-  "graph.get": Schema.Struct({
-    id: Schema.String.annotate({ description: params.planId }),
-  }),
-  "graph.list": Schema.Struct({}),
-  "graph.split": Schema.Struct({
-    agent: Schema.optionalKey(Schema.String.annotate({ description: params.graphSplit.agent })),
-    goal: Schema.String.annotate({ description: params.graphSplit.goal }),
-    project: Schema.String.annotate({ description: params.projectFolder }),
-  }),
-  "graph.task.act": Schema.Struct({
-    action: Schema.Literals(["retry", "skip"]),
-    id: Schema.String.annotate({ description: params.planId }),
-    task: Schema.String.annotate({ description: params.graphTask.task }),
-  }).annotate({ requiredOrder: ["id", "task", "action"] }),
-  "graph.task.delete": Schema.Struct({
-    id: Schema.String.annotate({ description: params.planId }),
-    task: Schema.String.annotate({ description: params.graphTask.task }),
-  }).annotate({ requiredOrder: ["id", "task"] }),
-  "graph.task.update": Schema.Struct({
-    agent: Schema.optionalKey(Schema.String.annotate({ description: params.graphTask.agent })),
-    brief: Schema.optionalKey(Schema.String.annotate({ description: params.graphTask.brief })),
-    check: Schema.optionalKey(Schema.String.annotate({ description: params.graphTask.check })),
-    id: Schema.String.annotate({ description: params.planId }),
-    needs: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.graphTask.needs })),
-    task: Schema.String.annotate({ description: params.graphTask.newTask }),
-    title: Schema.optionalKey(Schema.String),
-  }).annotate({ requiredOrder: ["id", "task"] }),
   "issue.comment.create": Schema.Struct({
     id: Schema.String.annotate({ description: params.issueOrAgent }),
     text: Schema.String.annotate({ description: params.issueComment.text }),
   }).annotate({ requiredOrder: ["id", "text"] }),
   "issue.create": Schema.Struct({
+    parent: Schema.optionalKey(Schema.String.annotate({ description: params.issueOrAgent })),
+    blockedBy: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String.annotate({ description: params.issueOrAgent })))),
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.agent })),
+    autoSubmitPr: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueCreate.autoSubmitPr })),
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.channel })),
     deliver: Schema.optionalKey(
       Schema.Literals(["change", "branch", "answer"]).annotate({
@@ -329,7 +301,7 @@ const written = (node: unknown): unknown => {
   return out;
 };
 
-const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>): JsonSchema => {
+export const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>): JsonSchema => {
   if (Object.keys(parameters.fields).length === 0) return { additionalProperties: true, properties: {}, type: "object" };
   const shaped = written(Schema.toJsonSchemaDocument(parameters, { includeAnnotationKey: (key) => key === "requiredOrder" || key === "parseOptions" }).schema);
   return Predicate.isObject(shaped) ? Object.fromEntries(Object.entries(shaped)) : {};

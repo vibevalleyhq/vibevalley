@@ -1,7 +1,3 @@
-// Cron: the owner's and the orchestrator's, kept in the cron table and in the core state.
-// Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
-// is published for the orchestrator, who does it.
-
 import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -18,13 +14,14 @@ import { Core } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
 
 import * as q from "../../db/generated/cron.sql.ts";
-import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./due.ts";
+import * as occurrences from "../../db/generated/cron_occurrence.sql.ts";
+import { afterRun, dueCrons, isMissed, needsOK, cronProblem } from "./due.ts";
 import { whenText } from "./when.ts";
 
 export interface Due {
+  readonly id: string;
   readonly cron: T.Cron;
   readonly missed: boolean;
 }
@@ -41,6 +38,8 @@ export class Cron extends Context.Service<
     /** What remove would do, refused as it would be; nothing changes. */
     readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
     readonly tick: Effect.Effect<void>;
+    readonly pendingOccurrences: Effect.Effect<readonly Due[]>;
+    readonly acknowledge: (id: string) => Effect.Effect<void>;
     /** What comes due from now on, subscribed before it returns. */
     readonly due: Effect.Effect<Stream.Stream<Due>, never, Scope.Scope>;
   }
@@ -114,17 +113,24 @@ const make = Effect.gen(function* () {
         (s) => {
           const missed = isMissed(s, at);
           const after = afterRun(s, at);
-          return db.attempt(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id })).pipe(
-            Effect.matchEffect({
-              onFailure: (failure) => Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`),
-              onSuccess: () =>
-                Effect.gen(function* () {
-                  yield* core.apply({ type: "cron", cron: after });
-                  PubSub.publishUnsafe(dueHub, { cron: after, missed });
-                  yield* chat.notice(s.channel, dueText(s, missed), "cron").pipe(bestEffort("cron notice was not kept"));
-                }),
-            }),
-          );
+          const occurrence = { id: newId(), cron: after, missed };
+          return db
+            .attemptTx(
+              Effect.gen(function* () {
+                yield* q.cronRan({ last_run: at, enabled: after.enabled, id: after.id });
+                yield* occurrences.recordOccurrence({ id: occurrence.id, cron_id: s.id, cron_json: JSON.stringify(after), missed, created_at: at });
+              }),
+            )
+            .pipe(
+              Effect.matchEffect({
+                onFailure: (failure) => Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`),
+                onSuccess: () =>
+                  Effect.gen(function* () {
+                    yield* core.apply({ type: "cron", cron: after });
+                    PubSub.publishUnsafe(dueHub, occurrence);
+                  }),
+              }),
+            );
         },
         { discard: true },
       );
@@ -205,6 +211,16 @@ const make = Effect.gen(function* () {
       return { does: [t("server.cron.removeWhen", { name: was.name, when: whenText(was.when, was.tz) })] };
     }),
     tick,
+    pendingOccurrences: Effect.map(db.run(occurrences.pendingOccurrences()), (rows) =>
+      rows.map((row) => ({
+        id: row.id,
+        cron: Schema.decodeSync(Schema.fromJsonString(S.Cron))(row.cron_json),
+        missed: row.missed,
+      })),
+    ),
+    acknowledge: Effect.fn("Cron.acknowledge")(function* (id) {
+      yield* db.run(occurrences.acknowledgeOccurrence({ id }));
+    }),
     due: Effect.map(PubSub.subscribe(dueHub), Stream.fromSubscription),
   });
   return shape;

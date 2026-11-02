@@ -1,24 +1,16 @@
-import { describe, expect, it, test } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { type Issue, defaultOrchestrator, type ProjectStack, type Run } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { templateCatalog } from "@/agent/seed.ts";
-import { graphsOf } from "@/task/issues.ts";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
 
 import { pullRequestConclusion, issueBrief, splitBrief } from "./brief.ts";
 import { pickIssues } from "./filter.ts";
 import { answerOpening, criteriaHead, refinementBrief, refinementOpening } from "./prompts.ts";
 import { refinementDescription, kept, parseRefinement } from "./refinement.ts";
-import { nextTaskId } from "./stored.ts";
 import { filledKinds, filledTemplate, sentTitles } from "./templates.ts";
 import { milestonesOf } from "./timeline.ts";
-test("the recorded cases", () => {
-  const cases = goldenCases("issue");
-  expect(new Set(cases.map((c) => c.fn))).toEqual(new Set(["nextTaskID"]));
-  expect(checkCases(cases, (c) => nextTaskId(graphsOf((c.in as { state: never }).state).map((g) => g.id)))).toEqual([]);
-});
 
 describe("an issue as a brief", () => {
   it("title and brief", () => {
@@ -48,6 +40,7 @@ describe("an issue as a brief", () => {
       title: "评估",
       priority: "medium",
       deliver: "change",
+      mandate: { strength: "explicit", maxBotReviewRounds: 3, autoSubmitPr: false },
       createdAt: 100,
       assignments: [
         {
@@ -109,17 +102,11 @@ describe("an issue as a brief", () => {
       "改拖卡\n\n为什么：\n旧接口\n\n" + criteriaHead + "\n1. 拖到待办就开工\n2. 测试通过",
     );
   });
-
-  it("the next task's id", () => {
-    expect(nextTaskId([])).toBe("p1");
-    expect(nextTaskId(["p3", "p12", "p9"])).toBe("p13");
-    expect(nextTaskId(["p3", "px", "p 7 ", "p-9", "p0x10", "p1.5", "q40"])).toBe("p4");
-  });
 });
 
 describe("a pull request", () => {
   it("a pull request's conclusion", () => {
-    expect(pullRequestConclusion("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明")).toBe("已完成 abc123\n第二行");
+    expect(pullRequestConclusion("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明")).toBe("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明");
     const text = "完整的最后一轮回复。".repeat(20) + "\n\n最后一段";
     expect(pullRequestConclusion(text)).toBe(text);
   });

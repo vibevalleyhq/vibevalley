@@ -5,10 +5,12 @@ import type { Agent } from "@vibevalley/protocol";
 
 import { expect, test } from "./fixtures";
 
+test.use({ farm: "flow-polish" });
+
 const fox: Agent = {
   id: "",
   name: "fox",
-  role: "helper",
+  role: "worker",
   duty: "",
   enabled: true,
   // The test server's pi is the scripted helper (fixtures.ts); 先问清楚 has it ask the owner.

@@ -5,7 +5,7 @@ import { Effect, Schema } from "effect";
 import { ToolFailed } from "./core/errors.ts";
 import type { Tool } from "./core/loop.ts";
 import { schemaEffectTool, schemaTool } from "./core/tool.ts";
-import { archiveFiles, remember, rewriteMemory, searchArchive } from "./memory.ts";
+import { archiveFiles, fileMemory, type MemoryPort, searchArchive } from "./memory.ts";
 import { self as selfWords } from "./prompts.ts";
 import { readSkill, type SkillInfo } from "./skills.ts";
 
@@ -15,7 +15,7 @@ export interface SelfOptions {
   readonly now: () => number;
   /** Scanned each time it asks. */
   readonly skills: () => Promise<SkillInfo[]>;
-  readonly memory: boolean;
+  readonly memory: boolean | MemoryPort;
 }
 
 async function searchIn(home: string, query: string): Promise<string> {
@@ -27,6 +27,7 @@ async function searchIn(home: string, query: string): Promise<string> {
 }
 
 export function selfTools(o: SelfOptions): Tool[] {
+  const memory = o.memory === true ? fileMemory(o.home, o.now) : o.memory === false ? undefined : o.memory;
   const loadSkill = schemaTool({
     name: "load_skill",
     description: selfWords.loadSkillDescription,
@@ -39,7 +40,8 @@ export function selfTools(o: SelfOptions): Tool[] {
     parameters: Schema.Struct({ note: Schema.String }),
     run: async (p) => {
       if (!p.note.trim()) throw new Error(selfWords.emptyNote);
-      await remember(o.home, p.note, new Date(o.now()));
+      if (!memory) throw new Error("Memory tools are disabled");
+      await memory.remember(p.note);
       return selfWords.remembered;
     },
   });
@@ -47,7 +49,10 @@ export function selfTools(o: SelfOptions): Tool[] {
     name: "rewrite_memory",
     description: selfWords.rewriteMemoryDescription,
     parameters: Schema.Struct({ content: Schema.String }),
-    run: async (p) => selfWords.rewritten((await rewriteMemory(o.home, p.content)).lineCount),
+    run: async (p) => {
+      if (!memory) throw new Error("Memory tools are disabled");
+      return selfWords.rewritten(await memory.rewrite(p.content));
+    },
   });
   const search = schemaTool({
     name: "search_archive",
@@ -55,7 +60,7 @@ export function selfTools(o: SelfOptions): Tool[] {
     parameters: Schema.Struct({ query: Schema.String }),
     run: (p) => searchIn(o.home, p.query),
   });
-  return [loadSkill, ...(o.memory ? [rememberTool, rewrite] : []), search];
+  return [loadSkill, ...(memory ? [rememberTool, rewrite] : []), search];
 }
 
 /** Interrupting it calls the subagent back. */

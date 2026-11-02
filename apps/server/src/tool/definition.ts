@@ -7,7 +7,7 @@ import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 
 import type { Actor } from "@/base/actor.ts";
 import { messageOf, reasonOf } from "@/errors.ts";
-import { maxTasks } from "@/task/graph.ts";
+import { maxChildren as maxTasks } from "@/issue/creation.ts";
 
 import { answers, descriptions, sessionDescriptions } from "./prompts.ts";
 import { type Op, parameters, schemas, sessionParameters, sessionSchemas, toolName } from "./schemas.ts";
@@ -26,6 +26,8 @@ export interface Caller {
   readonly here: string;
   /** The profile the owner picked for this input, if any: dispatch prefers it. */
   readonly picked: string;
+  /** The ingress envelope currently being handled; empty when this run was not opened by one. */
+  readonly envelope: string;
   /** Who calls, and on whose word: the services judge what it may do by it. */
   readonly actor: Actor;
 }
@@ -74,3 +76,18 @@ export const sessionSchemaTool = toolOf(sessionParameters, sessionSchemas, {
   ...sessionDescriptions,
   "issue.split": sessionDescriptions["issue.split"](maxTasks),
 });
+
+export const customTool = <A, E>(
+  name: string,
+  description: string,
+  parameters: JsonSchema,
+  read: (args: unknown) => Effect.Effect<A, Schema.SchemaError>,
+  body: (input: A) => Effect.Effect<string, E>,
+) => {
+  return effectTool<unknown>({
+    name,
+    description,
+    parameters,
+    run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
+  });
+};

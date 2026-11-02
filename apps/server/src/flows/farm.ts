@@ -10,7 +10,7 @@ import type * as T from "@vibevalley/protocol";
 
 import { Core } from "@/core/core.ts";
 import type { ServerConfig } from "@/infra/config.ts";
-import { agentSessionsStart, gamification, inboxStart, taskGraphsStart } from "@/services.ts";
+import { agentSessionsStart, collaborationStart, gamification, inboxStart, ingressReady, mailboxReady } from "@/services.ts";
 import { type Hired } from "@/session/session.ts";
 import { gitIn } from "@/testing/git.ts";
 import { helper } from "@/testing/helper.ts";
@@ -21,7 +21,7 @@ import { world, type WorldOptions } from "@/testing/world.ts";
 /** The seed profile on pi, with no effort: the scripted runtime has no models, so no effort levels. */
 export const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 
-const farmLayer = (options: WorldOptions) => world(options).pipe(gamification, agentSessionsStart, taskGraphsStart, inboxStart);
+const farmLayer = (options: WorldOptions) => world(options).pipe(gamification, agentSessionsStart, collaborationStart, mailboxReady, ingressReady, inboxStart);
 
 export interface Farm {
   readonly config: ServerConfig["Service"];
@@ -36,15 +36,17 @@ export function farm(
   options: Omit<WorldOptions, "runtimes"> & {
     readonly change?: (c: ServerConfig["Service"]) => ServerConfig["Service"];
     readonly runtime?: Runtime;
+    readonly beforeTurn?: Parameters<typeof helper>[1];
   } = {},
 ): Farm {
   const base = options.config ?? testConfig();
   const config = options.change ? options.change(base) : base;
   const turns: ScriptedTurn[] = [];
+  const { beforeTurn, ...worldOptions } = options;
   return {
     config,
     turns,
-    layer: farmLayer({ ...options, config, runtimes: [options.runtime ?? helper(turns)] }),
+    layer: farmLayer({ ...worldOptions, config, runtimes: [options.runtime ?? helper(turns, beforeTurn)] }),
   };
 }
 
@@ -65,9 +67,9 @@ export const watch = Effect.gen(function* () {
   let taken = 0;
   /** The next report not cut off by a stop, in order. */
   const nextReport = until(
-    () => facts.filter((f): f is T.FactReport => f.type === "report" && f.outcome !== "interrupted").length > taken,
+    () => facts.filter((f): f is T.FactSessionReport => f.type === "sessionReport" && f.outcome !== "interrupted").length > taken,
     "the next report",
-  ).pipe(Effect.map(() => facts.filter((f): f is T.FactReport => f.type === "report" && f.outcome !== "interrupted")[taken++]!));
+  ).pipe(Effect.map(() => facts.filter((f): f is T.FactSessionReport => f.type === "sessionReport" && f.outcome !== "interrupted")[taken++]!));
   return { facts, notes, nextReport };
 });
 

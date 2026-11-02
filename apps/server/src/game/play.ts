@@ -23,23 +23,6 @@ export function freeStation(sessions: readonly T.Session[], project: string, pre
   return -1;
 }
 
-/** Every session on a bed of its own farm: one without a bed, or on a bed another of its farm holds, moves to a free one. */
-export function withStations(state: T.WorkspaceState): T.WorkspaceState {
-  const placed: T.Session[] = [];
-  let moved = false;
-  for (const h of state.sessions) {
-    const at = playOf(h).station;
-    const clash = placed.some((x) => farmOf(x) === farmOf(h) && playOf(x).station === at);
-    if (at >= 0 && !clash) {
-      placed.push(h);
-      continue;
-    }
-    moved = true;
-    placed.push({ ...h, play: { ...playOf(h), station: freeStation(placed, farmOf(h)) } });
-  }
-  return moved ? { ...state, sessions: placed } : state;
-}
-
 const remember = (list: readonly string[], item: string, limit: number) => {
   const out = list.filter((x) => x !== item);
   out.push(item);
