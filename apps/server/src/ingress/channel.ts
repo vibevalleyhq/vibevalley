@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Deferred, Effect, Schema, Stream } from "effect";
 
 import type { TriggerActorKind, TriggerSource } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -71,22 +71,29 @@ export const channelInputs = Effect.gen(function* () {
   const db = yield* Db;
   const encode = Schema.encodeEffect(Schema.fromJsonString(S.Trigger));
   const decode = Schema.decodeUnknownEffect(Schema.fromJsonString(S.Trigger));
-  chat.attachIngress((fact) =>
-    Effect.gen(function* () {
-      const input = channelInput(fact, inputContext(chat.deliveryMessage(fact.row)));
-      yield* db.run(
-        q.recordTrigger({
-          id: input.envelope.id,
-          source: input.envelope.source,
-          source_key: fact.row.envelope_id,
-          occurred_at: input.envelope.at,
-          trigger_json: yield* encode(input.envelope),
-          payload_json: JSON.stringify({ text: fact.row.body, data: { kind: "channel_message", message: fact.row.envelope_id, channel: fact.row.channel_id } }),
-        }),
-      );
-      const stored = yield* db.one(q.triggerById({ id: input.envelope.id }));
-      if (!stored) return yield* Effect.die(new Error("Recorded channel trigger is missing"));
-      return yield* mailbox.routeChannel({ ...input, envelope: yield* decode(stored.trigger_json) });
-    }).pipe(Effect.orDie),
+  yield* Effect.forkScoped(
+    Stream.runForEach(yield* chat.routing, (call) =>
+      Effect.gen(function* () {
+        const fact = call.fact;
+        const input = channelInput(fact, inputContext(chat.deliveryMessage(fact.row)));
+        yield* db.run(
+          q.recordTrigger({
+            id: input.envelope.id,
+            source: input.envelope.source,
+            source_key: fact.row.envelope_id,
+            occurred_at: input.envelope.at,
+            trigger_json: yield* encode(input.envelope),
+            payload_json: JSON.stringify({
+              text: fact.row.body,
+              data: { kind: "channel_message", message: fact.row.envelope_id, channel: fact.row.channel_id },
+            }),
+          }),
+        );
+        const stored = yield* db.one(q.triggerById({ id: input.envelope.id }));
+        if (!stored) return yield* Effect.die(new Error("Recorded channel trigger is missing"));
+        const result = yield* mailbox.routeChannel({ ...input, envelope: yield* decode(stored.trigger_json) });
+        yield* Deferred.succeed(call.reply, result);
+      }).pipe(Effect.orDie),
+    ),
   );
 });

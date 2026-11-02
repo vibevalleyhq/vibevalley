@@ -345,8 +345,13 @@ export type ChannelDelivery =
       readonly reply: Deferred.Deferred<void>;
     };
 
+export interface ChannelRoute {
+  readonly fact: ChannelRouteFact;
+  readonly reply: Deferred.Deferred<ChannelRouteResult>;
+}
+
 export interface ChannelService {
-  readonly attachIngress: (route: (fact: ChannelRouteFact) => Effect.Effect<ChannelRouteResult>) => void;
+  readonly routing: Effect.Effect<Stream.Stream<ChannelRoute>, never, Scope.Scope>;
   /** Mailbox is assembled after Collaboration and reads the delivery calls before startup. */
   readonly delivery: Effect.Effect<Stream.Stream<ChannelDelivery>, never, Scope.Scope>;
   readonly replayDelivery: (row: ChannelEnvelopeRow) => Effect.Effect<void>;

@@ -88,6 +88,7 @@ import {
   type Written,
   type ChannelService,
   type ChannelDelivery,
+  type ChannelRoute,
   type ChannelEnvelopeRow,
   type ChannelRouteFact,
   type ChannelRouteResult,
@@ -133,12 +134,18 @@ const make = (sessions: Session["Service"]) =>
 
     const lastRead = new Map<string, string>();
     let closed = false;
-    let ingress: ((fact: ChannelRouteFact) => Effect.Effect<ChannelRouteResult>) | undefined;
+    const routingHub = yield* scopedPubSub<ChannelRoute>();
     const deliveryHub = yield* scopedPubSub<ChannelDelivery>();
     const ask = <A>(build: (reply: Deferred.Deferred<A>) => ChannelDelivery): Effect.Effect<A> =>
       Effect.gen(function* () {
         const reply = yield* Deferred.make<A>();
         yield* PubSub.publish(deliveryHub, build(reply));
+        return yield* Deferred.await(reply);
+      });
+    const route = (fact: ChannelRouteFact): Effect.Effect<ChannelRouteResult> =>
+      Effect.gen(function* () {
+        const reply = yield* Deferred.make<ChannelRouteResult>();
+        yield* PubSub.publish(routingHub, { fact, reply });
         return yield* Deferred.await(reply);
       });
     // Work set off by a timer belongs to this service: it ends with it and keeps its services.
@@ -486,8 +493,7 @@ const make = (sessions: Session["Service"]) =>
         kinds: Object.fromEntries(recipients.map((recipient) => [recipient, senderKind(model.participant(recipient)?.kind ?? "")])),
         ...(meta.outcome === undefined ? {} : { outcome: meta.outcome }),
       };
-      if (!ingress) return yield* Effect.die(new Error("Channel ingress is not attached"));
-      const routed = yield* ingress(fact);
+      const routed = yield* route(fact);
       const written: Written = { absent: [], heldNotice: "", received: routed.received, thread: "", again: false, row };
       if (routed.heldNotice && (yield* db.run(qm.holdNoticeSinceUser({ channel: ch.id }))).n === 0) written.heldNotice = routed.heldNotice;
       written.absent = named.filter((m) => m.how !== "delivered").map((m) => m.id);
@@ -998,10 +1004,7 @@ const make = (sessions: Session["Service"]) =>
     });
 
     const shape = Channel.of({
-      attachIngress: (route) => {
-        if (ingress) throw new Error("Channel ingress is already attached");
-        ingress = route;
-      },
+      routing: Effect.map(PubSub.subscribe(routingHub), Stream.fromSubscription),
       delivery: Effect.map(PubSub.subscribe(deliveryHub), Stream.fromSubscription),
       replayDelivery: Effect.fn("Channel.replayDelivery")(function* (row) {
         const written = yield* settle(messageRow(row));
