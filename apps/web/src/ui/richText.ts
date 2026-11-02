@@ -13,7 +13,7 @@ import { highlight } from "./code/highlight";
 import { icons } from "./icons";
 import { foldLines, safeHref } from "./richRules";
 
-export interface RichOptions {
+interface RichOptions {
   /** A link inside the app (a path) goes here instead of reloading the page; absent, it opens as a plain link. */
   readonly navigate?: (to: string) => void;
   /** The pixel skin: code keeps the text's colour, uncoloured. */

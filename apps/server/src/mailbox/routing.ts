@@ -1,12 +1,21 @@
+import { Effect } from "effect";
+
+import type * as T from "@vibevalley/protocol";
 import { everyone, ownerId } from "@vibevalley/protocol";
 
-import type { ChannelAudience } from "@/base/chat.ts";
+import type { ChannelAudience } from "@/mailbox/chat.ts";
 
-import type { Delivery, DeliveryReason } from "./brakes.ts";
+import type { Recipient, DeliveryReason } from "./brakes.ts";
+import type { ChannelMail } from "./mailbox.ts";
+import type { OutboundDelivery } from "./work.ts";
+
+/** The issue holds its mailbox until the owner answers: it asks, is stuck, or waits for the owner's verdict. */
+export const waitsForHuman = (issue: Pick<T.Issue, "stage">) =>
+  issue.stage.state === "asking" || issue.stage.state === "stuck" || issue.stage.state === "reviewing";
 
 /** Who hears a message before wake brakes are applied. */
-export function whoHears(input: ChannelAudience): Delivery[] {
-  const deliveries: Delivery[] = [];
+export function whoHears(input: ChannelAudience): Recipient[] {
+  const deliveries: Recipient[] = [];
   if (input.kind === "notice" || input.kind === "dispatch" || input.fromKind === "system" || input.spoken === true) return deliveries;
   const present = input.present ?? input.sessions;
   const add = (recipient: string, reason: DeliveryReason, wakes: boolean) => {
@@ -41,4 +50,85 @@ export function whoHears(input: ChannelAudience): Delivery[] {
     }
   } else if (threadOwner) add(threadOwner, "own_thread", true);
   return deliveries;
+}
+
+export function channelRecipients(trigger: T.Trigger, input: ChannelMail): OutboundDelivery[] {
+  const candidates = input.addressed ? [input.addressed] : whoHears(input.audience);
+  return candidates.map((delivery) => ({
+    trigger,
+    session: delivery.recipient,
+    delivery,
+    role: input.roles[delivery.recipient] ?? "worker",
+    commit: Effect.void,
+    event:
+      input.row.kind === "report"
+        ? input.outcome === "failed" || input.outcome === "interrupted"
+          ? "report_attention"
+          : "report_progress"
+        : input.row.sender_kind === "owner"
+          ? "conversation"
+          : delivery.reason === "mention" || delivery.reason === "everyone"
+            ? "mention"
+            : "ambient",
+  }));
+}
+
+const UrgencyValues = ["interrupt", "steer", "queue", "digest"] as const;
+export type Urgency = (typeof UrgencyValues)[number];
+
+export type DeliveryEvent = "stop" | "conversation" | "mention" | "assignment" | "review" | "ci_failed" | "report_attention" | "report_progress" | "ambient";
+
+export function triggerEvent(trigger: Pick<T.Trigger, "actor" | "source" | "meta" | "addressed">): DeliveryEvent {
+  if (trigger.actor.kind === "owner") return "conversation";
+  switch (trigger.source) {
+    case "github":
+      if (trigger.meta.kind !== "ci") return "review";
+      return trigger.meta.failed === true ? "ci_failed" : "report_progress";
+    case "cron":
+    case "workbench":
+      return "assignment";
+    case "channel":
+    case "connector":
+    case "voice":
+      return trigger.addressed === "mention" ? "mention" : "ambient";
+    case "patrol":
+      return "ambient";
+  }
+}
+
+interface UrgencyInput {
+  readonly source: T.TriggerSource;
+  readonly actor: T.TriggerActorKind;
+  readonly recipient: T.AgentRole;
+  readonly event: DeliveryEvent;
+  readonly canSteer: boolean;
+  readonly busyWithChildren?: boolean;
+}
+
+export function urgencyOf(input: UrgencyInput): Urgency {
+  let urgency: Urgency;
+  switch (input.event) {
+    case "stop":
+      urgency = input.recipient === "orchestrator" && input.busyWithChildren === true ? "steer" : "interrupt";
+      break;
+    case "conversation":
+      urgency = "steer";
+      break;
+    case "mention":
+      urgency = input.recipient === "worker" ? "steer" : "queue";
+      break;
+    case "assignment":
+    case "review":
+    case "report_attention":
+      urgency = "queue";
+      break;
+    case "ci_failed":
+      urgency = input.recipient === "worker" ? "queue" : "digest";
+      break;
+    case "report_progress":
+    case "ambient":
+      urgency = "digest";
+      break;
+  }
+  return urgency === "steer" && !input.canSteer ? "queue" : urgency;
 }

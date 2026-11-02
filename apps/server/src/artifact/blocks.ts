@@ -37,7 +37,7 @@ const changeOf = jsonOf(S.SuggestionChange);
 const demoSections = [0, 1, 2] as const;
 type DemoSection = (typeof demoSections)[number];
 const demoParagraphs = (section: DemoSection) => ([0, 1, 2] as const).map((p) => t(`server.artifact.demo.${section}.paragraphs.${p}`));
-export interface BlockStore {
+interface BlockStore {
   /** Every live block (no tombstones), in order. */
   readonly blocks: (id: T.ArtifactId) => Effect.Effect<T.Block[], ApiError>;
   /** Markdown read into blocks, inserted as one batch by actor at the end of what is there. */

@@ -16,9 +16,9 @@ import { Channel } from "@/channel/chat.ts";
 import { Core } from "@/core/core.ts";
 import { Cron } from "@/cron/cron.ts";
 import { viewOf } from "@/game/view.ts";
-import { Ingress } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";
 import { openFindings } from "@/issue/status.ts";
+import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Runtime } from "@/runtime/runtime.ts";
 import { Session } from "@/session/session.ts";
 import { write } from "@/testing/git.ts";
@@ -243,14 +243,14 @@ describe("an issue", () => {
       expect(got.queued).toContain("排上队了");
       const status = () => Effect.map(issues.get(issue.id), (i) => i.status);
       expect(yield* status()).toBe("todo");
-      yield* (yield* Ingress).refreshIssues;
+      yield* (yield* Issue).refreshQueue;
       expect(yield* status()).toBe("todo");
       const other = yield* issues.add({ title: "别排了", project: "queue", agent: "lab" });
       const queued = yield* issues.setStatus(other.id, "todo", "", "", owner);
       const unqueued = yield* issues.setStatus(other.id, "backlog", "", "", owner);
       expect([queued.queuedAt !== undefined, unqueued.queuedAt]).toEqual([true, undefined]);
       yield* core.apply({ type: "sessionGone", id: sessionId("w90") });
-      yield* (yield* Ingress).refreshIssues;
+      yield* (yield* Issue).refreshQueue;
       yield* w.nextReport;
       expect(yield* status()).toBe("in_review");
       expect((yield* sessions.list("lab")).some((s) => s.brief === "等空位的活")).toBe(true);
@@ -275,8 +275,8 @@ describe("an issue", () => {
         },
         owner,
       );
-      const ingress = yield* Ingress;
-      const due = () => Effect.andThen(TestClock.adjust(5 * 60_000 + 1), crons.tick).pipe(Effect.andThen(ingress.refreshCron));
+      const mailbox = yield* Mailbox;
+      const due = () => Effect.andThen(TestClock.adjust(5 * 60_000 + 1), crons.tick).pipe(Effect.andThen(mailbox.replay));
       const ofCron = () => Effect.map(issues.list(), (all) => withCron(all, made.id));
       const runs = () => Effect.flatMap(ofCron(), (i) => sessions.issueRuns(i.id));
       yield* due();

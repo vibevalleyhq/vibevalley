@@ -3,7 +3,7 @@
 
 import { createEffect } from "solid-js";
 
-export type DismissReason = "escape" | "outside";
+type DismissReason = "escape" | "outside";
 
 interface Layer {
   readonly inside: (target: Node) => boolean;

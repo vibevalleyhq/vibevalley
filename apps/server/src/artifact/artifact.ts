@@ -28,7 +28,7 @@ import { artifactProblem } from "./policy.ts";
 
 /** Who makes it. from: who says so in the channel (the owner, a session, an orchestrator); by: who it is kept as made by
  * (the owner, or the profile the session works as), and who writes its blocks. */
-export interface Maker {
+interface Maker {
   readonly from: string;
   readonly by: string;
 }

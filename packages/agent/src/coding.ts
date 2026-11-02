@@ -14,7 +14,7 @@ import { schemaEffectTool, schemaTool, stopped } from "./core/tool.ts";
 import { coding as words } from "./prompts.ts";
 import { afterRealTime } from "./realTime.ts";
 
-export interface CodingOptions {
+interface CodingOptions {
   readonly cwd: string;
   /** 2 minutes when absent. */
   readonly commandTimeoutMs?: number;

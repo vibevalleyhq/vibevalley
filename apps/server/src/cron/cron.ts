@@ -16,8 +16,8 @@ import { ServerConfig } from "@/infra/config.ts";
 import { Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
 import { Issue } from "@/issue/issue.ts";
-import { recordTrigger } from "@/issue/trigger.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
+import { recordTrigger, unroutedCronTriggers } from "@/mailbox/payload.ts";
 
 import * as q from "../../db/generated/cron.sql.ts";
 import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./due.ts";
@@ -108,11 +108,11 @@ const make = Effect.gen(function* () {
 
   const ran = (id: string, at: number, enabled: boolean) => db.run(q.cronRan({ last_run: at, enabled, id }));
 
-  const handle = (due: Due) =>
+  const recordDue = (due: Due) =>
     Effect.gen(function* () {
       const s = due.cron;
       const thread = `cron:${s.id}`;
-      const trigger = yield* recordTrigger(db, {
+      return yield* recordTrigger(db, {
         source: "cron",
         key: due.id,
         actor: { kind: "system", id: s.id },
@@ -124,6 +124,12 @@ const make = Effect.gen(function* () {
         at: s.lastRun ?? s.created,
         data: s,
       });
+    });
+
+  const handle = (due: Due, trigger: T.Trigger) =>
+    Effect.gen(function* () {
+      const s = due.cron;
+      const thread = `cron:${s.id}`;
       if (!(yield* mailbox.registered(trigger.id))) {
         const issue = yield* issues.scheduled(due, trigger);
         yield* mailbox.subscribe(issue.id, [thread]);
@@ -134,8 +140,30 @@ const make = Effect.gen(function* () {
       }
     }).pipe(bestEffort(`cron occurrence ${due.id}`));
 
+  const replay = Effect.gen(function* () {
+    let after = 0;
+    while (true) {
+      const rows = yield* unroutedCronTriggers(db, after);
+      const last = rows.at(-1);
+      if (!last) return;
+      yield* Effect.forEach(
+        rows,
+        (row) =>
+          Effect.gen(function* () {
+            const trigger = yield* Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(row.trigger_json);
+            const payload = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({ data: S.Cron })))(row.payload_json);
+            const by = jsonOrNone(S.RunTrigger)(JSON.stringify(trigger.meta.trigger));
+            yield* handle({ id: row.id, cron: payload.data, missed: by?.kind === "cron" && by.missed === true }, trigger);
+          }).pipe(bestEffort(`cron: replay ${row.id}`)),
+        { discard: true },
+      );
+      after = last.seq;
+    }
+  });
+
   const tick = lock.withPermits(1)(
     Effect.gen(function* () {
+      yield* replay;
       const at = now();
       yield* Effect.forEach(
         dueCrons(core.state().crons, at),
@@ -143,17 +171,24 @@ const make = Effect.gen(function* () {
           const missed = isMissed(s, at);
           const after = afterRun(s, at);
           const occurrence = { id: newId(), cron: after, missed };
-          return db.attemptTx(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id })).pipe(
-            Effect.matchEffect({
-              onFailure: (failure) => Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`),
-              onSuccess: () =>
-                Effect.gen(function* () {
-                  yield* core.apply({ type: "cron", cron: after });
-                  PubSub.publishUnsafe(dueHub, occurrence);
-                  yield* handle(occurrence);
-                }),
-            }),
-          );
+          return db
+            .attemptTx(
+              Effect.gen(function* () {
+                yield* q.cronRan({ last_run: at, enabled: after.enabled, id: after.id });
+                return yield* recordDue(occurrence);
+              }),
+            )
+            .pipe(
+              Effect.matchEffect({
+                onFailure: (failure) => Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`),
+                onSuccess: (trigger) =>
+                  Effect.gen(function* () {
+                    yield* core.apply({ type: "cron", cron: after });
+                    PubSub.publishUnsafe(dueHub, occurrence);
+                    yield* handle(occurrence, trigger);
+                  }),
+              }),
+            );
         },
         { discard: true },
       );

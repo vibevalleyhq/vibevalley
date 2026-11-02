@@ -53,7 +53,7 @@ export type BrainEvent =
   /** The last of its events, once it has closed: a reader's stream ends after it. */
   | { readonly type: "agent_closed" };
 
-export type FoldReason = "threshold" | "idle";
+type FoldReason = "threshold" | "idle";
 
 export interface BrainOptions {
   /** Also the session file's name unless session says otherwise. */
@@ -99,7 +99,7 @@ export interface BrainOptions {
   readonly reminders?: boolean;
 }
 
-export interface McpStatus {
+interface McpStatus {
   readonly toolCount: number;
   readonly failed: string[];
 }

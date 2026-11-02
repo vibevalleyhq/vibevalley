@@ -17,7 +17,7 @@ import * as q from "../../db/generated/issue.sql.ts";
 import { pullRequestConclusion } from "./brief.ts";
 import { statusMove } from "./moves.ts";
 
-export interface MergeDeps {
+interface MergeDeps {
   readonly core: Core["Service"];
   readonly sessions: Session["Service"];
   readonly projects: Project["Service"];

@@ -8,7 +8,7 @@ import { type ButtonProps, call, flag, type SpanProps } from "./internal/element
 
 const Context = createContext<{ readonly checked: () => boolean; readonly disabled: () => boolean }>();
 
-export interface SwitchRootProps extends Omit<ButtonProps, "onChange"> {
+interface SwitchRootProps extends Omit<ButtonProps, "onChange"> {
   checked?: boolean | undefined;
   defaultChecked?: boolean | undefined;
   onCheckedChange?: ((checked: boolean) => void) | undefined;

@@ -6,7 +6,6 @@ import { assignedAgentOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
-import { Ingress } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";
 import { issueBranch, Project } from "@/project/project.ts";
 import { Session } from "@/session/session.ts";
@@ -16,7 +15,16 @@ import { testIssues } from "@/testing/issues.ts";
 import { await_, farm, lab } from "./farm.ts";
 
 it.live("regression: native child issues wait for prerequisites and start from their parent's branch", () => {
-  const f = farm({ runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("收到") }) });
+  const release = Promise.withResolvers<void>();
+  const f = farm({
+    runtime: scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        await release.promise;
+        turn.say("收到");
+      },
+    }),
+  });
   return Effect.gen(function* () {
     const service = yield* Issue;
     const issues = testIssues(service);
@@ -31,10 +39,10 @@ it.live("regression: native child issues wait for prerequisites and start from t
     expect([child.project, assignedAgentOf(child)]).toEqual([parent.project, "lab"]);
     expect(child.stage.acts.map((act) => act.act)).toContain("start");
     expect((yield* issues.start(child.id, "")).queued).toBeDefined();
-    yield* (yield* Ingress).refreshIssues;
+    yield* (yield* Issue).refreshQueue;
     expect(sessions.presentSessions()).toEqual([]);
     yield* service.setStatus(prerequisite.id, "canceled", "", "", owner);
-    yield* (yield* Ingress).refreshIssues;
+    yield* (yield* Issue).refreshQueue;
     const started = yield* await_(
       () => issues.get(child.id),
       (item) => latestSessionIdOf(item) !== undefined,
@@ -44,7 +52,7 @@ it.live("regression: native child issues wait for prerequisites and start from t
     expect(session.branch).toBe(issueBranch(child.number));
     expect(gitSync(session.worktree!, "merge-base", parentHead, "HEAD")).toBe(parentHead);
     expect((yield* issues.get(child.id)).blockedBy).toEqual([prerequisite.id]);
-  }).pipe(Effect.scoped, Effect.provide(f.layer));
+  }).pipe(Effect.ensuring(Effect.sync(() => release.resolve())), Effect.scoped, Effect.provide(f.layer));
 });
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

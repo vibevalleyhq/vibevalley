@@ -1,7 +1,7 @@
 // The graph both a task graph's tasks and an agent's own todos are: nodes that wait for
 // other nodes. What a node is, and what settles it, is the caller's; these say only what the edges allow.
 
-export interface DagNode {
+interface DagNode {
   readonly id: string;
   readonly after: readonly string[];
 }
@@ -10,7 +10,7 @@ export interface DagNode {
 export const dagIDValid = (id: string) => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$/u.test(id);
 
 /** id is the node at fault; other the id it names (a missing one); circle the nodes waiting on one another. */
-export type DagProblem =
+type DagProblem =
   | { readonly kind: "duplicate"; readonly id: string }
   | { readonly kind: "self"; readonly id: string }
   | { readonly kind: "missing"; readonly id: string; readonly other: string }

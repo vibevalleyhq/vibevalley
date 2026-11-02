@@ -9,7 +9,7 @@ import { compareText, or } from "@/base/order";
 import { type Recency, recencyOf } from "@/features/project";
 import type { Pose } from "@/ui/cast";
 
-export type Spot =
+type Spot =
   | { readonly kind: "taken"; readonly session: Session; readonly plot: PlotView; readonly issue?: Issue }
   | { readonly kind: "open" }
   | { readonly kind: "shut" };

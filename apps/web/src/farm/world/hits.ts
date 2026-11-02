@@ -11,7 +11,7 @@ export type VillageHit =
   | { readonly kind: "spot"; readonly spot: string }
   | { readonly kind: "plot"; readonly bed: number };
 
-export interface VillageHitData {
+interface VillageHitData {
   /** In drawing order. */
   readonly sessions: ReadonlyMap<SessionId, Box>;
   readonly dog?: Box;

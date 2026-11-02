@@ -3,7 +3,7 @@ import { HttpRouter } from "effect/http";
 import { expect, it } from "vite-plus/test";
 
 import { Mcp } from "@/mcp/mcp.ts";
-import { OrchestratorResponse } from "@/orchestrator/response.ts";
+import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 
 import { mcpRoute } from "./mcp.ts";
 
@@ -26,8 +26,10 @@ it("forwards a disconnect to the Web handler", async () => {
       Layer.mergeAll(
         Layer.succeed(Mcp, handler),
         Layer.succeed(
-          OrchestratorResponse,
-          OrchestratorResponse.of({
+          Orchestrator,
+          Orchestrator.of({
+            stop: () => Effect.void,
+            markWrong: () => Effect.never,
             answerer: () => () => undefined,
             brief: () => Effect.never,
           }),

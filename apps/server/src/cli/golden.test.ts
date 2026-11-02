@@ -28,7 +28,7 @@ describe("the command line's answers", () => {
           }
           case "fail": {
             const r = yield* cli(at);
-            answers.set(c.line, { code: r.code, out: r.out, error: r.failure });
+            answers.set(c.line, { code: r.code, out: /^\{"seq":\d+\}$/u.test(r.out) ? '{"seq":"<sequence>"}' : r.out, error: r.failure });
             break;
           }
           case "dry": {

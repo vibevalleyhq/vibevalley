@@ -7,7 +7,7 @@ import { createEffect, createSignal } from "solid-js";
 export type Side = "top" | "bottom" | "left" | "right";
 export type Align = "start" | "center" | "end";
 
-export interface AnchorOptions {
+interface AnchorOptions {
   side?: Side | undefined;
   align?: Align | undefined;
   /** Gap between the anchor and the popup, px. */

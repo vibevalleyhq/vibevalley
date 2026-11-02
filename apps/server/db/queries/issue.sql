@@ -61,8 +61,6 @@ update issue set reviewed_at = sqlc.narg(reviewed_at), findings = sqlc.narg(find
 -- name: SetIssueQuestions :exec
 update issue set questions = sqlc.narg(questions) where id = sqlc.arg(id);
 
--- name: SetIssueChecks :exec
-update issue set checks = sqlc.narg(checks) where id = sqlc.arg(id);
 
 -- name: SetIssueReport :exec
 update issue set questions = sqlc.narg(questions), checks = sqlc.narg(checks) where id = sqlc.arg(id);

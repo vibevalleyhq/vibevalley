@@ -15,7 +15,7 @@ import { probeInstallation, Runtime } from "@/runtime/runtime.ts";
 
 import { watchStalls } from "./stalls.ts";
 
-export type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "project" | "issue" | "channel">;
+type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "project" | "issue" | "channel">;
 
 /** An acquired execution remains present until every runtime resource confirms disposal. */
 export interface Execution {
@@ -27,7 +27,7 @@ export interface Execution {
   readonly failure?: string;
 }
 
-export interface StartExecution {
+interface StartExecution {
   readonly agent: T.Agent;
   readonly owner: ExecutionOwner;
   readonly cwd: string;
@@ -36,7 +36,7 @@ export interface StartExecution {
   readonly options: Partial<SessionOptions>;
 }
 
-export interface ExecutionObserver {
+interface ExecutionObserver {
   readonly event: (event: Event) => void;
   readonly input: (input: ExecutionInput) => void;
   readonly report: (report: SubagentReport) => void;
@@ -46,7 +46,7 @@ export interface ExecutionObserver {
 }
 
 export type ExecutionInput = { readonly kind: "consumed" | "returned"; readonly inputId: string };
-export type DeliveredInput =
+type DeliveredInput =
   | { readonly kind: "accepted"; readonly landed: "prompted" | "steered" | "queued"; readonly inputId?: string }
   | { readonly kind: "rejected"; readonly code: string; readonly reason: string };
 

@@ -8,17 +8,17 @@ import type { Channel } from "@vibevalley/protocol";
 import { api, createRequestKey } from "@/infra/api";
 
 import type { Nameable } from "./mentions";
-export const CommandNames = ["issue", "remember", "stop", "dm"] as const;
-export type CommandName = (typeof CommandNames)[number];
+const CommandNames = ["issue", "remember", "stop", "dm"] as const;
+type CommandName = (typeof CommandNames)[number];
 
 /** Where a command runs: the place the box writes to, and the orchestrator that looks after it. */
-export interface CommandPlace {
+interface CommandPlace {
   readonly channel: Channel | undefined;
   readonly orchestrator: string;
 }
 
 /** What came of a command: words to show, or a place to open. */
-export type CommandDone = { readonly say: string } | { readonly open: string };
+type CommandDone = { readonly say: string } | { readonly open: string };
 
 /** Whether a command needs words after it (a title, a note, a profile). */
 const needsText: Record<CommandName, boolean> = { issue: true, remember: true, stop: false, dm: true };

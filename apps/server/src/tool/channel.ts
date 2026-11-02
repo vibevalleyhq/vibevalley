@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 
 import { Channel, type Spoken } from "@/channel/chat.ts";
-import { inboxLines } from "@/channel/prompts.ts";
+import { inboxLines } from "@/mailbox/prompts.ts";
 
 import { type Who, type Orchestrator, type SessionInput, refuse, said, callerOf, participant, tool, sessionSchemaTool } from "./definition.ts";
 import { answers, channelLine } from "./prompts.ts";

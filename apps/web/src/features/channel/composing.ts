@@ -35,7 +35,7 @@ export const chatSay = defineIntent<Said, void>({
 });
 
 /** A line sent and not yet in its channel. */
-export interface PendingLine {
+interface PendingLine {
   readonly key: string;
   readonly text: string;
   readonly state: "sending" | "failed";

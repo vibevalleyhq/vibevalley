@@ -48,7 +48,7 @@ describe("an issue as a brief", () => {
           issue: issueId("t1"),
           agent: "lab",
           assignedAt: 150,
-          executions: [{ kind: "session", session: sessionId("w1"), startedAt: 200 }],
+          executions: [{ kind: "worker", session: sessionId("w1"), startedAt: 200 }],
         },
       ],
       status: "in_review",
@@ -231,7 +231,7 @@ describe("templates", () => {
         project,
         createdAt: at,
         assignments: sent
-          ? [{ id: `a-${at}-${title}`, issue: id, agent, assignedAt: at, executions: [{ kind: "session", session: sessionId("s"), startedAt: at }] }]
+          ? [{ id: `a-${at}-${title}`, issue: id, agent, assignedAt: at, executions: [{ kind: "worker", session: sessionId("s"), startedAt: at }] }]
           : [],
         ...fields,
       } as Issue;

@@ -110,12 +110,6 @@ export const lineWords = {
   pickedProject: (project: string) => "（主人选定了项目：" + project + "，派活就派在这个项目里）\n",
   owner: (text: string) => "主人说：" + text,
   chat: (target: string, lines: string) => "【群聊】" + target + " 里有给你的话：\n" + lines + "\n\n你的回答会发在 " + target + "。",
-  again: (said: string) => `\n\n主人这次又说：${said}`,
-  issue: (title: string, description: string, again: string, channel: string) =>
-    `【工单「${title}」交给你了】\n${description}${again}\n\n你的回答会发在 #${channel}；照着做，做完说一两句。`,
-  missed: "（服务端没开着时错过的，补一次）",
-  cron: (name: string, missed: string, text: string, channel: string, id: string) =>
-    `【定时任务「${name}」到点了${missed}】\n${text}\n\n这是 #${channel} 的定时（${id}），你的回答会发在那里；照着做，做完说一两句。`,
   dictated:
     "（这句话是主人用语音说的，语音那边已经回答了，问答都在默认频道。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n",
   /** A message past lineMax, cut, with where to read it whole. */

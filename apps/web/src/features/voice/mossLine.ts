@@ -13,10 +13,10 @@ import { heard, levelOf, Playback, type MossTurn, type Piece, type PlaybackActio
 
 export type { MossTurn } from "./moss";
 
-export type MossPhase = "idle" | "connecting" | "live" | "ending";
+type MossPhase = "idle" | "connecting" | "live" | "ending";
 
 /** An action sent or an event received, as JSON; the noisy ones (words as they grow, audio announcements) are left out. */
-export interface MossEvent {
+interface MossEvent {
   readonly up: boolean;
   readonly text: string;
 }

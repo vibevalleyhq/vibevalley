@@ -13,7 +13,7 @@ import { type AssistantMessageEvent, Fold, SseData } from "./response.ts";
 // tell it apart.
 const AnswerSoFar = Schema.declare((u): u is AssistantMessage => Predicate.hasProperty(u, "role") && u.role === "assistant");
 
-export interface StreamOptions extends RequestOptions {
+interface StreamOptions extends RequestOptions {
   readonly apiKey: string;
 }
 

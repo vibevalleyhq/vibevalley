@@ -3,7 +3,7 @@ import type * as T from "@vibevalley/protocol";
 
 import { compareText, or } from "@/base/order.ts";
 
-export { targetOf } from "@/base/chat.ts";
+export { targetOf } from "@/mailbox/chat.ts";
 /** The database keeps them all; the state these many. What is said in them is the rooms' (Channel.follow). */
 export const keepChannels = 100;
 

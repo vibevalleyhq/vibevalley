@@ -59,30 +59,6 @@ export const markHanded = Effect.fn("MarkHanded")(function* (params: MarkHandedP
   })(params)
 })
 
-export const DeliveryChannelParams = Schema.Struct({
-  ["session_id"]: Schema.String,
-  ["envelope_id"]: Schema.String,
-})
-export type DeliveryChannelParams = typeof DeliveryChannelParams.Type
-
-
-export const DeliveryChannelResult = Schema.Struct({
-  ["channel_id"]: Schema.NullOr(Schema.String),
-})
-export type DeliveryChannelResult = typeof DeliveryChannelResult.Type
-
-
-export const DeliveryChannelSql = "-- name: DeliveryChannel :one\nselect channel_id from mailbox_delivery\nwhere session_id = $1 and envelope_id = $2;"
-
-export const deliveryChannel = Effect.fn("DeliveryChannel")(function* (params: DeliveryChannelParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findOne({
-    Request: DeliveryChannelParams,
-    Result: DeliveryChannelResult,
-    execute: (p) => sql.unsafe(DeliveryChannelSql, [p["session_id"], p["envelope_id"]]),
-  })(params)
-})
-
 export const DeliveryReceiptParams = Schema.Struct({
   ["session_id"]: Schema.String,
   ["envelope_id"]: Schema.String,

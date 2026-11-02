@@ -40,7 +40,7 @@ export interface Lighting {
   readonly destroy: () => void;
 }
 
-export interface LightingOptions {
+interface LightingOptions {
   /** A texture's normal maps; undefined: the sprite is lit as the ground behind it. */
   readonly normalsOf: (texture: Texture) => Normals | undefined;
 }

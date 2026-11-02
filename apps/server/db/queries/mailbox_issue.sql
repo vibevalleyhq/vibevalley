@@ -25,8 +25,8 @@ update mailbox_issue set state = 'returned', reason = sqlc.arg(reason)
 where trigger_id = sqlc.arg(trigger_id) and state <> 'returned';
 
 -- name: QueuedInputs :many
--- bound: one durable source per queued issue.
-select distinct on (m.issue_id) m.issue_id, t.trigger_json
+-- bound: non-returned inputs for open queued issues.
+select m.issue_id, t.trigger_json
 from mailbox_issue m join ingress_trigger t on t.id = m.trigger_id
 join issue i on i.id = m.issue_id
 where i.queued_at is not null and i.closed_at is null and m.state <> 'returned'
@@ -44,6 +44,3 @@ from ingress_trigger t
 where m.trigger_id = t.id and m.issue_id = sqlc.arg(issue_id) and m.state = 'held'
   and t.trigger_json::jsonb->'meta'->>'dispatch' = 'true';
 
--- name: RetireHeldInputs :exec
-update mailbox_issue set state = 'returned', reason = sqlc.narg(reason)
-where issue_id = sqlc.arg(issue_id) and trigger_id <> sqlc.arg(trigger_id) and state = 'held';

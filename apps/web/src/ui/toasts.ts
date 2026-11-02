@@ -4,7 +4,7 @@ import { defineAtom } from "@/state/atom";
 
 export type Tone = "info" | "bad";
 
-export interface Toast {
+interface Toast {
   readonly id: number;
   readonly text: string;
   readonly tone: Tone;

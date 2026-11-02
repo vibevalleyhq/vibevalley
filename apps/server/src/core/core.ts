@@ -35,14 +35,14 @@ export const stateEveryMs = 200;
 export type FactIn = T.Fact extends infer F ? (F extends T.Fact ? Omit<F, "at"> : never) : never;
 
 /** A fact with exactly the state it changed, even when it is read late. */
-export interface Transition {
+interface Transition {
   readonly before: T.WorkspaceState;
   readonly fact: T.Fact;
   readonly after: T.WorkspaceState;
 }
 
 /** What the owner did that changes no state (so it is no fact), said by the service it went through: the game counts some. */
-export type OwnerDid = { readonly kind: "reviewed"; readonly session: T.SessionId } | { readonly kind: "talked" };
+type OwnerDid = { readonly kind: "reviewed"; readonly session: T.SessionId } | { readonly kind: "talked" };
 
 export class Core extends Context.Service<
   Core,

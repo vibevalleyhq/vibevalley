@@ -14,13 +14,13 @@ const memoryPromptChars = 8_000;
 export const memoryFile = (home: string) => join(home, "MEMORY.md");
 
 /** `- YYYY-MM-DD note`, or whatever the agent wrote when it tidied. id is stable while the line is unchanged. */
-export interface MemoryLine {
+interface MemoryLine {
   readonly id: string;
   readonly text: string;
   readonly date?: string;
 }
 
-export interface MemorySnapshot {
+interface MemorySnapshot {
   readonly file: string;
   readonly prompt: string;
   readonly lines: MemoryLine[];

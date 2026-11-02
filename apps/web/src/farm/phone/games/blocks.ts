@@ -76,7 +76,7 @@ const shapes: Record<PieceKind, [size: number, cells: [number, number][]]> = {
   ],
 };
 
-export interface Falling {
+interface Falling {
   readonly kind: PieceKind;
   /** 0..3. */
   readonly turn: number;

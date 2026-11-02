@@ -142,7 +142,7 @@ export const QueuedInputsResult = Schema.Struct({
 export type QueuedInputsResult = typeof QueuedInputsResult.Type
 
 
-export const QueuedInputsSql = "-- name: QueuedInputs :many\n-- bound: one durable source per queued issue.\nselect distinct on (m.issue_id) m.issue_id, t.trigger_json\nfrom mailbox_issue m join ingress_trigger t on t.id = m.trigger_id\njoin issue i on i.id = m.issue_id\nwhere i.queued_at is not null and i.closed_at is null and m.state <> 'returned'\norder by m.issue_id, (t.trigger_json::jsonb->'meta'->>'dispatch' = 'true') desc nulls last, t.routing_position;"
+export const QueuedInputsSql = "-- name: QueuedInputs :many\n-- bound: non-returned inputs for open queued issues.\nselect m.issue_id, t.trigger_json\nfrom mailbox_issue m join ingress_trigger t on t.id = m.trigger_id\njoin issue i on i.id = m.issue_id\nwhere i.queued_at is not null and i.closed_at is null and m.state <> 'returned'\norder by m.issue_id, (t.trigger_json::jsonb->'meta'->>'dispatch' = 'true') desc nulls last, t.routing_position;"
 
 export const queuedInputs = Effect.fn("QueuedInputs")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -183,23 +183,5 @@ export const retireQueuedDispatches = Effect.fn("RetireQueuedDispatches")(functi
   return yield* SqlSchema.void({
     Request: RetireQueuedDispatchesParams,
     execute: (p) => sql.unsafe(RetireQueuedDispatchesSql, [p["issue_id"]]),
-  })(params)
-})
-
-export const RetireHeldInputsParams = Schema.Struct({
-  ["reason"]: Schema.NullOr(Schema.String),
-  ["issue_id"]: Schema.String,
-  ["trigger_id"]: Schema.String,
-})
-export type RetireHeldInputsParams = typeof RetireHeldInputsParams.Type
-
-
-export const RetireHeldInputsSql = "-- name: RetireHeldInputs :exec\nupdate mailbox_issue set state = 'returned', reason = $1\nwhere issue_id = $2 and trigger_id <> $3 and state = 'held';"
-
-export const retireHeldInputs = Effect.fn("RetireHeldInputs")(function* (params: RetireHeldInputsParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: RetireHeldInputsParams,
-    execute: (p) => sql.unsafe(RetireHeldInputsSql, [p["reason"], p["issue_id"], p["trigger_id"]]),
   })(params)
 })

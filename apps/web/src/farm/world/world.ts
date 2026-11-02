@@ -11,7 +11,7 @@ export const plotW = 34;
 export const plotH = 26;
 
 export type Facing = "up" | "down" | "left" | "right";
-export type PlotSpot = "front" | "left" | "right" | "back";
+type PlotSpot = "front" | "left" | "right" | "back";
 
 /** Around a plot, from its bottom-centre: where a helper stands to look on. */
 const around: Record<PlotSpot, Point> = { front: { x: 0, y: 5 }, left: { x: -24, y: -10 }, right: { x: 24, y: -10 }, back: { x: 6, y: -29 } };
@@ -36,7 +36,7 @@ export interface Goal {
   readonly facing?: Facing;
 }
 
-export type FxKind = "chimney" | "anvil" | "mast" | "pond";
+type FxKind = "chimney" | "anvil" | "mast" | "pond";
 
 /** What a helper works from the side (the anvil) is this far in front of where it stands. */
 const reach = 15;
@@ -192,7 +192,7 @@ export function placeOfAction(action: SessionAction): string {
 
 export const plotCalls = (crop: Crop) => isRipe(crop) || crop === "withered" || crop === "dry";
 
-export type StrollSpot = PlotSpot | "rest";
+type StrollSpot = PlotSpot | "rest";
 
 export function spotsFor(s: Session, crop: Crop, pose: Pose): readonly StrollSpot[] {
   if (isRipe(crop) || crop === "dry") return ["front"];

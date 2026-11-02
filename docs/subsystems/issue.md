@@ -40,7 +40,7 @@
 
 - 服务端 `apps/server/src/issue`（`Issue`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和问题、帮工历史、派给管家的工单；`refinement.ts` 起草（谁来起草、交回来的草稿怎么读进工单）；`merge.ts` 合并（本地合或提 PR、合不进去怎么说、PR 的轮询）；只有工单用的纯规则按管的事分开，见下一条。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
 - 只有服务端跑的规则在 `apps/server/src/issue`：`status.ts` 的 `issueStatusOf`（状态怎么算）、`issueRefiningOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForOrchestrator`、`openFindings`，`stage.ts` 的 `issueStageOf`（给主人看的状态和能做的事）和 `issueStageIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`brief.ts` 交给帮工的话和从汇报读回来的（`issueBrief`，交付物是结论时带上只读的规矩和结论的格式；`cureWords`、`resumeWords`、`answerCureWords`；`splitBrief` 一句话拆成标题和说明；`findingsOf` 打回的意见），`refinement.ts` 起草（`parseRefinement` 读草稿、`refinementDescription` 拼说明），`templates.ts` 播种表上的模板和最近的标题，`timeline.ts` 的 `milestonesOf` 时间线，`filter.ts` 的 `pickIssues`，`stored.ts` 写进行的样子和下一个计划的 id；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题）和 `closedText`，`stage.ts` 的 `stageWantsOwner`；状态和动作叫什么在 `packages/protocol/src/words`。
-- 表：`issue`（一张工单一行；授权源头、验收标准、问题和 checks）、`issue_assignment`（责任关系）、`issue_assignment_execution`（实际执行）；排队输入归 `mailbox_issue` 与 `ingress_trigger`，`issue_dispatch` 只保存尚未进入网关的输入快照。
+- 表：`issue`（一张工单一行；授权源头、验收标准、问题和 checks）、`issue_assignment`（责任关系）、`issue_assignment_execution`（实际执行）；排队输入归 `mailbox_issue` 与 `ingress_trigger`，Issue 直接提交 Trigger 并调用 Mailbox。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.refine`（`POST /api/v1/issue/refine`），时间线是 `issue.timeline.get`；命令行 `vibevalley issue …`。
 - 页面：工作台的看板在 `apps/web/src/features/issue`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/features/issue/acts.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；两边的动作（哪些要话、要先打开框、要开对话框，重开以后说什么）都经 `apps/web/src/features/issue/acts.ts` 的 `createIssueActs`，农场只换掉自己有特效的几个（`commands`）；一张工单的改动、时间线和帮工历史都经 `apps/web/src/features/issue/queries.ts` 的 `useIssueChanges`、`useIssueTimeline`、`useIssueRuns` 读，键都在 `issues` 下，什么时候重读写在那里一处；工作台、农场、轨迹和工作记录里的帮工步骤都经 `apps/web/src/features/session/events.ts` 的 `createSessionEvents` 读（快照、直播和重连的约定见[客户端](docs/subsystems/app.md)）；农场的播种袋在 `farm/panels/SeedForms.tsx`。
 
@@ -87,7 +87,7 @@
 - **改动跟着动作走**：起草和挪状态（`issue.refine`、`issue.status.update`）都带一个 `edit`，是主人在详情里改了还没存的那几栏；服务端先存它再做这件事，动作被拒绝时改动也已经存下。页面不先存再做。
 - **帮工的自评**（`Issue.checks`）：汇报里「标准 N：做到了 —— 凭据」这样的行（`checksOf`，N 从 1 数，同一条以最后一行为准），存成 `{ criterion, result, proof }`，`criterion` 是 `criteria` 里的下标；最近一次带了自评的汇报算数，重开时清掉。帮工不写就没有，页面只列标准。
 - **标题一行**：主人写的一句话直接成为工单时（`splitBrief`），第一行太长就取它的第一句、放不下就到最后一个停顿（`shortTitle`，40 个字以内），整段放进说明；起草的标题要求 20 个字以内。
-- **排队上下文只有来源一份**：首次手动派发与 queued_at 同事务写入待接入快照，Ingress 将它交给 Mailbox 后确认；定时任务直接使用已有 Trigger。调度从 mailbox_issue 的持久输入取得回复频道与 RunTrigger，重复点击不换来源。退回备选会使旧派发退役，重新排队的新来源替代旧来源；主人追问不会因此丢弃。
+- **排队上下文只有来源一份**：首次手动派发与 queued_at 同事务写入 Trigger，Issue 直接交给 Mailbox；定时任务直接使用已有 Trigger。调度从 mailbox_issue 的持久输入取得回复频道与 RunTrigger，重复点击不换来源。退回备选会使旧派发退役，重新排队的新来源替代旧来源；主人追问不会因此丢弃。
 
 ## 怎么走
 
@@ -122,7 +122,7 @@
 4. 交回来：读最后一个能读的代码块（`parseRefinement`），写回工单：`title`，`description` 用固定的小标题拼（为什么、要做的、不做的、可能涉及，空的不写），`criteria`，问题照旧进 `questions`（等你回答）；一次写，第二版整个盖过第一版。读不出来、没做成、被叫停，工单不动，工单串里说一句（串还没开就是一条提醒）。然后请帮工带着 `discard` 收工：帮工先停止写入，再把 worktree 重置回主分支，提交了也清掉；干净的 worktree 和空分支随收工清掉。
 5. 主人改各栏、回答问题再起草，满意了挪到待办开工；没开工就取消或删掉的，在起草的帮工带着 `discard` 收工，`project.clear` 清掉起草留下的 worktree 和没有提交的分支。
 
-**排队**：没空位的待办留在待办里排着，Ingress 接收新的派发输入后会尝试调度，也按 `chat.retry_wake_ms` 周期照看板先后重试（`Issue.tryQueued` 只接收 Mailbox 提供的具体来源），有空就照它排队时记下的来源开工，派不出去的出队、说为什么。空位一出来它自己就走，不另设「现在就试」。
+**排队**：没空位的待办留在待办里排着，Issue 订阅工单与会话变化，并按 `chat.retry_wake_ms` 周期照看板先后重试（`Issue.refreshQueue` 从 Mailbox 读取持久输入），有空就照它排队时记下的来源开工，档案或工单已不能派发的出队并说明原因；运行时启动失败保留排队输入，提醒后重试。空位一出来它自己就走，不另设「现在就试」。
 
 **验收**：等你验收时带话挪回待办就是没过，话一行一条记成验收意见（`findings`），还没解决的编号写成一句话交给帮工再修一轮；挪到已完成就是通过，意见都算解决。管家的 `issue_review` 走同一个 `Issue.review`：过了记下 `reviewedAt`，原来的意见都算解决，主人照样要完成它。新的一轮开始（带话、再干一轮）`reviewedAt` 作废，意见留着。
 
@@ -219,6 +219,6 @@ GitHub 读取在 `ingress/github-source.ts`，归一化与投递在 `ingress/git
 - `apps/server/src/core/golden.test.ts`：工单的状态、谁在起草、地的样子（`rules.jsonl.gz`、`reduce.jsonl.gz`）。
 - 页面：`apps/web/test/issues.spec.ts`（快速新建、列表和分组刷新后还在、工单有自己的地址和保存、没帮工时开工先问、拖着排序、搜索、截图）；`farm-hud.spec.ts`（播种袋的「草稿」写进备选）；`farm-chat.spec.ts`（点帮工的地打开它的工单）。
 
-工单派给管家时，责任与执行记录、`issue_dispatch` 输入快照同事务提交。快照保留派发时的正文、触发原因和回复频道；Ingress 将它存为独立 Trigger，Mailbox 接收后才删除待投递记录。重放以来源 ID 去重，不生成系统聊天消息。
+工单派给管家时，责任与执行记录、Trigger 同事务提交。Trigger 保留派发时的正文、触发原因和回复频道，Issue 直接调用 Mailbox；若在提交后、路由前退出，Mailbox 从未路由 Trigger 恢复。重放以来源 ID 去重，不生成系统聊天消息。
 
 - **冲突归工单**：`Issue.conflict` 与 issue 行一起保存，通过 issue 事实更新；Session 和 FactConflict 已移除该字段与事件。预览改动、合并失败和帮工汇报后的 Git 复查更新同一份记录。Session 关闭、换人或重启不丢失冲突；没有 Session 时仍可检查保留的工单分支。原生父工单有冲突时进入 Inbox，子单均结束后可派一个父工单 Session 解决，再验收合并。

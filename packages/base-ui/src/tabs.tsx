@@ -25,7 +25,7 @@ interface Ctx {
 const Context = createContext<Ctx>();
 const use = () => useContext(Context);
 
-export interface TabsRootProps extends DivProps {
+interface TabsRootProps extends DivProps {
   value?: string | undefined;
   defaultValue?: string | undefined;
   onValueChange?: ((value: string) => void) | undefined;
@@ -67,7 +67,7 @@ function Root(props: TabsRootProps) {
   );
 }
 
-export interface TabsListProps extends DivProps {
+interface TabsListProps extends DivProps {
   /** Moving the focus with the arrows selects that tab too. */
   activateOnFocus?: boolean | undefined;
   /** The arrows wrap from the last tab to the first. */
@@ -95,7 +95,7 @@ function List(props: TabsListProps) {
   );
 }
 
-export interface TabProps extends ButtonProps, Renderable {
+interface TabProps extends ButtonProps, Renderable {
   value: string;
 }
 
@@ -128,7 +128,7 @@ function Tab(props: TabProps) {
   );
 }
 
-export interface TabsPanelProps extends DivProps {
+interface TabsPanelProps extends DivProps {
   value: string;
   /** Kept in the page while another tab is selected, only hidden. */
   keepMounted?: boolean | undefined;

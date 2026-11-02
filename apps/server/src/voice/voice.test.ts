@@ -13,7 +13,6 @@ import { sessionId, issueId } from "@vibevalley/protocol/schema";
 
 import { Core } from "@/core/core.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
-import { OrchestratorResponse } from "@/orchestrator/response.ts";
 import { inboxStart } from "@/services.ts";
 import { NotAnswered } from "@/session/host.ts";
 import { Setting } from "@/setting/setting.ts";
@@ -183,21 +182,19 @@ describe("a call's agent", () => {
 });
 
 /** The farm with a voice service, its line on a free port behind a line of its own. */
-const farm = (capture: Capture, brief?: OrchestratorResponse["Service"]["brief"]) => {
+const farm = (capture: Capture, brief?: Orchestrator["Service"]["brief"]) => {
   const config = {
     ...testConfig(),
     voice: { id: "", line: { port: 0, url: "https://line.example.com" } },
   };
-  const answering = Orchestrator.layer().pipe(Layer.provideMerge(world({ config }).pipe(inboxStart)));
-  const responding = OrchestratorResponse.layer.pipe(Layer.provideMerge(answering));
+  const base = world({ config }).pipe(inboxStart);
+  const orchestrating = Orchestrator.layer().pipe(Layer.provideMerge(base));
   const chosen = brief
-    ? Layer.merge(
-        Layer.unwrap(Effect.map(OrchestratorResponse, (current) => Layer.succeed(OrchestratorResponse, OrchestratorResponse.of({ ...current, brief })))).pipe(
-          Layer.provide(responding),
-        ),
-        answering,
+    ? Layer.unwrap(Effect.map(Orchestrator, (current) => Layer.succeed(Orchestrator, Orchestrator.of({ ...current, brief })))).pipe(
+        Layer.provide(orchestrating),
+        Layer.provideMerge(base),
       )
-    : responding;
+    : orchestrating;
   return Voice.layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(Layer.provideMerge(chosen));
 };
 
@@ -231,7 +228,7 @@ const issueOf = (id: string, number: number, session: string) =>
         issue: issueId(id),
         agent: "lab",
         assignedAt: Date.now(),
-        executions: [{ kind: "session", session: sessionId(session), startedAt: Date.now() }],
+        executions: [{ kind: "worker", session: sessionId(session), startedAt: Date.now() }],
       },
     ],
     status: "in_progress",

@@ -49,12 +49,12 @@ it.live("regression: an orchestrator assignment survives ingress startup and an 
     yield* sql`delete from mailbox_issue where trigger_id = ${triggerId}`;
     yield* sql`update ingress_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
     yield* mailbox.start;
-    yield* ingress.start;
+    yield* (yield* Mailbox).replay;
     const deliveries = yield* sql`select session_id, envelope_id from mailbox_delivery where envelope_id = ${triggerId}`;
     expect(deliveries).toHaveLength(1);
     // A second replay of the same unrouted row acknowledges no second delivery.
     yield* sql`update ingress_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
-    yield* ingress.refreshIssues;
+    yield* (yield* Issue).refreshQueue;
     expect(yield* sql`select session_id, envelope_id from mailbox_delivery where envelope_id = ${triggerId}`).toEqual(deliveries);
     expect(yield* sql`select id from channel_message where body = ${source.payload.text}`).toHaveLength(0);
     const release = Promise.withResolvers<void>();

@@ -658,7 +658,7 @@ export const Assignment: Codec<T.Assignment> = Schema.Struct({
   executions: Schema.mutable(
     Schema.Array(
       Schema.Union([
-        Schema.Struct({ kind: Schema.Literal("session"), session: SessionId, startedAt: Schema.Finite }),
+        Schema.Struct({ kind: Schema.Literal("worker"), session: SessionId, startedAt: Schema.Finite }),
         Schema.Struct({ kind: Schema.Literal("orchestrator"), session: Schema.String, startedAt: Schema.Finite }),
       ]),
     ),

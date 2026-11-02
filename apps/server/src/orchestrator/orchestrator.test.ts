@@ -26,19 +26,19 @@ import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Resource } from "@/resource/resource.ts";
 import { Session } from "@/session/session.ts";
+import type { EvalCase } from "@/testing/evals.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { Said } from "@/testing/said.ts";
 import { aTurn, gate, untilGot as until, waitFor, whenTrue, within } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
-import type { EvalCase } from "./evals.ts";
 import { intake } from "./intake.ts";
 import { deepseekModel, orchestratorModel } from "./model.ts";
 import { Orchestrator } from "./orchestrator.ts";
-import { OrchestratorResponse } from "./response.ts";
+import { makeResponses } from "./response.ts";
 
 /** Words said to the orchestrator on the phone, as the voice line asks them. */
-const onPhone = (response: OrchestratorResponse["Service"], text: string) => Stream.toAsyncIterable(response.answerer("phone")(orchestratorModel)!(text));
+const onPhone = (orchestrator: Orchestrator["Service"], text: string) => Stream.toAsyncIterable(orchestrator.answerer("phone")(orchestratorModel)!(text));
 
 const userText = (m: Message) => (m.role === "user" ? messageText(m) : undefined);
 const lastInput = (c: Request) => c.messages.map(userText).findLast((t) => t !== undefined) ?? "";
@@ -91,7 +91,7 @@ const farm = (f: Reply = respond, config: ServerConfig["Service"] = testConfig()
     repos: ["demo", "notes"],
   });
   const orchestrating = Orchestrator.layer({ llm: () => llm }).pipe(Layer.provideMerge(below));
-  return { requests, layer: OrchestratorResponse.layer.pipe(Layer.provideMerge(orchestrating)) };
+  return { requests, layer: orchestrating };
 };
 
 /** Everything handed to the orchestrator before this is taken once this is: it takes one input at a time. So a test that
@@ -259,7 +259,7 @@ describe("the orchestrator", () => {
   it.live("streams its words to a call", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const response = yield* OrchestratorResponse;
+      const response = yield* Orchestrator;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
       const got = yield* Effect.promise(async () => {
@@ -299,7 +299,7 @@ describe("the orchestrator", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
-      const response = yield* OrchestratorResponse;
+      const response = yield* Orchestrator;
       const brief = yield* Effect.forkChild(response.brief("【要告诉主人】\n- #41 交回来了"));
       yield* Effect.promise(async () => {
         await whenTrue(() => f.requests.some((c) => lastLine(c).includes("要告诉主人")), "the brief's run asking");
@@ -322,7 +322,7 @@ describe("the orchestrator", () => {
   it.live("does not start a brief whose caller already left", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const response = yield* OrchestratorResponse;
+      const response = yield* Orchestrator;
       // A brief interrupted before it runs takes no line: nothing was started to wait for.
       yield* Fiber.interrupt(yield* Effect.forkChild(response.brief("【要告诉主人】\n- #41 交回来了"), { startImmediately: false }));
       expect(f.requests).toHaveLength(0);
@@ -332,7 +332,7 @@ describe("the orchestrator", () => {
   it.live("does not start an answer whose caller already left", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const response = yield* OrchestratorResponse;
+      const response = yield* Orchestrator;
       // A caller that left before reading: its answer was never read, so it never started.
       void response.answerer("api")(orchestratorModel)!("在吗");
       yield* aTurn;
@@ -340,16 +340,23 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.effect("a new interactive response ends the previous port after the orchestrator took it", () => {
+  it.effect("a new interactive response ends the previous port that is still open", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const mailbox = yield* Mailbox;
-      const first = mailbox.openResponse(true);
-      expect(mailbox.takeResponse(first.id)).toBe(first.caller);
-      const waiting = yield* Effect.forkChild(Stream.runCollect(first.caller.words));
-      const second = mailbox.openResponse(true);
+      const responses = makeResponses(yield* Ingress, yield* Channel);
+      const first = responses.open(true);
+      const second = responses.open(true);
+      // The newer interactive response ends the older one's words.
+      expect(yield* Stream.runCollect(first.caller.words)).toEqual([]);
+      // Taking a port hands it on and forgets it; dropping the last one leaves nothing to close.
+      expect(responses.take(second.id)).toBe(second.caller);
+      expect(responses.take(second.id)).toBeUndefined();
+      responses.drop(first.id);
+      // Closing the registry ends whatever is still open.
+      const third = responses.open(false);
+      const waiting = yield* Effect.forkChild(Stream.runCollect(third.caller.words));
+      responses.closeAll();
       expect(yield* Fiber.join(waiting)).toEqual([]);
-      mailbox.dropResponse(second.id);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -375,10 +382,10 @@ describe("the orchestrator", () => {
         },
       });
       const orchestrating = Orchestrator.layer({ llm: () => llm }).pipe(Layer.provideMerge(below));
-      return { requests, layer: OrchestratorResponse.layer.pipe(Layer.provideMerge(orchestrating)) };
+      return { requests, layer: orchestrating };
     })();
     return Effect.gen(function* () {
-      const response = yield* OrchestratorResponse;
+      const response = yield* Orchestrator;
       const got = yield* Effect.promise(async () => {
         const words = (async () => {
           for await (const _ of Stream.toAsyncIterable(response.answerer("api")(orchestratorModel)!("在吗"))) void _;
@@ -395,7 +402,7 @@ describe("the orchestrator", () => {
     const below = world({ config: { ...testConfig(), patrol: { heartbeatMinutes: 0 } } });
     return Effect.gen(function* () {
       const agents = yield* Agent;
-      const response = yield* OrchestratorResponse;
+      const response = yield* Orchestrator;
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
       const me = agents.agent(defaultOrchestrator)!;
@@ -415,7 +422,7 @@ describe("the orchestrator", () => {
       // Taken one at a time: once a third is answered, the second's refusal was said or not.
       yield* pieces("（标记）");
       expect(refusal().length).toBe(1);
-    }).pipe(Effect.scoped, Effect.provide(OrchestratorResponse.layer.pipe(Layer.provideMerge(Orchestrator.layer().pipe(Layer.provideMerge(below))))));
+    }).pipe(Effect.scoped, Effect.provide(Orchestrator.layer().pipe(Layer.provideMerge(below))));
   });
 
   it.live("hears a send key once", () => {

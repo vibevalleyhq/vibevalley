@@ -20,7 +20,7 @@ export const mossTranscription = { url: "https://api.mosi.cn/v1", model: "moss-t
 /** Real time: the handshake and the first answer each come within a few hundred ms. */
 const deadlineMs = 8_000;
 
-export type MossVerify =
+type MossVerify =
   | { readonly kind: "ok" }
   | { readonly kind: "refused"; readonly why: string }
   | { readonly kind: "unreachable"; readonly why: string }
@@ -28,7 +28,7 @@ export type MossVerify =
   | { readonly kind: "silent" };
 
 /** What a check needs of a WebSocket. */
-export interface MossLink {
+interface MossLink {
   readonly send: (frame: string | Uint8Array) => void;
   readonly close: () => void;
 }

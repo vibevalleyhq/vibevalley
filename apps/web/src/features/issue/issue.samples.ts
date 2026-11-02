@@ -26,7 +26,7 @@ export const sampleIssue = (number: number, title: string, status: IssueStatus, 
             issue: id,
             agent: agent ?? "sample",
             assignedAt: now - number * 37 * min,
-            executions: sessionIds.map((session) => ({ kind: "session" as const, session, startedAt: now - 20 * min })),
+            executions: sessionIds.map((session) => ({ kind: "worker" as const, session, startedAt: now - 20 * min })),
           },
         ]
       : [];

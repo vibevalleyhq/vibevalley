@@ -9,7 +9,6 @@ import { assignedAgentOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner, session as sessionActor } from "@/base/actor.ts";
-import { Ingress } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
 import { gitIn } from "@/testing/git.ts";
@@ -72,9 +71,9 @@ it.live("regression: splitting preserves the parent's assignment and branch ance
     expect([parent.number, assignedAgentOf(parent), parent.criteria, sessionIdsOf(parent)[0]]).toEqual([issue.number, "lab", ["卡片紧凑"], helper.id]);
     expect((yield* Effect.exit(service.split(issue.id, "", steps, sessionActor(helper.id))))._tag).toBe("Failure");
     release();
-    const ingress = yield* Ingress;
+
     yield* await_(
-      () => Effect.andThen(ingress.refreshIssues, issues.get(issue.id)),
+      () => Effect.andThen(issues.refreshQueue, issues.get(issue.id)),
       (item) => item.status === "in_review",
       "all native children merged",
     );

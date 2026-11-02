@@ -2,7 +2,7 @@ import { expect, it } from "vite-plus/test";
 
 import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
-import { messageLine } from "./prompts.ts";
+import { messageLine } from "@/mailbox/prompts.ts";
 
 const said = {
   id: "m",

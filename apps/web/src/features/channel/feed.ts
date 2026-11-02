@@ -3,7 +3,7 @@ import { type Chat, type ChatMessage, type Channel, type WorkspaceState } from "
 /** A page of a channel read at a time (features/channel/follow.ts). */
 export const chatPage = 50;
 
-export interface FeedItem {
+interface FeedItem {
   message: ChatMessage;
   /** The thread hanging under this message. */
   thread?: Channel;

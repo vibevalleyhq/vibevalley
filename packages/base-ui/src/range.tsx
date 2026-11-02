@@ -23,7 +23,7 @@ interface Ctx {
 const Context = createContext<Ctx>();
 const use = () => useContext(Context);
 
-export interface RangeRootProps extends Omit<DivProps, "children"> {
+interface RangeRootProps extends Omit<DivProps, "children"> {
   value: number | null;
   min?: number | undefined;
   max?: number | undefined;

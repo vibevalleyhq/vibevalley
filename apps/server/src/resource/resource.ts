@@ -14,13 +14,13 @@ import { Session } from "@/session/session.ts";
 import { resourceWords } from "./prompts.ts";
 import { TextCache } from "./textCache.ts";
 
-export interface ReadResource {
+interface ReadResource {
   readonly uri: string;
   readonly offset?: number;
   readonly limit?: number;
 }
 
-export interface ResourcePage {
+interface ResourcePage {
   readonly uri: string;
   readonly offset: number;
   readonly totalChars: number;

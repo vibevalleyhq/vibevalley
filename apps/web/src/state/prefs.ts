@@ -31,7 +31,7 @@ const PrefsSchema = Schema.Struct({
   widths: orFallback(Schema.Record(Schema.String, Schema.Finite), {}),
 });
 
-export type Prefs = typeof PrefsSchema.Type;
+type Prefs = typeof PrefsSchema.Type;
 
 const prefs = defineStored("prefs", PrefsSchema, { pick: "auto", project: "", pet: "dog", theme: "system", scale: 100, start: "workbench", widths: {} });
 

@@ -42,7 +42,7 @@ const withText: Readonly<Record<string, boolean>> = {
 
 const knownType = (text: string) => text in withText;
 
-export interface Revision {
+interface Revision {
   readonly block: string;
   readonly rev: number;
   readonly spans: TextSpan[];

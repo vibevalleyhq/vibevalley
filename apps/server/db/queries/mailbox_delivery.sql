@@ -11,10 +11,6 @@ returning position;
 update mailbox_delivery set state = 'handed', launch = sqlc.arg(launch), handed_at = sqlc.arg(handed_at)
 where session_id = sqlc.arg(session_id) and envelope_id = sqlc.arg(envelope_id) and state = 'pending';
 
--- name: DeliveryChannel :one
-select channel_id from mailbox_delivery
-where session_id = sqlc.arg(session_id) and envelope_id = sqlc.arg(envelope_id);
-
 -- name: DeliveryReceipt :one
 select state, dropped_why from mailbox_delivery where session_id = sqlc.arg(session_id) and envelope_id = sqlc.arg(envelope_id);
 

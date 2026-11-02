@@ -38,7 +38,7 @@ import {
 } from "./runs";
 
 /** Saves the model turn its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
-export type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
+type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
 
 const laneNames: Record<Lane, string> = {
   asked: t("web.session.trajectory.lane.asked"),

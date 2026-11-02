@@ -14,7 +14,7 @@ interface Ctx {
 
 const Context = createContext<Ctx>();
 
-export interface CheckboxRootProps extends Omit<ButtonProps, "onChange"> {
+interface CheckboxRootProps extends Omit<ButtonProps, "onChange"> {
   checked?: boolean | undefined;
   defaultChecked?: boolean | undefined;
   onCheckedChange?: ((checked: boolean) => void) | undefined;

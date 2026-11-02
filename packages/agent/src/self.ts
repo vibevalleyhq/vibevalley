@@ -9,7 +9,7 @@ import { archiveFiles, fileMemory, type MemoryPort, searchArchive } from "./memo
 import { self as selfWords } from "./prompts.ts";
 import { readSkill, type SkillInfo } from "./skills.ts";
 
-export interface SelfOptions {
+interface SelfOptions {
   readonly home: string;
   /** The brain's Time: the day a remembered line is dated. */
   readonly now: () => number;

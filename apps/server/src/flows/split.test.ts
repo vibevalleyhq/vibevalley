@@ -12,7 +12,6 @@ import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
 import { Core } from "@/core/core.ts";
 import { inbox } from "@/inbox/items.ts";
-import { Ingress } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Project } from "@/project/project.ts";
 import { Session } from "@/session/session.ts";
@@ -112,7 +111,7 @@ it.live("regression: splitting creates real queued issues whose dependencies mer
       (item) => item.status === "done",
       "the first child merged",
     );
-    yield* (yield* Ingress).refreshIssues;
+    yield* (yield* Issue).refreshQueue;
     yield* await_(
       () => issues.get(b.id),
       (item) => item.status === "done",

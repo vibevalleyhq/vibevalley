@@ -1,6 +1,6 @@
 # 定时任务
 
-定时任务（`Cron`）是一张工单的一种触发：到点记录 occurrence，由 Ingress 生成不可变 Trigger，经 Mailbox 交给帮工或管家的 Session。同一个定时任务复用一张工单；工单等待主人时自动输入留在信箱。定时任务存在农场的表里，主人在页面上看得到、关得掉；管家用工具定它。
+定时任务（`Cron`）是一张工单的一种触发：到点直接保存不可变 Trigger，调用 Issue 准备工单，再经 Mailbox 交给帮工或管家的 Session。同一个定时任务复用一张工单；工单等待主人时自动输入留在信箱。定时任务存在农场的表里，主人在页面上看得到、关得掉；管家用工具定它。
 
 ## 管什么，不管什么
 
@@ -16,7 +16,7 @@
 
 - 服务端 `apps/server/src/cron`（`Cron`）：`cron.ts` 存取、开机读表、每次检查（`tick`）和到点发布（`due`，一条流）；`due.ts` 是只有它用的纯函数：`dueCrons`、`isMissed`、`afterRun`、`needsOK`、`cronProblem`。
 - 几处都用的规则在 `apps/server/src/cron/when.ts`：`nextRun`、`cronProblem`、`whenText`、`nextText`、`dueText`，五段 cron 的解析、下次时间、说成话；下次时间用 Effect 的 `Cron.make`、`Cron.next` 和时区，解析和报错是自己的。
-- 表：`cron`（时间写法存成 JSON 的 `spec`）、`cron_occurrence`（尚未交给网关的到期快照）；工单表的 `cron` 列指着它的定时任务。
+- 表：`cron`（时间写法存成 JSON 的 `spec`）、`ingress_trigger`（来源为 cron 的不可变到期快照）；工单表的 `cron` 列指着它的定时任务。
 - 接口：`cron.create`、`cron.list`、`cron.update`、`cron.delete`（[capabilities.md](docs/reference/capabilities.md)）；`cron.update` 只有主人和「连接到本机」能调，管家不能。管家的工具 `cron_create`、`cron_list`、`cron_delete` 在 `tool/tool.ts`。
 - 配置：`cron.tick_ms`，默认 20000（20 秒看一遍；0 或更小是每毫秒）。
 - 页面：频道菜单的「定时任务」（`apps/web/src/farm/chat/ChannelMenu.tsx`）和聊天页的「定时任务」标签（`apps/web/src/features/channel/Tabs.tsx`）列出这个频道的定时任务，能开关、删、对待批的点「同意」「不要」；看板上定时任务的工单带「定时任务」标签（`apps/web/src/features/issue/cards.ts`）。
@@ -44,10 +44,10 @@
 
 1. `dueCrons` 挑出下次时间不晚于现在的。错过了好几次的也只算一次。
 2. 晚了超过 5 分钟（`missedAfterMs`）的算补跑：服务端没开着时错过的，开机后只补一次，提示里写「（服务端没开着时错过的，补一次）」；循环的从现在往后排，中间错过的不一个个补。
-3. 在同一事务里更新 `last_run`、关闭一次性任务并写 `cron_occurrence`。保存失败不发布，下次检查重试。
-4. 施加核心事实，发布带 occurrence ID 的 `Due`。Ingress 订阅它，也在开机和重试周期读取未确认 occurrence；用 ID 作为来源幂等键生成 Trigger，完整快照供 `vv://trigger/<id>` 读取，不写聊天消息。
-5. Ingress 调用 `Issue.scheduled` 准备工单，再将 `cron:<id>` 订阅绑定到工单并交给 Mailbox。首次开工前登记初始输入；排队时进入 Tier 1，后续开工读取未消费输入。已经开工的工单按信箱规则投递，asking/stuck/reviewing 时保持 held；已关闭工单在新的定时触发下重开。
-6. 确认网关已持久登记后删除 occurrence。域操作失败保留它供重试；已登记的 Trigger 不重复创建一轮。通用 Trigger 恢复跳过仍有 occurrence 的定时输入，避免绕过工单准备。
+3. 在同一事务里更新 `last_run`、关闭一次性任务并写 `ingress_trigger`。任何写入失败都回滚，下次检查重试。
+4. 提交后施加核心事实、发布 `Due`，完整 Trigger 快照供 `vv://trigger/<id>` 读取，不写聊天消息。
+5. Cron 直接调用 `Issue.scheduled` 准备工单，再将 `cron:<id>` 订阅绑定到工单并交给 Mailbox。首次开工前登记初始输入；排队时进入 Tier 1，后续开工读取未消费输入。已经开工的工单按信箱规则投递，asking/stuck/reviewing 时保持 held；已关闭工单在新的定时触发下重开。
+6. 每次 tick 先重放未路由的 cron Trigger，再找新的到期任务。一次性任务即使已经关闭，也会完成先前的派发。Mailbox 的通用重放跳过 cron 来源，由 Cron 准备工单后再交给 Mailbox，已登记的不重复派发。
 
 **开关**：关掉只改 `enabled`；重新打开一个周期定时任务，开关和起算时间（`last_run` 记成现在）一次写入，从现在往后算，不补关着时错过的。一次性的跑过就关，列表里显示「做过了」，主人可以删。
 
@@ -55,7 +55,7 @@
 
 ## 和谁打交道
 
-- **Ingress**：订阅 `Due()`，恢复未确认 occurrence，生成 Trigger，装配工单准备和信箱投递。
+- **Mailbox**：接收已准备好工单的 Trigger，保存路由回执并投递；Cron 不依赖 Ingress。
 - **工单（`issue`）**：一个定时任务一张工单，负责创建、派活、排队、重开（[工单](docs/subsystems/issue.md)）。
 - **频道（`channel`）**：提供所属频道、默认项目和管家；定时输入不伪装成聊天消息。
 - **档案（`agent`）**：定时任务只认存在的帮工的档案；没写的交给管家，是哪个管家问频道（`orchestratorOf`）。

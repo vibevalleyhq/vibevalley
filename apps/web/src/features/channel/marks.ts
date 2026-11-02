@@ -215,7 +215,7 @@ export function useMarkedFollowed(id: Accessor<string | undefined>): Accessor<Fo
   });
 }
 
-export interface ChannelMarks {
+interface ChannelMarks {
   readonly archives: readonly Intent<ArchiveMark, void>[];
   readonly notifies: readonly Intent<NotifyMark, void>[];
   readonly unreads: readonly Intent<ReadMark, void>[];

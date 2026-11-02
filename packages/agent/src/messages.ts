@@ -6,7 +6,7 @@ import type { Context, ImageContent, Message, TextContent, ToolDeclaration, User
 import type { AgentMessage } from "./core/loop.ts";
 import { imagePlaceholder, summary as summaryWords, transcript as transcriptWords } from "./prompts.ts";
 
-export type UserContent = string | readonly (TextContent | ImageContent)[];
+type UserContent = string | readonly (TextContent | ImageContent)[];
 
 export interface CustomMessage {
   readonly role: "custom";

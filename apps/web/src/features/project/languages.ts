@@ -64,7 +64,7 @@ function languageOf(name: string): Language {
 
 export const langIcon = (id: string) => `lang-${id}`;
 
-export interface LanguageShare extends Language {
+interface LanguageShare extends Language {
   /** Prose in Markdown counts as comments. */
   readonly lines: number;
   readonly files: number;

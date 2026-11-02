@@ -9,7 +9,7 @@ import { emptyWorkspaceState } from "@/core/core.ts";
 
 import { inbox } from "./items.ts";
 
-const assignments = [{ id: "a1", issue: "t1", agent: "lab", assignedAt: 0, executions: [{ kind: "session", session: "w1", startedAt: 0 }] }];
+const assignments = [{ id: "a1", issue: "t1", agent: "lab", assignedAt: 0, executions: [{ kind: "worker", session: "w1", startedAt: 0 }] }];
 
 test("a helper handed back with questions asks the owner to answer, not to complete it", () => {
   const session = {

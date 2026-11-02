@@ -5,14 +5,14 @@ import { t } from "@vibevalley/i18n";
 import type { Project } from "@/project/project.ts";
 import { ProjectError } from "@/project/shapes.ts";
 
-export interface GitHubCheck {
+interface GitHubCheck {
   readonly name: string;
   readonly status: string;
   readonly conclusion: string;
   readonly url: string;
 }
 
-export interface GitHubReview {
+interface GitHubReview {
   readonly id: string;
   readonly author: string;
   readonly state: string;
@@ -21,7 +21,7 @@ export interface GitHubReview {
   readonly bot: boolean;
 }
 
-export interface GitHubComment {
+interface GitHubComment {
   readonly id: string;
   readonly databaseId?: string;
   readonly author: string;

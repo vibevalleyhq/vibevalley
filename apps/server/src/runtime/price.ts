@@ -8,7 +8,7 @@ import { getModel } from "@vibevalley/ai/models";
 
 import type { PiDefault } from "./pi.ts";
 
-export interface Price {
+interface Price {
   readonly input: number;
   readonly output: number;
   readonly cacheRead: number;

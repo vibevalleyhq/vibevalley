@@ -10,7 +10,7 @@ import type * as T from "@vibevalley/protocol";
 
 import { Core } from "@/core/core.ts";
 import type { ServerConfig } from "@/infra/config.ts";
-import { agentSessionsStart, collaborationStart, gamification, inboxStart, ingressReady, mailboxReady } from "@/services.ts";
+import { agentSessionsStart, collaborationStart, gamification, inboxStart, mailboxReady } from "@/services.ts";
 import { type Hired } from "@/session/session.ts";
 import { gitIn } from "@/testing/git.ts";
 import { helper } from "@/testing/helper.ts";
@@ -21,7 +21,7 @@ import { world, type WorldOptions } from "@/testing/world.ts";
 /** The seed profile on pi, with no effort: the scripted runtime has no models, so no effort levels. */
 export const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 
-const farmLayer = (options: WorldOptions) => world(options).pipe(gamification, agentSessionsStart, mailboxReady, collaborationStart, ingressReady, inboxStart);
+const farmLayer = (options: WorldOptions) => world(options).pipe(gamification, agentSessionsStart, mailboxReady, collaborationStart, inboxStart);
 
 export interface Farm {
   readonly config: ServerConfig["Service"];

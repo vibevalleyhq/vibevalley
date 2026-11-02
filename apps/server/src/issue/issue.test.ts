@@ -19,7 +19,6 @@ import { Core } from "@/core/core.ts";
 import { Cron } from "@/cron/cron.ts";
 import { reasonOf } from "@/errors.ts";
 import { Db, dbQueries } from "@/infra/db.ts";
-import { Ingress } from "@/ingress/ingress.ts";
 import { gitRuns } from "@/project/git.ts";
 import { Session } from "@/session/session.ts";
 import { gitIn } from "@/testing/git.ts";
@@ -506,7 +505,7 @@ describe("issues", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("refused startup removes only the issue made for that dispatch and keeps an existing queue", () => {
+  it.live("regression: refused startup removes only the issue made for that dispatch and keeps an existing queue", () => {
     const f = farm([
       {
         ...busy,
@@ -650,7 +649,7 @@ describe("issues", () => {
       yield* occupied(core, "pi");
       const issue = yield* issues.add({ title: "queued", agent: "lab", project: "demo" });
       for (const channel of [first.id, second.id]) expect((yield* issues.start(issue.id, channel)).queued).toBeDefined();
-      yield* (yield* Ingress).refreshIssues;
+      yield* (yield* Issue).refreshQueue;
       expect(
         (yield* sql<{ channel: string }>`select t.trigger_json::jsonb->>'replyChannel' as channel
         from mailbox_issue m join ingress_trigger t on t.id = m.trigger_id where m.issue_id = ${issue.id} and m.state = 'held'`).map((r) => r.channel),
@@ -658,7 +657,7 @@ describe("issues", () => {
       yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
       const started = yield* issues.start(issue.id, second.id);
       expect(started.queued).toBeDefined();
-      yield* (yield* Ingress).refreshIssues;
+      yield* (yield* Issue).refreshQueue;
       const got = yield* issues.get(issue.id);
       expect(sessionIdsOf(got)).toHaveLength(1);
       const queuedSession = sessionIdsOf(got)[0];
@@ -683,7 +682,7 @@ describe("issues", () => {
     ]);
     return Effect.gen(function* () {
       const issues = testIssues(yield* Issue);
-      const ingress = yield* Ingress;
+
       const core = yield* Core;
       const chat = yield* Channel;
       const sessions = yield* Session;
@@ -693,13 +692,13 @@ describe("issues", () => {
       yield* occupied(core, "pi");
       const item = yield* issues.add({ title: "queued", description: "old-dispatch-context", agent: "lab", project: "demo" });
       yield* issues.start(item.id, first.id);
-      yield* ingress.refreshIssues;
+      yield* (yield* Issue).refreshQueue;
       yield* issues.setStatus(item.id, "backlog", "", "", owner);
       yield* issues.edit(item.id, { description: "new-dispatch-context" }, owner);
       yield* issues.start(item.id, second.id);
-      yield* ingress.refreshIssues;
+      yield* (yield* Issue).refreshQueue;
       yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
-      yield* ingress.refreshIssues;
+      yield* (yield* Issue).refreshQueue;
       yield* until(() => inputs.length > 0, "the requeued input");
       expect(inputs[0]).toContain("new-dispatch-context");
       expect(inputs[0]).not.toContain("old-dispatch-context");
@@ -728,7 +727,7 @@ describe("issues", () => {
         "the cron queued",
       );
       yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
-      yield* (yield* Ingress).refreshIssues;
+      yield* (yield* Issue).refreshQueue;
       yield* waitFor(sessions.issueRuns(issue!.id), (r) => r.length > 0, "the scheduled run");
       const [run] = yield* sessions.issueRuns(issue!.id);
       expect(run!.triggeredBy).toEqual({ kind: "cron", cron: sc.id, missed: true, message: issue!.mandate.originTriggerId });
@@ -747,11 +746,11 @@ describe("issues", () => {
       const issue = yield* issues.add({ title: "queued", agent: "lab", project: "demo" });
       expect((yield* issues.start(issue.id, chat.defaultChannel())).queued).toBeDefined();
       const queued = yield* issues.get(issue.id);
-      yield* (yield* Ingress).refreshIssues;
+      yield* (yield* Issue).refreshQueue;
       const stillQueued = yield* issues.get(issue.id);
       expect([stillQueued.queuedAt, sessionIdsOf(stillQueued)]).toEqual([queued.queuedAt, []]);
       yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
-      yield* (yield* Ingress).refreshIssues;
+      yield* (yield* Issue).refreshQueue;
       expect(sessionIdsOf(yield* issues.get(issue.id))).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

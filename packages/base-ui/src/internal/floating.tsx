@@ -31,7 +31,7 @@ export interface Floating<R extends string> {
 }
 
 /** What the shared parts read: everything but how to open or close, whose reasons each component names. */
-export type FloatingParts = Omit<Floating<string>, "setOpen">;
+type FloatingParts = Omit<Floating<string>, "setOpen">;
 
 export function createFloating<R extends string>(props: FloatingRootProps<R>, first: R): Floating<R> {
   let reason = first;
@@ -60,7 +60,7 @@ export function createFloating<R extends string>(props: FloatingRootProps<R>, fi
   };
 }
 
-export interface PortalProps {
+interface PortalProps {
   children?: JSX.Element;
   /** Where to put it; by default the modal dialog the trigger is in, else the body. */
   container?: HTMLElement | undefined;
@@ -78,7 +78,7 @@ export function makePortal(use: () => FloatingParts) {
   };
 }
 
-export interface PositionerProps extends DivProps {
+interface PositionerProps extends DivProps {
   side?: Side | undefined;
   align?: Align | undefined;
   /** Gap to the trigger, px. */

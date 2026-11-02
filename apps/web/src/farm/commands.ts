@@ -20,7 +20,7 @@ export const playBedFx = (s: Session, plays: Record<string, SessionPlayView> | u
   if (bed) farm.bedFx(bed.index, kind, text);
 };
 
-export interface FarmCommands {
+interface FarmCommands {
   /** Words for a helper; one at work hears them mid-turn. The key is the form's, kept until they went through. */
   water(s: Session, text: string, sendKey: string): Promise<void>;
   /** The server tells it what its conflicts are and to settle them. */

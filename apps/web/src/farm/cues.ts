@@ -21,7 +21,7 @@ export interface FarmSoundInput {
 }
 
 /** `hold`: good news that takes turns with other good news, holding the floor this many ms. */
-export interface Cue {
+interface Cue {
   name: SoundName;
   hold?: number;
 }

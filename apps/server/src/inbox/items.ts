@@ -1,5 +1,6 @@
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { everyone, ownerId, type Notify } from "@vibevalley/protocol";
 import { latestSessionIdOf, needOf, omitUndefined, cut, oneLine, slice } from "@vibevalley/protocol/rules";
 
 import { clip } from "@/base/clip.ts";
@@ -13,6 +14,21 @@ export interface InboxEntry {
   readonly channel?: string;
   readonly since?: number;
   readonly brief: string;
+}
+
+export function forOwner(m: T.ChatMessage, notify: Notify = "all"): boolean {
+  if (m.from === ownerId || notify === "none") return false;
+  if (notify === "mentions") return m.mentions.includes(ownerId) || m.mentions.includes(everyone);
+  switch (m.kind) {
+    case "report":
+    case "dispatch":
+      return true;
+    case "chat":
+      return m.fromKind === "orchestrator" || m.mentions.includes(ownerId) || m.mentions.includes(everyone);
+    case "notice":
+      break;
+  }
+  return false;
 }
 
 /** Newest first; items of the same moment in the order they are gathered. */

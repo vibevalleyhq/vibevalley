@@ -45,7 +45,7 @@ const usageAfterRunMs = 20_000;
 const spendPushAfterMs = 3_000;
 
 /** Dispatch eligibility with the runtime state that explains it. */
-export interface Assessment {
+interface Assessment {
   readonly agent: T.Agent;
   readonly info: T.RuntimeInfo | undefined;
   readonly problems: T.AgentProblem[];
@@ -113,7 +113,7 @@ export class Runtime extends Context.Service<
 }
 
 /** What reads a runtime's account usage; tests put their own. */
-export type UsageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) => Promise<T.AccountUsage | null>;
+type UsageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) => Promise<T.AccountUsage | null>;
 
 export interface RuntimeOptions {
   /** The runtimes; oar's defaults when none. */

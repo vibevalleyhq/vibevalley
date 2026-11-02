@@ -23,7 +23,7 @@ export interface ToastData {
   readonly timeout: number;
 }
 
-export interface ToastInput {
+interface ToastInput {
   type?: ToastType;
   title: string;
   description?: string;

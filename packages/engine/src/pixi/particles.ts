@@ -5,7 +5,7 @@
 
 import { type Container, Graphics } from "pixi.js";
 
-export interface BitSpec {
+interface BitSpec {
   readonly x: number;
   readonly y: number;
   /** Seconds before it is gone. */
@@ -24,7 +24,7 @@ export interface BitSpec {
   readonly alpha?: number;
 }
 
-export interface RingSpec {
+interface RingSpec {
   readonly x: number;
   readonly y: number;
   readonly from: number;
@@ -35,7 +35,7 @@ export interface RingSpec {
   readonly life: number;
 }
 
-export interface Particles {
+interface Particles {
   /** Puts `node` on `layer` and moves it as `spec` says until its life is over. */
   readonly add: (layer: Container, node: Container, spec: BitSpec) => void;
   readonly ring: (layer: Container, spec: RingSpec) => void;

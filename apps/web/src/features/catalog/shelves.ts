@@ -42,7 +42,7 @@ export function picturesOf(manifest: Record<string, Record<string, unknown>>): P
 
 const isHelper = (name: string) => SpeciesValues.some((s) => name.startsWith(`${s}-`));
 
-export interface Shelf {
+interface Shelf {
   readonly id: string;
   readonly label: string;
   readonly hint: string;

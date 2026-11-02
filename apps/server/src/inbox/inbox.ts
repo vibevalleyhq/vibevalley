@@ -14,13 +14,13 @@ import { Core } from "@/core/core.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
-import { Ingress } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";
+import { Mailbox } from "@/mailbox/mailbox.ts";
+import { recordTrigger } from "@/mailbox/payload.ts";
 import { Session } from "@/session/session.ts";
 
 import * as q from "../../db/generated/channel_message.sql.ts";
-import { forOwner } from "./away.ts";
-import { inbox, inboxEntries } from "./items.ts";
+import { forOwner, inbox, inboxEntries } from "./items.ts";
 import { emptyPatrol, type PatrolMemory, type PatrolNote, patrolStep } from "./patrol.ts";
 import { patrolText } from "./prompts.ts";
 
@@ -34,10 +34,9 @@ export class Inbox extends Context.Service<
     /** One round of the patrol, now. */
     readonly patrol: Effect.Effect<void>;
     readonly handoffState: (message: string) => Effect.Effect<"unseen" | "seen" | undefined>;
+    readonly prime: Effect.Effect<void>;
     /** Pending external deliveries changed: a later connector rereads them. */
     readonly externalChanges: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>;
-    /** From here what the inbox holds is known: the startup's, after the sessions and issues came back. */
-    readonly prime: Effect.Effect<void>;
   }
 >()("vibevalley/Inbox") {
   static readonly layer = Layer.effect(
@@ -51,7 +50,7 @@ const make = Effect.gen(function* () {
   const chat = yield* Channel;
   const issues = yield* Issue;
   const sessions = yield* Session;
-  const ingress = yield* Ingress;
+  const mailbox = yield* Mailbox;
   const db = yield* Db;
   const turn = yield* Semaphore.make(1);
   const externalHub = yield* scopedPubSub<void>();
@@ -117,7 +116,7 @@ const make = Effect.gen(function* () {
       byChannel,
       ([channel, notes]) =>
         Effect.flatMap(chat.topOf(channel), (top) =>
-          ingress.accept({
+          recordTrigger(db, {
             key: `${channel}:${now}:${notes.map((note) => note.key).join(",")}`,
             source: "patrol",
             actor: { kind: "system", id: "patrol" },
@@ -126,27 +125,28 @@ const make = Effect.gen(function* () {
             replyChannel: channel,
             at: now,
             text: patrolText(top.name, notes),
-          }),
+          }).pipe(Effect.flatMap(mailbox.receive)),
         ),
       { discard: true },
     ).pipe(bestEffort("vibevalley: patrol inputs were not kept"));
   });
 
-  const shape = Inbox.of({
+  const prime = turn.withPermits(1)(
+    Effect.sync(() => {
+      const state = core.state();
+      known = freshOf(undefined, inbox(state)).known;
+      primed = true;
+    }),
+  );
+
+  return Inbox.of({
     news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
     toOwner: Effect.map(PubSub.subscribe(toOwnerHub), Stream.fromSubscription),
     patrol,
     handoffState,
+    prime,
     externalChanges: Effect.map(PubSub.subscribe(externalHub), Stream.fromSubscription),
-    prime: turn.withPermits(1)(
-      Effect.sync(() => {
-        const state = core.state();
-        known = freshOf(undefined, inbox(state)).known;
-        primed = true;
-      }),
-    ),
   });
-  return shape;
 });
 
 /** After the sessions and issues came back: the inbox as it stands is known, and the patrol starts its rounds. The first

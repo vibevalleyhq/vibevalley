@@ -23,7 +23,7 @@ export interface Pairing {
   readonly problem: string;
 }
 
-export type FarmChoice = { readonly kind: "loading" } | { readonly kind: "farm"; readonly farm: Farm } | Pairing;
+type FarmChoice = { readonly kind: "loading" } | { readonly kind: "farm"; readonly farm: Farm } | Pairing;
 
 const where = "vibevalley.farm";
 

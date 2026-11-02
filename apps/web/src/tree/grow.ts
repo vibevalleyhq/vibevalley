@@ -60,7 +60,7 @@ function makeGenome(seed: number): Gene[] {
 
 const genome = makeGenome(20261022);
 
-export interface Segment {
+interface Segment {
   readonly x0: number;
   readonly y0: number;
   readonly x1: number;
@@ -78,7 +78,7 @@ export interface Placed {
 }
 
 /** A clump of foliage where leaves gather: as big as the leaves hung there. */
-export interface Clump {
+interface Clump {
   readonly x: number;
   readonly y: number;
   readonly r: number;

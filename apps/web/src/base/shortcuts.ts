@@ -3,7 +3,7 @@
 // inside one place (a list's arrows, the farm's tools) keep their handlers there; their rows here say what they are.
 
 /** Where a shortcut works, as the sheet groups them. */
-export type ShortcutPlace = "everywhere" | "composer" | "lists" | "pictures" | "farm" | "desktop";
+type ShortcutPlace = "everywhere" | "composer" | "lists" | "pictures" | "farm" | "desktop";
 
 export const shortcutPlaces: readonly ShortcutPlace[] = ["everywhere", "composer", "lists", "pictures", "farm", "desktop"];
 

@@ -12,6 +12,7 @@ import { orMissing } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Database, Db } from "@/infra/db.ts";
 import { sampleAgent } from "@/testing/agents.ts";
+import { bold, para, sample, span } from "@/testing/artifact.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { waitFor } from "@/testing/until.ts";
 
@@ -19,7 +20,6 @@ import * as qa from "../../db/generated/artifact.sql.ts";
 import { makeBlockStore } from "./blocks.ts";
 import { demoPieces } from "./demo.ts";
 import { plain } from "./spans.ts";
-import { bold, para, sample, span } from "./testing.ts";
 
 const on = (config: ServerConfig["Service"] = testConfig()) =>
   Db.layer.pipe(Layer.provideMerge(Database), Layer.provideMerge(Layer.succeed(ServerConfig, config)));

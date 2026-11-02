@@ -1,475 +1,380 @@
-# VibeValley 四层模块切分与状态收敛方案：重构模块边界，保持状态极简正交
+# VibeValley 四层架构正本清源与收口验收方案：理顺单向分层，砍掉一切反向钩子与中转冗余
 
-本文解决的核心矛盾是：**VibeValley 最初的模块切分存在历史缺陷（`Channel` 兼职事件总线、`Orchestrator` 成了凌驾万物的上帝服务、`Session` 被错当成帮工、`TaskGraph` 与 `Issue` 造了两套平行状态机）；我们追求的不应是「为了省事而将就旧模块」，也不应是「在旧模块上疯狂叠加新状态」，而是「合理切分出专业模块，同时让每个模块内部的状态极简、正交、不重复」。**
+## 实施与验收（2026-11-02）
+
+本文件的五张收口任务已完成。本文保留下面的设计要求；当前行为沉淀在 [Mailbox](docs/subsystems/mailbox.md)、[Ingress](docs/subsystems/ingress.md)、[工单](docs/subsystems/issue.md)、[定时](docs/subsystems/cron.md) 和[架构](docs/architecture.md)，原实施 Note 已删除。
+
+| 任务 | 落地结果 |
+|---|---|
+| Task 1 | Mailbox 位于 Session 之上、Collaboration 与 Issues 之下；四个反向回调和两张中转表无残留。Issue 自己推进排队，Cron 与 Inbox 直接投递，Ingress 不再承担内部调度或重放。 |
+| Task 2 | 频道受众只产生候选，`posting.forward` 统一优先级、刹车、投递与回执事务；工单输入先经 Tier 1。agent 间提及与汇报保留频道受众，不被误当成给该工单的任务。Mailbox 服务文件 520 行。 |
+| Task 3 | Fact 与 reducer 各 15 类，和成员表一致；原稿“14”已纠正。旧碎片类型无残留。 |
+| Task 4 | Session 类型与表结构无 play；像素状态由游戏投影管理，页面读取 FarmView.plays。 |
+| Task 5 | 架构、模块顺序、持久化、频道、巡查、定时与管家文档已同步；文档、类型、测试、死代码和逃生口检查通过。 |
+
+新增或修复的行为证据：
+
+- 聊天重放由 Channel 恢复受众，保留原始 Trigger 内容；多收件人中的一次写入失败使整批投递回滚，恢复后每人只得到一份。
+- 投递与订阅前刷新工单投影，Session 结束派生的 reviewing 立即冻结机器输入，主人追问再放行。
+- 运行时启动失败保留已有排队输入，非法档案或工单仍按原规则退回；父子分支回归用显式结束信号消除时间窗口，未删除行为断言。
+- Cron 的时间推进与 Trigger 同事务保存；失败不推进时间。已关闭的一次性任务仍恢复先前未路由的 Trigger，重启不再建第二张工单。
+- CLI 黄金数据共 54 条，仅第 36 条将异步帧序号从固定数字改为有效数字格式归一化；业务返回与其余样例不变。
+
+执行结果：
+
+```text
+vp check                         pass: no warnings, lint errors, or type errors
+vp run server:check              16/16 successful
+server tests                    751 passed, 1 skipped (live model evaluation)
+vp run web:check                 11/11 successful
+vp run docs:verify               9/9 successful
+vp run deadcode                  exit 0
+vp run health:verify             2/2 successful; ratchet only lowered
+comment-review --base HEAD       1 comment, 0 not kept
+```
+
+隔离程序命令：`vpx scripts/verify-server.ts --scripted-helper -- python3 /tmp/vv-close-smoke.py`。证据目录：
+
+```text
+/var/folders/hz/26kbk41x5_j5c4sykmx2yp7r0000gn/T/vibevalley-verify-eQJzdl
+result.json: code=0, stopped=true, cleanupErrors=[]
+ACCEPTED: issue creation, dispatch, report, dry-run, merge and state frame
+ACCEPTED: one-off cron dispatched directly and retained one issue
+```
+
+服务端日志无 ERROR/WARN。使用脚本帮工与真实 git、数据库、HTTP 和状态帧；未调用真实模型、外部电话或真实编码 agent。检查日志保存在 `/tmp/vv-close-server-final.log`、`/tmp/vv-close-web-final.log`、`/tmp/vv-close-docs.log`、`/tmp/vv-close-health.log` 和 `/tmp/vv-close-deadcode.log`。
 
 ---
 
-## 一、初始代码的四大模块切分缺陷（为什么不能只靠修补和简单复用？）
-
-剖析当前 `apps/server/src/` 的模块结构（`modules.ts`），可以看到早期演进留下的四个根源性架构问题：
-
-1. **缺陷一：`Channel`（1,949 行）把「人类聊天室」和「系统事件总线/信箱」混为一谈**
-   - 因为早期先做了聊天室，后来加派活、加叫醒、加三道刹车、加已读回执，全部塞进了 `channel/chat.ts`。
-   - 如果为了「复用现有表」把 GitHub CI 失败、PR 行内代码评审（带 `path:line`、`diff_hunk`、`review_thread_id`）、定时触发、巡查发现全部硬塞成「往聊天室发一条 `channel_message`」，就会把人类沟通的聊天室污染成杂乱的机器日志流，且结构化事件元数据无处安放。
-2. **缺陷二：`Orchestrator` 成了颠倒因果的「顶层上帝模块」，且与 `Session` 割裂**
-   - **概念错位**：管家（`Orchestrator`）和帮工（`Worker`）本质上都是 **Agent（智能体）**，只是角色（`role`）和挂载的工具集不同；在运行时它们**都应基于 `Session`（Agent 会话）管理**。但早期代码把「帮工」硬叫成 `Session`，导致管家无法作为标准 `Session` 管理，只能在 `session/host.ts` 另起一套 `AgentHost` + `InProcessRun` + `OrchestratorState`。
-   - **依赖颠倒**：`Orchestrator` 被放在模块第 9 层，import 了 14 个服务。甚至连主人在频道里发一句话，都要先调 `Orchestrator.say` 再由管家去调 `Channel.say`（`apps/server/src/orchestrator/orchestrator.ts:85`），因果关系完全颠倒！
-3. **缺陷三：外部接入（Ingress）散落 7 处，没有统一的事件标准化层**
-   - 微信/飞书/QQ 归 `connector`，GitHub PR 轮询藏在 `issue/merge.ts` 和 `project/project.ts`，定时归 `cron`，语音归 `voice`，巡查归 `inbox`。7 个地方各自构造不同格式的字符串，绕过统一网关直接去捅 `Orchestrator` 或 `Session`。
-4. **缺陷四：`Task`（计划图）与 `Issue`（工单）造了两套平行的状态机与接口**
-   - `issue` 表明明已经有 `parent`（父工单）和 `blocked_by`（前置依赖），却在 `apps/server/src/task/` 另造了一套 `GraphState`（7 个状态）、`TaskState`（5 个状态）、7 个 `graph_*` 工具和 `graph-draft / graph-ready / task-failed` 通知，还把子工单变成了 `moves: []` 的假工单。
+本文解决当前架构中最核心的层次问题：**为什么在引入 `Ingress`、`Mailbox`、`Resource` 之后，代码里反而出现了 `issue_dispatch`、`cron_occurrence` 这种自己轮询自己的中转表，以及 `attachIngress`、`attachDelivery`、`attachInputRegistrar`、`attachExternalChange` 这种下层反向回调上层的拧巴钩子？怎么把模块层次彻底理顺，并给出可通过「脚本 + 测试 + 文档」验收的可执行方案？**
 
 ---
 
-## 二、目标架构：四层专业模块切分 + 镜像 HITL 层（职责锋利、状态正交）
+## 一、一针见血：当前分层为什么绕？（根因诊断）
 
-我们按照 **「1. 接入与载荷层 → 2. 网关与双层信箱层 → 3. 契约与工单层 → 4. 拉取原语与信号层（+ 镜像 Human-in-the-Loop 交付层）」** 重新切分服务端模块。
+检查当前 `apps/server/src/modules.ts` 和 `src/ingress`、`src/mailbox` 的实现，所有拧巴和多余代码的根源只有一个：**把模块上下游的顺序排反了，并且把「内部业务动作」也强行绕道伪装成了「外部接入（Ingress）」！**
 
-**设计准则**：
-- **该拆的模块果断拆开**：让 `Ingress` 专管接入标准化、让 `Mailbox` 专管双层蓄水与分流、让 `Issue` 统管工单与父子 DAG、让 `Session` 统管管家与帮工的会话和信号、让 `Resource` 专管按需分页拉取；
-- **状态机严格正交（绝不重复造状态）**：一层只拥有属于自己职责的那 3–5 个核心状态，上层状态由下层事实推导，砍掉一切跨模块复制的状态枚举。
+看现在 `modules.ts` 里的顺序：
+`Agent Sessions (4)` → `Collaboration / Channel (5)` → `Issues & Cron (6)` → `Mailbox (7)` → `Ingress (8)`
+
+因为规定「下层不能 `import` 上层」，把 `Mailbox (7)` 和 `Ingress (8)` 放在了 `Channel (5)` 和 `Issue / Cron (6)` 的**上面**，直接引发了 **4 处画蛇添足的绕路**：
+
+1. **多余绕路 1：`Issue` 派活被迫建了一张 `issue_dispatch` 临时表自己轮询自己**
+   - 主人在看板点开工或打回时，代码在 `Issue`（第 6 层）。因为第 6 层不能调第 7 层的 `Mailbox` 和第 8 层的 `Ingress`，`Issue` 被迫先往数据库 `issue_dispatch` 表写一行；然后等第 8 层的 「旧路径：apps/server/src/ingress/issue.ts（已删除）」 每 3 秒轮询（或听 Core 事实）把这行读出来，包成 `Trigger` 调第 7 层 `Mailbox.receive`，再反过来调第 6 层 `issues.tryQueued`，最后调 `issues.acknowledgeDispatch` 删掉那行！
+2. **多余绕路 2：`Cron` 定时任务到点被迫建了一张 `cron_occurrence` 临时表自己轮询自己**
+   - `Cron`（第 6 层）到点时，同样因为调不到第 7 层 `Mailbox`，被迫往 `cron_occurrence` 表写一行；再由第 8 层 「旧路径：apps/server/src/ingress/cron.ts（已删除）」 每 3 秒轮询读出来，调 `issues.scheduled` 和 `mailbox.receive`，再调 `crons.acknowledge`！
+3. **多余绕路 3：`Channel` 被迫暴露 `attachIngress` 和 `attachDelivery` 两个反向可变槽位，`Mailbox` 写了双份路由**
+   - `Channel` 在第 5 层，当主人在频道发消息时，第 5 层为了通知第 8 层的 `Ingress` 和第 7 层的 `Mailbox`，只能在 `Channel` 里塞两个可变回调 `chat.attachIngress`（`apps/server/src/ingress/channel.ts:74`）和 `channel.attachDelivery`（`apps/server/src/mailbox/mailbox.ts:642`）。
+   - 更糟的是，`Mailbox` 为了接 `Channel`，在 `work.receive` 之外又写了一套平行的 `routeChannel` / `hearChannel`（`mailbox.ts:347-431`）！
+4. **多余绕路 4：`Session` 暴露 `attachInputRegistrar`，`Inbox` 暴露 `attachExternalChange`**
+   - `Session`（第 4 层）为了调第 7 层 `Mailbox` 登记初始输入，挂了 `sessions.attachInputRegistrar`（`mailbox.ts:602`）；
+   - `Inbox`（第 10 层）为了通知第 13 层 `Connector`，挂了 `inbox.attachExternalChange`（`apps/server/src/connector/connector.ts:689`）。
+
+---
+
+## 二、正确的分层：从上往下单向直调，0 反向钩子、0 中转轮询表
+
+要让层次彻底清晰，只需确立两条铁律：
+
+1. **`Mailbox`（信箱与节流泵）是紧贴在 `Session` 之上的底层通信原语（第 5 层）**：
+   - `Session`（第 4 层）管跑一轮；`Mailbox`（第 5 层）管给 `Session` 蓄水、算 `Urgency`、过三道刹车并调用 `Session.deliver`。
+   - `Channel`、`Issue`、`Cron`、`Inbox` 全部排在 `Mailbox` **上面**！它们需要发消息或派活时，在同一个事务里**直接往下调用 `Mailbox`**，根本不需要 `attach*` 反向回调，更不需要 `issue_dispatch` 和 `cron_occurrence` 两张轮询中转表！
+2. **`Ingress` 只管真正的「外部世界接入」（放在最外层，紧贴 `Gateway`）**：
+   - 看板点按钮（`Issue`）、定时器到点（`Cron`）、内部超时巡查（`Inbox`）是服务端自己的内部模块动作，它们直接调 `Mailbox`，**绝不绕道 `Ingress`**！
+   - `Ingress` 只负责把外部源（GitHub PR 的 CI/Review 轮询、外部连接器微信/飞书/QQ、声网语音、外部聊天输入）归一化为定长 `CompactCard` + `Trigger`，然后直接往下调 `Channel` / `Issue` / `Mailbox`！
+
+### 理顺前后的分层对比图
 
 ```mermaid
 flowchart TB
-  subgraph L1["第 1 层：接入与载荷模块 (src/ingress · 服务 Ingress)"]
-    AD_GH[GitHub 适配器<br/>PR / CI 指纹 / Review / Inline Thread]
-    AD_CN[连接器适配器<br/>微信 / 飞书 / QQ]
-    AD_CH[内部交互适配器<br/>Channel 发言 / 看板动作 / 语音 / Cron / Patrol]
-    NORM[标准化与载荷卡片化<br/>1. 幂等键去重 & 自发消息过滤 (Self-Echo Drop)<br/>2. 封装统一 Trigger 信封 + 定长 CompactCard + vv:// 资源指针]
-    AD_GH & AD_CN & AD_CH --> NORM
+  subgraph Before["❌ 现状：顺序颠倒导致 4 个反向 attach 钩子 + 2 张自轮询表"]
+    direction BT
+    B_SES["4. Session"]
+    B_CH["5. Channel"]
+    B_ISS["6. Issue & Cron"]
+    B_MB["7. Mailbox"]
+    B_IG["8. Ingress"]
+    B_CH -.->|"chat.attachIngress (反向回调)"| B_IG
+    B_CH -.->|"channel.attachDelivery (反向回调)"| B_MB
+    B_SES -.->|"attachInputRegistrar (反向回调)"| B_MB
+    B_ISS -.->|"写 issue_dispatch / cron_occurrence 表\n等 Ingress 每 3s 轮询!"| B_IG
   end
 
-  subgraph L2["第 2 层：网关与双层信箱模块 (src/mailbox · 服务 Mailbox)"]
-    ROUTER[1. 订阅路由网关 Router & Subscriptions<br/>查 thread_subscription：<br/>• 命中工单订阅 → 锁 followupOwner 进 Tier 1 工单信箱<br/>• 无主事件 / 被帮工 Handback 退回 → 进管家 Session 信箱]
-    TIER1[2. Tier 1 工单蓄水池 (issue_mailbox)<br/>承接工单排队期、换人期、以及 waitsForHuman 冻结期<br/>挂起非人工自动信号 (CI / Bot / Cron)]
-    TIER2[3. Tier 2 会话信箱与节流泵 (session_mailbox)<br/>统一面向 Session ID（管家 Session + 帮工 Session）<br/>Urgency 四档裁决 + 三道刹车 + 批处理合成]
-    ROUTER -->|归属工单| TIER1
-    ROUTER -->|归属管家 / 私聊| TIER2
-    TIER1 -->|工单有在场 Worker Session 且未冻结| TIER2
-  end
+  subgraph After["✅ 目标：严格从上往下单向调用（0 反向钩子 · 0 中转轮询表）"]
+    direction TB
+    A_GW["第 9 层：外部接入与网关 (Gateway & External Ingress)\nhttp · connector(微信/飞书/QQ) · voice · github(PR/CI/Review 轮询)"]
+    A_OR["第 8 层：编排、拉取与人类回执 (Orchestrator · Resource · Inbox)\norchestrator · tool · resource(resource_read) · inbox(HITL 门禁与巡查)"]
+    A_IS["第 7 层：工作项与定时契约 (Issues & Cron)\nissue(唯一工单状态机 + 父子 blockedBy DAG + Mandate) · cron"]
+    A_CH["第 6 层：聊天室与协作账本 (Collaboration)\nchannel(纯聊天室消息与 read_cursor) · artifact"]
+    A_MB["第 5 层：双层信箱与路由泵 (Mailbox)\nTier 1 工单蓄水池(mailbox_issue) + Tier 2 会话信箱泵(mailbox_delivery)"]
+    A_SE["第 4 层：统一 Agent 会话与执行器 (Agent Sessions)\nsession(统管管家 Session 与帮工 Session) · executor"]
+    A_PL["第 1–3 层：底座 (Platform · Agents · Source Control)\nbase · infra · core · setting · agent · runtime · memory · project"]
 
-  subgraph L3["第 3 层：契约与工单模块 (src/issue · 服务 Issue)"]
-    CONTRACT[唯一工作项与契约引擎 Issue<br/>• 唯一状态机：backlog → todo → in_progress → in_review → done | canceled<br/>• 原生父子与 blockedBy DAG（收编原 Task 模块，砍掉 GraphState）<br/>• Mandate 授权边界 + PR Follows 绑定 + Handback 退回契约<br/>• 判定 waitsForHuman（asking / stuck / reviewing 时冻结自动唤醒）]
+    A_GW -->|"外部事件转 Trigger + Card"| A_OR & A_IS & A_CH & A_MB
+    A_OR -->|"路由派单 / 巡查提醒 / 按需拉取"| A_IS & A_CH & A_MB & A_SE
+    A_IS -->|"派活 / 追问放行 / 定时触发 直接调"| A_CH & A_MB & A_SE
+    A_CH -->|"新消息入账 直接调"| A_MB
+    A_MB -->|"Wake / Steer(批) / Preempt 直接调"| A_SE
+    A_SE --> A_PL
   end
-
-  subgraph L4["第 4 层：拉取原语与信号模块 (src/session + src/resource)"]
-    SIGNAL[统一会话与信号服务 Session<br/>• 统管 Orchestrator Session 与 Worker Session（共用 session / session_run 表）<br/>• 下行信号：Wake(+1 特权槽) / Steer(整批排空) / Preempt(打断未消费回滚)<br/>• 上行信号：Consumed(真实入模) / Settling(后台守候) / HandedOff(留预览释放槽)]
-    PULL[统一只读拉取服务 Resource<br/>• resource_read(vv://..., offset, limit)<br/>• 会话级 LRU 快照缓存 TextCache + 契约墙权限隔离]
-  end
-
-  subgraph HITL["镜像出站层：Human-in-the-Loop 交付与回执模块 (src/inbox)"]
-    HOUT[人类交付门禁与回执 Inbox / Outbox<br/>• 仅放行 HITL 交接项 (asking / reviewing / stuck / ack)，拦截在途 progress<br/>• 结合 channel_read_cursor 判定人类未读 vs 已读：<br/>  - 未读前问题变更 → 自动从 Outbox 撤回旧通知<br/>  - 在场已读 → 抑制微信/飞书重复轰炸，延后 Patrol 催促]
-  end
-
-  NORM -->|Trigger 信封| ROUTER
-  TIER1 <-->|查询 waitsForHuman 与在场负责人| CONTRACT
-  TIER2 -->|下行信号| SIGNAL
-  SIGNAL <-->|按需拉取全文/上下文| PULL
-  SIGNAL -->|上行信号 Consumed / Report| TIER2 & CONTRACT
-  CONTRACT -->|Handback / 关单未读 letGo| ROUTER
-  CONTRACT & SIGNAL -->|需人裁决 / 最终验收| HOUT
-  HOUT -->|人类已读游标 / 拍板动作| AD_CH
 ```
 
 ---
 
-## 三、四个核心层级的模块边界与精简状态设计
+## 三、四个核心层级的极简职责与正交状态设计
 
-### 第 1 层：接入与载荷模块（`src/ingress`）—— 解决「外部与内部事件怎么标准化进网关」
+理顺层序后，你提出的四层架构在代码里呈现出一一对应、干净利落的边界：
 
-**为什么要独立切分 `ingress`（或将各源的入站标准化收拢）？**
-因为 `Channel` 是内部聊天室，`Project` 是本地 git 操作，它们都不应该背负「外部事件归一化」的职责。
+### 1. 接入与载荷层（`Gateway / Ingress`，位于顶层）—— 解决「外部消息怎么进系统」
+- **只管真正来自外部的输入**：
+  1. **GitHub 增量轮询（`github`）**：轮询开着的 PR 的 `check-runs` 指纹变化、PR Review 与行内评论（带 `path:line` 和 `diff_hunk` 尾部），过滤 Agent 自发消息（Self-Echo Drop），生成 `Trigger` + 600 字定长 `CompactCard`（带 `vv://github/<proj>/pulls/<n>/...` 指针），直接调下层 `Mailbox` 投进对应工单的蓄水池。
+  2. **人类聊天与外部连接器（`channel` / `connector` / `voice`）**：写入 `channel_message` 后，生成定长 `CompactCard`（带 `vv://trigger/<id>` 指针），直接调下层 `Mailbox` 投递。
+- **砍掉的冗余**：
+  - **删除 「旧路径：apps/server/src/ingress/issue.ts（已删除）」 与 `issue_dispatch` 表**：`Issue` 本来就在 `Mailbox` 上面，派活直接调 `Mailbox`；
+  - **删除 「旧路径：apps/server/src/ingress/cron.ts（已删除）」 与 `cron_occurrence` 表**：`Cron` 本来就在 `Mailbox` 上面，到点直接调 `Issue` 与 `Mailbox`。
 
-1. **职责边界**：
-   - **管什么**：把 8 类事件源（GitHub 轮询、微信/飞书/QQ 连接器、频道/串内人类发言、看板动作、语音通话、定时 `Cron`、巡查 `Patrol`）统一转换为不可变的 **`Trigger`（入站信封）**，并生成定长的 **`CompactCard`（载荷卡片）**。
-   - **不管什么**：不管这条事件该分给哪个工单或哪个 Agent（交给第 2 层 `Mailbox`）；不管本地 git 合并（留给 `Project`）；不管聊天室的点赞/置顶（留给 `Channel`）。
-2. **核心机制**：
-   - **GitHub 增量接入器（`src/ingress` 的 GitHub 子模块）**：轮询绑定 PR 的 `check-runs`/`statuses` 指纹变化、PR Reviews、Inline Review Comments（提取 `path:line` 与 `diff_hunk` 尾部），自动丢弃 Agent 自己的发言（Self-Echo Drop），生成 `source = "github"` 的 `Trigger`。
-   - **定长卡片化（Payload Cardification）**：所有 `Trigger` 带 `card: { summary, totalChars, readUri }`（如 `vv://trigger/<id>` 或 `vv://github/<proj>/pulls/<n>/thread/<c>`），从源头保证长日志和大文件绝不直接塞进信箱。
-   - **状态数量**：**0 个状态**（`Trigger` 是纯不可变事实记录，按确定性 `id` 幂等去重）。
+### 2. 网关与双层信箱层（`src/mailbox`，位于第 5 层）—— 解决「怎么蓄水、怎么分流、怎么节流」
+- **对外只暴露一套统一入口，内部两级蓄水**：
+  1. **Tier 1：工单蓄水池（`mailbox_issue` + `mailbox_subscription`）**
+     - 状态仅 3 个：`held`（因工单处于 `asking / stuck / reviewing` 等人类拍板、或排队无帮工、或 Review Bot 超 3 轮而挂起蓄水）→ `forwarded`（已下发给在场 `Worker Session`）| `returned`（被帮工 `handback` 退回、或关单时未消费追问 `letGo` 释放给管家）。
+     - **核心分流规则**：命中工单订阅的人类消息直接归属该工单（锁定 `followupOwner`，跳过管家，防管家抢建重复新单），并自动打开 `waitsForHuman` 冻结阀门，把池中挂起的 CI/Bot 消息一并放行！
+  2. **Tier 2：会话执行信箱与节流泵（`mailbox_delivery` + `pump.ts`）**
+     - 收件人统一是 **`session_id`（无论是管家的 `Orchestrator Session` 还是帮工的 `Worker Session`）**。
+     - 状态仅 4 个：`pending` → `handed` → `consumed`（收到模型真实入模信号后打 👀）| `dropped`。
+     - 统一由纯函数 `urgencyOf` 算 4 档（`interrupt | steer | queue | digest`），统一过三道刹车（`hopLimit = 4`、`cooldown = 60s`、`wakeBreaker = 3`）。
+- **砍掉的冗余**：
+  - 合并 `Mailbox.receive` 与 `Mailbox.routeChannel` / `hearChannel`，消除两套重复的写表与跳数统计逻辑。
 
----
+### 3. 契约与工单层（`src/issue`，位于第 7 层）—— 解决「干什么活、边界在哪、父子 DAG 怎么推进」
+- **只有 `Issue` 这一种工作项，只有 1 套状态机（6 个状态）**：
+  - `backlog`（草稿）→ `todo`（排队/等依赖）→ `in_progress`（在做）→ `in_review`（等验收）→ `done` | `canceled`。
+  - **原生父子与 `blockedBy` DAG**：已彻底砍掉原 `src/task` 模块和 `GraphState`（7 个状态）、`TaskState`（5 个状态）、`graph-draft / graph-ready / task-failed`（3 个 Inbox 状态）。子工单就是真 `Issue`，前置 `blockedBy` 全部 `done` 时自动派发，子工单做完通过检查（含冻结文件校验）后用 `git merge-tree` 自动合入父工单分支（`delivered: "merged_into_parent"`），全部子工单完成后父工单自动进入 `in_review`。
+  - **三大工单契约**：
+    1. `Mandate`：绑定 `originTriggerId` 一手源，管家附言 ≤ 30 词，帮工直接读一手源；
+    2. `pullRequest` 在途闭环：帮工通过本地 `.vibevalley/check` 后可直接调 `issue_report(prSubmit: true)` 开/更新 PR 并订阅 CI 与 Review，不必等主人点「完成」才开 PR；
+    3. `Handback & LetGo`：帮工调 `issue_handback` 将串内跑题追问退回管家另立新单；关单时未读追问自动释放回管家。
 
-### 第 2 层：网关与双层信箱模块（`src/mailbox`）—— 解决「怎么蓄水、怎么分流、怎么节流」
+### 4. 拉取原语与信号层（`src/session` 第 4 层 + `src/resource` 第 8 层）—— 解决「怎么统一管会话、怎么拉、怎么打断」
+- **正名与合并宿主**：
+  - **管家（`role: "orchestrator"`）和帮工（`role: "worker"`）都是 Agent，在运行时统一作为 `Session`（Agent 会话）管理**，共用 `session` 表与 `session_run` 表。
+- **双向信号（Signals：Mailbox ⇄ Session）**：
+  - 下行：`Wake`（人类追问享 `+1` 特权并发槽）、`Steer`（`packages/agent/src/core/loop.ts` 在 Step 边界用 `takeAll` 一次性排空全部待插话卡片）、`Preempt`（打断时未 `Consumed` 的投递自动退回 `pending`）。
+  - 上行：`Consumed(envelopeIds)`（消息真正写入模型请求历史时触发，取代靠 `spoke` 猜）、`Settling`（回合结束但后台任务仍在跑时守候槽位）、`HandedOff`（移交人类验收时释放槽位但保留预览 Server）。
+- **统一只读拉取原语（`resource_read`）**：
+  - 统一通过 `vv://trigger/<id>`、`vv://issue/<id>`、`vv://channel/<id>/messages`、`vv://github/<proj>/pulls/<n>/checks` 与 `/thread/<c>`、`vv://session/<id>/trajectory` 分页拉取；`offset = 0` 写入会话级 LRU `TextCache` 快照，`offset > 0` 在同一快照上按 UTF-16 切片。
 
-**为什么要切分成「双层信箱」，又如何做到状态极简？**
-因为**「工单/话题（Work Item）」和「Agent 会话（Session）」的生命周期不同步**。当工单还在排队、正在换帮工、或者正卡在 `asking` 等主人拍板时，冲着这张工单来的事件（如 CI 报错、PR 评论、补充说明）必须先在**工单级蓄水**，而不能直接塞给某个 `Session`。
-
-但双层信箱**不需要复杂状态机**，每层只需要 **3 个正交状态**：
-
-#### 2.1 第一层（Tier 1）：订阅路由网关与工单蓄水池
-1. **线程订阅表（`mailbox_subscription`）**：
-   - 记录工单订阅了哪些 `thread_key`（例如内部工单串 `channel:<thread_id>`、GitHub PR `github:<repo>#<pr>`）。
-2. **网关分流决策（纯函数 `routeTrigger`）**：
-   - **命中订阅工单**：
-     - 若是人类（`owner`）消息：**锁定 `followupOwner` 为该工单**（直接跳过管家，防止管家在旁误建重复新单！），解除该工单的 `waitsForHuman` 冻结阀门，连同池中暂存的信号一起下发给该工单当前的 `Worker Session`（若工单刚关单且非人工取消，则自动唤醒原 `Worker Session` 续接）。
-     - 若是自动信号（CI 变化、Bot 评论、定时）：进入该工单的 Tier 1 蓄水池。若工单当前 `waitsForHuman === true`（正等主人回答或排障）或该 PR 的 Review Bot 已满 3 轮，则状态设为 **`held`（挂起蓄水，不下发 Tier 2）**；否则直接下发 Tier 2。
-   - **未命中任何工单（或被帮工 `handback` 退回）**：
-     - 分流至对应频道管家的 **`Orchestrator Session`** Tier 2 信箱。
-3. **Tier 1 状态枚举（仅 3 个）**：
-   - `held`（因工单等人类拍板或排队无帮工而蓄水挂起）→ `forwarded`（已下发至 Tier 2 会话信箱）| `returned`（被帮工 `handback` 退回或关单未读 `letGo` 释放回网关交给管家）。
-
-#### 2.2 第二层（Tier 2）：统一面向 `Session` 的执行信箱与节流泵
-1. **收件人统一是 `session_id`**：
-   - 不再分「管家的 5 条内存流」和「帮工的 `channel_delivery`」——管家的 `Orchestrator Session` 和帮工的 `Worker Session` 都是 `Session`，全部由同一张 `mailbox_delivery` 表和同一个节流泵驱动。
-2. **Urgency 四档裁决 + 三道刹车**：
-   - 纯函数算 `Urgency`：`interrupt`（叫停）| `steer`（主人对话，Step 边界整批注入）| `queue`（派单/PR 评审/CI 失败/帮工异常汇报，下一轮开跑）| `digest`（普通旁听/完成汇报/巡查，攒批捎带）。
-   - 出水口统一过三道刹车（`hopLimit = 4`、`cooldown = 60s`、`wakeBreaker = 3`）。
-3. **Tier 2 状态枚举（仅 3 个，砍掉旧的 `announced` 中间态）**：
-   - `pending`（待交）→ `handed`（已发信号，等入模确认）→ `consumed`（收到第 4 层 `Signal.Consumed` 确认入模，打 👀）| `dropped`（会话离开或消息撤回）。
-
----
-
-### 第 3 层：契约与工单模块（`src/issue`）—— 解决「干什么活、边界在哪、父子 DAG 怎么走」
-
-**模块切分核心决策：把原 `src/task`（计划图）收编进 `src/issue`，砍掉整套平行的 `GraphState` / `TaskState`，让 `Issue` 成为唯一的工作项与契约模块。**
-
-1. **唯一的工单状态机（保持现有 6 个状态，零新增状态）**：
-   - `backlog`（草稿/待规划）→ `todo`（已派活排队/等前置依赖）→ `in_progress`（帮工 Session 在做）→ `in_review`（等验收）→ `done`（已完成）| `canceled`（已取消）。
-2. **原生父子与 `blockedBy` DAG（取代原 `TaskGraph` 状态机）**：
-   - 任何 `Issue` 都可以有 `parent`（父工单 ID）和 `blockedBy`（前置工单 ID 列表，复用 `@vibevalley/agent/dag` 做环检测与分层）。
-   - **拆解**：规划师或帮工调 `issue_split` 时，直接在父工单下创建一组带 `blockedBy` 的子 `Issue`（它们是拥有完整能力的真工单，不再是 `moves: []` 的假工单！）。
-   - **按 DAG 自动调度**：`todo` 状态的工单，当且仅当其 `blockedBy` 列表中的工单全部 `done`（或取消跳过）时，才由调度器派发 `Worker Session`。
-   - **父子分支自动汇合**：有 `parent` 的子工单从父工单分支（`vibevalley/issue-<父号>`）开 worktree；子工单做完且通过检查（含冻结测试校验）后，自动用 `git merge-tree` 无检出合入父工单分支并标为 `done`（`delivered: "merged_into_parent"`）；当父工单下所有子工单都 `done` 时，父工单自动进入 `in_review` 请主人点「完成」合入 `main`。
-3. **三大工单契约（属性字段，非新状态机）**：
-   - **源头与授权契约（`Mandate`）**：记录 `originTriggerId`（帮工可直接拉取主人的一手原话与上下文，管家建单附言硬限 ≤ 30 词，禁止替帮工瞎编方案）、`deliver`（`change | pull_request | branch | answer`）。
-   - **在途 PR 跟随契约（`pullRequest`）**：在 PR 项目上，允许帮工在通过本地 `.vibevalley/check` 后直接调 `issue_pr_submit`（或随报告提交）由服务端 `git push` 并创建/更新 PR，将 PR 线程注册进 `Mailbox` 订阅表，立即开启 CI 与 Code Review 自动闭环，不必等主人点「完成」才开 PR。
-   - **追问退回契约（`issue_handback` 与关单 `letGo`）**：帮工发现工单串里的追问超出本工单范围时，调 `issue_handback(trigger_id, reason)` 将其退回第 2 层网关转交管家另建新单；工单关单时，自动检查是否有在最后一次汇报之后才到达、未被回應的人类追问（`letGo`），自动释放回管家。
+### 5. 镜像层：Human-in-the-Loop 人类交付与回执（`src/inbox`，位于第 8 层）
+- **复用 `channel_read_cursor`（主人已读游标），零新增表、零新增状态**：
+  - **主人未读前（`read_cursor < 汇报消息号`）**：若帮工在后续轮次自己解决了问题或更新了问题，自动使旧汇报失效并从 `connector_outbox` 静默撤回，不让主人读过期问题；
+  - **主人在场已读后（`read_cursor >= 汇报消息号`）**：抑制往微信/飞书重复推送，且 `Patrol` 巡查对已读项自动将宽限期拉长至 2 小时以上，不催促正在思考的主人。
 
 ---
 
-### 第 4 层：拉取原语与信号模块（`src/session` + `src/resource`）—— 解决「怎么统一管会话、怎么拉、怎么打断」
+## 四、核心状态事实（`Fact`）与隐性债务减法总表
 
-#### 4.1 统一 `Session` 服务（正名：管家和帮工都是 Agent，都跑在 `Session` 上）
-- **合并宿主**：把原来管家的 `AgentHost` + `InProcessRun` 与帮工的 `Session` 统一为同一个 `Session` 服务。
-  - `Session` 按绑定的 `Agent.role` 分为两类实例：**`Orchestrator Session`（常驻进程内 `Brain`）** 与 **`Worker Session`（经 `Executor` 驱动 `oar` 或 `Brain`，绑定工单 worktree 或私聊目录）**。
-  - 两者共用同一张 `session` 表、同一张 `session_run` 表、同一套事件日志 `Journal`，以及**同一套阶段状态 `SessionPhase`（`working | resting | done | failed | closed`，砍掉管家专用的 4 个 `OrchestratorState`）**。
-- **标准双向信号协议（Signals：Mailbox ⇄ Session）**：
-  - **下行信号**：
-    1. `Signal.Wake(batch)`：空闲时开启新 `Run`（自动前置拼入 `Memory.recall`）；**若触发源为 `owner` 的评论追问，在 `hiring.ts` 中享有 `+1` 人类唤醒特权槽**，永不被排队的新工单堵死。
-    2. `Signal.Steer(batch)`：运行中注入补充卡片；**将 `packages/agent/src/core/loop.ts:307` 的 `takeOne(steering)` 升级为 `takeAll(steering)`**，在当前 Step 工具跑完后一次性排空全部待插话卡片，合成同一次模型请求。
-    3. `Signal.Preempt(reason)`：显式叫停信号；被打断时，凡已 `handed` 但尚未收到 `Signal.Consumed` 的投递自动退回 `pending`，下一轮开头绝不丢消息。
-  - **上行信号**：
-    1. `Signal.Consumed(ids)`：消息真正写入模型请求历史时发出（取代靠 `spoke` 猜的做法），驱动 `Mailbox` 标为 `consumed` 并打 👀。
-    2. `Signal.Settling` vs `Signal.HandedOff`：回合结束但仍有子任务/后台命令在跑时守候槽位；交回给主人验收（`HandedOff`）时立即释放干活槽位，但允许保留本地预览 Server 进程供主人验收。
+### 4.1 协议层 `Fact` 从 23 个收敛为 15 个正交事实
 
-#### 4.2 独立只读拉取服务（`src/resource`：Pull Protocol `resource_read`）
-- 从杂乱的业务工具中切出专门的只读上下文拉取层，向管家 Session 和帮工 Session 提供统一的 `resource_read({ uri, offset, limit })`：
-  - 支持 `vv://trigger/<id>`（含同串前后 5 条邻居消息 `around`）、`vv://issue/<id>`、`vv://channel/<id>/messages`、`vv://github/<project>/pulls/<n>/checks`、`vv://github/<project>/pulls/<n>/thread/<comment_id>`、`vv://session/<id>/trajectory`。
-  - **内置会话级 LRU 快照缓存（`TextCache`）**：`offset = 0` 拉取并冻结快照，`offset > 0` 在内存快照上按 UTF-16 切片翻页，既防翻页错行，又避免重复调 `gh` CLI。
-  - **契约墙鉴权**：Worker Session 只能拉取自己工单关联的资源。
-
----
-
-### 镜像出站层：Human-in-the-Loop 人类交付与回执模块（`src/inbox`）
-
-当第 3 层工单进入需要人类介入的 4 个节点（`backlog` 审草稿、`asking` 答问题、`stuck` 排障、`reviewing` 最终验收）时，由 `Inbox` 模块统一负责**「交付给人（Deliver to Human）」**：
-
-1. **人类交付门禁（Outbox Gate）**：
-   - 只有上述 4 类 HITL 节点、管家的直接回话、以及 `@主人` 提及才允许进入 `Inbox` 和外部连接器（`connector_outbox`）；帮工在途的中间动作与等待外部 CI 的过程一律留在内部，不打扰主人。
-2. **复用 `channel_read_cursor` 实现未读撤回与已读防打扰（零新增表、零新增状态）**：
-   - **未读撤回（`read_cursor < 汇报消息号`）**：主人在工作台没读过该提问、或 `connector_outbox` 还没发出时，若帮工在后续步骤自己解决了问题或更新了问题，直接从 `connector_outbox` 撤回旧通知，不让主人读过期废话。
-   - **已读静默（`read_cursor >= 汇报消息号`）**：主人在工作台点开了该工单串（游标已推过），代表主人已 **Seen（在场已读）**——连接器不再往微信/飞书重复发，巡查 `Patrol` 对已读项自动拉长宽限期，不催促正在思考的主人；但若已读后工单状态又发生了意外变化（如刚通过的 CI 突然挂了），则必须发增量提醒。
-
----
-
-## 四、重构后的模块分层表与状态账本（既切清了模块，又砍掉了冗余状态）
-
-### 4.1 服务端十三模块单向依赖序（`apps/server/src/modules.ts`）
-
-消除「`Orchestrator` 在最顶层统治一切」和「`Channel` 兼职事件总线」的旧格局，调整为 `apps/server/src/modules.ts` 的 13 模块流水线分层（由 `apps/server/src/modules.test.ts` 强制守门）：
-
-| 层序 | 模块名（`modules.ts`） | 包含目录（`apps/server/src/`） | 核心单一职责 |
+| 所属模块 | 旧 `Fact`（23 个） | 收敛后的标准 `Fact`（15 个） | 清理掉了什么混乱 |
 |---|---|---|---|
-| **1** | **Platform** | `base`, `infra`, `core`, `setting` | 地基、PGlite、配置与核心状态单写者 `Core` |
-| **2** | **Agents** | `agent`, `runtime`, `memory` | Agent 档案定义（`orchestrator` \| `worker`）、农机探测与配额、跨档案记忆检索 |
-| **3** | **Source Control** | `project` | 纯本地 Git 仓库、worktree、冲突预检（`merge-tree`）、`.vibevalley/check` 与 `gh` 命令封装 |
-| **4** | **Agent Sessions** | `executor`, `session` | **统一的 Agent 会话层**（同时托管管家 Session 与帮工 Session）与第 4 层双向信号（`Wake/Steer/Preempt/Consumed`） |
-| **5** | **Collaboration** | `channel`, `artifact` | 纯内部聊天室账本（频道/串/消息/已读游标 `read_cursor`）与协作产出（块/网页） |
-| **6** | **Issues** | `issue`, `cron` | **唯一工作项与契约层**（含原生父子与 `blockedBy` DAG、Mandate、PR Follows、Handback、`waitsForHuman` 判定；收编原 `task`） |
-| **7** | **Mailbox** | `mailbox` | **双层信箱与路由网关**（Thread 订阅表、Tier 1 工单蓄水池、Tier 2 Session 信箱泵、`Urgency` 4 档 + 三道刹车） |
-| **8** | **Ingress** | `ingress` | **第 1 层入站标准化器**（GitHub/连接器/频道/定时/巡查统一转不可变 `Trigger` + `CompactCard`） |
-| **9** | **Resource** | `resource` | **第 4 层统一只读拉取服务**（`resource_read`、会话级 LRU 快照缓存 `TextCache` 与契约墙鉴权） |
-| **10** | **Inbox** | `inbox` | **Human-in-the-Loop 人类交付门禁、已读游标联动（撤回/抑制/巡查）** |
-| **11** | **Orchestrator** | `orchestrator`, `tool` | 管家路由策略、现状生成与工具表绑定 |
-| **12** | **Gamification** | `game` | 游戏化账本、金币成就与农场皮投影计算 |
-| **13** | **Gateway** | `http`, `mcp`, `lan`, `connector`, `voice`, `projection` | 对外 HTTP/SSE/RPC/MCP 协议口、连接器长连接收发、声网语音通道与状态帧拼装 |
+| **Session** | `hired`, `left`, `phase`, `run`, `doing`, `quiet`, `retry`, `spent`, `report` | **`session`**（入场/更新）<br>**`sessionGone`**（离场）<br>**`sessionPhase`**（合并 `phase/run/doing/quiet/retry/spent`）<br>**`sessionReport`**（轮次报告） | 废除「雇佣管家（`hired`）」拟人词；消除 5 个重复改 `Session.phase` 的碎片 Fact |
+| **Issue** | `issue`, `issueGone`, `conflict`（原挂在 Session） | **`issue`**（内置 `conflict`）<br>**`issueGone`** | 分支冲突物归原主回到 `Issue`，换帮工不丢冲突状态 |
+| **Channel** | `channel`, `channelGone`, `message`, `ownerMentions` | **`channel`**, **`channelGone`**, **`message`**, **`ownerMentions`** | 保持不变 |
+| **Cron** | `cron`, `cronGone` | **`cron`**, **`cronGone`** | 保持不变 |
+| **Gateway** | `call`, `connector` | **`voiceCall`**, **`connector`** | `call` 正名为 `voiceCall`，免与 tool call 混淆 |
+| **Game** | `progress`, `commits`, `station` | **`gameProgress`**（合并三者） | 游戏金币、commit 等级与地块坐标收拢，不再霸占通用词 `progress` |
 
-### 4.2 全局状态精简账本（切清模块的同时，状态不增反降）
+### 4.2 数据库表与存储瘦身账本
 
-| 模块 | 拥有的状态枚举 | 取值（每个模块仅 3–6 个正交值） | 砍掉了什么旧包袱 |
-|---|---|---|---|
-| **`Ingress`** | 无状态（纯不可变 `Trigger`） | 按幂等 `id` 去重 | 砍掉 7 处散装入口各自拼字符串的野路子 |
-| **`Mailbox` (Tier 1)** | `IssueMailState`（3 个） | `held` \| `forwarded` \| `returned` | 取代原 `issue_queue`，并统一承接 `asking/stuck` 期间挂起的 CI/Bot 信号 |
-| **`Mailbox` (Tier 2)** | `DeliveryState`（4 个） | `pending` \| `handed` \| `consumed` \| `dropped` | 砍掉旧的 `announced` 态，统一管家与帮工的投递 |
-| **`Issue`** | `IssueStatus`（6 个） | `backlog` \| `todo` \| `in_progress` \| `in_review` \| `done` \| `canceled` | **净砍掉原 `TaskGraph` 的 12 个状态（`GraphState` 7 个 + `TaskState` 5 个）和 `Inbox` 的 3 个特例状态** |
-| **`Session`** | `SessionPhase`（5 个） | `working` \| `resting` \| `done` \| `failed` \| `closed` | **净砍掉管家专用的 4 个 `OrchestratorState`**，管家与帮工共用 `SessionPhase` |
-| **`Inbox` (HITL)** | 不存新状态（由 `read_cursor` 现算） | `cursor < number`（未读）\| `cursor >= number`（已读） | 零新增状态实现未读撤回、跨端防轰炸与巡查防乱催 |
+1. **已删除的 5 张冗余表**：`channel_seen_mark`、`issue_queue`、`mailbox_route`、`task_event`、`issue_follow`（合并进 `ingress_github` 与 `mailbox_subscription`）。
+2. **接下来继续砍掉的 2 张自轮询中转表**：`issue_dispatch`、`cron_occurrence`（调整模块层序后由 `Issue` 和 `Cron` 直接调 `Mailbox`）。
+3. **已淘汰的双源存储文件**：删除 `state.json`（开机直接从 `session` 表恢复）、删除 `spend.json`（迁入 `runtime_spend` 表）、统一管家 `MEMORY.md` 进 PGlite `memory` 表。
 
 ---
 
-## 五、核心状态事实（`Fact`）的命名与结构规整方案
+## 五、可执行任务单与「脚本 + 测试 + 文档」验收规范（直接交给开发者 / 智能体执行）
 
-审视 `packages/protocol/src/shapes.ts`（第 2253–2440 行）与 `apps/server/src/projection/reduce.ts` 中的 23 个 `Fact`，可以看到当前 `Fact` 体系存在明显的历史拼凑痕迹：
-
-### 5.1 现有 23 个 `Fact` 的四大命名与结构病灶
-
-1. **残留拟人隐喻导致语义荒谬（`hired` / `left`）**：
-   - 会话开启叫 `FactHired`（`type: "hired"`），会话关闭叫 `FactLeft`（`type: "left"`）。
-   - 现在管家（`role: "orchestrator"`）也放进了 `state.sessions`（`reduce.ts:47`），结果开机启动内置常驻管家时，发的事实竟然也是 `hired`（「雇佣了管家」），关机时叫 `left`！
-2. **`Session` 一家独占了 11 个无主语的碎片 Fact，且 6 个在重复改同一个 `phase` 字段**：
-   - `Issue`、`Channel`、`Cron` 都是干净的实体级 Fact（`issue` / `issueGone`、`channel` / `channelGone`、`cron` / `cronGone`）。
-   - 唯独 `Session` 散落着 11 个没有 `session` 前缀的裸词：`hired`、`phase`、`station`、`run`、`doing`、`quiet`、`retry`、`spent`、`report`、`conflict`、`left`。
-   - 更严重的是：**在 `shapes.ts` 中，`doing`、`quietSince`、`retry` 本来就是 `Session.phase`（`PhaseWorking`）内部的子属性**！但代码里既有一个给管家用的 `FactPhase`（直接传整个 `phase`），又有给帮工用的 `FactRun`、`FactDoing`、`FactQuiet`、`FactRetry`（各自去改 `phase` 的一个子字段），完全是两套写法并存。
-3. **属性挂错聚合根（`FactConflict` 挂在 `Session` 而非 `Issue` 上）**：
-   - 代码冲突（`conflict`）明明是**工单分支（`Issue`）与主分支**之间的 Git 状态，现在却定义成 `FactConflict { id: SessionId, conflict?: Conflict }` 挂在帮工会话上。一旦帮工收工离开或换人，冲突状态就跟着会话没了。
-4. **通用词被游戏皮占用（`FactProgress`、`FactStation`）**：
-   - `FactProgress`（`type: "progress"`）实际存的是像素农场的**金币、连胜与成就（游戏进度）**，却霸占了 `progress` 这个最容易被误认为「工单/任务执行进展」的核心词；`FactStation` 则是纯农场皮的站位。
-
-### 5.2 规整原则与收敛对照表（从 23 个收敛为 14 个正交 Fact）
-
-**规整三原则**：
-1. **废除拟人隐喻**：`hired` / `left` 统一正名为 `session` / `sessionGone`（或 `session.opened` / `session.closed`），与 `issue` / `issueGone`、`channel` / `channelGone`、`cron` / `cronGone` 保持完全一致的命名队形。
-2. **子属性变更收拢进 `sessionPhase`**：`run`（进 `working`）、`doing`（更新当前工具动作）、`quiet`（标静默）、`retry`（标重试）本质上全是在更新 `Session.phase`，统一由 `FactSessionPhase`（`type: "sessionPhase"`）承载，消除管家与帮工的两套更新路径。
-3. **物归原主**：`conflict` 归还给 `Issue`；游戏皮肤专用的 `progress`、`commits`、`station` 明确加上 `game` 语义前缀（或收拢为 `FactGame`）。
-
-| 所属模块 | 现有 `Fact`（23 个） | 存在的问题 | 规整后的 `Fact`（14 个） | 规整后的职责说明 |
-|---|---|---|---|---|
-| **Session**<br>（Agent 会话） | `hired`<br>`left`<br>`phase`<br>`run`<br>`doing`<br>`quiet`<br>`retry`<br>`spent`<br>`report` | • `hired`/`left` 是旧工人隐喻，套在管家会话上语义荒谬；<br>• `phase`/`run`/`doing`/`quiet`/`retry` 5 个 Fact 全在改 `session.phase`；<br>• 缺少 `session` 主语前缀 | **`session`**（原 `hired`）<br>**`sessionGone`**（原 `left`）<br>**`sessionPhase`**（合并 `phase`/`run`/`doing`/`quiet`/`retry` + `spent`）<br>**`sessionReport`**（原 `report`） | • `session`：会话（管家或帮工）创建/入场或基础属性更新；<br>• `sessionGone`：会话结束离场；<br>• `sessionPhase`：会话阶段（含 `working` 下的 `doing`/`quietSince`/`retry`）及实时花费更新；<br>• `sessionReport`：一轮 `Run` 结束并交出结构化报告 |
-| **Issue**<br>（工单与契约） | `issue`<br>`issueGone`<br>`conflict`（原挂在 Session 上） | `conflict` 是工单分支与主分支的冲突，挂在 Session 上导致换帮工时丢失 | **`issue`**（含 `conflict` 字段）<br>**`issueGone`** | • `issue`：工单创建或状态/契约/PR/冲突更新；<br>• `issueGone`：工单删除 |
-| **Channel & Mailbox**<br>（频道与信箱） | `channel`<br>`channelGone`<br>`message`<br>`ownerMentions` | 命名基本清晰，保持队形 | **`channel`**<br>**`channelGone`**<br>**`message`**<br>**`ownerMentions`** | • `channel` / `channelGone`：频道或串的增改删；<br>• `message`：新消息入账；<br>• `ownerMentions`：未处理的 `@主人` 集合更新 |
-| **Cron**<br>（定时任务） | `cron`<br>`cronGone` | 命名清晰，保持不变 | **`cron`**<br>**`cronGone`** | 定时任务的增改与删除 |
-| **Gateway**<br>（外联与语音） | `call`<br>`connector` | `call` 偏泛（易与工具调用混淆） | **`voiceCall`**（原 `call`）<br>**`connector`** | • `voiceCall`：语音通话状态变化；<br>• `connector`：外部连接器状态变化 |
-| **Game**<br>（农场皮与游戏账本） | `progress`<br>`commits`<br>`station` | `progress` 极易被误认为任务进度；`station` 是农场皮的坐标 | **`gameProgress`**（合并 `progress` + `commits` + `station`） | 统一承载金币、成就、等级（commit 数）与农场画面站位，不再占用顶层业务词汇 |
+以下 **5 张收口任务单（Task 1 ～ Task 5）** 每一张都给出了精确的文件路径、修改契约和可一键复制执行的验收命令。执行人每完成一张单，必须贴出对应「脚本检查 + 测试运行 + 文档校验」的终端输出作为交单凭据。
 
 ---
 
-## 六、全仓隐性架构债务盘点与减法清单（表结构、协议、存储、传输）
-
-顺着「模块切分清晰、状态与存储极简正交」的标准继续深挖 `apps/server/db/migrations/0001_schema.up.sql`、`packages/protocol/src/shapes.ts` 与 `apps/server/src/`，还可以一次性清掉以下 **7 项隐性技术债**：
-
-### 债务 1：四套重叠的「执行关联与最近一轮记录」（`issue.last_run` vs `session_run` vs `issue_assignment_execution`）
-
-- **代码现场**：
-  - `0001_schema.up.sql:167` 在 `issue` 表上存了一个 JSON 列 `last_run`（对应 `T.Issue.lastRun?: IssueRun`），专门记「管家（进程内 Agent）在这张工单上的最近一轮」；
-  - `0001_schema.up.sql:180` 的 `issue_assignment_execution` 表专门建了一个枚举 `executor_kind ('session' | 'orchestrator')`；
-  - 同时系统里已经有 `session_run` 表（第 269 行）、`session_run_issue` 表（第 412 行）和 `T.Session.lastRun`（`shapes.ts:517`）。
-- **根因**：全是因为以前「管家不进 `session` 表」，导致派给管家的工单找不到关联的 `Session`，只能在 `issue` 表和关联表上打补丁。
-- **减法方案**：
-  1. 管家会话（`Orchestrator Session`）统一进 `session` 表后，**直接删除 `issue.last_run` 列和 `T.IssueRun` 类型**；
-  2. **删除 `issue_assignment_execution_executor_kind` 枚举**，`issue_assignment_execution.executor` 统一外键指向 `session(id)`。
-
-### 债务 2：三张表重复记录「谁看过了哪条消息」（`channel_read_cursor` vs `channel_seen_mark` vs `mailbox_delivery`）
-
-- **代码现场**（`0001_schema.up.sql:108-119, 227-247`）：
-  - `channel_read_cursor (participant_id, channel_id, read_number)` 记每个参与者在每个频道/串读到了第几条 `number`；
-  - `channel_seen_mark (participant_id, message_id)` 又单独建表记某个参与者看没看过某条 `message_id`；
-  - `mailbox_delivery` 第三处记某个 `session_id` 对某条消息的 `state = 'seen'` 与 `seen_at`。
-- **根因**：早期频道模块的「新鲜度拦截（发话前先看未读）」自己建了 `channel_seen_mark`，后来加信箱投递和已读游标时没有合并。
-- **减法方案**：
-  - 频道与串内的消息拥有严格递增的 `number`（1, 2, 3…）。人类的已读进度和帮工主动调用 `channel_message_list` 的阅读进度统一只看 **`channel_read_cursor.read_number`**；帮工被动收到的投递回执统一只看 **`mailbox_delivery.seen_at`**。
-  - **直接删除 `channel_seen_mark` 表**，消除三处写已读的事务负担。
-
-### 债务 3：排队与路由碎片表（`issue_queue` 与 `mailbox_route`）
-
-- **代码现场**（`0001_schema.up.sql:254-267, 418-422`）：
-  - 既有 `issue_queue (issue, channel, triggered_by)` 记工单排队上下文，又有 `mailbox_issue (trigger_id, issue_id, state, ...)` 记工单蓄水池，还有一张只有两列的 `mailbox_route (envelope_id, routed_at)`。
-- **减法方案**：
-  1. **删除 `issue_queue` 表**：工单在 `todo` 排队等空位时，触发它的原始 `Trigger` 本来就躺在 `mailbox_issue`（状态 `held`）里，空位释放时直接从 `mailbox_issue` 取出来派发 `Session`，不需要两张排队表；
-  2. **删除 `mailbox_route` 表**：一个 `Trigger` 是否已完成路由，直接作为 `ingress_trigger` 表上的状态/时间戳列（`routed_at`），省去跨表 join。
-
-### 债务 4：数据库中重复定义 4 次的 Actor 枚举（`ActorKind` 碎片化）
-
-- **代码现场**（`0001_schema.up.sql:6, 282, 293, 319`）：
-  - `task_event_actor`、`cron_set_by`、`memory_author` 三个 Postgres `ENUM` 的取值完全相同（`'owner', 'orchestrator', 'session', 'system'`），外加 `channel_participant_kind` 和协议层的 `TriggerActorKind`。
-- **减法方案**：
-  - 在 `0001_schema.up.sql` 顶部只定义一个全局共用的 **`actor_kind` 枚举**；
-  - 随着 `TaskGraph` 并入 `Issue`，**直接删除 `task_event` 表及其两个枚举（`task_event_kind`、`task_event_actor`）**，工单与子工单的里程碑统一由 `issue/timeline.ts` 的 `milestonesOf` 生成。
-
-### 债务 5：存储双源分裂（PGlite 数据库 vs 家目录散落的 `state.json`、`spend.json`、`MEMORY.md`）
-
-- **代码现场**（`docs/architecture.md:96-111`）：
-  1. **`state.json` 与 `session` 表双源对账**：`session` 表（`0001_schema.up.sql:202`）其实已经持久化了 `place`、`oar_session`、`last_text`、`recalled`、`pending_report`；但核心状态里的 `sessions` 和 `commits` 却还在防抖写 `state.json`，开机时两边对账，对不上就报 `lost`。
-  2. **`spend.json` 与 `session_run.spent` 双源记账**：每轮花费已经记在 `session_run` 表和 `Runtime` 统计里，却另存一份 `spend.json`。
-  3. **管家 `MEMORY.md` 与帮工 `memory` 表双源分流**：`apps/server/src/memory/memory.ts` 被迫对管家读写磁盘文本文件 `MEMORY.md`（按行算 hash），对帮工读写 PGlite 的 `memory` 表（而 `memory` 表第 317 行早就预留好了 `scope` 等字段）。
-- **减法方案**：
-  - **PGlite（`db/`）作为运行时可变状态的唯一真相源（Single Source of Truth）**：
-    - 开机直接从 `session` 表恢复在场 `Session`，**彻底删除 `state.json` 和开机双源对账逻辑**；
-    - 管家的记性统一迁入 PGlite 的 `memory` 表（可通过 `artifact.markdown.get` 导出 Markdown），消除 `memory.ts` 里的双轨分支。
-
-### 债务 6：核心业务形状 `Session` 中混入了纯像素农场动画数据（`SessionPlay`）
-
-- **代码现场**（`packages/protocol/src/shapes.ts:493-524`、`apps/server/src/projection/reduce.ts:48, 59, 63`）：
-  - 核心状态里的业务实体 `T.Session` 上挂着 `play?: SessionPlay`（内含农场站位 `station`、最近工具动画历史 `history: PlayAction[]`、碰过的文件和命令计数），每次 `FactRun`、`FactDoing`、`FactStation` 都在 `reduce` 里修改 `Session`。
-- **减法方案**：
-  - 严格遵守「先有概念，再有皮」：`T.Session` 只保留纯粹的会话业务字段；小动物在农场里的站位和动画历史移入 `FarmView`（`StateFrame.view`），由 `game` 模块订阅事件维护，让业务层 `Session` 与像素农场皮彻底解耦。
-
-### 债务 7：客户端与服务端之间同时维护 4 条长连接通道
-
-- **代码现场**（`docs/architecture.md:78-90`）：
-  - 目前同时存在 `GET /api/v1/state`（SSE 状态帧）、`GET /api/v1/live`（SSE 窄流：轨迹 step、提醒 notice、农机 runtime）、`GET /api/v1/events`（SSE 调试全流）和 `/api/v1/rpc`（Effect RPC WebSocket 频道消息流）。
-- **减法方案**：
-  - 按提案 [页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md) 的方向，将 `state`、`live` 与频道订阅收敛到同一条多路复用连接上，消除多条 SSE + WebSocket 并存的连接管理与重连复杂度。
-
----
-
-## 七、总体收益汇总：做完这套切分与减法后，系统会变成什么样？
-
-| 维度 | 清理前（现状） | 清理并切分后（目标态） |
-|---|---|---|
-| **核心业务模块切分** | `Channel`（1,949 行）兼职事件总线，`Orchestrator` 在顶层 import 14 个模块，7 处入口各走各路 | **四层流水线 + 镜像 HITL**：`Ingress`（接入标准化）→ `Mailbox`（双层信箱与路由）→ `Issue`（唯一工单与原生 DAG 契约）→ `Session & Resource`（统一会话、双向信号与 `resource_read` 拉取）+ `Inbox`（人类已读联动门禁） |
-| **协议 `Fact` 数量** | **23 个**（含 `hired`/`left` 拟人词、`Session` 11 个无前缀碎片、挂错地方的 `conflict`） | **14 个**（全部按 `<模块/实体>` 规整命名，`Session` 仅留 `session` / `sessionGone` / `sessionPhase` / `sessionReport` 4 个） |
-| **状态枚举总数** | 多套平行状态机叠加（`GraphState` 7 + `TaskState` 5 + `OrchestratorState` 4 + `InboxKind` 11…） | **净删 19+ 个状态枚举值**（砍掉独立 `TaskGraph` 状态机与管家特例状态，所有模块状态不超过 3–6 个正交值） |
-| **冗余数据库表与列** | `issue.last_run`、`channel_seen_mark`、`issue_queue`、`mailbox_route`、`task_event`、4 套重复 Actor 枚举 | **净删 4 张冗余表 + 1 个冗余 JSON 列 + 5 个重复 Postgres ENUM**，并淘汰 `state.json` 双源对账 |
-| **Agent 端到端能力** | 帮工被动等主人点按钮，PR 开出后对 CI 失败与 Code Review 完全失明，串跑题无法退回 | **全闭环自治 + 精准 HITL**：支持在途提 PR、自动盯 CI 与回复 Inline Review、3 轮 Bot 刹车、超范围追问 `handback` 退回、未读前提问自动撤回、在场已读防轰炸 |
-
----
-
-## 八、可执行任务单与「脚本 + 测试 + 文档」验收规范（供直接交接给开发者 / 智能体）
-
-为方便将剩余收口工作直接派发给其他开发者或编码 Agent 独立完成，本节先盘点当前仓库（`HEAD`）已落地的基线，再将剩余 **4 张收口任务单（Task 1 ～ Task 4）** 全部转化为包含 **「目标与不变量 → 精确修改文件与符号 → 代码/契约规范 → 脚本+测试+文档三合一验收命令」** 的可执行规范。
-
-### 8.1 当前代码库已落地基线与守门测试（Baseline Verification）
-
-以下四层主干与数据库瘦身已在当前工作区落地，任何后续修改必须保证以下基线测试 100% 绿灯：
-
-| 已落地能力模块 | 核心实现文件 | 对应的自动化验收测试命令 |
-|---|---|---|
-| **第 1 层：`Ingress` 入站标准化与卡片化** | `apps/server/src/ingress/ingress.ts`、`apps/server/src/ingress/github.ts`、`apps/server/src/base/card.ts` | `vp test run apps/server/src/ingress/ingress.test.ts apps/server/src/base/card.test.ts apps/server/src/flows/ingress.test.ts` |
-| **第 2 层：`Mailbox` 双层信箱、订阅路由与刹车** | `apps/server/src/mailbox/mailbox.ts`、`apps/server/src/mailbox/work.ts`、`apps/server/src/mailbox/pump.ts`、`apps/server/src/mailbox/urgency.ts` | `vp test run apps/server/src/mailbox/urgency.test.ts apps/server/src/mailbox/brakes.test.ts apps/server/src/mailbox/reach.test.ts apps/server/src/mailbox/deliveries.test.ts apps/server/src/flows/mailbox-order.test.ts apps/server/src/flows/returns.test.ts` |
-| **第 3 层：`Issue` 原生父子 DAG、Mandate 与 PR 跟随** | `apps/server/src/issue/dependencies.ts`、`apps/server/src/issue/mandate.ts`、`apps/server/src/issue/followup.ts`、`apps/server/src/issue/verification.ts` | `vp test run apps/server/src/issue/mandate.test.ts apps/server/src/issue/dependencies.test.ts apps/server/src/issue/assignment.test.ts apps/server/src/flows/dependencies.test.ts apps/server/src/flows/split.test.ts apps/server/src/flows/pr-follow.test.ts apps/server/src/flows/parent-pr.test.ts` |
-| **第 4 层：`Resource` 快照分页拉取与 `Session` 信号** | `apps/server/src/resource/resource.ts`、`apps/server/src/resource/textCache.ts`、`apps/server/src/tool/resource.ts` | `vp test run apps/server/src/resource/textCache.test.ts apps/server/src/tool/resource.test.ts apps/server/src/flows/settling.test.ts` |
-| **镜像 HITL 层：`Inbox` 已读游标联动与未读撤回** | `apps/server/src/inbox/inbox.ts`、`apps/server/src/inbox/patrol.ts`、`apps/server/src/inbox/items.ts` | `vp test run apps/server/src/flows/handoff.test.ts` |
-| **模块单向依赖与单基线表结构门禁** | `apps/server/src/modules.ts`、`apps/server/db/migrations/0001_schema.up.sql` | `vp test run apps/server/src/modules.test.ts apps/server/src/infra/schema.test.ts` |
-
----
-
-### 8.2 待执行的 4 张收口任务单（Actionable Task Specs）
-
-#### Task 1：收拢协议层剩余 5 个碎片 `Fact`（`run`、`doing` 并入 `sessionPhase`；`station`、`commits`、`progress` 并入 `gameProgress`）
+### Task 1：调整 `modules.ts` 层序，删除 `issue_dispatch`、`cron_occurrence` 自轮询表与 4 个反向 `attach*` 钩子
 
 - **目标与不变量**：
-  - 将 `packages/protocol/src/shapes.ts` 中现有的 18 个 `Fact` 最终收敛为第 5.2 节定义的 **14 个正交 `Fact`**；
-  - 消除 `FactRun`、`FactDoing` 与 `FactSessionPhase` 对 `Session.phase` 的双轨修改，消除 `FactStation`、`FactCommits`、`FactProgress` 对顶层业务命名空间的占用。
-- **精确修改文件与符号清单**：
+  - 将 `Mailbox` 下沉到第 5 层（紧贴第 4 层 `Agent Sessions` 之上、`Collaboration` 和 `Issues` 之下），使 `Channel`、`Issue`、`Cron`、`Inbox` 都能**从上往下直接调用 `Mailbox`**；
+  - 彻底删除 `issue_dispatch`、`cron_occurrence` 两张轮询中转表及其 3 秒轮询纤程（「旧路径：ingress/issue.ts（已删除）」、「旧路径：ingress/cron.ts（已删除）」）；
+  - 彻底删除 `chat.attachIngress`、`channel.attachDelivery`、`sessions.attachInputRegistrar`、`inbox.attachExternalChange` 四个反向可变回调。
+- **精确修改文件清单**：
+  1. `apps/server/src/modules.ts`：
+     - 将模块顺序调整为：`Platform` → `Agents` → `Source Control` → `Agent Sessions` → `Mailbox` → `Collaboration` → `Issues` → `Ingress` → `Resource` → `Inbox` → `Orchestrator` → `Gamification` → `Gateway`。
+  2. `apps/server/src/channel/chat.ts` 与 「旧路径：apps/server/src/ingress/channel.ts（已删除）」：
+     - `Channel` 直接 `yield* Mailbox`，在写消息事务提交后直接调用 `mailbox`，删除 `chat.attachIngress` 与 `channel.attachDelivery`。
+  3. `apps/server/src/issue/issue.ts`、`apps/server/src/cron/cron.ts`：
+     - `Issue` 派活/改状态直接调 `mailbox`，删除 「旧路径：apps/server/src/ingress/issue.ts（已删除）」、「旧路径：apps/server/db/queries/issue_dispatch.sql（已删除）」 及 `0001_schema.up.sql` 中的 `issue_dispatch` 表；
+     - `Cron` 到点直接调 `Issue` 与 `Mailbox`，删除 「旧路径：apps/server/src/ingress/cron.ts（已删除）」、「旧路径：apps/server/db/queries/cron_occurrence.sql（已删除）」 及 `0001_schema.up.sql` 中的 `cron_occurrence` 表；
+     - 运行 `vp run --filter @vibevalley/server db:generate`。
+  4. `apps/server/src/inbox/inbox.ts` 与 `apps/server/src/connector/connector.ts`：
+     - 将 `inbox.attachExternalChange` 改为 `Inbox` 导出的 `readonly externalChanges: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>`，由 `Connector` 订阅。
+- **脚本 + 测试 + 文档验收命令**：
+  ```bash
+  # 1. 静态脚本验收：0 个反向 attach 钩子，0 张自轮询表
+  ! rg '\battach(Ingress|Delivery|InputRegistrar|ExternalChange)\b' apps/server/src
+  ! rg '\b(issue_dispatch|cron_occurrence)\b' apps/server/src apps/server/db
+  vp run --filter @vibevalley/server db:check
+
+  # 2. 模块边界与全链路流程测试验收
+  (cd apps/server && vp test run src/modules.test.ts src/infra/schema.test.ts src/flows/ingress.test.ts src/flows/mailbox-order.test.ts src/flows/dispatch.test.ts src/cron/cron.test.ts)
+  ```
+
+---
+
+### Task 2：合并 `Mailbox` 内部的两套平行路由（`receive` 与 `routeChannel` / `hearChannel` 合一）
+
+- **目标与不变量**：
+  - 消除 `apps/server/src/mailbox/mailbox.ts` 中 `routeChannel` / `hearChannel`（第 347–431 行）与 `apps/server/src/mailbox/work.ts` 中 `receive` / `forward` 的重复实现；
+  - 所有进入 `Mailbox` 的信件（无论来自频道、工单还是 GitHub）统一走同一套「查 `mailbox_subscription` → 命中工单进 `mailbox_issue`（受 `waitsForHuman` 与 Bot 预算控制），未命中或放行后统一经 `forward` 过 `urgencyOf` + `brakes` 写 `mailbox_delivery` 并唤醒 `pump`」的单一路径。
+- **精确修改文件清单**：
+  1. `apps/server/src/mailbox/work.ts` 与 `apps/server/src/mailbox/mailbox.ts`：
+     - 将群聊的多收件人扇出（`whoHears`）合并进统一的 `Mailbox.receive` 入口，删除 `Mailbox.routeChannel` 与 `Mailbox.hearChannel` 独立分支；
+     - 保持 `mailbox/deliveries.test.ts`、`mailbox/urgency.test.ts`、`mailbox/brakes.test.ts` 全部断言不变。
+- **脚本 + 测试 + 文档验收命令**：
+  ```bash
+  # 1. 静态脚本验收：Mailbox.ts 行数显著下降，无 routeChannel / hearChannel 双入口
+  ! rg '\b(routeChannel|hearChannel)\b' apps/server/src
+  test "$(wc -l < apps/server/src/mailbox/mailbox.ts)" -le 520
+
+  # 2. 测试验收
+  (cd apps/server && vp test run src/mailbox/deliveries.test.ts src/mailbox/urgency.test.ts src/mailbox/brakes.test.ts src/mailbox/reach.test.ts src/flows/thread.test.ts src/flows/returns.test.ts)
+  ```
+
+---
+
+### Task 3：收拢协议层剩余 5 个碎片 `Fact`（`run`、`doing` → `sessionPhase`；`station`、`commits`、`progress` → `gameProgress`）
+
+- **目标与不变量**：
+  - 将 `packages/protocol/src/shapes.ts` 中的 `Fact` 最终收敛为第 4.1 节的 **15 个正交 `Fact`**；
+  - `apps/server/src/projection/reduce.ts` 的 `switch (f.type)` 精确只剩 15 个分支。
+- **精确修改文件清单**：
   1. `packages/protocol/src/shapes.ts` 与 `packages/protocol/src/schema.ts`：
-     - 在 `FactSessionPhase`（`shapes.ts:2110`）中增加可选字段 `brief?: string`；从 `Fact` 与 `SideEvent` 联合类型中删除 `FactRun`、`FactDoing` 接口及其 Codec。
-     - 新增 `FactGameProgress` 接口与 Codec，删除 `FactStation`、`FactCommits`、`FactProgress`：
-       ```ts
-       export interface FactGameProgress {
-         type: "gameProgress";
-         at: number;
-         progress?: Progress;
-         news?: ProgressNews;
-         commits?: CommitCount;
-         station?: { readonly id: SessionId; readonly station: number };
-       }
-       ```
-  2. `apps/server/src/session/facts.ts`（第 121、127、139 行）与 `apps/server/src/session/session.ts`（第 405、613 行）：
-     - 原发 `{ type: "run", id }` 与 `{ type: "doing", id, action, label }` 处，统一改为发出 `{ type: "sessionPhase", id, phase: { _tag: "working", since, doing: { action, label } } }`；
-     - 原发 `{ type: "station", id, station }` 处，改为 `{ type: "gameProgress", station: { id, station } }`。
-  3. `apps/server/src/game/game.ts`（第 71、83、130 行）与 `apps/server/src/core/core.ts`（第 180 行）：
-     - 原发 `type: "progress"`、`type: "commits"`、`type: "station"` 统一改为 `type: "gameProgress"`。
-  4. `apps/server/src/projection/reduce.ts`（第 53–86 行）：
-     - 将 `case "run"`、`case "doing"` 合并入 `case "sessionPhase"`；将 `case "station"`、`case "commits"`、`case "progress"` 合并入 `case "gameProgress"`。
-  5. `scripts/stale-names.ts`：
-     - 新增一条防回退规则，拦截 `\b(FactHired|FactLeft|FactRun|FactDoing|FactStation|FactCommits|FactProgress)\b` 重新进入代码库。
-- **脚本 + 测试 + 文档验收标准**：
-  - **脚本检查**：
-    ```bash
-    ! rg 'type:\s*"(run|doing|station|commits|progress)"' apps/server/src packages/protocol/src
-    vpx scripts/stale-names.ts
-    ```
-  - **测试与黄金数据验收**：
-    ```bash
-    vp run golden:update -- core
-    vp test run apps/server/src/session/report.test.ts apps/server/src/game/play.test.ts apps/server/src/game/game.test.ts apps/server/src/core/core.test.ts apps/server/src/core/schema.test.ts apps/server/src/projection/reduce.test.ts apps/server/src/issue/moves.test.ts
-    ```
-  - **文档同步与校验**：
-    - 更新 `docs/subsystems/session.md`、`docs/subsystems/game.md`、`docs/subsystems/core.md` 中的事实名称，执行 `vp run docs:verify` 退出码为 0。
+     - 在 `FactSessionPhase`（`shapes.ts:2110`）增加 `brief?: string`，删除 `FactRun`、`FactDoing`；
+     - 新增 `FactGameProgress { type: "gameProgress"; at: number; progress?: Progress; news?: ProgressNews; commits?: CommitCount; station?: { readonly id: SessionId; readonly station: number } }`，删除 `FactStation`、`FactCommits`、`FactProgress`。
+  2. `apps/server/src/session/facts.ts`、`apps/server/src/session/session.ts`、`apps/server/src/game/game.ts`、`apps/server/src/core/core.ts`、`apps/server/src/projection/reduce.ts`：
+     - 同步替换为 `sessionPhase` 与 `gameProgress`。
+  3. `scripts/stale-names.ts`：
+     - 新增规则拦截 `\b(FactHired|FactLeft|FactRun|FactDoing|FactStation|FactCommits|FactProgress)\b`。
+- **脚本 + 测试 + 文档验收命令**：
+  ```bash
+  # 1. 静态脚本检查
+  ! rg 'type:\s*"(run|doing|station|commits|progress)"' apps/server/src packages/protocol/src
+  vpx scripts/stale-names.ts
+
+  # 2. 黄金数据重写与单元测试
+  vp run golden:update -- core
+  (cd apps/server && vp test run src/session/report.test.ts src/game/play.test.ts src/game/game.test.ts src/core/core.test.ts src/core/schema.test.ts src/projection/reduce.test.ts src/issue/moves.test.ts)
+  ```
 
 ---
 
-#### Task 2：剥离业务实体 `T.Session` 上的像素农场字段 `play`（彻底兑现「先有概念，再有皮」）
+### Task 4：剥离业务实体 `T.Session` 上的像素农场字段 `play`（兑现「先有概念，再有皮」）
 
 - **目标与不变量**：
-  - 核心业务形状 `T.Session`（`packages/protocol/src/shapes.ts:498`）与数据库 `session` 表（`0001_schema.up.sql:188`）不再持有像素农场专用的 `play?: SessionPlay`（地块坐标 `station`、动画历史 `history`）；
-  - 农场小动物站位与动画状态完全移入 `FarmView`（`StateFrame.view.plays`），由 `game` 模块维护，页面农场皮（`apps/web/src/farm`）行为与视觉完全不变。
-- **精确修改文件与符号清单**：
-  1. `packages/protocol/src/shapes.ts` 与 `packages/protocol/src/schema.ts`：
-     - 从 `Session`（第 514 行）和 `SessionView`（第 520 行）移除 `play` 属性；
-     - 在 `FarmView`（第 909 行）新增 `plays: Record<string, SessionPlayView>`。
-  2. `apps/server/db/migrations/0001_schema.up.sql`（第 211 行）与 `apps/server/db/queries/session.sql`：
-     - 删除 `session` 表的 `play text` 列；运行 `vp run --filter @vibevalley/server db:generate` 重新生成 `apps/server/db/generated/session.sql.ts`。
-  3. `apps/server/src/game/play.ts`、`apps/server/src/game/view.ts`、`apps/server/src/projection/frame.ts`：
-     - 在 `game` 模块维护 `SessionId -> SessionPlay`，在 `frame.ts` 拼装 `StateFrame.view.plays`。
-  4. `apps/web/src/farm/` 下读取 `.play` 的组件：
-     - 改为从 `useFrames()` / `FarmView.plays[session.id]` 读取。
-- **脚本 + 测试 + 文档验收标准**：
-  - **脚本检查**：
-    ```bash
-    ! rg '\bplay\b' apps/server/db/migrations/0001_schema.up.sql apps/server/db/queries/session.sql
-    vp run --filter @vibevalley/server db:check
-    ```
-  - **测试验收**：
-    ```bash
-    vp test run apps/server/src/infra/schema.test.ts apps/server/src/game/play.test.ts apps/server/src/session/session.test.ts
-    vp run web:check
-    ```
-  - **文档同步与校验**：
-    - 更新 `docs/subsystems/session.md`（删除 `play` 是地里那一层的说明）与 `docs/subsystems/game.md`，执行 `vp run docs:verify` 退出码为 0。
+  - `T.Session`（`packages/protocol/src/shapes.ts:498`）与数据库 `session` 表（`0001_schema.up.sql:188`）删除 `play` 字段；
+  - 像素小动物站位与工具动画历史移入 `FarmView.plays`（`StateFrame.view.plays`），由 `game` 模块维护。
+- **精确修改文件清单**：
+  1. `packages/protocol/src/shapes.ts`、`packages/protocol/src/schema.ts`：从 `Session` / `SessionView` 移出 `play`，加到 `FarmView.plays: Record<string, SessionPlayView>`。
+  2. `apps/server/db/migrations/0001_schema.up.sql`、`apps/server/db/queries/session.sql`：删除 `play` 列，运行 `vp run --filter @vibevalley/server db:generate`。
+  3. `apps/server/src/game/play.ts`、`apps/server/src/game/view.ts`、`apps/server/src/projection/frame.ts`、`apps/web/src/farm/`：将 `play` 的读写改走 `FarmView.plays`。
+- **脚本 + 测试 + 文档验收命令**：
+  ```bash
+  ! rg '\bplay\b' apps/server/db/migrations/0001_schema.up.sql apps/server/db/queries/session.sql
+  vp run --filter @vibevalley/server db:check
+  (cd apps/server && vp test run src/infra/schema.test.ts src/game/play.test.ts src/session/session.test.ts)
+  vp run web:check
+  ```
 
 ---
 
-#### Task 3：消除 `Session`、`Channel`、`Inbox` 残留的 3 处运行时可变回调（`attach*`）
+### Task 5：同步全仓架构与子系统文档，消除已废弃概念（`state.json`、`spend.json`、`task.md`、「十个模块」）的文档漂移
 
 - **目标与不变量**：
-  - 消除下层模块暴露 `attach*` 可变 `let` 回调槽位等待上层模块初始化回填的隐式生命周期耦合；
-  - 所有跨模块协同要么走单向直接调用（上层调下层），要么走下层导出的类型化 `Stream`（上层订阅下层），使每个模块单独在单元测试中实例化时均具备完整、确定的行为。
-- **精确修改文件与符号清单**：
-  1. **消除 `Inbox.attachExternalChange`**（`apps/server/src/inbox/inbox.ts:38, 140` 与 `apps/server/src/connector/connector.ts:689`）：
-     - `Connector`（`Gateway` 层）本来就排在 `Inbox` 上面并直接 `yield* Inbox`。
-     - 将 `Inbox.attachExternalChange` 替换为 `readonly externalChanges: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>`（内部由 `scopedPubSub<void>()` 实现）；`Connector` 在 `make` 中通过 `Stream.runForEach(yield* inbox.externalChanges, ...)` 订阅。
-  2. **消除 `Session.attachInputRegistrar` 与 `Channel.attachDelivery`**（`apps/server/src/session/session.ts:147`、`apps/server/src/channel/contracts.ts:338`、`apps/server/src/mailbox/mailbox.ts:602, 642`）：
-     - 将 `Channel` 写消息后的投递触发改为 `Channel` 发出的 `Stream<ChannelEnvelopeRow>`（加上开机 `unroutedChannel` 补齐查询），由排在 `Channel` 上面的 `Mailbox` 订阅消费；
-     - 将 `Session` 启动时的初始输入登记收敛为调用方按次传入的 `SendOptions.hiring` 事务回调，删除 `Session.attachInputRegistrar` 和 `Channel.attachDelivery`。
-- **脚本 + 测试 + 文档验收标准**：
-  - **脚本检查**：
-    ```bash
-    ! rg '\battach(ExternalChange|Delivery|InputRegistrar)\b' apps/server/src
-    ```
-  - **测试验收**：
-    ```bash
-    vp test run apps/server/src/modules.test.ts apps/server/src/channel/chat.test.ts apps/server/src/mailbox/deliveries.test.ts apps/server/src/flows/mailbox-order.test.ts apps/server/src/flows/talk.test.ts
-    ```
-  - **文档同步与校验**：
-    - 更新 `docs/subsystems/channel.md`、`docs/subsystems/session.md`、`docs/subsystems/inbox.md`，执行 `vp run docs:verify` 退出码为 0。
+  - 将维护文档中的模块列表、存盘表名、事实名称与当前代码 100% 对齐，确保 `vp run docs:verify` 零报错。
+- **精确修改文件清单**：
+  1. `docs/architecture.md`（第 65、78、86、102、106 行）：更新模块分层说明，删除 `state.json`、`spend.json` 存盘描述，改为 `session` 表、`runtime_spend` 表、`ingress_trigger` 与 `mailbox_delivery` 表。
+  2. `docs/reference/concept-map.md`（第 49、54、67、68、69 行）：将 `spend.json`、`state.json` 更新为对应的数据库表。
+  3. `docs/subsystems/foundation.md`（第 29、160、167 行）、`docs/subsystems/channel.md`（第 34、131 行）、`docs/subsystems/game.md`（第 20、60 行）、`docs/subsystems/issue.md`、`docs/README.md`：更新模块数、删除 `state.json` 描述，将原 `docs/subsystems/task.md` 中仍成立的父子工单分支与冻结验证规则并入 `docs/subsystems/issue.md`。
+- **脚本 + 测试 + 文档验收命令**：
+  ```bash
+  ! rg '十个模块|spend\.json' docs/architecture.md docs/reference/concept-map.md docs/subsystems/
+  vp run docs:verify
+  vp check && vp run server:check && vp run web:check && vp run deadcode && vp run health:verify
+  ```
 
 ---
 
-#### Task 4：同步全仓架构与子系统文档，消除已废弃概念（`state.json`、`spend.json`、`task.md`、「十个模块」）的文档漂移
+## 六、基于 CodeGraph（47,431 节点 / 245,643 边）的深度图谱诊断与精简清单
+
+使用 `colbymchenry/codegraph` 对全仓 2,380 个文件构建符号调用图（47,431 个符号节点、245,643 条调用与引用边），对 `apps/server/src/` 的跨模块边、服务公开方法扇入（Fan-in）和零外部调用导出做图谱查询后，抓出了 **5 处靠肉眼看局部文件极难发现的结构性膨胀点**：
+
+**文档检查**：`vpx scripts/doc-links.ts`（`vp run docs:verify` 的一部分）会检查 Markdown 里每一个反引号路径，确认文件在仓库中存在。删掉或迁移过的文件不能再以反引号路径出现，要写成「旧路径：…（已删除/已迁移）」，否则 `docs:verify` 会因为 broken link 失败。
+
+### 6.1 `Mailbox` 服务接口过度暴露：37 个公开方法中 13 个外部调用数为 0（可砍掉 43% 表面积）
+
+- **图谱证据**：
+  `apps/server/src/mailbox/mailbox.ts` 的 `Mailbox` 服务暴露了 **37 个 `readonly` 成员**，但 CodeGraph 跨模块调用边显示，其中 **13 个方法在 `src/mailbox/` 之外的生产调用数为 0**：
+  - 仅 `src/mailbox/pump.ts` 内部调用的 8 个方法：`hand`、`consume`、`returnHanded`、`breakerSpoke`、`breakerFailed`、`breakerReset`、`breakerOpen`、`sessionLeft`；
+  - 仅 `src/mailbox/mailbox.ts` 和旧路径：apps/server/src/mailbox/posting.ts（已并入 `apps/server/src/mailbox/work.ts`）内部自调的 5 个方法：`insert`、`replay`、`flushIssue`、`urgency`、`deliveryChannel`。
+- **根因**：`makePump(mailbox, sessions, ports)` 直接把公开的 `Mailbox["Service"]` 接口当成了内部紧耦合句柄传入，迫使所有内部账本推进和熔断器计数方法全部挂到了公开 `Context.Service` 上。
+- **精简动作**：`makePump` 直接接收模块私有的 `Deliveries` 与 `WakeBreaker` 实例，将这 13 个方法从 `Mailbox` 公开接口中彻底移除（若连同 6.3 的 3 个 `Response` 方法一并收拢，`Mailbox` 公开接口直接从 **37 个缩减到 21 个**）。
+
+### 6.2 为绕开模块层级而产生的「影子状态复制」与最后一个反向回调 `attachPullRequestPolicy`
+
+- **图谱证据**：
+  1. **影子状态复制**：`apps/server/src/mailbox/mailbox.ts:133` 内部自己维护了一个 `const board = new Map<string, T.Issue>()`，并在 `mailbox.ts:448` 订阅 `core.subscribe` 实时把 `FactIssue` / `FactIssueGone` 抄一份到内存里，还单独建了「旧路径：apps/server/src/mailbox/issue.ts（已并入 `apps/server/src/mailbox/routing.ts`）」重复了一份 `waitsForHuman`！
+  2. **反向可变回调**：`apps/server/src/session/session.ts:144` 暴露了 `readonly attachPullRequestPolicy: (follows: (issue: string) => boolean) => void`（内部用 `let followsPullRequest = (_issue: string) => false` 存可变函数），仅在 `apps/server/src/issue/issue.ts:178` 被注入一次。
+- **精简动作**：
+  - `Issue` 在调 `Mailbox.receive` / `Mailbox.subscribe` 时直接传入 `waitsForHuman: boolean`（或状态改变时调 `Mailbox.setIssueHold(issueId, held)`），删掉 `mailbox.ts` 里监听 `Core` 事实复制的 `board` Map 和「旧路径：apps/server/src/mailbox/issue.ts（已并入 `apps/server/src/mailbox/routing.ts`）」；
+  - `Issue` 在派发帮工调用 `Session` 时，直接把 `followsPullRequest: boolean` 作为会话启动/运行参数传入（或写入 `session` 行），删掉 `Session.attachPullRequestPolicy` 这个反向可变钩子。
+
+### 6.3 `OrchestratorResponse` 违背「一模块一服务」且在同进程内用 `responsePort` 字符串绕圈
+
+- **图谱证据**：
+  - `apps/server/src/orchestrator/` 目录下定义了 **两个** `Context.Service`：`Orchestrator`（`orchestrator.ts:432`）和 `OrchestratorResponse`（`response.ts:38`），违背了 `AGENTS.md`「每个模块导出一个服务，名字是概念的单数词」的铁律。
+  - 更绕的是，`OrchestratorResponse` 为了拿流式回答，先调 `mailbox.openResponse(latest)` 在 `Mailbox` 内存 `Map<string, Caller>` 里挂一个回调，生成 `responsePort: id` 字符串塞进 `Ingress` → 写进数据库 `ingress_trigger.meta` → 流经 `Channel` → 写进 `mailbox_delivery` → 唤醒 `Orchestrator` → 再由 `Orchestrator` 调 `mailbox.takeResponse(id)` 从 `Mailbox` 内存 Map 里把这个 `Caller` 捞出来！
+- **精简动作**：
+  - 将 `OrchestratorResponse` 并入 `Orchestrator` 服务的方法（消除同一目录下第二个 `Context.Service`），或者把 `responses` Map 收归 `Orchestrator` 自己管理，删掉 `Mailbox` 上的 `openResponse` / `takeResponse` / `dropResponse` 三个方法。
+
+### 6.4 领域契约下漏进地基目录：旧路径 apps/server/src/base/chat.ts（226 行，已拆入 `apps/server/src/mailbox/chat.ts` 与 `apps/server/src/channel/contracts.ts`）
+
+- **图谱证据**：
+  - `AGENTS.md` 明确规定：「`base` 是不碰外面的地基（id、JSON、排序、脱敏）」。
+  - 但「旧路径：apps/server/src/base/chat.ts（已拆入 `apps/server/src/mailbox/chat.ts` 与 `apps/server/src/channel/contracts.ts`）」（226 行）被塞入了 `ChannelEnvelopeRow`、`ChannelAudience`、`ChannelRouteFact`、`ChannelRouteResult`、`OrchestratorNews`、`IngressPurpose`、`MetaSchema` 等纯属 `Channel / Mailbox / Orchestrator` 业务的契约，在全仓产生了 28 条跨模块边。
+- **根因**：因为 `Mailbox` 在 `Channel` 之下，为了让两者共享聊天室行与路由类型，把业务契约硬塞进了 `base/`。
+- **精简动作**：
+  - 属于协议形状的（如 `Meta`）放回 `packages/protocol/src/shapes.ts`；属于 `Mailbox` 投递入参的（如 `InboxMessage`、投递信封契约）放回 `apps/server/src/mailbox/mailbox.ts`（或 `apps/server/src/mailbox/payload.ts`），上层 `Channel`、`Ingress`、`Orchestrator` 自然向下引用 `src/mailbox/`，让 `src/base/` 重新只留 `ids.ts`、`json.ts`、`order.ts`、`redact.ts`、`card.ts` 纯地基。
+
+### 6.5 僵尸公开方法与零生产调用的导出符号清理
+
+- **图谱证据**：
+  1. **`ChannelService`（`apps/server/src/channel/contracts.ts`）有 53 个方法**，其中 `replayDelivery`、`handoffSubject`、`recent` 在 `src/channel/` 之外的生产调用数为 **0**；`Issue`（`apps/server/src/issue/issue.ts`）上的 `hire` 在 `src/issue/` 之外的生产调用数也为 **0**。
+  2. **零生产调用的导出符号**：
+     - 完全无任何调用的死导出：`apps/server/src/base/ids.ts:38`（`code`）、`apps/server/src/agent/template.ts:57`（`TemplateProblem`）、`apps/server/src/infra/files.ts:10`（`NotWritten`）、`apps/server/src/session/inProcessRun.ts:15`（`RunBusy`）、`apps/server/src/setting/setting.ts:19`（`SettingRefused`）、`apps/server/src/resource/uri.ts:14`（`ResourceError`）；
+     - 生产代码已改用模板文件、仅剩旧单测还在引用的冗余导出：`apps/server/src/inbox/prompts.ts`（`patrolSystemPrompt`、`patrolTaskPrompt`）、`apps/server/src/memory/prompts.ts`（`extractionPrompt`）、`apps/server/src/orchestrator/prompts.ts`（`systemPrompt`、`situationPrompt`）、`apps/server/src/tool/prompts.ts`（`toolNote`、`workerPrompt`）。
+
+---
+
+### Task 6（新增）：落地 CodeGraph 精简项——收敛 `Mailbox / Channel / Issue / Session` 服务表面积并清空旧路径 base/chat.ts 的领域下漏
 
 - **目标与不变量**：
-  - 代码已删除 `state.json`、`spend.json`、`apps/server/src/task`，并将服务端调整为 13 个模块（`apps/server/src/modules.ts`），但部分维护文档仍保留旧描述；
-  - 彻底清理文档中的过时事实，并在静态检查脚本中加锁，确保「文档只写现状」（`docs/AGENTS.md`）。
-- **精确修改文件与符号清单**：
-  1. `docs/architecture.md`：
-     - 第 65 行：将「归进十个模块」更新为 `apps/server/src/modules.ts` 的 13 个模块顺序（`Platform`、`Agents`、`Source Control`、`Agent Sessions`、`Collaboration`、`Issues`、`Mailbox`、`Ingress`、`Resource`、`Inbox`、`Orchestrator`、`Gamification`、`Gateway`）；
-     - 第 78、86、102、106 行：删除 `state.json` 与 `spend.json` 的存盘描述，改为 PGlite 的 `session` 表、`runtime_spend` 表与 `ingress_trigger` / `mailbox_delivery` 表。
-  2. `docs/reference/concept-map.md`：
-     - 第 49、54、67、68、69 行：将 `spend.json` 改为 `runtime_spend` 表，将 `state.json` 改为 `session` 表与 `Project` 统计。
-  3. `docs/subsystems/foundation.md`（第 29、160、167 行）、`docs/subsystems/channel.md`（第 34、131 行）、`docs/subsystems/game.md`（第 20、60 行）：
-     - 同步删除 `state.json` 的过时描述，将「十个模块」更新为 13 个模块。
-  4. `docs/README.md` 与 `docs/subsystems/task.md`：
-     - 随着 `Task` 模块并入 `Issue`（父子工单 + `blockedBy` 原生 DAG），将 `docs/subsystems/task.md` 中仍成立的父子分支与冻结验证规则并入 `docs/subsystems/issue.md`，补充 `Ingress` / `Mailbox` / `Resource` 的子系统说明，并更新 `docs/README.md` 地图。
-- **脚本 + 测试 + 文档验收标准**：
-  - **脚本检查**：
-    ```bash
-    ! rg '十个模块|spend\.json' docs/architecture.md docs/reference/concept-map.md docs/subsystems/
-    vp run docs:verify
-    ```
-  - **全量总门禁（交单前必跑）**：
-    ```bash
-    vp check && vp run server:check && vp run web:check && vp run docs:verify && vp run deadcode && vp run health:verify
-    ```
+  - `Mailbox` 公开接口删掉 13 个内部自用方法；`ChannelService` 删掉 `replayDelivery`、`handoffSubject`、`recent`；`Issue` 删掉公开的 `hire`；`Session` 删掉 `attachPullRequestPolicy`；
+  - `apps/server/src/orchestrator/response.ts` 不再单独导出第二个 `Context.Service`；
+  - 消除「旧路径：apps/server/src/base/chat.ts（已拆入 `apps/server/src/mailbox/chat.ts` 与 `apps/server/src/channel/contracts.ts`）」中的业务专属契约下漏，删除零调用死导出。
+- **脚本 + 测试 + 文档验收命令**：
+  ```bash
+  # 1. 静态脚本验收：无 attachPullRequestPolicy，无内部方法外泄，旧 base/chat.ts 已拆入 mailbox/chat.ts
+  ! rg '\battachPullRequestPolicy\b' apps/server/src
+  ! rg '\b(breakerSpoke|breakerFailed|breakerReset|breakerOpen|returnHanded|replayDelivery|handoffSubject)\b' apps/server/src/mailbox/mailbox.ts apps/server/src/channel/contracts.ts
+  test -f apps/server/src/mailbox/chat.ts
+
+  # 2. 全量类型、死代码与服务端测试验收
+  vp check && vp run deadcode && vp run server:check
+  ```
 

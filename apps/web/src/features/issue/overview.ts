@@ -24,7 +24,7 @@ export const stageTone: Record<IssueStageKind, Tone> = {
 };
 
 /** The block that asks the owner for the one thing: its head and what it says under it. */
-export interface OwnerQuestion {
+interface OwnerQuestion {
   head: string;
   line?: string;
   tone: Tone;

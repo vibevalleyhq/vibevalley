@@ -1,17 +1,14 @@
-// The chat's shapes and pure rules: the stored row as the protocol sees it, a message's meta and reactions, what a
-// mailbox delivery tells its recipient, and where a message is addressed. Pure, so Mailbox and Collaboration can both
-// read them without one leaning on the other.
-
-import { Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOrNone } from "./json.ts";
+import { jsonOrNone } from "@/base/json.ts";
+import type { Db } from "@/infra/db.ts";
 
-export type IngressPurpose = "issue" | "cron" | "patrol" | "connector" | "voice" | "github";
+import * as qc from "../../db/generated/channel.sql.ts";
 
 export interface Meta {
   run?: string;
@@ -29,7 +26,7 @@ export interface Meta {
   /** The blocks it points at, as they read when it was sent. */
   blocks?: readonly T.QuotedBlock[];
   picked?: Picked;
-  ingressSource?: IngressPurpose;
+  ingressSource?: "issue" | "cron" | "patrol" | "connector" | "voice" | "github";
   ingressRecipient?: string;
   issue?: string;
   trigger?: T.RunTrigger;
@@ -59,7 +56,8 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
 });
 
 /** Anything unreadable is no meta. */
-export const metaOf = (raw: string | null): Meta => jsonOrNone(MetaSchema)(raw) ?? {};
+export const metaOf = (raw: unknown): Meta =>
+  (typeof raw === "string" ? jsonOrNone(MetaSchema)(raw) : Option.getOrUndefined(Schema.decodeUnknownOption(MetaSchema)(raw))) ?? {};
 
 /** As Go's omitempty writes it: nothing empty kept. */
 export const metaText = (m: Meta | undefined) =>
@@ -69,19 +67,8 @@ export const metaText = (m: Meta | undefined) =>
         Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== "" && v !== false && !(Array.isArray(v) && v.length === 0))),
       );
 
-/** {"emoji": [participant, …]}, as a message keeps them; anything unreadable is none. */
-const ReactionsSchema = Schema.Record(Schema.String, Schema.mutable(Schema.Array(Schema.String)));
-export const reactionsOf = (raw: string | null): Record<string, string[]> => jsonOrNone(ReactionsSchema)(raw) ?? {};
-export const reactionsText = (r: Record<string, string[]>) => {
-  const kept = Object.entries(r).filter(([, by]) => by.length > 0);
-  return kept.length > 0 ? JSON.stringify(Object.fromEntries(kept)) : null;
-};
-
 export const senderKind = (kind: string): T.ActorKind => (kind === "owner" || kind === "orchestrator" || kind === "session" ? kind : "system");
-export const messageKind = (kind: string): T.MessageKind => (kind === "dispatch" || kind === "report" || kind === "notice" ? kind : "chat");
 export const channelType = (type: string): T.ChannelType => (type === "thread" || type === "direct" ? type : "channel");
-export const subjectKind = (kind: string | null): T.SubjectKind | undefined => (kind === "issue" || kind === "talk" ? kind : undefined);
-export const notifyOf = (n: string): T.Notify => (n === "mentions" || n === "none" ? n : "all");
 
 export const inboxMore = (
   row: { readonly meta: string | null; readonly reply_number: number | null; readonly edited_at?: number | null; readonly deleted_at?: number | null },
@@ -151,14 +138,25 @@ export interface UnreadRow {
 
 export const summaryChannels = 20;
 
+/** What a participant has not read, as the mailbox and the channel both report it. */
+export const unreadSummaryOf = (db: Db["Service"], participant: string, channel: string): Effect.Effect<UnreadRow[]> =>
+  Effect.map(db.run(qc.inboxOf({ participant, channel })), (rows) =>
+    rows.slice(0, summaryChannels).map((r) => ({
+      target: targetOf({ type: channelType(r.type), ...(r.root_number !== null ? { rootNumber: r.root_number } : {}) }, r.channel_name || ""),
+      unread: r.unread ?? 0,
+      mentionsYou: r.mentions_you === true,
+      ...(r.latest_sender_name ? { latest: r.latest_sender_name } : {}),
+    })),
+  );
+
 /** The same words from the same sender in the same place this soon again are a retry, not a new message. */
 export const retryWindowMs = 60_000;
 
 export const heldShown = 3;
 
 /** The chat's stored message as the mailbox reads it: who said it, where, and when. */
-export type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
-export type StoredSenderKind = "owner" | "orchestrator" | "session" | "profile" | "system";
+type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
+type StoredSenderKind = "owner" | "orchestrator" | "session" | "profile" | "system";
 
 export interface ChannelEnvelopeRow {
   readonly envelope_id: string;
@@ -198,18 +196,15 @@ export interface ChannelAudience {
 }
 
 export interface ChannelRouteFact {
-  readonly purpose?: NonNullable<Meta["ingressSource"]>;
   readonly row: ChannelEnvelopeRow;
   readonly audience: ChannelAudience;
   readonly addressed?: string;
   readonly roles: Readonly<Record<string, T.AgentRole>>;
-  readonly kinds: Readonly<Record<string, T.ActorKind>>;
   readonly outcome?: T.Outcome;
 }
 
 export interface ChannelRouteResult {
   readonly heldNotice: string;
-  readonly received: readonly { readonly session: string; readonly envelope: string }[];
 }
 
 /** What came to an orchestrator in one channel, to wake it with. */

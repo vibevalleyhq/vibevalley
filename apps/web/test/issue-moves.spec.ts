@@ -94,7 +94,7 @@ test("a refused move stays where it was dropped, failed, and a retry sends the s
   expect(sent).toHaveLength(2);
   expect(sent[1]?.requestKey).toBe(sent[0]?.requestKey);
   const issue = await api.issue.get({ id: made.id });
-  expect(issue.assignments.flatMap((assignment) => assignment.executions).filter((execution) => execution.kind === "session")).toHaveLength(1);
+  expect(issue.assignments.flatMap((assignment) => assignment.executions).filter((execution) => execution.kind === "worker")).toHaveLength(1);
 });
 
 test("a failed move put back is the frame's card again", async ({ page, api }) => {

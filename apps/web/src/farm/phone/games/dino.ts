@@ -11,7 +11,7 @@ const dinoX = 8;
 const dinoRunSize = { w: 12, h: 14 } as const;
 const dinoDuckSize = { w: 16, h: 8 } as const;
 
-export type ObstacleKind = "cactus" | "cacti" | "bird";
+type ObstacleKind = "cactus" | "cacti" | "bird";
 
 export interface Obstacle {
   readonly kind: ObstacleKind;

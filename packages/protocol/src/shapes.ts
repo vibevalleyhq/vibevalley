@@ -1247,7 +1247,7 @@ export interface Assignment {
   agent: string;
   assignedAt: number;
   endedAt?: number;
-  executions: ({ kind: "session"; session: SessionId; startedAt: number } | { kind: "orchestrator"; session: string; startedAt: number })[];
+  executions: ({ kind: "worker"; session: SessionId; startedAt: number } | { kind: "orchestrator"; session: string; startedAt: number })[];
 }
 
 export interface IssueHistory {

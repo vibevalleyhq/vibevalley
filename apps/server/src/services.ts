@@ -22,19 +22,18 @@ import { Game, start as gameStart } from "./game/game.ts";
 import { Inbox, start as inboxReady } from "./inbox/inbox.ts";
 import { ServerConfig } from "./infra/config.ts";
 import { Database, Db } from "./infra/db.ts";
-import { Ingress, ready as ingressRestore, start as ingressStart } from "./ingress/ingress.ts";
-import { Issue, type IssueOptions } from "./issue/issue.ts";
+import { Ingress, start as ingressStart } from "./ingress/ingress.ts";
+import { Issue, start as issueStart } from "./issue/issue.ts";
 import { Lan, type LanOptions } from "./lan/lan.ts";
 import { Mailbox, start as mailboxStart } from "./mailbox/mailbox.ts";
 import { Mcp, type McpOptions } from "./mcp/mcp.ts";
 import { Memory } from "./memory/memory.ts";
 import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
-import { OrchestratorResponse } from "./orchestrator/response.ts";
 import { Project, type ProjectHooks, start as projectStart } from "./project/project.ts";
 import { layer as projection } from "./projection/projection.ts";
 import { Resource } from "./resource/resource.ts";
 import { type RuntimeOptions, Runtime } from "./runtime/runtime.ts";
-import { Session, ready as sessionReady, type SessionOptionsIn } from "./session/session.ts";
+import { Session, ready as sessionReady } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
 import { Tool } from "./tool/tool.ts";
 import { Voice, type VoiceOptions } from "./voice/voice.ts";
@@ -49,8 +48,6 @@ const on =
 export interface ServiceOptions {
   readonly runtime?: RuntimeOptions;
   readonly project?: ProjectHooks;
-  readonly session?: SessionOptionsIn;
-  readonly issue?: IssueOptions;
   readonly orchestrator?: OrchestratorOptions;
   readonly mcp?: McpOptions;
   readonly lan?: LanOptions;
@@ -85,24 +82,15 @@ export const sourceControl =
     below.pipe(on(Project.layer(o.project)));
 
 /** Agent Sessions: an agent at work on an issue in a workplace. */
-export const agentSessions =
-  (o: ServiceOptions = {}) =>
-  <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Executor.layer), on(Session.layer(o.session)));
+export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Executor.layer), on(Session.layer));
 
 /** Collaboration: channels, threads, messages, documents; the sessions register as its helpers. */
-export const collaboration =
-  (_o: ServiceOptions = {}) =>
-  <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Channel.layer), on(Artifact.layer));
+export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Channel.layer), on(Artifact.layer));
 
 /** Mailbox: delivery priority, durable per-Session input and the execution pump. */
 export const mailbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Mailbox.layer));
 
-export const issues =
-  (o: ServiceOptions = {}) =>
-  <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Issue.layer(o.issue)), on(Cron.layer));
+export const issues = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Issue.layer), on(Cron.layer));
 
 /** Ingress: immutable source events and their compact cards. */
 export const ingress = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Ingress.layer));
@@ -117,7 +105,7 @@ const inbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Inbox.laye
 const orchestrator =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Tool.layer), on(Orchestrator.layer(o.orchestrator)), on(OrchestratorResponse.layer));
+    below.pipe(on(Tool.layer), on(Orchestrator.layer(o.orchestrator)));
 
 /** Gamification: the ledger, progress and achievements, from events only. */
 export const gamification = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Game.layer));
@@ -136,9 +124,7 @@ export const agentSessionsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => buil
 export const collaborationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(channelStart));
 /** Mailbox's startup: restore open deliveries, replay committed messages without a route receipt, then wake sessions. */
 export const mailboxReady = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(mailboxStart));
-export const ingressReady = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(ingressRestore));
-const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(cronStart));
-/** Issues' startup without the crons' clock: for a test farm that ticks them by hand. */
+const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(issueStart), on(cronStart));
 /** Inbox's startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */
 export const inboxStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(inboxReady));
 /** Gamification's startup: commits start being counted. */
@@ -146,19 +132,25 @@ const gamificationStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(o
 
 /** The whole farm: every module built, then every startup in module order. */
 export const services = (config: ServerConfig["Service"], options: ServiceOptions = {}) =>
-  platform(config)
-    .pipe(
-      agents(options),
-      sourceControl(options),
-      agentSessions(options),
-      mailbox,
-      collaboration(options),
-      issues(options),
-      ingress,
-      resources,
-      inbox,
-      orchestrator(options),
-      gamification,
-      gateway(options),
-    )
-    .pipe(sourceControlStart, agentSessionsStart, mailboxReady, collaborationStart, ingressReady, on(ingressStart), issuesStart, inboxStart, gamificationStart);
+  platform(config).pipe(
+    agents(options),
+    sourceControl(options),
+    agentSessions,
+    mailbox,
+    collaboration,
+    issues,
+    ingress,
+    resources,
+    inbox,
+    orchestrator(options),
+    gamification,
+    gateway(options),
+    sourceControlStart,
+    agentSessionsStart,
+    mailboxReady,
+    collaborationStart,
+    on(ingressStart),
+    issuesStart,
+    inboxStart,
+    gamificationStart,
+  );

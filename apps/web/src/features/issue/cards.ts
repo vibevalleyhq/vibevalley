@@ -109,7 +109,7 @@ export function rowFacts(c: BoardCard): RowFacts {
 }
 
 /** What a card and a list row both show. `detail` is everything else: it is the hover tip. */
-export interface CardLook {
+interface CardLook {
   /** The issue's display number, such as #12. */
   number?: string;
   title: string;

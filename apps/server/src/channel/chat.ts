@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Semaphore, Stream } from "effect";
 // Every message is written to the database first. Mailbox is handed each committed message directly: it turns the
 // message into durable Session deliveries. Everything that changes the chat runs one at a time.
 import { HttpClient } from "effect/http";
@@ -18,8 +18,10 @@ import { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
 import { causeMessage, Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
+import { heldShown, type InboxMessage, retryWindowMs, unreadSummaryOf } from "@/mailbox/chat.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
-import { inputContext } from "@/mailbox/payload.ts";
+import { inputContext, keepChannelTrigger } from "@/mailbox/payload.ts";
+import { inboxLines, talkBrief } from "@/mailbox/prompts.ts";
 import { NotRecorded, Session } from "@/session/session.ts";
 
 import * as qc from "../../db/generated/channel.sql.ts";
@@ -28,20 +30,15 @@ import * as qmn from "../../db/generated/channel_mention.sql.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import * as qp from "../../db/generated/channel_participant.sql.ts";
 import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
-import * as qt from "../../db/generated/ingress_trigger.sql.ts";
 import { channelAttachments } from "./attachments.ts";
-import { Follows } from "./audience.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
 import { keepChannels, targetOf } from "./folded.ts";
-import { mentionOf, mentionsIn } from "./mentions.ts";
+import { channelNameProblem, mentionOf, mentionsIn, parseChatTarget } from "./mentions.ts";
 import { ChatModel, type ChannelRow } from "./model.ts";
 import { messageMutations } from "./mutations.ts";
-import { inboxLines, talkBrief } from "./prompts.ts";
 import { channelInput } from "./route.ts";
 import { parseSearch } from "./search.ts";
 import { channelStreams } from "./streams.ts";
-import { channelNameProblem, parseChatTarget } from "./targets.ts";
-import { heldShown, type InboxMessage, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";
 
 /** The channel a new farm opens with. */
 const firstChannelName = "general";
@@ -111,17 +108,19 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
     const http = yield* HttpClient.HttpClient;
     const agents = yield* Agent;
     const db = yield* Db;
-    const encodeTrigger = Schema.encodeEffect(Schema.fromJsonString(S.Trigger));
     const model = new ChatModel();
-    const follows = new Follows();
     const follow = (channel: string, participant: string, reason: qf.FollowParams["reason"], from: number) =>
       Effect.andThen(
         db.run(qf.follow({ channel_id: channel, participant_id: participant, reason, from_number: from })),
-        Effect.sync(() => follows.followed(channel, participant)),
+        Effect.sync(() => model.followed(channel, participant)),
       );
     const reload = Effect.gen(function* () {
-      model.load(yield* db.run(qc.allChannels()), yield* db.run(qp.participants()), yield* db.run(qr.readCursorsOf({ participant_id: ownerId })));
-      follows.load(yield* db.run(qf.allFollows()));
+      model.load(
+        yield* db.run(qc.allChannels()),
+        yield* db.run(qp.participants()),
+        yield* db.run(qr.readCursorsOf({ participant_id: ownerId })),
+        yield* db.run(qf.allFollows()),
+      );
     });
     /** A transaction that tells the model what it changes as it goes: if it fails, those changes are not in the database,
      * so the model is read again from it. */
@@ -133,8 +132,6 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
     const ownerReadHub = yield* scopedPubSub<{ readonly channel: string; readonly number: number; readonly at: number }>();
     const talkStarts = yield* FiberMap.make<string>();
 
-    const lastRead = new Map<string, string>();
-    const publishedLast = new Map<string, number>();
     let closed = false;
     // Work set off by a timer belongs to this service: it ends with it and keeps its services.
     const forkHere = yield* FiberSet.makeRuntime();
@@ -291,7 +288,7 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
         const channel = yield* counted(row);
         // A metadata change can read a message's number before the message's own fact is applied; keep the state's
         // last number at what was published, so that fact is still news.
-        const published = publishedLast.get(id);
+        const published = model.publishedNumber(id);
         const last = published !== undefined && (channel.lastNumber ?? 0) > published ? published : channel.lastNumber;
         yield* core.apply({ type: "channel", channel: { ...channel, ...(last === undefined ? {} : { lastNumber: last }) } });
       }
@@ -316,7 +313,7 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
       const thread = ch?.type !== "channel" && ch?.subject_kind === "issue" && ch.subject_id ? ch.subject_id : undefined;
       const message = toMessage(row);
       yield* core.apply({ type: "message", message, ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
-      publishedLast.set(row.channel_id, Math.max(publishedLast.get(row.channel_id) ?? 0, row.number));
+      model.notePublished(row.channel_id, row.number);
       yield* PubSub.publish(said, message);
     });
 
@@ -460,7 +457,7 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
             }),
           { discard: true },
         );
-        followers = follows.followers(ch.id);
+        followers = model.followers(ch.id);
       }
       const audience = sessionsNow.filter((h) => ch.type === "thread" || channelOfSession(h) === ch.id).map((h) => h.id);
       const heard = {
@@ -481,30 +478,19 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
       const addressed = meta.ingressRecipient;
       const recipients = [...new Set([...present, ...orchestrators, ...(addressed ? [addressed] : [])])];
       const fact: ChannelRouteFact = {
-        ...(meta.ingressSource ? { purpose: meta.ingressSource } : {}),
         row: channelEnvelope(row),
         audience: heard,
         ...(addressed ? { addressed } : {}),
         roles: Object.fromEntries(recipients.map((recipient) => [recipient, agents.isOrchestrator(recipient) ? "orchestrator" : "worker"])),
-        kinds: Object.fromEntries(recipients.map((recipient) => [recipient, senderKind(model.participant(recipient)?.kind ?? "")])),
+
         ...(meta.outcome === undefined ? {} : { outcome: meta.outcome }),
       };
       const { trigger, mail } = channelInput(fact, inputContext(asInbox(fact.row)));
-      yield* db.run(
-        qt.recordTrigger({
-          id: trigger.id,
-          source: trigger.source,
-          source_key: fact.row.envelope_id,
-          occurred_at: trigger.at,
-          trigger_json: yield* encodeTrigger(trigger).pipe(Effect.orDie),
-          payload_json: JSON.stringify({
-            text: fact.row.body,
-            data: { kind: "channel_message", message: fact.row.envelope_id, channel: fact.row.channel_id },
-          }),
-        }),
-      );
-      const routed = yield* mailbox.receive(trigger, mail).pipe(Effect.orDie);
-      const written: Written = { absent: [], heldNotice: "", received: routed.received, thread: "", again: false, row };
+      const routed = yield* Effect.gen(function* () {
+        const original = yield* keepChannelTrigger(db, trigger, fact.row.body, fact.row.channel_id);
+        return yield* mailbox.receive(original, mail);
+      }).pipe(Effect.catch((error) => Effect.as(Effect.logWarning(`chat: route ${trigger.id}`, error), { heldNotice: "" })));
+      const written: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
       if (routed.heldNotice && (yield* db.run(qm.holdNoticeSinceUser({ channel: ch.id }))).n === 0) written.heldNotice = routed.heldNotice;
       written.absent = named.filter((m) => m.how !== "delivered").map((m) => m.id);
       return written;
@@ -536,7 +522,7 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
         Effect.gen(function* () {
           if (w.sendKey) {
             const seen = yield* db.one(qm.messageBySendKey({ sender_id: w.from, send_key: w.sendKey }));
-            if (seen) return { absent: [], heldNotice: "", received: [], thread: "", again: true, row: seen };
+            if (seen) return { absent: [], heldNotice: "", thread: "", again: true, row: seen };
           }
           // The row as MessageByID would read it back: the sender's name and kind are the participant's.
           const sender = model.participant(w.from);
@@ -581,7 +567,7 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
             pinned_at: null,
             reactions: null,
           };
-          const out: Written = { absent: [], heldNotice: "", received: [], thread: "", again: false, row };
+          const out: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
           if (w.readBy) yield* readUpTo(w.readBy, w.channel, number);
           if (w.follow) yield* follow(w.channel, w.follow, "owner", number);
           if (w.thread) out.thread = yield* threadFor({ id, number, channel: w.channel }, w.thread);
@@ -630,11 +616,6 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
 
     const after = Effect.fnUntraced(function* (channel: string, written: Written, answers: T.SessionId | undefined): Effect.fn.Return<void> {
       yield* publishMessage(written.row, answers);
-      yield* Effect.forEach(
-        written.received,
-        ({ session, envelope }) => reacting(envelope, session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${envelope}`)),
-        { discard: true },
-      );
       embedLater(written.row);
       yield* publishChannel(channel);
       const meta = metaOf(written.row.meta);
@@ -659,23 +640,7 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
     const inboxRows = Effect.fn("Channel.deliveryUnread")(function* (who: string) {
       const h = sessionOf(who);
       const channel = h ? channelOfSession(h) : defaultId;
-      const rows = yield* db.run(qc.inboxOf({ participant: who, channel }));
-      const out: UnreadRow[] = [];
-      yield* Effect.forEach(
-        rows.slice(0, summaryChannels),
-        (r) =>
-          Effect.gen(function* () {
-            const latest = yield* db.one(qm.messageByNumber({ channel_id: r.id, number: r.latest ?? 0 }));
-            out.push({
-              target: targetOfRow(r.type, r.root_number, null, null, r.channel_name || null),
-              unread: r.unread ?? 0,
-              mentionsYou: !(r.mentions_you !== true),
-              ...(latest ? { latest: latest.sender_name } : {}),
-            });
-          }),
-        { discard: true },
-      );
-      return out;
+      return yield* unreadSummaryOf(db, who, channel);
     });
 
     const registerTalk = (session: T.Session, launch: string, snapshot: readonly MsgRow[]) =>
@@ -793,7 +758,7 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
      * it, in one transaction, so a restart neither says it twice nor leaves it out.
      */
     const handedOn = Effect.fn("Channel.handedOn")(function* (h: T.Session, thread: string) {
-      const followers = follows.followers(thread);
+      const followers = model.followers(thread);
       if (followers.includes(h.id)) return;
       // A profile's talk: the session that answers there is not told of in it; it only follows.
       if (model.channel(thread)?.type === "direct") return yield* follow(thread, h.id, "owner", model.channel(thread)?.last_number ?? 0);
@@ -819,8 +784,6 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
         model.left(p.id, now);
         yield* mailbox.dropSession(p.id, "left");
         yield* db.run(qf.unfollowAllOf({ at: now, participant_id: p.id }));
-        follows.left(p.id);
-        lastRead.delete(p.id);
       }
     });
 
@@ -870,12 +833,16 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
       ).pipe(bestEffort(`chat: after ${n._tag}`));
     });
     // Once the helpers are back, Collaboration restores their threads; Mailbox wakes them after its own recovery.
+    const replayDelivery = Effect.fn("Channel.replayDelivery")(function* (row: ChannelEnvelopeRow) {
+      const written = yield* settle(messageRow(row));
+      if (written.heldNotice) yield* write({ channel: row.channel_id, from: "system", kind: "notice", text: written.heldNotice, meta: { code: "hop_limit" } });
+    }, locked);
     const start = Effect.gen(function* () {
       yield* locked(Effect.forEach(presentSessions(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), { discard: true }));
       while (true) {
         const rows = yield* db.run(qm.unroutedChannelMessages());
         if (rows.length === 0) break;
-        yield* Effect.forEach(rows, (row) => shape.replayDelivery(row).pipe(bestEffort(`chat: route ${row.envelope_id}`)), { discard: true });
+        yield* Effect.forEach(rows, (row) => replayDelivery(row).pipe(bestEffort(`chat: route ${row.envelope_id}`)), { discard: true });
       }
     });
     yield* Effect.addFinalizer(() =>
@@ -1023,34 +990,14 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
       return { message: toMessage(written.row), again: false };
     });
 
+    const recent = Effect.fn("Channel.recent")(function* (channel: string, n: number) {
+      const row = model.channel(channel);
+      if (!row) return [];
+      const target = targetOfChannel(row);
+      return [...(yield* db.run(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].toReversed().map((m) => inboxOf(m, target));
+    });
     const shape = Channel.of({
-      replayDelivery: Effect.fn("Channel.replayDelivery")(function* (row) {
-        const written = yield* settle(messageRow(row));
-        yield* Effect.forEach(
-          written.received,
-          ({ session, envelope }) => reacting(envelope, session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${envelope}`)),
-          { discard: true },
-        );
-        if (written.heldNotice)
-          yield* write({ channel: row.channel_id, from: "system", kind: "notice", text: written.heldNotice, meta: { code: "hop_limit" } });
-      }, locked),
       ownerReads: Effect.map(PubSub.subscribe(ownerReadHub), Stream.fromSubscription),
-      handoffSubject: Effect.fn("Channel.handoffSubject")(function* (message) {
-        const row = yield* db.one(qm.messageByID({ id: message }));
-        if (!row) return undefined;
-        const own = model.channel(row.channel_id);
-        const thread = own?.type === "thread" ? own : model.channel(model.threadOfRoot(row.id) ?? "");
-        const subject = thread ?? own;
-        switch (subject?.subject_kind) {
-          case "issue":
-            return subject.subject_id ? { kind: "issue", id: subject.subject_id } : { kind: "chat", id: row.channel_id };
-          case "talk":
-            return subject.subject_id ? { kind: "session", id: subject.subject_id } : { kind: "chat", id: row.channel_id };
-          case null:
-          case undefined:
-            return { kind: "chat", id: row.channel_id };
-        }
-      }),
       now: () => core.state().chat,
       ...channelStreams(db, model, said),
       defaultChannel: () => defaultId,
@@ -1151,7 +1098,7 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
       issueMessages: Effect.fn("Channel.issueMessages")(function* (issue) {
         const thread = model.threadOfSubject("issue", issue);
         if (!thread) return [];
-        return yield* shape.recent(thread, 50);
+        return yield* recent(thread, 50);
       }),
       search: Effect.fn("Channel.search")(function* (text, channel) {
         const q = parseSearch(text);
@@ -1221,7 +1168,7 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
           if (m) return { kind: "sent", message: toMessage(m), target, absent: [] };
         }
         // Posting on a channel right after reading a thread: confirm once.
-        const last = lastRead.get(from) ?? "";
+        const last = model.lastRead.get(from) ?? "";
         if (row.type !== "thread" && opt.confirm !== true && last && last !== target) return { kind: "confirm", target, lastRead: last };
         // Newer messages it has not seen: show them instead of sending.
         const unseen = (yield* db.run(qm.unseenIn({ channel, participant: from }))).map((r) => r.id);
@@ -1317,9 +1264,9 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
             : [...(yield* db.run(qm.messagesBefore({ channel_id: channel, number: opt.before ?? 2147483647, n: limit })))].toReversed();
         const newest = rows.at(-1);
         if (newest && (opt.before == null || opt.before === 0)) yield* readThrough(who, channel, newest.number);
-        for (const participant of lastRead.keys())
-          if (participant !== ownerId && !agents.isOrchestrator(participant) && !sessions.present(participant)) lastRead.delete(participant);
-        lastRead.set(who, target);
+        for (const participant of model.lastRead.keys())
+          if (participant !== ownerId && !agents.isOrchestrator(participant) && !sessions.present(participant)) model.lastRead.delete(participant);
+        model.lastRead.set(who, target);
         const older = rows.length > 0 && (yield* db.run(qm.messagesBefore({ channel_id: channel, number: rows[0]!.number, n: 1 }))).length > 0;
         return { target, messages: rows.map((m) => inboxOf(m, target)), older };
       }, locked),
@@ -1479,7 +1426,7 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
           }),
         );
         yield* reload;
-        for (const [who, target] of lastRead) if (gone.has(target)) lastRead.delete(who);
+        for (const [who, target] of model.lastRead) if (gone.has(target)) model.lastRead.delete(who);
         yield* core.apply({ type: "channelGone", id });
       }, locked),
       setNotify: Effect.fn("Channel.setNotify")(function* (id, notify) {
@@ -1495,12 +1442,6 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
         const agent = agents.named(name) ?? agents.agent(name) ?? agents.orchestrators().find((o) => o.name === name);
         if (!agent) return yield* Effect.fail(missing(t("server.channel.noProfileNamed", { key: ref }), [lookIn.agent]));
         return yield* openDirect(agent);
-      }),
-      recent: Effect.fn("Channel.recent")(function* (channel, n) {
-        const row = model.channel(channel);
-        if (!row) return [];
-        const target = targetOfChannel(row);
-        return [...(yield* db.run(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].toReversed().map((m) => inboxOf(m, target));
       }),
       notifyOf: (id) => {
         const c = model.channel(id);

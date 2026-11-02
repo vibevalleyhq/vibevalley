@@ -8,7 +8,7 @@ import { reasonOf } from "@/infra/api";
 
 export type Answer<T> = { readonly state: "waiting" } | { readonly state: "done"; readonly value: T } | { readonly state: "failed"; readonly reason: string };
 
-export interface Reader<K> {
+interface Reader<K> {
   /** Reads after the wait; undefined reads nothing and tells undefined. Any answer to an earlier ask is dropped. */
   readonly request: (key: K | undefined) => void;
   /** Drops whatever is on its way. */

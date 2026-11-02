@@ -1,5 +1,5 @@
 import { chatNamed } from "./mentions.ts";
-export type SearchHas = "file" | "image" | "link";
+type SearchHas = "file" | "image" | "link";
 
 export interface SearchQuery {
   readonly words: string;

@@ -32,7 +32,6 @@ export const quietApp = {
   runtime: { background: false },
   project: { gh: noGitHub },
   orchestrator: { listen: false },
-  issue: { background: false },
 } satisfies ServiceOptions;
 
 export interface WorldOptions {
@@ -51,7 +50,8 @@ export interface WorldOptions {
 
 /** Services below Ingress for module tests. */
 export function worldBelowIngress(options: WorldOptions = {}) {
-  const config = options.config ?? testConfig();
+  const base = options.config ?? testConfig();
+  const config = options.stallMs !== undefined ? { ...base, session: { ...base.session, stallSeconds: options.stallMs / 1000 } } : base;
   for (const name of options.repos ?? []) {
     const dir = join(config.workRoot, "projects", name);
     mkdirSync(dir, { recursive: true });
@@ -61,11 +61,9 @@ export function worldBelowIngress(options: WorldOptions = {}) {
   const o: ServiceOptions = {
     runtime: { registry: registryOf(given), background: false, probe: installedOnly(given, options.usage), usageOf: async () => options.usage?.() ?? null },
     project: { gh: noGitHub, ...options.projects },
-    ...(options.stallMs !== undefined ? { session: { stallMs: options.stallMs } } : {}),
-    issue: { background: false },
   };
   const below = platform(config);
-  return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), agentSessions(o), mailbox, collaboration(o), issues(o));
+  return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), agentSessions, mailbox, collaboration, issues);
 }
 
 /** The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds

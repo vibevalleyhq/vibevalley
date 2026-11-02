@@ -21,7 +21,7 @@ const toolForKey = (key: string): Tool | undefined => tools[Number(key) - 1]?.id
 
 export type BedFxKind = "water" | "spray" | "harvest" | "shovel" | "note";
 
-export interface Aim {
+interface Aim {
   readonly ok: boolean;
   readonly text: string;
 }
@@ -92,7 +92,7 @@ export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot
 }
 
 /** What a key does on the farm: show the names, put the tool down, open the menu, pick a tool. */
-export type FarmKey =
+type FarmKey =
   | { readonly kind: "reveal"; readonly down: boolean }
   | { readonly kind: "closeTool" }
   | { readonly kind: "openMenu" }

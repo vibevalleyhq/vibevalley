@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { Follows } from "./audience.ts";
+import { Follows } from "./model.ts";
 
 describe("channel follows", () => {
   it("loads and updates who follows each thread", () => {

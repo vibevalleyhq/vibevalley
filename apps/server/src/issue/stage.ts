@@ -3,7 +3,13 @@ import { executionsOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { sessionOf } from "@/session/roster.ts";
 
-import { awaitsPullRequest } from "./followup.ts";
+export const awaitsPullRequest = (issue: Pick<T.Issue, "pullRequest">, session: Pick<T.Session, "phase" | "lastRun"> | undefined) =>
+  issue.pullRequest?.state === "open" && session?.phase._tag === "resting" && session.lastRun?.outcome === "completed";
+
+/** The conflict a preview of the issue's branch shows; none when it goes in clean. */
+export const conflictOf = (changes: { readonly base: string; readonly conflicts?: readonly string[] }): T.Conflict | undefined =>
+  changes.conflicts && changes.conflicts.length > 0 ? { base: changes.base, files: [...changes.conflicts] } : undefined;
+
 const move = (act: T.IssueAct, status: T.IssueStatus, words: T.ActWords = "none"): T.IssueAction => ({ act, does: "move", status, words });
 const say = (act: T.IssueAct): T.IssueAction => ({ act, does: "say" });
 const stop: T.IssueAction = { act: "stop", does: "stop" };

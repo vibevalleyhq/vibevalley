@@ -13,7 +13,7 @@ import { farmHome } from "./paths";
 import { probe } from "./probe";
 import type { MainWindow } from "./window";
 
-export interface HostUpdates {
+interface HostUpdates {
   readonly state: () => UpdateState;
   readonly check: () => Promise<void>;
   readonly install: () => Promise<void>;

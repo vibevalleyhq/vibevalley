@@ -24,7 +24,7 @@ interface Ctx extends Floating<TooltipOpenChangeReason> {
 const Context = createContext<Ctx>();
 const use = () => useContext(Context);
 
-export interface TooltipRootProps extends FloatingRootProps<TooltipOpenChangeReason> {
+interface TooltipRootProps extends FloatingRootProps<TooltipOpenChangeReason> {
   /** Wait before showing on hover, ms. */
   delay?: number | undefined;
   /** Wait before hiding once the pointer leaves, ms. */
@@ -38,7 +38,7 @@ function Root(props: TooltipRootProps) {
   return <Context value={ctx}>{props.children}</Context>;
 }
 
-export interface TooltipTriggerProps extends JSX.HTMLAttributes<HTMLElement> {
+interface TooltipTriggerProps extends JSX.HTMLAttributes<HTMLElement> {
   /** A button by default; a span to wrap something that is focusable itself, or a component. */
   render?: Render | undefined;
 }

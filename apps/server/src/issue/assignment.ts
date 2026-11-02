@@ -8,7 +8,7 @@ import { compare, compareText, or } from "@/base/order.ts";
 
 import * as q from "../../db/generated/issue_assignment.sql.ts";
 import type * as qe from "../../db/generated/issue_assignment_execution.sql.ts";
-import { nullText } from "./stored.ts";
+import { nullText } from "./rows.ts";
 
 /** Called in the transaction that changes responsibility. */
 export const assignTo = Effect.fnUntraced(function* (issue: string, agent: string | undefined, at: number) {
@@ -22,7 +22,7 @@ export const assignTo = Effect.fnUntraced(function* (issue: string, agent: strin
 
 const executionOf = (row: qe.AddExecutionResult): T.Assignment["executions"][number] =>
   row.role === "worker"
-    ? { kind: "session", session: sessionId(row.executor), startedAt: row.started_at }
+    ? { kind: "worker", session: sessionId(row.executor), startedAt: row.started_at }
     : { kind: "orchestrator", session: row.executor, startedAt: row.started_at };
 
 /** Only committed relations enter the index; deleting an issue reloads it after the cascade. */
@@ -80,6 +80,6 @@ export class Assignments {
     return this.of(issue)
       .flatMap((a) => a.executions)
       .toSorted((a, b) => or(compare(a.startedAt, b.startedAt), compareText(a.session, b.session)))
-      .flatMap((e) => (e.kind === "session" ? [e.session] : []));
+      .flatMap((e) => (e.kind === "worker" ? [e.session] : []));
   }
 }

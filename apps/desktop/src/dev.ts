@@ -26,7 +26,7 @@ function debounce(f: () => void) {
   };
 }
 
-export interface DevHooks {
+interface DevHooks {
   /** apps/web/dist and the repository root. */
   web: string;
   repo: string;

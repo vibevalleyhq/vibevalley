@@ -12,7 +12,7 @@ import { type ButtonProps, buttonType, call, type DivProps, flag, refs, type Spa
 import { createFloating, type Floating, type FloatingRootProps, focusWhenPlaced, makePortal, makePositioner } from "./internal/floating";
 import { createTypeahead, disabled, itemsIn, roveFocus } from "./internal/roving";
 
-export type SelectOpenChangeReason = "trigger" | "item" | "escape" | "outside" | "tab";
+type SelectOpenChangeReason = "trigger" | "item" | "escape" | "outside" | "tab";
 
 const option = "[role=option]";
 
@@ -32,7 +32,7 @@ const isList = (items: Items): items is Extract<Items, readonly unknown[]> => Ar
 const Context = createContext<Ctx>();
 const use = () => useContext(Context);
 
-export interface SelectRootProps extends FloatingRootProps<SelectOpenChangeReason> {
+interface SelectRootProps extends FloatingRootProps<SelectOpenChangeReason> {
   value?: string | undefined;
   defaultValue?: string | undefined;
   onValueChange?: ((value: string) => void) | undefined;
@@ -113,7 +113,7 @@ function Trigger(props: ButtonProps & Renderable) {
   );
 }
 
-export interface SelectValueProps extends Omit<SpanProps, "children"> {
+interface SelectValueProps extends Omit<SpanProps, "children"> {
   /** Shown while nothing is chosen. */
   placeholder?: JSX.Element;
   /** What to show for the value; the item's label from `items`, else the value itself, by default. */
@@ -164,7 +164,7 @@ function Popup(props: DivProps) {
   );
 }
 
-export interface SelectItemProps extends DivProps {
+interface SelectItemProps extends DivProps {
   value: string;
   disabled?: boolean | undefined;
   /** What typing matches, when its text is not it. */

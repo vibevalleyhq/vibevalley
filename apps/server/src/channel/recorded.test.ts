@@ -2,13 +2,12 @@ import { expect, test } from "vite-plus/test";
 
 import type { ChannelAudience } from "@/channel/contracts.ts";
 import { brakes, type BrakeInput } from "@/mailbox/brakes.ts";
+import type { InboxMessage, UnreadRow } from "@/mailbox/chat.ts";
+import { wakeInput } from "@/mailbox/prompts.ts";
 import { whoHears } from "@/mailbox/routing.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
-import { mentionsIn } from "./mentions.ts";
-import { wakeInput } from "./prompts.ts";
-import { channelNameProblem, parseChatTarget } from "./targets.ts";
-import type { InboxMessage, UnreadRow } from "./wake.ts";
+import { channelNameProblem, mentionsIn, parseChatTarget } from "./mentions.ts";
 const chatAudience = (input: ChannelAudience & BrakeInput) => brakes(whoHears(input), input);
 
 test("regression: a delivery batch includes every acknowledged card", () => {

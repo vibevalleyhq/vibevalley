@@ -1,11 +1,11 @@
 import type * as T from "@vibevalley/protocol";
 
 import { compactCard } from "@/base/card.ts";
-import { type ChannelRouteFact, metaOf, senderKind } from "@/base/chat.ts";
+import { type ChannelRouteFact, type Meta, metaOf, senderKind } from "@/mailbox/chat.ts";
 import type { ChannelMail } from "@/mailbox/mailbox.ts";
 import type { InputContext } from "@/mailbox/payload.ts";
 
-const sourceByPurpose: Record<NonNullable<ChannelRouteFact["purpose"]>, T.TriggerSource> = {
+const sourceByPurpose: Record<NonNullable<Meta["ingressSource"]>, T.TriggerSource> = {
   issue: "workbench",
   cron: "cron",
   patrol: "patrol",
@@ -30,7 +30,7 @@ const ingressActorKind = (raw: string): T.TriggerActorKind => {
 /** A committed channel message as the one trigger Mailbox routes, and what it needs to fan it out. */
 export const channelInput = (fact: ChannelRouteFact, context: InputContext): { readonly trigger: T.Trigger; readonly mail: ChannelMail } => {
   const meta = metaOf(fact.row.meta);
-  const source = fact.purpose ? sourceByPurpose[fact.purpose] : "channel";
+  const source = meta.ingressSource ? sourceByPurpose[meta.ingressSource] : "channel";
   const trigger: T.Trigger = {
     id: fact.row.envelope_id,
     source,
@@ -56,7 +56,6 @@ export const channelInput = (fact: ChannelRouteFact, context: InputContext): { r
       audience: fact.audience,
       ...(fact.addressed ? { addressed: { recipient: fact.addressed, reason: "addressed", wakes: true } } : {}),
       roles: fact.roles,
-      kinds: fact.kinds,
       ...(fact.outcome === undefined ? {} : { outcome: fact.outcome }),
     },
   };

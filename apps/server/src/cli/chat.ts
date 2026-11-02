@@ -94,7 +94,7 @@ class Quit extends Schema.TaggedError<Quit, { readonly brand: unique symbol }>()
 
 const typed = (handle: (t: Typed) => Effect.Effect<void, Quit>) => Stream.runForEach(terminal, handle).pipe(Effect.catchTag("Quit", () => Effect.void));
 
-export interface OwnChat {
+interface OwnChat {
   /** The folder it works in; the current one when empty. */
   readonly cwd: string;
   /** Its home under ~/.vibevalley/agent. */
@@ -191,7 +191,7 @@ function render(e: Event): string | undefined {
   return undefined;
 }
 
-export interface RuntimeChat {
+interface RuntimeChat {
   readonly model?: string;
   readonly effort?: string;
   /** A runtime session to go on with. */

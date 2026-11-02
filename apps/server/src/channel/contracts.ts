@@ -1,30 +1,35 @@
-import { type Effect, type Scope, type Stream } from "effect";
+import { Schema, type Effect, type Scope, type Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { type ChannelEnvelopeRow, type InboxMessage, type Meta, messageKind, metaOf, type Picked, reactionsOf, senderKind } from "@/base/chat.ts";
+import { jsonOrNone } from "@/base/json.ts";
 import { type ApiError } from "@/errors.ts";
+import { type InboxMessage, type Meta, metaOf, type Picked, senderKind } from "@/mailbox/chat.ts";
 
 import type * as qm from "../../db/generated/channel_message.sql.ts";
 import { type ChannelRow } from "./model.ts";
 
-export type {
-  ChannelAudience,
-  ChannelEnvelopeRow,
-  ChannelRouteFact,
-  ChannelRouteResult,
-  IngressPurpose,
-  Meta,
-  OrchestratorNews,
-  UnreadRow,
-} from "@/base/chat.ts";
-export type { InboxMessage, Picked } from "@/base/chat.ts";
-export { channelType, inboxMore, messageKind, metaOf, metaText, notifyOf, reactionsOf, reactionsText, senderKind, subjectKind } from "@/base/chat.ts";
+export type { ChannelAudience, ChannelEnvelopeRow, ChannelRouteFact, Meta, OrchestratorNews } from "@/mailbox/chat.ts";
+export type { InboxMessage, Picked } from "@/mailbox/chat.ts";
+export { channelType, inboxMore, metaOf, metaText, senderKind } from "@/mailbox/chat.ts";
 export type { Delivered, LaunchActivity, SessionNews } from "@/session/shapes.ts";
 
 export type MsgRow = qm.MessageByIDResult;
+
+/** {"emoji": [participant, …]}, as a message keeps them; anything unreadable is none. */
+const ReactionsSchema = Schema.Record(Schema.String, Schema.mutable(Schema.Array(Schema.String)));
+type Reactions = Record<string, string[]>;
+export const reactionsOf = (raw: string | null): Reactions => jsonOrNone(ReactionsSchema)(raw) ?? {};
+export const reactionsText = (r: Reactions) => {
+  const kept = Object.entries(r).filter(([, by]) => by.length > 0);
+  return kept.length > 0 ? JSON.stringify(Object.fromEntries(kept)) : null;
+};
+
+export const messageKind = (kind: string): T.MessageKind => (kind === "dispatch" || kind === "report" || kind === "notice" ? kind : "chat");
+export const subjectKind = (kind: string | null): T.SubjectKind | undefined => (kind === "issue" || kind === "talk" ? kind : undefined);
+export const notifyOf = (n: string): T.Notify => (n === "mentions" || n === "none" ? n : "all");
 
 export function toMessage(row: MsgRow): T.ChatMessage {
   const meta = metaOf(row.meta);
@@ -77,7 +82,7 @@ export interface Spoken {
   readonly lastRead?: string;
 }
 
-export interface SpeakOptions {
+interface SpeakOptions {
   readonly target?: string;
   readonly anyway?: boolean;
   readonly confirm?: boolean;
@@ -97,20 +102,20 @@ export interface SayMore {
   readonly blocks?: readonly T.QuotedBlock[];
 }
 
-export interface ReadOptions {
+interface ReadOptions {
   readonly target?: string;
   readonly unread?: boolean;
   readonly before?: number;
   readonly limit?: number;
 }
 
-export interface ReadResult {
+interface ReadResult {
   readonly target: string;
   readonly messages: InboxMessage[];
   readonly older: boolean;
 }
 
-export interface EnvelopeResource {
+interface EnvelopeResource {
   readonly message: T.ChatMessage;
   readonly attachments: readonly { readonly name: string; readonly path: string }[];
   readonly parent?: T.ChatMessage;
@@ -160,7 +165,6 @@ export interface Write {
 export interface Written {
   absent: string[];
   heldNotice: string;
-  received: readonly { readonly session: string; readonly envelope: string }[];
   thread: string;
   /** A send with a key already written: nothing new is written or delivered. */
   again: boolean;
@@ -168,15 +172,8 @@ export interface Written {
   row: MsgRow;
 }
 
-export interface ChannelHandoffSubject {
-  readonly kind: "issue" | "session" | "chat";
-  readonly id: string;
-}
-
 export interface ChannelService {
-  readonly replayDelivery: (row: ChannelEnvelopeRow) => Effect.Effect<void>;
   readonly ownerReads: Effect.Effect<Stream.Stream<{ readonly channel: string; readonly number: number; readonly at: number }>, never, Scope.Scope>;
-  readonly handoffSubject: (message: string) => Effect.Effect<ChannelHandoffSubject | undefined>;
   /** The channel what names none goes to (ChatMessage.channel, a connector's, a call's). */
   readonly defaultChannel: () => string;
   readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
@@ -258,8 +255,6 @@ export interface ChannelService {
   /** The orchestrator a place is looked after by: a channel's own, its thread's channel's, a direct channel's peer when
    * that is an orchestrator, else the default one. */
   readonly orchestratorOf: (channel: string) => string;
-  /** The newest messages of a channel, oldest first, as an agent reads them. */
-  readonly recent: (channel: string, n: number) => Effect.Effect<InboxMessage[]>;
   readonly markUnread: (channel: string, number: number) => Effect.Effect<void, ApiError>;
   /** The channel a place is in: a thread's, or the default one for a direct channel, which holds no work. */
   readonly topOf: (channel: string) => Effect.Effect<Info>;

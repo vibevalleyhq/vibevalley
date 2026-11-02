@@ -72,7 +72,7 @@ const plain = <T extends string>(values: readonly T[]) => values.map((value) => 
 
 /** Which of the line's settings a page shows: the call (credentials, listening, who answers), MOSS Live's key, or
  * dictation. They save together, each only what it changed. */
-export type LineView = "call" | "moss" | "dictation";
+type LineView = "call" | "moss" | "dictation";
 
 export function VoiceForm(props: { part: VoicePart; view?: LineView }) {
   const settings = useSettings();

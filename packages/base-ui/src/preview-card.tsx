@@ -9,7 +9,7 @@ import { createDismiss } from "./internal/dismiss";
 import { call, type DivProps, flag, refs, type Render } from "./internal/element";
 import { createFloating, type Floating, type FloatingRootProps, makePortal, makePositioner } from "./internal/floating";
 
-export type PreviewCardOpenChangeReason = "hover" | "focus" | "escape" | "outside";
+type PreviewCardOpenChangeReason = "hover" | "focus" | "escape" | "outside";
 
 interface Ctx extends Floating<PreviewCardOpenChangeReason> {
   /** Opens after the delay, or closes after the close delay; a later call replaces an earlier one. */
@@ -19,7 +19,7 @@ interface Ctx extends Floating<PreviewCardOpenChangeReason> {
 const Context = createContext<Ctx>();
 const use = () => useContext(Context);
 
-export interface PreviewCardRootProps extends FloatingRootProps<PreviewCardOpenChangeReason> {
+interface PreviewCardRootProps extends FloatingRootProps<PreviewCardOpenChangeReason> {
   /** Wait before showing, ms. */
   delay?: number | undefined;
   /** Wait before hiding once the pointer has left the link and the card, ms. */
@@ -50,7 +50,7 @@ function Root(props: PreviewCardRootProps) {
   return <Context value={ctx}>{props.children}</Context>;
 }
 
-export interface PreviewCardTriggerProps extends JSX.AnchorHTMLAttributes<HTMLAnchorElement> {
+interface PreviewCardTriggerProps extends JSX.AnchorHTMLAttributes<HTMLAnchorElement> {
   /** A link by default. */
   render?: Render | undefined;
 }

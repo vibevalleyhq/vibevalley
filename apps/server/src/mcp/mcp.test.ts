@@ -125,7 +125,11 @@ describe("mcp", () => {
       ]);
       const extra = (yield* chat.say("顺手做另一件事", thread, "extra")).message;
       const mailbox = yield* Mailbox;
-      yield* waitFor(mailbox.deliveryChannel(id, extra.id), (channel) => channel === thread, "the mailbox handoff");
+      yield* waitFor(
+        Effect.succeed(mailbox.pending(id).find((row) => row.envelope_id === extra.id)?.channel_id),
+        (channel) => channel === thread,
+        "the mailbox handoff",
+      );
       expect(yield* Effect.promise(() => c.tool("issue_handback", { envelope: extra.id, reason: "不是当前工单" }))).toContain("重新分流");
       expect(mailbox.pending(id).some((input) => input.envelope_id === extra.id)).toBe(false);
       expect(yield* Effect.promise(() => c.tool("issue_pr_submit"))).toContain("没有主人明确授予");

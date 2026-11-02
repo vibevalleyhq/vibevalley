@@ -59,7 +59,7 @@ const emptyText: Record<Lane, string> = {
   closed: t("web.issue.board.empty.closed"),
 };
 
-export interface BoardProps {
+interface BoardProps {
   cards: BoardCard[];
   loading: boolean;
   selected?: string | undefined;

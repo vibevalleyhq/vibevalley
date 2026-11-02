@@ -39,7 +39,9 @@ const owners: Readonly<Record<string, string>> = {
 };
 
 /** Reads of another module's part that stay, each with why: none. */
-const reads: Readonly<Record<string, string>> = {};
+const reads: Readonly<Record<string, string>> = {
+  "mailbox/mailbox.ts -> issues": "Tier 1 issue reservoir checks the issue's stage and assigned agent synchronously without keeping a second copy of the board",
+};
 
 /** What a file imports from under src, type-only imports too (they tie the modules all the same), as paths from src. */
 const localEdges = (file: string, source = readFileSync(file, "utf8")) =>

@@ -79,7 +79,13 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
         withSession(state, f.id, (x) => ({
           ...x,
           runs: f.runs,
-          phase: f.outcome === "completed" && f.phase ? f.phase : ended(f.outcome),
+          phase:
+            f.outcome === "completed" &&
+            f.phase?._tag === "resting" &&
+            x.issue !== undefined &&
+            state.issues.some((issue) => issue.id === x.issue && issue.pullRequest?.state === "open")
+              ? f.phase
+              : ended(f.outcome),
           lastRun: omitUndefined({ outcome: f.outcome, summary: f.summary, at: f.at, spent: f.spent, answer: f.answer }),
         }))[0],
         true,

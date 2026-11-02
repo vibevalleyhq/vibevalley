@@ -9,13 +9,13 @@ import { farm, farmState } from "@/farm/store";
 import { voiceCall } from "@/features/voice";
 import { playSound } from "@/ui/pixel/sound";
 
-export interface PhoneLogEntry {
+interface PhoneLogEntry {
   readonly call: InboxItem;
   readonly answered: boolean;
   readonly at: number;
 }
 
-export interface PhoneState {
+interface PhoneState {
   readonly calls: readonly InboxItem[];
   readonly handled: ReadonlySet<string>;
   readonly ringing: InboxItem | undefined;
@@ -29,7 +29,7 @@ export const ringEvery = 4_000;
 const logKeep = 40;
 
 /** What the calls touch outside themselves: the phone's open state, the bell and the clock. */
-export interface PhoneHost {
+interface PhoneHost {
   isOpen(): boolean;
   setOpen(open: boolean): void;
   play(sound: "ring" | "voiceOn" | "voiceOff"): void;

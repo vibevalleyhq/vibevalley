@@ -19,10 +19,10 @@ import { tempDir } from "@vibevalley/testkit/temp";
 
 import { orchestrator } from "@/base/actor.ts";
 import { standaloneLlm } from "@/cli/llm.ts";
+import { casesIn, check, committed, type EvalCase, isInput, stubbed } from "@/testing/evals.ts";
 import { world } from "@/testing/world.ts";
 import { Tool } from "@/tool/tool.ts";
 
-import { casesIn, check, committed, type EvalCase, isInput, stubbed } from "./evals.ts";
 import { agentPrompt, systemPrompt } from "./prompts.ts";
 
 const live = process.env.VIBEVALLEY_EVALS_LIVE === "1";

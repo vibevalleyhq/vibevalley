@@ -9,7 +9,7 @@ import { numberText } from "@/base/format";
 /** A switched-off runtime's account is not the farm's business. */
 export const usableRuntimes = (all: readonly RuntimeInfo[]) => all.filter((r) => r.installation.status === "available" && r.settings.enabled);
 
-export type QuotaLevel = "plenty" | "low" | "gold" | "empty" | "unknown";
+type QuotaLevel = "plenty" | "low" | "gold" | "empty" | "unknown";
 
 /** Below this much left (percent) the farm warns and the orchestrator sends someone else if it can (protocol.QuotaLow). */
 const quotaLow = 15;

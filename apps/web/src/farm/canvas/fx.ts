@@ -16,7 +16,7 @@ import { plotH } from "@/farm/world/world";
 
 const rand = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
-export interface PlotFx {
+interface PlotFx {
   /**
    * Starts what is new in the store's lists (each is started once: the store keeps them a few seconds) and moves
    * everything on by `dt` seconds. `bedOf` is the bed a session's plot is in.

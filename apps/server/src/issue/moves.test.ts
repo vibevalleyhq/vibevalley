@@ -15,7 +15,7 @@ const assigned = (sessions: string[] = ["w1"]) =>
       issue: issueId("t1"),
       agent: "lab",
       assignedAt: 0,
-      executions: sessions.map((session) => ({ kind: "session" as const, session: sessionId(session), startedAt: 0 })),
+      executions: sessions.map((session) => ({ kind: "worker" as const, session: sessionId(session), startedAt: 0 })),
     },
   ] satisfies Issue["assignments"];
 describe("status moves", () => {

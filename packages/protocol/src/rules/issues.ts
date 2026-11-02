@@ -17,7 +17,7 @@ export const executionsOf = (issue: Pick<Issue, "assignments">): Assignment["exe
 
 /** The external helper contexts that executed it, in order. */
 export const sessionIdsOf = (issue: Pick<Issue, "assignments">): SessionId[] =>
-  executionsOf(issue).flatMap((execution) => (execution.kind === "session" ? [execution.session] : []));
+  executionsOf(issue).flatMap((execution) => (execution.kind === "worker" ? [execution.session] : []));
 
 export const latestSessionIdOf = (issue: Pick<Issue, "assignments">): SessionId | undefined => sessionIdsOf(issue).at(-1);
 

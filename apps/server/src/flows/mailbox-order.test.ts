@@ -124,7 +124,7 @@ it.live("regression: queued triggers enter the first model request in receipt or
         at: [500, 1, 500][index]!,
         meta: { kind: "ci", failed: true },
       });
-    yield* ingress.start;
+    yield* (yield* Mailbox).replay;
     yield* issues.start(issue.id, "");
     yield* until(() => inputs.length === 1, "the queued batch in the initial request");
     const positions = markers.map((marker) => inputs[0]!.indexOf(marker));

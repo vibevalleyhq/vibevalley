@@ -13,6 +13,13 @@ import { statusMoves } from "./moves.ts";
 import { issueStageIn } from "./stage.ts";
 import { issueRefiningOf, issueStatusOf } from "./status.ts";
 
+export const nullText = (s: string | undefined) => {
+  const text = (s ?? "").trim();
+  return text === "" ? null : text;
+};
+
+export const jsonOrNull = (v: unknown, there: boolean) => (there ? JSON.stringify(v) : null);
+
 type Row = q.GetIssueResult;
 const strings = Schema.mutable(Schema.Array(Schema.String));
 const column = {

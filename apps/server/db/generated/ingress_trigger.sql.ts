@@ -63,7 +63,7 @@ export const UnroutedTriggersResult = Schema.Struct({
 export type UnroutedTriggersResult = typeof UnroutedTriggersResult.Type
 
 
-export const UnroutedTriggersSql = "-- name: UnroutedTriggers :many\nselect t.id, t.seq, t.trigger_json from ingress_trigger t\nwhere t.seq > $1\n  and t.payload_json::jsonb->'data'->>'kind' is distinct from 'channel_message'\n  and t.routed_at is null\norder by t.seq limit 1000;"
+export const UnroutedTriggersSql = "-- name: UnroutedTriggers :many\nselect t.id, t.seq, t.trigger_json from ingress_trigger t\nwhere t.seq > $1\n  and t.source <> 'cron'\n  and t.payload_json::jsonb->'data'->>'kind' is distinct from 'channel_message'\n  and t.routed_at is null\norder by t.seq limit 1000;"
 
 export const unroutedTriggers = Effect.fn("UnroutedTriggers")(function* (params: UnroutedTriggersParams) {
   const sql = yield* SqlClient.SqlClient
@@ -165,5 +165,31 @@ export const retireIssueDispatches = Effect.fn("RetireIssueDispatches")(function
   return yield* SqlSchema.void({
     Request: RetireIssueDispatchesParams,
     execute: (p) => sql.unsafe(RetireIssueDispatchesSql, [p["issue_id"], p["at"]]),
+  })(params)
+})
+
+export const UnroutedCronTriggersParams = Schema.Struct({
+  ["after"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+})
+export type UnroutedCronTriggersParams = typeof UnroutedCronTriggersParams.Type
+
+
+export const UnroutedCronTriggersResult = Schema.Struct({
+  ["id"]: Schema.String,
+  ["seq"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["trigger_json"]: Schema.String,
+  ["payload_json"]: Schema.String,
+})
+export type UnroutedCronTriggersResult = typeof UnroutedCronTriggersResult.Type
+
+
+export const UnroutedCronTriggersSql = "-- name: UnroutedCronTriggers :many\nselect id, seq, trigger_json, payload_json from ingress_trigger\nwhere source = 'cron' and routed_at is null and seq > $1\norder by seq limit 1000;"
+
+export const unroutedCronTriggers = Effect.fn("UnroutedCronTriggers")(function* (params: UnroutedCronTriggersParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: UnroutedCronTriggersParams,
+    Result: UnroutedCronTriggersResult,
+    execute: (p) => sql.unsafe(UnroutedCronTriggersSql, [p["after"]]),
   })(params)
 })

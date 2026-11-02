@@ -1,4 +1,4 @@
-import { type InboxMessage, summaryChannels, type UnreadRow } from "@/base/chat.ts";
+import { type InboxMessage, summaryChannels, type UnreadRow } from "@/mailbox/chat.ts";
 
 export const handbackWords = (orchestrator: string, issue: number, reason: string, uri: string) =>
   `@${orchestrator} #${issue} 的这条输入超出当前授权范围，请重新分流。帮工说明（不扩大主人授权）：${reason.slice(0, 600)}\n${uri}`;
@@ -38,3 +38,8 @@ export function wakeInput(messages: readonly InboxMessage[], others: readonly Un
   );
   return lines.join("\n");
 }
+
+/** A direct talk's opening: the owner chats with this helper alone, with no issue or project behind it. */
+export const talkBrief = (name: string, said: string) =>
+  `主人在和你（档案「${name}」）私聊。用主人的语言回答，延续这段对话。你有独立的工作目录，可用来保留聊天中的笔记和产出；这段对话没有关联工单或项目。主人要改一个项目时，先明确项目和要做的事，再用工单安排。\n\n私聊里最近说的，回答最后的问题：\n` +
+  said;

@@ -13,9 +13,8 @@ import { type BrainMessage, messageText } from "@vibevalley/agent/messages";
 import { selfTools } from "@vibevalley/agent/self";
 import type { AssistantMessage, ToolCall } from "@vibevalley/ai/messages";
 
+import { noResult } from "@/orchestrator/prompts.ts";
 import { type Op, schemas, toolName } from "@/tool/schemas.ts";
-
-import { noResult } from "./prompts.ts";
 
 /** One check on a turn, a closed set by kind: called (tool, with argContains in its arguments' JSON and argLacks not in
  * it, each when given), notCalled (tool), silent (no words said), says (contains in the words), saysNot (contains not in
@@ -49,7 +48,6 @@ export const kinds = ["called", "notCalled", "silent", "says", "saysNot"] as con
 
 /** The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). */
 export const orchestratorToolNames = () => [
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- schemas has one key per Op and no more
   ...(Object.keys(schemas) as Op[]).map(toolName),
   ...selfTools({ home: "", skills: () => Promise.resolve([]), memory: true, now: () => 0 }).map((t) => t.name),
 ];
@@ -131,13 +129,12 @@ export function casesIn(dir: string): { file: string; case: EvalCase }[] {
   } catch {
     return [];
   }
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- cases are written by orchestrator.eval.create, in this file's EvalCase
   return names.toSorted().map((n) => ({ file: join(dir, n), case: JSON.parse(readFileSync(join(dir, n), "utf8")) as EvalCase }));
 }
 
 export const isInput = (m: BrainMessage) => m.role === "custom" && (m as { customType?: string }).customType === "orchestratorInput";
 
-export const committed = join(import.meta.dirname, "testdata", "evals");
+export const committed = join(import.meta.dirname, "..", "orchestrator", "testdata", "evals");
 
 /** Arguments as one string whatever order their keys came in. */
 const argsKey = (args: unknown): string =>

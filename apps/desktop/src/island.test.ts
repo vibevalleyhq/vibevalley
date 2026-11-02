@@ -17,7 +17,7 @@ const issue = (number: number, state: Issue["stage"]["state"], more: Partial<Iss
               issue: `i${number}`,
               agent: "lab",
               assignedAt: 0,
-              executions: sessions.map((session) => ({ kind: "session", session, startedAt: 0 })),
+              executions: sessions.map((session) => ({ kind: "worker", session, startedAt: 0 })),
             },
           ]
         : [],

@@ -17,9 +17,12 @@
 - 2026-10-09 [商店和每日任务](.agents/notes/proposed/feature/2026-10-09-shop-and-daily-tasks.md)
 - 2026-10-09 [手机竖屏版面](.agents/notes/proposed/feature/2026-10-09-mobile-layout.md)
 
+### simplification
+
+- 2026-11-03 [Gemini 复杂度审查后的主线简化](.agents/notes/proposed/simplification/2026-11-03-gemini-complexity.md)
+
 ### architecture
 
-- 2026-11-01 [四层 Agent 网关剩余边界收口](.agents/notes/proposed/architecture/2026-11-01-four-layer-agent-gateway.md)
 - 2026-10-28 [agent 带什么：工具集（toolsets）和技能（skill 模块），主人用 `/` 叫它们](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)
 - 2026-10-27 [页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md)
 - 2026-10-22 [状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)

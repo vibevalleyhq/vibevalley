@@ -92,12 +92,12 @@ const contactAlpha = 0.5;
 
 const depth = (y: number) => Math.round(y * 10);
 
-export interface SceneInput {
+interface SceneInput {
   readonly frame: StateFrame | undefined;
   readonly agents: ReadonlyMap<string, Agent>;
 }
 
-export interface SceneEvents {
+interface SceneEvents {
   /** A plot was clicked, or the helper working it. */
   readonly onPlot: (bed: Bed) => void;
   /** A thing in the yard was clicked (a YardPlace id). */

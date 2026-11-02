@@ -7,12 +7,12 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { Mcp } from "@/mcp/mcp.ts";
 import { chatCompletionsPath } from "@/orchestrator/model.ts";
 import { chatCompletions } from "@/orchestrator/openai.ts";
-import { OrchestratorResponse } from "@/orchestrator/response.ts";
+import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 
 export const mcpRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const mcp = yield* Mcp;
-    const response = yield* OrchestratorResponse;
+    const response = yield* Orchestrator;
     yield* router.add(
       "*",
       "/mcp",

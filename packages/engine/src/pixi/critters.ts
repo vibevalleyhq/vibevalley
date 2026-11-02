@@ -11,7 +11,7 @@ import type { PointLight } from "./light";
 import { glyph } from "./particles";
 
 /** One frame: glyph rows ('#' a pixel), or a picture, centred on where the critter is. */
-export type FlapFrame = readonly string[] | Texture;
+type FlapFrame = readonly string[] | Texture;
 
 /** Two frames that alternate: wings up, wings down. */
 export type Flap = readonly [FlapFrame, FlapFrame];
@@ -39,7 +39,7 @@ function flapper(frames: Flap, color: number) {
   };
 }
 
-export interface FluttererOptions {
+interface FluttererOptions {
   /** Where each one lives: one per home. */
   readonly homes: readonly Point[];
   readonly colors: readonly number[];
@@ -50,7 +50,7 @@ export interface FluttererOptions {
   readonly speed?: number;
 }
 
-export interface Flutterers {
+interface Flutterers {
   /** Moves them on; `shown` (0..1) fades them in and out (by day, by night). */
   readonly update: (t: number, dt: number, shown: number) => void;
 }
@@ -83,7 +83,7 @@ export function flutterers(layer: Container, { homes, colors, frames, range = 24
   };
 }
 
-export interface FlockOptions {
+interface FlockOptions {
   readonly frames: Flap;
   readonly color: number;
   /** The shadow each one casts on the ground, and how far below it falls. */
@@ -95,7 +95,7 @@ export interface FlockOptions {
   readonly heights: readonly [number, number];
 }
 
-export interface Flocks {
+interface Flocks {
   /** Sends a flock over; `shadow` (0..1) is how dark their shadows are. */
   readonly launch: (shadow: number) => void;
   readonly update: (t: number, dt: number) => void;
@@ -140,7 +140,7 @@ export function flocks(layer: Container, o: FlockOptions): Flocks {
   };
 }
 
-export interface BlinkerOptions {
+interface BlinkerOptions {
   readonly homes: readonly Point[];
   readonly color: number;
   /** The soft glow around each one. */
@@ -149,7 +149,7 @@ export interface BlinkerOptions {
   readonly light: Pick<PointLight, "z" | "radius" | "color" | "intensity">;
 }
 
-export interface Blinkers {
+interface Blinkers {
   /** Moves them on; `shown` (0..1) fades them in. Their lights, for the light. */
   readonly update: (t: number, shown: number) => PointLight[];
 }

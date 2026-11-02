@@ -7,7 +7,7 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 export type MemoryKind = "leaf" | "fruit" | "seed";
 
 /** A fruit's three parts: an EverOS agent case, or the issue and its last report for a local `issue` memory. */
-export interface MemoryCase {
+interface MemoryCase {
   readonly intent: string;
   readonly approach: string;
   readonly insight: string;
@@ -33,7 +33,7 @@ export interface MemoryItem {
   readonly sown?: boolean;
 }
 
-export interface MemoryAgent {
+interface MemoryAgent {
   readonly id: string;
   readonly name: string;
 }

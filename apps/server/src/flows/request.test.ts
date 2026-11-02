@@ -25,7 +25,7 @@ const unused = (): never => {
 /** The farm's own services, and the doors these requests never go through as stand-ins that fail if they are used. */
 const withDoors = (f: ReturnType<typeof farm>) =>
   Layer.mergeAll(
-    Layer.mock(Orchestrator)({}),
+    Layer.mock(Orchestrator)({ answerer: unused }),
     Layer.mock(Lan)({ status: unused, stopPairing: unused, previewStopPairing: unused, setUpstream: unused }),
     Layer.mock(Voice)({ mossProblem: unused, lines: unused }),
     Layer.mock(Connector)({}),

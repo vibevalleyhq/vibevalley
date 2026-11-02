@@ -11,14 +11,14 @@
 
 ## 在哪
 
-- `apps/server/src/mailbox/`：`mailbox.ts` 是服务，`routing.ts` 是“谁该听到”，`brakes.ts`/`breaker.ts`/`deliveries.ts` 是刹车和投递状态，`pump.ts` 是叫醒循环，`work.ts` 是工单蓄水池，`urgency.ts` 是四档紧急度。
-- 表 `mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`；频道消息与投递在同一事务里写。
+- `apps/server/src/mailbox/`：`mailbox.ts` 是服务，`routing.ts` 是“谁该听到”与四档紧急度，`brakes.ts`/`deliveries.ts` 是三道刹车和投递状态，`work.ts` 是工单蓄水池与投递写入，`payload.ts` 是触发记录与载荷读写，`pump.ts` 是叫醒循环。
+- 表 `mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`；同一批收件人的投递与路由回执在同一事务里写。
 
 ## 模型和不变量
 
-- **一条消息和它的投递在同一个事务里。** Channel 的 `post(w, heard)` 在锁和事务里调 Mailbox 的 `heard`；事务失败两边都从库重读。
-- **宁可重复给，不丢。** 一轮没说话就结束、会话关掉、服务重启，交出去的投递回到 `pending`，再交一次。
-- **刹车不持久。** 跳数/冷却/熔断只在内存；重启清零和今天一样，主人的话在提交后解除。
+- **来源先持久化，投递与回执原子提交。** Channel 提交消息与 Trigger 后直接调用 Mailbox；中途退出时，由 Channel 重放未路由消息，受众仍按频道规则计算。定时来源由 Cron 准备工单后重放，其他来源由 Mailbox 重放。
+- **宁可重复给，不丢。** 一轮没有入模回执就结束、会话关掉、服务重启，交出去的投递回到 `pending`，再交一次。
+- **跳数与冷却从投递回执恢复。** 使用路由顺序与实际投递时间；只有新的主人回执重置跳数，重复输入不重置。熔断按当前进程的连续失败计数。
 - **谁该听到是频道的账，刹车是信箱的账。** Channel 给有序收件人，Mailbox 逐条定 `heldBy` 并计数。
 - **一个工单只留一条等人看的 cron 输入。** 新的 cron 输入把旧的 held 输入退回（`mailbox_issue_one_held`）；别的来源的 held 各自保留，PR 的多条 review 不会被合并掉。
 
@@ -31,13 +31,13 @@
 
 ## 和谁打交道
 
-- 依赖 Channel（消息、串、已读）、Session（投递、叫醒、流）、Issue（蓄水池/工单上下文）、Core（事实与门禁）。
-- 别人经 Mailbox 的 `say`/`speak`/`read`/`remove` 和 `forOrchestrator` 订阅它；频道不 import Mailbox。
+- 依赖 Session（投递、叫醒、流）、Agent（档案）、Core（事实与投影）与数据库；不 import Channel 或 Issue 服务。
+- Channel、Issue、Cron 直接调用 `receive`；管家订阅 `forOrchestrator`。投递前刷新工单投影，Session 结束派生出的 reviewing 门禁立即生效。
 
 ## 为什么这样
 
 - **投递状态只归一处。** 以前 Channel 既记话又记投递，两个写入方让内存和库对不上；拆出来后只有 Mailbox 写 `mailbox_delivery`。
-- **同一事务保住“不会说了却没投”。** 先提交消息再投递会在中间重启时丢话；钩子在事务里写，失败一起回滚。
+- **受众与投递分开。** 频道扇出只产生候选收件人；人类消息与机器任务输入先查工单订阅，命中进入 Tier 1；agent 间的提及与汇报保留频道受众，放行或无工单归属时共用 `posting.forward`。优先级、刹车、投递写入不因来源分叉。
 
 ## 怎么验证
 

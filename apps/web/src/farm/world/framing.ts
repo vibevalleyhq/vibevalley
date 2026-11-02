@@ -5,7 +5,7 @@ import { type Framing, frameWhole, type Rect, type Size } from "@vibevalley/engi
 import { farmFraming } from "@vibevalley/protocol/host";
 
 export type { Rect };
-export type VillageFraming = Framing;
+type VillageFraming = Framing;
 
 export const villageCutAcross = farmFraming.cut.across;
 export const villageCutDown = farmFraming.cut.down;

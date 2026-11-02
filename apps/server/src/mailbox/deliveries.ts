@@ -31,11 +31,6 @@ export class Deliveries {
     if (mine && r && from.includes(r.state)) mine.set(message, { ...r, ...to });
   }
 
-  /** MarkHanded. */
-  released(recipient: string, message: string) {
-    this.move(recipient, message, ["pending"], { wakes: true, reason: "addressed" });
-  }
-
   handed(recipient: string, message: string, launch: string) {
     this.move(recipient, message, ["pending"], { state: "handed", launch });
   }

@@ -20,7 +20,7 @@ import type { NotRecorded, RunStore } from "./session.ts";
 /** What an input starts a run with; attached only when the loop consumes it, not when it is queued. */
 
 /** A failed start asked while another run is still going: it is not recorded as its own run. */
-export class RunBusy extends Schema.TaggedError<RunBusy, { readonly brand: unique symbol }>()("RunBusy", { message: Schema.String }) {}
+class RunBusy extends Schema.TaggedError<RunBusy, { readonly brand: unique symbol }>()("RunBusy", { message: Schema.String }) {}
 
 export interface RunInput {
   readonly issue?: string;
@@ -34,7 +34,7 @@ export interface RunInput {
 const resultText = (result: ToolResult) => result.content.flatMap((p) => (p.type === "text" && p.text ? [p.text] : [])).join("\n");
 
 /** The run of an in-process agent, fed the loop's events. */
-export interface InProcessRun {
+interface InProcessRun {
   /** The loop's events, in order; input only for a consumed input's message_start. */
   readonly observe: (e: CoreEvent, input?: RunInput) => Effect.Effect<void, NotRecorded>;
   /** A rejected input as its own failed run, without consuming another input's work. */

@@ -1,7 +1,8 @@
-// What the chat keeps in memory of what it wrote: every channel, every participant, how far the owner has read in
-// each channel. The database stays the record: chat.ts writes there first and tells the model the same change right
-// after, each update here doing what its query does (the comments name it); a transaction that fails reloads the model,
-// since the changes told inside it are gone from the database. Only the chat writes these tables, one change at a time.
+// What the chat keeps in memory of what it wrote: every channel, every participant, who follows each channel, how far
+// the owner has read in each channel, and where each participant last read. The database stays the record: chat.ts
+// writes there first and tells the model the same change right after, each update here doing what its query does (the
+// comments name it); a transaction that fails reloads the model, since the changes told inside it are gone from the
+// database. Only the chat writes these tables, one change at a time.
 
 import { compareText, or } from "@/base/order.ts";
 
@@ -9,9 +10,36 @@ import type * as qc from "../../db/generated/channel.sql.ts";
 import type * as qp from "../../db/generated/channel_participant.sql.ts";
 
 export type ChannelRow = qc.AllChannelsResult;
-export type ParticipantRow = qp.ParticipantsResult;
+type ParticipantRow = qp.ParticipantsResult;
 
 const subjectKey = (kind: string, id: string) => kind + ":" + id;
+
+/** Who follows each thread, told each follow as the chat writes it and reloaded with the model. */
+export class Follows {
+  private follows = new Map<string, Set<string>>();
+
+  load(follows: readonly { channel_id: string; participant_id: string }[]) {
+    this.follows.clear();
+    for (const f of follows) this.followed(f.channel_id, f.participant_id);
+  }
+
+  /** Follow: following again is following. */
+  followed(channel: string, participant: string) {
+    const held = this.follows.get(channel);
+    if (held) held.add(participant);
+    else this.follows.set(channel, new Set([participant]));
+  }
+
+  /** A Session that left follows nothing. */
+  left(participant: string) {
+    for (const [channel, held] of this.follows) if (held.delete(participant) && held.size === 0) this.follows.delete(channel);
+  }
+
+  /** By id. */
+  followers(channel: string): string[] {
+    return [...(this.follows.get(channel) ?? [])].toSorted();
+  }
+}
 
 export class ChatModel {
   private byId = new Map<string, ChannelRow>();
@@ -19,8 +47,16 @@ export class ChatModel {
   private threadBySubject = new Map<string, string>();
   private people = new Map<string, ParticipantRow>();
   private ownerRead = new Map<string, number>();
+  private follows = new Follows();
+  readonly lastRead = new Map<string, string>();
+  private publishedLast = new Map<string, number>();
 
-  load(channels: readonly ChannelRow[], participants: readonly ParticipantRow[], ownerRead: readonly { channel_id: string; read_number: number }[]) {
+  load(
+    channels: readonly ChannelRow[],
+    participants: readonly ParticipantRow[],
+    ownerRead: readonly { channel_id: string; read_number: number }[],
+    follows?: readonly { channel_id: string; participant_id: string }[],
+  ) {
     this.byId.clear();
     this.threadByRoot.clear();
     this.threadBySubject.clear();
@@ -29,6 +65,7 @@ export class ChatModel {
     for (const c of channels) this.created(c);
     for (const p of participants) this.people.set(p.id, { ...p });
     for (const r of ownerRead) this.ownerRead.set(r.channel_id, r.read_number);
+    if (follows) this.follows.load(follows);
   }
 
   channel(id: string): ChannelRow | undefined {
@@ -90,6 +127,7 @@ export class ChatModel {
       if (c.id === id || c.parent_id === id) {
         this.byId.delete(c.id);
         this.ownerRead.delete(c.id);
+        this.publishedLast.delete(c.id);
         if (c.root_id !== null) this.threadByRoot.delete(c.root_id);
         if (c.subject_kind !== null && c.subject_id !== null && this.threadBySubject.get(subjectKey(c.subject_kind, c.subject_id)) === c.id)
           this.threadBySubject.delete(subjectKey(c.subject_kind, c.subject_id));
@@ -134,10 +172,32 @@ export class ChatModel {
     this.people.set(p.id, held ? { ...held, name: p.name, agent_id: p.agent_id, runtime: p.runtime, left_at: null } : { ...p, left_at: null });
   }
 
-  /** ParticipantLeft. */
+  /** ParticipantLeft: their participant state, follows and read place go with them. */
   left(id: string, at: number) {
+    this.follows.left(id);
+    this.lastRead.delete(id);
     const p = this.people.get(id);
     if (p && p.left_at === null) this.people.set(id, { ...p, left_at: at });
+  }
+
+  /** Follow: following again is following. */
+  followed(channel: string, participant: string) {
+    this.follows.followed(channel, participant);
+  }
+
+  /** Who follows a thread, by id. */
+  followers(channel: string): string[] {
+    return this.follows.followers(channel);
+  }
+
+  /** The newest number the chat published for a channel. */
+  publishedNumber(channel: string): number | undefined {
+    return this.publishedLast.get(channel);
+  }
+
+  /** What the chat published for a channel only moves on. */
+  notePublished(channel: string, number: number) {
+    this.publishedLast.set(channel, Math.max(this.publishedLast.get(channel) ?? 0, number));
   }
 
   /** ReadCursor for the owner. */

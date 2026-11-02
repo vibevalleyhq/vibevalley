@@ -5,7 +5,7 @@ import { compareText, or } from "@/base/order";
 
 import { type Lane, lanes } from "./lanes";
 
-export type BoardView = "board" | "list";
+type BoardView = "board" | "list";
 export const boardViews = ["board", "list"] as const satisfies readonly BoardView[];
 export const viewLabel: Record<BoardView, string> = { board: t("web.issue.boardLabels.view.board"), list: t("web.issue.boardLabels.view.list") };
 

@@ -16,7 +16,7 @@
 
 ## 在哪
 
-- **频道**：`apps/server/src/channel`（`Channel`）管理消息、频道、私聊、串、成员、已读游标和附件；`model.ts` 保存内存视图。`ingress/channel.ts` 把提交后的消息保存成不可变 Trigger，卡片指向 `vv://trigger/<id>`，完整原文独立留存；改消息不覆盖源事实。投递归 `mailbox`：`routing.ts` 决定受众，`work.ts` 管工单归属，`pump.ts` 发送会话输入，`deliveries.ts` 缓存未终结投递。
+- **频道**：`apps/server/src/channel`（`Channel`）管理消息、频道、私聊、串、成员、已读游标和附件；`model.ts` 保存内存视图。`channel/route.ts` 把提交后的消息保存成不可变 Trigger，卡片指向 `vv://trigger/<id>`，完整原文独立留存；改消息不覆盖源事实。投递归 `mailbox`：`routing.ts` 决定受众，`work.ts` 管工单归属，`pump.ts` 发送会话输入，`deliveries.ts` 缓存未终结投递。
 - **几处共用的规则在 `apps/server/src/channel/folded.ts`**：`targetOf` 写地址，`defaultOf` 认出默认频道，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryChannels`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留多少频道和串（`keepChannels` 100 个）。
 - **订阅**：契约是 `packages/protocol/src/rpc.ts` 的 `Subscriptions`（Effect RPC），服务端 `apps/server/src/http/rpc.ts` 挂在 `/api/v1/rpc`，页面经 `apps/web/src/infra/gateway.ts` 连、`features/channel/follow.ts` 按频道存。
 - **表**：`channel_participant`、`channel`（频道、私聊、串都是一行，照 Discord；`is_default` 至多一行为真，`peer_id` 每个对面至多一个私聊）、`channel_message`（每条带它的修订号、回复的号、改和删的时刻、置顶、回应）、`channel_attachment`、`channel_mention`、`channel_follow`、`channel_read_cursor`；信箱投递是 `mailbox_delivery`，路由回执保存在 `ingress_trigger.routed_at/routing_scope/routing_position`，源载荷不变。消息先提交，Delivery 与回执再在一个事务写；崩在两步之间，启动重放未路由消息。连接器是 `connector_account`、`connector_inbound`、`connector_outbox`。
@@ -175,7 +175,6 @@
 
 ## 还没做的
 
-- 将机器来源迁入独立 Ingress Trigger，并接上 Mailbox 工单层蓄水；Channel 只保留人类可见消息，见[网关实施计划](.agents/notes/proposed/architecture/2026-11-01-four-layer-agent-gateway.md)。
 - 不接受 MCP 的农机用的命令行版说话工具：[其他农机](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
 - 管家和帮工的工具按能力分配（现在是 `tool/tool.ts` 里两张写死的表）：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
 - 连接器（微信）和电话落在私聊：现在都在默认频道（或连接器接的频道）；已经接到某个频道的账号怎么办、电话的字幕给谁看还没定。

@@ -47,7 +47,7 @@
 
 **刚来的**：`Inbox` 订阅核心的事实，每次算一遍 Inbox，把刚来的发到 `news`。`voice` 订阅它：正在通话就把每件的 `title：body` 交给管家在电话里说（[语音](docs/subsystems/voice.md)「管家打电话找主人」）；没在通话就不管，手机会照帧里同样的 Inbox 响。
 
-**巡查**：每 `patrol.heartbeat_minutes` 分钟（默认 10，0 关掉；开机后等一个间隔才第一次看）不调模型看一遍 Inbox（`patrolStep`）。未读的 `mention`、`ask` 15 分钟，`quiet` 20 分钟，`interrupted` 30 分钟，`review` 和 `conflict` 2 小时；主人已经看过的交接从已读游标的更新时间起至少再等 2 小时，不在主人思考时按 15 分钟催。同一件事报过 4 小时内不再报，不再挂着的忘掉。有发现时按频道调用 Ingress.accept 保存 `source=patrol` 的 Trigger；Mailbox 以 digest 攒批，随管家下次交互捎带，不生成聊天消息。
+**巡查**：每 `patrol.heartbeat_minutes` 分钟（默认 10，0 关掉；开机后等一个间隔才第一次看）不调模型看一遍 Inbox（`patrolStep`）。未读的 `mention`、`ask` 15 分钟，`quiet` 20 分钟，`interrupted` 30 分钟，`review` 和 `conflict` 2 小时；主人已经看过的交接从已读游标的更新时间起至少再等 2 小时，不在主人思考时按 15 分钟催。同一件事报过 4 小时内不再报，不再挂着的忘掉。有发现时按频道直接保存 `source=patrol` 的 Trigger；直接交给 Mailbox 以 digest 攒批，随管家下次交互捎带，不生成聊天消息。
 
 原生子工单成功后由服务端自动汇合，不单独催主人验收；失败、问题照普通工单处理。父工单全部子单完成后产生普通 `review` 项；没有独立 Session 的父单使用 `target: { kind: "issue", id }` 打开工单，不增加图专用类别。
 

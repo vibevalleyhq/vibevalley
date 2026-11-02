@@ -6,8 +6,7 @@ import { messageId } from "@vibevalley/protocol/schema";
 import { emptyWorkspaceState } from "@/core/core.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
-import { forOwner } from "./away.ts";
-import { inboxEntries } from "./items.ts";
+import { forOwner, inboxEntries } from "./items.ts";
 import { emptyPatrol, type PatrolNote, patrolStep } from "./patrol.ts";
 
 describe("the patrol", () => {

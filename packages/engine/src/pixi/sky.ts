@@ -7,10 +7,10 @@
 import { duskOf, sunOf } from "../clock";
 
 export type Rgb = readonly [number, number, number];
-export type Vec3 = readonly [number, number, number];
+type Vec3 = readonly [number, number, number];
 
 /** How the lit picture is graded, after the light. */
-export interface Grade {
+interface Grade {
   readonly exposure: number;
   /** 1 as painted; more is more colourful. */
   readonly saturation: number;

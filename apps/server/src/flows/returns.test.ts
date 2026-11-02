@@ -76,7 +76,11 @@ it.live("regression: closing an unassigned issue returns its held owner input wi
     const source = event(issue.id, "unread-owner-followup");
     const trigger = (yield* ingress.accept(source))!;
     yield* service.setStatus(issue.id, "canceled", "", "", owner);
-    yield* mailbox.flushIssue(issue.id);
+    yield* await_(
+      () => Effect.succeed(mailbox.pending(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)),
+      (rows) => rows.length === 1,
+      "held input returned on cancel",
+    );
     yield* ingress.accept(source);
     expect(mailbox.pending(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
     expect((yield* sql<{ state: string }>`select state::text from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");

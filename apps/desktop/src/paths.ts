@@ -7,7 +7,7 @@ import { join } from "node:path";
 
 import { app } from "electron";
 
-export interface AppPaths {
+interface AppPaths {
   /** The farm's home (VIBEVALLEY_HOME): settings.json, the database, the logs. */
   readonly home: string;
   /** apps/server: src/main.ts and its node_modules. */

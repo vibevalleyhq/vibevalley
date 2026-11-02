@@ -12,18 +12,19 @@ import { modelClient, noDeepSeekKey } from "@/agent/model.ts";
 import { traitsOf } from "@/agent/prompts.ts";
 import { orchestrator } from "@/base/actor.ts";
 import { Channel, type OrchestratorNews } from "@/channel/chat.ts";
-import type { Picked } from "@/channel/wake.ts";
 import { Cron } from "@/cron/cron.ts";
 import { nextRun } from "@/cron/when.ts";
 import { type ApiError, refused } from "@/errors.ts";
 import { agentHome, projectsDir, ServerConfig } from "@/infra/config.ts";
 import { localeMinute } from "@/infra/time.ts";
+import { Ingress } from "@/ingress/ingress.ts";
+import type { Picked } from "@/mailbox/chat.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Project } from "@/project/project.ts";
 import { ownersLanguage } from "@/prompts.ts";
 import { runtimeLabel } from "@/runtime/presets.ts";
 import { Runtime } from "@/runtime/runtime.ts";
-import { type AgentHost, type Caller } from "@/session/host.ts";
+import { type AgentHost, type Caller, type NotAnswered } from "@/session/host.ts";
 import { type NotRecorded, Session } from "@/session/session.ts";
 import { Setting } from "@/setting/setting.ts";
 import { channelLine } from "@/tool/prompts.ts";
@@ -31,7 +32,9 @@ import { Tool } from "@/tool/tool.ts";
 
 import { intake, type Source } from "./intake.ts";
 import { deepseekModel } from "./model.ts";
+import type { Answer } from "./openai.ts";
 import { agentPrompt, identityNote, lineWords, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
+import { makeResponses } from "./response.ts";
 import { orchestratorInboxLines, quotaText, situationDelta } from "./situation.ts";
 
 const keepEvents = 1000;
@@ -79,6 +82,8 @@ export class Orchestrator extends Context.Service<
      * it sent keep working. */
     readonly stop: (agent?: string) => Effect.Effect<void>;
     readonly markWrong: (on: number, want: string, agent?: string) => Effect.Effect<OrchestratorEval, ApiError>;
+    readonly answerer: (on: "api" | "phone") => (model: string) => Answer<NotAnswered> | undefined;
+    readonly brief: (line: string) => Effect.Effect<string, NotAnswered>;
   }
 >()("vibevalley/Orchestrator") {
   static readonly layer = (options?: OrchestratorOptions) => Layer.effect(Orchestrator, make(options));
@@ -104,6 +109,8 @@ const make = (options: OrchestratorOptions = {}) =>
     const mailbox = yield* Mailbox;
     const cron = yield* Cron;
     const tool = yield* Tool;
+    const ingress = yield* Ingress;
+    const responses = makeResponses(ingress, chat);
 
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const service = yield* Llm;
@@ -328,7 +335,7 @@ const make = (options: OrchestratorOptions = {}) =>
         const picked: Pick = n.messages.findLast((m) => m.picked)?.picked ?? {};
         const response = n.messages.findLast((message) => message.responsePort);
         const voice = n.messages.findLast((message) => message.voiceMode);
-        const caller = response?.responsePort ? mailbox.takeResponse(response.responsePort) : undefined;
+        const caller = response?.responsePort ? responses.take(response.responsePort) : undefined;
         const line = n.source
           ? n.messages.map((message) => message.text.replace(new RegExp(`^@${n.agent}\\s*`, "u"), "")).join("\n")
           : voice?.voiceMode === "dictated"
@@ -383,7 +390,11 @@ const make = (options: OrchestratorOptions = {}) =>
       );
     }
 
-    yield* Effect.addFinalizer(() => Effect.forEach([...instances.values()], (me) => me.host.close, { concurrency: "unbounded", discard: true }));
+    yield* Effect.addFinalizer(() =>
+      Effect.forEach([...instances.values()], (me) => me.host.close, { concurrency: "unbounded", discard: true }).pipe(
+        Effect.andThen(Effect.sync(() => responses.closeAll())),
+      ),
+    );
 
     const modelId = (id: string) => {
       try {
@@ -411,5 +422,7 @@ const make = (options: OrchestratorOptions = {}) =>
           ].map((item) => item.name),
         );
       }),
+      answerer: (on) => responses.answerer(on),
+      brief: Effect.fn("Orchestrator.brief")((line: string) => responses.brief(line)),
     });
   });

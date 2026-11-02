@@ -45,7 +45,8 @@ where id = sqlc.arg(id);
 select c.id, c.type, c.root_id, c.root_number, c.subject_kind, c.subject_id, coalesce(ch.name, c.name, '')::text as channel_name,
        count(m.id)::int as unread,
        bool_or(exists (select 1 from channel_mention x where x.message_id = m.id and x.target_id = sqlc.arg(participant))) as mentions_you,
-       coalesce(max(m.number), 0)::int as latest
+       coalesce(max(m.number), 0)::int as latest,
+       (select p.name from channel_message lm join channel_participant p on p.id = lm.sender_id where lm.channel_id = c.id and lm.number = max(m.number)) as latest_sender_name
 from channel c
 left join channel ch on ch.id = c.parent_id
 join channel_message m on m.channel_id = c.id

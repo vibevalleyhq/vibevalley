@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { urgencyOf } from "./urgency.ts";
+import { urgencyOf } from "./routing.ts";
 
 const input = { source: "channel", actor: "owner", recipient: "worker", event: "conversation", canSteer: true } as const;
 

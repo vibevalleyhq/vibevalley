@@ -22,10 +22,10 @@ import * as qs from "../../db/generated/issue_assignment.sql.ts";
 import { assignTo, type Assignments } from "./assignment.ts";
 import { splitBrief } from "./brief.ts";
 import { draftMatch, refinementBrief } from "./prompts.ts";
+import { jsonOrNull, nullText } from "./rows.ts";
 import { isForOrchestrator } from "./status.ts";
-import { jsonOrNull, nullText } from "./stored.ts";
 
-export interface RefinementDeps {
+interface RefinementDeps {
   readonly core: Core["Service"];
   readonly store: Agent["Service"];
   readonly runtimes: Runtime["Service"];
@@ -157,7 +157,7 @@ export function refinement(d: RefinementDeps) {
 }
 
 /** A list may come as one string. */
-export interface IssueRefinement {
+interface IssueRefinement {
   readonly title: string;
   readonly why: string;
   readonly todo: string[];

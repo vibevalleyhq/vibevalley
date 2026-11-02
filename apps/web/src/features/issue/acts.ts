@@ -37,9 +37,9 @@ export function perform(issue: Issue, a: IssueAction, words = "", sendKey = ""):
 export const actionOf = (issue: Issue, act: IssueAct) => issue.stage.acts.find((a) => a.act === act);
 
 /** The box under an issue's ask: the findings of 打回, or a word to the helper. */
-export type ActBox = "reject" | "tell";
+type ActBox = "reject" | "tell";
 
-export interface ActWays {
+interface ActWays {
   /** Runs what shows nothing before the server has it, and says its refusal: the workbench's Act or the farm's. */
   readonly act: Act;
   /** Buttons the page carries out its own way, given the box's words; the rest are sent as the server says. */

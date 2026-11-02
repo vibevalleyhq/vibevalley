@@ -9,6 +9,7 @@ select trigger_json, payload_json from ingress_trigger where id = sqlc.arg(id);
 -- name: UnroutedTriggers :many
 select t.id, t.seq, t.trigger_json from ingress_trigger t
 where t.seq > sqlc.arg(after)
+  and t.source <> 'cron'
   and t.payload_json::jsonb->'data'->>'kind' is distinct from 'channel_message'
   and t.routed_at is null
 order by t.seq limit 1000;
@@ -43,3 +44,8 @@ where routed_at is null
   and trigger_json::jsonb->'meta'->>'dispatch' = 'true'
   and trigger_json::jsonb->'meta'->>'issue' = sqlc.arg(issue_id);
 
+
+-- name: UnroutedCronTriggers :many
+select id, seq, trigger_json, payload_json from ingress_trigger
+where source = 'cron' and routed_at is null and seq > sqlc.arg(after)
+order by seq limit 1000;

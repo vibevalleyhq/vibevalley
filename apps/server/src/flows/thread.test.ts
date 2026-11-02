@@ -45,7 +45,7 @@ describe("an issue's thread", () => {
       ))!;
       const followup = (yield* chat.say("这条还没处理", thread, "release-on-close")).message;
       yield* await_(
-        () => mailbox.deliveryChannel(started.session!, followup.id),
+        () => Effect.succeed(mailbox.pending(started.session!).find((row) => row.envelope_id === followup.id)?.channel_id),
         (id) => id === thread,
         "the followup stored",
       );
@@ -89,7 +89,7 @@ describe("an issue's thread", () => {
       const session = sessions.presentSessions()[0]!;
       const mailbox = yield* Mailbox;
       yield* await_(
-        () => mailbox.deliveryChannel(session.id, followup.id),
+        () => Effect.succeed(mailbox.pending(session.id).find((row) => row.envelope_id === followup.id)?.channel_id),
         (channel) => channel === thread,
         "the followup owned by the session",
       );

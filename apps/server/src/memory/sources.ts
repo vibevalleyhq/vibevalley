@@ -23,7 +23,7 @@ export interface RecalledLine {
   readonly score: number;
 }
 
-export interface Abilities {
+interface Abilities {
   readonly list: boolean;
   readonly forget: boolean;
   /** It wants whole runs (EverOS), in addition to explicit notes. */
@@ -216,7 +216,7 @@ interface Generation {
 }
 
 /** Owns source generations and every accepted operation, including retirement and shutdown. */
-export interface Sources {
+interface Sources {
   readonly prefetch: (cue: RecallCue) => Effect.Effect<RecalledLine[][]>;
   readonly list: (agent: string) => Effect.Effect<{ memories: T.Memory[]; sources: T.MemorySourceInfo[] }>;
   readonly search: (query: SearchQuery) => Effect.Effect<(SourceSearch & { source: string })[]>;
@@ -229,7 +229,7 @@ export interface Sources {
   readonly info: Effect.Effect<T.MemorySourceInfo[]>;
 }
 
-export interface SourcesOptions {
+interface SourcesOptions {
   readonly local: Source;
   readonly configured: () => readonly MemorySourceConfig[];
   readonly build: (c: MemorySourceConfig) => Source | undefined;

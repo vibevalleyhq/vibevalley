@@ -5,7 +5,7 @@ import type { Doing, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { clip } from "@/base/clip.ts";
-import { conflictOf } from "@/issue/conflict.ts";
+import { conflictOf } from "@/issue/stage.ts";
 import { MergeFailure } from "@/project/shapes.ts";
 import { inCny } from "@/runtime/price.ts";
 

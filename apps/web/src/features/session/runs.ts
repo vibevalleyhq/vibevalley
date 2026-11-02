@@ -70,7 +70,7 @@ export function runsOf(steps: SessionEvent[]): RunView[] {
   return views;
 }
 
-export interface Span {
+interface Span {
   step: SessionEvent;
   ms: number;
 }
@@ -215,14 +215,14 @@ export type Lane = "asked" | "model" | "tool";
 export const lanes: readonly Lane[] = ["asked", "model", "tool"];
 
 /** A stretch of one lane of the waterfall; `seq` is the shown row it opens. */
-export interface LaneSpan {
+interface LaneSpan {
   readonly lane: Lane;
   readonly start: number;
   readonly end: number;
   readonly seq: number;
 }
 
-export interface Waterfall {
+interface Waterfall {
   /** Each run's first and last time: the idle time between runs is not drawn. */
   readonly runs: readonly (readonly [number, number])[];
   readonly spans: readonly LaneSpan[];

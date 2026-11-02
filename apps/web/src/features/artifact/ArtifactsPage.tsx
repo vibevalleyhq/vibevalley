@@ -42,7 +42,7 @@ const justMade = defineAtom<string | undefined>(undefined);
 /** `rest` is the path after /artifacts/. */
 /** The owner's lines in a channel (features/channel's chatSay), given by app/: the channel feature shows artifacts, so this
  * one does not import it back. */
-export type ChatSay = IntentType<Omit<SayRequest, "sendKey">, void>;
+type ChatSay = IntentType<Omit<SayRequest, "sendKey">, void>;
 
 export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
   const router = useRouter();

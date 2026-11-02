@@ -58,7 +58,7 @@ function frame(stage: IssueStage, session: SessionView = helper): StateFrame {
     mandate: { strength: "explicit", maxBotReviewRounds: 3, autoSubmitPr: false },
     createdAt: 0,
     assignments: [
-      { id: "a1", issue: issueId("clock"), agent: session.agent, assignedAt: 0, executions: [{ kind: "session", session: session.id, startedAt: 0 }] },
+      { id: "a1", issue: issueId("clock"), agent: session.agent, assignedAt: 0, executions: [{ kind: "worker", session: session.id, startedAt: 0 }] },
     ],
     status: "in_review",
     moves: [],

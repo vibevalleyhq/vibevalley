@@ -19,7 +19,7 @@ export const warehouses: readonly Warehouse[] = [
 export type WarehouseDirection = "left" | "right" | "up" | "down";
 
 /** Cells are indexes into the warehouse's rows joined. */
-export interface WarehousePosition {
+interface WarehousePosition {
   readonly player: number;
   readonly boxes: readonly number[];
   readonly moves: number;

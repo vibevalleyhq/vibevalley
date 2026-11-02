@@ -57,7 +57,7 @@ const WordsFile = Schema.Struct({
 export class TemplateProblem extends Schema.TaggedError<TemplateProblem, { readonly brand: unique symbol }>()("TemplateProblem", { message: Schema.String }) {}
 
 /** A file's text, or none when there is no such file. */
-export type TextOf = (path: string) => Effect.Effect<string | undefined, TemplateProblem>;
+type TextOf = (path: string) => Effect.Effect<string | undefined, TemplateProblem>;
 
 const textOnDisk =
   (fs: FileSystem.FileSystem): TextOf =>

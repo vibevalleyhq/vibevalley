@@ -20,7 +20,7 @@ interface Ctx extends Floating<PopoverOpenChangeReason> {
 const Context = createContext<Ctx>();
 const use = () => useContext(Context);
 
-export type PopoverRootProps = FloatingRootProps<PopoverOpenChangeReason>;
+type PopoverRootProps = FloatingRootProps<PopoverOpenChangeReason>;
 
 function Root(props: PopoverRootProps) {
   const f = createFloating<PopoverOpenChangeReason>(props, "trigger");

@@ -6,7 +6,7 @@ import { A } from "./A";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 
-export interface TabItem<T extends string> {
+interface TabItem<T extends string> {
   readonly value: T;
   readonly label: string;
   readonly icon?: IconName | undefined;

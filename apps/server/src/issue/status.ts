@@ -4,9 +4,8 @@ import { assignedAgentOf, executionsOf, isBusy, latestSessionIdOf, omitUndefined
 import { compare, compareText, or } from "@/base/order.ts";
 import { sessionOf } from "@/session/roster.ts";
 
-import { awaitsPullRequest } from "./followup.ts";
 import { statusMoves } from "./moves.ts";
-import { issueStageIn } from "./stage.ts";
+import { awaitsPullRequest, issueStageIn } from "./stage.ts";
 
 export function issueStatusOf(t: T.Issue, state: T.WorkspaceState): T.IssueStatus {
   // Closed, the verdict is written down: done with what it delivered, else canceled (a close that does not say how too).

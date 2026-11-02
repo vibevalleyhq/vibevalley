@@ -8,7 +8,7 @@ import { SpriteIcon } from "./icons";
 import { type PickOption, pickItems } from "./pick";
 import { pxDrop, pxFocus, pxRing, pxText } from "./style";
 
-export interface SegmentOption<T> {
+interface SegmentOption<T> {
   value: T;
   label: string;
   disabled?: boolean;

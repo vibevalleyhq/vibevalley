@@ -11,7 +11,7 @@ import { Icon } from "@/ui/Icon";
 import { IconButton } from "@/ui/IconButton";
 import { Tip } from "@/ui/Tip";
 
-export type MossVerifyResult = { readonly ok: true } | { readonly ok: false; readonly why: string };
+type MossVerifyResult = { readonly ok: true } | { readonly ok: false; readonly why: string };
 
 const said = (r: MossVerifyResult) => (r.ok ? t("web.voice.voice.moss.ok") : r.why);
 

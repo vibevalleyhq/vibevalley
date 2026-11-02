@@ -315,23 +315,6 @@ export const setIssueQuestions = Effect.fn("SetIssueQuestions")(function* (param
   })(params)
 })
 
-export const SetIssueChecksParams = Schema.Struct({
-  ["checks"]: Schema.NullOr(Schema.String),
-  ["id"]: Schema.String,
-})
-export type SetIssueChecksParams = typeof SetIssueChecksParams.Type
-
-
-export const SetIssueChecksSql = "-- name: SetIssueChecks :exec\nupdate issue set checks = $1 where id = $2;"
-
-export const setIssueChecks = Effect.fn("SetIssueChecks")(function* (params: SetIssueChecksParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: SetIssueChecksParams,
-    execute: (p) => sql.unsafe(SetIssueChecksSql, [p["checks"], p["id"]]),
-  })(params)
-})
-
 export const SetIssueReportParams = Schema.Struct({
   ["questions"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),

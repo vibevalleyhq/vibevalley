@@ -16,7 +16,7 @@ import { jsonLines } from "./lines";
 /** How a row is drawn. The shapes here are apps/island IslandCore Messages.swift's; keep the two the same. */
 export type Tone = "working" | "waiting" | "stuck";
 
-export interface IslandRow {
+interface IslandRow {
   issue: string;
   number: number;
   title: string;
@@ -25,7 +25,7 @@ export interface IslandRow {
   tone: Tone;
 }
 
-export interface Glance {
+interface Glance {
   working: number;
   /** Issues that want the owner: asked, handed back, stuck. */
   waiting: number;
@@ -68,7 +68,7 @@ export function glanceOf(frame: StateFrame, now: number): Glance {
   };
 }
 
-export interface IslandOptions {
+interface IslandOptions {
   /** The helper; absent (not built, not macOS), the glance is still kept, for the tests. */
   binary: string | undefined;
   /** The page's pixel font, for the helper to read like the farm. */

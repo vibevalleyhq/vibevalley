@@ -1044,6 +1044,31 @@ describe("the chat", () => {
     }).pipe(Effect.orDie);
   const drop = (sql: SqlClient.SqlClient, name: string, table: string) => sql.unsafe(`drop trigger ${name} on ${table}`).pipe(Effect.orDie);
 
+  it.live("regression: channel fanout rolls back all recipients and replays the committed message once", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        yield* hire(f, x, "w1", "first", "demo");
+        yield* hire(f, x, "w2", "second", "demo");
+        yield* trigger(f.sql, "fail_second_recipient", "before insert on mailbox_delivery", "when (new.session_id = 'w2')");
+        expect((yield* Effect.exit(f.chat.say("@w1 @w2 atomic fanout", undefined, "fanout-key")))._tag).toBe("Failure");
+        const [message] = yield* f.sql<{ id: string }>`select id from channel_message where send_key = 'fanout-key'`;
+        expect(message).toBeDefined();
+        const id = message!.id;
+        expect(yield* f.sql`select session_id from mailbox_delivery where envelope_id = ${id}`).toEqual([]);
+        expect(yield* f.mailbox.registered(id)).toBe(false);
+        expect(f.mailbox.pending("w1").some((row) => row.envelope_id === id)).toBe(false);
+        yield* drop(f.sql, "fail_second_recipient", "mailbox_delivery");
+        yield* f.chat.start;
+        yield* f.chat.start;
+        expect(yield* f.sql`select session_id from mailbox_delivery where envelope_id = ${id} order by session_id`).toEqual([
+          { session_id: "w1" },
+          { session_id: "w2" },
+        ]);
+        expect(yield* f.mailbox.registered(id)).toBe(true);
+      }),
+    ),
+  );
+
   it.live("a read receipt is written whole or not at all", () =>
     run((f) =>
       Effect.gen(function* () {

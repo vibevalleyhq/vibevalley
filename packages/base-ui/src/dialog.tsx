@@ -25,7 +25,7 @@ interface Ctx {
 const Context = createContext<Ctx>();
 const use = () => useContext(Context);
 
-export interface DialogRootProps {
+interface DialogRootProps {
   open?: boolean | undefined;
   defaultOpen?: boolean | undefined;
   onOpenChange?: ((open: boolean, reason: DialogCloseReason) => void) | undefined;
@@ -78,7 +78,7 @@ function Trigger(props: ButtonProps & Renderable) {
   );
 }
 
-export interface DialogPopupProps extends JSX.DialogHtmlAttributes<HTMLDialogElement> {
+interface DialogPopupProps extends JSX.DialogHtmlAttributes<HTMLDialogElement> {
   /** Kept in the page while closed (its content too), only not shown. */
   keepMounted?: boolean | undefined;
 }

@@ -3,8 +3,8 @@
 import type { FailedTurn, FailureClass, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
 
-import { maybe, t } from "@vibevalley/i18n";
-import type { Question, CriterionCheck, Outcome, IssueReport } from "@vibevalley/protocol";
+import { list, maybe, t } from "@vibevalley/i18n";
+import type { EventTokens, Question, CriterionCheck, Outcome, IssueReport } from "@vibevalley/protocol";
 import { slice } from "@vibevalley/protocol/rules";
 
 import { clip } from "@/base/clip.ts";
@@ -49,7 +49,7 @@ const needsYou = new Set<FailureClass>(["auth", "billing", "quota", "model_unava
 
 const outcomeOf = (o: TurnOutcome): Outcome => (o.kind === "completed" ? "completed" : o.kind === "aborted" ? "interrupted" : "failed");
 
-export interface SessionRead {
+interface SessionRead {
   readonly outcome: Outcome;
   readonly text: string;
   readonly summary: string;
@@ -77,4 +77,30 @@ export function readReport(outcome: TurnOutcome, said: string): SessionRead {
     questions: questionsFromText(text),
     checks: checksFromText(text),
   };
+}
+
+export const tokensOf = (u: { input: number; cacheRead: number; output: number }): EventTokens => ({
+  input: u.input,
+  cacheRead: u.cacheRead,
+  output: u.output,
+});
+
+/** Groups of three digits, split by a space: 41 200. */
+const digits = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/gu, " ");
+
+/** changed is a prefix_changed's parts, none when the prompt's start was as before. */
+export function usageText(tokens: EventTokens, changed: readonly string[] = []): string {
+  const prompt = tokens.cacheRead + tokens.input;
+  let text =
+    prompt > 0
+      ? t("server.session.usage.cached", {
+          percent: Math.trunc((tokens.cacheRead * 100) / prompt),
+          read: digits(tokens.cacheRead),
+          missed: digits(tokens.input),
+          output: digits(tokens.output),
+        })
+      : t("server.session.usage.unread", { output: digits(tokens.output) });
+  // As the brain's prefix_changed names the parts.
+  if (changed.length > 0) text += t("server.session.usage.changed", { parts: list(changed.map((n) => maybe(`server.session.usage.parts.${n}`) ?? n)) });
+  return text;
 }

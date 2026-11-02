@@ -20,7 +20,7 @@ export const topsOf = (chat: Chat | undefined): Channel[] =>
 export const archivedOf = (chat: Chat | undefined): Channel[] =>
   (chat?.channels.filter((c) => c.type === "channel" && c.archived !== undefined) ?? []).toSorted((a, b) => (b.archived ?? 0) - (a.archived ?? 0));
 
-export interface ChannelGroup {
+interface ChannelGroup {
   /** None for the channels in no group, which come first. */
   readonly category?: string;
   readonly channels: readonly Channel[];

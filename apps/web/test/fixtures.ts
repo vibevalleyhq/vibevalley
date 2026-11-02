@@ -174,7 +174,7 @@ export const buttons = (...names: IssueAct[]): IssueAction[] =>
 
 export function withIssueSession(issue: Issue, session: SessionId, agent = "lab"): Issue {
   const current = issue.assignments.findLast((assignment) => assignment.endedAt === undefined);
-  const execution = { kind: "session" as const, session, startedAt: Date.now() };
+  const execution = { kind: "worker" as const, session, startedAt: Date.now() };
   return {
     ...issue,
     assignments: current

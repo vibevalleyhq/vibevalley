@@ -24,9 +24,9 @@ import { messageOf, type ApiError, missing, refused } from "@/errors.ts";
 import type { ToolStart } from "./facts.ts";
 import { makeInProcessRun, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";
+import { tokensOf, usageText } from "./report.ts";
 import type { RunStore } from "./session.ts";
 import type { SessionIdentity } from "./shapes.ts";
-import { tokensOf, usageText } from "./usage.ts";
 
 /** The input a caller waited on was not taken; cause is whatever stopped it, a defect included. */
 export class NotAnswered extends Schema.TaggedError<NotAnswered, { readonly brand: unique symbol }>()("NotAnswered", {
@@ -119,7 +119,7 @@ export interface HostOptions<R> {
  * and what memory gained since the model last saw it. heard: the messages the text tells of, recorded on the run. */
 export type Build<E> = (busy: boolean, memoryNews: string) => Effect.Effect<{ readonly text: string; readonly heard?: readonly string[] }, E>;
 
-export type Submitted = { readonly ok: true } | { readonly ok: false; readonly why: string; readonly run: string };
+type Submitted = { readonly ok: true } | { readonly ok: false; readonly why: string; readonly run: string };
 
 export interface AgentHost<R> {
   /** The input taken last: its route is where words go now. */

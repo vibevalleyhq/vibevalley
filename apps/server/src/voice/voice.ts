@@ -28,7 +28,7 @@ import { afterRealTime } from "@/infra/time.ts";
 import { Ingress } from "@/ingress/ingress.ts";
 import { orchestratorModel } from "@/orchestrator/model.ts";
 import { chatCompletions } from "@/orchestrator/openai.ts";
-import { OrchestratorResponse } from "@/orchestrator/response.ts";
+import { Orchestrator } from "@/orchestrator/orchestrator.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
 
 import { verifyMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
@@ -365,7 +365,7 @@ export interface VoiceOptions {
 const quickTunnel = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/u;
 
 /** A tunnel's public address and how to close it. */
-export interface Tunnel {
+interface Tunnel {
   readonly url: string;
   readonly close: () => void;
 }
@@ -445,7 +445,7 @@ const make = (options: VoiceOptions = {}) =>
     const settings = yield* Setting;
     const chat = yield* Channel;
     const ingress = yield* Ingress;
-    const response = yield* OrchestratorResponse;
+    const response = yield* Orchestrator;
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
     const httpClient = yield* HttpClient.HttpClient;

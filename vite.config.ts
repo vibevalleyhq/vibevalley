@@ -546,7 +546,6 @@ export default defineConfig({
           "apps/server/src/infra/db.ts",
           "apps/server/src/infra/baseline.ts",
           "apps/server/src/setting/setting.ts",
-          "apps/server/src/orchestrator/evals.ts",
         ],
         rules: { "vibevalley/sync-fs": "error" },
       },
