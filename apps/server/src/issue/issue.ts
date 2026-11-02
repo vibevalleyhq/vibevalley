@@ -566,8 +566,7 @@ const make = (options: IssueOptions = {}) =>
 
     /** said: the owner's words with it, when it is asked again. */
     const queuedFor = Effect.fn("Issue.queuedFor")(function* (id: string) {
-      const rows = yield* db.run(qi.issueInputs({ issue_id: id }));
-      return rows.map((row) => Schema.decodeSync(Schema.fromJsonString(S.Trigger))(row.trigger_json));
+      return yield* db.run(qi.issueInputs({ issue_id: id }));
     });
 
     const start = Effect.fn("Issue.start")(function* (
@@ -578,7 +577,10 @@ const make = (options: IssueOptions = {}) =>
       inputs: readonly T.Trigger[] = [],
     ): Effect.fn.Return<Dispatched, ApiError> {
       const mine = yield* Effect.option(get(id));
-      const initial = inputs.length > 0 || mine._tag === "None" ? inputs : yield* queuedFor(id);
+      const queued = inputs.length > 0 || mine._tag === "None" ? [] : yield* queuedFor(id);
+      const initial = inputs.length > 0 ? inputs : queued.map((row) => Schema.decodeSync(Schema.fromJsonString(S.Trigger))(row.trigger_json));
+      const forward = (session: string) =>
+        Effect.forEach(queued, (row) => db.run(qi.forwardIssueInput({ trigger_id: row.trigger_id, session_id: session })), { discard: true });
       if (Option.isSome(mine)) {
         const children = (yield* everyIssue).filter((child) => child.parent === mine.value.id);
         if (children.length > 0) {
@@ -593,6 +595,7 @@ const make = (options: IssueOptions = {}) =>
               worktree: true,
             });
             if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")));
+            yield* forward(hired.session.id);
             return { session: hired.session.id };
           }
           yield* Effect.forEach(
@@ -621,7 +624,9 @@ const make = (options: IssueOptions = {}) =>
         yield* queueRow(issue.id, true, (yield* chat.topOf(where)).id, trigger, initial[0]);
         return { queued: t("server.issue.queued", { full }) };
       }
-      return { session: yield* send(issue, agent, project, where, trigger, initial) };
+      const sent = yield* send(issue, agent, project, where, trigger, initial);
+      yield* forward(sent);
+      return { session: sent };
     });
 
     const splitting = yield* Semaphore.make(1);
