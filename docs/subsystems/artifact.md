@@ -149,6 +149,6 @@
 - `artifact/artifact.test.ts`：卡片说在哪、网页新的一版留着旧的、按工单和频道列、拒绝的几种、删掉以后内容文件的去留；交上来的 Markdown 读成块、不出新版；主人新建的是空的、不在哪里说。
 - `artifact/blocks.rules.test.ts`：拆分时留着 marks、接起来时合并一样的 marks；两键之间的键在两者之间；同键按 id 排；改过的块带着 rev 和写的人；协议里每种 op 都有分支；代码块没有 marks；Markdown → 块 → Markdown、块 → Markdown → 块不丢东西。
 - `artifact/blocks.test.ts`：一个人写的东西重启后还在；同一批发两次只收一次、回答一样；落后的改字盖住别人的改动是冲突、我写的存进修订；同一批勾选后改字不误判冲突；读写 Markdown；按 `afterBlock`/`parentId` 插块、换类型和属性、删块与重复删；`artifact.follow` 补上落后的批再推新的，100 批和 20 次重连都在；建议的创建、接受、拒绝、过期和重复接受；agent 改主人写过的块变成建议、原字不动；演示写三节（跳过关着的档案、每节连续、写的人、正在跑时再开被拒绝）；主人接手正长着的一段，演示不再改它。
-- `http/artifact.test.ts`：网页内容的响应头、404（一起写的也是）、「连接到本机」放行；`http/endpoints.test.ts`：真实 HTTP 接受没有存盘元数据的最小插入和拆分命令，块的定点和末尾插入、删除，带块的发言存下 id、引用版本和现在的字，一次挂多块、一块变了或删了也说得出来；建议的列表、接受改块、过期拒绝。`channel/prompts.test.ts`：给模型的提示里写着块的 id、引用时第几版、现在第几版和字，删掉的说已删除。
+- `http/artifact.test.ts`：网页内容的响应头、404（一起写的也是）、「连接到本机」放行；`http/endpoints.test.ts`：真实 HTTP 接受没有存盘元数据的最小插入和拆分命令，块的定点和末尾插入、删除，带块的发言存下 id、引用版本和现在的字，一次挂多块、一块变了或删了也说得出来；建议的列表、接受改块、过期拒绝。`channel/recorded.test.ts`：给模型的提示里写着块的 id、引用时第几版、现在第几版和字，删掉的说已删除。
 - `mcp/mcp.test.ts`：帮工从工作目录交一个文件，挂在它的工单和串上；`..`、绝对路径、目录、指向外面的符号链接都拒；帮工经 `/mcp` 一块一块写。
 - 页面：`apps/web/src/features/artifact/blocks.test.ts`（键和服务端生成的一样、偏移是码点、编辑保留 marks、行首 Markdown 和编号）；`apps/web/test/artifact.spec.ts`（在真的浏览器里证明网页读不到存储、碰不到外层、`fetch` 发不出；卡片、版本、回复、删；交上来的 Markdown 是块、不跑它带的 HTML；工单里的「产出」）；`apps/web/test/artifact-blocks.spec.ts`（新建一篇、一块一块写、写的留着；段首退格并段；卡片在对话旁打开、带话带进消息、一次带两块、窄屏关闭后草稿还在、两种主题和刷新后还开着；建议显示差异、接受改块、过期不能接受）。

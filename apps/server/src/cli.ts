@@ -9,18 +9,23 @@
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio, Predicate } from "effect";
-
-import "./cli/locale.ts";
-
 import { Argument, CliError, Command, Flag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
-import { t } from "@vibevalley/i18n";
+import { setLocale, t } from "@vibevalley/i18n";
 
-import { DryRunFlag, eventsCommand, groupCommands, issueWorkCommand, ServerFlag, stateCommand } from "./cli/api.ts";
-import { ownChat, runtimeChat } from "./cli/chat.ts";
+import { defaults } from "@/infra/config.ts";
+import { savedLocale } from "@/setting/setting.ts";
+
 import { err, exit, Failure, out, printFailure } from "./cli/output.ts";
 import { messageOf } from "./errors.ts";
+
+// The command line speaks the farm's language: the locale saved in the home's settings.json. It is set before the
+// commands load, since they say their help text as they load: hence the two imports below.
+setLocale(savedLocale(process.env.VIBEVALLEY_HOME || defaults().home));
+
+const { DryRunFlag, eventsCommand, groupCommands, issueWorkCommand, ServerFlag, stateCommand } = await import("./cli/api.ts");
+const { ownChat, runtimeChat } = await import("./cli/chat.ts");
 
 const version = "0.1.0";
 

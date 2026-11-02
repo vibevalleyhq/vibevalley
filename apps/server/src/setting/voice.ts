@@ -11,8 +11,11 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { voiceURL } from "./keys.ts";
 import { voiceOrchestratorPersona } from "./prompts.ts";
+
+/** An http(s) address: the voice's own answer, dictation, a memory source. */
+export const voiceURL = /^https?:\/\/\S+$/u;
+
 const limits = {
   silenceMs: [voiceSilenceMsMin, voiceSilenceMsMax],
   interruptMs: [voiceInterruptMsMin, voiceInterruptMsMax],

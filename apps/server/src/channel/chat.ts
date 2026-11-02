@@ -30,14 +30,11 @@ import * as qmn from "../../db/generated/channel_mention.sql.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import * as qp from "../../db/generated/channel_participant.sql.ts";
 import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
-import { channelAttachments } from "./attachments.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
-import { keepChannels, targetOf } from "./folded.ts";
+import { channelInput, keepChannels, parseSearch, targetOf } from "./folded.ts";
 import { channelNameProblem, mentionOf, mentionsIn, parseChatTarget } from "./mentions.ts";
 import { ChatModel, type ChannelRow } from "./model.ts";
-import { messageMutations } from "./mutations.ts";
-import { channelInput } from "./route.ts";
-import { parseSearch } from "./search.ts";
+import { channelAttachments, messageMutations } from "./mutations.ts";
 import { channelStreams } from "./streams.ts";
 
 /** The channel a new farm opens with. */

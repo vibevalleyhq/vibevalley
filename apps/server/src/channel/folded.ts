@@ -1,9 +1,15 @@
 // The chat in the core state.
 import type * as T from "@vibevalley/protocol";
 
+import { compactCard } from "@/base/card.ts";
 import { compareText, or } from "@/base/order.ts";
+import { type ChannelRouteFact, type Meta, metaOf, senderKind, targetOf } from "@/mailbox/chat.ts";
+import type { ChannelMail } from "@/mailbox/mailbox.ts";
+import type { InputContext } from "@/mailbox/payload.ts";
 
-export { targetOf } from "@/mailbox/chat.ts";
+import { chatNamed } from "./mentions.ts";
+
+export { targetOf };
 /** The database keeps them all; the state these many. What is said in them is the rooms' (Channel.follow). */
 export const keepChannels = 100;
 
@@ -40,3 +46,124 @@ export function withChannel(chat: T.Chat | undefined, c: T.Channel): T.Chat {
 export const defaultOf = (chat: T.Chat | undefined) => chat?.channels.find((c) => c.default);
 
 export const channelOf = (chat: T.Chat | undefined, id: string) => chat?.channels.find((c) => c.id === id);
+
+type SearchHas = "file" | "image" | "link";
+
+export interface SearchQuery {
+  readonly words: string;
+  /** A participant's id, or a name to match. */
+  readonly from?: string;
+  readonly in?: string;
+  readonly has: readonly SearchHas[];
+  /** Before the day it names (that day left out), and from the day it names on: epoch ms, at the server's midnight. */
+  readonly before?: number;
+  readonly after?: number;
+}
+
+const filterPattern = /(?:^|\s)(from|in|has|before|after):(\S+)/giu;
+
+const dayPattern = /^(\d{4})-(\d{1,2})-(\d{1,2})$/u;
+
+/** A filter that does not read stays among the words. */
+export function parseSearch(text: string): SearchQuery {
+  let from: string | undefined;
+  let inName: string | undefined;
+  let before: number | undefined;
+  let after: number | undefined;
+  const has: SearchHas[] = [];
+  const words = text
+    .replace(filterPattern, (whole, key: string, value: string) => {
+      const day = dayPattern.exec(value);
+      const at = day ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3])).getTime() : undefined;
+      switch (key.toLowerCase()) {
+        case "from":
+          from = chatNamed[value.replace(/^@/u, "")] ?? value.replace(/^@/u, "");
+          return " ";
+        case "in":
+          inName = value.replace(/^#/u, "");
+          return " ";
+        case "has":
+          if (value === "file" || value === "image" || value === "link") {
+            if (!has.includes(value)) has.push(value);
+            return " ";
+          }
+          return whole;
+        case "before":
+          if (at === undefined) return whole;
+          before = at;
+          return " ";
+        case "after":
+          if (at === undefined) return whole;
+          after = at;
+          return " ";
+        default:
+          return whole;
+      }
+    })
+    .replace(/\s+/gu, " ")
+    .trim();
+  return {
+    words,
+    has,
+    ...(from !== undefined ? { from } : {}),
+    ...(inName !== undefined ? { in: inName } : {}),
+    ...(before !== undefined ? { before } : {}),
+    ...(after !== undefined ? { after } : {}),
+  };
+}
+
+const sourceByPurpose: Record<NonNullable<Meta["ingressSource"]>, T.TriggerSource> = {
+  issue: "workbench",
+  cron: "cron",
+  patrol: "patrol",
+  connector: "connector",
+  voice: "voice",
+  github: "github",
+};
+
+const ingressActorKind = (raw: string): T.TriggerActorKind => {
+  switch (senderKind(raw)) {
+    case "owner":
+      return "owner";
+    case "session":
+      return "session";
+    case "orchestrator":
+      return "orchestrator";
+    case "system":
+      return "system";
+  }
+};
+
+/** A committed channel message as the one trigger Mailbox routes, and what it needs to fan it out. */
+export const channelInput = (fact: ChannelRouteFact, context: InputContext): { readonly trigger: T.Trigger; readonly mail: ChannelMail } => {
+  const meta = metaOf(fact.row.meta);
+  const source = meta.ingressSource ? sourceByPurpose[meta.ingressSource] : "channel";
+  const trigger: T.Trigger = {
+    id: fact.row.envelope_id,
+    source,
+    actor: { kind: ingressActorKind(fact.row.sender_kind), id: fact.row.sender_id, name: fact.row.name },
+    addressed: fact.addressed
+      ? "direct"
+      : fact.audience.mentions.length > 0
+        ? "mention"
+        : fact.row.channel_type === "thread" && fact.audience.threadOwner
+          ? "thread_owner"
+          : "unaddressed",
+    threads: [`channel:${fact.row.channel_id}`, ...(fact.row.subject_kind === "issue" && fact.row.subject_id ? [`issue:${fact.row.subject_id}`] : [])],
+    ...(fact.row.reply_number === null ? {} : { replyTo: `${fact.row.channel_id}:${fact.row.reply_number}` }),
+    replyChannel: fact.row.channel_id,
+    card: compactCard(fact.row.body, `vv://trigger/${fact.row.envelope_id}`, 600),
+    meta: { ...meta, channelMessageId: fact.row.envelope_id, inputContext: context, channelType: fact.row.channel_type },
+    at: fact.row.created_at,
+  };
+  return {
+    trigger,
+    mail: {
+      row: fact.row,
+      audience: fact.audience,
+      ...(fact.addressed ? { addressed: { recipient: fact.addressed, reason: "addressed", wakes: true } } : {}),
+      roles: fact.roles,
+      ...(fact.outcome === undefined ? {} : { outcome: fact.outcome }),
+    },
+  };
+};

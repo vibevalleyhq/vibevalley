@@ -10,12 +10,14 @@ import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
 import { NodeServices } from "@effect/platform-node";
 import { Clock, Effect, Fiber, FiberHandle, Option, Predicate, Queue, Schema, Stream } from "effect";
+import { FetchHttpClient } from "effect/http";
 
 import { type BrainEvent, makeBrain } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
 import { readMcpConfig } from "@vibevalley/agent/mcp";
 import { userMessage } from "@vibevalley/agent/messages";
 import { memoryStore } from "@vibevalley/agent/todoStore";
+import { type Llm, make } from "@vibevalley/ai/llm";
 import { t, currentLocale } from "@vibevalley/i18n";
 
 import { modelClient } from "@/agent/model.ts";
@@ -24,8 +26,10 @@ import { loadConfig } from "@/infra/config.ts";
 import { dshRuntime } from "@/runtime/dsh.ts";
 import { registryOf } from "@/runtime/runtime.ts";
 
-import { standaloneLlm } from "./llm.ts";
 import { instructions } from "./prompts.ts";
+
+// The command line and the live evals have no farm to give the Llm its HttpClient: it gets a fetch of its own.
+export const standaloneLlm = (): Llm["Service"] => Effect.runSync(make.pipe(Effect.provide(FetchHttpClient.layer)));
 
 const dim = (s: string) => "\x1b[2m" + s + "\x1b[0m";
 const short = (s: string) => {

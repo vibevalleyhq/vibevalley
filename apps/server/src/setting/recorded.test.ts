@@ -4,9 +4,7 @@ import type { SettingsUpdate, SettingsUpdateVoice, VoiceSettings } from "@vibeva
 
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
-import { keyHint } from "./keys.ts";
-import { memorySourcesProblem } from "./memorySources.ts";
-import { settingsProblem } from "./saving.ts";
+import { keyHint, memorySourcesProblem, settingsProblem } from "./memorySources.ts";
 import { defaultVoice, voiceOverrides, voiceProblem, voiceSettingsOver } from "./voice.ts";
 test("the recorded cases", () => {
   const cases = goldenCases("setting");

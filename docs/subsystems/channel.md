@@ -16,7 +16,7 @@
 
 ## 在哪
 
-- **频道**：`apps/server/src/channel`（`Channel`）管理消息、频道、私聊、串、成员、已读游标和附件；`model.ts` 保存内存视图。`channel/route.ts` 把提交后的消息保存成不可变 Trigger，卡片指向 `vv://trigger/<id>`，完整原文独立留存；改消息不覆盖源事实。投递归 `mailbox`：`routing.ts` 决定受众，`work.ts` 管工单归属，`pump.ts` 发送会话输入，`deliveries.ts` 缓存未终结投递。
+- **频道**：`apps/server/src/channel`（`Channel`）管理消息、频道、私聊、串、成员、已读游标和附件；`model.ts` 保存内存视图。`channel/folded.ts` 把提交后的消息保存成不可变 Trigger，卡片指向 `vv://trigger/<id>`，完整原文独立留存；改消息不覆盖源事实。投递归 `mailbox`：`routing.ts` 决定受众，`work.ts` 管工单归属，`pump.ts` 发送会话输入，`deliveries.ts` 缓存未终结投递。
 - **几处共用的规则在 `apps/server/src/channel/folded.ts`**：`targetOf` 写地址，`defaultOf` 认出默认频道，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryChannels`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留多少频道和串（`keepChannels` 100 个）。
 - **订阅**：契约是 `packages/protocol/src/rpc.ts` 的 `Subscriptions`（Effect RPC），服务端 `apps/server/src/http/rpc.ts` 挂在 `/api/v1/rpc`，页面经 `apps/web/src/infra/gateway.ts` 连、`features/channel/follow.ts` 按频道存。
 - **表**：`channel_participant`、`channel`（频道、私聊、串都是一行，照 Discord；`is_default` 至多一行为真，`peer_id` 每个对面至多一个私聊）、`channel_message`（每条带它的修订号、回复的号、改和删的时刻、置顶、回应）、`channel_attachment`、`channel_mention`、`channel_follow`、`channel_read_cursor`；信箱投递是 `mailbox_delivery`，路由回执保存在 `ingress_trigger.routed_at/routing_scope/routing_position`，源载荷不变。消息先提交，Delivery 与回执再在一个事务写；崩在两步之间，启动重放未路由消息。连接器是 `connector_account`、`connector_inbound`、`connector_outbox`。
@@ -194,5 +194,5 @@
 - `/mcp`：`mcp/mcp.test.ts`（给帮工它的工具、认出是谁、按阶段列帮工、不认识的人不给调、帮工只读写自己的记性、帮工写文档）。
 - `orchestrator/orchestrator.test.ts`：主人在私聊里说一句，管家读成「主人说」、知道在和主人私聊，答在私聊里、不在默认频道。
 - `chat.test.ts` 的「a message changes」：回复、改（只能改自己的）、回应加上再去掉、置顶、试跑删除、删、按修订号补齐、搜索、在消息下开串、附件的存取和去重、管家交到手上的 👀；`http/attachment.test.ts`：附件按 GET 读回、类型和下载方式、不认识的和越界的 404、超过上限拒绝。
-- `chat.test.ts` 的「a channel is renamed, grouped, placed, archived, quieted, and deleted once nothing points at it」和「a search reads its filters, and an edit can take a message's files off」；`channel/search.test.ts`（`parseSearch`）；`channel/embeds.test.ts`（链接、私有地址、跳转、只读页头）；`inbox/patrol.test.ts`（`forOwner` 照提醒级别）；`src/flows/talk.test.ts`：和档案私聊，派一个帮工答在私聊里、闲时休眠、再说话沿用上下文，无工单也能聊天，启动期间的消息不丢。
+- `chat.test.ts` 的「a channel is renamed, grouped, placed, archived, quieted, and deleted once nothing points at it」和「a search reads its filters, and an edit can take a message's files off」；`channel/recorded.test.ts`（`parseSearch`）；`channel/embeds.test.ts`（链接、私有地址、跳转、只读页头）；`inbox/patrol.test.ts`（`forOwner` 照提醒级别）；`src/flows/talk.test.ts`：和档案私聊，派一个帮工答在私聊里、闲时休眠、再说话沿用上下文，无工单也能聊天，启动期间的消息不丢。
 - 页面：`apps/web/test/chat-rest.spec.ts`（从工具栏和回应那一行选任何表情回应；Ctrl+K 跳到频道、开私聊；贴着的农场消息链接显示那条、点了跳过去；频道改名、分组、静音、归档、删；拖动排位；串列表改名、归档；置顶、引用、全农场搜索跳到消息并高亮；草稿刷新还在、↑ 改上一条、Esc 取消回复、表情；拖文件上传、视频内嵌、PDF、改消息去掉附件；和档案私聊、标成未读），`farm-chat.spec.ts` 的「⋯」（田头窗口里回应、回复、改、删），`apps/web/test/chat.spec.ts`（频道和未读、串、在频道里说话、私聊单列一段、里面不弹 @）、`chat-messages.spec.ts`（悬停一条消息回复、改、回应、置顶、删；成员栏；别处的变化实时到；选一张图发出去、在消息里显示、按它的地址读回）、`farm-chat.spec.ts`（频道菜单里的私聊）、`settings.spec.ts`（连接器页）、`farm-phone.spec.ts`（来电）。

@@ -15,9 +15,7 @@ import { jsonOf, jsonOrNone } from "@/base/json.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { keptFile, readOrSetAside } from "@/infra/files.ts";
 
-import { keyHint } from "./keys.ts";
-import { memorySourcesOver } from "./memorySources.ts";
-import { settingsProblem } from "./saving.ts";
+import { keyHint, memorySourcesOver, settingsProblem } from "./memorySources.ts";
 import { defaultVoice, voiceOverrides, voiceSettingsOver } from "./voice.ts";
 
 const MemorySourceConfig = Schema.Struct({

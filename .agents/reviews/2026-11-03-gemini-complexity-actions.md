@@ -110,7 +110,7 @@
 ### G10：`Meta` 的 JSON 往返与冗余字段（采纳）
 
 - **现状**：`apps/server/src/mailbox/payload.ts` 的 `triggerPayload` 直接 `metaOf(trigger.meta)`，不再先 `JSON.stringify(trigger.meta)` 再解析；同时显式取出 `inputContext` 和 `channelType`，不再从解构后的对象上重复读。`IngressPurpose` 这个具名别名已删除，`Meta["ingressSource"]`（`apps/server/src/mailbox/chat.ts`）直接写字面量联合；`ChannelRouteFact.purpose` 也已删除，路由事实只带 `row`、`audience` 和目标。
-- **改了什么**：删掉 `IngressPurpose` 与 `ChannelRouteFact.purpose` 两个转手字段，`Meta.ingressSource` 成为唯一的来源声明，`apps/server/src/channel/route.ts` 从它映射到 `T.TriggerSource`。
+- **改了什么**：删掉 `IngressPurpose` 与 `ChannelRouteFact.purpose` 两个转手字段，`Meta.ingressSource` 成为唯一的来源声明，`apps/server/src/channel/folded.ts` 从它映射到 `T.TriggerSource`。
 - **保留的部分**：`inputContext` 和 `channelType` 仍写在 `trigger.meta` 里，投递载荷再从它派生一次 `context`。这是「持久 Trigger 自描述」和「投递行可直接读」的取舍：只存一份源，派生一份可读副本，不再有第二层字符串化。彻底删掉派生副本会让每次读投递都要解码整个 Trigger，本轮不改。
 - **证据**：全仓搜不到 `IngressPurpose` 和 `ChannelRouteFact.purpose`；`payload.ts` 的 `triggerPayload`；`apps/server/src/mailbox/chat.ts` 的 `metaText` 统一处理空字段，等价于 Go 的 `omitempty`。
 
