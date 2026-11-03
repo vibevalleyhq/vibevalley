@@ -1,15 +1,91 @@
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, IssueHistory, IssueStatus, Priority, Session, SessionView, WorkspaceView } from "@vibevalley/protocol";
-import { assignedAgentOf, executionsOf, stageWantsOwner, omitUndefined, shortTitle } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, stageWantsOwner, omitUndefined, sessionIdsOf, shortTitle } from "@vibevalley/protocol/rules";
 
 import { ago, tookText } from "@/base/format";
 import { matches } from "@/base/search";
 
-import { type Ordering, orderRows, type RowFacts } from "./display";
 import { endedAt, issueSession, isForOrchestrator, issueTag, type IssueTag, issueTitle, tagText, tagOpen } from "./issue";
-import { type Lane, laneOf, moveOf, type Move } from "./lanes";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
+
+export type Lane = "todo" | "working" | "waiting" | "closed";
+
+export const lanes: Lane[] = ["todo", "working", "waiting", "closed"];
+
+export const laneLabel: Record<Lane, string> = {
+  todo: t("web.issue.boardLabels.lane.todo"),
+  working: t("web.issue.boardLabels.lane.working"),
+  waiting: t("web.issue.boardLabels.lane.waiting"),
+  closed: t("web.issue.boardLabels.lane.closed"),
+};
+
+/** The status a lane's header is drawn with: the one its cards mostly have. */
+export const laneStatus: Record<Lane, IssueStatus> = { todo: "todo", working: "in_progress", waiting: "in_review", closed: "done" };
+
+/** A card says its own status only where its lane does not: a draft in 待办 says so by its 草稿 flag instead. */
+export const ownStatus = (lane: Lane, status: IssueStatus) => status !== laneStatus[lane] && !(lane === "todo" && status === "backlog");
+
+export function laneOf(s: IssueStatus): Lane {
+  if (s === "backlog" || s === "todo") return "todo";
+  if (s === "in_progress") return "working";
+  if (s === "in_review") return "waiting";
+  return "closed";
+}
+
+export type Move = "start" | "close" | "reopen";
+
+/** A drop between lanes, if the server lets the issue go there (`Issue.moves`). A task's issue has no moves. */
+export function moveOf(from: Lane, to: Lane, moves: IssueStatus[]): Move | undefined {
+  if (from === "todo" && to === "working" && moves.includes("todo")) return "start";
+  if ((from === "working" || from === "waiting") && to === "closed" && (moves.includes("done") || moves.includes("canceled"))) return "close";
+  if (from === "closed" && to === "working" && moves.includes("todo")) return "reopen";
+  return undefined;
+}
+
+export const closedShown = 15;
+
+// The board's and the list's rows. The frame keeps every open issue and the newest closed ones (with the sessions on the
+// farm now), so those are read from it alone and a move shows on the next frame; issue.history.list adds what the frame
+// does not keep: the sessions that have left, and with 更早的 the older closed issues. An issue is held once, by the frame.
+
+/**
+ * Each issue the frame keeps, its sessions found on the farm, in the history, or (one that left after the history was
+ * read) as the frame last had it; the history's own rows after them with `older`. undefined before the first frame.
+ */
+export function boardRows(
+  core: WorkspaceView | undefined,
+  history: readonly IssueHistory[] | undefined,
+  older: boolean,
+  seen: ReadonlyMap<string, Session> = new Map(),
+): IssueHistory[] | undefined {
+  if (!core) return undefined;
+  const read = new Map((history ?? []).map((r) => [r.issue.id, r]));
+  const present = new Map<string, Session>(core.sessions.map((s) => [s.id, s]));
+  const live = core.issues.map((issue): IssueHistory => {
+    const row = read.get(issue.id);
+    return {
+      issue,
+      sessions: sessionIdsOf(issue).flatMap((id) => present.get(id) ?? row?.sessions.find((s) => s.id === id) ?? seen.get(id) ?? []),
+      missingSessions: (row?.missingSessions ?? []).filter((id) => sessionIdsOf(issue).includes(id) && !present.has(id)),
+    };
+  });
+  if (!older || !history) return live;
+  const kept = new Set(core.issues.map((i) => i.id));
+  return [...live, ...history.filter((r) => !kept.has(r.issue.id))];
+}
+
+/**
+ * What the history adds to the frame changes only when an issue gets a session or one leaves the farm: the history is
+ * read again when this does, not on every move or edit.
+ */
+export const historyKey = (core: WorkspaceView | undefined): string =>
+  core
+    ? `${core.issues
+        .filter((i) => sessionIdsOf(i).length > 0)
+        .map((i) => `${i.id}:${sessionIdsOf(i).join(",")}`)
+        .join(";")}|${core.sessions.map((s) => s.id).join(",")}`
+    : "";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";
@@ -77,34 +153,6 @@ export const noFilter: BoardFilter = { query: "", project: "", agent: "" };
 export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.project !== "" || f.agent !== "";
 export const filterShows = (f: BoardFilter, c: BoardCard) =>
   (f.project === "" || cardProject(c) === f.project) && (f.agent === "" || cardAgent(c) === f.agent) && matches(f.query, cardWords(c));
-
-const issueUpdated = (i: Issue) => Math.max(i.createdAt, i.queuedAt ?? 0, i.closedAt ?? 0, i.reviewedAt ?? 0);
-
-export function rowFacts(c: BoardCard): RowFacts {
-  switch (c.kind) {
-    case "family":
-    case "todo":
-    case "orchestrator":
-    case "missing":
-      return omitUndefined({
-        lane: c.lane,
-        priority: c.issue.priority,
-        createdAt: c.issue.createdAt,
-        updatedAt: issueUpdated(c.issue),
-        project: c.issue.project,
-        agent: assignedAgentOf(c.issue),
-      });
-    case "issue":
-      return omitUndefined({
-        lane: c.lane,
-        priority: c.issue.priority,
-        createdAt: c.issue.createdAt,
-        updatedAt: Math.max(issueUpdated(c.issue), ...c.sessions.flatMap((s) => [s.hiredAt, s.lastRun?.at ?? 0, endedAt(s) ?? 0])),
-        project: c.issue.project,
-        agent: assignedAgentOf(c.issue),
-      });
-  }
-}
 
 /** What a card and a list row both show. `detail` is everything else: it is the hover tip. */
 interface CardLook {
@@ -219,19 +267,4 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
 export function cardMove(c: BoardCard, to: Lane): Move | undefined {
   if (c.kind === "todo" || c.kind === "issue" || c.kind === "family") return moveOf(c.lane, to, c.issue.moves);
   return undefined;
-}
-
-function closedAt(c: BoardCard) {
-  switch (c.kind) {
-    case "issue":
-      return c.issue.closedAt ?? c.sessions[c.sessions.length - 1]!.hiredAt;
-    default:
-      return c.issue.closedAt ?? c.issue.createdAt;
-  }
-}
-
-/** A lane's cards in the order the owner picked; the closed lane by default newest closed first. */
-export function laneOrder(lane: Lane, cards: BoardCard[], ordering: Ordering) {
-  if (lane === "closed" && ordering === "manual") return [...cards].toSorted((a, b) => closedAt(b) - closedAt(a));
-  return orderRows(cards, ordering, rowFacts);
 }

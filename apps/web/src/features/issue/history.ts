@@ -7,7 +7,7 @@ import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { queries, ready, useQuery, useAgents } from "@/infra/query";
 
-import { boardRows, historyKey } from "./rows";
+import { boardRows, historyKey } from "./cards";
 
 /** Every issue with its real sessions: the frame's issues as the frame has them, the history (issue.history.list) for the
  * sessions that left and, with `older`, the issues the frame no longer keeps (rows.ts). */

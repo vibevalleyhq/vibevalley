@@ -19,7 +19,7 @@ import { Segmented } from "@/ui/Segmented";
 import { toast } from "@/ui/toasts";
 
 import { IssueBoard } from "./Board";
-import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, noFilter } from "./cards";
+import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, type Lane, noFilter } from "./cards";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { type BoardLook, boardLook, boardViews, viewLabel } from "./display";
 import { DisplayMenu } from "./DisplayMenu";
@@ -28,7 +28,6 @@ import { useIssueHistory, useNameOf } from "./history";
 import { issueIs } from "./issue";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
-import { type Lane } from "./lanes";
 import { issueMove, movedCards, sendMove } from "./moves";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 import { createWriteKey, writeIssue } from "./write";

@@ -11,8 +11,7 @@ import { omitUndefined, same } from "@vibevalley/protocol/rules";
 import { api } from "@/infra/api";
 import { bySeq, defineIntent, type Intent, type Intents, type Sent } from "@/state/intent";
 
-import type { BoardCard } from "./cards";
-import type { Lane } from "./lanes";
+import type { BoardCard, Lane } from "./cards";
 
 export interface IssueMove {
   readonly id: string;

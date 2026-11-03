@@ -3,8 +3,7 @@ import { expect, test } from "vite-plus/test";
 import type { Channel, Session, WorkspaceState } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { orchestratorTyping, archivedOf, groupsOf, linkedMessages, messagePath, pointedAt, threadsIn, topsOf } from "./places";
-import { switchTargets } from "./switcher";
+import { orchestratorTyping, archivedOf, groupsOf, linkedMessages, messagePath, pointedAt, switchTargets, threadsIn, topsOf } from "./places";
 const at = (id: string): Channel => ({ id, type: "channel", default: false, category: "", description: "", title: "", replies: 0, at: 0 });
 const orchestratorSession = (action: "thinking" | "speaking_text" | "none", channel?: string, agent = "orchestrator", since = 0): Session => ({
   id: sessionId(agent),

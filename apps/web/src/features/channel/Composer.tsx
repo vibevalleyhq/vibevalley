@@ -18,8 +18,7 @@ import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
 import { toast } from "@/ui/toasts";
 
-import { chatSay, createComposer } from "./composing";
-import { attachFiles, draftOf, drafts, setEditingId, uploadsIn, useReplying } from "./draft";
+import { attachFiles, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying } from "./composing";
 import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 import { HelperFace } from "./presence";

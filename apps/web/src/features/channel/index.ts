@@ -1,9 +1,8 @@
 export { ChatPage } from "./ChatPage";
 export { QuickSwitcher, switcher } from "./QuickSwitcher";
 export { createChannelForm } from "./Dialogs";
-export { chatSay, createComposer, pendingLines } from "./composing";
+export { chatSay, createComposer, drafts, pendingLines, useReplying } from "./composing";
 export { reactionSet, sameReaction, setMark, useMarkedFollowed, useMarkRead } from "./marks";
-export { drafts, useReplying } from "./draft";
 export { EmojiPicker, quickReactions, reactionOn } from "./EmojiPicker";
 export { followed, useFollowed, useMessage, useReports } from "./follow";
 export {

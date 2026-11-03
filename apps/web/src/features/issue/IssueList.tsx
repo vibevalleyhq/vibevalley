@@ -11,10 +11,9 @@ import { Icon } from "@/ui/Icon";
 import { IconButton } from "@/ui/IconButton";
 
 import { EmptyNote, OlderLink, QuickAdd } from "./Board";
-import { type BoardCard, cardAgent, cardLook, cardProject, laneOrder, rowFacts } from "./cards";
-import { type Grouping, groupRows, type Ordering, orderRows, type RowGroup } from "./display";
+import { type BoardCard, cardAgent, cardLook, cardProject, closedShown, laneLabel, laneStatus } from "./cards";
+import { type Grouping, groupRows, laneOrder, type Ordering, orderRows, type RowGroup, rowFacts } from "./display";
 import { useIssues, useNameOf } from "./history";
-import { closedShown, laneLabel, laneStatus } from "./lanes";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
 /** The quick add, with the group's project or helper when grouped by one. */

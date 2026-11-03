@@ -16,10 +16,10 @@ import { Dialog } from "@/ui/Dialog";
 import { TextArea } from "@/ui/Field";
 
 import { actionOf, perform } from "./acts";
+import { type Lane } from "./cards";
 import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./changes";
 import { useIssueChanges } from "./history";
 import { issueTitle } from "./issue";
-import { type Lane } from "./lanes";
 import { issueMove, sendMove } from "./moves";
 import { Note } from "./Sheet";
 

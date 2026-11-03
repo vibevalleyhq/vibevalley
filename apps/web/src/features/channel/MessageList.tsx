@@ -23,8 +23,7 @@ import { Markdown } from "@/ui/Markdown";
 import { Tag, type TagTone } from "@/ui/Tag";
 import { toast } from "@/ui/toasts";
 
-import { chatSay, pendingLines } from "./composing";
-import { editingId, setEditingId } from "./draft";
+import { chatSay, editingId, pendingLines, setEditingId } from "./composing";
 import { followed, useMessage } from "./follow";
 import { useMarkedFollowed, useMarkRead } from "./marks";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";

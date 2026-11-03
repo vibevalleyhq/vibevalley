@@ -19,7 +19,7 @@ import { Markdown } from "@/ui/Markdown";
 import { MoreMenu } from "@/ui/MoreMenu";
 import { toast } from "@/ui/toasts";
 
-import { drafts } from "./draft";
+import { drafts } from "./composing";
 import { quickReactions, reactionOn, EmojiPicker } from "./EmojiPicker";
 import { useMessage } from "./follow";
 import { pinSet, reactionSet, sameMessage, sameReaction, setMark, markUnread, unreadMark } from "./marks";

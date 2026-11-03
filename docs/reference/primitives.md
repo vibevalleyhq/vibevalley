@@ -113,7 +113,6 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `sampleAgent` | `agents.ts` |  |
 | `span` | `artifact.ts` |  |
 | `bold` | `artifact.ts` |  |
 | `para` | `artifact.ts` |  |
@@ -135,20 +134,20 @@
 | `repo` | `git.ts` | A repository with `mine` commits by the test user, `others` by someone else. |
 | `write` | `git.ts` |  |
 | `goldenCases` | `golden.ts` | The cases of a module's file, by the module's folder under src. |
-| `releaseHeld` | `helper.ts` | Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. |
-| `helper` | `helper.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). 只起草工单 drafts; |
-| `installedOnly` | `helper.ts` | A probe that finds every runtime given, bundled, and no other. |
-| `testIssues` | `issues.ts` |  |
 | `starter` | `layers.ts` | A built-in template as a farm whose agent.starters names it has it: under the template's own id. |
 | `testConfig` | `layers.ts` |  |
 | `testDatabase` | `layers.ts` |  |
 | `offline` | `layers.ts` | An HTTP client for a test that must not reach the network: every request dies, so one made by mistake is a failure. |
-| `Said` | `said.ts` |  |
-| `said` | `said.ts` |  |
 | `whenState` | `until.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. It |
+| `releaseHeld` | `worker.ts` | Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. |
+| `helper` | `worker.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). 只起草工单 drafts; |
+| `installedOnly` | `worker.ts` | A probe that finds every runtime given, bundled, and no other. |
 | `quietApp` | `world.ts` | For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. No runtime is |
 | `worldBelowIngress` | `world.ts` | Services below Ingress for module tests. |
 | `world` | `world.ts` | The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds |
+| `testIssues` | `world.ts` | Issues a test adds are ones the owner sent, so their mandate is explicit. |
+| `Said` | `world.ts` |  |
+| `said` | `world.ts` |  |
 
 ## `apps/web/src/base`
 
