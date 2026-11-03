@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { heard, levelOf, Playback, type MossTurn } from "./moss";
+import { heard, levelOf, Playback, type MossTurn } from "./mossLine";
 
 describe("heard", () => {
   it("revises a turn's words in place and starts a line for the next turn", () => {

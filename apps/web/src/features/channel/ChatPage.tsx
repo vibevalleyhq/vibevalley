@@ -27,10 +27,10 @@ import { toast } from "@/ui/toasts";
 
 import { Composer, FileDrop, type QuotedBlockDraft } from "./Composer";
 import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
-import { workbenchClock } from "./feed";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "./marks";
 import { MessageList } from "./MessageList";
 import {
+  workbenchClock,
   archivedOf,
   groupsOf,
   messagePath,

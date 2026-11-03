@@ -25,11 +25,10 @@ import { toast } from "@/ui/toasts";
 
 import { chatSay, pendingLines } from "./composing";
 import { editingId, setEditingId } from "./draft";
-import { feedOf, orchestratorTyping, workbenchClock } from "./feed";
 import { followed, useMessage } from "./follow";
 import { useMarkedFollowed, useMarkRead } from "./marks";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
-import { channelOf, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "./places";
+import { feedOf, orchestratorTyping, workbenchClock, channelOf, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "./places";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots, phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
 
 const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName }> = {

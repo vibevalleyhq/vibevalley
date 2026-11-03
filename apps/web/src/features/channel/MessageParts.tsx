@@ -20,12 +20,10 @@ import { MoreMenu } from "@/ui/MoreMenu";
 import { toast } from "@/ui/toasts";
 
 import { drafts } from "./draft";
-import { quickReactions, reactionOn } from "./emoji";
-import { EmojiPicker } from "./EmojiPicker";
-import { workbenchClock } from "./feed";
+import { quickReactions, reactionOn, EmojiPicker } from "./EmojiPicker";
 import { useMessage } from "./follow";
 import { pinSet, reactionSet, sameMessage, sameReaction, setMark, markUnread, unreadMark } from "./marks";
-import { type LinkedMessage, channelLabel, channelOf, linkedMessages, messagePath } from "./places";
+import { workbenchClock, type LinkedMessage, channelLabel, channelOf, linkedMessages, messagePath } from "./places";
 
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 

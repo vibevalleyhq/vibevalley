@@ -25,7 +25,7 @@
 
 ## 模型和不变量
 
-- **Agora 只在三处**：服务端的 `agora-token`、`agora-agents` 只在 `voice/voice.ts`；页面的 `agora-rtc-sdk-ng` 只在 `src/features/voice/agora.ts`，开始打电话时才动态加载；手机壳的 `react-native-agora` 只在 `apps/mobile/src/rtc.ts`。别处看到的是 `Voice` 的方法、`VoiceCall` 和 `@vibevalley/protocol/host` 的 `Rtc`。
+- **Agora 只在三处**：服务端的 `agora-token`、`agora-agents` 只在 `voice/voice.ts`；页面的 `agora-rtc-sdk-ng` 只在 `src/features/voice/call.ts`，开始打电话时才动态加载；手机壳的 `react-native-agora` 只在 `apps/mobile/src/rtc.ts`。别处看到的是 `Voice` 的方法、`VoiceCall` 和 `@vibevalley/protocol/host` 的 `Rtc`。
 - **一份授予是一组 `channel + uid`**：签发时生成频道（`vibevalley` 前缀）和数字 uid，签一个 RTC + RTM 通用的令牌（`tokenSeconds` = 3600 秒），同时把这组身份和签发时的 Agora 凭据快照存进授予。续签和启动只认这份授予，不重读当前凭据：中途改 App ID 只影响下一通电话。
 - **授予的期限就是令牌的期限**：没启动的授予与令牌同时过期，续签把两者一起延长；过期的在下一次请求时清掉，服务停止时全部清空。未知、过期或已撤销的 `channel + uid` 续签和启动都回 `VoiceUnavailable`（「这通电话的语音凭据已经失效，请重新接通」），页面重新取 `/session`。
 - **一份授予只有一个启动者**：启动时认领（`starting`），重复启动回「这通电话已经在接通」；启动失败撤销授予；成功后授予归通话，直到挂断。
@@ -48,7 +48,7 @@
 **接通**（页面 `VoiceCall.start`）：
 
 1. 浏览器先要麦克风权限。`POST /api/v1/voice/grant/create` 拿 `AgoraGrant`（`appId`、`channel`、`uid`、`token`）；没凭据回 `VoiceUnavailable`（「还没有 Agora 的凭据」），别的照常。
-2. 用 `host.rtc`（手机壳的声网原生 SDK，`apps/mobile/src/rtc.ts`）或页面自己的声网 Web SDK（`features/voice/agora.ts`）加入频道、发布麦克风。
+2. 用 `host.rtc`（手机壳的声网原生 SDK，`apps/mobile/src/rtc.ts`）或页面自己的声网 Web SDK（`features/voice/call.ts`）加入频道、发布麦克风。
 3. `POST /api/v1/voice/call/start`（`channel`、`uid`）。服务端认领授予、按当前语音设置建 vendors：
    - 「谁接电话」是管家时先开语音线路，拿到这通电话的地址和钥匙，作为 OpenAI 兼容的大模型交给 Agora，模型名 `vibevalley-orchestrator`；开不了回 `VoiceUnavailable`（「管家的语音线路接不通」）。
    - 快嘴：Agora 托管的模型、DeepSeek（用农场的 DeepSeek key，`https://api.deepseek.com/chat/completions`）或自己的 OpenAI 兼容接口（`llmKey`）。参数固定：最多 15 轮历史、`max_tokens` 512、`temperature` 0.7、`top_p` 0.95，带开场白和出错时说的话。
