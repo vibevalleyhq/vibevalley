@@ -51,13 +51,13 @@
 
 ### G03：`Trigger` 构造与落库（采纳）
 
-- **现状**：旧路径 apps/server/src/issue/trigger.ts（已迁移到 `apps/server/src/mailbox/payload.ts`）。旧短路径 issue/trigger.ts 已删除，Cron、Inbox、Issue 都从 `@/mailbox/trigger.ts` 导入 `recordTrigger`。
+- **现状**：旧路径 apps/server/src/issue/trigger.ts（已迁移到 `apps/server/src/mailbox/payload.ts`）。旧短路径 issue/trigger.ts 已删除，Cron、Inbox、Issue 都从 `@/mailbox/payload.ts` 导入 `recordTrigger`。
 - **改了什么**：
   - `mailbox/payload.ts` 统一 `recordTrigger`、频道消息的 `keepChannelTrigger` 和未路由 cron 查询。
   - `apps/server/src/channel/channel.ts` 的 `settle` 先写 Trigger 并把返回的 `Trigger` 直接交给 `Mailbox.receive`，不再插入后从数据库重读、重解码同一行。
   - `apps/server/src/ingress/ingress.ts` 仍保留 `Ingress.record`，但底层调用同一个生成的 `RecordTrigger` 查询，不再自己拼一套写入。
 - **没做什么**：没有把三条调用路径强行并成一个函数。Ingress、Channel、Cron 各自知道来源和幂等键，共用一个落库实现已经消除了「三套实现漂移」；合并调用方反而要把上层语义塞进下层。
-- **证据**：`grep recordTrigger apps/server/src` 只命中 `mailbox/payload.ts` 的实现和 Ingress、Issue、Cron、Inbox 的调用；`chat.ts` 的重查代码已删除。
+- **证据**：`grep recordTrigger apps/server/src` 只命中 `mailbox/payload.ts` 的实现和 Ingress、Issue、Cron、Inbox 的调用；`apps/server/src/channel/channel.ts` 的重查代码已删除。
 
 ### G04：排队输入与 `work.initial`（采纳）
 
@@ -80,7 +80,7 @@
 ### G06：死字段与死代码（采纳）
 
 - **现状**：
-  - `ChannelRouteResult` 只剩 `{ heldNotice: string }`，恒为 `[]` 的 `received` 已删除，`chat.ts` 里两处「👀」循环随之删除。
+  - `ChannelRouteResult` 只剩 `{ heldNotice: string }`，恒为 `[]` 的 `received` 已删除，`apps/server/src/channel/channel.ts` 里两处「👀」循环随之删除。
   - `ChannelRouteFact.kinds` 已删除，不再每次路由都组装一份没人读的 actor kind 表。
   - `Deliveries.released`、`RetireHeldInputs`、`SetIssueChecks` 在查询文件和生成文件里都搜不到，已删除。
 - **证据**：`apps/server/src/mailbox/envelope.ts` 的 `ChannelRouteResult` 定义；`ingress_trigger.sql` 与 `mailbox_issue.sql` 中对应查询已不存在。
@@ -219,3 +219,20 @@ vp run deadcode && vp run health:verify && vp run docs:verify
 - 真模型重放（`vp run --filter @vibevalley/server evals`）未运行；本轮没有改管家的提示和工具描述，只改了评测文件的位置。
 - 真声网电话没有打；`voice` 的行为没变，只更新了文档里的服务名。
 - 桌面版和手机壳没有重新打包；改动只在服务端和文档。
+
+## 七、第二阶段 10 轮文件名正名与碎片微文件消融（CodeGraph + DeepSeek V4.1 Flash）
+
+第二阶段按 CodeGraph 的引用边逐轮执行 10 次改动，把按性质命名、只剩转发或只服务单一调用的文件换成领域名字或并入相邻模块。
+
+- **服务与领域文件名正名**（旧路径 → 现在）：
+  - 旧路径 apps/server/src/channel/chat.ts → `apps/server/src/channel/channel.ts`
+  - 旧路径 apps/server/src/mailbox/chat.ts → `apps/server/src/mailbox/envelope.ts`
+  - 旧路径 apps/server/src/session/takeIn.ts → `apps/server/src/session/briefing.ts`
+  - 旧路径 apps/server/src/channel/folded.ts → `apps/server/src/channel/messages.ts`
+  - 旧路径 apps/server/src/channel/model.ts → `apps/server/src/channel/rooms.ts`
+  - 旧路径 apps/web/src/base/util.tsx → `apps/web/src/base/dom.tsx`
+  - 旧路径 apps/web/src/farm/panels/bits.tsx → `apps/web/src/farm/panels/rows.tsx`
+  - 旧路径 apps/web/src/features/channel/bits.tsx → `apps/web/src/features/channel/presence.tsx`
+- **碎片与中转文件消融**：溶解旧路径 apps/web/src/farm/support.ts；旧路径 apps/web/src/infra/frames.ts 并入 `apps/web/src/infra/frame.ts`；旧路径 apps/web/src/ui/richRules.ts 并入 `apps/web/src/ui/richText.ts`。
+- **守住正名**：`scripts/file-names.test.ts` 把 `util`、`bits`、`support` 列为模糊文件名并拦住；`scripts/stale-names.ts` 拦住退休的导入路径，旧名字不能再回流。
+- **结果**：仓库格式化文件从 1,237 个降到 1,124 个，减少 113 个冗余或微文件。

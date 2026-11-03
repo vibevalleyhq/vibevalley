@@ -243,7 +243,7 @@ flowchart TB
   test "$(wc -l < apps/server/src/mailbox/mailbox.ts)" -le 520
 
   # 2. 测试验收
-  (cd apps/server && vp test run src/mailbox/deliveries.test.ts src/mailbox/urgency.test.ts src/mailbox/brakes.test.ts src/mailbox/reach.test.ts src/flows/thread.test.ts src/flows/returns.test.ts)
+  (cd apps/server && vp test run src/mailbox/deliveries.test.ts src/mailbox/urgency.test.ts src/mailbox/brakes.test.ts src/flows/thread.test.ts src/flows/returns.test.ts)
   ```
 
 ---

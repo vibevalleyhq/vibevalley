@@ -369,6 +369,11 @@ const RULES: readonly Rule[] = [
     says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Executor, Issue, Memory, Project, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/store.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)',
     dirs: ["apps/server/src"],
   },
+  {
+    name: "a module under its retired grab-bag or metaphor filename",
+    pattern: /["'`](?:\.\.?\/|@\/)(?:channel\/(?:chat|folded|model)|mailbox\/chat|session\/takeIn|farm\/support|base\/util|ui\/richRules)(?:\.tsx?)?["'`]/u,
+    says: "channel/channel.ts, channel/messages.ts, channel/rooms.ts, mailbox/envelope.ts, session/briefing.ts, farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts",
+  },
 ];
 
 // A catalog (and the test that reads the English page) says what the owner reads, in the glossary's English column
