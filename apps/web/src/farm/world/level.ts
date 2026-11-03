@@ -19,7 +19,7 @@ export const inBox = (p: Point, b: Box) => p.x >= b.x0 && p.x < b.x1 && p.y >= b
 
 export const add = (a: Point, b: Point): Point => ({ x: a.x + b.x, y: a.y + b.y });
 
-export interface Thing {
+interface Thing {
   readonly at: Point;
   readonly box: Box;
   readonly field: (name: string) => unknown;

@@ -3,8 +3,8 @@ import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "s
 import { t } from "@vibevalley/i18n";
 import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
 
+import { aria, autofocus } from "@/base/dom";
 import { ago } from "@/base/format";
-import { aria, autofocus } from "@/base/util";
 import { reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { ready } from "@/infra/query";
@@ -16,19 +16,19 @@ import { Dialog } from "@/ui/Dialog";
 import { TextArea } from "@/ui/Field";
 
 import { actionOf, perform } from "./acts";
+import { type Lane } from "./cards";
 import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./changes";
-import { type Lane } from "./lanes";
+import { useIssueChanges } from "./history";
+import { issueTitle } from "./issue";
 import { issueMove, sendMove } from "./moves";
-import { useIssueChanges } from "./queries";
 import { Note } from "./Sheet";
-import { issueTitle } from "./titles";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
-export function CloseIssueDialog(props: { issue: Issue; session: Session; review?: boolean; lane?: Lane | undefined; onClose: () => void }) {
+export function CloseIssueDialog(props: { issue: Issue; session?: Session | undefined; review?: boolean; lane?: Lane | undefined; onClose: () => void }) {
   const [reviewing, setReviewing] = createSignal(untrack(() => props.review ?? false));
   const core = useCore();
   const live = () => core()?.issues.find((i) => i.id === props.issue.id);
-  const acts = () => (live()?.attention.acts ?? []).map((a) => a.act);
+  const acts = () => (live()?.stage.acts ?? []).map((a) => a.act);
   const working = () => acts().includes("stop");
   const presses = createPresses(() => props.lane);
   const cancel = async () => {
@@ -40,10 +40,10 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
         <div>
           <p class="text-base">
             {working()
-              ? t("web.issue.close.working", { who: props.session.name })
+              ? t("web.issue.close.working", { who: props.session?.name ?? props.issue.title })
               : acts().includes("complete")
-                ? t("web.issue.close.completable", { who: props.session.name })
-                : t("web.issue.close.notCompletable", { who: props.session.name })}
+                ? t("web.issue.close.completable", { who: props.session?.name ?? props.issue.title })
+                : t("web.issue.close.notCompletable", { who: props.session?.name ?? props.issue.title })}
           </p>
           <div class="mt-5 flex flex-wrap gap-2">
             <Show when={acts().includes("complete")}>
@@ -92,7 +92,7 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
   const changes = useIssueChanges(() => props.issue);
   const core = useCore();
   const live = () => core()?.issues.find((i) => i.id === props.issue);
-  const acts = () => (live()?.attention.acts ?? []).map((a) => a.act);
+  const acts = () => (live()?.stage.acts ?? []).map((a) => a.act);
   const presses = createPresses(() => props.lane);
   const take = async () => {
     if (await presses.press(live(), "complete")) props.onDone();

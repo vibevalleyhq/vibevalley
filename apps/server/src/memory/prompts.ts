@@ -1,8 +1,13 @@
 // What the memories say to models: the lines of what a helper recalls and what memory_search answers, how a note of
 // the owner's and a finished issue are kept, and what goes to EverOS. In Chinese whatever the owner's locale.
 
-/** A note the owner gave, as MEMORY.md keeps it. */
+/** Authorship stays explicit when database notes become model input. */
 export const fromOwner = "主人交代：";
+
+export function carriedMemory(lines: readonly string[]): string {
+  const text = lines.map((line) => "- " + line).join("\n");
+  return text.length > 8000 ? "较早的记性未放入上下文，需要时用 memory_search 查询。\n" + text.slice(-8000) : text;
+}
 
 export const recallWords = {
   everywhere: "所有项目",

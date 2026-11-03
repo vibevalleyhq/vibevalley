@@ -19,8 +19,7 @@ import { owner, session } from "@/base/actor.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Database, Db } from "@/infra/db.ts";
 import { Setting } from "@/setting/setting.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { until } from "@/testing/until.ts";
+import { testConfig, until } from "@/testing/layers.ts";
 
 import { foundText, Memory, make } from "./memory.ts";
 import { nowledge, nowledgeLabels } from "./nowledge.ts";
@@ -236,15 +235,8 @@ describe("Nowledge Mem", () => {
       const fake = new FakeNowledge();
       yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: true });
       const m = yield* Memory;
-      yield* m.keep({
-        agent: "lab",
-        session: "w1",
-        project: "demo",
-        brief: "修登录页",
-        outcome: "completed",
-        summary: "改好了",
-        said: "改好了。\n记住：测试前要 export DEEPSEEK_API_KEY=sk-abcdefghijklmnop1234\n记住（所有项目）：提交信息写中文",
-      });
+      yield* m.write({ agent: "lab", text: "测试前要 export DEEPSEEK_API_KEY=sk-abcdefghijklmnop1234", project: "demo", by: session("w1") });
+      yield* m.write({ agent: "lab", text: "提交信息写中文", project: "", by: session("w1") });
       yield* until(() => fake.adds.length === 2);
       expect([fake.adds[0]!.content, fake.adds[0]!.labels, fake.adds[0]!.source_app]).toEqual([
         "测试前要 export DEEPSEEK_API_KEY=[redacted]",

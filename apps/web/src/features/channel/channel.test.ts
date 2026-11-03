@@ -1,49 +1,42 @@
 import { expect, test } from "vite-plus/test";
 
-import type { Channel, OrchestratorState, WorkspaceState } from "@vibevalley/protocol";
+import type { Channel, Session, WorkspaceState } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 
-import { orchestratorTyping } from "./feed";
-import { linkedMessages } from "./links";
-import { archivedOf, groupsOf, messagePath, pointedAt, threadsIn, topsOf } from "./places";
-import { switchTargets } from "./switcher";
+import { orchestratorTyping, archivedOf, groupsOf, linkedMessages, messagePath, pointedAt, switchTargets, threadsIn, topsOf } from "./places";
 const at = (id: string): Channel => ({ id, type: "channel", default: false, category: "", description: "", title: "", replies: 0, at: 0 });
-const state = (orchestrator: OrchestratorState, where?: string): WorkspaceState => ({
+const orchestratorSession = (action: "thinking" | "speaking_text" | "none", channel?: string, agent = "orchestrator", since = 0): Session => ({
+  id: sessionId(agent),
+  role: "orchestrator",
+  agent,
+  name: agent,
+  runtime: "vibevalley",
+  brief: "",
+  hiredAt: 0,
+  runs: 0,
+  refining: false,
+  phase: action === "none" ? { _tag: "resting" } : { _tag: "working", since, doing: { action, label: "" } },
+  ...(channel ? { channel } : {}),
+});
+const state = (...sessions: Session[]): WorkspaceState => ({
   call: "idle",
   callReason: "",
-  orchestrators: { orchestrator: { state: orchestrator, ...(where ? { channel: where } : {}) } },
-  sessions: [],
+  sessions,
   crons: [],
   issues: [],
   connectors: [],
 });
 
-test("the orchestrator's dots show only in the channel it thinks or writes in", () => {
-  expect(orchestratorTyping(state("thinking", "c1"), at("c1"))).toEqual({ agent: "orchestrator", mood: "thinking" });
-  expect(orchestratorTyping(state("speaking", "c1"), at("c1"))).toEqual({ agent: "orchestrator", mood: "speaking" });
-  expect(orchestratorTyping(state("thinking", "c1"), at("c2"))).toBeUndefined();
-  expect(orchestratorTyping(state("thinking"), at("c1"))).toBeUndefined();
-  expect(orchestratorTyping(state("listening", "c1"), at("c1"))).toBeUndefined();
+test("the orchestrator's dots show only in the channel its session works in", () => {
+  expect(orchestratorTyping(state(orchestratorSession("thinking", "c1")), at("c1"))).toEqual({ agent: "orchestrator", mood: "thinking", since: 0 });
+  expect(orchestratorTyping(state(orchestratorSession("speaking_text", "c1")), at("c1"))).toEqual({ agent: "orchestrator", mood: "speaking", since: 0 });
+  expect(orchestratorTyping(state(orchestratorSession("thinking", "c1")), at("c2"))).toBeUndefined();
+  expect(orchestratorTyping(state(orchestratorSession("thinking")), at("c1"))).toBeUndefined();
+  expect(orchestratorTyping(state(orchestratorSession("none", "c1")), at("c1"))).toBeUndefined();
   expect(orchestratorTyping(undefined, at("c1"))).toBeUndefined();
-  const two: WorkspaceState = {
-    call: "idle",
-    callReason: "",
-    sessions: [],
-    orchestrators: { orchestrator: { state: "listening" }, lead: { state: "speaking", channel: "c2" } },
-    crons: [],
-    issues: [],
-    connectors: [],
-  };
-  expect([orchestratorTyping(two, at("c1")), orchestratorTyping(two, at("c2"))]).toEqual([undefined, { agent: "lead", mood: "speaking" }]);
-  const since: WorkspaceState = {
-    call: "idle",
-    callReason: "",
-    sessions: [],
-    orchestrators: { lead: { state: "thinking", channel: "c2", since: 1_000 } },
-    crons: [],
-    issues: [],
-    connectors: [],
-  };
-  expect(orchestratorTyping(since, at("c2"))).toEqual({ agent: "lead", mood: "thinking", since: 1_000 });
+  const two = state(orchestratorSession("none"), orchestratorSession("speaking_text", "c2", "lead"));
+  expect([orchestratorTyping(two, at("c1")), orchestratorTyping(two, at("c2"))]).toEqual([undefined, { agent: "lead", mood: "speaking", since: 0 }]);
+  expect(orchestratorTyping(state(orchestratorSession("thinking", "c2", "lead", 1_000)), at("c2"))).toEqual({ agent: "lead", mood: "thinking", since: 1_000 });
 });
 
 test("the sidebar lists the default first, then by place, grouped in the order the groups first come", () => {

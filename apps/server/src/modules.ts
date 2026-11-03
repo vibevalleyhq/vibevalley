@@ -1,4 +1,4 @@
-// The server's ten modules, lowest first: a module uses the ones before it and never one after
+// The server's thirteen modules, lowest first: a module uses the ones before it and never one after
 // (docs/subsystems/foundation.md). Each entry is the folders and root files under src/ it
 // is made of; modules.test.ts reads every import against this table, and services.ts assembles the modules in this order.
 // Platform's ground is two folders: base (pure: ids, JSON, ordering, redaction) imports nothing else under src, and
@@ -14,9 +14,12 @@ export const modules: readonly Module[] = [
   { name: "Platform", parts: ["base", "infra", "core", "setting", "errors.ts", "words.ts", "prompts.ts"] },
   { name: "Agents", parts: ["agent", "runtime", "memory"] },
   { name: "Source Control", parts: ["project"] },
-  { name: "Agent Sessions", parts: ["session"] },
+  { name: "Agent Sessions", parts: ["executor", "session"] },
+  { name: "Mailbox", parts: ["mailbox"] },
   { name: "Collaboration", parts: ["channel", "artifact"] },
-  { name: "Issues", parts: ["issue", "task", "cron"] },
+  { name: "Issues", parts: ["issue", "cron"] },
+  { name: "Ingress", parts: ["ingress"] },
+  { name: "Resource", parts: ["resource"] },
   { name: "Inbox", parts: ["inbox"] },
   { name: "Orchestrator", parts: ["orchestrator", "tool"] },
   { name: "Gamification", parts: ["game"] },

@@ -18,8 +18,8 @@
 | 技能 | 技能书 | `/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Skill` | `/api/v1/skill/…` |
 | 记性 | 记性 | 档案页和管家页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…`（`agent` 是管家的档案时是那个管家的） |
 | 管家 | 管家 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `WorkspaceState.orchestrators`（每个管家的状态）、`Channel.orchestrator`（照看那处的管家） | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
-| 工单 | 看板上的卡片 | `/issues`（`features/issue`） | `Issue`、`Issue.sessions`（这张工单用过的帮工） | `/api/v1/issue/…` |
-| 计划 | 种植计划：图纸桌、计划板 | `farm/panels/TaskBoard.tsx`、工作台 `features/issue/TaskDetail.tsx` | `TaskGraph`（从父工单拼回，`StateFrame.graphs`），每件是 `Task` | `/api/v1/graph/…` |
+| 工单 | 看板上的卡片 | `/issues`（`features/issue`） | `Issue`、`Issue.assignments`（责任与执行历史） | `/api/v1/issue/…` |
+| 父子工单 | 图纸桌打开工单 | 工作台 `features/issue/FamilyDetail.tsx` | `Issue.parent`、`blockedBy`，父单与子单都是普通工单 | `/api/v1/issue/…` |
 | 帮工 | 在一块地上干活的小动物 | 地块和地块详情（`farm/issue/IssueView.tsx`） | `Session`（`WorkspaceState.sessions`） | `/api/v1/session/stop`；别的按工单：`/api/v1/issue/…` |
 | 一轮（run） | 一季庄稼 | 地里长什么（`Session.phase`）；工单详情的「每一轮」 | `Run`、`RunTrigger`；核心状态里是 `run` 到 `report` 两个事实、`Session.runs`、`lastRun` | `/api/v1/issue/run/list` |
 | 轨迹 | 轨迹 | `features/session/WorkLog.tsx`、`features/session/Trajectory.tsx` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/session/list`、`/api/v1/session/get`、`/api/v1/session/event/list` |
@@ -44,18 +44,18 @@
 | 概念 | 服务端 | 存储 | oar |
 |---|---|---|---|
 | Workspace | `infra/config.ts` 的 `ServerConfig`；`services.ts` 把全部服务叠起来 | `VIBEVALLEY_WORK_ROOT`、`VIBEVALLEY_HOME` | |
-| 项目 | `Project`（`project/project.ts`、`git.ts`、`stack.ts`） | 工作目录下的 git 仓库 | 会话的 `cwd` |
+| 项目 | `Project`（`project/project.ts`、`git.ts`、`workplace.ts`） | 工作目录下的 git 仓库 | 会话的 `cwd` |
 | 档案、技能、档案模板 | `Agent`（模板的读法在 `agent/template.ts`） | `config.json`；内置模板 `apps/server/src/agent/templates/`，加进来的 `agent-templates/` | |
-| 农机 | `Runtime` | `config.json` 里每台农机的设置、`spend.json` | `Runtime`、`RuntimeRegistry` |
+| 农机 | `Runtime` | `config.json` 里每台农机的设置、`runtime_spend` 表 | `Runtime`、`RuntimeRegistry` |
 | 记性 | `Memory` | `memory` 表；管家的在 `agent/<档案 id>/MEMORY.md` | |
 | 管家 | `Orchestrator`（每个管家一个宿主） | `agent/<档案 id>/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`packages/agent`） |
-| 工单 | `Issue`（`issue/issue.ts`；派给管家的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_session` 表（一行是一个帮工） | |
-| 计划 | `Task`（`task/task.ts`） | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_event` 表 | |
-| 帮工 | `Session`（`session/session.ts`） | `state.json`（在场帮工的核心状态）、`session` 表（工作目录、oar 会话 id、最后一轮原话和想起过的记性） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
+| 工单 | `Issue`（`issue/issue.ts`；派给管家的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_assignment`（责任关系）、`issue_assignment_execution`（执行上下文） | |
+| 父子依赖 | `Issue`（`issue/dependencies.ts`） | `issue.parent`、`blocked_by`、`constraints` | 通用 DAG 算法在 `packages/agent/src/dag.ts` |
+| 执行上下文 | `Session`（`session/session.ts`），执行资源归 `Executor`；工单里的上下文画成帮工，私聊的通过 `channel` 关联频道 | `session` 表（工作目录、oar 会话 id、最后一轮原话、阶段和想起过的记性） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
 | 一轮（run） | `Session`（帮工的 run 在 `session/session.ts`；进程内 agent 的 run 在 `session/inProcessRun.ts`）；`session/facts.ts` 把会话事件读成事实 | `session_run` 表 | 帮工的一次 run 包着一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
 | 轨迹 | `Session`（`session/journal.ts` 的 `Journal`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |
 | 改动、完成 | `Issue`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 开 worktree 时的工单分支和 worktree；直接在项目目录干活的没有这两项 | |
-| 默认频道、频道、工单串 | `Channel`（`channel/chat.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tool`） | `channel`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
+| 默认频道、频道、工单串 | `Channel`（`channel/channel.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tool`） | `channel`、`channel_message`、`channel_participant`、`mailbox_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow` 表 | 送到 Agent Session 的话是 `Wake`、`Steer`、`Announce` |
 | 定时任务 | `Cron` | `cron` 表 | |
 | 巡查 | `Inbox`（`inbox/inbox.ts`；规则在 `inbox/patrol.ts`） | 不存：每轮从核心状态算 | |
 | 来电 | `Inbox`（`inbox/inbox.ts`、`inbox/items.ts`） | 不存：`StateFrame.inbox` 从核心状态现算 | |
@@ -64,9 +64,9 @@
 | 语音 | `Voice`（`voice/voice.ts`；声网的令牌和语音 agent 用 npm 的 `agora-token`、`agora-agents`） | `settings.json` | |
 | 钥匙和语音设置 | `Setting` | `settings.json`（只有你能读） | 会话的 `env` |
 | 进度、成就 | `Game`（`game/game.ts`、`progress.ts`） | `game_ledger` 表；进度从它折出来 | |
-| 等级 | `Game` | `state.json` 里的 commit 数 | |
-| 地 | `Game`；规则在 `apps/server/src/game/play.ts` | `state.json` 里的 `play.station` | |
-| 核心状态 | `Core` | `state.json`（聊天、进度、定时任务和工单除外） | |
+| 等级 | `Game` | `game_ledger` 折出的 commit 数 | |
+| 地 | `Game`；规则在 `apps/server/src/game/view.ts` | `session` 表里的 `play`（`play.station`） | |
+| 核心状态 | `Core` | 内存里的一份投影，从 PGlite 的 `session` 表和各模块表恢复 | |
 
 ## oar 那一层
 

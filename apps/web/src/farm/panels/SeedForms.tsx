@@ -9,7 +9,7 @@ import { t } from "@vibevalley/i18n";
 import { type ProjectTemplates, type Session } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { commands } from "@/farm/frames";
 import { farmProject } from "@/farm/store";
 import { issueOf } from "@/farm/world/plots";
@@ -262,7 +262,7 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
   const canTell = () =>
     core()
       ?.issues.find((i) => i.id === issueOf(props.session))
-      ?.attention.acts.some((a) => a.act === "tell") ?? false;
+      ?.stage.acts.some((a) => a.act === "tell") ?? false;
   const [text, setText] = createSignal("");
   const sendKey = newSendKey();
   const [refused, setRefused] = createSignal<string>();

@@ -5,3 +5,7 @@ export function matches(query: string, texts: readonly (string | undefined)[]) {
   const hay = texts.filter(Boolean).join("\n").toLowerCase();
   return words.every((w) => hay.includes(w));
 }
+
+export const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+export const or = (...c: number[]) => c.find((x) => x !== 0) ?? 0;

@@ -9,7 +9,7 @@
 - 改了 `apps/server/db/migrations` 或 `apps/server/db/queries`：新库能建、能读写。
 - 改了开机的流程（`apps/server/src/main.ts`、`services.ts`、`http/app.ts`）。
 
-真的帮工要本机登录的农机（`claude`、`codex`、`pi`……）或 DeepSeek 的钥匙，会花钱，要先问主人；这里用 `--scripted-helper`：pi 换成服务端测试里照工单字眼干活的帮工（`apps/server/src/testing/helper.ts`），别的农机都当没装。帮工的更多行为照样写测试（[地基](docs/subsystems/foundation.md)「测试」）。
+真的帮工要本机登录的农机（`claude`、`codex`、`pi`……）或 DeepSeek 的钥匙，会花钱，要先问主人；这里用 `--scripted-helper`：pi 换成服务端测试里照工单字眼干活的帮工（`apps/server/src/testing/worker.ts`），别的农机都当没装。帮工的更多行为照样写测试（[地基](docs/subsystems/foundation.md)「测试」）。
 
 ## 准备
 
@@ -38,7 +38,7 @@
    vpx scripts/verify-server.ts --scripted-helper -- sh -c '
      vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
      set -e
-     vv issue create --json "{\"title\":\"写打卡并提交\",\"project\":\"clock\",\"assignee\":\"docs\"}"
+     vv issue create --json "{\"title\":\"写打卡并提交\",\"project\":\"clock\",\"agent\":\"docs\"}"
      vv issue work 1
      vv issue status update 1 --dry-run --json "{\"status\":\"done\"}"
      vv issue status update 1 --json "{\"status\":\"done\"}"

@@ -1,5 +1,5 @@
 // The golden files (testdata, first recorded from the server's Go version) hold the core state's rules to their answers:
-// runs of facts folded from an empty farm, the shared rules' calls, and the task graphs', crons' and patrol's cases.
+// runs of facts folded from an empty farm, the shared rules' calls, and the child issues', crons' and patrol's cases.
 // Each is compared as JSON. Times of day are read in Asia/Shanghai (vite.config.ts sets it).
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -7,22 +7,17 @@ import { gunzipSync, gzipSync } from "node:zlib";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import type { Channel, WorkspaceState, Fact, Issue, Cron, CronRequest, Session, TaskGraph } from "@vibevalley/protocol";
-import { phaseText, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import type { Channel, WorkspaceState, Fact, Issue, Cron, CronRequest, Session, Conflict } from "@vibevalley/protocol";
+import { latestSessionIdOf, phaseText, stageWantsOwner } from "@vibevalley/protocol/rules";
 import { jsonDiff } from "@vibevalley/testkit/golden";
 
-import { targetOf } from "@/channel/folded.ts";
-import { cronProblem } from "@/cron/due.ts";
-import { nextRun, nextText, whenText } from "@/cron/when.ts";
+import { targetOf } from "@/channel/messages.ts";
+import { cronProblem, nextRun, nextText, whenText } from "@/cron/when.ts";
 import { effectsOf, viewOf } from "@/game/view.ts";
 import { inbox } from "@/inbox/items.ts";
-import { attentionOf } from "@/issue/attention.ts";
-import { withIssueStatuses } from "@/issue/status.ts";
+import { issueStageOf, withIssueStatuses } from "@/issue/status.ts";
 import { reduce } from "@/projection/reduce.ts";
-import { yuan } from "@/runtime/money.ts";
-import { graphChanges, graphEventText } from "@/task/changes.ts";
-import { asksForYou, blockedBy, graphProblems, graphSpent, layersOf, acceptanceChecks, readyTasks } from "@/task/graph.ts";
-import { graphText } from "@/task/prompts.ts";
+import { yuan } from "@/runtime/quota.ts";
 
 import { emptyWorkspaceState } from "./core.ts";
 
@@ -86,17 +81,17 @@ describe("the golden files", () => {
       // One source: what the inbox says of an issue's helper is what its attention says, every step of the way.
       const asked = new Set(inbox(next).flatMap((it) => (it.from.kind === "session" ? [it.from.id] : [])));
       for (const t of next.issues) {
-        const last = t.sessions.at(-1);
+        const last = latestSessionIdOf(t);
         const h = last === undefined ? undefined : next.sessions.find((s) => s.id === last);
-        if (!h || h.graph || t.task || t.graph || t.parent) continue;
-        expect({ line, issue: t.id, questions: asked.has(h.id) }).toEqual({ line, issue: t.id, questions: attentionWantsOwner(t.attention.state) });
+        if (!h || t.parent) continue;
+        expect({ line, issue: t.id, questions: asked.has(h.id) }).toEqual({ line, issue: t.id, questions: stageWantsOwner(t.stage.state) });
       }
       state = next;
     });
     await f.done();
   });
 
-  test("rules: targetOf, phaseText, yuan, attentionOf", async () => {
+  test("rules: targetOf, phaseText, yuan, issueStageOf", async () => {
     const rows = await lines("rules.jsonl.gz");
     const f = failures("rules.jsonl.gz", rows);
     rows.forEach((row, i) => {
@@ -104,12 +99,14 @@ describe("the golden files", () => {
       switch (row.fn) {
         case "targetOf":
           return f.check(i + 1, "targetOf", targetOf(input.c as Channel, input.channelName as string), row, "out");
-        case "phaseText":
-          return f.check(i + 1, "phaseText", phaseText(input.session as Session, input.now as number) || null, row, "out");
+        case "phaseText": {
+          const { session, now, conflict } = input as { session: Session; now: number; conflict?: Conflict };
+          return f.check(i + 1, "phaseText", phaseText(session, now, conflict) || null, row, "out");
+        }
         case "yuan":
           return f.check(i + 1, "yuan", yuan(row.in as number), row, "out");
-        case "attentionOf":
-          return f.check(i + 1, "attentionOf", attentionOf(input.issue as Issue, (input.session as Session | null) ?? undefined), row, "out");
+        case "issueStageOf":
+          return f.check(i + 1, "issueStageOf", issueStageOf(input.issue as Issue, (input.session as Session | null) ?? undefined), row, "out");
         default:
           throw new Error(`line ${i + 1}: no rule ${String(row.fn)}`);
       }
@@ -117,7 +114,7 @@ describe("the golden files", () => {
     await f.done();
   });
 
-  test("play: task graphs, crons and the patrol", async () => {
+  test("play: child issues, crons and the patrol", async () => {
     const rows = await lines("play.jsonl.gz");
     const f = failures("play.jsonl.gz", rows);
     const seen: Record<string, number> = {};
@@ -129,35 +126,6 @@ describe("the golden files", () => {
       const want = (row.output ??= {}) as Record<string, unknown>;
       const same = (what: string, got: unknown) => f.check(line, `${kind} ${what}`, got, want, what);
       switch (kind) {
-        case "task": {
-          const graph = input.task as TaskGraph;
-          const tasks = graph.tasks;
-          same("problems", graphProblems(graph.tasks));
-          same("layers", layersOf(graph.tasks));
-          same(
-            "ready",
-            readyTasks(graph).map((n) => n.id),
-          );
-          same("questions", asksForYou(graph));
-          same("spent", graphSpent(graph));
-          same("text", graphText(graph));
-          same(
-            "blocked",
-            tasks.map((n) => blockedBy(graph, n)),
-          );
-          same(
-            "acceptanceChecks",
-            tasks.map((n) => acceptanceChecks(graph, n)),
-          );
-          const changes = graphChanges(input.fresh === true ? undefined : graph, input.after as TaskGraph);
-          same("changes", changes);
-          const titles = new Map(tasks.map((n) => [n.id, "T" + n.title]));
-          same(
-            "eventTexts",
-            changes.map((c) => [graphEventText(c), graphEventText(c, (id) => titles.get(id) ?? id)]),
-          );
-          break;
-        }
         case "cron": {
           const s = input.s as Cron;
           same("next", nextRun(s) ?? null);
@@ -173,7 +141,7 @@ describe("the golden files", () => {
           throw new Error(`line ${line}: no kind ${kind}`);
       }
     });
-    for (const kind of ["task", "cron", "patrol"]) expect(seen[kind] ?? 0).toBeGreaterThan(20);
+    for (const kind of ["cron", "patrol"]) expect(seen[kind] ?? 0).toBeGreaterThan(20);
     await f.done();
   });
 });

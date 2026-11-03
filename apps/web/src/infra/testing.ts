@@ -2,7 +2,7 @@
 
 import type { StateFrame } from "@vibevalley/protocol";
 
-import type { Frames, FramesSource } from "./frames";
+import type { Frames, FramesSource } from "./frame";
 
 export interface TestFrames {
   readonly source: FramesSource;
@@ -31,9 +31,8 @@ export function testFrames(start: Partial<Frames> = {}): TestFrames {
 /** An empty farm's frame at this seq. */
 export const frameAt = (seq: number): StateFrame => ({
   seq,
-  state: { call: "idle", callReason: "", sessions: [], issues: [], orchestrators: {}, crons: [], connectors: [] },
+  state: { call: "idle", callReason: "", sessions: [], issues: [], crons: [], connectors: [] },
   inbox: [],
-  graphs: [],
   effects: [],
-  view: { level: { level: 1, xp: 0, need: 100 }, plots: {}, achievements: [] },
+  view: { level: { level: 1, xp: 0, need: 100 }, plots: {}, plays: {}, achievements: [] },
 });

@@ -1,25 +1,33 @@
 // VibeValley's own agent as an oar runtime, built on oar's runtime-author SPI the way oar's scripted runtime is: one turn
-// is one run of the agent until it settles.
+// is one run of the agent until it settles. Its own todos (packages/agent todo.ts) are kept in the farm's database, table
+// runtime_todo, one open graph per keeper (a session of this runtime).
 
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
+import { Clock, Effect, Exit, Fiber, Schema, Scope, Stream } from "effect";
 
-import { type BrainEvent, type BrainOwner, openBrain } from "@vibevalley/agent/brain";
+import { type BrainEvent, makeBrain } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
+import { toolFailed } from "@vibevalley/agent/core/errors";
 import type { McpServer } from "@vibevalley/agent/mcp";
 import { messageText, userMessage } from "@vibevalley/agent/messages";
+import { finished, type Todo } from "@vibevalley/agent/todo";
 import type { TodoStore } from "@vibevalley/agent/todoStore";
 import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import { models } from "@vibevalley/ai/models";
 import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
+import { newId } from "@/base/ids.ts";
+import { jsonOrNone } from "@/base/json.ts";
 import { messageOf } from "@/errors.ts";
+import { Db } from "@/infra/db.ts";
 import type { Time } from "@/infra/time.ts";
 
+import * as q from "../../db/generated/runtime_todo.sql.ts";
 import { helperInstructions } from "./prompts.ts";
 
 const vibevalleyRuntime = "vibevalley";
@@ -38,8 +46,11 @@ export interface RuntimeOptions {
   readonly todos?: (session: string) => TodoStore;
   /** The sessions' clock: the Runtime service's, or the wall clock on the command line. */
   readonly time: Time;
-  /** Where the sessions' brains run: the Runtime service's fibers and scope, or standaloneOwner on the command line. */
-  readonly owner: BrainOwner;
+  /** The caller owns both the brain and the reader that drains its closing events. */
+  readonly owner: {
+    readonly run: <A, E>(effect: Effect.Effect<A, E>) => Promise<A>;
+    readonly scope: Scope.Scope;
+  };
 }
 
 const defaultHome = () => process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
@@ -69,175 +80,198 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
     const kernel = createSessionKernel(o.resume);
     const instructions = o.systemPrompt ?? [helperInstructions(), ...(o.appendSystemPrompt ? [o.appendSystemPrompt] : [])].join("\n\n");
     const todos = options.todos?.(kernel.sessionId);
-    const agent = await openBrain(options.owner, {
-      name: "helper",
-      instructions,
-      llm,
-      ...(effort ? { thinkingLevel: effort } : {}),
-      home: join(home(), "helpers"),
-      cwd: o.cwd,
-      tools: codingTools({ cwd: o.cwd, ...(o.env ? { env: { ...o.env } } : {}) }),
-      ...(o.disallowedTools ? { disallowedTools: o.disallowedTools } : {}),
-      mcpServers: (o.mcpServers ?? []).map(toMcp),
-      noMemory: true,
-      session: kernel.sessionId,
-      reminders: false,
-      ...(todos ? { todos } : {}),
-    });
-    const queued: { input: string; inputId?: string }[] = [];
-    let active = false;
-    let disposed = false;
-    const frame = (type: string, native: unknown, events: Parameters<typeof kernel.frame>[0]["events"] = []) => kernel.frame({ type, native, events });
-    const begin = (input: string) => {
-      active = true;
-      void agent.send(userMessage(input, options.time.now()));
-    };
-    const end = (outcome: TurnOutcome) => {
-      if (!active) return;
-      active = false;
-      const progress = agent.progress();
-      const window = llm.model.contextWindow;
-      const tokens = progress.current.contextTokens;
-      frame("vibevalley/end", { outcome }, [
-        { kind: "turn_ended", outcome },
-        {
-          kind: "usage",
-          usage: {
-            tokens: {
-              input: progress.lifetime.input,
-              output: progress.lifetime.output,
-              cacheRead: progress.lifetime.cacheRead,
-              cacheWrite: progress.lifetime.cacheWrite,
-            },
-            context: {
-              tokens,
-              contextWindow: window,
-              percent: window > 0 ? (tokens / window) * 100 : 0,
+    const { run, scope: parent } = options.owner;
+    // The reader outlives brain teardown to drain final usage before oar exits.
+    const scope = await run(Scope.fork(parent));
+    const reading = await run(Scope.fork(parent));
+    try {
+      const agent = await run(
+        Scope.provide(
+          makeBrain({
+            name: "helper",
+            instructions,
+            llm,
+            ...(effort ? { thinkingLevel: effort } : {}),
+            home: join(home(), "helpers"),
+            cwd: o.cwd,
+            tools: codingTools({ cwd: o.cwd, ...(o.env ? { env: { ...o.env } } : {}) }),
+            ...(o.disallowedTools ? { disallowedTools: o.disallowedTools } : {}),
+            mcpServers: (o.mcpServers ?? []).map(toMcp),
+            noMemory: true,
+            session: kernel.sessionId,
+            reminders: false,
+            ...(todos ? { todos } : {}),
+          }),
+          scope,
+        ),
+      );
+      const queued: { input: string; inputId?: string }[] = [];
+      let active = false;
+      let disposed = false;
+      const frame = (type: string, native: unknown, events: Parameters<typeof kernel.frame>[0]["events"] = []) => kernel.frame({ type, native, events });
+      const begin = (input: string) => {
+        active = true;
+        void run(agent.send(userMessage(input, options.time.now())));
+      };
+      const end = (outcome: TurnOutcome) => {
+        if (!active) return;
+        active = false;
+        const progress = agent.progress();
+        const window = llm.model.contextWindow;
+        const tokens = progress.current.contextTokens;
+        frame("vibevalley/end", { outcome }, [
+          { kind: "turn_ended", outcome },
+          {
+            kind: "usage",
+            usage: {
+              tokens: {
+                input: progress.lifetime.input,
+                output: progress.lifetime.output,
+                cacheRead: progress.lifetime.cacheRead,
+                cacheWrite: progress.lifetime.cacheWrite,
+              },
+              context: {
+                tokens,
+                contextWindow: window,
+                percent: window > 0 ? (tokens / window) * 100 : 0,
+              },
             },
           },
-        },
-      ]);
-      const next = queued.shift();
-      if (next && !disposed) begin(next.input);
-    };
-    // Listening before the first input.
-    agent.subscribe((e: BrainEvent) => {
-      if (disposed) return;
-      switch (e.type) {
-        case "message_update": {
-          const d = e.assistantMessageEvent;
-          if (d.type === "text_delta") frame("vibevalley/text", { text: d.delta }, [{ kind: "text_delta", text: d.delta }]);
-          if (d.type === "thinking_end" && d.content)
-            frame("vibevalley/reasoning", { text: d.content }, [{ kind: "reasoning", content: { kind: "text", text: d.content } }]);
-          break;
-        }
-        case "tool_execution_start": {
-          const input = JSON.stringify(e.args ?? {});
-          frame("vibevalley/tool_start", { callId: e.toolCallId, name: e.toolName, input }, [
-            { kind: "tool_call_started", callId: e.toolCallId, tool: e.toolName, input },
-          ]);
-          break;
-        }
-        case "tool_execution_end": {
-          const text = messageText({ role: "toolResult", toolCallId: "", toolName: "", content: e.result.content, isError: false, timestamp: 0 });
-          const result = e.isError ? "failed" : "ok";
-          frame("vibevalley/tool_end", { callId: e.toolCallId, output: text, result }, [
-            {
-              kind: "tool_call_ended",
-              callId: e.toolCallId,
-              result,
-              content: [{ type: "text", text }],
-            },
-          ]);
-          break;
-        }
-        case "compaction_start":
-          frame("vibevalley/compaction", { phase: "start" }, [{ kind: "compaction_started", trigger: e.reason }]);
-          break;
-        case "compaction_end":
-          frame("vibevalley/compaction", { phase: "end" }, [
-            {
-              kind: "compaction_ended",
-              outcome: e.compaction ? "completed" : "failed",
-              trigger: e.reason,
-            },
-          ]);
-          break;
-        case "todos_changed":
-          // oar has no event for a todo: the graph goes in the raw record, where the session's trajectory keeps it.
-          frame("vibevalley/todos", { todos: e.todos });
-          break;
-        case "agent_settled":
-          end(
-            e.run.aborted
-              ? { kind: "aborted" }
-              : e.run.failed
-                ? { kind: "failed", failure: "unknown", reason: e.run.error || t("server.agent.modelFailed") }
-                : { kind: "completed" },
-          );
-          break;
-        default:
-          break;
-      }
-    });
-    frame("vibevalley/model", { model: llm.model.id }, [{ kind: "model", model: llm.model.id }]);
-    if (o.effort) frame("vibevalley/effort", { effort: o.effort }, [{ kind: "effort", effort: o.effort }]);
-
-    const capabilities = { queue: { durable: false }, attribution: "none", images: false } as const;
-    return sealSession({
-      id: kernel.sessionId,
-      capabilities,
-      prompt: (input, inputOptions) =>
-        kernel.control({ kind: "prompt", input, ...inputOptions }, () => {
-          if (active) return { kind: "rejected", code: "busy", reason: "busy" };
-          const refused = inputImagesRefusal(capabilities, inputOptions?.images);
-          if (refused !== null) return refused;
-          begin(input);
-          return { kind: "accepted" };
-        }),
-      steer: (input, inputOptions) =>
-        kernel.control({ kind: "steer", input, ...inputOptions }, () => {
-          if (!active) return { kind: "rejected", code: "no_active_turn", reason: "no active turn" };
-          const refused = inputImagesRefusal(capabilities, inputOptions?.images);
-          if (refused !== null) return refused;
-          void agent.send(userMessage(input, options.time.now()));
-          return { kind: "accepted" };
-        }),
-      queue: (input, inputOptions) =>
-        kernel.control({ kind: "queue", input, ...inputOptions }, () => {
-          const refused = inputImagesRefusal(capabilities, inputOptions?.images);
-          if (refused !== null) return refused;
-          if (active)
-            queued.push({
-              input,
-              ...(inputOptions?.inputId ? { inputId: inputOptions.inputId } : {}),
-            });
-          else begin(input);
-          return { kind: "accepted" };
-        }),
-      // The turn-end drain takes its entry off before running it, so an entry still here was never sent.
-      withdraw: (inputId) => kernel.control({ kind: "withdraw", inputId }, () => withdrawHeld(queued, inputId)),
-      abort: () =>
-        kernel.control({ kind: "abort" }, () => {
-          if (!active) return { kind: "rejected", code: "no_active_turn", reason: "no active turn" };
-          // The turn ends aborted when the agent has stopped (agent_settled).
-          void agent.stop();
-          return { kind: "accepted" };
-        }),
-      rawEvents: (observer, cursor) => kernel.rawEvents(observer, cursor),
-      records: () => kernel.records(),
-      graph: () => kernel.graph(),
-      dispose: async () => {
+        ]);
+        const next = queued.shift();
+        if (next && !disposed) begin(next.input);
+      };
+      // Listening before the first input.
+      const onBrainEvent = (e: BrainEvent) => {
         if (disposed) return;
-        const request = kernel.request("toRuntime", { kind: "dispose" });
-        queued.length = 0;
-        await agent.stop();
-        await agent.close();
-        disposed = true;
-        end({ kind: "aborted" });
-        kernel.respond(request.id, { kind: "exited", code: 0 });
-      },
-    });
+        switch (e.type) {
+          case "message_update": {
+            const d = e.assistantMessageEvent;
+            if (d.type === "text_delta") frame("vibevalley/text", { text: d.delta }, [{ kind: "text_delta", text: d.delta }]);
+            if (d.type === "thinking_end" && d.content)
+              frame("vibevalley/reasoning", { text: d.content }, [{ kind: "reasoning", content: { kind: "text", text: d.content } }]);
+            break;
+          }
+          case "tool_execution_start": {
+            const input = JSON.stringify(e.args ?? {});
+            frame("vibevalley/tool_start", { callId: e.toolCallId, name: e.toolName, input }, [
+              { kind: "tool_call_started", callId: e.toolCallId, tool: e.toolName, input },
+            ]);
+            break;
+          }
+          case "tool_execution_end": {
+            const text = messageText({ role: "toolResult", toolCallId: "", toolName: "", content: e.result.content, isError: false, timestamp: 0 });
+            const result = e.isError ? "failed" : "ok";
+            frame("vibevalley/tool_end", { callId: e.toolCallId, output: text, result }, [
+              {
+                kind: "tool_call_ended",
+                callId: e.toolCallId,
+                result,
+                content: [{ type: "text", text }],
+              },
+            ]);
+            break;
+          }
+          case "compaction_start":
+            frame("vibevalley/compaction", { phase: "start" }, [{ kind: "compaction_started", trigger: e.reason }]);
+            break;
+          case "compaction_end":
+            frame("vibevalley/compaction", { phase: "end" }, [
+              {
+                kind: "compaction_ended",
+                outcome: e.compaction ? "completed" : "failed",
+                trigger: e.reason,
+              },
+            ]);
+            break;
+          case "todos_changed":
+            // oar has no event for a todo: the graph goes in the raw record, where the session's trajectory keeps it.
+            frame("vibevalley/todos", { todos: e.todos });
+            break;
+          case "agent_settled":
+            end(
+              e.run.aborted
+                ? { kind: "aborted" }
+                : e.run.failed
+                  ? { kind: "failed", failure: "unknown", reason: e.run.error || t("server.agent.modelFailed") }
+                  : { kind: "completed" },
+            );
+            break;
+          default:
+            break;
+        }
+      };
+      const reader = await run(
+        Scope.provide(
+          Effect.flatMap(agent.events, (events) => Effect.forkScoped(Stream.runForEach(events, (event) => Effect.sync(() => onBrainEvent(event))))),
+          reading,
+        ),
+      );
+      let closing: Promise<void> | undefined;
+      frame("vibevalley/model", { model: llm.model.id }, [{ kind: "model", model: llm.model.id }]);
+      if (o.effort) frame("vibevalley/effort", { effort: o.effort }, [{ kind: "effort", effort: o.effort }]);
+
+      const capabilities = { queue: { durable: false }, attribution: "none", images: false } as const;
+      return sealSession({
+        id: kernel.sessionId,
+        capabilities,
+        prompt: (input, inputOptions) =>
+          kernel.control({ kind: "prompt", input, ...inputOptions }, () => {
+            if (active) return { kind: "rejected", code: "busy", reason: "busy" };
+            const refused = inputImagesRefusal(capabilities, inputOptions?.images);
+            if (refused !== null) return refused;
+            begin(input);
+            return { kind: "accepted" };
+          }),
+        steer: (input, inputOptions) =>
+          kernel.control({ kind: "steer", input, ...inputOptions }, () => {
+            if (!active) return { kind: "rejected", code: "no_active_turn", reason: "no active turn" };
+            const refused = inputImagesRefusal(capabilities, inputOptions?.images);
+            if (refused !== null) return refused;
+            void run(agent.send(userMessage(input, options.time.now())));
+            return { kind: "accepted" };
+          }),
+        queue: (input, inputOptions) =>
+          kernel.control({ kind: "queue", input, ...inputOptions }, () => {
+            const refused = inputImagesRefusal(capabilities, inputOptions?.images);
+            if (refused !== null) return refused;
+            if (active)
+              queued.push({
+                input,
+                ...(inputOptions?.inputId ? { inputId: inputOptions.inputId } : {}),
+              });
+            else begin(input);
+            return { kind: "accepted" };
+          }),
+        // The turn-end drain takes its entry off before running it, so an entry still here was never sent.
+        withdraw: (inputId) => kernel.control({ kind: "withdraw", inputId }, () => withdrawHeld(queued, inputId)),
+        abort: () =>
+          kernel.control({ kind: "abort" }, () => {
+            if (!active) return { kind: "rejected", code: "no_active_turn", reason: "no active turn" };
+            // The turn ends aborted when the agent has stopped (agent_settled).
+            void run(agent.stop);
+            return { kind: "accepted" };
+          }),
+        rawEvents: (observer, cursor) => kernel.rawEvents(observer, cursor),
+        records: () => kernel.records(),
+        graph: () => kernel.graph(),
+        dispose: () =>
+          (closing ??= run(
+            Effect.gen(function* () {
+              const request = kernel.request("toRuntime", { kind: "dispose" });
+              queued.length = 0;
+              yield* agent.stop;
+              yield* Scope.close(scope, Exit.void).pipe(Effect.andThen(Fiber.await(reader)), Effect.ensuring(Scope.close(reading, Exit.void)));
+              disposed = true;
+              end({ kind: "aborted" });
+              kernel.respond(request.id, { kind: "exited", code: 0 });
+            }),
+          )),
+      });
+    } catch (cause) {
+      await run(Scope.close(scope, Exit.void).pipe(Effect.ensuring(Scope.close(reading, Exit.void))));
+      throw cause;
+    }
   };
 
   const runtime = defineRuntime({
@@ -268,3 +302,58 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
   });
   return runtime;
 }
+
+const afterOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
+const fromRow = (r: q.OpenTodosResult): Todo => ({
+  id: r.id,
+  title: r.title,
+  brief: r.brief,
+  after: afterOf(r.after) ?? [],
+  by: r.executor,
+  state: r.state,
+  ...(r.result ? { result: r.result } : {}),
+  ...(r.tries !== 0 ? { tries: r.tries } : {}),
+});
+
+/** A finished graph stays, stamped finished_at: putting it away only empties the keeper's open graph. */
+export const dbTodoStores: Effect.Effect<(keeper: string) => TodoStore, never, Db> = Effect.gen(function* () {
+  const db = yield* Db;
+  return (keeper) => ({
+    load: Effect.map(db.run(q.openTodos({ keeper })), (rows) => rows.map(fromRow)),
+    change: <G extends Todo[] | undefined>(f: (g: Todo[]) => G) =>
+      db.inTx(
+        Effect.gen(function* () {
+          const rows = yield* db.run(q.openTodos({ keeper }));
+          const g = yield* Effect.try({ try: () => f(rows.map(fromRow)), catch: toolFailed });
+          if (g === undefined) return g;
+          // The graph keeps its id while it is open; a new one starts when the keeper had none.
+          const graph = rows[0]?.graph ?? newId();
+          yield* db.run(q.clearOpenTodos({ keeper }));
+          const at = yield* Clock.currentTimeMillis;
+          yield* Effect.forEach(
+            g.entries(),
+            ([position, todo]) =>
+              db.run(
+                q.addTodo({
+                  graph,
+                  keeper,
+                  id: todo.id,
+                  position,
+                  title: todo.title,
+                  brief: todo.brief,
+                  after: JSON.stringify(todo.after),
+                  executor: todo.by,
+                  state: todo.state,
+                  result: todo.result ?? "",
+                  tries: todo.tries ?? 0,
+                  updated_at: at,
+                }),
+              ),
+            { discard: true },
+          );
+          if (finished(g)) yield* db.run(q.finishTodos({ finished_at: at, keeper }));
+          return g;
+        }),
+      ),
+  });
+});

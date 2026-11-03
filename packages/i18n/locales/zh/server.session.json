@@ -23,12 +23,7 @@
   "done": "做完了",
   "unfinished": "没做完",
   "answer": {
-    "lines": "{field}：要是字符串或字符串的数组",
-    "noBlock": "没找到结论：要用一个 json 代码块给出",
-    "notObject": "要是一个对象",
-    "unreadable": "json 读不了：{why}",
-    "empty": "结论是空的",
-    "noEvidence": "结论没有依据：evidence 至少一条"
+    "noBlock": "没有通过 issue_report 交结构化 answer"
   },
   "noRoom": {
     "farm": "已经有 {max} 个帮工在干活了",
@@ -99,7 +94,6 @@
     "stillClosing": "{name} 的农机没能停止：工作目录留着，不能再开一轮",
     "noRoom": "{name} 先不接着干：{full}",
     "notReceived": "{name} 没收到：{why}",
-    "inGraph": "{name} 在做计划 {graph} 里的活：做完会自动合进计划的分支，整个计划合进主分支时再进主分支",
     "stillWorking": "{name} 还在干活：等这一轮做完，或者先叫停，再收",
     "notBack": "{name} 没接回来：{why}",
     "placeGone": "干活的目录不见了（{cwd}）",
@@ -109,14 +103,14 @@
     "noPlace": "{name} 没地方干活：{why}",
     "cannotSend": "{name} 派不出去：{why}",
     "notRecorded": "{name} 的工单没记下来：{why}",
-    "steered": "{name} 正在干，话已经插进去了",
-    "queued": "{name} 这一轮做完再看这句话",
-    "started": "{woke, select, true {{name} 醒了，开始新的一轮} other {{name} 开始新的一轮}}",
     "notReset": "{name} 的工作目录没能重置：{why}",
     "left": "{name} 收工了：{why}",
     "stillHasHelper": "这张工单还有帮工，不能清掉工作目录",
     "seconds": "{n} 秒",
-    "minutes": "{n} 分钟"
+    "minutes": "{n} 分钟",
+    "noIssue": "这个会话不关联工单，不能交付或清理工单的改动。",
+    "contextKept": "上下文目录保留在 {cwd}：{why}",
+    "contextHasFiles": "目录里已有文件"
   },
   "conflictBrief": "把 {base} 合进你的分支时有冲突（{files}）。请在你的分支上运行 git merge {base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。"
 }

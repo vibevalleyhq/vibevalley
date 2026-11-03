@@ -129,7 +129,7 @@ test("the island follows the issues in flight and opens one", async () => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));
   const app = await electron.launch({
     args: [`--user-data-dir=${join(dir, "electron")}`, join(import.meta.dirname, "..")],
-    // The server's pi is the scripted helper (apps/server src/testing/helper.ts): an issue can really be worked.
+    // The server's pi is the scripted helper (apps/server src/testing/worker.ts): an issue can really be worked.
     env: {
       ...cleanEnv(),
       HOME: dir,
@@ -152,7 +152,7 @@ test("the island follows the issues in flight and opens one", async () => {
     const fox = await api.agent.create(scripted);
     const project = await api.project.create({ name: "clock" });
     // The scripted helper asks with options when its job says 先问清楚: the issue waits on the owner.
-    const made = await api.issue.create({ title: "打卡页先问清楚，给选项", project: project.name, assignee: fox.id });
+    const made = await api.issue.create({ title: "打卡页先问清楚，给选项", project: project.name, agent: fox.id });
     await api.issue.status.update({ id: made.id, status: "todo" });
     await expect
       .poll(async () => (await probe())?.glance?.rows.map((r) => [r.issue, r.tone, r.doing]), { timeout: 20_000 })
@@ -170,7 +170,7 @@ test("the island follows the issues in flight and opens one", async () => {
 const scripted = {
   id: "",
   name: "阿狐",
-  role: "helper" as const,
+  role: "worker" as const,
   duty: "",
   enabled: true,
   runtime: "pi",

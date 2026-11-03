@@ -1,9 +1,8 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
 
-import { splitChips } from "./chips";
-import { plainText, withMentions } from "./markdown";
-import { pickItems } from "./pick";
-import { ToastStore } from "./toasts";
+import { pickItems, splitChips } from "./cells";
+import { plainText, withMentions } from "./PxMarkdown";
+import { ToastStore } from "./ToastViewport";
 
 // The toasts' timeouts run on fake timers, moved through rather than waited out.
 afterEach(() => vi.useRealTimers());

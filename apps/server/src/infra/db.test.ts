@@ -145,13 +145,17 @@ describe("the database", () => {
 
 /** Where a failed query is a value, not a defect (Db.attempt, Db.attemptTx), and why. */
 const attempting: Readonly<Record<string, string>> = {
+  "channel/channel.ts": "a direct context whose initial delivery cannot be kept is refused as NotRecorded before its events are attached",
   "connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
   "cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
   "game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",
-  "issue/issue.ts": "an issue or a task graph that is not saved, or a session not linked to its issue, is told as a refusal",
-  "memory/store.ts": "a memory read or write that fails is logged and taken as none",
-  "session/session.ts": "a session's record or run that is not kept is logged or told as NotRecorded, and the run goes on",
-  "task/task.ts": "a task graph event that is not kept is logged, and the graph goes on",
+  "issue/issue.ts": "an issue that is not saved, or a session not linked to its issue, is told as a refusal",
+  "mailbox/payload.ts": "the source cursor and trigger commit together; a failed cron input is logged and retried without advancing its clock",
+  "mailbox/work.ts":
+    "a Session's first direct deliveries are registered atomically; a failed insert is returned so Session startup can stop and report NotRecorded",
+  "memory/memory.ts": "a memory read or write that fails is logged and taken as none",
+  "session/inProcessRun.ts": "a run write fails as NotRecorded so an in-process run retries its end before accepting another input",
+  "session/session.ts": "a session's own record that is not kept is logged without discarding its live execution",
 };
 
 it("attempt and attemptTx are used only where a failed query is told or retried, each with its reason", () => {

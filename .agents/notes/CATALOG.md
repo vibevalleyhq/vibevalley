@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（28 篇）
+## proposed（27 篇）
 
 ### feature
 
@@ -17,15 +17,17 @@
 - 2026-10-09 [商店和每日任务](.agents/notes/proposed/feature/2026-10-09-shop-and-daily-tasks.md)
 - 2026-10-09 [手机竖屏版面](.agents/notes/proposed/feature/2026-10-09-mobile-layout.md)
 
+### simplification
+
+- 2026-11-03 [Gemini 复杂度审查后的主线简化](.agents/notes/proposed/simplification/2026-11-03-gemini-complexity.md)
+
 ### architecture
 
-- 2026-10-31 [频道只记话，信箱把话交给 agent：从 `Channel` 拆出 `Mailbox`，去掉 `useHelpers`](.agents/notes/proposed/architecture/2026-10-31-mailbox-out-of-channels.md)
 - 2026-10-28 [agent 带什么：工具集（toolsets）和技能（skill 模块），主人用 `/` 叫它们](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)
 - 2026-10-27 [页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md)
 - 2026-10-22 [状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)
 - 2026-10-22 [收回派活、工作区、配置、日志与手机线路的使用约束](.agents/notes/proposed/architecture/2026-10-22-close-ownership-gaps.md)
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)
-- 2026-10-18 [编排层：每个 agent 一个信箱，什么时候交给它只在一处定](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)
 - 2026-10-18 [记忆都存在农场的库里：主人画像、管家的记性和干活的经过都进 memory 表](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)
 - 2026-10-18 [一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)
 - 2026-10-17 [Session、Run、事件：一个 agent loop 的日志，和消息之间只有两个口子](.agents/notes/proposed/architecture/2026-10-17-session-run-step.md)

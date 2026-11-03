@@ -2,17 +2,18 @@
 
 import type { FailedTurn, FailureClass, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
-import { Result, Schema } from "effect";
 
-import { maybe, t } from "@vibevalley/i18n";
-import type { Question, CheckResult, CriterionCheck, IssueAnswer, Outcome } from "@vibevalley/protocol";
+import { list, maybe, t } from "@vibevalley/i18n";
+import type { EventTokens, Question, CriterionCheck, Outcome, IssueReport } from "@vibevalley/protocol";
 import { slice } from "@vibevalley/protocol/rules";
 
 import { clip } from "@/base/clip.ts";
-import { lastJsonBlock, misfitField } from "@/base/json.ts";
-import { messageOf } from "@/errors.ts";
+import { checksFromText, questionsFromText } from "@/base/questions.ts";
 
 const summaryMax = 160;
+
+export const handsToOwner = (report: IssueReport | undefined) =>
+  report !== undefined && (!report.prSubmit || report.questions.length > 0 || report.checks.some((check) => check.result !== "met"));
 
 export function failureText(f: FailedTurn): string {
   const advice = failureAdvice(f.failure);
@@ -31,10 +32,6 @@ export function failureText(f: FailedTurn): string {
   return out;
 }
 
-/** The line the farm rules ask every report to end on: 「结论：…」, perhaps bold or in a list. The markers are asked for in
- * Chinese whatever the owner's language; a model writing English may put them in English, which counts too. */
-const verdict = /(?:^|\n)[\s>*#_-]*(?:\*\*)?(?:结论|Conclusion)(?:\*\*)?\s*[:：]\s*(?:\*\*)?/giu;
-
 function conclusion(text: string, min: number): string {
   const blocks = text.trim().split(/\n{2,}/u);
   let tail = "";
@@ -42,21 +39,8 @@ function conclusion(text: string, min: number): string {
   return tail;
 }
 
-/** A report's verdict: the paragraph after its last 结论：, else empty. */
-export function reportVerdict(text: string): string {
-  const all = [...text.matchAll(verdict)];
-  const last = all.at(-1);
-  if (!last) return "";
-  // The verdict's own paragraph: a note written after it is not part of it.
-  const rest = text
-    .slice(last.index + last[0].length)
-    .replaceAll("**", "")
-    .trim();
-  return rest.split(/\n\s*\n/u, 1)[0]!.trim();
-}
-
-/** What a report says in short: its verdict, else its last paragraphs. */
-export const summaryOf = (text: string) => reportVerdict(text) || conclusion(text, 80);
+/** What an undeclared report says in short. Questions may also come from its 要问主人 lines. */
+export const summaryOf = (text: string) => conclusion(text, 80);
 
 /** A pull request's description: the verdict, else the whole reply. */
 
@@ -65,103 +49,16 @@ const needsYou = new Set<FailureClass>(["auth", "billing", "quota", "model_unava
 
 const outcomeOf = (o: TurnOutcome): Outcome => (o.kind === "completed" ? "completed" : o.kind === "aborted" ? "interrupted" : "failed");
 
-export interface SessionRead {
+interface SessionRead {
   readonly outcome: Outcome;
   readonly text: string;
   readonly summary: string;
   readonly failure: string;
   readonly needsYou: boolean;
-  /** The 要问主人： lines: what it cannot go on without. */
+  /** Explicit issue_report questions. */
   readonly questions: Question[];
-  /** The 标准 N： lines: its word on each of the issue's criteria. */
+  /** Explicit issue_report criterion checks. */
   readonly checks: CriterionCheck[];
-  /** The conclusion block an answer issue asks for (parseAnswer), when one can be read. */
-  readonly answer?: IssueAnswer;
-}
-
-const AnswerLines = Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Array(Schema.String)])));
-
-/** The conclusion block an answer issue asks for; a conclusion that is not a string reads as none. */
-const AnswerBlock = Schema.Struct({ conclusion: Schema.optional(Schema.Unknown), evidence: AnswerLines, unsure: AnswerLines, next: AnswerLines });
-
-const answerLines = (v: (typeof AnswerBlock.Type)["evidence"]): string[] =>
-  (v == null ? [] : typeof v === "string" ? [v] : v).map((l) => l.trim()).filter(Boolean);
-
-const answerOf = (raw: typeof AnswerBlock.Type): IssueAnswer => ({
-  conclusion: typeof raw.conclusion === "string" ? raw.conclusion.trim() : "",
-  evidence: answerLines(raw.evidence),
-  unsure: answerLines(raw.unsure),
-  next: answerLines(raw.next),
-});
-
-/** The last block that reads as an answer with a conclusion and something it rests on; problem says why none did. */
-export function parseAnswer(text: string): { answer?: IssueAnswer; problem: string } {
-  const read = lastJsonBlock(text, AnswerBlock, {
-    none: t("server.session.answer.noBlock"),
-    unparsed: (e) => t("server.session.answer.unreadable", { why: messageOf(e) }),
-    misfit: (issue) => {
-      const field = misfitField(issue);
-      const why = field === undefined ? t("server.session.answer.notObject") : t("server.session.answer.lines", { field });
-      return t("server.session.answer.unreadable", { why });
-    },
-    refuse: (raw) => {
-      const a = answerOf(raw);
-      return !a.conclusion ? t("server.session.answer.empty") : a.evidence.length === 0 ? t("server.session.answer.noEvidence") : undefined;
-    },
-  });
-  return Result.isSuccess(read) ? { answer: answerOf(read.success), problem: "" } : { problem: read.failure };
-}
-
-/** A line the session wrote to ask the owner (the farm's rules tell it to): 「要问主人：…」, with markdown around it allowed. */
-const questionLine = /^[\s>*#_-]*(?:\*\*)?(?:要问主人|Ask the owner|Question for the owner)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/iu;
-
-/** The answers it thought of, at the end of the question: 「（选项：A｜B）」. */
-const optionsTail = /\s*[（(]\s*(?:选项|Options)\s*[:：]\s*(.+?)\s*[)）]\s*$/iu;
-
-export function questionsOf(said: string): Question[] {
-  return said
-    .split("\n")
-    .map((line) => questionLine.exec(line)?.[1])
-    .filter((q): q is string => q !== undefined)
-    .map((q) => q.trim().replace(/\*\*$/u, "").trim())
-    .flatMap((q): Question[] => {
-      const tail = optionsTail.exec(q);
-      const question = tail ? q.slice(0, tail.index).trim() : q;
-      const options = (tail?.[1] ?? "")
-        .split(/[｜|]/u)
-        .map((o) => o.trim())
-        .filter(Boolean);
-      if (!question) return [];
-      return [{ question, options: options.length >= 2 ? options : [] }];
-    });
-}
-
-/** A line on one criterion (the issue's brief asks for them): 「标准 2：做到了 —— bun test 通过」. */
-const checkLine =
-  /^[\s>*#_-]*(?:\*\*)?(?:标准|Criterion)\s*(\d+)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(做到了|没做到|不确定|not met|unmet|unsure|met)(?![a-z])(?:\*\*)?\s*[，,。.;；:：—–-]*\s*(.*)$/iu;
-
-const checkWords: Record<string, CheckResult> = {
-  做到了: "met",
-  没做到: "unmet",
-  不确定: "unsure",
-  met: "met",
-  "not met": "unmet",
-  unmet: "unmet",
-  unsure: "unsure",
-};
-
-/** Numbered from 1 as the brief lists them; the last word on a criterion stands. */
-export function checksOf(said: string): CriterionCheck[] {
-  const out = new Map<number, CriterionCheck>();
-  for (const line of said.split("\n")) {
-    const m = checkLine.exec(line);
-    if (!m) continue;
-    const criterion = Number(m[1]) - 1;
-    if (criterion < 0) continue;
-    const proof = m[3]!.trim().replace(/\*\*$/u, "").trim();
-    out.set(criterion, { criterion, result: checkWords[m[2]!.toLowerCase()]!, proof: proof });
-  }
-  return [...out.values()].toSorted((a, b) => a.criterion - b.criterion);
 }
 
 export function readReport(outcome: TurnOutcome, said: string): SessionRead {
@@ -171,15 +68,39 @@ export function readReport(outcome: TurnOutcome, said: string): SessionRead {
   // A failed run leads with why it failed; what the session said before that follows.
   const whole = failed && text ? failed + "\n\n" + text : failed || text;
   const summary = failed || summaryOf(text) || (out === "completed" ? t("server.session.done") : t("server.session.unfinished"));
-  const answer = out === "completed" ? parseAnswer(text).answer : undefined;
   return {
     outcome: out,
     text: whole,
     summary: clip(summary, summaryMax),
     failure: failed,
     needsYou: outcome.kind === "failed" && needsYou.has(outcome.failure),
-    questions: out === "completed" ? questionsOf(text) : [],
-    checks: out === "completed" ? checksOf(text) : [],
-    ...(answer ? { answer } : {}),
+    questions: questionsFromText(text),
+    checks: checksFromText(text),
   };
+}
+
+export const tokensOf = (u: { input: number; cacheRead: number; output: number }): EventTokens => ({
+  input: u.input,
+  cacheRead: u.cacheRead,
+  output: u.output,
+});
+
+/** Groups of three digits, split by a space: 41 200. */
+const digits = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/gu, " ");
+
+/** changed is a prefix_changed's parts, none when the prompt's start was as before. */
+export function usageText(tokens: EventTokens, changed: readonly string[] = []): string {
+  const prompt = tokens.cacheRead + tokens.input;
+  let text =
+    prompt > 0
+      ? t("server.session.usage.cached", {
+          percent: Math.trunc((tokens.cacheRead * 100) / prompt),
+          read: digits(tokens.cacheRead),
+          missed: digits(tokens.input),
+          output: digits(tokens.output),
+        })
+      : t("server.session.usage.unread", { output: digits(tokens.output) });
+  // As the brain's prefix_changed names the parts.
+  if (changed.length > 0) text += t("server.session.usage.changed", { parts: list(changed.map((n) => maybe(`server.session.usage.parts.${n}`) ?? n)) });
+  return text;
 }

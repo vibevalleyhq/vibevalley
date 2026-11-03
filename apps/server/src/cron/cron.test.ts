@@ -8,18 +8,16 @@ import type * as T from "@vibevalley/protocol";
 import { CronWhenWeekly } from "@vibevalley/protocol/schema";
 
 import { orchestrator, owner } from "@/base/actor.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import { type ServerConfig } from "@/infra/config.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { aTurn } from "@/testing/until.ts";
+import { testConfig, aTurn } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 
 import * as q from "../../db/generated/cron.sql.ts";
 import { type Due, Cron } from "./cron.ts";
-import { afterRun, dueCrons, isMissed, needsOK } from "./due.ts";
-import { nextText } from "./when.ts";
+import { afterRun, dueCrons, isMissed, needsOK, nextText } from "./when.ts";
 
 test("the recorded cases", () => {
   const cases = goldenCases("cron");
@@ -81,7 +79,7 @@ const drained = aTurn;
 const req = (name: string, text: string, when: T.CronWhen, more: Partial<T.CronRequest> = {}): T.CronRequest => ({ name, text, when, ...more });
 
 describe("crons", () => {
-  it.effect("come due, say so, are kept, and come back on", () => {
+  it.effect("come due, are kept, and come back on", () => {
     const config = { ...testConfig(), db: "" };
     const now = Date.UTC(2026, 9, 13, 8);
     let everyId = "";
@@ -103,8 +101,7 @@ describe("crons", () => {
         yield* s.tick;
         yield* drained;
         expect(due.map((d) => [d.cron.id, d.missed, d.cron.enabled])).toEqual([[made.id, false, false]]);
-        const last = (yield* chat.history(general)).at(-1)!;
-        expect([last.kind, last.text]).toEqual(["notice", "⏰ 定时任务「看进度」到点了：看看帮工们的进度"]);
+        expect((yield* chat.history(general)).some((message) => message.text.includes("⏰"))).toBe(false);
         expect(s.list()[0]!.enabled).toBe(false);
         yield* s.tick;
         expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "lab" }), owner))).toMatchObject({
@@ -141,35 +138,6 @@ describe("crons", () => {
         expect(core.state().crons).toHaveLength(1);
       }).pipe(Effect.scoped, Effect.provide(farm(config)));
     });
-  });
-
-  it.effect("regression: a failed run write retries while a failed notice neither loses nor repeats the run", () => {
-    const now = 1_800_000_000_000;
-    return Effect.andThen(
-      TestClock.setTime(now),
-      Effect.gen(function* () {
-        const s = yield* Cron;
-        const core = yield* Core;
-        const sql = yield* SqlClient.SqlClient;
-        const made = yield* s.add(req("retry", "work", { kind: "once", at: now + 1 }), owner);
-        const due = yield* collect;
-        yield* sql.unsafe(`create function fail_run() returns trigger language plpgsql as $$ begin raise exception 'write failed'; end $$`).pipe(Effect.orDie);
-        yield* sql.unsafe(`create trigger fail_run before update of last_run on cron for each row execute function fail_run()`).pipe(Effect.orDie);
-        yield* TestClock.adjust(1);
-        yield* s.tick;
-        yield* drained;
-        const after = core.state().crons.find((x) => x.id === made.id)!;
-        expect([after.enabled, after.lastRun, due]).toEqual([true, undefined, []]);
-        yield* sql.unsafe(`drop trigger fail_run on cron`).pipe(Effect.orDie);
-        yield* sql.unsafe(`create trigger fail_notice before insert on channel_message for each row execute function fail_run()`).pipe(Effect.orDie);
-        yield* s.tick;
-        yield* drained;
-        expect(due.map((d) => d.cron.id)).toEqual([made.id]);
-        yield* s.tick;
-        yield* drained;
-        expect(due.map((d) => d.cron.id)).toEqual([made.id]);
-      }).pipe(Effect.scoped, Effect.provide(farm(testConfig()))),
-    );
   });
 
   it.effect("weekly days are integers from zero to six", () => {
@@ -274,5 +242,57 @@ describe("crons", () => {
         expect(due.map((d) => d.cron.id)).toEqual([id]);
       }).pipe(Effect.scoped, Effect.provide(farm(config)));
     });
+  });
+});
+
+it.effect("regression: a cron occurrence and its schedule advance commit together", () => {
+  const config = testConfig();
+  return Effect.gen(function* () {
+    const now = 1_800_000_000_000;
+    yield* TestClock.setTime(now);
+    yield* Effect.gen(function* () {
+      const crons = yield* Cron;
+      const sql = yield* SqlClient.SqlClient;
+      const item = yield* crons.add(req("atomic", "work", { kind: "once", at: now + 1 }), owner);
+      yield* sql.unsafe("create function reject_cron_input() returns trigger language plpgsql as $$ begin raise exception 'rejected input'; end $$");
+      yield* sql.unsafe(
+        "create trigger reject_cron_input before insert on ingress_trigger for each row when (new.source = 'cron') execute function reject_cron_input()",
+      );
+      yield* TestClock.adjust(2);
+      yield* crons.tick;
+      expect(yield* sql`select enabled, last_run from cron where id = ${item.id}`).toEqual([{ enabled: true, last_run: null }]);
+      expect(yield* sql`select id from ingress_trigger where source = 'cron'`).toEqual([]);
+      yield* sql.unsafe("drop trigger reject_cron_input on ingress_trigger");
+      yield* crons.tick;
+      expect((yield* sql`select id from ingress_trigger where source = 'cron'`).length).toBe(1);
+    }).pipe(Effect.scoped, Effect.provide(farm(config)));
+  });
+});
+
+it.effect("regression: a one-off cron resumes committed input after restart without a second issue", () => {
+  const config = { ...testConfig(), db: "" };
+  return Effect.gen(function* () {
+    const now = 1_800_000_000_000;
+    yield* TestClock.setTime(now);
+    yield* Effect.gen(function* () {
+      const crons = yield* Cron;
+      const sql = yield* SqlClient.SqlClient;
+      yield* crons.add(req("restart-once", "work", { kind: "once", at: now + 1 }), owner);
+      yield* sql.unsafe("create function reject_cron_issue() returns trigger language plpgsql as $$ begin raise exception 'rejected issue'; end $$");
+      yield* sql.unsafe("create trigger reject_cron_issue before insert on issue for each row execute function reject_cron_issue()");
+      yield* TestClock.adjust(2);
+      yield* crons.tick;
+      expect(yield* sql`select enabled from cron`).toEqual([{ enabled: false }]);
+      expect(yield* sql`select routed_at from ingress_trigger where source = 'cron'`).toEqual([{ routed_at: null }]);
+      yield* sql.unsafe("drop trigger reject_cron_issue on issue");
+    }).pipe(Effect.scoped, Effect.provide(farm(config)));
+    yield* Effect.gen(function* () {
+      const crons = yield* Cron;
+      const sql = yield* SqlClient.SqlClient;
+      yield* crons.tick;
+      yield* crons.tick;
+      expect(yield* sql`select title from issue`).toEqual([{ title: "restart-once" }]);
+      expect(yield* sql`select routed_at is not null as routed from ingress_trigger where source = 'cron'`).toEqual([{ routed: true }]);
+    }).pipe(Effect.scoped, Effect.provide(farm(config)));
   });
 });

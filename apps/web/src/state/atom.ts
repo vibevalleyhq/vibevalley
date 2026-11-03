@@ -4,10 +4,11 @@
 // subscription read as a signal (createExternal), so a value an atom has not got yet never holds up the state frames.
 
 import { Atom, AtomRegistry } from "effect/reactivity";
-import { type Accessor, createContext, createSignal, useContext } from "solid-js";
+import { type Accessor, createContext, createEffect, createSignal, useContext } from "solid-js";
 
 import { createExternal } from "@/base/external";
-import { type Frames, frames, type FramesSource, type Link } from "@/infra/frames";
+import { reasonOf } from "@/infra/api";
+import { type Frames, frames, type FramesSource, type Link } from "@/infra/frame";
 
 export const createRegistry = (): AtomRegistry.AtomRegistry => AtomRegistry.make();
 
@@ -87,3 +88,55 @@ export const framesAtom: Atom.Atom<Frames> = Atom.readable((get) => {
   get.addFinalizer(source.subscribe(() => get.setSelf(source.get())));
   return source.get();
 });
+
+export type Answer<T> = { readonly state: "waiting" } | { readonly state: "done"; readonly value: T } | { readonly state: "failed"; readonly reason: string };
+
+interface Reader<K> {
+  /** Reads after the wait; undefined reads nothing and tells undefined. Any answer to an earlier ask is dropped. */
+  readonly request: (key: K | undefined) => void;
+  /** Drops whatever is on its way. */
+  readonly stop: () => void;
+}
+
+/**
+ * The answer to the newest ask only, a failure told as a failure rather than "nothing found".
+ *
+ * A read is asked again as the owner types (a search) or as the place changes (a channel's pins): an answer to an older
+ * ask may come last and would otherwise put what was asked before back on screen. Framework-free, for the test: `told`
+ * hears each state of the newest ask only.
+ */
+export function latestReader<K, T>(read: (key: K) => Promise<T>, waitMs: number, told: (answer: Answer<T> | undefined) => void): Reader<K> {
+  let asked = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stop = () => {
+    asked++;
+    clearTimeout(timer);
+  };
+  return {
+    stop,
+    request: (key) => {
+      stop();
+      if (key === undefined) return told(undefined);
+      const mine = asked;
+      told({ state: "waiting" });
+      const go = () =>
+        void read(key).then(
+          (value) => mine === asked && told({ state: "done", value }),
+          (e: unknown) => mine === asked && told({ state: "failed", reason: reasonOf(e) }),
+        );
+      if (waitMs <= 0) go();
+      else timer = setTimeout(go, waitMs);
+    },
+  };
+}
+
+/** The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. */
+export function useLatest<K, T>(key: Accessor<K | undefined>, read: (key: K) => Promise<T>, waitMs = 0): Accessor<Answer<T> | undefined> {
+  const [answer, setAnswer] = createSignal<Answer<T> | undefined>(undefined);
+  const reader = latestReader(read, waitMs, (a) => setAnswer(() => a));
+  createEffect(key, (k) => {
+    reader.request(k);
+    return reader.stop;
+  });
+  return answer;
+}

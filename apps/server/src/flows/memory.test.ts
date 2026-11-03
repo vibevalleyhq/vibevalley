@@ -13,12 +13,14 @@ import { Memory } from "@/memory/memory.ts";
 import { briefBreak } from "@/session/briefing.ts";
 import { recallHead } from "@/session/prompts.ts";
 import { Session } from "@/session/session.ts";
+import type { DeliveryInput } from "@/session/signals.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import { await_, farm, type Farm, lab, mustHire, watch } from "./farm.ts";
 
 const scribe = (): T.Agent => ({ ...lab(), id: "scribe", name: "记录员" });
 const refiner = (): T.Agent => ({ ...lab(), id: "refiner", name: "起草员" });
+const delivery = (trigger: T.RunTrigger): DeliveryInput => ({ trigger, envelopeIds: [], byOwnerComment: false });
 
 /** Each turn's input in order, as its session was prompted. */
 const prompts = (f: Farm) => {
@@ -61,7 +63,8 @@ const nextPrompt = (f: Farm, next: () => string, seen: number) =>
 
 describe("memory", () => {
   it.live("is kept by one session and recalled by the next", () => {
-    const f = farm();
+    const firstTurn = Promise.withResolvers<void>();
+    const f = farm({ beforeTurn: async (_turn, _input, n) => (n === 0 ? firstTurn.promise : Promise.resolve()) });
     const next = prompts(f);
     return Effect.gen(function* () {
       const w = yield* watch;
@@ -69,15 +72,25 @@ describe("memory", () => {
       const sessions = yield* Session;
       const memories = yield* Memory;
       const core = yield* Core;
-      const lastText = (id: string, summary: string) => sessions.find(id)?.lastText ?? summary;
+      const lastText = (id: string, summary: string) => sessions.lastTextOf(id) || summary;
 
       const first = mustHire(yield* issues.hire(scribe(), "写上班打卡，记一笔", "memo"));
       expect(yield* nextPrompt(f, next, 0)).toBe("写上班打卡，记一笔");
+      yield* sessions.report(first.id, {
+        summary: "写好了",
+        questions: [],
+        checks: [],
+        remember: [
+          { text: "这个项目用 pnpm test 跑测试", scope: "project" },
+          { text: "提交信息写中文", scope: "all" },
+        ],
+        prSubmit: false,
+      });
+      firstTurn.resolve();
       const report = yield* w.nextReport;
       expect(report.outcome).toBe("completed");
       const text = lastText(report.id, report.summary);
-      expect(text).toMatch(/｜人设：[\s\S]*「记住：」/u);
-      expect(text).toMatch(/\n记住：这个项目用 pnpm test 跑测试\n记住（所有项目）：提交信息写中文$/u);
+      expect(text).toContain("issue_report.remember");
 
       const mine = yield* kept("scribe", 3);
       expect(mine).toHaveLength(3);
@@ -118,7 +131,7 @@ describe("memory", () => {
         project: "memo",
         by: owner,
       });
-      expect((yield* sessions.deliver(second.id, "顺手把下班打卡的测试也补上", { kind: "comment" })).kind).toBe("run");
+      expect((yield* sessions.deliver(second.id, "顺手把下班打卡的测试也补上", delivery({ kind: "comment" }))).kind).toBe("run");
       [recalled, asked] = reminded(yield* nextPrompt(f, next, 2));
       expect([recalled, asked]).toEqual([["- （这个项目）下班打卡也要有测试"], "顺手把下班打卡的测试也补上"]);
       yield* w.nextReport;
@@ -141,7 +154,8 @@ describe("memory", () => {
     // A database on disk, so the memories outlive the restart as they do in real use.
     const base = testConfig();
     const config = { ...base, db: join(base.home, "db") };
-    const before = farm({ config });
+    const firstTurn = Promise.withResolvers<void>();
+    const before = farm({ config, beforeTurn: async (_turn, _input, n) => (n === 0 ? firstTurn.promise : Promise.resolve()) });
     const next = prompts(before);
     let session = "";
     return Effect.gen(function* () {
@@ -153,6 +167,17 @@ describe("memory", () => {
         yield* (yield* Agent).save(scribe());
         const noted = mustHire(yield* issues.hire(scribe(), "写上班打卡，记一笔", "memo"));
         yield* nextPrompt(before, next, 0);
+        yield* sessions.report(noted.id, {
+          summary: "写好了",
+          questions: [],
+          checks: [],
+          remember: [
+            { text: "这个项目用 pnpm test 跑测试", scope: "project" },
+            { text: "提交信息写中文", scope: "all" },
+          ],
+          prSubmit: false,
+        });
+        firstTurn.resolve();
         yield* w.nextReport;
         yield* kept("scribe", 3);
         yield* sessions.dismiss(noted.id);
@@ -168,7 +193,7 @@ describe("memory", () => {
         const w = yield* watch;
         const sessions = yield* Session;
         yield* kept("scribe", 3);
-        expect((yield* sessions.deliver(session, "顺手把下班打卡的测试也补上", { kind: "comment" })).kind).toBe("run");
+        expect((yield* sessions.deliver(session, "顺手把下班打卡的测试也补上", delivery({ kind: "comment" }))).kind).toBe("run");
         expect(yield* nextPrompt(after, again, 0)).toBe("顺手把下班打卡的测试也补上");
         yield* w.nextReport;
       }).pipe(Effect.scoped, Effect.provide(after.layer));

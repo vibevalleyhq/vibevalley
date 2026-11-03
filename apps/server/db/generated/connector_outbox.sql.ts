@@ -33,11 +33,12 @@ export type PendingOutboxParams = typeof PendingOutboxParams.Type
 export const PendingOutboxResult = Schema.Struct({
   ["id"]: Schema.String,
   ["body"]: Schema.String,
+  ["message_id"]: Schema.String,
 })
 export type PendingOutboxResult = typeof PendingOutboxResult.Type
 
 
-export const PendingOutboxSql = "-- name: PendingOutbox :many\n-- bound: only what waits; each is sent or dropped.\nselect id, body from connector_outbox where connector = $1 and state = 'pending' order by id;"
+export const PendingOutboxSql = "-- name: PendingOutbox :many\n-- bound: only what waits; each is sent or dropped.\nselect id, body, message_id from connector_outbox where connector = $1 and state = 'pending' order by id;"
 
 export const pendingOutbox = Effect.fn("PendingOutbox")(function* (params: PendingOutboxParams) {
   const sql = yield* SqlClient.SqlClient
@@ -45,6 +46,22 @@ export const pendingOutbox = Effect.fn("PendingOutbox")(function* (params: Pendi
     Request: PendingOutboxParams,
     Result: PendingOutboxResult,
     execute: (p) => sql.unsafe(PendingOutboxSql, [p["connector"]]),
+  })(params)
+})
+
+export const DropPendingOutboxForMessageParams = Schema.Struct({
+  ["message_id"]: Schema.String,
+})
+export type DropPendingOutboxForMessageParams = typeof DropPendingOutboxForMessageParams.Type
+
+
+export const DropPendingOutboxForMessageSql = "-- name: DropPendingOutboxForMessage :exec\nupdate connector_outbox set state = 'dropped', error = 'withdrawn'\nwhere message_id = $1 and state = 'pending';"
+
+export const dropPendingOutboxForMessage = Effect.fn("DropPendingOutboxForMessage")(function* (params: DropPendingOutboxForMessageParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: DropPendingOutboxForMessageParams,
+    execute: (p) => sql.unsafe(DropPendingOutboxForMessageSql, [p["message_id"]]),
   })(params)
 })
 

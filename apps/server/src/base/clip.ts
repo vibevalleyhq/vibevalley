@@ -1,5 +1,6 @@
 // The server's cuts of text, on the shared measure (packages/protocol/src/rules/cut.ts).
 
+import type { CardAttachment, CompactCard, ParentPreview } from "@vibevalley/protocol";
 import { oneLine, slice } from "@vibevalley/protocol/rules";
 
 /** s on one line and trimmed, at most max units with the ellipsis. */
@@ -16,4 +17,21 @@ export function head(s: string, n: number): string {
     out += ch;
   }
   return out;
+}
+
+export function compactCard(
+  text: string,
+  readUri: string,
+  limit: number,
+  more: { readonly attachments?: readonly CardAttachment[]; readonly parentPreview?: ParentPreview } = {},
+): CompactCard {
+  const bounded = Math.max(0, Math.floor(limit));
+  return {
+    summary: text.slice(0, bounded),
+    totalChars: text.length,
+    truncated: text.length > bounded,
+    readUri,
+    ...(more.attachments === undefined ? {} : { attachments: more.attachments }),
+    ...(more.parentPreview === undefined ? {} : { parentPreview: more.parentPreview }),
+  };
 }

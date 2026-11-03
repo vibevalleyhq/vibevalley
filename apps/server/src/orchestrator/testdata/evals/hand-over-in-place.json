@@ -2,20 +2,13 @@
   "id": "hand-over-in-place",
   "createdAt": 1792271160000,
   "model": "deepseek-flash",
-  "want": "主人要 #41 换个人接着做，管家另建了一张新工单。应该在原工单上挪回待办并填 assignee，不新建。",
+  "want": "主人要 #41 换个人接着做，管家另建了一张新工单。应该在原工单上挪回待办并填 agent，不新建。",
   "memory": "",
   "tools": [
     "channel_create",
     "channel_list",
     "channel_message_list",
     "channel_update",
-    "graph_act",
-    "graph_get",
-    "graph_list",
-    "graph_split",
-    "graph_task_act",
-    "graph_task_delete",
-    "graph_task_update",
     "issue_comment_create",
     "issue_create",
     "issue_diff_get",
@@ -60,7 +53,7 @@
             "title": "首页白屏（阿狐接手）",
             "project": "demo",
             "start": true,
-            "assignee": "阿狐"
+            "agent": "阿狐"
           }
         }
       ],

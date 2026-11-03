@@ -7,11 +7,9 @@ import { farmFraming } from "@vibevalley/protocol/host";
 
 import { SpriteAtlas, levelWidth } from "@/ui/pixel/atlas";
 
-import { frameVillage, villageCutAcross, villageCutDown } from "./framing";
 import { Level } from "./level";
-import { yardPlaces } from "./places";
 import { beds, cropOfBed } from "./plots";
-import { VillageWorld } from "./world";
+import { frameVillage, PoseHold, poseMinMs, villageCutAcross, villageCutDown, VillageWorld, yardPlaces } from "./world";
 
 const assets = join(import.meta.dirname, "../../../public");
 const level = Level.parse(readFileSync(join(assets, "village.ldtk"), "utf8"));
@@ -76,8 +74,13 @@ describe("the atlas", () => {
 });
 
 describe("the plots", () => {
-  const view = { level: { level: 6, xp: 0, need: 60 }, plots: { i1: { crop: "leafy" as const } }, achievements: [] };
-  const session = { id: "s1", issue: "i1", play: { station: 2 } } as never;
+  const view = {
+    level: { level: 6, xp: 0, need: 60 },
+    plots: { i1: { crop: "leafy" as const } },
+    plays: { s1: { station: 2 }, s2: { station: 2 }, s3: { station: 2 } },
+    achievements: [],
+  };
+  const session = { id: "s1", issue: "i1" } as never;
   test("keyed by the issue; a bed shows its issue's crop, a reopened issue's new session too, a sprout before the view has it, cleared beds flower", () => {
     expect(cropOfBed(beds[2]!, [session], view as never)).toBe("leafy");
     expect(cropOfBed(beds[2]!, [{ ...(session as object), id: "s2" } as never], view as never)).toBe("leafy");
@@ -115,5 +118,29 @@ describe("the framing", () => {
         expect(-f.box.y).toBeLessThanOrEqual(f.box.h * villageCutDown + 0.5);
       }
     }
+  });
+});
+
+describe("the poses", () => {
+  test("shows the first pose at once, then keeps each at least 800 ms", () => {
+    const hold = new PoseHold("work", 0);
+    expect(hold.next("idle", 100)).toBe("work");
+    expect(hold.next("work", 200)).toBe("work");
+    expect(hold.next("idle", poseMinMs - 1)).toBe("work");
+    expect(hold.next("idle", poseMinMs)).toBe("idle");
+  });
+
+  test("keeps only the newest of a burst, and catches up within one window", () => {
+    const hold = new PoseHold("work", 0);
+    for (const [want, at] of [
+      ["idle", 100],
+      ["think", 200],
+      ["cheer", 300],
+      ["idle", 400],
+    ] as const)
+      expect(hold.next(want, at)).toBe("work");
+    expect(hold.next("idle", 799)).toBe("work");
+    expect(hold.next("idle", 800)).toBe("idle");
+    expect(hold.next("idle", 1_600)).toBe("idle");
   });
 });

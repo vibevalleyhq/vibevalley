@@ -7,8 +7,8 @@ import { For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { LanPairing, LanStatus } from "@vibevalley/protocol";
 
+import { useNow } from "@/base/dom";
 import { momentText } from "@/base/format";
-import { useNow } from "@/base/util";
 import { api, reasonOf } from "@/infra/api";
 import { ready, useQuery } from "@/infra/query";
 import { type Act, createAct } from "@/ui/act";

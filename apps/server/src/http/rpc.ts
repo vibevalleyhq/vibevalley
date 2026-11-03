@@ -8,7 +8,7 @@ import { rpcPath, Subscriptions } from "@vibevalley/protocol/rpc";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Artifact } from "@/artifact/artifact.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { sameOrigin } from "@/lan/lan.ts";
 
 const loopback = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/u;

@@ -9,8 +9,8 @@ import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
 import { omitUndefined, oneLine } from "@vibevalley/protocol/rules";
 
+import { aria, autofocus, Keyed, useNow } from "@/base/dom";
 import { ago } from "@/base/format";
-import { aria, autofocus, Keyed, useNow } from "@/base/util";
 import { api, reasonOf } from "@/infra/api";
 import { ready, useQuery } from "@/infra/query";
 import { createAct } from "@/ui/act";
@@ -38,7 +38,7 @@ import {
 } from "./runs";
 
 /** Saves the model turn its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
-export type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
+type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
 
 const laneNames: Record<Lane, string> = {
   asked: t("web.session.trajectory.lane.asked"),

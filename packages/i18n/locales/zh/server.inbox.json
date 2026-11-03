@@ -1,7 +1,6 @@
 {
   "orchestrator": "管家",
   "conflictFiles": "{files} 个文件和主分支冲突",
-  "step": "{graph}：{step}",
   "item": {
     "review": {
       "label": "等你看",
@@ -30,24 +29,6 @@
       "title": "{who} 好一阵没动静了",
       "body": "可能在跑很久的命令，也可能卡住了：看看它的轨迹。",
       "tray": "{who} 好一阵没动静"
-    },
-    "graph-draft": {
-      "label": "计划拆好了",
-      "title": "计划「{text}」拆好了",
-      "body": "看过再开工",
-      "tray": "计划「{text}」等你看"
-    },
-    "graph-ready": {
-      "label": "计划做完了",
-      "title": "计划「{text}」都做完了",
-      "body": "看看改动，合进主分支",
-      "tray": "计划「{text}」等你合进主分支"
-    },
-    "task-failed": {
-      "label": "计划卡住了",
-      "title": "计划卡住了：{text}",
-      "body": "重试、改工单，或者跳过",
-      "tray": "计划「{text}」没做成"
     },
     "mention": {
       "label": "找你",

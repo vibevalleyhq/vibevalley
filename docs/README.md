@@ -16,6 +16,9 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 内容 |
 |---|---|
 | [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、收获 |
+| [ingress.md](docs/subsystems/ingress.md) | Ingress：把七种来源标准化成一张 Trigger，去重、存载荷、交给信箱 |
+| [mailbox.md](docs/subsystems/mailbox.md) | 信箱：谁该听到、三道刹车、投递状态机、叫醒与工单蓄水池 |
+| [resource.md](docs/subsystems/resource.md) | Resource：只读、分页、按会话权限裁剪的 `resource_read` |
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
 | [project.md](docs/subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测、地契 |
 | [artifact.md](docs/subsystems/artifact.md) | 产出：主人和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
@@ -24,7 +27,6 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent：模型请求、循环、对话文件、提示开头、压缩、技能、记性、帮手、自己的任务，四种用法 |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 管家：收什么话、现状、工具、谁能让它合并、巡查、评测 |
 | [cron.md](docs/subsystems/cron.md) | 定时任务：一张工单的触发：间隔和 cron、补跑、回头看 |
-| [task.md](docs/subsystems/task.md) | 计划：带子工单的父工单、按图推进；agent 自己的任务 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
 | [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音管家 |
 | [lan.md](docs/subsystems/lan.md) | 「连接到本机」：局域网里配对过的设备用同一个农场 |
@@ -63,10 +65,10 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 叫法 | English | 代码里 | 意思 | 不用 |
 |---|---|---|---|---|
 | 管家 | manager | orchestrator（角色是 `orchestrator` 的档案） | 你直接说话的 agent，替你派活；可以有好几个，内置的是默认管家 | 工头（指管家时）、主 agent |
-| 帮工 | helper | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 一个档案为一张工单接的活，跨好几轮；重开的工单换一个帮工，工单不换 | 工人、子 agent、worker、执行（指帮工时） |
+| 帮工 | helper | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 一个档案工作的执行上下文；工单里的画成帮工，私聊的关联频道，跨多轮保留身份 | 工人、子 agent、worker、执行（指帮工时） |
 | 在场 | here | `presentSessions`（核心状态里的 `sessions`） | 现在还在的帮工：在干活或歇着，没走 | 地里 |
 | 一轮 | a round of work | `Run`（`session_run` 表） | 一次触发到一次汇报：派出去、带话、计划、定时任务、农机自己 | 一次干活、turn（指一轮时） |
-| 档案 | profile | agent（`Agent`） | 一份 agent：农机、模型、人设、技能、长相；角色（`role`）是管家（`orchestrator`）或帮工（`helper`） | 帮工档案、角色（指档案时） |
+| 档案 | profile | agent（`Agent`） | 一份 agent：农机、模型、人设、技能、长相；角色（`role`）是管家（`orchestrator`）或帮工（`worker`） | 帮工档案、角色（指档案时） |
 | 农机 | machine | runtime（`RuntimeInfo`） | 机器上的一种编码 agent 程序（pi、claude、codex……）；左栏和设置里也叫农机 | harness、引擎、runtime（中文界面） |
 | 工单 | ticket | issue（`Issue`） | 一件活，从写下到关上一个 id；每派一次是一个帮工 | job、ticket |
 | 产出 | artifact | artifact（`Artifact`，正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的，或交上来按版本换的网页；交上来的带卡片挂在频道和工单上 | 文档（指产出时）、doc（指产出时） |
@@ -94,14 +96,16 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 人设 | persona | `persona.md`、`PersonaMode` | 档案的性格和说话的方式：当系统提示，或放在每一轮的开头 | |
 | 帮手 | subagent | subagent（`runtime_todo_executor` 的 `subagent`） | 帮工或管家在自己的进程里另开的 agent，替它查一件事，答完就走 | |
 | 自己的任务 | todo | `Todo`（`runtime_todo` 表，工具 `todo_add`、`todo_update`、`todo_list`） | agent 给自己记的待办，不是工单 | |
-| 计划 | plan | task graph（`TaskGraph`，带 `graph` 的父工单） | 一件长活拆成的有先后的几件，按 DAG 推进；都做完了一次合进主分支 | 工作流、playbook、plan、种植计划 |
-| 一件 | task | task（`Task`，带 `task` 的子工单；拆出来的草稿是 `TaskDraft`） | 计划里的一件，一个帮工做 | 步骤、step（指一件时）、节点、node（指一件时） |
-| 派活 | dispatch | hire（`Issue.hire`、事实 `FactHired`） | 把一张工单交给一个档案、开一个帮工；工单挪到待办就是派活 | |
+| 父工单 | parent issue | `Issue`（有子工单） | 子单通过检查后汇入父分支，父单统一验收 | 计划图、TaskGraph |
+| 子工单 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | 一个帮工负责的原生工单，前置完成后派发 | Task、步骤状态机 |
+| 派活 | dispatch | hire（`Issue.hire`、事实 `FactSession`） | 把一张工单交给一个档案、开一个帮工；工单挪到待办就是派活 | |
+| 派工关联 | assignment | `Assignment`（`issue_assignment`） | 一张工单由哪个档案负责，执行上下文挂在这条关系下 | |
+| 执行器 | executor | `Executor` | 创建、投递、中断和释放 oar 的执行实例 | |
 | 起草 | refine | refine（`IssueRefinement`、`issue.refine`） | 一个帮工读代码，把待规划的工单写成标题、描述和验收标准，写完就走 | |
 | 主人 | owner | owner | 你 | |
 | 田头 | the farm chat | 默认频道（`Channel.default`） | 农场的皮对默认频道的叫法；工作台里写它的名字（`#general`） | 群（指默认频道时） |
 | 私聊 | direct message | direct | 你和一个管家两个人说话的地方，帮工不在 | 私信 |
-| 和帮工私聊 | talk | talk（串的 `subjectKind` 是 `talk`，`Issue.talkWith`） | 你和一个帮工的档案直接说话：派一个帮工答在私聊里，这张工单不上看板 | |
+| 和帮工私聊 | talk | `Channel.direct`、`Session.channel` | 和一个档案直接说话，Session 回到原私聊，闲置时休眠，不创建工单 | |
 | 频道 | channel | channel（`Channel`） | 另开的说话的地方；微信、飞书、QQ 各接一个 | 群（指频道时）、群聊 |
 | 串 | thread | thread | 挂在一条消息下面的话题串；派活时开的叫工单串 | 子频道 |
 | 附件 | attachment | `Attachment`（`channel_attachment` 表） | 一条消息带的文件和图 | |
@@ -132,7 +136,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 收获、收成清单 | harvest, harvest list | 完成、改动 | 动作 `complete`、`Changes` |
 | 麦茬 | stubble | 已完成 | `done` |
 | 仓库 | warehouse | 合进主分支或 PR 合了的工单 | `delivered`：`merged`、`pull_request` |
-| 种植计划、图纸桌 | planting plan | 计划 | `TaskGraph` |
+| 图纸桌 | issue board | 工单 | `Issue` |
 | 一季庄稼 | a crop | 一轮 | `Run` |
 | 地里 | in the field | 在场的帮工 | `presentSessions` |
 | 来电 | call | Inbox 里的一件 | `InboxItem` |

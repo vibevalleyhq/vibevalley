@@ -2,12 +2,11 @@ import { expect, test } from "vite-plus/test";
 
 import type { AccountUsage, Agent, RuntimeInfo } from "@vibevalley/protocol";
 
-import { sampleAgent } from "@/testing/agents.ts";
+import { sampleAgent } from "@/agent/seed.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
-import { agentProblems, chooseAgent } from "./fit.ts";
-import { factsOf } from "./presets.ts";
-import { moneyStop, quotaLeft, quotaOf, quotaText } from "./quota.ts";
+import { agentProblems, chooseAgent, factsOf, moneyStop } from "./presets.ts";
+import { quotaLeft, quotaOf, quotaText } from "./quota.ts";
 
 test("the recorded cases", () => {
   const cases = goldenCases("runtime");

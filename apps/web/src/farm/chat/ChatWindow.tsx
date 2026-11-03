@@ -8,9 +8,8 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
 
-import { useNow } from "@/base/util";
-import { farm } from "@/farm/store";
-import { useFarm } from "@/farm/ui";
+import { useNow } from "@/base/dom";
+import { farm, farmChannelLabel, useFarm } from "@/farm/store";
 import {
   chatSay,
   pendingLines,
@@ -41,7 +40,6 @@ import { playSound } from "@/ui/pixel/sound";
 
 import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
-import { farmChannelLabel } from "./labels";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";
 
 const suggestions = ([0, 1, 2, 3] as const).map((i) => t(`web.farm.chat.suggestions.${i}`));

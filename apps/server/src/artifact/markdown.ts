@@ -1,4 +1,4 @@
-// Markdown is how a artifact is traded with agents and MEMORY.md, not how it is stored.
+// Markdown is how an artifact is exchanged with agents, not how it is stored.
 // What a block is that Markdown has no word for goes in an HTML comment (<!-- issue:ID -->, <!-- memory:ID -->), an
 // image's size in its title ("640x480"). Nesting is two spaces of indent per level. What the export writes, the import
 // reads back to the same blocks.
@@ -6,8 +6,7 @@
 import type { Block, BlockAttrs, BlockType, SpanMarks, TextSpan } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
-import { ordered, textFor } from "./ops.ts";
-import { normal, plain, unmarked } from "./spans.ts";
+import { normal, ordered, plain, textFor, unmarked } from "./ops.ts";
 
 /** A block as Markdown says it: its place is its depth under the block before it. */
 export interface MdBlock {

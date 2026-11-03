@@ -8,7 +8,7 @@ import { unreadTotal } from "@/features/channel";
 
 /** The tray's title (working helpers, calls waiting) and its lines. */
 export function traySummary(state: WorkspaceState, inbox: readonly InboxItem[]): TraySummary {
-  const working = state.sessions.filter((h) => h.phase._tag === "working").length;
+  const working = state.sessions.filter((h) => h.role === "worker" && h.phase._tag === "working").length;
   const waiting = inbox.flatMap((c) => (c.words.tray ? [c.words.tray] : []));
   const unread = unreadTotal(state.chat);
   const lines = [
@@ -20,7 +20,7 @@ export function traySummary(state: WorkspaceState, inbox: readonly InboxItem[]):
   return { title, lines };
 }
 
-/** How many calls wait on the owner at an issue or a task graph; a mention is counted with the chat's unread instead. */
+/** How many calls wait on the owner at an issue; a mention is counted with the chat's unread instead. */
 export const waitingOnOwner = (inbox: readonly InboxItem[]) => inbox.filter((c) => c.target.kind !== "chat").length;
 
 /** The window's title: what waits on the owner, then the unread, before the app's name, so a tab in the background says

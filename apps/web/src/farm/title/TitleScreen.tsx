@@ -6,6 +6,7 @@
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
+import type { SettingsStatus, WorkspaceState } from "@vibevalley/protocol";
 
 import { farm } from "@/farm/store";
 import { api } from "@/infra/api";
@@ -15,7 +16,6 @@ import { useRouter } from "@/infra/router";
 import { createPixelAct } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";
 
-import { hasFarm, orchestratorReady } from "./ready";
 import { startScene } from "./scene";
 import { TitleStage } from "./TitleStage";
 
@@ -24,6 +24,14 @@ type Item = "start" | "continue" | "settings";
 // Text shadows go inline: the pixel skin turns a class with "shadow" in it into a box's drop.
 const deep = { "text-shadow": "4px 4px 0 #3a2a18" };
 const soft = { "text-shadow": "2px 2px 0 #3a2a18" };
+
+/** 继续游戏 needs a farm to go back to: a helper, a word said, or a coin earned. */
+const hasFarm = (core: WorkspaceState | undefined) =>
+  !!core &&
+  (core.sessions.some((s) => s.role !== "orchestrator") || (core.chat?.channels ?? []).some((c) => (c.lastNumber ?? 0) > 0) || (core.progress?.coins ?? 0) > 0);
+
+/** The orchestrator cannot think without DeepSeek's key. */
+const orchestratorReady = (status: SettingsStatus | undefined) => status?.deepseekApiKey.source !== undefined;
 
 export function TitleScreen() {
   const router = useRouter();

@@ -11,7 +11,7 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "@/infra/api";
 import { followReports, followChannel } from "@/infra/gateway";
 
-import { chatPage } from "./feed";
+import { chatPage } from "./places";
 export interface Followed {
   /** By number, oldest first. */
   readonly messages: readonly ChatMessage[];

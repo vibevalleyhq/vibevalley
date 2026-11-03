@@ -33,7 +33,7 @@ export type SpanProps = JSX.HTMLAttributes<HTMLSpanElement>;
 export type Render = "button" | "span" | "div" | "a" | ((props: RenderProps) => JSX.Element);
 
 /** What a component in `render` is given: an element's attributes, whichever element it makes. */
-export type RenderProps = Omit<JSX.HTMLAttributes<HTMLElement>, "ref"> & {
+type RenderProps = Omit<JSX.HTMLAttributes<HTMLElement>, "ref"> & {
   // A plain callback, so the props spread onto any element's own ref type.
   ref?: ((el: HTMLElement) => void) | undefined;
 };

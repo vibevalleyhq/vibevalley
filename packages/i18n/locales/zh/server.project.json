@@ -1,4 +1,6 @@
 {
+  "parentBranchChanged": "父工单工作目录已切换分支，不能自动合入",
+  "parentHasChanges": "父工单还有未提交的改动，提交后再合入子工单",
   "badName": "项目名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符",
   "badGithub": "请填 GitHub 仓库地址，例如 https://github.com/botiverse/raft-source",
   "branchMoved": "分支在检查以后又变了，请重新检查再合",
@@ -58,6 +60,7 @@
     "noPermission": "无法检测 GitHub 仓库权限",
     "readOnly": "没有写权限",
     "wrongBranch": "工单分支不匹配",
+    "changedDuringCheck": "检查期间工作目录发生了变化，提交改动后再提交 PR",
     "pushFailed": "推送工单分支失败，请检查 origin 和登录后重试",
     "listFailed": "查询已有 PR 失败；分支已推送，可重试",
     "listUnread": "无法读取已有 PR",
@@ -69,6 +72,7 @@
     "viewFailed": "查询 PR #{n} 失败",
     "stateUnread": "无法读取 PR #{n} 状态",
     "stateUnknown": "无法识别 PR #{n} 状态",
+    "resolveFailed": "解决 GitHub Review 讨论失败",
     "worktreeLeft": "PR 已结束，清理 worktree 失败：{why}",
     "branchLeft": "PR 已结束，清理本地分支失败：{why}"
   },

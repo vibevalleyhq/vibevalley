@@ -7,7 +7,7 @@
 
 import { cadence } from "@vibevalley/engine/pixi";
 
-export type DogPicture =
+type DogPicture =
   | "dog-sleep"
   | "dog-lie"
   | "dog-stretch"
@@ -22,10 +22,10 @@ export type DogPicture =
   | "dog-yawn";
 
 /** What a pat gets. */
-export type Trick = "wake" | "wag" | "bark" | "jump" | "belly";
+type Trick = "wake" | "wag" | "bark" | "jump" | "belly";
 
 /** What it shows: a picture, how far off the ground (a jump), how much taller with its feet put (a breath, a duck). */
-export interface DogLook {
+interface DogLook {
   readonly picture: DogPicture;
   readonly lift: number;
   readonly grow: number;

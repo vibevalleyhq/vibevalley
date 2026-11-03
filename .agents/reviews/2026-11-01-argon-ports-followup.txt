@@ -1,0 +1,23 @@
+模型：opencode-go/gemini-4-argon
+会话：ses_e69e11654ffeDUk9kh5poUfSCU
+范围：三项建议的整体 diff，重点为 Issue 入口与 Session 测试后门迁移。
+
+已完成对当前 `git diff`（含新增的 `apps/server/src/session/recording.ts` 与 `apps/server/src/flows/task.test.ts`）的只读复审。
+
+**结论：未发现正确性、测试覆盖损失、边界或并发风险问题（0 项发现）。**
+
+重点核查结论如下：
+
+1. **建议 1（收拢 `Issue` 服务边界与保留 `merge.ts` 锁内校验）**：
+   - `Issue` 服务接口与装配已移除 `queue`、`merge`、`cancel`、`ran`，内部保留给 `setStatus`、`start`、`tryQueued`、`hire` 使用；所有测试调用方均已迁移至 `issues.setStatus` 与 `issues.hire`。
+   - 保留 `apps/server/src/issue/merge.ts` 在 `prLock.withPermits(1)` 内的 `statusMove(issue, "done")` 校验是合理的：`setStatus` 中的 `settledMove` 在获取 `prLock` 之前执行，锁内二次校验可防止等待合并锁期间工单状态发生并发变更。
+   - 原 `apps/server/src/task/task.test.ts` 中依赖 `FakeWork` / `issues.ran` 的两项父子工单与拆单测试已完整迁至 `apps/server/src/flows/task.test.ts`，通过真实 `Session`、`Issue` 和 Git worktree 验证了全量步骤（`a`/`b`/`c`）的 `Assignment` 关联、分支 `merge-base`、帮工退场与父工单合并，覆盖度较原伪实现更强。
+
+2. **建议 2b（移除 `SessionsInside` 后门与重构测试）**：
+   - `apps/server/src/session/session.ts` 已移除 `Object.assign` 内部状态暴露、`SessionsInside` 类型及未使用的 `run`（`FiberSet.makeRuntimePromise`）；`apps/server/src/task/task.ts` 的 `splitIssue` 已改为通过 `live.sessionOf(sessionId)` 读取，且 `apps/server/src/modules.test.ts` 补齐了跨模块经 `session/roster.ts` 读 `core.state()` 的静态拦截与回归测试。
+   - `apps/server/src/session/recording.ts` 抽出了 `session_run` / `session_run_issue` 的真实持久化实现，由 `Session` 与 `inProcessRun.test.ts` 共用；`Session` 层面的 `finishedRuns`、`inputsConsumed` 流与 `runOf("orchestrator")` 生命周期已由 `apps/server/src/session/host.test.ts` 承接验证，无覆盖损失。
+   - `apps/server/src/session/session.test.ts` 的排队占槽测试已改为通过包装 `scriptedRuntime` 延迟 `events` 投递，在真实 `send` / `deliver` 路径上覆盖了 `pending` 与 `started` 两个阶段的占槽与 `handOver` 拒绝。
+
+3. **建议 3（`Executor` 快照隔离、`Hand.sess` 移除与启动失败回滚）**：
+   - `Executor` 的归属类型已收窄为 `ExecutionOwner`，`start` / `find` / `all` 均通过 `view(allocation)` 返回只读快照；`Session` 移除了 `Hand.sess` 双轨引用，统一通过 `executor.find(id)` 判断 `attached` 与 `closing`，并在 `attach` 时将 `s.sessionId` 记入 `h.oarSessionId` 供持久化和恢复使用。
+   - `Session.send` 的登记阶段已改为通过 `Effect.catchTag("NotRecorded", ...)` 处理预期记录失败，缺陷与中断交由外层 `Effect.onExit` 兜底清理，消除了双重清理与重复错误通知，并有 `session.test.ts` 与 `executor.test.ts` 的回归测试覆盖。

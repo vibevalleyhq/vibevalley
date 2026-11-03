@@ -7,8 +7,8 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { list as listed, t } from "@vibevalley/i18n";
 import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
 
+import { Keyed } from "@/base/dom";
 import { matches } from "@/base/search";
-import { Keyed } from "@/base/util";
 import { api, reasonOf } from "@/infra/api";
 import { ready, useAgents, useQuery, useRuntimes } from "@/infra/query";
 import { useRouter } from "@/infra/router";
@@ -16,14 +16,13 @@ import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { ConfirmButton } from "@/ui/ConfirmButton";
-import { Empty } from "@/ui/Empty";
 import { AgentFace } from "@/ui/Face";
 import { Field, TextArea, TextInput } from "@/ui/Field";
-import { Card } from "@/ui/layout";
+import { Card, Empty } from "@/ui/layout";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
-import { runtimeName } from "@/ui/runtimes";
+import { runtimeName } from "@/ui/RuntimeBadge";
 
-import { type InstalledSkill, installedSkills } from "./skills";
+import { type InstalledSkill, installedSkills } from "./quota";
 
 const installedPrefix = "installed:";
 const skillPath = (id?: string) => (id === undefined ? "/settings/skills" : `/settings/skills/${encodeURIComponent(id)}`);

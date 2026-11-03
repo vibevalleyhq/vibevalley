@@ -49,7 +49,7 @@
   },
   "doneWith": "Done, {what}",
   "canceledFor": "Canceled, {why}",
-  "attention": {
+  "stage": {
     "draft": "Draft",
     "queued": "Queued",
     "working": "Working",
@@ -80,7 +80,6 @@
     "reopen": "Reopen"
   },
   "phase": {
-    "arriving": "just sent, getting started",
     "quiet": "{what} (quiet for {span})",
     "done": "this round is done, for you to see{conflict}",
     "failed": "this round failed",

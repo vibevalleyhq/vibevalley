@@ -7,11 +7,11 @@
 //   message.state            the agent's state: idle, listening, thinking, speaking, silent
 // Every message of a turn carries the whole text so far, so a turn's caption is replaced, never appended to.
 
-import { recordOf } from "@/base/util";
+import { recordOf } from "@/base/dom";
 
-export type Speaker = "you" | "orchestrator";
+type Speaker = "you" | "orchestrator";
 
-export interface Caption {
+interface Caption {
   readonly speaker: Speaker;
   readonly turn: number;
   text: string;

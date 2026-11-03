@@ -8,9 +8,9 @@ import { TestClock } from "effect/testing";
 import { ownerId } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
 
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { ServerConfig } from "@/infra/config.ts";
-import { worldBelowTasks } from "@/testing/world.ts";
+import { world } from "@/testing/world.ts";
 
 import { Artifact } from "./artifact.ts";
 import { artifactMax } from "./policy.ts";
@@ -43,7 +43,7 @@ describe("an artifact", () => {
       expect((yield* artifacts.list({ issue: "issue-1" })).map((a) => a.id)).toEqual([forIssue.id]);
       expect((yield* artifacts.list({ channel: general })).map((a) => a.id)).toEqual([forIssue.id, made.id]);
       expect((yield* artifacts.list({})).length).toBe(2);
-    }).pipe(Effect.scoped, Effect.provide(worldBelowTasks())),
+    }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
   it.effect("handed in as Markdown is read into blocks to write on together, and takes no new version", () =>
@@ -63,7 +63,7 @@ describe("an artifact", () => {
       ]);
       expect(yield* artifacts.content(made.id)).toEqual({ version: 1, content: "# 结论\n\n用**抽屉**。\n", body: "blocks" });
       expect(yield* Effect.flip(artifacts.version(owner, { id: made.id, content: "x" }))).toMatchObject({ _tag: "Refused" });
-    }).pipe(Effect.scoped, Effect.provide(worldBelowTasks())),
+    }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
   it.effect("started on the page with a title is empty, announced nowhere, and an html one has no blocks", () =>
@@ -79,7 +79,7 @@ describe("an artifact", () => {
       expect(yield* Effect.flip(artifacts.blocks(html.id))).toMatchObject({ _tag: "Refused" });
       expect((yield* artifacts.rename(blank.id, "  第 43 周  ")).title).toBe("第 43 周");
       expect(yield* Effect.flip(artifacts.rename(blank.id, " "))).toMatchObject({ _tag: "Refused" });
-    }).pipe(Effect.scoped, Effect.provide(worldBelowTasks())),
+    }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
   it.effect("refuses what it cannot be, and says which", () =>
@@ -95,7 +95,7 @@ describe("an artifact", () => {
         _tag: "Missing",
       });
       expect(yield* artifacts.list({})).toEqual([]);
-    }).pipe(Effect.scoped, Effect.provide(worldBelowTasks())),
+    }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
   it.effect("goes with its versions, and its content files go once no other artifact keeps them", () =>
@@ -117,6 +117,6 @@ describe("an artifact", () => {
       expect(existsSync(dir) ? readdirSync(dir) : []).toEqual([]);
       // Its cards stay in the conversation.
       expect((yield* chat.history(chat.defaultChannel())).filter((m) => m.artifact).length).toBe(3);
-    }).pipe(Effect.scoped, Effect.provide(worldBelowTasks())),
+    }).pipe(Effect.scoped, Effect.provide(world())),
   );
 });

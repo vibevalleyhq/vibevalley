@@ -31,7 +31,7 @@ export function changeKind(status: string) {
   }
 }
 
-export type PatchMark = "added" | "removed" | "hunk" | "plain";
+type PatchMark = "added" | "removed" | "hunk" | "plain";
 
 export const patchMarkOf = (line: string): PatchMark =>
   line.startsWith("+") ? "added" : line.startsWith("-") ? "removed" : line.startsWith("@@") ? "hunk" : "plain";

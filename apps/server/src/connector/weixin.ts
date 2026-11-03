@@ -8,7 +8,7 @@ import { type HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 
-import { numberIn } from "@/base/number.ts";
+import { numberIn } from "@/base/order.ts";
 
 import { type Adapter, AppFailed, failedWith } from "./adapter.ts";
 
@@ -23,7 +23,7 @@ export interface Account {
   readonly token: string;
 }
 
-export interface Item {
+interface Item {
   readonly type?: number;
   readonly text_item?: { readonly text?: string };
   readonly voice_item?: { readonly text?: string };
@@ -106,7 +106,7 @@ const SendMessageResponse = Schema.Struct({
   message_id: Schema.optionalKey(Schema.String),
 });
 
-export type LoginState = "waiting" | "scanned" | "verify";
+type LoginState = "waiting" | "scanned" | "verify";
 
 export interface LoginAccount {
   readonly account: Account;

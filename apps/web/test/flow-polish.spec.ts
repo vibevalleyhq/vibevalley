@@ -5,10 +5,12 @@ import type { Agent } from "@vibevalley/protocol";
 
 import { expect, test } from "./fixtures";
 
+test.use({ farm: "flow-polish" });
+
 const fox: Agent = {
   id: "",
   name: "fox",
-  role: "helper",
+  role: "worker",
   duty: "",
   enabled: true,
   // The test server's pi is the scripted helper (fixtures.ts); 先问清楚 has it ask the owner.
@@ -30,7 +32,7 @@ const fox: Agent = {
 test("a dispatch links its issue, and what waits on the owner is counted on the rail and in the title", async ({ page, api }) => {
   const helper = await api.agent.create(fox);
   const project = await api.project.create({ name: "polish" });
-  const made = await api.issue.create({ title: "打卡页先问清楚", project: project.name, assignee: helper.id });
+  const made = await api.issue.create({ title: "打卡页先问清楚", project: project.name, agent: helper.id });
   await page.goto("/chat");
   await expect(page.locator('[data-testid="rail"] [data-place="issues"]')).not.toHaveAttribute("data-badge");
   await api.issue.status.update({ id: made.id, status: "todo" });

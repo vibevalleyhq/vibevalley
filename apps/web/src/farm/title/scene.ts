@@ -24,7 +24,7 @@ let opened: TitleScene | undefined;
 export const startScene = (): TitleScene => (opened ??= sceneAt(hourNow()));
 
 /** Fixed per scene, so it does not jump: where it starts (percent of the scene), how big, how slow. */
-export interface Mote {
+interface Mote {
   readonly x: number;
   readonly y: number;
   readonly size: number;

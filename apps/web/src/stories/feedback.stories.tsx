@@ -3,7 +3,7 @@ import { createSignal, For, Match, Switch } from "solid-js";
 import { stories, story } from "@vibevalley/stories";
 
 import { Button } from "@/ui/Button";
-import { Empty } from "@/ui/Empty";
+import { Empty } from "@/ui/layout";
 import { ToastHost } from "@/ui/ToastHost";
 import { toast } from "@/ui/toasts";
 

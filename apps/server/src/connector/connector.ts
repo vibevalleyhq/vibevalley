@@ -3,8 +3,8 @@
 //
 // Each app's account has one generation of work at a time (receiving, the inbox, the outbox); a login or logout cancels
 // and waits for the generation before it replaces the account. What an app hands over is accepted into connector_inbound
-// (a durable acceptance, with the page's cursor) and delivered to the orchestrator from there; a delivery the orchestrator took but
-// whose mark was not written yet may come again after a restart. Some apps let a bot answer only on the context of the
+// (a durable acceptance, with the page's cursor) and then enters the owner's durable Channel → Mailbox route; a delivery
+// the orchestrator took but whose mark was not written yet may come again after a restart. Some apps let a bot answer only on the context of the
 // owner's latest message, and only so many times: what an app will not take waits in connector_outbox and goes when the
 // owner next says something, several as one digest.
 
@@ -37,13 +37,13 @@ import { type ApiError } from "@vibevalley/protocol/api";
 import { messageId } from "@vibevalley/protocol/schema";
 
 import { newId } from "@/base/ids.ts";
-import { Channel } from "@/channel/chat.ts";
-import { channelOf, defaultOf } from "@/channel/folded.ts";
+import { Channel } from "@/channel/channel.ts";
+import { channelOf, defaultOf } from "@/channel/messages.ts";
 import { Core } from "@/core/core.ts";
 import { reasonOf } from "@/errors.ts";
 import { Inbox } from "@/inbox/inbox.ts";
 import { causeMessage, Db } from "@/infra/db.ts";
-import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+import { Ingress } from "@/ingress/ingress.ts";
 
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
@@ -81,7 +81,7 @@ interface Account {
 
 const paused = (a: Account, now: number) => a.pausedUntil !== 0 && a.pausedUntil > now;
 
-/** Why a step of the bridge did not go through: the database, the orchestrator, or an app. Said as the status's error. */
+/** Why a step of the bridge did not go through: the database, the farm, or an app. Said as the status's error. */
 class BridgeError extends Schema.TaggedError<BridgeError, { readonly brand: unique symbol }>()("BridgeError", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
@@ -122,9 +122,9 @@ const make = (options: ConnectorOptions = {}) =>
     const now = () => clock.currentTimeMillisUnsafe();
     const db = yield* Db;
     const chat = yield* Channel;
+    const ingress = yield* Ingress;
     const core = yield* Core;
     const inbox = yield* Inbox;
-    const orchestrator = yield* Orchestrator;
     const retryFirst = options.retryFirstMs ?? 30_000;
     const retryMost = options.retryMostMs ?? 30 * 60_000;
     /** retryFirst, then twice as long after each try that fails, up to retryMost. */
@@ -140,7 +140,8 @@ const make = (options: ConnectorOptions = {}) =>
     const inTx = <A>(work: Effect.Effect<A, SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError>) =>
       Effect.mapError(db.attemptTx(work), bridgeError);
     let closing = false;
-    const say = (text: string, channel: string | undefined, sendKey: string) => orchestrator.say(text, {}, channel, sendKey);
+    const say = (text: string, channel: string | undefined, sendKey: string) =>
+      ingress.owner({ source: "connector", text, ...(channel ? { channel } : {}), envelope: sendKey });
 
     // Each queue is a wake: holding one at most, so wakes while it works are one more look, never lost.
     const bridgeOf = (adapter: Adapter, mail: { readonly outbox: Queue.Queue<void>; readonly inbox: Queue.Queue<void> }) => {
@@ -284,13 +285,25 @@ const make = (options: ConnectorOptions = {}) =>
         draining.withPermits(1)(
           Effect.gen(function* () {
             const a = snapshot();
-            if (!a || !a.owner || paused(a, now())) return true;
+            if (!a || !a.owner) return true;
             const listed = yield* Effect.result(tried(outboxQ.pendingOutbox({ connector: id })));
             if (listed._tag === "Failure") {
               yield* Effect.logError("vibevalley: the outbox could not be read", listed.failure.message).pipe(Effect.annotateLogs({ connector: id }));
               return false;
             }
-            const pending = listed.success;
+            const allowed = new Set<string>();
+            yield* Effect.forEach(
+              new Set(listed.success.map((row) => row.message_id)),
+              (message) =>
+                Effect.gen(function* () {
+                  if ((yield* inbox.handoffState(message)) === "unseen") allowed.add(message);
+                  else yield* tried(outboxQ.dropPendingOutboxForMessage({ message_id: message }));
+                }),
+              { discard: true },
+            );
+            const pending = listed.success.filter((row) => allowed.has(row.message_id));
+            if (pending.length !== listed.success.length) outboxChanged();
+            if (paused(a, now())) return true;
             if (pending.length === 0) return true;
             const batches =
               late && pending.length > digestOver
@@ -331,6 +344,7 @@ const make = (options: ConnectorOptions = {}) =>
       const offer = Effect.fnUntraced(function* (m: ChatMessage) {
         const a = snapshot();
         if (!a || !a.owner) return;
+        if ((yield* inbox.handoffState(m.id)) !== "unseen") return;
         const added = yield* Effect.result(
           Effect.gen(function* () {
             const place = yield* Effect.mapError(chat.messageLocation(m.id), bridgeError);
@@ -395,13 +409,14 @@ const make = (options: ConnectorOptions = {}) =>
         if (m.from !== a.owner) return;
         yield* tried(accountQ.accountReply({ reply_context: m.reply || null, at: now(), connector: id }));
         yield* reload;
-        // A fresh reply opens the platform's delivery window; older messages precede its answer.
-        yield* drain(true);
-        if (!m.text) return;
         const channel = (yield* quotedChannel(m.quoted)) ?? snapshot()?.channel;
-        // Keyed by the app's message: one said but not yet marked delivered when the farm stopped is said once, not twice.
-        const sendKey = createHash("sha256").update(`${id}:${m.id}`).digest("hex");
-        yield* Effect.mapError(say(m.text, channel, sendKey), (e) => new BridgeError({ message: reasonOf(e), cause: e }));
+        if (m.text) {
+          // Keyed by the app's message: one said but not yet marked delivered when the farm stopped is said once, not twice.
+          const sendKey = createHash("sha256").update(`${id}:${m.id}`).digest("hex");
+          yield* Effect.mapError(say(m.text, channel, sendKey), (e) => new BridgeError({ message: reasonOf(e), cause: e }));
+        }
+        // The owner's action withdraws stale handoffs before its fresh reply opens the platform's delivery window.
+        yield* drain(true);
       });
 
       // The inbox: what the app handed over, delivered to the orchestrator in order.
@@ -585,6 +600,10 @@ const make = (options: ConnectorOptions = {}) =>
         load: reload,
         status,
         offer: (m: ChatMessage) => commands.withPermits(1)(Effect.suspend(() => (closing ? Effect.void : offer(m)))),
+        changed: () => {
+          outboxChanged();
+          Queue.offerUnsafe(mail.outbox, undefined);
+        },
         resume: commands.withPermits(1)(
           Effect.sync(() => {
             current ??= connected();
@@ -667,6 +686,13 @@ const make = (options: ConnectorOptions = {}) =>
       Effect.map(Effect.all({ outbox: Queue.sliding<void>(1), inbox: Queue.sliding<void>(1) }), (mail) => bridgeOf(a, mail)),
     );
     yield* Effect.forEach(bridges, (b) => Effect.orDie(b.load), { discard: true });
+    yield* Effect.forkScoped(
+      Stream.runForEach(yield* inbox.externalChanges, () =>
+        Effect.sync(() => {
+          for (const bridge of bridges) bridge.changed();
+        }),
+      ),
+    );
     const bridge = (id: ConnectorID) => bridges.find((b) => b.id === id);
 
     // What the owner hears off the farm (the inbox says what) goes out on every app the owner has, each checking it is

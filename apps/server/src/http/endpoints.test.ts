@@ -26,7 +26,7 @@ const refusal = (p: () => Promise<unknown>) =>
   );
 
 describe("the endpoints the agents' tools stand on", () => {
-  it.live("list channels and unread places, filter issues, review and split them, read graphs, search memories, write blocks", () =>
+  it.live("list channels and unread places, filter issues, review and split them, search memories, write blocks", () =>
     Effect.gen(function* () {
       const api = yield* farm;
       const channels = yield* call(() => api.channel.list());
@@ -53,8 +53,6 @@ describe("the endpoints the agents' tools stand on", () => {
       expect(yield* refusal(() => api.issue.review({ id: `#${open.number}`, pass: true }))).toBe("Refused");
       expect(yield* refusal(() => api.issue.split({ id: open.id, tasks: [{ id: "a", brief: "前端" }] }))).toBe("Refused");
 
-      expect(yield* call(() => api.graph.list())).toEqual([]);
-      expect(yield* refusal(() => api.graph.get({ id: "nope" }))).toBe("Missing");
       expect(yield* call(() => api.memory.search({ text: "登录" }))).toMatchObject({ found: [] });
 
       const doc = yield* call(() => api.artifact.create({ title: "说明" }));

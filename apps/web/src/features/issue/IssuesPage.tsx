@@ -3,9 +3,9 @@ import { createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-
 
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, Session } from "@vibevalley/protocol";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 
-import { variant } from "@/base/util";
+import { variant } from "@/base/dom";
 import { useOrchestrators } from "@/infra/agents";
 import { api, reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
@@ -19,28 +19,25 @@ import { Segmented } from "@/ui/Segmented";
 import { toast } from "@/ui/toasts";
 
 import { IssueBoard } from "./Board";
-import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, noFilter } from "./cards";
+import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, type Lane, noFilter } from "./cards";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
-import { type BoardLook, boardViews, viewLabel } from "./display";
+import { type BoardLook, boardLook, boardViews, viewLabel } from "./display";
 import { DisplayMenu } from "./DisplayMenu";
+import { FamilyDetail } from "./FamilyDetail";
+import { useIssueHistory, useNameOf } from "./history";
 import { issueIs } from "./issue";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
-import { type Lane } from "./lanes";
-import { boardLook } from "./look";
 import { issueMove, movedCards, sendMove } from "./moves";
-import { useIssueHistory, useGraphs, useNameOf } from "./queries";
-import { TaskDetail } from "./TaskDetail";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 import { createWriteKey, writeIssue } from "./write";
 
-type Closing = { issue: Issue; session: Session; review: boolean; lane?: Lane };
+type Closing = { issue: Issue; session: Session | undefined; review: boolean; lane?: Lane };
 
 /** `rest` is the path after /issues/. */
 export function IssuesPage(props: { rest: string }) {
   const router = useRouter();
   const core = useCore();
-  const graphs = useGraphs();
   const id = () => props.rest || undefined;
   // The project and the helper are in the address, so a reload or a link keeps the board as filtered; the words typed
   // are not, being half a thought.
@@ -73,7 +70,7 @@ export function IssuesPage(props: { rest: string }) {
   const moves = useIntents(issueMove);
   const act = createAct();
   const writeKey = createWriteKey();
-  const all = createMemo(() => movedCards(buildCards(history.rows() ?? [], core(), graphs(), orchestratorIds()), moves.list()));
+  const all = createMemo(() => movedCards(buildCards(history.rows() ?? [], core(), orchestratorIds()), moves.list()));
   const shown = () => all().filter((c) => filterShows(filter(), c));
   const card = () => {
     const at = id();
@@ -89,8 +86,8 @@ export function IssuesPage(props: { rest: string }) {
   const drop = async (c: BoardCard, to: Lane) => {
     if (c.kind === "todo" && to === "todo") return place(c, undefined);
     const move = cardMove(c, to);
-    if (move === "start" && c.kind === "todo") {
-      if (!c.issue.assignee || !c.issue.project) {
+    if (move === "start" && (c.kind === "todo" || c.kind === "family")) {
+      if (!assignedAgentOf(c.issue) || !c.issue.project) {
         open(c.id);
         toast(t("web.issue.page.pickFirst"));
         return;
@@ -98,7 +95,8 @@ export function IssuesPage(props: { rest: string }) {
       const done = await sendMove(moves, { id: c.id, status: "todo", lane: to }).done;
       if (done?.replied) notice(done.replied.reply);
     } else if (move === "close" && c.kind === "issue" && c.session) setClosing({ issue: c.issue, session: c.session, review: false, lane: to });
-    else if (move === "reopen" && c.kind === "issue") setReopening({ issue: c.issue, lane: to });
+    else if (move === "close" && c.kind === "family") setClosing({ issue: c.issue, session: undefined, review: false, lane: to });
+    else if (move === "reopen" && (c.kind === "issue" || c.kind === "family")) setReopening({ issue: c.issue, lane: to });
   };
 
   const add = async (text: string, where: { project?: string; agent?: string } = {}) => {
@@ -176,7 +174,6 @@ export function IssuesPage(props: { rest: string }) {
               id={at}
               cards={all}
               known={!history.loading() && history.rows() !== undefined}
-              rows={history.rows() ?? []}
               open={open}
               onClose={(issue, session, review) => setClosing({ issue, session, review })}
             />
@@ -202,17 +199,12 @@ function Detail(props: {
   id: string;
   cards: () => BoardCard[];
   known: boolean;
-  rows: { issue: Issue }[];
   open: (id: string | undefined) => void;
-  onClose: (issue: Issue, session: Session, review: boolean) => void;
+  onClose: (issue: Issue, session: Session | undefined, review: boolean) => void;
 }) {
   const card = createMemo<BoardCard | undefined>(
     // By its id, a session of it, or its number (#12 in a message links to /issues/12).
-    (last) =>
-      props
-        .cards()
-        .find((c) => c.id === props.id || ((c.kind === "issue" || c.kind === "todo") && (issueIs(c.issue, props.id) || String(c.issue.number) === props.id))) ??
-      last,
+    (last) => props.cards().find((c) => c.id === props.id || issueIs(c.issue, props.id) || String(c.issue.number) === props.id) ?? last,
   );
   /** Only read inside that kind's panel: it throws once the card is another kind. */
   const cardOf = <const K extends BoardCard["kind"]>(kind: K) => {
@@ -225,12 +217,7 @@ function Detail(props: {
   const shows = (kind: BoardCard["kind"]) => {
     const c = card();
     if (c?.kind !== kind) return undefined;
-    return c.kind === "issue" ? `issue:${c.sessions[c.sessions.length - 1]!.id}` : c.kind === "task" ? `task:${c.graph.id}` : `${c.kind}:${c.id}`;
-  };
-  const taskIssuesOf = (graph: string) => {
-    const got: Record<string, string> = {};
-    for (const r of props.rows) if (r.issue.parent === graph && r.issue.task && r.issue.sessions.length > 0) got[r.issue.task.key] = r.issue.id;
-    return got;
+    return c.kind === "issue" ? `issue:${c.sessions[c.sessions.length - 1]!.id}` : `${c.kind}:${c.id}`;
   };
   return (
     <Switch>
@@ -254,7 +241,7 @@ function Detail(props: {
             sessions={cardOf("issue").sessions}
             session={cardOf("issue").session}
             onClose={(session, review) => props.onClose(cardOf("issue").issue, session, review)}
-            onTask={cardOf("issue").issue.parent ? () => props.open(`task:${cardOf("issue").issue.parent}`) : undefined}
+            onParent={cardOf("issue").issue.parent ? () => props.open(cardOf("issue").issue.parent) : undefined}
           />
         )}
       </Match>
@@ -269,8 +256,15 @@ function Detail(props: {
           </div>
         )}
       </Match>
-      <Match when={shows("task")} keyed>
-        {() => <TaskDetail graph={cardOf("task").graph} taskIssues={taskIssuesOf(cardOf("task").graph.id)} onOpen={props.open} />}
+      <Match when={shows("family")} keyed>
+        {() => (
+          <FamilyDetail
+            issue={cardOf("family").issue}
+            children={cardOf("family").children}
+            onOpen={props.open}
+            onClose={(review) => props.onClose(cardOf("family").issue, undefined, review)}
+          />
+        )}
       </Match>
     </Switch>
   );

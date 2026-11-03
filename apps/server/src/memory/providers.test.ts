@@ -11,8 +11,7 @@ import { ServerConfig } from "@/infra/config.ts";
 import { Database, Db } from "@/infra/db.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 import { Setting } from "@/setting/setting.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { whenTrue } from "@/testing/until.ts";
+import { testConfig, whenTrue } from "@/testing/layers.ts";
 
 import { type BuildSource, type FinishedRun, foundText, type Found, Memory, make, type Note, type RecallCue, type SearchQuery } from "./memory.ts";
 import { localName, recallChars, recallCount, searchLimit } from "./recall.ts";
@@ -161,6 +160,7 @@ describe("memory sources", () => {
         const run: FinishedRun = {
           agent: "lab",
           session: "w1",
+          issue: "i1",
           project: "demo",
           brief: "修登录页",
           said: "改好了。\n记住：登录态统一走 refreshSession()",
@@ -168,7 +168,7 @@ describe("memory sources", () => {
           outcome: "completed",
         };
         yield* m.keep(run);
-        expect(yield* m.list("lab")).toHaveLength(2);
+        expect(yield* m.list("lab")).toHaveLength(1);
         yield* Effect.promise(() => until(() => fake.synced.length === 1));
         expect(fake.synced[0]!.said).toBe(run.said);
         yield* m.write(owner("lab", "替它记一条"));

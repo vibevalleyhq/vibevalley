@@ -13,11 +13,11 @@ import type { StateFrame } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
 import { newSendKey, reasonOf } from "@/infra/api";
-import type { Frames, Link } from "@/infra/frames";
+import type { Frames, Link } from "@/infra/frame";
 
 import { framesAtom, useAtom, useRegistry } from "./atom";
 
-export type IntentStatus = "pending" | "failed";
+type IntentStatus = "pending" | "failed";
 
 export interface Intent<I, R> {
   /** The request key: every send of this intent carries it, so the server acts on it once. */
@@ -32,7 +32,7 @@ export interface Intent<I, R> {
   readonly reason?: string;
 }
 
-export interface IntentKind<I, R> {
+interface IntentKind<I, R> {
   /** Sends it with its key; a repeat with the same key is the same request. */
   readonly send: (input: I, key: string) => Promise<R>;
   /**

@@ -12,8 +12,8 @@ src/app/            the wiring: App (the routes, each place a feature's page), R
 src/base/           the pure ground, touching nothing outside: times and money in words (format.ts), ordering, matching
                     (search.ts), the shortcut table, small Solid helpers (util.tsx; external.ts: a framework-free store as
                     a signal)
-src/infra/          what talks to the outside: the state stream (frames.ts, framework-free, opened again when even the
-                    server's heartbeat stops coming; frame.ts, its Solid store), the API client (api.ts, with request keys), rooms (gateway.ts), the live stream, REST queries (query.ts,
+src/infra/          what talks to the outside: the state stream (frame.ts: the stream itself, framework-free, opened again
+                    when even the server's heartbeat stops coming, and its Solid store), the API client (api.ts, with request keys), rooms (gateway.ts), the live stream, REST queries (query.ts,
                     agents.ts), saving settings, the host, the app's updates, the router (the browser's history), the
                     opening cover (opening.ts), the stories' fake server (storyApi.ts)
 src/state/          the middle layer on Effect's Atom: atom.ts (the page's registry, useAtom, the page's values as
@@ -46,7 +46,7 @@ test/               Playwright against a real server per worker (fixtures.ts); s
 - **The page does not fold facts.** It reads the folded `StateFrame` (`useCore()`, `useFrames()`); REST reads go through
   Solid Query (`infra/query.ts`); a rule of the server (may this be dispatched, what a move means) is asked of the server,
   not rewritten here. Presentation rules (lanes, grouping, ordering, feed merging) are pure functions in the feature they
-  belong to (`features/issue/display.ts`, `features/channel/unread.ts`), each with its test.
+  belong to (`features/issue/display.ts`, `features/channel/places.ts`), each with its test.
 - **What the owner does goes through the middle layer.** A change the page shows before the server has it is an
   intent (`state/intent.ts`): `defineIntent({ send, confirmed, watch?, whileLost, timeoutMs })`, kept by its request key
   in an atom family, so it outlives the component that made it. It settles when what the owner sees shows the change
@@ -62,7 +62,7 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   changes something is made inside an Act's `run` or through an intent defined in the feature's `.ts` (lint
   `vibevalley/act-door`), and a refusal toast without the error tone is reported (`vibevalley/failure-tone`). A read
   asked again as the owner types or the place changes (a search, a channel's pins) shows only the answer to the newest
-  ask, a failure as a failure (`useLatest`, `state/latest.ts`); the REST reads are read again when the state stream comes
+  ask, a failure as a failure (`useLatest`, `state/atom.ts`); the REST reads are read again when the state stream comes
   back (`refetchOnRelink`). Only `src/state` imports `effect/reactivity` (lint `vibevalley/atom-door`): its API is
   unstable, so a change in it is fixed there. Why: docs/subsystems/app.md, 为什么这样.
 - **What the page keeps, it keeps one way.** A value that outlives a component (a dialog two places open, the farm's

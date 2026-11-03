@@ -36,7 +36,7 @@ export function snap(value: number, o: { min: number; max: number; step: number 
   return Number(Math.min(o.max, Math.max(o.min, on)).toFixed(decimals));
 }
 
-export interface SliderRootProps extends Omit<DivProps, "onChange"> {
+interface SliderRootProps extends Omit<DivProps, "onChange"> {
   value?: number | undefined;
   defaultValue?: number | undefined;
   onValueChange?: ((value: number) => void) | undefined;

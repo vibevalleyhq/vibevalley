@@ -5,14 +5,14 @@ import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { Mcp } from "@/mcp/mcp.ts";
-import { chatCompletionsPath } from "@/orchestrator/model.ts";
 import { chatCompletions } from "@/orchestrator/openai.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+import { chatCompletionsPath } from "@/orchestrator/situation.ts";
 
 export const mcpRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const mcp = yield* Mcp;
-    const orchestrator = yield* Orchestrator;
+    const response = yield* Orchestrator;
     yield* router.add(
       "*",
       "/mcp",
@@ -25,6 +25,6 @@ export const mcpRoute = HttpRouter.use((router) =>
         }).pipe(Effect.onInterrupt(() => Effect.sync(() => gone.abort())));
       }),
     );
-    yield* router.add("*", chatCompletionsPath, chatCompletions({ answerer: orchestrator.answerer("api") }));
+    yield* router.add("*", chatCompletionsPath, chatCompletions({ answerer: response.answerer("api") }));
   }),
 );

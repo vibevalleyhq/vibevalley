@@ -26,7 +26,7 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { MemoryPanel } from "@/features/memory";
 import { useSkills } from "@/features/runtime";
 import { TrajectoryList } from "@/features/session";
@@ -46,7 +46,7 @@ import { Icon } from "@/ui/Icon";
 import { Toggle } from "@/ui/layout";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
 import { PoseSprite } from "@/ui/PoseSprite";
-import { runtimeName } from "@/ui/runtimes";
+import { runtimeName } from "@/ui/RuntimeBadge";
 import { Segmented } from "@/ui/Segmented";
 import { Tabs } from "@/ui/Tabs";
 import { Hint } from "@/ui/Tip";
@@ -62,7 +62,7 @@ function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agent {
   return {
     id: "",
     name: t("web.agent.newName", { runtime: runtimeName(catalog, runtime) }),
-    role: "helper",
+    role: "worker",
     duty: "",
     enabled: true,
     runtime,
@@ -114,7 +114,7 @@ export function AgentPage(props: { id: string }) {
           </A>
         </p>
       </Match>
-      <Match when={(saved()?.role ?? (search().get("role") === "orchestrator" ? "orchestrator" : "helper")) === "orchestrator" && loaded()}>
+      <Match when={(saved()?.role ?? (search().get("role") === "orchestrator" ? "orchestrator" : "worker")) === "orchestrator" && loaded()}>
         {(all) => <OrchestratorProfile saved={saved()} start={untrack(() => saved() ?? newOrchestrator())} all={all()} />}
       </Match>
       <Match when={loaded()}>

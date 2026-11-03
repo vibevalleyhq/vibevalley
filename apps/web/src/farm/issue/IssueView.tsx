@@ -1,4 +1,4 @@
-// Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/overview.ts.
+// Where it stands and what may be done is the server's Issue.stage, worded by src/features/issue/overview.ts.
 
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, Errored, For, Loading, Show, untrack } from "solid-js";
@@ -15,16 +15,14 @@ import {
   type IssueAct,
   type Session,
 } from "@vibevalley/protocol";
-import { isOneOf } from "@vibevalley/protocol/rules";
+import { isOneOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
+import { aria, useNow } from "@/base/dom";
 import { tookText, wallClockText } from "@/base/format";
-import { aria, useNow } from "@/base/util";
 import { playBedFx } from "@/farm/commands";
-import { farmActWords } from "@/farm/labels";
-import { tint } from "@/farm/panels/bits";
-import { farm, overlayOf } from "@/farm/store";
-import { useVillage } from "@/farm/support";
-import { useFarm } from "@/farm/ui";
+import { tint } from "@/farm/panels/rows";
+import { farm, farmActWords, overlayOf, useFarm } from "@/farm/store";
+import { useVillage } from "@/farm/world/load";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "@/farm/world/plots";
 import { issueThreadOf } from "@/features/channel";
 import {
@@ -117,11 +115,11 @@ function PlotDetail(props: { session: SessionView; onDone: () => void }) {
               : undefined
           }
           onNavigate={() => router.navigate(`/issues/${encodeURIComponent(id())}`)}
-          onTask={
-            props.session.graph
+          onParent={
+            i().parent
               ? () => {
-                  const graph = props.session.graph;
-                  if (graph) farm.openTaskBoard(graph.id);
+                  const parent = i().parent;
+                  if (parent) router.navigate(`/issues/${encodeURIComponent(parent)}`);
                   props.onDone();
                 }
               : undefined
@@ -140,7 +138,7 @@ function IssueBody(props: {
   onClose: (s: Session) => void;
   onThread?: (() => void) | undefined;
   onNavigate: () => void;
-  onTask?: (() => void) | undefined;
+  onParent?: (() => void) | undefined;
 }) {
   const frames = useFrames();
   const now = useNow();
@@ -148,8 +146,8 @@ function IssueBody(props: {
   const acts = createIssueActs(() => props.issue, {
     act: createPixelAct(t("web.farm.plot.failed")),
     done: (a) => {
-      if (a === "tell" || a === "answer" || a === "resolve") playBedFx(props.session, "water");
-      else if (a === "cure") playBedFx(props.session, "spray");
+      if (a === "tell" || a === "answer" || a === "resolve") playBedFx(props.session, frames.frame?.view.plays, "water");
+      else if (a === "cure") playBedFx(props.session, frames.frame?.view.plays, "spray");
     },
     complete: () => props.onHarvest(props.session),
     close: () => props.onClose(props.session),
@@ -157,7 +155,7 @@ function IssueBody(props: {
     told: (title, description) => toasts.add({ type: ToastType.info, title, description }),
   });
   const { busy, text, setText, box, go } = acts;
-  const s = createMemo(() => issueState(props.issue, props.sessions, props.session, frames.frame?.graphs ?? []));
+  const s = createMemo(() => issueState(props.issue, props.sessions, props.session, frames.frame?.state.issues ?? []));
   const changes = useIssueChanges(
     () => props.issue.id,
     () => s().showsChanges,
@@ -173,7 +171,7 @@ function IssueBody(props: {
     () => true,
   );
   const agent = useAgent(() => s().head.agent);
-  const state = () => s().attention.state;
+  const state = () => s().stage.state;
 
   const delivers = useIntents(issueDeliver);
   const deliver = () => shownDeliver(props.issue.id, props.issue.deliver, delivers.list());
@@ -193,7 +191,7 @@ function IssueBody(props: {
   /** The block asks for the lead and its own others; the rest go in the row at the bottom. */
   const blockActs = () => (s().ask ? s().others.filter((a) => a !== "close" && a !== "stop") : []);
   const rowActs = () => {
-    const all = s().attention.acts.map((a) => a.act);
+    const all = s().stage.acts.map((a) => a.act);
     return s().ask ? all.filter((a) => a === "close" || a === "stop") : all;
   };
   const boxShown = () => state() === "asking" || state() === "canceled" || box() !== undefined;
@@ -213,10 +211,10 @@ function IssueBody(props: {
         </div>
         <p
           class="mt-1 text-[13px]"
-          style={{ color: s().attention.state === "stuck" ? tones.berry : "#5a3d26" }}
+          style={{ color: s().stage.state === "stuck" ? tones.berry : "#5a3d26" }}
           aria-label={t("web.farm.plot.now")}
           data-testid="issue-now"
-          data-state={s().attention.state}
+          data-state={s().stage.state}
         >
           {s().statusLine(now(), timeline()?.spent?.cny)}
         </p>
@@ -331,8 +329,8 @@ function IssueBody(props: {
           <Show when={s().doing}>
             <p class={[body, "text-water-500"]}>{s().doing}</p>
           </Show>
-          <Show when={s().inTask}>
-            <p class={xs}>{s().taskText}</p>
+          <Show when={s().inFamily}>
+            <p class={xs}>{s().parentText}</p>
           </Show>
           <Show when={s().criteria.length > 0} fallback={<p class={xs}>{t("web.farm.plot.noCriteria", { answer: props.issue.deliver === "answer" })}</p>}>
             <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.reviewedAt === undefined} />
@@ -410,7 +408,7 @@ function IssueBody(props: {
             </Show>
           </Fold>
           <Fold label={t("web.farm.plot.runs")}>
-            <Runs issue={props.issue.id} version={`${props.issue.sessions.length}:${s().head.runs}:${s().head.phase._tag}`} />
+            <Runs issue={props.issue.id} version={`${sessionIdsOf(props.issue).length}:${s().head.runs}:${s().head.phase._tag}`} />
           </Fold>
           <Fold label={t("web.farm.plot.details")}>
             <div class="flex flex-col">
@@ -427,7 +425,7 @@ function IssueBody(props: {
                   <p class={body}>{s().crewLine}</p>
                 </Row>
               </Show>
-              <Show when={!s().inTask}>
+              <Show when={!s().inFamily}>
                 <Row label={t("web.farm.plot.deliver")}>
                   <div class="flex flex-wrap items-center gap-1.5" data-testid="plot-deliver" data-value={deliver().value} data-state={deliver().state}>
                     <For each={DeliverableValues}>
@@ -499,9 +497,9 @@ function IssueBody(props: {
                     {t("web.farm.plot.thread")}
                   </PxButton>
                 </Show>
-                <Show when={s().inTask && props.onTask}>
-                  <PxButton size="sm" onClick={() => props.onTask?.()}>
-                    {t("web.farm.plot.graph")}
+                <Show when={s().inFamily && props.onParent}>
+                  <PxButton size="sm" onClick={() => props.onParent?.()}>
+                    {t("web.issue.family.parent")}
                   </PxButton>
                 </Show>
               </div>
@@ -543,7 +541,9 @@ function Aside(props: { session: Session; agent?: Agent | undefined }) {
       <p class={["text-center", xs]}>
         {labelOf(speciesLabel, SpeciesValues, kind()[0] ?? "")} · {labelOf(outfitLabel, OutfitValues, kind()[1] ?? "")}
       </p>
-      <p class={xs}>{t("web.farm.plot.where", { plot: stationOfSession(props.session) + 1, round: Math.round(props.session.runs) })}</p>
+      <p class={xs}>
+        {t("web.farm.plot.where", { plot: stationOfSession(props.session, frames.frame?.view.plays) + 1, round: Math.round(props.session.runs) })}
+      </p>
     </div>
   );
 }

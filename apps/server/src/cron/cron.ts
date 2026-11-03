@@ -1,7 +1,3 @@
-// Cron: the owner's and the orchestrator's, kept in the cron table and in the core state.
-// Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
-// is published for the orchestrator, who does it.
-
 import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -13,18 +9,21 @@ import type { Actor } from "@/base/actor.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
+import { Issue } from "@/issue/issue.ts";
+import { Mailbox } from "@/mailbox/mailbox.ts";
+import { recordTrigger, unroutedCronTriggers } from "@/mailbox/payload.ts";
 
 import * as q from "../../db/generated/cron.sql.ts";
-import { afterRun, dueCrons, dueText, isMissed, needsOK, cronProblem } from "./due.ts";
-import { whenText } from "./when.ts";
+import { afterRun, cronProblem, dueCrons, dueText, isMissed, needsOK, whenText } from "./when.ts";
 
 export interface Due {
+  readonly id: string;
   readonly cron: T.Cron;
   readonly missed: boolean;
 }
@@ -69,6 +68,8 @@ const make = Effect.gen(function* () {
   const core = yield* Core;
   const store = yield* Agent;
   const chat = yield* Channel;
+  const issues = yield* Issue;
+  const mailbox = yield* Mailbox;
   const db = yield* Db;
   // Read in callbacks too: the Clock the service was built with (a test turns it by hand).
   const clock = yield* Clock.Clock;
@@ -106,25 +107,87 @@ const make = Effect.gen(function* () {
 
   const ran = (id: string, at: number, enabled: boolean) => db.run(q.cronRan({ last_run: at, enabled, id }));
 
+  const recordDue = (due: Due) =>
+    Effect.gen(function* () {
+      const s = due.cron;
+      const thread = `cron:${s.id}`;
+      return yield* recordTrigger(db, {
+        source: "cron",
+        key: due.id,
+        actor: { kind: "system", id: s.id },
+        text: dueText(s, due.missed),
+        threads: [thread],
+        addressed: "thread_owner",
+        replyChannel: s.channel,
+        meta: { cron: s.id, trigger: { kind: "cron", cron: s.id, ...(due.missed ? { missed: true } : {}) } },
+        at: s.lastRun ?? s.created,
+        data: s,
+      });
+    });
+
+  const handle = (due: Due, trigger: T.Trigger) =>
+    Effect.gen(function* () {
+      const s = due.cron;
+      const thread = `cron:${s.id}`;
+      if (!(yield* mailbox.registered(trigger.id))) {
+        const issue = yield* issues.scheduled(due, trigger);
+        yield* mailbox.subscribe(issue.id, [thread]);
+        yield* mailbox.receive(trigger);
+      } else {
+        const issue = yield* mailbox.ownerOf(trigger.id);
+        if (issue) yield* mailbox.subscribe(issue, [thread]);
+      }
+    }).pipe(bestEffort(`cron occurrence ${due.id}`));
+
+  const replay = Effect.gen(function* () {
+    let after = 0;
+    while (true) {
+      const rows = yield* unroutedCronTriggers(db, after);
+      const last = rows.at(-1);
+      if (!last) return;
+      yield* Effect.forEach(
+        rows,
+        (row) =>
+          Effect.gen(function* () {
+            const trigger = yield* Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(row.trigger_json);
+            const payload = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({ data: S.Cron })))(row.payload_json);
+            const by = trigger.meta.trigger;
+            yield* handle({ id: row.id, cron: payload.data, missed: by?.kind === "cron" && by.missed === true }, trigger);
+          }).pipe(bestEffort(`cron: replay ${row.id}`)),
+        { discard: true },
+      );
+      after = last.seq;
+    }
+  });
+
   const tick = lock.withPermits(1)(
     Effect.gen(function* () {
+      yield* replay;
       const at = now();
       yield* Effect.forEach(
         dueCrons(core.state().crons, at),
         (s) => {
           const missed = isMissed(s, at);
           const after = afterRun(s, at);
-          return db.attempt(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id })).pipe(
-            Effect.matchEffect({
-              onFailure: (failure) => Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`),
-              onSuccess: () =>
-                Effect.gen(function* () {
-                  yield* core.apply({ type: "cron", cron: after });
-                  PubSub.publishUnsafe(dueHub, { cron: after, missed });
-                  yield* chat.notice(s.channel, dueText(s, missed), "cron").pipe(bestEffort("cron notice was not kept"));
-                }),
-            }),
-          );
+          const occurrence = { id: newId(), cron: after, missed };
+          return db
+            .attemptTx(
+              Effect.gen(function* () {
+                yield* q.cronRan({ last_run: at, enabled: after.enabled, id: after.id });
+                return yield* recordDue(occurrence);
+              }),
+            )
+            .pipe(
+              Effect.matchEffect({
+                onFailure: (failure) => Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`),
+                onSuccess: (trigger) =>
+                  Effect.gen(function* () {
+                    yield* core.apply({ type: "cron", cron: after });
+                    PubSub.publishUnsafe(dueHub, occurrence);
+                    yield* handle(occurrence, trigger);
+                  }),
+              }),
+            );
         },
         { discard: true },
       );

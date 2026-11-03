@@ -7,11 +7,10 @@ import { Effect, Fiber, Layer } from "effect";
 
 import { ServerConfig } from "@/infra/config.ts";
 import { gitInEnv, gitSync, projectsDir, repo, write } from "@/testing/git.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { untilGot as until } from "@/testing/until.ts";
+import { testConfig, untilGot as until } from "@/testing/layers.ts";
 
 import { Project, activityOf, countsOf, githubRepository, type GitHubRun, type ProjectHooks, projectProblem, tokeiArgs } from "./project.ts";
-import { type MergeFailure } from "./shapes.ts";
+import { type MergeFailure } from "./workplace.ts";
 
 /** gh is not installed. */
 export const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
@@ -97,7 +96,7 @@ describe("projects", () => {
     ).pipe(Effect.ensuring(Effect.sync(putBack)));
   });
 
-  it.effect("a graph's branch: a step merges into it, it merges into main", () => {
+  it.effect("a parent issue's branch: a child merges into it, it merges into main", () => {
     const root = projectsDir();
     return projects(
       root,

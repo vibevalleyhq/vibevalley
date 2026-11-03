@@ -83,7 +83,7 @@ export interface Agent<A> {
   readonly prompt: (messages: readonly AgentMessage<A>[]) => Effect.Effect<void, AgentBusy>;
   /** Starts a run from the transcript as it is (its last message the user's or a tool's), or from a queued line. */
   readonly continue: Effect.Effect<void, AgentBusy | CannotContinue>;
-  /** Taken before the next turn of the run under way, one a turn. */
+  /** Taken before the next turn of the run under way, with every line waiting at that step boundary. */
   readonly steer: (message: AgentMessage<A>) => Effect.Effect<void>;
   /** Taken when the run would stop, one at a time. */
   readonly followUp: (message: AgentMessage<A>) => Effect.Effect<void>;
@@ -118,6 +118,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
     const reasoning = options.thinkingLevel && options.thinkingLevel !== "off" ? options.thinkingLevel : undefined;
 
     const takeOne = (q: Ref.Ref<readonly AgentMessage<A>[]>) => Ref.modify(q, (all) => [all.slice(0, 1), all.slice(1)] as const);
+    const takeAll = (q: Ref.Ref<readonly AgentMessage<A>[]>) => Ref.getAndSet(q, []);
 
     const emit = (event: AgentEvent<A>) =>
       Effect.gen(function* () {
@@ -304,7 +305,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
       Effect.gen(function* () {
         let asked: readonly AgentMessage<A>[] = context;
         // A run started from a steered line does not take another before its first request.
-        let pending = steered ? [] : yield* takeOne(steering);
+        let pending = steered ? [] : yield* takeAll(steering);
         let first = true;
         let continuing = false;
         outer: while (true) {
@@ -314,7 +315,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
           // oxlint-disable-next-line oxc/no-accumulating-spread -- see above.
           while (more || pending.length > 0) {
             if (!first) {
-              if (pending.length === 0) pending = yield* takeOne(steering);
+              if (pending.length === 0) pending = yield* takeAll(steering);
               yield* options.onEvent({ type: "turn_start" });
             }
             first = false;
@@ -358,7 +359,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
             yield* options.onEvent({ type: "turn_end", message, toolResults: results });
             if (decision === "end") return;
             continuing = decision === "continue";
-            pending = yield* takeOne(steering);
+            pending = yield* takeAll(steering);
             if (more || pending.length > 0) continuing = false;
           }
           const later = yield* takeOne(followUps);
@@ -434,7 +435,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
         const last: unknown = all.at(-1);
         if (last === undefined) return yield* new CannotContinue({ message: "No messages to continue from" });
         if (Predicate.hasProperty(last, "role") && last.role === "assistant") {
-          const steered = yield* takeOne(steering);
+          const steered = yield* takeAll(steering);
           if (steered.length > 0) return yield* start(steered, true);
           const later = yield* takeOne(followUps);
           if (later.length > 0) return yield* start(later);

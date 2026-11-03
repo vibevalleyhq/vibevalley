@@ -26,6 +26,11 @@ interface Rule {
 
 const RULES: readonly Rule[] = [
   {
+    name: "a fact split from sessionPhase or gameProgress",
+    pattern: /\b(FactHired|FactLeft|FactRun|FactDoing|FactStation|FactCommits|FactProgress)\b/u,
+    says: "a run or a step is sessionPhase (brief, phase.doing); a station, commits or the ledger is gameProgress",
+  },
+  {
     name: "a toggle, now an explicit set",
     pattern: /\b(reaction|pin|archive)\.toggle\b|\bReactionToggle\b|\/(reaction|pin|archive)\/toggle\b/u,
     says: "a retried toggle undoes itself; send the value the owner asked for: channel.reaction.set, channel.pin.set, channel.archive.set ({ on })",
@@ -49,10 +54,9 @@ const RULES: readonly Rule[] = [
     except: /^apps\/server\/src\/(agent\/brain\/(compaction|agent|.*\.test)\.ts|runtime\/runtime\.ts)$/u,
   },
   {
-    name: "a task graph's task under its old name",
-    pattern:
-      /\b(StepState|StepAction|StepEdit|StepActRequest|StepFieldChange|IssueStep|SessionTask|ReadySteps|CanEditStep|step_action|task_step|StepDraft\w*|stepNext|stepFailed|actOnStep|stepIssues|stepTone)\b|\/steps\/\{/u,
-    says: "a task graph is TaskGraph (graph.*, GraphState, IssueGraph, SessionGraph); each of its nodes is a Task (TaskState, TaskAction, TaskEdit, TaskDraft, IssueTask, taskNext, taskFailed, actOnTask, taskIssues, taskTone, graph_task_update, graph_task_act); a step is one event of a trajectory",
+    name: "a task graph under its old name",
+    pattern: /[Tt]ask\s*[Gg]raphs?/u,
+    says: "issues use native parent and blockedBy fields; there is no separate TaskGraph",
   },
   {
     name: "an API path without its version",
@@ -102,10 +106,15 @@ const RULES: readonly Rule[] = [
     says: "CoreState, StateFrame, SideEvent, Agent, Activity, PlayAction (a session play's history), canHarvest, Manager, Session; a Web Worker stays (new Worker)",
   },
   {
-    name: "a helper profile under the worker role",
-    // Playwright's per-worker fixtures ({ scope: "worker" }) and the browser's Worker are not the role.
-    pattern: /(?<!scope: )["'`]worker["'`]|\bagent\.role\.worker\b|\bagent\.list\.workers\b/u,
-    says: 'a profile\'s role is "orchestrator" or "helper" (AgentRoleValues); its words are web.agent.role.helper, web.agent.list.helpers',
+    name: "the old helper agent role",
+    pattern: /\brole\s*(?::|===?|!==?)\s*["'`]helper["'`]|\bagent\.role\.helper\b/u,
+    says: 'an agent role is "orchestrator" or "worker" (AgentRoleValues); its words are web.agent.role.worker',
+  },
+  {
+    name: "channel-owned delivery storage",
+    pattern: /\bchannel_delivery\b/u,
+    says: "mailbox_delivery: delivery belongs to the Mailbox module",
+    dirs: ["apps/server/src"],
   },
   {
     name: "an old home file or its mover",
@@ -162,11 +171,31 @@ const RULES: readonly Rule[] = [
     says: "WorkspaceState, emptyWorkspaceState; Core is the service that holds it",
   },
   {
-    name: "an issue's attention under the standing name",
+    name: "an issue's stage under the standing name",
     pattern: /\b(Standing|StandingValues|IssueStanding|standingLabel|standingOf|standingIn|standingTone|standingWantsOwner)\b|\.standing\b/u,
-    says: "Attention, IssueAttention, attentionLabel, attentionOf, attentionIn; an achievement's standing (AchievementStanding) stays",
+    says: "IssueStageKind, IssueStage, issueStageOf, issueStageIn; an achievement's standing (AchievementStanding) stays",
     // The achievements panel's standings are an achievement's tier.
     except: /^apps\/web\/src\/farm\/panels\/Achievements\.tsx$/u,
+  },
+  {
+    name: "an issue's stage under the attention type name",
+    pattern: /\b(Attention|AttentionValues|IssueAttention|attentionOf|attentionIn|attentionWantsOwner|attentionTone)\b|\.attention\b|shared\.attention/u,
+    says: "Issue.stage, IssueStage, IssueStageKind, issueStageOf, issueStageIn, stageWantsOwner, stageTone and shared.stage",
+  },
+  {
+    name: "issue responsibility and executions under flattened fields",
+    pattern: /\bassignee\b|Issue\.sessions\b|issue\.assignment\.list/u,
+    says: "Issue.assignments is the responsibility and execution history; inputs name an agent; use assignedAgentOf, sessionIdsOf or latestSessionIdOf when a projection is needed",
+  },
+  {
+    name: "issue execution links without responsibility assignments",
+    pattern: /\bIssueSessions\b|(?:generated|queries)\/issue_session\.sql\b|issue_assignment_session/u,
+    says: "Assignment and issue_assignment hold responsibility; issue_assignment_execution records its execution contexts (docs/subsystems/issue.md)",
+  },
+  {
+    name: "direct conversations backed by hidden issues",
+    pattern: /\b(talkWith|linkTalk|talkOf)\b|\bIssue\.talk\b/u,
+    says: "Channel.direct opens the conversation; its Session uses a channel context without an issue or assignment (docs/subsystems/channel.md)",
   },
   {
     name: "an issue's refinement under the draft name",
@@ -201,7 +230,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a word list for an issue's or a session's state outside the protocol's rules",
     pattern:
-      /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|Attention|IssueAct|Delivery|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/u,
+      /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|IssueStageKind|IssueAct|Delivery|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/u,
     says: "the shared catalog's words (packages/i18n/locales/*/shared.json: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
     except: /^packages\/protocol\/src\/rules\//u,
   },
@@ -330,14 +359,20 @@ const RULES: readonly Rule[] = [
     says: 'a service is a class with its interface inline and its layer static (node_modules/effect/AGENTS.md): class Issue extends Context.Service<Issue, { … }>()("vibevalley/Issue") { static readonly layer = … }; its type is Issue["Service"]',
     // Projection's interface is core's and its implementation the projection module's, above it (foundation.md): its layer
     // cannot sit on the class.
-    except: /^apps\/server\/src\/projection\/projection\.ts$/u,
+    except: /^apps\/server\/src\/projection\/frame\.ts$/u,
   },
   {
     name: "a service under a plural name",
     pattern:
       /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Projects|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Projects|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,
-    says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Issue, Memory, Project, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/store.ts, makeMemoryStore) and BlockStore (makeBlockStore, BlockStoreOptions) (docs/style/naming.md)',
+    says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Executor, Issue, Memory, Project, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)',
     dirs: ["apps/server/src"],
+  },
+  {
+    name: "a module under its retired grab-bag or metaphor filename",
+    pattern:
+      /["'`](?:\.\.?\/|@\/)(?:channel\/(?:chat|folded|model)|mailbox\/chat|session\/(?:takeIn|shapes)|farm\/support|base\/util|ui\/richRules|project\/shapes|testing\/(?:helper|until|issues|said|agents)|farm\/world\/places|features\/voice\/(?:agora|moss)|features\/channel\/(?:emoji|feed|switcher|draft)|features\/issue\/(?:lanes|rows|queries)|features\/artifact\/queries|memory\/store|artifact\/spans|tool\/(?:cron|memory|channel|definition)|infra\/live|state\/latest)(?:\.tsx?)?["'`]/u,
+    says: "channel/channel.ts, channel/messages.ts, channel/rooms.ts, mailbox/envelope.ts, session/briefing.ts, farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts, project/workplace.ts, session/signals.ts, features/issue/{history,cards}.ts, features/artifact/ArtifactCard.tsx, testing/{worker,layers,world}.ts, farm/world/world.ts, features/voice/{call,mossLine}.ts, features/channel/{EmojiPicker.tsx,places.ts,composing.ts}, memory/memory.ts, artifact/ops.ts, tool/{tool,schemas}.ts, infra/frame.ts, state/atom.ts",
   },
 ];
 

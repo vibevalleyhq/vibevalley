@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 const scripted: Agent = {
   id: "",
   name: "fox",
-  role: "helper",
+  role: "worker",
   duty: "",
   enabled: true,
   runtime: "pi",
@@ -33,7 +33,7 @@ const scripted: Agent = {
 async function handBack(api: VibeValleyApi, project: string) {
   const fox = await api.agent.create(scripted);
   await api.project.create({ name: project });
-  const issue = await api.issue.create({ title: commits, assignee: fox.id, project });
+  const issue = await api.issue.create({ title: commits, agent: fox.id, project });
   await api.issue.status.update({ id: issue.id, status: "todo" });
   await handedBack(api, issue.id, 20_000);
   return issue.id;
@@ -47,7 +47,7 @@ const anotherRound = "发呆 then check it";
 
 const handedBack = (api: VibeValleyApi, id: string, timeout?: number) =>
   expect
-    .poll(async () => (await api.issue.get({ id })).attention.acts.map((a) => a.act), timeout != null && timeout !== 0 ? { timeout } : {})
+    .poll(async () => (await api.issue.get({ id })).stage.acts.map((a) => a.act), timeout != null && timeout !== 0 ? { timeout } : {})
     .toContain("complete");
 
 async function bed(page: Page) {

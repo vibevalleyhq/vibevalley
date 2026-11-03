@@ -17,7 +17,7 @@ interface GroupCtx {
 
 const GroupContext = createContext<GroupCtx>();
 
-export interface RadioGroupProps extends DivProps {
+interface RadioGroupProps extends DivProps {
   value?: string | undefined;
   defaultValue?: string | undefined;
   onValueChange?: ((value: string) => void) | undefined;
@@ -75,7 +75,7 @@ export function RadioGroup(props: RadioGroupProps) {
 
 const RadioContext = createContext<() => boolean>(() => false);
 
-export interface RadioRootProps extends ButtonProps {
+interface RadioRootProps extends ButtonProps {
   value: string;
 }
 

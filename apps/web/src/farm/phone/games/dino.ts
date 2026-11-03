@@ -1,7 +1,7 @@
 // 小恐龙: a run is a value and `run` moves it on by some milliseconds. Sizes are the game's own
 // pixels on a 104×40 strip, y down; a seed replays.
 
-import { nextRandom } from "./random";
+import { nextRandom } from "@/farm/phone/lcd";
 
 export const dinoWidth = 104;
 export const dinoHeight = 40;
@@ -11,7 +11,7 @@ const dinoX = 8;
 const dinoRunSize = { w: 12, h: 14 } as const;
 const dinoDuckSize = { w: 16, h: 8 } as const;
 
-export type ObstacleKind = "cactus" | "cacti" | "bird";
+type ObstacleKind = "cactus" | "cacti" | "bird";
 
 export interface Obstacle {
   readonly kind: ObstacleKind;

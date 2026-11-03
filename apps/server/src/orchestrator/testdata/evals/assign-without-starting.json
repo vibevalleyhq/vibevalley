@@ -2,20 +2,13 @@
   "id": "assign-without-starting",
   "createdAt": 1792270980000,
   "model": "deepseek-flash",
-  "want": "主人说这张让 Codex 做、先别开始，管家却开工了。应该记下并写上 assignee，不开工。",
+  "want": "主人说这张让 Codex 做、先别开始，管家却开工了。应该记下并写上 agent，不开工。",
   "memory": "",
   "tools": [
     "channel_create",
     "channel_list",
     "channel_message_list",
     "channel_update",
-    "graph_act",
-    "graph_get",
-    "graph_list",
-    "graph_split",
-    "graph_task_act",
-    "graph_task_delete",
-    "graph_task_update",
     "issue_comment_create",
     "issue_create",
     "issue_diff_get",
@@ -60,7 +53,7 @@
             "title": "README 补上安装步骤",
             "project": "demo",
             "start": true,
-            "assignee": "codex"
+            "agent": "codex"
           }
         }
       ],

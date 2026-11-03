@@ -12,8 +12,7 @@ import { rpcPath } from "@vibevalley/protocol/rpc";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { app } from "@/http/app.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { until } from "@/testing/until.ts";
+import { testConfig, until } from "@/testing/layers.ts";
 import { quietApp } from "@/testing/world.ts";
 
 import { Lan, remoteMay } from "./lan.ts";

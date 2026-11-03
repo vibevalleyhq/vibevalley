@@ -8,7 +8,7 @@ import type { Agent, Issue, StateFrame, SessionView } from "@vibevalley/protocol
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { buttons, composerOn, defaultChannel, expect, gate, test } from "./fixtures";
+import { buttons, composerOn, defaultChannel, expect, gate, test, withIssueSession } from "./fixtures";
 
 test.use({ farm: "farm-chat" });
 
@@ -34,7 +34,7 @@ const row = (page: Page, id: string) => page.getByTestId("farm-chat").locator(`[
 const scripted: Agent = {
   id: "",
   name: "fox",
-  role: "helper",
+  role: "worker",
   duty: "",
   enabled: true,
   // The test server's pi is the scripted helper (fixtures.ts).
@@ -135,7 +135,7 @@ test("a dispatch note stays inside its column", async ({ page, api }) => {
   const made = await api.issue.create({
     title: "add a make-up clock-in button that asks for a reason and tells the team lead, and keep it inside its column",
     project: project.name,
-    assignee: fox.id,
+    agent: fox.id,
   });
   await api.issue.status.update({ id: made.id, status: "todo" });
   await openFarm(page);
@@ -161,6 +161,7 @@ test("a click on a helper's plot opens its issue: its state, the acts and the fo
   const frame = await firstFrame(server.url);
   const session: SessionView = {
     id: sessionId("w1"),
+    role: "worker",
     name: "fox",
     agent: "fox",
     runtime: "nobody",
@@ -172,21 +173,26 @@ test("a click on a helper's plot opens its issue: its state, the acts and the fo
     phaseText: "",
     issue: made.id,
     lastRun: { outcome: "completed", summary: "done, tests pass", at: Date.now() - 60_000 } as never,
-    play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
   };
   // What the server would say of an issue handed back: it may be completed (done) or canceled.
-  const issue: Issue = {
-    ...made,
-    sessions: [sessionId("w1")],
-    status: "in_review",
-    moves: ["done", "canceled"],
-    criteria: ["still logged in after reopening"],
-    attention: { state: "reviewing", since: Date.now() - 60_000, lead: "complete", acts: buttons("complete", "reject", "tell", "close") },
-  };
+  const issue: Issue = withIssueSession(
+    {
+      ...made,
+      status: "in_review",
+      moves: ["done", "canceled"],
+      criteria: ["still logged in after reopening"],
+      stage: { state: "reviewing", since: Date.now() - 60_000, lead: "complete", acts: buttons("complete", "reject", "tell", "close") },
+    },
+    sessionId("w1"),
+  );
   const fixture: StateFrame = {
     ...frame,
     state: { ...frame.state, sessions: [session], issues: [issue] },
-    view: { ...frame.view, plots: { [made.id]: { crop: "wheat" } } },
+    view: {
+      ...frame.view,
+      plots: { [made.id]: { crop: "wheat" } },
+      plays: { w1: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } },
+    },
   };
   await page.route("**/api/v1/state", (route) =>
     route.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: `data: ${JSON.stringify(fixture)}\n\n` }),

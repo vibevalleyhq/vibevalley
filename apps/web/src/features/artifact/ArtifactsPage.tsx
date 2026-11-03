@@ -6,8 +6,8 @@ import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type Artifact, type ArtifactVersion, artifactPath, type SayRequest } from "@vibevalley/protocol";
 
+import { Keyed, useNow } from "@/base/dom";
 import { ago } from "@/base/format";
-import { Keyed, useNow } from "@/base/util";
 import { api, reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { queries, ready } from "@/infra/query";
@@ -17,17 +17,16 @@ import { type IntentType, sendOnce, useIntents } from "@/state/intent";
 import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
-import { Empty } from "@/ui/Empty";
 import { TextArea } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
+import { Empty } from "@/ui/layout";
 import { type MoreItem, MoreMenu } from "@/ui/MoreMenu";
 import { Tag } from "@/ui/Tag";
 import { toast } from "@/ui/toasts";
 
-import { bodyIcon, bodyLabel } from "./ArtifactCard";
+import { artifactHref, bodyIcon, bodyLabel, useArtifact, useArtifacts } from "./ArtifactCard";
 import { BlocksView } from "./BlocksView";
 import type { BlockEditor } from "./editor";
-import { artifactHref, useArtifact, useArtifacts } from "./queries";
 
 /** What a page in the frame may do: run its scripts and open links in a tab of their own. Never allow-same-origin: it
  * would be the farm's own page. The server's header says the same (artifact/policy.ts). */
@@ -42,7 +41,7 @@ const justMade = defineAtom<string | undefined>(undefined);
 /** `rest` is the path after /artifacts/. */
 /** The owner's lines in a channel (features/channel's chatSay), given by app/: the channel feature shows artifacts, so this
  * one does not import it back. */
-export type ChatSay = IntentType<Omit<SayRequest, "sendKey">, void>;
+type ChatSay = IntentType<Omit<SayRequest, "sendKey">, void>;
 
 export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
   const router = useRouter();

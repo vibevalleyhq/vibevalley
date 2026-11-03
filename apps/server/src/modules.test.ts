@@ -39,13 +39,31 @@ const owners: Readonly<Record<string, string>> = {
 };
 
 /** Reads of another module's part that stay, each with why: none. */
-const reads: Readonly<Record<string, string>> = {};
+const reads: Readonly<Record<string, string>> = {
+  "mailbox/mailbox.ts -> issues": "Tier 1 issue reservoir checks the issue's stage and assigned agent synchronously without keeping a second copy of the board",
+};
 
 /** What a file imports from under src, type-only imports too (they tie the modules all the same), as paths from src. */
-const localEdges = (file: string) =>
-  edgesOf(file, readFileSync(file, "utf8")).flatMap(({ from: spec }) =>
+const localEdges = (file: string, source = readFileSync(file, "utf8")) =>
+  edgesOf(file, source).flatMap(({ from: spec }) =>
     spec.startsWith("@/") ? [normalize(spec.slice(2))] : spec.startsWith("./") || spec.startsWith("../") ? [rel(normalize(join(dirname(file), spec)))] : [],
   );
+
+const readsSessionSnapshot = (file: string, source: string) => calls(file, source, "core", "state") && localEdges(file, source).includes("session/roster.ts");
+
+const mailboxProjections: Readonly<Record<string, readonly string[]>> = {
+  "channel.sql.ts": ["defaultID", "orchestratorForChannel", "inboxOf"],
+  "issue.sql.ts": ["issueExists"],
+};
+
+const mailboxQueryViolations = (file: string, source: string) =>
+  edgesOf(file, source).flatMap((edge) => {
+    if (!edge.from.includes("/db/generated/")) return [];
+    const name = edge.from.split("/").at(-1) ?? "";
+    if (name.startsWith("mailbox_") || name === "ingress_trigger.sql.ts") return [];
+    const allowed = mailboxProjections[name] ?? [];
+    return edge.names.filter((symbol) => !allowed.includes(symbol)).map((symbol) => `${name}:${symbol}`);
+  });
 
 describe("the modules", () => {
   it("hold every folder and file under src", () => {
@@ -73,6 +91,24 @@ describe("the modules", () => {
     ).toEqual([]);
   });
 
+  it("keeps Mailbox's foreign queries to named read projections", () => {
+    const found = files(join(src, "mailbox"))
+      .filter((file) => !file.endsWith(".test.ts"))
+      .flatMap((file) => mailboxQueryViolations(file, readFileSync(file, "utf8")).map((query) => `${rel(file)} -> ${query}`));
+    expect(
+      found,
+      "Mailbox imports a query outside its read boundary. Fix: use a named channel/issue projection; keep writes in the owning service and Trigger receipts in Mailbox. See docs/subsystems/mailbox.md",
+    ).toEqual([]);
+  });
+
+  it("regression: namespace imports and foreign writes cannot hide behind a mailbox projection", () => {
+    const file = join(src, "mailbox/mailbox.ts");
+    expect(mailboxQueryViolations(file, 'import { orchestratorForChannel as route } from "../../db/generated/channel.sql.ts";')).toEqual([]);
+    expect(mailboxQueryViolations(file, 'import * as q from "../../db/generated/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
+    expect(mailboxQueryViolations(file, 'import { setOrchestrator } from "../../db/generated/channel.sql.ts";')).toEqual(["channel.sql.ts:setOrchestrator"]);
+    expect(mailboxQueryViolations(file, 'export * from "../../db/generated/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);
+  });
+
   it("keep base pure: it imports nothing else under src", () => {
     const found: string[] = [];
     for (const file of files(join(src, "base"))) {
@@ -94,6 +130,7 @@ describe("the modules", () => {
       const text = readFileSync(file, "utf8");
       const parts = readsOf(file, text, "core", "state");
       if (calls(file, text, "core", "session")) parts.push("sessions");
+      if (readsSessionSnapshot(file, text)) parts.push("sessions");
       for (const part of new Set(parts)) {
         const owner = owners[part];
         if (owner && owner !== moduleOf(from)?.name) found.push(`${from} -> ${part}`);
@@ -107,5 +144,13 @@ describe("the modules", () => {
       Object.keys(reads).filter((r) => !found.includes(r)),
       "a read listed in reads is gone. Fix: drop it from reads. See apps/server/src/modules.test.ts",
     ).toEqual([]);
+  });
+
+  it("regression: session snapshot helpers cannot hide a service's cross-module read", () => {
+    const file = join(src, "issue/issue.ts");
+    expect(readsSessionSnapshot(file, 'import { sessionOf } from "@/session/roster.ts"; const state = core.state(); sessionOf(state, id);')).toBe(true);
+    expect(readsSessionSnapshot(file, 'import { sessionOf } from "../session/roster.ts"; sessionOf(core.state(), id);')).toBe(true);
+    expect(readsSessionSnapshot(file, 'import { sessionOf } from "@/session/roster.ts"; export const rule = (state, id) => sessionOf(state, id);')).toBe(false);
+    expect(readsSessionSnapshot(file, "const state = core.state(); live.sessionOf(id); state.issues.find(item => item.id === id);")).toBe(false);
   });
 });

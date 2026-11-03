@@ -9,7 +9,7 @@ import type { InboxItem, StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { expect, test } from "./fixtures";
+import { expect, test, withIssueSession } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
@@ -60,6 +60,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   const frame = await firstFrame(server.url);
   const session: SessionView = {
     id: sessionId("w1"),
+    role: "worker",
     name: "fox",
     agent: "fox",
     runtime: "nobody",
@@ -71,7 +72,6 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
     phaseText: "",
     issue: made.id,
     lastRun: { outcome: "completed", summary: "done, tests pass", at: Date.now() - 60_000 } as never,
-    play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
   };
   const call: InboxItem = {
     id: "merge-w1-1",
@@ -85,8 +85,12 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   };
   const base: StateFrame = {
     ...frame,
-    state: { ...frame.state, sessions: [session], issues: [{ ...made, sessions: [sessionId("w1")], status: "in_review", moves: ["done", "canceled"] }] },
-    view: { ...frame.view, plots: { [made.id]: { crop: "wheat" } } },
+    state: { ...frame.state, sessions: [session], issues: [withIssueSession({ ...made, status: "in_review", moves: ["done", "canceled"] }, sessionId("w1"))] },
+    view: {
+      ...frame.view,
+      plots: { [made.id]: { crop: "wheat" } },
+      plays: { w1: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } },
+    },
   };
   let served = 0;
   await page.route("**/api/v1/state", (route) => {

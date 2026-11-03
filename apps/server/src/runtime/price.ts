@@ -1,14 +1,19 @@
-// What a run costs: a model's price per million tokens, in dollars, charged in the
-// farm's yuan. VibeValley's own agent and DeepSeek Harness are priced by the farm's models (ai/models.ts); pi by pi-ai's
-// built-in list, which is pi's own. No other runtime is priced.
+// What a run costs and what each runtime spent today: a model's price per million tokens, in dollars, charged in the
+// farm's yuan, and the running total for the day kept in the database. VibeValley's own agent and DeepSeek Harness are
+// priced by the farm's models (ai/models.ts); pi by pi-ai's built-in list, which is pi's own. No other runtime is priced.
 
 import { getBuiltinModel, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
+import { Clock, Effect, Fiber, Queue, Semaphore } from "effect";
 
 import { getModel } from "@vibevalley/ai/models";
 
+import { Db } from "@/infra/db.ts";
+import { bestEffort } from "@/infra/log.ts";
+
+import * as q from "../../db/generated/runtime_spend.sql.ts";
 import type { PiDefault } from "./pi.ts";
 
-export interface Price {
+interface Price {
   readonly input: number;
   readonly output: number;
   readonly cacheRead: number;
@@ -85,3 +90,72 @@ export function price(runtime: string, model: string, pi: PiDefault): Price | un
   }
   return undefined;
 }
+
+const dayOf = (at: number) => {
+  const date = new Date(at);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
+export const spending = Effect.gen(function* () {
+  const db = yield* Db;
+  const clock = yield* Clock.Clock;
+  let day = dayOf(yield* Clock.currentTimeMillis);
+  let today: Record<string, number> = Object.fromEntries((yield* db.run(q.spendForDay({ day }))).map((row) => [row.runtime, row.cny]));
+  const pending = new Map<string, q.AddSpendParams>();
+  const changed = yield* Queue.sliding<void>(1);
+  const serial = yield* Semaphore.make(1);
+  let closed = false;
+
+  const tally = () => {
+    const now = dayOf(clock.currentTimeMillisUnsafe());
+    if (now !== day) {
+      day = now;
+      today = {};
+    }
+    return today;
+  };
+
+  const flush = Effect.gen(function* () {
+    if (pending.size === 0) return;
+    const batch = [...pending.entries()];
+    yield* db.inTx(Effect.forEach(batch, ([, delta]) => db.run(q.addSpend(delta)), { discard: true }));
+    for (const [key, delta] of batch) {
+      const current = pending.get(key);
+      if (!current) continue;
+      const remaining = current.cny - delta.cny;
+      if (remaining > 0) pending.set(key, { ...current, cny: remaining });
+      else pending.delete(key);
+    }
+  }).pipe(Effect.uninterruptible, serial.withPermits(1));
+
+  const writer = yield* Effect.forkScoped(
+    Effect.forever(
+      Effect.gen(function* () {
+        yield* Queue.take(changed);
+        yield* Effect.sleep(1000);
+        yield* flush.pipe(bestEffort("runtime: daily spending was not saved"));
+        if (!closed && pending.size > 0) Queue.offerUnsafe(changed, undefined);
+      }),
+    ),
+  );
+  yield* Effect.addFinalizer(() =>
+    Effect.gen(function* () {
+      closed = true;
+      yield* Fiber.interrupt(writer);
+      yield* flush.pipe(bestEffort("runtime: final daily spending was not saved"));
+    }),
+  );
+
+  return {
+    tally,
+    spend: (runtime: string, cny: number) => {
+      if (closed || !Number.isFinite(cny) || cny <= 0) return false;
+      tally()[runtime] = (today[runtime] ?? 0) + cny;
+      const key = `${day}:${runtime}`;
+      const prior = pending.get(key);
+      pending.set(key, { day, runtime, cny: (prior?.cny ?? 0) + cny });
+      Queue.offerUnsafe(changed, undefined);
+      return true;
+    },
+  };
+});

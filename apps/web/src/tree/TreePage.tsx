@@ -10,8 +10,8 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
+import { useNow, useViewport } from "@/base/dom";
 import { ago } from "@/base/format";
-import { useNow, useViewport } from "@/base/util";
 import { useRouter, useSearch } from "@/infra/router";
 import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";

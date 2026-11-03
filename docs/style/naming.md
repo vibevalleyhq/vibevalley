@@ -43,7 +43,7 @@
 | `issue.list`、`project.list`（返回好几个） | 管一张表的存取对象 `Memory`（写 `MemoryStore`） |
 | `runsOf(session)`、`questionsOf(issue)`（返回好几个） | 只放一样东西的文件 `memories.ts`（写 `store.ts`） |
 | 一个数：`maxTasks`、`keepClosedIssues`、`autoRetries` | 返回一样东西的函数用复数名 |
-| 在内存里装着一组的：`Deliveries`、`IssueSessions`、`Trajectories` | |
+| 在内存里装着一组的：`Assignments`、`Deliveries`、`Trajectories` | |
 
 几个有名字的取值拼成的一份（`HireOptions`、`BoardProps`、`VoiceSettings`、`RuntimeFacts`）照英语的习惯用复数：它确实是好几项。用语表里本身就是复数的词照用语表（`Changes` 是「改动」：一个分支上的提交和文件）。以 s 结尾的单数词（`Status`、`Progress`、`Alias`）是单数。
 

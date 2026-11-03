@@ -1,15 +1,10 @@
-// What is waiting on the owner: the inbox the phone rings with, and what the
-// orchestrator's patrol reads; each item worded for every route the owner hears it on (the phone, the system notice, the
-// tray, the call), so a kind added to InboxKind is worded once, here. A graph's own sessions leave their finished, failed and conflicted work to the graph, which
-// questions in their place; a quiet one still questions.
-
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { needOf, omitUndefined, cut, oneLine, slice } from "@vibevalley/protocol/rules";
+import { everyone, ownerId, type Notify } from "@vibevalley/protocol";
+import { latestSessionIdOf, needOf, omitUndefined, cut, oneLine, slice } from "@vibevalley/protocol/rules";
 
 import { clip } from "@/base/clip.ts";
-import { defaultOf } from "@/channel/folded.ts";
-import { graphsOf } from "@/task/issues.ts";
+import { defaultOf } from "@/channel/messages.ts";
 
 import { patrolBrief, patrolWho } from "./prompts.ts";
 
@@ -19,6 +14,21 @@ export interface InboxEntry {
   readonly channel?: string;
   readonly since?: number;
   readonly brief: string;
+}
+
+export function forOwner(m: T.ChatMessage, notify: Notify = "all"): boolean {
+  if (m.from === ownerId || notify === "none") return false;
+  if (notify === "mentions") return m.mentions.includes(ownerId) || m.mentions.includes(everyone);
+  switch (m.kind) {
+    case "report":
+    case "dispatch":
+      return true;
+    case "chat":
+      return m.fromKind === "orchestrator" || m.mentions.includes(ownerId) || m.mentions.includes(everyone);
+    case "notice":
+      break;
+  }
+  return false;
 }
 
 /** Newest first; items of the same moment in the order they are gathered. */
@@ -40,8 +50,9 @@ function gathered(state: T.WorkspaceState): Unworded[] {
   // The channel is the session's or the default one; a farm without channels has neither.
   const push = (e: Omit<Unworded, "channel"> & { readonly channel: string | undefined }) => out.push(omitUndefined(e));
   for (const h of state.sessions) {
+    if (h.role === "orchestrator") continue;
     const want = wantOf(h, state);
-    if (!want || (h.graph && want.kind !== "quiet")) continue;
+    if (!want) continue;
     const channel = h.channel ?? general;
     const from: T.InboxFrom = { kind: "session", id: h.id, name: h.name, agent: h.agent };
     const target = { kind: "session", id: h.id } as const;
@@ -84,7 +95,7 @@ function gathered(state: T.WorkspaceState): Unworded[] {
         });
         break;
       case "conflict": {
-        const files = (h.conflict?.files ?? []).length;
+        const files = (state.issues.find((issue) => issue.id === h.issue)?.conflict?.files ?? []).length;
         push({
           item: { id: `${h.id}:conflict:${h.runs}`, kind: "conflict", from, text: t("server.inbox.conflictFiles", { files }), at, target },
           channel,
@@ -106,49 +117,27 @@ function gathered(state: T.WorkspaceState): Unworded[] {
   }
 
   const orchestrator: T.InboxFrom = { kind: "orchestrator" };
-  for (const graph of graphsOf(state)) {
-    const target = { kind: "graph", graph: graph.id } as const;
-    switch (graph.state) {
-      case "draft":
-        push({
-          item: { id: graph.id + ":draft", kind: "graph-draft", from: orchestrator, text: cut(graph.title, 40), at: graph.createdAt, target },
-          channel: general,
-          brief: patrolBrief.graphDraft(graph.title, graph.id),
-        });
-        break;
-      case "ready":
-        push({
-          item: { id: graph.id + ":ready", kind: "graph-ready", from: orchestrator, text: cut(graph.title, 40), at: graph.createdAt, target },
-          channel: general,
-          brief: patrolBrief.graphReady(graph.title, graph.id),
-        });
-        break;
-      case "running":
-      case "paused":
-        for (const task of graph.tasks) {
-          if (task.state !== "failed") continue;
-          // A step retried and failed again asks again: from its second failure the id counts them.
-          const failures = task.failures ?? 0;
-          const id = graph.id + ":failed:" + task.id + (failures > 1 ? `:${failures}` : "");
-          push({
-            item: {
-              id,
-              kind: "task-failed",
-              from: orchestrator,
-              text: cut(t("server.inbox.step", { graph: graph.title, step: task.title }), 40),
-              at: graph.createdAt,
-              target,
-            },
-            channel: general,
-            brief: patrolBrief.taskFailed(graph.title, graph.id, task.id, task.title, task.conclusion ? slice(task.conclusion, 0, 80) : ""),
-          });
-        }
-        break;
-      case "abandoned":
-      case "done":
-      case "splitting":
-        break;
-    }
+  for (const issue of state.issues) {
+    const conflicted = issue.stage.state === "stuck" && issue.stage.stuck === "conflict";
+    if (issue.stage.state !== "reviewing" && !conflicted) continue;
+    const session = latestSessionIdOf(issue);
+    if (session && state.sessions.some((item) => item.id === session)) continue;
+    const children = state.issues.filter((item) => item.parent === issue.id);
+    if (children.length === 0) continue;
+    const at = Math.max(issue.createdAt, ...children.map((item) => item.closedAt ?? item.createdAt));
+    push({
+      item: {
+        id: `${issue.id}:${conflicted ? "conflict" : "review"}:${at}`,
+        kind: conflicted ? "conflict" : "review",
+        from: orchestrator,
+        text: cut(issue.title, 40),
+        at,
+        target: { kind: "issue", id: issue.id },
+      },
+      channel: general,
+      since: at,
+      brief: conflicted ? patrolBrief.conflict(issue.title, issue.conflict?.files.length ?? 0) : patrolBrief.review(issue.title, `vv://issue/${issue.id}`),
+    });
   }
 
   for (const sc of state.crons) {
@@ -185,10 +174,10 @@ type Want =
   | { readonly kind: "review" | "fix" | "interrupted" | "conflict" }
   | { readonly kind: "quiet"; readonly since: number };
 
-/** What a session questions of the owner. Its issue's attention says it, the one the issue page and the phone both read; a
+/** What a session questions of the owner. Its issue's stage says it, the one the issue page and the phone both read; a
  * session whose issue the state does not hold says it by its phase. */
 function wantOf(h: T.Session, state: T.WorkspaceState): Want | undefined {
-  const issue = h.issue === undefined ? undefined : state.issues.find((item) => item.id === h.issue && item.sessions.at(-1) === h.id);
+  const issue = h.issue === undefined ? undefined : state.issues.find((item) => item.id === h.issue && latestSessionIdOf(item) === h.id);
   if (!issue) {
     const need = needOf(h);
     switch (need?.kind) {
@@ -205,11 +194,12 @@ function wantOf(h: T.Session, state: T.WorkspaceState): Want | undefined {
         return { kind: "quiet", since: need.since };
     }
   }
-  const st = issue.attention;
+  const st = issue.stage;
   switch (st.state) {
     case "asking":
       return { kind: "ask", questions: issue.questions };
     case "reviewing":
+      if (issue.parent) return undefined;
       return { kind: "review" };
     case "stuck":
       switch (st.stuck) {
@@ -273,27 +263,6 @@ function inboxWords(kind: T.InboxKind, who: string, text: string): T.InboxWords 
         title: t("server.inbox.item.quiet.title", { who }),
         body: t("server.inbox.item.quiet.body"),
         tray: t("server.inbox.item.quiet.tray", { who }),
-      };
-    case "graph-draft":
-      return {
-        label: t("server.inbox.item.graph-draft.label"),
-        title: t("server.inbox.item.graph-draft.title", { text }),
-        body: t("server.inbox.item.graph-draft.body"),
-        tray: t("server.inbox.item.graph-draft.tray", { text }),
-      };
-    case "graph-ready":
-      return {
-        label: t("server.inbox.item.graph-ready.label"),
-        title: t("server.inbox.item.graph-ready.title", { text }),
-        body: t("server.inbox.item.graph-ready.body"),
-        tray: t("server.inbox.item.graph-ready.tray", { text }),
-      };
-    case "task-failed":
-      return {
-        label: t("server.inbox.item.task-failed.label"),
-        title: t("server.inbox.item.task-failed.title", { text }),
-        body: t("server.inbox.item.task-failed.body"),
-        tray: t("server.inbox.item.task-failed.tray", { text }),
       };
     case "mention":
       return { label: t("server.inbox.item.mention.label"), title: t("server.inbox.item.mention.title", { who }), body: text, tray: "" };

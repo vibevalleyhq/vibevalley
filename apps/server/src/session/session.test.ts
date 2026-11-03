@@ -4,25 +4,27 @@ import { join } from "node:path";
 import type { Session as RuntimeSession } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Cause, Clock, Effect, Exit, Fiber, Semaphore, Stream } from "effect";
+import { Cause, Clock, Effect, Exit, Fiber, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
 import type * as T from "@vibevalley/protocol";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
-import type { LaunchActivity } from "@/channel/chat.ts";
+import type { LaunchActivity } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
+import { watchStalls } from "@/executor/executor.ts";
 import { Project } from "@/project/project.ts";
-import { MergeFailure } from "@/project/shapes.ts";
+import { MergeFailure } from "@/project/workplace.ts";
 import { gitIn } from "@/testing/git.ts";
-import { starter, testConfig } from "@/testing/layers.ts";
-import { until, waitFor } from "@/testing/until.ts";
+import { starter, testConfig, until, waitFor } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 
-import { NotRecorded, Session, type SessionsInside, watchStalls } from "./session.ts";
+import { NotRecorded, Session } from "./session.ts";
+import type { DeliveryInput } from "./signals.ts";
 const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
+const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byOwnerComment: false });
 
 /** A helper that writes a file, commits it and reports, as the farm's rules ask. */
 const worker = (turns: ScriptedTurn[]) =>
@@ -36,7 +38,7 @@ const worker = (turns: ScriptedTurn[]) =>
         gitIn(turn.options.cwd, "-c", "user.name=w", "-c", "user.email=w@x", "commit", "-qm", `做完第 ${turns.length} 轮`);
         return "ok";
       });
-      turn.say(`改好了。\n\n记住：这个项目用 pnpm test\n\n结论：做完了第 ${turns.length} 轮`);
+      turn.say(`做完了第 ${turns.length} 轮`);
     },
   });
 
@@ -66,7 +68,9 @@ describe("sessions", () => {
     return Effect.gen(function* () {
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
-      const sending = yield* Effect.forkChild(sessions.send(lab(), "interrupted", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true }));
+      const sending = yield* Effect.forkChild(
+        sessions.send(lab(), "interrupted", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true }),
+      );
       yield* Effect.promise(() => opening);
       const interrupting = yield* Effect.forkChild(Fiber.interrupt(sending));
       yield* Effect.yieldNow;
@@ -74,7 +78,7 @@ describe("sessions", () => {
       yield* Fiber.join(interrupting);
       expect(disposed).toBe(1);
       expect(sessions.noRoom("pi", "demo")).toBe("");
-      const again = yield* sessions.send(lab(), "again", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
+      const again = yield* sessions.send(lab(), "again", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
       expect(again.session).toBeDefined();
       expect(again.refused).toBeUndefined();
     }).pipe(Effect.scoped, Effect.provide(world({ config: testConfig(), runtimes: [runtime], repos: ["demo"] })));
@@ -102,11 +106,11 @@ describe("sessions", () => {
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
-      const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
+      const sent = yield* sessions.send(lab(), "first run", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
       yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.failedCheck("fix next time"))));
-      expect((yield* sessions.deliver(id, "resume the work", { kind: "comment" })).kind).toBe("run");
+      expect((yield* sessions.deliver(id, "resume the work", delivery({ kind: "comment" }))).kind).toBe("run");
       yield* until(() => phase(core, id) === "done" && core.session(id)?.lastRun?.summary === "做完了第 3 轮", "the fallback report");
       expect(opens).toBe(3);
       expect(sessions.noRoom("pi", "demo")).toBe("");
@@ -164,16 +168,16 @@ describe("sessions", () => {
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
-      const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
+      const sent = yield* sessions.send(lab(), "first run", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
       yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.failedCheck("fix next time"))));
-      const resumed = yield* sessions.deliver(id, "resume the work", { kind: "comment" });
+      const resumed = yield* sessions.deliver(id, "resume the work", delivery({ kind: "comment" }));
       expect(resumed.kind).toBe("refused");
       expect(JSON.stringify(resumed)).toContain("did not stop");
       expect(opens).toBe(2);
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
-      expect((yield* sessions.deliver(id, "do not start again", { kind: "comment" })).kind).toBe("refused");
+      expect((yield* sessions.deliver(id, "do not start again", delivery({ kind: "comment" }))).kind).toBe("refused");
       expect(opens).toBe(2);
     }).pipe(
       Effect.scoped,
@@ -206,10 +210,10 @@ describe("sessions", () => {
       yield* Effect.addFinalizer(() => Effect.promise(() => cleanup()));
       const sessions = yield* Session;
       const core = yield* Core;
-      const sent = yield* sessions.send(lab(), "work", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
+      const sent = yield* sessions.send(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the report");
-      const before = sessions.find(id)!;
+      const before = { lastText: sessions.lastTextOf(id), cwd: sessions.cwdOf(id)! };
       for (let n = 0; n < 2; n++) {
         const result = yield* Effect.result(
           sessions.handOver(id, "merged", () =>
@@ -221,8 +225,8 @@ describe("sessions", () => {
         );
         expect(result._tag).toBe("Failure");
         expect(JSON.stringify(result)).toContain("did not stop");
-        expect(sessions.find(id)?.lastText).toBe(before.lastText);
-        expect(existsSync(before.place.cwd)).toBe(true);
+        expect(sessions.lastTextOf(id)).toBe(before.lastText);
+        expect(existsSync(before.cwd)).toBe(true);
       }
       expect(used).toBe(false);
       expect(closes).toBe(1);
@@ -237,7 +241,10 @@ describe("sessions", () => {
       const seen: LaunchActivity[] = [];
       const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.launches, (a) => Effect.sync(() => seen.push(a))));
 
-      const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
+      const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", {
+        context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
+        worktree: true,
+      });
       const id = hired.session!.id;
       expect(id).toBe("w1");
       yield* until(() => phase(core, id) === "done", "the first run's report");
@@ -248,22 +255,23 @@ describe("sessions", () => {
         id,
       );
       expect(turns[0]!.input).toContain("给打卡接口加分页");
-      expect(turns[0]!.options.cwd).toBe((sessions as SessionsInside).place(id)!.cwd);
+      expect(turns[0]!.options.cwd).toBe(sessions.cwdOf(id));
 
       const events = (yield* sessions.events(id)) ?? [];
       expect(events.map((e) => e.type)).toEqual(
         expect.arrayContaining(["run/start", "user/message", "tool/call", "tool/result", "assistant/message", "run/end"]),
       );
       // The run's end is written just after the report's fact.
-      const runs = yield* waitFor(sessions.runs("i1"), (rs) => rs[0]?.outcome !== undefined, "the run's end written");
+      const runs = yield* waitFor(sessions.issueRuns("i1"), (rs) => rs[0]?.outcome !== undefined, "the run's end written");
       expect(runs.map((r) => [r.triggeredBy.kind, r.outcome])).toEqual([["issue", "completed"]]);
-      expect((sessions as SessionsInside).currentRun(id)).toBe("");
+      expect(sessions.runOf(id)).toBeUndefined();
 
-      const told = yield* sessions.tell(id, "再加个测试", { kind: "comment", message: "m1" });
-      expect(told).toBe("老实人 开始新的一轮".replace("老实人", session.name));
+      const told = yield* sessions.deliver(id, "再加个测试", delivery({ kind: "comment", message: "m1" }, ["m1"]));
+      expect(told).toMatchObject({ kind: "run" });
       yield* until(() => core.session(id)?.runs === 2 && phase(core, id) === "done", "the second run");
-      expect((yield* sessions.runs("i1")).map((r) => r.triggeredBy.kind)).toEqual(["issue", "comment"]);
-      expect(seen.some((a) => a.kind === "ended" && a.id === id)).toBe(true);
+      const both = yield* waitFor(sessions.issueRuns("i1"), (rs) => rs.length === 2, "both runs of the issue");
+      expect(both.map((r) => r.triggeredBy.kind)).toEqual(["issue", "comment"]);
+      expect(seen.some((a) => a.kind === "handedOff" && a.id === id)).toBe(true);
 
       const projects = yield* Project;
       const merged = yield* sessions.handOver(id, "merged", (place) => projects.merge(place));
@@ -277,61 +285,65 @@ describe("sessions", () => {
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [worker(turns)], repos: ["demo"] })));
   });
 
-  it.live("a turn asked for holds its room until it is working", () =>
-    Effect.gen(function* () {
+  it.live("a turn asked for holds its room until it is working", () => {
+    const { promise: finish, resolve: complete } = Promise.withResolvers<void>();
+    let opens = 0;
+    let holding = false;
+    const pending: (() => void)[] = [];
+    const base = scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        if (turn.input === "second") await finish;
+        turn.say("done");
+      },
+    });
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        opens++;
+        const session = await base.session(...args);
+        return {
+          ...session,
+          prompt: (input: string, options?: Parameters<RuntimeSession["prompt"]>[1]) => {
+            if (input === "second") holding = true;
+            return session.prompt(input, options);
+          },
+          events: (observer: Parameters<RuntimeSession["events"]>[0], options?: Parameters<RuntimeSession["events"]>[1]) =>
+            session.events((event) => {
+              if (holding) pending.push(() => observer(event));
+              else observer(event);
+            }, options),
+        };
+      },
+    };
+    return Effect.gen(function* () {
       const sessions = yield* Session;
       const core = yield* Core;
-      const s = sessions as SessionsInside;
-      yield* core.apply({
-        type: "hired",
-        session: {
-          id: "w1",
-          name: "w1",
-          agent: "lab",
-          runtime: "pi",
-          brief: "",
-          project: "demo",
-          hiredAt: 0,
-          runs: 0,
-          phase: { _tag: "done" },
-          refining: false,
-        } as T.Session,
-      });
-      const h: Parameters<typeof s.expect>[0] = {
-        id: sessionId("w1"),
-        place: { project: "demo", cwd: "/nowhere" },
-        access: Semaphore.makeUnsafe(1),
-        journal: yield* s.trajectories.openLog("w1"),
-        sess: undefined,
-        oarSessionId: "",
-        lastText: "",
-        tracking: {},
-        launch: "",
-        spoke: false,
-        recalled: new Set(),
-        triggers: [],
-        run: "",
-        heard: [],
-      };
-      s.hands.set("w1", h);
-      s.expect(h, { kind: "comment" });
+      const sent = yield* sessions.send(lab(), "first", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } });
+      const id = sent.session!.id;
+      yield* until(() => phase(core, id) === "done", "the initial report");
+      expect((yield* sessions.deliver(id, "second", delivery({ kind: "comment" }))).kind).toBe("run");
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
-      expect(phase(core, "w1")).toBe("done");
-      expect((yield* Effect.flip(sessions.handOver("w1", "merged", () => Effect.succeed({ text: "", commits: 0 })))) as { _tag: string }).toMatchObject({
-        _tag: "Refused",
-      });
+      expect(phase(core, id)).toBe("done");
+      expect(yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.succeed({ text: "", commits: 0 })))).toMatchObject({ _tag: "Refused" });
       for (const step of ["pending", "started"]) {
         if (step === "started") {
-          yield* core.apply({ type: "run", id: sessionId("w1") });
-          s.unexpect(h);
+          holding = false;
+          for (const deliver of pending.splice(0)) deliver();
+          yield* until(() => phase(core, id) === "working", "the buffered turn started");
         }
-        const got = yield* sessions.send(lab(), "another", "demo", { issue: { id: issueId("i2"), number: 2 } });
-        expect([got.session, got.refused !== undefined, s.hired()]).toEqual([undefined, true, 0]);
+        const got = yield* sessions.send(lab(), "another", "demo", { context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } } });
+        expect([got.session, got.refused !== undefined, opens]).toEqual([undefined, true, 1]);
       }
-      yield* core.apply({ type: "report", questions: [], checks: [], id: sessionId("w1"), outcome: "completed", summary: "", runs: 1 });
+      complete();
+      yield* until(() => phase(core, id) === "done", "the second report");
       expect(sessions.noRoom("pi", "demo")).toBe("");
-    }).pipe(Effect.scoped, Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, repos: ["demo"] }))),
-  );
+    }).pipe(
+      Effect.ensuring(Effect.sync(complete)),
+      Effect.scoped,
+      Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
+    );
+  });
 
   it.effect("stall sleeping and the quiet timestamp use the same clock", () =>
     Effect.gen(function* () {
@@ -379,8 +391,8 @@ describe("sessions", () => {
       const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
       const got = yield* sessions.send(lab(), "another", "demo", {
-        issue: { id: issueId("i2"), number: 2 },
-        hiring: () => Effect.mapError(sql.unsafe("select no_such_column from issue_session"), (cause) => new NotRecorded({ message: cause.message, cause })),
+        context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } },
+        hiring: () => Effect.mapError(sql.unsafe("select no_such_column from issue_assignment"), (cause) => new NotRecorded({ message: cause.message, cause })),
       });
       expect(got.refused).toContain("工单没记下来");
     }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));
@@ -391,11 +403,64 @@ describe("sessions", () => {
     return Effect.gen(function* () {
       const sessions = yield* Session;
       const exit = yield* Effect.exit(
-        sessions.send(lab(), "another", "demo", { issue: { id: issueId("i2"), number: 2 }, hiring: () => Effect.die(new Error("registration bug")) }),
+        sessions.send(lab(), "another", "demo", {
+          context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } },
+          hiring: () => Effect.die(new Error("registration bug")),
+        }),
       );
       expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
-      const next = yield* sessions.send(lab(), "another", "demo", { issue: { id: issueId("i3"), number: 3 } });
+      const next = yield* sessions.send(lab(), "another", "demo", { context: { kind: "issue", issue: { id: issueId("i3"), number: 3 } } });
       expect(next.session).toBeDefined();
     }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));
+  });
+
+  it.live("regression: a registration defect with failed disposal reports once and retains capacity", () => {
+    let cleanup = async () => {};
+    let closes = 0;
+    const base = worker([]);
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        const session = await base.session(...args);
+        cleanup = () => session.dispose();
+        return {
+          ...session,
+          dispose: async () => {
+            closes++;
+            throw new Error("did not stop");
+          },
+        };
+      },
+    };
+    return Effect.gen(function* () {
+      yield* Effect.addFinalizer(() => Effect.promise(() => cleanup()));
+      const sessions = yield* Session;
+      const core = yield* Core;
+      const events = yield* core.subscribe;
+      const exit = yield* Effect.exit(
+        sessions.send(lab(), "work", "demo", {
+          context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
+          hiring: () => Effect.die(new Error("registration bug")),
+        }),
+      );
+      expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
+      yield* core.notice("info", "barrier");
+      const seen = yield* events.pipe(
+        Stream.takeUntil((e) => e.type === "notice" && e.text === "barrier"),
+        Stream.runCollect,
+      );
+      const errors = seen.filter((e) => e.type === "notice" && e.level === "error");
+      expect(errors).toHaveLength(1);
+      expect(JSON.stringify(errors)).toContain("did not stop");
+      expect(closes).toBe(1);
+      expect(sessions.noRoom("pi", "demo")).not.toBe("");
+      expect(sessions.presentSessions()).toEqual([]);
+      const next = yield* sessions.send(lab(), "again", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } });
+      expect(next).toMatchObject({ retainedWork: true });
+      expect(next.session).toBeUndefined();
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
+    );
   });
 });

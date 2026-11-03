@@ -95,7 +95,7 @@ describe("a session's log", () => {
   it.effect("a sub-agent's steps go under their call", () =>
     Effect.gen(function* () {
       const j = yield* (yield* trajectories()).openLog("w1");
-      j.toolStarted("task-1", { text: "派个帮手", action: "other", tool: "TaskGraph" });
+      j.toolStarted("task-1", { text: "派个帮手", action: "other", tool: "Task" });
       j.said("帮手先看看", ["task-1"]);
       j.toolStarted("c1", bash("ls"), ["task-1"]);
       j.toolStarted("c1", bash("pwd"));

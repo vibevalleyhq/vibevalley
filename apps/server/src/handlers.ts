@@ -11,14 +11,16 @@ import type { ApiError, Handlers } from "@vibevalley/protocol/api";
 import { Agent } from "./agent/agent.ts";
 import { Artifact } from "./artifact/artifact.ts";
 import { owner } from "./base/actor.ts";
-import { Channel } from "./channel/chat.ts";
+import { Channel } from "./channel/channel.ts";
 import { Connector } from "./connector/connector.ts";
 import { Core } from "./core/core.ts";
 import { Cron } from "./cron/cron.ts";
 import { missing, lookIn, reasonOf, refused, orMissing } from "./errors.ts";
 import { Game } from "./game/game.ts";
-import { requestKeys } from "./http/requestKey.ts";
+import { requestKeys } from "./http/api.ts";
 import { ServerConfig } from "./infra/config.ts";
+import { Ingress } from "./ingress/ingress.ts";
+import { explicitMandate } from "./issue/creation.ts";
 import { Issue } from "./issue/issue.ts";
 import { deviceHeader, Lan } from "./lan/lan.ts";
 import { Memory } from "./memory/memory.ts";
@@ -27,7 +29,6 @@ import { Project } from "./project/project.ts";
 import { Runtime } from "./runtime/runtime.ts";
 import { Session } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
-import { Task } from "./task/task.ts";
 import { Voice } from "./voice/voice.ts";
 
 export const handlers = Effect.gen(function* () {
@@ -43,7 +44,7 @@ export const handlers = Effect.gen(function* () {
   const artifacts = yield* Artifact;
   const crons = yield* Cron;
   const issues = yield* Issue;
-  const tasks = yield* Task;
+  const ingress = yield* Ingress;
   const orchestrator = yield* Orchestrator;
   const game = yield* Game;
   const lan = yield* Lan;
@@ -96,7 +97,7 @@ export const handlers = Effect.gen(function* () {
     "channel.message.send": (body) =>
       Effect.andThen(
         Effect.sync(() => body.station !== undefined && game.want(body.station)),
-        orchestrator.say(
+        ingress.say(
           body.text,
           { ...(body.agent ? { agent: body.agent } : {}), ...(body.project ? { project: body.project } : {}) },
           body.id,
@@ -160,7 +161,8 @@ export const handlers = Effect.gen(function* () {
     "runtime.refresh": ({ id }) => runtimes.refresh(id).pipe(orMissing("runtime " + id, [lookIn.runtime])),
     "runtime.setting.update": ({ id, ...body }) => runtimes.update(id, body).pipe(orMissing("runtime " + id, [lookIn.runtime])),
     "agent.validate": (body) => Effect.forEach(body.agents, (agent) => Effect.map(runtimes.problemsOf(agent), (problems) => ({ id: agent.id, problems }))),
-    "session.stop": ({ id }) => (sessions.find(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session]))),
+    "session.stop": ({ id }) =>
+      sessions.present(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session])),
     "session.list": ({ agent }) => sessions.list(agent ?? ""),
     "session.get": ({ id }) => sessions.get(id).pipe(orMissing(t("server.helperRef", { id }), [lookIn.session])),
     "session.event.list": ({ id, run }) => Effect.map(sessions.events(id, run ?? ""), (events) => events ?? []),
@@ -170,7 +172,7 @@ export const handlers = Effect.gen(function* () {
     "channel.delete": ({ id }) => channels.removeChannel(id),
     "channel.previewDelete": ({ id }) => channels.previewRemoveChannel(id),
     "channel.notify.set": ({ id, notify }) => channels.setNotify(id, notify),
-    "channel.direct.create": ({ agent }) => issues.talkWith(agent),
+    "channel.direct.create": ({ agent }) => channels.direct(agent),
     "channel.markUnread": ({ id, number }) => channels.markUnread(id, number),
     "channel.list": () => channels.list(),
     "channel.unread.list": () => channels.unread(ownerId),
@@ -219,24 +221,24 @@ export const handlers = Effect.gen(function* () {
     "cron.previewDelete": ({ id }) => crons.previewRemove(id),
     "issue.list": (filter) => issues.query(filter),
     "issue.review": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.review(id, body)),
-    "issue.split": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => tasks.splitIssueOf(id, body.title ?? "", body.tasks)),
+    "issue.split": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.split(id, body.title ?? "", body.tasks, owner)),
     "issue.history.list": () => issues.history(),
     "issue.get": ({ id }) => issues.get(id),
-    "issue.run.list": ({ id }) => Effect.flatMap(issues.get(id), (issue) => sessions.runs(issue.id)),
+    "issue.run.list": ({ id }) => Effect.flatMap(issues.get(id), (issue) => sessions.issueRuns(issue.id)),
     "issue.timeline.get": ({ id }) => issues.timeline(id),
-    "issue.create": ({ requestKey, ...body }) => createOnce(requestKey, applied(issues.add(body))),
+    "issue.create": ({ requestKey, autoSubmitPr, ...body }) => createOnce(requestKey, applied(issues.add(body, explicitMandate("", autoSubmitPr ?? false)))),
     "issue.update": ({ id: ref, ...body }) => applied(Effect.flatMap(issues.idOf(ref), (id) => issues.edit(id, body, owner))),
     "issue.delete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.remove(id)),
     "issue.previewDelete": ({ id }) => issues.previewRemove(id),
     "issue.status.previewUpdate": ({ id, ...body }) =>
-      issues.previewStatus(id, body.status, body.text ?? "", body.assignee ? { assignee: body.assignee } : {}, body.edit),
+      issues.previewStatus(id, body.status, body.text ?? "", body.agent ? { agent: body.agent } : {}, body.edit),
     "issue.refine": ({ id: ref, ...body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.refine(id, body.text ?? "", channels.defaultChannel())),
     "issue.status.update": ({ id: ref, ...body }) =>
       statusOnce(
         body.requestKey,
         applied(
           Effect.flatMap(edited(ref, body.edit), (id) =>
-            issues.setStatus(id, body.status, body.text ?? "", channels.defaultChannel(), owner, body.assignee ? { assignee: body.assignee } : {}),
+            issues.setStatus(id, body.status, body.text ?? "", channels.defaultChannel(), owner, body.agent ? { agent: body.agent } : {}),
           ),
         ),
       ),
@@ -244,16 +246,6 @@ export const handlers = Effect.gen(function* () {
       Effect.flatMap(issues.idOf(ref), (id) => Effect.map(issues.comment(id, body.text, body.sendKey ?? ""), (): T.Applied => ({ seq: core.seq() }))),
     "issue.diff.get": ({ id }) => issues.changes(id, owner),
     "project.template.list": ({ id }) => issues.templates(id),
-    "graph.split": (body) => tasks.split(body.goal, body.project, body.agent ?? "", owner),
-    "graph.task.update": ({ id, task, ...body }) => tasks.editTask(id, task, body, owner),
-    "graph.task.delete": ({ id, task }) => tasks.removeTask(id, task, owner),
-    "graph.task.previewDelete": ({ id, task }) => tasks.previewRemoveTask(id, task),
-    "graph.act": ({ id, ...body }) => tasks.act(id, body.action, owner),
-    "graph.task.act": ({ id, task, ...body }) => tasks.taskAct(id, task, body.action, owner),
-    "graph.diff.get": ({ id }) => tasks.changes(id),
-    "graph.event.list": ({ id }) => tasks.events(id),
-    "graph.list": () => Effect.sync(tasks.graphs),
-    "graph.get": ({ id }) => tasks.graph(id),
   };
   return done;
 });

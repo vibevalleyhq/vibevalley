@@ -15,7 +15,7 @@ const enums = new Set([...schema.matchAll(/create type (\w+) as enum/giu)].map((
 const modules = readdirSync(src).filter((d) => statSync(join(src, d)).isDirectory());
 
 /** A plural ends in s; these words end in s and are singular. */
-const singularInS = new Set(["status", "alias"]);
+const singularInS = new Set(["status", "alias", "ingress"]);
 
 describe("the schema", () => {
   it("is one baseline, changed in place", () => {
@@ -41,7 +41,7 @@ describe("the schema", () => {
     }
   });
 
-  it("keeps a closed set of words in an enum type named after its table and column", () => {
+  it("names enums for their column except the shared actor kind", () => {
     expect(
       [...schema.matchAll(/^\s+\w+\s+text\b.*check \(\w+ in \(/gimu)].map((m) => m[0].trim()),
       "a closed set of words in a text column's check has no type the generated code can name. Fix: `create type <table>_<column> as enum (…)` and give the column that type. See docs/subsystems/foundation.md",
@@ -51,12 +51,17 @@ describe("the schema", () => {
     for (const line of schema.split("\n")) {
       table = /^create table (\w+)/iu.exec(line)?.[1]?.toLowerCase() ?? table;
       const column = /^\s+(\w+)\s+(\w+)/u.exec(line);
-      if (column && enums.has(column[2]!.toLowerCase()) && column[2]!.toLowerCase() !== `${table}_${column[1]!.toLowerCase()}`)
+      if (
+        column &&
+        enums.has(column[2]!.toLowerCase()) &&
+        column[2]!.toLowerCase() !== "actor_kind" &&
+        column[2]!.toLowerCase() !== `${table}_${column[1]!.toLowerCase()}`
+      )
         named.push(`${table}.${column[1]}`);
     }
     expect(
       named,
-      "an enum type is named after the one column that holds it, so its generated name says where it is used. Fix: rename the type <table>_<column>. See docs/subsystems/foundation.md",
+      "except shared actor_kind, an enum type is named after its owning column. Fix: rename the type <table>_<column>. See docs/subsystems/foundation.md",
     ).toEqual([]);
   });
 

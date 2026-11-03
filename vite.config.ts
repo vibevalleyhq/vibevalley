@@ -463,7 +463,7 @@ export default defineConfig({
       },
       {
         // Doors to the outside, where null comes in and is turned into undefined: a stored column's text, the DOM's body.
-        files: ["apps/server/src/base/json.ts", "apps/web/src/features/channel/draft.ts"],
+        files: ["apps/server/src/base/json.ts", "apps/web/src/features/channel/composing.ts"],
         rules: { "vibevalley/one-absent": "off" },
       },
       {
@@ -546,7 +546,6 @@ export default defineConfig({
           "apps/server/src/infra/db.ts",
           "apps/server/src/infra/baseline.ts",
           "apps/server/src/setting/setting.ts",
-          "apps/server/src/orchestrator/evals.ts",
         ],
         rules: { "vibevalley/sync-fs": "error" },
       },
@@ -565,7 +564,7 @@ export default defineConfig({
           "apps/server/src/runtime/dsh.ts",
           "apps/server/src/voice/voice.ts",
           "apps/server/src/testing/git.ts",
-          "apps/server/src/testing/helper.ts",
+          "apps/server/src/testing/worker.ts",
           "apps/desktop/src/island.ts",
           "apps/desktop/src/server.ts",
           "apps/desktop/src/update.ts",

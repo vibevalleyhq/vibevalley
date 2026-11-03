@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 import { ownerId } from "@vibevalley/protocol";
 import type { BlockRef, Channel } from "@vibevalley/protocol";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { DictationButton } from "@/features/voice";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
@@ -18,11 +18,10 @@ import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
 import { toast } from "@/ui/toasts";
 
-import { HelperFace } from "./bits";
-import { chatSay, createComposer } from "./composing";
-import { attachFiles, draftOf, drafts, setEditingId, uploadsIn, useReplying } from "./draft";
+import { attachFiles, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying } from "./composing";
 import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
+import { HelperFace } from "./presence";
 
 /** The box for saying a sentence in a channel: Enter sends, Shift+Enter starts a line, @ names someone. */
 export interface QuotedBlockDraft {

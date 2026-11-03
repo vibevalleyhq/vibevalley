@@ -15,8 +15,8 @@ import {
 } from "@vibevalley/protocol";
 import { plainText, closedText } from "@vibevalley/protocol/rules";
 
+import { useNow } from "@/base/dom";
 import { tookText, wallClockText } from "@/base/format";
-import { useNow } from "@/base/util";
 import { IssueArtifacts } from "@/features/artifact";
 import { createSessionEvents } from "@/features/session";
 import { useAgent } from "@/infra/agents";
@@ -25,24 +25,23 @@ import { sendReplacing, useIntents } from "@/state/intent";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Checkbox } from "@/ui/Checkbox";
-import { Dot } from "@/ui/Dot";
 import { TextArea } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
 import type { IconName } from "@/ui/icons";
 import { Markdown } from "@/ui/Markdown";
+import { Dot } from "@/ui/Tag";
 import { toast } from "@/ui/toasts";
 
 import { ActLines } from "./ActLines";
 import { createIssueActs, perform } from "./acts";
 import { changesLine } from "./changes";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
-import { issueDeliver, shownDeliver } from "./deliver";
+import { useIssues, useIssueChanges, useIssueRuns, useIssueTimeline } from "./history";
+import { issueTag, runText, tagOpen, tagText } from "./issue";
 import { issueMove, issueMoveOf, movedIssue, sendMove } from "./moves";
-import { type CriterionRow, issueState, noStepsText, attentionTone } from "./overview";
-import { useGraphs, useIssueChanges, useIssueRuns, useIssueTimeline } from "./queries";
-import { runText } from "./runs";
+import { type CriterionRow, issueState, noStepsText, stageTone } from "./overview";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
-import { issueTag, tagOpen, tagText } from "./tags";
+import { issueDeliver, shownDeliver } from "./write";
 
 /** The workbench's issue page, answering the owner top to bottom: what it is, where it stands, the one thing asked of
  * the owner (only when there is one), how far it is against its criteria, what it made, and how it got here; the
@@ -52,12 +51,13 @@ export function IssueDetail(props: {
   sessions: Session[];
   session?: SessionView | undefined;
   onClose: (session: Session, review: boolean) => void;
-  onTask?: (() => void) | undefined;
+  onParent?: (() => void) | undefined;
 }) {
-  const graphs = useGraphs();
+  const issues = useIssues();
   const now = useNow();
   const moves = useIntents(issueMove);
-  const s = createMemo(() => issueState(movedIssue(props.issue, moves.list()), props.sessions, props.session, graphs()));
+  const live = () => issues().find((item) => item.id === props.issue.id) ?? props.issue;
+  const s = createMemo(() => issueState(movedIssue(live(), moves.list()), props.sessions, props.session, issues()));
   const head = () => s().head;
   // The box under the block holds an answer, the findings of 打回, a word to the helper, or what a reopen asks for.
   const acts = createIssueActs(() => props.issue, {
@@ -94,14 +94,14 @@ export function IssueDetail(props: {
     </Button>
   );
 
-  const parent = () => graphs().find((g) => g.id === props.issue.parent);
-  const tone = () => attentionTone[s().attention.state];
+  const parent = () => issues().find((item) => item.id === props.issue.parent);
+  const tone = () => stageTone[s().stage.state];
   const heading = (
     <div class="pr-10">
-      <Show when={s().inTask ? props.onTask : undefined}>
-        {(onTask) => (
-          <button type="button" onClick={() => onTask()()} class="mb-1.5 cursor-pointer text-xs text-water hover:underline">
-            ‹ {parent()?.title ? t("web.issue.detail.graphStep", { graph: parent()!.title }) : t("web.issue.detail.backToGraph")}
+      <Show when={s().inFamily ? props.onParent : undefined}>
+        {(onParent) => (
+          <button type="button" data-testid="parent-issue" onClick={() => onParent()()} class="mb-1.5 cursor-pointer text-xs text-water hover:underline">
+            ‹ {parent()?.title ?? t("web.issue.family.parent")}
           </button>
         )}
       </Show>
@@ -114,7 +114,7 @@ export function IssueDetail(props: {
           {[s().project, t(`shared.priority.${props.issue.priority}`)].filter(Boolean).join(" · ")}
         </span>
       </div>
-      <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={t("web.issue.detail.now")} data-testid="issue-now" data-state={s().attention.state}>
+      <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={t("web.issue.detail.now")} data-testid="issue-now" data-state={s().stage.state}>
         <Dot tone={tone()} size={8} ring={false} />
         <span class={tone() === "berry" ? "text-berry" : "text-ink/80"}>{s().statusLine(now(), timeline()?.spent?.cny)}</span>
       </div>
@@ -131,13 +131,13 @@ export function IssueDetail(props: {
             <Note tone={ask().tone}>
               <div class="font-semibold">{ask().head}</div>
               <Show when={ask().line}>{(line) => <div class="mt-1 line-clamp-4">{plainText(line())}</div>}</Show>
-              <Show when={s().attention.state === "asking"}>
+              <Show when={s().stage.state === "asking"}>
                 <For each={props.issue.questions}>
                   {(a) => <Question ask={a} busy={busy()} onPick={(o) => void doAct("answer", o).then((ok) => ok && setText(""))} />}
                 </For>
               </Show>
             </Note>
-            <Show when={s().attention.state === "asking" || s().attention.state === "canceled" || box()}>
+            <Show when={s().stage.state === "asking" || s().stage.state === "canceled" || box()}>
               <TextArea
                 data-testid="issue-words"
                 data-box={box()}
@@ -147,7 +147,7 @@ export function IssueDetail(props: {
                 disabled={busy()}
                 onInput={(e) => setText(e.currentTarget.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && box() !== "reject" && s().attention.state !== "canceled") {
+                  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && box() !== "reject" && s().stage.state !== "canceled") {
                     e.preventDefault();
                     sayAct(box() === "tell" ? "tell" : "answer");
                   }
@@ -155,18 +155,18 @@ export function IssueDetail(props: {
                 placeholder={
                   box() === "reject"
                     ? t("web.issue.detail.rejectWhere")
-                    : s().attention.state === "asking"
+                    : s().stage.state === "asking"
                       ? t("web.issue.detail.sayIt")
-                      : s().attention.state === "canceled"
+                      : s().stage.state === "canceled"
                         ? t("web.issue.reopen.what")
                         : t("web.issue.detail.tell", { who: head().name })
                 }
                 aria-label={
                   box() === "reject"
                     ? t("web.issue.detail.rejectLabel")
-                    : s().attention.state === "asking"
+                    : s().stage.state === "asking"
                       ? t("web.issue.detail.answer")
-                      : s().attention.state === "canceled"
+                      : s().stage.state === "canceled"
                         ? t("web.issue.reopen.title")
                         : t("web.issue.detail.tell", { who: head().name })
                 }
@@ -217,14 +217,14 @@ export function IssueDetail(props: {
         <Show when={s().doing}>
           <div class="mb-1.5 text-sm text-water">{s().doing}</div>
         </Show>
-        <Show when={s().inTask}>
-          <div class="mb-1.5 text-xs text-muted">{s().taskText}</div>
+        <Show when={s().inFamily}>
+          <div class="mb-1.5 text-xs text-muted">{s().parentText}</div>
         </Show>
         <Show
           when={s().criteria.length > 0}
           fallback={<p class="text-sm text-muted">{t("web.issue.detail.noCriteria", { answer: props.issue.deliver === "answer" })}</p>}
         >
-          <Criteria rows={s().criteria} checking={s().attention.state === "reviewing" && props.issue.reviewedAt === undefined} />
+          <Criteria rows={s().criteria} checking={s().stage.state === "reviewing" && props.issue.reviewedAt === undefined} />
         </Show>
         <Show when={s().openFindings.length > 0}>
           <div class="mt-2">
@@ -239,7 +239,7 @@ export function IssueDetail(props: {
         <Switch
           fallback={
             <p class="text-sm text-muted">
-              {s().attention.state === "done" ? t("shared.join.sentence", { text: closedText(props.issue) }) : t("web.issue.detail.nothingToSee")}
+              {s().stage.state === "done" ? t("shared.join.sentence", { text: closedText(props.issue) }) : t("web.issue.detail.nothingToSee")}
             </p>
           }
         >
@@ -299,7 +299,7 @@ export function IssueDetail(props: {
             </Show>
           </Fold>
           <Fold label={t("web.issue.detail.runs")} summary={s().historyLine}>
-            <Runs issue={props.issue.id} version={`${props.issue.attention.state}:${props.session?.runs}:${props.session?.phase._tag}`} />
+            <Runs issue={props.issue.id} version={`${props.issue.stage.state}:${props.session?.runs}:${props.session?.phase._tag}`} />
           </Fold>
         </div>
       </section>
@@ -308,7 +308,7 @@ export function IssueDetail(props: {
 
   // The acts the block above does not offer: a word, a stop, a close.
   const sideActs = () => {
-    const all = s().attention.acts.map((a) => a.act);
+    const all = s().stage.acts.map((a) => a.act);
     return s().ask ? all.filter((a) => a === "close" || a === "stop") : all;
   };
   const side = (
@@ -321,7 +321,7 @@ export function IssueDetail(props: {
       <SheetLabel>{t("web.issue.detail.time")}</SheetLabel>
       <Property label={t("web.issue.detail.opened")}>{wallClockText(props.issue.createdAt)}</Property>
       <Property label={t("web.issue.detail.started")}>{wallClockText(props.sessions[0]!.hiredAt)}</Property>
-      <Show when={s().ask && s().attention.since}>
+      <Show when={s().ask && s().stage.since}>
         {(at) => <Property label={t("web.issue.detail.waiting")}>{t("web.issue.detail.since", { clock: wallClockText(at()) })}</Property>}
       </Show>
       <Show when={props.issue.reviewedAt}>
@@ -337,7 +337,7 @@ export function IssueDetail(props: {
       <Show when={agent()?.model}>
         <Property label={t("web.issue.detail.model")}>{agent()!.model}</Property>
       </Show>
-      <Show when={!s().inTask}>
+      <Show when={!s().inFamily}>
         <Property label={t("web.issue.detail.deliver")}>
           <Pick
             label={t("web.issue.detail.deliver")}
@@ -573,14 +573,14 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
       <div class="mt-3">
         <ActLines issue={props.issue.id} />
       </div>
-      <Show when={props.issue.attention.acts.length > 0}>
+      <Show when={props.issue.stage.acts.length > 0}>
         <div class="mt-3 flex flex-wrap items-center gap-2">
-          <Show when={props.issue.attention.state === "stuck"}>
+          <Show when={props.issue.stage.state === "stuck"}>
             <span class="text-sm text-berry">{t("web.issue.detail.orchestratorStuck")}</span>
           </Show>
-          <For each={props.issue.attention.acts}>
+          <For each={props.issue.stage.acts}>
             {(a) => (
-              <Button data-act={a.act} tone={a.act === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => go(a)}>
+              <Button data-act={a.act} tone={a.act === props.issue.stage.lead ? "primary" : "plain"} disabled={busy()} onClick={() => go(a)}>
                 {t(`shared.act.${a.act}`)}
               </Button>
             )}

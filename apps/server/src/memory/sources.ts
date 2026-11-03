@@ -12,9 +12,20 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 import { messageOf } from "@/errors.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 
-import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabel } from "./recall.ts";
-import type { FinishedRun, MemoryStore, Note, RecallCue } from "./store";
-import { termsOf } from "./terms.ts";
+import type { FinishedRun, MemoryStore, Note, RecallCue } from "./memory.ts";
+import {
+  lineOf,
+  localName,
+  memoryLikeness,
+  pick,
+  recallChars,
+  recallCount,
+  search,
+  type SearchQuery,
+  type SourceSearch,
+  sourceLabel,
+  termsOf,
+} from "./recall.ts";
 
 /** One line a source would have the agent recall, with how good a match it is (only to order one source's own). */
 export interface RecalledLine {
@@ -23,10 +34,10 @@ export interface RecalledLine {
   readonly score: number;
 }
 
-export interface Abilities {
+interface Abilities {
   readonly list: boolean;
   readonly forget: boolean;
-  /** It wants whole runs (EverOS), not only the 「记住：」 lines. */
+  /** It wants whole runs (EverOS), in addition to explicit notes. */
   readonly transcripts: boolean;
 }
 
@@ -216,7 +227,7 @@ interface Generation {
 }
 
 /** Owns source generations and every accepted operation, including retirement and shutdown. */
-export interface Sources {
+interface Sources {
   readonly prefetch: (cue: RecallCue) => Effect.Effect<RecalledLine[][]>;
   readonly list: (agent: string) => Effect.Effect<{ memories: T.Memory[]; sources: T.MemorySourceInfo[] }>;
   readonly search: (query: SearchQuery) => Effect.Effect<(SourceSearch & { source: string })[]>;
@@ -229,7 +240,7 @@ export interface Sources {
   readonly info: Effect.Effect<T.MemorySourceInfo[]>;
 }
 
-export interface SourcesOptions {
+interface SourcesOptions {
   readonly local: Source;
   readonly configured: () => readonly MemorySourceConfig[];
   readonly build: (c: MemorySourceConfig) => Source | undefined;

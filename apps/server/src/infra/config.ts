@@ -199,7 +199,7 @@ export const serverAddress = (c: ServerConfig["Service"]) => `127.0.0.1:${c.port
 /** Where the projects are: each folder in it is one. */
 export const projectsDir = (c: ServerConfig["Service"]) => join(c.workRoot, "projects");
 
-/** A profile's own folder, an orchestrator's conversation, MEMORY.md, archive and evals among what it keeps there. */
+/** A profile's folder for conversation logs, archives and evals; memory rows live in the database. */
 export const agentHome = (c: ServerConfig["Service"], agent: string) => join(c.home, "agent", agent);
 
 /** The configuration, as a service. */

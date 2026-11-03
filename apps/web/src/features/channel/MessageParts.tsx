@@ -6,7 +6,7 @@ import { Toolbar } from "@vibevalley/base-ui";
 import { list, t } from "@vibevalley/i18n";
 import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
 
-import { aria, autofocus } from "@/base/util";
+import { aria, autofocus } from "@/base/dom";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { useRouter } from "@/infra/router";
@@ -19,15 +19,11 @@ import { Markdown } from "@/ui/Markdown";
 import { MoreMenu } from "@/ui/MoreMenu";
 import { toast } from "@/ui/toasts";
 
-import { drafts } from "./draft";
-import { quickReactions, reactionOn } from "./emoji";
-import { EmojiPicker } from "./EmojiPicker";
-import { workbenchClock } from "./feed";
+import { drafts } from "./composing";
+import { quickReactions, reactionOn, EmojiPicker } from "./EmojiPicker";
 import { useMessage } from "./follow";
-import { type LinkedMessage, linkedMessages } from "./links";
-import { pinSet, reactionSet, sameMessage, sameReaction, setMark } from "./marks";
-import { channelLabel, channelOf, messagePath } from "./places";
-import { markUnread, unreadMark } from "./reading";
+import { pinSet, reactionSet, sameMessage, sameReaction, setMark, markUnread, unreadMark } from "./marks";
+import { workbenchClock, type LinkedMessage, channelLabel, channelOf, linkedMessages, messagePath } from "./places";
 
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 

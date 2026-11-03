@@ -22,13 +22,13 @@ function clip(text: string, limit = maxResultChars): string {
   return r.slice(0, head).join("") + toolResult.clippedNote(r.length - limit) + r.slice(r.length - tail).join("");
 }
 
-export interface ToolContext {
+interface ToolContext {
   readonly callId: string;
   /** Aborted when the run is stopped. */
   readonly signal: AbortSignal;
 }
 
-export interface TextToolSpec<P> {
+interface TextToolSpec<P> {
   readonly name: string;
   readonly description: string;
   readonly parameters: JsonSchema;
@@ -46,7 +46,7 @@ export const textTool = <P>(spec: TextToolSpec<P>): Tool => ({
     Effect.map(Effect.tryPromise({ try: async (signal) => spec.run(params as P, { callId: call.id, signal }), catch: toolFailed }), answered),
 });
 
-export interface EffectToolSpec<P> extends Omit<TextToolSpec<P>, "run"> {
+interface EffectToolSpec<P> extends Omit<TextToolSpec<P>, "run"> {
   /** A failure's message is the failed result the model reads. */
   readonly run: (params: P) => Effect.Effect<string, ToolFailed>;
 }
@@ -59,7 +59,7 @@ export const effectTool = <P>(spec: EffectToolSpec<P>): Tool => ({
   execute: (params) => Effect.map(spec.run(params as P), answered),
 });
 
-export interface SchemaToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<TextToolSpec<S["Type"]>, "parameters"> {
+interface SchemaToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<TextToolSpec<S["Type"]>, "parameters"> {
   readonly parameters: S;
 }
 
@@ -71,7 +71,7 @@ export function schemaTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: 
   return textTool<unknown>({ ...spec, parameters: parametersOf(spec.parameters), run: (p, tc) => spec.run(read(p), tc) });
 }
 
-export interface SchemaEffectToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<EffectToolSpec<S["Type"]>, "parameters"> {
+interface SchemaEffectToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<EffectToolSpec<S["Type"]>, "parameters"> {
   readonly parameters: S;
 }
 

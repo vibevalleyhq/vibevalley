@@ -22,9 +22,10 @@ async function firstFrame(url: string): Promise<StateFrame> {
   });
 }
 
-const helper = (id: string, station: number, phase: SessionView["phase"], crop: string): { session: SessionView; crop: string } => ({
+const helper = (id: string, station: number, phase: SessionView["phase"], crop: string): { session: SessionView; crop: string; station: number } => ({
   session: {
     id: sessionId(id),
+    role: "worker",
     name: `帮工${id}`,
     agent: `agent-${id}`,
     runtime: "nobody",
@@ -35,9 +36,9 @@ const helper = (id: string, station: number, phase: SessionView["phase"], crop: 
     refining: false,
     phaseText: "",
     issue: issueId(`issue-${id}`),
-    play: { station, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
   },
   crop,
+  station,
 });
 
 /** The real frame with four helpers: one hands-on at its plot, one reading at the library, one ripe, one withered. */
@@ -52,7 +53,11 @@ function withHelpers(frame: StateFrame): StateFrame {
   return {
     ...frame,
     state: { ...frame.state, sessions: helpers.map((h) => h.session) },
-    view: { ...frame.view, plots: Object.fromEntries(helpers.map((h) => [h.session.issue ?? h.session.id, { crop: h.crop } as never])) },
+    view: {
+      ...frame.view,
+      plots: Object.fromEntries(helpers.map((h) => [h.session.issue ?? h.session.id, { crop: h.crop } as never])),
+      plays: Object.fromEntries(helpers.map((h) => [h.session.id, { station: h.station, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] }])),
+    },
   };
 }
 

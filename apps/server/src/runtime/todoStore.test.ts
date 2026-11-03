@@ -8,7 +8,7 @@ import { Db } from "@/infra/db.ts";
 import { testDatabase } from "@/testing/layers.ts";
 
 import * as q from "../../db/generated/runtime_todo.sql.ts";
-import { dbTodoStores } from "./todoStore.ts";
+import { dbTodoStores } from "./vibevalley.ts";
 
 describe("an agent's own todos, kept", () => {
   const database = Layer.provideMerge(Db.layer, testDatabase());

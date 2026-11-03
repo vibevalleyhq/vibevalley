@@ -19,7 +19,7 @@ export function spriteOf(sizes: TitleSprites, name: string, scale = 1) {
 /** Where the farmhouse chimney's mouth is, the same in every scene. */
 export const chimney = { x: 1068 / sceneW, y: 330 / sceneH };
 
-export interface Cloud {
+interface Cloud {
   readonly sprite: string;
   readonly y: number;
   readonly scale: number;

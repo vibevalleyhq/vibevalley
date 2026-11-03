@@ -3,7 +3,7 @@
 
 import { t } from "@vibevalley/i18n";
 
-import { nextRandom } from "./random";
+import { nextRandom } from "@/farm/phone/lcd";
 
 export const mergeSize = 4;
 

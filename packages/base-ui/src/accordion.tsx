@@ -27,7 +27,7 @@ interface ItemCtx {
 const RootContext = createContext<RootCtx>();
 const ItemContext = createContext<ItemCtx>();
 
-export interface AccordionRootProps extends DivProps {
+interface AccordionRootProps extends DivProps {
   value?: readonly string[] | undefined;
   defaultValue?: readonly string[] | undefined;
   onValueChange?: ((value: string[]) => void) | undefined;
@@ -70,7 +70,7 @@ function Root(props: AccordionRootProps) {
   );
 }
 
-export interface AccordionItemProps extends DivProps {
+interface AccordionItemProps extends DivProps {
   value: string;
   disabled?: boolean | undefined;
 }

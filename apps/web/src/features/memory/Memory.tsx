@@ -8,8 +8,8 @@ import { t } from "@vibevalley/i18n";
 import { type Memory, type MemorySourceInfo, memoryKeep } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
+import { aria, useNow } from "@/base/dom";
 import { ago } from "@/base/format";
-import { aria, useNow } from "@/base/util";
 import { api, createRequestKey, reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { queries, ready, useProjects, useQuery } from "@/infra/query";
@@ -255,7 +255,7 @@ function RecallPreview(props: { agent: string }) {
   );
 }
 
-/** An orchestrator's own MEMORY.md, by its profile id. */
+/** Notes belong to the profile; authorship distinguishes the owner's words. */
 export function OrchestratorMemoryPanel(props: { agent: string }) {
   const viewQuery = useMemory(() => props.agent);
   const view = () => ready(viewQuery, undefined);
@@ -264,7 +264,6 @@ export function OrchestratorMemoryPanel(props: { agent: string }) {
   return (
     <Show when={view()} fallback={<Quiet>{t("web.memory.memory.orchestratorReading")}</Quiet>}>
       {(v) => {
-        const carried = () => v().carried ?? v().memories.length;
         return (
           <div class="flex flex-col gap-4">
             <p class="text-sm text-muted">{t("web.memory.memory.orchestratorIntro")}</p>
@@ -272,13 +271,11 @@ export function OrchestratorMemoryPanel(props: { agent: string }) {
             <Section title={t("web.memory.memory.notes")} count={v().memories.length} testid="notes">
               <Show when={v().memories.length > 0} fallback={<Quiet>{t("web.memory.memory.orchestratorNothing")}</Quiet>}>
                 <For each={v().memories} keyed={(m) => m.id}>
-                  {(m, i) => (
+                  {(m) => (
                     <MemoryItem
                       memory={m()}
-                      faded={i() >= carried()}
                       onForget={() => forget(m().id)}
-                      meta={[m().session === props.agent ? t("web.memory.memory.orchestratorOwn") : t("web.memory.memory.told"), ago(m().at, now())]}
-                      warning={i() >= carried() ? t("web.memory.memory.tooOld") : undefined}
+                      meta={[m().author === "owner" ? t("web.memory.memory.told") : t("web.memory.memory.orchestratorOwn"), ago(m().at, now())]}
                     />
                   )}
                 </For>

@@ -26,7 +26,7 @@ describe("the contract diff", () => {
   });
 
   it("knows an area and a service's interface line", () => {
-    expect([areaOf("apps/server/src/channel/chat.ts"), areaOf("apps/web/src/features/board/X.tsx"), areaOf("scripts/a.ts")]).toEqual([
+    expect([areaOf("apps/server/src/channel/channel.ts"), areaOf("apps/web/src/features/board/X.tsx"), areaOf("scripts/a.ts")]).toEqual([
       "server/channel",
       "web/board",
       "scripts",

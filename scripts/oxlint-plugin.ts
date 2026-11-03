@@ -1175,7 +1175,7 @@ const isContextService = (n: Node): boolean => {
 };
 
 /** Words that end in s and still name one thing; a service named for one of them is singular. */
-const singularInS = new Set(["Status", "Alias", "Canvas", "Lens", "Progress", "Access", "Address"]);
+const singularInS = new Set(["Status", "Alias", "Canvas", "Lens", "Progress", "Access", "Address", "Ingress"]);
 const lastWord = (name: string) => /[A-Z][a-z0-9]*$/u.exec(name)?.[0] ?? name;
 const looksPlural = (name: string) => name.endsWith("s") && !singularInS.has(lastWord(name));
 

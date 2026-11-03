@@ -5,8 +5,7 @@ import { t } from "@vibevalley/i18n";
 
 import { ready } from "@/infra/query";
 
-import { ArtifactCard } from "./ArtifactCard";
-import { useArtifacts } from "./queries";
+import { ArtifactCard, useArtifacts } from "./ArtifactCard";
 
 /** The artifacts made for an issue, latest version each; nothing when there are none. */
 export function IssueArtifacts(props: { issue: string; heading: JSX.Element }) {

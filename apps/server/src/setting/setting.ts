@@ -15,9 +15,7 @@ import { jsonOf, jsonOrNone } from "@/base/json.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { keptFile, readOrSetAside } from "@/infra/files.ts";
 
-import { keyHint } from "./keys.ts";
-import { memorySourcesOver } from "./memorySources.ts";
-import { settingsProblem } from "./saving.ts";
+import { keyHint, memorySourcesOver, settingsProblem } from "./memorySources.ts";
 import { defaultVoice, voiceOverrides, voiceSettingsOver } from "./voice.ts";
 
 const MemorySourceConfig = Schema.Struct({
@@ -63,7 +61,7 @@ export interface VoiceKeys {
 }
 
 /** One settings revision: the voice's providers and their keys belong together. */
-export interface VoiceConfig {
+interface VoiceConfig {
   readonly voice: VoiceSettings;
   readonly keys: VoiceKeys;
   readonly deepseekApiKey: string;
@@ -71,7 +69,7 @@ export interface VoiceConfig {
 
 /** Read together, so an address is never paired with another one's key. MOSS's key is the one 设置 › MOSS keeps; "" when
  * none is saved. */
-export type DictationConfig =
+type DictationConfig =
   | { readonly via: "moss"; readonly key: string }
   | { readonly via: "own"; readonly url: string; readonly model: string; readonly key: string };
 

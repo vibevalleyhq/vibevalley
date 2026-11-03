@@ -15,7 +15,7 @@ export type MenuOpenChangeReason = "trigger" | "item" | "escape" | "outside" | "
 
 const item = "[role=menuitem]";
 
-export interface MenuCtx extends Floating<MenuOpenChangeReason> {
+interface MenuCtx extends Floating<MenuOpenChangeReason> {
   /** Where the focus goes once the menu is placed. */
   readonly start: () => "first" | "last" | "menu";
   readonly setStart: (start: "first" | "last" | "menu") => void;
@@ -116,7 +116,7 @@ function Popup(props: DivProps) {
   );
 }
 
-export interface MenuItemProps extends DivProps {
+interface MenuItemProps extends DivProps {
   disabled?: boolean | undefined;
   /** Runs it without closing the menu. */
   closeOnClick?: boolean | undefined;

@@ -6,11 +6,21 @@ import type * as T from "@vibevalley/protocol";
 /** Changing an issue or moving it is the owner's call: the orchestrator asks for what it saw itself. */
 export const needsOwner = "改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
 
+export function workConstraints(constraints: T.IssueConstraints | undefined, frozen: readonly string[]): string {
+  const lines: string[] = [];
+  if (constraints && constraints.scope.length > 0) lines.push("工作范围：" + constraints.scope.join("、"));
+  if (constraints?.check) lines.push("检查命令：" + constraints.check);
+  if (constraints?.acceptance === true) lines.push("先写能发现尚未实现需求的验收测试。检查应当失败，测试会被冻结给后续子工单使用。");
+  if (frozen.length > 0) lines.push("以下验收文件已经冻结，不得修改：" + frozen.join("、"));
+  if (lines.length > 0) lines.push("用主人的语言汇报。");
+  return lines.join("\n");
+}
+
 /** What a draft's brief is matched against the profiles' tags by (chooseAgent). */
 export const draftMatch = (title: string) => "起草 " + title;
 
 export const criteriaHead =
-  "验收标准（主人照这几条验收；做完逐条对照，在结论前面每条写一行「标准 N：做到了」「标准 N：没做到」或「标准 N：不确定」，后面接凭据：跑了什么命令、结果如何，或改了哪个文件）：";
+  "验收标准（主人照这几条验收；做完逐条写进 issue_report.checks，criterion 从 0 开始，result 填 met、unmet 或 unsure，proof 写验证命令与结果或文件依据）：";
 
 export const answerOpening =
   "这一轮你只查清楚、回答问题：读代码、跑只读的命令，不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
@@ -23,17 +33,10 @@ const answerExample = {
 };
 
 export const answerFormat = [
-  "汇报的最后，用一个 json 代码块交结论，格式照这个：",
-  "```json",
+  "调用 issue_report 时，把 state 填 ready，并把 answer 填成这个形状：",
   JSON.stringify(answerExample, null, 2),
-  "```",
   "conclusion 一两句说答案；evidence 是依据，至少一条：文件和行号看到了什么、跑了什么命令输出了什么；unsure 是拿不准的，next 是建议接着做的，没有就给空数组。",
 ].join("\n");
-
-/** What a session sent to talk for a helper profile is told: the talk so far, the owner's newest words last. */
-export const talkBrief = (name: string, said: string) =>
-  `主人在和你（档案「${name}」）私聊。像聊天一样回答主人，一两段就够；说到代码就带上文件和行号。这一轮你只读：读代码、跑只读的命令，不改文件、不提交；干活的规矩里提交、写 commit 号的那两条不用照做，你改了什么交回来以后都会被清掉。主人要你改代码，就建议他把这件事记成一张工单。\n\n私聊里最近说的（最后一条是主人刚说的）：\n` +
-  said;
 
 export const refinementOpening =
   "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";

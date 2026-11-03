@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Stream } from "effect";
+import { Effect, Exit, Fiber, Scope, Stream } from "effect";
 
 import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "@vibevalley/ai/messages";
 import { type Answer, answer, assistantMessage, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
 import { until } from "@vibevalley/testkit/until";
 
-import { type BrainEvent, type BrainOptions, makeBrain, openBrain, standaloneOwner } from "./brain.ts";
+import { type BrainEvent, type BrainOptions, makeBrain } from "./brain.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
 import { textTool } from "./core/tool.ts";
 import { type BrainMessage, messageText, userMessage } from "./messages.ts";
@@ -170,8 +170,9 @@ describe("a run's receipt", () => {
     Effect.gen(function* () {
       const { llm } = scriptedLLM([billed("partial", 7, 3, 2, { hangAfter: 7 })]);
       const dir = home();
-      const agent = yield* Effect.promise(() =>
-        openBrain(standaloneOwner(), {
+      const scope = yield* Scope.fork(yield* Effect.scope);
+      const agent = yield* Scope.provide(
+        makeBrain({
           name: "partial",
           instructions: "",
           llm,
@@ -183,16 +184,21 @@ describe("a run's receipt", () => {
           noSession: true,
           reminders: false,
         }),
+        scope,
       );
       const events: BrainEvent[] = [];
-      agent.subscribe((e) => events.push(e));
-      void agent.send(userMessage("start", Date.now()));
+      const reader = yield* Effect.forkScoped(Stream.runForEach(yield* agent.events, (e) => Effect.sync(() => void events.push(e))));
+      yield* agent.send(userMessage("start", Date.now()));
       yield* until(
         () => events.some((e) => e.type === "message_update" && messageText(e.message) === "partial"),
         'events.some((e) => e.type === "message_update" && messageText(e.message) === "partial")',
       );
       expect(agent.progress().current.settled).toBe(false);
-      yield* Effect.promise(() => Promise.all(Array.from({ length: 8 }, () => agent.close())));
+      yield* Effect.all(
+        Array.from({ length: 8 }, () => Scope.close(scope, Exit.void)),
+        { concurrency: "unbounded" },
+      );
+      yield* Fiber.join(reader);
       expect(agent.progress()).toMatchObject({
         current: { settled: true, aborted: true },
         lifetime: { input: 7, output: 3, cacheRead: 2 },

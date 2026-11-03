@@ -5,16 +5,16 @@ import { t } from "@vibevalley/i18n";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
 import { plainText } from "@vibevalley/protocol/rules";
 
+import { aria, useNow } from "@/base/dom";
 import { tookText, spentText } from "@/base/format";
-import { aria, useNow } from "@/base/util";
 import { ArtifactCard } from "@/features/artifact";
 import { RunSteps } from "@/features/session";
 import { useAgent, useOrchestrators } from "@/infra/agents";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { useRouter } from "@/infra/router";
+import { useLatest } from "@/state/atom";
 import { useIntents } from "@/state/intent";
-import { useLatest } from "@/state/latest";
 import { A } from "@/ui/A";
 import { OrchestratorFace, OwnerFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
@@ -23,18 +23,12 @@ import { Markdown } from "@/ui/Markdown";
 import { Tag, type TagTone } from "@/ui/Tag";
 import { toast } from "@/ui/toasts";
 
-import { Dot, PhaseGlyph, SenderFace, ThinkingDots } from "./bits";
-import { chatSay, pendingLines } from "./composing";
-import { editingId, setEditingId } from "./draft";
-import { feedOf, orchestratorTyping, workbenchClock } from "./feed";
+import { chatSay, editingId, pendingLines, setEditingId } from "./composing";
 import { followed, useMessage } from "./follow";
-import { useMarkedFollowed } from "./marks";
+import { useMarkedFollowed, useMarkRead } from "./marks";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
-import { channelOf, messagePath, chatPath, parentAt } from "./places";
-import { phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
-import { useMarkRead } from "./reading";
-import { threadOwnerOf } from "./threads";
-import { unreadIn } from "./unread";
+import { feedOf, orchestratorTyping, workbenchClock, channelOf, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "./places";
+import { Dot, PhaseGlyph, SenderFace, ThinkingDots, phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
 
 const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName }> = {
   completed: { label: t("shared.outcome.completed"), tone: "ok", icon: "check" },

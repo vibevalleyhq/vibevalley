@@ -9,6 +9,33 @@ const issue = (api: VibeValleyApi, title: string) => api.issue.create({ title })
 const lane = (page: Page, key: string) => page.locator(`[data-testid="lane"][data-key="${key}"]`);
 const card = (scope: Page | ReturnType<Page["locator"]>, id: string) => scope.locator(`[data-testid="issue-card"][data-key="${id}"]`);
 
+test("native parent issues show child navigation and can merge without a parent session", async ({ page, api }, testInfo) => {
+  const project = await api.project.create({ name: "native-family" });
+  const parent = await api.issue.create({ title: "父子工单验收", project: project.name, agent: "docs" });
+  await api.issue.split({ id: parent.id, tasks: [{ id: "clock", brief: "写打卡并提交", check: "test -f clock.ts" }] });
+  await expect.poll(async () => (await api.issue.get({ id: parent.id })).status).toBe("in_review");
+  const child = (await api.issue.history.list()).find((row) => row.issue.parent === parent.id)!.issue;
+  await page.goto("/issues");
+  await expect(card(lane(page, "waiting"), parent.id)).toBeVisible();
+  await card(lane(page, "waiting"), parent.id).click();
+  const family = page.getByTestId("issue-family");
+  await expect(family).toBeVisible();
+  await expect(family.getByTestId("child-issue")).toHaveCount(1);
+  await expect(family.getByRole("textbox")).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("family.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: testInfo.outputPath("family-mobile.png") });
+  await family.getByTestId("child-issue").click();
+  await expect(page).toHaveURL(new RegExp(`/issues/${child.id}$`, "u"));
+  await page.getByTestId("parent-issue").click();
+  await expect(family).toBeVisible();
+  await family.locator('[data-act="complete"]').click();
+  const close = page.getByTestId("close-issue");
+  await expect(close).toBeVisible();
+  await close.locator('[data-act="complete"]').click();
+  await expect.poll(async () => (await api.issue.get({ id: parent.id })).status).toBe("done");
+});
+
 test("a quick add shows the new issue in todo without a reload", async ({ page, api }) => {
   const title = "add a shortcut to the board";
   await page.goto("/issues");

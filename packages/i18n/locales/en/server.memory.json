@@ -21,9 +21,6 @@
   "nowledgeForget": "Nowledge Mem memories are deleted in Nowledge Mem",
   "empty": "There is nothing to remember",
   "dbFailed": "Not remembered: the database could not be written",
-  "fileFailed": "Not remembered: MEMORY.md could not be written",
   "noMemory": "{agent}'s memory has no {id}",
-  "forgetOrchestrator": "Delete this line from the manager's MEMORY.md: \"{text}\"",
-  "forget": "Forget from {agent}'s memory: \"{text}\"",
-  "orchestratorRecall": "The manager does not recall: it always carries its whole memory"
+  "forget": "Forget from {agent}'s memory: \"{text}\""
 }

@@ -9,10 +9,9 @@ import { For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
 
-import { aria, Keyed } from "@/base/util";
-import { farm, type FarmOverlay, type FarmPanel } from "@/farm/store";
-import { useVillage } from "@/farm/support";
-import { useFarm } from "@/farm/ui";
+import { aria, Keyed } from "@/base/dom";
+import { farm, type FarmOverlay, type FarmPanel, useFarm } from "@/farm/store";
+import { useVillage } from "@/farm/world/load";
 import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "@/features/orchestrator";
 import { orchestratorLookOf } from "@/infra/agents";
 import { api } from "@/infra/api";
@@ -22,12 +21,11 @@ import { setPet, usePrefs } from "@/state/prefs";
 import { createPixelAct, FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
 
 import { Achievements } from "./Achievements";
-import { tint } from "./bits";
 import { FarmLog } from "./FarmLog";
 import { HarvestReview, Warehouse } from "./Harvest";
 import { Menu } from "./Menu";
+import { tint } from "./rows";
 import { SowForm, WaterForm } from "./SeedForms";
-import { TaskBoard } from "./TaskBoard";
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {
   shop: [t("web.farm.panel.shop"), "icon-shop", "sm"],
@@ -35,7 +33,6 @@ const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDial
   graphs: [t("web.farm.panel.graphs"), "icon-tasks", "lg"],
   log: [t("web.farm.panel.log"), "icon-log", "lg"],
   orchestrator: [t("web.farm.panel.orchestrator"), "manager-face", "wide"],
-  taskBoard: [t("web.farm.panel.taskBoard"), "machine-seeder", "lg"],
 };
 
 /** Each layer is drawn by its kind; one of a kind replaced by another (another plot, another panel) is built anew. */
@@ -104,7 +101,7 @@ function Layer(props: { o: FarmOverlay }) {
             testid={panel()}
             onClose={() => farm.panel(undefined)}
           >
-            <Switch fallback={<TaskBoard />}>
+            <Switch>
               <Match when={panel() === "warehouse"}>
                 <Warehouse />
               </Match>

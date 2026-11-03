@@ -1,30 +1,48 @@
-// What the agents remember: every agent's rows and the outside sources (sources.ts), and the
-// orchestrator's own MEMORY.md (agent/brain/memory.ts), which it carries whole rather than recalling from. A note the owner
-// writes for the orchestrator starts with 「主人交代：」, so the orchestrator reading it knows whose it is.
-
-import { Clock, Context, Effect, Layer } from "effect";
+import { Clock, Context, Effect, Layer, Schema } from "effect";
 import { HttpClient } from "effect/http";
 
-import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "@vibevalley/agent/memory";
+import { archiveFiles, type MemoryPort, parseMemoryLines, readArchive, searchArchive } from "@vibevalley/agent/memory";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
+import type { Actor } from "@/base/actor.ts";
 import { clip } from "@/base/clip.ts";
-import { messageOf, type ApiError, memoriesOf, missing, refused } from "@/errors.ts";
+import { newId } from "@/base/ids.ts";
+import { type ApiError, memoriesOf, missing, refused } from "@/errors.ts";
 import { agentHome, ServerConfig } from "@/infra/config.ts";
+import { Db } from "@/infra/db.ts";
+import { bestEffort } from "@/infra/log.ts";
 import { Setting } from "@/setting/setting.ts";
 
+import * as q from "../../db/generated/memory.sql.ts";
 import { everos } from "./everos.ts";
 import { loadSegmenter } from "./gse.ts";
 import { nowledge } from "./nowledge.ts";
-import { fromOwner } from "./prompts.ts";
-import { foundText, type Found, inProject, noteMaxChars, recallChars, searchLimit, type SearchQuery, type SearchResult, sourceLabel } from "./recall.ts";
+import { carriedMemory, fromOwner } from "./prompts.ts";
+import {
+  foundText,
+  type Found,
+  inProject,
+  issueMemoryText,
+  nextForgotten,
+  noteMaxChars,
+  pick,
+  type PickCue,
+  recallChars,
+  searchLimit,
+  type SearchQuery,
+  type SearchResult,
+  sourceLabel,
+  termsList,
+  termsText,
+  termsVersion,
+} from "./recall.ts";
 import { type EndedSession, interleave, localSource, makeSources, mergeRecalled, type Source } from "./sources.ts";
-import { type FinishedRun, makeMemoryStore, type Note, type RecallCue } from "./store";
 
-export type { EndedSession, FinishedRun, Found, Note, RecallCue, SearchQuery, SearchResult };
+export type { EndedSession, Found, SearchQuery, SearchResult };
 export { foundText };
 
 /** What a run recalls: the memories' ids (not to give the same session again) and the lines it is told, as told. */
@@ -36,7 +54,7 @@ export interface Recalled {
 export class Memory extends Context.Service<
   Memory,
   {
-    /** An agent's memories: an orchestrator's are the lines of the MEMORY.md in its home; a helper's are rows and its sources'. */
+    readonly forAgent: (agent: string, session: string) => MemoryPort;
     readonly memoriesOf: (agent: string) => Effect.Effect<T.MemoryList>;
     readonly remember: (n: Note) => Effect.Effect<T.Memory, ApiError>;
     readonly forget: (agent: string, id: string) => Effect.Effect<void, ApiError>;
@@ -64,25 +82,6 @@ export class Memory extends Context.Service<
   );
 }
 
-const lineMemory = (agent: string, line: MemoryLine, fileTime: number): T.Memory => {
-  const person = line.text.startsWith(fromOwner);
-  let at = fileTime;
-  if (line.date) {
-    // A date and a time with no zone is local time, as new Date(y, m - 1, d) is.
-    at = new Date(`${line.date}T00:00`).getTime();
-  }
-  return {
-    id: line.id,
-    agent,
-    kind: "note",
-    text: person ? line.text.slice(fromOwner.length).trim() : line.text,
-    at,
-    recalled: 0,
-    fading: false,
-    ...(person ? {} : { session: sessionId(agent) }),
-  } satisfies T.Memory;
-};
-
 /** Which outside source a configured one is; tests put their own. */
 export type BuildSource = (c: Parameters<typeof nowledge>[0], http: HttpClient.HttpClient) => Source | undefined;
 
@@ -103,8 +102,6 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     });
     // What an older cut left is cut again in the background.
     yield* Effect.forkScoped(Effect.andThen(loadSegmenter, local.recutTerms));
-    // An orchestrator carries its whole MEMORY.md into every turn; a helper is reminded of rows by its runs' cues.
-    const inFile = (agent: string) => agents.isOrchestrator(agent);
     const homeOf = (agent: string) => agentHome(config, agent);
 
     const list = Effect.fn("Memory.list")(function* (agent: string) {
@@ -119,29 +116,6 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     const forget = (agent: string, id: string) => Effect.mapError(sources.forget(agent, id), (e) => refused(e.message));
 
-    const writeOrchestrator = Effect.fn("Memory.writeOrchestrator")(function* (agent: string, text: string) {
-      const body = clip(text.replace(/\s*\n\s*/gu, " "), noteMaxChars);
-      if (body === "") return yield* Effect.fail(refused(t("server.memory.empty")));
-      const at = yield* Clock.currentTimeMillis;
-      const written = yield* Effect.tryPromise({
-        try: () => remember(homeOf(agent), fromOwner + body, new Date(at)),
-        catch: () => refused(t("server.memory.fileFailed")),
-      });
-      return lineMemory(agent, written, at);
-    });
-
-    // The orchestrators' memory is their MEMORY.md, read as they write it.
-    const fileRefused = (e: unknown) => refused(messageOf(e));
-    const orchestrator = (agent: string): Effect.Effect<T.MemoryList, ApiError> =>
-      Effect.tryPromise({ try: () => readMemory(homeOf(agent)), catch: fileRefused }).pipe(
-        Effect.map((snapshot) => ({
-          file: snapshot.file,
-          memories: snapshot.lines.map((l) => lineMemory(agent, l, snapshot.updatedAt)).toReversed(),
-          carried: snapshot.carried,
-          sources: [],
-        })),
-      );
-
     const preview = (agent: string, project: string, text: string) =>
       Effect.map(sources.prefetch({ agent, project, text, peek: true }), (groups): T.RecallPreview => {
         const lines = mergeRecalled(groups);
@@ -150,33 +124,57 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     // forget and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
     const forgettable = Effect.fn("Memory.forgettable")(function* (agent: string, id: string) {
-      const problem = inFile(agent) ? undefined : yield* sources.forgetProblem(id);
+      const problem = yield* sources.forgetProblem(id);
       if (problem) return yield* Effect.fail(refused(problem));
-      const listed = inFile(agent) ? yield* orchestrator(agent) : yield* sources.list(agent);
+      const listed = yield* sources.list(agent);
       const m = listed.memories.find((x) => x.id === id);
       if (!m) return yield* Effect.fail(missing(t("server.memory.noMemory", { agent, id }), [memoriesOf(agent)]));
       return m;
     });
 
+    const runPromise = Effect.runPromiseWith(yield* Effect.context());
     const shape = Memory.of({
+      forAgent: (agent, session) => {
+        const by = agents.isOrchestrator(agent) ? { kind: "orchestrator" as const, forOwner: false } : { kind: "session" as const, id: session };
+        return {
+          read: () =>
+            runPromise(
+              Effect.gen(function* () {
+                const notes = (yield* local.list(agent)).filter((note) => note.kind === "note").toReversed();
+                const lines = notes.map((note) => (note.author === "owner" ? fromOwner : "") + note.text);
+                return { lines, prompt: carriedMemory(lines) };
+              }),
+            ),
+          remember: (text) => runPromise(Effect.asVoid(local.write({ agent, text, project: "", by }))),
+          rewrite: (text) =>
+            runPromise(
+              Effect.gen(function* () {
+                const owners = new Set((yield* local.list(agent)).filter((note) => note.author === "owner").map((note) => note.text));
+                const notes = parseMemoryLines(text)
+                  .map((line) => line.text)
+                  .filter((line) => !owners.has(line) && !(line.startsWith(fromOwner) && owners.has(line.slice(fromOwner.length).trim())));
+                return yield* local.rewrite(agent, notes, by);
+              }),
+            ),
+        };
+      },
       memoriesOf: Effect.fn("Memory.memoriesOf")(function* (agent) {
-        return inFile(agent) ? yield* Effect.orDie(orchestrator(agent)) : yield* sources.list(agent);
+        return yield* sources.list(agent);
       }),
       remember: Effect.fn("Memory.remember")(function* (n) {
-        return inFile(n.agent) ? yield* writeOrchestrator(n.agent, n.text) : yield* write(n);
+        return yield* write(n);
       }),
       forget: Effect.fn("Memory.forget")(function* (agent, id) {
         yield* forgettable(agent, id);
-        return inFile(agent) ? yield* Effect.tryPromise({ try: () => forgetLine(homeOf(agent), id), catch: fileRefused }) : yield* forget(agent, id);
+        return yield* forget(agent, id);
       }),
       previewForget: Effect.fn("Memory.previewForget")(function* (agent, id) {
         const m = yield* forgettable(agent, id);
         return {
-          does: [inFile(agent) ? t("server.memory.forgetOrchestrator", { text: m.text }) : t("server.memory.forget", { agent, text: m.text })],
+          does: [t("server.memory.forget", { agent, text: m.text })],
         };
       }),
       recallOf: Effect.fn("Memory.recallOf")(function* (agent, project, text) {
-        if (inFile(agent)) return yield* Effect.fail(refused(t("server.memory.orchestratorRecall")));
         return yield* preview(agent, project, text);
       }),
       recall: Effect.fn("Memory.recall")(function* (cue) {
@@ -222,3 +220,212 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     });
     return shape;
   });
+
+// This farm's own memories, rows in the memory table: what each agent noted (its
+// explicit notes (from issue_report or the owner) and one line for each issue it worked. A memory that cannot be read or written never
+// stops a run: it is logged, and the run goes on without it.
+
+/** One finished run, everything about it; each provider keeps what it uses. */
+export interface FinishedRun {
+  readonly agent: string;
+  readonly session: string;
+  readonly issue?: string;
+  readonly project: string;
+  readonly brief: string;
+  readonly outcome: T.Outcome;
+  readonly said: string;
+  readonly summary: string;
+}
+
+/** What a run recalls by. peek only questions: nothing is counted as recalled (the 记性 tab's preview). */
+export interface RecallCue {
+  readonly agent: string;
+  readonly session?: string;
+  readonly project: string;
+  readonly text: string;
+  readonly skip?: ReadonlySet<string>;
+  readonly peek?: boolean;
+}
+
+/** A memory written outside a run: the owner's, from the 记性 tab, the orchestrator's for a profile, or a session's own. */
+export interface Note {
+  readonly agent: string;
+  readonly text: string;
+  readonly project: string;
+  /** Who writes it: a session's note is kept with the session. */
+  readonly by: Actor;
+}
+
+class MemoryRefused extends Schema.TaggedError<MemoryRefused, { readonly brand: unique symbol }>()("MemoryRefused", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
+
+/** Fading marks the ones that would go if this many more were kept. */
+const fadingSoon = 10;
+
+const recutBatch = 100;
+
+const makeMemoryStore = Effect.gen(function* () {
+  const clock = yield* Clock.Clock;
+  const db = yield* Db;
+
+  const list = (agent: string) =>
+    db.attempt(
+      Effect.map(q.memoriesOf({ agent }), (rows) =>
+        rows.map((r): T.Memory => ({
+          id: r.id,
+          agent,
+          kind: r.kind,
+          text: r.body,
+          author: r.author,
+          at: r.created_at,
+          recalled: r.recalled,
+          fading: false,
+          ...(r.project !== null ? { project: r.project } : {}),
+          ...(r.session !== null ? { session: sessionId(r.session) } : {}),
+          ...(r.recalled_at !== null ? { recalledAt: r.recalled_at } : {}),
+        })),
+      ),
+    );
+
+  const insertNote = Effect.fnUntraced(function* (agent: string, body: string, project: string | undefined, session: string | undefined, author: T.ActorKind) {
+    const at = yield* Clock.currentTimeMillis;
+    const id = newId();
+    yield* db.attempt(
+      q.addNote({
+        id,
+        agent,
+        body,
+        terms: termsText(body),
+        terms_of: termsVersion,
+        project: project ?? null,
+        session: session ?? null,
+        author,
+        created_at: at,
+      }),
+    );
+    return { id, at };
+  });
+
+  /** Every agent memory sharing any of text's words, how well (higher better); none when the index cannot say. */
+  const matches = Effect.fnUntraced(
+    function* (agent: string, text: string) {
+      const words = termsList(text);
+      if (words.length === 0) return {};
+      const rows = yield* db.attempt(q.matchMemories({ words, agent }));
+      return Object.fromEntries(rows.map((r) => [r.id, r.score ?? 0]));
+    },
+    (effect, agent) =>
+      effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`searching ${agent}'s memories: ${String(e)}`), {} as Record<string, number>))),
+  );
+
+  /** What a run would recall; nothing is counted as recalled until markRecalled. */
+  const recallable = Effect.fnUntraced(
+    function* (cue: RecallCue) {
+      const all = yield* list(cue.agent);
+      const picked: PickCue = omitUndefined({
+        session: cue.session,
+        project: cue.project,
+        text: cue.text,
+        skip: cue.skip,
+        now: yield* Clock.currentTimeMillis,
+        matches: yield* matches(cue.agent, cue.text),
+      });
+      return pick(all, picked);
+    },
+    (effect, cue) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), [] as T.Memory[]))),
+  );
+
+  const markRecalled = (ids: readonly string[]) =>
+    Effect.forEach(ids, (id) => db.attempt(q.recalled({ recalled_at: clock.currentTimeMillisUnsafe(), id })), { discard: true }).pipe(
+      bestEffort("a memory was recalled but not marked"),
+    );
+
+  /** Reading for deduplication, keeping notes and pruning are one durable change. A stopped run leaves nothing. */
+  const keep = (run: FinishedRun) =>
+    run.outcome === "interrupted"
+      ? Effect.void
+      : db
+          .attemptTx(
+            Effect.gen(function* () {
+              if (run.issue) {
+                const text = issueMemoryText(run.brief, run.summary, run.outcome);
+                yield* db.attempt(
+                  q.keepIssueMemory({
+                    id: newId(),
+                    agent: run.agent,
+                    body: text,
+                    terms: termsText(text),
+                    terms_of: termsVersion,
+                    project: run.project,
+                    session: run.session,
+                    created_at: yield* Clock.currentTimeMillis,
+                  }),
+                );
+              }
+              yield* Effect.forEach(nextForgotten(yield* list(run.agent), 0), (id) => db.attempt(q.forget({ agent: run.agent, id })), { discard: true });
+            }),
+          )
+          .pipe(bestEffort(`what ${run.session} learned was not kept`));
+
+  const listed = Effect.fnUntraced(
+    function* (agent: string) {
+      const all = yield* list(agent);
+      const fading = new Set(nextForgotten(all, fadingSoon));
+      return all.map((m) => ({ ...m, fading: fading.has(m.id) }));
+    },
+    (effect, agent) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memories of ${agent}: ${String(e)}`), [] as T.Memory[]))),
+  );
+
+  const write = Effect.fnUntraced(function* (n: Note) {
+    const body = clip(n.text, noteMaxChars);
+    if (body === "") return yield* new MemoryRefused({ message: t("server.memory.empty") });
+    const project = n.project.trim() || undefined;
+    const session = n.by.kind === "session" ? n.by.id || undefined : undefined;
+    const { id, at } = yield* insertNote(n.agent, body, project, session, n.by.kind).pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.andThen(
+          Effect.logWarning(`a note for ${n.agent}: ${String(e)}`),
+          Effect.fail(new MemoryRefused({ message: t("server.memory.dbFailed"), cause: e })),
+        ),
+      ),
+    );
+    return {
+      id,
+      agent: n.agent,
+      kind: "note",
+      text: body,
+      author: n.by.kind,
+      at,
+      recalled: 0,
+      fading: false,
+      ...(project ? { project } : {}),
+      ...(session ? { session: sessionId(session) } : {}),
+    } satisfies T.Memory;
+  });
+
+  const forget = (agent: string, id: string) => db.run(q.forget({ agent, id }));
+
+  const rewrite = (agent: string, texts: readonly string[], by: Actor) =>
+    db.attemptTx(
+      Effect.gen(function* () {
+        yield* q.clearManagedNotes({ agent });
+        yield* Effect.forEach(texts, (text) => write({ agent, text, project: "", by }), { discard: true });
+        return texts.length;
+      }),
+    );
+
+  /** Cuts again what an older termsVersion cut, a batch at a time: the terms are an index derived from the body. */
+  const recutTerms = Effect.gen(function* () {
+    for (;;) {
+      const rows = yield* db.attempt(q.staleTerms({ version: termsVersion, n: recutBatch }));
+      yield* Effect.forEach(rows, (r) => db.attempt(q.setTerms({ terms: termsText(r.body), version: termsVersion, id: r.id })), { discard: true });
+      if (rows.length < recutBatch) return;
+    }
+  }).pipe(bestEffort("memories were not cut again"));
+
+  return { list, listed, matches, recallable, markRecalled, keep, write, rewrite, forget, recutTerms };
+});
+
+export type MemoryStore = Effect.Success<typeof makeMemoryStore>;

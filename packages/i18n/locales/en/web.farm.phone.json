@@ -22,7 +22,6 @@
   "app": {
     "missed": "Missed",
     "channels": "Chat",
-    "graphs": "Plans",
     "games": "Games"
   },
   "game": {

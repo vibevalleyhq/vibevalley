@@ -6,7 +6,7 @@ import { messageId } from "@vibevalley/protocol/schema";
 import { emptyWorkspaceState } from "@/core/core.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
-import { forOwner } from "./away.ts";
+import { forOwner, inboxEntries } from "./items.ts";
 import { emptyPatrol, type PatrolNote, patrolStep } from "./patrol.ts";
 
 describe("the patrol", () => {
@@ -28,6 +28,38 @@ describe("the patrol", () => {
       });
     });
     expect(failed).toEqual([]);
+  });
+
+  it("gives a seen owner two hours before another reminder", () => {
+    const at = 1_000;
+    const message: ChatMessage = {
+      id: messageId("seen-message"),
+      number: 1,
+      channel: "seen-channel",
+      from: "w1",
+      fromKind: "session",
+      name: "帮工",
+      kind: "chat",
+      text: "请主人决定",
+      mentions: [ownerId],
+      spoken: false,
+      at,
+      revision: 1,
+      reactions: [],
+      attachments: [],
+      embeds: [],
+    };
+    const state: WorkspaceState = {
+      ...emptyWorkspaceState(),
+      chat: {
+        channels: [{ id: "seen-channel", type: "channel", default: true, name: "田头", category: "", description: "", title: "", at: 0, replies: 0 }],
+        ownerMentions: [{ message, channel: "seen-channel", address: "#田头:1" }],
+      },
+    };
+    const mention = inboxEntries(state)[0]!;
+    const now = at + 16 * 60_000;
+    expect(patrolStep(state, now, emptyPatrol())[0].some((note) => note.key === mention.item.id)).toBe(true);
+    expect(patrolStep(state, now, emptyPatrol(), { [mention.item.id]: now - 2 * 60_000 })[0]).toEqual([]);
   });
 });
 

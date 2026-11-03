@@ -7,14 +7,12 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show } from "so
 import { t } from "@vibevalley/i18n";
 import type { SessionId, SessionView } from "@vibevalley/protocol";
 
-import { farmState } from "@/farm/store";
-import { useVillage } from "@/farm/support";
+import { farmState, useFarm } from "@/farm/store";
 import { aimTool } from "@/farm/tools";
-import { useFarm } from "@/farm/ui";
+import { useVillage } from "@/farm/world/load";
 import type { Village } from "@/farm/world/load";
-import { yardPlaces } from "@/farm/world/places";
 import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "@/farm/world/plots";
-import { plotH } from "@/farm/world/world";
+import { plotH, yardPlaces } from "@/farm/world/world";
 import { useFollowed, defaultOf } from "@/features/channel";
 import { useFrames } from "@/infra/frame";
 import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "@/ui/pixel";
@@ -117,12 +115,14 @@ export function Overlay() {
 
     for (const bed of beds) {
       const p = world.plotAt(bed.index);
-      const session = bed.unlockLevel === undefined ? sessionAtStation(state.sessions, bed.station) : undefined;
+      const session = bed.unlockLevel === undefined ? sessionAtStation(state.sessions, bed.station, view.plays) : undefined;
       const plot = bed.unlockLevel !== undefined ? lockedPlot(bed, level) : plotOf(view, session);
       let card: Card | undefined;
       let where: "above" | "rail" | "middle" = "rail";
       const reward =
-        bed.station < 0 ? undefined : rewards().findLast((r) => state.sessions.some((h) => h.id === r.sessionId && stationOfSession(h) === bed.station));
+        bed.station < 0
+          ? undefined
+          : rewards().findLast((r) => state.sessions.some((h) => h.id === r.sessionId && stationOfSession(h, view.plays) === bed.station));
       const note = bedFx().findLast((f) => f.bed === bed.index && (f.kind === "note" || f.kind === "harvest"));
       if (hoverBed() === bed.index) {
         const issue = session ? state.issues.find((i) => i.id === issueOf(session)) : undefined;
@@ -182,7 +182,8 @@ export function Overlay() {
           card: { paper: CardColors.wood, padX: 2, padY: 2, rows: [[{ kind: "icon", sprite: atlas.get(icon), px: 22 }]] },
         });
       }
-      const count = place.id === "warehouse" ? harvestedOf(state).length : place.id === "taskBoard" ? frame.graphs.filter((g) => g.asksForYou).length : 0;
+      const count =
+        place.id === "warehouse" ? harvestedOf(state).length : place.id === "taskBoard" ? frame.inbox.filter((item) => item.target.kind !== "chat").length : 0;
       if (count > 0)
         back.push({
           key: `count:${place.id}`,
@@ -251,7 +252,7 @@ function Heads(props: { sessions: readonly SessionView[]; village: Village }) {
 function Head(props: { session: SessionView; village: Village; placed: Map<string, HTMLDivElement> }) {
   const rows = () => {
     const doing = doingOf(props.session);
-    const named = props.session.phase._tag === "arriving";
+    const named = props.session.phase._tag === "working" && props.session.runs === 0;
     const act = `act-${doing.action}`;
     if (doing.action === "none" && !named) return undefined;
     const out: Piece[] = [];

@@ -9,11 +9,15 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，和 [Multica](https://gi
 ```
 Workspace（工作目录，一张大地图）
 ├── 项目（一个 git 仓库，大地图上的一座岛）
+├── Agent 档案（持续的身份）
+│   └── Session（持续工作的上下文）
+│       └── run（一次触发到一次汇报）
 └── 工单（可以指一个项目）
-    ├── 分支和 worktree（代码相关且档案开了 worktree 的工单才有；岛上围着篱笆的那一块，重开还是这一块）
-    └── Session（在这块地上干活的帮工；派一次是一个，重开是下一个）
-        └── run（一轮：一次触发到一次汇报）
+    ├── Assignment → Agent 档案（由谁负责，执行记录关联到 Session）
+    └── 分支和 worktree（档案开了 worktree 的代码工单才有，重开仍是同一块）
 ```
+
+档案私聊也使用 Session，直接关联频道，不需要工单或 Assignment。Session 的工作目录和默认回复频道独立于每条输入的来源。
 
 现在只有一个 Workspace：工作目录 `VIBEVALLEY_WORK_ROOT`（项目在 `projects/`，worktree 在 `worktrees/`）和家目录 `VIBEVALLEY_HOME`。
 
@@ -28,7 +32,7 @@ Workspace（工作目录，一张大地图）
 
 ## Session 和 oar 会话
 
-单写的 Session 只指上面这一层：一个档案为一张工单接的活。农机那一层（oar 的会话，重启后会换一个）在代码里只经 oar 的 import 出现，文档里写「oar 会话」；中文里我们这一层写 Session，不写「会话」（[Worker 改叫 Session](docs/subsystems/session.md)）。
+单写的 Session 指一个档案持续工作的执行上下文，可以处理工单，也可以承接频道里的聊天。农机那一层（oar 的会话，重启后会换一个）在代码里只经 oar 的 import 出现，文档里写「oar 会话」；中文里我们这一层写 Session，不写「会话」（[Worker 改叫 Session](docs/subsystems/session.md)）。
 
 ## 东西
 
@@ -42,7 +46,9 @@ Workspace（工作目录，一张大地图）
 | runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 oar 驱动 |
 | 项目 | `project` | 一个 git 仓库，和能同时在里面做的工单数（`project.max_sessions`，`ProjectSummary.maxSessions`） |
 | 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，主人挪状态就是派活；代码相关的开不开 worktree 由档案设置决定；每张都有验收，完成就是通过；关上的能重开 |
-| Session | `Session`（服务是 `Session`，派活是 `Issue` 的 `hire`） | 档案为一张工单接的活，在档案配置的项目目录或工单的 worktree 里干，直到工单完成或它收工；跨好几次 run，重启后还是同一个 |
+| 派工关联 | `Assignment` | 工单由哪个档案负责；可以尚未开工，同人继续负责时跨执行上下文保留，换人或清空指派才结束 |
+| 执行器 | `Executor` | 管理 oar 执行实例的创建、投递、中断和释放；不替工单保存责任归属 |
+| Session | `Session`（服务是 `Session`，派活是 `Issue` 的 `hire`） | 档案的执行上下文；工单使用项目目录或工单 worktree，聊天使用独立目录并关联频道；跨多轮、休眠和重启保留身份 |
 | Run | `Run`（`session_run` 表）；核心状态里是 `run` 到 `report` 两个事实 | 一轮：一次触发到一次汇报；帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run |
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |
 | 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 |

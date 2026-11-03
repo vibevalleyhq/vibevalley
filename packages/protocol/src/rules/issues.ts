@@ -2,9 +2,24 @@
 
 import { t } from "@vibevalley/i18n";
 
-import type { Issue } from "../shapes";
+import type { Assignment, Issue, SessionId } from "../shapes";
 
 const titleMax = 40;
+
+/** The responsibility in force now. */
+export const assignmentOf = (issue: Pick<Issue, "assignments">): Assignment | undefined =>
+  issue.assignments.findLast((assignment) => assignment.endedAt === undefined);
+
+export const assignedAgentOf = (issue: Pick<Issue, "assignments">): string | undefined => assignmentOf(issue)?.agent;
+
+/** Every execution, in assignment and start order. */
+export const executionsOf = (issue: Pick<Issue, "assignments">): Assignment["executions"] => issue.assignments.flatMap((assignment) => assignment.executions);
+
+/** The external helper contexts that executed it, in order. */
+export const sessionIdsOf = (issue: Pick<Issue, "assignments">): SessionId[] =>
+  executionsOf(issue).flatMap((execution) => (execution.kind === "worker" ? [execution.session] : []));
+
+export const latestSessionIdOf = (issue: Pick<Issue, "assignments">): SessionId | undefined => sessionIdsOf(issue).at(-1);
 
 /** One short line for a title: its first line, and of a long one, the first sentence, else up to its last pause that fits;
  * failing those, cut. Lengths are characters. */

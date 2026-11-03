@@ -16,7 +16,7 @@ import { type Adapter, type AppFailed, failedOf, failedWith } from "./adapter.ts
 /** A text message's content: {"text": …}. */
 const textContent = jsonOrNone(Schema.Struct({ text: Schema.optionalKey(Schema.String) }));
 
-export type Domain = "feishu" | "lark";
+type Domain = "feishu" | "lark";
 
 const accounts: Record<Domain, string> = {
   feishu: "https://accounts.feishu.cn",

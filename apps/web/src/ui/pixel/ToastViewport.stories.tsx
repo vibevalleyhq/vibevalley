@@ -1,8 +1,7 @@
 import { stories, story } from "@vibevalley/stories";
 
 import { PxButton } from "./button";
-import { ToastStore } from "./toasts";
-import { ToastViewport } from "./ToastViewport";
+import { ToastStore, ToastViewport } from "./ToastViewport";
 
 export default stories({
   title: "组件/像素/ToastViewport",

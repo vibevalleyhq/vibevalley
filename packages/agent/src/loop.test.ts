@@ -93,7 +93,7 @@ describe("a run's turns", () => {
     ),
   );
 
-  it.effect("takes the lines sent while it works one a turn", () => {
+  it.effect("takes every line waiting at a step boundary in one turn", () => {
     const wake = gate();
     let napping = false;
     const nap = textTool<object>({
@@ -108,7 +108,7 @@ describe("a run's turns", () => {
     });
     return withAgent(
       home(),
-      [answer([toolCall("nap", {})]), answer("一"), answer("二")],
+      [answer([toolCall("nap", {})]), answer("一起")],
       (r) =>
         Effect.gen(function* () {
           yield* r.agent.send(userMessage("开始", Date.now()));
@@ -116,8 +116,9 @@ describe("a run's turns", () => {
           yield* r.agent.send(userMessage("甲", Date.now()));
           yield* r.agent.send(userMessage("乙", Date.now()));
           wake.open();
-          yield* until(() => r.agent.history().length >= 7, "r.agent.history().length >= 7");
-          expect(said(r)).toEqual(["user:开始", "assistant:", "toolResult:醒了", "user:甲", "assistant:一", "user:乙", "assistant:二"]);
+          yield* until(() => r.has("agent_settled"), 'r.has("agent_settled")');
+          expect(said(r)).toEqual(["user:开始", "assistant:", "toolResult:醒了", "user:甲", "user:乙", "assistant:一起"]);
+          expect(r.requests[1]!.messages.filter((message) => message.role === "user").map(messageText)).toEqual(["开始", "甲", "乙"]);
         }),
       { tools: [nap] },
     );

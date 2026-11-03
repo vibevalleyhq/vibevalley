@@ -1,17 +1,53 @@
-// The village's named positions, read from the level, and where a helper stands.
+// The village's named positions, read from the level, where a helper stands, how long a pose shows, what a tap lands on,
+// what a click in the yard opens, and how the village sits in a window.
 
+import { type Framing, frameWhole, type Rect, type Size } from "@vibevalley/engine/framing";
 import { navMap, type NavMap } from "@vibevalley/engine/nav";
-import type { Crop, Session, SessionAction } from "@vibevalley/protocol";
+import { t } from "@vibevalley/i18n";
+import type { Crop, Session, SessionAction, SessionId } from "@vibevalley/protocol";
+import { farmFraming } from "@vibevalley/protocol/host";
 
 import { add, type Box, inBox, type Level, type Point } from "./level";
-import { yardPlaces } from "./places";
 import { bedOfStation, isRipe } from "./plots";
+
+// What a click in the yard opens. The ids match the LDtk Prop and Area `spot` fields;
+// a place opens a farm panel, a workbench page, or the chat (the phone unfolded to 田头).
+
+export type FarmPanel = "shop" | "warehouse" | "graphs" | "log" | "orchestrator";
+
+export interface YardPlace {
+  readonly id: string;
+  readonly label: string;
+  readonly hint: string;
+  readonly panel?: FarmPanel;
+  /** A workbench page; the web page has only some of them yet (src/main.tsx). */
+  readonly route?: string;
+  readonly chat?: boolean;
+}
+
+export const yardPlaces: readonly YardPlace[] = [
+  { id: "shop", label: t("web.farm.panel.shop"), hint: t("web.farm.yard.shop.hint"), panel: "shop" },
+  { id: "warehouse", label: t("web.farm.panel.warehouse"), hint: t("web.farm.yard.warehouse.hint"), panel: "warehouse" },
+  { id: "tasks", label: t("web.farm.panel.graphs"), hint: t("web.farm.yard.tasks.hint"), panel: "graphs" },
+  { id: "log", label: t("web.farm.panel.log"), hint: t("web.farm.yard.log.hint"), panel: "log" },
+  { id: "taskBoard", label: t("web.farm.menu.issues"), hint: t("web.farm.yard.taskBoard.hint"), route: "/issues" },
+  { id: "agents", label: t("web.farm.menu.agents"), hint: t("web.farm.yard.agents.hint"), route: "/agents" },
+  // Changing its look is the HUD's face (换管家的样子); the orchestrator in the yard is someone to talk to.
+  { id: "manager", label: t("web.farm.orchestrator"), hint: t("web.farm.yard.manager.hint"), chat: true },
+  { id: "runtimes", label: t("web.farm.yard.runtimes.label"), hint: t("web.farm.yard.runtimes.hint"), route: "/runtimes" },
+  { id: "skills", label: t("web.farm.yard.skills.label"), hint: t("web.farm.yard.skills.hint"), route: "/settings/skills" },
+];
+
+export const yardPlace = (id: string) => yardPlaces.find((p) => p.id === id);
+
+/** The workbench pages the web page has (src/main.tsx); a place whose page is not among them opens nothing yet. */
+export const webRoutes: readonly string[] = ["/issues", "/chat"];
 
 export const plotW = 34;
 export const plotH = 26;
 
 export type Facing = "up" | "down" | "left" | "right";
-export type PlotSpot = "front" | "left" | "right" | "back";
+type PlotSpot = "front" | "left" | "right" | "back";
 
 /** Around a plot, from its bottom-centre: where a helper stands to look on. */
 const around: Record<PlotSpot, Point> = { front: { x: 0, y: 5 }, left: { x: -24, y: -10 }, right: { x: 24, y: -10 }, back: { x: 6, y: -29 } };
@@ -36,7 +72,7 @@ export interface Goal {
   readonly facing?: Facing;
 }
 
-export type FxKind = "chimney" | "anvil" | "mast" | "pond";
+type FxKind = "chimney" | "anvil" | "mast" | "pond";
 
 /** What a helper works from the side (the anvil) is this far in front of where it stands. */
 const reach = 15;
@@ -163,6 +199,32 @@ export class VillageWorld {
 
 export type Pose = "cheer" | "worry" | "idle" | "work" | "think";
 
+/** How long one pose stays on screen, so fast tool calls are seen one at a time. */
+export const poseMinMs = 800;
+
+/** The pose an actor shows: the newest wanted one, but only after the last change has been up for poseMinMs. A burst of
+ * actions keeps only the newest, and when the burst ends the picture catches up within one poseMinMs. */
+export class PoseHold {
+  private shown: Pose;
+  private wanted: Pose;
+  private since: number;
+
+  constructor(pose: Pose, now: number) {
+    this.shown = pose;
+    this.wanted = pose;
+    this.since = now;
+  }
+
+  next(want: Pose, now: number): Pose {
+    this.wanted = want;
+    if (want !== this.shown && now - this.since >= poseMinMs) {
+      this.shown = want;
+      this.since = now;
+    }
+    return this.shown;
+  }
+}
+
 const handsOn = new Set<SessionAction>(["edit_file", "run_command", "mcp", "other"]);
 
 export function poseOf(s: Session, crop: Crop): Pose {
@@ -192,14 +254,12 @@ export function placeOfAction(action: SessionAction): string {
 
 export const plotCalls = (crop: Crop) => isRipe(crop) || crop === "withered" || crop === "dry";
 
-export type StrollSpot = PlotSpot | "rest";
+type StrollSpot = PlotSpot | "rest";
 
 export function spotsFor(s: Session, crop: Crop, pose: Pose): readonly StrollSpot[] {
   if (isRipe(crop) || crop === "dry") return ["front"];
   if (crop === "withered") return ["front", "left", "right"];
   switch (s.phase._tag) {
-    case "arriving":
-      return ["right"];
     case "working":
       return pose === "work" ? ["front", "right", "left"] : ["left", "back", "right"];
     case "resting":
@@ -247,4 +307,39 @@ export interface Stroll {
   readonly spot: StrollSpot;
   readonly rest: number;
   readonly until: number;
+}
+
+// The village in a window (@vibevalley/engine/framing): a whole number of screen pixels for each art pixel, at most 5% of
+// its width cut off on each side and 8% of its height above and below (farmFraming); a window it cannot fill keeps bars.
+
+export type { Rect };
+
+export const villageCutAcross = farmFraming.cut.across;
+export const villageCutDown = farmFraming.cut.down;
+
+export const frameVillage = (window: Size, village: Size): Framing => frameWhole(window, village, farmFraming.cut);
+
+// What a tap lands on: the order is the rule. Helpers first (the last drawn on top), then the dog, the yard's places, the
+// plots (a little taller than their box).
+
+export type VillageHit =
+  | { readonly kind: "session"; readonly id: SessionId }
+  | { readonly kind: "dog" }
+  | { readonly kind: "spot"; readonly spot: string }
+  | { readonly kind: "plot"; readonly bed: number };
+
+interface VillageHitData {
+  /** In drawing order. */
+  readonly sessions: ReadonlyMap<SessionId, Box>;
+  readonly dog?: Box;
+  readonly spots: ReadonlyMap<string, Box>;
+  readonly plots: ReadonlyMap<number, Box>;
+}
+
+export function villageHitAt(data: VillageHitData, p: Point): VillageHit | undefined {
+  for (const [id, box] of [...data.sessions].toReversed()) if (inBox(p, box)) return { kind: "session", id };
+  if (data.dog && inBox(p, data.dog)) return { kind: "dog" };
+  for (const [spot, box] of [...data.spots].toReversed()) if (inBox(p, box)) return { kind: "spot", spot };
+  for (const [bed, b] of [...data.plots].toReversed()) if (inBox(p, { ...b, y0: b.y0 - 4, y1: b.y1 + 2 })) return { kind: "plot", bed };
+  return undefined;
 }

@@ -4,7 +4,7 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
-import { Pg_public_memory_author_ee4fd907c562, Pg_public_memory_kind_667ae7b26db7 } from "./types.js"
+import { Pg_public_actor_kind_da8cf903629c, Pg_public_memory_kind_667ae7b26db7 } from "./types.js"
 
 export const MemoriesOfParams = Schema.Struct({
   ["agent"]: Schema.NullOr(Schema.String),
@@ -18,7 +18,7 @@ export const MemoriesOfResult = Schema.Struct({
   ["body"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["session"]: Schema.NullOr(Schema.String),
-  ["author"]: Pg_public_memory_author_ee4fd907c562,
+  ["author"]: Pg_public_actor_kind_da8cf903629c,
   ["created_at"]: Schema.Number,
   ["recalled"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["recalled_at"]: Schema.NullOr(Schema.Number),
@@ -45,7 +45,7 @@ export const AddNoteParams = Schema.Struct({
   ["terms_of"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["project"]: Schema.NullOr(Schema.String),
   ["session"]: Schema.NullOr(Schema.String),
-  ["author"]: Pg_public_memory_author_ee4fd907c562,
+  ["author"]: Pg_public_actor_kind_da8cf903629c,
   ["created_at"]: Schema.Number,
 })
 export type AddNoteParams = typeof AddNoteParams.Type
@@ -115,6 +115,22 @@ export const forget = Effect.fn("Forget")(function* (params: ForgetParams) {
   return yield* SqlSchema.void({
     Request: ForgetParams,
     execute: (p) => sql.unsafe(ForgetSql, [p["agent"], p["id"]]),
+  })(params)
+})
+
+export const ClearManagedNotesParams = Schema.Struct({
+  ["agent"]: Schema.NullOr(Schema.String),
+})
+export type ClearManagedNotesParams = typeof ClearManagedNotesParams.Type
+
+
+export const ClearManagedNotesSql = "-- name: ClearManagedNotes :exec\ndelete from memory where agent = $1 and kind = 'note' and author <> 'owner';"
+
+export const clearManagedNotes = Effect.fn("ClearManagedNotes")(function* (params: ClearManagedNotesParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: ClearManagedNotesParams,
+    execute: (p) => sql.unsafe(ClearManagedNotesSql, [p["agent"]]),
   })(params)
 })
 

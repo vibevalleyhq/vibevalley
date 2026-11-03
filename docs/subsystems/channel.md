@@ -7,40 +7,44 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 频道、串、消息、@，消息号和地址 `#<频道>:<消息号>` | 工单的状态和派活（[工单](docs/subsystems/issue.md)）；派活时 `issue` 开 Session，频道模块只为这张工单开工单串 |
-| 一条消息给谁、叫不叫醒，三道刹车，送达的状态 | 一轮怎么跑、能不能插话（帮工经 `Session.deliver` 交给 oar，[帮工](docs/subsystems/session.md)） |
+| 一条消息里说了什么、@ 了谁、属于哪个串 | 收件优先级、三道刹车、送达状态与按 Session 分箱（`Mailbox`）；一轮怎么跑、能不能插话（[帮工](docs/subsystems/session.md)） |
 | 帮工的汇报贴进工单串；带话、验收意见、冲突经工单串交给帮工 | 汇报怎么读出结论（`session/report.ts` 的 `summaryOf`） |
 | 帮工在 `/mcp` 上的说话工具（`channel_message_send`、`channel_message_list`、`channel_unread_list`）背后的规则 | 工具的定义和认人（`apps/server/src/tool`、`mcp`、`Session.who`） |
-| 连接器：扫码登录、只认主人、收件和发件、转成纯文本 | 管家怎么回答（`orchestrator`）；连接器把话交给 `Orchestrator.say`，管家照频道的规则被叫醒 |
+| 连接器：扫码登录、只认主人、收件和发件、转成纯文本 | 管家怎么回答（`orchestrator`）；连接器用 `Ingress.owner` 写下 `source=connector` 的主人信封，Mailbox 照频道规则叫醒管家 |
 | | Inbox 和巡查（[Inbox](docs/subsystems/inbox.md)）；定时任务到点在频道里说的那句（[定时任务](docs/subsystems/cron.md)） |
 | | 频道、私聊和串在界面上的样子（[farm-ui.md](docs/reference/farm-ui.md)、`apps/web/src/farm/chat`、`apps/web/src/features/channel`） |
 
 ## 在哪
 
-- **频道**：`apps/server/src/channel`（`Channel`）。`chat.ts` 是对外的方法（`say`、`speak`、`read`、`tellSession`、`orchestratorSays`、`spoken`、`notice`、`openChannel`、`makeDefault`、`topOf`、`addressOf`……）、写一条消息、算给谁、叫醒和提示、推进已读和「看到了」、开串和开机恢复、订阅（`follow`、`reports`）；只有它用的纯规则按管的事分开：`mentions.ts`（`mentionsIn`，一条话点了谁）、`targets.ts`（`parseChatTarget`、`channelNameProblem`）、`wake.ts`（叫醒时给多少）、`search.ts`（`parseSearch`）、`folded.ts`（核心状态里的聊天：`targetOf`、`defaultOf`、`topOf`），黄金数据在 `testdata/rules.jsonl.gz`；`model.ts` 是它在内存里记着的频道和串、参与者和主人的已读位置，`audience.ts` 是一条消息给谁、谁被拦下（`chatAudience`），和要用的：谁跟着哪个串、主人上次说话后帮工之间来回了几次、每个人上次被帮工叫醒的时间。`deliveries.ts` 是还开着的投递（待送、提示过、交出去了），每条带着收件箱要显示的；看到了、丢掉了的就不在里面。
-- **几处共用的规则在 `apps/server/src/channel/folded.ts`**：`targetOf` 写地址，`defaultOf` 认出默认频道，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryChannels`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留多少频道和串（`keepChannels` 100 个）。
+- **频道**：`apps/server/src/channel`（`Channel`）管理消息、频道、私聊、串、成员、已读游标和附件；`rooms.ts` 保存内存视图。`channel/messages.ts` 把提交后的消息保存成不可变 Trigger，卡片指向 `vv://trigger/<id>`，完整原文独立留存；改消息不覆盖源事实。投递归 `mailbox`：`routing.ts` 决定受众，`work.ts` 管工单归属，`pump.ts` 发送会话输入，`deliveries.ts` 缓存未终结投递。
+- **几处共用的规则在 `apps/server/src/channel/messages.ts`**：`targetOf` 写地址，`defaultOf` 认出默认频道，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryChannels`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留多少频道和串（`keepChannels` 100 个）。
 - **订阅**：契约是 `packages/protocol/src/rpc.ts` 的 `Subscriptions`（Effect RPC），服务端 `apps/server/src/http/rpc.ts` 挂在 `/api/v1/rpc`，页面经 `apps/web/src/infra/gateway.ts` 连、`features/channel/follow.ts` 按频道存。
-- **表**：`channel_participant`、`channel`（频道、私聊、串都是一行，照 Discord；`is_default` 至多一行为真，`peer_id` 每个对面至多一个私聊）、`channel_message`（每条带它的修订号、回复的号、改和删的时刻、置顶、回应）、`channel_attachment`（附件的名字、类型、大小，文件在家目录的 `attachments/<sha256>`）、`channel_mention`、`channel_follow`、`channel_read_cursor`、`channel_seen_mark`、`channel_delivery`；连接器的 `connector_account`、`connector_inbound`、`connector_outbox`。表结构在 `apps/server/db/migrations/0001_schema.up.sql`。
+- **表**：`channel_participant`、`channel`（频道、私聊、串都是一行，照 Discord；`is_default` 至多一行为真，`peer_id` 每个对面至多一个私聊）、`channel_message`（每条带它的修订号、回复的号、改和删的时刻、置顶、回应）、`channel_attachment`、`channel_mention`、`channel_follow`、`channel_read_cursor`；信箱投递是 `mailbox_delivery`，路由回执保存在 `ingress_trigger.routed_at/routing_scope/routing_position`，源载荷不变。消息先提交，Delivery 与回执再在一个事务写；崩在两步之间，启动重放未路由消息。连接器是 `connector_account`、`connector_inbound`、`connector_outbox`。
 - **连接器**：`apps/server/src/connector`（`Connector`）。`connector.ts` 是桥：账号和它的代际、配对、只认主人、收进来的话交给管家、持久收件、发件表和退避；`digest.ts` 是送出去的写法（`ownerLine`、`plainText`、`splitText`、`flushText`）；`adapter.ts` 是桥对每家的要求（登录、接收到断开、发送，都是 Effect，失败是 `AppFailed`：`stale`、`restricted`、`failed`）；三家的协议和扫码登录在 `weixin.ts`、`feishu.ts`（飞书用 `@larksuiteoapi/node-sdk`）、`qq.ts`，HTTP 走 Effect 的 `HttpClient`。
-- **接口**：`channel.message.send`、`channel.message.update`、`channel.message.delete`、`channel.message.list`、`channel.message.search`、`channel.reaction.set`、`channel.pin.set`、`channel.pin.list`、`channel.thread.create`（带 `requestKey`，[核心状态](docs/subsystems/core.md)）、`channel.attachment.create`、`channel.create`、`channel.update`、`channel.default.set`、`channel.markRead`；读附件是 `GET /api/v1/attachment/<id>`（`http/attachment.ts`）；`voice.hear`、`voice.call.hear`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel.set`（[capabilities.md](docs/reference/capabilities.md)）。管家的工具 `channel_list`、`channel_create`、`channel_update`、`issue_comment_create`、`channel_message_list`；帮工的 `channel_message_send`、`channel_message_list`、`channel_unread_list`、`session_list`（`apps/server/src/tool/tool.ts`）。
-- **配置**：`chat.notice_batch_ms`（忙时攒多久再提示，默认 3000）、`chat.retry_wake_ms`（叫醒没开口以后多久再叫，默认 3000）。
-- **页面**：农场窗口的田头和频道菜单（`apps/web/src/farm/chat`，`ChannelMenu.tsx`，频道之下一段私聊）；整页的聊天页 `/chat`（`apps/web/src/features/channel`，侧栏分频道、私聊、帮工三段；`/chat` 是默认频道，别的在 `/chat/<id>`）；两边的输入框（回车发送、@ 叫人、失败了同一稿用同一把钥匙重发）在 `apps/web/src/features/channel/composing.ts` 的 `createComposer`，两边只画；开频道和改频道的表单两边各画一份，栏、忙和服务端的拒绝都在 `apps/web/src/features/channel/channelForm.ts` 的 `createChannelForm`；聊天软件页 `/settings/chat`（`features/connector/ConnectorsPage.tsx`）。
+- **接口**：`channel.message.send`、`channel.message.update`、`channel.message.delete`、`channel.message.list`、`channel.message.search`、`channel.reaction.set`、`channel.pin.set`、`channel.pin.list`、`channel.thread.create`（带 `requestKey`，[核心状态](docs/subsystems/core.md)）、`channel.attachment.create`、`channel.create`、`channel.update`、`channel.default.set`、`channel.markRead`；读附件是 `GET /api/v1/attachment/<id>`（`http/api.ts`）；`voice.hear`、`voice.call.hear`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel.set`（[capabilities.md](docs/reference/capabilities.md)）。管家的工具 `channel_list`、`channel_create`、`channel_update`、`issue_comment_create`、`channel_message_list`；帮工的 `channel_message_send`、`channel_message_list`、`channel_unread_list`、`session_list`（`apps/server/src/tool/tool.ts`）。
+- **配置**：`chat.notice_batch_ms`（忙时攒多久再插话，默认 3000）、`chat.retry_wake_ms`（叫醒没开口以后多久再叫，默认 3000）。
+- **页面**：农场窗口的田头和频道菜单（`apps/web/src/farm/chat`，`ChannelMenu.tsx`，频道之下一段私聊）；整页的聊天页 `/chat`（`apps/web/src/features/channel`，侧栏分频道、私聊、帮工三段；`/chat` 是默认频道，别的在 `/chat/<id>`）；两边的输入框（回车发送、@ 叫人、失败了同一稿用同一把钥匙重发）在 `apps/web/src/features/channel/composing.ts` 的 `createComposer`，两边只画；开频道和改频道的表单两边各画一份，栏、忙和服务端的拒绝都在 `apps/web/src/features/channel/Dialogs.tsx` 的 `createChannelForm`；聊天软件页 `/settings/chat`（`features/connector/ConnectorsPage.tsx`）。
 
 ## 模型和不变量
 
-- **数据库是家，先写库再成事实**：一条消息和它的 @、跟帖、投递在一个事务里写进库，提交以后才施加 `message`、`channel` 事实。核心状态 `WorkspaceState.chat` 只放最近的 100 个频道和串（挤出去的只有串），不放消息；每个都带服务端算好的 `unread`（主人没读的、不是自己说的、不是提示）、`last`（最新一条是谁、开头、什么时候），没挂工单和计划的串带 `title`（帮工说话的串是帮工的名字，别的是它挂着的那条消息的开头）。说的话按频道订阅。`message` 事实照旧每条都施加：游戏、通知和工单听它，它把所在 channel 的 `lastNumber` 推到这条的号码。`state.json` 不存频道，开机从库里放回。帮工的已读位置、跟帖、投递不进核心状态：库是它们的家，频道模块在内存里记着要用的那部分（下一条）。
+- **阅读与消费各一份记录**：主人和 Agent 主动读取推进 `channel_read_cursor.read_number`；模型被动接收以 `mailbox_delivery.consumed_at` 为准。未读查询同时排除两者已经覆盖的消息，不再存逐条已读表。消费先持久化，再显示阅读反应；工具读取不确认投递消费。
+
+- **工单线程的主人输入先归工单**：Ingress 写入 `channel:<id>` 和 `issue:<id>` 来源键，Mailbox 先存 Tier 1，再交给当前 Session。排队期没有 Session 也不丢；首轮从信箱领取，不再由 Issue 另拼聊天上下文。附件、引用和语音响应端口随原始输入保留。handback 或关单释放未消费追问时，信箱转交原 Trigger，使用确定性的返回编号防重，不生成系统聊天消息。
+
+- **数据库是家，先写库再成事实**：消息先提交，Ingress 再记录来源，Mailbox 事务保存投递与路由回执，随后施加 `message`、`channel` 事实。核心状态 `WorkspaceState.chat` 只放最近的 100 个频道和串（挤出去的只有串），不放消息；每个都带服务端算好的 `unread`（主人没读的、不是自己说的、不是提示）、`last`（最新一条是谁、开头、什么时候），没挂工单和计划的串带 `title`（帮工说话的串是帮工的名字，别的是它挂着的那条消息的开头）。说的话按频道订阅。`message` 事实照旧每条都施加：游戏、通知和工单听它，它把所在 channel 的 `lastNumber` 推到这条的号码。频道从 PGlite 的频道表放回，不在家目录另存一份。帮工的已读位置、跟帖、投递不进核心状态：库是它们的家，频道模块在内存里记着要用的那部分（下一条）。
 - **消息的去处由库里的身份决定**：连接器引用旧消息时回到它所在的频道或串，发件只送到那里所属的频道接的账号。两条路都由 `messageLocation` 按消息 id 查出它所在的 channel 和顶层频道（`top`）；消息或串被最近状态挤出、服务端重启，都不改变去处。
 - **没处理的 @主人 留到读过或回复过**：频道模块从库里的 @、已读位置和主人在同一处的后续消息算出完整集合，经 `ownerMentions` 事实写进 `Chat.ownerMentions`；不受最近 100 个的限制。写出 @主人、主人回复、标记已读和开机时刷新，每次用一条查询带回消息、频道和地址。通知只读这个结论，不再从聊天窗口推测完成条件。
-- **记着自己写过的，不再读回来**：频道模块开机时把全部频道和串、参与者和主人的已读位置读进 `model.ts`，此后每写一次库就把同样的改动告诉它（每个方法照它对应的那条查询算），按 id 找频道和串、按消息找串、主人读到哪、谁跟着串、来回了几次、谁刚被叫醒过、谁还有哪些没看都问它们；投递的每次变化（提示、交出、看到、退回、丢掉）先写库再告诉 `deliveries.ts`，开机先把交出去没看到的退回，再读一遍；刚写下的消息也在内存里拼好往下传，不按 id 再读。只有它写这几张表，所以记着的和库里的一样；一个事务失败时，它在事务里告诉过 `model.ts` 的改动库里没有，就从库重读一遍。主人自己说的话、在串里说的、电话里说的，「读到这一条」和这条消息在同一个事务里。
-- **写库一个一个来**：改频道的都在 `chat.ts` 的一把锁（`Semaphore`）里，数据库一个连接、一个写入方，所以 `number` 的先后就是提交的先后，不用像多写入方那样等「稳定」。不应开连接池。
+- **记着自己写过的，不再读回来**：Channel 缓存频道、串、参与者与阅读位置；Mailbox 缓存 pending/handed 投递。各自先提交自己的数据库记录，再更新缓存；事务失败时从库恢复。阅读游标和模型输入消费分别记录。
+- **写库一个一个来**：改频道的都在 `channel.ts` 的一把锁（`Semaphore`）里，数据库一个连接、一个写入方，所以 `number` 的先后就是提交的先后，不用像多写入方那样等「稳定」。不应开连接池。
 - **页面按频道订阅，按修订号续上**：每个频道有一个修订号（`channel.revision`），那里的消息每写下或改动一次（改、删、回应、置顶）就加一，记在那条消息上（`ChatMessage.revision`）。页面经一条 WebSocket 订阅它正看着的频道和串：`channel.follow({ id, after })` 先从库里补 `after` 以后变过的消息（按修订号，每条是它现在的样子），再推之后的每一次变化；落后超过 `catchUpMax`（200）次就回 `Reset`，页面重读最新一页（`channel.message.list`）再从那里接着订阅。先订阅、后读库，两边都有的按修订号去掉，中间的变化不会漏。页面按消息号留修订号大的那份；比读进来的几页更早的消息变了，等翻到那一页时一起读。读得慢的订阅积压到 64 条就结束，页面带着修订号重连。`channel.reports` 是全农场的汇报（农场的日志用）：按消息 id 接着读，没给 id 时从最近 `logKeep`（80）条起。主人自己的消息带它的 `sendKey`，页面的「发送中」那一行按它换成服务端的那条。
 - **只放农场自己的页面**：WebSocket 不受 CORS 管，别的网页也能连本机的端口。upgrade 之前，`Host` 要是回环地址（`127.0.0.1`、`localhost`、`[::1]`），`Origin` 有的话要和 `Host` 同源；只查 `Origin` 不够，一个被解析到本机的名字（DNS rebinding）就是它自己的源。经「连接到本机」转来的带设备头，由那一头查过（[连接到本机](docs/subsystems/lan.md)）。
 - **一处一列消息号**：主键是 uuidv7，`number` 在每个频道和串里从 1 数，对外的消息号就是它。地址是 `#<频道>`、`#<频道>:<消息号>`（默认频道是它自己的名字，比如 `#general`），私聊是 `@owner`（管家读写它和主人的私聊时写，`@主人` 也认）；频道名 1–24 个字母、数字、汉字、`_`、`-`，不能重名，这样地址能读回来。
 - **channel 三种（`type`），照 Discord**：频道（`channel`，有名字，可以带说明、默认项目和分组）、私聊（`direct`，主人和一个对面 `peer`：一个管家（它的档案 id），或一个帮工的档案 `profile:<档案>`；没有名字，列表里用对面的名字 `title`）、串（`thread`，挂在 `parent` 频道的一条消息 `root` 下，`subject_kind` 是 `issue`、`talk`）。
 - **默认频道是一条数据**：`channel.is_default`，协议里是 `Channel.default`；没写频道的话（连接器、电话、定时任务、提醒）去那里，代码只认这个标记，不认名字、不认类型。开机时一个频道都没有就建一个 `general`（`firstChannelName`）设成默认；`channel.default.set` 换一个，在同一个事务里清掉旧的。名字存下来、写进地址，不随语言变；农场的皮把它画成「田头」（`farmChannelLabel`）。
-- **私聊在开机时建好**：和每个管家的那一个（`peer` 是它的档案 id），一个对面只有一个（`on conflict do nothing`）；开机以后新建的管家在第一次 `channel.direct.create` 时建。和帮工的档案的私聊在主人第一次点「私聊」时建（`channel.direct.create { agent }`），它挂着这个档案的私聊工单（`subject` 是工单，下一条），所以它也是那张工单的串。它不放活：从私聊里记的工单、定的定时任务落在默认频道（`topOf`），帮工也不在私聊里。工单串的 `subject_id` 是工单的 id；没挂工单的 Session 开的是 `talk` 串，`subject_id` 是它自己；有人往 `#频道:<号>` 说话时现开的串也是 `talk`，没有 `subject_id`。
-- **一张工单一个串**：重开、换帮工都还是这一个串，前后几个帮工的派活、汇报、主人的话都在里面。串的主人是这张工单现在在干活的帮工（`sessionOnIssue`），每次写消息时按工单现算，不存；没有帮工在干时串没有主人。从帮工找串只走一个函数（`threadOfSession`：先找它的工单，再找串），不拿帮工的 id 去找工单串。核心状态里 `message` 事实的 `thread` 是工单的 id。页面的串标题是工单标题，帮工走了也对（`apps/web/src/features/channel/threads.ts` 的 `threadTitle`、`threadOwnerOf`）。
+- **私聊属于档案**：每个对面只有一个私聊，由库的唯一约束保证；管家的私聊在开机时建，帮工档案的在 `channel.direct.create` 时建。私聊不挂工单，执行它的 Session 通过 `channel` 指回它。私聊里新建的工单和定时任务仍落到默认频道。工单串的 `subject_id` 是工单 id；没有工单的公共说话串仍是 `talk`。
+- **一张工单一个串**：重开、换帮工都还是这一个串，前后几个帮工的派活、汇报、主人的话都在里面。串的主人是这张工单现在在干活的帮工（`sessionOnIssue`），每次写消息时按工单现算，不存；没有帮工在干时串没有主人。从帮工找串只走一个函数（`threadOfSession`：先找它的工单，再找串），不拿帮工的 id 去找工单串。核心状态里 `message` 事实的 `thread` 是工单的 id。页面的串标题是工单标题，帮工走了也对（`apps/web/src/features/channel/places.ts` 的 `threadTitle`、`threadOwnerOf`）。
 - **谁在频道里**：主人和每个管家在每个频道里（管家是参与者，id 是它的档案 id，名字是档案的名字，说话前照档案更新），私聊里只有主人和它的 `peer`；参与者的种类和别处记「谁做的」是同一组词（`ActorKind`：`owner`、`orchestrator`、`session`、`system`），一条消息的 `fromKind` 就是说话的人的种类，主人的 id 是 `owner`（protocol 的 `ownerId`，`@主人` 指它）；帮工在它的活所在的频道里，在哪个频道派的活，工单串就开在哪个频道下面。帮工派出来时加入（`channel_participant`），离开时打上 `left_at`，说过的话留着，给它没交完的投递作废（`dropped`）。
-- **和帮工的档案私聊是一张藏起来的工单**：每个档案一张私聊工单（`issue.talk` 是私聊的 id，交付物 `answer`，派给这个档案），不在看板、不在管家的 `issue_list` 里，没有要主人按的按钮。主人在私聊里说话，就是在这张工单的串里说话：有帮工在做就交给它；没有就派一个（`Issue.talkOn`），交给它的活是只读的私聊规矩加私聊里最近的 12 条（`talkJob`、`talkContext`），在工单的项目里，没有就在档案的工作目录，再没有就在最近干过活的那个项目。它占一个同时干活的名额；每一轮交回来就把它改的清掉（`discardWork`），它说的话和汇报都写在私聊里；交回来以后闲 10 分钟（`talkIdleMs`）就收工，下次再说就派新的一个。要改代码，它或主人把这件事记成工单，照常派、看、合。
+- **私聊直接使用 Session**：Channel 解析档案，首句启动频道上下文，连续输入走同一 Session；上下文使用自己的目录，不选择最近的项目，不清理项目改动。Session 在汇报后闲置 10 分钟只休眠执行器，保留 Session、目录和续接标识，下次输入恢复；聊天不创建 Issue 或 Assignment。
 - **频道自己能改**：`channel.update` 改名（频道照旧不重名、能写进地址；串可以起一个标题，空着就是它挂着的那条消息的开头）、照看它的管家（`orchestrator`，要是管家的档案，空或默认管家都存成没设，库里 `channel.orchestrator`）、分组（`category`，空是不分组）和位置（`before`：排在哪个频道前面，服务端给全部频道重排 `position`）。侧栏按分组、按位置列，拖一个频道到另一个上就排在它前面、进它的组。归档（`channel.archive.set`，带 `on`）的频道和串不在侧栏、串列表里，消息和地址照旧在；默认频道不能归档。删除（`channel.delete`，先试跑 `channel.previewDelete`）只删没人用的：默认频道、还有帮工在那里干活、有定时任务、接着连接器、有排队的工单、挂着工单串的都拒绝，说是哪一样；删频道连它的串、消息、跟帖和已读一起删，施加 `channelGone`。
 - **提醒级别**（`notify`）：每个频道和串一个，`all`（默认）、`mentions`（只有 @主人 的算）、`none`；串没设时照它的频道（`notifyOf`）。`none` 的不算未读、不进 Inbox 的 @ 提醒、不转到连接器；`mentions` 的未读只数没处理的 @主人。`channel.notify.set` 改它。
 - **列出来**：`channel.list` 是全部频道和私聊，默认的在前（管家的 `channel_list`）；`channel.unread.list` 是调用者自己没读完的地方，最新的在前，每处带地址、几条、有没有提到它（帮工的 `channel_unread_list`，主人调就是主人的）。
@@ -52,7 +56,7 @@
 | 谁说的 | 叫醒谁 | 只让谁知道 |
 |---|---|---|
 | 主人在频道里 | 被 @ 的；没 @ 别人时是管家 | 这个频道里的帮工 |
-| 主人在私聊里 | 对面（`direct`）：那个管家，或档案私聊工单现在的帮工；@ 只是字，不记、不投递 | — |
+| 主人在私聊里 | 对面（`direct`）：那个管家，或该档案在这个私聊的 Session；@ 只是字，不记、不投递 | — |
 | 管家在私聊里 | 谁也不叫（主人照常算未读） | — |
 | 主人在串里 | 被 @ 的、这张工单现在的帮工、跟着这个串的；工单没人在干时只记下 | — |
 | 管家或帮工 | 被 @ 的；在工单串里说话叫醒这张工单现在的帮工 | — |
@@ -61,15 +65,16 @@
 
   在串里说过话或被 @ 过，就跟着这个串（`channel_follow`）。`@主人` 不产生投递，它进 Inbox。
 
-- **三道刹车**只管 agent 叫醒 agent，主人的话不受限：一个频道或串里从主人上次说话算起最多叫醒 4 次（`hopLimit`），到了 @ 照记、照显示，不叫醒，那里贴一句提示（每次主人说话后只贴一次）；同一个帮工被 agent 叫醒至少隔 60 秒（`agentWakeCooldownMs`）；连着 3 次叫醒都在开口前失败（`wakeBreaker`）就不再自动叫它，工单串里贴一句，主人的下一句叫醒它的话解除。被拦下的投递照样记着（`held_by` 是 `hop_limit`、`cooldown`、`wake_breaker`）。来回次数和冷却从 `channel_delivery` 现算；熔断归 `apps/server/src/channel/breaker.ts` 的 `WakeBreaker`：计数在内存里，重启清零；开口只清计数，熔断要主人点名或帮工离开才解除。
+- **三道刹车**只管 agent 叫醒 agent，主人的话不受限：Channel 提供已落库消息、参与者、关注者和线程归属，Mailbox 的受众路由统一决定谁收到，并从 `mailbox_delivery` 现算来回次数和冷却。一个频道或串里从主人上次说话算起最多叫醒 4 次（`hopLimit`），到了 @ 照记、照显示，不叫醒，那里贴一句提示（每次主人说话后只贴一次）；同一个帮工被 agent 叫醒至少隔 60 秒（`agentWakeCooldownMs`）；连着 3 次叫醒都在开口前失败（`wakeBreaker`）就不再自动叫它，工单串里贴一句，主人的下一句叫醒它的话解除。被拦下的投递照样记着（`held_by` 是 `hop_limit`、`cooldown`、`wake_breaker`）。熔断归信箱模块。
 - **消息会变，变了不是新闻**：主人能改自己的聊天消息（`channel.message.update`，记下 `edited_at`，@ 不重算），能删任何一条（`channel.message.delete`，正文、附件和回应清掉、记下 `deleted_at`，号留着，还没交出去的投递丢掉，`dropped_why: deleted`，挂在它下面的串留着）；回复记下同一处被回复的消息号（`reply_number`），回应存在消息上（`{ 表情: [谁…] }`，`channel.reaction.set` 按 `on` 加上或去掉主人的那个，设成已经是的样子不改；页面先给 8 个常用的，「更多表情」里是全部），置顶记下 `pinned_at`。改动只推给订阅的人：不施加 `message` 事实、不投递、不叫醒、不算未读。
-- **送达看得见**：一条要叫醒帮工或管家的话交到它手上时（投递变成 `handed`，管家是交出去当即），服务端以它的名义在那条消息上加一个 👀。
+- **消费看得见**：收到 Session 的真实入模回执后，Mailbox 标记 consumed，并给关联聊天消息加 👀。机器 Trigger 没有关联聊天消息时，不生成反应或机器聊天记录。
 - **附件**：`channel.attachment.create` 收 base64（至多 25 MB，`attachmentMax`），按 sha256 存一份，回 `Attachment`；发消息带它们的 id，消息的 `meta` 里记下名字、类型和大小。读是 `GET /api/v1/attachment/<id>`：图片、视频、声音内嵌（消息里直接显示、播放），PDF 在新标签页里看，别的下载；都带 `nosniff`，PDF 以外带沙箱（浏览器的 PDF 阅读器在沙箱里打不开），不会当成农场自己的页面跑。主人改消息时能去掉附件（`channel.message.update` 的 `attachments`：留下的那些）。给 agent 的那一行写附件的名字和它在这台电脑上的路径（`messageLine`），帮工直接读文件；回复写成 `reply=<号>`，改过的、删了的也写明。
 - **搜索**：`channel.message.search` 在全农场或一个频道和它的串里找含这些字的消息（不分大小写，删了的和提示不算），新的在前，至多 50 条，每条带地址。字里认几个过滤（`parseSearch`）：`from:`（主人、管家、帮工的编号或名字）、`in:#频道`、`has:file`、`has:image`、`has:link`、`before:`、`after:`（日期，本地的零点）；页面原样交给服务端。
 - **链接预览**：消息里的 http(s) 链接（至多 3 个），服务端在写下以后去读那一页的标题、说明、站名和图（`embeds.ts`），读到了记在消息上（`channel_message.embeds`，修订号加一）；读不到就没有。只连公网：每次请求和每次跳转前，名字解析出的每个地址都要不是本机、局域网、云的元数据地址；只跟 3 次跳转，3 秒、512 KB 为限，只读 `text/html`，不带任何凭据。主人改了消息就照新的字再读一遍。
 - **消息的地址**：页面上一条消息在 `/chat/<频道或串>?m=<号>`：读到那一页、滚过去、亮一会儿。搜索结果、置顶、回复的引用点了都去那里，「复制链接」复制它。一条消息里贴着本农场的消息链接，页面就在它下面显示那条消息现在的样子（`linkedMessages`：频道是页面认得的，从哪个地址来都算，手机有它自己的；默认频道的链接不带频道，只认本页的地址），点了跳过去；服务端不给这种链接读预览（是本机或局域网的地址）。
 - **跳到**：工作台里任何一处按 Ctrl+K（Mac 上 ⌘K），或点聊天侧栏顶上的「跳到…」，按名字找频道、串、私聊（`#` 只找频道和串，`@` 只找私聊），还没私聊过的档案也在里面，选了就开一个；名字开头对上的在前，再按未读、按最近说话排，归档的不列（`switchTargets`）。
-- **送达**：每条给帮工的投递走 `pending` → `announced`（插过不带正文的提示）→ `handed`（放进了一轮的输入）→ `seen`；离开的是 `dropped`。这一轮真的开口才算 `seen`；没开口就结束、会话关掉、服务端重启都退回 `pending`，过一会儿再叫。宁可重复给，不会丢。给管家的投递交出去当即算看到。
+- **输入按接收顺序处理**：Trigger 的首次路由与投递共用 `mailbox_order`，按持久化 `position` 排队，不比较来源时间或哈希 ID。三道刹车按工单或频道的 `scope` 计算；主人新输入重置连续自动唤醒计数，重复回执不重置。退回投递有独立编号和顺序，不改原 Trigger 的首次回执；`mailbox_owner_route` 只读视图合并原始主人输入与退回投递，供刹车恢复使用。恢复从投递载荷和路由回执重建缓存，数据库写入与缓存更新在同一把锁内完成。被刹车挂起的卡片可随下一次合法运行带上；`queue` 等下一轮，不插进当前运行。
+- **投递**：管家与帮工都走 pending → handed → consumed，未消费而作废的是 dropped；中断、重启把未消费的 handed 退回 pending。忙时的主人输入按批 Steer，正文包含整批卡片与资源指针；消费回执逐个投递编号确认。阅读游标、工具展示和开口均不代替消费确认。
 - **主人的话重发不成两条**：`channel.message.send`、`issue.comment.create`、`voice.hear`、`voice.call.hear` 带页面为这一次发送生成的 `sendKey`（至多 64 个字，长了拒绝）。同一个人带同一个键再发就是已经说过的那一条：不另写、不再送，管家也不再听一遍（唯一索引 `channel_message_send_key` 在发送者和键上）。输入框由 `createComposer` 持有整次发送：文字、频道或串、指定档案、项目和地号共同决定意图；同一意图失败后重发用同一个键，改变其中一项就生成新键。发出去的参数取发送时的快照；迟到的成功只清掉没有再编辑、也没有换目标的那份草稿，输入框关掉后不再读取它的目标或回调。帮工的 `channel_message_send` 不带键：60 秒内（`retryWindowMs`）同一个帮工在同一处说一模一样的话，返回原来那条。连接器按外部消息 id 去重。
 - **消息带着产生它的那次干活**（`meta.run`）：过程面板按这个号取事件；没有号的消息不按时间推测归属。`meta` 按自己的 Schema 读回，整份无法解析或形状不对就当没有元数据，不拿半个坏值猜归属。创建频道的接口返回实际的频道号，页面用它跳转，不从名字猜号、不等状态流确认。
 - **连接器只认主人**：微信扫码的人就是主人；飞书返回扫码者的 OpenID 时直接绑定，没返回时和 QQ 一样，由第一个私聊机器人发 6 位配对码（前面可以带「配对」和空格）的人成为主人。别人的话丢掉，群里的不收。账号和密钥在 `connector_account`，不进日志、不发给页面；断开就删掉这一行。
@@ -78,7 +83,7 @@
 
 ## 怎么走
 
-**主人说一句**（`channel.message.send` → `Orchestrator.say` → `Channel.say`）：写库、算投递、推进主人的已读，提交后施加事实；被叫醒的是管家就经 `forOrchestrator` 交给它（带着是哪个管家 `agent` 和那处的 `type`），它在哪个频道、私聊被叫就回在哪里；主人在默认频道和私聊里的话它读成「主人说」，别处读成带地址的群聊消息，现状的最后一行写它正在回话的地方（`addressOf`）。管家每回答一次，说完写成一条完整的消息（`orchestratorSays`），写下就投递；它调工具之前说的那句是单独的一条。还在想、在写的时候，频道里没有这条消息，核心状态记着每个管家在哪个频道里（`orchestrators[<档案 id>].channel`），页面只在那里画「在想…」「正在输入…」，头像和名字是那个管家的。
+**主人说一句**（页面的 `channel.message.send` → `Ingress.say` → `Channel.say`；连接器、语音的已接收输入 → `Ingress.owner`）：写库、算投递、推进主人的已读，提交后施加事实；被叫醒的是管家就经 Mailbox 的 `forOrchestrator` 交给它（带着是哪个管家 `agent` 和那处的 `type`），它在哪个频道、私聊被叫就回在哪里；主人在默认频道和私聊里的话它读成「主人说」，别处读成带地址的群聊消息，现状的最后一行写它正在回话的地方（`addressOf`）。管家每回答一次，说完写成一条完整的消息（`orchestratorSays`），写下就投递；它调工具之前说的那句是单独的一条。还在想、在写的时候，频道里没有这条消息，核心状态记着每个管家在哪个频道里（该档案的 Session.channel），页面只在那里画「在想…」「正在输入…」，头像和名字是那个管家的。
 
 **派活开工单串**：帮工模块告诉频道模块雇了一个帮工（`sessionNews` 的 `hired`），它为新的 Session 建参与者，把它在频道里的已读位置放到最新，按它的工单找串：
 
@@ -98,7 +103,7 @@
 
 1. 60 秒内同一处一模一样的话：返回原来那条。
 2. 刚读的是一个串、却要发到频道顶层：先让它确认一次（`confirm`）。
-3. 目标里有它没看过的新消息：先不发，给它看最多 3 条（`heldShown`），记成看过；改了再发，或带 `anyway` 照发。
+3. 目标里有它没看过的新消息：先不发，从最旧的开始给它看最多 3 条（`heldShown`），阅读游标推进到这批最后一条；改了再发，或带 `anyway` 照发。
 4. 发出去，推进它的已读；不在地里的 @ 回给它。
 
 `channel_message_list` 默认读 30 条、最多 100 条，推进已读；不写地址时帮工读自己的工单串。`channel_unread_list` 列出它没读的频道和串。
@@ -109,34 +114,34 @@
 
 **开机**：说到一半的消息标成说完；所有 `handed` 退回 `pending`；为地里每个 Session 补上参与者和工单串；把最近的频道和串放回核心状态；开始以后把还在地里的帮工的投递再推一遍。
 
-**和帮工的档案私聊**（`channel.direct.create` → `Issue.talkWith`；对面是管家时只开它的私聊，没有工单）：第一次建私聊和私聊工单，把私聊挂到工单上（`linkTalk`）。主人在里面说一句：频道写下、提交，`ownerInThread` 告诉工单；私聊工单现在有帮工在做，就照串的规则叫醒它（`chatAudience` 的私聊分支认 `threadOwner`）；没有就 `talkOn` 派一个，它进来时只跟着私聊（`handedOn` 不在私聊里写派活的话）。它答完，汇报贴在私聊里（`publishMessage` 把私聊当工单串），工单清掉它改的，排一个 10 分钟后的收工（`idleLater`）；这期间主人又说话，它接着答，交回来时重新计时。
+**和帮工的档案私聊**：`channel.direct.create` 调 `Channel.direct`。主人消息提交后，Channel 在大锁之外按私聊串行启动 Session，初始最近消息带着消息 id 注册为待消费投递；入场后补交快照之后尚无投递的主人消息。已有上下文继续走正常投递，汇报回到 `Session.channel`。回复后安排闲时休眠；发送成功只表示接受输入，消费回执仍由执行事件推进。
 
 **外面进来的话**（连接器）：
 
 1. 适配器先用 Schema 解码平台响应，再把消息翻成「谁、说了什么、回复凭据、引用了哪条」；合法 JSON 的形状不对时进入退避，不进入交付。微信的二维码、扫码状态、消息页和发消息结果各有自己的 Schema；`message_id`、`msg_id`、`svr_id` 先把 64 位数字改成字符串再解码，避免精度丢失。每页消息和下一页游标交给桥的 `accept`，同一个事务写进 `connector_inbound` 和 `connector_account.cursor`，失败就整页回滚、游标不动；飞书和 QQ 的回调等这一行落库后才返回给 SDK。同一个平台消息 id 只收一次（`on conflict do nothing`）。
-2. 收件工人（有新收件或每秒）按顺序交付：持久化的 Inbound 先按 Schema 读，形状不对或内外编号不一致的坏行记错误日志并结清，不堵住后面的有效消息；这不是把正常投递失败丢掉，后者仍重试。还没配对的，对上配对码就绑定主人、回一句「配对好了」；不是主人的丢掉；主人的先记下回复凭据、补发发件表，再把话交给管家（`Orchestrator.say`）。被引用的是农场发出去的某条消息时，话说在那条所在的频道或串里（比如它的工单串），否则说在连接器接的频道（没接就是默认频道）。引用查询失败时不交付、不改去别处，等恢复后重试。
+2. 收件工人（有新收件或每秒）按顺序交付：持久化的 Inbound 先按 Schema 读，形状不对或内外编号不一致的坏行记错误日志并结清，不堵住后面的有效消息；这不是把正常投递失败丢掉，后者仍重试。还没配对的，对上配对码就绑定主人、回一句「配对好了」；不是主人的丢掉；主人的先记下回复凭据、补发发件表，再经 `Ingress.owner` 写成 `source=connector` 的信封。被引用的是农场发出去的某条消息时，话说在那条所在的频道或串里（比如它的工单串），否则说在连接器接的频道（没接就是默认频道）。引用查询失败时不交付、不改去别处，等恢复后重试。
 3. 交付成功，标成已交付、清空正文，只留去重记录。没交付完的，重启后接着交。
 
-**送出去的话**：哪些话出农场归[Inbox](docs/subsystems/inbox.md)（`inbox/away.ts` 的 `forOwner`，经 `Inbox.toOwner` 交给每个连接器的协调器），挑出主人要看的：说完了的，不是主人自己的；汇报和派活，管家的话，@主人 或 @所有人 的话；提示不送。只送连接器接的那个频道（和它下面的串）里的。`ownerLine` 加上「【谁 · 做完了 / 没做成 / 派活 / 在工单串里】」，Markdown 转成纯文本，按 UTF-16 长度切开（微信 1800、飞书 4000、QQ 2000，尽量在空行或换行处切），写进 `connector_outbox`；网络发送不阻塞读核心事件。
+**送出去的话**：哪些话出农场归[Inbox](docs/subsystems/inbox.md) 的 Human Handoff gate。只有 `ack`、`asking`、`blocked`、`ready` 且仍为 `unseen` 的消息经 `Inbox.toOwner` 交给连接器；`progress`、`waiting` 不外推，工作台已读或主人回复会撤掉尚未发送的 outbox。只送连接器接的那个频道（和它下面的串）里的。`ownerLine` 加上来源和交付状态，Markdown 转成纯文本，按 UTF-16 长度切开后写进 `connector_outbox`。
 
 **发件表**：每条马上发，按顺序，遇到发不出去的就停下。状态里的「还有几条没发」记在内存里：不知道时数一次库，此后加件、发出、作废的事务提交后跟着加减；事务失败或数的时候又变了，就回到不知道。发送期间新来的消息留下 dirty 标记，当前这轮结束后立即再查，不丢掉那次唤醒。拒收的（微信、QQ 的回复窗口，`restricted`）留着，30 秒后重试，每失败一次等待翻倍，最多半小时；发出去一条就从 30 秒重来。主人下次说话时先补发，积了 3 条以上就合成一条摘要（「你不在的时候有 N 条消息」，每条留头 60 个字），整批一起确认。飞书、QQ 拿到平台的消息 id 才算发成功。登录过期（`stale`）就暂停这个账号一小时，暂停写库或解除暂停失败时等待 30 秒再试，不密集轮询。收消息断了先等 2 秒重连，连着断 3 次等 30 秒。等待是服务的 Clock 上的 `Effect.sleep` 和一次唤醒赛跑，停下由纤程的中断收尾。
 
 **登录和换账号**：
 
-- 微信、飞书扫码，QQ 填机器人的 AppID 和 AppSecret（先验一次）。一次扫码由各自 SDK 走完：微信拿到二维码后最多等 8 分钟，跟随重定向的域，要输数字时页面显示输入框，二维码过期或验证码被禁用累计 3 次就结束；飞书按注册返回的间隔和有效期轮询，跟随租户跳到 Lark。连接器只把进度（等待扫码、扫过了、要输数字）给页面，成功后保存账号。每个连接器的状态（`ConnectorStatus`：进度、账号、错误、还有几条没发）在它的任何一部分可能变了的时候经 `connector` 事实写进核心状态的 `connectors`，一次一个，轮到时才读，所以最后写的是最新的；一样的不出新帧。页面的连接器页读核心状态，不轮询；`state.json` 不存它，开机由连接器重新说一遍。
+- 微信、飞书扫码，QQ 填机器人的 AppID 和 AppSecret（先验一次）。一次扫码由各自 SDK 走完：微信拿到二维码后最多等 8 分钟，跟随重定向的域，要输数字时页面显示输入框，二维码过期或验证码被禁用累计 3 次就结束；飞书按注册返回的间隔和有效期轮询，跟随租户跳到 Lark。连接器只把进度（等待扫码、扫过了、要输数字）给页面，成功后保存账号。每个连接器的状态（`ConnectorStatus`：进度、账号、错误、还有几条没发）在它的任何一部分可能变了的时候经 `connector` 事实写进核心状态的 `connectors`，一次一个，轮到时才读，所以最后写的是最新的；一样的不出新帧。页面的连接器页读核心状态，不轮询；开机由连接器重新说一遍。
 - 每个账号同时只有一代任务：登录，或者接收、收件、发件三个工人，一代是服务作用域里的一条纤程，适配器的调用由它的中断停下。协调器不在任何一代里：重新登录或退出时，它先取消并等旧一代结束，再在一个事务里改 `connector_account`、清掉旧收件、退休旧发件（`dropped`），然后起新一代。保存失败就保留旧账号、重新起旧的那一代。SDK 在接收返回后回调的，不再收下；旧连接迟到的结果不写新账号。
 
 ## 和谁打交道
 
 - **帮工（`session`）**：频道模块在帮工模块上面，直接读 `Session` 的查询（`sessionOf`、`presentSessions`、`runOf`、`reportOf`、`onIssue`、`present`），订阅它的 `launches`、`inputsConsumed`、`news`，据此开串、贴汇报、推进送达；交一句话走 `Session.deliver`。不再有 `Helpers` 端口。帮工接回以后 `channelStart` 给地里的每个帮工开好工单串、送出等着的话；接回以前它看不到帮工。
 - **核心状态（`core`）**：频道模块施加 `message`、`channel` 事实；读 `WorkspaceState.sessions` 知道谁在地里、谁在忙。
-- **管家（`orchestrator`）**：订阅 `forOrchestrator`（叫醒它的话，按频道分批）和 `orchestratorDigest`（只让它知道的汇报）；用 `orchestratorSays` 说话、`spoken` 记下通话里的话。主人的话经 `Orchestrator.say` 进频道，管家照频道的规则被叫醒。
+- **管家（`orchestrator`）**：订阅 Mailbox 的 `forOrchestrator`（叫醒它的话，按频道分批）和 `orchestratorDigest`（只让它知道的汇报）；用 `orchestratorSays` 说话、`spoken` 记下通话里的话。主人的输入先经 `Channel.say` 或 `Ingress.owner` 落库，管家照 Mailbox 的规则被叫醒。
 - **主人在串里的话**：`ownerInThread` 把主人在任何一个串里说完的话（不管经哪条路进来）告诉订阅的人；工单靠它知道主人在工单串里说了话。
 - **工单（`issue`）**：带话、验收意见、冲突和检查失败经 `tellSession`；首次派活时记下频道（`channelOf`）。
 - **定时任务（`cron`）、计划**：到点时用 `notice` 在频道里说一句再派活；派活工具按 `channelByName`、`channelOf` 取频道和它的默认项目。
 - **工具（`tool`、`mcp`）**：管家和帮工的说话工具都调 `speak`、`read`、`Inbox`；`/mcp` 用每个会话自己的令牌认出是谁在说话，令牌只用来分清人，不用来防人。
 - **语音（`voice`）**：电话里说的和回答经 `spoken` 留在默认频道，不叫醒谁，管家在电话里已经听过。
-- **连接器 → 管家、频道**：收进来的话交给 `Orchestrator.say`；送出去的读核心事件里的 `message`，只读不改频道。主人在外面说话也让农场开门（通话状态成 `live`）。
+- **连接器 → Mailbox、频道**：收进来的话先落 `connector_inbound`，再经 `Ingress.owner` 进入持久 Mailbox；送出去的读核心事件里的 `message`，只读不改频道。主人在外面说话也让农场开门（通话状态成 `live`）。
 - **Inbox（`inbox`）**：@主人 的话进 Inbox；巡查的发现没有频道时归默认频道（[Inbox](docs/subsystems/inbox.md)）。
 
 ## 为什么这样
@@ -157,7 +162,7 @@
 - **频道是安排活的地方，可以带默认项目。** Raft 的频道和代码仓库没关系；VibeValley 的帮工按工单在项目的 worktree 里干，频道带个默认项目，在那里派的活不说项目也知道去哪。
 - **默认频道是标记，不是类型、不是名字。** 原来默认频道是一种类型（`general`），名字「田头」写进了给模型的地址，发消息不写频道就算它：每个分支多一种类型，换语言、换名字就认不出。它和别的频道只差「没写频道的话去哪」这一点，像 Discord 服务器的 `system_channel_id`。放弃了只存一个默认频道的 id 在设置里：和频道分开存，删频道、换默认时要两处一起改。
 - **私聊是一种 channel，不是只有两个人的频道。** 只有两个人的频道里还要另设「不收 @、不让帮工进、不放活」；私聊的规则本来就是这几条，照 Discord 的 `DM` 单列一种。一个对面一个私聊，由库的唯一约束管，不靠调用方先查。帮工的 `talk` 串不改成和帮工的私聊：帮工是一次派活，活完就走，它的串挂在派活消息下面，读得出派的是什么；私聊的对面是常在的一方：一个管家，或一个帮工的档案。
-- **和档案私聊靠一张藏起来的工单，不另开一种帮工。** 每个帮工都挂一张工单：串、叫醒、交回、清掉改动、收工都是工单和帮工已有的；私聊的帮工只是「这张工单的串恰好是私聊」。放弃了让私聊的帮工改代码：私聊没有分支和改动清单，改了就绕过「主人看过才合」，所以它只读，每轮清掉，要改就记成工单。放弃了不占名额：一直歇着的帮工也占着 runtime 的额度和这台电脑的资源，所以闲 10 分钟就收工，下次带着最近的几条重新派。群私聊不做：几个人一起说话就是开一个频道。
+- **聊天是上下文，不是工单。** 责任关系归 Assignment，消息和回复归频道，执行与续接归 Session；隐藏工单只为复用执行逻辑而存在，会让看板、验收、记忆和回收增加例外。聊天使用独立目录，闲置只释放资源，不 reset 主人的项目，也不因为休眠丢掉持续上下文。
 - **提醒分三档，照 Discord。** 一个开关说不清「只在 @ 我时」；`none` 同时管未读、Inbox 和连接器，主人静音一处就是那里什么都不来找他。
 - **链接预览由服务端读。** 浏览器跨域读不了别的网站的页；服务端读是它第一次主动连一个别人给的地址，所以限住公网、http(s)、时间和大小，不带凭据。预览里的图由页面直接从它的网站读（不经服务端转），那个网站看得到主人的地址。
 - **草稿记在这台设备上。** 字、回复哪条、传上去的附件存在 `localStorage`（`state/stored.ts`）：刷新、关掉再开都还在；换一台设备不带过去，草稿本来就是这只手上的事。回复哪条只记那条消息的 id 和位置，不存一份副本：输入框上显示的是它现在的样子，改了跟着改，删了就不再回复它。
@@ -170,7 +175,6 @@
 
 ## 还没做的
 
-- 给 agent 的话从哪几条路来、什么时候交给它收成一处（每个 agent 一个信箱）：[编排层：每个 agent 一个信箱](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)。
 - 不接受 MCP 的农机用的命令行版说话工具：[其他农机](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
 - 管家和帮工的工具按能力分配（现在是 `tool/tool.ts` 里两张写死的表）：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
 - 连接器（微信）和电话落在私聊：现在都在默认频道（或连接器接的频道）；已经接到某个频道的账号怎么办、电话的字幕给谁看还没定。
@@ -181,7 +185,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/channel/chat.test.ts`（假的帮工、真的库）：派活在派活消息下开串；没挂工单的帮工有一个说话的串；主人在工单串里的话叫醒它的帮工；默认频道叫到管家；频道；主人和管家的私聊（只叫醒管家、@ 不算、管家答在私聊里、读得到 `@主人`、开机只建一个）；忙着的帮工一阵话只收一次提示；帮工之间互相叫停在来回上限；叫不醒的帮工在主人说话前不再叫；在频道里说话（重试、没看到的、确认频道、不在的名字和串）；管家的话整条写一次、写下就送；订阅按号码补齐再推新的，主人的那条带 `sendKey`，落后太多回 `Reset`，不认识的频道拒绝；全农场的汇报先给最近的再推新的；历史、翻页和已读；收件箱和管家的摘要；走了的帮工丢掉给它的；重启后交出去的再给一次；汇报的摘要是结论；消息带着产生它的那次干活；同一个 `sendKey` 只写一次；已读回执整份写或不写，写不成时记着的已读也照库重读；开不了串的派活不留派活消息、再试写一条。
+- `apps/server/src/channel/channel.test.ts`（假的帮工、真的库）：派活在派活消息下开串；没挂工单的帮工有一个说话的串；主人在工单串里的话叫醒它的帮工；默认频道叫到管家；频道；主人和管家的私聊（只叫醒管家、@ 不算、管家答在私聊里、读得到 `@主人`、开机只建一个）；忙着的帮工一阵话只收一次提示；帮工之间互相叫停在来回上限；叫不醒的帮工在主人说话前不再叫；在频道里说话（重试、没看到的、确认频道、不在的名字和串）；管家的话整条写一次、写下就送；订阅按号码补齐再推新的，主人的那条带 `sendKey`，落后太多回 `Reset`，不认识的频道拒绝；全农场的汇报先给最近的再推新的；历史、翻页和已读；收件箱和管家的摘要；走了的帮工丢掉给它的；重启后交出去的再给一次；汇报的摘要是结论；消息带着产生它的那次干活；同一个 `sendKey` 只写一次；已读回执整份写或不写，写不成时记着的已读也照库重读；开不了串的派活不留派活消息、再试写一条。
 - `apps/server/src/http/rpc.test.ts`（整座农场、真的 WebSocket）：订阅一个频道先补齐再推新的，不认识的频道拒绝；别的源和不是回环地址的 `Host` 回 403。页面的 `apps/web/test/channel-follow.spec.ts`：两个页面看同一个频道，各收到一次。
 - `src/flows/thread.test.ts`：一张工单一个串，派出去、取消、重开，前后两个帮工的派活、汇报、主人的话都在里面；主人的话叫醒现在的帮工，没人在干时只记下；串里的话等于评论（回答问题、作废验收），同一个键的评论只说一次。
 - `channel/recorded.test.ts`：黄金数据（`testdata/rules.jsonl.gz`）。
@@ -190,5 +194,5 @@
 - `/mcp`：`mcp/mcp.test.ts`（给帮工它的工具、认出是谁、按阶段列帮工、不认识的人不给调、帮工只读写自己的记性、帮工写文档）。
 - `orchestrator/orchestrator.test.ts`：主人在私聊里说一句，管家读成「主人说」、知道在和主人私聊，答在私聊里、不在默认频道。
 - `chat.test.ts` 的「a message changes」：回复、改（只能改自己的）、回应加上再去掉、置顶、试跑删除、删、按修订号补齐、搜索、在消息下开串、附件的存取和去重、管家交到手上的 👀；`http/attachment.test.ts`：附件按 GET 读回、类型和下载方式、不认识的和越界的 404、超过上限拒绝。
-- `chat.test.ts` 的「a channel is renamed, grouped, placed, archived, quieted, and deleted once nothing points at it」和「a search reads its filters, and an edit can take a message's files off」；`channel/search.test.ts`（`parseSearch`）；`channel/embeds.test.ts`（链接、私有地址、跳转、只读页头）；`inbox/patrol.test.ts`（`forOwner` 照提醒级别）；`src/flows/talk.test.ts`：和档案私聊，派一个帮工答在私聊里、闲了收工、再说话派新的、带上前面的话，私聊工单不在看板上。
+- `chat.test.ts` 的「a channel is renamed, grouped, placed, archived, quieted, and deleted once nothing points at it」和「a search reads its filters, and an edit can take a message's files off」；`channel/recorded.test.ts`（`parseSearch`）；`channel/embeds.test.ts`（链接、私有地址、跳转、只读页头）；`inbox/patrol.test.ts`（`forOwner` 照提醒级别）；`src/flows/talk.test.ts`：和档案私聊，派一个帮工答在私聊里、闲时休眠、再说话沿用上下文，无工单也能聊天，启动期间的消息不丢。
 - 页面：`apps/web/test/chat-rest.spec.ts`（从工具栏和回应那一行选任何表情回应；Ctrl+K 跳到频道、开私聊；贴着的农场消息链接显示那条、点了跳过去；频道改名、分组、静音、归档、删；拖动排位；串列表改名、归档；置顶、引用、全农场搜索跳到消息并高亮；草稿刷新还在、↑ 改上一条、Esc 取消回复、表情；拖文件上传、视频内嵌、PDF、改消息去掉附件；和档案私聊、标成未读），`farm-chat.spec.ts` 的「⋯」（田头窗口里回应、回复、改、删），`apps/web/test/chat.spec.ts`（频道和未读、串、在频道里说话、私聊单列一段、里面不弹 @）、`chat-messages.spec.ts`（悬停一条消息回复、改、回应、置顶、删；成员栏；别处的变化实时到；选一张图发出去、在消息里显示、按它的地址读回）、`farm-chat.spec.ts`（频道菜单里的私聊）、`settings.spec.ts`（连接器页）、`farm-phone.spec.ts`（来电）。

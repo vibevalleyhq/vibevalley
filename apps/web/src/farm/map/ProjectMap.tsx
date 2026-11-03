@@ -9,8 +9,8 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
 
+import { variant, autofocus } from "@/base/dom";
 import { useInterval } from "@/base/timer";
-import { variant, autofocus } from "@/base/util";
 import { chatSay, defaultOf } from "@/features/channel";
 import { writeIssue } from "@/features/issue";
 import { type ProjectsSkin, since } from "@/features/project";
@@ -28,7 +28,7 @@ import { TextArea } from "@/ui/Field";
 import { Card, Quiet } from "@/ui/layout";
 import { PixelCard, SpriteIcon } from "@/ui/pixel";
 import { type SpriteAtlas, type SpriteInfo, useAtlas } from "@/ui/pixel/atlas";
-import { badgeColors, CardColors } from "@/ui/pixel/card";
+import { badgeColors, CardColors } from "@/ui/pixel/PixelCard";
 import { PoseSprite } from "@/ui/PoseSprite";
 import { toast } from "@/ui/toasts";
 
@@ -318,7 +318,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                   {(taken) => {
                     const h = () => taken().session;
                     const cast = () => castOf(agents().get(h().agent)?.look, h().agent);
-                    const pose = () => mapPose(h());
+                    const pose = () => mapPose(h(), taken().issue?.conflict !== undefined);
                     const body = () => props.atlas.get(castSprite(cast(), pose(), has));
                     const bed = () => props.atlas.first([cropSprite(taken().plot.crop), "plot-seeded"]);
                     const visit = () => go(router.navigate, h().id);

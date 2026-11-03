@@ -28,8 +28,11 @@ it("forwards a disconnect to the Web handler", async () => {
         Layer.succeed(
           Orchestrator,
           Orchestrator.of({
+            stop: () => Effect.void,
+            markWrong: () => Effect.never,
             answerer: () => () => undefined,
-          } as unknown as Orchestrator["Service"]),
+            brief: () => Effect.never,
+          }),
         ),
       ),
     ),

@@ -13,7 +13,14 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/inbox`（`Inbox`，自成 Inbox 模块）：`inbox.ts` 的 `news`（刚来的）、`overdue`（巡查的发现）、`patrol`（马上巡一次）、开机时的 `prime`；`patrol.ts` 是巡查的纯规则（`patrolStep`、`patrolGrace`），`away.ts` 的 `forOwner` 是哪些话送到农场外的主人那里，黄金数据在 `testdata/rules.jsonl.gz`。
+- 服务端 `apps/server/src/inbox`（`Inbox`，自成 Inbox 模块）：`inbox.ts` 的 `news`（刚来的）、`toOwner`（合法且仍未读的人类交接）、`patrol`（马上巡一次）、开机时的 `prime`；`patrol.ts` 是巡查的纯规则，`away.ts` 判断一条频道消息是否具备对外候选资格，黄金数据在 `testdata/rules.jsonl.gz`。
+
+## Human Handoff
+
+- 通知资格直接读取工单阶段、消息和 `channel_read_cursor`，不另存人类交接状态。工单报告只在审草稿、提问、受阻或验收阶段外推；管家直接回话和提及主人按频道通知设置放行。
+- 已读游标覆盖消息号、同频道后续主人回复、同一会话更新的报告，都会阻止旧通知发送。工单离开需人介入阶段也会使旧报告失效。后续的新消息独立判断，不沿用上一条的已读结果。
+- Connector 在入队和发送前复查资格，失效的未发 `connector_outbox` 行标成 `dropped`；消息和工单变化、已读游标推进都会唤起复查。已经交给外部平台的请求不能撤回。
+- Patrol 用当前报告对应的已读游标时间延长宽限期；新一轮报告不会继承旧报告的宽限。
 - Inbox 在 `apps/server/src/inbox/items.ts`（`inbox`、`inboxEntries`，每件的话）；拼帧（`projection/frame.ts`）把它放在 `StateFrame.inbox`，和 `state`、`view` 并排。哪些是刚来的（`freshOf`）页面也要算，留在 `packages/protocol`。
 - 页面：手机 `apps/web/src/farm/phone/calls.ts`，系统通知和菜单栏 `apps/web/src/features/inbox/Follow.tsx`、`apps/web/src/features/inbox/tray.ts`。
 
@@ -27,8 +34,6 @@
 | `interrupted` | 这一轮停在了半路 |
 | `conflict` | 合进主分支会冲突 |
 | `quiet` | 干着活好久没动静 |
-| `graph-draft`、`graph-ready` | 计划拆好了等你看、做完了等你合进主分支 |
-| `task-failed` | 计划里有一件没做成；重试又失败再算一次 |
 | `mention` | @主人 的话，你没读、也没在那个对话里回 |
 | `cron-ask` | 管家定的定时任务等你同意（目标是定时任务所在的频道） |
 
@@ -42,7 +47,9 @@
 
 **刚来的**：`Inbox` 订阅核心的事实，每次算一遍 Inbox，把刚来的发到 `news`。`voice` 订阅它：正在通话就把每件的 `title：body` 交给管家在电话里说（[语音](docs/subsystems/voice.md)「管家打电话找主人」）；没在通话就不管，手机会照帧里同样的 Inbox 响。
 
-**巡查**：每 `patrol.heartbeat_minutes` 分钟（默认 10，0 关掉；开机后等一个间隔才第一次看）不调模型看一遍 Inbox（`patrolStep`）。放久了没人管的才报：`mention`、`ask` 15 分钟，`quiet` 20 分钟，`interrupted`、`task-failed` 30 分钟，`merge` 和 `conflict` 2 小时（`patrolGrace`，从 Inbox 给的时刻算，没有就从第一次看到算）；别的种类不报（没做成的当场就叫醒管家，`cron-ask` 是主人的事）。同一件事报过 4 小时内不再报，不再挂着的忘掉。有的才按频道发一条到 `overdue`；管家订阅它，写成「【巡查】#… 里有几件事放着没人管」叫醒自己，由它决定提不提醒主人。
+**巡查**：每 `patrol.heartbeat_minutes` 分钟（默认 10，0 关掉；开机后等一个间隔才第一次看）不调模型看一遍 Inbox（`patrolStep`）。未读的 `mention`、`ask` 15 分钟，`quiet` 20 分钟，`interrupted` 30 分钟，`review` 和 `conflict` 2 小时；主人已经看过的交接从已读游标的更新时间起至少再等 2 小时，不在主人思考时按 15 分钟催。同一件事报过 4 小时内不再报，不再挂着的忘掉。有发现时按频道直接保存 `source=patrol` 的 Trigger；直接交给 Mailbox 以 digest 攒批，随管家下次交互捎带，不生成聊天消息。
+
+原生子工单成功后由服务端自动汇合，不单独催主人验收；失败、问题照普通工单处理。父工单全部子单完成后产生普通 `review` 项；没有独立 Session 的父单使用 `target: { kind: "issue", id }` 打开工单，不增加图专用类别。
 
 **页面**：帧里的 `inbox` 有刚来的 → 农场画面开着、没在通话时手机弹出、响铃；窗口不在前面时发系统通知（`title`、`body`）；菜单栏每帧按 `tray` 列等你的事。
 
@@ -50,9 +57,9 @@
 
 - **核心状态（`core`）**：订阅事实、读状态；`frameOf` 把 Inbox 放进帧。
 - **频道（`channel`）**：巡查的发现没有频道时归默认频道（`defaultChannel()`）；@主人 的话读频道给出的未处理集合、频道和地址。
-- **管家（`orchestrator`）**：订阅 `overdue`，巡查的话由它写（`patrolText`）。它在本模块之上，所以是它来订阅，通知不调管家。
+- **管家（`orchestrator`）**：从 Mailbox 读取巡查摘要，和其他输入共用会话消费回执。
 - **语音（`voice`）**：订阅 `news`，通话里说。
-- **连接器（`connector`）**：订阅 `toOwner`（`forOwner` 挑出的频道里的话：汇报、派活、管家的话、@主人或 @所有人；提醒级别是 `none` 的那处什么都不送，`mentions` 的只送 @主人 的），送到微信、飞书、QQ；连接器只管怎么送。
+- **连接器（`connector`）**：订阅 `toOwner`，只收到目的合法且仍为 `unseen` 的交接；`seen`、`acted`、`withdrawn` 会撤掉尚未发出的 outbox。连接器只管平台发送与重试，不重新判断该不该打扰主人。
 - **页面**：只读帧里的 `inbox`，不自己配话、不自己判断哪些要主人。
 
 ## 为什么这样
@@ -66,6 +73,6 @@
 
 - `apps/server/src/core/golden.test.ts`（每种什么时候算、id、截字、先后，和工单站位一致）；`inbox.test.ts`（交回来带着问题、停在半路、每件的话、刚来的）。
 - `apps/server/src/inbox/patrol.test.ts`：巡查照黄金数据。
-- `apps/server/src/orchestrator/orchestrator.test.ts`「hears the patrol once」：巡查经 `overdue` 叫醒管家一次。
+- `apps/server/src/orchestrator/orchestrator.test.ts`「hears the patrol once with the next owner input」：巡查摘要随下一次主人输入进入模型，后续重复巡查不重复注入。
 - `apps/server/src/voice/voice.test.ts`「tells what comes together once」：通话里两件刚来的合成一段说。
 - 页面：`apps/web/test/farm-phone.spec.ts`（来电）、`src/farm/phone/calls.test.ts`、`src/features/inbox/tray.test.ts`（菜单栏）。

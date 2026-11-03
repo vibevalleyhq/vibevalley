@@ -39,7 +39,7 @@ redactOutput(process.stderr);
 // The page's tests (apps/web/test/fixtures.ts) never ask this machine's coding agents: pi is the scripted helper the
 // server's tests hire, and it is the only runtime installed. Never set otherwise; loaded only then.
 const testRuntimes = Effect.gen(function* () {
-  const { helper, installedOnly } = yield* Effect.promise(() => import("./testing/helper.ts"));
+  const { helper, installedOnly } = yield* Effect.promise(() => import("./testing/worker.ts"));
   const { registryOf } = yield* Effect.promise(() => import("./runtime/runtime.ts"));
   const given = [helper()];
   return { registry: registryOf(given), probe: installedOnly(given), background: false };

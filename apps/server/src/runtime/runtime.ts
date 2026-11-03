@@ -1,8 +1,7 @@
-import { join } from "node:path";
 // The runtimes the farm can run helpers on: oar's, VibeValley's own agent and DeepSeek Harness.
 // Each is probed for whether it is installed, its models, its account's quota and what it carries (skills, MCP servers,
 // tools); probing runs a runtime's own commands, so the answers are kept and asked again only on a refresh, the quota
-// every five minutes and soon after a run. What each runtime spent today is kept in spend.json, and a runtime past its
+// every five minutes and soon after a run. What each runtime spent today is kept in the database, and a runtime past its
 // day's budget takes no work.
 
 import {
@@ -13,30 +12,25 @@ import {
   type Runtime as OarRuntime,
   RuntimeRegistry,
 } from "@botiverse/oar";
-import { Cache, Clock, Context, Effect, Exit, FiberMap, FiberSet, FileSystem, Layer, Option, Schedule, Schema } from "effect";
+import { Cache, Clock, Context, Effect, Exit, FiberMap, FiberSet, Layer, Option, Schedule } from "effect";
 
 import { Llm } from "@vibevalley/ai/llm";
 import { currentLocale, type Locale, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { modelClient } from "@/agent/model.ts";
-import { jsonOrNone } from "@/base/json.ts";
+import { Agent, modelClient } from "@/agent/agent.ts";
 import { Core } from "@/core/core.ts";
 import { type ApiError, messageOf, refused } from "@/errors.ts";
 import { projectsDir, ServerConfig } from "@/infra/config.ts";
-import { keptFile } from "@/infra/files.ts";
 import { timeHere, withinRealTime } from "@/infra/time.ts";
 import { Setting } from "@/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
-import { agentProblems, type Candidate, chooseAgent, sessionOptions } from "./fit.ts";
 import { piBalance, type PiDefault, piSettings } from "./pi.ts";
-import { factsOf, presetOf, runtimeIds, runtimeLabel } from "./presets.ts";
-import { inCny, price, type Rate } from "./price.ts";
-import { moneyStop, quotaOf } from "./quota.ts";
-import { dbTodoStores } from "./todoStore.ts";
-import { vibevalleyRuntimeOf } from "./vibevalley.ts";
+import { agentProblems, type Candidate, chooseAgent, factsOf, moneyStop, presetOf, runtimeIds, runtimeLabel, sessionOptions } from "./presets.ts";
+import { inCny, price, type Rate, spending } from "./price.ts";
+import { quotaOf } from "./quota.ts";
+import { dbTodoStores, vibevalleyRuntimeOf } from "./vibevalley.ts";
 
 /** Past this a probe counts as unknown. */
 const probeTimeoutMs = 10_000;
@@ -47,7 +41,7 @@ const usageAfterRunMs = 20_000;
 const spendPushAfterMs = 3_000;
 
 /** Dispatch eligibility with the runtime state that explains it. */
-export interface Assessment {
+interface Assessment {
   readonly agent: T.Agent;
   readonly info: T.RuntimeInfo | undefined;
   readonly problems: T.AgentProblem[];
@@ -115,7 +109,7 @@ export class Runtime extends Context.Service<
 }
 
 /** What reads a runtime's account usage; tests put their own. */
-export type UsageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) => Promise<T.AccountUsage | null>;
+type UsageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) => Promise<T.AccountUsage | null>;
 
 export interface RuntimeOptions {
   /** The runtimes; oar's defaults when none. */
@@ -141,22 +135,6 @@ interface Observation {
   /** The info holds words (why a runtime is unsupported, its quota): one probed in another language is probed again. */
   locale?: Locale;
 }
-
-interface Spent {
-  day: string;
-  byRuntime: Record<string, number>;
-}
-
-const SpentSchema: Schema.Codec<Spent> = Schema.Struct({
-  day: Schema.String,
-  byRuntime: Schema.Record(Schema.String, Schema.Finite),
-});
-
-/** The local day of now, as the spend tally keys it. */
-const dayOf = (now: number) => {
-  const d = new Date(now);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
 
 /**
  * oar's installation probes read the binary from OAR_<ID>_BIN as they start: it is set for that moment only, so two
@@ -217,10 +195,8 @@ const defaultUsageOf: UsageOf = async (_id, runtime, found) => {
 
 /** Only what is there. */
 
-export const make = (options: RuntimeOptions = {}) =>
+const make = (options: RuntimeOptions = {}) =>
   Effect.gen(function* () {
-    const clock = yield* Clock.Clock;
-    const fs = yield* FileSystem.FileSystem;
     const config = yield* ServerConfig;
     const core = yield* Core;
     const store = yield* Agent;
@@ -267,27 +243,13 @@ export const make = (options: RuntimeOptions = {}) =>
     const later = yield* FiberMap.runtime(timers)();
     let closed = false;
 
-    const spendFile = join(config.home, "spend.json");
-    // The tally is written a second after the first spend, the ones in between joining it, and as the service closes.
-    const disk = yield* keptFile(spendFile, { soonMs: 1000 });
-    let spent: Spent = { day: dayOf(yield* Clock.currentTimeMillis), byRuntime: {} };
-    // An unreadable tally, or yesterday's, starts the day again.
-    const kept = jsonOrNone(SpentSchema)(Option.getOrUndefined(yield* Effect.option(fs.readFileString(spendFile))));
-    if (kept && kept.day === spent.day) spent = kept;
-    /** A new day starts from nothing. */
-    const tally = () => {
-      if (spent.day !== dayOf(clock.currentTimeMillisUnsafe())) spent = { day: dayOf(clock.currentTimeMillisUnsafe()), byRuntime: {} };
-      return spent.byRuntime;
-    };
-
+    const daily = yield* spending;
+    const tally = daily.tally;
     yield* Effect.addFinalizer(() =>
-      Effect.andThen(
-        Effect.suspend(() => {
-          closed = true;
-          return FiberMap.clear(timers);
-        }),
-        Effect.sync(() => disk.soon(() => JSON.stringify(spent))),
-      ),
+      Effect.suspend(() => {
+        closed = true;
+        return FiberMap.clear(timers);
+      }),
     );
 
     function withSpend(info: T.RuntimeInfo): T.RuntimeInfo {
@@ -487,7 +449,7 @@ export const make = (options: RuntimeOptions = {}) =>
 
     const candidates = Effect.suspend(() => Effect.forEach(store.agents(), (agent) => Effect.map(assess(agent), (a) => ({ agent, usable: usable(a) }))));
 
-    const shape = Runtime.of({
+    return Runtime.of({
       list: Effect.fn("Runtime.list")(function* () {
         return yield* Effect.forEach(runtimeIds(), (id) =>
           Effect.gen(function* () {
@@ -563,10 +525,8 @@ export const make = (options: RuntimeOptions = {}) =>
         return p ? inCny(p, config.cnyPerUsd) : undefined;
       },
       spend: (id, cny) => {
-        if (!(cny > 0) || closed) return;
-        tally()[id] = (tally()[id] ?? 0) + cny;
+        if (closed || !daily.spend(id, cny)) return;
         // The runtime's new total is pushed once per window.
-        disk.soon(() => JSON.stringify(spent));
         later(
           `push:${id}`,
           Effect.delay(
@@ -580,13 +540,6 @@ export const make = (options: RuntimeOptions = {}) =>
         if (closed) return;
         later(`usage:${id}`, Effect.delay(Effect.ignoreCause(refreshUsage(id)), usageAfterRunMs), { onlyIfMissing: true });
       },
-    });
-    return Object.assign(shape, {
-      refreshUsage,
-      /** The observation held for a runtime, none before its first probe lands. */
-      cached: held,
-      spent: () => spent,
-      setSpent: (s: Spent) => (spent = s),
     });
   });
 

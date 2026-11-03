@@ -3,12 +3,18 @@
 // through. requiredOrder is the order the required fields are listed in, and a struct that refuses fields it does not
 // know (parseOptions) says so in the JSON Schema too (additionalProperties false).
 
-import { Schema, Predicate } from "effect";
+import { Effect, Predicate, Schema } from "effect";
 
+import { ToolFailed } from "@vibevalley/agent/core/errors";
+import { effectTool } from "@vibevalley/agent/core/tool";
 import type { JsonSchema } from "@vibevalley/ai/tools";
-import type { Handlers } from "@vibevalley/protocol/api";
+import { ApiError as ApiErrorSchema, type Handlers } from "@vibevalley/protocol/api";
 
-import { params } from "./prompts.ts";
+import type { Actor } from "@/base/actor.ts";
+import { messageOf, reasonOf } from "@/errors.ts";
+import { maxChildren as maxTasks } from "@/issue/creation.ts";
+
+import { answers, descriptions, params, sessionDescriptions } from "./prompts.ts";
 
 /** A tool is an endpoint as a model sees it: its name is the endpoint's (toolName), its fields are the endpoint's. */
 export type Op = keyof Handlers;
@@ -109,43 +115,15 @@ export const parameters = {
     id: Schema.String.annotate({ description: params.channelRef }),
     project: Schema.optionalKey(Schema.String),
   }),
-  "graph.act": Schema.Struct({
-    action: Schema.Literals(["start", "pause", "resume", "abandon", "merge"]),
-    id: Schema.String.annotate({ description: params.planId }),
-  }).annotate({ requiredOrder: ["id", "action"] }),
-  "graph.get": Schema.Struct({
-    id: Schema.String.annotate({ description: params.planId }),
-  }),
-  "graph.list": Schema.Struct({}),
-  "graph.split": Schema.Struct({
-    agent: Schema.optionalKey(Schema.String.annotate({ description: params.graphSplit.agent })),
-    goal: Schema.String.annotate({ description: params.graphSplit.goal }),
-    project: Schema.String.annotate({ description: params.projectFolder }),
-  }),
-  "graph.task.act": Schema.Struct({
-    action: Schema.Literals(["retry", "skip"]),
-    id: Schema.String.annotate({ description: params.planId }),
-    task: Schema.String.annotate({ description: params.graphTask.task }),
-  }).annotate({ requiredOrder: ["id", "task", "action"] }),
-  "graph.task.delete": Schema.Struct({
-    id: Schema.String.annotate({ description: params.planId }),
-    task: Schema.String.annotate({ description: params.graphTask.task }),
-  }).annotate({ requiredOrder: ["id", "task"] }),
-  "graph.task.update": Schema.Struct({
-    agent: Schema.optionalKey(Schema.String.annotate({ description: params.graphTask.agent })),
-    brief: Schema.optionalKey(Schema.String.annotate({ description: params.graphTask.brief })),
-    check: Schema.optionalKey(Schema.String.annotate({ description: params.graphTask.check })),
-    id: Schema.String.annotate({ description: params.planId }),
-    needs: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.graphTask.needs })),
-    task: Schema.String.annotate({ description: params.graphTask.newTask }),
-    title: Schema.optionalKey(Schema.String),
-  }).annotate({ requiredOrder: ["id", "task"] }),
   "issue.comment.create": Schema.Struct({
     id: Schema.String.annotate({ description: params.issueOrAgent }),
     text: Schema.String.annotate({ description: params.issueComment.text }),
   }).annotate({ requiredOrder: ["id", "text"] }),
   "issue.create": Schema.Struct({
-    assignee: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.assignee })),
+    parent: Schema.optionalKey(Schema.String.annotate({ description: params.issueOrAgent })),
+    blockedBy: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String.annotate({ description: params.issueOrAgent })))),
+    agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.agent })),
+    autoSubmitPr: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueCreate.autoSubmitPr })),
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.channel })),
     deliver: Schema.optionalKey(
       Schema.Literals(["change", "branch", "answer"]).annotate({
@@ -180,13 +158,13 @@ export const parameters = {
     text: Schema.optionalKey(Schema.String.annotate({ description: params.issueReview.text })),
   }).annotate({ requiredOrder: ["id", "pass"] }),
   "issue.status.update": Schema.Struct({
-    assignee: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.assignee })),
+    agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.agent })),
     id: Schema.String.annotate({ description: params.issueNumber }),
     status: Schema.String.annotate({ description: params.issueStatus.status }),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.text })),
   }).annotate({ requiredOrder: ["id", "status"] }),
   "issue.update": Schema.Struct({
-    assignee: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.assignee })),
+    agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.agent })),
     criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.issueUpdate.criteria })),
     deliver: Schema.optionalKey(Schema.Literals(["change", "branch", "answer"]).annotate({ description: params.issueUpdate.deliver })),
     description: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.description })),
@@ -329,7 +307,7 @@ const written = (node: unknown): unknown => {
   return out;
 };
 
-const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>): JsonSchema => {
+export const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>): JsonSchema => {
   if (Object.keys(parameters.fields).length === 0) return { additionalProperties: true, properties: {}, type: "object" };
   const shaped = written(Schema.toJsonSchemaDocument(parameters, { includeAnnotationKey: (key) => key === "requiredOrder" || key === "parseOptions" }).schema);
   return Predicate.isObject(shaped) ? Object.fromEntries(Object.entries(shaped)) : {};
@@ -342,3 +320,83 @@ const shown = <A extends Record<string, Schema.Struct<Schema.Struct.Fields>>>(al
 /** As the model is shown them, by endpoint. */
 export const schemas = shown(parameters);
 export const sessionSchemas = shown(sessionParameters);
+
+export type Orchestrator<K extends keyof typeof parameters> = (typeof parameters)[K]["Type"];
+
+export type SessionInput<K extends keyof typeof sessionParameters> = (typeof sessionParameters)[K]["Type"];
+
+export interface Caller {
+  /** The profile: an orchestrator's own id for an orchestrator. */
+  readonly agent: string;
+  /** The session working as agent, and the project it works in; both empty for the orchestrator. */
+  readonly session: string;
+  readonly project: string;
+  /** The channel the orchestrator is answering. A session's default is its own issue thread, which the channel service knows. */
+  readonly here: string;
+  /** The profile the owner picked for this input, if any: dispatch prefers it. */
+  readonly picked: string;
+  /** The ingress envelope currently being handled; empty when this run was not opened by one. */
+  readonly envelope: string;
+  /** Who calls, and on whose word: the services judge what it may do by it. */
+  readonly actor: Actor;
+}
+
+export type Who = () => Caller;
+
+export class ToolRefusal extends Schema.TaggedError<ToolRefusal, { readonly brand: unique symbol }>()("ToolRefusal", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {}
+
+export const refuse = (message: string) => Effect.fail(new ToolRefusal({ message }));
+
+const toFailed = (e: unknown): ToolFailed => new ToolFailed({ message: Schema.is(ApiErrorSchema)(e) ? reasonOf(e) : messageOf(e), cause: e });
+
+export const said = (e: unknown) => toFailed(e).message;
+
+export const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e), cause: e }) });
+
+/** An answer, or "没成：" and why. */
+export const answered = <E>(e: Effect.Effect<string, E>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(said(err))));
+
+// Who reads and speaks in a channel: a session as itself, the orchestrator as the orchestrator.
+export const participant = (c: Caller) => c.session || c.agent;
+
+// A tool's arguments are read by its Schema before it runs; the model's JSON Schema is made from the same one.
+// Named by its endpoint (toolName): the name is never written a second time.
+const toolOf =
+  <All extends { readonly [op: string]: Schema.Codec<unknown, unknown> }>(
+    all: All,
+    shown: Record<keyof All & string, JsonSchema>,
+    words: Record<keyof All & string, string>,
+  ) =>
+  <K extends keyof All & Op, E>(op: K, body: (p: All[K]["Type"]) => Effect.Effect<string, E>) => {
+    const read: (args: unknown) => Effect.Effect<All[K]["Type"], Schema.SchemaError> = Schema.decodeUnknownEffect<All[K]>(all[op]);
+    return effectTool<unknown>({
+      name: toolName(op),
+      description: words[op],
+      parameters: shown[op],
+      run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
+    });
+  };
+
+export const tool = toolOf(parameters, schemas, descriptions);
+export const sessionSchemaTool = toolOf(sessionParameters, sessionSchemas, {
+  ...sessionDescriptions,
+  "issue.split": sessionDescriptions["issue.split"](maxTasks),
+});
+
+export const customTool = <A, E>(
+  name: string,
+  description: string,
+  parameters: JsonSchema,
+  read: (args: unknown) => Effect.Effect<A, Schema.SchemaError>,
+  body: (input: A) => Effect.Effect<string, E>,
+) => {
+  return effectTool<unknown>({
+    name,
+    description,
+    parameters,
+    run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
+  });
+};

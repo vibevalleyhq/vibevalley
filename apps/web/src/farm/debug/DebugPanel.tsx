@@ -9,14 +9,13 @@ import { clockText } from "@vibevalley/engine/clock";
 import { t } from "@vibevalley/i18n";
 import type { Session, StateFrame } from "@vibevalley/protocol";
 
+import { aria } from "@/base/dom";
 import { createExternal } from "@/base/external";
-import { aria } from "@/base/util";
-import { localEffects } from "@/farm/effects";
+import { localEffects } from "@/farm/frames";
 import { clock, farm } from "@/farm/store";
 import { typing } from "@/farm/tools";
 import { api } from "@/infra/api";
-import { orchestratorMood, useCore, useFrames, rawFrame } from "@/infra/frame";
-import { subscribeLive } from "@/infra/live";
+import { orchestratorMood, useCore, useFrames, rawFrame, subscribeLive } from "@/infra/frame";
 import { ready, useQuery } from "@/infra/query";
 import { createPixelAct } from "@/ui/pixel";
 import { playSound, SOUND_GROUPS, SOUND_LABEL } from "@/ui/pixel/sound";

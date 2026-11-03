@@ -35,7 +35,7 @@ export type Box = readonly [number, number, number, number];
 export type Place = "bench" | "library" | "workshop" | "mast";
 
 /** What life needs of the village (world/world.ts, the sprites, the map's own pixels). */
-export interface LifeWorld {
+interface LifeWorld {
   readonly width: number;
   readonly dog: Point;
   readonly fx: { readonly chimney: readonly Box[]; readonly anvil: readonly Box[]; readonly mast: readonly Box[]; readonly pond: readonly Box[] };
@@ -50,7 +50,7 @@ export interface LifeWorld {
 
 const inRect = (p: Point, b: Box) => p.x >= b[0] && p.x < b[2] && p.y >= b[1] && p.y < b[3];
 
-export interface LifeFrame {
+interface LifeFrame {
   readonly t: number;
   readonly dt: number;
   /** 0 by day, 1 at night. */
@@ -64,7 +64,7 @@ export interface LifeFrame {
   readonly dogAsleep: boolean;
 }
 
-export interface LifeLayers {
+interface LifeLayers {
   /** In the lit world, over everything attention: smoke, dust, leaves, ripples, butterflies, birds. */
   readonly world: Container;
   /** Over the lit world, added: what shines (sparks, twinkles, glints, fireflies, the mast's waves and lamp). */
@@ -73,7 +73,7 @@ export interface LifeLayers {
   readonly marks: Container;
 }
 
-export interface Life {
+interface Life {
   /** Moves everything on; the lights it makes (fireflies, the anvil's flashes, the mast's lamp), for the light. */
   readonly update: (frame: LifeFrame) => PointLight[];
   /** A click on the yard that nothing else took. */

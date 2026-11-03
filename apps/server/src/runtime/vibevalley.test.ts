@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { Event, Session } from "@botiverse/oar";
+import { Effect, Exit, Scope, Stream } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
-import { standaloneOwner } from "@vibevalley/agent/brain";
 import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf } from "@vibevalley/agent/testing";
 import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
-import { whenTrue } from "@vibevalley/testkit/until";
+import { nextTurn, whenTrue } from "@vibevalley/testkit/until";
 
 import { wallTime } from "@/infra/time.ts";
 
@@ -22,8 +22,15 @@ const home = () => {
   return h.dir;
 };
 const sessions: Session[] = [];
+const scopes: Scope.Closeable[] = [];
+const owner = async () => {
+  const scope = await Effect.runPromise(Scope.make());
+  scopes.push(scope);
+  return { run: Effect.runPromise, scope };
+};
 afterEach(async () => {
   await Promise.all(sessions.splice(0).map((s) => s.dispose()));
+  await Promise.all(scopes.splice(0).map((scope) => Effect.runPromise(Scope.close(scope, Exit.void))));
   for (const done of homes.splice(0)) done();
 });
 
@@ -40,7 +47,7 @@ async function open(steps: readonly Step[], extra: { resume?: string; home?: str
   const { llm, requests, pending } = scriptedLLM(steps);
   const h = extra.home ?? home();
   const cwd = extra.cwd ?? home();
-  const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: standaloneOwner(), home: () => h, llm: () => llm });
+  const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: await owner(), home: () => h, llm: () => llm });
   const session = await runtime.session(
     { via: "bundled" },
     {
@@ -61,6 +68,77 @@ const text = (r: Opened) => r.events.flatMap((e) => (e.kind === "text_delta" ? [
 const toolStarted = (r: Opened) => r.events.some((e) => e.kind === "tool_call_started");
 
 describe("VibeValley's runtime", () => {
+  it("shares the actual close with every concurrent caller", async () => {
+    const gate = Promise.withResolvers<void>();
+    const { llm } = scriptedLLM();
+    let started = false;
+    const held = {
+      ...llm,
+      service: {
+        ...llm.service,
+        stream: () =>
+          Stream.fromEffect(
+            Effect.gen(function* () {
+              started = true;
+              yield* Effect.uninterruptible(Effect.promise(() => gate.promise));
+            }),
+          ).pipe(Stream.drain),
+      },
+    };
+    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: await owner(), home, llm: () => held });
+    const session = await runtime.session({ via: "bundled" }, { cwd: home() });
+    sessions.push(session);
+    const events: Event[] = [];
+    session.events((event) => events.push(event), { cursor: { sessionId: session.id, afterSeq: -1 } });
+    try {
+      await session.prompt("work");
+      await whenTrue(() => started, "the held model stream");
+      const first = session.dispose();
+      const second = session.dispose();
+      expect(second).toBe(first);
+      let done = false;
+      void second.then(() => {
+        done = true;
+      });
+      await nextTurn();
+      expect(done).toBe(false);
+      gate.resolve();
+      await Promise.all([first, second]);
+      expect(done).toBe(true);
+      expect(events.filter((event) => event.kind === "turn_ended")).toHaveLength(1);
+      expect(events.filter((event) => event.kind === "exited")).toHaveLength(1);
+    } finally {
+      gate.resolve();
+      await session.dispose();
+    }
+  });
+
+  it("cuts off a runtime's active model when its owner's scope closes", async () => {
+    const parent = await owner();
+    const { llm } = scriptedLLM();
+    let started = false;
+    let cut = false;
+    const waiting = Effect.onInterrupt(
+      Effect.gen(function* () {
+        started = true;
+        return yield* Effect.never;
+      }),
+      () =>
+        Effect.sync(() => {
+          cut = true;
+        }),
+    );
+    const held = { ...llm, service: { ...llm.service, stream: () => Stream.fromEffect(waiting).pipe(Stream.drain) } };
+    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: parent, home, llm: () => held });
+    const session = await runtime.session({ via: "bundled" }, { cwd: home() });
+    sessions.push(session);
+    await session.prompt("work");
+    await whenTrue(() => started, "the model started");
+    await Effect.runPromise(Scope.close(parent.scope, Exit.void));
+    expect(cut).toBe(true);
+    await session.dispose();
+  });
+
   it("runs a prompt's tools and ends the turn completed", async () => {
     const r = await open([answer([words("我来写"), toolCall("write_file", { path: "hello.txt", content: "hi" })]), answer("写好了 hello.txt")], {
       append: "你是后端老周。",
@@ -162,7 +240,7 @@ rl.on('line', (line) => {
 
   it("lists DeepSeek's models, is bundled, and says why it cannot run", async () => {
     const { llm } = scriptedLLM();
-    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: standaloneOwner(), llm: () => llm });
+    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: await owner(), llm: () => llm });
     const models = await runtime.listModels();
     expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels.join(",") === "high,max" && m.default === true)).toBe(
       true,
@@ -171,7 +249,7 @@ rl.on('line', (line) => {
     await expect(runtime.session({ via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/u);
     const keyless = vibevalleyRuntimeOf({
       time: wallTime,
-      owner: standaloneOwner(),
+      owner: await owner(),
       llm: () => {
         throw new Error("没有 DeepSeek 的密钥");
       },

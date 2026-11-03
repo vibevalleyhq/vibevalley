@@ -1,4 +1,4 @@
--- The channels, the default one among them, and the threads under their messages (channel/chat.ts).
+-- The channels, the default one among them, and the threads under their messages (channel/channel.ts).
 
 -- name: DefaultID :one
 select id from channel where is_default;
@@ -28,7 +28,7 @@ values (sqlc.arg(id), 'thread', sqlc.arg(root_id), sqlc.arg(root_number), sqlc.n
 
 -- name: AllChannels :many
 -- bound: a row per channel, what the chat keeps in memory.
--- What the chat keeps in memory (channel/model.ts), loaded when it starts.
+-- What the chat keeps in memory (channel/rooms.ts), loaded when it starts.
 select * from channel order by id;
 
 -- name: RecentChannels :many
@@ -45,7 +45,8 @@ where id = sqlc.arg(id);
 select c.id, c.type, c.root_id, c.root_number, c.subject_kind, c.subject_id, coalesce(ch.name, c.name, '')::text as channel_name,
        count(m.id)::int as unread,
        bool_or(exists (select 1 from channel_mention x where x.message_id = m.id and x.target_id = sqlc.arg(participant))) as mentions_you,
-       coalesce(max(m.number), 0)::int as latest
+       coalesce(max(m.number), 0)::int as latest,
+       (select p.name from channel_message lm join channel_participant p on p.id = lm.sender_id where lm.channel_id = c.id and lm.number = max(m.number)) as latest_sender_name
 from channel c
 left join channel ch on ch.id = c.parent_id
 join channel_message m on m.channel_id = c.id
@@ -54,7 +55,7 @@ left join channel_follow f on f.channel_id = c.id and f.participant_id = sqlc.ar
 where m.sender_id <> sqlc.arg(participant) and m.kind <> 'notice'
   and (c.id = sqlc.arg(channel) or f.participant_id is not null)
   and m.number > greatest(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))
-  and not exists (select 1 from channel_seen_mark s where s.participant_id = sqlc.arg(participant) and s.message_id = m.id)
+  and not exists (select 1 from mailbox_delivery d where d.session_id = sqlc.arg(participant) and d.message_id = m.id and d.consumed_at is not null)
 group by c.id, ch.name
 order by max(m.number) desc
 limit 20;
@@ -81,11 +82,25 @@ update channel set notify = sqlc.arg(notify) where id = sqlc.arg(id);
 -- name: SetOrchestrator :exec
 update channel set orchestrator = sqlc.narg(orchestrator) where id = sqlc.arg(id) and type = 'channel';
 
+-- name: OrchestratorForChannel :one
+with recursive places as (
+  select id, type, peer_id, parent_id, orchestrator from channel where id = sqlc.arg(id)
+  union
+  select c.id, c.type, c.peer_id, c.parent_id, c.orchestrator
+  from channel c join places p on c.id = p.parent_id where p.type = 'thread'
+)
+select case when type = 'direct' then peer_id else orchestrator end as agent
+from places where type <> 'thread' limit 1;
+
+
 -- name: ChannelInUse :one
 -- What still points at a channel, so deleting it would take it from under them.
 select (select count(*) from cron r where r.channel_id = sqlc.arg(id))::int as crons,
        (select count(*) from connector_account a where a.channel_id = sqlc.arg(id))::int as connectors,
-       (select count(*) from issue_queue q where q.channel = sqlc.arg(id))::int as queued,
+       (select count(distinct i.id) from issue i
+        left join mailbox_issue m on m.issue_id = i.id and m.state = 'held'
+        left join ingress_trigger t on t.id = m.trigger_id
+        where i.queued_at is not null and (t.trigger_json::jsonb->>'replyChannel' = sqlc.arg(id)))::int as queued,
        (select count(*) from channel t where t.parent_id = sqlc.arg(id) and t.subject_kind = 'issue')::int as issue_threads;
 
 -- name: DeleteThreadsOf :exec
@@ -93,7 +108,3 @@ delete from channel where parent_id = sqlc.arg(id);
 
 -- name: DeleteChannel :exec
 delete from channel where id = sqlc.arg(id) and not is_default;
-
--- name: SetSubject :exec
--- A direct channel with a helper profile takes its talk issue as its subject: the issue's thread is the channel.
-update channel set subject_kind = 'issue', subject_id = sqlc.arg(subject_id) where id = sqlc.arg(id) and type = 'direct';

@@ -3,10 +3,10 @@
 import type * as T from "@vibevalley/protocol";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 
-import { withChannel, withMessage, withOwnerMentions } from "@/channel/folded.ts";
-import { freeStation, playedDoing, playedRun, playOf, stationed } from "@/game/play.ts";
+import { withChannel, withMessage, withOwnerMentions } from "@/channel/messages.ts";
+import { emptyPlay, freeStation, playedDoing, playedRun, playOf, stationed } from "@/game/view.ts";
 import { withIssue, withIssueStatuses } from "@/issue/status.ts";
-import { sessionOf, whileWorking, withSession } from "@/session/roster.ts";
+import { sessionOf, withSession } from "@/session/roster.ts";
 
 const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 
@@ -18,23 +18,38 @@ export function reduce(state: T.WorkspaceState, fact: T.Fact): [T.WorkspaceState
 
 function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
   switch (f.type) {
-    case "call": {
+    case "voiceCall": {
       if (state.call === f.state && state.callReason === f.reason) return [state, false];
       return [{ ...state, call: f.state, callReason: f.reason }, true];
     }
-    case "orchestrator": {
-      const was = state.orchestrators[f.agent];
-      if ((was?.state ?? "idle") === f.state && was?.channel === f.channel) return [state, false];
-      // At rest it leaves the map: idle is what an orchestrator not in it is.
-      const { [f.agent]: _was, ...others } = state.orchestrators;
-      // A round runs from its first thinking through its writing: its start stays while it goes on.
-      const busy = (s: T.OrchestratorState | undefined) => s === "thinking" || s === "speaking";
-      const since = busy(f.state) ? (busy(was?.state) ? was.since : f.at) : undefined;
-      const now =
-        f.state === "idle" && !f.channel
-          ? others
-          : { ...others, [f.agent]: { state: f.state, ...(f.channel ? { channel: f.channel } : {}), ...(since !== undefined ? { since } : {}) } };
-      return [{ ...state, orchestrators: now }, true];
+    case "sessionPhase": {
+      const session = sessionOf(state, f.id);
+      if (
+        !session ||
+        (same(session.phase, f.phase) &&
+          session.channel === f.channel &&
+          (f.spent === undefined || same(session.spent, f.spent)) &&
+          (f.brief === undefined || f.brief === session.brief))
+      )
+        return [state, false];
+      const [after] = withSession(state, f.id, (h) =>
+        omitUndefined({
+          ...h,
+          phase: f.phase,
+          channel: f.channel,
+          brief: f.brief ?? h.brief,
+          ...(f.spent ? { spent: f.spent } : {}),
+        }),
+      );
+      const plays = state.plays ?? {};
+      const before = playOf(plays, f.id);
+      const play =
+        f.phase._tag === "working"
+          ? session.phase._tag === "working"
+            ? playedDoing(before, { at: f.at, action: f.phase.doing.action, label: f.phase.doing.label })
+            : playedRun(before, f.at)
+          : before;
+      return [{ ...after, plays: { ...plays, [f.id]: play } }, true];
     }
     case "message": {
       const [chat, news] = withMessage(state.chat, f.message);
@@ -50,54 +65,56 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
     }
     case "ownerMentions":
       return same(state.chat?.ownerMentions, f.mentions) ? [state, false] : [{ ...state, chat: withOwnerMentions(state.chat, f.mentions) }, true];
-    case "hired": {
+    case "session": {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
       const was = sessionOf(state, f.session.id);
-      const play = was?.play ?? { ...playOf(f.session), station: freeStation(others, farmOf(f.session)) };
-      const h: T.Session = { ...f.session, play };
-      return [{ ...state, sessions: [...others, h] }, true];
+      if (f.session.role === "orchestrator") return [{ ...state, sessions: [...others, f.session] }, true];
+      const plays = state.plays ?? {};
+      const play = was ? playOf(plays, f.session.id) : { ...emptyPlay(), station: freeStation(plays, others, farmOf(f.session)) };
+      return [{ ...state, sessions: [...others, f.session], plays: { ...plays, [f.session.id]: play } }, true];
     }
-    case "station":
-      return stationed(state, f);
-    case "run":
-      return withSession(state, f.id, (h) => ({
-        ...h,
-        brief: f.brief ? f.brief : h.brief,
-        phase: { _tag: "working", since: f.at, doing: { action: "thinking", label: "" } },
-        play: playedRun(playOf(h), f.at),
-      }));
-    case "doing": {
-      const [after, changed] = whileWorking(state, f.id, (p) => ({ _tag: "working", since: p.since, doing: { action: f.action, label: f.label } }));
-      if (!changed) return [state, false];
-      return withSession(after, f.id, (h) => ({ ...h, play: playedDoing(playOf(h), f) }));
-    }
-    case "quiet":
-      return whileWorking(state, f.id, (p) => ({ ...p, quietSince: f.since }));
-    case "retry":
-      return whileWorking(state, f.id, (p) => ({ ...p, retry: f.of != null && f.of !== 0 ? { attempt: f.attempt, of: f.of } : { attempt: f.attempt } }));
-    case "spent":
-      return withSession(state, f.id, (h) => ({ ...h, spent: f.spent }));
-    case "report":
+    case "sessionReport":
       if (!sessionOf(state, f.id)) return [state, false];
       return [
         withSession(state, f.id, (x) => ({
           ...x,
           runs: f.runs,
-          phase: ended(f.outcome),
+          phase:
+            f.outcome === "completed" &&
+            f.phase?._tag === "resting" &&
+            x.issue !== undefined &&
+            state.issues.some((issue) => issue.id === x.issue && issue.pullRequest?.state === "open")
+              ? f.phase
+              : ended(f.outcome),
           lastRun: omitUndefined({ outcome: f.outcome, summary: f.summary, at: f.at, spent: f.spent, answer: f.answer }),
         }))[0],
         true,
       ];
-    case "conflict":
-      return withSession(state, f.id, (h) => omitUndefined({ ...h, conflict: f.conflict }));
-    case "left":
-      return [{ ...state, sessions: state.sessions.filter((h) => h.id !== f.id) }, true];
-    case "commits":
-      if (state.commits && same(state.commits, f.commits)) return [state, false];
-      return [{ ...state, commits: f.commits }, true];
-    case "progress":
-      if (state.progress && same(state.progress, f.progress)) return [state, false];
-      return [{ ...state, progress: f.progress }, true];
+    case "sessionGone": {
+      const plays = { ...state.plays };
+      delete plays[f.id];
+      return [{ ...state, sessions: state.sessions.filter((h) => h.id !== f.id), plays }, true];
+    }
+    case "gameProgress": {
+      let next = state;
+      let changed = false;
+      if (f.commits !== undefined && !same(next.commits, f.commits)) {
+        next = { ...next, commits: f.commits };
+        changed = true;
+      }
+      if (f.progress !== undefined && !same(next.progress, f.progress)) {
+        next = { ...next, progress: f.progress };
+        changed = true;
+      }
+      if (f.station !== undefined) {
+        const [stationedState, moved] = stationed(next, f.station);
+        if (moved) {
+          next = stationedState;
+          changed = true;
+        }
+      }
+      return [next, changed];
+    }
     case "cron": {
       const all = [...state.crons];
       const i = all.findIndex((x) => x.id === f.cron.id);

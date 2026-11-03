@@ -1,4 +1,4 @@
-// A file the server keeps (state.json…), saved whole or not at all and in order: each write goes to a temporary file
+// A file the server keeps (settings.json…), saved whole or not at all and in order: each write goes to a temporary file
 // renamed over it, so a crash never leaves half a file; the last write asked for wins. All of it on FileSystem: no write
 // holds the event loop while helpers stream.
 
@@ -31,7 +31,7 @@ export const writeOnce = (path: string, bytes: Uint8Array): Effect.Effect<void, 
   }).pipe(Effect.mapError(notWritten));
 
 /**
- * An owner's file (config.json, settings.json, state.json) read by read. One that does not read (not JSON, or not the
+ * An owner's file (config.json, settings.json) read by read. One that does not read (not JSON, or not the
  * shape this server knows) is moved aside as `<file>.unreadable-<time>` and none is returned: it is never written over,
  * and the owner can take it back. One that cannot be moved aside stops the start. No file is none too.
  */

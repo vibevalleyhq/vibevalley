@@ -189,14 +189,6 @@ export const RuntimeFacts: Codec<T.RuntimeFacts> = Schema.Struct({
 
 export const CallState: Codec<T.CallState> = Schema.Literals(T.CallStateValues);
 
-export const OrchestratorState: Codec<T.OrchestratorState> = Schema.Literals(T.OrchestratorStateValues);
-
-export const OrchestratorNow: Codec<T.OrchestratorNow> = Schema.Struct({
-  state: OrchestratorState,
-  channel: Schema.optionalKey(Schema.String),
-  since: Schema.optionalKey(Schema.Finite),
-});
-
 export const ActorKind: Codec<T.ActorKind> = Schema.Literals(T.ActorKindValues);
 
 export const MessageKind: Codec<T.MessageKind> = Schema.Literals(T.MessageKindValues);
@@ -382,8 +374,6 @@ export const Doing: Codec<T.Doing> = Schema.Struct(doingFields);
 
 export const DoingView: Codec<T.DoingView> = Schema.Struct({ ...doingFields, actionText: Schema.String });
 
-export const PhaseArriving: Codec<T.PhaseArriving> = Schema.TaggedStruct("arriving", {});
-
 export const Retry: Codec<T.Retry> = Schema.Struct({
   attempt: Schema.Finite,
   of: Schema.optionalKey(Schema.Finite),
@@ -414,9 +404,9 @@ export const PhaseClosed: Codec<T.PhaseClosed> = Schema.TaggedStruct("closed", {
   closed: SessionClose,
 });
 
-export const Phase: Codec<T.Phase> = Schema.Union([PhaseArriving, PhaseWorking, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
+export const Phase: Codec<T.Phase> = Schema.Union([PhaseWorking, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
 
-export const PhaseView: Codec<T.PhaseView> = Schema.Union([PhaseArriving, PhaseWorkingView, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
+export const PhaseView: Codec<T.PhaseView> = Schema.Union([PhaseWorkingView, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
 
 export const IssueAnswer: Codec<T.IssueAnswer> = Schema.Struct({
   conclusion: Schema.String,
@@ -431,11 +421,6 @@ export const LastRun: Codec<T.LastRun> = Schema.Struct({
   at: Schema.Finite,
   spent: Schema.optionalKey(Spent),
   answer: Schema.optionalKey(IssueAnswer),
-});
-
-export const SessionGraph: Codec<T.SessionGraph> = Schema.Struct({
-  id: Schema.String,
-  task: Schema.optionalKey(Schema.String),
 });
 
 export const PlayAction: Codec<T.PlayAction> = Schema.Struct({ at: Schema.Finite, ...doingFields });
@@ -457,6 +442,7 @@ export const SessionPlayView: Codec<T.SessionPlayView> = Schema.Struct({ ...play
 
 const sessionFields = {
   id: SessionId,
+  role: Schema.Literals(T.AgentRoleValues),
   name: Schema.String,
   agent: Schema.String,
   runtime: Schema.String,
@@ -464,23 +450,20 @@ const sessionFields = {
   project: Schema.optionalKey(Schema.String),
   branch: Schema.optionalKey(Schema.String),
   worktree: Schema.optionalKey(Schema.String),
-  conflict: Schema.optionalKey(Conflict),
   hiredAt: Schema.Finite,
   runs: Schema.Finite,
   lastRun: Schema.optionalKey(LastRun),
   spent: Schema.optionalKey(Spent),
-  graph: Schema.optionalKey(SessionGraph),
   channel: Schema.optionalKey(Schema.String),
   issue: Schema.optionalKey(IssueId),
   refining: Schema.Boolean,
 };
 
-export const Session: Codec<T.Session> = Schema.Struct({ ...sessionFields, phase: Phase, play: Schema.optionalKey(SessionPlay) });
+export const Session: Codec<T.Session> = Schema.Struct({ ...sessionFields, phase: Phase });
 
 export const SessionView: Codec<T.SessionView> = Schema.Struct({
   ...sessionFields,
   phase: PhaseView,
-  play: Schema.optionalKey(SessionPlayView),
   phaseText: Schema.String,
 });
 
@@ -492,59 +475,6 @@ export const Repo: Codec<T.Repo> = Schema.Struct({
 export const CommitCount: Codec<T.CommitCount> = Schema.Struct({
   total: Schema.Finite,
   repos: Schema.mutable(Schema.Array(Repo)),
-});
-
-export const GraphState: Codec<T.GraphState> = Schema.Literals(T.GraphStateValues);
-
-export const TaskState: Codec<T.TaskState> = Schema.Literals(T.TaskStateValues);
-
-export const TaskAction: Codec<T.TaskAction> = Schema.Literals(T.TaskActionValues);
-
-export const Task: Codec<T.Task> = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  brief: Schema.String,
-  needs: Schema.mutable(Schema.Array(Schema.String)),
-  agent: Schema.optionalKey(Schema.String),
-  check: Schema.optionalKey(Schema.String),
-  scope: Schema.mutable(Schema.Array(Schema.String)),
-  acceptance: Schema.Boolean,
-  frozen: Schema.mutable(Schema.Array(Schema.String)),
-  state: TaskState,
-  session: Schema.optionalKey(SessionId),
-  conclusion: Schema.String,
-  commits: Schema.mutable(Schema.Array(Schema.String)),
-  spent: Schema.optionalKey(Spent),
-  tries: Schema.Finite,
-  failures: Schema.optionalKey(Schema.Finite),
-  blockedBy: Schema.mutable(Schema.Array(Schema.String)),
-  stateText: Schema.String,
-  actions: Schema.mutable(Schema.Array(TaskAction)),
-  actionText: Schema.Record(Schema.String, Schema.String),
-  canEdit: Schema.Boolean,
-  canRemove: Schema.Boolean,
-});
-
-export const GraphAction: Codec<T.GraphAction> = Schema.Literals(T.GraphActionValues);
-
-export const TaskGraph: Codec<T.TaskGraph> = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  goal: Schema.String,
-  project: Schema.String,
-  branch: Schema.optionalKey(Schema.String),
-  state: GraphState,
-  stateTag: Schema.String,
-  actionText: Schema.Record(Schema.String, Schema.String),
-  actions: Schema.mutable(Schema.Array(GraphAction)),
-  tasks: Schema.mutable(Schema.Array(Task)),
-  parallel: Schema.Finite,
-  note: Schema.String,
-  createdAt: Schema.Finite,
-  layers: Schema.mutable(Schema.Array(Schema.mutable(Schema.Array(Schema.String)))),
-  asksForYou: Schema.Boolean,
-  spent: Schema.optionalKey(Spent),
-  settled: Schema.optionalKey(Schema.Finite),
 });
 
 export const Unlock: Codec<T.Unlock> = Schema.Struct({
@@ -644,28 +574,6 @@ export const ChannelEvent: Codec<T.ChannelEvent> = Schema.Union([Schema.TaggedSt
 
 export const Priority: Codec<T.Priority> = Schema.Literals(T.PriorityValues);
 
-export const IssueGraph: Codec<T.IssueGraph> = Schema.Struct({
-  state: GraphState,
-  branch: Schema.optionalKey(Schema.String),
-  parallel: Schema.Finite,
-  note: Schema.optionalKey(Schema.String),
-});
-
-export const IssueTask: Codec<T.IssueTask> = Schema.Struct({
-  key: Schema.String,
-  state: TaskState,
-  check: Schema.optionalKey(Schema.String),
-  scope: Schema.mutable(Schema.Array(Schema.String)),
-  acceptance: Schema.Boolean,
-  frozen: Schema.mutable(Schema.Array(Schema.String)),
-  session: Schema.optionalKey(SessionId),
-  conclusion: Schema.optionalKey(Schema.String),
-  commits: Schema.mutable(Schema.Array(Schema.String)),
-  spent: Schema.optionalKey(Spent),
-  tries: Schema.Finite,
-  failures: Schema.optionalKey(Schema.Finite),
-});
-
 export const IssueStatus: Codec<T.IssueStatus> = Schema.Literals(T.IssueStatusValues);
 
 export const PullRequestState: Codec<T.PullRequestState> = Schema.Literals(T.PullRequestStateValues);
@@ -701,7 +609,7 @@ export const CriterionCheck: Codec<T.CriterionCheck> = Schema.Struct({
   proof: Schema.String,
 });
 
-export const Attention: Codec<T.Attention> = Schema.Literals(T.AttentionValues);
+export const IssueStageKind: Codec<T.IssueStageKind> = Schema.Literals(T.IssueStageKindValues);
 export const StuckReason: Codec<T.StuckReason> = Schema.Literals(T.StuckReasonValues);
 export const IssueAct: Codec<T.IssueAct> = Schema.Literals(T.IssueActValues);
 
@@ -713,8 +621,8 @@ export const IssueAction: Codec<T.IssueAction> = Schema.Union([
   Schema.Struct({ act: IssueAct, does: Schema.Literal("stop") }),
 ]);
 
-export const IssueAttention: Codec<T.IssueAttention> = Schema.Struct({
-  state: Attention,
+export const IssueStage: Codec<T.IssueStage> = Schema.Struct({
+  state: IssueStageKind,
   since: Schema.optionalKey(Schema.Finite),
   stuck: Schema.optionalKey(StuckReason),
   lead: Schema.optionalKey(IssueAct),
@@ -739,48 +647,90 @@ export const Preview: Codec<T.Preview> = Schema.Struct({
   does: Schema.mutable(Schema.Array(Schema.String)),
 });
 
-export const IssueRun: Codec<T.IssueRun> = Schema.Struct({
-  startedAt: Schema.Finite,
-  endedAt: Schema.optionalKey(Schema.Finite),
-  outcome: Schema.optionalKey(Outcome),
-});
-
 export const Deliverable: Codec<T.Deliverable> = Schema.Literals(T.DeliverableValues);
 
+export const Assignment: Codec<T.Assignment> = Schema.Struct({
+  id: Schema.String,
+  issue: IssueId,
+  agent: Schema.String,
+  assignedAt: Schema.Finite,
+  endedAt: Schema.optionalKey(Schema.Finite),
+  executions: Schema.mutable(
+    Schema.Array(
+      Schema.Union([
+        Schema.Struct({ kind: Schema.Literal("worker"), session: SessionId, startedAt: Schema.Finite }),
+        Schema.Struct({ kind: Schema.Literal("orchestrator"), session: Schema.String, startedAt: Schema.Finite }),
+      ]),
+    ),
+  ),
+});
+
+export const MandateStrength: Codec<T.MandateStrength> = Schema.Literals(T.MandateStrengthValues);
+
+export const IssueMandate: Codec<T.IssueMandate> = Schema.Struct({
+  originTriggerId: Schema.optionalKey(Schema.String),
+  strength: MandateStrength,
+  maxBotReviewRounds: Schema.Int,
+  autoSubmitPr: Schema.Boolean,
+});
+
+export const IssueReportMemory: Codec<T.IssueReportMemory> = Schema.Struct({ text: Schema.String, scope: Schema.Literals(["project", "all"]) });
+
+export const IssueReport: Codec<T.IssueReport> = Schema.Struct({
+  summary: Schema.String,
+  questions: Schema.mutable(Schema.Array(Question)),
+  checks: Schema.mutable(Schema.Array(CriterionCheck)),
+  remember: Schema.mutable(Schema.Array(IssueReportMemory)),
+  prSubmit: Schema.Boolean,
+  answer: Schema.optionalKey(IssueAnswer),
+});
+
+export const IssueConstraints: Codec<T.IssueConstraints> = Schema.Struct({
+  check: Schema.optionalKey(Schema.String),
+  scope: Schema.mutable(Schema.Array(Schema.String)),
+  acceptance: Schema.Boolean,
+  frozen: Schema.mutable(Schema.Array(Schema.String)),
+});
+
 const issueFields = {
+  constraints: Schema.optionalKey(IssueConstraints),
   id: IssueId,
   number: Schema.Finite,
   title: Schema.String,
   description: Schema.String,
+  mandate: IssueMandate,
+  conflict: Schema.optionalKey(Conflict),
   project: Schema.optionalKey(Schema.String),
-  assignee: Schema.optionalKey(Schema.String),
+  assignments: Schema.mutable(Schema.Array(Assignment)),
   priority: Priority,
   rank: Schema.optionalKey(Schema.Finite),
   createdAt: Schema.Finite,
   queuedAt: Schema.optionalKey(Schema.Finite),
-  sessions: Schema.mutable(Schema.Array(SessionId)),
   closedAt: Schema.optionalKey(Schema.Finite),
   delivered: Schema.optionalKey(Delivery),
   canceled: Schema.optionalKey(IssueCanceled),
   parent: Schema.optionalKey(IssueId),
   blockedBy: Schema.mutable(Schema.Array(Schema.String)),
-  graph: Schema.optionalKey(IssueGraph),
-  task: Schema.optionalKey(IssueTask),
   cron: Schema.optionalKey(Schema.String),
   status: IssueStatus,
   moves: Schema.mutable(Schema.Array(IssueStatus)),
   pullRequest: Schema.optionalKey(PullRequest),
   deliver: Deliverable,
-  talk: Schema.optionalKey(Schema.String),
   reviewedAt: Schema.optionalKey(Schema.Finite),
   findings: Schema.mutable(Schema.Array(Finding)),
   questions: Schema.mutable(Schema.Array(Question)),
   criteria: Schema.mutable(Schema.Array(Schema.String)),
   checks: Schema.mutable(Schema.Array(CriterionCheck)),
   refining: Schema.optionalKey(IssueRefining),
-  lastRun: Schema.optionalKey(IssueRun),
+  lastRun: Schema.optionalKey(
+    Schema.Struct({
+      startedAt: Schema.Finite,
+      endedAt: Schema.optionalKey(Schema.Finite),
+      outcome: Schema.optionalKey(Outcome),
+    }),
+  ),
   answer: Schema.optionalKey(IssueAnswer),
-  attention: IssueAttention,
+  stage: IssueStage,
 };
 
 export const Issue: Codec<T.Issue> = Schema.Struct(issueFields);
@@ -810,7 +760,6 @@ export const ConnectorStatus: Codec<T.ConnectorStatus> = Schema.Struct({
 const workspaceFields = {
   call: CallState,
   callReason: Schema.String,
-  orchestrators: Schema.Record(Schema.String, OrchestratorNow),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
   progress: Schema.optionalKey(Progress),
@@ -822,6 +771,7 @@ export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
   ...workspaceFields,
   sessions: Schema.mutable(Schema.Array(Session)),
   crons: Schema.mutable(Schema.Array(Cron)),
+  plays: Schema.optionalKey(Schema.Record(Schema.String, SessionPlay)),
 });
 
 export const WorkspaceView: Codec<T.WorkspaceView> = Schema.Struct({
@@ -986,9 +936,9 @@ export const InboxTargetSession: Codec<T.InboxTargetSession> = Schema.Struct({
   id: Schema.String,
 });
 
-export const InboxTargetGraph: Codec<T.InboxTargetGraph> = Schema.Struct({
-  kind: Schema.Literal("graph"),
-  graph: Schema.String,
+export const InboxTargetIssue: Codec<T.InboxTargetIssue> = Schema.Struct({
+  kind: Schema.Literal("issue"),
+  id: Schema.String,
 });
 
 export const InboxTargetChat: Codec<T.InboxTargetChat> = Schema.Struct({
@@ -996,7 +946,7 @@ export const InboxTargetChat: Codec<T.InboxTargetChat> = Schema.Struct({
   channel: Schema.String,
 });
 
-export const InboxTarget: Codec<T.InboxTarget> = Schema.Union([InboxTargetSession, InboxTargetGraph, InboxTargetChat]);
+export const InboxTarget: Codec<T.InboxTarget> = Schema.Union([InboxTargetSession, InboxTargetIssue, InboxTargetChat]);
 
 export const InboxWords: Codec<T.InboxWords> = Schema.Struct({
   label: Schema.String,
@@ -1033,6 +983,7 @@ export const PlotView: Codec<T.PlotView> = Schema.Struct({
 export const FarmView: Codec<T.FarmView> = Schema.Struct({
   level: FarmLevel,
   plots: Schema.Record(Schema.String, PlotView),
+  plays: Schema.Record(Schema.String, SessionPlayView),
   achievements: Schema.mutable(Schema.Array(AchievementStanding)),
 });
 
@@ -1070,7 +1021,6 @@ export const StateFrame: Codec<T.StateFrame> = Schema.Struct({
   seq: Schema.Finite,
   state: WorkspaceView,
   inbox: Schema.mutable(Schema.Array(InboxItem)),
-  graphs: Schema.mutable(Schema.Array(TaskGraph)),
   view: FarmView,
   effects: Schema.mutable(Schema.Array(GameEffect)),
 });
@@ -1112,10 +1062,10 @@ export const LedgerEntryReviewed: Codec<T.LedgerEntryReviewed> = Schema.Struct({
   session: SessionId,
 });
 
-export const LedgerEntryGraph: Codec<T.LedgerEntryGraph> = Schema.Struct({
-  kind: Schema.Literal("graph"),
+export const LedgerEntryFamily: Codec<T.LedgerEntryFamily> = Schema.Struct({
+  kind: Schema.Literal("family"),
   at: Schema.Finite,
-  graph: Schema.String,
+  issue: Schema.String,
   merged: Schema.Finite,
   parallel: Schema.Boolean,
 });
@@ -1166,7 +1116,7 @@ export const LedgerEntry: Codec<T.LedgerEntry> = Schema.Union([
   LedgerEntryConflicted,
   LedgerEntryTold,
   LedgerEntryReviewed,
-  LedgerEntryGraph,
+  LedgerEntryFamily,
   LedgerEntryHandoff,
   LedgerEntryCalled,
   LedgerEntryHired,
@@ -1174,29 +1124,6 @@ export const LedgerEntry: Codec<T.LedgerEntry> = Schema.Union([
   LedgerEntryLevel,
   LedgerEntryTitled,
 ]);
-
-export const GraphEventKind: Codec<T.GraphEventKind> = Schema.Literals(T.GraphEventKindValues);
-
-export const TaskFieldChange: Codec<T.TaskFieldChange> = Schema.Struct({
-  field: Schema.String,
-  from: Schema.String,
-  to: Schema.String,
-});
-
-export const GraphEvent: Codec<T.GraphEvent> = Schema.Struct({
-  id: Schema.String,
-  graph: Schema.String,
-  task: Schema.optionalKey(Schema.String),
-  kind: GraphEventKind,
-  actor: ActorKind,
-  session: Schema.optionalKey(SessionId),
-  detail: Schema.String,
-  changes: Schema.mutable(Schema.Array(TaskFieldChange)),
-  commits: Schema.mutable(Schema.Array(Schema.String)),
-  at: Schema.Finite,
-  text: Schema.String,
-  actorText: Schema.String,
-});
 
 export const LanDevice: Codec<T.LanDevice> = Schema.Struct({
   id: Schema.String,
@@ -1322,7 +1249,7 @@ export const IssueUpdate: Codec<T.IssueUpdate> = Schema.Struct({
   title: Schema.optionalKey(Schema.String),
   description: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
-  assignee: Schema.optionalKey(Schema.String),
+  agent: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   deliver: Schema.optionalKey(Deliverable),
@@ -1435,8 +1362,6 @@ export const MemorySourceInfo: Codec<T.MemorySourceInfo> = Schema.Struct({
 export const MemoryList: Codec<T.MemoryList> = Schema.Struct({
   memories: Schema.mutable(Schema.Array(Memory)),
   sources: Schema.mutable(Schema.Array(MemorySourceInfo)),
-  file: Schema.optionalKey(Schema.String),
-  carried: Schema.optionalKey(Schema.Finite),
 });
 
 export const Commit: Codec<T.Commit> = Schema.Struct({
@@ -1469,21 +1394,6 @@ export const Changes: Codec<T.Changes> = Schema.Struct({
   behind: Schema.Finite,
 });
 
-export const TaskEdit: Codec<T.TaskEdit> = Schema.Struct({
-  title: Schema.optionalKey(Schema.String),
-  brief: Schema.optionalKey(Schema.String),
-  needs: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  agent: Schema.optionalKey(Schema.String),
-  check: Schema.optionalKey(Schema.String),
-  scope: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-});
-
-export const GraphSplitRequest: Codec<T.GraphSplitRequest> = Schema.Struct({
-  goal: Schema.String,
-  project: Schema.String,
-  agent: Schema.optionalKey(Schema.String),
-});
-
 export const IssueHistory: Codec<T.IssueHistory> = Schema.Struct({
   issue: Issue,
   sessions: Schema.mutable(Schema.Array(Session)),
@@ -1496,12 +1406,16 @@ export const IssueRefineRequest: Codec<T.IssueRefineRequest> = Schema.Struct({
 });
 
 export const IssueRequest: Codec<T.IssueRequest> = Schema.Struct({
+  constraints: Schema.optionalKey(IssueConstraints),
   title: Schema.String,
+  parent: Schema.optionalKey(IssueId),
+  blockedBy: Schema.optionalKey(Schema.mutable(Schema.Array(IssueId))),
   description: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
-  assignee: Schema.optionalKey(Schema.String),
+  agent: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
   deliver: Schema.optionalKey(Deliverable),
+  autoSubmitPr: Schema.optionalKey(Schema.Boolean),
   requestKey: Schema.optionalKey(Schema.String),
 });
 
@@ -1510,6 +1424,7 @@ export const RunTriggerKind: Codec<T.RunTriggerKind> = Schema.Literals(T.RunTrig
 export const RunTrigger: Codec<T.RunTrigger> = Schema.Struct({
   kind: RunTriggerKind,
   message: Schema.optionalKey(Schema.String),
+  channel: Schema.optionalKey(Schema.String),
   cron: Schema.optionalKey(Schema.String),
   missed: Schema.optionalKey(Schema.Boolean),
 });
@@ -1754,19 +1669,21 @@ export const Health: Codec<T.Health> = Schema.Struct({
   version: Schema.String,
 });
 
-export const FactCall: Codec<T.FactCall> = Schema.Struct({
-  type: Schema.Literal("call"),
+export const FactVoiceCall: Codec<T.FactVoiceCall> = Schema.Struct({
+  type: Schema.Literal("voiceCall"),
   at: Schema.Finite,
   state: CallState,
   reason: Schema.String,
 });
 
-export const FactOrchestrator: Codec<T.FactOrchestrator> = Schema.Struct({
-  type: Schema.Literal("orchestrator"),
+export const FactSessionPhase: Codec<T.FactSessionPhase> = Schema.Struct({
+  type: Schema.Literal("sessionPhase"),
   at: Schema.Finite,
-  agent: Schema.String,
-  state: OrchestratorState,
+  id: SessionId,
+  phase: Phase,
   channel: Schema.optionalKey(Schema.String),
+  spent: Schema.optionalKey(Spent),
+  brief: Schema.optionalKey(Schema.String),
 });
 
 export const FactMessage: Codec<T.FactMessage> = Schema.Struct({
@@ -1789,62 +1706,19 @@ export const FactOwnerMentions: Codec<T.FactOwnerMentions> = Schema.Struct({
   mentions: Schema.mutable(Schema.Array(OwnerMention)),
 });
 
-export const FactHired: Codec<T.FactHired> = Schema.Struct({
-  type: Schema.Literal("hired"),
+export const FactSession: Codec<T.FactSession> = Schema.Struct({
+  type: Schema.Literal("session"),
   at: Schema.Finite,
   session: Session,
 });
 
-export const FactStation: Codec<T.FactStation> = Schema.Struct({
-  type: Schema.Literal("station"),
-  at: Schema.Finite,
-  id: SessionId,
-  station: Schema.Finite,
-});
-
-export const FactRun: Codec<T.FactRun> = Schema.Struct({
-  type: Schema.Literal("run"),
-  at: Schema.Finite,
-  id: SessionId,
-  brief: Schema.optionalKey(Schema.String),
-});
-
-export const FactDoing: Codec<T.FactDoing> = Schema.Struct({
-  type: Schema.Literal("doing"),
-  at: Schema.Finite,
-  id: SessionId,
-  action: SessionAction,
-  label: Schema.String,
-});
-
-export const FactQuiet: Codec<T.FactQuiet> = Schema.Struct({
-  type: Schema.Literal("quiet"),
-  at: Schema.Finite,
-  id: SessionId,
-  since: Schema.Finite,
-});
-
-export const FactRetry: Codec<T.FactRetry> = Schema.Struct({
-  type: Schema.Literal("retry"),
-  at: Schema.Finite,
-  id: SessionId,
-  attempt: Schema.Finite,
-  of: Schema.optionalKey(Schema.Finite),
-});
-
-export const FactSpent: Codec<T.FactSpent> = Schema.Struct({
-  type: Schema.Literal("spent"),
-  at: Schema.Finite,
-  id: SessionId,
-  spent: Spent,
-});
-
-export const FactReport: Codec<T.FactReport> = Schema.Struct({
-  type: Schema.Literal("report"),
+export const FactSessionReport: Codec<T.FactSessionReport> = Schema.Struct({
+  type: Schema.Literal("sessionReport"),
   at: Schema.Finite,
   id: SessionId,
   run: Schema.optionalKey(Schema.String),
   outcome: Outcome,
+  phase: Schema.optionalKey(PhaseResting),
   summary: Schema.String,
   runs: Schema.Finite,
   spent: Schema.optionalKey(Spent),
@@ -1853,25 +1727,12 @@ export const FactReport: Codec<T.FactReport> = Schema.Struct({
   answer: Schema.optionalKey(IssueAnswer),
 });
 
-export const FactConflict: Codec<T.FactConflict> = Schema.Struct({
-  type: Schema.Literal("conflict"),
-  at: Schema.Finite,
-  id: SessionId,
-  conflict: Schema.optionalKey(Conflict),
-});
-
-export const FactLeft: Codec<T.FactLeft> = Schema.Struct({
-  type: Schema.Literal("left"),
+export const FactSessionGone: Codec<T.FactSessionGone> = Schema.Struct({
+  type: Schema.Literal("sessionGone"),
   at: Schema.Finite,
   id: SessionId,
   closed: Schema.optionalKey(SessionClose),
   merged: Schema.optionalKey(Schema.Finite),
-});
-
-export const FactCommits: Codec<T.FactCommits> = Schema.Struct({
-  type: Schema.Literal("commits"),
-  at: Schema.Finite,
-  commits: CommitCount,
 });
 
 export const FactIssue: Codec<T.FactIssue> = Schema.Struct({
@@ -1892,11 +1753,13 @@ export const FactIssueGone: Codec<T.FactIssueGone> = Schema.Struct({
   id: IssueId,
 });
 
-export const FactProgress: Codec<T.FactProgress> = Schema.Struct({
-  type: Schema.Literal("progress"),
+export const FactGameProgress: Codec<T.FactGameProgress> = Schema.Struct({
+  type: Schema.Literal("gameProgress"),
   at: Schema.Finite,
-  progress: Progress,
+  progress: Schema.optionalKey(Progress),
   news: Schema.optionalKey(ProgressNews),
+  commits: Schema.optionalKey(CommitCount),
+  station: Schema.optionalKey(Schema.Struct({ id: SessionId, station: Schema.Finite })),
 });
 
 export const FactCron: Codec<T.FactCron> = Schema.Struct({
@@ -1918,26 +1781,18 @@ export const FactConnector: Codec<T.FactConnector> = Schema.Struct({
 });
 
 export const Fact: Codec<T.Fact> = Schema.Union([
-  FactCall,
-  FactOrchestrator,
+  FactVoiceCall,
+  FactSessionPhase,
   FactMessage,
   FactChannel,
   FactOwnerMentions,
-  FactHired,
-  FactStation,
-  FactRun,
-  FactDoing,
-  FactQuiet,
-  FactRetry,
-  FactSpent,
-  FactReport,
-  FactConflict,
-  FactLeft,
-  FactCommits,
+  FactSession,
+  FactSessionReport,
+  FactSessionGone,
+  FactGameProgress,
   FactIssue,
   FactIssueGone,
   FactChannelGone,
-  FactProgress,
   FactCron,
   FactCronGone,
   FactConnector,
@@ -1970,26 +1825,18 @@ export const SideEventRuntime: Codec<T.SideEventRuntime> = Schema.Struct({
 });
 
 export const SideEvent: Codec<T.SideEvent> = Schema.Union([
-  FactCall,
-  FactOrchestrator,
+  FactVoiceCall,
+  FactSessionPhase,
   FactMessage,
   FactChannel,
   FactOwnerMentions,
-  FactHired,
-  FactStation,
-  FactRun,
-  FactDoing,
-  FactQuiet,
-  FactRetry,
-  FactSpent,
-  FactReport,
-  FactConflict,
-  FactLeft,
-  FactCommits,
+  FactSession,
+  FactSessionReport,
+  FactSessionGone,
+  FactGameProgress,
   FactIssue,
   FactIssueGone,
   FactChannelGone,
-  FactProgress,
   FactCron,
   FactCronGone,
   FactConnector,
@@ -2018,7 +1865,7 @@ export const IssueFilter: Codec<T.IssueFilter> = Schema.Struct({
   wantsOwner: Schema.optionalKey(Schema.Boolean),
 });
 
-export const TaskDraft: Codec<T.TaskDraft> = Schema.Struct({
+export const IssueChildDraft: Codec<T.IssueChildDraft> = Schema.Struct({
   id: Schema.String,
   title: Schema.optionalKey(Schema.String),
   brief: Schema.String,
@@ -2031,23 +1878,15 @@ export const TaskDraft: Codec<T.TaskDraft> = Schema.Struct({
 
 export const IssueSplitRequest: Codec<T.IssueSplitRequest> = Schema.Struct({
   title: Schema.optionalKey(Schema.String),
-  tasks: Schema.mutable(Schema.Array(TaskDraft)),
+  tasks: Schema.mutable(Schema.Array(IssueChildDraft)),
 });
 
 export const IssueStatusRequest: Codec<T.IssueStatusRequest> = Schema.Struct({
   status: IssueStatus,
   text: Schema.optionalKey(Schema.String),
-  assignee: Schema.optionalKey(Schema.String),
+  agent: Schema.optionalKey(Schema.String),
   edit: Schema.optionalKey(IssueUpdate),
   requestKey: Schema.optionalKey(Schema.String),
-});
-
-export const GraphActRequest: Codec<T.GraphActRequest> = Schema.Struct({
-  action: GraphAction,
-});
-
-export const TaskActRequest: Codec<T.TaskActRequest> = Schema.Struct({
-  action: TaskAction,
 });
 
 export const ChatReadRequest: Codec<T.ChatReadRequest> = Schema.Struct({
@@ -2358,3 +2197,75 @@ export const ChannelUnread: Codec<T.ChannelUnread> = Schema.Struct({
 });
 
 export const MessageHit: Codec<T.MessageHit> = Schema.Struct({ message: ChatMessage, channel: Schema.String, address: Schema.String });
+
+const CardAttachmentSchema: Codec<T.CardAttachment> = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  mimeType: Schema.String,
+  readUri: Schema.String,
+});
+
+const ParentPreviewSchema: Codec<T.ParentPreview> = Schema.Struct({
+  id: Schema.String,
+  from: Schema.String,
+  preview: Schema.String,
+  readUri: Schema.String,
+});
+
+export const CompactCard: Codec<T.CompactCard> = Schema.Struct({
+  summary: Schema.String,
+  totalChars: Schema.Finite,
+  truncated: Schema.Boolean,
+  readUri: Schema.String,
+  attachments: Schema.optionalKey(Schema.Array(CardAttachmentSchema)),
+  parentPreview: Schema.optionalKey(ParentPreviewSchema),
+});
+
+export const TriggerContext: Codec<T.TriggerContext> = Schema.Struct({
+  number: Schema.Int,
+  target: Schema.String,
+  replyTo: Schema.optionalKey(Schema.Int),
+  edited: Schema.optionalKey(Schema.Boolean),
+  deleted: Schema.optionalKey(Schema.Boolean),
+  attachments: Schema.optionalKey(Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String }))),
+  artifact: Schema.optionalKey(Schema.Struct({ id: Schema.String, title: Schema.String, version: Schema.Int })),
+  blocks: Schema.optionalKey(Schema.Array(QuotedBlock)),
+  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
+  responsePort: Schema.optionalKey(Schema.String),
+  voiceMode: Schema.optionalKey(Schema.Literals(["dictated", "conversation", "api"])),
+});
+
+export const TriggerMeta: Codec<T.TriggerMeta> = Schema.Struct({
+  issue: Schema.optionalKey(Schema.String),
+  ingressRecipient: Schema.optionalKey(Schema.String),
+  trigger: Schema.optionalKey(RunTrigger),
+  dispatch: Schema.optionalKey(Schema.Boolean),
+  cron: Schema.optionalKey(Schema.String),
+  project: Schema.optionalKey(Schema.String),
+  pr: Schema.optionalKey(Schema.Int),
+  kind: Schema.optionalKey(Schema.Literals(["ci", "review", "comment"])),
+  head: Schema.optionalKey(Schema.String),
+  fingerprint: Schema.optionalKey(Schema.String),
+  failed: Schema.optionalKey(Schema.Boolean),
+  botRound: Schema.optionalKey(Schema.Int),
+  botRoundKey: Schema.optionalKey(Schema.String),
+  channelMessageId: Schema.optionalKey(Schema.String),
+  inputContext: Schema.optionalKey(TriggerContext),
+  channelType: Schema.optionalKey(ChannelType),
+  responsePort: Schema.optionalKey(Schema.String),
+  voiceMode: Schema.optionalKey(Schema.Literals(["dictated", "conversation", "api"])),
+});
+
+export const Trigger: Codec<T.Trigger> = Schema.Struct({
+  id: Schema.String,
+  source: Schema.Literals(T.TriggerSourceValues),
+  actor: Schema.Struct({ kind: Schema.Literals(T.TriggerActorKindValues), id: Schema.String, name: Schema.optionalKey(Schema.String) }),
+  addressed: Schema.Literals(["direct", "mention", "thread_owner", "unaddressed"]),
+  threads: Schema.Array(Schema.String),
+  replyTo: Schema.optionalKey(Schema.String),
+  replyChannel: Schema.optionalKey(Schema.String),
+  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
+  card: CompactCard,
+  meta: TriggerMeta,
+  at: Schema.Finite,
+});

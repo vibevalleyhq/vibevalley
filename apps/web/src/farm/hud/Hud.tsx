@@ -4,33 +4,35 @@
 // of the village on the page (store screen.shown).
 
 import type { JSX } from "@solidjs/web";
-import { For, Show } from "solid-js";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
+import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
-import { aria } from "@/base/util";
+import { aria, useClickAway } from "@/base/dom";
+import { yuan } from "@/base/format";
+import { commands } from "@/farm/frames";
 import { Phone } from "@/farm/phone/Phone";
 import { PhoneButton } from "@/farm/phone/PhoneButton";
-import { farm } from "@/farm/store";
+import { farm, farmProject, timeOfDay, useFarm } from "@/farm/store";
 import { tools } from "@/farm/tools";
-import { timeOfDay, useFarm } from "@/farm/ui";
-import { webRoutes } from "@/farm/world/places";
 import { nextClearing } from "@/farm/world/plots";
+import { webRoutes } from "@/farm/world/world";
 import { unreadTotal } from "@/features/channel";
+import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "@/features/runtime";
 import { orchestratorLookOf } from "@/infra/agents";
 import { useCore, useFrames } from "@/infra/frame";
-import { ready, useAgents } from "@/infra/query";
+import { ready, useAgents, useRuntimes } from "@/infra/query";
 import { useRouter } from "@/infra/router";
-import { CardColors, PixelCard, SpriteIcon } from "@/ui/pixel";
+import { titleBar } from "@/ui/layout";
+import { CardColors, createPixelAct, PixelCard, PxButton, SpriteIcon } from "@/ui/pixel";
+import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
 import { playSound } from "@/ui/pixel/sound";
-import { titleBar } from "@/ui/TitleBar";
 
 import { Friends } from "./Friends";
 import { FxLayer } from "./FxLayer";
 import { HudCard } from "./HudCard";
 import { Overlay } from "./Overlay";
-import { ProjectSign } from "./ProjectSign";
-import { QuotaPill } from "./QuotaPill";
 import { clockText, thousands } from "./readout";
 
 const edge = 8;
@@ -52,6 +54,42 @@ function HudTap(props: { label: string; testid?: string; onClick: () => void; se
     >
       {props.children}
     </button>
+  );
+}
+
+/** Where the sign's post stands, in the village's pixels: on the grass right of the mast (village.ldtk: its top at 18, 73). */
+const signFoot = { x: 44, y: 104 };
+
+/** The project sign by the mast: whose farm this is (every plot here is that project's); a click goes back to the projects' map to enter another island. */
+function ProjectSign() {
+  const screen = useFarm((s) => s.screen);
+  const project = farmProject;
+  const router = useRouter();
+  const foot = () => screen()?.toScreen(signFoot);
+  return (
+    <Show when={foot()}>
+      {(at) => (
+        <button
+          type="button"
+          data-testid="project-sign"
+          data-key={project()}
+          aria-label={t("web.farm.sign.label", { project: project() || t("web.farm.sign.noProject") })}
+          title={t("web.farm.sign.hint")}
+          onClick={() => {
+            playSound("open");
+            router.navigate("/projects");
+          }}
+          class="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-full cursor-pointer flex-col items-center font-pixel hover:brightness-110"
+          style={{ left: `${at().x}px`, top: `${at().y}px` }}
+        >
+          <span class="flex max-w-40 flex-col items-center border-2 border-bark-900 bg-bark-500 px-2.5 py-1 text-cream-50 shadow-px-shade">
+            <span class="text-[10px] leading-3 text-cream-200">{t("web.farm.sign.project")}</span>
+            <span class="max-w-full truncate text-[13px] leading-4">{project() || t("web.farm.sign.noProject")}</span>
+          </span>
+          <span class="w-1.5 bg-bark-900" style={{ height: `${Math.round((screen()?.scale ?? 3) * 5)}px` }} />
+        </button>
+      )}
+    </Show>
   );
 }
 
@@ -259,5 +297,157 @@ function ToolBar() {
         )}
       </For>
     </div>
+  );
+}
+
+const levelInk = { plenty: "#3f6427", low: "#b8862a", gold: "#b8862a", empty: "#c84a3a", unknown: "#7f5b3b" } as const;
+
+function UsageLines(props: { usage: AccountUsage | null }) {
+  return (
+    <Switch fallback={<p class="text-[12px] text-bark-400">{t("web.farm.quota.unreported")}</p>}>
+      <Match when={props.usage?.status === "login_required"}>
+        <p class="text-[12px] text-wheat-700">{t("web.farm.quota.signedOut")}</p>
+      </Match>
+      <Match when={props.usage?.status === "unavailable" ? props.usage : undefined}>
+        {(u) => <p class="text-[12px] text-bark-400">{t("web.farm.quota.unreadable", { why: u().reason })}</p>}
+      </Match>
+      <Match when={props.usage?.status === "balance" ? props.usage : undefined}>
+        {(u) => (
+          <p class="text-[12px]" style={{ color: u().available ? "#2f1f13" : "#c84a3a" }}>
+            {t("web.farm.quota.balance", { provider: u().provider, enough: u().available })}
+          </p>
+        )}
+      </Match>
+      <Match when={props.usage?.status === "ok" ? props.usage : undefined}>
+        {(u) => (
+          <div class="mt-1 flex flex-col gap-1">
+            <For each={u().windows}>
+              {(w) => {
+                const left = () => 100 - w.usedPercent;
+                return (
+                  <div class="text-[12px]">
+                    <div class="flex justify-between gap-2">
+                      <span class="truncate">{windowLabel(w.label)}</span>
+                      <span style={{ color: levelInk[quotaLevel(left())] }}>{Math.round(left())}%</span>
+                    </div>
+                    <span class="block h-1.5 w-full" style={{ background: CardColors.barTrack }}>
+                      <span class="block h-full" style={{ width: `${Math.max(0, Math.min(100, left()))}%`, background: levelInk[quotaLevel(left())] }} />
+                    </span>
+                    <Show when={w.resetsAt}>{(at) => <span class="text-[10px] text-bark-400">{resetText(at())}</span>}</Show>
+                  </div>
+                );
+              }}
+            </For>
+          </div>
+        )}
+      </Match>
+    </Switch>
+  );
+}
+
+function Machine(props: { info: RuntimeInfo }) {
+  const quota = () => quotaOf(props.info);
+  const usage = () => props.info.usage;
+  const subscription = () => {
+    const u = usage();
+    return u?.status === "ok" ? u.subscription : undefined;
+  };
+  return (
+    <div class="flex gap-2.5 border-[1.5px] border-cream-200 bg-cream-100 p-2" data-testid="quota-machine">
+      <RuntimeIcon runtime={props.info.id} size={34} />
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-[13px]">{props.info.preset.label}</span>
+          <Show when={subscription()}>{(sub) => <span class="truncate text-[12px] text-bark-500">{sub()}</span>}</Show>
+        </div>
+        <UsageLines usage={usage()} />
+        {/* Spent today may be 0, which is still said. */}
+        <Show when={props.info.spentToday !== undefined ? { spent: props.info.spentToday } : undefined}>
+          {(today) => (
+            <p class="mt-0.5 text-[12px] text-bark-500">
+              {(props.info.settings.dailyBudget ?? 0) > 0
+                ? t("web.farm.quota.spentTodayBudget", { spent: yuan(today().spent), budget: yuan(props.info.settings.dailyBudget ?? 0) })
+                : t("web.farm.quota.spentToday", { spent: yuan(today().spent) })}
+            </p>
+          )}
+        </Show>
+        <Show when={props.info.stop}>
+          <p class="mt-0.5 text-[12px] text-berry">{props.info.stop}</p>
+        </Show>
+      </div>
+      <div class="flex w-12 flex-col items-center">
+        <SpriteIcon name={bottleSprite(quota())} size={40} label={quota().text} />
+        <span class="text-[12px]" style={{ color: quota().level === "unknown" ? "#9b7550" : quota().level === "empty" ? "#c84a3a" : "#46301d" }}>
+          {quota().short || "—"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * How much the runtimes' accounts have left: a bottle at the HUD's top right, filled to the lowest of them; open, each
+ * runtime's machine, usage windows, today's spend and a stop it is under.
+ */
+function QuotaPill(props: { height: number }) {
+  const all = useRuntimes();
+  const runtimes = () => usableRuntimes(ready(all, []));
+  const [open, setOpen] = createSignal(false);
+  const act = createPixelAct();
+  const box = useClickAway(open, () => setOpen(false));
+  const lowest = () => {
+    const lefts = runtimes().flatMap((r) => (r.quota?.left === undefined ? [] : [r.quota.left]));
+    return lefts.length > 0 ? Math.min(...lefts) : undefined;
+  };
+  const shown = () => {
+    const l = lowest();
+    return l === undefined ? undefined : Math.round(l);
+  };
+  return (
+    <Show when={runtimes().length > 0}>
+      <div ref={box} class="pointer-events-auto relative">
+        <button
+          type="button"
+          aria-label={shown() === undefined ? t("web.farm.quota.all") : t("web.farm.quota.lowest", { pct: String(shown()) })}
+          aria-expanded={aria(open())}
+          onClick={() => setOpen(!open())}
+          class="cursor-pointer"
+        >
+          <HudCard height={props.height} bright={open()}>
+            <SpriteIcon
+              name={bottleSprite({ level: quotaLevel(lowest()), fill: lowest() === undefined ? 0 : lowest()! / 100, short: "", text: "" })}
+              size={28}
+            />
+            <span style={{ color: lowest() === undefined ? "#2f1f13" : levelInk[quotaLevel(lowest())] }}>
+              {shown() === undefined ? t("web.farm.quota.quota") : `${shown()}%`}
+            </span>
+          </HudCard>
+        </button>
+        <Show when={open()}>
+          <div class="absolute top-full right-0 z-10 mt-2 w-[352px] bg-cream-50 p-3 shadow-px" role="dialog" aria-label={t("web.farm.quota.left")}>
+            <div class="flex items-center">
+              <span class="flex-1 text-[13px]">{t("web.farm.quota.left")}</span>
+              <PxButton
+                size="icon"
+                label={t("web.farm.quota.refresh")}
+                disabled={act.busy()}
+                onClick={() => {
+                  const ids = runtimes().map((r) => r.id);
+                  void act.run(() => Promise.all(ids.map((id) => commands.refreshRuntime(id))));
+                }}
+              >
+                <SpriteIcon name="button-refresh" size={14} />
+              </PxButton>
+            </div>
+            <div class="mt-2 flex max-h-[min(512px,70vh)] flex-col gap-3 overflow-y-auto">
+              <For each={runtimes()} keyed={(r) => r.id}>
+                {(r) => <Machine info={r()} />}
+              </For>
+            </div>
+            <p class="mt-2 text-[12px] text-bark-400">{t("web.farm.quota.note")}</p>
+          </div>
+        </Show>
+      </div>
+    </Show>
   );
 }

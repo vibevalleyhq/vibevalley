@@ -12,7 +12,7 @@ test.use({ farm: "issue-moves" });
 const fox: Agent = {
   id: "",
   name: "fox",
-  role: "helper",
+  role: "worker",
   duty: "",
   enabled: true,
   runtime: "pi",
@@ -37,7 +37,7 @@ const card = (page: Page, key: string, id: string) => lane(page, key).locator(`[
 async function startable(api: VibeValleyApi, name: string) {
   const helper = await api.agent.create({ ...fox, name });
   const project = await api.project.create({ name });
-  return api.issue.create({ title: `the ${name} one`, project: project.name, assignee: helper.id });
+  return api.issue.create({ title: `the ${name} one`, project: project.name, agent: helper.id });
 }
 
 const statusUpdates = (page: Page) => {
@@ -93,7 +93,8 @@ test("a refused move stays where it was dropped, failed, and a retry sends the s
   await expect(page).toHaveURL(new RegExp(`/issues/${made.id}$`, "u"), { timeout: 20_000 });
   expect(sent).toHaveLength(2);
   expect(sent[1]?.requestKey).toBe(sent[0]?.requestKey);
-  expect((await api.issue.get({ id: made.id })).sessions).toHaveLength(1);
+  const issue = await api.issue.get({ id: made.id });
+  expect(issue.assignments.flatMap((assignment) => assignment.executions).filter((execution) => execution.kind === "worker")).toHaveLength(1);
 });
 
 test("a failed move put back is the frame's card again", async ({ page, api }) => {

@@ -18,7 +18,7 @@ export const DefaultIDResult = Schema.Struct({
 export type DefaultIDResult = typeof DefaultIDResult.Type
 
 
-export const DefaultIDSql = "-- The channels, the default one among them, and the threads under their messages (channel/chat.ts).\n\n-- name: DefaultID :one\nselect id from channel where is_default;"
+export const DefaultIDSql = "-- The channels, the default one among them, and the threads under their messages (channel/channel.ts).\n\n-- name: DefaultID :one\nselect id from channel where is_default;"
 
 export const defaultID = Effect.fn("DefaultID")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -172,7 +172,7 @@ export const AllChannelsResult = Schema.Struct({
 export type AllChannelsResult = typeof AllChannelsResult.Type
 
 
-export const AllChannelsSql = "-- name: AllChannels :many\n-- bound: a row per channel, what the chat keeps in memory.\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\", \"channel\".\"revision\", \"channel\".\"category\", \"channel\".\"position\", \"channel\".\"archived_at\", \"channel\".\"notify\", \"channel\".\"orchestrator\" from channel order by id;"
+export const AllChannelsSql = "-- name: AllChannels :many\n-- bound: a row per channel, what the chat keeps in memory.\n-- What the chat keeps in memory (channel/rooms.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\", \"channel\".\"revision\", \"channel\".\"category\", \"channel\".\"position\", \"channel\".\"archived_at\", \"channel\".\"notify\", \"channel\".\"orchestrator\" from channel order by id;"
 
 export const allChannels = Effect.fn("AllChannels")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -261,11 +261,12 @@ export const InboxOfResult = Schema.Struct({
   ["unread"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["mentions_you"]: Schema.NullOr(Schema.Boolean),
   ["latest"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["latest_sender_name"]: Schema.NullOr(Schema.String),
 })
 export type InboxOfResult = typeof InboxOfResult.Type
 
 
-export const InboxOfSql = "-- name: InboxOf :many\n-- A participant's unread: the channel it is in and the threads it follows, newest first.\nselect c.id, c.type, c.root_id, c.root_number, c.subject_kind, c.subject_id, coalesce(ch.name, c.name, '')::text as channel_name,\n       count(m.id)::int as unread,\n       bool_or(exists (select 1 from channel_mention x where x.message_id = m.id and x.target_id = $1)) as mentions_you,\n       coalesce(max(m.number), 0)::int as latest\nfrom channel c\nleft join channel ch on ch.id = c.parent_id\njoin channel_message m on m.channel_id = c.id\nleft join channel_read_cursor rc on rc.participant_id = $1 and rc.channel_id = c.id\nleft join channel_follow f on f.channel_id = c.id and f.participant_id = $1 and f.unfollowed_at is null\nwhere m.sender_id <> $1 and m.kind <> 'notice'\n  and (c.id = $2 or f.participant_id is not null)\n  and m.number > greatest(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))\n  and not exists (select 1 from channel_seen_mark s where s.participant_id = $1 and s.message_id = m.id)\ngroup by c.id, ch.name\norder by max(m.number) desc\nlimit 20;"
+export const InboxOfSql = "-- name: InboxOf :many\n-- A participant's unread: the channel it is in and the threads it follows, newest first.\nselect c.id, c.type, c.root_id, c.root_number, c.subject_kind, c.subject_id, coalesce(ch.name, c.name, '')::text as channel_name,\n       count(m.id)::int as unread,\n       bool_or(exists (select 1 from channel_mention x where x.message_id = m.id and x.target_id = $1)) as mentions_you,\n       coalesce(max(m.number), 0)::int as latest,\n       (select p.name from channel_message lm join channel_participant p on p.id = lm.sender_id where lm.channel_id = c.id and lm.number = max(m.number)) as latest_sender_name\nfrom channel c\nleft join channel ch on ch.id = c.parent_id\njoin channel_message m on m.channel_id = c.id\nleft join channel_read_cursor rc on rc.participant_id = $1 and rc.channel_id = c.id\nleft join channel_follow f on f.channel_id = c.id and f.participant_id = $1 and f.unfollowed_at is null\nwhere m.sender_id <> $1 and m.kind <> 'notice'\n  and (c.id = $2 or f.participant_id is not null)\n  and m.number > greatest(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))\n  and not exists (select 1 from mailbox_delivery d where d.session_id = $1 and d.message_id = m.id and d.consumed_at is not null)\ngroup by c.id, ch.name\norder by max(m.number) desc\nlimit 20;"
 
 export const inboxOf = Effect.fn("InboxOf")(function* (params: InboxOfParams) {
   const sql = yield* SqlClient.SqlClient
@@ -401,6 +402,29 @@ export const setOrchestrator = Effect.fn("SetOrchestrator")(function* (params: S
   })(params)
 })
 
+export const OrchestratorForChannelParams = Schema.Struct({
+  ["id"]: Schema.String,
+})
+export type OrchestratorForChannelParams = typeof OrchestratorForChannelParams.Type
+
+
+export const OrchestratorForChannelResult = Schema.Struct({
+  ["agent"]: Schema.NullOr(Schema.String),
+})
+export type OrchestratorForChannelResult = typeof OrchestratorForChannelResult.Type
+
+
+export const OrchestratorForChannelSql = "-- name: OrchestratorForChannel :one\nwith recursive places as (\n  select id, type, peer_id, parent_id, orchestrator from channel where id = $1\n  union\n  select c.id, c.type, c.peer_id, c.parent_id, c.orchestrator\n  from channel c join places p on c.id = p.parent_id where p.type = 'thread'\n)\nselect case when type = 'direct' then peer_id else orchestrator end as agent\nfrom places where type <> 'thread' limit 1;"
+
+export const orchestratorForChannel = Effect.fn("OrchestratorForChannel")(function* (params: OrchestratorForChannelParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findOne({
+    Request: OrchestratorForChannelParams,
+    Result: OrchestratorForChannelResult,
+    execute: (p) => sql.unsafe(OrchestratorForChannelSql, [p["id"]]),
+  })(params)
+})
+
 export const ChannelInUseParams = Schema.Struct({
   ["id"]: Schema.String,
 })
@@ -416,7 +440,7 @@ export const ChannelInUseResult = Schema.Struct({
 export type ChannelInUseResult = typeof ChannelInUseResult.Type
 
 
-export const ChannelInUseSql = "-- name: ChannelInUse :one\n-- What still points at a channel, so deleting it would take it from under them.\nselect (select count(*) from cron r where r.channel_id = $1)::int as crons,\n       (select count(*) from connector_account a where a.channel_id = $1)::int as connectors,\n       (select count(*) from issue_queue q where q.channel = $1)::int as queued,\n       (select count(*) from channel t where t.parent_id = $1 and t.subject_kind = 'issue')::int as issue_threads;"
+export const ChannelInUseSql = "-- name: ChannelInUse :one\n-- What still points at a channel, so deleting it would take it from under them.\nselect (select count(*) from cron r where r.channel_id = $1)::int as crons,\n       (select count(*) from connector_account a where a.channel_id = $1)::int as connectors,\n       (select count(distinct i.id) from issue i\n        left join mailbox_issue m on m.issue_id = i.id and m.state = 'held'\n        left join ingress_trigger t on t.id = m.trigger_id\n        where i.queued_at is not null and (t.trigger_json::jsonb->>'replyChannel' = $1))::int as queued,\n       (select count(*) from channel t where t.parent_id = $1 and t.subject_kind = 'issue')::int as issue_threads;"
 
 export const channelInUse = Effect.fn("ChannelInUse")(function* (params: ChannelInUseParams) {
   const sql = yield* SqlClient.SqlClient
@@ -456,22 +480,5 @@ export const deleteChannel = Effect.fn("DeleteChannel")(function* (params: Delet
   return yield* SqlSchema.void({
     Request: DeleteChannelParams,
     execute: (p) => sql.unsafe(DeleteChannelSql, [p["id"]]),
-  })(params)
-})
-
-export const SetSubjectParams = Schema.Struct({
-  ["subject_id"]: Schema.NullOr(Schema.String),
-  ["id"]: Schema.String,
-})
-export type SetSubjectParams = typeof SetSubjectParams.Type
-
-
-export const SetSubjectSql = "-- name: SetSubject :exec\n-- A direct channel with a helper profile takes its talk issue as its subject: the issue's thread is the channel.\nupdate channel set subject_kind = 'issue', subject_id = $1 where id = $2 and type = 'direct';"
-
-export const setSubject = Effect.fn("SetSubject")(function* (params: SetSubjectParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: SetSubjectParams,
-    execute: (p) => sql.unsafe(SetSubjectSql, [p["subject_id"], p["id"]]),
   })(params)
 })

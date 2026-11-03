@@ -2,7 +2,7 @@
 // a ripple), and a wind that gusts and calms. Pure: the scene's clock in, decisions out.
 
 /** Says when it is time again for each thing; the time is the scene's clock, in seconds. */
-export interface Cadence {
+interface Cadence {
   /**
    * True once every `seconds` or so for `key` (each wait is 70–130% of it, so nothing ticks like a metronome). The
    * first call only starts the count, at a random point in the first wait.

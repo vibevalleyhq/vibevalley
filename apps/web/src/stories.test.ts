@@ -9,7 +9,6 @@ const ui = join(import.meta.dirname, "ui");
 
 const without: Record<string, string> = {
   "A.tsx": "a link that moves the router: it draws a plain <a>",
-  "TitleBar.tsx": "the desktop window's strip, from the host",
 };
 
 test("every part in ui/ has stories, or a reason not to", () => {

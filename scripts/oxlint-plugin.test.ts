@@ -107,7 +107,7 @@ tester.run("page-layers", rule("page-layers"), {
     { code: "import { a } from '../ui/A';", filename: "/repo/apps/server/src/x.ts" },
     { code: "import { a } from '@/infra/router';", filename: page("ui/A.tsx") },
     { code: "import { a } from '@/features/issue';", filename: page("farm/panels/Board.tsx") },
-    { code: "import { a } from '@/infra/frames';", filename: page("state/atom.ts") },
+    { code: "import { a } from '@/infra/frame';", filename: page("state/atom.ts") },
     { code: "import { a } from '@/base/format';", filename: page("infra/api.ts") },
   ],
   invalid: [
@@ -443,6 +443,7 @@ tester.run("singular-service", rule("singular-service"), {
   valid: [
     { code: 'class Issue extends Context.Service<Issue, { list: () => number }>()("vibevalley/Issue") {}', filename: server },
     { code: 'class Progress extends Context.Service<Progress, {}>()("vibevalley/Progress") {}', filename: server },
+    { code: 'class Ingress extends Context.Service<Ingress, {}>()("vibevalley/Ingress") {}', filename: server },
     { code: 'class SyncStatus extends Context.Service<SyncStatus, {}>()("vibevalley/SyncStatus") {}', filename: server },
     { code: "class Issues extends Data.Class {}", filename: server },
   ],

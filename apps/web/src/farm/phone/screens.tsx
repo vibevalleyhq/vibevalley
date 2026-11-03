@@ -7,20 +7,18 @@ import { For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
 
-import { aria } from "@/base/util";
-import { phoneState } from "@/farm/support";
+import { aria } from "@/base/dom";
 import { type CallPhase, createCall, voiceCall } from "@/features/voice";
 import { useAgent } from "@/infra/agents";
 import { useCore } from "@/infra/frame";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { SpriteIcon } from "@/ui/pixel";
-import type { GlyphCell } from "@/ui/pixel/card";
+import type { GlyphCell } from "@/ui/pixel/PixelCard";
 
-import { missedOf } from "./calls";
-import { phoneCells } from "./cells";
+import { missedOf, phoneState } from "./calls";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
-import { lcd } from "./lcd";
+import { lcd, phoneCells } from "./lcd";
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 
@@ -324,7 +322,7 @@ export function HomeScreen(props: {
   onOpen: (app: PhoneApp) => void;
   onOrchestrator: () => void;
   onChannels: () => void;
-  onTaskBoard: () => void;
+  onIssues: () => void;
 }) {
   const apps: App[] = [
     {
@@ -337,7 +335,7 @@ export function HomeScreen(props: {
     { id: "log", label: t("web.farm.phone.log"), icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
     { id: "orchestrator", label: t("web.farm.phone.manager"), icon: () => <OrchestratorFace size={28} />, go: () => props.onOrchestrator() },
     { id: "channels", label: t("web.farm.phone.app.channels"), icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
-    { id: "graphs", label: t("web.farm.phone.app.graphs"), icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
+    { id: "issues", label: t("web.farm.menu.issues"), icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onIssues() },
     { id: "games", label: t("web.farm.phone.app.games"), icon: GamesIcon, go: () => props.onOpen("games") },
   ];
   return <AppGrid apps={apps} />;

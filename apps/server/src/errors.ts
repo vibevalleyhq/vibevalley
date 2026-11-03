@@ -51,7 +51,6 @@ export const lookIn = {
   device: listed("device", commandOf("lan.get")),
   archive: listed("archive", commandOf("orchestrator.archive.list")),
   channel: listed("channel", commandOf("channel.list")),
-  graph: listed("graph", commandOf("graph.list")),
   artifact: listed("artifact", commandOf("artifact.list")),
 } satisfies Record<string, Next>;
 

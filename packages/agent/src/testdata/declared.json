@@ -49,7 +49,7 @@
   },
   {
    "name": "rewrite_memory",
-   "description": "整个重写你的记性（MEMORY.md）：合并重复的、删掉过时或错的。先看系统提示里的「记性」，再给出完整的新内容。",
+   "description": "整理你自己记下的内容：合并重复的、删掉过时或错的。先看系统提示里的「记性」，再给出完整的新内容，不改写主人交代的条目。",
    "parameters": "{\"type\":\"object\",\"properties\":{\"content\":{\"type\":\"string\"}},\"additionalProperties\":true,\"required\":[\"content\"]}"
   },
   {

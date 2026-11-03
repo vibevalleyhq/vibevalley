@@ -5,7 +5,7 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOrNone } from "@/base/json.ts";
-import { type Workplace } from "@/project/shapes.ts";
+import { type Workplace } from "@/project/workplace.ts";
 
 import type * as qs from "../../db/generated/session.sql.ts";
 import type * as qr from "../../db/generated/session_run.sql.ts";
@@ -13,7 +13,6 @@ import type * as qr from "../../db/generated/session_run.sql.ts";
 const triggerOf = jsonOrNone(S.RunTrigger);
 export const heardOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
 const spentOf = jsonOrNone(S.Spent);
-const graphOf = jsonOrNone(S.SessionGraph);
 export const placeOf = jsonOrNone(
   Schema.Struct({ project: Schema.String, cwd: Schema.String, branch: Schema.optionalKey(Schema.String) }) satisfies Schema.Codec<Workplace>,
 );
@@ -40,6 +39,7 @@ export function runOf(r: qr.RunsOfSessionResult): T.Run {
 export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionResult[]): T.Session {
   const s: T.Session = {
     id: sessionId(r.id),
+    role: r.role,
     name: r.name,
     agent: r.agent,
     runtime: r.runtime,
@@ -50,9 +50,8 @@ export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSe
     refining: false,
     ...(r.project !== null ? { project: r.project } : {}),
     ...(r.issue !== null ? { issue: issueId(r.issue) } : {}),
+    ...(r.channel !== null ? { channel: r.channel } : {}),
   };
-  const graph = graphOf(r.graph);
-  if (graph) s.graph = graph;
   let tokens = 0;
   let cny = 0;
   let priced = false;
@@ -69,4 +68,41 @@ export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSe
   const last = runs.at(-1);
   if (last?.outcome) s.lastRun = { outcome: last.outcome, summary: last.summary ?? "", at: last.ended_at ?? 0 };
   return s;
+}
+
+export function sessionState(s: T.Session): qs.KeepSessionStateParams {
+  return {
+    id: s.id,
+    phase: JSON.stringify(s.phase),
+    refining: s.refining,
+    runs: s.runs,
+    last_run: s.lastRun ? JSON.stringify(s.lastRun) : null,
+    spent: s.spent ? JSON.stringify(s.spent) : null,
+    channel: s.channel ?? null,
+  };
+}
+
+export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
+  const phase = Schema.decodeSync(Schema.fromJsonString(S.Phase))(row.phase);
+  const lastRun = row.last_run === null ? undefined : Schema.decodeSync(Schema.fromJsonString(S.LastRun))(row.last_run);
+  const spent = row.spent === null ? undefined : Schema.decodeSync(Schema.fromJsonString(S.Spent))(row.spent);
+  const place = row.place === null ? undefined : placeOf(row.place);
+  return {
+    id: sessionId(row.id),
+    role: row.role,
+    agent: row.agent,
+    name: row.name,
+    runtime: row.runtime,
+    brief: row.brief,
+    hiredAt: row.hired_at,
+    refining: row.refining,
+    runs: row.runs,
+    phase: row.role === "orchestrator" ? { _tag: "resting" } : phase,
+    ...(row.project === null ? {} : { project: row.project }),
+    ...(row.issue === null ? {} : { issue: issueId(row.issue) }),
+    ...(row.channel === null ? {} : { channel: row.channel }),
+    ...(place?.branch ? { branch: place.branch, worktree: place.cwd } : {}),
+    ...(lastRun ? { lastRun } : {}),
+    ...(spent ? { spent } : {}),
+  };
 }

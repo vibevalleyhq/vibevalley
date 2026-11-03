@@ -15,7 +15,7 @@ import { session } from "@/base/actor.ts";
 import { messageOf } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Session } from "@/session/session.ts";
-import type { Caller } from "@/tool/definition.ts";
+import type { Caller } from "@/tool/schemas.ts";
 import { Tool } from "@/tool/tool.ts";
 
 import { failedCall, noTool, unknownCaller } from "./prompts.ts";
@@ -48,7 +48,7 @@ const make = (options: McpOptions = {}) =>
     // A session no longer in the fields still talks; its profile and project are empty.
     const callerOf = (id: string): Caller => {
       const h = sessions.sessionOf(id);
-      return { agent: h?.agent ?? "", session: id, project: h?.project ?? "", here: "", picked: "", actor: session(id) };
+      return { agent: h?.agent ?? "", session: id, project: h?.project ?? "", here: "", picked: "", envelope: "", actor: session(id) };
     };
 
     const call = async (tool: LoopTool, args: unknown): Promise<string> => {

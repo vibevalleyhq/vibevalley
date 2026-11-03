@@ -2,7 +2,7 @@
 // only read it.
 
 import { t } from "@vibevalley/i18n";
-import type { Crop, FarmView, PlotView, Session } from "@vibevalley/protocol";
+import type { Crop, FarmView, PlotView, Session, SessionPlayView } from "@vibevalley/protocol";
 import { plotKeyOf } from "@vibevalley/protocol/rules";
 
 export interface Bed {
@@ -31,13 +31,16 @@ export const isRipe = (crop: Crop) => crop === "wheat" || crop === "carrot";
 /** The issue a session works; every session the farm shows has one. */
 export const issueOf = (s: Session) => s.issue ?? s.id;
 
-export const isBusy = (s: Session) => s.phase._tag === "arriving" || s.phase._tag === "working";
+export const isBusy = (s: Session) => s.phase._tag === "working";
 
 /** 0..5, or -1 while every bed is taken. */
-export const stationOfSession = (s: Session) => (s.play ? Math.round(s.play.station) : -1);
+export const stationOfSession = (s: Session, plays: Record<string, SessionPlayView> | undefined) => {
+  const play = plays?.[s.id];
+  return play ? Math.round(play.station) : -1;
+};
 
-export const sessionAtStation = (sessions: readonly Session[], station: number) =>
-  station < 0 ? undefined : sessions.find((s) => stationOfSession(s) === station);
+export const sessionAtStation = (sessions: readonly Session[], station: number, plays: Record<string, SessionPlayView> | undefined) =>
+  station < 0 ? undefined : sessions.find((s) => stationOfSession(s, plays) === station);
 
 export const nextClearing = (level: number) => beds.find((b) => b.unlockLevel !== undefined && b.unlockLevel > level)?.unlockLevel;
 
@@ -53,7 +56,7 @@ export const lockedPlot = (bed: Bed, level: number): PlotView => ({ crop: level 
  */
 export function cropOfBed(bed: Bed, sessions: readonly Session[], view: FarmView, leaving = false): Crop {
   if (bed.unlockLevel !== undefined) return lockedPlot(bed, Math.round(view.level.level)).crop;
-  const s = sessionAtStation(sessions, bed.station);
+  const s = sessionAtStation(sessions, bed.station, view.plays);
   if (!s) return leaving ? "harvested" : "empty";
   return view.plots[plotKeyOf(s)]?.crop ?? "sprout";
 }

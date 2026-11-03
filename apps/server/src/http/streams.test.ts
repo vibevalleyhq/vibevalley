@@ -7,7 +7,7 @@ import type { LiveEvent, SideEvent, StateFrame } from "@vibevalley/protocol";
 
 import { Core } from "@/core/core.ts";
 import { ServerConfig } from "@/infra/config.ts";
-import { layer as projection } from "@/projection/projection.ts";
+import { layer as projection } from "@/projection/frame.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import { streams } from "./streams.ts";

@@ -10,24 +10,26 @@ import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
 import { NodeServices } from "@effect/platform-node";
 import { Clock, Effect, Fiber, FiberHandle, Option, Predicate, Queue, Schema, Stream } from "effect";
+import { FetchHttpClient } from "effect/http";
 
-import { type BrainEvent, makeBrain, standaloneOwner } from "@vibevalley/agent/brain";
+import { type BrainEvent, makeBrain } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
 import { readMcpConfig } from "@vibevalley/agent/mcp";
 import { userMessage } from "@vibevalley/agent/messages";
 import { memoryStore } from "@vibevalley/agent/todoStore";
+import { type Llm, make } from "@vibevalley/ai/llm";
 import { t, currentLocale } from "@vibevalley/i18n";
 
-import { modelClient } from "@/agent/model.ts";
+import { modelClient } from "@/agent/agent.ts";
 import { messageOf } from "@/errors.ts";
 import { loadConfig } from "@/infra/config.ts";
-import { wallTime } from "@/infra/time.ts";
 import { dshRuntime } from "@/runtime/dsh.ts";
 import { registryOf } from "@/runtime/runtime.ts";
-import { vibevalleyRuntimeOf } from "@/runtime/vibevalley.ts";
 
-import { standaloneLlm } from "./llm.ts";
 import { instructions } from "./prompts.ts";
+
+// The command line and the live evals have no farm to give the Llm its HttpClient: it gets a fetch of its own.
+export const standaloneLlm = (): Llm["Service"] => Effect.runSync(make.pipe(Effect.provide(FetchHttpClient.layer)));
 
 const dim = (s: string) => "\x1b[2m" + s + "\x1b[0m";
 const short = (s: string) => {
@@ -96,7 +98,7 @@ class Quit extends Schema.TaggedError<Quit, { readonly brand: unique symbol }>()
 
 const typed = (handle: (t: Typed) => Effect.Effect<void, Quit>) => Stream.runForEach(terminal, handle).pipe(Effect.catchTag("Quit", () => Effect.void));
 
-export interface OwnChat {
+interface OwnChat {
   /** The folder it works in; the current one when empty. */
   readonly cwd: string;
   /** Its home under ~/.vibevalley/agent. */
@@ -193,7 +195,7 @@ function render(e: Event): string | undefined {
   return undefined;
 }
 
-export interface RuntimeChat {
+interface RuntimeChat {
   readonly model?: string;
   readonly effort?: string;
   /** A runtime session to go on with. */
@@ -207,17 +209,7 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
   id === "vibevalley"
     ? ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) })
     : Effect.gen(function* () {
-        const config = yield* loadConfig().pipe(Effect.provide(NodeServices.layer));
-        const service = standaloneLlm();
-        const registry = registryOf([
-          vibevalleyRuntimeOf({
-            home: () => config.home,
-            llm: (model) => modelClient(model, config.deepseek.apiKey, service),
-            time: wallTime,
-            owner: standaloneOwner(),
-          }),
-          dshRuntime,
-        ]);
+        const registry = registryOf([dshRuntime]);
         const runtime = registry.get(id);
         if (!runtime) return yield* Effect.fail(t("server.cli.chat.noRuntime", { id }));
         const installation = runtime.installation;

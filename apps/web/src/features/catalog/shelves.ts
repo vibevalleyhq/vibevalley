@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { compareText, or } from "@/base/order";
+import { compareText, or } from "@/base/search";
 import { outfitLabel, speciesLabel } from "@/ui/cast";
 
 export interface Picture {
@@ -42,7 +42,7 @@ export function picturesOf(manifest: Record<string, Record<string, unknown>>): P
 
 const isHelper = (name: string) => SpeciesValues.some((s) => name.startsWith(`${s}-`));
 
-export interface Shelf {
+interface Shelf {
   readonly id: string;
   readonly label: string;
   readonly hint: string;

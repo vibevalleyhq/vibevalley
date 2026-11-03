@@ -1,14 +1,14 @@
 import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 
 import { PxWindow } from "./base";
+import { type PickOption, pickItems } from "./cells";
 import { PxTip } from "./field";
 import { SpriteIcon } from "./icons";
-import { type PickOption, pickItems } from "./pick";
 import { pxDrop, pxFocus, pxRing, pxText } from "./style";
 
-export interface SegmentOption<T> {
+interface SegmentOption<T> {
   value: T;
   label: string;
   disabled?: boolean;

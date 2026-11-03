@@ -45,7 +45,7 @@ export interface Progress {
   readonly qr: string;
 }
 
-export interface Receiving {
+interface Receiving {
   readonly cursor: string;
   /** Kept durably before it returns: only then may the app consider them taken. */
   readonly accept: (messages: readonly Inbound[], cursor: string) => Effect.Effect<void, AppFailed>;

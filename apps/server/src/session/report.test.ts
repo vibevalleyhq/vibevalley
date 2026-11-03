@@ -5,50 +5,36 @@ import type { Doing, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { clip } from "@/base/clip.ts";
-import { MergeFailure } from "@/project/shapes.ts";
+import { conflictOf } from "@/issue/status.ts";
+import { MergeFailure } from "@/project/workplace.ts";
 import { inCny } from "@/runtime/price.ts";
 
-import { briefBreak, withRecall } from "./briefing.ts";
+import { briefBreak, conflictBrief, noRoom, notTakenIn, sessionName, whoMakesRoom, withRecall } from "./briefing.ts";
 import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
-import { noRoom, sessionName, whoMakesRoom } from "./hiring.ts";
 import { recallHead } from "./prompts.ts";
-import { checksOf, parseAnswer, questionsOf, readReport, reportVerdict, summaryOf } from "./report.ts";
+import { readReport, summaryOf } from "./report.ts";
 import { shellCommand } from "./shell.ts";
-import { conflictBrief, conflictOf, notTakenIn } from "./takeIn.ts";
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
 const ctx: FactContext = { id: sessionId("w1"), runtime: "pi", cwd: "/work/clock-in" };
 const base = (): Session =>
-  ({ id: "w1", name: "老周", agent: "zhou", runtime: "pi", brief: "加接口", project: "clock-in", phase: { _tag: "arriving" } }) as Session;
-const working = (doing: Doing): Session => ({ ...base(), phase: { _tag: "working", doing } }) as Session;
+  ({
+    id: "w1",
+    name: "老周",
+    agent: "zhou",
+    runtime: "pi",
+    brief: "加接口",
+    project: "clock-in",
+    phase: { _tag: "working", since: 0, doing: { action: "none", label: "" } },
+  }) as Session;
+const working = (doing: Doing): Session => ({ ...base(), phase: { _tag: "working", since: 0, doing } });
 const thinking: Doing = { action: "thinking", label: "" };
 const none: Tracking = {};
-
-describe("an answer handed back", () => {
-  const block = (o: unknown) => "查过了。\n\n```json\n" + JSON.stringify(o) + "\n```\n\n结论：查清楚了";
-  it("reads the last block with a conclusion and what it rests on", () => {
-    const text = block({ conclusion: "旧的", evidence: ["a.ts:1"] }) + "\n\n" + block({ conclusion: " 新的 ", evidence: "b.ts:2", next: ["  ", "接着改"] });
-    expect(parseAnswer(text)).toEqual({ answer: { conclusion: "新的", evidence: ["b.ts:2"], unsure: [], next: ["接着改"] }, problem: "" });
-    // A later block that is not an answer does not hide an earlier one that is.
-    expect(parseAnswer(text + '\n\n```json\n{"title": 1\n```').answer?.conclusion).toBe("新的");
-  });
-  it("says why there is none", () => {
-    expect(parseAnswer("说不清").problem).toBe("没找到结论：要用一个 json 代码块给出");
-    expect(parseAnswer(block({ conclusion: "", evidence: ["a.ts"] })).problem).toBe("结论是空的");
-    expect(parseAnswer(block({ conclusion: "猜的", evidence: [] })).problem).toBe("结论没有依据：evidence 至少一条");
-    expect(parseAnswer(block({ conclusion: "猜的", evidence: [1] })).problem).toBe("json 读不了：evidence：要是字符串或字符串的数组");
-  });
-  it("a completed report carries it; a failed one does not", () => {
-    const said = block({ conclusion: "慢在读配置", evidence: ["clock.ts:1"] });
-    expect(readReport({ kind: "completed" } as never, said).answer).toEqual({ conclusion: "慢在读配置", evidence: ["clock.ts:1"], unsure: [], next: [] });
-    expect(readReport({ kind: "interrupted" } as never, said).answer).toBeUndefined();
-  });
-});
 
 describe("a session's events", () => {
   it("a run starts with the brief and counts from what was spent", () => {
     const h = { ...base(), spent: { tokens: 50, cny: 0.1 } };
     const r = eventFacts(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + briefBreak + "加一个查询接口" }), h, none, ctx);
-    expect(r.facts).toEqual([{ type: "run", id: "w1" }]);
+    expect(r.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
     expect(r.journal).toEqual([{ type: "prompt", text: "加一个查询接口" }]);
     expect(r.tracking.runFrom).toEqual({ tokens: 50, cny: 0.1 });
   });
@@ -69,7 +55,9 @@ describe("a session's events", () => {
       none,
       ctx,
     );
-    expect(started.facts).toEqual([{ type: "doing", id: "w1", action: "run_command", label: "pnpm test" }]);
+    expect(started.facts).toEqual([
+      { type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "run_command", label: "pnpm test" } } },
+    ]);
     expect(started.journal[0]!.type).toBe("toolStarted");
     expect(started.tracking.shownCall).toEqual({ id: "c1", tool: "bash" });
     const same = eventFacts(
@@ -86,7 +74,7 @@ describe("a session's events", () => {
       ctx,
     );
     expect(failed.journal).toEqual([{ type: "toolEnded", callId: "c1", output: "1 failing", ok: false }]);
-    expect(failed.facts).toEqual([{ type: "doing", id: "w1", action: "thinking", label: "" }]);
+    expect(failed.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
   });
 
   it("the full input names the target better", () => {
@@ -98,7 +86,7 @@ describe("a session's events", () => {
       ctx,
     );
     expect(r.journal).toEqual([{ type: "toolInput", callId: "c1", input, text: "src/http.ts" }]);
-    expect(r.facts).toEqual([{ type: "doing", id: "w1", action: "read_file", label: "src/http.ts" }]);
+    expect(r.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "read_file", label: "src/http.ts" } } }]);
   });
 
   it("reasoning is a step when shown", () => {
@@ -109,7 +97,7 @@ describe("a session's events", () => {
       ctx,
     );
     expect(r.journal).toEqual([{ type: "thought", text: "先看看路由在哪" }]);
-    expect(r.facts).toEqual([{ type: "doing", id: "w1", action: "thinking", label: "" }]);
+    expect(r.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
     expect(eventFacts(ev({ kind: "reasoning", content: { kind: "redacted" } }), working(thinking), none, ctx).journal).toEqual([]);
   });
 
@@ -133,12 +121,12 @@ describe("a session's events", () => {
     const usage = (input: number, output: number) => ev({ kind: "usage", usage: { tokens: { input, output, cacheRead: 0, cacheWrite: 0 } } });
     const first = eventFacts(usage(1_000_000, 0), working(thinking), { rate }, ctx);
     expect(first.spentCny).toBe(7);
-    expect(first.facts).toEqual([{ type: "spent", id: "w1", spent: { tokens: 1_000_000, cny: 7 } }]);
+    expect(first.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: working(thinking).phase, spent: { tokens: 1_000_000, cny: 7 } }]);
     const second = eventFacts(usage(1_000_000, 500_000), { ...working(thinking), spent: { tokens: 1_000_000, cny: 7 } }, first.tracking, ctx);
     expect(second.spentCny).toBe(7);
-    expect(second.facts).toEqual([{ type: "spent", id: "w1", spent: { tokens: 1_500_000, cny: 14 } }]);
+    expect(second.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: working(thinking).phase, spent: { tokens: 1_500_000, cny: 14 } }]);
     const unpriced = eventFacts(ev({ kind: "usage", usage: { tokens: { input: 10, output: 5 } } }), working(thinking), none, ctx);
-    expect([unpriced.spentCny, unpriced.facts]).toEqual([0, [{ type: "spent", id: "w1", spent: { tokens: 15 } }]]);
+    expect([unpriced.spentCny, unpriced.facts]).toEqual([0, [{ type: "sessionPhase", id: "w1", phase: working(thinking).phase, spent: { tokens: 15 } }]]);
     expect(since({ tokens: 30, cny: 3 }, { tokens: 10, cny: 1 })).toEqual({ tokens: 20, cny: 2 });
     expect(since({ tokens: 30 }, undefined)).toBeUndefined();
   });
@@ -150,14 +138,14 @@ describe("a session's events", () => {
     const word = eventFacts(ev({ kind: "text_delta", text: "构建完了" }), working(doing), { quiet: true }, ctx);
     expect(word.tracking.quiet).toBe(false);
     expect(word.facts).toEqual([
-      { type: "doing", id: "w1", ...doing },
-      { type: "doing", id: "w1", action: "speaking_text", label: "" },
+      { type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing } },
+      { type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "speaking_text", label: "" } } },
     ]);
   });
 
   it("retries, model failures and exits are said", () => {
     const retry = eventFacts(ev({ kind: "retry", attempt: 2, maxAttempts: 3, delayMs: 1500, reason: "429" }), working(thinking), none, ctx);
-    expect(retry.facts).toEqual([{ type: "retry", id: "w1", attempt: 2, of: 3 }]);
+    expect(retry.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { ...working(thinking).phase, retry: { attempt: 2, of: 3 } } }]);
     expect(retry.journal).toEqual([{ type: "note", kind: "llm/retry", text: "调用模型没成功，第 2/3 次重试，2 秒后：429" }]);
     expect(eventFacts(ev({ kind: "model", model: "deepseek-flash" }), working(thinking), none, ctx).model).toBe("deepseek-flash");
     const failed = eventFacts(
@@ -169,7 +157,9 @@ describe("a session's events", () => {
     expect(failed.journal[0]!.type).toBe("note");
     expect((failed.journal[0] as { text: string }).text).toMatch(/^余额不够了：Insufficient Balance/u);
     const exited = eventFacts(ev({ kind: "exited", code: 137 }), { ...working(thinking), runs: 2 }, none, ctx);
-    expect(exited.facts).toEqual([{ type: "report", questions: [], checks: [], id: "w1", outcome: "failed", summary: "pi 进程退出了（退出码 137）", runs: 2 }]);
+    expect(exited.facts).toEqual([
+      { type: "sessionReport", questions: [], checks: [], id: "w1", outcome: "failed", summary: "pi 进程退出了（退出码 137）", runs: 2 },
+    ]);
     expect(exited.warn).toBe("老周 的 pi 进程退出了（退出码 137）");
     expect(eventFacts(ev({ kind: "exited", code: 0 }), { ...base(), phase: { _tag: "done" } }, none, ctx).facts).toEqual([]);
   });
@@ -184,12 +174,12 @@ describe("a session's events", () => {
 });
 
 describe("a run's report", () => {
-  it("the summary is the verdict", () => {
+  it("an undeclared report falls back to its trailing paragraphs without parsing markers", () => {
     const text = ["读了 src/http.ts。", "**结论：** 两个路由，POST /api/clock-in 和 POST /api/clock-out。", "（另外可选：README 第 3 行可以补个链接。）"].join(
       "\n\n",
     );
-    expect(summaryOf(text)).toBe("两个路由，POST /api/clock-in 和 POST /api/clock-out。");
-    expect(summaryOf("前面的话\n\n- 结论：做完了，commit abc123")).toBe("做完了，commit abc123");
+    expect(summaryOf(text)).toContain("README 第 3 行");
+    expect(summaryOf("前面的话\n\n- 结论：做完了，commit abc123")).toBe("前面的话\n\n- 结论：做完了，commit abc123");
     expect(summaryOf("开头在看代码。\n\n最后：一切正常，测试 28 个都过了。")).toMatch(/测试 28 个都过了/u);
   });
 
@@ -197,7 +187,7 @@ describe("a run's report", () => {
     expect(readReport({ kind: "completed" }, "  改了路由。\n\n结论：加好了，commit abc123  ")).toEqual({
       outcome: "completed",
       text: "改了路由。\n\n结论：加好了，commit abc123",
-      summary: "加好了，commit abc123",
+      summary: "改了路由。 结论：加好了，commit abc123",
       failure: "",
       needsYou: false,
       questions: [],
@@ -221,44 +211,6 @@ describe("a run's report", () => {
     expect(clip("a\n  b", 10)).toBe("a b");
     expect(clip("abcdefghij", 5)).toBe("abcd…");
   });
-
-  it("questions are the lines for the owner", () => {
-    expect(questionsOf("看了一下。\n\n要问主人：用 8787 还是 8797？\n- **要问主人**：要不要顺手改文档？\n\n结论：先停下等回答。")).toEqual([
-      { question: "用 8787 还是 8797？", options: [] },
-      { question: "要不要顺手改文档？", options: [] },
-    ]);
-    expect(questionsOf("结论：做完了")).toEqual([]);
-  });
-
-  it("a question may end with its options; one option is no choice", () => {
-    expect(
-      questionsOf("要问主人：全交给 w3，还是分着做？（选项：全交给 w3｜分着做）\n要问主人：端口？(选项: 8787 | 8797 |)\n要问主人：就这样？（选项：好）"),
-    ).toEqual([
-      { question: "全交给 w3，还是分着做？", options: ["全交给 w3", "分着做"] },
-      { question: "端口？", options: ["8787", "8797"] },
-      { question: "就这样？", options: [] },
-    ]);
-  });
-
-  it("checks are its word on each criterion, by number", () => {
-    const said = "标准 1：做到了 —— bun test 通过\n- **标准 2**：没做到，还差文档\n标准3：不确定\n标准 1：做到了。再跑一遍也过\n标准 0：做到了\n\n结论：做完了";
-    expect(checksOf(said)).toEqual([
-      { criterion: 0, result: "met", proof: "再跑一遍也过" },
-      { criterion: 1, result: "unmet", proof: "还差文档" },
-      { criterion: 2, result: "unsure", proof: "" },
-    ]);
-  });
-
-  it("a report in English may write its markers in English", () => {
-    const said =
-      "Added paging.\n\nAsk the owner: page size 20 or 50? (Options: 20 | 50)\nCriterion 1: met — bun test passes\n**Criterion 2**: not met, docs missing\n\n**Conclusion:** paging added (3f2a1bc).";
-    expect(questionsOf(said)).toEqual([{ question: "page size 20 or 50?", options: ["20", "50"] }]);
-    expect(checksOf(said)).toEqual([
-      { criterion: 0, result: "met", proof: "bun test passes" },
-      { criterion: 1, result: "unmet", proof: "docs missing" },
-    ]);
-    expect(reportVerdict(said)).toBe("paging added (3f2a1bc).");
-  });
 });
 
 describe("room and names", () => {
@@ -278,6 +230,13 @@ describe("room and names", () => {
     expect(noRoom(two, "pi", "a", limits)).not.toBe("");
     expect(noRoom(two, "pi", "a", { workspace: 6, perRuntime: 0, perProject: 0 })).toBe("");
     expect(noRoom(two, "pi", "a", { workspace: 3, perRuntime: 3, perProject: 3 }, "w1")).toBe("");
+  });
+
+  it("gives an owner follow-up one workspace slot without bypassing project or runtime limits", () => {
+    const full = [h("w1", "pi", "a", true), h("w2", "claude", "b", true), h("w3", "codex", "c", true)];
+    expect(noRoom(full, "dsh", "d", limits, "", true)).toBe("");
+    expect(noRoom(full, "pi", "d", { ...limits, perRuntime: 1 }, "", true)).not.toBe("");
+    expect(noRoom(full, "dsh", "a", { ...limits, perProject: 1 }, "", true)).not.toBe("");
   });
 
   it("session names", () => {

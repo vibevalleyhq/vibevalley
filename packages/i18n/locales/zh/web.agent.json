@@ -115,7 +115,7 @@
   "none": "没有。",
   "role": {
     "orchestrator": "管家",
-    "helper": "帮工"
+    "worker": "帮工"
   },
   "templates": {
     "title": "模板",

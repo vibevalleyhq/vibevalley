@@ -47,7 +47,7 @@ export interface CompactionOptions {
   readonly now: () => number;
 }
 
-export interface CompactionPlan {
+interface CompactionPlan {
   readonly messages: readonly BrainMessage[];
   readonly cut: number;
   readonly tokens: number;

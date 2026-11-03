@@ -1,4 +1,8 @@
 {
+  "family": {
+    "children": "Child issues",
+    "parent": "Parent issue"
+  },
   "reading": "Reading…",
   "never": "Never mind",
   "later": "Leave it for now",
@@ -185,44 +189,11 @@
     "evidence": "Evidence",
     "unsure": "Not sure about",
     "next": "Suggested next",
-    "conflict": "Merging into {base} would conflict: {files}",
-    "graphStep": "A task of the plan \"{graph}\"",
-    "backToGraph": "Back to the plan"
+    "conflict": "Merging into {base} would conflict: {files}"
   },
   "task": {
-    "label": "Plan",
-    "steps": "{n, plural, one {# task} other {# tasks}}",
-    "done": "{done} / {of} tasks done",
-    "waitsForYou": "A task is waiting for you: open it to answer or review.",
-    "splitting": "The manager is splitting it into tasks; they will be listed below.",
-    "ok": "Done.",
-    "check": "Check",
-    "scope": "Where it changes",
-    "conclusion": "Conclusion",
-    "spent": "Spent",
-    "tried": "Tried",
-    "tries": "{n} times",
-    "open": "Open this ticket",
-    "review": "See the changes, {merge}…",
-    "state": "State",
     "project": "Project",
-    "progress": "Progress",
-    "progressLine": "{done} / {of} tasks",
-    "parallel": "At once",
-    "atMost": "at most {n} tasks",
-    "written": "Written",
-    "note": "Note",
-    "abandonTitle": "{abandon} this plan?",
-    "abandonLine": "The tasks not done yet are not sent out; the plan's branch stays, with every commit made so far.",
-    "abandon": "Abandon it",
-    "reading": "Looking at what the plan's branch changed…",
-    "behind": "Meanwhile {base} got {n} more commits",
-    "merge": "Merge into {base}",
-    "layer": "Batch {n}",
-    "layerTogether": "Batch {n} · these {size} tasks can run at once",
-    "waitsOn": "waiting for \"{steps}\"",
-    "stepSeparator": "\", \"",
-    "conflict": "Merging into {base} would conflict: {files}. Not merging until the changes on {base} are sorted out."
+    "written": "Written"
   },
   "todo": {
     "queued": "Queued: every spot is taken, and it starts by itself when one frees up.",
@@ -300,20 +271,10 @@
     },
     "newIssue": "New ticket"
   },
-  "graph": {
-    "splitting": "splitting into tasks",
-    "draft": "split: look it over, then start",
-    "running": "{done} / {total} tasks done",
-    "paused": "paused",
-    "ready": "all done, waiting for you to merge into main",
-    "done": "merged into main",
-    "abandoned": "abandoned"
-  },
   "trigger": {
     "issue": "sent out",
     "comment": "a word passed on",
     "commentNumbered": "a word passed on (#{id})",
-    "task": "plan",
     "cron": "scheduled task",
     "missed": "scheduled task (made up)",
     "refine": "drafting",
@@ -342,7 +303,6 @@
     "runs": "{n, plural, one {# round} other {# rounds}}",
     "orchestratorWorking": "the manager is on it",
     "missingFlag": "Record missing",
-    "graph": "Plan: {title}",
     "missing": "The run's record is missing: {what}"
   },
   "issue": {
@@ -359,8 +319,6 @@
     "stuck": "Stuck",
     "canceled": "Canceled",
     "reopenLine": "To have it carry on, reopen it: write a line on what to do this time.",
-    "inGraph": "This is a task of a plan, and goes with the plan.",
-    "splitting": "Splitting the plan \"{graph}\": reading code only, changing no files.",
     "editing": "{who} is changing the code",
     "history": "{n} times: {line}",
     "historyItem": "{name} ({id})",
@@ -390,7 +348,6 @@
     "whoRuntime": "{name} ({runtime})",
     "changes": "{branch} → {base} · {commits} commits · +{added} -{removed}",
     "changesUncommitted": "{branch} → {base} · {commits} commits · +{added} -{removed} · {uncommitted} uncommitted",
-    "graphStep": "A task of the plan \"{graph}\": {step}. When done it merges into the plan's branch by itself, and reaches main when the whole plan does.",
     "justNow": "just now"
   }
 }

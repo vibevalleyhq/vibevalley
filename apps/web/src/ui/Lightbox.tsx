@@ -2,9 +2,9 @@ import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
+import { createModal } from "./Dialog";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
-import { createModal } from "./modal";
 
 export interface Picture {
   readonly src: string;

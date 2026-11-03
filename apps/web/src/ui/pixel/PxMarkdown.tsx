@@ -5,11 +5,30 @@ import remarkRehype from "remark-rehype";
 import { createMemo, onCleanup } from "solid-js";
 import { type Plugin, unified } from "unified";
 
-import { remarkIssueRefs } from "@/ui/richRules";
-import { fragmentOf, richen } from "@/ui/richText";
+import { fragmentOf, remarkIssueRefs, richen } from "@/ui/richText";
 
-import { mentionHref, withMentions } from "./markdown";
 import { cx, pxText } from "./style";
+
+export { plainText } from "@vibevalley/protocol/rules";
+
+const mentionHref = "#mention";
+
+const codeParts = /(```[\s\S]*?```|`[^`\n]*`)/gu;
+
+const mention = /(^|[^\p{L}\p{N}_@])@(w\d+|管家|主人|所有人)/gu;
+
+const mentionLinks = (s: string) => s.replace(mention, (_, before: string, name: string) => `${before}[@${name}](${mentionHref})`);
+
+/** @names outside code become links to mentionHref, as the group chat reads them (protocol MentionsIn). */
+export function withMentions(text: string): string {
+  let out = "";
+  let at = 0;
+  for (const m of text.matchAll(codeParts)) {
+    out += mentionLinks(text.slice(at, m.index)) + m[0];
+    at = m.index + m[0].length;
+  }
+  return out + mentionLinks(text.slice(at));
+}
 
 // Colours follow the text around it (currentColor), so the same rules read on cream paper and on a green bubble.
 // One weight and no italics: ** and * show as plain words.

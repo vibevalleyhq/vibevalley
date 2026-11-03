@@ -79,7 +79,7 @@ const ReminderList = Schema.fromJsonString(Schema.mutable(Schema.Array(ReminderS
 /** How long a claim that could not be stored waits to be tried again. */
 const retryClaimMs = 20_000;
 
-export interface Reminders {
+interface Reminders {
   readonly tools: Tool[];
   /** What is due at now, each stored as run (or gone, once) before it is said, so it comes due at most once. */
   readonly claimDue: (now: Date) => Effect.Effect<string[], AgentFailed>;

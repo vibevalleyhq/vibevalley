@@ -61,7 +61,6 @@ describe("the tools", () => {
       tool: "issue_create",
       input: `{"title":"加个 README","project":"demo","start":true}`,
     });
-    expect(toolStart("graph_split", { goal: "长".repeat(50) }).text).toBe("拆计划：" + "长".repeat(40) + "…");
     expect(toolStart("unknown", undefined).text).toBe("unknown");
   });
 

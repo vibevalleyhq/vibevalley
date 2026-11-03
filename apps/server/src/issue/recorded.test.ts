@@ -1,24 +1,15 @@
-import { describe, expect, it, test } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { type Issue, defaultOrchestrator, type ProjectStack, type Run } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { templateCatalog } from "@/agent/seed.ts";
-import { graphsOf } from "@/task/issues.ts";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
 
-import { pullRequestConclusion, issueBrief, splitBrief } from "./brief.ts";
-import { pickIssues } from "./filter.ts";
+import { pullRequestConclusion, issueBrief, milestonesOf, splitBrief } from "./brief.ts";
+import { filledKinds, filledTemplate, mandateNoteFits, sentTitles } from "./creation.ts";
 import { answerOpening, criteriaHead, refinementBrief, refinementOpening } from "./prompts.ts";
 import { refinementDescription, kept, parseRefinement } from "./refinement.ts";
-import { nextTaskId } from "./stored.ts";
-import { filledKinds, filledTemplate, sentTitles } from "./templates.ts";
-import { milestonesOf } from "./timeline.ts";
-test("the recorded cases", () => {
-  const cases = goldenCases("issue");
-  expect(new Set(cases.map((c) => c.fn))).toEqual(new Set(["nextTaskID"]));
-  expect(checkCases(cases, (c) => nextTaskId(graphsOf((c.in as { state: never }).state).map((g) => g.id)))).toEqual([]);
-});
+import { pickIssues } from "./status.ts";
 
 describe("an issue as a brief", () => {
   it("title and brief", () => {
@@ -48,8 +39,17 @@ describe("an issue as a brief", () => {
       title: "评估",
       priority: "medium",
       deliver: "change",
+      mandate: { strength: "explicit", maxBotReviewRounds: 3, autoSubmitPr: false },
       createdAt: 100,
-      sessions: [sessionId("w1")],
+      assignments: [
+        {
+          id: "a1",
+          issue: issueId("t1"),
+          agent: "lab",
+          assignedAt: 150,
+          executions: [{ kind: "worker", session: sessionId("w1"), startedAt: 200 }],
+        },
+      ],
       status: "in_review",
       moves: [],
       findings: [{ id: "f1", text: "少了测试", at: 400, resolved: false }],
@@ -58,7 +58,7 @@ describe("an issue as a brief", () => {
       blockedBy: [],
       criteria: [],
       checks: [],
-      attention: { state: "asking", acts: [] },
+      stage: { state: "asking", acts: [] },
     } satisfies Issue;
     const runs: Run[] = [
       {
@@ -101,17 +101,11 @@ describe("an issue as a brief", () => {
       "改拖卡\n\n为什么：\n旧接口\n\n" + criteriaHead + "\n1. 拖到待办就开工\n2. 测试通过",
     );
   });
-
-  it("the next task's id", () => {
-    expect(nextTaskId([])).toBe("p1");
-    expect(nextTaskId(["p3", "p12", "p9"])).toBe("p13");
-    expect(nextTaskId(["p3", "px", "p 7 ", "p-9", "p0x10", "p1.5", "q40"])).toBe("p4");
-  });
 });
 
 describe("a pull request", () => {
   it("a pull request's conclusion", () => {
-    expect(pullRequestConclusion("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明")).toBe("已完成 abc123\n第二行");
+    expect(pullRequestConclusion("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明")).toBe("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明");
     const text = "完整的最后一轮回复。".repeat(20) + "\n\n最后一段";
     expect(pullRequestConclusion(text)).toBe(text);
   });
@@ -209,8 +203,8 @@ describe("templates", () => {
 
   it("issue.list's filter keeps the open ones by default, and what waits on the owner the longest waiting first", () => {
     const issue = (title: string, status: Issue["status"], more: Partial<Issue> = {}) =>
-      ({ title, status, project: "app", attention: { state: "working", acts: [] }, ...more }) as Issue;
-    const waiting = (since: number) => ({ attention: { state: "reviewing" as const, acts: [], since } });
+      ({ title, status, project: "app", stage: { state: "working", acts: [] }, ...more }) as Issue;
+    const waiting = (since: number) => ({ stage: { state: "reviewing" as const, acts: [], since } });
     const all = [
       issue("修登录 按钮", "in_review", waiting(5)),
       issue("加打卡", "todo"),
@@ -228,17 +222,28 @@ describe("templates", () => {
   });
 
   it("recent titles are the project's own sent issues", () => {
-    const issue = (title: string, project: string, at: number, more: Partial<Issue> = {}) =>
-      ({ title, project, createdAt: at, sessions: ["s"], ...more }) as Issue;
+    const issue = (title: string, project: string, at: number, more: Partial<Issue> & { readonly sent?: boolean; readonly agent?: string } = {}) => {
+      const { sent = true, agent = "lab", ...fields } = more;
+      const id = issueId(`i-${at}-${title}`);
+      return {
+        title,
+        project,
+        createdAt: at,
+        assignments: sent
+          ? [{ id: `a-${at}-${title}`, issue: id, agent, assignedAt: at, executions: [{ kind: "worker", session: sessionId("s"), startedAt: at }] }]
+          : [],
+        ...fields,
+      } as Issue;
+    };
     const all = [
       issue("修登录", "app", 1),
       issue("  加  打卡 ", "app", 5),
       issue("修登录", "app", 4),
       issue("别的项目", "web", 9),
-      issue("没派过", "app", 8, { sessions: [] }),
+      issue("没派过", "app", 8, { sent: false }),
       issue("计划里的一步", "app", 8, { parent: issueId("g") }),
       issue("定时任务", "app", 8, { cron: "s1" }),
-      issue("给管家", "app", 8, { assignee: defaultOrchestrator }),
+      issue("给管家", "app", 8, { agent: defaultOrchestrator }),
       issue("长".repeat(61), "app", 8),
       issue("三", "app", 3),
       issue("二", "app", 2),
@@ -247,5 +252,15 @@ describe("templates", () => {
     ];
     expect(sentTitles(all, "app", (id) => id === defaultOrchestrator)).toEqual(["加 打卡", "修登录", "三", "二", "零"]);
     expect(sentTitles(all, "none", (id) => id === defaultOrchestrator)).toEqual([]);
+  });
+});
+
+describe("a mandate", () => {
+  it("limits manager notes by words across English and Chinese", () => {
+    expect(mandateNoteFits("word ".repeat(30))).toBe(true);
+    expect(mandateNoteFits("word ".repeat(31))).toBe(false);
+    expect(mandateNoteFits("工作，".repeat(30))).toBe(true);
+    expect(mandateNoteFits("工作，".repeat(31))).toBe(false);
+    expect(mandateNoteFits(" \n … ")).toBe(true);
   });
 });

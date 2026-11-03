@@ -7,7 +7,7 @@ import { createSignal, For, Show } from "solid-js";
 import { list, t } from "@vibevalley/i18n";
 import type { AgentTemplate, RuntimeInfo } from "@vibevalley/protocol";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { api } from "@/infra/api";
 import { ready, useAgentTemplates, useRuntimes } from "@/infra/query";
 import { useRouter } from "@/infra/router";
@@ -17,7 +17,7 @@ import { Button } from "@/ui/Button";
 import { ConfirmButton } from "@/ui/ConfirmButton";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { TextInput } from "@/ui/Field";
-import { runtimeName } from "@/ui/runtimes";
+import { runtimeName } from "@/ui/RuntimeBadge";
 import { Hint } from "@/ui/Tip";
 import { toast } from "@/ui/toasts";
 

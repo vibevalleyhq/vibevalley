@@ -7,29 +7,28 @@ import { t } from "@vibevalley/i18n";
 import type { ArtifactId, BlockOp } from "@vibevalley/protocol";
 import { artifactId, blockId, type Wire } from "@vibevalley/protocol/schema";
 
+import { sampleAgent } from "@/agent/seed.ts";
 import { newId } from "@/base/ids.ts";
 import { orMissing } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Database, Db } from "@/infra/db.ts";
-import { sampleAgent } from "@/testing/agents.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { waitFor } from "@/testing/until.ts";
+import { bold, para, sample, span } from "@/testing/artifact.ts";
+import { testConfig, waitFor } from "@/testing/layers.ts";
 
 import * as qa from "../../db/generated/artifact.sql.ts";
-import { type BlockStoreOptions, makeBlockStore } from "./blocks.ts";
-import { demoPieces } from "./demo.ts";
-import { plain } from "./spans.ts";
-import { bold, para, sample, span } from "./testing.ts";
+import { makeBlockStore } from "./blocks.ts";
+import { plain } from "./ops.ts";
+import { demoPieces } from "./policy.ts";
 
 const on = (config: ServerConfig["Service"] = testConfig()) =>
   Db.layer.pipe(Layer.provideMerge(Database), Layer.provideMerge(Layer.succeed(ServerConfig, config)));
 
 /** The blocks of artifacts made straight in the table: the rest of the Artifact service (channels, cards) is artifact.test.ts's. */
-const make = (options: BlockStoreOptions = {}) =>
+const make = () =>
   Effect.gen(function* () {
     const db = yield* Db;
     const row = (id: string) => db.one(qa.artifact({ id })).pipe(orMissing(id, []));
-    const blocks = yield* makeBlockStore(row, options);
+    const blocks = yield* makeBlockStore(row);
     const get = (id: ArtifactId) =>
       Effect.gen(function* () {
         const list = yield* blocks.blocks(id);

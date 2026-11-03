@@ -4,16 +4,17 @@
 // unanswered one is let go and said in the error tone; the overlay goes with it, and the server's state shows again.
 // Each overlay sets only the field the owner set.
 
-import { type Accessor, createMemo } from "solid-js";
+import { type Accessor, createEffect, createMemo } from "solid-js";
 
 import { type Channel, type Chat, type ChatMessage, type Notify, ownerId, type StateFrame } from "@vibevalley/protocol";
 
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
+import { defineAtom } from "@/state/atom";
 import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "@/state/intent";
 
 import { type Followed, followed, useFollowed } from "./follow";
-import { markedRead, type ReadMark, unreadMark } from "./reading";
+import { newestUnread } from "./places";
 
 export interface ReactionMark {
   /** The message's channel: the copy that shows the reaction is followed there. */
@@ -70,6 +71,75 @@ export interface NotifyMark {
 }
 
 const channelIn = (frame: StateFrame | undefined, id: string) => frame?.state.chat?.channels.find((c) => c.id === id);
+
+export interface ReadMark {
+  readonly channel: string;
+  readonly number: number;
+}
+
+/** The server puts read just before the message (never below 0): settled once the frame's read is there or before. */
+const unreadUpTo = (number: number) => Math.max(0, number - 1);
+
+const readMark = defineIntent<ReadMark, void>({
+  send: (r) => api.channel.markRead({ id: r.channel, number: r.number }),
+  confirmed: (frame, i) => (channelIn(frame, i.input.channel)?.read ?? 0) >= i.input.number,
+  whileLost: "queue",
+  timeoutMs: 20_000,
+});
+
+export const unreadMark = defineIntent<ReadMark, void>({
+  send: (r) => api.channel.markUnread({ id: r.channel, number: r.number }),
+  confirmed: (frame, i) => (channelIn(frame, i.input.channel)?.read ?? 0) <= unreadUpTo(i.input.number),
+  whileLost: "queue",
+  timeoutMs: 20_000,
+});
+
+const sameChannel = (a: ReadMark, b: ReadMark) => a.channel === b.channel;
+
+// Channels the owner marked unread while looking at them: they stay unread until the owner leaves and comes back.
+const held = defineAtom<ReadonlySet<string>>(new Set());
+const release = (channel: string) => held.update((h) => new Set([...h].filter((c) => c !== channel)));
+
+/** The owner's read in a channel goes back to just before this message, and the shown list leaves it so. */
+export function markUnread(intents: Intents<ReadMark, void>, mark: ReadMark, say: (reason: string) => void) {
+  held.update((h) => new Set([...h, mark.channel]));
+  setMark(intents, mark, sameChannel, (reason) => {
+    release(mark.channel);
+    say(reason);
+  });
+}
+
+/** A channel with the owner's mark unread on its way laid over its read; the same object with none. */
+export function markedRead(c: Channel, unreads: readonly Intent<ReadMark, void>[]): Channel {
+  const mark = unreads.findLast((u) => u.input.channel === c.id);
+  if (!mark) return c;
+  const read = unreadUpTo(mark.input.number);
+  return (c.read ?? 0) <= read ? c : { ...c, read };
+}
+
+/** A shown channel is read: the newest unread number goes to the server once it is drawn; `say` tells a refusal. */
+export function useMarkRead(channel: Accessor<Channel | undefined>, say: (reason: string) => void) {
+  const reads = useIntents(readMark);
+  createEffect(
+    () => channel()?.id,
+    (id) => () => {
+      if (id) release(id);
+    },
+  );
+  createEffect(
+    () => {
+      const c = channel();
+      const number = c && !held.get().has(c.id) ? newestUnread(c) : undefined;
+      // A string, so the same channel and number again is equal and posts nothing.
+      return c && number !== undefined ? `${c.id}\n${number}` : undefined;
+    },
+    (read) => {
+      if (!read) return;
+      const [id = "", n = ""] = read.split("\n");
+      setMark(reads, { channel: id, number: Number(n) }, sameChannel, say);
+    },
+  );
+}
 
 export const archiveSet = defineIntent<ArchiveMark, void>({
   send: (a) => api.channel.archive.set({ id: a.id, on: a.on }),
@@ -145,7 +215,7 @@ export function useMarkedFollowed(id: Accessor<string | undefined>): Accessor<Fo
   });
 }
 
-export interface ChannelMarks {
+interface ChannelMarks {
   readonly archives: readonly Intent<ArchiveMark, void>[];
   readonly notifies: readonly Intent<NotifyMark, void>[];
   readonly unreads: readonly Intent<ReadMark, void>[];

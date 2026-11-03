@@ -7,7 +7,7 @@ import { Effect, Layer, Queue, Stream } from "effect";
 import type * as T from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Connector } from "@/connector/connector.ts";
 import { Core } from "@/core/core.ts";
 import { handlers } from "@/handlers.ts";

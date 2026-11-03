@@ -3,19 +3,17 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Channel, CronView } from "@vibevalley/protocol";
 
-import { aria, useNow } from "@/base/util";
+import { aria, useNow } from "@/base/dom";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { useRouter } from "@/infra/router";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
-import { Empty } from "@/ui/Empty";
 import { Icon } from "@/ui/Icon";
+import { Empty } from "@/ui/layout";
 
-import { HelperFace, PhaseGlyph } from "./bits";
-import { chatPath } from "./places";
-import { phaseText } from "./presence";
-import { sessionThreadOf } from "./threads";
+import { chatPath, sessionThreadOf } from "./places";
+import { HelperFace, PhaseGlyph, phaseText } from "./presence";
 
 const card = "rounded-lg border border-line bg-page p-3";
 

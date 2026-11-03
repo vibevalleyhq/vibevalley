@@ -71,7 +71,7 @@ test("with the scripted helper, an issue goes out, comes back and is completed t
       "-c",
       `set -e
       vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
-      vv issue create --json '{"title":"写打卡并提交","project":"clock","assignee":"docs"}' > /dev/null
+      vv issue create --json '{"title":"写打卡并提交","project":"clock","agent":"docs"}' > /dev/null
       vv issue work 1
       vv issue status update 1 --dry-run --json '{"status":"done"}'
       vv issue status update 1 --json '{"status":"done"}'

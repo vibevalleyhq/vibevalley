@@ -5,6 +5,7 @@ import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
+import { sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { spentText } from "@/base/format";
 import { defaultOf, useFollowed, useReports } from "@/features/channel";
@@ -13,7 +14,7 @@ import { useCore } from "@/infra/frame";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { DashedLine, PxMarkdown } from "@/ui/pixel";
 
-import { clockOf, FarmEmpty, FarmTag } from "./bits";
+import { clockOf, FarmEmpty, FarmTag } from "./rows";
 
 const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
   completed: [t("shared.outcome.completed"), "#efcf92", "#2f1f13"],
@@ -22,7 +23,7 @@ const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
 };
 
 const issueOfSession = (s: WorkspaceState | undefined, session: string): Issue | undefined =>
-  (s?.issues ?? []).find((i) => i.sessions.some((s) => s === session));
+  (s?.issues ?? []).find((i) => sessionIdsOf(i).some((id) => id === session));
 
 type Row = { kind: "said" | "report"; message: ChatMessage };
 

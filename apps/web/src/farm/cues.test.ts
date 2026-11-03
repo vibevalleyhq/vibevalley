@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import type { IssueAttention, Session, IssueAct, IssueAction } from "@vibevalley/protocol";
+import type { IssueStage, Session, IssueAct, IssueAction } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
@@ -70,8 +70,8 @@ describe("farmCues", () => {
     expect(farmCues(base, { ...base, sessions: next })).toEqual([]);
     const prev = [session("b", "working"), session("c", "working")];
     expect(farmCues({ ...base, sessions: prev }, { ...base, sessions: next })).toEqual([{ name: "arrive" }]);
-    const issue = (id: string, attention: IssueAttention) => ({ id: issueId(id), attention });
-    const working: IssueAttention = { state: "working", acts: [] };
+    const issue = (id: string, stage: IssueStage) => ({ id: issueId(id), stage });
+    const working: IssueStage = { state: "working", acts: [] };
     const before = [issue("b", working), issue("c", working), issue("d", working)];
     const after = [
       issue("b", { state: "reviewing", acts: buttons("complete") }),

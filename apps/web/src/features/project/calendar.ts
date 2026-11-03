@@ -15,7 +15,7 @@ export interface CalendarDay {
   readonly future: boolean;
 }
 
-export interface Calendar {
+interface Calendar {
   readonly weeks: readonly (readonly CalendarDay[])[];
   readonly months: readonly { readonly week: number; readonly label: string }[];
 }
@@ -52,7 +52,7 @@ export function calendarOf(days: readonly { day: string; commits: number }[], no
   return { weeks: grid, months };
 }
 
-export interface Streaks {
+interface Streaks {
   readonly total: number;
   readonly days: number;
   readonly longest: number;

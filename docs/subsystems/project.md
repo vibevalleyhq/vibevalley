@@ -8,16 +8,16 @@
 |---|---|
 | 工作目录：`projects/` 下的项目，`worktrees/` 下的 worktree，工作目录的 `AGENTS.md` | 工作目录放在哪（配置 `work_root`，[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
 | 新建项目、从 GitHub 克隆，项目名的校验 | 派活时挑哪个项目（[管家](docs/subsystems/orchestrator.md)；档案的默认项目在帮工的档案上） |
-| 开了 worktree 时，一张工单一个 worktree 和分支：开、复用、留着、清掉 | 帮工什么时候开、换、离开（[帮工](docs/subsystems/session.md)）；一个项目同时几个帮工在干（`session/hiring.ts` 的 `noRoom`，上限从这里取） |
+| 开了 worktree 时，一张工单一个 worktree 和分支：开、复用、留着、清掉 | 帮工什么时候开、换、离开（[帮工](docs/subsystems/session.md)）；一个项目同时几个帮工在干（`session/briefing.ts` 的 `noRoom`，上限从这里取） |
 | 改动：提交、文件和 diff、没提交的、落后几个、会不会冲突 | 完成的流程：什么时候查冲突、交回帮工、本地合还是提 PR、PR 的轮询（[工单](docs/subsystems/issue.md#怎么走)） |
-| 检查（`.vibevalley/check`）、合并、推送、开 PR、查 PR 的状态、快进主分支 | 计划的分支和每一件的检查什么时候跑（[计划](docs/subsystems/task.md)） |
+| 检查（`.vibevalley/check`）、合并、推送、开 PR、查 PR 的状态、快进主分支 | 计划的分支和每一件的检查什么时候跑（[计划](docs/subsystems/issue.md)） |
 | GitHub 检测：`gh` 装没装、登没登录，每个项目能不能提 PR | `github.pr_projects` 里放哪些项目（主人的配置） |
 | 地契：项目列表、最近一次提交、种了什么（tokei）、一年的提交 | 项目页和地图怎么画（[farm-ui.md](docs/reference/farm-ui.md) 界面 12、19） |
 | 数工作目录里你名下的 commit | 经验和等级怎么算（`game/game.ts`、`game/view.ts` 的 `xpToNext`、`levelUps`；[游戏](docs/subsystems/game.md#模型和不变量)） |
 
 ## 在哪
 
-- 服务端 `apps/server/src/project`：`project.ts` 工作目录、新建和克隆、`Workplace`、改动（`Changes`）、冲突预检和 `.vibevalley/check`、合并和清理、`houseRules`、推送和 PR、快进主分支、GitHub 检测、地契、数 commit，对外的形状（`Workplace`、`Merged`、`MergeFailure`）；`repository.ts` 是一个仓库能回答的和能做的（主分支、分支在不在和指向哪、谁包含谁、领先几个提交、远端地址；提交剩下的改动、不检出就合并、试合并看冲突、描述一个分支、清掉 worktree 和分支），git 的拼法都在这里，拿这些答案做什么（合并的规矩、PR、项目检查、释放时留什么）在 `project.ts`；`git.ts` 跑 git 和别的命令；`stack.ts` 认项目的栈。
+- 服务端 `apps/server/src/project`：`project.ts` 工作目录、新建和克隆、`Workplace`、改动（`Changes`）、冲突预检和 `.vibevalley/check`、合并和清理、`houseRules`、推送和 PR、快进主分支、GitHub 检测、地契、数 commit，对外的形状（`Workplace`、`Merged`、`MergeFailure`）；`repository.ts` 是一个仓库能回答的和能做的（主分支、分支在不在和指向哪、谁包含谁、领先几个提交、远端地址；提交剩下的改动、不检出就合并、试合并看冲突、描述一个分支、清掉 worktree 和分支），git 的拼法都在这里，拿这些答案做什么（合并的规矩、PR、项目检查、释放时留什么）在 `project.ts`；`git.ts` 跑 git 和别的命令；`workplace.ts` 认项目的栈与对外的形状。
 - 配置（`ServerConfig`，[设置和配置](docs/subsystems/setting.md#模型和不变量)）：`work_root`、`project.max_sessions`、`project.check_timeout_seconds`、`github.pr_projects`、`tokei`、`git_emails`。
 - 没有表：项目就是磁盘上的文件夹，PR 的回执记在工单上（`Issue.pullRequest`）。
 - 接口：`project.list`、`project.validate`、`project.create`、`project.language.list`、`project.activity.get`、`github.get`、`github.refresh`；工单的改动是 `issue.diff.get`（[capabilities.md](docs/reference/capabilities.md)）。
@@ -60,7 +60,7 @@
 
 **合进计划分支**（`mergeInto`，计划的一件做完）：同样锁外检查、进锁核对和查冲突，但不检出任何分支：`merge-tree --write-tree` 写出树，`commit-tree` 做合并提交（能快进就快进），`update-ref` 只从原来的位置挪，目标分支同时被挪过就不覆盖。`mergeBranch` 把计划分支合进主分支并删掉它；`openBranch` 从 `HEAD` 开计划分支。
 
-**提 PR**（`submitPullRequest`）：分支必须是这张工单的分支；锁外提交、查冲突、检查；进锁核对分支没变、origin 是 GitHub、主分支没有冲突；`git push -u origin <分支>`；工单已有开着的 PR 就只推；否则先 `gh pr list --head <分支> --base <主分支> --state open` 找回开过但回执没存下的，再 `gh pr create`。标题和正文是帮工写的：走 PR 的项目，帮工的规矩里多一条，交回来以前照项目的 PR 约定把标题和正文写进 worktree 的 git 目录里的 `vibevalley-pr.md`（`git rev-parse --git-path vibevalley-pr.md`；第一行是标题，空一行是正文；`shapes.ts` 的 `pullRequestText` 读它），它不进提交；没写就用工单的标题，正文是「工单 #号」、帮工的结论和检查结果（没有 `.vibevalley/check` 就写没跑检查）。每一步失败都返回能重试的原因。`PullRequestState` 用 `gh pr view --json state,mergedAt` 读成 `open`、`merged`、`closed`。 gh 的 `--json` 回答按 Schema 读，不是要的形状就当没读到，返回能重试的原因，不当成一个 PR。
+**提 PR**（`submitPullRequest`）：分支必须是这张工单的分支；锁外提交、查冲突、检查；进锁核对分支没变、origin 是 GitHub、主分支没有冲突；`git push -u origin <分支>`；工单已有开着的 PR 就只推；否则先 `gh pr list --head <分支> --base <主分支> --state open` 找回开过但回执没存下的，再 `gh pr create`。标题和正文是帮工写的：走 PR 的项目，帮工的规矩里多一条，交回来以前照项目的 PR 约定把标题和正文写进 worktree 的 git 目录里的 `vibevalley-pr.md`（`git rev-parse --git-path vibevalley-pr.md`；第一行是标题，空一行是正文；`workplace.ts` 的 `pullRequestText` 读它），它不进提交；没写就用工单的标题，正文是「工单 #号」、帮工的结论和检查结果（没有 `.vibevalley/check` 就写没跑检查）。每一步失败都返回能重试的原因。`PullRequestState` 用 `gh pr view --json state,mergedAt` 读成 `open`、`merged`、`closed`。 gh 的 `--json` 回答按 Schema 读，不是要的形状就当没读到，返回能重试的原因，不当成一个 PR。
 
 **结束 PR**（`finishPullRequest`）：进锁，能提 PR 的先快进主分支，再强制删掉工单的 worktree 和本地分支；远端分支不动。
 
@@ -85,8 +85,9 @@
 
 ## 和谁打交道
 
-- **帮工（`session`）**：开工取 worktree、离开调 `release`，规矩里附 `houseRules`；`noRoom` 用 `limit` 判一个项目还能不能再开工；合并经 `session` 的 `handOver`（先让帮工歇下，再由工单、计划给的合并方式调 `merge`、`mergeInto`、`submitPullRequest`、`finishPullRequest`），`conflict` 的失败由它施加 `conflict` 事实。
-- **工单（`issue`）**：决定什么时候合、走本地合还是 PR（`usesPullRequests`）；`issue.diff.get` 调 `Changes`，用它刷新帮工的冲突；冲突预检 `Conflict`；重开时用 `branchChanges` 看分支上有没有上次的提交；PR 的轮询调 `PullRequestState`（[工单](docs/subsystems/issue.md)）。
+- **帮工（`session`）**：开工取 worktree、离开调 `release`，规矩里附 `houseRules`；`noRoom` 用 `limit` 判一个项目还能不能再开工；最终合并经 `session` 的 `handOver`（先让帮工歇下，再由工单、计划给的合并方式调 `merge`、`mergeInto`、`finishPullRequest`），`conflict` 的失败由它施加 `conflict` 事实。
+- **工单（`issue`）**：决定什么时候合、走本地合还是 PR（`usesPullRequests`）；`issue.diff.get` 调 `Changes`，用它刷新帮工的冲突；冲突预检 `Conflict`；重开时用 `branchChanges` 看分支上有没有上次的提交；PR 的合并／关闭轮询调 `pullRequestState`；在途提交使用 `Session.withWorkplace`，保留当前 Run 和执行资源。`submitPullRequest` 检查后再核对工作目录，检查期间产生的新改动不会未经重验就推送（[工单](docs/subsystems/issue.md)）。
+- **接入（`ingress`）**：通过 `githubRemote`、`githubRequest` 调 gh；CI、评审、行内评论的结构化解码、自发消息过滤和事件去重归 Ingress。
 - **计划（`task`）**：`openBranch` 开计划分支、`changedFiles` 看一件改了哪些文件、`Run` 跑一件的检查、`mergeBranch` 把计划合进主分支、`branchChanges` 给计划的改动。
 - **游戏（`game`）**：`game/game.ts` 开机、每 2 分钟、帮工干完一轮 15 秒后各调一次 `contributions`，变了施加 `commits` 事实，经验由它折。
 - **管家（`orchestrator`、`tool`）**：现状和 `look` 工具列出 `list` 和 `root`。

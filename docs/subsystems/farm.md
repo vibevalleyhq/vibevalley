@@ -21,11 +21,11 @@
 谁画哪一块、store 的动作、画布怎么告诉 DOM 东西在哪，在 [农场的 README](apps/web/src/farm/README.md)。
 
 - **像素村** `apps/web/src/farm/canvas/`（PixiJS）：`VillageCanvas.tsx` 挂画布，`scene.ts` 每帧把核心状态画成画面、按脚底的 y 排前后；`dog.ts`、`life.ts`、`fx.ts` 院子的动静和地上的效果。
-- **世界** `apps/web/src/farm/world/`：`world.ts` 给位置起名、算帮工去哪（`Whereabouts`、`spotsFor`、`poseOf`、`placeOfAction`），`pose.ts` 的 `PoseHold` 让一个姿势至少停 800ms；`level.ts` 读 `apps/web/public/village.ldtk`；`framing.ts` 放大和裁边（`frameVillage`：算法是 `@vibevalley/engine/framing` 的 `frameWhole`，村子多大、每边能裁多少是 `@vibevalley/protocol/host` 的 `farmFraming`，桌面壳也照它定窗口）；`hits.ts` 点到了什么；`plots.ts` 地有哪几块（`beds`）和地上画什么；`sprites.ts` 读 `public/pixel/sprites.json`。
+- **世界** `apps/web/src/farm/world/`：`world.ts` 给位置起名、算帮工去哪（`Whereabouts`、`spotsFor`、`poseOf`、`placeOfAction`），让一个姿势至少停 800ms（`PoseHold`），点到了什么（`villageHitAt`），以及放大和裁边（`frameVillage`：算法是 `@vibevalley/engine/framing` 的 `frameWhole`，村子多大、每边能裁多少是 `@vibevalley/protocol/host` 的 `farmFraming`，桌面壳也照它定窗口）；`level.ts` 读 `apps/web/public/village.ldtk`；`plots.ts` 地有哪几块（`beds`）和地上画什么；`sprites.ts` 读 `public/pixel/sprites.json`。
 - **引擎** `packages/engine`：`nav`（寻路）、`pixi`（光、天色、法线、粒子、小虫、节奏）、`audio`（合成器和响度）、`clock.ts`（一天的钟）。
 - **HUD 和面板** `farm/hud/`、`farm/panels/`：农场卡、额度、特效层，右上角的「记忆树」到 `/tree`（`src/tree`，[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)）；收获、播种袋（`SeedForms.tsx`）、成就、仓库、计划板、菜单。
-- **农具和去处**：`farm/tools.ts` 的 `Tool`、`aimTool`（指着一块地时说点下去做什么）、`toolForKey`；`farm/commands.ts` 把点击变成接口调用；`farm/world/places.ts` 的 `yardPlaces` 是院子里每样东西打开哪个面板或页面。
-- **音效** `ui/pixel/sound.ts`：配方（`SOUNDS`）和分组（`SOUND_GROUPS`），几张皮共用；农场什么时候响在 `farm/cues.ts`（`farmCues` 比前后两刻，`support.ts` 的 `farmSounds` 照它响）；合成在 `packages/engine/src/audio`。指针在 `apps/web/public/cursors/`，字体 Fusion Pixel 12px 在 `public/fonts/`。
+- **农具和去处**：`farm/tools.ts` 的 `Tool`、`aimTool`（指着一块地时说点下去做什么）、`toolForKey`；`farm/commands.ts` 把点击变成接口调用；`farm/world/world.ts` 的 `yardPlaces` 是院子里每样东西打开哪个面板或页面。
+- **音效** `ui/pixel/sound.ts`：配方（`SOUNDS`）和分组（`SOUND_GROUPS`），几张皮共用；农场什么时候响在 `farm/cues.ts`（`farmCues` 比前后两刻，`farmSounds` 照它响）；合成在 `packages/engine/src/audio`。指针在 `apps/web/public/cursors/`，字体 Fusion Pixel 12px 在 `public/fonts/`。
 - **手机** `farm/phone/`：`Phone.tsx` 机身，`calls.ts` 来电和记录，`screens.tsx` 主屏；小游戏的规则是纯函数（`games/blocks.ts`、`dino.ts`、`sokoban.ts`、`bugSnake.ts`、`merge.ts`），画面是 `*Game.tsx`。
 - **通知** `apps/web/src/features/inbox/tray.ts`（`noticeFor`、`CallBell`、`traySummary`），由 `src/features/inbox/Follow.tsx` 交给宿主。
 - **地图** `apps/web/src/farm/map/islands.ts`（纯函数，`islandsOf`、`islandLooks`、`growthOf`：最近一次提交的远近 `recencyOf` 画成作物）、`farm/map/ProjectMap.tsx`（`projectMap`）；词在 `web.farm.map`。它是皮，由 `app/` 交给工作台的「项目」页（`ProjectsSkin`：`/projects` 的「全部」是地图，选一个项目，上面是它的岛）；项目页自己（概况、语言、提交日历）说工作台的词。
@@ -36,9 +36,9 @@
 ## 模型和不变量
 
 - **皮里没有第二份状态。** 地、帮工、来电都从这一帧的 `StateFrame` 读；页面自己记的只有画面和这次打开的东西：小动物走到哪、`Whereabouts`、接过哪个来电、小游戏的棋盘。重开页面这些都从头来。
-- **一个项目一座农场。** 地号（`play.station`）在项目里各算各的（`farmOf`、`freeStation`：没有项目的帮工算一座），两个项目的第一个帮工都在各自的第 1 块地；全农场同时干活的上限（`maxRunning`、`noRoom`）不变。页面只把这个项目的帮工交给画地的部分：`farmFrameOf`（`farm/scope.ts`）过滤原始帧，`createFarmFrames` 过滤 store，画布、地上的牌子、特效、音效、帮工栏、面板和农场的命令读它；田头、首页、来电、等级读全农场的。
+- **一个项目一座农场。** 地号（`play.station`）在项目里各算各的（`farmOf`、`freeStation`：没有项目的帮工算一座），两个项目的第一个帮工都在各自的第 1 块地；全农场同时干活的上限（`maxRunning`、`noRoom`）不变。页面只把这个项目的帮工交给画地的部分：`farmFrameOf`（`farm/frames.ts`）过滤原始帧，`createFarmFrames` 过滤 store，画布、地上的牌子、特效、音效、帮工栏、面板和农场的命令读它；田头、首页、来电、等级读全农场的。
 - **一块地是一张工单。** 帮工的地按它的工单的 id 查 `FarmView.plots`（`plotKeyOf`；没挂工单的按它自己的 id），地的样子由服务端照这张工单算好；重开的工单换了帮工，查的还是这块地。它画在哪块地上看帮工的 `play.station`（0–5）；`beds` 有 9 块：6 块是同时在做的 6 张工单（`maxRunning`），另 3 块在 Lv.5、8、12 开垦成花坛，只是外观。没开垦的画成锁住的地。
-- **庄稼和牌子是服务端算好的，是工单站位的一张图**（`game/view.ts` 的 `plotOf`）：卡没卡、要不要主人只由工单的 `attention` 定（[工单](docs/subsystems/issue.md)「给主人看的状态」），地块不再从帮工的阶段、问题、意见另推一遍，所以地上说的和工单页说的是同一件事。帮工只补「这一轮长到哪」：
+- **庄稼和牌子是服务端算好的，是工单站位的一张图**（`game/view.ts` 的 `plotOf`）：卡没卡、要不要主人只由工单的 `stage` 定（[工单](docs/subsystems/issue.md)「给主人看的状态」），地块不再从帮工的阶段、问题、意见另推一遍，所以地上说的和工单页说的是同一件事。帮工只补「这一轮长到哪」：
 
 | 工单站在 | 庄稼（`Crop`） | 牌子 |
 |---|---|---|
@@ -52,7 +52,7 @@
 | 卡住了：停在半路 | 停在当时的样子 | 停在半路 |
 | 卡住了：没动静 | 干裂 `dry` | 没动静 |
 
-  没挂工单的帮工（起草、规划计划的）照它自己的阶段画（`plotOfSession`）。牌子上卡住的原因是词典 `shared` 里 `stuck` 的词；「有虫」「可收获」「除草中」是皮自己的说法。声音也跟着站位：工单进了等你验收响「熟了」，卡在有冲突或没做成响「有虫」（`farm/cues.ts` 的 `farmCues` 读 `Issue.attention`）。帮工离开后，那块地在页面上画 3.6 秒麦茬（`harvested`），然后是空地；这是画面，不在 `FarmView` 里。
+  没挂工单的帮工（起草、规划计划的）照它自己的阶段画（`plotOfSession`）。牌子上卡住的原因是词典 `shared` 里 `stuck` 的词；「有虫」「可收获」「除草中」是皮自己的说法。声音也跟着站位：工单进了等你验收响「熟了」，卡在有冲突或没做成响「有虫」（`farm/cues.ts` 的 `farmCues` 读 `Issue.stage`）。帮工离开后，那块地在页面上画 3.6 秒麦茬（`harvested`），然后是空地；这是画面，不在 `FarmView` 里。
 
 - **帮工去哪是一条规则**（`world/world.ts`），画面只管坐标：
   - 手上的事决定去处（`placeOfAction`）：读、搜去书屋，跑命令和 MCP 去工坊，查网页去电台，等着坐长椅，改文件和别的在自己的地边。
@@ -87,7 +87,7 @@
 
 **一帧**：服务端经 SSE 推来 `StateFrame` → 每块 `bed` 找 `station` 对上的帮工，按它的工单的 id 查 `view.plots` 换成 `plot-<庄稼>` 的图 → 每个帮工算庄稼、姿势、去处（`Whereabouts`），给出目标点，沿寻路的路一段段走 → 按脚底的 y 排前后，打光，画 HUD 和牌子。帮工从帧里消失后，它的小动物从大门走掉。
 
-**一次点击**（`world/hits.ts` 定点到了什么：帮工压过狗，狗压过道具，道具压过地）：
+**一次点击**（`world/world.ts` 的 `villageHitAt` 定点到了什么：帮工压过狗，狗压过道具，道具压过地）：
 
 | 农具（数字键 1–6） | 点一块地 |
 |---|---|
@@ -98,7 +98,7 @@
 | 收获 | 工单允许完成（`complete`）时打开收成清单（改动），确认后完成 |
 | 铲除 | 工单允许 `stop` 时叫停这一轮，否则允许 `close` 时请它收工 |
 
-农具、收成清单和工单详情只用最新帧里的 `Issue.attention.acts` 判断能做什么，照它带着的请求发（`perform`：挪状态、说一句或叫停）。庄稼、帮工阶段和计划归属只用于画面，不再决定动作。收成清单开着时，工单不再允许收获就撤下确认键；冲突清单只展示改动，是否提供「让它解决冲突」也读工单动作。
+农具、收成清单和工单详情只用最新帧里的 `Issue.stage.acts` 判断能做什么，照它带着的请求发（`perform`：挪状态、说一句或叫停）。庄稼、帮工阶段和计划归属只用于画面，不再决定动作。收成清单开着时，工单不再允许收获就撤下确认键；冲突清单只展示改动，是否提供「让它解决冲突」也读工单动作。
 
 **播种袋**（`farm/panels/SeedForms.tsx`：农场点空地打开，地图点一座岛的空位也打开它）：
 
@@ -152,7 +152,7 @@
 - `apps/web/src/farm/world/world.test.ts`：关卡是 384×256、九块地、帮工去的地点；路上能走、地里不能，从大门走得到每块地；叫人的地前面站着帮工；地图是两倍密的 384 格宽，每张图都在清单旁边；地按工单做键；放大和裁边（一个窗口正好放下、16:10 放大一档盖满、裁太多就退一档留边、扫一片窗口尺寸从不超过上限）。
 - `packages/engine/test/*.test.ts`：寻路、光、钟、节奏。
 - `apps/web/src/farm/cues.test.ts`：每个音效都有名字和分组、合得出样本。
-- `apps/web/src/farm/commands.test.ts`：验收前后、失败、计划工单、等回答时的农具动作只跟 `attention.acts` 走；指向后动作被撤回就拒绝点击。
+- `apps/web/src/farm/commands.test.ts`：验收前后、失败、计划工单、等回答时的农具动作只跟 `stage.acts` 走；指向后动作被撤回就拒绝点击。
 - `apps/web/test/farm-actions.spec.ts`：真实帮工交活后用农具收获；收成清单和工作台关闭框开着时，又一轮开工会撤下收获键，交回来才恢复；收获和关单都是挪状态。
 - `apps/web/src/farm/phone/calls.test.ts`：打开时已有的来电不响、新来电响铃，挂断，20 秒没接算未接，别处处理掉自己停；`games/*.test.ts` 测小游戏的规则（种子重放、推箱子每关可解）。来电本身的规则在 `apps/server/src/core` 的黄金数据（`core/golden.test.ts`）。
 - `apps/web/src/features/inbox/tray.test.ts`（来电变通知、只响一次、菜单栏摘要）、`projects.test.ts`（worktree 和空位、锁住的地，一座岛最多 6 块）、`catalog.test.ts`（书架、帧、重画的命令）。

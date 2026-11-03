@@ -20,7 +20,7 @@ interface GroupCtx {
 // A toggle may stand alone. Solid 2 reads an undefined context as unset and throws; null is a value: no group.
 const GroupContext = createContext<GroupCtx | null>(null);
 
-export interface ToggleProps extends ButtonProps {
+interface ToggleProps extends ButtonProps {
   pressed?: boolean | undefined;
   defaultPressed?: boolean | undefined;
   onPressedChange?: ((pressed: boolean) => void) | undefined;
@@ -55,7 +55,7 @@ export function Toggle(props: ToggleProps) {
   );
 }
 
-export interface ToggleGroupProps extends DivProps {
+interface ToggleGroupProps extends DivProps {
   value?: readonly string[] | undefined;
   defaultValue?: readonly string[] | undefined;
   onValueChange?: ((value: string[]) => void) | undefined;

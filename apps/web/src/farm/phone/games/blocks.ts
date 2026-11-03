@@ -1,7 +1,7 @@
 // 方块: a game is a value, each move a function to the next. Pieces come from a seven-bag
 // drawn with the game's own seeded generator, so a seed replays.
 
-import { nextRandom } from "./random";
+import { nextRandom } from "@/farm/phone/lcd";
 
 export const blocksWidth = 10;
 export const blocksHeight = 18;
@@ -76,7 +76,7 @@ const shapes: Record<PieceKind, [size: number, cells: [number, number][]]> = {
   ],
 };
 
-export interface Falling {
+interface Falling {
   readonly kind: PieceKind;
   /** 0..3. */
   readonly turn: number;

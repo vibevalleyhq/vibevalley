@@ -1,11 +1,12 @@
 // The one table the board, the command line, the orchestrator's tools and the server's refusals go by. reduce works it
-// out with each issue's status and attention (withIssueStatuses), so a round that ends changes what the issue may do at
+// out with each issue's status and stage (withIssueStatuses), so a round that ends changes what the issue may do at
 // once, wherever it is read.
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues } from "@vibevalley/protocol";
 import { commandOf, type Next } from "@vibevalley/protocol/api";
+import { executionsOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 /** in_progress and in_review are the session's to reach, never the owner's. */
 export type Move =
@@ -31,11 +32,11 @@ export type Move =
 /** The whole table; the reason says why when there is no move. */
 export function statusMove(issue: T.Issue, to: T.IssueStatus): [Move, string] {
   const from = issue.status;
-  if (issue.graph || issue.task || issue.delivered === "merged_into_parent") return ["none", t("server.issue.move.inGraph")];
+  if (issue.delivered === "merged_into_parent") return ["none", t("server.issue.move.inGraph")];
   if (from === to) return ["none", t("server.issue.move.same")];
   if (to === "in_progress" || to === "in_review") return ["none", t("server.issue.move.byHelpers")];
   // Run before: by a session, or by an in-process agent (the orchestrator), whoever it was.
-  const sent = issue.sessions.length > 0 || issue.lastRun !== undefined;
+  const sent = executionsOf(issue).length > 0 || issue.lastRun !== undefined;
   switch (from) {
     case "backlog":
       if (to === "todo") return issue.refining ? ["none", t("server.issue.move.drafting", { name: issue.refining.name })] : ["start", ""];
@@ -50,7 +51,7 @@ export function statusMove(issue: T.Issue, to: T.IssueStatus): [Move, string] {
     case "in_review":
       if (to === "todo") return ["round", ""];
       // A round that failed is never done: done is what was asked for, not how the round ended.
-      if (to === "done") return issue.attention.stuck === "failed" ? ["none", t("server.issue.move.failed")] : ["complete", ""];
+      if (to === "done") return issue.stage.stuck === "failed" ? ["none", t("server.issue.move.failed")] : ["complete", ""];
       if (to === "canceled") return ["cancel", ""];
       break;
     case "done":
@@ -67,8 +68,8 @@ export const statusMoves = (issue: T.Issue): T.IssueStatus[] => IssueStatusValue
 /** One that needs the owner's words runs nothing and says which field takes them. */
 export function nextSteps(item: T.Issue): Next[] {
   const n = String(item.number);
-  const session = item.sessions.at(-1);
-  const acts = item.attention.acts.flatMap((a): Next[] => {
+  const session = latestSessionIdOf(item);
+  const acts = item.stage.acts.flatMap((a): Next[] => {
     const label = t(`shared.act.${a.act}`);
     switch (a.does) {
       case "move":
@@ -81,7 +82,7 @@ export function nextSteps(item: T.Issue): Next[] {
         return session === undefined ? [] : [{ say: label, run: commandOf("session.stop", [session]) }];
     }
   });
-  const pressed = new Set(item.attention.acts.flatMap((a) => (a.does === "move" ? [a.status] : [])));
+  const pressed = new Set(item.stage.acts.flatMap((a) => (a.does === "move" ? [a.status] : [])));
   const moves = statusMoves(item)
     .filter((to) => !pressed.has(to))
     .map((to): Next => {

@@ -3,19 +3,22 @@
 // shown), the phone, and which project's farm `/` shows. The looks and who the next job goes to are state/prefs.ts.
 
 import { Schema } from "effect";
+import { type Accessor, createMemo } from "solid-js";
 
 import { dayClock } from "@vibevalley/engine/clock";
-import type { GameEffectReward, SessionId } from "@vibevalley/protocol";
+import { t } from "@vibevalley/i18n";
+import type { Channel, GameEffectReward, IssueAct, SessionId } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
+import { createExternal } from "@/base/external";
+import { channelLabel } from "@/features/channel";
 import { defineAtom } from "@/state/atom";
 import { defineStored } from "@/state/stored";
 
 import type { BedFxKind, Tool } from "./tools";
-import type { Rect } from "./world/framing";
 import type { Point } from "./world/level";
-import type { FarmPanel } from "./world/places";
-export type { FarmPanel } from "./world/places";
+import type { FarmPanel, Rect } from "./world/world";
+export type { FarmPanel } from "./world/world";
 
 /**
  * The layers over the farm, at most one of each kind, drawn in this order (later on top): a plot's issue, its harvest,
@@ -75,8 +78,6 @@ export interface FarmUi {
   readonly chatShown: string | undefined;
   readonly phoneOpen: boolean;
   readonly friendsOpen: boolean;
-  /** The task graph the task board shows; null is the newest still open. */
-  readonly graphShown: string | undefined;
   readonly titleOpen: boolean;
   readonly bedFx: readonly BedFx[];
   /** Rewards shown in the FX layer for a few seconds each. */
@@ -101,7 +102,6 @@ const farmUi = defineAtom<FarmUi>({
   chatShown: undefined,
   phoneOpen: false,
   friendsOpen: false,
-  graphShown: undefined,
   titleOpen: !titleSeen.get(),
   bedFx: [],
   rewards: [],
@@ -116,6 +116,9 @@ const set = (patch: Partial<FarmUi> | ((s: FarmUi) => Partial<FarmUi>)) =>
 
 /** The farm page's state now; read in a computation or a component, it follows it. */
 export const farmState = farmUi.get;
+
+/** A slice of the farm page's state, following it. */
+export const useFarm = <T>(select: (s: FarmUi) => T): Accessor<T> => createMemo(() => select(farmState()));
 
 export const subscribeFarm = farmUi.subscribe;
 
@@ -139,6 +142,23 @@ const rewardLinger = 4000;
 /** The world's one day clock: the canvas advances it each frame, the HUD and the debug console read and set it. */
 export const clock = dayClock({ daySeconds: 600, start: 0.42 });
 
+/** The clock's time of day, 0..1, in steps of five minutes of the day (the HUD's clock text). */
+export const timeOfDay = () => createExternal(clock.subscribe, () => Math.floor(clock.day().tod * 288) / 288);
+
+/** The farm's words for an issue's acts where they are its own: completing a change is a harvest here. */
+export const farmActWords: Partial<Record<IssueAct, string>> = { complete: t("web.farm.tool.harvest.label") };
+
+/** The farm calls the default channel by its words' chat.label (田头). */
+export const farmChannelLabel = (c: Channel | undefined) => (!c || c.default ? t("web.farm.chat.label") : channelLabel(c));
+
+export const farmClock = (at: number) => {
+  const d = new Date(Math.round(at));
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
+
+/** Long enough to fold: over 240 characters, eight lines or more, a heading or a code block. */
+export const readsLong = (text: string) => text.length > 240 || (text.match(/\n/gu)?.length ?? 0) >= 8 || /^(#{1,6} |```)/mu.test(text);
+
 export const farm = {
   /** Opens a plot's issue (null closes it). */
   select: (sessionId: string | undefined) => replace("inspect", sessionId === undefined ? undefined : { kind: "inspect", sessionId }),
@@ -154,11 +174,6 @@ export const farm = {
     replace(top.kind, undefined);
     return true;
   },
-  openTaskBoard: (graph?: string) => {
-    if (graph) set({ graphShown: graph });
-    replace("panel", { kind: "panel", panel: "taskBoard" });
-  },
-  showGraph: (graph: string | undefined) => set({ graphShown: graph }),
   hold: (tool: Tool) => set({ tool }),
   hover: (bed: number | undefined, spot: string | undefined) => set({ hoverBed: bed, hoverSpot: spot }),
   revealNames: (on: boolean) => set({ revealNames: on }),
@@ -204,7 +219,6 @@ export function resetFarm() {
     chatShown: undefined,
     phoneOpen: false,
     friendsOpen: false,
-    graphShown: undefined,
     bedFx: [],
     rewards: [],
     screen: undefined,

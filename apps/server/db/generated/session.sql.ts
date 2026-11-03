@@ -4,29 +4,46 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
-import { Pg_public_session_closed_2de0cea65eff } from "./types.js"
+import { Pg_public_session_closed_2de0cea65eff, Pg_public_session_role_337e49368aee } from "./types.js"
 
 export const KeepSessionParams = Schema.Struct({
   ["id"]: Schema.String,
+  ["role"]: Pg_public_session_role_337e49368aee,
   ["agent"]: Schema.String,
   ["name"]: Schema.String,
   ["runtime"]: Schema.String,
   ["brief"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
-  ["graph"]: Schema.NullOr(Schema.String),
+  ["channel"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
 })
 export type KeepSessionParams = typeof KeepSessionParams.Type
 
 
-export const KeepSessionSql = "-- Every session, on the farm or ended (session/sessions.ts).\n\n-- name: KeepSession :exec\ninsert into session (id, agent, name, runtime, brief, project, issue, graph, hired_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, $9)\non conflict (id) do nothing;"
+export const KeepSessionSql = "-- Every session, on the farm or ended (session/sessions.ts).\n\n-- name: KeepSession :exec\ninsert into session (id, role, agent, name, runtime, brief, project, issue, channel, hired_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\non conflict (id) do nothing;"
 
 export const keepSession = Effect.fn("KeepSession")(function* (params: KeepSessionParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: KeepSessionParams,
-    execute: (p) => sql.unsafe(KeepSessionSql, [p["id"], p["agent"], p["name"], p["runtime"], p["brief"], p["project"], p["issue"], p["graph"], p["hired_at"]]),
+    execute: (p) => sql.unsafe(KeepSessionSql, [p["id"], p["role"], p["agent"], p["name"], p["runtime"], p["brief"], p["project"], p["issue"], p["channel"], p["hired_at"]]),
+  })(params)
+})
+
+export const ForgetSessionParams = Schema.Struct({
+  ["id"]: Schema.String,
+})
+export type ForgetSessionParams = typeof ForgetSessionParams.Type
+
+
+export const ForgetSessionSql = "-- name: ForgetSession :exec\ndelete from session where id = $1;"
+
+export const forgetSession = Effect.fn("ForgetSession")(function* (params: ForgetSessionParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: ForgetSessionParams,
+    execute: (p) => sql.unsafe(ForgetSessionSql, [p["id"]]),
   })(params)
 })
 
@@ -56,13 +73,14 @@ export type SessionByIDParams = typeof SessionByIDParams.Type
 
 export const SessionByIDResult = Schema.Struct({
   ["id"]: Schema.String,
+  ["role"]: Pg_public_session_role_337e49368aee,
   ["agent"]: Schema.String,
   ["name"]: Schema.String,
   ["runtime"]: Schema.String,
   ["brief"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
-  ["graph"]: Schema.NullOr(Schema.String),
+  ["channel"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
   ["closed"]: Schema.NullOr(Pg_public_session_closed_2de0cea65eff),
@@ -70,11 +88,17 @@ export const SessionByIDResult = Schema.Struct({
   ["oar_session"]: Schema.NullOr(Schema.String),
   ["last_text"]: Schema.NullOr(Schema.String),
   ["recalled"]: Schema.NullOr(Schema.String),
+  ["pending_report"]: Schema.NullOr(Schema.String),
+  ["phase"]: Schema.String,
+  ["refining"]: Schema.Boolean,
+  ["runs"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["last_run"]: Schema.NullOr(Schema.String),
+  ["spent"]: Schema.NullOr(Schema.String),
 })
 export type SessionByIDResult = typeof SessionByIDResult.Type
 
 
-export const SessionByIDSql = "-- name: SessionByID :one\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\" from session where id = $1;"
+export const SessionByIDSql = "-- name: SessionByID :one\nselect \"session\".\"id\", \"session\".\"role\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"channel\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\", \"session\".\"pending_report\", \"session\".\"phase\", \"session\".\"refining\", \"session\".\"runs\", \"session\".\"last_run\", \"session\".\"spent\" from session where id = $1;"
 
 export const sessionByID = Effect.fn("SessionByID")(function* (params: SessionByIDParams) {
   const sql = yield* SqlClient.SqlClient
@@ -94,13 +118,14 @@ export type EndedSessionsParams = typeof EndedSessionsParams.Type
 
 export const EndedSessionsResult = Schema.Struct({
   ["id"]: Schema.String,
+  ["role"]: Pg_public_session_role_337e49368aee,
   ["agent"]: Schema.String,
   ["name"]: Schema.String,
   ["runtime"]: Schema.String,
   ["brief"]: Schema.String,
   ["project"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
-  ["graph"]: Schema.NullOr(Schema.String),
+  ["channel"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
   ["ended_at"]: Schema.NullOr(Schema.Number),
   ["closed"]: Schema.NullOr(Pg_public_session_closed_2de0cea65eff),
@@ -108,11 +133,17 @@ export const EndedSessionsResult = Schema.Struct({
   ["oar_session"]: Schema.NullOr(Schema.String),
   ["last_text"]: Schema.NullOr(Schema.String),
   ["recalled"]: Schema.NullOr(Schema.String),
+  ["pending_report"]: Schema.NullOr(Schema.String),
+  ["phase"]: Schema.String,
+  ["refining"]: Schema.Boolean,
+  ["runs"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["last_run"]: Schema.NullOr(Schema.String),
+  ["spent"]: Schema.NullOr(Schema.String),
 })
 export type EndedSessionsResult = typeof EndedSessionsResult.Type
 
 
-export const EndedSessionsSql = "-- name: EndedSessions :many\n-- Newest first, the newest n; agent '' is every agent's.\nselect \"session\".\"id\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"graph\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\" from session where ended_at is not null and ($1::text = '' or agent = $1) order by hired_at desc limit $2::int;"
+export const EndedSessionsSql = "-- name: EndedSessions :many\n-- Newest first, the newest n; agent '' is every agent's.\nselect \"session\".\"id\", \"session\".\"role\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"channel\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\", \"session\".\"pending_report\", \"session\".\"phase\", \"session\".\"refining\", \"session\".\"runs\", \"session\".\"last_run\", \"session\".\"spent\" from session where ended_at is not null and ($1::text = '' or agent = $1) order by hired_at desc limit $2::int;"
 
 export const endedSessions = Effect.fn("EndedSessions")(function* (params: EndedSessionsParams) {
   const sql = yield* SqlClient.SqlClient
@@ -166,31 +197,37 @@ export const keepHand = Effect.fn("KeepHand")(function* (params: KeepHandParams)
   })(params)
 })
 
-export const HandsParams = Schema.Struct({
-
-})
-export type HandsParams = typeof HandsParams.Type
-
-
-export const HandsResult = Schema.Struct({
+export const SetPendingReportParams = Schema.Struct({
+  ["report"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
-  ["place"]: Schema.NullOr(Schema.String),
-  ["oar_session"]: Schema.NullOr(Schema.String),
-  ["last_text"]: Schema.NullOr(Schema.String),
-  ["recalled"]: Schema.NullOr(Schema.String),
 })
-export type HandsResult = typeof HandsResult.Type
+export type SetPendingReportParams = typeof SetPendingReportParams.Type
 
 
-export const HandsSql = "-- name: Hands :many\n-- bound: only sessions on the farm now.\nselect id, place, oar_session, last_text, recalled from session where ended_at is null and place is not null;"
+export const SetPendingReportSql = "-- name: SetPendingReport :exec\nupdate session set pending_report = $1 where id = $2 and ended_at is null;"
 
-export const hands = Effect.fn("Hands")(function* () {
+export const setPendingReport = Effect.fn("SetPendingReport")(function* (params: SetPendingReportParams) {
   const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: HandsParams,
-    Result: HandsResult,
-    execute: () => sql.unsafe(HandsSql, []),
-  })({})
+  return yield* SqlSchema.void({
+    Request: SetPendingReportParams,
+    execute: (p) => sql.unsafe(SetPendingReportSql, [p["report"], p["id"]]),
+  })(params)
+})
+
+export const ClearPendingReportParams = Schema.Struct({
+  ["id"]: Schema.String,
+})
+export type ClearPendingReportParams = typeof ClearPendingReportParams.Type
+
+
+export const ClearPendingReportSql = "-- name: ClearPendingReport :exec\nupdate session set pending_report = null where id = $1;"
+
+export const clearPendingReport = Effect.fn("ClearPendingReport")(function* (params: ClearPendingReportParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: ClearPendingReportParams,
+    execute: (p) => sql.unsafe(ClearPendingReportSql, [p["id"]]),
+  })(params)
 })
 
 export const HighestSessionNumberParams = Schema.Struct({
@@ -214,4 +251,70 @@ export const highestSessionNumber = Effect.fn("HighestSessionNumber")(function* 
     Result: HighestSessionNumberResult,
     execute: () => sql.unsafe(HighestSessionNumberSql, []),
   })({})
+})
+
+export const ActiveSessionsParams = Schema.Struct({
+
+})
+export type ActiveSessionsParams = typeof ActiveSessionsParams.Type
+
+
+export const ActiveSessionsResult = Schema.Struct({
+  ["id"]: Schema.String,
+  ["role"]: Pg_public_session_role_337e49368aee,
+  ["agent"]: Schema.String,
+  ["name"]: Schema.String,
+  ["runtime"]: Schema.String,
+  ["brief"]: Schema.String,
+  ["project"]: Schema.NullOr(Schema.String),
+  ["issue"]: Schema.NullOr(Schema.String),
+  ["channel"]: Schema.NullOr(Schema.String),
+  ["hired_at"]: Schema.Number,
+  ["ended_at"]: Schema.NullOr(Schema.Number),
+  ["closed"]: Schema.NullOr(Pg_public_session_closed_2de0cea65eff),
+  ["place"]: Schema.NullOr(Schema.String),
+  ["oar_session"]: Schema.NullOr(Schema.String),
+  ["last_text"]: Schema.NullOr(Schema.String),
+  ["recalled"]: Schema.NullOr(Schema.String),
+  ["pending_report"]: Schema.NullOr(Schema.String),
+  ["phase"]: Schema.String,
+  ["refining"]: Schema.Boolean,
+  ["runs"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["last_run"]: Schema.NullOr(Schema.String),
+  ["spent"]: Schema.NullOr(Schema.String),
+})
+export type ActiveSessionsResult = typeof ActiveSessionsResult.Type
+
+
+export const ActiveSessionsSql = "-- name: ActiveSessions :many\n-- bound: all sessions retained for startup.\nselect \"session\".\"id\", \"session\".\"role\", \"session\".\"agent\", \"session\".\"name\", \"session\".\"runtime\", \"session\".\"brief\", \"session\".\"project\", \"session\".\"issue\", \"session\".\"channel\", \"session\".\"hired_at\", \"session\".\"ended_at\", \"session\".\"closed\", \"session\".\"place\", \"session\".\"oar_session\", \"session\".\"last_text\", \"session\".\"recalled\", \"session\".\"pending_report\", \"session\".\"phase\", \"session\".\"refining\", \"session\".\"runs\", \"session\".\"last_run\", \"session\".\"spent\" from session where ended_at is null order by hired_at, id;"
+
+export const activeSessions = Effect.fn("ActiveSessions")(function* () {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: ActiveSessionsParams,
+    Result: ActiveSessionsResult,
+    execute: () => sql.unsafe(ActiveSessionsSql, []),
+  })({})
+})
+
+export const KeepSessionStateParams = Schema.Struct({
+  ["phase"]: Schema.String,
+  ["refining"]: Schema.Boolean,
+  ["runs"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["last_run"]: Schema.NullOr(Schema.String),
+  ["spent"]: Schema.NullOr(Schema.String),
+  ["channel"]: Schema.NullOr(Schema.String),
+  ["id"]: Schema.String,
+})
+export type KeepSessionStateParams = typeof KeepSessionStateParams.Type
+
+
+export const KeepSessionStateSql = "-- name: KeepSessionState :exec\nupdate session set phase = $1, refining = $2, runs = $3,\n  last_run = $4, spent = $5, channel = $6\nwhere id = $7 and ended_at is null;"
+
+export const keepSessionState = Effect.fn("KeepSessionState")(function* (params: KeepSessionStateParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: KeepSessionStateParams,
+    execute: (p) => sql.unsafe(KeepSessionStateSql, [p["phase"], p["refining"], p["runs"], p["last_run"], p["spent"], p["channel"], p["id"]]),
+  })(params)
 })

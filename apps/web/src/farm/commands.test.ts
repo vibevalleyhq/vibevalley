@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "vite-plus/test";
 
-import type { Issue, IssueAct, IssueAction, IssueAttention, StateFrame, SessionView } from "@vibevalley/protocol";
+import type { Issue, IssueAct, IssueAction, IssueStage, StateFrame, SessionView } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { farmCommands } from "./commands";
@@ -35,6 +35,7 @@ const buttons = (...names: IssueAct[]): IssueAction[] =>
 
 const helper: SessionView = {
   id: sessionId("helper"),
+  role: "worker",
   name: "阿狐",
   agent: "fox",
   runtime: "pi",
@@ -45,18 +46,20 @@ const helper: SessionView = {
   refining: false,
   phaseText: "",
   issue: issueId("clock"),
-  play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
 };
 
-function frame(attention: IssueAttention, session: SessionView = helper): StateFrame {
+function frame(stage: IssueStage, session: SessionView = helper): StateFrame {
   const issue: Issue = {
     id: issueId("clock"),
     number: 1,
     title: "提交打卡页",
     priority: "medium",
     deliver: "change",
+    mandate: { strength: "explicit", maxBotReviewRounds: 3, autoSubmitPr: false },
     createdAt: 0,
-    sessions: [session.id],
+    assignments: [
+      { id: "a1", issue: issueId("clock"), agent: session.agent, assignedAt: 0, executions: [{ kind: "worker", session: session.id, startedAt: 0 }] },
+    ],
     status: "in_review",
     moves: [],
     findings: [],
@@ -65,15 +68,19 @@ function frame(attention: IssueAttention, session: SessionView = helper): StateF
     blockedBy: [],
     criteria: [],
     checks: [],
-    attention,
+    stage,
   };
   return {
     seq: 0,
-    state: { call: "idle", callReason: "", sessions: [session], issues: [issue], orchestrators: {}, crons: [], connectors: [] },
+    state: { call: "idle", callReason: "", sessions: [session], issues: [issue], crons: [], connectors: [] },
     inbox: [],
-    graphs: [],
     effects: [],
-    view: { level: { level: 1, xp: 0, need: 100 }, plots: { clock: { crop: "wheat" } }, achievements: [] },
+    view: {
+      level: { level: 1, xp: 0, need: 100 },
+      plots: { clock: { crop: "wheat" } },
+      plays: { helper: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } },
+      achievements: [],
+    },
   };
 }
 
@@ -85,7 +92,7 @@ const aim = (f: StateFrame, tool: Tool) => {
 test("a crop is harvested exactly when the issue offers completing it", () => {
   const f = frame({ state: "asking", lead: "answer", acts: buttons("answer", "close") });
   expect(aim(f, "harvest").aim.ok).toBe(false);
-  f.state.issues[0]!.attention = { state: "reviewing", lead: "complete", acts: buttons("complete", "tell", "close") };
+  f.state.issues[0]!.stage = { state: "reviewing", lead: "complete", acts: buttons("complete", "tell", "close") };
   expect(aim(f, "harvest").aim.ok).toBe(true);
 });
 
@@ -95,11 +102,8 @@ test("a failed round can be cured even before its crop image catches up", () => 
   expect(aim(f, "harvest").aim.ok).toBe(false);
 });
 
-test("an issue in a task graph offers no farm actions even while its helper is working", () => {
-  const f = frame(
-    { state: "working", acts: [] },
-    { ...helper, phase: { _tag: "working", since: 0, doing: { action: "none", label: "", actionText: "" } }, graph: { id: "graph" } },
-  );
+test("an issue with no allowed actions offers no farm actions even while its helper is working", () => {
+  const f = frame({ state: "working", acts: [] }, { ...helper, phase: { _tag: "working", since: 0, doing: { action: "none", label: "", actionText: "" } } });
   for (const tool of ["water", "bug", "harvest", "shovel"] as const) expect(aim(f, tool).aim.ok, tool).toBe(false);
   expect(aim(f, "hand").aim.ok).toBe(true);
 });
@@ -114,6 +118,6 @@ test("a click is refused when the issue stops allowing its action after aiming",
   farm.hold("harvest");
   const commands = farmCommands(() => f);
   const pointed = commands.aim(beds[0]!);
-  f.state.issues[0]!.attention = { state: "asking", acts: buttons("answer", "close") };
+  f.state.issues[0]!.stage = { state: "asking", acts: buttons("answer", "close") };
   expect((await commands.act(pointed)).kind).toBe("refused");
 });

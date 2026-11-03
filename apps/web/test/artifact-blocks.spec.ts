@@ -19,6 +19,46 @@ async function newBlocks(page: Page, title: string) {
   return shown.getByTestId("artifact-blocks");
 }
 
+test("regression: a focused block applies a deferred socket update when focus leaves", async ({ page, api }) => {
+  const made = await api.artifact.create({ title: "deferred update", kind: "markdown", content: "initial\n\nsentinel" });
+  const [first, second] = (await api.artifact.block.list({ id: made.id })).blocks;
+  await page.goto(`/artifacts/${made.id}`);
+  const blocks = page.getByTestId("artifact-blocks");
+  const focused = blocks.locator(`[data-block="${first!.id}"]`);
+  const other = blocks.locator(`[data-block="${second!.id}"]`);
+  await focused.getByRole("textbox").click();
+  await expect(focused.locator("textarea")).toBeFocused();
+  await api.artifact.submit({
+    id: made.id,
+    batchId: "deferred-update",
+    lastSeq: made.seq,
+    ops: [
+      { op: "update_text", blockId: first!.id, baseRev: first!.rev, text: [{ t: "remote content", marks: {} }] },
+      { op: "update_text", blockId: second!.id, baseRev: second!.rev, text: [{ t: "batch arrived", marks: {} }] },
+    ],
+  });
+  await expect(other).toContainText("batch arrived");
+  await expect(focused.locator("textarea")).toHaveValue("initial");
+  await other.getByRole("textbox").click();
+  await expect(focused).toContainText("remote content");
+  await page.screenshot({ path: ".screens/argon-editor-deferred.png" });
+});
+
+test("regression: pushed writer indicators expire on the page's clock", async ({ page, api }) => {
+  await page.clock.install();
+  const made = await api.artifact.create({ title: "writer activity" });
+  await page.goto(`/artifacts/${made.id}`);
+  const blocks = page.getByTestId("artifact-blocks");
+  await expect(blocks).toBeVisible();
+  await page.getByTestId("artifact-title").click();
+  await api.artifact.demo({ id: made.id });
+  await expect(blocks).toHaveAttribute("data-writing", "");
+  await page.clock.fastForward(4001);
+  await page.clock.runFor(32);
+  await expect(blocks).not.toHaveAttribute("data-writing", "");
+  await page.screenshot({ path: ".screens/argon-editor-writing-expired.png", animations: "disabled" });
+});
+
 test("a blocks artifact is started on the page and written block by block, and what is written is kept", async ({ page }) => {
   const title = `weekly ${Date.now() % 100000}`;
   const doc = await newBlocks(page, title);

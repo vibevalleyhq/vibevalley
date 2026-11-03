@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled,
 
 import { t } from "@vibevalley/i18n";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 
 import { PxWindow } from "./base";
 import { SpriteIcon } from "./icons";

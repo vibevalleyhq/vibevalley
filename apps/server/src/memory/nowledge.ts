@@ -14,7 +14,7 @@ import { redact, type RedactedString, redactedHead } from "@/base/redact.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 
 import { recallWords } from "./prompts.ts";
-import { memoryNotesOf, recallCount, type MemoryScope } from "./recall.ts";
+import { recallCount, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 
 const app = "vibevalley";
@@ -226,11 +226,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       const hits = yield* find(agent, "", most, false);
       return hits.map((h): T.Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0, fading: false }));
     }),
-    // The 「记住：」 lines; a stopped run leaves nothing here either.
-    syncTurn: Effect.fnUntraced(function* (run) {
-      if (c.write !== true || run.outcome === "interrupted") return;
-      yield* Effect.forEach(memoryNotesOf(run.said), (note) => add(run.agent, note.text, note.everywhere ? "" : run.project), { discard: true });
-    }),
+    syncTurn: () => Effect.void,
     sessionEnded: () => Effect.void,
     add: Effect.fnUntraced(function* (n) {
       if (c.write !== true) return undefined;

@@ -12,7 +12,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 产出、它的正文（块或每一版的网页）、交上来时那句话和卡片、给页面看网页的那条路 | 评论本身：回复卡片的消息（[频道](docs/subsystems/channel.md)），帮工照常被叫醒 |
-| 块的模型、块的类型和 marks、顺序键；op 管线：一批 op 一个事务、批号去重、seq、每个 op 的结果；块的修订 | 一篇怎么分给几个帮工写（[计划](docs/subsystems/task.md)，还没接上） |
+| 块的模型、块的类型和 marks、顺序键；op 管线：一批 op 一个事务、批号去重、seq、每个 op 的结果；块的修订 | 一篇怎么分给几个帮工写（[计划](docs/subsystems/issue.md)，还没接上） |
 | Markdown 读成块、块写成 Markdown | 图片、PDF 这类文件：消息的附件，HTML 附件照旧只能下载 |
 | 帮工和管家交、读、改产出的工具 | 帮工怎么拿到工具、是谁在调（`/mcp`、`mcp`）；工单和记性本身：`issue_ref`、`memory_item` 块只存它们的 id |
 
@@ -26,7 +26,7 @@
   - 顺序键在 `packages/protocol/src/rules/order.ts`（`keyBetween`），服务端和页面用同一份。
 - 表：`artifact`（一篇一行：正文的种类、在哪说的、第一次说它的那条消息、为哪张工单、谁做的、网页的最新版本、块的 `seq`）、`artifact_version`（网页的每一版）、`artifact_block`（每一块，含墓碑）、`artifact_block_revision`（每一块每一版的字，`kind` 是 `normal` 或 `conflict`）、`artifact_change`（每一批：`seq`、`batch_id`、谁、改了哪些块、每个 op 的结果）、`artifact_suggestion`（主人写过的块上，agent 提的改动：谁、对着哪一版、改什么、接受还是拒绝）。
 - 形状在 `packages/protocol/src/shapes.ts`：`Artifact`、`ArtifactCard`、`ArtifactVersion`；块那一套 `BlockInput`（作者给的新块）、`Block`、`BlockAttrs`、`TextSpan`、`SpanMarks`，op 是封闭的联合 `BlockOp`（按 `op` 区分），`BlockSubmit`、`BlockAck`、`BlockOpResult`、`BlockSnapshot`；建议那一套 `Suggestion`、`SuggestionChange`、`SuggestionEvent`。块的类型是封闭的 `BlockType`（成员表 `BlockTypeValues`），接口解码时拒掉别的取值，服务端和页面都写带类型的字面量。
-- 接口：`artifact.*`（[capabilities.md](docs/reference/capabilities.md)）。网页一版的内容是 `GET /api/v1/artifact/<id>/<版本>`（`http/artifact.ts`，`artifactPath`）。主人和「连接到本机」写块时写的人记成 `owner`；`artifact.demo` 只有本机的主人能调。
+- 接口：`artifact.*`（[capabilities.md](docs/reference/capabilities.md)）。网页一版的内容是 `GET /api/v1/artifact/<id>/<版本>`（`http/api.ts`，`artifactPath`）。主人和「连接到本机」写块时写的人记成 `owner`；`artifact.demo` 只有本机的主人能调。
 - 帮工和管家的工具照接口名来：`artifact_list`、`artifact_get`、`artifact_content_get`、`artifact_create`、`artifact_version_create`；两边都有 `artifact_block_create`、`artifact_block_update`、`artifact_block_delete`（`apps/server/src/tool/tool.ts`），管家也能直接替主人改一块。
 - 频道：`Channel.announce` 以作者的身份说那句带卡片的话，`Channel.placeOf` 把「在哪说」认成频道。
 - 页面 `apps/web/src/features/artifact`：
@@ -93,9 +93,9 @@
 - 发送：改字先只改本地，停 500 毫秒发一次，一直在打字时最长 2 秒发一次，离开这一块、回车时立刻发；同一块攒着的字合成一个 `update_text`。op 排成队，一次只有一批在路上；一个带 `baseRev` 的 op 改的块已经被同一批前面的 op 改过时，它进下一批，拿服务端回给的新 rev。发不出去的那批留着原来的 `batchId` 重发。
 - 收到回答：改过的块整块换成服务端的，只有还有没发的字、还在路上的、正在用输入法拼字的块保留本地的字。冲突的块换成服务端的字，下面一行红字说你写的没存上、留在修订里了。
 - **输入法拼字时不发、不换**：拼音还没上屏时不发这一块的字，也不用服务端的字替换它；上屏以后照常发。
-- 别人（帮工）写的：还没有广播，页面开着时问 `artifact.block.list`，自己没有待发的东西、seq 变了，才整篇换上。平时每 4 秒问一次；最近 4 次里问到过别人（不是 `owner`）写的改动，或刚点了演示，就每秒问一次，安静下来再回到 4 秒。
-- 在写的块：问来的改动里别人改过的块（新块，或 rev 变了），之后 3 次问之内算「在写」：旁边挂写它的帮工的头像，归属条加粗、一明一暗地呼吸，悬停说「在写」；上方的状态多一句「帮工在写」。只按页面问到的时候算，不比两边的钟。
-- 主人光标所在的块，问来的改动不换上：这一块整块留着本地的样子（rev 也不动），离开以后下一次问再换上；离开之前打字，按旧的 rev 发出去，照冲突的规则处理。
+- 别人写的块经 `artifact.follow` 推送；WebSocket 不可用时保留 `artifact.block.list` 轮询兜底。没有自己的待发改动时才应用新快照；平时每 4 秒问一次，最近 4 秒收到过别人的新版本或刚点了演示时每秒问一次。快照、批次答复和推送都不能倒退 seq 或块 rev。
+- 写入提示按页面收到新版本的真实时间消退：块的呼吸条保持 3 秒，顶部「帮工在写」保持 4 秒；即使再没有推送或轮询，到期也通知页面重画。只比较页面自己的时间，不比较两边的钟。
+- 主人聚焦、拼字或有待发文字时，保存最新远端块，保留本地内容和旧 rev。失焦且没有待发改动时直接应用暂存版本，不等待全量轮询；有排队或在途改动时仍按旧 rev 发送，服务端照常判断冲突，答复处理完再应用仍较新的远端版本。
 
 **演示**（`artifact.demo`，一起写的产出上的「演示：几个帮工一起写」）：不花模型的钱，让主人看几个帮工同时写一篇是什么样子。
 
@@ -149,6 +149,6 @@
 - `artifact/artifact.test.ts`：卡片说在哪、网页新的一版留着旧的、按工单和频道列、拒绝的几种、删掉以后内容文件的去留；交上来的 Markdown 读成块、不出新版；主人新建的是空的、不在哪里说。
 - `artifact/blocks.rules.test.ts`：拆分时留着 marks、接起来时合并一样的 marks；两键之间的键在两者之间；同键按 id 排；改过的块带着 rev 和写的人；协议里每种 op 都有分支；代码块没有 marks；Markdown → 块 → Markdown、块 → Markdown → 块不丢东西。
 - `artifact/blocks.test.ts`：一个人写的东西重启后还在；同一批发两次只收一次、回答一样；落后的改字盖住别人的改动是冲突、我写的存进修订；同一批勾选后改字不误判冲突；读写 Markdown；按 `afterBlock`/`parentId` 插块、换类型和属性、删块与重复删；`artifact.follow` 补上落后的批再推新的，100 批和 20 次重连都在；建议的创建、接受、拒绝、过期和重复接受；agent 改主人写过的块变成建议、原字不动；演示写三节（跳过关着的档案、每节连续、写的人、正在跑时再开被拒绝）；主人接手正长着的一段，演示不再改它。
-- `http/artifact.test.ts`：网页内容的响应头、404（一起写的也是）、「连接到本机」放行；`http/endpoints.test.ts`：真实 HTTP 接受没有存盘元数据的最小插入和拆分命令，块的定点和末尾插入、删除，带块的发言存下 id、引用版本和现在的字，一次挂多块、一块变了或删了也说得出来；建议的列表、接受改块、过期拒绝。`channel/prompts.test.ts`：给模型的提示里写着块的 id、引用时第几版、现在第几版和字，删掉的说已删除。
+- `http/artifact.test.ts`：网页内容的响应头、404（一起写的也是）、「连接到本机」放行；`http/endpoints.test.ts`：真实 HTTP 接受没有存盘元数据的最小插入和拆分命令，块的定点和末尾插入、删除，带块的发言存下 id、引用版本和现在的字，一次挂多块、一块变了或删了也说得出来；建议的列表、接受改块、过期拒绝。`channel/recorded.test.ts`：给模型的提示里写着块的 id、引用时第几版、现在第几版和字，删掉的说已删除。
 - `mcp/mcp.test.ts`：帮工从工作目录交一个文件，挂在它的工单和串上；`..`、绝对路径、目录、指向外面的符号链接都拒；帮工经 `/mcp` 一块一块写。
 - 页面：`apps/web/src/features/artifact/blocks.test.ts`（键和服务端生成的一样、偏移是码点、编辑保留 marks、行首 Markdown 和编号）；`apps/web/test/artifact.spec.ts`（在真的浏览器里证明网页读不到存储、碰不到外层、`fetch` 发不出；卡片、版本、回复、删；交上来的 Markdown 是块、不跑它带的 HTML；工单里的「产出」）；`apps/web/test/artifact-blocks.spec.ts`（新建一篇、一块一块写、写的留着；段首退格并段；卡片在对话旁打开、带话带进消息、一次带两块、窄屏关闭后草稿还在、两种主题和刷新后还开着；建议显示差异、接受改块、过期不能接受）。

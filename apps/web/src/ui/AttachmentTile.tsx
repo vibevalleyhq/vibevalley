@@ -7,7 +7,7 @@ import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 
 /** How a file shows: a picture, a player, a PDF to open in a tab, or a file to save. */
-export type FileKind = "image" | "video" | "audio" | "pdf" | "file";
+type FileKind = "image" | "video" | "audio" | "pdf" | "file";
 
 export const fileKind = (type: string): FileKind =>
   type.startsWith("image/") ? "image" : type.startsWith("video/") ? "video" : type.startsWith("audio/") ? "audio" : type === "application/pdf" ? "pdf" : "file";

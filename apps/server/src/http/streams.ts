@@ -8,9 +8,8 @@ import { HttpRouter, HttpServerResponse } from "effect/http";
 import { eventsPath, livePath, statePath, streamHeartbeatMs, type Streams } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { wireJson } from "@/base/wire.ts";
-import { bounded } from "@/core/bounded.ts";
-import { Core } from "@/core/core.ts";
+import { wireJson } from "@/base/json.ts";
+import { bounded, Core } from "@/core/core.ts";
 
 /** Each stream's Schema: what readStream (packages/protocol/src/stream.ts) takes its payloads to be. */
 const schemas = { [statePath]: S.StateFrame, [eventsPath]: S.SideEvent, [livePath]: S.LiveEvent } satisfies {

@@ -1,34 +1,11 @@
 import { list, t } from "@vibevalley/i18n";
-import type { AccountUsage, RuntimeInfo, RuntimeQuota } from "@vibevalley/protocol";
+import type { AccountUsage, RuntimeQuota } from "@vibevalley/protocol";
 
-import { yuan } from "./money.ts";
-import { runtimeLabel } from "./presets.ts";
+/** CNY in words; anything positive under a cent says so, so that a spent amount never reads as ¥0.00. */
+export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? t("server.runtime.lessThanCent") : "¥" + cny.toFixed(2));
 
-const two = (n: number) => String(n).padStart(2, "0");
-
-function whenText(at: number): string {
-  const d = new Date(at);
-  return t("server.runtime.date", { month: d.getMonth() + 1, day: d.getDate(), time: `${two(d.getHours())}:${two(d.getMinutes())}` });
-}
-
-/** Why a runtime takes no work now because of money (quota gone, balance gone, the day's budget spent); "" when it does. */
-export function moneyStop(info: RuntimeInfo | undefined): string {
-  if (!info) return "";
-  const u = info.usage;
-  if (u?.status === "ok") {
-    for (const w of u.windows) {
-      if (w.usedPercent < 100) continue;
-      const resets = w.resetsAt != null && w.resetsAt !== 0 ? t("server.runtime.resets", { when: whenText(w.resetsAt) }) : "";
-      return t("server.runtime.quotaGone", { runtime: runtimeLabel(info.id), window: w.label, resets });
-    }
-  } else if (u?.status === "balance" && u.balances.length > 0) {
-    if (!u.available || u.balances.every((b) => !(b.amount > 0))) return t("server.runtime.balanceGone", { provider: u.provider });
-  }
-  const budget = info.settings.dailyBudget ?? 0;
-  const spent = info.spentToday ?? 0;
-  if (budget > 0 && spent >= budget) return t("server.runtime.budget", { spent: yuan(spent), budget: yuan(budget) });
-  return "";
-}
+/** The percent of a window still left below which a runtime is nearly out of quota. */
+export const quotaLow = 15;
 
 /** The least left of any window, 0 at the least; undefined when the usage has no windows. */
 export function quotaLeft(usage: AccountUsage | null): number | undefined {

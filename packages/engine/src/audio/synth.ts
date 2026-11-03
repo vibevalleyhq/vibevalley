@@ -11,7 +11,7 @@ interface Shape {
   attack?: number;
 }
 
-export interface ToneOptions extends Shape {
+interface ToneOptions extends Shape {
   freq: number;
   /** Glide to this frequency over the duration. */
   to?: number;
@@ -20,7 +20,7 @@ export interface ToneOptions extends Shape {
   lowpass?: number;
 }
 
-export interface NoiseOptions extends Shape {
+interface NoiseOptions extends Shape {
   filter: BiquadFilterType;
   freq: number;
   /** Sweep the filter to this frequency over the duration. */
@@ -28,7 +28,7 @@ export interface NoiseOptions extends Shape {
   q?: number;
 }
 
-export interface BellOptions extends Shape {
+interface BellOptions extends Shape {
   freq: number;
   /** Overtones as [ratio to freq, relative gain]. The default is a small, bright bell. */
   partials?: readonly (readonly [number, number])[];

@@ -10,8 +10,8 @@ test("helper avatars show their actual runtime on cards and small issue rows", a
   const claude = profiles.find((a) => a.runtime === "claude");
   if (!codex || !claude) throw new Error("the farm's seed profiles must include Codex and Claude Code");
   for (const a of profiles) if (![defaultOrchestrator, codex.id, claude.id].includes(a.id)) await api.agent.delete({ id: a.id });
-  await api.issue.create({ title: "for codex", assignee: codex.id });
-  await api.issue.create({ title: "for claude", assignee: claude.id });
+  await api.issue.create({ title: "for codex", agent: codex.id });
+  await api.issue.create({ title: "for claude", agent: claude.id });
 
   await page.goto("/agents");
   for (const a of [codex, claude]) {

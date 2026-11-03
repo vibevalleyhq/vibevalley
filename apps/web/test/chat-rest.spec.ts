@@ -176,7 +176,7 @@ test("a file dropped on the channel goes up; a video plays in place and a PDF op
 const helper: Agent = {
   id: "",
   name: "fox",
-  role: "helper",
+  role: "worker",
   duty: "",
   enabled: true,
   runtime: "pi",
@@ -194,9 +194,9 @@ const helper: Agent = {
   look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
 };
 
-test("the owner talks with a helper profile alone, and its answer can be marked unread", async ({ page, api }) => {
+test("regression: a profile's direct chat uses a session without a hidden issue", async ({ page, api }) => {
   const fox = await api.agent.create(helper);
-  await api.project.create({ name: "talk-farm" });
+  const before = (await api.issue.list({})).map((issue) => issue.id);
   await page.goto("/chat");
   await page.getByTestId("new-direct").click();
   await page.getByTestId("direct-picker").locator(`[data-key="${fox.id}"]`).click();
@@ -208,6 +208,11 @@ test("the owner talks with a helper profile alone, and its answer can be marked 
   const answer = page.getByTestId("messages").locator('[data-testid="message"]:not([data-from-kind="owner"])').last();
   await expect(answer).toBeVisible({ timeout: 20_000 });
   await expect(channelRow(page, direct)).toBeVisible();
+  expect((await api.issue.list({})).map((issue) => issue.id)).toEqual(before);
+  const sessions = await api.session.list({ agent: fox.id });
+  expect(sessions).toHaveLength(1);
+  expect(sessions[0]).toMatchObject({ channel: direct });
+  expect(sessions[0]?.issue).toBeUndefined();
 
   await answer.hover();
   await answer.locator('[data-testid="message-tool"][data-key="more"]').click();

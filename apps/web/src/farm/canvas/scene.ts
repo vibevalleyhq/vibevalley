@@ -26,25 +26,26 @@ import { type Agent, type Crop, defaultOrchestrator, type Session, type StateFra
 import { omitUndefined, plotKeyOf } from "@vibevalley/protocol/rules";
 
 import { clock, farmState } from "@/farm/store";
-import { frameVillage } from "@/farm/world/framing";
-import { villageHitAt, type VillageHit } from "@/farm/world/hits";
 import type { Box, Point } from "@/farm/world/level";
 import type { Village } from "@/farm/world/load";
 import { bedOfStation, beds, cropOfBed, isRipe, stationOfSession, type Bed } from "@/farm/world/plots";
-import { PoseHold } from "@/farm/world/pose";
 import {
+  frameVillage,
   placeOfAction,
   plotCalls,
   plotH,
   plotW,
+  PoseHold,
   poseOf,
   restSpots,
   spotsFor,
   strollDwell,
+  villageHitAt,
   Whereabouts,
   type Goal,
   type Pose,
   type Stroll,
+  type VillageHit,
 } from "@/farm/world/world";
 import { orchestratorSprite } from "@/features/orchestrator";
 import { orchestratorMood } from "@/infra/frame";
@@ -92,12 +93,12 @@ const contactAlpha = 0.5;
 
 const depth = (y: number) => Math.round(y * 10);
 
-export interface SceneInput {
+interface SceneInput {
   readonly frame: StateFrame | undefined;
   readonly agents: ReadonlyMap<string, Agent>;
 }
 
-export interface SceneEvents {
+interface SceneEvents {
   /** A plot was clicked, or the helper working it. */
   readonly onPlot: (bed: Bed) => void;
   /** A thing in the yard was clicked (a YardPlace id). */
@@ -517,7 +518,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     const store = farmState();
     if (!frame) return;
     const { state, view } = frame;
-    const present = new Map(state.sessions.map((s) => [s.id, s]));
+    const present = new Map(state.sessions.filter((s) => s.role === "worker").map((s) => [s.id, s]));
     // What is under a still pointer is found again as things move under it.
     if (pointerAt && !downOn) setHover(hitAt(pointerAt));
     const hovered = store.hoverBed;
@@ -527,7 +528,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       const { bed } = p;
       const leaving =
         bed.unlockLevel === undefined &&
-        !state.sessions.some((s) => stationOfSession(s) === bed.station) &&
+        !state.sessions.some((s) => stationOfSession(s, view.plays) === bed.station) &&
         [...actors.values()].some((a) => a.leftAt !== undefined && a.station === bed.station);
       const crop = cropOfBed(bed, state.sessions, view, leaving);
       p.ripe = bed.unlockLevel === undefined && isRipe(crop);
@@ -557,8 +558,8 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     const counts = new Map<string, number>();
     const crowd = (key: string) => counts.get(key) ?? 0;
     let queued = 0;
-    for (const s of [...state.sessions].toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
-      const station = stationOfSession(s);
+    for (const s of state.sessions.filter((s) => s.role === "worker").toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+      const station = stationOfSession(s, view.plays);
       const crop = cropOf(s);
       const pose = poseOf(s, crop);
       const calls = plotCalls(crop);
@@ -614,7 +615,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       const a = actors.get(id);
       if (a?.bed) return a.bed.index;
       const s = present.get(id);
-      return s ? bedOfStation(stationOfSession(s))?.index : undefined;
+      return s ? bedOfStation(stationOfSession(s, view.plays))?.index : undefined;
     };
     fx.update(dt, store.bedFx, store.rewards, bedOfSession);
 

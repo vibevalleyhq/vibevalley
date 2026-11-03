@@ -9,7 +9,7 @@ export interface Day {
   readonly paused: boolean;
 }
 
-export interface DayClock {
+interface DayClock {
   readonly daySeconds: number;
   readonly day: () => Day;
   /** Moves the clock on by `seconds` of real time (times its speed), unless paused. */

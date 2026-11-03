@@ -18,7 +18,7 @@ const use = () => {
   return useContext(Context);
 };
 
-export interface CollapsibleRootProps extends DivProps {
+interface CollapsibleRootProps extends DivProps {
   open?: boolean | undefined;
   defaultOpen?: boolean | undefined;
   onOpenChange?: ((open: boolean) => void) | undefined;
@@ -58,7 +58,7 @@ function Trigger(props: ButtonProps) {
   );
 }
 
-export interface CollapsiblePanelProps extends DivProps {
+interface CollapsiblePanelProps extends DivProps {
   /** Kept in the page while closed, only hidden. */
   keepMounted?: boolean | undefined;
 }

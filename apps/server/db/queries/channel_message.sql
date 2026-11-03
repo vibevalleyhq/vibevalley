@@ -43,6 +43,16 @@ where m.channel_id = sqlc.arg(channel_id) and m.number < sqlc.arg(number) order 
 select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.channel_id = sqlc.arg(channel_id) and m.number > sqlc.arg(number) order by m.number limit sqlc.arg(n)::int;
 
+-- name: MissingDirectDeliveries :many
+-- bound: owner messages committed after a direct session's startup snapshot, without a delivery to that session.
+select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,
+       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent
+from channel_message m join channel_participant p on p.id = m.sender_id
+where m.channel_id = sqlc.arg(channel_id) and m.number > sqlc.arg(after_number)
+  and m.sender_id = 'owner' and m.kind = 'chat' and m.deleted_at is null
+  and not exists (select 1 from mailbox_delivery d where d.session_id = sqlc.arg(recipient_id) and d.message_id = m.id)
+order by m.number;
+
 -- name: RecentReports :many
 -- Newest first: the turn reports anywhere on the farm, for its log.
 select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
@@ -81,12 +91,12 @@ limit 1;
 
 -- name: UnseenIn :many
 -- bound: one participant's unread in one channel; the read cursor moves past them.
--- Newest first.
+-- Oldest first, so a partial read can advance the cursor without skipping messages.
 select m.id from channel_message m
 where m.channel_id = sqlc.arg(channel) and m.sender_id <> sqlc.arg(participant)
   and m.number > coalesce((select read_number from channel_read_cursor where participant_id = sqlc.arg(participant) and channel_id = sqlc.arg(channel)), 0)
-  and not exists (select 1 from channel_seen_mark s where s.participant_id = sqlc.arg(participant) and s.message_id = m.id)
-order by m.number desc;
+  and not exists (select 1 from mailbox_delivery d where d.session_id = sqlc.arg(participant) and d.message_id = m.id and d.consumed_at is not null)
+order by m.number;
 
 -- name: HoldNoticeSinceUser :one
 select count(*)::int as n from channel_message m
@@ -96,11 +106,6 @@ where m.channel_id = sqlc.arg(channel) and m.sender_id = 'system' and (m.meta::j
 -- name: MessageByNumber :one
 select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.channel_id = sqlc.arg(channel_id) and m.number = sqlc.arg(number);
-
--- name: OwnerLastMessages :many
--- bound: a row per channel.
--- The owner's last message in each channel, from which agents waking agents are counted (channel/audience.ts).
-select channel_id, max(id)::text as id from channel_message where sender_id = 'owner' group by channel_id;
 
 -- name: MessagesChangedAfter :many
 -- What changed in a channel after a revision, in the order it changed: a follower's catch-up.
@@ -157,3 +162,32 @@ delete from channel_message where channel_id in (select t.id from channel t wher
 -- name: SetEmbeds :exec
 -- The previews read for its links, once they are: a change like any other.
 update channel_message set meta = sqlc.narg(meta), revision = sqlc.arg(revision) where id = sqlc.arg(id);
+
+-- name: NotificationReceipt :one
+select r.updated_at as read_at,
+  exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.number > m.number
+    and n.deleted_at is null and (n.sender_id = 'owner' or (m.kind = 'report' and n.kind = 'report' and n.sender_id = m.sender_id))) as superseded
+from channel_message m
+left join channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'owner' and r.read_number >= m.number
+where m.id = sqlc.arg(id);
+
+-- name: OwnerReadReports :many
+-- bound: the latest report per session.
+select m.sender_id, m.created_at, r.updated_at
+from channel_message m
+join channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'owner' and r.read_number >= m.number
+where m.kind = 'report' and m.deleted_at is null
+  and not exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.sender_id = m.sender_id and n.kind = 'report' and n.number > m.number);
+
+-- name: UnroutedChannelMessages :many
+select m.id as envelope_id, m.number, m.channel_id, m.sender_id, m.kind, m.body, m.meta, m.reply_number, m.created_at,
+       p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,
+       coalesce(ch.name, c.name, '')::text as channel_name
+from channel_message m
+join channel_participant p on p.id = m.sender_id
+join channel c on c.id = m.channel_id
+left join channel ch on ch.id = c.parent_id
+left join ingress_trigger r on r.id = m.id
+where r.routed_at is null and m.deleted_at is null
+order by m.channel_id, m.number
+limit 1000;

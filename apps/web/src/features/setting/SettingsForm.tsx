@@ -30,7 +30,7 @@ import { KeyRow, SettingRow, SettingsGroup } from "@/ui/settings";
 import { Hint, Tip } from "@/ui/Tip";
 import { toast } from "@/ui/toasts";
 
-export type SettingsPart = "deepseek" | "memory";
+type SettingsPart = "deepseek" | "memory";
 
 const sourceLabels: Record<MemorySourceKind, string> = { nowledge: "Nowledge Mem", everos: "EverOS" };
 const sourceAddress: Record<MemorySourceKind, string> = { nowledge: "http://127.0.0.1:14242/mcp/", everos: "http://127.0.0.1:18791" };

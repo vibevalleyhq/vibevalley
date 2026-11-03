@@ -9,13 +9,6 @@
     "channel_list",
     "channel_message_list",
     "channel_update",
-    "graph_act",
-    "graph_get",
-    "graph_list",
-    "graph_split",
-    "graph_task_act",
-    "graph_task_delete",
-    "graph_task_update",
     "issue_comment_create",
     "issue_create",
     "issue_diff_get",
@@ -136,7 +129,7 @@
     },
     {
       "kind": "notCalled",
-      "tool": "graph_split"
+      "tool": "issue_status_update"
     },
     {
       "kind": "says",

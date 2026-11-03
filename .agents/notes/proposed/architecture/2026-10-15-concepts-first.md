@@ -57,7 +57,7 @@ VibeValley 是 AI 版的 Linear，穿农场的皮。概念收成下面几样，�
 
 - 工单状态：`backlog`（写下没派）、`todo`（排队等空地）、`in_progress`、`in_review`（等你看）、`done`、`canceled`；关单的原因（收获、合进计划、收工、丢了）留着，从它算出 `done` 还是 `canceled`；
 - 优先级的 `normal` 改叫 `medium`；
-- `Issue.agent` 改叫 `assignee`；
+- 工单的责任归属是 `Assignment.agent`，不在 `Issue` 上另存负责人字段；
 - `AgentProfile` 改叫 `Agent`，`Helper` 改叫 `Run`，`WorkStep` 改叫 `Activity`（`asked` → `prompt`、`said` → `response`、`tool` → `action`、`problem` → `error`）；
 - `IncomingCall` 改叫 `InboxItem`（已经改了，见第 5 步），`Merges.Harvest` 改叫 `Merge`（已经改了，现在是 `Issue.Merge`），`Foreman` 改叫 `Orchestrator`。
 
@@ -66,7 +66,7 @@ VibeValley 是 AI 版的 Linear，穿农场的皮。概念收成下面几样，�
 5. **Inbox（这一步已经做了，[要你处理的事是一个 Inbox](docs/subsystems/channel.md)）**：需要你的事和巡查的发现并成一样，巡查只看它。
 6. **计划并进工单（这一步已经做了）**：父工单和子工单、先后关系；`Task` 的状态和节点迁过去；定时派活改成周期工单。
    - 6a：工单进了核心状态，有标题和说明（[工单](docs/subsystems/issue.md)）；
-   - 6b、6c：计划是带子工单的父工单（[种植计划是带子工单的父工单](docs/subsystems/task.md)）；收获过的工单就是仓库（[仓库是收获过的工单](docs/subsystems/game.md)）；
+   - 6b、6c：计划是带子工单的父工单（[种植计划是带子工单的父工单](docs/subsystems/issue.md)）；收获过的工单就是仓库（[仓库是收获过的工单](docs/subsystems/game.md)）；
    - 6d：写了帮工档案的定时是周期工单，到点写一张新工单开工。
 7. **管家是一个 agent**：能被派工单；定时「发一句话」改成派给管家的周期工单。
 8. **状态分成两份**：

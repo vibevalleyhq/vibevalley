@@ -6,10 +6,10 @@
 import { writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { Effect } from "effect";
+import { Effect, Schema, Stream } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
-import { openBrain, standaloneOwner } from "@vibevalley/agent/brain";
+import { makeBrain } from "@vibevalley/agent/brain";
 import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { memoryFile } from "@vibevalley/agent/memory";
 import { type BrainMessage, transcript } from "@vibevalley/agent/messages";
@@ -18,15 +18,17 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { orchestrator } from "@/base/actor.ts";
-import { standaloneLlm } from "@/cli/llm.ts";
+import { standaloneLlm } from "@/cli/chat.ts";
+import { casesIn, check, committed, type EvalCase, isInput, stubbed } from "@/testing/evals.ts";
 import { world } from "@/testing/world.ts";
 import { Tool } from "@/tool/tool.ts";
 
-import { casesIn, check, committed, type EvalCase, isInput, stubbed } from "./evals.ts";
 import { agentPrompt, systemPrompt } from "./prompts.ts";
 
 const live = process.env.VIBEVALLEY_EVALS_LIVE === "1";
 const key = process.env.DEEPSEEK_API_KEY ?? "";
+
+class EvalFailure extends Schema.TaggedError<EvalFailure, { readonly brand: unique symbol }>()("EvalFailure", { message: Schema.String }) {}
 
 /** The orchestrator's tool definitions, from a farm that is let go at once: every call is answered by stubs. */
 const orchestratorTools = () =>
@@ -34,54 +36,54 @@ const orchestratorTools = () =>
     Effect.scoped(
       Effect.gen(function* () {
         const t = yield* Tool;
-        return t.orchestrator(() => ({ agent: defaultOrchestrator, session: "", project: "", here: "", picked: "", actor: orchestrator(true) }));
+        return t.orchestrator(() => ({ agent: defaultOrchestrator, session: "", project: "", here: "", picked: "", envelope: "", actor: orchestrator(true) }));
       }).pipe(Effect.provide(world())),
     ),
   );
 
 /** One sample: the brain as the orchestrator makes it, with the case's memory and channel; the turn the input begins, and
  * the tokens it took. */
-async function replay(c: EvalCase, model: string, tools: readonly LoopTool[]): Promise<{ turn: BrainMessage[]; tokens: number }> {
+function replay(c: EvalCase, model: string, tools: readonly LoopTool[]): Promise<{ turn: BrainMessage[]; tokens: number }> {
   const home = tempDir("vibevalley-eval-");
   writeFileSync(memoryFile(home), c.memory);
   writeFileSync(join(home, defaultOrchestrator + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));
-  const brain = await openBrain(standaloneOwner(), {
-    name: defaultOrchestrator,
-    instructions: systemPrompt + agentPrompt,
-    llm: deepseek(model, key, standaloneLlm()),
-    home,
-    cwd: home,
-    tools: stubbed(tools, c.did),
-    noSkills: true,
-    noSubagents: true,
-    reminders: false,
-  });
-  try {
-    const turn: BrainMessage[] = [];
-    let tokens = 0;
-    await new Promise<void>((done, fail) => {
-      // A real model's turn: the deadline is the point.
-      // oxlint-disable-next-line vibevalley/no-test-sleep
-      const timer = setTimeout(() => fail(new Error("the turn took too long")), 5 * 60_000);
-      brain.subscribe((e) => {
-        if (e.type === "message_end" && !isInput(e.message)) {
-          if (e.message.role === "assistant") {
-            tokens += e.message.usage.totalTokens;
-            if (e.message.stopReason === "error") fail(new Error("the model: " + (e.message.errorMessage ?? "")));
-          }
-          turn.push(e.message);
-        }
-        if (e.type === "agent_settled") {
-          clearTimeout(timer);
-          done();
-        }
-      });
-      void brain.send(c.input);
-    });
-    return { turn, tokens };
-  } finally {
-    await brain.close();
-  }
+  return Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const brain = yield* makeBrain({
+          name: defaultOrchestrator,
+          instructions: systemPrompt + agentPrompt,
+          llm: deepseek(model, key, standaloneLlm()),
+          home,
+          cwd: home,
+          tools: stubbed(tools, c.did),
+          noSkills: true,
+          noSubagents: true,
+          reminders: false,
+        });
+        const events = yield* brain.events;
+        const turn: BrainMessage[] = [];
+        let tokens = 0;
+        yield* Effect.andThen(
+          brain.send(c.input),
+          events.pipe(
+            Stream.takeUntil((event) => event.type === "agent_settled"),
+            Stream.runForEach((event) =>
+              Effect.gen(function* () {
+                if (event.type !== "message_end" || isInput(event.message)) return;
+                if (event.message.role === "assistant") {
+                  tokens += event.message.usage.totalTokens;
+                  if (event.message.stopReason === "error") return yield* new EvalFailure({ message: "the model: " + (event.message.errorMessage ?? "") });
+                }
+                turn.push(event.message);
+              }),
+            ),
+          ),
+        ).pipe(Effect.timeoutOrElse({ duration: "5 minutes", orElse: () => new EvalFailure({ message: "the turn took too long" }) }));
+        return { turn, tokens };
+      }),
+    ),
+  );
 }
 
 describe.skipIf(!live || !key)("the orchestrator's evals, live", () => {

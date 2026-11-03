@@ -9,6 +9,7 @@ import type { Issue } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { ServerConfig } from "@/infra/config.ts";
+import { githubSnapshot } from "@/ingress/github.ts";
 import { gitSync, projectsDir, repo, write } from "@/testing/git.ts";
 import { testConfig } from "@/testing/layers.ts";
 
@@ -37,6 +38,153 @@ const loggedIn = (permission: () => string) =>
   });
 
 describe("GitHub", () => {
+  it.effect("regression: GitHub snapshots read all collection pages and overflowing review threads", () => {
+    const root = projectsDir();
+    const resolved: string[] = [];
+    let failReviews = false;
+    const author = (login: string) => ({ login, __typename: login.endsWith("[bot]") ? "Bot" : "User" });
+    const inline = Array.from({ length: 101 }, (_, i) => ({
+      id: `I${i}`,
+      fullDatabaseId: String(2_147_483_657 + i),
+      author: author("bob"),
+      body: `inline ${i}`,
+      url: `https://comments/${i}`,
+      createdAt: "2026-11-01T00:02:00Z",
+      path: "src/a.ts",
+      line: i + 1,
+      originalLine: i + 1,
+      diffHunk: "@@\n-old\n+new",
+      pullRequestReview: { id: "R1" },
+    }));
+    const pull = (key: string, nodes: unknown[]) => ({ data: { repository: { pullRequest: { [key]: { nodes } } } } });
+    repo(join(root, "sample"), 1, 0);
+    gitSync(join(root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
+    return projects(
+      root,
+      Effect.gen(function* () {
+        const project = yield* Project;
+        const snapshot = yield* githubSnapshot(project)("sample", 7);
+        expect(snapshot.viewer).toBe("gardener");
+        expect(snapshot.checks).toEqual([
+          { name: "test", status: "COMPLETED", conclusion: "FAILURE", url: "https://checks/1" },
+          { name: "legacy", status: "SUCCESS", conclusion: "", url: "https://checks/2" },
+        ]);
+        expect(snapshot.reviews.map((review) => review.id)).toEqual(["R1", "R2"]);
+        expect(snapshot.comments).toHaveLength(104);
+        expect(snapshot.comments.find((comment) => comment.id === "I100")).toMatchObject({
+          databaseId: "2147483757",
+          line: 101,
+          threadId: "PRRT_9",
+          reviewId: "R1",
+          diffHunk: "@@\n-old\n+new",
+        });
+        expect(snapshot.comments.find((comment) => comment.id === "SECOND")).toMatchObject({ threadId: "PRRT_second", resolved: true });
+        failReviews = true;
+        expect((yield* Effect.flip(githubSnapshot(project)("sample", 7)))._tag).toBe("ProjectError");
+        yield* project.resolveReviewThread("sample", "PRRT_9");
+        expect(resolved).toEqual(["PRRT_9"]);
+      }),
+      {},
+      {
+        gh: gh((args) => {
+          if (args[0] === "pr") return { out: JSON.stringify({ headRefOid: "abc" }) };
+          if (args[1] === "user") return { out: JSON.stringify({ login: "gardener" }) };
+          const thread = args.find((arg) => arg.startsWith("thread="))?.slice(7);
+          if (thread) {
+            resolved.push(thread);
+            return { out: JSON.stringify({ data: { resolveReviewThread: { thread: { id: thread, isResolved: true } } } }) };
+          }
+          expect(args).toContain("--paginate");
+          expect(args).toContain("--slurp");
+          const query = args.find((arg) => arg.startsWith("query="))?.slice(6) ?? "";
+          expect(query).not.toContain("databaseId");
+          if (query.startsWith("query IngressChecks("))
+            return {
+              out: JSON.stringify([
+                {
+                  data: {
+                    repository: {
+                      object: {
+                        statusCheckRollup: {
+                          contexts: {
+                            nodes: [{ __typename: "CheckRun", name: "test", status: "COMPLETED", conclusion: "FAILURE", detailsUrl: "https://checks/1" }],
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                {
+                  data: {
+                    repository: {
+                      object: {
+                        statusCheckRollup: {
+                          contexts: { nodes: [{ __typename: "StatusContext", context: "legacy", state: "SUCCESS", targetUrl: "https://checks/2" }] },
+                        },
+                      },
+                    },
+                  },
+                },
+              ]),
+            };
+          if (query.startsWith("query IngressReviews("))
+            return failReviews
+              ? { out: "not available", ok: false }
+              : {
+                  out: JSON.stringify(
+                    [1, 2].map((i) =>
+                      pull("reviews", [
+                        {
+                          id: `R${i}`,
+                          author: author("review-bot[bot]"),
+                          state: "CHANGES_REQUESTED",
+                          body: "fix it",
+                          submittedAt: "2026-11-01T00:00:00Z",
+                        },
+                      ]),
+                    ),
+                  ),
+                };
+          if (query.startsWith("query IngressComments("))
+            return {
+              out: JSON.stringify(
+                [1, 2].map((i) =>
+                  pull("comments", [
+                    {
+                      id: `C${i}`,
+                      author: author("alice"),
+                      body: "general",
+                      url: `https://comments/${i}`,
+                      createdAt: "2026-11-01T00:01:00Z",
+                    },
+                  ]),
+                ),
+              ),
+            };
+          if (query.startsWith("query IngressThreads("))
+            return {
+              out: JSON.stringify([
+                pull("reviewThreads", [
+                  {
+                    id: "PRRT_9",
+                    isResolved: false,
+                    comments: { totalCount: 101, edges: inline.slice(0, 100).map((node, i) => ({ cursor: `edge${i}`, node })) },
+                  },
+                ]),
+                pull("reviewThreads", [
+                  { id: "PRRT_second", isResolved: true, comments: { totalCount: 1, edges: [{ cursor: "last", node: { ...inline[0], id: "SECOND" } }] } },
+                ]),
+              ]),
+            };
+          expect(query.startsWith("query IngressThreadComments(")).toBe(true);
+          expect(args).toContain("id=PRRT_9");
+          expect(args).toContain("endCursor=edge99");
+          return { out: JSON.stringify([{ data: { node: { comments: { nodes: [inline[100]] } } } }]) };
+        }),
+      },
+    );
+  });
+
   it.effect("the probe says whether gh is there and logged in, and never what it printed", () =>
     Effect.gen(function* () {
       for (const [name, version, auth, want] of [
@@ -188,6 +336,9 @@ describe("GitHub", () => {
         mkdirSync(join(place.cwd, ".vibevalley"));
         const check = join(place.cwd, ".vibevalley/check");
         write(check, "#!/bin/sh\necho check-failed\nexit 1\n", 0o755);
+        yield* Effect.flip(p.submitPullRequest(place, issue, "done"));
+        expect([pushes, calls]).toEqual([0, 0]);
+        write(check, "#!/bin/sh\nprintf changed > generated.ts\nexit 0\n", 0o755);
         yield* Effect.flip(p.submitPullRequest(place, issue, "done"));
         expect([pushes, calls]).toEqual([0, 0]);
         write(check, "#!/bin/sh\nexit 0\n", 0o755);

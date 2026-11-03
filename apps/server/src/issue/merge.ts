@@ -1,22 +1,24 @@
 import { Clock, Effect, Semaphore, Predicate } from "effect";
 
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
+import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import type { Channel } from "@/channel/chat.ts";
+import type { Channel } from "@/channel/channel.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import type { Db } from "@/infra/db.ts";
-import type { Project } from "@/project/project.ts";
-import { type Merged, MergeFailure, type ProjectError, type Workplace } from "@/project/shapes.ts";
+import { issueBranch, type Project } from "@/project/project.ts";
+import { type Merged, MergeFailure, type ProjectError, type Workplace } from "@/project/workplace.ts";
 import type { NotTakenIn, Session } from "@/session/session.ts";
 
 import * as q from "../../db/generated/issue.sql.ts";
 import { pullRequestConclusion } from "./brief.ts";
+import { acceptanceAncestors } from "./dependencies.ts";
 import { statusMove } from "./moves.ts";
 
-export interface MergeDeps {
+interface MergeDeps {
   readonly core: Core["Service"];
   readonly sessions: Session["Service"];
   readonly projects: Project["Service"];
@@ -24,19 +26,20 @@ export interface MergeDeps {
   readonly db: Db["Service"];
   readonly get: (ref: string) => Effect.Effect<T.Issue, ApiError>;
   readonly list: Effect.Effect<T.Issue[]>;
-  /** The issue's latest session, refused when it was never sent. */
-  readonly latest: (id: string) => Effect.Effect<string, ApiError>;
   /** The issue's latest session while it is on the farm. */
   readonly liveSession: (id: string) => Effect.Effect<string, ApiError>;
   readonly publish: (id: string) => Effect.Effect<void>;
+  readonly setConflict: (id: string, conflict: T.Conflict | undefined) => Effect.Effect<void>;
 }
 
 export function merging(d: MergeDeps) {
-  const { core, sessions, projects, chat, db, get, list, latest, liveSession, publish } = d;
+  const { core, sessions, projects, chat, db, get, list, liveSession, publish } = d;
   /** Merges by pull request and the poll of their states, one at a time. */
   const prLock = Semaphore.makeUnsafe(1);
 
   const notTaken = Effect.fnUntraced(function* (id: string, n: NotTakenIn) {
+    const issue = sessions.sessionOf(id)?.issue;
+    if (issue && n.failure.kind === "conflict") yield* d.setConflict(issue, { base: n.failure.base, files: [...n.failure.files] });
     let [owner, line] = [n.owner, n.notice];
     if (n.fix) {
       const untold = yield* chat
@@ -48,7 +51,16 @@ export function merging(d: MergeDeps) {
     return refused(owner);
   });
   const handedOver = (id: string, use: (place: Workplace, said: string) => Effect.Effect<Merged, MergeFailure | ProjectError>) =>
-    sessions.handOver(id, "merged", use).pipe(Effect.catchTag("NotTakenIn", (e) => Effect.flatMap(notTaken(id, e), Effect.fail)));
+    sessions
+      .handOver(id, "merged", (place, said) =>
+        use(place, said).pipe(
+          Effect.tap(() => {
+            const issue = sessions.sessionOf(id)?.issue;
+            return issue ? d.setConflict(issue, undefined) : Effect.void;
+          }),
+        ),
+      )
+      .pipe(Effect.catchTag("NotTakenIn", (e) => Effect.flatMap(notTaken(id, e), Effect.fail)));
 
   const mergeSession = Effect.fn("Issue.mergeSession")(function* (id: string) {
     const session = sessions.sessionOf(id);
@@ -58,8 +70,10 @@ export function merging(d: MergeDeps) {
     return merged.text;
   });
 
-  const savePullRequest = (id: string, pr: T.PullRequest) =>
-    Effect.andThen(db.run(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) })), publish(id));
+  const savePullRequest = Effect.fnUntraced(function* (id: string, pr: T.PullRequest) {
+    yield* db.run(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) }));
+    yield* publish(id);
+  });
 
   const pullRequestOf = Effect.fnUntraced(function* (place: Workplace, issue: T.Issue, said: string) {
     const pr = yield* projects
@@ -70,15 +84,26 @@ export function merging(d: MergeDeps) {
   });
 
   const merge = Effect.fn("Issue.merge")(
-    function* (id: string) {
+    function* (id: string, accepted: boolean = false) {
       const issue = yield* get(id);
       // Whoever asks (the board, the command line, the orchestrator's tool) is held to the same table.
-      if (!issue.graph && !issue.task) {
+      if (!accepted) {
         const [m, why] = statusMove(issue, "done");
         if (m === "none") return yield* Effect.fail(refused(why));
       }
+      const last = latestSessionIdOf(issue);
+      if (issue.project && (!last || !sessions.present(last)) && (yield* list).some((child) => child.parent === issue.id)) {
+        const place = yield* projects.workplace(issue.project, issue.number, true, "").pipe(Effect.mapError((error) => refused(error.message)));
+        if (issue.pullRequest?.state === "open" || projects.usesPullRequests(issue.project))
+          return (yield* pullRequestOf(place, issue, issue.description).pipe(Effect.mapError((error) => refused(error.message)))).text;
+        return (yield* projects.merge(place).pipe(
+          Effect.tap(() => d.setConflict(issue.id, undefined)),
+          Effect.tapError((error) => (error.kind === "conflict" ? d.setConflict(issue.id, { base: error.base, files: [...error.files] }) : Effect.void)),
+          Effect.mapError((error) => refused(error.message)),
+        )).text;
+      }
       const session = yield* liveSession(id);
-      if (issue.project && !issue.graph && !issue.task && (issue.pullRequest?.state === "open" || projects.usesPullRequests(issue.project))) {
+      if (issue.project && (issue.pullRequest?.state === "open" || projects.usesPullRequests(issue.project))) {
         return (yield* handedOver(session, (place, said) => pullRequestOf(place, issue, said))).text;
       }
       return yield* mergeSession(session);
@@ -88,8 +113,8 @@ export function merging(d: MergeDeps) {
 
   const finishPullRequest = Effect.fnUntraced(function* (issue: T.Issue, state: T.PullRequestState) {
     const closed = state === "closed" ? "dismissed" : "merged";
-    const id = yield* latest(issue.id);
-    if (sessions.find(id))
+    const id = latestSessionIdOf(issue);
+    if (id && sessions.present(id))
       yield* sessions
         .handOver(id, closed, (place) => projects.finishPullRequest(place.project, issue.number))
         .pipe(Effect.catchTag("NotTakenIn", (e) => Effect.fail(refused(e.failure.reasonText))));
@@ -121,5 +146,59 @@ export function merging(d: MergeDeps) {
     }),
   );
 
-  return { merge, refreshPullRequests };
+  const submit = Effect.fn("Issue.submitWorkingPullRequest")(function* (id: string, session: string, summary?: string) {
+    const submitted = yield* sessions
+      .withWorkplace(session, (place) =>
+        Effect.gen(function* () {
+          const issue = yield* get(id);
+          if (issue.status === "done" || issue.status === "canceled") return yield* Effect.fail(refused(t("server.issue.closedReopen")));
+          return yield* pullRequestOf(place, issue, summary ?? [issue.title, issue.description].filter(Boolean).join("\n\n"));
+        }),
+      )
+      .pipe(
+        Effect.catchTags({
+          MergeFailure: (error) => Effect.fail(refused(error.message)),
+        }),
+      );
+    return submitted.text;
+  });
+
+  return { merge, refreshPullRequests, submit };
 }
+
+export const verifyChild = Effect.fn("Issue.verifyChild")(function* (
+  projects: Project["Service"],
+  child: T.Issue,
+  parent: T.Issue,
+  all: readonly T.Issue[],
+  place: Workplace,
+) {
+  const constraints = child.constraints;
+  const inherited = acceptanceAncestors(child, all);
+  const changed = () => projects.changedFiles(place.cwd, issueBranch(parent.number)).pipe(Effect.mapError((error) => MergeFailure.error(error.message)));
+  if (constraints?.acceptance === true) {
+    if (!constraints.check) return yield* MergeFailure.failedCheck(t("server.issue.verification.acceptanceNeedsCheck"));
+    if ((yield* projects.run(place.cwd, constraints.check)).ok)
+      return yield* MergeFailure.failedCheck(t("server.issue.verification.acceptancePassed", { check: constraints.check }));
+    return { ...constraints, frozen: yield* changed() };
+  }
+  const frozen = new Set(inherited.flatMap((item) => item.constraints?.frozen ?? []));
+  const checkFrozen = Effect.gen(function* () {
+    const touched = (yield* changed()).filter((file) => frozen.has(file));
+    if (touched.length > 0) return yield* MergeFailure.failedCheck(t("server.issue.verification.frozen", { files: list(touched) }));
+  });
+  if (frozen.size > 0) yield* checkFrozen;
+  const leaf = !all.some((item) => item.parent === child.parent && item.status !== "canceled" && item.blockedBy.includes(child.id));
+  const checks = new Set([constraints?.check, ...(leaf ? inherited.map((item) => item.constraints?.check) : [])].flatMap((check) => (check ? [check] : [])));
+  yield* Effect.forEach(
+    checks,
+    (check) =>
+      Effect.gen(function* () {
+        const result = yield* projects.run(place.cwd, check);
+        if (!result.ok) return yield* MergeFailure.failedCheck(t("server.issue.verification.failed", { check, output: result.output }));
+      }),
+    { discard: true },
+  );
+  if (frozen.size > 0) yield* checkFrozen;
+  return constraints;
+});

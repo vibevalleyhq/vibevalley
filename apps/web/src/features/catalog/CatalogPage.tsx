@@ -5,10 +5,10 @@ import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untra
 import { Slider } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
+import { aria } from "@/base/dom";
 import { numberText } from "@/base/format";
 import { SpriteManifest, CursorManifest } from "@/base/manifests";
 import { useTimeout } from "@/base/timer";
-import { aria } from "@/base/util";
 import { ready, useQuery } from "@/infra/query";
 import { useRouter } from "@/infra/router";
 import { Button } from "@/ui/Button";

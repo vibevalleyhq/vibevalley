@@ -1,12 +1,12 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 
 import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@botiverse/oar";
-import { NodeServices } from "@effect/platform-node";
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Layer, Stream } from "effect";
+import { Context, Effect, Layer, Stream } from "effect";
+import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
 import { setLocale, t } from "@vibevalley/i18n";
@@ -15,17 +15,16 @@ import { tempDir } from "@vibevalley/testkit/temp";
 import { waitFor } from "@vibevalley/testkit/until";
 
 import { Agent } from "@/agent/agent.ts";
+import { sampleAgent } from "@/agent/seed.ts";
 import { Core } from "@/core/core.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { layer as projection } from "@/projection/projection.ts";
-import { sampleAgent } from "@/testing/agents.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { nextTurn, whenTrue } from "@/testing/until.ts";
+import { type ServerConfig } from "@/infra/config.ts";
+import { platform } from "@/services.ts";
+import { testConfig, nextTurn, whenTrue } from "@/testing/layers.ts";
 
 import { piBalance } from "./pi.ts";
 import { factsOf, presetOf, runtimeIds } from "./presets.ts";
 import { inCny, price } from "./price.ts";
-import { make, type RuntimeOptions, usable } from "./runtime.ts";
+import { Runtime, type RuntimeOptions, usable } from "./runtime.ts";
 
 const fake = (id: string, more: Partial<Parameters<typeof defineRuntime>[0]> = {}) =>
   defineRuntime({
@@ -49,14 +48,16 @@ const notFound = async (id: string): Promise<T.RuntimeInfo> => ({
   checkedAt: Date.now(),
 });
 
-const world = (config: ServerConfig["Service"] = testConfig()) =>
-  Layer.mergeAll(Core.layer.pipe(Layer.provide(projection)), Agent.layer).pipe(
-    Layer.provideMerge(Layer.succeed(ServerConfig, config)),
-    Layer.provideMerge(NodeServices.layer),
-  );
+const world = (config: ServerConfig["Service"] = testConfig()) => Agent.layer.pipe(Layer.provideMerge(platform(config)));
+
+const makeRuntime = (options: RuntimeOptions) =>
+  Effect.gen(function* () {
+    const context = yield* Layer.build(Runtime.layer({ registry: new RuntimeRegistry([]), ...options }));
+    return Context.get(context, Runtime);
+  });
 
 /** A runtime service over the given runtimes, never asking this machine's. */
-const runtimes = (options: RuntimeOptions = {}) => make({ background: false, probe: notFound, usageOf: async () => null, ...options });
+const runtimes = (options: RuntimeOptions = {}) => makeRuntime({ background: false, probe: notFound, usageOf: async () => null, ...options });
 
 const agent = (a: Partial<T.Agent>): T.Agent => sampleAgent({ id: "a", name: "小禾", ...a });
 
@@ -83,7 +84,7 @@ describe("runtime", () => {
       fake("pi", { installation: async (): Promise<InstallationSnapshot> => ({ kind: "unsupported", reason: t("server.runtime.oarUnknown") }) }),
     ]);
     return Effect.gen(function* () {
-      const r = yield* make({ registry, background: false, usageOf: async () => null });
+      const r = yield* makeRuntime({ registry, background: false, usageOf: async () => null });
       const reason = Effect.map(r.list(), (all) => {
         const got = all.find((x) => x.id === "pi")!.installation;
         return got.status === "unsupported" ? got.reason : "";
@@ -98,7 +99,7 @@ describe("runtime", () => {
     }).pipe(Effect.ensuring(Effect.sync(() => setLocale("zh"))), Effect.scoped, Effect.provide(world()));
   });
 
-  it.live("an accepted probe owns the installation its usage reads use, and a slow one does not overwrite a newer", () => {
+  it.effect("an accepted probe owns the installation its usage reads use, and a slow one does not overwrite a newer", () => {
     let n = 0;
     const { promise: held, resolve: release } = Promise.withResolvers<void>();
     const registry = new RuntimeRegistry([
@@ -115,8 +116,16 @@ describe("runtime", () => {
     return Effect.gen(function* () {
       const runPromise = Effect.runPromiseWith(yield* Effect.context());
       let used = "";
-      const options: RuntimeOptions = { registry, background: false, usageOf: async () => null };
-      const r = yield* make(options);
+      let observeUsage = false;
+      const options: RuntimeOptions = {
+        registry,
+        background: false,
+        usageOf: async (_id, _rt, found) => {
+          if (observeUsage) used = found.via === "executable" ? found.command : "";
+          return null;
+        },
+      };
+      const r = yield* makeRuntime(options);
       const slow = runPromise(r.refresh("pi"));
       yield* Effect.promise(() => until(() => n === 1));
       yield* r.refresh("pi");
@@ -124,17 +133,16 @@ describe("runtime", () => {
       yield* Effect.promise(() => slow);
       const got = yield* r.info("pi");
       expect(got!.installation).toMatchObject({ command: "new" });
-      options.usageOf = async (_id, _rt, found) => {
-        used = found.via === "executable" ? found.command : "";
-        return null;
-      };
-      yield* r.refreshUsage("pi");
+      observeUsage = true;
+      r.usageSoon("pi");
+      yield* TestClock.adjust(20_000);
+      yield* Effect.promise(() => until(() => used === "new"));
       expect(used).toBe("new");
     }).pipe(Effect.scoped, Effect.provide(world()));
   });
 
   for (const first of ["full", "usage"] as const)
-    it.live(`a changed usage cannot overwrite a newer full probe (${first} first)`, () => {
+    it.effect(`a changed usage cannot overwrite a newer full probe (${first} first)`, () => {
       const { promise: fullGate, resolve: releaseFull } = Promise.withResolvers<void>();
       const { promise: usageGate, resolve: releaseUsage } = Promise.withResolvers<void>();
       return Effect.gen(function* () {
@@ -151,7 +159,7 @@ describe("runtime", () => {
             },
           }),
         ]);
-        const r = yield* make({
+        const r = yield* makeRuntime({
           registry,
           background: false,
           usageOf: async () => {
@@ -165,16 +173,17 @@ describe("runtime", () => {
         yield* r.refresh("pi");
         const fullRefresh = runPromise(r.refresh("pi"));
         yield* Effect.promise(() => until(() => full === 2));
-        const usageRefresh = yield* Effect.forkChild(r.refreshUsage("pi"));
+        r.usageSoon("pi");
+        yield* TestClock.adjust(20_000);
         yield* Effect.promise(() => until(() => usageCalls === 2));
         if (first === "full") {
           releaseFull();
           yield* Effect.promise(() => fullRefresh);
           releaseUsage();
-          yield* Fiber.join(usageRefresh);
+          yield* Effect.promise(nextTurn);
         } else {
           releaseUsage();
-          yield* Fiber.join(usageRefresh);
+          yield* Effect.promise(nextTurn);
           releaseFull();
           yield* Effect.promise(() => fullRefresh);
         }
@@ -203,37 +212,39 @@ describe("runtime", () => {
         windows: [{ label: "5 hours", usedPercent, resetsAt: null }],
       }) as T.AccountUsage;
     return Effect.gen(function* () {
-      let calls = 0;
-      const r = yield* make({
-        registry: new RuntimeRegistry([
-          fake("pi", {
-            installation: async () => ({ kind: "available", via: "executable", command: "pi" }),
+      const pushed: T.RuntimeInfo[] = [];
+      yield* Effect.forkScoped(
+        Stream.runForEach(yield* (yield* Core).subscribe, (event) =>
+          Effect.sync(() => {
+            if (event.type === "runtime") pushed.push(event.info);
           }),
-        ]),
-        background: false,
+        ),
+      );
+      let calls = 0;
+      const r = yield* makeRuntime({
+        registry: new RuntimeRegistry([fake("pi", { installation: async () => ({ kind: "available", via: "executable", command: "pi" }) })]),
+        background: true,
         usageOf: async () => (++calls === 1 ? null : new Promise<T.AccountUsage>((answer) => out.push(answer))),
       });
-      yield* r.refresh("pi");
-      // A spend while the read is out pushes a new total, rebuilding the cached observation.
-      const read = yield* Effect.forkChild(r.refreshUsage("pi"));
-      yield* Effect.promise(() => until(() => out.length === 1));
-      const shown = yield* r.cached("pi");
+      yield* Effect.promise(() => whenTrue(() => new Set(pushed.map((info) => info.id)).size === runtimeIds().length, "the initial probes"));
+      r.usageSoon("pi");
+      yield* TestClock.adjust(20_000);
+      yield* Effect.promise(() => whenTrue(() => out.length === 1, "first delayed usage"));
       r.spend("pi", 1);
       yield* TestClock.adjust(3_000);
-      yield* waitFor(r.cached("pi"), (now) => now !== shown, "the new total cached");
+      yield* Effect.promise(() => whenTrue(() => pushed.some((info) => info.id === "pi" && info.spentToday === 1), "spend push"));
       out[0]!(used(40));
-      yield* Fiber.join(read);
-      expect((yield* r.info("pi"))!.usage).toEqual(used(40));
+      yield* waitFor(r.info("pi"), (info) => info?.usage?.status === "ok" && info.usage.windows[0]?.usedPercent === 40, "the usage kept after spend");
       expect((yield* r.info("pi"))!.spentToday).toBe(1);
-      // Two reads out at once: the one asked later answers first, and the older one's late answer is dropped.
-      const older = yield* Effect.forkChild(r.refreshUsage("pi"));
-      yield* Effect.promise(() => until(() => out.length === 2));
-      const newer = yield* Effect.forkChild(r.refreshUsage("pi"));
-      yield* Effect.promise(() => until(() => out.length === 3));
+      yield* TestClock.adjust(300_000);
+      yield* Effect.promise(() => whenTrue(() => out.length === 2, "periodic usage"));
+      r.usageSoon("pi");
+      yield* TestClock.adjust(20_000);
+      yield* Effect.promise(() => whenTrue(() => out.length === 3, "overlapping delayed usage"));
       out[2]!(used(100));
-      yield* Fiber.join(newer);
+      yield* waitFor(r.info("pi"), (info) => info?.usage?.status === "ok" && info.usage.windows[0]?.usedPercent === 100, "the newer usage");
       out[1]!(used(70));
-      yield* Fiber.join(older);
+      yield* Effect.promise(nextTurn);
       expect((yield* r.info("pi"))!.usage).toEqual(used(100));
     }).pipe(Effect.scoped, Effect.provide(world()));
   });
@@ -491,7 +502,7 @@ describe("runtime", () => {
           installation: async () => ({ kind: "not_found" }) as const,
         }),
       ]);
-      const r = yield* make({ background: false, usageOf: async () => null, registry });
+      const r = yield* makeRuntime({ background: false, usageOf: async () => null, registry });
       // The first answer does not wait for a probe: every runtime is checking, already with its name, look and facts.
       for (const info of yield* r.list()) {
         expect(info.installation.status).toBe("checking");
@@ -536,7 +547,7 @@ describe("runtime", () => {
             env: {},
           }),
         );
-        const r = yield* make({ background: false, usageOf: async () => null, registry });
+        const r = yield* makeRuntime({ background: false, usageOf: async () => null, registry });
         yield* r.refresh("pi");
         return yield* r.resolve(agent({}));
       }).pipe(Effect.scoped, Effect.provide(world()));
@@ -549,13 +560,15 @@ describe("runtime", () => {
     }).pipe(Effect.ensuring(Effect.sync(() => env("OAR_PI_BIN", before))));
   });
 
-  it.live("yesterday's spending does not stop today's work", () =>
+  it.effect("yesterday's spending does not stop today's work", () =>
     Effect.gen(function* () {
       const r = yield* runtimes({ probe: notFound });
       const agents = yield* Agent;
       yield* agents.saveSettings("pi", { ...agents.settings("pi"), dailyBudget: 10 });
       yield* r.refresh("pi");
-      r.setSpent({ day: "2000-01-01", byRuntime: { pi: 12 } });
+      r.spend("pi", 12);
+      expect((yield* r.info("pi"))!.stop).toMatch(/每日预算 ¥10\.00/u);
+      yield* TestClock.adjust("24 hours");
       const got = yield* r.info("pi");
       expect([got!.spentToday, got!.stop]).toEqual([undefined, ""]);
       r.spend("pi", 3);
@@ -565,7 +578,7 @@ describe("runtime", () => {
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
-  it.live("an infinite persisted spend cannot bypass the day's budget", () => {
+  it.live("regression: legacy spend files are ignored and invalid amounts cannot enter the database counter", () => {
     const config = testConfig();
     const d = new Date();
     const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -574,8 +587,71 @@ describe("runtime", () => {
       const r = yield* runtimes({ probe: notFound });
       yield* r.refresh("pi");
       expect((yield* r.info("pi"))!.spentToday).toBeUndefined();
+      r.spend("pi", Number.POSITIVE_INFINITY);
+      r.spend("pi", Number.NaN);
+      expect((yield* r.info("pi"))!.spentToday).toBeUndefined();
+      const sql = yield* SqlClient.SqlClient;
+      expect((yield* Effect.exit(sql`insert into runtime_spend (day, runtime, cny) values ('1970-01-01', 'pi', 'Infinity'::float8)`))._tag).toBe("Failure");
       r.spend("pi", 2);
       expect((yield* r.info("pi"))!.spentToday).toBe(2);
+    }).pipe(Effect.scoped, Effect.provide(world(config)));
+  });
+
+  it.effect("regression: flushed spending survives restart without being added twice and each day remains separate", () => {
+    const config = testConfig();
+    return Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const runtime = yield* runtimes();
+          runtime.spend("pi", 4);
+          yield* TestClock.adjust(2000);
+          yield* waitFor(sql<{ cny: number }>`select cny from runtime_spend where runtime = 'pi'`, (rows) => rows[0]?.cny === 4, "the spend committed");
+        }),
+      );
+      expect(existsSync(join(config.home, "spend.json"))).toBe(false);
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const runtime = yield* runtimes();
+          expect((yield* runtime.info("pi"))?.spentToday).toBe(4);
+          runtime.spend("pi", 2);
+        }),
+      );
+      yield* TestClock.adjust("24 hours");
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const runtime = yield* runtimes();
+          expect((yield* runtime.info("pi"))?.spentToday).toBeUndefined();
+          runtime.spend("pi", 5);
+        }),
+      );
+      expect(yield* sql<{ cny: number }>`select cny from runtime_spend where runtime = 'pi' order by day`).toEqual([{ cny: 6 }, { cny: 5 }]);
+    }).pipe(Effect.scoped, Effect.provide(world(config)));
+  });
+
+  it.effect("regression: a failed spending write retries the same delta once", () => {
+    const config = testConfig();
+    return Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql.unsafe("create sequence spend_attempts");
+      yield* sql.unsafe(
+        "create function refuse_spend() returns trigger language plpgsql as $$ begin perform nextval('spend_attempts'); raise exception 'refused'; end $$",
+      );
+      yield* sql.unsafe("create trigger refuse_spend before insert on runtime_spend for each row execute function refuse_spend()");
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const runtime = yield* runtimes();
+          runtime.spend("pi", 4);
+          yield* TestClock.adjust(2000);
+          yield* waitFor(sql<{ is_called: boolean }>`select is_called from spend_attempts`, (rows) => rows[0]?.is_called === true, "the rejected write");
+          expect(yield* sql`select * from runtime_spend`).toEqual([]);
+          expect((yield* runtime.info("pi"))?.spentToday).toBe(4);
+          yield* sql.unsafe("drop trigger refuse_spend on runtime_spend");
+          yield* TestClock.adjust(2000);
+          yield* waitFor(sql<{ cny: number }>`select cny from runtime_spend where runtime = 'pi'`, (rows) => rows[0]?.cny === 4, "the retry committed");
+        }),
+      );
+      expect(yield* sql<{ cny: number }>`select cny from runtime_spend where runtime = 'pi'`).toEqual([{ cny: 4 }]);
     }).pipe(Effect.scoped, Effect.provide(world(config)));
   });
 

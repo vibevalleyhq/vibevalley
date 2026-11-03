@@ -3,6 +3,7 @@
 -- numbers to the code, as the shapes have them); JSON is kept as text and read with @vibevalley/protocol/schema; a
 -- memory's terms are searched by a tsvector column.
 
+CREATE TYPE actor_kind AS ENUM ('owner', 'orchestrator', 'session', 'system');
 CREATE TYPE channel_participant_kind AS ENUM ('owner', 'orchestrator', 'session', 'profile', 'system');
 CREATE TABLE channel_participant (
   id         text primary key,
@@ -18,7 +19,7 @@ CREATE TABLE channel_participant (
   check ((kind in ('session', 'profile')) = (agent_id is not null))
 );
 CREATE TYPE channel_type AS ENUM ('channel', 'direct', 'thread');
-CREATE TYPE channel_subject_kind AS ENUM ('issue', 'graph', 'talk');
+CREATE TYPE channel_subject_kind AS ENUM ('issue', 'talk');
 CREATE TYPE channel_notify AS ENUM ('all', 'mentions', 'none');
 CREATE TABLE channel (
   id            text primary key,
@@ -52,8 +53,7 @@ CREATE TABLE channel (
   check ((type = 'direct') = (peer_id is not null)),
   check (type <> 'direct' or name is null),
   check ((type = 'thread') = (parent_id is not null)),
-  -- A direct channel with a helper profile is its talk issue's thread too.
-  check ((subject_kind is null) or type in ('thread', 'direct')),
+  check ((subject_kind is null) or type = 'thread'),
   check (not is_default or type = 'channel'),
   check (not is_default or archived_at is null),
   check (orchestrator is null or type = 'channel')
@@ -113,48 +113,49 @@ CREATE TABLE channel_read_cursor (
   updated_at       double precision not null,
   primary key (participant_id, channel_id)
 );
-CREATE TABLE channel_seen_mark (
-  participant_id  text not null references channel_participant (id),
-  message_id      text not null references channel_message (id) on delete cascade,
-  primary key (participant_id, message_id)
-);
-CREATE TYPE channel_delivery_reason AS ENUM ('mention', 'everyone', 'own_thread', 'follower', 'channel', 'direct', 'dispatch', 'addressed', 'graph');
-CREATE TYPE channel_delivery_held_by AS ENUM ('hop_limit', 'cooldown', 'wake_breaker');
-CREATE TYPE channel_delivery_state AS ENUM ('pending', 'announced', 'handed', 'seen', 'dropped');
-CREATE TABLE channel_delivery (
-  recipient_id   text not null references channel_participant (id),
-  message_id     text not null references channel_message (id) on delete cascade,
-  reason         channel_delivery_reason not null,
-  wakes          boolean not null,
-  held_by        channel_delivery_held_by,
-  state          channel_delivery_state not null default 'pending',
-  launch         text,
-  announced_at   double precision,
-  handed_at      double precision,
-  seen_at        double precision,
-  dropped_why    text,
-  created_at     double precision not null,
-  primary key (recipient_id, message_id),
-  check ((held_by is null) or wakes),
-  check ((state in ('announced', 'handed')) = (launch is not null) or state in ('seen', 'dropped'))
-);
 CREATE TYPE issue_priority AS ENUM ('urgent', 'high', 'medium', 'low');
+CREATE TYPE issue_mandate_strength AS ENUM ('explicit', 'inferred');
 CREATE TYPE issue_delivered AS ENUM ('merged', 'merged_into_parent', 'pull_request', 'kept', 'none');
 CREATE TYPE issue_canceled AS ENUM ('dismissed', 'lost');
 CREATE TYPE issue_deliver AS ENUM ('change', 'branch', 'answer');
+CREATE TABLE ingress_trigger (
+  id text primary key,
+  seq integer generated always as identity,
+  source text not null,
+  source_key text not null,
+  trigger_json text not null,
+  payload_json text not null,
+  occurred_at double precision not null,
+  routed_at double precision,
+  routing_scope text,
+  routing_position integer,
+  check ((routed_at is null and routing_scope is null and routing_position is null) or
+         (routed_at is not null and routing_scope is not null and routing_position is not null)),
+  unique (source, source_key)
+);
+CREATE TABLE ingress_github (
+  project text not null,
+  pr_number integer not null,
+  check_fingerprint text not null default '',
+  check_revision integer not null default 0,
+  primary key (project, pr_number)
+);
+
 CREATE TABLE issue (
   id          text primary key,
   number      integer not null unique,
   title       text not null default '',
   description text not null,
+  origin_trigger_id text,
+  mandate_strength issue_mandate_strength not null,
+  max_bot_review_rounds integer not null,
+  auto_submit_pr boolean not null,
   project     text,
-  assignee    text,
   priority    issue_priority not null default 'medium',
   rank        integer not null default 0,
   parent      text references issue (id) on delete cascade,
   blocked_by  text,
-  graph       text,
-  task        text,
+  constraints text,
   cron    text,
   created_at  double precision not null,
   queued_at   double precision,
@@ -164,29 +165,117 @@ CREATE TABLE issue (
   canceled    issue_canceled,
   pull_request text,
   deliver issue_deliver not null default 'change',
-  -- A profile's talk with the owner: the direct channel it is said in. Off the board; read-only, its rounds' leftovers go.
-  talk    text unique,
   reviewed_at double precision,
   findings    text,
   questions        text,
   criteria    text,
   checks      text,
-  -- An in-process agent's latest run on it (JSON IssueRun): no end while it goes on.
-  last_run text,
+  conflict text,
   -- An answer issue's conclusion (JSON IssueAnswer), read from its latest round's report.
   answer   text,
   check (delivered is null or canceled is null)
 );
 CREATE INDEX issue_by_parent on issue (parent);
-CREATE TABLE issue_session (
-  session         text primary key,
+CREATE TABLE issue_assignment (
+  id              text primary key,
   issue           text not null references issue (id) on delete cascade,
-  started_at      double precision not null
+  agent           text not null,
+  assigned_at     double precision not null,
+  ended_at        double precision
 );
+CREATE TYPE session_role AS ENUM ('orchestrator', 'worker');
+CREATE TYPE session_closed AS ENUM ('merged', 'completed', 'dismissed', 'lost');
+CREATE TABLE session (
+  id          text primary key,
+  role        session_role not null,
+  agent       text not null,
+  name        text not null,
+  runtime     text not null,
+  brief       text not null,
+  project     text,
+  issue       text,
+  channel     text,
+  hired_at    double precision not null,
+  ended_at    double precision,
+  closed      session_closed,
+  place       text,
+  oar_session text,
+  last_text   text,
+  recalled    text,
+  pending_report text,
+  phase text not null default '{"_tag":"resting"}',
+  refining boolean not null default false,
+  runs integer not null default 0,
+  last_run text,
+  spent text
+);
+CREATE TABLE issue_assignment_execution (
+  assignment text not null references issue_assignment(id) on delete cascade,
+  executor text not null references session(id),
+  started_at double precision not null,
+  primary key (assignment, executor)
+);
+CREATE INDEX session_by_agent on session (agent, hired_at);
+CREATE TYPE mailbox_delivery_source AS ENUM ('workbench', 'channel', 'connector', 'voice', 'github', 'cron', 'patrol');
+CREATE TYPE mailbox_delivery_urgency AS ENUM ('interrupt', 'steer', 'queue', 'digest');
+CREATE TYPE mailbox_delivery_held_by AS ENUM ('hop_limit', 'cooldown', 'wake_breaker');
+CREATE TYPE mailbox_delivery_state AS ENUM ('pending', 'handed', 'consumed', 'dropped');
+CREATE SEQUENCE mailbox_order AS integer;
+CREATE TABLE mailbox_delivery (
+  position integer not null default nextval('mailbox_order'),
+  scope text not null,
+  session_id     text not null references session (id) on delete cascade,
+  envelope_id    text not null,
+  channel_id     text references channel (id) on delete cascade,
+  message_id     text references channel_message (id) on delete cascade,
+  source         mailbox_delivery_source not null,
+  urgency        mailbox_delivery_urgency not null,
+  reason         text not null,
+  wakes          boolean not null,
+  held_by        mailbox_delivery_held_by,
+  state          mailbox_delivery_state not null default 'pending',
+  payload_json   text not null,
+  launch         text,
+  handed_at      double precision,
+  consumed_at        double precision,
+  dropped_why    text,
+  created_at     double precision not null,
+  primary key (session_id, envelope_id),
+  check ((held_by is null) or wakes),
+  check ((state = 'handed') = (launch is not null) or state in ('consumed', 'dropped'))
+);
+CREATE TABLE mailbox_subscription (
+  thread_key text primary key,
+  issue_id text not null references issue(id) on delete cascade
+);
+CREATE INDEX mailbox_subscription_by_issue on mailbox_subscription(issue_id);
+CREATE TYPE mailbox_issue_state AS ENUM ('held', 'forwarded', 'returned');
+CREATE TABLE mailbox_issue (
+  trigger_id text primary key references ingress_trigger(id) on delete cascade,
+  issue_id text not null references issue(id) on delete cascade,
+  state mailbox_issue_state not null default 'held',
+  session_id text references session(id) on delete set null,
+  reason text,
+  created_at double precision not null
+);
+CREATE INDEX mailbox_issue_by_issue on mailbox_issue(issue_id, state, created_at);
+-- At most one held input per issue: a newer hold replaces the older one.
+CREATE FUNCTION mailbox_issue_one_held() RETURNS trigger AS $$
+BEGIN
+  DELETE FROM mailbox_issue WHERE issue_id = NEW.issue_id AND trigger_id <> NEW.trigger_id AND state = 'held'
+    AND EXISTS (SELECT 1 FROM ingress_trigger t WHERE t.id = NEW.trigger_id AND t.source = 'cron');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER mailbox_issue_one_held BEFORE INSERT OR UPDATE OF state ON mailbox_issue
+  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION mailbox_issue_one_held();
+
+CREATE INDEX ingress_trigger_route_order on ingress_trigger (routing_scope, routing_position) where routed_at is not null;
+CREATE INDEX mailbox_delivery_scope_position on mailbox_delivery (scope, position);
 CREATE TYPE session_run_outcome AS ENUM ('completed', 'failed', 'interrupted');
 CREATE TABLE session_run (
   id           text primary key,
-  session      text not null,
+  session      text not null references session(id) on delete cascade,
   issue        text,
   triggered_by text not null,
   heard        text,
@@ -196,19 +285,6 @@ CREATE TABLE session_run (
   summary      text,
   spent        text
 );
-CREATE TYPE task_event_kind AS ENUM ('splitting', 'drafted', 'started', 'paused', 'resumed', 'ready', 'merged', 'abandoned', 'noted', 'task_started', 'task_sent_back', 'task_merged', 'task_failed', 'task_retried', 'task_requeued', 'task_skipped', 'task_edited', 'task_added', 'task_removed');
-CREATE TYPE task_event_actor AS ENUM ('owner', 'orchestrator', 'session', 'system');
-CREATE TABLE task_event (
-  id          text primary key,
-  graph_id    text not null,
-  task_id     text,
-  kind        task_event_kind not null,
-  actor       task_event_actor not null,
-  payload     text not null default '{}',
-  created_at  double precision not null
-);
-CREATE INDEX task_event_by_graph on task_event (graph_id, id);
-CREATE TYPE cron_set_by AS ENUM ('owner', 'orchestrator', 'session', 'system');
 CREATE TABLE cron (
   id          text primary key,
   name        text not null,
@@ -223,7 +299,7 @@ CREATE TABLE cron (
   last_run    double precision,
   -- Who set it, and whether it waits for the owner to say yes (cron/rules.go's needsOK): a waiting one stays off
   -- until the owner turns it on, which clears pending.
-  set_by      cron_set_by not null default 'owner',
+  set_by      actor_kind not null default 'owner',
   pending     boolean not null default false
 );
 CREATE TABLE game_ledger (
@@ -234,7 +310,6 @@ CREATE TABLE game_ledger (
 );
 CREATE TYPE memory_scope AS ENUM ('owner', 'agent');
 CREATE TYPE memory_kind AS ENUM ('note', 'issue');
-CREATE TYPE memory_author AS ENUM ('owner', 'orchestrator', 'session', 'system');
 CREATE TABLE memory (
   id           text primary key,
   scope        memory_scope not null,
@@ -248,7 +323,7 @@ CREATE TABLE memory (
   importance   integer not null default 0 check (importance between 0 and 3),
   project      text,                -- null: every project
   session      text,                -- the Session it came from
-  author       memory_author not null,
+  author       actor_kind not null,
   replaced_by  text,                -- the memory that superseded it; never recalled again
   created_at   double precision not null,
   updated_at   double precision not null,
@@ -314,7 +389,9 @@ CREATE TABLE lan_device (
   paired_at  double precision not null,
   last_seen  double precision
 );
-CREATE INDEX issue_session_by_issue on issue_session (issue, started_at);
+CREATE INDEX issue_assignment_by_issue on issue_assignment (issue, assigned_at, id);
+CREATE UNIQUE INDEX issue_assignment_current on issue_assignment (issue) where ended_at is null;
+CREATE INDEX issue_assignment_execution_by_executor on issue_assignment_execution (executor);
 CREATE UNIQUE INDEX channel_by_name on channel (name) where name is not null;
 CREATE INDEX channel_by_subject on channel (subject_kind, subject_id);
 CREATE UNIQUE INDEX channel_one_default on channel (is_default) where is_default;
@@ -322,39 +399,15 @@ CREATE INDEX channel_mention_by_target on channel_mention (target_id, message_id
 CREATE INDEX channel_message_by_channel on channel_message (channel_id, number);
 CREATE INDEX channel_message_by_sender on channel_message (sender_id, id);
 CREATE UNIQUE INDEX channel_message_send_key on channel_message (sender_id, send_key) where send_key is not null;
-CREATE INDEX channel_delivery_open on channel_delivery (recipient_id, message_id) where state in ('pending', 'announced', 'handed');
+CREATE INDEX mailbox_delivery_open on mailbox_delivery (session_id, envelope_id) where state in ('pending', 'handed');
 CREATE INDEX session_run_by_issue on session_run (issue, started_at);
 CREATE INDEX session_run_by_session on session_run (session, started_at);
-CREATE TYPE session_closed AS ENUM ('merged', 'completed', 'dismissed', 'lost');
-CREATE TABLE session (
-  id        text primary key,
-  agent     text not null,
-  name      text not null,
-  runtime   text not null,
-  brief     text not null,
-  project   text,
-  issue     text,
-  graph     text,
-  hired_at  double precision not null,
-  ended_at  double precision,
-  closed    session_closed,
-  place       text,
-  oar_session text,
-  last_text   text,
-  recalled    text
-);
-CREATE INDEX session_by_agent on session (agent, hired_at);
 CREATE TABLE session_run_issue (
   run text not null references session_run(id) on delete cascade,
   issue text not null references issue(id) on delete cascade,
   primary key (run, issue)
 );
 CREATE INDEX session_run_issue_by_issue on session_run_issue(issue, run);
-CREATE TABLE issue_queue (
-  issue text primary key references issue(id) on delete cascade,
-  channel text not null,
-  triggered_by text not null
-);
 CREATE TYPE runtime_todo_executor AS ENUM ('self', 'subagent');
 CREATE TYPE runtime_todo_state AS ENUM ('waiting', 'working', 'done', 'failed', 'skipped');
 CREATE TABLE runtime_todo (
@@ -475,8 +528,9 @@ CREATE INDEX artifact_suggestion_by_block on artifact_suggestion (block_id);
 CREATE INDEX channel_by_parent on channel (parent_id) where parent_id is not null;
 CREATE INDEX channel_follow_by_participant on channel_follow (participant_id);
 CREATE INDEX channel_read_cursor_by_channel on channel_read_cursor (channel_id);
-CREATE INDEX channel_seen_mark_by_message on channel_seen_mark (message_id);
-CREATE INDEX channel_delivery_by_message on channel_delivery (message_id);
+CREATE INDEX mailbox_delivery_by_message on mailbox_delivery (message_id);
+CREATE INDEX mailbox_issue_by_session on mailbox_issue (session_id) where session_id is not null;
+CREATE INDEX mailbox_delivery_by_channel on mailbox_delivery (channel_id) where channel_id is not null;
 CREATE INDEX cron_by_channel on cron (channel_id);
 CREATE INDEX connector_account_by_channel on connector_account (channel_id) where channel_id is not null;
 CREATE INDEX connector_inbound_by_message on connector_inbound (message_id) where message_id is not null;
@@ -486,3 +540,18 @@ CREATE INDEX artifact_version_by_message on artifact_version (message_id) where 
 
 -- A thread hangs under a message, which is made after its channel.
 ALTER TABLE channel ADD FOREIGN KEY (root_id) REFERENCES channel_message (id);
+
+CREATE VIEW mailbox_owner_route AS
+select routing_scope as scope, routing_position as position from ingress_trigger
+where routed_at is not null and trigger_json::jsonb->'actor'->>'kind' = 'owner'
+union all
+select scope, position from mailbox_delivery
+where payload_json::jsonb->'trigger'->'actor'->>'kind' = 'owner'
+  and envelope_id <> payload_json::jsonb->'trigger'->>'id';
+
+CREATE TABLE runtime_spend (
+  day text NOT NULL,
+  runtime text NOT NULL,
+  cny double precision NOT NULL CHECK (cny >= 0 AND cny < 'Infinity'::float8),
+  PRIMARY KEY (day, runtime)
+);

@@ -13,7 +13,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { newId } from "@/base/ids.ts";
 import { jsonOf } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
-import { bounded } from "@/core/bounded.ts";
+import { bounded } from "@/core/core.ts";
 import { type ApiError, lookIn, refused, messageOf } from "@/errors.ts";
 import { Db } from "@/infra/db.ts";
 
@@ -22,10 +22,9 @@ import * as qb from "../../db/generated/artifact_block.sql.ts";
 import * as qr from "../../db/generated/artifact_block_revision.sql.ts";
 import * as qc from "../../db/generated/artifact_change.sql.ts";
 import * as qs from "../../db/generated/artifact_suggestion.sql.ts";
-import { demoJitter, demoPieces } from "./demo.ts";
 import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
-import { ordered, Page, wire } from "./ops.ts";
-import { unmarked } from "./spans.ts";
+import { ordered, Page, unmarked, wire } from "./ops.ts";
+import { demoJitter, demoPieces } from "./policy.ts";
 
 const attrsOf = jsonOf(S.BlockAttrs);
 const storedSpans = jsonOf(Schema.NullOr(Schema.mutable(Schema.Array(S.TextSpan))));
@@ -37,7 +36,7 @@ const changeOf = jsonOf(S.SuggestionChange);
 const demoSections = [0, 1, 2] as const;
 type DemoSection = (typeof demoSections)[number];
 const demoParagraphs = (section: DemoSection) => ([0, 1, 2] as const).map((p) => t(`server.artifact.demo.${section}.paragraphs.${p}`));
-export interface BlockStore {
+interface BlockStore {
   /** Every live block (no tombstones), in order. */
   readonly blocks: (id: T.ArtifactId) => Effect.Effect<T.Block[], ApiError>;
   /** Markdown read into blocks, inserted as one batch by actor at the end of what is there. */
@@ -112,18 +111,15 @@ const blockIn = (ack: T.BlockAck, id: string) => ack.blocks.find((b) => b.id ===
 /** How long a batch is kept to answer it again, and a block's text to merge a stale update against. */
 const keptDays = 30;
 
-/** How long a demo waits between pieces; tests make it short. */
-export interface BlockStoreOptions {
-  readonly tickMs?: number;
-}
+/** How long the demo waits between pieces. */
+const demoTickMs = 1000;
 
 /** found: the artifact's row, failing when there is none or it is not a blocks one. */
-export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.ArtifactResult, ApiError>, options: BlockStoreOptions = {}) =>
+export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.ArtifactResult, ApiError>) =>
   Effect.gen(function* () {
     const db = yield* Db;
     const lock = yield* Semaphore.make(1);
     const scope = yield* Effect.scope;
-    const tick = options.tickMs ?? 1000;
     // Every batch that commits, for pages following an artifact; the database is the catch-up, this is only the live tail.
     const changes = yield* scopedPubSub<{ readonly artifact: T.ArtifactId; readonly ack: T.BlockAck }>();
     const suggestionChanges = yield* scopedPubSub<{ readonly artifactId: T.ArtifactId; readonly suggestions: T.Suggestion[] }>();
@@ -567,7 +563,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
 
     let demoOn = false;
     /** About ticks of the tick, a bit more or less so the writers interleave. */
-    const wait = (ticks: number) => Effect.sleep(ticks * (1 + demoJitter * (2 * Math.random() - 1)) * tick);
+    const wait = (ticks: number) => Effect.sleep(ticks * (1 + demoJitter * (2 * Math.random() - 1)) * demoTickMs);
 
     /** Inserts b at the end of the top level, or at the end of a section; the key is picked under the batch lock, so two writers cannot pick the same place. */
     const demoInsert = Effect.fn("BlockStore.demoInsert")(function* (

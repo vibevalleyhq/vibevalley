@@ -1,8 +1,11 @@
 // aimTool is the rule: the screen shows it while pointing and follows it on a click.
 
+import { onSettled } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueAct, PlotView, Session } from "@vibevalley/protocol";
 
+import { farm, farmState } from "./store";
 import { type Bed, isRipe } from "./world/plots";
 
 export type Tool = "hand" | "water" | "bug" | "weed" | "harvest" | "shovel";
@@ -21,7 +24,7 @@ const toolForKey = (key: string): Tool | undefined => tools[Number(key) - 1]?.id
 
 export type BedFxKind = "water" | "spray" | "harvest" | "shovel" | "note";
 
-export interface Aim {
+interface Aim {
   readonly ok: boolean;
   readonly text: string;
 }
@@ -66,9 +69,9 @@ export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot
   const crop = plot.crop;
   const act = actForTool(
     tool,
-    (issue?.attention.acts ?? []).map((a) => a.act),
+    (issue?.stage.acts ?? []).map((a) => a.act),
   );
-  const unavailable = issue ? t("web.farm.aim.unavailable", { state: t(`shared.attention.${issue.attention.state}`).toLowerCase() }) : t("web.farm.aim.unread");
+  const unavailable = issue ? t("web.farm.aim.unavailable", { state: t(`shared.stage.${issue.stage.state}`).toLowerCase() }) : t("web.farm.aim.unread");
   switch (tool) {
     case "hand":
       return { ok: true, text: session ? t("web.farm.aim.look") : t("web.farm.aim.sow") };
@@ -92,7 +95,7 @@ export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot
 }
 
 /** What a key does on the farm: show the names, put the tool down, open the menu, pick a tool. */
-export type FarmKey =
+type FarmKey =
   | { readonly kind: "reveal"; readonly down: boolean }
   | { readonly kind: "closeTool" }
   | { readonly kind: "openMenu" }
@@ -120,3 +123,42 @@ export const typing = () => {
   const el = document.activeElement;
   return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el instanceof HTMLElement && el.isContentEditable);
 };
+
+/** The farm's keys while it is on screen: the tools by number, Esc's menu, Alt for every name. */
+export function farmKeys() {
+  onSettled(() => {
+    const on = (down: boolean) => (e: KeyboardEvent) => {
+      const s = farmState();
+      if (s.titleOpen) return;
+      const key = farmKey({ key: e.key, down, meta: e.metaKey, control: e.ctrlKey, alt: e.altKey }, typing(), s.overlays.length > 0, s.tool);
+      switch (key?.kind) {
+        case undefined:
+          return;
+        case "reveal":
+          farm.revealNames(key.down);
+          return;
+        case "closeTool":
+          farm.hold("hand");
+          break;
+        case "openMenu":
+          farm.menu(true);
+          break;
+        case "pick":
+          farm.hold(key.tool);
+          break;
+      }
+      e.preventDefault();
+    };
+    const down = on(true);
+    const up = on(false);
+    const blur = () => farm.revealNames(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
+    };
+  });
+}

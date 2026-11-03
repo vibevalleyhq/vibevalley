@@ -18,16 +18,17 @@ import { t } from "@vibevalley/i18n";
 import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrchestrator, type VoiceCall, type VoiceSettings } from "@vibevalley/protocol";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import { messageOf, errnoOf } from "@/errors.ts";
 import { Inbox } from "@/inbox/inbox.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { callbackLog, bestEffort } from "@/infra/log.ts";
 import { afterRealTime } from "@/infra/time.ts";
-import { orchestratorModel } from "@/orchestrator/model.ts";
+import { Ingress } from "@/ingress/ingress.ts";
 import { chatCompletions } from "@/orchestrator/openai.ts";
 import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+import { orchestratorModel } from "@/orchestrator/situation.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
 
 import { verifyMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
@@ -364,7 +365,7 @@ export interface VoiceOptions {
 const quickTunnel = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/u;
 
 /** A tunnel's public address and how to close it. */
-export interface Tunnel {
+interface Tunnel {
   readonly url: string;
   readonly close: () => void;
 }
@@ -443,7 +444,8 @@ const make = (options: VoiceOptions = {}) =>
     const inbox = yield* Inbox;
     const settings = yield* Setting;
     const chat = yield* Channel;
-    const orchestrator = yield* Orchestrator;
+    const ingress = yield* Ingress;
+    const response = yield* Orchestrator;
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
     const httpClient = yield* HttpClient.HttpClient;
@@ -476,7 +478,7 @@ const make = (options: VoiceOptions = {}) =>
     let tunnel: Tunnel | undefined;
     /** What cancels closing the tunnel, lineLingerMs after the last call. */
     let closing: (() => void) | undefined;
-    const answer = chatCompletions({ answerer: orchestrator.answerer("phone"), misheard: t("server.voice.misheard") });
+    const answer = chatCompletions({ answerer: response.answerer("phone"), misheard: t("server.voice.misheard") });
     const route = /^\/llm\/([\w-]+)\/chat\/completions$/u;
     // A call's own key on its own path; anything else is not there or not let in.
     const lineHandler = Effect.gen(function* () {
@@ -629,7 +631,7 @@ const make = (options: VoiceOptions = {}) =>
         const ring = rang;
         rang = undefined;
         // The call ending ends the wait for the brief (not the orchestrator's run).
-        const said = yield* orchestrator.brief(onCallLine(texts, ring)).pipe(
+        const said = yield* response.brief(onCallLine(texts, ring)).pipe(
           Effect.mapError(callStepFailed),
           Effect.raceFirst(Effect.as(aborted(call.life.signal), undefined)),
           Effect.catch((e) => (stopped || call.ending || calls.get(on) !== call ? Effect.succeed(undefined) : Effect.fail(e))),
@@ -677,7 +679,7 @@ const make = (options: VoiceOptions = {}) =>
       const call = yield* callOf(agentId);
       // Both transcript directions use the answer mode captured by this call, never the current settings.
       if (!call.quick) return;
-      yield* orchestrator.heard(text, picked, sendKey);
+      yield* ingress.owner({ source: "voice", text, envelope: sendKey, ...(picked ? { picked: { agent: picked } } : {}) });
     });
 
     return Voice.of({

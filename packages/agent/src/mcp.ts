@@ -59,7 +59,7 @@ export function mcpContentText(content: readonly Block[]): string {
 /** The server's name first, only the characters function names allow. */
 export const mcpToolName = (server: string, tool: string) => (server + "__" + tool).replace(/[^A-Za-z0-9_-]/gu, "_").slice(0, 64);
 
-export interface McpConnection {
+interface McpConnection {
   readonly tools: Tool[];
   close(): Promise<void>;
 }
@@ -165,7 +165,7 @@ function mcpTool(client: Client, server: string, t: { name: string; description?
   });
 }
 
-export interface McpConnections {
+interface McpConnections {
   readonly tools: Tool[];
   readonly failed: string[];
   close(): Promise<void>;

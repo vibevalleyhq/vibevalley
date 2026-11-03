@@ -2,10 +2,10 @@ import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 
+import { autofocus } from "@/base/dom";
 import { ago, wallClockText } from "@/base/format";
-import { autofocus } from "@/base/util";
 import { IssueArtifacts } from "@/features/artifact";
 import { useWorkAgents } from "@/infra/agents";
 import { api } from "@/infra/api";
@@ -19,10 +19,9 @@ import { TextArea, TextInput } from "@/ui/Field";
 import { toast } from "@/ui/toasts";
 
 import { ActLines } from "./ActLines";
-import { isRefined } from "./issue";
+import { isRefined, newIssueTitle } from "./issue";
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
-import { newIssueTitle } from "./titles";
 
 interface Draft {
   title: string;
@@ -39,7 +38,7 @@ const draftOf = (i: Issue): Draft => ({
   description: i.description,
   criteria: i.criteria.join("\n"),
   project: i.project ?? "",
-  agent: i.assignee ?? "",
+  agent: assignedAgentOf(i) ?? "",
   priority: i.priority,
   deliver: i.deliver,
 });
@@ -91,7 +90,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       title: x.title,
       description: x.description,
       project: x.project,
-      assignee: x.agent,
+      agent: x.agent,
       priority: x.priority,
       deliver: x.deliver,
       criteria: criteriaList(x.criteria),
@@ -165,6 +164,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const criteria = () => criteriaList(d().criteria);
   const heading = (
     <div>
+      <Show when={props.item.parent}>
+        {(parent) => (
+          <button
+            type="button"
+            data-testid="parent-issue"
+            class="mb-2 cursor-pointer text-xs text-water hover:underline"
+            onClick={() => props.onDone(parent())}
+          >
+            {t("web.issue.family.parent")}
+          </button>
+        )}
+      </Show>
       <Show when={backlog()}>
         <div class="mb-4 pr-10">
           <Stages at="talk" />

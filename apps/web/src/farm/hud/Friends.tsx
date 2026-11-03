@@ -5,12 +5,12 @@
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import type { Agent } from "@vibevalley/protocol";
+import type { Agent, FarmView, Session } from "@vibevalley/protocol";
 
-import { aria, useClickAway } from "@/base/util";
-import { farm } from "@/farm/store";
-import { useFarm } from "@/farm/ui";
-import { webRoutes } from "@/farm/world/places";
+import { aria, useClickAway } from "@/base/dom";
+import { farm, useFarm } from "@/farm/store";
+import { isBusy, isRipe, plotOf } from "@/farm/world/plots";
+import { webRoutes } from "@/farm/world/world";
 import { bottleSprite, quotaOf } from "@/features/runtime";
 import { useCore, useFrames } from "@/infra/frame";
 import { ready, useAgents, useRuntimes } from "@/infra/query";
@@ -19,8 +19,17 @@ import { setPick, usePrefs } from "@/state/prefs";
 import { AgentFace } from "@/ui/Face";
 import { PxButton, SpriteIcon } from "@/ui/pixel";
 
-import { statusOf, type FriendStatus } from "./friendStatus";
 import { HudCard } from "./HudCard";
+
+type FriendStatus = "bug" | "ripe" | "busy" | "rest" | "away";
+
+function statusOf(mine: readonly Session[], view: FarmView): FriendStatus {
+  const crops = mine.map((s) => plotOf(view, s).crop);
+  if (crops.includes("withered")) return "bug";
+  if (crops.some(isRipe)) return "ripe";
+  if (mine.some(isBusy)) return "busy";
+  return mine.length > 0 ? "rest" : "away";
+}
 
 const status: Record<FriendStatus, { dot: string; label: string }> = {
   bug: { dot: "#c84a3a", label: t("web.farm.friends.status.bug") },
@@ -137,12 +146,12 @@ export function Friends(props: { height: number }) {
   const frames = useFrames();
   const open = useFarm((s) => s.friendsOpen);
   const sorted = () => {
-    const work = ready(agents, []).filter((a) => a.role === "helper");
+    const work = ready(agents, []).filter((a) => a.role === "worker");
     return [...work.filter((a) => a.enabled), ...work.filter((a) => !a.enabled)];
   };
   const statuses = () => {
     const sessions = frames.frame?.state.sessions ?? [];
-    const view = frames.frame?.view ?? { level: { level: 1, xp: 0, need: 10 }, plots: {}, achievements: [] };
+    const view = frames.frame?.view ?? { level: { level: 1, xp: 0, need: 10 }, plots: {}, plays: {}, achievements: [] };
     return sorted().map((a) =>
       statusOf(
         sessions.filter((s) => s.agent === a.id),
@@ -151,7 +160,7 @@ export function Friends(props: { height: number }) {
     );
   };
   const busy = () => statuses().filter((s) => s === "busy").length;
-  const attention = (): FriendStatus | undefined => (statuses().includes("bug") ? "bug" : statuses().includes("ripe") ? "ripe" : undefined);
+  const stage = (): FriendStatus | undefined => (statuses().includes("bug") ? "bug" : statuses().includes("ripe") ? "ripe" : undefined);
   const box = useClickAway(open, () => farm.friendsOpen(false));
   return (
     <div ref={box} class="pointer-events-auto relative" aria-label={t("web.farm.friends.helpers")} role="group" data-testid="friends">
@@ -191,7 +200,7 @@ export function Friends(props: { height: number }) {
           </Show>
           <SpriteIcon name="button-next" size={12} class={open() ? "-rotate-90" : "rotate-90"} />
         </HudCard>
-        <Show when={attention()}>
+        <Show when={stage()}>
           {(a) => <span class="absolute -top-1 -left-1 h-2.5 w-2.5 border-2 border-cream-300" style={{ background: status[a()].dot }} />}
         </Show>
       </button>

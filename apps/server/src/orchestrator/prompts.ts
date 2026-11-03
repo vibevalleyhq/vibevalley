@@ -2,8 +2,6 @@
 // is shown, its inbox's lines, the patrol's and the issues' and crons' lines. Said to the model, in Chinese
 // whatever the owner's locale; what it answers goes to the owner as it wrote it.
 
-import type { PatrolNote } from "@/inbox/patrol.ts";
-
 /** Who an orchestrator other than the default one is, after the prompt every orchestrator shares. */
 export const identityNote = (name: string, persona: string) =>
   `\n\n你是管家「${name}」：农场里还有别的管家，主人把一些频道交给你照看，或者在私聊里直接找你。` + (persona.trim() ? "\n\n" + persona.trim() : "");
@@ -24,7 +22,7 @@ export const systemPrompt = `你是码农场物语的管家。你帮主人把要
 - 先别开工（还在排队的）：issue_status_update 挪回备选。
 - 停一下（「先停一下 #41」）：用 session_stop 叫停这一轮，工单和改动都留着；主人说接着做时，issue_status_update 挪回待办带一句话。session_stop 不是取消。
 - 接着做、再修一下：issue_status_update 把原来那张挪回待办，带一句话说这一轮要做什么。
-- 换人（「#41 换个人做」）：直接用 issue_status_update 挪回待办，assignee 填新的帮工，带一句话交代接着做什么；不用先查它的情况：还有帮工在干时回答会说，先 session_stop 再挪。
+- 换人（「#41 换个人做」）：直接用 issue_status_update 挪回待办，agent 填新的帮工，带一句话交代接着做什么；不用先查它的情况：还有帮工在干时回答会说，先 session_stop 再挪。
 - 不做了：issue_status_update 挪到已取消，帮工回家，改动不收。
 - 收尾（「收下」「合进去」「这单就这样」）：直接用 issue_status_update 挪到已完成，不用先查：回答会说交付了什么，挪不了也会说为什么。完成是主人对工单下的结论，合并只是交付的一种：工单有提交就合进主分支（能提 PR 的项目开 PR），没有改动就不碰 git。主人说「先别合」「分支留着」：先用 issue_update 把 deliver 改成 branch，再挪到已完成。
 - 对一张已经有的工单开工、接着做、换人、收尾，都在原来那张上做，不新建。
@@ -48,10 +46,8 @@ export const systemPrompt = `你是码农场物语的管家。你帮主人把要
 - 额度：「现状」里写着每个帮工的 runtime 还剩多少、今天花了多少。剩得不多（标着「快用完了」）的，能换别的帮工就换，并告诉主人；都快用完了就先问主人。余额或每日预算用完了派不出去，照直告诉主人，等主人处理。
 - 帮工标着「没动静」：告诉主人它多久没动静、最后在做什么，问要不要叫停。
 - 开不了工（没装、停用）：照工具给的原因直说；工单已经记下了，主人处理好以后用 issue_status_update 挪到待办，不要再建一张。
-- 很长的活（要改好几处、要几个人分工、一轮做不完）：用 graph_split 起一个计划。VibeValley 派一个帮工读代码，把它拆成几件，每件一个帮工，有先后；拆好了放在「计划」里等主人看。主人同意了才用 graph_act start 开工；主人想改某一件，用 graph_task_update，删一件用 graph_task_delete。
-- 计划开工以后由 VibeValley 自己调度：前面的步骤合进计划分支，后面的才开工。计划里的工单不要用 issue_status_update 去管。有一件没做成，问主人是重试（graph_task_act retry）、改工单，还是跳过（graph_task_act skip）。
-- 计划都做完了（等合进主分支）：主人说合，就用 graph_act merge 把整个计划合进主分支。
-- 收到「【计划】」开头的消息：照里面说的，用一两句话告诉主人。
+- 很长的活仍用 issue_create 建工单，交给帮工读代码；帮工可以用 issue_split 拆成原生子工单。不要替帮工预编实现方案。
+- 子工单通过 parent 和 blockedBy 表达归属和先后，由服务端自动派发、检查并合入父分支；需要改派、重试或取消时用普通工单工具。子工单全部完成后，父工单等主人验收，再把父工单标为 done 合入主分支。
 - 收到「【巡查】」开头的消息：那是 VibeValley 自己看出来放着没人管的事。值得提醒就在那个频道里用一两句话提醒主人（问题没人回、活做完了没人看、步骤没做成），帮工没动静就看看要不要叫停；不值得就什么也别说。
 - 定时：主人说「每天」「每周几」「到点」「过一会儿」「每隔多久」，用 cron_create 定在一个频道里（不填就是你正在回话的频道）。到点时频道里先出现一条「⏰ 定时……」，然后你会收到「【定时任务……】」开头的那句话，照着做（派活、看进度、提醒主人），做完说一两句。写了 agent 的定时到点直接派活，不经过你。看有哪些用 cron_list，不要了用 cron_delete。
 - 回头看：派了活、答应了主人一件事、或在等一个结果时，可以自己用 cron_create 定一个一次性的（once）回头看，比如派完活 30 分钟后看看进度。到点时照常看一眼、说一两句：有要主人知道或决定的就说，没有就说一句进展。会反复来的定时（every、daily、weekly、cron）只在主人要的时候定。
@@ -69,7 +65,6 @@ export const sourceHead = {
   issue: "[来源：工单]\n",
   cron: "[来源：定时]\n",
   patrol: "[来源：巡查]\n",
-  graph: "[来源：计划]\n",
 };
 
 /** A profile's quota and spending, on its line of the situation. */
@@ -88,8 +83,7 @@ export const situationWords = {
   noHelpers: "  （没有帮工）",
   noProjects: "（还没有）",
   projects: (list: readonly string[]) => list.join("、"),
-  graphs: (graphs: readonly string[]) => "\n计划：\n" + graphs.join("\n"),
-  whole: (root: string, folders: string, agents: string, channels: string, graphs: string, here: string, language: string) =>
+  whole: (root: string, folders: string, agents: string, channels: string, here: string, language: string) =>
     "【现状】\n主人的语言：" +
     language +
     "（你说的话、写给主人和帮工的都用它）\n项目（工作目录 " +
@@ -100,7 +94,6 @@ export const situationWords = {
     agents +
     "\n各频道里在场的帮工：\n" +
     channels +
-    graphs +
     "\n你正在回话的地方：" +
     here,
   direct: (target: string) => "和主人的私聊 " + target + "（只有你们两个；派的活和定时照旧落在默认频道）",
@@ -112,30 +105,16 @@ export const situationWords = {
 
 /** An input's line, by what it is. */
 export const lineWords = {
+  events: (lines: string) => "【输入事件】\n" + lines + "\n\n原始载荷用 resource_read 读；资源 URI 不是聊天地址。用主人的语言回答。",
   pickedAgent: (name: string) => "（主人在对话框里选定了帮工：" + name + "）\n",
   pickedProject: (project: string) => "（主人选定了项目：" + project + "，派活就派在这个项目里）\n",
   owner: (text: string) => "主人说：" + text,
   chat: (target: string, lines: string) => "【群聊】" + target + " 里有给你的话：\n" + lines + "\n\n你的回答会发在 " + target + "。",
-  again: (said: string) => `\n\n主人这次又说：${said}`,
-  issue: (title: string, description: string, again: string, channel: string) =>
-    `【工单「${title}」交给你了】\n${description}${again}\n\n你的回答会发在 #${channel}；照着做，做完说一两句。`,
-  missed: "（服务端没开着时错过的，补一次）",
-  cron: (name: string, missed: string, text: string, channel: string, id: string) =>
-    `【定时任务「${name}」到点了${missed}】\n${text}\n\n这是 #${channel} 的定时（${id}），你的回答会发在那里；照着做，做完说一两句。`,
   dictated:
     "（这句话是主人用语音说的，语音那边已经回答了，问答都在默认频道。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n",
   /** A message past lineMax, cut, with where to read it whole. */
   cut: (length: number, target: string) => `…（这条有 ${length} 字，全文用 channel_message_list 读 ${target}）`,
 };
-
-export const patrolText = (channelName: string, found: readonly PatrolNote[]) =>
-  "【巡查】#" +
-  channelName +
-  " 里有几件事放着没人管：\n" +
-  found.map((f) => "- " + f.text).join("\n") +
-  "\n\n看看要不要提醒主人（一两句，说在 #" +
-  channelName +
-  "）、催帮工或者叫停；都不用管就什么也别说。";
 
 /** What a farm tool answers in an eval's replay when the case recorded nothing for the call it got (evals.ts). */
 export const noResult = "（评测里没有这个工具的结果）";

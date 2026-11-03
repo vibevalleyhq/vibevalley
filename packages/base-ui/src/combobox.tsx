@@ -12,7 +12,7 @@ import { call, type DivProps, flag, refs } from "./internal/element";
 import { createFloating, type Floating, type FloatingRootProps, makePortal, makePositioner } from "./internal/floating";
 import { itemsIn } from "./internal/roving";
 
-export type ComboboxOpenChangeReason = "input" | "item" | "escape" | "outside" | "tab";
+type ComboboxOpenChangeReason = "input" | "item" | "escape" | "outside" | "tab";
 
 const option = "[role=option]:not([data-disabled])";
 
@@ -32,7 +32,7 @@ interface Ctx extends Floating<ComboboxOpenChangeReason> {
 const Context = createContext<Ctx>();
 const use = () => useContext(Context);
 
-export interface ComboboxRootProps extends FloatingRootProps<ComboboxOpenChangeReason> {
+interface ComboboxRootProps extends FloatingRootProps<ComboboxOpenChangeReason> {
   value?: string | undefined;
   defaultValue?: string | undefined;
   onValueChange?: ((value: string) => void) | undefined;
@@ -203,7 +203,7 @@ function Popup(props: DivProps) {
   );
 }
 
-export interface ComboboxItemProps extends DivProps {
+interface ComboboxItemProps extends DivProps {
   value: string;
   disabled?: boolean | undefined;
   /** What the input shows once it is picked; its text by default. */

@@ -9,7 +9,7 @@ import { frameOf } from "@/projection/frame.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 
-import { Channel } from "./chat.ts";
+import { Channel } from "./channel.ts";
 const mentionIds = (core: Core["Service"]) =>
   frameOf(core.state())
     .inbox.filter((item) => item.kind === "mention")

@@ -1,6 +1,8 @@
+import { type Accessor, createEffect, onSettled } from "solid-js";
+
 import type { GameEffect, Issue, Session } from "@vibevalley/protocol";
 
-import { playSound, type SoundName } from "@/ui/pixel/sound";
+import { isMuted, playSound, setMuted, type SoundName, unlockSound } from "@/ui/pixel/sound";
 
 import type { BedFxKind } from "./tools";
 const BED_SOUND = { water: "water", spray: "spray", harvest: "harvest", shovel: "shovel", note: "nope" } as const satisfies Record<BedFxKind, SoundName>;
@@ -15,13 +17,13 @@ export interface FarmSoundInput {
   effects?: readonly GameEffect[];
   /** Absent until the page has the core state; the first state is the farm as it already was. */
   sessions?: readonly Session[];
-  /** Where each issue stands (Issue.attention): its plot ripens or gets bugs as it does. */
-  issues?: readonly Pick<Issue, "id" | "attention">[];
+  /** Where each issue stands (Issue.stage): its plot ripens or gets bugs as it does. */
+  issues?: readonly Pick<Issue, "id" | "stage">[];
   call?: { phase: CallPhase; problem?: string };
 }
 
 /** `hold`: good news that takes turns with other good news, holding the floor this many ms. */
-export interface Cue {
+interface Cue {
   name: SoundName;
   hold?: number;
 }
@@ -60,11 +62,11 @@ export function farmCues(prev: FarmSoundInput, next: FarmSoundInput): Cue[] {
   // Ripe and bug follow where the issue stands, as its plot does: a round handed back with a conflict or a question is
   // neither.
   if (prev.issues && next.issues && next.issues !== prev.issues) {
-    const before = new Map(prev.issues.map((t) => [t.id, t.attention]));
+    const before = new Map(prev.issues.map((t) => [t.id, t.stage]));
     for (const t of next.issues) {
       const was = before.get(t.id);
       if (!was) continue;
-      const now = t.attention;
+      const now = t.stage;
       if (now.state === "reviewing" && was.state !== "reviewing") cues.push({ name: "ripe", hold: 220 });
       else if (now.state === "stuck" && (now.stuck === "failed" || now.stuck === "conflict") && (was.state !== "stuck" || was.stuck !== now.stuck))
         cues.push({ name: "bug" });
@@ -86,11 +88,33 @@ export function farmCues(prev: FarmSoundInput, next: FarmSoundInput): Cue[] {
 // one before, then holds the floor.
 let floorFree = 0;
 
-export function inTurn(name: SoundName, hold: number) {
+function inTurn(name: SoundName, hold: number) {
   const now = Date.now();
   const at = Math.max(now, floorFree);
   floorFree = at + hold;
   if (at === now) playSound(name);
   // oxlint-disable-next-line vibevalley/dropped-timer -- a cue waits its turn for at most a moment, and plays once whatever is shown then
   else setTimeout(() => playSound(name), at - now);
+}
+
+/** Whether the sounds are off, kept on this machine and followed across tabs. */
+export const muted = (): [Accessor<boolean>, (on: boolean) => void] => [isMuted, setMuted];
+
+/** Plays what changed between one input and the next (ui/pixel/sound.ts farmCues); the first input is the farm as it was. */
+export function farmSounds(input: Accessor<FarmSoundInput>) {
+  createEffect(input, (next, before) => {
+    if (before === undefined || before === next) return;
+    for (const cue of farmCues(before, next)) {
+      if (cue.hold === undefined) playSound(cue.name);
+      else inTurn(cue.name, cue.hold);
+    }
+  });
+  onSettled(() => {
+    window.addEventListener("pointerdown", unlockSound, { once: true });
+    window.addEventListener("keydown", unlockSound, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockSound);
+      window.removeEventListener("keydown", unlockSound);
+    };
+  });
 }

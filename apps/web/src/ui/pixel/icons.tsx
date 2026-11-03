@@ -37,9 +37,6 @@ export function PhaseGlyph(props: { phase: Phase; size?: number }) {
   const closed = () => (props.phase._tag === "closed" ? props.phase.closed : undefined);
   return (
     <Switch>
-      <Match when={props.phase._tag === "arriving"}>
-        <SpriteIcon name="icon-seeds" size={size()} />
-      </Match>
       <Match when={props.phase._tag === "working" && doing() === "none"}>
         <span class="inline-block shrink-0" style={{ width: `${size()}px`, height: `${size()}px` }} />
       </Match>
