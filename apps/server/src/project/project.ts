@@ -31,11 +31,12 @@ import {
   ProjectError,
   pullRequestFile,
   pullRequestText,
+  stackFiles,
+  stackOf,
   type Workplace,
   type WorkplaceCleanup,
   type WorkplaceRelease,
 } from "./shapes.ts";
-import { stackFiles, stackOf } from "./stack.ts";
 
 const fail = (message: string) => Effect.fail(new ProjectError({ message }));
 

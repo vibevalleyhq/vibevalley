@@ -1,6 +1,6 @@
 export { ChatPage } from "./ChatPage";
 export { QuickSwitcher, switcher } from "./QuickSwitcher";
-export { createChannelForm } from "./channelForm";
+export { createChannelForm } from "./Dialogs";
 export { chatSay, createComposer, pendingLines } from "./composing";
 export { reactionSet, sameReaction, setMark, useMarkedFollowed, useMarkRead } from "./marks";
 export { drafts, useReplying } from "./draft";
