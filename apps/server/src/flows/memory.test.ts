@@ -10,10 +10,10 @@ import { owner } from "@/base/actor.ts";
 import { Core } from "@/core/core.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Memory } from "@/memory/memory.ts";
+import { briefBreak } from "@/session/briefing.ts";
 import { recallHead } from "@/session/prompts.ts";
 import { Session } from "@/session/session.ts";
 import type { DeliveryInput } from "@/session/shapes.ts";
-import { briefBreak } from "@/session/takeIn.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import { await_, farm, type Farm, lab, mustHire, watch } from "./farm.ts";

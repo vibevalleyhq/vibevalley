@@ -10,9 +10,9 @@ import { messageLine, wakeInput } from "@/mailbox/prompts.ts";
 import { whoHears } from "@/mailbox/routing.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
-import { parseSearch } from "./folded.ts";
 import { channelNameProblem, mentionsIn, parseChatTarget } from "./mentions.ts";
-import { Follows } from "./model.ts";
+import { parseSearch } from "./messages.ts";
+import { Follows } from "./rooms.ts";
 
 const chatAudience = (input: ChannelAudience & BrakeInput) => brakes(whoHears(input), input);
 

@@ -38,7 +38,7 @@ import { messageId } from "@vibevalley/protocol/schema";
 
 import { newId } from "@/base/ids.ts";
 import { Channel } from "@/channel/channel.ts";
-import { channelOf, defaultOf } from "@/channel/folded.ts";
+import { channelOf, defaultOf } from "@/channel/messages.ts";
 import { Core } from "@/core/core.ts";
 import { reasonOf } from "@/errors.ts";
 import { Inbox } from "@/inbox/inbox.ts";

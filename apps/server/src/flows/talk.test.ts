@@ -9,7 +9,7 @@ import { TestClock } from "effect/testing";
 
 import { Agent } from "@/agent/agent.ts";
 import { Channel } from "@/channel/channel.ts";
-import { channelOf } from "@/channel/folded.ts";
+import { channelOf } from "@/channel/messages.ts";
 import { Core } from "@/core/core.ts";
 import { Db } from "@/infra/db.ts";
 import { Issue } from "@/issue/issue.ts";

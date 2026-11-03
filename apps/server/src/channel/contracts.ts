@@ -9,7 +9,7 @@ import { type ApiError } from "@/errors.ts";
 import { type InboxMessage, type Meta, metaOf, type Picked, senderKind } from "@/mailbox/envelope.ts";
 
 import type * as qm from "../../db/generated/channel_message.sql.ts";
-import { type ChannelRow } from "./model.ts";
+import { type ChannelRow } from "./rooms.ts";
 
 export type { ChannelAudience, ChannelEnvelopeRow, ChannelRouteFact, Meta, OrchestratorNews } from "@/mailbox/envelope.ts";
 export type { InboxMessage, Picked } from "@/mailbox/envelope.ts";

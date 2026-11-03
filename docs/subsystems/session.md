@@ -21,7 +21,7 @@ Session 是一个档案持续工作的执行上下文：处理工单时，农场
 Mailbox 投递持久化 Trigger 与输入上下文，不要求存在聊天消息。管家与帮工的投递都先记 handed，真实输入回执再标记 consumed；管家拒绝启动时退回 pending。聊天中的 👀 跟随消费回执，不表示仅送到消费者。
 
 - 服务端 `apps/server/src/executor`（`Executor`）：拥有 oar 执行实例，创建、投递、中断、关闭、订阅事件与汇报；`stalls.ts` 观察原始事件的静默间隔。`Session` 交给它准备好的输入和选项，收到事件后记轮次、轨迹和核心事实。
-- 服务端 `apps/server/src/session`（`Session`）：`session.ts` 生命周期（`send` 派、`deliver` 带话、`stop`、`dismiss`、交出现场 `handOver`、只读一轮之后把 worktree 重置回主分支 `discardWork`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；纯函数按管的事分开：`report.ts` 的 `readReport`（一轮的结尾怎么读），`hiring.ts` 的 `noRoom`、`whoMakesRoom`（还能不能再来一个、谁回家腾地方），`briefing.ts`（交给帮工的说明、技能和想起来的），`takeIn.ts`（收活：冲突怎么说、没收进去是什么意思），`roster.ts`（核心状态里的帮工）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`inProcessRun.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
+- 服务端 `apps/server/src/session`（`Session`）：`session.ts` 生命周期（`send` 派、`deliver` 带话、`stop`、`dismiss`、交出现场 `handOver`、只读一轮之后把 worktree 重置回主分支 `discardWork`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；纯函数按管的事分开：`report.ts` 的 `readReport`（一轮的结尾怎么读），`hiring.ts` 的 `noRoom`、`whoMakesRoom`（还能不能再来一个、谁回家腾地方），`briefing.ts`（交给帮工的说明、技能和想起来的，还有收活时冲突怎么说、没收进去是什么意思），`roster.ts`（核心状态里的帮工）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`inProcessRun.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
 - `apps/server/src/runtime`（`Runtime`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `@vibevalley/ai/models`，pi 按 pi-ai 自带的价目）、今天的花费；`fit.ts` 的 `agentProblems`、`quota.ts` 的 `moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
 - 表：`session`（任一 Agent 的会话一行，`role` 是 `orchestrator` 或 `worker`；帮工走了也留着，管家常驻）、`session_run`（一次 run 一行，外键必须指向 Session）、`session_run_issue`（一次 run 实际消费了哪几张工单）。`issue_assignment` 和 `issue_assignment_execution` 归工单。
 - 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`logs/`（oar 的原始记录）；阶段、运行次数、最近报告、花费和当前场景字段由 session 表保存，Core 只是实时投影。登记身份、初始阶段和工作目录同事务写入；结束 Run、保存会话状态和清掉 pending_report 同事务完成。
@@ -133,7 +133,7 @@ PR 在途的普通成功回合以及 prSubmit=true 的提交报告在结束时�
 
 **叫停**（`session.stop`）：打断这一轮，Session 留在地里，带句话开下一轮。
 
-**离开**（合并时 `handOver`、收工 `dismiss`）：先关 oar 会话；合并时在干或有待开始的一轮就拒绝；`handOver` 只管让帮工歇下、交出现场（worktree 和它最后说的话）、按给的关法离开，怎么合（本地合、提 PR、结束 PR、合进计划分支）由调它的人给，帮工模块不知道 PR 和计划；调用方的检查在这次交接内运行，直到检查和合并结束都不接新一轮，检查失败后的带话在交接结束以后做；合的那一步失败，Session 和分支都留着：失败照种类说成 `NotTakenIn`，由 Issue 保存冲突（`takeIn.ts` 的 `notTakenIn`：帮工要带回去修的话、给主人的话、农场的通知、计划记的一行）；冲突由谁解决由调用方说（`settle`：工单交给主人决定，计划直接让帮工修），带话的路也由调用方定。
+**离开**（合并时 `handOver`、收工 `dismiss`）：先关 oar 会话；合并时在干或有待开始的一轮就拒绝；`handOver` 只管让帮工歇下、交出现场（worktree 和它最后说的话）、按给的关法离开，怎么合（本地合、提 PR、结束 PR、合进计划分支）由调它的人给，帮工模块不知道 PR 和计划；调用方的检查在这次交接内运行，直到检查和合并结束都不接新一轮，检查失败后的带话在交接结束以后做；合的那一步失败，Session 和分支都留着：失败照种类说成 `NotTakenIn`，由 Issue 保存冲突（`briefing.ts` 的 `notTakenIn`：帮工要带回去修的话、给主人的话、农场的通知、计划记的一行）；冲突由谁解决由调用方说（`settle`：工单交给主人决定，计划直接让帮工修），带话的路也由调用方定。
 
 `dismiss` 的 `discard` 把停止写入后的工作区重置，再离场清理，起草的调用方不自己排停机和重置的顺序。农机关闭失败时整次动作拒绝，现场、句柄和监听都保留，不重置、不合并、不离场；这次关闭的失败也保留，重复调用不会把农机内部的重复关闭当作成功。重置失败时提醒主人，照常离场，清理仍保留未合的改动。
 

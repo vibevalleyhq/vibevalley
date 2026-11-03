@@ -16,8 +16,8 @@
 
 ## 在哪
 
-- **频道**：`apps/server/src/channel`（`Channel`）管理消息、频道、私聊、串、成员、已读游标和附件；`model.ts` 保存内存视图。`channel/folded.ts` 把提交后的消息保存成不可变 Trigger，卡片指向 `vv://trigger/<id>`，完整原文独立留存；改消息不覆盖源事实。投递归 `mailbox`：`routing.ts` 决定受众，`work.ts` 管工单归属，`pump.ts` 发送会话输入，`deliveries.ts` 缓存未终结投递。
-- **几处共用的规则在 `apps/server/src/channel/folded.ts`**：`targetOf` 写地址，`defaultOf` 认出默认频道，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryChannels`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留多少频道和串（`keepChannels` 100 个）。
+- **频道**：`apps/server/src/channel`（`Channel`）管理消息、频道、私聊、串、成员、已读游标和附件；`rooms.ts` 保存内存视图。`channel/messages.ts` 把提交后的消息保存成不可变 Trigger，卡片指向 `vv://trigger/<id>`，完整原文独立留存；改消息不覆盖源事实。投递归 `mailbox`：`routing.ts` 决定受众，`work.ts` 管工单归属，`pump.ts` 发送会话输入，`deliveries.ts` 缓存未终结投递。
+- **几处共用的规则在 `apps/server/src/channel/messages.ts`**：`targetOf` 写地址，`defaultOf` 认出默认频道，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryChannels`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留多少频道和串（`keepChannels` 100 个）。
 - **订阅**：契约是 `packages/protocol/src/rpc.ts` 的 `Subscriptions`（Effect RPC），服务端 `apps/server/src/http/rpc.ts` 挂在 `/api/v1/rpc`，页面经 `apps/web/src/infra/gateway.ts` 连、`features/channel/follow.ts` 按频道存。
 - **表**：`channel_participant`、`channel`（频道、私聊、串都是一行，照 Discord；`is_default` 至多一行为真，`peer_id` 每个对面至多一个私聊）、`channel_message`（每条带它的修订号、回复的号、改和删的时刻、置顶、回应）、`channel_attachment`、`channel_mention`、`channel_follow`、`channel_read_cursor`；信箱投递是 `mailbox_delivery`，路由回执保存在 `ingress_trigger.routed_at/routing_scope/routing_position`，源载荷不变。消息先提交，Delivery 与回执再在一个事务写；崩在两步之间，启动重放未路由消息。连接器是 `connector_account`、`connector_inbound`、`connector_outbox`。
 - **连接器**：`apps/server/src/connector`（`Connector`）。`connector.ts` 是桥：账号和它的代际、配对、只认主人、收进来的话交给管家、持久收件、发件表和退避；`digest.ts` 是送出去的写法（`ownerLine`、`plainText`、`splitText`、`flushText`）；`adapter.ts` 是桥对每家的要求（登录、接收到断开、发送，都是 Effect，失败是 `AppFailed`：`stale`、`restricted`、`failed`）；三家的协议和扫码登录在 `weixin.ts`、`feishu.ts`（飞书用 `@larksuiteoapi/node-sdk`）、`qq.ts`，HTTP 走 Effect 的 `HttpClient`。

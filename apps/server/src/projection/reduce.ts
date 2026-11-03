@@ -3,7 +3,7 @@
 import type * as T from "@vibevalley/protocol";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 
-import { withChannel, withMessage, withOwnerMentions } from "@/channel/folded.ts";
+import { withChannel, withMessage, withOwnerMentions } from "@/channel/messages.ts";
 import { emptyPlay, freeStation, playedDoing, playedRun, playOf, stationed } from "@/game/view.ts";
 import { withIssue, withIssueStatuses } from "@/issue/status.ts";
 import { sessionOf, withSession } from "@/session/roster.ts";

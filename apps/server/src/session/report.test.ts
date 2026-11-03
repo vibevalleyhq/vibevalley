@@ -9,11 +9,11 @@ import { conflictOf } from "@/issue/status.ts";
 import { MergeFailure } from "@/project/shapes.ts";
 import { inCny } from "@/runtime/price.ts";
 
+import { briefBreak, conflictBrief, noRoom, notTakenIn, sessionName, whoMakesRoom, withRecall } from "./briefing.ts";
 import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
 import { recallHead } from "./prompts.ts";
 import { readReport, summaryOf } from "./report.ts";
 import { shellCommand } from "./shell.ts";
-import { briefBreak, conflictBrief, noRoom, notTakenIn, sessionName, whoMakesRoom, withRecall } from "./takeIn.ts";
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
 const ctx: FactContext = { id: sessionId("w1"), runtime: "pi", cwd: "/work/clock-in" };
 const base = (): Session =>

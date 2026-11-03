@@ -17,7 +17,7 @@ import * as qc from "../../db/generated/channel.sql.ts";
 import * as qa from "../../db/generated/channel_attachment.sql.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import { toMessage, reactionsOf, reactionsText, type MsgRow, type ChannelService } from "./contracts.ts";
-import type { ChatModel } from "./model.ts";
+import type { ChatModel } from "./rooms.ts";
 
 const emojiPattern = /^\S{1,16}$/u;
 

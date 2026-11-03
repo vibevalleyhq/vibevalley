@@ -28,7 +28,7 @@ values (sqlc.arg(id), 'thread', sqlc.arg(root_id), sqlc.arg(root_number), sqlc.n
 
 -- name: AllChannels :many
 -- bound: a row per channel, what the chat keeps in memory.
--- What the chat keeps in memory (channel/model.ts), loaded when it starts.
+-- What the chat keeps in memory (channel/rooms.ts), loaded when it starts.
 select * from channel order by id;
 
 -- name: RecentChannels :many

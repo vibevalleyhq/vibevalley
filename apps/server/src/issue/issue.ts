@@ -37,9 +37,9 @@ import { recordTrigger } from "@/mailbox/payload.ts";
 import { issueBranch, Project } from "@/project/project.ts";
 import { MergeFailure, type Workplace } from "@/project/shapes.ts";
 import { Runtime } from "@/runtime/runtime.ts";
+import { conflictBrief } from "@/session/briefing.ts";
 import { askedMax } from "@/session/journal.ts";
 import { type Hired, type HireOptions, NotRecorded, type SessionNews, Session } from "@/session/session.ts";
-import { conflictBrief } from "@/session/takeIn.ts";
 
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qs from "../../db/generated/issue_assignment.sql.ts";
