@@ -24,10 +24,11 @@ import { summaryOf } from "@/session/report.ts";
 import { sessionOnIssue } from "@/session/roster.ts";
 import { Session, newsOf, type SessionNews } from "@/session/session.ts";
 import type { InputConsumed, InputReturned } from "@/session/signals.ts";
-import { testConfig, offline } from "@/testing/layers.ts";
+import { testConfig, offline, testDatabase } from "@/testing/layers.ts";
 import { until, waitFor } from "@/testing/until.ts";
 import { Said, said } from "@/testing/world.ts";
 
+import { orchestratorForChannel, setOrchestrator } from "../../db/generated/channel.sql.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import * as qsession from "../../db/generated/session.sql.ts";
 import { Channel, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./channel.ts";
@@ -1148,3 +1149,19 @@ describe("the chat", () => {
     ),
   );
 });
+
+it.effect("regression: mailbox routing reads the current channel manager through threads and direct conversations", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`insert into channel_participant (id, kind, name, joined_at) values ('manager', 'orchestrator', 'manager', 0)`;
+    yield* sql`insert into channel (id, type, name, orchestrator, created_at) values ('room', 'channel', 'room', 'first', 0)`;
+    yield* sql`insert into channel_message (id, channel_id, number, sender_id, kind, body, created_at, revision)
+      values ('root', 'room', 1, 'manager', 'chat', '', 0, 1)`;
+    yield* sql`insert into channel (id, type, root_id, parent_id, created_at) values ('thread', 'thread', 'root', 'room', 0)`;
+    yield* sql`insert into channel (id, type, peer_id, created_at) values ('direct', 'direct', 'manager', 0)`;
+    expect((yield* orchestratorForChannel({ id: "thread" })).agent).toBe("first");
+    yield* setOrchestrator({ id: "room", orchestrator: "second" });
+    expect((yield* orchestratorForChannel({ id: "thread" })).agent).toBe("second");
+    expect((yield* orchestratorForChannel({ id: "direct" })).agent).toBe("manager");
+  }).pipe(Effect.provide(testDatabase())),
+);

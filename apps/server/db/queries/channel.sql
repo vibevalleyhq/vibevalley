@@ -82,9 +82,15 @@ update channel set notify = sqlc.arg(notify) where id = sqlc.arg(id);
 -- name: SetOrchestrator :exec
 update channel set orchestrator = sqlc.narg(orchestrator) where id = sqlc.arg(id) and type = 'channel';
 
--- name: ChannelForRouting :one
--- What Mailbox needs to name the orchestrator a place answers to, without reading the chat's model.
-select id, type, peer_id, parent_id, orchestrator from channel where id = sqlc.arg(id);
+-- name: OrchestratorForChannel :one
+with recursive places as (
+  select id, type, peer_id, parent_id, orchestrator from channel where id = sqlc.arg(id)
+  union
+  select c.id, c.type, c.peer_id, c.parent_id, c.orchestrator
+  from channel c join places p on c.id = p.parent_id where p.type = 'thread'
+)
+select case when type = 'direct' then peer_id else orchestrator end as agent
+from places where type <> 'thread' limit 1;
 
 
 -- name: ChannelInUse :one

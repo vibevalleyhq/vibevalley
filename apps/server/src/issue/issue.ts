@@ -18,13 +18,11 @@ import {
   shortTitle,
 } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
-import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import { templateCatalog } from "@/agent/seed.ts";
 import { actsForOwner, type Actor } from "@/base/actor.ts";
 import { newId } from "@/base/ids.ts";
-import { jsonOf } from "@/base/json.ts";
 import { Channel } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import type { Due } from "@/cron/cron.ts";
@@ -121,9 +119,6 @@ export interface IssueReviewRequest {
   readonly findings?: readonly string[];
   readonly text?: string;
 }
-
-// The issue's JSON columns, read by their Schemas; one that does not read is none.
-const triggerOf = jsonOf(S.RunTrigger);
 
 /** Only while the issue is still open: a completion the owner chose (kept, none) is written before its session leaves,
  * and a task graph's step closes with its graph, so neither comes here. */
@@ -772,7 +767,7 @@ const make = Effect.gen(function* () {
           const input = issueInputs[0];
           if (!input) return "";
           const by: T.RunTrigger = {
-            ...(triggerOf(JSON.stringify(input.meta.trigger)) ?? { kind: "issue" }),
+            ...(input.meta.trigger ?? { kind: "issue" }),
             message: input.id,
           };
           return yield* send(issue, agent, project, input.replyChannel ?? chat.defaultChannel(), by, issueInputs).pipe(

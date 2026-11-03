@@ -18,6 +18,7 @@
 ## 模型和不变量
 
 - **一个 Trigger 只产生一次**：`(source, key)` 唯一；重复读到的来源事件返回已有 Trigger，不再写库。
+- **控制字段有类型**：`TriggerMeta` 与 `TriggerContext` 的字段由 protocol 的 Schema 解码；来源原始数据只放 payload。频道只提供投递需要的元数据，不复制整份消息元数据。
 - **载荷不可变**：`text`/`data` 与 Trigger 在同一行的不同列保存，之后的处理只读。
 - **不替别人做决定**：Trigger 的 `addressed`、`threads` 只是来源给的地址，真正的路由和刹车在 Mailbox。
 

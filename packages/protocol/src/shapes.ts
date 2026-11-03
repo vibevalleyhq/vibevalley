@@ -632,6 +632,41 @@ export interface CompactCard {
   readonly parentPreview?: ParentPreview;
 }
 
+export interface TriggerContext {
+  readonly number: number;
+  readonly target: string;
+  readonly replyTo?: number;
+  readonly edited?: boolean;
+  readonly deleted?: boolean;
+  readonly attachments?: readonly { readonly name: string; readonly path: string }[];
+  readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
+  readonly blocks?: readonly QuotedBlock[];
+  readonly picked?: { readonly agent?: string; readonly project?: string };
+  readonly responsePort?: string;
+  readonly voiceMode?: "dictated" | "conversation" | "api";
+}
+
+export interface TriggerMeta {
+  readonly issue?: string;
+  readonly ingressRecipient?: string;
+  readonly trigger?: RunTrigger;
+  readonly dispatch?: boolean;
+  readonly cron?: string;
+  readonly project?: string;
+  readonly pr?: number;
+  readonly kind?: "ci" | "review" | "comment";
+  readonly head?: string;
+  readonly fingerprint?: string;
+  readonly failed?: boolean;
+  readonly botRound?: number;
+  readonly botRoundKey?: string;
+  readonly channelMessageId?: string;
+  readonly inputContext?: TriggerContext;
+  readonly channelType?: ChannelType;
+  readonly responsePort?: string;
+  readonly voiceMode?: "dictated" | "conversation" | "api";
+}
+
 export interface Trigger {
   readonly id: string;
   readonly source: TriggerSource;
@@ -642,7 +677,7 @@ export interface Trigger {
   readonly replyChannel?: string;
   readonly picked?: { readonly agent?: string; readonly project?: string };
   readonly card: CompactCard;
-  readonly meta: Readonly<Record<string, unknown>>;
+  readonly meta: TriggerMeta;
   readonly at: number;
 }
 

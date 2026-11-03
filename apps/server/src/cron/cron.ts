@@ -151,7 +151,7 @@ const make = Effect.gen(function* () {
           Effect.gen(function* () {
             const trigger = yield* Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(row.trigger_json);
             const payload = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({ data: S.Cron })))(row.payload_json);
-            const by = jsonOrNone(S.RunTrigger)(JSON.stringify(trigger.meta.trigger));
+            const by = trigger.meta.trigger;
             yield* handle({ id: row.id, cron: payload.data, missed: by?.kind === "cron" && by.missed === true }, trigger);
           }).pipe(bestEffort(`cron: replay ${row.id}`)),
         { discard: true },

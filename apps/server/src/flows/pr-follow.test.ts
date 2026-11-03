@@ -101,7 +101,7 @@ for (const submittedReport of [false, true]) {
         threads: [`issue:${issue.id}`],
         text: key,
         at: 1,
-        meta: { kind: "ci", failed: true },
+        meta: { kind: "ci" as const, failed: true },
       });
       const ci = (yield* ingress.accept(event("fix-first-ci")))!;
       yield* until(() => inputs.length === 2, "CI automatically woke the helper");

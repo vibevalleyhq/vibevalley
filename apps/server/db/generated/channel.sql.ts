@@ -402,30 +402,26 @@ export const setOrchestrator = Effect.fn("SetOrchestrator")(function* (params: S
   })(params)
 })
 
-export const ChannelForRoutingParams = Schema.Struct({
+export const OrchestratorForChannelParams = Schema.Struct({
   ["id"]: Schema.String,
 })
-export type ChannelForRoutingParams = typeof ChannelForRoutingParams.Type
+export type OrchestratorForChannelParams = typeof OrchestratorForChannelParams.Type
 
 
-export const ChannelForRoutingResult = Schema.Struct({
-  ["id"]: Schema.String,
-  ["type"]: Pg_public_channel_type_653a6aa2de49,
-  ["peer_id"]: Schema.NullOr(Schema.String),
-  ["parent_id"]: Schema.NullOr(Schema.String),
-  ["orchestrator"]: Schema.NullOr(Schema.String),
+export const OrchestratorForChannelResult = Schema.Struct({
+  ["agent"]: Schema.NullOr(Schema.String),
 })
-export type ChannelForRoutingResult = typeof ChannelForRoutingResult.Type
+export type OrchestratorForChannelResult = typeof OrchestratorForChannelResult.Type
 
 
-export const ChannelForRoutingSql = "-- name: ChannelForRouting :one\n-- What Mailbox needs to name the orchestrator a place answers to, without reading the chat's model.\nselect id, type, peer_id, parent_id, orchestrator from channel where id = $1;"
+export const OrchestratorForChannelSql = "-- name: OrchestratorForChannel :one\nwith recursive places as (\n  select id, type, peer_id, parent_id, orchestrator from channel where id = $1\n  union\n  select c.id, c.type, c.peer_id, c.parent_id, c.orchestrator\n  from channel c join places p on c.id = p.parent_id where p.type = 'thread'\n)\nselect case when type = 'direct' then peer_id else orchestrator end as agent\nfrom places where type <> 'thread' limit 1;"
 
-export const channelForRouting = Effect.fn("ChannelForRouting")(function* (params: ChannelForRoutingParams) {
+export const orchestratorForChannel = Effect.fn("OrchestratorForChannel")(function* (params: OrchestratorForChannelParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findOne({
-    Request: ChannelForRoutingParams,
-    Result: ChannelForRoutingResult,
-    execute: (p) => sql.unsafe(ChannelForRoutingSql, [p["id"]]),
+    Request: OrchestratorForChannelParams,
+    Result: OrchestratorForChannelResult,
+    execute: (p) => sql.unsafe(OrchestratorForChannelSql, [p["id"]]),
   })(params)
 })
 

@@ -12,7 +12,7 @@ import { ServerConfig } from "@/infra/config.ts";
 import { Db } from "@/infra/db.ts";
 import type { Picked } from "@/mailbox/envelope.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
-import { triggerOf } from "@/mailbox/payload.ts";
+import { triggerOf, type TriggerInput } from "@/mailbox/payload.ts";
 import type { ProjectError } from "@/project/workplace.ts";
 
 import * as q from "../../db/generated/ingress_trigger.sql.ts";
@@ -28,19 +28,7 @@ interface OwnerInput {
   readonly voiceMode?: "dictated" | "conversation" | "api";
 }
 
-export interface SourceEvent {
-  readonly source: T.TriggerSource;
-  readonly key: string;
-  readonly actor: T.TriggerActor;
-  readonly text: string;
-  readonly data?: unknown;
-  readonly threads: readonly string[];
-  readonly addressed: T.TriggerAddressing;
-  readonly replyChannel?: string;
-  readonly replyTo?: string;
-  readonly picked?: T.Trigger["picked"];
-  readonly meta?: Readonly<Record<string, unknown>>;
-  readonly at: number;
+export interface SourceEvent extends TriggerInput {
   readonly selfEcho?: boolean;
 }
 

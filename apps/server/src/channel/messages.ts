@@ -3,7 +3,7 @@ import type * as T from "@vibevalley/protocol";
 
 import { compactCard } from "@/base/clip.ts";
 import { compareText, or } from "@/base/order.ts";
-import { type ChannelRouteFact, type Meta, metaOf, senderKind, targetOf } from "@/mailbox/envelope.ts";
+import { type ChannelRouteFact, type Meta, metaOf, senderKind, targetOf, channelType } from "@/mailbox/envelope.ts";
 import type { ChannelMail } from "@/mailbox/mailbox.ts";
 import type { InputContext } from "@/mailbox/payload.ts";
 
@@ -153,7 +153,14 @@ export const channelInput = (fact: ChannelRouteFact, context: InputContext): { r
     ...(fact.row.reply_number === null ? {} : { replyTo: `${fact.row.channel_id}:${fact.row.reply_number}` }),
     replyChannel: fact.row.channel_id,
     card: compactCard(fact.row.body, `vv://trigger/${fact.row.envelope_id}`, 600),
-    meta: { ...meta, channelMessageId: fact.row.envelope_id, inputContext: context, channelType: fact.row.channel_type },
+    meta: {
+      ...(meta.issue ? { issue: meta.issue } : {}),
+      ...(meta.ingressRecipient ? { ingressRecipient: meta.ingressRecipient } : {}),
+      ...(meta.trigger ? { trigger: meta.trigger } : {}),
+      channelMessageId: fact.row.envelope_id,
+      inputContext: context,
+      channelType: channelType(fact.row.channel_type),
+    },
     at: fact.row.created_at,
   };
   return {

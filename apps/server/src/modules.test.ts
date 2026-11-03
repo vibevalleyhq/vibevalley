@@ -51,6 +51,20 @@ const localEdges = (file: string, source = readFileSync(file, "utf8")) =>
 
 const readsSessionSnapshot = (file: string, source: string) => calls(file, source, "core", "state") && localEdges(file, source).includes("session/roster.ts");
 
+const mailboxProjections: Readonly<Record<string, readonly string[]>> = {
+  "channel.sql.ts": ["defaultID", "orchestratorForChannel", "inboxOf"],
+  "issue.sql.ts": ["issueExists"],
+};
+
+const mailboxQueryViolations = (file: string, source: string) =>
+  edgesOf(file, source).flatMap((edge) => {
+    if (!edge.from.includes("/db/generated/")) return [];
+    const name = edge.from.split("/").at(-1) ?? "";
+    if (name.startsWith("mailbox_") || name === "ingress_trigger.sql.ts") return [];
+    const allowed = mailboxProjections[name] ?? [];
+    return edge.names.filter((symbol) => !allowed.includes(symbol)).map((symbol) => `${name}:${symbol}`);
+  });
+
 describe("the modules", () => {
   it("hold every folder and file under src", () => {
     const tops = readdirSync(src).filter((f) => statSync(join(src, f)).isDirectory() || (f.endsWith(".ts") && !f.endsWith(".test.ts")));
@@ -75,6 +89,24 @@ describe("the modules", () => {
       Object.keys(pending).filter((p) => !found.includes(p)),
       "an import listed in pending is gone. Fix: drop it from pending. See apps/server/src/modules.test.ts",
     ).toEqual([]);
+  });
+
+  it("keeps Mailbox's foreign queries to named read projections", () => {
+    const found = files(join(src, "mailbox"))
+      .filter((file) => !file.endsWith(".test.ts"))
+      .flatMap((file) => mailboxQueryViolations(file, readFileSync(file, "utf8")).map((query) => `${rel(file)} -> ${query}`));
+    expect(
+      found,
+      "Mailbox imports a query outside its read boundary. Fix: use a named channel/issue projection; keep writes in the owning service and Trigger receipts in Mailbox. See docs/subsystems/mailbox.md",
+    ).toEqual([]);
+  });
+
+  it("regression: namespace imports and foreign writes cannot hide behind a mailbox projection", () => {
+    const file = join(src, "mailbox/mailbox.ts");
+    expect(mailboxQueryViolations(file, 'import { orchestratorForChannel as route } from "../../db/generated/channel.sql.ts";')).toEqual([]);
+    expect(mailboxQueryViolations(file, 'import * as q from "../../db/generated/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
+    expect(mailboxQueryViolations(file, 'import { setOrchestrator } from "../../db/generated/channel.sql.ts";')).toEqual(["channel.sql.ts:setOrchestrator"]);
+    expect(mailboxQueryViolations(file, 'export * from "../../db/generated/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);
   });
 
   it("keep base pure: it imports nothing else under src", () => {

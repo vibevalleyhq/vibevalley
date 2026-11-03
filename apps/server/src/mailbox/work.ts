@@ -12,7 +12,7 @@ import { channelType, senderKind, type ChannelRouteResult } from "@/mailbox/enve
 import { NotRecorded, Session } from "@/session/session.ts";
 
 import * as qr from "../../db/generated/ingress_trigger.sql.ts";
-import * as qissue from "../../db/generated/issue.sql.ts";
+import { issueExists } from "../../db/generated/issue.sql.ts";
 import * as qd from "../../db/generated/mailbox_delivery.sql.ts";
 import * as qi from "../../db/generated/mailbox_issue.sql.ts";
 import * as qs from "../../db/generated/mailbox_subscription.sql.ts";
@@ -134,7 +134,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
           const row: DeliveryDraft = {
             envelope_id: input.deliveryId ?? trigger.id,
             scope,
-            message_id: typeof trigger.meta.channelMessageId === "string" ? trigger.meta.channelMessageId : null,
+            message_id: trigger.meta.channelMessageId ?? null,
             channel_id: destination,
             source: trigger.source,
             urgency,
@@ -298,7 +298,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
     ) {
       const addressed = trigger.meta.ingressRecipient;
       const recipient =
-        typeof addressed === "string" && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorOf(trigger.replyChannel ?? (yield* defaultChannel));
+        addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorOf(trigger.replyChannel ?? (yield* defaultChannel));
       yield* forward([
         {
           trigger,
@@ -327,9 +327,13 @@ export const makeWorkMailbox = (options: WorkOptions) =>
     const flush = Effect.fn("Mailbox.flushIssue")(function* (id: string, human: boolean = false) {
       const issue = issueOf(id);
       if (!issue) return;
-      const inputs = yield* db.run(qi.issueInputs({ issue_id: id }));
       if (issue.status === "backlog") return;
-      if (issue.status === "done" || (issue.status === "canceled" && issue.canceled !== "lost")) {
+      const assigned = assignedAgentOf(issue);
+      const worker = latestSessionIdOf(issue);
+      const recipient = assigned && agents.isOrchestrator(assigned) ? assigned : worker && sessions.present(worker) ? worker : undefined;
+      const closing = issue.status === "done" || (issue.status === "canceled" && issue.canceled !== "lost");
+      const inputs = yield* db.run(qi.pendingIssueInputs({ issue_id: id, recipient: recipient ?? null, closing }));
+      if (closing) {
         yield* Effect.forEach(
           inputs,
           (input) =>
@@ -342,23 +346,14 @@ export const makeWorkMailbox = (options: WorkOptions) =>
         );
         return;
       }
-      const assigned = assignedAgentOf(issue);
-      const worker = latestSessionIdOf(issue);
-      const recipient = assigned && agents.isOrchestrator(assigned) ? assigned : worker && sessions.present(worker) ? worker : undefined;
       let forwarded = false;
       yield* Effect.forEach(
         inputs,
         (input) =>
           Effect.gen(function* () {
             const trigger = readTrigger(input.trigger_json);
-            if (input.state === "forwarded" && input.session_id !== null) {
-              if (!recipient || input.session_id === recipient) return;
-              const receipt = yield* db.one(qd.deliveryReceipt({ session_id: input.session_id, envelope_id: trigger.id }));
-              if (receipt?.state === "consumed" || (receipt?.state === "dropped" && receipt.dropped_why !== "left" && receipt.dropped_why !== "reassigned"))
-                return;
-            }
             const reason =
-              trigger.actor.kind === "bot" && typeof trigger.meta.botRound === "number" && trigger.meta.botRound > issue.mandate.maxBotReviewRounds && !human
+              trigger.actor.kind === "bot" && trigger.meta.botRound !== undefined && trigger.meta.botRound > issue.mandate.maxBotReviewRounds && !human
                 ? "budget"
                 : !recipient
                   ? "session"
@@ -376,6 +371,16 @@ export const makeWorkMailbox = (options: WorkOptions) =>
                 session: recipient,
                 issue: id,
                 ...(input.session_id && input.session_id !== recipient ? { previous: input.session_id } : {}),
+                prepare: Effect.gen(function* () {
+                  if (input.session_id === null) return true;
+                  const receipt = yield* db.one(qd.deliveryReceipt({ session_id: input.session_id, envelope_id: trigger.id }));
+                  return (
+                    receipt === undefined ||
+                    receipt.state === "pending" ||
+                    receipt.state === "handed" ||
+                    (receipt.state === "dropped" && (receipt.dropped_why === "left" || receipt.dropped_why === "reassigned"))
+                  );
+                }),
                 commit: db.run(qi.forwardIssueInput({ trigger_id: trigger.id, session_id: recipient })),
               },
             ]);
@@ -410,7 +415,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
             const id = thread.slice(6);
             const issue = issueOf(id);
             if (issue) ids.add(issue.id);
-            else if (yield* db.one(qissue.issueExists({ id }))) ids.add(id);
+            else if (yield* db.one(issueExists({ id }))) ids.add(id);
           }),
         { discard: true },
       );
@@ -442,7 +447,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       }
       const addressed = trigger.meta.ingressRecipient;
       const recipient =
-        typeof addressed === "string" && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorOf(trigger.replyChannel ?? (yield* defaultChannel));
+        addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : yield* orchestratorOf(trigger.replyChannel ?? (yield* defaultChannel));
       yield* forward([{ trigger, session: recipient, commit: Effect.void }]);
       dispatch(recipient);
       return undefined;

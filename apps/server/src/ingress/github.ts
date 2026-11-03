@@ -288,7 +288,7 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
           occurred: review.at,
           text: `${review.author} ${review.state}\n${review.body}`.trim(),
           data: review,
-          kind: "review",
+          kind: "review" as const,
         })),
         ...current.comments.map((comment) => ({
           key: `${project}#${pr.number}:comment:${comment.id}`,
@@ -305,7 +305,7 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
             .filter(Boolean)
             .join("\n"),
           data: comment,
-          kind: "comment",
+          kind: "comment" as const,
         })),
       ].toSorted((a, b) => or(compareText(a.occurred, b.occurred), compareText(a.key, b.key)));
       yield* Effect.forEach(

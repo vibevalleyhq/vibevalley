@@ -463,7 +463,7 @@ export default defineConfig({
       },
       {
         // Doors to the outside, where null comes in and is turned into undefined: a stored column's text, the DOM's body.
-        files: ["apps/server/src/base/json.ts", "apps/web/src/features/channel/draft.ts"],
+        files: ["apps/server/src/base/json.ts", "apps/web/src/features/channel/composing.ts"],
         rules: { "vibevalley/one-absent": "off" },
       },
       {

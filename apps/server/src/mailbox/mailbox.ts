@@ -16,7 +16,6 @@ import {
   type ChannelAudience,
   type ChannelEnvelopeRow,
   type ChannelRouteResult,
-  metaOf,
   type InboxMessage,
   type OrchestratorNews,
   senderKind,
@@ -24,7 +23,7 @@ import {
 } from "@/mailbox/envelope.ts";
 import { type NotRecorded, Session } from "@/session/session.ts";
 
-import * as qc from "../../db/generated/channel.sql.ts";
+import { defaultID, orchestratorForChannel } from "../../db/generated/channel.sql.ts";
 import * as qr from "../../db/generated/ingress_trigger.sql.ts";
 import * as qd from "../../db/generated/mailbox_delivery.sql.ts";
 import { type Recipient, Reach, WakeBreaker } from "./brakes.ts";
@@ -107,14 +106,11 @@ export class Mailbox extends Context.Service<
       const config = yield* ServerConfig;
       const issueOf = (id: string) => core.state().issues.find((issue) => issue.id === id);
       const defaultChannelOf = Effect.gen(function* () {
-        return (yield* db.one(qc.defaultID()))?.id ?? "";
+        return (yield* db.one(defaultID()))?.id ?? "";
       });
       const orchestratorOf = (channel: string): Effect.Effect<string> =>
         Effect.gen(function* () {
-          const row = yield* db.one(qc.channelForRouting({ id: channel }));
-          if (!row) return defaultOrchestrator;
-          if (row.type === "thread") return row.parent_id ? yield* orchestratorOf(row.parent_id) : defaultOrchestrator;
-          const own = row.type === "direct" ? row.peer_id : row.orchestrator;
+          const own = (yield* db.one(orchestratorForChannel({ id: channel })))?.agent;
           return own && agents.isOrchestrator(own) ? own : defaultOrchestrator;
         });
       const deliveryUnread = Effect.fn("Mailbox.deliveryUnread")(function* (who: string) {
@@ -312,7 +308,7 @@ export class Mailbox extends Context.Service<
 
       const publishOrchestrator = (recipient: string, messages: readonly InboxMessage[], primary: DeliveryRow) =>
         Effect.gen(function* () {
-          const meta = metaOf(primary.payload.trigger.meta);
+          const meta = primary.payload.trigger.meta;
           const source = orchestratorSource(primary.payload.trigger.source);
           PubSub.publishUnsafe(orchestratorHub, {
             agent: recipient,
@@ -347,7 +343,7 @@ export class Mailbox extends Context.Service<
           const current = sessions.sessionOf(recipient)?.issue;
           const itemOf = (row: DeliveryRow) => {
             const id = row.payload.trigger.meta.issue;
-            return issueOf(typeof id === "string" ? id : (current ?? ""));
+            return issueOf(id ?? current ?? "");
           };
           const answered = new Set(
             rows

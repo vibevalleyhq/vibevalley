@@ -78,6 +78,36 @@ export const issueInputs = Effect.fn("IssueInputs")(function* (params: IssueInpu
   })(params)
 })
 
+export const PendingIssueInputsParams = Schema.Struct({
+  ["issue_id"]: Schema.String,
+  ["closing"]: Schema.Boolean,
+  ["recipient"]: Schema.NullOr(Schema.String),
+})
+export type PendingIssueInputsParams = typeof PendingIssueInputsParams.Type
+
+
+export const PendingIssueInputsResult = Schema.Struct({
+  ["trigger_id"]: Schema.String,
+  ["issue_id"]: Schema.String,
+  ["state"]: Pg_public_mailbox_issue_state_c1149c28be2e,
+  ["session_id"]: Schema.NullOr(Schema.String),
+  ["reason"]: Schema.NullOr(Schema.String),
+  ["trigger_json"]: Schema.String,
+})
+export type PendingIssueInputsResult = typeof PendingIssueInputsResult.Type
+
+
+export const PendingIssueInputsSql = "-- name: PendingIssueInputs :many\n-- bound: inputs that need closing or forwarding to the issue's current recipient.\nselect m.trigger_id, m.issue_id, m.state, m.session_id, m.reason, t.trigger_json\nfrom mailbox_issue m join ingress_trigger t on t.id = m.trigger_id\nleft join mailbox_delivery d on d.session_id = m.session_id and d.envelope_id = m.trigger_id\nwhere m.issue_id = $1 and m.state <> 'returned'\n  and (\n    ($2::boolean and (t.trigger_json::jsonb->'actor'->>'kind' <> 'owner' or d.state is distinct from 'consumed'))\n    or (not $2::boolean and (\n      m.state = 'held' or m.session_id is null\n      or ($3::text is not null and m.session_id <> $3\n        and (d.state is null or d.state in ('pending', 'handed') or (d.state = 'dropped' and d.dropped_why in ('left', 'reassigned'))))\n    ))\n  )\norder by t.routing_position;"
+
+export const pendingIssueInputs = Effect.fn("PendingIssueInputs")(function* (params: PendingIssueInputsParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: PendingIssueInputsParams,
+    Result: PendingIssueInputsResult,
+    execute: (p) => sql.unsafe(PendingIssueInputsSql, [p["issue_id"], p["closing"], p["recipient"]]),
+  })(params)
+})
+
 export const HoldIssueInputParams = Schema.Struct({
   ["reason"]: Schema.NullOr(Schema.String),
   ["trigger_id"]: Schema.String,

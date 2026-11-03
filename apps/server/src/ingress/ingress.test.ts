@@ -1,9 +1,11 @@
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 
 import { Channel } from "@/channel/channel.ts";
+import { inputOf, readPayload, triggerOf, triggerPayload } from "@/mailbox/payload.ts";
 import { Resource } from "@/resource/resource.ts";
 import { world } from "@/testing/world.ts";
 
@@ -40,3 +42,43 @@ it.live("regression: machine triggers are immutable source records and do not be
     expect(yield* chat.history(channel)).toEqual(before);
   }).pipe(Effect.scoped, Effect.provide(world())),
 );
+
+it("regression: trigger control fields reject malformed values and preserve voice and attachment context", () => {
+  const trigger = triggerOf({
+    source: "voice",
+    key: "voice-control",
+    actor: { kind: "owner", id: "owner" },
+    addressed: "direct",
+    threads: [],
+    text: "voice input",
+    at: 0,
+    meta: {
+      issue: "original",
+      trigger: { kind: "comment" },
+      inputContext: {
+        number: 7,
+        target: "#room",
+        responsePort: "call-route",
+        voiceMode: "conversation",
+        attachments: [{ name: "note.txt", path: "/tmp/note.txt" }],
+      },
+      channelType: "channel",
+    },
+  });
+  for (const meta of [
+    { dispatch: "true" },
+    { botRound: "3" },
+    { kind: "unknown" },
+    { trigger: { kind: "unknown" } },
+    { inputContext: { number: 7, target: 42 } },
+  ])
+    expect(Schema.is(S.Trigger)({ ...trigger, meta })).toBe(false);
+  const decoded = Schema.decodeUnknownSync(S.Trigger)(JSON.parse(JSON.stringify(trigger)));
+  const payload = readPayload(JSON.stringify(triggerPayload(decoded, "assigned")));
+  const message = inputOf({ envelope_id: trigger.id, payload });
+  expect(payload.trigger.meta.issue).toBe("assigned");
+  expect(decoded.meta.issue).toBe("original");
+  expect(message.responsePort).toBe("call-route");
+  expect(message.voiceMode).toBe("conversation");
+  expect(message.attachments).toEqual([{ name: "note.txt", path: "/tmp/note.txt" }]);
+});

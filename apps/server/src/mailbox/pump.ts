@@ -1,8 +1,7 @@
-import { Clock, Effect, Schema } from "effect";
+import { Clock, Effect, type Schema } from "effect";
 import type { SqlError } from "effect/sql";
 
 import { isBusy } from "@vibevalley/protocol/rules";
-import { RunTrigger } from "@vibevalley/protocol/schema";
 
 import type { Session } from "@/session/session.ts";
 import type { Delivered, InputConsumed, InputReturned, LaunchActivity } from "@/session/signals.ts";
@@ -56,9 +55,10 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
   const deliver = (recipient: string, text: string, rows: readonly DeliveryRow[]): Effect.Effect<Delivered> => {
     const first = rows.findLast((row) => row.payload.trigger.actor.kind === "owner") ?? rows.find((row) => row.wakes && row.held_by === null) ?? rows[0]!;
     return sessions.deliver(recipient, text, {
-      trigger: Schema.is(RunTrigger)(first.payload.trigger.meta.trigger)
-        ? { ...first.payload.trigger.meta.trigger, message: first.envelope_id }
-        : { kind: "comment", message: first.envelope_id, ...(first.channel_id ? { channel: first.channel_id } : {}) },
+      trigger:
+        first.payload.trigger.meta.trigger !== undefined
+          ? { ...first.payload.trigger.meta.trigger, message: first.envelope_id }
+          : { kind: "comment", message: first.envelope_id, ...(first.channel_id ? { channel: first.channel_id } : {}) },
       envelopeIds: rows.map((row) => row.envelope_id),
       byOwnerComment: rows.some((row) => row.payload.trigger.actor.kind === "owner"),
     });

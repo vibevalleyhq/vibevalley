@@ -8,12 +8,12 @@ import * as S from "@vibevalley/protocol/schema";
 import { compactCard } from "@/base/clip.ts";
 import { refused } from "@/errors.ts";
 import { type Db, causeMessage } from "@/infra/db.ts";
-import { metaOf, senderKind } from "@/mailbox/envelope.ts";
+import { senderKind } from "@/mailbox/envelope.ts";
 import type { InboxMessage, OrchestratorNews } from "@/mailbox/envelope.ts";
 
 import * as qr from "../../db/generated/ingress_trigger.sql.ts";
 
-export type InputContext = Omit<InboxMessage, "id" | "from" | "fromKind" | "name" | "text" | "originTrigger">;
+export type InputContext = T.TriggerContext;
 export interface DeliveryPayload {
   readonly note?: string;
   readonly trigger: T.Trigger;
@@ -21,23 +21,10 @@ export interface DeliveryPayload {
   readonly channelType: T.ChannelType;
 }
 
-const InputContextSchema: Schema.Codec<InputContext, S.Wire<InputContext>> = Schema.Struct({
-  number: Schema.Int,
-  target: Schema.String,
-  replyTo: Schema.optionalKey(Schema.Int),
-  edited: Schema.optionalKey(Schema.Boolean),
-  deleted: Schema.optionalKey(Schema.Boolean),
-  attachments: Schema.optionalKey(Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String }))),
-  artifact: Schema.optionalKey(Schema.Struct({ id: Schema.String, title: Schema.String, version: Schema.Int })),
-  blocks: Schema.optionalKey(Schema.Array(S.QuotedBlock)),
-  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
-  responsePort: Schema.optionalKey(Schema.String),
-  voiceMode: Schema.optionalKey(Schema.Literals(["dictated", "conversation", "api"])),
-});
 const Payload: Schema.Codec<DeliveryPayload, S.Wire<DeliveryPayload>> = Schema.Struct({
   note: Schema.optionalKey(Schema.String),
   trigger: S.Trigger,
-  context: InputContextSchema,
+  context: S.TriggerContext,
   channelType: S.ChannelType,
 });
 export const readPayload = Schema.decodeUnknownSync(Schema.fromJsonString(Payload));
@@ -53,7 +40,7 @@ export interface TriggerInput {
   readonly replyChannel?: string;
   readonly replyTo?: string;
   readonly picked?: T.Trigger["picked"];
-  readonly meta?: Readonly<Record<string, unknown>>;
+  readonly meta?: T.TriggerMeta;
   readonly at: number;
   readonly data?: unknown;
 }
@@ -120,8 +107,8 @@ export const unroutedCronTriggers = (db: Db["Service"], after: number) => db.run
 export const deliveryScope = (channel: string, issue?: string) => (issue ? `issue:${issue}` : `channel:${channel}`);
 
 export function triggerPayload(trigger: T.Trigger, issue?: string, note?: string): DeliveryPayload {
-  const { issue: _sourceIssue, ingressSource: _sourcePurpose, inputContext, channelType, ...sourceMeta } = trigger.meta;
-  const meta = metaOf(trigger.meta);
+  const { issue: _sourceIssue, inputContext, channelType, ...sourceMeta } = trigger.meta;
+  const meta = trigger.meta;
   return {
     ...(note ? { note } : {}),
     trigger: {
@@ -131,17 +118,14 @@ export function triggerPayload(trigger: T.Trigger, issue?: string, note?: string
         ...(issue ? { issue } : {}),
       },
     },
-    context:
-      inputContext !== undefined
-        ? Schema.decodeUnknownSync(InputContextSchema)(inputContext)
-        : {
-            number: 0,
-            target: trigger.card.readUri,
-            ...(trigger.picked ? { picked: trigger.picked } : {}),
-            ...(meta.responsePort ? { responsePort: meta.responsePort } : {}),
-            ...(meta.voiceMode ? { voiceMode: meta.voiceMode } : {}),
-          },
-    channelType: channelType !== undefined ? Schema.decodeUnknownSync(S.ChannelType)(channelType) : "channel",
+    context: inputContext ?? {
+      number: 0,
+      target: trigger.card.readUri,
+      ...(trigger.picked ? { picked: trigger.picked } : {}),
+      ...(meta.responsePort ? { responsePort: meta.responsePort } : {}),
+      ...(meta.voiceMode ? { voiceMode: meta.voiceMode } : {}),
+    },
+    channelType: channelType ?? "channel",
   };
 }
 

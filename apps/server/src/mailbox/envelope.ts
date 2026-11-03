@@ -8,7 +8,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { jsonOrNone } from "@/base/json.ts";
 import type { Db } from "@/infra/db.ts";
 
-import * as qc from "../../db/generated/channel.sql.ts";
+import { inboxOf } from "../../db/generated/channel.sql.ts";
 
 export interface Meta {
   run?: string;
@@ -105,28 +105,13 @@ export interface Picked {
   readonly project?: string;
 }
 
-export interface InboxMessage {
+export interface InboxMessage extends T.TriggerContext {
   readonly id: string;
   readonly originTrigger?: string;
-  readonly number: number;
-  readonly target: string;
   readonly from: string;
   readonly fromKind: T.ActorKind;
   readonly name: string;
   readonly text: string;
-  readonly replyTo?: number;
-  readonly edited?: boolean;
-  readonly deleted?: boolean;
-  /** Files said with it, where they are on this computer. */
-  readonly attachments?: readonly { readonly name: string; readonly path: string }[];
-  readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
-  /** Blocks of a blocks artifact the message points at. */
-  readonly blocks?: readonly T.QuotedBlock[];
-  /** Kept with the message, so whoever takes it sees it, whenever that is. */
-  readonly picked?: Picked;
-  /** Process-local response route; absent after a restart, while the durable message still runs. */
-  readonly responsePort?: string;
-  readonly voiceMode?: "dictated" | "conversation" | "api";
 }
 
 export interface UnreadRow {
@@ -140,7 +125,7 @@ export const summaryChannels = 20;
 
 /** What a participant has not read, as the mailbox and the channel both report it. */
 export const unreadSummaryOf = (db: Db["Service"], participant: string, channel: string): Effect.Effect<UnreadRow[]> =>
-  Effect.map(db.run(qc.inboxOf({ participant, channel })), (rows) =>
+  Effect.map(db.run(inboxOf({ participant, channel })), (rows) =>
     rows.slice(0, summaryChannels).map((r) => ({
       target: targetOf({ type: channelType(r.type), ...(r.root_number !== null ? { rootNumber: r.root_number } : {}) }, r.channel_name || ""),
       unread: r.unread ?? 0,

@@ -2221,6 +2221,41 @@ export const CompactCard: Codec<T.CompactCard> = Schema.Struct({
   parentPreview: Schema.optionalKey(ParentPreviewSchema),
 });
 
+export const TriggerContext: Codec<T.TriggerContext> = Schema.Struct({
+  number: Schema.Int,
+  target: Schema.String,
+  replyTo: Schema.optionalKey(Schema.Int),
+  edited: Schema.optionalKey(Schema.Boolean),
+  deleted: Schema.optionalKey(Schema.Boolean),
+  attachments: Schema.optionalKey(Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String }))),
+  artifact: Schema.optionalKey(Schema.Struct({ id: Schema.String, title: Schema.String, version: Schema.Int })),
+  blocks: Schema.optionalKey(Schema.Array(QuotedBlock)),
+  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
+  responsePort: Schema.optionalKey(Schema.String),
+  voiceMode: Schema.optionalKey(Schema.Literals(["dictated", "conversation", "api"])),
+});
+
+export const TriggerMeta: Codec<T.TriggerMeta> = Schema.Struct({
+  issue: Schema.optionalKey(Schema.String),
+  ingressRecipient: Schema.optionalKey(Schema.String),
+  trigger: Schema.optionalKey(RunTrigger),
+  dispatch: Schema.optionalKey(Schema.Boolean),
+  cron: Schema.optionalKey(Schema.String),
+  project: Schema.optionalKey(Schema.String),
+  pr: Schema.optionalKey(Schema.Int),
+  kind: Schema.optionalKey(Schema.Literals(["ci", "review", "comment"])),
+  head: Schema.optionalKey(Schema.String),
+  fingerprint: Schema.optionalKey(Schema.String),
+  failed: Schema.optionalKey(Schema.Boolean),
+  botRound: Schema.optionalKey(Schema.Int),
+  botRoundKey: Schema.optionalKey(Schema.String),
+  channelMessageId: Schema.optionalKey(Schema.String),
+  inputContext: Schema.optionalKey(TriggerContext),
+  channelType: Schema.optionalKey(ChannelType),
+  responsePort: Schema.optionalKey(Schema.String),
+  voiceMode: Schema.optionalKey(Schema.Literals(["dictated", "conversation", "api"])),
+});
+
 export const Trigger: Codec<T.Trigger> = Schema.Struct({
   id: Schema.String,
   source: Schema.Literals(T.TriggerSourceValues),
@@ -2231,6 +2266,6 @@ export const Trigger: Codec<T.Trigger> = Schema.Struct({
   replyChannel: Schema.optionalKey(Schema.String),
   picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
   card: CompactCard,
-  meta: Schema.Record(Schema.String, Schema.Unknown),
+  meta: TriggerMeta,
   at: Schema.Finite,
 });
