@@ -6,7 +6,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 
 import { clip } from "@/base/clip.ts";
 import { conflictOf } from "@/issue/status.ts";
-import { MergeFailure } from "@/project/shapes.ts";
+import { MergeFailure } from "@/project/workplace.ts";
 import { inCny } from "@/runtime/price.ts";
 
 import { briefBreak, conflictBrief, noRoom, notTakenIn, sessionName, whoMakesRoom, withRecall } from "./briefing.ts";

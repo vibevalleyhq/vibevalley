@@ -3,7 +3,7 @@ import { Schema } from "effect";
 import { t } from "@vibevalley/i18n";
 import type { Priority } from "@vibevalley/protocol";
 
-import { compareText, or } from "@/base/order";
+import { compareText, or } from "@/base/search";
 import { defineStored, orFallback } from "@/state/stored";
 
 import { type Lane, lanes } from "./lanes";

@@ -4,7 +4,7 @@ import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { isBusy, roomLeft } from "@vibevalley/protocol/rules";
 
-import type { MergeFailure } from "@/project/shapes.ts";
+import type { MergeFailure } from "@/project/workplace.ts";
 import { runtimeLabel } from "@/runtime/presets.ts";
 
 import { recallHead, recallIntro } from "./prompts.ts";

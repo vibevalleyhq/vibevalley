@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { stackOf } from "./shapes.ts";
+import { stackOf } from "./workplace.ts";
 
 const scripts = `{"scripts":{"test":"vitest run","build":"vite build"}}`;
 const go = {

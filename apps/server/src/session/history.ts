@@ -5,7 +5,7 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOrNone } from "@/base/json.ts";
-import { type Workplace } from "@/project/shapes.ts";
+import { type Workplace } from "@/project/workplace.ts";
 
 import type * as qs from "../../db/generated/session.sql.ts";
 import type * as qr from "../../db/generated/session_run.sql.ts";

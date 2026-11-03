@@ -23,7 +23,7 @@ import { restoredSession, sessionState } from "@/session/history.ts";
 import { summaryOf } from "@/session/report.ts";
 import { sessionOnIssue } from "@/session/roster.ts";
 import { Session, newsOf, type SessionNews } from "@/session/session.ts";
-import type { InputConsumed, InputReturned } from "@/session/shapes.ts";
+import type { InputConsumed, InputReturned } from "@/session/signals.ts";
 import { testConfig, offline } from "@/testing/layers.ts";
 import { Said, said } from "@/testing/said.ts";
 import { until, waitFor } from "@/testing/until.ts";

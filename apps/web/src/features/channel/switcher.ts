@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import { type Chat, type Channel, type Issue, type Session } from "@vibevalley/protocol";
 
-import { compareText, or } from "@/base/order";
+import { compareText, or } from "@/base/search";
 
 import { channelLabel, channelName, topOf, threadTitle, unreadIn, unreadUnder } from "./places";
 

@@ -10,7 +10,7 @@ import type { Core } from "@/core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import type { Db } from "@/infra/db.ts";
 import { issueBranch, type Project } from "@/project/project.ts";
-import { type Merged, MergeFailure, type ProjectError, type Workplace } from "@/project/shapes.ts";
+import { type Merged, MergeFailure, type ProjectError, type Workplace } from "@/project/workplace.ts";
 import type { NotTakenIn, Session } from "@/session/session.ts";
 
 import * as q from "../../db/generated/issue.sql.ts";

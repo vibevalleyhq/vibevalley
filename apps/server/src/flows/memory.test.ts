@@ -13,7 +13,7 @@ import { Memory } from "@/memory/memory.ts";
 import { briefBreak } from "@/session/briefing.ts";
 import { recallHead } from "@/session/prompts.ts";
 import { Session } from "@/session/session.ts";
-import type { DeliveryInput } from "@/session/shapes.ts";
+import type { DeliveryInput } from "@/session/signals.ts";
 import { testConfig } from "@/testing/layers.ts";
 
 import { await_, farm, type Farm, lab, mustHire, watch } from "./farm.ts";

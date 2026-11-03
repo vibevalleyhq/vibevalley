@@ -8,7 +8,7 @@ import { type ApiError } from "@/errors.ts";
 import { Ingress } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
-import type { ProjectError } from "@/project/shapes.ts";
+import type { ProjectError } from "@/project/workplace.ts";
 import { Session } from "@/session/session.ts";
 
 import { resourceWords } from "./prompts.ts";

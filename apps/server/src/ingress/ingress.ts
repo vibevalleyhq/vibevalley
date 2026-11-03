@@ -13,7 +13,7 @@ import { Db } from "@/infra/db.ts";
 import type { Picked } from "@/mailbox/envelope.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { triggerOf } from "@/mailbox/payload.ts";
-import type { ProjectError } from "@/project/shapes.ts";
+import type { ProjectError } from "@/project/workplace.ts";
 
 import * as q from "../../db/generated/ingress_trigger.sql.ts";
 import { githubInputs, type GitHubPullIngress } from "./github.ts";

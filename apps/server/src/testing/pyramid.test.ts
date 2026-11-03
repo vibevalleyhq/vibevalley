@@ -46,7 +46,7 @@ describe("the test pyramid", () => {
     });
     expect(
       leaving,
-      "a module's recorded.test.ts replays its golden data in the process, and this import chain reaches a database, a process or the network. Fix: import the pure function from a file that runs nothing, moving it (or the shapes it needs) out of the file that does, as project/shapes.ts was. See docs/subsystems/foundation.md",
+      "a module's recorded.test.ts replays its golden data in the process, and this import chain reaches a database, a process or the network. Fix: import the pure function from a file that runs nothing, moving it (or the shapes it needs) out of the file that does, as project/workplace.ts was. See docs/subsystems/foundation.md",
     ).toEqual([]);
   });
 

@@ -11,7 +11,7 @@ import { testConfig } from "@/testing/layers.ts";
 import { untilGot as until } from "@/testing/until.ts";
 
 import { Project, activityOf, countsOf, githubRepository, type GitHubRun, type ProjectHooks, projectProblem, tokeiArgs } from "./project.ts";
-import { type MergeFailure } from "./shapes.ts";
+import { type MergeFailure } from "./workplace.ts";
 
 /** gh is not installed. */
 export const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });

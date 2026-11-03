@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { type Crop, type Issue, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
 import { isBusy, phaseText, plotKeyOf, roomLeft } from "@vibevalley/protocol/rules";
 
-import { compareText, or } from "@/base/order";
+import { compareText, or } from "@/base/search";
 import { type Recency, recencyOf } from "@/features/project";
 import type { Pose } from "@/ui/cast";
 

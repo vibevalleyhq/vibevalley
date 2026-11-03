@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import { type LanguageCount, type ProjectSummary } from "@vibevalley/protocol";
 
-import { compareText, or } from "@/base/order";
+import { compareText, or } from "@/base/search";
 
 /** Only repository home URLs, never credentials, arbitrary git transports or command-line options. */
 export function githubRepository(input: string): { name: string; url: string } | undefined {

@@ -16,14 +16,14 @@ import type { LaunchActivity } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import { watchStalls } from "@/executor/executor.ts";
 import { Project } from "@/project/project.ts";
-import { MergeFailure } from "@/project/shapes.ts";
+import { MergeFailure } from "@/project/workplace.ts";
 import { gitIn } from "@/testing/git.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { until, waitFor } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import { NotRecorded, Session } from "./session.ts";
-import type { DeliveryInput } from "./shapes.ts";
+import type { DeliveryInput } from "./signals.ts";
 const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byOwnerComment: false });
 

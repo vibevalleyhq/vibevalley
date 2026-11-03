@@ -18,7 +18,7 @@ import { world } from "@/testing/world.ts";
 import * as qs from "../../db/generated/session.sql.ts";
 import { Caller } from "./host.ts";
 import { Session, type RunFinished } from "./session.ts";
-import type { InputConsumed } from "./shapes.ts";
+import type { InputConsumed } from "./signals.ts";
 describe("Caller", () => {
   it.effect("keeps what came before its reader, then streams until it ends", () =>
     Effect.gen(function* () {

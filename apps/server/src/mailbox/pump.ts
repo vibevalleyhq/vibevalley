@@ -5,7 +5,7 @@ import { isBusy } from "@vibevalley/protocol/rules";
 import { RunTrigger } from "@vibevalley/protocol/schema";
 
 import type { Session } from "@/session/session.ts";
-import type { Delivered, InputConsumed, InputReturned, LaunchActivity } from "@/session/shapes.ts";
+import type { Delivered, InputConsumed, InputReturned, LaunchActivity } from "@/session/signals.ts";
 
 import type { DeliveryRow } from "./deliveries.ts";
 

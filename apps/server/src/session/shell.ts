@@ -5,7 +5,7 @@ import { Effect, FileSystem } from "effect";
 import { t } from "@vibevalley/i18n";
 
 import { messageOf } from "@/errors.ts";
-import { ProjectError, type Workplace, type WorkplaceRelease } from "@/project/shapes.ts";
+import { ProjectError, type Workplace, type WorkplaceRelease } from "@/project/workplace.ts";
 
 // codex runs every command as `/bin/zsh -lc '<command>'`; the label shows the
 // command, not the shell around it.

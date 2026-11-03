@@ -17,7 +17,7 @@ import { until, waitFor } from "@/testing/until.ts";
 import { world } from "@/testing/world.ts";
 
 import { NotRecorded, Session } from "./session.ts";
-import type { DeliveryInput } from "./shapes.ts";
+import type { DeliveryInput } from "./signals.ts";
 
 const profile = () => ({ ...starter("lab"), effort: "" });
 const delivery = (trigger: DeliveryInput["trigger"]): DeliveryInput => ({ trigger, envelopeIds: [], byOwnerComment: false });

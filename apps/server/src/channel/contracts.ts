@@ -14,7 +14,7 @@ import { type ChannelRow } from "./rooms.ts";
 export type { ChannelAudience, ChannelEnvelopeRow, ChannelRouteFact, Meta, OrchestratorNews } from "@/mailbox/envelope.ts";
 export type { InboxMessage, Picked } from "@/mailbox/envelope.ts";
 export { channelType, inboxMore, metaOf, metaText, senderKind } from "@/mailbox/envelope.ts";
-export type { Delivered, LaunchActivity, SessionNews } from "@/session/shapes.ts";
+export type { Delivered, LaunchActivity, SessionNews } from "@/session/signals.ts";
 
 export type MsgRow = qm.MessageByIDResult;
 

@@ -36,7 +36,7 @@ import {
   type Workplace,
   type WorkplaceCleanup,
   type WorkplaceRelease,
-} from "./shapes.ts";
+} from "./workplace.ts";
 
 const fail = (message: string) => Effect.fail(new ProjectError({ message }));
 

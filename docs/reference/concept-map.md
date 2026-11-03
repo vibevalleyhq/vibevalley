@@ -44,7 +44,7 @@
 | 概念 | 服务端 | 存储 | oar |
 |---|---|---|---|
 | Workspace | `infra/config.ts` 的 `ServerConfig`；`services.ts` 把全部服务叠起来 | `VIBEVALLEY_WORK_ROOT`、`VIBEVALLEY_HOME` | |
-| 项目 | `Project`（`project/project.ts`、`git.ts`、`shapes.ts`） | 工作目录下的 git 仓库 | 会话的 `cwd` |
+| 项目 | `Project`（`project/project.ts`、`git.ts`、`workplace.ts`） | 工作目录下的 git 仓库 | 会话的 `cwd` |
 | 档案、技能、档案模板 | `Agent`（模板的读法在 `agent/template.ts`） | `config.json`；内置模板 `apps/server/src/agent/templates/`，加进来的 `agent-templates/` | |
 | 农机 | `Runtime` | `config.json` 里每台农机的设置、`runtime_spend` 表 | `Runtime`、`RuntimeRegistry` |
 | 记性 | `Memory` | `memory` 表；管家的在 `agent/<档案 id>/MEMORY.md` | |

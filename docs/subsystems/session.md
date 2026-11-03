@@ -40,7 +40,7 @@ Session 服务只返回声明的接口，不附带 Hand、令牌生成器和日�
 
 | 层 | 代码里 | 是什么 |
 |---|---|---|
-| Session | `Session`（`shapes.ts`）、`session` 表 | 一个档案的上下文：工单按配置使用项目目录或 worktree；聊天使用自身目录并关联频道，跨好几次 run；编号 `w<n>`，接着已有的最大号往下排，新 Session 不会撞上旧日志 |
+| Session | `Session`（`signals.ts`）、`session` 表 | 一个档案的上下文：工单按配置使用项目目录或 worktree；聊天使用自身目录并关联频道，跨好几次 run；编号 `w<n>`，接着已有的最大号往下排，新 Session 不会撞上旧日志 |
 | Run | `Run`、`session_run` | 一次触发到一次汇报：帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run；核心状态里是 `sessionPhase` 到 `sessionReport` 两个事实 |
 | oar 会话 | oar 的会话、`Subagent` | 农机的一条可续的记录流；重启或接不上时换一个 |
 

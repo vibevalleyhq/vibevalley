@@ -179,9 +179,9 @@
 | `SpriteManifest` | `manifests.ts` |  |
 | `CursorManifest` | `manifests.ts` |  |
 | `TitleManifest` | `manifests.ts` |  |
-| `compareText` | `order.ts` |  |
-| `or` | `order.ts` |  |
 | `matches` | `search.ts` | Every word of the query is somewhere in the texts, ignoring case; an empty query matches everything. |
+| `compareText` | `search.ts` |  |
+| `or` | `search.ts` |  |
 | `shortcutPlaces` | `shortcuts.ts` |  |
 | `shortcuts` | `shortcuts.ts` |  |
 | `keyCap` | `shortcuts.ts` | A key's cap on the sheet. |

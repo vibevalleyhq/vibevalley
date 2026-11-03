@@ -13,7 +13,7 @@ import { orchestrator, owner } from "@/base/actor.ts";
 import { Core } from "@/core/core.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
-import type { DeliveryInput } from "@/session/shapes.ts";
+import type { DeliveryInput } from "@/session/signals.ts";
 import { releaseHeld } from "@/testing/helper.ts";
 import { testConfig } from "@/testing/layers.ts";
 

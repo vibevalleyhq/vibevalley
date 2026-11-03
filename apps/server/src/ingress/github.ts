@@ -11,7 +11,7 @@ import { Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Project } from "@/project/project.ts";
-import { ProjectError } from "@/project/shapes.ts";
+import { ProjectError } from "@/project/workplace.ts";
 
 import * as q from "../../db/generated/ingress_github.sql.ts";
 import * as qt from "../../db/generated/ingress_trigger.sql.ts";

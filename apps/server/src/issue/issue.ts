@@ -35,7 +35,7 @@ import { bestEffort } from "@/infra/log.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { recordTrigger } from "@/mailbox/payload.ts";
 import { issueBranch, Project } from "@/project/project.ts";
-import { MergeFailure, type Workplace } from "@/project/shapes.ts";
+import { MergeFailure, type Workplace } from "@/project/workplace.ts";
 import { Runtime } from "@/runtime/runtime.ts";
 import { conflictBrief } from "@/session/briefing.ts";
 import { askedMax } from "@/session/journal.ts";

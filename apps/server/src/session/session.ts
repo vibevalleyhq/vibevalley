@@ -46,7 +46,7 @@ import { causeMessage, Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
 import { Memory } from "@/memory/memory.ts";
 import { Project } from "@/project/project.ts";
-import { type Merged, MergeFailure, type ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/shapes.ts";
+import { type Merged, MergeFailure, type ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/workplace.ts";
 import { Runtime } from "@/runtime/runtime.ts";
 
 import {
@@ -69,8 +69,8 @@ import { type Journal, makeTrajectories } from "./journal.ts";
 import { channelRules, restartedContextNote, restartedNote, sourceBrief, workplaceRules } from "./prompts.ts";
 import { handsToOwner, readReport, summaryOf } from "./report.ts";
 import { sessionOnIssue } from "./roster.ts";
-import type { Delivered, DeliveryInput, InputConsumed, InputReturned, LaunchActivity, SessionIdentity, SessionNews } from "./shapes.ts";
 import { contextPlace, releaseContextPlace } from "./shell.ts";
+import type { Delivered, DeliveryInput, InputConsumed, InputReturned, LaunchActivity, SessionIdentity, SessionNews } from "./signals.ts";
 
 export type { SessionNews };
 export { NotRecorded };

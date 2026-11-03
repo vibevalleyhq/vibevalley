@@ -17,7 +17,7 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/project`：`project.ts` 工作目录、新建和克隆、`Workplace`、改动（`Changes`）、冲突预检和 `.vibevalley/check`、合并和清理、`houseRules`、推送和 PR、快进主分支、GitHub 检测、地契、数 commit，对外的形状（`Workplace`、`Merged`、`MergeFailure`）；`repository.ts` 是一个仓库能回答的和能做的（主分支、分支在不在和指向哪、谁包含谁、领先几个提交、远端地址；提交剩下的改动、不检出就合并、试合并看冲突、描述一个分支、清掉 worktree 和分支），git 的拼法都在这里，拿这些答案做什么（合并的规矩、PR、项目检查、释放时留什么）在 `project.ts`；`git.ts` 跑 git 和别的命令；`shapes.ts` 认项目的栈与对外的形状。
+- 服务端 `apps/server/src/project`：`project.ts` 工作目录、新建和克隆、`Workplace`、改动（`Changes`）、冲突预检和 `.vibevalley/check`、合并和清理、`houseRules`、推送和 PR、快进主分支、GitHub 检测、地契、数 commit，对外的形状（`Workplace`、`Merged`、`MergeFailure`）；`repository.ts` 是一个仓库能回答的和能做的（主分支、分支在不在和指向哪、谁包含谁、领先几个提交、远端地址；提交剩下的改动、不检出就合并、试合并看冲突、描述一个分支、清掉 worktree 和分支），git 的拼法都在这里，拿这些答案做什么（合并的规矩、PR、项目检查、释放时留什么）在 `project.ts`；`git.ts` 跑 git 和别的命令；`workplace.ts` 认项目的栈与对外的形状。
 - 配置（`ServerConfig`，[设置和配置](docs/subsystems/setting.md#模型和不变量)）：`work_root`、`project.max_sessions`、`project.check_timeout_seconds`、`github.pr_projects`、`tokei`、`git_emails`。
 - 没有表：项目就是磁盘上的文件夹，PR 的回执记在工单上（`Issue.pullRequest`）。
 - 接口：`project.list`、`project.validate`、`project.create`、`project.language.list`、`project.activity.get`、`github.get`、`github.refresh`；工单的改动是 `issue.diff.get`（[capabilities.md](docs/reference/capabilities.md)）。
@@ -60,7 +60,7 @@
 
 **合进计划分支**（`mergeInto`，计划的一件做完）：同样锁外检查、进锁核对和查冲突，但不检出任何分支：`merge-tree --write-tree` 写出树，`commit-tree` 做合并提交（能快进就快进），`update-ref` 只从原来的位置挪，目标分支同时被挪过就不覆盖。`mergeBranch` 把计划分支合进主分支并删掉它；`openBranch` 从 `HEAD` 开计划分支。
 
-**提 PR**（`submitPullRequest`）：分支必须是这张工单的分支；锁外提交、查冲突、检查；进锁核对分支没变、origin 是 GitHub、主分支没有冲突；`git push -u origin <分支>`；工单已有开着的 PR 就只推；否则先 `gh pr list --head <分支> --base <主分支> --state open` 找回开过但回执没存下的，再 `gh pr create`。标题和正文是帮工写的：走 PR 的项目，帮工的规矩里多一条，交回来以前照项目的 PR 约定把标题和正文写进 worktree 的 git 目录里的 `vibevalley-pr.md`（`git rev-parse --git-path vibevalley-pr.md`；第一行是标题，空一行是正文；`shapes.ts` 的 `pullRequestText` 读它），它不进提交；没写就用工单的标题，正文是「工单 #号」、帮工的结论和检查结果（没有 `.vibevalley/check` 就写没跑检查）。每一步失败都返回能重试的原因。`PullRequestState` 用 `gh pr view --json state,mergedAt` 读成 `open`、`merged`、`closed`。 gh 的 `--json` 回答按 Schema 读，不是要的形状就当没读到，返回能重试的原因，不当成一个 PR。
+**提 PR**（`submitPullRequest`）：分支必须是这张工单的分支；锁外提交、查冲突、检查；进锁核对分支没变、origin 是 GitHub、主分支没有冲突；`git push -u origin <分支>`；工单已有开着的 PR 就只推；否则先 `gh pr list --head <分支> --base <主分支> --state open` 找回开过但回执没存下的，再 `gh pr create`。标题和正文是帮工写的：走 PR 的项目，帮工的规矩里多一条，交回来以前照项目的 PR 约定把标题和正文写进 worktree 的 git 目录里的 `vibevalley-pr.md`（`git rev-parse --git-path vibevalley-pr.md`；第一行是标题，空一行是正文；`workplace.ts` 的 `pullRequestText` 读它），它不进提交；没写就用工单的标题，正文是「工单 #号」、帮工的结论和检查结果（没有 `.vibevalley/check` 就写没跑检查）。每一步失败都返回能重试的原因。`PullRequestState` 用 `gh pr view --json state,mergedAt` 读成 `open`、`merged`、`closed`。 gh 的 `--json` 回答按 Schema 读，不是要的形状就当没读到，返回能重试的原因，不当成一个 PR。
 
 **结束 PR**（`finishPullRequest`）：进锁，能提 PR 的先快进主分支，再强制删掉工单的 worktree 和本地分支；远端分支不动。
 

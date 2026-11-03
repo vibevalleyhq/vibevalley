@@ -26,7 +26,7 @@ import { makeInProcessRun, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";
 import { tokensOf, usageText } from "./report.ts";
 import type { RunStore } from "./session.ts";
-import type { SessionIdentity } from "./shapes.ts";
+import type { SessionIdentity } from "./signals.ts";
 
 /** The input a caller waited on was not taken; cause is whatever stopped it, a defect included. */
 export class NotAnswered extends Schema.TaggedError<NotAnswered, { readonly brand: unique symbol }>()("NotAnswered", {

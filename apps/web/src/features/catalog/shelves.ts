@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { compareText, or } from "@/base/order";
+import { compareText, or } from "@/base/search";
 import { outfitLabel, speciesLabel } from "@/ui/cast";
 
 export interface Picture {
