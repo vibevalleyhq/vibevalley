@@ -62,7 +62,7 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   changes something is made inside an Act's `run` or through an intent defined in the feature's `.ts` (lint
   `vibevalley/act-door`), and a refusal toast without the error tone is reported (`vibevalley/failure-tone`). A read
   asked again as the owner types or the place changes (a search, a channel's pins) shows only the answer to the newest
-  ask, a failure as a failure (`useLatest`, `state/latest.ts`); the REST reads are read again when the state stream comes
+  ask, a failure as a failure (`useLatest`, `state/atom.ts`); the REST reads are read again when the state stream comes
   back (`refetchOnRelink`). Only `src/state` imports `effect/reactivity` (lint `vibevalley/atom-door`): its API is
   unstable, so a change in it is fixed there. Why: docs/subsystems/app.md, 为什么这样.
 - **What the page keeps, it keeps one way.** A value that outlives a component (a dialog two places open, the farm's

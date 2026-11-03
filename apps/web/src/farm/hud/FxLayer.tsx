@@ -8,7 +8,7 @@ import type { GameEffect, GameEffectAchievement } from "@vibevalley/protocol";
 
 import { localEffects, rawFarmFrame } from "@/farm/frames";
 import { useVillage } from "@/farm/world/load";
-import { subscribeLive } from "@/infra/live";
+import { subscribeLive } from "@/infra/frame";
 import { EarnedMedal, noticeTitle, type ToastData, ToastViewport, toasts, ToastType } from "@/ui/pixel";
 
 import { clearingLevels } from "./readout";

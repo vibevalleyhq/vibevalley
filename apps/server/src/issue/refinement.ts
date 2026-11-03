@@ -33,7 +33,7 @@ interface RefinementDeps {
   readonly chat: Channel["Service"];
   readonly db: Db["Service"];
   readonly get: (ref: string) => Effect.Effect<T.Issue, ApiError>;
-  /** The issue while it was never sent (no task graph's). */
+  /** The issue while it was never sent. */
   readonly unsent: (id: string) => Effect.Effect<T.Issue, ApiError>;
   readonly hire: (agent: T.Agent, brief: string, project: string, opt?: HireOptions) => Effect.Effect<Hired, ApiError>;
   readonly publish: (id: string) => Effect.Effect<void>;

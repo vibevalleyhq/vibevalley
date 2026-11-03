@@ -18,7 +18,7 @@ const say = (act: T.IssueAct): T.IssueAction => ({ act, does: "say" });
 const stop: T.IssueAction = { act: "stop", does: "stop" };
 const close = move("close", "canceled");
 
-/** session is the issue's newest one, undefined while none is on the farm. A task graph's issues stand with the graph: the owner acts on them there. */
+/** session is the issue's newest one, undefined while none is on the farm. A child issue stands with its parent while its parent is open. */
 export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.IssueStage {
   const last = session?.lastRun;
   // Completing follows what the issue delivers, not who did the work: an answer is taken (知道了), a change completed

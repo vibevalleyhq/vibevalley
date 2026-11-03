@@ -152,7 +152,7 @@ export function plotOf(h: T.Session, issue: T.Issue | undefined, play: T.Session
       return { crop: "dry", badge: badgeQuestions() };
     case "reviewing":
       if (issue.reviewedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe() };
-      // One its task graph acts on asks nothing of the owner here.
+      // One its parent issue acts on asks nothing of the owner here.
       return a.acts.length > 0 ? { crop: "flowering", badge: badgeReview() } : { crop: "flowering" };
     case "stuck":
       switch (a.stuck) {
@@ -174,7 +174,7 @@ export function plotOf(h: T.Session, issue: T.Issue | undefined, play: T.Session
   return plotOfSession(h, play);
 }
 
-/** A session that works no issue (a draft, the one splitting a task graph): its own phase is all there is. */
+/** A session that works no issue (a draft, the one splitting an issue): its own phase is all there is. */
 function plotOfSession(h: T.Session, play: T.SessionPlay): T.PlotView {
   const need = needOf(h);
   const conflict = need?.kind === "conflict";

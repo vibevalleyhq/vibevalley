@@ -23,7 +23,7 @@
 - 能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出，`docs:verify` 查它是不是最新。
 - 命令行 `apps/server/src/cli.ts`：每个接口一条命令（从 `endpoints` 来），`state`、`events`、`issue work`；`runtime chat` 和自己的 agent 不经服务端。
 - 「连接到本机」 `apps/server/src/lan/lan.ts` 的 `remoteMay`：从 `endpoints` 和三条流里挑 `can` 有 `remote` 的。
-- 页面 `apps/web/src/infra/frame.ts`（读 `/state`）、`infra/live.ts`（读 `/live`），命令用 `VibeValleyApi`。
+- 页面 `apps/web/src/infra/frame.ts`（读 `/state` 和 `/live`），命令用 `VibeValleyApi`。
 - Core 不写状态文件；构造时为空，由各模块从数据库施加恢复事实。
 
 ## 模型和不变量

@@ -1,9 +1,19 @@
-// The state stream, and the Solid store the page reads it through: one stream while anyone listens, and the frames as
-// they came for the code that compares them (rawFrame below).
+// The server's two event streams: the state (/api/v1/state), and the Solid store the page reads it through, holding one
+// stream while anyone listens and the frames as they came for the code that compares them (rawFrame below); and the
+// notices (/api/v1/live), which the page's framework-free code (the farm, the session logs) subscribes to.
 
 import { type Accessor, createContext, createStore, onSettled, reconcile, useContext } from "solid-js";
 
-import { defaultOrchestrator, readStream, type StateFrame, statePath, type WorkspaceState, type WorkspaceView } from "@vibevalley/protocol";
+import {
+  defaultOrchestrator,
+  type LiveEvent,
+  livePath,
+  readStream,
+  type StateFrame,
+  statePath,
+  type WorkspaceState,
+  type WorkspaceView,
+} from "@vibevalley/protocol";
 
 import { createExternal } from "@/base/external";
 
@@ -112,3 +122,46 @@ export function orchestratorMood(state: WorkspaceState | undefined, agent = defa
  * (sounds, the canvas, the host's notices). UI reads the store above, which keeps objects and updates only what changed.
  */
 export const rawFrame = (): Accessor<StateFrame | undefined> => createExternal(frames.subscribe, () => frames.get().frame);
+
+type LiveListener = (e: LiveEvent) => void;
+
+const liveListeners = new Set<LiveListener>();
+const liveConnections = new Set<() => void>();
+let liveAbort: AbortController | undefined;
+
+// One live stream while anyone listens; it reconnects a second after it drops and closes with the last listener.
+function connectLive(signal: AbortSignal) {
+  readStream(
+    "",
+    livePath,
+    (e) => liveListeners.forEach((l) => l(e)),
+    signal,
+    async (url, init) => {
+      const response = await fetch(url, init);
+      if (response.ok && !signal.aborted) for (const connected of liveConnections) connected();
+      return response;
+    },
+  ).catch(() => {
+    if (signal.aborted) return;
+    const again = setTimeout(() => connectLive(signal), 1000);
+    signal.addEventListener("abort", () => clearTimeout(again), { once: true });
+  });
+}
+
+/** Listens to the live stream (/api/v1/live); returns how to stop. Framework-free: the Solid side subscribes here too. */
+export function subscribeLive(l: LiveListener, connected?: () => void) {
+  liveListeners.add(l);
+  if (connected) liveConnections.add(connected);
+  if (!liveAbort) {
+    liveAbort = new AbortController();
+    connectLive(liveAbort.signal);
+  }
+  return () => {
+    liveListeners.delete(l);
+    if (connected) liveConnections.delete(connected);
+    if (liveListeners.size === 0) {
+      liveAbort?.abort();
+      liveAbort = undefined;
+    }
+  };
+}

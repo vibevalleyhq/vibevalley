@@ -16,7 +16,7 @@ export type SuggestionId = string & Brand.Brand<"SuggestionId">;
 export type MessageId = string & Brand.Brand<"MessageId">;
 
 /** The built-in orchestrator's profile id: it cannot be deleted or made a helper, so a farm always has an orchestrator, and
- * what names none goes to it (the phone, a task graph's news, a channel with no orchestrator of its own). */
+ * what names none goes to it (the phone, a child issue's news, a channel with no orchestrator of its own). */
 export const defaultOrchestrator = "orchestrator";
 
 /** The runtime of VibeValley's own agent: the only one an orchestrator runs on. */
@@ -409,7 +409,7 @@ export interface Channel {
   read?: number;
   /** What the owner has not read here: others' messages past read, notices left out; absent when none. */
   unread?: number;
-  /** A thread not on an issue or a task graph, by the server: a talk thread's session, else the head of the message it hangs under. */
+  /** A thread not on an issue, by the server: a talk thread's session, else the head of the message it hangs under. */
   title: string;
   /** The newest message, as a list shows it under the channel. */
   last?: ChannelLast;
@@ -1533,8 +1533,8 @@ export interface IssueRequest {
 export const DeliverableValues = ["change", "branch", "answer"] as const;
 export type Deliverable = (typeof DeliverableValues)[number];
 
-/** What a completed issue delivered: its branch merged into the project's main branch, into its parent's branch (a step of
- * a task graph), by a pull request, its branch kept unmerged, or nothing (no change, or an answer). */
+/** What a completed issue delivered: its branch merged into the project's main branch, into its parent issue's branch, by a
+ * pull request, its branch kept unmerged, or nothing (no change, or an answer). */
 export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "kept", "none"] as const;
 export type Delivery = (typeof DeliveryValues)[number];
 
@@ -1543,7 +1543,7 @@ export const IssueCanceledValues = ["dismissed", "lost"] as const;
 export type IssueCanceled = (typeof IssueCanceledValues)[number];
 
 /** How a session left: its work merged into the main branch, its issue completed otherwise (what it delivered is the
- * issue's: a kept branch, nothing, a task graph's branch), sent home, or its workplace lost. */
+ * issue's: a kept branch, nothing, a parent issue's branch), sent home, or its workplace lost. */
 export const SessionCloseValues = ["merged", "completed", "dismissed", "lost"] as const;
 export type SessionClose = (typeof SessionCloseValues)[number];
 

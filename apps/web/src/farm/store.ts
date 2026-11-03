@@ -78,7 +78,6 @@ export interface FarmUi {
   readonly chatShown: string | undefined;
   readonly phoneOpen: boolean;
   readonly friendsOpen: boolean;
-  /** The task graph the task board shows; null is the newest still open. */
   readonly titleOpen: boolean;
   readonly bedFx: readonly BedFx[];
   /** Rewards shown in the FX layer for a few seconds each. */

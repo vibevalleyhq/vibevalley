@@ -34,7 +34,7 @@ describe("the tray", () => {
 });
 
 describe("what waits on the owner", () => {
-  test("counts the calls at an issue or a task graph, not the mentions, which the chat counts", () => {
+  test("counts the calls at an issue, not the mentions, which the chat counts", () => {
     const mention: InboxItem = { ...call("m", "mention"), target: { kind: "chat", channel: "c1" } };
     expect(waitingOnOwner([call("a", "review"), call("b", "ask"), mention])).toBe(2);
     expect(waitingOnOwner([])).toBe(0);

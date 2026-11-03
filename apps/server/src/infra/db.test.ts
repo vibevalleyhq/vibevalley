@@ -149,7 +149,7 @@ const attempting: Readonly<Record<string, string>> = {
   "connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
   "cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
   "game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",
-  "issue/issue.ts": "an issue or a task graph that is not saved, or a session not linked to its issue, is told as a refusal",
+  "issue/issue.ts": "an issue that is not saved, or a session not linked to its issue, is told as a refusal",
   "mailbox/payload.ts": "the source cursor and trigger commit together; a failed cron input is logged and retried without advancing its clock",
   "mailbox/work.ts":
     "a Session's first direct deliveries are registered atomically; a failed insert is returned so Session startup can stop and report NotRecorded",

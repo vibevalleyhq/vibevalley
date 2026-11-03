@@ -54,10 +54,9 @@ const RULES: readonly Rule[] = [
     except: /^apps\/server\/src\/(agent\/brain\/(compaction|agent|.*\.test)\.ts|runtime\/runtime\.ts)$/u,
   },
   {
-    name: "a task graph's task under its old name",
-    pattern:
-      /\b(StepState|StepAction|StepEdit|StepActRequest|StepFieldChange|IssueStep|SessionTask|ReadySteps|CanEditStep|step_action|task_step|StepDraft\w*|stepNext|stepFailed|actOnStep|stepIssues|stepTone)\b|\/steps\/\{/u,
-    says: "a task graph is TaskGraph (graph.*, GraphState, IssueGraph, SessionGraph); each of its nodes is a Task (TaskState, TaskAction, TaskEdit, TaskDraft, IssueTask, taskNext, taskFailed, actOnTask, taskIssues, taskTone, graph_task_update, graph_task_act); a step is one event of a trajectory",
+    name: "a task graph under its old name",
+    pattern: /[Tt]ask\s*[Gg]raphs?/u,
+    says: "issues use native parent and blockedBy fields; there is no separate TaskGraph",
   },
   {
     name: "an API path without its version",

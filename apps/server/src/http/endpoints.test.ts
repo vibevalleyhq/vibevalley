@@ -26,7 +26,7 @@ const refusal = (p: () => Promise<unknown>) =>
   );
 
 describe("the endpoints the agents' tools stand on", () => {
-  it.live("list channels and unread places, filter issues, review and split them, read graphs, search memories, write blocks", () =>
+  it.live("list channels and unread places, filter issues, review and split them, search memories, write blocks", () =>
     Effect.gen(function* () {
       const api = yield* farm;
       const channels = yield* call(() => api.channel.list());

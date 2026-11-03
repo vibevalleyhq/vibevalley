@@ -190,7 +190,7 @@ export class Session extends Context.Service<
     /** The helper working the issue now, if one is. */
     readonly onIssue: (issue: string) => string | undefined;
     /** The session hands its workplace over and leaves as closed says: use takes the work in (Source Control's merge, pull
-     * request, merge into a task graph's branch), given the workplace and the session's last words in full. Refused while
+     * request, merge into a parent issue's branch), given the workplace and the session's last words in full. Refused while
      * it works. Work that does not go in keeps the session and its branch, and says in NotTakenIn what
      * the helper is sent back with and what the owner is told; settle says who settles a conflict. A pull request left
      * open keeps the session too. */
@@ -209,7 +209,7 @@ export class Session extends Context.Service<
     readonly events: (id: string, run?: string) => Effect.Effect<T.SessionEvent[] | undefined>;
     /** These four are subscribed before they return: nothing published after is missed. */
     readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
-    /** A session hired, reported or gone, with the session as it stood after: what the issues and task graphs follow. */
+    /** A session hired, reported or gone, with the session as it stood after: what the issues and their child issues follow. */
     readonly news: Effect.Effect<Stream.Stream<SessionNews>, never, Scope.Scope>;
     readonly startedIssues: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>;
     readonly finishedRuns: Effect.Effect<Stream.Stream<RunFinished>, never, Scope.Scope>;

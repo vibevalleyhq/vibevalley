@@ -42,7 +42,7 @@ describe("a plot", () => {
         "flowering",
         "等你验收",
       ],
-      // A task graph's step: it stands, but its graph is where the owner acts.
+      // A child issue: it stands, but its parent issue is where the owner acts.
       [{ state: "reviewing", acts: [] }, {}, "flowering", undefined],
       // A conflict is not ripe, whatever the round came to.
       [{ state: "stuck", stuck: "conflict", lead: "resolve", acts: [{ act: "resolve", does: "say" }] }, {}, "withered", "有冲突"],

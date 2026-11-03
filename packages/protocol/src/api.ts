@@ -133,7 +133,7 @@ export interface Handlers<R = never> {
   readonly "issue.list": (a: T.IssueFilter) => Effect.Effect<T.Issue[], ApiError, R>;
   /** A verdict on what was handed back; a pass only makes it ready, completing it is issue.status.update to done. */
   readonly "issue.review": (a: { readonly id: string } & T.IssueReviewRequest) => Effect.Effect<T.Issue, ApiError, R>;
-  /** The issue becomes a task graph's parent and its tasks the issues under it, started at once. */
+  /** The issue becomes a parent issue and the split's issues its children, started at once. */
   readonly "issue.split": (a: { readonly id: string } & T.IssueSplitRequest) => Effect.Effect<string, ApiError, R>;
   readonly "issue.get": (a: { readonly id: string }) => Effect.Effect<T.Issue, ApiError, R>;
   readonly "issue.run.list": (a: { readonly id: string }) => Effect.Effect<T.Run[], ApiError, R>;
@@ -230,7 +230,7 @@ export interface Handlers<R = never> {
   readonly "channel.list": () => Effect.Effect<T.Channel[], ApiError, R>;
   /** The places the caller has not read all of, the newest first. */
   readonly "channel.unread.list": () => Effect.Effect<T.ChannelUnread[], ApiError, R>;
-  /** Every task graph, as the board has them. */
+  /** Every achievement, as the board has them. */
   readonly "game.achievement.list": () => Effect.Effect<T.Achievement[], ApiError, R>;
   readonly "game.title.set": (a: T.ChooseTitleRequest) => Effect.Effect<void, ApiError, R>;
   readonly "runtime.list": () => Effect.Effect<T.RuntimeInfo[], ApiError, R>;

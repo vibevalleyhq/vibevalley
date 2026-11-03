@@ -1,5 +1,5 @@
 // The golden files (testdata, first recorded from the server's Go version) hold the core state's rules to their answers:
-// runs of facts folded from an empty farm, the shared rules' calls, and the task graphs', crons' and patrol's cases.
+// runs of facts folded from an empty farm, the shared rules' calls, and the child issues', crons' and patrol's cases.
 // Each is compared as JSON. Times of day are read in Asia/Shanghai (vite.config.ts sets it).
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -114,7 +114,7 @@ describe("the golden files", () => {
     await f.done();
   });
 
-  test("play: task graphs, crons and the patrol", async () => {
+  test("play: child issues, crons and the patrol", async () => {
     const rows = await lines("play.jsonl.gz");
     const f = failures("play.jsonl.gz", rows);
     const seen: Record<string, number> = {};

@@ -211,12 +211,12 @@
 | `orchestratorSession` | `frame.ts` |  |
 | `orchestratorMood` | `frame.ts` |  |
 | `rawFrame` | `frame.ts` | The frame as the stream sent it: a new object each time, for code that compares the one before with the one after |
+| `subscribeLive` | `frame.ts` | Listens to the live stream (/api/v1/live); returns how to stop. Framework-free: the Solid side subscribes here too. |
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |
 | `followReports` | `gateway.ts` | The farm's reports after the one with this id (the newest when absent), then each from now on. |
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `currentHost` | `host.ts` |  |
-| `subscribeLive` | `live.ts` | Listens to the live stream (/api/v1/live); returns how to stop. Framework-free: the Solid side subscribes here too. |
 | `reveal` | `opening.ts` | Once the page has mounted: takes the cover away when the page is ready, in one fade. |
 | `queries` | `query.ts` | REST reads besides the state stream (history, changes, …); a frame that changes what they show invalidates them. |
 | `refetchOnRelink` | `query.ts` | What changed while the state stream was lost reached no REST read either (they are invalidated by frames): each is |
@@ -256,14 +256,14 @@
 | `framesSource` | `atom.ts` |  |
 | `linkIn` | `atom.ts` | Whether the state stream is up now, read from its source: reading framesAtom here would open and close the stream. |
 | `framesAtom` | `atom.ts` | The state stream as an atom: subscribed to its source while anything reads it, so the stream stays open meanwhile. |
+| `latestReader` | `atom.ts` | The answer to the newest ask only, a failure told as a failure rather than "nothing found". |
+| `useLatest` | `atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
 | `bySeq` | `intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once a frame has caught up. |
 | `defineIntent` | `intent.ts` |  |
 | `sendOnce` | `intent.ts` | An intent made by a button rather than typed (a suggestion, the project map's sow, an artifact's reply): pressed again |
 | `sendReplacing` | `intent.ts` | A setting the owner changes again before the first change showed (a reaction off and on, a level picked twice): the |
 | `intentsIn` | `intent.ts` | A type's intents in one registry; the same object for every caller, so its timers and watches are kept once. |
 | `useIntents` | `intent.ts` | A type's intents in the page's registry, with the list as an accessor. |
-| `latestReader` | `latest.ts` | Framework-free, for the test: `told` hears each state of the newest ask only. |
-| `useLatest` | `latest.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
 | `ScaleValues` | `prefs.ts` | The workbench's size, in percent; the farm keeps its own whole-number scaling. |
 | `StartValues` | `prefs.ts` | Where / opens. |
 | `prefsNow` | `prefs.ts` | The choices now; read in a computation or a component, it follows them. |

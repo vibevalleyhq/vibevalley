@@ -121,7 +121,7 @@ export interface IssueReviewRequest {
 }
 
 /** Only while the issue is still open: a completion the owner chose (kept, none) is written before its session leaves,
- * and a task graph's step closes with its graph, so neither comes here. */
+ * and a child issue merges into its parent, so it does not merge into main here. */
 const closingOf = (closed: T.SessionClose | undefined): { delivered: T.Delivery } | { canceled: T.IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 

@@ -97,7 +97,7 @@ describe("projects", () => {
     ).pipe(Effect.ensuring(Effect.sync(putBack)));
   });
 
-  it.effect("a graph's branch: a step merges into it, it merges into main", () => {
+  it.effect("a parent issue's branch: a child merges into it, it merges into main", () => {
     const root = projectsDir();
     return projects(
       root,

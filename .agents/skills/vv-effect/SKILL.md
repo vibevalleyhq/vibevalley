@@ -42,7 +42,7 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 | 要记住的选择（本机的偏好、看板的样子、窗格宽度） | `state/stored.ts` 的 `defineStored(名字, Schema, 默认值)`：经 Schema 解码、按字段退回默认值、跨标签页跟着变 | 直接读写 `localStorage`（`vibevalley/stored-door`） |
 | 值得放进地址的选择（看板的筛选） | `useSearchParam` | 一个刷新就丢的信号 |
 | 全页面共享的值 | `state/atom.ts` 的 `defineAtom`，读的时候 `useAtom` 不挂起，帧照常流 | 模块级的 `createSignal`、`createStore`（`vibevalley/page-store`） |
-| 只有搜索、置顶这类最新一次的回答算数 | `state/latest.ts` 的 `useLatest` | 自己比对请求的先后 |
+| 只有搜索、置顶这类最新一次的回答算数 | `state/atom.ts` 的 `useLatest` | 自己比对请求的先后 |
 
 只有 `state/` 能 import `effect/reactivity`（`vibevalley/atom-door`）：Atom 的 API 标着不稳定，换了只改这一层。传输和长时间运行的机器（帧的源、直播流、聊天的订阅、通话、听写）不包进 atom，它们的状态是连接和计时器推出来的。
 

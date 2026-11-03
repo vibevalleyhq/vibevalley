@@ -42,7 +42,7 @@ export const toOarMcp = (server: T.MCPServer): McpServer =>
 export const conflictBrief = (base: string, files: readonly string[]) => t("server.session.conflictBrief", { base, files: list(files) });
 
 /** Who settles a conflict when the work does not go in: the owner (an issue: told what to tell the helper), or the helper
- * at once (a task graph's step). */
+ * at once (a child issue). */
 export type Settle = "owner" | "helper";
 
 export interface SessionLimits {
@@ -85,7 +85,7 @@ export function whoMakesRoom(sessions: readonly T.Session[], max: number): T.Ses
 
 /** What a take-in that did not go through means. The session stays with its branch and worktree either way. fix: what
  * the helper is sent back with ("" when it is left to the owner); owner: what the owner is told; notice: the farm's line;
- * short: the line a task graph keeps. */
+ * short: the line a parent issue keeps. */
 export function notTakenIn(
   f: MergeFailure,
   name: string,

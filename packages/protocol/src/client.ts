@@ -198,7 +198,7 @@ export class VibeValleyApi {
     list: (a: T.IssueFilter): Promise<T.Issue[]> => this.call<T.Issue[]>("/api/v1/issue/list", a),
     /** A verdict on what was handed back; a pass only makes it ready, completing it is issue.status.update to done. */
     review: (a: { id: string } & T.IssueReviewRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/review", a),
-    /** The issue becomes a task graph's parent and its tasks the issues under it, started at once. */
+    /** The issue becomes a parent issue and the split's issues its children, started at once. */
     split: (a: { id: string } & T.IssueSplitRequest): Promise<string> => this.call<string>("/api/v1/issue/split", a),
     get: (a: { id: string }): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/get", a),
     create: (a: T.IssueRequest): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/create", a),
@@ -301,7 +301,7 @@ export class VibeValleyApi {
 
   readonly game = {
     achievement: {
-      /** Every task graph, as the board has them. */
+      /** Every achievement, as the board has them. */
       list: (): Promise<T.Achievement[]> => this.call<T.Achievement[]>("/api/v1/game/achievement/list", undefined),
     },
     title: {

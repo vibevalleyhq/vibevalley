@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from "vite-plus/test";
 
 import { VibeValleyApiError } from "@vibevalley/protocol";
 
-import { type Answer, latestReader } from "./latest";
+import { type Answer, latestReader } from "./atom";
 import { deferred } from "./testing";
 
 afterEach(() => vi.useRealTimers());
