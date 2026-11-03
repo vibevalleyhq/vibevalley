@@ -6,8 +6,7 @@
 import type { Block, BlockAttrs, BlockType, SpanMarks, TextSpan } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
-import { ordered, textFor } from "./ops.ts";
-import { normal, plain, unmarked } from "./spans.ts";
+import { normal, ordered, plain, textFor, unmarked } from "./ops.ts";
 
 /** A block as Markdown says it: its place is its depth under the block before it. */
 export interface MdBlock {

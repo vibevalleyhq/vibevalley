@@ -7,8 +7,7 @@ import type { Wire } from "@vibevalley/protocol/schema";
 import { bold, para, sample, span } from "@/testing/artifact.ts";
 
 import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
-import { ordered, Page } from "./ops.ts";
-import { normal, plain, runeLen, sameText, splitAt } from "./spans.ts";
+import { normal, ordered, Page, plain, runeLen, sameText, splitAt } from "./ops.ts";
 
 // The cases write ids as the wire has them; the page takes them as read.
 const branded = <A>(wire: Wire<A>): A => wire as A;

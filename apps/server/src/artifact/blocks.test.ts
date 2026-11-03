@@ -18,8 +18,8 @@ import { waitFor } from "@/testing/until.ts";
 
 import * as qa from "../../db/generated/artifact.sql.ts";
 import { makeBlockStore } from "./blocks.ts";
+import { plain } from "./ops.ts";
 import { demoPieces } from "./policy.ts";
-import { plain } from "./spans.ts";
 
 const on = (config: ServerConfig["Service"] = testConfig()) =>
   Db.layer.pipe(Layer.provideMerge(Database), Layer.provideMerge(Layer.succeed(ServerConfig, config)));

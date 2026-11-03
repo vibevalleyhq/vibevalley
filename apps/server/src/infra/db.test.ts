@@ -153,7 +153,7 @@ const attempting: Readonly<Record<string, string>> = {
   "mailbox/payload.ts": "the source cursor and trigger commit together; a failed cron input is logged and retried without advancing its clock",
   "mailbox/work.ts":
     "a Session's first direct deliveries are registered atomically; a failed insert is returned so Session startup can stop and report NotRecorded",
-  "memory/store.ts": "a memory read or write that fails is logged and taken as none",
+  "memory/memory.ts": "a memory read or write that fails is logged and taken as none",
   "session/inProcessRun.ts": "a run write fails as NotRecorded so an in-process run retries its end before accepting another input",
   "session/session.ts": "a session's own record that is not kept is logged without discarding its live execution",
 };

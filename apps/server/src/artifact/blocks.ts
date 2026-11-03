@@ -23,9 +23,8 @@ import * as qr from "../../db/generated/artifact_block_revision.sql.ts";
 import * as qc from "../../db/generated/artifact_change.sql.ts";
 import * as qs from "../../db/generated/artifact_suggestion.sql.ts";
 import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
-import { ordered, Page, wire } from "./ops.ts";
+import { ordered, Page, unmarked, wire } from "./ops.ts";
 import { demoJitter, demoPieces } from "./policy.ts";
-import { unmarked } from "./spans.ts";
 
 const attrsOf = jsonOf(S.BlockAttrs);
 const storedSpans = jsonOf(Schema.NullOr(Schema.mutable(Schema.Array(S.TextSpan))));

@@ -12,6 +12,7 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 import { messageOf } from "@/errors.ts";
 import type { MemorySourceConfig } from "@/setting/memorySources.ts";
 
+import type { FinishedRun, MemoryStore, Note, RecallCue } from "./memory.ts";
 import {
   lineOf,
   localName,
@@ -25,7 +26,6 @@ import {
   sourceLabel,
   termsOf,
 } from "./recall.ts";
-import type { FinishedRun, MemoryStore, Note, RecallCue } from "./store";
 
 /** One line a source would have the agent recall, with how good a match it is (only to order one source's own). */
 export interface RecalledLine {
