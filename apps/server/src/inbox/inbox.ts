@@ -9,17 +9,13 @@ import { freshOf } from "@vibevalley/protocol/rules";
 
 import { scopedPubSub } from "@/base/pubsub.ts";
 import { Channel } from "@/channel/channel.ts";
-import { toMessage } from "@/channel/contracts.ts";
 import { Core } from "@/core/core.ts";
 import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
-import { recordTrigger } from "@/mailbox/payload.ts";
 import { Session } from "@/session/session.ts";
 
-import * as q from "../../db/generated/channel_message.sql.ts";
 import { forOwner, inbox, inboxEntries } from "./items.ts";
 import { emptyPatrol, type PatrolMemory, type PatrolNote, patrolStep } from "./patrol.ts";
 import { patrolText } from "./prompts.ts";
@@ -51,24 +47,21 @@ const make = Effect.gen(function* () {
   const issues = yield* Issue;
   const sessions = yield* Session;
   const mailbox = yield* Mailbox;
-  const db = yield* Db;
   const turn = yield* Semaphore.make(1);
   const externalHub = yield* scopedPubSub<void>();
 
   const handoffState = Effect.fn("Inbox.handoffState")(function* (id: string) {
-    const row = yield* db.one(q.messageByID({ id }));
-    if (!row || row.deleted_at !== null) return undefined;
-    const message = toMessage(row);
+    const found = yield* chat.notificationReceipt(id);
+    if (!found) return undefined;
+    const { message, readAt } = found;
     if (!forOwner(message, chat.notifyOf(message.channel))) return undefined;
-    const receipt = yield* db.one(q.notificationReceipt({ id }));
-    if (!receipt || receipt.superseded) return undefined;
     if (message.kind === "report") {
       const session = sessions.sessionOf(message.from);
       const issue = issues.onBoard().find((item) => item.id === session?.issue);
       if (issue && !["draft", "asking", "stuck", "reviewing"].includes(issue.stage.state)) return undefined;
       if (!issue && session?.phase._tag === "working") return undefined;
     }
-    return receipt.read_at === null ? ("unseen" as const) : ("seen" as const);
+    return readAt === undefined ? ("unseen" as const) : ("seen" as const);
   });
 
   let known: Set<string> | undefined;
@@ -96,7 +89,7 @@ const make = Effect.gen(function* () {
   const patrol = Effect.gen(function* () {
     const state = core.state();
     const now = yield* Clock.currentTimeMillis;
-    const read = yield* db.run(q.ownerReadReports());
+    const read = yield* chat.ownerReadReports;
     const ownerSeen = Object.fromEntries(
       inboxEntries(state).flatMap((entry) => {
         const target = entry.item.target;
@@ -116,16 +109,18 @@ const make = Effect.gen(function* () {
       byChannel,
       ([channel, notes]) =>
         Effect.flatMap(chat.topOf(channel), (top) =>
-          recordTrigger(db, {
-            key: `${channel}:${now}:${notes.map((note) => note.key).join(",")}`,
-            source: "patrol",
-            actor: { kind: "system", id: "patrol" },
-            addressed: "direct",
-            threads: [],
-            replyChannel: channel,
-            at: now,
-            text: patrolText(top.name, notes),
-          }).pipe(Effect.flatMap(mailbox.receive)),
+          mailbox
+            .recordTrigger({
+              key: `${channel}:${now}:${notes.map((note) => note.key).join(",")}`,
+              source: "patrol",
+              actor: { kind: "system", id: "patrol" },
+              addressed: "direct",
+              threads: [],
+              replyChannel: channel,
+              at: now,
+              text: patrolText(top.name, notes),
+            })
+            .pipe(Effect.flatMap(mailbox.receive)),
         ),
       { discard: true },
     ).pipe(bestEffort("vibevalley: patrol inputs were not kept"));

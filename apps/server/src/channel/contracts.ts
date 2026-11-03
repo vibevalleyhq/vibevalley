@@ -220,6 +220,16 @@ export interface ChannelService {
   readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
   /** The places who has not read all of, the newest first, by their addresses. */
   readonly unread: (who: string) => Effect.Effect<T.ChannelUnread[]>;
+  /** A message the owner was told of, and when they read it; none once it is gone or a later one replaced it. */
+  readonly notificationReceipt: (id: string) => Effect.Effect<{ readonly message: T.ChatMessage; readonly readAt: number | undefined } | undefined>;
+  /** The owner has read these reports, the latest of each session's, and when. */
+  readonly ownerReadReports: Effect.Effect<
+    readonly {
+      readonly sender_id: string;
+      readonly created_at: number;
+      readonly updated_at: number;
+    }[]
+  >;
   /** Every channel and direct channel as a page lists them, the default first. */
   readonly list: () => Effect.Effect<T.Channel[]>;
   readonly history: (channel: string, before?: number, limit?: number) => Effect.Effect<T.ChatMessage[]>;

@@ -28,7 +28,19 @@ import * as qr from "../../db/generated/ingress_trigger.sql.ts";
 import * as qd from "../../db/generated/mailbox_delivery.sql.ts";
 import { type Recipient, Reach, WakeBreaker } from "./brakes.ts";
 import { Deliveries, type DeliveryRow, type DeliveryDraft } from "./deliveries.ts";
-import { inputOf, orchestratorSource, deliveryScope, type InputContext } from "./payload.ts";
+import {
+  inputOf,
+  orchestratorSource,
+  deliveryScope,
+  keepChannelTrigger,
+  knownGitHubEvents,
+  readTriggerById,
+  recordTrigger,
+  type InputContext,
+  type TriggerInput,
+  type TriggerResource,
+  unroutedCronTriggers,
+} from "./payload.ts";
 import { wakeInput } from "./prompts.ts";
 import { makePump } from "./pump.ts";
 import { channelRecipients, waitsForHuman } from "./routing.ts";
@@ -38,6 +50,8 @@ export interface InsertDelivery {
   readonly session: string;
   readonly row: DeliveryDraft;
 }
+
+export type { TriggerInput, TriggerResource };
 
 const RoutePosition = Schema.Struct({ scope: Schema.String, position: Schema.Int });
 const readRouteReceipt = Schema.decodeUnknownSync(Schema.Struct({ ...RoutePosition.fields, from_owner: Schema.Boolean }));
@@ -94,6 +108,11 @@ export class Mailbox extends Context.Service<
     readonly waitingOn: (envelope: string) => Effect.Effect<number>;
     readonly returnInput: (session: string, envelope: string, reason: string) => Effect.Effect<void, ApiError>;
     readonly deliverDirect: (session: string, text: string, replyChannel: string | undefined, byOwner: boolean) => Effect.Effect<void>;
+    readonly recordTrigger: (input: TriggerInput) => Effect.Effect<T.Trigger, ApiError>;
+    readonly keepChannelTrigger: (trigger: T.Trigger, body: string, channelId: string) => Effect.Effect<T.Trigger, Schema.SchemaError>;
+    readonly readTrigger: (id: string) => Effect.Effect<TriggerResource | undefined, Schema.SchemaError>;
+    readonly unroutedCronTriggers: (after: number) => Effect.Effect<readonly qr.UnroutedCronTriggersResult[]>;
+    readonly knownGitHubEvents: (project: string, prNumber: number) => Effect.Effect<readonly qr.KnownGitHubEventsResult[]>;
   }
 >()("vibevalley/Mailbox") {
   static readonly layer = Layer.effect(
@@ -304,6 +323,11 @@ export class Mailbox extends Context.Service<
           if (yield* routeLocked(work.returnInput(session, envelope, why))) return;
           return yield* Effect.fail(missing(t("server.issue.issueRef", { ref: envelope }), [lookIn.issue]));
         }),
+        recordTrigger: Effect.fn("Mailbox.recordTrigger")((input) => recordTrigger(db, input)),
+        keepChannelTrigger: Effect.fn("Mailbox.keepChannelTrigger")((trigger, body, channelId) => keepChannelTrigger(db, trigger, body, channelId)),
+        readTrigger: Effect.fn("Mailbox.readTrigger")((id) => readTriggerById(db, id)),
+        unroutedCronTriggers: Effect.fn("Mailbox.unroutedCronTriggers")((after) => unroutedCronTriggers(db, after)),
+        knownGitHubEvents: Effect.fn("Mailbox.knownGitHubEvents")((project, prNumber) => knownGitHubEvents(db, project, prNumber)),
       });
 
       const publishOrchestrator = (recipient: string, messages: readonly InboxMessage[], primary: DeliveryRow) =>

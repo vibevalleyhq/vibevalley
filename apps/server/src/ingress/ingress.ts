@@ -1,7 +1,6 @@
-import { Context, Effect, Layer, Schedule, Schema } from "effect";
+import { Context, Effect, Layer, Schedule, type Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import { Artifact } from "@/artifact/artifact.ts";
@@ -9,13 +8,10 @@ import { Channel, type SayMore } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import type { ApiError } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
 import type { Picked } from "@/mailbox/envelope.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { triggerOf, type TriggerInput } from "@/mailbox/payload.ts";
+import { Mailbox, type TriggerInput, type TriggerResource } from "@/mailbox/mailbox.ts";
 import type { ProjectError } from "@/project/workplace.ts";
 
-import * as q from "../../db/generated/ingress_trigger.sql.ts";
 import { githubInputs, type GitHubPullIngress } from "./github.ts";
 
 interface OwnerInput {
@@ -32,12 +28,6 @@ export interface SourceEvent extends TriggerInput {
   readonly selfEcho?: boolean;
 }
 
-const Payload = Schema.Struct({ text: Schema.String, data: Schema.Unknown });
-interface TriggerResource {
-  readonly trigger: T.Trigger;
-  readonly payload: typeof Payload.Type;
-}
-
 export class Ingress extends Context.Service<
   Ingress,
   {
@@ -46,7 +36,7 @@ export class Ingress extends Context.Service<
     readonly accept: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, Schema.SchemaError | ApiError>;
     readonly refreshGitHub: Effect.Effect<void>;
     readonly githubSnapshot: (project: string, pr: number) => Effect.Effect<GitHubPullIngress, ProjectError>;
-    readonly record: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, Schema.SchemaError>;
+    readonly record: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, Schema.SchemaError | ApiError>;
     readonly read: (id: string) => Effect.Effect<TriggerResource | undefined, Schema.SchemaError>;
   }
 >()("vibevalley/Ingress") {
@@ -57,37 +47,20 @@ export class Ingress extends Context.Service<
 }
 
 const make = Effect.gen(function* () {
-  const db = yield* Db;
   const store = yield* Agent;
   const artifacts = yield* Artifact;
   const chat = yield* Channel;
   const core = yield* Core;
   const mailbox = yield* Mailbox;
-  const encodeTrigger = Schema.encodeEffect(Schema.fromJsonString(S.Trigger));
-  const decodeTrigger = Schema.decodeUnknownEffect(Schema.fromJsonString(S.Trigger));
-  const encodePayload = Schema.encodeEffect(Schema.fromJsonString(Payload));
-  const decodePayload = Schema.decodeUnknownEffect(Schema.fromJsonString(Payload));
 
   const read = Effect.fn("Ingress.read")(function* (id: string) {
-    const row = yield* db.one(q.triggerById({ id }));
-    return row ? { trigger: yield* decodeTrigger(row.trigger_json), payload: yield* decodePayload(row.payload_json) } : undefined;
+    return yield* mailbox.readTrigger(id);
   });
 
   const record = Effect.fn("Ingress.record")(function* (event: SourceEvent) {
     if (event.selfEcho === true) return undefined;
-    const trigger = triggerOf(event);
-    const { id } = trigger;
-    yield* db.run(
-      q.recordTrigger({
-        id,
-        source: event.source,
-        source_key: event.key,
-        occurred_at: event.at,
-        trigger_json: yield* encodeTrigger(trigger),
-        payload_json: yield* encodePayload({ text: event.text, data: event.data ?? null }),
-      }),
-    );
-    return (yield* read(id))?.trigger;
+    const trigger = yield* mailbox.recordTrigger(event);
+    return (yield* read(trigger.id))?.trigger;
   });
   const accept = Effect.fn("Ingress.accept")(function* (event: SourceEvent) {
     const trigger = yield* record(event);

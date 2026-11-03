@@ -10,11 +10,11 @@ import type { ApiError } from "@/errors.ts";
 import { Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
 import { Issue } from "@/issue/issue.ts";
+import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Project } from "@/project/project.ts";
 import { ProjectError } from "@/project/workplace.ts";
 
 import * as q from "../../db/generated/ingress_github.sql.ts";
-import * as qt from "../../db/generated/ingress_trigger.sql.ts";
 import type { SourceEvent } from "./ingress.ts";
 
 interface GitHubCheck {
@@ -240,6 +240,7 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
   Effect.gen(function* () {
     const db = yield* Db;
     const issues = yield* Issue;
+    const mailbox = yield* Mailbox;
     const snapshot = githubSnapshot(yield* Project);
     const polling = yield* Semaphore.make(1);
 
@@ -272,7 +273,7 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
           });
         yield* db.run(q.observeGitHubChecks({ project, pr_number: pr.number, check_fingerprint: fingerprint, check_revision: revision }));
       }
-      const known = yield* db.run(qt.knownGitHubEvents({ project, pr_number: pr.number }));
+      const known = yield* mailbox.knownGitHubEvents(project, pr.number);
       const keys = new Set(known.filter((event) => event.routed).map((event) => event.source_key));
       const rounds = new Map(
         known.flatMap((event) => (event.bot_round_key !== null && event.bot_round !== null ? [[event.bot_round_key, event.bot_round] as const] : [])),

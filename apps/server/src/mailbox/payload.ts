@@ -45,6 +45,22 @@ export interface TriggerInput {
   readonly data?: unknown;
 }
 
+const StoredPayload = Schema.Struct({ text: Schema.String, data: Schema.Unknown });
+export interface TriggerResource {
+  readonly trigger: T.Trigger;
+  readonly payload: typeof StoredPayload.Type;
+}
+const decodeStoredTrigger = Schema.decodeUnknownEffect(Schema.fromJsonString(S.Trigger));
+const decodeStoredPayload = Schema.decodeUnknownEffect(Schema.fromJsonString(StoredPayload));
+
+export const readTriggerById = (db: Db["Service"], id: string) =>
+  Effect.gen(function* () {
+    const row = yield* db.one(qr.triggerById({ id }));
+    return row ? { trigger: yield* decodeStoredTrigger(row.trigger_json), payload: yield* decodeStoredPayload(row.payload_json) } : undefined;
+  });
+
+export const knownGitHubEvents = (db: Db["Service"], project: string, prNumber: number) => db.run(qr.knownGitHubEvents({ project, pr_number: prNumber }));
+
 export const triggerOf = (input: TriggerInput): T.Trigger => {
   const id = createHash("sha256")
     .update(JSON.stringify([input.source, input.key]))

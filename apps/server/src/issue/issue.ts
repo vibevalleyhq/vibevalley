@@ -31,7 +31,6 @@ import { ServerConfig } from "@/infra/config.ts";
 import { causeMessage, Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
-import { recordTrigger } from "@/mailbox/payload.ts";
 import { issueBranch, Project } from "@/project/project.ts";
 import { MergeFailure, type Workplace } from "@/project/workplace.ts";
 import { Runtime } from "@/runtime/runtime.ts";
@@ -370,7 +369,7 @@ const make = Effect.gen(function* () {
         }
         const changed = yield* db.run(q.queueIssue({ at, id }));
         if (changed.length > 0 && !source)
-          dispatch = yield* recordTrigger(db, {
+          dispatch = yield* mailbox.recordTrigger({
             source: "workbench",
             key: newId(),
             actor: { kind: "system", id: "system" },
@@ -515,7 +514,7 @@ const make = Effect.gen(function* () {
             started_at: assignedAt,
           });
           if (input)
-            dispatch = yield* recordTrigger(db, {
+            dispatch = yield* mailbox.recordTrigger({
               source: "workbench",
               key: newId(),
               actor: { kind: "system", id: "system" },
@@ -667,7 +666,7 @@ const make = Effect.gen(function* () {
             Effect.gen(function* () {
               yield* q.addIssue(issueRow(row.id, row.req, parent.mandate, at));
               dispatches.push(
-                yield* recordTrigger(db, {
+                yield* mailbox.recordTrigger({
                   source: "workbench",
                   key: newId(),
                   actor: { kind: "system", id: "system" },

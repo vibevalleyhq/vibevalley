@@ -17,7 +17,6 @@ import { Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
-import { recordTrigger, unroutedCronTriggers } from "@/mailbox/payload.ts";
 
 import * as q from "../../db/generated/cron.sql.ts";
 import { afterRun, cronProblem, dueCrons, dueText, isMissed, needsOK, whenText } from "./when.ts";
@@ -111,7 +110,7 @@ const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const s = due.cron;
       const thread = `cron:${s.id}`;
-      return yield* recordTrigger(db, {
+      return yield* mailbox.recordTrigger({
         source: "cron",
         key: due.id,
         actor: { kind: "system", id: s.id },
@@ -142,7 +141,7 @@ const make = Effect.gen(function* () {
   const replay = Effect.gen(function* () {
     let after = 0;
     while (true) {
-      const rows = yield* unroutedCronTriggers(db, after);
+      const rows = yield* mailbox.unroutedCronTriggers(after);
       const last = rows.at(-1);
       if (!last) return;
       yield* Effect.forEach(

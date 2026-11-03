@@ -20,7 +20,7 @@ import { causeMessage, Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
 import { heldShown, type InboxMessage, retryWindowMs, unreadSummaryOf } from "@/mailbox/envelope.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
-import { inputContext, keepChannelTrigger } from "@/mailbox/payload.ts";
+import { inputContext } from "@/mailbox/payload.ts";
 import { inboxLines, talkBrief } from "@/mailbox/prompts.ts";
 import { NotRecorded, Session } from "@/session/session.ts";
 
@@ -483,7 +483,7 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
       };
       const { trigger, mail } = channelInput(fact, inputContext(asInbox(fact.row)));
       const routed = yield* Effect.gen(function* () {
-        const original = yield* keepChannelTrigger(db, trigger, fact.row.body, fact.row.channel_id);
+        const original = yield* mailbox.keepChannelTrigger(trigger, fact.row.body, fact.row.channel_id);
         return yield* mailbox.receive(original, mail);
       }).pipe(Effect.catch((error) => Effect.as(Effect.logWarning(`chat: route ${trigger.id}`, error), { heldNotice: "" })));
       const written: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
@@ -1017,6 +1017,17 @@ const make = (sessions: Session["Service"], mailbox: Mailbox["Service"]) =>
           around: [...before, ...after].map(toMessage),
         };
       }),
+      notificationReceipt: Effect.fn("Channel.notificationReceipt")(function* (id) {
+        const row = yield* db.one(qm.messageByID({ id }));
+        if (!row || row.deleted_at !== null) return undefined;
+        const receipt = yield* db.one(qm.notificationReceipt({ id }));
+        if (!receipt || receipt.superseded) return undefined;
+        return {
+          message: toMessage(row),
+          readAt: receipt.read_at ?? undefined,
+        };
+      }),
+      ownerReadReports: db.run(qm.ownerReadReports()).pipe(Effect.withSpan("Channel.ownerReadReports")),
       say: Effect.fn("Channel.say")(
         (text, channel, sendKey, more = {}) => ownerSays(text, channel, sendKey, more, more.source, more.responsePort, more.voiceMode),
         locked,
