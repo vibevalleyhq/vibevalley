@@ -1,8 +1,9 @@
-// The village's named positions, read from the level, where a helper stands, and how the village sits in a window.
+// The village's named positions, read from the level, where a helper stands, how long a pose shows, what a tap lands on,
+// and how the village sits in a window.
 
 import { type Framing, frameWhole, type Rect, type Size } from "@vibevalley/engine/framing";
 import { navMap, type NavMap } from "@vibevalley/engine/nav";
-import type { Crop, Session, SessionAction } from "@vibevalley/protocol";
+import type { Crop, Session, SessionAction, SessionId } from "@vibevalley/protocol";
 import { farmFraming } from "@vibevalley/protocol/host";
 
 import { add, type Box, inBox, type Level, type Point } from "./level";
@@ -165,6 +166,32 @@ export class VillageWorld {
 
 export type Pose = "cheer" | "worry" | "idle" | "work" | "think";
 
+/** How long one pose stays on screen, so fast tool calls are seen one at a time. */
+export const poseMinMs = 800;
+
+/** The pose an actor shows: the newest wanted one, but only after the last change has been up for poseMinMs. A burst of
+ * actions keeps only the newest, and when the burst ends the picture catches up within one poseMinMs. */
+export class PoseHold {
+  private shown: Pose;
+  private wanted: Pose;
+  private since: number;
+
+  constructor(pose: Pose, now: number) {
+    this.shown = pose;
+    this.wanted = pose;
+    this.since = now;
+  }
+
+  next(want: Pose, now: number): Pose {
+    this.wanted = want;
+    if (want !== this.shown && now - this.since >= poseMinMs) {
+      this.shown = want;
+      this.since = now;
+    }
+    return this.shown;
+  }
+}
+
 const handsOn = new Set<SessionAction>(["edit_file", "run_command", "mcp", "other"]);
 
 export function poseOf(s: Session, crop: Crop): Pose {
@@ -258,3 +285,28 @@ export const villageCutAcross = farmFraming.cut.across;
 export const villageCutDown = farmFraming.cut.down;
 
 export const frameVillage = (window: Size, village: Size): Framing => frameWhole(window, village, farmFraming.cut);
+
+// What a tap lands on: the order is the rule. Helpers first (the last drawn on top), then the dog, the yard's places, the
+// plots (a little taller than their box).
+
+export type VillageHit =
+  | { readonly kind: "session"; readonly id: SessionId }
+  | { readonly kind: "dog" }
+  | { readonly kind: "spot"; readonly spot: string }
+  | { readonly kind: "plot"; readonly bed: number };
+
+interface VillageHitData {
+  /** In drawing order. */
+  readonly sessions: ReadonlyMap<SessionId, Box>;
+  readonly dog?: Box;
+  readonly spots: ReadonlyMap<string, Box>;
+  readonly plots: ReadonlyMap<number, Box>;
+}
+
+export function villageHitAt(data: VillageHitData, p: Point): VillageHit | undefined {
+  for (const [id, box] of [...data.sessions].toReversed()) if (inBox(p, box)) return { kind: "session", id };
+  if (data.dog && inBox(p, data.dog)) return { kind: "dog" };
+  for (const [spot, box] of [...data.spots].toReversed()) if (inBox(p, box)) return { kind: "spot", spot };
+  for (const [bed, b] of [...data.plots].toReversed()) if (inBox(p, { ...b, y0: b.y0 - 4, y1: b.y1 + 2 })) return { kind: "plot", bed };
+  return undefined;
+}

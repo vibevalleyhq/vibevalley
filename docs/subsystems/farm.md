@@ -21,7 +21,7 @@
 谁画哪一块、store 的动作、画布怎么告诉 DOM 东西在哪，在 [农场的 README](apps/web/src/farm/README.md)。
 
 - **像素村** `apps/web/src/farm/canvas/`（PixiJS）：`VillageCanvas.tsx` 挂画布，`scene.ts` 每帧把核心状态画成画面、按脚底的 y 排前后；`dog.ts`、`life.ts`、`fx.ts` 院子的动静和地上的效果。
-- **世界** `apps/web/src/farm/world/`：`world.ts` 给位置起名、算帮工去哪（`Whereabouts`、`spotsFor`、`poseOf`、`placeOfAction`），`pose.ts` 的 `PoseHold` 让一个姿势至少停 800ms；`level.ts` 读 `apps/web/public/village.ldtk`；`framing.ts` 放大和裁边（`frameVillage`：算法是 `@vibevalley/engine/framing` 的 `frameWhole`，村子多大、每边能裁多少是 `@vibevalley/protocol/host` 的 `farmFraming`，桌面壳也照它定窗口）；`hits.ts` 点到了什么；`plots.ts` 地有哪几块（`beds`）和地上画什么；`sprites.ts` 读 `public/pixel/sprites.json`。
+- **世界** `apps/web/src/farm/world/`：`world.ts` 给位置起名、算帮工去哪（`Whereabouts`、`spotsFor`、`poseOf`、`placeOfAction`），让一个姿势至少停 800ms（`PoseHold`），点到了什么（`villageHitAt`）；`level.ts` 读 `apps/web/public/village.ldtk`；`framing.ts` 放大和裁边（`frameVillage`：算法是 `@vibevalley/engine/framing` 的 `frameWhole`，村子多大、每边能裁多少是 `@vibevalley/protocol/host` 的 `farmFraming`，桌面壳也照它定窗口）；`plots.ts` 地有哪几块（`beds`）和地上画什么；`sprites.ts` 读 `public/pixel/sprites.json`。
 - **引擎** `packages/engine`：`nav`（寻路）、`pixi`（光、天色、法线、粒子、小虫、节奏）、`audio`（合成器和响度）、`clock.ts`（一天的钟）。
 - **HUD 和面板** `farm/hud/`、`farm/panels/`：农场卡、额度、特效层，右上角的「记忆树」到 `/tree`（`src/tree`，[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)）；收获、播种袋（`SeedForms.tsx`）、成就、仓库、计划板、菜单。
 - **农具和去处**：`farm/tools.ts` 的 `Tool`、`aimTool`（指着一块地时说点下去做什么）、`toolForKey`；`farm/commands.ts` 把点击变成接口调用；`farm/world/places.ts` 的 `yardPlaces` 是院子里每样东西打开哪个面板或页面。
@@ -87,7 +87,7 @@
 
 **一帧**：服务端经 SSE 推来 `StateFrame` → 每块 `bed` 找 `station` 对上的帮工，按它的工单的 id 查 `view.plots` 换成 `plot-<庄稼>` 的图 → 每个帮工算庄稼、姿势、去处（`Whereabouts`），给出目标点，沿寻路的路一段段走 → 按脚底的 y 排前后，打光，画 HUD 和牌子。帮工从帧里消失后，它的小动物从大门走掉。
 
-**一次点击**（`world/hits.ts` 定点到了什么：帮工压过狗，狗压过道具，道具压过地）：
+**一次点击**（`world/world.ts` 的 `villageHitAt` 定点到了什么：帮工压过狗，狗压过道具，道具压过地）：
 
 | 农具（数字键 1–6） | 点一块地 |
 |---|---|

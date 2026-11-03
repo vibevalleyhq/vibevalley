@@ -7,7 +7,7 @@ export { FarmDialog, type FarmDialogSize, FarmSection } from "./dialog";
 export { PxTextArea, PxTextInput } from "./field";
 export { reducedMotion, SpriteIcon } from "./icons";
 export { numberText } from "@/base/format";
-export { plainText } from "./markdown";
+export { plainText } from "./PxMarkdown";
 export { EarnedMedal } from "./medals";
 export { badgeColors, CardColors, type Piece } from "./card";
 export { PixelCard } from "./PixelCard";

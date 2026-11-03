@@ -10,7 +10,7 @@ import { SpriteAtlas, levelWidth } from "@/ui/pixel/atlas";
 import { Level } from "./level";
 import { yardPlaces } from "./places";
 import { beds, cropOfBed } from "./plots";
-import { frameVillage, villageCutAcross, villageCutDown, VillageWorld } from "./world";
+import { frameVillage, PoseHold, poseMinMs, villageCutAcross, villageCutDown, VillageWorld } from "./world";
 
 const assets = join(import.meta.dirname, "../../../public");
 const level = Level.parse(readFileSync(join(assets, "village.ldtk"), "utf8"));
@@ -119,5 +119,29 @@ describe("the framing", () => {
         expect(-f.box.y).toBeLessThanOrEqual(f.box.h * villageCutDown + 0.5);
       }
     }
+  });
+});
+
+describe("the poses", () => {
+  test("shows the first pose at once, then keeps each at least 800 ms", () => {
+    const hold = new PoseHold("work", 0);
+    expect(hold.next("idle", 100)).toBe("work");
+    expect(hold.next("work", 200)).toBe("work");
+    expect(hold.next("idle", poseMinMs - 1)).toBe("work");
+    expect(hold.next("idle", poseMinMs)).toBe("idle");
+  });
+
+  test("keeps only the newest of a burst, and catches up within one window", () => {
+    const hold = new PoseHold("work", 0);
+    for (const [want, at] of [
+      ["idle", 100],
+      ["think", 200],
+      ["cheer", 300],
+      ["idle", 400],
+    ] as const)
+      expect(hold.next(want, at)).toBe("work");
+    expect(hold.next("idle", 799)).toBe("work");
+    expect(hold.next("idle", 800)).toBe("idle");
+    expect(hold.next("idle", 1_600)).toBe("idle");
   });
 });

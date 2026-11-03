@@ -95,9 +95,10 @@ the API and then plays the bed's effect. Parent and child issues use the workben
 
 - `world/`: `loadVillage()`, and `useVillage()` in the same file (the level and the atlas, fetched once; the atlas alone is
   `ui/pixel/atlas.ts`'s `loadAtlas`); `VillageWorld` (plots, places,
-  props, gate, queue, lawn, lights, fx boxes, `nav`, `goalOf`, `poseOf`, `spotsFor`, `Whereabouts`); `plots.ts` (beds, `cropOfBed`, `sessionAtStation`, `cropLabel`); `places.ts` (the
-  yard places and `FarmPanel`); `hits.ts` (`villageHitAt`, the click order); `textures.ts` (`loadTextures`, `texture`: Pixi textures at the
-  density); `framing.ts`.
+  props, gate, queue, lawn, lights, fx boxes, `nav`, `goalOf`, `poseOf`, `spotsFor`, `Whereabouts`); `PoseHold` and
+  `poseMinMs` (how long a pose shows); `villageHitAt` (what a tap lands on, in order); `plots.ts` (beds, `cropOfBed`,
+  `sessionAtStation`, `cropLabel`); `places.ts` (the yard places and `FarmPanel`); `textures.ts` (`loadTextures`,
+  `texture`: Pixi textures at the density); `framing.ts`.
 - `src/ui/pixel`, shared with the other skins and the workbench's pixel pages: the pixel components for the DOM over
   the canvas (its `index.ts`); `atlas.ts` (`SpriteAtlas`: sizes and anchors in art pixels, `density` 2, `spriteUrl`;
   `loadAtlas`, `useAtlas`); `sound.ts` (`playSound(name)`, `isMuted`/`setMuted`, the sounds' recipes).
