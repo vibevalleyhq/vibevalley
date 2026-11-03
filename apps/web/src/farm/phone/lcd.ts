@@ -1,4 +1,4 @@
-import type { GlyphCell } from "@/ui/pixel/card";
+import type { GlyphCell } from "@/ui/pixel/PixelCard";
 
 // The phone's screen: four greens, like an old handheld's. The handset and the games draw
 // with these.

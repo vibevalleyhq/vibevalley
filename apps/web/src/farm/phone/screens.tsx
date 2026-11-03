@@ -13,7 +13,7 @@ import { useAgent } from "@/infra/agents";
 import { useCore } from "@/infra/frame";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { SpriteIcon } from "@/ui/pixel";
-import type { GlyphCell } from "@/ui/pixel/card";
+import type { GlyphCell } from "@/ui/pixel/PixelCard";
 
 import { missedOf, phoneState } from "./calls";
 import { BugSnakeIcon } from "./games/BugSnakeGame";

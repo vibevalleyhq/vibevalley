@@ -12,8 +12,8 @@ import { Channel } from "@/channel/channel.ts";
 import { messageOf, type ApiError, reasonOf, refused } from "@/errors.ts";
 import { Session } from "@/session/session.ts";
 
-import { type Caller, type Who, type Orchestrator, type SessionInput, refuse, callerOf, tool, sessionSchemaTool } from "./definition.ts";
 import { answers, blockLine } from "./prompts.ts";
+import { type Caller, type Who, type Orchestrator, type SessionInput, refuse, callerOf, tool, sessionSchemaTool } from "./schemas.ts";
 
 export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue | string>) =>
   Effect.gen(function* () {

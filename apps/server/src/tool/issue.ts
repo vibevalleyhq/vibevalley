@@ -16,7 +16,6 @@ import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Runtime } from "@/runtime/runtime.ts";
 import { Session } from "@/session/session.ts";
 
-import { type Who, type Orchestrator, type SessionInput, said, answered, callerOf, customTool, participant, tool, sessionSchemaTool } from "./definition.ts";
 import {
   answers,
   changesText,
@@ -35,7 +34,19 @@ import {
   sessionLine,
   statusOf,
 } from "./prompts.ts";
-import { toolParameters } from "./schemas.ts";
+import {
+  type Who,
+  type Orchestrator,
+  type SessionInput,
+  said,
+  answered,
+  callerOf,
+  customTool,
+  participant,
+  tool,
+  sessionSchemaTool,
+  toolParameters,
+} from "./schemas.ts";
 
 type IssueTool = "issue.get" | "issue.diff.get" | "session.stop";
 const spaces = /\s+/gu;

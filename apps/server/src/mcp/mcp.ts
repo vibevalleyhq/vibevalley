@@ -15,7 +15,7 @@ import { session } from "@/base/actor.ts";
 import { messageOf } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Session } from "@/session/session.ts";
-import type { Caller } from "@/tool/definition.ts";
+import type { Caller } from "@/tool/schemas.ts";
 import { Tool } from "@/tool/tool.ts";
 
 import { failedCall, noTool, unknownCaller } from "./prompts.ts";

@@ -28,7 +28,7 @@ import { TextArea } from "@/ui/Field";
 import { Card, Quiet } from "@/ui/layout";
 import { PixelCard, SpriteIcon } from "@/ui/pixel";
 import { type SpriteAtlas, type SpriteInfo, useAtlas } from "@/ui/pixel/atlas";
-import { badgeColors, CardColors } from "@/ui/pixel/card";
+import { badgeColors, CardColors } from "@/ui/pixel/PixelCard";
 import { PoseSprite } from "@/ui/PoseSprite";
 import { toast } from "@/ui/toasts";
 
