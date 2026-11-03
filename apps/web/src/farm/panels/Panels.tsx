@@ -22,10 +22,10 @@ import { setPet, usePrefs } from "@/state/prefs";
 import { createPixelAct, FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
 
 import { Achievements } from "./Achievements";
-import { tint } from "./bits";
 import { FarmLog } from "./FarmLog";
 import { HarvestReview, Warehouse } from "./Harvest";
 import { Menu } from "./Menu";
+import { tint } from "./rows";
 import { SowForm, WaterForm } from "./SeedForms";
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {

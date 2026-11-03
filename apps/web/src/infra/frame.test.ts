@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from "vite-plus/test";
 
 import { streamSilenceMs } from "@vibevalley/protocol";
 
-import { frames } from "./frames";
+import { frames } from "./frame";
 import { frameAt } from "./testing";
 
 afterEach(() => {

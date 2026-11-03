@@ -25,7 +25,6 @@ import { Splitter, usePaneWidth } from "@/ui/Splitter";
 import { Tabs } from "@/ui/Tabs";
 import { toast } from "@/ui/toasts";
 
-import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
 import { Composer, FileDrop, type QuotedBlockDraft } from "./Composer";
 import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
 import { workbenchClock } from "./feed";
@@ -51,7 +50,7 @@ import {
   unreadIn,
   unreadUnder,
 } from "./places";
-import { phaseDot, phaseText } from "./presence";
+import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots, phaseDot, phaseText } from "./presence";
 import { switcher } from "./QuickSwitcher";
 import { Crons, Sessions } from "./Tabs";
 

@@ -3,7 +3,7 @@ import type * as solid from "solid-js";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 
 import { api } from "@/infra/api";
-import { frames } from "@/infra/frames";
+import { frames } from "@/infra/frame";
 import { testFrames } from "@/infra/testing";
 import { framesSource, pageRegistry } from "@/state/atom";
 import { type Intent, intentsIn } from "@/state/intent";

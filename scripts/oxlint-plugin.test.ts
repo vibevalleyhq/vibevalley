@@ -107,7 +107,7 @@ tester.run("page-layers", rule("page-layers"), {
     { code: "import { a } from '../ui/A';", filename: "/repo/apps/server/src/x.ts" },
     { code: "import { a } from '@/infra/router';", filename: page("ui/A.tsx") },
     { code: "import { a } from '@/features/issue';", filename: page("farm/panels/Board.tsx") },
-    { code: "import { a } from '@/infra/frames';", filename: page("state/atom.ts") },
+    { code: "import { a } from '@/infra/frame';", filename: page("state/atom.ts") },
     { code: "import { a } from '@/base/format';", filename: page("infra/api.ts") },
   ],
   invalid: [

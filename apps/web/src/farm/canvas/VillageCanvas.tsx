@@ -17,7 +17,7 @@ import { useVillage } from "@/farm/support";
 import { yardPlace } from "@/farm/world/places";
 import { beds } from "@/farm/world/plots";
 import { textureProgress } from "@/farm/world/textures";
-import { frames } from "@/infra/frames";
+import { frames } from "@/infra/frame";
 import { ready, useAgents, useQuery } from "@/infra/query";
 import { useRouter } from "@/infra/router";
 import { spriteUrl } from "@/ui/pixel/atlas";

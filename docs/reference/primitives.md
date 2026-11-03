@@ -204,14 +204,14 @@
 | `reasonOf` | `api.ts` | What a refusal says, for a toast or an inline line. |
 | `newSendKey` | `api.ts` | A client's key for one send: a retry with the same key is the same message, said once. |
 | `createRequestKey` | `api.ts` | The request key of one thing the owner may send again (a form's create, a button's): the same key until a send went |
+| `frames` | `frame.ts` |  |
 | `FramesContext` | `frame.ts` |  |
-| `createFrames` | `frame.ts` | The state stream (infra/frames.ts) as a store: each frame reconciles in by id, so only what changed updates. |
+| `createFrames` | `frame.ts` | The stream above as a store: each frame reconciles in by id, so only what changed updates. |
 | `useFrames` | `frame.ts` |  |
 | `useCore` | `frame.ts` | The folded state; undefined until the first frame. Read it inside JSX or a memo. |
 | `orchestratorSession` | `frame.ts` |  |
 | `orchestratorMood` | `frame.ts` |  |
 | `rawFrame` | `frame.ts` | The frame as the stream sent it: a new object each time, for code that compares the one before with the one after |
-| `frames` | `frames.ts` |  |
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |
 | `followReports` | `gateway.ts` | The farm's reports after the one with this id (the newest when absent), then each from now on. |
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |

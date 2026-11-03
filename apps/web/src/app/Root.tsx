@@ -2,8 +2,7 @@ import type { JSX } from "@solidjs/web";
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { Loading, onSettled } from "solid-js";
 
-import { createFrames, FramesContext } from "@/infra/frame";
-import { frames } from "@/infra/frames";
+import { createFrames, frames, FramesContext } from "@/infra/frame";
 import { reveal } from "@/infra/opening";
 import { queries, refetchOnRelink } from "@/infra/query";
 import { createRouter, RouterContext } from "@/infra/router";

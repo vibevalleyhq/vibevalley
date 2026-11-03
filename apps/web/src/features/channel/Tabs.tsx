@@ -12,9 +12,8 @@ import { Button } from "@/ui/Button";
 import { Empty } from "@/ui/Empty";
 import { Icon } from "@/ui/Icon";
 
-import { HelperFace, PhaseGlyph } from "./bits";
 import { chatPath, sessionThreadOf } from "./places";
-import { phaseText } from "./presence";
+import { HelperFace, PhaseGlyph, phaseText } from "./presence";
 
 const card = "rounded-lg border border-line bg-page p-3";
 

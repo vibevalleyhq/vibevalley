@@ -1,5 +1,5 @@
 // The state stream after a sleep: the connection looks open but nothing comes, not even the server's heartbeat. The page
-// gives it up as lost and opens it again (packages/protocol/src/stream.ts, infra/frames.ts).
+// gives it up as lost and opens it again (packages/protocol/src/stream.ts, infra/frame.ts).
 import { streamSilenceMs } from "@vibevalley/protocol";
 
 import { expect, test } from "./fixtures";

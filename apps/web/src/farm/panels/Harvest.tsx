@@ -18,7 +18,7 @@ import { ready, useAgents } from "@/infra/query";
 import { useRouter } from "@/infra/router";
 import { createPixelAct, FarmSection, PxButton, SpriteIcon } from "@/ui/pixel";
 
-import { FarmEmpty, FarmTag, FileRow, PlusMinus, tint, Tinted } from "./bits";
+import { FarmEmpty, FarmTag, FileRow, PlusMinus, tint, Tinted } from "./rows";
 
 const xs = "text-[12px] text-bark-600";
 

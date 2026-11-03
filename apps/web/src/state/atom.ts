@@ -7,7 +7,7 @@ import { Atom, AtomRegistry } from "effect/reactivity";
 import { type Accessor, createContext, createSignal, useContext } from "solid-js";
 
 import { createExternal } from "@/base/external";
-import { type Frames, frames, type FramesSource, type Link } from "@/infra/frames";
+import { type Frames, frames, type FramesSource, type Link } from "@/infra/frame";
 
 export const createRegistry = (): AtomRegistry.AtomRegistry => AtomRegistry.make();
 

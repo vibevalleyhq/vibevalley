@@ -7,7 +7,7 @@ import { type Accessor, createEffect, createSignal, onSettled, untrack } from "s
 import { SpriteManifest } from "@/base/manifests";
 
 import { api } from "./api";
-import type { FramesSource } from "./frames";
+import type { FramesSource } from "./frame";
 
 /** REST reads besides the state stream (history, changes, …); a frame that changes what they show invalidates them. */
 export const queries = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });

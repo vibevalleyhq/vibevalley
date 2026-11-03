@@ -20,7 +20,7 @@ import { isOneOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "@/base/format";
 import { aria, useNow } from "@/base/util";
 import { playBedFx } from "@/farm/commands";
-import { tint } from "@/farm/panels/bits";
+import { tint } from "@/farm/panels/rows";
 import { farm, overlayOf } from "@/farm/store";
 import { useVillage } from "@/farm/support";
 import { farmActWords, useFarm } from "@/farm/ui";

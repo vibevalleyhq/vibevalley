@@ -2,7 +2,7 @@
 
 import type { StateFrame } from "@vibevalley/protocol";
 
-import type { Frames, FramesSource } from "./frames";
+import type { Frames, FramesSource } from "./frame";
 
 export interface TestFrames {
   readonly source: FramesSource;

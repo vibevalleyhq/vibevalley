@@ -12,8 +12,8 @@ src/app/            the wiring: App (the routes, each place a feature's page), R
 src/base/           the pure ground, touching nothing outside: times and money in words (format.ts), ordering, matching
                     (search.ts), the shortcut table, small Solid helpers (util.tsx; external.ts: a framework-free store as
                     a signal)
-src/infra/          what talks to the outside: the state stream (frames.ts, framework-free, opened again when even the
-                    server's heartbeat stops coming; frame.ts, its Solid store), the API client (api.ts, with request keys), rooms (gateway.ts), the live stream, REST queries (query.ts,
+src/infra/          what talks to the outside: the state stream (frame.ts: the stream itself, framework-free, opened again
+                    when even the server's heartbeat stops coming, and its Solid store), the API client (api.ts, with request keys), rooms (gateway.ts), the live stream, REST queries (query.ts,
                     agents.ts), saving settings, the host, the app's updates, the router (the browser's history), the
                     opening cover (opening.ts), the stories' fake server (storyApi.ts)
 src/state/          the middle layer on Effect's Atom: atom.ts (the page's registry, useAtom, the page's values as

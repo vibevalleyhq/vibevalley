@@ -16,7 +16,7 @@ import { useCore, useFrames } from "@/infra/frame";
 import { ready, useQuery } from "@/infra/query";
 import { createPixelAct, numberText, SpriteIcon } from "@/ui/pixel";
 
-import { tint, Tinted } from "./bits";
+import { tint, Tinted } from "./rows";
 
 const walls: AchievementCategory[] = ["harvest", "craft", "thrift", "team"];
 

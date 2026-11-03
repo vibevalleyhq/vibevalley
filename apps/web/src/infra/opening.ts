@@ -3,7 +3,7 @@
 // state frame, the reads its places started and their pictures. Then the page shows once, whole, instead of passing
 // through an empty shell, zero counts and a dialog popping in again. The farm's cover hands over to its own bar at once.
 
-import { frames } from "./frames";
+import { frames } from "./frame";
 import { queries } from "./query";
 
 /** Past this the page shows as it is: a read that hangs keeps its own loading words, not a cover. */

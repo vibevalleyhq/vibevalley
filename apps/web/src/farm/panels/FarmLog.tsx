@@ -14,7 +14,7 @@ import { useCore } from "@/infra/frame";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { DashedLine, PxMarkdown } from "@/ui/pixel";
 
-import { clockOf, FarmEmpty, FarmTag } from "./bits";
+import { clockOf, FarmEmpty, FarmTag } from "./rows";
 
 const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
   completed: [t("shared.outcome.completed"), "#efcf92", "#2f1f13"],

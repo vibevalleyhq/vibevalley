@@ -12,8 +12,8 @@ import { defineAtom } from "@/state/atom";
 import { createAct } from "@/ui/act";
 import { Dialog } from "@/ui/Dialog";
 
-import { Count } from "./bits";
 import { channelOf, chatPath } from "./places";
+import { Count } from "./presence";
 import { type SwitchTarget, switchTargets } from "./switcher";
 
 const shown = defineAtom(false);
