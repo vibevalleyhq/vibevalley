@@ -3,9 +3,9 @@ import { For } from "solid-js";
 import { stories, story } from "@vibevalley/stories";
 
 import { Button } from "./Button";
-import { Dot } from "./Dot";
 import { IconButton } from "./IconButton";
-import { Card, ListCard, ListRow, Quiet, SecretInput, TextLink, Toggle } from "./layout";
+import { Card, Empty, ListCard, ListRow, Quiet, SecretInput, TextLink, Toggle } from "./layout";
+import { Dot } from "./Tag";
 
 const projects = [
   { id: "vibevalley", line: "3 个在做 · 1 个等你", tone: "leaf" as const },
@@ -74,6 +74,27 @@ export default stories({
           </div>
         </div>
       ),
+    }),
+    "Empty with a next step": story({
+      fill: true,
+      args: { words: "还没有工单。写一句要做的事，管家会帮你拆开。" },
+      controls: { words: { kind: "text", long: true } },
+      render: (a) => (
+        <Empty
+          icon="issues"
+          action={
+            <Button tone="primary" icon="add">
+              新工单
+            </Button>
+          }
+        >
+          {a.words}
+        </Empty>
+      ),
+    }),
+    "Empty with nothing to do": story({
+      fill: true,
+      render: () => <Empty icon="search">没有符合筛选的工单。</Empty>,
     }),
   },
 });

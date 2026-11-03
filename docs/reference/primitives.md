@@ -138,7 +138,7 @@
 | `testConfig` | `layers.ts` |  |
 | `testDatabase` | `layers.ts` |  |
 | `offline` | `layers.ts` | An HTTP client for a test that must not reach the network: every request dies, so one made by mistake is a failure. |
-| `whenState` | `until.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. It |
+| `whenState` | `layers.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. It |
 | `releaseHeld` | `worker.ts` | Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. |
 | `helper` | `worker.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). 只起草工单 drafts; |
 | `installedOnly` | `worker.ts` | A probe that finds every runtime given, bundled, and no other. |

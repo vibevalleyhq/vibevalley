@@ -236,3 +236,23 @@ vp run deadcode && vp run health:verify && vp run docs:verify
 - **碎片与中转文件消融**：溶解旧路径 apps/web/src/farm/support.ts；旧路径 apps/web/src/infra/frames.ts 并入 `apps/web/src/infra/frame.ts`；旧路径 apps/web/src/ui/richRules.ts 并入 `apps/web/src/ui/richText.ts`。
 - **守住正名**：`scripts/file-names.test.ts` 把 `util`、`bits`、`support` 列为模糊文件名并拦住；`scripts/stale-names.ts` 拦住退休的导入路径，旧名字不能再回流。
 - **结果**：仓库格式化文件从 1,237 个降到 1,124 个，减少 113 个冗余或微文件。
+
+## 八、第三阶段 10 轮深模块收敛与过时概念彻底清除（CodeGraph + DeepSeek V4.1 Flash）
+
+第三阶段接着第二阶段，同样分 10 轮：先用 CodeGraph 的引用边找出旧文件的全部调用方，再把按性质命名的形状改成正名，把只剩转发或只服务单一调用的碎片并入拥有它的模块，最后全仓替换导入。没有新增平行状态、反向回调或跨模块依赖。
+
+- **形状与领域正名**：旧路径 apps/server/src/project/shapes.ts → `apps/server/src/project/workplace.ts`；旧路径 apps/server/src/session/shapes.ts → `apps/server/src/session/signals.ts`；旧路径 apps/web/src/features/issue/queries.ts → `apps/web/src/features/issue/history.ts`。
+- **服务端模块吸收**：旧路径 apps/server/src/memory/store.ts 并入 `apps/server/src/memory/memory.ts`；旧路径 apps/server/src/artifact/spans.ts 并入 `apps/server/src/artifact/ops.ts`；旧路径 apps/server/src/tool/cron.ts、apps/server/src/tool/memory.ts、apps/server/src/tool/channel.ts 并入 `apps/server/src/tool/tool.ts`；旧路径 apps/server/src/tool/definition.ts 并入 `apps/server/src/tool/schemas.ts`。
+- **页面按概念收拢**：旧路径 apps/web/src/features/issue/rows.ts、apps/web/src/features/issue/lanes.ts 并入 `apps/web/src/features/issue/cards.ts`；旧路径 apps/web/src/features/artifact/queries.ts 并入 `apps/web/src/features/artifact/ArtifactCard.tsx`；旧路径 apps/web/src/features/channel/draft.ts 并入 `apps/web/src/features/channel/composing.ts`；旧路径 apps/web/src/features/channel/switcher.ts、apps/web/src/features/channel/feed.ts 并入 `apps/web/src/features/channel/places.ts`；旧路径 apps/web/src/features/channel/emoji.ts 并入 `apps/web/src/features/channel/EmojiPicker.tsx`；旧路径 apps/web/src/features/voice/agora.ts 并入 `apps/web/src/features/voice/call.ts`；旧路径 apps/web/src/features/voice/moss.ts 并入 `apps/web/src/features/voice/mossLine.ts`；旧路径 apps/web/src/farm/world/places.ts 并入 `apps/web/src/farm/world/world.ts`；旧路径 apps/web/src/farm/phone/games/random.ts 并入 `apps/web/src/farm/phone/lcd.ts`。
+- **状态与通用名消除**：旧路径 apps/web/src/infra/live.ts 并入 `apps/web/src/infra/frame.ts`；旧路径 apps/web/src/state/latest.ts 并入 `apps/web/src/state/atom.ts`；旧路径 apps/web/src/ui/mentions.ts 并入 `apps/web/src/ui/richText.ts`；旧路径 apps/web/src/base/order.ts 并入 `apps/web/src/base/search.ts`。
+- **测试帮手归并**：旧路径 apps/server/src/testing/helper.ts → `apps/server/src/testing/worker.ts`；旧路径 apps/server/src/testing/until.ts 并入 `apps/server/src/testing/layers.ts`；旧路径 apps/server/src/testing/agents.ts、apps/server/src/testing/issues.ts、apps/server/src/testing/said.ts 并入 `apps/server/src/testing/world.ts`；新增 `apps/server/src/mailbox/work.test.ts` 覆盖投递写入。
+- **皮与零件**：旧路径 apps/web/src/ui/Empty.tsx、apps/web/src/ui/TitleBar.tsx 并入 `apps/web/src/ui/layout.tsx`；旧路径 apps/web/src/ui/pixel/card.ts 并入 `apps/web/src/ui/pixel/PixelCard.tsx`；旧路径 apps/web/src/ui/pixel/medals.tsx 并入 `apps/web/src/ui/pixel/glyphs.tsx`；旧路径 apps/web/src/farm/hud/ProjectSign.tsx、apps/web/src/farm/hud/QuotaPill.tsx 并入 `apps/web/src/farm/hud/Hud.tsx`。
+- **守住正名**：`scripts/stale-names.ts` 的「a module under its retired grab-bag or metaphor filename」补上第三阶段的全部旧路径（`project/shapes`、`session/shapes`、`testing/helper`、`tool/definition`、`infra/live`、`state/latest` 等），任何一次回流都会在 `docs:verify` 报出文件、行号和现在该写的位置；`scripts/file-names.test.ts` 继续拦住 `util`、`bits`、`support` 这类模糊名。
+- **结果**：`apps/` 与 `packages/` 下的 ts/tsx 从 957 个降到 925 个（删除 33 个旧文件，新增 1 个测试），所有导入已改到新家。
+
+本阶段收敛后的核对：
+
+```text
+vpx scripts/stale-names.ts        688 files and 92 catalogs ok
+vpx scripts/doc-links.ts          ok: 0 broken links
+```

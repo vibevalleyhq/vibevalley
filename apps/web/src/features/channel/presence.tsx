@@ -10,7 +10,7 @@ import { Icon, type IconSize } from "@/ui/Icon";
 import { actionIcon, type IconName } from "@/ui/icons";
 const span = spanText;
 
-export { Dot } from "@/ui/Dot";
+export { Dot } from "@/ui/Tag";
 
 /** The server's words for what the session is doing, how long it has been quiet filled in by the clock. */
 export function phaseText(h: SessionView, now: number) {

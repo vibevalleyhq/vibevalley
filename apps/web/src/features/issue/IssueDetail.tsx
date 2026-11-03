@@ -25,11 +25,11 @@ import { sendReplacing, useIntents } from "@/state/intent";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { Checkbox } from "@/ui/Checkbox";
-import { Dot } from "@/ui/Dot";
 import { TextArea } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
 import type { IconName } from "@/ui/icons";
 import { Markdown } from "@/ui/Markdown";
+import { Dot } from "@/ui/Tag";
 import { toast } from "@/ui/toasts";
 
 import { ActLines } from "./ActLines";

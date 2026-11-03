@@ -365,13 +365,14 @@ const RULES: readonly Rule[] = [
     name: "a service under a plural name",
     pattern:
       /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Projects|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Projects|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,
-    says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Executor, Issue, Memory, Project, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/store.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)',
+    says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Executor, Issue, Memory, Project, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)',
     dirs: ["apps/server/src"],
   },
   {
     name: "a module under its retired grab-bag or metaphor filename",
-    pattern: /["'`](?:\.\.?\/|@\/)(?:channel\/(?:chat|folded|model)|mailbox\/chat|session\/takeIn|farm\/support|base\/util|ui\/richRules)(?:\.tsx?)?["'`]/u,
-    says: "channel/channel.ts, channel/messages.ts, channel/rooms.ts, mailbox/envelope.ts, session/briefing.ts, farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts",
+    pattern:
+      /["'`](?:\.\.?\/|@\/)(?:channel\/(?:chat|folded|model)|mailbox\/chat|session\/(?:takeIn|shapes)|farm\/support|base\/util|ui\/richRules|project\/shapes|testing\/(?:helper|until|issues|said|agents)|farm\/world\/places|features\/voice\/(?:agora|moss)|features\/channel\/(?:emoji|feed|switcher|draft)|features\/issue\/(?:lanes|rows|queries)|features\/artifact\/queries|memory\/store|artifact\/spans|tool\/(?:cron|memory|channel|definition)|infra\/live|state\/latest)(?:\.tsx?)?["'`]/u,
+    says: "channel/channel.ts, channel/messages.ts, channel/rooms.ts, mailbox/envelope.ts, session/briefing.ts, farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts, project/workplace.ts, session/signals.ts, features/issue/{history,cards}.ts, features/artifact/ArtifactCard.tsx, testing/{worker,layers,world}.ts, farm/world/world.ts, features/voice/{call,mossLine}.ts, features/channel/{EmojiPicker.tsx,places.ts,composing.ts}, memory/memory.ts, artifact/ops.ts, tool/{tool,schemas}.ts, infra/frame.ts, state/atom.ts",
   },
 ];
 
