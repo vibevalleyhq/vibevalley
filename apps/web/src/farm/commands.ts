@@ -11,8 +11,8 @@ import { toasts, ToastType } from "@/ui/pixel";
 
 import { farm, farmState } from "./store";
 import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type ToolResult } from "./tools";
-import { webRoutes, type YardPlace } from "./world/places";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
+import { webRoutes, type YardPlace } from "./world/world";
 
 /** The bed's effect for a helper's plot: what the farm plays once the server took an act on it. */
 export const playBedFx = (s: Session, plays: Record<string, SessionPlayView> | undefined, kind: BedFxKind, text?: string) => {

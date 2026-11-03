@@ -9,8 +9,8 @@ import type { Agent, FarmView, Session } from "@vibevalley/protocol";
 
 import { aria, useClickAway } from "@/base/dom";
 import { farm, useFarm } from "@/farm/store";
-import { webRoutes } from "@/farm/world/places";
 import { isBusy, isRipe, plotOf } from "@/farm/world/plots";
+import { webRoutes } from "@/farm/world/world";
 import { bottleSprite, quotaOf } from "@/features/runtime";
 import { useCore, useFrames } from "@/infra/frame";
 import { ready, useAgents, useRuntimes } from "@/infra/query";

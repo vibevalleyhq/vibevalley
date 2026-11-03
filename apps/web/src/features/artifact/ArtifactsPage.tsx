@@ -24,10 +24,9 @@ import { type MoreItem, MoreMenu } from "@/ui/MoreMenu";
 import { Tag } from "@/ui/Tag";
 import { toast } from "@/ui/toasts";
 
-import { bodyIcon, bodyLabel } from "./ArtifactCard";
+import { artifactHref, bodyIcon, bodyLabel, useArtifact, useArtifacts } from "./ArtifactCard";
 import { BlocksView } from "./BlocksView";
 import type { BlockEditor } from "./editor";
-import { artifactHref, useArtifact, useArtifacts } from "./queries";
 
 /** What a page in the frame may do: run its scripts and open links in a tab of their own. Never allow-same-origin: it
  * would be the farm's own page. The server's header says the same (artifact/policy.ts). */

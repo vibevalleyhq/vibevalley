@@ -1,14 +1,28 @@
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import type { ArtifactBody, ArtifactCard as Card } from "@vibevalley/protocol";
+import type { ArtifactBody, ArtifactCard as Card, ArtifactListRequest } from "@vibevalley/protocol";
+import { artifactId } from "@vibevalley/protocol/schema";
 
+import { api } from "@/infra/api";
+import { useQuery } from "@/infra/query";
 import { useRouter } from "@/infra/router";
 import { A } from "@/ui/A";
 import { Icon } from "@/ui/Icon";
 import type { IconName } from "@/ui/icons";
 
-import { artifactHref } from "./queries";
+// Artifacts (docs/subsystems/artifact.md) are not in the frame: they are read when shown, and read again every few
+// seconds while shown, so a new version a helper hands in comes up on its own.
+const fresh = 5_000;
+
+export const useArtifact = (id: () => string) =>
+  useQuery(() => ({ queryKey: ["artifacts", "one", id()], queryFn: () => api.artifact.get({ id: artifactId(id()) }), refetchInterval: fresh, retry: false }));
+
+export const useArtifacts = (q: () => ArtifactListRequest) =>
+  useQuery(() => ({ queryKey: ["artifacts", "list", q()], queryFn: () => api.artifact.list(q()), refetchInterval: fresh }));
+
+/** Where an artifact is looked at; a version other than the latest is in the query string. */
+export const artifactHref = (id: string, version?: number) => `/artifacts/${id}${version != null && version !== 0 ? `?v=${version}` : ""}`;
 
 export const bodyLabel: Record<ArtifactBody, string> = { blocks: t("web.artifact.body.blocks"), html: t("web.artifact.body.html") };
 export const bodyIcon: Record<ArtifactBody, IconName> = { blocks: "artifacts", html: "web" };

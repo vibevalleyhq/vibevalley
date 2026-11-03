@@ -21,11 +21,11 @@
 谁画哪一块、store 的动作、画布怎么告诉 DOM 东西在哪，在 [农场的 README](apps/web/src/farm/README.md)。
 
 - **像素村** `apps/web/src/farm/canvas/`（PixiJS）：`VillageCanvas.tsx` 挂画布，`scene.ts` 每帧把核心状态画成画面、按脚底的 y 排前后；`dog.ts`、`life.ts`、`fx.ts` 院子的动静和地上的效果。
-- **世界** `apps/web/src/farm/world/`：`world.ts` 给位置起名、算帮工去哪（`Whereabouts`、`spotsFor`、`poseOf`、`placeOfAction`），让一个姿势至少停 800ms（`PoseHold`），点到了什么（`villageHitAt`）；`level.ts` 读 `apps/web/public/village.ldtk`；`framing.ts` 放大和裁边（`frameVillage`：算法是 `@vibevalley/engine/framing` 的 `frameWhole`，村子多大、每边能裁多少是 `@vibevalley/protocol/host` 的 `farmFraming`，桌面壳也照它定窗口）；`plots.ts` 地有哪几块（`beds`）和地上画什么；`sprites.ts` 读 `public/pixel/sprites.json`。
+- **世界** `apps/web/src/farm/world/`：`world.ts` 给位置起名、算帮工去哪（`Whereabouts`、`spotsFor`、`poseOf`、`placeOfAction`），让一个姿势至少停 800ms（`PoseHold`），点到了什么（`villageHitAt`），以及放大和裁边（`frameVillage`：算法是 `@vibevalley/engine/framing` 的 `frameWhole`，村子多大、每边能裁多少是 `@vibevalley/protocol/host` 的 `farmFraming`，桌面壳也照它定窗口）；`level.ts` 读 `apps/web/public/village.ldtk`；`plots.ts` 地有哪几块（`beds`）和地上画什么；`sprites.ts` 读 `public/pixel/sprites.json`。
 - **引擎** `packages/engine`：`nav`（寻路）、`pixi`（光、天色、法线、粒子、小虫、节奏）、`audio`（合成器和响度）、`clock.ts`（一天的钟）。
 - **HUD 和面板** `farm/hud/`、`farm/panels/`：农场卡、额度、特效层，右上角的「记忆树」到 `/tree`（`src/tree`，[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)）；收获、播种袋（`SeedForms.tsx`）、成就、仓库、计划板、菜单。
-- **农具和去处**：`farm/tools.ts` 的 `Tool`、`aimTool`（指着一块地时说点下去做什么）、`toolForKey`；`farm/commands.ts` 把点击变成接口调用；`farm/world/places.ts` 的 `yardPlaces` 是院子里每样东西打开哪个面板或页面。
-- **音效** `ui/pixel/sound.ts`：配方（`SOUNDS`）和分组（`SOUND_GROUPS`），几张皮共用；农场什么时候响在 `farm/cues.ts`（`farmCues` 比前后两刻，`support.ts` 的 `farmSounds` 照它响）；合成在 `packages/engine/src/audio`。指针在 `apps/web/public/cursors/`，字体 Fusion Pixel 12px 在 `public/fonts/`。
+- **农具和去处**：`farm/tools.ts` 的 `Tool`、`aimTool`（指着一块地时说点下去做什么）、`toolForKey`；`farm/commands.ts` 把点击变成接口调用；`farm/world/world.ts` 的 `yardPlaces` 是院子里每样东西打开哪个面板或页面。
+- **音效** `ui/pixel/sound.ts`：配方（`SOUNDS`）和分组（`SOUND_GROUPS`），几张皮共用；农场什么时候响在 `farm/cues.ts`（`farmCues` 比前后两刻，`farmSounds` 照它响）；合成在 `packages/engine/src/audio`。指针在 `apps/web/public/cursors/`，字体 Fusion Pixel 12px 在 `public/fonts/`。
 - **手机** `farm/phone/`：`Phone.tsx` 机身，`calls.ts` 来电和记录，`screens.tsx` 主屏；小游戏的规则是纯函数（`games/blocks.ts`、`dino.ts`、`sokoban.ts`、`bugSnake.ts`、`merge.ts`），画面是 `*Game.tsx`。
 - **通知** `apps/web/src/features/inbox/tray.ts`（`noticeFor`、`CallBell`、`traySummary`），由 `src/features/inbox/Follow.tsx` 交给宿主。
 - **地图** `apps/web/src/farm/map/islands.ts`（纯函数，`islandsOf`、`islandLooks`、`growthOf`：最近一次提交的远近 `recencyOf` 画成作物）、`farm/map/ProjectMap.tsx`（`projectMap`）；词在 `web.farm.map`。它是皮，由 `app/` 交给工作台的「项目」页（`ProjectsSkin`：`/projects` 的「全部」是地图，选一个项目，上面是它的岛）；项目页自己（概况、语言、提交日历）说工作台的词。

@@ -2,7 +2,7 @@ export { IssuesPage } from "./IssuesPage";
 export { actionOf, createIssueActs, perform } from "./acts";
 export { issueDeliver, shownDeliver } from "./write";
 export { issueMove, issueMoveOf, sendMove } from "./moves";
-export { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "./queries";
+export { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "./history";
 export { issueTitle, runText } from "./issue";
 export { changeKind, changesLine, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./changes";
 export { issueState, noStepsText } from "./overview";

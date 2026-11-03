@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 
 import { muted } from "@/farm/cues";
 import { farm } from "@/farm/store";
-import { webRoutes, yardPlaces } from "@/farm/world/places";
+import { webRoutes, yardPlaces } from "@/farm/world/world";
 import { useRouter } from "@/infra/router";
 import { FarmSection, PxButton } from "@/ui/pixel";
 

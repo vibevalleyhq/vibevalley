@@ -17,9 +17,8 @@ import { defineStored } from "@/state/stored";
 
 import type { BedFxKind, Tool } from "./tools";
 import type { Point } from "./world/level";
-import type { FarmPanel } from "./world/places";
-import type { Rect } from "./world/world";
-export type { FarmPanel } from "./world/places";
+import type { FarmPanel, Rect } from "./world/world";
+export type { FarmPanel } from "./world/world";
 
 /**
  * The layers over the farm, at most one of each kind, drawn in this order (later on top): a plot's issue, its harvest,

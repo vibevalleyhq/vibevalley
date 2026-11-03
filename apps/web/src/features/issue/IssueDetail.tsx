@@ -36,10 +36,10 @@ import { ActLines } from "./ActLines";
 import { createIssueActs, perform } from "./acts";
 import { changesLine } from "./changes";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
+import { useIssues, useIssueChanges, useIssueRuns, useIssueTimeline } from "./history";
 import { issueTag, runText, tagOpen, tagText } from "./issue";
 import { issueMove, issueMoveOf, movedIssue, sendMove } from "./moves";
 import { type CriterionRow, issueState, noStepsText, stageTone } from "./overview";
-import { useIssues, useIssueChanges, useIssueRuns, useIssueTimeline } from "./queries";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { issueDeliver, shownDeliver } from "./write";
 

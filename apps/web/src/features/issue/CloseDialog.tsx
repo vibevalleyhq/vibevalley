@@ -17,10 +17,10 @@ import { TextArea } from "@/ui/Field";
 
 import { actionOf, perform } from "./acts";
 import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./changes";
+import { useIssueChanges } from "./history";
 import { issueTitle } from "./issue";
 import { type Lane } from "./lanes";
 import { issueMove, sendMove } from "./moves";
-import { useIssueChanges } from "./queries";
 import { Note } from "./Sheet";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */

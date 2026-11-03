@@ -10,9 +10,8 @@ import { reasonOf } from "@/infra/api";
 import { ready } from "@/infra/query";
 import { Icon } from "@/ui/Icon";
 
-import { bodyIcon, bodyLabel } from "./ArtifactCard";
+import { bodyIcon, bodyLabel, useArtifact } from "./ArtifactCard";
 import { BlocksView, type QuoteTarget } from "./BlocksView";
-import { useArtifact } from "./queries";
 
 const sandbox = "allow-scripts allow-popups allow-popups-to-escape-sandbox";
 

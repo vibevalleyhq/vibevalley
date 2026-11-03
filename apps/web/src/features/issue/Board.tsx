@@ -11,9 +11,9 @@ import { Hint } from "@/ui/Tip";
 
 import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, laneOrder } from "./cards";
 import type { Ordering } from "./display";
+import { useIssues, useNameOf } from "./history";
 import { closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./lanes";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
-import { useIssues, useNameOf } from "./queries";
 
 /** One sentence, enter, and it is a 待办: the board's lane and the list's groups both use it. */
 export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTMLInputElement) => void; autofocus?: boolean }) {

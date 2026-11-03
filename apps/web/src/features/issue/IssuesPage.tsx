@@ -24,12 +24,12 @@ import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { type BoardLook, boardLook, boardViews, viewLabel } from "./display";
 import { DisplayMenu } from "./DisplayMenu";
 import { FamilyDetail } from "./FamilyDetail";
+import { useIssueHistory, useNameOf } from "./history";
 import { issueIs } from "./issue";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { type Lane } from "./lanes";
 import { issueMove, movedCards, sendMove } from "./moves";
-import { useIssueHistory, useNameOf } from "./queries";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 import { createWriteKey, writeIssue } from "./write";
 

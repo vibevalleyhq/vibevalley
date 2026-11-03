@@ -8,9 +8,8 @@ import { farmFraming } from "@vibevalley/protocol/host";
 import { SpriteAtlas, levelWidth } from "@/ui/pixel/atlas";
 
 import { Level } from "./level";
-import { yardPlaces } from "./places";
 import { beds, cropOfBed } from "./plots";
-import { frameVillage, PoseHold, poseMinMs, villageCutAcross, villageCutDown, VillageWorld } from "./world";
+import { frameVillage, PoseHold, poseMinMs, villageCutAcross, villageCutDown, VillageWorld, yardPlaces } from "./world";
 
 const assets = join(import.meta.dirname, "../../../public");
 const level = Level.parse(readFileSync(join(assets, "village.ldtk"), "utf8"));

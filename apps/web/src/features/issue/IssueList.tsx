@@ -13,9 +13,9 @@ import { IconButton } from "@/ui/IconButton";
 import { EmptyNote, OlderLink, QuickAdd } from "./Board";
 import { type BoardCard, cardAgent, cardLook, cardProject, laneOrder, rowFacts } from "./cards";
 import { type Grouping, groupRows, type Ordering, orderRows, type RowGroup } from "./display";
+import { useIssues, useNameOf } from "./history";
 import { closedShown, laneLabel, laneStatus } from "./lanes";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
-import { useIssues, useNameOf } from "./queries";
 
 /** The quick add, with the group's project or helper when grouped by one. */
 export type ListAdd = (text: string, where: { project?: string; agent?: string }) => void;
