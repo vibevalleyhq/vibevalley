@@ -5,7 +5,7 @@ import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
 import type { ChannelAudience } from "@/channel/contracts.ts";
 import { brakes, type BrakeInput } from "@/mailbox/brakes.ts";
-import type { InboxMessage, UnreadRow } from "@/mailbox/chat.ts";
+import type { InboxMessage, UnreadRow } from "@/mailbox/envelope.ts";
 import { messageLine, wakeInput } from "@/mailbox/prompts.ts";
 import { whoHears } from "@/mailbox/routing.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";

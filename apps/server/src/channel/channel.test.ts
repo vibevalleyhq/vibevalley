@@ -30,7 +30,7 @@ import { until, waitFor } from "@/testing/until.ts";
 
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import * as qsession from "../../db/generated/session.sql.ts";
-import { Channel, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./chat.ts";
+import { Channel, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./channel.ts";
 import { channelOf, defaultOf } from "./folded.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 is held until release (unless holds is

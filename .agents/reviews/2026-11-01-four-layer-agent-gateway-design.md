@@ -206,7 +206,7 @@ flowchart TB
 - **精确修改文件清单**：
   1. `apps/server/src/modules.ts`：
      - 将模块顺序调整为：`Platform` → `Agents` → `Source Control` → `Agent Sessions` → `Mailbox` → `Collaboration` → `Issues` → `Ingress` → `Resource` → `Inbox` → `Orchestrator` → `Gamification` → `Gateway`。
-  2. `apps/server/src/channel/chat.ts` 与 「旧路径：apps/server/src/ingress/channel.ts（已删除）」：
+  2. `apps/server/src/channel/channel.ts` 与 「旧路径：apps/server/src/ingress/channel.ts（已删除）」：
      - `Channel` 直接 `yield* Mailbox`，在写消息事务提交后直接调用 `mailbox`，删除 `chat.attachIngress` 与 `channel.attachDelivery`。
   3. `apps/server/src/issue/issue.ts`、`apps/server/src/cron/cron.ts`：
      - `Issue` 派活/改状态直接调 `mailbox`，删除 「旧路径：apps/server/src/ingress/issue.ts（已删除）」、「旧路径：apps/server/db/queries/issue_dispatch.sql（已删除）」 及 `0001_schema.up.sql` 中的 `issue_dispatch` 表；
@@ -342,11 +342,11 @@ flowchart TB
 - **精简动作**：
   - 将 `OrchestratorResponse` 并入 `Orchestrator` 服务的方法（消除同一目录下第二个 `Context.Service`），或者把 `responses` Map 收归 `Orchestrator` 自己管理，删掉 `Mailbox` 上的 `openResponse` / `takeResponse` / `dropResponse` 三个方法。
 
-### 6.4 领域契约下漏进地基目录：旧路径 apps/server/src/base/chat.ts（226 行，已拆入 `apps/server/src/mailbox/chat.ts` 与 `apps/server/src/channel/contracts.ts`）
+### 6.4 领域契约下漏进地基目录：旧路径 apps/server/src/base/chat.ts（226 行，已拆入 `apps/server/src/mailbox/envelope.ts` 与 `apps/server/src/channel/contracts.ts`）
 
 - **图谱证据**：
   - `AGENTS.md` 明确规定：「`base` 是不碰外面的地基（id、JSON、排序、脱敏）」。
-  - 但「旧路径：apps/server/src/base/chat.ts（已拆入 `apps/server/src/mailbox/chat.ts` 与 `apps/server/src/channel/contracts.ts`）」（226 行）被塞入了 `ChannelEnvelopeRow`、`ChannelAudience`、`ChannelRouteFact`、`ChannelRouteResult`、`OrchestratorNews`、`IngressPurpose`、`MetaSchema` 等纯属 `Channel / Mailbox / Orchestrator` 业务的契约，在全仓产生了 28 条跨模块边。
+  - 但「旧路径：apps/server/src/base/chat.ts（已拆入 `apps/server/src/mailbox/envelope.ts` 与 `apps/server/src/channel/contracts.ts`）」（226 行）被塞入了 `ChannelEnvelopeRow`、`ChannelAudience`、`ChannelRouteFact`、`ChannelRouteResult`、`OrchestratorNews`、`IngressPurpose`、`MetaSchema` 等纯属 `Channel / Mailbox / Orchestrator` 业务的契约，在全仓产生了 28 条跨模块边。
 - **根因**：因为 `Mailbox` 在 `Channel` 之下，为了让两者共享聊天室行与路由类型，把业务契约硬塞进了 `base/`。
 - **精简动作**：
   - 属于协议形状的（如 `Meta`）放回 `packages/protocol/src/shapes.ts`；属于 `Mailbox` 投递入参的（如 `InboxMessage`、投递信封契约）放回 `apps/server/src/mailbox/mailbox.ts`（或 `apps/server/src/mailbox/payload.ts`），上层 `Channel`、`Ingress`、`Orchestrator` 自然向下引用 `src/mailbox/`，让 `src/base/` 重新只留 `ids.ts`、`json.ts`、`order.ts`、`redact.ts`、`card.ts` 纯地基。
@@ -366,13 +366,13 @@ flowchart TB
 - **目标与不变量**：
   - `Mailbox` 公开接口删掉 13 个内部自用方法；`ChannelService` 删掉 `replayDelivery`、`handoffSubject`、`recent`；`Issue` 删掉公开的 `hire`；`Session` 删掉 `attachPullRequestPolicy`；
   - `apps/server/src/orchestrator/response.ts` 不再单独导出第二个 `Context.Service`；
-  - 消除「旧路径：apps/server/src/base/chat.ts（已拆入 `apps/server/src/mailbox/chat.ts` 与 `apps/server/src/channel/contracts.ts`）」中的业务专属契约下漏，删除零调用死导出。
+  - 消除「旧路径：apps/server/src/base/chat.ts（已拆入 `apps/server/src/mailbox/envelope.ts` 与 `apps/server/src/channel/contracts.ts`）」中的业务专属契约下漏，删除零调用死导出。
 - **脚本 + 测试 + 文档验收命令**：
   ```bash
-  # 1. 静态脚本验收：无 attachPullRequestPolicy，无内部方法外泄，旧 base/chat.ts 已拆入 mailbox/chat.ts
+  # 1. 静态脚本验收：无 attachPullRequestPolicy，无内部方法外泄，旧 base/chat.ts 已拆入 mailbox/envelope.ts
   ! rg '\battachPullRequestPolicy\b' apps/server/src
   ! rg '\b(breakerSpoke|breakerFailed|breakerReset|breakerOpen|returnHanded|replayDelivery|handoffSubject)\b' apps/server/src/mailbox/mailbox.ts apps/server/src/channel/contracts.ts
-  test -f apps/server/src/mailbox/chat.ts
+  test -f apps/server/src/mailbox/envelope.ts
 
   # 2. 全量类型、死代码与服务端测试验收
   vp check && vp run deadcode && vp run server:check

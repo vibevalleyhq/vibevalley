@@ -8,7 +8,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Artifact } from "@/artifact/artifact.ts";
 import { artifactMax } from "@/artifact/policy.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { messageOf, type ApiError, reasonOf, refused } from "@/errors.ts";
 import { Session } from "@/session/session.ts";
 

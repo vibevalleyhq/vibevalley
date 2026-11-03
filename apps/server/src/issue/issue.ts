@@ -25,7 +25,7 @@ import { templateCatalog } from "@/agent/seed.ts";
 import { actsForOwner, type Actor } from "@/base/actor.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOf } from "@/base/json.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import type { Due } from "@/cron/cron.ts";
 import { type ApiError, Inconsistent, missing, lookIn, reasonOf, refused } from "@/errors.ts";

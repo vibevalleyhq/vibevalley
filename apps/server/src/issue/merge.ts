@@ -5,7 +5,7 @@ import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import type { Channel } from "@/channel/chat.ts";
+import type { Channel } from "@/channel/channel.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
 import type { Db } from "@/infra/db.ts";

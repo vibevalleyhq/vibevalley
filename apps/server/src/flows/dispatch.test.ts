@@ -7,7 +7,7 @@ import { answer } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Ingress } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";

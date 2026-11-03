@@ -8,7 +8,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { Agent } from "@/agent/agent.ts";
 import { type ApiError, missing, lookIn, refused } from "@/errors.ts";
 import { Db, causeMessage } from "@/infra/db.ts";
-import { channelType, senderKind, type ChannelRouteResult } from "@/mailbox/chat.ts";
+import { channelType, senderKind, type ChannelRouteResult } from "@/mailbox/envelope.ts";
 import { NotRecorded, Session } from "@/session/session.ts";
 
 import * as qr from "../../db/generated/ingress_trigger.sql.ts";

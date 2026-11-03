@@ -8,8 +8,8 @@ import * as S from "@vibevalley/protocol/schema";
 import { compactCard } from "@/base/card.ts";
 import { refused } from "@/errors.ts";
 import { type Db, causeMessage } from "@/infra/db.ts";
-import { metaOf, senderKind } from "@/mailbox/chat.ts";
-import type { InboxMessage, OrchestratorNews } from "@/mailbox/chat.ts";
+import { metaOf, senderKind } from "@/mailbox/envelope.ts";
+import type { InboxMessage, OrchestratorNews } from "@/mailbox/envelope.ts";
 
 import * as qr from "../../db/generated/ingress_trigger.sql.ts";
 

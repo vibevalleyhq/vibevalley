@@ -247,7 +247,7 @@
 - **现有命名及路径**：
   - `apps/server/src/session/session.ts`：第 142 行 `readonly onIssue: (issue: string) => string | undefined;`、第 1042 行 `onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id`。
   - `apps/server/src/session/roster.ts`：第 15 行 `export const sessionOnIssue = (state: T.WorkspaceState, issue: string) => state.sessions.find((h) => !h.refining && h.issue === issue);`
-  - `apps/server/src/channel/chat.ts`：第 352 行 `if (ch.subject_kind === "issue") return sessions.onIssue(ch.subject_id) ?? "";`
+  - `apps/server/src/channel/channel.ts`：第 352 行 `if (ch.subject_kind === "issue") return sessions.onIssue(ch.subject_id) ?? "";`
 - **造成的歧义与矛盾**：
   1. **违背 `naming.md`「查询的形状」**：按 `naming.md` 第 55–56 行，「取或算出某样东西的某一项用 `xOf`；是非判断用 `isX` / `hasX`」。`sessions.onIssue(issueId)` 既不像返回 `SessionId` 的查询（读起来像介词短语或判断「是否在工单上」），又隐藏了两个关键过滤条件：**（1）只在场（`present`）的 Session；（2）排除正在起草的（`!h.refining`）Session**。
   2. **与 `Issue` 侧的查询名字混淆**：在 `@vibevalley/protocol/rules` 中有 `latestSessionIdOf(issue: T.Issue)`（从 `issue.assignments` 历史找最新一次执行的 Session ID，不管是否已离场）；在 `issue/assignment.ts` 中有 `worked.issueOf(sessionId)`（从 Session 找 Issue）。唯独 `sessions.onIssue(issueId)` 名字里完全看不出返回值是 `SessionId`。
@@ -255,7 +255,7 @@
   - `Session.onIssue(issue)` → **`Session.sessionIdOnIssue(issue)`**（或直接返回 `T.Session | undefined` 叫 **`Session.onIssue(issue)` 改为 `Session.workingOn(issue)` / `Session.forIssue(issue)`**，最清晰的是对照 `latestSessionIdOf(issue)` 命名为 **`presentSessionIdOf(issue)`**）。
   - **消除的歧义**：在调用处 `sessions.presentSessionIdOf(ch.subject_id)` 一眼看清：（1）返回值是 `SessionId | undefined`；（2）它只查当前**在场（present）**且非起草的帮工，从而与查 Assignment 历史记录的 `latestSessionIdOf(issue)` 形成精准对比。
 - **外部行为如何保持**：
-  - 仅涉及 `session.ts` 与 `channel/chat.ts:352` 内部调用，外部接口零变化。
+  - 仅涉及 `session.ts` 与 `channel/channel.ts:352` 内部调用，外部接口零变化。
 - **验收**：
   - `vp check && vp run server:check`
 

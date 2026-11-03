@@ -8,7 +8,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { Agent } from "@/agent/agent.ts";
 import { actsForOwner } from "@/base/actor.ts";
 import { head } from "@/base/clip.ts";
-import { Channel, type Info } from "@/channel/chat.ts";
+import { Channel, type Info } from "@/channel/channel.ts";
 import { explicitMandate, inferredMandate, mandateNoteFits } from "@/issue/creation.ts";
 import { Issue } from "@/issue/issue.ts";
 import { openFindings } from "@/issue/status.ts";

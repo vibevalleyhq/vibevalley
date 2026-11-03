@@ -55,7 +55,7 @@
 | 一轮（run） | `Session`（帮工的 run 在 `session/session.ts`；进程内 agent 的 run 在 `session/inProcessRun.ts`）；`session/facts.ts` 把会话事件读成事实 | `session_run` 表 | 帮工的一次 run 包着一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
 | 轨迹 | `Session`（`session/journal.ts` 的 `Journal`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |
 | 改动、完成 | `Issue`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 开 worktree 时的工单分支和 worktree；直接在项目目录干活的没有这两项 | |
-| 默认频道、频道、工单串 | `Channel`（`channel/chat.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tool`） | `channel`、`channel_message`、`channel_participant`、`mailbox_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow` 表 | 送到 Agent Session 的话是 `Wake`、`Steer`、`Announce` |
+| 默认频道、频道、工单串 | `Channel`（`channel/channel.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tool`） | `channel`、`channel_message`、`channel_participant`、`mailbox_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow` 表 | 送到 Agent Session 的话是 `Wake`、`Steer`、`Announce` |
 | 定时任务 | `Cron` | `cron` 表 | |
 | 巡查 | `Inbox`（`inbox/inbox.ts`；规则在 `inbox/patrol.ts`） | 不存：每轮从核心状态算 | |
 | 来电 | `Inbox`（`inbox/inbox.ts`、`inbox/items.ts`） | 不存：`StateFrame.inbox` 从核心状态现算 | |

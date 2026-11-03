@@ -50,12 +50,12 @@
 
 - **现有概念及路径**：
   1. `apps/server/src/task/task.ts:242`：内部函数 `const cron = Effect.fnUntraced(...)`（及文件内 7 处调用）与 `docs/subsystems/task.md:62`。
-  2. `apps/server/src/session/session.ts:142,1042`：`readonly onIssue: (issue: string) => string | undefined;` 与唯一调用处 `apps/server/src/channel/chat.ts:352`（及 `docs/subsystems/session.md:146`、`docs/subsystems/channel.md:131`）。
+  2. `apps/server/src/session/session.ts:142,1042`：`readonly onIssue: (issue: string) => string | undefined;` 与唯一调用处 `apps/server/src/channel/channel.ts:352`（及 `docs/subsystems/session.md:146`、`docs/subsystems/channel.md:131`）。
 - **消除了什么概念混淆 / 歧义**：
   1. **`Task.cron` → `Task.advance`**：消除与定时任务服务 `Cron` 的双关碰撞，与 `packages/agent/src/todoTools.ts` 的 DAG 推进函数 `advance` 统一。
   2. **`Session.onIssue` → `Session.presentSessionIdOf`（或直接删掉 `Session.onIssue`，因为 `Channel` 已经有 `sessions.presentSessions()`，或者复用 `sessionOnIssue`）**：
      - 看 `apps/server/src/session/session.ts:1042`：`onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id`。
-     - 全仓只有 `apps/server/src/channel/chat.ts:352` 一处调用了 `sessions.onIssue(ch.subject_id)`！而在 `chat.ts` 里，第 248 行本来就已经有 `const presentSessions = () => sessions.presentSessions();`（且第 239、440、480、1008、1061、1079 行全都在遍历 `presentSessions()`）！
+     - 全仓只有 `apps/server/src/channel/channel.ts:352` 一处调用了 `sessions.onIssue(ch.subject_id)`！而在 `chat.ts` 里，第 248 行本来就已经有 `const presentSessions = () => sessions.presentSessions();`（且第 239、440、480、1008、1061、1079 行全都在遍历 `presentSessions()`）！
      - 更进一步：如果将 `Session.onIssue` 改名为含义明确的 `Session.onIssue` → 在 `chat.ts` 中直接查或改名，不仅消除了 `onIssue` 返回 `string | undefined`（SessionId）而非 `boolean` / `Session` 的歧义，还能让 `Session` 服务接口更干净。
 - **验收**：
   - `vp run server:check && vp run docs:verify`

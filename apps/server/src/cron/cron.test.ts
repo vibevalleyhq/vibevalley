@@ -8,7 +8,7 @@ import type * as T from "@vibevalley/protocol";
 import { CronWhenWeekly } from "@vibevalley/protocol/schema";
 
 import { orchestrator, owner } from "@/base/actor.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import { type ServerConfig } from "@/infra/config.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";

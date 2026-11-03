@@ -8,7 +8,7 @@ import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { channelOf } from "@/channel/folded.ts";
 import { Core } from "@/core/core.ts";
 import { Inbox } from "@/inbox/inbox.ts";

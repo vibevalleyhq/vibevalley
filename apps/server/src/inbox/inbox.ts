@@ -8,7 +8,7 @@ import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 
 import { scopedPubSub } from "@/base/pubsub.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { toMessage } from "@/channel/contracts.ts";
 import { Core } from "@/core/core.ts";
 import { ServerConfig } from "@/infra/config.ts";

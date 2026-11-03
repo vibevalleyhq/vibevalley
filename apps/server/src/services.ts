@@ -13,7 +13,7 @@ import { Llm } from "@vibevalley/ai/llm";
 
 import { Agent } from "./agent/agent.ts";
 import { Artifact } from "./artifact/artifact.ts";
-import { Channel, start as channelStart } from "./channel/chat.ts";
+import { Channel, start as channelStart } from "./channel/channel.ts";
 import { Connector, type ConnectorOptions } from "./connector/connector.ts";
 import { Core } from "./core/core.ts";
 import { Cron, start as cronStart } from "./cron/cron.ts";

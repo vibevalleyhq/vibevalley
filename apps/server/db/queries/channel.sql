@@ -1,4 +1,4 @@
--- The channels, the default one among them, and the threads under their messages (channel/chat.ts).
+-- The channels, the default one among them, and the threads under their messages (channel/channel.ts).
 
 -- name: DefaultID :one
 select id from channel where is_default;

@@ -3,7 +3,7 @@ import { Effect } from "effect";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Resource } from "@/resource/resource.ts";
 import { world } from "@/testing/world.ts";
 

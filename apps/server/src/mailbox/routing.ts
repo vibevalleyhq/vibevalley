@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import type * as T from "@vibevalley/protocol";
 import { everyone, ownerId } from "@vibevalley/protocol";
 
-import type { ChannelAudience } from "@/mailbox/chat.ts";
+import type { ChannelAudience } from "@/mailbox/envelope.ts";
 
 import type { Recipient, DeliveryReason } from "./brakes.ts";
 import type { ChannelMail } from "./mailbox.ts";

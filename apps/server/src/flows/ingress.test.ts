@@ -6,7 +6,7 @@ import { SqlClient } from "effect/sql";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Ingress } from "@/ingress/ingress.ts";
 import { explicitMandate } from "@/issue/creation.ts";
 import { Issue } from "@/issue/issue.ts";

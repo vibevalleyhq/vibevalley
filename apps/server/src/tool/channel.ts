@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 
-import { Channel, type Spoken } from "@/channel/chat.ts";
+import { Channel, type Spoken } from "@/channel/channel.ts";
 import { inboxLines } from "@/mailbox/prompts.ts";
 
 import { type Who, type Orchestrator, type SessionInput, refuse, said, callerOf, participant, tool, sessionSchemaTool } from "./definition.ts";

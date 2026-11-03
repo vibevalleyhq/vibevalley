@@ -21,7 +21,7 @@ import {
   type OrchestratorNews,
   senderKind,
   unreadSummaryOf,
-} from "@/mailbox/chat.ts";
+} from "@/mailbox/envelope.ts";
 import { type NotRecorded, Session } from "@/session/session.ts";
 
 import * as qc from "../../db/generated/channel.sql.ts";

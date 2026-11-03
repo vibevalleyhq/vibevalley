@@ -6,7 +6,7 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner, session as sessionActor } from "@/base/actor.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Issue } from "@/issue/issue.ts";
 import { sampleAgent } from "@/testing/agents.ts";
 import { testIssues } from "@/testing/issues.ts";

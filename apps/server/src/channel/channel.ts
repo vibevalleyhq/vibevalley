@@ -18,7 +18,7 @@ import { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, missing, Inconsistent } from "@/errors.ts";
 import { causeMessage, Db } from "@/infra/db.ts";
 import { bestEffort } from "@/infra/log.ts";
-import { heldShown, type InboxMessage, retryWindowMs, unreadSummaryOf } from "@/mailbox/chat.ts";
+import { heldShown, type InboxMessage, retryWindowMs, unreadSummaryOf } from "@/mailbox/envelope.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { inputContext, keepChannelTrigger } from "@/mailbox/payload.ts";
 import { inboxLines, talkBrief } from "@/mailbox/prompts.ts";

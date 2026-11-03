@@ -10,14 +10,14 @@ import { defaultOrchestrator, orchestratorRuntime, ownerId } from "@vibevalley/p
 import { Agent, modelClient, noDeepSeekKey } from "@/agent/agent.ts";
 import { traitsOf } from "@/agent/prompts.ts";
 import { orchestrator } from "@/base/actor.ts";
-import { Channel, type OrchestratorNews } from "@/channel/chat.ts";
+import { Channel, type OrchestratorNews } from "@/channel/channel.ts";
 import { Cron } from "@/cron/cron.ts";
 import { nextRun } from "@/cron/when.ts";
 import { type ApiError, refused } from "@/errors.ts";
 import { agentHome, projectsDir, ServerConfig } from "@/infra/config.ts";
 import { localeMinute } from "@/infra/time.ts";
 import { Ingress } from "@/ingress/ingress.ts";
-import type { Picked } from "@/mailbox/chat.ts";
+import type { Picked } from "@/mailbox/envelope.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Project } from "@/project/project.ts";
 import { ownersLanguage } from "@/prompts.ts";

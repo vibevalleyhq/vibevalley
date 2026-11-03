@@ -18,7 +18,7 @@ import { t } from "@vibevalley/i18n";
 import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrchestrator, type VoiceCall, type VoiceSettings } from "@vibevalley/protocol";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import { messageOf, errnoOf } from "@/errors.ts";
 import { Inbox } from "@/inbox/inbox.ts";

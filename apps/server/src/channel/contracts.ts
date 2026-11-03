@@ -6,14 +6,14 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOrNone } from "@/base/json.ts";
 import { type ApiError } from "@/errors.ts";
-import { type InboxMessage, type Meta, metaOf, type Picked, senderKind } from "@/mailbox/chat.ts";
+import { type InboxMessage, type Meta, metaOf, type Picked, senderKind } from "@/mailbox/envelope.ts";
 
 import type * as qm from "../../db/generated/channel_message.sql.ts";
 import { type ChannelRow } from "./model.ts";
 
-export type { ChannelAudience, ChannelEnvelopeRow, ChannelRouteFact, Meta, OrchestratorNews } from "@/mailbox/chat.ts";
-export type { InboxMessage, Picked } from "@/mailbox/chat.ts";
-export { channelType, inboxMore, metaOf, metaText, senderKind } from "@/mailbox/chat.ts";
+export type { ChannelAudience, ChannelEnvelopeRow, ChannelRouteFact, Meta, OrchestratorNews } from "@/mailbox/envelope.ts";
+export type { InboxMessage, Picked } from "@/mailbox/envelope.ts";
+export { channelType, inboxMore, metaOf, metaText, senderKind } from "@/mailbox/envelope.ts";
 export type { Delivered, LaunchActivity, SessionNews } from "@/session/shapes.ts";
 
 export type MsgRow = qm.MessageByIDResult;

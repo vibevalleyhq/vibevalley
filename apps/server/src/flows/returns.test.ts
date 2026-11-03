@@ -7,7 +7,7 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Ingress, type SourceEvent } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";

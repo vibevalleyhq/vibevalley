@@ -18,7 +18,7 @@ export const DefaultIDResult = Schema.Struct({
 export type DefaultIDResult = typeof DefaultIDResult.Type
 
 
-export const DefaultIDSql = "-- The channels, the default one among them, and the threads under their messages (channel/chat.ts).\n\n-- name: DefaultID :one\nselect id from channel where is_default;"
+export const DefaultIDSql = "-- The channels, the default one among them, and the threads under their messages (channel/channel.ts).\n\n-- name: DefaultID :one\nselect id from channel where is_default;"
 
 export const defaultID = Effect.fn("DefaultID")(function* () {
   const sql = yield* SqlClient.SqlClient

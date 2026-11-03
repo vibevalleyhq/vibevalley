@@ -3,7 +3,7 @@ import type * as T from "@vibevalley/protocol";
 
 import { compactCard } from "@/base/card.ts";
 import { compareText, or } from "@/base/order.ts";
-import { type ChannelRouteFact, type Meta, metaOf, senderKind, targetOf } from "@/mailbox/chat.ts";
+import { type ChannelRouteFact, type Meta, metaOf, senderKind, targetOf } from "@/mailbox/envelope.ts";
 import type { ChannelMail } from "@/mailbox/mailbox.ts";
 import type { InputContext } from "@/mailbox/payload.ts";
 

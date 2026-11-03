@@ -2,7 +2,7 @@ import { Effect } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Cron } from "@/cron/cron.ts";
 
 import { type Who, type Orchestrator, refuse, callerOf, answered, tool } from "./definition.ts";

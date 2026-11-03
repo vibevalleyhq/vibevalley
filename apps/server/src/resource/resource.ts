@@ -3,7 +3,7 @@ import { Context, Effect, Layer, Schema } from "effect";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { type ApiError } from "@/errors.ts";
 import { Ingress } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";

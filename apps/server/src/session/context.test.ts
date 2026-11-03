@@ -8,7 +8,7 @@ import { Effect } from "effect";
 import { maxRunning } from "@vibevalley/protocol";
 
 import { Agent } from "@/agent/agent.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import { Executor } from "@/executor/executor.ts";
 import { Project } from "@/project/project.ts";

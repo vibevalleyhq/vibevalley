@@ -37,7 +37,7 @@ import { type ApiError } from "@vibevalley/protocol/api";
 import { messageId } from "@vibevalley/protocol/schema";
 
 import { newId } from "@/base/ids.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { channelOf, defaultOf } from "@/channel/folded.ts";
 import { Core } from "@/core/core.ts";
 import { reasonOf } from "@/errors.ts";

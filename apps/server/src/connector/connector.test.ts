@@ -7,7 +7,7 @@ import { TestClock } from "effect/testing";
 
 import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { gate, untilGot as until, waitFor, whenState } from "@/testing/until.ts";

@@ -8,7 +8,7 @@ import type { Agent } from "@/agent/agent.ts";
 import { clip } from "@/base/clip.ts";
 import { lastJsonBlock, misfitField } from "@/base/json.ts";
 import { questionsFromText } from "@/base/questions.ts";
-import type { Channel } from "@/channel/chat.ts";
+import type { Channel } from "@/channel/channel.ts";
 import type { Core } from "@/core/core.ts";
 import { type ApiError, refused, lookIn, messageOf } from "@/errors.ts";
 import type { Db } from "@/infra/db.ts";

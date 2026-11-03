@@ -3,7 +3,7 @@ import { Clock, Cause, Effect, Stream } from "effect";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { newId } from "@/base/ids.ts";
-import { type Channel } from "@/channel/chat.ts";
+import { type Channel } from "@/channel/channel.ts";
 import { type Ingress } from "@/ingress/ingress.ts";
 import { Caller, type NotAnswered } from "@/session/host.ts";
 

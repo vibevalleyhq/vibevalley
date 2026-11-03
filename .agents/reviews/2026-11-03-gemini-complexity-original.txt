@@ -25,7 +25,7 @@
 |---|---|---|---|---|
 | **G01** | 隐藏复杂度 / 重复状态源 | `Mailbox` 用 `Effect.scoped(core.transitions)` 绕过 `modules.test.ts` 的 `core.state()` 静态检查，并在内存里维护第二份 `board: Map<string, T.Issue>` | `apps/server/src/mailbox/mailbox.ts:57, 204-208, 490-496`<br>`apps/server/src/modules.test.ts:44, 83-102` | 每次信箱操作都开关一次 `PubSub` 订阅并全量清空重建 Map；违反「核心状态只有一份」与模块边界初衷 |
 | **G02** | 反向可变钩子残留 | `Session.attachPullRequestPolicy` 仍是下层（第 4 层 `Session`）暴露给上层（第 7 层 `Issue`）的反向可变回调，且回调内部直接读 `core.state().issues` | `apps/server/src/session/session.ts:144, 344, 623, 1055`<br>`apps/server/src/issue/issue.ts:178` | 与 Task 1 砍掉的 4 个 `attach*` 完全同类；若 `Issue` 尚未初始化，回调默认返回 `false` |
-| **G03** | 平行流程 / 职责错位 | `Trigger` 生成、SHA-256 计算、CompactCard 截断与 `recordTrigger` 落库在 `ingress/ingress.ts`、`issue/trigger.ts`、`channel/route.ts + chat.ts` 写了 3 套；`chat.ts` 插入后还立即重查重解 | `apps/server/src/ingress/ingress.ts:81-108`<br>`apps/server/src/issue/trigger.ts:13-60`<br>`apps/server/src/channel/route.ts:28-59`<br>`apps/server/src/channel/chat.ts:448-464` | 违反「来源只标准化一次」；`cron` 和 `inbox` 被迫从 `issue/trigger.ts` 借用底层 Trigger 写入函数 |
+| **G03** | 平行流程 / 职责错位 | `Trigger` 生成、SHA-256 计算、CompactCard 截断与 `recordTrigger` 落库在 `ingress/ingress.ts`、`issue/trigger.ts`、`channel/route.ts + chat.ts` 写了 3 套；`chat.ts` 插入后还立即重查重解 | `apps/server/src/ingress/ingress.ts:81-108`<br>`apps/server/src/issue/trigger.ts:13-60`<br>`apps/server/src/channel/route.ts:28-59`<br>`apps/server/src/channel/channel.ts:448-464` | 违反「来源只标准化一次」；`cron` 和 `inbox` 被迫从 `issue/trigger.ts` 借用底层 Trigger 写入函数 |
 | **G04** | 平行流程 / 死代码 / 潜在缺陷 | `work.initial`（`Mailbox.initialInputs`）在生产中完全未接线（0 调用）；`Issue.start` 与 `Issue.refreshQueue` 各写一套初始输入处理，且 `queuedInputs` 的 `DISTINCT ON (m.issue_id)` 在排队期有多条追问时只取 1 条交给 `registerInitialInputs` | `apps/server/src/mailbox/work.ts:242-279`<br>`apps/server/src/issue/issue.ts:563-620, 782-805`<br>`apps/server/db/queries/mailbox_issue.sql:25-31` | 约 35 行 `work.initial` 成为死代码；排队期间若先有 `dispatch` 后有主人追问，开工时 `registerInitialInputs` 只登记了 `dispatch` 那一条 |
 | **G05** | 搬移复杂度 / 接口膨胀 | `Mailbox` 服务接口（44 个成员）暴露了 14 个仅 `pump.ts` 内部回调、仅测试调用或 0 调用的底层方法；`Transfer` 接口含 12 个字段（9 个可选）混杂数据与事务钩子 `prepare`/`commit` | `apps/server/src/mailbox/mailbox.ts:79-123`<br>`apps/server/src/mailbox/work.ts:25-38`<br>`apps/server/src/mailbox/posting.ts:62-145` | 为把 `mailbox.ts` 压到 520 行，把内部协作暴露成了公共 Service 契约，增加了模块理解面 |
 
@@ -43,7 +43,7 @@
    - **隐藏问题**：`work.ts:242-274` 写了完整的 `initial = Effect.fn("Mailbox.initialInputs")` 来合并工单排队输入与显式输入，但 `mailbox.ts` 根本没调用它！相反，`Issue.start` 和 `Issue.refreshQueue` 在 `issue.ts` 里各自手搓了一套讀取和转发 `mailbox_issue` 的逻辑（见 **G04**）；此外在 `pump.ts:39-55` 的 `readyInputs` 里又对 Tier 2 的 `mailbox_delivery` 重复做了一次 `waitsForHuman(issue)` 过滤，使得 Tier 1 和 Tier 2 都持有 `board: Map<string, T.Issue>`。
 3. **`Trigger` 与 `replay`（消除了自轮询表，但重放与写入分裂为 3 套）**
    - **真简化**：砍掉了 `issue_dispatch` 和 `cron_occurrence` 两张表。
-   - **隐藏复杂度**：由于 `Ingress` 在第 8 层，而 `Channel`（第 6 层）、`Issue/Cron`（第 7 层）、`Mailbox`（第 5 层）都在 `Ingress` 之下，下层无法调用 `Ingress.record`。结果代码里出现了 **3 套写 `ingress_trigger` 表的实现**（`Ingress.record`、`issue/trigger.ts:recordTrigger`、`channel/chat.ts:settle`），以及 **3 套重放循环**（`Mailbox.replay` 每 3 秒轮询非 cron/非 channel_message 的未路由 trigger；`Channel.start` 重放 `unroutedChannelMessages`；`Cron.tick` 每次先跑 `Cron.replay` 重放 `unroutedCronTriggers`）（见 **G03、G08**）。
+   - **隐藏复杂度**：由于 `Ingress` 在第 8 层，而 `Channel`（第 6 层）、`Issue/Cron`（第 7 层）、`Mailbox`（第 5 层）都在 `Ingress` 之下，下层无法调用 `Ingress.record`。结果代码里出现了 **3 套写 `ingress_trigger` 表的实现**（`Ingress.record`、`issue/trigger.ts:recordTrigger`、`channel/channel.ts:settle`），以及 **3 套重放循环**（`Mailbox.replay` 每 3 秒轮询非 cron/非 channel_message 的未路由 trigger；`Channel.start` 重放 `unroutedChannelMessages`；`Cron.tick` 每次先跑 `Cron.replay` 重放 `unroutedCronTriggers`）（见 **G03、G08**）。
 4. **`Issue.refreshQueue`（方向理顺，但与 `Issue.start` 存在双轨分叉）**
    - **真简化**：排队推进回到了 `Issue` 自身（监听 `core.subscribe` 的 `issue` / `sessionGone` / `session` 事实 + 定时兜底），不再由 `Ingress` 反向调用。
    - **残留问题**：`Issue.refreshQueue`（`issue.ts:782-816`）与 `Issue.start`（`issue.ts:563-620`）对排队输入的消费方式不一致：`refreshQueue` 通过 `mailbox.queuedInputs`（每个工单只取 1 条 `DISTINCT ON (m.issue_id)`）调 `mailbox.registerInitialInputs`，而 `Issue.start` 直接查 `qi.issueInputs` 并调 `qi.forwardIssueInput`（不写 `mailbox_delivery`）（见 **G04**）。
@@ -133,11 +133,11 @@
 - **文件路径与行号**：
   - 实现 1：`apps/server/src/ingress/ingress.ts:81-108`（`Ingress.record`）
   - 实现 2：`apps/server/src/issue/trigger.ts:13-60`（`recordTrigger`，位于 `issue` 目录却被 `cron` 和 `inbox` 跨模块引用）
-  - 实现 3：`apps/server/src/channel/route.ts:28-59`（`channelInput`）+ `apps/server/src/channel/chat.ts:448-464`（`Channel.settle`）
+  - 实现 3：`apps/server/src/channel/route.ts:28-59`（`channelInput`）+ `apps/server/src/channel/channel.ts:448-464`（`Channel.settle`）
 - **生产调用方**：
   - `Ingress.record`：`ingress/ingress.ts:110`
   - `issue/trigger.ts:recordTrigger`：`issue/issue.ts:413, 526, 687`、`cron/cron.ts:103`、`inbox/inbox.ts:127`
-  - `channelInput` + `qt.recordTrigger`：`channel/chat.ts:447-460`
+  - `channelInput` + `qt.recordTrigger`：`channel/channel.ts:447-460`
 - **代码片段**：
   ```ts
   // 1) apps/server/src/ingress/ingress.ts:83-94
@@ -156,7 +156,7 @@
     card: compactCard(input.text, `vv://trigger/${id}`, 600), ...
   };
 
-  // 3) apps/server/src/channel/chat.ts:448-464
+  // 3) apps/server/src/channel/channel.ts:448-464
   yield* db.run(qt.recordTrigger({ id: trigger.id, source: trigger.source, source_key: fact.row.envelope_id, ... }));
   const saved = yield* db.one(qt.triggerById({ id: trigger.id }));
   const routed = yield* Effect.gen(function* () {
@@ -174,7 +174,7 @@
   - 删除 `apps/server/src/issue/trigger.ts`，让 `Ingress.record`、`Channel.settle`、`Issue`、`Cron`、`Inbox` 统一调用该下层函数。
 - **可删除的概念 / 字段 / 代码**：`apps/server/src/issue/trigger.ts` 整个文件（60 行），以及 `ingress.ts` 与 `channel/route.ts` 中重复的 `Trigger` 组装与写后重查代码（约 45 行）。
 - **必须保留的行为**：`(source, source_key)` 幂等去重语义不变：当同一 `(source, key)` 再次进入时，保留首次写入的 `trigger_json` 与 `payload_json`，不覆盖已存载荷。
-- **验证方式**：`(cd apps/server && vp test run src/ingress/ingress.test.ts src/flows/ingress.test.ts src/channel/chat.test.ts src/cron/cron.test.ts)`。
+- **验证方式**：`(cd apps/server && vp test run src/ingress/ingress.test.ts src/flows/ingress.test.ts src/channel/channel.test.ts src/cron/cron.test.ts)`。
 - **风险与置信度**：风险低，置信度 **高（已证实）**。
 
 ---
@@ -302,7 +302,7 @@
 
 - **文件路径与行号**：
   - `apps/server/src/base/chat.ts:199-213`（`ChannelRouteFact.kinds`、`ChannelRouteResult.received`）
-  - `apps/server/src/channel/chat.ts:444`（构造 `kinds`）、`466`（透传 `routed.received`）、`638-642`（`after` 中遍历 `written.received` 打 `👀`）、`1028-1032`（`replayDelivery` 中遍历 `written.received` 打 `👀`）
+  - `apps/server/src/channel/channel.ts:444`（构造 `kinds`）、`466`（透传 `routed.received`）、`638-642`（`after` 中遍历 `written.received` 打 `👀`）、`1028-1032`（`replayDelivery` 中遍历 `written.received` 打 `👀`）
   - `apps/server/src/channel/route.ts:59`（透传 `kinds: fact.kinds`）
   - `apps/server/src/mailbox/mailbox.ts:62`（`ChannelMail.kinds`）、`217`（`received: []`）
   - `apps/server/src/mailbox/posting.ts:144`（`received: []`）
@@ -320,7 +320,7 @@
   // apps/server/src/mailbox/posting.ts:144
   return { heldNotice: entries.some(({ row }) => row.held_by === "hop_limit") ? hopLimitText(hopLimit) : "", received: [] };
 
-  // apps/server/src/channel/chat.ts:638-642 —— 永远在空数组 [] 上跑 Effect.forEach！
+  // apps/server/src/channel/channel.ts:638-642 —— 永远在空数组 [] 上跑 Effect.forEach！
   yield* Effect.forEach(
     written.received,
     ({ session, envelope }) => reacting(envelope, session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${envelope}`)),
@@ -345,7 +345,7 @@
 
 - **文件路径与行号**：
   - `apps/server/src/mailbox/mailbox.ts:116-135`（`const deliveryUnread = Effect.fn("Mailbox.deliveryUnread")(...)`）
-  - `apps/server/src/channel/chat.ts:659-678`（`const inboxRows = Effect.fn("Channel.deliveryUnread")(...)`）
+  - `apps/server/src/channel/channel.ts:659-678`（`const inboxRows = Effect.fn("Channel.deliveryUnread")(...)`）
 - **生产调用方**：
   - `mailbox.ts:116`：被 `mailbox.ts:416`（`wakeInput` 组装帮工唤醒时的「别处还有没读的」摘要）调用。
   - `chat.ts:659`：被 `chat.ts:1336`（`Channel.unread`，供 `channel.unread.list` 接口和 MCP `channel_unread_list` 工具使用）调用。
@@ -374,7 +374,7 @@
     return out;
   });
   ```
-  （`apps/server/src/channel/chat.ts:659-678` 的 `inboxRows` 除 `channelOfSession(h)` 外逐行相同，甚至連 `Effect.fn` 名字都叫 `deliveryUnread`，连 `!(r.mentions_you !== true)` 这种双重否定都一模一样！）
+  （`apps/server/src/channel/channel.ts:659-678` 的 `inboxRows` 除 `channelOfSession(h)` 外逐行相同，甚至連 `Effect.fn` 名字都叫 `deliveryUnread`，连 `!(r.mentions_you !== true)` 这种双重否定都一模一样！）
 - **为什么多余**：
   - 把 `Mailbox` 下移到 `Channel` 之下后，`Mailbox` 不能调 `Channel.unread`，于是直接把 `Channel` 里的 `inboxRows` 加上 `targetOfRow`、`defaultChannelOf`、`orchestratorOf` 一起复制进了 `mailbox.ts:99-135`，导致 `Mailbox` 直接依赖了 `channel.sql.ts`（`qc.inboxOf`、`qc.defaultID`、`qc.channelForRouting`）和 `channel_message.sql.ts`（`qm.messageByNumber`）。
   - 同时，两处还存在着细微逻辑分叉：`chat.ts:661` 用 `channelOfSession(h)`（能识别私聊 `directOfSession` 并校验频道是否存在），而 `mailbox.ts:118` 只用 `h?.channel ?? (yield* defaultChannelOf)`。
@@ -382,7 +382,7 @@
   - 将 `unreadRowsOf(db, participant, channel)` 提取为公共 helper（或把 `qm.messageByNumber` 的 `sender_name` 直接合进 `channel.sql` 的 `InboxOf` 查询，消除最多 20 次 N+1 查询！），由 `Mailbox` 和 `Channel` 共用；并将 `!(r.mentions_you !== true)` 简化为 `r.mentions_you === true`。
 - **可删除的概念 / 字段 / 代码**：消除 1 份重复的 25 行 Effect 组装函数 + 最多 20 次 N+1 `messageByNumber` 单行查询。
 - **必须保留的行为**：`wakeInput` 的未读频道摘要与 `channel.unread.list` 返回顺序、字段完全一致。
-- **验证方式**：`(cd apps/server && vp test run src/channel/chat.test.ts src/mailbox/ src/mcp/mcp.test.ts)`。
+- **验证方式**：`(cd apps/server && vp test run src/channel/channel.test.ts src/mailbox/ src/mcp/mcp.test.ts)`。
 - **风险与置信度**：风险低，置信度 **高（已证实）**。
 
 ---
@@ -391,7 +391,7 @@
 
 - **文件路径与行号**：
   - `apps/server/src/mailbox/mailbox.ts:314-330`（`Mailbox.replay`）与 `510`（每 `retryWakeMs` 3 秒定时的后台轮询）
-  - `apps/server/src/channel/chat.ts:868-875`（`Channel.start` 中的 `unroutedChannelMessages` 重放循环）
+  - `apps/server/src/channel/channel.ts:868-875`（`Channel.start` 中的 `unroutedChannelMessages` 重放循环）
   - `apps/server/src/cron/cron.ts:132-149`（`Cron.replay`，每次 `tick` 跑一遍 `unroutedCronTriggers`）
   - `apps/server/db/queries/ingress_trigger.sql:10-24, 48-51`（`UnroutedTriggers`、`KnownGitHubEvents`、`RetireIssueDispatches`、`UnroutedCronTriggers`）
   - `apps/server/db/migrations/0001_schema.up.sql:417-423`（`mailbox_owner_route` 视图）
@@ -438,7 +438,7 @@
   - `apps/server/src/channel/wake.ts:1-3`（整文件仅 3 行）
   - `apps/server/src/base/chat.ts:1-225`
 - **生产调用方**：
-  - `apps/server/src/channel/chat.ts:43`：`import { heldShown, type InboxMessage, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";`
+  - `apps/server/src/channel/channel.ts:43`：`import { heldShown, type InboxMessage, retryWindowMs, summaryChannels, type UnreadRow } from "./wake.ts";`
   - `apps/server/src/ingress/ingress.ts:12`：`import type { Picked } from "@/channel/wake.ts";`
   - `apps/server/src/orchestrator/orchestrator.ts:15`：`import type { Picked } from "@/channel/wake.ts";`
   - `apps/server/src/orchestrator/situation.ts:5`：`import { type InboxMessage } from "@/channel/wake.ts";`
@@ -503,7 +503,7 @@
   2. 提供 `metaFromObject(raw: unknown): Meta`（直接 `Schema.decodeUnknownOption(MetaSchema)`），消除两处 `metaOf(JSON.stringify(trigger.meta))`。
 - **可删除的概念 / 字段 / 代码**：消除 `payload_json` 中重复持久化的 `trigger.meta.inputContext` 与 `channelType`，消除两处 `JSON.stringify` 往返解析。
 - **必须保留的行为**：`channel_message.meta` 与 `mailbox_delivery.payload_json` 对现有有效字段（`responsePort`、`voiceMode`、`picked`、`issue`、`trigger`）的读取结果保持不变。
-- **验证方式**：`(cd apps/server && vp test run src/mailbox/ src/channel/chat.test.ts src/flows/ingress.test.ts)`。
+- **验证方式**：`(cd apps/server && vp test run src/mailbox/ src/channel/channel.test.ts src/flows/ingress.test.ts)`。
 - **风险与置信度**：风险低，置信度 **高（已证实）**。
 
 ---
@@ -582,7 +582,7 @@
 | 子项 | 当前符号与位置 | 为什么违反命名原则（`docs/style/naming.md`） | 建议最小重命名 |
 |---|---|---|---|
 | **G13a** | `Delivery`（位于 `packages/protocol/src/shapes.ts:1388`，指工单完成的交付方式 `"merged" \| "pull_request" \| ...`） vs `Delivery`（位于 `apps/server/src/mailbox/brakes.ts:9`，指信箱候选收件人 `{ recipient, reason, wakes }`） | **同名异义双关**：`Issue` 领域的「交付方式」在数据库里叫 `issue_delivered`，在词典里叫 `delivered`，唯独在 `shapes.ts` 里占用了 `Delivery`，与 `Mailbox` 的核心概念 `Delivery`（投递）正面撞名。 | 将 `brakes.ts:9` 的内部接口 `Delivery` 改名为 `Recipient` 或 `CandidateDelivery`（不改动协议层 `T.Delivery`，成本最小）。 |
-| **G13b** | `Channel.inboxRows` 的 span 名 `Effect.fn("Channel.deliveryUnread")`（`apps/server/src/channel/chat.ts:659`）与 `Mailbox.deliveryUnread`（`apps/server/src/mailbox/mailbox.ts:116`） | **Span 名与函数名/职责不符**：lint 规则要求服务方法 span 名为 `<Service>.<method>`，内部函数 `inboxRows` 的 span 却叫 `Channel.deliveryUnread`（复制粘贴遗留）。 | 按 **G07** 合并两处实现；若保留则改为 `Effect.fn("Channel.inboxRows")`。 |
+| **G13b** | `Channel.inboxRows` 的 span 名 `Effect.fn("Channel.deliveryUnread")`（`apps/server/src/channel/channel.ts:659`）与 `Mailbox.deliveryUnread`（`apps/server/src/mailbox/mailbox.ts:116`） | **Span 名与函数名/职责不符**：lint 规则要求服务方法 span 名为 `<Service>.<method>`，内部函数 `inboxRows` 的 span 却叫 `Channel.deliveryUnread`（复制粘贴遗留）。 | 按 **G07** 合并两处实现；若保留则改为 `Effect.fn("Channel.inboxRows")`。 |
 | **G13c** | `apps/server/src/issue/trigger.ts`（文件路径） | **模块归属名不副实**：文件放在 `issue/` 下，却不读写任何 `issue` 表，而是写 `ingress_trigger` 表，且被 `cron/cron.ts` 和 `inbox/inbox.ts` 跨模块导入。 | 按 **G03** 移入 `mailbox/`（或 `ingress/`）。 |
 | **G13d** | `Transfer`（`apps/server/src/mailbox/work.ts:25`） | **过泛命名**：`Transfer` 在字面上看不出是「发往 Tier 2 `mailbox_delivery` 的待投递项」，且容易与 `handOver`（交接）混淆。 | 改为 `DeliveryTransfer` 或 `OutboundDelivery`。 |
 | **G13e** | `Mailbox.openResponse` / `takeResponse` / `dropResponse`（`apps/server/src/mailbox/mailbox.ts:92-94`） | **职责与模块名不符**：这组方法管理的是进程内 `Caller` 流式回答槽位（仅被 `orchestrator/response.ts` 和 `orchestrator/orchestrator.ts` 使用，与持久化信箱、刹车、泵毫无关系），只因为 `Orchestrator` 和 `OrchestratorResponse` 都需要访问它而寄居在 `Mailbox` 里。 | 保持现状或下沉为 `session/host.ts`（`Caller` 定义处）的辅助注册表，避免污染 `Mailbox` 接口。 |
@@ -593,8 +593,8 @@
 
 - **文件路径与行号**：
   - `apps/server/src/mailbox/posting.ts:169-208`（`registerTalk`）
-  - `apps/server/src/channel/chat.ts:680-747`（`registerTalk` 与 `startTalk`）
-- **生产调用方**：`apps/server/src/channel/chat.ts:690`（当主人在帮工档案私聊里发第一句话启动 `talk` Session 时）。
+  - `apps/server/src/channel/channel.ts:680-747`（`registerTalk` 与 `startTalk`）
+- **生产调用方**：`apps/server/src/channel/channel.ts:690`（当主人在帮工档案私聊里发第一句话启动 `talk` Session 时）。
 - **代码片段**：
   ```ts
   // apps/server/src/mailbox/posting.ts:169-208
@@ -621,7 +621,7 @@
   3. 对比同文件的 `registerInitialInputs`（`posting.ts:146-162`）：它是在单个事务块里跑完所有数据库写入，**等事务提交成功后**才在最后统一更新内存 `received` 和 `stored`。`registerTalk` 却在循环内部边写库边改内存，且最后 `.pipe(Effect.orDie)` 把所有 `SqlError` 变成了不可恢复的 Defect（而 `Session.send` 的 `hiring` 约定是返回 `NotRecorded` 走优雅拒绝路径）。
 - **最小修改方案**：
   - 将 `registerTalk` 改为与 `registerInitialInputs` 相同的结构：在一次 `writtenLocked(db.attemptTx(...))` 中完成全部行的写入与 `markHanded`，事务提交后再更新 `open` 与 `reach`，并将错误映射为 `NotRecorded` 而非 `Effect.orDie`。
-- **验证方式**：`(cd apps/server && vp test run src/flows/talk.test.ts src/channel/chat.test.ts)`。
+- **验证方式**：`(cd apps/server && vp test run src/flows/talk.test.ts src/channel/channel.test.ts)`。
 - **风险与置信度**：风险低，置信度 **中高（代码路径已核实，故障窗口在嵌套事务回滚时触发）**。
 
 ---
@@ -649,7 +649,7 @@
 
 - **`HEAD` 提交**：`749a7f407f4bcbf5575a6e00c6114c84013403e1`
 - **工作区未提交改动**：42 个已跟踪变更文件 + 1 个未跟踪新增文件 `apps/server/src/mailbox/posting.ts`（以及已标记删除的 `.agents/notes/proposed/architecture/2026-11-01-four-layer-agent-gateway.md`）。
-- 本次审查完整覆盖了工作区未提交改动后的最新状态（特别是新拆出的 `mailbox/posting.ts`、`mailbox/mailbox.ts`、`mailbox/work.ts`、`mailbox/routing.ts`、`mailbox/payload.ts`、`issue/issue.ts`、`issue/trigger.ts`、`cron/cron.ts`、`channel/chat.ts`、`ingress/ingress.ts`、`inbox/inbox.ts`、`services.ts` 及 `db/queries/ingress_trigger.sql`）。
+- 本次审查完整覆盖了工作区未提交改动后的最新状态（特别是新拆出的 `mailbox/posting.ts`、`mailbox/mailbox.ts`、`mailbox/work.ts`、`mailbox/routing.ts`、`mailbox/payload.ts`、`issue/issue.ts`、`issue/trigger.ts`、`cron/cron.ts`、`channel/channel.ts`、`ingress/ingress.ts`、`inbox/inbox.ts`、`services.ts` 及 `db/queries/ingress_trigger.sql`）。
 
 ### 2. 未深入展开的外围模块
 

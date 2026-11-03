@@ -9,7 +9,7 @@ import type { Actor } from "@/base/actor.ts";
 import { newId } from "@/base/ids.ts";
 import { jsonOrNone } from "@/base/json.ts";
 import { scopedPubSub } from "@/base/pubsub.ts";
-import { Channel } from "@/channel/chat.ts";
+import { Channel } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
