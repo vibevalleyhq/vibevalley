@@ -5,7 +5,7 @@ import { list, t } from "@vibevalley/i18n";
 import type { Issue, Session } from "@vibevalley/protocol";
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 
-import { variant } from "@/base/util";
+import { variant } from "@/base/dom";
 import { useOrchestrators } from "@/infra/agents";
 import { api, reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";

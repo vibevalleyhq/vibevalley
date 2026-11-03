@@ -7,7 +7,7 @@ import { createSignal, omit, Show } from "solid-js";
 import { Switch } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 
 import { A } from "./A";
 import { TextInput } from "./Field";

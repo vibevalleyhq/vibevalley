@@ -6,7 +6,7 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 
-import { aria, useClickAway } from "@/base/util";
+import { aria, useClickAway } from "@/base/dom";
 import { farm } from "@/farm/store";
 import { createChannelForm, directsOf, topsOf, chatPath, unreadUnder } from "@/features/channel";
 import { useCore } from "@/infra/frame";

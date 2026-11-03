@@ -20,8 +20,8 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
+import { variant, Keyed } from "@/base/dom";
 import { momentText, wallClockText, yuan } from "@/base/format";
-import { variant, Keyed } from "@/base/util";
 import { useWorkAgents } from "@/infra/agents";
 import { api, reasonOf } from "@/infra/api";
 import { ready, useRuntimes } from "@/infra/query";

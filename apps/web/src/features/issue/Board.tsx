@@ -4,7 +4,7 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { maxRunning } from "@vibevalley/protocol";
 
-import { autofocus } from "@/base/util";
+import { autofocus } from "@/base/dom";
 import { Icon } from "@/ui/Icon";
 import { Segmented } from "@/ui/Segmented";
 import { Hint } from "@/ui/Tip";

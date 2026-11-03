@@ -9,8 +9,8 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
 
+import { variant, autofocus } from "@/base/dom";
 import { useInterval } from "@/base/timer";
-import { variant, autofocus } from "@/base/util";
 import { chatSay, defaultOf } from "@/features/channel";
 import { writeIssue } from "@/features/issue";
 import { type ProjectsSkin, since } from "@/features/project";

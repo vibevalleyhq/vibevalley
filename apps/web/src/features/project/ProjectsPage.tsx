@@ -7,7 +7,7 @@ import { type Component, createMemo, createSignal, For, Match, Show, Switch, unt
 import { list, t } from "@vibevalley/i18n";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
 
-import { autofocus, useNow } from "@/base/util";
+import { autofocus, useNow } from "@/base/dom";
 import { useWorkAgents } from "@/infra/agents";
 import { api, reasonOf } from "@/infra/api";
 import { ready, useProjects, useQuery } from "@/infra/query";

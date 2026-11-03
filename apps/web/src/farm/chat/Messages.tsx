@@ -9,8 +9,8 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
 
+import { aria, autofocus } from "@/base/dom";
 import { spentText } from "@/base/format";
-import { aria, autofocus } from "@/base/util";
 import { artifactHref } from "@/features/artifact";
 import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, reactionOn, reactionSet, sameReaction, setMark, useMessage } from "@/features/channel";
 import { api } from "@/infra/api";

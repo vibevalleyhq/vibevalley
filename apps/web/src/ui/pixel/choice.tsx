@@ -1,6 +1,6 @@
 import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 
 import { PxWindow } from "./base";
 import { type PickOption, pickItems } from "./cells";

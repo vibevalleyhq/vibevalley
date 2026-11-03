@@ -7,7 +7,7 @@ import { For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { phoneState } from "@/farm/support";
 import { type CallPhase, createCall, voiceCall } from "@/features/voice";
 import { useAgent } from "@/infra/agents";

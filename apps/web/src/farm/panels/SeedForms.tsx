@@ -9,7 +9,7 @@ import { t } from "@vibevalley/i18n";
 import { type ProjectTemplates, type Session } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { commands } from "@/farm/frames";
 import { farmProject } from "@/farm/store";
 import { issueOf } from "@/farm/world/plots";

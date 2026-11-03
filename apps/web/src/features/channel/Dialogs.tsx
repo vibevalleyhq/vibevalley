@@ -6,7 +6,7 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Channel, Notify } from "@vibevalley/protocol";
 
-import { autofocus } from "@/base/util";
+import { autofocus } from "@/base/dom";
 import { useOrchestrators } from "@/infra/agents";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";

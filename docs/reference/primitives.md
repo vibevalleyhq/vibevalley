@@ -46,9 +46,9 @@
 | `orchestrator` | `actor.ts` | forOwner: the owner's own words are in the run it acts in. |
 | `session` | `actor.ts` |  |
 | `actsForOwner` | `actor.ts` | On the owner's word: the owner, or the orchestrator in a run the owner's words are in. |
-| `compactCard` | `card.ts` |  |
 | `clip` | `clip.ts` | s on one line and trimmed, at most max units with the ellipsis. |
 | `head` | `clip.ts` | The first n UTF-16 units of s, never half a surrogate pair. |
+| `compactCard` | `clip.ts` |  |
 | `newId` | `ids.ts` |  |
 | `code` | `ids.ts` | A short human code, for pairing a device: not an id, and never a key. |
 | `jsonOf` | `json.ts` | Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. |
@@ -56,18 +56,18 @@
 | `localizedJson` | `json.ts` | A data file kept in each language (seeds.json and seeds.en.json), read once per language; one that does not fit its |
 | `lastJsonBlock` | `json.ts` | The last fenced block of a model's text that decodes with schema and is not refused, or the words for why the last |
 | `misfitField` | `json.ts` | The field a decoding first failed on, undefined when the value itself was not an object. |
-| `numberIn` | `number.ts` |  |
+| `wireOf` | `json.ts` | value with every own key set to undefined dropped, in plain objects and arrays all the way down; other objects as |
+| `wireJson` | `json.ts` | The JSON text of value as the wire carries it: wireOf, then encoded by schema (which still fails on a missing required |
 | `compareText` | `order.ts` | By UTF-8 bytes, which is by code point, not by UTF-16 unit: the order the recorded cases were sorted in. |
 | `compare` | `order.ts` |  |
 | `or` | `order.ts` |  |
+| `numberIn` | `order.ts` |  |
 | `scopedPubSub` | `pubsub.ts` | An unbounded PubSub shut down when the scope that made it (its service's layer) closes, so a subscriber's stream ends |
 | `checksFromText` | `questions.ts` | The helper's text checks, one per 标准 line; explicit issue_report.checks still win. |
 | `questionsFromText` | `questions.ts` |  |
 | `redact` | `redact.ts` |  |
 | `redactedHead` | `redact.ts` | Its first n UTF-16 units, trimmed: cut after redacting, as a secret cut first may no longer look like one. |
 | `redactOutput` | `redact.ts` | Everything the process writes to stream goes through redact first: the server's log, and what a library prints. A |
-| `wireOf` | `wire.ts` | value with every own key set to undefined dropped, in plain objects and arrays all the way down; other objects as |
-| `wireJson` | `wire.ts` | The JSON text of value as the wire carries it: wireOf, then encoded by schema (which still fails on a missing required |
 
 ## `apps/server/src/infra`
 
@@ -156,6 +156,15 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
+| `autofocus` | `dom.tsx` | A ref that focuses its element once it is on the page: what React's autoFocus does on mount. |
+| `useNow` | `dom.tsx` | The time, a new reading every `ms`: for "3 分钟前" that keeps up without anything else changing. |
+| `Keyed` | `dom.tsx` | Rebuilds its children whenever `key` changes, as a React key does: their state starts over. |
+| `aria` | `dom.tsx` | aria-expanded, aria-pressed, aria-selected: "true" or "false", as a boolean false would drop the attribute. |
+| `useViewport` | `dom.tsx` | The window's size, following it as it is resized. |
+| `createSettled` | `dom.tsx` | The value once it has stopped changing for `ms`: what is asked of the server while someone types. |
+| `useClickAway` | `dom.tsx` | Closes a popup when the pointer goes down outside `box` while `open`: a menu folds when you click elsewhere. Returns |
+| `variant` | `dom.tsx` |  |
+| `recordOf` | `dom.tsx` | A JSON object's fields, each still to be checked; undefined for anything that is not an object. |
 | `createExternal` | `external.ts` | A store outside Solid (subscribe, get) as an accessor; it notifies when `get` returns a different value. `always`: |
 | `ago` | `format.ts` |  |
 | `tookText` | `format.ts` |  |
@@ -179,15 +188,6 @@
 | `pressed` | `shortcuts.ts` | Whether a keydown is one of the shell's chords (mod+K, ?): the rest are each place's own. |
 | `useInterval` | `timer.ts` | fn every ms for as long as the owner lives. |
 | `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the owner's end clears it. |
-| `autofocus` | `util.tsx` | A ref that focuses its element once it is on the page: what React's autoFocus does on mount. |
-| `useNow` | `util.tsx` | The time, a new reading every `ms`: for "3 分钟前" that keeps up without anything else changing. |
-| `Keyed` | `util.tsx` | Rebuilds its children whenever `key` changes, as a React key does: their state starts over. |
-| `aria` | `util.tsx` | aria-expanded, aria-pressed, aria-selected: "true" or "false", as a boolean false would drop the attribute. |
-| `useViewport` | `util.tsx` | The window's size, following it as it is resized. |
-| `createSettled` | `util.tsx` | The value once it has stopped changing for `ms`: what is asked of the server while someone types. |
-| `useClickAway` | `util.tsx` | Closes a popup when the pointer goes down outside `box` while `open`: a menu folds when you click elsewhere. Returns |
-| `variant` | `util.tsx` |  |
-| `recordOf` | `util.tsx` | A JSON object's fields, each still to be checked; undefined for anything that is not an object. |
 
 ## `apps/web/src/infra`
 

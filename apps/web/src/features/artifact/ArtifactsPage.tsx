@@ -6,8 +6,8 @@ import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type Artifact, type ArtifactVersion, artifactPath, type SayRequest } from "@vibevalley/protocol";
 
+import { Keyed, useNow } from "@/base/dom";
 import { ago } from "@/base/format";
-import { Keyed, useNow } from "@/base/util";
 import { api, reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { queries, ready } from "@/infra/query";

@@ -8,7 +8,7 @@ import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { Phone } from "@/farm/phone/Phone";
 import { PhoneButton } from "@/farm/phone/PhoneButton";
 import { farm } from "@/farm/store";

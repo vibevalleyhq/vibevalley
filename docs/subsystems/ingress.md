@@ -41,4 +41,4 @@
 
 ## 怎么验证
 
-- `ingress/ingress.test.ts`、`flows/ingress.test.ts`、`base/card.test.ts`。
+- `ingress/ingress.test.ts`、`flows/ingress.test.ts`、`base/base.test.ts`。

@@ -8,8 +8,8 @@ import { t } from "@vibevalley/i18n";
 import { type Memory, type MemorySourceInfo, memoryKeep } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
+import { aria, useNow } from "@/base/dom";
 import { ago } from "@/base/format";
-import { aria, useNow } from "@/base/util";
 import { api, createRequestKey, reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { queries, ready, useProjects, useQuery } from "@/infra/query";

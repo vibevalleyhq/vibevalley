@@ -7,7 +7,7 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Agent, FarmView, Session } from "@vibevalley/protocol";
 
-import { aria, useClickAway } from "@/base/util";
+import { aria, useClickAway } from "@/base/dom";
 import { farm } from "@/farm/store";
 import { useFarm } from "@/farm/ui";
 import { webRoutes } from "@/farm/world/places";

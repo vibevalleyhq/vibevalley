@@ -3,7 +3,7 @@ import { Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { isBusy } from "@vibevalley/protocol/rules";
 
-import { variant } from "@/base/util";
+import { variant } from "@/base/dom";
 import { reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { currentHost } from "@/infra/host";

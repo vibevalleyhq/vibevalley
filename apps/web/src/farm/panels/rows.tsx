@@ -7,7 +7,7 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { ChangedFile } from "@vibevalley/protocol";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { changeKind, patchLines, patchMarkOf } from "@/features/issue";
 import { SpriteIcon } from "@/ui/pixel";
 

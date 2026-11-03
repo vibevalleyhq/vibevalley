@@ -6,8 +6,8 @@
 import { t } from "@vibevalley/i18n";
 import { mossLinePath } from "@vibevalley/protocol";
 
+import { recordOf } from "@/base/dom";
 import { messageOf } from "@/base/format";
-import { recordOf } from "@/base/util";
 
 import { heard, levelOf, Playback, type MossTurn, type Piece, type PlaybackAction, type Queued } from "./moss";
 

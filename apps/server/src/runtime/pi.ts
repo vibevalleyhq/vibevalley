@@ -12,7 +12,7 @@ import { t } from "@vibevalley/i18n";
 import type { AccountUsage, RuntimeSettings } from "@vibevalley/protocol";
 
 import { jsonOf } from "@/base/json.ts";
-import { numberIn } from "@/base/number.ts";
+import { numberIn } from "@/base/order.ts";
 import { messageOf } from "@/errors.ts";
 
 /** Past this a read of pi's balance counts as unknown. */

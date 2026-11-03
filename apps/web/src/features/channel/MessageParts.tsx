@@ -6,7 +6,7 @@ import { Toolbar } from "@vibevalley/base-ui";
 import { list, t } from "@vibevalley/i18n";
 import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
 
-import { aria, autofocus } from "@/base/util";
+import { aria, autofocus } from "@/base/dom";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { useRouter } from "@/infra/router";

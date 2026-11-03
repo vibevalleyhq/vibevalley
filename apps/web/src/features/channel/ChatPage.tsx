@@ -5,8 +5,8 @@ import { t } from "@vibevalley/i18n";
 import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, ownerId, type SessionView } from "@vibevalley/protocol";
 import { artifactId as brandArtifactId, blockId as brandBlockId } from "@vibevalley/protocol/schema";
 
+import { aria, autofocus, Keyed, useNow } from "@/base/dom";
 import { tookText } from "@/base/format";
-import { aria, autofocus, Keyed, useNow } from "@/base/util";
 import { ArtifactCanvas, type QuoteTarget } from "@/features/artifact";
 import { useAgent, useOrchestrators } from "@/infra/agents";
 import { api } from "@/infra/api";

@@ -7,8 +7,8 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
 
+import { Keyed } from "@/base/dom";
 import { momentText, wallClockText } from "@/base/format";
-import { Keyed } from "@/base/util";
 import { channelLabel, defaultOf, topsOf } from "@/features/channel";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";

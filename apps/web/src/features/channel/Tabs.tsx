@@ -3,7 +3,7 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Channel, CronView } from "@vibevalley/protocol";
 
-import { aria, useNow } from "@/base/util";
+import { aria, useNow } from "@/base/dom";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { useRouter } from "@/infra/router";

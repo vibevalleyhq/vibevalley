@@ -8,7 +8,7 @@ import { type HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 
-import { numberIn } from "@/base/number.ts";
+import { numberIn } from "@/base/order.ts";
 
 import { type Adapter, AppFailed, failedWith } from "./adapter.ts";
 

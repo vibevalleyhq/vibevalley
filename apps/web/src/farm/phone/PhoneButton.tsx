@@ -6,7 +6,7 @@ import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { farm } from "@/farm/store";
 import { phoneState } from "@/farm/support";
 import { useFarm } from "@/farm/ui";

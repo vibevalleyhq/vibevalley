@@ -18,8 +18,7 @@ import { maxRunning } from "@vibevalley/protocol";
 import { slice } from "@vibevalley/protocol/rules";
 
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
-import { numberIn } from "@/base/number.ts";
-import { or } from "@/base/order.ts";
+import { numberIn, or } from "@/base/order.ts";
 import { messageOf } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 

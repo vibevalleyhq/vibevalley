@@ -9,8 +9,8 @@ import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
 import { omitUndefined, oneLine } from "@vibevalley/protocol/rules";
 
+import { aria, autofocus, Keyed, useNow } from "@/base/dom";
 import { ago } from "@/base/format";
-import { aria, autofocus, Keyed, useNow } from "@/base/util";
 import { api, reasonOf } from "@/infra/api";
 import { ready, useQuery } from "@/infra/query";
 import { createAct } from "@/ui/act";

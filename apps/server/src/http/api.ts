@@ -12,7 +12,7 @@ import { artifactId } from "@vibevalley/protocol/schema";
 
 import { Artifact } from "@/artifact/artifact.ts";
 import { artifactHeaders } from "@/artifact/policy.ts";
-import { wireOf } from "@/base/wire.ts";
+import { wireOf } from "@/base/json.ts";
 import { Channel } from "@/channel/channel.ts";
 import { messageOf, refused } from "@/errors.ts";
 import { Voice } from "@/voice/voice.ts";

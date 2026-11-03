@@ -1,7 +1,7 @@
 // The chat in the core state.
 import type * as T from "@vibevalley/protocol";
 
-import { compactCard } from "@/base/card.ts";
+import { compactCard } from "@/base/clip.ts";
 import { compareText, or } from "@/base/order.ts";
 import { type ChannelRouteFact, type Meta, metaOf, senderKind, targetOf } from "@/mailbox/envelope.ts";
 import type { ChannelMail } from "@/mailbox/mailbox.ts";

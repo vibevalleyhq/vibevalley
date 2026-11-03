@@ -7,8 +7,8 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { list as listed, t } from "@vibevalley/i18n";
 import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
 
+import { Keyed } from "@/base/dom";
 import { matches } from "@/base/search";
-import { Keyed } from "@/base/util";
 import { api, reasonOf } from "@/infra/api";
 import { ready, useAgents, useQuery, useRuntimes } from "@/infra/query";
 import { useRouter } from "@/infra/router";

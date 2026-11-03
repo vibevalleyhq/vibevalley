@@ -6,8 +6,8 @@ import { t } from "@vibevalley/i18n";
 import type { Changes, Issue, Session } from "@vibevalley/protocol";
 import { assignedAgentOf } from "@vibevalley/protocol/rules";
 
+import { useNow } from "@/base/dom";
 import { ago } from "@/base/format";
-import { useNow } from "@/base/util";
 import { commands } from "@/farm/frames";
 import { harvestedOf } from "@/farm/hud/readout";
 import { issueOf } from "@/farm/world/plots";

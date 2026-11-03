@@ -7,7 +7,7 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Achievement, AchievementCategory, AchievementStanding, Progress } from "@vibevalley/protocol";
 
-import { aria, useClickAway } from "@/base/util";
+import { aria, useClickAway } from "@/base/dom";
 import { commands } from "@/farm/frames";
 import { thousands } from "@/farm/hud/readout";
 import { beds } from "@/farm/world/plots";

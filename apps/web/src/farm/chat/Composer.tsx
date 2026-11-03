@@ -8,7 +8,7 @@ import { For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { chatSay, createComposer, drafts, threadOwnerOf, useReplying } from "@/features/channel";
 import { DictationButton } from "@/features/voice";
 import { useAgent } from "@/infra/agents";

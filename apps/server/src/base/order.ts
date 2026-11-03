@@ -13,3 +13,8 @@ export function compareText(a: string, b: string): number {
 export const compare = (a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0);
 
 export const or = (...c: number[]) => c.find((x) => x !== 0) ?? 0;
+
+export const numberIn = (text: string | undefined, fallback = 0) => {
+  const n = Number(text?.trim() || Number.NaN);
+  return Number.isFinite(n) ? n : fallback;
+};

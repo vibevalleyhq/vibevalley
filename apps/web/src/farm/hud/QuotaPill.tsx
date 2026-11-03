@@ -6,8 +6,8 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
+import { aria, useClickAway } from "@/base/dom";
 import { yuan } from "@/base/format";
-import { aria, useClickAway } from "@/base/util";
 import { commands } from "@/farm/frames";
 import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "@/features/runtime";
 import { ready, useRuntimes } from "@/infra/query";

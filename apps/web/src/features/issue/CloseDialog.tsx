@@ -3,8 +3,8 @@ import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "s
 import { t } from "@vibevalley/i18n";
 import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
 
+import { aria, autofocus } from "@/base/dom";
 import { ago } from "@/base/format";
-import { aria, autofocus } from "@/base/util";
 import { reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { ready } from "@/infra/query";

@@ -9,7 +9,7 @@ import { For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
 
-import { aria, Keyed } from "@/base/util";
+import { aria, Keyed } from "@/base/dom";
 import { farm, type FarmOverlay, type FarmPanel } from "@/farm/store";
 import { useVillage } from "@/farm/support";
 import { useFarm } from "@/farm/ui";

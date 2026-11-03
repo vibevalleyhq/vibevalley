@@ -3,7 +3,7 @@ import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { Combobox } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
-import { autofocus } from "@/base/util";
+import { autofocus } from "@/base/dom";
 import { useWorkAgents } from "@/infra/agents";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";

@@ -23,7 +23,7 @@ import {
   VoiceValues,
 } from "@vibevalley/protocol";
 
-import { variant, aria, createSettled, Keyed } from "@/base/util";
+import { variant, aria, createSettled, Keyed } from "@/base/dom";
 import { api, reasonOf } from "@/infra/api";
 import { ready, useQuery, useSettings } from "@/infra/query";
 import { saveSettings } from "@/infra/settings";

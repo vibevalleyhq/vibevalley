@@ -15,8 +15,8 @@ import {
 } from "@vibevalley/protocol";
 import { plainText, closedText } from "@vibevalley/protocol/rules";
 
+import { useNow } from "@/base/dom";
 import { tookText, wallClockText } from "@/base/format";
-import { useNow } from "@/base/util";
 import { IssueArtifacts } from "@/features/artifact";
 import { createSessionEvents } from "@/features/session";
 import { useAgent } from "@/infra/agents";

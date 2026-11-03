@@ -4,7 +4,7 @@
 import type { JSX } from "@solidjs/web";
 import { Match, Show, Switch, untrack } from "solid-js";
 
-import { Keyed } from "@/base/util";
+import { Keyed } from "@/base/dom";
 import { FarmPage } from "@/farm/FarmPage";
 import { projectMap } from "@/farm/map/ProjectMap";
 import { lastFarmProject } from "@/farm/store";

@@ -9,8 +9,8 @@ import { clockText } from "@vibevalley/engine/clock";
 import { t } from "@vibevalley/i18n";
 import type { Session, StateFrame } from "@vibevalley/protocol";
 
+import { aria } from "@/base/dom";
 import { createExternal } from "@/base/external";
-import { aria } from "@/base/util";
 import { localEffects } from "@/farm/frames";
 import { clock, farm } from "@/farm/store";
 import { typing } from "@/farm/tools";

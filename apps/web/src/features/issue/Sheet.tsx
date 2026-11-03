@@ -3,7 +3,7 @@ import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { Select } from "@/ui/Field";
 import { Icon } from "@/ui/Icon";
 

@@ -26,7 +26,7 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { MemoryPanel } from "@/features/memory";
 import { useSkills } from "@/features/runtime";
 import { TrajectoryList } from "@/features/session";

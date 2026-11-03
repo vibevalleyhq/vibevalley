@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 import { ownerId } from "@vibevalley/protocol";
 import type { BlockRef, Channel } from "@vibevalley/protocol";
 
-import { aria } from "@/base/util";
+import { aria } from "@/base/dom";
 import { DictationButton } from "@/features/voice";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";

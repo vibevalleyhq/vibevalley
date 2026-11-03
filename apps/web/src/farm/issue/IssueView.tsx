@@ -17,8 +17,8 @@ import {
 } from "@vibevalley/protocol";
 import { isOneOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
+import { aria, useNow } from "@/base/dom";
 import { tookText, wallClockText } from "@/base/format";
-import { aria, useNow } from "@/base/util";
 import { playBedFx } from "@/farm/commands";
 import { tint } from "@/farm/panels/rows";
 import { farm, overlayOf } from "@/farm/store";

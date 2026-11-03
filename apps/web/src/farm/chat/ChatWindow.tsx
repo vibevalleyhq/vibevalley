@@ -8,7 +8,7 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
 
-import { useNow } from "@/base/util";
+import { useNow } from "@/base/dom";
 import { farm } from "@/farm/store";
 import { useFarm } from "@/farm/ui";
 import {

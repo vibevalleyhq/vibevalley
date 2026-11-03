@@ -4,8 +4,8 @@ import { t } from "@vibevalley/i18n";
 import { type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 
+import { autofocus } from "@/base/dom";
 import { ago, wallClockText } from "@/base/format";
-import { autofocus } from "@/base/util";
 import { IssueArtifacts } from "@/features/artifact";
 import { useWorkAgents } from "@/infra/agents";
 import { api } from "@/infra/api";

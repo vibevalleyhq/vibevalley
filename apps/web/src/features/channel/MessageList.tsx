@@ -5,8 +5,8 @@ import { t } from "@vibevalley/i18n";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
 import { plainText } from "@vibevalley/protocol/rules";
 
+import { aria, useNow } from "@/base/dom";
 import { tookText, spentText } from "@/base/format";
-import { aria, useNow } from "@/base/util";
 import { ArtifactCard } from "@/features/artifact";
 import { RunSteps } from "@/features/session";
 import { useAgent, useOrchestrators } from "@/infra/agents";
