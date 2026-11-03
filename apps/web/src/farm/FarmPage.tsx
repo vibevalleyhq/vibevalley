@@ -18,10 +18,9 @@ import { Hud } from "./hud/Hud";
 import { IssueView } from "./issue/IssueView";
 import { Panels } from "./panels/Panels";
 import { feedPhoneCalls } from "./phone/calls";
-import { farm } from "./store";
+import { farm, useFarm } from "./store";
 import { TitleScreen } from "./title/TitleScreen";
 import { farmKeys } from "./tools";
-import { useFarm } from "./ui";
 
 /** `project`: whose farm ("" for the sessions without a project). */
 export function FarmPage(props: { project: string }) {

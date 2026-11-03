@@ -7,9 +7,8 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show } from "so
 import { t } from "@vibevalley/i18n";
 import type { SessionId, SessionView } from "@vibevalley/protocol";
 
-import { farmState } from "@/farm/store";
+import { farmState, useFarm } from "@/farm/store";
 import { aimTool } from "@/farm/tools";
-import { useFarm } from "@/farm/ui";
 import { useVillage } from "@/farm/world/load";
 import type { Village } from "@/farm/world/load";
 import { yardPlaces } from "@/farm/world/places";

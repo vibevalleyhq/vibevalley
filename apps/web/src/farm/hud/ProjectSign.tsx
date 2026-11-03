@@ -5,8 +5,7 @@ import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { farmProject } from "@/farm/store";
-import { useFarm } from "@/farm/ui";
+import { farmProject, useFarm } from "@/farm/store";
 import { useRouter } from "@/infra/router";
 import { playSound } from "@/ui/pixel/sound";
 

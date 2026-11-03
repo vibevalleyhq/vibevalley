@@ -16,10 +16,9 @@ import { SpriteIcon } from "@/ui/pixel";
 import type { GlyphCell } from "@/ui/pixel/card";
 
 import { missedOf, phoneState } from "./calls";
-import { phoneCells } from "./cells";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
-import { lcd } from "./lcd";
+import { lcd, phoneCells } from "./lcd";
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 

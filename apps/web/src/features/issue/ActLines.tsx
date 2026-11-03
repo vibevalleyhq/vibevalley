@@ -6,7 +6,7 @@ import { useIntents } from "@/state/intent";
 import { Icon } from "@/ui/Icon";
 
 import { issueMove, issueMoveOf } from "./moves";
-import type { PendingWords } from "./say";
+import type { PendingWords } from "./write";
 
 /**
  * What the owner did here that the frame does not show yet: the status on its way (or refused, with why), and words

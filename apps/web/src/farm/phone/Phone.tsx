@@ -11,8 +11,7 @@ import type { InboxItem } from "@vibevalley/protocol";
 
 import { useInterval } from "@/base/timer";
 import { ChatWindow } from "@/farm/chat/ChatWindow";
-import { farm } from "@/farm/store";
-import { useFarm } from "@/farm/ui";
+import { farm, useFarm } from "@/farm/store";
 import { unreadTotal } from "@/features/channel";
 import { voiceCall } from "@/features/voice";
 import { useCore } from "@/infra/frame";

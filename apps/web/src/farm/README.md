@@ -2,7 +2,7 @@
 
 The pixel farm at `/`. It is full-bleed, outside the workbench's shell; its 工作台 link goes to `/issues`, and the
 shell's 农场 link comes back. The farm is the server's (`useFrames()`, `useCore()` in `src/infra/frame.ts`); this folder
-only draws it and keeps the page's own state. Its Solid side reads the framework-free modules here through `ui.ts` and `frames.ts`
+only draws it and keeps the page's own state. Its Solid side reads the framework-free modules here through `store.ts` and `frames.ts`
 (`useFarm`, `timeOfDay`, `commands`; the frames as they came are `infra/frame.ts`'s `rawFrame`) and the wiring in
 `world/load.ts` (the village), `tools.ts` (the keys), `phone/calls.ts` and `phone/pad.ts` (the phone's calls, the pad), and
 `cues.ts` (the sounds).
@@ -41,7 +41,7 @@ Which part draws which overlay (`FarmUi.overlays`):
 ## The store (`store.ts`)
 
 The farm page's state is an atom of the page's (`defineAtom`, `state/atom.ts`): `farmState()` reads it anywhere and,
-read in a component or a computation, follows it; `useFarm(select)` (`ui.ts`) is a slice that changes only when the
+read in a component or a computation, follows it; `useFarm(select)` is a slice that changes only when the
 slice does; `subscribeFarm(fn)` listens from plain code. What this machine keeps (the title seen, the farm entered last,
 read by `farmProject()` and `lastFarmProject()`) is stored (`defineStored`, `state/stored.ts`). Changes only through
 `farm.*`:
@@ -102,7 +102,7 @@ the API and then plays the bed's effect. Parent and child issues use the workben
   the canvas (its `index.ts`); `atlas.ts` (`SpriteAtlas`: sizes and anchors in art pixels, `density` 2, `spriteUrl`;
   `loadAtlas`, `useAtlas`); `sound.ts` (`playSound(name)`, `isMuted`/`setMuted`, the sounds' recipes).
 - `cues.ts`: `farmCues` (what plays when the farm changes) and `inTurn`; `muted()` and `farmSounds(...)` (FarmPage runs it).
-- `labels.ts`: the farm's own words for an issue's acts (completing is a harvest).
+- `store.ts`: the farm's own words for an issue's acts (completing is a harvest).
 - `tools.ts`: `Tool`, `tools`, `aimTool`, `farmKey`, `managerSprite`.
 - `@vibevalley/engine`: `/pixi` (`pixelStage` with `frame`, `Walker`, `frameAt`, particles, critters, light, sky),
   `/nav`, `/audio`, `/clock`.

@@ -4,8 +4,7 @@ import type { Applied } from "@vibevalley/protocol";
 
 import type { Intent } from "@/state/intent";
 
-import { type IssueSaid, pendingWords } from "./say";
-import { shownDeliver, type DeliverPick } from "./write";
+import { type DeliverPick, type IssueSaid, pendingWords, shownDeliver } from "./write";
 
 const said = (key: string, id: string, over: Partial<Intent<IssueSaid, Applied>> = {}): Intent<IssueSaid, Applied> => ({
   key,

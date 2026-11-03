@@ -11,6 +11,7 @@ import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcom
 
 import { aria, autofocus } from "@/base/dom";
 import { spentText } from "@/base/format";
+import { farmClock, readsLong } from "@/farm/store";
 import { artifactHref } from "@/features/artifact";
 import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, reactionOn, reactionSet, sameReaction, setMark, useMessage } from "@/features/channel";
 import { api } from "@/infra/api";
@@ -19,8 +20,6 @@ import { useIntents } from "@/state/intent";
 import { A } from "@/ui/A";
 import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
 import { createPixelAct, noticeTitle, PxMarkdown, SpriteIcon, ToastType, toasts } from "@/ui/pixel";
-
-import { farmClock, readsLong } from "./labels";
 
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 

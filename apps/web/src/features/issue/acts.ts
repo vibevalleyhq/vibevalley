@@ -9,11 +9,11 @@ import { useIntents } from "@/state/intent";
 import type { Act } from "@/ui/act";
 
 import { issueMove, issueMoveOf, sendMove } from "./moves";
-import { issueSay, pendingWords } from "./say";
+import { issueSay, pendingWords } from "./write";
 
 // The owner's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx)
 // and the farm's (farm/issue/IssueView.tsx). What a button sends is the server's (Issue.stage.acts); a move and words
-// go as intents (moves.ts, say.ts), shown on the page until the frame has them, and the rest through the page's Act.
+// go as intents (moves.ts, write.ts), shown on the page until the frame has them, and the rest through the page's Act.
 // This says which take words from the box, which open the box first, which open a dialog, what a reopen tells, and keeps
 // the box and its words. A page only says how it runs a button its own way (the farm's commands with their effects).
 

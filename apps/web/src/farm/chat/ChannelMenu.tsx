@@ -7,15 +7,13 @@ import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 
 import { aria, useClickAway } from "@/base/dom";
-import { farm } from "@/farm/store";
+import { farm, farmChannelLabel } from "@/farm/store";
 import { createChannelForm, directsOf, topsOf, chatPath, unreadUnder } from "@/features/channel";
 import { useCore } from "@/infra/frame";
 import { ready, useProjects } from "@/infra/query";
 import { useRouter } from "@/infra/router";
 import { PxButton, PxTextInput, SpriteIcon } from "@/ui/pixel";
 import { playSound } from "@/ui/pixel/sound";
-
-import { farmChannelLabel } from "./labels";
 
 type Mode = "list" | "create" | "settings";
 

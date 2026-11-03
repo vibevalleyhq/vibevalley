@@ -44,10 +44,7 @@ export function FarmEmpty(props: { text: string }) {
 /** What the server answered, under the button that asked. */
 
 /** Hours and minutes of a time. */
-export function clockOf(at: number) {
-  const d = new Date(Math.round(at));
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
+export { farmClock as clockOf } from "@/farm/store";
 
 export function PlusMinus(props: { added: number; removed: number }) {
   return (

@@ -8,7 +8,7 @@ import { api } from "@/infra/api";
 import { subscribeLive } from "@/infra/live";
 import { queries } from "@/infra/query";
 
-import { SessionLogs } from "./logs";
+import { SessionLogs } from "./runs";
 
 // SessionLogs deduplicates active readers. A later observation must not borrow a request started before it subscribed.
 let readNumber = 0;
