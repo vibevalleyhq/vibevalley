@@ -15,7 +15,7 @@ import { answerOpening, criteriaHead } from "@/issue/prompts.ts";
 import { factsOf, presetOf } from "@/runtime/presets.ts";
 import { briefBreak } from "@/session/briefing.ts";
 
-import { until } from "./until.ts";
+import { until } from "./layers.ts";
 
 const sessionGit = (cwd: string, ...args: string[]) =>
   execFileSync("git", ["-c", "user.name=session", "-c", "user.email=session@vibevalley.test", ...args], { cwd, stdio: "ignore" });

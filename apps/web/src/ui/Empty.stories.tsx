@@ -1,7 +1,7 @@
 import { stories, story } from "@vibevalley/stories";
 
 import { Button } from "./Button";
-import { Empty } from "./Empty";
+import { Empty } from "./layout";
 
 export default stories({
   title: "组件/工作台/Empty",

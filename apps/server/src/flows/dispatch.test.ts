@@ -14,7 +14,7 @@ import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { ingress as ingressLayer } from "@/services.ts";
 import { Session } from "@/session/session.ts";
-import { waitFor } from "@/testing/until.ts";
+import { waitFor } from "@/testing/layers.ts";
 import { testIssues, worldBelowIngress } from "@/testing/world.ts";
 
 it.live("regression: an orchestrator assignment survives ingress startup and an acknowledgement retry without creating chat notices", () => {

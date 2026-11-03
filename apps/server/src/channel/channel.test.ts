@@ -24,8 +24,7 @@ import { summaryOf } from "@/session/report.ts";
 import { sessionOnIssue } from "@/session/roster.ts";
 import { Session, newsOf, type SessionNews } from "@/session/session.ts";
 import type { InputConsumed, InputReturned } from "@/session/signals.ts";
-import { testConfig, offline, testDatabase } from "@/testing/layers.ts";
-import { until, waitFor } from "@/testing/until.ts";
+import { testConfig, offline, testDatabase, until, waitFor } from "@/testing/layers.ts";
 import { Said, said } from "@/testing/world.ts";
 
 import { orchestratorForChannel, setOrchestrator } from "../../db/generated/channel.sql.ts";

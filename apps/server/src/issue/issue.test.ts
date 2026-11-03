@@ -22,8 +22,7 @@ import { Db, dbQueries } from "@/infra/db.ts";
 import { gitRuns } from "@/project/git.ts";
 import { Session } from "@/session/session.ts";
 import { gitIn } from "@/testing/git.ts";
-import { starter, testConfig } from "@/testing/layers.ts";
-import { until, waitFor } from "@/testing/until.ts";
+import { starter, testConfig, until, waitFor } from "@/testing/layers.ts";
 import { testIssues, world } from "@/testing/world.ts";
 
 import { Issue } from "./issue.ts";

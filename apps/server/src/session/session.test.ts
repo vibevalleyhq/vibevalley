@@ -18,8 +18,7 @@ import { watchStalls } from "@/executor/executor.ts";
 import { Project } from "@/project/project.ts";
 import { MergeFailure } from "@/project/workplace.ts";
 import { gitIn } from "@/testing/git.ts";
-import { starter, testConfig } from "@/testing/layers.ts";
-import { until, waitFor } from "@/testing/until.ts";
+import { starter, testConfig, until, waitFor } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 
 import { NotRecorded, Session } from "./session.ts";

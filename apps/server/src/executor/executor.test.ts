@@ -7,8 +7,7 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "@/agent/agent.ts";
 import { Session } from "@/session/session.ts";
-import { starter } from "@/testing/layers.ts";
-import { until } from "@/testing/until.ts";
+import { starter, until } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 
 import { Executor } from "./executor.ts";

@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import { FetchHttpClient, HttpClient } from "effect/http";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 
-import { whenTrue } from "@/testing/until.ts";
+import { whenTrue } from "@/testing/layers.ts";
 
 import { everos } from "./everos.ts";
 import { nowledge } from "./nowledge.ts";

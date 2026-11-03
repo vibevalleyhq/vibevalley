@@ -13,8 +13,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 import { emptyProgress } from "@/game/progress.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { layer as projection } from "@/projection/frame.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { whenState } from "@/testing/until.ts";
+import { testConfig, whenState } from "@/testing/layers.ts";
 
 import { bounded, Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
 

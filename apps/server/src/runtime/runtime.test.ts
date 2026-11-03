@@ -19,8 +19,7 @@ import { sampleAgent } from "@/agent/seed.ts";
 import { Core } from "@/core/core.ts";
 import { type ServerConfig } from "@/infra/config.ts";
 import { platform } from "@/services.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { nextTurn, whenTrue } from "@/testing/until.ts";
+import { testConfig, nextTurn, whenTrue } from "@/testing/layers.ts";
 
 import { piBalance } from "./pi.ts";
 import { factsOf, presetOf, runtimeIds } from "./presets.ts";

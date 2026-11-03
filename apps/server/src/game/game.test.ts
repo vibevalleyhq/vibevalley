@@ -12,8 +12,7 @@ import { Core } from "@/core/core.ts";
 import { Project } from "@/project/project.ts";
 import { sessionOf } from "@/session/roster.ts";
 import { gitSync, repo } from "@/testing/git.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { waitFor as until } from "@/testing/until.ts";
+import { testConfig, waitFor as until } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 
 import * as q from "../../db/generated/game_ledger.sql.ts";

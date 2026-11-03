@@ -7,8 +7,7 @@ import { Effect, Fiber, Layer } from "effect";
 
 import { ServerConfig } from "@/infra/config.ts";
 import { gitInEnv, gitSync, projectsDir, repo, write } from "@/testing/git.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { untilGot as until } from "@/testing/until.ts";
+import { testConfig, untilGot as until } from "@/testing/layers.ts";
 
 import { Project, activityOf, countsOf, githubRepository, type GitHubRun, type ProjectHooks, projectProblem, tokeiArgs } from "./project.ts";
 import { type MergeFailure } from "./workplace.ts";

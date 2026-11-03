@@ -9,8 +9,7 @@ import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrc
 
 import { Channel } from "@/channel/channel.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { gate, untilGot as until, waitFor, whenState } from "@/testing/until.ts";
+import { testConfig, gate, untilGot as until, waitFor, whenState } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 
 import * as accountQ from "../../db/generated/connector_account.sql.ts";

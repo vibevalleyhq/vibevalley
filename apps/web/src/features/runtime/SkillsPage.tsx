@@ -16,10 +16,9 @@ import { A } from "@/ui/A";
 import { createAct } from "@/ui/act";
 import { Button } from "@/ui/Button";
 import { ConfirmButton } from "@/ui/ConfirmButton";
-import { Empty } from "@/ui/Empty";
 import { AgentFace } from "@/ui/Face";
 import { Field, TextArea, TextInput } from "@/ui/Field";
-import { Card } from "@/ui/layout";
+import { Card, Empty } from "@/ui/layout";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
 import { runtimeName } from "@/ui/RuntimeBadge";
 

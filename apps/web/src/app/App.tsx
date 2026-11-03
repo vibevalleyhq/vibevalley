@@ -24,7 +24,7 @@ import { useRouter } from "@/infra/router";
 import { prefsNow } from "@/state/prefs";
 import { TreePage } from "@/tree/TreePage";
 import { Navigate } from "@/ui/A";
-import { WindowStrip } from "@/ui/TitleBar";
+import { WindowStrip } from "@/ui/layout";
 import { ToastHost } from "@/ui/ToastHost";
 
 import { places as placeList } from "./places";

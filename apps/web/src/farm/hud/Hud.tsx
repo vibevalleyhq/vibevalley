@@ -24,10 +24,10 @@ import { orchestratorLookOf } from "@/infra/agents";
 import { useCore, useFrames } from "@/infra/frame";
 import { ready, useAgents, useRuntimes } from "@/infra/query";
 import { useRouter } from "@/infra/router";
+import { titleBar } from "@/ui/layout";
 import { CardColors, createPixelAct, PixelCard, PxButton, SpriteIcon } from "@/ui/pixel";
 import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
 import { playSound } from "@/ui/pixel/sound";
-import { titleBar } from "@/ui/TitleBar";
 
 import { Friends } from "./Friends";
 import { FxLayer } from "./FxLayer";

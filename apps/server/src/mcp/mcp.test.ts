@@ -18,8 +18,7 @@ import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Memory } from "@/memory/memory.ts";
 import { Session } from "@/session/session.ts";
-import { starter } from "@/testing/layers.ts";
-import { until, waitFor } from "@/testing/until.ts";
+import { starter, until, waitFor } from "@/testing/layers.ts";
 import { Said, world } from "@/testing/world.ts";
 
 import { Mcp } from "./mcp.ts";

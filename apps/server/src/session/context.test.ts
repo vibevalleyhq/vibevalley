@@ -12,8 +12,7 @@ import { Channel } from "@/channel/channel.ts";
 import { Core } from "@/core/core.ts";
 import { Executor } from "@/executor/executor.ts";
 import { Project } from "@/project/project.ts";
-import { starter, testConfig } from "@/testing/layers.ts";
-import { until, waitFor } from "@/testing/until.ts";
+import { starter, testConfig, until, waitFor } from "@/testing/layers.ts";
 import { world } from "@/testing/world.ts";
 
 import { NotRecorded, Session } from "./session.ts";

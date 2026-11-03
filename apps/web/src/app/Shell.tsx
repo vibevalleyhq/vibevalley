@@ -16,9 +16,9 @@ import { useUpdates } from "@/infra/settings";
 import { A } from "@/ui/A";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
+import { titleBar } from "@/ui/layout";
 import { ShortcutSheet } from "@/ui/ShortcutSheet";
 import { Hint } from "@/ui/Tip";
-import { titleBar } from "@/ui/TitleBar";
 
 import { type Place, placeOf, places, settingsPlace } from "./places";
 

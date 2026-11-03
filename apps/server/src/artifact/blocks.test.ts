@@ -13,8 +13,7 @@ import { orMissing } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Database, Db } from "@/infra/db.ts";
 import { bold, para, sample, span } from "@/testing/artifact.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { waitFor } from "@/testing/until.ts";
+import { testConfig, waitFor } from "@/testing/layers.ts";
 
 import * as qa from "../../db/generated/artifact.sql.ts";
 import { makeBlockStore } from "./blocks.ts";
