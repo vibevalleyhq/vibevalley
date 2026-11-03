@@ -15,8 +15,7 @@ import { Inbox } from "@/inbox/inbox.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Session } from "@/session/session.ts";
-import { testIssues } from "@/testing/issues.ts";
-import { Said } from "@/testing/said.ts";
+import { Said, testIssues } from "@/testing/world.ts";
 
 import { await_, farm, lab, until } from "./farm.ts";
 

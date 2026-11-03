@@ -564,7 +564,7 @@ export default defineConfig({
           "apps/server/src/runtime/dsh.ts",
           "apps/server/src/voice/voice.ts",
           "apps/server/src/testing/git.ts",
-          "apps/server/src/testing/helper.ts",
+          "apps/server/src/testing/worker.ts",
           "apps/desktop/src/island.ts",
           "apps/desktop/src/server.ts",
           "apps/desktop/src/update.ts",

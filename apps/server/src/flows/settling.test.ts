@@ -7,7 +7,7 @@ import { Executor } from "@/executor/executor.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
 import type { LaunchActivity } from "@/session/signals.ts";
-import { testIssues } from "@/testing/issues.ts";
+import { testIssues } from "@/testing/world.ts";
 
 import { await_, farm, lab, until } from "./farm.ts";
 

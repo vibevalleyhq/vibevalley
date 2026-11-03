@@ -15,10 +15,10 @@ import { tempDir } from "@vibevalley/testkit/temp";
 import { waitFor } from "@vibevalley/testkit/until";
 
 import { Agent } from "@/agent/agent.ts";
+import { sampleAgent } from "@/agent/seed.ts";
 import { Core } from "@/core/core.ts";
 import { type ServerConfig } from "@/infra/config.ts";
 import { platform } from "@/services.ts";
-import { sampleAgent } from "@/testing/agents.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { nextTurn, whenTrue } from "@/testing/until.ts";
 

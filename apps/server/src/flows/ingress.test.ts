@@ -13,7 +13,7 @@ import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Resource } from "@/resource/resource.ts";
 import { Session } from "@/session/session.ts";
-import { testIssues } from "@/testing/issues.ts";
+import { testIssues } from "@/testing/world.ts";
 
 import { await_, farm, lab, until } from "./farm.ts";
 

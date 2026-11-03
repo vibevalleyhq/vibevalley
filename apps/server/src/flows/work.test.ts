@@ -14,8 +14,8 @@ import { Core } from "@/core/core.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
 import type { DeliveryInput } from "@/session/signals.ts";
-import { releaseHeld } from "@/testing/helper.ts";
 import { testConfig } from "@/testing/layers.ts";
+import { releaseHeld } from "@/testing/worker.ts";
 
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 

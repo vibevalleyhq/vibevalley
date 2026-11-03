@@ -129,7 +129,7 @@ test("the island follows the issues in flight and opens one", async () => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));
   const app = await electron.launch({
     args: [`--user-data-dir=${join(dir, "electron")}`, join(import.meta.dirname, "..")],
-    // The server's pi is the scripted helper (apps/server src/testing/helper.ts): an issue can really be worked.
+    // The server's pi is the scripted helper (apps/server src/testing/worker.ts): an issue can really be worked.
     env: {
       ...cleanEnv(),
       HOME: dir,

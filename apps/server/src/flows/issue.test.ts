@@ -22,9 +22,8 @@ import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Runtime } from "@/runtime/runtime.ts";
 import { Session } from "@/session/session.ts";
 import { write } from "@/testing/git.ts";
-import { helper } from "@/testing/helper.ts";
-import { testIssues } from "@/testing/issues.ts";
-import { Said } from "@/testing/said.ts";
+import { helper } from "@/testing/worker.ts";
+import { Said, testIssues } from "@/testing/world.ts";
 
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 

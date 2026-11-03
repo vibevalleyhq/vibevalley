@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 
 import type { AccountUsage, Agent, RuntimeInfo } from "@vibevalley/protocol";
 
-import { sampleAgent } from "@/testing/agents.ts";
+import { sampleAgent } from "@/agent/seed.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
 import { agentProblems, chooseAgent, factsOf, moneyStop } from "./presets.ts";

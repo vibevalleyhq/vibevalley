@@ -7,11 +7,11 @@ import { t } from "@vibevalley/i18n";
 import type { ArtifactId, BlockOp } from "@vibevalley/protocol";
 import { artifactId, blockId, type Wire } from "@vibevalley/protocol/schema";
 
+import { sampleAgent } from "@/agent/seed.ts";
 import { newId } from "@/base/ids.ts";
 import { orMissing } from "@/errors.ts";
 import { ServerConfig } from "@/infra/config.ts";
 import { Database, Db } from "@/infra/db.ts";
-import { sampleAgent } from "@/testing/agents.ts";
 import { bold, para, sample, span } from "@/testing/artifact.ts";
 import { testConfig } from "@/testing/layers.ts";
 import { waitFor } from "@/testing/until.ts";

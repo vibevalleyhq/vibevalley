@@ -12,7 +12,7 @@ import { owner, session as sessionActor } from "@/base/actor.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
 import { gitIn } from "@/testing/git.ts";
-import { testIssues } from "@/testing/issues.ts";
+import { testIssues } from "@/testing/world.ts";
 
 import { farm, lab, mustHire, await_ } from "./farm.ts";
 

@@ -11,7 +11,7 @@ import { Channel } from "@/channel/channel.ts";
 import { Ingress, type SourceEvent } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
-import { testIssues } from "@/testing/issues.ts";
+import { testIssues } from "@/testing/world.ts";
 
 import { await_, farm, lab } from "./farm.ts";
 

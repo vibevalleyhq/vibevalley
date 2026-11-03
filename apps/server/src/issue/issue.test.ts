@@ -22,10 +22,9 @@ import { Db, dbQueries } from "@/infra/db.ts";
 import { gitRuns } from "@/project/git.ts";
 import { Session } from "@/session/session.ts";
 import { gitIn } from "@/testing/git.ts";
-import { testIssues } from "@/testing/issues.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { until, waitFor } from "@/testing/until.ts";
-import { world } from "@/testing/world.ts";
+import { testIssues, world } from "@/testing/world.ts";
 
 import { Issue } from "./issue.ts";
 const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });

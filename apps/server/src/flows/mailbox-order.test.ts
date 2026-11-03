@@ -10,7 +10,7 @@ import { Ingress, type SourceEvent } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Session } from "@/session/session.ts";
-import { testIssues } from "@/testing/issues.ts";
+import { testIssues } from "@/testing/world.ts";
 
 import { farm, lab, until } from "./farm.ts";
 

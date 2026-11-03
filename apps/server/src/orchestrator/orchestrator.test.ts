@@ -28,9 +28,8 @@ import { Resource } from "@/resource/resource.ts";
 import { Session } from "@/session/session.ts";
 import type { EvalCase } from "@/testing/evals.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
-import { Said } from "@/testing/said.ts";
 import { aTurn, gate, untilGot as until, waitFor, whenTrue, within } from "@/testing/until.ts";
-import { world } from "@/testing/world.ts";
+import { Said, world } from "@/testing/world.ts";
 
 import { Orchestrator } from "./orchestrator.ts";
 import { makeResponses } from "./response.ts";

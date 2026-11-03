@@ -9,7 +9,7 @@ import { Agent } from "@/agent/agent.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Project } from "@/project/project.ts";
 import { gitSync } from "@/testing/git.ts";
-import { testIssues } from "@/testing/issues.ts";
+import { testIssues } from "@/testing/world.ts";
 
 import { await_, farm, lab } from "./farm.ts";
 

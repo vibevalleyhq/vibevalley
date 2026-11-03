@@ -1,6 +1,6 @@
 // A whole farm for the flow tests, which go through several services at once (an issue refined, sent, completed; a
 // memory kept by one session and recalled by the next). No binary, login or model: the helpers are oar's scripted
-// runtime over real git repositories in temporary folders, doing what the words of their brief say (testing/helper.ts).
+// runtime over real git repositories in temporary folders, doing what the words of their brief say (testing/worker.ts).
 
 import { type Runtime } from "@botiverse/oar";
 import type { ScriptedTurn } from "@botiverse/oar/testing";
@@ -13,9 +13,9 @@ import type { ServerConfig } from "@/infra/config.ts";
 import { agentSessionsStart, collaborationStart, gamification, inboxStart, mailboxReady } from "@/services.ts";
 import { type Hired } from "@/session/session.ts";
 import { gitIn } from "@/testing/git.ts";
-import { helper } from "@/testing/helper.ts";
 import { starter, testConfig } from "@/testing/layers.ts";
 import { until as untilHeld, waitFor } from "@/testing/until.ts";
+import { helper } from "@/testing/worker.ts";
 import { world, type WorldOptions } from "@/testing/world.ts";
 
 /** The seed profile on pi, with no effort: the scripted runtime has no models, so no effort levels. */
@@ -29,7 +29,7 @@ export interface Farm {
   readonly layer: ReturnType<typeof farmLayer>;
 }
 
-/** The farm with its one runtime, pi: testing/helper.ts's unless the test gives its own. As the server starts it, sessions
+/** The farm with its one runtime, pi: testing/worker.ts's unless the test gives its own. As the server starts it, sessions
  * left on the farm by the last run come back (Agent Sessions' startup), and the game keeps its ledger. */
 
 export function farm(

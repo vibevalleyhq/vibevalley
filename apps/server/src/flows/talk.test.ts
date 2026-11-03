@@ -15,8 +15,8 @@ import { Db } from "@/infra/db.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Session } from "@/session/session.ts";
 import { testConfig } from "@/testing/layers.ts";
-import { Said } from "@/testing/said.ts";
 import { waitFor } from "@/testing/until.ts";
+import { Said } from "@/testing/world.ts";
 
 import { farm, lab, until } from "./farm.ts";
 

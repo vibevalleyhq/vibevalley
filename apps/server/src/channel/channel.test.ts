@@ -25,8 +25,8 @@ import { sessionOnIssue } from "@/session/roster.ts";
 import { Session, newsOf, type SessionNews } from "@/session/session.ts";
 import type { InputConsumed, InputReturned } from "@/session/signals.ts";
 import { testConfig, offline } from "@/testing/layers.ts";
-import { Said, said } from "@/testing/said.ts";
 import { until, waitFor } from "@/testing/until.ts";
+import { Said, said } from "@/testing/world.ts";
 
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import * as qsession from "../../db/generated/session.sql.ts";

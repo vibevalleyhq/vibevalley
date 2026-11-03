@@ -60,7 +60,7 @@ export function readyAddress(line: string, pid: number): string | undefined {
 
 // The validation command owns assertions and fixtures; this owner isolates and releases its server and child process groups.
 export interface VerificationOptions {
-  /** pi is the scripted helper the server's tests hire (apps/server/src/testing/helper.ts), doing what the words of its
+  /** pi is the scripted helper the server's tests hire (apps/server/src/testing/worker.ts), doing what the words of its
    * job say, and no other runtime is installed: issues can be sent and handed back without a key or a real agent. */
   readonly scriptedHelper?: boolean;
 }

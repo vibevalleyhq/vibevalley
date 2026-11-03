@@ -6,12 +6,15 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { type Runtime } from "@botiverse/oar";
-import { Effect, Layer } from "effect";
+import { Context, Effect, Layer, Stream } from "effect";
 
-import type { AccountUsage } from "@vibevalley/protocol";
+import type { AccountUsage, ChatMessage, IssueRequest } from "@vibevalley/protocol";
 
+import { Core } from "@/core/core.ts";
 import { Inbox } from "@/inbox/inbox.ts";
 import { type ServerConfig } from "@/infra/config.ts";
+import { explicitMandate } from "@/issue/creation.ts";
+import type { Issue } from "@/issue/issue.ts";
 import { Mcp } from "@/mcp/mcp.ts";
 import { type GitHubRun, type ProjectHooks } from "@/project/project.ts";
 import { registryOf } from "@/runtime/runtime.ts";
@@ -19,9 +22,8 @@ import { agentSessions, agents, collaboration, ingress, issues, mailbox, platfor
 import { Tool } from "@/tool/tool.ts";
 
 import { repo } from "./git.ts";
-import { installedOnly } from "./helper.ts";
 import { testConfig } from "./layers.ts";
-import { said } from "./said.ts";
+import { installedOnly } from "./worker.ts";
 
 const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 
@@ -76,3 +78,31 @@ const on =
   <A, E, R>(layer: Layer.Layer<A, E, R>) =>
   <B, E2, R2>(below: Layer.Layer<B, E2, R2>) =>
     layer.pipe(Layer.provideMerge(below));
+
+/** Issues a test adds are ones the owner sent, so their mandate is explicit. */
+export const testIssues = (issues: Issue["Service"]) => ({
+  ...issues,
+  add: (request: IssueRequest) => issues.add(request, explicitMandate()),
+});
+
+// What is said in a test farm, from the farm's start: the core state keeps no messages (a page follows a channel's
+// room), and a test reads them as the message facts told them, by channel.
+
+export class Said extends Context.Service<
+  Said,
+  {
+    readonly in: (channel: string) => ChatMessage[];
+    readonly all: () => ChatMessage[];
+  }
+>()("vibevalley/testing/Said") {}
+
+export const said = Layer.effect(
+  Said,
+  Effect.gen(function* () {
+    const core = yield* Core;
+    const all: ChatMessage[] = [];
+    const events = yield* core.subscribe;
+    yield* Effect.forkScoped(Stream.runForEach(events, (e) => Effect.sync(() => void (e.type === "message" && all.push(e.message)))));
+    return Said.of({ in: (channel) => all.filter((m) => m.channel === channel), all: () => [...all] });
+  }),
+);
