@@ -18,8 +18,7 @@ import { useRouter } from "@/infra/router";
 import { useIntents } from "@/state/intent";
 import { setPick, usePrefs } from "@/state/prefs";
 import { AgentFace } from "@/ui/Face";
-import { createPixelAct, SpriteIcon } from "@/ui/pixel";
-import { toasts } from "@/ui/pixel/toasts";
+import { createPixelAct, SpriteIcon, toasts } from "@/ui/pixel";
 
 /** Who the next line goes to, with a button to stop picking. */
 function PickChip(props: { named: boolean }) {

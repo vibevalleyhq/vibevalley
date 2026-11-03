@@ -246,7 +246,6 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `followAppearance` | `appearance.ts` | Once, as the page starts: applied now and whenever the choice or the system's theme changes. |
 | `createRegistry` | `atom.ts` |  |
 | `pageRegistry` | `atom.ts` | The page's one registry. Root gives it, and the page's own values (defineAtom, defineStored) live in it, since plain |
 | `RegistryContext` | `atom.ts` | Every atom's value lives in one registry for the page; the page's own unless a test or a story gives another. |
@@ -269,7 +268,6 @@
 | `ScaleValues` | `prefs.ts` | The workbench's size, in percent; the farm keeps its own whole-number scaling. |
 | `StartValues` | `prefs.ts` | Where / opens. |
 | `prefsNow` | `prefs.ts` | The choices now; read in a computation or a component, it follows them. |
-| `subscribePrefs` | `prefs.ts` |  |
 | `setPick` | `prefs.ts` |  |
 | `setPet` | `prefs.ts` |  |
 | `setTheme` | `prefs.ts` |  |
@@ -278,6 +276,7 @@
 | `setWidth` | `prefs.ts` | A pane's width; none puts it back to its default. |
 | `rememberPick` | `prefs.ts` | Who and where an issue was given to, for the next quick add and the farm's next job: "" for no one is the orchestrator's. |
 | `usePrefs` | `prefs.ts` | One of the choices, following it. |
+| `followAppearance` | `prefs.ts` | Once, as the page starts: applied now and whenever the choice or the system's theme changes. |
 | `storedAtom` | `stored.ts` | A choice's atom, for a registry of the caller's (the tests); the page's are made by defineStored. |
 | `defineStored` | `stored.ts` | A choice kept on this machine, read and set as the page's value; `name` is unique across the page. |
 | `orFallback` | `stored.ts` | A field of a stored struct that reads as `fallback` when it is missing or does not decode, so one bad field does not |

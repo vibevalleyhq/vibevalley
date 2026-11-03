@@ -3,7 +3,7 @@
 
 import { type Act, createAct } from "@/ui/act";
 
-import { noticeTitle, ToastType, toasts } from "./toasts";
+import { noticeTitle, ToastType, toasts } from "./ToastViewport";
 
 export type Cell = readonly [x: number, y: number];
 

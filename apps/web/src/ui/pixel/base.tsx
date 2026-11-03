@@ -1,7 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 
-import { pxText, pxWindow } from "./style";
+import { pxFrame, pxText, pxWindow } from "./style";
 
 /** `border` draws a second edge inside the frame. `paper` is a bg-* class. */
 export function PxWindow(props: {
@@ -21,6 +21,11 @@ export function PxWindow(props: {
       {props.children}
     </div>
   );
+}
+
+/** `paper` is a bg-* class; the content sits 2 px in, clear of the rim. */
+export function PxFrame(props: { children?: JSX.Element; paper?: string; class?: string }) {
+  return <div class={[props.paper ?? "bg-cream-50", pxFrame, "p-0.5 text-bark-900", props.class]}>{props.children}</div>;
 }
 
 export function PxCard(props: { title?: JSX.Element; aside?: JSX.Element; children?: JSX.Element; class?: string }) {

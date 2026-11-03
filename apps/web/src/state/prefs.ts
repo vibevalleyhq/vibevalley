@@ -8,6 +8,8 @@ import type { Accessor } from "solid-js";
 
 import { ThemeChoice } from "@vibevalley/protocol/host";
 
+import { currentHost } from "@/infra/host";
+
 import { defineStored, orFallback } from "./stored";
 
 /** The workbench's size, in percent; the farm keeps its own whole-number scaling. */
@@ -38,7 +40,7 @@ const prefs = defineStored("prefs", PrefsSchema, { pick: "auto", project: "", pe
 /** The choices now; read in a computation or a component, it follows them. */
 export const prefsNow = prefs.get;
 
-export const subscribePrefs = prefs.subscribe;
+const subscribePrefs = prefs.subscribe;
 
 const set = (patch: Partial<Prefs>) => prefs.update((p) => ({ ...p, ...patch }));
 
@@ -65,3 +67,23 @@ export const usePrefs =
   <T>(select: (p: Prefs) => T): Accessor<T> =>
   () =>
     select(prefs.get());
+
+const dark = () => window.matchMedia("(prefers-color-scheme: dark)");
+
+// The theme goes on <html> as data-theme ("system" worked out from the system's own) and is told to the host so its own
+// parts follow; the interface size is --workbench-zoom, which only the workbench's shell reads (the farm keeps its
+// whole-number scaling).
+function apply() {
+  const { theme, scale } = prefsNow();
+  const root = document.documentElement;
+  root.dataset.theme = theme === "system" ? (dark().matches ? "dark" : "light") : theme;
+  root.style.setProperty("--workbench-zoom", String(scale / 100));
+  currentHost().theme?.(theme);
+}
+
+/** Once, as the page starts: applied now and whenever the choice or the system's theme changes. */
+export function followAppearance() {
+  apply();
+  subscribePrefs(apply);
+  dark().addEventListener("change", apply);
+}
