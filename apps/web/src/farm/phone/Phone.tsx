@@ -12,7 +12,6 @@ import type { InboxItem } from "@vibevalley/protocol";
 import { useInterval } from "@/base/timer";
 import { ChatWindow } from "@/farm/chat/ChatWindow";
 import { farm } from "@/farm/store";
-import { padListening, phoneState, pressPad } from "@/farm/support";
 import { useFarm } from "@/farm/ui";
 import { unreadTotal } from "@/features/channel";
 import { voiceCall } from "@/features/voice";
@@ -20,14 +19,14 @@ import { useCore } from "@/infra/frame";
 import { useRouter } from "@/infra/router";
 import { playSound } from "@/ui/pixel/sound";
 
-import { missedOf, phoneCalls } from "./calls";
+import { missedOf, phoneCalls, phoneState } from "./calls";
 import { BlocksGame } from "./games/BlocksGame";
 import { BugSnakeGame } from "./games/BugSnakeGame";
 import { DinoGame } from "./games/DinoGame";
 import { MergeGame } from "./games/MergeGame";
 import { SokobanGame } from "./games/SokobanGame";
 import { lcd } from "./lcd";
-import type { PadButton } from "./pad";
+import { type PadButton, padListening, pressPad } from "./pad";
 import { GamesScreen, HomeScreen, ListScreen, OrchestratorScreen, type PhoneApp, RingingScreen } from "./screens";
 
 const games: ReadonlySet<PhoneApp> = new Set(["blocks", "dino", "sokoban", "bugs", "merge"]);

@@ -1,8 +1,11 @@
 // aimTool is the rule: the screen shows it while pointing and follows it on a click.
 
+import { onSettled } from "solid-js";
+
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueAct, PlotView, Session } from "@vibevalley/protocol";
 
+import { farm, farmState } from "./store";
 import { type Bed, isRipe } from "./world/plots";
 
 export type Tool = "hand" | "water" | "bug" | "weed" | "harvest" | "shovel";
@@ -120,3 +123,42 @@ export const typing = () => {
   const el = document.activeElement;
   return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el instanceof HTMLElement && el.isContentEditable);
 };
+
+/** The farm's keys while it is on screen: the tools by number, Esc's menu, Alt for every name. */
+export function farmKeys() {
+  onSettled(() => {
+    const on = (down: boolean) => (e: KeyboardEvent) => {
+      const s = farmState();
+      if (s.titleOpen) return;
+      const key = farmKey({ key: e.key, down, meta: e.metaKey, control: e.ctrlKey, alt: e.altKey }, typing(), s.overlays.length > 0, s.tool);
+      switch (key?.kind) {
+        case undefined:
+          return;
+        case "reveal":
+          farm.revealNames(key.down);
+          return;
+        case "closeTool":
+          farm.hold("hand");
+          break;
+        case "openMenu":
+          farm.menu(true);
+          break;
+        case "pick":
+          farm.hold(key.tool);
+          break;
+      }
+      e.preventDefault();
+    };
+    const down = on(true);
+    const up = on(false);
+    const blur = () => farm.revealNames(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
+    };
+  });
+}

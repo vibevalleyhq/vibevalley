@@ -28,11 +28,9 @@ import { Setting } from "@/setting/setting.ts";
 import { dshRuntime } from "./dsh.ts";
 import { piBalance, type PiDefault, piSettings } from "./pi.ts";
 import { agentProblems, type Candidate, chooseAgent, factsOf, moneyStop, presetOf, runtimeIds, runtimeLabel, sessionOptions } from "./presets.ts";
-import { inCny, price, type Rate } from "./price.ts";
+import { inCny, price, type Rate, spending } from "./price.ts";
 import { quotaOf } from "./quota.ts";
-import { spending } from "./spending.ts";
-import { dbTodoStores } from "./todoStore.ts";
-import { vibevalleyRuntimeOf } from "./vibevalley.ts";
+import { dbTodoStores, vibevalleyRuntimeOf } from "./vibevalley.ts";
 
 /** Past this a probe counts as unknown. */
 const probeTimeoutMs = 10_000;

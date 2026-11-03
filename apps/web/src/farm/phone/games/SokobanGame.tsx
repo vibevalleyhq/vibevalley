@@ -6,7 +6,7 @@ import { For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 
 import { lcd } from "@/farm/phone/lcd";
-import { kept, usePad } from "@/farm/support";
+import { kept, usePad } from "@/farm/phone/pad";
 import { playSound } from "@/ui/pixel/sound";
 
 import { moveWarehouse, newWarehouse, undoWarehouse, warehouseDone, warehouses } from "./sokoban";

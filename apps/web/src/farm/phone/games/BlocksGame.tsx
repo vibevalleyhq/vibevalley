@@ -6,7 +6,7 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 
 import { lcd } from "@/farm/phone/lcd";
-import { kept, usePad, useTicks } from "@/farm/support";
+import { kept, usePad, useTicks } from "@/farm/phone/pad";
 import { playSound } from "@/ui/pixel/sound";
 
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";

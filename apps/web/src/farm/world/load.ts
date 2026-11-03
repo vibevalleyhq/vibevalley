@@ -1,5 +1,8 @@
 // The level and the atlas, fetched once per page (public/village.ldtk, public/pixel).
 
+import { type Accessor, createSignal, onSettled } from "solid-js";
+
+import { messageOf } from "@/base/format";
 import { loadAtlas, type SpriteAtlas } from "@/ui/pixel/atlas";
 
 import { Level } from "./level";
@@ -19,7 +22,7 @@ const text = async (url: string) => {
 };
 
 /** A failed load is tried again on the next call. */
-export function loadVillage(): Promise<Village> {
+function loadVillage(): Promise<Village> {
   loading ??= Promise.all([text("/village.ldtk"), loadAtlas()]).then(
     ([ldtk, atlas]) => ({ world: new VillageWorld(Level.parse(ldtk)), atlas }),
     (e: unknown) => {
@@ -28,4 +31,20 @@ export function loadVillage(): Promise<Village> {
     },
   );
   return loading;
+}
+
+/** The level and the atlas: undefined while loading; `error` when they could not be loaded. */
+export function useVillage(): Accessor<{ village?: Village; error?: string }> {
+  const [got, setGot] = createSignal<{ village?: Village; error?: string }>({});
+  onSettled(() => {
+    let live = true;
+    loadVillage().then(
+      (village) => live && setGot({ village }),
+      (e: unknown) => live && setGot({ error: messageOf(e) }),
+    );
+    return () => {
+      live = false;
+    };
+  });
+  return got;
 }

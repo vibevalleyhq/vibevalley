@@ -13,7 +13,7 @@ import { CursorManifest } from "@/base/manifests";
 import { clickBed, openPlace } from "@/farm/commands";
 import { commands, farmFrameOf } from "@/farm/frames";
 import { farm, farmProject, farmState, subscribeFarm } from "@/farm/store";
-import { useVillage } from "@/farm/support";
+import { useVillage } from "@/farm/world/load";
 import { yardPlace } from "@/farm/world/places";
 import { beds } from "@/farm/world/plots";
 import { textureProgress } from "@/farm/world/textures";

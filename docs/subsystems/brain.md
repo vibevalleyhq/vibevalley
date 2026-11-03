@@ -11,7 +11,7 @@ VibeValley 自己的 agent（代码里是 `Brain`）是农场里唯一一个从�
 | 对话文件、提示的开头、压缩、接着做被打断的一轮 | 一轮记成 Run 和日志、话写进哪个频道（`session/host.ts` 的 `AgentHost`，[帮工](docs/subsystems/session.md)） |
 | 自己带的工具：技能、记性、旧账、帮手、提醒、自己的任务、编码工具、MCP 客户端 | 农场的工具（派活、工单、频道……，`tool`，[管家](docs/subsystems/orchestrator.md)） |
 | 记性文件 `MEMORY.md` 和旧账 `archive/` 的读写 | 帮工档案的记性、外面的记性来源（[记性](docs/subsystems/memory.md)） |
-| | 包成 oar 的农机 `vibevalley`（server 的 `runtime/vibevalley.ts`）、`/v1/chat/completions`（`orchestrator/openai.ts`）、自己的任务存进库（`runtime/todoStore.ts`）、给主人看的话；农机的探测、额度、花费（[档案和农机](docs/subsystems/agent.md)、[帮工](docs/subsystems/session.md)） |
+| | 包成 oar 的农机 `vibevalley`（server 的 `runtime/vibevalley.ts`）、`/v1/chat/completions`（`orchestrator/openai.ts`）、自己的任务存进库（`runtime/vibevalley.ts`）、给主人看的话；农机的探测、额度、花费（[档案和农机](docs/subsystems/agent.md)、[帮工](docs/subsystems/session.md)） |
 
 ## 在哪
 

@@ -3,8 +3,9 @@
 The pixel farm at `/`. It is full-bleed, outside the workbench's shell; its 工作台 link goes to `/issues`, and the
 shell's 农场 link comes back. The farm is the server's (`useFrames()`, `useCore()` in `src/infra/frame.ts`); this folder
 only draws it and keeps the page's own state. Its Solid side reads the framework-free modules here through `ui.ts` and `frames.ts`
-(`useFarm`, `timeOfDay`, `commands`; the frames as they came are `infra/frame.ts`'s `rawFrame`) and `support.ts` (the village, the keys, the phone's calls, the sounds,
-the pad).
+(`useFarm`, `timeOfDay`, `commands`; the frames as they came are `infra/frame.ts`'s `rawFrame`) and the wiring in
+`world/load.ts` (the village), `tools.ts` (the keys), `phone/calls.ts` and `phone/pad.ts` (the phone's calls, the pad), and
+`cues.ts` (the sounds).
 
 ## Its parts
 
@@ -92,7 +93,7 @@ the API and then plays the bed's effect. Parent and child issues use the workben
 
 ## Pieces to build with
 
-- `world/`: `loadVillage()`, and `useVillage()` in `support.ts` (the level and the atlas, fetched once; the atlas alone is
+- `world/`: `loadVillage()`, and `useVillage()` in the same file (the level and the atlas, fetched once; the atlas alone is
   `ui/pixel/atlas.ts`'s `loadAtlas`); `VillageWorld` (plots, places,
   props, gate, queue, lawn, lights, fx boxes, `nav`, `goalOf`, `poseOf`, `spotsFor`, `Whereabouts`); `plots.ts` (beds, `cropOfBed`, `sessionAtStation`, `cropLabel`); `places.ts` (the
   yard places and `FarmPanel`); `hits.ts` (`villageHitAt`, the click order); `textures.ts` (`loadTextures`, `texture`: Pixi textures at the
@@ -100,8 +101,7 @@ the API and then plays the bed's effect. Parent and child issues use the workben
 - `src/ui/pixel`, shared with the other skins and the workbench's pixel pages: the pixel components for the DOM over
   the canvas (its `index.ts`); `atlas.ts` (`SpriteAtlas`: sizes and anchors in art pixels, `density` 2, `spriteUrl`;
   `loadAtlas`, `useAtlas`); `sound.ts` (`playSound(name)`, `isMuted`/`setMuted`, the sounds' recipes).
-- `cues.ts`: `farmCues` (what plays when the farm changes) and `inTurn`; `muted()` and `farmSounds(...)` (FarmPage runs it)
-  in `support.ts`.
+- `cues.ts`: `farmCues` (what plays when the farm changes) and `inTurn`; `muted()` and `farmSounds(...)` (FarmPage runs it).
 - `labels.ts`: the farm's own words for an issue's acts (completing is a harvest).
 - `tools.ts`: `Tool`, `tools`, `aimTool`, `farmKey`, `managerSprite`.
 - `@vibevalley/engine`: `/pixi` (`pixelStage` with `frame`, `Walker`, `frameAt`, particles, critters, light, sky),

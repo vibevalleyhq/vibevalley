@@ -8,7 +8,6 @@ import { t } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
 
 import { aria } from "@/base/dom";
-import { phoneState } from "@/farm/support";
 import { type CallPhase, createCall, voiceCall } from "@/features/voice";
 import { useAgent } from "@/infra/agents";
 import { useCore } from "@/infra/frame";
@@ -16,7 +15,7 @@ import { AgentFace, OrchestratorFace } from "@/ui/Face";
 import { SpriteIcon } from "@/ui/pixel";
 import type { GlyphCell } from "@/ui/pixel/card";
 
-import { missedOf } from "./calls";
+import { missedOf, phoneState } from "./calls";
 import { phoneCells } from "./cells";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";

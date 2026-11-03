@@ -22,8 +22,8 @@ import { tookText, wallClockText } from "@/base/format";
 import { playBedFx } from "@/farm/commands";
 import { tint } from "@/farm/panels/rows";
 import { farm, overlayOf } from "@/farm/store";
-import { useVillage } from "@/farm/support";
 import { farmActWords, useFarm } from "@/farm/ui";
+import { useVillage } from "@/farm/world/load";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "@/farm/world/plots";
 import { issueThreadOf } from "@/features/channel";
 import {

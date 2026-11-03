@@ -11,15 +11,16 @@ import { createCall } from "@/features/voice";
 import { FramesContext, useFrames } from "@/infra/frame";
 
 import { VillageCanvas } from "./canvas/VillageCanvas";
-import { type FarmSoundInput } from "./cues";
+import { type FarmSoundInput, farmSounds } from "./cues";
 import { DebugPanel } from "./debug/DebugPanel";
 import { createFarmFrames, rawFarmFrame } from "./frames";
 import { Hud } from "./hud/Hud";
 import { IssueView } from "./issue/IssueView";
 import { Panels } from "./panels/Panels";
+import { feedPhoneCalls } from "./phone/calls";
 import { farm } from "./store";
-import { farmKeys, farmSounds, feedPhoneCalls } from "./support";
 import { TitleScreen } from "./title/TitleScreen";
+import { farmKeys } from "./tools";
 import { useFarm } from "./ui";
 
 /** `project`: whose farm ("" for the sessions without a project). */

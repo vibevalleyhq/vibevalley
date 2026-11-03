@@ -11,8 +11,8 @@ import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol
 
 import { aria, Keyed } from "@/base/dom";
 import { farm, type FarmOverlay, type FarmPanel } from "@/farm/store";
-import { useVillage } from "@/farm/support";
 import { useFarm } from "@/farm/ui";
+import { useVillage } from "@/farm/world/load";
 import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "@/features/orchestrator";
 import { orchestratorLookOf } from "@/infra/agents";
 import { api } from "@/infra/api";

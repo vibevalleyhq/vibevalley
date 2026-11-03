@@ -1,26 +1,33 @@
 // VibeValley's own agent as an oar runtime, built on oar's runtime-author SPI the way oar's scripted runtime is: one turn
-// is one run of the agent until it settles.
+// is one run of the agent until it settles. Its own todos (packages/agent todo.ts) are kept in the farm's database, table
+// runtime_todo, one open graph per keeper (a session of this runtime).
 
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
-import { Effect, Exit, Fiber, Scope, Stream } from "effect";
+import { Clock, Effect, Exit, Fiber, Schema, Scope, Stream } from "effect";
 
 import { type BrainEvent, makeBrain } from "@vibevalley/agent/brain";
 import { codingTools } from "@vibevalley/agent/coding";
+import { toolFailed } from "@vibevalley/agent/core/errors";
 import type { McpServer } from "@vibevalley/agent/mcp";
 import { messageText, userMessage } from "@vibevalley/agent/messages";
+import { finished, type Todo } from "@vibevalley/agent/todo";
 import type { TodoStore } from "@vibevalley/agent/todoStore";
 import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import { models } from "@vibevalley/ai/models";
 import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
+import { newId } from "@/base/ids.ts";
+import { jsonOrNone } from "@/base/json.ts";
 import { messageOf } from "@/errors.ts";
+import { Db } from "@/infra/db.ts";
 import type { Time } from "@/infra/time.ts";
 
+import * as q from "../../db/generated/runtime_todo.sql.ts";
 import { helperInstructions } from "./prompts.ts";
 
 const vibevalleyRuntime = "vibevalley";
@@ -295,3 +302,58 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
   });
   return runtime;
 }
+
+const afterOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
+const fromRow = (r: q.OpenTodosResult): Todo => ({
+  id: r.id,
+  title: r.title,
+  brief: r.brief,
+  after: afterOf(r.after) ?? [],
+  by: r.executor,
+  state: r.state,
+  ...(r.result ? { result: r.result } : {}),
+  ...(r.tries !== 0 ? { tries: r.tries } : {}),
+});
+
+/** A finished graph stays, stamped finished_at: putting it away only empties the keeper's open graph. */
+export const dbTodoStores: Effect.Effect<(keeper: string) => TodoStore, never, Db> = Effect.gen(function* () {
+  const db = yield* Db;
+  return (keeper) => ({
+    load: Effect.map(db.run(q.openTodos({ keeper })), (rows) => rows.map(fromRow)),
+    change: <G extends Todo[] | undefined>(f: (g: Todo[]) => G) =>
+      db.inTx(
+        Effect.gen(function* () {
+          const rows = yield* db.run(q.openTodos({ keeper }));
+          const g = yield* Effect.try({ try: () => f(rows.map(fromRow)), catch: toolFailed });
+          if (g === undefined) return g;
+          // The graph keeps its id while it is open; a new one starts when the keeper had none.
+          const graph = rows[0]?.graph ?? newId();
+          yield* db.run(q.clearOpenTodos({ keeper }));
+          const at = yield* Clock.currentTimeMillis;
+          yield* Effect.forEach(
+            g.entries(),
+            ([position, todo]) =>
+              db.run(
+                q.addTodo({
+                  graph,
+                  keeper,
+                  id: todo.id,
+                  position,
+                  title: todo.title,
+                  brief: todo.brief,
+                  after: JSON.stringify(todo.after),
+                  executor: todo.by,
+                  state: todo.state,
+                  result: todo.result ?? "",
+                  tries: todo.tries ?? 0,
+                  updated_at: at,
+                }),
+              ),
+            { discard: true },
+          );
+          if (finished(g)) yield* db.run(q.finishTodos({ finished_at: at, keeper }));
+          return g;
+        }),
+      ),
+  });
+});

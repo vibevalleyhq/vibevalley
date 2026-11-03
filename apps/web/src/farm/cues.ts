@@ -1,6 +1,8 @@
+import { type Accessor, createEffect, onSettled } from "solid-js";
+
 import type { GameEffect, Issue, Session } from "@vibevalley/protocol";
 
-import { playSound, type SoundName } from "@/ui/pixel/sound";
+import { isMuted, playSound, setMuted, type SoundName, unlockSound } from "@/ui/pixel/sound";
 
 import type { BedFxKind } from "./tools";
 const BED_SOUND = { water: "water", spray: "spray", harvest: "harvest", shovel: "shovel", note: "nope" } as const satisfies Record<BedFxKind, SoundName>;
@@ -86,11 +88,33 @@ export function farmCues(prev: FarmSoundInput, next: FarmSoundInput): Cue[] {
 // one before, then holds the floor.
 let floorFree = 0;
 
-export function inTurn(name: SoundName, hold: number) {
+function inTurn(name: SoundName, hold: number) {
   const now = Date.now();
   const at = Math.max(now, floorFree);
   floorFree = at + hold;
   if (at === now) playSound(name);
   // oxlint-disable-next-line vibevalley/dropped-timer -- a cue waits its turn for at most a moment, and plays once whatever is shown then
   else setTimeout(() => playSound(name), at - now);
+}
+
+/** Whether the sounds are off, kept on this machine and followed across tabs. */
+export const muted = (): [Accessor<boolean>, (on: boolean) => void] => [isMuted, setMuted];
+
+/** Plays what changed between one input and the next (ui/pixel/sound.ts farmCues); the first input is the farm as it was. */
+export function farmSounds(input: Accessor<FarmSoundInput>) {
+  createEffect(input, (next, before) => {
+    if (before === undefined || before === next) return;
+    for (const cue of farmCues(before, next)) {
+      if (cue.hold === undefined) playSound(cue.name);
+      else inTurn(cue.name, cue.hold);
+    }
+  });
+  onSettled(() => {
+    window.addEventListener("pointerdown", unlockSound, { once: true });
+    window.addEventListener("keydown", unlockSound, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockSound);
+      window.removeEventListener("keydown", unlockSound);
+    };
+  });
 }
