@@ -20,7 +20,7 @@ const Presets = Schema.Struct({
   defaultSettings: S.RuntimeSettings,
   fallbackPreset: S.RuntimePreset,
   runtimePresets: Schema.Array(S.RuntimePreset),
-  runtimeFacts: Schema.Record(Schema.String, S.RuntimeFacts),
+  runtimeSupport: Schema.Record(Schema.String, S.RuntimeSupport),
   runtimeIds: Schema.Array(Schema.String),
 });
 const presets = localizedJson(Presets, presetsZh, presetsEn);
@@ -39,9 +39,9 @@ export function presetOf(runtime: string): T.RuntimePreset {
 export const runtimeLabel = (runtime: string) => presetOf(runtime).label;
 
 /** What the farm knows a runtime takes before probing it: for one it has no word on, nothing beyond a prompt. */
-export function factsOf(runtime: string): T.RuntimeFacts {
-  const facts = presets().runtimeFacts[runtime];
-  return facts ? structuredClone(facts) : { steer: false, refused: {}, capabilities: [], inProcess: false };
+export function supportOf(runtime: string): T.RuntimeSupport {
+  const support = presets().runtimeSupport[runtime];
+  return support ? structuredClone(support) : { steer: false, refused: {}, capabilities: [], inProcess: false };
 }
 
 const two = (n: number) => String(n).padStart(2, "0");
@@ -85,9 +85,9 @@ export function sessionOptions(agent: T.Agent, settings: T.RuntimeSettings | und
   };
   const problems: T.AgentProblem[] = [];
   const add = (field: string, level: T.AgentProblemLevel, text: string) => problems.push({ field, level, text });
-  // The probed facts; seeds.json's for a runtime not probed.
-  const facts = runtime?.facts.refused ? runtime.facts : factsOf(agent.runtime);
-  const refused = facts.refused;
+  // What the probe found it supports; seeds.json's for a runtime not probed.
+  const support = runtime?.support.refused ? runtime.support : supportOf(agent.runtime);
+  const refused = support.refused;
   const promptOption = agent.personaMode === "append" ? sessionAppendSystemPrompt : agent.personaMode === "replace" ? sessionSystemPrompt : "";
   if (!blank(agent.persona) && promptOption && refused[promptOption]) add("persona", "error", t("server.runtime.persona", { refused: refused[promptOption] }));
   if (options.effort && refused[sessionEffort]) add("effort", "error", refused[sessionEffort]);

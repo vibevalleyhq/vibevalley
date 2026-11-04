@@ -38,8 +38,9 @@ update memory set terms = sqlc.arg(terms), terms_of = sqlc.arg(version) where id
 
 -- name: MatchMemories :many
 -- bound: one agent's current memories that share a word.
--- How well each of an agent's memories shares any of words, higher for a better match. The words go in as lexemes as
--- they are, quoted, so none reads as an operator.
-select id, ts_rank(terms_vector, query)::float8 as score
-from memory, (select array_to_string(array(select quote_literal(w) from unnest(sqlc.arg(words)::text[]) as w), ' | ')::tsquery as query) as q
-where terms_vector @@ query and agent = sqlc.arg(agent) and replaced_by is null;
+-- How well each of an agent's memories shares any of words, higher for a better match (FTS5's bm25, which is lower for a
+-- better one). The words go in as phrases, quoted, so none reads as an operator.
+select memory.id, (-bm25(memory_term))::real as score
+from memory_term join memory on memory.rowid = memory_term.rowid
+where memory_term match (select group_concat('"' || replace(value, '"', '""') || '"', ' OR ') from json_each(sqlc.arg(words)::text[]))
+  and memory.agent = sqlc.arg(agent) and memory.replaced_by is null;

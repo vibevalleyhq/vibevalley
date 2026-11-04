@@ -12,7 +12,7 @@
 ## 在哪
 
 - `apps/server/src/mailbox/`：`mailbox.ts` 是服务，`routing.ts` 是“谁该听到”与四档紧急度，`brakes.ts`/`deliveries.ts` 是三道刹车和投递状态，`work.ts` 是工单蓄水池与投递写入，`payload.ts` 是触发记录与载荷读写，`pump.ts` 是叫醒循环。
-- 表 `mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`；同一批收件人的投递与路由回执在同一事务里写。
+- 表 `mailbox_trigger`（每条输入的 Trigger 和载荷，以及它的路由回执：所有来源的都记在这里，Ingress、频道、定时、工单经 `mailbox/payload.ts` 写）、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`；同一批收件人的投递与路由回执在同一事务里写。
 
 ## 模型和不变量
 
@@ -33,7 +33,7 @@
 ## 和谁打交道
 
 - 依赖 Session（投递、叫醒、流）、Agent（档案）、Core（事实与投影）与数据库；不 import Channel 或 Issue 服务。
-- 频道和工单只开放具名读取：默认频道、频道管家、未读摘要与工单存在性；频道管家的线程继承和私聊选择在 Channel 的查询中解释。`modules.test.ts` 限定这些查询，Mailbox 不导入它们的整份查询模块，也不写它们的表。Trigger 与投递回执的事务写入归 Mailbox。
+- 频道和工单只开放具名读取：默认频道、频道管家、未读摘要与工单存在性；频道管家的线程继承和私聊选择在 Channel 的查询中解释。`modules.test.ts` 的 `foreignReads` 限定这些查询，Mailbox 不导入它们的整份查询模块，也不写它们的表。Trigger 与投递回执的事务写入归 Mailbox。
 - Channel、Issue、Cron 直接调用 `receive`；管家订阅 `forOrchestrator`。投递前刷新工单投影，Session 结束派生出的 reviewing 门禁立即生效。
 
 ## 为什么这样

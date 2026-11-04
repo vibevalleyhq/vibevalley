@@ -12,7 +12,7 @@ import { wireJson } from "@/base/json.ts";
 import { bounded, Core } from "@/core/core.ts";
 
 /** Each stream's Schema: what readStream (packages/protocol/src/stream.ts) takes its payloads to be. */
-const schemas = { [statePath]: S.StateFrame, [eventsPath]: S.SideEvent, [livePath]: S.LiveEvent } satisfies {
+const schemas = { [statePath]: S.StateFrame, [eventsPath]: S.ServerEvent, [livePath]: S.LiveEvent } satisfies {
   [P in keyof Streams]: Schema.Codec<Streams[P], unknown>;
 };
 

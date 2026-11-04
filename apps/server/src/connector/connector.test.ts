@@ -216,7 +216,7 @@ describe("the chat apps", () => {
       expect(yield* saidIn(chat.defaultChannel())).toEqual(["帮我看看打卡页"]);
       const sql = yield* SqlClient.SqlClient;
       expect(
-        yield* sql<{ source: string; meta: string | null }>`select d.source::text, m.meta from mailbox_delivery d
+        yield* sql<{ source: string; meta: string | null }>`select d.source, m.meta from mailbox_delivery d
           join channel_message m on m.id = d.message_id where m.body = '帮我看看打卡页'`,
       ).toEqual([{ source: "connector", meta: `{"ingressSource":"connector"}` }]);
       expect(yield* Effect.promise(yield* statusOf("weixin"))).toMatchObject({
@@ -262,7 +262,7 @@ describe("the chat apps", () => {
       yield* chat.markRead(channel, message!.number);
       yield* waitFor(Effect.promise(yield* statusOf("weixin")), (status) => status.pending === 0, "the seen handoff withdrawn");
       const sql = yield* SqlClient.SqlClient;
-      expect(yield* sql<{ state: string }>`select state::text from connector_outbox where message_id = ${message!.id}`).toEqual([{ state: "dropped" }]);
+      expect(yield* sql<{ state: string }>`select state from connector_outbox where message_id = ${message!.id}`).toEqual([{ state: "dropped" }]);
       expect(script.sent).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(farm(script, testConfig(), { retryFirstMs: 10_000 })));
   });
@@ -657,9 +657,9 @@ describe("the chat apps", () => {
     return Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       yield* weixinConnected(script);
-      yield* sql.unsafe(`create function fail_pause() returns trigger language plpgsql as $$ begin raise exception 'pause failure'; end $$`).pipe(Effect.orDie);
+      yield* sql.unsafe(`select 1`).pipe(Effect.orDie);
       yield* sql
-        .unsafe(`create trigger fail_pause before update of paused_until on connector_account for each row execute function fail_pause()`)
+        .unsafe(`create trigger fail_pause before update of paused_until on connector_account for each row begin select raise(abort, 'pause failure'); end`)
         .pipe(Effect.orDie);
       script.updates = () =>
         Effect.sync(() => {
@@ -670,7 +670,7 @@ describe("the chat apps", () => {
       yield* until(() => polls === 1, "the first stale poll");
       yield* TestClock.adjust(29_999);
       expect(polls).toBe(1);
-      yield* sql.unsafe("drop trigger fail_pause on connector_account").pipe(Effect.orDie);
+      yield* sql.unsafe("drop trigger fail_pause").pipe(Effect.orDie);
       yield* TestClock.adjust(1);
       yield* until(() => polls >= 2, "polling after the backoff");
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
@@ -685,11 +685,13 @@ describe("the chat apps", () => {
       const sql = yield* SqlClient.SqlClient;
       yield* c.login("qq", { appId: "102", secret: "right" });
       yield* reaches("qq", "pairing");
-      yield* Effect.orDie(sql.unsafe(`create function fail_outbox() returns trigger language plpgsql as $$ begin raise exception 'disk failure'; end $$`));
-      yield* Effect.orDie(sql.unsafe(`create trigger fail_outbox before update on connector_outbox for each row execute function fail_outbox()`));
+      yield* Effect.orDie(sql.unsafe(`select 1`));
+      yield* Effect.orDie(
+        sql.unsafe(`create trigger fail_outbox before update on connector_outbox for each row begin select raise(abort, 'disk failure'); end`),
+      );
       const { message } = yield* chat.say("pending", undefined, "");
       yield* Effect.orDie(
-        sql.unsafe(`insert into connector_outbox (id, connector, message_id, body, created_at) values ('pending-test', 'qq', $1, 'pending', 1)`, [message.id]),
+        sql.unsafe(`insert into connector_outbox (id, connector, message_id, body, created_at) values ('pending-test', 'qq', ?, 'pending', 1)`, [message.id]),
       );
       const status: ConnectorStatus = yield* c.logout("qq");
       expect(status.state).toBe("pairing");

@@ -83,6 +83,7 @@ export const catalogs = {
         graph: "列出计划，找它的 id",
         memories: "列出它的记性，找那一条的 id",
         artifact: "列出产出，找它的 id",
+        pkm: "列出笔记页，找它的名字",
       },
       projectRef: "项目 {id}",
       helperRef: "帮工 {id}",
@@ -661,6 +662,23 @@ export const catalogs = {
       noKey: "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。",
       cannotStart: "我这边起不来：{why}",
       onlyDeepseek: "管家只接 DeepSeek 的模型：管家档案的模型设成 deepseek/<模型> 或直接写模型名，{configured} 用不了",
+    },
+    "server.pkm": {
+      noPage: "没有「{page}」这一页",
+      noBlock: "这一页上没有块 {id}",
+      noComment: "没有这条评论：{id}",
+      noTitle: "页面要有标题",
+      noText: "要记的话是空的",
+      noRename: "「{from}」和「{to}」都不是已有的页面",
+      sameName: "新旧名字是同一个",
+      circular: "[循环引用：{id}]",
+      brokenRef: "[失效的块引用：{id}]",
+      summary: "> **摘要**：{tldr}",
+      kept: "改写时保留了全部链接",
+      clipHeading: "## 核心论点与金句摘录",
+      clusterHeading: "## {topic}：聚到一起的素材",
+      clusterLine: "来自 [[{title}]]：(({id}))",
+      clusterTldr: "围绕 {topic} 聚到一起的 {count} 条素材",
     },
     "server.project": {
       parentBranchChanged: "父工单工作目录已切换分支，不能自动合入",
@@ -2727,6 +2745,43 @@ export const catalogs = {
           "它收到的话、调的每个工具（点一行看参数和结果）、它说的话。新的在下面，一直留着最近的 1000 步。哪一轮做错了，在它收到的话上点「这一轮做错了」，写一句应该怎样，存成一条评测。",
       },
     },
+    "web.pkm": {
+      place: { label: "笔记", hint: "你自己的笔记：PARA 分好的大纲页、每天的日记、反链和润色建议" },
+      tier: { project: "项目", area: "领域", resource: "资源", inbox: "收件箱", journal: "日记", archive: "归档" },
+      list: {
+        label: "全部笔记页",
+        capture: "记一句，进今天的日记",
+        captured: "记进了今天的日记",
+        find: "搜笔记",
+        nothingFound: "没有找到",
+        open: "{n} 项没做完",
+        radar: "收件箱 {inbox} · 搁着的项目 {stale} · 过期 {overdue}",
+        all: "全部笔记",
+      },
+      empty: "笔记还空着。这些页面就是 {root} 里的 Markdown 文件；在左边记一句，就有了今天的日记。",
+      gone: "没有这一页，或者它的文件已经删掉了。",
+      pick: "从左边挑一页看",
+      page: {
+        more: "更多",
+        export: "导出成 Markdown（复制）",
+        exported: "复制好了",
+        undo: "撤销上一次改动",
+        undone: "撤销了：{what}",
+        nothingToUndo: "没有可以撤销的改动",
+        tier: "放在哪",
+        moved: "挪到了{tier}",
+        file: "文件 {file}",
+        append: "加一块",
+        collapse: "收起",
+        expand: "展开",
+        edit: "改这一块",
+        marker: "切换状态",
+        empty: "空的",
+        missingRef: "找不到这一块",
+      },
+      backlinks: { title: "链到这里的", none: "还没有别的页链到这里", projects: "项目", journals: "日记", areas: "领域和资源", archives: "归档" },
+      comments: { title: "评论和润色建议", accept: "采纳", reject: "不要", on: "关于「{span}」", accepted: "采纳了", rejected: "不要了" },
+    },
     "web.project": {
       title: "项目",
       list: "项目列表",
@@ -3474,6 +3529,7 @@ export const catalogs = {
         graph: "List the plans and find its id",
         memories: "List its memories and find that one's id",
         artifact: "List the artifacts to find its id",
+        pkm: "List the notes’ pages to find its name",
       },
       projectRef: "project {id}",
       helperRef: "helper {id}",
@@ -4064,6 +4120,23 @@ export const catalogs = {
       cannotStart: "I can't start on my side: {why}",
       onlyDeepseek:
         "The manager runs only on DeepSeek models: set the manager profile's model to deepseek/<model> or just the model's name; {configured} cannot be used",
+    },
+    "server.pkm": {
+      noPage: "There is no page “{page}”",
+      noBlock: "This page has no block {id}",
+      noComment: "There is no comment {id}",
+      noTitle: "A page needs a title",
+      noText: "There is nothing to capture",
+      noRename: "Neither “{from}” nor “{to}” is a page",
+      sameName: "The old and new names are the same",
+      circular: "[circular ref: {id}]",
+      brokenRef: "[missing block: {id}]",
+      summary: "> **Summary**: {tldr}",
+      kept: "Rewritten with every link kept",
+      clipHeading: "## Key points and quotes",
+      clusterHeading: "## {topic}: sources gathered",
+      clusterLine: "From [[{title}]]: (({id}))",
+      clusterTldr: "{count} sources gathered on {topic}",
     },
     "server.project": {
       parentBranchChanged: "The parent worktree changed branches; the child cannot be merged automatically",
@@ -6258,6 +6331,50 @@ export const catalogs = {
           'What it heard, every tool it called (click a row for the arguments and the result), what it said. Newest at the bottom; the last 1000 steps are kept. When a round went wrong, click "This round went wrong" on what it heard, write what it should have done, and it is kept as an eval.',
       },
     },
+    "web.pkm": {
+      place: { label: "Notes", hint: "Your own notes: outline pages sorted by PARA, daily journals, backlinks and suggested rewrites" },
+      tier: { project: "Projects", area: "Areas", resource: "Resources", inbox: "Inbox", journal: "Journals", archive: "Archive" },
+      list: {
+        label: "All note pages",
+        capture: "Jot a line into today's journal",
+        captured: "Added to today's journal",
+        find: "Search notes",
+        nothingFound: "Nothing found",
+        open: "{n} open",
+        radar: "Inbox {inbox} · stale projects {stale} · overdue {overdue}",
+        all: "All notes",
+      },
+      empty: "No notes yet. The pages are the Markdown files in {root}; jot a line on the left to start today's journal.",
+      gone: "There is no such page, or its file was deleted.",
+      pick: "Pick a page on the left",
+      page: {
+        more: "More",
+        export: "Export as Markdown (copy)",
+        exported: "Copied",
+        undo: "Undo the last change",
+        undone: "Undone: {what}",
+        nothingToUndo: "Nothing to undo",
+        tier: "Where it sits",
+        moved: "Moved to {tier}",
+        file: "File {file}",
+        append: "Add a block",
+        collapse: "Collapse",
+        expand: "Expand",
+        edit: "Edit this block",
+        marker: "Change its state",
+        empty: "Empty",
+        missingRef: "Block not found",
+      },
+      backlinks: {
+        title: "Linked here",
+        none: "No other page links here yet",
+        projects: "Projects",
+        journals: "Journals",
+        areas: "Areas and resources",
+        archives: "Archive",
+      },
+      comments: { title: "Comments and suggested rewrites", accept: "Accept", reject: "Reject", on: "On “{span}”", accepted: "Accepted", rejected: "Rejected" },
+    },
     "web.project": {
       title: "Projects",
       list: "Projects",
@@ -7546,6 +7663,7 @@ export interface Messages {
   "server.lookIn.graph": undefined;
   "server.lookIn.issue": undefined;
   "server.lookIn.memories": undefined;
+  "server.lookIn.pkm": undefined;
   "server.lookIn.project": undefined;
   "server.lookIn.runtime": undefined;
   "server.lookIn.session": undefined;
@@ -7578,6 +7696,21 @@ export interface Messages {
   "server.orchestrator.label": undefined;
   "server.orchestrator.noKey": undefined;
   "server.orchestrator.onlyDeepseek": { readonly configured: string | number };
+  "server.pkm.brokenRef": { readonly id: string | number };
+  "server.pkm.circular": { readonly id: string | number };
+  "server.pkm.clipHeading": undefined;
+  "server.pkm.clusterHeading": { readonly topic: string | number };
+  "server.pkm.clusterLine": { readonly id: string | number; readonly title: string | number };
+  "server.pkm.clusterTldr": { readonly count: string | number; readonly topic: string | number };
+  "server.pkm.kept": undefined;
+  "server.pkm.noBlock": { readonly id: string | number };
+  "server.pkm.noComment": { readonly id: string | number };
+  "server.pkm.noPage": { readonly page: string | number };
+  "server.pkm.noRename": { readonly from: string | number; readonly to: string | number };
+  "server.pkm.noText": undefined;
+  "server.pkm.noTitle": undefined;
+  "server.pkm.sameName": undefined;
+  "server.pkm.summary": { readonly tldr: string | number };
   "server.project.badGithub": undefined;
   "server.project.badName": undefined;
   "server.project.branchLeft": { readonly branch: string | number; readonly why: string | number };
@@ -9718,6 +9851,53 @@ export interface Messages {
   "web.orchestrator.pet.bluecat": undefined;
   "web.orchestrator.pet.dog": undefined;
   "web.orchestrator.pet.ragdoll": undefined;
+  "web.pkm.backlinks.archives": undefined;
+  "web.pkm.backlinks.areas": undefined;
+  "web.pkm.backlinks.journals": undefined;
+  "web.pkm.backlinks.none": undefined;
+  "web.pkm.backlinks.projects": undefined;
+  "web.pkm.backlinks.title": undefined;
+  "web.pkm.comments.accept": undefined;
+  "web.pkm.comments.accepted": undefined;
+  "web.pkm.comments.on": { readonly span: string | number };
+  "web.pkm.comments.reject": undefined;
+  "web.pkm.comments.rejected": undefined;
+  "web.pkm.comments.title": undefined;
+  "web.pkm.empty": { readonly root: string | number };
+  "web.pkm.gone": undefined;
+  "web.pkm.list.all": undefined;
+  "web.pkm.list.capture": undefined;
+  "web.pkm.list.captured": undefined;
+  "web.pkm.list.find": undefined;
+  "web.pkm.list.label": undefined;
+  "web.pkm.list.nothingFound": undefined;
+  "web.pkm.list.open": { readonly n: string | number };
+  "web.pkm.list.radar": { readonly inbox: string | number; readonly overdue: string | number; readonly stale: string | number };
+  "web.pkm.page.append": undefined;
+  "web.pkm.page.collapse": undefined;
+  "web.pkm.page.edit": undefined;
+  "web.pkm.page.empty": undefined;
+  "web.pkm.page.expand": undefined;
+  "web.pkm.page.export": undefined;
+  "web.pkm.page.exported": undefined;
+  "web.pkm.page.file": { readonly file: string | number };
+  "web.pkm.page.marker": undefined;
+  "web.pkm.page.missingRef": undefined;
+  "web.pkm.page.more": undefined;
+  "web.pkm.page.moved": { readonly tier: string | number };
+  "web.pkm.page.nothingToUndo": undefined;
+  "web.pkm.page.tier": undefined;
+  "web.pkm.page.undo": undefined;
+  "web.pkm.page.undone": { readonly what: string | number };
+  "web.pkm.pick": undefined;
+  "web.pkm.place.hint": undefined;
+  "web.pkm.place.label": undefined;
+  "web.pkm.tier.archive": undefined;
+  "web.pkm.tier.area": undefined;
+  "web.pkm.tier.inbox": undefined;
+  "web.pkm.tier.journal": undefined;
+  "web.pkm.tier.project": undefined;
+  "web.pkm.tier.resource": undefined;
   "web.project.add": undefined;
   "web.project.all": undefined;
   "web.project.allLine": undefined;

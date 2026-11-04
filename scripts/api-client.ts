@@ -1,10 +1,10 @@
-// Writes packages/protocol/src/client.ts, the HTTP client (VibeValleyApi), from packages/protocol/src/api.ts: each
-// method's arguments, answer and doc comment from the Handlers interface, its method, path, query and body from
-// `endpoints`. Generated rather than read from `endpoints` at run time: the page would then load effect's Schema for every
+// Writes packages/protocol/src/client.ts, the HTTP client (VibeValleyApi), from the endpoint table: each method's
+// arguments, answer and doc comment from its concept's Handlers interface (src/<concept>/api.ts), its method, path, query
+// and body from `endpoints`. Generated rather than read from `endpoints` at run time: the page would then load effect's Schema for every
 // endpoint. --check fails when the file is not what api.ts says (docs:verify runs it).
 
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { endpoints, pathOf } from "../packages/protocol/src/api.ts";
@@ -12,11 +12,11 @@ import { endpoints, pathOf } from "../packages/protocol/src/api.ts";
 const protocol = join(import.meta.dirname, "..", "packages/protocol/src");
 const out = join(protocol, "client.ts");
 
-/** Handlers' members as written: "group.name" → its argument list, its answer type and its doc comment. */
-function handlers(source: string) {
-  const start = source.indexOf("export interface Handlers<R = never> {");
+/** A concept's Handlers members as written: "group.name" → its argument list, its answer type and its doc comment. */
+function handlers(source: string, found: Map<string, { args: string; result: string; doc: string }>) {
+  const start = source.search(/export interface \w+Handlers<R = never> \{/u);
+  if (start < 0) return found;
   const body = source.slice(source.indexOf("\n", start) + 1, source.indexOf("\n}\n", start));
-  const found = new Map<string, { args: string; result: string; doc: string }>();
   let doc = "";
   let inDoc = false;
   let member = "";
@@ -38,7 +38,12 @@ function handlers(source: string) {
   return found;
 }
 
-const signatures = handlers(readFileSync(join(protocol, "api.ts"), "utf8"));
+const signatures = new Map<string, { args: string; result: string; doc: string }>();
+for (const concept of readdirSync(protocol).toSorted()) {
+  const file = join(protocol, concept, "api.ts");
+  if (statSync(join(protocol, concept)).isDirectory() && readdirSync(join(protocol, concept)).includes("api.ts"))
+    handlers(readFileSync(file, "utf8"), signatures);
+}
 
 function method(e: (typeof endpoints)[number], indent: string): string {
   const sig = signatures.get(e.op);

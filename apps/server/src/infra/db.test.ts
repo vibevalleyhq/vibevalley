@@ -11,7 +11,7 @@ import { testDatabase } from "@/testing/layers.ts";
 
 import { lanOpen, setLanOpen } from "../../db/generated/lan.sql.ts";
 import { lanDevices, addLanDevice, seenLanDevice } from "../../db/generated/lan_device.sql.ts";
-import { Db, setAsideStale } from "./db.ts";
+import { Db, dbFile, setAsideStale } from "./db.ts";
 
 describe("the database", () => {
   it.effect("has the schema, and the generated queries run on it", () =>
@@ -79,52 +79,26 @@ describe("the database", () => {
     }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
-  // In memory a farm's database is given back and kept for the next one (db.ts): it must be as good as new.
-  it.effect("regression: a returned database resets data, identities and session settings", () => {
-    const seqs = (aborted: boolean) =>
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        const rows = yield* sql<{
-          count: number;
-          app: string;
-        }>`SELECT count(*)::int AS count, current_setting('application_name') AS app FROM channel_participant`.pipe(Effect.orDie);
-        yield* sql`INSERT INTO channel_participant (id, kind, name, joined_at) VALUES ('u', 'owner', '主人', 1)`.pipe(Effect.orDie);
-        const seq = yield* sql<{ seq: number }>`SELECT seq FROM channel_participant WHERE id = 'u'`.pipe(Effect.orDie);
-        yield* sql`SET application_name = 'left-behind'`.pipe(Effect.orDie);
-        if (aborted) {
-          yield* sql.unsafe("BEGIN").pipe(Effect.orDie);
-          yield* sql.unsafe("SELECT 1/0").pipe(Effect.result);
-        }
-        return [rows[0]!.count, seq[0]!.seq, rows[0]!.app];
-      });
+  it.effect("every farm in memory has a database of its own, numbered from the start", () => {
+    const farm = Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const before = yield* sql<{ count: number }>`SELECT count(*) AS count FROM channel_participant`.pipe(Effect.orDie);
+      yield* sql`INSERT INTO channel_participant (id, kind, name, joined_at) VALUES ('u', 'owner', '主人', 1)`.pipe(Effect.orDie);
+      const seq = yield* sql<{ seq: number }>`SELECT seq FROM channel_participant WHERE id = 'u'`.pipe(Effect.orDie);
+      return [before[0]!.count, seq[0]!.seq];
+    });
     return Effect.gen(function* () {
-      for (let farm = 0; farm < 4; farm++) expect(yield* seqs(farm === 2).pipe(Effect.provide(testDatabase()))).toEqual([0, 1, ""]);
+      for (let n = 0; n < 3; n++) expect(yield* farm.pipe(Effect.provide(testDatabase()))).toEqual([0, 1]);
     });
   });
 
-  it.effect("a database whose schema a test changed is not given to the next farm", () =>
-    Effect.gen(function* () {
-      const functions = Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        return (yield* sql<{ n: number }>`SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'left_behind'`.pipe(Effect.orDie))[0]!.n;
-      });
-      yield* Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        yield* sql.unsafe("create function left_behind() returns int language sql as 'select 1'").pipe(Effect.orDie);
-        expect(yield* functions).toBe(1);
-      }).pipe(Effect.provide(testDatabase()));
-      expect(yield* functions.pipe(Effect.provide(testDatabase()))).toBe(0);
-    }),
-  );
-
-  // A new folder on disk starts from the copy of the baseline the first database in memory left (db.ts).
-  it.effect("a new database on disk made from the copy keeps what is written, across a reopen", () => {
+  it.effect("a new database on disk keeps what is written, across a reopen", () => {
     const where = join(tempDir("vibevalley-db-"), "db");
     const open = <A, E>(f: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(f).pipe(Effect.provide(testDatabase({ db: where })));
     return Effect.gen(function* () {
-      yield* lanDevices().pipe(Effect.provide(testDatabase()), Effect.orDie);
       yield* open(addLanDevice({ id: "d1", name: "手机", key_hash: "h", paired_at: 1 }));
       expect(readFileSync(where + ".schema", "utf8").trim()).not.toBe("");
+      expect(readdirSync(where)).toContain(dbFile);
       expect(yield* open(lanDevices())).toMatchObject([{ id: "d1", name: "手机" }]);
     });
   });
@@ -145,17 +119,21 @@ describe("the database", () => {
 
 /** Where a failed query is a value, not a defect (Db.attempt, Db.attemptTx), and why. */
 const attempting: Readonly<Record<string, string>> = {
-  "channel/channel.ts": "a direct context whose initial delivery cannot be kept is refused as NotRecorded before its events are attached",
+  "channel/talk.ts": "a direct context whose initial delivery cannot be kept is refused as NotRecorded before its events are attached",
   "connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
   "cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
   "game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",
-  "issue/issue.ts": "an issue that is not saved, or a session not linked to its issue, is told as a refusal",
+  "issue/dispatch.ts": "an orchestrator's turn that is not linked to its issue is told as a refusal",
+  "issue/issue.ts": "an edit that is not saved is told as a refusal",
+  "issue/records.ts": "an issue that is not saved, or a session not linked to its issue, is told as a refusal",
+  "issue/split.ts": "children that cannot be saved are told as a refusal, and the parent stays unsplit",
   "mailbox/payload.ts": "the source cursor and trigger commit together; a failed cron input is logged and retried without advancing its clock",
   "mailbox/work.ts":
     "a Session's first direct deliveries are registered atomically; a failed insert is returned so Session startup can stop and report NotRecorded",
   "memory/memory.ts": "a memory read or write that fails is logged and taken as none",
   "session/inProcessRun.ts": "a run write fails as NotRecorded so an in-process run retries its end before accepting another input",
-  "session/session.ts": "a session's own record that is not kept is logged without discarding its live execution",
+  "session/records.ts": "a session's own record that is not kept is logged without discarding its live execution",
+  "session/session.ts": "a report handed in that cannot be kept is told as a refusal, and the turn does not take it",
 };
 
 it("attempt and attemptTx are used only where a failed query is told or retried, each with its reason", () => {

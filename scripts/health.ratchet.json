@@ -240,13 +240,13 @@
     "resultBranch": 3
   },
   "server: Platform": {
-    "nonNull": 6,
+    "nonNull": 7,
     "doubleCast": 0,
     "cast": 4,
     "lintOff": 6,
-    "orDie": 4,
+    "orDie": 3,
     "ignored": 0,
-    "swallowed": 3,
+    "swallowed": 2,
     "resultBranch": 0
   },
   "server: Resource": {
@@ -260,7 +260,7 @@
     "resultBranch": 0
   },
   "server: Source Control": {
-    "nonNull": 35,
+    "nonNull": 34,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 0,
@@ -399,8 +399,18 @@
     "swallowed": 0,
     "resultBranch": 0
   },
+  "web: features/pkm": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
   "web: features/project": {
-    "nonNull": 14,
+    "nonNull": 13,
     "doubleCast": 0,
     "cast": 1,
     "lintOff": 1,

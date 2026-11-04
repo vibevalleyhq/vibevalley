@@ -21,9 +21,9 @@ import { newId } from "@/base/ids.ts";
 import { Core } from "@/core/core.ts";
 import { messageOf, type ApiError, missing, refused } from "@/errors.ts";
 
-import type { ToolStart } from "./facts.ts";
 import { makeInProcessRun, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";
+import type { ToolStart } from "./reaction.ts";
 import { tokensOf, usageText } from "./report.ts";
 import type { RunStore } from "./session.ts";
 import type { SessionIdentity } from "./signals.ts";
@@ -191,7 +191,7 @@ export const makeHost = <R>(
       if (!session) return;
       const phase = session.phase;
       yield* core.apply({
-        type: "sessionPhase",
+        type: "sessionPhaseChanged",
         id,
         phase: { _tag: "working", since: phase._tag === "working" ? phase.since : yield* Clock.currentTimeMillis, doing: { action, label: "" } },
         ...(route === undefined || o.channel(route) === undefined ? {} : { channel: o.channel(route)! }),

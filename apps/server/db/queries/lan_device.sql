@@ -5,10 +5,10 @@
 select * from lan_device;
 
 -- name: AddLanDevice :exec
-insert into lan_device (id, name, key_hash, paired_at) values ($1, $2, $3, $4);
+insert into lan_device (id, name, key_hash, paired_at) values (sqlc.arg(id), sqlc.arg(name), sqlc.arg(key_hash), sqlc.arg(paired_at));
 
 -- name: RemoveLanDevice :exec
-delete from lan_device where id = $1;
+delete from lan_device where id = sqlc.arg(id);
 
 -- name: SeenLanDevice :exec
-update lan_device set last_seen = $1 where id = $2;
+update lan_device set last_seen = sqlc.arg(last_seen) where id = sqlc.arg(id);

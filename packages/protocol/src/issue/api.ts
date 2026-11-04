@@ -1,0 +1,160 @@
+// The endpoints of issues: their answers (IssueHandlers) and their lines in the table (api.ts puts the
+// concepts together).
+
+import { type Effect, Schema } from "effect";
+
+import { type ApiError, type Endpoint, input } from "../endpoint";
+import * as S from "../schema";
+import type * as T from "../shapes";
+
+const issueDeleteInput = input({ id: Schema.String });
+const issueStatusUpdateInput = input({ id: Schema.String }, S.IssueStatusRequest);
+
+export interface IssueHandlers<R = never> {
+  /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
+  readonly "issue.comment.create": (a: { readonly id: string } & T.CommentRequest) => Effect.Effect<T.Applied, ApiError, R>;
+  readonly "issue.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
+  /** One joined read of issues and their real sessions, including explicit missing records. */
+  readonly "issue.history.list": () => Effect.Effect<T.IssueHistory[], ApiError, R>;
+  /** The open issues by default, the newest first; the filter narrows them. */
+  readonly "issue.list": (a: T.IssueFilter) => Effect.Effect<T.Issue[], ApiError, R>;
+  /** A verdict on what was handed back; a pass only makes it ready, completing it is issue.status.update to done. */
+  readonly "issue.review": (a: { readonly id: string } & T.IssueReviewRequest) => Effect.Effect<T.Issue, ApiError, R>;
+  /** The issue becomes a parent issue and the split's issues its children, started at once. */
+  readonly "issue.split": (a: { readonly id: string } & T.IssueSplitRequest) => Effect.Effect<string, ApiError, R>;
+  readonly "issue.get": (a: { readonly id: string }) => Effect.Effect<T.Issue, ApiError, R>;
+  readonly "issue.run.list": (a: { readonly id: string }) => Effect.Effect<T.Run[], ApiError, R>;
+  /** The issue's milestones, newest first, and what all its runs cost. */
+  readonly "issue.timeline.get": (a: { readonly id: string }) => Effect.Effect<T.IssueTimeline, ApiError, R>;
+  readonly "issue.create": (a: T.IssueRequest) => Effect.Effect<T.AppliedIssue, ApiError, R>;
+  readonly "issue.update": (a: { readonly id: string } & T.IssueUpdate) => Effect.Effect<T.AppliedIssue, ApiError, R>;
+  readonly "issue.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  /** What issue.delete would do, refused as it would be; nothing changes. */
+  readonly "issue.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is
+   * another round (the words are the findings; stuck, none takes the server's own); done is accepted and delivered as the
+   * issue says; canceled sends its session home. Issue.moves lists where it may go. */
+  readonly "issue.status.update": (a: { readonly id: string } & T.IssueStatusRequest) => Effect.Effect<T.AppliedIssue, ApiError, R>;
+  /** What issue.status.update would do with the same body, refused as it would be; nothing changes. */
+  readonly "issue.status.previewUpdate": (a: { readonly id: string } & T.IssueStatusRequest) => Effect.Effect<T.Preview, ApiError, R>;
+  /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
+   * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
+  readonly "issue.refine": (a: { readonly id: string } & T.IssueRefineRequest) => Effect.Effect<T.Issue, ApiError, R>;
+}
+
+export const issueEndpoints: readonly Endpoint[] = [
+  {
+    op: "issue.comment.create",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.CommentRequest),
+    result: S.Applied,
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.diff.get",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: S.Changes,
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.history.list",
+    about: [],
+    input: undefined,
+    result: Schema.mutable(Schema.Array(S.IssueHistory)),
+    can: ["owner", "remote"],
+  },
+  {
+    op: "issue.list",
+    about: [],
+    input: S.IssueFilter,
+    result: Schema.mutable(Schema.Array(S.Issue)),
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.review",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.IssueReviewRequest),
+    result: S.Issue,
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.split",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.IssueSplitRequest),
+    result: Schema.String,
+    can: ["owner", "remote", "session"],
+  },
+  {
+    op: "issue.get",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: S.Issue,
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.run.list",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: Schema.mutable(Schema.Array(S.Run)),
+    can: ["owner", "remote"],
+  },
+  {
+    op: "issue.timeline.get",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: S.IssueTimeline,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "issue.create",
+    about: [],
+    input: S.IssueRequest,
+    result: S.AppliedIssue,
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.update",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.IssueUpdate),
+    result: S.AppliedIssue,
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.delete",
+    about: ["id"],
+    input: issueDeleteInput,
+    result: undefined,
+    can: ["owner", "remote"],
+    dryRun: "issue.previewDelete",
+  },
+  {
+    op: "issue.previewDelete",
+    about: ["id"],
+    input: issueDeleteInput,
+    result: S.Preview,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "issue.status.update",
+    about: ["id"],
+    input: issueStatusUpdateInput,
+    result: S.AppliedIssue,
+    can: ["owner", "remote", "orchestrator"],
+    dryRun: "issue.status.previewUpdate",
+  },
+  {
+    op: "issue.status.previewUpdate",
+    about: ["id"],
+    input: issueStatusUpdateInput,
+    result: S.Preview,
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.refine",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.IssueRefineRequest),
+    result: S.Issue,
+    can: ["owner", "remote"],
+  },
+];

@@ -3,7 +3,7 @@ import { describe, expect, test } from "vite-plus/test";
 import type { LanguageCount } from "@vibevalley/protocol";
 
 import { calendarOf, recencyOf, since, streaksOf } from "./calendar";
-import { githubRepository, languageShares, number } from "./projects";
+import { languageShares, number } from "./projects";
 const lang = (name: string, code: number, comments = 0, files = 1): LanguageCount => ({ name, files, code, comments, blanks: 0 });
 
 describe("languages", () => {
@@ -76,13 +76,7 @@ test("recency by the newest commit", () => {
   expect(recencyOf(0, 200 * day)).toBe("older");
 });
 
-test("new projects: names and GitHub addresses", () => {
-  expect(githubRepository("https://github.com/botiverse/raft-source.git/")).toEqual({
-    name: "raft-source",
-    url: "https://github.com/botiverse/raft-source.git",
-  });
-  expect(githubRepository("git@github.com:a/b.git")).toBeUndefined();
-  expect(githubRepository("https://github.com/a/..")).toBeUndefined();
+test("numbers and how long ago", () => {
   expect(number(1234567)).toBe("1,234,567");
   expect(since(0, 3 * 3600000)).toBe("3 小时前");
 });

@@ -14,7 +14,7 @@ import {
   type MCPServer,
   OutfitValues,
   type PersonaMode,
-  type RuntimeFacts,
+  type RuntimeSupport,
   type RuntimeInfo,
   sessionAppendSystemPrompt,
   sessionDisallowedTools,
@@ -54,8 +54,8 @@ import { Hint } from "@/ui/Tip";
 import { FromTemplate } from "./FromTemplate";
 import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
 
-const unknownFacts: RuntimeFacts = { steer: false, refused: {}, capabilities: [], inProcess: false };
-const factsOf = (info: RuntimeInfo | undefined) => info?.facts ?? unknownFacts;
+const noSupport: RuntimeSupport = { steer: false, refused: {}, capabilities: [], inProcess: false };
+const supportOf = (info: RuntimeInfo | undefined) => info?.support ?? noSupport;
 
 function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agent {
   const info = catalog.find((r) => r.id === runtime);
@@ -69,7 +69,7 @@ function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agent {
     model: "",
     effort: "",
     persona: "",
-    personaMode: factsOf(info).refused[sessionAppendSystemPrompt] ? "prompt" : "append",
+    personaMode: supportOf(info).refused[sessionAppendSystemPrompt] ? "prompt" : "append",
     skills: [],
     mcpServers: [],
     disallowedTools: [],
@@ -403,7 +403,7 @@ type Tab = "who" | "runtime" | "persona" | "skills" | "tools" | "env" | "memory"
 
 function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch; nameTaken: boolean; isNew: boolean; onTrajectories: () => void }) {
   const [tab, setTab] = createSignal<Tab>("who");
-  const facts = () => factsOf(props.runtime);
+  const support = () => supportOf(props.runtime);
   const tabs = (): [Tab, string][] => [
     ["who", t("web.agent.tab.who")],
     ["runtime", t("web.agent.tab.runtime")],
@@ -418,7 +418,7 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefined; pa
           ["trajectories", t("web.agent.trajectories")],
         ] as [Tab, string][])),
   ];
-  const envRefused = () => facts().refused[sessionEnv];
+  const envRefused = () => support().refused[sessionEnv];
   const draft = () => props.draft;
   return (
     <div class="flex min-h-0 flex-1 flex-col">
@@ -467,10 +467,10 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefined; pa
           <Match when={tab() === "runtime"}>
             <RuntimeChoice draft={draft()} patch={props.patch} />
             <ModelAndEffort draft={draft()} runtime={props.runtime} patch={props.patch} />
-            <Facts runtime={draft().runtime} info={props.runtime} />
+            <Support runtime={draft().runtime} info={props.runtime} />
           </Match>
           <Match when={tab() === "persona"}>
-            <Persona draft={draft()} facts={facts()} patch={props.patch} />
+            <Persona draft={draft()} support={support()} patch={props.patch} />
           </Match>
           <Match when={tab() === "skills"}>
             <SkillPicker draft={draft()} runtime={props.runtime} patch={props.patch} />
@@ -533,7 +533,7 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
   const all = useRuntimes();
   const runtimes = () => ready(all, []);
   const choose = (info: RuntimeInfo) => {
-    const f = factsOf(info);
+    const f = supportOf(info);
     const cannotTakeSystemPrompt = !!f.refused[sessionAppendSystemPrompt] || !!f.refused[sessionSystemPrompt];
     const d = props.draft;
     // A persona the new runtime can't take as a system prompt goes into each job instead.
@@ -596,7 +596,7 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined
   const models = () => props.runtime?.models ?? [];
   const fallback = () => props.runtime?.settings.defaultModel || models().find((m) => m.isDefault)?.id || "";
   const model = () => models().find((m) => m.id === (props.draft.model || fallback()));
-  const refusedEffort = () => factsOf(props.runtime).refused[sessionEffort];
+  const refusedEffort = () => supportOf(props.runtime).refused[sessionEffort];
   const levels = () => model()?.effortLevels ?? [];
   return (
     <>
@@ -637,18 +637,18 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined
 }
 
 /** What it takes comes with runtime.list: until then, nothing is said rather than a guess. */
-function Facts(props: { runtime: string; info?: RuntimeInfo | undefined }) {
-  const facts = () => factsOf(props.info);
+function Support(props: { runtime: string; info?: RuntimeInfo | undefined }) {
+  const support = () => supportOf(props.info);
   return (
     <section class="flex flex-col gap-1.5 rounded-lg border border-line p-3">
       <h3 class="text-sm font-semibold">{t("web.agent.can", { runtime: props.info ? props.info.preset.label : props.runtime })}</h3>
       <Show when={props.info} fallback={<span class="text-sm">{t("web.agent.readingMachines")}</span>}>
         <span class="flex items-start gap-1.5 text-sm">
-          <Icon name={facts().steer ? "check" : "cross"} size={12} class="mt-1" />
-          {facts().steer ? t("web.agent.steer") : t("web.agent.noSteer")}
+          <Icon name={support().steer ? "check" : "cross"} size={12} class="mt-1" />
+          {support().steer ? t("web.agent.steer") : t("web.agent.noSteer")}
         </span>
-        <span class="text-sm">{facts().inProcess ? t("web.agent.inProcess") : t("web.agent.ownProcess")}</span>
-        <For each={Object.entries(facts().refused)}>
+        <span class="text-sm">{support().inProcess ? t("web.agent.inProcess") : t("web.agent.ownProcess")}</span>
+        <For each={Object.entries(support().refused)}>
           {([option, reason]) => (
             <span class="text-sm text-muted">
               {t("web.agent.refuses")}
@@ -669,7 +669,7 @@ const personaModes: { value: PersonaMode; label: string; detail: string; option?
   { value: "prompt", label: t("web.agent.persona.prompt.label"), detail: t("web.agent.persona.prompt.detail") },
 ];
 
-function Persona(props: { draft: Agent; facts: RuntimeFacts; patch: Patch }) {
+function Persona(props: { draft: Agent; support: RuntimeSupport; patch: Patch }) {
   const mode = () => personaModes.find((m) => m.value === props.draft.personaMode);
   return (
     <>
@@ -691,8 +691,8 @@ function Persona(props: { draft: Agent; facts: RuntimeFacts; patch: Patch }) {
             options={personaModes.map((m) => ({
               value: m.value,
               label: m.label,
-              disabled: !!m.option && !!props.facts.refused[m.option],
-              title: m.option ? props.facts.refused[m.option] : undefined,
+              disabled: !!m.option && !!props.support.refused[m.option],
+              title: m.option ? props.support.refused[m.option] : undefined,
             }))}
             onChange={(personaMode) => props.patch({ ...props.draft, personaMode })}
           />
@@ -760,9 +760,9 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
 const mcpTarget = (s: MCPServer) => (s.type === "stdio" ? [s.command, ...s.args].join(" ") : s.url);
 
 function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch }) {
-  const facts = () => factsOf(props.runtime);
-  const mcpRefused = () => facts().refused[sessionMcpServers];
-  const toolsRefused = () => facts().refused[sessionDisallowedTools];
+  const support = () => supportOf(props.runtime);
+  const mcpRefused = () => support().refused[sessionMcpServers];
+  const toolsRefused = () => support().refused[sessionDisallowedTools];
   const [type, setType] = createSignal<"stdio" | "http">("stdio");
   const [name, setName] = createSignal("");
   const [target, setTarget] = createSignal("");

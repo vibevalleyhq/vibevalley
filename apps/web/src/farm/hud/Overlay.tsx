@@ -6,6 +6,7 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show } from "so
 
 import { t } from "@vibevalley/i18n";
 import type { SessionId, SessionView } from "@vibevalley/protocol";
+import { defaultOf } from "@vibevalley/protocol/rules";
 
 import { farmState, useFarm } from "@/farm/store";
 import { aimTool } from "@/farm/tools";
@@ -13,7 +14,7 @@ import { useVillage } from "@/farm/world/load";
 import type { Village } from "@/farm/world/load";
 import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "@/farm/world/plots";
 import { plotH, yardPlaces } from "@/farm/world/world";
-import { useFollowed, defaultOf } from "@/features/channel";
+import { useFollowed } from "@/features/channel";
 import { useFrames } from "@/infra/frame";
 import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "@/ui/pixel";
 

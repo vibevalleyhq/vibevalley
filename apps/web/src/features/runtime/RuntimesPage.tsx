@@ -204,7 +204,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
         <Card title={t("web.runtime.account")}>
           <Usage info={props.info} />
         </Card>
-        <FactsCard info={props.info} />
+        <SupportCard info={props.info} />
       </div>
       <SettingsCard info={props.info} onSaved={keep} />
       <ModelsCard info={props.info} />
@@ -248,7 +248,7 @@ function Usage(props: { info: RuntimeInfo }) {
   return (
     <Show
       when={props.info.usage}
-      fallback={<Quiet>{props.info.facts.capabilities.includes("accountUsage") ? t("web.runtime.afterInstall") : t("web.runtime.noUsage")}</Quiet>}
+      fallback={<Quiet>{props.info.support.capabilities.includes("accountUsage") ? t("web.runtime.afterInstall") : t("web.runtime.noUsage")}</Quiet>}
     >
       {(usage) => (
         <Switch>
@@ -324,17 +324,17 @@ function Window(props: { window: UsageWindow }) {
   );
 }
 
-function FactsCard(props: { info: RuntimeInfo }) {
-  const facts = () => props.info.facts;
-  const refused = () => Object.entries(facts().refused);
+function SupportCard(props: { info: RuntimeInfo }) {
+  const support = () => props.info.support;
+  const refused = () => Object.entries(support().refused);
   return (
     <Card title={t("web.runtime.can")}>
       <div class="flex flex-col gap-1.5">
         <span class="flex items-start gap-1.5 text-sm">
-          <Icon name={facts().steer ? "check" : "cross"} size={12} class="mt-1" />
-          {facts().steer ? t("web.runtime.steer") : t("web.runtime.noSteer")}
+          <Icon name={support().steer ? "check" : "cross"} size={12} class="mt-1" />
+          {support().steer ? t("web.runtime.steer") : t("web.runtime.noSteer")}
         </span>
-        <span class="text-sm">{facts().inProcess ? t("web.runtime.inProcess") : t("web.runtime.ownProcess")}</span>
+        <span class="text-sm">{support().inProcess ? t("web.runtime.inProcess") : t("web.runtime.ownProcess")}</span>
         <span class="pt-2 text-xs font-medium text-muted">{t("web.runtime.refused")}</span>
         <Show when={refused().length > 0} fallback={<span class="text-sm">{t("web.runtime.acceptsAll")}</span>}>
           <For each={refused()}>
@@ -349,7 +349,7 @@ function FactsCard(props: { info: RuntimeInfo }) {
         <div class="flex flex-wrap gap-1">
           <For each={RuntimeCapabilityValues}>
             {(c) => (
-              <span class={["rounded px-1.5 py-px text-xs", facts().capabilities.includes(c) ? "bg-selected" : "border border-line text-muted line-through"]}>
+              <span class={["rounded px-1.5 py-px text-xs", support().capabilities.includes(c) ? "bg-selected" : "border border-line text-muted line-through"]}>
                 {capabilityLabel[c]}
               </span>
             )}
@@ -403,8 +403,8 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
     const wanted = draft().defaultModel || models().find((m) => m.isDefault)?.id;
     return models().find((m) => m.id === wanted);
   };
-  const refusedEffort = () => props.info.facts.refused[sessionEffort];
-  const refusedEnv = () => props.info.facts.refused[sessionEnv];
+  const refusedEffort = () => props.info.support.refused[sessionEffort];
+  const refusedEnv = () => props.info.support.refused[sessionEnv];
   const effortHint = () => refusedEffort() ?? ((model()?.effortLevels.length ?? 0) > 0 ? undefined : t("web.runtime.noEffort"));
   const saving = createAct();
   const save = () => {

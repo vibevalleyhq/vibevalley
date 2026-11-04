@@ -17,7 +17,7 @@ export const layers: readonly Layer[] = ["rule", "module", "flow"];
 export const budgetMs: Record<Layer, number> = { rule: 20, module: 300, flow: 2_000 };
 
 /** Imports that leave the process: the database, child processes, the network. */
-const outside = /^(node:child_process|node:net|node:http|node:https|@electric-sql\/pglite|@effect\/sql-pglite|@effect\/platform-node)$/u;
+const outside = /^(node:child_process|node:net|node:http|node:https|node:sqlite|@effect\/sql-sqlite-node|@effect\/platform-node)$/u;
 
 interface WorkspacePackage {
   readonly dir: string;

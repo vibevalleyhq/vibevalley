@@ -109,7 +109,7 @@
 在这里：已有：编码 agent 经 oar 驱动，农场不自己起它们的进程；connector 的重试和退避在 `connector.ts`，`Adapter` 是窄接口的雏形。以后做：扩展点只填空，先做农场的工具（和[工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)一起），connector 的超时和轮询等出问题时收。
 
 **2.3 单一状态机和事件总线。** 白皮书：核心业务状态只能由纯函数改：transition(state, cmd) 返回新状态和要发的领域事件，不做 I/O；外层执行器把新状态落盘，再把事件推进总线；通知、卡片、庄稼动画、成就统计都是订阅者。
-在这里：已有：oar 的会话事件经 `apps/server/src/session/facts.ts`（纯函数）读成事实，`Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态，页面读折好的帧；农场的游戏规则只读事件、算画面，业务不调它（[概念先行](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）；下层经 `Stream` 往上报。以后做：[状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)。
+在这里：已有：oar 的会话事件经 `apps/server/src/session/reaction.ts`（纯函数）读成事实，`Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态，页面读折好的帧；农场的游戏规则只读事件、算画面，业务不调它（[概念先行](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）；下层经 `Stream` 往上报。以后做：[状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)。
 
 **2.4 三级上下文和原语词典。** 白皮书：根级宪章（CLAUDE.md，150 行内，只写红线和命令入口）；目录级 RULES.md（50 行内，就近、按需加载）；代码里关键的防死锁、顺序敏感处标 // @invariant ADR-xxx，没在提交说明里写原因就删改的由 lint 拦；公共工具标 @primitive，CI 扫描生成 PRIMITIVES.md，不手写。
 在这里：已有：`CLAUDE.md` 只有一行 `@AGENTS.md`，`AGENTS.md` 写目录、命令和常驻规矩，每条链到它的家；子目录的规矩在子目录的 `AGENTS.md`（`docs/AGENTS.md`、`.agents/notes/README.md`）和各包的 README；注释只写为什么、顺序和锁、安全边界（[注释](docs/style/code.md#注释)）。不做：`@invariant` 的 lint（写成注释已经够，删改由评审看）、`@primitive` 标记（每个导出多一件要记得的事）。以后做：共用帮手的清单，按位置收、从 JSDoc 生成，配一条认得出原样重复的 lint。

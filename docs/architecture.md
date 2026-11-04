@@ -14,7 +14,7 @@ flowchart LR
     API[handlers<br/>VibeValleyApi、三条 SSE]
     SITE[Core<br/>核心状态 WorkspaceState]
     FM[管家<br/>vibevalley 自己的 agent + 派活工具]
-    CHAT[频道<br/>群聊 · PGlite]
+    CHAT[频道<br/>群聊 · SQLite]
     MCP[农场的工具<br/>/mcp]
     TK[工单<br/>派活、排队、计划、合并]
     CREW[帮工<br/>oar 子 agent]
@@ -53,7 +53,7 @@ flowchart LR
 
 三条线：
 
-- **命令**：页面通过 HTTP 调 `VibeValleyApi`（`packages/protocol` 的客户端，按 `api.ts` 的接口表）：在频道说话、写和派工单、带话、叫停、收工、完成、计划、读配置。帮工在频道说话走另一个入口：服务端的 MCP 端点 `/mcp`（[频道](docs/subsystems/channel.md)）。
+- **命令**：页面通过 HTTP 调 `VibeValleyApi`（`packages/protocol` 的客户端，按接口表 `endpoints`）：在频道说话、写和派工单、带话、叫停、收工、完成、计划、读配置。帮工在频道说话走另一个入口：服务端的 MCP 端点 `/mcp`（[频道](docs/subsystems/channel.md)）。
 - **状态**：服务端的核心状态每变一次就是一条事实。页面收折好的帧（`GET /api/v1/state`），自己不折。
 - **语音**：页面和 Agora 频道之间是音频和字幕，服务端只签令牌、请语音管家进出频道（[语音](docs/subsystems/voice.md)）。
 
@@ -61,15 +61,15 @@ flowchart LR
 
 仓库的目录见根目录 [AGENTS.md](AGENTS.md#目录)。
 
-- **契约**：`packages/protocol` 是服务端和页面之间唯一的契约。形状写在 `src/shapes.ts`，`src/schema.ts` 给每个形状一个由它定类型的 Effect Schema（读写 JSON 时解码），接口写在 `src/api.ts`（路径、参数、请求体、答复、谁能调）；`src/rules` 只放两边都跑的纯函数（帮工在干什么的话、一行的标题、站位的名字、Inbox 里哪些是刚来的、文档的顺序键）。只有服务端跑的规则在它的模块里（`apps/server/src/<模块>`），结论写进帧（[理由](docs/subsystems/foundation.md)）。
-- **服务**：`apps/server/src/` 下一块业务一个文件夹，名字用单数；文件夹归进十三个模块，从下往上是 Platform（`base`、`infra`、`core`、`setting`）、Agents（`agent`、`runtime`、`memory`；模型和 agent 本身在 `packages/ai`、`packages/agent`，这里只组装）、Source Control（`project`）、Agent Sessions（`executor`、`session`）、Mailbox（`mailbox`，信箱状态、受众路由、攒批和刹车）、Collaboration（`channel`、`artifact`）、Issues（`issue`、`cron`）、Ingress（`ingress`，来源事实与载荷）、Resource（`resource`，权限、读取和快照分页）、Inbox（`inbox`）、Orchestrator（`orchestrator`、`tool`）、Gamification（`game`）、Gateway（`http`、`mcp`、`lan`、`connector`、`voice` 和根目录的入口文件），表在 `src/modules.ts`。一个模块只 import 排在它前面的模块，也不读核心状态里别的模块那一块（经那个模块的查询），`src/modules.test.ts` 查。每个文件夹导出一个 Effect 服务（`Context.Service`）和它的 `layer`，反方向的消息走它们给的流（`Stream`）或由后建模块实现前一模块声明的窄端口。`services.ts` 按模块组装，分两段：先建好所有模块（建的时候订阅自己要跟的事），再按模块顺序跑开机（第一次看 GitHub、把帮工请回来、恢复频道、重放没有路由回执的信箱消息、定时任务开始走、记下 Inbox 里已有的并开始巡查、数 commit）；测试的 `testing/world.ts` 用同一套组装函数（[理由](docs/subsystems/foundation.md)）。帮工由 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动，管家是 VibeValley 自己的 agent（`packages/agent`，[管家](docs/subsystems/orchestrator.md)）。
-- **HTTP 和 MCP**：`src/http` 在最上面：`api.ts` 照 protocol 的接口表挂路由，`handlers.ts` 答每一个，`streams.ts` 是三条事件流；`/mcp` 是给编码 agent 的另一个入口（`src/mcp`）；`main.ts` 单独跑它，`--web` 时也在 `/` 提供页面（[子系统](docs/subsystems/README.md)）。命令走 HTTP，事件和状态走 server-sent events（[理由](docs/subsystems/core.md)）。
-- **存盘**：PGlite（进程里的 Postgres），表在 `apps/server/db/migrations/`，查询在 `db/queries/`、由 effect-sqlc 生成成 `db/generated/`（[理由](docs/subsystems/foundation.md)）；下文「存了什么」。
+- **契约**：`packages/protocol` 是服务端和页面之间唯一的契约。一个概念一个文件夹 `src/<概念>/`，名字和服务端的模块一样：`shapes.ts` 是形状，`schema.ts` 给每个形状一个由它定类型的 Effect Schema（读写 JSON 时解码），`api.ts` 是这个概念的接口（路径、参数、请求体、答复、谁能调）和它的 `Handlers`；`src/` 下同名的三个文件只汇总，外面照旧从 `@vibevalley/protocol`、`/schema`、`/api` 引；接口共用的（`Endpoint`、`input`、拒绝）在 `src/endpoint.ts`。`src/rules` 只放两边都跑的纯函数（帮工在干什么的话、一行的标题、站位的名字、Inbox 里哪些是刚来的、文档的顺序键）。只有服务端跑的规则在它的模块里（`apps/server/src/<模块>`），结论写进帧（[理由](docs/subsystems/foundation.md)）。
+- **服务**：`apps/server/src/` 下一块业务一个文件夹，名字用单数；文件夹归进十三个模块，从下往上是 Platform（`base`、`infra`、`core`、`setting`）、Agents（`agent`、`runtime`、`memory`；模型和 agent 本身在 `packages/ai`、`packages/agent`，这里只组装）、Source Control（`project`）、Agent Sessions（`executor`、`session`）、Mailbox（`mailbox`，信箱状态、受众路由、攒批和刹车）、Collaboration（`channel`、`artifact`、`pkm`）、Issues（`issue`、`cron`）、Ingress（`ingress`，来源事实与载荷）、Resource（`resource`，权限、读取和快照分页）、Inbox（`inbox`）、Orchestrator（`orchestrator`、`tool`）、Gamification（`game`）、Gateway（`http`、`mcp`、`lan`、`connector`、`voice` 和根目录的入口文件），表在 `src/modules.ts`。一个模块只 import 排在它前面的模块，也不读核心状态里别的模块那一块（经那个模块的查询），`src/modules.test.ts` 查。每个文件夹导出一个 Effect 服务（`Context.Service`）和它的 `layer`，反方向的消息走它们给的流（`Stream`）或由后建模块实现前一模块声明的窄端口。`services.ts` 按模块组装，分两段：先建好所有模块（建的时候订阅自己要跟的事），再按模块顺序跑开机（第一次看 GitHub、把帮工请回来、恢复频道、重放没有路由回执的信箱消息、定时任务开始走、记下 Inbox 里已有的并开始巡查、数 commit）；测试的 `testing/world.ts` 用同一套组装函数（[理由](docs/subsystems/foundation.md)）。帮工由 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动，管家是 VibeValley 自己的 agent（`packages/agent`，[管家](docs/subsystems/orchestrator.md)）。
+- **HTTP 和 MCP**：`src/http` 在最上面：`api.ts` 照 protocol 的接口表挂路由，`handlers.ts` 合起 `http/handlers/<概念>.ts` 答每一个，`streams.ts` 是三条事件流；`/mcp` 是给编码 agent 的另一个入口（`src/mcp`）；`main.ts` 单独跑它，`--web` 时也在 `/` 提供页面（[子系统](docs/subsystems/README.md)）。命令走 HTTP，事件和状态走 server-sent events（[理由](docs/subsystems/core.md)）。
+- **存盘**：SQLite（Node 自带的 `node:sqlite`，在进程里），表在 `apps/server/db/migrations/`，查询在 `db/queries/`、由 `scripts/sqlite-generate.ts` 生成成 `db/generated/`（[理由](docs/subsystems/foundation.md)）；下文「存了什么」。
 - **页面**：只连服务端的接口，用 Solid Query 读一次性的数据，帧由一条流给（[理由](docs/subsystems/app.md)）；按概念分 feature，和服务端的模块对得上，层只往前 import（`base` 纯的、`infra` 和外面说话、`state` 中间层在最下面）；三个宿主共用：桌面是 Electron 带着服务端起来、打开它的地址，浏览器直接打开（[页面](docs/subsystems/app.md)）。
 
 ## 核心状态
 
-农场上的一切（通话、管家、帮工、频道、工单和计划、定时任务、commit 数、金币和成就）是一个值 `WorkspaceState`（`packages/protocol/src/shapes.ts`；[理由](docs/subsystems/core.md)）。只有服务端持有它，只在 `Core.apply`（`apps/server/src/core/core.ts`）里改：每个事实（雇了一个帮工、开始一轮、这一轮结束、一张工单变了……）由纯函数 `reduce(state, fact)`（`apps/server/src/projection/reduce.ts`，用各模块的规则）折进去。折法和拼帧读每个模块的规则，所以放在组装那一层（`projection/`），组装时交给 Platform 里的 `core`（`Projection`），`core` 不 import 上面的模块。不改变状态的事实不发。
+农场上的一切（通话、管家、帮工、频道、工单和计划、定时任务、commit 数、金币和成就）是一个值 `WorkspaceState`（`packages/protocol/src/core/shapes.ts`；[理由](docs/subsystems/core.md)）。只有服务端持有它，只在 `Core.apply`（`apps/server/src/core/core.ts`）里改：每个事实（雇了一个帮工、开始一轮、这一轮结束、一张工单变了……）由纯函数 `reduce(state, fact)`（`apps/server/src/projection/reduce.ts`，用各模块的规则）折进去。折法和拼帧读每个模块的规则，所以放在组装那一层（`projection/`），组装时交给 Platform 里的 `core`（`Projection`），`core` 不 import 上面的模块。不改变状态的事实不发。
 
 帮工的阶段和每种阶段要主人做什么见[帮工](docs/subsystems/session.md#模型和不变量)。核心状态只保留在场的帮工，离开就删掉。
 
@@ -81,13 +81,13 @@ flowchart LR
 
 `GET /api/v1/events`（server-sent events）：连上先发一条 `snapshot`（整份核心状态），之后发事实，以及几样核心状态之外的：轨迹的一步（`step`）、提醒（`notice`）、农机变了（`runtime`）。断线重连又从快照开始。这条流留给命令行（`state`、`events`）和调试。
 
-`GET /api/v1/live`（server-sent events）是页面的窄流：只发 `LiveEvent` 的三种成员（会话的一步、提醒、农机），不发事实、不发快照；状态仍由 `/api/v1/state` 给。事实的种类见 `shapes.ts` 的 `Fact`；帮工的会话事件怎么变成事实见 [帮工](docs/subsystems/session.md)。
+`GET /api/v1/live`（server-sent events）是页面的窄流：只发 `LiveEvent` 的三种成员（会话的一步、提醒、农机），不发事实、不发快照；状态仍由 `/api/v1/state` 给。事实的种类见 `core/shapes.ts` 的 `Fact`；帮工的会话事件怎么变成事实见 [帮工](docs/subsystems/session.md)。
 
 三条流每 20 秒发一次心跳；写不出去就结束订阅。Core 只保留内存投影；Session、工单、频道、定时和游戏账本各自持久化，启动时重建投影。
 
 ## HTTP 接口
 
-接口的唯一定义是 `packages/protocol/src/api.ts` 的接口表 `endpoints`：每个接口的 `op`（`issue.status.update`，路径就是它：`POST /api/v1/issue/status/update`）、`about`、输入和答复的 Schema、`can`（谁能调）。服务端照它挂路由、解码输入、编码答复，页面和命令行都照它调。**当前都在 `/api/v1` 下**，没有 v2 或版本协商；不兼容改动和 v1 的保留照[接口版本](docs/subsystems/core.md#为什么这样)。不在表里的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[频道](docs/subsystems/channel.md)）、给语音管家的 `/v1/chat/completions`（[语音](docs/subsystems/voice.md)）。「连接到本机」只放 `can` 里有 `remote` 的（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/lan.md)）。
+接口的唯一定义是 `packages/protocol/src/api.ts` 拼起来的接口表 `endpoints`（每个概念的一段在 `<概念>/api.ts`）：每个接口的 `op`（`issue.status.update`，路径就是它：`POST /api/v1/issue/status/update`）、`about`、输入和答复的 Schema、`can`（谁能调）。服务端照它挂路由、解码输入、编码答复，页面和命令行都照它调。**当前都在 `/api/v1` 下**，没有 v2 或版本协商；不兼容改动和 v1 的保留照[接口版本](docs/subsystems/core.md#为什么这样)。不在表里的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[频道](docs/subsystems/channel.md)）、给语音管家的 `/v1/chat/completions`（[语音](docs/subsystems/voice.md)）。「连接到本机」只放 `can` 里有 `remote` 的（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/lan.md)）。
 
 ## 存了什么
 
@@ -99,12 +99,13 @@ flowchart LR
 | `config.json` | 档案（管家和帮工，各记着从哪个模板装的）、技能书、每台农机的设置。新农场只有从内置模板装的默认管家（`apps/server/src/agent/templates`） |
 | `agent-templates/<id>/` | 主人从本机文件夹加进来的档案模板：`agent.json`、`persona.md`（和它们的 `.en`） |
 | `settings.json` | 「设置」里存的钥匙、语音设置和记性的来源（Nowledge Mem、EverOS 的地址和 key）；只有你能读 |
-| `db/` | PGlite 的库：Agent Session 与 Run、Ingress `ingress_trigger`、话题订阅 `mailbox_subscription`、工单蓄水 `mailbox_issue`、会话投递 `mailbox_delivery`、GitHub CI 观察位置 `ingress_github`、频道、工单、文档、计划经过、账本、记性、定时、连接器和配对设备。Session 的 `pending_report` 保住已调用工具但尚未结束的结构化交接。结构只有 `0001_schema.up.sql` 一份基线；查询按表分文件、生成代码不手改。 |
+| `db/` | SQLite 的库（`vibevalley.db`）：Agent Session 与 Run、信箱的触发 `mailbox_trigger`、话题订阅 `mailbox_subscription`、工单蓄水 `mailbox_issue`、会话投递 `mailbox_delivery`、GitHub CI 观察位置 `ingress_github`、频道、工单、文档、计划经过、账本、记性、定时、连接器、配对设备，和笔记的批注与撤销记录。Session 的 `pending_report` 保住已调用工具但尚未结束的结构化交接。结构只有 `0001_schema.up.sql` 一份基线；查询按表分文件、生成代码不手改。 |
 | `events/<id>.json` | 每个 Session 的事件日志（走了留 30 天；是谁、为哪张工单、怎么关的在库里的 `session` 表，一直留着）；每个管家的是 `<档案 id>.json` |
 | `helpers/<oar 会话 id>.jsonl` | VibeValley 自己的帮工的对话，每个 oar 会话一份 |
 | `agent/<档案 id>/` | 每个管家（VibeValley 自己的 agent）一份：对话 `<档案 id>.jsonl`、压掉的旧对话 `archive/`、主人标出的做错的一轮 `evals/` |
 | `logs/` | 每个帮工会话的原始记录 |
 | `artifacts/<sha256>` | 产出每一版的内容，同样的内容只存一份（[产出](docs/subsystems/artifact.md)） |
+| `pkm/` | 笔记库：PARA 的文件夹和日记里的 Markdown 页面，剪藏的原文在 `.pkm/snapshots/`；配置 `pkm.root` 可以换到别处（[笔记](docs/subsystems/pkm.md)） |
 | `vibevalley.yaml` | 可选：配置（见下）；放钥匙时不进仓库 |
 
 工作目录的 `projects/` 放项目，`worktrees/` 放工单现场，`contexts/<Session id>-<唯一后缀>/` 放非工单上下文自己的文件。聊天休眠和服务端重启保留上下文目录，不清理项目目录。

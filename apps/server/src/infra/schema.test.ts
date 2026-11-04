@@ -6,12 +6,11 @@ import { describe, expect, it } from "vite-plus/test";
 const db = join(import.meta.dirname, "../../db");
 const src = join(import.meta.dirname, "..");
 const schema = readFileSync(join(db, "migrations", "0001_schema.up.sql"), "utf8");
-const tables = [...schema.matchAll(/create table (?:if not exists )?(\w+)/giu)].map((m) => m[1]!.toLowerCase());
+const tables = [...schema.matchAll(/create (?:virtual )?table (?:if not exists )?(\w+)/giu)].map((m) => m[1]!.toLowerCase());
 const indexes = [...schema.matchAll(/create (?:unique )?index (?:if not exists )?(\w+) on (\w+)/giu)].map((m) => ({
   name: m[1]!.toLowerCase(),
   table: m[2]!.toLowerCase(),
 }));
-const enums = new Set([...schema.matchAll(/create type (\w+) as enum/giu)].map((m) => m[1]!.toLowerCase()));
 const modules = readdirSync(src).filter((d) => statSync(join(src, d)).isDirectory());
 
 /** A plural ends in s; these words end in s and are singular. */
@@ -41,27 +40,18 @@ describe("the schema", () => {
     }
   });
 
-  it("names enums for their column except the shared actor kind", () => {
+  it("writes a closed set of words as its own column's check", () => {
     expect(
-      [...schema.matchAll(/^\s+\w+\s+text\b.*check \(\w+ in \(/gimu)].map((m) => m[0].trim()),
-      "a closed set of words in a text column's check has no type the generated code can name. Fix: `create type <table>_<column> as enum (…)` and give the column that type. See docs/subsystems/foundation.md",
-    ).toEqual([]);
-    let table = "";
-    const named: string[] = [];
-    for (const line of schema.split("\n")) {
-      table = /^create table (\w+)/iu.exec(line)?.[1]?.toLowerCase() ?? table;
-      const column = /^\s+(\w+)\s+(\w+)/u.exec(line);
-      if (
-        column &&
-        enums.has(column[2]!.toLowerCase()) &&
-        column[2]!.toLowerCase() !== "actor_kind" &&
-        column[2]!.toLowerCase() !== `${table}_${column[1]!.toLowerCase()}`
-      )
-        named.push(`${table}.${column[1]}`);
-    }
+      [...schema.matchAll(/create type/giu)].length,
+      "SQLite has no enum types. Fix: make the column text with check (<column> in (…)) on its own line; the generated code reads the words from it. See apps/server/scripts/sqlite-generate.ts",
+    ).toBe(0);
+    const elsewhere = schema
+      .split("\n")
+      .map((line) => ({ column: /^\s+(\w+)\s+text\b/u.exec(line)?.[1], checked: /check \((\w+) in \(/iu.exec(line)?.[1] }))
+      .filter((c) => c.column !== undefined && c.checked !== undefined && c.checked !== c.column);
     expect(
-      named,
-      "except shared actor_kind, an enum type is named after its owning column. Fix: rename the type <table>_<column>. See docs/subsystems/foundation.md",
+      elsewhere,
+      "a column's words are checked on another column's line, so the generated code gives them to the wrong one. Fix: move the check to its column. See apps/server/scripts/sqlite-generate.ts",
     ).toEqual([]);
   });
 

@@ -64,9 +64,9 @@ export class Core extends Context.Service<
     /** The state now, then the transitions from here on. */
     readonly transitions: Effect.Effect<readonly [T.WorkspaceState, Stream.Stream<Transition>], never, Scope.Scope>;
     /** A snapshot of the state, then every side event. */
-    readonly events: Stream.Stream<T.SideEvent>;
+    readonly events: Stream.Stream<T.ServerEvent>;
     /** Every side event from now on, subscribed before this returns: none applied after it is missed. */
-    readonly subscribe: Effect.Effect<Stream.Stream<T.SideEvent>, never, Scope.Scope>;
+    readonly subscribe: Effect.Effect<Stream.Stream<T.ServerEvent>, never, Scope.Scope>;
     readonly facts: Stream.Stream<T.Fact>;
     readonly live: Stream.Stream<T.LiveEvent>;
     /** What the owner did from now on, subscribed before this returns: none said after it is missed. */
@@ -81,7 +81,7 @@ export class Core extends Context.Service<
   );
 }
 
-const liveOf = (e: T.SideEvent): T.LiveEvent | undefined => {
+const liveOf = (e: T.ServerEvent): T.LiveEvent | undefined => {
   switch (e.type) {
     case "event":
       return { type: "event", at: e.at, id: e.id, activity: e.activity };
@@ -94,7 +94,7 @@ const liveOf = (e: T.SideEvent): T.LiveEvent | undefined => {
   }
 };
 
-const isFact = (e: T.SideEvent): e is T.Fact => {
+const isFact = (e: T.ServerEvent): e is T.Fact => {
   switch (e.type) {
     case "snapshot":
     case "event":
@@ -111,13 +111,13 @@ const make = Effect.gen(function* () {
   const held = yield* SubscriptionRef.make({ state: emptyWorkspaceState(), seq: 0 });
   const current = () => SubscriptionRef.getUnsafe(held);
 
-  const events = yield* scopedPubSub<T.SideEvent>();
+  const events = yield* scopedPubSub<T.ServerEvent>();
   const transitions = yield* scopedPubSub<Transition>();
   const owner = yield* scopedPubSub<OwnerDid>();
   /** Each fact and effect, for the frames: a frame waits for the burst it starts. */
   const changes = yield* scopedPubSub<T.GameEffect | undefined>();
 
-  const publish = (e: T.SideEvent) => {
+  const publish = (e: T.ServerEvent) => {
     PubSub.publishUnsafe(events, e);
     if (isFact(e)) PubSub.publishUnsafe(changes, undefined);
   };
@@ -153,7 +153,7 @@ const make = Effect.gen(function* () {
     }).pipe(Effect.map((tell) => tell?.()));
   });
 
-  const side = (e: T.SideEvent) => Effect.sync(() => publish(e));
+  const side = (e: T.ServerEvent) => Effect.sync(() => publish(e));
 
   // A frame now, then one for each burst of changes: the state as it is then, with the burst's effects.
   const frameNow = (effects: readonly (T.GameEffect | undefined)[]) =>
@@ -178,10 +178,10 @@ const make = Effect.gen(function* () {
     apply,
 
     setCommits: Effect.fn("Core.setCommits")(function* (commits) {
-      return yield* apply({ type: "gameProgress", commits });
+      return yield* apply({ type: "progressChanged", commits });
     }),
     open: Effect.fn("Core.open")(function* () {
-      if (current().state.call !== "live") yield* apply({ type: "voiceCall", state: "live", reason: "" });
+      if (current().state.call !== "live") yield* apply({ type: "callChanged", state: "live", reason: "" });
     }),
     // A session's every line of output comes through here: a span each would bury the traces.
     sessionEvent: Effect.fnUntraced(function* (id, activity) {
@@ -204,7 +204,7 @@ const make = Effect.gen(function* () {
       Effect.gen(function* () {
         const sub = yield* PubSub.subscribe(events);
         return Stream.concat(
-          Stream.succeed<T.SideEvent>({ type: "snapshot", at: yield* Clock.currentTimeMillis, state: current().state }),
+          Stream.succeed<T.ServerEvent>({ type: "snapshot", at: yield* Clock.currentTimeMillis, state: current().state }),
           Stream.fromSubscription(sub),
         );
       }),

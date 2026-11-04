@@ -7,11 +7,11 @@ import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "s
 
 import { t } from "@vibevalley/i18n";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
-import { phaseText } from "@vibevalley/protocol/rules";
+import { defaultOf, phaseText } from "@vibevalley/protocol/rules";
 
 import { variant, autofocus } from "@/base/dom";
 import { useInterval } from "@/base/timer";
-import { chatSay, defaultOf } from "@/features/channel";
+import { chatSay } from "@/features/channel";
 import { writeIssue } from "@/features/issue";
 import { type ProjectsSkin, since } from "@/features/project";
 import { createRequestKey } from "@/infra/api";

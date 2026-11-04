@@ -12,10 +12,9 @@ import { ServerConfig } from "@/infra/config.ts";
 import { Db } from "@/infra/db.ts";
 import type { Picked } from "@/mailbox/envelope.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
-import { triggerOf, type TriggerInput } from "@/mailbox/payload.ts";
+import { keepSourceTrigger, keptTrigger, triggerOf, type TriggerInput } from "@/mailbox/payload.ts";
 import type { ProjectError } from "@/project/workplace.ts";
 
-import * as q from "../../db/generated/ingress_trigger.sql.ts";
 import { githubInputs, type GitHubPullIngress } from "./github.ts";
 
 interface OwnerInput {
@@ -69,7 +68,7 @@ const make = Effect.gen(function* () {
   const decodePayload = Schema.decodeUnknownEffect(Schema.fromJsonString(Payload));
 
   const read = Effect.fn("Ingress.read")(function* (id: string) {
-    const row = yield* db.one(q.triggerById({ id }));
+    const row = yield* keptTrigger(db, id);
     return row ? { trigger: yield* decodeTrigger(row.trigger_json), payload: yield* decodePayload(row.payload_json) } : undefined;
   });
 
@@ -77,16 +76,14 @@ const make = Effect.gen(function* () {
     if (event.selfEcho === true) return undefined;
     const trigger = triggerOf(event);
     const { id } = trigger;
-    yield* db.run(
-      q.recordTrigger({
-        id,
-        source: event.source,
-        source_key: event.key,
-        occurred_at: event.at,
-        trigger_json: yield* encodeTrigger(trigger),
-        payload_json: yield* encodePayload({ text: event.text, data: event.data ?? null }),
-      }),
-    );
+    yield* keepSourceTrigger(db, {
+      id,
+      source: event.source,
+      source_key: event.key,
+      occurred_at: event.at,
+      trigger_json: yield* encodeTrigger(trigger),
+      payload_json: yield* encodePayload({ text: event.text, data: event.data ?? null }),
+    });
     return (yield* read(id))?.trigger;
   });
   const accept = Effect.fn("Ingress.accept")(function* (event: SourceEvent) {

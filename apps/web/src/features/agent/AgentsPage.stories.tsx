@@ -31,7 +31,7 @@ const runtime = (installation: Installation): RuntimeInfo => ({
   stop: "",
   id: "claude",
   preset: { id: "claude", label: "Claude Code", blurb: "", look },
-  facts: { steer: true, refused: {}, capabilities: [], inProcess: false },
+  support: { steer: true, refused: {}, capabilities: [], inProcess: false },
   installation,
   models: null,
   usage: null,

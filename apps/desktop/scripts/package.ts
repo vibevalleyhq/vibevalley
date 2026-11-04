@@ -2,7 +2,7 @@
 // release.json that says what they are: src/releases.ts): the shell from build/, and three
 // resources the shell finds under process.resourcesPath (src/main.ts): web/ is apps/web/dist, island/ the island's
 // release build, server/ is apps/server deployed with its production dependencies. The server runs unbundled with tsx, as it does in the
-// repository: PGlite's wasm, the word lists, the migrations and the agent SDKs are read from paths beside their code.
+// repository: the word lists, the migrations and the agent SDKs are read from paths beside their code.
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";

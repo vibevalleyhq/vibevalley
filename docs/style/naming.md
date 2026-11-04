@@ -45,7 +45,7 @@
 | 一个数：`maxTasks`、`keepClosedIssues`、`autoRetries` | 返回一样东西的函数用复数名 |
 | 在内存里装着一组的：`Assignments`、`Deliveries`、`Trajectories` | |
 
-几个有名字的取值拼成的一份（`HireOptions`、`BoardProps`、`VoiceSettings`、`RuntimeFacts`）照英语的习惯用复数：它确实是好几项。用语表里本身就是复数的词照用语表（`Changes` 是「改动」：一个分支上的提交和文件）。以 s 结尾的单数词（`Status`、`Progress`、`Alias`）是单数。
+几个有名字的取值拼成的一份（`HireOptions`、`BoardProps`、`VoiceSettings`）照英语的习惯用复数：它确实是好几项。用语表里本身就是复数的词照用语表（`Changes` 是「改动」：一个分支上的提交和文件）。以 s 结尾的单数词（`Status`、`Progress`、`Alias`）是单数。
 
 ## 查询和命令
 

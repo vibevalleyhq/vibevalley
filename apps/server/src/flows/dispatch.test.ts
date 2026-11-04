@@ -26,8 +26,8 @@ it.live("regression: an orchestrator assignment survives ingress startup and an 
       const item = yield* testIssues(issues).add({ title: "durable assignment", agent: defaultOrchestrator });
       yield* testIssues(issues).start(item.id, (yield* Channel).defaultChannel());
       const sql = yield* SqlClient.SqlClient;
-      const rows = yield* sql<{ id: string }>`select id from ingress_trigger
-        where trigger_json::jsonb->'meta'->>'issue' = ${item.id} and trigger_json::jsonb->'meta'->>'dispatch' = 'true'
+      const rows = yield* sql<{ id: string }>`select id from mailbox_trigger
+        where trigger_json->'meta'->>'issue' = ${item.id} and trigger_json->'meta'->'dispatch' = 'true'
         order by seq desc limit 1`;
       triggerId = rows[0]?.id ?? "";
       issueId = item.id;
@@ -46,13 +46,13 @@ it.live("regression: an orchestrator assignment survives ingress startup and an 
     // A crash between the trigger's write and its hand-off: the row is there, routed to no one.
     yield* sql`delete from mailbox_delivery where envelope_id = ${triggerId}`;
     yield* sql`delete from mailbox_issue where trigger_id = ${triggerId}`;
-    yield* sql`update ingress_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
+    yield* sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
     yield* mailbox.start;
     yield* (yield* Mailbox).replay;
     const deliveries = yield* sql`select session_id, envelope_id from mailbox_delivery where envelope_id = ${triggerId}`;
     expect(deliveries).toHaveLength(1);
     // A second replay of the same unrouted row acknowledges no second delivery.
-    yield* sql`update ingress_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
+    yield* sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
     yield* (yield* Issue).refreshQueue;
     expect(yield* sql`select session_id, envelope_id from mailbox_delivery where envelope_id = ${triggerId}`).toEqual(deliveries);
     expect(yield* sql`select id from channel_message where body = ${source.payload.text}`).toHaveLength(0);

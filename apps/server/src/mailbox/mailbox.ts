@@ -24,8 +24,8 @@ import {
 import { type NotRecorded, Session } from "@/session/session.ts";
 
 import { defaultID, orchestratorForChannel } from "../../db/generated/channel.sql.ts";
-import * as qr from "../../db/generated/ingress_trigger.sql.ts";
 import * as qd from "../../db/generated/mailbox_delivery.sql.ts";
+import * as qr from "../../db/generated/mailbox_trigger.sql.ts";
 import { type Recipient, Reach, WakeBreaker } from "./brakes.ts";
 import { Deliveries, type DeliveryRow, type DeliveryDraft } from "./deliveries.ts";
 import { inputOf, orchestratorSource, deliveryScope, type InputContext } from "./payload.ts";
@@ -402,20 +402,20 @@ export class Mailbox extends Context.Service<
 
       const bindIssue = (issue: T.Issue) =>
         work.subscribe(issue.id, [`issue:${issue.id}`, ...(issue.project && issue.pullRequest ? [`github:${issue.project}#${issue.pullRequest.number}`] : [])]);
-      const onFact = (fact: T.SideEvent) =>
+      const onFact = (fact: T.ServerEvent) =>
         Effect.gen(function* () {
-          if (fact.type === "issue") {
+          if (fact.type === "issueChanged") {
             yield* bindIssue(fact.issue);
             if (fact.issue.status === "done" || fact.issue.status === "canceled") {
               yield* flushIssue(fact.issue.id);
             } else later(`issue:${fact.issue.id}`, 0, () => flushIssue(fact.issue.id).pipe(bestEffort(`mailbox: inputs of ${fact.issue.id}`)));
-          } else if (fact.type === "issueGone") {
+          } else if (fact.type === "issueRemoved") {
             return;
-          } else if (fact.type === "session" && fact.session.issue && issueOf(fact.session.issue) !== undefined) {
+          } else if (fact.type === "sessionChanged" && fact.session.issue && issueOf(fact.session.issue) !== undefined) {
             const issue = fact.session.issue;
             later(`issue:${issue}`, 0, () => flushIssue(issue).pipe(bestEffort(`mailbox: inputs of ${issue}`)));
           } else if (
-            fact.type === "channel" &&
+            fact.type === "channelChanged" &&
             fact.channel.subjectKind === "issue" &&
             fact.channel.subjectId &&
             issueOf(fact.channel.subjectId) !== undefined

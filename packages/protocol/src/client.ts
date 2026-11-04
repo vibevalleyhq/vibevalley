@@ -322,6 +322,23 @@ export class VibeValleyApi {
     refresh: (): Promise<T.GitHubStatus> => this.call<T.GitHubStatus>("/api/v1/github/refresh", undefined),
   };
 
+  readonly project = {
+    list: (): Promise<T.ProjectSummary[]> => this.call<T.ProjectSummary[]>("/api/v1/project/list", undefined),
+    /** The first thing Create would refuse in this project, without making it. */
+    validate: (a: T.NewProject): Promise<T.Validation> => this.call<T.Validation>("/api/v1/project/validate", a),
+    create: (a: T.NewProject): Promise<T.ProjectSummary> => this.call<T.ProjectSummary>("/api/v1/project/create", a),
+    language: {
+      list: (a: { id: string }): Promise<T.ProjectLanguages> => this.call<T.ProjectLanguages>("/api/v1/project/language/list", a),
+    },
+    template: {
+      /** The issue templates for the project: its stack, the titles sent out there before, and the template catalog filled in for it. */
+      list: (a: { id: string }): Promise<T.ProjectTemplates> => this.call<T.ProjectTemplates>("/api/v1/project/template/list", a),
+    },
+    activity: {
+      get: (a: { id: string }): Promise<T.ProjectActivity> => this.call<T.ProjectActivity>("/api/v1/project/activity/get", a),
+    },
+  };
+
   readonly agent = {
     list: (): Promise<T.Agent[]> => this.call<T.Agent[]>("/api/v1/agent/list", undefined),
     /** The issues of each profile as it would be dispatched now; a draft not saved yet too. */
@@ -349,6 +366,59 @@ export class VibeValleyApi {
     },
   };
 
+  readonly skill = {
+    list: (): Promise<T.Skill[]> => this.call<T.Skill[]>("/api/v1/skill/list", undefined),
+    /** Create allocates an identity; callers with an existing identity use save. */
+    create: (a: T.Skill): Promise<T.Skill> => this.call<T.Skill>("/api/v1/skill/create", a),
+    update: (a: T.Skill): Promise<T.Skill> => this.call<T.Skill>("/api/v1/skill/update", a),
+    delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/skill/delete", a),
+    /** What delete would do, refused as it would be; nothing changes. */
+    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/skill/previewDelete", a),
+  };
+
+  readonly pkm = {
+    search: (a: T.PkmSearchRequest): Promise<T.PkmSearchHit[]> => this.call<T.PkmSearchHit[]>("/api/v1/pkm/search", a),
+    /** A LATER line in today's journal, tagged #inbox. */
+    capture: (a: T.PkmCaptureRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/capture", a),
+    /** Puts back the file the last change wrote. */
+    undo: (): Promise<T.PkmUndo> => this.call<T.PkmUndo>("/api/v1/pkm/undo", undefined),
+    /** Reads again every file that changed on disk. */
+    scan: (): Promise<T.PkmScan> => this.call<T.PkmScan>("/api/v1/pkm/scan", undefined),
+    page: {
+      /** Every page in the vault, newest first; files changed on disk are read again first. */
+      list: (): Promise<T.PkmVault> => this.call<T.PkmVault>("/api/v1/pkm/page/list", undefined),
+      /** The page with its ((refs)) read out, the blocks linking to it and its open remarks; read again from its file when that changed. */
+      get: (a: T.PkmPageRef): Promise<T.PkmPageView> => this.call<T.PkmPageView>("/api/v1/pkm/page/get", a),
+      /** Makes the page, or sets the props and tier of the one with that title (its file moves to the tier's folder). */
+      save: (a: T.PkmPageRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/page/save", a),
+      move: (a: T.PkmMoveRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/page/move", a),
+      rename: (a: T.PkmRenameRequest): Promise<T.PkmRename> => this.call<T.PkmRename>("/api/v1/pkm/page/rename", a),
+      /** The page as plain Markdown: refs read out, links and remarks taken off. */
+      export: (a: T.PkmPageRef): Promise<T.PkmMarkdown> => this.call<T.PkmMarkdown>("/api/v1/pkm/page/export", a),
+    },
+    block: {
+      /** The ops in order on the page as its file is now, written back once. */
+      apply: (a: T.PkmMutation): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/block/apply", a),
+    },
+    radar: {
+      get: (a: { staleDays?: number }): Promise<T.PkmRadar> => this.call<T.PkmRadar>("/api/v1/pkm/radar/get", a),
+    },
+    comment: {
+      list: (a: { page?: string }): Promise<T.PkmComment[]> => this.call<T.PkmComment[]>("/api/v1/pkm/comment/list", a),
+      /** A rewrite of a block for the owner to accept: it keeps every [[link]] and ((ref)) the block had. */
+      suggest: (a: T.PkmProposalRequest): Promise<T.PkmProposal> => this.call<T.PkmProposal>("/api/v1/pkm/comment/suggest", a),
+      /** Accepted, the suggested text replaces the block's and its remarks come off; rejected, the block stays. */
+      resolve: (a: T.PkmResolveRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/comment/resolve", a),
+    },
+    clip: {
+      create: (a: T.PkmClipRequest): Promise<T.PkmClip> => this.call<T.PkmClip>("/api/v1/pkm/clip/create", a),
+    },
+    cluster: {
+      /** A resource page of ((refs)) to the inbox, journal and resource blocks about the topic. */
+      create: (a: T.PkmClusterRequest): Promise<T.PkmCluster> => this.call<T.PkmCluster>("/api/v1/pkm/cluster/create", a),
+    },
+  };
+
   readonly memory = {
     /** An agent's memories from the database and its configured sources. */
     list: (a: { agent: string }): Promise<T.MemoryList> => this.call<T.MemoryList>("/api/v1/memory/list", a),
@@ -360,33 +430,6 @@ export class VibeValleyApi {
     delete: (a: { agent: string; memory: string }): Promise<void> => this.call<void>("/api/v1/memory/delete", a),
     /** What delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { agent: string; memory: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/memory/previewDelete", a),
-  };
-
-  readonly skill = {
-    list: (): Promise<T.Skill[]> => this.call<T.Skill[]>("/api/v1/skill/list", undefined),
-    /** Create allocates an identity; callers with an existing identity use save. */
-    create: (a: T.Skill): Promise<T.Skill> => this.call<T.Skill>("/api/v1/skill/create", a),
-    update: (a: T.Skill): Promise<T.Skill> => this.call<T.Skill>("/api/v1/skill/update", a),
-    delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/skill/delete", a),
-    /** What delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/skill/previewDelete", a),
-  };
-
-  readonly project = {
-    list: (): Promise<T.ProjectSummary[]> => this.call<T.ProjectSummary[]>("/api/v1/project/list", undefined),
-    /** The first thing Create would refuse in this project, without making it. */
-    validate: (a: T.NewProject): Promise<T.Validation> => this.call<T.Validation>("/api/v1/project/validate", a),
-    create: (a: T.NewProject): Promise<T.ProjectSummary> => this.call<T.ProjectSummary>("/api/v1/project/create", a),
-    language: {
-      list: (a: { id: string }): Promise<T.ProjectLanguages> => this.call<T.ProjectLanguages>("/api/v1/project/language/list", a),
-    },
-    template: {
-      /** The issue templates for the project: its stack, the titles sent out there before, and the template catalog filled in for it. */
-      list: (a: { id: string }): Promise<T.ProjectTemplates> => this.call<T.ProjectTemplates>("/api/v1/project/template/list", a),
-    },
-    activity: {
-      get: (a: { id: string }): Promise<T.ProjectActivity> => this.call<T.ProjectActivity>("/api/v1/project/activity/get", a),
-    },
   };
 
   readonly connector = {

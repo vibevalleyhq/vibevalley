@@ -1,0 +1,17 @@
+{
+  "noPage": "没有「{page}」这一页",
+  "noBlock": "这一页上没有块 {id}",
+  "noComment": "没有这条评论：{id}",
+  "noTitle": "页面要有标题",
+  "noText": "要记的话是空的",
+  "noRename": "「{from}」和「{to}」都不是已有的页面",
+  "sameName": "新旧名字是同一个",
+  "circular": "[循环引用：{id}]",
+  "brokenRef": "[失效的块引用：{id}]",
+  "summary": "> **摘要**：{tldr}",
+  "kept": "改写时保留了全部链接",
+  "clipHeading": "## 核心论点与金句摘录",
+  "clusterHeading": "## {topic}：聚到一起的素材",
+  "clusterLine": "来自 [[{title}]]：(({id}))",
+  "clusterTldr": "围绕 {topic} 聚到一起的 {count} 条素材"
+}

@@ -1,10 +1,9 @@
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { everyone, ownerId, type Notify } from "@vibevalley/protocol";
-import { latestSessionIdOf, needOf, omitUndefined, cut, oneLine, slice } from "@vibevalley/protocol/rules";
+import { cut, defaultOf, latestSessionIdOf, needOf, omitUndefined, oneLine, slice } from "@vibevalley/protocol/rules";
 
 import { clip } from "@/base/clip.ts";
-import { defaultOf } from "@/channel/messages.ts";
 
 import { patrolBrief, patrolWho } from "./prompts.ts";
 

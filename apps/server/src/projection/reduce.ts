@@ -18,11 +18,11 @@ export function reduce(state: T.WorkspaceState, fact: T.Fact): [T.WorkspaceState
 
 function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
   switch (f.type) {
-    case "voiceCall": {
+    case "callChanged": {
       if (state.call === f.state && state.callReason === f.reason) return [state, false];
       return [{ ...state, call: f.state, callReason: f.reason }, true];
     }
-    case "sessionPhase": {
+    case "sessionPhaseChanged": {
       const session = sessionOf(state, f.id);
       if (
         !session ||
@@ -51,21 +51,21 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
           : before;
       return [{ ...after, plays: { ...plays, [f.id]: play } }, true];
     }
-    case "message": {
+    case "messageChanged": {
       const [chat, news] = withMessage(state.chat, f.message);
       return [chat === state.chat ? state : { ...state, ...(chat ? { chat } : {}) }, news];
     }
-    case "channel":
+    case "channelChanged":
       if (state.chat?.channels.some((c) => c.id === f.channel.id && same(c, f.channel)) === true) return [state, false];
       return [{ ...state, chat: withChannel(state.chat, f.channel) }, true];
-    case "channelGone": {
+    case "channelRemoved": {
       const all = state.chat?.channels ?? [];
       const kept = all.filter((c) => c.id !== f.id && c.parent !== f.id);
       return kept.length === all.length || !state.chat ? [state, false] : [{ ...state, chat: { ...state.chat, channels: kept } }, true];
     }
-    case "ownerMentions":
+    case "ownerMentionsChanged":
       return same(state.chat?.ownerMentions, f.mentions) ? [state, false] : [{ ...state, chat: withOwnerMentions(state.chat, f.mentions) }, true];
-    case "session": {
+    case "sessionChanged": {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
       const was = sessionOf(state, f.session.id);
       if (f.session.role === "orchestrator") return [{ ...state, sessions: [...others, f.session] }, true];
@@ -73,7 +73,7 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
       const play = was ? playOf(plays, f.session.id) : { ...emptyPlay(), station: freeStation(plays, others, farmOf(f.session)) };
       return [{ ...state, sessions: [...others, f.session], plays: { ...plays, [f.session.id]: play } }, true];
     }
-    case "sessionReport":
+    case "sessionReported":
       if (!sessionOf(state, f.id)) return [state, false];
       return [
         withSession(state, f.id, (x) => ({
@@ -90,12 +90,12 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
         }))[0],
         true,
       ];
-    case "sessionGone": {
+    case "sessionLeft": {
       const plays = { ...state.plays };
       delete plays[f.id];
       return [{ ...state, sessions: state.sessions.filter((h) => h.id !== f.id), plays }, true];
     }
-    case "gameProgress": {
+    case "progressChanged": {
       let next = state;
       let changed = false;
       if (f.commits !== undefined && !same(next.commits, f.commits)) {
@@ -115,7 +115,7 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
       }
       return [next, changed];
     }
-    case "cron": {
+    case "cronChanged": {
       const all = [...state.crons];
       const i = all.findIndex((x) => x.id === f.cron.id);
       if (i >= 0 && same(all[i], f.cron)) return [state, false];
@@ -123,16 +123,16 @@ function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
       else all.push(f.cron);
       return [{ ...state, crons: all }, true];
     }
-    case "cronGone":
+    case "cronRemoved":
       if (!state.crons.some((x) => x.id === f.id)) return [state, false];
       return [{ ...state, crons: state.crons.filter((x) => x.id !== f.id) }, true];
-    case "issue":
+    case "issueChanged":
       if (state.issues.some((t) => t.id === f.issue.id && same(t, f.issue))) return [state, false];
       return [{ ...state, issues: withIssue(state.issues, f.issue) }, true];
-    case "issueGone":
+    case "issueRemoved":
       if (!state.issues.some((x) => x.id === f.id)) return [state, false];
       return [{ ...state, issues: state.issues.filter((x) => x.id !== f.id) }, true];
-    case "connector": {
+    case "connectorChanged": {
       const all = [...state.connectors];
       const i = all.findIndex((x) => x.id === f.status.id);
       if (i >= 0 && same(all[i], f.status)) return [state, false];

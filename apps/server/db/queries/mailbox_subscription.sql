@@ -6,4 +6,4 @@ returning issue_id;
 
 -- name: SubscribedIssues :many
 -- bound: one owner per supplied thread key.
-select distinct issue_id from mailbox_subscription where thread_key = any(sqlc.arg(keys)::text[]);
+select distinct issue_id from mailbox_subscription where thread_key in (select value from json_each(sqlc.arg(keys)::text[]));

@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, For, Show, untrack } from "soli
 
 import { t } from "@vibevalley/i18n";
 import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, ownerId, type SessionView } from "@vibevalley/protocol";
+import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 import { artifactId as brandArtifactId, blockId as brandBlockId } from "@vibevalley/protocol/schema";
 
 import { aria, autofocus, Keyed, useNow } from "@/base/dom";
@@ -42,8 +43,6 @@ import {
   topOf,
   topsOf,
   chatPath,
-  channelOf,
-  defaultOf,
   sessionThreadOf,
   threadOwnerOf,
   threadTitle,

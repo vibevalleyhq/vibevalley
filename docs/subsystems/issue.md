@@ -38,9 +38,9 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/issue`（`Issue`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和问题、帮工历史、派给管家的工单；`refinement.ts` 起草（谁来起草、交回来的草稿怎么读进工单）；`merge.ts` 合并（本地合或提 PR、合不进去怎么说、PR 的轮询）；只有工单用的纯规则按管的事分开，见下一条。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
+- 服务端 `apps/server/src/issue`（`Issue`）：`issue.ts` 拼起对外的 `Issue`，自己管挪状态、带话和取消、验收和问题、帮工历史；它里面按职责分几个文件，每块只拿排在前面的几块给它的：`records.ts` 工单的行、内存里的派工（`Assignments`）和发布到核心状态，别的块都经它读写，派工只在这里加载和改；`split.ts` 拆成子工单，子工单验收后合进父工单的分支；`dispatch.ts` 派活（雇帮工、交给管家、排队、重开、定时任务的一轮）；`settle.ts` 挪状态之前先定下的（谁接手、交付什么）和试挪时的说法；`refinement.ts` 起草（谁来起草、交回来的草稿怎么读进工单）；`merge.ts` 合并（本地合或提 PR、合不进去怎么说、PR 的轮询）；只有工单用的纯规则按管的事分开，见下一条。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
 - 只有服务端跑的规则在 `apps/server/src/issue`：`status.ts` 的 `issueStatusOf`（状态怎么算）、`issueRefiningOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForOrchestrator`、`openFindings`，`stage.ts` 的 `issueStageOf`（给主人看的状态和能做的事）和 `issueStageIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`brief.ts` 交给帮工的话和从汇报读回来的（`issueBrief`，交付物是结论时带上只读的规矩和结论的格式；`cureWords`、`resumeWords`、`answerCureWords`；`splitBrief` 一句话拆成标题和说明；`findingsOf` 打回的意见），`refinement.ts` 起草（`parseRefinement` 读草稿、`refinementDescription` 拼说明），`templates.ts` 播种表上的模板和最近的标题，`timeline.ts` 的 `milestonesOf` 时间线，`filter.ts` 的 `pickIssues`，`stored.ts` 写进行的样子和下一个计划的 id；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题）和 `closedText`，`stage.ts` 的 `stageWantsOwner`；状态和动作叫什么在 `packages/protocol/src/words`。
-- 表：`issue`（一张工单一行；授权源头、验收标准、问题和 checks）、`issue_assignment`（责任关系）、`issue_assignment_execution`（实际执行）；排队输入归 `mailbox_issue` 与 `ingress_trigger`，Issue 直接提交 Trigger 并调用 Mailbox。
+- 表：`issue`（一张工单一行；授权源头、验收标准、问题和 checks）、`issue_assignment`（责任关系）、`issue_assignment_execution`（实际执行）；排队输入归 `mailbox_issue` 与 `mailbox_trigger`，Issue 直接提交 Trigger 并调用 Mailbox。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.refine`（`POST /api/v1/issue/refine`），时间线是 `issue.timeline.get`；命令行 `vibevalley issue …`。
 - 页面：工作台的看板在 `apps/web/src/features/issue`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/features/issue/acts.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；两边的动作（哪些要话、要先打开框、要开对话框，重开以后说什么）都经 `apps/web/src/features/issue/acts.ts` 的 `createIssueActs`，农场只换掉自己有特效的几个（`commands`）；一张工单的改动、时间线和帮工历史都经 `apps/web/src/features/issue/history.ts` 的 `useIssueChanges`、`useIssueTimeline`、`useIssueRuns` 读，键都在 `issues` 下，什么时候重读写在那里一处；工作台、农场、轨迹和工作记录里的帮工步骤都经 `apps/web/src/features/session/events.ts` 的 `createSessionEvents` 读（快照、直播和重连的约定见[客户端](docs/subsystems/app.md)）；农场的播种袋在 `farm/panels/SeedForms.tsx`。
 
@@ -57,7 +57,7 @@
 
 - **一张工单一个 id**，从写下到关上不变；重开是同一张工单的下一个帮工，不是新工单。
 - **状态六个**，和 Linear 一样：`backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled`。只存主人的意思（排没排上队 `queued_at`、关的结论：完成了交付了什么 `delivered`，或不做了为什么 `canceled`），帮工那一半（在做、交回来了）从核心状态里帮工的阶段算，不另存一份。
-- **数据库是家，核心状态有一份**：开着的和最近关的 50 家在 `WorkspaceState.issues`，`Issue` 每改一次库就施加一条 `issue` 事实；页面只读核心状态。
+- **数据库是家，核心状态有一份**：开着的和最近关的 50 家在 `WorkspaceState.issues`，`Issue` 每改一次库就施加一条 `issueChanged` 事实；页面只读核心状态。
 - **主人只挪到 `backlog`、`todo`、`done`、`canceled`**；`in_progress`、`in_review` 是帮工干出来的。每张工单的 `moves`（能挪到哪）和 `stage.acts`（能做什么）是同一张表的两面，都在 reduce 里和状态一起算（`withIssueStatuses`）：帮工这一轮一结束，看板、地块详情、命令行读到的就是新的，不等服务端再发布这张工单；服务端的拒绝调同一个 `statusMove`。拒绝（不能这样挪、现在不能这样做）带着 `next`：这张工单的按钮和按钮没盖到的挪法，各是一条能直接跑的命令（`moves.ts` 的 `nextSteps`）；要主人说一句的（带话、回答、打回、重开、再干一轮）只说哪个字段要写，不给命令。找不到工单时 `next` 是 `issue list`。挪状态和删工单各有试跑（`issue.status.previewUpdate`、`issue.previewDelete`，命令行的 `--dry-run`）：`setStatus` 先算出挪法和它要定下的（谁接手、交付是没改动、留分支还是合并），再动手；试跑只把同一份算出来的说成话（会派给谁、有没有空位、合进哪、会不会冲突、要不要先替它提交），不写库、不碰 git，所以试跑说能做的，真做不会因为同一个原因被拒。
 - **工单输入只存一份**：`channel_message` 以来源幂等键存输入，`mailbox_delivery` 管 `pending` → `handed` → `seen` / `dropped`。等主人时自动输入保留 `pending` 并标记 `deferred`；主人回复后恢复唤醒。Bot 超过预算用 `hop_limit` 挂起。超范围追问和关单未读消息以确定性键转交管家，全文经 `vv://` URI 拉取。
 - **原生依赖**：创建工单可以指定 `parent`、`blockedBy`。子工单继承父单的项目和负责人，父子必须同项目；父单等待子单的关系和前置依赖一起查环。前置全部完成或取消后，排队工单才会派发。子工单从父单的 `vibevalley/issue-<编号>` 分支开独立 worktree，拥有普通工单的操作。
@@ -126,7 +126,7 @@
 
 **验收**：等你验收时带话挪回待办就是没过，话一行一条记成验收意见（`findings`），还没解决的编号写成一句话交给帮工再修一轮；挪到已完成就是通过，意见都算解决。管家的 `issue_review` 走同一个 `Issue.review`：过了记下 `reviewedAt`，原来的意见都算解决，主人照样要完成它。新的一轮开始（带话、再干一轮）`reviewedAt` 作废，意见留着。
 
-**主人的话从一处进工单**：主人的话不管从哪来（`issue.comment.create`、在工单串里 `channel.message.send`、连接器、农场替主人说的冲突和检查没过），写进工单串就有一条带 `thread` 的 `message` 事实，工单服务订阅频道的 `ownerInThread`：清掉 `questions`，作废验收。帮工没有串时 `issue.comment.create` 直接送到帮工、没有事实，`comment` 自己做这两步。关上的工单不动。农场替主人说的话也算：冲突解决、检查没过修好以后是新的一轮代码，管家先前的验过作废。
+**主人的话从一处进工单**：主人的话不管从哪来（`issue.comment.create`、在工单串里 `channel.message.send`、连接器、农场替主人说的冲突和检查没过），写进工单串就有一条带 `thread` 的 `messageChanged` 事实，工单服务订阅频道的 `ownerInThread`：清掉 `questions`，作废验收。帮工没有串时 `issue.comment.create` 直接送到帮工、没有事实，`comment` 自己做这两步。关上的工单不动。农场替主人说的话也算：冲突解决、检查没过修好以后是新的一轮代码，管家先前的验过作废。
 
 **问题**：`issue_report(state="asking", questions=[…])` 把问题写进工单；主人在工单串里说一句就算回答，点一个选项就是把这句原样说出去，问题清掉。起草工单仍有自己的草稿格式，起草问题不经过运行报告解析。
 
@@ -221,4 +221,4 @@ GitHub 读取在 `ingress/github.ts`，归一化与投递在 `ingress/github.ts`
 
 工单派给管家时，责任与执行记录、Trigger 同事务提交。Trigger 保留派发时的正文、触发原因和回复频道，Issue 直接调用 Mailbox；若在提交后、路由前退出，Mailbox 从未路由 Trigger 恢复。重放以来源 ID 去重，不生成系统聊天消息。
 
-- **冲突归工单**：`Issue.conflict` 与 issue 行一起保存，通过 issue 事实更新；Session 和 FactConflict 已移除该字段与事件。预览改动、合并失败和帮工汇报后的 Git 复查更新同一份记录。Session 关闭、换人或重启不丢失冲突；没有 Session 时仍可检查保留的工单分支。原生父工单有冲突时进入 Inbox，子单均结束后可派一个父工单 Session 解决，再验收合并。
+- **冲突归工单**：`Issue.conflict` 与 issue 行一起保存，通过 `issueChanged` 事实更新，帮工那边没有这份记录。预览改动、合并失败和帮工汇报后的 Git 复查更新同一份记录。Session 关闭、换人或重启不丢失冲突；没有 Session 时仍可检查保留的工单分支。原生父工单有冲突时进入 Inbox，子单均结束后可派一个父工单 Session 解决，再验收合并。

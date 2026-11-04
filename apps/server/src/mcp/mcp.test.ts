@@ -61,7 +61,7 @@ const client = (mcp: Mcp["Service"], token: string) => {
 
 const hired = (core: Core["Service"], s: Partial<T.Session> & { id: string }) =>
   core.apply({
-    type: "session",
+    type: "sessionChanged",
     session: {
       name: s.id,
       role: "worker",

@@ -54,7 +54,7 @@ export const boardLook = defineStored(
 );
 
 /** What grouping and ordering read from a row. A task has no priority of its own: undefined sorts after low. */
-export interface RowFacts {
+export interface RowKeys {
   lane: Lane;
   priority?: Priority;
   createdAt: number;
@@ -67,9 +67,9 @@ const rank: Record<Priority, number> = { urgent: 0, high: 1, medium: 2, low: 3 }
 const priorityRank = (p: Priority | undefined) => (p === undefined ? 4 : rank[p]);
 
 /** Stable: rows that tie keep the order they came in. */
-export function orderRows<T>(rows: T[], ordering: Ordering, facts: (row: T) => RowFacts): T[] {
+export function orderRows<T>(rows: T[], ordering: Ordering, facts: (row: T) => RowKeys): T[] {
   if (ordering === "manual") return rows;
-  const key = (a: RowFacts, b: RowFacts) => {
+  const key = (a: RowKeys, b: RowKeys) => {
     switch (ordering) {
       case "priority":
         return priorityRank(a.priority) - priorityRank(b.priority);
@@ -94,7 +94,7 @@ export interface RowGroup<T> {
 
 /** By status every lane is a group, even empty, in lane order; by project or agent the named groups come by name and
  * the rows without one last. Rows keep their order inside a group. */
-export function groupRows<T>(rows: T[], grouping: Grouping, facts: (row: T) => RowFacts): RowGroup<T>[] {
+export function groupRows<T>(rows: T[], grouping: Grouping, facts: (row: T) => RowKeys): RowGroup<T>[] {
   switch (grouping) {
     case "none":
       return [{ key: "", rows }];
@@ -115,7 +115,7 @@ export function groupRows<T>(rows: T[], grouping: Grouping, facts: (row: T) => R
 
 const issueUpdated = (i: Issue) => Math.max(i.createdAt, i.queuedAt ?? 0, i.closedAt ?? 0, i.reviewedAt ?? 0);
 
-export function rowFacts(c: BoardCard): RowFacts {
+export function rowKeys(c: BoardCard): RowKeys {
   switch (c.kind) {
     case "family":
     case "todo":
@@ -153,5 +153,5 @@ function closedAt(c: BoardCard) {
 /** A lane's cards in the order the owner picked; the closed lane by default newest closed first. */
 export function laneOrder(lane: Lane, cards: BoardCard[], ordering: Ordering) {
   if (lane === "closed" && ordering === "manual") return [...cards].toSorted((a, b) => closedAt(b) - closedAt(a));
-  return orderRows(cards, ordering, rowFacts);
+  return orderRows(cards, ordering, rowKeys);
 }

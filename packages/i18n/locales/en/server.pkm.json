@@ -1,0 +1,17 @@
+{
+  "noPage": "There is no page “{page}”",
+  "noBlock": "This page has no block {id}",
+  "noComment": "There is no comment {id}",
+  "noTitle": "A page needs a title",
+  "noText": "There is nothing to capture",
+  "noRename": "Neither “{from}” nor “{to}” is a page",
+  "sameName": "The old and new names are the same",
+  "circular": "[circular ref: {id}]",
+  "brokenRef": "[missing block: {id}]",
+  "summary": "> **Summary**: {tldr}",
+  "kept": "Rewritten with every link kept",
+  "clipHeading": "## Key points and quotes",
+  "clusterHeading": "## {topic}: sources gathered",
+  "clusterLine": "From [[{title}]]: (({id}))",
+  "clusterTldr": "{count} sources gathered on {topic}"
+}

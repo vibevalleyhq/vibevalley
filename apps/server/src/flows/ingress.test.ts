@@ -72,7 +72,7 @@ it.live("regression: chat triggers keep their original payload through edits and
     const current = yield* ingress.owner({ source: "voice", text: "original voice input", envelope: "voice-source" });
     yield* chat.say("next message", undefined, "after");
     yield* chat.edit(current.message.id, "edited voice input");
-    yield* sql`update ingress_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
+    yield* sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
     yield* (yield* Mailbox).replay;
     expect(yield* mailbox.registered(current.message.id)).toBe(false);
     yield* chat.start;
@@ -202,7 +202,7 @@ it.live("regression: issue input waits without a session and an owner followup r
     };
     const queued = (yield* ingress.accept(ownerEvent))!;
     expect(sessions.presentSessions()).toHaveLength(0);
-    expect((yield* sql<{ state: string }>`select state::text from mailbox_issue where trigger_id = ${queued.id}`)[0]?.state).toBe("held");
+    expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${queued.id}`)[0]?.state).toBe("held");
     const started = yield* issues.start(issue.id, "");
     yield* until(() => inputs.some((input) => input.includes("queued-owner-detail")), "the queued input delivered");
     expect(inputs[0]).toContain("queued-owner-detail");
@@ -216,13 +216,13 @@ it.live("regression: issue input waits without a session and an owner followup r
       addressed: "thread_owner",
       at: 2,
     }))!;
-    expect((yield* sql<{ state: string; reason: string }>`select state::text, reason from mailbox_issue where trigger_id = ${automatic.id}`)[0]).toEqual({
+    expect((yield* sql<{ state: string; reason: string }>`select state, reason from mailbox_issue where trigger_id = ${automatic.id}`)[0]).toEqual({
       state: "held",
       reason: "human",
     });
     expect(inputs.some((input) => input.includes("frozen-ci-detail"))).toBe(false);
     yield* ingress.accept(ownerEvent);
-    expect((yield* sql<{ state: string }>`select state::text from mailbox_issue where trigger_id = ${automatic.id}`)[0]?.state).toBe("held");
+    expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${automatic.id}`)[0]?.state).toBe("held");
     yield* ingress.accept({ ...ownerEvent, key: "release-owner", text: "release-owner-detail", at: 3 });
     yield* until(() => inputs.some((input) => input.includes("frozen-ci-detail")), "the frozen input released");
     expect((yield* issues.list()).map((item) => item.id)).toEqual([issue.id]);

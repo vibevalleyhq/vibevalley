@@ -14,7 +14,7 @@ import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema"
 import { type KeptFile, keptFile } from "@/infra/files.ts";
 import { type Time, timeHere } from "@/infra/time.ts";
 
-import type { From, ToolStart } from "./facts.ts";
+import type { From, ToolStart } from "./reaction.ts";
 
 const keepEvents = 240;
 const textMax = 6000;

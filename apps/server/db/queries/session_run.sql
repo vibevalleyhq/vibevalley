@@ -27,4 +27,4 @@ select * from session_run where session = sqlc.arg(session) order by id;
 
 -- name: RunsOfSessions :many
 -- bound: the runs of the sessions given, which a list takes limited.
-select * from session_run where session = any(sqlc.arg(sessions)::text[]) order by session, id;
+select * from session_run where session in (select value from json_each(sqlc.arg(sessions)::text[])) order by session, id;

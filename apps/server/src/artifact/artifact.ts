@@ -246,7 +246,7 @@ const make = () =>
           ? yield* db.run(qa.artifactsForIssue({ issue: q.issue }))
           : q.channel
             ? yield* db.run(qa.artifactsInChannel({ channel_id: q.channel }))
-            : yield* db.run(qa.artifacts({ limit_n: BigInt(listedMax) }));
+            : yield* db.run(qa.artifacts({ limit_n: listedMax }));
         const out: T.Artifact[] = [];
         // Both given: the issue's, in that channel.
         yield* Effect.forEach(

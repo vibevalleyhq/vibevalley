@@ -6,9 +6,9 @@ state's fold and the frame (`apps/server/src/projection`). No files, no network.
 
 | Entry | What |
 |---|---|
-| `@vibevalley/protocol` | `src/shapes.ts` (the types, and the constants both sides share), `src/stream.ts` (reading a stream), `src/client.ts` (`VibeValleyApi`, written by `vp run api:client` from `api.ts`) |
-| `@vibevalley/protocol/schema` | a Schema for every shape, each typed `Codec<T.X>` (`Schema.Codec<T.X, Wire<T.X>>`, the wire side without the ids' brands): it fails to compile when the two differ |
-| `@vibevalley/protocol/api` | `endpoints` (method, path, parameters, request and answer Schemas, who may call), `Handlers`, `errorStatus` |
+| `@vibevalley/protocol` | `src/<concept>/shapes.ts`, a folder per concept named as the server's module, gathered by `src/shapes.ts` (the types, and the constants both sides share), `src/stream.ts` (reading a stream), `src/client.ts` (`VibeValleyApi`, written by `vp run api:client` from the endpoint table) |
+| `@vibevalley/protocol/schema` | a Schema for every shape, in `src/<concept>/schema.ts` beside it, each typed `Codec<T.X>` (`Schema.Codec<T.X, Wire<T.X>>`, the wire side without the ids' brands): it fails to compile when the two differ |
+| `@vibevalley/protocol/api` | `endpoints` (method, path, parameters, request and answer Schemas, who may call) and `Handlers`, put together from each concept's `src/<concept>/api.ts`; `errorStatus`, `Endpoint` and `input` from `src/endpoint.ts` |
 | `@vibevalley/protocol/rpc` | `Subscriptions`: the RPCs a page follows a channel and the farm's reports by, over the WebSocket at `rpcPath` |
 | `@vibevalley/protocol/host` | `Host`: what the page may ask of the desktop's shell or the phone's (below); `desktopBridge` and `mobileBridge`, the contracts each host's calls go over (`@vibevalley/bridge`), and `mobileHost`, the page's end of the phone's |
 | `@vibevalley/protocol/rules` | the core state's fold (`reduce`, `frameOf`), the inbox, plots and achievements, task graphs, schedules, the doc's order keys, text as JavaScript measures it |

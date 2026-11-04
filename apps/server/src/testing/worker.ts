@@ -12,7 +12,7 @@ import { Effect } from "effect";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
 import { answerOpening, criteriaHead } from "@/issue/prompts.ts";
-import { factsOf, presetOf } from "@/runtime/presets.ts";
+import { supportOf, presetOf } from "@/runtime/presets.ts";
 import { briefBreak } from "@/session/briefing.ts";
 
 import { until } from "./layers.ts";
@@ -170,7 +170,7 @@ export const installedOnly =
   async (id: string): Promise<RuntimeInfo> => ({
     id,
     preset: presetOf(id),
-    facts: factsOf(id),
+    support: supportOf(id),
     installation: given.some((r) => r.id === id) ? { status: "available", via: "bundled", command: id, version: null } : { status: "not_found" },
     models: null,
     stop: "",

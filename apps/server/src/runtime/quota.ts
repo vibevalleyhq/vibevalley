@@ -4,9 +4,6 @@ import type { AccountUsage, RuntimeQuota } from "@vibevalley/protocol";
 /** CNY in words; anything positive under a cent says so, so that a spent amount never reads as ¥0.00. */
 export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? t("server.runtime.lessThanCent") : "¥" + cny.toFixed(2));
 
-/** The percent of a window still left below which a runtime is nearly out of quota. */
-export const quotaLow = 15;
-
 /** The least left of any window, 0 at the least; undefined when the usage has no windows. */
 export function quotaLeft(usage: AccountUsage | null): number | undefined {
   if (usage?.status !== "ok" || usage.windows.length === 0) return undefined;

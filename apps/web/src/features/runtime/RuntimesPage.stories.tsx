@@ -14,7 +14,7 @@ const info = (more: Partial<RuntimeInfo> = {}): RuntimeInfo => ({
   id: "claude",
   stop: "",
   preset: { id: "claude", label: "Claude Code", blurb: "Anthropic 的编码 agent，在终端里干活。", look },
-  facts: { steer: true, refused: {}, capabilities: ["listModels", "accountUsage", "checkUpdate", "skills", "mcpServers", "tools"], inProcess: false },
+  support: { steer: true, refused: {}, capabilities: ["listModels", "accountUsage", "checkUpdate", "skills", "mcpServers", "tools"], inProcess: false },
   installation: ready,
   models: [
     { id: "opus", name: "Opus", effortLevels: ["low", "medium", "high"], isDefault: true },

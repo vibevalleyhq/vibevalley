@@ -5,7 +5,7 @@ import type { AccountUsage, Agent, RuntimeInfo } from "@vibevalley/protocol";
 import { sampleAgent } from "@/agent/seed.ts";
 import { checkCases, goldenCases } from "@/testing/golden.ts";
 
-import { agentProblems, chooseAgent, factsOf, moneyStop } from "./presets.ts";
+import { agentProblems, chooseAgent, supportOf, moneyStop } from "./presets.ts";
 import { quotaLeft, quotaOf, quotaText } from "./quota.ts";
 
 test("the recorded cases", () => {
@@ -21,9 +21,9 @@ test("the recorded cases", () => {
           text: quotaText(c.in as AccountUsage),
         };
       case "agentProblems": {
-        // Recorded before a runtime always carried its facts: one recorded without them has its own.
-        const i = c.in as { agent: Agent; runtime: (Omit<RuntimeInfo, "facts"> & Partial<Pick<RuntimeInfo, "facts">>) | null };
-        return agentProblems(i.agent, i.runtime ? { ...i.runtime, facts: i.runtime.facts ?? factsOf(i.runtime.id) } : undefined);
+        // Recorded before a runtime always carried its support: one recorded without them has its own.
+        const i = c.in as { agent: Agent; runtime: (Omit<RuntimeInfo, "support"> & Partial<Pick<RuntimeInfo, "support">>) | null };
+        return agentProblems(i.agent, i.runtime ? { ...i.runtime, support: i.runtime.support ?? supportOf(i.runtime.id) } : undefined);
       }
       default:
         throw new Error(`line ${c.line}: no rule ${c.fn}`);

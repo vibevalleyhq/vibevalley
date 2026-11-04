@@ -1,0 +1,61 @@
+{
+  "place": {
+    "label": "Notes",
+    "hint": "Your own notes: outline pages sorted by PARA, daily journals, backlinks and suggested rewrites"
+  },
+  "tier": {
+    "project": "Projects",
+    "area": "Areas",
+    "resource": "Resources",
+    "inbox": "Inbox",
+    "journal": "Journals",
+    "archive": "Archive"
+  },
+  "list": {
+    "label": "All note pages",
+    "capture": "Jot a line into today's journal",
+    "captured": "Added to today's journal",
+    "find": "Search notes",
+    "nothingFound": "Nothing found",
+    "open": "{n} open",
+    "radar": "Inbox {inbox} · stale projects {stale} · overdue {overdue}",
+    "all": "All notes"
+  },
+  "empty": "No notes yet. The pages are the Markdown files in {root}; jot a line on the left to start today's journal.",
+  "gone": "There is no such page, or its file was deleted.",
+  "pick": "Pick a page on the left",
+  "page": {
+    "more": "More",
+    "export": "Export as Markdown (copy)",
+    "exported": "Copied",
+    "undo": "Undo the last change",
+    "undone": "Undone: {what}",
+    "nothingToUndo": "Nothing to undo",
+    "tier": "Where it sits",
+    "moved": "Moved to {tier}",
+    "file": "File {file}",
+    "append": "Add a block",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "edit": "Edit this block",
+    "marker": "Change its state",
+    "empty": "Empty",
+    "missingRef": "Block not found"
+  },
+  "backlinks": {
+    "title": "Linked here",
+    "none": "No other page links here yet",
+    "projects": "Projects",
+    "journals": "Journals",
+    "areas": "Areas and resources",
+    "archives": "Archive"
+  },
+  "comments": {
+    "title": "Comments and suggested rewrites",
+    "accept": "Accept",
+    "reject": "Reject",
+    "on": "On “{span}”",
+    "accepted": "Accepted",
+    "rejected": "Rejected"
+  }
+}

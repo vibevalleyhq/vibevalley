@@ -11,7 +11,7 @@ import { type Db, causeMessage } from "@/infra/db.ts";
 import { senderKind } from "@/mailbox/envelope.ts";
 import type { InboxMessage, OrchestratorNews } from "@/mailbox/envelope.ts";
 
-import * as qr from "../../db/generated/ingress_trigger.sql.ts";
+import * as qr from "../../db/generated/mailbox_trigger.sql.ts";
 
 export type InputContext = T.TriggerContext;
 export interface DeliveryPayload {
@@ -63,6 +63,15 @@ export const triggerOf = (input: TriggerInput): T.Trigger => {
     ...(input.picked === undefined ? {} : { picked: input.picked }),
   };
 };
+
+/** A source's trigger as Ingress encoded it, kept once by (source, key): an event read again is the trigger it was. */
+export const keepSourceTrigger = (db: Db["Service"], row: qr.RecordTriggerParams) => db.run(qr.recordTrigger(row));
+
+/** A kept trigger's words and payload, as they were written. */
+export const keptTrigger = (db: Db["Service"], id: string) => db.one(qr.triggerById({ id }));
+
+/** The events already kept for one pull request: their keys, whether routed, and the bot's review rounds. */
+export const knownGitHubEvents = (db: Db["Service"], project: string, pr: number) => db.run(qr.knownGitHubEvents({ project, pr_number: pr }));
 
 /** The caller's transaction includes this row, so it can advance its source cursor atomically. */
 export const recordTrigger = (db: Db["Service"], input: TriggerInput) =>

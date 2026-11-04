@@ -97,7 +97,7 @@ const make = Effect.gen(function* () {
       by: row.set_by,
       pending: row.pending,
     };
-    yield* core.apply({ type: "cron", cron: s });
+    yield* core.apply({ type: "cronChanged", cron: s });
   }
 
   const find = (id: string) => {
@@ -182,7 +182,7 @@ const make = Effect.gen(function* () {
                 onFailure: (failure) => Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`),
                 onSuccess: (trigger) =>
                   Effect.gen(function* () {
-                    yield* core.apply({ type: "cron", cron: after });
+                    yield* core.apply({ type: "cronChanged", cron: after });
                     PubSub.publishUnsafe(dueHub, occurrence);
                     yield* handle(occurrence, trigger);
                   }),
@@ -241,7 +241,7 @@ const make = Effect.gen(function* () {
           created_at: at,
         }),
       );
-      yield* core.apply({ type: "cron", cron: s });
+      yield* core.apply({ type: "cronChanged", cron: s });
       return s;
     }, lock.withPermits(1)),
     setEnabled: Effect.fn("Cron.setEnabled")(function* (id, enabled) {
@@ -254,13 +254,13 @@ const make = Effect.gen(function* () {
         s = { ...s, lastRun: at };
         yield* ran(id, at, enabled);
       } else yield* db.run(q.enableCron({ enabled, id }));
-      yield* core.apply({ type: "cron", cron: s });
+      yield* core.apply({ type: "cronChanged", cron: s });
       return s;
     }, lock.withPermits(1)),
     remove: Effect.fn("Cron.remove")(function* (id) {
       const was = yield* find(id);
       yield* db.run(q.removeCron({ id }));
-      yield* core.apply({ type: "cronGone", id });
+      yield* core.apply({ type: "cronRemoved", id });
       return was;
     }, lock.withPermits(1)),
     previewRemove: Effect.fn("Cron.previewRemove")(function* (id) {

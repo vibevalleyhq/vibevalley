@@ -3,29 +3,12 @@
 // stay the server's.
 
 import { type BlockAttrs, type BlockType, BlockTypeValues, type SpanMarks, type TextSpan } from "@vibevalley/protocol";
+import { normalSpans } from "@vibevalley/protocol/rules";
 
 /** The server counts offsets in code points; a string's index is in UTF-16 units. */
 export const codePointOffset = (text: string, utf16: number) => [...text.slice(0, Math.min(Math.max(0, utf16), text.length))].length;
 
 export const plainOf = (spans: readonly TextSpan[]) => spans.map((s) => s.t).join("");
-
-const sameMarks = (a: SpanMarks, b: SpanMarks) =>
-  (a.bold ?? false) === (b.bold ?? false) &&
-  (a.italic ?? false) === (b.italic ?? false) &&
-  (a.code ?? false) === (b.code ?? false) &&
-  (a.strike ?? false) === (b.strike ?? false) &&
-  a.link === b.link;
-
-export function normalSpans(spans: Iterable<TextSpan>): TextSpan[] {
-  const out: TextSpan[] = [];
-  for (const s of spans) {
-    if (!s.t) continue;
-    const last = out.at(-1);
-    if (last && sameMarks(last.marks, s.marks)) out[out.length - 1] = { t: last.t + s.t, marks: s.marks };
-    else out.push(s);
-  }
-  return out;
-}
 
 /** Spans cut at a UTF-16 index of their text. */
 export function splitSpans(spans: readonly TextSpan[], at: number): [TextSpan[], TextSpan[]] {

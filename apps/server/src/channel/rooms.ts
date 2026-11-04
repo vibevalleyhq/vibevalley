@@ -82,6 +82,12 @@ export class ChatModel {
     return this.threadBySubject.get(subjectKey(kind, id));
   }
 
+  /** The default channel (is_default): where words with no channel named land. */
+  defaultId(): string {
+    for (const c of this.byId.values()) if (c.is_default) return c.id;
+    return "";
+  }
+
   channelByName(name: string): ChannelRow | undefined {
     for (const c of this.byId.values()) if (c.name === name && c.type === "channel") return c;
     return undefined;

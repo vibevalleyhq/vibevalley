@@ -33,17 +33,17 @@ describe("a session's work", () => {
       const report = yield* w.nextReport;
       const text = lastText(sessions, report.id, report.summary);
       yield* sessions.dismiss(session.id);
-      yield* until(() => w.facts.some((x) => x.type === "sessionGone"), "it went home");
+      yield* until(() => w.facts.some((x) => x.type === "sessionLeft"), "it went home");
       expect(report.outcome).toBe("completed");
       expect(text).toMatch(/做完了：写 hello\.py/u);
       expect(text).toMatch(/原型/u);
       // The farm's other news (its commits, the issue, the default channel and the owner's mentions in it) comes and goes beside the session's own.
-      const mine = w.facts.filter((x) => !["commits", "issue", "message", "channel", "ownerMentions", "progress"].includes(x.type));
-      expect([mine[0]!.type, mine.at(-1)!.type]).toEqual(["session", "sessionGone"]);
-      expect(mine.some((x) => x.type === "sessionPhase" && x.phase._tag === "working")).toBe(true);
+      const mine = w.facts.filter((x) => !["commits", "issueChanged", "messageChanged", "channelChanged", "ownerMentionsChanged", "progress"].includes(x.type));
+      expect([mine[0]!.type, mine.at(-1)!.type]).toEqual(["sessionChanged", "sessionLeft"]);
+      expect(mine.some((x) => x.type === "sessionPhaseChanged" && x.phase._tag === "working")).toBe(true);
       expect(
         mine.some(
-          (x) => x.type === "sessionPhase" && x.phase._tag === "working" && x.phase.doing.action === "run_command" && x.phase.doing.label === "echo hi",
+          (x) => x.type === "sessionPhaseChanged" && x.phase._tag === "working" && x.phase.doing.action === "run_command" && x.phase.doing.label === "echo hi",
         ),
       ).toBe(true);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -91,7 +91,7 @@ describe("a session's work", () => {
         runPromise(
           sql<{
             n: number;
-          }>`select count(*)::int as n from game_ledger where kind = 'harvested' and payload like ${`%"session":"${session.id}"%`}`.pipe(Effect.orDie),
+          }>`select count(*) as n from game_ledger where kind = 'harvested' and payload like ${`%"session":"${session.id}"%`}`.pipe(Effect.orDie),
         ).then((r) => r[0]!.n);
       yield* until(async () => (await entries()) > 0, "a harvested entry");
       expect(yield* Effect.promise(entries)).toBe(1);
@@ -376,7 +376,12 @@ describe("a session's work", () => {
           "a third run going",
         );
         expect((yield* sessions.deliver(session.id, "顺便看看", delivery({ kind: "comment", message: "m43" }, ["m43"]))).kind).toBe("steered");
-        expect((yield* sessions.issueRuns(session.issue!))[2]!.heard).toEqual(["m43"]);
+        // A run's heard is recorded behind the steer (recordRun), so it is waited for.
+        yield* await_(
+          () => sessions.issueRuns(session!.issue!),
+          (r) => r[2]?.heard.includes("m43") === true,
+          "the steered message heard",
+        );
       }).pipe(Effect.scoped, Effect.provide(before.layer));
       const after = farm({ config });
       yield* Effect.gen(function* () {
@@ -396,7 +401,7 @@ describe("a session's work", () => {
       const found: boolean[] = [];
       yield* Effect.forkScoped(
         Stream.runForEach(yield* core.subscribe, (e) =>
-          e.type === "session"
+          e.type === "sessionChanged"
             ? Effect.map(Effect.exit(issues.get(e.session.issue ?? e.session.id)), (x) => void found.push(x._tag === "Success"))
             : Effect.void,
         ),

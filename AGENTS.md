@@ -6,15 +6,15 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 
 ```
 apps/server/               服务端（Effect v4，Node 24 上用 tsx 跑）：src/ 里一块业务一个文件夹，名字用单数，每个导出一个服务
-                           （Context.Service）：core、setting、agent、project、memory、artifact、runtime、executor、session、mailbox、channel、cron、issue、
+                           （Context.Service）：core、setting、agent、project、memory、artifact、runtime、executor、session、mailbox、channel、pkm、cron、issue、
                            inbox、tool、mcp、orchestrator、lan、voice、connector、game；projection 是核心状态的折法和拼帧（读各模块的
                            规则，组装时交给 core）；VibeValley 自己的 agent 在 packages/agent，这里只组装它（runtime/vibevalley.ts 是
                            oar 的 vibevalley runtime）；base 是不碰外面的地基（id、JSON、排序、脱敏），infra 是和进程、机器打交道的
                            （配置、库、文件、家目录的租约、日志、时间）；services.ts 按次序把它们组装起来，
-                           handlers.ts 是全部接口的处理，http/ 是路由、流和 /mcp；cli.ts 是命令行（农场的每个接口、和农机直接聊、
+                           handlers.ts 把 http/handlers/<概念>.ts 合成全部接口的处理，http/ 是路由、流和 /mcp；cli.ts 是命令行（农场的每个接口、和农机直接聊、
                            自己的 agent）
-apps/server/db/            库（PGlite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，
-                           generated/ 是 effect-sqlc 从它们写出的
+apps/server/db/            库（SQLite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，
+                           generated/ 是 scripts/sqlite-generate.ts 从它们写出的
 apps/server/src/*/testdata 规则的黄金数据（*.jsonl.gz）和样例
 apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手机三个宿主共用的一份，由服务端（--web）在 / 提供；/ 打开工作台，/farm 是像素农场
                            （src/farm，PixiJS），其余是工作台：一个概念一个 src/features/<概念>，名字和服务端的模块一样；分层
@@ -23,8 +23,8 @@ apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手
 apps/desktop/              Electron 壳：用自己的 Node 带着服务端起来，打开它提供的页面；宿主能力经 preload 给页面
 apps/island/               刘海上的灵动岛（Swift、AppKit、SwiftUI）：桌面壳带起来的原生小程序，显示在做和等你的工单，点一行打开它
 apps/mobile/               手机壳（Expo、React Native）：扫码配对，WebView 打开那台电脑「连接到本机」放出的页面；通知、锁屏不断的通话经桥给页面
-packages/protocol/         契约：形状（src/shapes.ts）、它们的 Schema（schema.ts）、接口（api.ts）、订阅的 RPC（rpc.ts）和两边都跑的规则
-                           （src/rules）：服务端和页面都用；只有服务端跑的规则在 apps/server/src 各自的模块里。宿主接口（host.ts）：页面能
+packages/protocol/         契约：一个概念一个文件夹 src/<概念>/（名字同服务端的模块），里面是形状（shapes.ts）、它们的 Schema（schema.ts）、
+                           接口（api.ts），src/ 下同名的三个文件只汇总；订阅的 RPC（rpc.ts）和两边都跑的规则（src/rules）：服务端和页面都用；只有服务端跑的规则在 apps/server/src 各自的模块里。宿主接口（host.ts）：页面能
                            向桌面壳、手机壳要的东西（通知、托盘、全局快捷键、通话的线路），和手机壳的桥
 packages/base-ui/          无样式的组件（照 Base UI 的 Solid 2 版）：键盘、焦点、ARIA、开合和选中的状态、浮层的定位；样子在 apps/web/src/ui
 packages/engine/           像素农场的引擎：Pixi 的舞台、寻路、音效合成、日钟、按整数倍放大
@@ -55,7 +55,7 @@ vpx scripts/comment-review.ts                                   # 提 PR 前：�
 vp run --filter @vibevalley/server start                         # 服务端，127.0.0.1:8787；后面加 --web ../web/dist 同时提供页面
 vp run --filter @vibevalley/server cli issue list                # 命令行：调农场的接口（help 列出全部），runtime chat <农机> 直接聊
 vp run server:check                                             # 改完服务端、packages/protocol、ai、agent、testkit：类型（vp check）、规则的测试、查询是否最新、vitest
-vp run --filter @vibevalley/server db:generate                   # 改完 db/queries 或 db/migrations：用 effect-sqlc 重写 db/generated
+vp run --filter @vibevalley/server db:generate                   # 改完 db/queries 或 db/migrations：重写 db/generated（推不出的类型写 ::int 这类，生成器会说）
 vp run golden:update                                            # 有意改了规则：用现在的结果重写各处的黄金数据，再看 diff（后面加 <模块> 只重写那一处，核心状态的是 core，模型的是 ai）
 vp run --filter @vibevalley/server evals                         # 改了管家的提示或工具描述：真模型重放管家的样例（要 DEEPSEEK_API_KEY、花钱，先问主人；vv-acceptance 的管家评测分册）
 vp run web:check                                                # 改完 apps/、packages/：类型（vp check），engine、宿主的桥、手机壳和页面规则的测试，页面能构建
@@ -68,8 +68,8 @@ vp run --filter @vibevalley/island test                          # 改完灵动�
 vp run --filter @vibevalley/mobile test                          # 改完手机壳（类型在 vp check）；建原生工程、跑模拟器上的端到端见 apps/mobile/README.md
 vp run package:mac                                              # macOS 应用、.dmg 和更新用的 .zip、release.json（apps/desktop/dist）：壳、页面、灵动岛和带着生产依赖的 apps/server
 vp run --filter @vibevalley/desktop update-check                 # 改了桌面版的更新或打包：两个真的包上走一遍更新（十分钟上下）；推 v* 的 tag 发布草稿 Release
-vp run capabilities                                             # 改了 api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
-vp run api:client                                               # 改了 api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）
+vp run capabilities                                             # 改了 <概念>/api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
+vp run api:client                                               # 改了 <概念>/api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）
 vp run i18n:gen                                                 # 改了 packages/i18n/locales：重写 catalogs.ts（键和参数的类型）；vpx scripts/i18n.ts check|find <文字> 查问题、找键
 vp run effect:check                                             # 改了 Effect 代码：Effect 自己的诊断（@effect/tsgo，规则在 tsconfig.base.json 的 plugins，vp check 的 oxlint 也跑同一批），警告也算失败；在 server:check 和 CI 里
 vp run health                                                   # 看先改哪里：热点和逃生口；vp run health:verify 对棘轮（逃生口变少了跑 vp run health:write 降下来）
@@ -81,7 +81,7 @@ vp run site:check && vp run site:build                          # 改完 site/�
 
 Node 24（`.node-version` 定的那个，`vp` 和 CI 都照它；服务端经 tsx 跑，脚本经 `vpx` 直接跑 `.ts`），Vite+（`vp`：pnpm 12、格式、lint、类型、测试、任务），Electron 44。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `apps/server` 要重启它。
 
-一件事的主线：oar 的会话事件 → `apps/server/src/session/facts.ts`（纯函数）读成事实 → `Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给页面；每个会话和管家的每一步由 `session/journal.ts` 记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
+一件事的主线：oar 的会话事件 → `apps/server/src/session/reaction.ts`（纯函数）读成事实 → `Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给页面；每个会话和管家的每一步由 `session/journal.ts` 记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
 
 ## 怎么让 agent 做对
 
@@ -110,15 +110,15 @@ list are in the [vv-effect](.agents/skills/vv-effect/SKILL.md) skill.
 ## 规矩
 
 - **先有概念，再有皮**：服务端按实际的概念分模块（工单、帮工、项目、群聊……，[概念](docs/concepts.md)）；农场只画它们，每个农场里的东西都对得上一件实际的事；游戏规则只读事件、算画面，业务不调它（[提案](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）。
-- **核心状态只有一份**：帮工或农场的新状态，在 `packages/protocol/src/shapes.ts` 里加字段或事实，在 `apps/server/src/projection/reduce.ts` 的 `reduce` 里折，只由服务端 `Core.apply` 施加。不要在服务端、页面里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
-- **`packages/protocol` 只放契约**：线上的形状写在 `shapes.ts`，每个形状在 `schema.ts` 有一个由它定类型的 Schema（`Codec<T.X>`：两边对不上就编不过），接口写在 `api.ts`；`src/rules` 只放页面和服务端都要跑的纯函数，只有服务端跑的规则归拥有它的模块（`apps/server/src/<模块>`），结论写进帧给页面，页面不为了展示去调规则（`rules/contract.test.ts` 查每个导出都有服务端以外的包在用）；黄金数据（`apps/server/src/<模块>/testdata/*.jsonl.gz`）跟着规则走，有意改了规则就 `vp run golden:update` 重写，看过 diff 再留（[理由](docs/subsystems/foundation.md)）。
-- **生成的不手改**：`apps/server/db/generated` 由 effect-sqlc 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`packages/i18n/src/catalogs.ts` 由 `vp run i18n:gen` 写，`docs:verify` 查它们（[理由](docs/subsystems/foundation.md)）。
+- **核心状态只有一份**：帮工或农场的新状态，在 `packages/protocol/src/<概念>/shapes.ts` 里加字段、在 `core/shapes.ts` 加事实，在 `apps/server/src/projection/reduce.ts` 的 `reduce` 里折，只由服务端 `Core.apply` 施加。不要在服务端、页面里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
+- **`packages/protocol` 只放契约**：一个概念一个文件夹 `src/<概念>/`：线上的形状写在它的 `shapes.ts`，每个形状在同一个文件夹的 `schema.ts` 有一个由它定类型的 Schema（`Codec<T.X>`：两边对不上就编不过），接口写在它的 `api.ts`，`src/shapes.ts`、`schema.ts`、`api.ts` 只汇总；`src/rules` 只放页面和服务端都要跑的纯函数，只有服务端跑的规则归拥有它的模块（`apps/server/src/<模块>`），结论写进帧给页面，页面不为了展示去调规则（`rules/contract.test.ts` 查每个导出都有服务端以外的包在用）；黄金数据（`apps/server/src/<模块>/testdata/*.jsonl.gz`）跟着规则走，有意改了规则就 `vp run golden:update` 重写，看过 diff 再留（[理由](docs/subsystems/foundation.md)）。
+- **生成的不手改**：`apps/server/db/generated` 由 `scripts/sqlite-generate.ts` 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`packages/i18n/src/catalogs.ts` 由 `vp run i18n:gen` 写，`docs:verify` 查它们（[理由](docs/subsystems/foundation.md)）。
 - **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `apps/server/src` 文件夹（`issue`、`issue_assignment`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `db/queries/<表>.sql`，一张表一个文件，代码里只调生成的；`src/infra/schema.test.ts` 查这几条（[理由](docs/subsystems/foundation.md)）。
 - **内部不留兼容**：架构还在成形，不为兼容少走一步：改名、改形状、改存盘的格式（库里的表、家目录的文件、环境变量、存下的取值）都直接改，不写兼容层，不在读的地方兜底旧数据，也不写数据搬运；表结构直接改 `db/migrations/0001_schema.up.sql`，不另加迁移（`schema.test.ts` 查这条），本机的旧库和旧文件作废（库由服务端开机时挪到一边、新建一个），旧文件删掉重建；启动时只认今天的名字（[理由](docs/subsystems/foundation.md)）。对外 HTTP 的版本是唯一例外，v1 留到主人的设备都升上来（[接口版本](docs/subsystems/core.md#为什么这样)）。
 - **页面不折事实**：它读 `GET /api/v1/state` 折好的 `StateFrame`（`useCore()`、`useFrames()`）；要新的数据就加进 protocol 的字段和 `reduce`，页面里只写跟着时钟走的画面和摆法（各 feature 里的纯函数）；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在页面里重写，加一个字段或接口问服务端（[理由](docs/subsystems/app.md)）。
 - **封闭的联合穷尽处理**：按 `_tag`、`kind`、`type` 分支的地方，`switch` 覆盖每一种，或用 `default` 说明其余的有意不管（lint 的 `switch-exhaustiveness-check` 查）；成员表（`XValues`）要每种都处理时用 `Record<X, …>`，加新成员时编不过。
 - **服务端的服务**：每个模块导出一个服务，名字是概念的单数词，和模块的文件夹、表同一个（`Issue`、`Session`，lint 的 `singular-service` 查），照 Effect 的默认写法（`node_modules/effect/AGENTS.md`）：类，接口写在类型参数里（频道的大接口放同模块 `contracts.ts`），layer 是它的静态成员（`class Issue extends Context.Service<Issue, { … }>()("vibevalley/Issue") { static readonly layer = … }`），别处要它的类型写 `Issue["Service"]`；一个 `make`（`Effect.gen` 里 `yield*` 它用到的服务，不拿整个农场，用 `Issue.of({ … })` 拼出服务）；`services.ts` 按次序把 `X.layer` 叠起来，模块只用排在它前面的，往上走流（`Stream`，新闻、变化）；开机就要做的放 `start`、`ready` 这类 layer，叠在最后；服务之间传的形状放在定义它的模块里；和服务同名的协议形状经 `import type * as T from "@vibevalley/protocol"` 写成 `T.Issue`（lint 的 `protocol-namespace` 查，[命名](docs/style/naming.md)）（[architecture.md](docs/architecture.md)）。
-- **处理函数要薄**：接口的处理（`handlers.ts`、`http/`）和页面只做转发和展示，规则在拥有它的服务或纯函数里。
+- **处理函数要薄**：接口的处理（`http/handlers/<概念>.ts`、`http/`）和页面只做转发和展示，规则在拥有它的服务或纯函数里。
 - **帮工没有权限确认**：服务端只听 127.0.0.1，永远不要对外；帮工只在工作目录里开工（[理由](docs/subsystems/session.md)）。例外只有两个，都是单独的监听：语音线路只有一个接口、每通电话一把钥匙，经隧道给声网（[理由](docs/subsystems/voice.md)）；「连接到本机」默认关着，只放主人在本机点过头的设备、每台一把钥匙，不放 `/mcp`（[理由](docs/subsystems/lan.md)）。
 - **图标分两套**：工作台的按钮和标记用 reicon 的线条图标，一个意思一个图，写在 `apps/web/src/ui/icons.ts`，`<Icon name>` 只收表里的名字；像素皮（农场、记忆树、`ui/pixel`）用 `design/pixel` 生成的贴图（`SpriteIcon`；形状照 Hugeicons）；头像、农机的 logo 和插画在哪都是像素图；都不用 ▶、■、✓ 这类字符代替（[客户端](docs/subsystems/app.md)）。
 - **界面照田间工作台**：工作台的颜色、圆角、字号、阴影、动效和层都用 `apps/web/src/style.css` 的令牌，lint 的 `no-hex-color`、`design-tokens` 拦散值；挑哪一档、原子组件的样子和交之前的自查照 [界面怎么做](docs/style/design.md)。

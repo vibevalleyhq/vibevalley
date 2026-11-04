@@ -6,15 +6,14 @@
     "start": "node --import tsx src/main.ts",
     "cli": "node --import tsx src/cli.ts",
     "evals": "VIBEVALLEY_EVALS_LIVE=1 vp test run src/orchestrator/evals.live.test.ts",
-    "db:generate": "vpx scripts/db-generate.ts",
-    "db:check": "vpx scripts/db-generate.ts --check"
+    "db:generate": "vpx scripts/sqlite-generate.ts",
+    "db:check": "vpx scripts/sqlite-generate.ts --check"
   },
   "dependencies": {
     "@botiverse/oar": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
     "@effect/platform-node": "catalog:",
-    "@effect/sql-pglite": "catalog:",
-    "@electric-sql/pglite": "catalog:",
+    "@effect/sql-sqlite-node": "catalog:",
     "@larksuiteoapi/node-sdk": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@vibevalley/agent": "workspace:*",

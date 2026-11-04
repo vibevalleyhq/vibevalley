@@ -50,7 +50,7 @@ const noWorktree = (root: string) => {
 
 const occupied = (core: Core["Service"], runtime: string) =>
   core.apply({
-    type: "session",
+    type: "sessionChanged",
     session: {
       id: sessionId("occupied"),
       role: "worker",
@@ -125,9 +125,8 @@ describe("issues", () => {
       const before = (yield* issues.get(issue.id)).assignments;
       const db = yield* Db;
       yield* db.run(
-        sql.unsafe("create function reject_assignment() returns trigger language plpgsql as $$ begin raise exception 'assignment refused'; end $$"),
+        sql.unsafe("create trigger reject_assignment before insert on issue_assignment for each row begin select raise(abort, 'assignment refused'); end"),
       );
-      yield* db.run(sql.unsafe("create trigger reject_assignment before insert on issue_assignment for each row execute function reject_assignment()"));
       expect((yield* Effect.exit(issues.edit(issue.id, { agent: "lab2" }, owner)))._tag).toBe("Failure");
       expect(assignedAgentOf(yield* issues.get(issue.id))).toBe("lab");
       expect((yield* issues.get(issue.id)).assignments).toEqual(before);
@@ -292,9 +291,8 @@ describe("issues", () => {
       const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
-      yield* sql.unsafe("create function reject_link() returns trigger language plpgsql as $$ begin raise exception 'link refused'; end $$").pipe(Effect.orDie);
       yield* sql
-        .unsafe("create trigger reject_link before insert on issue_assignment_execution for each row execute function reject_link()")
+        .unsafe("create trigger reject_link before insert on issue_assignment_execution for each row begin select raise(abort, 'link refused'); end")
         .pipe(Effect.orDie);
       const agent = { ...lab(), worktree: true };
       expect((yield* issues.hire(agent, "first work", "demo")).refused).toContain("did not stop");
@@ -302,7 +300,7 @@ describe("issues", () => {
       expect(issue).toBeDefined();
       expect((yield* Effect.result(issues.remove(issue.id)))._tag).toBe("Failure");
       expect(existsSync(join(f.config.workRoot, "worktrees", "demo.1", "still-owned.txt"))).toBe(true);
-      yield* sql.unsafe("drop trigger reject_link on issue_assignment_execution").pipe(Effect.orDie);
+      yield* sql.unsafe("drop trigger reject_link").pipe(Effect.orDie);
       const again = yield* issues.hire(agent, "do not overlap", "demo", { issue: issue.id });
       expect(again.session).toBeUndefined();
       expect(again.refused).toBeTruthy();
@@ -347,9 +345,8 @@ describe("issues", () => {
     return Effect.gen(function* () {
       const issues = testIssues(yield* Issue);
       const sql = yield* SqlClient.SqlClient;
-      yield* sql.unsafe("create function reject_link() returns trigger language plpgsql as $$ begin raise exception 'link refused'; end $$").pipe(Effect.orDie);
       yield* sql
-        .unsafe("create trigger reject_link before insert on issue_assignment_execution for each row execute function reject_link()")
+        .unsafe("create trigger reject_link before insert on issue_assignment_execution for each row begin select raise(abort, 'link refused'); end")
         .pipe(Effect.orDie);
       const agent = { ...lab(), worktree: true };
       expect((yield* issues.hire(agent, "first work", "demo")).refused).toContain("link refused");
@@ -360,7 +357,7 @@ describe("issues", () => {
       expect((yield* issues.get(kept[0]!.id)).project).toBe("demo");
       expect((yield* Effect.result(issues.remove(kept[0]!.id)))._tag).toBe("Failure");
       expect((yield* issues.list()).map((i) => i.id)).toEqual([kept[0]!.id]);
-      yield* sql.unsafe("drop trigger reject_link on issue_assignment_execution").pipe(Effect.orDie);
+      yield* sql.unsafe("drop trigger reject_link").pipe(Effect.orDie);
       const next = yield* issues.hire(agent, "unrelated work", "demo");
       expect(next.session?.branch).toBe("vibevalley/issue-2");
       yield* until(() => turns === 2, "the unrelated dispatch");
@@ -528,7 +525,7 @@ describe("issues", () => {
       yield* occupied(core, "pi");
       yield* (yield* Agent).save(agent);
       const queued = yield* issues.setStatus(existing.id, "todo", "", "", owner);
-      yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
+      yield* core.apply({ type: "sessionLeft", id: sessionId("occupied") });
       expect((yield* issues.hire(agent, "new attempt", "demo", { issue: existing.id })).refused).toContain("startup refused");
       const kept = yield* issues.get(existing.id);
       expect([kept.number, kept.queuedAt, sessionIdsOf(kept)]).toEqual([existing.number, queued.queuedAt, []]);
@@ -543,10 +540,10 @@ describe("issues", () => {
       const core = yield* Core;
       const sessions = yield* Session;
       const sql = yield* SqlClient.SqlClient;
+      yield* sql.unsafe(`select 1`).pipe(Effect.orDie);
       yield* sql
-        .unsafe(`create function reject_issue() returns trigger language plpgsql as $$ begin raise exception 'test write failure'; end $$`)
+        .unsafe(`create trigger reject_issue before insert on issue for each row begin select raise(abort, 'test write failure'); end`)
         .pipe(Effect.orDie);
-      yield* sql.unsafe(`create trigger reject_issue before insert on issue for each row execute function reject_issue()`).pipe(Effect.orDie);
       const got = yield* issues.hire({ ...lab(), worktree: true }, "test", "demo");
       expect(got.refused).toContain("test write failure");
       expect(got.session).toBeUndefined();
@@ -649,10 +646,10 @@ describe("issues", () => {
       for (const channel of [first.id, second.id]) expect((yield* issues.start(issue.id, channel)).queued).toBeDefined();
       yield* (yield* Issue).refreshQueue;
       expect(
-        (yield* sql<{ channel: string }>`select t.trigger_json::jsonb->>'replyChannel' as channel
-        from mailbox_issue m join ingress_trigger t on t.id = m.trigger_id where m.issue_id = ${issue.id} and m.state = 'held'`).map((r) => r.channel),
+        (yield* sql<{ channel: string }>`select t.trigger_json->>'replyChannel' as channel
+        from mailbox_issue m join mailbox_trigger t on t.id = m.trigger_id where m.issue_id = ${issue.id} and m.state = 'held'`).map((r) => r.channel),
       ).toEqual([first.id]);
-      yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
+      yield* core.apply({ type: "sessionLeft", id: sessionId("occupied") });
       const started = yield* issues.start(issue.id, second.id);
       expect(started.queued).toBeDefined();
       yield* (yield* Issue).refreshQueue;
@@ -695,7 +692,7 @@ describe("issues", () => {
       yield* issues.edit(item.id, { description: "new-dispatch-context" }, owner);
       yield* issues.start(item.id, second.id);
       yield* (yield* Issue).refreshQueue;
-      yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
+      yield* core.apply({ type: "sessionLeft", id: sessionId("occupied") });
       yield* (yield* Issue).refreshQueue;
       yield* until(() => inputs.length > 0, "the requeued input");
       expect(inputs[0]).toContain("new-dispatch-context");
@@ -724,7 +721,7 @@ describe("issues", () => {
         (item) => item?.queuedAt !== undefined,
         "the cron queued",
       );
-      yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
+      yield* core.apply({ type: "sessionLeft", id: sessionId("occupied") });
       yield* (yield* Issue).refreshQueue;
       yield* waitFor(sessions.issueRuns(issue!.id), (r) => r.length > 0, "the scheduled run");
       const [run] = yield* sessions.issueRuns(issue!.id);
@@ -747,7 +744,7 @@ describe("issues", () => {
       yield* (yield* Issue).refreshQueue;
       const stillQueued = yield* issues.get(issue.id);
       expect([stillQueued.queuedAt, sessionIdsOf(stillQueued)]).toEqual([queued.queuedAt, []]);
-      yield* core.apply({ type: "sessionGone", id: sessionId("occupied") });
+      yield* core.apply({ type: "sessionLeft", id: sessionId("occupied") });
       yield* (yield* Issue).refreshQueue;
       expect(sessionIdsOf(yield* issues.get(issue.id))).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

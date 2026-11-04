@@ -19,7 +19,7 @@ import { Mailbox } from "@/mailbox/mailbox.ts";
 import { recordTrigger } from "@/mailbox/payload.ts";
 import { Session } from "@/session/session.ts";
 
-import * as q from "../../db/generated/channel_message.sql.ts";
+import { messageByID, notificationReceipt, ownerReadReports } from "../../db/generated/channel_message.sql.ts";
 import { forOwner, inbox, inboxEntries } from "./items.ts";
 import { emptyPatrol, type PatrolMemory, type PatrolNote, patrolStep } from "./patrol.ts";
 import { patrolText } from "./prompts.ts";
@@ -56,11 +56,11 @@ const make = Effect.gen(function* () {
   const externalHub = yield* scopedPubSub<void>();
 
   const handoffState = Effect.fn("Inbox.handoffState")(function* (id: string) {
-    const row = yield* db.one(q.messageByID({ id }));
+    const row = yield* db.one(messageByID({ id }));
     if (!row || row.deleted_at !== null) return undefined;
     const message = toMessage(row);
     if (!forOwner(message, chat.notifyOf(message.channel))) return undefined;
-    const receipt = yield* db.one(q.notificationReceipt({ id }));
+    const receipt = yield* db.one(notificationReceipt({ id }));
     if (!receipt || receipt.superseded) return undefined;
     if (message.kind === "report") {
       const session = sessions.sessionOf(message.from);
@@ -80,8 +80,9 @@ const make = Effect.gen(function* () {
     Stream.runForEach(facts, (event) =>
       turn.withPermits(1)(
         Effect.gen(function* () {
-          if (event.type === "message" && (yield* handoffState(event.message.id)) === "unseen") yield* PubSub.publish(toOwnerHub, event.message);
-          if (event.type === "message" || event.type === "sessionReport" || event.type === "issue") yield* PubSub.publish(externalHub, undefined);
+          if (event.type === "messageChanged" && (yield* handoffState(event.message.id)) === "unseen") yield* PubSub.publish(toOwnerHub, event.message);
+          if (event.type === "messageChanged" || event.type === "sessionReported" || event.type === "issueChanged")
+            yield* PubSub.publish(externalHub, undefined);
           if (!primed) return;
           const news = freshOf(known, inbox(core.state()));
           known = news.known;
@@ -96,7 +97,7 @@ const make = Effect.gen(function* () {
   const patrol = Effect.gen(function* () {
     const state = core.state();
     const now = yield* Clock.currentTimeMillis;
-    const read = yield* db.run(q.ownerReadReports());
+    const read = yield* db.run(ownerReadReports());
     const ownerSeen = Object.fromEntries(
       inboxEntries(state).flatMap((entry) => {
         const target = entry.item.target;

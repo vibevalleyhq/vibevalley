@@ -4,13 +4,13 @@
 import { Cause, Exit, Schema } from "effect";
 
 import * as S from "./schema";
-import { eventsPath, livePath, statePath, type LiveEvent, type SideEvent, type StateFrame } from "./shapes";
+import { eventsPath, livePath, statePath, type LiveEvent, type ServerEvent, type StateFrame } from "./shapes";
 
 /** What each long-lived stream carries, by its path. The server writes each with the Schema for it (http/streams.ts
  * checks its Schemas against this). */
 export interface Streams {
   [statePath]: StateFrame;
-  [eventsPath]: SideEvent;
+  [eventsPath]: ServerEvent;
   [livePath]: LiveEvent;
 }
 
@@ -18,7 +18,7 @@ export interface Streams {
  * for the shape. */
 const decoders: { readonly [P in keyof Streams]: (json: unknown) => Exit.Exit<Streams[P], Schema.SchemaError> } = {
   [statePath]: Schema.decodeUnknownExit(S.StateFrame),
-  [eventsPath]: Schema.decodeUnknownExit(S.SideEvent),
+  [eventsPath]: Schema.decodeUnknownExit(S.ServerEvent),
   [livePath]: Schema.decodeUnknownExit(S.LiveEvent),
 };
 

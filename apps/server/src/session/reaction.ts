@@ -41,7 +41,7 @@ export interface Tracking {
   readonly quiet?: boolean;
 }
 
-export interface FactContext {
+export interface ReactionContext {
   readonly id: T.SessionId;
   readonly runtime: string;
   readonly cwd: string;
@@ -101,11 +101,17 @@ function label(runtime: string, tool: string, input: string | undefined, cwd: st
   return { kind: action.kind, detail: detail ? near(cwd, detail) : "" };
 }
 
-export function phaseFact(session: Pick<T.Session, "id" | "channel">, phase: T.Phase, spent?: T.Spent): Omit<T.FactSessionPhase, "at"> {
-  return { type: "sessionPhase", id: session.id, phase, ...(session.channel !== undefined ? { channel: session.channel } : {}), ...(spent ? { spent } : {}) };
+export function phaseFact(session: Pick<T.Session, "id" | "channel">, phase: T.Phase, spent?: T.Spent): Omit<T.FactSessionPhaseChanged, "at"> {
+  return {
+    type: "sessionPhaseChanged",
+    id: session.id,
+    phase,
+    ...(session.channel !== undefined ? { channel: session.channel } : {}),
+    ...(spent ? { spent } : {}),
+  };
 }
 
-export function eventFacts(event: Event, session: T.Session | undefined, tracking: Tracking, ctx: FactContext): Reaction {
+export function reactionTo(event: Event, session: T.Session | undefined, tracking: Tracking, ctx: ReactionContext): Reaction {
   const id = ctx.id;
   const facts: FactIn[] = [];
   let journal: Op[] = [];
@@ -119,7 +125,7 @@ export function eventFacts(event: Event, session: T.Session | undefined, trackin
   const doing = (action: T.SessionAction, text: string) => {
     if (!working || (working.doing.action === action && working.doing.label === text)) return;
     facts.push({
-      type: "sessionPhase",
+      type: "sessionPhaseChanged",
       id,
       ...(session?.channel !== undefined ? { channel: session.channel } : {}),
       phase: { _tag: "working", since: working.since, doing: { action, label: text } },
@@ -131,7 +137,7 @@ export function eventFacts(event: Event, session: T.Session | undefined, trackin
     next = { ...next, quiet: false };
     if (working)
       facts.push({
-        type: "sessionPhase",
+        type: "sessionPhaseChanged",
         id,
         ...(session?.channel !== undefined ? { channel: session.channel } : {}),
         phase: { _tag: "working", since: working.since, doing: { action: working.doing.action, label: working.doing.label } },
@@ -148,7 +154,7 @@ export function eventFacts(event: Event, session: T.Session | undefined, trackin
       const recalled = recalledIn(event.input);
       if (recalled) journal.push({ type: "note", kind: "memory/recalled", text: recalled });
       facts.push({
-        type: "sessionPhase",
+        type: "sessionPhaseChanged",
         id,
         ...(session?.channel !== undefined ? { channel: session.channel } : {}),
         phase: { _tag: "working", since: event.receivedAt, doing: { action: "thinking", label: "" } },
@@ -245,7 +251,7 @@ export function eventFacts(event: Event, session: T.Session | undefined, trackin
           event.code !== null
             ? t("server.session.log.exitedCode", { runtime: ctx.runtime, code: event.code })
             : t("server.session.log.exited", { runtime: ctx.runtime });
-        facts.push({ type: "sessionReport", id, outcome: "failed", summary: why, runs: session.runs, questions: [], checks: [] });
+        facts.push({ type: "sessionReported", id, outcome: "failed", summary: why, runs: session.runs, questions: [], checks: [] });
         warn = t("server.session.log.exitedNotice", { name: session.name, why });
       }
       break;

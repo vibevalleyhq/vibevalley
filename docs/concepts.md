@@ -49,7 +49,7 @@ Workspace（工作目录，一张大地图）
 | 派工关联 | `Assignment` | 工单由哪个档案负责；可以尚未开工，同人继续负责时跨执行上下文保留，换人或清空指派才结束 |
 | 执行器 | `Executor` | 管理 oar 执行实例的创建、投递、中断和释放；不替工单保存责任归属 |
 | Session | `Session`（服务是 `Session`，派活是 `Issue` 的 `hire`） | 档案的执行上下文；工单使用项目目录或工单 worktree，聊天使用独立目录并关联频道；跨多轮、休眠和重启保留身份 |
-| Run | `Run`（`session_run` 表）；核心状态里是 `run` 到 `report` 两个事实 | 一轮：一次触发到一次汇报；帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run |
+| Run | `Run`（`session_run` 表）；核心状态里由带着 `brief` 的 `sessionPhaseChanged` 事实开始、`sessionReported` 事实结束 | 一轮：一次触发到一次汇报；帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run |
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |
 | 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 |
 | 完成 | 动作 `complete`；工单的 `status` 是 `done` | 主人对工单的结论；交付由 `delivered` 另记。合并只是交付的一种，PR 合入后才完成（[完成和交付](docs/subsystems/issue.md#完成和交付)） |

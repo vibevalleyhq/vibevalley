@@ -102,7 +102,7 @@ export const said = Layer.effect(
     const core = yield* Core;
     const all: ChatMessage[] = [];
     const events = yield* core.subscribe;
-    yield* Effect.forkScoped(Stream.runForEach(events, (e) => Effect.sync(() => void (e.type === "message" && all.push(e.message)))));
+    yield* Effect.forkScoped(Stream.runForEach(events, (e) => Effect.sync(() => void (e.type === "messageChanged" && all.push(e.message)))));
     return Said.of({ in: (channel) => all.filter((m) => m.channel === channel), all: () => [...all] });
   }),
 );

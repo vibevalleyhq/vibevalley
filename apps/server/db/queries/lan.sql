@@ -4,4 +4,4 @@
 select open from lan where id = 1;
 
 -- name: SetLanOpen :exec
-insert into lan (id, open) values (1, $1) on conflict (id) do update set open = excluded.open;
+insert into lan (id, open) values (1, sqlc.arg(open)) on conflict (id) do update set open = excluded.open;

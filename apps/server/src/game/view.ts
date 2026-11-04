@@ -207,7 +207,7 @@ function levelUps(before: number | undefined, after: number): T.GameEffect[] {
 
 export function effectsOf(before: T.WorkspaceState, fact: T.Fact): T.GameEffect[] {
   switch (fact.type) {
-    case "gameProgress": {
+    case "progressChanged": {
       const out: T.GameEffect[] = [];
       if (fact.commits) out.push(...levelUps(before.commits?.total, fact.commits.total));
       const news = fact.news;
@@ -218,7 +218,7 @@ export function effectsOf(before: T.WorkspaceState, fact: T.Fact): T.GameEffect[
       }
       return out;
     }
-    case "sessionReport":
+    case "sessionReported":
       return fact.outcome === "failed" && sessionOf(before, fact.id)?.role === "worker" ? [{ kind: "penalty", sessionId: fact.id }] : [];
     default:
       break;

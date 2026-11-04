@@ -47,5 +47,5 @@ export interface DeliveryInput {
 /** What happened to a helper: the fact, and the session as it stood after it (none once it left). */
 export type SessionNews =
   | { readonly _tag: "hired"; readonly session: T.Session }
-  | { readonly _tag: "reported"; readonly report: T.FactSessionReport; readonly session: T.Session | undefined }
-  | { readonly _tag: "left"; readonly left: T.FactSessionGone };
+  | { readonly _tag: "reported"; readonly report: T.FactSessionReported; readonly session: T.Session | undefined }
+  | { readonly _tag: "left"; readonly left: T.FactSessionLeft };

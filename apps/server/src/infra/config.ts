@@ -49,6 +49,8 @@ export class ServerConfig extends Context.Service<
     readonly chat: { readonly noticeBatchMs: number; readonly retryWakeMs: number };
     /** An OTLP collector (http://127.0.0.1:4318): the spans, logs and metrics go there; none when empty. */
     readonly otlp: { readonly url: string };
+    /** The notes' vault (pkm/): its PARA folders and journals. Empty: home/pkm. */
+    readonly pkm: { readonly root: string };
   }
 >()("vibevalley/ServerConfig") {}
 
@@ -77,6 +79,7 @@ export function defaults(home = homedir()): ServerConfig["Service"] {
     github: { prProjects: [], prPollSeconds: 180 },
     chat: { noticeBatchMs, retryWakeMs: 3_000 },
     otlp: { url: "" },
+    pkm: { root: "" },
   };
 }
 
@@ -136,6 +139,7 @@ const keys = (d: ServerConfig["Service"]) =>
       "chat",
     ),
     otlp: Keys.nested(Keys.all({ url: text("url", d.otlp.url) }), "otlp"),
+    pkm: Keys.nested(Keys.all({ root: text("root", d.pkm.root) }), "pkm"),
   });
 
 const expandHome = (path: string) => (path.startsWith("~/") ? join(homedir(), path.slice(2)) : path);
@@ -183,8 +187,18 @@ export const loadConfig = Effect.fnUntraced(function* (
   }
   if (read.github.prPollSeconds <= 0) return yield* new ConfigError({ message: t("server.base.prPoll") });
   const c: ServerConfig["Service"] = { ...base, ...read, home };
-  return { ...c, workRoot: expandHome(c.workRoot), tokei: expandHome(c.tokei), web: expandHome(c.web), db: expandHome(c.db) };
+  return {
+    ...c,
+    workRoot: expandHome(c.workRoot),
+    tokei: expandHome(c.tokei),
+    web: expandHome(c.web),
+    db: expandHome(c.db),
+    pkm: { root: expandHome(c.pkm.root) },
+  };
 });
+
+/** The notes' vault. */
+export const pkmDir = (c: ServerConfig["Service"]) => c.pkm.root || join(c.home, "pkm");
 
 /** The database's folder, or "memory". */
 export function dbDir(c: ServerConfig["Service"]): string {

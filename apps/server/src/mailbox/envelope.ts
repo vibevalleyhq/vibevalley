@@ -180,7 +180,7 @@ export interface ChannelAudience {
   readonly spoken?: boolean;
 }
 
-export interface ChannelRouteFact {
+export interface ChannelRouteInput {
   readonly row: ChannelEnvelopeRow;
   readonly audience: ChannelAudience;
   readonly addressed?: string;

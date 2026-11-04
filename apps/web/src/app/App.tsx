@@ -16,6 +16,7 @@ import { Follow } from "@/features/inbox";
 import { IssuesPage } from "@/features/issue";
 import { PairPage } from "@/features/lan";
 import { OrchestratorPage } from "@/features/orchestrator";
+import { PkmPage } from "@/features/pkm";
 import { ProjectsPage, sortProjects } from "@/features/project";
 import { RuntimesPage } from "@/features/runtime";
 import { SettingsPage } from "@/features/setting";
@@ -47,6 +48,7 @@ const places: Record<string, (rest: Rest) => JSX.Element> = {
   projects: (rest) => <ProjectsPage rest={rest()} skin={projectMap} />,
   catalog: (rest) => <CatalogPage rest={rest()} />,
   artifacts: (rest) => <ArtifactsPage rest={rest()} say={chatSay} />,
+  pkm: (rest) => <PkmPage rest={rest()} />,
 };
 
 /**

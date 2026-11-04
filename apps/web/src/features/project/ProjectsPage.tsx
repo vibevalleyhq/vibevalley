@@ -6,6 +6,7 @@ import { type Component, createMemo, createSignal, For, Match, Show, Switch, unt
 
 import { list, t } from "@vibevalley/i18n";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
+import { githubRepository } from "@vibevalley/protocol/rules";
 
 import { autofocus, useNow } from "@/base/dom";
 import { useWorkAgents } from "@/infra/agents";
@@ -24,7 +25,7 @@ import { Segmented } from "@/ui/Segmented";
 import { toast } from "@/ui/toasts";
 
 import { calendarOf, type CalendarDay, dateText, dayText, type Recency, recencyOf, recencyText, since, streaksOf } from "./calendar";
-import { githubRepository, langIcon, languageShares, number, percent, sortProjects } from "./projects";
+import { langIcon, languageShares, number, percent, sortProjects } from "./projects";
 
 type Asked<A> = QueryObserverResult<A>;
 

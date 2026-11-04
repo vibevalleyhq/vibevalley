@@ -408,7 +408,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
           // Subscribed before the missed batches are read, so nothing that commits in between is lost; anything both have
           // is dropped by seq.
           const live = yield* PubSub.subscribe(changes);
-          const missed = yield* db.run(qc.artifactChangesAfter({ artifact_id: id, seq: after, n: BigInt(catchUpMax + 1) }));
+          const missed = yield* db.run(qc.artifactChangesAfter({ artifact_id: id, seq: after, n: catchUpMax + 1 }));
           if (missed.length > catchUpMax) return Stream.succeed<T.ArtifactEvent>({ _tag: "Reset" });
           const upto = missed.at(-1)?.seq ?? after;
           const current = yield* blocksOf(id);
@@ -443,7 +443,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
 
     const suggestionList = Effect.fn("Artifact.suggestions")(function* (id: T.ArtifactId) {
       yield* found(id);
-      return (yield* db.run(qs.artifactSuggestions({ artifact_id: id, n: 500n }))).map(suggestionOf);
+      return (yield* db.run(qs.artifactSuggestions({ artifact_id: id, n: 500 }))).map(suggestionOf);
     });
 
     const publishSuggestions = Effect.fnUntraced(function* (id: T.ArtifactId) {

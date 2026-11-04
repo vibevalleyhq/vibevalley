@@ -267,7 +267,7 @@ describe("the orchestrator", () => {
       expect(got).toBe("收到\n");
       const sql = yield* SqlClient.SqlClient;
       expect(
-        yield* sql<{ source: string; meta: string }>`select d.source::text, m.meta from mailbox_delivery d
+        yield* sql<{ source: string; meta: string }>`select d.source, m.meta from mailbox_delivery d
           join channel_message m on m.id = d.message_id where m.body = '现在地里怎么样'`,
       ).toEqual([
         {
@@ -312,7 +312,7 @@ describe("the orchestrator", () => {
       expect(said).toContain("#41 交回来了");
       const sql = yield* SqlClient.SqlClient;
       expect(yield* sql`select id from channel_message where body like '%【要告诉主人】%'`).toHaveLength(0);
-      expect(yield* sql`select id from ingress_trigger where payload_json::jsonb->>'text' = '【要告诉主人】\n- #41 交回来了'`).toHaveLength(1);
+      expect(yield* sql`select id from mailbox_trigger where payload_json->>'text' = '【要告诉主人】\n- #41 交回来了'`).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

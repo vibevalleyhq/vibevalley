@@ -46,6 +46,14 @@
 
 - 2026-10-26 [把模块层往下压：项目检查成端口，重启留在内存，项目的决定成规则](.agents/notes/proposed/testing/2026-10-26-press-the-module-layer-down.md)
 
+## implemented（3 篇）
+
+### architecture
+
+- 2026-11-04 [「事实」只有一个意思，每种事实说出发生了什么](.agents/notes/implemented/architecture/2026-11-04-one-meaning-of-fact.md)
+- 2026-11-04 [契约按概念竖着分，输入的记录归信箱，大模块拆成内部的几块](.agents/notes/implemented/architecture/2026-11-04-contract-by-concept.md)
+- 2026-11-03 [服务端的库从 PGlite 换成 SQLite，查询由仓库里的 SQLite 生成器写成代码](.agents/notes/implemented/architecture/2026-11-03-sqlite-instead-of-pglite.md)
+
 ## rejected（1 篇）
 
 ### feature

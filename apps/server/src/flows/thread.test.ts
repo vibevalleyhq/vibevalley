@@ -4,12 +4,11 @@ import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 
 import type * as T from "@vibevalley/protocol";
-import { latestSessionIdOf } from "@vibevalley/protocol/rules";
+import { channelOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "@/agent/agent.ts";
 import { owner } from "@/base/actor.ts";
 import { Channel } from "@/channel/channel.ts";
-import { channelOf } from "@/channel/messages.ts";
 import { Core } from "@/core/core.ts";
 import { Inbox } from "@/inbox/inbox.ts";
 import { Issue } from "@/issue/issue.ts";
@@ -139,7 +138,7 @@ describe("an issue's thread", () => {
       const kept = yield* channels.say("先记一下：时区用东八区", thread!.id, "");
       const woken = yield* sql<{
         n: number;
-      }>`select count(*)::int as n from mailbox_delivery where message_id = ${kept.message.id} and session_id = ${first}`.pipe(Effect.orDie);
+      }>`select count(*) as n from mailbox_delivery where message_id = ${kept.message.id} and session_id = ${first}`.pipe(Effect.orDie);
       expect(woken[0]!.n).toBe(0);
       expect(yield* sql`select trigger_id from mailbox_issue where trigger_id = ${kept.message.id} and state = 'returned'`).toHaveLength(1);
 

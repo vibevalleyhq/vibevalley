@@ -24,7 +24,8 @@ type LookIn =
   | "channel"
   | "graph"
   | "memories"
-  | "artifact";
+  | "artifact"
+  | "pkm";
 
 /** Something asked for by id or name is not there. next is required: where to look for the ones that are (lookIn). */
 export const missing = (what: string, next: readonly Next[]): ApiError => ({ _tag: "Missing", what, ...(next.length > 0 ? { next } : {}) });
@@ -52,6 +53,7 @@ export const lookIn = {
   archive: listed("archive", commandOf("orchestrator.archive.list")),
   channel: listed("channel", commandOf("channel.list")),
   artifact: listed("artifact", commandOf("artifact.list")),
+  pkm: listed("pkm", commandOf("pkm.page.list")),
 } satisfies Record<string, Next>;
 
 /** Where an agent's memories are listed. */

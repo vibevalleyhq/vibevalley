@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 帮工的档案的记性：存、挑、记下、忘掉、上限 | 提醒块怎么拼进输入、轨迹怎么显示「想起了」（`session/briefing.ts` 的 `withRecall`，`session/facts.ts`） |
+| 帮工的档案的记性：存、挑、记下、忘掉、上限 | 提醒块怎么拼进输入、轨迹怎么显示「想起了」（`session/briefing.ts` 的 `withRecall`，`session/reaction.ts`） |
 | 开工想起什么（`pick`），和「下回开工会想起什么」的预览 | 什么时候算新的一轮、同一个会话想起过哪些（`session`，存在库里它那一行） |
 | 管理器：本地和外面的来源一起读、一起写，合并、去重、超时 | 外面来源的地址和 key 怎么存、怎么校验（`setting`，`settings.json` 的 `memorySources`） |
 | `memory_search`、`memory_create` 背后的检索和写入，回给模型的话（`foundText`） | 工具的参数、谁能用、范围由谁定（`apps/server/src/tool`；帮工经 `/mcp`，`mcp`） |
@@ -17,7 +17,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/memory`（`Memory`）：`memory.ts` 对外的方法、所有档案共用的数据库记忆入口；`sources.ts` 管来源；`store.ts` 存显式 note 与工单记忆；`recall.ts` 挑法和检索；`terms.ts`、`gse.ts` 切词；`nowledge.ts`、`everos.ts` 接外部来源。
-- 表：`memory`（一条记忆一行，`terms` 是切好的词，`terms_vector` 是它的 `tsvector`，GIN 索引 `memory_by_terms`）；查询在 `db/queries/memory.sql`。
+- 表：`memory`（一条记忆一行，`terms` 是切好的词，空格隔开）和它的全文索引 `memory_term`（FTS5 的外部内容表，由触发器跟着 `memory` 的增删改）；查询在 `db/queries/memory.sql`。
 - 接口：`memory.list`、`memory.recall`、`memory.create`、`memory.search`（在全部来源里找，不填档案就是全部档案的）、`memory.delete`，管家的旧账 `orchestrator.archive.list`、`orchestrator.archive.get`（带 `agent`，不填是默认管家）（[capabilities.md](docs/reference/capabilities.md)）。
 - 页面：`apps/web/src/features/memory/Memory.tsx`（帮工页和管家页的记性、管家的旧账）；来源在「设置」的「记性」（`features/setting/SettingsForm.tsx`）。农场 HUD 的「记忆树」按钮到 `/tree`（`apps/web/src/tree`）：所有档案的记性汇总成一棵树和一片星空，现在用的是假数据（[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)）。
 
@@ -31,9 +31,9 @@
 - **词**（`terms.ts`）：中文用 gse 的 `cutSearch` 和 `cutAll` 的并集（「表名单数」两种切法都有，「单数」也算），只留两个字以上含汉字的词；英文、数字、路径、版本号按整词（`db/migrations`、`v1.2.3` 各是一个词），小写；去掉停用词。每条写入时切好存进 `terms` 列，`terms_of` 记是第几版切法；切法或词典变了就把 `termsVersion` 加一，本地来源开机后在后台把 `terms_of` 旧的一批一百行重切。词典第一次用时加载。
 - **挑法是纯函数，不调模型**（`recall.ts` 的 `pick`）：
   - 跳过这个会话想起过的、和这个 Session 自己写的；做过的活只算这个项目的；别的项目的话要和这一轮的话共有 3 个以上的词才算。
-  - 分数 = 种类（`note` 2、`issue` 0.5）+ 地方（这个项目 2、所有项目 1、别的项目 0）+ 共有的词 × 0.5（最多算 8 个）+ 全文索引的 `ts_rank`（最多算 5）× 0.3 + `exp(-距最后一次用过的天数 / 30)`；同分新的在前。
+  - 分数 = 种类（`note` 2、`issue` 0.5）+ 地方（这个项目 2、所有项目 1、别的项目 0）+ 共有的词 × 0.5（最多算 8 个）+ 全文索引的分（FTS5 的 `bm25` 取负，越大越好，最多算 5）× 0.3 + `exp(-距最后一次用过的天数 / 30)`；同分新的在前。
   - 最多 8 条、1600 字（UTF-16，每行加一个换行），做过的活最多 3 件。
-- **检索**（`recall.ts`，`memory_search` 的本地那一半）：`ts_rank` + 共有的词 × 0.5 + 整句出现加 2，给了项目时这个项目的再加 0.5；给了项目只查这个项目的和所有项目的；一个词也不中的不要；没有查询词就按新旧列出；默认 10 条。
+- **检索**（`recall.ts`，`memory_search` 的本地那一半）：全文索引的分 + 共有的词 × 0.5 + 整句出现加 2，给了项目时这个项目的再加 0.5；给了项目只查这个项目的和所有项目的；一个词也不中的不要；没有查询词就按新旧列出；默认 10 条。
 - **id**：本地的照原样，外面来源的带名字（`nowledge:<id>`、`everos:<id>`），「忘掉」照前缀找到那一家。
 - **记不住不拦着干活**：读不出、写不进、外面的来源慢或出错，都只记日志，那一轮照常。Nowledge 的 `memory_search`、`memory_add`、`get_memory_by_id` 和 EverOS 的 `memory/search` 回答先按形状解码，解析或形状校验失败按读不出处理；详情的范围认不出来时仍是未知，不猜成全局。
 - **所有档案共用数据库记忆**：memoriesOf、remember、forget 和召回不按角色分流。Session.host 注入 MemoryPort，管家的系统提示、remember、rewrite_memory 和页面都读写 memory 表。作者由 author 保存，主人的条目在提示中带「主人交代」；Agent 整理记性只替换自己管理的 note，保留主人条目的身份与内容。旧 MEMORY.md 不参与读取或恢复。
@@ -91,8 +91,8 @@
 - **帮工自己在 `issue_report.remember` 选择记什么，农场不另调模型总结。** 结构化字段消除了正文解析歧义；做过的活仍由农场自动记。
 - **挑法是纯函数，页签的预览问服务端。** 不调模型、可以用黄金数据测；预览和开工走同一条路（只是不计想起），页面里没有第二份挑法。
 - **自动想起和工具两条都留。** 只给工具就要靠帮工记得去查，接不了 MCP 的农机就没有记性；只给自动想起，干到一半想查没有办法。
-- **中文用 gse 的切法，只带简体词典。** Postgres 自带的分词把一串中文当一个词；两个字一组（CJK bigram）零依赖，但切得不准；装 zhparser 一类的扩展 PGlite 带不了。所以词在写入前由 `gse.ts` 切好（照 gse v1.1.0 的词典和 HMM，逐字对上它），存成 `tsvector`，每个词原样当一个词位。只带简体那一份词典：日文、繁体、idf 词典用不上。英文和代码不交给 gse：它把 `v1.2.3` 切成几段，一个版本号就算三个共有的词。
-- **全文索引用 `tsvector` 和 GIN。** 自己存词、算分要自己写倒排和长度归一；`terms_vector` 由库从 `terms` 算出，`ts_rank` 给分。`terms` 是从 `body` 算出来的索引，`termsVersion` 变了就重切，和重建缓存一样，不算兼容旧数据。
+- **中文用 gse 的切法，只带简体词典。** 库自带的分词（FTS5 的 unicode61）把一串中文当一个词；两个字一组（CJK bigram）零依赖，但切得不准；装中文分词的扩展要随库带原生代码。所以词在写入前由 `gse.ts` 切好（照 gse v1.1.0 的词典和 HMM，逐字对上它），空格隔开存进 `terms`，FTS5 把每个词原样当一个词。只带简体那一份词典：日文、繁体、idf 词典用不上。英文和代码不交给 gse：它把 `v1.2.3` 切成几段，一个版本号就算三个共有的词。
+- **全文索引用 SQLite 自带的 FTS5。** 自己存词、算分要自己写倒排和长度归一；`memory_term` 是 `memory.terms` 的外部内容表，分词只认空格（ASCII 的标点都算词里的字），所以 gse 切好的词、`db/migrations`、`v1.2.3` 各是一个词，查询把每个词加引号用 `OR` 连起来，`bm25` 给分。`terms` 是从 `body` 算出来的索引，`termsVersion` 变了就重切，和重建缓存一样，不算兼容旧数据。
 - **多个来源同时开，接口照 Hermes 的 `memoryProvider`。** Hermes 只许开一个外接来源，因为每个来源都往 agent 身上加自己的工具；这里对 agent 只给统一的两个工具，来源多了工具不变，而主人 Nowledge 和 EverOS 都要。也没选「只写一个目标、其余只读」：EverOS 要整段对话自己提炼，不写它就什么都没有，重复交给读时去重。接口里只放现在有人调的方法，其余的等第一个调用的人。
 - **合并按名次轮流取，不按分数。** 本地的是名次，Nowledge 的是 0 到 1 的相关度，比不了。
 - **外面的读最多等 2 秒，写在后台排队。** 开工等它就是主人在等；收工和记一条不等外面的服务，送不成只记日志。只给真放进话里的本地记忆记想起，被合并挤掉的不算。

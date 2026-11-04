@@ -184,19 +184,19 @@ function familyEntry(id: string, children: readonly T.Issue[]): Entry {
 export function entriesFor(before: T.WorkspaceState, fact: T.Fact, after: T.WorkspaceState): Entry[] {
   const out: Entry[] = [];
   switch (fact.type) {
-    case "sessionReport": {
+    case "sessionReported": {
       const h = sessionOf(after, fact.id) ?? sessionOf(before, fact.id);
       if (h?.role === "orchestrator") break;
       if (fact.outcome === "failed") out.push({ kind: "failed", session: fact.id, ...(h?.agent ? { agent: h.agent } : {}) });
       break;
     }
-    case "voiceCall":
+    case "callChanged":
       if (fact.state === "live") out.push({ kind: "opened" });
       break;
-    case "session":
+    case "sessionChanged":
       if (fact.session.role === "worker") out.push({ kind: "hired", session: fact.session.id, agent: fact.session.agent });
       break;
-    case "issue": {
+    case "issueChanged": {
       const issue = fact.issue;
       const previous = before.issues.find((item) => item.id === issue.id);
       const session = latestSessionIdOf(issue);
@@ -208,7 +208,7 @@ export function entriesFor(before: T.WorkspaceState, fact: T.Fact, after: T.Work
       }
       break;
     }
-    case "sessionGone": {
+    case "sessionLeft": {
       // Harvested: only when something went into the main branch, which is what earns.
       const h = sessionOf(before, fact.id);
       if (h && fact.closed === "merged" && fact.merged != null && fact.merged > 0)
@@ -224,7 +224,7 @@ export function entriesFor(before: T.WorkspaceState, fact: T.Fact, after: T.Work
         });
       break;
     }
-    case "message": {
+    case "messageChanged": {
       if (fact.message.fromKind === "owner") {
         if (fact.thread) {
           const h = sessionOnIssue(before, fact.thread);
@@ -237,7 +237,7 @@ export function entriesFor(before: T.WorkspaceState, fact: T.Fact, after: T.Work
       } else if (fact.message.fromKind === "session" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });
       break;
     }
-    case "gameProgress": {
+    case "progressChanged": {
       if (fact.commits) {
         const [level] = levelForCommits(fact.commits.total);
         const [was] = levelForCommits(before.commits?.total ?? 0);

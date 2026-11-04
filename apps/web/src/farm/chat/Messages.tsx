@@ -8,12 +8,13 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
+import { channelOf } from "@vibevalley/protocol/rules";
 
 import { aria, autofocus } from "@/base/dom";
 import { spentText } from "@/base/format";
 import { farmClock, readsLong } from "@/farm/store";
 import { artifactHref } from "@/features/artifact";
-import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, reactionOn, reactionSet, sameReaction, setMark, useMessage } from "@/features/channel";
+import { drafts, EmojiPicker, messagePath, quickReactions, reactionOn, reactionSet, sameReaction, setMark, useMessage } from "@/features/channel";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { useIntents } from "@/state/intent";
