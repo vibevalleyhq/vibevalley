@@ -193,7 +193,7 @@ function ChannelMain(props: {
         <button type="button" class={[iconButton, "md:hidden"]} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
           <Icon name="chat" size={20} />
         </button>
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">{markOf(props.channel)}</span>
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-selected text-lg font-semibold text-muted">{markOf(props.channel)}</span>
         <div class="flex min-w-0 flex-1 flex-col">
           <h1 class="truncate text-lg font-semibold" title={props.channel?.default === true ? t("web.channel.defaultHint") : undefined}>
             {name()}
@@ -722,7 +722,9 @@ function Members(props: { channel: Channel }) {
     >
       <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.members.title")}</p>
       <div class="flex items-center gap-2 px-1 py-1 text-sm">
-        <span class="flex size-7 items-center justify-center rounded-full bg-wheat text-xs font-semibold">{t("web.channel.members.owner").slice(0, 1)}</span>
+        <span class="flex size-7 items-center justify-center rounded-full bg-selected text-xs font-semibold text-muted">
+          {t("web.channel.members.owner").slice(0, 1)}
+        </span>
         {t("web.channel.members.owner")}
       </div>
       <div data-testid="member-orchestrator" data-key={here()} class="flex items-center gap-2 px-1 py-1 text-sm">

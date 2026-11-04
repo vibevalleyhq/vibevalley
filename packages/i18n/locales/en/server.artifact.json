@@ -83,5 +83,27 @@
   "badBlockType": "A block's type can only be {types}",
   "otherArtifact": "This batch of changes ({batch}) belongs to another artifact",
   "notBlocks": "“{title}” is a whole web page, not changed block by block: hand in a new version",
-  "notHtml": "“{title}” is written together and takes no new version: change it block by block (artifact_block_create, artifact_block_update)"
+  "notHtml": "“{title}” is written together and takes no new version: change it block by block (artifact_block_create, artifact_block_update)",
+  "check": {
+    "refused": "{n} parts of the page cannot show in the sandbox; fix them and hand it in again:",
+    "more": "{n} more, listed once these are fixed",
+    "script": "Line {line} loads a script from {url}: write it in the page, or load it from {hosts}",
+    "style": "Line {line} loads styles from {url}: write them in the page, or load them from {hosts}",
+    "font": "Line {line} loads a font from {url}: inline it as data:, or load it from {hosts}",
+    "inline": "Line {line} loads a picture or media from {url}: the page loads none from outside, inline it as data:",
+    "link": "Line {line} connects to {url}: only {hosts} can be connected to",
+    "form": "Line {line} submits a form to {url}: the page cannot submit forms, handle it in a script",
+    "refresh": "Line {line} has a <meta http-equiv=\"refresh\"> that takes the page away: remove it",
+    "base": "Line {line} has a <base href>: remove it and write addresses in full",
+    "frame": "Line {line}, <{tag}>: a page cannot hold another page"
+  },
+  "edit": {
+    "empty": "No words are selected to change",
+    "same": "The new words are the same as the old",
+    "notFound": "\"{words}\" is not in the page's source: a script may draw it; hand it to a helper",
+    "many": "\"{words}\" is in the page {n} times and which one is unclear: select a few more words, or hand it to a helper",
+    "crosses": "\"{words}\" crosses differently formatted parts; only words within one can be changed here: select fewer, or hand it to a helper",
+    "stale": "You are looking at version {version}; the latest is {latest}: change the latest",
+    "note": "The owner changed on the page: \"{old}\" → \"{new}\""
+  }
 }

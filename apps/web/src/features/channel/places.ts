@@ -234,8 +234,8 @@ export function workbenchClock(at: number) {
 }
 
 export interface SwitchTarget {
-  readonly kind: "channel" | "direct" | "thread" | "profile";
-  /** The channel's id; a profile's id for one with no direct channel yet. */
+  readonly kind: "channel" | "direct" | "thread" | "profile" | "note" | "notes";
+  /** The channel's id; a profile's id for one with no direct channel yet; a note's slug; the words to search the notes for. */
   readonly id: string;
   readonly label: string;
   /** Where it is or what picking it does: a channel's group, a thread's channel. */

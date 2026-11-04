@@ -262,14 +262,14 @@ doc_changes     (doc_id, seq, batch_id unique, actor, block_ids, created_at)
 
 ### 进度
 
-P1 的服务端做了（[产出](docs/subsystems/artifact.md)，文档后来并进了产出，正文是 `blocks` 的那种）：
+P1 的服务端做了（[稿子](docs/subsystems/artifact.md)，文档后来并进了稿子，正文是 `blocks` 的那种）：
 
 - 块模型、全部九种 op、存储（`artifact`、`artifact_block`、`artifact_block_revision`、`artifact_change`）、一批一个事务、`batchId` 去重、seq、每个 op 的结果、墓碑、修订、顺序键、码点偏移、Markdown 导入导出和往返用例。
 - 落后的 `baseRev`：这一块的字从那一版起没变过就照收，变过就是 `conflict`（`split_block` 在末尾拆）。三方合并（`merged`）留在 P2。
 - 还没有 WebSocket：`doc.submit` 的回答里带改后的块；页面开着时每 4 秒问一次 `doc.get`，看帮工写的；最近问到过别人的改动就每秒问一次，别人刚改过的块挂头像、归属条呼吸，主人光标所在的块不被问来的改动换掉。
-- 演示（`artifact.demo`）：不用模型，三个帮工档案按脚本同时写各自的一节，每秒左右用 `update_text` 把一段换长，走真的 op 管线，用来先看「几个帮工同时写」和 P3「agent 流式写入」的样子（[产出](docs/subsystems/artifact.md)）。
+- 演示（`artifact.demo`）：不用模型，三个帮工档案按脚本同时写各自的一节，每秒左右用 `update_text` 把一段换长，走真的 op 管线，用来先看「几个帮工同时写」和 P3「agent 流式写入」的样子（[稿子](docs/subsystems/artifact.md)）。
 - 帮工经 `/mcp` 的 `doc_get`、`doc_block_create`、`doc_block_update` 写，走同一条管线，`actor` 是它的档案（P3 的 agent 接入先做了不流式、不查 presence 的这一部分）。
-- 页面：工作台的「产出」页（`apps/web/src/features/artifact`），编辑器是自己的一列 `<textarea>`：各种块的画法、回车拆段、段首退格并段、上下键跨块、空列表项回车退出列表、行首 Markdown 换类型、防抖和待发队列、按作者的归属条、不认识的类型画占位块、拼字时不替换。marks 只画不改（工具条留到以后）。
+- 页面：工作台的「稿子」页（`apps/web/src/features/artifact`），编辑器是自己的一列 `<textarea>`：各种块的画法、回车拆段、段首退格并段、上下键跨块、空列表项回车退出列表、行首 Markdown 换类型、防抖和待发队列、按作者的归属条、不认识的类型画占位块、拼字时不替换。marks 只画不改（工具条留到以后）。
 - P1 的完成标准两条都有测试：重开库后不丢、Markdown 往返（`apps/server/src/doc/doc.test.ts`、`rules.test.ts`）。顺序键只有一份（`packages/protocol/src/rules/order.ts`），服务端和页面共用；下面的 JSON 用例还没写。
 
 ### 待定

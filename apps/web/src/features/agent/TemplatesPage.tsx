@@ -39,7 +39,7 @@ export function TemplatesPage() {
   };
   return (
     <div class="h-full overflow-y-auto">
-      <div class="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-4 pb-8 sm:px-6">
+      <div class="flex flex-col gap-6 px-4 pt-4 pb-8">
         <div class="flex flex-col gap-1">
           <A href="/agents" class="text-xs text-muted hover:underline">
             {t("web.agent.all")}
@@ -68,7 +68,7 @@ export function TemplatesPage() {
             {t("web.agent.templates.add")}
           </Button>
         </form>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           <For each={sorted()} keyed={(template) => template.id}>
             {(template) => (
               <TemplateCard template={template()} runtime={ready(runtimes, []).find((r) => r.id === template().runtime)} runtimes={ready(runtimes, [])} />
@@ -125,7 +125,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
             <span class="shrink-0 rounded bg-hover px-1.5 text-xs text-muted">{t(`web.agent.role.${template().role}`)}</span>
           </span>
           <span class="line-clamp-2 text-sm text-muted">{template().duty}</span>
-          <span class={["text-xs", here() ? "text-ok-ink" : "text-warn-ink"]}>
+          <span class={["text-xs", here() ? "text-muted" : "text-warn-ink"]}>
             {orchestrator()
               ? t("web.agent.templates.onServer")
               : here()
@@ -158,7 +158,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
         <Show when={template().source === "added"}>
           <ConfirmButton label={t("web.agent.remove")} confirm={t("web.agent.templates.removeSure")} onConfirm={remove} />
         </Show>
-        <Button tone="primary" data-testid="template-install" disabled={act.busy()} onClick={() => void install()}>
+        <Button data-testid="template-install" disabled={act.busy()} onClick={() => void install()}>
           {t("web.agent.templates.install")}
         </Button>
       </div>

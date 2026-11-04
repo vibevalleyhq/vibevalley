@@ -1,0 +1,186 @@
+import { createSignal, For, Show } from "solid-js";
+
+import { t } from "@vibevalley/i18n";
+import type { PkmPageSummary, PkmTier } from "@vibevalley/protocol";
+
+import { reasonOf } from "@/infra/api";
+import { ready } from "@/infra/query";
+import { A } from "@/ui/A";
+import { Icon } from "@/ui/Icon";
+import type { IconName } from "@/ui/icons";
+
+import { tierOrder } from "./outline";
+import { tierLabel } from "./PageView";
+import { notesSearch } from "./Search";
+import { pkmHref, usePkmRadar } from "./vault";
+
+/** slug: the page open, if any. */
+export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPageSummary[]; error?: unknown }) {
+  const [shut, setShut] = createSignal<ReadonlySet<PkmTier>>(new Set());
+  const listed = (tier: PkmTier) => props.pages.filter((p) => p.tier === tier);
+  const toggle = (tier: PkmTier) =>
+    setShut((was) => {
+      const next = new Set(was);
+      if (next.has(tier)) next.delete(tier);
+      else next.add(tier);
+      return next;
+    });
+  return (
+    <div class="flex min-h-0 flex-1 flex-col gap-4">
+      <button
+        type="button"
+        data-testid="pkm-find"
+        onClick={() => notesSearch.open()}
+        class="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-line bg-page px-2 text-sm text-faint transition-colors duration-120 hover:border-faint/40 hover:text-muted"
+      >
+        <Icon name="search" size={14} />
+        <span class="flex-1 text-left">{t("web.pkm.list.find")}</span>
+      </button>
+      <div class="flex flex-col gap-px">
+        <A href="/pkm" data-testid="pkm-today" aria-current={props.slug === undefined ? "page" : undefined} class={row(props.slug === undefined)}>
+          <Icon name="calendar" size={14} class={props.slug === undefined ? "text-ink" : "text-faint"} />
+          <span class="flex-1">{t("web.pkm.list.today")}</span>
+        </A>
+        <Radar />
+      </div>
+      <Show when={props.error}>{(e) => <p class="px-2 text-xs text-berry">{reasonOf(e())}</p>}</Show>
+      <div class="-mx-2 flex min-h-0 scroll-fade-y flex-col gap-4 overflow-y-auto px-2 pb-2" data-testid="pkm-list">
+        <For each={tierOrder.filter((tier) => tier !== "journal" && listed(tier).length > 0)}>
+          {(tier) => (
+            <section data-testid="pkm-tier" data-key={tier} class="flex flex-col gap-px">
+              <button
+                type="button"
+                aria-expanded={shut().has(tier) ? "false" : "true"}
+                onClick={() => toggle(tier)}
+                class="group flex h-6 cursor-pointer items-center gap-1 rounded-md px-2 text-xs font-medium text-faint hover:text-muted"
+              >
+                {tierLabel(tier)}
+                {/* Folded, the arrow stays to say so; open, it comes only when pointed at. */}
+                <Icon
+                  name={shut().has(tier) ? "next" : "choose"}
+                  size={10}
+                  class={shut().has(tier) ? "" : "opacity-0 transition-opacity duration-120 group-hover:opacity-100 group-focus-visible:opacity-100"}
+                />
+              </button>
+              <Show when={!shut().has(tier)}>
+                <ul class="flex flex-col gap-px">
+                  <For each={listed(tier)} keyed={(p) => p.slug}>
+                    {(p) => (
+                      <li>
+                        <A
+                          href={pkmHref(p().slug)}
+                          data-testid="pkm-row"
+                          data-key={p().slug}
+                          aria-current={p().slug === props.slug ? "page" : undefined}
+                          class={[row(p().slug === props.slug), "pl-7.5"]}
+                        >
+                          <span class="min-w-0 flex-1 truncate">{p().title}</span>
+                          <Show when={p().open > 0}>
+                            <span class="shrink-0 text-xs text-faint tabular-nums" title={t("web.pkm.list.open", { n: p().open })}>
+                              {p().open}
+                            </span>
+                          </Show>
+                        </A>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </Show>
+            </section>
+          )}
+        </For>
+      </div>
+    </div>
+  );
+}
+
+const row = (here: boolean) => [
+  "flex h-7 items-center gap-2 rounded-md px-2 text-sm transition-colors duration-120",
+  here ? "bg-selected text-ink" : "text-ink hover:bg-hover",
+];
+
+function Radar() {
+  const radar = usePkmRadar();
+  const [which, setWhich] = createSignal<"stale" | "overdue">();
+  const flip = (to: "stale" | "overdue") => setWhich((was) => (was === to ? undefined : to));
+  const look = (props: { icon: IconName; label: string; n: number; open?: boolean | undefined; tone?: string; testid: string; click: () => void }) => (
+    <button
+      type="button"
+      data-testid={props.testid}
+      aria-expanded={props.open === undefined ? undefined : props.open ? "true" : "false"}
+      onClick={() => props.click()}
+      class={[row(props.open === true), "cursor-pointer text-left"]}
+    >
+      <Icon name={props.icon} size={14} class="text-faint" />
+      <span class="flex-1">{props.label}</span>
+      <span class={["text-xs tabular-nums", props.tone ?? "text-faint"]}>{props.n}</span>
+    </button>
+  );
+  return (
+    <Show when={ready(radar, undefined)}>
+      {(r) => (
+        <div data-testid="pkm-radar" class="contents">
+          <Show when={r().inbox > 0}>
+            {look({
+              icon: "inbox",
+              label: t("web.pkm.radar.inbox"),
+              n: r().inbox,
+              testid: "pkm-radar-inbox",
+              click: () => document.querySelector('[data-testid="pkm-tier"][data-key="inbox"]')?.scrollIntoView({ block: "nearest" }),
+            })}
+          </Show>
+          <Show when={r().stale.length > 0}>
+            {look({
+              icon: "wait",
+              label: t("web.pkm.radar.stale"),
+              n: r().stale.length,
+              open: which() === "stale",
+              testid: "pkm-radar-stale",
+              click: () => flip("stale"),
+            })}
+          </Show>
+          <Show when={which() === "stale"}>
+            <ul class="flex flex-col gap-px">
+              <For each={r().stale} keyed={(s) => s.slug}>
+                {(s) => (
+                  <li>
+                    <A href={pkmHref(s().slug)} class={[row(false), "pl-7.5"]}>
+                      <span class="min-w-0 flex-1 truncate">{s().title}</span>
+                      <span class="shrink-0 text-xs text-faint">{t("web.pkm.radar.days", { n: s().days })}</span>
+                    </A>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+          <Show when={r().overdue.length > 0}>
+            {look({
+              icon: "clock",
+              label: t("web.pkm.radar.overdue"),
+              n: r().overdue.length,
+              open: which() === "overdue",
+              // The one count that is a fault, in its colour.
+              tone: "text-berry",
+              testid: "pkm-radar-overdue",
+              click: () => flip("overdue"),
+            })}
+          </Show>
+          <Show when={which() === "overdue"}>
+            <ul class="flex flex-col gap-px">
+              <For each={r().overdue} keyed={(o) => o.block}>
+                {(o) => (
+                  <li>
+                    <A href={pkmHref(o().page, o().block)} class="flex flex-col rounded-md py-1 pr-2 pl-7.5 hover:bg-hover">
+                      <span class="truncate text-sm">{o().plain}</span>
+                      <span class="text-xs text-berry">{o().deadline}</span>
+                    </A>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </div>
+      )}
+    </Show>
+  );
+}

@@ -1,8 +1,7 @@
-// How the notes page lays out what the server gives (docs/subsystems/pkm.md): pages by PARA tier, which blocks show under
-// collapsed ones, a block's text in pieces to draw, the editor's keys as ops, and a word diff for a suggested rewrite.
-
-import type { PkmBlock, PkmBlockOp, PkmPageSummary, PkmTier } from "@vibevalley/protocol";
+import type { PkmBlock, PkmPageSummary, PkmTier } from "@vibevalley/protocol";
 import { slugOf } from "@vibevalley/protocol/rules";
+
+import { titleFor } from "./days";
 
 /** The tiers in the list's order: what is worked on first, what is done with last. */
 export const tierOrder: readonly PkmTier[] = ["project", "area", "resource", "inbox", "journal", "archive"];
@@ -25,22 +24,6 @@ export function visibleBlocks(blocks: readonly PkmBlock[], collapsed: ReadonlySe
     if (collapsed.has(b.id)) hiddenUnder = b.depth;
   }
   return out;
-}
-
-export interface Keys {
-  readonly key: string;
-  readonly shiftKey: boolean;
-  readonly altKey: boolean;
-  readonly metaKey: boolean;
-  readonly ctrlKey: boolean;
-}
-
-/** The op an editing key sends for the block; undefined for any other key. */
-export function keyOp(e: Keys, block: string): PkmBlockOp | undefined {
-  if (e.key === "Tab") return { op: e.shiftKey ? "outdent" : "indent", block };
-  if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) return { op: "move", block, direction: e.key === "ArrowUp" ? "up" : "down" };
-  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) return { op: "toggle_marker", block };
-  return undefined;
 }
 
 export type Piece =
@@ -122,4 +105,22 @@ export function wordDiff(was: string, now: string): DiffPiece[] {
   while (i < n) push("del", a[i++] ?? "");
   while (j < m) push("add", b[j++] ?? "");
   return out;
+}
+
+export interface NoteTarget {
+  readonly slug: string;
+  readonly label: string;
+  readonly tier: PkmTier;
+}
+
+/** The pages whose title (a journal's day too) has what was typed in it, the newest first; none for nothing typed. */
+export function noteTargets(pages: readonly PkmPageSummary[], query: string, max = 6): NoteTarget[] {
+  const typed = query.trim().toLowerCase();
+  if (typed === "") return [];
+  return pages
+    .map((p) => ({ slug: p.slug, label: titleFor(p.title, p.day), tier: p.tier, updated: p.updated, title: p.title }))
+    .filter((p) => p.label.toLowerCase().includes(typed) || p.title.toLowerCase().includes(typed))
+    .toSorted((a, b) => b.updated - a.updated)
+    .slice(0, max)
+    .map(({ slug, label, tier }) => ({ slug, label, tier }));
 }

@@ -88,6 +88,17 @@ describe("pkm", () => {
     }).pipe(Effect.provide(farm())),
   );
 
+  it.effect("opens a day's journal, making it with a block to write in when it is not there", () =>
+    Effect.gen(function* () {
+      const pkm = yield* Pkm;
+      const made = yield* pkm.journal("2026-11-02");
+      expect([made.title, made.tier, made.file, made.blocks.map((b) => b.body)]).toEqual(["2026_11_02", "journal", "journals/2026_11_02.md", [""]]);
+      const again = yield* pkm.journal("2026-11-02");
+      expect(again.blocks.map((b) => b.id)).toEqual(made.blocks.map((b) => b.id));
+      expect((yield* pkm.list()).pages.map((p) => [p.slug, p.day])).toEqual([["2026_11_02", "2026-11-02"]]);
+    }).pipe(Effect.provide(farm())),
+  );
+
   it.effect("a rewrite keeps the block's links, waits for the owner and comes off once accepted", () =>
     Effect.gen(function* () {
       const pkm = yield* Pkm;

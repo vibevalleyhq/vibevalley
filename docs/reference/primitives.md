@@ -15,6 +15,7 @@
 | `slice` | `cut.ts` | s.slice(start, end), a surrogate pair cut in half made U+FFFD (what String.prototype.toWellFormed does, which the |
 | `cut` | `cut.ts` | s as it is when it fits in max units; else its first max units and an ellipsis. |
 | `oneLine` | `cut.ts` | Runs of white space are one space. |
+| `htmlSandbox` | `display.ts` | The <iframe>'s sandbox attribute; the server's CSP sandbox directive is the same tokens. |
 | `freshOf` | `inbox.ts` | The items of now that are news to known: undefined known is the first look, which knows them all and has no news. |
 | `assignmentOf` | `issues.ts` | The responsibility in force now. |
 | `assignedAgentOf` | `issues.ts` |  |
@@ -34,6 +35,9 @@
 | `phaseText` | `phase.ts` | phaseWords as said at now. |
 | `phaseWords` | `phase.ts` | What a session is doing in words, how long it has been quiet left as {span}. |
 | `slugOf` | `pkm.ts` | A page's name from its title: trimmed, lower case, spaces as dashes, "/" (or "\") as "__". |
+| `applyBlockOps` | `pkm.ts` | The blocks after the ops in order (a copy: blocks is not changed); an op on a block not on the page changes nothing. |
+| `flatBlocks` | `pkm.ts` | The outline as the wire has it: in order, each with its parent and the path of first lines above it. |
+| `treeOfBlocks` | `pkm.ts` |  |
 | `plainText` | `plain.ts` |  |
 | `farmOf` | `play.ts` | The farm a session's bed is on: each project has its own, and the sessions without one share one. |
 | `plotKeyOf` | `play.ts` | The plot a session works, the key of `FarmView.plots`: its issue, so a reopened issue keeps its plot; one with no issue is its own. |
@@ -195,7 +199,8 @@
 | `shortcutPlaces` | `shortcuts.ts` |  |
 | `shortcuts` | `shortcuts.ts` |  |
 | `keyCap` | `shortcuts.ts` | A key's cap on the sheet. |
-| `pressed` | `shortcuts.ts` | Whether a keydown is one of the shell's chords (mod+K, ?): the rest are each place's own. |
+| `inField` | `shortcuts.ts` |  |
+| `pressed` | `shortcuts.ts` | The chords matched here (mod+K, ?, C): the rest are each place's own. |
 | `useInterval` | `timer.ts` | fn every ms for as long as the owner lives. |
 | `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the owner's end clears it. |
 

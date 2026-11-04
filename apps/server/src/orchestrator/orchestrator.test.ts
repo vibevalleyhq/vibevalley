@@ -24,6 +24,7 @@ import type { ServerConfig } from "@/infra/config.ts";
 import { Ingress } from "@/ingress/ingress.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
+import { Pkm } from "@/pkm/pkm.ts";
 import { Resource } from "@/resource/resource.ts";
 import { Session } from "@/session/session.ts";
 import type { EvalCase } from "@/testing/evals.ts";
@@ -182,6 +183,21 @@ describe("the orchestrator", () => {
       expect(saidIn(chat.defaultChannel()).some((m) => m.from === "owner" && m.text === "随便说一句" && m.spoken)).toBe(true);
       expect(f.requests.slice(before).filter((c) => lastLine(c).includes("随便说一句")).length).toBe(1);
       expect(lastLine(f.requests[answered - 1]!)).toContain("语音那边已经回答了");
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("is shown the owner's note projects, and the notes the owner's words call up", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const ingress = yield* Ingress;
+      const pkm = yield* Pkm;
+      yield* pkm.save({ title: "Beehives", tier: "project", markdown: "- TODO check the queens every week\n" });
+      yield* ingress.say("蜂箱的 queens 怎么样了", {}, undefined, "");
+      yield* until(() => f.requests.length > 0, "the orchestrator asked");
+      const input = lastInput(f.requests.at(-1)!);
+      expect(input).toMatch(/主人笔记里在做的项目[\s\S]*- 《Beehives》（1 件没做完）/u);
+      expect(input).toMatch(/【笔记里可能相关的】[\s\S]*《Beehives》TODO check the queens every week/u);
+      expect(f.requests.filter((r) => lastInput(r).includes("【笔记里可能相关的】")).length).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

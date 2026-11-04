@@ -1,7 +1,7 @@
 {
   "place": {
     "label": "笔记",
-    "hint": "你自己的笔记：PARA 分好的大纲页、每天的日记、反链和润色建议"
+    "hint": "你自己的笔记：每天的日记、PARA 分好的大纲页、反链和润色建议"
   },
   "tier": {
     "project": "项目",
@@ -12,38 +12,100 @@
     "archive": "归档"
   },
   "list": {
-    "label": "全部笔记页",
-    "capture": "记一句，进今天的日记",
-    "captured": "记进了今天的日记",
+    "label": "页面和日历",
     "find": "搜笔记",
-    "nothingFound": "没有找到",
     "open": "{n} 项没做完",
-    "radar": "收件箱 {inbox} · 搁着的项目 {stale} · 过期 {overdue}",
-    "all": "全部笔记"
+    "today": "今天"
   },
-  "empty": "笔记还空着。这些页面就是 {root} 里的 Markdown 文件；在左边记一句，就有了今天的日记。",
+  "calendar": {
+    "label": "日历",
+    "previous": "上个月",
+    "next": "下个月"
+  },
+  "radar": {
+    "inbox": "收件箱",
+    "stale": "搁着",
+    "overdue": "过期",
+    "days": "{n} 天没动"
+  },
   "gone": "没有这一页，或者它的文件已经删掉了。",
-  "pick": "从左边挑一页看",
   "page": {
     "more": "更多",
     "export": "导出成 Markdown（复制）",
     "exported": "复制好了",
+    "copyFile": "复制文件路径（{file}）",
+    "copiedFile": "文件路径复制好了",
     "undo": "撤销上一次改动",
     "undone": "撤销了：{what}",
     "nothingToUndo": "没有可以撤销的改动",
     "tier": "放在哪",
     "moved": "挪到了{tier}",
-    "file": "文件 {file}",
-    "append": "加一块",
+    "append": "接着写…",
     "collapse": "收起",
     "expand": "展开",
     "edit": "改这一块",
-    "marker": "切换状态",
-    "empty": "空的",
-    "missingRef": "找不到这一块"
+    "missingRef": "找不到这一块",
+    "refFrom": "引自「{page}」",
+    "notSaved": "没存上：{why}",
+    "outline": "大纲"
+  },
+  "props": {
+    "deadline": "截止 {day}",
+    "left": "截止 {day} · 还剩 {n} 天",
+    "dueToday": "截止 {day} · 今天到期",
+    "overdue": "截止 {day} · 过了 {n} 天",
+    "area": "领域",
+    "more": "还有 {n} 项属性",
+    "fewer": "收起属性"
+  },
+  "marker": {
+    "TODO": "待办",
+    "DOING": "在做",
+    "DONE": "做完了",
+    "NOW": "现在做",
+    "LATER": "以后做",
+    "WAITING": "在等",
+    "CANCELED": "不做了"
+  },
+  "command": {
+    "todo": "标成待办",
+    "doing": "标成在做",
+    "done": "标成做完了",
+    "clear": "去掉标记",
+    "h1": "大标题",
+    "h2": "小标题",
+    "today": "链到今天的日记"
+  },
+  "complete": {
+    "newPage": "新页面"
+  },
+  "toolbar": {
+    "label": "编辑这一块",
+    "indent": "缩进",
+    "outdent": "取消缩进",
+    "up": "上移",
+    "down": "下移",
+    "todo": "切换待办",
+    "link": "插入链接"
+  },
+  "rail": {
+    "label": "这一页的旁注",
+    "show": "打开旁注",
+    "hide": "收起旁注",
+    "contents": "这页的大纲"
+  },
+  "search": {
+    "title": "搜笔记",
+    "placeholder": "搜页面和块",
+    "filters": "筛选",
+    "all": "全部",
+    "todo": "只看待办",
+    "linked": "链到这一页的",
+    "pages": "页面",
+    "none": "没有找到"
   },
   "backlinks": {
-    "title": "链到这里的",
+    "title": "链到这里的 · {n}",
     "none": "还没有别的页链到这里",
     "projects": "项目",
     "journals": "日记",
@@ -51,11 +113,20 @@
     "archives": "归档"
   },
   "comments": {
-    "title": "评论和润色建议",
+    "title": "评论 · {n}",
+    "count": "{n} 条评论",
     "accept": "采纳",
     "reject": "不要",
-    "on": "关于「{span}」",
     "accepted": "采纳了",
-    "rejected": "不要了"
+    "rejected": "不要了",
+    "on": "「{span}」"
+  },
+  "tierOne": {
+    "project": "项目",
+    "area": "领域",
+    "resource": "资料",
+    "inbox": "收件箱",
+    "journal": "日记",
+    "archive": "归档"
   }
 }

@@ -36,6 +36,8 @@
   },
   "rail": "工作台",
   "farm": "回农场",
+  "farmShort": "农场",
+  "update": "更新",
   "working": "开工中 · {n} 个在干活",
   "off": "没开工",
   "chips": {
@@ -165,6 +167,7 @@
       "everywhere": "到处",
       "composer": "输入框",
       "lists": "菜单和名单",
+      "issues": "工单",
       "pictures": "看图",
       "farm": "农场",
       "desktop": "桌面版（系统全局）"
@@ -186,7 +189,8 @@
       "farmMenu": "放下农具，或打开菜单",
       "debug": "调试台",
       "voice": "跟管家说话（在设置里能换）",
-      "command": "命令：记工单、让管家记住、叫停、私聊"
+      "command": "命令：记工单、让管家记住、叫停、私聊",
+      "newIssue": "新工单"
     }
   },
   "rich": {

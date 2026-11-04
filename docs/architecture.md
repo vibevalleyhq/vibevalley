@@ -104,7 +104,7 @@ flowchart LR
 | `helpers/<oar 会话 id>.jsonl` | VibeValley 自己的帮工的对话，每个 oar 会话一份 |
 | `agent/<档案 id>/` | 每个管家（VibeValley 自己的 agent）一份：对话 `<档案 id>.jsonl`、压掉的旧对话 `archive/`、主人标出的做错的一轮 `evals/` |
 | `logs/` | 每个帮工会话的原始记录 |
-| `artifacts/<sha256>` | 产出每一版的内容，同样的内容只存一份（[产出](docs/subsystems/artifact.md)） |
+| `artifacts/<sha256>` | 稿子每一版的内容，同样的内容只存一份（[稿子](docs/subsystems/artifact.md)） |
 | `pkm/` | 笔记库：PARA 的文件夹和日记里的 Markdown 页面，剪藏的原文在 `.pkm/snapshots/`；配置 `pkm.root` 可以换到别处（[笔记](docs/subsystems/pkm.md)） |
 | `vibevalley.yaml` | 可选：配置（见下）；放钥匙时不进仓库 |
 

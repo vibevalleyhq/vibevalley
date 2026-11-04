@@ -1,7 +1,3 @@
-// The workbench's frame: a dark rail of places on the left (the orchestrator's face
-// back to the farm at the top, 设置 and the seeds back to the farm at the bottom), and over every page but the chat a
-// head with the place's name and whether the farm is open.
-
 import type { JSX } from "@solidjs/web";
 import { For, onSettled, Show } from "solid-js";
 
@@ -10,12 +6,14 @@ import { t } from "@vibevalley/i18n";
 import { pressed } from "@/base/shortcuts";
 import { QuickSwitcher, switcher } from "@/features/channel";
 import { waitingOnOwner } from "@/features/inbox";
+import { NotesSearch } from "@/features/pkm";
 import { useCore, useFrames } from "@/infra/frame";
 import { useRouter } from "@/infra/router";
 import { useUpdates } from "@/infra/settings";
 import { A } from "@/ui/A";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
+import type { IconName } from "@/ui/icons";
 import { titleBar } from "@/ui/layout";
 import { ShortcutSheet } from "@/ui/ShortcutSheet";
 import { Hint } from "@/ui/Tip";
@@ -31,7 +29,8 @@ function PlaceIcon(props: { place: Place }) {
   return <Icon name={props.place.icon} size={20} />;
 }
 
-function Slot(props: { to: string; place: string; label: string; current?: boolean; fill?: string; badge?: number; children: JSX.Element }) {
+/** name: none for the farm's face at the top, which is a picture of its own; a place's name sits under its icon so the rail reads without hovering. */
+function Slot(props: { to: string; place: string; label: string; name?: string; current?: boolean; badge?: number; children: JSX.Element }) {
   return (
     <A
       href={props.to}
@@ -40,16 +39,22 @@ function Slot(props: { to: string; place: string; label: string; current?: boole
       aria-label={props.label}
       aria-current={props.current === true ? "page" : undefined}
       data-badge={props.badge !== undefined && props.badge > 0 ? props.badge : undefined}
-      class="relative flex h-11 w-11 items-center justify-center rounded-xl text-on-rail/70 hover:bg-on-rail/13 hover:text-on-rail focus-visible:outline-2 focus-visible:outline-focus aria-[current=page]:text-on-rail"
-      style={props.current === true ? { background: props.fill ?? "color-mix(in srgb, var(--wb-on-rail) 20%, transparent)" } : undefined}
+      class={[
+        "relative flex flex-col items-center justify-center gap-0.5 rounded-lg text-on-rail/65 hover:bg-on-rail/6 hover:text-on-rail focus-visible:outline-2 focus-visible:outline-focus aria-[current=page]:text-on-rail",
+        // The farm's face at the top is a square picture; a place is a square of its icon and name, of its icon alone on a
+        // phone, where the rail gives the page all it can.
+        props.name === undefined ? "size-11 sm:size-12" : "size-12 sm:size-14",
+      ]}
+      style={props.current === true ? { background: "color-mix(in srgb, var(--wb-on-rail) 9%, transparent)" } : undefined}
     >
       {props.children}
+      <Show when={props.name}>{(name) => <span class="hidden w-full truncate text-center text-xs leading-4 sm:block">{name()}</span>}</Show>
       {/* How many wait on the owner there: the place to go next, seen from anywhere. */}
       <Show when={props.badge}>
         {(n) => (
           <span
             data-testid="rail-badge"
-            class="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-wheat px-1 text-center text-2xs leading-4 font-semibold text-ink"
+            class="absolute top-0.5 right-1 min-w-4 rounded-full bg-wheat px-1 text-center text-2xs leading-4 font-semibold text-ink"
           >
             {n()}
           </span>
@@ -58,6 +63,13 @@ function Slot(props: { to: string; place: string; label: string; current?: boole
     </A>
   );
 }
+
+/** One size up from a page's head (docs/style/design.md, 图标). */
+function RailIcon(props: { name: IconName }) {
+  return <Icon name={props.name} size={24} />;
+}
+
+const railGroups = ["work", "setup", "reference"] as const;
 
 function Rail(props: { here?: Place | undefined }) {
   const frames = useFrames();
@@ -72,39 +84,55 @@ function Rail(props: { here?: Place | undefined }) {
     <nav
       aria-label={t("web.base.rail")}
       data-testid="rail"
-      class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-rail pb-3 md:w-20"
+      class="flex w-14 shrink-0 flex-col items-center overflow-y-auto border-r border-line bg-rail pb-3 sm:w-18"
       // The window's buttons sit over the rail's top: it is at least as wide as they reach, and a little.
       style={titleBar.left > 0 ? { "min-width": `${titleBar.left + 8}px` } : undefined}
     >
       {/* Room for the desktop window's buttons over the rail's top. */}
       <div class="shrink-0" style={{ height: `${titleBar.top}px` }} />
       <div class="flex shrink-0 items-center justify-center" style={{ height: `${head}px` }}>
-        <Slot to="/farm" place="farm" label={t("web.base.farm")} current fill="var(--wb-wheat)">
+        <Slot to="/farm" place="farm" label={t("web.base.farm")}>
           <OrchestratorFace size={38} />
         </Slot>
       </div>
-      <div class="flex flex-col gap-2">
-        <For each={places.filter((p) => p.id !== "settings")}>
-          {(p) => (
-            <Slot to={p.path} place={p.id} label={`${p.label} · ${p.hint}`} current={p === props.here} badge={p.id === "issues" ? waiting() : 0}>
-              <PlaceIcon place={p} />
-            </Slot>
+      <div class="flex flex-col items-center gap-1">
+        <For each={railGroups}>
+          {(group, i) => (
+            <>
+              <Show when={i() > 0}>
+                <span aria-hidden="true" class="my-1 h-px w-8 bg-on-rail/10" />
+              </Show>
+              <For each={places.filter((p) => p.group === group && p.id !== "settings")}>
+                {(p) => (
+                  <Slot
+                    to={p.path}
+                    place={p.id}
+                    label={`${p.label} · ${p.hint}`}
+                    name={p.label}
+                    current={p === props.here}
+                    badge={p.id === "issues" ? waiting() : 0}
+                  >
+                    <RailIcon name={p.icon} />
+                  </Slot>
+                )}
+              </For>
+            </>
           )}
         </For>
       </div>
-      <div class="mt-auto flex flex-col items-center gap-2 pt-2">
+      <div class="mt-auto flex flex-col items-center gap-1 pt-2">
         <Show when={ready()}>
           {(r) => (
-            <Slot to="/settings/about" place="update" label={t("web.base.updateReady", { next: r().next })}>
-              <Icon name="update" size={20} />
+            <Slot to="/settings/about" place="update" label={t("web.base.updateReady", { next: r().next })} name={t("web.base.update")}>
+              <RailIcon name="update" />
             </Slot>
           )}
         </Show>
-        <Slot to={settings.path} place={settings.id} label={`${settings.label} · ${settings.hint}`} current={props.here === settings}>
-          <PlaceIcon place={settings} />
+        <Slot to={settings.path} place={settings.id} label={`${settings.label} · ${settings.hint}`} name={settings.label} current={props.here === settings}>
+          <RailIcon name={settings.icon} />
         </Slot>
-        <Slot to="/farm" place="farm" label={t("web.base.farm")}>
-          <Icon name="farm" size={20} />
+        <Slot to="/farm" place="farm" label={t("web.base.farm")} name={t("web.base.farmShort")}>
+          <RailIcon name="farm" />
         </Slot>
         <span role="status" data-testid="link" data-state={frames.link} title={linkWords[frames.link]} class="flex h-4 items-center">
           <span
@@ -169,6 +197,7 @@ export function Shell(props: { children: JSX.Element }) {
     // The interface size (设置 › 外观) scales the workbench only: zoom keeps its fixed pixel sizes in proportion.
     <div class="flex h-full [zoom:var(--workbench-zoom,1)]">
       <QuickSwitcher />
+      <NotesSearch />
       <ShortcutSheet />
       <Rail here={here()} />
       <main class="flex min-w-0 flex-1 flex-col">

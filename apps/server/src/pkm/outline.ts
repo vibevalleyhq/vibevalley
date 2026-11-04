@@ -69,10 +69,11 @@ const pageOrder = [
   "snapshot",
   "tldr",
 ];
-const blockOrder = ["id", "completed", "deadline", "scheduled", "render", "caption", "source-anchor", "comment"];
+const blockOrder = ["collapsed", "id", "completed", "deadline", "scheduled", "render", "caption", "source-anchor", "comment"];
 
 const propLine = /^([a-zA-Z0-9_-]+)::\s*(.*)$/u;
-const bulletLine = /^(\s*)-\s(.*)$/u;
+/** A bullet; a bare - (an empty block, its space trimmed by an editor) is one too. */
+const bulletLine = /^(\s*)-(?:\s(.*))?$/u;
 const markerLead = new RegExp(`^(${PkmMarkerValues.join("|")})(?:\\s+\\[#([ABC])\\])?\\s+(.*)$`, "su");
 const priorityLead = /^\[#([ABC])\]\s+(.*)$/su;
 const fenceLead = /^(`{3,}|~{3,})/u;
@@ -91,9 +92,6 @@ function seededId(seed: string): string {
 
 const isMarker = (word: string | undefined): word is T.PkmMarker => PkmMarkerValues.some((m) => m === word);
 const isPriority = (word: string | undefined): word is T.PkmPriority => word === "A" || word === "B" || word === "C";
-
-/** A block's first line without a heading's #s: how it is named in a path. */
-const headOf = (body: string) => (body.split("\n")[0] ?? "").replace(/^#+\s*/u, "").trim();
 
 /** The file's text as a page; ids not written in it are made from where the block is (seededId). */
 export function parse(text: string, file: string, mtime: number): Page {
@@ -282,28 +280,6 @@ export function edgesOf(page: Pick<Page, "blocks">): Edge[] {
       }
   }
   return edges;
-}
-
-/** The outline as the wire has it: in order, each with its parent and the path of first lines above it. */
-export function flatten(nodes: readonly Node[]): T.PkmBlock[] {
-  const out: T.PkmBlock[] = [];
-  const go = (list: readonly Node[], parent: string | undefined, path: readonly string[]) => {
-    for (const node of list) {
-      out.push({
-        id: node.id,
-        ...(parent ? { parent } : {}),
-        depth: node.depth,
-        ...(node.marker ? { marker: node.marker } : {}),
-        ...(node.priority ? { priority: node.priority } : {}),
-        body: node.body,
-        props: { ...node.props },
-        path: path.join(" > "),
-      });
-      go(node.children, node.id, [...path, headOf(node.body)]);
-    }
-  };
-  go(nodes, undefined, []);
-  return out;
 }
 
 /** The ids of page's blocks not written in its file taken from was where a block reads the same at the same depth: a page

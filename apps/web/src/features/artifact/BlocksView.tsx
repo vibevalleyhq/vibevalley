@@ -2,7 +2,7 @@
 // a plain field (marks are kept through the edit), and Enter splits it, Backspace at its start joins it to the one before,
 // Up and Down at its ends move between blocks.
 
-import type { JSX } from "@solidjs/web";
+import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -59,7 +59,13 @@ export interface QuoteTarget {
   readonly text: string;
 }
 
-export function BlocksView(props: { id: ArtifactId; onEditor?: (editor: BlockEditor) => void; onQuote?: ((block: QuoteTarget) => void) | undefined }) {
+/** suggestionsAt: where the open suggestions are drawn (the artifacts page's side panel); without it, above the blocks. */
+export function BlocksView(props: {
+  id: ArtifactId;
+  onEditor?: (editor: BlockEditor) => void;
+  onQuote?: ((block: QuoteTarget) => void) | undefined;
+  suggestionsAt?: HTMLElement | undefined;
+}) {
   const editor = new BlockEditor(
     api,
     untrack(() => props.id),
@@ -149,6 +155,16 @@ export function BlocksView(props: { id: ArtifactId; onEditor?: (editor: BlockEdi
     setWorking(undefined);
   };
 
+  const suggestionsList = () => (
+    <SuggestionsList
+      list={suggestions()}
+      blocks={editor.blocks}
+      agents={agents()}
+      working={working()}
+      onAccept={(suggestion) => void resolve(suggestion, true)}
+      onReject={(suggestion) => void resolve(suggestion, false)}
+    />
+  );
   return (
     <article
       aria-label={(version(), editor.artifact?.title) ?? ""}
@@ -159,14 +175,9 @@ export function BlocksView(props: { id: ArtifactId; onEditor?: (editor: BlockEdi
       data-writing={(version(), editor.othersWriting) ? "" : undefined}
       class="flex min-h-0 flex-1 flex-col"
     >
-      <SuggestionsList
-        list={suggestions()}
-        blocks={editor.blocks}
-        agents={agents()}
-        working={working()}
-        onAccept={(suggestion) => void resolve(suggestion, true)}
-        onReject={(suggestion) => void resolve(suggestion, false)}
-      />
+      <Show when={props.suggestionsAt} fallback={suggestionsList()}>
+        {(at) => <Portal mount={at()}>{suggestionsList()}</Portal>}
+      </Show>
       <p role="status" class={["truncate pb-2 pl-[35px] text-xs", (version(), editor.error !== undefined) ? "text-berry" : "text-muted"]}>
         {(version(), editor.blocks.length > 0 || editor.busy || editor.error !== undefined) ? status() : ""}
       </p>

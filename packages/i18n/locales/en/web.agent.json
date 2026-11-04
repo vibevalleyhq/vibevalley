@@ -156,8 +156,6 @@
     "look": "Look"
   },
   "list": {
-    "title": "Profiles",
-    "intro": "Each profile is an agent. Managers stay, lead and do no work themselves, and there may be several; helpers are runtimes set up: which runtime and model, what persona and skills, and which little animal they are on the farm. When a manager sends work, it sends a helper.",
     "orchestrators": "Managers",
     "helpers": "Helpers",
     "make": "Make a new helper",

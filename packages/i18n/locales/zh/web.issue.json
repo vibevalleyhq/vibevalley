@@ -9,8 +9,6 @@
   "orchestrator": "管家",
   "noHelper": "还没选帮工",
   "board": {
-    "add": "＋ 写一张，回车存下",
-    "addLabel": "写一张待办",
     "earlier": "更早的 {n} 张",
     "recent": "只看最近的",
     "empty": {
@@ -349,5 +347,13 @@
     "changes": "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
     "changesUncommitted": "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
     "justNow": "刚刚"
+  },
+  "new": {
+    "title": "新工单",
+    "card": "新工单",
+    "words": "要做什么",
+    "placeholder": "要做什么？一句话就行，帮工会照它起草",
+    "keys": "⌘ 回车记下",
+    "keep": "记下"
   }
 }

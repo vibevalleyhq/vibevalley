@@ -1,7 +1,7 @@
 {
   "place": {
     "label": "Notes",
-    "hint": "Your own notes: outline pages sorted by PARA, daily journals, backlinks and suggested rewrites"
+    "hint": "Your own notes: daily journals, outline pages sorted by PARA, backlinks and suggested rewrites"
   },
   "tier": {
     "project": "Projects",
@@ -12,38 +12,100 @@
     "archive": "Archive"
   },
   "list": {
-    "label": "All note pages",
-    "capture": "Jot a line into today's journal",
-    "captured": "Added to today's journal",
+    "label": "Pages and calendar",
     "find": "Search notes",
-    "nothingFound": "Nothing found",
     "open": "{n} open",
-    "radar": "Inbox {inbox} · stale projects {stale} · overdue {overdue}",
-    "all": "All notes"
+    "today": "Today"
   },
-  "empty": "No notes yet. The pages are the Markdown files in {root}; jot a line on the left to start today's journal.",
+  "calendar": {
+    "label": "Calendar",
+    "previous": "Previous month",
+    "next": "Next month"
+  },
+  "radar": {
+    "inbox": "Inbox",
+    "stale": "Stale",
+    "overdue": "Overdue",
+    "days": "{n} days untouched"
+  },
   "gone": "There is no such page, or its file was deleted.",
-  "pick": "Pick a page on the left",
   "page": {
     "more": "More",
     "export": "Export as Markdown (copy)",
     "exported": "Copied",
+    "copyFile": "Copy the file's path ({file})",
+    "copiedFile": "File path copied",
     "undo": "Undo the last change",
     "undone": "Undone: {what}",
     "nothingToUndo": "Nothing to undo",
-    "tier": "Where it sits",
+    "tier": "Where it goes",
     "moved": "Moved to {tier}",
-    "file": "File {file}",
-    "append": "Add a block",
+    "append": "Keep writing…",
     "collapse": "Collapse",
     "expand": "Expand",
     "edit": "Edit this block",
-    "marker": "Change its state",
-    "empty": "Empty",
-    "missingRef": "Block not found"
+    "missingRef": "Block not found",
+    "refFrom": "From “{page}”",
+    "notSaved": "Not saved: {why}",
+    "outline": "Outline"
+  },
+  "props": {
+    "deadline": "Due {day}",
+    "left": "Due {day} · {n} days left",
+    "dueToday": "Due {day} · today",
+    "overdue": "Due {day} · {n} days ago",
+    "area": "Area",
+    "more": "{n} more properties",
+    "fewer": "Fewer properties"
+  },
+  "marker": {
+    "TODO": "To do",
+    "DOING": "Doing",
+    "DONE": "Done",
+    "NOW": "Now",
+    "LATER": "Later",
+    "WAITING": "Waiting",
+    "CANCELED": "Canceled"
+  },
+  "command": {
+    "todo": "Mark to do",
+    "doing": "Mark doing",
+    "done": "Mark done",
+    "clear": "Clear the mark",
+    "h1": "Heading",
+    "h2": "Subheading",
+    "today": "Link today's journal"
+  },
+  "complete": {
+    "newPage": "New page"
+  },
+  "toolbar": {
+    "label": "Edit this block",
+    "indent": "Indent",
+    "outdent": "Outdent",
+    "up": "Move up",
+    "down": "Move down",
+    "todo": "Toggle to do",
+    "link": "Insert a link"
+  },
+  "rail": {
+    "label": "Beside this page",
+    "show": "Show the side panel",
+    "hide": "Hide the side panel",
+    "contents": "On this page"
+  },
+  "search": {
+    "title": "Search notes",
+    "placeholder": "Search pages and blocks",
+    "filters": "Filters",
+    "all": "All",
+    "todo": "To do only",
+    "linked": "Linking here",
+    "pages": "Pages",
+    "none": "Nothing found"
   },
   "backlinks": {
-    "title": "Linked here",
+    "title": "Linked here · {n}",
     "none": "No other page links here yet",
     "projects": "Projects",
     "journals": "Journals",
@@ -51,11 +113,20 @@
     "archives": "Archive"
   },
   "comments": {
-    "title": "Comments and suggested rewrites",
+    "title": "Comments · {n}",
+    "count": "{n} comments",
     "accept": "Accept",
-    "reject": "Reject",
-    "on": "On “{span}”",
+    "reject": "Dismiss",
     "accepted": "Accepted",
-    "rejected": "Rejected"
+    "rejected": "Dismissed",
+    "on": "“{span}”"
+  },
+  "tierOne": {
+    "project": "Project",
+    "area": "Area",
+    "resource": "Resource",
+    "inbox": "Inbox",
+    "journal": "Journal",
+    "archive": "Archive"
   }
 }

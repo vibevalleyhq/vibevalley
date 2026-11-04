@@ -21,7 +21,7 @@
 #### （1）支持「DAG 本质是 Agent 能力（规划、分派子任务、自检推进）」的代码与历史证据
 1. **核心抽象源于 Agent package**：DAG 的拓扑定义与分层算法 `packages/agent/src/dag.ts` 位于 `@vibevalley/agent` 包内；其文件头注释（`dag.ts:1`）和早期提交 `74b10145`（`Tasks are DAGs: the farm's task graph, the agent's own task graph, one module`）明确记录：最初设计就是把「Agent 把一件活拆成有依赖关系的几步、按依赖并发派发执行并回收结果」作为统一的能力（当时统一叫 `Task`，表名叫 `task_graph` / `agent_task`）。
 2. **`issue_split` 与 `graph.split` 的发起与决策主体都是 Agent**：
-   - 在 `graph.split` 中，拆图不是人填表建子工单，而是派一个作为「规划师」的 Agent 读仓库代码产出 DAG（`task/prompts.ts:159`）；
+   - 在 `graph.split` 中，拆图不是人填表建子工单，而是派一个作为「规划师」的 Agent 读仓库代码稿子 DAG（`task/prompts.ts:159`）；
    - 在 `issue_split`（`task/task.ts:522`）中，更是正在干活的 Agent 自己发现任务太大，主动调用工具将当前任务裂变为一张并发执行的 DAG，且**无需主人审批直接进入 `running` 自动调度**。
 3. **两套状态机与推进语义高度同构**：
    - 对比 `packages/agent/src/todo.ts` 与 `apps/server/src/task/graph.ts`：节点状态同为 `waiting | working | done(merged) | failed | skipped`；推进条件同为上游全部 `done(merged) | skipped`；都有并发槽位控制（`maxSubagents = 3` vs `defaultParallel = 3`）、失败自动打回重试（`retries = 1` vs `autoRetries = 2`）、中断/重启退回或暂停恢复。

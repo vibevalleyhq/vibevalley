@@ -105,7 +105,7 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
       </Match>
       <Match when={at() !== "trajectory"}>
         <div class="h-full overflow-y-auto px-4 pb-4">
-          <div class="mx-auto flex max-w-4xl flex-col gap-4">
+          <div class="flex max-w-4xl flex-col gap-4">
             {head()}
             {bar()}
             <Switch>

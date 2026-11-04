@@ -1,49 +1,51 @@
 @import "tailwindcss";
 
 /* The workbench's palette, by what a colour is for, in the two themes of 设置 › 外观 (state/appearance.ts sets
-   <html data-theme>). Light is the farm's colours, so the two skins stay one place. The pixel skin (the farm, the
-   memory tree, ui/pixel) is drawn and keeps its colours: its root sets data-theme="light" again. A colour written into
-   a class instead (bg-[#…]) would not follow: vibevalley/no-hex-color refuses it. */
+   <html data-theme>). Paper and ink are near neutral, so that colour is left for what means something: green to go,
+   wheat for waiting, berry for wrong, water for a link. Three steps of words (ink, muted, faint) each pass AA on the
+   page, the side and the rail, and stay apart. The farm and the pixel skin (the memory tree, ui/pixel) are drawn in
+   their own colours: their root sets data-theme="light" again. A colour written into a class instead (bg-[#…]) would
+   not follow: vibevalley/no-hex-color refuses it. */
 :root,
 [data-theme="light"] {
   color-scheme: light;
-  --wb-page: #fffaf0;
-  --wb-side: #f1ebe0;
-  --wb-ink: #2f1f13;
-  --wb-muted: #7f5b3b;
-  --wb-faint: #846344;
-  --wb-line: #2f1f131f;
-  --wb-hover: #2f1f130f;
-  --wb-selected: #2f1f131a;
+  --wb-page: #fcfcfb;
+  --wb-side: #f6f5f3;
+  --wb-ink: #1c1917;
+  --wb-muted: #5e5852;
+  --wb-faint: #716a64;
+  --wb-line: #1c191714;
+  --wb-hover: #1c19170a;
+  --wb-selected: #1c191711;
   --wb-focus: #74a046;
-  --wb-accent: #567c31;
+  --wb-accent: #4d7a2a;
   /* A primary button under the pointer: darker in light, so the page-coloured words on it stay readable. */
-  --wb-accent-hover: #476a28;
+  --wb-accent-hover: #426a22;
   --wb-leaf: #74a046;
   --wb-wheat: #e5a93c;
-  --wb-berry: #aa3f31;
-  --wb-water: #3b6b8e;
-  --wb-bark: #7f5b3b;
+  --wb-berry: #a83a2c;
+  --wb-water: #2c6aa3;
+  --wb-bark: #5e5852;
   /* A mark that something is ready, missing or to be looked at: its tint and its words. */
-  --wb-ok-soft: #e3efd2;
-  --wb-ok-ink: #3f6427;
-  --wb-bad-soft: #f6ddd8;
-  --wb-warn-ink: #9c5824;
+  --wb-ok-soft: #e8f0de;
+  --wb-ok-ink: #3b6125;
+  --wb-bad-soft: #f8e4e0;
+  --wb-warn-ink: #94531f;
   /* Under a dialog. */
-  --wb-scrim: #2f1f1340;
-  /* The rail and what is on it: dark in both themes. */
-  --wb-rail: #46301d;
-  --wb-on-rail: #fffaf0;
+  --wb-scrim: #1c191740;
+  /* The rail and what is on it: the quietest surface, a step below the side, so the page is what is looked at. */
+  --wb-rail: #efeeeb;
+  --wb-on-rail: #1c1917;
   /* Nobody at work. */
-  --wb-idle: #c8a46e;
+  --wb-idle: #aca59e;
   /* A command or its output: dark in both themes. */
-  --wb-code-bg: #2f1f13;
-  --wb-code-ink: #eedcb2;
-  --wb-float: #2f1f1326;
+  --wb-code-bg: #1c1917;
+  --wb-code-ink: #e7e5e2;
+  --wb-float: #1c191724;
   /* What lies on the surface it is on, a hair above it: a segmented control's thumb, a card under the pointer. */
-  --wb-raise: #2f1f131a;
-  /* Code's colours (ui/code: Shiki's tokens name these), drawn from the farm's: keywords berry, strings leaf, numbers
-     and constants water, functions bark, comments faint. */
+  --wb-raise: #1c191714;
+  /* Code's colours (ui/code: Shiki's tokens name these): keywords berry, strings leaf, numbers and constants water,
+     functions a warm brown, comments faint. */
   --shiki-token-keyword: #a8452f;
   --shiki-token-string: #4c7a2d;
   --shiki-token-string-expression: #4c7a2d;
@@ -53,32 +55,32 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --wb-page: #1d1813;
-  --wb-side: #262019;
-  --wb-ink: #f1e7d6;
-  --wb-muted: #bfa88c;
-  --wb-faint: #9e8974;
-  --wb-line: #f1e7d621;
-  --wb-hover: #f1e7d610;
-  --wb-selected: #f1e7d61c;
+  --wb-page: #151413;
+  --wb-side: #1b1a18;
+  --wb-ink: #ecebe8;
+  --wb-muted: #a9a49e;
+  --wb-faint: #8b867f;
+  --wb-line: #ecebe81a;
+  --wb-hover: #ecebe80c;
+  --wb-selected: #ecebe814;
   --wb-focus: #8dbb5c;
   --wb-accent: #7fae4f;
   --wb-accent-hover: #8dbb5c;
   --wb-leaf: #8dbb5c;
   --wb-wheat: #e5a93c;
-  --wb-berry: #e37e6f;
-  --wb-water: #6fa8d4;
-  --wb-bark: #bfa88c;
-  --wb-ok-soft: #2f3f22;
-  --wb-ok-ink: #b7d98f;
-  --wb-bad-soft: #4a2620;
-  --wb-warn-ink: #e6a565;
+  --wb-berry: #e47d6d;
+  --wb-water: #6aa6dc;
+  --wb-bark: #a9a49e;
+  --wb-ok-soft: #26331c;
+  --wb-ok-ink: #b0d488;
+  --wb-bad-soft: #3e231e;
+  --wb-warn-ink: #e0a062;
   --wb-scrim: #00000080;
-  --wb-rail: #14100c;
-  --wb-on-rail: #f1e7d6;
-  --wb-idle: #8a7354;
-  --wb-code-bg: #120e0a;
-  --wb-code-ink: #eedcb2;
+  --wb-rail: #121110;
+  --wb-on-rail: #ecebe8;
+  --wb-idle: #6f6a64;
+  --wb-code-bg: #0e0d0c;
+  --wb-code-ink: #e7e5e2;
   --wb-float: #00000066;
   --wb-raise: #00000059;
   --shiki-token-keyword: #e8907a;

@@ -273,6 +273,11 @@ export class VibeValleyApi {
        * block by block instead. */
       create: (a: T.ArtifactVersionRequest): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/version/create", a),
     },
+    html: {
+      /** The owner's words in place of some in an html one's page: the next version, the rest of its bytes as they were.
+       * Refused when the words are not found once in the page's own text, cross an element, or the version is not the latest. */
+      edit: (a: T.ArtifactHtmlEdit): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/html/edit", a),
+    },
     block: {
       /** A blocks artifact and every live block (no tombstones), in order. */
       list: (a: { id: T.ArtifactId }): Promise<T.BlockSnapshot> => this.call<T.BlockSnapshot>("/api/v1/artifact/block/list", a),
@@ -378,7 +383,7 @@ export class VibeValleyApi {
 
   readonly pkm = {
     search: (a: T.PkmSearchRequest): Promise<T.PkmSearchHit[]> => this.call<T.PkmSearchHit[]>("/api/v1/pkm/search", a),
-    /** A LATER line in today's journal, tagged #inbox. */
+    /** A LATER line in today's journal, tagged #inbox; an agent's says who noted it. */
     capture: (a: T.PkmCaptureRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/capture", a),
     /** Puts back the file the last change wrote. */
     undo: (): Promise<T.PkmUndo> => this.call<T.PkmUndo>("/api/v1/pkm/undo", undefined),
@@ -399,6 +404,10 @@ export class VibeValleyApi {
     block: {
       /** The ops in order on the page as its file is now, written back once. */
       apply: (a: T.PkmMutation): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/block/apply", a),
+    },
+    journal: {
+      /** The journal of a day, made empty when it has none yet. */
+      open: (a: T.PkmJournalRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/journal/open", a),
     },
     radar: {
       get: (a: { staleDays?: number }): Promise<T.PkmRadar> => this.call<T.PkmRadar>("/api/v1/pkm/radar/get", a),

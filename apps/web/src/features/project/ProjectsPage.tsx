@@ -72,9 +72,11 @@ export function ProjectsPage(props: { rest: string; skin: ProjectsSkin }) {
   const selected = () => sorted().find((p) => p.name === (props.rest && decodeURIComponent(props.rest)));
   const [creating, setCreating] = createSignal(false);
   return (
-    <div class="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-3 md:flex-row md:overflow-hidden">
-      <div class="max-h-60 shrink-0 overflow-y-auto md:max-h-none md:w-72">
+    // The list is the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
+    <div class="flex h-full min-h-0 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
+      <div class="max-h-60 shrink-0 overflow-y-auto border-b border-line bg-side px-2 py-3 md:max-h-none md:w-72 md:border-r md:border-b-0">
         <ListCard
+          bare
           title={t("web.project.title")}
           label={t("web.project.list")}
           testid="projects"
@@ -117,7 +119,7 @@ export function ProjectsPage(props: { rest: string; skin: ProjectsSkin }) {
           </Switch>
         </ListCard>
       </div>
-      <div class="flex min-h-[480px] min-w-0 flex-1 flex-col md:min-h-0">
+      <div class="flex min-h-[480px] min-w-0 flex-1 flex-col p-3 md:min-h-0">
         {/* Keyed by the name, a plain value: the panel's queries are still settling when the page moves back to the map,
             and a read through a narrowed accessor then would halt the page. */}
         <Show when={selected()?.name} keyed fallback={<props.skin.Map />}>

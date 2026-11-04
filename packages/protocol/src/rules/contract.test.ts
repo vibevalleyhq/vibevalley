@@ -51,3 +51,14 @@ test("every rule here is one the page uses", () => {
     "packages/protocol/src/rules holds only what the page and the server both run. Fix: a rule only the server runs moves into the module that owns it in apps/server/src, and its conclusion goes into the frame. See docs/subsystems/foundation.md",
   ).toEqual([]);
 });
+
+test("an HTML artifact's sandbox is written once, here", () => {
+  // A page test says what the browser got in its own words: it may not import the rule it checks.
+  const copies = [...outside.filter((d) => !d.endsWith("/test")), "apps/server/src"]
+    .flatMap((d) => files(join(root, d)))
+    .filter((p) => !p.endsWith(".test.ts") && /allow-(?:scripts|popups|same-origin)/u.test(readFileSync(p, "utf8")));
+  expect(
+    copies.map((p) => p.slice(root.length + 1)),
+    "An <iframe>'s sandbox or the server's CSP wrote its own tokens. Fix: use htmlSandbox from @vibevalley/protocol/rules. See packages/protocol/src/rules/display.ts",
+  ).toEqual([]);
+});

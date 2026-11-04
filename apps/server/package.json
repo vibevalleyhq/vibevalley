@@ -23,6 +23,7 @@
     "agora-agents": "catalog:",
     "agora-token": "catalog:",
     "effect": "catalog:",
+    "parse5": "catalog:",
     "tsx": "catalog:",
     "yaml": "catalog:"
   },

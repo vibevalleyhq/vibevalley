@@ -19,6 +19,7 @@ export const pkmHandlers = Effect.gen(function* () {
     "pkm.block.apply": (req) => pkm.apply(req),
     "pkm.search": (req) => pkm.search(req),
     "pkm.capture": ({ text }) => pkm.capture(text),
+    "pkm.journal.open": ({ day }) => pkm.journal(day),
     "pkm.radar.get": ({ staleDays }) => pkm.radar(staleDays),
     "pkm.comment.list": ({ page }) => pkm.comments(page),
     "pkm.comment.suggest": (req) => pkm.suggest(req, ownerId),

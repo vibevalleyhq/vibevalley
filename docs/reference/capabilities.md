@@ -126,6 +126,7 @@
 | `artifact.content.get` | `/api/v1/artifact/content/get` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.create` | `/api/v1/artifact/create` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.version.create` | `/api/v1/artifact/version/create` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.html.edit` | `/api/v1/artifact/html/edit` | ✓ | ✓ |   |   |
 | `artifact.update` | `/api/v1/artifact/update` | ✓ | ✓ |   |   |
 | `artifact.delete` | `/api/v1/artifact/delete` | ✓ | ✓ |   |   |
 | `artifact.previewDelete` | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
@@ -207,17 +208,18 @@
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|
 | `pkm.page.list` | `/api/v1/pkm/page/list` | ✓ | ✓ |   |   |
-| `pkm.page.get` | `/api/v1/pkm/page/get` | ✓ | ✓ |   |   |
+| `pkm.page.get` | `/api/v1/pkm/page/get` | ✓ | ✓ | ✓ | ✓ |
 | `pkm.page.save` | `/api/v1/pkm/page/save` | ✓ | ✓ |   |   |
 | `pkm.page.move` | `/api/v1/pkm/page/move` | ✓ | ✓ |   |   |
 | `pkm.page.rename` | `/api/v1/pkm/page/rename` | ✓ | ✓ |   |   |
 | `pkm.page.export` | `/api/v1/pkm/page/export` | ✓ | ✓ |   |   |
 | `pkm.block.apply` | `/api/v1/pkm/block/apply` | ✓ | ✓ |   |   |
-| `pkm.search` | `/api/v1/pkm/search` | ✓ | ✓ |   |   |
-| `pkm.capture` | `/api/v1/pkm/capture` | ✓ | ✓ |   |   |
+| `pkm.search` | `/api/v1/pkm/search` | ✓ | ✓ | ✓ | ✓ |
+| `pkm.capture` | `/api/v1/pkm/capture` | ✓ | ✓ | ✓ | ✓ |
+| `pkm.journal.open` | `/api/v1/pkm/journal/open` | ✓ | ✓ |   |   |
 | `pkm.radar.get` | `/api/v1/pkm/radar/get` | ✓ | ✓ |   |   |
 | `pkm.comment.list` | `/api/v1/pkm/comment/list` | ✓ | ✓ |   |   |
-| `pkm.comment.suggest` | `/api/v1/pkm/comment/suggest` | ✓ | ✓ |   |   |
+| `pkm.comment.suggest` | `/api/v1/pkm/comment/suggest` | ✓ | ✓ | ✓ | ✓ |
 | `pkm.comment.resolve` | `/api/v1/pkm/comment/resolve` | ✓ | ✓ |   |   |
 | `pkm.clip.create` | `/api/v1/pkm/clip/create` | ✓ | ✓ |   |   |
 | `pkm.cluster.create` | `/api/v1/pkm/cluster/create` | ✓ | ✓ |   |   |

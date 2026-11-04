@@ -13,7 +13,7 @@
     "channel": "列出频道，找它的 id",
     "graph": "列出计划，找它的 id",
     "memories": "列出它的记性，找那一条的 id",
-    "artifact": "列出产出，找它的 id",
+    "artifact": "列出稿子，找它的 id",
     "pkm": "列出笔记页，找它的名字"
   },
   "projectRef": "项目 {id}",

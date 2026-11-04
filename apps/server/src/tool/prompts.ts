@@ -6,6 +6,8 @@ import { IssueStatusValues, PriorityValues } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
 import { phaseText, shortTitle, stageWantsOwner } from "@vibevalley/protocol/rules";
 
+import type { HtmlWarning } from "@/artifact/check.ts";
+import { artifactMax, htmlSources } from "@/artifact/policy.ts";
 import { head } from "@/base/clip.ts";
 import { nextText, whenText } from "@/cron/when.ts";
 import { mandateNoteWordLimit } from "@/issue/creation.ts";
@@ -158,18 +160,22 @@ const agentProfile = "帮工档案的名字或 id";
 const searchText = "要找什么，几个词或一句话；不填就列出最新的";
 const channelRef = "频道：#clock-in 这样的名字，或它的 id";
 
+const hostsOf = (urls: readonly string[]) => urls.map((u) => new URL(u).host).join("、");
+/** Written from htmlSources, as the CSP and the check before it is kept are: change them together. */
+const htmlRules = `页面在沙箱里显示：连不了网、调不了农场的接口、不能提交表单、不能再嵌一个页面；样式和脚本写在这一个文件里，库只能从 ${hostsOf(htmlSources.script)} 加载，字体和它的样式还能从 ${hostsOf([...new Set([...htmlSources.style, ...htmlSources.font])].filter((h) => !htmlSources.script.includes(h)))} 加载；图片、音视频内联成 data:；一稿最多 ${artifactMax / 1024 / 1024} MB。交上来先查，从别处加载的会被退回，说哪一行、怎么改`;
+
 /** The orchestrator's and the session's tool parameter descriptions (tool/schemas.ts). */
 export const params = {
   artifact: {
     title: "标题：主人在卡片上看到的那一行，最多 80 个字",
-    kind: "html 是一整页（样式、脚本都写在这一个文件里，图片用 data: 或 https 地址，能用 https 上的图表库，但连不了网也调不了农场的接口），一版一版换；markdown 读成一块一块的，主人和你都能接着改（artifact_block_create、artifact_block_update）",
-    content: "这一版的全文；和 file 二选一",
+    kind: `html 是一整页，一稿一稿换（${htmlRules}）；markdown 读成一块一块的，主人和你都能接着改（artifact_block_create、artifact_block_update）`,
+    content: "这一稿的全文；和 file 二选一",
     file: "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
-    note: "这一版改了什么，一句话；第一版可以写这是什么",
+    note: "这一稿改了什么，一句话；第一稿可以写这是什么",
     channel: "在哪说：#<频道>，或 #<频道>:<消息号>（一个串）；不填就是你正在回话的地方",
     issue: "它是为哪张工单做的：编号（#12）；不填就不挂在工单上",
-    id: "产出的 id：卡片上、artifact_list 的回答里有",
-    version: "第几版；不填是最新的",
+    id: "稿子的 id：卡片上、artifact_list 的回答里有",
+    version: "第几稿；不填是最新的",
   },
   issueOrAgent,
   issueNumber,
@@ -217,6 +223,16 @@ export const params = {
     status: "只看这个状态的：备选、待办、处理中、等你看、已完成、已取消",
     text: "标题或说明里有这些字的（找重复、找某件事时用）",
     wantsOwner: "只看在等主人的：等回答、等验收、卡住了；按等了多久排，久的在前",
+  },
+  pkm: {
+    text: "要找什么，几个词或一句话",
+    limit: "最多几条，默认 10",
+    tier: "只找这一层的页：project（在做的项目）、area（长期负责的领域）、resource（资料）、inbox（收件箱）、journal（日记）、archive（归档）",
+    page: "页的标题（或别名）",
+    capture: "要记的一句话：写清楚是什么、为什么值得记",
+    block: "块的 id：pkm_search、pkm_page_get 的回答里〔〕中的那串",
+    suggested: "这一块改成的整段字；原来的 [[链接]] 和 ((引用)) 都要留着，漏了的会补在末尾",
+    rationale: "为什么这样改，一句话，主人接受前会看到",
   },
   memoryCreate: {
     project: "只在这个项目里用：项目文件夹名",
@@ -287,6 +303,15 @@ export const params = {
   },
 };
 
+const pkmTierWord: Record<T.PkmTier, string> = {
+  project: "项目",
+  area: "领域",
+  resource: "资料",
+  inbox: "收件箱",
+  journal: "日记",
+  archive: "归档",
+};
+
 /** Who the orchestrator is, as a tool answer names it. */
 export const ownerAgentWord = "管家";
 
@@ -333,20 +358,26 @@ export const descriptions = {
   "channel.create":
     "开一个新频道：一件长期的事、一个项目，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，project 是它的默认项目（在这里派的活默认在这个项目里干）。主人要求了才开。",
   "channel.update": "改一个频道是做什么的（description），或它的默认项目（project，写空字符串就是不要默认项目）。",
+  "pkm.search":
+    "在主人的笔记里找：主人自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个项目的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
+  "pkm.page.get": "读主人笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
+  "pkm.capture":
+    "往主人今天的日记里记一句，标成 LATER #inbox，写上是你记的：主人让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",
+  "pkm.comment.suggest":
+    "对主人笔记里的一块提一个改写：不直接改，主人在笔记页看到差异、接受了才换。主人让你整理、改写、纠正他记的东西时用；先用 pkm_page_get 读到块的 id 和现在的字。",
   "memory.search":
     "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；project 只找那个项目的和所有项目都用的。派活前想知道某个项目有什么约定、谁做过类似的活时用。",
   "memory.create":
     "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。主人要某个帮工以后都记得一件事时用；不填 project 就是所有项目都用。主人对你自己说的偏好用 remember。",
-  "artifact.list": "列出产出：在一个频道里说过的，或为一张工单做的；都不填列出最近的。每行是 id、标题、种类、第几版、谁做的、最新这版改了什么。",
-  "artifact.get": "看一个产出：每一版是谁做的、改了什么、在对话里哪条消息（主人的评论就是对它的回复）。",
+  "artifact.list": "列出稿子：在一个频道里说过的，或为一张工单做的；都不填列出最近的。每行是 id、标题、种类、第几稿、谁做的、最新这一稿改了什么。",
+  "artifact.get": "看一份稿子：每一稿是谁做的、改了什么、在对话里哪条消息（主人的评论就是对它的回复）。",
   "artifact.content.get":
-    "读一个产出：网页读某一版的全文，照主人的评论改下一版前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
+    "读一份稿子：网页读某一稿的全文，照主人的评论改下一稿前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
   "artifact.create":
-    "做一个产出：要交给主人看的一整页，比如两种设计让主人挑、调研报告、对比表、带图的说明。它挂在你说话的地方，你会以自己的名义说一句带卡片的话，主人在工作台里点开看、回复卡片评论。只是几句话的事直接说，不用它。",
-  "artifact.version.create":
-    "给一个网页（html）产出出新的一版（旧的留着）：照主人的评论改完以后用，note 写这版改了什么。会在第一版说过的地方再说一句带卡片的话。一起写的产出不出新版，一块一块改它。",
+    "写一份稿子：要交给主人看的一整页，比如两种设计让主人挑、调研报告、对比表、带图的说明。它挂在你说话的地方，你会以自己的名义说一句带卡片的话，主人在工作台里点开看、回复卡片评论。只是几句话的事直接说，不用它。",
+  "artifact.version.create": `给一个网页（html）稿子出新的一稿（旧的留着）：照主人的评论改完以后用，note 写这一稿改了什么。会在第一稿说过的地方再说一句带卡片的话。一起写的稿子不出新稿，一块一块改它。${htmlRules}。`,
   "artifact.block.create":
-    "在一个一起写的产出里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，接着改就用回答里的 id 和版本调 artifact_block_update。",
+    "在一个一起写的稿子里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，接着改就用回答里的 id 和版本调 artifact_block_update。",
   "artifact.block.update":
     "改一块的字、类型或属性：text 是整段新字，type 换类型，level/checked/language 是标题级别、待办勾选、代码语言。baseRev 是你读到或写下它时的版本；这之后别人改过它的字，就不改，回答里有现在的字和版本。",
   "artifact.block.delete": "删一块（子块一起删），置成墓碑；主人要删掉哪一段、或你写的某一块不要了时用。",
@@ -359,24 +390,30 @@ export const sessionDescriptions = {
   "channel.unread.list": "列出你还没读的对话：在哪、几条、有没有提到你、最后是谁说的。",
   "channel.message.send":
     "在群聊里发一条消息。id 不填就是你自己的工单串；#<频道> 是一个频道；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
+  "pkm.search":
+    "在主人的笔记里找：主人自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个项目的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
+  "pkm.page.get": "读主人笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
+  "pkm.capture":
+    "往主人今天的日记里记一句，标成 LATER #inbox，写上是你记的：主人让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",
+  "pkm.comment.suggest":
+    "对主人笔记里的一块提一个改写：不直接改，主人在笔记页看到差异、接受了才换。主人让你整理、改写、纠正他记的东西时用；先用 pkm_page_get 读到块的 id 和现在的字。",
   "memory.search":
     "在你的记性里找：你和主人以前替你的档案记下的话、做过的活。不填 project 只找这个项目的和所有项目都用的；project 写空字符串也找别的项目的。干到一半想知道「这个项目的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
   "memory.create":
     "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。不填 project 记这个项目的；project 写空字符串记成所有项目都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
   "artifact.block.create":
-    "在一个一起写的产出里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 artifact_block_update。",
+    "在一个一起写的稿子里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 artifact_block_update。",
   "artifact.block.update":
     "改一块的字、类型或属性：text 是整段新字，type 换类型，level/checked/language 是标题级别、待办勾选、代码语言。baseRev 是你读到或写下它时的版本；这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
   "artifact.block.delete": "删一块（子块一起删），置成墓碑；主人要删掉哪一段、或你写的某一块不要了时用。",
   "artifact.list":
-    "列出产出：不填就是为你这张工单做的；channel 填 #<频道> 是在那里说过的。每行是 id、标题、是一起写的还是网页、第几版、谁做的、最新这版改了什么。",
-  "artifact.get": "看一个产出：每一版是谁做的、改了什么、在对话里哪条消息（主人的评论就是对它的回复）。",
+    "列出稿子：不填就是为你这张工单做的；channel 填 #<频道> 是在那里说过的。每行是 id、标题、是一起写的还是网页、第几稿、谁做的、最新这一稿改了什么。",
+  "artifact.get": "看一份稿子：每一稿是谁做的、改了什么、在对话里哪条消息（主人的评论就是对它的回复）。",
   "artifact.content.get":
-    "读一个产出：网页读某一版的全文，照主人的评论改下一版前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
+    "读一份稿子：网页读某一稿的全文，照主人的评论改下一稿前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
   "artifact.create":
-    "做一个产出：要交给主人看、代码改动说不清的一整页，比如两种设计让主人挑、调研报告、对比表、带图的说明。先把它写成你工作目录里的一个文件，再用 file 交上来（或者直接给 content）。它挂在你的工单上，你会在工单串里说一句带卡片的话，主人在工作台里点开看、回复卡片评论，评论会叫醒你。",
-  "artifact.version.create":
-    "给一个网页（html）产出出新的一版（旧的留着）：照主人的评论改完以后用，note 写这版改了什么。会在第一版说过的地方再说一句带卡片的话。一起写的产出不出新版，一块一块改它。",
+    "写一份稿子：要交给主人看、代码改动说不清的一整页，比如两种设计让主人挑、调研报告、对比表、带图的说明。先把它写成你工作目录里的一个文件，再用 file 交上来（或者直接给 content）。它挂在你的工单上，你会在工单串里说一句带卡片的话，主人在工作台里点开看、回复卡片评论，评论会叫醒你。",
+  "artifact.version.create": `给一个网页（html）稿子出新的一稿（旧的留着）：照主人的评论改完以后用，note 写这一稿改了什么。会在第一稿说过的地方再说一句带卡片的话。一起写的稿子不出新稿，一块一块改它。${htmlRules}。`,
   "issue.split": (maxTasks: number) =>
     `把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 ${maxTasks} 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。`,
 };
@@ -387,26 +424,30 @@ export const answers = {
   artifact: {
     made: (a: T.Artifact) =>
       a.body === "html"
-        ? `做好了「${a.title}」第 ${a.version} 版（id=${a.id}），已经在对话里带着卡片说了，主人在工作台点开看；主人回复那张卡片就是评论`
+        ? `做好了「${a.title}」第 ${a.version} 稿（id=${a.id}），已经在对话里带着卡片说了，主人在工作台点开看；主人回复那张卡片就是评论`
         : `做好了「${a.title}」（id=${a.id}），读成了一块一块的，已经在对话里带着卡片说了；要改哪一段，先用 artifact_content_get 读到块的 id 和版本，再 artifact_block_update；主人回复那张卡片就是评论`,
-    versioned: (a: T.Artifact) => `「${a.title}」出了第 ${a.version} 版（id=${a.id}），已经在第一版说过的地方带着卡片说了`,
-    none: "还没有产出",
+    warned: (ws: readonly HtmlWarning[]) =>
+      ws.length === 0
+        ? ""
+        : `\n提醒：${ws.map((w) => `第 ${w.line} 行的脚本用了 ${w.call}`).join("；")}。页面连不了网，这部分在主人那里不会动；要用的数据直接写进页面。`,
+    versioned: (a: T.Artifact) => `「${a.title}」出了第 ${a.version} 稿（id=${a.id}），已经在第一稿说过的地方带着卡片说了`,
+    none: "还没有稿子",
     line: (a: T.Artifact) => {
       const note = a.versions.at(-1)?.note;
-      const what = a.body === "html" ? `网页 · 第 ${a.version} 版` : "一起写的";
+      const what = a.body === "html" ? `网页 · 第 ${a.version} 稿` : "一起写的";
       return `- 〔${a.id}〕「${a.title}」${what} · ${a.byName}${note ? " · " + note : ""}`;
     },
     detail: (a: T.Artifact) =>
       [
         a.body === "html"
-          ? `「${a.title}」（id=${a.id}）网页，${a.byName} 做的，最新是第 ${a.version} 版：`
+          ? `「${a.title}」（id=${a.id}）网页，${a.byName} 做的，最新是第 ${a.version} 稿：`
           : `「${a.title}」（id=${a.id}）一起写的，${a.byName} 起的头；用 artifact_content_get 读它的每一块`,
         ...a.versions.map(
           (v) =>
-            `- 第 ${v.version} 版 · ${v.byName}${v.note ? " · " + v.note : ""}${v.number !== undefined ? ` · 卡片是 msg=${v.number}，主人的评论是对它的回复` : ""}`,
+            `- 第 ${v.version} 稿 · ${v.byName}${v.note ? " · " + v.note : ""}${v.number !== undefined ? ` · 卡片是 msg=${v.number}，主人的评论是对它的回复` : ""}`,
         ),
       ].join("\n"),
-    content: (title: string, version: number, content: string) => `「${title}」第 ${version} 版的全文：\n\n${content}`,
+    content: (title: string, version: number, content: string) => `「${title}」第 ${version} 稿的全文：\n\n${content}`,
     noPlace: "找不到你的工作目录：用 content 直接给全文",
     outside: (file: string) => `${file} 不在你的工作目录里：只能交工作目录里的文件`,
     notFile: (file: string) => `${file} 不是一个文件`,
@@ -534,6 +575,31 @@ export const answers = {
   channelSettings: {
     noChannel: (name: string) => "没有 " + name + " 这个频道",
     updated: (name: string) => "改好了 #" + name + "。",
+  },
+  pkm: {
+    none: (text: string) => `笔记里没找到「${text}」`,
+    hit: (h: T.PkmSearchHit) => `- 〔${h.block}〕《${h.pageTitle}》${h.path ? h.path + " › " : ""}${h.marker ? h.marker + " " : ""}${h.plain}`,
+    page: (p: T.PkmPage, shown: readonly string[], more: number) =>
+      [
+        `《${p.title}》${pkmTierWord[p.tier]}${
+          Object.keys(p.props).length > 0
+            ? " · " +
+              Object.entries(p.props)
+                .map(([k, v]) => `${k}: ${v}`)
+                .join(" · ")
+            : ""
+        }`,
+        ...(shown.length > 0 ? shown : ["（这页还没有字）"]),
+        ...(more > 0 ? [`……还有 ${more} 块没列`] : []),
+      ].join("\n"),
+    block: (b: T.PkmBlock) => {
+      const indent = "  ".repeat(b.depth);
+      const [first = "", ...rest] = b.body.split("\n");
+      return [`${indent}- 〔${b.id}〕${b.marker ? b.marker + " " : ""}${first}`, ...rest.map((line) => `${indent}  ${line}`)].join("\n");
+    },
+    captured: (title: string) => `记进了今天的日记《${title}》，标成 LATER #inbox，写着是你记的；主人在笔记里会看到`,
+    suggested: (id: string, restored: readonly string[]) =>
+      `提了改写（〔${id}〕），主人在笔记页接受了才会换掉原来的字${restored.length > 0 ? "；你漏掉的 " + restored.join("、") + " 补在了末尾" : ""}`,
   },
   memory: {
     rememberedFor: (id: string, where: string, memId: string) => "替 " + id + " 记下了（" + where + "）〔" + memId + "〕",

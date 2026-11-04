@@ -11,7 +11,7 @@ import type { PlatformError } from "effect/PlatformError";
 import { t } from "@vibevalley/i18n";
 import { ownerId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
-import { slugOf } from "@vibevalley/protocol/rules";
+import { flatBlocks, slugOf } from "@vibevalley/protocol/rules";
 
 import { newId } from "@/base/ids.ts";
 import { type ApiError, Inconsistent, lookIn, missing, reasonOf, refused } from "@/errors.ts";
@@ -41,8 +41,8 @@ import {
   wireOf,
 } from "./graph.ts";
 import { applyOps } from "./ops.ts";
-import { carryIds, edgesOf, find, flatten, type Node, type Page, parse, print, spansOf, walk, withoutSpans } from "./outline.ts";
-import { fileNameOf, fileOf, journalTitle, ownFolder, tierFolder, titleOfFile } from "./para.ts";
+import { carryIds, edgesOf, find, type Node, type Page, parse, print, spansOf, walk, withoutSpans } from "./outline.ts";
+import { fileNameOf, fileOf, journalTitle, journalTitleOf, ownFolder, tierFolder, titleOfFile } from "./para.ts";
 
 /** Only the newest this many changes can be undone. */
 const changeKeep = 200;
@@ -58,7 +58,10 @@ export class Pkm extends Context.Service<
     readonly move: (req: T.PkmMoveRequest) => Effect.Effect<T.PkmPage, ApiError>;
     readonly apply: (req: T.PkmMutation) => Effect.Effect<T.PkmPage, ApiError>;
     readonly search: (req: T.PkmSearchRequest) => Effect.Effect<T.PkmSearchHit[]>;
-    readonly capture: (text: string) => Effect.Effect<T.PkmPage, ApiError>;
+    /** by: the agent's name when an agent notes it, said after the words; none for the owner's own. */
+    readonly capture: (text: string, by?: string) => Effect.Effect<T.PkmPage, ApiError>;
+    /** A day, YYYY-MM-DD. */
+    readonly journal: (day: string) => Effect.Effect<T.PkmPage, ApiError>;
     readonly radar: (staleDays: number | undefined) => Effect.Effect<T.PkmRadar>;
     readonly comments: (page: string | undefined) => Effect.Effect<T.PkmComment[], ApiError>;
     /** by: who proposes it, the owner or an agent's id. */
@@ -150,7 +153,7 @@ export const make = Effect.gen(function* () {
       db.run(
         terms.addTerms({
           rows: JSON.stringify(
-            flatten(page.blocks).map((b) => ({ block: b.id, page: page.slug, terms: termsList(`${page.title}\n${b.path}\n${b.body}`).join(" ") })),
+            flatBlocks(page.blocks).map((b) => ({ block: b.id, page: page.slug, terms: termsList(`${page.title}\n${b.path}\n${b.body}`).join(" ") })),
           ),
         }),
       ),
@@ -309,13 +312,16 @@ export const make = Effect.gen(function* () {
       const v = yield* vault();
       const ids = new Set([...walk(page.blocks)].map((n) => n.id));
       const rows = yield* db.run(q.openComments({ page: page.slug }));
+      const linking = backlinks(v, page.slug);
       return {
         page: wireOf(page),
-        transclusions: transclusions(v, page, {
-          circular: (id) => t("server.pkm.circular", { id }),
-          broken: (id) => t("server.pkm.brokenRef", { id }),
-        }),
-        backlinks: backlinks(v, page.slug),
+        transclusions: transclusions(
+          v,
+          page,
+          { circular: (id) => t("server.pkm.circular", { id }), broken: (id) => t("server.pkm.brokenRef", { id }) },
+          Object.values(linking).flat(),
+        ),
+        backlinks: linking,
         comments: rows.filter((r) => ids.has(r.block)).map(commentOf),
       } satisfies T.PkmPageView;
     });
@@ -383,9 +389,10 @@ export const make = Effect.gen(function* () {
       const rows = yield* db.run(terms.matchTerms({ words: queryWords(text) }));
       return search(yield* vault(), req, new Map(rows.map((r) => [r.block, r.score])));
     }),
-    capture: Effect.fn("Pkm.capture")(function* (text) {
-      const said = text.trim();
-      if (said === "") return yield* Effect.fail(refused(t("server.pkm.noText")));
+    capture: Effect.fn("Pkm.capture")(function* (text, by) {
+      const words = text.trim();
+      if (words === "") return yield* Effect.fail(refused(t("server.pkm.noText")));
+      const said = by ? t("server.pkm.notedBy", { text: words, name: by }) : words;
       const body = /(?:^|\s)#inbox\b/u.test(said) ? said : `${said} #inbox`;
       const title = journalTitle(yield* now);
       return yield* locked(
@@ -393,6 +400,17 @@ export const make = Effect.gen(function* () {
           yield* ready;
           if (pageOf(yield* vault(), title)) return wireOf(yield* mutate(title, [{ op: "append", marker: "LATER", body }], "capture"));
           return wireOf(yield* upsert({ title, tier: "journal", markdown: `- LATER ${body}\n` }, "capture"));
+        }),
+      );
+    }),
+    journal: Effect.fn("Pkm.journal")(function* (day) {
+      const title = journalTitleOf(day);
+      return yield* locked(
+        Effect.gen(function* () {
+          yield* ready;
+          const there = pageOf(yield* vault(), title);
+          if (there) return wireOf(yield* fresh(there.slug));
+          return wireOf(yield* upsert({ title, tier: "journal", markdown: "- \n" }, "journal"));
         }),
       );
     }),

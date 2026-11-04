@@ -17,6 +17,7 @@ import { Core } from "@/core/core.ts";
 import { Issue } from "@/issue/issue.ts";
 import { Mailbox } from "@/mailbox/mailbox.ts";
 import { Memory } from "@/memory/memory.ts";
+import { Pkm } from "@/pkm/pkm.ts";
 import { Session } from "@/session/session.ts";
 import { starter, until, waitFor } from "@/testing/layers.ts";
 import { Said, world } from "@/testing/world.ts";
@@ -118,6 +119,10 @@ describe("mcp", () => {
         "issue_split",
         "memory_create",
         "memory_search",
+        "pkm_capture",
+        "pkm_comment_suggest",
+        "pkm_page_get",
+        "pkm_search",
         "resource_read",
         "session_list",
       ]);
@@ -149,6 +154,38 @@ describe("mcp", () => {
       expect(yield* Effect.promise(() => c.tool("channel_message_list"))).toContain("从 MCP 说一句");
       expect(yield* Effect.promise(() => client(mcp, "").tool("session_list"))).toContain("没认出你是谁");
       expect(yield* Effect.promise(() => client(mcp, "hb_w1_forged").tool("channel_message_send", { text: "冒名" }))).toContain("没认出你是谁");
+    }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi], repos: ["chat-j"] })));
+  });
+
+  it.live("lets a session find and read the owner's notes, note a line in today's journal and propose a rewrite, never change a block", () => {
+    const tokens: string[] = [];
+    const pi = scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        for (const s of turn.options.mcpServers ?? [])
+          if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers.authorization ?? "").replace(/^Bearer /u, ""));
+        turn.say("做完了");
+      },
+    });
+    return Effect.gen(function* () {
+      const issues = yield* Issue;
+      const mcp = yield* Mcp;
+      const pkm = yield* Pkm;
+      yield* pkm.save({ title: "Beehives", tier: "project", markdown: "- check the queens every week\n- order frames\n" });
+      yield* issues.hire(lab(), "看看蜂箱", "chat-j");
+      yield* until(() => tokens.length > 0, "the session's token");
+      const c = client(mcp, tokens[0]!);
+      yield* Effect.promise(c.init);
+      const found = yield* Effect.promise(() => c.tool("pkm_search", { text: "queens" }));
+      expect(found).toContain("《Beehives》");
+      const block = /〔([0-9a-f-]{36})〕/u.exec(found)?.[1] ?? "";
+      expect(yield* Effect.promise(() => c.tool("pkm_page_get", { page: "Beehives" }))).toContain(`〔${block}〕check the queens every week`);
+      expect(yield* Effect.promise(() => c.tool("pkm_capture", { text: "蜂箱要换新的框" }))).toContain("LATER");
+      const journal = (yield* pkm.list()).pages.find((p) => p.tier === "journal")!;
+      expect((yield* pkm.page(journal.slug)).page.blocks.map((b) => b.body).join("\n")).toMatch(/蜂箱要换新的框（.+ 记） #inbox/u);
+      expect(yield* Effect.promise(() => c.tool("pkm_comment_suggest", { block, suggested: "check the queens every Monday" }))).toContain("接受");
+      expect((yield* pkm.page("beehives")).page.blocks[0]?.body).toBe("check the queens every week");
+      expect((yield* pkm.comments("beehives")).map((x) => x.suggested)).toEqual(["check the queens every Monday"]);
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi], repos: ["chat-j"] })));
   });
 
@@ -185,7 +222,12 @@ describe("mcp", () => {
       expect((yield* chat.history(thread!)).at(-1)!.artifact).toMatchObject({ id: one!.id, version: 1 });
       expect(yield* artifacts.content(one!.id)).toMatchObject({ content: "<p>抽屉和整页</p>" });
       expect(yield* Effect.promise(() => c.tool("artifact_list"))).toContain(one!.id);
-      expect(yield* Effect.promise(() => c.tool("artifact_version_create", { id: one!.id, content: "<p>改了</p>", note: "照评论改" }))).toContain("第 2 版");
+      expect(yield* Effect.promise(() => c.tool("artifact_version_create", { id: one!.id, content: "<p>改了</p>", note: "照评论改" }))).toContain("第 2 稿");
+      const refusedAnswer = yield* Effect.promise(() =>
+        c.tool("artifact_version_create", { id: one!.id, content: '<p>x</p>\n<script src="https://unpkg.com/react"></script>' }),
+      );
+      expect([refusedAnswer.includes("没成"), refusedAnswer.includes("unpkg.com")]).toEqual([true, true]);
+      expect(yield* Effect.promise(() => c.tool("artifact_version_create", { id: one!.id, content: "<script>fetch('/x')</script>" }))).toContain("fetch");
       expect(yield* Effect.promise(() => c.tool("artifact_content_get", { id: one!.id, version: 1 }))).toContain("<p>抽屉和整页</p>");
       expect(yield* Effect.promise(() => c.tool("artifact_get", { id: one!.id }))).toContain("照评论改");
       // A file outside, and a link inside that leads to it.
@@ -217,7 +259,7 @@ describe("mcp", () => {
       const outside = yield* artifacts.create(
         { from: ownerId, by: ownerId },
         {
-          title: "别处的产出",
+          title: "别处的稿子",
           kind: "html",
           content: "outside",
           channel: chat.defaultChannel(),
@@ -228,9 +270,9 @@ describe("mcp", () => {
       yield* until(() => tokens.length > 0, "the channel context's token");
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);
-      expect(yield* Effect.promise(() => c.tool("artifact_create", { title: "这里的产出", kind: "html", content: "inside" }))).toContain("做好了");
+      expect(yield* Effect.promise(() => c.tool("artifact_create", { title: "这里的稿子", kind: "html", content: "inside" }))).toContain("做好了");
       const [inside] = yield* artifacts.list({ channel: direct });
-      expect(inside).toMatchObject({ title: "这里的产出", channel: direct, by: "lab" });
+      expect(inside).toMatchObject({ title: "这里的稿子", channel: direct, by: "lab" });
       const listed = yield* Effect.promise(() => c.tool("artifact_list"));
       expect(listed).toContain(inside!.id);
       expect(listed).not.toContain(outside.id);

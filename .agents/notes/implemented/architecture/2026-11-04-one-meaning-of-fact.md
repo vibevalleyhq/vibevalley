@@ -9,7 +9,7 @@ Status: implemented
 | 名字 | 它其实是什么 |
 |---|---|
 | `T.Fact`、`FactIn`、`core.apply(...facts)`、`Transition.fact`、`core.facts` | 改核心状态的一件事（用语表里「事实」的意思） |
-| `session/facts.ts` 的 `eventFacts`、`FactContext` | 把 oar 的一个会话事件读成核心的改动、轨迹的一步、花费和告警（一个 `Reaction`）；事实只是它产出的四样之一 |
+| `session/facts.ts` 的 `eventFacts`、`FactContext` | 把 oar 的一个会话事件读成核心的改动、轨迹的一步、花费和告警（一个 `Reaction`）；事实只是它稿子的四样之一 |
 | `RuntimeFacts`、`RuntimeInfo.facts`、`presets.json` 的 `runtimeFacts`、`factsOf` | 一种农机支持什么：steer、拒收哪些参数、能力、是不是进程内 |
 | `ChannelRouteFact` | 路由一条频道消息的输入，和 `ChannelRouteResult` 成对 |
 | 页面的 `RowFacts`、`rowFacts` | 看板一行排序和分组用的键 |

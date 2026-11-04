@@ -81,7 +81,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
 
   return (
     <div class="h-full overflow-y-auto px-4 pb-8">
-      <div class="mx-auto flex max-w-3xl flex-col gap-4">
+      <div class="flex max-w-3xl flex-col gap-4">
         <div
           data-testid="profile-bar"
           data-state={isNew ? "new" : dirty() ? "dirty" : "saved"}

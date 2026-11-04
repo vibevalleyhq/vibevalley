@@ -12,6 +12,7 @@ import { artifactId } from "@vibevalley/protocol/schema";
 
 import { Artifact } from "@/artifact/artifact.ts";
 import { artifactHeaders } from "@/artifact/policy.ts";
+import { withShell } from "@/artifact/shell.ts";
 import { wireOf } from "@/base/json.ts";
 import { Channel } from "@/channel/channel.ts";
 import { messageOf, refused } from "@/errors.ts";
@@ -123,7 +124,12 @@ export const artifactContent = HttpRouter.add(
     if (!/^[0-9a-f-]{36}$/u.test(id) || !/^[1-9]\d*$/u.test(version)) return notFound();
     const path = yield* artifacts.file(artifactId(id), Number(version));
     if (!path) return notFound();
-    return yield* HttpServerResponse.file(path, { contentType: artifactHeaders["content-type"]!, headers: artifactHeaders });
+    const contentType = artifactHeaders["content-type"]!;
+    if (new URL(request.url, "http://farm").searchParams.get("shell") !== "1")
+      return yield* HttpServerResponse.file(path, { contentType, headers: artifactHeaders });
+    // The workbench's view: the page with the shell after it (artifact/shell.ts).
+    const page = yield* artifacts.content(artifactId(id), Number(version));
+    return HttpServerResponse.text(withShell(page.content), { contentType, headers: artifactHeaders });
   }).pipe(Effect.orElseSucceed(notFound)),
 );
 

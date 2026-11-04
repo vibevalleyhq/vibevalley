@@ -1,24 +1,24 @@
 {
-  "noTitle": "产出要有个标题",
+  "noTitle": "稿子要有个标题",
   "longTitle": "标题太长了，最多 {max} 个字",
-  "badKind": "认不得 {kind} 这种产出，只认 {kinds}",
-  "empty": "产出是空的",
-  "tooBig": "一版最多 {mb} MB",
-  "notKept": "产出没存下来：{why}",
-  "missing": "没有 {id} 这个产出",
-  "noVersion": "「{title}」没有第 {version} 版，最新是第 {latest} 版",
-  "noFile": "「{title}」第 {version} 版的内容不见了",
+  "badKind": "认不得 {kind} 这种稿子，只认 {kinds}",
+  "empty": "稿子是空的",
+  "tooBig": "一稿最多 {mb} MB",
+  "notKept": "稿子没存下来：{why}",
+  "missing": "没有 {id} 这份稿子",
+  "noVersion": "「{title}」没有第 {version} 稿，最新是第 {latest} 稿",
+  "noFile": "「{title}」第 {version} 稿的内容不见了",
   "made": "做了「{title}」",
-  "versioned": "「{title}」出了第 {version} 版",
+  "versioned": "「{title}」出了第 {version} 稿",
   "withNote": "{said}：{note}",
   "preview": {
-    "remove": "删掉「{title}」和它的 {n} 版",
+    "remove": "删掉「{title}」和它的 {n} 稿",
     "cards": "对话里的卡片还在，点开说已经删掉了",
     "removeBlock": "删掉块 {id}",
     "removeChildren": "连同 {n} 个子块",
     "removeBlocks": "删掉「{title}」和它的 {n} 块"
   },
-  "untitled": "没起名的产出",
+  "untitled": "没起名的稿子",
   "noBatch": "这批改动没有 batchId",
   "demoNotInserted": "演示的块没插进去：{status}",
   "noWriter": "没有能写的帮工：先在档案里打开一个",
@@ -59,7 +59,7 @@
       "heading": "背景 · 演示",
       "paragraphs": {
         "0": "（演示）这一节是脚本写的，不是帮工真的想出来的。我们这里有好几个帮工，以前一篇文章只能一个人从头写到尾，别人只能等着。",
-        "1": "现在产出按块存，每一块有自己的版本号。几个帮工各写各的一节，互不抢同一块，谁写的哪一块，左边的归属条一眼就能看出来。",
+        "1": "现在稿子按块存，每一块有自己的版本号。几个帮工各写各的一节，互不抢同一块，谁写的哪一块，左边的归属条一眼就能看出来。",
         "2": "这篇演示就是想让主人亲眼看一下：三个帮工同时动笔，字一段一段长出来，最后拼成一篇完整的文章。"
       }
     },
@@ -76,12 +76,34 @@
       "paragraphs": {
         "0": "（演示）等广播做好以后，页面不用再一秒问一次服务端，帮工写一下，主人这边马上就能看到。",
         "1": "再往后，帮工想改别人那一节的字，不直接改，而是挂一条建议，等主人点头；写完的一节在大纲里标成写完待看。",
-        "2": "演示到这里就结束了。这篇产出留着也行，删掉也行，它不会影响任何工单和记性。"
+        "2": "演示到这里就结束了。这篇稿子留着也行，删掉也行，它不会影响任何工单和记性。"
       }
     }
   },
   "badBlockType": "块的类型只能是 {types}",
-  "otherArtifact": "这批改动（{batch}）是另一个产出的",
-  "notBlocks": "「{title}」是一整页网页，不按块改：交新的一版",
-  "notHtml": "「{title}」是一起写的，不交新的一版：一块一块改（artifact_block_create、artifact_block_update）"
+  "otherArtifact": "这批改动（{batch}）是另一份稿子的",
+  "notBlocks": "「{title}」是一整页网页，不按块改：交新的一稿",
+  "notHtml": "「{title}」是一起写的，不交新的一稿：一块一块改（artifact_block_create、artifact_block_update）",
+  "check": {
+    "refused": "页面里有 {n} 处在沙箱里显示不了，改完再交：",
+    "more": "还有 {n} 处，改完这些再交会列出来",
+    "script": "第 {line} 行的脚本来自 {url}：脚本写在页面里，或者从 {hosts} 加载",
+    "style": "第 {line} 行的样式来自 {url}：样式写在页面里，或者从 {hosts} 加载",
+    "font": "第 {line} 行的字体来自 {url}：字体内联成 data:，或者从 {hosts} 加载",
+    "inline": "第 {line} 行的图片或音视频来自 {url}：页面不从外面加载图片，内联成 data:",
+    "link": "第 {line} 行的 <link> 连向 {url}：只能连向 {hosts}",
+    "form": "第 {line} 行的表单提交到 {url}：页面不能提交表单，用脚本处理它",
+    "refresh": "第 {line} 行的 <meta http-equiv=\"refresh\"> 会把页面带走：删掉它",
+    "base": "第 {line} 行的 <base href>：删掉它，地址写全",
+    "frame": "第 {line} 行的 <{tag}>：页面里不能再嵌一个页面"
+  },
+  "edit": {
+    "empty": "没有选中要改的字",
+    "same": "改成的字和原来一样",
+    "notFound": "页面的源码里找不到「{words}」：它可能是脚本画出来的，交给帮工改",
+    "many": "「{words}」在页面里有 {n} 处，分不清是哪一处：多选几个字再改，或者交给帮工改",
+    "crosses": "「{words}」跨了带格式的几段，这里只改一段里的字：少选几个字，或者交给帮工改",
+    "stale": "你看的是第 {version} 稿，最新的是第 {latest} 稿：在最新的一稿上改",
+    "note": "主人在页面上改了：「{old}」→「{new}」"
+  }
 }

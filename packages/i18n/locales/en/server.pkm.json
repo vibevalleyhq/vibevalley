@@ -13,5 +13,6 @@
   "clipHeading": "## Key points and quotes",
   "clusterHeading": "## {topic}: sources gathered",
   "clusterLine": "From [[{title}]]: (({id}))",
-  "clusterTldr": "{count} sources gathered on {topic}"
+  "clusterTldr": "{count} sources gathered on {topic}",
+  "notedBy": "{text} (noted by {name})"
 }

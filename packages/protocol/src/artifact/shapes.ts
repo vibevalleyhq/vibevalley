@@ -99,6 +99,30 @@ export interface ArtifactVersionRequest {
   note?: string;
 }
 
+/** Some words in an HTML artifact's page, as the W3C Web Annotation TextQuoteSelector says them: the words, and up to
+ * 32 characters of the page's text on each side to tell one of them from another like it. Text is the page's text
+ * nodes outside <script> and <style>; whitespace is not compared as written. */
+export interface HtmlAnchor {
+  kind: "text";
+  exact: string;
+  prefix: string;
+  suffix: string;
+}
+
+/** The owner's words in place of the anchored ones, in the version they were read in; kept as the next version. */
+export interface ArtifactHtmlEdit {
+  id: ArtifactId;
+  version: number;
+  anchor: HtmlAnchor;
+  text: string;
+}
+
+// The page's own scripts can send the same message, so a selection is only ever data: saving is the owner's button.
+export interface HtmlShellMessage {
+  vibevalley: "selection";
+  anchor: HtmlAnchor;
+}
+
 export interface ArtifactListRequest {
   channel?: string;
   issue?: string;

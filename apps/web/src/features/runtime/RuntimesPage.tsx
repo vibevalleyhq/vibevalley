@@ -80,7 +80,7 @@ function Stamina(props: { quota: Quota; cells?: number; width: number; height: n
       style={{ width: `${props.width}px`, height: `${props.height}px` }}
     >
       <For each={Array.from({ length: cells() }, (_, i) => i)}>
-        {(i) => <span class={["flex-1 rounded-xs", i < lit() ? levelInk[props.quota.level] : "bg-on-rail/13"]} />}
+        {(i) => <span class={["flex-1 rounded-xs", i < lit() ? levelInk[props.quota.level] : "bg-line"]} />}
       </For>
     </Meter.Root>
   );
@@ -102,10 +102,11 @@ export function RuntimesPage(props: { rest: string }) {
         </p>
       }
     >
-      <div class="h-full p-3">
+      <div class="h-full">
         <Split
+          edge
           list={
-            <ListCard title={t("web.runtime.title")} label={t("web.runtime.list")} testid="runtimes">
+            <ListCard bare title={t("web.runtime.title")} label={t("web.runtime.list")} testid="runtimes">
               <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.runtime.intro")}</li>
               <For each={list()}>
                 {(r) => {

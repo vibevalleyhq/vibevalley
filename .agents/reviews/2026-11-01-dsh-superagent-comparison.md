@@ -4,7 +4,7 @@
 
 两者的核心差距不在工程基建规模，而在 **Agent 围绕工单与 GitHub 的闭环完备度**：
 
-- **VibeValley 工程落地显著更广、地基更强**：拥有独立服务端（Effect v4 + PGlite + `effect-sqlc`）、跨三端 UI（Solid 2 工作台 + PixiJS 农场 + 桌面/手机宿主）、自研模型与循环（`@vibevalley/ai` + `@vibevalley/agent`）、通过 `@botiverse/oar` 驱动多农机（Claude Code、Codex、pi、DSH、VibeValley）并核算配额花费、本地无工作区冲突预检（`git merge-tree`）、DAG 计划（`TaskGraph`）与冻结验收测试、中英文分词记忆检索（GSE + `tsvector` + 外部记忆源）、协作产出（`Artifact`）与六层测试金字塔。
+- **VibeValley 工程落地显著更广、地基更强**：拥有独立服务端（Effect v4 + PGlite + `effect-sqlc`）、跨三端 UI（Solid 2 工作台 + PixiJS 农场 + 桌面/手机宿主）、自研模型与循环（`@vibevalley/ai` + `@vibevalley/agent`）、通过 `@botiverse/oar` 驱动多农机（Claude Code、Codex、pi、DSH、VibeValley）并核算配额花费、本地无工作区冲突预检（`git merge-tree`）、DAG 计划（`TaskGraph`）与冻结验收测试、中英文分词记忆检索（GSE + `tsvector` + 外部记忆源）、协作稿子（`Artifact`）与六层测试金字塔。
 - **dsh-superagent 的 Agent 业务闭环从前到后设计得更完备**：它将 Agent 定位为「消耗最少人类注意力、交付最大价值」的自治团队成员（[000-philosophy.md](https://github.com/deepseek-ai/dsh-superagent-prototype/blob/main/docs/000-philosophy.md)），打通了「**外部事件（GitHub/飞书）→ 两层准入与主动研判（Gate + Eval）→ 不可变授权契约（Mandate）→ 路由器零改写派单 → 订阅扇出与 Worker 自主决定追问（Subscription Fan-out & Handback）→ Worker 全权驱动 GitHub（建 PR、盯 CI、回 Review Thread、静默 Resolve、3 轮 Bot 预算、双账号 Auto-merge）→ 四用途门禁 Outbox 回源会话闭环**」的完整无人值守链路。
 - **VibeValley 当前在工单与 GitHub 上的核心短板**：帮工被当成「在本地 worktree 跑完一轮、靠文末正则交一段话就停下等主人点按钮」的被动执行器；管家（`Orchestrator`）承担了过多自然语言转述而丢失原始上下文；GitHub 仅在主人点「完成」时才由宿主代跑 `git push` 与 `gh pr create`，PR 开出后的 CI 失败、行内代码评审（Inline Review Comment）、Review Bot 意见与 PR 上的追问全部处于失明状态。
 
@@ -268,7 +268,7 @@ VibeValley 在提案 [状态先提交，副作用由 worker 在提交之后做](
 
 ---
 
-## 四、VibeValley 可落地的借鉴路线图（按投入产出比排序）
+## 四、VibeValley 可落地的借鉴路线图（按投入稿子比排序）
 
 结合 VibeValley 现有的十模块架构（`Platform` → `Agents` → `Source Control` → `Agent Sessions` → `Collaboration` → `Issues` → `Inbox` → `Orchestrator` → `Gamification` → `Gateway`），建议按以下 **6 个事项** 分阶段吸收 `dsh-superagent` 的核心设计：
 

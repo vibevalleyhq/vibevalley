@@ -52,7 +52,6 @@ test("an artifact opens from its card in its own sandbox, keeps its versions and
   const { violations } = await new AxeBuilder({ page }).exclude('[data-testid="artifact-frame"]').withTags(["wcag2a", "wcag2aa"]).analyze();
   expect(violations.map((v) => v.id)).toEqual([]);
 
-  // Deleted: back to 产出, its cards stay.
   await page.getByTestId("artifact-more").click();
   await page.locator('[role="menuitem"][data-key="delete"]').click();
   await page.getByTestId("artifact-delete-sure").click();
@@ -72,7 +71,6 @@ test("Markdown handed in is read into blocks to write on, without running the HT
   await expect(shown.locator('[data-type="heading"]')).toBeVisible();
   await expect(shown.locator('[data-type="bulleted"]')).toHaveCount(2);
   await expect(shown.locator("script, img")).toHaveCount(0);
-  // Every artifact is listed on 产出, whichever way it came.
   await expect(page.locator(`[data-testid="artifact-row"][data-key="${made.id}"]`)).toHaveAttribute("aria-current", "page");
   expect(await page.evaluate(() => window.ran)).toBeUndefined();
 });
@@ -82,4 +80,29 @@ test("an issue lists the artifacts made for it", async ({ page, api }) => {
   const made = await api.artifact.create({ title: "for the issue", kind: "markdown", content: "done", issue: String(issue.number) });
   await page.goto(`/issues/${issue.id}`);
   await expect(page.getByTestId("issue-artifacts").locator(`[data-testid="artifact-card"][data-key="${made.id}"]`)).toBeVisible();
+});
+
+test("words selected in a page are changed in place: the next version has them, every other byte as it was", async ({ page, api }) => {
+  const source = '<!doctype html>\n<h1>Launch</h1>\n<p id="p">Ship   on\n  Friday, not before.</p>\n<script>document.title = "Friday"</script>\n';
+  const made = await api.artifact.create({ title: "launch", kind: "html", content: source });
+  await page.goto(`/artifacts/${made.id}`);
+  const frame = page.frameLocator('[data-testid="artifact-frame"]');
+  await expect(frame.locator("#p")).toContainText("Friday");
+  await frame.locator("#p").evaluate((p) => {
+    const text = p.firstChild!;
+    const at = text.textContent!.indexOf("Friday");
+    const range = document.createRange();
+    range.setStart(text, at);
+    range.setEnd(text, at + "Friday".length);
+    document.getSelection()!.removeAllRanges();
+    document.getSelection()!.addRange(range);
+  });
+  const words = page.getByTestId("artifact-words-text");
+  await expect(words).toHaveValue("Friday");
+  await words.fill("Monday");
+  await page.getByTestId("artifact-words-save").click();
+  await expect(page.getByTestId("artifact")).toHaveAttribute("data-version", "2");
+  await expect(frame.locator("#p")).toContainText("Monday");
+  expect((await api.artifact.content.get({ id: made.id })).content).toBe(source.replace("  Friday,", "  Monday,"));
+  expect((await api.artifact.content.get({ id: made.id, version: 1 })).content).toBe(source);
 });

@@ -2,12 +2,12 @@
 // to a page, what a search finds, what wants a look. Pure: the service holds the pages and hands them here.
 
 import type * as T from "@vibevalley/protocol";
-import { slugOf } from "@vibevalley/protocol/rules";
+import { flatBlocks, plainText, slugOf } from "@vibevalley/protocol/rules";
 
 import { termsList } from "@/memory/recall.ts";
 
-import { type Edge, edgesOf, find, flatten, type Node, type Page, blockRef, walk, wikiLink, withoutSpans } from "./outline.ts";
-import { dayOf, tierWeight } from "./para.ts";
+import { type Edge, edgesOf, find, type Node, type Page, blockRef, walk, wikiLink, withoutSpans } from "./outline.ts";
+import { dayOf, journalDay, tierWeight } from "./para.ts";
 
 /** The pages by slug. */
 export type Vault = ReadonlyMap<string, Page>;
@@ -35,7 +35,7 @@ export interface Located {
 export function blockOf(vault: Vault, id: string): Located | undefined {
   for (const page of vault.values()) {
     const node = find(page.blocks, id);
-    const block = node && flatten(page.blocks).find((b) => b.id === id);
+    const block = node && flatBlocks(page.blocks).find((b) => b.id === id);
     if (node && block) return { page, node, block };
   }
   return undefined;
@@ -56,8 +56,14 @@ export interface RefWords {
   readonly broken: (id: string) => string;
 }
 
-/** Each ((id)) on the page as it reads now; refs inside a read-out ref are read out too, two levels down, never in a circle. */
-export function transclusions(vault: Vault, page: Page, words: RefWords): T.PkmTransclusion[] {
+/** Each ((id)) on the page as it reads now, and in the blocks shown with it (its backlinks); refs inside a read-out ref
+ * are read out too, two levels down, never in a circle. */
+export function transclusions(
+  vault: Vault,
+  page: Page,
+  words: RefWords,
+  shownWith: readonly { readonly block: string; readonly body: string }[] = [],
+): T.PkmTransclusion[] {
   const out = new Map<string, T.PkmTransclusion>();
   const readOut = (id: string, seen: ReadonlySet<string>, depth: number): T.PkmTransclusion => {
     if (seen.has(id) || depth >= 2) return { block: id, found: true, circular: true, body: words.circular(id) };
@@ -67,10 +73,10 @@ export function transclusions(vault: Vault, page: Page, words: RefWords): T.PkmT
     const body = at.node.body.replace(blockRef, (_whole, inner: string) => readOut(inner, next, depth + 1).body);
     return { block: id, found: true, page: at.page.slug, pageTitle: at.page.title, body };
   };
-  for (const node of walk(page.blocks))
-    for (const m of node.body.matchAll(blockRef)) {
+  for (const { block, body } of [...walk(page.blocks).map((node) => ({ block: node.id, body: node.body })), ...shownWith])
+    for (const m of body.matchAll(blockRef)) {
       const id = m[1] ?? "";
-      if (!out.has(id)) out.set(id, readOut(id, new Set([node.id]), 0));
+      if (!out.has(id)) out.set(id, readOut(id, new Set([block]), 0));
     }
   return [...out.values()];
 }
@@ -84,9 +90,16 @@ export function backlinks(vault: Vault, slug: string): T.PkmBacklinks {
   for (const { page, edges } of linking) {
     const ids = new Set(edges.filter((e) => e.page === slug).map((e) => e.block));
     if (ids.size === 0) continue;
-    for (const block of flatten(page.blocks)) {
+    for (const block of flatBlocks(page.blocks)) {
       if (!ids.has(block.id)) continue;
-      const link: T.PkmBacklink = { block: block.id, page: page.slug, pageTitle: page.title, tier: page.tier, path: block.path, body: block.body };
+      const link: T.PkmBacklink = {
+        block: block.id,
+        page: page.slug,
+        pageTitle: page.title,
+        tier: page.tier,
+        path: plainPath(vault, block.path),
+        body: block.body,
+      };
       switch (page.tier) {
         case "project":
           groups.projects.push(link);
@@ -113,8 +126,34 @@ const openMarkers: ReadonlySet<T.PkmMarker> = new Set(["TODO", "DOING", "NOW", "
 export const summaryOf = (page: Page): T.PkmPageSummary => {
   let open = 0;
   for (const node of walk(page.blocks)) if (node.marker && openMarkers.has(node.marker)) open += 1;
-  return { slug: page.slug, title: page.title, tier: page.tier, file: page.file, tldr: page.props.tldr ?? "", updated: page.mtime, open };
+  const day = page.tier === "journal" ? journalDay(page.file) : undefined;
+  return {
+    slug: page.slug,
+    title: page.title,
+    tier: page.tier,
+    file: page.file,
+    tldr: page.props.tldr ?? "",
+    updated: page.mtime,
+    open,
+    ...(day ? { day } : {}),
+  };
 };
+
+/** Where a block is (its path: the first lines above it) as plain words, each step as plainOf says it. */
+const plainPath = (vault: Vault, path: string) =>
+  path === ""
+    ? ""
+    : path
+        .split(" > ")
+        .map((step) => plainOf(vault, step))
+        .join(" > ");
+
+/** A block's text as one line: a ((ref)) read out one level only (a nested one as …), a [[link]] as its words. */
+export function plainOf(vault: Vault, body: string): string {
+  const refsOut = body.replace(blockRef, (_whole, id: string) => blockOf(vault, id)?.node.body.replace(blockRef, "…") ?? "…");
+  const linksOut = withoutSpans(refsOut).replace(wikiLink, (_whole, inner: string) => (inner.split("|").at(-1) ?? inner).trim());
+  return plainText(linksOut);
+}
 
 export const wireOf = (page: Page): T.PkmPage => ({
   slug: page.slug,
@@ -123,7 +162,7 @@ export const wireOf = (page: Page): T.PkmPage => ({
   file: page.file,
   props: { ...page.props },
   tldr: page.props.tldr ?? "",
-  blocks: flatten(page.blocks),
+  blocks: flatBlocks(page.blocks),
   updated: page.mtime,
 });
 
@@ -153,7 +192,7 @@ export function search(vault: Vault, req: T.PkmSearchRequest, ranked?: ReadonlyM
             .map((e) => e.block),
         )
       : undefined;
-    const blocks = flatten(page.blocks);
+    const blocks = flatBlocks(page.blocks);
     for (const [i, block] of blocks.entries()) {
       if (req.marker && block.marker !== req.marker) continue;
       if (linking && !linking.has(block.id)) continue;
@@ -177,8 +216,9 @@ export function search(vault: Vault, req: T.PkmSearchRequest, ranked?: ReadonlyM
         pageTitle: page.title,
         tier: page.tier,
         ...(block.marker ? { marker: block.marker } : {}),
-        path: block.path,
+        path: plainPath(vault, block.path),
         body: block.body,
+        plain: plainOf(vault, block.body),
         score: score * tierWeight[page.tier],
         children,
       });
@@ -214,7 +254,7 @@ export function radar(vault: Vault, now: number, staleDays: number): T.PkmRadar 
     for (const node of walk(page.blocks)) {
       const deadline = node.props.deadline;
       if (deadline && deadline < today && node.marker !== "DONE" && node.marker !== "CANCELED")
-        out.overdue.push({ block: node.id, page: page.slug, body: node.body, deadline });
+        out.overdue.push({ block: node.id, page: page.slug, body: node.body, plain: plainOf(vault, node.body), deadline });
     }
   }
   return out;

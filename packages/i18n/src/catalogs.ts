@@ -82,7 +82,7 @@ export const catalogs = {
         channel: "列出频道，找它的 id",
         graph: "列出计划，找它的 id",
         memories: "列出它的记性，找那一条的 id",
-        artifact: "列出产出，找它的 id",
+        artifact: "列出稿子，找它的 id",
         pkm: "列出笔记页，找它的名字",
       },
       projectRef: "项目 {id}",
@@ -123,26 +123,26 @@ export const catalogs = {
       effortsAnd: "、",
     },
     "server.artifact": {
-      noTitle: "产出要有个标题",
+      noTitle: "稿子要有个标题",
       longTitle: "标题太长了，最多 {max} 个字",
-      badKind: "认不得 {kind} 这种产出，只认 {kinds}",
-      empty: "产出是空的",
-      tooBig: "一版最多 {mb} MB",
-      notKept: "产出没存下来：{why}",
-      missing: "没有 {id} 这个产出",
-      noVersion: "「{title}」没有第 {version} 版，最新是第 {latest} 版",
-      noFile: "「{title}」第 {version} 版的内容不见了",
+      badKind: "认不得 {kind} 这种稿子，只认 {kinds}",
+      empty: "稿子是空的",
+      tooBig: "一稿最多 {mb} MB",
+      notKept: "稿子没存下来：{why}",
+      missing: "没有 {id} 这份稿子",
+      noVersion: "「{title}」没有第 {version} 稿，最新是第 {latest} 稿",
+      noFile: "「{title}」第 {version} 稿的内容不见了",
       made: "做了「{title}」",
-      versioned: "「{title}」出了第 {version} 版",
+      versioned: "「{title}」出了第 {version} 稿",
       withNote: "{said}：{note}",
       preview: {
-        remove: "删掉「{title}」和它的 {n} 版",
+        remove: "删掉「{title}」和它的 {n} 稿",
         cards: "对话里的卡片还在，点开说已经删掉了",
         removeBlock: "删掉块 {id}",
         removeChildren: "连同 {n} 个子块",
         removeBlocks: "删掉「{title}」和它的 {n} 块",
       },
-      untitled: "没起名的产出",
+      untitled: "没起名的稿子",
       noBatch: "这批改动没有 batchId",
       demoNotInserted: "演示的块没插进去：{status}",
       noWriter: "没有能写的帮工：先在档案里打开一个",
@@ -183,7 +183,7 @@ export const catalogs = {
           heading: "背景 · 演示",
           paragraphs: {
             "0": "（演示）这一节是脚本写的，不是帮工真的想出来的。我们这里有好几个帮工，以前一篇文章只能一个人从头写到尾，别人只能等着。",
-            "1": "现在产出按块存，每一块有自己的版本号。几个帮工各写各的一节，互不抢同一块，谁写的哪一块，左边的归属条一眼就能看出来。",
+            "1": "现在稿子按块存，每一块有自己的版本号。几个帮工各写各的一节，互不抢同一块，谁写的哪一块，左边的归属条一眼就能看出来。",
             "2": "这篇演示就是想让主人亲眼看一下：三个帮工同时动笔，字一段一段长出来，最后拼成一篇完整的文章。",
           },
         },
@@ -200,14 +200,36 @@ export const catalogs = {
           paragraphs: {
             "0": "（演示）等广播做好以后，页面不用再一秒问一次服务端，帮工写一下，主人这边马上就能看到。",
             "1": "再往后，帮工想改别人那一节的字，不直接改，而是挂一条建议，等主人点头；写完的一节在大纲里标成写完待看。",
-            "2": "演示到这里就结束了。这篇产出留着也行，删掉也行，它不会影响任何工单和记性。",
+            "2": "演示到这里就结束了。这篇稿子留着也行，删掉也行，它不会影响任何工单和记性。",
           },
         },
       },
       badBlockType: "块的类型只能是 {types}",
-      otherArtifact: "这批改动（{batch}）是另一个产出的",
-      notBlocks: "「{title}」是一整页网页，不按块改：交新的一版",
-      notHtml: "「{title}」是一起写的，不交新的一版：一块一块改（artifact_block_create、artifact_block_update）",
+      otherArtifact: "这批改动（{batch}）是另一份稿子的",
+      notBlocks: "「{title}」是一整页网页，不按块改：交新的一稿",
+      notHtml: "「{title}」是一起写的，不交新的一稿：一块一块改（artifact_block_create、artifact_block_update）",
+      check: {
+        refused: "页面里有 {n} 处在沙箱里显示不了，改完再交：",
+        more: "还有 {n} 处，改完这些再交会列出来",
+        script: "第 {line} 行的脚本来自 {url}：脚本写在页面里，或者从 {hosts} 加载",
+        style: "第 {line} 行的样式来自 {url}：样式写在页面里，或者从 {hosts} 加载",
+        font: "第 {line} 行的字体来自 {url}：字体内联成 data:，或者从 {hosts} 加载",
+        inline: "第 {line} 行的图片或音视频来自 {url}：页面不从外面加载图片，内联成 data:",
+        link: "第 {line} 行的 <link> 连向 {url}：只能连向 {hosts}",
+        form: "第 {line} 行的表单提交到 {url}：页面不能提交表单，用脚本处理它",
+        refresh: '第 {line} 行的 <meta http-equiv="refresh"> 会把页面带走：删掉它',
+        base: "第 {line} 行的 <base href>：删掉它，地址写全",
+        frame: "第 {line} 行的 <{tag}>：页面里不能再嵌一个页面",
+      },
+      edit: {
+        empty: "没有选中要改的字",
+        same: "改成的字和原来一样",
+        notFound: "页面的源码里找不到「{words}」：它可能是脚本画出来的，交给帮工改",
+        many: "「{words}」在页面里有 {n} 处，分不清是哪一处：多选几个字再改，或者交给帮工改",
+        crosses: "「{words}」跨了带格式的几段，这里只改一段里的字：少选几个字，或者交给帮工改",
+        stale: "你看的是第 {version} 稿，最新的是第 {latest} 稿：在最新的一稿上改",
+        note: "主人在页面上改了：「{old}」→「{new}」",
+      },
     },
     "server.base": {
       noFile: "{path}: 没有这个文件",
@@ -679,6 +701,7 @@ export const catalogs = {
       clusterHeading: "## {topic}：聚到一起的素材",
       clusterLine: "来自 [[{title}]]：(({id}))",
       clusterTldr: "围绕 {topic} 聚到一起的 {count} 条素材",
+      notedBy: "{text}（{name} 记）",
     },
     "server.project": {
       parentBranchChanged: "父工单工作目录已切换分支，不能自动合入",
@@ -950,9 +973,9 @@ export const catalogs = {
         search_archive: "翻旧账",
         memory_search: "翻记性",
         memory_create: "替帮工记",
-        artifact_block_create: "往产出里加一块",
-        artifact_block_update: "改产出的一块",
-        artifact_block_delete: "删产出的一块",
+        artifact_block_create: "往稿子里加一块",
+        artifact_block_update: "改稿子的一块",
+        artifact_block_delete: "删稿子的一块",
       },
       about: "{label}：{about}",
     },
@@ -1204,9 +1227,6 @@ export const catalogs = {
         look: "长相",
       },
       list: {
-        title: "档案",
-        intro:
-          "每份档案是一个 agent。管家常驻、带队、自己不干活，可以有好几个；帮工是配置好的农机：用哪台农机和模型、带什么人设和技能，在农场里是哪种小动物。管家派活时派的就是帮工。",
         orchestrators: "管家",
         helpers: "帮工",
         make: "捏一个新帮工",
@@ -1228,30 +1248,34 @@ export const catalogs = {
       noEffortModel: "{model}没有推理强度可选。",
     },
     "web.artifact": {
-      place: { label: "产出", hint: "你和帮工、管家留下要看的东西：一起写的产出、交上来的网页，都在这里" },
-      card: { version: "第 {version} 版", open: "打开「{title}」" },
+      place: { label: "稿子", hint: "你和帮工、管家留下要看的东西：一起写的稿子、交上来的网页，都在这里" },
+      card: { version: "第 {version} 稿", open: "打开「{title}」" },
       page: {
         by: "{name} 做的",
         updated: "{when}更新",
-        versions: "版本",
+        versions: "每一稿",
         open: "在新标签页打开",
         delete: "删掉",
         deleteAsk: "删掉「{title}」？对话里的卡片还在。",
         deleted: "删掉了「{title}」",
-        gone: "这个产出已经删掉了，或者没有这个产出。",
-        frame: "「{title}」第 {version} 版",
-        list: "全部产出",
+        gone: "这份稿子已经删掉了，或者没有这份稿子。",
+        frame: "「{title}」第 {version} 稿",
+        list: "全部稿子",
         new: "新建",
-        none: "还没有产出：写个标题新建一篇，或者让帮工交一份上来。",
-        all: "全部产出",
+        none: "还没有稿子：写个标题新建一篇，或者让帮工交一份上来。",
+        all: "全部稿子",
         forIssue: "为 #{number} 做的",
-        untitled: "没起名的产出",
+        untitled: "没起名的稿子",
         find: "按标题找",
         nothingFound: "没有标题对得上的",
         title: "标题",
         more: "更多",
         copyLink: "复制链接",
         copied: "链接复制好了",
+        group: { delivered: "帮工和管家交的", mine: "我写的" },
+        rail: "这篇的旁注",
+        railShow: "打开旁注",
+        railHide: "收起旁注",
       },
       talk: {
         atMessage: "在对话里",
@@ -1259,10 +1283,11 @@ export const catalogs = {
         replyHint: "写给做它的帮工：哪里要改",
         send: "回复",
         sent: "回复了",
-        replyVersion: "回复这一版",
-        sentVersion: "回复了第 {version} 版",
+        replyVersion: "回复这一稿",
+        sentVersion: "回复了第 {version} 稿",
+        none: "还没在对话里说过：自己写的这篇，还没交给谁看。",
       },
-      issue: { title: "产出" },
+      issue: { title: "稿子" },
       blocks: {
         memoryItem: "记性",
         saving: "在存……",
@@ -1286,7 +1311,7 @@ export const catalogs = {
         image: "图片：{alt} {src}",
         start: "从这里开始写……",
       },
-      canvas: { label: "打开的产出", close: "关掉", openPage: "在产出页打开", quote: "带话" },
+      canvas: { label: "打开的稿子", close: "关掉", openPage: "在稿子页打开", quote: "带话" },
       suggestions: {
         title: "建议（{n}）",
         by: "{name} 提的",
@@ -1315,6 +1340,14 @@ export const catalogs = {
         attrs: "改属性：{attrs}",
       },
       body: { blocks: "一起写的", html: "网页" },
+      edit: {
+        title: "改字",
+        hint: "选中页面里的字，就能在右边直接改掉它",
+        older: "这是旧的一稿：回到最新的一稿再改字",
+        to: "改成",
+        save: "存成新的一稿",
+        saved: "存成了第 {version} 稿",
+      },
     },
     "web.base": {
       place: {
@@ -1329,6 +1362,8 @@ export const catalogs = {
       link: { connecting: "连接中", open: "已连上", lost: "断了，重连中" },
       rail: "工作台",
       farm: "回农场",
+      farmShort: "农场",
+      update: "更新",
       working: "开工中 · {n} 个在干活",
       off: "没开工",
       chips: { drop: "去掉 {v}", valueOf: "{k} 的值", removeKey: "删除 {k}", remove: "删除", name: "变量名", value: "变量的值", valueHint: "值", add: "添加" },
@@ -1393,7 +1428,7 @@ export const catalogs = {
       lightbox: { label: "看图", prev: "上一张", next: "下一张", original: "打开原图", close: "关上" },
       shortcuts: {
         title: "快捷键",
-        place: { everywhere: "到处", composer: "输入框", lists: "菜单和名单", pictures: "看图", farm: "农场", desktop: "桌面版（系统全局）" },
+        place: { everywhere: "到处", composer: "输入框", lists: "菜单和名单", issues: "工单", pictures: "看图", farm: "农场", desktop: "桌面版（系统全局）" },
         say: {
           switcher: "跳到频道、串、私聊",
           sheet: "打开这张表",
@@ -1412,6 +1447,7 @@ export const catalogs = {
           debug: "调试台",
           voice: "跟管家说话（在设置里能换）",
           command: "命令：记工单、让管家记住、叫停、私聊",
+          newIssue: "新工单",
         },
       },
       rich: {
@@ -1654,6 +1690,8 @@ export const catalogs = {
         direct: "私聊",
         newDirect: "开一个私聊",
         keys: "{mac, select, true {⌘K} other {Ctrl K}}",
+        note: "笔记 · {tier}",
+        searchNotes: "在笔记里搜「{q}」",
       },
       farmSearch: {
         open: "全部搜索",
@@ -2328,8 +2366,6 @@ export const catalogs = {
       orchestrator: "管家",
       noHelper: "还没选帮工",
       board: {
-        add: "＋ 写一张，回车存下",
-        addLabel: "写一张待办",
         earlier: "更早的 {n} 张",
         recent: "只看最近的",
         empty: {
@@ -2611,6 +2647,7 @@ export const catalogs = {
         changesUncommitted: "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
         justNow: "刚刚",
       },
+      new: { title: "新工单", card: "新工单", words: "要做什么", placeholder: "要做什么？一句话就行，帮工会照它起草", keys: "⌘ 回车记下", keep: "记下" },
     },
     "web.lan": {
       lan: {
@@ -2746,41 +2783,59 @@ export const catalogs = {
       },
     },
     "web.pkm": {
-      place: { label: "笔记", hint: "你自己的笔记：PARA 分好的大纲页、每天的日记、反链和润色建议" },
+      place: { label: "笔记", hint: "你自己的笔记：每天的日记、PARA 分好的大纲页、反链和润色建议" },
       tier: { project: "项目", area: "领域", resource: "资源", inbox: "收件箱", journal: "日记", archive: "归档" },
-      list: {
-        label: "全部笔记页",
-        capture: "记一句，进今天的日记",
-        captured: "记进了今天的日记",
-        find: "搜笔记",
-        nothingFound: "没有找到",
-        open: "{n} 项没做完",
-        radar: "收件箱 {inbox} · 搁着的项目 {stale} · 过期 {overdue}",
-        all: "全部笔记",
-      },
-      empty: "笔记还空着。这些页面就是 {root} 里的 Markdown 文件；在左边记一句，就有了今天的日记。",
+      list: { label: "页面和日历", find: "搜笔记", open: "{n} 项没做完", today: "今天" },
+      calendar: { label: "日历", previous: "上个月", next: "下个月" },
+      radar: { inbox: "收件箱", stale: "搁着", overdue: "过期", days: "{n} 天没动" },
       gone: "没有这一页，或者它的文件已经删掉了。",
-      pick: "从左边挑一页看",
       page: {
         more: "更多",
         export: "导出成 Markdown（复制）",
         exported: "复制好了",
+        copyFile: "复制文件路径（{file}）",
+        copiedFile: "文件路径复制好了",
         undo: "撤销上一次改动",
         undone: "撤销了：{what}",
         nothingToUndo: "没有可以撤销的改动",
         tier: "放在哪",
         moved: "挪到了{tier}",
-        file: "文件 {file}",
-        append: "加一块",
+        append: "接着写…",
         collapse: "收起",
         expand: "展开",
         edit: "改这一块",
-        marker: "切换状态",
-        empty: "空的",
         missingRef: "找不到这一块",
+        refFrom: "引自「{page}」",
+        notSaved: "没存上：{why}",
+        outline: "大纲",
       },
-      backlinks: { title: "链到这里的", none: "还没有别的页链到这里", projects: "项目", journals: "日记", areas: "领域和资源", archives: "归档" },
-      comments: { title: "评论和润色建议", accept: "采纳", reject: "不要", on: "关于「{span}」", accepted: "采纳了", rejected: "不要了" },
+      props: {
+        deadline: "截止 {day}",
+        left: "截止 {day} · 还剩 {n} 天",
+        dueToday: "截止 {day} · 今天到期",
+        overdue: "截止 {day} · 过了 {n} 天",
+        area: "领域",
+        more: "还有 {n} 项属性",
+        fewer: "收起属性",
+      },
+      marker: { TODO: "待办", DOING: "在做", DONE: "做完了", NOW: "现在做", LATER: "以后做", WAITING: "在等", CANCELED: "不做了" },
+      command: { todo: "标成待办", doing: "标成在做", done: "标成做完了", clear: "去掉标记", h1: "大标题", h2: "小标题", today: "链到今天的日记" },
+      complete: { newPage: "新页面" },
+      toolbar: { label: "编辑这一块", indent: "缩进", outdent: "取消缩进", up: "上移", down: "下移", todo: "切换待办", link: "插入链接" },
+      rail: { label: "这一页的旁注", show: "打开旁注", hide: "收起旁注", contents: "这页的大纲" },
+      search: {
+        title: "搜笔记",
+        placeholder: "搜页面和块",
+        filters: "筛选",
+        all: "全部",
+        todo: "只看待办",
+        linked: "链到这一页的",
+        pages: "页面",
+        none: "没有找到",
+      },
+      backlinks: { title: "链到这里的 · {n}", none: "还没有别的页链到这里", projects: "项目", journals: "日记", areas: "领域和资源", archives: "归档" },
+      comments: { title: "评论 · {n}", count: "{n} 条评论", accept: "采纳", reject: "不要", accepted: "采纳了", rejected: "不要了", on: "「{span}」" },
+      tierOne: { project: "项目", area: "领域", resource: "资料", inbox: "收件箱", journal: "日记", archive: "归档" },
     },
     "web.project": {
       title: "项目",
@@ -3654,6 +3709,28 @@ export const catalogs = {
       otherArtifact: "This batch of changes ({batch}) belongs to another artifact",
       notBlocks: "“{title}” is a whole web page, not changed block by block: hand in a new version",
       notHtml: "“{title}” is written together and takes no new version: change it block by block (artifact_block_create, artifact_block_update)",
+      check: {
+        refused: "{n} parts of the page cannot show in the sandbox; fix them and hand it in again:",
+        more: "{n} more, listed once these are fixed",
+        script: "Line {line} loads a script from {url}: write it in the page, or load it from {hosts}",
+        style: "Line {line} loads styles from {url}: write them in the page, or load them from {hosts}",
+        font: "Line {line} loads a font from {url}: inline it as data:, or load it from {hosts}",
+        inline: "Line {line} loads a picture or media from {url}: the page loads none from outside, inline it as data:",
+        link: "Line {line} connects to {url}: only {hosts} can be connected to",
+        form: "Line {line} submits a form to {url}: the page cannot submit forms, handle it in a script",
+        refresh: 'Line {line} has a <meta http-equiv="refresh"> that takes the page away: remove it',
+        base: "Line {line} has a <base href>: remove it and write addresses in full",
+        frame: "Line {line}, <{tag}>: a page cannot hold another page",
+      },
+      edit: {
+        empty: "No words are selected to change",
+        same: "The new words are the same as the old",
+        notFound: '"{words}" is not in the page\'s source: a script may draw it; hand it to a helper',
+        many: '"{words}" is in the page {n} times and which one is unclear: select a few more words, or hand it to a helper',
+        crosses: '"{words}" crosses differently formatted parts; only words within one can be changed here: select fewer, or hand it to a helper',
+        stale: "You are looking at version {version}; the latest is {latest}: change the latest",
+        note: 'The owner changed on the page: "{old}" → "{new}"',
+      },
     },
     "server.base": {
       noFile: "{path}: no such file",
@@ -4137,6 +4214,7 @@ export const catalogs = {
       clusterHeading: "## {topic}: sources gathered",
       clusterLine: "From [[{title}]]: (({id}))",
       clusterTldr: "{count} sources gathered on {topic}",
+      notedBy: "{text} (noted by {name})",
     },
     "server.project": {
       parentBranchChanged: "The parent worktree changed branches; the child cannot be merged automatically",
@@ -4698,9 +4776,6 @@ export const catalogs = {
         look: "Look",
       },
       list: {
-        title: "Profiles",
-        intro:
-          "Each profile is an agent. Managers stay, lead and do no work themselves, and there may be several; helpers are runtimes set up: which runtime and model, what persona and skills, and which little animal they are on the farm. When a manager sends work, it sends a helper.",
         orchestrators: "Managers",
         helpers: "Helpers",
         make: "Make a new helper",
@@ -4746,6 +4821,10 @@ export const catalogs = {
         more: "More",
         copyLink: "Copy link",
         copied: "Link copied",
+        group: { delivered: "Handed in by helpers", mine: "Written by you" },
+        rail: "Beside this artifact",
+        railShow: "Show the side panel",
+        railHide: "Hide the side panel",
       },
       talk: {
         atMessage: "In the conversation",
@@ -4755,6 +4834,7 @@ export const catalogs = {
         sent: "Replied",
         replyVersion: "Reply to this version",
         sentVersion: "Replied to version {version}",
+        none: "Not said in any conversation yet: you wrote this one and have not handed it to anyone.",
       },
       issue: { title: "Artifacts" },
       blocks: {
@@ -4809,6 +4889,14 @@ export const catalogs = {
         attrs: "Change attrs: {attrs}",
       },
       body: { blocks: "Written together", html: "Web page" },
+      edit: {
+        title: "Change words",
+        hint: "Select words in the page to change them on the right",
+        older: "This is an older version: go to the latest to change words",
+        to: "Change to",
+        save: "Save as a new version",
+        saved: "Saved as version {version}",
+      },
     },
     "web.base": {
       place: {
@@ -4823,6 +4911,8 @@ export const catalogs = {
       link: { connecting: "Connecting", open: "Connected", lost: "Lost, reconnecting" },
       rail: "Workbench",
       farm: "Back to the farm",
+      farmShort: "Farm",
+      update: "Update",
       working: "Open · {n} working",
       off: "Not open",
       chips: {
@@ -4905,6 +4995,7 @@ export const catalogs = {
           everywhere: "Everywhere",
           composer: "Message box",
           lists: "Menus and lists",
+          issues: "Issues",
           pictures: "Pictures",
           farm: "Farm",
           desktop: "Desktop app (system-wide)",
@@ -4927,6 +5018,7 @@ export const catalogs = {
           debug: "Debug console",
           voice: "Talk to the manager (changeable in settings)",
           command: "Commands: a ticket, remember, stop, a direct message",
+          newIssue: "New issue",
         },
       },
       rich: {
@@ -5172,6 +5264,8 @@ export const catalogs = {
         direct: "Direct message",
         newDirect: "New direct message",
         keys: "{mac, select, true {⌘K} other {Ctrl K}}",
+        note: "Note · {tier}",
+        searchNotes: "Search notes for “{q}”",
       },
       farmSearch: {
         open: "Search everything",
@@ -5908,8 +6002,6 @@ export const catalogs = {
       orchestrator: "Manager",
       noHelper: "No helper yet",
       board: {
-        add: "+ Write one, Enter saves it",
-        addLabel: "Write a to-do",
         earlier: "{n} earlier",
         recent: "Recent only",
         empty: {
@@ -6193,6 +6285,14 @@ export const catalogs = {
         changesUncommitted: "{branch} → {base} · {commits} commits · +{added} -{removed} · {uncommitted} uncommitted",
         justNow: "just now",
       },
+      new: {
+        title: "New issue",
+        card: "New issue",
+        words: "What to do",
+        placeholder: "What needs doing? A sentence is enough; it is drafted from your words",
+        keys: "⌘ Enter to save",
+        keep: "Save",
+      },
     },
     "web.lan": {
       lan: {
@@ -6332,48 +6432,90 @@ export const catalogs = {
       },
     },
     "web.pkm": {
-      place: { label: "Notes", hint: "Your own notes: outline pages sorted by PARA, daily journals, backlinks and suggested rewrites" },
+      place: { label: "Notes", hint: "Your own notes: daily journals, outline pages sorted by PARA, backlinks and suggested rewrites" },
       tier: { project: "Projects", area: "Areas", resource: "Resources", inbox: "Inbox", journal: "Journals", archive: "Archive" },
-      list: {
-        label: "All note pages",
-        capture: "Jot a line into today's journal",
-        captured: "Added to today's journal",
-        find: "Search notes",
-        nothingFound: "Nothing found",
-        open: "{n} open",
-        radar: "Inbox {inbox} · stale projects {stale} · overdue {overdue}",
-        all: "All notes",
-      },
-      empty: "No notes yet. The pages are the Markdown files in {root}; jot a line on the left to start today's journal.",
+      list: { label: "Pages and calendar", find: "Search notes", open: "{n} open", today: "Today" },
+      calendar: { label: "Calendar", previous: "Previous month", next: "Next month" },
+      radar: { inbox: "Inbox", stale: "Stale", overdue: "Overdue", days: "{n} days untouched" },
       gone: "There is no such page, or its file was deleted.",
-      pick: "Pick a page on the left",
       page: {
         more: "More",
         export: "Export as Markdown (copy)",
         exported: "Copied",
+        copyFile: "Copy the file's path ({file})",
+        copiedFile: "File path copied",
         undo: "Undo the last change",
         undone: "Undone: {what}",
         nothingToUndo: "Nothing to undo",
-        tier: "Where it sits",
+        tier: "Where it goes",
         moved: "Moved to {tier}",
-        file: "File {file}",
-        append: "Add a block",
+        append: "Keep writing…",
         collapse: "Collapse",
         expand: "Expand",
         edit: "Edit this block",
-        marker: "Change its state",
-        empty: "Empty",
         missingRef: "Block not found",
+        refFrom: "From “{page}”",
+        notSaved: "Not saved: {why}",
+        outline: "Outline",
+      },
+      props: {
+        deadline: "Due {day}",
+        left: "Due {day} · {n} days left",
+        dueToday: "Due {day} · today",
+        overdue: "Due {day} · {n} days ago",
+        area: "Area",
+        more: "{n} more properties",
+        fewer: "Fewer properties",
+      },
+      marker: { TODO: "To do", DOING: "Doing", DONE: "Done", NOW: "Now", LATER: "Later", WAITING: "Waiting", CANCELED: "Canceled" },
+      command: {
+        todo: "Mark to do",
+        doing: "Mark doing",
+        done: "Mark done",
+        clear: "Clear the mark",
+        h1: "Heading",
+        h2: "Subheading",
+        today: "Link today's journal",
+      },
+      complete: { newPage: "New page" },
+      toolbar: {
+        label: "Edit this block",
+        indent: "Indent",
+        outdent: "Outdent",
+        up: "Move up",
+        down: "Move down",
+        todo: "Toggle to do",
+        link: "Insert a link",
+      },
+      rail: { label: "Beside this page", show: "Show the side panel", hide: "Hide the side panel", contents: "On this page" },
+      search: {
+        title: "Search notes",
+        placeholder: "Search pages and blocks",
+        filters: "Filters",
+        all: "All",
+        todo: "To do only",
+        linked: "Linking here",
+        pages: "Pages",
+        none: "Nothing found",
       },
       backlinks: {
-        title: "Linked here",
+        title: "Linked here · {n}",
         none: "No other page links here yet",
         projects: "Projects",
         journals: "Journals",
         areas: "Areas and resources",
         archives: "Archive",
       },
-      comments: { title: "Comments and suggested rewrites", accept: "Accept", reject: "Reject", on: "On “{span}”", accepted: "Accepted", rejected: "Rejected" },
+      comments: {
+        title: "Comments · {n}",
+        count: "{n} comments",
+        accept: "Accept",
+        reject: "Dismiss",
+        accepted: "Accepted",
+        rejected: "Dismissed",
+        on: "“{span}”",
+      },
+      tierOne: { project: "Project", area: "Area", resource: "Resource", inbox: "Inbox", journal: "Journal", archive: "Archive" },
     },
     "web.project": {
       title: "Projects",
@@ -7168,6 +7310,17 @@ export interface Messages {
   "server.artifact.attrNotForType": { readonly attr: string | number; readonly type: string | number };
   "server.artifact.badBlockType": { readonly types: string | number };
   "server.artifact.badKind": { readonly kind: string | number; readonly kinds: string | number };
+  "server.artifact.check.base": { readonly line: string | number };
+  "server.artifact.check.font": { readonly hosts: string | number; readonly line: string | number; readonly url: string | number };
+  "server.artifact.check.form": { readonly line: string | number; readonly url: string | number };
+  "server.artifact.check.frame": { readonly line: string | number; readonly tag: string | number };
+  "server.artifact.check.inline": { readonly line: string | number; readonly url: string | number };
+  "server.artifact.check.link": { readonly hosts: string | number; readonly line: string | number; readonly url: string | number };
+  "server.artifact.check.more": { readonly n: string | number };
+  "server.artifact.check.refresh": { readonly line: string | number };
+  "server.artifact.check.refused": { readonly n: string | number };
+  "server.artifact.check.script": { readonly hosts: string | number; readonly line: string | number; readonly url: string | number };
+  "server.artifact.check.style": { readonly hosts: string | number; readonly line: string | number; readonly url: string | number };
   "server.artifact.demo.0.heading": undefined;
   "server.artifact.demo.0.paragraphs.0": undefined;
   "server.artifact.demo.0.paragraphs.1": undefined;
@@ -7182,6 +7335,13 @@ export interface Messages {
   "server.artifact.demo.2.paragraphs.2": undefined;
   "server.artifact.demoNotInserted": { readonly status: string | number };
   "server.artifact.demoRunning": undefined;
+  "server.artifact.edit.crosses": { readonly words: string | number };
+  "server.artifact.edit.empty": undefined;
+  "server.artifact.edit.many": { readonly n: string | number; readonly words: string | number };
+  "server.artifact.edit.notFound": { readonly words: string | number };
+  "server.artifact.edit.note": { readonly new: string | number; readonly old: string | number };
+  "server.artifact.edit.same": undefined;
+  "server.artifact.edit.stale": { readonly latest: string | number; readonly version: string | number };
   "server.artifact.empty": undefined;
   "server.artifact.longTitle": { readonly max: string | number };
   "server.artifact.made": { readonly title: string | number };
@@ -7709,6 +7869,7 @@ export interface Messages {
   "server.pkm.noRename": { readonly from: string | number; readonly to: string | number };
   "server.pkm.noText": undefined;
   "server.pkm.noTitle": undefined;
+  "server.pkm.notedBy": { readonly name: string | number; readonly text: string | number };
   "server.pkm.sameName": undefined;
   "server.pkm.summary": { readonly tldr: string | number };
   "server.project.badGithub": undefined;
@@ -8137,7 +8298,6 @@ export interface Messages {
   "web.agent.list.helpers": undefined;
   "web.agent.list.here": { readonly n: string | number };
   "web.agent.list.hired": undefined;
-  "web.agent.list.intro": undefined;
   "web.agent.list.ledger": undefined;
   "web.agent.list.make": undefined;
   "web.agent.list.makeOrchestrator": undefined;
@@ -8145,7 +8305,6 @@ export interface Messages {
   "web.agent.list.orchestratorLine": undefined;
   "web.agent.list.orchestrators": undefined;
   "web.agent.list.tallyHint": undefined;
-  "web.agent.list.title": undefined;
   "web.agent.list.toggle": { readonly act: string | number; readonly name: string | number };
   "web.agent.list.voice": undefined;
   "web.agent.loading": undefined;
@@ -8292,6 +8451,12 @@ export interface Messages {
   "web.artifact.canvas.quote": undefined;
   "web.artifact.card.open": { readonly title: string | number };
   "web.artifact.card.version": { readonly version: string | number };
+  "web.artifact.edit.hint": undefined;
+  "web.artifact.edit.older": undefined;
+  "web.artifact.edit.save": undefined;
+  "web.artifact.edit.saved": { readonly version: string | number };
+  "web.artifact.edit.title": undefined;
+  "web.artifact.edit.to": undefined;
   "web.artifact.issue.title": undefined;
   "web.artifact.page.all": undefined;
   "web.artifact.page.by": { readonly name: string | number };
@@ -8304,12 +8469,17 @@ export interface Messages {
   "web.artifact.page.forIssue": { readonly number: string | number };
   "web.artifact.page.frame": { readonly title: string | number; readonly version: string | number };
   "web.artifact.page.gone": undefined;
+  "web.artifact.page.group.delivered": undefined;
+  "web.artifact.page.group.mine": undefined;
   "web.artifact.page.list": undefined;
   "web.artifact.page.more": undefined;
   "web.artifact.page.new": undefined;
   "web.artifact.page.none": undefined;
   "web.artifact.page.nothingFound": undefined;
   "web.artifact.page.open": undefined;
+  "web.artifact.page.rail": undefined;
+  "web.artifact.page.railHide": undefined;
+  "web.artifact.page.railShow": undefined;
   "web.artifact.page.title": undefined;
   "web.artifact.page.untitled": undefined;
   "web.artifact.page.updated": { readonly when: string | number };
@@ -8340,6 +8510,7 @@ export interface Messages {
   "web.artifact.suggestions.types.quote": undefined;
   "web.artifact.suggestions.types.todo": undefined;
   "web.artifact.talk.atMessage": undefined;
+  "web.artifact.talk.none": undefined;
   "web.artifact.talk.reply": undefined;
   "web.artifact.talk.replyHint": undefined;
   "web.artifact.talk.replyVersion": undefined;
@@ -8373,6 +8544,7 @@ export interface Messages {
   "web.base.chips.valueHint": undefined;
   "web.base.chips.valueOf": { readonly k: string | number };
   "web.base.farm": undefined;
+  "web.base.farmShort": undefined;
   "web.base.file.pdf": undefined;
   "web.base.file.remove": { readonly name: string | number };
   "web.base.form.asking": undefined;
@@ -8444,6 +8616,7 @@ export interface Messages {
   "web.base.shortcuts.place.desktop": undefined;
   "web.base.shortcuts.place.everywhere": undefined;
   "web.base.shortcuts.place.farm": undefined;
+  "web.base.shortcuts.place.issues": undefined;
   "web.base.shortcuts.place.lists": undefined;
   "web.base.shortcuts.place.pictures": undefined;
   "web.base.shortcuts.say.close": undefined;
@@ -8456,6 +8629,7 @@ export interface Messages {
   "web.base.shortcuts.say.mention": undefined;
   "web.base.shortcuts.say.move": undefined;
   "web.base.shortcuts.say.names": undefined;
+  "web.base.shortcuts.say.newIssue": undefined;
   "web.base.shortcuts.say.newline": undefined;
   "web.base.shortcuts.say.pick": undefined;
   "web.base.shortcuts.say.send": undefined;
@@ -8495,6 +8669,7 @@ export interface Messages {
   "web.base.time.yesterday": undefined;
   "web.base.toasts": undefined;
   "web.base.unreachable": undefined;
+  "web.base.update": undefined;
   "web.base.updateReady": { readonly next: string | number };
   "web.base.working": { readonly n: string | number };
   "web.base.write": undefined;
@@ -8758,7 +8933,9 @@ export interface Messages {
   "web.channel.switcher.keys": { readonly mac: boolean };
   "web.channel.switcher.newDirect": undefined;
   "web.channel.switcher.none": undefined;
+  "web.channel.switcher.note": { readonly tier: string | number };
   "web.channel.switcher.open": undefined;
+  "web.channel.switcher.searchNotes": { readonly q: string | number };
   "web.channel.switcher.title": undefined;
   "web.channel.tab.chat": undefined;
   "web.channel.tab.crons": undefined;
@@ -9429,8 +9606,6 @@ export interface Messages {
   "web.issue.acts.sayAgain": undefined;
   "web.issue.acts.sending": undefined;
   "web.issue.acts.takeBack": undefined;
-  "web.issue.board.add": undefined;
-  "web.issue.board.addLabel": undefined;
   "web.issue.board.earlier": { readonly n: string | number };
   "web.issue.board.empty.closed": undefined;
   "web.issue.board.empty.todo": undefined;
@@ -9638,6 +9813,12 @@ export interface Messages {
   "web.issue.list.writeIn": { readonly group: string | number };
   "web.issue.marks.priority": { readonly word: string | number };
   "web.issue.never": undefined;
+  "web.issue.new.card": undefined;
+  "web.issue.new.keep": undefined;
+  "web.issue.new.keys": undefined;
+  "web.issue.new.placeholder": undefined;
+  "web.issue.new.title": undefined;
+  "web.issue.new.words": undefined;
   "web.issue.noHelper": undefined;
   "web.issue.orchestrator": undefined;
   "web.issue.page.allHelpers": undefined;
@@ -9856,48 +10037,99 @@ export interface Messages {
   "web.pkm.backlinks.journals": undefined;
   "web.pkm.backlinks.none": undefined;
   "web.pkm.backlinks.projects": undefined;
-  "web.pkm.backlinks.title": undefined;
+  "web.pkm.backlinks.title": { readonly n: string | number };
+  "web.pkm.calendar.label": undefined;
+  "web.pkm.calendar.next": undefined;
+  "web.pkm.calendar.previous": undefined;
+  "web.pkm.command.clear": undefined;
+  "web.pkm.command.doing": undefined;
+  "web.pkm.command.done": undefined;
+  "web.pkm.command.h1": undefined;
+  "web.pkm.command.h2": undefined;
+  "web.pkm.command.today": undefined;
+  "web.pkm.command.todo": undefined;
   "web.pkm.comments.accept": undefined;
   "web.pkm.comments.accepted": undefined;
+  "web.pkm.comments.count": { readonly n: string | number };
   "web.pkm.comments.on": { readonly span: string | number };
   "web.pkm.comments.reject": undefined;
   "web.pkm.comments.rejected": undefined;
-  "web.pkm.comments.title": undefined;
-  "web.pkm.empty": { readonly root: string | number };
+  "web.pkm.comments.title": { readonly n: string | number };
+  "web.pkm.complete.newPage": undefined;
   "web.pkm.gone": undefined;
-  "web.pkm.list.all": undefined;
-  "web.pkm.list.capture": undefined;
-  "web.pkm.list.captured": undefined;
   "web.pkm.list.find": undefined;
   "web.pkm.list.label": undefined;
-  "web.pkm.list.nothingFound": undefined;
   "web.pkm.list.open": { readonly n: string | number };
-  "web.pkm.list.radar": { readonly inbox: string | number; readonly overdue: string | number; readonly stale: string | number };
+  "web.pkm.list.today": undefined;
+  "web.pkm.marker.CANCELED": undefined;
+  "web.pkm.marker.DOING": undefined;
+  "web.pkm.marker.DONE": undefined;
+  "web.pkm.marker.LATER": undefined;
+  "web.pkm.marker.NOW": undefined;
+  "web.pkm.marker.TODO": undefined;
+  "web.pkm.marker.WAITING": undefined;
   "web.pkm.page.append": undefined;
   "web.pkm.page.collapse": undefined;
+  "web.pkm.page.copiedFile": undefined;
+  "web.pkm.page.copyFile": { readonly file: string | number };
   "web.pkm.page.edit": undefined;
-  "web.pkm.page.empty": undefined;
   "web.pkm.page.expand": undefined;
   "web.pkm.page.export": undefined;
   "web.pkm.page.exported": undefined;
-  "web.pkm.page.file": { readonly file: string | number };
-  "web.pkm.page.marker": undefined;
   "web.pkm.page.missingRef": undefined;
   "web.pkm.page.more": undefined;
   "web.pkm.page.moved": { readonly tier: string | number };
+  "web.pkm.page.notSaved": { readonly why: string | number };
   "web.pkm.page.nothingToUndo": undefined;
+  "web.pkm.page.outline": undefined;
+  "web.pkm.page.refFrom": { readonly page: string | number };
   "web.pkm.page.tier": undefined;
   "web.pkm.page.undo": undefined;
   "web.pkm.page.undone": { readonly what: string | number };
-  "web.pkm.pick": undefined;
   "web.pkm.place.hint": undefined;
   "web.pkm.place.label": undefined;
+  "web.pkm.props.area": undefined;
+  "web.pkm.props.deadline": { readonly day: string | number };
+  "web.pkm.props.dueToday": { readonly day: string | number };
+  "web.pkm.props.fewer": undefined;
+  "web.pkm.props.left": { readonly day: string | number; readonly n: string | number };
+  "web.pkm.props.more": { readonly n: string | number };
+  "web.pkm.props.overdue": { readonly day: string | number; readonly n: string | number };
+  "web.pkm.radar.days": { readonly n: string | number };
+  "web.pkm.radar.inbox": undefined;
+  "web.pkm.radar.overdue": undefined;
+  "web.pkm.radar.stale": undefined;
+  "web.pkm.rail.contents": undefined;
+  "web.pkm.rail.hide": undefined;
+  "web.pkm.rail.label": undefined;
+  "web.pkm.rail.show": undefined;
+  "web.pkm.search.all": undefined;
+  "web.pkm.search.filters": undefined;
+  "web.pkm.search.linked": undefined;
+  "web.pkm.search.none": undefined;
+  "web.pkm.search.pages": undefined;
+  "web.pkm.search.placeholder": undefined;
+  "web.pkm.search.title": undefined;
+  "web.pkm.search.todo": undefined;
   "web.pkm.tier.archive": undefined;
   "web.pkm.tier.area": undefined;
   "web.pkm.tier.inbox": undefined;
   "web.pkm.tier.journal": undefined;
   "web.pkm.tier.project": undefined;
   "web.pkm.tier.resource": undefined;
+  "web.pkm.tierOne.archive": undefined;
+  "web.pkm.tierOne.area": undefined;
+  "web.pkm.tierOne.inbox": undefined;
+  "web.pkm.tierOne.journal": undefined;
+  "web.pkm.tierOne.project": undefined;
+  "web.pkm.tierOne.resource": undefined;
+  "web.pkm.toolbar.down": undefined;
+  "web.pkm.toolbar.indent": undefined;
+  "web.pkm.toolbar.label": undefined;
+  "web.pkm.toolbar.link": undefined;
+  "web.pkm.toolbar.outdent": undefined;
+  "web.pkm.toolbar.todo": undefined;
+  "web.pkm.toolbar.up": undefined;
   "web.project.add": undefined;
   "web.project.all": undefined;
   "web.project.allLine": undefined;

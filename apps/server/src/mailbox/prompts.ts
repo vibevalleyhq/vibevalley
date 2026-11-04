@@ -14,11 +14,11 @@ export function messageLine(m: InboxMessage): string {
       : `[target=${m.target} msg=${m.number}${m.replyTo !== undefined ? ` reply=${m.replyTo}` : ""} from=${from}]`;
   if (m.deleted === true) return head + " （这条已删除）";
   const files = (m.attachments ?? []).map((a) => `\n  │ [附件 ${a.name}：${a.path}]`).join("");
-  const made = m.artifact ? `\n  │ [产出「${m.artifact.title}」第 ${m.artifact.version} 版：id=${m.artifact.id}，原文用 artifact_content_get 读]` : "";
+  const made = m.artifact ? `\n  │ [稿子「${m.artifact.title}」第 ${m.artifact.version} 稿：id=${m.artifact.id}，原文用 artifact_content_get 读]` : "";
   const quoted = (m.blocks ?? [])
     .map((b) => {
       const now = b.deleted === true ? "已删除" : b.nowRev !== undefined && b.nowRev !== b.rev ? `现在第 ${b.nowRev} 版` : "没变";
-      return `\n  │ [指着产出「${b.title}」的块：artifact=${b.artifactId} block=${b.blockId} 引用时第 ${b.rev} 版，${now}]${b.text ? "\n  │ " + b.text.replaceAll("\n", "\n  │ ") : ""}`;
+      return `\n  │ [指着稿子「${b.title}」的块：artifact=${b.artifactId} block=${b.blockId} 引用时第 ${b.rev} 版，${now}]${b.text ? "\n  │ " + b.text.replaceAll("\n", "\n  │ ") : ""}`;
     })
     .join("");
   return `${head}${m.edited === true ? "（改过）" : ""} ${m.text.trim().replaceAll("\n", "\n  │ ")}${files}${made}${quoted}`;
@@ -41,5 +41,5 @@ export function wakeInput(messages: readonly InboxMessage[], others: readonly Un
 
 /** A direct talk's opening: the owner chats with this helper alone, with no issue or project behind it. */
 export const talkBrief = (name: string, said: string) =>
-  `主人在和你（档案「${name}」）私聊。用主人的语言回答，延续这段对话。你有独立的工作目录，可用来保留聊天中的笔记和产出；这段对话没有关联工单或项目。主人要改一个项目时，先明确项目和要做的事，再用工单安排。\n\n私聊里最近说的，回答最后的问题：\n` +
+  `主人在和你（档案「${name}」）私聊。用主人的语言回答，延续这段对话。你有独立的工作目录，可用来保留聊天中的笔记和写出来的东西；这段对话没有关联工单或项目。主人要改一个项目时，先明确项目和要做的事，再用工单安排。\n\n私聊里最近说的，回答最后的问题：\n` +
   said;

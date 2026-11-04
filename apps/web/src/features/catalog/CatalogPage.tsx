@@ -74,7 +74,7 @@ export function CatalogPage(props: { rest: string }) {
   const shelf = () => (props.rest === "cursors" || props.rest === "sounds" ? props.rest : "sprites");
   const tabs = () => <Tabs label={t("web.catalog.shelves")} value={shelf()} items={shelfTabs.map((s) => ({ value: s.id, label: s.label, href: s.to }))} />;
   return (
-    <div class="h-full p-3">
+    <div class="h-full">
       <Switch fallback={<Sprites id={props.rest ? decodeURIComponent(props.rest) : undefined} tabs={tabs()} />}>
         <Match when={shelf() === "cursors"}>
           <Cursors tabs={tabs()} />
@@ -87,10 +87,10 @@ export function CatalogPage(props: { rest: string }) {
   );
 }
 
-/** The column every shelf has, so switching shelves never moves the picker. */
+/** The column every shelf has, so switching shelves never moves the picker: the page's side column (Layout). */
 function Column(props: { tabs: JSX.Element; children: JSX.Element }) {
   return (
-    <div class="flex flex-col gap-2 rounded-lg border border-line bg-page p-2">
+    <div class="flex flex-col gap-2">
       {props.tabs}
       {props.children}
     </div>
@@ -99,12 +99,13 @@ function Column(props: { tabs: JSX.Element; children: JSX.Element }) {
 
 function Layout(props: { left: JSX.Element; children: JSX.Element; right?: JSX.Element }) {
   return (
-    <div class="flex h-full min-h-0 flex-col gap-3 overflow-y-auto lg:flex-row lg:overflow-hidden">
-      <div class="shrink-0 lg:w-60 lg:overflow-y-auto">{props.left}</div>
+    // The shelves are the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
+    <div class="flex h-full min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+      <div class="shrink-0 border-b border-line bg-side px-2 py-3 lg:w-60 lg:overflow-y-auto lg:border-r lg:border-b-0">{props.left}</div>
       <Show when={props.right}>
-        <div class="shrink-0 xl:order-last xl:w-88 xl:overflow-y-auto">{props.right}</div>
+        <div class="shrink-0 p-3 xl:order-last xl:w-88 xl:overflow-y-auto xl:pl-0">{props.right}</div>
       </Show>
-      <div class="flex min-w-0 flex-1 flex-col gap-3 lg:overflow-y-auto">{props.children}</div>
+      <div class="flex min-w-0 flex-1 flex-col gap-3 p-3 lg:overflow-y-auto">{props.children}</div>
     </div>
   );
 }

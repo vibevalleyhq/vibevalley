@@ -191,7 +191,9 @@
     "none": "Nothing found",
     "direct": "Direct message",
     "newDirect": "New direct message",
-    "keys": "{mac, select, true {⌘K} other {Ctrl K}}"
+    "keys": "{mac, select, true {⌘K} other {Ctrl K}}",
+    "note": "Note · {tier}",
+    "searchNotes": "Search notes for “{q}”"
   },
   "farmSearch": {
     "open": "Search everything",

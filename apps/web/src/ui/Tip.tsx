@@ -41,9 +41,10 @@ export function Hint(props: { text: string; icon?: IconName }) {
       <Tooltip.Trigger
         render="span"
         tabindex={0}
-        class="inline-flex cursor-help rounded text-faint outline-none hover:text-muted focus-visible:outline-2 focus-visible:outline-focus"
+        // A form of ten fields should not read as ten marks: help stays out of the way.
+        class="inline-flex cursor-help rounded text-faint opacity-50 transition-opacity duration-120 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
       >
-        <Icon name={props.icon ?? "info"} size={14} />
+        <Icon name={props.icon ?? "info"} size={12} />
       </Tooltip.Trigger>
       <Bubble text={props.text} />
     </Tooltip.Root>

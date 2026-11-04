@@ -7,7 +7,7 @@ Status: implemented
 服务端和页面按概念竖着分（一个概念一个模块、一个 feature），有三处还是横着的，每个功能都要穿过它们：
 
 - **契约**：`packages/protocol/src/shapes.ts`（3017 行、509 个声明，约二十个概念交错排着）、`schema.ts`（2491 行）、`api.ts`（1490 行，`Handlers` 接口和 `endpoints` 表），加上服务端根目录的 `handlers.ts`。10 月以来 442 个提交里，`shapes.ts` 改了 51 次、`schema.ts` 48 次、`handlers.ts` 36 次、`api.ts` 29 次；加一个笔记模块要在这四个文件的末尾各追加一段。
-- **一条输入送到 agent 的记录**：`ingress_trigger` 表名归 `ingress`（Ingress 层，排第 8），可写它的是 `mailbox/payload.ts` 的 `recordTrigger` 和 `mailbox` 的路由回执（Mailbox 层，排第 5）；`ingress` 文件夹本身是顶层的入口（主人说话、GitHub 事件），依赖频道、工单、产出。
+- **一条输入送到 agent 的记录**：`ingress_trigger` 表名归 `ingress`（Ingress 层，排第 8），可写它的是 `mailbox/payload.ts` 的 `recordTrigger` 和 `mailbox` 的路由回执（Mailbox 层，排第 5）；`ingress` 文件夹本身是顶层的入口（主人说话、GitHub 事件），依赖频道、工单、稿子。
 - **一个模块一个服务，在大模块里成了一个闭包**：`Issue`（26 个方法，`issue.ts` 1438 行）、`Channel`（50 个方法，`channel.ts` 1511 行）、`Session`（36 个方法，`session.ts` 1420 行）是全仓库改得最多的三个文件。
 
 ## Decision
