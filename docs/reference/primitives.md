@@ -196,7 +196,9 @@
 | `SpriteManifest` | `manifests.ts` |  |
 | `CursorManifest` | `manifests.ts` |  |
 | `TitleManifest` | `manifests.ts` |  |
-| `matches` | `search.ts` | Every word of the query is somewhere in the texts, ignoring case; an empty query matches everything. |
+| `pinyinLoaded` | `search.ts` | Settles once pinyin matches too (tests wait on it). |
+| `spelled` | `search.ts` | The text holds the query, ignoring case, or spells it in pinyin; query is lower case. |
+| `matches` | `search.ts` | Every word of the query is somewhere in the texts (spelled), ignoring case; an empty query matches everything. |
 | `compareText` | `search.ts` |  |
 | `or` | `search.ts` |  |
 | `shortcutPlaces` | `shortcuts.ts` |  |

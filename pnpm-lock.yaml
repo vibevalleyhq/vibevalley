@@ -263,6 +263,9 @@ catalogs:
     pele:
       specifier: ^1.13.0
       version: 1.13.0
+    pinyin-pro:
+      specifier: 3.29.5
+      version: 3.29.5
     pixi.js:
       specifier: ^8.22.0
       version: 8.22.0
@@ -609,6 +612,9 @@ importers:
       pele:
         specifier: 'catalog:'
         version: 1.13.0
+      pinyin-pro:
+        specifier: 'catalog:'
+        version: 3.29.5
       pixi.js:
         specifier: 'catalog:'
         version: 8.22.0
@@ -5932,6 +5938,9 @@ packages:
   picomatch@4.0.7:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
+
+  pinyin-pro@3.29.5:
+    resolution: {integrity: sha512-Fk5YoRmtdHqJWqAuzYVG/NzvzeCbaG+ZEwbY6Nbps3QAIrvQQEtcm49frcyCM8i2b5najnzPDtYqrHRYTTiuwQ==}
 
   pixi.js@8.22.0:
     resolution: {integrity: sha512-QbTANHMZ751MIjLiLSUSM8a7LNMWwMIf0KbRCqlW+SPS9hNLfSVS+cl1O2SEp9g1K/wyLzj/OJHv+1TUfiPr/w==}
@@ -12765,6 +12774,8 @@ snapshots:
   picomatch@2.3.2: {}
 
   picomatch@4.0.7: {}
+
+  pinyin-pro@3.29.5: {}
 
   pixi.js@8.22.0:
     dependencies:

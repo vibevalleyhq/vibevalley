@@ -8,6 +8,7 @@ import { t } from "@vibevalley/i18n";
 import { aria } from "@/base/dom";
 import { numberText } from "@/base/format";
 import { SpriteManifest, CursorManifest } from "@/base/manifests";
+import { spelled } from "@/base/search";
 import { useTimeout } from "@/base/timer";
 import { ready, useQuery } from "@/infra/query";
 import { useRouter } from "@/infra/router";
@@ -443,7 +444,7 @@ function Cursors(props: { tabs: JSX.Element }) {
   const all = () => {
     const q = query().trim().toLowerCase();
     const d = data();
-    return d ? Object.entries(d).filter(([name]) => !q || name.toLowerCase().includes(q)) : undefined;
+    return d ? Object.entries(d).filter(([name]) => !q || spelled(name, q)) : undefined;
   };
   return (
     <Layout
@@ -508,7 +509,7 @@ function Sounds(props: { tabs: JSX.Element }) {
   const [query, setQuery] = createSignal("");
   const matches = (group: string, name: SoundName) => {
     const q = query().trim().toLowerCase();
-    return !q || [group, name, SOUND_LABEL[name]].some((w) => w.toLowerCase().includes(q));
+    return !q || [group, name, SOUND_LABEL[name]].some((w) => spelled(w, q));
   };
   return (
     <Layout

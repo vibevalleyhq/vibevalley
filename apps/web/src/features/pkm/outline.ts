@@ -1,6 +1,8 @@
 import type { PkmBlock, PkmPageSummary, PkmTier } from "@vibevalley/protocol";
 import { pkmTag, slugOf } from "@vibevalley/protocol/rules";
 
+import { spelled } from "@/base/search";
+
 import { titleFor } from "./days";
 
 /** The tiers in the list's order: what is worked on first, what is done with last. */
@@ -118,7 +120,7 @@ export function noteTargets(pages: readonly PkmPageSummary[], query: string, max
   if (typed === "") return [];
   return pages
     .map((p) => ({ slug: p.slug, label: titleFor(p.title, p.day), tier: p.tier, updated: p.updated, title: p.title }))
-    .filter((p) => p.label.toLowerCase().includes(typed) || p.title.toLowerCase().includes(typed))
+    .filter((p) => spelled(p.label, typed) || spelled(p.title, typed))
     .toSorted((a, b) => b.updated - a.updated)
     .slice(0, max)
     .map(({ slug, label, tier }) => ({ slug, label, tier }));

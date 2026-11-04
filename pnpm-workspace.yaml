@@ -51,6 +51,7 @@ catalog:
   remark-gfm: "^4.0.1"
   remark-parse: "^11.0.0"
   remark-rehype: "^11.1.2"
+  pinyin-pro: "3.29.5"
   pele: ^1.13.0
   shiki: ^4.6.0
   solid-js: "2.0.0-rc.21"

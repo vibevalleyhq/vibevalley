@@ -4,6 +4,7 @@ import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled,
 import { t } from "@vibevalley/i18n";
 
 import { aria } from "@/base/dom";
+import { spelled } from "@/base/search";
 
 import { PxWindow } from "./base";
 import { SpriteIcon } from "./icons";
@@ -96,7 +97,7 @@ export function PxTextInput(props: {
   const suggestions = () => props.suggestions ?? [];
   const shown = createMemo(() => {
     const q = props.value.toLowerCase();
-    return open() ? suggestions().filter((s) => s.toLowerCase().includes(q) && s !== props.value) : [];
+    return open() ? suggestions().filter((s) => spelled(s, q) && s !== props.value) : [];
   });
   const pick = (s: string) => {
     props.onChange(s);

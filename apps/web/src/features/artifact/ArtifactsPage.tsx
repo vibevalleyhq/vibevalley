@@ -7,6 +7,7 @@ import { htmlSandbox } from "@vibevalley/protocol/rules";
 
 import { Keyed, useNow } from "@/base/dom";
 import { ago } from "@/base/format";
+import { spelled } from "@/base/search";
 import { api, reasonOf } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { queries, ready } from "@/infra/query";
@@ -51,7 +52,7 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
   const list = () => ready(all, []);
   const shown = () => {
     const q = query().trim().toLowerCase();
-    return q ? list().filter((a) => a.title.toLowerCase().includes(q)) : list();
+    return q ? list().filter((a) => spelled(a.title, q)) : list();
   };
   const id = () => (props.rest ? decodeURIComponent(props.rest) : undefined);
   const open = () => id() ?? list()[0]?.id;

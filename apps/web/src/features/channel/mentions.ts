@@ -2,6 +2,8 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, everyone, defaultOrchestrator, ownerId, type Session, type SessionView } from "@vibevalley/protocol";
 import { mentionLead } from "@vibevalley/protocol/rules";
 
+import { spelled } from "@/base/search";
+
 import { phaseText } from "./presence";
 const mentionOf: Record<string, string> = {
   [defaultOrchestrator]: t("web.channel.names.mention.orchestrator"),
@@ -49,7 +51,7 @@ export function typedName(text: string, caret: number) {
 
 export function offeredFor(all: Nameable[], query: string) {
   const q = query.toLowerCase();
-  return all.filter((n) => n.token.slice(1).toLowerCase().startsWith(q) || n.name.toLowerCase().includes(q)).slice(0, menuMax);
+  return all.filter((n) => n.token.slice(1).toLowerCase().startsWith(q) || spelled(n.name, q)).slice(0, menuMax);
 }
 
 export function insertName(text: string, caret: number, start: number, token: string) {

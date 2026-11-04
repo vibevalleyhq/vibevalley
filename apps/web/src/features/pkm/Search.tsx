@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 import type { PkmPageSummary, PkmSearchHit, PkmTier } from "@vibevalley/protocol";
 
 import { autofocus } from "@/base/dom";
+import { spelled } from "@/base/search";
 import { api } from "@/infra/api";
 import { ready } from "@/infra/query";
 import { useRouter } from "@/infra/router";
@@ -71,7 +72,7 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
   const rows = createMemo((): Found[] => {
     const typed = query().trim().toLowerCase();
     const pages = (ready(vault, undefined)?.pages ?? [])
-      .filter((p) => typed !== "" && (!tier() || p.tier === tier()) && p.title.toLowerCase().includes(typed))
+      .filter((p) => typed !== "" && (!tier() || p.tier === tier()) && spelled(p.title, typed))
       .slice(0, 6)
       .map((page): Found => ({ kind: "page", page }));
     const a = found();

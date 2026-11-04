@@ -40,8 +40,9 @@ test("a page is written in place: Enter starts a block, Tab nests it, and the se
     ]);
 });
 
-test("a Chinese input method's 【【 opens a link, and a # right after Chinese is a tag", async ({ page, api }) => {
+test("a Chinese input method's 【【 opens a link, ＃ after Chinese a tag, and pinyin finds the page", async ({ page, api }) => {
   await api.pkm.page.save({ title: "Herbs", tier: "project", markdown: "- first thought\n" });
+  await api.pkm.page.save({ title: "读书", tier: "area", markdown: "- 书单\n" });
   await page.goto("/pkm/herbs");
   const blocks = page.getByTestId("pkm-block");
   await blocks.first().getByTestId("pkm-block-text").click();
@@ -50,15 +51,17 @@ test("a Chinese input method's 【【 opens a link, and a # right after Chinese 
   // What an input method commits: each mark as one input, not a composition.
   for (const typed of ["，见", "【", "【", "Her"]) await page.keyboard.insertText(typed);
   await expect(editor).toHaveValue("first thought，见[[Her");
-  await page.getByTestId("pkm-complete").locator('[role="option"][data-key="herbs"]').click();
+  const complete = page.getByTestId("pkm-complete");
+  await complete.locator('[role="option"][data-key="herbs"]').click();
   await expect(editor).toHaveValue("first thought，见[[Herbs]]");
-  for (const typed of ["读了", "＃", "读书"]) await page.keyboard.insertText(typed);
-  // The tag is being completed: the first Escape closes its menu, the second leaves the block.
-  await expect(page.getByTestId("pkm-complete")).toBeVisible();
-  await page.keyboard.press("Escape");
+  for (const typed of ["读了", "＃", "ds"]) await page.keyboard.insertText(typed);
+  await complete.locator('[role="option"][data-key="读书"]').click();
+  await expect(editor).toHaveValue("first thought，见[[Herbs]]读了#读书 ");
   await page.keyboard.press("Escape");
   await expect(blocks.first().getByTestId("pkm-link")).toHaveCount(2);
-  await expect.poll(async () => (await api.pkm.page.get({ page: "herbs" })).page.blocks.map((b) => b.body)).toEqual(["first thought，见[[Herbs]]读了#读书"]);
+  await expect
+    .poll(async () => (await api.pkm.page.get({ page: "herbs" })).page.blocks.map((b) => b.body.trim()))
+    .toEqual(["first thought，见[[Herbs]]读了#读书"]);
 });
 
 test("the search lists pages and blocks by page and opens one at its block", async ({ page, api }) => {

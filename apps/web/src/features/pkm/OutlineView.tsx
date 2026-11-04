@@ -4,6 +4,7 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack }
 import { t } from "@vibevalley/i18n";
 import type { PkmBlock, PkmBlockOp, PkmMarker, PkmPageSummary, PkmPageView, PkmSearchHit } from "@vibevalley/protocol";
 
+import { spelled } from "@/base/search";
 import { useTimeout } from "@/base/timer";
 import { api } from "@/infra/api";
 import { queries } from "@/infra/query";
@@ -518,7 +519,7 @@ function Editor(props: {
     switch (c.kind) {
       case "page":
       case "tag": {
-        const matches = props.pages.filter((p) => p.title.toLowerCase().includes(q)).slice(0, 8);
+        const matches = props.pages.filter((p) => spelled(p.title, q)).slice(0, 8);
         const fresh = c.query.trim() !== "" && !props.pages.some((p) => p.title.toLowerCase() === q.trim());
         return [
           ...matches.map((p) => ({ key: p.slug, label: p.title, pick: take(p.title) })),
@@ -533,7 +534,7 @@ function Editor(props: {
       case "command": {
         const today = props.pages.find((p) => p.day === dayKey(Date.now()))?.title ?? dayKey(Date.now()).replace(/-/gu, "_");
         return commands(today)
-          .filter((cmd) => cmd.key.includes(q) || cmd.label.toLowerCase().includes(q))
+          .filter((cmd) => cmd.key.includes(q) || spelled(cmd.label, q))
           .map((cmd) => ({
             key: cmd.key,
             label: cmd.label,
