@@ -1,12 +1,12 @@
 // VibeValley's command line, on effect/cli, for agents first and people too. Every command is a thing to do with the
 // farm, written by hand and typed (issue.ts, channel.ts…), asking the server through the typed client; what no command
 // covers is `api` (api.ts; reach.ts says which). Answers are short text, or the protocol's shape with --format json; a
-// failure is JSON on stderr with what to do next, and an exit code that says which kind (output.ts). With no command,
-// and `runtime chat`, it is a conversation in the terminal: the server's program, handed this terminal (chat.ts).
+// failure is JSON on stderr with what to do next, and an exit code that says which kind (output.ts). `chat` is a
+// conversation in the terminal: the server's program, handed this terminal (chat.ts). With no command, the help.
 //
 //	vpx src/main.ts issue list --waiting
-//	vpx src/main.ts runtime chat claude
-//	vpx src/main.ts [--cwd DIR] [--name NAME] [--model ID] [--mcp FILE] [-p PROMPT]
+//	vpx src/main.ts search 打卡
+//	vpx src/main.ts chat [runtime] [--cwd DIR] [--model ID] [-p PROMPT]
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import { Cause, Effect, Exit, Option, Predicate, Stdio } from "effect";
@@ -31,7 +31,8 @@ const { guideCommand } = await import("./guide.ts");
 const { issueCommand } = await import("./issue.ts");
 const { keptCommands } = await import("./notes.ts");
 const { pkmCommand } = await import("./pkm.ts");
-const { farmPartCommands, runtimeCommands } = await import("./project.ts");
+const { farmPartCommands, runtimeCommand } = await import("./project.ts");
+const { searchCommand } = await import("./search.ts");
 
 const version = "0.1.0";
 
@@ -42,43 +43,57 @@ const passed = (flags: Readonly<Record<string, Option.Option<string>>>) =>
 
 const prompt = text("prompt", t("cli.flag.prompt")).pipe(Flag.withAlias("p"));
 
-const runtimeChatCommand = Command.make(
+/** `chat [runtime]`: a conversation in this terminal, with VibeValley's own agent or, named, a runtime on this machine.
+ * Its own command, never the bare `vibevalley`: an agent that runs the command line without words gets the help, not a
+ * conversation waiting on its input. */
+const chatCommand = Command.make(
   "chat",
   {
-    runtime: Argument.String("runtime").pipe(Argument.withDescription(t("cli.flag.runtime"))),
+    runtime: Argument.String("runtime").pipe(Argument.optional, Argument.withDescription(t("cli.arg.chatRuntime"))),
+    cwd: text("cwd", t("cli.flag.cwd")),
     model: text("model", t("cli.flag.model")),
     effort: text("effort", t("cli.flag.effort")),
     resume: text("resume", t("cli.flag.resume")),
-    cwd: text("cwd", t("cli.flag.cwd")),
-    prompt,
-  },
-  ({ runtime, ...flags }) =>
-    converse(["runtime", runtime, ...passed({ model: flags.model, effort: flags.effort, resume: flags.resume, cwd: flags.cwd, prompt: flags.prompt })]),
-).pipe(
-  Command.withDescription(t("cli.command.runtimeChat")),
-  Command.withExamples([{ command: "vibevalley runtime chat claude", description: t("cli.example.runtimeChat.about") }]),
-);
-
-const root = Command.make(
-  "vibevalley",
-  {
-    cwd: text("cwd", t("cli.flag.ownCwd")),
     name: text("name", t("cli.flag.name")),
-    model: text("model", t("cli.flag.ownModel")),
     mcp: text("mcp", t("cli.flag.mcp")),
     prompt,
   },
-  (flags) => converse(passed(flags)),
+  ({ runtime, ...flags }) => {
+    const id = Option.getOrElse(runtime, () => "vibevalley");
+    const own = id === "vibevalley";
+    // Each flag is one side's: --name and --mcp are the farm's agent's, --effort and --resume a runtime's.
+    const stray = own ? (["effort", "resume"] as const) : (["name", "mcp"] as const);
+    const given = stray.filter((f) => Option.isSome(flags[f]));
+    if (given.length > 0)
+      return Effect.fail(
+        new Failure({ code: exit.usage, tag: "InvalidValue", text: t("cli.failure.chatFlag", { flags: given.map((f) => `--${f}`).join(" "), runtime: id }) }),
+      );
+    return converse(
+      own
+        ? passed({ cwd: flags.cwd, name: flags.name, model: flags.model, mcp: flags.mcp, prompt: flags.prompt })
+        : ["runtime", id, ...passed({ model: flags.model, effort: flags.effort, resume: flags.resume, cwd: flags.cwd, prompt: flags.prompt })],
+    );
+  },
 ).pipe(
+  Command.withDescription(t("cli.command.chat")),
+  Command.withExamples([
+    { command: "vibevalley chat", description: t("cli.example.chat.about") },
+    { command: "vibevalley chat claude", description: t("cli.example.runtimeChat.about") },
+  ]),
+);
+
+const root = Command.make("vibevalley").pipe(
   Command.withDescription(t("cli.command.root")),
-  // By what a person or an agent does; what no command covers is reached through api (cli/reach.ts says which).
+  // By what a person or an agent does; what no command covers is reached through api (reach.ts says which).
   Command.withSubcommands([
     issueCommand,
+    searchCommand,
     channelCommand,
     pkmCommand,
     ...farmPartCommands,
-    Command.make("runtime").pipe(Command.withSubcommands([...runtimeCommands, runtimeChatCommand]), Command.withDescription(t("cli.group.runtime.about"))),
+    runtimeCommand,
     ...keptCommands,
+    chatCommand,
     doctorCommand,
     appCommand,
     guideCommand,
@@ -120,7 +135,8 @@ export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
         }
       }),
   };
-  return yield* Command.runWith(root, { version, renderErrors: false })(args).pipe(
+  // Run bare, it was asked what it can do: the help, on stdout as with --help.
+  return yield* Command.runWith(root, { version, renderErrors: false })(args.length === 0 ? ["--help"] : args).pipe(
     Effect.provide(CliOutput.layerPresenter(presenter)),
     Effect.as(exit.ok as number),
     Effect.catch((e) => {

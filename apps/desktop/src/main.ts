@@ -88,7 +88,7 @@ if (!app.requestSingleInstanceLock()) {
         })
       : undefined,
   });
-  // The command line's way in (`vibevalley app …`); answered at once, so `app status` works while the server starts.
+  // The command line's way in (`vibevalley app …`); answered at once, so `app open` and doctor's look at the app work while the server starts.
   const stopControl = serveControl(paths.home, {
     status: () => {
       const url = server?.url();

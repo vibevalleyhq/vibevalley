@@ -20,22 +20,23 @@ describe("the hand-written commands", () => {
       expect([noted.code, noted.out]).toEqual([0, "记进了「Garden」"]);
       const today = yield* cli(at("pkm", "capture", "call", "the", "vet"));
       expect(today.code).toBe(0);
-      const journal = yield* cli(at("pkm", "today"));
+      const journal = yield* cli(at("pkm", "show"));
       expect(journal.out).toContain("call the vet #inbox");
 
       // As exported for people: the title on top, a top block with blocks under it as a heading.
-      const page = yield* cli(at("pkm", "page", "get", "garden"));
+      const page = yield* cli(at("pkm", "show", "garden"));
       expect(page.out).toBe("# Garden\n\n- bulbs\n### tomatoes\n\n- basil");
-      const asJson = yield* cli(at("pkm", "page", "get", "garden", "--format", "json"));
+      const asJson = yield* cli(at("pkm", "show", "garden", "--format", "json"));
       expect(json(asJson.out)).toMatchObject({ page: { slug: "garden" } });
 
-      const found = yield* cli(at("pkm", "search", "basil"));
-      expect(found.out).toBe("Garden › tomatoes: basil");
+      // Found by the farm's one search, under the notes' heading.
+      const found = yield* cli(at("search", "basil", "--in", "notes"));
+      expect(found.out).toBe("## 笔记\nGarden › tomatoes: basil");
 
       // The editor is a command line that the file is added to, as $EDITOR is.
-      const edited = yield* cli(at("pkm", "page", "edit", "Garden"), "", { EDITOR: "perl -pi -e 's/bulbs/bulbs and soil/'" });
+      const edited = yield* cli(at("pkm", "edit", "Garden"), "", { EDITOR: "perl -pi -e 's/bulbs/bulbs and soil/'" });
       expect([edited.code, edited.out]).toEqual([0, "存好了「Garden」"]);
-      expect((yield* cli(at("pkm", "page", "get", "garden"))).out).toBe("# Garden\n\n- bulbs and soil\n### tomatoes\n\n- basil");
+      expect((yield* cli(at("pkm", "show", "garden"))).out).toBe("# Garden\n\n- bulbs and soil\n### tomatoes\n\n- basil");
 
       // A page that is not there names the closest.
       const wrong = yield* cli(at("pkm", "capture", "--page", "Gardens", "x"));
@@ -52,7 +53,7 @@ describe("the hand-written commands", () => {
       expect(checks.map((c) => c.check)).toEqual(["farm", "server", "app", "runtimes", "model", "lan"]);
       expect(checks.find((c) => c.check === "app")).toMatchObject({ ok: true, open: false });
 
-      const app = yield* cli(["app", "status"], "", { VIBEVALLEY_HOME: "/nonexistent-home" });
+      const app = yield* cli(["app", "quit"], "", { VIBEVALLEY_HOME: "/nonexistent-home" });
       expect([app.code, app.failure?.tag]).toEqual([5, "AppNotOpen"]);
 
       const gone = yield* cli(["doctor", "--server", "http://127.0.0.1:9"]);

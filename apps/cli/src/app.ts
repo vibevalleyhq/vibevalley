@@ -62,11 +62,6 @@ const printed = (value: unknown) => printBody(JSON.stringify(value ?? { ok: true
 /** Which app answers on this farm's socket; fails AppNotOpen when none does (doctor reads it too). */
 export const appStatus = ask((c) => c.status());
 
-const statusCommand = Command.make("status", {}, () => Effect.flatMap(appStatus, printed)).pipe(
-  Command.withDescription(t("cli.command.app.status")),
-  Command.withExamples([{ command: "vibevalley app status", description: t("cli.example.appStatus.about") }]),
-);
-
 /** Opens the page at path; an app not running is started first (VIBEVALLEY_APP, which its launcher sets) and waited for. */
 const openCommand = Command.make("open", { path: Argument.String("path").pipe(Argument.withDefault("/")) }, ({ path }) =>
   Effect.gen(function* () {
@@ -134,6 +129,6 @@ const updateCommand = Command.make("update", { step: Argument.Literals("step", [
 );
 
 export const appCommand = Command.make("app").pipe(
-  Command.withSubcommands([statusCommand, openCommand, quitCommand, restartCommand, updateCommand]),
+  Command.withSubcommands([openCommand, quitCommand, restartCommand, updateCommand]),
   Command.withDescription(t("cli.command.app.about")),
 );

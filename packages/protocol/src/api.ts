@@ -87,50 +87,51 @@ export { pathOf };
 
 /** Endpoints with a command of their own that takes the same arguments, by that command (the command line's, apps/server
  * src/cli): what commandOf writes for them; every other endpoint is written as `api call`. */
-const sameAs: Partial<Record<keyof Handlers, readonly string[]>> = {
-  "issue.list": ["issue", "list"],
-  "issue.get": ["issue", "show"],
-  "issue.diff.get": ["issue", "diff"],
-  "issue.timeline.get": ["issue", "log"],
-  "session.list": ["session", "list"],
-  "session.get": ["session", "show"],
-  "session.stop": ["session", "stop"],
-  "project.list": ["project", "list"],
-  "agent.list": ["agent", "list"],
-  "runtime.list": ["runtime", "list"],
-  "cron.list": ["cron", "list"],
-  "channel.list": ["channel", "list"],
-  "artifact.list": ["artifact", "list"],
-  "artifact.get": ["artifact", "show"],
-  "pkm.page.list": ["pkm", "page", "list"],
+const sameAs: Partial<Record<keyof Handlers, { readonly words: readonly string[]; readonly after?: readonly string[] }>> = {
+  "issue.list": { words: ["issue", "list"] },
+  "issue.get": { words: ["issue", "show"] },
+  "issue.diff.get": { words: ["issue", "show"], after: ["--diff"] },
+  "issue.timeline.get": { words: ["issue", "show"], after: ["--log"] },
+  "session.list": { words: ["session", "list"] },
+  "session.get": { words: ["session", "show"] },
+  "session.stop": { words: ["session", "stop"] },
+  "project.list": { words: ["project", "list"] },
+  "agent.list": { words: ["agent", "list"] },
+  "runtime.list": { words: ["runtime", "list"] },
+  "cron.list": { words: ["cron", "list"] },
+  "channel.list": { words: ["channel", "list"] },
+  "artifact.list": { words: ["artifact", "list"] },
+  "artifact.get": { words: ["artifact", "show"] },
+  "pkm.page.list": { words: ["pkm", "list"] },
 };
 
 /** The command line's verbs for what can be done with an issue (`issue accept 12`). */
-export const IssueVerbValues = ["work", "answer", "say", "reject", "accept", "stop", "cancel", "reopen"] as const;
+export const IssueVerbValues = ["work", "say", "accept", "stop", "cancel"] as const;
 export type IssueVerb = (typeof IssueVerbValues)[number];
 
 /** The verb each of an issue's acts is asked for by: the server's next steps say an act this way, and the command line
- * asks for the act by it. */
+ * asks for the act by it. Few verbs, each the thing done, the act the one the issue offers now: work sends it out (and
+ * reopens a closed one first), say talks to its helper (an answer when it asks, sending it back when it waits for review). */
 export const issueVerbs: Readonly<Record<IssueAct, IssueVerb>> = {
   start: "work",
   resume: "work",
   cure: "work",
   resolve: "work",
-  answer: "answer",
+  answer: "say",
   tell: "say",
-  reject: "reject",
+  reject: "say",
   complete: "accept",
   acknowledge: "accept",
   stop: "stop",
   close: "cancel",
-  reopen: "reopen",
+  reopen: "work",
 };
 
 /** A command that does what op does with these arguments (about: its `about` fields, in order) and input, as a next step
  * says it (without `vibevalley`): the endpoint's own command when it has one, else `api call` with the whole input. */
 export const commandOf = (op: keyof Handlers, about: readonly string[] = [], input?: Record<string, unknown>): string[] => {
   const same = sameAs[op];
-  if (same && input === undefined) return [...same, ...about];
+  if (same && input === undefined) return [...same.words, ...about, ...(same.after ?? [])];
   const names = endpoints.find((e) => e.op === op)?.about ?? [];
   const fields = { ...Object.fromEntries(names.flatMap((name, i) => (about[i] === undefined ? [] : [[name, about[i]]]))), ...input };
   return ["api", "call", op, ...(Object.keys(fields).length > 0 ? ["--json", JSON.stringify(fields)] : [])];

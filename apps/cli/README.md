@@ -9,16 +9,17 @@ too. One command is one thing to do with the farm, typed with effect/cli and ask
 src/main.ts        the root: the groups below, the global flags (--server, --dry-run, --format), how help and failures are said
 src/farm.ts        what every task command stands on: ask (the typed client), show (text or --format json), change (--dry-run),
                    pick (a thing by its name)
-src/issue.ts       issue list|show|new|edit|work|say|answer|accept|reject|stop|cancel|reopen|diff|log
+src/issue.ts       issue list|show|new|edit|work|say|accept|stop|cancel: the act each does is the one the issue offers now
+src/search.ts      search: issues, channels, notes and memories at once, each under its heading (--in for some)
 src/channel.ts     channel list|read|say|search
-src/pkm.ts         the notes: pkm capture|today|search|radar|page list|get|edit
-src/project.ts     project, agent, session, runtime list|refresh
+src/pkm.ts         the notes: pkm capture|show [page]|list|edit|radar (searching them is search)
+src/project.ts     project, agent, session, runtime list [--probe]
 src/notes.ts       memory, cron, artifact
 src/app.ts         the desktop app's own abilities, over its socket in the farm's home (@vibevalley/home)
 src/doctor.ts      this machine's farm: found, reachable, the app, the runtimes, the keys, connecting to this machine
 src/api.ts         every endpoint as it is: api list (with its input's JSON Schema), api call <op>, api state, api events
 src/reach.ts       which command reaches each endpoint, or only api (a Record over every op: a new one does not compile without it)
-src/chat.ts        `vibevalley` alone and `runtime chat`: the server's conversation program, handed this terminal (VIBEVALLEY_CHAT)
+src/chat.ts        `chat [runtime]`: the server's conversation program, handed this terminal (VIBEVALLEY_CHAT); bare `vibevalley` is the help
 src/guide/         `vibevalley guide`, per language
 src/output.ts      stdout for the result, the failure as one JSON line on stderr, exit codes by kind
 src/testing.ts     a run in the process against a whole farm (@vibevalley/server/testing)

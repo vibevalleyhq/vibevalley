@@ -18,6 +18,7 @@ The last line of `issue show` lists the commands the issue takes now; a command 
 vibevalley issue new 'Fix the login page' --project web --agent lao-zhou --criterion 'expired sessions go back to login' --key login-1
 vibevalley issue work 13          # send it and wait for the hand-back; each status on stderr, the change at the end
 vibevalley issue work 13 --no-wait
+vibevalley issue work 9           # done or closed: reopened first, then sent out
 ```
 
 `--key`: sending again with the same key does not make a second issue, so a retry is safe.
@@ -26,16 +27,16 @@ vibevalley issue work 13 --no-wait
 
 ```bash
 vibevalley issue show 13          # under "Questions", what it asks, with the answers it thought of
-vibevalley issue answer 13 'use 8797'
-vibevalley issue say 13 'leave the database alone'   # a word to it, not an answer
+vibevalley issue say 13 'use 8797'   # it is asking: what you say is the answer
+vibevalley issue say 13 'leave the database alone'   # not asking: a word passed on to it
 ```
 
 ## Review
 
 ```bash
-vibevalley issue diff 13
+vibevalley issue show 13 --diff     # with its change (--log: its timeline and cost)
 vibevalley issue accept 13
-vibevalley issue reject 13 'expired sessions do not go back to login'
+vibevalley issue say 13 'expired sessions do not go back to login'   # waiting for review: sends it back
 ```
 
 ## Channels
@@ -50,8 +51,17 @@ vibevalley channel say general '@w3 look at the login page first'
 ```bash
 vibevalley pkm capture 'a remember-me box on the login page'
 pbpaste | vibevalley pkm capture --page Reading
-vibevalley pkm search 'reading list'
-vibevalley pkm page get Reading
+vibevalley pkm show                # today's journal (--day for another)
+vibevalley pkm show Reading
+```
+
+## Finding things
+
+Not sure where it was written: one command searches the issues, channels, notes and memories, each under its own heading.
+
+```bash
+vibevalley search login expired
+vibevalley search 'reading list' --in notes
 ```
 
 ## Before changing anything

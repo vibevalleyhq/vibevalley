@@ -94,7 +94,7 @@ describe("the command line", () => {
       expect((yield* cli(at("issue", "show", "1"))).out.split("\n")[1]).toMatch(/^draft/u);
       const create = yield* cli(at("issue", "new", "不该建", "--dry-run"));
       expect([create.code, create.failure?.tag]).toEqual([2, "NoDryRun"]);
-      const added = yield* cli(at("cron", "add", "早上看看", "看看昨天的改动", "--daily", "09:00"));
+      const added = yield* cli(at("cron", "new", "早上看看", "看看昨天的改动", "--daily", "09:00"));
       const id = added.out.split("  ")[0]!;
       expect((yield* cli(at("cron", "remove", id, "--dry-run"))).out).toContain("删掉定时任务「早上看看」");
       expect((yield* cli(at("cron", "list"))).out).toContain(id);
@@ -131,12 +131,29 @@ describe("the command line", () => {
     }),
   );
 
+  it.live("with no command it shows the help, and finds things across the farm with one search", () =>
+    Effect.gen(function* () {
+      const server = yield* farm;
+      const at = (...args: string[]) => [...args, "--server", server];
+      // Never a conversation waiting on input: an agent that runs it bare reads what it can do.
+      const bare = yield* cli([]);
+      expect([bare.code, bare.out.includes("SUBCOMMANDS")]).toEqual([0, true]);
+      const mixed = yield* cli(["chat", "claude", "--name", "fox"]);
+      expect([mixed.code, mixed.failure?.tag]).toEqual([2, "InvalidValue"]);
+      yield* cli(at("issue", "new", "打卡页的端口"));
+      const found = yield* cli(at("search", "端口"));
+      expect(found.out.split("\n").slice(0, 2)).toEqual(["## 工单", expect.stringMatching(/^#1 /u)]);
+      const nothing = yield* cli(at("search", "没有这句话", "--in", "issues"));
+      expect(nothing.out).toBe("没有找到「没有这句话」");
+    }),
+  );
+
   it.live("an agent does an issue from start to end with these commands alone, reading their text", () =>
     Effect.gen(function* () {
       const server = yield* workingFarm;
       const at = (...args: string[]) => [...args, "--server", server];
       const profile = json((yield* cli(at("api", "call", "agent.create", "--json", JSON.stringify(scripted)))).out) as { id: string };
-      expect((yield* cli(at("project", "add", "clock"))).code).toBe(0);
+      expect((yield* cli(at("project", "new", "clock"))).code).toBe(0);
       // The test helper asks which port when its issue says 先问清楚, with options when it says 给选项, and commits clock.ts
       // when it says 提交.
       const made = yield* cli(at("issue", "new", "打卡页先问清楚，给选项，提交", "--project", "clock", "--agent", profile.id, "--criterion", "clock-in works"));
@@ -145,11 +162,14 @@ describe("the command line", () => {
       expect(asked.code).toBe(0);
       const waiting = (yield* cli(at("issue", "show", n))).out;
       expect(waiting).toContain("用 8797");
-      expect(waiting.split("\n").at(-1)).toContain("answer");
-      expect((yield* cli(at("issue", "answer", n, "用 8797"))).code).toBe(0);
+      expect(waiting.split("\n").at(-1)).toContain("say");
+      expect((yield* cli(at("issue", "say", n, "用 8797"))).code).toBe(0);
       expect((yield* cli(at("issue", "work", n, "--timeout", "30"))).code).toBe(0);
       expect((yield* cli(at("issue", "show", n))).out.split("\n")[1]).toMatch(/^reviewing/u);
-      expect((yield* cli(at("issue", "diff", n))).out).toContain("clock.ts");
+      expect((yield* cli(at("issue", "show", n, "--diff"))).out).toContain("clock.ts");
+      // Waiting for review, saying something sends it back: a move, so it has a dry run, where passing a word has none.
+      const sentBack = yield* cli(at("issue", "say", n, "再加个注释", "--dry-run"));
+      expect([sentBack.code, sentBack.failure]).toEqual([0, undefined]);
       expect((yield* cli(at("issue", "accept", n))).out).toMatch(new RegExp(`^#${n} {2}done`, "u"));
     }),
   );

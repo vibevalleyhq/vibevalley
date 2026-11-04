@@ -6,14 +6,11 @@ export const catalogs = {
     cli: {
       flag: {
         prompt: "问一句就走，不进对话",
-        runtime: "claude、codex、kimi、pi……；vibevalley 是自己的 agent",
         model: "模型",
         effort: "思考的力度",
         resume: "接着这个会话",
         cwd: "在哪个文件夹；不填是当前的",
-        ownCwd: "自己的 agent 在哪个文件夹干活；不填是当前的",
         name: "自己的 agent 的名字（家目录 ~/.vibevalley/agent/<名字>）",
-        ownModel: "模型；不填用配置里的",
         mcp: "MCP 配置文件；不填用家目录里的 mcp.json",
         server: "服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是这台电脑上开着的那个（家目录的 server.json），都没有是 {fallback}",
         dryRun: "只说会做什么，不动手（会删、会合、会关、会让帮工走的命令）",
@@ -44,15 +41,18 @@ export const catalogs = {
         text: "标题或描述里有这些字",
         timeout: "最多等几秒",
         waiting: "只看在等主人的",
+        probe: "先重新探测每一台农机（装了新的、升了版本以后）",
+        diff: "加上改动：提交和文件",
+        log: "加上时间线和花费",
+        searchIn: "只搜这几处：issues、channels、notes、memory（可以给几次）",
+        searchLimit: "每一处最多几条",
       },
       command: {
-        runtimeChat: "和一个农机直接聊，不经过 VibeValley：不记轨迹和花费",
-        root: "不带命令是和 VibeValley 自己的 agent 聊；别的命令是对农场做的一件件事：答复是短文字，--format json 给接口的形状，guide 说怎么用",
+        root: "对农场做的一件件事：答复是短文字，--format json 给接口的形状；guide 说怎么用，chat 在终端里对话",
         state: "核心状态（GET {path}）",
         events: "副作用，一行一条（GET {path}）",
         app: {
           about: "桌面版自己的事：状态、打开到某一页、更新、退出",
-          status: "桌面版是哪个、什么版本、农场在哪",
           open: "让桌面版的窗口到这一页（/issues/12）；没开就先打开",
           quit: "退出桌面版（服务端先存好）",
           restart: "重启桌面版",
@@ -61,12 +61,10 @@ export const catalogs = {
         doctor: "一条命令看清这台电脑上的农场：找到的是哪个、连不连得上、桌面版、农机、模型的 key、连接到本机",
         pkm: {
           capture: "记一句话进今天的日记（--page 记到那一页）；不给字就读标准输入，多行按缩进拆成块",
-          today: "今天的日记（--day 看别的一天）",
-          search: "搜笔记：按页分组，一条一行：页 › 路径: 块",
+          show: "一页给人读的 Markdown（引用读成字，批注去掉）；不给页就是今天的日记（--day 看别的一天）",
+          list: "列出笔记的页，最近改的在前",
+          edit: "在 $EDITOR 里改一整页的原文，关掉编辑器存回去",
           radar: "要看一眼的：收件箱、搁着的项目、过期的",
-          pageGet: "一页给人读的 Markdown：引用读成字，批注去掉",
-          pageEdit: "在 $EDITOR 里改一整页的原文，关掉编辑器存回去",
-          pageList: "列出笔记的页，最近改的在前",
         },
         agent: { list: "列出档案：id、名字、角色、农机", show: "看一份档案：职责、农机和模型、技能" },
         api: {
@@ -74,30 +72,27 @@ export const catalogs = {
           call: "调一个接口，--json 照它的 Schema 查过再发",
           list: "列出每个接口和它做什么；--format json 带上请求体的 JSON Schema",
         },
-        artifact: { list: "列出稿子（--issue 只看一张工单的）", read: "读一篇稿子的正文", show: "看一篇稿子" },
-        channel: { list: "列出频道和私聊", read: "读一个频道最近的消息", say: "在频道里说一句", search: "在全部频道里搜消息" },
-        cron: { add: "新建定时任务：--every、--daily、--cron、--at 给一个", list: "列出定时任务", remove: "删掉一个定时任务" },
+        artifact: { list: "列出稿子（--issue 只看一张工单的）", show: "看一篇稿子：标题、版本、归属，下面是正文" },
+        channel: { list: "列出频道和私聊", read: "读一个频道最近的消息", say: "在频道里说一句" },
+        cron: { list: "列出定时任务", remove: "删掉一个定时任务", new: "新建定时任务：--every、--daily、--cron、--at 给一个" },
         guide: "给 agent 的用法：常见的几件事各怎么做",
         issue: {
-          diff: "看工单的改动：提交和文件",
           edit: "改工单的标题、描述、项目、档案或优先级",
           list: "列出工单：一张一行，号在前",
-          log: "工单的时间线和花费",
           new: "写一张新工单",
-          show: "看一张工单：在哪一步、问题、验收标准、现在能做什么",
-          work: "派活：开工（或卡住了接着干），等它交回来，打出改动",
-          say: "带一句话给工单的帮工",
-          answer: "回答工单的帮工在等的问题",
+          show: "看一张工单：在哪一步、问题、验收标准、现在能做什么（--diff 加上改动，--log 加上时间线和花费）",
+          work: "派活：开工（卡住了接着干，关掉了先重开），等它交回来，打出改动",
+          say: "和工单的帮工说话：它在问就是回答，在等验收就是打回再来一轮，别的时候捎给它",
           accept: "验收通过，工单完成",
-          reject: "打回：说哪里不对，再来一轮",
           stop: "停下工单的帮工这一轮",
           cancel: "关掉工单",
-          reopen: "重开关掉的工单",
         },
-        memory: { add: "给一份档案记一条记性", search: "搜记性" },
-        project: { add: "新建项目（--repo 从 GitHub 克隆）", list: "列出项目", show: "看一个项目" },
-        runtime: { list: "列出农机：装没装、版本", refresh: "重新探测一台农机" },
+        memory: { add: "给一份档案记一条记性" },
+        project: { list: "列出项目", show: "看一个项目", new: "新建项目（--repo 从 GitHub 克隆）" },
+        runtime: { list: "列出农机：装没装、版本（--probe 先重新探测一遍）" },
         session: { list: "列出帮工：id、名字、档案、在做什么", show: "看一个帮工", stop: "停下帮工这一轮" },
+        search: "在整个农场里搜：工单、频道里的话、笔记、记性，各列在自己的标题下",
+        chat: "在终端里对话：不给农机是 VibeValley 自己的 agent，给了就和那个农机直接聊（不记轨迹和花费）",
       },
       next: {
         help: "看这条命令怎么写",
@@ -122,6 +117,7 @@ export const catalogs = {
         noOp: "没有 {op} 这个接口",
         noSuch: "没有叫「{said}」的{what}；有这些：{these}",
         noChat: "这里找不到 VibeValley 的对话程序：从桌面版装的命令行里用它，或在仓库里经 vp run --filter @vibevalley/cli start",
+        chatFlag: "{flags} 不能和 {runtime} 一起用：--name、--mcp 是 VibeValley 自己的 agent 的，--effort、--resume 是农机的",
       },
       op: {
         agent: {
@@ -308,7 +304,7 @@ export const catalogs = {
         lan: { about: "连接到本机：开关、配对、设备" },
         memory: { about: "档案的记性" },
         orchestrator: { about: "管家：上线、停下、旧账、评测" },
-        pkm: { about: "笔记：页、日记、批注、剪藏和搜索", page: { about: "笔记的页" } },
+        pkm: { about: "笔记：记一句、看和改页、日记、要看一眼的", page: { about: "笔记的页" } },
         project: { about: "项目：工作目录下的 git 仓库" },
         runtime: { about: "农机：机器上的编码 agent" },
         server: { about: "服务端本身" },
@@ -348,9 +344,10 @@ export const catalogs = {
         page: "页：标题、slug 或别名",
         project: "项目的名字",
         projectName: "新项目的名字",
-        runtime: "农机的 id，比如 claude",
         session: "帮工的 id，比如 w3",
         words: "要说的话",
+        pageOrToday: "页的名字或 slug；不给就是日记",
+        chatRuntime: "农机（claude、codex…）；不给是 VibeValley 自己的 agent",
       },
       channel: { said: "发到了 {channel}" },
       cron: { removed: "删掉了定时任务 {cron}", when: "什么时候跑：--every、--daily、--cron、--at 正好给一个" },
@@ -360,54 +357,40 @@ export const catalogs = {
         apiCall: { about: "直接调一个接口" },
         apiList: { about: "笔记的每个接口，带请求体的 Schema" },
         artifactList: { about: "一张工单的稿子" },
-        artifactRead: { about: "读稿子的正文" },
         artifactShow: { about: "看一篇稿子" },
         channelList: { about: "看有哪些频道" },
         channelRead: { about: "读最近十条" },
         channelSay: { run: "vibevalley channel say general '@w3 先看看登录页'", about: "在 general 里叫帮工 w3" },
-        channelSearch: { run: "vibevalley channel search 登录页", about: "搜提到登录页的消息" },
-        cronAdd: { run: "vibevalley cron add 早报 '看看昨天合进去的' --daily 09:00 --channel general", about: "每天九点在 general 说一句" },
         cronList: { about: "看有哪些定时任务" },
         cronRemove: { about: "试删一个定时任务，什么都不动" },
         guide: { about: "看给 agent 的用法" },
-        issueDiff: { about: "看 12 号改了什么" },
+        issueDiff: { about: "加上 12 号的改动" },
         issueEdit: { about: "把 12 号的优先级调高" },
         issueList: { about: "没关的工单" },
-        issueLog: { about: "12 号的时间线" },
+        issueLog: { about: "加上 12 号的时间线和花费" },
         issueNew: { run: "vibevalley issue new 修登录页 --project web --agent 老周 --criterion '过期后回到登录页'", about: "写一张带验收标准的工单，派给老周" },
         issueShow: { about: "看 12 号现在能做什么" },
         issueWaiting: { about: "在等主人的工单" },
         issueWork: { about: "派 12 号，等它交回来" },
         issueWorkNoWait: { about: "派 12 号，不等" },
         memoryAdd: { run: "vibevalley memory add 老周 web 的端口是 8797 --project web", about: "给老周记一条" },
-        memorySearch: { run: "vibevalley memory search 端口 --agent 老周", about: "老周对端口记得什么" },
         pkmCapture: { run: "vibevalley pkm capture 给登录页加个记住我", about: "记一句进今天的日记" },
         pkmCapturePage: { run: "pbpaste | vibevalley pkm capture --page 读书", about: "把剪贴板里的大纲记到「读书」那一页" },
-        pkmPageEdit: { run: "EDITOR='code --wait' vibevalley pkm page edit 读书", about: "在 VS Code 里改一整页" },
-        pkmPageGet: { run: "vibevalley pkm page get 读书", about: "读一页" },
-        pkmPageList: { about: "最近的页" },
         pkmRadar: { about: "要看一眼的" },
-        pkmSearch: { run: "vibevalley pkm search 置身事内", about: "搜笔记" },
         pkmToday: { about: "今天的日记" },
-        projectAdd: { about: "从 GitHub 克隆一个项目" },
         projectList: { about: "看有哪些项目" },
         projectShow: { about: "看 web 项目" },
         runtimeList: { about: "看装了哪些农机" },
-        runtimeRefresh: { about: "装了 Claude Code 以后重新找一遍" },
         sessionList: { about: "看在干活的帮工" },
         sessionShow: { about: "看帮工 w3" },
         sessionStop: { about: "停下 w3 这一轮" },
         issue: {
-          say: { run: "vibevalley issue say 12 先别动数据库", about: "带一句话给 12 号的帮工" },
-          answer: { run: "vibevalley issue answer 12 用 8797", about: "回答 12 号在问的" },
+          say: { run: "vibevalley issue say 12 用 8797", about: "12 号在问就回答，在等验收就打回，否则捎给它的帮工" },
           accept: { about: "12 号验收通过", run: "vibevalley issue accept 12" },
-          reject: { run: "vibevalley issue reject 12 过期后没回到登录页", about: "打回 12 号" },
           stop: { about: "停下 12 号的帮工", run: "vibevalley issue stop 12" },
           cancel: { run: "vibevalley issue cancel 12 不做了", about: "关掉 12 号" },
-          reopen: { run: "vibevalley issue reopen 12 这次只改样式", about: "重开 12 号，这次只改样式" },
         },
         doctor: { about: "看这台电脑上的农场好不好" },
-        appStatus: { about: "桌面版开着没有、什么版本" },
         appOpen: { about: "让窗口到 12 号工单" },
         appQuit: { about: "退出桌面版" },
         appRestart: { about: "重启桌面版" },
@@ -415,6 +398,15 @@ export const catalogs = {
         apiState: { about: "一帧一行地跟着核心状态" },
         apiEvents: { about: "一行一条地跟着副作用" },
         runtimeChat: { about: "直接和 Claude Code 聊" },
+        search: { run: "vibevalley search 打卡 端口", about: "在整个农场里找「打卡 端口」" },
+        searchIn: { run: "vibevalley search 读书 --in notes --in memory", about: "只在笔记和记性里找" },
+        pkmShow: { run: "vibevalley pkm show 读书", about: "读「读书」这一页" },
+        pkmEdit: { run: "vibevalley pkm edit 读书", about: "在编辑器里改「读书」这一页" },
+        cronNew: { run: "vibevalley cron new 早上看看 看看昨天的改动 --daily 09:00", about: "每天早上九点让管家看看昨天的改动" },
+        pkmList: { about: "最近改过的页" },
+        projectNew: { about: "从 GitHub 克隆一个项目" },
+        runtimeProbe: { about: "装了新农机以后重新看一遍" },
+        chat: { about: "和 VibeValley 自己的 agent 对话" },
       },
       issue: {
         can: "能做：{verbs}",
@@ -434,6 +426,7 @@ export const catalogs = {
       more: "还有更多：{flag}",
       session: { stopped: "停下了帮工 {session}" },
       what: { agent: "档案", channel: "频道", project: "项目" },
+      search: { issues: "工单", channels: "频道", notes: "笔记", memory: "记性", nothing: "没有找到「{words}」" },
     },
     desktop: {
       open: "打开 VibeValley",
@@ -3901,14 +3894,11 @@ export const catalogs = {
     cli: {
       flag: {
         prompt: "Ask once and leave, without a conversation",
-        runtime: "claude, codex, kimi, pi…; vibevalley is VibeValley's own agent",
         model: "The model",
         effort: "How hard to think",
         resume: "Go on with this session",
         cwd: "Which folder; the current one when empty",
-        ownCwd: "Which folder the own agent works in; the current one when empty",
         name: "The own agent's name (its home is ~/.vibevalley/agent/<name>)",
-        ownModel: "The model; the configuration's when empty",
         mcp: "The MCP configuration file; mcp.json in the home when empty",
         server: "The server's address; VIBEVALLEY_SERVER when empty, else the one running on this machine (the home's server.json), else {fallback}",
         dryRun: "Only say what it would do, without doing it (commands that delete, merge, close or send a helper away)",
@@ -3939,15 +3929,18 @@ export const catalogs = {
         text: "Words the title or description contains",
         timeout: "Wait at most this many seconds",
         waiting: "Only those waiting on the owner",
+        probe: "Look for every runtime again first (after installing or upgrading one)",
+        diff: "Add its change: commits and files",
+        log: "Add its timeline and cost",
+        searchIn: "Search only these: issues, channels, notes, memory (may be given more than once)",
+        searchLimit: "At most this many from each",
       },
       command: {
-        runtimeChat: "Talk to a machine directly, not through VibeValley: no trajectory, no spending",
-        root: "With no command, a conversation with VibeValley's own agent; every other command is one thing to do with the farm: answers are short text, --format json gives the protocol's shape, and guide says how to use them",
+        root: "One thing to do with the farm per command: answers are short text, --format json gives the protocol's shape; guide says how to use them, chat talks in the terminal",
         state: "The core state (GET {path})",
         events: "Side effects, one per line (GET {path})",
         app: {
           about: "The desktop app itself: its status, a page to open, updates, quitting",
-          status: "Which desktop app this is, its version and where its farm is",
           open: "Bring the desktop window to this page (/issues/12), opening the app if it is not",
           quit: "Quit the desktop app (its server saves first)",
           restart: "Restart the desktop app",
@@ -3956,12 +3949,10 @@ export const catalogs = {
         doctor: "See this machine's farm at once: which one was found, whether it answers, the desktop app, runtimes, the model's key, the LAN listener",
         pkm: {
           capture: "Note something in today's journal (--page: on that page); no words reads stdin, lines split into blocks by indentation",
-          today: "Today's journal (--day for another day)",
-          search: "Search the notes: a hit a line, page › where: block",
+          show: "A page as Markdown to read (refs read out, remarks taken off); with no page, today's journal (--day for another day)",
+          list: "List notes pages, the latest changed first",
+          edit: "Edit a whole page's file in $EDITOR; it is saved when the editor closes",
           radar: "What wants a look: the inbox, projects left alone, what is overdue",
-          pageGet: "A page as Markdown to read: refs read out, remarks taken off",
-          pageEdit: "Edit a whole page's file in $EDITOR; it is saved when the editor closes",
-          pageList: "List notes pages, the latest changed first",
         },
         agent: { list: "List profiles: id, name, role, runtime", show: "Show a profile: its duty, runtime and model, skills" },
         api: {
@@ -3969,35 +3960,27 @@ export const catalogs = {
           call: "Call an endpoint, --json checked against its Schema before it is sent",
           list: "List every endpoint and what it does; --format json adds its request body's JSON Schema",
         },
-        artifact: { list: "List drafts (--issue: only one issue's)", read: "Read a draft's content", show: "Show a draft" },
-        channel: {
-          list: "List channels and direct chats",
-          read: "Read a channel's latest messages",
-          say: "Say something in a channel",
-          search: "Search messages in every channel",
-        },
-        cron: { add: "Add a scheduled task: give one of --every, --daily, --cron, --at", list: "List scheduled tasks", remove: "Remove a scheduled task" },
+        artifact: { list: "List drafts (--issue: only one issue's)", show: "Show a draft: its title, version and owner, then its words" },
+        channel: { list: "List channels and direct chats", read: "Read a channel's latest messages", say: "Say something in a channel" },
+        cron: { list: "List scheduled tasks", remove: "Remove a scheduled task", new: "Make a scheduled task: give one of --every, --daily, --cron, --at" },
         guide: "How an agent does the common things, step by step",
         issue: {
-          diff: "An issue's change: its commits and files",
           edit: "Change an issue's title, description, project, profile or priority",
           list: "List issues: one a line, number first",
-          log: "An issue's timeline and cost",
           new: "Write a new issue",
-          show: "Show an issue: where it stands, its questions and criteria, what can be done now",
-          work: "Send it out: start it (or go on when stuck), wait for the hand-back, print the change",
-          say: "Pass a word to the issue's helper",
-          answer: "Answer the question the issue's helper waits on",
+          show: "Show an issue: where it stands, its questions and criteria, what can be done now (--diff adds its change, --log its timeline and cost)",
+          work: "Send it out: start it (go on when stuck, reopen a closed one first), wait for the hand-back, print the change",
+          say: "Talk to the issue's helper: an answer when it asks, sending it back when it waits for review, else a word passed on",
           accept: "Accept the work: the issue is done",
-          reject: "Send it back: say what is wrong, another round",
           stop: "Stop the issue's helper's round",
           cancel: "Close the issue",
-          reopen: "Reopen a closed issue",
         },
-        memory: { add: "Note a memory for a profile", search: "Search memories" },
-        project: { add: "Add a project (--repo clones it from GitHub)", list: "List projects", show: "Show a project" },
-        runtime: { list: "List runtimes: installed or not, version", refresh: "Look for a runtime again" },
+        memory: { add: "Note a memory for a profile" },
+        project: { list: "List projects", show: "Show a project", new: "Make a project (--repo clones it from GitHub)" },
+        runtime: { list: "List the runtimes: installed or not, versions (--probe looks again first)" },
         session: { list: "List helpers: id, name, profile, what it is doing", show: "Show a helper", stop: "Stop a helper's round" },
+        search: "Search the whole farm: issues, what was said in channels, notes, memories, each under its own heading",
+        chat: "Talk in the terminal: with no runtime, VibeValley's own agent; with one, that runtime directly (no trajectory, no spending)",
       },
       next: {
         help: "See how this command is written",
@@ -4023,6 +4006,7 @@ export const catalogs = {
         noSuch: 'No {what} is called "{said}"; there are: {these}',
         noChat:
           "VibeValley's conversation program is not found here: use the command line the desktop app installs, or vp run --filter @vibevalley/cli start in the repository",
+        chatFlag: "{flags} cannot go with {runtime}: --name and --mcp are VibeValley's own agent's, --effort and --resume a runtime's",
       },
       op: {
         agent: {
@@ -4238,7 +4222,7 @@ export const catalogs = {
         lan: { about: "Connect to this machine: on or off, pairing, devices" },
         memory: { about: "A profile's memories" },
         orchestrator: { about: "The manager: online, stop, archive, evals" },
-        pkm: { about: "Notes: pages, journals, remarks, clips and search", page: { about: "Notes pages" } },
+        pkm: { about: "Notes: note a line, read and edit pages, journals, what wants a look", page: { about: "Notes pages" } },
         project: { about: "Projects: the git repositories in the working folder" },
         runtime: { about: "Machines: the coding agents on this computer" },
         server: { about: "The server itself" },
@@ -4278,9 +4262,10 @@ export const catalogs = {
         page: "A page: its title, slug or an alias",
         project: "The project's name",
         projectName: "The new project's name",
-        runtime: "The runtime's id, such as claude",
         session: "The helper's id, such as w3",
         words: "What to say",
+        pageOrToday: "A page's name or slug; none for the journal",
+        chatRuntime: "A runtime (claude, codex…); none for VibeValley's own agent",
       },
       channel: { said: "Said in {channel}" },
       cron: { removed: "Removed scheduled task {cron}", when: "When to run: give exactly one of --every, --daily, --cron, --at" },
@@ -4290,23 +4275,17 @@ export const catalogs = {
         apiCall: { about: "Call an endpoint directly" },
         apiList: { about: "Every notes endpoint, with its request Schema" },
         artifactList: { about: "An issue's drafts" },
-        artifactRead: { about: "Read a draft's content" },
         artifactShow: { about: "Show a draft" },
         channelList: { about: "Which channels there are" },
         channelRead: { about: "Read the last ten" },
         channelSay: { run: "vibevalley channel say general '@w3 look at the login page first'", about: "Call helper w3 in general" },
-        channelSearch: { run: "vibevalley channel search login", about: "Find messages about the login page" },
-        cronAdd: {
-          run: "vibevalley cron add morning 'what was merged yesterday' --daily 09:00 --channel general",
-          about: "Say something in general every day at nine",
-        },
         cronList: { about: "Which tasks are scheduled" },
         cronRemove: { about: "Try removing a task, changing nothing" },
         guide: { about: "Read the agents' guide" },
-        issueDiff: { about: "What #12 changed" },
+        issueDiff: { about: "With #12's change" },
         issueEdit: { about: "Raise #12's priority" },
         issueList: { about: "The open issues" },
-        issueLog: { about: "#12's timeline" },
+        issueLog: { about: "With #12's timeline and cost" },
         issueNew: {
           run: "vibevalley issue new 'Fix the login page' --project web --agent lao-zhou --criterion 'expired sessions go back to login'",
           about: "Write an issue with a criterion and give it to lao-zhou",
@@ -4316,34 +4295,23 @@ export const catalogs = {
         issueWork: { about: "Send #12 out and wait for it" },
         issueWorkNoWait: { about: "Send #12 out without waiting" },
         memoryAdd: { run: "vibevalley memory add lao-zhou 'web runs on 8797' --project web", about: "Note something for lao-zhou" },
-        memorySearch: { run: "vibevalley memory search port --agent lao-zhou", about: "What lao-zhou remembers about ports" },
         pkmCapture: { run: "vibevalley pkm capture 'a remember-me box on the login page'", about: "Note a line in today's journal" },
         pkmCapturePage: { run: "pbpaste | vibevalley pkm capture --page Reading", about: "Put the outline on the clipboard on the Reading page" },
-        pkmPageEdit: { run: "EDITOR='code --wait' vibevalley pkm page edit Reading", about: "Edit a whole page in VS Code" },
-        pkmPageGet: { run: "vibevalley pkm page get Reading", about: "Read a page" },
-        pkmPageList: { about: "The latest pages" },
         pkmRadar: { about: "What wants a look" },
-        pkmSearch: { run: "vibevalley pkm search 'reading list'", about: "Search the notes" },
         pkmToday: { about: "Today's journal" },
-        projectAdd: { about: "Clone a project from GitHub" },
         projectList: { about: "Which projects there are" },
         projectShow: { about: "The web project" },
         runtimeList: { about: "Which runtimes are installed" },
-        runtimeRefresh: { about: "Look again after installing Claude Code" },
         sessionList: { about: "The helpers at work" },
         sessionShow: { about: "Helper w3" },
         sessionStop: { about: "Stop w3's round" },
         issue: {
-          say: { run: "vibevalley issue say 12 'leave the database alone'", about: "Pass a word to #12's helper" },
-          answer: { run: "vibevalley issue answer 12 'use 8797'", about: "Answer what #12 asks" },
+          say: { run: "vibevalley issue say 12 'use 8797'", about: "Answer #12 if it asks, send it back if it waits for review, else pass the word on" },
           accept: { about: "Accept #12", run: "vibevalley issue accept 12" },
-          reject: { run: "vibevalley issue reject 12 'expired sessions do not go back to login'", about: "Send #12 back" },
           stop: { about: "Stop #12's helper", run: "vibevalley issue stop 12" },
           cancel: { run: "vibevalley issue cancel 12 'not needed'", about: "Close #12" },
-          reopen: { run: "vibevalley issue reopen 12 'only the styles this time'", about: "Reopen #12, only the styles this time" },
         },
         doctor: { about: "How this machine's farm is" },
-        appStatus: { about: "Whether the desktop app is open, and its version" },
         appOpen: { about: "Bring the window to issue 12" },
         appQuit: { about: "Quit the desktop app" },
         appRestart: { about: "Restart the desktop app" },
@@ -4351,6 +4319,18 @@ export const catalogs = {
         apiState: { about: "Follow the core state, a frame a line" },
         apiEvents: { about: "Follow the side events, one a line" },
         runtimeChat: { about: "Talk to Claude Code directly" },
+        search: { run: "vibevalley search clock-in port", about: "Find “clock-in port” anywhere on the farm" },
+        searchIn: { run: "vibevalley search reading --in notes --in memory", about: "Look only in the notes and the memories" },
+        pkmShow: { run: "vibevalley pkm show reading", about: "Read the page “reading”" },
+        pkmEdit: { run: "vibevalley pkm edit reading", about: "Edit the page “reading” in your editor" },
+        cronNew: {
+          run: "vibevalley cron new morning 'look at yesterday's changes' --daily 09:00",
+          about: "Have the orchestrator look at yesterday's changes every morning at nine",
+        },
+        pkmList: { about: "The pages changed last" },
+        projectNew: { about: "Clone a project from GitHub" },
+        runtimeProbe: { about: "Look again after installing a runtime" },
+        chat: { about: "Talk to VibeValley's own agent" },
       },
       issue: {
         can: "Can: {verbs}",
@@ -4370,6 +4350,7 @@ export const catalogs = {
       more: "There is more: {flag}",
       session: { stopped: "Stopped helper {session}" },
       what: { agent: "profile", channel: "channel", project: "project" },
+      search: { issues: "Issues", channels: "Channels", notes: "Notes", memory: "Memories", nothing: "Nothing found for “{words}”" },
     },
     desktop: {
       open: "Open VibeValley",
@@ -8062,14 +8043,15 @@ export interface Messages {
   "cli.arg.agent": undefined;
   "cli.arg.artifact": undefined;
   "cli.arg.channel": undefined;
+  "cli.arg.chatRuntime": undefined;
   "cli.arg.cron": undefined;
   "cli.arg.cronName": undefined;
   "cli.arg.issue": undefined;
   "cli.arg.op": undefined;
   "cli.arg.page": undefined;
+  "cli.arg.pageOrToday": undefined;
   "cli.arg.project": undefined;
   "cli.arg.projectName": undefined;
-  "cli.arg.runtime": undefined;
   "cli.arg.session": undefined;
   "cli.arg.words": undefined;
   "cli.channel.said": { readonly channel: string | number };
@@ -8082,51 +8064,40 @@ export interface Messages {
   "cli.command.app.open": undefined;
   "cli.command.app.quit": undefined;
   "cli.command.app.restart": undefined;
-  "cli.command.app.status": undefined;
   "cli.command.app.update": undefined;
   "cli.command.artifact.list": undefined;
-  "cli.command.artifact.read": undefined;
   "cli.command.artifact.show": undefined;
   "cli.command.channel.list": undefined;
   "cli.command.channel.read": undefined;
   "cli.command.channel.say": undefined;
-  "cli.command.channel.search": undefined;
-  "cli.command.cron.add": undefined;
+  "cli.command.chat": undefined;
   "cli.command.cron.list": undefined;
+  "cli.command.cron.new": undefined;
   "cli.command.cron.remove": undefined;
   "cli.command.doctor": undefined;
   "cli.command.events": { readonly path: string | number };
   "cli.command.guide": undefined;
   "cli.command.issue.accept": undefined;
-  "cli.command.issue.answer": undefined;
   "cli.command.issue.cancel": undefined;
-  "cli.command.issue.diff": undefined;
   "cli.command.issue.edit": undefined;
   "cli.command.issue.list": undefined;
-  "cli.command.issue.log": undefined;
   "cli.command.issue.new": undefined;
-  "cli.command.issue.reject": undefined;
-  "cli.command.issue.reopen": undefined;
   "cli.command.issue.say": undefined;
   "cli.command.issue.show": undefined;
   "cli.command.issue.stop": undefined;
   "cli.command.issue.work": undefined;
   "cli.command.memory.add": undefined;
-  "cli.command.memory.search": undefined;
   "cli.command.pkm.capture": undefined;
-  "cli.command.pkm.pageEdit": undefined;
-  "cli.command.pkm.pageGet": undefined;
-  "cli.command.pkm.pageList": undefined;
+  "cli.command.pkm.edit": undefined;
+  "cli.command.pkm.list": undefined;
   "cli.command.pkm.radar": undefined;
-  "cli.command.pkm.search": undefined;
-  "cli.command.pkm.today": undefined;
-  "cli.command.project.add": undefined;
+  "cli.command.pkm.show": undefined;
   "cli.command.project.list": undefined;
+  "cli.command.project.new": undefined;
   "cli.command.project.show": undefined;
   "cli.command.root": undefined;
   "cli.command.runtime.list": undefined;
-  "cli.command.runtime.refresh": undefined;
-  "cli.command.runtimeChat": undefined;
+  "cli.command.search": undefined;
   "cli.command.session.list": undefined;
   "cli.command.session.show": undefined;
   "cli.command.session.stop": undefined;
@@ -8150,33 +8121,24 @@ export interface Messages {
   "cli.example.appOpen.about": undefined;
   "cli.example.appQuit.about": undefined;
   "cli.example.appRestart.about": undefined;
-  "cli.example.appStatus.about": undefined;
   "cli.example.appUpdate.about": undefined;
   "cli.example.artifactList.about": undefined;
-  "cli.example.artifactRead.about": undefined;
   "cli.example.artifactShow.about": undefined;
   "cli.example.channelList.about": undefined;
   "cli.example.channelRead.about": undefined;
   "cli.example.channelSay.about": undefined;
   "cli.example.channelSay.run": undefined;
-  "cli.example.channelSearch.about": undefined;
-  "cli.example.channelSearch.run": undefined;
-  "cli.example.cronAdd.about": undefined;
-  "cli.example.cronAdd.run": undefined;
+  "cli.example.chat.about": undefined;
   "cli.example.cronList.about": undefined;
+  "cli.example.cronNew.about": undefined;
+  "cli.example.cronNew.run": undefined;
   "cli.example.cronRemove.about": undefined;
   "cli.example.doctor.about": undefined;
   "cli.example.guide.about": undefined;
   "cli.example.issue.accept.about": undefined;
   "cli.example.issue.accept.run": undefined;
-  "cli.example.issue.answer.about": undefined;
-  "cli.example.issue.answer.run": undefined;
   "cli.example.issue.cancel.about": undefined;
   "cli.example.issue.cancel.run": undefined;
-  "cli.example.issue.reject.about": undefined;
-  "cli.example.issue.reject.run": undefined;
-  "cli.example.issue.reopen.about": undefined;
-  "cli.example.issue.reopen.run": undefined;
   "cli.example.issue.say.about": undefined;
   "cli.example.issue.say.run": undefined;
   "cli.example.issue.stop.about": undefined;
@@ -8193,33 +8155,34 @@ export interface Messages {
   "cli.example.issueWorkNoWait.about": undefined;
   "cli.example.memoryAdd.about": undefined;
   "cli.example.memoryAdd.run": undefined;
-  "cli.example.memorySearch.about": undefined;
-  "cli.example.memorySearch.run": undefined;
   "cli.example.pkmCapture.about": undefined;
   "cli.example.pkmCapture.run": undefined;
   "cli.example.pkmCapturePage.about": undefined;
   "cli.example.pkmCapturePage.run": undefined;
-  "cli.example.pkmPageEdit.about": undefined;
-  "cli.example.pkmPageEdit.run": undefined;
-  "cli.example.pkmPageGet.about": undefined;
-  "cli.example.pkmPageGet.run": undefined;
-  "cli.example.pkmPageList.about": undefined;
+  "cli.example.pkmEdit.about": undefined;
+  "cli.example.pkmEdit.run": undefined;
+  "cli.example.pkmList.about": undefined;
   "cli.example.pkmRadar.about": undefined;
-  "cli.example.pkmSearch.about": undefined;
-  "cli.example.pkmSearch.run": undefined;
+  "cli.example.pkmShow.about": undefined;
+  "cli.example.pkmShow.run": undefined;
   "cli.example.pkmToday.about": undefined;
-  "cli.example.projectAdd.about": undefined;
   "cli.example.projectList.about": undefined;
+  "cli.example.projectNew.about": undefined;
   "cli.example.projectShow.about": undefined;
   "cli.example.runtimeChat.about": undefined;
   "cli.example.runtimeList.about": undefined;
-  "cli.example.runtimeRefresh.about": undefined;
+  "cli.example.runtimeProbe.about": undefined;
+  "cli.example.search.about": undefined;
+  "cli.example.search.run": undefined;
+  "cli.example.searchIn.about": undefined;
+  "cli.example.searchIn.run": undefined;
   "cli.example.sessionList.about": undefined;
   "cli.example.sessionShow.about": undefined;
   "cli.example.sessionStop.about": undefined;
   "cli.failure.ambiguous": { readonly said: string | number; readonly these: string | number; readonly what: string | number };
   "cli.failure.appNotOpen": { readonly home: string | number; readonly why: string | number };
   "cli.failure.body": { readonly op: string | number; readonly why: string | number };
+  "cli.failure.chatFlag": { readonly flags: string | number; readonly runtime: string | number };
   "cli.failure.dryRun": { readonly op: string | number };
   "cli.failure.file": { readonly file: string | number; readonly why: string | number };
   "cli.failure.gone": { readonly n: string | number };
@@ -8243,6 +8206,7 @@ export interface Messages {
   "cli.flag.cwd": undefined;
   "cli.flag.daily": undefined;
   "cli.flag.day": undefined;
+  "cli.flag.diff": undefined;
   "cli.flag.dryRun": undefined;
   "cli.flag.effort": undefined;
   "cli.flag.every": undefined;
@@ -8252,20 +8216,21 @@ export interface Messages {
   "cli.flag.json": undefined;
   "cli.flag.key": undefined;
   "cli.flag.limit": undefined;
+  "cli.flag.log": undefined;
   "cli.flag.mcp": undefined;
   "cli.flag.model": undefined;
   "cli.flag.module": undefined;
   "cli.flag.name": undefined;
   "cli.flag.noWait": undefined;
-  "cli.flag.ownCwd": undefined;
-  "cli.flag.ownModel": undefined;
   "cli.flag.priority": undefined;
+  "cli.flag.probe": undefined;
   "cli.flag.project": undefined;
   "cli.flag.prompt": undefined;
   "cli.flag.reply": undefined;
   "cli.flag.repo": undefined;
   "cli.flag.resume": undefined;
-  "cli.flag.runtime": undefined;
+  "cli.flag.searchIn": undefined;
+  "cli.flag.searchLimit": undefined;
   "cli.flag.server": { readonly fallback: string | number };
   "cli.flag.text": undefined;
   "cli.flag.timeout": undefined;
@@ -8476,6 +8441,11 @@ export interface Messages {
   "cli.pkm.saved": { readonly page: string | number };
   "cli.pkm.stale": { readonly days: string | number; readonly page: string | number };
   "cli.pkm.unchanged": { readonly page: string | number };
+  "cli.search.channels": undefined;
+  "cli.search.issues": undefined;
+  "cli.search.memory": undefined;
+  "cli.search.notes": undefined;
+  "cli.search.nothing": { readonly words: string | number };
   "cli.session.stopped": { readonly session: string | number };
   "cli.what.agent": undefined;
   "cli.what.channel": undefined;

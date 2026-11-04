@@ -83,17 +83,10 @@ const sayCommand = Command.make(
   Command.withExamples([{ command: t("cli.example.channelSay.run"), description: t("cli.example.channelSay.about") }]),
 );
 
-const searchCommand = Command.make("search", { words }, (o) =>
-  Effect.flatMap(
-    ask((api) => api.channel.message.search({ text: o.words.join(" ") })),
-    (hits) => show(hits, (hs) => hs.map((h) => `${h.channel}  ${messageLine(h.message)}`).join("\n")),
-  ),
-).pipe(
-  Command.withDescription(t("cli.command.channel.search")),
-  Command.withExamples([{ command: t("cli.example.channelSearch.run"), description: t("cli.example.channelSearch.about") }]),
-);
+/** A message found in a channel, one line: the channel, then the message (what `vibevalley search` prints). */
+export const channelHitLine = (h: T.MessageHit) => `${h.channel}  ${messageLine(h.message)}`;
 
 export const channelCommand = Command.make("channel").pipe(
-  Command.withSubcommands([listCommand, readCommand, sayCommand, searchCommand]),
+  Command.withSubcommands([listCommand, readCommand, sayCommand]),
   Command.withDescription(t("cli.group.channel.about")),
 );

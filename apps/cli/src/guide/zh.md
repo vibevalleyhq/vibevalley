@@ -18,6 +18,7 @@ vibevalley issue show 12          # 一张工单：在哪一步、问题、验�
 vibevalley issue new 修登录页 --project web --agent 老周 --criterion '过期后回到登录页' --key login-1
 vibevalley issue work 13          # 派活，等它交回来；经过的状态写在 stderr，最后打出改动
 vibevalley issue work 13 --no-wait
+vibevalley issue work 9           # 已完成或关掉的工单：先重开，再派出去
 ```
 
 `--key`：同一把键重发不会建两张，网络断了重试放心。
@@ -26,16 +27,16 @@ vibevalley issue work 13 --no-wait
 
 ```bash
 vibevalley issue show 13          # 「问题」下面是它在问的，括号里是它想到的答案
-vibevalley issue answer 13 用 8797
-vibevalley issue say 13 先别动数据库   # 不是回答问题，只是带一句话
+vibevalley issue say 13 用 8797      # 它在问，说的就是回答
+vibevalley issue say 13 先别动数据库   # 没在问，就是捎一句话给它
 ```
 
 ## 验收
 
 ```bash
-vibevalley issue diff 13
+vibevalley issue show 13 --diff     # 加上改动（--log 加上时间线和花费）
 vibevalley issue accept 13
-vibevalley issue reject 13 过期后没回到登录页
+vibevalley issue say 13 过期后没回到登录页   # 在等验收时说的，就是打回再来一轮
 ```
 
 ## 频道
@@ -50,8 +51,17 @@ vibevalley channel say general '@w3 先看看登录页'
 ```bash
 vibevalley pkm capture 给登录页加个记住我
 pbpaste | vibevalley pkm capture --page 读书
-vibevalley pkm search 置身事内
-vibevalley pkm page get 读书
+vibevalley pkm show                # 今天的日记（--day 看别的一天）
+vibevalley pkm show 读书
+```
+
+## 找东西
+
+不知道写在哪：一条命令搜工单、频道、笔记和记性，各列在自己的标题下。
+
+```bash
+vibevalley search 登录页 过期
+vibevalley search 置身事内 --in notes
 ```
 
 ## 改东西之前

@@ -15,22 +15,12 @@ import { exit, Failure } from "./output.ts";
 const words = Argument.String("words").pipe(Argument.variadic(), Argument.withDescription(t("cli.arg.words")));
 const optionalText = (name: string, about: Parameters<typeof t>[0]) => Flag.String(name).pipe(Flag.optional, Flag.withDescription(t(about)));
 
-const memoryLine = (m: T.Memory) =>
+/** A memory, one line: id, whose, kind, project, words (what `vibevalley search` prints for the memories too). */
+export const memoryLine = (m: T.Memory) =>
   [m.id, `@${m.agent}`, m.kind, m.project === undefined ? "" : `[${m.project}]`, m.text.replace(/\s+/gu, " ")].filter((x) => x !== "").join("  ");
 
 const memoryGroup = Command.make("memory").pipe(
   Command.withSubcommands([
-    Command.make("search", { words, agent: optionalText("agent", "cli.flag.agent"), project: optionalText("project", "cli.flag.project") }, (o) => {
-      const agent = given(o.agent);
-      const project = given(o.project);
-      return Effect.flatMap(
-        ask((api) => api.memory.search({ text: o.words.join(" "), ...(agent ? { agent } : {}), ...(project ? { project } : {}) })),
-        (found) => show(found, (f) => f.found.map(memoryLine).join("\n")),
-      );
-    }).pipe(
-      Command.withDescription(t("cli.command.memory.search")),
-      Command.withExamples([{ command: t("cli.example.memorySearch.run"), description: t("cli.example.memorySearch.about") }]),
-    ),
     Command.make(
       "add",
       {
@@ -89,7 +79,7 @@ const whenOf = (o: { every: number | undefined; daily: string | undefined; cron:
           code: exit.usage,
           tag: "InvalidValue",
           text: t("cli.cron.when"),
-          next: [{ say: t("cli.next.help"), run: ["cron", "add", "--help"] }],
+          next: [{ say: t("cli.next.help"), run: ["cron", "new", "--help"] }],
         }),
       );
 };
@@ -106,7 +96,7 @@ const cronGroup = Command.make("cron").pipe(
       Command.withExamples([{ command: "vibevalley cron list", description: t("cli.example.cronList.about") }]),
     ),
     Command.make(
-      "add",
+      "new",
       {
         name: Argument.String("name").pipe(Argument.withDescription(t("cli.arg.cronName"))),
         words,
@@ -126,7 +116,7 @@ const cronGroup = Command.make("cron").pipe(
           const agent = given(o.agent);
           const project = given(o.project);
           yield* change({
-            name: "cron add",
+            name: "cron new",
             does: (api) =>
               api.cron.create({
                 name: o.name,
@@ -140,8 +130,8 @@ const cronGroup = Command.make("cron").pipe(
           });
         }),
     ).pipe(
-      Command.withDescription(t("cli.command.cron.add")),
-      Command.withExamples([{ command: t("cli.example.cronAdd.run"), description: t("cli.example.cronAdd.about") }]),
+      Command.withDescription(t("cli.command.cron.new")),
+      Command.withExamples([{ command: t("cli.example.cronNew.run"), description: t("cli.example.cronNew.about") }]),
     ),
     Command.make("remove", { cron: Argument.String("cron").pipe(Argument.withDescription(t("cli.arg.cron"))) }, (o) =>
       change({
@@ -174,23 +164,17 @@ const artifactGroup = Command.make("artifact").pipe(
       Command.withDescription(t("cli.command.artifact.list")),
       Command.withExamples([{ command: "vibevalley artifact list --issue 12", description: t("cli.example.artifactList.about") }]),
     ),
+    // Its line, then its words: what an agent reading a draft wants in one go.
     Command.make("show", { artifact: artifactArg }, (o) =>
-      Effect.flatMap(
-        ask((api) => api.artifact.get({ id: artifactId(o.artifact) })),
-        (a) => show(a, artifactLine),
-      ),
+      Effect.gen(function* () {
+        const id = artifactId(o.artifact);
+        const artifact = yield* ask((api) => api.artifact.get({ id }));
+        const body = yield* ask((api) => api.artifact.content.get({ id }));
+        yield* show({ ...artifact, content: body.content }, (a) => `${artifactLine(a)}\n\n${a.content}`);
+      }),
     ).pipe(
       Command.withDescription(t("cli.command.artifact.show")),
       Command.withExamples([{ command: "vibevalley artifact show a1", description: t("cli.example.artifactShow.about") }]),
-    ),
-    Command.make("read", { artifact: artifactArg }, (o) =>
-      Effect.flatMap(
-        ask((api) => api.artifact.content.get({ id: artifactId(o.artifact) })),
-        (c) => show(c, (x) => x.content),
-      ),
-    ).pipe(
-      Command.withDescription(t("cli.command.artifact.read")),
-      Command.withExamples([{ command: "vibevalley artifact read a1", description: t("cli.example.artifactRead.about") }]),
     ),
   ]),
   Command.withDescription(t("cli.group.artifact.about")),
