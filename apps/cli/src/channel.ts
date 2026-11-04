@@ -25,12 +25,12 @@ export const channelNamed = (said: string) =>
         said,
         (c) => [c.id, c.name, c.title],
         (c) => `#${nameOf(c)}`,
-        t("server.cli.what.channel"),
+        t("cli.what.channel"),
       ),
   );
 
-const channelArg = Argument.String("channel").pipe(Argument.withDescription(t("server.cli.arg.channel")));
-const words = Argument.String("words").pipe(Argument.variadic(), Argument.withDescription(t("server.cli.arg.words")));
+const channelArg = Argument.String("channel").pipe(Argument.withDescription(t("cli.arg.channel")));
+const words = Argument.String("words").pipe(Argument.variadic(), Argument.withDescription(t("cli.arg.words")));
 
 const listCommand = Command.make("list", {}, () =>
   Effect.flatMap(
@@ -38,16 +38,16 @@ const listCommand = Command.make("list", {}, () =>
     (all) => show(all, (cs) => cs.map(channelLine).join("\n")),
   ),
 ).pipe(
-  Command.withDescription(t("server.cli.command.channel.list")),
-  Command.withExamples([{ command: "vibevalley channel list", description: t("server.cli.example.channelList.about") }]),
+  Command.withDescription(t("cli.command.channel.list")),
+  Command.withExamples([{ command: "vibevalley channel list", description: t("cli.example.channelList.about") }]),
 );
 
 const readCommand = Command.make(
   "read",
   {
     channel: channelArg,
-    limit: Flag.Int("limit").pipe(Flag.withDefault(20), Flag.withDescription(t("server.cli.flag.limit"))),
-    before: Flag.Int("before").pipe(Flag.optional, Flag.withDescription(t("server.cli.flag.before"))),
+    limit: Flag.Int("limit").pipe(Flag.withDefault(20), Flag.withDescription(t("cli.flag.limit"))),
+    before: Flag.Int("before").pipe(Flag.optional, Flag.withDescription(t("cli.flag.before"))),
   },
   (o) =>
     Effect.gen(function* () {
@@ -56,17 +56,17 @@ const readCommand = Command.make(
       const messages = yield* ask((api) => api.channel.message.list({ id: channel.id, limit: o.limit, ...(before === undefined ? {} : { before }) }));
       yield* show(messages, (ms) => {
         const first = ms[0];
-        return [...ms.map(messageLine), ...(first && first.number > 1 ? [t("server.cli.more", { flag: `--before ${first.number}` })] : [])].join("\n");
+        return [...ms.map(messageLine), ...(first && first.number > 1 ? [t("cli.more", { flag: `--before ${first.number}` })] : [])].join("\n");
       });
     }),
 ).pipe(
-  Command.withDescription(t("server.cli.command.channel.read")),
-  Command.withExamples([{ command: "vibevalley channel read general --limit 10", description: t("server.cli.example.channelRead.about") }]),
+  Command.withDescription(t("cli.command.channel.read")),
+  Command.withExamples([{ command: "vibevalley channel read general --limit 10", description: t("cli.example.channelRead.about") }]),
 );
 
 const sayCommand = Command.make(
   "say",
-  { channel: channelArg, words, reply: Flag.Int("reply").pipe(Flag.optional, Flag.withDescription(t("server.cli.flag.reply"))) },
+  { channel: channelArg, words, reply: Flag.Int("reply").pipe(Flag.optional, Flag.withDescription(t("cli.flag.reply"))) },
   (o) =>
     Effect.gen(function* () {
       const channel = yield* channelNamed(o.channel);
@@ -74,13 +74,13 @@ const sayCommand = Command.make(
       yield* change({
         name: "channel say",
         does: (api) => api.channel.message.send({ id: channel.id, text: o.words.join(" "), ...(replyTo === undefined ? {} : { replyTo }) }),
-        said: () => t("server.cli.channel.said", { channel: `#${nameOf(channel)}` }),
+        said: () => t("cli.channel.said", { channel: `#${nameOf(channel)}` }),
         as: () => ({ channel: channel.id }),
       });
     }),
 ).pipe(
-  Command.withDescription(t("server.cli.command.channel.say")),
-  Command.withExamples([{ command: t("server.cli.example.channelSay.run"), description: t("server.cli.example.channelSay.about") }]),
+  Command.withDescription(t("cli.command.channel.say")),
+  Command.withExamples([{ command: t("cli.example.channelSay.run"), description: t("cli.example.channelSay.about") }]),
 );
 
 const searchCommand = Command.make("search", { words }, (o) =>
@@ -89,11 +89,11 @@ const searchCommand = Command.make("search", { words }, (o) =>
     (hits) => show(hits, (hs) => hs.map((h) => `${h.channel}  ${messageLine(h.message)}`).join("\n")),
   ),
 ).pipe(
-  Command.withDescription(t("server.cli.command.channel.search")),
-  Command.withExamples([{ command: t("server.cli.example.channelSearch.run"), description: t("server.cli.example.channelSearch.about") }]),
+  Command.withDescription(t("cli.command.channel.search")),
+  Command.withExamples([{ command: t("cli.example.channelSearch.run"), description: t("cli.example.channelSearch.about") }]),
 );
 
 export const channelCommand = Command.make("channel").pipe(
   Command.withSubcommands([listCommand, readCommand, sayCommand, searchCommand]),
-  Command.withDescription(t("server.cli.group.channel.about")),
+  Command.withDescription(t("cli.group.channel.about")),
 );

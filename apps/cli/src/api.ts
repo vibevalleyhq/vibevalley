@@ -25,19 +25,19 @@ export const ServerFlag = GlobalFlag.Setting("server")({
     Flag.withFallbackConfig(Config.String("VIBEVALLEY_SERVER")),
     Flag.withDefault(defaultServer),
     // The rule, not this machine's address: help reads the same everywhere, and so does its golden data.
-    Flag.withDescription(t("server.cli.flag.server", { fallback: fallbackServer })),
+    Flag.withDescription(t("cli.flag.server", { fallback: fallbackServer })),
   ),
 });
 
 /** --dry-run: a command that changes what cannot be taken back answers what it would do (its endpoint's dryRun) and changes
  * nothing; one that only reads runs as it is; any other is refused rather than done. */
 export const DryRunFlag = GlobalFlag.Setting("dry-run")({
-  flag: Flag.Boolean("dry-run").pipe(Flag.withDefault(false), Flag.withDescription(t("server.cli.flag.dryRun"))),
+  flag: Flag.Boolean("dry-run").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.dryRun"))),
 });
 
 /** --format: text (the default) is short lines to read, json the protocol's shape for whatever parses it. */
 export const FormatFlag = GlobalFlag.Setting("format")({
-  flag: Flag.Literals("format", ["text", "json"]).pipe(Flag.withDefault("text" as const), Flag.withDescription(t("server.cli.flag.format"))),
+  flag: Flag.Literals("format", ["text", "json"]).pipe(Flag.withDefault("text" as const), Flag.withDescription(t("cli.flag.format"))),
 });
 
 /** The innermost reason a request did not leave or come back: fetch's "fetch failed" hides ECONNREFUSED in its cause. */
@@ -51,8 +51,8 @@ const unreachable = (base: string) => (e: HttpClientError.HttpClientError) =>
   new Failure({
     code: exit.unreachable,
     tag: "Unreachable",
-    text: t("server.cli.failure.unreachable", { base, why: whyOf(e) }),
-    next: [{ say: t("server.cli.next.startServer") }],
+    text: t("cli.failure.unreachable", { base, why: whyOf(e) }),
+    next: [{ say: t("cli.next.startServer") }],
   });
 
 const codeOf: Readonly<Record<ApiError["_tag"], number>> = {
@@ -94,15 +94,15 @@ const request = Effect.fn("Cli.request")(function* (base: string, path: string, 
 });
 
 const usage = (path: readonly string[], text: string, tag = "InvalidValue") =>
-  new Failure({ code: exit.usage, tag, text, next: [{ say: t("server.cli.next.help"), run: [...path, "--help"] }] });
+  new Failure({ code: exit.usage, tag, text, next: [{ say: t("cli.next.help"), run: [...path, "--help"] }] });
 
 /** --json's text: as given, `-` for stdin, `@file` for a file's. */
 const bodyText = (given: string, path: readonly string[]) =>
   given === "-"
-    ? stdinText.pipe(Effect.mapError((e) => usage(path, t("server.cli.failure.stdin", { why: e.message }))))
+    ? stdinText.pipe(Effect.mapError((e) => usage(path, t("cli.failure.stdin", { why: e.message }))))
     : given.startsWith("@")
       ? Effect.flatMap(FileSystem.FileSystem, (fs) => fs.readFileString(given.slice(1))).pipe(
-          Effect.mapError((e) => usage(path, t("server.cli.failure.file", { file: given.slice(1), why: e.message }))),
+          Effect.mapError((e) => usage(path, t("cli.failure.file", { file: given.slice(1), why: e.message }))),
         )
       : Effect.succeed(given);
 
@@ -124,7 +124,7 @@ export const frames = (base: string, path: string) =>
             : new Failure({
                 code: exit.other,
                 tag: "Server",
-                text: e._tag === "Retry" ? t("server.cli.failure.retry") : t("server.cli.failure.stream", { why: e.message }),
+                text: e._tag === "Retry" ? t("cli.failure.retry") : t("cli.failure.stream", { why: e.message }),
               }),
         ),
       );
@@ -137,8 +137,8 @@ const callPath = ["api", "call"];
 const callCommand = Command.make(
   "call",
   {
-    op: Argument.String("op").pipe(Argument.withDescription(t("server.cli.arg.op"))),
-    json: Flag.String("json").pipe(Flag.optional, Flag.withDescription(t("server.cli.flag.json"))),
+    op: Argument.String("op").pipe(Argument.withDescription(t("cli.arg.op"))),
+    json: Flag.String("json").pipe(Flag.optional, Flag.withDescription(t("cli.flag.json"))),
   },
   (o) =>
     Effect.gen(function* () {
@@ -147,34 +147,32 @@ const callCommand = Command.make(
         return yield* new Failure({
           code: exit.missing,
           tag: "Missing",
-          text: t("server.cli.failure.noOp", { op: o.op }),
-          next: [{ say: t("server.cli.next.listOps"), run: ["api", "list"] }],
+          text: t("cli.failure.noOp", { op: o.op }),
+          next: [{ say: t("cli.next.listOps"), run: ["api", "list"] }],
         });
       let body: string | undefined;
       if (e.input) {
         const text = Option.isSome(o.json) ? yield* bodyText(o.json.value, callPath) : "{}";
-        const value = yield* json(text).pipe(
-          Effect.mapError((issue) => usage(callPath, t("server.cli.failure.notJson", { why: issue.message }), "InvalidJson")),
-        );
+        const value = yield* json(text).pipe(Effect.mapError((issue) => usage(callPath, t("cli.failure.notJson", { why: issue.message }), "InvalidJson")));
         yield* Schema.decodeUnknownEffect(e.input)(value).pipe(
-          Effect.mapError((issue) => usage(callPath, t("server.cli.failure.body", { op: e.op, why: issue.message }))),
+          Effect.mapError((issue) => usage(callPath, t("cli.failure.body", { op: e.op, why: issue.message }))),
         );
         body = JSON.stringify(value);
       }
       const base = yield* ServerFlag;
       if (yield* DryRunFlag) {
         if (e.dryRun) return yield* printBody(yield* request(base, pathOf(e.dryRun), body));
-        if (!readsOnly(e.op)) return yield* new Failure({ code: exit.usage, tag: "NoDryRun", text: t("server.cli.failure.dryRun", { op: e.op }) });
+        if (!readsOnly(e.op)) return yield* new Failure({ code: exit.usage, tag: "NoDryRun", text: t("cli.failure.dryRun", { op: e.op }) });
       }
       yield* printBody(yield* request(base, pathOf(e.op), body));
     }),
 ).pipe(
-  Command.withDescription(t("server.cli.command.api.call")),
-  Command.withExamples([{ command: 'vibevalley api call issue.get --json \'{"id":"12"}\'', description: t("server.cli.example.apiCall.about") }]),
+  Command.withDescription(t("cli.command.api.call")),
+  Command.withExamples([{ command: 'vibevalley api call issue.get --json \'{"id":"12"}\'', description: t("cli.example.apiCall.about") }]),
 );
 
 /** `api list`: each endpoint, what it does and, as JSON, its input's JSON Schema and who may call it. */
-const listCommand = Command.make("list", { module: Flag.String("module").pipe(Flag.optional, Flag.withDescription(t("server.cli.flag.module"))) }, (o) =>
+const listCommand = Command.make("list", { module: Flag.String("module").pipe(Flag.optional, Flag.withDescription(t("cli.flag.module"))) }, (o) =>
   Effect.gen(function* () {
     const chosen = endpoints.filter((e) => Option.isNone(o.module) || e.op.split(".")[0] === o.module.value);
     if ((yield* FormatFlag) === "text") {
@@ -184,8 +182,8 @@ const listCommand = Command.make("list", { module: Flag.String("module").pipe(Fl
         modules
           .map((m) =>
             [
-              `${m}  ${maybe(`server.cli.group.${m}.about`) ?? ""}`,
-              ...chosen.filter((e) => e.op.split(".")[0] === m).map((e) => `  ${e.op}  ${t(`server.cli.op.${e.op}`)}`),
+              `${m}  ${maybe(`cli.group.${m}.about`) ?? ""}`,
+              ...chosen.filter((e) => e.op.split(".")[0] === m).map((e) => `  ${e.op}  ${t(`cli.op.${e.op}`)}`),
             ].join("\n"),
           )
           .join("\n\n"),
@@ -195,7 +193,7 @@ const listCommand = Command.make("list", { module: Flag.String("module").pipe(Fl
       JSON.stringify(
         chosen.map((e) => ({
           op: e.op,
-          does: t(`server.cli.op.${e.op}`),
+          does: t(`cli.op.${e.op}`),
           can: e.can,
           ...(e.dryRun ? { dryRun: e.dryRun } : {}),
           input: e.input ? Schema.toJsonSchemaDocument(e.input).schema : null,
@@ -204,13 +202,13 @@ const listCommand = Command.make("list", { module: Flag.String("module").pipe(Fl
     );
   }),
 ).pipe(
-  Command.withDescription(t("server.cli.command.api.list")),
-  Command.withExamples([{ command: "vibevalley api list --module pkm --format json", description: t("server.cli.example.apiList.about") }]),
+  Command.withDescription(t("cli.command.api.list")),
+  Command.withExamples([{ command: "vibevalley api list --module pkm --format json", description: t("cli.example.apiList.about") }]),
 );
 
 const stateCommand = Command.make(
   "state",
-  { watch: Flag.Boolean("watch").pipe(Flag.withDefault(false), Flag.withDescription(t("server.cli.flag.watch"))) },
+  { watch: Flag.Boolean("watch").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.watch"))) },
   ({ watch }) =>
     Effect.flatMap(ServerFlag, (base) =>
       // The server writes each frame on one line, so a stream is one line per frame whatever stdout is; one frame alone
@@ -218,16 +216,16 @@ const stateCommand = Command.make(
       watch ? Stream.runForEach(frames(base, statePath), out) : Stream.runForEach(Stream.take(frames(base, statePath), 1), printBody),
     ),
 ).pipe(
-  Command.withDescription(t("server.cli.command.state", { path: statePath })),
-  Command.withExamples([{ command: "vibevalley api state --watch", description: t("server.cli.example.apiState.about") }]),
+  Command.withDescription(t("cli.command.state", { path: statePath })),
+  Command.withExamples([{ command: "vibevalley api state --watch", description: t("cli.example.apiState.about") }]),
 );
 
 const eventsCommand = Command.make("events", {}, () => Effect.flatMap(ServerFlag, (base) => Stream.runForEach(frames(base, eventsPath), out))).pipe(
-  Command.withDescription(t("server.cli.command.events", { path: eventsPath })),
-  Command.withExamples([{ command: "vibevalley api events", description: t("server.cli.example.apiEvents.about") }]),
+  Command.withDescription(t("cli.command.events", { path: eventsPath })),
+  Command.withExamples([{ command: "vibevalley api events", description: t("cli.example.apiEvents.about") }]),
 );
 
 export const apiCommand = Command.make("api").pipe(
   Command.withSubcommands([listCommand, callCommand, stateCommand, eventsCommand]),
-  Command.withDescription(t("server.cli.command.api.about")),
+  Command.withDescription(t("cli.command.api.about")),
 );

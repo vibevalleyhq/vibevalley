@@ -212,7 +212,7 @@ vp run deadcode && vp run health:verify && vp run docs:verify
 - cron occurrence 与排期同事务提交、一次性任务重启后不重复建工单：`apps/server/src/cron/cron.test.ts`。
 - 开工被拒只删这次派发的工单、保留已有排队：`regression: refused startup removes only the issue made for that dispatch and keeps an existing queue`（`apps/server/src/flows/issue.test.ts`）。
 - 私聊首句投递：`apps/server/src/flows/talk.test.ts`。
-- 工单状态与黄金数据：`vp run golden:update -- core` 后由 `apps/server/src/core/golden.test.ts` 和 `apps/server/src/cli/golden.test.ts` 守住。
+- 工单状态与黄金数据：`vp run golden:update -- core` 后由 `apps/server/src/core/golden.test.ts` 和 `apps/cli/src/golden.test.ts` 守住。
 
 ### 没有验证到的
 

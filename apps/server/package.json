@@ -9,14 +9,16 @@
   "exports": {
     "./assets": "./src/assets.ts",
     "./baseline": "./src/infra/baseline.ts",
-    "./modules": "./src/modules.ts"
+    "./chat": "./src/chat.ts",
+    "./modules": "./src/modules.ts",
+    "./testing": "./src/testing/farm.ts"
   },
   "scripts": {
     "start": "vpx src/main.ts",
-    "cli": "vpx src/cli.ts",
     "evals": "VIBEVALLEY_EVALS_LIVE=1 vp test run src/orchestrator/evals.live.test.ts",
     "db:generate": "vpx scripts/sqlite-generate.ts",
-    "db:check": "vpx scripts/sqlite-generate.ts --check"
+    "db:check": "vpx scripts/sqlite-generate.ts --check",
+    "chat": "vpx src/chat.ts"
   },
   "dependencies": {
     "@botiverse/oar": "catalog:",
@@ -27,7 +29,6 @@
     "@modelcontextprotocol/sdk": "catalog:",
     "@vibevalley/agent": "workspace:*",
     "@vibevalley/ai": "workspace:*",
-    "@vibevalley/bridge": "workspace:*",
     "@vibevalley/home": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",

@@ -1,34 +1,28 @@
-// The command line run in a test: against the whole farm on a free port, with a Stdio of its own and no environment.
+// The command line run in a test: in the process, with a Stdio of its own and no environment, pointed at a whole farm
+// (@vibevalley/server/testing).
 
 import { NodeServices } from "@effect/platform-node";
-import { ConfigProvider, Effect, Layer, Sink, Stdio, Stream } from "effect";
+import { ConfigProvider, Effect, Layer, Option, Schema, Sink, Stdio, Stream } from "effect";
 import { TerminalCapabilities } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
-import { run } from "#/cli.ts";
-import { app } from "#/http/app.ts";
-import { registryOf } from "#/runtime/runtime.ts";
+import { run } from "./main.ts";
 
-import { testConfig } from "./layers.ts";
-import { helper, installedOnly } from "./worker.ts";
-import { quietApp } from "./world.ts";
+export { farm, lookIn, memoriesOf, workingFarm } from "@vibevalley/server/testing";
 
-/** The whole farm on a free port; the command line is pointed at it. */
-export const farm = Effect.gen(function* () {
-  let address = "";
-  yield* Layer.build(app(testConfig(), 0, (a) => Effect.sync(() => void (address = a)), quietApp));
-  return "http://" + address;
-});
-
-/** The same with the test helper as its only runtime (pi, testing/worker.ts), so an issue can be worked from the command
- * line as an agent would. */
-export const workingFarm = Effect.gen(function* () {
-  let address = "";
-  const given = [helper()];
-  const runtime = { registry: registryOf(given), probe: installedOnly(given), background: false };
-  yield* Layer.build(app(testConfig(), 0, (a) => Effect.sync(() => void (address = a)), { ...quietApp, runtime }));
-  return "http://" + address;
-});
+/** The failure stderr ends with (output.ts's printFailure). */
+const failureOf = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Struct({
+      error: Schema.Struct({
+        tag: Schema.String,
+        message: Schema.String,
+        status: Schema.optionalKey(Schema.Int),
+        next: Schema.optionalKey(Schema.Array(Schema.Struct({ say: Schema.String, run: Schema.optionalKey(Schema.Array(Schema.String)) }))),
+      }),
+    }),
+  ),
+);
 
 const text = (chunk: string | Uint8Array) => (typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
 
@@ -51,8 +45,6 @@ export const cli = (args: string[], stdin = "", env: Record<string, string> = {}
     );
     [out, err] = [out.replace(/\n$/u, ""), err.replace(/\n$/u, "")];
     const last = err.split("\n").at(-1) ?? "";
-    const failure = last.startsWith('{"error"')
-      ? (JSON.parse(last) as { error: { tag: string; message: string; next?: { say: string; run?: string[] }[] } }).error
-      : undefined;
+    const failure = Option.getOrUndefined(Option.map(failureOf(last), (f) => f.error));
     return { code, out, err, failure };
   });

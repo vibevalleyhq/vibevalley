@@ -21,7 +21,7 @@
 - 折法和拼帧 `apps/server/src/projection`：`reduce.ts` 的 `reduce`、`frame.ts` 的 `frameOf`，用各模块的规则（`session/roster.ts`、`channel/messages.ts`、`issue/status.ts`、`game/view.ts`、`game/view.ts` 的 `effectsOf`、`inbox/items.ts`、`ingress/`、`mailbox/`、`cron/when.ts`）；`projection.ts` 把它们交给 `core`（`Projection`）。`emptyWorkspaceState` 在 `core.ts`。`reduce` 只在工单或帮工的集合引用变了时重算工单状态；聊天气泡、花费这类事实不重算，`projection/reduce.test.ts` 守着这条。
 - `apps/server/src/http`：`api.ts` 按 `endpoints` 挂每个接口，`streams.ts` 三条流，`app.ts` 组装和开始答 HTTP；`handlers/<概念>.ts` 各实现一段 `Handlers`，根目录的 `handlers.ts` 合起来。
 - 能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出，`docs:verify` 查它是不是最新。
-- 命令行 `apps/server/src/cli.ts`：每个接口一条命令（从 `endpoints` 来），`state`、`events`、`issue work`；`runtime chat` 和自己的 agent 不经服务端。
+- 命令行 `apps/cli`（`@vibevalley/cli`，入口 `src/main.ts`）：一条命令是一件事，经 `VibeValleyApi` 调服务端；`reach.ts` 写着每个接口由哪条命令用到、哪些只经 `api call`；终端里的对话是服务端的程序 `apps/server/src/chat.ts`，命令行把终端交给它。
 - 「连接到本机」 `apps/server/src/lan/lan.ts` 的 `remoteMay`：从 `endpoints` 和三条流里挑 `can` 有 `remote` 的。
 - 页面 `apps/web/src/infra/frame.ts`（读 `/state` 和 `/live`），命令用 `VibeValleyApi`。
 - Core 不写状态文件；构造时为空，由各模块从数据库施加恢复事实。
@@ -75,9 +75,9 @@ Session 的身份、阶段、最近报告和资源恢复字段只在 session 表
 
 **命令行是皮**
 
-- `vibevalley <模块> [<名词>] <动词> [about 的值…] [--json 输入|-|@文件]` 经 HTTP 调服务端，不自己打开 `vibevalley.db`；连哪个服务端是 `--server`、`VIBEVALLEY_SERVER`，再没有就读家目录的 `server.json`（服务端监听上以后写进去、停下时收回，写着地址和 pid，pid 不在了就不认；桌面版的服务端在随机端口上，靠它找到），最后是 `http://127.0.0.1:8787`。命令树搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），从 `endpoints` 生成，每个操作一条命令、有帮助；位置参数并进 `--json` 的输入，发出去以前照接口的 Schema 查；`about` 的字段（比如 id）写在命令后面或放进 `--json` 都行，两边都没有是 `MissingArgument`；有输入的接口都收 `--json`。请求、流、读写和退出都走 Effect（`HttpClient`、`Sse`、`Stdio`、`NodeRuntime.runMain`）。
-- 输出是给脚本和 agent 读的：stdout 只放 JSON，失败是 stderr 最后一行的 `{"error":{…,"next":[…]}}`，退出码分得出是哪一种（[开发](docs/development.md#只用命令行派一个活)）。
-- 手写的只有组合命令：`state`（`/state` 的帧）、`events`（一直看 `/events`）、`issue work <id>`（挪到待办，跟着 `/state` 的帧等它交回来，打出改动）；和不经服务端的本机工具 `runtime chat`。直接聊不算农场的活：没有工单，不进核心状态、轨迹和花费。
+- 命令行是自己的包 `apps/cli`，经 HTTP 调服务端，不载入服务端、不打开它的库；连哪个服务端是 `--server`、`VIBEVALLEY_SERVER`，再没有就读家目录的 `server.json`（`@vibevalley/home`：服务端监听上以后写进去、停下时收回，写着地址和 pid，pid 不在了就不认；桌面版的服务端在随机端口上，靠它找到），最后是 `http://127.0.0.1:8787`。命令搭在 `effect/cli` 上，一条命令是一件事（`issue new|work|answer|accept…`、`channel say`、`pkm capture`），参数由 `Flag`、`Argument` 写出，经 `VibeValleyApi` 调；接口的全集经 `api list`、`api call <操作>`，后者发出去以前照接口的 Schema 查。请求、流、读写和退出都走 Effect（`HttpClient`、`Sse`、`Stdio`、`NodeRuntime.runMain`）。
+- 输出是给 agent 和人读的：默认是短文字，`--format json` 是接口的形状；失败是 stderr 最后一行的 `{"error":{…,"next":[…]}}`，退出码分得出是哪一种（[开发](docs/development.md#只用命令行派一个活)）。
+- 工单的动作由服务端给（`stage.acts`），命令按 `issueVerbs` 的词要它；`issue work <号>` 派出去以后跟着 `/state` 的帧等它交回来，打出改动。终端里的对话（不带命令、`runtime chat`）要服务端的农机、模型和配置，是服务端的程序 `apps/server/src/chat.ts`，命令行把终端交给它（`VIBEVALLEY_CHAT` 指到它，桌面版的启动脚本设）。直接聊不算农场的活：没有工单，不进核心状态、轨迹和花费。
 - **试跑**：会删、会合、会关、会让帮工走的接口在 `endpoints` 里带 `dryRun`，指向同参数、同请求体、答复 `Preview`（`{ does }`）的另一个接口；命令行的 `--dry-run` 调它。试跑归拥有规则的服务：能不能做是一处判断，真做和试跑都过它（工单的 `settledMove`，档案的 `deletableAgent`，记性的 `forgettable`……），所以试跑说能做的，真做不会因为同一个原因被拒；试跑不写库、不施加事实、不碰 git。每个 `delete` 都带试跑（`cli.test.ts` 查）。
 - **拒绝带下一步**：`Refused`、`Missing` 有 `next`，每条是 `{ say, run? }`，`run` 是能原样接在命令后面跑的话，由拒绝的那一处给出。找不到的必须说去哪儿找（`missing` 的 `next` 必填，去处在 `errors.ts` 的 `lookIn`）；工单和计划的拒绝给出它们现在能做的动作（工单的 `nextSteps`，计划的 `graphNext`、`stepNext`）；要主人想一句话或拿主意的只给 `say`。
 
@@ -151,7 +151,7 @@ HTTP 命令入口与页面 WebSocket 共用来源判断：Host 应为回环地�
 - `apps/server/src/core/core.test.ts` 里另有：`seq` 每次改了状态的提交加一、没变的不加，帧带着它；`http/api.test.ts` 的「a request key」：同一个键只做一次、并发的等第一个、失败不记；`flows/request.test.ts`：经处理函数，工单的建和挪、开串、记一条记性同一个键只做一次，答复的 `seq` 由第一帧不小于它的帧看见，三个设值发两次只改一次。
 - `apps/server/src/core/core.test.ts`：旧 state.json 不参与恢复且不被改写；事实盖时间、去重、阶段独立更新和合帧。Session 与私聊流程验证数据库恢复、资源上下文和位置保留。
 - `apps/server/src/core/golden.test.ts`：几千个随机事实逐个比状态、特效和视图（`reduce.jsonl.gz`）；`cron/cron.test.ts` 查折法和出帧填的话。
-- `apps/server/src/cli.test.ts`：每个接口都有命令、调一个接口打出回答、失败时 stdout 是空的、退出码按种类、拒绝的 `next` 原样能跑、每个 `delete` 都有同形状的试跑且试跑不动东西、`lookIn` 的每条命令都在。`apps/server/src/cli/golden.test.ts`：帮助、典型的错误和试跑录在 `cli/testdata/cli.jsonl.gz`，改了 `vp run golden:update cli` 再看 diff。`scripts/verify-server.test.ts`：沙箱里只用命令行把一张工单派出去、交回来、试跑完成、完成。`lan/lan.test.ts`：「连接到本机」按 `can` 放行。
+- `apps/cli/src/main.test.ts`：每个接口由一条带例子的命令或 `api` 够得着、默认的文字比 JSON 短、失败时 stdout 是空的、退出码按种类、拒绝的 `next` 原样能跑、每个 `delete` 都有同形状的试跑且试跑不动东西、`lookIn` 的每条命令都在、只用命令行把一张工单从头做到尾。`apps/cli/src/golden.test.ts`：帮助、典型的错误和试跑录在 `apps/cli/src/testdata/cli.jsonl.gz`，改了 `vp run golden:update cli` 再看 diff。`scripts/verify-server.test.ts`：沙箱里只用命令行把一张工单派出去、交回来、试跑完成、完成。`lan/lan.test.ts`：「连接到本机」按 `can` 放行。
 - `packages/protocol/src/api.test.ts`：每个操作名是 `模块[.名词].动词`、单数、路径各不相同；试跑叫 `preview<动词>`；`about` 的字段输入里都有。`apps/server/src/http/api.test.ts`：接口都是 POST，输入不合 Schema 是 400，不在表里的路径 404。
 - 契约：`apps/web/test/*.spec.ts` 每个 worker 起一个真的服务端，经接口和三条流走一遍每块页面。
 - 能力表：`vp run docs:verify`（`scripts/capabilities.ts --check`）。

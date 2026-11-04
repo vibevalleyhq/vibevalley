@@ -1,7 +1,7 @@
 // vp run golden:update [-- <where>…]: rewrites the golden data with what the rules answer now, then look at the diff.
 // With no <where>, every golden file; with some, only theirs: a server module (core for the core state's reduce, rules
-// and play; setting, issue, tool…: the tests in apps/server/src/<module>) or a package with golden data (ai: the tests
-// in packages/ai).
+// and play; setting, issue, tool…: the tests in apps/server/src/<module>) or another package with golden data (ai: the
+// tests in packages/ai; cli: the command line's answers in apps/cli).
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -18,8 +18,9 @@ function run(cwd: string, cmd: string[]) {
 
 // A "--" before the names (as vp run wanted) is not a name.
 const wanted = process.argv.slice(2).filter((a) => a !== "--");
-/** The packages whose tests read golden data, besides the server. */
-const packages = ["ai"];
+/** The packages whose tests read golden data, besides the server, by where they are. */
+const places: Readonly<Record<string, string>> = { ai: "packages/ai", cli: "apps/cli" };
+const packages = Object.keys(places);
 const isPackage = (w: string) => packages.includes(w);
 const unknown = wanted.filter((w) => !isPackage(w) && !existsSync(join(root, "apps/server/src", w)));
 if (unknown.length > 0) {
@@ -29,4 +30,4 @@ if (unknown.length > 0) {
 // vp test itself, not the cached test task: with VIBEVALLEY_GOLDEN set the run writes files, and a replay would not.
 const modules = wanted.filter((w) => !isPackage(w));
 if (wanted.length === 0 || modules.length > 0) run("apps/server", ["vp", "test", "run", ...modules.map((m) => `src/${m}/`)]);
-for (const p of wanted.length === 0 ? packages : wanted.filter(isPackage)) run(`packages/${p}`, ["vp", "test", "run"]);
+for (const p of wanted.length === 0 ? packages : wanted.filter(isPackage)) run(places[p]!, ["vp", "test", "run"]);

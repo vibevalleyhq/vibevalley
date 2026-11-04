@@ -21,10 +21,10 @@ const projectGroup = Command.make("project").pipe(
         (all) => show(all, (ps) => ps.map(projectLine).join("\n")),
       ),
     ).pipe(
-      Command.withDescription(t("server.cli.command.project.list")),
-      Command.withExamples([{ command: "vibevalley project list", description: t("server.cli.example.projectList.about") }]),
+      Command.withDescription(t("cli.command.project.list")),
+      Command.withExamples([{ command: "vibevalley project list", description: t("cli.example.projectList.about") }]),
     ),
-    Command.make("show", { project: nameArg("project", "server.cli.arg.project") }, (o) =>
+    Command.make("show", { project: nameArg("project", "cli.arg.project") }, (o) =>
       Effect.gen(function* () {
         const all = yield* ask((api) => api.project.list());
         const p = yield* pick(
@@ -32,17 +32,17 @@ const projectGroup = Command.make("project").pipe(
           o.project,
           (x) => [x.name],
           (x) => x.name,
-          t("server.cli.what.project"),
+          t("cli.what.project"),
         );
         yield* show(p, projectLine);
       }),
     ).pipe(
-      Command.withDescription(t("server.cli.command.project.show")),
-      Command.withExamples([{ command: "vibevalley project show web", description: t("server.cli.example.projectShow.about") }]),
+      Command.withDescription(t("cli.command.project.show")),
+      Command.withExamples([{ command: "vibevalley project show web", description: t("cli.example.projectShow.about") }]),
     ),
     Command.make(
       "add",
-      { name: nameArg("name", "server.cli.arg.projectName"), repo: Flag.String("repo").pipe(Flag.optional, Flag.withDescription(t("server.cli.flag.repo"))) },
+      { name: nameArg("name", "cli.arg.projectName"), repo: Flag.String("repo").pipe(Flag.optional, Flag.withDescription(t("cli.flag.repo"))) },
       (o) => {
         const github = given(o.repo);
         return change({
@@ -52,11 +52,11 @@ const projectGroup = Command.make("project").pipe(
         });
       },
     ).pipe(
-      Command.withDescription(t("server.cli.command.project.add")),
-      Command.withExamples([{ command: "vibevalley project add web --repo https://github.com/me/web", description: t("server.cli.example.projectAdd.about") }]),
+      Command.withDescription(t("cli.command.project.add")),
+      Command.withExamples([{ command: "vibevalley project add web --repo https://github.com/me/web", description: t("cli.example.projectAdd.about") }]),
     ),
   ]),
-  Command.withDescription(t("server.cli.group.project.about")),
+  Command.withDescription(t("cli.group.project.about")),
 );
 
 const agentLine = (a: T.Agent) => [a.id, a.name, a.role, a.runtime, a.enabled ? "" : "off"].filter((x) => x !== "").join("  ");
@@ -69,10 +69,10 @@ const agentGroup = Command.make("agent").pipe(
         (all) => show(all, (as) => as.map(agentLine).join("\n")),
       ),
     ).pipe(
-      Command.withDescription(t("server.cli.command.agent.list")),
-      Command.withExamples([{ command: "vibevalley agent list", description: t("server.cli.example.agentList.about") }]),
+      Command.withDescription(t("cli.command.agent.list")),
+      Command.withExamples([{ command: "vibevalley agent list", description: t("cli.example.agentList.about") }]),
     ),
-    Command.make("show", { agent: nameArg("agent", "server.cli.arg.agent") }, (o) =>
+    Command.make("show", { agent: nameArg("agent", "cli.arg.agent") }, (o) =>
       Effect.gen(function* () {
         const all = yield* ask((api) => api.agent.list());
         const a = yield* pick(
@@ -80,7 +80,7 @@ const agentGroup = Command.make("agent").pipe(
           o.agent,
           (x) => [x.id, x.name],
           (x) => `${x.id} (${x.name})`,
-          t("server.cli.what.agent"),
+          t("cli.what.agent"),
         );
         yield* show(a, (x) =>
           [
@@ -94,11 +94,11 @@ const agentGroup = Command.make("agent").pipe(
         );
       }),
     ).pipe(
-      Command.withDescription(t("server.cli.command.agent.show")),
-      Command.withExamples([{ command: t("server.cli.example.agentShow.run"), description: t("server.cli.example.agentShow.about") }]),
+      Command.withDescription(t("cli.command.agent.show")),
+      Command.withExamples([{ command: t("cli.example.agentShow.run"), description: t("cli.example.agentShow.about") }]),
     ),
   ]),
-  Command.withDescription(t("server.cli.group.agent.about")),
+  Command.withDescription(t("cli.group.agent.about")),
 );
 
 const sessionLine = (s: T.Session) =>
@@ -106,19 +106,19 @@ const sessionLine = (s: T.Session) =>
     .filter((x) => x !== "")
     .join("  ");
 
-const sessionArg = nameArg("session", "server.cli.arg.session");
+const sessionArg = nameArg("session", "cli.arg.session");
 
 const sessionGroup = Command.make("session").pipe(
   Command.withSubcommands([
-    Command.make("list", { agent: Flag.String("agent").pipe(Flag.optional, Flag.withDescription(t("server.cli.flag.agent"))) }, (o) => {
+    Command.make("list", { agent: Flag.String("agent").pipe(Flag.optional, Flag.withDescription(t("cli.flag.agent"))) }, (o) => {
       const agent = given(o.agent);
       return Effect.flatMap(
         ask((api) => api.session.list(agent === undefined ? {} : { agent })),
         (all) => show(all, (ss) => ss.map(sessionLine).join("\n")),
       );
     }).pipe(
-      Command.withDescription(t("server.cli.command.session.list")),
-      Command.withExamples([{ command: "vibevalley session list", description: t("server.cli.example.sessionList.about") }]),
+      Command.withDescription(t("cli.command.session.list")),
+      Command.withExamples([{ command: "vibevalley session list", description: t("cli.example.sessionList.about") }]),
     ),
     Command.make("show", { session: sessionArg }, (o) =>
       Effect.flatMap(
@@ -126,17 +126,17 @@ const sessionGroup = Command.make("session").pipe(
         (s) => show(s, (x) => [sessionLine(x), x.brief.split("\n")[0] ?? "", x.worktree ?? ""].filter((l) => l !== "").join("\n")),
       ),
     ).pipe(
-      Command.withDescription(t("server.cli.command.session.show")),
-      Command.withExamples([{ command: "vibevalley session show w3", description: t("server.cli.example.sessionShow.about") }]),
+      Command.withDescription(t("cli.command.session.show")),
+      Command.withExamples([{ command: "vibevalley session show w3", description: t("cli.example.sessionShow.about") }]),
     ),
     Command.make("stop", { session: sessionArg }, (o) =>
-      change({ name: "session stop", does: (api) => api.session.stop({ id: o.session }), said: () => t("server.cli.session.stopped", { session: o.session }) }),
+      change({ name: "session stop", does: (api) => api.session.stop({ id: o.session }), said: () => t("cli.session.stopped", { session: o.session }) }),
     ).pipe(
-      Command.withDescription(t("server.cli.command.session.stop")),
-      Command.withExamples([{ command: "vibevalley session stop w3", description: t("server.cli.example.sessionStop.about") }]),
+      Command.withDescription(t("cli.command.session.stop")),
+      Command.withExamples([{ command: "vibevalley session stop w3", description: t("cli.example.sessionStop.about") }]),
     ),
   ]),
-  Command.withDescription(t("server.cli.group.session.about")),
+  Command.withDescription(t("cli.group.session.about")),
 );
 
 const runtimeLine = (r: T.RuntimeInfo) =>
@@ -150,14 +150,14 @@ export const runtimeCommands = [
       (all) => show(all, (rs) => rs.map(runtimeLine).join("\n")),
     ),
   ).pipe(
-    Command.withDescription(t("server.cli.command.runtime.list")),
-    Command.withExamples([{ command: "vibevalley runtime list", description: t("server.cli.example.runtimeList.about") }]),
+    Command.withDescription(t("cli.command.runtime.list")),
+    Command.withExamples([{ command: "vibevalley runtime list", description: t("cli.example.runtimeList.about") }]),
   ),
-  Command.make("refresh", { runtime: nameArg("runtime", "server.cli.arg.runtime") }, (o) =>
+  Command.make("refresh", { runtime: nameArg("runtime", "cli.arg.runtime") }, (o) =>
     change({ name: "runtime refresh", does: (api) => api.runtime.refresh({ id: o.runtime }), said: runtimeLine }),
   ).pipe(
-    Command.withDescription(t("server.cli.command.runtime.refresh")),
-    Command.withExamples([{ command: "vibevalley runtime refresh claude", description: t("server.cli.example.runtimeRefresh.about") }]),
+    Command.withDescription(t("cli.command.runtime.refresh")),
+    Command.withExamples([{ command: "vibevalley runtime refresh claude", description: t("cli.example.runtimeRefresh.about") }]),
   ),
 ];
 

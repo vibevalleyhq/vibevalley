@@ -1,5 +1,5 @@
 // Writes docs/reference/capabilities.md from the endpoint table (packages/protocol/src/api.ts): what each endpoint does,
-// in the command line's words (server.cli.op in the zh dictionary), and who may call it, by its `can`. --check fails when the file is not what the table says (docs:verify runs it).
+// in the command line's words (cli.op in the zh dictionary), and who may call it, by its `can`. --check fails when the file is not what the table says (docs:verify runs it).
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -8,7 +8,7 @@ import { endpoints, pathOf } from "@vibevalley/protocol/api";
 
 const out = join(import.meta.dirname, "..", "docs/reference/capabilities.md");
 
-const words: unknown = JSON.parse(readFileSync(join(import.meta.dirname, "..", "packages/i18n/locales/zh/server.cli.json"), "utf8"));
+const words: unknown = JSON.parse(readFileSync(join(import.meta.dirname, "..", "packages/i18n/locales/zh/cli.json"), "utf8"));
 /** The line of help an op has, by its dotted path in the dictionary. */
 const said = (path: readonly string[]): string => {
   let at: unknown = words;

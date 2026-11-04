@@ -2,13 +2,16 @@
 // what typical mistakes, refusals and dry runs print, exit code and all. A command added, renamed or reworded shows up
 // as a diff here; `vp run golden:update cli` writes the new answers back, to be read before kept.
 
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { cli, farm } from "#/testing/cli.ts";
-import { checkCases, goldenCases } from "#/testing/golden.ts";
+import { checkCases, goldenCasesAt } from "@vibevalley/testkit/golden";
 
-const cases = goldenCases("cli", "cli.jsonl.gz");
+import { cli, farm } from "./testing.ts";
+
+const cases = goldenCasesAt(resolve(import.meta.dirname, "testdata", "cli.jsonl.gz"));
 
 describe("the command line's answers", () => {
   it.live("are what they were", () =>

@@ -1,8 +1,9 @@
 // Packages the macOS app (dist/VibeValley-<version>-<arch>.dmg for a first install, .zip for the app's own updates, and
 // release.json that says what they are: src/releases.ts): the shell from build/, and three
 // resources the shell finds under process.resourcesPath (src/main.ts): web/ is apps/web/dist, island/ the island's
-// release build, server/ is apps/server's bundle (its `vp pack`, dist/main.mjs) with the dependencies it leaves out in
-// node_modules and the few files it reads at run time (apps/server/src/assets.ts), at the paths it reads them from.
+// release build, server/ is apps/server's bundle (its `vp pack`, dist/main.mjs and dist/chat.mjs) with the dependencies
+// it leaves out in node_modules and the few files it reads at run time (apps/server/src/assets.ts), at the paths it reads
+// them from; cli/ is the command line's bundle (apps/cli, everything in it) with its guide beside it (apps/cli/src/assets.ts).
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -11,6 +12,7 @@ import { join } from "node:path";
 
 import { build, Platform } from "electron-builder";
 
+import { cliFiles } from "@vibevalley/cli/assets";
 import { serverFiles } from "@vibevalley/server/assets";
 import { baselineHash } from "@vibevalley/server/baseline";
 
@@ -21,6 +23,7 @@ const desktop = join(import.meta.dirname, "..");
 const repo = join(desktop, "../..");
 const stage = join(desktop, "dist/stage");
 const server = join(stage, "server");
+const cli = join(stage, "cli");
 
 const sh = (cwd: string, cmd: string, ...args: string[]) => execFileSync(cmd, args, { cwd, stdio: "inherit" });
 sh(repo, "vp", "run", "--filter", "@vibevalley/web", "build");
@@ -46,6 +49,9 @@ for (const name of readdirSync(server))
 cpSync(assets, server, { recursive: true });
 rmSync(assets, { recursive: true, force: true });
 rmSync(join(server, "node_modules", "@vibevalley"), { recursive: true, force: true });
+// The command line is one bundle with nothing beside it but its guide: it loads none of the server.
+sh(join(repo, "apps/cli"), "vp", "pack", "--out-dir", join(cli, "dist"));
+for (const path of cliFiles) cpSync(join(repo, "apps/cli", path), join(cli, path), { recursive: true });
 // Nor what only an editor reads: the dependencies' source maps and type declarations, a third of the server's files.
 // Neither is loaded at run time (a missing map only leaves a stack trace unmapped); docs and licences stay, as an agent's
 // SDK may read its own.
@@ -64,9 +70,10 @@ const version = isVersion(asked) ? asked : "0.0.0";
 const dist = join(desktop, "dist");
 const channel = channels[channelOf(version, true)];
 
-// The command line in the app (Resources/bin/<command>, linked into ~/.local/bin by 「安装命令行」, src/cli.ts): the
-// app's own Node runs the server's cli.mjs, on this channel's farm unless VIBEVALLEY_HOME says otherwise. VIBEVALLEY_APP
-// lets `app open` start the app when it is not running.
+// The command line in the app (Resources/bin/<command>, linked into ~/.local/bin by 「安装命令行」, src/commandLine.ts):
+// the app's own Node runs cli/dist/main.mjs, on this channel's farm unless VIBEVALLEY_HOME says otherwise.
+// VIBEVALLEY_APP lets `app open` start the app when it is not running; VIBEVALLEY_CHAT is the server's conversation
+// program, which the command line hands its terminal to (apps/cli src/chat.ts).
 const launcher = join(stage, "bin", channel.command);
 mkdirSync(join(stage, "bin"), { recursive: true });
 writeFileSync(
@@ -83,7 +90,8 @@ done
 resources=\${here%/*}/..
 export VIBEVALLEY_HOME="\${VIBEVALLEY_HOME:-$HOME/.vibevalley${channel.suffix}}"
 export VIBEVALLEY_APP="$resources/../.."
-ELECTRON_RUN_AS_NODE=1 exec "$resources/../MacOS/${channel.name}" "$resources/server/dist/cli.mjs" "$@"
+export VIBEVALLEY_CHAT="$resources/server/dist/chat.mjs"
+ELECTRON_RUN_AS_NODE=1 exec "$resources/../MacOS/${channel.name}" "$resources/cli/dist/main.mjs" "$@"
 `,
   { mode: 0o755 },
 );
@@ -100,6 +108,7 @@ await build({
       { from: join(repo, "apps/web/dist"), to: "web" },
       { from: islandBinary, to: "island/VibeValleyIsland" },
       { from: join(stage, "bin"), to: "bin" },
+      { from: cli, to: "cli" },
     ],
     // extraResources leaves out every node_modules; the server needs its own, so it is copied in whole.
     afterPack: async (ctx) => {

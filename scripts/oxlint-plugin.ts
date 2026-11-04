@@ -196,7 +196,7 @@ const han = /[\p{Script=Han}、，。：；（）！？「」【】〔〕]/u;
  * file's place (apps/web/src/farm/phone/x.tsx: web.farm.phone, then web.farm, then web).
  */
 export function catalogOf(filename: string): string {
-  const at = /\/apps\/(server|web|desktop|mobile)\/(?:src\/)?(.*)$/u.exec(filename.replaceAll("\\", "/"));
+  const at = /\/apps\/(server|web|desktop|mobile|cli)\/(?:src\/)?(.*)$/u.exec(filename.replaceAll("\\", "/"));
   const host = at?.[1];
   const rest = at?.[2];
   if (host === undefined || rest === undefined) return "shared";

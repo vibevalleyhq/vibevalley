@@ -4,9 +4,8 @@ import { Effect } from "effect";
 import { endpoints } from "@vibevalley/protocol/api";
 import { Preview } from "@vibevalley/protocol/schema";
 
-import { reach } from "./cli/reach.ts";
-import { lookIn, memoriesOf } from "./errors.ts";
-import { cli, farm, workingFarm } from "./testing/cli.ts";
+import { reach } from "./reach.ts";
+import { cli, farm, lookIn, memoriesOf, workingFarm } from "./testing.ts";
 
 const json = (text: string): unknown => JSON.parse(text);
 

@@ -18,7 +18,7 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { orchestrator } from "#/base/actor.ts";
-import { standaloneLlm } from "#/cli/chat.ts";
+import { standaloneLlm } from "#/chat/chat.ts";
 import { casesIn, check, committed, type EvalCase, isInput, stubbed } from "#/testing/evals.ts";
 import { world } from "#/testing/world.ts";
 import { Tool } from "#/tool/tool.ts";

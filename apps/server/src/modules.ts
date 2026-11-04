@@ -25,7 +25,7 @@ export const modules: readonly Module[] = [
   { name: "Gamification", parts: ["game"] },
   {
     name: "Gateway",
-    parts: ["http", "mcp", "lan", "connector", "voice", "handlers.ts", "cli.ts", "cli", "main.ts", "services.ts", "modules.ts", "projection"],
+    parts: ["http", "mcp", "lan", "connector", "voice", "handlers.ts", "chat.ts", "chat", "main.ts", "services.ts", "modules.ts", "projection"],
   },
 ];
 

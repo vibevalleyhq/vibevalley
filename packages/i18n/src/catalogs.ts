@@ -3,293 +3,7 @@
 /** Each language's catalogs by namespace. */
 export const catalogs = {
   zh: {
-    desktop: {
-      open: "打开 VibeValley",
-      quit: "退出",
-      cannotStart: "VibeValley 起不来",
-      seeLog: "{reason}，日志在 {log}",
-      noAddress: "服务端 {seconds} 秒内没有发布就绪地址",
-      failed: "服务端启动失败：{why}",
-      exited: "服务端退出了（{code}）",
-      waiting: "{n} 等你",
-      working: "{n} 在干",
-      idle: "没在干",
-      menu: {
-        about: "关于 {app}",
-        hide: "隐藏 {app}",
-        hideOthers: "隐藏其他",
-        unhide: "全部显示",
-        quit: "退出 {app}",
-        edit: "编辑",
-        undo: "撤销",
-        redo: "重做",
-        cut: "剪切",
-        copy: "拷贝",
-        paste: "粘贴",
-        selectAll: "全选",
-        view: "显示",
-        reload: "重新载入",
-        devTools: "开发者工具",
-        resetZoom: "实际大小",
-        zoomIn: "放大",
-        zoomOut: "缩小",
-        fullScreen: "进入全屏幕",
-        window: "窗口",
-        minimize: "最小化",
-        zoom: "缩放",
-        front: "前置全部窗口",
-        close: "关闭窗口",
-      },
-      commandLine: { taken: "{link} 已经有别的文件，没有换掉：先挪开它再装" },
-    },
-    mobile: {
-      cannotRead: "读不出保存的连接：{why}",
-      unreachable: "连不上那台电脑：两台设备要在同一个网络里，那台电脑要允许连接",
-      answered: "那台电脑答了 {status}",
-      cannotSave: "保存配对失败：{why}",
-      cannotRestore: "恢复保存的连接失败：{why}",
-      cannotForget: "忘不掉保存的连接：{why}",
-      callEnded: "通话已结束",
-      noNotify: "没有通知的权限：到系统设置里打开",
-      noCamera: "没有相机的权限：到系统设置里打开，或者粘贴链接",
-      stopScan: "不扫了",
-      title: "连进 VibeValley",
-      intro: "在跑 VibeValley 的电脑上打开「设置」的「连接到本机」，点「添加设备」，扫它的二维码。配对要那台电脑上的主人点头。",
-      scan: "扫二维码",
-      paste: "或者粘贴配对链接",
-      name: "这台手机叫",
-      waiting: "等那台电脑上的主人点头……",
-      ask: "请主人放行",
-      cancel: "取消配对",
-      agora: "声网：{what}失败（{code}）",
-      agoraLost: "声网：连接失败（{reason}）",
-      step: { mute: "静音", unmute: "取消静音", renew: "续期", initialize: "初始化", mic: "打开麦克风", volume: "读取音量", join: "加入频道" },
-      noMic: "没有麦克风权限",
-      android: "安卓手机",
-      phone: "一台手机",
-    },
-    server: {
-      lookIn: {
-        issue: "列出工单，找它的编号",
-        session: "列出帮工，找它的 id",
-        project: "列出项目，找它的名字",
-        runtime: "列出农机，找它的 id",
-        agent: "列出档案，找它的 id",
-        skill: "列出技能，找它的 id",
-        template: "列出模板，找它的 id",
-        cron: "列出定时任务，找它的 id",
-        device: "看连着的设备，找它的 id",
-        archive: "列出管家的旧账",
-        channel: "列出频道，找它的 id",
-        graph: "列出计划，找它的 id",
-        memories: "列出它的记性，找那一条的 id",
-        artifact: "列出稿子，找它的 id",
-        pkm: "列出笔记页，找它的名字",
-      },
-      projectRef: "项目 {id}",
-      helperRef: "帮工 {id}",
-      archiveRef: "旧账 {name}",
-    },
-    "server.agent": {
-      template: {
-        unreadable: "模板读不通：{file}（{why}）",
-        noFile: "不是模板：没有 {file}",
-        badId: "模板的 id「{id}」不行（{file}）：只能用小写字母、数字和 -，最多 32 个字",
-        badVersion: "模板的 version 要是 1 以上的整数（{file}）",
-        noRuntime: "帮工的模板要写推荐的农机（{file}）",
-        noTemplate: "没有 {id} 这个模板",
-        taken: "已经有叫 {id} 的模板了",
-        builtIn: "{id} 是内置的模板，删不了",
-        notFrom: "「{name}」不是从模板装的",
-        gone: "「{name}」的模板 {template} 不在了",
-        delete: "删掉模板「{name}」",
-        deleteKept: "删掉模板「{name}」：从它装的 {installed} 份档案留着",
-      },
-      notSaved: "没存下来：{file} 写不进去（{why}）",
-      orchestratorStays: "默认管家删不了：至少要有一个管家",
-      defaultStaysOrchestrator: "默认管家只能是管家：至少要有一个管家",
-      noAgent: "没有 {id} 这个档案",
-      noSkill: "没有 {id} 这个技能",
-      orchestratorRuntime: "管家只在 VibeValley 自己的 agent 上跑：农机要是 {runtime}",
-      newAgentId: "新档案的 id 要留空；指定 id 请用保存",
-      newSkillId: "新技能的 id 要留空；指定 id 请用保存",
-      removeAgent: "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
-      removeSkill: "删掉技能「{name}」",
-      modelFailed: "模型出错了",
-      noDeepSeekKey: "没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者写进 vibevalley.yaml 的 deepseek.api_key。",
-      refused: { launchArgs: "VibeValley 跑在 server 进程里，没有命令行参数", serviceTier: "DeepSeek 没有服务档位" },
-      unequip: "从 {holders} 的档案里摘掉它",
-      quoted: "「{name}」",
-      efforts: "{runtime} 只有 {efforts} 两档思考强度，没有「{asked}」",
-      effortsAnd: "、",
-    },
-    "server.artifact": {
-      noTitle: "稿子要有个标题",
-      longTitle: "标题太长了，最多 {max} 个字",
-      badKind: "认不得 {kind} 这种稿子，只认 {kinds}",
-      empty: "稿子是空的",
-      tooBig: "一稿最多 {mb} MB",
-      notKept: "稿子没存下来：{why}",
-      missing: "没有 {id} 这份稿子",
-      noVersion: "「{title}」没有第 {version} 稿，最新是第 {latest} 稿",
-      noFile: "「{title}」第 {version} 稿的内容不见了",
-      made: "做了「{title}」",
-      versioned: "「{title}」出了第 {version} 稿",
-      withNote: "{said}：{note}",
-      preview: {
-        remove: "删掉「{title}」和它的 {n} 稿",
-        cards: "对话里的卡片还在，点开说已经删掉了",
-        removeBlock: "删掉块 {id}",
-        removeChildren: "连同 {n} 个子块",
-        removeBlocks: "删掉「{title}」和它的 {n} 块",
-      },
-      untitled: "没起名的稿子",
-      noBatch: "这批改动没有 batchId",
-      demoNotInserted: "演示的块没插进去：{status}",
-      noWriter: "没有能写的帮工：先在档案里打开一个",
-      demoRunning: "演示正在写，写完再点",
-      notApplied: "这一块没写进去",
-      attrNotForType: "这一块是 {type}，不用 {attr}",
-      parentDeleted: "父块 {id} 已经删掉了",
-      afterNotSibling: "没有块 {id}，或它不在这一层",
-      nothingToChange: "没说要改什么",
-      suggestion: {
-        empty: "建议里没有要改的东西",
-        deleteAlone: "删块的建议不能再带别的改动",
-        noBlock: "没有块 {id}，或它已经删掉了",
-        beyond: "建议对着第 {rev} 版，可这一块现在才第 {now} 版",
-        missing: "没有建议 {id}",
-        stale: "这一块从第 {rev} 版起改过了，现在是第 {now} 版；建议作废，让它重看再提",
-        suggested: "主人写过的块不直接改，已经提了建议〔{id}〕，等主人接受",
-      },
-      op: {
-        deleted: "这一块已经删掉了",
-        noAttr: "没有属性 {name}",
-        noBlock: "没有块 {id}",
-        noId: "新块没有 id",
-        taken: "块 {id} 已经有了",
-        unknownType: "不认识的块类型 {type}",
-        badKey: "不是有效的顺序键：{key}",
-        missing: "没有这一块",
-        noText: "这一块没有字",
-        noRev: "没有第 {rev} 版",
-        changed: "这一块刚被别人改过",
-        underSelf: "不能挪到自己下面",
-        splitAtEnd: "这一块刚被别人改过，从末尾拆开了",
-        splitOutside: "拆分位置 {at} 不在字里（{length} 个字）",
-        intoSelf: "不能并进自己",
-      },
-      demo: {
-        "0": {
-          heading: "背景 · 演示",
-          paragraphs: {
-            "0": "（演示）这一节是脚本写的，不是帮工真的想出来的。我们这里有好几个帮工，以前一篇文章只能一个人从头写到尾，别人只能等着。",
-            "1": "现在稿子按块存，每一块有自己的版本号。几个帮工各写各的一节，互不抢同一块，谁写的哪一块，左边的归属条一眼就能看出来。",
-            "2": "这篇演示就是想让主人亲眼看一下：三个帮工同时动笔，字一段一段长出来，最后拼成一篇完整的文章。",
-          },
-        },
-        "1": {
-          heading: "做法 · 演示",
-          paragraphs: {
-            "0": "（演示）每个帮工先在自己那一节的末尾插一个空段落，然后每隔一秒左右把这一段整段换新，看起来就是一段话在慢慢长长。",
-            "1": "所有改动都走和主人一样的 op 管线：插入是 insert_block，长字是 update_text，带着上一版的版本号，服务端按顺序一批一批收下。",
-            "2": "如果主人在帮工正写着的那一段里改了字，帮工那一下就会冲突、写不进去；它不抢这一段，接着去写下一段。",
-          },
-        },
-        "2": {
-          heading: "下一步 · 演示",
-          paragraphs: {
-            "0": "（演示）等广播做好以后，页面不用再一秒问一次服务端，帮工写一下，主人这边马上就能看到。",
-            "1": "再往后，帮工想改别人那一节的字，不直接改，而是挂一条建议，等主人点头；写完的一节在大纲里标成写完待看。",
-            "2": "演示到这里就结束了。这篇稿子留着也行，删掉也行，它不会影响任何工单和记性。",
-          },
-        },
-      },
-      badBlockType: "块的类型只能是 {types}",
-      otherArtifact: "这批改动（{batch}）是另一份稿子的",
-      notBlocks: "「{title}」是一整页网页，不按块改：交新的一稿",
-      notHtml: "「{title}」是一起写的，不交新的一稿：一块一块改（artifact_block_create、artifact_block_update）",
-      check: {
-        refused: "页面里有 {n} 处在沙箱里显示不了，改完再交：",
-        more: "还有 {n} 处，改完这些再交会列出来",
-        script: "第 {line} 行的脚本来自 {url}：脚本写在页面里，或者从 {hosts} 加载",
-        style: "第 {line} 行的样式来自 {url}：样式写在页面里，或者从 {hosts} 加载",
-        font: "第 {line} 行的字体来自 {url}：字体内联成 data:，或者从 {hosts} 加载",
-        inline: "第 {line} 行的图片或音视频来自 {url}：页面不从外面加载图片，内联成 data:",
-        link: "第 {line} 行的 <link> 连向 {url}：只能连向 {hosts}",
-        form: "第 {line} 行的表单提交到 {url}：页面不能提交表单，用脚本处理它",
-        refresh: '第 {line} 行的 <meta http-equiv="refresh"> 会把页面带走：删掉它',
-        base: "第 {line} 行的 <base href>：删掉它，地址写全",
-        frame: "第 {line} 行的 <{tag}>：页面里不能再嵌一个页面",
-      },
-      edit: {
-        empty: "没有选中要改的字",
-        same: "改成的字和原来一样",
-        notFound: "页面的源码里找不到「{words}」：它可能是脚本画出来的，交给帮工改",
-        many: "「{words}」在页面里有 {n} 处，分不清是哪一处：多选几个字再改，或者交给帮工改",
-        crosses: "「{words}」跨了带格式的几段，这里只改一段里的字：少选几个字，或者交给帮工改",
-        stale: "你看的是第 {version} 稿，最新的是第 {latest} 稿：在最新的一稿上改",
-        note: "主人在页面上改了：「{old}」→「{new}」",
-      },
-    },
-    "server.base": {
-      noFile: "{path}: 没有这个文件",
-      notPort: "{path}: {name} 不是端口：{port}",
-      prPoll: "github.pr_poll_seconds 必须大于 0",
-      homeTaken: "家目录 {home} 正被另一个服务端使用；请连接现有的服务端，或先停掉它",
-      homeUnlocked: "锁不住家目录 {home}",
-      requestKeyLong: "requestKey 太长（最多 {max} 个字符）",
-    },
-    "server.channel": {
-      name: { owner: "主人", orchestrator: "管家" },
-      mention: { orchestrator: "@管家", owner: "@主人", everyone: "@所有人" },
-      channelName: "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字",
-      channelTaken: "已经有叫 {name} 的频道了",
-      hopLimit: "帮工之间已经来回 {limit} 次了，先停一停：等主人说一句再接着叫人。",
-      breaker: "{name} 连续 {failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。",
-      dispatch: {
-        draft: "看代码，起草这张工单",
-        project: "项目",
-        sent: "派 @{id}（{name}）去 {project}：{what}",
-        redraft: "这张工单交给 @{id}（{name}）再起草一版",
-        handedOn: "这张工单交给 @{id}（{name}）接着做，第 {nth} 次派活",
-      },
-      badTarget: "不认识这个地方：{target}（写 #<频道>，比如 #general；或 #<频道>:<消息号>）",
-      noMessage: "频道里没有 {n} 这条消息",
-      empty: "没说什么",
-      sendKeyLong: "sendKey 太长",
-      channelGone: "找不到这个频道",
-      noHelper: "没有 {id} 这个帮工",
-      noChannel: "没有 {id} 这个频道",
-      notOrchestrator: "{id} 不是管家的档案：频道只能交给管家照看",
-      noMessageId: "没有 {id} 这条消息",
-      threadOnlyTitle: "串只能改标题",
-      defaultStays: "默认频道不能归档、不能删：先把别的频道设成默认",
-      deletesChannel: "删掉 {target}，连同它的 {threads} 个串和 {said} 条消息",
-      inUse: "删不了：{why}。可以归档它",
-      helpersThere: "还有帮工在这个频道里干活",
-      cronsThere: "还有 {n} 个定时任务在这里",
-      connectorsThere: "接着连接器",
-      queuedThere: "还有 {n} 张工单排着队要在这里开工",
-      issuesThere: "这里派过 {n} 张工单的活",
-      noAttachment: "没有 {id} 这个附件：先上传，再带着它说话",
-      messageGone: "这条消息已经删了",
-      notYours: "只能改你自己说的话",
-      badEmoji: "回应是一个表情或一个短词，不带空格",
-      threadOnlyInChannel: "串只开在频道里的消息下面",
-      emptyFile: "这个文件是空的",
-      deletes: "删掉 {target} 的第 {number} 条（{name}：{text}），号留着",
-      deletesDeliveries: "还没交出去的 {n} 份不再送",
-      defaultIsChannel: "默认频道只能是一个频道，不能是私聊或串",
-      noDirect: "{target}：你和对方之间没有私聊",
-      noChannelNamed: "没有叫 #{name} 的频道。有：{tags}",
-      absent: "{who} 不在场，没送到",
-      fileTooBig: "文件太大了：至多 {mb} MB",
-      noProfileNamed: "没有叫 {key} 的档案",
-      talkFailed: "没有接上这个会话：{why}",
-      profileDisabled: "{name}已停用",
-    },
-    "server.cli": {
+    cli: {
       flag: {
         prompt: "问一句就走，不进对话",
         runtime: "claude、codex、kimi、pi……；vibevalley 是自己的 agent",
@@ -333,7 +47,7 @@ export const catalogs = {
       },
       command: {
         runtimeChat: "和一个农机直接聊，不经过 VibeValley：不记轨迹和花费",
-        root: "不带命令是和 VibeValley 自己的 agent 聊；别的命令是调 VibeValley 的接口，答复是 JSON",
+        root: "不带命令是和 VibeValley 自己的 agent 聊；别的命令是对农场做的一件件事：答复是短文字，--format json 给接口的形状，guide 说怎么用",
         state: "核心状态（GET {path}）",
         events: "副作用，一行一条（GET {path}）",
         app: {
@@ -407,20 +121,7 @@ export const catalogs = {
         noDryRun: "{command} 没有试跑：去掉 --dry-run 才会做",
         noOp: "没有 {op} 这个接口",
         noSuch: "没有叫「{said}」的{what}；有这些：{these}",
-      },
-      chat: {
-        error: "\n出错了：{why}",
-        compacted: "（前面的对话压成了摘要，原文在 {archive}）",
-        usage: "{aborted, select, true {（停下了，输入 {input}，缓存 {cached}，输出 {output}）} other {（输入 {input}，缓存 {cached}，输出 {output}）}}",
-        hello: "{skills} 个技能，{tools} 个 MCP 工具。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。",
-        forgot: "忘掉了。",
-        noRuntime: "没有 {id} 这个农机",
-        unknownInstall: "{id} 看不出装没装",
-        unusable: "{id} 用不了：{kind}",
-        resumed: "（接着）",
-        direct: "直接聊：不经过 VibeValley，不记轨迹和花费。Ctrl+C 停这一轮，空着时再按退出。",
-        rejected: "没接住：{why}",
-        notSent: "没送进去：{why}",
+        noChat: "这里找不到 VibeValley 的对话程序：从桌面版装的命令行里用它，或在仓库里经 vp run --filter @vibevalley/cli start",
       },
       op: {
         agent: {
@@ -733,6 +434,306 @@ export const catalogs = {
       more: "还有更多：{flag}",
       session: { stopped: "停下了帮工 {session}" },
       what: { agent: "档案", channel: "频道", project: "项目" },
+    },
+    desktop: {
+      open: "打开 VibeValley",
+      quit: "退出",
+      cannotStart: "VibeValley 起不来",
+      seeLog: "{reason}，日志在 {log}",
+      noAddress: "服务端 {seconds} 秒内没有发布就绪地址",
+      failed: "服务端启动失败：{why}",
+      exited: "服务端退出了（{code}）",
+      waiting: "{n} 等你",
+      working: "{n} 在干",
+      idle: "没在干",
+      menu: {
+        about: "关于 {app}",
+        hide: "隐藏 {app}",
+        hideOthers: "隐藏其他",
+        unhide: "全部显示",
+        quit: "退出 {app}",
+        edit: "编辑",
+        undo: "撤销",
+        redo: "重做",
+        cut: "剪切",
+        copy: "拷贝",
+        paste: "粘贴",
+        selectAll: "全选",
+        view: "显示",
+        reload: "重新载入",
+        devTools: "开发者工具",
+        resetZoom: "实际大小",
+        zoomIn: "放大",
+        zoomOut: "缩小",
+        fullScreen: "进入全屏幕",
+        window: "窗口",
+        minimize: "最小化",
+        zoom: "缩放",
+        front: "前置全部窗口",
+        close: "关闭窗口",
+      },
+      commandLine: { taken: "{link} 已经有别的文件，没有换掉：先挪开它再装" },
+    },
+    mobile: {
+      cannotRead: "读不出保存的连接：{why}",
+      unreachable: "连不上那台电脑：两台设备要在同一个网络里，那台电脑要允许连接",
+      answered: "那台电脑答了 {status}",
+      cannotSave: "保存配对失败：{why}",
+      cannotRestore: "恢复保存的连接失败：{why}",
+      cannotForget: "忘不掉保存的连接：{why}",
+      callEnded: "通话已结束",
+      noNotify: "没有通知的权限：到系统设置里打开",
+      noCamera: "没有相机的权限：到系统设置里打开，或者粘贴链接",
+      stopScan: "不扫了",
+      title: "连进 VibeValley",
+      intro: "在跑 VibeValley 的电脑上打开「设置」的「连接到本机」，点「添加设备」，扫它的二维码。配对要那台电脑上的主人点头。",
+      scan: "扫二维码",
+      paste: "或者粘贴配对链接",
+      name: "这台手机叫",
+      waiting: "等那台电脑上的主人点头……",
+      ask: "请主人放行",
+      cancel: "取消配对",
+      agora: "声网：{what}失败（{code}）",
+      agoraLost: "声网：连接失败（{reason}）",
+      step: { mute: "静音", unmute: "取消静音", renew: "续期", initialize: "初始化", mic: "打开麦克风", volume: "读取音量", join: "加入频道" },
+      noMic: "没有麦克风权限",
+      android: "安卓手机",
+      phone: "一台手机",
+    },
+    server: {
+      lookIn: {
+        issue: "列出工单，找它的编号",
+        session: "列出帮工，找它的 id",
+        project: "列出项目，找它的名字",
+        runtime: "列出农机，找它的 id",
+        agent: "列出档案，找它的 id",
+        skill: "列出技能，找它的 id",
+        template: "列出模板，找它的 id",
+        cron: "列出定时任务，找它的 id",
+        device: "看连着的设备，找它的 id",
+        archive: "列出管家的旧账",
+        channel: "列出频道，找它的 id",
+        graph: "列出计划，找它的 id",
+        memories: "列出它的记性，找那一条的 id",
+        artifact: "列出稿子，找它的 id",
+        pkm: "列出笔记页，找它的名字",
+      },
+      projectRef: "项目 {id}",
+      helperRef: "帮工 {id}",
+      archiveRef: "旧账 {name}",
+    },
+    "server.agent": {
+      template: {
+        unreadable: "模板读不通：{file}（{why}）",
+        noFile: "不是模板：没有 {file}",
+        badId: "模板的 id「{id}」不行（{file}）：只能用小写字母、数字和 -，最多 32 个字",
+        badVersion: "模板的 version 要是 1 以上的整数（{file}）",
+        noRuntime: "帮工的模板要写推荐的农机（{file}）",
+        noTemplate: "没有 {id} 这个模板",
+        taken: "已经有叫 {id} 的模板了",
+        builtIn: "{id} 是内置的模板，删不了",
+        notFrom: "「{name}」不是从模板装的",
+        gone: "「{name}」的模板 {template} 不在了",
+        delete: "删掉模板「{name}」",
+        deleteKept: "删掉模板「{name}」：从它装的 {installed} 份档案留着",
+      },
+      notSaved: "没存下来：{file} 写不进去（{why}）",
+      orchestratorStays: "默认管家删不了：至少要有一个管家",
+      defaultStaysOrchestrator: "默认管家只能是管家：至少要有一个管家",
+      noAgent: "没有 {id} 这个档案",
+      noSkill: "没有 {id} 这个技能",
+      orchestratorRuntime: "管家只在 VibeValley 自己的 agent 上跑：农机要是 {runtime}",
+      newAgentId: "新档案的 id 要留空；指定 id 请用保存",
+      newSkillId: "新技能的 id 要留空；指定 id 请用保存",
+      removeAgent: "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
+      removeSkill: "删掉技能「{name}」",
+      modelFailed: "模型出错了",
+      noDeepSeekKey: "没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者写进 vibevalley.yaml 的 deepseek.api_key。",
+      refused: { launchArgs: "VibeValley 跑在 server 进程里，没有命令行参数", serviceTier: "DeepSeek 没有服务档位" },
+      unequip: "从 {holders} 的档案里摘掉它",
+      quoted: "「{name}」",
+      efforts: "{runtime} 只有 {efforts} 两档思考强度，没有「{asked}」",
+      effortsAnd: "、",
+    },
+    "server.artifact": {
+      noTitle: "稿子要有个标题",
+      longTitle: "标题太长了，最多 {max} 个字",
+      badKind: "认不得 {kind} 这种稿子，只认 {kinds}",
+      empty: "稿子是空的",
+      tooBig: "一稿最多 {mb} MB",
+      notKept: "稿子没存下来：{why}",
+      missing: "没有 {id} 这份稿子",
+      noVersion: "「{title}」没有第 {version} 稿，最新是第 {latest} 稿",
+      noFile: "「{title}」第 {version} 稿的内容不见了",
+      made: "做了「{title}」",
+      versioned: "「{title}」出了第 {version} 稿",
+      withNote: "{said}：{note}",
+      preview: {
+        remove: "删掉「{title}」和它的 {n} 稿",
+        cards: "对话里的卡片还在，点开说已经删掉了",
+        removeBlock: "删掉块 {id}",
+        removeChildren: "连同 {n} 个子块",
+        removeBlocks: "删掉「{title}」和它的 {n} 块",
+      },
+      untitled: "没起名的稿子",
+      noBatch: "这批改动没有 batchId",
+      demoNotInserted: "演示的块没插进去：{status}",
+      noWriter: "没有能写的帮工：先在档案里打开一个",
+      demoRunning: "演示正在写，写完再点",
+      notApplied: "这一块没写进去",
+      attrNotForType: "这一块是 {type}，不用 {attr}",
+      parentDeleted: "父块 {id} 已经删掉了",
+      afterNotSibling: "没有块 {id}，或它不在这一层",
+      nothingToChange: "没说要改什么",
+      suggestion: {
+        empty: "建议里没有要改的东西",
+        deleteAlone: "删块的建议不能再带别的改动",
+        noBlock: "没有块 {id}，或它已经删掉了",
+        beyond: "建议对着第 {rev} 版，可这一块现在才第 {now} 版",
+        missing: "没有建议 {id}",
+        stale: "这一块从第 {rev} 版起改过了，现在是第 {now} 版；建议作废，让它重看再提",
+        suggested: "主人写过的块不直接改，已经提了建议〔{id}〕，等主人接受",
+      },
+      op: {
+        deleted: "这一块已经删掉了",
+        noAttr: "没有属性 {name}",
+        noBlock: "没有块 {id}",
+        noId: "新块没有 id",
+        taken: "块 {id} 已经有了",
+        unknownType: "不认识的块类型 {type}",
+        badKey: "不是有效的顺序键：{key}",
+        missing: "没有这一块",
+        noText: "这一块没有字",
+        noRev: "没有第 {rev} 版",
+        changed: "这一块刚被别人改过",
+        underSelf: "不能挪到自己下面",
+        splitAtEnd: "这一块刚被别人改过，从末尾拆开了",
+        splitOutside: "拆分位置 {at} 不在字里（{length} 个字）",
+        intoSelf: "不能并进自己",
+      },
+      demo: {
+        "0": {
+          heading: "背景 · 演示",
+          paragraphs: {
+            "0": "（演示）这一节是脚本写的，不是帮工真的想出来的。我们这里有好几个帮工，以前一篇文章只能一个人从头写到尾，别人只能等着。",
+            "1": "现在稿子按块存，每一块有自己的版本号。几个帮工各写各的一节，互不抢同一块，谁写的哪一块，左边的归属条一眼就能看出来。",
+            "2": "这篇演示就是想让主人亲眼看一下：三个帮工同时动笔，字一段一段长出来，最后拼成一篇完整的文章。",
+          },
+        },
+        "1": {
+          heading: "做法 · 演示",
+          paragraphs: {
+            "0": "（演示）每个帮工先在自己那一节的末尾插一个空段落，然后每隔一秒左右把这一段整段换新，看起来就是一段话在慢慢长长。",
+            "1": "所有改动都走和主人一样的 op 管线：插入是 insert_block，长字是 update_text，带着上一版的版本号，服务端按顺序一批一批收下。",
+            "2": "如果主人在帮工正写着的那一段里改了字，帮工那一下就会冲突、写不进去；它不抢这一段，接着去写下一段。",
+          },
+        },
+        "2": {
+          heading: "下一步 · 演示",
+          paragraphs: {
+            "0": "（演示）等广播做好以后，页面不用再一秒问一次服务端，帮工写一下，主人这边马上就能看到。",
+            "1": "再往后，帮工想改别人那一节的字，不直接改，而是挂一条建议，等主人点头；写完的一节在大纲里标成写完待看。",
+            "2": "演示到这里就结束了。这篇稿子留着也行，删掉也行，它不会影响任何工单和记性。",
+          },
+        },
+      },
+      badBlockType: "块的类型只能是 {types}",
+      otherArtifact: "这批改动（{batch}）是另一份稿子的",
+      notBlocks: "「{title}」是一整页网页，不按块改：交新的一稿",
+      notHtml: "「{title}」是一起写的，不交新的一稿：一块一块改（artifact_block_create、artifact_block_update）",
+      check: {
+        refused: "页面里有 {n} 处在沙箱里显示不了，改完再交：",
+        more: "还有 {n} 处，改完这些再交会列出来",
+        script: "第 {line} 行的脚本来自 {url}：脚本写在页面里，或者从 {hosts} 加载",
+        style: "第 {line} 行的样式来自 {url}：样式写在页面里，或者从 {hosts} 加载",
+        font: "第 {line} 行的字体来自 {url}：字体内联成 data:，或者从 {hosts} 加载",
+        inline: "第 {line} 行的图片或音视频来自 {url}：页面不从外面加载图片，内联成 data:",
+        link: "第 {line} 行的 <link> 连向 {url}：只能连向 {hosts}",
+        form: "第 {line} 行的表单提交到 {url}：页面不能提交表单，用脚本处理它",
+        refresh: '第 {line} 行的 <meta http-equiv="refresh"> 会把页面带走：删掉它',
+        base: "第 {line} 行的 <base href>：删掉它，地址写全",
+        frame: "第 {line} 行的 <{tag}>：页面里不能再嵌一个页面",
+      },
+      edit: {
+        empty: "没有选中要改的字",
+        same: "改成的字和原来一样",
+        notFound: "页面的源码里找不到「{words}」：它可能是脚本画出来的，交给帮工改",
+        many: "「{words}」在页面里有 {n} 处，分不清是哪一处：多选几个字再改，或者交给帮工改",
+        crosses: "「{words}」跨了带格式的几段，这里只改一段里的字：少选几个字，或者交给帮工改",
+        stale: "你看的是第 {version} 稿，最新的是第 {latest} 稿：在最新的一稿上改",
+        note: "主人在页面上改了：「{old}」→「{new}」",
+      },
+    },
+    "server.base": {
+      noFile: "{path}: 没有这个文件",
+      notPort: "{path}: {name} 不是端口：{port}",
+      prPoll: "github.pr_poll_seconds 必须大于 0",
+      homeTaken: "家目录 {home} 正被另一个服务端使用；请连接现有的服务端，或先停掉它",
+      homeUnlocked: "锁不住家目录 {home}",
+      requestKeyLong: "requestKey 太长（最多 {max} 个字符）",
+    },
+    "server.channel": {
+      name: { owner: "主人", orchestrator: "管家" },
+      mention: { orchestrator: "@管家", owner: "@主人", everyone: "@所有人" },
+      channelName: "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字",
+      channelTaken: "已经有叫 {name} 的频道了",
+      hopLimit: "帮工之间已经来回 {limit} 次了，先停一停：等主人说一句再接着叫人。",
+      breaker: "{name} 连续 {failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。",
+      dispatch: {
+        draft: "看代码，起草这张工单",
+        project: "项目",
+        sent: "派 @{id}（{name}）去 {project}：{what}",
+        redraft: "这张工单交给 @{id}（{name}）再起草一版",
+        handedOn: "这张工单交给 @{id}（{name}）接着做，第 {nth} 次派活",
+      },
+      badTarget: "不认识这个地方：{target}（写 #<频道>，比如 #general；或 #<频道>:<消息号>）",
+      noMessage: "频道里没有 {n} 这条消息",
+      empty: "没说什么",
+      sendKeyLong: "sendKey 太长",
+      channelGone: "找不到这个频道",
+      noHelper: "没有 {id} 这个帮工",
+      noChannel: "没有 {id} 这个频道",
+      notOrchestrator: "{id} 不是管家的档案：频道只能交给管家照看",
+      noMessageId: "没有 {id} 这条消息",
+      threadOnlyTitle: "串只能改标题",
+      defaultStays: "默认频道不能归档、不能删：先把别的频道设成默认",
+      deletesChannel: "删掉 {target}，连同它的 {threads} 个串和 {said} 条消息",
+      inUse: "删不了：{why}。可以归档它",
+      helpersThere: "还有帮工在这个频道里干活",
+      cronsThere: "还有 {n} 个定时任务在这里",
+      connectorsThere: "接着连接器",
+      queuedThere: "还有 {n} 张工单排着队要在这里开工",
+      issuesThere: "这里派过 {n} 张工单的活",
+      noAttachment: "没有 {id} 这个附件：先上传，再带着它说话",
+      messageGone: "这条消息已经删了",
+      notYours: "只能改你自己说的话",
+      badEmoji: "回应是一个表情或一个短词，不带空格",
+      threadOnlyInChannel: "串只开在频道里的消息下面",
+      emptyFile: "这个文件是空的",
+      deletes: "删掉 {target} 的第 {number} 条（{name}：{text}），号留着",
+      deletesDeliveries: "还没交出去的 {n} 份不再送",
+      defaultIsChannel: "默认频道只能是一个频道，不能是私聊或串",
+      noDirect: "{target}：你和对方之间没有私聊",
+      noChannelNamed: "没有叫 #{name} 的频道。有：{tags}",
+      absent: "{who} 不在场，没送到",
+      fileTooBig: "文件太大了：至多 {mb} MB",
+      noProfileNamed: "没有叫 {key} 的档案",
+      talkFailed: "没有接上这个会话：{why}",
+      profileDisabled: "{name}已停用",
+    },
+    "server.chat": {
+      error: "\n出错了：{why}",
+      compacted: "（前面的对话压成了摘要，原文在 {archive}）",
+      usage: "{aborted, select, true {（停下了，输入 {input}，缓存 {cached}，输出 {output}）} other {（输入 {input}，缓存 {cached}，输出 {output}）}}",
+      hello: "{skills} 个技能，{tools} 个 MCP 工具。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。",
+      forgot: "忘掉了。",
+      noRuntime: "没有 {id} 这个农机",
+      unknownInstall: "{id} 看不出装没装",
+      unusable: "{id} 用不了：{kind}",
+      resumed: "（接着）",
+      direct: "直接聊：不经过 VibeValley，不记轨迹和花费。Ctrl+C 停这一轮，空着时再按退出。",
+      rejected: "没接住：{why}",
+      notSent: "没送进去：{why}",
     },
     "server.connector": {
       media: { image: "[图片]", file: "[文件]", audio: "[语音]", video: "[视频]", sticker: "[表情]", message: "[消息]", attachment: "[附件]" },
@@ -3897,302 +3898,7 @@ export const catalogs = {
     },
   },
   en: {
-    desktop: {
-      open: "Open VibeValley",
-      quit: "Quit",
-      cannotStart: "VibeValley cannot start",
-      seeLog: "{reason}; the log is at {log}",
-      noAddress: "The server gave no ready address within {seconds} seconds",
-      failed: "The server failed to start: {why}",
-      exited: "The server exited ({code})",
-      waiting: "{n} for you",
-      working: "{n} working",
-      idle: "idle",
-      menu: {
-        about: "About {app}",
-        hide: "Hide {app}",
-        hideOthers: "Hide Others",
-        unhide: "Show All",
-        quit: "Quit {app}",
-        edit: "Edit",
-        undo: "Undo",
-        redo: "Redo",
-        cut: "Cut",
-        copy: "Copy",
-        paste: "Paste",
-        selectAll: "Select All",
-        view: "View",
-        reload: "Reload",
-        devTools: "Developer Tools",
-        resetZoom: "Actual Size",
-        zoomIn: "Zoom In",
-        zoomOut: "Zoom Out",
-        fullScreen: "Toggle Full Screen",
-        window: "Window",
-        minimize: "Minimize",
-        zoom: "Zoom",
-        front: "Bring All to Front",
-        close: "Close Window",
-      },
-      commandLine: { taken: "{link} is another program's file and was not replaced: move it away, then install again" },
-    },
-    mobile: {
-      cannotRead: "The saved connection cannot be read: {why}",
-      unreachable: "Cannot reach that computer: both devices must be on the same network, and that computer must allow connections",
-      answered: "That computer answered {status}",
-      cannotSave: "Saving the pairing failed: {why}",
-      cannotRestore: "Restoring the saved connection failed: {why}",
-      cannotForget: "The saved connection cannot be forgotten: {why}",
-      callEnded: "The call has ended",
-      noNotify: "No permission for notifications: turn it on in the system settings",
-      noCamera: "No permission for the camera: turn it on in the system settings, or paste the link",
-      stopScan: "Stop scanning",
-      title: "Connect to VibeValley",
-      intro:
-        "On the computer running VibeValley, open Connect to this machine under Settings, press Add a device, and scan its QR code. Pairing needs the owner's approval on that computer.",
-      scan: "Scan the QR code",
-      paste: "Or paste the pairing link",
-      name: "This phone is called",
-      waiting: "Waiting for the owner on that computer to approve…",
-      ask: "Ask the owner to let it in",
-      cancel: "Cancel pairing",
-      agora: "Agora: {what} failed ({code})",
-      agoraLost: "Agora: the connection failed ({reason})",
-      step: {
-        mute: "muting",
-        unmute: "unmuting",
-        renew: "renewing",
-        initialize: "starting",
-        mic: "turning on the microphone",
-        volume: "reading the volume",
-        join: "joining the channel",
-      },
-      noMic: "No microphone permission",
-      android: "Android phone",
-      phone: "A phone",
-    },
-    server: {
-      lookIn: {
-        issue: "List the tickets and find its number",
-        session: "List the helpers and find its id",
-        project: "List the projects and find its name",
-        runtime: "List the machines and find its id",
-        agent: "List the profiles and find its id",
-        skill: "List the skills and find its id",
-        template: "List the templates and find its id",
-        cron: "List the scheduled tasks and find its id",
-        device: "See the connected devices and find its id",
-        archive: "List the manager's archive",
-        channel: "List the channels and find its id",
-        graph: "List the plans and find its id",
-        memories: "List its memories and find that one's id",
-        artifact: "List the artifacts to find its id",
-        pkm: "List the notes’ pages to find its name",
-      },
-      projectRef: "project {id}",
-      helperRef: "helper {id}",
-      archiveRef: "archive {name}",
-    },
-    "server.agent": {
-      template: {
-        unreadable: "The template does not read: {file} ({why})",
-        noFile: "Not a template: there is no {file}",
-        badId: 'The template id "{id}" will not do ({file}): lowercase letters, digits and - only, up to 32',
-        badVersion: "A template's version is a whole number from 1 ({file})",
-        noRuntime: "A helper's template names the machine it is for, runtime ({file})",
-        noTemplate: "There is no template {id}",
-        taken: "There is a template {id} already",
-        builtIn: "{id} is built in and cannot be deleted",
-        notFrom: '"{name}" was not installed from a template',
-        gone: '"{name}"\'s template {template} is gone',
-        delete: 'Delete the template "{name}"',
-        deleteKept: 'Delete the template "{name}": the {installed} profiles installed from it stay',
-      },
-      notSaved: "Not saved: could not write {file} ({why})",
-      orchestratorStays: "The default manager cannot be deleted: there is always at least one manager",
-      defaultStaysOrchestrator: "The default manager stays a manager: there is always at least one",
-      noAgent: "There is no profile {id}",
-      noSkill: "There is no skill {id}",
-      orchestratorRuntime: "A manager runs only on VibeValley's own agent: its machine must be {runtime}",
-      newAgentId: "Leave a new profile's id empty; to choose the id, save it instead",
-      newSkillId: "Leave a new skill's id empty; to choose the id, save it instead",
-      removeAgent: 'Delete the profile "{name}" ({id}, on {runtime}): tickets already sent to it keep it',
-      removeSkill: 'Delete the skill "{name}"',
-      modelFailed: "the model failed",
-      noDeepSeekKey: "No DeepSeek key: set DEEPSEEK_API_KEY, or put it in vibevalley.yaml under deepseek.api_key.",
-      refused: { launchArgs: "VibeValley runs inside the server process and takes no command-line arguments", serviceTier: "DeepSeek has no service tiers" },
-      unequip: "Take it off the profiles of {holders}",
-      quoted: '"{name}"',
-      efforts: '{runtime} has only the {efforts} thinking efforts, not "{asked}"',
-      effortsAnd: " and ",
-    },
-    "server.artifact": {
-      noTitle: "An artifact needs a title",
-      longTitle: "The title is too long: at most {max} characters",
-      badKind: "No artifact of kind {kind}: only {kinds}",
-      empty: "The artifact is empty",
-      tooBig: "A version is at most {mb} MB",
-      notKept: "The artifact was not kept: {why}",
-      missing: "There is no artifact {id}",
-      noVersion: '"{title}" has no version {version}; the latest is {latest}',
-      noFile: 'The content of "{title}" version {version} is gone',
-      made: 'Made "{title}"',
-      versioned: '"{title}" is at version {version}',
-      withNote: "{said}: {note}",
-      preview: {
-        remove: 'Delete "{title}" and its {n} versions',
-        cards: "Its cards stay in the conversation and say it was deleted when opened",
-        removeBlock: "Delete block {id}",
-        removeChildren: "and its {n} child blocks",
-        removeBlocks: "Delete “{title}” and its {n} blocks",
-      },
-      untitled: "Untitled",
-      noBatch: "This batch of changes has no batchId",
-      demoNotInserted: "The demo's block was not inserted: {status}",
-      noWriter: "No helper can write: turn one on in the profiles first",
-      demoRunning: "The demo is writing: try again when it is done",
-      notApplied: "The block was not written",
-      attrNotForType: "A {type} block does not take {attr}",
-      parentDeleted: "The parent block {id} was deleted",
-      afterNotSibling: "There is no block {id}, or it is not at that level",
-      nothingToChange: "Nothing was said to change",
-      suggestion: {
-        empty: "The suggestion changes nothing",
-        deleteAlone: "A delete suggestion cannot carry another change",
-        noBlock: "There is no block {id}, or it was deleted",
-        beyond: "The suggestion is for rev {rev}, but the block is only at rev {now}",
-        missing: "There is no suggestion {id}",
-        stale: "The block changed since rev {rev}, and is now at rev {now}; the suggestion is stale",
-        suggested: "A block the owner wrote is not changed directly: a suggestion was made〔{id}〕and waits for the owner",
-      },
-      op: {
-        deleted: "This block was deleted",
-        noAttr: "There is no attribute {name}",
-        noBlock: "There is no block {id}",
-        noId: "The new block has no id",
-        taken: "Block {id} already exists",
-        unknownType: "Unknown block type {type}",
-        badKey: "Not a valid order key: {key}",
-        missing: "There is no such block",
-        noText: "This block has no text",
-        noRev: "There is no version {rev}",
-        changed: "Someone else just changed this block",
-        underSelf: "A block cannot move under itself",
-        splitAtEnd: "Someone else just changed this block, so it was split at its end",
-        splitOutside: "The split position {at} is outside the text ({length} characters)",
-        intoSelf: "A block cannot merge into itself",
-      },
-      demo: {
-        "0": {
-          heading: "Background · demo",
-          paragraphs: {
-            "0": "(Demo) A script wrote this section; no helper really thought of it. We have several helpers here, and an article used to be written by one of them from start to end while the others waited.",
-            "1": "Now a artifact is stored in blocks, each with its own version. Each helper writes its own section without fighting over a block, and the bar on the left shows at a glance who wrote which.",
-            "2": "This demo lets you see it for yourself: three helpers write at once, the words grow paragraph by paragraph, and in the end they make one whole article.",
-          },
-        },
-        "1": {
-          heading: "How · demo",
-          paragraphs: {
-            "0": "(Demo) Each helper first inserts an empty paragraph at the end of its section, then replaces that paragraph about once a second, so it looks like a paragraph slowly growing.",
-            "1": "Every change goes through the same op pipeline as yours: inserting is insert_block, growing is update_text with the last version's number, and the server takes them in order, batch by batch.",
-            "2": "If you change the words in a paragraph a helper is writing, the helper's next write conflicts and does not go in; it leaves that paragraph to you and goes on to the next.",
-          },
-        },
-        "2": {
-          heading: "Next · demo",
-          paragraphs: {
-            "0": "(Demo) Once broadcasting is done, the page will no longer ask the server every second: when a helper writes, you see it at once.",
-            "1": "Later, a helper that wants to change another section's words will not change them directly but leave a suggestion for you to approve; a finished section is marked in the outline as done and waiting for you.",
-            "2": "That is the end of the demo. Keep this artifact or delete it: it touches no ticket and no memory.",
-          },
-        },
-      },
-      badBlockType: "A block's type can only be {types}",
-      otherArtifact: "This batch of changes ({batch}) belongs to another artifact",
-      notBlocks: "“{title}” is a whole web page, not changed block by block: hand in a new version",
-      notHtml: "“{title}” is written together and takes no new version: change it block by block (artifact_block_create, artifact_block_update)",
-      check: {
-        refused: "{n} parts of the page cannot show in the sandbox; fix them and hand it in again:",
-        more: "{n} more, listed once these are fixed",
-        script: "Line {line} loads a script from {url}: write it in the page, or load it from {hosts}",
-        style: "Line {line} loads styles from {url}: write them in the page, or load them from {hosts}",
-        font: "Line {line} loads a font from {url}: inline it as data:, or load it from {hosts}",
-        inline: "Line {line} loads a picture or media from {url}: the page loads none from outside, inline it as data:",
-        link: "Line {line} connects to {url}: only {hosts} can be connected to",
-        form: "Line {line} submits a form to {url}: the page cannot submit forms, handle it in a script",
-        refresh: 'Line {line} has a <meta http-equiv="refresh"> that takes the page away: remove it',
-        base: "Line {line} has a <base href>: remove it and write addresses in full",
-        frame: "Line {line}, <{tag}>: a page cannot hold another page",
-      },
-      edit: {
-        empty: "No words are selected to change",
-        same: "The new words are the same as the old",
-        notFound: '"{words}" is not in the page\'s source: a script may draw it; hand it to a helper',
-        many: '"{words}" is in the page {n} times and which one is unclear: select a few more words, or hand it to a helper',
-        crosses: '"{words}" crosses differently formatted parts; only words within one can be changed here: select fewer, or hand it to a helper',
-        stale: "You are looking at version {version}; the latest is {latest}: change the latest",
-        note: 'The owner changed on the page: "{old}" → "{new}"',
-      },
-    },
-    "server.base": {
-      noFile: "{path}: no such file",
-      notPort: "{path}: {name} is not a port: {port}",
-      prPoll: "github.pr_poll_seconds must be above 0",
-      homeTaken: "The home {home} is used by another server: connect to that one, or stop it first",
-      homeUnlocked: "Could not lock the home {home}",
-      requestKeyLong: "requestKey is too long (at most {max} characters)",
-    },
-    "server.channel": {
-      name: { owner: "You", orchestrator: "Manager" },
-      mention: { orchestrator: "@manager", owner: "@owner", everyone: "@everyone" },
-      channelName: "A channel name has only letters, digits, - and _, up to 24 characters",
-      channelTaken: "There is already a channel called {name}",
-      hopLimit: "The helpers have gone back and forth {limit} times: they pause here until you say something.",
-      breaker: "{name} failed {failed} times in a row as soon as it was woken, so it is not woken again for now; telling it something directly tries again.",
-      dispatch: {
-        draft: "reading the code and drafting this ticket",
-        project: "the project",
-        sent: "Sent @{id} ({name}) to {project}: {what}",
-        redraft: "This ticket goes to @{id} ({name}) for another draft",
-        handedOn: "This ticket goes to @{id} ({name}) to carry on, sent for the {nth, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} time",
-      },
-      badTarget: "Unknown place: {target} (write #<channel>, such as #general, or #<channel>:<message number>)",
-      noMessage: "The channel has no message {n}",
-      empty: "Nothing was said",
-      sendKeyLong: "The sendKey is too long",
-      channelGone: "The channel cannot be found",
-      noHelper: "There is no helper {id}",
-      noChannel: "There is no channel {id}",
-      notOrchestrator: "{id} is not a manager's profile: only a manager can look after a channel",
-      noMessageId: "There is no message {id}",
-      threadOnlyTitle: "A thread can only get a title",
-      defaultStays: "The default channel cannot be archived or deleted: make another one the default first",
-      deletesChannel: "Delete {target}, with its {threads} threads and {said} messages",
-      inUse: "Cannot delete it: {why}. It can be archived",
-      helpersThere: "helpers still work in this channel",
-      cronsThere: "{n} scheduled tasks are here",
-      connectorsThere: "a connector is bound to it",
-      queuedThere: "{n} tickets wait in the queue to start here",
-      issuesThere: "{n} tickets were worked here",
-      noAttachment: "There is no attachment {id}: upload it first, then say it",
-      messageGone: "This message is deleted already",
-      notYours: "Only your own words can be changed",
-      badEmoji: "A reaction is one emoji or a short word, without spaces",
-      threadOnlyInChannel: "A thread opens only under a message in a channel",
-      emptyFile: "The file is empty",
-      deletes: "Delete message {number} in {target} ({name}: {text}); its number stays",
-      deletesDeliveries: "{n} not yet handed are no longer sent",
-      defaultIsChannel: "Only a channel can be the default, not a direct channel or a thread",
-      noDirect: "{target}: there is no direct channel between you",
-      noChannelNamed: "There is no channel #{name}. There are: {tags}",
-      absent: "{n, plural, one {{who} is} other {{who} are}} not here; not delivered",
-      fileTooBig: "The file is too big: {mb} MB at most",
-      noProfileNamed: "No profile is named {key}",
-      talkFailed: "Could not start this conversation: {why}",
-      profileDisabled: "{name} is disabled",
-    },
-    "server.cli": {
+    cli: {
       flag: {
         prompt: "Ask once and leave, without a conversation",
         runtime: "claude, codex, kimi, pi…; vibevalley is VibeValley's own agent",
@@ -4236,7 +3942,7 @@ export const catalogs = {
       },
       command: {
         runtimeChat: "Talk to a machine directly, not through VibeValley: no trajectory, no spending",
-        root: "With no command, talk to VibeValley's own agent; every other command calls one of VibeValley's endpoints and answers JSON",
+        root: "With no command, a conversation with VibeValley's own agent; every other command is one thing to do with the farm: answers are short text, --format json gives the protocol's shape, and guide says how to use them",
         state: "The core state (GET {path})",
         events: "Side effects, one per line (GET {path})",
         app: {
@@ -4315,20 +4021,8 @@ export const catalogs = {
         noDryRun: "{command} has no dry run: drop --dry-run to do it",
         noOp: "There is no endpoint {op}",
         noSuch: 'No {what} is called "{said}"; there are: {these}',
-      },
-      chat: {
-        error: "\nSomething went wrong: {why}",
-        compacted: "(the conversation so far was compacted into a summary; the original is in {archive})",
-        usage: "{aborted, select, true {(stopped, input {input}, cached {cached}, output {output})} other {(input {input}, cached {cached}, output {output})}}",
-        hello: "{skills} skills, {tools} MCP tools. /reset forgets the conversation, /exit quits, Ctrl+C stops.",
-        forgot: "Forgotten.",
-        noRuntime: "There is no machine {id}",
-        unknownInstall: "Cannot tell whether {id} is installed",
-        unusable: "{id} cannot be used: {kind}",
-        resumed: " (resumed)",
-        direct: "Talking directly: not through VibeValley, no trajectory, no spending. Ctrl+C stops this turn; again when idle quits.",
-        rejected: "Not taken: {why}",
-        notSent: "Not delivered: {why}",
+        noChat:
+          "VibeValley's conversation program is not found here: use the command line the desktop app installs, or vp run --filter @vibevalley/cli start in the repository",
       },
       op: {
         agent: {
@@ -4676,6 +4370,315 @@ export const catalogs = {
       more: "There is more: {flag}",
       session: { stopped: "Stopped helper {session}" },
       what: { agent: "profile", channel: "channel", project: "project" },
+    },
+    desktop: {
+      open: "Open VibeValley",
+      quit: "Quit",
+      cannotStart: "VibeValley cannot start",
+      seeLog: "{reason}; the log is at {log}",
+      noAddress: "The server gave no ready address within {seconds} seconds",
+      failed: "The server failed to start: {why}",
+      exited: "The server exited ({code})",
+      waiting: "{n} for you",
+      working: "{n} working",
+      idle: "idle",
+      menu: {
+        about: "About {app}",
+        hide: "Hide {app}",
+        hideOthers: "Hide Others",
+        unhide: "Show All",
+        quit: "Quit {app}",
+        edit: "Edit",
+        undo: "Undo",
+        redo: "Redo",
+        cut: "Cut",
+        copy: "Copy",
+        paste: "Paste",
+        selectAll: "Select All",
+        view: "View",
+        reload: "Reload",
+        devTools: "Developer Tools",
+        resetZoom: "Actual Size",
+        zoomIn: "Zoom In",
+        zoomOut: "Zoom Out",
+        fullScreen: "Toggle Full Screen",
+        window: "Window",
+        minimize: "Minimize",
+        zoom: "Zoom",
+        front: "Bring All to Front",
+        close: "Close Window",
+      },
+      commandLine: { taken: "{link} is another program's file and was not replaced: move it away, then install again" },
+    },
+    mobile: {
+      cannotRead: "The saved connection cannot be read: {why}",
+      unreachable: "Cannot reach that computer: both devices must be on the same network, and that computer must allow connections",
+      answered: "That computer answered {status}",
+      cannotSave: "Saving the pairing failed: {why}",
+      cannotRestore: "Restoring the saved connection failed: {why}",
+      cannotForget: "The saved connection cannot be forgotten: {why}",
+      callEnded: "The call has ended",
+      noNotify: "No permission for notifications: turn it on in the system settings",
+      noCamera: "No permission for the camera: turn it on in the system settings, or paste the link",
+      stopScan: "Stop scanning",
+      title: "Connect to VibeValley",
+      intro:
+        "On the computer running VibeValley, open Connect to this machine under Settings, press Add a device, and scan its QR code. Pairing needs the owner's approval on that computer.",
+      scan: "Scan the QR code",
+      paste: "Or paste the pairing link",
+      name: "This phone is called",
+      waiting: "Waiting for the owner on that computer to approve…",
+      ask: "Ask the owner to let it in",
+      cancel: "Cancel pairing",
+      agora: "Agora: {what} failed ({code})",
+      agoraLost: "Agora: the connection failed ({reason})",
+      step: {
+        mute: "muting",
+        unmute: "unmuting",
+        renew: "renewing",
+        initialize: "starting",
+        mic: "turning on the microphone",
+        volume: "reading the volume",
+        join: "joining the channel",
+      },
+      noMic: "No microphone permission",
+      android: "Android phone",
+      phone: "A phone",
+    },
+    server: {
+      lookIn: {
+        issue: "List the tickets and find its number",
+        session: "List the helpers and find its id",
+        project: "List the projects and find its name",
+        runtime: "List the machines and find its id",
+        agent: "List the profiles and find its id",
+        skill: "List the skills and find its id",
+        template: "List the templates and find its id",
+        cron: "List the scheduled tasks and find its id",
+        device: "See the connected devices and find its id",
+        archive: "List the manager's archive",
+        channel: "List the channels and find its id",
+        graph: "List the plans and find its id",
+        memories: "List its memories and find that one's id",
+        artifact: "List the artifacts to find its id",
+        pkm: "List the notes’ pages to find its name",
+      },
+      projectRef: "project {id}",
+      helperRef: "helper {id}",
+      archiveRef: "archive {name}",
+    },
+    "server.agent": {
+      template: {
+        unreadable: "The template does not read: {file} ({why})",
+        noFile: "Not a template: there is no {file}",
+        badId: 'The template id "{id}" will not do ({file}): lowercase letters, digits and - only, up to 32',
+        badVersion: "A template's version is a whole number from 1 ({file})",
+        noRuntime: "A helper's template names the machine it is for, runtime ({file})",
+        noTemplate: "There is no template {id}",
+        taken: "There is a template {id} already",
+        builtIn: "{id} is built in and cannot be deleted",
+        notFrom: '"{name}" was not installed from a template',
+        gone: '"{name}"\'s template {template} is gone',
+        delete: 'Delete the template "{name}"',
+        deleteKept: 'Delete the template "{name}": the {installed} profiles installed from it stay',
+      },
+      notSaved: "Not saved: could not write {file} ({why})",
+      orchestratorStays: "The default manager cannot be deleted: there is always at least one manager",
+      defaultStaysOrchestrator: "The default manager stays a manager: there is always at least one",
+      noAgent: "There is no profile {id}",
+      noSkill: "There is no skill {id}",
+      orchestratorRuntime: "A manager runs only on VibeValley's own agent: its machine must be {runtime}",
+      newAgentId: "Leave a new profile's id empty; to choose the id, save it instead",
+      newSkillId: "Leave a new skill's id empty; to choose the id, save it instead",
+      removeAgent: 'Delete the profile "{name}" ({id}, on {runtime}): tickets already sent to it keep it',
+      removeSkill: 'Delete the skill "{name}"',
+      modelFailed: "the model failed",
+      noDeepSeekKey: "No DeepSeek key: set DEEPSEEK_API_KEY, or put it in vibevalley.yaml under deepseek.api_key.",
+      refused: { launchArgs: "VibeValley runs inside the server process and takes no command-line arguments", serviceTier: "DeepSeek has no service tiers" },
+      unequip: "Take it off the profiles of {holders}",
+      quoted: '"{name}"',
+      efforts: '{runtime} has only the {efforts} thinking efforts, not "{asked}"',
+      effortsAnd: " and ",
+    },
+    "server.artifact": {
+      noTitle: "An artifact needs a title",
+      longTitle: "The title is too long: at most {max} characters",
+      badKind: "No artifact of kind {kind}: only {kinds}",
+      empty: "The artifact is empty",
+      tooBig: "A version is at most {mb} MB",
+      notKept: "The artifact was not kept: {why}",
+      missing: "There is no artifact {id}",
+      noVersion: '"{title}" has no version {version}; the latest is {latest}',
+      noFile: 'The content of "{title}" version {version} is gone',
+      made: 'Made "{title}"',
+      versioned: '"{title}" is at version {version}',
+      withNote: "{said}: {note}",
+      preview: {
+        remove: 'Delete "{title}" and its {n} versions',
+        cards: "Its cards stay in the conversation and say it was deleted when opened",
+        removeBlock: "Delete block {id}",
+        removeChildren: "and its {n} child blocks",
+        removeBlocks: "Delete “{title}” and its {n} blocks",
+      },
+      untitled: "Untitled",
+      noBatch: "This batch of changes has no batchId",
+      demoNotInserted: "The demo's block was not inserted: {status}",
+      noWriter: "No helper can write: turn one on in the profiles first",
+      demoRunning: "The demo is writing: try again when it is done",
+      notApplied: "The block was not written",
+      attrNotForType: "A {type} block does not take {attr}",
+      parentDeleted: "The parent block {id} was deleted",
+      afterNotSibling: "There is no block {id}, or it is not at that level",
+      nothingToChange: "Nothing was said to change",
+      suggestion: {
+        empty: "The suggestion changes nothing",
+        deleteAlone: "A delete suggestion cannot carry another change",
+        noBlock: "There is no block {id}, or it was deleted",
+        beyond: "The suggestion is for rev {rev}, but the block is only at rev {now}",
+        missing: "There is no suggestion {id}",
+        stale: "The block changed since rev {rev}, and is now at rev {now}; the suggestion is stale",
+        suggested: "A block the owner wrote is not changed directly: a suggestion was made〔{id}〕and waits for the owner",
+      },
+      op: {
+        deleted: "This block was deleted",
+        noAttr: "There is no attribute {name}",
+        noBlock: "There is no block {id}",
+        noId: "The new block has no id",
+        taken: "Block {id} already exists",
+        unknownType: "Unknown block type {type}",
+        badKey: "Not a valid order key: {key}",
+        missing: "There is no such block",
+        noText: "This block has no text",
+        noRev: "There is no version {rev}",
+        changed: "Someone else just changed this block",
+        underSelf: "A block cannot move under itself",
+        splitAtEnd: "Someone else just changed this block, so it was split at its end",
+        splitOutside: "The split position {at} is outside the text ({length} characters)",
+        intoSelf: "A block cannot merge into itself",
+      },
+      demo: {
+        "0": {
+          heading: "Background · demo",
+          paragraphs: {
+            "0": "(Demo) A script wrote this section; no helper really thought of it. We have several helpers here, and an article used to be written by one of them from start to end while the others waited.",
+            "1": "Now a artifact is stored in blocks, each with its own version. Each helper writes its own section without fighting over a block, and the bar on the left shows at a glance who wrote which.",
+            "2": "This demo lets you see it for yourself: three helpers write at once, the words grow paragraph by paragraph, and in the end they make one whole article.",
+          },
+        },
+        "1": {
+          heading: "How · demo",
+          paragraphs: {
+            "0": "(Demo) Each helper first inserts an empty paragraph at the end of its section, then replaces that paragraph about once a second, so it looks like a paragraph slowly growing.",
+            "1": "Every change goes through the same op pipeline as yours: inserting is insert_block, growing is update_text with the last version's number, and the server takes them in order, batch by batch.",
+            "2": "If you change the words in a paragraph a helper is writing, the helper's next write conflicts and does not go in; it leaves that paragraph to you and goes on to the next.",
+          },
+        },
+        "2": {
+          heading: "Next · demo",
+          paragraphs: {
+            "0": "(Demo) Once broadcasting is done, the page will no longer ask the server every second: when a helper writes, you see it at once.",
+            "1": "Later, a helper that wants to change another section's words will not change them directly but leave a suggestion for you to approve; a finished section is marked in the outline as done and waiting for you.",
+            "2": "That is the end of the demo. Keep this artifact or delete it: it touches no ticket and no memory.",
+          },
+        },
+      },
+      badBlockType: "A block's type can only be {types}",
+      otherArtifact: "This batch of changes ({batch}) belongs to another artifact",
+      notBlocks: "“{title}” is a whole web page, not changed block by block: hand in a new version",
+      notHtml: "“{title}” is written together and takes no new version: change it block by block (artifact_block_create, artifact_block_update)",
+      check: {
+        refused: "{n} parts of the page cannot show in the sandbox; fix them and hand it in again:",
+        more: "{n} more, listed once these are fixed",
+        script: "Line {line} loads a script from {url}: write it in the page, or load it from {hosts}",
+        style: "Line {line} loads styles from {url}: write them in the page, or load them from {hosts}",
+        font: "Line {line} loads a font from {url}: inline it as data:, or load it from {hosts}",
+        inline: "Line {line} loads a picture or media from {url}: the page loads none from outside, inline it as data:",
+        link: "Line {line} connects to {url}: only {hosts} can be connected to",
+        form: "Line {line} submits a form to {url}: the page cannot submit forms, handle it in a script",
+        refresh: 'Line {line} has a <meta http-equiv="refresh"> that takes the page away: remove it',
+        base: "Line {line} has a <base href>: remove it and write addresses in full",
+        frame: "Line {line}, <{tag}>: a page cannot hold another page",
+      },
+      edit: {
+        empty: "No words are selected to change",
+        same: "The new words are the same as the old",
+        notFound: '"{words}" is not in the page\'s source: a script may draw it; hand it to a helper',
+        many: '"{words}" is in the page {n} times and which one is unclear: select a few more words, or hand it to a helper',
+        crosses: '"{words}" crosses differently formatted parts; only words within one can be changed here: select fewer, or hand it to a helper',
+        stale: "You are looking at version {version}; the latest is {latest}: change the latest",
+        note: 'The owner changed on the page: "{old}" → "{new}"',
+      },
+    },
+    "server.base": {
+      noFile: "{path}: no such file",
+      notPort: "{path}: {name} is not a port: {port}",
+      prPoll: "github.pr_poll_seconds must be above 0",
+      homeTaken: "The home {home} is used by another server: connect to that one, or stop it first",
+      homeUnlocked: "Could not lock the home {home}",
+      requestKeyLong: "requestKey is too long (at most {max} characters)",
+    },
+    "server.channel": {
+      name: { owner: "You", orchestrator: "Manager" },
+      mention: { orchestrator: "@manager", owner: "@owner", everyone: "@everyone" },
+      channelName: "A channel name has only letters, digits, - and _, up to 24 characters",
+      channelTaken: "There is already a channel called {name}",
+      hopLimit: "The helpers have gone back and forth {limit} times: they pause here until you say something.",
+      breaker: "{name} failed {failed} times in a row as soon as it was woken, so it is not woken again for now; telling it something directly tries again.",
+      dispatch: {
+        draft: "reading the code and drafting this ticket",
+        project: "the project",
+        sent: "Sent @{id} ({name}) to {project}: {what}",
+        redraft: "This ticket goes to @{id} ({name}) for another draft",
+        handedOn: "This ticket goes to @{id} ({name}) to carry on, sent for the {nth, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} time",
+      },
+      badTarget: "Unknown place: {target} (write #<channel>, such as #general, or #<channel>:<message number>)",
+      noMessage: "The channel has no message {n}",
+      empty: "Nothing was said",
+      sendKeyLong: "The sendKey is too long",
+      channelGone: "The channel cannot be found",
+      noHelper: "There is no helper {id}",
+      noChannel: "There is no channel {id}",
+      notOrchestrator: "{id} is not a manager's profile: only a manager can look after a channel",
+      noMessageId: "There is no message {id}",
+      threadOnlyTitle: "A thread can only get a title",
+      defaultStays: "The default channel cannot be archived or deleted: make another one the default first",
+      deletesChannel: "Delete {target}, with its {threads} threads and {said} messages",
+      inUse: "Cannot delete it: {why}. It can be archived",
+      helpersThere: "helpers still work in this channel",
+      cronsThere: "{n} scheduled tasks are here",
+      connectorsThere: "a connector is bound to it",
+      queuedThere: "{n} tickets wait in the queue to start here",
+      issuesThere: "{n} tickets were worked here",
+      noAttachment: "There is no attachment {id}: upload it first, then say it",
+      messageGone: "This message is deleted already",
+      notYours: "Only your own words can be changed",
+      badEmoji: "A reaction is one emoji or a short word, without spaces",
+      threadOnlyInChannel: "A thread opens only under a message in a channel",
+      emptyFile: "The file is empty",
+      deletes: "Delete message {number} in {target} ({name}: {text}); its number stays",
+      deletesDeliveries: "{n} not yet handed are no longer sent",
+      defaultIsChannel: "Only a channel can be the default, not a direct channel or a thread",
+      noDirect: "{target}: there is no direct channel between you",
+      noChannelNamed: "There is no channel #{name}. There are: {tags}",
+      absent: "{n, plural, one {{who} is} other {{who} are}} not here; not delivered",
+      fileTooBig: "The file is too big: {mb} MB at most",
+      noProfileNamed: "No profile is named {key}",
+      talkFailed: "Could not start this conversation: {why}",
+      profileDisabled: "{name} is disabled",
+    },
+    "server.chat": {
+      error: "\nSomething went wrong: {why}",
+      compacted: "(the conversation so far was compacted into a summary; the original is in {archive})",
+      usage: "{aborted, select, true {(stopped, input {input}, cached {cached}, output {output})} other {(input {input}, cached {cached}, output {output})}}",
+      hello: "{skills} skills, {tools} MCP tools. /reset forgets the conversation, /exit quits, Ctrl+C stops.",
+      forgot: "Forgotten.",
+      noRuntime: "There is no machine {id}",
+      unknownInstall: "Cannot tell whether {id} is installed",
+      unusable: "{id} cannot be used: {kind}",
+      resumed: " (resumed)",
+      direct: "Talking directly: not through VibeValley, no trajectory, no spending. Ctrl+C stops this turn; again when idle quits.",
+      rejected: "Not taken: {why}",
+      notSent: "Not delivered: {why}",
     },
     "server.connector": {
       media: { image: "[image]", file: "[file]", audio: "[voice]", video: "[video]", sticker: "[sticker]", message: "[message]", attachment: "[attachment]" },
@@ -8055,6 +8058,428 @@ export const catalogs = {
 
 /** Every key, and the params its zh message names (undefined: none). */
 export interface Messages {
+  "cli.and": undefined;
+  "cli.arg.agent": undefined;
+  "cli.arg.artifact": undefined;
+  "cli.arg.channel": undefined;
+  "cli.arg.cron": undefined;
+  "cli.arg.cronName": undefined;
+  "cli.arg.issue": undefined;
+  "cli.arg.op": undefined;
+  "cli.arg.page": undefined;
+  "cli.arg.project": undefined;
+  "cli.arg.projectName": undefined;
+  "cli.arg.runtime": undefined;
+  "cli.arg.session": undefined;
+  "cli.arg.words": undefined;
+  "cli.channel.said": { readonly channel: string | number };
+  "cli.command.agent.list": undefined;
+  "cli.command.agent.show": undefined;
+  "cli.command.api.about": undefined;
+  "cli.command.api.call": undefined;
+  "cli.command.api.list": undefined;
+  "cli.command.app.about": undefined;
+  "cli.command.app.open": undefined;
+  "cli.command.app.quit": undefined;
+  "cli.command.app.restart": undefined;
+  "cli.command.app.status": undefined;
+  "cli.command.app.update": undefined;
+  "cli.command.artifact.list": undefined;
+  "cli.command.artifact.read": undefined;
+  "cli.command.artifact.show": undefined;
+  "cli.command.channel.list": undefined;
+  "cli.command.channel.read": undefined;
+  "cli.command.channel.say": undefined;
+  "cli.command.channel.search": undefined;
+  "cli.command.cron.add": undefined;
+  "cli.command.cron.list": undefined;
+  "cli.command.cron.remove": undefined;
+  "cli.command.doctor": undefined;
+  "cli.command.events": { readonly path: string | number };
+  "cli.command.guide": undefined;
+  "cli.command.issue.accept": undefined;
+  "cli.command.issue.answer": undefined;
+  "cli.command.issue.cancel": undefined;
+  "cli.command.issue.diff": undefined;
+  "cli.command.issue.edit": undefined;
+  "cli.command.issue.list": undefined;
+  "cli.command.issue.log": undefined;
+  "cli.command.issue.new": undefined;
+  "cli.command.issue.reject": undefined;
+  "cli.command.issue.reopen": undefined;
+  "cli.command.issue.say": undefined;
+  "cli.command.issue.show": undefined;
+  "cli.command.issue.stop": undefined;
+  "cli.command.issue.work": undefined;
+  "cli.command.memory.add": undefined;
+  "cli.command.memory.search": undefined;
+  "cli.command.pkm.capture": undefined;
+  "cli.command.pkm.pageEdit": undefined;
+  "cli.command.pkm.pageGet": undefined;
+  "cli.command.pkm.pageList": undefined;
+  "cli.command.pkm.radar": undefined;
+  "cli.command.pkm.search": undefined;
+  "cli.command.pkm.today": undefined;
+  "cli.command.project.add": undefined;
+  "cli.command.project.list": undefined;
+  "cli.command.project.show": undefined;
+  "cli.command.root": undefined;
+  "cli.command.runtime.list": undefined;
+  "cli.command.runtime.refresh": undefined;
+  "cli.command.runtimeChat": undefined;
+  "cli.command.session.list": undefined;
+  "cli.command.session.show": undefined;
+  "cli.command.session.stop": undefined;
+  "cli.command.state": { readonly path: string | number };
+  "cli.cron.removed": { readonly cron: string | number };
+  "cli.cron.when": undefined;
+  "cli.doctor.installRuntime": undefined;
+  "cli.doctor.lanSettings": undefined;
+  "cli.doctor.noModelKey": undefined;
+  "cli.doctor.noRuntime": undefined;
+  "cli.doctor.setModelKey": undefined;
+  "cli.doctor.unreachable": { readonly base: string | number };
+  "cli.doctor.wrong": { readonly checks: string | number };
+  "cli.example.agentList.about": undefined;
+  "cli.example.agentShow.about": undefined;
+  "cli.example.agentShow.run": undefined;
+  "cli.example.apiCall.about": undefined;
+  "cli.example.apiEvents.about": undefined;
+  "cli.example.apiList.about": undefined;
+  "cli.example.apiState.about": undefined;
+  "cli.example.appOpen.about": undefined;
+  "cli.example.appQuit.about": undefined;
+  "cli.example.appRestart.about": undefined;
+  "cli.example.appStatus.about": undefined;
+  "cli.example.appUpdate.about": undefined;
+  "cli.example.artifactList.about": undefined;
+  "cli.example.artifactRead.about": undefined;
+  "cli.example.artifactShow.about": undefined;
+  "cli.example.channelList.about": undefined;
+  "cli.example.channelRead.about": undefined;
+  "cli.example.channelSay.about": undefined;
+  "cli.example.channelSay.run": undefined;
+  "cli.example.channelSearch.about": undefined;
+  "cli.example.channelSearch.run": undefined;
+  "cli.example.cronAdd.about": undefined;
+  "cli.example.cronAdd.run": undefined;
+  "cli.example.cronList.about": undefined;
+  "cli.example.cronRemove.about": undefined;
+  "cli.example.doctor.about": undefined;
+  "cli.example.guide.about": undefined;
+  "cli.example.issue.accept.about": undefined;
+  "cli.example.issue.accept.run": undefined;
+  "cli.example.issue.answer.about": undefined;
+  "cli.example.issue.answer.run": undefined;
+  "cli.example.issue.cancel.about": undefined;
+  "cli.example.issue.cancel.run": undefined;
+  "cli.example.issue.reject.about": undefined;
+  "cli.example.issue.reject.run": undefined;
+  "cli.example.issue.reopen.about": undefined;
+  "cli.example.issue.reopen.run": undefined;
+  "cli.example.issue.say.about": undefined;
+  "cli.example.issue.say.run": undefined;
+  "cli.example.issue.stop.about": undefined;
+  "cli.example.issue.stop.run": undefined;
+  "cli.example.issueDiff.about": undefined;
+  "cli.example.issueEdit.about": undefined;
+  "cli.example.issueList.about": undefined;
+  "cli.example.issueLog.about": undefined;
+  "cli.example.issueNew.about": undefined;
+  "cli.example.issueNew.run": undefined;
+  "cli.example.issueShow.about": undefined;
+  "cli.example.issueWaiting.about": undefined;
+  "cli.example.issueWork.about": undefined;
+  "cli.example.issueWorkNoWait.about": undefined;
+  "cli.example.memoryAdd.about": undefined;
+  "cli.example.memoryAdd.run": undefined;
+  "cli.example.memorySearch.about": undefined;
+  "cli.example.memorySearch.run": undefined;
+  "cli.example.pkmCapture.about": undefined;
+  "cli.example.pkmCapture.run": undefined;
+  "cli.example.pkmCapturePage.about": undefined;
+  "cli.example.pkmCapturePage.run": undefined;
+  "cli.example.pkmPageEdit.about": undefined;
+  "cli.example.pkmPageEdit.run": undefined;
+  "cli.example.pkmPageGet.about": undefined;
+  "cli.example.pkmPageGet.run": undefined;
+  "cli.example.pkmPageList.about": undefined;
+  "cli.example.pkmRadar.about": undefined;
+  "cli.example.pkmSearch.about": undefined;
+  "cli.example.pkmSearch.run": undefined;
+  "cli.example.pkmToday.about": undefined;
+  "cli.example.projectAdd.about": undefined;
+  "cli.example.projectList.about": undefined;
+  "cli.example.projectShow.about": undefined;
+  "cli.example.runtimeChat.about": undefined;
+  "cli.example.runtimeList.about": undefined;
+  "cli.example.runtimeRefresh.about": undefined;
+  "cli.example.sessionList.about": undefined;
+  "cli.example.sessionShow.about": undefined;
+  "cli.example.sessionStop.about": undefined;
+  "cli.failure.ambiguous": { readonly said: string | number; readonly these: string | number; readonly what: string | number };
+  "cli.failure.appNotOpen": { readonly home: string | number; readonly why: string | number };
+  "cli.failure.body": { readonly op: string | number; readonly why: string | number };
+  "cli.failure.dryRun": { readonly op: string | number };
+  "cli.failure.file": { readonly file: string | number; readonly why: string | number };
+  "cli.failure.gone": { readonly n: string | number };
+  "cli.failure.noChat": undefined;
+  "cli.failure.noDryRun": { readonly command: string | number };
+  "cli.failure.noOp": { readonly op: string | number };
+  "cli.failure.noSuch": { readonly said: string | number; readonly these: string | number; readonly what: string | number };
+  "cli.failure.notJson": { readonly why: string | number };
+  "cli.failure.retry": undefined;
+  "cli.failure.stdin": { readonly why: string | number };
+  "cli.failure.stream": { readonly why: string | number };
+  "cli.failure.unreachable": { readonly base: string | number; readonly why: string | number };
+  "cli.flag.agent": undefined;
+  "cli.flag.at": undefined;
+  "cli.flag.before": undefined;
+  "cli.flag.body": undefined;
+  "cli.flag.capturePage": undefined;
+  "cli.flag.channel": undefined;
+  "cli.flag.criterion": undefined;
+  "cli.flag.cronExpr": undefined;
+  "cli.flag.cwd": undefined;
+  "cli.flag.daily": undefined;
+  "cli.flag.day": undefined;
+  "cli.flag.dryRun": undefined;
+  "cli.flag.effort": undefined;
+  "cli.flag.every": undefined;
+  "cli.flag.format": undefined;
+  "cli.flag.issue": undefined;
+  "cli.flag.issueStatus": undefined;
+  "cli.flag.json": undefined;
+  "cli.flag.key": undefined;
+  "cli.flag.limit": undefined;
+  "cli.flag.mcp": undefined;
+  "cli.flag.model": undefined;
+  "cli.flag.module": undefined;
+  "cli.flag.name": undefined;
+  "cli.flag.noWait": undefined;
+  "cli.flag.ownCwd": undefined;
+  "cli.flag.ownModel": undefined;
+  "cli.flag.priority": undefined;
+  "cli.flag.project": undefined;
+  "cli.flag.prompt": undefined;
+  "cli.flag.reply": undefined;
+  "cli.flag.repo": undefined;
+  "cli.flag.resume": undefined;
+  "cli.flag.runtime": undefined;
+  "cli.flag.server": { readonly fallback: string | number };
+  "cli.flag.text": undefined;
+  "cli.flag.timeout": undefined;
+  "cli.flag.waiting": undefined;
+  "cli.flag.watch": undefined;
+  "cli.group.agent.about": undefined;
+  "cli.group.artifact.about": undefined;
+  "cli.group.channel.about": undefined;
+  "cli.group.connector.about": undefined;
+  "cli.group.cron.about": undefined;
+  "cli.group.game.about": undefined;
+  "cli.group.github.about": undefined;
+  "cli.group.issue.about": undefined;
+  "cli.group.lan.about": undefined;
+  "cli.group.memory.about": undefined;
+  "cli.group.orchestrator.about": undefined;
+  "cli.group.pkm.about": undefined;
+  "cli.group.pkm.page.about": undefined;
+  "cli.group.project.about": undefined;
+  "cli.group.runtime.about": undefined;
+  "cli.group.server.about": undefined;
+  "cli.group.session.about": undefined;
+  "cli.group.setting.about": undefined;
+  "cli.group.skill.about": undefined;
+  "cli.group.voice.about": undefined;
+  "cli.issue.can": { readonly verbs: string | number };
+  "cli.issue.cannot": { readonly issue: string | number; readonly state: string | number; readonly verb: string | number };
+  "cli.issue.conflicts": { readonly files: string | number };
+  "cli.issue.criteria": undefined;
+  "cli.issue.needsWords": { readonly verb: string | number };
+  "cli.issue.noChanges": undefined;
+  "cli.issue.noHelper": { readonly issue: string | number };
+  "cli.issue.none": undefined;
+  "cli.issue.questions": undefined;
+  "cli.issue.spent": { readonly cny: string | number; readonly tokens: string | number };
+  "cli.issue.stopped": { readonly issue: string | number };
+  "cli.issue.timeout": { readonly issue: string | number; readonly seconds: string | number };
+  "cli.issue.told": { readonly issue: string | number };
+  "cli.more": { readonly flag: string | number };
+  "cli.next.help": undefined;
+  "cli.next.listOps": undefined;
+  "cli.next.openApp": undefined;
+  "cli.next.startServer": undefined;
+  "cli.op.agent.create": undefined;
+  "cli.op.agent.delete": undefined;
+  "cli.op.agent.list": undefined;
+  "cli.op.agent.previewDelete": undefined;
+  "cli.op.agent.template.add": undefined;
+  "cli.op.agent.template.delete": undefined;
+  "cli.op.agent.template.install": undefined;
+  "cli.op.agent.template.list": undefined;
+  "cli.op.agent.template.previewDelete": undefined;
+  "cli.op.agent.template.update": undefined;
+  "cli.op.agent.update": undefined;
+  "cli.op.agent.validate": undefined;
+  "cli.op.artifact.block.create": undefined;
+  "cli.op.artifact.block.delete": undefined;
+  "cli.op.artifact.block.list": undefined;
+  "cli.op.artifact.block.previewDelete": undefined;
+  "cli.op.artifact.block.update": undefined;
+  "cli.op.artifact.content.get": undefined;
+  "cli.op.artifact.create": undefined;
+  "cli.op.artifact.delete": undefined;
+  "cli.op.artifact.demo": undefined;
+  "cli.op.artifact.get": undefined;
+  "cli.op.artifact.html.edit": undefined;
+  "cli.op.artifact.list": undefined;
+  "cli.op.artifact.markdown.get": undefined;
+  "cli.op.artifact.previewDelete": undefined;
+  "cli.op.artifact.submit": undefined;
+  "cli.op.artifact.suggestion.accept": undefined;
+  "cli.op.artifact.suggestion.create": undefined;
+  "cli.op.artifact.suggestion.list": undefined;
+  "cli.op.artifact.suggestion.reject": undefined;
+  "cli.op.artifact.update": undefined;
+  "cli.op.artifact.version.create": undefined;
+  "cli.op.channel.archive.set": undefined;
+  "cli.op.channel.attachment.create": undefined;
+  "cli.op.channel.create": undefined;
+  "cli.op.channel.default.set": undefined;
+  "cli.op.channel.delete": undefined;
+  "cli.op.channel.direct.create": undefined;
+  "cli.op.channel.list": undefined;
+  "cli.op.channel.markRead": undefined;
+  "cli.op.channel.markUnread": undefined;
+  "cli.op.channel.message.delete": undefined;
+  "cli.op.channel.message.list": undefined;
+  "cli.op.channel.message.previewDelete": undefined;
+  "cli.op.channel.message.search": undefined;
+  "cli.op.channel.message.send": undefined;
+  "cli.op.channel.message.update": undefined;
+  "cli.op.channel.notify.set": undefined;
+  "cli.op.channel.pin.list": undefined;
+  "cli.op.channel.pin.set": undefined;
+  "cli.op.channel.previewDelete": undefined;
+  "cli.op.channel.reaction.set": undefined;
+  "cli.op.channel.thread.create": undefined;
+  "cli.op.channel.unread.list": undefined;
+  "cli.op.channel.update": undefined;
+  "cli.op.connector.channel.set": undefined;
+  "cli.op.connector.list": undefined;
+  "cli.op.connector.login": undefined;
+  "cli.op.connector.logout": undefined;
+  "cli.op.connector.verify": undefined;
+  "cli.op.cron.create": undefined;
+  "cli.op.cron.delete": undefined;
+  "cli.op.cron.list": undefined;
+  "cli.op.cron.previewDelete": undefined;
+  "cli.op.cron.update": undefined;
+  "cli.op.game.achievement.list": undefined;
+  "cli.op.game.title.set": undefined;
+  "cli.op.github.get": undefined;
+  "cli.op.github.refresh": undefined;
+  "cli.op.issue.comment.create": undefined;
+  "cli.op.issue.create": undefined;
+  "cli.op.issue.delete": undefined;
+  "cli.op.issue.diff.get": undefined;
+  "cli.op.issue.get": undefined;
+  "cli.op.issue.history.list": undefined;
+  "cli.op.issue.list": undefined;
+  "cli.op.issue.previewDelete": undefined;
+  "cli.op.issue.refine": undefined;
+  "cli.op.issue.review": undefined;
+  "cli.op.issue.run.list": undefined;
+  "cli.op.issue.split": undefined;
+  "cli.op.issue.status.previewUpdate": undefined;
+  "cli.op.issue.status.update": undefined;
+  "cli.op.issue.timeline.get": undefined;
+  "cli.op.issue.update": undefined;
+  "cli.op.lan.device.delete": undefined;
+  "cli.op.lan.device.previewDelete": undefined;
+  "cli.op.lan.get": undefined;
+  "cli.op.lan.me.get": undefined;
+  "cli.op.lan.pair": undefined;
+  "cli.op.lan.pairing.answer": undefined;
+  "cli.op.lan.pairing.previewStop": undefined;
+  "cli.op.lan.pairing.start": undefined;
+  "cli.op.lan.pairing.stop": undefined;
+  "cli.op.lan.update": undefined;
+  "cli.op.memory.create": undefined;
+  "cli.op.memory.delete": undefined;
+  "cli.op.memory.list": undefined;
+  "cli.op.memory.previewDelete": undefined;
+  "cli.op.memory.recall": undefined;
+  "cli.op.memory.search": undefined;
+  "cli.op.orchestrator.archive.get": undefined;
+  "cli.op.orchestrator.archive.list": undefined;
+  "cli.op.orchestrator.eval.create": undefined;
+  "cli.op.orchestrator.open": undefined;
+  "cli.op.orchestrator.stop": undefined;
+  "cli.op.pkm.block.apply": undefined;
+  "cli.op.pkm.capture": undefined;
+  "cli.op.pkm.clip.create": undefined;
+  "cli.op.pkm.cluster.create": undefined;
+  "cli.op.pkm.comment.list": undefined;
+  "cli.op.pkm.comment.resolve": undefined;
+  "cli.op.pkm.comment.suggest": undefined;
+  "cli.op.pkm.journal.open": undefined;
+  "cli.op.pkm.page.export": undefined;
+  "cli.op.pkm.page.get": undefined;
+  "cli.op.pkm.page.list": undefined;
+  "cli.op.pkm.page.move": undefined;
+  "cli.op.pkm.page.rename": undefined;
+  "cli.op.pkm.page.save": undefined;
+  "cli.op.pkm.radar.get": undefined;
+  "cli.op.pkm.scan": undefined;
+  "cli.op.pkm.search": undefined;
+  "cli.op.pkm.source.get": undefined;
+  "cli.op.pkm.source.update": undefined;
+  "cli.op.pkm.undo": undefined;
+  "cli.op.project.activity.get": undefined;
+  "cli.op.project.create": undefined;
+  "cli.op.project.language.list": undefined;
+  "cli.op.project.list": undefined;
+  "cli.op.project.template.list": undefined;
+  "cli.op.project.validate": undefined;
+  "cli.op.runtime.list": undefined;
+  "cli.op.runtime.refresh": undefined;
+  "cli.op.runtime.setting.update": undefined;
+  "cli.op.server.health.get": undefined;
+  "cli.op.session.event.list": undefined;
+  "cli.op.session.get": undefined;
+  "cli.op.session.list": undefined;
+  "cli.op.session.stop": undefined;
+  "cli.op.setting.get": undefined;
+  "cli.op.setting.update": undefined;
+  "cli.op.setting.validate": undefined;
+  "cli.op.skill.create": undefined;
+  "cli.op.skill.delete": undefined;
+  "cli.op.skill.list": undefined;
+  "cli.op.skill.previewDelete": undefined;
+  "cli.op.skill.update": undefined;
+  "cli.op.voice.call.hear": undefined;
+  "cli.op.voice.call.say": undefined;
+  "cli.op.voice.call.start": undefined;
+  "cli.op.voice.call.stop": undefined;
+  "cli.op.voice.dictate": undefined;
+  "cli.op.voice.grant.create": undefined;
+  "cli.op.voice.grant.renew": undefined;
+  "cli.op.voice.hear": undefined;
+  "cli.op.voice.moss.verify": undefined;
+  "cli.pkm.captured": { readonly page: string | number };
+  "cli.pkm.editorExited": { readonly code: string | number; readonly editor: string | number; readonly file: string | number };
+  "cli.pkm.editorFailed": { readonly editor: string | number; readonly why: string | number };
+  "cli.pkm.inbox": { readonly n: string | number };
+  "cli.pkm.keptAt": { readonly file: string | number; readonly why: string | number };
+  "cli.pkm.overdue": { readonly deadline: string | number; readonly words: string | number };
+  "cli.pkm.saved": { readonly page: string | number };
+  "cli.pkm.stale": { readonly days: string | number; readonly page: string | number };
+  "cli.pkm.unchanged": { readonly page: string | number };
+  "cli.session.stopped": { readonly session: string | number };
+  "cli.what.agent": undefined;
+  "cli.what.channel": undefined;
+  "cli.what.project": undefined;
   "desktop.cannotStart": undefined;
   "desktop.commandLine.taken": { readonly link: string | number };
   "desktop.exited": { readonly code: string | number };
@@ -8298,439 +8723,18 @@ export interface Messages {
   "server.channel.talkFailed": { readonly why: string | number };
   "server.channel.threadOnlyInChannel": undefined;
   "server.channel.threadOnlyTitle": undefined;
-  "server.cli.and": undefined;
-  "server.cli.arg.agent": undefined;
-  "server.cli.arg.artifact": undefined;
-  "server.cli.arg.channel": undefined;
-  "server.cli.arg.cron": undefined;
-  "server.cli.arg.cronName": undefined;
-  "server.cli.arg.issue": undefined;
-  "server.cli.arg.op": undefined;
-  "server.cli.arg.page": undefined;
-  "server.cli.arg.project": undefined;
-  "server.cli.arg.projectName": undefined;
-  "server.cli.arg.runtime": undefined;
-  "server.cli.arg.session": undefined;
-  "server.cli.arg.words": undefined;
-  "server.cli.channel.said": { readonly channel: string | number };
-  "server.cli.chat.compacted": { readonly archive: string | number };
-  "server.cli.chat.direct": undefined;
-  "server.cli.chat.error": { readonly why: string | number };
-  "server.cli.chat.forgot": undefined;
-  "server.cli.chat.hello": { readonly skills: string | number; readonly tools: string | number };
-  "server.cli.chat.noRuntime": { readonly id: string | number };
-  "server.cli.chat.notSent": { readonly why: string | number };
-  "server.cli.chat.rejected": { readonly why: string | number };
-  "server.cli.chat.resumed": undefined;
-  "server.cli.chat.unknownInstall": { readonly id: string | number };
-  "server.cli.chat.unusable": { readonly id: string | number; readonly kind: string | number };
-  "server.cli.chat.usage": { readonly aborted: boolean; readonly cached: string | number; readonly input: string | number; readonly output: string | number };
-  "server.cli.command.agent.list": undefined;
-  "server.cli.command.agent.show": undefined;
-  "server.cli.command.api.about": undefined;
-  "server.cli.command.api.call": undefined;
-  "server.cli.command.api.list": undefined;
-  "server.cli.command.app.about": undefined;
-  "server.cli.command.app.open": undefined;
-  "server.cli.command.app.quit": undefined;
-  "server.cli.command.app.restart": undefined;
-  "server.cli.command.app.status": undefined;
-  "server.cli.command.app.update": undefined;
-  "server.cli.command.artifact.list": undefined;
-  "server.cli.command.artifact.read": undefined;
-  "server.cli.command.artifact.show": undefined;
-  "server.cli.command.channel.list": undefined;
-  "server.cli.command.channel.read": undefined;
-  "server.cli.command.channel.say": undefined;
-  "server.cli.command.channel.search": undefined;
-  "server.cli.command.cron.add": undefined;
-  "server.cli.command.cron.list": undefined;
-  "server.cli.command.cron.remove": undefined;
-  "server.cli.command.doctor": undefined;
-  "server.cli.command.events": { readonly path: string | number };
-  "server.cli.command.guide": undefined;
-  "server.cli.command.issue.accept": undefined;
-  "server.cli.command.issue.answer": undefined;
-  "server.cli.command.issue.cancel": undefined;
-  "server.cli.command.issue.diff": undefined;
-  "server.cli.command.issue.edit": undefined;
-  "server.cli.command.issue.list": undefined;
-  "server.cli.command.issue.log": undefined;
-  "server.cli.command.issue.new": undefined;
-  "server.cli.command.issue.reject": undefined;
-  "server.cli.command.issue.reopen": undefined;
-  "server.cli.command.issue.say": undefined;
-  "server.cli.command.issue.show": undefined;
-  "server.cli.command.issue.stop": undefined;
-  "server.cli.command.issue.work": undefined;
-  "server.cli.command.memory.add": undefined;
-  "server.cli.command.memory.search": undefined;
-  "server.cli.command.pkm.capture": undefined;
-  "server.cli.command.pkm.pageEdit": undefined;
-  "server.cli.command.pkm.pageGet": undefined;
-  "server.cli.command.pkm.pageList": undefined;
-  "server.cli.command.pkm.radar": undefined;
-  "server.cli.command.pkm.search": undefined;
-  "server.cli.command.pkm.today": undefined;
-  "server.cli.command.project.add": undefined;
-  "server.cli.command.project.list": undefined;
-  "server.cli.command.project.show": undefined;
-  "server.cli.command.root": undefined;
-  "server.cli.command.runtime.list": undefined;
-  "server.cli.command.runtime.refresh": undefined;
-  "server.cli.command.runtimeChat": undefined;
-  "server.cli.command.session.list": undefined;
-  "server.cli.command.session.show": undefined;
-  "server.cli.command.session.stop": undefined;
-  "server.cli.command.state": { readonly path: string | number };
-  "server.cli.cron.removed": { readonly cron: string | number };
-  "server.cli.cron.when": undefined;
-  "server.cli.doctor.installRuntime": undefined;
-  "server.cli.doctor.lanSettings": undefined;
-  "server.cli.doctor.noModelKey": undefined;
-  "server.cli.doctor.noRuntime": undefined;
-  "server.cli.doctor.setModelKey": undefined;
-  "server.cli.doctor.unreachable": { readonly base: string | number };
-  "server.cli.doctor.wrong": { readonly checks: string | number };
-  "server.cli.example.agentList.about": undefined;
-  "server.cli.example.agentShow.about": undefined;
-  "server.cli.example.agentShow.run": undefined;
-  "server.cli.example.apiCall.about": undefined;
-  "server.cli.example.apiEvents.about": undefined;
-  "server.cli.example.apiList.about": undefined;
-  "server.cli.example.apiState.about": undefined;
-  "server.cli.example.appOpen.about": undefined;
-  "server.cli.example.appQuit.about": undefined;
-  "server.cli.example.appRestart.about": undefined;
-  "server.cli.example.appStatus.about": undefined;
-  "server.cli.example.appUpdate.about": undefined;
-  "server.cli.example.artifactList.about": undefined;
-  "server.cli.example.artifactRead.about": undefined;
-  "server.cli.example.artifactShow.about": undefined;
-  "server.cli.example.channelList.about": undefined;
-  "server.cli.example.channelRead.about": undefined;
-  "server.cli.example.channelSay.about": undefined;
-  "server.cli.example.channelSay.run": undefined;
-  "server.cli.example.channelSearch.about": undefined;
-  "server.cli.example.channelSearch.run": undefined;
-  "server.cli.example.cronAdd.about": undefined;
-  "server.cli.example.cronAdd.run": undefined;
-  "server.cli.example.cronList.about": undefined;
-  "server.cli.example.cronRemove.about": undefined;
-  "server.cli.example.doctor.about": undefined;
-  "server.cli.example.guide.about": undefined;
-  "server.cli.example.issue.accept.about": undefined;
-  "server.cli.example.issue.accept.run": undefined;
-  "server.cli.example.issue.answer.about": undefined;
-  "server.cli.example.issue.answer.run": undefined;
-  "server.cli.example.issue.cancel.about": undefined;
-  "server.cli.example.issue.cancel.run": undefined;
-  "server.cli.example.issue.reject.about": undefined;
-  "server.cli.example.issue.reject.run": undefined;
-  "server.cli.example.issue.reopen.about": undefined;
-  "server.cli.example.issue.reopen.run": undefined;
-  "server.cli.example.issue.say.about": undefined;
-  "server.cli.example.issue.say.run": undefined;
-  "server.cli.example.issue.stop.about": undefined;
-  "server.cli.example.issue.stop.run": undefined;
-  "server.cli.example.issueDiff.about": undefined;
-  "server.cli.example.issueEdit.about": undefined;
-  "server.cli.example.issueList.about": undefined;
-  "server.cli.example.issueLog.about": undefined;
-  "server.cli.example.issueNew.about": undefined;
-  "server.cli.example.issueNew.run": undefined;
-  "server.cli.example.issueShow.about": undefined;
-  "server.cli.example.issueWaiting.about": undefined;
-  "server.cli.example.issueWork.about": undefined;
-  "server.cli.example.issueWorkNoWait.about": undefined;
-  "server.cli.example.memoryAdd.about": undefined;
-  "server.cli.example.memoryAdd.run": undefined;
-  "server.cli.example.memorySearch.about": undefined;
-  "server.cli.example.memorySearch.run": undefined;
-  "server.cli.example.pkmCapture.about": undefined;
-  "server.cli.example.pkmCapture.run": undefined;
-  "server.cli.example.pkmCapturePage.about": undefined;
-  "server.cli.example.pkmCapturePage.run": undefined;
-  "server.cli.example.pkmPageEdit.about": undefined;
-  "server.cli.example.pkmPageEdit.run": undefined;
-  "server.cli.example.pkmPageGet.about": undefined;
-  "server.cli.example.pkmPageGet.run": undefined;
-  "server.cli.example.pkmPageList.about": undefined;
-  "server.cli.example.pkmRadar.about": undefined;
-  "server.cli.example.pkmSearch.about": undefined;
-  "server.cli.example.pkmSearch.run": undefined;
-  "server.cli.example.pkmToday.about": undefined;
-  "server.cli.example.projectAdd.about": undefined;
-  "server.cli.example.projectList.about": undefined;
-  "server.cli.example.projectShow.about": undefined;
-  "server.cli.example.runtimeChat.about": undefined;
-  "server.cli.example.runtimeList.about": undefined;
-  "server.cli.example.runtimeRefresh.about": undefined;
-  "server.cli.example.sessionList.about": undefined;
-  "server.cli.example.sessionShow.about": undefined;
-  "server.cli.example.sessionStop.about": undefined;
-  "server.cli.failure.ambiguous": { readonly said: string | number; readonly these: string | number; readonly what: string | number };
-  "server.cli.failure.appNotOpen": { readonly home: string | number; readonly why: string | number };
-  "server.cli.failure.body": { readonly op: string | number; readonly why: string | number };
-  "server.cli.failure.dryRun": { readonly op: string | number };
-  "server.cli.failure.file": { readonly file: string | number; readonly why: string | number };
-  "server.cli.failure.gone": { readonly n: string | number };
-  "server.cli.failure.noDryRun": { readonly command: string | number };
-  "server.cli.failure.noOp": { readonly op: string | number };
-  "server.cli.failure.noSuch": { readonly said: string | number; readonly these: string | number; readonly what: string | number };
-  "server.cli.failure.notJson": { readonly why: string | number };
-  "server.cli.failure.retry": undefined;
-  "server.cli.failure.stdin": { readonly why: string | number };
-  "server.cli.failure.stream": { readonly why: string | number };
-  "server.cli.failure.unreachable": { readonly base: string | number; readonly why: string | number };
-  "server.cli.flag.agent": undefined;
-  "server.cli.flag.at": undefined;
-  "server.cli.flag.before": undefined;
-  "server.cli.flag.body": undefined;
-  "server.cli.flag.capturePage": undefined;
-  "server.cli.flag.channel": undefined;
-  "server.cli.flag.criterion": undefined;
-  "server.cli.flag.cronExpr": undefined;
-  "server.cli.flag.cwd": undefined;
-  "server.cli.flag.daily": undefined;
-  "server.cli.flag.day": undefined;
-  "server.cli.flag.dryRun": undefined;
-  "server.cli.flag.effort": undefined;
-  "server.cli.flag.every": undefined;
-  "server.cli.flag.format": undefined;
-  "server.cli.flag.issue": undefined;
-  "server.cli.flag.issueStatus": undefined;
-  "server.cli.flag.json": undefined;
-  "server.cli.flag.key": undefined;
-  "server.cli.flag.limit": undefined;
-  "server.cli.flag.mcp": undefined;
-  "server.cli.flag.model": undefined;
-  "server.cli.flag.module": undefined;
-  "server.cli.flag.name": undefined;
-  "server.cli.flag.noWait": undefined;
-  "server.cli.flag.ownCwd": undefined;
-  "server.cli.flag.ownModel": undefined;
-  "server.cli.flag.priority": undefined;
-  "server.cli.flag.project": undefined;
-  "server.cli.flag.prompt": undefined;
-  "server.cli.flag.reply": undefined;
-  "server.cli.flag.repo": undefined;
-  "server.cli.flag.resume": undefined;
-  "server.cli.flag.runtime": undefined;
-  "server.cli.flag.server": { readonly fallback: string | number };
-  "server.cli.flag.text": undefined;
-  "server.cli.flag.timeout": undefined;
-  "server.cli.flag.waiting": undefined;
-  "server.cli.flag.watch": undefined;
-  "server.cli.group.agent.about": undefined;
-  "server.cli.group.artifact.about": undefined;
-  "server.cli.group.channel.about": undefined;
-  "server.cli.group.connector.about": undefined;
-  "server.cli.group.cron.about": undefined;
-  "server.cli.group.game.about": undefined;
-  "server.cli.group.github.about": undefined;
-  "server.cli.group.issue.about": undefined;
-  "server.cli.group.lan.about": undefined;
-  "server.cli.group.memory.about": undefined;
-  "server.cli.group.orchestrator.about": undefined;
-  "server.cli.group.pkm.about": undefined;
-  "server.cli.group.pkm.page.about": undefined;
-  "server.cli.group.project.about": undefined;
-  "server.cli.group.runtime.about": undefined;
-  "server.cli.group.server.about": undefined;
-  "server.cli.group.session.about": undefined;
-  "server.cli.group.setting.about": undefined;
-  "server.cli.group.skill.about": undefined;
-  "server.cli.group.voice.about": undefined;
-  "server.cli.issue.can": { readonly verbs: string | number };
-  "server.cli.issue.cannot": { readonly issue: string | number; readonly state: string | number; readonly verb: string | number };
-  "server.cli.issue.conflicts": { readonly files: string | number };
-  "server.cli.issue.criteria": undefined;
-  "server.cli.issue.needsWords": { readonly verb: string | number };
-  "server.cli.issue.noChanges": undefined;
-  "server.cli.issue.noHelper": { readonly issue: string | number };
-  "server.cli.issue.none": undefined;
-  "server.cli.issue.questions": undefined;
-  "server.cli.issue.spent": { readonly cny: string | number; readonly tokens: string | number };
-  "server.cli.issue.stopped": { readonly issue: string | number };
-  "server.cli.issue.timeout": { readonly issue: string | number; readonly seconds: string | number };
-  "server.cli.issue.told": { readonly issue: string | number };
-  "server.cli.more": { readonly flag: string | number };
-  "server.cli.next.help": undefined;
-  "server.cli.next.listOps": undefined;
-  "server.cli.next.openApp": undefined;
-  "server.cli.next.startServer": undefined;
-  "server.cli.op.agent.create": undefined;
-  "server.cli.op.agent.delete": undefined;
-  "server.cli.op.agent.list": undefined;
-  "server.cli.op.agent.previewDelete": undefined;
-  "server.cli.op.agent.template.add": undefined;
-  "server.cli.op.agent.template.delete": undefined;
-  "server.cli.op.agent.template.install": undefined;
-  "server.cli.op.agent.template.list": undefined;
-  "server.cli.op.agent.template.previewDelete": undefined;
-  "server.cli.op.agent.template.update": undefined;
-  "server.cli.op.agent.update": undefined;
-  "server.cli.op.agent.validate": undefined;
-  "server.cli.op.artifact.block.create": undefined;
-  "server.cli.op.artifact.block.delete": undefined;
-  "server.cli.op.artifact.block.list": undefined;
-  "server.cli.op.artifact.block.previewDelete": undefined;
-  "server.cli.op.artifact.block.update": undefined;
-  "server.cli.op.artifact.content.get": undefined;
-  "server.cli.op.artifact.create": undefined;
-  "server.cli.op.artifact.delete": undefined;
-  "server.cli.op.artifact.demo": undefined;
-  "server.cli.op.artifact.get": undefined;
-  "server.cli.op.artifact.html.edit": undefined;
-  "server.cli.op.artifact.list": undefined;
-  "server.cli.op.artifact.markdown.get": undefined;
-  "server.cli.op.artifact.previewDelete": undefined;
-  "server.cli.op.artifact.submit": undefined;
-  "server.cli.op.artifact.suggestion.accept": undefined;
-  "server.cli.op.artifact.suggestion.create": undefined;
-  "server.cli.op.artifact.suggestion.list": undefined;
-  "server.cli.op.artifact.suggestion.reject": undefined;
-  "server.cli.op.artifact.update": undefined;
-  "server.cli.op.artifact.version.create": undefined;
-  "server.cli.op.channel.archive.set": undefined;
-  "server.cli.op.channel.attachment.create": undefined;
-  "server.cli.op.channel.create": undefined;
-  "server.cli.op.channel.default.set": undefined;
-  "server.cli.op.channel.delete": undefined;
-  "server.cli.op.channel.direct.create": undefined;
-  "server.cli.op.channel.list": undefined;
-  "server.cli.op.channel.markRead": undefined;
-  "server.cli.op.channel.markUnread": undefined;
-  "server.cli.op.channel.message.delete": undefined;
-  "server.cli.op.channel.message.list": undefined;
-  "server.cli.op.channel.message.previewDelete": undefined;
-  "server.cli.op.channel.message.search": undefined;
-  "server.cli.op.channel.message.send": undefined;
-  "server.cli.op.channel.message.update": undefined;
-  "server.cli.op.channel.notify.set": undefined;
-  "server.cli.op.channel.pin.list": undefined;
-  "server.cli.op.channel.pin.set": undefined;
-  "server.cli.op.channel.previewDelete": undefined;
-  "server.cli.op.channel.reaction.set": undefined;
-  "server.cli.op.channel.thread.create": undefined;
-  "server.cli.op.channel.unread.list": undefined;
-  "server.cli.op.channel.update": undefined;
-  "server.cli.op.connector.channel.set": undefined;
-  "server.cli.op.connector.list": undefined;
-  "server.cli.op.connector.login": undefined;
-  "server.cli.op.connector.logout": undefined;
-  "server.cli.op.connector.verify": undefined;
-  "server.cli.op.cron.create": undefined;
-  "server.cli.op.cron.delete": undefined;
-  "server.cli.op.cron.list": undefined;
-  "server.cli.op.cron.previewDelete": undefined;
-  "server.cli.op.cron.update": undefined;
-  "server.cli.op.game.achievement.list": undefined;
-  "server.cli.op.game.title.set": undefined;
-  "server.cli.op.github.get": undefined;
-  "server.cli.op.github.refresh": undefined;
-  "server.cli.op.issue.comment.create": undefined;
-  "server.cli.op.issue.create": undefined;
-  "server.cli.op.issue.delete": undefined;
-  "server.cli.op.issue.diff.get": undefined;
-  "server.cli.op.issue.get": undefined;
-  "server.cli.op.issue.history.list": undefined;
-  "server.cli.op.issue.list": undefined;
-  "server.cli.op.issue.previewDelete": undefined;
-  "server.cli.op.issue.refine": undefined;
-  "server.cli.op.issue.review": undefined;
-  "server.cli.op.issue.run.list": undefined;
-  "server.cli.op.issue.split": undefined;
-  "server.cli.op.issue.status.previewUpdate": undefined;
-  "server.cli.op.issue.status.update": undefined;
-  "server.cli.op.issue.timeline.get": undefined;
-  "server.cli.op.issue.update": undefined;
-  "server.cli.op.lan.device.delete": undefined;
-  "server.cli.op.lan.device.previewDelete": undefined;
-  "server.cli.op.lan.get": undefined;
-  "server.cli.op.lan.me.get": undefined;
-  "server.cli.op.lan.pair": undefined;
-  "server.cli.op.lan.pairing.answer": undefined;
-  "server.cli.op.lan.pairing.previewStop": undefined;
-  "server.cli.op.lan.pairing.start": undefined;
-  "server.cli.op.lan.pairing.stop": undefined;
-  "server.cli.op.lan.update": undefined;
-  "server.cli.op.memory.create": undefined;
-  "server.cli.op.memory.delete": undefined;
-  "server.cli.op.memory.list": undefined;
-  "server.cli.op.memory.previewDelete": undefined;
-  "server.cli.op.memory.recall": undefined;
-  "server.cli.op.memory.search": undefined;
-  "server.cli.op.orchestrator.archive.get": undefined;
-  "server.cli.op.orchestrator.archive.list": undefined;
-  "server.cli.op.orchestrator.eval.create": undefined;
-  "server.cli.op.orchestrator.open": undefined;
-  "server.cli.op.orchestrator.stop": undefined;
-  "server.cli.op.pkm.block.apply": undefined;
-  "server.cli.op.pkm.capture": undefined;
-  "server.cli.op.pkm.clip.create": undefined;
-  "server.cli.op.pkm.cluster.create": undefined;
-  "server.cli.op.pkm.comment.list": undefined;
-  "server.cli.op.pkm.comment.resolve": undefined;
-  "server.cli.op.pkm.comment.suggest": undefined;
-  "server.cli.op.pkm.journal.open": undefined;
-  "server.cli.op.pkm.page.export": undefined;
-  "server.cli.op.pkm.page.get": undefined;
-  "server.cli.op.pkm.page.list": undefined;
-  "server.cli.op.pkm.page.move": undefined;
-  "server.cli.op.pkm.page.rename": undefined;
-  "server.cli.op.pkm.page.save": undefined;
-  "server.cli.op.pkm.radar.get": undefined;
-  "server.cli.op.pkm.scan": undefined;
-  "server.cli.op.pkm.search": undefined;
-  "server.cli.op.pkm.source.get": undefined;
-  "server.cli.op.pkm.source.update": undefined;
-  "server.cli.op.pkm.undo": undefined;
-  "server.cli.op.project.activity.get": undefined;
-  "server.cli.op.project.create": undefined;
-  "server.cli.op.project.language.list": undefined;
-  "server.cli.op.project.list": undefined;
-  "server.cli.op.project.template.list": undefined;
-  "server.cli.op.project.validate": undefined;
-  "server.cli.op.runtime.list": undefined;
-  "server.cli.op.runtime.refresh": undefined;
-  "server.cli.op.runtime.setting.update": undefined;
-  "server.cli.op.server.health.get": undefined;
-  "server.cli.op.session.event.list": undefined;
-  "server.cli.op.session.get": undefined;
-  "server.cli.op.session.list": undefined;
-  "server.cli.op.session.stop": undefined;
-  "server.cli.op.setting.get": undefined;
-  "server.cli.op.setting.update": undefined;
-  "server.cli.op.setting.validate": undefined;
-  "server.cli.op.skill.create": undefined;
-  "server.cli.op.skill.delete": undefined;
-  "server.cli.op.skill.list": undefined;
-  "server.cli.op.skill.previewDelete": undefined;
-  "server.cli.op.skill.update": undefined;
-  "server.cli.op.voice.call.hear": undefined;
-  "server.cli.op.voice.call.say": undefined;
-  "server.cli.op.voice.call.start": undefined;
-  "server.cli.op.voice.call.stop": undefined;
-  "server.cli.op.voice.dictate": undefined;
-  "server.cli.op.voice.grant.create": undefined;
-  "server.cli.op.voice.grant.renew": undefined;
-  "server.cli.op.voice.hear": undefined;
-  "server.cli.op.voice.moss.verify": undefined;
-  "server.cli.pkm.captured": { readonly page: string | number };
-  "server.cli.pkm.editorExited": { readonly code: string | number; readonly editor: string | number; readonly file: string | number };
-  "server.cli.pkm.editorFailed": { readonly editor: string | number; readonly why: string | number };
-  "server.cli.pkm.inbox": { readonly n: string | number };
-  "server.cli.pkm.keptAt": { readonly file: string | number; readonly why: string | number };
-  "server.cli.pkm.overdue": { readonly deadline: string | number; readonly words: string | number };
-  "server.cli.pkm.saved": { readonly page: string | number };
-  "server.cli.pkm.stale": { readonly days: string | number; readonly page: string | number };
-  "server.cli.pkm.unchanged": { readonly page: string | number };
-  "server.cli.session.stopped": { readonly session: string | number };
-  "server.cli.what.agent": undefined;
-  "server.cli.what.channel": undefined;
-  "server.cli.what.project": undefined;
+  "server.chat.compacted": { readonly archive: string | number };
+  "server.chat.direct": undefined;
+  "server.chat.error": { readonly why: string | number };
+  "server.chat.forgot": undefined;
+  "server.chat.hello": { readonly skills: string | number; readonly tools: string | number };
+  "server.chat.noRuntime": { readonly id: string | number };
+  "server.chat.notSent": { readonly why: string | number };
+  "server.chat.rejected": { readonly why: string | number };
+  "server.chat.resumed": undefined;
+  "server.chat.unknownInstall": { readonly id: string | number };
+  "server.chat.unusable": { readonly id: string | number; readonly kind: string | number };
+  "server.chat.usage": { readonly aborted: boolean; readonly cached: string | number; readonly input: string | number; readonly output: string | number };
   "server.connector.digest": { readonly lines: string | number; readonly n: string | number };
   "server.connector.disconnected": undefined;
   "server.connector.expired": undefined;

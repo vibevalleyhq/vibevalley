@@ -11,11 +11,13 @@ apps/server/               服务端（Effect v4，Node 24；仓库里用 vpx �
                            规则，组装时交给 core）；VibeValley 自己的 agent 在 packages/agent，这里只组装它（runtime/vibevalley.ts 是
                            oar 的 vibevalley runtime）；base 是不碰外面的地基（id、JSON、排序、脱敏），infra 是和进程、机器打交道的
                            （配置、库、文件、家目录的租约、日志、时间）；services.ts 按次序把它们组装起来，
-                           handlers.ts 把 http/handlers/<概念>.ts 合成全部接口的处理，http/ 是路由、流和 /mcp；cli.ts 是命令行（给 agent 用的、按事情分的命令，api 够得着每个接口，和农机直接聊、
-                           自己的 agent）
+                           handlers.ts 把 http/handlers/<概念>.ts 合成全部接口的处理，http/ 是路由、流和 /mcp；chat.ts 是终端里的对话（和农机直接聊、
+                           自己的 agent），由命令行交出终端来跑
 apps/server/db/            库（SQLite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，
                            generated/ 是 scripts/sqlite-generate.ts 从它们写出的
 apps/server/src/*/testdata 规则的黄金数据（*.jsonl.gz）和样例
+apps/cli/                  命令行（vibevalley）：给 agent 用的、按事情分的命令，经 VibeValleyApi 调服务端，不载入服务端；api list|call 够得着每个接口，
+                           guide 是给 agent 的用法，帮助和典型的答复录在黄金数据里（apps/cli/README.md）
 apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手机三个宿主共用的一份，由服务端（--web）在 / 提供；/ 打开工作台，/farm 是像素农场
                            （src/farm，PixiJS），其余是工作台：一个概念一个 src/features/<概念>，名字和服务端的模块一样；分层
                            base（纯的）→ infra（服务端、宿主、浏览器）→ state（中间层）→ ui → ui/pixel → features → 皮（farm、tree）→ app，lint 查；public/ 是全部的图、像素字、指针和样音
@@ -56,7 +58,7 @@ vp install                                                      # 根目录：�
 vp check                                                        # 改完任何代码：格式（oxfmt）、lint（oxlint，带类型，跑在 tsrs 上）和全部包的类型；--fix 改格式
 vpx scripts/comment-review.ts                                   # 提 PR 前：模型照 docs/style/code.md 审这个分支新加的注释，你逐条核实再删或改（vv-comments；--all <目录> 清一块已有的）
 vp run --filter @vibevalley/server start                         # 服务端，127.0.0.1:8787；后面加 --web ../web/dist 同时提供页面
-vp run --filter @vibevalley/server cli issue list                # 命令行：给 agent 用的、按事情分的命令（guide 是用法，api list|call 够得着每个接口），doctor 看农场好不好，pkm 记、查、改笔记，app 管桌面版，runtime chat <农机> 直接聊；装了桌面版的在「关于」里装 vibevalley 命令
+vp run --filter @vibevalley/cli start issue list                 # 命令行：给 agent 用的、按事情分的命令（guide 是用法，api list|call 够得着每个接口），doctor 看农场好不好，pkm 记、查、改笔记，app 管桌面版，runtime chat <农机> 直接聊；装了桌面版的在「关于」里装 vibevalley 命令
 vp run server:check                                             # 改完服务端、packages/protocol、ai、agent、testkit：类型（vp check）、规则的测试、查询是否最新、vitest
 vp run --filter @vibevalley/server db:generate                   # 改完 db/queries 或 db/migrations：重写 db/generated（推不出的类型写 ::int 这类，生成器会说）
 vp run golden:update                                            # 有意改了规则：用现在的结果重写各处的黄金数据，再看 diff（后面加 <模块> 只重写那一处，核心状态的是 core，模型的是 ai）

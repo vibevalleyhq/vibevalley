@@ -1,4 +1,14 @@
 {
+  "apps/cli": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 1,
+    "lintOff": 0,
+    "orDie": 1,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
   "apps/desktop": {
     "nonNull": 0,
     "doubleCast": 0,
@@ -192,9 +202,9 @@
   "server: Gateway": {
     "nonNull": 7,
     "doubleCast": 0,
-    "cast": 7,
+    "cast": 6,
     "lintOff": 3,
-    "orDie": 3,
+    "orDie": 2,
     "ignored": 6,
     "swallowed": 0,
     "resultBranch": 10

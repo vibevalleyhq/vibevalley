@@ -129,9 +129,6 @@
 | `bold` | `artifact.ts` |  |
 | `para` | `artifact.ts` |  |
 | `sample` | `artifact.ts` | Every kind of block, and inline marks, as the export writes them. |
-| `farm` | `cli.ts` | The whole farm on a free port; the command line is pointed at it. |
-| `workingFarm` | `cli.ts` | The same with the test helper as its only runtime (pi, testing/worker.ts), so an issue can be worked from the command |
-| `cli` | `cli.ts` | One run, with a Stdio of its own and no environment: its exit code, what it put on stdout and on stderr, and the |
 | `kinds` | `evals.ts` |  |
 | `orchestratorToolNames` | `evals.ts` | The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). |
 | `problemOf` | `evals.ts` | "" when it is whole: the fields its kind reads are there. |
@@ -140,6 +137,8 @@
 | `isInput` | `evals.ts` |  |
 | `committed` | `evals.ts` |  |
 | `stubbed` | `evals.ts` | Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once, |
+| `farm` | `farm.ts` | The whole farm on a free port: its address. |
+| `workingFarm` | `farm.ts` | The same with the test helper as its only runtime (pi, testing/worker.ts), so an issue can be worked from outside as |
 | `gitSync` | `git.ts` | Runs git in dir as a test user; its output, trimmed. A failure throws with what git said. |
 | `gitIn` | `git.ts` | Runs git in dir as dir's own config says (no test user); its output, trimmed. A failure throws with what git said. |
 | `gitInEnv` | `git.ts` | gitIn with these in its environment (a commit's dates). |

@@ -42,7 +42,7 @@
   },
   "command": {
     "runtimeChat": "和一个农机直接聊，不经过 VibeValley：不记轨迹和花费",
-    "root": "不带命令是和 VibeValley 自己的 agent 聊；别的命令是调 VibeValley 的接口，答复是 JSON",
+    "root": "不带命令是和 VibeValley 自己的 agent 聊；别的命令是对农场做的一件件事：答复是短文字，--format json 给接口的形状，guide 说怎么用",
     "state": "核心状态（GET {path}）",
     "events": "副作用，一行一条（GET {path}）",
     "app": {
@@ -145,21 +145,8 @@
     "ambiguous": "「{said}」不止一个{what}：{these}。说得更准些，或用 id",
     "noDryRun": "{command} 没有试跑：去掉 --dry-run 才会做",
     "noOp": "没有 {op} 这个接口",
-    "noSuch": "没有叫「{said}」的{what}；有这些：{these}"
-  },
-  "chat": {
-    "error": "\n出错了：{why}",
-    "compacted": "（前面的对话压成了摘要，原文在 {archive}）",
-    "usage": "{aborted, select, true {（停下了，输入 {input}，缓存 {cached}，输出 {output}）} other {（输入 {input}，缓存 {cached}，输出 {output}）}}",
-    "hello": "{skills} 个技能，{tools} 个 MCP 工具。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。",
-    "forgot": "忘掉了。",
-    "noRuntime": "没有 {id} 这个农机",
-    "unknownInstall": "{id} 看不出装没装",
-    "unusable": "{id} 用不了：{kind}",
-    "resumed": "（接着）",
-    "direct": "直接聊：不经过 VibeValley，不记轨迹和花费。Ctrl+C 停这一轮，空着时再按退出。",
-    "rejected": "没接住：{why}",
-    "notSent": "没送进去：{why}"
+    "noSuch": "没有叫「{said}」的{what}；有这些：{these}",
+    "noChat": "这里找不到 VibeValley 的对话程序：从桌面版装的命令行里用它，或在仓库里经 vp run --filter @vibevalley/cli start"
   },
   "op": {
     "agent": {

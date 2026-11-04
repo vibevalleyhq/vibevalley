@@ -80,6 +80,7 @@ export default defineConfig({
         "vp run effect:check",
         "vp run --filter @vibevalley/server db:check",
         "vp run --filter @vibevalley/server test",
+        "vp run --filter @vibevalley/cli test",
       ],
       "web:check": ["vp run packages:build", "vp check", "vp run web:test"],
       // web:check without its vp check: CI's web job runs this one, and its check job runs vp check.
@@ -94,6 +95,7 @@ export default defineConfig({
       "effect:check": [
         "vp run packages:build",
         "effect-tsgo diagnostics --project apps/server/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project apps/cli/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/agent/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/ai/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/protocol/tsconfig.json --strict",
@@ -220,7 +222,7 @@ export default defineConfig({
       },
       {
         // The server's tests make their folders with tempDir, which removes them when the run ends.
-        files: ["apps/server/src/**"],
+        files: ["apps/server/src/**", "apps/cli/src/**"],
         excludeFiles: ["apps/server/src/**/*.stories.tsx"],
         rules: {
           "no-restricted-imports": [
@@ -247,7 +249,14 @@ export default defineConfig({
         },
       },
       {
-        files: ["**/*.test.ts", "**/*.test.tsx", "apps/server/src/testing/**", "packages/*/src/testing.ts", "packages/testkit/src/**"],
+        files: [
+          "**/*.test.ts",
+          "**/*.test.tsx",
+          "apps/server/src/testing/**",
+          "apps/cli/src/testing.ts",
+          "packages/*/src/testing.ts",
+          "packages/testkit/src/**",
+        ],
         rules: {
           "typescript/no-unsafe-argument": "off",
           "typescript/no-unsafe-assignment": "off",
@@ -267,6 +276,7 @@ export default defineConfig({
           "apps/*/test/**",
           "packages/*/test/**",
           "apps/server/src/testing/**",
+          "apps/cli/src/testing.ts",
           "packages/*/src/testing.ts",
           "packages/testkit/src/**",
         ],
@@ -280,7 +290,7 @@ export default defineConfig({
       {
         // The server logs through Effect (src/infra/log.ts for callbacks): levels, and the logger the layer gives; so does
         // the agent it runs on. The command line prints.
-        files: ["apps/server/src/**", "packages/ai/src/**", "packages/agent/src/**"],
+        files: ["apps/server/src/**", "apps/cli/src/**", "packages/ai/src/**", "packages/agent/src/**"],
         rules: { "no-console": "error", "vibevalley/no-wall-clock": "error" },
       },
       {
@@ -333,7 +343,7 @@ export default defineConfig({
         rules: { "vibevalley/no-cjk-literal": "off" },
       },
       {
-        files: ["apps/server/src/cli.ts", "apps/server/src/cli/**", "apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
+        files: ["apps/cli/src/**", "apps/server/src/chat.ts", "apps/server/src/chat/**", "apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "no-console": "off" },
       },
       {
@@ -416,25 +426,31 @@ export default defineConfig({
       },
       {
         // The server is Effect; a Promise is only a library's one call (scripts/oxlint-plugin.ts, promise-boundary).
-        files: ["apps/server/src/**"],
-        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**", "apps/server/src/flows/**"],
+        files: ["apps/server/src/**", "apps/cli/src/**"],
+        excludeFiles: [
+          "apps/server/src/**/*.test.ts",
+          "apps/cli/src/**/*.test.ts",
+          "apps/cli/src/testing.ts",
+          "apps/server/src/testing/**",
+          "apps/server/src/flows/**",
+        ],
         rules: { "vibevalley/promise-boundary": "error" },
       },
       {
         // A tryPromise without catch fails with UnknownError and loses the real cause (scripts/oxlint-plugin.ts, try-promise-catch).
-        files: ["apps/server/src/**", "packages/agent/src/**", "packages/ai/src/**"],
+        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**"],
         excludeFiles: ["**/*.test.ts"],
         rules: { "vibevalley/try-promise-catch": "error" },
       },
       {
         // Errors are told apart by their tag, not their class (scripts/oxlint-plugin.ts, no-instanceof-tagged).
-        files: ["apps/server/src/**", "packages/agent/src/**", "packages/ai/src/**"],
+        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**"],
         excludeFiles: ["**/*.test.ts"],
         rules: { "vibevalley/no-instanceof-tagged": "error" },
       },
       {
         // Unknown values are read with Predicate or a Schema, not a hand-written object check (scripts/oxlint-plugin.ts, no-object-guard).
-        files: ["apps/server/src/**", "packages/agent/src/**", "packages/ai/src/**", "packages/protocol/src/**"],
+        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**", "packages/protocol/src/**"],
         excludeFiles: ["**/*.test.ts"],
         rules: { "vibevalley/no-object-guard": "error" },
       },
@@ -486,8 +502,8 @@ export default defineConfig({
       },
       {
         // A protocol shape named like a service is read as T.X, so the service keeps the name (scripts/oxlint-plugin.ts, protocol-namespace).
-        files: ["apps/server/src/**"],
-        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
+        files: ["apps/server/src/**", "apps/cli/src/**"],
+        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/cli/src/**/*.test.ts", "apps/cli/src/testing.ts", "apps/server/src/testing/**"],
         rules: { "vibevalley/protocol-namespace": "error" },
       },
       {
@@ -525,26 +541,26 @@ export default defineConfig({
       },
       {
         // Effects over a list go through Effect.forEach (scripts/oxlint-plugin.ts, yield-in-loop).
-        files: ["apps/server/src/**", "packages/agent/src/**"],
+        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**", "apps/server/src/flows/**"],
         rules: { "vibevalley/yield-in-loop": "error" },
       },
       {
         // A fiber belongs to a scope, so none outlives its service or a test (scripts/oxlint-plugin.ts, scoped-fibers).
-        files: ["apps/server/src/**", "packages/agent/src/**"],
+        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "vibevalley/scoped-fibers": "error" },
       },
       {
         // An Effect generator reads the time with yield* Clock.currentTimeMillis (scripts/oxlint-plugin.ts, clock-in-effect).
-        files: ["apps/server/src/**", "packages/agent/src/**"],
+        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         rules: { "vibevalley/clock-in-effect": "error" },
       },
       {
         // The server and the brain read and write files off the event loop (scripts/oxlint-plugin.ts, sync-fs). Before the
         // services are up a sync call is fine: the home's lock, the database's folder and baseline, the locale the CLI
         // starts in; and the evals' cases are read by a tool, not the server.
-        files: ["apps/server/src/**", "packages/agent/src/**"],
+        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         excludeFiles: [
           "**/*.test.ts",
           "apps/server/src/testing/**",
@@ -584,7 +600,7 @@ export default defineConfig({
       },
       {
         // An import from outside its folder is written from src, as #/… (scripts/oxlint-plugin.ts, parent-import).
-        files: ["apps/web/src/**", "apps/server/src/**"],
+        files: ["apps/web/src/**", "apps/server/src/**", "apps/cli/src/**"],
         rules: { "vibevalley/parent-import": "error" },
       },
       {

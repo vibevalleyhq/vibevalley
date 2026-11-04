@@ -42,7 +42,7 @@
   },
   "command": {
     "runtimeChat": "Talk to a machine directly, not through VibeValley: no trajectory, no spending",
-    "root": "With no command, talk to VibeValley's own agent; every other command calls one of VibeValley's endpoints and answers JSON",
+    "root": "With no command, a conversation with VibeValley's own agent; every other command is one thing to do with the farm: answers are short text, --format json gives the protocol's shape, and guide says how to use them",
     "state": "The core state (GET {path})",
     "events": "Side effects, one per line (GET {path})",
     "app": {
@@ -145,21 +145,8 @@
     "ambiguous": "More than one {what} is \"{said}\": {these}. Be more exact, or use the id",
     "noDryRun": "{command} has no dry run: drop --dry-run to do it",
     "noOp": "There is no endpoint {op}",
-    "noSuch": "No {what} is called \"{said}\"; there are: {these}"
-  },
-  "chat": {
-    "error": "\nSomething went wrong: {why}",
-    "compacted": "(the conversation so far was compacted into a summary; the original is in {archive})",
-    "usage": "{aborted, select, true {(stopped, input {input}, cached {cached}, output {output})} other {(input {input}, cached {cached}, output {output})}}",
-    "hello": "{skills} skills, {tools} MCP tools. /reset forgets the conversation, /exit quits, Ctrl+C stops.",
-    "forgot": "Forgotten.",
-    "noRuntime": "There is no machine {id}",
-    "unknownInstall": "Cannot tell whether {id} is installed",
-    "unusable": "{id} cannot be used: {kind}",
-    "resumed": " (resumed)",
-    "direct": "Talking directly: not through VibeValley, no trajectory, no spending. Ctrl+C stops this turn; again when idle quits.",
-    "rejected": "Not taken: {why}",
-    "notSent": "Not delivered: {why}"
+    "noSuch": "No {what} is called \"{said}\"; there are: {these}",
+    "noChat": "VibeValley's conversation program is not found here: use the command line the desktop app installs, or vp run --filter @vibevalley/cli start in the repository"
   },
   "op": {
     "agent": {

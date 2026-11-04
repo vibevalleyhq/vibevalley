@@ -164,7 +164,7 @@ const inRepo = (path: string) => join(import.meta.dirname, "..", path);
 tester.run("no-cross-package-path", rule("no-cross-package-path"), {
   valid: [
     { code: "import { a } from './api-client.ts';", filename: inRepo("scripts/capabilities.ts") },
-    { code: "import { a } from '../infra/lease.ts';", filename: inRepo("apps/server/src/cli/api.ts") },
+    { code: "import { a } from '../infra/lease.ts';", filename: inRepo("apps/server/src/chat/chat.ts") },
     { code: "import { a } from '@vibevalley/protocol/api';", filename: inRepo("scripts/capabilities.ts") },
   ],
   invalid: [

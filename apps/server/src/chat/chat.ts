@@ -2,7 +2,6 @@
 // reminders and the MCP servers in a config file), and any runtime on this machine. What is typed while it works joins
 // the turn, Ctrl+C stops the turn, and again (idle) quits.
 
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
@@ -18,6 +17,7 @@ import { readMcpConfig } from "@vibevalley/agent/mcp";
 import { userMessage } from "@vibevalley/agent/messages";
 import { memoryStore } from "@vibevalley/agent/todoStore";
 import { type Llm, make } from "@vibevalley/ai/llm";
+import { homeOf } from "@vibevalley/home";
 import { t, currentLocale } from "@vibevalley/i18n";
 
 import { modelClient } from "#/agent/agent.ts";
@@ -49,7 +49,7 @@ function show(e: BrainEvent, prompt: () => void) {
     }
     case "message_end":
       if (e.message.role !== "assistant") return;
-      if (e.message.stopReason === "error") write(t("server.cli.chat.error", { why: e.message.errorMessage ?? "" }));
+      if (e.message.stopReason === "error") write(t("server.chat.error", { why: e.message.errorMessage ?? "" }));
       write("\n");
       return;
     case "tool_execution_start":
@@ -59,11 +59,11 @@ function show(e: BrainEvent, prompt: () => void) {
       console.log(dim((e.isError ? "✗ " : "✓ ") + short(e.result.content.map((c) => (c.type === "text" ? c.text : "")).join(""))));
       return;
     case "compaction_end":
-      if (e.compaction) console.log(dim(t("server.cli.chat.compacted", { archive: e.compaction.archive ?? "" })));
+      if (e.compaction) console.log(dim(t("server.chat.compacted", { archive: e.compaction.archive ?? "" })));
       return;
     case "agent_settled":
       write(
-        dim(t("server.cli.chat.usage", { aborted: e.run.aborted, input: e.run.usage.input, cached: e.run.usage.cacheRead, output: e.run.usage.output }) + "\n"),
+        dim(t("server.chat.usage", { aborted: e.run.aborted, input: e.run.usage.input, cached: e.run.usage.cacheRead, output: e.run.usage.output }) + "\n"),
       );
       prompt();
       return;
@@ -117,7 +117,7 @@ export const ownChat = (values: OwnChat) =>
     const config = yield* loadConfig();
     const llm = modelClient(values.model || config.agent.model, config.deepseek.apiKey, standaloneLlm());
     const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
-    const home = join(homedir(), ".vibevalley", "agent", values.name);
+    const home = join(homeOf(), "agent", values.name);
     const servers = yield* Effect.tryPromise({ try: () => readMcpConfig(values.mcp || join(home, "mcp.json")), catch: messageOf });
     const asked = values.p !== undefined;
     // A one-off question keeps no reminders running.
@@ -149,7 +149,7 @@ export const ownChat = (values: OwnChat) =>
     }
     yield* Effect.forkScoped(Stream.runForEach(events, shown));
     console.log(
-      dim(`vibevalley agent · ${cwd} · ${home}\n` + t("server.cli.chat.hello", { skills: (yield* agent.skills).length, tools: agent.mcpStatus().toolCount })),
+      dim(`vibevalley agent · ${cwd} · ${home}\n` + t("server.chat.hello", { skills: (yield* agent.skills).length, tools: agent.mcpStatus().toolCount })),
     );
     prompt = () => write("› ");
     prompt();
@@ -166,7 +166,7 @@ export const ownChat = (values: OwnChat) =>
         if (text === "/exit") return yield* new Quit();
         if (text === "/reset") {
           yield* agent.reset;
-          console.log(dim(t("server.cli.chat.forgot")));
+          console.log(dim(t("server.chat.forgot")));
           return prompt();
         }
         if (text) yield* agent.send(yield* said(text));
@@ -211,11 +211,11 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
     : Effect.gen(function* () {
         const registry = registryOf([dshRuntime]);
         const runtime = registry.get(id);
-        if (!runtime) return yield* Effect.fail(t("server.cli.chat.noRuntime", { id }));
+        if (!runtime) return yield* Effect.fail(t("server.chat.noRuntime", { id }));
         const installation = runtime.installation;
-        if (!installation) return yield* Effect.fail(t("server.cli.chat.unknownInstall", { id }));
+        if (!installation) return yield* Effect.fail(t("server.chat.unknownInstall", { id }));
         const found = yield* Effect.tryPromise({ try: () => installation(), catch: messageOf });
-        if (found.kind !== "available") return yield* Effect.fail(t("server.cli.chat.unusable", { id, kind: found.kind }));
+        if (found.kind !== "available") return yield* Effect.fail(t("server.chat.unusable", { id, kind: found.kind }));
         const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
         const session: Session = yield* Effect.acquireRelease(
           Effect.tryPromise({
@@ -230,7 +230,7 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
           }),
           (s) => Effect.promise(() => s.dispose()),
         );
-        console.log(dim(`${id} · ${session.id}${values.resume ? t("server.cli.chat.resumed") : ""}\n` + t("server.cli.chat.direct")));
+        console.log(dim(`${id} · ${session.id}${values.resume ? t("server.chat.resumed") : ""}\n` + t("server.chat.direct")));
         session.events(
           (e) => {
             const line = render(e);
@@ -240,7 +240,7 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
         );
         const said = (r: unknown, words: "rejected" | "notSent") => {
           const why = Predicate.hasProperty(r, "reason") && typeof r.reason === "string" ? r.reason : "";
-          if (Predicate.hasProperty(r, "kind") && r.kind === "rejected") console.log(dim(t(`server.cli.chat.${words}`, { why })));
+          if (Predicate.hasProperty(r, "kind") && r.kind === "rejected") console.log(dim(t(`server.chat.${words}`, { why })));
         };
         // One turn at a time: a line typed while it runs is steered into it or queued after it. Interrupting the turn's
         // fiber aborts the prompt (its signal).

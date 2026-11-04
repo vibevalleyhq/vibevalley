@@ -42,8 +42,8 @@ function failureFrom(base: string, e: unknown): Failure {
   return new Failure({
     code: exit.unreachable,
     tag: "Unreachable",
-    text: t("server.cli.failure.unreachable", { base, why: innermost(e) }),
-    next: [{ say: t("server.cli.next.openApp"), run: ["app", "open"] }, { say: t("server.cli.next.startServer") }],
+    text: t("cli.failure.unreachable", { base, why: innermost(e) }),
+    next: [{ say: t("cli.next.openApp"), run: ["app", "open"] }, { say: t("cli.next.startServer") }],
   });
 }
 
@@ -67,7 +67,7 @@ export const change = <A>(o: {
 }) =>
   Effect.gen(function* () {
     if (yield* DryRunFlag) {
-      if (!o.preview) return yield* new Failure({ code: exit.usage, tag: "NoDryRun", text: t("server.cli.failure.noDryRun", { command: o.name }) });
+      if (!o.preview) return yield* new Failure({ code: exit.usage, tag: "NoDryRun", text: t("cli.failure.noDryRun", { command: o.name }) });
       return yield* show(yield* ask(o.preview), (p) => p.does.join("\n"));
     }
     const done = yield* ask(o.does);
@@ -87,7 +87,7 @@ export function pick<A>(all: readonly A[], said: string, keys: (a: A) => readonl
     new Failure({
       code: found.length === 0 ? exit.missing : exit.usage,
       tag: found.length === 0 ? "Missing" : "Ambiguous",
-      text: t(found.length === 0 ? "server.cli.failure.noSuch" : "server.cli.failure.ambiguous", { what, said, these: named.join(", ") }),
+      text: t(found.length === 0 ? "cli.failure.noSuch" : "cli.failure.ambiguous", { what, said, these: named.join(", ") }),
     }),
   );
 }

@@ -22,10 +22,15 @@ const config: KnipConfig = {
       ignoreDependencies: ["@effect/tsgo", "effect", "@effect/language-service"],
     },
     "apps/server": {
-      // main.ts and cli.ts run through vpx (`vp run start`, `vp run cli`, the desktop app and the e2e), which knip does not
-      // read in a script; main.ts is also the pack block's entry.
-      entry: ["scripts/*.ts", "src/main.ts", "src/cli.ts"],
+      // main.ts and chat.ts run through vpx (`vp run start`, `vp run chat`, the desktop app and the e2e), which knip does
+      // not read in a script; both are the pack block's entries, and chat.ts is what the command line runs.
+      entry: ["scripts/*.ts", "src/main.ts", "src/chat.ts"],
       project: ["src/**/*.ts", "scripts/**/*.ts"],
+    },
+    "apps/cli": {
+      // main.ts runs through vpx (`vp run start`, the acceptance sandbox) and is the pack block's entry.
+      entry: ["src/main.ts"],
+      project: ["src/**/*.ts"],
     },
     "apps/web": {
       entry: ["index.html", "stories.html", "src/stories.tsx", "vite.stories.config.ts", "test/**/*.ts"],
