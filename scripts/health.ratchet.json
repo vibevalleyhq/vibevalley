@@ -182,8 +182,8 @@
   "server: Gateway": {
     "nonNull": 7,
     "doubleCast": 0,
-    "cast": 13,
-    "lintOff": 7,
+    "cast": 7,
+    "lintOff": 3,
     "orDie": 3,
     "ignored": 6,
     "swallowed": 0,

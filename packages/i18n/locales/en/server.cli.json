@@ -16,14 +16,35 @@
     "watch": "Keep watching: one JSON line per frame",
     "format": "md: Markdown to read (the default); json: the endpoint's answer",
     "capturePage": "At the end of this page (its title, slug or an alias); none: today's journal",
-    "day": "Which day's journal, YYYY-MM-DD; none: today"
+    "day": "Which day's journal, YYYY-MM-DD; none: today",
+    "agent": "A profile: its id or name",
+    "at": "When to run once, such as 2026-11-05T09:00",
+    "before": "Read those before this number",
+    "body": "The description; - reads stdin",
+    "channel": "Which channel to say it in",
+    "criterion": "An acceptance criterion; give it more than once",
+    "cronExpr": "A cron expression, such as '0 9 * * 1-5'",
+    "daily": "What time each day, HH:MM",
+    "every": "Every so many minutes",
+    "issue": "The issue's number",
+    "issueStatus": "Only those in this status",
+    "key": "A request key: sent again with the same key, it is done once",
+    "limit": "At most this many",
+    "module": "Only this module's endpoints, such as pkm",
+    "noWait": "Come back once it is sent, not when it is handed back",
+    "priority": "The priority",
+    "project": "The project's name",
+    "reply": "Reply to this message number",
+    "repo": "The GitHub repository's address",
+    "text": "Words the title or description contains",
+    "timeout": "Wait at most this many seconds",
+    "waiting": "Only those waiting on the owner"
   },
   "command": {
     "runtimeChat": "Talk to a machine directly, not through VibeValley: no trajectory, no spending",
     "root": "With no command, talk to VibeValley's own agent; every other command calls one of VibeValley's endpoints and answers JSON",
     "state": "The core state (GET {path})",
     "events": "Side effects, one per line (GET {path})",
-    "issueWork": "Move a backlog ticket to To do, wait for it to come back and print its changes; each status passed goes to stderr",
     "app": {
       "about": "The desktop app itself: its status, a page to open, updates, quitting",
       "status": "Which desktop app this is, its version and where its farm is",
@@ -39,19 +60,79 @@
       "search": "Search the notes: a hit a line, page › where: block",
       "radar": "What wants a look: the inbox, projects left alone, what is overdue",
       "pageGet": "A page as Markdown to read: refs read out, remarks taken off",
-      "pageEdit": "Edit a whole page's file in $EDITOR; it is saved when the editor closes"
+      "pageEdit": "Edit a whole page's file in $EDITOR; it is saved when the editor closes",
+      "pageList": "List notes pages, the latest changed first"
+    },
+    "agent": {
+      "list": "List profiles: id, name, role, runtime",
+      "show": "Show a profile: its duty, runtime and model, skills"
+    },
+    "api": {
+      "about": "Use the endpoints directly: list them, call one, follow the state stream",
+      "call": "Call an endpoint, --json checked against its Schema before it is sent",
+      "list": "List every endpoint and what it does; --format json adds its request body's JSON Schema"
+    },
+    "artifact": {
+      "list": "List drafts (--issue: only one issue's)",
+      "read": "Read a draft's content",
+      "show": "Show a draft"
+    },
+    "channel": {
+      "list": "List channels and direct chats",
+      "read": "Read a channel's latest messages",
+      "say": "Say something in a channel",
+      "search": "Search messages in every channel"
+    },
+    "cron": {
+      "add": "Add a scheduled task: give one of --every, --daily, --cron, --at",
+      "list": "List scheduled tasks",
+      "remove": "Remove a scheduled task"
+    },
+    "guide": "How an agent does the common things, step by step",
+    "issue": {
+      "diff": "An issue's change: its commits and files",
+      "edit": "Change an issue's title, description, project, profile or priority",
+      "list": "List issues: one a line, number first",
+      "log": "An issue's timeline and cost",
+      "new": "Write a new issue",
+      "show": "Show an issue: where it stands, its questions and criteria, what can be done now",
+      "work": "Send it out: start it (or go on when stuck), wait for the hand-back, print the change",
+      "say": "Pass a word to the issue's helper",
+      "answer": "Answer the question the issue's helper waits on",
+      "accept": "Accept the work: the issue is done",
+      "reject": "Send it back: say what is wrong, another round",
+      "stop": "Stop the issue's helper's round",
+      "cancel": "Close the issue",
+      "reopen": "Reopen a closed issue"
+    },
+    "memory": {
+      "add": "Note a memory for a profile",
+      "search": "Search memories"
+    },
+    "project": {
+      "add": "Add a project (--repo clones it from GitHub)",
+      "list": "List projects",
+      "show": "Show a project"
+    },
+    "runtime": {
+      "list": "List runtimes: installed or not, version",
+      "refresh": "Look for a runtime again"
+    },
+    "session": {
+      "list": "List helpers: id, name, profile, what it is doing",
+      "show": "Show a helper",
+      "stop": "Stop a helper's round"
     }
   },
   "next": {
     "help": "See how this command is written",
-    "whatItDoes": "See what this command does",
     "startServer": "Start the server first (vp run --filter @vibevalley/server start), or point --server at one that runs",
-    "openApp": "Open the desktop app first (vibevalley app open opens it too)"
+    "openApp": "Open the desktop app first (vibevalley app open opens it too)",
+    "listOps": "List every endpoint"
   },
   "and": "; ",
   "failure": {
     "unreachable": "Cannot reach {base}: {why}",
-    "shape": "The answer does not fit its Schema: {why}",
     "stdin": "Cannot read stdin: {why}",
     "file": "Cannot read {file}: {why}",
     "notJson": "--json is not JSON: {why}",
@@ -60,8 +141,11 @@
     "retry": "The server asked the stream to reconnect; the command line does not",
     "stream": "The stream cannot be read: {why}",
     "gone": "Ticket #{n} is gone: it was deleted",
-    "missingArgument": "<{name}> is missing: give it after the command, or in --json",
-    "appNotOpen": "Cannot reach the desktop app of {home}: {why}"
+    "appNotOpen": "Cannot reach the desktop app of {home}: {why}",
+    "ambiguous": "More than one {what} is \"{said}\": {these}. Be more exact, or use the id",
+    "noDryRun": "{command} has no dry run: drop --dry-run to do it",
+    "noOp": "There is no endpoint {op}",
+    "noSuch": "No {what} is called \"{said}\"; there are: {these}"
   },
   "chat": {
     "error": "\nSomething went wrong: {why}",
@@ -373,187 +457,55 @@
   },
   "group": {
     "agent": {
-      "about": "Profiles and profile templates",
-      "template": {
-        "about": "Profile templates: list, install, add, remake a profile"
-      }
+      "about": "Profiles and profile templates"
     },
     "artifact": {
-      "about": "Artifacts: written together, or handed in as web pages",
-      "block": {
-        "about": "An artifact's blocks"
-      },
-      "content": {
-        "about": "An artifact's content"
-      },
-      "html": {
-        "about": "The words of an HTML artifact"
-      },
-      "markdown": {
-        "about": "Artifacts read as Markdown"
-      },
-      "suggestion": {
-        "about": "Suggested changes on an artifact"
-      },
-      "version": {
-        "about": "The versions of an HTML artifact"
-      }
+      "about": "Artifacts: written together, or handed in as web pages"
     },
     "channel": {
-      "about": "Channels, direct messages, threads and messages",
-      "archive": {
-        "about": "Archiving channels"
-      },
-      "attachment": {
-        "about": "Message attachments"
-      },
-      "default": {
-        "about": "The default channel"
-      },
-      "direct": {
-        "about": "Direct messages with a profile"
-      },
-      "message": {
-        "about": "Messages in channels and threads"
-      },
-      "notify": {
-        "about": "A channel's notifications"
-      },
-      "pin": {
-        "about": "Pinned messages"
-      },
-      "reaction": {
-        "about": "Reactions on messages"
-      },
-      "thread": {
-        "about": "Threads under messages"
-      },
-      "unread": {
-        "about": "Places with unread messages"
-      }
+      "about": "Channels, direct messages, threads and messages"
     },
     "connector": {
-      "about": "Connectors: WeChat, Feishu and QQ, each into a channel",
-      "channel": {
-        "about": "The channel a connector goes to"
-      }
+      "about": "Connectors: WeChat, Feishu and QQ, each into a channel"
     },
     "cron": {
       "about": "Scheduled tasks"
     },
     "game": {
-      "about": "Achievements and titles",
-      "achievement": {
-        "about": "Achievements"
-      },
-      "title": {
-        "about": "The title on the farm card"
-      }
+      "about": "Achievements and titles"
     },
     "github": {
       "about": "GitHub: whether gh is installed and logged in"
     },
     "issue": {
-      "about": "Tickets: write, dispatch, review, complete",
-      "comment": {
-        "about": "Comments on a ticket"
-      },
-      "diff": {
-        "about": "A ticket's changes"
-      },
-      "history": {
-        "about": "Tickets' helper history"
-      },
-      "run": {
-        "about": "A ticket's rounds of work"
-      },
-      "status": {
-        "about": "Moving a ticket"
-      },
-      "timeline": {
-        "about": "A ticket's milestones and spending"
-      }
+      "about": "Tickets: write, dispatch, review, complete"
     },
     "lan": {
-      "about": "Connect to this machine: on or off, pairing, devices",
-      "device": {
-        "about": "Paired devices"
-      },
-      "me": {
-        "about": "The device making the request"
-      },
-      "pairing": {
-        "about": "Pairing a new device"
-      }
+      "about": "Connect to this machine: on or off, pairing, devices"
     },
     "memory": {
       "about": "A profile's memories"
     },
     "orchestrator": {
-      "about": "The manager: online, stop, archive, evals",
-      "archive": {
-        "about": "The manager's archived conversations"
-      },
-      "eval": {
-        "about": "The manager's eval cases"
-      }
+      "about": "The manager: online, stop, archive, evals"
     },
     "pkm": {
       "about": "Notes: pages, journals, remarks, clips and search",
-      "block": {
-        "about": "Blocks on a notes page"
-      },
-      "clip": {
-        "about": "Clipping web pages into the notes"
-      },
-      "cluster": {
-        "about": "Gathering blocks on a topic into a page"
-      },
-      "comment": {
-        "about": "Remarks and suggested rewrites in the notes"
-      },
-      "journal": {
-        "about": "Daily journals"
-      },
       "page": {
         "about": "Notes pages"
-      },
-      "radar": {
-        "about": "The review radar: what wants a look"
-      },
-      "source": {
-        "about": "A notes page's file as written: edit a whole page in an editor"
       }
     },
     "project": {
-      "about": "Projects: the git repositories in the working folder",
-      "activity": {
-        "about": "A project's commits"
-      },
-      "language": {
-        "about": "A project's languages"
-      },
-      "template": {
-        "about": "A project's ticket templates"
-      }
+      "about": "Projects: the git repositories in the working folder"
     },
     "runtime": {
-      "about": "Machines: the coding agents on this computer",
-      "setting": {
-        "about": "A machine's settings"
-      }
+      "about": "Machines: the coding agents on this computer"
     },
     "server": {
-      "about": "The server itself",
-      "health": {
-        "about": "Whether the server is up"
-      }
+      "about": "The server itself"
     },
     "session": {
-      "about": "Helpers",
-      "event": {
-        "about": "A helper's trajectory"
-      }
+      "about": "Helpers"
     },
     "setting": {
       "about": "Settings: models, keys, folders and the rest"
@@ -562,16 +514,7 @@
       "about": "Skills"
     },
     "voice": {
-      "about": "Calls and dictation",
-      "call": {
-        "about": "Calls with the manager"
-      },
-      "grant": {
-        "about": "Agora tokens for calls"
-      },
-      "moss": {
-        "about": "The MOSS key"
-      }
+      "about": "Calls and dictation"
     }
   },
   "doctor": {
@@ -593,5 +536,248 @@
     "unchanged": "\"{page}\" is unchanged",
     "saved": "Saved \"{page}\"",
     "keptAt": "{why}; your edit is in {file}"
+  },
+  "arg": {
+    "agent": "A profile: its id or name",
+    "artifact": "The draft's id",
+    "channel": "A channel: its name (general or #general) or id",
+    "cron": "The scheduled task's id",
+    "cronName": "The scheduled task's name",
+    "issue": "An issue: its number (12 or #12)",
+    "op": "An endpoint's op, such as issue.get (vibevalley api list lists them all)",
+    "page": "A page: its title, slug or an alias",
+    "project": "The project's name",
+    "projectName": "The new project's name",
+    "runtime": "The runtime's id, such as claude",
+    "session": "The helper's id, such as w3",
+    "words": "What to say"
+  },
+  "channel": {
+    "said": "Said in {channel}"
+  },
+  "cron": {
+    "removed": "Removed scheduled task {cron}",
+    "when": "When to run: give exactly one of --every, --daily, --cron, --at"
+  },
+  "example": {
+    "agentList": {
+      "about": "Which profiles can take work"
+    },
+    "agentShow": {
+      "run": "vibevalley agent show lao-zhou",
+      "about": "What a profile does"
+    },
+    "apiCall": {
+      "about": "Call an endpoint directly"
+    },
+    "apiList": {
+      "about": "Every notes endpoint, with its request Schema"
+    },
+    "artifactList": {
+      "about": "An issue's drafts"
+    },
+    "artifactRead": {
+      "about": "Read a draft's content"
+    },
+    "artifactShow": {
+      "about": "Show a draft"
+    },
+    "channelList": {
+      "about": "Which channels there are"
+    },
+    "channelRead": {
+      "about": "Read the last ten"
+    },
+    "channelSay": {
+      "run": "vibevalley channel say general '@w3 look at the login page first'",
+      "about": "Call helper w3 in general"
+    },
+    "channelSearch": {
+      "run": "vibevalley channel search login",
+      "about": "Find messages about the login page"
+    },
+    "cronAdd": {
+      "run": "vibevalley cron add morning 'what was merged yesterday' --daily 09:00 --channel general",
+      "about": "Say something in general every day at nine"
+    },
+    "cronList": {
+      "about": "Which tasks are scheduled"
+    },
+    "cronRemove": {
+      "about": "Try removing a task, changing nothing"
+    },
+    "guide": {
+      "about": "Read the agents' guide"
+    },
+    "issueDiff": {
+      "about": "What #12 changed"
+    },
+    "issueEdit": {
+      "about": "Raise #12's priority"
+    },
+    "issueList": {
+      "about": "The open issues"
+    },
+    "issueLog": {
+      "about": "#12's timeline"
+    },
+    "issueNew": {
+      "run": "vibevalley issue new 'Fix the login page' --project web --agent lao-zhou --criterion 'expired sessions go back to login'",
+      "about": "Write an issue with a criterion and give it to lao-zhou"
+    },
+    "issueShow": {
+      "about": "What #12 takes now"
+    },
+    "issueWaiting": {
+      "about": "Issues waiting on the owner"
+    },
+    "issueWork": {
+      "about": "Send #12 out and wait for it"
+    },
+    "issueWorkNoWait": {
+      "about": "Send #12 out without waiting"
+    },
+    "memoryAdd": {
+      "run": "vibevalley memory add lao-zhou 'web runs on 8797' --project web",
+      "about": "Note something for lao-zhou"
+    },
+    "memorySearch": {
+      "run": "vibevalley memory search port --agent lao-zhou",
+      "about": "What lao-zhou remembers about ports"
+    },
+    "pkmCapture": {
+      "run": "vibevalley pkm capture 'a remember-me box on the login page'",
+      "about": "Note a line in today's journal"
+    },
+    "pkmCapturePage": {
+      "run": "pbpaste | vibevalley pkm capture --page Reading",
+      "about": "Put the outline on the clipboard on the Reading page"
+    },
+    "pkmPageEdit": {
+      "run": "EDITOR='code --wait' vibevalley pkm page edit Reading",
+      "about": "Edit a whole page in VS Code"
+    },
+    "pkmPageGet": {
+      "run": "vibevalley pkm page get Reading",
+      "about": "Read a page"
+    },
+    "pkmPageList": {
+      "about": "The latest pages"
+    },
+    "pkmRadar": {
+      "about": "What wants a look"
+    },
+    "pkmSearch": {
+      "run": "vibevalley pkm search 'reading list'",
+      "about": "Search the notes"
+    },
+    "pkmToday": {
+      "about": "Today's journal"
+    },
+    "projectAdd": {
+      "about": "Clone a project from GitHub"
+    },
+    "projectList": {
+      "about": "Which projects there are"
+    },
+    "projectShow": {
+      "about": "The web project"
+    },
+    "runtimeList": {
+      "about": "Which runtimes are installed"
+    },
+    "runtimeRefresh": {
+      "about": "Look again after installing Claude Code"
+    },
+    "sessionList": {
+      "about": "The helpers at work"
+    },
+    "sessionShow": {
+      "about": "Helper w3"
+    },
+    "sessionStop": {
+      "about": "Stop w3's round"
+    },
+    "issue": {
+      "say": {
+        "run": "vibevalley issue say 12 'leave the database alone'",
+        "about": "Pass a word to #12's helper"
+      },
+      "answer": {
+        "run": "vibevalley issue answer 12 'use 8797'",
+        "about": "Answer what #12 asks"
+      },
+      "accept": {
+        "about": "Accept #12",
+        "run": "vibevalley issue accept 12"
+      },
+      "reject": {
+        "run": "vibevalley issue reject 12 'expired sessions do not go back to login'",
+        "about": "Send #12 back"
+      },
+      "stop": {
+        "about": "Stop #12's helper",
+        "run": "vibevalley issue stop 12"
+      },
+      "cancel": {
+        "run": "vibevalley issue cancel 12 'not needed'",
+        "about": "Close #12"
+      },
+      "reopen": {
+        "run": "vibevalley issue reopen 12 'only the styles this time'",
+        "about": "Reopen #12, only the styles this time"
+      }
+    },
+    "doctor": {
+      "about": "How this machine's farm is"
+    },
+    "appStatus": {
+      "about": "Whether the desktop app is open, and its version"
+    },
+    "appOpen": {
+      "about": "Bring the window to issue 12"
+    },
+    "appQuit": {
+      "about": "Quit the desktop app"
+    },
+    "appRestart": {
+      "about": "Restart the desktop app"
+    },
+    "appUpdate": {
+      "about": "Look for an update now"
+    },
+    "apiState": {
+      "about": "Follow the core state, a frame a line"
+    },
+    "apiEvents": {
+      "about": "Follow the side events, one a line"
+    },
+    "runtimeChat": {
+      "about": "Talk to Claude Code directly"
+    }
+  },
+  "issue": {
+    "can": "Can: {verbs}",
+    "cannot": "{issue} is {state} now and cannot {verb}",
+    "conflicts": "Conflicts: {files}",
+    "criteria": "Criteria",
+    "needsWords": "{verb} needs something to say",
+    "noChanges": "No change yet",
+    "noHelper": "{issue} has no helper at work",
+    "none": "No issues",
+    "questions": "Questions",
+    "spent": "Spent: {tokens} tokens, ¥{cny}",
+    "stopped": "Stopped {issue}'s helper",
+    "timeout": "{issue} was not handed back within {seconds} seconds",
+    "told": "Passed to {issue}'s helper"
+  },
+  "more": "There is more: {flag}",
+  "session": {
+    "stopped": "Stopped helper {session}"
+  },
+  "what": {
+    "agent": "profile",
+    "channel": "channel",
+    "project": "project"
   }
 }

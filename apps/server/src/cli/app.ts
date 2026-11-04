@@ -64,7 +64,10 @@ const printed = (value: unknown) => printBody(JSON.stringify(value ?? { ok: true
 /** Which app answers on this farm's socket; fails AppNotOpen when none does (doctor reads it too). */
 export const appStatus = ask((c) => c.status());
 
-const statusCommand = Command.make("status", {}, () => Effect.flatMap(appStatus, printed)).pipe(Command.withDescription(t("server.cli.command.app.status")));
+const statusCommand = Command.make("status", {}, () => Effect.flatMap(appStatus, printed)).pipe(
+  Command.withDescription(t("server.cli.command.app.status")),
+  Command.withExamples([{ command: "vibevalley app status", description: t("server.cli.example.appStatus.about") }]),
+);
 
 /** Opens the page at path; an app not running is started first (VIBEVALLEY_APP, which its launcher sets) and waited for. */
 const openCommand = Command.make("open", { path: Argument.String("path").pipe(Argument.withDefault("/")) }, ({ path }) =>
@@ -88,21 +91,30 @@ const openCommand = Command.make("open", { path: Argument.String("path").pipe(Ar
     );
     yield* printed({ opened: where });
   }),
-).pipe(Command.withDescription(t("server.cli.command.app.open")));
+).pipe(
+  Command.withDescription(t("server.cli.command.app.open")),
+  Command.withExamples([{ command: "vibevalley app open /issues/12", description: t("server.cli.example.appOpen.about") }]),
+);
 
 const quitCommand = Command.make("quit", {}, () =>
   Effect.flatMap(
     ask((c) => c.quit()),
     printed,
   ),
-).pipe(Command.withDescription(t("server.cli.command.app.quit")));
+).pipe(
+  Command.withDescription(t("server.cli.command.app.quit")),
+  Command.withExamples([{ command: "vibevalley app quit", description: t("server.cli.example.appQuit.about") }]),
+);
 
 const restartCommand = Command.make("restart", {}, () =>
   Effect.flatMap(
     ask((c) => c.restart()),
     printed,
   ),
-).pipe(Command.withDescription(t("server.cli.command.app.restart")));
+).pipe(
+  Command.withDescription(t("server.cli.command.app.restart")),
+  Command.withExamples([{ command: "vibevalley app restart", description: t("server.cli.example.appRestart.about") }]),
+);
 
 /** Where the app's update stands; check asks for one now, install puts a downloaded one in place and restarts. */
 const updateCommand = Command.make("update", { step: Argument.Literals("step", ["check", "install"]).pipe(Argument.optional) }, ({ step }) =>
@@ -118,7 +130,10 @@ const updateCommand = Command.make("update", { step: Argument.Literals("step", [
       printed,
     );
   }),
-).pipe(Command.withDescription(t("server.cli.command.app.update")));
+).pipe(
+  Command.withDescription(t("server.cli.command.app.update")),
+  Command.withExamples([{ command: "vibevalley app update check", description: t("server.cli.example.appUpdate.about") }]),
+);
 
 export const appCommand = Command.make("app").pipe(
   Command.withSubcommands([statusCommand, openCommand, quitCommand, restartCommand, updateCommand]),

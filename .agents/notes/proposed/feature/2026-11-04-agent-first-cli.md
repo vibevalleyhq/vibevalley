@@ -32,7 +32,7 @@ vibevalley issue work <工单> [--no-wait] [--timeout 秒]    # 派活，等它�
 vibevalley issue say <工单> <话>              # 带一句话给它的帮工
 vibevalley issue answer <工单> <话>           # 回答它在等的问题
 vibevalley issue accept <工单> | reject <工单> <为什么>
-vibevalley issue done|cancel|reopen <工单>
+vibevalley issue stop|cancel|reopen <工单>
 vibevalley issue diff <工单> | log <工单>      # 改动；时间线、每一轮和花费
 
 vibevalley channel list | read <频道> [--limit] [--before 号] | say <频道> <话> [--reply 号] | search <词…>
@@ -46,7 +46,7 @@ vibevalley pkm capture|today|search|radar|page get|page edit|page list
 vibevalley artifact list | show <稿子> | read <稿子>
 
 vibevalley api list [--module m]             # 每个接口：操作、说明、请求体的 JSON Schema
-vibevalley api <操作> [--json 字|-|@文件]     # 直接调一个接口，照它的 Schema 查过再发
+vibevalley api call <操作> [--json 字|-|@文件]  # 直接调一个接口，照它的 Schema 查过再发
 vibevalley api state [--watch] | api events
 ```
 
@@ -56,9 +56,10 @@ vibevalley api state [--watch] | api events
 
 ### 类型
 
-- 每条命令用 effect/cli 的 `Flag`、`Argument` 写出来，参数是参数（`--project`、`<工单>`），不是 `--json`；只有 `api <操作>` 收 JSON。
+- 每条命令用 effect/cli 的 `Flag`、`Argument` 写出来，参数是参数（`--project`、`<工单>`），不是 `--json`；只有 `api call <操作>` 收 JSON。
 - 答复先照协议的 Schema 解出来再用，`--format json` 打的也是解过的；命令行里没有 `as never`。
-- 一个概念一个文件（`cli/issue.ts`、`cli/channel.ts`……），`cli/api.ts` 只剩 `api` 这一组和调接口的那几行。
+- 一个概念一个文件（`cli/issue.ts`、`cli/channel.ts`……），都经 `cli/farm.ts` 的 `ask`（生成的 `VibeValleyApi`）、`show`（照 `--format`）、`change`（照 `--dry-run`）；`cli/api.ts` 只剩 `api` 这一组和全局的参数。
+- 工单的动作由服务端给（`stage.acts`），命令行按词要它：`packages/protocol` 的 `issueVerbs` 是每个动作的词（`complete` 是 `accept`），服务端的 `next` 也照它写出命令；接口没有对应命令的，`next` 写成 `api call <操作> --json …`。
 
 ### 输出
 
@@ -72,7 +73,7 @@ vibevalley api state [--watch] | api events
 
 - 每条命令一句说明、至少一个例子（`Command.withExamples`）；测试查每条都有。
 - `vibevalley --help` 按事情分组；`vibevalley api list` 是机器读的全集。
-- 写一份给 agent 的说明（`docs/cli.md`，命令行的 `vibevalley guide` 打出它）：常见的几件事各一段，从「看有什么工单」到「派活、回答、验收」，照着就能做完。
+- 写一份给 agent 的说明（`apps/server/src/cli/guide/<语言>.md`，`vibevalley guide` 打出它，跟着命令行一起装）：常见的几件事各一段，从「看有什么工单」到「派活、回答、验收」，照着就能做完。
 
 ## Alternatives considered
 
@@ -84,10 +85,10 @@ vibevalley api state [--watch] | api events
 ## Acceptance criteria
 
 - 命令行里没有 `as never`，`cli/api.ts` 里不再按接口拼命令；`reach.ts` 每个接口一行。
-- 每条命令有说明和例子；`vibevalley api list` 列出每个接口；`api <操作>` 发出去以前照 Schema 查。
+- 每条命令有说明和例子；`vibevalley api list` 列出每个接口；`api call <操作>` 发出去以前照 Schema 查。
 - 一条流程测试只用命令行：建工单、派活、帮工问问题、回答、交回、验收、完成，每一步读默认的文字答复往下走（用测试里的帮工）。
 - `issue list` 默认的文字比 `--format json` 短得多（测试里对比一次）。
-- 文档：[开发](docs/development.md) 的命令行一段改成新的样子，`docs/cli.md` 写好，`AGENTS.md` 的命令一行跟着改；[渠道和命令行](.agents/notes/proposed/feature/2026-11-04-desktop-channels-and-cli.md) 里「命令的样子」指到这里。
+- 文档：[开发](docs/development.md) 的命令行一段改成新的样子，`vibevalley guide` 写好，`AGENTS.md` 的命令一行跟着改；[渠道和命令行](.agents/notes/proposed/feature/2026-11-04-desktop-channels-and-cli.md) 里「命令的样子」指到这里。
 
 ## Risks
 

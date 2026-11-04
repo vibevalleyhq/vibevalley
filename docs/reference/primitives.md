@@ -133,6 +133,7 @@
 | `para` | `artifact.ts` |  |
 | `sample` | `artifact.ts` | Every kind of block, and inline marks, as the export writes them. |
 | `farm` | `cli.ts` | The whole farm on a free port; the command line is pointed at it. |
+| `workingFarm` | `cli.ts` | The same with the test helper as its only runtime (pi, testing/worker.ts), so an issue can be worked from the command |
 | `cli` | `cli.ts` | One run, with a Stdio of its own and no environment: its exit code, what it put on stdout and on stderr, and the |
 | `kinds` | `evals.ts` |  |
 | `orchestratorToolNames` | `evals.ts` | The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). |

@@ -4,7 +4,6 @@ import { Clock, Effect, Option, Semaphore } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { commandOf } from "@vibevalley/protocol/api";
 import { assignedAgentOf, closedText, cut, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "@/agent/agent.ts";
@@ -124,7 +123,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
     /** Starting it and its dry run ask the same, so neither refuses what the other allows. */
     const readyOf = Effect.fn("Issue.readyOf")(function* (issue: T.Issue, assignedAgent: string | undefined = assignedAgentOf(issue)) {
       if (issue.refining) return yield* Effect.fail(refused(t("server.issue.drafting", { name: issue.refining.name })));
-      const pick = [lookIn.agent, { say: t("server.issue.pickHint", { command: commandOf("issue.status.update", [String(issue.number)]).join(" ") }) }];
+      const pick = [lookIn.agent, { say: t("server.issue.pickHint", { n: issue.number }) }];
       if (!assignedAgent) return yield* Effect.fail(refused(t("server.issue.noAssignee"), pick));
       const agent = store.agent(assignedAgent);
       if (!agent) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: assignedAgent }), pick));

@@ -69,53 +69,49 @@ vp run release final     # 在 release/x.y 上打正式版（前面要有同一�
 
 先起服务端（见上）。另开终端，命令行在根目录是 `vp run --filter @vibevalley/server cli`；下面写成 `vibevalley`。装了桌面版的，「关于」里「安装命令行」以后终端里就有 `vibevalley`（beta 是 `vibevalley-beta`，alpha 是 `vibevalley-alpha`），连的是那个渠道的农场。`vibevalley doctor` 一次说清楚找到的是哪个农场、连不连得上、桌面版开没开、装了哪些农机、缺不缺模型的 key、连接到本机有没有问题；`vibevalley app …` 是桌面版自己的事（状态、打开到某一页、更新、退出、重启）。它连这台机器上用着家目录的那个服务端（家目录的 `server.json` 写着地址，桌面版的也找得到），没有就是 `http://127.0.0.1:8787`；别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
 
-命令行搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），接口表里每个接口是一条命令，命令的词就是操作名（`issue.create` 是 `issue create`，`issue.status.update` 是 `issue status update <id>`，操作名里的大写写成 `-`：`channel mark-read`），每条命令和每一组的说明在词典里（`server.cli.op.<操作>`、`server.cli.group.<组>.about`，少了编不过），`--dry-run` 才用到的接口（`previewDelete` 这类）没有自己的命令；`about` 的字段（多是 `<id>`）是位置参数；手写的命令（`issue work`、`runtime chat`、笔记的那些）顶替同名的生成命令或组；`vibevalley --help`、`vibevalley issue --help`、`vibevalley issue status update --help` 列出命令和参数。它的输出是给脚本和 agent 读的：
+命令行搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），是给这台电脑上的 agent 用的，主人也一样用：一条命令是一件事，不是一个接口（[计划](.agents/notes/proposed/feature/2026-11-04-agent-first-cli.md)）。组名照接口的模块（`issue`、`channel`、`pkm`、`project`、`agent`、`session`、`runtime`、`memory`、`cron`、`artifact`），组里的词是事情：`issue new|work|say|answer|accept|reject|stop|cancel|reopen|diff|log`。每条命令用 `Flag`、`Argument` 写出参数，经生成的 `VibeValleyApi` 调服务端，没有类型断言；工单是号（`12`、`#12`），频道、档案、项目按名字认，认不准就拒、列出候选。`vibevalley guide` 打出给 agent 的用法（`src/cli/guide/<语言>.md`），每条命令的 `--help` 有说明和例子（`cli.test.ts` 查）。
 
-- **笔记的命令**是给人和 agent 在终端里用的（`src/cli/pkm.ts`），读出来的默认是 Markdown，`--format json` 是接口的答复：`pkm capture 一句话`（记进今天的日记，`--page` 记到那一页末尾，不给字就读标准输入、按缩进拆成块）、`pkm today`（`--day`）、`pkm search <词…>`（一条一行：页 › 路径: 块）、`pkm radar`、`pkm page get <页>`（给人读的 Markdown）、`pkm page edit <页>`（在 `$VISUAL`、`$EDITOR` 里改这一页文件的原文，关掉存回去；这期间页面被改过就不写，改过的留在临时文件里）。
-- **stdout 只放结果**：一个 JSON 文档（终端里排开，不是终端时一行）；`state --watch`、`events` 一行一帧。失败时 stdout 是空的。
-- **输入** `--json` 收 JSON 文本、`-`（读标准输入）或 `@文件`，和位置参数并成一份，发出去以前照接口的 Schema 查一遍，对不上就不发，说是哪个字段；输入只有位置参数的命令不收 `--json`。
-- **试跑** `--dry-run`：会删、会合、会关、会让帮工走的命令（接口表里带 `dryRun` 的：`issue status update`、`issue act` 和每一个删除，`cli.test.ts` 查每个 `delete` 都有）只回答会做什么（`{"does":[…]}`），什么都不动；它和真做走同一处判断，所以真做会拒的，试跑也拒、话一样。只读的命令照常跑；别的改东西、还没有试跑的命令带着 `--dry-run` 会被拒（`NoDryRun`），不会悄悄做了。
-- **失败**是 stderr 最后一行的 JSON：`{"error":{"tag":…,"message":…,"next":[{"say":…,"run":[…]}]}}`，`next` 是接着能做什么，`run` 是能直接跑的命令（不带 `vibevalley`）：找不到的（`Missing`）总说去哪儿找（列出它们的命令），工单和计划的拒绝给出它们现在能做的动作。退出码分得出是哪一种：
+- **接口的全集**经 `api`：`api list [--module m]` 按模块列出每个接口（`--format json` 带入参的 JSON Schema），`api call <操作> [--json 字|-|@文件]` 直接调一个，发出去以前照它的 Schema 查一遍，对不上就不发、说是哪个字段；`api state [--watch]`、`api events` 跟着服务端的流，一行一帧。哪个接口由哪条命令用到、哪些只经 `api`，写在 `src/cli/reach.ts`（`Record<操作, …>`，加接口不写这一行编不过）。
+- **输出**：默认是短的文字，一件东西一行，开头是接着能用的名字（`#12  todo  修登录页`）；`show` 是几段短的，最后一行「能做」是这张工单现在能用的命令；列表默认 20 条，还有的话最后一行说怎么看下一页。`--format json` 是接口的形状，全命令行同一个参数。stdout 只放结果，失败时 stdout 是空的。
+- **笔记的命令**（`src/cli/pkm.ts`）：`pkm capture 一句话`（记进今天的日记，`--page` 记到那一页末尾，不给字就读标准输入、按缩进拆成块）、`pkm today`（`--day`）、`pkm search <词…>`（一条一行：页 › 路径: 块）、`pkm radar`、`pkm page list|get <页>`、`pkm page edit <页>`（在 `$VISUAL`、`$EDITOR` 里改这一页文件的原文，关掉存回去；这期间页面被改过就不写，改过的留在临时文件里）。
+- **试跑** `--dry-run`：会删、会合、会关、会让帮工走的命令（接口表里带 `dryRun` 的：工单的动作和每一个删除，`cli.test.ts` 查每个 `delete` 都有）只回答会做什么，什么都不动；它和真做走同一处判断，所以真做会拒的，试跑也拒、话一样。只读的命令照常跑；别的改东西、还没有试跑的命令带着 `--dry-run` 会被拒（`NoDryRun`），不会悄悄做了。新建的收 `--key`，同一把键重发不会建两份。
+- **失败**是 stderr 最后一行的 JSON：`{"error":{"tag":…,"message":…,"next":[{"say":…,"run":[…]}]}}`，`next` 是接着能做什么，`run` 是能直接跑的命令（不带 `vibevalley`）：找不到的（`Missing`）总说去哪儿找（列出它们的命令），工单此刻不收的动作被拒时列出它能做的动作。帮助走 stdout，写错了命令时的帮助走 stderr。退出码分得出是哪一种：
 
   | 退出码 | 意思 |
   |---|---|
   | 0 | 成功，或要了帮助 |
   | 1 | 服务端出错 |
-  | 2 | 命令写错了：不认的参数、少参数、请求体不对 |
+  | 2 | 命令写错了：不认的参数、少参数、请求体不对、认不准是哪一个 |
   | 3 | 服务端拒绝（`Refused`，和语音、连接器、连接到本机的拒绝） |
   | 4 | 没有这个东西（`Missing`） |
   | 5 | 连不上服务端 |
-  | 130 | 按了 Ctrl+C：`state --watch`、`issue work` 放下请求再走 |
+  | 130 | 按了 Ctrl+C：`api state --watch`、`issue work` 放下请求再走 |
 
-1. 建工单。把 `…` 换成标题和项目，用返回的工单 ID 替换后面的 `<id>`。
+1. 建工单。把 `…` 换成标题和项目；答复第一个词是工单的号，后面的 `<号>` 用它。
 
    ```bash
-   vibevalley issue create --json '{"title":"…","project":"…","agent":"codex"}'
+   vibevalley issue new … --project … --agent codex --criterion '…'
    ```
 
-2. 派活。命令把备选挪到待办，等帮工交回来，再打出改动。
+2. 派活。命令把它派出去，等帮工交回来或停下来问，经过的状态写在 stderr，最后打出改动。
 
    ```bash
-   vibevalley issue work <id>
+   vibevalley issue work <号>
    ```
 
-3. 如果不满意，写清要改什么，再干一轮。
+3. 帮工在问，`issue show <号>` 的「问题」下面是它问的；回答了再派一轮。不满意交回来的，说清要改什么，打回去再干一轮。
 
    ```bash
-   vibevalley issue status update <id> --json '{"status":"todo","text":"…"}'
+   vibevalley issue answer <号> …
+   vibevalley issue reject <号> …
+   vibevalley issue work <号>
    ```
 
-   反复运行下面的命令。先等 `status` 变成 `in_progress`，再等它回到 `in_review`。
+4. 满意了，先试跑，看它会怎么交付（合进主分支还是开 PR、合之前跑不跑检查）；再去掉 `--dry-run` 真做。
 
    ```bash
-   vibevalley issue get <id>
-   ```
-
-4. 如果满意，收下改动。先试跑，看它会怎么交付（合进主分支还是开 PR、合之前跑不跑检查）；再去掉 `--dry-run` 真做。
-
-   ```bash
-   vibevalley issue status update <id> --dry-run --json '{"status":"done"}'
-   vibevalley issue status update <id> --json '{"status":"done"}'
+   vibevalley issue accept <号> --dry-run
+   vibevalley issue accept <号>
    ```
 
 状态规则和理由见子系统 [工单](docs/subsystems/issue.md#怎么走)。不派真的帮工、在隔离的沙箱里把这几步走一遍，见 [vv-acceptance/references/server.md](.agents/skills/vv-acceptance/references/server.md) 的 `--scripted-helper`。

@@ -20,7 +20,7 @@ import { type ProjectHandlers, projectEndpoints } from "./project/api";
 import { type RuntimeHandlers, runtimeEndpoints } from "./runtime/api";
 import { type SessionHandlers, sessionEndpoints } from "./session/api";
 import { type SettingHandlers, settingEndpoints } from "./setting/api";
-import { pathOf } from "./shapes";
+import { type IssueAct, pathOf } from "./shapes";
 import { type VoiceHandlers, voiceEndpoints } from "./voice/api";
 
 export * from "./endpoint";
@@ -85,14 +85,56 @@ export const endpoints: readonly Endpoint[] = [
 
 export { pathOf };
 
-/** How the command line writes a word of an op: previewDelete is preview-delete. */
-export const kebab = (word: string) => word.replace(/[A-Z]/gu, (c, i: number) => (i > 0 ? "-" : "") + c.toLowerCase());
+/** Endpoints with a command of their own that takes the same arguments, by that command (the command line's, apps/server
+ * src/cli): what commandOf writes for them; every other endpoint is written as `api call`. */
+const sameAs: Partial<Record<keyof Handlers, readonly string[]>> = {
+  "issue.list": ["issue", "list"],
+  "issue.get": ["issue", "show"],
+  "issue.diff.get": ["issue", "diff"],
+  "issue.timeline.get": ["issue", "log"],
+  "session.list": ["session", "list"],
+  "session.get": ["session", "show"],
+  "session.stop": ["session", "stop"],
+  "project.list": ["project", "list"],
+  "agent.list": ["agent", "list"],
+  "runtime.list": ["runtime", "list"],
+  "cron.list": ["cron", "list"],
+  "channel.list": ["channel", "list"],
+  "artifact.list": ["artifact", "list"],
+  "artifact.get": ["artifact", "show"],
+  "pkm.page.list": ["pkm", "page", "list"],
+};
 
-export const commandOf = (op: keyof Handlers, about: readonly string[] = [], input?: unknown): string[] => [
-  ...op.split(".").map(kebab),
-  ...about,
-  ...(input === undefined ? [] : ["--json", JSON.stringify(input)]),
-];
+/** The command line's verbs for what can be done with an issue (`issue accept 12`). */
+export const IssueVerbValues = ["work", "answer", "say", "reject", "accept", "stop", "cancel", "reopen"] as const;
+export type IssueVerb = (typeof IssueVerbValues)[number];
+
+/** The verb each of an issue's acts is asked for by: the server's next steps say an act this way, and the command line
+ * asks for the act by it. */
+export const issueVerbs: Readonly<Record<IssueAct, IssueVerb>> = {
+  start: "work",
+  resume: "work",
+  cure: "work",
+  resolve: "work",
+  answer: "answer",
+  tell: "say",
+  reject: "reject",
+  complete: "accept",
+  acknowledge: "accept",
+  stop: "stop",
+  close: "cancel",
+  reopen: "reopen",
+};
+
+/** A command that does what op does with these arguments (about: its `about` fields, in order) and input, as a next step
+ * says it (without `vibevalley`): the endpoint's own command when it has one, else `api call` with the whole input. */
+export const commandOf = (op: keyof Handlers, about: readonly string[] = [], input?: Record<string, unknown>): string[] => {
+  const same = sameAs[op];
+  if (same && input === undefined) return [...same, ...about];
+  const names = endpoints.find((e) => e.op === op)?.about ?? [];
+  const fields = { ...Object.fromEntries(names.flatMap((name, i) => (about[i] === undefined ? [] : [[name, about[i]]]))), ...input };
+  return ["api", "call", op, ...(Object.keys(fields).length > 0 ? ["--json", JSON.stringify(fields)] : [])];
+};
 
 /** Only get, list, check, recall and preview read; every other verb may change something. */
 export const readsOnly = (op: string) => /^(get|list|check|recall|search|preview[A-Z]\w*)$/u.test(op.split(".").at(-1) ?? "");

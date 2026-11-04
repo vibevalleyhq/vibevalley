@@ -1,83 +1,24 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { t } from "@vibevalley/i18n";
-import { endpoints, kebab } from "@vibevalley/protocol/api";
+import { endpoints } from "@vibevalley/protocol/api";
 import { Preview } from "@vibevalley/protocol/schema";
 
+import { reach } from "./cli/reach.ts";
 import { lookIn, memoriesOf } from "./errors.ts";
-import { cli, farm } from "./testing/cli.ts";
+import { cli, farm, workingFarm } from "./testing/cli.ts";
+
+const json = (text: string): unknown => JSON.parse(text);
 
 describe("the command line", () => {
-  it.effect("has a command, with its line of help, for every endpoint; what --dry-run answers has none of its own", () =>
+  it.effect("reaches every endpoint: by the command reach.ts names, which is there with an example, or through api", () =>
     Effect.gen(function* () {
-      // Hand-written in their place (cli/pkm.ts): their help is their own.
-      const replaced = new Set(["pkm.capture", "pkm.search", "pkm.page.get", "pkm.radar.get"]);
-      const dryRunOnly = new Set(endpoints.flatMap((e) => (e.dryRun ? [e.dryRun] : [])));
-      for (const e of endpoints) {
-        if (replaced.has(e.op)) continue;
-        const path = e.op.split(".").map(kebab);
-        if (dryRunOnly.has(e.op)) {
-          const listed = (yield* cli([...path.slice(0, -1), "--help"])).out;
-          expect({ op: e.op, listed: new RegExp(`^\\s+${path.at(-1)}\\s`, "mu").test(listed) }).toEqual({ op: e.op, listed: false });
-          continue;
-        }
-        const help = yield* cli([...path, "--help"]);
-        expect({ op: e.op, code: help.code }).toEqual({ op: e.op, code: 0 });
-        expect(help.out).toContain(t(`server.cli.op.${e.op}`));
+      for (const command of new Set(Object.values(reach).filter((c) => c !== "api"))) {
+        const help = yield* cli([...command.split(" "), "--help"]);
+        expect({ command, code: help.code, examples: help.out.includes("EXAMPLES") }).toEqual({ command, code: 0, examples: true });
       }
-    }),
-  );
-
-  it.live("calls an endpoint and prints its answer as one JSON document", () =>
-    Effect.gen(function* () {
-      const server = yield* farm;
-      const made = yield* cli(["issue", "create", "--server", server, "--json", JSON.stringify({ title: "试一下" })]);
-      expect([made.code, made.out.split("\n").length]).toEqual([0, 1]);
-      const issue = JSON.parse(made.out) as { id: string; number: number; status: string };
-      expect(issue.status).toBe("backlog");
-      // The issue's number is enough, as the server takes it, and the body can come on stdin.
-      const got = JSON.parse((yield* cli(["issue", "get", String(issue.number), "--server", server])).out) as { title: string };
-      expect(got.title).toBe("试一下");
-      const edited = yield* cli(["issue", "update", issue.id, "--server", server, "--json", "-"], JSON.stringify({ title: "改一下" }));
-      expect((JSON.parse(edited.out) as { title: string }).title).toBe("改一下");
-      const list = JSON.parse((yield* cli(["issue", "list", "--server", server])).out) as { id: string }[];
-      expect(list.map((i) => i.id)).toContain(issue.id);
-      expect(JSON.parse((yield* cli(["state", "--server", server])).out)).toHaveProperty("state");
-      // With no --server, VIBEVALLEY_SERVER says where.
-      const fromEnv = yield* cli(["issue", "get", issue.id], "", { VIBEVALLEY_SERVER: server });
-      expect([fromEnv.code, (JSON.parse(fromEnv.out) as { title: string }).title]).toEqual([0, "改一下"]);
-    }),
-  );
-
-  it.live("fails with nothing on stdout, a JSON failure on stderr and an exit code by kind", () =>
-    Effect.gen(function* () {
-      const server = yield* farm;
-      const missingArgument = yield* cli(["issue", "get", "--server", server]);
-      expect([missingArgument.code, missingArgument.out, missingArgument.failure?.tag]).toEqual([2, "", "MissingArgument"]);
-      expect(missingArgument.failure?.next).toEqual([{ say: "看这条命令怎么写", run: ["issue", "get", "--help"] }]);
-      const unknownFlag = yield* cli(["issue", "list", "--bogus", "1", "--server", server]);
-      expect([unknownFlag.code, unknownFlag.failure?.tag]).toEqual([2, "UnrecognizedOption"]);
-      // A body its endpoint does not take never leaves: the wrong field is named.
-      const wrongBody = yield* cli(["issue", "create", "--server", server, "--json", JSON.stringify({ title: 1 })]);
-      expect([wrongBody.code, wrongBody.failure?.tag]).toEqual([2, "InvalidValue"]);
-      expect(wrongBody.failure?.message).toContain("title");
-      const notJson = yield* cli(["issue", "create", "--server", server, "--json", "{"]);
-      expect([notJson.code, notJson.failure?.tag]).toEqual([2, "InvalidJson"]);
-      const missing = yield* cli(["issue", "get", "nope", "--server", server]);
-      expect([missing.code, missing.out, missing.failure?.tag]).toEqual([4, "", "Missing"]);
-      const made = JSON.parse((yield* cli(["issue", "create", "--server", server, "--json", JSON.stringify({ title: "派不出去" })])).out) as { id: string };
-      const refused = yield* cli(["issue", "status", "update", made.id, "--server", server, "--json", JSON.stringify({ status: "done" })]);
-      expect([refused.code, refused.out, refused.failure?.tag]).toEqual([3, "", "Refused"]);
-      // The refusal says what can be done instead, as commands that run as they are.
-      const cancel = refused.failure?.next?.find((n) => n.run?.includes('{"status":"canceled"}') === true);
-      expect(cancel?.run).toBeDefined();
-      const canceled = yield* cli([...cancel!.run!, "--server", server]);
-      expect([canceled.code, (JSON.parse(canceled.out) as { status: string }).status]).toEqual([0, "canceled"]);
-      const nowhere = yield* cli(["issue", "get", "nope", "--server", server]);
-      expect(nowhere.failure?.next).toEqual([{ say: "列出工单，找它的编号", run: ["issue", "list"] }]);
-      const unreachable = yield* cli(["issue", "list", "--server", "http://127.0.0.1:9"]);
-      expect([unreachable.code, unreachable.failure?.tag]).toEqual([5, "Unreachable"]);
+      const listed = new Set((yield* cli(["api", "list"])).out.split("\n").map((l) => l.trim().split("  ")[0]));
+      expect(endpoints.map((e) => e.op).filter((op) => !listed.has(op))).toEqual([]);
     }),
   );
 
@@ -88,77 +29,96 @@ describe("the command line", () => {
       expect({ op: e.op, preview: preview?.op }).toEqual({ op: e.op, preview: e.dryRun });
       expect([preview!.about, preview!.input === e.input, preview!.result === Preview, preview!.can]).toEqual([e.about, true, true, e.can]);
     }
-    // Every delete has one.
     expect(endpoints.filter((e) => e.op.endsWith(".delete") && !e.dryRun).map((e) => e.op)).toEqual([]);
   });
 
-  it.live("--dry-run says what a command would do and changes nothing; one with no dry run is refused, a read runs", () =>
+  it.live("answers in short lines, the name to use next first, and in the protocol's shape with --format json", () =>
     Effect.gen(function* () {
       const server = yield* farm;
-      const made = JSON.parse((yield* cli(["issue", "create", "--server", server, "--json", JSON.stringify({ title: "先试跑" })])).out) as {
-        id: string;
-        number: number;
-      };
-      const preview = yield* cli(["issue", "delete", made.id, "--server", server, "--dry-run"]);
-      expect([preview.code, (JSON.parse(preview.out) as { does: string[] }).does[0]]).toEqual([0, `删掉工单 #${made.number}「先试跑」`]);
-      expect((yield* cli(["issue", "get", made.id, "--server", server])).code).toBe(0);
-      const cancel = yield* cli(["issue", "status", "update", made.id, "--server", server, "--dry-run", "--json", JSON.stringify({ status: "canceled" })]);
-      expect((JSON.parse(cancel.out) as { does: string[] }).does).toEqual([`#${made.number} 关成已取消：还没派过`]);
-      expect((JSON.parse((yield* cli(["issue", "get", made.id, "--server", server])).out) as { status: string }).status).toBe("backlog");
-      // Refused as the real move would be, with the same words.
-      const real = yield* cli(["issue", "status", "update", made.id, "--server", server, "--json", JSON.stringify({ status: "done" })]);
-      const dry = yield* cli(["issue", "status", "update", made.id, "--server", server, "--dry-run", "--json", JSON.stringify({ status: "done" })]);
-      expect([dry.code, dry.failure?.message]).toEqual([3, real.failure?.message]);
-      const create = yield* cli(["issue", "create", "--server", server, "--dry-run", "--json", JSON.stringify({ title: "不该建" })]);
-      expect([create.code, create.failure?.tag]).toEqual([2, "NoDryRun"]);
-      const list = yield* cli(["issue", "list", "--server", server, "--dry-run"]);
-      expect(list.code).toBe(0);
-      expect((JSON.parse(list.out) as { title: string }[]).some((i) => i.title === "不该建")).toBe(false);
+      const at = (...args: string[]) => [...args, "--server", server];
+      const made = yield* cli(at("issue", "new", "试一下", "--criterion", "能打开"));
+      expect(made.out).toMatch(/^#1 {2}draft {2}试一下$/u);
+      const shown = (yield* cli(at("issue", "show", "#1"))).out;
+      expect(shown).toContain("能打开");
+      expect(shown.split("\n").at(-1)).toMatch(/^能做：/u);
+      const edited = yield* cli(at("issue", "edit", "1", "--title", "改一下"));
+      expect(edited.out).toMatch(/^#1 {2}draft {2}改一下$/u);
+      const asJson = json((yield* cli(at("issue", "show", "1", "--format", "json"))).out) as { number: number; criteria: string[] };
+      expect([asJson.number, asJson.criteria]).toEqual([1, ["能打开"]]);
+      for (const title of ["二", "三", "四"]) yield* cli(at("issue", "new", title));
+      const list = yield* cli(at("issue", "list"));
+      const listJson = yield* cli(at("issue", "list", "--format", "json"));
+      expect(list.out.split("\n")).toHaveLength(4);
+      // What an agent reads by default is a small part of the whole.
+      expect(list.out.length * 3).toBeLessThan(listJson.out.length);
+      const limited = yield* cli(at("issue", "list", "--limit", "2"));
+      expect(limited.out.split("\n").at(-1)).toContain("--limit 4");
+      // With no --server, VIBEVALLEY_SERVER says where.
+      expect((yield* cli(["issue", "show", "1"], "", { VIBEVALLEY_SERVER: server })).code).toBe(0);
     }),
   );
 
-  it.live("each delete's dry run names what it would delete and leaves it there; one that is not there is missing", () =>
+  it.live("fails with nothing on stdout, a JSON failure on stderr, an exit code by kind and the commands to go on with", () =>
     Effect.gen(function* () {
       const server = yield* farm;
-      const run = (args: string[], body?: unknown) => cli([...args, "--server", server, ...(body === undefined ? [] : ["--json", JSON.stringify(body)])]);
-      const doc = (r: { out: string }) => JSON.parse(r.out) as { id: string; does: string[] } & Record<string, unknown>;
-      const list = (args: string[]) => Effect.map(run(args), (r) => JSON.parse(r.out) as unknown);
+      const at = (...args: string[]) => [...args, "--server", server];
+      const missingArgument = yield* cli(at("issue", "show"));
+      expect([missingArgument.code, missingArgument.out, missingArgument.failure?.tag]).toEqual([2, "", "MissingArgument"]);
+      expect((yield* cli(at("issue", "list", "--bogus", "1"))).failure?.tag).toBe("UnrecognizedOption");
+      const missing = yield* cli(at("issue", "show", "nope"));
+      expect([missing.code, missing.failure?.tag, missing.failure?.next]).toEqual([4, "Missing", [{ say: "列出工单，找它的编号", run: ["issue", "list"] }]]);
+      yield* cli(at("issue", "new", "还是草稿"));
+      // An act the issue does not take now is refused, naming the ones it does as commands to run.
+      const refused = yield* cli(at("issue", "accept", "1"));
+      expect([refused.code, refused.failure?.tag]).toEqual([3, "Refused"]);
+      const cancel = refused.failure?.next?.find((n) => n.say === "cancel");
+      expect(cancel?.run).toEqual(["issue", "cancel", "1"]);
+      expect((yield* cli(at(...cancel!.run!))).out).toMatch(/^#1 {2}canceled/u);
+      const noWords = yield* cli(at("issue", "say", "1"));
+      expect([noWords.code, noWords.failure?.tag]).toEqual([2, "MissingArgument"]);
+      const nowhere = yield* cli(at("channel", "read", "nowhere"));
+      expect([nowhere.code, nowhere.failure?.tag]).toEqual([4, "Missing"]);
+      expect(nowhere.failure?.message).toContain("#general");
+      expect((yield* cli(["issue", "list", "--server", "http://127.0.0.1:9"])).failure?.tag).toBe("Unreachable");
+      const wrong = yield* cli(["issue", "nope"]);
+      expect([wrong.code, wrong.out, wrong.failure?.tag]).toEqual([2, "", "UnknownSubcommand"]);
+    }),
+  );
 
-      const cron = doc(yield* run(["cron", "create"], { name: "早上看看", text: "看看昨天的改动", when: { kind: "daily", time: "09:00" } }));
-      expect(doc(yield* run(["cron", "delete", cron.id, "--dry-run"])).does[0]).toContain("删掉定时任务「早上看看」");
-      expect(JSON.stringify(yield* list(["cron", "list"]))).toContain(cron.id);
+  it.live("--dry-run says what would happen and changes nothing; a change with no dry run is refused", () =>
+    Effect.gen(function* () {
+      const server = yield* farm;
+      const at = (...args: string[]) => [...args, "--server", server];
+      yield* cli(at("issue", "new", "先试跑"));
+      const cancel = yield* cli(at("issue", "cancel", "1", "--dry-run"));
+      expect([cancel.code, cancel.out]).toEqual([0, "#1 关成已取消：还没派过"]);
+      expect((yield* cli(at("issue", "show", "1"))).out.split("\n")[1]).toMatch(/^draft/u);
+      const create = yield* cli(at("issue", "new", "不该建", "--dry-run"));
+      expect([create.code, create.failure?.tag]).toEqual([2, "NoDryRun"]);
+      const added = yield* cli(at("cron", "add", "早上看看", "看看昨天的改动", "--daily", "09:00"));
+      const id = added.out.split("  ")[0]!;
+      expect((yield* cli(at("cron", "remove", id, "--dry-run"))).out).toContain("删掉定时任务「早上看看」");
+      expect((yield* cli(at("cron", "list"))).out).toContain(id);
+    }),
+  );
 
-      const skill = doc(yield* run(["skill", "create"], { id: "", name: "写测试", description: "先写测试", body: "先写测试再改" }));
-      const agents = (yield* list(["agent", "list"])) as { id: string; name: string }[];
-      const docs = agents.find((a) => a.id === "docs")!;
-      yield* run(["agent", "update", "docs"], { ...docs, skills: [skill.id] });
-      expect(doc(yield* run(["skill", "delete", skill.id, "--dry-run"])).does).toEqual(["删掉技能「写测试」", `从 「${docs.name}」 的档案里摘掉它`]);
-      expect(JSON.stringify(yield* list(["skill", "list"]))).toContain(skill.id);
-
-      expect(doc(yield* run(["agent", "delete", "docs", "--dry-run"])).does[0]).toContain(`删掉档案「${docs.name}」`);
-      expect(JSON.stringify(yield* list(["agent", "list"]))).toContain('"id":"docs"');
-      const orchestrator = yield* run(["agent", "delete", "orchestrator", "--dry-run"]);
-      expect([orchestrator.code, orchestrator.failure?.message]).toEqual([3, "默认管家删不了：至少要有一个管家"]);
-
-      const memory = doc(yield* run(["memory", "create", "docs"], { text: "主人喜欢短的提交说明" }));
-      expect(doc(yield* run(["memory", "delete", "docs", memory.id, "--dry-run"])).does).toEqual([`从 docs 的记性里忘掉：「主人喜欢短的提交说明」`]);
-      expect(JSON.stringify(yield* list(["memory", "list", "docs"]))).toContain(memory.id);
-
-      expect(doc(yield* run(["lan", "pairing", "stop", "--dry-run"])).does).toEqual(["没有在配对的码：什么都不会动"]);
-
-      // Not there: the delete and its dry run are both missing, and say where to look.
-      for (const args of [
-        ["agent", "delete", "nobody"],
-        ["skill", "delete", "nothing"],
-        ["cron", "delete", "never"],
-        ["memory", "delete", "docs", "nothing"],
-        ["lan", "device", "delete", "nowhere"],
-      ]) {
-        const dry = yield* run([...args, "--dry-run"]);
-        const real = yield* run(args);
-        expect([args.join(" "), dry.code, real.code, dry.failure?.message === real.failure?.message]).toEqual([args.join(" "), 4, 4, true]);
-        expect(dry.failure?.next?.[0]?.run).toBeDefined();
-      }
+  it.live("api call reaches any endpoint, its --json checked against the endpoint's Schema before it is sent", () =>
+    Effect.gen(function* () {
+      const server = yield* farm;
+      const at = (...args: string[]) => [...args, "--server", server];
+      yield* cli(at("issue", "new", "直接调"));
+      expect(json((yield* cli(at("api", "call", "issue.get", "--json", JSON.stringify({ id: "1" })))).out)).toMatchObject({ number: 1, title: "直接调" });
+      expect((yield* cli(at("api", "call", "issue.get", "--json", "-"), JSON.stringify({ id: "1" }))).code).toBe(0);
+      const wrongBody = yield* cli(at("api", "call", "issue.create", "--json", JSON.stringify({ title: 1 })));
+      expect([wrongBody.code, wrongBody.failure?.tag]).toEqual([2, "InvalidValue"]);
+      expect(wrongBody.failure?.message).toContain("title");
+      const noOp = yield* cli(at("api", "call", "issue.nothing"));
+      expect([noOp.code, noOp.failure?.next?.[0]?.run]).toEqual([4, ["api", "list"]]);
+      const preview = json((yield* cli(at("api", "call", "agent.delete", "--json", JSON.stringify({ id: "docs" }), "--dry-run"))).out) as { does: string[] };
+      expect(preview.does[0]).toContain("删掉档案");
+      const schemas = json((yield* cli(at("api", "list", "--module", "issue", "--format", "json"))).out) as { op: string; input: unknown }[];
+      expect(schemas.find((e) => e.op === "issue.create")?.input).toMatchObject({ type: "object" });
+      expect(json((yield* cli(at("api", "state"))).out)).toHaveProperty("state");
     }),
   );
 
@@ -166,20 +126,54 @@ describe("the command line", () => {
     Effect.gen(function* () {
       for (const next of [...Object.values(lookIn), memoriesOf("docs")]) {
         if (!next.run) continue;
-        const help = yield* cli([...next.run, "--help"]);
+        const help = yield* cli([...next.run.filter((w) => !w.startsWith("{")), "--help"]);
         expect({ run: next.run, code: help.code }).toEqual({ run: next.run, code: 0 });
       }
     }),
   );
 
-  it.effect("asked for help, prints it on stdout; given a mistake, keeps stdout empty", () =>
+  it.live("an agent does an issue from start to end with these commands alone, reading their text", () =>
     Effect.gen(function* () {
-      const help = yield* cli(["issue", "--help"]);
-      expect(help.code).toBe(0);
-      expect(help.out).toContain("status");
-      expect(help.err).toBe("");
-      const wrong = yield* cli(["issue", "nope"]);
-      expect([wrong.code, wrong.out, wrong.failure?.tag]).toEqual([2, "", "UnknownSubcommand"]);
+      const server = yield* workingFarm;
+      const at = (...args: string[]) => [...args, "--server", server];
+      const profile = json((yield* cli(at("api", "call", "agent.create", "--json", JSON.stringify(scripted)))).out) as { id: string };
+      expect((yield* cli(at("project", "add", "clock"))).code).toBe(0);
+      // The test helper asks which port when its issue says 先问清楚, with options when it says 给选项, and commits clock.ts
+      // when it says 提交.
+      const made = yield* cli(at("issue", "new", "打卡页先问清楚，给选项，提交", "--project", "clock", "--agent", profile.id, "--criterion", "clock-in works"));
+      const n = /^#(\d+)/u.exec(made.out)?.[1] ?? "";
+      const asked = yield* cli(at("issue", "work", n, "--timeout", "30"));
+      expect(asked.code).toBe(0);
+      const waiting = (yield* cli(at("issue", "show", n))).out;
+      expect(waiting).toContain("用 8797");
+      expect(waiting.split("\n").at(-1)).toContain("answer");
+      expect((yield* cli(at("issue", "answer", n, "用 8797"))).code).toBe(0);
+      expect((yield* cli(at("issue", "work", n, "--timeout", "30"))).code).toBe(0);
+      expect((yield* cli(at("issue", "show", n))).out.split("\n")[1]).toMatch(/^reviewing/u);
+      expect((yield* cli(at("issue", "diff", n))).out).toContain("clock.ts");
+      expect((yield* cli(at("issue", "accept", n))).out).toMatch(new RegExp(`^#${n} {2}done`, "u"));
     }),
   );
 });
+
+/** A profile on the test helper (the farm's pi is it: testing/worker.ts). */
+const scripted = {
+  id: "",
+  name: "fox",
+  role: "worker",
+  duty: "",
+  enabled: true,
+  runtime: "pi",
+  model: "",
+  effort: "",
+  persona: "",
+  personaMode: "append",
+  skills: [],
+  mcpServers: [],
+  disallowedTools: [],
+  env: {},
+  workdir: "",
+  worktree: true,
+  tags: [],
+  look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
+};

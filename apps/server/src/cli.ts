@@ -1,15 +1,16 @@
-// VibeValley's command line, on effect/cli. With no command: VibeValley's own agent in a terminal (cli/chat.ts).
-// `runtime chat <runtime>` talks to another runtime the same way. Every other command is one of the endpoints
-// (cli/api.ts), called over HTTP: its answer is JSON on stdout; a failure is JSON on stderr with what to do next, and an
-// exit code that says which kind (cli/output.ts).
+// VibeValley's command line, on effect/cli, for agents first and people too. With no command: VibeValley's own agent in
+// a terminal (cli/chat.ts). Every other command is a thing to do with the farm, written by hand and typed (cli/issue.ts,
+// cli/channel.ts…), asking the server through the typed client; what no command covers is `api` (cli/api.ts, cli/reach.ts
+// says which). Answers are short text, or the protocol's shape with --format json; a failure is JSON on stderr with what
+// to do next, and an exit code that says which kind (cli/output.ts).
 //
 //	vpx src/cli.ts [--cwd DIR] [--name NAME] [--model ID] [--mcp FILE] [-p PROMPT]
 //	vpx src/cli.ts runtime chat claude
-//	vpx src/cli.ts issue list
+//	vpx src/cli.ts issue list --waiting
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio, Predicate } from "effect";
-import { Argument, CliError, Command, Flag } from "effect/cli";
+import { Cause, Effect, Exit, Fiber, Option, Predicate, Stdio } from "effect";
+import { Argument, CliError, CliOutput, Command, Flag, TerminalCapabilities } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
 import { setLocale, t } from "@vibevalley/i18n";
@@ -17,18 +18,23 @@ import { setLocale, t } from "@vibevalley/i18n";
 import { defaults } from "@/infra/config.ts";
 import { savedLocale } from "@/setting/setting.ts";
 
-import { appCommand } from "./cli/app.ts";
-import { doctorCommand } from "./cli/doctor.ts";
 import { err, exit, Failure, out, printFailure } from "./cli/output.ts";
-import { pkmCommands } from "./cli/pkm.ts";
 import { messageOf } from "./errors.ts";
 
 // The command line speaks the farm's language: the locale saved in the home's settings.json. It is set before the
-// commands load, since they say their help text as they load: hence the two imports below.
+// commands load, since they say their help text as they load: hence the imports below, after it.
 setLocale(savedLocale(process.env.VIBEVALLEY_HOME || defaults().home));
 
-const { DryRunFlag, eventsCommand, groupCommands, issueWorkCommand, ServerFlag, stateCommand } = await import("./cli/api.ts");
+const { apiCommand, DryRunFlag, FormatFlag, ServerFlag } = await import("./cli/api.ts");
+const { appCommand } = await import("./cli/app.ts");
+const { channelCommand } = await import("./cli/channel.ts");
 const { ownChat, runtimeChat } = await import("./cli/chat.ts");
+const { doctorCommand } = await import("./cli/doctor.ts");
+const { guideCommand } = await import("./cli/guide.ts");
+const { issueCommand } = await import("./cli/issue.ts");
+const { keptCommands } = await import("./cli/notes.ts");
+const { pkmCommand } = await import("./cli/pkm.ts");
+const { farmPartCommands, runtimeCommands } = await import("./cli/project.ts");
 
 const version = "0.1.0";
 
@@ -67,7 +73,10 @@ const runtimeChatCommand = Command.make(
         ...asked(o.prompt),
       }),
     ),
-).pipe(Command.withDescription(t("server.cli.command.runtimeChat")));
+).pipe(
+  Command.withDescription(t("server.cli.command.runtimeChat")),
+  Command.withExamples([{ command: "vibevalley runtime chat claude", description: t("server.cli.example.runtimeChat.about") }]),
+);
 
 const root = Command.make(
   "vibevalley",
@@ -81,15 +90,23 @@ const root = Command.make(
   (o) => chat(ownChat({ cwd: some(o.cwd) ?? "", name: some(o.name) ?? "vibevalley", model: some(o.model) ?? "", mcp: some(o.mcp) ?? "", ...asked(o.prompt) })),
 ).pipe(
   Command.withDescription(t("server.cli.command.root")),
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- effect's Command types subcommands by a tuple written out; these are built from the endpoint table
+  // By what a person or an agent does; what no command covers is reached through api (cli/reach.ts says which).
   Command.withSubcommands([
-    ...groupCommands({ issue: [issueWorkCommand], runtime: [runtimeChatCommand], ...pkmCommands }),
-    stateCommand,
-    eventsCommand,
-    appCommand,
+    issueCommand,
+    channelCommand,
+    pkmCommand,
+    ...farmPartCommands,
+    Command.make("runtime").pipe(
+      Command.withSubcommands([...runtimeCommands, runtimeChatCommand]),
+      Command.withDescription(t("server.cli.group.runtime.about")),
+    ),
+    ...keptCommands,
     doctorCommand,
-  ] as never),
-  Command.withGlobalFlags([ServerFlag, DryRunFlag]),
+    appCommand,
+    guideCommand,
+    apiCommand,
+  ]),
+  Command.withGlobalFlags([ServerFlag, DryRunFlag, FormatFlag]),
 );
 
 /** What the parser said was wrong, as one failure: every mistake's words, and the help of the command it was in. */
@@ -104,27 +121,34 @@ function usageOf(e: CliError.CliError): Failure {
   });
 }
 
-/** Runs the command line on args and gives back its exit code. Whatever effect/cli prints (help, version, completions)
- * is held and goes to stdout when asked for, to stderr when it came with a mistake: stdout stays the result. */
+/** Runs the command line on args and gives back its exit code. What effect/cli says itself goes through its Presenter
+ * onto this run's Stdio: help and the version to stdout, help that came with a mistake to stderr before the failure, so
+ * stdout stays the result. */
 export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
-  const held: string[] = [];
-  const hold = (...a: unknown[]) => void held.push(a.map(String).join(" "));
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the real console with its writes held: everything else is inherited
-  const console_ = Object.assign(Object.create(console) as Console.Console, { log: hold, error: hold, info: hold, warn: hold });
-  const flush = (to: (s: string) => Effect.Effect<void, never, Stdio.Stdio>) =>
-    Effect.suspend(() => {
-      const text = held.join("\n").replace(/\n+$/u, "");
-      held.length = 0;
-      return text ? to(text) : Effect.void;
-    });
+  const io = yield* Stdio.Stdio;
+  const said = (to: typeof out, text: string) => Effect.provideService(to(text), Stdio.Stdio, io);
+  const presenter: CliOutput.Presenter = {
+    present: (event) =>
+      Effect.gen(function* () {
+        const formatter = CliOutput.defaultFormatter({ colors: (yield* TerminalCapabilities.TerminalCapabilities).canColor });
+        switch (event._tag) {
+          case "Help":
+            // Asked for (--help) to stdout; shown because of a mistake, to stderr with it.
+            return yield* said(event.reason === "Requested" ? out : err, formatter.formatHelpDoc(event.helpDoc).replace(/\n+$/u, ""));
+          case "InvalidInvocation":
+            return yield* said(err, formatter.formatHelpDoc(event.helpDoc).replace(/\n+$/u, ""));
+          case "Version":
+            return yield* said(out, formatter.formatVersion(event.name, event.version));
+        }
+      }),
+  };
   return yield* Command.runWith(root, { version, renderErrors: false })(args).pipe(
-    Effect.provideService(Console.Console, console_),
-    Effect.andThen(flush(out)),
+    Effect.provide(CliOutput.layerPresenter(presenter)),
     Effect.as(exit.ok as number),
     Effect.catch((e) => {
-      if (CliError.isCliError(e) && e._tag === "ShowHelp" && e.errors.length === 0) return Effect.as(flush(out), exit.ok as number);
+      if (CliError.isCliError(e) && e._tag === "ShowHelp" && e.errors.length === 0) return Effect.succeed(exit.ok);
       const f = Predicate.isTagged(e, "Failure") ? e : CliError.isCliError(e) ? usageOf(e) : new Failure({ code: exit.other, tag: "Error", text: String(e) });
-      return flush(err).pipe(Effect.andThen(printFailure(f)), Effect.as(f.code));
+      return Effect.as(printFailure(f), f.code);
     }),
   );
 });

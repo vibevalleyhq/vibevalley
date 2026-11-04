@@ -15,7 +15,7 @@ describe("the command line's answers", () => {
     Effect.gen(function* () {
       const server = yield* farm;
       // The one issue the cases refuse and dry-run: #1 in a farm of its own.
-      expect((yield* cli(["issue", "create", "--server", server, "--json", JSON.stringify({ title: "派不出去" })])).code).toBe(0);
+      expect((yield* cli(["issue", "new", "派不出去", "--server", server])).code).toBe(0);
       const answers = new Map<number, unknown>();
       for (const c of cases) {
         const args = c.in as string[];
@@ -33,7 +33,12 @@ describe("the command line's answers", () => {
           }
           case "dry": {
             const r = yield* cli([...at, "--dry-run"]);
-            answers.set(c.line, { code: r.code, out: r.out === "" ? null : (JSON.parse(r.out) as unknown), error: r.failure });
+            // A task command's dry run is lines of text; api call's is the endpoint's JSON.
+            answers.set(c.line, {
+              code: r.code,
+              out: r.out === "" ? null : r.out.startsWith("{") ? (JSON.parse(r.out) as unknown) : r.out.split("\n"),
+              error: r.failure,
+            });
             break;
           }
           default:

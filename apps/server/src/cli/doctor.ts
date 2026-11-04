@@ -6,12 +6,12 @@ import { Effect, Schema } from "effect";
 import { Command } from "effect/cli";
 
 import { t } from "@vibevalley/i18n";
-import * as S from "@vibevalley/protocol/schema";
 
 import { announced } from "@/infra/lease.ts";
 
-import { answer, call, ServerFlag } from "./api.ts";
+import { ServerFlag } from "./api.ts";
 import { appStatus, farmHome } from "./app.ts";
+import { ask } from "./farm.ts";
 import { exit, Failure, type Next, printBody } from "./output.ts";
 
 interface Check {
@@ -30,8 +30,7 @@ export const doctorCommand = Command.make("doctor", {}, () =>
     const home = yield* farmHome;
     const checks: Check[] = [{ check: "farm", ok: true, home, server: base, from: announced(home) === base ? "server.json" : "default" }];
 
-    const health = yield* call(base, "server.health.get").pipe(
-      Effect.flatMap(answer(S.Health)),
+    const health = yield* ask((api) => api.server.health.get()).pipe(
       Effect.match({
         onSuccess: (h): Check => ({ check: "server", ok: h.ok, version: h.version }),
         onFailure: (e) => failed("server", whyOf(e), [{ say: t("server.cli.next.openApp"), run: ["app", "open"] }, { say: t("server.cli.next.startServer") }]),
@@ -53,7 +52,7 @@ export const doctorCommand = Command.make("doctor", {}, () =>
       ),
     );
 
-    const runtimes = yield* call(base, "runtime.list").pipe(Effect.flatMap(answer(Schema.Array(S.RuntimeInfo))));
+    const runtimes = yield* ask((api) => api.runtime.list());
     const installed = runtimes.flatMap((r) => (r.installation.status === "available" ? [r.id] : []));
     checks.push(
       installed.length > 0
@@ -61,14 +60,14 @@ export const doctorCommand = Command.make("doctor", {}, () =>
         : failed("runtimes", t("server.cli.doctor.noRuntime"), [{ say: t("server.cli.doctor.installRuntime"), run: ["runtime", "refresh"] }]),
     );
 
-    const settings = yield* call(base, "setting.get").pipe(Effect.flatMap(answer(S.SettingsStatus)));
+    const settings = yield* ask((api) => api.setting.get());
     checks.push(
       settings.deepseekApiKey.source !== undefined
         ? { check: "model", ok: true, from: settings.deepseekApiKey.source }
         : failed("model", t("server.cli.doctor.noModelKey"), [{ say: t("server.cli.doctor.setModelKey"), run: ["app", "open", "/settings/models"] }]),
     );
 
-    const lan = yield* call(base, "lan.get").pipe(Effect.flatMap(answer(S.LanStatus)));
+    const lan = yield* ask((api) => api.lan.get());
     checks.push(
       lan.problem === ""
         ? { check: "lan", ok: true, open: lan.open }
@@ -79,4 +78,7 @@ export const doctorCommand = Command.make("doctor", {}, () =>
     const wrong = checks.filter((c) => !c.ok).map((c) => c.check);
     if (wrong.length > 0) return yield* new Failure({ code: exit.other, tag: "Doctor", text: t("server.cli.doctor.wrong", { checks: wrong.join(", ") }) });
   }),
-).pipe(Command.withDescription(t("server.cli.command.doctor")));
+).pipe(
+  Command.withDescription(t("server.cli.command.doctor")),
+  Command.withExamples([{ command: "vibevalley doctor", description: t("server.cli.example.doctor.about") }]),
+);
