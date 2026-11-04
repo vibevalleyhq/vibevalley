@@ -193,7 +193,7 @@ describe("the endpoints the agents' tools stand on", () => {
       let address = "";
       yield* Layer.build(app(testConfig(), 0, (a) => Effect.sync(() => void (address = a)), quietApp));
       const [declared, streamed] = yield* Effect.promise(() => postBig(`http://${address}/api/v1/channel/message/list`));
-      expect([declared, streamed]).toEqual([413, "cut"]);
+      expect([declared, streamed]).toEqual([413, 413]);
     }),
   );
 });

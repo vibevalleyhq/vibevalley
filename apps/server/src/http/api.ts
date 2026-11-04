@@ -44,7 +44,10 @@ function serve(endpoint: Endpoint, handle: (input: unknown) => Effect.Effect<unk
       // A body that says it is too big is refused before it is read; one that grows past the limit on the way stops there.
       const length = Number(request.headers["content-length"] ?? 0);
       if (length > max) return HttpServerResponse.text(`the body is ${length} bytes, at most ${max}\n`, { status: 413 });
-      const text = yield* Effect.provideService(request.text, HttpIncomingMessage.MaxBodySize, ByteSize.bytes(max));
+      const text = yield* Effect.provideService(request.text, HttpIncomingMessage.MaxBodySize, ByteSize.bytes(max)).pipe(
+        Effect.catchReason("HttpServerError", "RequestParseError", (e) => (e.reason === "BodyTooLarge" ? Effect.undefined : Effect.fail(e))),
+      );
+      if (text === undefined) return HttpServerResponse.text(`the body grew past ${max} bytes\n`, { status: 413 });
       const decoded = Schema.decodeExit(Schema.fromJsonString(endpoint.input))(text === "" ? "{}" : text);
       if (decoded._tag === "Failure") return badRequest(Cause.pretty(decoded.cause));
       input = decoded.value;

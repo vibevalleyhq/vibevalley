@@ -634,7 +634,7 @@ const make = (options: VoiceOptions = {}) =>
         const said = yield* response.brief(onCallLine(texts, ring)).pipe(
           Effect.mapError(callStepFailed),
           Effect.raceFirst(Effect.as(aborted(call.life.signal), undefined)),
-          Effect.catch((e) => (stopped || call.ending || calls.get(on) !== call ? Effect.succeed(undefined) : Effect.fail(e))),
+          Effect.catch((e) => (stopped || call.ending || calls.get(on) !== call ? Effect.undefined : Effect.fail(e))),
         );
         if (said === undefined || stopped || call.ending || calls.get(on) !== call) break;
         if (said) {

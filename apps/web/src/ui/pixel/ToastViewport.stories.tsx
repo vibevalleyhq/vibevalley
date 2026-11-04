@@ -3,6 +3,9 @@ import { stories, story } from "@vibevalley/stories";
 import { PxButton } from "./button";
 import { ToastStore, ToastViewport } from "./ToastViewport";
 
+// Made outside the render: a store's atom says its first value at once, a write a component may not make.
+const store = new ToastStore();
+
 export default stories({
   title: "组件/像素/ToastViewport",
   themes: ["light"],
@@ -12,7 +15,6 @@ export default stories({
       fill: true,
       note: "顶上居中一叠，指针放上去就停住，往右或往下拖开关掉。",
       render: () => {
-        const store = new ToastStore();
         return (
           <div class="flex items-start gap-2">
             <PxButton onClick={() => store.add({ title: "两块地熟了", description: "去看改动" })}>说一句</PxButton>

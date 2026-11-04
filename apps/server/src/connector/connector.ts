@@ -464,7 +464,7 @@ const make = (options: ConnectorOptions = {}) =>
       const inboxRun = Effect.forever(
         Effect.andThen(
           Effect.catch(drainInbox, (e) => Effect.sync(() => setErr(e.message))),
-          Effect.raceFirst(Effect.sleep(1_000), Queue.take(mail.inbox)),
+          Effect.timeoutOrElse(Queue.take(mail.inbox), { duration: "1 second", orElse: () => Effect.void }),
         ),
       );
 

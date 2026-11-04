@@ -15,13 +15,11 @@ export const artifactHandlers = Effect.gen(function* () {
   const issues = yield* Issue;
   const done: ArtifactHandlers = {
     "artifact.list": ({ channel, issue }) =>
-      Effect.flatMap(issue ? issues.idOf(issue) : Effect.succeed(undefined), (id) =>
-        artifacts.list({ ...(channel ? { channel } : {}), ...(id ? { issue: id } : {}) }),
-      ),
+      Effect.flatMap(issue ? issues.idOf(issue) : Effect.undefined, (id) => artifacts.list({ ...(channel ? { channel } : {}), ...(id ? { issue: id } : {}) })),
     "artifact.get": ({ id }) => artifacts.get(id),
     "artifact.content.get": ({ id, version }) => Effect.map(artifacts.content(id, version), (c) => ({ version: c.version, content: c.content })),
     "artifact.create": (req) =>
-      Effect.flatMap(req.issue ? issues.idOf(req.issue) : Effect.succeed(undefined), (issue) =>
+      Effect.flatMap(req.issue ? issues.idOf(req.issue) : Effect.undefined, (issue) =>
         artifacts.create({ from: ownerId, by: ownerId }, { ...req, ...(issue ? { issue } : {}) }),
       ),
     "artifact.version.create": (req) => artifacts.version({ from: ownerId, by: ownerId }, req),

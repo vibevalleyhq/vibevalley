@@ -2,6 +2,7 @@
 
 import { NodeServices } from "@effect/platform-node";
 import { ConfigProvider, Effect, Layer, Sink, Stdio, Stream } from "effect";
+import { TerminalCapabilities } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
 import { run } from "@/cli.ts";
@@ -31,8 +32,9 @@ export const cli = (args: string[], stdin = "", env: Record<string, string> = {}
       stdin: Stream.make(new TextEncoder().encode(stdin)),
       stdoutIsTerminal: Effect.succeed(false),
     });
+    // Colour read from this Stdio and env, not the process's: under `vp run` the process has FORCE_COLOR.
     const code = yield* run(args).pipe(
-      Effect.provide(io),
+      Effect.provide(TerminalCapabilities.layer.pipe(Layer.provideMerge(io))),
       Effect.provide([NodeServices.layer, FetchHttpClient.layer, ConfigProvider.layer(ConfigProvider.fromEnvRecord(env))]),
     );
     [out, err] = [out.replace(/\n$/u, ""), err.replace(/\n$/u, "")];

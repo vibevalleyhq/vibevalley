@@ -68,7 +68,7 @@ const textOnDisk =
       Effect.map((text): string | undefined => text),
       Effect.catchIf(
         (e) => e.reason._tag === "NotFound",
-        () => Effect.succeed(undefined),
+        () => Effect.undefined,
       ),
       Effect.mapError((e) => new TemplateProblem({ message: t("server.agent.template.unreadable", { file: path, why: e.message }) })),
     );

@@ -42,7 +42,7 @@ export const readOrSetAside = <A>(file: string, read: (text: string) => A, start
       Effect.map((t): string | undefined => t),
       Effect.catchIf(
         (e) => e.reason._tag === "NotFound",
-        () => Effect.succeed(undefined),
+        () => Effect.undefined,
       ),
       Effect.orDie,
     );

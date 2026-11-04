@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 
 import { Toggle, ToggleGroup } from "@vibevalley/base-ui";
 
@@ -25,7 +25,8 @@ export function Segmented<T extends string>(props: {
   // The first place is taken where it is; only a change of choice slides.
   const [moved, setMoved] = createSignal(false);
   const place = () => {
-    const on = track()?.querySelector<HTMLElement>('button[aria-pressed="true"]');
+    // Run from effects and observers, never to follow the track: what it reads is read now.
+    const on = untrack(track)?.querySelector<HTMLElement>('button[aria-pressed="true"]');
     setThumb(on ? { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight } : undefined);
   };
   createEffect(
