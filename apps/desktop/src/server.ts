@@ -23,7 +23,7 @@ const shellPathTimeoutMs = 5_000;
 
 /** The PATH a terminal has. An app opened from Finder or at login gets launchd's short one, which has none of pi,
  * claude or codex; the login shell's is the one the owner installed them on. Unanswered, the app's own. */
-export function loginShellPath(env: NodeJS.ProcessEnv): Promise<string | undefined> {
+function loginShellPath(env: NodeJS.ProcessEnv): Promise<string | undefined> {
   const sh = env.SHELL || "/bin/zsh";
   return new Promise((resolve) => {
     // The markers keep out what a profile prints on its own.
