@@ -138,14 +138,12 @@
     "workingQuestion": "{n} 个帮工在干活，重启会打断它们。现在重启？",
     "newFarmQuestion": "新版本从新的数据开始，旧的留在家目录里。现在重启？",
     "download": "去下载",
-    "channel": "更新通道",
-    "channels": {
-      "stable": "正式版",
-      "beta": "测试版",
-      "alpha": "尝鲜版",
-      "stableHint": "只更新到正式版",
-      "betaHint": "先拿到下一版的测试版：功能已经定了，只修错，农场不会从头来",
-      "alphaHint": "每一批改动都先拿到：功能还在变，表结构变了农场会从头来（旧的留在一边）"
-    }
+    "cli": "命令行",
+    "cliHint": "装上以后，在终端里用 {command} 读写这个农场，本机的 agent 也能用",
+    "cliReady": "在终端里用 {command}；本机的 agent 也能用它读写这个农场",
+    "cliNotOnPath": "已经装到 {link}，但 ~/.local/bin 不在 PATH 里：在 ~/.zshrc 里加一行 export PATH=\"$HOME/.local/bin:$PATH\"",
+    "cliTaken": "{link} 已经有别的文件，没有换掉：先挪开它再装",
+    "cliInstall": "安装",
+    "cliRemove": "移除"
   }
 }

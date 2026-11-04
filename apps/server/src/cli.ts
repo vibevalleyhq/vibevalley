@@ -17,7 +17,10 @@ import { setLocale, t } from "@vibevalley/i18n";
 import { defaults } from "@/infra/config.ts";
 import { savedLocale } from "@/setting/setting.ts";
 
+import { appCommand } from "./cli/app.ts";
+import { doctorCommand } from "./cli/doctor.ts";
 import { err, exit, Failure, out, printFailure } from "./cli/output.ts";
+import { pkmCommands } from "./cli/pkm.ts";
 import { messageOf } from "./errors.ts";
 
 // The command line speaks the farm's language: the locale saved in the home's settings.json. It is set before the
@@ -79,7 +82,13 @@ const root = Command.make(
 ).pipe(
   Command.withDescription(t("server.cli.command.root")),
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- effect's Command types subcommands by a tuple written out; these are built from the endpoint table
-  Command.withSubcommands([...groupCommands({ issue: [issueWorkCommand], runtime: [runtimeChatCommand] }), stateCommand, eventsCommand] as never),
+  Command.withSubcommands([
+    ...groupCommands({ issue: [issueWorkCommand], runtime: [runtimeChatCommand], ...pkmCommands }),
+    stateCommand,
+    eventsCommand,
+    appCommand,
+    doctorCommand,
+  ] as never),
   Command.withGlobalFlags([ServerFlag, DryRunFlag]),
 );
 

@@ -51,6 +51,8 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **页面总在服务端的源上**：页面和接口同源，没有 CORS；桌面窗口只停在服务端的地址上，别的链接交给系统浏览器。
 - **连进来的浏览器先配对**：不是 `127.0.0.1`、`localhost` 打开的页面，又没有配对的 cookie，去 `/pair`（`features/lan/PairPage.tsx`）：设备起个名字、请主人放行，那台电脑点头后把钥匙存进 `vibevalley_lan_key` 这个 cookie（`SameSite=Strict`，十年），之后的请求和流都带着它（[连接到本机](docs/subsystems/lan.md)）。
 - **一个家目录一个服务端**：服务端拿 `$VIBEVALLEY_HOME/.vibevalley.lock`（[地基](docs/subsystems/foundation.md)），所以应用和终端指向同一个家目录时，后开的那个起不来。桌面壳自己单实例：第二次打开把第一个的窗口叫到前面。
+- **一个渠道一个应用**（`src/channel.ts`，[计划](.agents/notes/proposed/feature/2026-11-04-desktop-channels-and-cli.md)）：正式版、beta、alpha 和源码（`desktop:dev`）各是一个应用：名字、appId、userData（所以单实例锁）、农场（`~/.vibevalley`、`~/.vibevalley-beta`……）、工作目录（`~/vibevalley`……）、语音线路和连接到本机的端口（相隔 10）都分开，能同时开；渠道由版本定：打包时版本是 tag，它的阶段就是渠道，源码和 tag 之间打的包（0.0.0）是 dev。主人设了 `VIBEVALLEY_HOME` 这些就照主人的。整台电脑一份的东西（全局快捷键、刘海上的灵动岛）归先开的那个渠道（`src/machine.ts`：用户临时目录里的一个文件记着进程号，进程没了就让出来）。
+- **桌面版的命令行**：打包时每个渠道带一个启动脚本（`Contents/Resources/bin/<命令>`，`vibevalley`、`vibevalley-beta`、`vibevalley-alpha`），用应用自带的 Node 跑服务端包里的 `cli.mjs`，家目录是这个渠道的；「关于」里「安装命令行」把它链到 `~/.local/bin`（`src/commandLine.ts`，不要管理员权限；那里有别人的文件不换；说 `~/.local/bin` 在不在登录 shell 的 PATH 里）。桌面版自己的能力经 `desktopControl`（`packages/protocol/src/host.ts`）给命令行：主进程在家目录的 `desktop.sock`（0600）上用 `@vibevalley/bridge` 回答（`src/control.ts`，`@vibevalley/bridge/socket` 一行一条 JSON），`vibevalley app status|open|quit|restart|update`；`desktopReach` 给页面的每个调用标明命令行有没有，加调用时不标编不过。
 
 ## 怎么走
 
@@ -91,7 +93,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 **发布**：推一个 `v*` 的 tag，`.github/workflows/release.yml` 在 macOS（arm64）上打包，建一个草稿 Release，放上 `.dmg`、`.zip` 和 `release.json`；人看过再发布，发布以前应用看不到它。
 
-**自己更新**（`src/update.ts`，只在打包的应用里）：开机查一次，之后每 4 小时，也能在「关于」里点。读这台电脑选的通道（「关于」的「更新通道」：正式版、测试版、尝鲜版，存在 user-data 的 `update-channel`；没选过就是手上这一版所在的那个）里最新的 Release 的 `release.json`：正式版读 `latest`，测试版和尝鲜版读 GitHub 的 Release 列表（latest 不含预发布），挑通道收得到的阶段里最新的，草稿不算（`releases.ts` 的 `manifestFor`；`VIBEVALLEY_UPDATE_FEED` 给一份清单代替所有通道）；版本照 semver 排，`0.4.0-alpha.2 < 0.4.0-beta.1 < 0.4.0`，换回正式版不降级。比本机新就把这台 Mac 的 zip 下到 user-data 的 `updates/<版本>/`，大小和 SHA-512 对不上就报错丢掉，`ditto` 解开，`Info.plist` 的版本要对得上。应用在安装盘里、被 macOS 挪到 App Translocation、或所在的文件夹不能写时不换，「关于」里说清楚、给 Release 的页面。能换的：退出时（服务端存好以后）起一个脱离的脚本，等这个进程走了，把旧的 `.app` 挪到 `updates/previous.app`、新的挪到原处、去掉隔离属性；「关于」里「重启更新」也一样，换完再打开。新版本的表结构和家目录里的库（`db.schema`）不一样时，它的服务端会把旧库挪到一边、从新农场开始：这样的版本退出时不换，只在「关于」里说，主人点了才换。页面经 `desktopBridge` 的 `updateState`、`updateCheck`、`updateInstall` 和推送 `update` 看到它（`Host.update`），侧栏底部在下好时多一个图标。
+**自己更新**（`src/update.ts`，只在打包的应用里）：开机查一次，之后每 4 小时，也能在「关于」里点。只在自己的渠道里更新：正式版读最新 Release 的 `release.json`（`latest`），beta 和 alpha 读 GitHub 的 Release 列表（latest 不含预发布），挑同一阶段里最新的，草稿不算（`releases.ts` 的 `manifestFor`；`VIBEVALLEY_UPDATE_FEED` 给一份清单代替它）；源码和 0.0.0 的包不更新。版本照 semver 排，`0.4.0-alpha.2 < 0.4.0-beta.1 < 0.4.0`。比本机新就把这台 Mac 的 zip 下到 user-data 的 `updates/<版本>/`，大小和 SHA-512 对不上就报错丢掉，`ditto` 解开，`Info.plist` 的版本要对得上。应用在安装盘里、被 macOS 挪到 App Translocation、或所在的文件夹不能写时不换，「关于」里说清楚、给 Release 的页面。能换的：退出时（服务端存好以后）起一个脱离的脚本，等这个进程走了，把旧的 `.app` 挪到 `updates/previous.app`、新的挪到原处、去掉隔离属性；「关于」里「重启更新」也一样，换完再打开。新版本的表结构和家目录里的库（`db.schema`）不一样时，它的服务端会把旧库挪到一边、从新农场开始：这样的版本退出时不换，只在「关于」里说，主人点了才换。页面经 `desktopBridge` 的 `updateState`、`updateCheck`、`updateInstall` 和推送 `update` 看到它（`Host.update`），侧栏底部在下好时多一个图标。
 
 ## 和谁打交道
 

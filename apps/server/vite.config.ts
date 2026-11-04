@@ -18,11 +18,11 @@ export default defineConfig({
     isolate: false,
     reporters: [...configDefaults.reporters, "@vibevalley/testkit/budgets"],
   },
-  // The packaged app's server (apps/desktop/scripts/package.ts): src/main.ts and the workspace packages it uses, in one
-  // ES module for Node 24; the other dependencies stay in node_modules, as they read their own files beside them. What
+  // The packaged app's server and command line (apps/desktop/scripts/package.ts): src/main.ts, src/cli.ts and the
+  // workspace packages they use, as ES modules for Node 24; the other dependencies stay in node_modules, as they read their own files beside them. What
   // the server reads at run time is carried beside the bundle at the same paths (src/assets.ts).
   pack: {
-    entry: ["src/main.ts"],
+    entry: ["src/main.ts", "src/cli.ts"],
     format: "esm",
     platform: "node",
     target: "node24",

@@ -40,6 +40,7 @@ export const catalogs = {
         front: "前置全部窗口",
         close: "关闭窗口",
       },
+      commandLine: { taken: "{link} 已经有别的文件，没有换掉：先挪开它再装" },
     },
     mobile: {
       cannotRead: "读不出保存的连接：{why}",
@@ -304,6 +305,9 @@ export const catalogs = {
         dryRun: "只说会做什么，不动手（会删、会合、会关、会让帮工走的命令）",
         json: "请求体：JSON 文本，- 读标准输入，@文件 读文件",
         watch: "一直看：每一帧一行 JSON",
+        format: "md 是给人读的 Markdown（默认），json 是接口的答复",
+        capturePage: "记到这一页的末尾（标题、slug 或别名）；不填是今天的日记",
+        day: "哪一天的日记，YYYY-MM-DD；不填是今天",
       },
       command: {
         runtimeChat: "和一个农机直接聊，不经过 VibeValley：不记轨迹和花费",
@@ -311,12 +315,29 @@ export const catalogs = {
         state: "核心状态（GET {path}）",
         events: "副作用，一行一条（GET {path}）",
         issueWork: "备选的挪到待办，等它交回来，打出改动；经过的每个状态写到 stderr",
-        group: "{group} 的接口",
+        app: {
+          about: "桌面版自己的事：状态、打开到某一页、更新、退出",
+          status: "桌面版是哪个、什么版本、农场在哪",
+          open: "让桌面版的窗口到这一页（/issues/12）；没开就先打开",
+          quit: "退出桌面版（服务端先存好）",
+          restart: "重启桌面版",
+          update: "桌面版的更新：不带参数说现在的样子，check 去查，install 装上并重启",
+        },
+        doctor: "一条命令看清这台电脑上的农场：找到的是哪个、连不连得上、桌面版、农机、模型的 key、连接到本机",
+        pkm: {
+          capture: "记一句话进今天的日记（--page 记到那一页）；不给字就读标准输入，多行按缩进拆成块",
+          today: "今天的日记（--day 看别的一天）",
+          search: "搜笔记：按页分组，一条一行：页 › 路径: 块",
+          radar: "要看一眼的：收件箱、搁着的项目、过期的",
+          pageGet: "一页给人读的 Markdown：引用读成字，批注去掉",
+          pageEdit: "在 $EDITOR 里改一整页的原文，关掉编辑器存回去",
+        },
       },
       next: {
         help: "看这条命令怎么写",
         whatItDoes: "看这条命令做什么",
         startServer: "先起服务端（vp run --filter @vibevalley/server start），或用 --server 指到在跑的那个",
+        openApp: "先打开桌面版（vibevalley app open 也会打开它）",
       },
       and: "；",
       failure: {
@@ -331,6 +352,7 @@ export const catalogs = {
         stream: "流读不下去：{why}",
         gone: "工单 #{n} 不在了：被删掉了",
         missingArgument: "缺 <{name}>：写在命令后面，或放进 --json",
+        appNotOpen: "连不上 {home} 的桌面版：{why}",
       },
       chat: {
         error: "\n出错了：{why}",
@@ -345,6 +367,268 @@ export const catalogs = {
         direct: "直接聊：不经过 VibeValley，不记轨迹和花费。Ctrl+C 停这一轮，空着时再按退出。",
         rejected: "没接住：{why}",
         notSent: "没送进去：{why}",
+      },
+      op: {
+        agent: {
+          create: "新建一份档案",
+          delete: "删掉一份档案",
+          list: "列出全部档案",
+          previewDelete: "试删一份档案：说会删掉什么，不真删",
+          template: {
+            add: "把本机的一个模板文件夹加进来，不装",
+            delete: "删掉加进来的模板，从它装的档案留着",
+            install: "从模板装一份新档案",
+            list: "列出能装的档案模板：内置的，再是加进来的",
+            previewDelete: "试删一个档案模板：说会删掉什么，不真删",
+            update: "照模板现在的版本重做档案，本机的设置留着",
+          },
+          update: "改一份档案（整份写入）",
+          validate: "看每份档案现在派活哪里不对，没存的草稿也看",
+        },
+        artifact: {
+          block: {
+            create: "在稿子里插一块",
+            delete: "删掉稿子里的一块和它的子块",
+            list: "按顺序列出稿子现有的每一块",
+            previewDelete: "试删一块：说会删掉什么，不真删",
+            update: "改一块的字、类型或属性",
+          },
+          content: { get: "读稿子的正文：网页的一版，或块写成的 Markdown" },
+          create: "新建稿子：空的一篇来一起写，或交上来一稿",
+          delete: "删掉一篇稿子",
+          demo: "开演示：几个帮工一起写一篇稿子，不花模型的钱",
+          get: "看一篇稿子",
+          html: { edit: "在网页稿子里换掉一段字，成为新的一版" },
+          list: "列出某个频道或工单的稿子，不指定就是全部",
+          markdown: { get: "把一起写的稿子读成 Markdown" },
+          previewDelete: "试删一篇稿子：说会删掉什么，不真删",
+          submit: "以主人的身份交一批块的操作，按顺序一次做完",
+          suggestion: {
+            accept: "接受一条改写建议",
+            create: "对主人写的一块提改写建议",
+            list: "列出稿子上的改写建议，没答的和答过的",
+            reject: "拒绝一条改写建议",
+          },
+          update: "给稿子改标题",
+          version: { create: "给网页稿子交新的一版，旧的留着" },
+        },
+        channel: {
+          archive: { set: "归档一个频道或取回来，消息留着" },
+          attachment: { create: "上传一个附件，给消息带上" },
+          create: "新建一个频道",
+          default: { set: "设成默认频道：没指名的话都到这里" },
+          delete: "删掉一个频道，连同它的串和消息",
+          direct: { create: "打开和一份档案的私聊，没有就建" },
+          list: "列出全部频道和私聊，默认的在前",
+          markRead: "标成已读，读到这一条为止",
+          markUnread: "标成未读，从这一条起",
+          message: {
+            delete: "删掉一条消息：字去掉，编号留着",
+            list: "读一个频道的消息，可以往前翻",
+            previewDelete: "试删一条消息：说会删掉什么，不真删",
+            search: "搜消息",
+            send: "在频道或串里发一条消息",
+            update: "改主人自己发的一条消息，不再通知谁",
+          },
+          notify: { set: "设一个频道的提醒：全部、只在 @主人 时、不提醒" },
+          pin: { list: "列出频道里钉住的消息，新钉的在前", set: "钉住一条消息，或取消钉住" },
+          previewDelete: "试删一个频道：说会删掉什么，不真删",
+          reaction: { set: "给一条消息加上表情，或撤回" },
+          thread: { create: "在一条消息下开串，已经有就用那个" },
+          unread: { list: "列出还没读完的频道和串，新的在前" },
+          update: "改一个频道",
+        },
+        connector: {
+          channel: { set: "设连接器的消息进哪个频道" },
+          list: "列出微信、飞书、QQ 连接器和它们的状况",
+          login: "登录一个连接器",
+          logout: "退出一个连接器的登录",
+          verify: "交验证码，接着连接器的登录",
+        },
+        cron: {
+          create: "新建一个定时任务",
+          delete: "删掉一个定时任务",
+          list: "列出全部定时任务",
+          previewDelete: "试删一个定时任务：说会删掉什么，不真删",
+          update: "改一个定时任务，只改给出的",
+        },
+        game: { achievement: { list: "列出全部里程碑" }, title: { set: "挑一个挂在农场卡上的称号" } },
+        github: { get: "看 gh 装没装、登没登录", refresh: "重新检测 GitHub，顺带刷新开着的 PR" },
+        issue: {
+          comment: { create: "给工单带一句话，交给它最新的帮工" },
+          create: "写一张新工单",
+          delete: "删掉一张工单",
+          diff: { get: "看工单的改动：提交、文件和 diff" },
+          get: "看一张工单",
+          history: { list: "工单和它们的帮工历史，缺了记录的也列出" },
+          list: "列出工单：默认是没关的，新的在前",
+          previewDelete: "试删一张工单：说会删掉什么，不真删",
+          refine: "让一个帮工读代码，把备选的工单起草好",
+          review: "验收交回来的活：通过或打回；完成另挪状态",
+          run: { list: "列出工单的每一轮" },
+          split: "把工单拆成子工单，马上开工",
+          status: { previewUpdate: "试挪工单的状态：说会发生什么，不动手", update: "挪工单的状态：派活、再来一轮、完成或取消" },
+          timeline: { get: "工单的时间线和每一轮加起来的花费" },
+          update: "改一张工单",
+        },
+        lan: {
+          device: { delete: "移除一台配对过的设备", previewDelete: "试移除一台设备：说会怎样，不真移除" },
+          get: "看「连接到本机」开没开、有哪些设备",
+          me: { get: "发这个请求的设备是哪台" },
+          pair: "用配对码把这台设备配上",
+          pairing: { answer: "放行或拒绝来配对的设备", previewStop: "试停配对：说会怎样，不真停", start: "开始配对，给出配对码", stop: "停止配对" },
+          update: "打开或关上「连接到本机」",
+        },
+        memory: {
+          create: "给一份档案记一条记性",
+          delete: "删掉档案的一条记性",
+          list: "列出一份档案的记性：库里的和配置的来源",
+          previewDelete: "试删一条记性：说会删掉什么，不真删",
+          recall: "看档案对这个项目和这句话会想起什么",
+          search: "按字搜记性，不指定档案就搜全部",
+        },
+        orchestrator: {
+          archive: { get: "读管家压掉的一份对话原文", list: "列出或搜管家压掉的对话原文" },
+          eval: { create: "把管家做错的一轮存成评测样例，写上该怎么做" },
+          open: "让管家上线，可以说话了",
+          stop: "停下管家这一轮，派出去的帮工接着干",
+        },
+        pkm: {
+          block: { apply: "对一页按顺序施加块的操作，一次写回" },
+          capture: "在今天的日记里记一句，标上 #inbox",
+          clip: { create: "把一个网页剪藏成一页资源" },
+          cluster: { create: "把写到一个话题的块聚成一页资源" },
+          comment: { list: "列出批注和改写，可以只看一页的", resolve: "接受或拒绝一条改写", suggest: "对一块提改写，留住它的链接和引用" },
+          journal: { open: "打开某一天的日记，没有就建" },
+          page: {
+            export: "把一页导出成干净的 Markdown",
+            get: "看一页：引用读出来，带反链和没答的批注",
+            list: "列出笔记库里的每一页，新的在前",
+            move: "把一页挪到 PARA 的另一个文件夹",
+            rename: "给一页改名或并进同名的页，链接跟着改",
+            save: "新建一页，或改同名那页的属性和文件夹",
+          },
+          radar: { get: "回顾雷达：收件箱里的、搁着的项目、过期的块" },
+          scan: "重读磁盘上改过的笔记文件",
+          search: "搜笔记",
+          undo: "撤销笔记的上一次改动",
+          source: { get: "一页文件的原文（带块的 id）和它上次写的时间", update: "用改过的原文重写一页；这期间文件被改过就不写" },
+        },
+        project: {
+          activity: { get: "项目的提交：每天几次、谁提交的" },
+          create: "新建一个项目",
+          language: { list: "项目用了哪些语言" },
+          list: "列出全部项目",
+          template: { list: "项目的工单模板，按它的栈填好" },
+          validate: "新建项目会被拒的第一处，不真建",
+        },
+        runtime: { list: "列出全部农机", refresh: "重新探测一台农机", setting: { update: "改一台农机的设置：开关、路径、默认模型、预算" } },
+        server: { health: { get: "服务端在不在、是哪个版本" } },
+        session: { event: { list: "读一个帮工的轨迹，从早到晚" }, get: "看一个帮工", list: "列出帮工，可以只看一份档案的", stop: "停下帮工这一轮，帮工还在" },
+        setting: { get: "看设置", update: "改设置", validate: "这些设置会被拒的第一处，不存" },
+        skill: {
+          create: "新建一个技能",
+          delete: "删掉一个技能",
+          list: "列出全部技能",
+          previewDelete: "试删一个技能：说会删掉什么，不真删",
+          update: "改一个技能",
+        },
+        voice: {
+          call: { hear: "交上通话里主人说的一句", say: "交上通话里管家说出的话", start: "开始和管家通话", stop: "挂断通话" },
+          dictate: "听写：把一段录音转成字",
+          grant: { create: "拿通话用的声网令牌", renew: "给通话换新的声网令牌" },
+          hear: "交上正在通的那通电话里听到的一句",
+          moss: { verify: "试 MOSS 的钥匙能不能用，什么都不说" },
+        },
+      },
+      group: {
+        agent: { about: "档案和档案模板", template: { about: "档案模板：列出、装、加进来、重做档案" } },
+        artifact: {
+          about: "稿子：一起写的，和交上来的网页",
+          block: { about: "稿子里的块" },
+          content: { about: "稿子的正文" },
+          html: { about: "网页稿子的字" },
+          markdown: { about: "稿子读成 Markdown" },
+          suggestion: { about: "稿子上的改写建议" },
+          version: { about: "网页稿子的一版一版" },
+        },
+        channel: {
+          about: "频道、私聊、串和消息",
+          archive: { about: "归档频道" },
+          attachment: { about: "消息的附件" },
+          default: { about: "默认频道" },
+          direct: { about: "和一份档案的私聊" },
+          message: { about: "频道和串里的消息" },
+          notify: { about: "频道的提醒" },
+          pin: { about: "钉住的消息" },
+          reaction: { about: "消息上的表情" },
+          thread: { about: "消息下面的串" },
+          unread: { about: "还没读完的频道和串" },
+        },
+        connector: { about: "连接器：把微信、飞书、QQ 接到频道", channel: { about: "连接器接到哪个频道" } },
+        cron: { about: "定时任务" },
+        game: { about: "里程碑和称号", achievement: { about: "里程碑" }, title: { about: "农场卡上的称号" } },
+        github: { about: "GitHub 的检测：gh 装没装、登没登录" },
+        issue: {
+          about: "工单：写、派活、验收、完成",
+          comment: { about: "给工单带话" },
+          diff: { about: "工单的改动" },
+          history: { about: "工单的帮工历史" },
+          run: { about: "工单的每一轮" },
+          status: { about: "挪工单的状态" },
+          timeline: { about: "工单的时间线和花费" },
+        },
+        lan: {
+          about: "连接到本机：开关、配对、设备",
+          device: { about: "配对过的设备" },
+          me: { about: "发请求的这台设备" },
+          pairing: { about: "给新设备配对" },
+        },
+        memory: { about: "档案的记性" },
+        orchestrator: { about: "管家：上线、停下、旧账、评测", archive: { about: "管家压掉的对话原文" }, eval: { about: "管家的评测样例" } },
+        pkm: {
+          about: "笔记：页、日记、批注、剪藏和搜索",
+          block: { about: "笔记页里的块" },
+          clip: { about: "把网页剪藏进笔记" },
+          cluster: { about: "按话题把块聚成一页" },
+          comment: { about: "笔记的批注和改写" },
+          journal: { about: "每天的日记" },
+          page: { about: "笔记的页" },
+          radar: { about: "回顾雷达：该看一眼的" },
+          source: { about: "笔记页的原文：在编辑器里改一整页" },
+        },
+        project: {
+          about: "项目：工作目录下的 git 仓库",
+          activity: { about: "项目的提交" },
+          language: { about: "项目用的语言" },
+          template: { about: "项目的工单模板" },
+        },
+        runtime: { about: "农机：机器上的编码 agent", setting: { about: "农机的设置" } },
+        server: { about: "服务端本身", health: { about: "服务端在不在" } },
+        session: { about: "帮工", event: { about: "帮工的轨迹" } },
+        setting: { about: "设置：模型、钥匙、目录和别的" },
+        skill: { about: "技能" },
+        voice: { about: "通话和听写", call: { about: "和管家通话" }, grant: { about: "通话用的声网令牌" }, moss: { about: "MOSS 的钥匙" } },
+      },
+      doctor: {
+        unreachable: "农场 {base} 连不上，后面几项没查",
+        noRuntime: "一个农机也没装：帮工没有能干活的",
+        installRuntime: "装一个编码 agent（Claude Code、Codex……），装好以后让农场再找一遍",
+        noModelKey: "没有 DeepSeek 的 key：管家和自己的 agent 起不来",
+        setModelKey: "在「设置 › 模型」里填 DeepSeek 的 key",
+        lanSettings: "看「设置 › 设备」",
+        wrong: "这几项不对：{checks}",
+      },
+      pkm: {
+        captured: "记进了「{page}」",
+        inbox: "收件箱里 {n} 页",
+        stale: "「{page}」{days} 天没动了",
+        overdue: "{deadline} 过期：{words}",
+        editorFailed: "开不了编辑器 {editor}：{why}",
+        editorExited: "编辑器 {editor} 退出码 {code}，没有存；改过的在 {file}",
+        unchanged: "「{page}」没改",
+        saved: "存好了「{page}」",
+        keptAt: "{why}；你改过的在 {file}",
       },
     },
     "server.connector": {
@@ -702,6 +986,8 @@ export const catalogs = {
       clusterLine: "来自 [[{title}]]：(({id}))",
       clusterTldr: "围绕 {topic} 聚到一起的 {count} 条素材",
       notedBy: "{text}（{name} 记）",
+      noPageLike: "没有「{page}」这一页；最像的是 {like}",
+      changedSince: "「{page}」在读出以后又被改过，没有写：重新读一次再改",
     },
     "server.project": {
       parentBranchChanged: "父工单工作目录已切换分支，不能自动合入",
@@ -3236,15 +3522,13 @@ export const catalogs = {
         workingQuestion: "{n} 个帮工在干活，重启会打断它们。现在重启？",
         newFarmQuestion: "新版本从新的数据开始，旧的留在家目录里。现在重启？",
         download: "去下载",
-        channel: "更新通道",
-        channels: {
-          stable: "正式版",
-          beta: "测试版",
-          alpha: "尝鲜版",
-          stableHint: "只更新到正式版",
-          betaHint: "先拿到下一版的测试版：功能已经定了，只修错，农场不会从头来",
-          alphaHint: "每一批改动都先拿到：功能还在变，表结构变了农场会从头来（旧的留在一边）",
-        },
+        cli: "命令行",
+        cliHint: "装上以后，在终端里用 {command} 读写这个农场，本机的 agent 也能用",
+        cliReady: "在终端里用 {command}；本机的 agent 也能用它读写这个农场",
+        cliNotOnPath: '已经装到 {link}，但 ~/.local/bin 不在 PATH 里：在 ~/.zshrc 里加一行 export PATH="$HOME/.local/bin:$PATH"',
+        cliTaken: "{link} 已经有别的文件，没有换掉：先挪开它再装",
+        cliInstall: "安装",
+        cliRemove: "移除",
       },
     },
     "web.tree": {
@@ -3547,6 +3831,7 @@ export const catalogs = {
         front: "Bring All to Front",
         close: "Close Window",
       },
+      commandLine: { taken: "{link} is another program's file and was not replaced: move it away, then install again" },
     },
     mobile: {
       cannotRead: "The saved connection cannot be read: {why}",
@@ -3820,6 +4105,9 @@ export const catalogs = {
         dryRun: "Only say what it would do, without doing it (commands that delete, merge, close or send a helper away)",
         json: "The request body: JSON text, - to read stdin, @file to read a file",
         watch: "Keep watching: one JSON line per frame",
+        format: "md: Markdown to read (the default); json: the endpoint's answer",
+        capturePage: "At the end of this page (its title, slug or an alias); none: today's journal",
+        day: "Which day's journal, YYYY-MM-DD; none: today",
       },
       command: {
         runtimeChat: "Talk to a machine directly, not through VibeValley: no trajectory, no spending",
@@ -3827,12 +4115,29 @@ export const catalogs = {
         state: "The core state (GET {path})",
         events: "Side effects, one per line (GET {path})",
         issueWork: "Move a backlog ticket to To do, wait for it to come back and print its changes; each status passed goes to stderr",
-        group: "The {group} endpoints",
+        app: {
+          about: "The desktop app itself: its status, a page to open, updates, quitting",
+          status: "Which desktop app this is, its version and where its farm is",
+          open: "Bring the desktop window to this page (/issues/12), opening the app if it is not",
+          quit: "Quit the desktop app (its server saves first)",
+          restart: "Restart the desktop app",
+          update: "The desktop app's update: as it stands with no argument, check to look now, install to put it in place and restart",
+        },
+        doctor: "See this machine's farm at once: which one was found, whether it answers, the desktop app, runtimes, the model's key, the LAN listener",
+        pkm: {
+          capture: "Note something in today's journal (--page: on that page); no words reads stdin, lines split into blocks by indentation",
+          today: "Today's journal (--day for another day)",
+          search: "Search the notes: a hit a line, page › where: block",
+          radar: "What wants a look: the inbox, projects left alone, what is overdue",
+          pageGet: "A page as Markdown to read: refs read out, remarks taken off",
+          pageEdit: "Edit a whole page's file in $EDITOR; it is saved when the editor closes",
+        },
       },
       next: {
         help: "See how this command is written",
         whatItDoes: "See what this command does",
         startServer: "Start the server first (vp run --filter @vibevalley/server start), or point --server at one that runs",
+        openApp: "Open the desktop app first (vibevalley app open opens it too)",
       },
       and: "; ",
       failure: {
@@ -3847,6 +4152,7 @@ export const catalogs = {
         stream: "The stream cannot be read: {why}",
         gone: "Ticket #{n} is gone: it was deleted",
         missingArgument: "<{name}> is missing: give it after the command, or in --json",
+        appNotOpen: "Cannot reach the desktop app of {home}: {why}",
       },
       chat: {
         error: "\nSomething went wrong: {why}",
@@ -3861,6 +4167,306 @@ export const catalogs = {
         direct: "Talking directly: not through VibeValley, no trajectory, no spending. Ctrl+C stops this turn; again when idle quits.",
         rejected: "Not taken: {why}",
         notSent: "Not delivered: {why}",
+      },
+      op: {
+        agent: {
+          create: "Create a profile",
+          delete: "Delete a profile",
+          list: "List every profile",
+          previewDelete: "Preview deleting a profile: say what would go, without deleting",
+          template: {
+            add: "Add a template folder from this machine, without installing it",
+            delete: "Delete an added template; the profiles installed from it stay",
+            install: "Install a new profile from a template",
+            list: "List the profile templates: the built-in ones, then those added",
+            previewDelete: "Preview deleting a profile template: say what would go, without deleting",
+            update: "Remake a profile from its template's current version, keeping this machine's settings",
+          },
+          update: "Update a profile (the whole profile is written)",
+          validate: "Check what would stop each profile from being dispatched now, unsaved drafts too",
+        },
+        artifact: {
+          block: {
+            create: "Insert one block into an artifact",
+            delete: "Delete a block of an artifact and its children",
+            list: "List an artifact's live blocks, in order",
+            previewDelete: "Preview deleting a block: say what would go, without deleting",
+            update: "Change a block's words, type or attributes",
+          },
+          content: { get: "Read an artifact's content: an HTML version, or its blocks as Markdown" },
+          create: "Create an artifact: an empty one to write in, or a hand-in",
+          delete: "Delete an artifact",
+          demo: "Start the demo: several helpers write one artifact at once, no model spending",
+          get: "Get an artifact",
+          html: { edit: "Replace some words in an HTML artifact, as its next version" },
+          list: "List the artifacts of a channel or ticket, or every one",
+          markdown: { get: "Read a block artifact as Markdown" },
+          previewDelete: "Preview deleting an artifact: say what would go, without deleting",
+          submit: "Submit a batch of block operations as the owner, applied in order at once",
+          suggestion: {
+            accept: "Accept a suggested change",
+            create: "Suggest a change to a block the owner wrote",
+            list: "List an artifact's suggestions, open and resolved",
+            reject: "Reject a suggested change",
+          },
+          update: "Rename an artifact",
+          version: { create: "Hand in a new version of an HTML artifact; the old ones stay" },
+        },
+        channel: {
+          archive: { set: "Archive a channel or bring it back; its messages stay" },
+          attachment: { create: "Upload an attachment for a message" },
+          create: "Create a channel",
+          default: { set: "Make a channel the default: where anything unaddressed goes" },
+          delete: "Delete a channel with its threads and messages",
+          direct: { create: "Open a direct message with a profile, made if there is none" },
+          list: "List every channel and direct message, the default first",
+          markRead: "Mark read up to a message",
+          markUnread: "Mark unread from a message on",
+          message: {
+            delete: "Delete a message: its words go, its number stays",
+            list: "Read a channel's messages, paging back",
+            previewDelete: "Preview deleting a message: say what would go, without deleting",
+            search: "Search messages",
+            send: "Send a message to a channel or thread",
+            update: "Edit one of the owner's own messages; nobody is told again",
+          },
+          notify: { set: "Set a channel's notifications: all, mentions or none" },
+          pin: { list: "List a channel's pinned messages, newest pinned first", set: "Pin or unpin a message" },
+          previewDelete: "Preview deleting a channel: say what would go, without deleting",
+          reaction: { set: "Add or take back a reaction on a message" },
+          thread: { create: "Open the thread under a message, made if there is none" },
+          unread: { list: "List the places with unread messages, newest first" },
+          update: "Update a channel",
+        },
+        connector: {
+          channel: { set: "Choose the channel a connector's messages go to" },
+          list: "List the WeChat, Feishu and QQ connectors and how they stand",
+          login: "Log a connector in",
+          logout: "Log a connector out",
+          verify: "Hand in a verification code to go on with a connector's login",
+        },
+        cron: {
+          create: "Create a scheduled task",
+          delete: "Delete a scheduled task",
+          list: "List every scheduled task",
+          previewDelete: "Preview deleting a scheduled task: say what would go, without deleting",
+          update: "Update a scheduled task; only what is given changes",
+        },
+        game: { achievement: { list: "List every achievement" }, title: { set: "Pick the title shown on the farm card" } },
+        github: { get: "Whether gh is installed and logged in", refresh: "Check GitHub again and refresh the open PRs" },
+        issue: {
+          comment: { create: "Comment on a ticket; its newest helper hears it" },
+          create: "Create a ticket",
+          delete: "Delete a ticket",
+          diff: { get: "A ticket's changes: commits, files and diff" },
+          get: "Get a ticket",
+          history: { list: "Tickets with their helper history, missing records included" },
+          list: "List tickets: the open ones by default, newest first",
+          previewDelete: "Preview deleting a ticket: say what would go, without deleting",
+          refine: "Have a helper read the code and refine a backlog ticket",
+          review: "Review what was handed back: pass or send back; completing is a separate move",
+          run: { list: "List a ticket's rounds of work" },
+          split: "Split a ticket into child tickets, started at once",
+          status: {
+            previewUpdate: "Preview moving a ticket: say what would happen, without moving it",
+            update: "Move a ticket: dispatch it, another round, complete or cancel",
+          },
+          timeline: { get: "A ticket's milestones and what all its rounds cost" },
+          update: "Update a ticket",
+        },
+        lan: {
+          device: { delete: "Remove a paired device", previewDelete: "Preview removing a device: say what would go, without removing it" },
+          get: "Whether connect to this machine is on, and its devices",
+          me: { get: "The device this request comes from" },
+          pair: "Pair this device with a pairing code",
+          pairing: {
+            answer: "Allow or refuse the device asking to pair",
+            previewStop: "Preview stopping pairing: say what would happen, without stopping it",
+            start: "Start pairing and give a pairing code",
+            stop: "Stop pairing",
+          },
+          update: "Turn connect to this machine on or off",
+        },
+        memory: {
+          create: "Add a memory to a profile",
+          delete: "Delete one of a profile's memories",
+          list: "List a profile's memories, from the database and its sources",
+          previewDelete: "Preview deleting a memory: say what would go, without deleting",
+          recall: "What a profile would recall for this project and text",
+          search: "Search memories by words, every profile's if none is named",
+        },
+        orchestrator: {
+          archive: { get: "Read one of the manager's archived conversations", list: "List or search the manager's archived conversations" },
+          eval: { create: "Save a manager turn that went wrong as an eval case, with what it should have done" },
+          open: "Bring the manager online",
+          stop: "Stop the manager's current round; the helpers it sent keep working",
+        },
+        pkm: {
+          block: { apply: "Apply block operations to a page in order, written back once" },
+          capture: "Note a line in today's journal, tagged #inbox",
+          clip: { create: "Clip a web page into a resource page" },
+          cluster: { create: "Gather the blocks about a topic into a resource page" },
+          comment: {
+            list: "List remarks and suggested rewrites, one page's if given",
+            resolve: "Accept or reject a suggested rewrite",
+            suggest: "Suggest a rewrite of a block, keeping its links and refs",
+          },
+          journal: { open: "Open a day's journal, made if there is none" },
+          page: {
+            export: "Export a page as plain Markdown",
+            get: "Get a page with its refs read out, its backlinks and open remarks",
+            list: "List every page in the notes, newest first",
+            move: "Move a page to another PARA folder",
+            rename: "Rename a page or merge it into one of that name; links follow",
+            save: "Create a page, or set the properties and folder of the one with that title",
+          },
+          radar: { get: "The review radar: inbox pages, stale projects, overdue blocks" },
+          scan: "Read again every note file changed on disk",
+          search: "Search the notes",
+          undo: "Undo the last change to the notes",
+          source: {
+            get: "A page's file as written, block ids and all, and when it was last written",
+            update: "Write a page anew from its edited text; refused if the file changed meanwhile",
+          },
+        },
+        project: {
+          activity: { get: "A project's commits: how many per day, and by whom" },
+          create: "Create a project",
+          language: { list: "The languages a project is written in" },
+          list: "List every project",
+          template: { list: "A project's ticket templates, filled in for its stack" },
+          validate: "The first thing creating a project would refuse, without creating it",
+        },
+        runtime: {
+          list: "List every machine",
+          refresh: "Probe a machine again",
+          setting: { update: "Update a machine's settings: on or off, path, default model, budget" },
+        },
+        server: { health: { get: "Whether the server is up, and its version" } },
+        session: {
+          event: { list: "Read a helper's trajectory, oldest first" },
+          get: "Get a helper",
+          list: "List helpers, one profile's if given",
+          stop: "Stop a helper's round; the helper stays",
+        },
+        setting: { get: "Get the settings", update: "Update the settings", validate: "The first thing saving these settings would refuse, without saving" },
+        skill: {
+          create: "Create a skill",
+          delete: "Delete a skill",
+          list: "List every skill",
+          previewDelete: "Preview deleting a skill: say what would go, without deleting",
+          update: "Update a skill",
+        },
+        voice: {
+          call: {
+            hear: "Hand in a line the owner said on a call",
+            say: "Hand in what the manager said on a call",
+            start: "Start a call with the manager",
+            stop: "Hang up a call",
+          },
+          dictate: "Dictate: turn a recording into text",
+          grant: { create: "Get an Agora token for a call", renew: "Renew a call's Agora token" },
+          hear: "Hand in a line heard on the call that is on",
+          moss: { verify: "Check whether MOSS Live takes the key, saying nothing" },
+        },
+      },
+      group: {
+        agent: { about: "Profiles and profile templates", template: { about: "Profile templates: list, install, add, remake a profile" } },
+        artifact: {
+          about: "Artifacts: written together, or handed in as web pages",
+          block: { about: "An artifact's blocks" },
+          content: { about: "An artifact's content" },
+          html: { about: "The words of an HTML artifact" },
+          markdown: { about: "Artifacts read as Markdown" },
+          suggestion: { about: "Suggested changes on an artifact" },
+          version: { about: "The versions of an HTML artifact" },
+        },
+        channel: {
+          about: "Channels, direct messages, threads and messages",
+          archive: { about: "Archiving channels" },
+          attachment: { about: "Message attachments" },
+          default: { about: "The default channel" },
+          direct: { about: "Direct messages with a profile" },
+          message: { about: "Messages in channels and threads" },
+          notify: { about: "A channel's notifications" },
+          pin: { about: "Pinned messages" },
+          reaction: { about: "Reactions on messages" },
+          thread: { about: "Threads under messages" },
+          unread: { about: "Places with unread messages" },
+        },
+        connector: { about: "Connectors: WeChat, Feishu and QQ, each into a channel", channel: { about: "The channel a connector goes to" } },
+        cron: { about: "Scheduled tasks" },
+        game: { about: "Achievements and titles", achievement: { about: "Achievements" }, title: { about: "The title on the farm card" } },
+        github: { about: "GitHub: whether gh is installed and logged in" },
+        issue: {
+          about: "Tickets: write, dispatch, review, complete",
+          comment: { about: "Comments on a ticket" },
+          diff: { about: "A ticket's changes" },
+          history: { about: "Tickets' helper history" },
+          run: { about: "A ticket's rounds of work" },
+          status: { about: "Moving a ticket" },
+          timeline: { about: "A ticket's milestones and spending" },
+        },
+        lan: {
+          about: "Connect to this machine: on or off, pairing, devices",
+          device: { about: "Paired devices" },
+          me: { about: "The device making the request" },
+          pairing: { about: "Pairing a new device" },
+        },
+        memory: { about: "A profile's memories" },
+        orchestrator: {
+          about: "The manager: online, stop, archive, evals",
+          archive: { about: "The manager's archived conversations" },
+          eval: { about: "The manager's eval cases" },
+        },
+        pkm: {
+          about: "Notes: pages, journals, remarks, clips and search",
+          block: { about: "Blocks on a notes page" },
+          clip: { about: "Clipping web pages into the notes" },
+          cluster: { about: "Gathering blocks on a topic into a page" },
+          comment: { about: "Remarks and suggested rewrites in the notes" },
+          journal: { about: "Daily journals" },
+          page: { about: "Notes pages" },
+          radar: { about: "The review radar: what wants a look" },
+          source: { about: "A notes page's file as written: edit a whole page in an editor" },
+        },
+        project: {
+          about: "Projects: the git repositories in the working folder",
+          activity: { about: "A project's commits" },
+          language: { about: "A project's languages" },
+          template: { about: "A project's ticket templates" },
+        },
+        runtime: { about: "Machines: the coding agents on this computer", setting: { about: "A machine's settings" } },
+        server: { about: "The server itself", health: { about: "Whether the server is up" } },
+        session: { about: "Helpers", event: { about: "A helper's trajectory" } },
+        setting: { about: "Settings: models, keys, folders and the rest" },
+        skill: { about: "Skills" },
+        voice: {
+          about: "Calls and dictation",
+          call: { about: "Calls with the manager" },
+          grant: { about: "Agora tokens for calls" },
+          moss: { about: "The MOSS key" },
+        },
+      },
+      doctor: {
+        unreachable: "The farm at {base} does not answer; the rest was not checked",
+        noRuntime: "No runtime is installed: helpers have nothing to work with",
+        installRuntime: "Install a coding agent (Claude Code, Codex…), then have the farm look again",
+        noModelKey: "No DeepSeek key: the orchestrator and your own agent cannot start",
+        setModelKey: "Fill in the DeepSeek key under Settings › Models",
+        lanSettings: "See Settings › Devices",
+        wrong: "These are not right: {checks}",
+      },
+      pkm: {
+        captured: 'Noted in "{page}"',
+        inbox: "{n} pages in the inbox",
+        stale: '"{page}" untouched for {days} days',
+        overdue: "Overdue since {deadline}: {words}",
+        editorFailed: "Could not open the editor {editor}: {why}",
+        editorExited: "The editor {editor} exited with {code}; nothing saved, your edit is in {file}",
+        unchanged: '"{page}" is unchanged',
+        saved: 'Saved "{page}"',
+        keptAt: "{why}; your edit is in {file}",
       },
     },
     "server.connector": {
@@ -4230,6 +4836,8 @@ export const catalogs = {
       clusterLine: "From [[{title}]]: (({id}))",
       clusterTldr: "{count} sources gathered on {topic}",
       notedBy: "{text} (noted by {name})",
+      noPageLike: 'There is no page "{page}"; the closest are {like}',
+      changedSince: '"{page}" was changed after it was read and was not written: read it again, then edit',
     },
     "server.project": {
       parentBranchChanged: "The parent worktree changed branches; the child cannot be merged automatically",
@@ -6944,15 +7552,13 @@ export const catalogs = {
         workingQuestion: "{n} helpers are working; restarting cuts them off. Restart now?",
         newFarmQuestion: "The new version starts from fresh data; the old stays in the home folder. Restart now?",
         download: "Download",
-        channel: "Update channel",
-        channels: {
-          stable: "Release",
-          beta: "Beta",
-          alpha: "Alpha",
-          stableHint: "Updates only to releases",
-          betaHint: "Gets the next version's betas first: its features are settled, only fixes go in, and the farm never starts over",
-          alphaHint: "Gets every batch of changes first: features still change, and a schema change starts the farm over (the old one is kept aside)",
-        },
+        cli: "Command line",
+        cliHint: "Once installed, {command} reads and writes this farm from a terminal, for agents on this Mac too",
+        cliReady: "Use {command} in a terminal; agents on this Mac can read and write this farm with it",
+        cliNotOnPath: 'Installed at {link}, but ~/.local/bin is not on your PATH: add export PATH="$HOME/.local/bin:$PATH" to ~/.zshrc',
+        cliTaken: "{link} is another program's file and was not replaced: move it away, then install",
+        cliInstall: "Install",
+        cliRemove: "Remove",
       },
     },
     "web.tree": {
@@ -7242,6 +7848,7 @@ export const catalogs = {
 /** Every key, and the params its zh message names (undefined: none). */
 export interface Messages {
   "desktop.cannotStart": undefined;
+  "desktop.commandLine.taken": { readonly link: string | number };
   "desktop.exited": { readonly code: string | number };
   "desktop.failed": { readonly why: string | number };
   "desktop.idle": undefined;
@@ -7496,12 +8103,32 @@ export interface Messages {
   "server.cli.chat.unknownInstall": { readonly id: string | number };
   "server.cli.chat.unusable": { readonly id: string | number; readonly kind: string | number };
   "server.cli.chat.usage": { readonly aborted: boolean; readonly cached: string | number; readonly input: string | number; readonly output: string | number };
+  "server.cli.command.app.about": undefined;
+  "server.cli.command.app.open": undefined;
+  "server.cli.command.app.quit": undefined;
+  "server.cli.command.app.restart": undefined;
+  "server.cli.command.app.status": undefined;
+  "server.cli.command.app.update": undefined;
+  "server.cli.command.doctor": undefined;
   "server.cli.command.events": { readonly path: string | number };
-  "server.cli.command.group": { readonly group: string | number };
   "server.cli.command.issueWork": undefined;
+  "server.cli.command.pkm.capture": undefined;
+  "server.cli.command.pkm.pageEdit": undefined;
+  "server.cli.command.pkm.pageGet": undefined;
+  "server.cli.command.pkm.radar": undefined;
+  "server.cli.command.pkm.search": undefined;
+  "server.cli.command.pkm.today": undefined;
   "server.cli.command.root": undefined;
   "server.cli.command.runtimeChat": undefined;
   "server.cli.command.state": { readonly path: string | number };
+  "server.cli.doctor.installRuntime": undefined;
+  "server.cli.doctor.lanSettings": undefined;
+  "server.cli.doctor.noModelKey": undefined;
+  "server.cli.doctor.noRuntime": undefined;
+  "server.cli.doctor.setModelKey": undefined;
+  "server.cli.doctor.unreachable": { readonly base: string | number };
+  "server.cli.doctor.wrong": { readonly checks: string | number };
+  "server.cli.failure.appNotOpen": { readonly home: string | number; readonly why: string | number };
   "server.cli.failure.body": { readonly op: string | number; readonly why: string | number };
   "server.cli.failure.dryRun": { readonly op: string | number };
   "server.cli.failure.file": { readonly file: string | number; readonly why: string | number };
@@ -7513,9 +8140,12 @@ export interface Messages {
   "server.cli.failure.stdin": { readonly why: string | number };
   "server.cli.failure.stream": { readonly why: string | number };
   "server.cli.failure.unreachable": { readonly base: string | number; readonly why: string | number };
+  "server.cli.flag.capturePage": undefined;
   "server.cli.flag.cwd": undefined;
+  "server.cli.flag.day": undefined;
   "server.cli.flag.dryRun": undefined;
   "server.cli.flag.effort": undefined;
+  "server.cli.flag.format": undefined;
   "server.cli.flag.json": undefined;
   "server.cli.flag.mcp": undefined;
   "server.cli.flag.model": undefined;
@@ -7527,9 +8157,244 @@ export interface Messages {
   "server.cli.flag.runtime": undefined;
   "server.cli.flag.server": { readonly fallback: string | number };
   "server.cli.flag.watch": undefined;
+  "server.cli.group.agent.about": undefined;
+  "server.cli.group.agent.template.about": undefined;
+  "server.cli.group.artifact.about": undefined;
+  "server.cli.group.artifact.block.about": undefined;
+  "server.cli.group.artifact.content.about": undefined;
+  "server.cli.group.artifact.html.about": undefined;
+  "server.cli.group.artifact.markdown.about": undefined;
+  "server.cli.group.artifact.suggestion.about": undefined;
+  "server.cli.group.artifact.version.about": undefined;
+  "server.cli.group.channel.about": undefined;
+  "server.cli.group.channel.archive.about": undefined;
+  "server.cli.group.channel.attachment.about": undefined;
+  "server.cli.group.channel.default.about": undefined;
+  "server.cli.group.channel.direct.about": undefined;
+  "server.cli.group.channel.message.about": undefined;
+  "server.cli.group.channel.notify.about": undefined;
+  "server.cli.group.channel.pin.about": undefined;
+  "server.cli.group.channel.reaction.about": undefined;
+  "server.cli.group.channel.thread.about": undefined;
+  "server.cli.group.channel.unread.about": undefined;
+  "server.cli.group.connector.about": undefined;
+  "server.cli.group.connector.channel.about": undefined;
+  "server.cli.group.cron.about": undefined;
+  "server.cli.group.game.about": undefined;
+  "server.cli.group.game.achievement.about": undefined;
+  "server.cli.group.game.title.about": undefined;
+  "server.cli.group.github.about": undefined;
+  "server.cli.group.issue.about": undefined;
+  "server.cli.group.issue.comment.about": undefined;
+  "server.cli.group.issue.diff.about": undefined;
+  "server.cli.group.issue.history.about": undefined;
+  "server.cli.group.issue.run.about": undefined;
+  "server.cli.group.issue.status.about": undefined;
+  "server.cli.group.issue.timeline.about": undefined;
+  "server.cli.group.lan.about": undefined;
+  "server.cli.group.lan.device.about": undefined;
+  "server.cli.group.lan.me.about": undefined;
+  "server.cli.group.lan.pairing.about": undefined;
+  "server.cli.group.memory.about": undefined;
+  "server.cli.group.orchestrator.about": undefined;
+  "server.cli.group.orchestrator.archive.about": undefined;
+  "server.cli.group.orchestrator.eval.about": undefined;
+  "server.cli.group.pkm.about": undefined;
+  "server.cli.group.pkm.block.about": undefined;
+  "server.cli.group.pkm.clip.about": undefined;
+  "server.cli.group.pkm.cluster.about": undefined;
+  "server.cli.group.pkm.comment.about": undefined;
+  "server.cli.group.pkm.journal.about": undefined;
+  "server.cli.group.pkm.page.about": undefined;
+  "server.cli.group.pkm.radar.about": undefined;
+  "server.cli.group.pkm.source.about": undefined;
+  "server.cli.group.project.about": undefined;
+  "server.cli.group.project.activity.about": undefined;
+  "server.cli.group.project.language.about": undefined;
+  "server.cli.group.project.template.about": undefined;
+  "server.cli.group.runtime.about": undefined;
+  "server.cli.group.runtime.setting.about": undefined;
+  "server.cli.group.server.about": undefined;
+  "server.cli.group.server.health.about": undefined;
+  "server.cli.group.session.about": undefined;
+  "server.cli.group.session.event.about": undefined;
+  "server.cli.group.setting.about": undefined;
+  "server.cli.group.skill.about": undefined;
+  "server.cli.group.voice.about": undefined;
+  "server.cli.group.voice.call.about": undefined;
+  "server.cli.group.voice.grant.about": undefined;
+  "server.cli.group.voice.moss.about": undefined;
   "server.cli.next.help": undefined;
+  "server.cli.next.openApp": undefined;
   "server.cli.next.startServer": undefined;
   "server.cli.next.whatItDoes": undefined;
+  "server.cli.op.agent.create": undefined;
+  "server.cli.op.agent.delete": undefined;
+  "server.cli.op.agent.list": undefined;
+  "server.cli.op.agent.previewDelete": undefined;
+  "server.cli.op.agent.template.add": undefined;
+  "server.cli.op.agent.template.delete": undefined;
+  "server.cli.op.agent.template.install": undefined;
+  "server.cli.op.agent.template.list": undefined;
+  "server.cli.op.agent.template.previewDelete": undefined;
+  "server.cli.op.agent.template.update": undefined;
+  "server.cli.op.agent.update": undefined;
+  "server.cli.op.agent.validate": undefined;
+  "server.cli.op.artifact.block.create": undefined;
+  "server.cli.op.artifact.block.delete": undefined;
+  "server.cli.op.artifact.block.list": undefined;
+  "server.cli.op.artifact.block.previewDelete": undefined;
+  "server.cli.op.artifact.block.update": undefined;
+  "server.cli.op.artifact.content.get": undefined;
+  "server.cli.op.artifact.create": undefined;
+  "server.cli.op.artifact.delete": undefined;
+  "server.cli.op.artifact.demo": undefined;
+  "server.cli.op.artifact.get": undefined;
+  "server.cli.op.artifact.html.edit": undefined;
+  "server.cli.op.artifact.list": undefined;
+  "server.cli.op.artifact.markdown.get": undefined;
+  "server.cli.op.artifact.previewDelete": undefined;
+  "server.cli.op.artifact.submit": undefined;
+  "server.cli.op.artifact.suggestion.accept": undefined;
+  "server.cli.op.artifact.suggestion.create": undefined;
+  "server.cli.op.artifact.suggestion.list": undefined;
+  "server.cli.op.artifact.suggestion.reject": undefined;
+  "server.cli.op.artifact.update": undefined;
+  "server.cli.op.artifact.version.create": undefined;
+  "server.cli.op.channel.archive.set": undefined;
+  "server.cli.op.channel.attachment.create": undefined;
+  "server.cli.op.channel.create": undefined;
+  "server.cli.op.channel.default.set": undefined;
+  "server.cli.op.channel.delete": undefined;
+  "server.cli.op.channel.direct.create": undefined;
+  "server.cli.op.channel.list": undefined;
+  "server.cli.op.channel.markRead": undefined;
+  "server.cli.op.channel.markUnread": undefined;
+  "server.cli.op.channel.message.delete": undefined;
+  "server.cli.op.channel.message.list": undefined;
+  "server.cli.op.channel.message.previewDelete": undefined;
+  "server.cli.op.channel.message.search": undefined;
+  "server.cli.op.channel.message.send": undefined;
+  "server.cli.op.channel.message.update": undefined;
+  "server.cli.op.channel.notify.set": undefined;
+  "server.cli.op.channel.pin.list": undefined;
+  "server.cli.op.channel.pin.set": undefined;
+  "server.cli.op.channel.previewDelete": undefined;
+  "server.cli.op.channel.reaction.set": undefined;
+  "server.cli.op.channel.thread.create": undefined;
+  "server.cli.op.channel.unread.list": undefined;
+  "server.cli.op.channel.update": undefined;
+  "server.cli.op.connector.channel.set": undefined;
+  "server.cli.op.connector.list": undefined;
+  "server.cli.op.connector.login": undefined;
+  "server.cli.op.connector.logout": undefined;
+  "server.cli.op.connector.verify": undefined;
+  "server.cli.op.cron.create": undefined;
+  "server.cli.op.cron.delete": undefined;
+  "server.cli.op.cron.list": undefined;
+  "server.cli.op.cron.previewDelete": undefined;
+  "server.cli.op.cron.update": undefined;
+  "server.cli.op.game.achievement.list": undefined;
+  "server.cli.op.game.title.set": undefined;
+  "server.cli.op.github.get": undefined;
+  "server.cli.op.github.refresh": undefined;
+  "server.cli.op.issue.comment.create": undefined;
+  "server.cli.op.issue.create": undefined;
+  "server.cli.op.issue.delete": undefined;
+  "server.cli.op.issue.diff.get": undefined;
+  "server.cli.op.issue.get": undefined;
+  "server.cli.op.issue.history.list": undefined;
+  "server.cli.op.issue.list": undefined;
+  "server.cli.op.issue.previewDelete": undefined;
+  "server.cli.op.issue.refine": undefined;
+  "server.cli.op.issue.review": undefined;
+  "server.cli.op.issue.run.list": undefined;
+  "server.cli.op.issue.split": undefined;
+  "server.cli.op.issue.status.previewUpdate": undefined;
+  "server.cli.op.issue.status.update": undefined;
+  "server.cli.op.issue.timeline.get": undefined;
+  "server.cli.op.issue.update": undefined;
+  "server.cli.op.lan.device.delete": undefined;
+  "server.cli.op.lan.device.previewDelete": undefined;
+  "server.cli.op.lan.get": undefined;
+  "server.cli.op.lan.me.get": undefined;
+  "server.cli.op.lan.pair": undefined;
+  "server.cli.op.lan.pairing.answer": undefined;
+  "server.cli.op.lan.pairing.previewStop": undefined;
+  "server.cli.op.lan.pairing.start": undefined;
+  "server.cli.op.lan.pairing.stop": undefined;
+  "server.cli.op.lan.update": undefined;
+  "server.cli.op.memory.create": undefined;
+  "server.cli.op.memory.delete": undefined;
+  "server.cli.op.memory.list": undefined;
+  "server.cli.op.memory.previewDelete": undefined;
+  "server.cli.op.memory.recall": undefined;
+  "server.cli.op.memory.search": undefined;
+  "server.cli.op.orchestrator.archive.get": undefined;
+  "server.cli.op.orchestrator.archive.list": undefined;
+  "server.cli.op.orchestrator.eval.create": undefined;
+  "server.cli.op.orchestrator.open": undefined;
+  "server.cli.op.orchestrator.stop": undefined;
+  "server.cli.op.pkm.block.apply": undefined;
+  "server.cli.op.pkm.capture": undefined;
+  "server.cli.op.pkm.clip.create": undefined;
+  "server.cli.op.pkm.cluster.create": undefined;
+  "server.cli.op.pkm.comment.list": undefined;
+  "server.cli.op.pkm.comment.resolve": undefined;
+  "server.cli.op.pkm.comment.suggest": undefined;
+  "server.cli.op.pkm.journal.open": undefined;
+  "server.cli.op.pkm.page.export": undefined;
+  "server.cli.op.pkm.page.get": undefined;
+  "server.cli.op.pkm.page.list": undefined;
+  "server.cli.op.pkm.page.move": undefined;
+  "server.cli.op.pkm.page.rename": undefined;
+  "server.cli.op.pkm.page.save": undefined;
+  "server.cli.op.pkm.radar.get": undefined;
+  "server.cli.op.pkm.scan": undefined;
+  "server.cli.op.pkm.search": undefined;
+  "server.cli.op.pkm.source.get": undefined;
+  "server.cli.op.pkm.source.update": undefined;
+  "server.cli.op.pkm.undo": undefined;
+  "server.cli.op.project.activity.get": undefined;
+  "server.cli.op.project.create": undefined;
+  "server.cli.op.project.language.list": undefined;
+  "server.cli.op.project.list": undefined;
+  "server.cli.op.project.template.list": undefined;
+  "server.cli.op.project.validate": undefined;
+  "server.cli.op.runtime.list": undefined;
+  "server.cli.op.runtime.refresh": undefined;
+  "server.cli.op.runtime.setting.update": undefined;
+  "server.cli.op.server.health.get": undefined;
+  "server.cli.op.session.event.list": undefined;
+  "server.cli.op.session.get": undefined;
+  "server.cli.op.session.list": undefined;
+  "server.cli.op.session.stop": undefined;
+  "server.cli.op.setting.get": undefined;
+  "server.cli.op.setting.update": undefined;
+  "server.cli.op.setting.validate": undefined;
+  "server.cli.op.skill.create": undefined;
+  "server.cli.op.skill.delete": undefined;
+  "server.cli.op.skill.list": undefined;
+  "server.cli.op.skill.previewDelete": undefined;
+  "server.cli.op.skill.update": undefined;
+  "server.cli.op.voice.call.hear": undefined;
+  "server.cli.op.voice.call.say": undefined;
+  "server.cli.op.voice.call.start": undefined;
+  "server.cli.op.voice.call.stop": undefined;
+  "server.cli.op.voice.dictate": undefined;
+  "server.cli.op.voice.grant.create": undefined;
+  "server.cli.op.voice.grant.renew": undefined;
+  "server.cli.op.voice.hear": undefined;
+  "server.cli.op.voice.moss.verify": undefined;
+  "server.cli.pkm.captured": { readonly page: string | number };
+  "server.cli.pkm.editorExited": { readonly code: string | number; readonly editor: string | number; readonly file: string | number };
+  "server.cli.pkm.editorFailed": { readonly editor: string | number; readonly why: string | number };
+  "server.cli.pkm.inbox": { readonly n: string | number };
+  "server.cli.pkm.keptAt": { readonly file: string | number; readonly why: string | number };
+  "server.cli.pkm.overdue": { readonly deadline: string | number; readonly words: string | number };
+  "server.cli.pkm.saved": { readonly page: string | number };
+  "server.cli.pkm.stale": { readonly days: string | number; readonly page: string | number };
+  "server.cli.pkm.unchanged": { readonly page: string | number };
   "server.connector.digest": { readonly lines: string | number; readonly n: string | number };
   "server.connector.disconnected": undefined;
   "server.connector.expired": undefined;
@@ -7887,6 +8752,7 @@ export interface Messages {
   "server.orchestrator.noKey": undefined;
   "server.orchestrator.onlyDeepseek": { readonly configured: string | number };
   "server.pkm.brokenRef": { readonly id: string | number };
+  "server.pkm.changedSince": { readonly page: string | number };
   "server.pkm.circular": { readonly id: string | number };
   "server.pkm.clipHeading": undefined;
   "server.pkm.clusterHeading": { readonly topic: string | number };
@@ -7896,6 +8762,7 @@ export interface Messages {
   "server.pkm.noBlock": { readonly id: string | number };
   "server.pkm.noComment": { readonly id: string | number };
   "server.pkm.noPage": { readonly page: string | number };
+  "server.pkm.noPageLike": { readonly like: string | number; readonly page: string | number };
   "server.pkm.noRename": { readonly from: string | number; readonly to: string | number };
   "server.pkm.noText": undefined;
   "server.pkm.noTitle": undefined;
@@ -10449,15 +11316,15 @@ export interface Messages {
   "web.session.trajectory.want": undefined;
   "web.session.trajectory.wantHint": undefined;
   "web.session.trajectory.wrong": undefined;
-  "web.setting.about.channel": undefined;
-  "web.setting.about.channels.alpha": undefined;
-  "web.setting.about.channels.alphaHint": undefined;
-  "web.setting.about.channels.beta": undefined;
-  "web.setting.about.channels.betaHint": undefined;
-  "web.setting.about.channels.stable": undefined;
-  "web.setting.about.channels.stableHint": undefined;
   "web.setting.about.check": undefined;
   "web.setting.about.checking": undefined;
+  "web.setting.about.cli": undefined;
+  "web.setting.about.cliHint": { readonly command: string | number };
+  "web.setting.about.cliInstall": undefined;
+  "web.setting.about.cliNotOnPath": { readonly link: string | number };
+  "web.setting.about.cliReady": { readonly command: string | number };
+  "web.setting.about.cliRemove": undefined;
+  "web.setting.about.cliTaken": { readonly link: string | number };
   "web.setting.about.copied": undefined;
   "web.setting.about.copy": undefined;
   "web.setting.about.download": undefined;

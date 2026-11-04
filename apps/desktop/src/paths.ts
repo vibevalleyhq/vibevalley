@@ -2,10 +2,11 @@
 // apps/web/dist and the island apps/island's release build (scripts/build.ts); a packaged app has them in its resources
 // (server/, web/, island/).
 
-import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { app } from "electron";
+
+import { channelOf, farmHomeOf } from "./channel";
 
 interface AppPaths {
   /** The farm's home (VIBEVALLEY_HOME): settings.json, the database, the logs. */
@@ -27,13 +28,14 @@ interface AppPaths {
   readonly updates: string;
   /** The login shell's PATH as it said it last (server.ts shellPath). */
   readonly shellPath: string;
-  /** The update channel chosen on this machine (update.ts keptChannel). */
-  readonly updateChannel: string;
   /** Node's compile cache for the server's modules. */
   readonly compileCache: string;
 }
 
-export const farmHome = () => process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
+/** This app's channel (channel.ts): its version's stage once packaged, dev from the repository. */
+export const currentChannel = () => channelOf(app.getVersion(), app.isPackaged);
+
+export const farmHome = () => farmHomeOf(currentChannel(), process.env);
 
 export function appPaths(): AppPaths {
   const repo = join(app.getAppPath(), "..");
@@ -52,7 +54,6 @@ export function appPaths(): AppPaths {
     trayIcon: join(web, "pixel", "app-sprout.png"),
     updates: join(app.getPath("userData"), "updates"),
     shellPath: join(app.getPath("userData"), "shell-path"),
-    updateChannel: join(app.getPath("userData"), "update-channel"),
     compileCache: join(app.getPath("userData"), "compile-cache"),
   };
 }

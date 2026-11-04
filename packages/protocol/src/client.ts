@@ -383,7 +383,7 @@ export class VibeValleyApi {
 
   readonly pkm = {
     search: (a: T.PkmSearchRequest): Promise<T.PkmSearchHit[]> => this.call<T.PkmSearchHit[]>("/api/v1/pkm/search", a),
-    /** A LATER line in today's journal, tagged #inbox; an agent's says who noted it. */
+    /** Into today's journal as LATER lines tagged #inbox (an agent's says who noted it), or at the end of a page. */
     capture: (a: T.PkmCaptureRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/capture", a),
     /** Puts back the file the last change wrote. */
     undo: (): Promise<T.PkmUndo> => this.call<T.PkmUndo>("/api/v1/pkm/undo", undefined),
@@ -404,6 +404,12 @@ export class VibeValleyApi {
     block: {
       /** The ops in order on the page as its file is now, written back once. */
       apply: (a: T.PkmMutation): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/block/apply", a),
+    },
+    source: {
+      /** The page's file as written, ids and all, with when it was written. */
+      get: (a: T.PkmPageRef): Promise<T.PkmSource> => this.call<T.PkmSource>("/api/v1/pkm/source/get", a),
+      /** The page written anew from its file's text; refused when the file changed after it was read. */
+      update: (a: T.PkmSourceUpdate): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/source/update", a),
     },
     journal: {
       /** The journal of a day, made empty when it has none yet. */

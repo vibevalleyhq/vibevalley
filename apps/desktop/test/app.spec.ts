@@ -1,14 +1,17 @@
 // The whole desktop app: Electron starts the server (apps/server) (a temporary home), the window shows the page it serves, the
 // state stream brings an issue made through the API to the board without a reload, and a notice the page sends through
 // the host interface reaches the main process. Which calls ring is apps/web/src/features/inbox/tray.ts's (its own tests).
-
 import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { connect as dial } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { _electron as electron, expect, test } from "@playwright/test";
 
+import { connect } from "@vibevalley/bridge";
+import { socketLink } from "@vibevalley/bridge/socket";
 import { VibeValleyApi, pathOf } from "@vibevalley/protocol";
+import { desktopControl, desktopControlSocket } from "@vibevalley/protocol/host";
 
 import type { DesktopProbe } from "../src/probe";
 
@@ -89,12 +92,14 @@ test("the desktop app shows the live board and sends a notice", async () => {
     await page.goto(server + "/settings/about");
     await expect(page.getByTestId("update-state")).toHaveAttribute("data-state", "idle");
     await expect(page.getByTestId("update-check")).toBeVisible();
-    // The channel is this machine's: chosen, it is kept for the next time the page asks.
-    const channel = page.getByTestId("update-channel");
-    await expect(channel.locator('[data-key="stable"]')).toHaveAttribute("aria-pressed", "true");
-    await channel.locator('[data-key="beta"]').click();
-    await page.reload();
-    await expect(page.getByTestId("update-channel").locator('[data-key="beta"]')).toHaveAttribute("aria-pressed", "true");
+    // The command line reaches the app over its socket in the farm's home (`vibevalley app …`, apps/server src/cli/app.ts).
+    const socket = dial(join(dir, "home", desktopControlSocket));
+    await new Promise<void>((resolve, reject) => socket.once("connect", () => resolve()).once("error", reject));
+    const control = connect(desktopControl, socketLink(socket));
+    expect(await control.call.status()).toMatchObject({ name: "VibeValley Dev", channel: "dev", server });
+    await control.call.open("/settings/general");
+    await page.waitForURL(server + "/settings/general");
+    socket.destroy();
 
     await page.screenshot({ path: test.info().outputPath("desktop.png") });
   } finally {

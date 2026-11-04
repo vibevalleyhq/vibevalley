@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { Clock, Context, Effect, FileSystem, Layer, Option, Ref, Semaphore } from "effect";
 import type { PlatformError } from "effect/PlatformError";
 
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
 import { ownerId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { flatBlocks, slugOf } from "@vibevalley/protocol/rules";
@@ -41,7 +41,7 @@ import {
   wireOf,
 } from "./graph.ts";
 import { applyOps } from "./ops.ts";
-import { carryIds, edgesOf, find, type Node, type Page, parse, print, spansOf, walk, withoutSpans } from "./outline.ts";
+import { carryIds, edgesOf, find, type Node, outlineOf, type Page, parse, print, spansOf, walk, withoutSpans } from "./outline.ts";
 import { fileNameOf, fileOf, journalTitle, journalTitleOf, ownFolder, tierFolder, titleOfFile } from "./para.ts";
 
 /** Only the newest this many changes can be undone. */
@@ -58,8 +58,11 @@ export class Pkm extends Context.Service<
     readonly move: (req: T.PkmMoveRequest) => Effect.Effect<T.PkmPage, ApiError>;
     readonly apply: (req: T.PkmMutation) => Effect.Effect<T.PkmPage, ApiError>;
     readonly search: (req: T.PkmSearchRequest) => Effect.Effect<T.PkmSearchHit[]>;
-    /** by: the agent's name when an agent notes it, said after the words; none for the owner's own. */
-    readonly capture: (text: string, by?: string) => Effect.Effect<T.PkmPage, ApiError>;
+    /** text read as an outline (outlineOf). page: at that page's end as it is; none: today's journal, each top block a
+     * LATER tagged #inbox. by: the agent's name when an agent notes it, said after the words; none for the owner's own. */
+    readonly capture: (text: string, by?: string, page?: string) => Effect.Effect<T.PkmPage, ApiError>;
+    readonly source: (ref: string) => Effect.Effect<T.PkmSource, ApiError>;
+    readonly sourceUpdate: (req: T.PkmSourceUpdate) => Effect.Effect<T.PkmPage, ApiError>;
     /** A day, YYYY-MM-DD. */
     readonly journal: (day: string) => Effect.Effect<T.PkmPage, ApiError>;
     readonly radar: (staleDays: number | undefined) => Effect.Effect<T.PkmRadar>;
@@ -81,7 +84,11 @@ export class Pkm extends Context.Service<
   );
 }
 
-const noPage = (ref: string) => missing(t("server.pkm.noPage", { page: ref }), [lookIn.pkm]);
+/** No page by that name: the closest few by title and words are named, so the next try is right. */
+const noPage = (ref: string, vault: Vault) => {
+  const like = [...new Set(search(vault, { text: ref, limit: 10 }).map((h) => h.pageTitle))].slice(0, 3);
+  return missing(like.length > 0 ? t("server.pkm.noPageLike", { page: ref, like: list(like) }) : t("server.pkm.noPage", { page: ref }), [lookIn.pkm]);
+};
 
 const commentOf = (row: q.CommentResult): T.PkmComment => ({
   id: row.id,
@@ -236,7 +243,7 @@ export const make = Effect.gen(function* () {
     Effect.gen(function* () {
       yield* ready;
       const held = pageOf(yield* vault(), ref);
-      if (!held) return yield* Effect.fail(noPage(ref));
+      if (!held) return yield* Effect.fail(noPage(ref, yield* vault()));
       const mtime = yield* mtimeOf(held.file);
       if (Option.isNone(mtime)) {
         yield* Ref.update(pages, (m) => {
@@ -245,7 +252,7 @@ export const make = Effect.gen(function* () {
           return next;
         });
         yield* unindexed(held.slug);
-        return yield* Effect.fail(noPage(ref));
+        return yield* Effect.fail(noPage(ref, yield* vault()));
       }
       if (mtime.value === held.mtime) return held;
       const page = yield* readPage(held.file, mtime.value, held);
@@ -389,17 +396,53 @@ export const make = Effect.gen(function* () {
       const rows = yield* db.run(terms.matchTerms({ words: queryWords(text) }));
       return search(yield* vault(), req, new Map(rows.map((r) => [r.block, r.score])));
     }),
-    capture: Effect.fn("Pkm.capture")(function* (text, by) {
-      const words = text.trim();
-      if (words === "") return yield* Effect.fail(refused(t("server.pkm.noText")));
-      const said = by ? t("server.pkm.notedBy", { text: words, name: by }) : words;
-      const body = /(?:^|\s)#inbox\b/u.test(said) ? said : `${said} #inbox`;
+    capture: Effect.fn("Pkm.capture")(function* (text, by, page) {
+      const blocks = outlineOf(text, newId);
+      if (blocks.length === 0) return yield* Effect.fail(refused(t("server.pkm.noText")));
+      if (page !== undefined)
+        return yield* locked(
+          Effect.gen(function* () {
+            const there = yield* fresh(page);
+            return wireOf(yield* write({ ...there, blocks: [...there.blocks, ...blocks] }, "capture"));
+          }),
+        );
+      // Into the journal as things to come back to: LATER and #inbox on each, the agent's name on the first.
+      const marked = blocks.map((b, i) => {
+        const said = i === 0 && by ? t("server.pkm.notedBy", { text: b.body, name: by }) : b.body;
+        return { ...b, marker: b.marker ?? ("LATER" as const), body: /(?:^|\s)#inbox\b/u.test(said) ? said : `${said} #inbox` };
+      });
       const title = journalTitle(yield* now);
       return yield* locked(
         Effect.gen(function* () {
           yield* ready;
-          if (pageOf(yield* vault(), title)) return wireOf(yield* mutate(title, [{ op: "append", marker: "LATER", body }], "capture"));
-          return wireOf(yield* upsert({ title, tier: "journal", markdown: `- LATER ${body}\n` }, "capture"));
+          const there = pageOf(yield* vault(), title);
+          if (there) {
+            const journal = yield* fresh(there.slug);
+            return wireOf(yield* write({ ...journal, blocks: [...journal.blocks, ...marked] }, "capture"));
+          }
+          const file = fileOf("journal", title);
+          const empty = parse("", file, 0);
+          return wireOf(yield* write({ ...empty, slug: slugOf(title), title, tier: "journal", props: titled(title, empty.props), blocks: marked }, "capture"));
+        }),
+      );
+    }),
+    source: Effect.fn("Pkm.source")(function* (ref) {
+      return yield* locked(
+        Effect.gen(function* () {
+          const page = yield* fresh(ref);
+          const markdown = (yield* textAt(page.file)) ?? print(page);
+          return { page: page.slug, title: page.title, markdown, updated: page.mtime } satisfies T.PkmSource;
+        }),
+      );
+    }),
+    sourceUpdate: Effect.fn("Pkm.sourceUpdate")(function* (req) {
+      return yield* locked(
+        Effect.gen(function* () {
+          const page = yield* fresh(req.page);
+          // Written since it was read (the app, another editor): not overwritten.
+          if (page.mtime !== req.updated) return yield* Effect.fail(refused(t("server.pkm.changedSince", { page: page.title })));
+          const read = parse(req.markdown, page.file, 0);
+          return wireOf(yield* write({ ...page, props: titled(page.title, read.props), blocks: read.blocks }, "edit"));
         }),
       );
     }),

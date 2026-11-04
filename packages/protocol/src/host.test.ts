@@ -3,7 +3,7 @@ import { expect, test } from "vite-plus/test";
 import type { BridgeMessage } from "@vibevalley/bridge";
 import { linkPair } from "@vibevalley/bridge/testing";
 
-import { mobileHost, type RtcEvents } from "./host";
+import { desktopControl, desktopReach, mobileHost, type RtcEvents } from "./host";
 
 const grant = (channel: string) => ({ appId: "a", channel, uid: "7", token: "t" });
 
@@ -88,4 +88,9 @@ test("a superseded join's rejection does not detach the next call", async () => 
   await refused;
   p.push("rtcStream", { line: 2, text: "still here" });
   expect(heard).toEqual(["still here"]);
+});
+
+test("what the page asks of the desktop that the command line can too has a call of the same name in desktopControl", () => {
+  const control = Object.entries(desktopReach).flatMap(([name, reach]) => (reach === "control" ? [name] : []));
+  expect(control.filter((name) => !(name in desktopControl))).toEqual([]);
 });

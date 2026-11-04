@@ -18,6 +18,7 @@
     "@modelcontextprotocol/sdk": "catalog:",
     "@vibevalley/agent": "workspace:*",
     "@vibevalley/ai": "workspace:*",
+    "@vibevalley/bridge": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "agora-agents": "catalog:",

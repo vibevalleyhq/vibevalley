@@ -4,12 +4,14 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./socket": "./src/socket.ts"
   },
   "dependencies": {
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "vite-plus": "catalog:"
   }
 }

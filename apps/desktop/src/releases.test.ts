@@ -16,7 +16,7 @@ test("a prerelease comes before its release: alpha, then beta, each by its numbe
   expect([stageOf("0.4.0"), stageOf("0.4.0-beta.3"), stageOf("0.4.0-alpha.1"), stageOf("0.4")]).toEqual(["stable", "beta", "alpha", undefined]);
 });
 
-test("a channel updates to the latest release it takes, never to a draft", () => {
+test("a channel updates to the latest release of its own stage, never to a draft", () => {
   const listed = (tag: string, draft = false) => ({
     tag_name: tag,
     draft,
@@ -25,7 +25,8 @@ test("a channel updates to the latest release it takes, never to a draft", () =>
   const list = [listed("v0.5.0-alpha.1", true), listed("v0.4.0-beta.2"), listed("v0.4.0-alpha.3"), listed("v0.3.1"), listed("v0.5.0-alpha.0")];
   expect(manifestFor(list, "stable")).toBe("https://example.test/v0.3.1/release.json");
   expect(manifestFor(list, "beta")).toBe("https://example.test/v0.4.0-beta.2/release.json");
-  expect(manifestFor(list, "alpha")).toBe("https://example.test/v0.5.0-alpha.0/release.json");
+  // Not the newer beta or release: an alpha app takes alphas.
+  expect(manifestFor([...list, listed("v0.6.0")], "alpha")).toBe("https://example.test/v0.5.0-alpha.0/release.json");
   expect(manifestFor([listed("v0.4.0-beta.1", true)], "beta")).toBeUndefined();
 });
 

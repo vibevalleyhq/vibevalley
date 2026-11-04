@@ -6,13 +6,14 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { build, Platform } from "electron-builder";
 
 import { serverFiles } from "../../server/src/assets.ts";
 import { baselineHash } from "../../server/src/infra/baseline.ts";
+import { channelOf, channels } from "../src/channel.ts";
 import { isVersion, type Release, stageOf } from "../src/releases.ts";
 
 const desktop = join(import.meta.dirname, "..");
@@ -60,17 +61,44 @@ const described = git("describe", "--tags", "--always").replace(/^v/u, "");
 const asked = process.env.VIBEVALLEY_VERSION ?? described;
 const version = isVersion(asked) ? asked : "0.0.0";
 const dist = join(desktop, "dist");
+const channel = channels[channelOf(version, true)];
+
+// The command line in the app (Resources/bin/<command>, linked into ~/.local/bin by 「安装命令行」, src/cli.ts): the
+// app's own Node runs the server's cli.mjs, on this channel's farm unless VIBEVALLEY_HOME says otherwise. VIBEVALLEY_APP
+// lets `app open` start the app when it is not running.
+const launcher = join(stage, "bin", channel.command);
+mkdirSync(join(stage, "bin"), { recursive: true });
+writeFileSync(
+  launcher,
+  `#!/bin/sh
+here=$0
+while [ -L "$here" ]; do
+  link=$(readlink "$here")
+  case "$link" in
+    /*) here=$link ;;
+    *) here=\${here%/*}/$link ;;
+  esac
+done
+resources=\${here%/*}/..
+export VIBEVALLEY_HOME="\${VIBEVALLEY_HOME:-$HOME/.vibevalley${channel.suffix}}"
+export VIBEVALLEY_APP="$resources/../.."
+ELECTRON_RUN_AS_NODE=1 exec "$resources/../MacOS/${channel.name}" "$resources/server/dist/cli.mjs" "$@"
+`,
+  { mode: 0o755 },
+);
+
 await build({
   targets: Platform.MAC.createTarget(["dmg", "zip"]),
   config: {
-    appId: "dev.vibevalley.app",
-    productName: "VibeValley",
+    appId: channel.appId,
+    productName: channel.name,
     extraMetadata: { version },
     directories: { output: dist, buildResources: join(desktop, "resources") },
     files: ["build/**", "package.json"],
     extraResources: [
       { from: join(repo, "apps/web/dist"), to: "web" },
       { from: islandBinary, to: "island/VibeValleyIsland" },
+      { from: join(stage, "bin"), to: "bin" },
     ],
     // extraResources leaves out every node_modules; the server needs its own, so it is copied in whole.
     afterPack: async (ctx) => {

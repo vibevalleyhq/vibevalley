@@ -158,7 +158,11 @@ export const PkmSearchHit: Codec<T.PkmSearchHit> = Schema.Struct({
   children: Schema.mutable(Schema.Array(PkmBlock)),
 });
 
-export const PkmCaptureRequest: Codec<T.PkmCaptureRequest> = Schema.Struct({ text: Schema.String });
+export const PkmCaptureRequest: Codec<T.PkmCaptureRequest> = Schema.Struct({ text: Schema.String, page: Schema.optionalKey(Schema.String) });
+
+export const PkmSource: Codec<T.PkmSource> = Schema.Struct({ page: Schema.String, title: Schema.String, markdown: Schema.String, updated: Schema.Finite });
+
+export const PkmSourceUpdate: Codec<T.PkmSourceUpdate> = Schema.Struct({ page: Schema.String, markdown: Schema.String, updated: Schema.Finite });
 
 export const PkmJournalRequest: Codec<T.PkmJournalRequest> = Schema.Struct({ day: Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/u)) });
 

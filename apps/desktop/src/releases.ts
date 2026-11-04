@@ -2,7 +2,7 @@
 
 import { Schema } from "effect";
 
-import type { UpdateChannel, UpdateManual } from "@vibevalley/protocol/host";
+import type { UpdateManual } from "@vibevalley/protocol/host";
 
 export const Build = Schema.Struct({
   /** process.arch: arm64 or x64. */
@@ -49,14 +49,14 @@ export function newer(a: string, b: string): boolean {
   return false;
 }
 
+/** A release, a beta or an alpha. */
+export type Stage = "stable" | "beta" | "alpha";
+
 /** The release, beta or alpha a version is; undefined for one that is not a version. */
-export function stageOf(v: string): UpdateChannel | undefined {
+export function stageOf(v: string): Stage | undefined {
   const m = versionPattern.exec(v);
   return m ? (m[4] === "alpha" ? "alpha" : m[4] === "beta" ? "beta" : "stable") : undefined;
 }
-
-/** What a channel takes: alpha takes betas and releases too, beta takes releases too. */
-const takes: Record<UpdateChannel, readonly UpdateChannel[]> = { stable: ["stable"], beta: ["stable", "beta"], alpha: ["stable", "beta", "alpha"] };
 
 /** One of GitHub's releases as its list gives it, the fields read here. */
 export const ListedRelease = Schema.Struct({
@@ -66,14 +66,14 @@ export const ListedRelease = Schema.Struct({
 });
 export type ListedRelease = typeof ListedRelease.Type;
 
-/** The release.json of the latest release a channel takes, from GitHub's list of releases; drafts are not anyone's yet. */
-export function manifestFor(list: readonly ListedRelease[], channel: UpdateChannel): string | undefined {
+/** The release.json of the latest release of a stage, from GitHub's list of releases: each channel's app updates only
+ * within its own (channel.ts); drafts are not anyone's yet. */
+export function manifestFor(list: readonly ListedRelease[], stage: Stage): string | undefined {
   let best: { version: string; url: string } | undefined;
   for (const r of list) {
     const version = r.tag_name.replace(/^v/u, "");
-    const stage = stageOf(version);
     const url = r.assets.find((a) => a.name === "release.json")?.browser_download_url;
-    if (r.draft || stage === undefined || !takes[channel].includes(stage) || url === undefined) continue;
+    if (r.draft || stageOf(version) !== stage || url === undefined) continue;
     if (best === undefined || newer(version, best.version)) best = { version, url };
   }
   return best?.url;

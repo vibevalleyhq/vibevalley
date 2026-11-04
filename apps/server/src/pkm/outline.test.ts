@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { flatBlocks } from "@vibevalley/protocol/rules";
 
-import { carryIds, edgesOf, parse, print, spansOf, walk } from "./outline.ts";
+import { carryIds, edgesOf, outlineOf, parse, print, spansOf, walk } from "./outline.ts";
 import { fileOf, tierOfFile, titleOfFile } from "./para.ts";
 
 const page = [
@@ -105,5 +105,28 @@ describe("the outline", () => {
     expect(titleOfFile("01_Projects/Cetus-Core__Engine.md")).toBe("Cetus-Core/Engine");
     expect(tierOfFile("04_Archives/a.md")).toBe("archive");
     expect(tierOfFile("elsewhere/a.md")).toBe("inbox");
+  });
+});
+
+describe("text read as an outline", () => {
+  it("a line a block, nested by indentation whatever its width, a leading dash or not, with fresh ids", () => {
+    let n = 0;
+    const id = () => `id-${++n}`;
+    const blocks = outlineOf("    读书\n      - 第一章\n         笔记\n      第二章\n\n    TODO 还书\n", id);
+    const shape = (nodes: readonly { body: string; marker?: string; id: string; children: readonly unknown[] }[]): unknown[] =>
+      nodes.map((b) => [b.marker ?? "", b.body, shape(b.children as never)]);
+    expect(shape(blocks as never)).toEqual([
+      [
+        "",
+        "读书",
+        [
+          ["", "第一章", [["", "笔记", []]]],
+          ["", "第二章", []],
+        ],
+      ],
+      ["TODO", "还书", []],
+    ]);
+    expect([...walk(blocks)].map((b) => b.id)).toEqual(["id-1", "id-2", "id-3", "id-4", "id-5"]);
+    expect(outlineOf(" \n\n", id)).toEqual([]);
   });
 });

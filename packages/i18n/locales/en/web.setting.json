@@ -138,14 +138,12 @@
     "workingQuestion": "{n} helpers are working; restarting cuts them off. Restart now?",
     "newFarmQuestion": "The new version starts from fresh data; the old stays in the home folder. Restart now?",
     "download": "Download",
-    "channel": "Update channel",
-    "channels": {
-      "stable": "Release",
-      "beta": "Beta",
-      "alpha": "Alpha",
-      "stableHint": "Updates only to releases",
-      "betaHint": "Gets the next version's betas first: its features are settled, only fixes go in, and the farm never starts over",
-      "alphaHint": "Gets every batch of changes first: features still change, and a schema change starts the farm over (the old one is kept aside)"
-    }
+    "cli": "Command line",
+    "cliHint": "Once installed, {command} reads and writes this farm from a terminal, for agents on this Mac too",
+    "cliReady": "Use {command} in a terminal; agents on this Mac can read and write this farm with it",
+    "cliNotOnPath": "Installed at {link}, but ~/.local/bin is not on your PATH: add export PATH=\"$HOME/.local/bin:$PATH\" to ~/.zshrc",
+    "cliTaken": "{link} is another program's file and was not replaced: move it away, then install",
+    "cliInstall": "Install",
+    "cliRemove": "Remove"
   }
 }

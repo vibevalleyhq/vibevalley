@@ -6,7 +6,8 @@ Effect v4 on Node 24, run from source with vpx (`vp run start`) and bundled with
 
 ```
 src/main.ts        the server: loads the configuration, takes the home's lease, serves; --ready-json, --web
-src/cli.ts         the command line: every endpoint, state and events, issue work, chatting with a runtime or the farm's own agent
+src/cli.ts         the command line: every endpoint (described in the dictionary), state and events, issue work, the notes from a
+                   terminal (cli/pkm.ts), doctor, the desktop app's own abilities (cli/app.ts), chatting with a runtime or the farm's own agent
 src/services.ts    every service in build order, then what runs at start
 src/handlers.ts    every endpoint's answer, put together from src/http/handlers/<concept>.ts (each hands it to the service that owns it)
 src/http/          the router over the endpoint table, the streams, /mcp and /v1/chat/completions, the page

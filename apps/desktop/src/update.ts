@@ -12,16 +12,16 @@ import { promisify } from "node:util";
 
 import { Schema } from "effect";
 
-import { UpdateChannel, type UpdateState } from "@vibevalley/protocol/host";
+import type { UpdateState } from "@vibevalley/protocol/host";
 
 import { reasonOf } from "./lines";
-import { type Build, bundleOf, buildFor, ListedRelease, manifestFor, newer, placeProblem, plistVersion, Release, stageOf, startsNewFarm } from "./releases";
+import { type Build, bundleOf, buildFor, ListedRelease, manifestFor, newer, placeProblem, plistVersion, Release, type Stage, startsNewFarm } from "./releases";
 
-/** The latest release's manifest, what the stable channel reads; VIBEVALLEY_UPDATE_FEED names one manifest in place of
- * every channel's (a local copy, to try an update). */
+/** The latest release's manifest, what the stable channel reads; VIBEVALLEY_UPDATE_FEED names one in its place (a local
+ * copy, to try an update). */
 const defaultFeed = "https://github.com/vibevalleyhq/vibevalley/releases/latest/download/release.json";
 
-/** GitHub's latest leaves prereleases out, so a beta or alpha channel reads the list (unauthenticated: 60 asks an hour
+/** GitHub's latest leaves prereleases out, so the beta and alpha apps read the list (unauthenticated: 60 asks an hour
  * from one address, and the app asks every 4 hours). */
 const releaseList = "https://api.github.com/repos/vibevalleyhq/vibevalley/releases?per_page=30";
 
@@ -51,17 +51,6 @@ fi
 if [ "$reopen" = 1 ]; then open "$current"; fi
 `;
 
-const isChannel = Schema.is(UpdateChannel);
-
-/** The channel chosen on this machine; none chosen, the one the running version is from, so an app installed from a beta
- * by hand goes on with betas. */
-export function keptChannel(file: string, version: string): UpdateChannel {
-  const kept = existsSync(file) ? readFileSync(file, "utf8").trim() : "";
-  return isChannel(kept) ? kept : (stageOf(version) ?? "stable");
-}
-
-export const keepChannel = (file: string, channel: UpdateChannel) => writeFileSync(file, channel + "\n");
-
 export function updater(o: {
   /** The running app's version (app.getVersion()). */
   readonly version: string;
@@ -72,9 +61,10 @@ export function updater(o: {
   readonly home: string;
   /** Where downloads go, a folder a version. */
   readonly dir: string;
-  /** One manifest for every channel (VIBEVALLEY_UPDATE_FEED); absent: the channel's latest. */
+  /** One manifest in place of the stage's latest (VIBEVALLEY_UPDATE_FEED). */
   readonly feed: string | undefined;
-  readonly channel: () => UpdateChannel;
+  /** The stage this app's channel takes (channel.ts). */
+  readonly stage: Stage;
   readonly heard: (state: UpdateState) => void;
 }) {
   let state: UpdateState = { _tag: "idle", version: o.version };
@@ -87,11 +77,10 @@ export function updater(o: {
   /** The manifest of the latest release the channel takes; undefined when there is none yet. */
   const manifest = async (): Promise<string | undefined> => {
     if (o.feed !== undefined) return o.feed;
-    const channel = o.channel();
-    if (channel === "stable") return defaultFeed;
+    if (o.stage === "stable") return defaultFeed;
     const res = await fetch(releaseList, { headers: { accept: "application/vnd.github+json" } });
     if (!res.ok) throw new Error(`releases: ${res.status}`);
-    return manifestFor(readList(await res.json()), channel);
+    return manifestFor(readList(await res.json()), o.stage);
   };
 
   const download = async (release: Release, build: Build, bundle: string, feed: string) => {

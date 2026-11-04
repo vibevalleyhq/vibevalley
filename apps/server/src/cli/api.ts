@@ -8,7 +8,7 @@ import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
 import { Sse } from "effect/encoding";
 import { type HttpClientError, HttpClient, HttpClientRequest } from "effect/http";
 
-import { t } from "@vibevalley/i18n";
+import { maybe, t } from "@vibevalley/i18n";
 import { eventsPath, type IssueStatusValues, statePath } from "@vibevalley/protocol";
 import { ApiError, type Endpoint, endpoints, type Handlers, kebab, pathOf, readsOnly } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
@@ -90,11 +90,11 @@ const request = Effect.fn("Cli.request")(function* (base: string, path: string, 
   return text;
 });
 
-const call = (base: string, op: keyof Handlers, input?: Readonly<Record<string, unknown>>) =>
+export const call = (base: string, op: keyof Handlers, input?: Readonly<Record<string, unknown>>) =>
   request(base, pathOf(op), input === undefined ? undefined : JSON.stringify(input));
 
 /** An answer read by its Schema; one that is not is the server's fault, not the command's. */
-const answer =
+export const answer =
   <T>(schema: Schema.Codec<T>) =>
   (text: string) =>
     Schema.decodeEffect(Schema.fromJsonString(schema))(text).pipe(
@@ -174,8 +174,15 @@ function endpointCommand(e: Endpoint) {
       }
       yield* printBody(yield* request(base, pathOf(e.op), body));
     }),
-  ).pipe(Command.withDescription(`POST ${pathOf(e.op)}`));
+  ).pipe(Command.withDescription(t(`server.cli.op.${e.op}`)));
 }
+
+/** A group's line in the help (server.cli.group.<module>[.<noun>].about); cli/golden.test.ts holds every group to one. */
+const groupAbout = (path: readonly string[]) => maybe(`server.cli.group.${path.join(".")}.about`) ?? "";
+
+/** What another endpoint answers for --dry-run (issue.previewDelete for issue.delete): reached as `delete --dry-run`, not
+ * as a command of its own. */
+const dryRunOnly = new Set<string>(endpoints.flatMap((e) => (e.dryRun ? [e.dryRun] : [])));
 
 /** /api/v1/state or /api/v1/events: each frame's data as it comes. */
 const frames = (base: string, path: string) =>
@@ -248,7 +255,8 @@ export const issueWorkCommand = Command.make("work", { id: Argument.String("id")
   }),
 ).pipe(Command.withDescription(t("server.cli.command.issueWork")));
 
-/** Every endpoint as `<module> [<noun>] <verb>`, with the hand-written commands of a module (issue work, runtime chat) beside them. */
+/** Every endpoint as `<module> [<noun>] <verb>`, with the hand-written commands (issue work, runtime chat, the notes')
+ * beside them. */
 export function groupCommands(extra: Readonly<Record<string, readonly Command.Command.Any[]>>) {
   const modules = new Map<string, { own: Command.Command.Any[]; nouns: Map<string, Command.Command.Any[]> }>();
   const of = (m: string) => {
@@ -257,13 +265,25 @@ export function groupCommands(extra: Readonly<Record<string, readonly Command.Co
     return got;
   };
   for (const e of endpoints) {
-    const [m = "", noun = "", ...more] = e.op.split(".").map(kebab);
+    if (dryRunOnly.has(e.op)) continue;
+    // By the op's own names: the help's lines are keyed by them; a command is named in kebab-case.
+    const [m = "", noun = "", ...more] = e.op.split(".");
     if (more.length === 0) of(m).own.push(endpointCommand(e));
     else of(m).nouns.set(noun, [...(of(m).nouns.get(noun) ?? []), endpointCommand(e)]);
   }
-  for (const [m, commands] of Object.entries(extra)) of(m).own.push(...commands);
-  const group = (name: string, commands: readonly Command.Command.Any[]) =>
+  // By where they go: a module ("pkm") or one of its nouns ("pkm.page"). A hand-written command takes the place of the
+  // generated command, or group, of its name.
+  for (const [where, commands] of Object.entries(extra)) {
+    const [m = "", noun] = where.split(".");
+    const names = new Set(commands.map((c) => c.name));
+    const at = of(m);
+    if (noun === undefined) {
+      at.own = [...at.own.filter((c) => !names.has(c.name)), ...commands];
+      for (const name of names) at.nouns.delete(name);
+    } else at.nouns.set(noun, [...(at.nouns.get(noun) ?? []).filter((c) => !names.has(c.name)), ...commands]);
+  }
+  const group = (path: readonly string[], commands: readonly Command.Command.Any[]) =>
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- effect's Command types a command by flags written out; these are built from the endpoint table
-    Command.make(name).pipe(Command.withSubcommands(commands as never), Command.withDescription(t("server.cli.command.group", { group: name })));
-  return [...modules].map(([m, { own, nouns }]) => group(m, [...own, ...[...nouns].map(([n, cs]) => group(n, cs))])) as Command.Command.Any[];
+    Command.make(kebab(path.at(-1) ?? "")).pipe(Command.withSubcommands(commands as never), Command.withDescription(groupAbout(path)));
+  return [...modules].map(([m, { own, nouns }]) => group([m], [...own, ...[...nouns].map(([n, cs]) => group([m, n], cs))])) as Command.Command.Any[];
 }

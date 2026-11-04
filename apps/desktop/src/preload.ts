@@ -27,8 +27,12 @@ const host: Host = {
     },
     check: () => main.call.updateCheck(),
     install: () => main.call.updateInstall(),
-    channel: () => main.call.updateChannel(),
-    setChannel: (channel) => main.call.updateSetChannel(channel),
+  },
+  // The app run from the repository answers that it has none; the page then shows nothing of it.
+  commandLine: {
+    state: () => main.call.cliState(),
+    install: () => main.call.cliInstall(),
+    remove: () => main.call.cliRemove(),
   },
 };
 

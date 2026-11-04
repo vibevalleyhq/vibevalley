@@ -1,7 +1,7 @@
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type UpdateChannel, UpdateChannelValues } from "@vibevalley/protocol/host";
+import type { CommandLineState } from "@vibevalley/protocol/host";
 import { isBusy } from "@vibevalley/protocol/rules";
 
 import { variant } from "@/base/dom";
@@ -11,7 +11,6 @@ import { currentHost } from "@/infra/host";
 import { useUpdates } from "@/infra/settings";
 import { Button } from "@/ui/Button";
 import { ConfirmButton } from "@/ui/ConfirmButton";
-import { Segmented } from "@/ui/Segmented";
 import { SettingRow } from "@/ui/settings";
 import { toast } from "@/ui/toasts";
 
@@ -76,30 +75,41 @@ export function UpdateRow() {
   );
 }
 
-/** Which releases this machine updates to: kept by the desktop (update.ts keptChannel), asked again at once on a change. */
-export function ChannelRow() {
-  const update = currentHost().update;
-  const [channel, setChannel] = createSignal<UpdateChannel>();
-  onSettled(() => void update?.channel().then(setChannel, (e: unknown) => toast(reasonOf(e), "bad")));
-  const choose = (next: UpdateChannel) => {
-    const was = channel();
-    setChannel(next);
-    void update?.setChannel(next).catch((e: unknown) => {
-      setChannel(was);
-      toast(reasonOf(e), "bad");
-    });
-  };
+/** 「安装命令行」: the app's command line linked into ~/.local/bin (apps/desktop src/commandLine.ts); nothing where the
+ * host has none to install. */
+export function CommandLineRow() {
+  const cli = currentHost().commandLine;
+  const [state, setState] = createSignal<CommandLineState>();
+  // The app run from the repository has none: it answers so, and the row stays away.
+  onSettled(() => void cli?.state().then(setState, () => undefined));
+  const act = (step: () => Promise<CommandLineState> | undefined) => void step()?.then(setState, (e: unknown) => toast(reasonOf(e), "bad"));
+  const hint = (s: CommandLineState) =>
+    s.taken
+      ? t("web.setting.about.cliTaken", { link: s.link })
+      : !s.installed
+        ? t("web.setting.about.cliHint", { command: s.command })
+        : s.onPath
+          ? t("web.setting.about.cliReady", { command: s.command })
+          : t("web.setting.about.cliNotOnPath", { link: s.link });
   return (
-    <Show when={channel()}>
-      {(c) => (
-        <SettingRow label={t("web.setting.about.channel")} hint={t(`web.setting.about.channels.${c()}Hint`)}>
-          <Segmented
-            label={t("web.setting.about.channel")}
-            testid="update-channel"
-            value={c()}
-            options={UpdateChannelValues.map((v) => ({ value: v, label: t(`web.setting.about.channels.${v}`) }))}
-            onChange={choose}
-          />
+    <Show when={state()}>
+      {(s) => (
+        <SettingRow label={t("web.setting.about.cli")} hint={hint(s())}>
+          <span data-testid="cli-state" data-installed={String(s().installed)} class="font-mono text-xs text-muted">
+            {s().command}
+          </span>
+          <Show
+            when={s().installed}
+            fallback={
+              <Button icon="terminal" data-testid="cli-install" disabled={s().taken} onClick={() => act(() => cli?.install())}>
+                {t("web.setting.about.cliInstall")}
+              </Button>
+            }
+          >
+            <Button data-testid="cli-remove" onClick={() => act(() => cli?.remove())}>
+              {t("web.setting.about.cliRemove")}
+            </Button>
+          </Show>
         </SettingRow>
       )}
     </Show>

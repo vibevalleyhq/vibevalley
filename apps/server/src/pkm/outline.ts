@@ -304,3 +304,27 @@ export function carryIds(was: Page, page: Page): Page {
     });
   return { ...page, blocks: relabel(page.blocks) };
 }
+
+/** Typed or piped text as blocks of their own (`pkm capture`): a line a block, a leading "- " or "* " taken off, nested by
+ * its indentation under the line before it, whatever the indent's width; markers and [#A] read as in a file. Ids are
+ * fresh, as these blocks are new wherever they go. */
+export function outlineOf(text: string, newId: () => string): Node[] {
+  const lines = text
+    .replace(/\r\n/gu, "\n")
+    .split("\n")
+    .filter((l) => l.trim() !== "");
+  if (lines.length === 0) return [];
+  const width = (l: string) => l.length - l.trimStart().length;
+  const least = Math.min(...lines.map(width));
+  // The widths of the lines still open above, outermost first: a line goes under the last narrower one.
+  const open: number[] = [];
+  const markdown = lines.map((l) => {
+    const w = width(l) - least;
+    while (open.length > 0 && (open.at(-1) ?? 0) >= w) open.pop();
+    const depth = open.length;
+    open.push(w);
+    return `${"  ".repeat(depth)}- ${l.trim().replace(/^[-*]\s+/u, "")}`;
+  });
+  const fresh = (nodes: readonly Node[]): Node[] => nodes.map((n) => ({ ...n, id: newId(), explicit: false, children: fresh(n.children) }));
+  return fresh(parse(markdown.join("\n") + "\n", "captured.md", 0).blocks);
+}

@@ -1,19 +1,30 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { endpoints, kebab, pathOf } from "@vibevalley/protocol/api";
+import { t } from "@vibevalley/i18n";
+import { endpoints, kebab } from "@vibevalley/protocol/api";
 import { Preview } from "@vibevalley/protocol/schema";
 
 import { lookIn, memoriesOf } from "./errors.ts";
 import { cli, farm } from "./testing/cli.ts";
 
 describe("the command line", () => {
-  it.effect("has a command, with its help, for every endpoint", () =>
+  it.effect("has a command, with its line of help, for every endpoint; what --dry-run answers has none of its own", () =>
     Effect.gen(function* () {
+      // Hand-written in their place (cli/pkm.ts): their help is their own.
+      const replaced = new Set(["pkm.capture", "pkm.search", "pkm.page.get", "pkm.radar.get"]);
+      const dryRunOnly = new Set(endpoints.flatMap((e) => (e.dryRun ? [e.dryRun] : [])));
       for (const e of endpoints) {
-        const help = yield* cli([...e.op.split(".").map(kebab), "--help"]);
+        if (replaced.has(e.op)) continue;
+        const path = e.op.split(".").map(kebab);
+        if (dryRunOnly.has(e.op)) {
+          const listed = (yield* cli([...path.slice(0, -1), "--help"])).out;
+          expect({ op: e.op, listed: new RegExp(`^\\s+${path.at(-1)}\\s`, "mu").test(listed) }).toEqual({ op: e.op, listed: false });
+          continue;
+        }
+        const help = yield* cli([...path, "--help"]);
         expect({ op: e.op, code: help.code }).toEqual({ op: e.op, code: 0 });
-        expect(help.out).toContain(`POST ${pathOf(e.op)}`);
+        expect(help.out).toContain(t(`server.cli.op.${e.op}`));
       }
     }),
   );

@@ -54,7 +54,7 @@ Status: proposed
 - **名字照接口**：组和命令的名字就是 `api.ts` 的操作（`pkm`、`artifact`、`game` 都照旧），接口、命令行和 agent 的工具是同一套词；界面上的叫法（笔记、稿子）只在界面上。
 - **每个接口一句说明**：词典里每个操作一句（`server.cli.op.<操作>`），每组一句（`server.cli.group.<模块>`），中英两份；命令行的帮助、能力表（`docs/reference/capabilities.md` 多一列）都读它。命令行按操作取说明时键的类型是全部操作的联合，少了一句编不过。管家和帮工的工具描述照旧在各自的 `prompts.ts`（它们为模型调过，评测管着），不改。
 - **删掉 `preview-delete`**：命令行不再为 `previewDelete` 这类接口生成命令，它们只经 `--dry-run` 用到（`issue delete --dry-run`）；接口本身留着，页面在用。
-- **笔记的命令**（手写的，和 `issue work` 一样，在 `pkm` 组里；生成的那些照旧在）：读的命令默认打 Markdown，`--json` 给接口的答复；只有这一组这样，别的命令照旧是 JSON。
+- **笔记的命令**（手写的，和 `issue work` 一样，在 `pkm` 组里；手写的顶替同名的生成命令或组，其余生成的照旧在）：读的命令默认打 Markdown，`--format json` 给接口的答复（不用 `--json`：生成的命令拿它收请求体）；只有这一组这样，别的命令照旧是 JSON。
 
   ```bash
   vibevalley pkm capture 一句话             # 记进今天的日记；--page <标题> 记到那一页的末尾；不给字就读标准输入
@@ -62,11 +62,10 @@ Status: proposed
   vibevalley pkm search <词…>               # 按页分组，一条一行：页 › 路径: 块
   vibevalley pkm page get <标题>            # 一页给人读的 Markdown（pkm.page.export：引用读成字，批注去掉）
   vibevalley pkm page edit <标题>           # 在 $EDITOR 里改这一页的原文，关掉编辑器存回去
-  vibevalley pkm clip <网址>                # 剪藏
   vibevalley pkm radar                      # 收件箱、搁着的、过期的
   ```
 
-  接口要补三处，规则都在服务端：`pkm.capture` 收 `page`（不给是今天的日记），`text` 照大纲读（多行按缩进拆成块，和在页面上粘贴一样）；读一页文件的原文（带 `id::`）和它的 `updated`；`pkm.page.save` 收 `updated`，这期间页面被别处改过就拒绝，`page edit` 说清楚、把改过的原文留在临时文件里。标题照页面的找法认（别名、大小写），找不到时 `next` 列出最像的几页。
+  接口要补，规则都在服务端：`pkm.capture` 收 `page`（不给是今天的日记），`text` 照大纲读（多行按缩进拆成块）；`pkm.source.get` 读一页文件的原文（带 `id::`）和它上次写的时间，`pkm.source.update` 照原文重写这一页，这期间文件被改过就拒绝，`page edit` 说清楚、把改过的原文留在临时文件里（`pkm.page.save` 对已有的页只改属性和文件夹，不换大纲，所以另起一对）。页名照页面的找法认（标题、slug、别名），找不到时说最像的几页。剪藏不在这一组：它要网页的标题和正文，是浏览器里的剪藏工具给的，命令行不去抓网页，`pkm clip create` 照旧。
 - **`vibevalley doctor`**：一条命令说清楚现在的样子，答复和别的命令一样是 JSON：一项一行（哪个渠道和家目录、`server.json` 指向哪、连不连得上、服务端和命令行的版本、装着哪些农机、缺哪些钥匙、语音线路和连接到本机的端口占没占），每项 `ok`、不 ok 时 `why` 和 `next`（和失败时的 `next` 同一种写法）。农场连不上时退出码不是 0。
 - **这篇不做**：`vibevalley serve`（不开桌面版、只起一个农场）和把只给 agent 用的命令（`voice hear`、`lan pairing` 这类）收进一个「高级」组，以后另起。
 
@@ -100,3 +99,8 @@ Status: proposed
 - 端口按渠道固定，被别的程序占了时那个渠道的语音线路或连接到本机起不来：照今天一样在「设置」里说，能在设置里换。
 - 全局快捷键和灵动岛归先开的那个，主人可能以为后开的坏了：后开的「设置」里说它们在哪个渠道那里。
 - `~/.local/bin` 里的链接指向应用的位置；应用被挪走或删掉，命令就断了：命令说找不到应用、去哪重新装。
+
+## 做到哪了
+
+- 做了：渠道表和各渠道的应用、农场、工作目录、端口；只在自己的渠道里更新，「关于」里的通道选项去掉；先开的渠道拿全局快捷键和灵动岛；命令行随应用打包（`cli.mjs` 和每个渠道的启动脚本）、「关于」里装到 `~/.local/bin`；`desktopControl` 和 `vibevalley app`；每个接口和每组的说明、能力表的说明一列；`preview-delete` 这类命令去掉；`vibevalley doctor`；笔记的命令和 `pkm.capture` 的 `page`、`pkm.source.get`、`pkm.source.update`。验过：打包一个 `0.5.0-beta.1`，应用是 `dev.vibevalley.app.beta`，经 `~/.local/bin` 的链接跑它的 `vibevalley-beta`，`doctor` 读的是 `~/.vibevalley-beta`；桌面版的 Playwright 经套接字问状态、让窗口到一页。
+- 还没做：灵动岛上标出它是哪个渠道（岛是 Swift 的，要它收一个渠道的名字来画）；各渠道图标的角标（要出图）；后开的渠道在「设置」里说快捷键和灵动岛在谁那里。

@@ -192,7 +192,26 @@ export interface PkmSearchHit {
 }
 
 export interface PkmCaptureRequest {
+  /** One line, or an outline: a line a block, nested by its indentation, a leading "- " or not. */
   text: string;
+  /** A page's slug, title or alias: the blocks go at its end as they are. None: today's journal, each top block a
+   * LATER tagged #inbox. */
+  page?: string;
+}
+
+/** A page's file as it is written (its id:: lines included), and when it was last written: what `pkm page edit` opens. */
+export interface PkmSource {
+  page: string;
+  title: string;
+  markdown: string;
+  updated: number;
+}
+
+/** The page's file written anew from markdown; refused when the file changed since updated (it was read). */
+export interface PkmSourceUpdate {
+  page: string;
+  markdown: string;
+  updated: number;
 }
 
 export interface PkmJournalRequest {

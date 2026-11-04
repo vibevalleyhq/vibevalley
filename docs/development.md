@@ -67,10 +67,11 @@ vp run release final     # 在 release/x.y 上打正式版（前面要有同一�
 
 ## 只用命令行派一个活
 
-先起服务端（见上）。另开终端，命令行在根目录是 `vp run --filter @vibevalley/server cli`；下面写成 `vibevalley`。它连这台机器上用着家目录的那个服务端（家目录的 `server.json` 写着地址，桌面版的也找得到），没有就是 `http://127.0.0.1:8787`；别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
+先起服务端（见上）。另开终端，命令行在根目录是 `vp run --filter @vibevalley/server cli`；下面写成 `vibevalley`。装了桌面版的，「关于」里「安装命令行」以后终端里就有 `vibevalley`（beta 是 `vibevalley-beta`，alpha 是 `vibevalley-alpha`），连的是那个渠道的农场。`vibevalley doctor` 一次说清楚找到的是哪个农场、连不连得上、桌面版开没开、装了哪些农机、缺不缺模型的 key、连接到本机有没有问题；`vibevalley app …` 是桌面版自己的事（状态、打开到某一页、更新、退出、重启）。它连这台机器上用着家目录的那个服务端（家目录的 `server.json` 写着地址，桌面版的也找得到），没有就是 `http://127.0.0.1:8787`；别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
 
-命令行搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），接口表里每个接口是一条命令，命令的词就是操作名（`issue.create` 是 `issue create`，`issue.status.update` 是 `issue status update <id>`，操作名里的大写写成 `-`：`issue preview-delete`），`about` 的字段（多是 `<id>`）是位置参数；`vibevalley --help`、`vibevalley issue --help`、`vibevalley issue status update --help` 列出命令和参数。它的输出是给脚本和 agent 读的：
+命令行搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），接口表里每个接口是一条命令，命令的词就是操作名（`issue.create` 是 `issue create`，`issue.status.update` 是 `issue status update <id>`，操作名里的大写写成 `-`：`channel mark-read`），每条命令和每一组的说明在词典里（`server.cli.op.<操作>`、`server.cli.group.<组>.about`，少了编不过），`--dry-run` 才用到的接口（`previewDelete` 这类）没有自己的命令；`about` 的字段（多是 `<id>`）是位置参数；手写的命令（`issue work`、`runtime chat`、笔记的那些）顶替同名的生成命令或组；`vibevalley --help`、`vibevalley issue --help`、`vibevalley issue status update --help` 列出命令和参数。它的输出是给脚本和 agent 读的：
 
+- **笔记的命令**是给人和 agent 在终端里用的（`src/cli/pkm.ts`），读出来的默认是 Markdown，`--format json` 是接口的答复：`pkm capture 一句话`（记进今天的日记，`--page` 记到那一页末尾，不给字就读标准输入、按缩进拆成块）、`pkm today`（`--day`）、`pkm search <词…>`（一条一行：页 › 路径: 块）、`pkm radar`、`pkm page get <页>`（给人读的 Markdown）、`pkm page edit <页>`（在 `$VISUAL`、`$EDITOR` 里改这一页文件的原文，关掉存回去；这期间页面被改过就不写，改过的留在临时文件里）。
 - **stdout 只放结果**：一个 JSON 文档（终端里排开，不是终端时一行）；`state --watch`、`events` 一行一帧。失败时 stdout 是空的。
 - **输入** `--json` 收 JSON 文本、`-`（读标准输入）或 `@文件`，和位置参数并成一份，发出去以前照接口的 Schema 查一遍，对不上就不发，说是哪个字段；输入只有位置参数的命令不收 `--json`。
 - **试跑** `--dry-run`：会删、会合、会关、会让帮工走的命令（接口表里带 `dryRun` 的：`issue status update`、`issue act` 和每一个删除，`cli.test.ts` 查每个 `delete` 都有）只回答会做什么（`{"does":[…]}`），什么都不动；它和真做走同一处判断，所以真做会拒的，试跑也拒、话一样。只读的命令照常跑；别的改东西、还没有试跑的命令带着 `--dry-run` 会被拒（`NoDryRun`），不会悄悄做了。
