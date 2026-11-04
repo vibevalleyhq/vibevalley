@@ -1,0 +1,12 @@
+#!/bin/sh
+# Vite+ runs oxlint with OXLINT_TSGOLINT_PATH set to oxlint-tsgolint's bin/tsgolint, which is this file: hand the call to
+# tsrs's linter, the one this package installs. $0 is reached through pnpm's links, so it is followed to this folder.
+here=$0
+while [ -L "$here" ]; do
+  link=$(readlink "$here")
+  case "$link" in
+    /*) here=$link ;;
+    *) here=${here%/*}/$link ;;
+  esac
+done
+exec "${here%/*}/../node_modules/.bin/tsrs-lint" "$@"

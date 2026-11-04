@@ -1,0 +1,17 @@
+{
+  "name": "@vibevalley/tsrs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TypeScript on tsrs: oxlint's type-aware lint and type check (standing in for oxlint-tsgolint), and the editor's TypeScript with Effect's diagnostics",
+  "bin": {
+    "tsgolint": "./bin/tsgolint"
+  },
+  "exports": {
+    "./bin/tsgolint": "./bin/tsgolint",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@effect/tsgo": "catalog:",
+    "tsrs": "catalog:"
+  }
+}

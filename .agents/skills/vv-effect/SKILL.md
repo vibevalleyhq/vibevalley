@@ -1,6 +1,6 @@
 ---
 name: vv-effect
-description: 在 VibeValley 里写、改、评审 Effect v4 的代码（apps/server、packages/agent、packages/ai，以及页面的中间层 apps/web/src/state 上的 Effect Atom，effect 4.0.5）：先读包里自带的官方指南，再照本仓库的约定写：服务是 Context.Service 的类、库经 Db、文件经 FileSystem、时间经 Clock、Promise 只在库的一次调用上且写 { try, catch }、错误打标签按 catchTag 接、服务的方法用 Effect.fn 命名、测试用 it.effect 和 TestClock；哪些已经由 effect:check、vp check 的 effecttsgo 规则、vibevalley/* lint 和逃生口的棘轮拦着。用在：写或改任何用到 Effect 的代码；页面上主人做一件事要先显示结果（乐观更新）、要等服务端确认、要记住一个选择、要一个全页面共享的值（意图、act()、defineStored、defineAtom，Atom 只在 state/）（服务、layer、错误、Stream、Schedule、Schema、测试）；评审一段 Effect 代码；effect:check 或 vp check 报了 effecttsgo 的诊断不知道怎么改；不确定一个 API 在 v4 叫什么（Context.Tag、Effect.Service、catchAll、Either、Layer.scoped 这些 v3 名字都不在了）；主人说「Effect 的最佳实践」「这段 Effect 写得对不对」。
+description: 在 VibeValley 里写、改、评审 Effect v4 的代码（apps/server、packages/agent、packages/ai，以及页面的中间层 apps/web/src/state 上的 Effect Atom，effect 4.0.5）：先读包里自带的官方指南，再照本仓库的约定写：服务是 Context.Service 的类、库经 Db、文件经 FileSystem、时间经 Clock、Promise 只在库的一次调用上且写 { try, catch }、错误打标签按 catchTag 接、服务的方法用 Effect.fn 命名、测试用 it.effect 和 TestClock；哪些已经由 effect:check、vibevalley/* lint 和逃生口的棘轮拦着。用在：写或改任何用到 Effect 的代码；页面上主人做一件事要先显示结果（乐观更新）、要等服务端确认、要记住一个选择、要一个全页面共享的值（意图、act()、defineStored、defineAtom，Atom 只在 state/）（服务、layer、错误、Stream、Schedule、Schema、测试）；评审一段 Effect 代码；effect:check 报了诊断不知道怎么改；不确定一个 API 在 v4 叫什么（Context.Tag、Effect.Service、catchAll、Either、Layer.scoped 这些 v3 名字都不在了）；主人说「Effect 的最佳实践」「这段 Effect 写得对不对」。
 ---
 
 # 在这个仓库写 Effect
@@ -50,7 +50,7 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 
 写的时候不用记，撞上了照报错改；报错不懂时看这里对应的那一行。
 
-- **`vp run effect:check`**（`@effect/tsgo` 的语言服务，规则和级别在 `tsconfig.base.json` 的 `plugins`，警告也算失败）和 **`vp check` 里的 `effecttsgo/*`**（同一张表，`scripts/effect-lint.ts`）：漂着没运行的 Effect、少了 `return yield*`、`yield` 少了 `*`、v3 的旧 API、gen 里的 `try/catch`、Effect 里再 `run*` 一个 Effect、方法签名里漏出的依赖、服务没写成类、`Math.random`、`crypto.randomUUID`、`process.env`、`setTimeout`、`fetch`……开着哪些、为什么关着哪些，看那张表和[地基](docs/subsystems/foundation.md)的说明。真要在一行上违反一条时写 `// @effect-diagnostics-next-line <规则>:off`，上一行说为什么。
+- **`vp run effect:check`**（`@effect/tsgo` 的语言服务，规则和级别在 `tsconfig.base.json` 的 `plugins`，警告也算失败）（编辑器经 `packages/tsrs/tsdk` 也显示同一张表的诊断）：漂着没运行的 Effect、少了 `return yield*`、`yield` 少了 `*`、v3 的旧 API、gen 里的 `try/catch`、Effect 里再 `run*` 一个 Effect、方法签名里漏出的依赖、服务没写成类、`Math.random`、`crypto.randomUUID`、`process.env`、`setTimeout`、`fetch`……开着哪些、为什么关着哪些，看那张表和[地基](docs/subsystems/foundation.md)的说明。真要在一行上违反一条时写 `// @effect-diagnostics-next-line <规则>:off`，上一行说为什么。
 - **`vibevalley/*` lint**：`promise-boundary`（async 和 `new Promise` 只在 `Effect.tryPromise`、`Effect.promise` 里，那里的 async 函数最多一个 `await`）、`try-promise-catch`（`Effect.tryPromise` 写 `{ try, catch }`，不只传函数）、`db-door`（`SqlClient`、`withTransaction` 只在 `infra/db.ts`）、`no-instanceof-tagged`（`x instanceof YError` 分带标签的错误：改成 `Predicate.isTagged` 或 `catchTag`）、`no-object-guard`（`typeof x === "object" && x !== null`：改成 `Predicate.isObject`）、`service-method-names`（`X.of({ … })` 里返回 Effect 的成员不是 `Effect.fn("X.m")` 或 `Effect.fnUntraced`，或 `Effect.fn` 的名字不是 `X.m`；只认得出语法上看得见的，看不见的边界在 `scripts/oxlint-plugin.ts` 对应规则旁的注释）、`no-wall-clock`、`no-test-sleep`。
 - **逃生口的棘轮**：`as`、`!`、关 lint 的注释、`Effect.orDie`、不带 `{ log }` 的 `Effect.ignore`、空的 `catch`，`yield* Effect.result`（`resultBranch`），按区只许减；低于基线也要跑 `health:write` 固定下来。
 

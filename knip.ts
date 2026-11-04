@@ -49,6 +49,10 @@ const config: KnipConfig = {
       project: ["src/**/*.{ts,tsx}"],
       includeEntryExports: true,
     },
+    "packages/tsrs": {
+      // Run by path from its shell scripts (bin/tsgolint, tsdk/tsgo), which knip does not read.
+      ignoreDependencies: ["tsrs", "@effect/tsgo"],
+    },
     "packages/base-ui": {
       project: ["src/**/*.{ts,tsx}"],
       includeEntryExports: true,

@@ -1,6 +1,5 @@
 import { defineConfig } from "vite-plus";
 
-import { effectRules } from "./scripts/effect-lint.ts";
 import { says } from "./scripts/oxlint-plugin.ts";
 
 // What no-restricted-imports says, each written once: what is wrong, how to fix it, and where to look
@@ -122,16 +121,14 @@ export default defineConfig({
   },
   lint: {
     ignorePatterns: ["site/**", "apps/server/db/generated/**"],
-    // oxlint's defaults, import for no-cycle, and effecttsgo: Effect's rules, patched into oxlint by package.json's prepare
-    // (scripts/effect-lint.ts); listing plugins replaces the defaults.
-    plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "effecttsgo"],
+    // oxlint's defaults and import for no-cycle; listing plugins replaces the defaults. Effect's own rules are effect:check's.
+    plugins: ["eslint", "typescript", "unicorn", "oxc", "import"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "solid", specifier: "eslint-plugin-solid" },
       { name: "vibevalley", specifier: "./scripts/oxlint-plugin.ts" },
     ],
     rules: {
-      ...effectRules(),
       "vite-plus/prefer-vite-plus-imports": "error",
       "vibevalley/no-comment-divider": "error",
       // [...text] splits by code point, on purpose (docs/style/code.md).

@@ -34,6 +34,8 @@ packages/agent/            VibeValley 自己的 agent：core/ 是循环和工具
                            不认识农场，lint 查方向（ai ← agent ← apps/server）
 packages/bridge/           宿主之间的调用：一份契约（每个调用的入参、出参，每个推送的载荷，都是 Schema），两头由它生成，传输是各宿主的适配器
 packages/testkit/          测试共用的：黄金数据、在真实时间上等条件、测试金字塔（只在 devDependencies）
+packages/tsrs/             TypeScript 跑在 tsrs（TypeScript 7 的 Rust 移植）上：顶替 oxlint-tsgolint 给 vp check 做带类型的 lint 和类型检查，
+                           tsdk/ 是编辑器用的带 Effect 语言服务的 TypeScript
 packages/health/           仓库的体检：热点（改动次数乘行数）和逃生口（类型的、错误通道的）的棘轮；这个仓库的配置在 scripts/health.config.ts
 packages/stories/          零件的故事（像 Storybook）：故事的格式和查看器；页面的故事分四层：设计体系、组件（ui/ 每个零件旁边一个 X.stories.tsx）、交互、界面
 site/                      官网 vibevalley.dev（Astro 静态生成，Tailwind，会动的部分是 React island）：图和像素字直接用 apps/web/public 的
@@ -50,7 +52,7 @@ scripts/                   文档、Note、旧名字的检查，和验证服务�
 
 ```bash
 vp install                                                      # 根目录：装 apps/*、packages/* 的依赖（Vite+ 带的 pnpm 12，pnpm workspace）
-vp check                                                        # 改完任何代码：格式（oxfmt）、lint（oxlint，带类型）和全部包的类型；--fix 改格式
+vp check                                                        # 改完任何代码：格式（oxfmt）、lint（oxlint，带类型，跑在 tsrs 上）和全部包的类型；--fix 改格式
 vpx scripts/comment-review.ts                                   # 提 PR 前：模型照 docs/style/code.md 审这个分支新加的注释，你逐条核实再删或改（vv-comments；--all <目录> 清一块已有的）
 vp run --filter @vibevalley/server start                         # 服务端，127.0.0.1:8787；后面加 --web ../web/dist 同时提供页面
 vp run --filter @vibevalley/server cli issue list                # 命令行：调农场的接口（help 列出全部），runtime chat <农机> 直接聊
