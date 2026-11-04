@@ -59,6 +59,12 @@ test("the recorded cases", () => {
   expect(failed).toEqual([]);
 });
 
+test("an @ right after Chinese names someone, and one inside a Latin word or an address does not", () => {
+  expect(mentionsIn("问@w3 看看")).toEqual(["w3"]);
+  expect(mentionsIn("「@w3」你呢")).toEqual(["w3"]);
+  expect(mentionsIn("mail a@w3.dev, x@@w3")).toEqual([]);
+});
+
 test("with several orchestrators: the place's hears the owner, 管家 is the place's, and each is named by its id", () => {
   const names = { here: "lead", orchestrators: ["orchestrator", "lead", "agent-1", "agent-12"] };
   expect(mentionsIn("@管家 看看，@agent-12 也看看，@agent-1", names)).toEqual(["lead", "agent-12", "agent-1"]);

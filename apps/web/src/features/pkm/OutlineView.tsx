@@ -11,6 +11,7 @@ import { useLatest } from "@/state/atom";
 import { Icon } from "@/ui/Icon";
 import type { IconName } from "@/ui/icons";
 import { toast } from "@/ui/toasts";
+import { typeMarks } from "@/ui/typedMarks";
 
 import { Body } from "./Body";
 import { dayKey } from "./days";
@@ -22,6 +23,7 @@ import {
   type Completion,
   completed,
   completionAt,
+  noteMarks,
   type EditAction,
   editAction,
   type Focus,
@@ -637,6 +639,7 @@ function Editor(props: {
         onCompositionStart={() => setComposing(true)}
         onCompositionEnd={() => setComposing(false)}
         onInput={(e) => {
+          if (!e.isComposing && typeMarks(e.currentTarget, noteMarks)) return;
           setDraft(e.currentTarget.value);
           setCaretAt(e.currentTarget.selectionStart);
           setPicked(0);

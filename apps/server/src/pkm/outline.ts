@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 
 import { PkmMarkerValues } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
-import { slugOf } from "@vibevalley/protocol/rules";
+import { pkmTag, slugOf } from "@vibevalley/protocol/rules";
 
 import { tierOfFile, titleOfFile } from "./para.ts";
 
@@ -79,7 +79,6 @@ const priorityLead = /^\[#([ABC])\]\s+(.*)$/su;
 const fenceLead = /^(`{3,}|~{3,})/u;
 export const wikiLink = /\[\[([^[\]]+?)\]\]/gu;
 export const blockRef = /\(\(([0-9a-fA-F-]{8,36})\)\)/gu;
-const tagRef = /(?:^|\s)#([\p{L}\p{N}_/-]+)/gu;
 const spanRemark = /==([^=]+)==\^\[([^\]]+)\]/gu;
 
 const shaOf = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
@@ -272,7 +271,7 @@ export function edgesOf(page: Pick<Page, "blocks">): Edge[] {
       if (target && !target.startsWith(".")) edges.push({ block: node.id, page: slugOf(target), kind: "wikilink" });
     }
     for (const m of text.matchAll(blockRef)) edges.push({ block: node.id, target: m[1] ?? "", kind: "block_ref" });
-    for (const m of text.matchAll(tagRef)) edges.push({ block: node.id, page: slugOf(m[1] ?? ""), kind: "tag" });
+    for (const m of text.matchAll(pkmTag)) edges.push({ block: node.id, page: slugOf(m[1] ?? ""), kind: "tag" });
     for (const value of Object.values(node.props))
       for (const m of value.matchAll(wikiLink)) {
         const target = (m[1] ?? "").split("|")[0]?.trim() ?? "";

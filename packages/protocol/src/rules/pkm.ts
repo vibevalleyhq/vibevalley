@@ -5,6 +5,17 @@ import type { PkmBlock, PkmBlockOp, PkmMarker, PkmPriority } from "../shapes";
 /** A page's name from its title: trimmed, lower case, spaces as dashes, "/" (or "\") as "__". */
 export const slugOf = (title: string) => title.trim().replace(/\\/gu, "/").replace(/\//gu, "__").replace(/\s+/gu, "-").toLowerCase();
 
+// What a #tag may follow: anything but a Latin letter, a digit or one of _ / & # (so C#, issue#12, a link's #part, an
+// entity and a ## heading are not tags). Chinese runs on without spaces, so 今天读了#读书 and 「#读书」 are tags.
+const tagLead = String.raw`(?<![\p{Script=Latin}\p{N}_/&#])#`;
+const tagName = String.raw`[\p{L}\p{N}_/-]`;
+
+/** Every #tag in a text (read it with matchAll): the name is group 1. The page draws them, the server links them. */
+export const pkmTag = new RegExp(`${tagLead}(${tagName}+)`, "gu");
+
+/** A #tag being typed, ending where the text ends (the caret): its name so far is group 1. */
+export const pkmTagTyped = new RegExp(`${tagLead}(${tagName}*)$`, "u");
+
 /** The server's carries more: whether its id is written in the file. */
 export interface PkmTreeNode {
   id: string;

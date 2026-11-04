@@ -12,6 +12,7 @@
 | `normalSpans` | `artifact.ts` | Drops empty spans and joins neighbours with the same marks, so one text has one way to be written. |
 | `defaultOf` | `channel.ts` | The channel words go to when none is named. |
 | `channelOf` | `channel.ts` | A channel by its id; none when no id is given. |
+| `mentionLead` | `channel.ts` | What an @name may follow: anything but a Latin letter, a digit, _ or @, so a@b.com names no one while 问@w3 does |
 | `slice` | `cut.ts` | s.slice(start, end), a surrogate pair cut in half made U+FFFD (what String.prototype.toWellFormed does, which the |
 | `cut` | `cut.ts` | s as it is when it fits in max units; else its first max units and an ellipsis. |
 | `oneLine` | `cut.ts` | Runs of white space are one space. |
@@ -35,6 +36,8 @@
 | `phaseText` | `phase.ts` | phaseWords as said at now. |
 | `phaseWords` | `phase.ts` | What a session is doing in words, how long it has been quiet left as {span}. |
 | `slugOf` | `pkm.ts` | A page's name from its title: trimmed, lower case, spaces as dashes, "/" (or "\") as "__". |
+| `pkmTag` | `pkm.ts` | Every #tag in a text (read it with matchAll): the name is group 1. The page draws them, the server links them. |
+| `pkmTagTyped` | `pkm.ts` | A #tag being typed, ending where the text ends (the caret): its name so far is group 1. |
 | `applyBlockOps` | `pkm.ts` | The blocks after the ops in order (a copy: blocks is not changed); an op on a block not on the page changes nothing. |
 | `flatBlocks` | `pkm.ts` | The outline as the wire has it: in order, each with its parent and the path of first lines above it. |
 | `treeOfBlocks` | `pkm.ts` |  |
@@ -203,6 +206,7 @@
 | `pressed` | `shortcuts.ts` | The chords matched here (mod+K, ?, C): the rest are each place's own. |
 | `useInterval` | `timer.ts` | fn every ms for as long as the owner lives. |
 | `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the owner's end clears it. |
+| `typedMarks` | `typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for; undefined when there are none. |
 
 ## `apps/web/src/infra`
 

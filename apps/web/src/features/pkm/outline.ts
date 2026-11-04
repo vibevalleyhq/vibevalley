@@ -1,5 +1,5 @@
 import type { PkmBlock, PkmPageSummary, PkmTier } from "@vibevalley/protocol";
-import { slugOf } from "@vibevalley/protocol/rules";
+import { pkmTag, slugOf } from "@vibevalley/protocol/rules";
 
 import { titleFor } from "./days";
 
@@ -33,7 +33,7 @@ export type Piece =
   | { readonly kind: "ref"; readonly id: string }
   | { readonly kind: "remark"; readonly text: string; readonly remark: string };
 
-const inline = /==([^=]+)==\^\[([^\]]+)\]|\[\[([^[\]]+?)\]\]|\(\(([0-9a-fA-F-]{8,36})\)\)|(^|\s)#([\p{L}\p{N}_/-]+)/gu;
+const inline = new RegExp(String.raw`==([^=]+)==\^\[([^\]]+)\]|\[\[([^[\]]+?)\]\]|\(\(([0-9a-fA-F-]{8,36})\)\)|` + pkmTag.source, "gu");
 
 /** A block's text as pieces: ==words==^[remark] inline remarks, [[page]] or [[page|words]] links, #tags, ((block)) refs
  * and the text between. */
@@ -56,9 +56,8 @@ export function piecesOf(body: string): Piece[] {
       text(body.slice(at, start));
       out.push({ kind: "ref", id: m[4] });
     } else {
-      const lead = m[5] ?? "";
-      text(body.slice(at, start) + lead);
-      out.push({ kind: "tag", page: slugOf(m[6] ?? ""), text: `#${m[6] ?? ""}` });
+      text(body.slice(at, start));
+      out.push({ kind: "tag", page: slugOf(m[5] ?? ""), text: `#${m[5] ?? ""}` });
     }
     at = start + m[0].length;
   }

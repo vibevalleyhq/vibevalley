@@ -100,6 +100,17 @@ describe("completion at the caret", () => {
     expect(completionAt("x /to", 5)).toBeUndefined();
   });
 
+  test("a # right after Chinese is a tag being typed; one after a Latin word is not", () => {
+    expect(completionAt("今天读了#读", 6)).toEqual({ kind: "tag", query: "读", from: 4 });
+    expect(completionAt("「#读", 3)).toEqual({ kind: "tag", query: "读", from: 1 });
+    expect(completionAt("C#", 2)).toBeUndefined();
+  });
+
+  test("regression: a list closed with Escape (the caret as -1) stays closed", () => {
+    expect(completionAt("tagged #pk", -1)).toBeUndefined();
+    expect(completionAt("see [[Cet", -1)).toBeUndefined();
+  });
+
   test("writes the choice in without doubling a closer already there", () => {
     expect(completed("see [[Cet]] now", 9, { kind: "page", query: "Cet", from: 4 }, "Cetus Core")).toEqual({ value: "see [[Cetus Core]] now", caret: 18 });
     expect(completed("tagged #pk", 10, { kind: "tag", query: "pk", from: 7 }, "pkm")).toEqual({ value: "tagged #pkm ", caret: 12 });

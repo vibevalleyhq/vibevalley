@@ -40,6 +40,27 @@ test("a page is written in place: Enter starts a block, Tab nests it, and the se
     ]);
 });
 
+test("a Chinese input method's 【【 opens a link, and a # right after Chinese is a tag", async ({ page, api }) => {
+  await api.pkm.page.save({ title: "Herbs", tier: "project", markdown: "- first thought\n" });
+  await page.goto("/pkm/herbs");
+  const blocks = page.getByTestId("pkm-block");
+  await blocks.first().getByTestId("pkm-block-text").click();
+  const editor = page.getByTestId("pkm-editor");
+  await page.keyboard.press("End");
+  // What an input method commits: each mark as one input, not a composition.
+  for (const typed of ["，见", "【", "【", "Her"]) await page.keyboard.insertText(typed);
+  await expect(editor).toHaveValue("first thought，见[[Her");
+  await page.getByTestId("pkm-complete").locator('[role="option"][data-key="herbs"]').click();
+  await expect(editor).toHaveValue("first thought，见[[Herbs]]");
+  for (const typed of ["读了", "＃", "读书"]) await page.keyboard.insertText(typed);
+  // The tag is being completed: the first Escape closes its menu, the second leaves the block.
+  await expect(page.getByTestId("pkm-complete")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(blocks.first().getByTestId("pkm-link")).toHaveCount(2);
+  await expect.poll(async () => (await api.pkm.page.get({ page: "herbs" })).page.blocks.map((b) => b.body)).toEqual(["first thought，见[[Herbs]]读了#读书"]);
+});
+
 test("the search lists pages and blocks by page and opens one at its block", async ({ page, api }) => {
   await api.pkm.page.save({ title: "Orchard", tier: "resource", markdown: "- apples ripen in autumn\n- pears too\n" });
   await page.goto("/pkm/orchard");

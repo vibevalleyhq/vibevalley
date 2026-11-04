@@ -9,7 +9,7 @@ import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 
 import { aria } from "@/base/dom";
-import { chatSay, createComposer, drafts, threadOwnerOf, useReplying } from "@/features/channel";
+import { chatMarks, chatSay, createComposer, drafts, threadOwnerOf, useReplying } from "@/features/channel";
 import { DictationButton } from "@/features/voice";
 import { useAgent } from "@/infra/agents";
 import { api } from "@/infra/api";
@@ -19,6 +19,7 @@ import { useIntents } from "@/state/intent";
 import { setPick, usePrefs } from "@/state/prefs";
 import { AgentFace } from "@/ui/Face";
 import { createPixelAct, SpriteIcon, toasts } from "@/ui/pixel";
+import { typeMarks } from "@/ui/typedMarks";
 
 /** Who the next line goes to, with a button to stop picking. */
 function PickChip(props: { named: boolean }) {
@@ -143,7 +144,10 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
             data-testid="composer-input"
             placeholder={placeholder()}
             aria-label={placeholder()}
-            onInput={(e) => box.edit(e.currentTarget.value, e.currentTarget.selectionStart)}
+            onInput={(e) => {
+              if (!e.isComposing && typeMarks(e.currentTarget, chatMarks)) return;
+              box.edit(e.currentTarget.value, e.currentTarget.selectionStart);
+            }}
             onKeyUp={box.follow}
             onClick={box.follow}
             onKeyDown={box.onKey}

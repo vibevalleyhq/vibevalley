@@ -51,7 +51,7 @@ tester.run("no-comment-divider", rule("no-comment-divider"), {
 });
 
 tester.run("no-cjk-literal", rule("no-cjk-literal"), {
-  valid: ['t("web.issue.title")', "/[，。]/.test(s)", "const a = 'plain'"],
+  valid: ['t("web.issue.title")', "/[，。]/.test(s)", "const a = 'plain'", String.raw`const typed = ["[", "\u3010"]`],
   invalid: [
     { code: "const a = '工单'", errors: [{ messageId: "cjk" }] },
     { code: "const a = `${n} 个`", errors: [{ messageId: "cjk" }] },

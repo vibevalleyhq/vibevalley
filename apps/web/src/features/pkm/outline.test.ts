@@ -35,6 +35,12 @@ test("reads links, tags and refs out of a block's text", () => {
     { kind: "text", text: " first" },
   ]);
   expect(piecesOf("issue#3 is not a tag")).toEqual([{ kind: "text", text: "issue#3 is not a tag" }]);
+  expect(piecesOf("今天读了#读书，很好")).toEqual([
+    { kind: "text", text: "今天读了" },
+    { kind: "tag", page: "读书", text: "#读书" },
+    { kind: "text", text: "，很好" },
+  ]);
+  expect(piecesOf("## 标题 and C# and a.com/#top")).toEqual([{ kind: "text", text: "## 标题 and C# and a.com/#top" }]);
   expect(piecesOf("a ==sharp words==^[💬 too strong] b")).toEqual([
     { kind: "text", text: "a " },
     { kind: "remark", text: "sharp words", remark: "too strong" },

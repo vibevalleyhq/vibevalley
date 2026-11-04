@@ -1,7 +1,9 @@
 // The server applies the same ops with the same rule: change packages/protocol/src/rules/pkm.ts and here together.
 
 import type { PkmBlock, PkmBlockOp, PkmMarker } from "@vibevalley/protocol";
-import { applyBlockOps, flatBlocks, treeOfBlocks } from "@vibevalley/protocol/rules";
+import { applyBlockOps, flatBlocks, pkmTagTyped, treeOfBlocks } from "@vibevalley/protocol/rules";
+
+import type { Mark } from "@/base/typedMarks";
 
 /** Every op the page makes names its new block's id, so the random id here is never used. */
 export const applied = (blocks: readonly PkmBlock[], ops: readonly PkmBlockOp[]): PkmBlock[] =>
@@ -134,6 +136,10 @@ export function pasteAction(text: string, block: PkmBlock, caret: Caret, newId: 
   return { kind: "ops", ops, focus: { block: last, at: lastText.length - after.length } };
 }
 
+/** What a block's box reads from an input method's full-width marks (base/typedMarks.ts): 【【 opens a link, （（ a block
+ * ref, 、 first a command, ＃ a tag. */
+export const noteMarks: readonly Mark[] = ["[[", "]]", "((", "))", "/", "#"];
+
 export type CompletionKind = "page" | "block" | "tag" | "command";
 
 /** What is being completed at the caret: the words typed after [[, ((, # or a / that starts the block, and where the
@@ -144,8 +150,9 @@ export interface Completion {
   readonly from: number;
 }
 
-/** The completion the caret is in; none once a line break comes between. */
+/** The completion the caret is in; none once a line break comes between, or for a caret of -1 (a list closed). */
 export function completionAt(value: string, caret: number): Completion | undefined {
+  if (caret < 0) return undefined;
   const before = value.slice(0, caret);
   const open = (opening: string, closing: string, kind: CompletionKind): Completion | undefined => {
     const at = before.lastIndexOf(opening);
@@ -157,7 +164,7 @@ export function completionAt(value: string, caret: number): Completion | undefin
   if (command) return { kind: "command", query: command[1] ?? "", from: 0 };
   const link = open("[[", "]]", "page") ?? open("((", "))", "block");
   if (link) return link;
-  const tag = /(?:^|\s)#([\p{L}\p{N}_/-]*)$/u.exec(before);
+  const tag = pkmTagTyped.exec(before);
   return tag ? { kind: "tag", query: tag[1] ?? "", from: caret - (tag[1] ?? "").length - 1 } : undefined;
 }
 

@@ -148,6 +148,20 @@ test("scrolled up from the newest, a pill leads back down", async ({ page, api }
   await expect(page.getByTestId("to-latest")).toHaveCount(0);
 });
 
+test("a Chinese input method's ＠ right after Chinese offers names, and 、 first offers the commands", async ({ page, api }) => {
+  const id = await newChannel(api, "zhong");
+  await page.goto(`/chat/${id}`);
+  const box = await composerOn(page, id);
+  await box.click();
+  for (const typed of ["问", "＠"]) await page.keyboard.insertText(typed);
+  await expect(box).toHaveValue("问@");
+  await expect(page.getByTestId("mentions").getByRole("option").first()).toBeVisible();
+  await box.fill("");
+  await page.keyboard.insertText("、");
+  await expect(box).toHaveValue("/");
+  await expect(page.getByTestId("mentions").locator('[data-key="/issue"]')).toBeVisible();
+});
+
 test("/ offers the commands, and /issue writes an issue instead of saying the line", async ({ page, api }) => {
   const id = await newChannel(api, "commands");
   await page.goto(`/chat/${id}`);

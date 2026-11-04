@@ -23,7 +23,7 @@
 - **连接器**：`apps/server/src/connector`（`Connector`）。`connector.ts` 是桥：账号和它的代际、配对、只认主人、收进来的话交给管家、持久收件、发件表和退避；`digest.ts` 是送出去的写法（`ownerLine`、`plainText`、`splitText`、`flushText`）；`adapter.ts` 是桥对每家的要求（登录、接收到断开、发送，都是 Effect，失败是 `AppFailed`：`stale`、`restricted`、`failed`）；三家的协议和扫码登录在 `weixin.ts`、`feishu.ts`（飞书用 `@larksuiteoapi/node-sdk`）、`qq.ts`，HTTP 走 Effect 的 `HttpClient`。
 - **接口**：`channel.message.send`、`channel.message.update`、`channel.message.delete`、`channel.message.list`、`channel.message.search`、`channel.reaction.set`、`channel.pin.set`、`channel.pin.list`、`channel.thread.create`（带 `requestKey`，[核心状态](docs/subsystems/core.md)）、`channel.attachment.create`、`channel.create`、`channel.update`、`channel.default.set`、`channel.markRead`；读附件是 `GET /api/v1/attachment/<id>`（`http/api.ts`）；`voice.hear`、`voice.call.hear`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel.set`（[capabilities.md](docs/reference/capabilities.md)）。管家的工具 `channel_list`、`channel_create`、`channel_update`、`issue_comment_create`、`channel_message_list`；帮工的 `channel_message_send`、`channel_message_list`、`channel_unread_list`、`session_list`（`apps/server/src/tool/tool.ts`）。
 - **配置**：`chat.notice_batch_ms`（忙时攒多久再插话，默认 3000）、`chat.retry_wake_ms`（叫醒没开口以后多久再叫，默认 3000）。
-- **页面**：农场窗口的田头和频道菜单（`apps/web/src/farm/chat`，`ChannelMenu.tsx`，频道之下一段私聊）；整页的聊天页 `/chat`（`apps/web/src/features/channel`，侧栏分频道、私聊、帮工三段；`/chat` 是默认频道，别的在 `/chat/<id>`）；两边的输入框（回车发送、@ 叫人、失败了同一稿用同一把钥匙重发）在 `apps/web/src/features/channel/composing.ts` 的 `createComposer`，两边只画；开频道和改频道的表单两边各画一份，栏、忙和服务端的拒绝都在 `apps/web/src/features/channel/Dialogs.tsx` 的 `createChannelForm`；聊天软件页 `/settings/chat`（`features/connector/ConnectorsPage.tsx`）。
+- **页面**：农场窗口的田头和频道菜单（`apps/web/src/farm/chat`，`ChannelMenu.tsx`，频道之下一段私聊）；整页的聊天页 `/chat`（`apps/web/src/features/channel`，侧栏分频道、私聊、帮工三段；`/chat` 是默认频道，别的在 `/chat/<id>`）；两边的输入框（回车发送、@ 叫人、失败了同一稿用同一把钥匙重发；中文输入法的 `＠` 和行首的 `、` 当场换成 `@` 和 `/`）在 `apps/web/src/features/channel/composing.ts` 的 `createComposer`，两边只画；开频道和改频道的表单两边各画一份，栏、忙和服务端的拒绝都在 `apps/web/src/features/channel/Dialogs.tsx` 的 `createChannelForm`；聊天软件页 `/settings/chat`（`features/connector/ConnectorsPage.tsx`）。
 
 ## 模型和不变量
 
@@ -49,7 +49,7 @@
 - **提醒级别**（`notify`）：每个频道和串一个，`all`（默认）、`mentions`（只有 @主人 的算）、`none`；串没设时照它的频道（`notifyOf`）。`none` 的不算未读、不进 Inbox 的 @ 提醒、不转到连接器；`mentions` 的未读只数没处理的 @主人。`channel.notify.set` 改它。
 - **列出来**：`channel.list` 是全部频道和私聊，默认的在前（管家的 `channel_list`）；`channel.unread.list` 是调用者自己没读完的地方，最新的在前，每处带地址、几条、有没有提到它（帮工的 `channel_unread_list`，主人调就是主人的）。
 - **标成未读**：`channel.markUnread { id, number }` 把主人在那里的已读退到这一条之前；页面在主人离开那里之前不再自动标成已读。
-- **@ 名**：`@w3`（帮工的 id）、`@管家`（这处的管家）、别的管家的档案 id（`@agent-1`，长的先认，`@agent-12` 不是 agent-1）、`@主人`、`@所有人`（只有主人用才算）。反引号和代码块里的不算；名字在它的词结束处结束（`@w3你看` 是 w3）。写 @ 就是叫醒；@ 了不在地里的，消息照发，发的人被告知没送到。
+- **@ 名**：`@w3`（帮工的 id）、`@管家`（这处的管家）、别的管家的档案 id（`@agent-1`，长的先认，`@agent-12` 不是 agent-1）、`@主人`、`@所有人`（只有主人用才算）。反引号和代码块里的不算；名字在它的词结束处结束（`@w3你看` 是 w3）；`@` 前面不是拉丁字母、数字、`_` 或 `@` 就算（`mentionLead`，页面开名字的菜单也照它），中文不空格，所以 `问@w3`、`@管家@w2` 都算，`a@w3.dev` 不算。写 @ 就是叫醒；@ 了不在地里的，消息照发，发的人被告知没送到。
 - **这处的管家**（`orchestratorOf`）：频道是它自己设的，没设或设的不再是管家时是默认管家；串跟着它的频道；私聊的对面是管家时是对面，不是时是默认管家。服务端把它写进每个 `Channel.orchestrator`，页面不另算；改了频道的，它的串也重发一遍。
 - **给谁、叫不叫醒**（`chatAudience`，「管家」都是这处的管家；每个管家都算在场，都不冷却）：
 

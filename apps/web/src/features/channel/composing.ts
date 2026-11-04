@@ -12,6 +12,7 @@ import { t } from "@vibevalley/i18n";
 import { type Attachment, type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, VibeValleyApi, type WorkspaceView } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
+import type { Mark } from "@/base/typedMarks";
 import { useOrchestrators } from "@/infra/agents";
 import { api, reasonOf } from "@/infra/api";
 import { orchestratorMood } from "@/infra/frame";
@@ -80,6 +81,10 @@ export interface ComposerWays {
   /** Once a line is on its way: what it carried beside its words (a reply, files) is in the line now. */
   readonly sent?: () => void;
 }
+
+/** What a chat box reads from an input method's full-width marks (base/typedMarks.ts): 、 first is a command, ＠ names
+ * someone. */
+export const chatMarks: readonly Mark[] = ["/", "@"];
 
 export function createComposer(core: () => WorkspaceView | undefined, input: () => HTMLTextAreaElement | undefined, ways: ComposerWays) {
   const [text, setText] = createSignal(ways.initial ?? "");

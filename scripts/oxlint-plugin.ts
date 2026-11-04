@@ -224,11 +224,13 @@ const noCjkLiteral = defineRule({
   create(context) {
     const data = { catalog: catalogOf(context.filename) };
     return {
+      // Read as written: a character spelled as a \u escape is a code point on purpose (a keystroke an input method
+      // types, base/typedMarks.ts), not words.
       Literal(node) {
-        if (typeof node.value === "string" && han.test(node.value)) context.report({ node, messageId: "cjk", data });
+        if (typeof node.value === "string" && han.test(node.raw ?? node.value)) context.report({ node, messageId: "cjk", data });
       },
       TemplateLiteral(node) {
-        if (node.quasis.some((q) => han.test(q.value.cooked ?? q.value.raw))) context.report({ node, messageId: "cjk", data });
+        if (node.quasis.some((q) => han.test(q.value.raw))) context.report({ node, messageId: "cjk", data });
       },
       JSXText(node) {
         if (han.test(node.value)) context.report({ node, messageId: "cjk", data });

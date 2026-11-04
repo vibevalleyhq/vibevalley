@@ -1,5 +1,6 @@
 import { maybe, t } from "@vibevalley/i18n";
 import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
+import { mentionLead } from "@vibevalley/protocol/rules";
 // The chat's names for who is not a helper; defaultOrchestrator is filled in where the place is known.
 export const chatNamed: Readonly<Record<string, string>> = {
   管家: defaultOrchestrator,
@@ -32,7 +33,7 @@ const onlyDefault: Nameable = { here: defaultOrchestrator, orchestrators: [defau
  * names w3; the longest name is tried first, so `@agent-12` is not agent-1. */
 export function mentionsIn(text: string, names: Nameable = onlyDefault): string[] {
   const pattern = new RegExp(
-    `(^|[^\\p{L}\\p{N}_@])@(w[0-9]+|${[...names.orchestrators, ...Object.keys(chatNamed)]
+    `${mentionLead}@(w[0-9]+|${[...names.orchestrators, ...Object.keys(chatNamed)]
       .toSorted((a, b) => b.length - a.length)
       .map(escaped)
       .join("|")})`,
@@ -41,8 +42,8 @@ export function mentionsIn(text: string, names: Nameable = onlyDefault): string[
   const prose = text.replace(chatFence, " ").replace(chatTick, " ");
   const found: string[] = [];
   for (const m of prose.matchAll(pattern)) {
-    const named = chatNamed[m[2]!];
-    const id = named === defaultOrchestrator ? names.here : (named ?? m[2]!);
+    const named = chatNamed[m[1]!];
+    const id = named === defaultOrchestrator ? names.here : (named ?? m[1]!);
     if (!found.includes(id)) found.push(id);
   }
   return found;

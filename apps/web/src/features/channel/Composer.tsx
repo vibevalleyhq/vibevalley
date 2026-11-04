@@ -17,8 +17,9 @@ import { AttachmentTile } from "@/ui/AttachmentTile";
 import { OrchestratorFace } from "@/ui/Face";
 import { Icon } from "@/ui/Icon";
 import { toast } from "@/ui/toasts";
+import { typeMarks } from "@/ui/typedMarks";
 
-import { attachFiles, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying } from "./composing";
+import { attachFiles, chatMarks, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying } from "./composing";
 import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
 import { HelperFace } from "./presence";
@@ -238,7 +239,10 @@ export function Composer(props: {
           data-testid="composer-input"
           aria-label={props.placeholder}
           placeholder={props.placeholder}
-          onInput={(e) => box.edit(e.currentTarget.value, e.currentTarget.selectionStart)}
+          onInput={(e) => {
+            if (!e.isComposing && typeMarks(e.currentTarget, chatMarks)) return;
+            box.edit(e.currentTarget.value, e.currentTarget.selectionStart);
+          }}
           onKeyUp={box.follow}
           onClick={box.follow}
           onKeyDown={onKey}
