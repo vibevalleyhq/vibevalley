@@ -38,7 +38,7 @@ v0.4.0-alpha.1 → alpha.N → v0.4.0-beta.1 → beta.N → v0.4.0 → v0.4.1
 
 - `package.ts` 收 `X.Y.Z` 和 `X.Y.Z-alpha.N`、`X.Y.Z-beta.N`。
 - `newer` 照 semver 排：`0.4.0-alpha.2 < 0.4.0-beta.1 < 0.4.0`。
-- 「关于」里选更新的通道：正式版、beta、alpha，存在这台电脑上（userData）。正式版照旧读 `latest`；beta 和 alpha 读 GitHub 的 Release 列表（不含草稿），挑这个通道收得到的阶段里最新的一个（alpha 也收 beta 和正式版，beta 也收正式版），再读它的 `release.json`。换回正式版不降级：等正式版超过手上这一版。
+- 应用更新到哪个阶段由它是哪个渠道定：一个渠道一个应用、一个农场，见[桌面版的渠道和命令行](.agents/notes/proposed/feature/2026-11-04-desktop-channels-and-cli.md)。正式版照旧读 `latest`；beta 和 alpha 读 GitHub 的 Release 列表（不含草稿），挑同一阶段里最新的一个，再读它的 `release.json`。
 
 ## Alternatives considered
 
@@ -50,7 +50,7 @@ v0.4.0-alpha.1 → alpha.N → v0.4.0-beta.1 → beta.N → v0.4.0 → v0.4.1
 
 - `v0.4.0-beta.1` 的 tag 打出来的包版本是 `0.4.0-beta.1`，`newer` 的测试覆盖预发布的顺序。
 - `vp run release alpha` 在 `main` 上算出下一个 alpha、列出要打的东西、问过才推；工作区不干净、分支不对、表结构在 beta 线上变了时拒绝，并说怎么改。
-- 「关于」里能选通道；beta 通道的应用在只有预发布时更新到它，正式版通道的不会。
+- beta 渠道的应用在只有预发布时更新到它，正式版的不会。
 - 改完的文档：[应用](docs/subsystems/app.md) 的自己更新一段、[开发](docs/development.md) 的发版。
 
 ## Risks
