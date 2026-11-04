@@ -14,12 +14,13 @@ import { Effect, FileSystem, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Otlp, OtlpSerialization } from "effect/observability";
 
+import { announce } from "@vibevalley/home";
 import type { ServerReady } from "@vibevalley/protocol";
 
 import { redactOutput } from "./base/redact.ts";
 import { app } from "./http/app.ts";
 import { loadConfig, projectsDir } from "./infra/config.ts";
-import { announce, leaseHome } from "./infra/lease.ts";
+import { leaseHome } from "./infra/lease.ts";
 
 const { values: flags } = parseArgs({
   options: {

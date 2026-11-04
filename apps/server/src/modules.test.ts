@@ -46,7 +46,7 @@ const reads: Readonly<Record<string, string>> = {
 /** What a file imports from under src, type-only imports too (they tie the modules all the same), as paths from src. */
 const localEdges = (file: string, source = readFileSync(file, "utf8")) =>
   edgesOf(file, source).flatMap(({ from: spec }) =>
-    spec.startsWith("@/") ? [normalize(spec.slice(2))] : spec.startsWith("./") || spec.startsWith("../") ? [rel(normalize(join(dirname(file), spec)))] : [],
+    spec.startsWith("#/") ? [normalize(spec.slice(2))] : spec.startsWith("./") || spec.startsWith("../") ? [rel(normalize(join(dirname(file), spec)))] : [],
   );
 
 const readsSessionSnapshot = (file: string, source: string) => calls(file, source, "core", "state") && localEdges(file, source).includes("session/roster.ts");
@@ -67,7 +67,7 @@ const tableModule = (name: string) => {
 const foreignQueries = (file: string, source: string) => {
   const module = rel(file).split("/")[0]!;
   return edgesOf(file, source).flatMap((edge) => {
-    if (!edge.from.includes("/db/generated/")) return [];
+    if (!edge.from.startsWith("#db/")) return [];
     const name = edge.from.split("/").at(-1) ?? "";
     if (name === "types.ts" || tableModule(name) === module) return [];
     const allowed = foreignReads[module]?.[name] ?? [];
@@ -113,11 +113,11 @@ describe("the modules", () => {
 
   it("regression: namespace imports and foreign writes cannot hide behind a read projection", () => {
     const file = join(src, "mailbox/mailbox.ts");
-    expect(foreignQueries(file, 'import { orchestratorForChannel as route } from "../../db/generated/channel.sql.ts";')).toEqual([]);
-    expect(foreignQueries(file, 'import * as q from "../../db/generated/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
-    expect(foreignQueries(file, 'import { setOrchestrator } from "../../db/generated/channel.sql.ts";')).toEqual(["channel.sql.ts:setOrchestrator"]);
-    expect(foreignQueries(file, 'export * from "../../db/generated/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);
-    expect(foreignQueries(join(src, "ingress/ingress.ts"), 'import { recordTrigger } from "../../db/generated/mailbox_trigger.sql.ts";')).toEqual([
+    expect(foreignQueries(file, 'import { orchestratorForChannel as route } from "#db/channel.sql.ts";')).toEqual([]);
+    expect(foreignQueries(file, 'import * as q from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
+    expect(foreignQueries(file, 'import { setOrchestrator } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:setOrchestrator"]);
+    expect(foreignQueries(file, 'export * from "#db/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);
+    expect(foreignQueries(join(src, "ingress/ingress.ts"), 'import { recordTrigger } from "#db/mailbox_trigger.sql.ts";')).toEqual([
       "mailbox_trigger.sql.ts:recordTrigger",
     ]);
   });
@@ -161,9 +161,9 @@ describe("the modules", () => {
 
   it("regression: session snapshot helpers cannot hide a service's cross-module read", () => {
     const file = join(src, "issue/issue.ts");
-    expect(readsSessionSnapshot(file, 'import { sessionOf } from "@/session/roster.ts"; const state = core.state(); sessionOf(state, id);')).toBe(true);
+    expect(readsSessionSnapshot(file, 'import { sessionOf } from "#/session/roster.ts"; const state = core.state(); sessionOf(state, id);')).toBe(true);
     expect(readsSessionSnapshot(file, 'import { sessionOf } from "../session/roster.ts"; sessionOf(core.state(), id);')).toBe(true);
-    expect(readsSessionSnapshot(file, 'import { sessionOf } from "@/session/roster.ts"; export const rule = (state, id) => sessionOf(state, id);')).toBe(false);
+    expect(readsSessionSnapshot(file, 'import { sessionOf } from "#/session/roster.ts"; export const rule = (state, id) => sessionOf(state, id);')).toBe(false);
     expect(readsSessionSnapshot(file, "const state = core.state(); live.sessionOf(id); state.issues.find(item => item.id === id);")).toBe(false);
   });
 });

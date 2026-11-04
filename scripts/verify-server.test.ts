@@ -3,7 +3,8 @@ import { join } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
-import { pathOf } from "../packages/protocol/src/shapes.ts";
+import { pathOf } from "@vibevalley/protocol";
+
 import { runVerification, readyAddress } from "./verify-server";
 
 test("only a machine receipt from the owned process announces readiness", () => {

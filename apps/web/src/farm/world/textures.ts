@@ -3,7 +3,7 @@
 
 import { Assets, Texture, TextureStyle } from "pixi.js";
 
-import type { SpriteAtlas } from "@/ui/pixel/atlas";
+import type { SpriteAtlas } from "#/ui/pixel/atlas.ts";
 
 const loaded = new Map<string, Promise<Texture>>();
 const ready = new Map<string, Texture>();

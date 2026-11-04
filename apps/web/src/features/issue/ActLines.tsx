@@ -2,8 +2,8 @@ import { For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { useIntents } from "@/state/intent";
-import { Icon } from "@/ui/Icon";
+import { useIntents } from "#/state/intent.ts";
+import { Icon } from "#/ui/Icon.tsx";
 
 import { issueMove, issueMoveOf } from "./moves";
 import type { PendingWords } from "./write";

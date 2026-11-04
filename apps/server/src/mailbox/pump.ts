@@ -3,8 +3,8 @@ import type { SqlError } from "effect/sql";
 
 import { isBusy } from "@vibevalley/protocol/rules";
 
-import type { Session } from "@/session/session.ts";
-import type { Delivered, InputConsumed, InputReturned, LaunchActivity } from "@/session/signals.ts";
+import type { Session } from "#/session/session.ts";
+import type { Delivered, InputConsumed, InputReturned, LaunchActivity } from "#/session/signals.ts";
 
 import type { DeliveryRow } from "./deliveries.ts";
 

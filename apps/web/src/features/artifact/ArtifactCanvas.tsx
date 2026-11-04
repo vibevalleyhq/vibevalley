@@ -7,9 +7,9 @@ import { t } from "@vibevalley/i18n";
 import { artifactPath } from "@vibevalley/protocol";
 import { htmlSandbox } from "@vibevalley/protocol/rules";
 
-import { reasonOf } from "@/infra/api";
-import { ready } from "@/infra/query";
-import { Icon } from "@/ui/Icon";
+import { reasonOf } from "#/infra/api.ts";
+import { ready } from "#/infra/query.ts";
+import { Icon } from "#/ui/Icon.tsx";
 
 import { bodyIcon, bodyLabel, useArtifact } from "./ArtifactCard";
 import { BlocksView, type QuoteTarget } from "./BlocksView";

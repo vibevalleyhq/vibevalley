@@ -2,8 +2,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { ChatMessage, Channel } from "@vibevalley/protocol";
 
-import { forOwner } from "@/inbox/items.ts";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
+import { forOwner } from "#/inbox/items.ts";
+import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { flushText, isPairing, ownerLine, plainText, shortId, splitText } from "./digest.ts";
 

@@ -15,7 +15,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFile
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { format, placeholderKinds, placeholders } from "../packages/i18n/src/format.ts";
+import { format, placeholderKinds, placeholders } from "@vibevalley/i18n/format";
+
 import { readGlossary, wordProblems } from "./glossary.ts";
 
 const root = join(import.meta.dirname, "..");

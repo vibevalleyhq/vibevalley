@@ -26,7 +26,7 @@ import {
   type PointLight,
 } from "@vibevalley/engine/pixi";
 
-import { playSound } from "@/ui/pixel/sound";
+import { playSound } from "#/ui/pixel/sound.ts";
 
 /** x0, y0, x1, y1. */
 export type Box = readonly [number, number, number, number];

@@ -5,9 +5,9 @@ import { Effect } from "effect";
 import { ownerId } from "@vibevalley/protocol";
 import type { ArtifactHandlers } from "@vibevalley/protocol/api";
 
-import { Agent } from "@/agent/agent.ts";
-import { Artifact } from "@/artifact/artifact.ts";
-import { Issue } from "@/issue/issue.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Artifact } from "#/artifact/artifact.ts";
+import { Issue } from "#/issue/issue.ts";
 
 export const artifactHandlers = Effect.gen(function* () {
   const agents = yield* Agent;

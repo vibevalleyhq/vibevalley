@@ -2,10 +2,10 @@ import { createSignal, For, Match, Switch } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
-import { Button } from "@/ui/Button";
-import { Empty } from "@/ui/layout";
-import { ToastHost } from "@/ui/ToastHost";
-import { toast } from "@/ui/toasts";
+import { Button } from "#/ui/Button.tsx";
+import { Empty } from "#/ui/layout.tsx";
+import { ToastHost } from "#/ui/ToastHost.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 export default stories({
   title: "交互/空的、加载和出错",

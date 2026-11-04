@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { inspect } from "node:util";
 
-import { pathOf } from "../packages/protocol/src/shapes.ts";
+import { pathOf } from "@vibevalley/protocol";
 
 export interface VerificationResult {
   code: number;

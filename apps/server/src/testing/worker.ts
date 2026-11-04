@@ -11,9 +11,9 @@ import { Effect } from "effect";
 
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
-import { answerOpening, criteriaHead } from "@/issue/prompts.ts";
-import { supportOf, presetOf } from "@/runtime/presets.ts";
-import { briefBreak } from "@/session/briefing.ts";
+import { answerOpening, criteriaHead } from "#/issue/prompts.ts";
+import { supportOf, presetOf } from "#/runtime/presets.ts";
+import { briefBreak } from "#/session/briefing.ts";
 
 import { until } from "./layers.ts";
 

@@ -7,9 +7,9 @@ import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
 import { farmOf, needOf, omitUndefined, plotKeyOf } from "@vibevalley/protocol/rules";
 
-import { type AchievementDef, achievements } from "@/agent/seed.ts";
-import { openFindings } from "@/issue/status.ts";
-import { sessionOf } from "@/session/roster.ts";
+import { type AchievementDef, achievements } from "#/agent/seed.ts";
+import { openFindings } from "#/issue/status.ts";
+import { sessionOf } from "#/session/roster.ts";
 
 const historyLimit = 30;
 

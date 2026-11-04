@@ -7,12 +7,12 @@ import { t } from "@vibevalley/i18n";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
 import { defaultOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
-import { spentText } from "@/base/format";
-import { useFollowed, useReports } from "@/features/channel";
-import { useAgent } from "@/infra/agents";
-import { useCore } from "@/infra/frame";
-import { AgentFace, OrchestratorFace } from "@/ui/Face";
-import { DashedLine, PxMarkdown } from "@/ui/pixel";
+import { spentText } from "#/base/format.ts";
+import { useFollowed, useReports } from "#/features/channel/index.ts";
+import { useAgent } from "#/infra/agents.ts";
+import { useCore } from "#/infra/frame.ts";
+import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
+import { DashedLine, PxMarkdown } from "#/ui/pixel/index.ts";
 
 import { clockOf, FarmEmpty, FarmTag } from "./rows";
 

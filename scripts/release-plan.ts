@@ -5,7 +5,7 @@
  * versions' order is the desktop's (apps/desktop/src/releases.ts), so what is tagged is what an app updates to.
  */
 
-import { newer } from "../apps/desktop/src/releases.ts";
+import { newer } from "@vibevalley/desktop/releases";
 
 export type Stage = "alpha" | "beta" | "final";
 

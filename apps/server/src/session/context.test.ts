@@ -7,13 +7,13 @@ import { Effect } from "effect";
 
 import { maxRunning } from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { Channel } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import { Executor } from "@/executor/executor.ts";
-import { Project } from "@/project/project.ts";
-import { starter, testConfig, until, waitFor } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import { Executor } from "#/executor/executor.ts";
+import { Project } from "#/project/project.ts";
+import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
+import { world } from "#/testing/world.ts";
 
 import { NotRecorded, Session } from "./session.ts";
 import type { DeliveryInput } from "./signals.ts";

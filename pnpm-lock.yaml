@@ -380,9 +380,24 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
+      '@vibevalley/desktop':
+        specifier: workspace:*
+        version: link:apps/desktop
       '@vibevalley/health':
         specifier: workspace:*
         version: link:packages/health
+      '@vibevalley/i18n':
+        specifier: workspace:*
+        version: link:packages/i18n
+      '@vibevalley/protocol':
+        specifier: workspace:*
+        version: link:packages/protocol
+      '@vibevalley/server':
+        specifier: workspace:*
+        version: link:apps/server
+      '@vibevalley/testkit':
+        specifier: workspace:*
+        version: link:packages/testkit
       effect:
         specifier: 'catalog:'
         version: 4.1.2
@@ -403,6 +418,10 @@ importers:
         version: 1.5.0(@types/node@26.6.6)(@vitest/browser-playwright@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
 
   apps/desktop:
+    dependencies:
+      '@vibevalley/home':
+        specifier: workspace:*
+        version: link:../../packages/home
     devDependencies:
       '@playwright/test':
         specifier: 'catalog:'
@@ -422,6 +441,9 @@ importers:
       '@vibevalley/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@vibevalley/server':
+        specifier: workspace:*
+        version: link:../server
       effect:
         specifier: 'catalog:'
         version: 4.1.2
@@ -536,6 +558,9 @@ importers:
       '@vibevalley/bridge':
         specifier: workspace:*
         version: link:../../packages/bridge
+      '@vibevalley/home':
+        specifier: workspace:*
+        version: link:../../packages/home
       '@vibevalley/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
@@ -784,6 +809,25 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
+      vite-plus:
+        specifier: 'catalog:'
+        version: 1.5.0(@types/node@26.6.6)(@vitest/browser-playwright@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
+
+  packages/home:
+    dependencies:
+      '@vibevalley/i18n':
+        specifier: workspace:*
+        version: link:../i18n
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.2
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      '@vibevalley/testkit':
+        specifier: workspace:*
+        version: link:../testkit
       vite-plus:
         specifier: 'catalog:'
         version: 1.5.0(@types/node@26.6.6)(@vitest/browser-playwright@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)

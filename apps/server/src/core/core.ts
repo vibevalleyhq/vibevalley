@@ -2,7 +2,7 @@ import { type Cause, Clock, Context, Effect, Layer, PubSub, Queue, type Scope, S
 
 import type * as T from "@vibevalley/protocol";
 
-import { scopedPubSub } from "@/base/pubsub.ts";
+import { scopedPubSub } from "#/base/pubsub.ts";
 
 export const emptyWorkspaceState = (): T.WorkspaceState => ({
   call: "idle",

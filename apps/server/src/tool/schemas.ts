@@ -11,9 +11,9 @@ import type { JsonSchema } from "@vibevalley/ai/tools";
 import { PkmTierValues } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema, type Handlers } from "@vibevalley/protocol/api";
 
-import type { Actor } from "@/base/actor.ts";
-import { messageOf, reasonOf } from "@/errors.ts";
-import { maxChildren as maxTasks } from "@/issue/creation.ts";
+import type { Actor } from "#/base/actor.ts";
+import { messageOf, reasonOf } from "#/errors.ts";
+import { maxChildren as maxTasks } from "#/issue/creation.ts";
 
 import { answers, descriptions, params, sessionDescriptions } from "./prompts.ts";
 

@@ -5,8 +5,8 @@ import { Effect } from "effect";
 import { t } from "@vibevalley/i18n";
 import type { SessionHandlers } from "@vibevalley/protocol/api";
 
-import { missing, lookIn, orMissing } from "@/errors.ts";
-import { Session } from "@/session/session.ts";
+import { missing, lookIn, orMissing } from "#/errors.ts";
+import { Session } from "#/session/session.ts";
 
 export const sessionHandlers = Effect.gen(function* () {
   const sessions = yield* Session;

@@ -4,18 +4,16 @@
 
 import { chmodSync, mkdirSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
-import { join } from "node:path";
 
 import { type Handlers, serve } from "@vibevalley/bridge";
 import { socketLink } from "@vibevalley/bridge/socket";
-import { desktopControl, desktopControlSocket } from "@vibevalley/protocol/host";
-
-const controlSocket = (home: string) => join(home, desktopControlSocket);
+import { controlSocketOf } from "@vibevalley/home";
+import { desktopControl } from "@vibevalley/protocol/host";
 
 /** Listens until the returned function is called; a socket left by a run that did not close it is taken over. A home
  * that cannot hold one (the server will say why it cannot start there) leaves the app without it, said in the log. */
 export function serveControl(home: string, handlers: Handlers<typeof desktopControl>): () => void {
-  const path = controlSocket(home);
+  const path = controlSocketOf(home);
   try {
     mkdirSync(home, { recursive: true });
     rmSync(path, { force: true });

@@ -7,19 +7,19 @@ import { createSignal, For, Show } from "solid-js";
 import { list, t } from "@vibevalley/i18n";
 import type { AgentTemplate, RuntimeInfo } from "@vibevalley/protocol";
 
-import { aria } from "@/base/dom";
-import { api } from "@/infra/api";
-import { ready, useAgentTemplates, useRuntimes } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { A } from "@/ui/A";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { ConfirmButton } from "@/ui/ConfirmButton";
-import { AgentFace, OrchestratorFace } from "@/ui/Face";
-import { TextInput } from "@/ui/Field";
-import { runtimeName } from "@/ui/RuntimeBadge";
-import { Hint } from "@/ui/Tip";
-import { toast } from "@/ui/toasts";
+import { aria } from "#/base/dom.tsx";
+import { api } from "#/infra/api.ts";
+import { ready, useAgentTemplates, useRuntimes } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { A } from "#/ui/A.tsx";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
+import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
+import { TextInput } from "#/ui/Field.tsx";
+import { runtimeName } from "#/ui/RuntimeBadge.tsx";
+import { Hint } from "#/ui/Tip.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 export function TemplatesPage() {
   const templates = useAgentTemplates();

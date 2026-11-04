@@ -3,13 +3,13 @@ import { createSignal, onSettled, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Artifact, HtmlAnchor } from "@vibevalley/protocol";
 
-import { api } from "@/infra/api";
-import { queries } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { TextArea } from "@/ui/Field";
-import { toast } from "@/ui/toasts";
+import { api } from "#/infra/api.ts";
+import { queries } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { TextArea } from "#/ui/Field.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 import { artifactHref } from "./ArtifactCard";
 import { selectionOf } from "./shell";

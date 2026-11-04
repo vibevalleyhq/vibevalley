@@ -7,17 +7,17 @@ import { HttpClient } from "effect/http";
 import type * as T from "@vibevalley/protocol";
 import { everyone, ownerId } from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { newId } from "@/base/ids.ts";
-import { Inconsistent } from "@/errors.ts";
-import { Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { inputContext, keepChannelTrigger } from "@/mailbox/payload.ts";
+import { Agent } from "#/agent/agent.ts";
+import { newId } from "#/base/ids.ts";
+import { Inconsistent } from "#/errors.ts";
+import { Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { inputContext, keepChannelTrigger } from "#/mailbox/payload.ts";
+import * as qc from "#db/channel.sql.ts";
+import * as qmn from "#db/channel_mention.sql.ts";
+import * as qm from "#db/channel_message.sql.ts";
 
-import * as qc from "../../db/generated/channel.sql.ts";
-import * as qmn from "../../db/generated/channel_mention.sql.ts";
-import * as qm from "../../db/generated/channel_message.sql.ts";
 import { metaOf, metaText, type MsgRow, senderKind, messageKind, channelType, type Write, type Written, type ChannelRouteInput } from "./contracts.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
 import { mentionsIn } from "./mentions.ts";

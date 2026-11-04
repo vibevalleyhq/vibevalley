@@ -5,9 +5,9 @@ import { Effect } from "effect";
 import { t } from "@vibevalley/i18n";
 import type { ProjectHandlers } from "@vibevalley/protocol/api";
 
-import { lookIn, refused, orMissing } from "@/errors.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Project } from "@/project/project.ts";
+import { lookIn, refused, orMissing } from "#/errors.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Project } from "#/project/project.ts";
 
 export const projectHandlers = Effect.gen(function* () {
   const projects = yield* Project;

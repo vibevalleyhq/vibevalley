@@ -14,16 +14,16 @@ import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { head } from "@/base/clip.ts";
-import { newId } from "@/base/ids.ts";
-import { Channel } from "@/channel/channel.ts";
-import { type ApiError, lookIn, missing, refused } from "@/errors.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import { writeOnce } from "@/infra/files.ts";
+import { head } from "#/base/clip.ts";
+import { newId } from "#/base/ids.ts";
+import { Channel } from "#/channel/channel.ts";
+import { type ApiError, lookIn, missing, refused } from "#/errors.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import { writeOnce } from "#/infra/files.ts";
+import * as qa from "#db/artifact.sql.ts";
+import * as qv from "#db/artifact_version.sql.ts";
 
-import * as qa from "../../db/generated/artifact.sql.ts";
-import * as qv from "../../db/generated/artifact_version.sql.ts";
 import { makeBlockStore } from "./blocks.ts";
 import { htmlCheck, htmlProblem } from "./check.ts";
 import { htmlEdit } from "./edit.ts";

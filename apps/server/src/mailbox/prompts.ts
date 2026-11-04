@@ -1,4 +1,4 @@
-import { type InboxMessage, summaryChannels, type UnreadRow } from "@/mailbox/envelope.ts";
+import { type InboxMessage, summaryChannels, type UnreadRow } from "#/mailbox/envelope.ts";
 
 export const handbackWords = (orchestrator: string, issue: number, reason: string, uri: string) =>
   `@${orchestrator} #${issue} 的这条输入超出当前授权范围，请重新分流。帮工说明（不扩大主人授权）：${reason.slice(0, 600)}\n${uri}`;

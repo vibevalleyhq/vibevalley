@@ -3,8 +3,8 @@ import { describe, expect, it } from "vite-plus/test";
 import type { Fact, Issue, IssueStatus, Session } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { emptyWorkspaceState } from "@/core/core.ts";
-import { reduce } from "@/projection/reduce.ts";
+import { emptyWorkspaceState } from "#/core/core.ts";
+import { reduce } from "#/projection/reduce.ts";
 
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
 import { issueStageOf } from "./status.ts";

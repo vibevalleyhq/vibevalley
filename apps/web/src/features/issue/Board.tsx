@@ -4,9 +4,9 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { maxRunning } from "@vibevalley/protocol";
 
-import { Icon } from "@/ui/Icon";
-import { Segmented } from "@/ui/Segmented";
-import { Hint } from "@/ui/Tip";
+import { Icon } from "#/ui/Icon.tsx";
+import { Segmented } from "#/ui/Segmented.tsx";
+import { Hint } from "#/ui/Tip.tsx";
 
 import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./cards";
 import { laneOrder, type Ordering } from "./display";

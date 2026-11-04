@@ -11,8 +11,8 @@ import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibe
 import { cut } from "@vibevalley/protocol/rules";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 
-import { type KeptFile, keptFile } from "@/infra/files.ts";
-import { type Time, timeHere } from "@/infra/time.ts";
+import { type KeptFile, keptFile } from "#/infra/files.ts";
+import { type Time, timeHere } from "#/infra/time.ts";
 
 import type { From, ToolStart } from "./reaction.ts";
 

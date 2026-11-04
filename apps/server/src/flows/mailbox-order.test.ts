@@ -4,13 +4,13 @@ import { Effect } from "effect";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { Channel } from "@/channel/channel.ts";
-import { Ingress, type SourceEvent } from "@/ingress/ingress.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { Session } from "@/session/session.ts";
-import { testIssues } from "@/testing/world.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Ingress, type SourceEvent } from "#/ingress/ingress.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { Session } from "#/session/session.ts";
+import { testIssues } from "#/testing/world.ts";
 
 import { farm, lab, until } from "./farm.ts";
 

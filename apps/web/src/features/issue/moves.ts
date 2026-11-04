@@ -8,8 +8,8 @@
 import type { AppliedIssue, Issue, IssueStatus, IssueUpdate } from "@vibevalley/protocol";
 import { omitUndefined, same } from "@vibevalley/protocol/rules";
 
-import { api } from "@/infra/api";
-import { bySeq, defineIntent, type Intent, type Intents, type Sent } from "@/state/intent";
+import { api } from "#/infra/api.ts";
+import { bySeq, defineIntent, type Intent, type Intents, type Sent } from "#/state/intent.ts";
 
 import type { BoardCard, Lane } from "./cards";
 

@@ -7,8 +7,8 @@ import { createEffect, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { createCall } from "@/features/voice";
-import { FramesContext, useFrames } from "@/infra/frame";
+import { createCall } from "#/features/voice/index.ts";
+import { FramesContext, useFrames } from "#/infra/frame.ts";
 
 import { VillageCanvas } from "./canvas/VillageCanvas";
 import { type FarmSoundInput, farmSounds } from "./cues";

@@ -7,10 +7,10 @@ import { SqlClient } from "effect/sql";
 
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { testDatabase } from "@/testing/layers.ts";
+import { testDatabase } from "#/testing/layers.ts";
+import { lanOpen, setLanOpen } from "#db/lan.sql.ts";
+import { lanDevices, addLanDevice, seenLanDevice } from "#db/lan_device.sql.ts";
 
-import { lanOpen, setLanOpen } from "../../db/generated/lan.sql.ts";
-import { lanDevices, addLanDevice, seenLanDevice } from "../../db/generated/lan_device.sql.ts";
 import { Db, dbFile, setAsideStale } from "./db.ts";
 
 describe("the database", () => {

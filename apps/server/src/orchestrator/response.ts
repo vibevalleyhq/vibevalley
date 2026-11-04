@@ -2,10 +2,10 @@ import { Clock, Cause, Effect, Stream } from "effect";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { newId } from "@/base/ids.ts";
-import { type Channel } from "@/channel/channel.ts";
-import { type Ingress } from "@/ingress/ingress.ts";
-import { Caller, type NotAnswered } from "@/session/host.ts";
+import { newId } from "#/base/ids.ts";
+import { type Channel } from "#/channel/channel.ts";
+import { type Ingress } from "#/ingress/ingress.ts";
+import { Caller, type NotAnswered } from "#/session/host.ts";
 
 import type { Answer } from "./openai.ts";
 import { orchestratorModel } from "./situation.ts";

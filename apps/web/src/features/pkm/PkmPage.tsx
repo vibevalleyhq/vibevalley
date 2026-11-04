@@ -3,13 +3,13 @@ import { createSignal, For, onSettled, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { PkmPageSummary } from "@vibevalley/protocol";
 
-import { Keyed } from "@/base/dom";
-import { api } from "@/infra/api";
-import { ready } from "@/infra/query";
-import { useSearch } from "@/infra/router";
-import { A } from "@/ui/A";
-import { createAct } from "@/ui/act";
-import { Icon } from "@/ui/Icon";
+import { Keyed } from "#/base/dom.tsx";
+import { api } from "#/infra/api.ts";
+import { ready } from "#/infra/query.ts";
+import { useSearch } from "#/infra/router.ts";
+import { A } from "#/ui/A.tsx";
+import { createAct } from "#/ui/act.ts";
+import { Icon } from "#/ui/Icon.tsx";
 
 import { Calendar } from "./Calendar";
 import { dayKey } from "./days";

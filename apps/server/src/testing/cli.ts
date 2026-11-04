@@ -5,9 +5,9 @@ import { ConfigProvider, Effect, Layer, Sink, Stdio, Stream } from "effect";
 import { TerminalCapabilities } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
-import { run } from "@/cli.ts";
-import { app } from "@/http/app.ts";
-import { registryOf } from "@/runtime/runtime.ts";
+import { run } from "#/cli.ts";
+import { app } from "#/http/app.ts";
+import { registryOf } from "#/runtime/runtime.ts";
 
 import { testConfig } from "./layers.ts";
 import { helper, installedOnly } from "./worker.ts";

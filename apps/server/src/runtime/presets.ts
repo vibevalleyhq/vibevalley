@@ -10,7 +10,7 @@ import type * as T from "@vibevalley/protocol";
 import { sessionAppendSystemPrompt, sessionDisallowedTools, sessionEffort, sessionEnv, sessionMcpServers, sessionSystemPrompt } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { localizedJson } from "@/base/json.ts";
+import { localizedJson } from "#/base/json.ts";
 
 import presetsEn from "./presets.en.json";
 import presetsZh from "./presets.json";

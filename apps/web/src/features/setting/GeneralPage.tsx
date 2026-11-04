@@ -2,9 +2,9 @@
 
 import { t } from "@vibevalley/i18n";
 
-import { setStart, StartValues, usePrefs } from "@/state/prefs";
-import { Segmented } from "@/ui/Segmented";
-import { SettingRow, SettingsGroup, SettingsPage } from "@/ui/settings";
+import { setStart, StartValues, usePrefs } from "#/state/prefs.ts";
+import { Segmented } from "#/ui/Segmented.tsx";
+import { SettingRow, SettingsGroup, SettingsPage } from "#/ui/settings.tsx";
 
 import { LanguageChoice } from "./SettingsForm";
 

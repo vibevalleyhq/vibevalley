@@ -8,9 +8,9 @@ import { TestClock } from "effect/testing";
 import { ownerId } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
 
-import { Channel } from "@/channel/channel.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { world } from "@/testing/world.ts";
+import { Channel } from "#/channel/channel.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { world } from "#/testing/world.ts";
 
 import { Artifact } from "./artifact.ts";
 import { artifactMax } from "./policy.ts";

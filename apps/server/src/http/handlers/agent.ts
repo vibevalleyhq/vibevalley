@@ -4,8 +4,8 @@ import { Effect } from "effect";
 
 import type { AgentHandlers } from "@vibevalley/protocol/api";
 
-import { Agent } from "@/agent/agent.ts";
-import { Runtime } from "@/runtime/runtime.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Runtime } from "#/runtime/runtime.ts";
 
 export const agentHandlers = Effect.gen(function* () {
   const agents = yield* Agent;

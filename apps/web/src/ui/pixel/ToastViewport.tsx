@@ -4,7 +4,7 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { defineAtom } from "@/state/atom";
+import { defineAtom } from "#/state/atom.ts";
 
 import { SpriteIcon } from "./icons";
 import { pxDrop, pxText } from "./style";

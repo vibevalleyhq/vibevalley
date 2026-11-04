@@ -8,9 +8,9 @@ import { Cause, Effect, Exit, Layer } from "effect";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 
-import { ServerConfig } from "@/infra/config.ts";
-import { defaultSettings } from "@/runtime/presets.ts";
-import { testConfig, starter } from "@/testing/layers.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { defaultSettings } from "#/runtime/presets.ts";
+import { testConfig, starter } from "#/testing/layers.ts";
 
 import { Agent, withCast } from "./agent.ts";
 

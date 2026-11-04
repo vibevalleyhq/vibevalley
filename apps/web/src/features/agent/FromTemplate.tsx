@@ -7,11 +7,11 @@ import { Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
 
-import { api } from "@/infra/api";
-import { ready, useAgentTemplates } from "@/infra/query";
-import { createAct } from "@/ui/act";
-import { ConfirmButton } from "@/ui/ConfirmButton";
-import { toast } from "@/ui/toasts";
+import { api } from "#/infra/api.ts";
+import { ready, useAgentTemplates } from "#/infra/query.ts";
+import { createAct } from "#/ui/act.ts";
+import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 export function FromTemplate(props: { agent: Agent; onUpdated: (a: Agent) => void }) {
   const templates = useAgentTemplates();

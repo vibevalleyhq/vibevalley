@@ -6,7 +6,7 @@ import { Command } from "effect/cli";
 
 import { currentLocale, t } from "@vibevalley/i18n";
 
-import { serverFile } from "@/assets.ts";
+import { serverFile } from "#/assets.ts";
 
 import { exit, Failure, out } from "./output.ts";
 

@@ -5,8 +5,8 @@ import { t } from "@vibevalley/i18n";
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { compareText, or, spelled } from "@/base/search";
-import { outfitLabel, speciesLabel } from "@/ui/cast";
+import { compareText, or, spelled } from "#/base/search.ts";
+import { outfitLabel, speciesLabel } from "#/ui/cast.ts";
 
 export interface Picture {
   readonly name: string;

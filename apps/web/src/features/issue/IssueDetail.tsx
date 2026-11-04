@@ -15,22 +15,22 @@ import {
 } from "@vibevalley/protocol";
 import { plainText, closedText } from "@vibevalley/protocol/rules";
 
-import { useNow } from "@/base/dom";
-import { tookText, wallClockText } from "@/base/format";
-import { IssueArtifacts } from "@/features/artifact";
-import { createSessionEvents } from "@/features/session";
-import { useAgent } from "@/infra/agents";
-import { ready } from "@/infra/query";
-import { sendReplacing, useIntents } from "@/state/intent";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { Checkbox } from "@/ui/Checkbox";
-import { TextArea } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import type { IconName } from "@/ui/icons";
-import { Markdown } from "@/ui/Markdown";
-import { Dot } from "@/ui/Tag";
-import { toast } from "@/ui/toasts";
+import { useNow } from "#/base/dom.tsx";
+import { tookText, wallClockText } from "#/base/format.ts";
+import { IssueArtifacts } from "#/features/artifact/index.ts";
+import { createSessionEvents } from "#/features/session/index.ts";
+import { useAgent } from "#/infra/agents.ts";
+import { ready } from "#/infra/query.ts";
+import { sendReplacing, useIntents } from "#/state/intent.ts";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { Checkbox } from "#/ui/Checkbox.tsx";
+import { TextArea } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import type { IconName } from "#/ui/icons.ts";
+import { Markdown } from "#/ui/Markdown.tsx";
+import { Dot } from "#/ui/Tag.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 import { ActLines } from "./ActLines";
 import { createIssueActs, perform } from "./acts";

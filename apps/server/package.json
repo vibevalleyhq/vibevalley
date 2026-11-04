@@ -2,6 +2,15 @@
   "name": "@vibevalley/server",
   "private": true,
   "type": "module",
+  "imports": {
+    "#/*": "./src/*",
+    "#db/*": "./db/generated/*"
+  },
+  "exports": {
+    "./assets": "./src/assets.ts",
+    "./baseline": "./src/infra/baseline.ts",
+    "./modules": "./src/modules.ts"
+  },
   "scripts": {
     "start": "vpx src/main.ts",
     "cli": "vpx src/cli.ts",
@@ -19,6 +28,7 @@
     "@vibevalley/agent": "workspace:*",
     "@vibevalley/ai": "workspace:*",
     "@vibevalley/bridge": "workspace:*",
+    "@vibevalley/home": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "agora-agents": "catalog:",

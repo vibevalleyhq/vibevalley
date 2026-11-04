@@ -7,13 +7,13 @@ import { TestClock } from "effect/testing";
 
 import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Channel } from "@/channel/channel.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { testConfig, gate, untilGot as until, waitFor, whenState } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { testConfig, gate, untilGot as until, waitFor, whenState } from "#/testing/layers.ts";
+import { world } from "#/testing/world.ts";
+import * as accountQ from "#db/connector_account.sql.ts";
+import * as inboundQ from "#db/connector_inbound.sql.ts";
 
-import * as accountQ from "../../db/generated/connector_account.sql.ts";
-import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 import { AppFailed, failedWith } from "./adapter.ts";
 import { Connector } from "./connector.ts";
 import type { FeishuApi, Message as FeishuMessage } from "./feishu.ts";

@@ -5,7 +5,7 @@ import { expect, test } from "vite-plus/test";
 import type { WorkspaceState, Issue, Session } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 
-import { emptyWorkspaceState } from "@/core/core.ts";
+import { emptyWorkspaceState } from "#/core/core.ts";
 
 import { inbox } from "./items.ts";
 

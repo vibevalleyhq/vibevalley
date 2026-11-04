@@ -2,26 +2,32 @@
 // a few KB each, and PNG keeps their pixels exact. Only the pages read these; the islands get the pictures' addresses.
 // The big pictures (the title scene, the screenshots) go through images.ts, which compresses them.
 
-import sizes from '../../../apps/web/public/pixel/sprites.json'
+import sizes from '@game/pixel/sprites.json'
+import { byName } from './files'
 import { BUBBLES, FRONT, MARKS, PLOTS, POSES, THINGS, type Art, type StoryArt } from './story'
 
-const pixel = import.meta.glob<string>(
+const pixel = byName(
+  import.meta.glob<string>(
   [
-    '../../../apps/web/public/pixel/{icon,act,button,mark,logo,app,plot,fg}-*.png',
-    '../../../apps/web/public/pixel/{coins-stack,stamp-done,dog-scratch,plot-dry}.png',
-    '../../../apps/web/public/pixel/{prop-board,prop-table,prop-crates,machine-seeder,machine-windmill,machine-beehive,machine-tractor}.png',
-    '../../../apps/web/public/pixel/bear-farmer-{side,side-1,side-2,cheer,up,read,work,tinker-1,tinker-2,hammer-1,hammer-2}.png',
+    '@game/pixel/{icon,act,button,mark,logo,app,plot,fg}-*.png',
+    '@game/pixel/{coins-stack,stamp-done,dog-scratch,plot-dry}.png',
+    '@game/pixel/{prop-board,prop-table,prop-crates,machine-seeder,machine-windmill,machine-beehive,machine-tractor}.png',
+    '@game/pixel/bear-farmer-{side,side-1,side-2,cheer,up,read,work,tinker-1,tinker-2,hammer-1,hammer-2}.png',
   ],
   { eager: true, query: '?url', import: 'default' },
+  ),
 )
-const walkers = import.meta.glob<string>(
-  '../../../apps/web/public/pixel/{bear-farmer,rabbit-gardener,fox-rain,cat-winter,owl-farmer,hedgehog-gardener,raccoon-rain}-side*.png',
-  { eager: true, query: '?url', import: 'default' },
+const walkers = byName(
+  import.meta.glob<string>('@game/pixel/{bear-farmer,rabbit-gardener,fox-rain,cat-winter,owl-farmer,hedgehog-gardener,raccoon-rain}-side*.png', {
+    eager: true,
+    query: '?url',
+    import: 'default',
+  }),
 )
 
 /** A pixel sprite by its name in apps/web/public/pixel (icon-seeds, act-run_command, logo-claude, plot-wheat…). */
 export function pixelArt(name: string): string {
-  const url = pixel[`../../../apps/web/public/pixel/${name}.png`]
+  const url = pixel[`${name}.png`]
   if (!url) throw new Error(`no sprite ${name}`)
   return url
 }
@@ -29,7 +35,7 @@ export function pixelArt(name: string): string {
 /** The helpers walking across the page: each its species and outfit, and its side frames in a step (step, stand, step, stand). */
 export const WALKERS = ['bear-farmer', 'rabbit-gardener', 'fox-rain', 'cat-winter', 'owl-farmer', 'hedgehog-gardener', 'raccoon-rain'].map((look) => ({
   look,
-  frames: ['side-1', 'side', 'side-2', 'side'].map((f) => walkers[`../../../apps/web/public/pixel/${look}-${f}.png`] ?? ''),
+  frames: ['side-1', 'side', 'side-2', 'side'].map((f) => walkers[`${look}-${f}.png`] ?? ''),
 }))
 
 /** The machines a helper can drive, by their pixel logos. */

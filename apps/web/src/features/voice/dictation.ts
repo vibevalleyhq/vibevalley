@@ -4,7 +4,7 @@
 
 import { t } from "@vibevalley/i18n";
 
-import { api, reasonOf } from "@/infra/api";
+import { api, reasonOf } from "#/infra/api.ts";
 
 export type DictationPhase = "idle" | "recording" | "transcribing";
 

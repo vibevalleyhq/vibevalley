@@ -4,15 +4,15 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack }
 import { t } from "@vibevalley/i18n";
 import type { PkmBlock, PkmBlockOp, PkmMarker, PkmPageSummary, PkmPageView, PkmSearchHit } from "@vibevalley/protocol";
 
-import { spelled } from "@/base/search";
-import { useTimeout } from "@/base/timer";
-import { api } from "@/infra/api";
-import { queries } from "@/infra/query";
-import { useLatest } from "@/state/atom";
-import { Icon } from "@/ui/Icon";
-import type { IconName } from "@/ui/icons";
-import { toast } from "@/ui/toasts";
-import { typeMarks } from "@/ui/typedMarks";
+import { spelled } from "#/base/search.ts";
+import { useTimeout } from "#/base/timer.ts";
+import { api } from "#/infra/api.ts";
+import { queries } from "#/infra/query.ts";
+import { useLatest } from "#/state/atom.ts";
+import { Icon } from "#/ui/Icon.tsx";
+import type { IconName } from "#/ui/icons.ts";
+import { toast } from "#/ui/toasts.ts";
+import { typeMarks } from "#/ui/typedMarks.ts";
 
 import { Body } from "./Body";
 import { dayKey } from "./days";

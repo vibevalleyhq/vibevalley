@@ -3,11 +3,11 @@ import { Context, Effect, Layer } from "effect";
 
 import { artifactPath, ownerId } from "@vibevalley/protocol";
 
-import { Artifact } from "@/artifact/artifact.ts";
-import { htmlPolicy } from "@/artifact/policy.ts";
-import { remoteMay } from "@/lan/lan.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { quietApp } from "@/testing/world.ts";
+import { Artifact } from "#/artifact/artifact.ts";
+import { htmlPolicy } from "#/artifact/policy.ts";
+import { remoteMay } from "#/lan/lan.ts";
+import { testConfig } from "#/testing/layers.ts";
+import { quietApp } from "#/testing/world.ts";
 
 import { app } from "./app.ts";
 

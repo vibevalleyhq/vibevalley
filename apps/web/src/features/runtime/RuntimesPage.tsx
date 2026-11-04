@@ -20,23 +20,23 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { variant, Keyed } from "@/base/dom";
-import { momentText, wallClockText, yuan } from "@/base/format";
-import { useWorkAgents } from "@/infra/agents";
-import { api, reasonOf } from "@/infra/api";
-import { ready, useRuntimes } from "@/infra/query";
-import { A } from "@/ui/A";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { KeyValueEditor } from "@/ui/Chips";
-import { AgentFace } from "@/ui/Face";
-import { Select, TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "@/ui/layout";
-import { SpriteIcon } from "@/ui/pixel";
-import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
-import { Segmented } from "@/ui/Segmented";
-import { Hint } from "@/ui/Tip";
+import { variant, Keyed } from "#/base/dom.tsx";
+import { momentText, wallClockText, yuan } from "#/base/format.ts";
+import { useWorkAgents } from "#/infra/agents.ts";
+import { api, reasonOf } from "#/infra/api.ts";
+import { ready, useRuntimes } from "#/infra/query.ts";
+import { A } from "#/ui/A.tsx";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { KeyValueEditor } from "#/ui/Chips.tsx";
+import { AgentFace } from "#/ui/Face.tsx";
+import { Select, TextInput } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "#/ui/layout.tsx";
+import { SpriteIcon } from "#/ui/pixel/index.ts";
+import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
+import { Segmented } from "#/ui/Segmented.tsx";
+import { Hint } from "#/ui/Tip.tsx";
 
 import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
 

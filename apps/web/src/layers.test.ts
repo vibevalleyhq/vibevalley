@@ -15,9 +15,9 @@ function graph() {
       if (!/\.tsx?$/u.test(file)) continue;
       const at = join(features, feature, file);
       for (const { from } of edgesOf(at, readFileSync(at, "utf8"))) {
-        // A feature is reached by a relative path or, from outside its folder, as @/features/<feature>.
-        const path = from.startsWith("@/features/")
-          ? from.slice("@/features/".length)
+        // A feature is reached by a relative path or, from outside its folder, as #/features/<feature>.
+        const path = from.startsWith("#/features/")
+          ? from.slice("#/features/".length)
           : from.startsWith(".")
             ? relative(features, join(dirname(at), from))
             : undefined;

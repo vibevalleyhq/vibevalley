@@ -8,21 +8,21 @@ import { list, t } from "@vibevalley/i18n";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
 import { githubRepository } from "@vibevalley/protocol/rules";
 
-import { autofocus, useNow } from "@/base/dom";
-import { useWorkAgents } from "@/infra/agents";
-import { api, reasonOf } from "@/infra/api";
-import { ready, useProjects, useQuery } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { Dialog } from "@/ui/Dialog";
-import { AgentFace } from "@/ui/Face";
-import { Field, TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { Card, ListCard, ListRow, Quiet } from "@/ui/layout";
-import { SpriteIcon } from "@/ui/pixel";
-import { Segmented } from "@/ui/Segmented";
-import { toast } from "@/ui/toasts";
+import { autofocus, useNow } from "#/base/dom.tsx";
+import { useWorkAgents } from "#/infra/agents.ts";
+import { api, reasonOf } from "#/infra/api.ts";
+import { ready, useProjects, useQuery } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { Dialog } from "#/ui/Dialog.tsx";
+import { AgentFace } from "#/ui/Face.tsx";
+import { Field, TextInput } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import { Card, ListCard, ListRow, Quiet } from "#/ui/layout.tsx";
+import { SpriteIcon } from "#/ui/pixel/index.ts";
+import { Segmented } from "#/ui/Segmented.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 import { calendarOf, type CalendarDay, dateText, dayText, type Recency, recencyOf, recencyText, since, streaksOf } from "./calendar";
 import { langIcon, languageShares, number, percent, sortProjects } from "./projects";
@@ -187,6 +187,14 @@ function Overview(props: { project: ProjectSummary; languages: Asked<ProjectLang
   const counted = () => ready(props.languages, undefined);
   const worked = () => ready(props.activity, undefined);
   const lines = () => counted()?.languages.reduce((n, l) => n + l.code + l.comments, 0);
+  const firstCommit = () => {
+    const w = worked();
+    return w?.first !== undefined ? dateText(w.first) : w ? t("web.project.noCommits") : "…";
+  };
+  const codeLines = () => {
+    const n = lines();
+    return n !== undefined ? t("web.project.lines", { n: number(n) }) : notCounted() ? t("web.project.uncounted") : "…";
+  };
   const languageCount = () => {
     const c = counted();
     return c ? languageShares(c.languages, undefined).length : undefined;
@@ -204,15 +212,9 @@ function Overview(props: { project: ProjectSummary; languages: Asked<ProjectLang
           <span class="rounded bg-leaf-300/50 px-1.5 text-xs">{recencyText(recency())}</span>
         </div>
         <div class="flex flex-wrap gap-x-6 gap-y-2">
-          <Stat
-            label={t("web.project.firstCommit")}
-            value={worked()?.first !== undefined ? dateText(worked()!.first!) : worked() ? t("web.project.noCommits") : "…"}
-          />
+          <Stat label={t("web.project.firstCommit")} value={firstCommit()} />
           <Stat label={t("web.project.commitCount")} value={worked() ? t("web.project.commits", { n: number(worked()!.total) }) : "…"} />
-          <Stat
-            label={t("web.project.code")}
-            value={lines() !== undefined ? t("web.project.lines", { n: number(lines()!) }) : notCounted() ? t("web.project.uncounted") : "…"}
-          />
+          <Stat label={t("web.project.code")} value={codeLines()} />
           <Stat
             label={t("web.project.languages")}
             value={languageCount() !== undefined ? t("web.project.kinds", { n: languageCount()! }) : notCounted() ? t("web.project.uncounted") : "…"}

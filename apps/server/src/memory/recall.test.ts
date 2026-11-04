@@ -3,7 +3,7 @@ import { expect, test } from "vite-plus/test";
 import { dayMs, type Memory, memoryKeep } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { checkCases, goldenCases } from "@/testing/golden.ts";
+import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { lineOf, nextForgotten, pick, type PickCue, relevance, termsList, termsOf } from "./recall.ts";
 

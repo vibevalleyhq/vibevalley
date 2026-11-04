@@ -37,17 +37,17 @@ import { type ApiError } from "@vibevalley/protocol/api";
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 import { messageId } from "@vibevalley/protocol/schema";
 
-import { newId } from "@/base/ids.ts";
-import { Channel } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import { reasonOf } from "@/errors.ts";
-import { Inbox } from "@/inbox/inbox.ts";
-import { causeMessage, Db } from "@/infra/db.ts";
-import { Ingress } from "@/ingress/ingress.ts";
+import { newId } from "#/base/ids.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import { reasonOf } from "#/errors.ts";
+import { Inbox } from "#/inbox/inbox.ts";
+import { causeMessage, Db } from "#/infra/db.ts";
+import { Ingress } from "#/ingress/ingress.ts";
+import * as accountQ from "#db/connector_account.sql.ts";
+import * as inboundQ from "#db/connector_inbound.sql.ts";
+import * as outboxQ from "#db/connector_outbox.sql.ts";
 
-import * as accountQ from "../../db/generated/connector_account.sql.ts";
-import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
-import * as outboxQ from "../../db/generated/connector_outbox.sql.ts";
 import { type Adapter, type AppFailed, failedWith, type Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
 import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./digest.ts";
 import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";

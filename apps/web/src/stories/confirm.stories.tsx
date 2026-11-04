@@ -2,10 +2,10 @@ import { createSignal, For, Show } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
-import { ConfirmButton } from "@/ui/ConfirmButton";
-import { Empty } from "@/ui/layout";
-import { ToastHost } from "@/ui/ToastHost";
-import { toast } from "@/ui/toasts";
+import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
+import { Empty } from "#/ui/layout.tsx";
+import { ToastHost } from "#/ui/ToastHost.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 const all = ["登录页改版", "补齐看板的测试", "灵动岛的动画"];
 

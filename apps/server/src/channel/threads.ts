@@ -6,15 +6,15 @@ import { Clock, Effect } from "effect";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { head } from "@/base/clip.ts";
-import { Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { Session } from "@/session/session.ts";
+import { head } from "#/base/clip.ts";
+import { Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { Session } from "#/session/session.ts";
+import * as qf from "#db/channel_follow.sql.ts";
+import * as qm from "#db/channel_message.sql.ts";
+import * as qp from "#db/channel_participant.sql.ts";
 
-import * as qf from "../../db/generated/channel_follow.sql.ts";
-import * as qm from "../../db/generated/channel_message.sql.ts";
-import * as qp from "../../db/generated/channel_participant.sql.ts";
 import { type Meta, subjectOf, type ChannelEnvelopeRow, type SessionNews } from "./contracts.ts";
 import type { ChannelRecords } from "./records.ts";
 import type { ChannelWriting } from "./writing.ts";

@@ -5,9 +5,9 @@ import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer } from "effect";
 
-import { ServerConfig } from "@/infra/config.ts";
-import { gitInEnv, gitSync, projectsDir, repo, write } from "@/testing/git.ts";
-import { testConfig, untilGot as until } from "@/testing/layers.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { gitInEnv, gitSync, projectsDir, repo, write } from "#/testing/git.ts";
+import { testConfig, untilGot as until } from "#/testing/layers.ts";
 
 import { Project, activityOf, countsOf, type GitHubRun, type ProjectHooks, projectProblem, tokeiArgs } from "./project.ts";
 import { type MergeFailure } from "./workplace.ts";

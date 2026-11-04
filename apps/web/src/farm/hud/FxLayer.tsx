@@ -6,10 +6,10 @@ import { createEffect, createSignal, onSettled, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { GameEffect, GameEffectAchievement } from "@vibevalley/protocol";
 
-import { localEffects, rawFarmFrame } from "@/farm/frames";
-import { useVillage } from "@/farm/world/load";
-import { subscribeLive } from "@/infra/frame";
-import { EarnedMedal, noticeTitle, type ToastData, ToastViewport, toasts, ToastType } from "@/ui/pixel";
+import { localEffects, rawFarmFrame } from "#/farm/frames.ts";
+import { useVillage } from "#/farm/world/load.ts";
+import { subscribeLive } from "#/infra/frame.ts";
+import { EarnedMedal, noticeTitle, type ToastData, ToastViewport, toasts, ToastType } from "#/ui/pixel/index.ts";
 
 import { clearingLevels } from "./readout";
 

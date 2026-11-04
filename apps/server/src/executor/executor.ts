@@ -9,9 +9,9 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
 
-import { type ApiError, messageOf, reasonOf, refused } from "@/errors.ts";
-import { projectsDir, ServerConfig } from "@/infra/config.ts";
-import { probeInstallation, Runtime } from "@/runtime/runtime.ts";
+import { type ApiError, messageOf, reasonOf, refused } from "#/errors.ts";
+import { projectsDir, ServerConfig } from "#/infra/config.ts";
+import { probeInstallation, Runtime } from "#/runtime/runtime.ts";
 
 type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "project" | "issue" | "channel">;
 

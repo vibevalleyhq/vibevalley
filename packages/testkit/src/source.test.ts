@@ -6,7 +6,7 @@ const file = `import type { A } from "./a";
 import { type B } from "./b";
 import {
   c,
-  d } from "@/c.ts";
+  d } from "#/c.ts";
 import * as ns from "./ns";
 export * from "./e";
 export { f } from "./f";
@@ -27,7 +27,7 @@ describe("a source file's edges", () => {
     expect(edgesOf("a.ts", file)).toEqual([
       { from: "./a", typeOnly: true, names: ["A"] },
       { from: "./b", typeOnly: false, names: ["B"] },
-      { from: "@/c.ts", typeOnly: false, names: ["c", "d"] },
+      { from: "#/c.ts", typeOnly: false, names: ["c", "d"] },
       { from: "./ns", typeOnly: false, names: ["*"] },
       { from: "./e", typeOnly: false, names: ["*"] },
       { from: "./f", typeOnly: false, names: ["f"] },
@@ -35,7 +35,7 @@ describe("a source file's edges", () => {
       { from: "./h", typeOnly: false, names: ["*"] },
     ]);
     // Under verbatimModuleSyntax `import { type B }` still loads ./b.
-    expect(importsOf("a.ts", file)).toEqual(["./b", "@/c.ts", "./ns", "./e", "./f", "./h"]);
+    expect(importsOf("a.ts", file)).toEqual(["./b", "#/c.ts", "./ns", "./e", "./f", "./h"]);
   });
 
   it("lists what it exports itself", () => {

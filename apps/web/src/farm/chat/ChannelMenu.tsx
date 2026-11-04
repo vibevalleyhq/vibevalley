@@ -6,14 +6,14 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 
-import { aria, useClickAway } from "@/base/dom";
-import { farm, farmChannelLabel } from "@/farm/store";
-import { createChannelForm, directsOf, topsOf, chatPath, unreadUnder } from "@/features/channel";
-import { useCore } from "@/infra/frame";
-import { ready, useProjects } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { PxButton, PxTextInput, SpriteIcon } from "@/ui/pixel";
-import { playSound } from "@/ui/pixel/sound";
+import { aria, useClickAway } from "#/base/dom.tsx";
+import { farm, farmChannelLabel } from "#/farm/store.ts";
+import { createChannelForm, directsOf, topsOf, chatPath, unreadUnder } from "#/features/channel/index.ts";
+import { useCore } from "#/infra/frame.ts";
+import { ready, useProjects } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { PxButton, PxTextInput, SpriteIcon } from "#/ui/pixel/index.ts";
+import { playSound } from "#/ui/pixel/sound.ts";
 
 type Mode = "list" | "create" | "settings";
 

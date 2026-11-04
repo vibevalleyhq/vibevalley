@@ -4,7 +4,7 @@
 import { t } from "@vibevalley/i18n";
 import { lanKeyCookie } from "@vibevalley/protocol";
 
-import { api } from "@/infra/api";
+import { api } from "#/infra/api.ts";
 
 const loopback = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 

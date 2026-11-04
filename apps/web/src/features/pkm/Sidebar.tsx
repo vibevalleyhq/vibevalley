@@ -3,11 +3,11 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { PkmPageSummary, PkmTier } from "@vibevalley/protocol";
 
-import { reasonOf } from "@/infra/api";
-import { ready } from "@/infra/query";
-import { A } from "@/ui/A";
-import { Icon } from "@/ui/Icon";
-import type { IconName } from "@/ui/icons";
+import { reasonOf } from "#/infra/api.ts";
+import { ready } from "#/infra/query.ts";
+import { A } from "#/ui/A.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import type { IconName } from "#/ui/icons.ts";
 
 import { tierOrder } from "./outline";
 import { tierLabel } from "./PageView";

@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 import type { Issue, IssueStage, Session, SessionEvent, IssueStageKind, DoingView, SessionView } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 
-import { tookText, spanText } from "@/base/format";
+import { tookText, spanText } from "#/base/format.ts";
 
 import type { Tone } from "./cards";
 import { endedAt, issueTitle } from "./issue";

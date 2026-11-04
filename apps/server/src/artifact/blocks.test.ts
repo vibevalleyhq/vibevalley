@@ -7,15 +7,15 @@ import { t } from "@vibevalley/i18n";
 import type { ArtifactId, BlockOp } from "@vibevalley/protocol";
 import { artifactId, blockId, type Wire } from "@vibevalley/protocol/schema";
 
-import { sampleAgent } from "@/agent/seed.ts";
-import { newId } from "@/base/ids.ts";
-import { orMissing } from "@/errors.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Database, Db } from "@/infra/db.ts";
-import { bold, para, sample, span } from "@/testing/artifact.ts";
-import { testConfig, waitFor } from "@/testing/layers.ts";
+import { sampleAgent } from "#/agent/seed.ts";
+import { newId } from "#/base/ids.ts";
+import { orMissing } from "#/errors.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Database, Db } from "#/infra/db.ts";
+import { bold, para, sample, span } from "#/testing/artifact.ts";
+import { testConfig, waitFor } from "#/testing/layers.ts";
+import * as qa from "#db/artifact.sql.ts";
 
-import * as qa from "../../db/generated/artifact.sql.ts";
 import { makeBlockStore } from "./blocks.ts";
 import { plain } from "./ops.ts";
 import { demoPieces } from "./policy.ts";

@@ -3,11 +3,17 @@
   "private": true,
   "type": "module",
   "main": "build/main.cjs",
+  "exports": {
+    "./releases": "./src/releases.ts"
+  },
   "scripts": {
     "build": "vpx scripts/build.ts",
     "dev": "vpx scripts/dev.ts",
     "package": "vpx scripts/package.ts",
     "update-check": "vpx scripts/update-check.ts"
+  },
+  "dependencies": {
+    "@vibevalley/home": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
@@ -16,6 +22,7 @@
     "@vibevalley/engine": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
+    "@vibevalley/server": "workspace:*",
     "effect": "catalog:",
     "electron": "catalog:",
     "electron-builder": "catalog:",

@@ -5,7 +5,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { farmFraming } from "@vibevalley/protocol/host";
 
-import { SpriteAtlas, levelWidth } from "@/ui/pixel/atlas";
+import { SpriteAtlas, levelWidth } from "#/ui/pixel/atlas.ts";
 
 import { Level } from "./level";
 import { beds, cropOfBed } from "./plots";

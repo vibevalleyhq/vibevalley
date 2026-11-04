@@ -1,11 +1,11 @@
 // The chat in the core state.
 import type * as T from "@vibevalley/protocol";
 
-import { compactCard } from "@/base/clip.ts";
-import { compareText, or } from "@/base/order.ts";
-import { type ChannelRouteInput, type Meta, metaOf, senderKind, targetOf, channelType } from "@/mailbox/envelope.ts";
-import type { ChannelMail } from "@/mailbox/mailbox.ts";
-import type { InputContext } from "@/mailbox/payload.ts";
+import { compactCard } from "#/base/clip.ts";
+import { compareText, or } from "#/base/order.ts";
+import { type ChannelRouteInput, type Meta, metaOf, senderKind, targetOf, channelType } from "#/mailbox/envelope.ts";
+import type { ChannelMail } from "#/mailbox/mailbox.ts";
+import type { InputContext } from "#/mailbox/payload.ts";
 
 import { chatNamed } from "./mentions.ts";
 

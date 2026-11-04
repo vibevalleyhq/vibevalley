@@ -3,10 +3,10 @@ import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { type Channel, type ChatMessage, ownerId, VibeValleyApiError } from "@vibevalley/protocol";
 import { messageId } from "@vibevalley/protocol/schema";
 
-import { api } from "@/infra/api";
-import { frameAt, testFrames } from "@/infra/testing";
-import { type Intent, intentsIn } from "@/state/intent";
-import { deferred, testRegistry } from "@/state/testing";
+import { api } from "#/infra/api.ts";
+import { frameAt, testFrames } from "#/infra/testing.ts";
+import { type Intent, intentsIn } from "#/state/intent.ts";
+import { deferred, testRegistry } from "#/state/testing.ts";
 
 import { followed } from "./follow";
 import {

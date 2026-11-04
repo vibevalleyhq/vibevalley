@@ -3,7 +3,7 @@ import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { createModal } from "@/ui/Dialog";
+import { createModal } from "#/ui/Dialog.tsx";
 
 import { DashedLine } from "./base";
 import { PxButton } from "./button";

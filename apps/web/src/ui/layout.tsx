@@ -7,8 +7,8 @@ import { createSignal, omit, Show } from "solid-js";
 import { Switch } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
-import { aria } from "@/base/dom";
-import { currentHost } from "@/infra/host";
+import { aria } from "#/base/dom.tsx";
+import { currentHost } from "#/infra/host.ts";
 
 import { A } from "./A";
 import { TextInput } from "./Field";

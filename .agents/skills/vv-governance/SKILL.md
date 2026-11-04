@@ -20,7 +20,7 @@ agent 照着已有的代码抄、走最短的路，写在文字里的规矩会�
 
 1. 说清它挡的是哪一类问题，对上六种病里的哪一种（[六种病](.agents/skills/vv-governance/references/whitepaper.md#六种病)）。说不出一类、只是一次的事，不立规矩：规矩越多越容易漏读。
 2. 按顺序选手段，能用前面的就不用后面的：代码（类型、结构、边界，把这一类整个消掉）→ 检查（lint、测试、CI、棘轮）→ 文字（规矩、skill）→ 人看。
-3. 写成检查时，失败的话写三样：错在哪和为什么、`Fix:` 能照抄的改法、`See` 仓库里一个文件（[写法](docs/style/code.md#检查管着的写法)）。agent 读到的只有这句话，只说「不许」它就猜，猜的常常是绕过去。lint 规则用 `scripts/oxlint-plugin.ts` 的 `says`，`no-restricted-imports` 的话写进 `vite.config.ts` 的 `refused`；规则算得出改法的就算出来（`parent-import` 给出 `@/…`），能机械改对的给自动修复。
+3. 写成检查时，失败的话写三样：错在哪和为什么、`Fix:` 能照抄的改法、`See` 仓库里一个文件（[写法](docs/style/code.md#检查管着的写法)）。agent 读到的只有这句话，只说「不许」它就猜，猜的常常是绕过去。lint 规则用 `scripts/oxlint-plugin.ts` 的 `says`，`no-restricted-imports` 的话写进 `vite.config.ts` 的 `refused`；规则算得出改法的就算出来（`parent-import` 给出 `#/…`），能机械改对的给自动修复。
 4. 只许减不许增、数得清、又没有动机去刷的，做成棘轮（`packages/health` 的逃生口，`escapeAdvice` 写每种该怎么改）；会被刷的读数（行数、测试数、覆盖率）只出报告，不做门槛，否则 agent 学会的是凑数。
 5. 给检查写测试：一个该拦的、一个不该拦的，加上报错的格式。
 6. 写不成检查的才进文字：一句规矩放进 `AGENTS.md` 并链到它的家，理由写进对应子系统的「为什么这样」。

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { WorkspaceState, Fact, LedgerEntry } from "@vibevalley/protocol";
 
-import { reduce } from "@/projection/reduce.ts";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
+import { reduce } from "#/projection/reduce.ts";
+import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { catchUp, emptyFolded, entriesFor, harvestCoins, progressFold, progressStep } from "./progress.ts";
 

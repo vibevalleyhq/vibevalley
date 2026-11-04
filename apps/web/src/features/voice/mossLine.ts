@@ -6,8 +6,8 @@
 import { t } from "@vibevalley/i18n";
 import { mossLinePath } from "@vibevalley/protocol";
 
-import { recordOf } from "@/base/dom";
-import { messageOf } from "@/base/format";
+import { recordOf } from "#/base/dom.tsx";
+import { messageOf } from "#/base/format.ts";
 
 // The turns' words as MOSS revises them, and the account of the answer's playback MOSS needs told back. MOSS sends only
 // so far ahead of what was played: every piece played is reported (playback.chunk.completed), a run played to its end too

@@ -21,7 +21,12 @@
   "devDependencies": {
     "@effect/tsgo": "catalog:",
     "@types/node": "catalog:",
+    "@vibevalley/desktop": "workspace:*",
     "@vibevalley/health": "workspace:*",
+    "@vibevalley/i18n": "workspace:*",
+    "@vibevalley/protocol": "workspace:*",
+    "@vibevalley/server": "workspace:*",
+    "@vibevalley/testkit": "workspace:*",
     "effect": "catalog:",
     "eslint-plugin-solid": "catalog:",
     "knip": "catalog:",

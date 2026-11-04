@@ -196,9 +196,6 @@ const DesktopStatus = Schema.Struct({
   server: Schema.optionalKey(Schema.String),
 });
 
-/** The desktop app's socket, in its farm's home beside the server's server.json. */
-export const desktopControlSocket = "desktop.sock";
-
 /** The desktop app's command line asks it (`vibevalley app …`, apps/server src/cli/app.ts) over a socket in its farm's
  * home (apps/desktop src/control.ts). open takes a path of the page's (/issues/12). Where a call is the same as the
  * page's, it has the page's name. */

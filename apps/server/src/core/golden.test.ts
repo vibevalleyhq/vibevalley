@@ -11,13 +11,13 @@ import type { Channel, WorkspaceState, Fact, Issue, Cron, CronRequest, Session, 
 import { latestSessionIdOf, phaseText, stageWantsOwner } from "@vibevalley/protocol/rules";
 import { jsonDiff } from "@vibevalley/testkit/golden";
 
-import { targetOf } from "@/channel/messages.ts";
-import { cronProblem, nextRun, nextText, whenText } from "@/cron/when.ts";
-import { effectsOf, viewOf } from "@/game/view.ts";
-import { inbox } from "@/inbox/items.ts";
-import { issueStageOf, withIssueStatuses } from "@/issue/status.ts";
-import { reduce } from "@/projection/reduce.ts";
-import { yuan } from "@/runtime/quota.ts";
+import { targetOf } from "#/channel/messages.ts";
+import { cronProblem, nextRun, nextText, whenText } from "#/cron/when.ts";
+import { effectsOf, viewOf } from "#/game/view.ts";
+import { inbox } from "#/inbox/items.ts";
+import { issueStageOf, withIssueStatuses } from "#/issue/status.ts";
+import { reduce } from "#/projection/reduce.ts";
+import { yuan } from "#/runtime/quota.ts";
 
 import { emptyWorkspaceState } from "./core.ts";
 

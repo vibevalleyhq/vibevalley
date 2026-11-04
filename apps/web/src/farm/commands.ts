@@ -5,9 +5,9 @@ import { t } from "@vibevalley/i18n";
 import type { IssueAct, Session, SessionPlayView, StateFrame } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { actionOf, perform } from "@/features/issue";
-import { api, reasonOf } from "@/infra/api";
-import { toasts, ToastType } from "@/ui/pixel";
+import { actionOf, perform } from "#/features/issue/index.ts";
+import { api, reasonOf } from "#/infra/api.ts";
+import { toasts, ToastType } from "#/ui/pixel/index.ts";
 
 import { farm, farmState } from "./store";
 import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type ToolResult } from "./tools";

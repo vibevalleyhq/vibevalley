@@ -2,12 +2,12 @@ import { createSignal, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { useWorkAgents } from "@/infra/agents";
-import { ready, useProjects } from "@/infra/query";
-import { prefsNow } from "@/state/prefs";
-import { Button } from "@/ui/Button";
-import { Dialog } from "@/ui/Dialog";
-import { Select, TextArea } from "@/ui/Field";
+import { useWorkAgents } from "#/infra/agents.ts";
+import { ready, useProjects } from "#/infra/query.ts";
+import { prefsNow } from "#/state/prefs.ts";
+import { Button } from "#/ui/Button.tsx";
+import { Dialog } from "#/ui/Dialog.tsx";
+import { Select, TextArea } from "#/ui/Field.tsx";
 
 /** The project and helper the board is filtered to, or the list group it was opened in. */
 export interface NewIssueAt {

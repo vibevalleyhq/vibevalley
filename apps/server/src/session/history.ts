@@ -4,11 +4,10 @@ import type * as T from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOrNone } from "@/base/json.ts";
-import { type Workplace } from "@/project/workplace.ts";
-
-import type * as qs from "../../db/generated/session.sql.ts";
-import type * as qr from "../../db/generated/session_run.sql.ts";
+import { jsonOrNone } from "#/base/json.ts";
+import { type Workplace } from "#/project/workplace.ts";
+import type * as qs from "#db/session.sql.ts";
+import type * as qr from "#db/session_run.sql.ts";
 
 const triggerOf = jsonOrNone(S.RunTrigger);
 export const heardOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));

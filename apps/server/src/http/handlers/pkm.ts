@@ -5,7 +5,7 @@ import { Effect } from "effect";
 import { ownerId } from "@vibevalley/protocol";
 import type { PkmHandlers } from "@vibevalley/protocol/api";
 
-import { Pkm } from "@/pkm/pkm.ts";
+import { Pkm } from "#/pkm/pkm.ts";
 
 export const pkmHandlers = Effect.gen(function* () {
   const pkm = yield* Pkm;

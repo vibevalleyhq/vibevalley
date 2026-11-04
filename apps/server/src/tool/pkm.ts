@@ -4,8 +4,8 @@ import { Effect } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { Pkm } from "@/pkm/pkm.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Pkm } from "#/pkm/pkm.ts";
 
 import { answers } from "./prompts.ts";
 import { answered, callerOf, sessionSchemaTool, tool, type Who } from "./schemas.ts";

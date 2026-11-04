@@ -5,9 +5,9 @@ import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
-import { pkmDir, ServerConfig } from "@/infra/config.ts";
-import { Database, Db } from "@/infra/db.ts";
-import { testConfig } from "@/testing/layers.ts";
+import { pkmDir, ServerConfig } from "#/infra/config.ts";
+import { Database, Db } from "#/infra/db.ts";
+import { testConfig } from "#/testing/layers.ts";
 
 import { make, Pkm } from "./pkm.ts";
 

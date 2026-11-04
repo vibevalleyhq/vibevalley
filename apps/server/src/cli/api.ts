@@ -8,11 +8,10 @@ import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
 import { Sse } from "effect/encoding";
 import { type HttpClientError, HttpClient, HttpClientRequest } from "effect/http";
 
+import { announced, homeOf } from "@vibevalley/home";
 import { maybe, t } from "@vibevalley/i18n";
 import { eventsPath, statePath } from "@vibevalley/protocol";
 import { ApiError, endpoints, pathOf, readsOnly } from "@vibevalley/protocol/api";
-
-import { announced, homeOf } from "@/infra/lease.ts";
 
 import { exit, Failure, out, printBody, stdinText } from "./output.ts";
 

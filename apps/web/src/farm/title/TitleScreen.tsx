@@ -8,13 +8,13 @@ import { createSignal, For, onSettled, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { SettingsStatus, WorkspaceState } from "@vibevalley/protocol";
 
-import { farm } from "@/farm/store";
-import { api } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { ready, useSettings } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { createPixelAct } from "@/ui/pixel";
-import { playSound } from "@/ui/pixel/sound";
+import { farm } from "#/farm/store.ts";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { ready, useSettings } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { createPixelAct } from "#/ui/pixel/index.ts";
+import { playSound } from "#/ui/pixel/sound.ts";
 
 import { startScene } from "./scene";
 import { TitleStage } from "./TitleStage";

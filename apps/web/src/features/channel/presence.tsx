@@ -3,14 +3,14 @@ import { For, Match, Show, Switch } from "solid-js";
 import { type ChatMessage, type Phase, type SessionView } from "@vibevalley/protocol";
 import { spanText } from "@vibevalley/protocol/rules";
 
-import { useAgent } from "@/infra/agents";
-import { useCore } from "@/infra/frame";
-import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
-import { Icon, type IconSize } from "@/ui/Icon";
-import { actionIcon, type IconName } from "@/ui/icons";
+import { useAgent } from "#/infra/agents.ts";
+import { useCore } from "#/infra/frame.ts";
+import { AgentFace, OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
+import { Icon, type IconSize } from "#/ui/Icon.tsx";
+import { actionIcon, type IconName } from "#/ui/icons.ts";
 const span = spanText;
 
-export { Dot } from "@/ui/Tag";
+export { Dot } from "#/ui/Tag.tsx";
 
 /** The server's words for what the session is doing, how long it has been quiet filled in by the clock. */
 export function phaseText(h: SessionView, now: number) {

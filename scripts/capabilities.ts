@@ -4,7 +4,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { endpoints, pathOf } from "../packages/protocol/src/api.ts";
+import { endpoints, pathOf } from "@vibevalley/protocol/api";
 
 const out = join(import.meta.dirname, "..", "docs/reference/capabilities.md");
 

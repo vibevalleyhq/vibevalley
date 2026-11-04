@@ -4,12 +4,12 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { PkmPageSummary } from "@vibevalley/protocol";
 
-import { api } from "@/infra/api";
-import { useRouter } from "@/infra/router";
-import { defineStored } from "@/state/stored";
-import { createAct } from "@/ui/act";
-import { Icon } from "@/ui/Icon";
-import { IconButton } from "@/ui/IconButton";
+import { api } from "#/infra/api.ts";
+import { useRouter } from "#/infra/router.ts";
+import { defineStored } from "#/state/stored.ts";
+import { createAct } from "#/ui/act.ts";
+import { Icon } from "#/ui/Icon.tsx";
+import { IconButton } from "#/ui/IconButton.tsx";
 
 import { dayKey, dayTitle, monthTitle, monthWeeks, weekdayNames } from "./days";
 import { pkmHref, refreshVault } from "./vault";

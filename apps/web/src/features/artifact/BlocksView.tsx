@@ -8,15 +8,15 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack }
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ArtifactId, ownerId, type Suggestion, type TextSpan } from "@vibevalley/protocol";
 
-import { createExternal } from "@/base/external";
-import { api } from "@/infra/api";
-import { followArtifact, followSuggestions } from "@/infra/gateway";
-import { ready, useAgents } from "@/infra/query";
-import { createAct } from "@/ui/act";
-import { hexColor, swatches } from "@/ui/cast";
-import { Checkbox } from "@/ui/Checkbox";
-import { AgentFace } from "@/ui/Face";
-import { Icon } from "@/ui/Icon";
+import { createExternal } from "#/base/external.ts";
+import { api } from "#/infra/api.ts";
+import { followArtifact, followSuggestions } from "#/infra/gateway.ts";
+import { ready, useAgents } from "#/infra/query.ts";
+import { createAct } from "#/ui/act.ts";
+import { hexColor, swatches } from "#/ui/cast.ts";
+import { Checkbox } from "#/ui/Checkbox.tsx";
+import { AgentFace } from "#/ui/Face.tsx";
+import { Icon } from "#/ui/Icon.tsx";
 
 import { knownTypes, plainOf } from "./blocks";
 import { BlockEditor, type EditBlock } from "./editor";
@@ -31,7 +31,8 @@ function authorColor(updatedBy: string, agent: Agent | undefined) {
   if (agent?.look.trim) return hexColor(agent.look.trim);
   let h = 0;
   for (let i = 0; i < updatedBy.length; i++) h = (h * 31 + updatedBy.charCodeAt(i)) & 0x7fffffff;
-  return hexColor(swatches.trim[h % swatches.trim.length]!);
+  const trim = swatches.trim[h % swatches.trim.length];
+  return trim === undefined ? ownerColor : hexColor(trim);
 }
 
 /** A block as one drawing of the editor shows it; `block` is the editor's own, for its actions. */

@@ -4,6 +4,7 @@
   "exclude": ["dist"],
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "react"
+    "jsxImportSource": "react",
+    "paths": { "@game/*": ["../apps/web/public/*"], "@shots/*": ["../docs/images/*"] }
   }
 }

@@ -5,12 +5,12 @@ import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { createExternal } from "@/base/external";
-import { Button } from "@/ui/Button";
-import { TextArea } from "@/ui/Field";
-import { IconButton } from "@/ui/IconButton";
-import { Card } from "@/ui/layout";
-import { Hint, Tip } from "@/ui/Tip";
+import { createExternal } from "#/base/external.ts";
+import { Button } from "#/ui/Button.tsx";
+import { TextArea } from "#/ui/Field.tsx";
+import { IconButton } from "#/ui/IconButton.tsx";
+import { Card } from "#/ui/layout.tsx";
+import { Hint, Tip } from "#/ui/Tip.tsx";
 
 import { type MossLine, mossLine, type MossSetup } from "./mossLine";
 

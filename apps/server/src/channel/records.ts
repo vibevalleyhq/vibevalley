@@ -10,21 +10,21 @@ import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import { oneLine } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import { head } from "@/base/clip.ts";
-import { newId } from "@/base/ids.ts";
-import { scopedPubSub } from "@/base/pubsub.ts";
-import { Core } from "@/core/core.ts";
-import { refused } from "@/errors.ts";
-import { Db } from "@/infra/db.ts";
-import { type InboxMessage, unreadSummaryOf } from "@/mailbox/envelope.ts";
-import { Session } from "@/session/session.ts";
+import { Agent } from "#/agent/agent.ts";
+import { head } from "#/base/clip.ts";
+import { newId } from "#/base/ids.ts";
+import { scopedPubSub } from "#/base/pubsub.ts";
+import { Core } from "#/core/core.ts";
+import { refused } from "#/errors.ts";
+import { Db } from "#/infra/db.ts";
+import { type InboxMessage, unreadSummaryOf } from "#/mailbox/envelope.ts";
+import { Session } from "#/session/session.ts";
+import * as qc from "#db/channel.sql.ts";
+import * as qf from "#db/channel_follow.sql.ts";
+import * as qm from "#db/channel_message.sql.ts";
+import * as qp from "#db/channel_participant.sql.ts";
+import * as qr from "#db/channel_read_cursor.sql.ts";
 
-import * as qc from "../../db/generated/channel.sql.ts";
-import * as qf from "../../db/generated/channel_follow.sql.ts";
-import * as qm from "../../db/generated/channel_message.sql.ts";
-import * as qp from "../../db/generated/channel_participant.sql.ts";
-import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import {
   type MsgRow,
   senderKind,

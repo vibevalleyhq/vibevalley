@@ -4,11 +4,11 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { SessionEvent } from "@vibevalley/protocol";
 
-import { aria, useNow } from "@/base/dom";
-import { ago, tookText } from "@/base/format";
-import { Icon } from "@/ui/Icon";
-import { actionIcon, type IconName } from "@/ui/icons";
-import { Markdown } from "@/ui/Markdown";
+import { aria, useNow } from "#/base/dom.tsx";
+import { ago, tookText } from "#/base/format.ts";
+import { Icon } from "#/ui/Icon.tsx";
+import { actionIcon, type IconName } from "#/ui/icons.ts";
+import { Markdown } from "#/ui/Markdown.tsx";
 
 import { createSessionEvents } from "./events";
 import {

@@ -10,8 +10,9 @@ import { _electron as electron, expect, test } from "@playwright/test";
 
 import { connect } from "@vibevalley/bridge";
 import { socketLink } from "@vibevalley/bridge/socket";
+import { controlSocketOf } from "@vibevalley/home";
 import { VibeValleyApi, pathOf } from "@vibevalley/protocol";
-import { desktopControl, desktopControlSocket } from "@vibevalley/protocol/host";
+import { desktopControl } from "@vibevalley/protocol/host";
 
 import type { DesktopProbe } from "../src/probe";
 
@@ -93,7 +94,7 @@ test("the desktop app shows the live board and sends a notice", async () => {
     await expect(page.getByTestId("update-state")).toHaveAttribute("data-state", "idle");
     await expect(page.getByTestId("update-check")).toBeVisible();
     // The command line reaches the app over its socket in the farm's home (`vibevalley app …`, apps/server src/cli/app.ts).
-    const socket = dial(join(dir, "home", desktopControlSocket));
+    const socket = dial(controlSocketOf(join(dir, "home")));
     await new Promise<void>((resolve, reject) => socket.once("connect", () => resolve()).once("error", reject));
     const control = connect(desktopControl, socketLink(socket));
     expect(await control.call.status()).toMatchObject({ name: "VibeValley Dev", channel: "dev", server });

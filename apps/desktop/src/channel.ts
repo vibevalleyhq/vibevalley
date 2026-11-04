@@ -4,6 +4,8 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { defaultHome } from "@vibevalley/home";
+
 import { stageOf } from "./releases";
 
 export type Channel = "stable" | "beta" | "alpha" | "dev";
@@ -43,8 +45,7 @@ export function channelOf(version: string, packaged: boolean): Channel {
 }
 
 /** The farm's home: VIBEVALLEY_HOME when the owner set one, else the channel's. */
-export const farmHomeOf = (channel: Channel, env: NodeJS.ProcessEnv, home = homedir()) =>
-  env.VIBEVALLEY_HOME || join(home, `.vibevalley${channels[channel].suffix}`);
+export const farmHomeOf = (channel: Channel, env: NodeJS.ProcessEnv, home = homedir()) => env.VIBEVALLEY_HOME || defaultHome(channels[channel].suffix, home);
 
 /** What the channel's server starts with: its farm, work folder and ports, each unless the owner set it. */
 export function serverEnvOf(channel: Channel, env: NodeJS.ProcessEnv, home = homedir()): NodeJS.ProcessEnv {

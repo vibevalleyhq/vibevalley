@@ -4,7 +4,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { cli, farm } from "@/testing/cli.ts";
+import { cli, farm } from "#/testing/cli.ts";
 
 const json = (text: string): unknown => JSON.parse(text);
 

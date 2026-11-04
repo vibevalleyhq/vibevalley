@@ -11,8 +11,9 @@ import { join } from "node:path";
 
 import { build, Platform } from "electron-builder";
 
-import { serverFiles } from "../../server/src/assets.ts";
-import { baselineHash } from "../../server/src/infra/baseline.ts";
+import { serverFiles } from "@vibevalley/server/assets";
+import { baselineHash } from "@vibevalley/server/baseline";
+
 import { channelOf, channels } from "../src/channel.ts";
 import { isVersion, type Release, stageOf } from "../src/releases.ts";
 

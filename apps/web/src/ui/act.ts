@@ -7,8 +7,8 @@ import { type Accessor, createSignal } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { reasonOf } from "@/infra/api";
-import { linkIn, useRegistry } from "@/state/atom";
+import { reasonOf } from "#/infra/api.ts";
+import { linkIn, useRegistry } from "#/state/atom.ts";
 
 import { toast } from "./toasts";
 

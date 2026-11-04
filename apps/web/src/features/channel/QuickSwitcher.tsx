@@ -4,16 +4,16 @@ import { Combobox } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 import { channelOf } from "@vibevalley/protocol/rules";
 
-import { autofocus } from "@/base/dom";
-import { notesSearch, noteTargets, pkmHref, usePkmVault } from "@/features/pkm";
-import { useWorkAgents } from "@/infra/agents";
-import { api } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { ready } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { defineAtom } from "@/state/atom";
-import { createAct } from "@/ui/act";
-import { Dialog } from "@/ui/Dialog";
+import { autofocus } from "#/base/dom.tsx";
+import { notesSearch, noteTargets, pkmHref, usePkmVault } from "#/features/pkm/index.ts";
+import { useWorkAgents } from "#/infra/agents.ts";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { ready } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { defineAtom } from "#/state/atom.ts";
+import { createAct } from "#/ui/act.ts";
+import { Dialog } from "#/ui/Dialog.tsx";
 
 import { chatPath, type SwitchTarget, switchTargets } from "./places";
 import { Count } from "./presence";

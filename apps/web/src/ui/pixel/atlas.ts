@@ -6,7 +6,7 @@ import { type Accessor, createSignal, onSettled } from "solid-js";
 
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { SpriteManifest } from "@/base/manifests";
+import { SpriteManifest } from "#/base/manifests.ts";
 
 export interface SpriteInfo {
   readonly name: string;

@@ -7,17 +7,17 @@ import type * as T from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import type { Actor } from "@/base/actor.ts";
-import { clip } from "@/base/clip.ts";
-import { newId } from "@/base/ids.ts";
-import { type ApiError, memoriesOf, missing, refused } from "@/errors.ts";
-import { agentHome, ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { Setting } from "@/setting/setting.ts";
+import { Agent } from "#/agent/agent.ts";
+import type { Actor } from "#/base/actor.ts";
+import { clip } from "#/base/clip.ts";
+import { newId } from "#/base/ids.ts";
+import { type ApiError, memoriesOf, missing, refused } from "#/errors.ts";
+import { agentHome, ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { Setting } from "#/setting/setting.ts";
+import * as q from "#db/memory.sql.ts";
 
-import * as q from "../../db/generated/memory.sql.ts";
 import { everos } from "./everos.ts";
 import { loadSegmenter } from "./gse.ts";
 import { nowledge } from "./nowledge.ts";

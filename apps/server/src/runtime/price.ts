@@ -7,10 +7,10 @@ import { Clock, Effect, Fiber, Queue, Semaphore } from "effect";
 
 import { getModel } from "@vibevalley/ai/models";
 
-import { Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
+import { Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import * as q from "#db/runtime_spend.sql.ts";
 
-import * as q from "../../db/generated/runtime_spend.sql.ts";
 import type { PiDefault } from "./pi.ts";
 
 interface Price {

@@ -5,7 +5,7 @@ import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import type { Phase, SessionAction } from "@vibevalley/protocol";
 
-import { useInterval } from "@/base/timer";
+import { useInterval } from "#/base/timer.ts";
 
 /** A drawing from apps/web/public/pixel; decorative unless it has a label. */
 export function SpriteIcon(props: { name: string; size: number; label?: string; class?: JSX.ClassValue; style?: JSX.CSSProperties }) {

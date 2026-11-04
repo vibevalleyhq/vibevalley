@@ -5,9 +5,9 @@ import { t } from "@vibevalley/i18n";
 import { type Crop, type Issue, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
 import { isBusy, phaseText, plotKeyOf, roomLeft } from "@vibevalley/protocol/rules";
 
-import { compareText, or } from "@/base/search";
-import { type Recency, recencyOf } from "@/features/project";
-import type { Pose } from "@/ui/cast";
+import { compareText, or } from "#/base/search.ts";
+import { type Recency, recencyOf } from "#/features/project/index.ts";
+import type { Pose } from "#/ui/cast.ts";
 
 type Spot =
   | { readonly kind: "taken"; readonly session: Session; readonly plot: PlotView; readonly issue?: Issue }

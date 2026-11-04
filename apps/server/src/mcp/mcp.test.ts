@@ -9,18 +9,18 @@ import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import { blockId, sessionId } from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import { Artifact } from "@/artifact/artifact.ts";
-import { owner } from "@/base/actor.ts";
-import { Channel } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { Memory } from "@/memory/memory.ts";
-import { Pkm } from "@/pkm/pkm.ts";
-import { Session } from "@/session/session.ts";
-import { starter, until, waitFor } from "@/testing/layers.ts";
-import { Said, world } from "@/testing/world.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Artifact } from "#/artifact/artifact.ts";
+import { owner } from "#/base/actor.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { Memory } from "#/memory/memory.ts";
+import { Pkm } from "#/pkm/pkm.ts";
+import { Session } from "#/session/session.ts";
+import { starter, until, waitFor } from "#/testing/layers.ts";
+import { Said, world } from "#/testing/world.ts";
 
 import { Mcp } from "./mcp.ts";
 

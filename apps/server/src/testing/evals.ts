@@ -13,8 +13,8 @@ import { type BrainMessage, messageText } from "@vibevalley/agent/messages";
 import { selfTools } from "@vibevalley/agent/self";
 import type { AssistantMessage, ToolCall } from "@vibevalley/ai/messages";
 
-import { noResult } from "@/orchestrator/prompts.ts";
-import { type Op, schemas, toolName } from "@/tool/schemas.ts";
+import { noResult } from "#/orchestrator/prompts.ts";
+import { type Op, schemas, toolName } from "#/tool/schemas.ts";
 
 /** One check on a turn, a closed set by kind: called (tool, with argContains in its arguments' JSON and argLacks not in
  * it, each when given), notCalled (tool), silent (no words said), says (contains in the words), saysNot (contains not in

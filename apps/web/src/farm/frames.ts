@@ -3,7 +3,7 @@ import { type Accessor, createMemo } from "solid-js";
 import type { GameEffect, StateFrame } from "@vibevalley/protocol";
 import { farmOf } from "@vibevalley/protocol/rules";
 
-import { type Frames, frames, rawFrame } from "@/infra/frame";
+import { type Frames, frames, rawFrame } from "#/infra/frame.ts";
 
 import { farmCommands } from "./commands";
 import { farmProject } from "./store";

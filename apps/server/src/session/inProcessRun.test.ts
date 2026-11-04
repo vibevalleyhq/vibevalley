@@ -6,11 +6,11 @@ import type { CoreEvent } from "@vibevalley/agent/brain";
 import type { StopReason } from "@vibevalley/ai/messages";
 import { assistantMessage, text, thinking } from "@vibevalley/ai/testing";
 
-import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import { world } from "@/testing/world.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import { world } from "#/testing/world.ts";
+import * as qs from "#db/session.sql.ts";
 
-import * as qs from "../../db/generated/session.sql.ts";
 import { makeInProcessRun, NotRecorded, recording } from "./inProcessRun.ts";
 import { makeTrajectories } from "./journal.ts";
 import { type RunFinished, type RunStore, runOf, Session } from "./session.ts";

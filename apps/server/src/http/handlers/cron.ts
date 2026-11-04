@@ -4,8 +4,8 @@ import { Effect } from "effect";
 
 import type { CronHandlers } from "@vibevalley/protocol/api";
 
-import { owner } from "@/base/actor.ts";
-import { Cron } from "@/cron/cron.ts";
+import { owner } from "#/base/actor.ts";
+import { Cron } from "#/cron/cron.ts";
 
 export const cronHandlers = Effect.gen(function* () {
   const crons = yield* Cron;

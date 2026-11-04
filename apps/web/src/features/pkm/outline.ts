@@ -1,7 +1,7 @@
 import type { PkmBlock, PkmPageSummary, PkmTier } from "@vibevalley/protocol";
 import { pkmTag, slugOf } from "@vibevalley/protocol/rules";
 
-import { spelled } from "@/base/search";
+import { spelled } from "#/base/search.ts";
 
 import { titleFor } from "./days";
 

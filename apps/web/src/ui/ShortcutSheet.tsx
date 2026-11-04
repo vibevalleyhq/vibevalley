@@ -2,7 +2,7 @@ import { createSignal, For, onSettled } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { inField, keyCap, pressed, shortcutPlaces, shortcuts } from "@/base/shortcuts";
+import { inField, keyCap, pressed, shortcutPlaces, shortcuts } from "#/base/shortcuts.ts";
 
 import { Dialog } from "./Dialog";
 

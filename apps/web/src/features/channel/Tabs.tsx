@@ -3,14 +3,14 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Channel, CronView } from "@vibevalley/protocol";
 
-import { aria, useNow } from "@/base/dom";
-import { api } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { useRouter } from "@/infra/router";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { Icon } from "@/ui/Icon";
-import { Empty } from "@/ui/layout";
+import { aria, useNow } from "#/base/dom.tsx";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { useRouter } from "#/infra/router.ts";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import { Empty } from "#/ui/layout.tsx";
 
 import { chatPath, sessionThreadOf } from "./places";
 import { HelperFace, PhaseGlyph, phaseText } from "./presence";

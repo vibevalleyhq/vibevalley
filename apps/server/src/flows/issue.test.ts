@@ -10,20 +10,20 @@ import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, executionsOf, isBusy, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import { owner } from "@/base/actor.ts";
-import { Channel } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import { Cron } from "@/cron/cron.ts";
-import { viewOf } from "@/game/view.ts";
-import { Issue } from "@/issue/issue.ts";
-import { openFindings } from "@/issue/status.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { Runtime } from "@/runtime/runtime.ts";
-import { Session } from "@/session/session.ts";
-import { write } from "@/testing/git.ts";
-import { helper } from "@/testing/worker.ts";
-import { Said, testIssues } from "@/testing/world.ts";
+import { Agent } from "#/agent/agent.ts";
+import { owner } from "#/base/actor.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import { Cron } from "#/cron/cron.ts";
+import { viewOf } from "#/game/view.ts";
+import { Issue } from "#/issue/issue.ts";
+import { openFindings } from "#/issue/status.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { Runtime } from "#/runtime/runtime.ts";
+import { Session } from "#/session/session.ts";
+import { write } from "#/testing/git.ts";
+import { helper } from "#/testing/worker.ts";
+import { Said, testIssues } from "#/testing/world.ts";
 
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 

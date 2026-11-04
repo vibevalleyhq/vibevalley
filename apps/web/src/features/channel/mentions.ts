@@ -2,7 +2,7 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, everyone, defaultOrchestrator, ownerId, type Session, type SessionView } from "@vibevalley/protocol";
 import { mentionLead } from "@vibevalley/protocol/rules";
 
-import { spelled } from "@/base/search";
+import { spelled } from "#/base/search.ts";
 
 import { phaseText } from "./presence";
 const mentionOf: Record<string, string> = {

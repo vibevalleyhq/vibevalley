@@ -7,15 +7,15 @@ import { test } from "vite-plus/test";
 import type * as T from "@vibevalley/protocol";
 import { CronWhenWeekly } from "@vibevalley/protocol/schema";
 
-import { orchestrator, owner } from "@/base/actor.ts";
-import { Channel } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import { type ServerConfig } from "@/infra/config.ts";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
-import { testConfig, aTurn } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
+import { orchestrator, owner } from "#/base/actor.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import { type ServerConfig } from "#/infra/config.ts";
+import { checkCases, goldenCases } from "#/testing/golden.ts";
+import { testConfig, aTurn } from "#/testing/layers.ts";
+import { world } from "#/testing/world.ts";
+import * as q from "#db/cron.sql.ts";
 
-import * as q from "../../db/generated/cron.sql.ts";
 import { type Due, Cron } from "./cron.ts";
 import { afterRun, dueCrons, isMissed, needsOK, nextText } from "./when.ts";
 

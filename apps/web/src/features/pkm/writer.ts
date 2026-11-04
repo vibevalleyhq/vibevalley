@@ -3,7 +3,7 @@
 
 import type { PkmBlock, PkmBlockOp, PkmPage, PkmUndo } from "@vibevalley/protocol";
 
-import { api, reasonOf } from "@/infra/api";
+import { api, reasonOf } from "#/infra/api.ts";
 
 import { applied } from "./editing";
 

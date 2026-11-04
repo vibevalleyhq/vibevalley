@@ -2,9 +2,8 @@ import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 
-import { testDatabase } from "@/testing/layers.ts";
-
-import { issueInputs, pendingIssueInputs } from "../../db/generated/mailbox_issue.sql.ts";
+import { testDatabase } from "#/testing/layers.ts";
+import { issueInputs, pendingIssueInputs } from "#db/mailbox_issue.sql.ts";
 
 it.effect("regression: reassignment selects unread inputs without loading consumed history", () =>
   Effect.gen(function* () {

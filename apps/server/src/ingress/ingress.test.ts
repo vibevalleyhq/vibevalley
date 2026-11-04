@@ -4,10 +4,10 @@ import { Effect, Schema } from "effect";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Channel } from "@/channel/channel.ts";
-import { inputOf, readPayload, triggerOf, triggerPayload } from "@/mailbox/payload.ts";
-import { Resource } from "@/resource/resource.ts";
-import { world } from "@/testing/world.ts";
+import { Channel } from "#/channel/channel.ts";
+import { inputOf, readPayload, triggerOf, triggerPayload } from "#/mailbox/payload.ts";
+import { Resource } from "#/resource/resource.ts";
+import { world } from "#/testing/world.ts";
 
 import { Ingress, type SourceEvent } from "./ingress.ts";
 

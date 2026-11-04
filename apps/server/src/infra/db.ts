@@ -10,7 +10,7 @@ import { SqliteClient } from "@effect/sql-sqlite-node";
 import { type Cause, Clock, Context, Duration, Effect, Layer, Metric, Option } from "effect";
 import { SqlClient, type SqlError } from "effect/sql";
 
-import { messageOf } from "@/errors.ts";
+import { messageOf } from "#/errors.ts";
 
 import { baselineHash, baselineStatements } from "./baseline.ts";
 import { dbDir, ServerConfig } from "./config.ts";

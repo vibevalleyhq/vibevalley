@@ -2,7 +2,7 @@
 
 import { Show } from "solid-js";
 
-import { RuntimeBadge } from "@/ui/RuntimeBadge";
+import { RuntimeBadge } from "#/ui/RuntimeBadge.tsx";
 
 import { SpriteIcon } from "./icons";
 

@@ -4,7 +4,7 @@
 import type * as T from "@vibevalley/protocol";
 import { flatBlocks, plainText, slugOf } from "@vibevalley/protocol/rules";
 
-import { termsList } from "@/memory/recall.ts";
+import { termsList } from "#/memory/recall.ts";
 
 import { type Edge, edgesOf, find, type Node, type Page, blockRef, walk, wikiLink, withoutSpans } from "./outline.ts";
 import { dayOf, journalDay, tierWeight } from "./para.ts";

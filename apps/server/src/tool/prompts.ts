@@ -6,13 +6,13 @@ import { IssueStatusValues, PriorityValues } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
 import { phaseText, shortTitle, stageWantsOwner } from "@vibevalley/protocol/rules";
 
-import type { HtmlWarning } from "@/artifact/check.ts";
-import { artifactMax, htmlSources } from "@/artifact/policy.ts";
-import { head } from "@/base/clip.ts";
-import { nextText, whenText } from "@/cron/when.ts";
-import { mandateNoteWordLimit } from "@/issue/creation.ts";
-import { runtimeLabel } from "@/runtime/presets.ts";
-import { yuan } from "@/runtime/quota.ts";
+import type { HtmlWarning } from "#/artifact/check.ts";
+import { artifactMax, htmlSources } from "#/artifact/policy.ts";
+import { head } from "#/base/clip.ts";
+import { nextText, whenText } from "#/cron/when.ts";
+import { mandateNoteWordLimit } from "#/issue/creation.ts";
+import { runtimeLabel } from "#/runtime/presets.ts";
+import { yuan } from "#/runtime/quota.ts";
 
 type Op = keyof Handlers;
 

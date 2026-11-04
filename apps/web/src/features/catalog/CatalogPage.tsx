@@ -5,20 +5,20 @@ import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untra
 import { Slider } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
-import { aria } from "@/base/dom";
-import { numberText } from "@/base/format";
-import { SpriteManifest, CursorManifest } from "@/base/manifests";
-import { spelled } from "@/base/search";
-import { useTimeout } from "@/base/timer";
-import { ready, useQuery } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { Button } from "@/ui/Button";
-import { TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { Card, Quiet, Toggle } from "@/ui/layout";
-import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "@/ui/pixel/sound";
-import { Segmented } from "@/ui/Segmented";
-import { Tabs } from "@/ui/Tabs";
+import { aria } from "#/base/dom.tsx";
+import { numberText } from "#/base/format.ts";
+import { SpriteManifest, CursorManifest } from "#/base/manifests.ts";
+import { spelled } from "#/base/search.ts";
+import { useTimeout } from "#/base/timer.ts";
+import { ready, useQuery } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { Button } from "#/ui/Button.tsx";
+import { TextInput } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import { Card, Quiet, Toggle } from "#/ui/layout.tsx";
+import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "#/ui/pixel/sound.ts";
+import { Segmented } from "#/ui/Segmented.tsx";
+import { Tabs } from "#/ui/Tabs.tsx";
 
 import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, remakeOf, shelfOf, shelves } from "./shelves";
 

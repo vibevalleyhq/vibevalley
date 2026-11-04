@@ -13,17 +13,15 @@ import { Cause, Effect, Exit, Fiber, Option, Predicate, Stdio } from "effect";
 import { Argument, CliError, CliOutput, Command, Flag, TerminalCapabilities } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
+import { homeOf, savedLocale } from "@vibevalley/home";
 import { setLocale, t } from "@vibevalley/i18n";
-
-import { defaults } from "@/infra/config.ts";
-import { savedLocale } from "@/setting/setting.ts";
 
 import { err, exit, Failure, out, printFailure } from "./cli/output.ts";
 import { messageOf } from "./errors.ts";
 
 // The command line speaks the farm's language: the locale saved in the home's settings.json. It is set before the
 // commands load, since they say their help text as they load: hence the imports below, after it.
-setLocale(savedLocale(process.env.VIBEVALLEY_HOME || defaults().home));
+setLocale(savedLocale(homeOf()));
 
 const { apiCommand, DryRunFlag, FormatFlag, ServerFlag } = await import("./cli/api.ts");
 const { appCommand } = await import("./cli/app.ts");

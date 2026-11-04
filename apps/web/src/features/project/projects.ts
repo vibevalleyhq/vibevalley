@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import { type LanguageCount, type ProjectSummary } from "@vibevalley/protocol";
 
-import { compareText, or } from "@/base/search";
+import { compareText, or } from "#/base/search.ts";
 
 /** Newest commit first, then by name. */
 export const sortProjects = (list: readonly ProjectSummary[]) => [...list].toSorted((a, b) => or((b.last ?? 0) - (a.last ?? 0), compareText(a.name, b.name)));

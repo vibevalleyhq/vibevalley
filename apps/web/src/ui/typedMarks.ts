@@ -1,4 +1,4 @@
-import { type Mark, typedMarks } from "@/base/typedMarks";
+import { type Mark, typedMarks } from "#/base/typedMarks.ts";
 
 /** Reads the marks an input method just typed into the field as its syntax (base/typedMarks.ts), the way typing them
  * would: the field gets an input of its own, so its handler sees the new text. Gives

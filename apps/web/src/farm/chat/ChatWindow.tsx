@@ -9,8 +9,8 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
-import { useNow } from "@/base/dom";
-import { farm, farmChannelLabel, useFarm } from "@/farm/store";
+import { useNow } from "#/base/dom.tsx";
+import { farm, farmChannelLabel, useFarm } from "#/farm/store.ts";
 import {
   chatSay,
   pendingLines,
@@ -26,16 +26,16 @@ import {
   followed,
   useMessage,
   useMarkedFollowed,
-} from "@/features/channel";
-import { RunSteps } from "@/features/session";
-import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "@/features/voice";
-import { orchestratorMood, useCore } from "@/infra/frame";
-import { ready, useAgents } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { sendOnce, useIntents } from "@/state/intent";
-import { OrchestratorFace } from "@/ui/Face";
-import { noticeTitle, PxButton, SpriteIcon, ToastType, toasts } from "@/ui/pixel";
-import { playSound } from "@/ui/pixel/sound";
+} from "#/features/channel/index.ts";
+import { RunSteps } from "#/features/session/index.ts";
+import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "#/features/voice/index.ts";
+import { orchestratorMood, useCore } from "#/infra/frame.ts";
+import { ready, useAgents } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { sendOnce, useIntents } from "#/state/intent.ts";
+import { OrchestratorFace } from "#/ui/Face.tsx";
+import { noticeTitle, PxButton, SpriteIcon, ToastType, toasts } from "#/ui/pixel/index.ts";
+import { playSound } from "#/ui/pixel/sound.ts";
 
 import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";

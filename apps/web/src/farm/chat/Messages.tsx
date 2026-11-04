@@ -10,17 +10,17 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
 import { channelOf } from "@vibevalley/protocol/rules";
 
-import { aria, autofocus } from "@/base/dom";
-import { spentText } from "@/base/format";
-import { farmClock, readsLong } from "@/farm/store";
-import { artifactHref } from "@/features/artifact";
-import { drafts, EmojiPicker, messagePath, quickReactions, reactionOn, reactionSet, sameReaction, setMark, useMessage } from "@/features/channel";
-import { api } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { useIntents } from "@/state/intent";
-import { A } from "@/ui/A";
-import { AgentFace, OrchestratorFace, OwnerFace } from "@/ui/Face";
-import { createPixelAct, noticeTitle, PxMarkdown, SpriteIcon, ToastType, toasts } from "@/ui/pixel";
+import { aria, autofocus } from "#/base/dom.tsx";
+import { spentText } from "#/base/format.ts";
+import { farmClock, readsLong } from "#/farm/store.ts";
+import { artifactHref } from "#/features/artifact/index.ts";
+import { drafts, EmojiPicker, messagePath, quickReactions, reactionOn, reactionSet, sameReaction, setMark, useMessage } from "#/features/channel/index.ts";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { useIntents } from "#/state/intent.ts";
+import { A } from "#/ui/A.tsx";
+import { AgentFace, OrchestratorFace, OwnerFace } from "#/ui/Face.tsx";
+import { createPixelAct, noticeTitle, PxMarkdown, SpriteIcon, ToastType, toasts } from "#/ui/pixel/index.ts";
 
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 

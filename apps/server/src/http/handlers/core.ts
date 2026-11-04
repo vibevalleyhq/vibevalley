@@ -4,7 +4,7 @@ import { Effect } from "effect";
 
 import type { CoreHandlers } from "@vibevalley/protocol/api";
 
-import { ServerConfig } from "@/infra/config.ts";
+import { ServerConfig } from "#/infra/config.ts";
 
 export const coreHandlers = Effect.gen(function* () {
   const config = yield* ServerConfig;

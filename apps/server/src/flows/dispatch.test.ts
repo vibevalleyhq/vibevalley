@@ -7,15 +7,15 @@ import { answer } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Channel } from "@/channel/channel.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Ingress } from "@/ingress/ingress.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { ingress as ingressLayer } from "@/services.ts";
-import { Session } from "@/session/session.ts";
-import { waitFor } from "@/testing/layers.ts";
-import { testIssues, worldBelowIngress } from "@/testing/world.ts";
+import { Channel } from "#/channel/channel.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Ingress } from "#/ingress/ingress.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { ingress as ingressLayer } from "#/services.ts";
+import { Session } from "#/session/session.ts";
+import { waitFor } from "#/testing/layers.ts";
+import { testIssues, worldBelowIngress } from "#/testing/world.ts";
 
 it.live("regression: an orchestrator assignment survives ingress startup and an acknowledgement retry without creating chat notices", () => {
   let triggerId = "";

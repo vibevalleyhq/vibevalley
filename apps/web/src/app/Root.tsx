@@ -2,11 +2,11 @@ import type { JSX } from "@solidjs/web";
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { Loading, onSettled } from "solid-js";
 
-import { createFrames, frames, FramesContext } from "@/infra/frame";
-import { reveal } from "@/infra/opening";
-import { queries, refetchOnRelink } from "@/infra/query";
-import { createRouter, RouterContext } from "@/infra/router";
-import { pageRegistry, RegistryContext } from "@/state/atom";
+import { createFrames, frames, FramesContext } from "#/infra/frame.ts";
+import { reveal } from "#/infra/opening.ts";
+import { queries, refetchOnRelink } from "#/infra/query.ts";
+import { createRouter, RouterContext } from "#/infra/router.ts";
+import { pageRegistry, RegistryContext } from "#/state/atom.ts";
 
 /** What every page has around it: the router, the state frames, the atoms' registry (intents, the page's own values),
  * the query cache. */

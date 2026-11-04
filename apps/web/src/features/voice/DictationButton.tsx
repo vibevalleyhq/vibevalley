@@ -4,11 +4,11 @@ import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { createExternal } from "@/base/external";
-import { ready, useSettings } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { Icon, type IconSize } from "@/ui/Icon";
-import type { IconName } from "@/ui/icons";
+import { createExternal } from "#/base/external.ts";
+import { ready, useSettings } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { Icon, type IconSize } from "#/ui/Icon.tsx";
+import type { IconName } from "#/ui/icons.ts";
 
 import { dictation, type DictationPhase, insertDictated } from "./dictation";
 

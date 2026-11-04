@@ -5,17 +5,17 @@ import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import { type ApiError, missing, lookIn, refused } from "@/errors.ts";
-import { Db, causeMessage } from "@/infra/db.ts";
-import { channelType, senderKind, type ChannelRouteResult } from "@/mailbox/envelope.ts";
-import { NotRecorded, Session } from "@/session/session.ts";
+import { Agent } from "#/agent/agent.ts";
+import { type ApiError, missing, lookIn, refused } from "#/errors.ts";
+import { Db, causeMessage } from "#/infra/db.ts";
+import { channelType, senderKind, type ChannelRouteResult } from "#/mailbox/envelope.ts";
+import { NotRecorded, Session } from "#/session/session.ts";
+import { issueExists } from "#db/issue.sql.ts";
+import * as qd from "#db/mailbox_delivery.sql.ts";
+import * as qi from "#db/mailbox_issue.sql.ts";
+import * as qs from "#db/mailbox_subscription.sql.ts";
+import * as qr from "#db/mailbox_trigger.sql.ts";
 
-import { issueExists } from "../../db/generated/issue.sql.ts";
-import * as qd from "../../db/generated/mailbox_delivery.sql.ts";
-import * as qi from "../../db/generated/mailbox_issue.sql.ts";
-import * as qs from "../../db/generated/mailbox_subscription.sql.ts";
-import * as qr from "../../db/generated/mailbox_trigger.sql.ts";
 import { agentWakeCooldownMs, brakes, hopLimit, hopLimitText, type Recipient, type Reach, type WakeBreaker } from "./brakes.ts";
 import type { Deliveries, DeliveryDraft, DeliveryRow } from "./deliveries.ts";
 import type { InsertDelivery, TalkRow } from "./mailbox.ts";

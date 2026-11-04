@@ -7,7 +7,7 @@ import { Cron as EffectCron, DateTime, Option } from "effect";
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { actsForOwner, type Actor } from "@/base/actor.ts";
+import { actsForOwner, type Actor } from "#/base/actor.ts";
 /** A day of the week by its number, Sunday 0. */
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a cron day of the week is 0 to 6
 const weekday = (d: number) => t(`server.cron.weekdays.${d as 0 | 1 | 2 | 3 | 4 | 5 | 6}`);

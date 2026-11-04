@@ -3,9 +3,9 @@ import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { aria } from "@/base/dom";
-import { Select } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
+import { aria } from "#/base/dom.tsx";
+import { Select } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
 
 import type { Tone } from "./cards";
 import { type Stage, stageLabel, stages } from "./issue";

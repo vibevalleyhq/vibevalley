@@ -4,7 +4,7 @@
 
 import { type Accessor, createEffect, onSettled } from "solid-js";
 
-import { defineAtom } from "@/state/atom";
+import { defineAtom } from "#/state/atom.ts";
 
 export type PadButton = "left" | "right" | "up" | "down" | "a" | "b";
 

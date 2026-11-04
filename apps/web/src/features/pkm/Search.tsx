@@ -3,14 +3,14 @@ import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { PkmPageSummary, PkmSearchHit, PkmTier } from "@vibevalley/protocol";
 
-import { autofocus } from "@/base/dom";
-import { spelled } from "@/base/search";
-import { api } from "@/infra/api";
-import { ready } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { defineAtom, useLatest } from "@/state/atom";
-import { Dialog } from "@/ui/Dialog";
-import { Icon } from "@/ui/Icon";
+import { autofocus } from "#/base/dom.tsx";
+import { spelled } from "#/base/search.ts";
+import { api } from "#/infra/api.ts";
+import { ready } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { defineAtom, useLatest } from "#/state/atom.ts";
+import { Dialog } from "#/ui/Dialog.tsx";
+import { Icon } from "#/ui/Icon.tsx";
 
 import { titleFor } from "./days";
 import { tierOrder } from "./outline";

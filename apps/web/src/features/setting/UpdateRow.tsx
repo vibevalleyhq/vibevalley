@@ -4,15 +4,15 @@ import { t } from "@vibevalley/i18n";
 import type { CommandLineState } from "@vibevalley/protocol/host";
 import { isBusy } from "@vibevalley/protocol/rules";
 
-import { variant } from "@/base/dom";
-import { reasonOf } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { currentHost } from "@/infra/host";
-import { useUpdates } from "@/infra/settings";
-import { Button } from "@/ui/Button";
-import { ConfirmButton } from "@/ui/ConfirmButton";
-import { SettingRow } from "@/ui/settings";
-import { toast } from "@/ui/toasts";
+import { variant } from "#/base/dom.tsx";
+import { reasonOf } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { currentHost } from "#/infra/host.ts";
+import { useUpdates } from "#/infra/settings.ts";
+import { Button } from "#/ui/Button.tsx";
+import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
+import { SettingRow } from "#/ui/settings.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 export function UpdateRow() {
   const update = currentHost().update;

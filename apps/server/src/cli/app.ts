@@ -2,7 +2,6 @@
 // (desktopControl, apps/desktop src/control.ts), as the page asks them through the window.
 
 import { connect as dial, type Socket } from "node:net";
-import { join } from "node:path";
 
 import { Config, Effect, Schedule } from "effect";
 import { Argument, Command } from "effect/cli";
@@ -10,10 +9,9 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { connect } from "@vibevalley/bridge";
 import { socketLink } from "@vibevalley/bridge/socket";
+import { controlSocketOf, homeOf } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
-import { desktopControl, desktopControlSocket } from "@vibevalley/protocol/host";
-
-import { homeOf } from "@/infra/lease.ts";
+import { desktopControl } from "@vibevalley/protocol/host";
 
 import { exit, Failure, printBody } from "./output.ts";
 
@@ -39,7 +37,7 @@ const notOpen = (home: string, why: string) =>
 
 const dialed = Effect.flatMap(farmHome, (home) =>
   Effect.callback<Socket, Failure>((resume) => {
-    const socket = dial(join(home, desktopControlSocket));
+    const socket = dial(controlSocketOf(home));
     socket.once("connect", () => resume(Effect.succeed(socket)));
     socket.once("error", (e) => resume(Effect.fail(notOpen(home, e.message))));
     return Effect.sync(() => socket.destroy());

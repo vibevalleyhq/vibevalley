@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 
 import type { Applied } from "@vibevalley/protocol";
 
-import type { Intent } from "@/state/intent";
+import type { Intent } from "#/state/intent.ts";
 
 import { type DeliverPick, type IssueSaid, pendingWords, shownDeliver } from "./write";
 

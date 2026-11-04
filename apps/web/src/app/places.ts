@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
 
-import type { IconName } from "@/ui/icons";
+import type { IconName } from "#/ui/icons.ts";
 
 export interface Place {
   readonly id: string;

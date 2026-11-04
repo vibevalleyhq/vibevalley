@@ -5,7 +5,7 @@
     "jsx": "preserve",
     "jsxImportSource": "@solidjs/web",
     "types": ["vite/client", "node"],
-    "paths": { "@/*": ["./src/*"] }
+    "allowImportingTsExtensions": true
   },
   "include": ["src", "test", "scripts", "vite.config.ts", "vite.stories.config.ts", "playwright.config.ts"]
 }

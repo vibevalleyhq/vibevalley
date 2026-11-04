@@ -3,9 +3,9 @@ import { Context, Effect, Layer } from "effect";
 
 import { attachmentPath } from "@vibevalley/protocol";
 
-import { Channel } from "@/channel/channel.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { quietApp } from "@/testing/world.ts";
+import { Channel } from "#/channel/channel.ts";
+import { testConfig } from "#/testing/layers.ts";
+import { quietApp } from "#/testing/world.ts";
 
 import { app } from "./app.ts";
 

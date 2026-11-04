@@ -3,8 +3,8 @@ import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled,
 
 import { t } from "@vibevalley/i18n";
 
-import { aria } from "@/base/dom";
-import { spelled } from "@/base/search";
+import { aria } from "#/base/dom.tsx";
+import { spelled } from "#/base/search.ts";
 
 import { PxWindow } from "./base";
 import { SpriteIcon } from "./icons";

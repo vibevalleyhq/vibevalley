@@ -25,10 +25,10 @@ import {
 import { type Agent, type Crop, defaultOrchestrator, type Session, type StateFrame, type SessionId } from "@vibevalley/protocol";
 import { omitUndefined, plotKeyOf } from "@vibevalley/protocol/rules";
 
-import { clock, farmState } from "@/farm/store";
-import type { Box, Point } from "@/farm/world/level";
-import type { Village } from "@/farm/world/load";
-import { bedOfStation, beds, cropOfBed, isRipe, stationOfSession, type Bed } from "@/farm/world/plots";
+import { clock, farmState } from "#/farm/store.ts";
+import type { Box, Point } from "#/farm/world/level.ts";
+import type { Village } from "#/farm/world/load.ts";
+import { bedOfStation, beds, cropOfBed, isRipe, stationOfSession, type Bed } from "#/farm/world/plots.ts";
 import {
   frameVillage,
   placeOfAction,
@@ -46,12 +46,12 @@ import {
   type Pose,
   type Stroll,
   type VillageHit,
-} from "@/farm/world/world";
-import { orchestratorSprite } from "@/features/orchestrator";
-import { orchestratorMood } from "@/infra/frame";
-import { prefsNow } from "@/state/prefs";
-import { castPrefix } from "@/ui/cast";
-import { playSound } from "@/ui/pixel/sound";
+} from "#/farm/world/world.ts";
+import { orchestratorSprite } from "#/features/orchestrator/index.ts";
+import { orchestratorMood } from "#/infra/frame.ts";
+import { prefsNow } from "#/state/prefs.ts";
+import { castPrefix } from "#/ui/cast.ts";
+import { playSound } from "#/ui/pixel/sound.ts";
 
 import { villageDog } from "./dog";
 import { plotFx } from "./fx";

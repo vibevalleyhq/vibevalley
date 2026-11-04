@@ -8,15 +8,15 @@ import { t } from "@vibevalley/i18n";
 import { type Memory, type MemorySourceInfo, memoryKeep } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { aria, useNow } from "@/base/dom";
-import { ago } from "@/base/format";
-import { api, createRequestKey, reasonOf } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { queries, ready, useProjects, useQuery } from "@/infra/query";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { Select, TextArea, TextInput } from "@/ui/Field";
-import { Quiet } from "@/ui/layout";
+import { aria, useNow } from "#/base/dom.tsx";
+import { ago } from "#/base/format.ts";
+import { api, createRequestKey, reasonOf } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { queries, ready, useProjects, useQuery } from "#/infra/query.ts";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { Select, TextArea, TextInput } from "#/ui/Field.tsx";
+import { Quiet } from "#/ui/layout.tsx";
 
 /** Notes not tied to a project. */
 const everywhere = "*";

@@ -12,14 +12,14 @@ import { t } from "@vibevalley/i18n";
 import { type Attachment, type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, VibeValleyApi, type WorkspaceView } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import type { Mark } from "@/base/typedMarks";
-import { useOrchestrators } from "@/infra/agents";
-import { api, reasonOf } from "@/infra/api";
-import { orchestratorMood } from "@/infra/frame";
-import { defineAtom } from "@/state/atom";
-import { defineIntent, type Intent, type Intents } from "@/state/intent";
-import { defineStored, orFallback } from "@/state/stored";
-import { createAct } from "@/ui/act";
+import type { Mark } from "#/base/typedMarks.ts";
+import { useOrchestrators } from "#/infra/agents.ts";
+import { api, reasonOf } from "#/infra/api.ts";
+import { orchestratorMood } from "#/infra/frame.ts";
+import { defineAtom } from "#/state/atom.ts";
+import { defineIntent, type Intent, type Intents } from "#/state/intent.ts";
+import { defineStored, orFallback } from "#/state/stored.ts";
+import { createAct } from "#/ui/act.ts";
 
 import { commandNameables, commandOf, runCommand, typedCommand } from "./commands";
 import { followed, useMessage } from "./follow";

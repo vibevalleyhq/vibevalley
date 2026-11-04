@@ -1,7 +1,7 @@
 import { createEffect, createSignal, Show } from "solid-js";
 
-import { Keyed } from "@/base/dom";
-import { ready, useSprites } from "@/infra/query";
+import { Keyed } from "#/base/dom.tsx";
+import { ready, useSprites } from "#/infra/query.ts";
 
 import { type Cast, castSprite, type Pose, walkFrames } from "./cast";
 

@@ -5,11 +5,11 @@ import { createSignal, Match, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { api } from "@/infra/api";
-import { createAct } from "@/ui/act";
-import { Icon } from "@/ui/Icon";
-import { IconButton } from "@/ui/IconButton";
-import { Tip } from "@/ui/Tip";
+import { api } from "#/infra/api.ts";
+import { createAct } from "#/ui/act.ts";
+import { Icon } from "#/ui/Icon.tsx";
+import { IconButton } from "#/ui/IconButton.tsx";
+import { Tip } from "#/ui/Tip.tsx";
 
 type MossVerifyResult = { readonly ok: true } | { readonly ok: false; readonly why: string };
 

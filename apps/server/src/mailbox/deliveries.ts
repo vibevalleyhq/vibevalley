@@ -1,4 +1,5 @@
-import type * as qd from "../../db/generated/mailbox_delivery.sql.ts";
+import type * as qd from "#db/mailbox_delivery.sql.ts";
+
 import { readPayload, type DeliveryPayload } from "./payload.ts";
 
 export type DeliveryRow = Omit<qd.AllOpenDeliveriesResult, "session_id" | "payload_json"> & { readonly payload: DeliveryPayload };

@@ -14,12 +14,12 @@ import { TestClock } from "effect/testing";
 import { asTransport } from "@vibevalley/agent/mcpTransport";
 import type { MemorySourceUpdate } from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { owner, session } from "@/base/actor.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Database, Db } from "@/infra/db.ts";
-import { Setting } from "@/setting/setting.ts";
-import { testConfig, until } from "@/testing/layers.ts";
+import { Agent } from "#/agent/agent.ts";
+import { owner, session } from "#/base/actor.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Database, Db } from "#/infra/db.ts";
+import { Setting } from "#/setting/setting.ts";
+import { testConfig, until } from "#/testing/layers.ts";
 
 import { foundText, Memory, make } from "./memory.ts";
 import { nowledge, nowledgeLabels } from "./nowledge.ts";

@@ -5,7 +5,11 @@
 import react from '@astrojs/react'
 import sitemap from '@astrojs/sitemap'
 import tailwindcss from '@tailwindcss/vite'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'astro/config'
+
+/** The game's art (apps/web/public) and the screenshots (docs/images), by one name each wherever the pages read them. */
+const at = (path) => fileURLToPath(new URL(path, import.meta.url))
 
 export default defineConfig({
   site: 'https://vibevalley.dev',
@@ -13,6 +17,7 @@ export default defineConfig({
   i18n: { locales: ['zh', 'en'], defaultLocale: 'zh', routing: { prefixDefaultLocale: false } },
   vite: {
     plugins: [tailwindcss()],
+    resolve: { alias: { '@game': at('../apps/web/public'), '@shots': at('../docs/images') } },
     // Pixel art keeps its pixels: no inlining into CSS as data URIs, every picture a file of its own.
     build: { assetsInlineLimit: 0 },
   },

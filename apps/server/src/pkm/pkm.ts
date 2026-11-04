@@ -13,15 +13,15 @@ import { ownerId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { flatBlocks, slugOf } from "@vibevalley/protocol/rules";
 
-import { newId } from "@/base/ids.ts";
-import { type ApiError, Inconsistent, lookIn, missing, reasonOf, refused } from "@/errors.ts";
-import { pkmDir, ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import { termsList } from "@/memory/recall.ts";
+import { newId } from "#/base/ids.ts";
+import { type ApiError, Inconsistent, lookIn, missing, reasonOf, refused } from "#/errors.ts";
+import { pkmDir, ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import { termsList } from "#/memory/recall.ts";
+import * as changes from "#db/pkm_change.sql.ts";
+import * as q from "#db/pkm_comment.sql.ts";
+import * as terms from "#db/pkm_term.sql.ts";
 
-import * as changes from "../../db/generated/pkm_change.sql.ts";
-import * as q from "../../db/generated/pkm_comment.sql.ts";
-import * as terms from "../../db/generated/pkm_term.sql.ts";
 import {
   backlinks,
   blockOf,

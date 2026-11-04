@@ -10,12 +10,12 @@ import { HttpClient } from "effect/http";
 import { type Agent, defaultOrchestrator, type WorkspaceState } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { withCast } from "@/agent/agent.ts";
-import { builtInDir, profileOf, templateFrom } from "@/agent/template.ts";
-import { Core } from "@/core/core.ts";
-import { defaults, ServerConfig } from "@/infra/config.ts";
-import { Database } from "@/infra/db.ts";
-import { afterRealTime } from "@/infra/time.ts";
+import { withCast } from "#/agent/agent.ts";
+import { builtInDir, profileOf, templateFrom } from "#/agent/template.ts";
+import { Core } from "#/core/core.ts";
+import { defaults, ServerConfig } from "#/infra/config.ts";
+import { Database } from "#/infra/db.ts";
+import { afterRealTime } from "#/infra/time.ts";
 
 export { aTurn, gate, nextTurn, until, untilGot, waitFor, whenTrue, within } from "@vibevalley/testkit/until";
 

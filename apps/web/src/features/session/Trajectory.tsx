@@ -9,15 +9,15 @@ import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
 import { omitUndefined, oneLine } from "@vibevalley/protocol/rules";
 
-import { aria, autofocus, Keyed, useNow } from "@/base/dom";
-import { ago } from "@/base/format";
-import { api, reasonOf } from "@/infra/api";
-import { ready, useQuery } from "@/infra/query";
-import { createAct } from "@/ui/act";
-import { TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { Quiet } from "@/ui/layout";
-import { Markdown } from "@/ui/Markdown";
+import { aria, autofocus, Keyed, useNow } from "#/base/dom.tsx";
+import { ago } from "#/base/format.ts";
+import { api, reasonOf } from "#/infra/api.ts";
+import { ready, useQuery } from "#/infra/query.ts";
+import { createAct } from "#/ui/act.ts";
+import { TextInput } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import { Quiet } from "#/ui/layout.tsx";
+import { Markdown } from "#/ui/Markdown.tsx";
 
 import { createSessionEvents } from "./events";
 import {
@@ -534,6 +534,12 @@ export function TrajectoryList(props: { agent: string }) {
                     const phase = h().phase;
                     return phase._tag === "closed" ? phase.at : undefined;
                   };
+                  const sentText = () => {
+                    const left = ended();
+                    return left === undefined
+                      ? t("web.session.trajectory.hired", { ago: ago(h().hiredAt, now()) })
+                      : t("web.session.trajectory.hiredAndLeft", { hired: ago(h().hiredAt, now()), left: ago(left, now()) });
+                  };
                   return (
                     <li>
                       <button
@@ -554,11 +560,7 @@ export function TrajectoryList(props: { agent: string }) {
                             <span class="rounded bg-hat px-1.5 text-xs text-bark-900">{t("web.session.trajectory.here")}</span>
                           </Show>
                         </span>
-                        <span class="text-xs text-muted">
-                          {ended() === undefined
-                            ? t("web.session.trajectory.hired", { ago: ago(h().hiredAt, now()) })
-                            : t("web.session.trajectory.hiredAndLeft", { hired: ago(h().hiredAt, now()), left: ago(ended()!, now()) })}
-                        </span>
+                        <span class="text-xs text-muted">{sentText()}</span>
                         <Show when={h().brief}>
                           <span class="truncate text-xs">{oneLine(h().brief).trim()}</span>
                         </Show>

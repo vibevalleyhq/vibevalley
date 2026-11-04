@@ -5,13 +5,13 @@ import { Effect } from "effect";
 import type * as T from "@vibevalley/protocol";
 import type { ApiError, IssueHandlers } from "@vibevalley/protocol/api";
 
-import { owner } from "@/base/actor.ts";
-import { Channel } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import { requestKeys } from "@/http/api.ts";
-import { explicitMandate } from "@/issue/creation.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Session } from "@/session/session.ts";
+import { owner } from "#/base/actor.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import { requestKeys } from "#/http/api.ts";
+import { explicitMandate } from "#/issue/creation.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Session } from "#/session/session.ts";
 
 export const issueHandlers = Effect.gen(function* () {
   const core = yield* Core;

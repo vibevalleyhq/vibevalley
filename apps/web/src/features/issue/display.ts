@@ -4,8 +4,8 @@ import { t } from "@vibevalley/i18n";
 import type { Issue, Priority } from "@vibevalley/protocol";
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 
-import { compareText, or } from "@/base/search";
-import { defineStored, orFallback } from "@/state/stored";
+import { compareText, or } from "#/base/search.ts";
+import { defineStored, orFallback } from "#/state/stored.ts";
 
 import { type BoardCard, type Lane, lanes } from "./cards";
 import { endedAt } from "./issue";

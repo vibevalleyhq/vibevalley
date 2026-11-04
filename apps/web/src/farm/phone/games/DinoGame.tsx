@@ -5,9 +5,9 @@ import { createEffect, createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { drawPattern, lcd } from "@/farm/phone/lcd";
-import { kept, usePad, useTicks } from "@/farm/phone/pad";
-import { playSound } from "@/ui/pixel/sound";
+import { drawPattern, lcd } from "#/farm/phone/lcd.ts";
+import { kept, usePad, useTicks } from "#/farm/phone/pad.ts";
+import { playSound } from "#/ui/pixel/sound.ts";
 
 import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
 

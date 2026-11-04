@@ -3,20 +3,20 @@ import { For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { pressed } from "@/base/shortcuts";
-import { QuickSwitcher, switcher } from "@/features/channel";
-import { waitingOnOwner } from "@/features/inbox";
-import { NotesSearch } from "@/features/pkm";
-import { useCore, useFrames } from "@/infra/frame";
-import { useRouter } from "@/infra/router";
-import { useUpdates } from "@/infra/settings";
-import { A } from "@/ui/A";
-import { OrchestratorFace } from "@/ui/Face";
-import { Icon } from "@/ui/Icon";
-import type { IconName } from "@/ui/icons";
-import { titleBar } from "@/ui/layout";
-import { ShortcutSheet } from "@/ui/ShortcutSheet";
-import { Hint } from "@/ui/Tip";
+import { pressed } from "#/base/shortcuts.ts";
+import { QuickSwitcher, switcher } from "#/features/channel/index.ts";
+import { waitingOnOwner } from "#/features/inbox/index.ts";
+import { NotesSearch } from "#/features/pkm/index.ts";
+import { useCore, useFrames } from "#/infra/frame.ts";
+import { useRouter } from "#/infra/router.ts";
+import { useUpdates } from "#/infra/settings.ts";
+import { A } from "#/ui/A.tsx";
+import { OrchestratorFace } from "#/ui/Face.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import type { IconName } from "#/ui/icons.ts";
+import { titleBar } from "#/ui/layout.tsx";
+import { ShortcutSheet } from "#/ui/ShortcutSheet.tsx";
+import { Hint } from "#/ui/Tip.tsx";
 
 import { type Place, placeOf, places, settingsPlace } from "./places";
 
@@ -182,7 +182,7 @@ function Desk(props: { place?: Place | undefined }) {
 
 export function Shell(props: { children: JSX.Element }) {
   const router = useRouter();
-  const here = () => placeOf(router.path().split("?")[0]!);
+  const here = () => placeOf(router.path().split("?")[0] ?? "");
   // Ctrl+K (⌘K on a Mac) anywhere in the workbench (base/shortcuts.ts).
   onSettled(() => {
     const key = (e: KeyboardEvent) => {

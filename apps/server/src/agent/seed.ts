@@ -7,7 +7,7 @@ import { Schema } from "effect";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { localizedJson } from "@/base/json.ts";
+import { localizedJson } from "#/base/json.ts";
 
 import seedsEn from "./seeds.en.json";
 import seedsZh from "./seeds.json";

@@ -7,15 +7,15 @@ import { For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { LanPairing, LanStatus } from "@vibevalley/protocol";
 
-import { useNow } from "@/base/dom";
-import { momentText } from "@/base/format";
-import { api, reasonOf } from "@/infra/api";
-import { ready, useQuery } from "@/infra/query";
-import { type Act, createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { Card, Quiet } from "@/ui/layout";
-import { Qr } from "@/ui/Qr";
-import { toast } from "@/ui/toasts";
+import { useNow } from "#/base/dom.tsx";
+import { momentText } from "#/base/format.ts";
+import { api, reasonOf } from "#/infra/api.ts";
+import { ready, useQuery } from "#/infra/query.ts";
+import { type Act, createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { Card, Quiet } from "#/ui/layout.tsx";
+import { Qr } from "#/ui/Qr.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 const notes = [0, 1, 2, 3] as const;
 

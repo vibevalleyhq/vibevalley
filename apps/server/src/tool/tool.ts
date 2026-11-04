@@ -4,16 +4,16 @@ import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { maybe, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { head } from "@/base/clip.ts";
-import { Channel, type Spoken } from "@/channel/channel.ts";
-import { Cron } from "@/cron/cron.ts";
-import { inboxLines } from "@/mailbox/prompts.ts";
-import { foundText, Memory, type SearchQuery } from "@/memory/memory.ts";
-import { Project } from "@/project/project.ts";
-import { resourceWords } from "@/resource/prompts.ts";
-import { Resource, ResourceRequest } from "@/resource/resource.ts";
-import type { ToolStart } from "@/session/reaction.ts";
+import { Agent } from "#/agent/agent.ts";
+import { head } from "#/base/clip.ts";
+import { Channel, type Spoken } from "#/channel/channel.ts";
+import { Cron } from "#/cron/cron.ts";
+import { inboxLines } from "#/mailbox/prompts.ts";
+import { foundText, Memory, type SearchQuery } from "#/memory/memory.ts";
+import { Project } from "#/project/project.ts";
+import { resourceWords } from "#/resource/prompts.ts";
+import { Resource, ResourceRequest } from "#/resource/resource.ts";
+import type { ToolStart } from "#/session/reaction.ts";
 
 import { artifactTools } from "./artifact.ts";
 import { issueTools } from "./issue.ts";

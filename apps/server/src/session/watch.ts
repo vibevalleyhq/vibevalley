@@ -8,13 +8,13 @@ import { Clock, Effect } from "effect";
 import { t } from "@vibevalley/i18n";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { session as sessionActor } from "@/base/actor.ts";
-import { Core } from "@/core/core.ts";
-import { Executor, type Execution, type StartFailure } from "@/executor/executor.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { Memory } from "@/memory/memory.ts";
-import { Runtime } from "@/runtime/runtime.ts";
+import { session as sessionActor } from "#/base/actor.ts";
+import { Core } from "#/core/core.ts";
+import { Executor, type Execution, type StartFailure } from "#/executor/executor.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { Memory } from "#/memory/memory.ts";
+import { Runtime } from "#/runtime/runtime.ts";
 
 import { type Journal } from "./journal.ts";
 import { reactionTo, phaseFact, type Op, since } from "./reaction.ts";

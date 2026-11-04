@@ -43,7 +43,7 @@ export const refused = {
   ),
   useQuery: says(
     "solid-query's useQuery tracks what its fetch reads, so a signal read inside refetches",
-    'import { useQuery } from "@/infra/query"',
+    'import { useQuery } from "#/infra/query.ts"',
     "apps/web/src/infra/query.ts",
   ),
 };
@@ -76,7 +76,7 @@ export default defineConfig({
       "server:check": [
         "vp run packages:build",
         "vp check",
-        "vp run --filter @vibevalley/protocol --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent test",
+        "vp run --filter @vibevalley/protocol --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent test",
         "vp run effect:check",
         "vp run --filter @vibevalley/server db:check",
         "vp run --filter @vibevalley/server test",
@@ -97,6 +97,7 @@ export default defineConfig({
         "effect-tsgo diagnostics --project packages/agent/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/ai/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/protocol/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project packages/home/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/bridge/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/testkit/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/health/tsconfig.json --strict",
@@ -118,7 +119,7 @@ export default defineConfig({
     printWidth: 160,
     // site/ is its own project; the rest are written by tools or are data, and docs keep their compact tables.
     ignorePatterns: ["site/**", "**/*.md", "apps/server/db/generated/**", "**/testdata/**", "apps/web/public/**", ".agents/**", "design/**"],
-    // Imports from farthest to nearest: Node, packages, the workspace's own, this app's @/, then the same folder.
+    // Imports from farthest to nearest: Node, packages, the workspace's own, this app's #/, then the same folder.
     sortImports: {
       customGroups: [{ groupName: "workspace", elementNamePattern: ["@vibevalley/**"] }],
       groups: ["builtin", "external", "workspace", ["internal", "subpath"], ["parent", "sibling", "index"], "style", "unknown"],
@@ -138,6 +139,8 @@ export default defineConfig({
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
       "vibevalley/no-comment-divider": "error",
+      // A package reaches another only by its name (scripts/oxlint-plugin.ts, no-cross-package-path).
+      "vibevalley/no-cross-package-path": "error",
       // [...text] splits by code point, on purpose (docs/style/code.md).
       "typescript/no-misused-spread": "off",
       // A copy before changing what is iterated, on purpose.
@@ -580,7 +583,7 @@ export default defineConfig({
         rules: { "vibevalley/child-process-door": "error" },
       },
       {
-        // An import from outside its folder is written from src, as @/… (scripts/oxlint-plugin.ts, parent-import).
+        // An import from outside its folder is written from src, as #/… (scripts/oxlint-plugin.ts, parent-import).
         files: ["apps/web/src/**", "apps/server/src/**"],
         rules: { "vibevalley/parent-import": "error" },
       },

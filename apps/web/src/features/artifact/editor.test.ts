@@ -3,8 +3,8 @@ import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { type Block, type BlockAck, type BlockSnapshot, ownerId } from "@vibevalley/protocol";
 import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
-import { api } from "@/infra/api";
-import { deferred } from "@/state/testing";
+import { api } from "#/infra/api.ts";
+import { deferred } from "#/state/testing.ts";
 
 import { BlockEditor } from "./editor";
 

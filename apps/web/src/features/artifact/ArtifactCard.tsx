@@ -4,12 +4,12 @@ import { t } from "@vibevalley/i18n";
 import type { ArtifactBody, ArtifactCard as Card, ArtifactListRequest } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
 
-import { api } from "@/infra/api";
-import { useQuery } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { A } from "@/ui/A";
-import { Icon } from "@/ui/Icon";
-import type { IconName } from "@/ui/icons";
+import { api } from "#/infra/api.ts";
+import { useQuery } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { A } from "#/ui/A.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import type { IconName } from "#/ui/icons.ts";
 
 // Artifacts (docs/subsystems/artifact.md) are not in the frame: they are read when shown, and read again every few
 // seconds while shown, so a new version a helper hands in comes up on its own.

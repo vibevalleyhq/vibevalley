@@ -8,14 +8,14 @@ import { SqlClient } from "effect/sql";
 import type * as T from "@vibevalley/protocol";
 import { needOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "@/agent/agent.ts";
-import { orchestrator, owner } from "@/base/actor.ts";
-import { Core } from "@/core/core.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Session } from "@/session/session.ts";
-import type { DeliveryInput } from "@/session/signals.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { releaseHeld } from "@/testing/worker.ts";
+import { Agent } from "#/agent/agent.ts";
+import { orchestrator, owner } from "#/base/actor.ts";
+import { Core } from "#/core/core.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Session } from "#/session/session.ts";
+import type { DeliveryInput } from "#/session/signals.ts";
+import { testConfig } from "#/testing/layers.ts";
+import { releaseHeld } from "#/testing/worker.ts";
 
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 

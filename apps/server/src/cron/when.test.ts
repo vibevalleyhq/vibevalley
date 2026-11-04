@@ -6,9 +6,9 @@ import { expect, test } from "vite-plus/test";
 
 import type { Cron, CronRequest, CronWhen } from "@vibevalley/protocol";
 
-import { emptyWorkspaceState } from "@/core/core.ts";
-import { frameOf } from "@/projection/frame.ts";
-import { reduce } from "@/projection/reduce.ts";
+import { emptyWorkspaceState } from "#/core/core.ts";
+import { frameOf } from "#/projection/frame.ts";
+import { reduce } from "#/projection/reduce.ts";
 
 import { cronProblem, nextRun, nextText, whenText } from "./when.ts";
 

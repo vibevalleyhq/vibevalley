@@ -9,16 +9,16 @@ import { clockText } from "@vibevalley/engine/clock";
 import { t } from "@vibevalley/i18n";
 import type { Session, StateFrame } from "@vibevalley/protocol";
 
-import { aria } from "@/base/dom";
-import { createExternal } from "@/base/external";
-import { localEffects } from "@/farm/frames";
-import { clock, farm } from "@/farm/store";
-import { typing } from "@/farm/tools";
-import { api } from "@/infra/api";
-import { orchestratorMood, useCore, useFrames, rawFrame, subscribeLive } from "@/infra/frame";
-import { ready, useQuery } from "@/infra/query";
-import { createPixelAct } from "@/ui/pixel";
-import { playSound, SOUND_GROUPS, SOUND_LABEL } from "@/ui/pixel/sound";
+import { aria } from "#/base/dom.tsx";
+import { createExternal } from "#/base/external.ts";
+import { localEffects } from "#/farm/frames.ts";
+import { clock, farm } from "#/farm/store.ts";
+import { typing } from "#/farm/tools.ts";
+import { api } from "#/infra/api.ts";
+import { orchestratorMood, useCore, useFrames, rawFrame, subscribeLive } from "#/infra/frame.ts";
+import { ready, useQuery } from "#/infra/query.ts";
+import { createPixelAct } from "#/ui/pixel/index.ts";
+import { playSound, SOUND_GROUPS, SOUND_LABEL } from "#/ui/pixel/sound.ts";
 
 const keep = 2000;
 

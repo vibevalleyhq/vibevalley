@@ -5,7 +5,7 @@ import { HttpServerRequest } from "effect/http";
 
 import type { LanHandlers } from "@vibevalley/protocol/api";
 
-import { deviceHeader, Lan } from "@/lan/lan.ts";
+import { deviceHeader, Lan } from "#/lan/lan.ts";
 
 export const lanHandlers = Effect.gen(function* () {
   const lan = yield* Lan;

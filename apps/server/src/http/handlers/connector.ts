@@ -4,7 +4,7 @@ import { Effect } from "effect";
 
 import type { ConnectorHandlers } from "@vibevalley/protocol/api";
 
-import { Connector } from "@/connector/connector.ts";
+import { Connector } from "#/connector/connector.ts";
 
 export const connectorHandlers = Effect.gen(function* () {
   const connectors = yield* Connector;

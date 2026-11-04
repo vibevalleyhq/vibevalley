@@ -7,8 +7,8 @@ import { setLocale } from "@vibevalley/i18n";
 import type { Spent } from "@vibevalley/protocol";
 import { endpoints, fieldsOf } from "@vibevalley/protocol/api";
 
-import { htmlSources } from "@/artifact/policy.ts";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
+import { htmlSources } from "#/artifact/policy.ts";
+import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { descriptions, params, sessionDescriptions, spentText } from "./prompts.ts";
 import { agentOnly, type Op, parameters, schemas, sessionParameters, sessionSchemas, toolName } from "./schemas.ts";

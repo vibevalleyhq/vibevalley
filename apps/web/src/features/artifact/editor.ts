@@ -21,7 +21,7 @@ import {
 import { keyBetween, normalSpans } from "@vibevalley/protocol/rules";
 import { blockId } from "@vibevalley/protocol/schema";
 
-import { reasonOf } from "@/infra/api";
+import { reasonOf } from "#/infra/api.ts";
 
 import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, plainOf, splitSpans } from "./blocks";
 

@@ -9,20 +9,20 @@ import { t } from "@vibevalley/i18n";
 import { type ProjectTemplates, type Session } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { aria } from "@/base/dom";
-import { commands } from "@/farm/frames";
-import { farmProject } from "@/farm/store";
-import { issueOf } from "@/farm/world/plots";
-import { createWriteKey, writeIssue } from "@/features/issue";
-import { useWorkAgents } from "@/infra/agents";
-import { api, reasonOf, newSendKey } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { ready, useProjects, useQuery } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { usePrefs } from "@/state/prefs";
-import { AgentFace } from "@/ui/Face";
-import { createPixelAct, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
-import { playSound } from "@/ui/pixel/sound";
+import { aria } from "#/base/dom.tsx";
+import { commands } from "#/farm/frames.ts";
+import { farmProject } from "#/farm/store.ts";
+import { issueOf } from "#/farm/world/plots.ts";
+import { createWriteKey, writeIssue } from "#/features/issue/index.ts";
+import { useWorkAgents } from "#/infra/agents.ts";
+import { api, reasonOf, newSendKey } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { ready, useProjects, useQuery } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { usePrefs } from "#/state/prefs.ts";
+import { AgentFace } from "#/ui/Face.tsx";
+import { createPixelAct, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
+import { playSound } from "#/ui/pixel/sound.ts";
 
 const xs = "text-[12px] text-bark-600";
 /** Who picks the helper when the owner does not. */

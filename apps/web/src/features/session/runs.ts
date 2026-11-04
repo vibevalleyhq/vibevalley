@@ -6,7 +6,7 @@ import { t } from "@vibevalley/i18n";
 import type { LiveEvent, SessionEvent } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { big, tookText } from "@/base/format";
+import { big, tookText } from "#/base/format.ts";
 
 /** The steps kept for one session's log in the page. */
 export const stepLimit = 240;

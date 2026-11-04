@@ -7,8 +7,8 @@ import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { type AchievementDef, achievements } from "@/agent/seed.ts";
-import { sessionOf, sessionOnIssue } from "@/session/roster.ts";
+import { type AchievementDef, achievements } from "#/agent/seed.ts";
+import { sessionOf, sessionOnIssue } from "#/session/roster.ts";
 
 import { achievementInWords, levelForCommits } from "./view.ts";
 

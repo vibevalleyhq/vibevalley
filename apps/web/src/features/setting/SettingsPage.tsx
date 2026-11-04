@@ -6,17 +6,17 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { matches } from "@/base/search";
-import { ConnectorsPage } from "@/features/connector";
-import { LanPage } from "@/features/lan";
-import { SkillsPage } from "@/features/runtime";
-import { MossPlayground, VoiceForm } from "@/features/voice";
-import { A, Navigate } from "@/ui/A";
-import { TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import type { IconName } from "@/ui/icons";
-import { SettingsPage as Page, SettingsSearch } from "@/ui/settings";
-import { Splitter, usePaneWidth } from "@/ui/Splitter";
+import { matches } from "#/base/search.ts";
+import { ConnectorsPage } from "#/features/connector/index.ts";
+import { LanPage } from "#/features/lan/index.ts";
+import { SkillsPage } from "#/features/runtime/index.ts";
+import { MossPlayground, VoiceForm } from "#/features/voice/index.ts";
+import { A, Navigate } from "#/ui/A.tsx";
+import { TextInput } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import type { IconName } from "#/ui/icons.ts";
+import { SettingsPage as Page, SettingsSearch } from "#/ui/settings.tsx";
+import { Splitter, usePaneWidth } from "#/ui/Splitter.tsx";
 
 import { AboutPage } from "./AboutPage";
 import { AppearancePage } from "./AppearancePage";

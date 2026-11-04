@@ -2,8 +2,8 @@ import { list, t } from "@vibevalley/i18n";
 import type { Issue, IssueHistory, IssueStatus, Priority, Session, SessionView, WorkspaceView } from "@vibevalley/protocol";
 import { assignedAgentOf, executionsOf, stageWantsOwner, omitUndefined, sessionIdsOf, shortTitle } from "@vibevalley/protocol/rules";
 
-import { ago, tookText } from "@/base/format";
-import { matches } from "@/base/search";
+import { ago, tookText } from "#/base/format.ts";
+import { matches } from "#/base/search.ts";
 
 import { endedAt, issueSession, isForOrchestrator, issueTag, type IssueTag, issueTitle, tagText, tagOpen } from "./issue";
 import type { CardMove } from "./moves";

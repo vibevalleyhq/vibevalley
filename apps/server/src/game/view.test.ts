@@ -7,8 +7,8 @@ import { describe, expect, it, test } from "vite-plus/test";
 import type { Issue, IssueStage, Session } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { emptyWorkspaceState } from "@/core/core.ts";
-import { reduce } from "@/projection/reduce.ts";
+import { emptyWorkspaceState } from "#/core/core.ts";
+import { reduce } from "#/projection/reduce.ts";
 
 import { emptyPlay, playOf, plotOf, viewOf } from "./view.ts";
 

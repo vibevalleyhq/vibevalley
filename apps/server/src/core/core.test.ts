@@ -10,10 +10,10 @@ import { vi } from "vite-plus/test";
 import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { emptyProgress } from "@/game/progress.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { layer as projection } from "@/projection/frame.ts";
-import { testConfig, whenState } from "@/testing/layers.ts";
+import { emptyProgress } from "#/game/progress.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { layer as projection } from "#/projection/frame.ts";
+import { testConfig, whenState } from "#/testing/layers.ts";
 
 import { bounded, Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
 

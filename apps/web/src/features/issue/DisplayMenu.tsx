@@ -3,8 +3,8 @@ import { Show } from "solid-js";
 import { Popover } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
-import { Button } from "@/ui/Button";
-import { Segmented } from "@/ui/Segmented";
+import { Button } from "#/ui/Button.tsx";
+import { Segmented } from "#/ui/Segmented.tsx";
 
 import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "./display";
 

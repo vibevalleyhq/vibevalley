@@ -111,9 +111,6 @@
 | `keptFile` | `files.ts` | soonMs: how long a soon write waits after the first change, so a burst is one write and a crash loses no more. |
 | `HomeTaken` | `lease.ts` |  |
 | `leaseHome` | `lease.ts` | Takes the home, or throws HomeTaken; the function it returns gives it back. |
-| `homeOf` | `lease.ts` | The home a server or the command line uses: VIBEVALLEY_HOME, or ~/.vibevalley (as loadConfig reads it). |
-| `announce` | `lease.ts` | Says where this server listens, for as long as it does; the function it returns takes it back. |
-| `announced` | `lease.ts` | Where the server using this home listens; undefined when none says so or it has stopped. |
 | `callbackLog` | `log.ts` | Made in a service's make: the lines it writes end with the service and keep its logger. |
 | `bestEffort` | `log.ts` | Work the caller goes on without: a failure or a defect is logged at Warn after what (the words say what was being |
 | `timeHere` | `time.ts` | The Clock of the service that asks, as a Time: what it sleeps on runs with the service's own context, on fibers its |

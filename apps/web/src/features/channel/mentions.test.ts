@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { pinyinLoaded } from "@/base/search";
+import { pinyinLoaded } from "#/base/search.ts";
 
 import { offeredFor, typedName } from "./mentions";
 

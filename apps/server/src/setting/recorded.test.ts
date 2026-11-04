@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 
 import type { SettingsUpdate, SettingsUpdateVoice, VoiceSettings } from "@vibevalley/protocol";
 
-import { checkCases, goldenCases } from "@/testing/golden.ts";
+import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { keyHint, memorySourcesProblem, settingsProblem } from "./memorySources.ts";
 import { defaultVoice, voiceOverrides, voiceProblem, voiceSettingsOver } from "./voice.ts";

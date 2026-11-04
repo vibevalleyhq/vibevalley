@@ -5,9 +5,8 @@
 import { Effect, Schema } from "effect";
 import { Command } from "effect/cli";
 
+import { announced } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
-
-import { announced } from "@/infra/lease.ts";
 
 import { ServerFlag } from "./api.ts";
 import { appStatus, farmHome } from "./app.ts";

@@ -3,7 +3,7 @@
 import type { PkmBlock, PkmBlockOp, PkmMarker } from "@vibevalley/protocol";
 import { applyBlockOps, flatBlocks, pkmTagTyped, treeOfBlocks } from "@vibevalley/protocol/rules";
 
-import type { Mark } from "@/base/typedMarks";
+import type { Mark } from "#/base/typedMarks.ts";
 
 /** Every op the page makes names its new block's id, so the random id here is never used. */
 export const applied = (blocks: readonly PkmBlock[], ops: readonly PkmBlockOp[]): PkmBlock[] =>

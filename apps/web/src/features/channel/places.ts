@@ -2,7 +2,7 @@ import { t } from "@vibevalley/i18n";
 import { type Chat, type ChatMessage, type Channel, type Issue, type Session, type WorkspaceState } from "@vibevalley/protocol";
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
-import { compareText, or, spelled } from "@/base/search";
+import { compareText, or, spelled } from "#/base/search.ts";
 
 const isTop = (c: Channel) => c.type !== "thread";
 

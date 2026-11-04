@@ -3,13 +3,13 @@ import { Context, Effect, Layer, Schema } from "effect";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Channel } from "@/channel/channel.ts";
-import { type ApiError } from "@/errors.ts";
-import { Ingress } from "@/ingress/ingress.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import type { ProjectError } from "@/project/workplace.ts";
-import { Session } from "@/session/session.ts";
+import { Channel } from "#/channel/channel.ts";
+import { type ApiError } from "#/errors.ts";
+import { Ingress } from "#/ingress/ingress.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import type { ProjectError } from "#/project/workplace.ts";
+import { Session } from "#/session/session.ts";
 
 import { resourceWords } from "./prompts.ts";
 

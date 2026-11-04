@@ -5,10 +5,10 @@ import { sessionIdsOf } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOrNone } from "@/base/json.ts";
-import { type Core } from "@/core/core.ts";
+import { jsonOrNone } from "#/base/json.ts";
+import { type Core } from "#/core/core.ts";
+import type * as q from "#db/issue.sql.ts";
 
-import type * as q from "../../db/generated/issue.sql.ts";
 import { statusMoves } from "./moves.ts";
 import { issueRefiningOf, issueStageIn, issueStatusOf } from "./status.ts";
 

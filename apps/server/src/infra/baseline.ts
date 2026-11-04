@@ -5,7 +5,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-import { serverFile } from "@/assets.ts";
+import { serverFile } from "#/assets.ts";
 
 const baselineFile = serverFile("db/migrations/0001_schema.up.sql");
 const baselineSql = () => readFileSync(baselineFile, "utf8");

@@ -33,6 +33,7 @@ packages/ai/               模型：DeepSeek 的请求和流、消息形状、�
 packages/agent/            VibeValley 自己的 agent：core/ 是循环和工具，其余是 Brain（对话、压缩、技能、记性、帮手、自己的任务）；
                            不认识农场，lint 查方向（ai ← agent ← apps/server）
 packages/bridge/           宿主之间的调用：一份契约（每个调用的入参、出参，每个推送的载荷，都是 Schema），两头由它生成，传输是各宿主的适配器
+packages/home/             农场的家目录在磁盘上的约定：在哪、服务端在哪个端口（server.json）、语言（settings.json）、桌面版的 socket；服务端、命令行、桌面版都用它
 packages/testkit/          测试共用的：黄金数据、在真实时间上等条件、测试金字塔（只在 devDependencies）
 packages/tsrs/             TypeScript 跑在 tsrs（TypeScript 7 的 Rust 移植）上：顶替 oxlint-tsgolint 给 vp check 做带类型的 lint 和类型检查，
                            tsdk/ 是编辑器用的带 Effect 语言服务的 TypeScript

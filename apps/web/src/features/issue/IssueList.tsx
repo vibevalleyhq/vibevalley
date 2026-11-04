@@ -4,11 +4,11 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { IssueStatus } from "@vibevalley/protocol";
 
-import { ago } from "@/base/format";
-import { useOrchestrators } from "@/infra/agents";
-import { OrchestratorFace } from "@/ui/Face";
-import { Icon } from "@/ui/Icon";
-import { IconButton } from "@/ui/IconButton";
+import { ago } from "#/base/format.ts";
+import { useOrchestrators } from "#/infra/agents.ts";
+import { OrchestratorFace } from "#/ui/Face.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import { IconButton } from "#/ui/IconButton.tsx";
 
 import { EmptyNote, OlderLink } from "./Board";
 import { type BoardCard, cardAgent, cardLook, cardProject, closedShown, laneLabel, laneStatus } from "./cards";

@@ -6,12 +6,12 @@ import { Effect } from "effect";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Artifact } from "@/artifact/artifact.ts";
-import { htmlCheck } from "@/artifact/check.ts";
-import { artifactMax } from "@/artifact/policy.ts";
-import { Channel } from "@/channel/channel.ts";
-import { messageOf, type ApiError, reasonOf, refused } from "@/errors.ts";
-import { Session } from "@/session/session.ts";
+import { Artifact } from "#/artifact/artifact.ts";
+import { htmlCheck } from "#/artifact/check.ts";
+import { artifactMax } from "#/artifact/policy.ts";
+import { Channel } from "#/channel/channel.ts";
+import { messageOf, type ApiError, reasonOf, refused } from "#/errors.ts";
+import { Session } from "#/session/session.ts";
 
 import { answers, blockLine } from "./prompts.ts";
 import { type Caller, type Who, type Orchestrator, type SessionInput, refuse, callerOf, tool, sessionSchemaTool } from "./schemas.ts";

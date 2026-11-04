@@ -8,7 +8,7 @@ import type { MountOptions, Mounted } from "pele/lazy";
 
 import { t } from "@vibevalley/i18n";
 
-import { messageOf } from "@/base/format";
+import { messageOf } from "#/base/format.ts";
 
 import { highlight } from "./code/highlight";
 import { icons } from "./icons";

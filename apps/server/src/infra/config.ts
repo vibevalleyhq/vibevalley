@@ -8,9 +8,10 @@ import { join } from "node:path";
 import { Config as Keys, ConfigProvider, Context, Effect, FileSystem, Schema } from "effect";
 import { parse } from "yaml";
 
+import { defaultHome } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
 
-import { messageOf } from "@/errors.ts";
+import { messageOf } from "#/errors.ts";
 
 export class ServerConfig extends Context.Service<
   ServerConfig,
@@ -58,7 +59,7 @@ const noticeBatchMs = 3_000;
 
 export function defaults(home = homedir()): ServerConfig["Service"] {
   return {
-    home: join(home, ".vibevalley"),
+    home: defaultHome("", home),
     version: "0.1.0",
     workRoot: join(home, "vibevalley-dev"),
     db: "",

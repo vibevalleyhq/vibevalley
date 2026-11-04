@@ -3,10 +3,10 @@
 import { t } from "@vibevalley/i18n";
 import { type ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
 
-import { ScaleValues, setScale, setTheme, usePrefs } from "@/state/prefs";
-import type { IconName } from "@/ui/icons";
-import { Segmented } from "@/ui/Segmented";
-import { SettingRow, SettingsGroup, SettingsPage } from "@/ui/settings";
+import { ScaleValues, setScale, setTheme, usePrefs } from "#/state/prefs.ts";
+import type { IconName } from "#/ui/icons.ts";
+import { Segmented } from "#/ui/Segmented.tsx";
+import { SettingRow, SettingsGroup, SettingsPage } from "#/ui/settings.tsx";
 
 const themeIcon: Record<ThemeChoice, IconName> = { light: "themeLight", dark: "themeDark", system: "themeSystem" };
 

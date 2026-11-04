@@ -2,12 +2,12 @@ import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
 import { expect, it } from "@effect/vitest";
 import { Effect, Stream } from "effect";
 
-import { Agent } from "@/agent/agent.ts";
-import { Executor } from "@/executor/executor.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Session } from "@/session/session.ts";
-import type { LaunchActivity } from "@/session/signals.ts";
-import { testIssues } from "@/testing/world.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Executor } from "#/executor/executor.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Session } from "#/session/session.ts";
+import type { LaunchActivity } from "#/session/signals.ts";
+import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab, until } from "./farm.ts";
 
