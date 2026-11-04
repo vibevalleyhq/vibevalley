@@ -22,7 +22,7 @@ import { type MoreItem, MoreMenu } from "@/ui/MoreMenu";
 import { toast } from "@/ui/toasts";
 
 import { byTier, hasChildren, keyOp, type Piece, piecesOf, tierOrder, visibleBlocks, wordDiff } from "./outline";
-import { pkmHref, refreshPkm, usePkmPage, usePkmRadar, usePkmVault } from "./queries";
+import { pkmHref, refreshPkm, usePkmPage, usePkmRadar, usePkmVault } from "./vault";
 
 const tierLabel = (tier: PkmTier) => t(`web.pkm.tier.${tier}`);
 
