@@ -257,7 +257,7 @@ flowchart TB
   1. `packages/protocol/src/shapes.ts` 与 `packages/protocol/src/schema.ts`：
      - 在 `FactSessionPhase`（`shapes.ts:2110`）增加 `brief?: string`，删除 `FactRun`、`FactDoing`；
      - 新增 `FactGameProgress { type: "gameProgress"; at: number; progress?: Progress; news?: ProgressNews; commits?: CommitCount; station?: { readonly id: SessionId; readonly station: number } }`，删除 `FactStation`、`FactCommits`、`FactProgress`。
-  2. `apps/server/src/session/facts.ts`、`apps/server/src/session/session.ts`、`apps/server/src/game/game.ts`、`apps/server/src/core/core.ts`、`apps/server/src/projection/reduce.ts`：
+  2. `apps/server/src/session/reaction.ts`、`apps/server/src/session/session.ts`、`apps/server/src/game/game.ts`、`apps/server/src/core/core.ts`、`apps/server/src/projection/reduce.ts`：
      - 同步替换为 `sessionPhase` 与 `gameProgress`。
   3. `scripts/stale-names.ts`：
      - 新增规则拦截 `\b(FactHired|FactLeft|FactRun|FactDoing|FactStation|FactCommits|FactProgress)\b`。

@@ -27,7 +27,7 @@ import { Setting } from "@/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
 import { piBalance, type PiDefault, piSettings } from "./pi.ts";
-import { agentProblems, type Candidate, chooseAgent, factsOf, moneyStop, presetOf, runtimeIds, runtimeLabel, sessionOptions } from "./presets.ts";
+import { agentProblems, type Candidate, chooseAgent, supportOf, moneyStop, presetOf, runtimeIds, runtimeLabel, sessionOptions } from "./presets.ts";
 import { inCny, price, type Rate, spending } from "./price.ts";
 import { quotaOf } from "./quota.ts";
 import { dbTodoStores, vibevalleyRuntimeOf } from "./vibevalley.ts";
@@ -259,19 +259,19 @@ const make = (options: RuntimeOptions = {}) =>
       return { ...out, stop: moneyStop(out), quota: quotaOf(out.usage) };
     }
 
-    /** What the runtime takes: seeds.json's facts, with what it refuses taken from the adapter and the farm's policy laid over it. */
-    function facts(id: string) {
-      const f = factsOf(id);
+    /** What the runtime takes: seeds.json's support, with what it refuses taken from the adapter and the farm's policy laid over it. */
+    function support(id: string) {
+      const f = supportOf(id);
       return {
         ...f,
         refused: { ...registry.get(id)?.refusedSessionOptions, ...f.refused } as Record<string, string>,
       };
     }
 
-    /** What a probe found, as the farm shows it: its preset, facts and today's spend laid over. */
+    /** What a probe found, as the farm shows it: its preset, support and today's spend laid over. */
     const shown = (next: Observation): Observation => {
       const id = next.info.id;
-      return { ...next, info: withSpend({ ...next.info, preset: presetOf(id), facts: facts(id) }), locale: currentLocale() };
+      return { ...next, info: withSpend({ ...next.info, preset: presetOf(id), support: support(id) }), locale: currentLocale() };
     };
 
     const probe = Effect.fnUntraced(function* (id: string): Effect.fn.Return<Observation> {
@@ -280,7 +280,7 @@ const make = (options: RuntimeOptions = {}) =>
       const info: T.RuntimeInfo = {
         id,
         preset: presetOf(id),
-        facts: facts(id),
+        support: support(id),
         installation: { status: "checking" },
         models: null,
         usage: null,
@@ -470,7 +470,7 @@ const make = (options: RuntimeOptions = {}) =>
             return {
               id,
               preset: presetOf(id),
-              facts: facts(id),
+              support: support(id),
               installation: { status: "checking" },
               models: null,
               usage: null,

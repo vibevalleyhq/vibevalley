@@ -21,7 +21,7 @@ Session 是一个档案持续工作的执行上下文：处理工单时，农场
 Mailbox 投递持久化 Trigger 与输入上下文，不要求存在聊天消息。管家与帮工的投递都先记 handed，真实输入回执再标记 consumed；管家拒绝启动时退回 pending。聊天中的 👀 跟随消费回执，不表示仅送到消费者。
 
 - 服务端 `apps/server/src/executor`（`Executor`）：拥有 oar 执行实例，创建、投递、中断、关闭、订阅事件与汇报；`stalls.ts` 观察原始事件的静默间隔。`Session` 交给它准备好的输入和选项，收到事件后记轮次、轨迹和核心事实。
-- 服务端 `apps/server/src/session`（`Session`）：`session.ts` 生命周期（`send` 派、`deliver` 带话、`stop`、`dismiss`、交出现场 `handOver`、只读一轮之后把 worktree 重置回主分支 `discardWork`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；纯函数按管的事分开：`report.ts` 的 `readReport`（一轮的结尾怎么读），`hiring.ts` 的 `noRoom`、`whoMakesRoom`（还能不能再来一个、谁回家腾地方），`briefing.ts`（交给帮工的说明、技能和想起来的，还有收活时冲突怎么说、没收进去是什么意思），`roster.ts`（核心状态里的帮工）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`inProcessRun.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
+- 服务端 `apps/server/src/session`（`Session`）：`session.ts` 拼起对外的 `Session`：生命周期（`send` 派、`deliver` 带话、`stop`、`dismiss`、交出现场 `handOver`、只读一轮之后把 worktree 重置回主分支 `discardWork`、重启后 `restore`）；它里面按职责分：`records.ts` 内存里的 hand 和它们的行、run 的记账和写入的先后、给别的模块听的流、`/mcp` 认人的令牌、退出时的保存；`watch.ts` 跟着一次 launch（oar 的事件读进阶段和 run、汇报收尾、没动静）；`launch.ts` 开、唤醒和歇下（农机和项目留下的余地、带话，睡着就叫醒、闲着时用它的现场、回家和交出现场）；`reaction.ts` 的 `reactionTo`（纯函数）把一个 oar 事件读成事实和日志；纯函数按管的事分开：`report.ts` 的 `readReport`（一轮的结尾怎么读），`hiring.ts` 的 `noRoom`、`whoMakesRoom`（还能不能再来一个、谁回家腾地方），`briefing.ts`（交给帮工的说明、技能和想起来的，还有收活时冲突怎么说、没收进去是什么意思），`roster.ts`（核心状态里的帮工）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`inProcessRun.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
 - `apps/server/src/runtime`（`Runtime`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `@vibevalley/ai/models`，pi 按 pi-ai 自带的价目）、今天的花费；`fit.ts` 的 `agentProblems`、`quota.ts` 的 `moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
 - 表：`session`（任一 Agent 的会话一行，`role` 是 `orchestrator` 或 `worker`；帮工走了也留着，管家常驻）、`session_run`（一次 run 一行，外键必须指向 Session）、`session_run_issue`（一次 run 实际消费了哪几张工单）。`issue_assignment` 和 `issue_assignment_execution` 归工单。
 - 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`logs/`（oar 的原始记录）；阶段、运行次数、最近报告、花费和当前场景字段由 session 表保存，Core 只是实时投影。登记身份、初始阶段和工作目录同事务写入；结束 Run、保存会话状态和清掉 pending_report 同事务完成。
@@ -41,10 +41,10 @@ Session 服务只返回声明的接口，不附带 Hand、令牌生成器和日�
 | 层 | 代码里 | 是什么 |
 |---|---|---|
 | Session | `Session`（`signals.ts`）、`session` 表 | 一个档案的上下文：工单按配置使用项目目录或 worktree；聊天使用自身目录并关联频道，跨好几次 run；编号 `w<n>`，接着已有的最大号往下排，新 Session 不会撞上旧日志 |
-| Run | `Run`、`session_run` | 一次触发到一次汇报：帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run；核心状态里是 `sessionPhase` 到 `sessionReport` 两个事实 |
+| Run | `Run`、`session_run` | 一次触发到一次汇报：帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run；核心状态里是 `sessionPhaseChanged` 到 `sessionReported` 两个事实 |
 | oar 会话 | oar 的会话、`Subagent` | 农机的一条可续的记录流；重启或接不上时换一个 |
 
-- **核心状态只放在地里的**：`WorkspaceState.sessions` 是在地里的 Session；`sessionReport` 事实按结果折成 `done`（做完）、`failed`、`resting`（叫停、重启打断）。走了的从 `session` 表读，阶段是 `closed`（什么时候、怎么走的，`SessionClose`：`merged`（合进了主分支）、`completed`（它的工单完成了、没合进主分支：分支留着、没有改动、计划的一步合进计划的分支）、`dismissed`、`lost`），轮数、最后一轮的结果和花费从 `session_run` 算，不另存。`triggered_by`、`heard`、`spent`、计划、工作目录和想起过的记性各自按 Schema 读回；某个字段读不了只按那个字段原有的空值处理，坏工作目录仍按接不回来处理。
+- **核心状态只放在地里的**：`WorkspaceState.sessions` 是在地里的 Session；`sessionReported` 事实按结果折成 `done`（做完）、`failed`、`resting`（叫停、重启打断）。走了的从 `session` 表读，阶段是 `closed`（什么时候、怎么走的，`SessionClose`：`merged`（合进了主分支）、`completed`（它的工单完成了、没合进主分支：分支留着、没有改动、计划的一步合进计划的分支）、`dismissed`、`lost`），轮数、最后一轮的结果和花费从 `session_run` 算，不另存。`triggered_by`、`heard`、`spent`、计划、工作目录和想起过的记性各自按 Schema 读回；某个字段读不了只按那个字段原有的空值处理，坏工作目录仍按接不回来处理。
 
 **聊天上下文**：创建时给频道上下文，不需要工单号，目录是 `VIBEVALLEY_WORK_ROOT/contexts/<Session id>-<唯一后缀>`。只关闭执行器的休眠保留身份、续接标识和文件；工单的交付、重置和合并不能用于这种上下文。`session.channel` 持久保存默认回复位置，`Run.triggeredBy.channel` 记录输入所在频道。
 
@@ -110,7 +110,7 @@ PR 在途的普通成功回合以及 prSubmit=true 的提交报告在结束时�
 
 从取得 `Subagents` 到发布帮工、叫醒和离场，帮工模块只用一份资源分配（`Allocation`）。每个真正返回的 oar 会话立即登记，`dispose` 的成功或失败只认同一次调用；启动、第一句话、工单关联或日志登记失败，以及 attach 前的中断，都经同一处关闭。不能取消的 spawn 由 `Subagents.close()` 等到迟到返回再销毁。只有 `Subagents` 和取得的全部会话都确认释放，才交回现场和令牌。接回旧会话失败时也先完成这次释放，才能换新会话；不能停止的不会再尝试另开一个。未发布分配与已发布帮工按同一个 Session id 算位置，不重复占位。
 
-**一次 run**：农机开一轮时施加 `run`、写 `session_run` 一行、日志写 `run/start`；之后每个 oar 事件经 `facts.ts` 变成事实（`doing` 是头顶的气泡，只在变了时施加；`retry`；`spent`）和日志。汇报（`SubagentReport`）经 `readReport` 读成 `sessionReport` 事实，带上 run 的 id、这一轮的花费和问主人的问题，`session_run` 记上结果、摘要和花费，日志写 `run/end`，交给记性记下这一轮，20 秒后读一次额度。oar 的 follow 在一个消费者上按顺序交来事件和汇报，汇报不越过它那条记录里的事件：claude 在 `turn_ended` 那一帧里才报用量，汇报照样带得上这一轮的花费。农机进程在干活时退出，记成一次失败的汇报并提醒。
+**一次 run**：农机开一轮时施加 `run`、写 `session_run` 一行、日志写 `run/start`；之后每个 oar 事件经 `reactionTo`（`reaction.ts`）变成事实（`doing` 是头顶的气泡，只在变了时施加；`retry`；`spent`）和日志。汇报（`SubagentReport`）经 `readReport` 读成 `sessionReported` 事实，带上 run 的 id、这一轮的花费和问主人的问题，`session_run` 记上结果、摘要和花费，日志写 `run/end`，交给记性记下这一轮，20 秒后读一次额度。oar 的 follow 在一个消费者上按顺序交来事件和汇报，汇报不越过它那条记录里的事件：claude 在 `turn_ended` 那一帧里才报用量，汇报照样带得上这一轮的花费。农机进程在干活时退出，记成一次失败的汇报并提醒。
 
 **带话**（`deliver` 返回结构化投递结果）：
 
@@ -126,7 +126,7 @@ PR 在途的普通成功回合以及 prSubmit=true 的提交报告在结束时�
 
 - 摘要优先取 `issue_report.summary`；没有结构化报告的异常退出只截最后几段，最长 160 字，不解析正文标记。
 - 失败按 oar 的失败分类（`@botiverse/oar/observe` 的 `failureAdvice`）说人话：登录或密钥、额度、限流、余额、模型用不了、上下文太长、请求被拒、服务商太忙、服务商出错、进程退出；带 HTTP 状态码和原因（最长 200 字），加上怎么办（再试一次、过一阵再试、要你先处理）。失败的汇报原话以失败原因开头。登录、余额、额度、模型这四类另发一条醒目的提醒。
-- `issue_report.questions`、`checks` 和 `answer` 进入 `sessionReport` 事实；正文不进入这些字段。
+- `issue_report.questions`、`checks` 和 `answer` 进入 `sessionReported` 事实；正文不进入这些字段。
 - 结构化 `answer` 折进 `lastRun.answer`；结论工单用它判断是否交出了结论。工单阶段由运行结果、问题、冲突和交付事实推导。
 
 **没动静**：`executor/executor.ts` 的 `watchStalls` 用 oar 的 `reduceStatus`、`stallOf` 从这个会话的第一条记录起折出状态（oar 自己的 `observeStalls` 只听订阅以后的记录），一轮在干、超过 `session.stall_seconds`（默认 240 秒）没有任何记录时报一次。等待和计时使用同一个 Clock，到点读一次时间，`quiet.since` 由这一刻回推。Session 施加 `quiet`（地块干裂、挂「没动静」，管家的「农场现状」和 Inbox 里也会说），日志记一条 `run/error`，农场提醒一次（带最后在做什么）。下一个不是用量的事件结束它。不自动叫停。
@@ -139,12 +139,12 @@ PR 在途的普通成功回合以及 prSubmit=true 的提交报告在结束时�
 
 工单清理空闲工作区经 `clearWorkplace`：帮工模块确认没有已发布的帮工或未释放的启动分配，再调用项目清理。项目的回执区分已释放和仍保留，不靠通知文字判断能否删除工单身份。
 
-腾位置也归帮工模块：`makeRoom` 在农机或项目到了上限时拒绝，整片地满了就请最久没干活的那个收工（`whoMakesRoom`），并说请走了谁。分支变化和冲突归 Issue：它通过 Session.withWorkplace 取得工作目录、调用 Project 检查；有冲突的工单在帮工交回一轮后重新检查（那一轮可能已经解决了），工单不用叫它。成功或收工才关上日志、`session` 表记上结束和怎么关的、作废令牌、记性收尾、施加 `sessionGone`。收工时分支上有提交就留着分支。
+腾位置也归帮工模块：`makeRoom` 在农机或项目到了上限时拒绝，整片地满了就请最久没干活的那个收工（`whoMakesRoom`），并说请走了谁。分支变化和冲突归 Issue：它通过 Session.withWorkplace 取得工作目录、调用 Project 检查；有冲突的工单在帮工交回一轮后重新检查（那一轮可能已经解决了），工单不用叫它。成功或收工才关上日志、`session` 表记上结束和怎么关的、作废令牌、记性收尾、施加 `sessionLeft`。收工时分支上有提交就留着分支。
 
 **重启**（`restore`，开机时 `session` 的 `ready` 跑它）：
 
 1. 删掉过期的日志；还开着的 run 记成 `interrupted`「VibeValley 重启了，这一轮停在了半路」。
-2. 核心状态里的每个 Session 对上库里它那一行：没有这一行（库按新的表结构重建过）或 worktree 不见了的，施加 `sessionGone`（`lost`）、提醒「没接回来」和原因。编号从库里和核心状态里见过的最大号接着排。
+2. 核心状态里的每个 Session 对上库里它那一行：没有这一行（库按新的表结构重建过）或 worktree 不见了的，施加 `sessionLeft`（`lost`）、提醒「没接回来」和原因。编号从库里和核心状态里见过的最大号接着排。
 3. 接回来的回到各自的地上，oar 会话先不打开，日志接着原来的写；重启时正在干的那一轮施加 `interrupted` 的汇报，帮工歇着，提醒一次「给它带句话就能接着干」。合并、收工不需要会话。
 4. 平时改了接回要的东西 300 毫秒后写进库；停机时先写一次（库在这一层之后才关），再放开会话，被停机打断的一轮在开机时才报。
 
@@ -167,7 +167,7 @@ PR 在途的普通成功回合以及 prSubmit=true 的提交报告在结束时�
 - **执行器拥有资源，Session 拥有领域状态。** `Executor` 直接驱动 oar 并确认关闭，`Session` 负责接活身份、轮次、轨迹和核心事实。把启动、关闭、投递和事件监听一起移入执行器，避免一个实例的创建与释放分属两处；不增加一层转发到 Session 的空接口。管家的进程内大脑仍由 `AgentHost` 管理，不伪装成 oar 资源。
 - **帮工是 oar 的子 agent，一套代码驱动全部农机。** oar 统一了发现、开会话、事件、插话和汇报；每种农机自己接要重写这些。服务端是 TypeScript，直接用 npm 的 oar，不再维护一份移植。
 - **不要权限确认，用工作目录、worktree 和只听本机圈住。** 开着确认，帮工会卡在第一个命令上，界面也没有批准的地方；各农机的沙箱能力不一样（codex 有 `OAR_CODEX_SANDBOX`，其他没有统一的），先用目录圈住。代价是帮工能在本机执行任意命令，VibeValley 按本机单人使用设计。
-- **规则写成纯函数，`session.ts` 只管生命周期。** `facts.ts`、`readReport`、`noRoom` 一个值进、一个值出，有不开会话的单元测试；放弃了按功能拆成几个服务（它们读同一个帮工、同一份记账，要么互相依赖、要么各存一份）。`facts.ts` 不在里面跑 `reduce`：一个事件最多产生「结束没动静」加一条事实，前一条不改后一条要看的字段。
+- **规则写成纯函数，`session.ts` 只管生命周期。** `reactionTo`、`readReport`、`noRoom` 一个值进、一个值出，有不开会话的单元测试；放弃了按功能拆成几个服务（它们读同一个帮工、同一份记账，要么互相依赖、要么各存一份）：一个服务里分成几个文件，hand 和记账只在 `records.ts`，别的块经它拿。`reactionTo` 不在里面跑 `reduce`：一个事件最多产生「结束没动静」加一条事实，前一条不改后一条要看的字段。
 - **Run 是一轮，Session 跨好几轮。** 只有「轮」不成为记录时，答不了「这条评论让它干了什么、花了多少、做成没有」。叫 run 不叫 turn：turn 是 oar 那一层的词，各家农机的 turn 大小也不一样（Claude Code 的 `num_turns` 数的是一次提问里模型来回的次数）；也不叫 operation（太泛）。插进来的话不另开 run：农机把它和原来的活放在同一轮里做完、一起汇报，分成两次是假的。
 - **Session 表示持续上下文，Assignment 表示责任关系。** 工单和聊天使用同一份启动、轮次、休眠和恢复实现，来源不再决定一种新的 Session 类型。`Agent` 是档案身份；底层运行记录在中文文档里写「oar 会话」，重建它不改变 Session 身份。
 - **run 归实际消费输入和终结的一方。** 放弃了「每张排队的工单先开一个 run，结束时一起关」：入队和消费之间隔着停止、失败和重启，会留下从没执行的 run、关掉没消费的工单。多张工单进同一个 loop 时只留一个 run、用关系表关联，不复制几份日志；待终结和在干是两种状态，不能共用「run id 非空」。摘要的回执在真正消费时提交，发送成功只说明进了队列。

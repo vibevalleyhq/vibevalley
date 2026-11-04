@@ -3,7 +3,7 @@ import { Effect, Layer, Stream } from "effect";
 import { HttpRouter } from "effect/http";
 import { describe, expect, it } from "vite-plus/test";
 
-import type { LiveEvent, SideEvent, StateFrame } from "@vibevalley/protocol";
+import type { LiveEvent, ServerEvent, StateFrame } from "@vibevalley/protocol";
 
 import { Core } from "@/core/core.ts";
 import { ServerConfig } from "@/infra/config.ts";
@@ -61,8 +61,8 @@ describe("the SSE contract", () => {
     );
   });
 
-  it("ends the stream on an invalid SideEvent", async () => {
-    const bad = { type: "notice", at: 0, level: "info", text: 42 } as unknown as SideEvent;
+  it("ends the stream on an invalid ServerEvent", async () => {
+    const bad = { type: "notice", at: 0, level: "info", text: 42 } as unknown as ServerEvent;
     await withRoutes(
       (core) => ({ ...core, events: Stream.succeed(bad) }),
       async (handler) => {

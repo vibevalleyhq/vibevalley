@@ -7,6 +7,7 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
+import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
 import { useNow } from "@/base/dom";
 import { farm, farmChannelLabel, useFarm } from "@/farm/store";
@@ -14,9 +15,7 @@ import {
   chatSay,
   pendingLines,
   topOf,
-  channelOf,
   feedOf,
-  defaultOf,
   orchestratorTyping,
   parentAt,
   phaseText,

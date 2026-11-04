@@ -221,7 +221,7 @@ describe("an issue", () => {
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
       yield* core.apply({
-        type: "session",
+        type: "sessionChanged",
         session: {
           id: "w90",
           role: "worker",
@@ -248,7 +248,7 @@ describe("an issue", () => {
       const queued = yield* issues.setStatus(other.id, "todo", "", "", owner);
       const unqueued = yield* issues.setStatus(other.id, "backlog", "", "", owner);
       expect([queued.queuedAt !== undefined, unqueued.queuedAt]).toEqual([true, undefined]);
-      yield* core.apply({ type: "sessionGone", id: sessionId("w90") });
+      yield* core.apply({ type: "sessionLeft", id: sessionId("w90") });
       yield* (yield* Issue).refreshQueue;
       yield* w.nextReport;
       expect(yield* status()).toBe("in_review");
@@ -289,9 +289,7 @@ describe("an issue", () => {
       expect(sessionIdsOf(yield* ofCron())).toHaveLength(1);
       expect(yield* runs()).toHaveLength(1);
       const sql = yield* SqlClient.SqlClient;
-      const held = yield* sql
-        .unsafe<{ state: string }>("select state from mailbox_issue where issue_id = $1 and state = 'held'", [first.id])
-        .pipe(Effect.orDie);
+      const held = yield* sql.unsafe<{ state: string }>("select state from mailbox_issue where issue_id = ? and state = 'held'", [first.id]).pipe(Effect.orDie);
       expect(held).toHaveLength(1);
 
       yield* issues.setStatus(first.id, "done", "", "", owner);

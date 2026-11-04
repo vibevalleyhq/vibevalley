@@ -2,7 +2,7 @@
 // words, when it resets.
 
 import { t } from "@vibevalley/i18n";
-import type { RuntimeInfo } from "@vibevalley/protocol";
+import { quotaLow, type RuntimeInfo } from "@vibevalley/protocol";
 
 import { numberText } from "@/base/format";
 
@@ -10,9 +10,6 @@ import { numberText } from "@/base/format";
 export const usableRuntimes = (all: readonly RuntimeInfo[]) => all.filter((r) => r.installation.status === "available" && r.settings.enabled);
 
 type QuotaLevel = "plenty" | "low" | "gold" | "empty" | "unknown";
-
-/** Below this much left (percent) the farm warns and the orchestrator sends someone else if it can (protocol.QuotaLow). */
-const quotaLow = 15;
 
 /** How full a quota's bottle is drawn, by the share left. */
 export const quotaLevel = (left: number | undefined): QuotaLevel => (left === undefined ? "unknown" : left < quotaLow ? "empty" : left < 50 ? "low" : "plenty");

@@ -75,19 +75,21 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `baselineSql` | `baseline.ts` |  |
 | `baselineHash` | `baseline.ts` |  |
+| `baselineStatements` | `baseline.ts` | The baseline as single statements, in order: SQLite prepares one at a time. A trigger's body (BEGIN … END;) stays |
 | `ServerConfig` | `config.ts` |  |
 | `defaults` | `config.ts` |  |
 | `ConfigError` | `config.ts` | Why the configuration cannot be read: the file, or a key's value. |
 | `loadConfig` | `config.ts` | file: the YAML to read, which must be there; empty is home/vibevalley.yaml, read if it is there. The environment wins |
+| `pkmDir` | `config.ts` | The notes' vault. |
 | `dbDir` | `config.ts` | The database's folder, or "memory". |
 | `serverAddress` | `config.ts` | The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. |
 | `projectsDir` | `config.ts` | Where the projects are: each folder in it is one. |
 | `agentHome` | `config.ts` | A profile's folder for conversation logs, archives and evals; memory rows live in the database. |
 | `dbQueries` | `db.ts` | Every query run: what a test holds a hot path's budget to, and a reading of the farm's load. |
+| `dbFile` | `db.ts` | The database's file in its folder. |
 | `setAsideStale` | `db.ts` | A folder's database made from another baseline is moved aside, whole, to <folder>.<hash>-<time>: it is not |
-| `Database` | `db.ts` | The database as an SqlClient, with the schema in place. |
+| `Database` | `db.ts` | The database as an SqlClient, with the schema in place and foreign keys on. In memory, every farm has its own: running |
 | `causeMessage` | `db.ts` | What the database said, from under the SqlError around it. |
 | `Db` | `db.ts` | The farm's database as the services use it: a generated query (db/generated) run against it. The database is in this |
 | `NotWritten` | `files.ts` |  |
@@ -139,6 +141,9 @@
 | `testDatabase` | `layers.ts` |  |
 | `offline` | `layers.ts` | An HTTP client for a test that must not reach the network: every request dies, so one made by mistake is a failure. |
 | `whenState` | `layers.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. It |
+| `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds. |
+| `allow` | `refuse.ts` |  |
+| `heard` | `refuse.ts` | The lines the farm logs from here on, each with its cause; layer is given to what builds the farm. |
 | `releaseHeld` | `worker.ts` | Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. |
 | `helper` | `worker.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). 只起草工单 drafts; |
 | `installedOnly` | `worker.ts` | A probe that finds every runtime given, bundled, and no other. |

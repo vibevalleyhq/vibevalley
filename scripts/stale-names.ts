@@ -28,7 +28,18 @@ const RULES: readonly Rule[] = [
   {
     name: "a fact split from sessionPhase or gameProgress",
     pattern: /\b(FactHired|FactLeft|FactRun|FactDoing|FactStation|FactCommits|FactProgress)\b/u,
-    says: "a run or a step is sessionPhase (brief, phase.doing); a station, commits or the ledger is gameProgress",
+    says: "a run or a step is sessionPhaseChanged (brief, phase.doing); a station, commits or the ledger is progressChanged",
+  },
+  {
+    name: "a fact named for its thing, not for what happened to it",
+    pattern:
+      /\b(FactIssue|FactIssueGone|FactSession|FactSessionGone|FactSessionReport|FactSessionPhase|FactMessage|FactChannel|FactChannelGone|FactOwnerMentions|FactCron|FactCronGone|FactConnector|FactGameProgress|FactVoiceCall)\b|type: "(issueGone|sessionGone|sessionReport|sessionPhase|channelGone|cronGone|gameProgress|voiceCall)"/u,
+    says: "a fact says what happened: <thing>Changed (FactIssueChanged, type issueChanged), <thing>Removed, sessionReported, sessionLeft, callChanged, progressChanged (.agents/notes/implemented/architecture/2026-11-04-one-meaning-of-fact.md)",
+  },
+  {
+    name: "fact for something that is not a fact of the core state",
+    pattern: /\b(RuntimeFacts|runtimeFacts|FactsCard|ChannelRouteFact|RowFacts|rowFacts|SideEvent\w*|eventFacts|FactContext|unknownFacts)\b/u,
+    says: "a fact is only a change to the core state: RuntimeSupport (runtimeSupport, supportOf), ChannelRouteInput, RowKeys, ServerEvent, reactionTo and ReactionContext (session/reaction.ts)",
   },
   {
     name: "a toggle, now an explicit set",
@@ -103,7 +114,7 @@ const RULES: readonly Rule[] = [
     name: "an old protocol name",
     // The browser's Worker (new Worker, a value typed : Worker) is not the old name.
     pattern: /\b(FarmState|SiteFrame|SiteEvent|AgentProfile|WorkStep|ActionStep\w*|CanMerge|Foreman|(?<!new |: )Worker)\b/u,
-    says: "CoreState, StateFrame, SideEvent, Agent, Activity, PlayAction (a session play's history), canHarvest, Manager, Session; a Web Worker stays (new Worker)",
+    says: "CoreState, StateFrame, ServerEvent, Agent, Activity, PlayAction (a session play's history), canHarvest, Manager, Session; a Web Worker stays (new Worker)",
   },
   {
     name: "the old helper agent role",
@@ -343,7 +354,7 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "a runtime's preset read from the agent's seeds",
-    pattern: /\b(presetOf|factsOf|runtimeIds|runtimeLabel|defaultSettings)\b.*["']@\/agent\/seed(\.ts)?["']/u,
+    pattern: /\b(presetOf|supportOf|runtimeIds|runtimeLabel|defaultSettings)\b.*["']@\/agent\/seed(\.ts)?["']/u,
     says: "the runtimes' presets, facts, order and default settings are runtime/presets.ts (presets.json); agent/seed.ts keeps the achievements and the issue templates",
   },
   {
@@ -373,6 +384,8 @@ const RULES: readonly Rule[] = [
     pattern:
       /["'`](?:\.\.?\/|@\/)(?:channel\/(?:chat|folded|model)|mailbox\/chat|session\/(?:takeIn|shapes)|farm\/support|base\/util|ui\/richRules|project\/shapes|testing\/(?:helper|until|issues|said|agents)|farm\/world\/places|features\/voice\/(?:agora|moss)|features\/channel\/(?:emoji|feed|switcher|draft)|features\/issue\/(?:lanes|rows|queries)|features\/artifact\/queries|memory\/store|artifact\/spans|tool\/(?:cron|memory|channel|definition)|infra\/live|state\/latest)(?:\.tsx?)?["'`]/u,
     says: "channel/channel.ts, channel/messages.ts, channel/rooms.ts, mailbox/envelope.ts, session/briefing.ts, farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts, project/workplace.ts, session/signals.ts, features/issue/{history,cards}.ts, features/artifact/ArtifactCard.tsx, testing/{worker,layers,world}.ts, farm/world/world.ts, features/voice/{call,mossLine}.ts, features/channel/{EmojiPicker.tsx,places.ts,composing.ts}, memory/memory.ts, artifact/ops.ts, tool/{tool,schemas}.ts, infra/frame.ts, state/atom.ts",
+    // The retired files were the server's and the page's; the contract's concept folders (session/shapes.ts) are today's.
+    dirs: ["apps/server/src", "apps/web/src"],
   },
 ];
 

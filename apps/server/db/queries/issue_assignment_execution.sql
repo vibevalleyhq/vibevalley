@@ -1,11 +1,8 @@
 -- name: AddExecution :one
-with recorded as (
-  insert into issue_assignment_execution (assignment, executor, started_at)
-  values (sqlc.arg(assignment), sqlc.arg(executor), sqlc.arg(started_at))
-  on conflict (assignment, executor) do update set assignment = issue_assignment_execution.assignment
-  returning *
-)
-select recorded.*, session.role from recorded join session on session.id = recorded.executor;
+insert into issue_assignment_execution (assignment, executor, started_at)
+values (sqlc.arg(assignment), sqlc.arg(executor), sqlc.arg(started_at))
+on conflict (assignment, executor) do update set assignment = issue_assignment_execution.assignment
+returning *, (select session.role from session where session.id = issue_assignment_execution.executor)::session.role as role;
 
 -- name: AllExecutions :many
 -- bound: execution contexts retained with each responsibility assignment.

@@ -15,7 +15,7 @@ import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore, D
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
-import { slice } from "@vibevalley/protocol/rules";
+import { githubRepository, slice } from "@vibevalley/protocol/rules";
 
 import { jsonOf, jsonOrNone } from "@/base/json.ts";
 import { numberIn, or } from "@/base/order.ts";
@@ -46,16 +46,6 @@ const runOutput = 3000;
 const cloneTimeoutMs = 3 * 60_000;
 
 const projectName = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/u;
-const githubURL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+)\/?$/u;
-
-/** Only repository home URLs: never credentials, other git transports or command-line options. */
-export function githubRepository(input: string): { name: string; url: string } | undefined {
-  const m = githubURL.exec(input.trim());
-  if (!m) return undefined;
-  const name = m[2]!.replace(/\.git$/u, "");
-  if (name === "" || name === "." || name === "..") return undefined;
-  return { name, url: `https://github.com/${m[1]}/${name}.git` };
-}
 
 export function projectProblem(req: T.NewProject): string {
   if (!projectName.test(req.name)) return t("server.project.badName");

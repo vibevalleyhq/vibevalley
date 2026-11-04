@@ -10,16 +10,16 @@
 | 核心状态的折叠与实时投影 | 各模块负责自己的数据库持久化与恢复（[帮工](docs/subsystems/session.md)） |
 | 给页面的帧 `StateFrame`（`frameOf`）和特效的发出 | 地里长什么、特效和账本怎么算（[游戏](docs/subsystems/game.md)、[farm-ui.md](docs/reference/farm-ui.md)） |
 | 三条 SSE 流 `/api/v1/state`、`/api/v1/events`、`/api/v1/live` | 帮工的 `/mcp`（[频道](docs/subsystems/channel.md)）、语音线路（[语音](docs/subsystems/voice.md)） |
-| 接口表 `api.ts` 的 `endpoints`、能力表 `can`、`/api/v1` 版本、命令行这张皮 | 每个接口做什么（拥有它的服务）；「连接到本机」的配对和钥匙（[连接到本机](docs/subsystems/lan.md)）；管家和帮工的工具（`apps/server/src/tool`，[管家](docs/subsystems/orchestrator.md)） |
+| 接口表 `endpoints`（`packages/protocol/src/api.ts` 拼起各概念的 `<概念>/api.ts`）、能力表 `can`、`/api/v1` 版本、命令行这张皮 | 每个接口做什么（拥有它的服务）；「连接到本机」的配对和钥匙（[连接到本机](docs/subsystems/lan.md)）；管家和帮工的工具（`apps/server/src/tool`，[管家](docs/subsystems/orchestrator.md)） |
 | 重启时核心状态怎么回来，各拥有者在哪一步接手 | 各拥有者自己怎么恢复（链接见「怎么走」） |
 | 跨模块的接口约定：调用方交意图，拥有者负责协调和结果 | 某个模块的具体动作 |
 
 ## 在哪
 
 - `apps/server/src/core/core.ts`（`Core`）：施加、存盘、各条流；`services.ts` 让它最先建、最后关。
-- `packages/protocol`：形状在 `shapes.ts`（`WorkspaceState`、`Fact`、`SideEvent`、`LiveEvent`、`StateFrame`，三条流的路径 `statePath`、`eventsPath`、`livePath`）；`api.ts` 的接口表 `endpoints`、`Handlers`、客户端 `VibeValleyApi`；`stream.ts` 的 `readStream`。
+- `packages/protocol`：核心状态的形状在 `core/shapes.ts`（`WorkspaceState`、`Fact`、`ServerEvent`、`LiveEvent`、`StateFrame`，三条流的路径 `statePath`、`eventsPath`、`livePath`）；`api.ts` 拼起的接口表 `endpoints` 和 `Handlers`（每个概念一段，`<概念>/api.ts`；共用的 `Endpoint`、`input`、`errorStatus` 在 `endpoint.ts`）、客户端 `VibeValleyApi`；`stream.ts` 的 `readStream`。
 - 折法和拼帧 `apps/server/src/projection`：`reduce.ts` 的 `reduce`、`frame.ts` 的 `frameOf`，用各模块的规则（`session/roster.ts`、`channel/messages.ts`、`issue/status.ts`、`game/view.ts`、`game/view.ts` 的 `effectsOf`、`inbox/items.ts`、`ingress/`、`mailbox/`、`cron/when.ts`）；`projection.ts` 把它们交给 `core`（`Projection`）。`emptyWorkspaceState` 在 `core.ts`。`reduce` 只在工单或帮工的集合引用变了时重算工单状态；聊天气泡、花费这类事实不重算，`projection/reduce.test.ts` 守着这条。
-- `apps/server/src/http`：`api.ts` 按 `endpoints` 挂每个接口，`streams.ts` 三条流，`app.ts` 组装和开始答 HTTP；`handlers.ts` 实现 `Handlers`。
+- `apps/server/src/http`：`api.ts` 按 `endpoints` 挂每个接口，`streams.ts` 三条流，`app.ts` 组装和开始答 HTTP；`handlers/<概念>.ts` 各实现一段 `Handlers`，根目录的 `handlers.ts` 合起来。
 - 能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出，`docs:verify` 查它是不是最新。
 - 命令行 `apps/server/src/cli.ts`：每个接口一条命令（从 `endpoints` 来），`state`、`events`、`issue work`；`runtime chat` 和自己的 agent 不经服务端。
 - 「连接到本机」 `apps/server/src/lan/lan.ts` 的 `remoteMay`：从 `endpoints` 和三条流里挑 `can` 有 `remote` 的。
@@ -32,6 +32,7 @@
 
 - **一份，只在服务端，只在 `apply` 里改**（`apply(...facts)` 一次可以给几条）。核心状态里有什么见 [architecture.md](docs/architecture.md)「核心状态」。
 - **`reduce(state, fact)` 是纯函数，返回新状态和「变没变」**。没变的事实不发、不存、不算特效；关于不在地里的帮工的事实什么也不改。变了且有工单时，工单的状态跟着重算（`withIssueStatuses`）。
+- **每种事实的名字说出发生了什么**：东西的新样子（新出现或改了）叫 `<东西>Changed`（`issueChanged`、`sessionChanged`、`messageChanged`……），从核心状态拿掉的叫 `<东西>Removed`，带着结果的事用它自己的动词（`sessionReported`、`sessionLeft`）。「事实」只指改核心状态的这一件事，别处不借这个词（[理由](.agents/notes/implemented/architecture/2026-11-04-one-meaning-of-fact.md)）。
 - **事实的时间由 `Core` 盖**：施加时把 `at` 改成当时的时钟，调用方给的不算。
 - **`Transition` 绑住一条事实和它改的那一份状态**：`before`、`fact`、`after`。消费晚了也不读当前状态去猜当时，消费者不再自己跑一遍 `reduce`。`transitions` 同一步里拿初始快照和订阅，中间不漏事实。`Transition` 拿着旧状态的引用，所以 **`reduce` 不改传进来的旧值**。
 - **`seq` 数提交**：`Core` 记着折过几次，`apply` 每一次真改了状态的提交（一批算一次，没变的事实不算）加一，`Core.seq()` 读当前值。出帧时和状态一起读，写进 `StateFrame.seq`：这一帧带着到这个号为止的每次折叠。
@@ -50,10 +51,10 @@ Session 的身份、阶段、最近报告和资源恢复字段只在 session 表
 | 流 | 连上先发 | 之后发 | 谁读 |
 |---|---|---|---|
 | `GET /api/v1/state` | 一帧 `StateFrame` | 一条事实或特效到了，再收 200 毫秒，合成一帧（带这段时间的特效）；不是事实的旁路事件不出帧 | 页面、`vibevalley state` |
-| `GET /api/v1/events` | `snapshot`（整份核心状态） | `SideEvent`：每条事实、轨迹的一步（`step`）、提醒（`Notice`）、农机变了（`runtime`） | 命令行 `vibevalley events`、调试 |
+| `GET /api/v1/events` | `snapshot`（整份核心状态） | `ServerEvent`：每条事实、轨迹的一步（`step`）、提醒（`Notice`）、农机变了（`runtime`） | 命令行 `vibevalley events`、调试 |
 | `GET /api/v1/live` | 什么也不发 | `LiveEvent` 的三种：`SessionEvent`、`Notice`、`Runtime`；不发事实和快照 | 页面 |
 
-- 三条流分别用 `StateFrame`、`SideEvent`、`LiveEvent` 的 Schema 编码；不合形状的值记错误并终止这条流，不发给客户端。重启后的核心状态省略 `callReason`，不保留一个显式 `undefined`。
+- 三条流分别用 `StateFrame`、`ServerEvent`、`LiveEvent` 的 Schema 编码；不合形状的值记错误并终止这条流，不发给客户端。重启后的核心状态省略 `callReason`，不保留一个显式 `undefined`。
 - 每 20 秒一行心跳（`: ping`），免得代理关掉空闲的连接；客户端断开，这条流和出帧的那一头跟着停。
 - 三条 SSE 每个连接都有容量 64 的有界 relay。正常顺序不变；积压到上限的连接明确结束并记警告，源订阅释放，不静默丢帧，也不把发布者挡住。客户端重连取快照。内部的事实和 Transition 订阅不能靠重连补齐，不走这条会断开的 relay；Core 关闭时 shutdown 四个 PubSub。
 - 断线不补发：重连从一帧（或快照）重新开始。页面的状态流断了 1 秒后重连。
@@ -113,7 +114,7 @@ HTTP 命令入口与页面 WebSocket 共用来源判断：Host 应为回环地�
 5. 频道里交出去还没看到的消息退回 `pending`，过一会儿再叫（[频道](docs/subsystems/channel.md)）；管家没做完的一轮接着做（[管家](docs/subsystems/orchestrator.md)「重启后接着做」）。
 6. 账本整本重折出金币、连胜、成就，规则改了重启就按新规则算（[游戏](docs/subsystems/game.md)）。
 
-**加一个能力**：写服务的方法 → 在 `api.ts` 的 `endpoints` 加一行（方法、路径、Schema、`can`）→ 在 `handlers.ts` 实现 → `vp run capabilities`。页面的客户端、命令行的命令、「连接到本机」的放行都从同一张表来。
+**加一个能力**：写服务的方法 → 在 `<概念>/api.ts` 的那段接口表加一行（方法、路径、Schema、`can`）→ 在 `http/handlers/<概念>.ts` 实现 → `vp run capabilities`。页面的客户端、命令行的命令、「连接到本机」的放行都从同一张表来。
 
 ## 和谁打交道
 
@@ -124,7 +125,7 @@ HTTP 命令入口与页面 WebSocket 共用来源判断：Host 应为回环地�
 
 ## 为什么这样
 
-- **核心状态只有一份，只因事实而变。** 一个帮工的状态曾经拆在服务端的行、站点里的一份行副本、页面从行推出来的作物、管家读的名册四处：每加一个功能（花费、冲突）就在几处各补一个字段；「没动静」只有管家看得到；冲突标记靠「开始干活时顺手清掉」这种副作用维持；页面比较前后两行来猜「开始了新一轮」。一份状态、一个纯函数折，新加一种状态只在 `shapes.ts` 加字段或事实、在 `reduce` 里折，编译器逼每个视图都处理到；服务端和页面不会对不上，重启只是读回上一份。放弃了「保留行模型、只补字段」：这正是要解决的问题。代价是拿一个状态要经过 `reduce`，不能随手改一个字段。
+- **核心状态只有一份，只因事实而变。** 一个帮工的状态曾经拆在服务端的行、站点里的一份行副本、页面从行推出来的作物、管家读的名册四处：每加一个功能（花费、冲突）就在几处各补一个字段；「没动静」只有管家看得到；冲突标记靠「开始干活时顺手清掉」这种副作用维持；页面比较前后两行来猜「开始了新一轮」。一份状态、一个纯函数折，新加一种状态只在形状里加字段或事实、在 `reduce` 里折，编译器逼每个视图都处理到；服务端和页面不会对不上，重启只是读回上一份。放弃了「保留行模型、只补字段」：这正是要解决的问题。代价是拿一个状态要经过 `reduce`，不能随手改一个字段。
 - **线上发事实，不发 JSON patch。** patch 只说哪个字段变了，看不出发生了什么（开始一轮还是改了标签）；账本、特效、计划要的正是「发生了什么」。
 - **折法放在组装那一层，交给 `core`。** 一条事实要用帮工、频道、工单、游戏各自的规则去折，帧要用通知、计划、定时任务、游戏的；`core` 在最下面（Platform），直接 import 它们方向就反了。放弃了每个模块各交一段折法、由组装拼起来：一个 `reduce` 里能看全每种事实怎么折，黄金数据也只比一个函数。
 - **页面读折好的帧，不折事实。** 页面再折一遍就是第二份核心状态，两边改规则靠自觉对齐（[客户端](docs/subsystems/app.md)）。给人看的话在出帧时填，不进 `reduce`：话随时会改，存进持久状态 就要兼容旧话。动作的说法也一样在帧里带好，页面不另拿一份。不变的大块说法（成就的定义）不进帧，帧每个事实都出，一次性的接口给一次就够（[游戏](docs/subsystems/game.md)）。

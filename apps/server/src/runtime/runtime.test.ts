@@ -20,9 +20,10 @@ import { Core } from "@/core/core.ts";
 import { type ServerConfig } from "@/infra/config.ts";
 import { platform } from "@/services.ts";
 import { testConfig, nextTurn, whenTrue } from "@/testing/layers.ts";
+import { allow, heard, refuse } from "@/testing/refuse.ts";
 
 import { piBalance } from "./pi.ts";
-import { factsOf, presetOf, runtimeIds } from "./presets.ts";
+import { supportOf, presetOf, runtimeIds } from "./presets.ts";
 import { inCny, price } from "./price.ts";
 import { Runtime, type RuntimeOptions, usable } from "./runtime.ts";
 
@@ -37,7 +38,7 @@ const notFound = async (id: string): Promise<T.RuntimeInfo> => ({
   stop: "",
   id,
   preset: presetOf(id),
-  facts: factsOf(id),
+  support: supportOf(id),
   installation: { status: "not_found" },
   models: null,
   usage: null,
@@ -319,14 +320,14 @@ describe("runtime", () => {
       });
       const a = agent({ env: { TEST: "value" } });
       const assessed = yield* r.assess(a);
-      expect(assessed.info!.facts.refused.env).toBe("test adapter refuses env");
+      expect(assessed.info!.support.refused.env).toBe("test adapter refuses env");
       expect(usable(assessed)).toBe(false);
       expect(usable(yield* r.assess(agent({})))).toBe(true);
       expect(usable(yield* r.assess(agent({ enabled: false })))).toBe(false);
-      const opencode = (yield* r.info("opencode"))!.facts.refused;
+      const opencode = (yield* r.info("opencode"))!.support.refused;
       expect(opencode).toEqual({
         env: "test env",
-        disallowedTools: factsOf("opencode").refused.disallowedTools,
+        disallowedTools: supportOf("opencode").refused.disallowedTools,
       });
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
@@ -512,15 +513,15 @@ describe("runtime", () => {
       expect(list.map((i) => i.id)).toEqual(runtimeIds());
       const byId = Object.fromEntries(list.map((i) => [i.id, i]));
       expect(byId.opencode!.installation.status).toBe("not_found");
-      expect(byId.opencode!.facts.refused).toEqual({
+      expect(byId.opencode!.support.refused).toEqual({
         env: "test env",
-        disallowedTools: factsOf("opencode").refused.disallowedTools,
+        disallowedTools: supportOf("opencode").refused.disallowedTools,
       });
       expect(byId.claude!.installation.status).toBe("unsupported");
       expect(byId.claude!.preset.label).toBe("Claude Code");
-      expect(byId.claude!.facts.capabilities).toEqual(factsOf("claude").capabilities);
+      expect(byId.claude!.support.capabilities).toEqual(supportOf("claude").capabilities);
       expect(JSON.stringify(byId.claude)).toMatch(/"preset":\{"id":"claude","label":"Claude Code"/u);
-      expect(JSON.stringify(byId.claude)).toMatch(/"facts":\{"steer":true,"refused":\{\}/u);
+      expect(JSON.stringify(byId.claude)).toMatch(/"support":\{"steer":true,"refused":\{\}/u);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
@@ -591,7 +592,7 @@ describe("runtime", () => {
       r.spend("pi", Number.NaN);
       expect((yield* r.info("pi"))!.spentToday).toBeUndefined();
       const sql = yield* SqlClient.SqlClient;
-      expect((yield* Effect.exit(sql`insert into runtime_spend (day, runtime, cny) values ('1970-01-01', 'pi', 'Infinity'::float8)`))._tag).toBe("Failure");
+      expect((yield* Effect.exit(sql`insert into runtime_spend (day, runtime, cny) values ('1970-01-01', 'pi', 9e999)`))._tag).toBe("Failure");
       r.spend("pi", 2);
       expect((yield* r.info("pi"))!.spentToday).toBe(2);
     }).pipe(Effect.scoped, Effect.provide(world(config)));
@@ -631,28 +632,29 @@ describe("runtime", () => {
 
   it.effect("regression: a failed spending write retries the same delta once", () => {
     const config = testConfig();
+    const log = heard();
     return Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
-      yield* sql.unsafe("create sequence spend_attempts");
-      yield* sql.unsafe(
-        "create function refuse_spend() returns trigger language plpgsql as $$ begin perform nextval('spend_attempts'); raise exception 'refused'; end $$",
-      );
-      yield* sql.unsafe("create trigger refuse_spend before insert on runtime_spend for each row execute function refuse_spend()");
+      yield* refuse(sql, "refuse_spend", "before insert on runtime_spend");
       yield* Effect.scoped(
         Effect.gen(function* () {
           const runtime = yield* runtimes();
           runtime.spend("pi", 4);
           yield* TestClock.adjust(2000);
-          yield* waitFor(sql<{ is_called: boolean }>`select is_called from spend_attempts`, (rows) => rows[0]?.is_called === true, "the rejected write");
+          yield* waitFor(
+            Effect.sync(() => log.count("refuse_spend")),
+            (n) => n > 0,
+            "the rejected write",
+          );
           expect(yield* sql`select * from runtime_spend`).toEqual([]);
           expect((yield* runtime.info("pi"))?.spentToday).toBe(4);
-          yield* sql.unsafe("drop trigger refuse_spend on runtime_spend");
+          yield* allow(sql, "refuse_spend");
           yield* TestClock.adjust(2000);
           yield* waitFor(sql<{ cny: number }>`select cny from runtime_spend where runtime = 'pi'`, (rows) => rows[0]?.cny === 4, "the retry committed");
         }),
       );
       expect(yield* sql<{ cny: number }>`select cny from runtime_spend where runtime = 'pi'`).toEqual([{ cny: 4 }]);
-    }).pipe(Effect.scoped, Effect.provide(world(config)));
+    }).pipe(Effect.scoped, Effect.provide(Layer.merge(world(config), log.layer)));
   });
 
   it.live("an update that cannot be saved is refused, and nothing is probed", () => {
@@ -706,7 +708,7 @@ describe("runtime", () => {
       const got = yield* r.resolve(a);
       expect([got.runtime.id, got.model, got.effort, got.env]).toEqual(["pi", "known", "default-effort", { base: "kept", override: "profile" }]);
       const core = yield* Core;
-      const notices: T.SideEvent[] = [];
+      const notices: T.ServerEvent[] = [];
       // Subscribed before it returns: no wait for the reader to start.
       yield* Effect.forkScoped(Stream.runForEach(yield* core.subscribe, (e) => Effect.sync(() => notices.push(e))));
       const fallback = yield* r.resolve({ ...a, model: "unknown", effort: "profile-effort" });

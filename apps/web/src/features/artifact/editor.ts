@@ -18,12 +18,12 @@ import {
   type ArtifactId,
   type VibeValleyApi,
 } from "@vibevalley/protocol";
-import { keyBetween } from "@vibevalley/protocol/rules";
+import { keyBetween, normalSpans } from "@vibevalley/protocol/rules";
 import { blockId } from "@vibevalley/protocol/schema";
 
 import { reasonOf } from "@/infra/api";
 
-import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, normalSpans, plainOf, splitSpans } from "./blocks";
+import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, plainOf, splitSpans } from "./blocks";
 
 /** Text edits wait this long after the last key, and no longer than maxWaitMs while typing goes on. */
 const idleWaitMs = 500;

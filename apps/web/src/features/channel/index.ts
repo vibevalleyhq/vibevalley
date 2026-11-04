@@ -12,8 +12,6 @@ export {
   topsOf,
   directsOf,
   chatPath,
-  channelOf,
-  defaultOf,
   parentAt,
   issueThreadOf,
   threadOwnerOf,

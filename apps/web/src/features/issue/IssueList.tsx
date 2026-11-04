@@ -12,7 +12,7 @@ import { IconButton } from "@/ui/IconButton";
 
 import { EmptyNote, OlderLink, QuickAdd } from "./Board";
 import { type BoardCard, cardAgent, cardLook, cardProject, closedShown, laneLabel, laneStatus } from "./cards";
-import { type Grouping, groupRows, laneOrder, type Ordering, orderRows, type RowGroup, rowFacts } from "./display";
+import { type Grouping, groupRows, laneOrder, type Ordering, orderRows, type RowGroup, rowKeys } from "./display";
 import { useIssues, useNameOf } from "./history";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
@@ -54,10 +54,10 @@ export function IssueList(props: {
   return (
     <Show when={!props.loading} fallback={<EmptyNote>{t("web.issue.reading")}</EmptyNote>}>
       <div class="@container min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-        <For each={groupRows(props.cards, props.grouping, rowFacts)} keyed={(g) => g.key}>
+        <For each={groupRows(props.cards, props.grouping, rowKeys)} keyed={(g) => g.key}>
           {(g) => {
             const folding = () => g().lane === "closed" && !props.older && ordered().length > closedShown;
-            const ordered = () => (g().lane ? laneOrder(g().lane!, g().rows, props.ordering) : orderRows(g().rows, props.ordering, rowFacts));
+            const ordered = () => (g().lane ? laneOrder(g().lane!, g().rows, props.ordering) : orderRows(g().rows, props.ordering, rowKeys));
             const rows = () => (folding() ? ordered().slice(0, closedShown) : ordered());
             const hidden = () => (folding() ? ordered().length - closedShown : 0);
             const isFolded = () => folded().has(g().key);
@@ -201,7 +201,7 @@ function Row(props: {
           <CardFace card={props.card} size={18} />
         </Show>
       </span>
-      <span class="w-14 shrink-0 text-right text-xs text-muted @min-[640px]:w-[72px]">{ago(rowFacts(props.card).updatedAt, now())}</span>
+      <span class="w-14 shrink-0 text-right text-xs text-muted @min-[640px]:w-[72px]">{ago(rowKeys(props.card).updatedAt, now())}</span>
     </div>
   );
 }

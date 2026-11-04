@@ -13,14 +13,14 @@ it.effect("regression: reassignment selects unread inputs without loading consum
       values ('work', 1, '', 'explicit', 3, false, 0)`;
     yield* sql`insert into session (id, role, agent, name, runtime, brief, hired_at)
       values ('old', 'worker', 'lab', 'lab', 'pi', '', 0)`;
-    yield* sql`insert into ingress_trigger (id, source, source_key, trigger_json, payload_json, occurred_at, routed_at, routing_scope, routing_position)
-      select n::text, 'github', n::text, '{"actor":{"kind":"owner"}}', '{}', 0, 0, 'issue:work', n
-      from generate_series(1, 2007) n`;
+    yield* sql`insert into mailbox_trigger (id, source, source_key, trigger_json, payload_json, occurred_at, routed_at, routing_scope, routing_position)
+      select n, 'github', n, '{"actor":{"kind":"owner"}}', '{}', 0, 0, 'issue:work', n
+      from (with recursive s(n) as (select 1 union all select n + 1 from s where n < 2007) select n from s)`;
     yield* sql`insert into mailbox_issue (trigger_id, issue_id, state, session_id, created_at)
-      select n::text, 'work', 'forwarded', 'old', 0 from generate_series(1, 2007) n`;
+      select n, 'work', 'forwarded', 'old', 0 from (with recursive s(n) as (select 1 union all select n + 1 from s where n < 2007) select n from s)`;
     yield* sql`insert into mailbox_delivery (session_id, envelope_id, scope, source, urgency, reason, wakes, state, payload_json, created_at)
-      select 'old', n::text, 'issue:work', 'github', 'queue', 'addressed', true, 'consumed', '{}', 0
-      from generate_series(1, 2006) n`;
+      select 'old', n, 'issue:work', 'github', 'queue', 'addressed', true, 'consumed', '{}', 0
+      from (with recursive s(n) as (select 1 union all select n + 1 from s where n < 2006) select n from s)`;
     yield* sql`update mailbox_delivery set state = 'pending' where envelope_id = '2001'`;
     yield* sql`update mailbox_delivery set state = 'handed', launch = 'run' where envelope_id = '2002'`;
     yield* sql`update mailbox_delivery set state = 'dropped', dropped_why = 'left' where envelope_id = '2003'`;

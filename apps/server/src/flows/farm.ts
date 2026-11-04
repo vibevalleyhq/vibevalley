@@ -66,9 +66,9 @@ export const watch = Effect.gen(function* () {
   let taken = 0;
   /** The next report not cut off by a stop, in order. */
   const nextReport = until(
-    () => facts.filter((f): f is T.FactSessionReport => f.type === "sessionReport" && f.outcome !== "interrupted").length > taken,
+    () => facts.filter((f): f is T.FactSessionReported => f.type === "sessionReported" && f.outcome !== "interrupted").length > taken,
     "the next report",
-  ).pipe(Effect.map(() => facts.filter((f): f is T.FactSessionReport => f.type === "sessionReport" && f.outcome !== "interrupted")[taken++]!));
+  ).pipe(Effect.map(() => facts.filter((f): f is T.FactSessionReported => f.type === "sessionReported" && f.outcome !== "interrupted")[taken++]!));
   return { facts, notes, nextReport };
 });
 

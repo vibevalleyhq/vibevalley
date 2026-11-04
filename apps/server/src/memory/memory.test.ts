@@ -203,11 +203,13 @@ describe("memory", () => {
     Effect.gen(function* () {
       const m = yield* Memory;
       const sql = yield* SqlClient.SqlClient;
-      yield* sql.unsafe(`create function fail_write() returns trigger language plpgsql as $$ begin raise exception 'write failed'; end $$`);
-      yield* sql.unsafe(`create trigger fail_write before insert on memory for each row when (new.kind = 'issue') execute function fail_write()`);
+      yield* sql.unsafe(`select 1`);
+      yield* sql.unsafe(
+        `create trigger fail_write before insert on memory for each row when (new.kind = 'issue') begin select raise(abort, 'write failed'); end`,
+      );
       yield* m.keep(run("s1", "记住：不要覆盖用户改动"));
       expect(yield* m.list("lab")).toEqual([]);
-      yield* sql.unsafe(`drop trigger fail_write on memory`);
+      yield* sql.unsafe(`drop trigger fail_write`);
       yield* m.keep(run("s1", "记住：不要覆盖用户改动"));
       expect(yield* m.list("lab")).toHaveLength(1);
     }).pipe(Effect.provide(world())),

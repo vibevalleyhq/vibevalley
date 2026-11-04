@@ -29,6 +29,7 @@ import { Mailbox, start as mailboxStart } from "./mailbox/mailbox.ts";
 import { Mcp, type McpOptions } from "./mcp/mcp.ts";
 import { Memory } from "./memory/memory.ts";
 import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
+import { Pkm } from "./pkm/pkm.ts";
 import { Project, type ProjectHooks, start as projectStart } from "./project/project.ts";
 import { layer as projection } from "./projection/frame.ts";
 import { Resource } from "./resource/resource.ts";
@@ -84,8 +85,8 @@ export const sourceControl =
 /** Agent Sessions: an agent at work on an issue in a workplace. */
 export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Executor.layer), on(Session.layer));
 
-/** Collaboration: channels, threads, messages, documents; the sessions register as its helpers. */
-export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Channel.layer), on(Artifact.layer));
+/** Collaboration: channels, threads, messages, documents, the owner's notes; the sessions register as its helpers. */
+export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Channel.layer), on(Artifact.layer), on(Pkm.layer));
 
 /** Mailbox: delivery priority, durable per-Session input and the execution pump. */
 export const mailbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Mailbox.layer));

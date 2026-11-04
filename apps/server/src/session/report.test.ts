@@ -10,12 +10,12 @@ import { MergeFailure } from "@/project/workplace.ts";
 import { inCny } from "@/runtime/price.ts";
 
 import { briefBreak, conflictBrief, noRoom, notTakenIn, sessionName, whoMakesRoom, withRecall } from "./briefing.ts";
-import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
 import { recallHead } from "./prompts.ts";
+import { reactionTo, type ReactionContext, near, since, type Tracking } from "./reaction.ts";
 import { readReport, summaryOf } from "./report.ts";
 import { shellCommand } from "./shell.ts";
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
-const ctx: FactContext = { id: sessionId("w1"), runtime: "pi", cwd: "/work/clock-in" };
+const ctx: ReactionContext = { id: sessionId("w1"), runtime: "pi", cwd: "/work/clock-in" };
 const base = (): Session =>
   ({
     id: "w1",
@@ -33,15 +33,15 @@ const none: Tracking = {};
 describe("a session's events", () => {
   it("a run starts with the brief and counts from what was spent", () => {
     const h = { ...base(), spent: { tokens: 50, cny: 0.1 } };
-    const r = eventFacts(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + briefBreak + "加一个查询接口" }), h, none, ctx);
-    expect(r.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
+    const r = reactionTo(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + briefBreak + "加一个查询接口" }), h, none, ctx);
+    expect(r.facts).toEqual([{ type: "sessionPhaseChanged", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
     expect(r.journal).toEqual([{ type: "prompt", text: "加一个查询接口" }]);
     expect(r.tracking.runFrom).toEqual({ tokens: 50, cny: 0.1 });
   });
 
   it("a run is reminded of memories", () => {
     const block = recallHead + "你以前记下的……\n- （这个项目）测试用 pnpm test";
-    const r = eventFacts(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + briefBreak + withRecall(block, "加一个查询接口") }), base(), none, ctx);
+    const r = reactionTo(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + briefBreak + withRecall(block, "加一个查询接口") }), base(), none, ctx);
     expect(r.journal).toEqual([
       { type: "prompt", text: "加一个查询接口" },
       { type: "note", kind: "memory/recalled", text: "- （这个项目）测试用 pnpm test" },
@@ -49,61 +49,63 @@ describe("a session's events", () => {
   });
 
   it("a command shows from its folder", () => {
-    const started = eventFacts(
+    const started = reactionTo(
       ev({ kind: "tool_call_started", callId: "c1", tool: "bash", input: `{"command":"cd /work/clock-in && pnpm test"}` }),
       working(thinking),
       none,
       ctx,
     );
     expect(started.facts).toEqual([
-      { type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "run_command", label: "pnpm test" } } },
+      { type: "sessionPhaseChanged", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "run_command", label: "pnpm test" } } },
     ]);
     expect(started.journal[0]!.type).toBe("toolStarted");
     expect(started.tracking.shownCall).toEqual({ id: "c1", tool: "bash" });
-    const same = eventFacts(
+    const same = reactionTo(
       ev({ kind: "tool_call_started", callId: "c2", tool: "bash", input: `{"command":"pnpm test"}` }),
       working({ action: "run_command", label: "pnpm test" }),
       none,
       ctx,
     );
     expect(same.facts).toEqual([]);
-    const failed = eventFacts(
+    const failed = reactionTo(
       ev({ kind: "tool_call_ended", callId: "c1", exitCode: 1, content: [{ type: "text", text: "1 failing" }] }),
       working({ action: "run_command", label: "pnpm test" }),
       started.tracking,
       ctx,
     );
     expect(failed.journal).toEqual([{ type: "toolEnded", callId: "c1", output: "1 failing", ok: false }]);
-    expect(failed.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
+    expect(failed.facts).toEqual([{ type: "sessionPhaseChanged", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
   });
 
   it("the full input names the target better", () => {
     const input = `{"path":"/work/clock-in/src/http.ts"}`;
-    const r = eventFacts(
+    const r = reactionTo(
       ev({ kind: "tool_call_input", callId: "c1", input }),
       working({ action: "read_file", label: "read" }),
       { shownCall: { id: "c1", tool: "read" } },
       ctx,
     );
     expect(r.journal).toEqual([{ type: "toolInput", callId: "c1", input, text: "src/http.ts" }]);
-    expect(r.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "read_file", label: "src/http.ts" } } }]);
+    expect(r.facts).toEqual([
+      { type: "sessionPhaseChanged", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "read_file", label: "src/http.ts" } } },
+    ]);
   });
 
   it("reasoning is a step when shown", () => {
-    const r = eventFacts(
+    const r = reactionTo(
       ev({ kind: "reasoning", content: { kind: "text", text: "先看看路由在哪" } }),
       working({ action: "read_file", label: "a.ts" }),
       none,
       ctx,
     );
     expect(r.journal).toEqual([{ type: "thought", text: "先看看路由在哪" }]);
-    expect(r.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
-    expect(eventFacts(ev({ kind: "reasoning", content: { kind: "redacted" } }), working(thinking), none, ctx).journal).toEqual([]);
+    expect(r.facts).toEqual([{ type: "sessionPhaseChanged", id: "w1", phase: { _tag: "working", since: 0, doing: thinking } }]);
+    expect(reactionTo(ev({ kind: "reasoning", content: { kind: "redacted" } }), working(thinking), none, ctx).journal).toEqual([]);
   });
 
   it("a sub-agent's steps say whose", () => {
-    expect(eventFacts(ev({ kind: "text_delta", text: "好" }), working(thinking), none, ctx).journal).toEqual([{ type: "response", text: "好" }]);
-    const sub = eventFacts(ev({ kind: "tool_call_started", callId: "c1", tool: "bash", input: "{}", agentPath: ["task-1"] }), working(thinking), none, ctx);
+    expect(reactionTo(ev({ kind: "text_delta", text: "好" }), working(thinking), none, ctx).journal).toEqual([{ type: "response", text: "好" }]);
+    const sub = reactionTo(ev({ kind: "tool_call_started", callId: "c1", tool: "bash", input: "{}", agentPath: ["task-1"] }), working(thinking), none, ctx);
     expect(sub.journal[0]!.from).toEqual(["task-1"]);
   });
 
@@ -113,42 +115,45 @@ describe("a session's events", () => {
       { kind: "reasoning", content: { kind: "empty" } },
       { kind: "text_delta", text: "好的" },
     ])
-      expect(eventFacts(ev(body), h, none, ctx).facts).toEqual([]);
+      expect(reactionTo(ev(body), h, none, ctx).facts).toEqual([]);
   });
 
   it("spending is counted from the last total", () => {
     const rate = inCny({ input: 1, output: 2, cacheRead: 0.1, cacheWrite: 0 }, 7);
     const usage = (input: number, output: number) => ev({ kind: "usage", usage: { tokens: { input, output, cacheRead: 0, cacheWrite: 0 } } });
-    const first = eventFacts(usage(1_000_000, 0), working(thinking), { rate }, ctx);
+    const first = reactionTo(usage(1_000_000, 0), working(thinking), { rate }, ctx);
     expect(first.spentCny).toBe(7);
-    expect(first.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: working(thinking).phase, spent: { tokens: 1_000_000, cny: 7 } }]);
-    const second = eventFacts(usage(1_000_000, 500_000), { ...working(thinking), spent: { tokens: 1_000_000, cny: 7 } }, first.tracking, ctx);
+    expect(first.facts).toEqual([{ type: "sessionPhaseChanged", id: "w1", phase: working(thinking).phase, spent: { tokens: 1_000_000, cny: 7 } }]);
+    const second = reactionTo(usage(1_000_000, 500_000), { ...working(thinking), spent: { tokens: 1_000_000, cny: 7 } }, first.tracking, ctx);
     expect(second.spentCny).toBe(7);
-    expect(second.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: working(thinking).phase, spent: { tokens: 1_500_000, cny: 14 } }]);
-    const unpriced = eventFacts(ev({ kind: "usage", usage: { tokens: { input: 10, output: 5 } } }), working(thinking), none, ctx);
-    expect([unpriced.spentCny, unpriced.facts]).toEqual([0, [{ type: "sessionPhase", id: "w1", phase: working(thinking).phase, spent: { tokens: 15 } }]]);
+    expect(second.facts).toEqual([{ type: "sessionPhaseChanged", id: "w1", phase: working(thinking).phase, spent: { tokens: 1_500_000, cny: 14 } }]);
+    const unpriced = reactionTo(ev({ kind: "usage", usage: { tokens: { input: 10, output: 5 } } }), working(thinking), none, ctx);
+    expect([unpriced.spentCny, unpriced.facts]).toEqual([
+      0,
+      [{ type: "sessionPhaseChanged", id: "w1", phase: working(thinking).phase, spent: { tokens: 15 } }],
+    ]);
     expect(since({ tokens: 30, cny: 3 }, { tokens: 10, cny: 1 })).toEqual({ tokens: 20, cny: 2 });
     expect(since({ tokens: 30 }, undefined)).toBeUndefined();
   });
 
   it("a quiet spell ends with a word, not with usage", () => {
     const doing: Doing = { action: "run_command", label: "pnpm build" };
-    const usage = eventFacts(ev({ kind: "usage", usage: {} }), working(doing), { quiet: true }, ctx);
+    const usage = reactionTo(ev({ kind: "usage", usage: {} }), working(doing), { quiet: true }, ctx);
     expect([usage.tracking.quiet, usage.facts]).toEqual([true, []]);
-    const word = eventFacts(ev({ kind: "text_delta", text: "构建完了" }), working(doing), { quiet: true }, ctx);
+    const word = reactionTo(ev({ kind: "text_delta", text: "构建完了" }), working(doing), { quiet: true }, ctx);
     expect(word.tracking.quiet).toBe(false);
     expect(word.facts).toEqual([
-      { type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing } },
-      { type: "sessionPhase", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "speaking_text", label: "" } } },
+      { type: "sessionPhaseChanged", id: "w1", phase: { _tag: "working", since: 0, doing } },
+      { type: "sessionPhaseChanged", id: "w1", phase: { _tag: "working", since: 0, doing: { action: "speaking_text", label: "" } } },
     ]);
   });
 
   it("retries, model failures and exits are said", () => {
-    const retry = eventFacts(ev({ kind: "retry", attempt: 2, maxAttempts: 3, delayMs: 1500, reason: "429" }), working(thinking), none, ctx);
-    expect(retry.facts).toEqual([{ type: "sessionPhase", id: "w1", phase: { ...working(thinking).phase, retry: { attempt: 2, of: 3 } } }]);
+    const retry = reactionTo(ev({ kind: "retry", attempt: 2, maxAttempts: 3, delayMs: 1500, reason: "429" }), working(thinking), none, ctx);
+    expect(retry.facts).toEqual([{ type: "sessionPhaseChanged", id: "w1", phase: { ...working(thinking).phase, retry: { attempt: 2, of: 3 } } }]);
     expect(retry.journal).toEqual([{ type: "note", kind: "llm/retry", text: "调用模型没成功，第 2/3 次重试，2 秒后：429" }]);
-    expect(eventFacts(ev({ kind: "model", model: "deepseek-flash" }), working(thinking), none, ctx).model).toBe("deepseek-flash");
-    const failed = eventFacts(
+    expect(reactionTo(ev({ kind: "model", model: "deepseek-flash" }), working(thinking), none, ctx).model).toBe("deepseek-flash");
+    const failed = reactionTo(
       ev({ kind: "turn_ended", outcome: { kind: "failed", failure: "billing", reason: "Insufficient Balance" } }),
       working(thinking),
       none,
@@ -156,12 +161,12 @@ describe("a session's events", () => {
     );
     expect(failed.journal[0]!.type).toBe("note");
     expect((failed.journal[0] as { text: string }).text).toMatch(/^余额不够了：Insufficient Balance/u);
-    const exited = eventFacts(ev({ kind: "exited", code: 137 }), { ...working(thinking), runs: 2 }, none, ctx);
+    const exited = reactionTo(ev({ kind: "exited", code: 137 }), { ...working(thinking), runs: 2 }, none, ctx);
     expect(exited.facts).toEqual([
-      { type: "sessionReport", questions: [], checks: [], id: "w1", outcome: "failed", summary: "pi 进程退出了（退出码 137）", runs: 2 },
+      { type: "sessionReported", questions: [], checks: [], id: "w1", outcome: "failed", summary: "pi 进程退出了（退出码 137）", runs: 2 },
     ]);
     expect(exited.warn).toBe("老周 的 pi 进程退出了（退出码 137）");
-    expect(eventFacts(ev({ kind: "exited", code: 0 }), { ...base(), phase: { _tag: "done" } }, none, ctx).facts).toEqual([]);
+    expect(reactionTo(ev({ kind: "exited", code: 0 }), { ...base(), phase: { _tag: "done" } }, none, ctx).facts).toEqual([]);
   });
 
   it("near", () => {

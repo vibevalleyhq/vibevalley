@@ -34,11 +34,11 @@ import type { SqlClient, SqlError } from "effect/sql";
 import { t } from "@vibevalley/i18n";
 import { type ChatMessage, type ConnectorID, type ConnectorLogin, type ConnectorStatus, dayMs } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
+import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 import { messageId } from "@vibevalley/protocol/schema";
 
 import { newId } from "@/base/ids.ts";
 import { Channel } from "@/channel/channel.ts";
-import { channelOf, defaultOf } from "@/channel/messages.ts";
 import { Core } from "@/core/core.ts";
 import { reasonOf } from "@/errors.ts";
 import { Inbox } from "@/inbox/inbox.ts";
@@ -163,7 +163,7 @@ const make = (options: ConnectorOptions = {}) =>
       // each read when its turn comes, so the last said is the latest.
       const telling = Semaphore.makeUnsafe(1);
       const told = () => {
-        forkHere(telling.withPermits(1)(Effect.ignore(Effect.flatMap(status, (s) => core.apply({ type: "connector", status: s })))));
+        forkHere(telling.withPermits(1)(Effect.ignore(Effect.flatMap(status, (s) => core.apply({ type: "connectorChanged", status: s })))));
       };
       const setErr = (e: string) => {
         if (err === e) return;

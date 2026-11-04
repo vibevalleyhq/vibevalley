@@ -36,9 +36,9 @@ it.live("regression: a consumed trigger can be handed back once without losing i
     const issue = yield* issues.add({ title: "work", project: "handback-trigger", agent: "lab" });
     const started = yield* issues.start(issue.id, "");
     const trigger = (yield* ingress.accept(event(issue.id, "beyond-original-scope")))!;
-    const receipt = yield* sql`select routed_at, routing_scope, routing_position from ingress_trigger where id = ${trigger.id}`;
+    const receipt = yield* sql`select routed_at, routing_scope, routing_position from mailbox_trigger where id = ${trigger.id}`;
     yield* await_(
-      () => sql<{ state: string }>`select state::text from mailbox_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`,
+      () => sql<{ state: string }>`select state from mailbox_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`,
       (rows) => rows[0]?.state === "consumed",
       "the original input consumed",
     );
@@ -51,14 +51,13 @@ it.live("regression: a consumed trigger can be handed back once without losing i
     expect(returned[0]!.payload.trigger.meta.issue).toBeUndefined();
     expect((yield* ingress.read(trigger.id))?.trigger).toEqual(trigger);
     expect(
-      (yield* sql<{ state: string }>`select state::text from mailbox_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`)[0]
-        ?.state,
+      (yield* sql<{ state: string }>`select state from mailbox_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`)[0]?.state,
     ).toBe("consumed");
-    expect((yield* sql<{ state: string }>`select state::text from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
-    expect(yield* sql`select routed_at, routing_scope, routing_position from ingress_trigger where id = ${trigger.id}`).toEqual(receipt);
+    expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
+    expect(yield* sql`select routed_at, routing_scope, routing_position from mailbox_trigger where id = ${trigger.id}`).toEqual(receipt);
     yield* mailbox.restore;
     expect(mailbox.pending(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
-    const ownerEpoch = yield* sql<{ position: number }>`select max(position)::int as position from mailbox_owner_route where scope = ${returned[0]!.scope}`;
+    const ownerEpoch = yield* sql<{ position: number }>`select max(position) as position from mailbox_owner_route where scope = ${returned[0]!.scope}`;
     expect(ownerEpoch[0]!.position).toBe(returned[0]!.position);
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });
@@ -83,7 +82,7 @@ it.live("regression: closing an unassigned issue returns its held owner input wi
     );
     yield* ingress.accept(source);
     expect(mailbox.pending(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
-    expect((yield* sql<{ state: string }>`select state::text from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
+    expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
     expect((yield* chat.history(chat.defaultChannel())).some((message) => message.text.includes(source.text))).toBe(false);
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });

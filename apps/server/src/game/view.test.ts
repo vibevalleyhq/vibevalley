@@ -103,7 +103,7 @@ describe("a bed", () => {
     refining: false,
   });
 
-  const hire = (state = emptyWorkspaceState(), h: Session) => reduce(state, { type: "session", at: 0, session: h })[0];
+  const hire = (state = emptyWorkspaceState(), h: Session) => reduce(state, { type: "sessionChanged", at: 0, session: h })[0];
   const bed = (state: ReturnType<typeof emptyWorkspaceState>, id: string) => playOf(state.plays, id).station;
 
   test("each project's farm has its own beds: the first of each is on bed 0", () => {
@@ -117,10 +117,10 @@ describe("a bed", () => {
   test("a bed taken on another project's farm is free on this one, and taken on its own is not", () => {
     let s = hire(undefined, worker("a1", "alpha"));
     s = hire(s, worker("b1", "beta"));
-    const [moved, changed] = reduce(s, { type: "gameProgress", at: 0, station: { id: sessionId("b1"), station: 3 } });
+    const [moved, changed] = reduce(s, { type: "progressChanged", at: 0, station: { id: sessionId("b1"), station: 3 } });
     expect(changed).toBe(true);
     // b1 holds bed 3 on beta's farm: b2 cannot take it, and stays on beta's first free bed.
-    const [again, took] = reduce(hire(moved, worker("b2", "beta")), { type: "gameProgress", at: 0, station: { id: sessionId("b2"), station: 3 } });
+    const [again, took] = reduce(hire(moved, worker("b2", "beta")), { type: "progressChanged", at: 0, station: { id: sessionId("b2"), station: 3 } });
     expect(took).toBe(false);
     expect(bed(again, "b2")).toBe(0);
   });
@@ -128,9 +128,9 @@ describe("a bed", () => {
   test("a saved bed another session of its farm holds moves to a free one", () => {
     let s = emptyWorkspaceState();
     for (const h of [worker("a1", "alpha"), worker("a2", "alpha"), worker("b1", "beta")]) s = hire(s, h);
-    s = reduce(s, { type: "gameProgress", at: 0, station: { id: sessionId("a1"), station: 3 } })[0];
-    s = reduce(s, { type: "gameProgress", at: 0, station: { id: sessionId("a2"), station: 3 } })[0];
-    s = reduce(s, { type: "gameProgress", at: 0, station: { id: sessionId("b1"), station: 0 } })[0];
+    s = reduce(s, { type: "progressChanged", at: 0, station: { id: sessionId("a1"), station: 3 } })[0];
+    s = reduce(s, { type: "progressChanged", at: 0, station: { id: sessionId("a2"), station: 3 } })[0];
+    s = reduce(s, { type: "progressChanged", at: 0, station: { id: sessionId("b1"), station: 0 } })[0];
     expect(["a1", "a2", "b1"].map((id) => bed(s, id))).toEqual([3, 1, 0]);
   });
 });

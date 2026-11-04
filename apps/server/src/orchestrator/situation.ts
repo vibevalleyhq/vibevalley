@@ -1,10 +1,10 @@
 import { t } from "@vibevalley/i18n";
-import { ownerId, type RunTriggerKind, type RuntimeInfo } from "@vibevalley/protocol";
+import { ownerId, quotaLow, type RunTriggerKind, type RuntimeInfo } from "@vibevalley/protocol";
 
 import { head } from "@/base/clip.ts";
 import { type InboxMessage } from "@/mailbox/envelope.ts";
 import { messageLine } from "@/mailbox/prompts.ts";
-import { quotaLow, yuan } from "@/runtime/quota.ts";
+import { yuan } from "@/runtime/quota.ts";
 
 import { lineWords, quotaWords, situationWords, sourceHead } from "./prompts.ts";
 

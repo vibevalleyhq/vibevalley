@@ -6,13 +6,13 @@
 
 ## 管什么，不管什么
 
-- **管**：来源的校验、去重、载荷保存、触发者/收件人/回复位置的标准化，以及 `ingress_trigger` 的读写。
+- **管**：来源的校验、去重、触发者/收件人/回复位置的标准化；读成的 Trigger 经信箱的 `keepSourceTrigger` 记进 `mailbox_trigger`（表归信箱：派工、定时、巡查的 Trigger 也记在那里）。
 - **不管**：谁该听到、叫不叫醒（[信箱](docs/subsystems/mailbox.md)）、工单怎么变（[工单](docs/subsystems/issue.md)）、会话怎么跑（[帮工](docs/subsystems/session.md)）。
 
 ## 在哪
 
 - `apps/server/src/ingress/ingress.ts` 是服务；`github.ts` 把 PR 检查和评审读成事件；聊天由 Channel 的 `route.ts` 标准化。
-- 表 `ingress_trigger` 保存原始 Trigger 与 payload；来源自己的观察位置在 `ingress_github` 等表。
+- Trigger 与 payload 存在信箱的 `mailbox_trigger`；来源自己的观察位置在 `ingress_github` 等表。
 - 入口是 `Ingress.accept`（一条来源事件）、`Ingress.owner`（主人的话）、`Ingress.record`（只记下不派发）；状态帧里的 `StateFrame` 不直接暴露它。
 
 ## 模型和不变量
@@ -25,7 +25,7 @@
 ## 怎么走
 
 1. 来源产生 `SourceEvent`；`Ingress.accept` 校验并去重。
-2. 写 `ingress_trigger`，把 `Trigger` 交给 Mailbox。
+2. 经 `keepSourceTrigger` 写进 `mailbox_trigger`，把 `Trigger` 交给 Mailbox。
 3. GitHub 由 `refreshGitHub` 周期拉取；连接器/语音由 `owner` 或 `say` 进入。
 4. 未路由的持久信件由 Mailbox 重放；聊天消息由 Channel 重放并重新计算受众。Ingress 不推进工单排队。
 

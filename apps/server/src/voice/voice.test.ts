@@ -388,7 +388,7 @@ describe("voice", () => {
       yield* voice.heard(agent.agentId, "语音消息", "", "voice-1");
       const sql = yield* SqlClient.SqlClient;
       expect(
-        yield* sql<{ source: string; meta: string | null }>`select d.source::text, m.meta from mailbox_delivery d
+        yield* sql<{ source: string; meta: string | null }>`select d.source, m.meta from mailbox_delivery d
           join channel_message m on m.id = d.message_id where m.body = '语音消息'`,
       ).toEqual([{ source: "voice", meta: `{"ingressSource":"voice","spoken":true}` }]);
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
@@ -465,10 +465,10 @@ describe("voice", () => {
       expect(yield* voice.speak("没人在听")).toBe(false);
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "session", session: helperOn("w1", "t1") });
-      yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "sessionChanged", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "issueChanged", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
-        type: "sessionReport",
+        type: "sessionReported",
         questions: [],
         checks: [],
         id: sessionId("w1"),
@@ -513,11 +513,11 @@ describe("voice", () => {
         ["w1", "t1", 41],
         ["w2", "t2", 42],
       ] as const) {
-        yield* core.apply({ type: "session", session: helperOn(w, t) });
-        yield* core.apply({ type: "issue", issue: issueOf(t, n, w) });
+        yield* core.apply({ type: "sessionChanged", session: helperOn(w, t) });
+        yield* core.apply({ type: "issueChanged", issue: issueOf(t, n, w) });
       }
       yield* core.apply({
-        type: "sessionReport",
+        type: "sessionReported",
         questions: [],
         checks: [],
         id: sessionId("w1"),
@@ -526,7 +526,7 @@ describe("voice", () => {
         runs: 1,
       });
       yield* core.apply({
-        type: "sessionReport",
+        type: "sessionReported",
         questions: [],
         checks: [],
         id: sessionId("w2"),
@@ -557,10 +557,10 @@ describe("voice", () => {
       yield* credentials({ answer: { vendor: "orchestrator" } });
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "session", session: helperOn("w1", "t1") });
-      yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "sessionChanged", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "issueChanged", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
-        type: "sessionReport",
+        type: "sessionReported",
         questions: [],
         checks: [],
         id: sessionId("w1"),
@@ -569,10 +569,10 @@ describe("voice", () => {
         runs: 1,
       });
       yield* until(() => asks === 1, "the failed brief");
-      yield* core.apply({ type: "session", session: helperOn("w2", "t2") });
-      yield* core.apply({ type: "issue", issue: issueOf("t2", 42, "w2") });
+      yield* core.apply({ type: "sessionChanged", session: helperOn("w2", "t2") });
+      yield* core.apply({ type: "issueChanged", issue: issueOf("t2", 42, "w2") });
       yield* core.apply({
-        type: "sessionReport",
+        type: "sessionReported",
         questions: [],
         checks: [],
         id: sessionId("w2"),
@@ -603,10 +603,10 @@ describe("voice", () => {
       yield* Effect.provide(credentials({ answer: { vendor: "orchestrator" } }), context);
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "session", session: helperOn("w1", "t1") });
-      yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "sessionChanged", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "issueChanged", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
-        type: "sessionReport",
+        type: "sessionReported",
         questions: [],
         checks: [],
         id: sessionId("w1"),
@@ -639,10 +639,10 @@ describe("voice", () => {
       yield* credentials({ answer: { vendor: "orchestrator" } });
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      yield* core.apply({ type: "session", session: helperOn("w1", "t1") });
-      yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "sessionChanged", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "issueChanged", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
-        type: "sessionReport",
+        type: "sessionReported",
         questions: [],
         checks: [],
         id: sessionId("w1"),

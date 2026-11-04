@@ -2,6 +2,7 @@ import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { Combobox } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
+import { channelOf } from "@vibevalley/protocol/rules";
 
 import { autofocus } from "@/base/dom";
 import { useWorkAgents } from "@/infra/agents";
@@ -12,7 +13,7 @@ import { defineAtom } from "@/state/atom";
 import { createAct } from "@/ui/act";
 import { Dialog } from "@/ui/Dialog";
 
-import { channelOf, chatPath, type SwitchTarget, switchTargets } from "./places";
+import { chatPath, type SwitchTarget, switchTargets } from "./places";
 import { Count } from "./presence";
 
 const shown = defineAtom(false);

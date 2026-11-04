@@ -14,12 +14,11 @@ import type {
   BlockOpSplitBlock,
   BlockOpStatus,
   BlockOpUpdateText,
-  SpanMarks,
   TextSpan,
   ArtifactId,
   BlockId,
 } from "@vibevalley/protocol";
-import { keyBetween, validKey, isOneOf } from "@vibevalley/protocol/rules";
+import { isOneOf, keyBetween, normalSpans, sameMarks, validKey } from "@vibevalley/protocol/rules";
 import { artifactId } from "@vibevalley/protocol/schema";
 
 import { or } from "@/base/order.ts";
@@ -34,39 +33,9 @@ export const plain = (spans: readonly TextSpan[]) => spans.map((s) => s.t).join(
 
 export const runeLen = (spans: readonly TextSpan[]) => spans.reduce((n, s) => n + chars(s.t).length, 0);
 
-/** The marks as the wire has them: only those set. */
-function marksOf(m: SpanMarks | undefined): SpanMarks {
-  const out: SpanMarks = {};
-  if (m?.bold === true) out.bold = true;
-  if (m?.italic === true) out.italic = true;
-  if (m?.code === true) out.code = true;
-  if (m?.strike === true) out.strike = true;
-  if (m?.link !== undefined) out.link = m.link;
-  return out;
-}
-
-const sameMarks = (a: SpanMarks, b: SpanMarks) =>
-  !(a.bold !== true) === !(b.bold !== true) &&
-  !(a.italic !== true) === !(b.italic !== true) &&
-  !(a.code !== true) === !(b.code !== true) &&
-  !(a.strike !== true) === !(b.strike !== true) &&
-  a.link === b.link;
-
-/** Drops empty spans and joins neighbours with the same marks, so one text has one way to be written. */
-export function normal(spans: readonly TextSpan[] | undefined): TextSpan[] {
-  const out: TextSpan[] = [];
-  for (const s of spans ?? []) {
-    if (s.t === "") continue;
-    const last = out.at(-1);
-    if (last && sameMarks(last.marks, s.marks)) last.t += s.t;
-    else out.push({ t: s.t, marks: marksOf(s.marks) });
-  }
-  return out;
-}
-
 export function sameText(a: readonly TextSpan[], b: readonly TextSpan[]): boolean {
-  const x = normal(a);
-  const y = normal(b);
+  const x = normalSpans(a);
+  const y = normalSpans(b);
   return x.length === y.length && x.every((s, i) => s.t === y[i]!.t && sameMarks(s.marks, y[i]!.marks));
 }
 
@@ -84,10 +53,10 @@ export function splitAt(spans: readonly TextSpan[], at: number): [TextSpan[], Te
     }
     at -= r.length;
   }
-  return [normal(left), normal(right)];
+  return [normalSpans(left), normalSpans(right)];
 }
 
-const joined = (a: readonly TextSpan[], b: readonly TextSpan[]) => normal([...a, ...b]);
+const joined = (a: readonly TextSpan[], b: readonly TextSpan[]) => normalSpans([...a, ...b]);
 
 /** Code has no marks. */
 export function unmarked(spans: readonly TextSpan[]): TextSpan[] {
@@ -132,7 +101,7 @@ const parentOf = (b: Block) => b.parentId ?? "";
 export function textFor(type: string, spans: readonly TextSpan[] | undefined): TextSpan[] {
   if (withText[type] !== true) return [];
   if (type === "code") return unmarked(spans ?? []);
-  return normal(spans);
+  return normalSpans(spans);
 }
 
 /** The attributes as the wire has them: only those set. */

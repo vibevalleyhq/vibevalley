@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, For, Show, untrack } from "soli
 
 import { t } from "@vibevalley/i18n";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, ownerId } from "@vibevalley/protocol";
-import { plainText } from "@vibevalley/protocol/rules";
+import { channelOf, plainText } from "@vibevalley/protocol/rules";
 
 import { aria, useNow } from "@/base/dom";
 import { tookText, spentText } from "@/base/format";
@@ -27,7 +27,7 @@ import { chatSay, editingId, pendingLines, setEditingId } from "./composing";
 import { followed, useMessage } from "./follow";
 import { useMarkedFollowed, useMarkRead } from "./marks";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
-import { feedOf, orchestratorTyping, workbenchClock, channelOf, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "./places";
+import { feedOf, orchestratorTyping, workbenchClock, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "./places";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots, phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
 
 const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName }> = {

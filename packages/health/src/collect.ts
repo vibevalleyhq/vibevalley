@@ -4,7 +4,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { RawCommit, Source } from "./readings.ts";
@@ -16,11 +16,11 @@ export const headTime = (root: string) => Number(git(root, ["log", "-1", "--form
 /** The first commit's time: a window that starts before it has no history to compare with. */
 export const firstTime = (root: string) => Number(git(root, ["log", "--max-parents=0", "--format=%ct"]).trim().split("\n").at(-1)) * 1000;
 
-/** The tracked .ts and .tsx files as they are on disk. */
+/** The .ts and .tsx files as they are on disk: tracked ones and new ones not ignored, less those deleted and not yet committed. */
 export function sources(root: string): Source[] {
-  return git(root, ["ls-files", "-z", "--", "*.ts", "*.tsx"])
+  return git(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "*.ts", "*.tsx"])
     .split("\0")
-    .filter(Boolean)
+    .filter((path, i, all) => path !== "" && all.indexOf(path) === i && existsSync(join(root, path)))
     .map((path) => ({ path, text: readFileSync(join(root, path), "utf8") }));
 }
 

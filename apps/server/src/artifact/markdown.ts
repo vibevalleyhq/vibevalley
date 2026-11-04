@@ -4,9 +4,10 @@
 // reads back to the same blocks.
 
 import type { Block, BlockAttrs, BlockType, SpanMarks, TextSpan } from "@vibevalley/protocol";
+import { normalSpans } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 
-import { normal, ordered, plain, textFor, unmarked } from "./ops.ts";
+import { ordered, plain, textFor, unmarked } from "./ops.ts";
 
 /** A block as Markdown says it: its place is its depth under the block before it. */
 export interface MdBlock {
@@ -89,7 +90,7 @@ const escape = (t: string) => Array.from(t, (c) => (specials.includes(c) ? "\\" 
 const wordy = (c: string | undefined) => c !== undefined && /^[A-Za-z0-9]$/u.test(c);
 
 function inlineOf(spans: readonly TextSpan[]): string {
-  const all = normal(spans);
+  const all = normalSpans(spans);
   return all
     .map((s, i) => {
       let t = s.marks.code === true ? codeSpan(s.t) : escape(s.t);
@@ -200,7 +201,7 @@ export function blocksOfMarkdown(md: string): MdBlock[] {
 }
 
 /** Markdown's inline marks: **bold**, _italic_ or *italic*, `code`, ~~strike~~, [text](url), and \ before any character to take it as it is. */
-export const inlineSpans = (s: string) => normal(inline(Array.from(s), {}));
+export const inlineSpans = (s: string) => normalSpans(inline(Array.from(s), {}));
 
 function inline(s: readonly string[], m: SpanMarks): TextSpan[] {
   const out: TextSpan[] = [];

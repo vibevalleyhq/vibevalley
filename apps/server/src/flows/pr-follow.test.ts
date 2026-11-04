@@ -107,7 +107,7 @@ for (const submittedReport of [false, true]) {
       yield* until(() => inputs.length === 2, "CI automatically woke the helper");
       expect(inputs[1]).toContain("fix-first-ci");
       yield* await_(
-        () => sql<{ state: string }>`select state::text from mailbox_delivery where envelope_id = ${ci.id}`,
+        () => sql<{ state: string }>`select state from mailbox_delivery where envelope_id = ${ci.id}`,
         (rows) => rows[0]?.state === "consumed",
         "CI entered the model",
       );
@@ -116,7 +116,7 @@ for (const submittedReport of [false, true]) {
       yield* until(() => sessions.sessionOf(id)?.phase._tag === "done", "explicit handoff");
       expect((yield* issues.get(issue.id)).stage.state).toBe("reviewing");
       const held = (yield* ingress.accept(event("after-handoff-ci")))!;
-      expect((yield* sql<{ state: string }>`select state::text from mailbox_issue where trigger_id = ${held.id}`)[0]?.state).toBe("held");
+      expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${held.id}`)[0]?.state).toBe("held");
       expect(inputs).toHaveLength(2);
     }).pipe(
       Effect.ensuring(

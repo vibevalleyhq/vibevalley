@@ -164,6 +164,17 @@
 | `github.get` | `/api/v1/github/get` | ✓ | ✓ |   |   |
 | `github.refresh` | `/api/v1/github/refresh` | ✓ | ✓ |   |   |
 
+## project
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
+|---|---|---|---|---|---|
+| `project.list` | `/api/v1/project/list` | ✓ | ✓ | ✓ |   |
+| `project.validate` | `/api/v1/project/validate` | ✓ | ✓ |   |   |
+| `project.create` | `/api/v1/project/create` | ✓ | ✓ |   |   |
+| `project.language.list` | `/api/v1/project/language/list` | ✓ | ✓ |   |   |
+| `project.template.list` | `/api/v1/project/template/list` | ✓ | ✓ |   |   |
+| `project.activity.get` | `/api/v1/project/activity/get` | ✓ | ✓ |   |   |
+
 ## agent
 
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
@@ -181,17 +192,6 @@
 | `agent.template.delete` | `/api/v1/agent/template/delete` | ✓ |   |   |   |
 | `agent.template.previewDelete` | `/api/v1/agent/template/previewDelete` | ✓ |   |   |   |
 
-## memory
-
-| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
-|---|---|---|---|---|---|
-| `memory.list` | `/api/v1/memory/list` | ✓ | ✓ |   |   |
-| `memory.recall` | `/api/v1/memory/recall` | ✓ | ✓ |   |   |
-| `memory.create` | `/api/v1/memory/create` | ✓ | ✓ | ✓ | ✓ |
-| `memory.search` | `/api/v1/memory/search` | ✓ | ✓ | ✓ | ✓ |
-| `memory.delete` | `/api/v1/memory/delete` | ✓ | ✓ |   |   |
-| `memory.previewDelete` | `/api/v1/memory/previewDelete` | ✓ | ✓ |   |   |
-
 ## skill
 
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
@@ -202,16 +202,38 @@
 | `skill.delete` | `/api/v1/skill/delete` | ✓ |   |   |   |
 | `skill.previewDelete` | `/api/v1/skill/previewDelete` | ✓ |   |   |   |
 
-## project
+## pkm
 
 | 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|
-| `project.list` | `/api/v1/project/list` | ✓ | ✓ | ✓ |   |
-| `project.validate` | `/api/v1/project/validate` | ✓ | ✓ |   |   |
-| `project.create` | `/api/v1/project/create` | ✓ | ✓ |   |   |
-| `project.language.list` | `/api/v1/project/language/list` | ✓ | ✓ |   |   |
-| `project.template.list` | `/api/v1/project/template/list` | ✓ | ✓ |   |   |
-| `project.activity.get` | `/api/v1/project/activity/get` | ✓ | ✓ |   |   |
+| `pkm.page.list` | `/api/v1/pkm/page/list` | ✓ | ✓ |   |   |
+| `pkm.page.get` | `/api/v1/pkm/page/get` | ✓ | ✓ |   |   |
+| `pkm.page.save` | `/api/v1/pkm/page/save` | ✓ | ✓ |   |   |
+| `pkm.page.move` | `/api/v1/pkm/page/move` | ✓ | ✓ |   |   |
+| `pkm.page.rename` | `/api/v1/pkm/page/rename` | ✓ | ✓ |   |   |
+| `pkm.page.export` | `/api/v1/pkm/page/export` | ✓ | ✓ |   |   |
+| `pkm.block.apply` | `/api/v1/pkm/block/apply` | ✓ | ✓ |   |   |
+| `pkm.search` | `/api/v1/pkm/search` | ✓ | ✓ |   |   |
+| `pkm.capture` | `/api/v1/pkm/capture` | ✓ | ✓ |   |   |
+| `pkm.radar.get` | `/api/v1/pkm/radar/get` | ✓ | ✓ |   |   |
+| `pkm.comment.list` | `/api/v1/pkm/comment/list` | ✓ | ✓ |   |   |
+| `pkm.comment.suggest` | `/api/v1/pkm/comment/suggest` | ✓ | ✓ |   |   |
+| `pkm.comment.resolve` | `/api/v1/pkm/comment/resolve` | ✓ | ✓ |   |   |
+| `pkm.clip.create` | `/api/v1/pkm/clip/create` | ✓ | ✓ |   |   |
+| `pkm.cluster.create` | `/api/v1/pkm/cluster/create` | ✓ | ✓ |   |   |
+| `pkm.undo` | `/api/v1/pkm/undo` | ✓ |   |   |   |
+| `pkm.scan` | `/api/v1/pkm/scan` | ✓ | ✓ |   |   |
+
+## memory
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
+|---|---|---|---|---|---|
+| `memory.list` | `/api/v1/memory/list` | ✓ | ✓ |   |   |
+| `memory.recall` | `/api/v1/memory/recall` | ✓ | ✓ |   |   |
+| `memory.create` | `/api/v1/memory/create` | ✓ | ✓ | ✓ | ✓ |
+| `memory.search` | `/api/v1/memory/search` | ✓ | ✓ | ✓ | ✓ |
+| `memory.delete` | `/api/v1/memory/delete` | ✓ | ✓ |   |   |
+| `memory.previewDelete` | `/api/v1/memory/previewDelete` | ✓ | ✓ |   |   |
 
 ## connector
 

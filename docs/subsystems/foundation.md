@@ -10,18 +10,18 @@
 | 模块怎么分、怎么起名、谁能用谁；服务、`make`、`layer`、开机的 `start`/`ready` | 每块业务里面的行为（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[项目](docs/subsystems/project.md)、[频道](docs/subsystems/channel.md)、[管家](docs/subsystems/orchestrator.md)、[定时任务](docs/subsystems/cron.md)、[种植计划](docs/subsystems/issue.md)、[记性](docs/subsystems/memory.md)） |
 | 形状、Schema 和接口表放在哪 | 核心状态折什么、帧里有什么（[architecture.md](docs/architecture.md)「核心状态」） |
 | 规则放在哪、黄金数据跟着谁 | 某条规则本身（它的主人的子系统） |
-| 存盘的地基：一个 PGlite 库、一份表结构、effect-sqlc、表名、uuidv7 主键、不认旧数据 | 每张表存什么（拥有它的子系统）；家目录里的文件（[architecture.md](docs/architecture.md#存了什么)）和配置键（[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
-| 测试的地基：`src/testing`、黄金数据、oar 的 `scriptedRuntime`；旧名字和能力表的检查 | 接口的处理（`handlers.ts`）、页面的分层（[客户端](docs/subsystems/app.md)） |
+| 存盘的地基：一个 SQLite 库、一份表结构、查询的生成器、表名、uuidv7 主键、不认旧数据 | 每张表存什么（拥有它的子系统）；家目录里的文件（[architecture.md](docs/architecture.md#存了什么)）和配置键（[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
+| 测试的地基：`src/testing`、黄金数据、oar 的 `scriptedRuntime`；旧名字和能力表的检查 | 接口的处理（`http/handlers`）、页面的分层（[客户端](docs/subsystems/app.md)） |
 | 话放在哪：词典（`packages/i18n`）、`prompts.ts`、主人的语言怎么传到每个进程 | 某一句怎么说（说它的模块）；用哪个词（[用语表](docs/README.md#用语)） |
 
 ## 在哪
 
 - **仓库**：`pnpm-workspace.yaml` 列出 workspace（`apps/*`、`packages/*`），由 Vite+（`vp`）管：`vp install` 装一次（pnpm 12，设置都在 `pnpm-workspace.yaml`）。依赖的版本只写在 `pnpm-workspace.yaml` 的 catalog 里，各包的 `package.json` 写 `catalog:`（Expo SDK 定的那批写 `catalog:expo`），同一个依赖全仓库只有一个版本；`pnpm add` 照 `catalogMode: strict` 把版本放进 catalog，手写的版本由 `scripts/catalog.test.ts` 拦下；`vite`、`vitest` 再经 `overrides` 指到 Vite+ 带的那一份。依赖的文件只在 pnpm 的全局虚拟仓库里放一份（`enableGlobalVirtualStore`），每个 checkout 和帮工的 worktree 的 `node_modules` 只是链过去：一个新 worktree 几秒装好、只有几十个文件。全局仓库不提升（hoist），所以类型里用了没声明的包的依赖，在 `packageExtensions` 里替它声明（`@solidjs/web` 的 `csstype`、`expo-camera` 的 `@types/react`）。`site/` 不在 workspace 里，有自己的 `pnpm-workspace.yaml` 和版本；桌面版打包时把 `catalog:` 换成 pnpm 装的确切版本再交给 npm（`apps/desktop/scripts/package.ts`）。根目录的 `vite.config.ts` 是格式（oxfmt）和 lint（oxlint，带类型）的设置，`vp check` 一起跑它们和类型；共用的 TypeScript 设置在 `tsconfig.base.json`，根目录的 `tsconfig.json` 管 `scripts/`；全部包的类型由 `vp check` 一并查，各包不另跑 `tsc`。
-- **服务端** `apps/server`：`src/main.ts`（服务端）、`src/cli.ts`（命令行）；`src/services.ts`（全部服务的次序）、`src/handlers.ts`（每个接口转给哪个服务）、`src/http/`（`app.ts` 组装、`api.ts` 按接口表路由、`streams.ts` 三条 SSE、`mcp.ts`、`page.ts` 页面）。
+- **服务端** `apps/server`：`src/main.ts`（服务端）、`src/cli.ts`（命令行）；`src/services.ts`（全部服务的次序）、`src/handlers.ts`（合起 `http/handlers/<概念>.ts`：每个接口转给哪个服务）、`src/http/`（`app.ts` 组装、`api.ts` 按接口表路由、`streams.ts` 三条 SSE、`mcp.ts`、`page.ts` 页面）。
 - **地基** 分两个文件夹，按文件是什么分：`src/base` 是纯的，除了自己不 import `src` 里别的（`modules.test.ts` 查）：`ids.ts`（`newId`、`code`）、`json.ts`（按 Schema 读 JSON 与 `wireOf`）、`redact.ts`、`actor.ts`（谁在做）、`clip.ts`（截断与 `compactCard`）、`order.ts`（排序与 `numberIn`）、`pubsub.ts`、`questions.ts`；`src/infra` 和进程、机器打交道：`config.ts`（`ServerConfig`、`loadConfig`）、`db.ts`（`Database`）、`baseline.ts`（表结构的哈希）、`time.ts`（给 Effect 以外的代码的 `Time`、真实时间的截止）、`log.ts`（回调里的日志 `callbackLog`，没有服务可问时的 `plainLog`，「记一笔、接着做」的 `bestEffort`）、`lease.ts`（家目录的租约）、`files.ts`；`src/errors.ts` 是接口的拒绝。
-- **形状和接口**：`packages/protocol/src/shapes.ts`（类型和两边共用的常量）、`schema.ts`（每个形状的 Schema）、`api.ts`（`endpoints` 表、`Handlers`、`errorStatus`）、`client.ts`（`VibeValleyApi`，由 `scripts/api-client.ts` 照 `api.ts` 写出）、`stream.ts`（读 SSE）；能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出。
+- **形状和接口**：`packages/protocol/src/<概念>/`，一个概念一个文件夹（`common` 是几个概念共用的：带品牌的 id、谁做的、结果、花费、预览）：`shapes.ts`（类型和两边共用的常量）、`schema.ts`（每个形状的 Schema）、`api.ts`（这个概念的 `Handlers` 和接口表的一段）；`src/shapes.ts`、`schema.ts`、`api.ts` 只汇总，`endpoint.ts` 是接口共用的（`Endpoint`、`input`、`errorStatus`），`codec.ts` 是 `Wire` 和 `Codec`；`client.ts`（`VibeValleyApi`，由 `scripts/api-client.ts` 照接口表写出）、`stream.ts`（读 SSE）；能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出。
 - **规则和黄金数据**：页面和服务端都跑的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有服务端跑的在拥有它的模块里（`issue/status.ts`、`channel/rooms.ts`……），折法和拼帧在 `projection/`；黄金数据是 `apps/server/src/<模块>/testdata/*.jsonl.gz`（核心状态的折法、拼帧和共用规则的在 `core/testdata`，`core/golden.test.ts` 读），读写工具 `src/testing/golden.ts`。
-- **存盘**：`apps/server/db/migrations/0001_schema.up.sql`、`db/queries/<表>.sql`、生成的 `db/generated/`，生成器的设置 `db/effect-sqlc.json`，脚本 `scripts/db-generate.ts`。
+- **存盘**：`apps/server/db/migrations/0001_schema.up.sql`、`db/queries/<表>.sql`、生成的 `db/generated/`，生成器 `scripts/sqlite-generate.ts`。
 - **测试工具**：`src/testing/layers.ts`（`testConfig`、`testDatabase`：临时家目录、内存库）、`world.ts`（`world`：一整座农场，农机和它的额度由测试给）、`git.ts`（真的 git 仓库）、`golden.ts`（按模块找黄金数据，读、比、更新在 `@vibevalley/testkit/golden`）；`src/flows/farm.ts`（流程测试的农场和帮工）；`@vibevalley/ai/testing`（照脚本回答的模型，大脑经 `packages/agent/src/testing.ts` 用它）。
 - **话**：对主人说的都在 `packages/i18n`（`@vibevalley/i18n`）：词典是 `locales/<语言>/<命名空间>.json`，命名空间是「宿主.模块」（`web.setting`、`server.issue`、`desktop`、`mobile`，两边都说的是 `shared`）；代码里写 `t("web.setting.keys.saved")`、`t("server.issue.does.merge", { base, commits, helper })`，按一个值取、值可能不对应词条时用 `maybe()`，列表用 `list()`，把两段话接起来（「标签：内容」「内容（旁注）」）用 `shared.join` 的几条；`src/catalogs.ts` 由 `vp run i18n:gen` 从词典写出（词条连同每条的参数类型）；语言是 `currentLocale`、`setLocale`。命令行 `vpx scripts/i18n.ts`：`scan` 列出每个键在哪用，`check`（在 `docs:verify` 里）查用到却没有的、没人用的、英文缺或多的、占位对不上的、英文里有汉字的、中英一字不差的（`same.json` 列出有意一样的，比如「中文」），`find <文字>` 按文字找键，`migrate` 是把旧的词表搬进来用的。对模型说的在模块的 `prompts.ts`（主人的语言是 `src/prompts.ts` 的 `ownersLanguage`）；种子和工单模板是 `agent/seeds.json`、`template_catalog.json`，农机的预设是 `runtime/presets.json`，各有 `.en.json`。
 - **静态检查只封已有规则的绕过，不按数量扩**：命名空间、别名和 `globalThis` 的调用识别、`no-unused-vars` 改成 error、MOSS 的 JSON 走 Schema 都已经做完；方法简写、多行导入和重导出当前规则已能捕获，不新增全面 AST 替换或额外的棘轮。日志关联字段和指标仍按治理 Note 的 P4.5 追踪。
@@ -60,7 +60,7 @@
 - **Effect 代码里不另起运行时**：在 `Effect.gen` 里施加事实、发提醒是 `yield* core.apply(...)`；`Effect.runSync` 只留给外面的库的回调（oar 的事件、汇报），它们不在纤程里、要照给的次序落下。给外面的库（oar、记性的来源、MCP、node 的 http）的回调起的纤程用 `FiberSet.makeRuntime*`，归服务的作用域。
 - **定时任务归作用域**：服务里等一会儿再做的（防抖存盘、合并写、攒一下再提醒、太久没动静）是服务自己的 `FiberMap` 里的纤程：同一个键再来就换掉上一个，`onlyIfMissing` 是已经在等就不再排；超时用 `Effect.timeoutOption`。服务关的时候作用域收掉它们，不手动 `clearTimeout`。同一段逻辑的 `Effect.sleep` 和静默时长用同一个 Clock；同步回调要读时间时用它的 `currentTimeMillisUnsafe`，不另读墙钟。时间只从 `Clock` 来，lint 查（`vibevalley/no-wall-clock`，`scripts/oxlint-plugin.ts`：`apps/server/src` 里不许 `Date.now()`、不带参数的 `new Date()`、`setTimeout`、`setInterval`）：Effect 的生成器里读现在是 `yield* Clock.currentTimeMillis`，回调里要读时间的服务在 `make` 里取一次 `Clock.Clock`，用它的 `currentTimeMillisUnsafe`；Effect 以外的类（轨迹、帮工的宿主）构造时接一个 `Time`（`infra/time.ts`：`timeHere` 把服务的 Clock 变成 `now`、`sleep`、`after`），不自己读墙钟、开计时器。只有两种时间是真的：真实进程和外部协议的截止与节奏（命令的超时、杀进程前的宽限、农机的探测、QQ 的令牌和心跳、扫码登录的轮询、cloudflared），用 `infra/time.ts` 的 `afterRealTime`、`withinRealTime`、`wallTime`，名字说明它是真时间；没有服务可问的命令行用 `wallTime`。id 里的时间只用来排序，`newId` 照旧读墙钟。`it.effect` 的测试用 `TestClock` 拨（从 0 开始，要真实的时间先 `TestClock.setTime`）；真实进程测试用 `it.live`，不混用假现在和真实睡眠。服务不另开 `now` 选项，也不为测试开缩短窗口的选项。
 - **读写过异步的状态才上锁**：服务里的 `let` 多是句柄、标记、读改写在同一步里的同步状态，不换成 `Ref`；读和写之间隔着 `yield*` 的才要一把锁或 `SynchronizedRef`（连接到本机的开和关）。
-- **容易混用的 id 带品牌**：`IssueId`、`SessionId`、`ArtifactId`、`BlockId`、`MessageId`（protocol 的 `shapes.ts`），线上和库里仍是字符串。从库的行、外来的字符串、新起的 id 变成它们时用 `@vibevalley/protocol/schema` 的对应构造函数（`Brand.nominal`，不检查），只在知道是哪一种的地方用；提及、参与者这种几种 id 混着走的地方是 `string`，和品牌比较不用转。
+- **容易混用的 id 带品牌**：`IssueId`、`SessionId`、`ArtifactId`、`BlockId`、`MessageId`（protocol 的 `common/shapes.ts`），线上和库里仍是字符串。从库的行、外来的字符串、新起的 id 变成它们时用 `@vibevalley/protocol/schema` 的对应构造函数（`Brand.nominal`，不检查），只在知道是哪一种的地方用；提及、参与者这种几种 id 混着走的地方是 `string`，和品牌比较不用转。
 - **定期的后台任务用 `Schedule`**：`x.pipe(Effect.repeat(Schedule.spaced(n)))`，先等一个周期再做的加 `Effect.delay(n)`；不写 `Effect.forever` 加 `Effect.sleep`。等到有事才攒一阵的（核心状态出帧）不是定期，照旧用 `Effect.forever`。
 - **文件走 `FileSystem`，表里的 JSON 照 Schema 读**：`platform` 提供 `NodeServices.layer`；服务的 Effect 代码里用 `FileSystem`，写入失败保留 `NotWritten`，由调用方决定回报拒绝或记录日志。自己写进表的 JSON 列用 protocol 的 Schema 读回来（`base/json.ts` 的 `jsonOf`、`jsonOrNone`），不 `JSON.parse(...) as T`；模型和记录交回的话里的 JSON 块（草稿、结论、任务图）用 `lastJsonBlock(text, schema, words)`：从最后一个往前找第一个读得出、合形状、没被拒的，读不出的照模块自己的话说为什么。不认识的值用 `Predicate.isObject`、`Predicate.hasProperty` 或 Schema 判断，不手写 `typeof x === "object" && x !== null`（lint `vibevalley/no-object-guard`，服务端、`packages/agent`、`ai`、`protocol`）。
 - **库经 `Db` 服务用**（`infra/db.ts`，`platform` 提供）：`run` 跑生成的查询、失败是缺陷；`attempt` 留着失败给要记日志或说成拒绝的调用方；`one` 取单行，只把 `NoSuchElementError` 折成 `undefined`，`SqlError`、`SchemaError` 照旧是缺陷，不用 `Effect.option` 把它们当成「没有这一行」；`inTx` 包一个事务，库的失败是缺陷；`attemptTx` 也包一个事务，留着 `SqlError` 给要说成拒绝的调用方（`catchTag("SqlError", …)`），不先 die 再 `catchDefect` 接回来。模块不各写一份 `provideService(SqlClient)`，也不自己 `withTransaction`（lint `vibevalley/db-door`）。
@@ -73,7 +73,7 @@
 
 **形状和规则**
 
-- **形状写一次，Schema 由它定类型**：`shapes.ts` 是类型，`schema.ts` 里每个 Schema 写成 `Codec<T.X>`（`Schema.Codec<T.X, Wire<T.X>>`：线上的一侧是去掉 id 品牌的同一个形状），两边对不上就编不过，`schema.test.ts` 再逐个查 Schema 和 interface 的键；`endpoints` 里的每一行带方法、路径、参数、请求和回答的 Schema、`can`（谁能调），`Handlers` 由它推出，`handlers.ts` 漏了或多了一个接口就编不过。服务端按这张表路由（`http/api.ts`：请求解不开是 400，拒绝按 `errorStatus` 给状态码），页面和命令行用同一张表调（`VibeValleyApi`、`cli.ts`）。
+- **形状写一次，Schema 由它定类型**：概念的 `shapes.ts` 是类型，同一个文件夹的 `schema.ts` 里每个 Schema 写成 `Codec<T.X>`（`Schema.Codec<T.X, Wire<T.X>>`：线上的一侧是去掉 id 品牌的同一个形状），两边对不上就编不过，`schema.test.ts` 再逐个查 Schema 和 interface 的键；`endpoints` 里的每一行带方法、路径、参数、请求和回答的 Schema、`can`（谁能调），`Handlers` 由各概念的一段拼成，`http/handlers/<概念>.ts` 漏了或多了一个接口就编不过。一个概念的 Schema 用到另一个概念的，直接 import 那个概念的 `schema.ts`；概念之间不成环（环上的一个会读到还没求值的另一个），所以带品牌的 id 和几个共用的放在 `common`。服务端按这张表路由（`http/api.ts`：请求解不开是 400，拒绝按 `errorStatus` 给状态码），页面和命令行用同一张表调（`VibeValleyApi`、`cli.ts`）。
 - **生成的不手改**：`db/generated/`、[capabilities.md](docs/reference/capabilities.md) 和 `packages/protocol/src/client.ts`（`vp run api:client`：每个方法的参数、回答和注释照 `Handlers`，方法、路径、查询和请求体照 `endpoints`；生成而不在运行时读 `endpoints`，HTTP 的调用不用带上每个接口的 Schema；页面里的 Effect 只在房间的连接上（`apps/web/src/infra/gateway.ts`，[频道](docs/subsystems/channel.md)）；`docs:verify` 查它是不是最新）。生成的 client 对非 2xx 先做不依赖 Schema 的结构校验，真正的 `ApiError` 保留标签和 `next`，纯文本或畸形响应也保留状态和原始 `body`；成功仍走普通 JSON 解析。`seeds.json`、`template_catalog.json`（`packages/protocol/src/rules`）是直接改的数据文件。
 - **要每种都处理的地方穷尽**：按 `_tag`、`type` 分支的 `switch` 覆盖每一种，返回值或 `never` 让 `tsc` 查出漏掉的；成员表要每种都处理时写成 `Record<X, …>`。
 - **规则在它的主人那里，protocol 只放契约**：只有服务端跑的规则在拥有它的模块里（`session/roster.ts`、`issue/status.ts`、`issue/dependencies.ts`、`game/view.ts`、`inbox/items.ts`、`setting/memorySources.ts`、`runtime/quota.ts`……），上面的模块可以 import 下面的；核心状态的折法和拼帧读每个模块的规则，放在组装那一层（`projection/`），交给 `core`。`packages/protocol/src/rules` 只放页面和服务端都跑的（`rules/contract.test.ts` 查）。页面要的结论由服务端算好写进帧或另开接口问；只有跟着页面的时钟走、两边都得算的（帮工在干什么的话）才挪进 protocol，不在页面里重写。
@@ -82,10 +82,10 @@
 
 **存盘**
 
-- **一个 PGlite 库**：`infra/db.ts` 在家目录的库文件夹里开 PGlite（编成 WASM 的 Postgres，在服务端进程里），测试用内存库。一条连接，所以行的先后就是提交的先后（消息的编号靠它）。时间存毫秒的 `float8`，与 JavaScript 的 `number` 对齐。 内存测试库归还时先检查 DDL 污染，再重置会话设置并清空数据；结构污染或清理失败的实例不回池。
-- **SQL 只在 effect-sqlc**：查询在 `db/queries/<表>.sql`，一张表一个文件，只写这张表（联查别的表可以，写不行）；服务里不手写 SQL，只调 `db/generated` 的函数，再把行读成自己的形状。改完跑 `vp run --filter @vibevalley/server db:generate`，`server:check` 跑 `db:check` 查生成的是不是最新。
+- **一个 SQLite 库**：`infra/db.ts` 经 `@effect/sql-sqlite-node`（Node 自带的 `node:sqlite`）在家目录的库文件夹里开 `vibevalley.db`，外键打开；测试用内存库，每座农场一个新的，跑一遍基线只要几毫秒，不复用。一条连接，所以行的先后就是提交的先后（消息的编号靠它）。时间存毫秒的 `real`，与 JavaScript 的 `number` 对齐；布尔存 0 和 1，生成的 Schema 两头转；一组封闭的取值是 `text` 加 `check (列 in (…))`，生成的类型是它们的字面量。
+- **SQL 只在生成的查询里**：查询在 `db/queries/<表>.sql`，一张表一个文件，只写这张表（联查别的表可以，写不行）；模块只调自己的表的查询，读别的模块的表只用 `modules.test.ts` 的 `foreignReads` 点名的几条读的投影（信箱读频道、工单的，Inbox 读消息的）；服务里不手写 SQL，只调 `db/generated` 的函数，再把行读成自己的形状。改完跑 `vp run --filter @vibevalley/server db:generate`，`server:check` 跑 `db:check` 查生成的是不是最新。生成器在内存的 SQLite 里跑基线、逐条 prepare 查询，结果列从哪张表的哪一列来由 SQLite 说；它说不出的写在查询里：参数 `sqlc.arg(名字)`（`narg` 可空），推不出类型的参数和算出来的列写 `::int`、`::real`、`::text`、`::bool`（列写 `::表.列` 取那一列的类型，可空加 `?`），数组参数 `::text[]` 编成 JSON 文本给 `json_each`；推不出、写错的，生成器报出在哪、怎么写。`RETURNING` 看不到 AFTER 触发器后来改的值，要返回的值在语句里算。
 - **表名是 `<模块>` 或 `<模块>_<概念>`**，单数，模块是拥有它的 `src` 文件夹（`issue`、`issue_assignment`、`channel_message`、`session_run`、`game_ledger`、`lan_device`）。索引名以表名开头。
-- **一份表结构，不认旧数据**：`0001_schema.up.sql` 是整个库，改表直接改它，不另加迁移；`migrations/` 里只能有这一个文件。开机时 `PgliteMigrator` 在空库上跑它；旧库不升级：库的文件夹旁边 `db.schema` 记着建它的基线的哈希，对不上就把整个文件夹挪到 `db.<旧哈希>-<时间>`（不删）再新建一个，日志里说一句；没有 `db.schema` 的当作今天的。测试的库在内存里，由 `Database` 自己管：每个进程第一个库跑完基线就存一份文件，之后的库从这份文件起；一座农场关的时候它的库不关，关掉外键检查逐表 `DELETE`、序号从 1 重来，清空后留给下一座（同时开着的农场各拿一个；比 `TRUNCATE` 便宜，它要给每张表重建文件）。只有没人改过表结构的才留：第一个库装了一个事件触发器，任何 DDL 都在会话上打个记号（测试为了让写失败加的触发器、删改的表），有记号的库关掉。存盘的格式只有现在这一种：表、家目录里的文件、环境变量、存下的取值都只认今天的名字。
+- **一份表结构，不认旧数据**：`0001_schema.up.sql` 是整个库，改表直接改它，不另加迁移；`migrations/` 里只能有这一个文件。开机时新的库逐条跑它（`baselineStatements`）；旧库不升级：库的文件夹旁边 `db.schema` 记着建它的基线的哈希，对不上就把整个文件夹挪到 `db.<旧哈希>-<时间>`（不删）再新建一个，日志里说一句；没有 `db.schema` 的当作今天的。存盘的格式只有现在这一种：表、家目录里的文件、环境变量、存下的取值都只认今天的名字。
 - **运行时新建的行主键是 uuidv7**：`base/ids.ts` 的 `newId()`（带时间，同一毫秒里接着数，同一进程里单调），存成 `text`；协议里部分 id 带品牌，编码后仍是 `string`。不用 uuid 的：从文件来的自然键（档案、技能、项目、农机、连接器）、单例、几列组成的主键。工单另有从 1 数的 `number`，消息在对话里有从 1 数的 `number`。`code()` 是给人念的配对码，不是 id。
 
 - **数据库契约由真库验证**：系统目录检查外键索引，全部生成查询经 `EXPLAIN` 编译；不要求 `_at` 列是 `int8`，现有毫秒列用 `float8`。11 个外键没有首列索引，10,000 行下代表查询走现有索引，不批量加索引（写成本和基线不变）。嵌套事务回滚和外层整体回滚都有测试：内层 savepoint 回滚后外层继续，外层失败时内层一起回滚，`Db` 没有事务上下文覆盖的缺陷。
@@ -134,7 +134,7 @@
 
 1. 名字用单数、用语表里的词；写服务类、`make`、`layer`，服务之间传的形状放在它里面。
 2. 按依赖插进 `services.ts`（和 `testing/world.ts`）；开机要做的写成 `start` 一类的 layer，叠在最后。
-3. 要它答接口：在 `api.ts` 的 `endpoints` 加行，`handlers.ts` 编不过的地方就是要接上的。
+3. 要它答接口：在 `packages/protocol/src/<模块>/api.ts` 加它的一段（新概念要在 `src/api.ts` 汇总进去），`http/handlers/<模块>.ts` 编不过的地方就是要接上的。
 
 **加一张表或改表**
 
@@ -145,8 +145,8 @@
 
 **加一个形状、事实或接口**
 
-1. 改 `shapes.ts`，在 `schema.ts` 写它的 Schema；接口在 `api.ts` 的 `endpoints` 加一行（`can` 写清谁能调）。
-2. 编不过的地方就是还没接上的地方：`handlers.ts` 实现新接口，新事实在 `reduce` 里折，要每种都处理的 `switch` 补上。
+1. 改概念的 `shapes.ts`，在同一个文件夹的 `schema.ts` 写它的 Schema；接口在它的 `api.ts` 加一行（`can` 写清谁能调）。
+2. 编不过的地方就是还没接上的地方：`http/handlers/<概念>.ts` 实现新接口，新事实在 `reduce` 里折，要每种都处理的 `switch` 补上。
 3. 改了接口跑 `vp run capabilities`；跑 `vp run server:check` 和 `vp run web:check`。
 
 **改一条规则**
@@ -157,7 +157,7 @@
 ## 和谁打交道
 
 - **每个服务**：照这里的约定写服务、`make`、`layer`，经 `infra` 拿配置、数据库，经 `base` 拿 id。
-- **`core`**：核心状态只经 `Core.apply` 改；它最先建、最后关，状态从 PGlite 恢复，不在家目录另存一份。
+- **`core`**：核心状态只经 `Core.apply` 改；它最先建、最后关，状态从库里恢复，不在家目录另存一份。
 - **`http/app.ts`、`main.ts`**：建全部服务，开 HTTP，把地址告诉要它的服务；`--ready-json` 让桌面壳读到地址。
 - **页面**：直接 import `@vibevalley/protocol` 的类型、规则和 `VibeValleyApi`（[客户端](docs/subsystems/app.md)）。
 - **文档**：`scripts/capabilities.ts` 写 [capabilities.md](docs/reference/capabilities.md)；`docs:verify` 跑 `stale-names.ts`，在 `apps/server/src`、`apps/web/src`、`apps/web/test`、`packages/protocol/src` 里查改掉的旧名字。
@@ -170,13 +170,13 @@
 - **一门语言到底。** 服务端是 Go、客户端是 Flutter 时，规则写两遍、形状靠生成器在两门语言间搬，驱动编码 agent 的 oar 还得维护一份 Go 的移植。换成 TypeScript 以后，oar 和各家编码 agent 的 SDK 直接用 npm 的，规则在服务端和页面之间共用，agent 只要写好一门。放弃了「服务端留在 Go，只换客户端」：跨语言的成本还在，smith 还要追 oar。
 - **Effect v4。** 服务之间的依赖、资源的生命周期、错误类型由它管：`Context.Service` 和 layer 让依赖写在 `make` 上、开停的顺序从叠法里来，Schema 让形状和解码是一份，`effect/http`、`effect/sql` 不用另找。能用 Effect 自己的模块就用（`Cron`、`DateTime`、`Schema`、`HttpRouter`、`PubSub`、`Stream`），不再写一份。
 - **状态、资源和适配器分开。** `Core` 的状态由 `SubscriptionRef` 持有，农机探测用 `Cache` 合并并发查询和控制有效期；同步回调中的局部读改写保留闭包。`makeBrain`、`makeJournal`、`makeTrajectories`、`makeInProcessRun` 一次构造出完整对象。Journal 的方法同步执行，oar 的回调按事件顺序写它；保存由作用域里的异步文件组件合并。`Host` 从 Effect 环境取 `Core` 和 `FileSystem`；路由、模型、工具和恢复回调仍是实例的策略，避免 Session 反向依赖 Orchestrator。`vibevalleyRuntimeOf` 遵守 oar 的 Promise 接口。
-- **服务端不打包。** PGlite 的 wasm、分词的词典、表结构、各家 agent 的 SDK 都按包的位置找自己的文件；打成一个文件要逐个改路径。tsx 直接跑源码，桌面版带着 `apps/server` 和它的 `node_modules`（[客户端](docs/subsystems/app.md)）。
-- **PGlite，不是 SQLite。** effect-sqlc 读 Postgres 的表结构和查询，类型推得出来；PGlite 在进程里，不要单独装数据库，桌面版带得走。代价是库比 SQLite 大、开机多花一点时间。
+- **服务端不打包。** 分词的词典、表结构、各家 agent 的 SDK 都按包的位置找自己的文件；打成一个文件要逐个改路径。tsx 直接跑源码，桌面版带着 `apps/server` 和它的 `node_modules`（[客户端](docs/subsystems/app.md)）。
+- **SQLite，不是 PGlite。** Node 24 自带 `node:sqlite`（桌面版 Electron 的 Node 也有），在进程里、不用单独装数据库，开一个库几毫秒，全文检索有自带的 FTS5；PGlite 要加载几十 MB 的 wasm，新建一个库约半秒，测试为此要一池清空复用的库。代价是 SQLite 推不出参数和算出来的列的类型，effect-sqlc 只认 Postgres：生成器在这个仓库里，推不出的写在查询里，宁可报错不猜。
 - **形状写在 TypeScript，Schema 由类型定。** 只写 Schema 再推类型时，类型的名字和注释在推出来的东西里看不清；只写类型又没有运行时的解码。两样都写、用 `Codec<T.X>` 绑住，编译器保证一致。没有生成这一步，服务端和页面 import 同一份文件。
 - **一个模块一个服务，名字单数、用我们的词。** 按「谁调谁」切层切口最少，但那是按代码现状分；按概念分，模块就是产品里的东西（[概念先行](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）。一块业务一个入口，调用处读得出是谁的事。服务原来管一类东西的用复数（`Issues`、`Sessions`）：复数说「好几个」，可服务只有一个，文件夹、表、标签又都是单数，一个概念两个词；改成和 Effect 自己的 `Database` 一样的单数。代价是和协议的形状撞名，让形状经 `T.` 读：服务在服务端处处用，形状在这里是线上的那一份，前缀正好说出这一点。放弃了给服务加后缀（`IssueService`：命名一篇不让角色进名字）和给形状改名（页面、协议、文档都用 `Issue`）。
 - **反方向走流，不让慢订阅者拖住发布者。** 下层要告诉上层的事（事实、帮工的动静、给管家的消息）如果直接调，就有环；发布的人不该被慢的订阅者挡住。能从快照恢复的三条 SSE 各经容量 64 的有界 relay，正常顺序不变；到上限的连接明确结束并记错误、释放源订阅，不静默丢帧。必须完整接收的内部事实订阅不在这里断开，也不能用容量上限伪装成可靠交付。
 - **规则跟着主人，黄金数据跟着规则。** 规则都堆在一处时，没有哪个名字说得清是谁的。黄金数据跟着规则走，删一条规则就删它的用例；共用的规则在 `packages/protocol`，页面拿到的就是服务端用的那份。
-- **查询由 effect-sqlc 生成，一张表一个文件。** 手写在服务里的 SQL 字符串，列和字段靠手对，表改了编译器不知道。按表分文件，改表结构时要看的查询就在同名文件里。没用 ORM：查询不多，SQL 写得更直接。
+- **查询由生成器写成代码，一张表一个文件。** 手写在服务里的 SQL 字符串，列和字段靠手对，表改了编译器不知道。按表分文件，改表结构时要看的查询就在同名文件里。没用 ORM：查询不多，SQL 写得更直接。
 - **表按模块命名。** 一个库里十几个模块的表共用一个命名空间：频道占了 `message`，`delivery` 会撞。规矩写进 `schema.test.ts`，加一张不合的表测试就失败。
 - **一份表结构，不留兼容，不搬数据。** 每次改名都多一段搬旧数据的代码，都在每次启动的路上；项目还没有外部用户，搬数据的代码只让架构成形期的每一步更慢。放弃了「改表写迁移」和「开机看到旧文件顺手导入」。以后有了用户，改存盘要重新写迁移：在 `0001_schema.up.sql` 后面加文件，并改这一条。
 - **主键用 uuidv7。** 带时间、同一进程里单调，跨表、跨农场导数据也不会打架。代价是已读位置和投递按 id 比先后：系统时钟往回调时，重启后的新消息可能排在旧消息前面；只有一个人在本机用，接受这个风险。
@@ -188,9 +188,9 @@
 - **改名靠编译器和护栏，不靠全局替换。** `turn`、`station`、`harvest` 在 oar、游戏和界面文字里都是对的，盲目 `sed` 要花更多时间找回来。标识符改名用编辑器的重命名和 `tsc`，字符串、SQL、Markdown 用 `rg` 逐处改；改掉的旧名写进 `scripts/stale-names.ts`，回来时 `docs:verify` 失败。
 
 - **测试的层按依赖算，边界写成检查。** 层由一个文件经 import 一路碰得到什么算出来，加一个 import 就换了层，金字塔小结里看得见；放弃了按文件名声明层（`*.rules.test.ts`：要改二三十个名字，名字和内容还会对不上）、按层裁剪 `world`（农场搭起来中位数 10 毫秒，越层由依赖和预算挡住就够）、覆盖率门槛（说不出测在哪层、花多少）、超预算就失败（机器快慢不同，CI 会时好时坏）。按依赖算的第一回就找出一处越层：`session/report.test.ts` 要用 `MergeFailure`，而它定义在会跑 git 的 `project.ts` 里，形状挪到了 `project/workplace.ts`。不靠时间等的 lint 改掉了 72 处写死的等待，顺带找出 `Core.owner` 是开机后才订上的流（开机后主人马上做的会漏），改成返回前就订上；只剩 8 处没有可等事件的否定断言，每处一行理由。
-- **测试快一个台阶，靠模块的接口便宜，不靠并行。** 顺序跑服务端的测试原来要 210 s：worker 的 CPU 里 PGlite 占 36%，加载模块、起子进程、读写文件占 30%，空闲 19%，Effect 和业务代码只有 6%；把写死的几个延时调小几乎不省时间，测试主要在干活，不在等。所以先让每个测试本身便宜：库清空复用（新建一个约 110 ms，清空约 13 ms）、模块只加载一次、测试仓库从模板复制、产品代码少起 git（一个 git 命令就是一个进程，约 20 ms；管家每次开口都要列项目，列一次原来每个项目起一个 git）、规则在自己的接口上测；做完是 108 s。没做：前后端共用一个时钟（页面和服务端是两个进程，页面的测试基本不依赖时间，投入换不来收益）；把延时常量在测试里调小（几乎不省时间，测的也不再是上线的数值）；每个测试一个 Postgres schema（每个 schema 要重跑建表，还要改所有查询的 `search_path`）；测试里把 git 换成假的（合并、冲突、工作区正是最容易错的地方）；加并行（不在这一轮：每个测试先便宜，并行的收益跟着放大）。
+- **测试快一个台阶，靠模块的接口便宜，不靠并行。** 顺序跑服务端的测试原来要 210 s：worker 的 CPU 里当时的库（PGlite）占 36%，加载模块、起子进程、读写文件占 30%，空闲 19%，Effect 和业务代码只有 6%；把写死的几个延时调小几乎不省时间，测试主要在干活，不在等。所以先让每个测试本身便宜：库清空复用（当时新建一个约 110 ms；换成 SQLite 后每座农场新开一个）、模块只加载一次、测试仓库从模板复制、产品代码少起 git（一个 git 命令就是一个进程，约 20 ms；管家每次开口都要列项目，列一次原来每个项目起一个 git）、规则在自己的接口上测；做完是 108 s。没做：前后端共用一个时钟（页面和服务端是两个进程，页面的测试基本不依赖时间，投入换不来收益）；把延时常量在测试里调小（几乎不省时间，测的也不再是上线的数值）；每个测试一个 Postgres schema（每个 schema 要重跑建表，还要改所有查询的 `search_path`）；测试里把 git 换成假的（合并、冲突、工作区正是最容易错的地方）；加并行（不在这一轮：每个测试先便宜，并行的收益跟着放大）。
 - **时间只从 Clock 来，靠 lint，不靠记得。** 虚拟时钟只跳过「等」、跳不过「干活」，它的价值是确定性和测得到长的窗口（一小时后到点的定时任务、10 分钟后关的线路）。可一处绕开 Clock 的 `setTimeout` 就让 `TestClock` 卡住，而这些地方集中在 Promise 一侧，所以写成规则，并让那一侧的类在构造时接 `Time`：时间从哪来写在构造参数上，测试换一个 `Time` 就拨得动。外部协议和真实进程的节奏留在真时间，名字上说明（`afterRealTime`、`wallTime`）；外面的库自己在真时间上重试的（声网的 SDK），把重试收回来、关掉它的（`maxRetries: 0`）。
-- **I/O 用确定性计数守预算。** `Db` 和 git 入口记录查询、事务和命令次数；频道一条消息的 SQL 预算是 17，列出 20 张工单最多两次 SQL、零次 git。测试继续用真 PGlite 和真 git，先订阅状态变化再等；没有事件端口时轮询逐步退避。不启动真实外部 CLI 的模块测试优先 `it.effect`，窗口由 `TestClock.adjust` 显式推进；真实进程测试保留 `it.live`。耗时预算用于诊断，I/O 次数预算用于阻止 N+1 回退。
+- **I/O 用确定性计数守预算。** `Db` 和 git 入口记录查询、事务和命令次数；频道一条消息的 SQL 预算是 17，列出 20 张工单最多两次 SQL、零次 git。测试继续用真 SQLite 和真 git，先订阅状态变化再等；没有事件端口时轮询逐步退避。不启动真实外部 CLI 的模块测试优先 `it.effect`，窗口由 `TestClock.adjust` 显式推进；真实进程测试保留 `it.live`。耗时预算用于诊断，I/O 次数预算用于阻止 N+1 回退。
 
 ## 还没做的
 

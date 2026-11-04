@@ -13,7 +13,7 @@ import { foundText, Memory, type SearchQuery } from "@/memory/memory.ts";
 import { Project } from "@/project/project.ts";
 import { resourceWords } from "@/resource/prompts.ts";
 import { Resource, ResourceRequest } from "@/resource/resource.ts";
-import type { ToolStart } from "@/session/facts.ts";
+import type { ToolStart } from "@/session/reaction.ts";
 
 import { artifactTools } from "./artifact.ts";
 import { issueTools } from "./issue.ts";

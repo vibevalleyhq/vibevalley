@@ -97,7 +97,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **服务端（`main.ts`、`http/app.ts`）**：主接口只听 `127.0.0.1`；`--ready-json` 在开始答 HTTP 以后写收据，`--web` 让它在 `/` 提供页面，路径没有扩展名的回 `index.html`（页面自己的路由）。桌面壳只依赖收据和「SIGTERM 会存盘」这两条。
 - **「连接到本机」（`lan`）**：它的监听把页面放给任何人（页面里没有农场的东西），接口和流只放带钥匙的；配对的链接是 `http://<地址>:<端口>/pair?c=<码>`，手机相机扫开就是浏览器里的 `/pair`。
 - **设置（`setting`）**：设置页读写设置，保存前问 `settings/check`；钥匙从不回到页面，页面只看到来源和末四位。
-- **语音（`voice`）**：通话在 `src/features/voice/call.ts`（`voiceCall`），按钮和 ⌥⇧Space 发同一个动作；Agora 的 SDK 只在那里动态 import。
+- **语音（`voice`）**：通话在 `src/features/voice/call.ts`（`callChanged`），按钮和 ⌥⇧Space 发同一个动作；Agora 的 SDK 只在那里动态 import。
 - **验证脚本**：`scripts/verify-server.ts` 起一个隔离的服务端，`vv-acceptance/references/page.md` 对着它用 Playwright 截图。
 
 ## 为什么这样

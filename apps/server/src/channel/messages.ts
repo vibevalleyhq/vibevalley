@@ -3,7 +3,7 @@ import type * as T from "@vibevalley/protocol";
 
 import { compactCard } from "@/base/clip.ts";
 import { compareText, or } from "@/base/order.ts";
-import { type ChannelRouteFact, type Meta, metaOf, senderKind, targetOf, channelType } from "@/mailbox/envelope.ts";
+import { type ChannelRouteInput, type Meta, metaOf, senderKind, targetOf, channelType } from "@/mailbox/envelope.ts";
 import type { ChannelMail } from "@/mailbox/mailbox.ts";
 import type { InputContext } from "@/mailbox/payload.ts";
 
@@ -42,10 +42,6 @@ export function withChannel(chat: T.Chat | undefined, c: T.Channel): T.Chat {
   all = all.filter((x) => keep.has(x.id)).toSorted(byID);
   return { ...base, channels: all };
 }
-
-export const defaultOf = (chat: T.Chat | undefined) => chat?.channels.find((c) => c.default);
-
-export const channelOf = (chat: T.Chat | undefined, id: string) => chat?.channels.find((c) => c.id === id);
 
 type SearchHas = "file" | "image" | "link";
 
@@ -135,7 +131,7 @@ const ingressActorKind = (raw: string): T.TriggerActorKind => {
 };
 
 /** A committed channel message as the one trigger Mailbox routes, and what it needs to fan it out. */
-export const channelInput = (fact: ChannelRouteFact, context: InputContext): { readonly trigger: T.Trigger; readonly mail: ChannelMail } => {
+export const channelInput = (fact: ChannelRouteInput, context: InputContext): { readonly trigger: T.Trigger; readonly mail: ChannelMail } => {
   const meta = metaOf(fact.row.meta);
   const source = meta.ingressSource ? sourceByPurpose[meta.ingressSource] : "channel";
   const trigger: T.Trigger = {

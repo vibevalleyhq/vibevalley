@@ -48,7 +48,7 @@ test("the golden runs and the frames made of them decode", async () => {
     expect(JSON.parse(sent)).toEqual(JSON.parse(JSON.stringify(frame)));
     decode.frame(JSON.parse(sent));
   }
-  expect(() => decode.fact({ type: "sessionPhase", at: 1, id: "w1", phase: { _tag: "working", since: 1, doing: { action: "dance", label: "" } } })).toThrow(
-    /run_command/u,
-  );
+  expect(() =>
+    decode.fact({ type: "sessionPhaseChanged", at: 1, id: "w1", phase: { _tag: "working", since: 1, doing: { action: "dance", label: "" } } }),
+  ).toThrow(/run_command/u);
 });

@@ -22,6 +22,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
 | [project.md](docs/subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测、地契 |
 | [artifact.md](docs/subsystems/artifact.md) | 产出：主人和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
+| [pkm.md](docs/subsystems/pkm.md) | 笔记：主人的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
 | [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、谁听见、工单串、连接器、Inbox |
 | [inbox.md](docs/subsystems/inbox.md) | Inbox：要你处理的事、刚来的、巡查，经通话、手机、系统通知送到主人 |
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent：模型请求、循环、对话文件、提示开头、压缩、技能、记性、帮手、自己的任务，四种用法 |
@@ -72,6 +73,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 农机 | machine | runtime（`RuntimeInfo`） | 机器上的一种编码 agent 程序（pi、claude、codex……）；左栏和设置里也叫农机 | harness、引擎、runtime（中文界面） |
 | 工单 | ticket | issue（`Issue`） | 一件活，从写下到关上一个 id；每派一次是一个帮工 | job、ticket |
 | 产出 | artifact | artifact（`Artifact`，正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的，或交上来按版本换的网页；交上来的带卡片挂在频道和工单上 | 文档（指产出时）、doc（指产出时） |
+| 笔记 | notes | pkm（`Pkm`，一页 `PkmPage`，一块 `PkmBlock`） | 你自己的知识库：PARA 几个文件夹里的大纲页面和每天的日记，工作台的「笔记」页（`/pkm`）；文件在笔记库里，别的编辑器也能改 | |
 | 项目 | project | project（`ProjectSummary`） | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
 | 大地图 | the map | `WorkspaceState`；目录是 `ServerConfig` 的 `workRoot`、`home` | 全部项目、工单、频道和档案；工作台「项目」页的「全部」 | 世界、全图 |
 | 空位 | spot | `ServerConfig.project.maxSessions`（配置 `project.max_sessions`）、`Session.makeRoom`；每台农机另有 `maxWorking` | 一个项目（和整个 VibeValley）同时能在做的工单数；满了的待办排队，有空位自动开工 | 并发位、空地 |
@@ -94,11 +96,11 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 记性 | memory | memory（`Memory`） | 一份档案记得的事 | 记忆库 |
 | 技能 | skill | skill（`Skill`） | 档案能带的技能；农场里画成技能书 | 插件（指技能时） |
 | 人设 | persona | `persona.md`、`PersonaMode` | 档案的性格和说话的方式：当系统提示，或放在每一轮的开头 | |
-| 帮手 | subagent | subagent（`runtime_todo_executor` 的 `subagent`） | 帮工或管家在自己的进程里另开的 agent，替它查一件事，答完就走 | |
+| 帮手 | subagent | subagent（`runtime_todo.executor` 的 `subagent`） | 帮工或管家在自己的进程里另开的 agent，替它查一件事，答完就走 | |
 | 自己的任务 | todo | `Todo`（`runtime_todo` 表，工具 `todo_add`、`todo_update`、`todo_list`） | agent 给自己记的待办，不是工单 | |
 | 父工单 | parent issue | `Issue`（有子工单） | 子单通过检查后汇入父分支，父单统一验收 | 计划图、TaskGraph |
 | 子工单 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | 一个帮工负责的原生工单，前置完成后派发 | Task、步骤状态机 |
-| 派活 | dispatch | hire（`Issue.hire`、事实 `FactSession`） | 把一张工单交给一个档案、开一个帮工；工单挪到待办就是派活 | |
+| 派活 | dispatch | hire（`Issue.hire`、事实 `FactSessionChanged`） | 把一张工单交给一个档案、开一个帮工；工单挪到待办就是派活 | |
 | 派工关联 | assignment | `Assignment`（`issue_assignment`） | 一张工单由哪个档案负责，执行上下文挂在这条关系下 | |
 | 执行器 | executor | `Executor` | 创建、投递、中断和释放 oar 的执行实例 | |
 | 起草 | refine | refine（`IssueRefinement`、`issue.refine`） | 一个帮工读代码，把待规划的工单写成标题、描述和验收标准，写完就走 | |
@@ -112,7 +114,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 工作目录 | working folder | `Workplace`（`workdir`） | 帮工干活的目录：项目目录或工单的 worktree；VibeValley 自己的是 `VIBEVALLEY_WORK_ROOT` | 工作区 |
 | 定时任务 | scheduled task | cron（`Cron`） | 一张工单的一种触发：到点开它的一轮，派给帮工或管家 | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
 | Inbox | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 要你处理的事，从核心状态现算 | 通知（指 Inbox 时）、来电（农场的皮里用） |
-| 提醒 | notice | `Core.notice`、`NoticeLevel`（边事件 `SideEventNotice`） | VibeValley 一闪而过地告诉你一句：信息、警告或出错；不进 Inbox | |
+| 提醒 | notice | `Core.notice`、`NoticeLevel`（事件流里是 `ServerEventNotice`） | VibeValley 一闪而过地告诉你一句：信息、警告或出错；不进 Inbox | |
 | 巡查 | patrol | `patrolStep`（`Inbox.patrol`） | 定时看 Inbox，放久了叫醒管家 | |
 | 通话 | call | `VoiceCall`（`voice.call.*`） | 和管家打电话 | |
 | 听写 | dictation | dictation（`Dictation`） | 说话变成输入框里的字 | |

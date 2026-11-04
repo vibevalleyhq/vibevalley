@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import type { Block, BlockAttrs, BlockOp, BlockOpStatus, BlockType, TextSpan } from "@vibevalley/protocol";
-import { keyBetween, validKey } from "@vibevalley/protocol/rules";
+import { keyBetween, normalSpans, validKey } from "@vibevalley/protocol/rules";
 import type { Wire } from "@vibevalley/protocol/schema";
 
 import { bold, para, sample, span } from "@/testing/artifact.ts";
 
 import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
-import { normal, ordered, Page, plain, runeLen, sameText, splitAt } from "./ops.ts";
+import { ordered, Page, plain, runeLen, sameText, splitAt } from "./ops.ts";
 
 // The cases write ids as the wire has them; the page takes them as read.
 const branded = <A>(wire: Wire<A>): A => wire as A;
@@ -44,7 +44,7 @@ describe("text", () => {
   it("keeps marks across a split, and joins like marks", () => {
     const [l, r] = splitAt([span("你"), bold("好世"), span("界")], 2);
     expect(sameText(l, [span("你"), bold("好")]) && sameText(r, [bold("世"), span("界")])).toBe(true);
-    expect(normal([span("a"), span(""), span("b"), bold("c"), bold("d")]).map((s) => s.t)).toEqual(["ab", "cd"]);
+    expect(normalSpans([span("a"), span(""), span("b"), bold("c"), bold("d")]).map((s) => s.t)).toEqual(["ab", "cd"]);
   });
 });
 
@@ -333,7 +333,7 @@ function shape(bs: readonly Block[]): string {
     .map((b) => {
       const d = b.parentId !== undefined ? (depth.get(b.parentId) ?? 0) + 1 : 0;
       depth.set(b.id, d);
-      return `${d} ${b.type} ${attrsText(b.attrs)} ${spansText(normal(b.text))}`;
+      return `${d} ${b.type} ${attrsText(b.attrs)} ${spansText(normalSpans(b.text))}`;
     })
     .join("\n");
 }

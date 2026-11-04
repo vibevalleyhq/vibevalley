@@ -20,7 +20,7 @@
 | Observability（日志、OTLP 追踪） | 用：日志经 Effect（`infra/log.ts`），OTLP 在 `main.ts` 接上 |
 | Testing Effect programs（`@effect/vitest`、共享 layer） | 照做：`it.effect`、`TestClock`；服务端用 `testing/world.ts` 搭农场，`packages/agent` 用 `testing.ts` 的 `withAgent`（大脑在测试的纤程上，钟是 `TestClock`） |
 | Runtime type guards（`Predicate`） | 照做：对象用 `Predicate.isObject`、`Predicate.hasProperty`，不手写 |
-| Working with SQL databases（`effect/sql`） | 用，经 `Db` 服务和 effect-sqlc 生成的查询（`apps/server/db/`） |
+| Working with SQL databases（`effect/sql`） | 用，经 `Db` 服务和 `scripts/sqlite-generate.ts` 生成的查询（`apps/server/db/`） |
 | Effect HttpClient | 外面的 HTTP 经 `HttpClient`（[地基](docs/subsystems/foundation.md)）；Promise 一侧还有几处直接 `fetch` |
 | Building HttpApi servers | 不用：接口表是 `packages/protocol/src/api.ts` 自己的，处理在 `apps/server/src/handlers.ts` |
 | Typed GraphQL clients | 不用 |

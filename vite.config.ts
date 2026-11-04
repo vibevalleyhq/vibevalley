@@ -70,7 +70,7 @@ export default defineConfig({
       ],
       "notes:verify": "vpx scripts/agent-notes.ts",
       "names:verify": "vpx scripts/stale-names.ts",
-      // db:check is a script: it reads ../effect-sqlc, outside what the cache can see.
+      // db:check is a script: it reads db/migrations and db/queries through node:sqlite.
       "server:check": [
         "vp check",
         "vp run --filter @vibevalley/protocol --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent test",

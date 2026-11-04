@@ -24,9 +24,9 @@ const health: Health = {
     return parts.slice(0, 2).join("/");
   },
   hotByDesign: {
-    "packages/protocol/src/shapes.ts": "The contract: every new field the frame or an endpoint carries is written here.",
-    "packages/protocol/src/schema.ts": "Each shape's Schema, so it changes with shapes.ts.",
-    "packages/protocol/src/api.ts": "The endpoint table: every new endpoint is a line here.",
+    "packages/protocol/src/shapes.ts": "Only gathers <concept>/shapes.ts now; its changes in the window are from when every shape was written here.",
+    "packages/protocol/src/schema.ts": "Only gathers <concept>/schema.ts now; its changes in the window are from when every Schema was written here.",
+    "packages/protocol/src/api.ts": "Puts the concepts' endpoints together; its changes in the window are from when every endpoint was written here.",
   },
   ratchet: "scripts/health.ratchet.json",
   days: 30,

@@ -1,0 +1,61 @@
+{
+  "place": {
+    "label": "笔记",
+    "hint": "你自己的笔记：PARA 分好的大纲页、每天的日记、反链和润色建议"
+  },
+  "tier": {
+    "project": "项目",
+    "area": "领域",
+    "resource": "资源",
+    "inbox": "收件箱",
+    "journal": "日记",
+    "archive": "归档"
+  },
+  "list": {
+    "label": "全部笔记页",
+    "capture": "记一句，进今天的日记",
+    "captured": "记进了今天的日记",
+    "find": "搜笔记",
+    "nothingFound": "没有找到",
+    "open": "{n} 项没做完",
+    "radar": "收件箱 {inbox} · 搁着的项目 {stale} · 过期 {overdue}",
+    "all": "全部笔记"
+  },
+  "empty": "笔记还空着。这些页面就是 {root} 里的 Markdown 文件；在左边记一句，就有了今天的日记。",
+  "gone": "没有这一页，或者它的文件已经删掉了。",
+  "pick": "从左边挑一页看",
+  "page": {
+    "more": "更多",
+    "export": "导出成 Markdown（复制）",
+    "exported": "复制好了",
+    "undo": "撤销上一次改动",
+    "undone": "撤销了：{what}",
+    "nothingToUndo": "没有可以撤销的改动",
+    "tier": "放在哪",
+    "moved": "挪到了{tier}",
+    "file": "文件 {file}",
+    "append": "加一块",
+    "collapse": "收起",
+    "expand": "展开",
+    "edit": "改这一块",
+    "marker": "切换状态",
+    "empty": "空的",
+    "missingRef": "找不到这一块"
+  },
+  "backlinks": {
+    "title": "链到这里的",
+    "none": "还没有别的页链到这里",
+    "projects": "项目",
+    "journals": "日记",
+    "areas": "领域和资源",
+    "archives": "归档"
+  },
+  "comments": {
+    "title": "评论和润色建议",
+    "accept": "采纳",
+    "reject": "不要",
+    "on": "关于「{span}」",
+    "accepted": "采纳了",
+    "rejected": "不要了"
+  }
+}

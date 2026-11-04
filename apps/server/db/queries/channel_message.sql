@@ -100,7 +100,7 @@ order by m.number;
 
 -- name: HoldNoticeSinceUser :one
 select count(*)::int as n from channel_message m
-where m.channel_id = sqlc.arg(channel) and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = 'hop_limit'
+where m.channel_id = sqlc.arg(channel) and m.sender_id = 'system' and (m.meta ->> 'code') = 'hop_limit'
   and m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = sqlc.arg(channel) and u.sender_id = 'owner'), '');
 
 -- name: MessageByNumber :one
@@ -142,12 +142,12 @@ join channel_participant p on p.id = m.sender_id
 join channel c on c.id = m.channel_id
 left join channel ch on ch.id = c.parent_id
 where m.deleted_at is null and m.kind <> 'notice'
-  and (sqlc.arg(text)::text = '' or strpos(lower(m.body), lower(sqlc.arg(text))) > 0)
+  and (sqlc.arg(text)::text = '' or instr(lower(m.body), lower(sqlc.arg(text))) > 0)
   and (sqlc.arg(channel)::text = '' or c.id = sqlc.arg(channel) or c.parent_id = sqlc.arg(channel))
   and (sqlc.arg(sender)::text = '' or m.sender_id = sqlc.arg(sender) or lower(p.name) = lower(sqlc.arg(sender)))
-  and (not sqlc.arg(has_file)::boolean or strpos(coalesce(m.meta, ''), '"attachments"') > 0)
-  and (not sqlc.arg(has_image)::boolean or strpos(coalesce(m.meta, ''), '"type":"image/') > 0)
-  and (not sqlc.arg(has_link)::boolean or strpos(m.body, 'http://') > 0 or strpos(m.body, 'https://') > 0)
+  and (not sqlc.arg(has_file)::boolean or instr(coalesce(m.meta, ''), '"attachments"') > 0)
+  and (not sqlc.arg(has_image)::boolean or instr(coalesce(m.meta, ''), '"type":"image/') > 0)
+  and (not sqlc.arg(has_link)::boolean or instr(m.body, 'http://') > 0 or instr(m.body, 'https://') > 0)
   and m.created_at >= sqlc.arg(after)::float8 and m.created_at < sqlc.arg(before)::float8
 order by m.id desc limit sqlc.arg(n)::int;
 
@@ -166,7 +166,7 @@ update channel_message set meta = sqlc.narg(meta), revision = sqlc.arg(revision)
 -- name: NotificationReceipt :one
 select r.updated_at as read_at,
   exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.number > m.number
-    and n.deleted_at is null and (n.sender_id = 'owner' or (m.kind = 'report' and n.kind = 'report' and n.sender_id = m.sender_id))) as superseded
+    and n.deleted_at is null and (n.sender_id = 'owner' or (m.kind = 'report' and n.kind = 'report' and n.sender_id = m.sender_id)))::bool as superseded
 from channel_message m
 left join channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'owner' and r.read_number >= m.number
 where m.id = sqlc.arg(id);
@@ -187,7 +187,7 @@ from channel_message m
 join channel_participant p on p.id = m.sender_id
 join channel c on c.id = m.channel_id
 left join channel ch on ch.id = c.parent_id
-left join ingress_trigger r on r.id = m.id
+left join mailbox_trigger r on r.id = m.id
 where r.routed_at is null and m.deleted_at is null
 order by m.channel_id, m.number
 limit 1000;

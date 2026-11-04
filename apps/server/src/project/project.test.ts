@@ -9,7 +9,7 @@ import { ServerConfig } from "@/infra/config.ts";
 import { gitInEnv, gitSync, projectsDir, repo, write } from "@/testing/git.ts";
 import { testConfig, untilGot as until } from "@/testing/layers.ts";
 
-import { Project, activityOf, countsOf, githubRepository, type GitHubRun, type ProjectHooks, projectProblem, tokeiArgs } from "./project.ts";
+import { Project, activityOf, countsOf, type GitHubRun, type ProjectHooks, projectProblem, tokeiArgs } from "./project.ts";
 import { type MergeFailure } from "./workplace.ts";
 
 /** gh is not installed. */
@@ -26,10 +26,6 @@ const projects = <A, E>(root: string, body: Effect.Effect<A, E, Project>, change
 
 describe("projects", () => {
   it("names and addresses", () => {
-    expect(githubRepository(" https://github.com/botiverse/raft-source.git/ ")).toEqual({
-      name: "raft-source",
-      url: "https://github.com/botiverse/raft-source.git",
-    });
     for (const github of [
       "file:///tmp/repo",
       "https://github.com.evil/x/y",

@@ -1,13 +1,10 @@
 import { t } from "@vibevalley/i18n";
 import { type Chat, type ChatMessage, type Channel, type Issue, type Session, type WorkspaceState } from "@vibevalley/protocol";
+import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
 import { compareText, or } from "@/base/search";
 
 const isTop = (c: Channel) => c.type !== "thread";
-
-export const defaultOf = (chat: Chat | undefined) => chat?.channels.find((c) => c.default);
-
-export const channelOf = (chat: Chat | undefined, id: string | undefined) => (id ? chat?.channels.find((c) => c.id === id) : undefined);
 
 /** As the sidebar lists them, the server's order: the default first, then by position (the unplaced after), then by id. */
 const bySidebar = (a: Channel, b: Channel) => {

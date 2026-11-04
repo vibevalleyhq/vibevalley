@@ -30,7 +30,7 @@
 - **家目录不在 YAML 里**：YAML 在家目录里，家目录只由 `VIBEVALLEY_HOME` 定，默认 `~/.vibevalley`。
 - **`defaults()` 是默认值的唯一出处，零就是零**：端口 0 是随便一个，`patrol.heartbeat_minutes` 0 是关掉巡查。
 - **读不成就不起来**：`--config` 给了却找不到的文件、读不成数字的值、不在 0–65535 的 `port`、`voice.line.port`、`lan.port`，`github.pr_poll_seconds` 不大于 0，`loadConfig` 都报错，服务端不起来。家目录的 `vibevalley.yaml` 不在时照默认。
-- **读完再整理**：`work_root`、`tokei`、`web`、`db` 里开头的 `~/` 换成用户目录；`db` 是 `memory` 时用内存库，空的是家目录的 `db` 文件夹（`dbDir`），别的是那个文件夹。
+- **读完再整理**：`work_root`、`tokei`、`web`、`db`、`pkm.root` 里开头的 `~/` 换成用户目录；`db` 是 `memory` 时用内存库，空的是家目录的 `db` 文件夹（`dbDir`），别的是那个文件夹。
 - **主接口的地址固定**：`serverAddress` 是 `127.0.0.1:<port>`，没有 `host` 配置，设了 `VIBEVALLEY_HOST` 也不认。
 - **服务只读 `ServerConfig` 的字段**：开机读一次，作为 `ServerConfig` 服务交给各服务，不读 `process.env`；测试从 `testing/layers.ts` 的 `testConfig()` 出发改字段。不热重载：改了配置要重启服务端。
 
@@ -39,7 +39,7 @@
 | 键 | 用途 | 默认 |
 |---|---|---|
 | `work_root` | 工作目录：`projects/` 是项目，`worktrees/` 是 worktree，帮工只在这里面干活（[项目](docs/subsystems/project.md)） | `~/vibevalley-dev` |
-| `db` | 库：PGlite 的文件夹；`memory` 是只在内存里 | `$VIBEVALLEY_HOME/db` |
+| `db` | 库：SQLite 的库所在的文件夹；`memory` 是只在内存里 | `$VIBEVALLEY_HOME/db` |
 | `port` | 主接口固定听 `127.0.0.1`，只能选端口；0 由系统分配。HTTP 和帮工的 `/mcp` 使用同一实际监听地址 | 8787 |
 | `web` | 同时在 `/` 提供的页面（`apps/web/dist`）；也可以用 `--web` 给 | 无 |
 | `agent.model` | 命令行里自己的 agent 用的模型；空着是 DeepSeek 的默认 | |
@@ -63,6 +63,7 @@
 | `chat.notice_batch_ms` | 忙着的帮工收到的提示，攒多久合成一条 | 3000 |
 | `chat.retry_wake_ms` | 叫醒在开口前就失败了，多久以后再叫一次 | 3000 |
 | `otlp.url` | OTLP 收集器的地址（如 `http://127.0.0.1:4318`）：填了，`Effect.fn` 的 span、日志（接口的日志带 `op`）和指标都送过去：`vibevalley.http.requests`（按 `op`、`status`）、`vibevalley.sse.open`（按 `stream`）、`vibevalley.sessions.running`；空着不送 | 空 |
+| `pkm.root` | 笔记库的文件夹：PARA 的几个文件夹和日记在里面，可以指向已有的 Logseq 库（[笔记](docs/subsystems/pkm.md)） | `$VIBEVALLEY_HOME/pkm` |
 
 **设置**：
 

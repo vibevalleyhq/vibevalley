@@ -39,8 +39,8 @@ const activity = Effect.fnUntraced(function* (core: Core["Service"], agent: stri
   const id = sessionId(agent);
   const had = core.session(id);
   const since = had?.phase._tag === "working" ? had.phase.since : yield* Clock.currentTimeMillis;
-  yield* core.apply(...(had ? [] : [{ type: "session" as const, session: { ...helper, id, agent, role: "orchestrator" as const } }]), {
-    type: "sessionPhase",
+  yield* core.apply(...(had ? [] : [{ type: "sessionChanged" as const, session: { ...helper, id, agent, role: "orchestrator" as const } }]), {
+    type: "sessionPhaseChanged",
     id,
     phase: phaseOf(action, since),
     ...(channel ? { channel } : {}),
@@ -117,7 +117,7 @@ describe("core", () => {
       const core = yield* Core;
       yield* core.open();
       const reopen = core.open();
-      yield* core.apply({ type: "voiceCall", state: "idle", reason: "" });
+      yield* core.apply({ type: "callChanged", state: "idle", reason: "" });
       expect(core.state().call).toBe("idle");
       yield* reopen;
       expect(core.state().call).toBe("live");
@@ -132,13 +132,13 @@ describe("core", () => {
           const core = yield* Core;
           const seen = yield* core.events.pipe(Stream.take(6), Stream.runCollect, Effect.forkScoped);
           yield* TestClock.adjust(5);
-          yield* core.apply({ type: "session", session: { ...helper, phase: { _tag: "working", since: 5, doing: { action: "none", label: "" } } } });
+          yield* core.apply({ type: "sessionChanged", session: { ...helper, phase: { _tag: "working", since: 5, doing: { action: "none", label: "" } } } });
           yield* activity(core, "orchestrator", "thinking");
           yield* activity(core, "orchestrator", "thinking");
-          yield* core.apply({ type: "gameProgress", progress: emptyProgress() });
+          yield* core.apply({ type: "progressChanged", progress: emptyProgress() });
           yield* core.setCommits({ total: 1, today: 0, week: 0 } as never);
           const got = yield* Fiber.join(seen);
-          expect(got.map((e) => e.type)).toEqual(["snapshot", "session", "session", "sessionPhase", "gameProgress", "gameProgress"]);
+          expect(got.map((e) => e.type)).toEqual(["snapshot", "sessionChanged", "sessionChanged", "sessionPhaseChanged", "progressChanged", "progressChanged"]);
           expect(got[2]!.at).toBeGreaterThan(0);
         }).pipe(
           Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))),
@@ -188,8 +188,8 @@ describe("core", () => {
       expect(core.seq()).toBe(1);
       // A batch is one commit.
       yield* core.apply(
-        { type: "sessionPhase", id: sessionId("orchestrator"), phase: phaseOf("speaking") },
-        { type: "gameProgress", commits: { total: 3, repos: [] } },
+        { type: "sessionPhaseChanged", id: sessionId("orchestrator"), phase: phaseOf("speaking") },
+        { type: "progressChanged", commits: { total: 3, repos: [] } },
       );
       const replied = core.seq();
       expect(replied).toBe(2);
@@ -236,7 +236,7 @@ describe("core", () => {
       yield* activity(core, "orchestrator", "speaking", "c1");
       expect(core.session("orchestrator")?.phase).toMatchObject({ _tag: "working", since: began._tag === "working" ? began.since : 0 });
       expect(core.session("lead")?.channel).toBe("c2");
-      yield* core.apply({ type: "sessionPhase", id: sessionId("orchestrator"), phase: { _tag: "resting" } });
+      yield* core.apply({ type: "sessionPhaseChanged", id: sessionId("orchestrator"), phase: { _tag: "resting" } });
       expect(core.session("orchestrator")).toMatchObject({ phase: { _tag: "resting" } });
       expect(core.session("orchestrator")?.channel).toBeUndefined();
       expect(core.session("lead")?.phase).toEqual(phaseOf("speaking", expect.any(Number)));
@@ -249,8 +249,8 @@ describe("core", () => {
     Effect.gen(function* () {
       const runSync = Effect.runSyncWith(yield* Effect.context());
       const core = yield* Core;
-      yield* core.apply({ type: "session", session: helper });
-      yield* Effect.sync(() => runSync(core.apply({ type: "sessionPhase", id: helper.id, phase: phaseOf("thinking") })));
+      yield* core.apply({ type: "sessionChanged", session: helper });
+      yield* Effect.sync(() => runSync(core.apply({ type: "sessionPhaseChanged", id: helper.id, phase: phaseOf("thinking") })));
       expect(core.session(helper.id)?.phase).toEqual(phaseOf("thinking"));
     }).pipe(
       Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),

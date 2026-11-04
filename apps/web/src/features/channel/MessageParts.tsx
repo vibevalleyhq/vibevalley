@@ -5,6 +5,7 @@ import { createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { Toolbar } from "@vibevalley/base-ui";
 import { list, t } from "@vibevalley/i18n";
 import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
+import { channelOf } from "@vibevalley/protocol/rules";
 
 import { aria, autofocus } from "@/base/dom";
 import { api } from "@/infra/api";
@@ -23,7 +24,7 @@ import { drafts } from "./composing";
 import { quickReactions, reactionOn, EmojiPicker } from "./EmojiPicker";
 import { useMessage } from "./follow";
 import { pinSet, reactionSet, sameMessage, sameReaction, setMark, markUnread, unreadMark } from "./marks";
-import { workbenchClock, type LinkedMessage, channelLabel, channelOf, linkedMessages, messagePath } from "./places";
+import { workbenchClock, type LinkedMessage, channelLabel, linkedMessages, messagePath } from "./places";
 
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? t("web.channel.messages.owner") : m.name);
 

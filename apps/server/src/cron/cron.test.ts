@@ -254,17 +254,16 @@ it.effect("regression: a cron occurrence and its schedule advance commit togethe
       const crons = yield* Cron;
       const sql = yield* SqlClient.SqlClient;
       const item = yield* crons.add(req("atomic", "work", { kind: "once", at: now + 1 }), owner);
-      yield* sql.unsafe("create function reject_cron_input() returns trigger language plpgsql as $$ begin raise exception 'rejected input'; end $$");
       yield* sql.unsafe(
-        "create trigger reject_cron_input before insert on ingress_trigger for each row when (new.source = 'cron') execute function reject_cron_input()",
+        "create trigger reject_cron_input before insert on mailbox_trigger for each row when (new.source = 'cron') begin select raise(abort, 'rejected input'); end",
       );
       yield* TestClock.adjust(2);
       yield* crons.tick;
-      expect(yield* sql`select enabled, last_run from cron where id = ${item.id}`).toEqual([{ enabled: true, last_run: null }]);
-      expect(yield* sql`select id from ingress_trigger where source = 'cron'`).toEqual([]);
-      yield* sql.unsafe("drop trigger reject_cron_input on ingress_trigger");
+      expect(yield* sql`select enabled, last_run from cron where id = ${item.id}`).toEqual([{ enabled: 1, last_run: null }]);
+      expect(yield* sql`select id from mailbox_trigger where source = 'cron'`).toEqual([]);
+      yield* sql.unsafe("drop trigger reject_cron_input");
       yield* crons.tick;
-      expect((yield* sql`select id from ingress_trigger where source = 'cron'`).length).toBe(1);
+      expect((yield* sql`select id from mailbox_trigger where source = 'cron'`).length).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(farm(config)));
   });
 });
@@ -278,13 +277,12 @@ it.effect("regression: a one-off cron resumes committed input after restart with
       const crons = yield* Cron;
       const sql = yield* SqlClient.SqlClient;
       yield* crons.add(req("restart-once", "work", { kind: "once", at: now + 1 }), owner);
-      yield* sql.unsafe("create function reject_cron_issue() returns trigger language plpgsql as $$ begin raise exception 'rejected issue'; end $$");
-      yield* sql.unsafe("create trigger reject_cron_issue before insert on issue for each row execute function reject_cron_issue()");
+      yield* sql.unsafe("create trigger reject_cron_issue before insert on issue for each row begin select raise(abort, 'rejected issue'); end");
       yield* TestClock.adjust(2);
       yield* crons.tick;
-      expect(yield* sql`select enabled from cron`).toEqual([{ enabled: false }]);
-      expect(yield* sql`select routed_at from ingress_trigger where source = 'cron'`).toEqual([{ routed_at: null }]);
-      yield* sql.unsafe("drop trigger reject_cron_issue on issue");
+      expect(yield* sql`select enabled from cron`).toEqual([{ enabled: 0 }]);
+      expect(yield* sql`select routed_at from mailbox_trigger where source = 'cron'`).toEqual([{ routed_at: null }]);
+      yield* sql.unsafe("drop trigger reject_cron_issue");
     }).pipe(Effect.scoped, Effect.provide(farm(config)));
     yield* Effect.gen(function* () {
       const crons = yield* Cron;
@@ -292,7 +290,7 @@ it.effect("regression: a one-off cron resumes committed input after restart with
       yield* crons.tick;
       yield* crons.tick;
       expect(yield* sql`select title from issue`).toEqual([{ title: "restart-once" }]);
-      expect(yield* sql`select routed_at is not null as routed from ingress_trigger where source = 'cron'`).toEqual([{ routed: true }]);
+      expect(yield* sql`select routed_at is not null as routed from mailbox_trigger where source = 'cron'`).toEqual([{ routed: 1 }]);
     }).pipe(Effect.scoped, Effect.provide(farm(config)));
   });
 });

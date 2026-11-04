@@ -7,9 +7,10 @@ import { Effect, Fiber } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
+import { channelOf } from "@vibevalley/protocol/rules";
+
 import { Agent } from "@/agent/agent.ts";
 import { Channel } from "@/channel/channel.ts";
-import { channelOf } from "@/channel/messages.ts";
 import { Core } from "@/core/core.ts";
 import { Db } from "@/infra/db.ts";
 import { Issue } from "@/issue/issue.ts";
@@ -132,12 +133,6 @@ describe("a talk with a helper profile", () => {
       yield* channels.say("启动中的第二句", dm, "");
       opened.resolve();
       yield* until(() => sessions.presentSessions().some((s) => s.channel === dm), "the context registered");
-      const before = yield* db.run(
-        sql<{
-          state: string;
-        }>`select d.state from mailbox_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm} order by m.number`,
-      );
-      expect(before[0]?.state).toBe("handed");
       releaseFirst.resolve();
       yield* until(() => said(dm).filter((m) => m.kind === "report").length === 2, "both inputs answered");
       expect(starts).toBe(1);
@@ -152,6 +147,18 @@ describe("a talk with a helper profile", () => {
         "both inputs consumed",
       );
       expect(after.map((d) => d.state)).toEqual(["consumed", "consumed"]);
+      // Seen only once its turn has started: handed first, consumed no earlier than the run it opened. Read from the
+      // times, not from a state caught in between, which a fast write passes before anyone looks.
+      const [first] = yield* db.run(
+        sql<{
+          handed_at: number;
+          consumed_at: number;
+        }>`select d.handed_at, d.consumed_at from mailbox_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm} order by m.number limit 1`,
+      );
+      const [run] = yield* db.run(sql<{ started_at: number }>`select started_at from session_run order by started_at limit 1`);
+      expect(first && run).toBeTruthy();
+      expect(first!.handed_at).toBeLessThanOrEqual(run!.started_at);
+      expect(run!.started_at).toBeLessThanOrEqual(first!.consumed_at);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -185,7 +192,7 @@ describe("a talk with a helper profile", () => {
         );
         const context = sessions.presentSessions().find((s) => s.channel === dm);
         if (!context) throw new Error("the conversation has no session");
-        yield* (yield* Core).apply({ type: "gameProgress", station: { id: context.id, station: 3 } });
+        yield* (yield* Core).apply({ type: "progressChanged", station: { id: context.id, station: 3 } });
         return { dm, session: context.id };
       }).pipe(Effect.scoped, Effect.provide(farm({ config, runtime }).layer));
       expect(existsSync(join(config.home, "state.json"))).toBe(false);

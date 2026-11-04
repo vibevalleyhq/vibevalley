@@ -1,8 +1,8 @@
-// Each struct Schema in schema.ts has exactly the keys of its interface in shapes.ts. `Schema.Codec<T.X>` cannot see
+// Each struct Schema in <concept>/schema.ts has exactly the keys of its interface in <concept>/shapes.ts. `Schema.Codec<T.X>` cannot see
 // this: an optional key named differently on each side (draft against refining) still compiles, and encoding then
 // drops the field from every frame and every state.json read.
 
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 import { expect, test } from "vite-plus/test";
 
@@ -79,8 +79,11 @@ function differences(at: string, want: readonly string[], nested: Map<string, Sh
 }
 
 test("every struct Schema has the keys of its shape, nested object types too", () => {
-  const path = new URL("./shapes.ts", import.meta.url);
-  const shapes = interfaces(path.pathname, readFileSync(path, "utf8"));
+  // Each concept's shapes, read as one: an interface may extend one in another concept.
+  const files = readdirSync(new URL("./", import.meta.url), { withFileTypes: true })
+    .filter((d) => d.isDirectory() && existsSync(new URL(`./${d.name}/shapes.ts`, import.meta.url)))
+    .map((d) => new URL(`./${d.name}/shapes.ts`, import.meta.url));
+  const shapes = new Map(files.flatMap((f) => [...interfaces(f.pathname, readFileSync(f, "utf8"))]));
   const keysOf = (name: string): string[] => {
     const s = shapes.get(name)!;
     const inherited = s.parent && shapes.has(s.parent) ? keysOf(s.parent).filter((k) => s.omit?.includes(k) !== true) : [];

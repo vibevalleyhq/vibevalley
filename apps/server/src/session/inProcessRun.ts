@@ -18,8 +18,8 @@ import { causeMessage, Db } from "@/infra/db.ts";
 
 import * as qr from "../../db/generated/session_run.sql.ts";
 import * as qi from "../../db/generated/session_run_issue.sql.ts";
-import type { ToolStart } from "./facts.ts";
 import type { Journal } from "./journal.ts";
+import type { ToolStart } from "./reaction.ts";
 import type { RunStore } from "./session.ts";
 
 /** What an input starts a run with; attached only when the loop consumes it, not when it is queued. */

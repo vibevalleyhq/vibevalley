@@ -5,10 +5,10 @@ import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
-import { sessionIdsOf } from "@vibevalley/protocol/rules";
+import { defaultOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { spentText } from "@/base/format";
-import { defaultOf, useFollowed, useReports } from "@/features/channel";
+import { useFollowed, useReports } from "@/features/channel";
 import { useAgent } from "@/infra/agents";
 import { useCore } from "@/infra/frame";
 import { AgentFace, OrchestratorFace } from "@/ui/Face";
