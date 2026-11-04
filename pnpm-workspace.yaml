@@ -55,7 +55,6 @@ catalog:
   shiki: ^4.5.0
   solid-js: "2.0.0-rc.16"
   tailwindcss: "^4.3.3"
-  tsx: "^4.23.15"
   typescript: "^7.0.2"
   unified: "^11.0.5"
   uqr: "^0.1.3"

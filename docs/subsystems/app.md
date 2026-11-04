@@ -58,7 +58,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 1. Electron 拿单实例锁；拿不到就退出，让已经开着的那个出来。拿到了就马上起服务端（第 3、4 步）：它不用 Electron 的任何东西，和 Electron 准备好、开窗口同时进行。
 2. 马上开窗口，先放页面文件里的 `opening.html`（`apps/web/public`，从应用自己的文件读，不经服务端）：工作台的地色（跟着系统的主题），过一会儿淡出头像、一根细条和「叫醒农场……」；窗口底色是工作台在当前主题下的页面色，页面换主题时跟着换，所以刷新时窗口不会闪出别的颜色。
 3. 用登录 shell 的 PATH 起服务端，因为从 Finder 或登录时打开的应用拿不到 pi、claude、codex 所在的 PATH。问 shell（`loginShellPath`，`$SHELL -ilc`，5 秒，问不到用原来的）要等它读完整个 profile，所以不等：用上次问到的那个（`shellPath`，记在应用数据目录的 `shell-path`）马上起，同时照样再问一遍、记下给下次；只有第一次开、什么都没记时才等。之后才装的农机，下次开机才找得到。
-4. `startServer` 用 Electron 自己的 Node（`ELECTRON_RUN_AS_NODE=1`）带 tsx 起 `apps/server/src/main.ts --ready-json --web <页面>`，`VIBEVALLEY_PORT=0`，`NODE_COMPILE_CACHE` 指到应用数据目录的 `compile-cache`（模块编译好的代码留到下次），工作目录是服务端的文件夹（开发时是仓库的 `apps/server`，打包的应用是 `Contents/Resources/server`），其余配置读家目录的 `vibevalley.yaml`。stdout 和 stderr 都追加进 `$VIBEVALLEY_HOME/logs/desktop-server.log`。
+4. `startServer` 起服务端，带 `--ready-json --web <页面>`：打包的应用用 Electron 自己的 Node（`ELECTRON_RUN_AS_NODE=1`）跑服务端 `vp pack` 打的 `dist/main.mjs`；从仓库开（`desktop:dev`、`desktop:test`）用服务端自己的 `vpx` 跑 `src/main.ts`（`paths.ts` 的 `command`）；`VIBEVALLEY_PORT=0`，`NODE_COMPILE_CACHE` 指到应用数据目录的 `compile-cache`（模块编译好的代码留到下次），工作目录是服务端的文件夹（开发时是仓库的 `apps/server`，打包的应用是 `Contents/Resources/server`），其余配置读家目录的 `vibevalley.yaml`。stdout 和 stderr 都追加进 `$VIBEVALLEY_HOME/logs/desktop-server.log`。
 5. 等收据：服务端开始答 HTTP 以后在 stdout 写一行 JSON（`url`、`pid`）。40 秒没有、或子进程先退出，就停掉它，窗口换成同一页带着原因（`?problem=`，「农场起不来：……，日志在 ……」），关掉窗口应用退出；窗口已经被关掉时弹框说。
 6. 窗口换到那个地址；注册 ⌥⇧Space（被别的程序占了也照常开，页面的通话按钮还能用）。
 
@@ -86,7 +86,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 手机的每条通话线路在桥上带自己的身份；静音、续期、挂断和字幕只归这一条。原生宿主（`apps/mobile/src/host.ts`）属于当前加载的页面；重新加载、返回配对或换农场时关闭宿主，连还在等麦克风权限、等入线的电话一起取消。原生声网只有一个引擎，`rtc.ts` 在下一次入线前结束旧尝试，按频道和本机用户号认回调；旧权限答复、旧频道排队的事件和迟到的挂断不能碰新线路。异步入线失败只认带连接身份的失败状态，不把引擎的全局错误当作某条电话的结果。锁屏不关闭页面宿主，通话继续。
 
-**打包**：`vp run package:mac` 构建页面和壳，用 `pnpm deploy --prod` 把 `apps/server` 连同生产依赖放进 `dist/stage/server`（版本照锁文件，workspace 包拷进去，测试文件、黄金数据和测试的帮手删掉，依赖的 source map 和类型声明也删掉：运行时不读，占服务端文件的大半），electron-builder 打出 `apps/desktop/dist` 里的 `.dmg`（第一次装，lzfse 压缩的 ULFO）、`.zip`（更新用）和 `release.json`（`src/releases.ts` 的 `Release`：版本、这次的 PR 标题、服务端的表结构哈希、每个架构的文件名、大小和 SHA-512）。`web/` 放进资源，`server/` 在 `afterPack` 里整个拷进去（electron-builder 的 extraResources 会丢掉 `node_modules`）。版本是构建所在的 tag（`v0.2.0`），没有 tag 是 0.0.0。没有签名和公证。
+**打包**：`vp run package:mac` 构建页面和壳，用 `pnpm deploy --prod` 把 `apps/server` 的生产依赖放进 `dist/stage/server`（版本照锁文件），再用 `vp pack` 把服务端和工作区的包打成 `dist/main.mjs` 放进去；源码、测试、工作区的包都不带，只留 `src/assets.ts` 列的运行时要读的文件（表结构、分词的词典、内置模板），依赖的 source map 和类型声明也删掉（运行时不读，占服务端文件的大半），electron-builder 打出 `apps/desktop/dist` 里的 `.dmg`（第一次装，lzfse 压缩的 ULFO）、`.zip`（更新用）和 `release.json`（`src/releases.ts` 的 `Release`：版本、这次的 PR 标题、服务端的表结构哈希、每个架构的文件名、大小和 SHA-512）。`web/` 放进资源，`server/` 在 `afterPack` 里整个拷进去（electron-builder 的 extraResources 会丢掉 `node_modules`）。版本是构建所在的 tag（`v0.2.0`），没有 tag 是 0.0.0。没有签名和公证。
 
 **发布**：推一个 `v*` 的 tag，`.github/workflows/release.yml` 在 macOS（arm64）上打包，建一个草稿 Release，放上 `.dmg`、`.zip` 和 `release.json`；人看过再发布，发布以前应用看不到它。
 

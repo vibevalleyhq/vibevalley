@@ -3,9 +3,9 @@
 // (cli/api.ts), called over HTTP: its answer is JSON on stdout; a failure is JSON on stderr with what to do next, and an
 // exit code that says which kind (cli/output.ts).
 //
-//	node --import tsx src/cli.ts [--cwd DIR] [--name NAME] [--model ID] [--mcp FILE] [-p PROMPT]
-//	node --import tsx src/cli.ts runtime chat claude
-//	node --import tsx src/cli.ts issue list
+//	vpx src/cli.ts [--cwd DIR] [--name NAME] [--model ID] [--mcp FILE] [-p PROMPT]
+//	vpx src/cli.ts runtime chat claude
+//	vpx src/cli.ts issue list
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import { Cause, Console, Effect, Exit, Fiber, Option, type Stdio, Predicate } from "effect";
@@ -124,7 +124,7 @@ export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
 const codeOf = (end: Exit.Exit<unknown, unknown>) =>
   Exit.isSuccess(end) ? (typeof end.value === "number" ? end.value : exit.ok) : Cause.hasInterruptsOnly(end.cause) ? exit.interrupted : exit.other;
 
-// Not every loader sets import.meta.main (tsx may not): the script run is then told by its path.
+// Not every loader sets import.meta.main: the script run is then told by its path.
 if (import.meta.main ?? process.argv[1] === new URL(import.meta.url).pathname) {
   run(process.argv.slice(2)).pipe(
     Effect.provide([NodeServices.layer, FetchHttpClient.layer]),

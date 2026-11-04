@@ -5,7 +5,7 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ## 目录
 
 ```
-apps/server/               服务端（Effect v4，Node 24 上用 tsx 跑）：src/ 里一块业务一个文件夹，名字用单数，每个导出一个服务
+apps/server/               服务端（Effect v4，Node 24；仓库里用 vpx 跑源码，桌面版带 vp pack 打的包）：src/ 里一块业务一个文件夹，名字用单数，每个导出一个服务
                            （Context.Service）：core、setting、agent、project、memory、artifact、runtime、executor、session、mailbox、channel、pkm、cron、issue、
                            inbox、tool、mcp、orchestrator、lan、voice、connector、game；projection 是核心状态的折法和拼帧（读各模块的
                            规则，组装时交给 core）；VibeValley 自己的 agent 在 packages/agent，这里只组装它（runtime/vibevalley.ts 是
@@ -79,7 +79,7 @@ vp run docs:verify                                              # 改完文档�
 vp run site:check && vp run site:build                          # 改完 site/：类型和模板，再生成到 site/dist（不开 astro dev）
 ```
 
-Node 24（`.node-version` 定的那个，`vp` 和 CI 都照它；服务端经 tsx 跑，脚本经 `vpx` 直接跑 `.ts`），Vite+（`vp`：pnpm 12、格式、lint、类型、测试、任务），Electron 44。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `apps/server` 要重启它。
+Node 24（`.node-version` 定的那个，`vp` 和 CI 都照它；服务端、命令行和脚本都经 `vpx` 直接跑 `.ts`，桌面版的服务端是 `vp pack` 打的包），Vite+（`vp`：pnpm 12、格式、lint、类型、测试、任务），Electron 44。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `apps/server` 要重启它。
 
 一件事的主线：oar 的会话事件 → `apps/server/src/session/reaction.ts`（纯函数）读成事实 → `Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给页面；每个会话和管家的每一步由 `session/journal.ts` 记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
 

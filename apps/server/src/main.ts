@@ -1,9 +1,9 @@
 // The vibevalley server: the farm over HTTP on loopback. The desktop app starts it on a free
 // port and reads where from --ready-json; run alone, it is the server.
 //
-//	node --import tsx src/main.ts                        # port from the configuration (127.0.0.1:8787)
-//	node --import tsx src/main.ts --config dev.yaml      # this file, not $VIBEVALLEY_HOME/vibevalley.yaml
-//	node --import tsx src/main.ts --web ../web/dist      # also the page at /
+//	vpx src/main.ts                        # port from the configuration (127.0.0.1:8787)
+//	vpx src/main.ts --config dev.yaml      # this file, not $VIBEVALLEY_HOME/vibevalley.yaml
+//	vpx src/main.ts --web ../web/dist      # also the page at /
 //
 // The configuration is loadConfig's: the YAML file, then VIBEVALLEY_* in the environment.
 

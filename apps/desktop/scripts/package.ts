@@ -1,8 +1,8 @@
 // Packages the macOS app (dist/VibeValley-<version>-<arch>.dmg for a first install, .zip for the app's own updates, and
 // release.json that says what they are: src/releases.ts): the shell from build/, and three
 // resources the shell finds under process.resourcesPath (src/main.ts): web/ is apps/web/dist, island/ the island's
-// release build, server/ is apps/server deployed with its production dependencies. The server runs unbundled with tsx, as it does in the
-// repository: the word lists, the migrations and the agent SDKs are read from paths beside their code.
+// release build, server/ is apps/server's bundle (its `vp pack`, dist/main.mjs) with the dependencies it leaves out in
+// node_modules and the few files it reads at run time (apps/server/src/assets.ts), at the paths it reads them from.
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -11,6 +11,7 @@ import { join } from "node:path";
 
 import { build, Platform } from "electron-builder";
 
+import { serverFiles } from "../../server/src/assets.ts";
 import { baselineHash } from "../../server/src/infra/baseline.ts";
 import type { Release } from "../src/releases.ts";
 
@@ -32,40 +33,23 @@ rmSync(stage, { recursive: true, force: true });
 // Everything at the versions the lockfile pins, the workspace packages copied in: npm without the lockfile let a
 // transitive dependency float past what the rest is pinned to.
 sh(repo, "pnpm", "--filter", "@vibevalley/server", "deploy", "--prod", server);
-// What only the tests read does not ship: test files, golden data, test helpers, in the server and its packages.
-const testOnly = /\.test\.tsx?$|(^|\/)(testdata|testing)$/u;
-const prune = (dir: string) => {
-  for (const name of readdirSync(dir, { recursive: true, encoding: "utf8" }))
-    if (testOnly.test(name) && !name.includes("node_modules/.pnpm/node_modules")) rmSync(join(dir, name), { recursive: true, force: true });
-};
-prune(join(server, "src"));
+// The server is its bundle: src/main.ts and the workspace packages in one module, the other dependencies left as they are.
+sh(join(repo, "apps/server"), "vp", "pack", "--out-dir", join(server, "dist"));
+// Of what pnpm deployed beside it only those dependencies and the files the server reads stay: no sources, no tests, no
+// workspace packages (they are in the bundle).
+const assets = join(stage, "assets");
+for (const path of serverFiles) cpSync(join(server, path), join(assets, path), { recursive: true });
+for (const name of readdirSync(server))
+  if (!["dist", "node_modules", "package.json"].includes(name)) rmSync(join(server, name), { recursive: true, force: true });
+cpSync(assets, server, { recursive: true });
+rmSync(assets, { recursive: true, force: true });
+rmSync(join(server, "node_modules", "@vibevalley"), { recursive: true, force: true });
 // Nor what only an editor reads: the dependencies' source maps and type declarations, a third of the server's files.
 // Neither is loaded at run time (a missing map only leaves a stack trace unmapped); docs and licences stay, as an agent's
 // SDK may read its own.
 const devOnly = /\.(?:js|mjs|cjs|ts|mts|cts)\.map$|\.d\.(?:ts|mts|cts)$/u;
 for (const name of readdirSync(join(server, "node_modules", ".pnpm"), { recursive: true, encoding: "utf8" }))
   if (devOnly.test(name)) rmSync(join(server, "node_modules", ".pnpm", name), { force: true });
-for (const name of readdirSync(join(server, "node_modules", "@vibevalley"))) prune(join(server, "node_modules", "@vibevalley", name, "src"));
-// tsx reads the nearest tsconfig; the repository's extends a file the app does not carry.
-writeFileSync(
-  join(server, "tsconfig.json"),
-  JSON.stringify(
-    {
-      compilerOptions: {
-        target: "ES2024",
-        module: "NodeNext",
-        moduleResolution: "NodeNext",
-        resolveJsonModule: true,
-        allowImportingTsExtensions: true,
-        noEmit: true,
-        // @/ is src/, as in apps/server/tsconfig.json.
-        paths: { "@/*": ["./src/*"] },
-      },
-    },
-    null,
-    2,
-  ),
-);
 
 // The version is the tag the release is built from (v0.2.0); between tags, 0.0.0, which no release is older than.
 // VIBEVALLEY_VERSION gives one outright (scripts/update-check.ts builds two in a row).

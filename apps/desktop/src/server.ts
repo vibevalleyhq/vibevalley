@@ -1,7 +1,8 @@
 // The server for the desktop app (apps/server): started as a child process on a port it picks (VIBEVALLEY_PORT=0), ready
 // when it prints its address as one JSON line (--ready-json, ServerReady), stopped with SIGTERM so it saves on the way out.
-// It runs on Electron's own Node (ELECTRON_RUN_AS_NODE), unbundled: the migrations, the word lists and the
-// coding agents' SDKs are found beside their packages, so the server keeps its node_modules.
+// Packaged, it is the bundle (apps/server's `vp pack`, dist/main.mjs) on Electron's own Node (ELECTRON_RUN_AS_NODE), with
+// its dependencies' node_modules beside it; run from the repository, it is the source through vpx, as `vp run start` runs
+// it (paths.ts says which).
 
 import { execFile, spawn } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -68,8 +69,10 @@ export async function shellPath(
 }
 
 export interface ServerFiles {
-  /** apps/server: src/main.ts and its node_modules. */
+  /** apps/server, or the packaged app's copy: the folder the server runs in. */
   server: string;
+  /** What runs it, before its own flags: the executable and its arguments. */
+  command: readonly [string, ...string[]];
   /** The built page (apps/web/dist), served at / on the server's origin. */
   web: string;
   /** Appended to: the server's stdout and stderr. */
@@ -93,8 +96,8 @@ function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0): Prom
   mkdirSync(dirname(files.log), { recursive: true });
   const log = createWriteStream(files.log, { flags: "a" });
   log.write(`--- ${new Date().toISOString()} vibevalley: starting ${files.server}\n`);
-  // tsx and the tsconfig (whose paths are the server's @/ imports) are found from the cwd: the server's own.
-  const child = spawn(process.execPath, ["--import", "tsx", "src/main.ts", "--ready-json", "--web", files.web], {
+  const [bin, ...args] = files.command;
+  const child = spawn(bin, [...args, "--ready-json", "--web", files.web], {
     cwd: files.server,
     env: { ...env, ELECTRON_RUN_AS_NODE: "1", VIBEVALLEY_PORT: String(port), NODE_COMPILE_CACHE: files.compileCache },
     stdio: ["ignore", "pipe", "pipe"],

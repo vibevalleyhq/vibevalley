@@ -11,7 +11,7 @@ export interface Module {
 }
 
 export const modules: readonly Module[] = [
-  { name: "Platform", parts: ["base", "infra", "core", "setting", "errors.ts", "words.ts", "prompts.ts"] },
+  { name: "Platform", parts: ["base", "infra", "core", "setting", "errors.ts", "words.ts", "prompts.ts", "assets.ts"] },
   { name: "Agents", parts: ["agent", "runtime", "memory"] },
   { name: "Source Control", parts: ["project"] },
   { name: "Agent Sessions", parts: ["executor", "session"] },

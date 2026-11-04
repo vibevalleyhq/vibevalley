@@ -1,7 +1,7 @@
 # apps/server
 
 The farm's server: every service, the HTTP API, the three state streams, `/mcp` for the helpers, and the page at `/`.
-Effect v4 on Node 24, run from source with tsx (`vp run start`); the database is SQLite (`node:sqlite`). How it is built and why:
+Effect v4 on Node 24, run from source with vpx (`vp run start`) and bundled with `vp pack` for the desktop app (`vp run build`, dist/); the database is SQLite (`node:sqlite`). How it is built and why:
 [foundation](docs/subsystems/foundation.md); what each service does: [the subsystems](docs/subsystems/README.md).
 
 ```

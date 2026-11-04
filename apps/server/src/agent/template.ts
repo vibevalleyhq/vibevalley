@@ -11,7 +11,9 @@ import type * as T from "@vibevalley/protocol";
 import { AgentRoleValues, orchestratorRuntime, OrchestratorLookValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-export const builtInDir = join(import.meta.dirname, "templates");
+import { serverFile } from "@/assets.ts";
+
+export const builtInDir = serverFile("src/agent/templates");
 const addedDir = (home: string) => join(home, "agent-templates");
 
 /** The files a template is made of: nothing else in its folder is read or copied. */

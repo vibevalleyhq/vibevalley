@@ -6,7 +6,13 @@ import { expect, test } from "vite-plus/test";
 
 import { type RunningServer, type ServerFiles, serverKeeper, shellPath } from "./server";
 
-const files: ServerFiles = { server: "/server", web: "/web", log: "/tmp/vibevalley-server-test.log", compileCache: "/tmp/vibevalley-compile-cache" };
+const files: ServerFiles = {
+  server: "/server",
+  command: ["/server/node_modules/.bin/vpx", "src/main.ts"],
+  web: "/web",
+  log: "/tmp/vibevalley-server-test.log",
+  compileCache: "/tmp/vibevalley-compile-cache",
+};
 
 test("a stop while a restart is starting stops the new server, not the one already gone", async () => {
   const stops: string[] = [];

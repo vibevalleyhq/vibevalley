@@ -10,8 +10,10 @@ import { app } from "electron";
 interface AppPaths {
   /** The farm's home (VIBEVALLEY_HOME): settings.json, the database, the logs. */
   readonly home: string;
-  /** apps/server: src/main.ts and its node_modules. */
+  /** apps/server, or the packaged app's copy (its bundle in dist/ and its node_modules). */
   readonly server: string;
+  /** What runs the server (server.ts ServerFiles). */
+  readonly command: readonly [string, ...string[]];
   /** The built page, served at / on the server's origin; opening.html and the pictures are read from it too. */
   readonly web: string;
   readonly island: string;
@@ -38,6 +40,8 @@ export function appPaths(): AppPaths {
   return {
     home,
     server: app.isPackaged ? join(process.resourcesPath, "server") : join(repo, "server"),
+    // vpx reads the server's tsconfig, whose paths are its @/ imports, from the folder it runs in.
+    command: app.isPackaged ? [process.execPath, "dist/main.mjs"] : [join(repo, "server", "node_modules", ".bin", "vpx"), "src/main.ts"],
     web,
     island: app.isPackaged ? join(process.resourcesPath, "island", "VibeValleyIsland") : join(repo, "island", ".build", "release", "VibeValleyIsland"),
     log: join(home, "logs", "desktop-server.log"),
