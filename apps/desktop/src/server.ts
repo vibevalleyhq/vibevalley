@@ -4,7 +4,7 @@
 // coding agents' SDKs are found beside their packages, so the server keeps its node_modules.
 
 import { execFile, spawn } from "node:child_process";
-import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { Schema } from "effect";
@@ -45,20 +45,22 @@ export async function shellPath(
   ask = loginShellPath,
 ): Promise<{ readonly path: string | undefined; readonly refreshed: Promise<unknown> }> {
   let last: string | undefined;
-  try {
-    last = readFileSync(kept, "utf8").trim() || undefined;
-  } catch {
-    last = undefined;
-  }
+  // None kept is the first start; one that cannot be read is told and the shell asked as on a first start.
+  if (existsSync(kept))
+    try {
+      last = readFileSync(kept, "utf8").trim() || undefined;
+    } catch (e) {
+      console.error("vibevalley: the kept PATH could not be read; the login shell is waited on:", e);
+    }
   const asked = ask(env).then((path) => {
-    if (path && path !== last) {
+    if (path && path !== last)
       try {
         mkdirSync(dirname(kept), { recursive: true });
         writeFileSync(kept, path);
-      } catch {
-        // Not kept: the next start asks the shell again.
+      } catch (e) {
+        // Safe to go on: this start has its PATH; the next one asks the shell again.
+        console.error("vibevalley: the login shell's PATH could not be kept:", e);
       }
-    }
     return path;
   });
   // refreshed: the shell answered and what it said is kept.
