@@ -57,8 +57,8 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 1. Electron 拿单实例锁；拿不到就退出，让已经开着的那个出来。
 2. 马上开窗口，先放页面文件里的 `opening.html`（`apps/web/public`，从应用自己的文件读，不经服务端）：工作台的地色（跟着系统的主题），过一会儿淡出头像、一根细条和「叫醒农场……」；窗口底色是工作台在当前主题下的页面色，页面换主题时跟着换，所以刷新时窗口不会闪出别的颜色。
-3. 问登录 shell 要 PATH（`loginShellPath`，`$SHELL -ilc`，5 秒，问不到用原来的），因为从 Finder 或登录时打开的应用拿不到 pi、claude、codex 所在的 PATH。
-4. `startServer` 用 Electron 自己的 Node（`ELECTRON_RUN_AS_NODE=1`）带 tsx 起 `apps/server/src/main.ts --ready-json --web <页面>`，`VIBEVALLEY_PORT=0`，工作目录是服务端的文件夹（开发时是仓库的 `apps/server`，打包的应用是 `Contents/Resources/server`），其余配置读家目录的 `vibevalley.yaml`。stdout 和 stderr 都追加进 `$VIBEVALLEY_HOME/logs/desktop-server.log`。
+3. 用登录 shell 的 PATH 起服务端，因为从 Finder 或登录时打开的应用拿不到 pi、claude、codex 所在的 PATH。问 shell（`loginShellPath`，`$SHELL -ilc`，5 秒，问不到用原来的）要等它读完整个 profile，所以不等：用上次问到的那个（`shellPath`，记在应用数据目录的 `shell-path`）马上起，同时照样再问一遍、记下给下次；只有第一次开、什么都没记时才等。之后才装的农机，下次开机才找得到。
+4. `startServer` 用 Electron 自己的 Node（`ELECTRON_RUN_AS_NODE=1`）带 tsx 起 `apps/server/src/main.ts --ready-json --web <页面>`，`VIBEVALLEY_PORT=0`，`NODE_COMPILE_CACHE` 指到应用数据目录的 `compile-cache`（模块编译好的代码留到下次），工作目录是服务端的文件夹（开发时是仓库的 `apps/server`，打包的应用是 `Contents/Resources/server`），其余配置读家目录的 `vibevalley.yaml`。stdout 和 stderr 都追加进 `$VIBEVALLEY_HOME/logs/desktop-server.log`。
 5. 等收据：服务端开始答 HTTP 以后在 stdout 写一行 JSON（`url`、`pid`）。40 秒没有、或子进程先退出，就停掉它，窗口换成同一页带着原因（`?problem=`，「农场起不来：……，日志在 ……」），关掉窗口应用退出；窗口已经被关掉时弹框说。
 6. 窗口换到那个地址；注册 ⌥⇧Space（被别的程序占了也照常开，页面的通话按钮还能用）。
 

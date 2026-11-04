@@ -16,7 +16,7 @@ import { followSavedLocale } from "./locale";
 import { setAppMenu } from "./menu";
 import { appPaths, farmHome } from "./paths";
 import { probe } from "./probe";
-import { loginShellPath, type ServerKeeper, serverKeeper } from "./server";
+import { shellPath, type ServerKeeper, serverKeeper } from "./server";
 import { menuBar } from "./tray";
 import { defaultFeed, type Updater, updater } from "./update";
 import { mainWindow } from "./window";
@@ -66,7 +66,7 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(paths.dockIcon));
     // The window comes at once, on the bar: reading the login shell's PATH and starting the server take seconds.
     window.opening();
-    const path = await loginShellPath(process.env);
+    const { path } = await shellPath(paths.shellPath, process.env);
     const keeper = serverKeeper(paths, path ? { ...process.env, PATH: path } : process.env);
     server = keeper;
     try {

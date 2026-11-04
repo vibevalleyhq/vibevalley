@@ -4,7 +4,7 @@
 // coding agents' SDKs are found beside their packages, so the server keeps its node_modules.
 
 import { execFile, spawn } from "node:child_process";
-import { createWriteStream, mkdirSync } from "node:fs";
+import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { Schema } from "effect";
@@ -34,6 +34,37 @@ export function loginShellPath(env: NodeJS.ProcessEnv): Promise<string | undefin
   });
 }
 
+/**
+ * The PATH to start the server with: the login shell's as it said it last time, kept in `kept`, so the server does not
+ * wait on the shell (a profile can take a second or more); the shell is asked again all the same and its answer kept for
+ * the next start. With none kept yet (the first start) it waits. A tool installed since is found from the next start.
+ */
+export async function shellPath(
+  kept: string,
+  env: NodeJS.ProcessEnv,
+  ask = loginShellPath,
+): Promise<{ readonly path: string | undefined; readonly refreshed: Promise<unknown> }> {
+  let last: string | undefined;
+  try {
+    last = readFileSync(kept, "utf8").trim() || undefined;
+  } catch {
+    last = undefined;
+  }
+  const asked = ask(env).then((path) => {
+    if (path && path !== last) {
+      try {
+        mkdirSync(dirname(kept), { recursive: true });
+        writeFileSync(kept, path);
+      } catch {
+        // Not kept: the next start asks the shell again.
+      }
+    }
+    return path;
+  });
+  // refreshed: the shell answered and what it said is kept.
+  return last === undefined ? { path: await asked, refreshed: asked } : { path: last, refreshed: asked };
+}
+
 export interface ServerFiles {
   /** apps/server: src/main.ts and its node_modules. */
   server: string;
@@ -41,6 +72,8 @@ export interface ServerFiles {
   web: string;
   /** Appended to: the server's stdout and stderr. */
   log: string;
+  /** Node's compile cache for the server (NODE_COMPILE_CACHE): its modules' compiled code, kept between starts. */
+  compileCache: string;
 }
 
 export interface RunningServer {
@@ -61,7 +94,7 @@ function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0): Prom
   // tsx and the tsconfig (whose paths are the server's @/ imports) are found from the cwd: the server's own.
   const child = spawn(process.execPath, ["--import", "tsx", "src/main.ts", "--ready-json", "--web", files.web], {
     cwd: files.server,
-    env: { ...env, ELECTRON_RUN_AS_NODE: "1", VIBEVALLEY_PORT: String(port) },
+    env: { ...env, ELECTRON_RUN_AS_NODE: "1", VIBEVALLEY_PORT: String(port), NODE_COMPILE_CACHE: files.compileCache },
     stdio: ["ignore", "pipe", "pipe"],
   });
   child.stderr.pipe(log, { end: false });

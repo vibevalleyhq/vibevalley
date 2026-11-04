@@ -23,6 +23,10 @@ interface AppPaths {
   readonly trayIcon: string;
   /** Downloaded updates, one folder a version (update.ts). */
   readonly updates: string;
+  /** The login shell's PATH as it said it last (server.ts shellPath). */
+  readonly shellPath: string;
+  /** Node's compile cache for the server's modules. */
+  readonly compileCache: string;
 }
 
 export const farmHome = () => process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
@@ -41,5 +45,7 @@ export function appPaths(): AppPaths {
     dockIcon: join(web, "icons", "app-256.png"),
     trayIcon: join(web, "pixel", "app-sprout.png"),
     updates: join(app.getPath("userData"), "updates"),
+    shellPath: join(app.getPath("userData"), "shell-path"),
+    compileCache: join(app.getPath("userData"), "compile-cache"),
   };
 }

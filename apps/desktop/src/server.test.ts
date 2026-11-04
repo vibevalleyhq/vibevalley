@@ -1,8 +1,12 @@
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { expect, test } from "vite-plus/test";
 
-import { type RunningServer, type ServerFiles, serverKeeper } from "./server";
+import { type RunningServer, type ServerFiles, serverKeeper, shellPath } from "./server";
 
-const files: ServerFiles = { server: "/server", web: "/web", log: "/tmp/vibevalley-server-test.log" };
+const files: ServerFiles = { server: "/server", web: "/web", log: "/tmp/vibevalley-server-test.log", compileCache: "/tmp/vibevalley-compile-cache" };
 
 test("a stop while a restart is starting stops the new server, not the one already gone", async () => {
   const stops: string[] = [];
@@ -32,4 +36,25 @@ test("a stop while a restart is starting stops the new server, not the one alrea
   release();
   await Promise.all([restarting, stopping]);
   expect(stops).toEqual(["http://127.0.0.1:4100", "http://127.0.0.1:4100"]);
+});
+
+test("the server starts on the PATH the shell said last time, and the shell's new answer is kept for the next start", async () => {
+  const kept = join(mkdtempSync(join(tmpdir(), "vv-shell-path-")), "shell-path");
+  // None kept: the first start waits for the shell.
+  expect((await shellPath(kept, {}, async () => "/first/bin")).path).toBe("/first/bin");
+  expect(readFileSync(kept, "utf8")).toBe("/first/bin");
+  // Kept: it does not wait on a shell that is slow to answer, and what it answers is kept.
+  let answer: (path: string) => void = () => undefined;
+  const slow = new Promise<string>((resolve) => {
+    answer = resolve;
+  });
+  const started = await shellPath(kept, {}, () => slow);
+  expect(started.path).toBe("/first/bin");
+  answer("/second/bin");
+  await started.refreshed;
+  expect(readFileSync(kept, "utf8")).toBe("/second/bin");
+  // A shell that does not answer leaves what was kept.
+  writeFileSync(kept, "/kept/bin");
+  expect((await shellPath(kept, {}, async () => undefined)).path).toBe("/kept/bin");
+  expect(readFileSync(kept, "utf8")).toBe("/kept/bin");
 });
