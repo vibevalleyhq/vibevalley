@@ -55,7 +55,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 **开机（桌面）**
 
-1. Electron 拿单实例锁；拿不到就退出，让已经开着的那个出来。
+1. Electron 拿单实例锁；拿不到就退出，让已经开着的那个出来。拿到了就马上起服务端（第 3、4 步）：它不用 Electron 的任何东西，和 Electron 准备好、开窗口同时进行。
 2. 马上开窗口，先放页面文件里的 `opening.html`（`apps/web/public`，从应用自己的文件读，不经服务端）：工作台的地色（跟着系统的主题），过一会儿淡出头像、一根细条和「叫醒农场……」；窗口底色是工作台在当前主题下的页面色，页面换主题时跟着换，所以刷新时窗口不会闪出别的颜色。
 3. 用登录 shell 的 PATH 起服务端，因为从 Finder 或登录时打开的应用拿不到 pi、claude、codex 所在的 PATH。问 shell（`loginShellPath`，`$SHELL -ilc`，5 秒，问不到用原来的）要等它读完整个 profile，所以不等：用上次问到的那个（`shellPath`，记在应用数据目录的 `shell-path`）马上起，同时照样再问一遍、记下给下次；只有第一次开、什么都没记时才等。之后才装的农机，下次开机才找得到。
 4. `startServer` 用 Electron 自己的 Node（`ELECTRON_RUN_AS_NODE=1`）带 tsx 起 `apps/server/src/main.ts --ready-json --web <页面>`，`VIBEVALLEY_PORT=0`，`NODE_COMPILE_CACHE` 指到应用数据目录的 `compile-cache`（模块编译好的代码留到下次），工作目录是服务端的文件夹（开发时是仓库的 `apps/server`，打包的应用是 `Contents/Resources/server`），其余配置读家目录的 `vibevalley.yaml`。stdout 和 stderr 都追加进 `$VIBEVALLEY_HOME/logs/desktop-server.log`。
@@ -86,7 +86,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 手机的每条通话线路在桥上带自己的身份；静音、续期、挂断和字幕只归这一条。原生宿主（`apps/mobile/src/host.ts`）属于当前加载的页面；重新加载、返回配对或换农场时关闭宿主，连还在等麦克风权限、等入线的电话一起取消。原生声网只有一个引擎，`rtc.ts` 在下一次入线前结束旧尝试，按频道和本机用户号认回调；旧权限答复、旧频道排队的事件和迟到的挂断不能碰新线路。异步入线失败只认带连接身份的失败状态，不把引擎的全局错误当作某条电话的结果。锁屏不关闭页面宿主，通话继续。
 
-**打包**：`vp run package:mac` 构建页面和壳，用 `pnpm deploy --prod` 把 `apps/server` 连同生产依赖放进 `dist/stage/server`（版本照锁文件，workspace 包拷进去，测试文件、黄金数据和测试的帮手删掉），electron-builder 打出 `apps/desktop/dist` 里的 `.dmg`（第一次装）、`.zip`（更新用）和 `release.json`（`src/releases.ts` 的 `Release`：版本、这次的 PR 标题、服务端的表结构哈希、每个架构的文件名、大小和 SHA-512）。`web/` 放进资源，`server/` 在 `afterPack` 里整个拷进去（electron-builder 的 extraResources 会丢掉 `node_modules`）。版本是构建所在的 tag（`v0.2.0`），没有 tag 是 0.0.0。没有签名和公证。
+**打包**：`vp run package:mac` 构建页面和壳，用 `pnpm deploy --prod` 把 `apps/server` 连同生产依赖放进 `dist/stage/server`（版本照锁文件，workspace 包拷进去，测试文件、黄金数据和测试的帮手删掉，依赖的 source map 和类型声明也删掉：运行时不读，占服务端文件的大半），electron-builder 打出 `apps/desktop/dist` 里的 `.dmg`（第一次装，lzfse 压缩的 ULFO）、`.zip`（更新用）和 `release.json`（`src/releases.ts` 的 `Release`：版本、这次的 PR 标题、服务端的表结构哈希、每个架构的文件名、大小和 SHA-512）。`web/` 放进资源，`server/` 在 `afterPack` 里整个拷进去（electron-builder 的 extraResources 会丢掉 `node_modules`）。版本是构建所在的 tag（`v0.2.0`），没有 tag 是 0.0.0。没有签名和公证。
 
 **发布**：推一个 `v*` 的 tag，`.github/workflows/release.yml` 在 macOS（arm64）上打包，建一个草稿 Release，放上 `.dmg`、`.zip` 和 `release.json`；人看过再发布，发布以前应用看不到它。
 
@@ -117,6 +117,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **按概念分 feature，feature 之间准用，只走出口、不成环。** 以前一个概念的页、读取、规则和字分在 `pages/`、`data/`、`rules/` 和共用的词表里，改工单要动四处；现在和服务端一样，一个概念一个文件夹。大仓库的分法在一件事上不一样：feature 之间能不能互相 import。bulletproof-react 和 Feature-Sliced Design 不准（FSD 另加 entities、widgets 两层来拼），VS Code 的 `workbench/contrib/*` 随便互相用。我们的概念本来就互相嵌着（工单详情里是帮工的轨迹，群聊里是档案的脸），全不准就得把这些都挪进上层或再加一层；随便用，环会越积越多：拆之前设置页的四栏、群聊和轨迹、工单和计划都互相依赖，原因都是放错地方的字和小函数。所以准用，但只经出口（具名导出，不用 `export *`），图不成环。FSD 的 entities、Huly 每个概念一个的契约包，在这里是 `@vibevalley/protocol`，页面不再加一层。放弃了 FSD 的六层（按「东西」还是「动作」归类，争论比收益大）和一个概念一个包（每个都要 `package.json`）。皮不拆进 feature：农场的 store、部件和 world 是一体的，「种地的词只在皮里」也靠目录分界查。
 - **路由自己写。** 只要一个路径信号、`navigate` 和按前缀分发；`@solidjs/router` 的 2.0 还在预发布。
 - **桌面版自己更新，不用 Electron 的 autoUpdater。** 它在 macOS 上是 Squirrel.Mac，只装签过名的应用，而这里没有 Apple Developer 账号。自己查、自己下、退出时换，信任和主人第一次从 Release 手动下载一样（GitHub 的 HTTPS 和 Release 上的文件，SHA-512 核对）。放弃了只提示让主人自己下（下载、拖进「应用程序」、过 Gatekeeper 都是能替人做的事），也放弃了再签一层自己的签名（写 Release 的权限和签名的钥匙在同一处，不比第一次下载更可信）。有了账号就签名、公证，换成 electron-updater。只出 arm64：服务端的原生模块和岛都分架构。表结构变了的版本不自动换，因为库不迁移（「内部不留兼容」），换上就是新农场。
+- **服务端的依赖里只有一份 undici 8。** 两份时（oar 的和 Effect 的）openai、pi-ai 各装了两份，应用多 33 MB；`pnpm-workspace.yaml` 的 `overrides` 把 undici 8 定成一个版本，Electron 构建工具用的 undici 6、7 不动。
 - **打包的服务端照锁文件装依赖。** 以前用没有锁文件的 `npm install`，一个传递依赖（`@effect/platform-node-shared`）跳到了要更新 `effect` 的版本，打包的应用起不来，而仓库里跑得好好的。`pnpm deploy` 装的就是测试时那一套。
 - **Electron 用自己的 Node 跑服务端。** 应用里不必再带一份 Node；服务端照样不打包，和仓库里跑的是同一份源码。代价是应用约 300 MB。
 - **推折好的整份状态，页面不折。** 页面再写一份 `reduce` 就是第二份核心状态，两边改规则靠自觉对齐。推整份的代价是带宽：一份真实状态几十 KB，本机和局域网没问题；要换增量时，增量格式又是一份两端都要遵守的约定。

@@ -46,6 +46,17 @@ if (!app.requestSingleInstanceLock()) {
     void quitAfterSave(() => updates?.installOnQuit());
   });
 
+  // The server needs nothing of Electron's: started here, it comes up while Electron gets ready and opens the window.
+  // How the start went is kept as a value, said in the window once there is one.
+  const starting = shellPath(paths.shellPath, process.env).then(async ({ path }) => {
+    const keeper = serverKeeper(paths, path ? { ...process.env, PATH: path } : process.env);
+    server = keeper;
+    return keeper.start().then(
+      () => ({ keeper }) as const,
+      (e: unknown) => ({ failed: e }) as const,
+    );
+  });
+
   const window = mainWindow({ web: paths.web, server: () => server?.url() });
   const page = serveHost({
     window,
@@ -64,25 +75,22 @@ if (!app.requestSingleInstanceLock()) {
     setAppMenu();
     // A packaged app has its icon (resources/icon.icns); run from the repository, the Dock shows Electron's unless set.
     if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(paths.dockIcon));
-    // The window comes at once, on the bar: reading the login shell's PATH and starting the server take seconds.
+    // The window comes at once, on the bar, while the server finishes starting.
     window.opening();
-    const { path } = await shellPath(paths.shellPath, process.env);
-    const keeper = serverKeeper(paths, path ? { ...process.env, PATH: path } : process.env);
-    server = keeper;
-    try {
-      await keeper.start();
-    } catch (e) {
+    const started = await starting;
+    if ("failed" in started) {
       // Said in the window in place of the bar; closing it quits. Closed already, the box says it.
       const open = window.current();
       if (!open) {
-        dialog.showErrorBox(t("desktop.cannotStart"), reasonOf(e));
+        dialog.showErrorBox(t("desktop.cannotStart"), reasonOf(started.failed));
         app.exit(1);
         return;
       }
-      window.opening(reasonOf(e));
+      window.opening(reasonOf(started.failed));
       open.once("closed", () => app.exit(1));
       return;
     }
+    const { keeper } = started;
     window.open();
     const island = startIsland({
       binary: process.platform === "darwin" ? paths.island : undefined,

@@ -39,6 +39,12 @@ const prune = (dir: string) => {
     if (testOnly.test(name) && !name.includes("node_modules/.pnpm/node_modules")) rmSync(join(dir, name), { recursive: true, force: true });
 };
 prune(join(server, "src"));
+// Nor what only an editor reads: the dependencies' source maps and type declarations, a third of the server's files.
+// Neither is loaded at run time (a missing map only leaves a stack trace unmapped); docs and licences stay, as an agent's
+// SDK may read its own.
+const devOnly = /\.(?:js|mjs|cjs|ts|mts|cts)\.map$|\.d\.(?:ts|mts|cts)$/u;
+for (const name of readdirSync(join(server, "node_modules", ".pnpm"), { recursive: true, encoding: "utf8" }))
+  if (devOnly.test(name)) rmSync(join(server, "node_modules", ".pnpm", name), { force: true });
 for (const name of readdirSync(join(server, "node_modules", "@vibevalley"))) prune(join(server, "node_modules", "@vibevalley", name, "src"));
 // tsx reads the nearest tsconfig; the repository's extends a file the app does not carry.
 writeFileSync(
@@ -91,6 +97,8 @@ await build({
       identity: null,
       artifactName: "VibeValley-${version}-${arch}.${ext}",
     },
+    // lzfse (ULFO) rather than zlib: made and opened faster, a little smaller; macOS has read it since 10.11.
+    dmg: { format: "ULFO" },
     npmRebuild: false,
   },
 });

@@ -85,6 +85,9 @@ catalogs:
 
 overrides:
   "react-native-agora@4.6.4>base64-js": "catalog:"
+  # One undici 8 for the server's dependencies: with two (oar's and Effect's), openai and pi-ai were installed once for
+  # each, 33 MB more in the app. Electron's build tools keep their undici 6 and 7.
+  "undici@8": 8.12.3
   vite@*: "catalog:"
   vitest@*: "catalog:"
 
