@@ -8,6 +8,10 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
+| `sameMarks` | `artifact.ts` | A mark not set and a mark set false are the same. |
+| `normalSpans` | `artifact.ts` | Drops empty spans and joins neighbours with the same marks, so one text has one way to be written. |
+| `defaultOf` | `channel.ts` | The channel words go to when none is named. |
+| `channelOf` | `channel.ts` | A channel by its id; none when no id is given. |
 | `slice` | `cut.ts` | s.slice(start, end), a surrogate pair cut in half made U+FFFD (what String.prototype.toWellFormed does, which the |
 | `cut` | `cut.ts` | s as it is when it fits in max units; else its first max units and an ellipsis. |
 | `oneLine` | `cut.ts` | Runs of white space are one space. |
@@ -29,9 +33,11 @@
 | `needOf` | `phase.ts` |  |
 | `phaseText` | `phase.ts` | phaseWords as said at now. |
 | `phaseWords` | `phase.ts` | What a session is doing in words, how long it has been quiet left as {span}. |
+| `slugOf` | `pkm.ts` | A page's name from its title: trimmed, lower case, spaces as dashes, "/" (or "\") as "__". |
 | `plainText` | `plain.ts` |  |
 | `farmOf` | `play.ts` | The farm a session's bed is on: each project has its own, and the sessions without one share one. |
 | `plotKeyOf` | `play.ts` | The plot a session works, the key of `FarmView.plots`: its issue, so a reopened issue keeps its plot; one with no issue is its own. |
+| `githubRepository` | `project.ts` | Only repository home URLs: never credentials, other git transports or command-line options. |
 | `same` | `same.ts` |  |
 | `stageWantsOwner` | `stage.ts` | Questions the owner for something: the page leads with it, the board flags it. |
 
