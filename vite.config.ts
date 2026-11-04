@@ -68,16 +68,20 @@ export default defineConfig({
         "vpx scripts/primitives.ts --check",
       ],
       "notes:verify": "vpx scripts/agent-notes.ts",
+      // The types each package gives the others (its pack block, dist/): what vp check reads a workspace package by, so
+      // every check builds them first. Cached, so a package nobody changed is not built again; vp install runs it too.
+      "packages:build": "vp run --filter './packages/*' build",
       "names:verify": "vpx scripts/stale-names.ts",
       // db:check is a script: it reads db/migrations and db/queries through node:sqlite.
       "server:check": [
+        "vp run packages:build",
         "vp check",
         "vp run --filter @vibevalley/protocol --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent test",
         "vp run effect:check",
         "vp run --filter @vibevalley/server db:check",
         "vp run --filter @vibevalley/server test",
       ],
-      "web:check": ["vp check", "vp run web:test"],
+      "web:check": ["vp run packages:build", "vp check", "vp run web:test"],
       // web:check without its vp check: CI's web job runs this one, and its check job runs vp check.
       "web:test": [
         "vp run --filter @vibevalley/bridge --filter @vibevalley/engine --filter @vibevalley/base-ui --filter @vibevalley/stories --filter @vibevalley/i18n --filter @vibevalley/mobile --filter @vibevalley/desktop --filter @vibevalley/web test",
@@ -88,6 +92,7 @@ export default defineConfig({
       "health:verify": ["vp run --filter @vibevalley/health test", "vpx packages/health/src/cli.ts --config scripts/health.config.ts --check"],
       // Effect's own diagnostics (@effect/tsgo; which rules and how strict is tsconfig.base.json's plugins), a warning failing.
       "effect:check": [
+        "vp run packages:build",
         "effect-tsgo diagnostics --project apps/server/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/agent/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/ai/tsconfig.json --strict",

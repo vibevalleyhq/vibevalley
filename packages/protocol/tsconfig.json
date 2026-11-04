@@ -3,7 +3,8 @@
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "resolveJsonModule": true,
-    "types": ["node"]
+    "types": ["node"],
+    "outDir": "dist"
   },
   "include": ["src"]
 }

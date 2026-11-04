@@ -29,23 +29,21 @@ Status: proposed
 - **测试**：命令行的测试 dev 依赖 `@vibevalley/server/testing` 的 `farm`、`workingFarm`，进程里起整个农场，和现在一样快；另加一条冒烟测试，`vp pack` 出命令行的包，真的起一个服务端（`VIBEVALLEY_TEST_RUNTIMES`，和页面的 e2e 一样）跑 `issue new`、`issue show`。黄金数据跟着搬，`vp run golden:update cli` 照旧。
 - 文档里 `vp run --filter @vibevalley/server cli` 改成 `vp run --filter @vibevalley/cli start`；`AGENTS.md` 的目录加 `apps/cli/`。
 
-### 3. 包之间给的是打好的包
+### 3. 包之间给的是打好的类型
 
-每个库用 `vp pack`（tsdown）打到 `dist/`：ES 模块、`.d.mts` 和 source map；`exports` 写成三个条件：
+每个库用 `vp pack`（tsdown）打到 `dist/`：ES 模块、`.d.ts` 和指回源码的 `.d.ts.map`；`exports` 每条两个条件：
 
 ```json
-"./api": {
-  "@vibevalley/source": "./src/api.ts",
-  "types": "./dist/api.d.mts",
-  "default": "./dist/api.mjs"
-}
+"./api": { "types": "./dist/api.d.ts", "default": "./src/api.ts" }
 ```
 
-- **跑起来的和发出去的用 `dist`**：桌面版的包、命令行的包、`vp run --filter @vibevalley/server start`。
-- **开发和测试用源码**：Vite、Vitest、tsx 设 `@vibevalley/source` 条件，改一个包，页面热更新、测试马上看到，不用先打包。
-- **类型照 `dist` 的 `.d.mts` 查**：`vp check` 查一个包时，它依赖的包是打好的类型，不再拿自己的配置编译别人的源码；`check` 任务 `dependsOn` 依赖的包的 `build`，带缓存，没改的包不重打。
-- **页面的零件**（`base-ui`、`stories`、`engine` 里带 JSX 的）照 Solid 的库的做法，留着 JSX 打（`solid` 条件），由页面的 Vite 编译。
-- 每个包的 `exports` 由 `publint` 一类的检查查：指的文件都在、类型和代码对得上。
+- **类型照 `dist`**：`vp check`、`effect:check` 查一个包时，它依赖的包是打好的声明，不再拿自己的配置编译别人的源码；包的公开面就是它的声明。
+- **代码照源码**：`vpx`、Vitest、Vite、桌面版的打包都编译 TypeScript，用源码就不会过期，也不用为跑起来先打包；`dist` 里的 JS 等到有包要单独发出去（比如命令行发到 npm）再用。
+- **打好的要新**：根目录的 `packages:build` 打每个有 `pack` 的包，带缓存（缓存命中也会放回 `dist`）；`server:check`、`web:check`、`effect:check`、提交前的钩子、`vp install`（`prepare`）和 CI 的检查都先跑它。
+- **工具跟着认**：测试金字塔（`testkit/src/pyramid.ts`）照 `default` 找源码；knip 照包的 tsconfig 的 `outDir` 把 `dist` 映回 `src`。
+- **页面的零件**（`base-ui`、`stories`、`engine` 里带 JSX 的）照 Solid 的库的做法，留着 JSX 打（`solid` 条件）。
+
+**试过的**（2026-11-04，`protocol`、`i18n`）：两个包各打一次不到 0.5 秒；声明保住了类型（Schema 是 `Codec<T>`，`endpoints` 有类型）；整个仓库照 `dist` 查类型全过，挪走 `dist` 就是两万多个错，确认读的是它；服务端、页面、脚本的测试、e2e 的沙箱、knip、Effect 的诊断都过。原先打算的「开发用源码的条件、跑起来用 `dist`」没有用：仓库里服务端、e2e、桌面版的开发、脚本四处用 `vpx` 直接跑源码，都要另配条件；而跑起来的本来就编译 TypeScript，只让类型读 `dist` 就得到了边界。
 
 ## Alternatives considered
 
@@ -53,7 +51,7 @@ Status: proposed
 - **聊天也经 HTTP**：服务端加一个流式的聊天接口，命令行只做客户端，最干净；但要新接口和新的流，`runtime chat` 今天不要服务端开着也能聊，这次先起服务端的程序，等聊天进了农场的接口再改。
 - **命令行的测试一律起真的服务端进程**：边界最真，但每个测试多一两秒，帮工的替身要经环境变量配；进程里的农场加一条真进程的冒烟测试，两样都有。
 - **只靠包名、不打包**（停在第 1 步）：没有构建的先后，开发最快；但用的一方仍然编译别人的源码，类型上没有边界，包能不能单独发出去也没人查。
-- **全都只认 `dist`、没有源码条件**：边界最硬，但每改一个包都要先打包，页面的热更新跨不过包，测试前要等构建；源码条件只给开发和测试，`vp check` 和发出去的包照 `dist`。
+- **代码也照 `dist`**（开发和测试经一个源码的条件读源码）：发出去的和跑起来的一样，但仓库里四处用 `vpx` 跑源码，都要配条件，忘了配就跑旧的；跑起来的本来就编译 TypeScript，`dist` 的 JS 只在单独发包时有用。
 - **TypeScript 的 project references**：也能让类型照声明查，但 tsgo 和 `vp check` 不走它，还要另配一套 `tsconfig`；`vp pack` 已经在打服务端，用同一个工具。
 
 ## Acceptance criteria
@@ -61,11 +59,11 @@ Status: proposed
 - `vibevalley/no-cross-package-path` 在 lint 里，仓库里没有穿出包的相对路径；服务端里没有 `@/` 和 `../../db`。
 - `packages/home` 是家目录的约定的唯一一份，服务端、命令行、桌面版都用它。
 - `apps/cli` 不依赖 `@vibevalley/server`（dev 依赖的 `./testing` 除外，lint 或 knip 查）；`vibevalley issue list` 不载入服务端；命令行的测试和冒烟测试都过，桌面版装的 `vibevalley` 能用、`runtime chat` 能聊。
-- 每个库有 `build`，`exports` 是上面的三个条件，`vp check` 照依赖的 `.d.mts` 查类型；`desktop:test`、`package:mac` 用的是打好的包。
+- 每个库有 `build`，`exports` 是上面的两个条件，`vp check` 照依赖的 `.d.ts` 查类型。
 - 文档：[架构](docs/architecture.md)、[地基](docs/subsystems/foundation.md)写包之间怎么引用、什么时候用源码、什么时候用 `dist`；`AGENTS.md` 的目录和命令跟着改。
 
 ## Risks
 
-- **打包的类型**：Effect 的服务和 `Effect.gen` 推出来的类型很大，`.d.mts` 可能慢或推不出来；第 3 步先打 `protocol`、`i18n` 量一下时间，再定用 tsgo 出声明还是给导出的东西写明类型（`isolatedDeclarations`）。
-- **`dist` 过期**：源码条件只在开发和测试里，`vp check` 和发出去的包照 `dist`，`dependsOn` 管先后；手动起服务端前忘了打包会用到旧的，`start` 任务也 `dependsOn` 依赖的 `build`。
+- **打包的类型**：`protocol`、`i18n` 很快；`agent`、`ai` 里 Effect 的服务和 `Effect.gen` 推出来的类型更大，轮到它们时再量，推不出来的给导出的东西写明类型。
+- **类型过期**：改了一个包、没打包就单跑 `vp check`，别的包看到的是旧的声明，编辑器里也一样，直到 `packages:build`（钩子和各项检查都先跑它）。写文档和 `AGENTS.md` 说清，嫌烦再加 `vp pack --watch`。
 - **桌面版的启动脚本**：命令行和服务端成了两个包，渠道的 `~/.local/bin` 链接和 `vibevalley app` 的那几条要跟着改，`desktop:test` 和 `update-check` 跑一遍。

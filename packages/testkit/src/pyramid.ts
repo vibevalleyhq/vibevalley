@@ -24,6 +24,12 @@ interface WorkspacePackage {
   readonly exports: Readonly<Record<string, string>>;
 }
 
+/** An export's target: a file, or by condition its built types and its source. */
+type Target = string | { readonly types?: string; readonly default?: string };
+
+/** The source file an export leads to: what runs is the source (default); only types are built. */
+const sourceOf = (t: Target): string => (typeof t === "string" ? t : (t.default ?? ""));
+
 /** The packages under the workspace's packages/ folder, by name; none when root is not inside a workspace. */
 function workspacePackages(root: string): Map<string, WorkspacePackage> {
   let at = root;
@@ -36,8 +42,9 @@ function workspacePackages(root: string): Map<string, WorkspacePackage> {
   for (const d of readdirSync(join(at, "packages"))) {
     const manifest = join(at, "packages", d, "package.json");
     if (!existsSync(manifest)) continue;
-    const m = JSON.parse(readFileSync(manifest, "utf8")) as { name: string; exports?: string | Record<string, string> };
-    out.set(m.name, { dir: join(at, "packages", d), exports: typeof m.exports === "string" ? { ".": m.exports } : (m.exports ?? {}) });
+    const m = JSON.parse(readFileSync(manifest, "utf8")) as { name: string; exports?: string | Record<string, Target> };
+    const exports = typeof m.exports === "string" ? { ".": m.exports } : (m.exports ?? {});
+    out.set(m.name, { dir: join(at, "packages", d), exports: Object.fromEntries(Object.entries(exports).map(([k, v]) => [k, sourceOf(v)])) });
   }
   return out;
 }
