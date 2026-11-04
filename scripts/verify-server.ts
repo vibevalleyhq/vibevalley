@@ -211,7 +211,7 @@ export async function runVerification(command: string[] = [], options: Verificat
       /* oxlint-enable eslint/no-await-in-loop */
     }
     if (!address || !existsSync(join(evidence, "health.json"))) throw new Error(`server did not become healthy; see ${log}`);
-    const run = command.length > 0 ? command : [cli, "server", "health"];
+    const run = command.length > 0 ? command : [cli, "api", "call", "server.health.get"];
     const task = launch(run, root, "command", { ...env, VIBEVALLEY_SERVER: address, VIBEVALLEY_VERIFY_CLI: cli });
     code = await task.exited;
     if (interrupted) code = 130;
@@ -234,7 +234,11 @@ export async function runVerification(command: string[] = [], options: Verificat
     process.off("SIGTERM", interrupt);
     writeFileSync(
       join(evidence, "result.json"),
-      JSON.stringify({ code, address, stopped: failures.length === 0, command: command[0] ?? "server health", cleanupErrors: failures.map(String) }, null, 2),
+      JSON.stringify(
+        { code, address, stopped: failures.length === 0, command: command[0] ?? "api call server.health.get", cleanupErrors: failures.map(String) },
+        null,
+        2,
+      ),
     );
     if (failures.length === 0) for (const path of [home, work, binaries]) rmSync(path, { recursive: true, force: true });
     console.log(`verification evidence: ${evidence}`);

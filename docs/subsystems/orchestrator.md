@@ -27,7 +27,7 @@
 
 ## 模型和不变量
 
-- **管家是角色是 `orchestrator` 的档案，只在 VibeValley 自己的 agent 上跑。** 「是不是管家」一律问角色（`Agent.isOrchestrator`、`orchestrators()`），只有「没指明时给谁」才用默认管家。默认管家（档案 `orchestrator`）每个农场都有：加载时没有就补上，删它拒绝（「默认管家删不了：每个农场至少有一个管家」），改成帮工拒绝；别的管家能删。保存一份管家档案时农机不是 `vibevalley` 就拒绝。派活用的档案（`agents()`、`named`）只有帮工；全部档案（`all()`）和按 id 取的含管家。模型从档案读（`vibevalley agent save <id> --json …` 改），只接 DeepSeek：写成 `deepseek/<模型>` 或直接写模型名，别家的拒绝；没写是 `deepseek-flash`（`@vibevalley/ai/client` 的 `defaultModel`）。模型在大脑起来时读，改了下次起来用上。
+- **管家是角色是 `orchestrator` 的档案，只在 VibeValley 自己的 agent 上跑。** 「是不是管家」一律问角色（`Agent.isOrchestrator`、`orchestrators()`），只有「没指明时给谁」才用默认管家。默认管家（档案 `orchestrator`）每个农场都有：加载时没有就补上，删它拒绝（「默认管家删不了：每个农场至少有一个管家」），改成帮工拒绝；别的管家能删。保存一份管家档案时农机不是 `vibevalley` 就拒绝。派活用的档案（`agents()`、`named`）只有帮工；全部档案（`all()`）和按 id 取的含管家。模型从档案读（`vibevalley api call agent.update --json …` 改），只接 DeepSeek：写成 `deepseek/<模型>` 或直接写模型名，别家的拒绝；没写是 `deepseek-flash`（`@vibevalley/ai/client` 的 `defaultModel`）。模型在大脑起来时读，改了下次起来用上。
 - **每个管家一份**：`Orchestrator` 按档案各起一个宿主（`instanceOf`，第一句话到了才起来，`Session.host`，名字是档案 id），各有自己的排队、自己「上次给模型看的现状」（`shown`）和「起不来的原因只说一次」（`cannot`）。提示开头照旧；别的管家在后面接一句它是谁和它的人设（`identityNote`），默认管家没有，开头和评测样例的一样。名字和人设在大脑起来时读。开机时每个管家被关掉打断的那一轮各自接着做完。电话、`chat/completions`、听写和计划的信封只投默认管家的 Session。
 - **谁接哪条话**：一条输入带着给哪个管家（`Intake.to`，不是管家的或没写的给默认管家）。
 
@@ -75,7 +75,7 @@
 
 **压缩**：照 [VibeValley 自己的 agent](docs/subsystems/brain.md#压缩)。管家的 `wakeSoon` 读它自己的定时任务（`agent` 为空或是 `orchestrator`、开着）：10 分钟内要到点就不在闲时压。压缩之后下一条输入的现状带全文。
 
-**叫停**（`orchestrator.stop`，`vibevalley orchestrator stop`；管家在 `thinking` 或 `speaking` 时输入框旁边有停止键）：停掉正在跑的这一轮、丢掉排着等它的话（巡查过后还会再报，计划的状态在计划板上）；已经说出来的半句留在频道，派出去的帮工照常干活；交给管家的工单那一轮记成 `interrupted`，日志记「主人叫停了」。管家闲着时什么也不做。
+**叫停**（`orchestrator.stop`，`vibevalley api call orchestrator.stop`；管家在 `thinking` 或 `speaking` 时输入框旁边有停止键）：停掉正在跑的这一轮、丢掉排着等它的话（巡查过后还会再报，计划的状态在计划板上）；已经说出来的半句留在频道，派出去的帮工照常干活；交给管家的工单那一轮记成 `interrupted`，日志记「主人叫停了」。管家闲着时什么也不做。
 
 **关闭**：`AgentHost.close` 先拒绝新输入，等手里的那条输入（start、Build、交给大脑，一把 `Semaphore`）做完，再关大脑的作用域、等事件跟完，最后关 execution；关闭中的输入只结束 caller，不记新的 failed run，迟到文本不交给已关闭的 Brain。大脑在自己的纤程上发事件、等听的人，所以事件先进一条 `Queue`，由宿主的一条纤程按序跟；队列在大脑自己的收尾之后才结束，收尾时发的「一轮结束」也跟得到。重复 `close` 都等同一次关闭（一个 `Deferred`）。
 

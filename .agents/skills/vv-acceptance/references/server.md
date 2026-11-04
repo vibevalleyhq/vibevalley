@@ -27,7 +27,7 @@
 2. 调这次改动的接口、看状态：
 
    ```bash
-   vpx scripts/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" issue list && "$VIBEVALLEY_VERIFY_CLI" state'
+   vpx scripts/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" issue list && "$VIBEVALLEY_VERIFY_CLI" api state'
    ```
 
    要造数据或断言，写进同一个子命令。
@@ -38,15 +38,15 @@
    vpx scripts/verify-server.ts --scripted-helper -- sh -c '
      vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
      set -e
-     vv issue create --json "{\"title\":\"写打卡并提交\",\"project\":\"clock\",\"agent\":\"docs\"}"
-     vv issue work 1
-     vv issue status update 1 --dry-run --json "{\"status\":\"done\"}"
-     vv issue status update 1 --json "{\"status\":\"done\"}"
-     git -C "$(vv project list | jq -r ".[0].path")" log --oneline main
+     vv issue new 写打卡并提交 --project clock --agent docs
+     vv issue work 1 --format json
+     vv issue accept 1 --dry-run --format json
+     vv issue accept 1 --format json
+     git -C "$(vv project list --format json | jq -r ".[0].path")" log --oneline main
    '
    ```
 
-   每条命令的 stdout 是一个 JSON 文档：`issue work` 等帮工交回来、打出改动（经过的状态在 stderr），`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `helper.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/verify-server.test.ts` 跑着同样的一遍。
+   带 `--format json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue work` 等帮工交回来、打出改动（经过的状态在 stderr），`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `helper.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/verify-server.test.ts` 跑着同样的一遍。
 
 4. 页面也改了的，在同一个子命令末尾接上 [page.md](.agents/skills/vv-acceptance/references/page.md) 的截图命令。
 

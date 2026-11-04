@@ -52,8 +52,9 @@ const issueText = (i: T.Issue) =>
     }),
   ].join("\n");
 
-/** The first act the issue offers of those wanted, done: a move, a word to its helper, or stopping its helper. */
-const act = (name: string, said: string, wanted: readonly T.IssueAct[], words: string | undefined) =>
+/** The first act the issue offers of those wanted, done: a move, a word to its helper, or stopping its helper. Quiet, it
+ * prints nothing (issue work answers with the changes it waits for). */
+const act = (name: string, said: string, wanted: readonly T.IssueAct[], words: string | undefined, quiet = false) =>
   Effect.gen(function* () {
     const issue = yield* ask((api) => api.issue.get({ id: ref(said) }));
     const action: T.IssueAction | undefined = issue.stage.acts.find((a) => wanted.includes(a.act));
@@ -75,6 +76,7 @@ const act = (name: string, said: string, wanted: readonly T.IssueAct[], words: s
           preview: (api) => api.issue.status.previewUpdate(request),
           does: (api) => api.issue.status.update(request),
           said: (i) => issueLine(i),
+          quiet,
         });
       }
       case "say": {
@@ -251,8 +253,9 @@ const workCommand = Command.make(
       // Already at work, followed as it is; handed back or done, said as it stands: asked again, work does no harm.
       const active = before.stage.state === "queued" || before.stage.state === "working";
       const startable = before.stage.acts.some((a) => workActs.includes(a.act));
-      if (!active && startable) yield* act("work", o.issue, workActs, undefined);
-      if ((yield* DryRunFlag) || o.noWait) return;
+      const waits = !(yield* DryRunFlag) && !o.noWait;
+      if (!active && startable) yield* act("work", o.issue, workActs, undefined, waits);
+      if (!waits) return;
       const base = yield* ServerFlag;
       const follow = frames(base, statePath).pipe(
         Stream.mapEffect((data) =>

@@ -56,13 +56,14 @@ export const show = <A>(value: A, text: (value: A) => string) =>
   Effect.flatMap(FormatFlag, (format) => (format === "json" ? printBody(JSON.stringify(value ?? null)) : out(text(value))));
 
 /** A change, or with --dry-run what it would do: by the endpoint's own dry run where it has one; a change with none is
- * refused rather than made. */
+ * refused rather than made. Quiet, the change is made and not printed: the command answers with what follows it. */
 export const change = <A>(o: {
   readonly name: string;
   readonly preview?: (api: VibeValleyApi) => Promise<Preview>;
   readonly does: (api: VibeValleyApi) => Promise<A>;
   readonly said: (done: A) => string;
   readonly as?: (done: A) => unknown;
+  readonly quiet?: boolean;
 }) =>
   Effect.gen(function* () {
     if (yield* DryRunFlag) {
@@ -70,6 +71,7 @@ export const change = <A>(o: {
       return yield* show(yield* ask(o.preview), (p) => p.does.join("\n"));
     }
     const done = yield* ask(o.does);
+    if (o.quiet === true) return;
     yield* show(o.as ? o.as(done) : done, () => o.said(done));
   });
 
