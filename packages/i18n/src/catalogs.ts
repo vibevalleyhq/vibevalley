@@ -3441,12 +3441,18 @@ export const catalogs = {
         recording: "在听…再点一下停",
         transcribing: "在认字…",
         failed: "上次没认出来：{why}",
-        start: "听写：点一下开始说，再点一下停",
+        start: "听写：点一下开始，再点一下停；也可以按住说，松开就停",
         stop: "停下听写",
         label: "听写",
         noMic: "录不了音：没有麦克风权限",
         cannot: "录不了音：{why}",
         nothing: "没录上",
+        listening: "已经听了多久",
+        keys: "Esc 取消 · Enter 完成",
+        cancel: "不要这段",
+        done: "说完了，转成字",
+        again: "再说一次",
+        dismiss: "知道了",
       },
       call: { renew: "令牌续期失败：{why}", noMic: "没有麦克风权限", cannotHear: "声网：听不到对面：{why}", agora: "声网：{code} {msg}" },
       moss: {
@@ -7148,12 +7154,18 @@ export const catalogs = {
         recording: "Listening… click again to stop",
         transcribing: "Transcribing…",
         failed: "Last time it was not recognized: {why}",
-        start: "Dictation: click to start speaking, again to stop",
+        start: "Dictation: click to start and again to stop, or hold to talk and let go",
         stop: "Stop dictation",
         label: "Dictation",
         noMic: "Cannot record: no microphone permission",
         cannot: "Cannot record: {why}",
         nothing: "Nothing was recorded",
+        listening: "How long it has listened",
+        keys: "Esc cancel · Enter done",
+        cancel: "Discard this recording",
+        done: "Done, turn it into text",
+        again: "Try again",
+        dismiss: "Dismiss",
       },
       call: {
         renew: "Renewing the token failed: {why}",
@@ -10654,9 +10666,15 @@ export interface Messages {
   "web.voice.choices.number.idleSeconds": undefined;
   "web.voice.choices.number.interruptMs": undefined;
   "web.voice.choices.number.silenceMs": undefined;
+  "web.voice.dictation.again": undefined;
+  "web.voice.dictation.cancel": undefined;
   "web.voice.dictation.cannot": { readonly why: string | number };
+  "web.voice.dictation.dismiss": undefined;
+  "web.voice.dictation.done": undefined;
   "web.voice.dictation.failed": { readonly why: string | number };
+  "web.voice.dictation.keys": undefined;
   "web.voice.dictation.label": undefined;
+  "web.voice.dictation.listening": undefined;
   "web.voice.dictation.noMic": undefined;
   "web.voice.dictation.nothing": undefined;
   "web.voice.dictation.recording": undefined;

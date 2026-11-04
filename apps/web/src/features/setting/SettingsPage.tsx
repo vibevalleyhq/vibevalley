@@ -23,9 +23,12 @@ import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
 
-type Group = "options" | "helpers" | "voice" | "connect";
+/** The groups listed under their names. */
+type Listed = "options" | "helpers" | "voice" | "connect";
+// about stands apart at the foot of the list: what this copy is, not a setting.
+type Group = Listed | "about";
 
-const groups: readonly Group[] = ["options", "helpers", "voice", "connect"];
+const groups: readonly Listed[] = ["options", "helpers", "voice", "connect"];
 
 interface Section {
   readonly id: string;
@@ -40,7 +43,6 @@ const sections: readonly Section[] = [
   { id: "general", group: "options", icon: "settings", label: t("web.setting.nav.general"), words: t("web.setting.words.general") },
   { id: "appearance", group: "options", icon: "appearance", label: t("web.setting.nav.appearance"), words: t("web.setting.words.appearance") },
   { id: "models", group: "options", icon: "key", label: t("web.setting.nav.models"), words: t("web.setting.words.models") },
-  { id: "about", group: "options", icon: "info", label: t("web.setting.nav.about"), words: t("web.setting.words.about") },
   { id: "memory", group: "helpers", icon: "memory", label: t("web.setting.nav.memory"), words: t("web.setting.words.memory") },
   { id: "skills", group: "helpers", icon: "skill", label: t("web.setting.nav.skills"), words: t("web.setting.words.skills") },
   { id: "call", group: "voice", icon: "call", label: t("web.setting.nav.call"), words: t("web.setting.words.call") },
@@ -49,6 +51,7 @@ const sections: readonly Section[] = [
   { id: "github", group: "connect", icon: "terminal", label: "GitHub", words: t("web.setting.words.github") },
   { id: "chat", group: "connect", icon: "chat", label: t("web.setting.nav.chat"), words: t("web.setting.words.chat") },
   { id: "devices", group: "connect", icon: "devices", label: t("web.setting.nav.devices"), words: t("web.setting.words.devices") },
+  { id: "about", group: "about", icon: "info", label: t("web.setting.nav.about"), words: t("web.setting.words.about") },
 ];
 
 /** `rest` is the path after /settings/. */
@@ -87,24 +90,16 @@ export function SettingsPage(props: { rest: string }) {
                   <Show when={shown(g).length > 0}>
                     <div class="flex flex-col gap-0.5">
                       <span class="px-2 pb-1 text-xs font-medium text-faint">{t(`web.setting.groups.${g}`)}</span>
-                      <For each={shown(g)}>
-                        {(s) => (
-                          <A
-                            href={`/settings/${s.id}`}
-                            data-key={s.id}
-                            aria-current={s === section() ? "page" : undefined}
-                            class={[
-                              "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
-                              s === section() ? "bg-selected font-medium text-ink" : "text-muted hover:bg-hover hover:text-ink",
-                            ]}
-                          >
-                            <Icon name={s.icon} size={16} />
-                            {s.label}
-                          </A>
-                        )}
-                      </For>
+                      <For each={shown(g)}>{(s) => <SectionLink section={s} current={s === section()} />}</For>
                     </div>
                   </Show>
+                )}
+              </For>
+              <For each={shown("about")}>
+                {(s) => (
+                  <div class="flex flex-col border-t border-line pt-3 md:mt-auto">
+                    <SectionLink section={s} current={s === section()} />
+                  </div>
                 )}
               </For>
             </nav>
@@ -167,5 +162,22 @@ export function SettingsPage(props: { rest: string }) {
         </SettingsSearch>
       )}
     </Show>
+  );
+}
+
+function SectionLink(props: { section: Section; current: boolean }) {
+  return (
+    <A
+      href={`/settings/${props.section.id}`}
+      data-key={props.section.id}
+      aria-current={props.current ? "page" : undefined}
+      class={[
+        "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
+        props.current ? "bg-selected font-medium text-ink" : "text-muted hover:bg-hover hover:text-ink",
+      ]}
+    >
+      <Icon name={props.section.icon} size={16} />
+      {props.section.label}
+    </A>
   );
 }

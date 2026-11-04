@@ -5,7 +5,7 @@ import { createExternal } from "@/base/external";
 
 import { voiceCall } from "./call";
 
-export { DictationButton } from "./DictationButton";
+export { DictationBar, DictationButton, DictationKey, dictationKey, DictationProblem, useDictation } from "./DictationButton";
 export { VoiceForm } from "./VoiceForm";
 export { MossPlayground } from "./MossPlayground";
 export { VoiceCall, voiceCall } from "./call";

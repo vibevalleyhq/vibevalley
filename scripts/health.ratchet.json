@@ -453,7 +453,7 @@
     "nonNull": 7,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 2,
+    "lintOff": 1,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 6,

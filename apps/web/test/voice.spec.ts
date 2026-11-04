@@ -7,11 +7,12 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
 });
 
-test("dictation waits for a transcriber to be set", async ({ page }) => {
+test("dictation waits for a transcriber to be set, and its key opens where one is set", async ({ page }) => {
   await page.goto("/chat");
   const dictate = page.getByTestId("composer").getByTestId("dictate");
   await expect(dictate).toHaveAttribute("data-state", "unset");
-  await expect(dictate).toBeDisabled();
+  await dictate.click();
+  await expect(page).toHaveURL(/\/settings\/dictation$/u);
 });
 
 test("` opens the debug console over the farm, and its level-up shows the banner", async ({ page }) => {

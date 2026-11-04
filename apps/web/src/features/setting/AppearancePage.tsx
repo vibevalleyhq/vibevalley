@@ -1,11 +1,14 @@
 // 外观: how the workbench looks on this machine. The farm, the memory tree and the pixel skin are drawn and keep theirs.
 
 import { t } from "@vibevalley/i18n";
-import { ThemeChoiceValues } from "@vibevalley/protocol/host";
+import { type ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
 
 import { ScaleValues, setScale, setTheme, usePrefs } from "@/state/prefs";
+import type { IconName } from "@/ui/icons";
 import { Segmented } from "@/ui/Segmented";
 import { SettingRow, SettingsGroup, SettingsPage } from "@/ui/settings";
+
+const themeIcon: Record<ThemeChoice, IconName> = { light: "themeLight", dark: "themeDark", system: "themeSystem" };
 
 export function AppearancePage() {
   const theme = usePrefs((p) => p.theme);
@@ -18,7 +21,7 @@ export function AppearancePage() {
             label={t("web.setting.appearance.theme")}
             testid="theme"
             value={theme()}
-            options={ThemeChoiceValues.map((v) => ({ value: v, label: t(`web.setting.appearance.themes.${v}`) }))}
+            options={ThemeChoiceValues.map((v) => ({ value: v, icon: themeIcon[v], label: t(`web.setting.appearance.themes.${v}`) }))}
             onChange={setTheme}
           />
         </SettingRow>

@@ -12,6 +12,9 @@ import {
   Call,
   Key,
   Laptop,
+  Monitor,
+  Moon,
+  Sun,
   Notebook,
   NotebookBookmark,
   Palette,
@@ -157,6 +160,10 @@ export const icons = {
   call: Call,
   realtime: SoundwaveCircle,
   devices: Laptop,
+  // The workbench's theme: light, dark, the computer's.
+  themeLight: Sun,
+  themeDark: Moon,
+  themeSystem: Monitor,
   update: Download,
 } satisfies Record<string, IconFunction>;
 

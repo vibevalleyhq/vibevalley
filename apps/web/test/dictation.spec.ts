@@ -47,8 +47,12 @@ test("dictation records the microphone as 16 kHz WAV and puts the words in the f
     await dictate.click();
     await expect.poll(() => page.evaluate(() => window.heard ?? 0)).toBeGreaterThan(2);
     await expect(dictate).toHaveAttribute("data-state", "recording");
+    // The box's row is the recording's while it listens; its key is done.
+    await expect(page.getByTestId("dictation-bar")).toBeVisible();
+    await expect(page.getByTestId("send")).toBeHidden();
     await dictate.click();
     await expect(page.locator("textarea")).toHaveValue(new RegExp(said, "u"));
+    await expect(page.getByTestId("dictation-bar")).toBeHidden();
 
     expect(uploads).toHaveLength(1);
     const wav = uploads[0]!.subarray(uploads[0]!.indexOf("RIFF"));
@@ -60,4 +64,19 @@ test("dictation records the microphone as 16 kHz WAV and puts the words in the f
   } finally {
     transcriber.close();
   }
+});
+
+test("Esc while the box listens drops the recording: nothing is sent and the box is as it was", async ({ page, api }) => {
+  // An address nothing answers at: a recording sent there would come back as a problem in the box.
+  await api.setting.update({ dictation: { via: "own", url: "http://127.0.0.1:9/v1", model: "whisper" } });
+  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
+  await page.goto("/chat");
+  const dictate = page.getByTestId("dictate");
+  await dictate.click();
+  await expect(dictate).toHaveAttribute("data-state", "recording");
+  await page.getByTestId("composer-input").press("Escape");
+  await expect(dictate).toHaveAttribute("data-state", "idle");
+  await expect(page.getByTestId("dictation-bar")).toBeHidden();
+  await expect(page.getByTestId("dictation-problem")).toBeHidden();
+  await expect(page.getByTestId("send")).toBeVisible();
 });

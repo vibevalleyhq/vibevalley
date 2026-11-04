@@ -7,7 +7,7 @@ import { ownerId } from "@vibevalley/protocol";
 import type { BlockRef, Channel } from "@vibevalley/protocol";
 
 import { aria } from "@/base/dom";
-import { DictationButton } from "@/features/voice";
+import { DictationBar, DictationKey, dictationKey, DictationProblem, useDictation } from "@/features/voice";
 import { api } from "@/infra/api";
 import { useCore } from "@/infra/frame";
 import { useRouter } from "@/infra/router";
@@ -92,7 +92,11 @@ export function Composer(props: {
     el?.setSelectionRange(from + emojiText.length, from + emojiText.length);
   };
   // ↑ in an empty box changes the owner's last message here; Esc lets go of the message being answered.
+  const dictating = useDictation({ input: () => input, value: () => box.text(), onValue: (v, c) => box.edit(v, c) });
+  // While this box listens, its row is the recording's: cancel or done in place of attach and send.
+  const listening = () => dictating.mine() && (dictating.state() === "recording" || dictating.state() === "transcribing");
   const onKey = (e: KeyboardEvent) => {
+    if (dictationKey(dictating, e)) return;
     const id = props.channel?.id;
     if (!e.isComposing && id && box.offered().length === 0) {
       if (e.key === "ArrowUp" && box.text() === "") {
@@ -248,87 +252,99 @@ export function Composer(props: {
           }}
           class="block [field-sizing:content] max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-base outline-none placeholder:text-faint"
         />
-        <div class="flex items-center gap-1 px-2 pb-2">
-          <Show when={props.channel?.type !== "direct"}>
-            <span class="text-xs text-faint">{t("web.channel.composer.mention")}</span>
-          </Show>
-          <span class="flex-1" />
-          <input
-            ref={(el) => (picker = el)}
-            type="file"
-            multiple
-            class="hidden"
-            aria-hidden="true"
-            tabindex={-1}
-            onChange={(e) => {
-              const files = [...(e.currentTarget.files ?? [])];
-              e.currentTarget.value = "";
-              attach(files);
-            }}
-          />
-          <button
-            type="button"
-            data-testid="attach"
-            onClick={() => picker?.click()}
-            disabled={!props.channel}
-            aria-label={t("web.channel.composer.attach")}
-            title={t("web.channel.composer.attach")}
-            class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50"
+        <DictationProblem dictating={dictating} />
+        <div class="flex h-9 items-center gap-1 px-2 pb-2">
+          <Show
+            when={listening()}
+            fallback={
+              <>
+                <Show when={props.channel?.type !== "direct"}>
+                  <span class="text-xs text-faint">{t("web.channel.composer.mention")}</span>
+                </Show>
+                <span class="flex-1" />
+                <input
+                  ref={(el) => (picker = el)}
+                  type="file"
+                  multiple
+                  class="hidden"
+                  aria-hidden="true"
+                  tabindex={-1}
+                  onChange={(e) => {
+                    const files = [...(e.currentTarget.files ?? [])];
+                    e.currentTarget.value = "";
+                    attach(files);
+                  }}
+                />
+                <button
+                  type="button"
+                  data-testid="attach"
+                  onClick={() => picker?.click()}
+                  disabled={!props.channel}
+                  aria-label={t("web.channel.composer.attach")}
+                  title={t("web.channel.composer.attach")}
+                  class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50"
+                >
+                  <Icon name="attach" size={16} />
+                </button>
+                <div>
+                  <button
+                    type="button"
+                    ref={(el) => (emojiButton = el)}
+                    data-testid="emoji"
+                    onClick={() => setEmoji(!emoji())}
+                    disabled={!props.channel}
+                    aria-label={t("web.channel.emoji.open")}
+                    aria-expanded={aria(emoji())}
+                    title={t("web.channel.emoji.open")}
+                    class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50"
+                  >
+                    <Icon name="react" size={16} />
+                  </button>
+                  <Show when={emoji()}>
+                    <EmojiPicker
+                      anchor={emojiButton}
+                      onClose={() => setEmoji(false)}
+                      onPick={(e) => {
+                        setEmoji(false);
+                        insert(e);
+                      }}
+                    />
+                  </Show>
+                </div>
+              </>
+            }
           >
-            <Icon name="attach" size={16} />
-          </button>
-          <div>
-            <button
-              type="button"
-              ref={(el) => (emojiButton = el)}
-              data-testid="emoji"
-              onClick={() => setEmoji(!emoji())}
-              disabled={!props.channel}
-              aria-label={t("web.channel.emoji.open")}
-              aria-expanded={aria(emoji())}
-              title={t("web.channel.emoji.open")}
-              class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-50"
-            >
-              <Icon name="react" size={16} />
-            </button>
-            <Show when={emoji()}>
-              <EmojiPicker
-                anchor={emojiButton}
-                onClose={() => setEmoji(false)}
-                onPick={(e) => {
-                  setEmoji(false);
-                  insert(e);
-                }}
-              />
+            <DictationBar dictating={dictating} />
+          </Show>
+          <DictationKey dictating={dictating} bar size={16} class="size-7 rounded-md hover:bg-hover" />
+          <Show when={!listening()}>
+            <Show when={box.stoppable()}>
+              <button
+                type="button"
+                data-testid="stop"
+                onClick={() => void stop()}
+                aria-label={t("web.channel.composer.stop")}
+                title={t("web.channel.composer.stopHint")}
+                class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md border border-line text-berry hover:bg-hover"
+              >
+                <Icon name="stop" size={16} />
+              </button>
             </Show>
-          </div>
-          <DictationButton field={() => input} value={box.text()} onValue={box.edit} size={16} class="size-7 rounded-md hover:bg-hover" />
-          <Show when={box.stoppable()}>
             <button
               type="button"
-              data-testid="stop"
-              onClick={() => void stop()}
-              aria-label={t("web.channel.composer.stop")}
-              title={t("web.channel.composer.stopHint")}
-              class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md border border-line text-berry hover:bg-hover"
+              data-testid="send"
+              onClick={() => void box.send()}
+              disabled={!box.canSend()}
+              aria-label={t("web.channel.composer.send")}
+              title={t("web.channel.composer.sendHint")}
+              class={[
+                "inline-flex size-7 cursor-pointer items-center justify-center rounded-md border disabled:cursor-default",
+                box.canSend() ? "border-accent bg-accent hover:bg-accent-hover" : "border-transparent opacity-50",
+              ]}
             >
-              <Icon name="stop" size={16} />
+              <Icon name="send" size={16} />
             </button>
           </Show>
-          <button
-            type="button"
-            data-testid="send"
-            onClick={() => void box.send()}
-            disabled={!box.canSend()}
-            aria-label={t("web.channel.composer.send")}
-            title={t("web.channel.composer.sendHint")}
-            class={[
-              "inline-flex size-7 cursor-pointer items-center justify-center rounded-md border disabled:cursor-default",
-              box.canSend() ? "border-accent bg-accent hover:bg-accent-hover" : "border-transparent opacity-50",
-            ]}
-          >
-            <Icon name="send" size={16} />
-          </button>
         </div>
       </div>
     </div>

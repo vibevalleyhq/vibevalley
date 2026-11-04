@@ -2,6 +2,9 @@ import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 
 import { Toggle, ToggleGroup } from "@vibevalley/base-ui";
 
+import { Icon } from "./Icon";
+import type { IconName } from "./icons";
+
 interface Place {
   readonly x: number;
   readonly y: number;
@@ -13,7 +16,7 @@ interface Place {
  * 分段). */
 export function Segmented<T extends string>(props: {
   value: T;
-  options: { value: T; label: string; disabled?: boolean | undefined; title?: string | undefined }[];
+  options: { value: T; label: string; icon?: IconName | undefined; disabled?: boolean | undefined; title?: string | undefined }[];
   onChange: (v: T) => void;
   label: string;
   block?: boolean;
@@ -76,11 +79,12 @@ export function Segmented<T extends string>(props: {
             disabled={o.disabled}
             title={o.title}
             class={[
-              "relative h-6 cursor-pointer rounded-sm px-2.5 text-sm whitespace-nowrap transition-colors duration-120 disabled:cursor-default disabled:opacity-50",
+              "relative inline-flex h-6 cursor-pointer items-center justify-center gap-1.5 rounded-sm px-2.5 text-sm whitespace-nowrap transition-colors duration-120 disabled:cursor-default disabled:opacity-50",
               { "flex-1": !(props.block !== true) },
               o.value === props.value ? "font-medium text-ink" : "text-muted hover:text-ink",
             ]}
           >
+            <Show when={o.icon}>{(name) => <Icon name={name()} size={14} />}</Show>
             {o.label}
           </Toggle>
         )}
