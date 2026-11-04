@@ -116,7 +116,7 @@ function Popup(props: DivProps) {
   );
 }
 
-interface MenuItemProps extends DivProps {
+export interface MenuItemProps extends DivProps {
   disabled?: boolean | undefined;
   /** Runs it without closing the menu. */
   closeOnClick?: boolean | undefined;

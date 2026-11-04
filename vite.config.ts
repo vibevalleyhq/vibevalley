@@ -70,7 +70,7 @@ export default defineConfig({
       "notes:verify": "vpx scripts/agent-notes.ts",
       // The types each package gives the others (its pack block, dist/): what vp check reads a workspace package by, so
       // every check builds them first. Cached, so a package nobody changed is not built again; vp install runs it too.
-      "packages:build": "vp run --filter './packages/*' build",
+      "packages:build": ["vp run --filter './packages/*' build", "vpx scripts/built-types.ts"],
       "names:verify": "vpx scripts/stale-names.ts",
       // db:check is a script: it reads db/migrations and db/queries through node:sqlite.
       "server:check": [

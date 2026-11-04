@@ -3,11 +3,26 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./pixi": "./src/pixi/index.ts",
-    "./nav": "./src/nav/index.ts",
-    "./audio": "./src/audio/index.ts",
-    "./clock": "./src/clock.ts",
-    "./framing": "./src/framing.ts"
+    "./pixi": {
+      "types": "./dist/pixi/index.d.ts",
+      "default": "./src/pixi/index.ts"
+    },
+    "./nav": {
+      "types": "./dist/nav/index.d.ts",
+      "default": "./src/nav/index.ts"
+    },
+    "./audio": {
+      "types": "./dist/audio/index.d.ts",
+      "default": "./src/audio/index.ts"
+    },
+    "./clock": {
+      "types": "./dist/clock.d.ts",
+      "default": "./src/clock.ts"
+    },
+    "./framing": {
+      "types": "./dist/framing.d.ts",
+      "default": "./src/framing.ts"
+    }
   },
   "dependencies": {
     "pixi.js": "catalog:"

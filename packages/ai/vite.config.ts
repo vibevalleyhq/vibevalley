@@ -5,5 +5,19 @@ import { configDefaults } from "vite-plus/test/config";
 // replays one without. budgets prints the test pyramid's shape, as the server's run does.
 export default defineConfig({
   test: { include: ["src/**/*.test.ts"], reporters: [...configDefaults.reporters, "@vibevalley/testkit/budgets"] },
-  run: { tasks: { test: { command: "vp test run", cache: { env: ["VIBEVALLEY_GOLDEN"] } } } },
+  // The types other packages check against (package.json's exports: types is dist/, default the source every run
+  // compiles), declarations only, with maps back to the source for the editor.
+  pack: {
+    entry: ["src/client.ts", "src/llm.ts", "src/messages.ts", "src/models.ts", "src/response.ts", "src/testing.ts", "src/tools.ts"],
+    outDir: "dist",
+    clean: true,
+    fixedExtension: false,
+    dts: { sourcemap: true, emitDtsOnly: true },
+  },
+  run: {
+    tasks: {
+      build: { command: "vp pack", cache: { input: [{ auto: true }, "!dist/**"] } },
+      test: { command: "vp test run", cache: { env: ["VIBEVALLEY_GOLDEN"] } },
+    },
+  },
 });

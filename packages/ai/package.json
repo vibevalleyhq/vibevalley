@@ -3,13 +3,34 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./client": "./src/client.ts",
-    "./llm": "./src/llm.ts",
-    "./messages": "./src/messages.ts",
-    "./models": "./src/models.ts",
-    "./response": "./src/response.ts",
-    "./testing": "./src/testing.ts",
-    "./tools": "./src/tools.ts"
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./src/client.ts"
+    },
+    "./llm": {
+      "types": "./dist/llm.d.ts",
+      "default": "./src/llm.ts"
+    },
+    "./messages": {
+      "types": "./dist/messages.d.ts",
+      "default": "./src/messages.ts"
+    },
+    "./models": {
+      "types": "./dist/models.d.ts",
+      "default": "./src/models.ts"
+    },
+    "./response": {
+      "types": "./dist/response.d.ts",
+      "default": "./src/response.ts"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.ts"
+    },
+    "./tools": {
+      "types": "./dist/tools.d.ts",
+      "default": "./src/tools.ts"
+    }
   },
   "dependencies": {
     "effect": "catalog:"
