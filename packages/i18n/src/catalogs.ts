@@ -3236,6 +3236,15 @@ export const catalogs = {
         workingQuestion: "{n} 个帮工在干活，重启会打断它们。现在重启？",
         newFarmQuestion: "新版本从新的数据开始，旧的留在家目录里。现在重启？",
         download: "去下载",
+        channel: "更新通道",
+        channels: {
+          stable: "正式版",
+          beta: "测试版",
+          alpha: "尝鲜版",
+          stableHint: "只更新到正式版",
+          betaHint: "先拿到下一版的测试版：功能已经定了，只修错，农场不会从头来",
+          alphaHint: "每一批改动都先拿到：功能还在变，表结构变了农场会从头来（旧的留在一边）",
+        },
       },
     },
     "web.tree": {
@@ -6935,6 +6944,15 @@ export const catalogs = {
         workingQuestion: "{n} helpers are working; restarting cuts them off. Restart now?",
         newFarmQuestion: "The new version starts from fresh data; the old stays in the home folder. Restart now?",
         download: "Download",
+        channel: "Update channel",
+        channels: {
+          stable: "Release",
+          beta: "Beta",
+          alpha: "Alpha",
+          stableHint: "Updates only to releases",
+          betaHint: "Gets the next version's betas first: its features are settled, only fixes go in, and the farm never starts over",
+          alphaHint: "Gets every batch of changes first: features still change, and a schema change starts the farm over (the old one is kept aside)",
+        },
       },
     },
     "web.tree": {
@@ -10431,6 +10449,13 @@ export interface Messages {
   "web.session.trajectory.want": undefined;
   "web.session.trajectory.wantHint": undefined;
   "web.session.trajectory.wrong": undefined;
+  "web.setting.about.channel": undefined;
+  "web.setting.about.channels.alpha": undefined;
+  "web.setting.about.channels.alphaHint": undefined;
+  "web.setting.about.channels.beta": undefined;
+  "web.setting.about.channels.betaHint": undefined;
+  "web.setting.about.channels.stable": undefined;
+  "web.setting.about.channels.stableHint": undefined;
   "web.setting.about.check": undefined;
   "web.setting.about.checking": undefined;
   "web.setting.about.copied": undefined;

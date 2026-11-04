@@ -91,7 +91,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 **发布**：推一个 `v*` 的 tag，`.github/workflows/release.yml` 在 macOS（arm64）上打包，建一个草稿 Release，放上 `.dmg`、`.zip` 和 `release.json`；人看过再发布，发布以前应用看不到它。
 
-**自己更新**（`src/update.ts`，只在打包的应用里）：开机查一次，之后每 4 小时，也能在「关于」里点。读最新 Release 的 `release.json`（`VIBEVALLEY_UPDATE_FEED` 可以换成别处），比本机新就把这台 Mac 的 zip 下到 user-data 的 `updates/<版本>/`，大小和 SHA-512 对不上就报错丢掉，`ditto` 解开，`Info.plist` 的版本要对得上。应用在安装盘里、被 macOS 挪到 App Translocation、或所在的文件夹不能写时不换，「关于」里说清楚、给 Release 的页面。能换的：退出时（服务端存好以后）起一个脱离的脚本，等这个进程走了，把旧的 `.app` 挪到 `updates/previous.app`、新的挪到原处、去掉隔离属性；「关于」里「重启更新」也一样，换完再打开。新版本的表结构和家目录里的库（`db.schema`）不一样时，它的服务端会把旧库挪到一边、从新农场开始：这样的版本退出时不换，只在「关于」里说，主人点了才换。页面经 `desktopBridge` 的 `updateState`、`updateCheck`、`updateInstall` 和推送 `update` 看到它（`Host.update`），侧栏底部在下好时多一个图标。
+**自己更新**（`src/update.ts`，只在打包的应用里）：开机查一次，之后每 4 小时，也能在「关于」里点。读这台电脑选的通道（「关于」的「更新通道」：正式版、测试版、尝鲜版，存在 user-data 的 `update-channel`；没选过就是手上这一版所在的那个）里最新的 Release 的 `release.json`：正式版读 `latest`，测试版和尝鲜版读 GitHub 的 Release 列表（latest 不含预发布），挑通道收得到的阶段里最新的，草稿不算（`releases.ts` 的 `manifestFor`；`VIBEVALLEY_UPDATE_FEED` 给一份清单代替所有通道）；版本照 semver 排，`0.4.0-alpha.2 < 0.4.0-beta.1 < 0.4.0`，换回正式版不降级。比本机新就把这台 Mac 的 zip 下到 user-data 的 `updates/<版本>/`，大小和 SHA-512 对不上就报错丢掉，`ditto` 解开，`Info.plist` 的版本要对得上。应用在安装盘里、被 macOS 挪到 App Translocation、或所在的文件夹不能写时不换，「关于」里说清楚、给 Release 的页面。能换的：退出时（服务端存好以后）起一个脱离的脚本，等这个进程走了，把旧的 `.app` 挪到 `updates/previous.app`、新的挪到原处、去掉隔离属性；「关于」里「重启更新」也一样，换完再打开。新版本的表结构和家目录里的库（`db.schema`）不一样时，它的服务端会把旧库挪到一边、从新农场开始：这样的版本退出时不换，只在「关于」里说，主人点了才换。页面经 `desktopBridge` 的 `updateState`、`updateCheck`、`updateInstall` 和推送 `update` 看到它（`Host.update`），侧栏底部在下好时多一个图标。
 
 ## 和谁打交道
 

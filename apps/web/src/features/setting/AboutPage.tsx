@@ -12,7 +12,7 @@ import { Quiet } from "@/ui/layout";
 import { SettingRow, SettingsGroup, SettingsPage } from "@/ui/settings";
 import { toast } from "@/ui/toasts";
 
-import { UpdateRow } from "./UpdateRow";
+import { ChannelRow, UpdateRow } from "./UpdateRow";
 
 function PathRow(props: { label: string; hint: string; path: string }) {
   const reveal = currentHost().reveal;
@@ -51,6 +51,7 @@ export function AboutPage() {
                 <span class="font-mono text-sm">{s().version}</span>
               </SettingRow>
               <UpdateRow />
+              <ChannelRow />
             </SettingsGroup>
             <SettingsGroup title={t("web.setting.about.files")}>
               <For

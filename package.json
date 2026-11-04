@@ -11,6 +11,7 @@
     "site:build": "pnpm --dir site install && pnpm --dir site run build",
     "site:deploy": "pnpm --dir site install && pnpm --dir site run deploy",
     "package:mac": "vp run --filter @vibevalley/desktop package",
+    "release": "vpx scripts/release.ts",
     "capabilities": "vpx scripts/capabilities.ts",
     "api:client": "vpx scripts/api-client.ts",
     "i18n:gen": "vpx scripts/i18n.ts gen",

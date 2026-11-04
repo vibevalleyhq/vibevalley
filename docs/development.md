@@ -22,8 +22,12 @@ vp run desktop:dev                           # 或者桌面版：Electron 带着
 
 ```bash
 vp run package:mac       # apps/desktop/dist：VibeValley.app（mac-arm64/）、.dmg、.zip 和 release.json
-git tag v0.2.0 && git push origin v0.2.0   # 发布：release.yml 打包、建草稿 Release，看过再在 GitHub 上发布
+vp run release alpha     # 在 main 上打下一个 alpha
+vp run release beta      # 第一次在 main 上：切出 release/x.y、打 beta.1；之后在 release/x.y 上打下一个 beta
+vp run release final     # 在 release/x.y 上打正式版（前面要有同一版的 beta）
 ```
+
+发版分三个阶段（[计划](.agents/notes/proposed/process/2026-11-04-alpha-beta-release.md)）：alpha 给自己用，功能会变、农场可能从头来；beta 冻住功能只修错，同一条 beta 线里表结构不变；正式版和最后一个 beta 同一份代码。修错先进 `main`，再挑到 `release/x.y`。`vp run release <阶段>`（`scripts/release.ts`）不手写版本号：查工作区干净、分支对、和 origin 一致，从已有的 tag 算出下一个版本（`scripts/release-plan.ts`），beta 和正式版先跑 `vp run release:verify`、表结构和这条线的第一个 beta 比，列出要打什么、包含哪些提交、会不会让农场从头来，问过才打 tag、推送；只在终端里跑。推上去的 tag 由 release.yml 打包、建草稿 Release，看过再在 GitHub 上发布，alpha 和 beta 勾上 pre-release。
 
 `apps/desktop/scripts/package.ts` 先构建页面和壳，再把服务端用 `vp pack` 打成 `dist/main.mjs`，连同它没打进去的生产依赖和运行时要读的几样文件放进 `dist/stage/server`，最后由 electron-builder 把壳、`server/` 和 `web/` 一起打进应用；服务端在应用里用 Electron 自带的 Node 直接跑那个包。没有签名，第一次打开要在「系统设置 → 隐私与安全性」里放行。
 

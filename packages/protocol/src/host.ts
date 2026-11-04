@@ -84,10 +84,19 @@ export const UpdateState: Schema.Codec<UpdateState> = Schema.Union([
 ]);
 
 /** The host updating itself: watch hears the state now and each change after; install restarts into the new version. */
+/** Which releases the app updates to: only releases, betas too, or alphas too (.agents/notes/proposed/process/
+ * 2026-11-04-alpha-beta-release.md). Kept on this machine. */
+export const UpdateChannelValues = ["stable", "beta", "alpha"] as const;
+export type UpdateChannel = (typeof UpdateChannelValues)[number];
+export const UpdateChannel: Schema.Codec<UpdateChannel> = Schema.Literals(UpdateChannelValues);
+
 export interface Updates {
   readonly watch: (fn: (state: UpdateState) => void) => () => void;
   readonly check: () => Promise<void>;
   readonly install: () => Promise<void>;
+  readonly channel: () => Promise<UpdateChannel>;
+  /** Kept, then the channel is asked at once. */
+  readonly setChannel: (channel: UpdateChannel) => Promise<void>;
 }
 
 export interface Host {
@@ -153,6 +162,8 @@ export const desktopBridge = {
   // Both wait for a download.
   updateCheck: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
   updateInstall: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
+  updateChannel: call({ input: Schema.Void, output: UpdateChannel }),
+  updateSetChannel: call({ input: UpdateChannel, output: Schema.Void }),
   voiceShortcut: push(Schema.Void),
   update: push(UpdateState),
 };

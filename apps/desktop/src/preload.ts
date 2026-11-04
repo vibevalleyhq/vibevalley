@@ -27,6 +27,8 @@ const host: Host = {
     },
     check: () => main.call.updateCheck(),
     install: () => main.call.updateInstall(),
+    channel: () => main.call.updateChannel(),
+    setChannel: (channel) => main.call.updateSetChannel(channel),
   },
 };
 

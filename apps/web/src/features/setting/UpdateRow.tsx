@@ -1,6 +1,7 @@
-import { Match, Show, Switch } from "solid-js";
+import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
+import { type UpdateChannel, UpdateChannelValues } from "@vibevalley/protocol/host";
 import { isBusy } from "@vibevalley/protocol/rules";
 
 import { variant } from "@/base/dom";
@@ -10,6 +11,7 @@ import { currentHost } from "@/infra/host";
 import { useUpdates } from "@/infra/settings";
 import { Button } from "@/ui/Button";
 import { ConfirmButton } from "@/ui/ConfirmButton";
+import { Segmented } from "@/ui/Segmented";
 import { SettingRow } from "@/ui/settings";
 import { toast } from "@/ui/toasts";
 
@@ -68,6 +70,36 @@ export function UpdateRow() {
               )}
             </Match>
           </Switch>
+        </SettingRow>
+      )}
+    </Show>
+  );
+}
+
+/** Which releases this machine updates to: kept by the desktop (update.ts keptChannel), asked again at once on a change. */
+export function ChannelRow() {
+  const update = currentHost().update;
+  const [channel, setChannel] = createSignal<UpdateChannel>();
+  onSettled(() => void update?.channel().then(setChannel, (e: unknown) => toast(reasonOf(e), "bad")));
+  const choose = (next: UpdateChannel) => {
+    const was = channel();
+    setChannel(next);
+    void update?.setChannel(next).catch((e: unknown) => {
+      setChannel(was);
+      toast(reasonOf(e), "bad");
+    });
+  };
+  return (
+    <Show when={channel()}>
+      {(c) => (
+        <SettingRow label={t("web.setting.about.channel")} hint={t(`web.setting.about.channels.${c()}Hint`)}>
+          <Segmented
+            label={t("web.setting.about.channel")}
+            testid="update-channel"
+            value={c()}
+            options={UpdateChannelValues.map((v) => ({ value: v, label: t(`web.setting.about.channels.${v}`) }))}
+            onChange={choose}
+          />
         </SettingRow>
       )}
     </Show>

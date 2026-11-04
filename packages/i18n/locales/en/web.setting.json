@@ -137,6 +137,15 @@
     "restartQuestion": "Restart into the new version?",
     "workingQuestion": "{n} helpers are working; restarting cuts them off. Restart now?",
     "newFarmQuestion": "The new version starts from fresh data; the old stays in the home folder. Restart now?",
-    "download": "Download"
+    "download": "Download",
+    "channel": "Update channel",
+    "channels": {
+      "stable": "Release",
+      "beta": "Beta",
+      "alpha": "Alpha",
+      "stableHint": "Updates only to releases",
+      "betaHint": "Gets the next version's betas first: its features are settled, only fixes go in, and the farm never starts over",
+      "alphaHint": "Gets every batch of changes first: features still change, and a schema change starts the farm over (the old one is kept aside)"
+    }
   }
 }

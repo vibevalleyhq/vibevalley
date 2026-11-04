@@ -89,6 +89,12 @@ test("the desktop app shows the live board and sends a notice", async () => {
     await page.goto(server + "/settings/about");
     await expect(page.getByTestId("update-state")).toHaveAttribute("data-state", "idle");
     await expect(page.getByTestId("update-check")).toBeVisible();
+    // The channel is this machine's: chosen, it is kept for the next time the page asks.
+    const channel = page.getByTestId("update-channel");
+    await expect(channel.locator('[data-key="stable"]')).toHaveAttribute("aria-pressed", "true");
+    await channel.locator('[data-key="beta"]').click();
+    await page.reload();
+    await expect(page.getByTestId("update-channel").locator('[data-key="beta"]')).toHaveAttribute("aria-pressed", "true");
 
     await page.screenshot({ path: test.info().outputPath("desktop.png") });
   } finally {

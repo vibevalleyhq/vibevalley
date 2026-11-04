@@ -101,6 +101,8 @@ export default defineConfig({
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/deadcode.ts says what to do).
       deadcode: "vpx scripts/deadcode.ts",
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },
+      // What a beta and a release must pass before scripts/release.ts tags them (alphas are tagged on CI being green).
+      "release:verify": ["vp run server:check", "vp run web:check", "vp run docs:verify", "vp run desktop:test"],
     },
   },
   // scripts/'s own tests; each package has its vite.config.ts with its own.

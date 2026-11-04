@@ -27,6 +27,8 @@ interface AppPaths {
   readonly updates: string;
   /** The login shell's PATH as it said it last (server.ts shellPath). */
   readonly shellPath: string;
+  /** The update channel chosen on this machine (update.ts keptChannel). */
+  readonly updateChannel: string;
   /** Node's compile cache for the server's modules. */
   readonly compileCache: string;
 }
@@ -50,6 +52,7 @@ export function appPaths(): AppPaths {
     trayIcon: join(web, "pixel", "app-sprout.png"),
     updates: join(app.getPath("userData"), "updates"),
     shellPath: join(app.getPath("userData"), "shell-path"),
+    updateChannel: join(app.getPath("userData"), "update-channel"),
     compileCache: join(app.getPath("userData"), "compile-cache"),
   };
 }

@@ -18,7 +18,7 @@ import { appPaths, farmHome } from "./paths";
 import { probe } from "./probe";
 import { shellPath, type ServerKeeper, serverKeeper } from "./server";
 import { menuBar } from "./tray";
-import { defaultFeed, type Updater, updater } from "./update";
+import { keepChannel, keptChannel, type Updater, updater } from "./update";
 import { mainWindow } from "./window";
 
 followSavedLocale(farmHome());
@@ -67,6 +67,11 @@ if (!app.requestSingleInstanceLock()) {
       install: async () => {
         if (updates) await quitAfterSave(() => updates?.installNow());
       },
+      channel: () => keptChannel(paths.updateChannel, app.getVersion()),
+      setChannel: async (channel) => {
+        keepChannel(paths.updateChannel, channel);
+        await updates?.check();
+      },
     },
   });
   app.on("second-instance", () => window.show());
@@ -113,7 +118,8 @@ if (!app.requestSingleInstanceLock()) {
         exe: app.getPath("exe"),
         home: paths.home,
         dir: paths.updates,
-        feed: process.env.VIBEVALLEY_UPDATE_FEED || defaultFeed,
+        feed: process.env.VIBEVALLEY_UPDATE_FEED || undefined,
+        channel: () => keptChannel(paths.updateChannel, app.getVersion()),
         heard: (state) => page.push("update", state),
       });
       updates.start();

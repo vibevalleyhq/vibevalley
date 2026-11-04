@@ -69,6 +69,7 @@ vp run desktop:dev                                              # 桌面版：�
 vp run --filter @vibevalley/island test                          # 改完灵动岛（swift test）：消息和位置的测试（macOS）；样子用它的 --snapshot 画出来看（apps/island/README.md）
 vp run --filter @vibevalley/mobile test                          # 改完手机壳（类型在 vp check）；建原生工程、跑模拟器上的端到端见 apps/mobile/README.md
 vp run package:mac                                              # macOS 应用、.dmg 和更新用的 .zip、release.json（apps/desktop/dist）：壳、页面、灵动岛和带着生产依赖的 apps/server
+vp run release alpha|beta|final                                 # 发版：算出下一个版本、查过（beta 和正式版跑 release:verify、表结构不变），问过才打 tag 推送，release.yml 出草稿（docs/development.md）
 vp run --filter @vibevalley/desktop update-check                 # 改了桌面版的更新或打包：两个真的包上走一遍更新（十分钟上下）；推 v* 的 tag 发布草稿 Release
 vp run capabilities                                             # 改了 <概念>/api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
 vp run api:client                                               # 改了 <概念>/api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）

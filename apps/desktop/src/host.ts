@@ -4,7 +4,7 @@ import { nativeTheme, Notification, shell } from "electron";
 
 import { serve } from "@vibevalley/bridge";
 import { currentLocale, setLocale } from "@vibevalley/i18n";
-import { desktopBridge, type TraySummary, type UpdateState } from "@vibevalley/protocol/host";
+import { desktopBridge, type TraySummary, type UpdateChannel, type UpdateState } from "@vibevalley/protocol/host";
 
 import { revealable } from "./boundary";
 import { mainLink } from "./bridge";
@@ -17,6 +17,8 @@ interface HostUpdates {
   readonly state: () => UpdateState;
   readonly check: () => Promise<void>;
   readonly install: () => Promise<void>;
+  readonly channel: () => UpdateChannel;
+  readonly setChannel: (channel: UpdateChannel) => Promise<void>;
 }
 
 export function serveHost(o: { readonly window: MainWindow; readonly tray: (summary: TraySummary) => void; readonly updates: HostUpdates }) {
@@ -50,6 +52,8 @@ export function serveHost(o: { readonly window: MainWindow; readonly tray: (summ
       updateState: () => o.updates.state(),
       updateCheck: () => o.updates.check(),
       updateInstall: () => o.updates.install(),
+      updateChannel: () => o.updates.channel(),
+      updateSetChannel: (channel) => o.updates.setChannel(channel),
     },
   );
 }

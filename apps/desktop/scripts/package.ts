@@ -13,7 +13,7 @@ import { build, Platform } from "electron-builder";
 
 import { serverFiles } from "../../server/src/assets.ts";
 import { baselineHash } from "../../server/src/infra/baseline.ts";
-import type { Release } from "../src/releases.ts";
+import { isVersion, type Release, stageOf } from "../src/releases.ts";
 
 const desktop = join(import.meta.dirname, "..");
 const repo = join(desktop, "../..");
@@ -51,13 +51,14 @@ const devOnly = /\.(?:js|mjs|cjs|ts|mts|cts)\.map$|\.d\.(?:ts|mts|cts)$/u;
 for (const name of readdirSync(join(server, "node_modules", ".pnpm"), { recursive: true, encoding: "utf8" }))
   if (devOnly.test(name)) rmSync(join(server, "node_modules", ".pnpm", name), { force: true });
 
-// The version is the tag the release is built from (v0.2.0); between tags, 0.0.0, which no release is older than.
+// The version is the tag the release is built from (v0.2.0, v0.3.0-beta.1); between tags, 0.0.0, which no release is
+// older than.
 // VIBEVALLEY_VERSION gives one outright (scripts/update-check.ts builds two in a row).
 // What git says when it finds nothing (no tag before) is not the package's to print.
 const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
 const described = git("describe", "--tags", "--always").replace(/^v/u, "");
 const asked = process.env.VIBEVALLEY_VERSION ?? described;
-const version = /^\d+\.\d+\.\d+$/u.test(asked) ? asked : "0.0.0";
+const version = isVersion(asked) ? asked : "0.0.0";
 const dist = join(desktop, "dist");
 await build({
   targets: Platform.MAC.createTarget(["dmg", "zip"]),
@@ -91,9 +92,11 @@ await build({
 // titles are main's commit subjects), and the baseline its server makes a database from.
 const arch = process.arch;
 const zip = `VibeValley-${version}-${arch}.zip`;
+// A release's notes are everything since the release before it, its alphas and betas included; a prerelease's, since the
+// tag before it.
 const previous = (() => {
   try {
-    return git("describe", "--tags", "--abbrev=0", "HEAD^");
+    return git("describe", "--tags", "--abbrev=0", ...(stageOf(version) === "stable" ? ["--exclude", "*-*"] : []), "HEAD^");
   } catch {
     return undefined;
   }
