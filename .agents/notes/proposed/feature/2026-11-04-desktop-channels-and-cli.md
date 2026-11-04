@@ -51,6 +51,8 @@ Status: proposed
 
 ### 命令的样子
 
+命令按事情分、手写、带类型，这一段里「一个接口一条命令」的部分由[给 agent 用的命令行](.agents/notes/proposed/feature/2026-11-04-agent-first-cli.md)取代；每个接口的说明、`doctor`、笔记的命令留着。
+
 - **名字照接口**：组和命令的名字就是 `api.ts` 的操作（`pkm`、`artifact`、`game` 都照旧），接口、命令行和 agent 的工具是同一套词；界面上的叫法（笔记、稿子）只在界面上。
 - **每个接口一句说明**：词典里每个操作一句（`server.cli.op.<操作>`），每组一句（`server.cli.group.<模块>`），中英两份；命令行的帮助、能力表（`docs/reference/capabilities.md` 多一列）都读它。命令行按操作取说明时键的类型是全部操作的联合，少了一句编不过。管家和帮工的工具描述照旧在各自的 `prompts.ts`（它们为模型调过，评测管着），不改。
 - **删掉 `preview-delete`**：命令行不再为 `previewDelete` 这类接口生成命令，它们只经 `--dry-run` 用到（`issue delete --dry-run`）；接口本身留着，页面在用。
