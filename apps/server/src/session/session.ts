@@ -368,13 +368,12 @@ const make = Effect.gen(function* () {
       if (full) return { refused: full };
       hired++;
       const id = sessionId(`w${hired}`);
-      const placed = yield* Effect.result(
+      const place = yield* (
         issue
           ? projects.workplace(project, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "")
-          : contextPlace(config.workRoot, id).pipe(Effect.provideService(FileSystem.FileSystem, fs)),
-      );
-      if (placed._tag === "Failure") return { refused: t("server.session.life.noPlace", { name: agent.name, why: placed.failure.message }) };
-      const place = placed.success;
+          : contextPlace(config.workRoot, id).pipe(Effect.provideService(FileSystem.FileSystem, fs))
+      ).pipe(Effect.catch((e) => Effect.succeed(t("server.session.life.noPlace", { name: agent.name, why: e.message }))));
+      if (typeof place === "string") return { refused: place };
       const releasePlace = issue ? projects.release(place) : releaseContextPlace(place).pipe(Effect.provideService(FileSystem.FileSystem, fs));
       let committed = false;
       let released = false;
@@ -492,11 +491,11 @@ const make = Effect.gen(function* () {
             const allocation = executor.find(id);
             if (allocation?.attached === true) return;
             if (allocation) {
-              const stopped = yield* Effect.result(executor.close(id));
-              if (stopped._tag === "Failure") {
-                yield* core.notice("error", allocation.failure ?? reasonOf(stopped.failure));
-                return;
-              }
+              const stopFailed = yield* executor.close(id).pipe(
+                Effect.as(false),
+                Effect.catch((e) => Effect.as(core.notice("error", allocation.failure ?? reasonOf(e)), true)),
+              );
+              if (stopFailed) return;
             }
             if (registeredRow) yield* forget(id);
             revokeToken(h);
@@ -556,10 +555,10 @@ const make = Effect.gen(function* () {
           const name = current?.name ?? id;
           if (work === "discard" && !current?.issue) return yield* Effect.fail(refused(t("server.session.life.noIssue")));
           yield* closeExecution(h);
-          if (work === "discard" && h.place.branch) {
-            const reset = yield* Effect.result(projects.reset(h.place));
-            if (reset._tag === "Failure") yield* core.notice("warn", t("server.session.life.notReset", { name, why: reset.failure.message }));
-          }
+          if (work === "discard" && h.place.branch)
+            yield* projects.reset(h.place).pipe(
+              Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name, why: e.message }))),
+            );
           yield* leave(h, closed, 0);
           const kept = current?.issue ? yield* projects.release(h.place) : { kept: false as const };
           if (kept.kept) yield* core.notice("info", t("server.session.life.left", { name, why: kept.reason }));
@@ -575,8 +574,9 @@ const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const s = core.session(id);
           if (hands.get(id) !== h || !s || isBusy(s)) return;
-          const reset = yield* Effect.result(projects.reset(h.place));
-          if (reset._tag === "Failure") yield* core.notice("warn", t("server.session.life.notReset", { name: s.name, why: reset.failure.message }));
+          yield* projects.reset(h.place).pipe(
+            Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name: s.name, why: e.message }))),
+          );
         }),
       );
     }),

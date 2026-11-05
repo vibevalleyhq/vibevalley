@@ -5,6 +5,7 @@ import { type HttpClient, HttpClientRequest } from "effect/http";
 import { t } from "@vibevalley/i18n";
 
 import { jsonOrNone } from "#/base/json.ts";
+import { Inconsistent } from "#/errors.ts";
 
 import { type Adapter, type AppFailed, failedOf, failedWith } from "./adapter.ts";
 
@@ -131,7 +132,12 @@ export class FeishuClient implements FeishuApi {
         return Option.none<LoginAccount>();
       });
       const polling: Effect.Effect<LoginAccount, AppFailed> = Effect.repeat(Effect.delay(once, reg.intervalMs), { until: Option.isSome }).pipe(
-        Effect.map(Option.getOrThrow),
+        Effect.flatMap(
+          Option.match({
+            onNone: () => Effect.die(new Inconsistent({ message: "the login poll stopped without an account" })),
+            onSome: Effect.succeed,
+          }),
+        ),
       );
       return yield* polling.pipe(
         Effect.timeoutOrElse({ duration: reg.expiresMs, orElse: () => Effect.fail(failedWith(t("server.connector.feishu.tooLong"))) }),

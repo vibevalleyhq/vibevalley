@@ -627,11 +627,11 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
           { discard: true },
         );
         yield* Effect.forEach(writers, ({ writer, section }) => Effect.andThen(wait(section / 3), demoWrite(artifact, writer, headings, section)), {
-          concurrency: "unbounded",
+          concurrency: 4,
           discard: true,
         });
       },
-      (e) => e.pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => (demoOn = false)))),
+      (e) => e.pipe(Effect.ignore({ log: "Warn" }), Effect.ensuring(Effect.sync(() => (demoOn = false)))),
     );
 
     const demo = Effect.fn("Artifact.demo")(function* (id: T.ArtifactId, helpers: readonly T.Agent[]) {

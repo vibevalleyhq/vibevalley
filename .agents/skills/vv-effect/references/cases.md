@@ -68,7 +68,7 @@ const AppLive = Db.layer.pipe(Layer.provideMerge(Core.layer), Layer.provideMerge
 
 ### 3. 返回 Effect 的函数
 
-不建议（这里，`infra/files.ts`）：
+不建议：
 
 ```ts
 export const writeOnce = (path: string, bytes: Uint8Array): Effect.Effect<void, NotWritten, FileSystem.FileSystem> =>
@@ -79,7 +79,7 @@ export const writeOnce = (path: string, bytes: Uint8Array): Effect.Effect<void, 
   });
 ```
 
-建议：
+建议（这里，`infra/files.ts`）：
 
 ```ts
 export const writeOnce = Effect.fn("Files.writeOnce")(function* (path: string, bytes: Uint8Array) {
@@ -217,13 +217,13 @@ yield* fs.writeFile(path, bytes, { flag: "wx" }).pipe(
 
 ### 9. 「不该发生」的情况
 
-不建议（这里，`agent/agent.ts`）：
+不建议：
 
 ```ts
 if (!orchestrator) return yield* Effect.die(new Error(`the built-in template ${defaultOrchestrator} is not in agent/templates`));
 ```
 
-建议：
+建议（这里，`agent/agent.ts`）：
 
 ```ts
 if (!orchestrator) return yield* Effect.die(new Inconsistent({ message: `the built-in template ${defaultOrchestrator} is not in agent/templates` }));
@@ -255,13 +255,13 @@ catch: (cause) => new SourceFailed({ source: name, cause }),
 
 ### 11. 从 `Option` 拿值
 
-不建议（这里，`connector/feishu.ts`）：
+不建议：
 
 ```ts
 Effect.repeat(Effect.delay(once, interval), { until: Option.isSome }).pipe(Effect.map(Option.getOrThrow));
 ```
 
-建议：
+建议（这里，`connector/feishu.ts`）：
 
 ```ts
 Effect.repeat(Effect.delay(once, interval), { until: Option.isSome }).pipe(
@@ -281,13 +281,13 @@ Effect.repeat(Effect.delay(once, interval), { until: Option.isSome }).pipe(
 
 ### 12. 解析 JSON
 
-不建议（这里，`memory/gse.ts`）：
+不建议：
 
 ```ts
 emitTable ??= JSON.parse(yield* read(files.emit)) as Record<State, Record<string, number>>;
 ```
 
-建议：
+建议（这里，`memory/gse.ts`）：
 
 ```ts
 const EmitTable = Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Finite));

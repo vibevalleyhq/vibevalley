@@ -150,7 +150,7 @@ const make = (options: ConnectorOptions = {}) =>
       // What the page and the tests see: the status, said to the core whenever a part of it may have changed. the core keeps it only when it differs.
       const telling = Semaphore.makeUnsafe(1);
       const told = () => {
-        forkHere(telling.withPermits(1)(Effect.ignore(Effect.flatMap(status, (s) => core.apply({ type: "connectorChanged", status: s })))));
+        forkHere(telling.withPermits(1)(Effect.flatMap(status, (s) => core.apply({ type: "connectorChanged", status: s }))));
       };
       const setErr = (e: string) => {
         if (err === e) return;
@@ -271,14 +271,15 @@ const make = (options: ConnectorOptions = {}) =>
           Effect.gen(function* () {
             const a = snapshot();
             if (!a || !a.owner) return true;
-            const listed = yield* Effect.result(tried(outboxQ.pendingOutbox({ connector: id })));
-            if (listed._tag === "Failure") {
-              yield* Effect.logError("vibevalley: the outbox could not be read", listed.failure.message).pipe(Effect.annotateLogs({ connector: id }));
-              return false;
-            }
+            const listed = yield* tried(outboxQ.pendingOutbox({ connector: id })).pipe(
+              Effect.catch((e) =>
+                Effect.as(Effect.logError("vibevalley: the outbox could not be read", e.message).pipe(Effect.annotateLogs({ connector: id })), undefined),
+              ),
+            );
+            if (!listed) return false;
             const allowed = new Set<string>();
             yield* Effect.forEach(
-              new Set(listed.success.map((row) => row.message_id)),
+              new Set(listed.map((row) => row.message_id)),
               (message) =>
                 Effect.gen(function* () {
                   if ((yield* inbox.handoffState(message)) === "unseen") allowed.add(message);
@@ -286,8 +287,8 @@ const make = (options: ConnectorOptions = {}) =>
                 }),
               { discard: true },
             );
-            const pending = listed.success.filter((row) => allowed.has(row.message_id));
-            if (pending.length !== listed.success.length) outboxChanged();
+            const pending = listed.filter((row) => allowed.has(row.message_id));
+            if (pending.length !== listed.length) outboxChanged();
             if (paused(a, now())) return true;
             if (pending.length === 0) return true;
             const batches =
@@ -295,31 +296,41 @@ const make = (options: ConnectorOptions = {}) =>
                 ? [{ ids: pending.map((r) => r.id), text: flushText(pending.map((r) => r.body))[0]! }]
                 : pending.map((r) => ({ ids: [r.id], text: r.body }));
             for (const out of batches) {
-              const sent = yield* Effect.result(adapter.send(a.secrets, a.owner, out.text, a.replyContext));
-              if (sent._tag === "Success") {
-                const marked = yield* Effect.result(
+              const sent = yield* adapter.send(a.secrets, a.owner, out.text, a.replyContext).pipe(
+                Effect.flatMap((extId) =>
                   inTx(
-                    Effect.forEach(out.ids, (oid) => db.attempt(outboxQ.outboxSent({ sent_at: now(), ext_id: sent.success || null, id: oid })), {
+                    Effect.forEach(out.ids, (oid) => db.attempt(outboxQ.outboxSent({ sent_at: now(), ext_id: extId || null, id: oid })), {
                       discard: true,
                     }),
+                  ).pipe(
+                    Effect.tap(() =>
+                      Effect.sync(() => {
+                        outboxChanged((n) => n - out.ids.length);
+                        setErr("");
+                      }),
+                    ),
+                    Effect.as(true),
+                    Effect.catch((e) =>
+                      Effect.sync(() => {
+                        outboxChanged();
+                        setErr(e.message);
+                        return false;
+                      }),
+                    ),
                   ),
-                );
-                if (marked._tag === "Failure") {
-                  outboxChanged();
-                  setErr(marked.failure.message);
-                  return false;
-                }
-                outboxChanged((n) => n - out.ids.length);
-                setErr("");
-                continue;
-              }
-              const refused = sent.failure;
-              yield* Effect.forEach(out.ids, (oid) => kept(tried(outboxQ.outboxFailed({ error: refused.message || null, id: oid }))), { discard: true });
-              if (refused.kind === "stale") yield* pause;
-              // The app would not take it now (WeChat's, QQ's reply window): tried again later, and with the owner's next message.
-              else if (refused.kind === "restricted") setErr("");
-              else setErr(refused.message);
-              return false;
+                ),
+                Effect.catch((refused) =>
+                  Effect.gen(function* () {
+                    yield* Effect.forEach(out.ids, (oid) => kept(tried(outboxQ.outboxFailed({ error: refused.message || null, id: oid }))), { discard: true });
+                    if (refused.kind === "stale") yield* pause;
+                    // The app would not take it now (WeChat's, QQ's reply window): tried again later, and with the owner's next message.
+                    else if (refused.kind === "restricted") setErr("");
+                    else setErr(refused.message);
+                    return false;
+                  }),
+                ),
+              );
+              if (!sent) return false;
             }
             return true;
           }),
@@ -330,28 +341,30 @@ const make = (options: ConnectorOptions = {}) =>
         const a = snapshot();
         if (!a || !a.owner) return;
         if ((yield* inbox.handoffState(m.id)) !== "unseen") return;
-        const added = yield* Effect.result(
-          Effect.gen(function* () {
-            const place = yield* Effect.mapError(chat.messageLocation(m.id), bridgeError);
-            if (!place || place.top !== (a.channel ?? chat.defaultChannel())) return 0;
-            const pieces = splitText(ownerLine(m, place.channel), maxChars[id]);
-            const at = now();
-            yield* inTx(
-              Effect.forEach(pieces, (piece) => db.attempt(outboxQ.addOutbox({ id: newId(), connector: id, message_id: m.id, body: piece, created_at: at })), {
-                discard: true,
-              }),
-            );
-            return pieces.length;
+        yield* Effect.gen(function* () {
+          const place = yield* Effect.mapError(chat.messageLocation(m.id), bridgeError);
+          if (!place || place.top !== (a.channel ?? chat.defaultChannel())) return 0;
+          const pieces = splitText(ownerLine(m, place.channel), maxChars[id]);
+          const at = now();
+          yield* inTx(
+            Effect.forEach(pieces, (piece) => db.attempt(outboxQ.addOutbox({ id: newId(), connector: id, message_id: m.id, body: piece, created_at: at })), {
+              discard: true,
+            }),
+          );
+          return pieces.length;
+        }).pipe(
+          Effect.match({
+            onFailure: (e) => {
+              outboxChanged();
+              setErr(e.message);
+            },
+            onSuccess: (added) => {
+              if (added === 0) return;
+              outboxChanged((n) => n + added);
+              Queue.offerUnsafe(mail.outbox, undefined);
+            },
           }),
         );
-        if (added._tag === "Failure") {
-          outboxChanged();
-          setErr(added.failure.message);
-          return;
-        }
-        if (added.success === 0) return;
-        outboxChanged((n) => n + added.success);
-        Queue.offerUnsafe(mail.outbox, undefined);
       });
 
       // What is held is tried again after retryFirst, then on outboxBackoff while tries fail, until one sends all.
@@ -473,11 +486,12 @@ const make = (options: ConnectorOptions = {}) =>
           if (!a) return;
           if (paused(a, now())) {
             yield* Effect.sleep(Math.max(0, a.pausedUntil - now()));
-            const resumed = yield* Effect.result(Effect.andThen(tried(accountQ.pauseAccount({ paused_until: null, connector: id })), reload));
-            if (resumed._tag === "Failure") {
-              setErr(resumed.failure.message);
-              yield* Effect.sleep(Math.min(30_000, retryMost));
-            }
+            yield* Effect.andThen(tried(accountQ.pauseAccount({ paused_until: null, connector: id })), reload).pipe(
+              Effect.catch((e) => {
+                setErr(e.message);
+                return Effect.sleep(Math.min(30_000, retryMost));
+              }),
+            );
             continue;
           }
           const stopped = yield* receive(a.secrets).pipe(
@@ -529,27 +543,32 @@ const make = (options: ConnectorOptions = {}) =>
               const linked = result;
               const pair = linked.owner ? null : String(100_000 + randomInt(900_000));
               const at = yield* Clock.currentTimeMillis;
-              const connectedNow = yield* Effect.result(
-                inTx(
-                  Effect.gen(function* () {
-                    yield* db.attempt(
-                      accountQ.connectAccount({
-                        connector: id,
-                        secrets: JSON.stringify(linked.secrets),
-                        owner_id: linked.owner || null,
-                        pair_code: pair,
-                        connected_at: at,
-                      }),
-                    );
-                    yield* db.attempt(inboundQ.clearInbound({ connector: id }));
-                    yield* retire(t("server.connector.switched"));
+              const failedConnect = yield* inTx(
+                Effect.gen(function* () {
+                  yield* db.attempt(
+                    accountQ.connectAccount({
+                      connector: id,
+                      secrets: JSON.stringify(linked.secrets),
+                      owner_id: linked.owner || null,
+                      pair_code: pair,
+                      connected_at: at,
+                    }),
+                  );
+                  yield* db.attempt(inboundQ.clearInbound({ connector: id }));
+                  yield* retire(t("server.connector.switched"));
+                }),
+              ).pipe(
+                Effect.andThen(Effect.sync(() => outboxChanged(() => 0))),
+                Effect.andThen(reload),
+                Effect.as(undefined),
+                Effect.catch((e) =>
+                  Effect.sync(() => {
+                    outboxChanged();
+                    return e.message;
                   }),
-                ).pipe(Effect.andThen(Effect.sync(() => outboxChanged(() => 0))), Effect.andThen(reload)),
+                ),
               );
-              if (connectedNow._tag === "Failure") {
-                outboxChanged();
-                failure = connectedNow.failure.message;
-              }
+              if (failedConnect) failure = failedConnect;
             }
             setErr(failure ?? "");
             resetProgress();
@@ -570,7 +589,10 @@ const make = (options: ConnectorOptions = {}) =>
         // The login's answer is taken by the coordinator, on its own fiber: replacing this generation must not cut it short.
         return generation(
           Effect.withFiber((g) =>
-            Effect.flatMap(Effect.result(login), (r) => Effect.sync(() => void forkHere(loginResult(g, r._tag === "Success" ? r.success : r.failure)))),
+            login.pipe(
+              Effect.catch(Effect.succeed),
+              Effect.flatMap((r) => Effect.sync(() => void forkHere(loginResult(g, r)))),
+            ),
           ),
         );
       };
@@ -624,26 +646,30 @@ const make = (options: ConnectorOptions = {}) =>
           commands.withPermits(1)(
             Effect.gen(function* () {
               yield* stopGeneration;
-              const retired = yield* Effect.result(
-                inTx(
-                  Effect.gen(function* () {
-                    yield* db.attempt(accountQ.disconnectAccount({ connector: id }));
-                    yield* db.attempt(inboundQ.clearInbound({ connector: id }));
-                    yield* retire(t("server.connector.disconnected"));
-                  }),
-                ),
+              yield* inTx(
+                Effect.gen(function* () {
+                  yield* db.attempt(accountQ.disconnectAccount({ connector: id }));
+                  yield* db.attempt(inboundQ.clearInbound({ connector: id }));
+                  yield* retire(t("server.connector.disconnected"));
+                }),
+              ).pipe(
+                Effect.match({
+                  onFailure: (e) => {
+                    outboxChanged();
+                    resetProgress();
+                    loginTry++;
+                    setErr(e.message);
+                    current = connected();
+                  },
+                  onSuccess: () => {
+                    outboxChanged(() => 0);
+                    resetProgress();
+                    loginTry++;
+                    account = undefined;
+                    setErr("");
+                  },
+                }),
               );
-              if (retired._tag === "Success") outboxChanged(() => 0);
-              else outboxChanged();
-              resetProgress();
-              loginTry++;
-              if (retired._tag === "Failure") {
-                setErr(retired.failure.message);
-                current = connected();
-              } else {
-                account = undefined;
-                setErr("");
-              }
               told();
             }),
           ),

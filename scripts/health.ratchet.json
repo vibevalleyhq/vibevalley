@@ -66,7 +66,7 @@
     "lintOff": 3,
     "orDie": 1,
     "ignored": 0,
-    "swallowed": 1,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "packages/base-ui": {
@@ -165,18 +165,18 @@
     "cast": 2,
     "lintOff": 2,
     "orDie": 0,
-    "ignored": 4,
+    "ignored": 0,
     "swallowed": 0,
-    "resultBranch": 8
+    "resultBranch": 0
   },
   "server: Agents": {
     "nonNull": 34,
     "doubleCast": 1,
-    "cast": 9,
-    "lintOff": 5,
+    "cast": 8,
+    "lintOff": 4,
     "orDie": 5,
-    "ignored": 5,
-    "swallowed": 2,
+    "ignored": 0,
+    "swallowed": 1,
     "resultBranch": 0
   },
   "server: Collaboration": {
@@ -185,7 +185,7 @@
     "cast": 1,
     "lintOff": 0,
     "orDie": 0,
-    "ignored": 2,
+    "ignored": 0,
     "swallowed": 0,
     "resultBranch": 0
   },
@@ -205,9 +205,9 @@
     "cast": 6,
     "lintOff": 3,
     "orDie": 2,
-    "ignored": 6,
+    "ignored": 0,
     "swallowed": 0,
-    "resultBranch": 10
+    "resultBranch": 0
   },
   "server: Inbox": {
     "nonNull": 0,
@@ -237,7 +237,7 @@
     "orDie": 0,
     "ignored": 0,
     "swallowed": 1,
-    "resultBranch": 7
+    "resultBranch": 0
   },
   "server: Mailbox": {
     "nonNull": 4,
@@ -257,7 +257,7 @@
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
-    "resultBranch": 3
+    "resultBranch": 0
   },
   "server: Platform": {
     "nonNull": 7,
@@ -284,10 +284,10 @@
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 0,
-    "orDie": 9,
-    "ignored": 1,
+    "orDie": 2,
+    "ignored": 0,
     "swallowed": 1,
-    "resultBranch": 1
+    "resultBranch": 0
   },
   "web: app": {
     "nonNull": 7,

@@ -262,11 +262,11 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
             const text = typedIn.text;
             if (text === "/exit") return yield* new Quit();
             if (!text) return busy ? undefined : write("› ");
-            if (!busy) return yield* FiberHandle.run(turns, Effect.ignore(turnOf(text)), { onlyIfMissing: false });
+            if (!busy) return yield* FiberHandle.run(turns, Effect.ignore(turnOf(text), { log: "Warn" }), { onlyIfMissing: false });
             const steering = session.steer ? session.steer(text) : session.queue(text);
             yield* Effect.tryPromise({ try: () => steering, catch: messageOf }).pipe(
               Effect.map((r) => said(r, "notSent")),
-              Effect.ignore,
+              Effect.ignore({ log: "Warn" }),
             );
           }),
         );

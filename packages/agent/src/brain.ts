@@ -277,7 +277,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
     /** The parts of the system prompt, in order, named instructions, env, skills, memory; an empty one is left out. */
     const promptParts = Effect.gen(function* () {
       const found = yield* Effect.promise(scanned);
-      const memory = memoryPort ? (yield* Effect.promise(() => memoryPort.read())).prompt : "";
+      const memory = memoryPort ? (yield* memoryPort.read()).prompt : "";
       const all: PromptPart[] = [
         { name: "instructions", text: options.instructions.trim() },
         { name: "env", text: words.envSection(options.cwd) },
@@ -286,7 +286,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
       if (memory) all.push({ name: "memory", text: words.memorySection(memory) });
       return all.filter((p) => p.text !== "");
     });
-    const memoryLines = memoryPort ? Effect.promise(async () => [...(await memoryPort.read()).lines]) : Effect.succeed<string[]>([]);
+    const memoryLines = memoryPort ? Effect.map(memoryPort.read(), (r) => [...r.lines]) : Effect.succeed<string[]>([]);
 
     /** When the agent starts and after a fold: the prompt changes only where the cache is lost anyway. */
     const refreshPrefix = Effect.gen(function* () {
@@ -399,7 +399,9 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
     const continueRun: Effect.Effect<void> = Effect.suspend(() => {
       steps = 0;
       // Stop can clear the queue after its check: then no run starts, and no end event will follow.
-      return Effect.catch(loop().continue, () => ended);
+      return Effect.catchTag(loop().continue, "CannotContinue", () => ended).pipe(
+        Effect.catchTag("AgentBusy", (err) => Effect.logWarning(`agent ${options.name}: cannot continue run:`, err)),
+      );
     });
 
     const ended: Effect.Effect<void> = Effect.gen(function* () {

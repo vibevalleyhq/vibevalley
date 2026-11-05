@@ -172,7 +172,7 @@ const make = Effect.gen(function* () {
       forkHere(
         close.pipe(
           Effect.onExit((exit) => Deferred.done(closing, exit)),
-          Effect.ignore,
+          Effect.ignore({ log: "Debug" }),
         ),
       );
       return Deferred.await(closing);
@@ -245,11 +245,10 @@ const make = Effect.gen(function* () {
       const id = owner.id;
       const prior = allocations.get(id);
       if (prior) return { refused: prior.failure ?? t("server.session.life.notReturned"), retained: true };
-      const resolved = yield* Effect.result(runtimes.resolve(agent));
-      if (resolved._tag === "Failure") return { refused: reasonOf(resolved.failure), retained: false };
+      const r = yield* runtimes.resolve(agent).pipe(Effect.catch((e) => Effect.succeed(reasonOf(e))));
+      if (typeof r === "string") return { refused: r, retained: false };
       const raced = allocations.get(id);
       if (raced) return { refused: raced.failure ?? t("server.session.life.notReturned"), retained: true };
-      const r = resolved.success;
       const base = r.runtime;
       const resources = new Set<RuntimeSession>();
       const mine: OarRuntime = {
@@ -312,7 +311,7 @@ const make = Effect.gen(function* () {
         yield* Effect.logInfo(`vibevalley: ${verb} ${id} (${agent.name}): ${agent.runtime}${how}, in ${cwd}`);
         return { execution: view(allocation) };
       });
-      return yield* opening.pipe(Effect.onExit((exit) => (exit._tag === "Failure" ? Effect.ignore(closeOwned(allocation)) : Effect.void)));
+      return yield* opening.pipe(Effect.onExit((exit) => (exit._tag === "Failure" ? Effect.ignore(closeOwned(allocation), { log: "Warn" }) : Effect.void)));
     }),
     deliver: Effect.fn("Executor.deliver")(function* (id, text, inputId) {
       const agent = allocations.get(id)?.agent;

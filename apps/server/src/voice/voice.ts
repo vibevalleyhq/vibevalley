@@ -508,18 +508,22 @@ const make = (options: VoiceOptions = {}) =>
       }),
     );
     const server = createServer();
-    const listened = yield* Effect.result(NodeHttpServer.make(() => server, { host: "127.0.0.1", port: linePort }));
-    if (listened._tag === "Failure") {
-      lineProblem = t("server.voice.lineDown", { why: messageOf(listened.failure.cause) });
-      yield* Effect.logError(`vibevalley: the voice line cannot listen on 127.0.0.1:${linePort}: ${messageOf(listened.failure.cause)}`);
-    } else {
-      const http = listened.success;
-      if (http.address._tag !== "UnixPathAddress") linePort = http.address.port;
-      yield* http.serve(lineHandler);
-      // Its close waits for every socket: an answer still streaming is cut first.
-      yield* Effect.addFinalizer(() => Effect.sync(() => server.closeAllConnections()));
-      line = true;
-    }
+    yield* NodeHttpServer.make(() => server, { host: "127.0.0.1", port: linePort }).pipe(
+      Effect.matchEffect({
+        onFailure: (failure) => {
+          lineProblem = t("server.voice.lineDown", { why: messageOf(failure.cause) });
+          return Effect.logError(`vibevalley: the voice line cannot listen on 127.0.0.1:${linePort}: ${messageOf(failure.cause)}`);
+        },
+        onSuccess: (http) =>
+          Effect.gen(function* () {
+            if (http.address._tag !== "UnixPathAddress") linePort = http.address.port;
+            yield* http.serve(lineHandler);
+            // Its close waits for every socket: an answer still streaming is cut first.
+            yield* Effect.addFinalizer(() => Effect.sync(() => server.closeAllConnections()));
+            line = true;
+          }),
+      }),
+    );
 
     const openTunnel =
       options.tunnel ??
@@ -769,7 +773,7 @@ const make = (options: VoiceOptions = {}) =>
               release();
               if (grants.get(key) === g) grants.delete(key);
               const opening = openingLine;
-              if (opening && !callLine) forkHere(Effect.ignore(Effect.map(Fiber.join(opening), (opened) => closeLine(opened.id))));
+              if (opening && !callLine) forkHere(Effect.ignore(Effect.map(Fiber.join(opening), (opened) => closeLine(opened.id)), { log: "Debug" }));
               const pending = starting;
               const agora = client;
               // An agent that joins after its start was given up on is stopped; one that never joined has nothing to stop.

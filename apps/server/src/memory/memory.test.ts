@@ -104,11 +104,11 @@ describe("memory", () => {
     return Effect.gen(function* () {
       const m = yield* Memory;
       const port = m.forAgent(defaultOrchestrator, defaultOrchestrator);
-      yield* Effect.promise(() => port.remember("agent note"));
+      yield* port.remember("agent note");
       const written = yield* m.remember({ agent: defaultOrchestrator, text: "owner note", project: "", by: owner });
       expect((yield* m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.author)).toEqual(["owner", "orchestrator"]);
-      expect((yield* Effect.promise(() => port.read())).prompt).toContain("主人交代：owner note");
-      yield* Effect.promise(() => port.rewrite("# notes\n- replacement note\n- 主人交代：owner note"));
+      expect((yield* port.read()).prompt).toContain("主人交代：owner note");
+      yield* port.rewrite("# notes\n- replacement note\n- 主人交代：owner note");
       const notes = (yield* m.memoriesOf(defaultOrchestrator)).memories;
       expect(notes.map((note) => note.text)).toEqual(["replacement note", "owner note"]);
       expect(notes.find((note) => note.author === "owner")?.id).toBe(written.id);

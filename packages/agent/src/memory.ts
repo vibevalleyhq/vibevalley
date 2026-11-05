@@ -2,6 +2,9 @@ import { createHash } from "node:crypto";
 import { appendFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
+import { Effect } from "effect";
+
+import { agentFailed, type AgentFailed } from "./core/errors.ts";
 import { memory as memoryWords } from "./prompts.ts";
 
 /** Cut from the top when the prompt carries it: the newest notes matter most. */
@@ -28,17 +31,20 @@ interface MemorySnapshot {
 }
 
 export interface MemoryPort {
-  readonly read: () => Promise<{ readonly prompt: string; readonly lines: readonly string[] }>;
-  readonly remember: (note: string) => Promise<void>;
-  readonly rewrite: (content: string) => Promise<number>;
+  readonly read: () => Effect.Effect<{ readonly prompt: string; readonly lines: readonly string[] }>;
+  readonly remember: (note: string) => Effect.Effect<void, unknown>;
+  readonly rewrite: (content: string) => Effect.Effect<number, unknown>;
 }
 
 export const fileMemory = (home: string, now: () => number): MemoryPort => ({
-  read: async () => ({ prompt: (await readMemory(home)).prompt, lines: await memoryFileLines(home) }),
-  remember: async (note) => {
-    await remember(home, note, new Date(now()));
-  },
-  rewrite: async (content) => (await rewriteMemory(home, content)).lineCount,
+  read: () =>
+    Effect.promise(async () => {
+      const [snap, lines] = await Promise.all([readMemory(home), memoryFileLines(home)]);
+      return { prompt: snap.prompt, lines };
+    }),
+  remember: (note) => Effect.tryPromise({ try: () => remember(home, note, new Date(now())), catch: agentFailed }).pipe(Effect.asVoid),
+  rewrite: (content) =>
+    Effect.tryPromise({ try: () => rewriteMemory(home, content), catch: (e): AgentFailed => agentFailed(e) }).pipe(Effect.map((s) => s.lineCount)),
 });
 
 export const parseMemoryLines = (text: string): MemoryLine[] =>

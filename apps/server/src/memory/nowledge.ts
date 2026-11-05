@@ -171,7 +171,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       const was = transport;
       client = undefined;
       transport = undefined;
-      if (was) yield* Effect.promise(() => was.close().catch(() => {}));
+      if (was) yield* Effect.tryPromise({ try: () => was.close(), catch: sourceError }).pipe(Effect.ignore({ log: "Debug" }));
     }),
     // Nothing to ask with, nothing asked: listing its newest would only be noise at the start of a run.
     prefetch: Effect.fnUntraced(function* (cue) {

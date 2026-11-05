@@ -9,7 +9,7 @@ import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { type ApiError, missing, refused, lookIn } from "#/errors.ts";
+import { type ApiError, Inconsistent, lookIn, missing, refused } from "#/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { keptFile, readOrSetAside } from "#/infra/files.ts";
 import { defaultSettings } from "#/runtime/presets.ts";
@@ -166,7 +166,7 @@ const make = Effect.gen(function* () {
   s = (yield* readOrSetAside(file, readStored, "the profiles start from the starters")) ?? seed;
   // The default orchestrator is always there, and always an orchestrator: a farm is never without one.
   const orchestrator = builtInOf(defaultOrchestrator);
-  if (!orchestrator) return yield* Effect.die(new Error(`the built-in template ${defaultOrchestrator} is not in agent/templates`));
+  if (!orchestrator) return yield* Effect.die(new Inconsistent({ message: `the built-in template ${defaultOrchestrator} is not in agent/templates` }));
   const agents = s.agents.some((a) => a.id === defaultOrchestrator)
     ? s.agents.map((a) => (a.id === defaultOrchestrator ? { ...a, role: "orchestrator" as const } : a))
     : [installed(orchestrator, s.agents, defaultOrchestrator), ...s.agents];

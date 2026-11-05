@@ -177,8 +177,11 @@ export const sessionLaunch = (r: SessionRecords, wt: SessionWatch) =>
     const wake = Effect.fn("Session.wake")(function* (h: Hand, session: T.Session, input: string, recall: string): Effect.fn.Return<Delivered> {
       const agent = store.agent(session.agent);
       if (!agent) return { kind: "refused", reason: t("server.session.life.agentGone", { name: session.name }) };
-      const stopped = yield* Effect.result(rest(h));
-      if (stopped._tag === "Failure") return { kind: "refused", reason: reasonOf(stopped.failure) };
+      const stopFailed = yield* rest(h).pipe(
+        Effect.as(""),
+        Effect.catch((e) => Effect.succeed(reasonOf(e))),
+      );
+      if (stopFailed) return { kind: "refused", reason: stopFailed };
       const resume = h.oarSessionId;
       let opened = yield* open(agent, session, h, h.place, withRecall(recall, input), resume);
       if (!opened.execution && !opened.retained && resume) {

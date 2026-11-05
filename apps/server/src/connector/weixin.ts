@@ -195,6 +195,7 @@ export class WeixinClient implements WeixinApi {
     return this.request("get_qrcode_status", HttpClientRequest.get(endpoint(base, q)), "", false, QrStatusResponse).pipe(
       Effect.timeout(35_000),
       Effect.map((s) => (s.status ? s : { status: "wait" })),
+      Effect.tapError((e) => Effect.logDebug("weixin qr poll failed", e)),
       Effect.catch(() => Effect.as(Effect.sleep(2_000), { status: "wait" })),
     );
   }

@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
 
-import { ToolFailed } from "./core/errors.ts";
+import { ToolFailed, toolFailed } from "./core/errors.ts";
 import type { Tool } from "./core/loop.ts";
 import { schemaEffectTool, schemaTool } from "./core/tool.ts";
 import { archiveFiles, fileMemory, type MemoryPort, searchArchive } from "./memory.ts";
@@ -32,25 +32,27 @@ export function selfTools(o: SelfOptions): Tool[] {
     parameters: Schema.Struct({ name: Schema.String }),
     run: async (p) => readSkill(await o.skills(), p.name),
   });
-  const rememberTool = schemaTool({
+  const rememberTool = schemaEffectTool({
     name: "remember",
     description: selfWords.rememberDescription,
     parameters: Schema.Struct({ note: Schema.String }),
-    run: async (p) => {
-      if (!p.note.trim()) throw new Error(selfWords.emptyNote);
-      if (!memory) throw new Error("Memory tools are disabled");
-      await memory.remember(p.note);
-      return selfWords.remembered;
+    run: (p) => {
+      if (!p.note.trim()) return Effect.fail(new ToolFailed({ message: selfWords.emptyNote }));
+      if (!memory) return Effect.fail(new ToolFailed({ message: "Memory tools are disabled" }));
+      return memory.remember(p.note).pipe(Effect.as(selfWords.remembered), Effect.mapError(toolFailed));
     },
   });
-  const rewrite = schemaTool({
+  const rewrite = schemaEffectTool({
     name: "rewrite_memory",
     description: selfWords.rewriteMemoryDescription,
     parameters: Schema.Struct({ content: Schema.String }),
-    run: async (p) => {
-      if (!memory) throw new Error("Memory tools are disabled");
-      return selfWords.rewritten(await memory.rewrite(p.content));
-    },
+    run: (p) =>
+      memory
+        ? memory.rewrite(p.content).pipe(
+            Effect.map((n) => selfWords.rewritten(n)),
+            Effect.mapError(toolFailed),
+          )
+        : Effect.fail(new ToolFailed({ message: "Memory tools are disabled" })),
   });
   const search = schemaTool({
     name: "search_archive",

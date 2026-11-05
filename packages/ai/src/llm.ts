@@ -57,14 +57,13 @@ export const failedMessage = (model: Model, timestamp: number, e: LlmError): Ass
   errorMessage: e.message,
 });
 
+const ErrorBody = Schema.fromJsonString(Schema.Struct({ error: Schema.Record(Schema.String, Schema.Unknown) }));
+const decodeErrorBody = Schema.decodeUnknownOption(ErrorBody);
+
 /** As pi-ai words a refusal: the status and the body's error object, else its text. */
 function statusMessage(status: number, text: string): string {
-  try {
-    const body: unknown = JSON.parse(text);
-    if (Predicate.isObject(body) && Predicate.isObject(body.error)) return `${status}: ${JSON.stringify(body.error)}`;
-  } catch {
-    // Not JSON: the text as it came.
-  }
+  const parsed = decodeErrorBody(text);
+  if (Option.isSome(parsed)) return `${status}: ${JSON.stringify(parsed.value.error)}`;
   return `${status} ${text.trim() || "status code (no body)"}`;
 }
 

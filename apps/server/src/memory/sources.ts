@@ -280,7 +280,10 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       const scope = yield* Scope.make();
       const operations = yield* Scope.provide(FiberSet.make(), scope);
       const writes = yield* Queue.dropping<Effect.Effect<void>, Cause.Done>(writeQueue);
-      const writer = yield* Effect.forkIn(Effect.ignore(Effect.forever(Effect.flatten(Queue.take(writes)))), scope);
+      const writer = yield* Effect.forkIn(
+        Effect.catch(Effect.forever(Effect.flatten(Queue.take(writes))), () => Effect.void),
+        scope,
+      );
       return { all: sources, off, scope, operations, writes, writer } satisfies Generation;
     });
 

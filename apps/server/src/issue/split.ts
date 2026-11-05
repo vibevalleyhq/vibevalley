@@ -145,8 +145,8 @@ export const issueSplitting = (r: IssueRecords) =>
     }, splitting.withPermits(1));
 
     const joining = yield* Semaphore.make(1);
-    const joinChildren = joining.withPermits(1)(
-      Effect.gen(function* () {
+    const joinChildren = Effect.fn("Issue.joinChildren")(
+      function* () {
         const all = yield* everyIssue;
         yield* Effect.forEach(
           all.filter((item) => item.parent !== undefined && item.stage.state === "reviewing"),
@@ -159,8 +159,8 @@ export const issueSplitting = (r: IssueRecords) =>
               const parentSession = latestSessionIdOf(parent);
               const parentWorker = parentSession ? sessions.sessionOf(parentSession) : undefined;
               if (parentWorker && isBusy(parentWorker)) return;
-              const result = yield* Effect.result(
-                sessions.handOver(
+              yield* sessions
+                .handOver(
                   session,
                   "completed",
                   (place) =>
@@ -178,19 +178,24 @@ export const issueSplitting = (r: IssueRecords) =>
                       return merged;
                     }),
                   "helper",
-                ),
-              );
-              if (result._tag === "Failure") {
-                const failure = result.failure;
-                if (failure._tag === "NotTakenIn" && failure.failure.kind === "conflict")
-                  yield* setConflict(child.id, { base: failure.failure.base, files: [...failure.failure.files] });
-                yield* asked(child.id, [{ question: failure._tag === "NotTakenIn" ? failure.message : reasonOf(failure), options: [] }]);
-              } else yield* setConflict(child.id, undefined);
+                )
+                .pipe(
+                  Effect.tap(() => setConflict(child.id, undefined)),
+                  Effect.catch((failure) =>
+                    Effect.andThen(
+                      failure._tag === "NotTakenIn" && failure.failure.kind === "conflict"
+                        ? setConflict(child.id, { base: failure.failure.base, files: [...failure.failure.files] })
+                        : Effect.void,
+                      asked(child.id, [{ question: failure._tag === "NotTakenIn" ? failure.message : reasonOf(failure), options: [] }]),
+                    ),
+                  ),
+                );
               yield* publish(parent.id);
             }),
           { discard: true },
         );
-      }),
+      },
+      joining.withPermits(1),
     );
 
     return { split, joinChildren };

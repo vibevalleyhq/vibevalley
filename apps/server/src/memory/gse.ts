@@ -3,9 +3,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 
-import { Effect, FileSystem } from "effect";
+import { Effect, FileSystem, Schema } from "effect";
 
 import { serverFile } from "#/assets.ts";
+import { jsonOf } from "#/base/json.ts";
 
 const dataDir = serverFile("src/memory/data");
 
@@ -45,12 +46,15 @@ const files = { dictionary: "zh_s.txt.gz", emit: "hmm_emit.json.gz" } as const;
 const readNow = (file: string) => gunzipSync(readFileSync(join(dataDir, file))).toString("utf8");
 
 /** Reads the dictionary and the HMM's table on the file system, off the event loop. */
-export const loadSegmenter = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const read = (file: string) => Effect.map(fs.readFile(join(dataDir, file)), (bytes) => gunzipSync(bytes).toString("utf8"));
-  dictionary ??= dictionaryOf(yield* read(files.dictionary));
-  emitTable ??= emitOf(yield* read(files.emit));
-}).pipe(Effect.orDie);
+export const loadSegmenter = Effect.fn("Gse.loadSegmenter")(
+  function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const read = (file: string) => Effect.map(fs.readFile(join(dataDir, file)), (bytes) => gunzipSync(bytes).toString("utf8"));
+    dictionary ??= dictionaryOf(yield* read(files.dictionary));
+    emitTable ??= yield* Schema.decodeUnknownEffect(Schema.fromJsonString(EmitTable))(yield* read(files.emit));
+  },
+  Effect.orDie,
+);
 
 const dict = (): Dictionary => (dictionary ??= dictionaryOf(readNow(files.dictionary)));
 
@@ -143,9 +147,9 @@ function routesOf(runes: readonly string[]): { freq: number; index: number }[] {
 // As jieba's HMM: it cuts a run of single characters the dictionary does not know.
 type State = "B" | "E" | "M" | "S";
 
+const EmitTable = Schema.Record(Schema.Literals(["B", "E", "M", "S"]), Schema.Record(Schema.String, Schema.Finite));
 let emitTable: Record<State, Record<string, number>> | undefined;
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the segmenter's table, shipped with the package
-const emitOf = (text: string) => JSON.parse(text) as Record<State, Record<string, number>>;
+const emitOf = jsonOf(EmitTable);
 const emit = () => (emitTable ??= emitOf(readNow(files.emit)));
 
 const minFloat = -3.14e100;

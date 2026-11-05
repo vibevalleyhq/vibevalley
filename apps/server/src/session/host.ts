@@ -338,10 +338,10 @@ export const makeHost = <R>(
         const run: RunInput = { ...hosted.run, by: hosted.run.by.kind ? hosted.run.by : { kind: "comment" } };
         return inputs.withPermits(1)(
           Effect.gen(function* () {
-            const started = yield* Effect.result(start);
-            if (started._tag === "Failure") {
+            const b = yield* start.pipe(Effect.catch((e) => Effect.succeed(messageOf(e))));
+            if (typeof b === "string") {
               if (closing) return closeInput(hosted);
-              const why = messageOf(started.failure);
+              const why = b;
               const id = yield* inProcess
                 .failedStart(run, hosted.run.asked ?? "", t("server.session.host.cannotStart", { why }))
                 .pipe(
@@ -352,7 +352,6 @@ export const makeHost = <R>(
               hosted.caller?.end();
               return { ok: false, why, run: id } as const;
             }
-            const b = started.success;
             if (closing) return closeInput(hosted);
             const { text, heard } = yield* build(b.busy() || (yield* b.queued), yield* b.memoryNews);
             if (closing) return closeInput(hosted);
@@ -368,13 +367,10 @@ export const makeHost = <R>(
       inputs.withPermits(1)(
         Effect.gen(function* () {
           if (closing) return;
-          const started = yield* Effect.result(start);
-          if (started._tag === "Failure") {
-            if (!closing) yield* log(`could not go on with its last run: ${messageOf(started.failure)}`);
-            return;
-          }
-          const b = started.success;
-          if (closing) return;
+          const b = yield* start.pipe(
+            Effect.catch((e) => Effect.as(!closing ? log(`could not go on with its last run: ${messageOf(e)}`) : Effect.void, undefined)),
+          );
+          if (!b || closing) return;
           const at = current();
           input = at;
           toCaller = 0;

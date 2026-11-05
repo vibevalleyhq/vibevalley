@@ -4,7 +4,7 @@ import type * as T from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOrNone } from "#/base/json.ts";
+import { jsonOf, jsonOrNone } from "#/base/json.ts";
 import { type Workplace } from "#/project/workplace.ts";
 import type * as qs from "#db/session.sql.ts";
 import type * as qr from "#db/session_run.sql.ts";
@@ -12,6 +12,9 @@ import type * as qr from "#db/session_run.sql.ts";
 const triggerOf = jsonOrNone(S.RunTrigger);
 export const heardOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
 const spentOf = jsonOrNone(S.Spent);
+const phaseOf = jsonOf(S.Phase);
+const lastRunOf = jsonOf(S.LastRun);
+const strictSpentOf = jsonOf(S.Spent);
 export const placeOf = jsonOrNone(
   Schema.Struct({ project: Schema.String, cwd: Schema.String, branch: Schema.optionalKey(Schema.String) }) satisfies Schema.Codec<Workplace>,
 );
@@ -82,9 +85,9 @@ export function sessionState(s: T.Session): qs.KeepSessionStateParams {
 }
 
 export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
-  const phase = Schema.decodeSync(Schema.fromJsonString(S.Phase))(row.phase);
-  const lastRun = row.last_run === null ? undefined : Schema.decodeSync(Schema.fromJsonString(S.LastRun))(row.last_run);
-  const spent = row.spent === null ? undefined : Schema.decodeSync(Schema.fromJsonString(S.Spent))(row.spent);
+  const phase = phaseOf(row.phase);
+  const lastRun = row.last_run === null ? undefined : lastRunOf(row.last_run);
+  const spent = row.spent === null ? undefined : strictSpentOf(row.spent);
   const place = row.place === null ? undefined : placeOf(row.place);
   return {
     id: sessionId(row.id),

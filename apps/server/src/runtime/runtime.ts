@@ -341,7 +341,7 @@ const make = (options: RuntimeOptions = {}) =>
             ...(item.enabled !== undefined ? { enabled: item.enabled } : {}),
           })),
         ],
-        { concurrency: "unbounded" },
+        { concurrency: 4 },
       );
       return { info: { ...info, models, usage, skills, mcpServers, tools }, found, read: 0 };
     });
@@ -404,7 +404,7 @@ const make = (options: RuntimeOptions = {}) =>
     });
 
     const each = (f: (id: string) => Effect.Effect<unknown>) =>
-      Effect.forEach(runtimeIds(), (id) => Effect.ignoreCause(f(id)), { concurrency: 4, discard: true });
+      Effect.forEach(runtimeIds(), (id) => Effect.ignoreCause(f(id), { log: "Warn" }), { concurrency: 4, discard: true });
 
     // In the background, so the first page load does not wait on every runtime.
     if (options.background ?? true)
@@ -437,14 +437,14 @@ const make = (options: RuntimeOptions = {}) =>
               relabeling.add(id);
               emit(
                 Effect.ensuring(
-                  Effect.ignoreCause(refresh(id)),
+                  Effect.ignoreCause(refresh(id), { log: "Warn" }),
                   Effect.sync(() => relabeling.delete(id)),
                 ),
               );
             }
             if (hit) return withSpend(hit.info);
             // In the service's own fiber set: one probe however many lists ask, and none outlives the service.
-            if (!closed && !probing.has(id)) emit(Effect.ignoreCause(out(id, Cache.get(cache, id))));
+            if (!closed && !probing.has(id)) emit(Effect.ignoreCause(out(id, Cache.get(cache, id)), { log: "Warn" }));
             return {
               id,
               preset: presetOf(id),
@@ -516,7 +516,7 @@ const make = (options: RuntimeOptions = {}) =>
       },
       usageSoon: (id) => {
         if (closed) return;
-        later(`usage:${id}`, Effect.delay(Effect.ignoreCause(refreshUsage(id)), usageAfterRunMs), { onlyIfMissing: true });
+        later(`usage:${id}`, Effect.delay(Effect.ignoreCause(refreshUsage(id), { log: "Warn" }), usageAfterRunMs), { onlyIfMissing: true });
       },
     });
   });

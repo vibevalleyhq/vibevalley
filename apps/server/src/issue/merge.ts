@@ -132,18 +132,19 @@ export function merging(d: MergeDeps) {
     yield* publish(issue.id);
   });
 
-  const refreshPullRequests = prLock.withPermits(1)(
-    Effect.gen(function* () {
+  const refreshPullRequests = Effect.fn("Issue.refreshPullRequests")(
+    function* () {
       for (const issue of yield* list) {
         if (issue.pullRequest?.state !== "open" || !issue.project) continue;
-        const state = yield* Effect.result(projects.pullRequestState(issue.project, issue.pullRequest.number));
-        const done = state._tag === "Failure" ? state : state.success === "open" ? undefined : yield* Effect.result(finishPullRequest(issue, state.success));
-        if (done?._tag === "Failure")
-          yield* Effect.logWarning(
-            `vibevalley: refresh pull requests: issue #${issue.number}: ${done.failure instanceof Error ? done.failure.message : reasonOf(done.failure)}`,
-          );
+        yield* projects.pullRequestState(issue.project, issue.pullRequest.number).pipe(
+          Effect.flatMap((state) => (state === "open" ? Effect.void : finishPullRequest(issue, state))),
+          Effect.catch((e) =>
+            Effect.logWarning(`vibevalley: refresh pull requests: issue #${issue.number}: ${e instanceof Error ? e.message : reasonOf(e)}`),
+          ),
+        );
       }
-    }),
+    },
+    prLock.withPermits(1),
   );
 
   const submit = Effect.fn("Issue.submitWorkingPullRequest")(function* (id: string, session: string, summary?: string) {

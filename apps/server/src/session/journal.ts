@@ -7,6 +7,7 @@ import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibe
 import { cut } from "@vibevalley/protocol/rules";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 
+import { jsonOrNone } from "#/base/json.ts";
 import { type KeptFile, keptFile } from "#/infra/files.ts";
 import { type Time, timeHere } from "#/infra/time.ts";
 
@@ -22,7 +23,7 @@ const outputHead = 2000;
 const outputTail = 4000;
 const pushAfterMs = 300;
 const saveAfterMs = 1500;
-const decodeEvents = Schema.decodeUnknownSync(Schema.Array(SessionEventSchema));
+const decodeEvents = jsonOrNone(Schema.Array(SessionEventSchema));
 
 function clipOutput(text: string): string {
   const n = text.length;
@@ -36,10 +37,10 @@ export const readJournal = (file: string): Effect.Effect<SessionEvent[] | undefi
     const fs = yield* FileSystem.FileSystem;
     const body = yield* Effect.option(fs.readFileString(file));
     if (body._tag === "None") return undefined;
-    const events = yield* Effect.option(Effect.try(() => [...decodeEvents(JSON.parse(body.value))]));
-    if (events._tag === "Some") return events.value;
+    const events = decodeEvents(body.value);
+    if (events !== undefined) return [...events];
     // Another reader may already have removed it.
-    yield* Effect.ignore(fs.remove(file));
+    yield* Effect.ignore(fs.remove(file), { log: "Debug" });
     return undefined;
   });
 
@@ -291,6 +292,6 @@ export const makeTrajectories = (home: string, push: (id: string, e: SessionEven
           const all = open.get(id)?.journal.events() ?? (yield* withFs(readJournal(fileOf(id)))) ?? [];
           return run ? all.filter((e) => e.run === run) : all;
         }),
-      forget: (id) => (knownId.test(id) ? Effect.ignore(fs.remove(fileOf(id))) : Effect.void),
+      forget: (id) => (knownId.test(id) ? Effect.ignore(fs.remove(fileOf(id)), { log: "Debug" }) : Effect.void),
     } satisfies Trajectories;
   });

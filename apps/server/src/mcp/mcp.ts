@@ -90,7 +90,7 @@ const make = (options: McpOptions = {}) =>
               await server.connect(transport);
               return server;
             }),
-            (server) => Effect.ignore(Effect.tryPromise({ try: () => server.close(), catch: messageOf })),
+            (server) => Effect.ignore(Effect.tryPromise({ try: () => server.close(), catch: messageOf }), { log: "Debug" }),
           );
           return yield* Effect.promise(() => transport.handleRequest(request));
         }),

@@ -209,7 +209,7 @@ export const channelWriting = (r: ChannelRecords) =>
                 Effect.provideService(HttpClient.HttpClient, http),
                 Effect.catchCause((cause) => Effect.as(Effect.logWarning("a link preview was not read", cause), undefined)),
               ),
-            { concurrency: "unbounded" },
+            { concurrency: 4 },
           )).filter((e): e is T.Embed => e !== undefined);
           yield* locked(
             Effect.gen(function* () {

@@ -15,7 +15,6 @@ const { ownChat, runtimeChat } = await import("./chat/chat.ts");
 const text = (name: string) => Flag.String(name).pipe(Flag.optional);
 const given = (o: Option.Option<string>) => Option.getOrUndefined(o);
 const prompt = text("prompt").pipe(Flag.withAlias("p"));
-const asked = (p: Option.Option<string>) => (Option.isSome(p) ? { p: p.value } : {});
 
 /** A conversation takes Ctrl+C itself (stop the turn, again to quit), so the signal that would end the program must not. What went wrong is said on stderr. */
 const talk = <E>(conversation: Effect.Effect<void, E>) =>
@@ -25,21 +24,24 @@ const talk = <E>(conversation: Effect.Effect<void, E>) =>
 const runtime = Command.make(
   "runtime",
   { id: Argument.String("runtime"), model: text("model"), effort: text("effort"), resume: text("resume"), cwd: text("cwd"), prompt },
-  (o) =>
-    talk(
+  (o) => {
+    const fields = { model: given(o.model), effort: given(o.effort), resume: given(o.resume), cwd: given(o.cwd), p: given(o.prompt) };
+    return talk(
       runtimeChat(o.id, {
-        ...(Option.isSome(o.model) ? { model: o.model.value } : {}),
-        ...(Option.isSome(o.effort) ? { effort: o.effort.value } : {}),
-        ...(Option.isSome(o.resume) ? { resume: o.resume.value } : {}),
-        ...(Option.isSome(o.cwd) ? { cwd: o.cwd.value } : {}),
-        ...asked(o.prompt),
+        ...(fields.model ? { model: fields.model } : {}),
+        ...(fields.effort ? { effort: fields.effort } : {}),
+        ...(fields.resume ? { resume: fields.resume } : {}),
+        ...(fields.cwd ? { cwd: fields.cwd } : {}),
+        ...(fields.p ? { p: fields.p } : {}),
       }),
-    ),
+    );
+  },
 );
 
-const chat = Command.make("chat", { cwd: text("cwd"), name: text("name"), model: text("model"), mcp: text("mcp"), prompt }, (o) =>
-  talk(ownChat({ cwd: given(o.cwd) ?? "", name: given(o.name) ?? "vibevalley", model: given(o.model) ?? "", mcp: given(o.mcp) ?? "", ...asked(o.prompt) })),
-).pipe(Command.withSubcommands([runtime]));
+const chat = Command.make("chat", { cwd: text("cwd"), name: text("name"), model: text("model"), mcp: text("mcp"), prompt }, (o) => {
+  const p = given(o.prompt);
+  return talk(ownChat({ cwd: given(o.cwd) ?? "", name: given(o.name) ?? "vibevalley", model: given(o.model) ?? "", mcp: given(o.mcp) ?? "", ...(p ? { p } : {}) }));
+}).pipe(Command.withSubcommands([runtime]));
 
 Command.runWith(chat, { version: "0.1.0" })(process.argv.slice(2)).pipe(
   Effect.tapError((why) => Effect.sync(() => process.stderr.write(`${typeof why === "string" ? why : messageOf(why)}\n`))),

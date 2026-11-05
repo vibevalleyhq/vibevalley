@@ -65,15 +65,14 @@ const resolveAll: Resolve = (host) =>
       );
 
 /** May the server ask for this address: http(s), and every address its name has is on the public web. */
-export const reachable = (url: URL, resolve: Resolve = resolveAll): Effect.Effect<boolean> =>
-  Effect.gen(function* () {
-    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-    if (url.username || url.password) return false;
-    const host = url.hostname.replace(/^\[|\]$/gu, "");
-    if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
-    const addresses = yield* resolve(host);
-    return addresses.length > 0 && addresses.every((a) => !privateAddress(a));
-  });
+export const reachable = Effect.fn("Embeds.reachable")(function* (url: URL, resolve: Resolve = resolveAll): Effect.fn.Return<boolean> {
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  if (url.username || url.password) return false;
+  const host = url.hostname.replace(/^\[|\]$/gu, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
+  const addresses = yield* resolve(host);
+  return addresses.length > 0 && addresses.every((a) => !privateAddress(a));
+});
 
 const entities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " " };
 const decode = (s: string) => s.replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/gu, (_, e: string) => entities[e] ?? _).trim();
@@ -123,8 +122,8 @@ export const readEmbed = Effect.fn("Embeds.read")(function* (link: string, resol
     if (!(yield* reachable(at, resolve))) return undefined;
     const answered = yield* client.get(at, { headers: { accept: "text/html", "user-agent": "VibeValley link preview" } }).pipe(
       Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
-      Effect.timeoutOption(timeoutMs),
-      Effect.catch(() => Effect.succeedNone),
+      Effect.timeout(timeoutMs),
+      Effect.option,
     );
     if (Option.isNone(answered)) return undefined;
     const res = answered.value;

@@ -105,18 +105,19 @@ const handshake = (key: string, transport: MossTransport) =>
   });
 
 /** Whether MOSS Live takes key. */
-export const verifyMoss = (key: string, transport: MossTransport = nodeTransport): Effect.Effect<MossVerify> =>
-  Effect.gen(function* () {
-    const got = yield* handshake(key, transport);
-    if (got === "attached") return { kind: "ok" } as const;
-    if (got === "silent") return { kind: "silent" } as const;
-    if ("error" in got) return { kind: "failed", why: got.error } as const;
-    const asked = yield* Effect.result(transport.status(key));
-    if (asked._tag === "Failure") return { kind: "unreachable", why: got.down || asked.failure } as const;
-    const { code, body } = asked.success;
-    if (code === 401 || code === 403) return { kind: "refused", why: refusal(body) } as const;
-    return { kind: "failed", why: got.down || `HTTP ${code}` } as const;
-  });
+export const verifyMoss = Effect.fn("Moss.verify")(function* (key: string, transport: MossTransport = nodeTransport): Effect.fn.Return<MossVerify> {
+  const got = yield* handshake(key, transport);
+  if (got === "attached") return { kind: "ok" } as const;
+  if (got === "silent") return { kind: "silent" } as const;
+  if ("error" in got) return { kind: "failed", why: got.error } as const;
+  return yield* transport.status(key).pipe(
+    Effect.match({
+      onFailure: (why): MossVerify => ({ kind: "unreachable", why: got.down || why }),
+      onSuccess: ({ code, body }): MossVerify =>
+        code === 401 || code === 403 ? { kind: "refused", why: refusal(body) } : { kind: "failed", why: got.down || `HTTP ${code}` },
+    }),
+  );
+});
 
 /** Where MOSS's frames go to the page, and where a closing goes: one queue, so they keep their order. */
 type Down = string | Uint8Array | Socket.CloseEvent;
@@ -159,5 +160,5 @@ export const relay = (page: Socket.Socket, key: string, transport: MossTransport
           else waiting.push(frame);
         }
     });
-    yield* Effect.raceFirst(toPage, fromPage).pipe(Effect.ignore);
+    yield* Effect.raceFirst(toPage, fromPage).pipe(Effect.ignore({ log: "Debug" }));
   });

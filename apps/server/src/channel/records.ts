@@ -69,7 +69,7 @@ export const channelRecords = Effect.gen(function* () {
   });
   /** A transaction that tells the model what it changes as it goes: if it fails, those changes are not in the database,
    * so the model is read again from it. */
-  const tx = <A, E>(work: Effect.Effect<A, E>) => db.inTx(work).pipe(Effect.onError(() => Effect.ignoreCause(reload)));
+  const tx = <A, E>(work: Effect.Effect<A, E>) => db.inTx(work).pipe(Effect.onError(() => Effect.ignoreCause(reload, { log: "Warn" })));
   const lock = yield* Semaphore.make(1);
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
   // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.

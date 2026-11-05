@@ -156,8 +156,11 @@ const cronTools = Effect.gen(function* () {
     }),
   );
 
-  const cronDelete = tool("cron.delete", (p: Orchestrator<"cron.delete">) =>
-    answered(Effect.map(cron.remove(p.id), (s) => answers.cancelCron.canceled(s.name))),
+  const cronDelete = tool(
+    "cron.delete",
+    Effect.fn("Tool.cronDelete")(function* (p: Orchestrator<"cron.delete">) {
+      return answers.cancelCron.canceled((yield* cron.remove(p.id)).name);
+    }, answered),
   );
   return { cronCreate, cronList, cronDelete };
 });
@@ -270,25 +273,24 @@ const channelTools = Effect.gen(function* () {
   const messageList = (who: Who) =>
     tool(
       "channel.message.list",
-      Effect.fn("Tool.messageList")(function* (p: Orchestrator<"channel.message.list">) {
-        const c = yield* callerOf(who);
-        let where = p.id ?? "";
-        // A session's default is its own thread, which the channel service fills in.
-        if (where === "" && c.session === "") where = (yield* chat.addressOf(c.here)).target;
-        const read = yield* Effect.result(
-          chat.read(participant(c), {
+      Effect.fn("Tool.messageList")(
+        function* (p: Orchestrator<"channel.message.list">) {
+          const c = yield* callerOf(who);
+          let where = p.id ?? "";
+          // A session's default is its own thread, which the channel service fills in.
+          if (where === "" && c.session === "") where = (yield* chat.addressOf(c.here)).target;
+          const r = yield* chat.read(participant(c), {
             target: where,
             ...(p.unread === true ? { unread: true } : {}),
             ...(p.before != null && p.before !== 0 ? { before: Math.trunc(p.before) } : {}),
             ...(p.limit != null && p.limit !== 0 ? { limit: Math.trunc(p.limit) } : {}),
-          }),
-        );
-        if (read._tag === "Failure") return answers.readChat.failed(said(read.failure));
-        const r = read.success;
-        if (r.messages.length === 0) return p.unread === true ? answers.readChat.noUnread(r.target) : answers.readChat.empty(r.target);
-        const older = r.older ? answers.readChat.olderNote(r.messages[0]!.number) : "";
-        return answers.readChat.head(r.target, older) + inboxLines(r.messages);
-      }),
+          });
+          if (r.messages.length === 0) return p.unread === true ? answers.readChat.noUnread(r.target) : answers.readChat.empty(r.target);
+          const older = r.older ? answers.readChat.olderNote(r.messages[0]!.number) : "";
+          return answers.readChat.head(r.target, older) + inboxLines(r.messages);
+        },
+        Effect.catch((e) => Effect.succeed(answers.readChat.failed(said(e)))),
+      ),
     );
 
   const unreadList = (who: Who) =>

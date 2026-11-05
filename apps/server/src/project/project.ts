@@ -8,9 +8,8 @@ import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
 import { githubRepository, slice } from "@vibevalley/protocol/rules";
 
-import { jsonOf, jsonOrNone } from "#/base/json.ts";
+import { jsonOrNone } from "#/base/json.ts";
 import { numberIn, or } from "#/base/order.ts";
-import { messageOf } from "#/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 
 import { git, type GitError, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
@@ -102,9 +101,9 @@ const noTokei = () => t("server.project.noTokei");
 const yearDays = 53 * 7;
 
 // What the gh commands below print with --json; anything else is not taken as their answer.
-const repoView = jsonOf(Schema.Struct({ viewerPermission: Schema.optional(Schema.NullOr(Schema.String)) }));
-const openPullRequests = jsonOf(Schema.Array(Schema.Struct({ url: Schema.String, number: Schema.Int })));
-const pullRequestView = jsonOf(Schema.Struct({ state: Schema.String, mergedAt: Schema.optional(Schema.NullOr(Schema.String)) }));
+const repoView = jsonOrNone(Schema.Struct({ viewerPermission: Schema.optional(Schema.NullOr(Schema.String)) }));
+const openPullRequests = jsonOrNone(Schema.Array(Schema.Struct({ url: Schema.String, number: Schema.Int })));
+const pullRequestView = jsonOrNone(Schema.Struct({ state: Schema.String, mergedAt: Schema.optional(Schema.NullOr(Schema.String)) }));
 /** Close to JavaScript's localeCompare for names, as the Go has it: case ignored first, then by bytes. */
 const localeCompare = (a: string, b: string) => {
   const x = a.toLowerCase();
@@ -292,16 +291,16 @@ const make = (hooks: ProjectHooks = {}) =>
     const ensure = Effect.fn("Project.ensure")(
       function* (name: string) {
         if (!projectName.test(name)) return yield* fail(t("server.project.notProjectName", { name }));
-        yield* Effect.orDie(fs.makeDirectory(join(root, name), { recursive: true }));
+        yield* fs.makeDirectory(join(root, name), { recursive: true });
         // git answers with real paths (on macOS /tmp is /private/tmp): compare like with like.
-        const path = yield* Effect.orDie(fs.realPath(join(root, name)));
-        if (dirname(path) !== (yield* Effect.orDie(fs.realPath(root)))) return yield* fail(t("server.project.outside"));
+        const path = yield* fs.realPath(join(root, name));
+        if (dirname(path) !== (yield* fs.realPath(root))) return yield* fail(t("server.project.outside"));
         // A folder is a repository's top when it holds .git (a folder, or a file in a worktree).
         if (!(yield* exists(join(path, ".git")))) {
           yield* git(path, "init", "-q", "-b", "main");
-          if (!(yield* exists(join(path, ".gitignore")))) yield* Effect.orDie(fs.writeFileString(join(path, ".gitignore"), gitignore));
-          if ((yield* Effect.orDie(fs.readDirectory(path))).filter((e) => e !== ".git").length <= 1)
-            yield* Effect.orDie(fs.writeFileString(join(path, "README.md"), `# ${name}\n`));
+          if (!(yield* exists(join(path, ".gitignore")))) yield* fs.writeFileString(join(path, ".gitignore"), gitignore);
+          if ((yield* fs.readDirectory(path)).filter((e) => e !== ".git").length <= 1)
+            yield* fs.writeFileString(join(path, "README.md"), `# ${name}\n`);
           yield* git(path, "add", "-A");
           yield* repository(path).commit(t("server.project.commit.initial"));
         } else if (!(yield* gitOk(path, "rev-parse", "--verify", "HEAD"))) {
@@ -504,7 +503,7 @@ const make = (hooks: ProjectHooks = {}) =>
               return { name: req.name, path, git: true };
             });
             return yield* made.pipe(
-              Effect.tapError(() => Effect.ignore(fs.remove(path, { recursive: true }))),
+              Effect.tapError(() => Effect.ignore(fs.remove(path, { recursive: true }), { log: "Warn" })),
               Effect.ensuring(Effect.sync(() => pending.delete(req.name))),
             );
           }),
@@ -578,33 +577,36 @@ const make = (hooks: ProjectHooks = {}) =>
         }
         return out;
       }),
-      workplace: Effect.fn("Project.workplace")(function* (project, issueNumber, worktree, baseBranch) {
-        let made = false;
-        return yield* serially(
-          project,
-          Effect.gen(function* () {
-            const path = yield* ensure(project);
-            if (!worktree) return { project, cwd: path };
-            const place = issueWorkplace(project, issueNumber);
-            const branch = place.branch!;
-            const cwd = place.cwd;
-            if (yield* exists(cwd)) return place;
-            yield* Effect.orDie(fs.makeDirectory(trees, { recursive: true }));
-            const branchThere = yield* repository(path)
-              .hasBranch(branch)
-              .pipe(Effect.orElseSucceed(() => false));
-            let from = baseBranch;
-            if (!branchThere && usesPullRequests(project)) {
-              const main = yield* syncMain(project);
-              from ||= main;
-            }
-            const args = branchThere ? ["worktree", "add", "-q", cwd, branch] : ["worktree", "add", "-q", "-b", branch, cwd, from || "HEAD"];
-            yield* git(path, ...args).pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })));
-            made = true;
-            return { project, cwd, branch };
-          }),
-        ).pipe(Effect.tap((place) => (made ? projectSetup(place.cwd) : Effect.void)));
-      }),
+      workplace: Effect.fn("Project.workplace")(
+        function* (project, issueNumber, worktree, baseBranch) {
+          let made = false;
+          return yield* serially(
+            project,
+            Effect.gen(function* () {
+              const path = yield* ensure(project);
+              if (!worktree) return { project, cwd: path };
+              const place = issueWorkplace(project, issueNumber);
+              const branch = place.branch!;
+              const cwd = place.cwd;
+              if (yield* exists(cwd)) return place;
+              yield* fs.makeDirectory(trees, { recursive: true });
+              const branchThere = yield* repository(path)
+                .hasBranch(branch)
+                .pipe(Effect.orElseSucceed(() => false));
+              let from = baseBranch;
+              if (!branchThere && usesPullRequests(project)) {
+                const main = yield* syncMain(project);
+                from ||= main;
+              }
+              const args = branchThere ? ["worktree", "add", "-q", cwd, branch] : ["worktree", "add", "-q", "-b", branch, cwd, from || "HEAD"];
+              yield* git(path, ...args);
+              made = true;
+              return { project, cwd, branch };
+            }),
+          ).pipe(Effect.tap((place) => (made ? projectSetup(place.cwd) : Effect.void)));
+        },
+        Effect.mapError((e) => (Predicate.isTagged(e, "ProjectError") ? e : new ProjectError({ message: reason(e), cause: e }))),
+      ),
       changes: Effect.fn("Project.changes")(function* (place) {
         return yield* describe(place.project, place.cwd, place.branch);
       }),
@@ -759,15 +761,12 @@ const make = (hooks: ProjectHooks = {}) =>
                   reason: t("server.project.clear.worktreeLeft", { cwd: place.cwd, why: removed }),
                 };
             }
-            const branch = yield* Effect.result(repository(path).hasBranch(place.branch!));
-            if (branch._tag === "Failure") {
-              if (!(yield* exists(path))) return { kept: false };
-              return {
-                kept: true,
-                reason: t("server.project.clear.unconfirmed", { branch: place.branch!, why: reason(branch.failure) }),
-              };
-            }
-            if (!branch.success) return { kept: false };
+            if (!(yield* exists(path))) return { kept: false };
+            const branch = yield* repository(path)
+              .hasBranch(place.branch!)
+              .pipe(Effect.catch((e) => Effect.succeed(t("server.project.clear.unconfirmed", { branch: place.branch!, why: reason(e) }))));
+            if (typeof branch === "string") return { kept: true, reason: branch };
+            if (!branch) return { kept: false };
             const main = (yield* repository(path).mainOrNone) || "main";
             const ahead = yield* repository(path)
               .ahead(main, place.branch!)
@@ -818,9 +817,7 @@ const make = (hooks: ProjectHooks = {}) =>
                 if (!p.git || repo === "") c = { available: false, reason: t("server.project.github.notGithub") };
                 else {
                   const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
-                  const permission = view.ok
-                    ? Option.getOrUndefined(yield* Effect.option(Effect.try({ try: () => repoView(view.out).viewerPermission, catch: messageOf })))
-                    : undefined;
+                  const permission = view.ok ? repoView(view.out)?.viewerPermission : undefined;
                   c =
                     permission === undefined
                       ? { available: false, reason: t("server.project.github.noPermission") }
@@ -865,10 +862,8 @@ const make = (hooks: ProjectHooks = {}) =>
             // Recover a creation whose receipt was lost before it was saved.
             const listed = yield* gh("pr", "list", "--repo", repo, "--head", place.branch!, "--base", main, "--state", "open", "--json", "url,number");
             if (!listed.ok) return yield* fail(t("server.project.github.listFailed"));
-            const existing = yield* Effect.try({
-              try: () => openPullRequests(listed.out),
-              catch: () => new ProjectError({ message: t("server.project.github.listUnread") }),
-            });
+            const existing = openPullRequests(listed.out);
+            if (!existing) return yield* fail(t("server.project.github.listUnread"));
             if (existing.length > 0) return { ...existing[0]!, state: "open" as const };
             const check = (yield* lexists(join(place.cwd, ".vibevalley/check"))) ? t("server.project.github.checked") : t("server.project.github.noCheck");
             // The helper's own title and body when it wrote them (session/prompts.ts tells it where), else the issue's.
@@ -902,10 +897,8 @@ const make = (hooks: ProjectHooks = {}) =>
         if (repo === "") return yield* fail(t("server.project.github.notGithub"));
         const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
         if (!viewed.ok) return yield* fail(t("server.project.github.viewFailed", { n }));
-        const result = yield* Effect.try({
-          try: () => pullRequestView(viewed.out),
-          catch: () => new ProjectError({ message: t("server.project.github.stateUnread", { n }) }),
-        });
+        const result = pullRequestView(viewed.out);
+        if (!result) return yield* fail(t("server.project.github.stateUnread", { n }));
         if (result.mergedAt || result.state === "MERGED") return "merged" as const;
         if (result.state === "OPEN") return "open" as const;
         if (result.state === "CLOSED") return "closed" as const;

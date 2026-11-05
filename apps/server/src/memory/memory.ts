@@ -132,30 +132,25 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       return m;
     });
 
-    const runPromise = Effect.runPromiseWith(yield* Effect.context());
     const shape = Memory.of({
       forAgent: (agent, session) => {
         const by = agents.isOrchestrator(agent) ? { kind: "orchestrator" as const, forOwner: false } : { kind: "session" as const, id: session };
         return {
           read: () =>
-            runPromise(
-              Effect.gen(function* () {
-                const notes = (yield* local.list(agent)).filter((note) => note.kind === "note").toReversed();
-                const lines = notes.map((note) => (note.author === "owner" ? fromOwner : "") + note.text);
-                return { lines, prompt: carriedMemory(lines) };
-              }),
-            ),
-          remember: (text) => runPromise(Effect.asVoid(local.write({ agent, text, project: "", by }))),
+            Effect.map(local.list(agent), (all) => {
+              const notes = all.filter((note) => note.kind === "note").toReversed();
+              const lines = notes.map((note) => (note.author === "owner" ? fromOwner : "") + note.text);
+              return { lines, prompt: carriedMemory(lines) };
+            }),
+          remember: (text) => Effect.asVoid(local.write({ agent, text, project: "", by })),
           rewrite: (text) =>
-            runPromise(
-              Effect.gen(function* () {
-                const owners = new Set((yield* local.list(agent)).filter((note) => note.author === "owner").map((note) => note.text));
-                const notes = parseMemoryLines(text)
-                  .map((line) => line.text)
-                  .filter((line) => !owners.has(line) && !(line.startsWith(fromOwner) && owners.has(line.slice(fromOwner.length).trim())));
-                return yield* local.rewrite(agent, notes, by);
-              }),
-            ),
+            Effect.gen(function* () {
+              const owners = new Set((yield* local.list(agent)).filter((note) => note.author === "owner").map((note) => note.text));
+              const notes = parseMemoryLines(text)
+                .map((line) => line.text)
+                .filter((line) => !owners.has(line) && !(line.startsWith(fromOwner) && owners.has(line.slice(fromOwner.length).trim())));
+              return yield* local.rewrite(agent, notes, by);
+            }),
         };
       },
       memoriesOf: Effect.fn("Memory.memoriesOf")(function* (agent) {
