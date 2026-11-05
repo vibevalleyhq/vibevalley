@@ -38,15 +38,17 @@
    vpx scripts/verify-server.ts --scripted-helper -- sh -c '
      vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
      set -e
-     vv issue new 写打卡并提交 --project clock --agent docs
-     vv issue work 1 --format json
-     vv issue accept 1 --dry-run --format json
-     vv issue accept 1 --format json
+     vv issue create 写打卡并提交 --project clock --agent docs
+     vv issue status 1 todo
+     vv issue watch 1 --timeout 60
+     vv issue diff 1 --format json
+     vv issue status 1 done --dry-run --format json
+     vv issue status 1 done --format json
      git -C "$(vv project list --format json | jq -r ".[0].path")" log --oneline main
    '
    ```
 
-   带 `--format json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue work` 等帮工交回来、打出改动（经过的状态在 stderr），`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `helper.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/verify-server.test.ts` 跑着同样的一遍。
+   带 `--format json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue status 1 todo` 派出去，`issue watch` 等帮工交回来（经过的状态在 stderr），`issue diff` 是改动，`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `helper.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/verify-server.test.ts` 跑着同样的一遍。
 
 4. 页面也改了的，在同一个子命令末尾接上 [page.md](.agents/skills/vv-acceptance/references/page.md) 的截图命令。
 
@@ -57,7 +59,7 @@
 
 ## 出错时
 
-- **`issue work` 被拒**：档案带了思考力度（换 `docs`、`night`），或标题里没有帮工认得的字眼（见 `helper.ts`）。
+- **`issue status 1 todo` 被拒**：档案带了思考力度（换 `docs`、`night`），或标题里没有帮工认得的字眼（见 `helper.ts`）。
 - **表结构对不上**：`db/generated` 不是最新的，`vp run --filter @vibevalley/server db:generate`。
 
 ## 收拾

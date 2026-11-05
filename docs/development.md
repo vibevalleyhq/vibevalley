@@ -69,48 +69,54 @@ vp run release final     # 在 release/x.y 上打正式版（前面要有同一�
 
 先起服务端（见上）。另开终端，命令行在根目录是 `vp run --filter @vibevalley/cli start`；下面写成 `vibevalley`。装了桌面版的，「关于」里「安装命令行」以后终端里就有 `vibevalley`（beta 是 `vibevalley-beta`，alpha 是 `vibevalley-alpha`），连的是那个渠道的农场。`vibevalley doctor` 一次说清楚找到的是哪个农场、连不连得上、桌面版开没开、装了哪些农机、缺不缺模型的 key、连接到本机有没有问题；`vibevalley app …` 是桌面版自己的事（状态、打开到某一页、更新、退出、重启）。它连这台机器上用着家目录的那个服务端（家目录的 `server.json` 写着地址，桌面版的也找得到），没有就是 `http://127.0.0.1:8787`；别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
 
-命令行是自己的包 `apps/cli`（入口 `src/main.ts`），搭在 `effect/cli` 上，不载入服务端，是给这台电脑上的 agent 用的，主人也一样用：一条命令是一件事，不是一个接口（[为什么](docs/subsystems/core.md#为什么这样)）。组名照接口的模块（`issue`、`channel`、`pkm`、`project`、`agent`、`session`、`runtime`、`memory`、`cron`、`artifact`），组里的词是事情，尽量少：工单是 `list|show|new|edit|work|say|accept|stop|cancel`，动作由工单此刻能做的定（`say` 在它问时是回答、在等验收时是打回，别的时候是捎话；`work` 对关掉的先重开），`show --diff|--log` 加上改动、时间线。不知道写在哪就用顶层的 `search <词…>`，一次搜工单、频道、笔记和记性（`--in` 只搜几处）。终端里的对话是 `chat [农机]`；不带命令只打帮助，不会开一个等输入的对话。每条命令用 `Flag`、`Argument` 写出参数，经生成的 `VibeValleyApi` 调服务端，没有类型断言；工单是号（`12`、`#12`），频道、档案、项目按名字认，认不准就拒、列出候选。`vibevalley guide` 打出给 agent 的用法（`apps/cli/src/guide/<语言>.md`），每条命令的 `--help` 有说明和例子（`apps/cli/src/main.test.ts` 查）。
+命令行是自己的包 `apps/cli`（入口 `src/main.ts`），搭在 `effect/cli` 上，不载入服务端，给这台电脑上的 agent 用，主人也一样用。它照农场的领域模型，像 `gh issue` 那样正规：**一条命令就是服务端的一个操作**，路径是 `<资源> [<子资源>] <动词>`，资源照接口的模块和名词（`issue`、`pkm page`、`channel message`），动词是标准的 `list`、`show`、`create`、`edit`、`delete`（对接口的 `list`、`get`、`create`、`update`、`delete`）和接口自己的（`status`、`comment`、`review`、`send`、`search`、`capture`、`export`、`refresh`、`stop`）。命令行不推断、不拼操作：工单能不能挪、挪到哪，频道、档案按名字认成哪一个，都是服务端的事，拒绝时带 `next`。例外只有名字就说明了的几个：`issue watch`（跟着状态流）、`pkm page edit`（读原文、编辑器、写回）、`doctor`、`chat`（服务端的对话程序）。参数照接口的字段写（`--description`、`--agent`、`--wants-owner`），经生成的 `VibeValleyApi` 调服务端，没有类型断言；工单是号（`12`、`#12`）。不带命令只打帮助。`vibevalley guide` 打出给 agent 的用法（`apps/cli/src/guide/<语言>.md`），每条命令的 `--help` 有说明和例子（`apps/cli/src/main.test.ts` 查）。
 
+- **工单**：`issue list|show|create|edit|status|comment|review|diff|timeline|delete|watch`。状态只有一套（`backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled`）：`issue status <号> todo` 是派活或再来一轮，`done` 是完成，`canceled` 是关掉；`issue comment` 在帮工问时就是回答；`issue review --pass|--fail` 是验收的意见，完成另挪状态。停下帮工这一轮是帮工的操作：`session stop <帮工>`。
 - **接口的全集**经 `api`：`api list [--module m]` 按模块列出每个接口（`--format json` 带入参的 JSON Schema），`api call <操作> [--json 字|-|@文件]` 直接调一个，发出去以前照它的 Schema 查一遍，对不上就不发、说是哪个字段；`api state [--watch]`、`api events` 跟着服务端的流，一行一帧。哪个接口由哪条命令用到、哪些只经 `api`，写在 `apps/cli/src/reach.ts`（`Record<操作, …>`，加接口不写这一行编不过）。
-- **输出**：默认是短的文字，一件东西一行，开头是接着能用的名字（`#12  todo  修登录页`）；`show` 是几段短的，最后一行「能做」是这张工单现在能用的命令；列表默认 20 条，还有的话最后一行说怎么看下一页。`--format json` 是接口的形状，全命令行同一个参数。stdout 只放结果，失败时 stdout 是空的。
-- **笔记的命令**（`apps/cli/src/pkm.ts`）：`pkm capture 一句话`（记进今天的日记，`--page` 记到那一页末尾，不给字就读标准输入、按缩进拆成块）、`pkm show [页]`（不给页是今天的日记，`--day` 看别的一天）、`pkm list`、`pkm radar`、`pkm edit <页>`（在 `$VISUAL`、`$EDITOR` 里改这一页文件的原文，关掉存回去；这期间页面被改过就不写，改过的留在临时文件里）。
-- **试跑** `--dry-run`：会删、会合、会关、会让帮工走的命令（接口表里带 `dryRun` 的：工单的动作和每一个删除，`main.test.ts` 查每个 `delete` 都有）只回答会做什么，什么都不动；它和真做走同一处判断，所以真做会拒的，试跑也拒、话一样。只读的命令照常跑；别的改东西、还没有试跑的命令带着 `--dry-run` 会被拒（`NoDryRun`），不会悄悄做了。新建的收 `--key`，同一把键重发不会建两份。
-- **失败**是 stderr 最后一行的 JSON：`{"error":{"tag":…,"message":…,"next":[{"say":…,"run":[…]}]}}`，`next` 是接着能做什么，`run` 是能直接跑的命令（不带 `vibevalley`）：找不到的（`Missing`）总说去哪儿找（列出它们的命令），工单此刻不收的动作被拒时列出它能做的动作。帮助走 stdout，写错了命令时的帮助走 stderr。退出码分得出是哪一种：
+- **输出**：默认是短的文字，一件东西一行，开头是接着能用的名字（`#12  todo  修登录页`）；`issue show` 是几段短的，最后是这张工单现在能用的命令；列表默认 20 条，还有的话最后一行说怎么看下一页。`--format json` 是接口的形状，全命令行同一个参数。stdout 只放结果，失败时 stdout 是空的。
+- **笔记的命令**（`apps/cli/src/pkm.ts`）：`pkm capture 一句话`（记进今天的日记，`--page` 记到那一页末尾，不给字就读标准输入、按缩进拆成块）、`pkm search`、`pkm radar`、`pkm journal show`（`--day` 看别的一天）、`pkm page list|show|export`（大纲、给人读的 Markdown）、`pkm page edit <页>`（在 `$VISUAL`、`$EDITOR` 里改这一页文件的原文，关掉存回去；这期间页面被改过就不写，改过的留在临时文件里）。
+- **试跑** `--dry-run`：会删、会合、会关、会让帮工走的命令（接口表里带 `dryRun` 的：`issue status` 和每一个删除，`main.test.ts` 查每个 `delete` 都有）只回答会做什么，什么都不动；它和真做走同一处判断，所以真做会拒的，试跑也拒、话一样。只读的命令照常跑；别的改东西、还没有试跑的命令带着 `--dry-run` 会被拒（`NoDryRun`），不会悄悄做了。新建的收 `--key`，同一把键重发不会建两份。
+- **失败**是 stderr 最后一行的 JSON：`{"error":{"tag":…,"message":…,"next":[{"say":…,"run":[…]}]}}`，`next` 是接着能做什么，`run` 是能直接跑的命令（不带 `vibevalley`）：找不到的（`Missing`）总说去哪儿找（列出它们的命令），工单此刻不收的状态被拒时列出它能用的命令。帮助走 stdout，写错了命令时的帮助走 stderr。退出码分得出是哪一种：
 
   | 退出码 | 意思 |
   |---|---|
   | 0 | 成功，或要了帮助 |
   | 1 | 服务端出错 |
-  | 2 | 命令写错了：不认的参数、少参数、请求体不对、认不准是哪一个 |
+  | 2 | 命令写错了：不认的参数、少参数、请求体不对 |
   | 3 | 服务端拒绝（`Refused`，和语音、连接器、连接到本机的拒绝） |
   | 4 | 没有这个东西（`Missing`） |
   | 5 | 连不上服务端 |
-  | 130 | 按了 Ctrl+C：`api state --watch`、`issue work` 放下请求再走 |
+  | 130 | 按了 Ctrl+C：`api state --watch`、`issue watch` 放下请求再走 |
 
-1. 建工单。把 `…` 换成标题和项目；答复第一个词是工单的号，后面的 `<号>` 用它。
+1. 建工单，派出去。把 `…` 换成标题和项目；答复第一个词是工单的号，后面的 `<号>` 用它。
 
    ```bash
-   vibevalley issue new … --project … --agent codex --criterion '…'
+   vibevalley issue create … --project … --agent codex --criterion '…'
+   vibevalley issue status <号> todo
    ```
 
-2. 派活。命令把它派出去，等帮工交回来或停下来问，经过的状态写在 stderr，最后打出改动。
+2. 跟着它，等它交回来或停下来问，经过的状态写在 stderr。
 
    ```bash
-   vibevalley issue work <号>
+   vibevalley issue watch <号>
    ```
 
-3. 帮工在问，`issue show <号>` 的「问题」下面是它问的；不满意交回来的，说清要改什么。两样都是 `issue say`：它在问就是回答，在等验收就是打回；说完再派一轮。
+3. 帮工在问，`issue show <号>` 的「问题」下面是它问的；评论就是回答，再跟着它。
 
    ```bash
-   vibevalley issue say <号> …
-   vibevalley issue work <号>
+   vibevalley issue comment <号> …
+   vibevalley issue watch <号>
    ```
 
-4. 满意了，先试跑，看它会怎么交付（合进主分支还是开 PR、合之前跑不跑检查）；再去掉 `--dry-run` 真做。
+4. 看改动、给验收意见。不满意就再来一轮，说清要改什么；满意了先试跑完成，看它会怎么交付（合进主分支还是开 PR、合之前跑不跑检查），再真做。
 
    ```bash
-   vibevalley issue accept <号> --dry-run
-   vibevalley issue accept <号>
+   vibevalley issue diff <号>
+   vibevalley issue review <号> --fail --finding …
+   vibevalley issue status <号> todo --comment …
+   vibevalley issue review <号> --pass
+   vibevalley issue status <号> done --dry-run
+   vibevalley issue status <号> done
    ```
 
 状态规则和理由见子系统 [工单](docs/subsystems/issue.md#怎么走)。不派真的帮工、在隔离的沙箱里把这几步走一遍，见 [vv-acceptance/references/server.md](.agents/skills/vv-acceptance/references/server.md) 的 `--scripted-helper`。

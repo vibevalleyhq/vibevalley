@@ -56,14 +56,13 @@ export const show = <A>(value: A, text: (value: A) => string) =>
   Effect.flatMap(FormatFlag, (format) => (format === "json" ? printBody(JSON.stringify(value ?? null)) : out(text(value))));
 
 /** A change, or with --dry-run what it would do: by the endpoint's own dry run where it has one; a change with none is
- * refused rather than made. Quiet, the change is made and not printed: the command answers with what follows it. */
+ * refused rather than made. */
 export const change = <A>(o: {
   readonly name: string;
   readonly preview?: (api: VibeValleyApi) => Promise<Preview>;
   readonly does: (api: VibeValleyApi) => Promise<A>;
   readonly said: (done: A) => string;
   readonly as?: (done: A) => unknown;
-  readonly quiet?: boolean;
 }) =>
   Effect.gen(function* () {
     if (yield* DryRunFlag) {
@@ -71,26 +70,8 @@ export const change = <A>(o: {
       return yield* show(yield* ask(o.preview), (p) => p.does.join("\n"));
     }
     const done = yield* ask(o.does);
-    if (o.quiet === true) return;
     yield* show(o.as ? o.as(done) : done, () => o.said(done));
   });
-
-/** A thing named the way a person names it (a channel's name, a profile's), found among all of its kind by id or name;
- * none or more than one is refused, the candidates named. */
-export function pick<A>(all: readonly A[], said: string, keys: (a: A) => readonly (string | undefined)[], label: (a: A) => string, what: string) {
-  const want = said.replace(/^[#@]/u, "").toLowerCase();
-  const exact = all.filter((a) => keys(a).some((k) => k !== undefined && k.toLowerCase() === want));
-  const found = exact.length > 0 ? exact : all.filter((a) => keys(a).some((k) => k !== undefined && k.toLowerCase().includes(want)));
-  if (found.length === 1 && found[0] !== undefined) return Effect.succeed(found[0]);
-  const named = (found.length > 0 ? found : all).slice(0, 8).map(label);
-  return Effect.fail(
-    new Failure({
-      code: found.length === 0 ? exit.missing : exit.usage,
-      tag: found.length === 0 ? "Missing" : "Ambiguous",
-      text: t(found.length === 0 ? "cli.failure.noSuch" : "cli.failure.ambiguous", { what, said, these: named.join(", ") }),
-    }),
-  );
-}
 
 /** A flag's value, or nothing for the request to leave out. */
 export const given = <A>(o: Option.Option<A>): A | undefined => Option.getOrUndefined(o);

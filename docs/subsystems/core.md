@@ -21,7 +21,7 @@
 - 折法和拼帧 `apps/server/src/projection`：`reduce.ts` 的 `reduce`、`frame.ts` 的 `frameOf`，用各模块的规则（`session/roster.ts`、`channel/messages.ts`、`issue/status.ts`、`game/view.ts`、`game/view.ts` 的 `effectsOf`、`inbox/items.ts`、`ingress/`、`mailbox/`、`cron/when.ts`）；`projection.ts` 把它们交给 `core`（`Projection`）。`emptyWorkspaceState` 在 `core.ts`。`reduce` 只在工单或帮工的集合引用变了时重算工单状态；聊天气泡、花费这类事实不重算，`projection/reduce.test.ts` 守着这条。
 - `apps/server/src/http`：`api.ts` 按 `endpoints` 挂每个接口，`streams.ts` 三条流，`app.ts` 组装和开始答 HTTP；`handlers/<概念>.ts` 各实现一段 `Handlers`，根目录的 `handlers.ts` 合起来。
 - 能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出，`docs:verify` 查它是不是最新。
-- 命令行 `apps/cli`（`@vibevalley/cli`，入口 `src/main.ts`）：一条命令是一件事，经 `VibeValleyApi` 调服务端；`reach.ts` 写着每个接口由哪条命令用到、哪些只经 `api call`；终端里的对话是服务端的程序 `apps/server/src/chat.ts`，命令行把终端交给它。
+- 命令行 `apps/cli`（`@vibevalley/cli`，入口 `src/main.ts`）：一条命令一个操作（`issue status`、`channel message send`），经 `VibeValleyApi` 调服务端；`reach.ts` 写着每个接口由哪条命令用到、哪些只经 `api call`；工单的动作写成哪条命令是 `packages/protocol` 的 `actCommand`，服务端的 `next` 和 `issue show` 都用它；终端里的对话是服务端的程序 `apps/server/src/chat.ts`，命令行把终端交给它。
 - 「连接到本机」 `apps/server/src/lan/lan.ts` 的 `remoteMay`：从 `endpoints` 和三条流里挑 `can` 有 `remote` 的。
 - 页面 `apps/web/src/infra/frame.ts`（读 `/state` 和 `/live`），命令用 `VibeValleyApi`。
 - Core 不写状态文件；构造时为空，由各模块从数据库施加恢复事实。
@@ -51,7 +51,7 @@ Session 的身份、阶段、最近报告和资源恢复字段只在 session 表
 | 流 | 连上先发 | 之后发 | 谁读 |
 |---|---|---|---|
 | `GET /api/v1/state` | 一帧 `StateFrame` | 一条事实或特效到了，再收 200 毫秒，合成一帧（带这段时间的特效）；不是事实的旁路事件不出帧 | 页面、`vibevalley state` |
-| `GET /api/v1/events` | `snapshot`（整份核心状态） | `ServerEvent`：每条事实、轨迹的一步（`step`）、提醒（`Notice`）、农机变了（`runtime`） | 命令行 `vibevalley events`、调试 |
+| `GET /api/v1/events` | `snapshot`（整份核心状态） | `ServerEvent`：每条事实、轨迹的一步（`step`）、提醒（`Notice`）、农机变了（`runtime`） | 命令行 `vibevalley api events`、调试 |
 | `GET /api/v1/live` | 什么也不发 | `LiveEvent` 的三种：`SessionEvent`、`Notice`、`Runtime`；不发事实和快照 | 页面 |
 
 - 三条流分别用 `StateFrame`、`ServerEvent`、`LiveEvent` 的 Schema 编码；不合形状的值记错误并终止这条流，不发给客户端。重启后的核心状态省略 `callReason`，不保留一个显式 `undefined`。
@@ -75,9 +75,9 @@ Session 的身份、阶段、最近报告和资源恢复字段只在 session 表
 
 **命令行是皮**
 
-- 命令行是自己的包 `apps/cli`，经 HTTP 调服务端，不载入服务端、不打开它的库；连哪个服务端是 `--server`、`VIBEVALLEY_SERVER`，再没有就读家目录的 `server.json`（`@vibevalley/home`：服务端监听上以后写进去、停下时收回，写着地址和 pid，pid 不在了就不认；桌面版的服务端在随机端口上，靠它找到），最后是 `http://127.0.0.1:8787`。命令搭在 `effect/cli` 上，一条命令是一件事（`issue new|work|say|accept…`、`search`、`pkm capture`），参数由 `Flag`、`Argument` 写出，经 `VibeValleyApi` 调；接口的全集经 `api list`、`api call <操作>`，后者发出去以前照接口的 Schema 查。请求、流、读写和退出都走 Effect（`HttpClient`、`Sse`、`Stdio`、`NodeRuntime.runMain`）。
+- 命令行是自己的包 `apps/cli`，经 HTTP 调服务端，不载入服务端、不打开它的库；连哪个服务端是 `--server`、`VIBEVALLEY_SERVER`，再没有就读家目录的 `server.json`（`@vibevalley/home`：服务端监听上以后写进去、停下时收回，写着地址和 pid，pid 不在了就不认；桌面版的服务端在随机端口上，靠它找到），最后是 `http://127.0.0.1:8787`。命令搭在 `effect/cli` 上，照领域模型一条命令一个操作：`<资源> [<子资源>] <动词>`，动词是标准的 `list`、`show`、`create`、`edit`、`delete` 和接口自己的；参数照接口的字段写，经 `VibeValleyApi` 调；接口的全集经 `api list`、`api call <操作>`，后者发出去以前照接口的 Schema 查。请求、流、读写和退出都走 Effect（`HttpClient`、`Sse`、`Stdio`、`NodeRuntime.runMain`）。
 - 输出是给 agent 和人读的：默认是短文字，`--format json` 是接口的形状；失败是 stderr 最后一行的 `{"error":{…,"next":[…]}}`，退出码分得出是哪一种（[开发](docs/development.md#只用命令行派一个活)）。
-- 工单的动作由服务端给（`stage.acts`），命令按 `issueVerbs` 的词要它；`issue work <号>` 派出去以后跟着 `/state` 的帧等它交回来，打出改动。终端里的对话（`chat [农机]`）要服务端的农机、模型和配置，是服务端的程序 `apps/server/src/chat.ts`，命令行把终端交给它（`VIBEVALLEY_CHAT` 指到它，桌面版的启动脚本设）。直接聊不算农场的活：没有工单，不进核心状态、轨迹和花费。
+- 工单能不能挪、挪到哪由服务端判断：`issue status <号> <状态>` 调 `issue.status.update`，拒绝时带 `next`；每个动作对应的命令由 `actCommand` 写出（挪状态是 `issue status`，说话是 `issue comment`，停下是 `session stop`）。`issue watch <号>` 跟着 `/state` 的帧，等它到 `in_review`、`done` 或 `canceled`。终端里的对话（`chat [农机]`）要服务端的农机、模型和配置，是服务端的程序 `apps/server/src/chat.ts`，命令行把终端交给它（`VIBEVALLEY_CHAT` 指到它，桌面版的启动脚本设）。直接聊不算农场的活：没有工单，不进核心状态、轨迹和花费。
 - **试跑**：会删、会合、会关、会让帮工走的接口在 `endpoints` 里带 `dryRun`，指向同参数、同请求体、答复 `Preview`（`{ does }`）的另一个接口；命令行的 `--dry-run` 调它。试跑归拥有规则的服务：能不能做是一处判断，真做和试跑都过它（工单的 `settledMove`，档案的 `deletableAgent`，记性的 `forgettable`……），所以试跑说能做的，真做不会因为同一个原因被拒；试跑不写库、不施加事实、不碰 git。每个 `delete` 都带试跑（`cli.test.ts` 查）。
 - **拒绝带下一步**：`Refused`、`Missing` 有 `next`，每条是 `{ say, run? }`，`run` 是能原样接在命令后面跑的话，由拒绝的那一处给出。找不到的必须说去哪儿找（`missing` 的 `next` 必填，去处在 `errors.ts` 的 `lookIn`）；工单和计划的拒绝给出它们现在能做的动作（工单的 `nextSteps`，计划的 `graphNext`、`stepNext`）；要主人想一句话或拿主意的只给 `say`。
 
@@ -136,7 +136,7 @@ HTTP 命令入口与页面 WebSocket 共用来源判断：Host 应为回环地�
 - **接口带版本，版本在路径里。** 客户端不一起升级：桌面应用和服务端一起换，经「连接到本机」连的设备什么时候升由那台设备定；没有版本时要么形状只加不改（锁死改名），要么所有设备同一天升级（做不到）。放弃了请求头里的版本：curl、日志、「连接到本机」的放行表都要多一层解析；放弃了每个操作自己带版本：同一个概念散在几个版本里；放弃了 `/api` 当 v1 的别名：两个名字要一直维护，也分不清谁是新客户端（[不留兼容](docs/subsystems/foundation.md)）；放弃了网关映射：本机前面没有网关。v1 不能在设备升级前删，这是唯一明确的兼容负担。
 - **先有能力，再有入口，能力表和接口写在同一处。** 农场能做的事曾从七个入口各接一遍：没有命令行；「连接到本机」放什么在它自己的代码里写死；同一件事几个入口规则不一样（派活一条路排队、一条路拒绝）；加一个能力要接好几处，漏了也不报错。`can` 和接口写在 `endpoints` 的同一行里，少了它类型就不对。放弃了另放一个 YAML：加操作时会忘了改它。放弃了让命令行各自接一遍：它的命令手写，但 `apps/cli/src/reach.ts` 是一张覆盖每个接口的表，写明由哪条命令用到、或只经 `api call`，加接口不写这一行编不过。放弃了命令行直接开数据库：服务端开着时就有两份核心状态。放弃了管家的工具、MCP 也从接口生成：模型要的说明、默认值、人读的写法和回话和给程序的接口不一样，硬生成会变差；所以工具手写这些，但由接口声明，名字、字段、谁能调照接口表，测试查（[管家](docs/subsystems/orchestrator.md) 的 `apps/server/src/tool`）。放弃了工具和接口各起各的名字、各定谁能调：两边一年比一年漂，同一件事管家和帮工叫法不同，参数一个叫 `target` 一个叫 `id`。
 - **命令行是 agent 驱动农场、验证改动的入口。** 改完代码最贵的一步是证明改对了：Playwright 绑在界面的字和布局上，服务端的测试只测写好的情形；验证一个改动就是在沙箱里写一串命令、读它们的答复（`vv-acceptance/references/server.md`）。所以它的输出、退出码、试跑和下一步都按「给 agent 读」定。放弃了手写参数解析：帮助、参数类型、错误的格式 `effect/cli` 都有，和服务端是同一个运行时。
-- **一条命令是一件事，不是一个接口。** 上一版每个接口一条命令（从接口表拼出来）：派一个活要先知道是 `issue status update` 和它的请求体，命令跟不上类型、四处 `as never`，每条都打出整份 JSON。现在命令是 agent 要做的事（`issue work`、`issue say`），动词尽量少：工单的动作由它此刻能做的定，一个 `say` 在它问时是回答、在等验收时是打回，agent 不用先判断该用哪个命令；不知道东西写在哪就用一个 `search`。不带命令只打帮助：agent 裸跑不会掉进一个等输入的对话。参数是参数，经生成的 `VibeValleyApi` 调；接口的全集仍经 `api call`，`reach.ts` 管着不漏。放弃了只给 agent 开 MCP：这台电脑上的 Claude Code、Codex 在 shell 里最顺，命令行能接管道、写进脚本，不用配。放弃了命令和帮工的 MCP 工具共用一份定义：工具的描述为模型调过、有评测管着，以后再看。放弃了默认 JSON：agent 读 JSON 费 token，人读不下去；要结构时 `--format json`。
+- **命令照领域模型，一条命令一个操作。** 最早一版每个接口一条命令（从接口表拼出来）：命令是接口的形状、参数全塞 `--json`、跟不上类型。之后一版按意图收成几个动词（`work`、`say`、`accept`），由工单此刻的样子挑动作：一个词几个意思，打回这种要花钱的动作藏在「说一句」后面，动作和动词的翻译表要两边对齐。现在照 `gh issue`、Linear 的命令行：挑过的一部分接口各一条命令，名字是资源加标准动词，参数是接口的字段，合不合法由服务端说；智能体只是推进工单的负责人，命令行管的是工单。放弃了顶层一个 `search` 搜全部：它是几个操作拼的，各资源有自己的 `search`、`list`。放弃了只给 agent 开 MCP：这台电脑上的 Claude Code、Codex 在 shell 里最顺，命令行能接管道、写进脚本，不用配。放弃了默认 JSON：agent 读 JSON 费 token，人读不下去；要结构时 `--format json`。
 - **命令行是自己的包，不载入服务端。** 它跟着服务端一起装、一起起时，`vibevalley issue list` 也要先载入整个服务端的依赖。终端里的对话要服务端的农机、模型和配置，留成服务端的程序，命令行把终端交给它；放弃了把聊天也做成流式的接口：要新接口和新的流，而直接聊今天不要服务端开着也能用。命令行的测试在进程里起整个农场（`@vibevalley/server/testing`），和以前一样快；只有这一处 dev 依赖服务端。
 - **试跑是服务的一个接口，不是命令行的推算。** 放弃了命令行先 GET 再推算：那是在命令行里重写服务端的规则，迟早和真做不一致。放弃了给真做的接口的输入加一个 `dryRun` 字段：试跑的答复和真做的形状不一样，分开两个接口，各自的 Schema 都准。拆不成「判断」和「动手」两步的接口宁可不标试跑，也不说错。
 - **下一步由拒绝的一处给出。** 放弃了命令行按错误的字猜下一步：字一改提示就错。`run` 写成命令行的话，页面可以做成按钮，管家的工具把 `say` 当回话。

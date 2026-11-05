@@ -16,7 +16,7 @@ apps/server/               服务端（Effect v4，Node 24；仓库里用 vpx �
 apps/server/db/            库（SQLite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，
                            generated/ 是 scripts/sqlite-generate.ts 从它们写出的
 apps/server/src/*/testdata 规则的黄金数据（*.jsonl.gz）和样例
-apps/cli/                  命令行（vibevalley）：给 agent 用的、按事情分的命令，经 VibeValleyApi 调服务端，不载入服务端；api list|call 够得着每个接口，
+apps/cli/                  命令行（vibevalley）：照领域模型一条命令一个操作，经 VibeValleyApi 调服务端，不载入服务端；api list|call 够得着每个接口，
                            guide 是给 agent 的用法，帮助和典型的答复录在黄金数据里（apps/cli/README.md）
 apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手机三个宿主共用的一份，由服务端（--web）在 / 提供；/ 打开工作台，/farm 是像素农场
                            （src/farm，PixiJS），其余是工作台：一个概念一个 src/features/<概念>，名字和服务端的模块一样；分层
@@ -58,7 +58,7 @@ vp install                                                      # 根目录：�
 vp check                                                        # 改完任何代码：格式（oxfmt）、lint（oxlint，带类型，跑在 tsrs 上）和全部包的类型；--fix 改格式
 vpx scripts/comment-review.ts                                   # 提 PR 前：模型照 docs/style/code.md 审这个分支新加的注释，你逐条核实再删或改（vv-comments；--all <目录> 清一块已有的）
 vp run --filter @vibevalley/server start                         # 服务端，127.0.0.1:8787；后面加 --web ../web/dist 同时提供页面
-vp run --filter @vibevalley/cli start issue list                 # 命令行：给 agent 用的、按事情分的命令（guide 是用法，api list|call 够得着每个接口），doctor 看农场好不好，search 一次搜工单、频道、笔记和记性，pkm 记、看、改笔记，app 管桌面版，chat [农机] 在终端里对话；装了桌面版的在「关于」里装 vibevalley 命令
+vp run --filter @vibevalley/cli start issue list                 # 命令行：照领域模型一条命令一个操作（issue status、channel message send…；guide 是用法，api list|call 够得着每个接口），doctor 看农场好不好，pkm 记、搜、看、改笔记，app 管桌面版，chat [农机] 在终端里对话；装了桌面版的在「关于」里装 vibevalley 命令
 vp run server:check                                             # 改完服务端、packages/protocol、ai、agent、testkit：类型（vp check）、规则的测试、查询是否最新、vitest
 vp run packages:build                                           # 改了 packages/ 的导出或类型、单跑 vp check 以前：打出各库给别人的声明（dist/，带缓存；各项检查、提交前的钩子、vp install 都先跑它）
 vp run --filter @vibevalley/server db:generate                   # 改完 db/queries 或 db/migrations：重写 db/generated（推不出的类型写 ::int 这类，生成器会说）

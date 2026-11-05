@@ -110,8 +110,10 @@ describe("crons", () => {
         expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "nobody" }), owner))).toMatchObject({
           reason: expect.stringContaining("没有叫 nobody"),
         });
+        // A channel is named as the owner names it: one there is not is not found.
         expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { channel: "elsewhere" }), owner))).toMatchObject({
-          reason: expect.stringContaining("elsewhere"),
+          _tag: "Missing",
+          what: expect.stringContaining("elsewhere"),
         });
         const every = yield* s.add(req("巡检", "跑一遍检查", { kind: "every", minutes: 5 }, { agent: "lab", project: "demo" }), owner);
         expect([every.agent, every.project]).toEqual(["lab", "demo"]);

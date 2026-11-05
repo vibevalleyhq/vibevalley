@@ -2,6 +2,7 @@ import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Se
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { ownerId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
@@ -200,7 +201,8 @@ const make = Effect.gen(function* () {
       const at = now();
       const problem = cronProblem(req, at);
       if (problem) return yield* Effect.fail(refused(problem));
-      const want = req.channel ?? chat.defaultChannel();
+      // A channel as the owner names it (general, #general) as well as by id.
+      const want = req.channel === undefined ? chat.defaultChannel() : yield* chat.placeOf(ownerId, req.channel);
       const channel = (yield* chat.channels()).find((c) => c.id === want);
       if (!channel) return yield* Effect.fail(refused(t("server.cron.noChannel", { name: want }), [lookIn.channel]));
       const named = (req.agent ?? "").trim();

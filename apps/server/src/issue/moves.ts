@@ -5,7 +5,7 @@
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues } from "@vibevalley/protocol";
-import { commandOf, issueVerbs, type Next } from "@vibevalley/protocol/api";
+import { actCommand, type Next } from "@vibevalley/protocol/api";
 import { executionsOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 /** in_progress and in_review are the session's to reach, never the owner's. */
@@ -71,21 +71,29 @@ export function nextSteps(item: T.Issue): Next[] {
   const session = latestSessionIdOf(item);
   const acts = item.stage.acts.flatMap((a): Next[] => {
     const label = t(`shared.act.${a.act}`);
-    const command = ["issue", issueVerbs[a.act], n];
-    // One that needs the owner's words runs nothing: it says the command, the words to come after it.
-    if ((a.does === "move" && a.words === "required") || a.does === "say")
-      return [{ say: t("server.issue.move.withWords", { say: label, command: command.join(" ") }) }];
-    if (a.does === "stop" && session === undefined) return [];
-    return [{ say: label, run: command }];
+    const command = actCommand(item, a, session);
+    if (command === undefined) return [];
+    // One that needs the owner's words runs nothing: it says the command, and where the words go.
+    if (command.words === "required")
+      return [
+        {
+          say: t("server.issue.move.withWords", {
+            say: label,
+            command: [...command.run, ...(a.does === "move" ? ["--comment", "…"] : ["…"])].join(" "),
+          }),
+        },
+      ];
+    return [{ say: label, run: [...command.run] }];
   });
   const pressed = new Set(item.stage.acts.flatMap((a) => (a.does === "move" ? [a.status] : [])));
   const moves = statusMoves(item)
     .filter((to) => !pressed.has(to))
     .map((to): Next => {
       const say = t("server.issue.move.moveTo", { status: t(`shared.status.${to}`) });
+      const run = ["issue", "status", n, to];
       return statusMove(item, to)[0] === "round"
-        ? { say: t("server.issue.move.roundWithText", { say, command: commandOf("issue.status.update", [n], { status: to, text: "…" }).join(" ") }) }
-        : { say, run: commandOf("issue.status.update", [n], { status: to }) };
+        ? { say: t("server.issue.move.roundWithText", { say, command: [...run, "--comment", "…"].join(" ") }) }
+        : { say, run };
     });
   return [...acts, ...moves];
 }

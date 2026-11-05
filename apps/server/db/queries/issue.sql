@@ -40,10 +40,10 @@ from issue left join session_run latest_run on latest_run.id = (
 
 -- name: AddIssue :exec
 insert into issue (id, number, title, description, origin_trigger_id, mandate_strength, max_bot_review_rounds, auto_submit_pr,
-                   project, priority, rank, created_at, cron, deliver, parent, blocked_by, constraints)
+                   project, priority, rank, created_at, cron, deliver, parent, blocked_by, constraints, criteria)
 values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.narg(origin_trigger_id),
         sqlc.arg(mandate_strength), sqlc.arg(max_bot_review_rounds), sqlc.arg(auto_submit_pr), sqlc.narg(project), sqlc.arg(priority),
-        (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(cron), sqlc.arg(deliver), sqlc.narg(parent), sqlc.narg(blocked_by), sqlc.narg(constraints));
+        (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(cron), sqlc.arg(deliver), sqlc.narg(parent), sqlc.narg(blocked_by), sqlc.narg(constraints), sqlc.narg(criteria));
 
 -- name: SetIssueConstraints :exec
 update issue set constraints = sqlc.narg(constraints) where issue.id = sqlc.arg(id);

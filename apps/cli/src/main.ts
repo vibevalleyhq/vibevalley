@@ -5,7 +5,7 @@
 // conversation in the terminal: the server's program, handed this terminal (chat.ts). With no command, the help.
 //
 //	vpx src/main.ts issue list --waiting
-//	vpx src/main.ts search 打卡
+//	vpx src/main.ts issue status 12 todo
 //	vpx src/main.ts chat [runtime] [--cwd DIR] [--model ID] [-p PROMPT]
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
@@ -31,8 +31,7 @@ const { guideCommand } = await import("./guide.ts");
 const { issueCommand } = await import("./issue.ts");
 const { keptCommands } = await import("./notes.ts");
 const { pkmCommand } = await import("./pkm.ts");
-const { farmPartCommands, runtimeCommand } = await import("./project.ts");
-const { searchCommand } = await import("./search.ts");
+const { farmPartCommands } = await import("./project.ts");
 
 const version = "0.1.0";
 
@@ -87,11 +86,9 @@ const root = Command.make("vibevalley").pipe(
   // By what a person or an agent does; what no command covers is reached through api (reach.ts says which).
   Command.withSubcommands([
     issueCommand,
-    searchCommand,
-    channelCommand,
     pkmCommand,
+    channelCommand,
     ...farmPartCommands,
-    runtimeCommand,
     ...keptCommands,
     chatCommand,
     doctorCommand,

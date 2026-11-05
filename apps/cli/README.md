@@ -1,20 +1,19 @@
 # apps/cli
 
 `vibevalley`, the command line: for the agents on this machine first (Claude Code, Codex, the helpers) and for people
-too. One command is one thing to do with the farm, typed with effect/cli and asking the server through the generated
-`VibeValleyApi`; it loads none of the server. How it reads and why: [development](docs/development.md#只用命令行派一个活),
+too. It follows the farm's model as a project tracker's does (`gh issue`): one command is one operation of the server's,
+`<resource> [<sub-resource>] <verb>`, typed with effect/cli and asking the server through the generated `VibeValleyApi`;
+it loads none of the server and works out nothing the server decides. How it reads and why: [development](docs/development.md#只用命令行派一个活),
 [the core](docs/subsystems/core.md).
 
 ```
 src/main.ts        the root: the groups below, the global flags (--server, --dry-run, --format), how help and failures are said
-src/farm.ts        what every task command stands on: ask (the typed client), show (text or --format json), change (--dry-run),
-                   pick (a thing by its name)
-src/issue.ts       issue list|show|new|edit|work|say|accept|stop|cancel: the act each does is the one the issue offers now
-src/search.ts      search: issues, channels, notes and memories at once, each under its heading (--in for some)
-src/channel.ts     channel list|read|say|search
-src/pkm.ts         the notes: pkm capture|show [page]|list|edit|radar (searching them is search)
-src/project.ts     project, agent, session, runtime list [--probe]
-src/notes.ts       memory, cron, artifact
+src/farm.ts        what every command stands on: ask (the typed client), show (text or --format json), change (--dry-run)
+src/issue.ts       issue list|show|create|edit|status|comment|review|diff|timeline|delete|watch
+src/channel.ts     channel list, channel message list|send|search
+src/pkm.ts         the notes: pkm capture|search|radar, pkm journal show, pkm page list|show|export|edit
+src/project.ts     project list|create, agent list, session list|show|stop, runtime list|refresh
+src/notes.ts       memory list|search|create|delete, cron list|create|edit|delete, artifact list|show|read
 src/app.ts         the desktop app's own abilities, over its socket in the farm's home (@vibevalley/home)
 src/doctor.ts      this machine's farm: found, reachable, the app, the runtimes, the keys, connecting to this machine
 src/api.ts         every endpoint as it is: api list (with its input's JSON Schema), api call <op>, api state, api events
@@ -28,8 +27,9 @@ src/testdata/      the golden answers: help, typical mistakes, refusals and dry 
 
 ## Rules
 
-- **A command is a thing to do, not an endpoint.** A new endpoint gets a line in `reach.ts`: the command that uses it,
-  or `api`.
+- **A command is an operation of the server's**, named by its resource and a standard verb (`list`, `show`, `create`,
+  `edit`, `delete`, or the endpoint's own); it calls that one endpoint and leaves what is allowed to the server. A new
+  endpoint gets a line in `reach.ts`: the command that calls it, or `api`.
 - **Text first, the protocol's shape with `--format json`.** A line leads with the name to use next (`#12`, `#general`).
 - **Every command has a description and an example** (`main.test.ts` holds it); the words are in
   `packages/i18n/locales/<lang>/cli.json`.

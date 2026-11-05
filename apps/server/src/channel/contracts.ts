@@ -222,7 +222,7 @@ export interface ChannelService {
   readonly unread: (who: string) => Effect.Effect<T.ChannelUnread[]>;
   /** Every channel and direct channel as a page lists them, the default first. */
   readonly list: () => Effect.Effect<T.Channel[]>;
-  readonly history: (channel: string, before?: number, limit?: number) => Effect.Effect<T.ChatMessage[]>;
+  readonly history: (channel: string, before?: number, limit?: number) => Effect.Effect<T.ChatMessage[], ApiError>;
   /** A message's durable location; the recent state may hold neither the message nor its thread. */
   readonly messageLocation: (id: T.MessageId) => Effect.Effect<{ readonly channel: T.Channel; readonly top: string } | undefined>;
   readonly envelopeResource: (id: T.MessageId) => Effect.Effect<EnvelopeResource | undefined>;

@@ -194,7 +194,8 @@ const make = Effect.gen(function* () {
     const files = yield* attachmentsOf(more.attachments ?? []);
     if (!text.trim() && files.length === 0) return yield* Effect.fail(refused(t("server.channel.empty")));
     if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(t("server.channel.sendKeyLong")));
-    const where = channel ?? model.defaultId();
+    // A channel as the owner names it (general, #general, @fox) as well as by id; none is the default one.
+    const where = channel === undefined || model.channel(channel) ? (channel ?? model.defaultId()) : yield* resolveTarget(ownerId, channel);
     if (!model.channel(where)) return yield* Effect.fail(missing(t("server.channel.noChannel", { id: where }), [lookIn.channel]));
     yield* answered(where, more.replyTo);
     const written = yield* write({
@@ -519,7 +520,9 @@ const make = Effect.gen(function* () {
       return yield* Effect.forEach([...model.channels("channel"), ...model.channels("direct")], counted);
     }),
     history: Effect.fn("Channel.history")(function* (channel, before, limit) {
-      const rows = yield* db.run(qm.messagesBefore({ channel_id: channel, number: before ?? 2147483647, n: Math.min(Math.max(limit ?? 50, 1), 200) }));
+      // A channel as the owner names it (general, #general, @fox) as well as by id.
+      const at = model.channel(channel) ? channel : yield* resolveTarget(ownerId, channel);
+      const rows = yield* db.run(qm.messagesBefore({ channel_id: at, number: before ?? 2147483647, n: Math.min(Math.max(limit ?? 50, 1), 200) }));
       return [...rows].toReversed().map(toMessage);
     }),
     markRead: Effect.fn("Channel.markRead")(function* (channel, seq) {

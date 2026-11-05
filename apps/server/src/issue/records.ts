@@ -26,7 +26,7 @@ import { assignTo, Assignments } from "./assignment.ts";
 import { issueBrief, splitBrief } from "./brief.ts";
 import { issueRow } from "./creation.ts";
 import { dependencyProblems } from "./dependencies.ts";
-import { openQuestions } from "./refinement.ts";
+import { kept, openQuestions } from "./refinement.ts";
 import { issueRows, jsonOrNull } from "./rows.ts";
 import { isClosed, issueOrder } from "./status.ts";
 
@@ -136,6 +136,7 @@ export const issueRecords = Effect.gen(function* () {
               title,
               description,
               blockedBy,
+              ...(req.criteria ? { criteria: kept(req.criteria) } : {}),
               ...(project ? { project } : {}),
               ...(parent ? { parent: parent.id } : {}),
               deliver: req.deliver ?? (store.isOrchestrator(req.agent ?? "") ? "answer" : "change"),

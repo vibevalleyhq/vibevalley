@@ -18,7 +18,7 @@ describe("the command line's answers", () => {
     Effect.gen(function* () {
       const server = yield* farm;
       // The one issue the cases refuse and dry-run: #1 in a farm of its own.
-      expect((yield* cli(["issue", "new", "派不出去", "--server", server])).code).toBe(0);
+      expect((yield* cli(["issue", "create", "派不出去", "--server", server])).code).toBe(0);
       const answers = new Map<number, unknown>();
       for (const c of cases) {
         const args = c.in as string[];

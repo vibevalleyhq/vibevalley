@@ -1,6 +1,6 @@
-// `vibevalley issue …`: what an agent does with issues, a command a thing to do. What an issue can do now is the
-// server's word (its stage's acts, as its page has them); a verb asks for one of them and says which others there are
-// when it is not one of them.
+// `vibevalley issue …`: the issues as a project tracker has them, a command an operation of the server's (issue.list,
+// issue.status.update…). Which moves an issue takes now is the server's to say: a refused one comes back with the
+// commands it does take (its next), and `issue show` ends with them.
 
 import { Effect, Schema, Stream } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
@@ -8,16 +8,18 @@ import { Argument, Command, Flag } from "effect/cli";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues, PriorityValues, statePath } from "@vibevalley/protocol";
-import { issueVerbs } from "@vibevalley/protocol/api";
+import { actCommand } from "@vibevalley/protocol/api";
+import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
-import { DryRunFlag, frames, ServerFlag } from "./api.ts";
+import { frames, ServerFlag } from "./api.ts";
 import { ask, change, given, show } from "./farm.ts";
-import { exit, Failure, err, stdinText } from "./output.ts";
+import { err, exit, Failure, stdinText } from "./output.ts";
 
 const issueArg = Argument.String("issue").pipe(Argument.withDescription(t("cli.arg.issue")));
-const wordsArg = (name: string) => Argument.String(name).pipe(Argument.variadic(), Argument.withDescription(t("cli.arg.words")));
-const optionalText = (name: string) => Flag.String(name).pipe(Flag.optional);
+const words = (about: Parameters<typeof t>[0]) => Argument.String("words").pipe(Argument.variadic({ min: 1 }), Argument.withDescription(t(about)));
+const optionalText = (name: string, about: Parameters<typeof t>[0]) => Flag.String(name).pipe(Flag.optional, Flag.withDescription(t(about)));
+const priorityFlag = Flag.Literals("priority", PriorityValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.priority")));
 
 /** #12 or 12: the issue's number, as the server takes it. */
 const ref = (said: string) => said.replace(/^#/u, "");
@@ -25,93 +27,42 @@ const ref = (said: string) => said.replace(/^#/u, "");
 /** Whose it is: the profile of its latest assignment. */
 const agentOf = (i: T.Issue) => i.assignments.at(-1)?.agent;
 
-/** One line an issue: what to name it by first, then where it stands, its title, who has it and where (what `issue list`
- * and `vibevalley search` print). */
-export const issueLine = (i: T.Issue) =>
-  [`#${i.number}`, i.stage.state, i.title, agentOf(i) === undefined ? "" : `@${agentOf(i)}`, i.project === undefined ? "" : `[${i.project}]`]
+/** One line an issue: its number first, then its status, its title, whose it is and where. */
+const issueLine = (i: T.Issue) =>
+  [`#${i.number}`, i.status, i.title, agentOf(i) === undefined ? "" : `@${agentOf(i)}`, i.project === undefined ? "" : `[${i.project}]`]
     .filter((p) => p !== "")
     .join("  ");
 
-/** What can be done with it now, as commands: the lead first, as the server orders them. */
-const nextOf = (i: T.Issue) => [...new Set(i.stage.acts.map((a) => issueVerbs[a.act]))].map((verb) => ({ say: verb, run: ["issue", verb, String(i.number)] }));
+/** What can be done with it now, as the commands that do it (the server's acts, the one it waits on first). */
+const doable = (i: T.Issue) =>
+  i.stage.acts.flatMap((a) => {
+    const c = actCommand(i, a, latestSessionIdOf(i));
+    if (c === undefined) return [];
+    const after = c.words !== "required" ? [] : a.does === "move" ? ["--comment", "…"] : ["…"];
+    return [[...c.run, ...after].join(" ")];
+  });
 
 const issueText = (i: T.Issue) =>
   [
     `#${i.number}  ${i.title}`,
-    `${i.stage.state}${i.stage.stuck ? ` (${i.stage.stuck})` : ""}  ${i.priority}${i.project ? `  [${i.project}]` : ""}${agentOf(i) ? `  @${agentOf(i)}` : ""}`,
+    [i.status, i.priority, i.project ? `[${i.project}]` : "", agentOf(i) ? `@${agentOf(i)}` : ""].filter((p) => p !== "").join("  "),
+    t("cli.issue.stage", { stage: i.stage.stuck ? `${i.stage.state} (${i.stage.stuck})` : i.stage.state }),
     ...(i.description.trim() === "" ? [] : ["", i.description.trim()]),
     ...(i.criteria.length === 0 ? [] : ["", t("cli.issue.criteria"), ...i.criteria.map((c, n) => `  ${n + 1}. ${c}`)]),
     ...(i.questions.length === 0
       ? []
       : ["", t("cli.issue.questions"), ...i.questions.map((q) => `  ? ${q.question}${q.options.length > 0 ? `  (${q.options.join(" | ")})` : ""}`)]),
-    "",
-    t("cli.issue.can", {
-      verbs:
-        nextOf(i)
-          .map((n) => n.say)
-          .join(", ") || "-",
-    }),
+    ...(doable(i).length === 0 ? [] : ["", t("cli.issue.can"), ...doable(i).map((c) => `  vibevalley ${c}`)]),
   ].join("\n");
-
-/** The first act the issue offers of those wanted, done: a move, a word to its helper, or stopping its helper. Quiet, it
- * prints nothing (issue work answers with the changes it waits for). */
-const act = (name: string, said: string, wanted: readonly T.IssueAct[], words: string | undefined, quiet = false) =>
-  Effect.gen(function* () {
-    const issue = yield* ask((api) => api.issue.get({ id: ref(said) }));
-    // In the command's own order: say answers the question the helper waits on, sends back what waits for review, else
-    // carries the words to it.
-    const action: T.IssueAction | undefined = wanted.map((w) => issue.stage.acts.find((a) => a.act === w)).find((a) => a !== undefined);
-    if (!action)
-      return yield* new Failure({
-        code: exit.refused,
-        tag: "Refused",
-        text: t("cli.issue.cannot", { issue: `#${issue.number}`, state: issue.stage.state, verb: name }),
-        next: nextOf(issue),
-      });
-    const id = issue.id;
-    switch (action.does) {
-      case "move": {
-        if (action.words === "required" && !words)
-          return yield* new Failure({ code: exit.usage, tag: "MissingArgument", text: t("cli.issue.needsWords", { verb: name }) });
-        const request = { id, status: action.status, ...(words ? { text: words } : {}) };
-        return yield* change({
-          name: `issue ${name}`,
-          preview: (api) => api.issue.status.previewUpdate(request),
-          does: (api) => api.issue.status.update(request),
-          said: (i) => issueLine(i),
-          quiet,
-        });
-      }
-      case "say": {
-        if (!words) return yield* new Failure({ code: exit.usage, tag: "MissingArgument", text: t("cli.issue.needsWords", { verb: name }) });
-        return yield* change({
-          name: `issue ${name}`,
-          does: (api) => api.issue.comment.create({ id, text: words }),
-          said: () => t("cli.issue.told", { issue: `#${issue.number}` }),
-        });
-      }
-      case "stop": {
-        const session = issue.assignments.at(-1)?.executions.at(-1)?.session;
-        if (session === undefined)
-          return yield* new Failure({ code: exit.refused, tag: "Refused", text: t("cli.issue.noHelper", { issue: `#${issue.number}` }) });
-        return yield* change({
-          name: `issue ${name}`,
-          does: (api) => api.session.stop({ id: session }),
-          said: () => t("cli.issue.stopped", { issue: `#${issue.number}` }),
-        });
-      }
-    }
-  });
-
-const joined = (words: readonly string[]) => (words.length > 0 ? words.join(" ") : undefined);
 
 const listCommand = Command.make(
   "list",
   {
     status: Flag.Literals("status", IssueStatusValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.issueStatus"))),
-    project: optionalText("project").pipe(Flag.withDescription(t("cli.flag.project"))),
-    text: optionalText("text").pipe(Flag.withDescription(t("cli.flag.text"))),
-    waiting: Flag.Boolean("waiting").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.waiting"))),
+    project: optionalText("project", "cli.flag.project"),
+    text: optionalText("text", "cli.flag.text"),
+    wantsOwner: Flag.Boolean("wants-owner").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.wantsOwner"))),
+    closed: Flag.Boolean("closed").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.closed"))),
     limit: Flag.Int("limit").pipe(Flag.withDefault(20), Flag.withDescription(t("cli.flag.limit"))),
   },
   (o) =>
@@ -125,12 +76,12 @@ const listCommand = Command.make(
           ...(status ? { status } : {}),
           ...(project ? { project } : {}),
           ...(text ? { text } : {}),
-          ...(o.waiting ? { wantsOwner: true } : {}),
+          ...(o.wantsOwner ? { wantsOwner: true } : {}),
+          ...(o.closed ? { closed: true } : {}),
         }),
       );
-      const shown = issues.slice(0, o.limit);
       yield* show(
-        shown,
+        issues.slice(0, o.limit),
         (list) =>
           [...list.map(issueLine), ...(issues.length > o.limit ? [t("cli.more", { flag: `--limit ${o.limit * 2}` })] : [])].join("\n") || t("cli.issue.none"),
       );
@@ -139,87 +90,149 @@ const listCommand = Command.make(
   Command.withDescription(t("cli.command.issue.list")),
   Command.withExamples([
     { command: "vibevalley issue list", description: t("cli.example.issueList.about") },
-    { command: "vibevalley issue list --waiting", description: t("cli.example.issueWaiting.about") },
+    { command: "vibevalley issue list --wants-owner", description: t("cli.example.issueWantsOwner.about") },
   ]),
 );
 
-const newCommand = Command.make(
-  "new",
+const showCommand = Command.make("show", { issue: issueArg }, (o) =>
+  Effect.flatMap(
+    ask((api) => api.issue.get({ id: ref(o.issue) })),
+    (i) => show(i, issueText),
+  ),
+).pipe(
+  Command.withDescription(t("cli.command.issue.show")),
+  Command.withExamples([{ command: "vibevalley issue show 12", description: t("cli.example.issueShow.about") }]),
+);
+
+/** --description: as given, or `-` for what comes on stdin. */
+const descriptionOf = (said: string | undefined) => (said === "-" ? stdinText.pipe(Effect.orElseSucceed(() => "")) : Effect.succeed(said));
+
+const createCommand = Command.make(
+  "create",
   {
-    title: wordsArg("title"),
-    body: optionalText("body").pipe(Flag.withDescription(t("cli.flag.body"))),
-    project: optionalText("project").pipe(Flag.withDescription(t("cli.flag.project"))),
-    agent: optionalText("agent").pipe(Flag.withDescription(t("cli.flag.agent"))),
-    priority: Flag.Literals("priority", PriorityValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.priority"))),
+    title: words("cli.arg.title"),
+    description: optionalText("description", "cli.flag.description"),
+    project: optionalText("project", "cli.flag.project"),
+    agent: optionalText("agent", "cli.flag.agent"),
+    priority: priorityFlag,
     criterion: Flag.String("criterion").pipe(Flag.atLeast(0), Flag.withDescription(t("cli.flag.criterion"))),
-    key: optionalText("key").pipe(Flag.withDescription(t("cli.flag.key"))),
+    key: optionalText("key", "cli.flag.key"),
   },
   (o) =>
     Effect.gen(function* () {
-      const said = given(o.body);
-      const description = said === "-" ? yield* stdinText.pipe(Effect.orElseSucceed(() => "")) : said;
+      const description = yield* descriptionOf(given(o.description));
       const fields = { project: given(o.project), agent: given(o.agent), priority: given(o.priority), requestKey: given(o.key) };
-      const request = {
+      const request: T.IssueRequest = {
         title: o.title.join(" "),
         ...(description ? { description } : {}),
         ...(fields.project ? { project: fields.project } : {}),
         ...(fields.agent ? { agent: fields.agent } : {}),
         ...(fields.priority ? { priority: fields.priority } : {}),
+        ...(o.criterion.length > 0 ? { criteria: [...o.criterion] } : {}),
         ...(fields.requestKey ? { requestKey: fields.requestKey } : {}),
       };
-      yield* change({
-        name: "issue new",
-        // Criteria are the issue's to keep once it is made: set right after, in the same command.
-        does: (api) =>
-          api.issue.create(request).then((made) => (o.criterion.length > 0 ? api.issue.update({ id: made.id, criteria: [...o.criterion] }) : made)),
-        said: (i) => issueLine(i),
-      });
+      yield* change({ name: "issue create", does: (api) => api.issue.create(request), said: issueLine });
     }),
 ).pipe(
-  Command.withDescription(t("cli.command.issue.new")),
-  Command.withExamples([{ command: t("cli.example.issueNew.run"), description: t("cli.example.issueNew.about") }]),
+  Command.withDescription(t("cli.command.issue.create")),
+  Command.withExamples([{ command: t("cli.example.issueCreate.run"), description: t("cli.example.issueCreate.about") }]),
 );
 
 const editCommand = Command.make(
   "edit",
   {
     issue: issueArg,
-    title: optionalText("title"),
-    body: optionalText("body").pipe(Flag.withDescription(t("cli.flag.body"))),
-    project: optionalText("project").pipe(Flag.withDescription(t("cli.flag.project"))),
-    agent: optionalText("agent").pipe(Flag.withDescription(t("cli.flag.agent"))),
-    priority: Flag.Literals("priority", PriorityValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.priority"))),
+    title: optionalText("title", "cli.flag.title"),
+    description: optionalText("description", "cli.flag.description"),
+    project: optionalText("project", "cli.flag.project"),
+    agent: optionalText("agent", "cli.flag.agent"),
+    priority: priorityFlag,
+    criterion: Flag.String("criterion").pipe(Flag.atLeast(0), Flag.withDescription(t("cli.flag.criteria"))),
   },
-  (o) => {
-    const title = given(o.title);
-    const description = given(o.body);
-    const project = given(o.project);
-    const agent = given(o.agent);
-    const priority = given(o.priority);
-    return change({
-      name: "issue edit",
-      does: (api) =>
-        api.issue.update({
-          id: ref(o.issue),
-          ...(title ? { title } : {}),
-          ...(description ? { description } : {}),
-          ...(project ? { project } : {}),
-          ...(agent ? { agent } : {}),
-          ...(priority ? { priority } : {}),
-        }),
-      said: (i) => issueLine(i),
-    });
-  },
+  (o) =>
+    Effect.gen(function* () {
+      const description = yield* descriptionOf(given(o.description));
+      const fields = { title: given(o.title), project: given(o.project), agent: given(o.agent), priority: given(o.priority) };
+      const update: T.IssueUpdate = {
+        ...(fields.title ? { title: fields.title } : {}),
+        ...(description ? { description } : {}),
+        ...(fields.project ? { project: fields.project } : {}),
+        ...(fields.agent ? { agent: fields.agent } : {}),
+        ...(fields.priority ? { priority: fields.priority } : {}),
+        ...(o.criterion.length > 0 ? { criteria: [...o.criterion] } : {}),
+      };
+      yield* change({ name: "issue edit", does: (api) => api.issue.update({ id: ref(o.issue), ...update }), said: issueLine });
+    }),
 ).pipe(
   Command.withDescription(t("cli.command.issue.edit")),
   Command.withExamples([{ command: "vibevalley issue edit 12 --priority high", description: t("cli.example.issueEdit.about") }]),
 );
 
-/** Only what `issue work` reads of a frame; the rest is left as it came. */
-const IssuesOfFrame = Schema.fromJsonString(
-  Schema.Struct({ state: Schema.Struct({ issues: Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus })) }) }),
+/** `issue status 12 todo`: the issue moved to a status (sending it out, another round, done, canceled…), as the server
+ * allows from where it stands; --dry-run says what that would do. */
+const statusCommand = Command.make(
+  "status",
+  {
+    issue: issueArg,
+    status: Argument.Literals("status", IssueStatusValues).pipe(Argument.withDescription(t("cli.arg.status"))),
+    comment: optionalText("comment", "cli.flag.statusComment"),
+  },
+  (o) => {
+    const text = given(o.comment);
+    const request = { id: ref(o.issue), status: o.status, ...(text ? { text } : {}) };
+    return change({
+      name: "issue status",
+      preview: (api) => api.issue.status.previewUpdate(request),
+      does: (api) => api.issue.status.update(request),
+      said: issueLine,
+    });
+  },
+).pipe(
+  Command.withDescription(t("cli.command.issue.status")),
+  Command.withExamples([
+    { command: "vibevalley issue status 12 todo", description: t("cli.example.issueStatus.about") },
+    { command: "vibevalley issue status 12 done --dry-run", description: t("cli.example.issueDone.about") },
+  ]),
 );
-const settled = new Set<string>(["in_review", "done", "canceled"] satisfies (typeof IssueStatusValues)[number][]);
+
+const commentCommand = Command.make("comment", { issue: issueArg, words: words("cli.arg.comment") }, (o) =>
+  change({
+    name: "issue comment",
+    does: (api) => api.issue.comment.create({ id: ref(o.issue), text: o.words.join(" ") }),
+    said: () => t("cli.issue.commented", { issue: `#${ref(o.issue)}` }),
+  }),
+).pipe(
+  Command.withDescription(t("cli.command.issue.comment")),
+  Command.withExamples([{ command: t("cli.example.issue.comment.run"), description: t("cli.example.issue.comment.about") }]),
+);
+
+/** `issue review 12 --pass`: the verdict on what was handed back; completing it is `issue status 12 done`. */
+const reviewCommand = Command.make(
+  "review",
+  {
+    issue: issueArg,
+    pass: Flag.Boolean("pass").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.pass"))),
+    fail: Flag.Boolean("fail").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.fail"))),
+    finding: Flag.String("finding").pipe(Flag.atLeast(0), Flag.withDescription(t("cli.flag.finding"))),
+    comment: optionalText("comment", "cli.flag.reviewComment"),
+  },
+  (o) => {
+    if (o.pass === o.fail) return Effect.fail(new Failure({ code: exit.usage, tag: "InvalidValue", text: t("cli.issue.passOrFail") }));
+    const text = given(o.comment);
+    return change({
+      name: "issue review",
+      does: (api) =>
+        api.issue.review({ id: ref(o.issue), pass: o.pass, ...(o.finding.length > 0 ? { findings: [...o.finding] } : {}), ...(text ? { text } : {}) }),
+      said: issueLine,
+    });
+  },
+).pipe(
+  Command.withDescription(t("cli.command.issue.review")),
+  Command.withExamples([
+    { command: "vibevalley issue review 12 --pass", description: t("cli.example.issueReviewPass.about") },
+    { command: t("cli.example.issueReviewFail.run"), description: t("cli.example.issueReviewFail.about") },
+  ]),
+);
 
 const changesText = (c: T.Changes) =>
   [
@@ -228,45 +241,72 @@ const changesText = (c: T.Changes) =>
     ...(c.conflicts.length > 0 ? [t("cli.issue.conflicts", { files: c.conflicts.join(", ") })] : []),
   ].join("\n") || t("cli.issue.noChanges");
 
-const workActs: readonly T.IssueAct[] = ["start", "resume", "cure", "resolve"];
+const diffCommand = Command.make("diff", { issue: issueArg }, (o) =>
+  Effect.flatMap(
+    ask((api) => api.issue.diff.get({ id: ref(o.issue) })),
+    (c) => show(c, changesText),
+  ),
+).pipe(
+  Command.withDescription(t("cli.command.issue.diff")),
+  Command.withExamples([{ command: "vibevalley issue diff 12", description: t("cli.example.issueDiff.about") }]),
+);
 
-/** `issue work 12`: starts it (or sends it on when it is stuck; a closed one is reopened first), then, unless --no-wait,
- * follows it in the core state until it is handed back, done or canceled, each status on stderr, and prints its changes. */
-const workCommand = Command.make(
-  "work",
-  {
-    issue: issueArg,
-    noWait: Flag.Boolean("no-wait").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.noWait"))),
-    timeout: Flag.Int("timeout").pipe(Flag.optional, Flag.withDescription(t("cli.flag.timeout"))),
-  },
+const timelineCommand = Command.make("timeline", { issue: issueArg }, (o) =>
+  Effect.flatMap(
+    ask((api) => api.issue.timeline.get({ id: ref(o.issue) })),
+    (tl) =>
+      show(tl, (x) =>
+        [
+          ...x.milestones.map((m) => `${new Date(m.at).toISOString().slice(0, 16).replace("T", " ")}  ${m.kind}${m.who ? `  ${m.who}` : ""}  ${m.text}`),
+          ...(x.spent ? [t("cli.issue.spent", { tokens: x.spent.tokens, cny: x.spent.cny?.toFixed(2) ?? "-" })] : []),
+        ].join("\n"),
+      ),
+  ),
+).pipe(
+  Command.withDescription(t("cli.command.issue.timeline")),
+  Command.withExamples([{ command: "vibevalley issue timeline 12", description: t("cli.example.issueTimeline.about") }]),
+);
+
+const deleteCommand = Command.make("delete", { issue: issueArg }, (o) =>
+  change({
+    name: "issue delete",
+    preview: (api) => api.issue.previewDelete({ id: ref(o.issue) }),
+    does: (api) => api.issue.delete({ id: ref(o.issue) }),
+    said: () => t("cli.issue.deleted", { issue: `#${ref(o.issue)}` }),
+  }),
+).pipe(
+  Command.withDescription(t("cli.command.issue.delete")),
+  Command.withExamples([{ command: "vibevalley issue delete 12 --dry-run", description: t("cli.example.issueDelete.about") }]),
+);
+
+/** Only what `issue watch` reads of a frame; the rest is left as it came. */
+const IssuesOfFrame = Schema.fromJsonString(
+  Schema.Struct({ state: Schema.Struct({ issues: Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus })) }) }),
+);
+/** Where it waits on the owner or is over: what watching it waits for. */
+const settled = new Set<T.IssueStatus>(["in_review", "done", "canceled"]);
+
+/** `issue watch 12`: follows the issue in the core state until it waits on the owner or is over, each status on stderr,
+ * then prints it. One that already does returns at once. */
+const watchCommand = Command.make(
+  "watch",
+  { issue: issueArg, timeout: Flag.Int("timeout").pipe(Flag.optional, Flag.withDescription(t("cli.flag.timeout"))) },
   (o) =>
     Effect.gen(function* () {
-      const asked = yield* ask((api) => api.issue.get({ id: ref(o.issue) }));
-      const dry = yield* DryRunFlag;
-      // Done or canceled: reopened, then sent out as any other; a dry run says the reopening and goes no further.
-      const reopens = !asked.stage.acts.some((a) => workActs.includes(a.act)) && asked.stage.acts.some((a) => a.act === "reopen");
-      if (reopens) yield* act("work", o.issue, ["reopen"], undefined, !dry);
-      if (reopens && dry) return;
-      const before = reopens ? yield* ask((api) => api.issue.get({ id: asked.id })) : asked;
-      // Already at work, followed as it is; handed back or done, said as it stands: asked again, work does no harm.
-      const active = before.stage.state === "queued" || before.stage.state === "working";
-      const startable = before.stage.acts.some((a) => workActs.includes(a.act));
-      const waits = !dry && !o.noWait;
-      if (!active && startable) yield* act("work", o.issue, workActs, undefined, waits);
-      if (!waits) return;
+      const issue = yield* ask((api) => api.issue.get({ id: ref(o.issue) }));
       const base = yield* ServerFlag;
       const follow = frames(base, statePath).pipe(
         Stream.mapEffect((data) =>
           Schema.decodeEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Server", text: e.message }))),
         ),
         Stream.mapEffect((frame) => {
-          const now = frame.state.issues.find((i) => i.id === before.id);
+          const now = frame.state.issues.find((i) => i.id === issue.id);
           return now
             ? Effect.succeed(now.status)
-            : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: before.number }) }));
+            : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
         }),
         Stream.changes,
-        Stream.tap((status) => err(JSON.stringify({ issue: before.number, status }))),
+        Stream.tap((status) => err(JSON.stringify({ issue: issue.number, status }))),
         Stream.takeUntil((status) => settled.has(status)),
         Stream.runDrain,
       );
@@ -276,78 +316,32 @@ const workCommand = Command.make(
         : follow.pipe(
             Effect.timeoutOrElse({
               duration: `${timeout} seconds`,
-              orElse: () => new Failure({ code: exit.other, tag: "Timeout", text: t("cli.issue.timeout", { issue: `#${before.number}`, seconds: timeout }) }),
+              orElse: () => new Failure({ code: exit.other, tag: "Timeout", text: t("cli.issue.timeout", { issue: `#${issue.number}`, seconds: timeout }) }),
             }),
           );
-      const after = yield* ask((api) => api.issue.get({ id: before.id }));
-      yield* err(issueLine(after));
       yield* Effect.flatMap(
-        ask((api) => api.issue.diff.get({ id: before.id })),
-        (c) => show(c, changesText),
+        ask((api) => api.issue.get({ id: issue.id })),
+        (now) => show(now, issueLine),
       );
     }),
 ).pipe(
-  Command.withDescription(t("cli.command.issue.work")),
-  Command.withExamples([
-    { command: "vibevalley issue work 12", description: t("cli.example.issueWork.about") },
-    { command: "vibevalley issue work 12 --no-wait", description: t("cli.example.issueWorkNoWait.about") },
-  ]),
-);
-
-const actCommand = (verb: "say" | "accept" | "stop" | "cancel", wanted: readonly T.IssueAct[], words: "none" | "optional" | "required") =>
-  Command.make(verb, { issue: issueArg, words: wordsArg("words") }, (o) => {
-    const said = joined(o.words);
-    if (words === "required" && !said) return Effect.fail(new Failure({ code: exit.usage, tag: "MissingArgument", text: t("cli.issue.needsWords", { verb }) }));
-    return act(verb, o.issue, wanted, said);
-  }).pipe(
-    Command.withDescription(t(`cli.command.issue.${verb}`)),
-    Command.withExamples([{ command: t(`cli.example.issue.${verb}.run`), description: t(`cli.example.issue.${verb}.about`) }]),
-  );
-
-const logText = (x: T.IssueTimeline) =>
-  [
-    ...x.milestones.map((m) => `${new Date(m.at).toISOString().slice(0, 16).replace("T", " ")}  ${m.kind}${m.who ? `  ${m.who}` : ""}  ${m.text}`),
-    ...(x.spent ? [t("cli.issue.spent", { tokens: x.spent.tokens, cny: x.spent.cny?.toFixed(2) ?? "-" })] : []),
-  ].join("\n");
-
-/** `issue show 12`: the issue, where it stands and what can be done; --diff adds its changes, --log its timeline and
- * cost (as JSON, beside the issue's own fields). */
-const showCommand = Command.make(
-  "show",
-  {
-    issue: issueArg,
-    diff: Flag.Boolean("diff").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.diff"))),
-    log: Flag.Boolean("log").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.log"))),
-  },
-  (o) =>
-    Effect.gen(function* () {
-      const issue = yield* ask((api) => api.issue.get({ id: ref(o.issue) }));
-      const changes = o.diff ? yield* ask((api) => api.issue.diff.get({ id: issue.id })) : undefined;
-      const timeline = o.log ? yield* ask((api) => api.issue.timeline.get({ id: issue.id })) : undefined;
-      yield* show({ ...issue, ...(changes ? { changes } : {}), ...(timeline ? { timeline } : {}) }, () =>
-        [issueText(issue), ...(changes ? [changesText(changes)] : []), ...(timeline ? [logText(timeline)] : [])].join("\n\n"),
-      );
-    }),
-).pipe(
-  Command.withDescription(t("cli.command.issue.show")),
-  Command.withExamples([
-    { command: "vibevalley issue show 12", description: t("cli.example.issueShow.about") },
-    { command: "vibevalley issue show 12 --diff", description: t("cli.example.issueDiff.about") },
-    { command: "vibevalley issue show 12 --log", description: t("cli.example.issueLog.about") },
-  ]),
+  Command.withDescription(t("cli.command.issue.watch")),
+  Command.withExamples([{ command: "vibevalley issue watch 12 --timeout 600", description: t("cli.example.issueWatch.about") }]),
 );
 
 export const issueCommand = Command.make("issue").pipe(
   Command.withSubcommands([
     listCommand,
     showCommand,
-    newCommand,
+    createCommand,
     editCommand,
-    workCommand,
-    actCommand("say", ["answer", "reject", "tell"], "required"),
-    actCommand("accept", ["complete", "acknowledge"], "none"),
-    actCommand("stop", ["stop"], "none"),
-    actCommand("cancel", ["close"], "optional"),
+    statusCommand,
+    commentCommand,
+    reviewCommand,
+    diffCommand,
+    timelineCommand,
+    deleteCommand,
+    watchCommand,
   ]),
   Command.withDescription(t("cli.group.issue.about")),
 );

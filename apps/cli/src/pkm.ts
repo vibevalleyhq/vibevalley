@@ -1,5 +1,6 @@
-// The notes from a terminal (`vibevalley pkm …`): notes are text, so what these read comes out as Markdown (--format text,
-// the default), the endpoint's answer with --format json.
+// The notes from a terminal (`vibevalley pkm …`), a command an operation of the server's: a capture, a search, the
+// radar, a day's journal, and the pages (listed, shown as their outline, exported as Markdown, edited in $EDITOR); the
+// endpoint's answer with --format json.
 
 import { join } from "node:path";
 
@@ -10,31 +11,37 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { FormatFlag } from "./api.ts";
 import { ask, given, show } from "./farm.ts";
-import { exit, Failure, out, printBody, stdinText } from "./output.ts";
+import { exit, Failure, out, stdinText } from "./output.ts";
 
-const words = Argument.String("words").pipe(Argument.variadic(), Argument.withDescription(t("cli.arg.words")));
+const words = (about: Parameters<typeof t>[0]) => Argument.String("words").pipe(Argument.variadic(), Argument.withDescription(t(about)));
+const pageArgument = Argument.String("page").pipe(Argument.withDescription(t("cli.arg.page")));
 
 /** Today on this machine, YYYY-MM-DD (sv-SE writes dates so). */
 const today = Effect.map(Clock.currentTimeMillis, (ms) => new Date(ms).toLocaleDateString("sv-SE"));
 
-/** A page as Markdown for people (pkm.page.export), or as the endpoint gives it. */
-const printPage = (page: string) =>
-  Effect.gen(function* () {
-    if ((yield* FormatFlag) === "json") return yield* printBody(JSON.stringify(yield* ask((api) => api.pkm.page.get({ page }))));
-    const m = yield* ask((api) => api.pkm.page.export({ page }));
-    yield* out(m.markdown.replace(/\n+$/u, ""));
-  });
+/** A page as its outline: the title, then each block at its depth, its marker and priority first. */
+const outline = (p: T.PkmPage) =>
+  [
+    `# ${p.title}`,
+    "",
+    ...p.blocks.map(
+      (b) =>
+        `${"  ".repeat(b.depth)}- ${[b.marker, b.priority === undefined ? undefined : `[#${b.priority}]`, b.body.replace(/\n/gu, " ")].filter((x) => x !== undefined).join(" ")}`,
+    ),
+  ].join("\n");
 
 /** `pkm capture 一句话`: into today's journal, or --page's end; with no words, what comes on stdin, read as an outline. */
-const captureCommand = Command.make("capture", { words, page: Flag.String("page").pipe(Flag.optional, Flag.withDescription(t("cli.flag.capturePage"))) }, (o) =>
-  Effect.gen(function* () {
-    const text = o.words.length > 0 ? o.words.join(" ") : yield* stdinText.pipe(Effect.orElseSucceed(() => ""));
-    const page = given(o.page);
-    const written = yield* ask((api) => api.pkm.capture({ text, ...(page === undefined ? {} : { page }) }));
-    yield* show(written, (w) => t("cli.pkm.captured", { page: w.title }));
-  }),
+const captureCommand = Command.make(
+  "capture",
+  { words: words("cli.arg.capture"), page: Flag.String("page").pipe(Flag.optional, Flag.withDescription(t("cli.flag.capturePage"))) },
+  (o) =>
+    Effect.gen(function* () {
+      const text = o.words.length > 0 ? o.words.join(" ") : yield* stdinText.pipe(Effect.orElseSucceed(() => ""));
+      const page = given(o.page);
+      const written = yield* ask((api) => api.pkm.capture({ text, ...(page === undefined ? {} : { page }) }));
+      yield* show(written, (w) => t("cli.pkm.captured", { page: w.title }));
+    }),
 ).pipe(
   Command.withDescription(t("cli.command.pkm.capture")),
   Command.withExamples([
@@ -43,8 +50,16 @@ const captureCommand = Command.make("capture", { words, page: Flag.String("page"
   ]),
 );
 
-/** One search hit a line, page › where: words (what `vibevalley search` prints for the notes). */
-export const pkmHitLine = (h: T.PkmSearchHit) => `${h.pageTitle} › ${h.path === "" ? "" : `${h.path}: `}${h.plain}`;
+/** `pkm search 读书 笔记`: one hit a line, page › where: words. */
+const searchCommand = Command.make("search", { words: words("cli.arg.search") }, (o) =>
+  Effect.flatMap(
+    ask((api) => api.pkm.search({ text: o.words.join(" ") })),
+    (hits) => show(hits, (hs) => hs.map((h) => `${h.pageTitle} › ${h.path === "" ? "" : `${h.path}: `}${h.plain}`).join("\n")),
+  ),
+).pipe(
+  Command.withDescription(t("cli.command.pkm.search")),
+  Command.withExamples([{ command: t("cli.example.pkmSearch.run"), description: t("cli.example.pkmSearch.about") }]),
+);
 
 /** `pkm radar`: what wants a look, as lines. */
 const radarCommand = Command.make("radar", {}, () =>
@@ -64,7 +79,36 @@ const radarCommand = Command.make("radar", {}, () =>
   Command.withExamples([{ command: "vibevalley pkm radar", description: t("cli.example.pkmRadar.about") }]),
 );
 
-const pageArgument = Argument.String("page").pipe(Argument.withDescription(t("cli.arg.page")));
+/** `pkm journal show`: a day's journal (today, or --day), made when it has none. */
+const journalShow = Command.make("show", { day: Flag.String("day").pipe(Flag.optional, Flag.withDescription(t("cli.flag.day"))) }, (o) =>
+  Effect.gen(function* () {
+    const day = given(o.day) ?? (yield* today);
+    yield* show(yield* ask((api) => api.pkm.journal.open({ day })), outline);
+  }),
+).pipe(
+  Command.withDescription(t("cli.command.pkm.journalShow")),
+  Command.withExamples([{ command: "vibevalley pkm journal show", description: t("cli.example.pkmJournal.about") }]),
+);
+
+const pageShow = Command.make("show", { page: pageArgument }, (o) =>
+  Effect.flatMap(
+    ask((api) => api.pkm.page.get({ page: o.page })),
+    (view) => show(view, (v) => outline(v.page)),
+  ),
+).pipe(
+  Command.withDescription(t("cli.command.pkm.pageShow")),
+  Command.withExamples([{ command: t("cli.example.pkmPageShow.run"), description: t("cli.example.pkmPageShow.about") }]),
+);
+
+const pageExport = Command.make("export", { page: pageArgument }, (o) =>
+  Effect.flatMap(
+    ask((api) => api.pkm.page.export({ page: o.page })),
+    (m) => show(m, (x) => x.markdown.replace(/\n+$/u, "")),
+  ),
+).pipe(
+  Command.withDescription(t("cli.command.pkm.pageExport")),
+  Command.withExamples([{ command: t("cli.example.pkmPageExport.run"), description: t("cli.example.pkmPageExport.about") }]),
+);
 
 /** $VISUAL, else $EDITOR, else vi: a command line, the file added as its last word. */
 const editorCommand = Config.all({
@@ -74,7 +118,7 @@ const editorCommand = Config.all({
 
 const pageLine = (p: T.PkmPageSummary) => [p.title, p.tier, p.open > 0 ? `open ${p.open}` : ""].filter((x) => x !== "").join("  ");
 
-const listCommand = Command.make("list", { limit: Flag.Int("limit").pipe(Flag.withDefault(20), Flag.withDescription(t("cli.flag.limit"))) }, (o) =>
+const pageList = Command.make("list", { limit: Flag.Int("limit").pipe(Flag.withDefault(20), Flag.withDescription(t("cli.flag.limit"))) }, (o) =>
   Effect.flatMap(
     ask((api) => api.pkm.page.list()),
     (vault) =>
@@ -83,36 +127,13 @@ const listCommand = Command.make("list", { limit: Flag.Int("limit").pipe(Flag.wi
       ),
   ),
 ).pipe(
-  Command.withDescription(t("cli.command.pkm.list")),
-  Command.withExamples([{ command: "vibevalley pkm list", description: t("cli.example.pkmList.about") }]),
+  Command.withDescription(t("cli.command.pkm.pageList")),
+  Command.withExamples([{ command: "vibevalley pkm page list", description: t("cli.example.pkmPageList.about") }]),
 );
 
-/** `pkm show 读书`: a page as Markdown; with no page, a day's journal (today, or --day), made when it has none. */
-const showCommand = Command.make(
-  "show",
-  {
-    page: Argument.String("page").pipe(Argument.optional, Argument.withDescription(t("cli.arg.pageOrToday"))),
-    day: Flag.String("day").pipe(Flag.optional, Flag.withDescription(t("cli.flag.day"))),
-  },
-  (o) =>
-    Effect.gen(function* () {
-      const page = given(o.page);
-      if (page !== undefined) return yield* printPage(page);
-      const day = given(o.day) ?? (yield* today);
-      const journal = yield* ask((api) => api.pkm.journal.open({ day }));
-      yield* printPage(journal.slug);
-    }),
-).pipe(
-  Command.withDescription(t("cli.command.pkm.show")),
-  Command.withExamples([
-    { command: "vibevalley pkm show", description: t("cli.example.pkmToday.about") },
-    { command: t("cli.example.pkmShow.run"), description: t("cli.example.pkmShow.about") },
-  ]),
-);
-
-/** `pkm edit 读书`: the page's file in $VISUAL or $EDITOR (vi without either), written back when the editor closes;
+/** `pkm page edit 读书`: the page's file in $VISUAL or $EDITOR (vi without either), written back when the editor closes;
  * left as it was if nothing changed. One changed meanwhile is not overwritten: the edit stays in its file, named. */
-const editCommand = Command.make("edit", { page: pageArgument }, (o) =>
+const pageEdit = Command.make("edit", { page: pageArgument }, (o) =>
   Effect.gen(function* () {
     const source = yield* ask((api) => api.pkm.source.get({ page: o.page }));
     const fs = yield* FileSystem.FileSystem;
@@ -135,11 +156,18 @@ const editCommand = Command.make("edit", { page: pageArgument }, (o) =>
     yield* out(t("cli.pkm.saved", { page: source.title }));
   }),
 ).pipe(
-  Command.withDescription(t("cli.command.pkm.edit")),
-  Command.withExamples([{ command: t("cli.example.pkmEdit.run"), description: t("cli.example.pkmEdit.about") }]),
+  Command.withDescription(t("cli.command.pkm.pageEdit")),
+  Command.withExamples([{ command: t("cli.example.pkmPageEdit.run"), description: t("cli.example.pkmPageEdit.about") }]),
+);
+
+const journalGroup = Command.make("journal").pipe(Command.withSubcommands([journalShow]), Command.withDescription(t("cli.group.pkm.journal.about")));
+
+const pageGroup = Command.make("page").pipe(
+  Command.withSubcommands([pageList, pageShow, pageExport, pageEdit]),
+  Command.withDescription(t("cli.group.pkm.page.about")),
 );
 
 export const pkmCommand = Command.make("pkm").pipe(
-  Command.withSubcommands([captureCommand, showCommand, listCommand, editCommand, radarCommand]),
+  Command.withSubcommands([captureCommand, searchCommand, radarCommand, journalGroup, pageGroup]),
   Command.withDescription(t("cli.group.pkm.about")),
 );

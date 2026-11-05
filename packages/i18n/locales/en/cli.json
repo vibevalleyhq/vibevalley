@@ -17,7 +17,6 @@
     "agent": "A profile: its id or name",
     "at": "When to run once, such as 2026-11-05T09:00",
     "before": "Read those before this number",
-    "body": "The description; - reads stdin",
     "channel": "Which channel to say it in",
     "criterion": "An acceptance criterion; give it more than once",
     "cronExpr": "A cron expression, such as '0 9 * * 1-5'",
@@ -28,42 +27,49 @@
     "key": "A request key: sent again with the same key, it is done once",
     "limit": "At most this many",
     "module": "Only this module's endpoints, such as pkm",
-    "noWait": "Come back once it is sent, not when it is handed back",
     "priority": "The priority",
     "project": "The project's name",
     "reply": "Reply to this message number",
     "repo": "The GitHub repository's address",
     "text": "Words the title or description contains",
     "timeout": "Wait at most this many seconds",
-    "waiting": "Only those waiting on the owner",
-    "probe": "Look for every runtime again first (after installing or upgrading one)",
-    "diff": "Add its change: commits and files",
-    "log": "Add its timeline and cost",
-    "searchIn": "Search only these: issues, channels, notes, memory (may be given more than once)",
-    "searchLimit": "At most this many from each"
+    "closed": "Only closed ones (done, canceled)",
+    "criteria": "An acceptance criterion, may be given more than once; given, they replace the old ones",
+    "description": "The description; - reads stdin",
+    "enabled": "On (true) or off (false)",
+    "fail": "Fail it",
+    "finding": "What is wrong, one a flag, may be given more than once",
+    "pass": "Pass it",
+    "reviewComment": "Words with the review",
+    "statusComment": "Words with the move: what to change, when it goes for another round",
+    "title": "The new title",
+    "wantsOwner": "Only those waiting on the owner, the longest waiting first"
   },
   "command": {
-    "root": "One thing to do with the farm per command: answers are short text, --format json gives the protocol's shape; guide says how to use them, chat talks in the terminal",
+    "root": "VibeValley's command line, one operation a command: answers are short text, --format json gives the protocol's shape; guide says how to use it, chat talks in the terminal",
     "state": "The core state (GET {path})",
     "events": "Side effects, one per line (GET {path})",
     "app": {
-      "about": "The desktop app itself: its status, a page to open, updates, quitting",
+      "about": "The desktop app's own: its status, opening a page, quitting, restarting, updating",
       "open": "Bring the desktop window to this page (/issues/12), opening the app if it is not",
       "quit": "Quit the desktop app (its server saves first)",
       "restart": "Restart the desktop app",
-      "update": "The desktop app's update: as it stands with no argument, check to look now, install to put it in place and restart"
+      "update": "The desktop app's update: as it stands with no argument, check to look now, install to put it in place and restart",
+      "status": "Which desktop app this is, its version, where its farm is"
     },
     "doctor": "See this machine's farm at once: which one was found, whether it answers, the desktop app, runtimes, the model's key, the LAN listener",
     "pkm": {
       "capture": "Note something in today's journal (--page: on that page); no words reads stdin, lines split into blocks by indentation",
-      "show": "A page as Markdown to read (refs read out, remarks taken off); with no page, today's journal (--day for another day)",
-      "list": "List notes pages, the latest changed first",
-      "edit": "Edit a whole page's file in $EDITOR; it is saved when the editor closes",
-      "radar": "What wants a look: the inbox, projects left alone, what is overdue"
+      "radar": "What wants a look: the inbox, projects left alone, what is overdue",
+      "journalShow": "A day's journal (--day for another), made when there is none",
+      "pageEdit": "Edit a whole page's file in $EDITOR; it is saved when the editor closes",
+      "pageExport": "A page as Markdown to read: refs read out, remarks taken off",
+      "pageList": "List notes pages, the latest changed first",
+      "pageShow": "A page's outline: each block at its depth",
+      "search": "Search the notes: a hit a line, page › where: block"
     },
     "agent": {
-      "list": "List profiles: id, name, role, runtime",
-      "show": "Show a profile: its duty, runtime and model, skills"
+      "list": "List profiles: id, name, role, runtime"
     },
     "api": {
       "about": "Use the endpoints directly: list them, call one, follow the state stream",
@@ -72,47 +78,54 @@
     },
     "artifact": {
       "list": "List drafts (--issue: only one issue's)",
-      "show": "Show a draft: its title, version and owner, then its words"
+      "show": "Show a draft: its title, version and owner",
+      "read": "Read a draft's words"
     },
     "channel": {
       "list": "List channels and direct chats",
-      "read": "Read a channel's latest messages",
-      "say": "Say something in a channel"
+      "messageList": "List a channel's latest messages",
+      "messageSearch": "Search the messages of every channel",
+      "messageSend": "Send a message to a channel"
     },
     "cron": {
       "list": "List scheduled tasks",
-      "remove": "Remove a scheduled task",
-      "new": "Make a scheduled task: give one of --every, --daily, --cron, --at"
+      "create": "Make a scheduled task: give one of --every, --daily, --cron, --at",
+      "delete": "Delete a scheduled task",
+      "edit": "Turn a scheduled task on or off"
     },
     "guide": "How an agent does the common things, step by step",
     "issue": {
       "edit": "Change an issue's title, description, project, profile or priority",
       "list": "List issues: one a line, number first",
-      "new": "Write a new issue",
       "show": "Show an issue: where it stands, its questions and criteria, what can be done now (--diff adds its change, --log its timeline and cost)",
-      "work": "Send it out: start it (go on when stuck, reopen a closed one first), wait for the hand-back, print the change",
-      "say": "Talk to the issue's helper: an answer when it asks, sending it back when it waits for review, else a word passed on",
-      "accept": "Accept the work: the issue is done",
-      "stop": "Stop the issue's helper's round",
-      "cancel": "Close the issue"
+      "comment": "Comment on an issue: the answer when its helper asks, read by it in its next round otherwise",
+      "create": "Write a new issue",
+      "delete": "Delete an issue",
+      "diff": "An issue's change: its commits and files",
+      "review": "Review what was handed back: pass or fail; completing it is issue status … done",
+      "status": "Move an issue's status: todo sends it out or for another round, done completes it, canceled closes it; the server says which it takes",
+      "timeline": "An issue's timeline and cost",
+      "watch": "Follow an issue until it is in_review, done or canceled, each status on stderr"
     },
     "memory": {
-      "add": "Note a memory for a profile"
+      "create": "Keep a memory for a profile",
+      "delete": "Delete one of a profile's memories",
+      "list": "List a profile's memories",
+      "search": "Search the memories; every profile's when none is named"
     },
     "project": {
       "list": "List projects",
-      "show": "Show a project",
-      "new": "Make a project (--repo clones it from GitHub)"
+      "create": "Make a project (--repo clones it from GitHub)"
     },
     "runtime": {
-      "list": "List the runtimes: installed or not, versions (--probe looks again first)"
+      "list": "List the runtimes: installed or not, their versions",
+      "refresh": "Look for a runtime again, after installing or upgrading it"
     },
     "session": {
       "list": "List helpers: id, name, profile, what it is doing",
       "show": "Show a helper",
       "stop": "Stop a helper's round"
     },
-    "search": "Search the whole farm: issues, what was said in channels, notes, memories, each under its own heading",
     "chat": "Talk in the terminal: with no runtime, VibeValley's own agent; with one, that runtime directly (no trajectory, no spending)"
   },
   "next": {
@@ -133,10 +146,8 @@
     "stream": "The stream cannot be read: {why}",
     "gone": "Ticket #{n} is gone: it was deleted",
     "appNotOpen": "Cannot reach the desktop app of {home}: {why}",
-    "ambiguous": "More than one {what} is \"{said}\": {these}. Be more exact, or use the id",
     "noDryRun": "{command} has no dry run: drop --dry-run to do it",
     "noOp": "There is no endpoint {op}",
-    "noSuch": "No {what} is called \"{said}\"; there are: {these}",
     "noChat": "VibeValley's conversation program is not found here: use the command line the desktop app installs, or vp run --filter @vibevalley/cli start in the repository",
     "chatFlag": "{flags} cannot go with {runtime}: --name and --mcp are VibeValley's own agent's, --effort and --resume a runtime's"
   },
@@ -436,13 +447,16 @@
   },
   "group": {
     "agent": {
-      "about": "Profiles and profile templates"
+      "about": "Profiles: whom work is given to"
     },
     "artifact": {
       "about": "Artifacts: written together, or handed in as web pages"
     },
     "channel": {
-      "about": "Channels, direct messages, threads and messages"
+      "about": "Channels and direct talks, and their messages",
+      "message": {
+        "about": "A channel's messages: read, send, search"
+      }
     },
     "connector": {
       "about": "Connectors: WeChat, Feishu and QQ, each into a channel"
@@ -457,7 +471,7 @@
       "about": "GitHub: whether gh is installed and logged in"
     },
     "issue": {
-      "about": "Tickets: write, dispatch, review, complete"
+      "about": "Issues: write, edit, move, comment, review, follow"
     },
     "lan": {
       "about": "Connect to this machine: on or off, pairing, devices"
@@ -469,9 +483,12 @@
       "about": "The manager: online, stop, archive, evals"
     },
     "pkm": {
-      "about": "Notes: note a line, read and edit pages, journals, what wants a look",
+      "about": "Notes: note a line, search, the radar, journals and pages",
       "page": {
-        "about": "Notes pages"
+        "about": "Notes pages: list, outline, export, edit the file"
+      },
+      "journal": {
+        "about": "Journals: a page a day"
       }
     },
     "project": {
@@ -525,27 +542,33 @@
     "issue": "An issue: its number (12 or #12)",
     "op": "An endpoint's op, such as issue.get (vibevalley api list lists them all)",
     "page": "A page: its title, slug or an alias",
-    "project": "The project's name",
     "projectName": "The new project's name",
     "session": "The helper's id, such as w3",
-    "words": "What to say",
-    "pageOrToday": "A page's name or slug; none for the journal",
-    "chatRuntime": "A runtime (claude, codex…); none for VibeValley's own agent"
+    "chatRuntime": "A runtime (claude, codex…); none for VibeValley's own agent",
+    "appPath": "A page of the desktop app, such as /issues/12; the start page if none",
+    "capture": "What to note; stdin if none",
+    "comment": "The comment",
+    "cronText": "What is said when it comes due: the work for the orchestrator or a profile",
+    "memory": "The memory to keep",
+    "memoryId": "The memory's id, as memory list shows it",
+    "message": "The message",
+    "runtime": "The runtime's id, such as claude",
+    "search": "The words to find",
+    "status": "The status to move it to",
+    "title": "The issue's title",
+    "updateStep": "check looks for a new version, install installs it and restarts; none says how it stands"
   },
   "channel": {
-    "said": "Said in {channel}"
+    "sent": "Sent to {channel}"
   },
   "cron": {
-    "removed": "Removed scheduled task {cron}",
-    "when": "When to run: give exactly one of --every, --daily, --cron, --at"
+    "when": "When to run: give exactly one of --every, --daily, --cron, --at",
+    "deleted": "Deleted the scheduled task {cron}",
+    "edited": "Changed the scheduled task {cron}"
   },
   "example": {
     "agentList": {
       "about": "Which profiles can take work"
-    },
-    "agentShow": {
-      "run": "vibevalley agent show lao-zhou",
-      "about": "What a profile does"
     },
     "apiCall": {
       "about": "Call an endpoint directly"
@@ -557,29 +580,19 @@
       "about": "An issue's drafts"
     },
     "artifactShow": {
-      "about": "Show a draft"
+      "about": "Which draft a1 is, and its version"
     },
     "channelList": {
       "about": "Which channels there are"
     },
-    "channelRead": {
-      "about": "Read the last ten"
-    },
-    "channelSay": {
-      "run": "vibevalley channel say general '@w3 look at the login page first'",
-      "about": "Call helper w3 in general"
-    },
     "cronList": {
       "about": "Which tasks are scheduled"
-    },
-    "cronRemove": {
-      "about": "Try removing a task, changing nothing"
     },
     "guide": {
       "about": "Read the agents' guide"
     },
     "issueDiff": {
-      "about": "With #12's change"
+      "about": "#12's change"
     },
     "issueEdit": {
       "about": "Raise #12's priority"
@@ -587,28 +600,8 @@
     "issueList": {
       "about": "The open issues"
     },
-    "issueLog": {
-      "about": "With #12's timeline and cost"
-    },
-    "issueNew": {
-      "run": "vibevalley issue new 'Fix the login page' --project web --agent lao-zhou --criterion 'expired sessions go back to login'",
-      "about": "Write an issue with a criterion and give it to lao-zhou"
-    },
     "issueShow": {
       "about": "What #12 takes now"
-    },
-    "issueWaiting": {
-      "about": "Issues waiting on the owner"
-    },
-    "issueWork": {
-      "about": "Send #12 out and wait for it"
-    },
-    "issueWorkNoWait": {
-      "about": "Send #12 out without waiting"
-    },
-    "memoryAdd": {
-      "run": "vibevalley memory add lao-zhou 'web runs on 8797' --project web",
-      "about": "Note something for lao-zhou"
     },
     "pkmCapture": {
       "run": "vibevalley pkm capture 'a remember-me box on the login page'",
@@ -621,14 +614,8 @@
     "pkmRadar": {
       "about": "What wants a look"
     },
-    "pkmToday": {
-      "about": "Today's journal"
-    },
     "projectList": {
       "about": "Which projects there are"
-    },
-    "projectShow": {
-      "about": "The web project"
     },
     "runtimeList": {
       "about": "Which runtimes are installed"
@@ -643,21 +630,9 @@
       "about": "Stop w3's round"
     },
     "issue": {
-      "say": {
-        "run": "vibevalley issue say 12 'use 8797'",
-        "about": "Answer #12 if it asks, send it back if it waits for review, else pass the word on"
-      },
-      "accept": {
-        "about": "Accept #12",
-        "run": "vibevalley issue accept 12"
-      },
-      "stop": {
-        "about": "Stop #12's helper",
-        "run": "vibevalley issue stop 12"
-      },
-      "cancel": {
-        "run": "vibevalley issue cancel 12 'not needed'",
-        "about": "Close #12"
+      "comment": {
+        "run": "vibevalley issue comment 12 'use 8797'",
+        "about": "Answer what #12 asks, or pass a word to its helper"
       }
     },
     "doctor": {
@@ -684,68 +659,127 @@
     "runtimeChat": {
       "about": "Talk to Claude Code directly"
     },
-    "search": {
-      "run": "vibevalley search clock-in port",
-      "about": "Find “clock-in port” anywhere on the farm"
-    },
-    "searchIn": {
-      "run": "vibevalley search reading --in notes --in memory",
-      "about": "Look only in the notes and the memories"
-    },
-    "pkmShow": {
-      "run": "vibevalley pkm show reading",
-      "about": "Read the page “reading”"
-    },
-    "pkmEdit": {
-      "run": "vibevalley pkm edit reading",
-      "about": "Edit the page “reading” in your editor"
-    },
-    "cronNew": {
-      "run": "vibevalley cron new morning 'look at yesterday's changes' --daily 09:00",
-      "about": "Have the orchestrator look at yesterday's changes every morning at nine"
-    },
-    "pkmList": {
-      "about": "The pages changed last"
-    },
-    "projectNew": {
-      "about": "Clone a project from GitHub"
-    },
-    "runtimeProbe": {
-      "about": "Look again after installing a runtime"
-    },
     "chat": {
       "about": "Talk to VibeValley's own agent"
+    },
+    "appStatus": {
+      "about": "Whether the desktop app is open, and which"
+    },
+    "artifactRead": {
+      "about": "Read a1's words"
+    },
+    "channelMessageList": {
+      "about": "Read #general's last ten"
+    },
+    "channelMessageSearch": {
+      "run": "vibevalley channel message search port",
+      "about": "Find “port” in every channel"
+    },
+    "channelMessageSend": {
+      "run": "vibevalley channel message send general '@w3 look at the login page first'",
+      "about": "Ask w3 in #general to look at the login page first"
+    },
+    "cronCreate": {
+      "run": "vibevalley cron create morning 'look at yesterday\\'s changes' --daily 09:00",
+      "about": "Have the orchestrator look at yesterday's changes every morning at nine"
+    },
+    "cronDelete": {
+      "about": "Try it first: what it would delete"
+    },
+    "cronEdit": {
+      "about": "Turn c1 off for now"
+    },
+    "issueCreate": {
+      "run": "vibevalley issue create 'fix the login page' --project web --agent docs --criterion 'an expired session goes back to login'",
+      "about": "Write an issue for docs"
+    },
+    "issueDelete": {
+      "about": "Try it first: what it would delete"
+    },
+    "issueDone": {
+      "about": "Try completing it first: how it would be delivered"
+    },
+    "issueReviewFail": {
+      "run": "vibevalley issue review 12 --fail --finding 'expired sessions do not go back to login'",
+      "about": "Fail it, saying what is wrong"
+    },
+    "issueReviewPass": {
+      "about": "#12 passes review"
+    },
+    "issueStatus": {
+      "about": "Send #12 out (or for another round)"
+    },
+    "issueTimeline": {
+      "about": "#12's timeline and cost"
+    },
+    "issueWantsOwner": {
+      "about": "The issues waiting on the owner, the longest waiting first"
+    },
+    "issueWatch": {
+      "about": "Follow #12, ten minutes at most"
+    },
+    "memoryCreate": {
+      "run": "vibevalley memory create docs 'the port is 8797'",
+      "about": "Have docs remember the port is 8797"
+    },
+    "memoryDelete": {
+      "about": "Try deleting docs' m1 first"
+    },
+    "memoryList": {
+      "about": "What docs remembers"
+    },
+    "memorySearch": {
+      "run": "vibevalley memory search port",
+      "about": "Search every profile's memories for “port”"
+    },
+    "pkmJournal": {
+      "about": "Today's journal"
+    },
+    "pkmPageEdit": {
+      "run": "vibevalley pkm page edit reading",
+      "about": "Edit the page “reading” in your editor"
+    },
+    "pkmPageExport": {
+      "run": "vibevalley pkm page export reading",
+      "about": "The page “reading” as Markdown"
+    },
+    "pkmPageList": {
+      "about": "The pages changed last"
+    },
+    "pkmPageShow": {
+      "run": "vibevalley pkm page show reading",
+      "about": "The page “reading” as its outline"
+    },
+    "pkmSearch": {
+      "run": "vibevalley pkm search 'reading list'",
+      "about": "Find “reading list” in the notes"
+    },
+    "projectCreate": {
+      "about": "Clone a project from GitHub"
+    },
+    "runtimeRefresh": {
+      "about": "Look again after installing a new Claude Code"
     }
   },
   "issue": {
-    "can": "Can: {verbs}",
-    "cannot": "{issue} is {state} now and cannot {verb}",
+    "can": "What can be done:",
     "conflicts": "Conflicts: {files}",
     "criteria": "Criteria",
-    "needsWords": "{verb} needs something to say",
     "noChanges": "No change yet",
-    "noHelper": "{issue} has no helper at work",
     "none": "No issues",
     "questions": "Questions",
     "spent": "Spent: {tokens} tokens, ¥{cny}",
-    "stopped": "Stopped {issue}'s helper",
     "timeout": "{issue} was not handed back within {seconds} seconds",
-    "told": "Passed to {issue}'s helper"
+    "commented": "Commented on {issue}",
+    "deleted": "Deleted {issue}",
+    "passOrFail": "Give --pass or --fail, one of them",
+    "stage": "Now: {stage}"
   },
   "more": "There is more: {flag}",
   "session": {
     "stopped": "Stopped helper {session}"
   },
-  "what": {
-    "agent": "profile",
-    "channel": "channel",
-    "project": "project"
-  },
-  "search": {
-    "issues": "Issues",
-    "channels": "Channels",
-    "notes": "Notes",
-    "memory": "Memories",
-    "nothing": "Nothing found for “{words}”"
+  "memory": {
+    "deleted": "Deleted the memory {memory}"
   }
 }

@@ -20,7 +20,7 @@
 
    ```bash
    vpx scripts/verify-server.ts -- sh -c '
-     "$VIBEVALLEY_VERIFY_CLI" issue new 截图验收 &&
+     "$VIBEVALLEY_VERIFY_CLI" issue create 截图验收 &&
      VIBEVALLEY_PAGES=/issues vpx apps/web/scripts/screens.ts
    '
    ```

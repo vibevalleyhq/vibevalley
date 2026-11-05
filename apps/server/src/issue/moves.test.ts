@@ -183,15 +183,15 @@ describe("next steps after a refusal", () => {
       },
     } as unknown as Issue;
     const next = nextSteps(t);
-    // Each act as the command line asks for it; a move no button makes, through api.
+    // Each act as the command that does it: a move is issue status, stopping is its helper's session stop.
     expect(next.filter((n) => n.run).map((n) => n.run)).toEqual([
-      ["issue", "accept", "41"],
-      ["issue", "stop", "41"],
-      ["issue", "cancel", "41"],
+      ["issue", "status", "41", "done"],
+      ["session", "stop", "w1"],
+      ["issue", "status", "41", "canceled"],
     ]);
     expect(next.filter((n) => !n.run).map((n) => n.say)).toEqual([
-      "带话：issue say 41 后面写上要说的话",
-      `挪到待办：api call issue.status.update --json {"id":"41","status":"todo","text":"…"}，text 换成这一轮要它做什么`,
+      "带话：issue comment 41 …，… 换成要说的话",
+      "挪到待办：issue status 41 todo --comment …，… 换成这一轮要它做什么",
     ]);
   });
 });

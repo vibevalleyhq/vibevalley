@@ -56,7 +56,7 @@ export const doctorCommand = Command.make("doctor", {}, () =>
     checks.push(
       installed.length > 0
         ? { check: "runtimes", ok: true, installed }
-        : failed("runtimes", t("cli.doctor.noRuntime"), [{ say: t("cli.doctor.installRuntime"), run: ["runtime", "list", "--probe"] }]),
+        : failed("runtimes", t("cli.doctor.noRuntime"), [{ say: t("cli.doctor.installRuntime"), run: ["runtime", "list"] }]),
     );
 
     const settings = yield* ask((api) => api.setting.get());

@@ -228,6 +228,7 @@ export const IssueRequest: Codec<T.IssueRequest> = Schema.Struct({
   priority: Schema.optionalKey(Priority),
   deliver: Schema.optionalKey(Deliverable),
   autoSubmitPr: Schema.optionalKey(Schema.Boolean),
+  criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   requestKey: Schema.optionalKey(Schema.String),
 });
 

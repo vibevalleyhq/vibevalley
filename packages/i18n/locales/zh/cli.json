@@ -17,7 +17,6 @@
     "agent": "档案：id 或名字",
     "at": "跑一次的时间，比如 2026-11-05T09:00",
     "before": "读这一号以前的",
-    "body": "描述；- 读标准输入",
     "channel": "在哪个频道说",
     "criterion": "一条验收标准，可以给多次",
     "cronExpr": "cron 表达式，比如 '0 9 * * 1-5'",
@@ -28,42 +27,49 @@
     "key": "请求键：同一把键重发只做一次",
     "limit": "最多几条",
     "module": "只看这个模块的接口，比如 pkm",
-    "noWait": "派出去就回来，不等它交回",
     "priority": "优先级",
     "project": "项目的名字",
     "reply": "回复这一号消息",
     "repo": "GitHub 仓库的地址",
     "text": "标题或描述里有这些字",
     "timeout": "最多等几秒",
-    "waiting": "只看在等主人的",
-    "probe": "先重新探测每一台农机（装了新的、升了版本以后）",
-    "diff": "加上改动：提交和文件",
-    "log": "加上时间线和花费",
-    "searchIn": "只搜这几处：issues、channels、notes、memory（可以给几次）",
-    "searchLimit": "每一处最多几条"
+    "closed": "只看关掉的（done、canceled）",
+    "criteria": "验收标准，可以给多次；给了就整份换掉",
+    "description": "描述；- 读标准输入",
+    "enabled": "开（true）还是关（false）",
+    "fail": "不通过",
+    "finding": "哪里不对，一条一处，可以给多次",
+    "pass": "通过",
+    "reviewComment": "验收的话",
+    "statusComment": "一起说的话：再来一轮时说要改什么",
+    "title": "新的标题",
+    "wantsOwner": "只看在等主人的，等得最久的在前"
   },
   "command": {
-    "root": "对农场做的一件件事：答复是短文字，--format json 给接口的形状；guide 说怎么用，chat 在终端里对话",
+    "root": "VibeValley 的命令行，一条命令一个操作：答复是短文字，--format json 给接口的形状；不知道怎么用看 guide，在终端里对话用 chat",
     "state": "核心状态（GET {path}）",
     "events": "副作用，一行一条（GET {path}）",
     "app": {
-      "about": "桌面版自己的事：状态、打开到某一页、更新、退出",
+      "about": "桌面版自己的事：状态、打开到某一页、退出、重启、更新",
       "open": "让桌面版的窗口到这一页（/issues/12）；没开就先打开",
       "quit": "退出桌面版（服务端先存好）",
       "restart": "重启桌面版",
-      "update": "桌面版的更新：不带参数说现在的样子，check 去查，install 装上并重启"
+      "update": "桌面版的更新：不带参数说现在的样子，check 去查，install 装上并重启",
+      "status": "桌面版是哪个、什么版本、农场在哪"
     },
     "doctor": "一条命令看清这台电脑上的农场：找到的是哪个、连不连得上、桌面版、农机、模型的 key、连接到本机",
     "pkm": {
       "capture": "记一句话进今天的日记（--page 记到那一页）；不给字就读标准输入，多行按缩进拆成块",
-      "show": "一页给人读的 Markdown（引用读成字，批注去掉）；不给页就是今天的日记（--day 看别的一天）",
-      "list": "列出笔记的页，最近改的在前",
-      "edit": "在 $EDITOR 里改一整页的原文，关掉编辑器存回去",
-      "radar": "要看一眼的：收件箱、搁着的项目、过期的"
+      "radar": "要看一眼的：收件箱、搁着的项目、过期的",
+      "journalShow": "一天的日记（--day 看别的一天），没有就建",
+      "pageEdit": "在 $EDITOR 里改一整页的原文，关掉编辑器存回去",
+      "pageExport": "把一页导出成给人读的 Markdown：引用读成字，批注去掉",
+      "pageList": "列出笔记的页，最近改的在前",
+      "pageShow": "看一页的大纲：每一块和它的层级",
+      "search": "搜笔记：一条一行，页 › 路径: 块"
     },
     "agent": {
-      "list": "列出档案：id、名字、角色、农机",
-      "show": "看一份档案：职责、农机和模型、技能"
+      "list": "列出档案：id、名字、角色、农机"
     },
     "api": {
       "about": "直接用接口：列出全部、调一个、跟着状态流",
@@ -72,47 +78,54 @@
     },
     "artifact": {
       "list": "列出稿子（--issue 只看一张工单的）",
-      "show": "看一篇稿子：标题、版本、归属，下面是正文"
+      "show": "看一篇稿子：标题、版本、归属",
+      "read": "读一篇稿子的正文"
     },
     "channel": {
       "list": "列出频道和私聊",
-      "read": "读一个频道最近的消息",
-      "say": "在频道里说一句"
+      "messageList": "列出一个频道最近的消息",
+      "messageSearch": "在全部频道里搜消息",
+      "messageSend": "在频道里发一条消息"
     },
     "cron": {
       "list": "列出定时任务",
-      "remove": "删掉一个定时任务",
-      "new": "新建定时任务：--every、--daily、--cron、--at 给一个"
+      "create": "新建定时任务：--every、--daily、--cron、--at 给一个",
+      "delete": "删掉一个定时任务",
+      "edit": "开或关一个定时任务"
     },
     "guide": "给 agent 的用法：常见的几件事各怎么做",
     "issue": {
       "edit": "改工单的标题、描述、项目、档案或优先级",
       "list": "列出工单：一张一行，号在前",
-      "new": "写一张新工单",
       "show": "看一张工单：在哪一步、问题、验收标准、现在能做什么（--diff 加上改动，--log 加上时间线和花费）",
-      "work": "派活：开工（卡住了接着干，关掉了先重开），等它交回来，打出改动",
-      "say": "和工单的帮工说话：它在问就是回答，在等验收就是打回再来一轮，别的时候捎给它",
-      "accept": "验收通过，工单完成",
-      "stop": "停下工单的帮工这一轮",
-      "cancel": "关掉工单"
+      "comment": "给工单写一条评论：帮工在问时就是回答，在干活时下一轮会看到",
+      "create": "写一张新工单",
+      "delete": "删掉一张工单",
+      "diff": "看工单的改动：提交和文件",
+      "review": "验收交回来的活：通过或不通过；完成另用 issue status 挪到 done",
+      "status": "挪工单的状态：todo 是派活或再来一轮，done 是完成，canceled 是关掉；能不能挪由服务端说",
+      "timeline": "工单的时间线和花费",
+      "watch": "跟着一张工单，等它到了 in_review、done 或 canceled，经过的状态写在 stderr"
     },
     "memory": {
-      "add": "给一份档案记一条记性"
+      "create": "给一份档案记一条记性",
+      "delete": "删掉档案的一条记性",
+      "list": "列出一份档案的记性",
+      "search": "搜记性；不指定档案就搜全部"
     },
     "project": {
       "list": "列出项目",
-      "show": "看一个项目",
-      "new": "新建项目（--repo 从 GitHub 克隆）"
+      "create": "新建项目（--repo 从 GitHub 克隆）"
     },
     "runtime": {
-      "list": "列出农机：装没装、版本（--probe 先重新探测一遍）"
+      "list": "列出农机：装没装、版本",
+      "refresh": "重新探测一台农机：装了新的或升了版本以后"
     },
     "session": {
       "list": "列出帮工：id、名字、档案、在做什么",
       "show": "看一个帮工",
       "stop": "停下帮工这一轮"
     },
-    "search": "在整个农场里搜：工单、频道里的话、笔记、记性，各列在自己的标题下",
     "chat": "在终端里对话：不给农机是 VibeValley 自己的 agent，给了就和那个农机直接聊（不记轨迹和花费）"
   },
   "next": {
@@ -133,10 +146,8 @@
     "stream": "流读不下去：{why}",
     "gone": "工单 #{n} 不在了：被删掉了",
     "appNotOpen": "连不上 {home} 的桌面版：{why}",
-    "ambiguous": "「{said}」不止一个{what}：{these}。说得更准些，或用 id",
     "noDryRun": "{command} 没有试跑：去掉 --dry-run 才会做",
     "noOp": "没有 {op} 这个接口",
-    "noSuch": "没有叫「{said}」的{what}；有这些：{these}",
     "noChat": "这里找不到 VibeValley 的对话程序：从桌面版装的命令行里用它，或在仓库里经 vp run --filter @vibevalley/cli start",
     "chatFlag": "{flags} 不能和 {runtime} 一起用：--name、--mcp 是 VibeValley 自己的 agent 的，--effort、--resume 是农机的"
   },
@@ -436,13 +447,16 @@
   },
   "group": {
     "agent": {
-      "about": "档案和档案模板"
+      "about": "档案：派活时指给谁"
     },
     "artifact": {
       "about": "稿子：一起写的，和交上来的网页"
     },
     "channel": {
-      "about": "频道、私聊、串和消息"
+      "about": "频道和私聊，和里面的消息",
+      "message": {
+        "about": "频道里的消息：读、发、搜"
+      }
     },
     "connector": {
       "about": "连接器：把微信、飞书、QQ 接到频道"
@@ -457,7 +471,7 @@
       "about": "GitHub 的检测：gh 装没装、登没登录"
     },
     "issue": {
-      "about": "工单：写、派活、验收、完成"
+      "about": "工单：写、改、挪状态、评论、验收、跟着"
     },
     "lan": {
       "about": "连接到本机：开关、配对、设备"
@@ -469,9 +483,12 @@
       "about": "管家：上线、停下、旧账、评测"
     },
     "pkm": {
-      "about": "笔记：记一句、看和改页、日记、要看一眼的",
+      "about": "笔记：记一句、搜、雷达、日记和页",
       "page": {
-        "about": "笔记的页"
+        "about": "笔记的页：列出、看大纲、导出、改原文"
+      },
+      "journal": {
+        "about": "日记：一天一页"
       }
     },
     "project": {
@@ -525,27 +542,33 @@
     "issue": "工单：号（12 或 #12）",
     "op": "接口的操作名，比如 issue.get（vibevalley api list 列出全部）",
     "page": "页：标题、slug 或别名",
-    "project": "项目的名字",
     "projectName": "新项目的名字",
     "session": "帮工的 id，比如 w3",
-    "words": "要说的话",
-    "pageOrToday": "页的名字或 slug；不给就是日记",
-    "chatRuntime": "农机（claude、codex…）；不给是 VibeValley 自己的 agent"
+    "chatRuntime": "农机（claude、codex…）；不给是 VibeValley 自己的 agent",
+    "appPath": "桌面版里的一页，比如 /issues/12；不填是首页",
+    "capture": "要记的话；不给就读标准输入",
+    "comment": "评论的话",
+    "cronText": "到点时说的话：交给管家或档案去做的事",
+    "memory": "要记的一条",
+    "memoryId": "记性的 id，memory list 列出",
+    "message": "消息的话",
+    "runtime": "农机的 id，比如 claude",
+    "search": "要找的词",
+    "status": "要挪到的状态",
+    "title": "工单的标题",
+    "updateStep": "check 去查有没有新版本，install 装上并重启；不填只说现在的样子"
   },
   "channel": {
-    "said": "发到了 {channel}"
+    "sent": "发到了 {channel}"
   },
   "cron": {
-    "removed": "删掉了定时任务 {cron}",
-    "when": "什么时候跑：--every、--daily、--cron、--at 正好给一个"
+    "when": "什么时候跑：--every、--daily、--cron、--at 正好给一个",
+    "deleted": "删掉了定时任务 {cron}",
+    "edited": "改好了定时任务 {cron}"
   },
   "example": {
     "agentList": {
       "about": "看有哪些档案能派活"
-    },
-    "agentShow": {
-      "run": "vibevalley agent show 老周",
-      "about": "看一份档案做什么"
     },
     "apiCall": {
       "about": "直接调一个接口"
@@ -557,29 +580,19 @@
       "about": "一张工单的稿子"
     },
     "artifactShow": {
-      "about": "看一篇稿子"
+      "about": "看 a1 是哪篇、第几版"
     },
     "channelList": {
       "about": "看有哪些频道"
     },
-    "channelRead": {
-      "about": "读最近十条"
-    },
-    "channelSay": {
-      "run": "vibevalley channel say general '@w3 先看看登录页'",
-      "about": "在 general 里叫帮工 w3"
-    },
     "cronList": {
       "about": "看有哪些定时任务"
-    },
-    "cronRemove": {
-      "about": "试删一个定时任务，什么都不动"
     },
     "guide": {
       "about": "看给 agent 的用法"
     },
     "issueDiff": {
-      "about": "加上 12 号的改动"
+      "about": "12 号的改动"
     },
     "issueEdit": {
       "about": "把 12 号的优先级调高"
@@ -587,28 +600,8 @@
     "issueList": {
       "about": "没关的工单"
     },
-    "issueLog": {
-      "about": "加上 12 号的时间线和花费"
-    },
-    "issueNew": {
-      "run": "vibevalley issue new 修登录页 --project web --agent 老周 --criterion '过期后回到登录页'",
-      "about": "写一张带验收标准的工单，派给老周"
-    },
     "issueShow": {
       "about": "看 12 号现在能做什么"
-    },
-    "issueWaiting": {
-      "about": "在等主人的工单"
-    },
-    "issueWork": {
-      "about": "派 12 号，等它交回来"
-    },
-    "issueWorkNoWait": {
-      "about": "派 12 号，不等"
-    },
-    "memoryAdd": {
-      "run": "vibevalley memory add 老周 web 的端口是 8797 --project web",
-      "about": "给老周记一条"
     },
     "pkmCapture": {
       "run": "vibevalley pkm capture 给登录页加个记住我",
@@ -621,14 +614,8 @@
     "pkmRadar": {
       "about": "要看一眼的"
     },
-    "pkmToday": {
-      "about": "今天的日记"
-    },
     "projectList": {
       "about": "看有哪些项目"
-    },
-    "projectShow": {
-      "about": "看 web 项目"
     },
     "runtimeList": {
       "about": "看装了哪些农机"
@@ -643,21 +630,9 @@
       "about": "停下 w3 这一轮"
     },
     "issue": {
-      "say": {
-        "run": "vibevalley issue say 12 用 8797",
-        "about": "12 号在问就回答，在等验收就打回，否则捎给它的帮工"
-      },
-      "accept": {
-        "about": "12 号验收通过",
-        "run": "vibevalley issue accept 12"
-      },
-      "stop": {
-        "about": "停下 12 号的帮工",
-        "run": "vibevalley issue stop 12"
-      },
-      "cancel": {
-        "run": "vibevalley issue cancel 12 不做了",
-        "about": "关掉 12 号"
+      "comment": {
+        "run": "vibevalley issue comment 12 用 8797",
+        "about": "回答 12 号在问的，或者捎一句话给它的帮工"
       }
     },
     "doctor": {
@@ -684,68 +659,127 @@
     "runtimeChat": {
       "about": "直接和 Claude Code 聊"
     },
-    "search": {
-      "run": "vibevalley search 打卡 端口",
-      "about": "在整个农场里找「打卡 端口」"
-    },
-    "searchIn": {
-      "run": "vibevalley search 读书 --in notes --in memory",
-      "about": "只在笔记和记性里找"
-    },
-    "pkmShow": {
-      "run": "vibevalley pkm show 读书",
-      "about": "读「读书」这一页"
-    },
-    "pkmEdit": {
-      "run": "vibevalley pkm edit 读书",
-      "about": "在编辑器里改「读书」这一页"
-    },
-    "cronNew": {
-      "run": "vibevalley cron new 早上看看 看看昨天的改动 --daily 09:00",
-      "about": "每天早上九点让管家看看昨天的改动"
-    },
-    "pkmList": {
-      "about": "最近改过的页"
-    },
-    "projectNew": {
-      "about": "从 GitHub 克隆一个项目"
-    },
-    "runtimeProbe": {
-      "about": "装了新农机以后重新看一遍"
-    },
     "chat": {
       "about": "和 VibeValley 自己的 agent 对话"
+    },
+    "appStatus": {
+      "about": "桌面版开着没有、是哪个"
+    },
+    "artifactRead": {
+      "about": "读 a1 的正文"
+    },
+    "channelMessageList": {
+      "about": "读 #general 最近十条"
+    },
+    "channelMessageSearch": {
+      "run": "vibevalley channel message search 端口",
+      "about": "Find “端口” in every channel"
+    },
+    "channelMessageSend": {
+      "run": "vibevalley channel message send general '@w3 先看看登录页'",
+      "about": "在 #general 里叫 w3 先看看登录页"
+    },
+    "cronCreate": {
+      "run": "vibevalley cron create 早上看看 看看昨天的改动 --daily 09:00",
+      "about": "每天早上九点让管家看看昨天的改动"
+    },
+    "cronDelete": {
+      "about": "先试删，看会删掉什么"
+    },
+    "cronEdit": {
+      "about": "先关掉 c1"
+    },
+    "issueCreate": {
+      "run": "vibevalley issue create 修登录页 --project web --agent docs --criterion '过期后回到登录页'",
+      "about": "写一张工单，交给 docs"
+    },
+    "issueDelete": {
+      "about": "先试删，看会删掉什么"
+    },
+    "issueDone": {
+      "about": "先试一下完成，看会怎么交付"
+    },
+    "issueReviewFail": {
+      "run": "vibevalley issue review 12 --fail --finding '过期后没回到登录页'",
+      "about": "不通过，说哪里不对"
+    },
+    "issueReviewPass": {
+      "about": "12 号验收通过"
+    },
+    "issueStatus": {
+      "about": "派 12 号出去（或再来一轮）"
+    },
+    "issueTimeline": {
+      "about": "12 号的时间线和花费"
+    },
+    "issueWantsOwner": {
+      "about": "在等主人的工单，等得最久的在前"
+    },
+    "issueWatch": {
+      "about": "跟着 12 号，最多等十分钟"
+    },
+    "memoryCreate": {
+      "run": "vibevalley memory create docs 端口用 8797",
+      "about": "让 docs 记住端口用 8797"
+    },
+    "memoryDelete": {
+      "about": "先试删 docs 的 m1"
+    },
+    "memoryList": {
+      "about": "docs 记着的"
+    },
+    "memorySearch": {
+      "run": "vibevalley memory search 端口",
+      "about": "搜全部档案记着的「端口」"
+    },
+    "pkmJournal": {
+      "about": "今天的日记"
+    },
+    "pkmPageEdit": {
+      "run": "vibevalley pkm page edit 读书",
+      "about": "在编辑器里改「读书」这一页"
+    },
+    "pkmPageExport": {
+      "run": "vibevalley pkm page export 读书",
+      "about": "「读书」这一页导出成 Markdown"
+    },
+    "pkmPageList": {
+      "about": "最近改过的页"
+    },
+    "pkmPageShow": {
+      "run": "vibevalley pkm page show 读书",
+      "about": "「读书」这一页的大纲"
+    },
+    "pkmSearch": {
+      "run": "vibevalley pkm search 置身事内",
+      "about": "在笔记里找「置身事内」"
+    },
+    "projectCreate": {
+      "about": "从 GitHub 克隆一个项目"
+    },
+    "runtimeRefresh": {
+      "about": "装了新的 Claude Code 以后重新探测"
     }
   },
   "issue": {
-    "can": "能做：{verbs}",
-    "cannot": "{issue} 现在是 {state}，不能 {verb}",
+    "can": "能做：",
     "conflicts": "冲突：{files}",
     "criteria": "验收标准",
-    "needsWords": "{verb} 要说点什么",
     "noChanges": "还没有改动",
-    "noHelper": "{issue} 没有在干活的帮工",
     "none": "没有工单",
     "questions": "问题",
     "spent": "花费：{tokens} tokens，¥{cny}",
-    "stopped": "停下了 {issue} 的帮工",
     "timeout": "{issue} 等了 {seconds} 秒还没交回",
-    "told": "话带给了 {issue} 的帮工"
+    "commented": "评论了 {issue}",
+    "deleted": "删掉了 {issue}",
+    "passOrFail": "给 --pass 或 --fail，只给一个",
+    "stage": "现在：{stage}"
   },
   "more": "还有更多：{flag}",
   "session": {
     "stopped": "停下了帮工 {session}"
   },
-  "what": {
-    "agent": "档案",
-    "channel": "频道",
-    "project": "项目"
-  },
-  "search": {
-    "issues": "工单",
-    "channels": "频道",
-    "notes": "笔记",
-    "memory": "记性",
-    "nothing": "没有找到「{words}」"
+  "memory": {
+    "deleted": "删掉了记性 {memory}"
   }
 }

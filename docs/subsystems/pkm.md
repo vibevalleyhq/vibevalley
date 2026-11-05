@@ -19,7 +19,7 @@
   - `ops.ts`：块的操作，用两边共用的规则（`packages/protocol/src/rules/pkm.ts` 的 `applyBlockOps`、`flatBlocks`，页面先在本地施加同一份）；`graph.ts`：几页合起来的查询（纯函数）：找页、块引用、反链、搜索、回顾雷达、导出、改名时改链接、改写时留住链接，给命中和路径去掉记号的 `plainOf`；`para.ts`：PARA 的文件夹、文件名和日记的日子（`journalDay`）。
 - 笔记库在 `$VIBEVALLEY_HOME/pkm/`，配置 `pkm.root` 可以换成别的文件夹（[设置和配置](docs/subsystems/setting.md#模型和不变量)）：`00_Inbox`、`01_Projects`、`02_Areas`、`03_Resources`、`04_Archives`、`journals`，剪藏的原文在 `.pkm/snapshots/`。
 - 表：`pkm_comment`（批注和改写：哪页哪块、谁、状态、提的字、理由）、`pkm_change`（每次改动写的那个文件：改之前和之后的字，撤销用）、`pkm_term`（FTS5 的全文索引：每一块的词）。
-- 形状在 `packages/protocol/src/pkm/shapes.ts` 的 `Pkm*`；块的操作是封闭的联合 `PkmBlockOp`（按 `op` 区分）。接口 `pkm.*`（[capabilities.md](docs/reference/capabilities.md)），命令行是 `vibevalley pkm capture|show|list|edit|radar`，搜笔记用顶层的 `vibevalley search`（[开发](docs/development.md#只用命令行派一个活)）。
+- 形状在 `packages/protocol/src/pkm/shapes.ts` 的 `Pkm*`；块的操作是封闭的联合 `PkmBlockOp`（按 `op` 区分）。接口 `pkm.*`（[capabilities.md](docs/reference/capabilities.md)），命令行是 `vibevalley pkm capture|search|radar`、`pkm journal show`、`pkm page list|show|export|edit`，一条命令一个接口（[开发](docs/development.md#只用命令行派一个活)）。
 - 页面 `apps/web/src/features/pkm`：`PkmPage.tsx` 摆左中右三栏：左边侧栏，中间日记流或一页，右边旁注；`Sidebar.tsx` 搜索、今天、雷达、按 PARA 的页（悬挂缩进：图标和组名在第一列，所有页名在第二列；雷达的收件箱、搁着、过期只在有东西时出一行，过期的数是莓色；组名不带页数，折叠的箭头只在指着或折着时出现）；`Calendar.tsx` 右边最上面的月历，能折起来（记在本机）；`PageView.tsx` 一页的正文一栏和旁注（月历、评论、反链、这页的大纲）；`OutlineView.tsx` 写大纲的地方；`writer.ts` 本地先改、一批一批交给服务端（`PageWriter`）；`editing.ts` 每个键、粘贴、补全做什么（纯函数）；`days.ts` 日记的标题、截止还剩几天、月历；`Search.tsx` 搜笔记的对话框（外壳的 Ctrl+K 也开它）。
 
 ## 模型和不变量
@@ -38,7 +38,7 @@
 
 **闪念**（`pkm.capture`）：字照大纲读（`outline.ts` 的 `outlineOf`：一行一块，开头的 `- ` 去掉，按缩进挂到上一行下面，块的 id 都是新的）。不给 `page` 时记进今天的日记（`journals/2026_11_03.md`）末尾，每个顶层块是 `LATER …`，没带 `#inbox` 的加上；没有今天的日记就新建一页。给了 `page` 就原样接在那一页末尾。页名找不到时，说最像的几页。
 
-**改一整页的原文**（`pkm.source.get`、`pkm.source.update`，命令行的 `pkm edit`）：读出页面文件的原文（带 `id::`）和它上次写的时间；写回时这期间文件被改过就拒绝，没改过就照原文重写这一页（一次撤销）。
+**改一整页的原文**（`pkm.source.get`、`pkm.source.update`，命令行的 `pkm page edit`）：读出页面文件的原文（带 `id::`）和它上次写的时间；写回时这期间文件被改过就拒绝，没改过就照原文重写这一页（一次撤销）。
 
 **日记**（`pkm.journal.open`）：那天（`YYYY-MM-DD`）的日记，没有就建一页、里面一块空的可以写。页面列表里的日记带 `day`（从文件名读），页面不解析标题；日记的标题照主人的语言写（「11月3日周二」），文件名照 Logseq。
 
