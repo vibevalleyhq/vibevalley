@@ -5,12 +5,12 @@ import { Argument, Command, Flag } from "effect/cli";
 import { homeOf, savedLocale } from "@vibevalley/home";
 import { setLocale } from "@vibevalley/i18n";
 
-import { messageOf } from "./errors.ts";
+import { messageOf } from "#/base/errors.ts";
 
 // The conversation speaks the farm's language: set before the chat loads, as it says its words as it loads.
 setLocale(savedLocale(homeOf()));
 
-const { ownChat, runtimeChat } = await import("./chat/chat.ts");
+const { ownChat, runtimeChat } = await import("./chat.ts");
 
 const text = (name: string) => Flag.String(name).pipe(Flag.optional);
 const given = (o: Option.Option<string>) => Option.getOrUndefined(o);

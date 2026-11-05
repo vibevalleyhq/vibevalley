@@ -6,7 +6,7 @@ import { IssueStatusValues } from "@vibevalley/protocol";
 import { assignmentOf, assignedAgentOf, isOneOf, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { lookIn, refused } from "#/errors.ts";
+import { lookIn, refused } from "#/base/errors.ts";
 import { issueBranch, Project } from "#/project/project.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 import { conflictBrief } from "#/session/briefing.ts";

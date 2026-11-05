@@ -5,7 +5,7 @@ import { Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 
-import { errnoOf } from "#/errors.ts";
+import { errnoOf } from "#/base/errors.ts";
 
 const alive = (pid: number) => {
   try {

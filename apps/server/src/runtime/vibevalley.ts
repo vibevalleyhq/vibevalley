@@ -19,7 +19,7 @@ import { isOneOf } from "@vibevalley/protocol/rules";
 
 import { newId } from "#/base/ids.ts";
 import { jsonOrNone } from "#/base/json.ts";
-import { messageOf } from "#/errors.ts";
+import { messageOf } from "#/base/errors.ts";
 import { Db } from "#/infra/db.ts";
 import type { Time } from "#/infra/time.ts";
 import * as q from "#db/runtime_todo.sql.ts";

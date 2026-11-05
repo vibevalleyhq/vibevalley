@@ -15,7 +15,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 
 import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
-import { messageOf, type ApiError, missing, refused } from "#/errors.ts";
+import { messageOf, type ApiError, missing, refused } from "#/base/errors.ts";
 
 import { makeInProcessRun, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";

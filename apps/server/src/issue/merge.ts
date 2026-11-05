@@ -7,7 +7,7 @@ import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import type { Channel } from "#/channel/channel.ts";
 import type { Core } from "#/core/core.ts";
-import { type ApiError, missing, lookIn, reasonOf, refused } from "#/errors.ts";
+import { type ApiError, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import type { Db } from "#/infra/db.ts";
 import { issueBranch, type Project } from "#/project/project.ts";
 import { type Merged, MergeFailure, type ProjectError, type Workplace } from "#/project/workplace.ts";

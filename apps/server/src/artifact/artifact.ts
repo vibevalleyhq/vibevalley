@@ -12,7 +12,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { head } from "#/base/clip.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
-import { type ApiError, lookIn, missing, refused } from "#/errors.ts";
+import { type ApiError, lookIn, missing, refused } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { writeOnce } from "#/infra/files.ts";

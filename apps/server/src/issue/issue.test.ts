@@ -17,7 +17,7 @@ import { owner } from "#/base/actor.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Cron } from "#/cron/cron.ts";
-import { reasonOf } from "#/errors.ts";
+import { reasonOf } from "#/base/errors.ts";
 import { Db, dbQueries } from "#/infra/db.ts";
 import { gitRuns } from "#/project/git.ts";
 import { Session } from "#/session/session.ts";

@@ -7,7 +7,7 @@ import { testConfig } from "./layers.ts";
 import { helper, installedOnly } from "./worker.ts";
 import { quietApp } from "./world.ts";
 
-export { lookIn, memoriesOf } from "#/errors.ts";
+export { lookIn, memoriesOf } from "#/base/errors.ts";
 
 /** The whole farm on a free port: its address. */
 export const farm = Effect.gen(function* () {

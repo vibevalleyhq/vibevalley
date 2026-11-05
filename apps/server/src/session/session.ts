@@ -10,7 +10,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { session as sessionActor } from "#/base/actor.ts";
 import { jsonOrNone } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";
-import { type ApiError, reasonOf, refused } from "#/errors.ts";
+import { type ApiError, reasonOf, refused } from "#/base/errors.ts";
 import { Executor } from "#/executor/executor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, Db } from "#/infra/db.ts";

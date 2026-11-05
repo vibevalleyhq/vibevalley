@@ -35,7 +35,7 @@ const converse = (args: readonly string[]) =>
     if (code !== 0) return yield* new Ended({ code });
   }).pipe(Effect.uninterruptible);
 
-/** The flags given, as the server's conversation reads them (apps/server src/chat.ts): --name value, in order. */
+/** The flags given, as the server's conversation reads them (apps/server src/chat/main.ts): --name value, in order. */
 const passed = (flags: Readonly<Record<string, Option.Option<string>>>) =>
   Object.entries(flags).flatMap(([name, value]) => (Option.isSome(value) ? [`--${name}`, value.value] : []));
 

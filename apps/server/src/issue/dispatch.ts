@@ -9,7 +9,7 @@ import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import type { Due } from "#/cron/cron.ts";
-import { type ApiError, Inconsistent, missing, lookIn, reasonOf, refused } from "#/errors.ts";
+import { type ApiError, Inconsistent, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";

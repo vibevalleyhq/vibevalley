@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 
 import { Effect, Metric, Schema } from "effect";
 
-import { errnoOf, messageOf } from "#/errors.ts";
+import { errnoOf, messageOf } from "#/base/errors.ts";
 import { afterRealTime } from "#/infra/time.ts";
 
 export interface Ran {

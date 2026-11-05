@@ -7,7 +7,7 @@ import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { coerceArguments } from "@vibevalley/ai/tools";
 
 import { session } from "#/base/actor.ts";
-import { messageOf } from "#/errors.ts";
+import { messageOf } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Session } from "#/session/session.ts";
 import type { Caller } from "#/tool/schemas.ts";

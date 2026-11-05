@@ -9,7 +9,7 @@ import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { type ApiError, Inconsistent, lookIn, missing, refused } from "#/errors.ts";
+import { type ApiError, Inconsistent, lookIn, missing, refused } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { keptFile, readOrSetAside } from "#/infra/files.ts";
 import { defaultSettings } from "#/runtime/presets.ts";

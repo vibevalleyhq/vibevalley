@@ -11,7 +11,7 @@ import { Agent } from "#/agent/agent.ts";
 import type { Actor } from "#/base/actor.ts";
 import { clip } from "#/base/clip.ts";
 import { newId } from "#/base/ids.ts";
-import { type ApiError, memoriesOf, missing, refused } from "#/errors.ts";
+import { type ApiError, memoriesOf, missing, refused } from "#/base/errors.ts";
 import { agentHome, ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";

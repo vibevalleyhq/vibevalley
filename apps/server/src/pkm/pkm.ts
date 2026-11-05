@@ -9,7 +9,7 @@ import type * as T from "@vibevalley/protocol";
 import { flatBlocks, slugOf } from "@vibevalley/protocol/rules";
 
 import { newId } from "#/base/ids.ts";
-import { type ApiError, Inconsistent, lookIn, missing, reasonOf, refused } from "#/errors.ts";
+import { type ApiError, Inconsistent, lookIn, missing, reasonOf, refused } from "#/base/errors.ts";
 import { pkmDir, ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { termsList } from "#/memory/recall.ts";

@@ -5,7 +5,7 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 import type { OrchestratorHandlers } from "@vibevalley/protocol/api";
 
 import { Core } from "#/core/core.ts";
-import { missing, lookIn } from "#/errors.ts";
+import { missing, lookIn } from "#/base/errors.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
 

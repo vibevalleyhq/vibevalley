@@ -82,7 +82,7 @@ export const repository = (path: string) => {
     conflicts,
     /** A merge commit of theirs into ours, made without checking either out: merge-tree writes the tree. */
     mergeCommit: Effect.fnUntraced(function* (ours: string, theirs: string, message: string) {
-      const tree = (yield* git(path, "merge-tree", "--write-tree", "--no-messages", ours, theirs)).split("\n")[0]!;
+      const tree = (yield* git(path, "merge-tree", "--write-tree", "--no-messages", ours, theirs)).split("\n")[0] ?? "";
       const args = ["commit-tree", tree, "-p", ours, "-p", theirs, "-m", message];
       return yield* git(path, ...args).pipe(Effect.catch(() => git(path, ...asFarm, ...args)));
     }),
@@ -97,7 +97,7 @@ export const repository = (path: string) => {
           const code = line.slice(0, 2).trim();
           uncommitted.push({
             path: line.slice(3),
-            status: code === "??" ? "A" : code === "" ? "" : code[0]!,
+            status: code === "??" ? "A" : code.slice(0, 1),
           });
         }
       }
@@ -151,9 +151,10 @@ export const repository = (path: string) => {
         if (n.added >= 0) {
           const head = `diff --git a/${file} b/${file}\n`;
           const i = chunks.findIndex((c) => c.startsWith(head));
-          if (i >= 0) {
+          const found = chunks[i];
+          if (i >= 0 && found !== undefined) {
             // A chunk cut out of the middle of the diff lost its trailing newline to the split.
-            let chunk = i < chunks.length - 1 ? chunks[i]! + "\n" : chunks[i]!;
+            let chunk = i < chunks.length - 1 ? found + "\n" : found;
             const lines = chunk.split("\n");
             if (lines.length > patchLines)
               chunk = lines.slice(0, patchLines).join("\n") + "\n" + t("server.project.moreLines", { n: lines.length - patchLines });
@@ -167,11 +168,11 @@ export const repository = (path: string) => {
       }
       for (const line of log.split("\n")) {
         if (line === "") continue;
-        const parts = line.split("\t");
+        const [hash = "", timestamp, ...rest] = line.split("\t");
         changes.commits.push({
-          hash: parts[0]!,
-          at: numberIn(parts[1]) * 1000,
-          subject: parts.slice(2).join("\t"),
+          hash,
+          at: numberIn(timestamp) * 1000,
+          subject: rest.join("\t"),
         });
       }
       changes.conflicts.push(...clashes);

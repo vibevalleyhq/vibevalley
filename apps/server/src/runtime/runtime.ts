@@ -14,7 +14,7 @@ import type * as T from "@vibevalley/protocol";
 
 import { Agent, modelClient } from "#/agent/agent.ts";
 import { Core } from "#/core/core.ts";
-import { type ApiError, messageOf, refused } from "#/errors.ts";
+import { type ApiError, messageOf, refused } from "#/base/errors.ts";
 import { projectsDir, ServerConfig } from "#/infra/config.ts";
 import { timeHere, withinRealTime } from "#/infra/time.ts";
 import { Setting } from "#/setting/setting.ts";

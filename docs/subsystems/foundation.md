@@ -19,7 +19,7 @@
 |---|---|
 | `pnpm-workspace.yaml`、`vite.config.ts` | 工作区包列表、依赖版本 catalog、oxfmt 与 oxlint 配置 |
 | `tsconfig.base.json`、`scripts/oxlint-plugin.ts` | TypeScript 严格选项、`@effect/tsgo` 插件与仓库自定义 lint 规则 |
-| `apps/server/src/base/` | 纯工具函数（`ids.ts`、`json.ts`、`redact.ts`、`actor.ts`、`clip.ts`、`order.ts`） |
+| `apps/server/src/base/` | 纯工具函数与基础定义（`ids.ts`、`json.ts`、`redact.ts`、`actor.ts`、`clip.ts`、`order.ts`、`errors.ts`、`assets.ts`、`prompts.ts`） |
 | `apps/server/src/infra/` | 系统适配（`config.ts`、`db.ts`、`baseline.ts`、`time.ts`、`log.ts`、`lease.ts`、`files.ts`） |
 | `apps/server/src/modules.ts`、`services.ts` | 13 个模块的归属表与两阶段服务组装 |
 | `packages/protocol/src/<概念>/` | 按概念划分的 `shapes.ts`、`schema.ts`、`api.ts` |

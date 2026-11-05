@@ -5,7 +5,7 @@ import { gunzipSync } from "node:zlib";
 
 import { Effect, FileSystem, Schema } from "effect";
 
-import { serverFile } from "#/assets.ts";
+import { serverFile } from "#/base/assets.ts";
 import { jsonOf } from "#/base/json.ts";
 
 const dataDir = serverFile("src/memory/data");

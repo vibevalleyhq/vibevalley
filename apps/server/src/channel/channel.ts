@@ -10,7 +10,7 @@ import { Agent } from "#/agent/agent.ts";
 import { head } from "#/base/clip.ts";
 import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
-import { type ApiError, refused, lookIn, missing } from "#/errors.ts";
+import { type ApiError, refused, lookIn, missing } from "#/base/errors.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { heldShown, type InboxMessage, retryWindowMs } from "#/mailbox/envelope.ts";

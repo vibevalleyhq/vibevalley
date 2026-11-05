@@ -15,7 +15,7 @@ import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley
 
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
-import { messageOf, errnoOf } from "#/errors.ts";
+import { messageOf, errnoOf } from "#/base/errors.ts";
 import { Inbox } from "#/inbox/inbox.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { callbackLog, bestEffort } from "#/infra/log.ts";

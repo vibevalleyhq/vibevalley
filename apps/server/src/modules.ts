@@ -5,7 +5,7 @@ export interface Module {
 }
 
 export const modules: readonly Module[] = [
-  { name: "Platform", parts: ["base", "infra", "core", "setting", "errors.ts", "words.ts", "prompts.ts", "assets.ts"] },
+  { name: "Platform", parts: ["base", "infra", "core", "setting"] },
   { name: "Agents", parts: ["agent", "runtime", "memory"] },
   { name: "Source Control", parts: ["project"] },
   { name: "Agent Sessions", parts: ["executor", "session"] },
@@ -19,7 +19,7 @@ export const modules: readonly Module[] = [
   { name: "Gamification", parts: ["game"] },
   {
     name: "Gateway",
-    parts: ["http", "mcp", "lan", "connector", "voice", "handlers.ts", "chat.ts", "chat", "main.ts", "services.ts", "modules.ts", "projection"],
+    parts: ["http", "mcp", "lan", "connector", "voice", "chat", "projection", "main.ts", "services.ts", "modules.ts"],
   },
 ];
 
@@ -28,6 +28,6 @@ export const outside = ["testing", "flows"];
 
 /** The module a path under src/ (forward slashes) is part of; undefined outside every module. */
 export function moduleOf(path: string): Module | undefined {
-  const top = path.split("/")[0]!;
+  const top = path.split("/")[0] ?? "";
   return modules.find((m) => m.parts.includes(top));
 }

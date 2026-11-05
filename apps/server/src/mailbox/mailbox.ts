@@ -8,7 +8,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { Core } from "#/core/core.ts";
-import { type ApiError, refused, missing, lookIn } from "#/errors.ts";
+import { type ApiError, refused, missing, lookIn } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";

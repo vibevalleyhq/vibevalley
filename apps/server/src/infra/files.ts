@@ -3,7 +3,7 @@ import { basename, dirname, join } from "node:path";
 
 import { Clock, Effect, FiberHandle, FileSystem, Schema, Semaphore } from "effect";
 
-import { Inconsistent, messageOf } from "#/errors.ts";
+import { Inconsistent, messageOf } from "#/base/errors.ts";
 
 export class NotWritten extends Schema.TaggedError<NotWritten, { readonly brand: unique symbol }>()("NotWritten", {
   message: Schema.String,

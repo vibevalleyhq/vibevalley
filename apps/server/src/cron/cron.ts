@@ -12,7 +12,7 @@ import { jsonOrNone } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
-import { messageOf, type ApiError, missing, refused, lookIn } from "#/errors.ts";
+import { messageOf, type ApiError, missing, refused, lookIn } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";

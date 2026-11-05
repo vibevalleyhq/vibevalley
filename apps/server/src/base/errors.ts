@@ -1,7 +1,7 @@
 import { Effect, Predicate, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import { type ApiError, commandOf, type Next } from "@vibevalley/protocol/api";
+import type { ApiError, Next } from "@vibevalley/protocol/api";
 
 export type { ApiError, Next };
 
@@ -38,23 +38,23 @@ const listed = (key: LookIn, run?: readonly string[]): Next => ({
 });
 
 export const lookIn = {
-  issue: listed("issue", commandOf("issue.list")),
-  session: listed("session", commandOf("session.list")),
-  project: listed("project", commandOf("project.list")),
-  runtime: listed("runtime", commandOf("runtime.list")),
-  agent: listed("agent", commandOf("agent.list")),
+  issue: listed("issue", ["issue", "list"]),
+  session: listed("session", ["session", "list"]),
+  project: listed("project", ["project", "list"]),
+  runtime: listed("runtime", ["runtime", "list"]),
+  agent: listed("agent", ["agent", "list"]),
   skill: listed("skill"),
   template: listed("template"),
-  cron: listed("cron", commandOf("cron.list")),
+  cron: listed("cron", ["cron", "list"]),
   device: listed("device"),
   archive: listed("archive"),
-  channel: listed("channel", commandOf("channel.list")),
-  artifact: listed("artifact", commandOf("artifact.list")),
-  pkm: listed("pkm", commandOf("pkm.page.list")),
+  channel: listed("channel", ["channel", "list"]),
+  artifact: listed("artifact", ["artifact", "list"]),
+  pkm: listed("pkm", ["pkm", "page", "list"]),
 } satisfies Record<string, Next>;
 
 /** Where an agent's memories are listed. */
-export const memoriesOf = (agent: string): Next => ({ say: t("server.lookIn.memories"), run: commandOf("memory.list", [agent]) });
+export const memoriesOf = (agent: string): Next => ({ say: t("server.lookIn.memories"), run: ["memory", "list", agent] });
 
 /** An error's words, whatever its tag. */
 export const reasonOf = (e: ApiError): string =>

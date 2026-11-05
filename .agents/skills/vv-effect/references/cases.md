@@ -712,7 +712,7 @@ yield* Effect.uninterruptibleMask((restore) =>
 
 为什么：`uninterruptible` 连它里面的等待也保护起来，`timeout`、`race` 都停不了它；只保护必须做完的那一小段，其余用 `restore` 放回去。
 
-在这里：审；终端里的对话是有意整段不打断的，那里写了为什么（`apps/server/src/chat.ts`）。
+在这里：审；终端里的对话是有意整段不打断的，那里写了为什么（`apps/server/src/chat/main.ts`）。
 
 ### 31. 重试的上限和抖动
 

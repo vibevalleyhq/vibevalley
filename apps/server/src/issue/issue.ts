@@ -12,7 +12,7 @@ import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import type { Due } from "#/cron/cron.ts";
-import { type ApiError, missing, lookIn, refused } from "#/errors.ts";
+import { type ApiError, missing, lookIn, refused } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";

@@ -7,7 +7,7 @@ import { parse } from "yaml";
 import { defaultHome } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
 
-import { messageOf } from "#/errors.ts";
+import { messageOf } from "#/base/errors.ts";
 
 export class ServerConfig extends Context.Service<
   ServerConfig,

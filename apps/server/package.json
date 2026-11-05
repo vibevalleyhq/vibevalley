@@ -7,9 +7,9 @@
     "#db/*": "./db/generated/*"
   },
   "exports": {
-    "./assets": "./src/assets.ts",
+    "./assets": "./src/base/assets.ts",
     "./baseline": "./src/infra/baseline.ts",
-    "./chat": "./src/chat.ts",
+    "./chat": "./src/chat/main.ts",
     "./modules": "./src/modules.ts",
     "./testing": "./src/testing/farm.ts"
   },
@@ -18,7 +18,7 @@
     "evals": "VIBEVALLEY_EVALS_LIVE=1 vp test run src/orchestrator/evals.live.test.ts",
     "db:generate": "vpx scripts/sqlite-generate.ts",
     "db:check": "vpx scripts/sqlite-generate.ts --check",
-    "chat": "vpx src/chat.ts"
+    "chat": "vpx src/chat/main.ts"
   },
   "dependencies": {
     "@botiverse/oar": "catalog:",

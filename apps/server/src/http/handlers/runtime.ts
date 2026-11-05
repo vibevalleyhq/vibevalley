@@ -2,7 +2,7 @@ import { Effect } from "effect";
 
 import type { RuntimeHandlers } from "@vibevalley/protocol/api";
 
-import { lookIn, orMissing } from "#/errors.ts";
+import { lookIn, orMissing } from "#/base/errors.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 
 export const runtimeHandlers = Effect.gen(function* () {

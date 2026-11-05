@@ -10,7 +10,7 @@ import { Agent } from "#/agent/agent.ts";
 import { actsForOwner, type Actor } from "#/base/actor.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
-import { missing, lookIn, reasonOf, refused } from "#/errors.ts";
+import { missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";

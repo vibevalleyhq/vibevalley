@@ -30,7 +30,7 @@ import { messageId } from "@vibevalley/protocol/schema";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
-import { reasonOf } from "#/errors.ts";
+import { reasonOf } from "#/base/errors.ts";
 import { Inbox } from "#/inbox/inbox.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { Ingress } from "#/ingress/ingress.ts";

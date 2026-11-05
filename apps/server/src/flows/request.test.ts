@@ -7,7 +7,7 @@ import { Agent } from "#/agent/agent.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Connector } from "#/connector/connector.ts";
 import { Core } from "#/core/core.ts";
-import { handlers } from "#/handlers.ts";
+import { handlers } from "#/http/handlers.ts";
 import { Lan } from "#/lan/lan.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
 import { Voice } from "#/voice/voice.ts";
