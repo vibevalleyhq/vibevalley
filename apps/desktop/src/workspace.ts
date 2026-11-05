@@ -1,13 +1,16 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-interface Manifest {
-  readonly name: string;
-  readonly dependencies?: Record<string, string>;
-}
+import { Schema } from "effect";
 
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a workspace package's own package.json
-const manifest = (dir: string) => JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as Manifest;
+const Manifest = Schema.fromJsonString(
+  Schema.Struct({
+    name: Schema.String,
+    dependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  }),
+);
+
+const manifest = (dir: string) => Schema.decodeUnknownSync(Manifest)(readFileSync(join(dir, "package.json"), "utf8"));
 
 /** name → folder under packages/. */
 function workspacePackages(repo: string): Map<string, string> {

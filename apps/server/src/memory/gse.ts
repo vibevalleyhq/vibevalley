@@ -104,10 +104,12 @@ function find(word: string): number | undefined {
   return keys[lo]?.startsWith(word) === true ? 0 : undefined;
 }
 
+type Ends = readonly [number, ...number[]];
+
 /** For each start, the ends of the dictionary words that start there; itself when none does. */
-function dagOf(runes: readonly string[]): number[][] {
+function dagOf(runes: readonly string[]): Ends[] {
   const n = runes.length;
-  const dag: number[][] = [];
+  const dag: Ends[] = [];
   for (let k = 0; k < n; k++) {
     const ends: number[] = [];
     let i = k;
@@ -120,7 +122,8 @@ function dagOf(runes: readonly string[]): number[][] {
       if (i >= n) break;
       frag += runes[i] ?? "";
     }
-    dag.push(ends.length > 0 ? ends : [k]);
+    const [first, ...rest] = ends;
+    dag.push(first !== undefined ? [first, ...rest] : [k]);
   }
   return dag;
 }
@@ -129,17 +132,20 @@ function dagOf(runes: readonly string[]): number[][] {
 function routesOf(runes: readonly string[]): { freq: number; index: number }[] {
   const dag = dagOf(runes);
   const n = runes.length;
-  const routes: { freq: number; index: number }[] = [];
-  routes[n] = { freq: 0, index: 0 };
+  const routes: { freq: number; index: number }[] = Array.from({ length: n + 1 }, () => ({ freq: 0, index: 0 }));
   const logT = Math.log(dict().totalFreq);
+  const score = (idx: number, end: number) => {
+    const f = find(runes.slice(idx, end + 1).join(""));
+    return { freq: (f === undefined ? 0 : Math.log(f)) - logT + (routes[end + 1]?.freq ?? 0), index: end };
+  };
   for (let idx = n - 1; idx >= 0; idx--) {
-    let best: { freq: number; index: number } | undefined;
-    for (const i of dag[idx] ?? []) {
-      const f = find(runes.slice(idx, i + 1).join(""));
-      const r = { freq: (f === undefined ? Math.log(1) : Math.log(f)) - logT + (routes[i + 1]?.freq ?? 0), index: i };
-      if (!best || best.freq < r.freq || (best.freq === r.freq && best.index < r.index)) best = r;
+    const [first, ...rest] = dag[idx] ?? [idx];
+    let best = score(idx, first);
+    for (const end of rest) {
+      const r = score(idx, end);
+      if (r.freq > best.freq || (r.freq === best.freq && r.index > best.index)) best = r;
     }
-    routes[idx] = best ?? { freq: 0, index: idx };
+    routes[idx] = best;
   }
   return routes;
 }
@@ -153,7 +159,7 @@ const emitOf = jsonOf(EmitTable);
 const emit = () => (emitTable ??= emitOf(readNow(files.emit)));
 
 const minFloat = -3.14e100;
-const prevStatus: Record<State, readonly State[]> = { B: ["E", "S"], M: ["M", "B"], S: ["S", "E"], E: ["B", "M"] };
+const prevStatus: Record<State, readonly [State, State]> = { B: ["E", "S"], M: ["M", "B"], S: ["S", "E"], E: ["B", "M"] };
 const probStart: Record<State, number> = { B: -0.26268660809250016, E: -3.14e100, M: -3.14e100, S: -1.4652633398537678 };
 const probTrans: Record<State, Partial<Record<State, number>>> = {
   B: { E: -0.51082562376599, M: -0.916290731874155 },
@@ -175,19 +181,14 @@ function viterbi(obs: readonly string[]): State[] {
     vtb[y] = (e[y][first] ?? minFloat) + probStart[y];
     path[y] = [y];
   }
-  for (let t = 1; t < obs.length; t++) {
+  for (const ch of obs.slice(1)) {
     const next: Record<State, number> = { B: minFloat, M: minFloat, E: minFloat, S: minFloat };
     const newPath: Record<State, State[]> = { B: [], M: [], E: [], S: [] };
-    const ch = obs[t] ?? "";
     for (const y of states) {
       const emP = e[y][ch] ?? minFloat;
-      let best = { prob: minFloat, state: prevStatus[y][0] ?? ("S" as State) };
-      let firstChoice = true;
-      for (const y0 of prevStatus[y]) {
-        const p = { prob: vtb[y0] + (probTrans[y0][y] ?? minFloat) + emP, state: y0 };
-        best = firstChoice ? p : better(best, p);
-        firstChoice = false;
-      }
+      const stepFrom = (y0: State) => ({ prob: vtb[y0] + (probTrans[y0][y] ?? minFloat) + emP, state: y0 });
+      const [s0, s1] = prevStatus[y];
+      const best = better(stepFrom(s0), stepFrom(s1));
       next[y] = best.prob;
       newPath[y] = [...path[best.state], y];
     }
@@ -316,20 +317,18 @@ export function cutAll(text: string): string[] {
   const dag = dagOf(runes);
   const out: string[] = [];
   let start = -1;
-  for (let k = 0; k < dag.length; k++) {
-    const ends = dag[k] ?? [];
-    const [onlyEnd] = ends;
-    if (ends.length === 1 && onlyEnd !== undefined && k > start) {
-      out.push(runes.slice(k, onlyEnd + 1).join(""));
-      start = onlyEnd;
-      continue;
+  dag.forEach(([first, ...rest], k) => {
+    if (rest.length === 0 && k > start) {
+      out.push(runes.slice(k, first + 1).join(""));
+      start = first;
+      return;
     }
-    for (const j of ends) {
+    for (const j of [first, ...rest]) {
       if (j > k) {
         out.push(runes.slice(k, j + 1).join(""));
         start = j;
       }
     }
-  }
+  });
   return out;
 }

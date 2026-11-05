@@ -27,9 +27,9 @@ export const reactionsText = (r: Reactions) => {
   return kept.length > 0 ? JSON.stringify(Object.fromEntries(kept)) : null;
 };
 
-export const messageKind = (kind: string): T.MessageKind => (kind === "dispatch" || kind === "report" || kind === "notice" ? kind : "chat");
-export const subjectKind = (kind: string | null): T.SubjectKind | undefined => (kind === "issue" || kind === "talk" ? kind : undefined);
-export const notifyOf = (n: string): T.Notify => (n === "mentions" || n === "none" ? n : "all");
+export const messageKind = (kind: string): T.MessageKind => (Schema.is(S.MessageKind)(kind) ? kind : "chat");
+export const subjectKind = (kind: string | null): T.SubjectKind | undefined => (kind !== null && Schema.is(S.SubjectKind)(kind) ? kind : undefined);
+export const notifyOf = (n: string): T.Notify => (Schema.is(S.Notify)(n) ? n : "all");
 
 export function toMessage(row: MsgRow): T.ChatMessage {
   const meta = metaOf(row.meta);

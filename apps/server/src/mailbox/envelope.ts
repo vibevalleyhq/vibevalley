@@ -66,8 +66,8 @@ export const metaText = (m: Meta | undefined) =>
         Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== "" && v !== false && !(Array.isArray(v) && v.length === 0))),
       );
 
-export const senderKind = (kind: string): T.ActorKind => (kind === "owner" || kind === "orchestrator" || kind === "session" ? kind : "system");
-export const channelType = (type: string): T.ChannelType => (type === "thread" || type === "direct" ? type : "channel");
+export const senderKind = (kind: string): T.ActorKind => (Schema.is(S.ActorKind)(kind) ? kind : "system");
+export const channelType = (type: string): T.ChannelType => (Schema.is(S.ChannelType)(type) ? type : "channel");
 
 export const inboxMore = (
   row: { readonly meta: string | null; readonly reply_number: number | null; readonly edited_at?: number | null; readonly deleted_at?: number | null },

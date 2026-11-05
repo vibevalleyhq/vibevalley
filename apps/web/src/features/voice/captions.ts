@@ -1,4 +1,4 @@
-import { recordOf } from "#/base/dom.tsx";
+import { Option, Schema } from "effect";
 
 type Speaker = "you" | "orchestrator";
 
@@ -31,7 +31,16 @@ export function liveCaptions(turns: readonly Caption[], spoken: readonly SpokenL
   });
 }
 
-type Message = Record<string, unknown>;
+const CaptionMessage = Schema.Struct({
+  object: Schema.optionalKey(Schema.String),
+  turn_id: Schema.optionalKey(Schema.Finite),
+  turn_status: Schema.optionalKey(Schema.Finite),
+  text: Schema.optionalKey(Schema.String),
+  final: Schema.optionalKey(Schema.Boolean),
+  state: Schema.optionalKey(Schema.String),
+});
+type Message = typeof CaptionMessage.Type;
+const decodePacket = Schema.decodeUnknownOption(Schema.fromJsonString(CaptionMessage));
 
 export class LiveCaptions {
   static readonly keep = 8;
@@ -51,18 +60,18 @@ export class LiveCaptions {
   }
 
   apply(m: Message) {
-    const turn = typeof m.turn_id === "number" ? Math.trunc(m.turn_id) : 0;
-    const status = typeof m.turn_status === "number" ? m.turn_status : 0;
+    const turn = m.turn_id !== undefined ? Math.trunc(m.turn_id) : 0;
+    const status = m.turn_status ?? 0;
     switch (m.object) {
       case "user.transcription":
         // Ends on `final`, or on turn_status as the official quickstart reads it.
-        this.put("you", turn, typeof m.text === "string" ? m.text : "", m.final === true || status !== 0);
+        this.put("you", turn, m.text ?? "", m.final === true || status !== 0);
         return true;
       case "assistant.transcription":
-        this.put("orchestrator", turn, typeof m.text === "string" ? m.text : "", status !== 0);
+        this.put("orchestrator", turn, m.text ?? "", status !== 0);
         return true;
       case "message.state":
-        this.agentState = typeof m.state === "string" ? m.state : undefined;
+        this.agentState = m.state;
         return true;
       case "message.interrupt": {
         const c = this.find("orchestrator", turn);
@@ -121,14 +130,7 @@ export class LiveCaptions {
 
   private assemble(packet: string): Message | undefined {
     const parts = packet.split("|");
-    if (parts.length !== 4) {
-      // Not chunked: a plain JSON message.
-      try {
-        return recordOf(JSON.parse(packet));
-      } catch {
-        return undefined;
-      }
-    }
+    if (parts.length !== 4) return Option.getOrUndefined(decodePacket(packet));
     const [id = "", index = "", total = "", data = ""] = parts;
     const i = /^\d+$/u.test(index) ? Number(index) : NaN;
     const n = total === "???" ? undefined : /^\d+$/u.test(total) ? Number(total) : NaN;
@@ -141,7 +143,7 @@ export class LiveCaptions {
     try {
       const joined = Array.from({ length: n }, (_, k) => got.get(k + 1) ?? "").join("");
       const bytes = Uint8Array.from(atob(joined), (c) => c.charCodeAt(0));
-      return recordOf(JSON.parse(new TextDecoder().decode(bytes)));
+      return Option.getOrUndefined(decodePacket(new TextDecoder().decode(bytes)));
     } catch {
       return undefined;
     }

@@ -99,22 +99,53 @@ const modelName = (value: string) => {
 
 /** The choice's name, with the release dsh's own selector badges it with: DeepSeek's deepseek-flash is
  * DeepSeek-V4.1-Flash-1017, the API's only Flash model name. */
-function displayName(id: string, choice: Record<string, unknown>): string {
-  const name = typeof choice.name === "string" ? choice.name : "";
+function displayName(id: string, name: string): string {
   const slash = id.indexOf("/");
   return slash >= 0 && isDeepseek(id.slice(0, slash)) && id.slice(slash + 1) === "deepseek-flash" && name === "DeepSeek-V4.1-Flash" ? name + "-1017" : name;
 }
 
-type Rec = Record<string, unknown>;
-const records = (v: unknown): Rec[] => (Array.isArray(v) ? v.filter(Predicate.isObject) : []);
+const OptionLeaf = Schema.Struct({
+  value: Schema.optionalKey(Schema.String),
+  name: Schema.optionalKey(Schema.String),
+});
+type OptionLeaf = typeof OptionLeaf.Type;
+
+const OptionGroup = Schema.Struct({
+  value: Schema.optionalKey(Schema.String),
+  name: Schema.optionalKey(Schema.String),
+  options: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+});
+
+const ConfigOption = Schema.Struct({
+  id: Schema.optionalKey(Schema.String),
+  category: Schema.optionalKey(Schema.String),
+  currentValue: Schema.optionalKey(Schema.Unknown),
+  options: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+});
+
+const SessionNewResponse = Schema.Struct({
+  sessionId: Schema.optionalKey(Schema.String),
+  configOptions: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+});
+
+const decodeItems = <S extends Schema.Top>(schema: S, items: readonly unknown[] | undefined): S["Type"][] => {
+  if (!items) return [];
+  const decode = Schema.decodeUnknownOption(schema);
+  return items.flatMap((item) => {
+    const r = decode(item);
+    return r._tag === "Some" ? [r.value] : [];
+  });
+};
 
 /** A session/new response's models. undefined when it has no `model` config option. */
 export function projectModels(response: unknown): ModelEntry[] | undefined {
-  const options = records(Predicate.isObject(response) && "configOptions" in response ? response.configOptions : undefined);
+  const parsed = Schema.decodeUnknownOption(SessionNewResponse)(response);
+  if (parsed._tag === "None") return undefined;
+  const options = decodeItems(ConfigOption, parsed.value.configOptions);
   const model = options.find((o) => o.id === "model");
   if (!model) return undefined;
   const thinking = options.find((o) => o.category === "thought_level");
-  const levels = records(thinking?.options)
+  const levels = decodeItems(OptionLeaf, thinking?.options)
     .map((o) => effortLevelOf(o.value))
     .filter((l): l is string => l !== undefined && l !== "off");
   const current = effortLevelOf(thinking?.currentValue);
@@ -122,13 +153,13 @@ export function projectModels(response: unknown): ModelEntry[] | undefined {
   const currentId = canonicalModelId(modelId(typeof model.currentValue === "string" ? model.currentValue : ""));
   const entries: ModelEntry[] = [];
   const index = new Map<string, number>();
-  const add = (choice: Rec) => {
-    const value = typeof choice.value === "string" ? choice.value : "";
+  const add = (choice: OptionLeaf) => {
+    const value = choice.value ?? "";
     if (!value) return;
     const id = canonicalModelId(modelId(value));
     const entry: ModelEntry = {
       id,
-      displayName: displayName(id, choice),
+      displayName: displayName(id, choice.name ?? ""),
       ...(levels.length > 0 ? { effortLevels: levels } : {}),
       ...(defaultEffort ? { defaultEffort } : {}),
       ...(id === currentId ? { default: true as const } : {}),
@@ -142,20 +173,19 @@ export function projectModels(response: unknown): ModelEntry[] | undefined {
     index.set(id, entries.length);
     entries.push(entry);
   };
-  for (const choice of records(model.options)) {
-    const group = records(choice.options);
-    if (Array.isArray(choice.options)) for (const inner of group) add(inner);
+  for (const choice of decodeItems(OptionGroup, model.options)) {
+    if (choice.options !== undefined) for (const inner of decodeItems(OptionLeaf, choice.options)) add(inner);
     else add(choice);
   }
   return entries;
 }
 
 /** A throwaway session in the listing's cwd, for its model option: initialize, session/new, session/close. */
-async function readNewSession(command: string, cwd: string, timeoutMs: number): Promise<Rec> {
+async function readNewSession(command: string, cwd: string, timeoutMs: number): Promise<unknown> {
   const child = spawn(command, ["--profile", "acp"], { cwd, stdio: ["pipe", "pipe", "ignore"] });
   const lines = createInterface({ input: child.stdout });
   let next = 0;
-  const waiting = new Map<number, { resolve: (v: Rec) => void; reject: (e: Error) => void }>();
+  const waiting = new Map<number, { resolve: (v: Record<string, unknown>) => void; reject: (e: Error) => void }>();
   lines.on("line", (line) => {
     // A line that is no JSON-RPC answer is a log.
     const m = rpcAnswer(line);
@@ -165,8 +195,8 @@ async function readNewSession(command: string, cwd: string, timeoutMs: number): 
     if (m.error) w.reject(Object.assign(new Error(m.error.message ?? "ACP error"), { code: m.error.code }));
     else w.resolve(m.result ?? {});
   });
-  const request = (method: string, params: Rec) =>
-    new Promise<Rec>((resolve, reject) => {
+  const request = (method: string, params: Record<string, unknown>) =>
+    new Promise<Record<string, unknown>>((resolve, reject) => {
       const id = ++next;
       const cancel = afterRealTime(timeoutMs, () => reject(new Error(`${method} timed out`)));
       waiting.set(id, {
@@ -185,8 +215,10 @@ async function readNewSession(command: string, cwd: string, timeoutMs: number): 
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
     });
     const response = await request("session/new", { cwd, mcpServers: [] });
+    const decoded = Schema.decodeUnknownOption(SessionNewResponse)(response);
     // Best effort: the list is in hand, and the process is killed next.
-    if (typeof response.sessionId === "string") await Promise.allSettled([request("session/close", { sessionId: response.sessionId })]);
+    if (decoded._tag === "Some" && decoded.value.sessionId)
+      await Promise.allSettled([request("session/close", { sessionId: decoded.value.sessionId })]);
     return response;
   } finally {
     child.kill();

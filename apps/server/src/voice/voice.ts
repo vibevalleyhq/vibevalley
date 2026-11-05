@@ -1,33 +1,58 @@
-import { type ChildProcess, spawn } from "node:child_process";
-import { randomBytes, randomInt } from "node:crypto";
-import { createServer } from "node:http";
-
-import { NodeHttpServer } from "@effect/platform-node";
-import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
-import agoraToken from "agora-token";
-import { Cause, Clock, Context, Effect, Fiber, FiberSet, Layer, Predicate, Queue, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
-import { HttpBody, HttpClient, type HttpClientError, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { type AgoraClient } from "agora-agents";
+import { type Cause, Clock, Context, Effect, Fiber, FiberSet, Layer, Queue, Schema, type Scope, Stream } from "effect";
+import { HttpBody, HttpClient, type HttpClientError } from "effect/http";
 import type { Socket } from "effect/socket";
 
 import { t } from "@vibevalley/i18n";
-import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrchestrator, type VoiceCall, type VoiceSettings } from "@vibevalley/protocol";
-import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
+import { type AgoraGrant, type Dictated, defaultOrchestrator, type Validation, type VoiceCall } from "@vibevalley/protocol";
+import { type ApiError } from "@vibevalley/protocol/api";
 
+import { messageOf } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
-import { messageOf, errnoOf } from "#/base/errors.ts";
 import { Inbox } from "#/inbox/inbox.ts";
 import { ServerConfig } from "#/infra/config.ts";
-import { callbackLog, bestEffort } from "#/infra/log.ts";
-import { afterRealTime } from "#/infra/time.ts";
+import { bestEffort, callbackLog } from "#/infra/log.ts";
 import { Ingress } from "#/ingress/ingress.ts";
-import { chatCompletions } from "#/orchestrator/openai.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
-import { orchestratorModel } from "#/orchestrator/situation.ts";
-import { type AgoraCredentials, Setting, type VoiceKeys } from "#/setting/setting.ts";
+import { type AgoraCredentials, Setting } from "#/setting/setting.ts";
 
-import { verifyMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
+import {
+  agentFor,
+  alreadyStopping,
+  type CallLine,
+  callStepFailed,
+  clientOf,
+  failed,
+  newChannel,
+  newUid,
+  retrying,
+  type Run,
+  sign,
+  speakPieces,
+  tokenSeconds,
+  unavailable,
+  vendorsFor,
+  voiceAgentUid,
+  voiceUnknown,
+} from "./agora.ts";
+import { type LineFailed, makeVoiceLine, type Tunnel, tunnelAnswers } from "./line.ts";
+import { type MossTransport, mossTranscription, relay, verifyMoss } from "./moss.ts";
 import { noticeLine, onCallLine } from "./prompts.ts";
+
+export {
+  agentFor,
+  type CallLine,
+  clientOf,
+  retrying,
+  type Run,
+  speakPieces,
+  tokenSeconds,
+  tunnelAnswers,
+  vendorsFor,
+  voiceAgentUid,
+  voiceUnknown,
+};
 
 /** Succeeds once the signal aborts. */
 const aborted = (signal: AbortSignal) =>
@@ -37,16 +62,7 @@ const aborted = (signal: AbortSignal) =>
     signal.addEventListener("abort", done, { once: true });
     return Effect.sync(() => signal.removeEventListener("abort", done));
   });
-const { RtcRole, RtcTokenBuilder } = agoraToken;
 
-/** A page renews tokens before they run out. */
-export const tokenSeconds = 3600;
-export const voiceAgentUid = "123456";
-const deepseekChat = "https://api.deepseek.com/chat/completions";
-/** A new quick tunnel's address takes a while to answer (seen: about 25 s). */
-const lineReadyMs = 60_000;
-/** So calling again does not wait for a new tunnel. */
-const lineLingerMs = 10 * 60_000;
 /** OpenAI's own cap on one recording. */
 const dictateMaxBytes = 25 << 20;
 const dictateFormats: Record<string, string> = {
@@ -64,209 +80,9 @@ const DictationResponse = Schema.fromJsonString(
   }),
 );
 
-/** settings: the Settings section the owner fixes it in, when a setting does; the page offers to go there. */
-const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => ({
-  _tag: "VoiceUnavailable",
-  reason,
-  ...(settings ? { settings } : {}),
-});
-/** A step of a call outside the farm (Agora, the orchestrator's answer) that did not go; cause is what it threw. */
-class CallStepFailed extends Schema.TaggedError<CallStepFailed, { readonly brand: unique symbol }>()("CallStepFailed", {
-  message: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-const callStepFailed = (cause: unknown) => new CallStepFailed({ message: messageOf(cause), cause });
-
 /** What an HTTP call's failure says to the owner: the network's own words (refused, reset), not the client's wrapper. */
 const causeText = (e: HttpClientError.HttpClientError | Cause.TimeoutError) =>
   e._tag === "HttpClientError" && "cause" in e.reason && e.reason.cause !== undefined ? messageOf(e.reason.cause) : e.message;
-
-const failed = (reason: string): ApiError => ({ _tag: "VoiceCallFailed", reason });
-
-export interface CallLine {
-  readonly id: string;
-  readonly url: string;
-  readonly key: string;
-}
-
-/** For a member added to the union and not to vendorsFor. */
-export const voiceUnknown = () => t("server.voice.unknownSuffix");
-
-type Vendors = {
-  stt: AresSTT | DeepgramSTT | MicrosoftSTT;
-  llm: OpenAI;
-  tts: MiniMaxTTS | OpenAITTS | MicrosoftTTS;
-};
-
-/** The three vendors the voice page chose, or why they cannot be: a vendor whose key is missing. Agora-hosted ones need no key of their own. */
-export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: string, line?: CallLine): Vendors | VoiceUnavailable {
-  const speech = {
-    greetingMessage: voice.greeting,
-    failureMessage: voice.failureMessage,
-    maxHistory: 15,
-    params: { max_tokens: 512, temperature: 0.7, top_p: 0.95 },
-    ...(voice.persona ? { systemMessages: [{ role: "system", content: voice.persona }] } : {}),
-  };
-  try {
-    let stt: Vendors["stt"];
-    const asr = voice.asr;
-    switch (asr.vendor) {
-      case "ares":
-        stt = new AresSTT();
-        break;
-      case "deepgram":
-        stt = new DeepgramSTT({ model: asr.model, language: voice.language });
-        break;
-      case "microsoft":
-        if (!keys.asrKey) return unavailable(t("server.voice.noAsrKey"), "call");
-        stt = new MicrosoftSTT({ key: keys.asrKey, region: asr.region, language: voice.language });
-        break;
-      default: {
-        const exhaustive: never = asr;
-        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.asr"), vendor: String(Reflect.get(exhaustive, "vendor") ?? "") }));
-      }
-    }
-    let llm: OpenAI;
-    const answer = voice.answer;
-    switch (answer.vendor) {
-      case "orchestrator":
-        if (!line) return unavailable(t("server.voice.noLine"));
-        llm = new OpenAI({ apiKey: line.key, url: line.url, model: orchestratorModel, ...speech });
-        break;
-      case "agora":
-        llm = new OpenAI({ model: answer.model, ...speech });
-        break;
-      case "deepseek":
-        if (!deepseekKey) return unavailable(t("server.voice.noDeepseekKey"), "models");
-        llm = new OpenAI({
-          apiKey: deepseekKey,
-          url: deepseekChat,
-          model: answer.model,
-          ...speech,
-        });
-        break;
-      case "openai":
-        if (!keys.llmKey) return unavailable(t("server.voice.noLlmKey"), "call");
-        llm = new OpenAI({ apiKey: keys.llmKey, url: answer.url, model: answer.model, ...speech });
-        break;
-      default: {
-        const exhaustive: never = answer;
-        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.llm"), vendor: String(Reflect.get(exhaustive, "vendor") ?? "") }));
-      }
-    }
-    let tts: Vendors["tts"];
-    const item = voice.tts;
-    switch (item.vendor) {
-      case "minimax":
-        tts = new MiniMaxTTS({ model: item.model, voiceId: item.voiceId });
-        break;
-      case "openai":
-        tts = new OpenAITTS({ voice: item.voice });
-        break;
-      case "microsoft":
-        if (!keys.ttsKey) return unavailable(t("server.voice.noTtsKey"), "call");
-        tts = new MicrosoftTTS({ key: keys.ttsKey, region: item.region, voiceName: item.voiceName });
-        break;
-      default: {
-        const exhaustive: never = item;
-        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.tts"), vendor: String(Reflect.get(exhaustive, "vendor") ?? "") }));
-      }
-    }
-    return { stt, llm, tts };
-  } catch (e) {
-    // The SDK throws on a configuration it refuses; that is a problem with the settings, not the server's.
-    return unavailable(t("server.voice.unusable", { why: messageOf(e) }), "call");
-  }
-}
-
-const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN } as const)[area];
-
-/** As Agora's SDK retries on its own: 408, 429 and 5xx, twice, after what Retry-After says (at most a minute), else 1 s then 2 s. */
-const agoraRetries = Schedule.exponential("1 second").pipe(
-  Schedule.setInputType<Response>(),
-  Schedule.while(({ input, attempt }) => attempt <= 2 && ([408, 429].includes(input.status) || input.status >= 500)),
-  Schedule.modifyDelay(({ input, duration }) => {
-    const after = Number(input.headers.get("Retry-After"));
-    return Effect.succeed(after > 0 ? Math.min(after * 1000, 60_000) : duration);
-  }),
-  Schedule.passthrough,
-);
-
-/** Agora's REST calls retried as its SDK would, but sleeping on the service's Clock: the SDK's own retries wait on real
- * time, out of its reach. */
-export const retrying =
-  (fetcher: typeof fetch, run: Run): typeof fetch =>
-  (input, init) =>
-    run(
-      // A failed fetch goes back to the SDK as it is: it rejects the SDK's call, as the fetch itself would.
-      Effect.repeat(
-        Effect.promise(() => fetcher(input, init)),
-        agoraRetries,
-      ),
-      init?.signal ? { signal: init.signal } : undefined,
-    );
-
-/** Runs an Effect for the Promise side (the Agora SDK's fetch) on the service's fibers, so its sleeps are on its Clock. */
-export type Run = <A>(effect: Effect.Effect<A>, options?: { readonly signal: AbortSignal }) => Promise<A>;
-
-export const clientOf = (c: AgoraCredentials, area: Area, run: Run, fetcher: typeof fetch = fetch) =>
-  new AgoraClient({
-    area: areaOf(area),
-    appId: c.appId,
-    appCertificate: c.appCertificate,
-    maxRetries: 0,
-    fetch: retrying(fetcher, run),
-  });
-
-/** Read at each start: a change takes effect on the next call. Captions go over the RTC data stream: the client has no RTM. */
-export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Vendors) {
-  return new Agent({
-    client,
-    turnDetection: {
-      language: voice.language,
-      config: {
-        speech_threshold: 0.5,
-        start_of_speech: {
-          mode: "vad",
-          vad_config: { interrupt_duration_ms: voice.interruptMs, prefix_padding_ms: 300 },
-        },
-        end_of_speech: { mode: "vad", vad_config: { silence_duration_ms: voice.silenceMs } },
-      },
-    },
-    // RTM carries transcripts and the agent's state. a client without RTM asks for the RTC data stream, which carries the transcripts (chunked).
-    advancedFeatures: { enable_rtm: false, enable_tools: true },
-    parameters: {
-      audio_scenario: "chorus",
-      data_channel: "datastream",
-      enable_error_message: true,
-      enable_metrics: true,
-    },
-  })
-    .withStt(vendors.stt)
-    .withLlm(vendors.llm)
-    .withTts(vendors.tts);
-}
-
-/** Already left or leaving counts as success, as the quickstart treats it. */
-function alreadyStopping(e: unknown): boolean {
-  if (!Predicate.isObject(e)) return false;
-  if ("statusCode" in e && e.statusCode === 404) return true;
-  const body = "body" in e && Predicate.isObject(e.body) ? e.body : {};
-  const said = [Reflect.get(body, "detail"), Reflect.get(body, "reason"), "message" in e ? e.message : undefined];
-  return said.some((s) => typeof s === "string" && s.toLowerCase().includes("already in the process of shutting down"));
-}
-
-const sign = (c: AgoraCredentials, channel: string, uid: string): AgoraGrant => ({
-  appId: c.appId,
-  channel,
-  uid,
-  token: RtcTokenBuilder.buildTokenWithRtm(c.appId, c.appCertificate, channel, uid, RtcRole.PUBLISHER, tokenSeconds, tokenSeconds),
-});
-
-/** prefix-<ms>-<6 random>: the quickstart's timestamp-plus-random shape. */
-const newChannel = (now: number) => `vibevalley-${now}-${Array.from({ length: 6 }, () => "0123456789abcdefghijklmnopqrstuvwxyz"[randomInt(36)]).join("")}`;
-const newUid = () => String(randomInt(9_999_000) + 1000);
 
 interface Grant {
   readonly credentials: AgoraCredentials;
@@ -320,34 +136,6 @@ export class Voice extends Context.Service<
   static readonly layer = (options?: VoiceOptions) => Layer.effect(Voice, make(options));
 }
 
-/** Agora reads out at most 512 bytes at a time: the words in pieces under that, cut after a sentence where one ends. */
-export function speakPieces(text: string, max = 480): string[] {
-  const bytes = (text: string) => Buffer.byteLength(text, "utf8");
-  const out: string[] = [];
-  let rest = text.trim();
-  while (rest !== "") {
-    if (bytes(rest) <= max) {
-      out.push(rest);
-      break;
-    }
-    const chars = [...rest];
-    let fit = 0;
-    let used = 0;
-    for (const ch of chars) {
-      const len = bytes(ch);
-      if (used + len > max) break;
-      used += len;
-      fit++;
-    }
-    const head = chars.slice(0, fit).join("");
-    const end = Math.max(-1, ...[...head.matchAll(/[。！？!?；;\n]/gu)].map((m) => m.index));
-    const cut = end > 0 ? [...head.slice(0, end + 1)].length : fit;
-    out.push(chars.slice(0, cut).join("").trim());
-    rest = chars.slice(cut).join("").trim();
-  }
-  return out.filter(Boolean);
-}
-
 export interface VoiceOptions {
   /** Agora's REST calls go through it; fetch when absent. */
   readonly fetch?: typeof fetch;
@@ -358,79 +146,6 @@ export interface VoiceOptions {
   /** How MOSS Live is reached; its WebSocket and HTTPS when absent. */
   readonly moss?: MossTransport;
 }
-
-const quickTunnel = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/u;
-
-/** A tunnel's public address and how to close it. */
-interface Tunnel {
-  readonly url: string;
-  readonly close: () => void;
-}
-
-/** Why the voice line cannot be had now; the message is the owner's. */
-class LineFailed extends Schema.TaggedError<LineFailed, { readonly brand: unique symbol }>()("LineFailed", {
-  message: Schema.String,
-  cause: Schema.optionalKey(Schema.Defect()),
-}) {}
-
-const cloudflared = (port: number) =>
-  Effect.callback<Tunnel, LineFailed>((resume) => {
-    let child: ChildProcess;
-    try {
-      child = spawn("cloudflared", ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`], { stdio: ["ignore", "pipe", "pipe"] });
-    } catch (e) {
-      return resume(Effect.fail(new LineFailed({ message: messageOf(e), cause: e })));
-    }
-    const close = () => child.kill();
-    let settled = false;
-    const settle = (e: Effect.Effect<Tunnel, LineFailed>) => {
-      if (settled) return;
-      settled = true;
-      cancel();
-      resume(e);
-    };
-    const failWith = (message: string) => settle(Effect.fail(new LineFailed({ message })));
-    // A real process: its deadline is real time.
-    const cancel = afterRealTime(30_000, () => {
-      close();
-      failWith(t("server.voice.tunnel.timedOut"));
-    });
-    // cloudflared says its address on either stream; both are read until it exits, so it never blocks on a write.
-    const read = (b: Buffer) => {
-      const url = quickTunnel.exec(b.toString())?.[0];
-      if (url) settle(Effect.succeed({ url, close }));
-    };
-    child.stdout?.on("data", read);
-    child.stderr?.on("data", read);
-    child.on("error", (e) => failWith(errnoOf(e) === "ENOENT" ? t("server.voice.tunnel.missing") : e.message));
-    child.on("exit", () => failWith(t("server.voice.tunnel.exited")));
-    // Given up on before it said its address: the process goes too.
-    return Effect.sync(() => {
-      if (settled) return;
-      settled = true;
-      cancel();
-      close();
-    });
-  });
-
-/** The line refusing a keyless request counts as an answer. Asked over the real network every 2 s. */
-export const tunnelAnswers = (client: HttpClient.HttpClient, url: string) =>
-  Effect.gen(function* () {
-    const deadline = (yield* Clock.currentTimeMillis) + lineReadyMs;
-    const every = 2_000;
-    return yield* client.post(url + "/llm/ready/chat/completions").pipe(
-      Effect.timeout("5 seconds"),
-      Effect.option,
-      Effect.map((res) => res._tag === "Some" && res.value.status === 401),
-      Effect.repeat(
-        Schedule.spaced(every).pipe(
-          Schedule.setInputType<boolean>(),
-          Schedule.while(({ input, now }) => !input && now + every < deadline),
-          Schedule.passthrough,
-        ),
-      ),
-    );
-  });
 
 /** Something to tell on the call: updates, and what rang when the call answers a ring. */
 interface Told {
@@ -475,118 +190,24 @@ const make = (options: VoiceOptions = {}) =>
       return c ? Effect.succeed(c) : Effect.fail(unavailable(t("server.voice.noAgora"), "call"));
     };
 
-    // The voice line: local only, like the farm; the tunnel is the one way in from outside.
-    const keys = new Map<string, string>();
-    let line = false;
-    let linePort = config.voice.line.port;
-    let lineProblem = "";
-    let tunnel: Tunnel | undefined;
-    /** What cancels closing the tunnel, lineLingerMs after the last call. */
-    let closing: (() => void) | undefined;
-    const answer = chatCompletions({ answerer: response.answerer("phone"), misheard: t("server.voice.misheard") });
-    const route = /^\/llm\/([\w-]+)\/chat\/completions$/u;
-    // A call's own key on its own path; anything else is not there or not let in.
-    const lineHandler = Effect.gen(function* () {
-      const request = yield* HttpServerRequest.HttpServerRequest;
-      const m = route.exec(request.url.split("?")[0] ?? "");
-      if (request.method !== "POST" || !m?.[1]) return HttpServerResponse.empty({ status: 404 });
-      const key = keys.get(m[1]);
-      if (!key || request.headers.authorization !== "Bearer " + key)
-        return HttpServerResponse.jsonUnsafe({ error: { message: "unauthorized" } }, { status: 401 });
-      return yield* answer;
-    }).pipe(
-      Effect.catchCauseIf(
-        (cause) => !Cause.hasInterruptsOnly(cause),
-        () => Effect.succeed(HttpServerResponse.empty({ status: 502 })),
-      ),
-    );
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         stopped = true;
         for (const call of calls.values()) call.life.abort();
         calls.clear();
         grants.clear();
-        keys.clear();
-        closing?.();
-        tunnel?.close();
-        tunnel = undefined;
-      }),
-    );
-    const server = createServer();
-    yield* NodeHttpServer.make(() => server, { host: "127.0.0.1", port: linePort }).pipe(
-      Effect.matchEffect({
-        onFailure: (failure) => {
-          lineProblem = t("server.voice.lineDown", { why: messageOf(failure.cause) });
-          return Effect.logError(`vibevalley: the voice line cannot listen on 127.0.0.1:${linePort}: ${messageOf(failure.cause)}`);
-        },
-        onSuccess: (http) =>
-          Effect.gen(function* () {
-            if (http.address._tag !== "UnixPathAddress") linePort = http.address.port;
-            yield* http.serve(lineHandler);
-            // Its close waits for every socket: an answer still streaming is cut first.
-            yield* Effect.addFinalizer(() => Effect.sync(() => server.closeAllConnections()));
-            line = true;
-          }),
       }),
     );
 
-    const openTunnel =
-      options.tunnel ??
-      ((port: number) =>
-        Effect.tap(cloudflared(port), (item) =>
-          Effect.flatMap(tunnelAnswers(httpClient, item.url), (answers) =>
-            answers ? Effect.void : Effect.logInfo(`vibevalley: the voice line's tunnel ${item.url} does not answer yet; the call goes on`),
-          ),
-        ));
-    // Opening a tunnel waits for it to answer, through this very line: one opening at a time.
-    const opening = yield* Semaphore.make(1);
-    const lineClosed = () => new LineFailed({ message: t("server.voice.lineClosed") });
-    const base = Effect.suspend(() => {
-      if (config.voice.line.url) return Effect.succeed(config.voice.line.url.replace(/\/+$/u, ""));
-      closing?.();
-      closing = undefined;
-      return opening.withPermits(1)(
-        Effect.gen(function* () {
-          if (tunnel) return tunnel.url;
-          const item = yield* openTunnel(linePort);
-          if (stopped) {
-            item.close();
-            return yield* lineClosed();
-          }
-          tunnel = item;
-          return item.url;
-        }),
-      );
+    const voiceLine = yield* makeVoiceLine({
+      port: config.voice.line.port,
+      url: config.voice.line.url,
+      tunnel: options.tunnel,
+      httpClient,
+      answerer: response.answerer("phone"),
+      forkHere,
+      isStopped: () => stopped,
     });
-    const openLine = Effect.gen(function* () {
-      if (stopped) return yield* lineClosed();
-      if (lineProblem) return yield* new LineFailed({ message: lineProblem });
-      if (!line) return yield* new LineFailed({ message: t("server.voice.lineNotOpen") });
-      const url = yield* base;
-      if (stopped) return yield* lineClosed();
-      const id = randomBytes(8).toString("hex");
-      const key = randomBytes(24).toString("base64url");
-      keys.set(id, key);
-      return { id, key, url: url + "/llm/" + id + "/chat/completions" } satisfies CallLine;
-    });
-    const closeLine = (id: string) => {
-      keys.delete(id);
-      if (keys.size > 0 || !tunnel) return;
-      closing?.();
-      const lingering = forkHere(
-        Effect.sleep(lineLingerMs).pipe(
-          Effect.andThen(
-            Effect.sync(() => {
-              closing = undefined;
-              if (keys.size > 0 || !tunnel) return;
-              tunnel.close();
-              tunnel = undefined;
-            }),
-          ),
-        ),
-      );
-      closing = () => lingering.interruptUnsafe();
-    };
 
     const callOf = (agentId: string) => {
       const call = calls.get(agentId);
@@ -722,7 +343,7 @@ const make = (options: VoiceOptions = {}) =>
           const { voice, keys: vendorKeys, deepseekApiKey } = settings.voiceConfig();
           if (voice.answer.vendor === "orchestrator") {
             // Opened on the service's fibers: a start given up on still closes a line that opens late.
-            const opening = forkHere(openLine);
+            const opening = forkHere(voiceLine.open);
             openingLine = opening;
             callLine = yield* Fiber.join(opening).pipe(Effect.mapError((e) => unavailable(t("server.voice.lineFailed", { why: e.message }))));
             const opened = callLine;
@@ -730,7 +351,7 @@ const make = (options: VoiceOptions = {}) =>
             release = () => {
               if (once) return;
               once = true;
-              closeLine(opened.id);
+              voiceLine.close(opened.id);
             };
           }
           // Answering a ring, the orchestrator's first words are what rang: no greeting before them.
@@ -778,7 +399,7 @@ const make = (options: VoiceOptions = {}) =>
               release();
               if (grants.get(key) === g) grants.delete(key);
               const opening = openingLine;
-              if (opening && !callLine) forkHere(Effect.ignore(Effect.map(Fiber.join(opening), (opened) => closeLine(opened.id)), { log: "Debug" }));
+              if (opening && !callLine) forkHere(Effect.ignore(Effect.map(Fiber.join(opening), (opened) => voiceLine.close(opened.id)), { log: "Debug" }));
               const pending = starting;
               const agora = client;
               // An agent that joins after its start was given up on is stopped; one that never joined has nothing to stop.
@@ -907,7 +528,7 @@ const make = (options: VoiceOptions = {}) =>
         if (got._tag === "None") return yield* Effect.fail(unavailable(t("server.voice.dictation.shape")));
         return { text: (got.value.text ?? "").trim() };
       }),
-      lines: () => keys.size,
+      lines: voiceLine.lines,
       speak: Effect.fn("Voice.speak")(function* (text) {
         const on = liveCall();
         return on ? yield* speakOn(on, text) : false;

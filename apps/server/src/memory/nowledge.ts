@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 // Nowledge Mem (https://mem.nowledge.co), a knowledge graph on this Mac, spoken to over MCP: memory_search reads, memory_add writes.
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { Clock, Effect, Option, Predicate, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 
 import { asTransport } from "@vibevalley/agent/mcpTransport";
 import { t } from "@vibevalley/i18n";
@@ -35,8 +35,8 @@ const globalLabel = `${app}-scope-global`;
 export const nowledgeLabels = (agent: string, project: string) =>
   [app, label("agent", agent), project ? projectLabel + Buffer.from(project, "utf8").toString("hex") : globalLabel].join(",");
 
-const scopeOf = (labels: unknown): MemoryScope => {
-  if (!Array.isArray(labels) || !labels.every((l): l is string => typeof l === "string") || !labels.includes(app)) return { kind: "unknown" };
+const scopeOf = (labels: readonly string[] | undefined): MemoryScope => {
+  if (!labels || !labels.includes(app)) return { kind: "unknown" };
   const [only, ...extra] = labels.filter((l) => l === globalLabel || l.startsWith(projectLabel));
   if (!only || extra.length > 0) return { kind: "unknown" };
   if (only === globalLabel) return { kind: "global" };
@@ -71,7 +71,18 @@ const AddedResponse = Schema.fromJsonString(
     memory: Schema.optionalKey(Schema.Struct({ id: Schema.optionalKey(Schema.String) })),
   }),
 );
-const DetailResponse = Schema.fromJsonString(Schema.Struct({ labels: Schema.optionalKey(Schema.Unknown) }));
+const DetailResponse = Schema.fromJsonString(Schema.Struct({ labels: Schema.optionalKey(Schema.Array(Schema.String)) }));
+const ToolAnswer = Schema.Struct({
+  content: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        type: Schema.optionalKey(Schema.String),
+        text: Schema.optionalKey(Schema.String),
+      }),
+    ),
+  ),
+  isError: Schema.optionalKey(Schema.Boolean),
+});
 
 const hitID = (h: Hit) => h.memory_id || h.id || "";
 
@@ -125,10 +136,9 @@ export function nowledge(c: MemorySourceConfig): Source {
             return sourceError(e);
           },
         });
-        const text = (Array.isArray(res.content) ? res.content : [])
-          .map((x: unknown) => (Predicate.isObject(x) && "type" in x && x.type === "text" && "text" in x && typeof x.text === "string" ? x.text : ""))
-          .join("");
-        if (res.isError === true) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
+        const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(ToolAnswer)(res));
+        const text = (parsed?.content ?? []).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
+        if (parsed?.isError === true) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
         return text;
       }),
     );

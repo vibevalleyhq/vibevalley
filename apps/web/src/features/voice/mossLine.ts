@@ -1,7 +1,8 @@
+import { Schema } from "effect";
+
 import { t } from "@vibevalley/i18n";
 import { mossLinePath } from "@vibevalley/protocol";
 
-import { recordOf } from "#/base/dom.tsx";
 import { messageOf } from "#/base/format.ts";
 
 // The turns' words as MOSS revises them, and the account of the answer's playback MOSS needs told back.
@@ -184,8 +185,27 @@ let captureUrl: string | undefined;
 
 const noisy = new Set(["input.transcript.updated", "output.transcript.updated", "response.audio.context", "playback.chunk.completed"]);
 
-/** A field MOSS sends as a string; "" when it is anything else. */
-const str = (v: unknown) => (typeof v === "string" ? v : "");
+const MossEventPayload = Schema.Struct({
+  text: Schema.optionalKey(Schema.String),
+  turn: Schema.optionalKey(Schema.String),
+  turn_id: Schema.optionalKey(Schema.String),
+  chunk_id: Schema.optionalKey(Schema.String),
+  run_id: Schema.optionalKey(Schema.String),
+  reason: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(
+    Schema.Union([
+      Schema.String,
+      Schema.Struct({ message: Schema.optionalKey(Schema.String) }),
+    ]),
+  ),
+});
+const MossFrame = Schema.fromJsonString(
+  Schema.Struct({
+    action: Schema.optionalKey(Schema.String),
+    data: Schema.optionalKey(MossEventPayload),
+  }),
+);
+const decodeMossFrame = Schema.decodeUnknownOption(MossFrame);
 
 export class MossLine {
   phase: MossPhase = "idle";
@@ -279,17 +299,13 @@ export class MossLine {
   }
 
   private event(data: string, setup: MossSetup) {
-    let m: Record<string, unknown> | undefined;
-    try {
-      m = recordOf(JSON.parse(data));
-    } catch {
-      return;
-    }
-    if (!m) return;
-    const action = str(m.action);
+    const decoded = decodeMossFrame(data);
+    if (decoded._tag === "None") return;
+    const m = decoded.value;
+    const action = m.action ?? "";
     if (!noisy.has(action)) this.log(false, data);
-    const d = recordOf(m.data) ?? {};
-    const text = str(d.text);
+    const d = m.data ?? {};
+    const text = d.text ?? "";
     switch (action) {
       case "session_attached": {
         const persona = setup.persona.trim();
@@ -302,33 +318,35 @@ export class MossLine {
         break;
       case "input.transcript.updated":
       case "input.transcript.done":
-        this.words("owner", str(d.turn), text, action.endsWith("done"));
+        this.words("owner", d.turn ?? "", text, action.endsWith("done"));
         break;
       case "output.transcript.updated":
       case "output.transcript.done":
-        this.words("moss", str(d.turn_id), text, action.endsWith("done"));
+        this.words("moss", d.turn_id ?? "", text, action.endsWith("done"));
         break;
       case "response.audio.context":
-        this.piece = { chunk: str(d.chunk_id), run: str(d.run_id), turn: str(d.turn_id) };
+        this.piece = { chunk: d.chunk_id ?? "", run: d.run_id ?? "", turn: d.turn_id ?? "" };
         break;
       case "response.audio.done":
-        this.tell(this.playback.sent(str(d.run_id), str(d.turn_id)));
+        this.tell(this.playback.sent(d.run_id ?? "", d.turn_id ?? ""));
         break;
       case "input.speech.stopped":
         this.heardAt = performance.now();
         break;
-      case "response.audio.stop":
-        this.qos.stops[str(d.reason) || "?"] = (this.qos.stops[str(d.reason) || "?"] ?? 0) + 1;
-        this.cut(str(d.run_id), str(d.turn_id));
+      case "response.audio.stop": {
+        const reason = d.reason || "?";
+        this.qos.stops[reason] = (this.qos.stops[reason] ?? 0) + 1;
+        this.cut(d.run_id ?? "", d.turn_id ?? "");
         break;
+      }
       case "response.interrupted":
         // Cut off, an answer never gets its output.transcript.done: what it got to say is here.
-        this.words("moss", str(d.turn_id), str(d.text), true);
-        this.cut(str(d.run_id), str(d.turn_id));
+        this.words("moss", d.turn_id ?? "", text, true);
+        this.cut(d.run_id ?? "", d.turn_id ?? "");
         break;
       case "error": {
-        const e: unknown = d.error;
-        this.problem = typeof e === "object" && e !== null && "message" in e && typeof e.message === "string" ? e.message : data;
+        const e = d.error;
+        this.problem = typeof e === "string" ? e : (e?.message ?? data);
         break;
       }
       default:

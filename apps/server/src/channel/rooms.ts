@@ -76,9 +76,20 @@ export class ChatModel {
   }
 
   /** The default channel (is_default): where words with no channel named land. */
+  defaultChannel(): ChannelRow | undefined {
+    for (const c of this.byId.values()) if (c.is_default) return c;
+    return undefined;
+  }
+
   defaultId(): string {
-    for (const c of this.byId.values()) if (c.is_default) return c.id;
-    return "";
+    return this.defaultChannel()?.id ?? "";
+  }
+
+  /** The top-level channel a room belongs to: a thread's parent channel, a channel itself, or the default channel for a direct room. */
+  topChannel(id: string): ChannelRow | undefined {
+    const row = this.byId.get(id);
+    if (!row || row.type === "direct") return this.defaultChannel();
+    return (row.type === "thread" && row.parent_id ? this.byId.get(row.parent_id) : row) ?? this.defaultChannel();
   }
 
   channelByName(name: string): ChannelRow | undefined {

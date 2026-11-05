@@ -12,8 +12,8 @@
   "apps/desktop": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 2,
-    "lintOff": 3,
+    "cast": 1,
+    "lintOff": 2,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
@@ -22,8 +22,8 @@
   "apps/mobile": {
     "nonNull": 0,
     "doubleCast": 1,
-    "cast": 3,
-    "lintOff": 5,
+    "cast": 2,
+    "lintOff": 4,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,

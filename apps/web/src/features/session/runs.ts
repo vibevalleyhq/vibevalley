@@ -170,19 +170,18 @@ export function spanColor(step: SessionEvent) {
   }
 }
 
+const CommandInput = Schema.fromJsonString(Schema.Struct({ command: Schema.optionalKey(Schema.String) }));
+const JsonObjectInput = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown));
+
 /** A call's input as it reads best: a command as `$ …`, JSON indented, anything else as it came. */
 export function readableInput(step: SessionEvent) {
   const raw = step.input?.trim() ?? "";
   if (!raw) return "";
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (Predicate.isObject(parsed)) {
-      const command = Predicate.hasProperty(parsed, "command") ? parsed.command : undefined;
-      if (!Array.isArray(parsed) && typeof command === "string") return `$ ${command}`;
-      return JSON.stringify(parsed, null, 2);
-    }
-  } catch {
-    // Not JSON (or clipped): shown as it came.
+  const obj = Schema.decodeUnknownOption(JsonObjectInput)(raw);
+  if (obj._tag === "Some") {
+    const cmd = Schema.decodeUnknownOption(CommandInput)(raw);
+    if (cmd._tag === "Some" && cmd.value.command !== undefined) return `$ ${cmd.value.command}`;
+    return JSON.stringify(obj.value, null, 2);
   }
   return raw;
 }
