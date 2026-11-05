@@ -129,18 +129,10 @@ interface Observation {
   locale?: Locale;
 }
 
-/** oar's installation probes read the binary from OAR_<ID>_BIN as they start. An empty path looks on PATH, ignoring the variable. */
+/** oar's installation probes take the binary from OAR_<ID>_BIN in their env overlay. An empty path looks on PATH, ignoring the host's variable. */
 export function probeInstallation(runtime: OarRuntime, binPath: string): Promise<InstallationSnapshot> {
   if (!runtime.installation) return Promise.resolve({ kind: "not_found" });
-  const name = `OAR_${runtime.id.toUpperCase()}_BIN`;
-  const before = process.env[name];
-  process.env[name] = binPath;
-  try {
-    return runtime.installation();
-  } finally {
-    if (before === undefined) delete process.env[name];
-    else process.env[name] = before;
-  }
+  return runtime.installation({ env: { [`OAR_${runtime.id.toUpperCase()}_BIN`]: binPath } });
 }
 
 function fromOar(usage: Awaited<ReturnType<NonNullable<OarRuntime["accountUsage"]>>>): T.AccountUsage {

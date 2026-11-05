@@ -530,8 +530,9 @@ describe("runtime", () => {
     process.env.OAR_PI_BIN = "external-default";
     const registry = new RuntimeRegistry([
       fake("pi", {
-        installation: async () => {
-          const bin = process.env.OAR_PI_BIN;
+        // As oar's probes: the overlay wins over the host's environment.
+        installation: async (probe) => {
+          const bin = probe?.env?.OAR_PI_BIN ?? process.env.OAR_PI_BIN;
           await nextTurn();
           return { kind: "available", via: "executable", command: bin ?? "none" } as const;
         },

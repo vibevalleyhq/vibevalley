@@ -172,8 +172,8 @@
   "server: Agents": {
     "nonNull": 34,
     "doubleCast": 1,
-    "cast": 10,
-    "lintOff": 6,
+    "cast": 9,
+    "lintOff": 5,
     "orDie": 5,
     "ignored": 5,
     "swallowed": 2,

@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Cause, Clock, Context, Effect, Fiber, FiberSet, Layer, Predicate, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
+import { Cause, Clock, Context, Effect, Fiber, FiberSet, Layer, Predicate, Queue, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 import { HttpBody, HttpClient, type HttpClientError, HttpServerRequest, HttpServerResponse } from "effect/http";
 import type { Socket } from "effect/socket";
 
@@ -427,6 +427,15 @@ export const tunnelAnswers = (client: HttpClient.HttpClient, url: string) =>
     );
   });
 
+/** Something to tell on the call: updates, and what rang when the call answers a ring. */
+interface Told {
+  readonly texts: readonly string[];
+  readonly ring?: string | undefined;
+}
+
+/** Everything that waited, as one: the texts in the order they came, and the latest ring. */
+const mergedTold = (all: readonly Told[]) => ({ texts: all.flatMap((t) => t.texts), ring: all.findLast((t) => t.ring)?.ring });
+
 const make = (options: VoiceOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
@@ -603,20 +612,20 @@ const make = (options: VoiceOptions = {}) =>
         ),
     );
 
-    // What is to be told on the call waits in one queue, so that it never crowds itself.
+    // What is to be told on the call waits in one queue, read by one fiber, so that it never crowds itself: a round gathers
+    // for gatherMs, then asks one answer of everything that waited. A round ends when nothing more waits, the call ends or
+    // three answers in a row are empty; what still waits then is dropped.
     const gatherMs = options.gatherMs ?? 3000;
-    const waiting: string[] = [];
-    let rang: string | undefined;
-    let telling = false;
-    const drain = Effect.gen(function* () {
-      for (let tries = 0; (waiting.length > 0 || rang) && tries < 3;) {
+    const told = yield* Queue.unbounded<Told>();
+    const round = Effect.gen(function* () {
+      let pending: Told[] = yield* Queue.takeAll(told);
+      for (let tries = 0; pending.length > 0 && tries < 3;) {
         yield* Effect.sleep(gatherMs);
+        pending.push(...(yield* Queue.clear(told)));
         const on = liveCall();
         const call = on ? calls.get(on) : undefined;
         if (!on || !call || stopped) break;
-        const texts = waiting.splice(0);
-        const ring = rang;
-        rang = undefined;
+        const { texts, ring } = mergedTold(pending);
         // The call ending ends the wait for the brief (not the orchestrator's run).
         const said = yield* response.brief(onCallLine(texts, ring)).pipe(
           Effect.mapError(callStepFailed),
@@ -627,29 +636,17 @@ const make = (options: VoiceOptions = {}) =>
         if (said) {
           tries = 0;
           yield* speakOn(on, said);
-        } else {
-          tries++;
-          waiting.unshift(...texts);
-          if (ring) rang ??= ring;
-        }
+          pending = yield* Queue.clear(told);
+        } else tries++;
       }
     }).pipe(
       Effect.catch((e) => Effect.sync(() => logs.warn("vibevalley: voice: the update could not be told: " + messageOf(e)))),
-      Effect.ensuring(
-        Effect.sync(() => {
-          waiting.length = 0;
-          rang = undefined;
-          telling = false;
-        }),
-      ),
+      Effect.catchDefect((d) => Effect.sync(() => logs.warn("vibevalley: voice: the update could not be told: " + messageOf(d)))),
+      Effect.ensuring(Queue.clear(told)),
     );
+    yield* Effect.forkScoped(Effect.forever(round));
     const tell = (texts: readonly string[], ring?: string) => {
-      if (stopped) return;
-      waiting.push(...texts);
-      if (ring) rang = ring;
-      if (telling) return;
-      telling = true;
-      forkHere(drain);
+      if (!stopped && (texts.length > 0 || ring)) Queue.offerUnsafe(told, { texts, ring });
     };
 
     // What came into the inbox: with a call on, the orchestrator says it on the call; with none, the page's phone rings

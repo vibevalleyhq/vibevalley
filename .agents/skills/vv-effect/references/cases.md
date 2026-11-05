@@ -897,3 +897,71 @@ yield* Effect.forEach(files, (file) => Effect.tryPromise({ try: (signal) => uplo
 为什么：里面的错误带着原因（堆栈、路径、库的报错），是给日志看的；经接口出去的是协议里的错误，只有给主人看的话和接着能做什么。在边界上转一次，不把里面的东西泄出去。
 
 在这里：接口的错误类型是 `ApiError`（类型挡住大部分）；转换在拥有规则的服务或处理里，审。
+
+### 40. 为了传一个参数改全局的环境变量
+
+不建议：
+
+```ts
+const before = process.env[name];
+process.env[name] = binPath; // Every other probe and session in the process sees it until it is put back.
+try {
+  return runtime.installation();
+} finally {
+  if (before === undefined) delete process.env[name];
+  else process.env[name] = before;
+}
+```
+
+建议：
+
+```ts
+// oar's probes take an env overlay: the host's environment is untouched.
+return runtime.installation({ env: { [`OAR_${runtime.id.toUpperCase()}_BIN`]: binPath } });
+```
+
+为什么：全局的环境是整个进程共享的，写进去再还原只在同步的那一小段里安全，改了库、加了一个 `await` 就串了；库已经收参数时，参数就是那个更高一层的写法。看着要「设好再还原」的地方，先看库现在给不给参数（这一处是 oar 早先只读环境变量时留下的）。
+
+在这里：`apps/server/src/runtime/runtime.ts` 的 `probeInstallation`；`process.env` 由 Effect 的诊断拦，审。
+
+### 41. 手写的单消费者队列
+
+不建议：
+
+```ts
+const waiting: string[] = [];
+let telling = false;
+const drain = Effect.gen(function* () {
+  while (waiting.length > 0) {
+    yield* Effect.sleep(gatherMs);
+    yield* say(waiting.splice(0));
+  }
+}).pipe(Effect.ensuring(Effect.sync(() => { waiting.length = 0; telling = false; })));
+const tell = (texts: readonly string[]) => {
+  waiting.push(...texts);
+  if (telling) return; // A flag stands for "a consumer is running": every exit path has to reset it.
+  telling = true;
+  forkHere(drain);
+};
+```
+
+建议：
+
+```ts
+const told = yield* Queue.unbounded<Told>();
+const round = Effect.gen(function* () {
+  let pending = yield* Queue.takeAll(told); // Waits for one, takes all.
+  while (pending.length > 0) {
+    yield* Effect.sleep(gatherMs);
+    pending.push(...(yield* Queue.clear(told)));
+    yield* say(pending);
+    pending = yield* Queue.clear(told);
+  }
+}).pipe(Effect.ensuring(Queue.clear(told)));
+yield* Effect.forkScoped(Effect.forever(round));
+const tell = (t: Told) => Queue.offerUnsafe(told, t);
+```
+
+为什么：数组、「有没有人在消费」的标志、按需 fork、出口处的复位，合起来就是一个队列和一个消费者；`Queue` 和归作用域的一个纤程把它们换成结构，标志就不会忘了复位。`takeAll` 等到至少一个、`clear` 不等，正好是「攒一会儿，一次说完」。
+
+在这里：`apps/server/src/voice/voice.ts` 的通话播报；审。

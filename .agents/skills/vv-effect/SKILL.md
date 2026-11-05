@@ -11,8 +11,8 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 
 | 层 | 是什么 | 在哪 |
 |---|---|---|
-| 道 | 为什么这样写：14 条原则（失败是值、依赖是契约、资源成对、时间经服务、命名的函数就是 span、交界收窄、进门解码、重试有上限……），每条落到哪些写法 | [references/principles.md](.agents/skills/vv-effect/references/principles.md) |
-| 术 | 怎么写：39 个案例，每个一对「不建议 / 建议」的代码，配为什么和谁拦着；不少取自这个仓库自己的代码 | [references/cases.md](.agents/skills/vv-effect/references/cases.md) |
+| 道 | 为什么这样写：15 条原则（失败是值、依赖是契约、资源成对、时间经服务、命名的函数就是 span、交界收窄、进门解码、重试有上限、看着别扭先往上看一层……），每条落到哪些写法 | [references/principles.md](.agents/skills/vv-effect/references/principles.md) |
+| 术 | 怎么写：41 个案例，每个一对「不建议 / 建议」的代码，配为什么和谁拦着；不少取自这个仓库自己的代码 | [references/cases.md](.agents/skills/vv-effect/references/cases.md) |
 | 器 | 拿什么查：去哪儿查 API、哪个检查拦什么、怎么读报错、测试和观测用什么、加一条检查写在哪 | [references/tools.md](.agents/skills/vv-effect/references/tools.md) |
 
 写代码时先翻「术」找最像的一条；案例里没有、或两条打架时回到「道」；报错看不懂、要查 API、要加检查时看「器」。

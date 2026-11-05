@@ -49,8 +49,7 @@ export const loadSegmenter = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const read = (file: string) => Effect.map(fs.readFile(join(dataDir, file)), (bytes) => gunzipSync(bytes).toString("utf8"));
   dictionary ??= dictionaryOf(yield* read(files.dictionary));
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the segmenter's table, shipped with the package
-  emitTable ??= JSON.parse(yield* read(files.emit)) as Record<State, Record<string, number>>;
+  emitTable ??= emitOf(yield* read(files.emit));
 }).pipe(Effect.orDie);
 
 const dict = (): Dictionary => (dictionary ??= dictionaryOf(readNow(files.dictionary)));
@@ -145,9 +144,9 @@ function routesOf(runes: readonly string[]): { freq: number; index: number }[] {
 type State = "B" | "E" | "M" | "S";
 
 let emitTable: Record<State, Record<string, number>> | undefined;
-const emit = () =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the segmenter's table, shipped with the package
-  (emitTable ??= JSON.parse(readNow(files.emit)) as Record<State, Record<string, number>>);
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the segmenter's table, shipped with the package
+const emitOf = (text: string) => JSON.parse(text) as Record<State, Record<string, number>>;
+const emit = () => (emitTable ??= emitOf(readNow(files.emit)));
 
 const minFloat = -3.14e100;
 const prevStatus: Record<State, readonly State[]> = { B: ["E", "S"], M: ["M", "B"], S: ["S", "E"], E: ["B", "M"] };
