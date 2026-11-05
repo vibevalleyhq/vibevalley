@@ -1,6 +1,3 @@
-// A direct channel with a profile: the owner's first words there start a session that talks with them, given the recent
-// words as its context.
-
 import { Clock, Effect, FiberMap } from "effect";
 
 import { t } from "@vibevalley/i18n";

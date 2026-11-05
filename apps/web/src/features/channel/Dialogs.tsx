@@ -1,5 +1,3 @@
-// A channel has no members to pick: helpers are in the channel their job was arranged in.
-
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Show, untrack } from "solid-js";
 
@@ -76,9 +74,7 @@ function Form(props: {
   );
 }
 
-// Making a channel or changing one, as both chat windows carry it out: the workbench's dialogs (here) and the farm's menu
-// (farm/chat/ChannelMenu.tsx). This keeps the fields, the busy flag and the server's refusal; a window only draws them and
-// says what happens once it went through.
+// Making a channel or changing one, as both chat windows carry it out: the workbench's dialogs (here) and the farm's menu (farm/chat/ChannelMenu.tsx).
 /** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
 export function createChannelForm(channel?: Channel) {
   const was = untrack(() => ({

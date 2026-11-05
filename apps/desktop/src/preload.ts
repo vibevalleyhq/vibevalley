@@ -1,5 +1,3 @@
-// The host interface for the page (@vibevalley/protocol/host), over the desktop's bridge to the main process.
-
 import { contextBridge } from "electron";
 
 import { connect } from "@vibevalley/bridge";

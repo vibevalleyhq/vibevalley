@@ -1,7 +1,3 @@
-// PreviewCard (Base UI's; shadcn's HoverCard): a card about a link, shown after the pointer rests on the link or the
-// keyboard focuses it. Moving from the link onto the card keeps it open, so what is on it can be read and clicked;
-// leaving both, a press outside or Escape closes it. It adds to the link, so nothing reads it as the link's description.
-
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, omit, onCleanup, useContext } from "solid-js";
 

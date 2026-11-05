@@ -1,6 +1,3 @@
-// The hand-written commands against a farm of their own: the notes from a terminal, doctor, and `app` with no desktop
-// app to answer.
-
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 

@@ -1,5 +1,3 @@
-// A script that calls the network is let through with a warning: the CSP stops the call, the rest of the page still works.
-
 import { type DefaultTreeAdapterTypes as P, parse } from "parse5";
 
 import { list, t } from "@vibevalley/i18n";
@@ -73,7 +71,7 @@ function linkNeed(rel: string, as: string): Need | undefined {
   return undefined;
 }
 
-/** A srcset's URLs. Not split on every comma: a data: URL has one; a URL runs to a space, its descriptors to a comma. */
+/** A srcset's URLs. Not split on every comma: a data: URL has one. */
 function srcsetUrls(v: string): string[] {
   const out: string[] = [];
   let i = 0;

@@ -1,7 +1,3 @@
-// What the blocks editor computes on its own: offsets in the server's unit, marks kept
-// through an edit, list numbers and the line-start shortcuts. Order keys are the shared rule (keyBetween); the ops' rules
-// stay the server's.
-
 import { type BlockAttrs, type BlockType, BlockTypeValues, type SpanMarks, type TextSpan } from "@vibevalley/protocol";
 import { normalSpans } from "@vibevalley/protocol/rules";
 
@@ -28,8 +24,7 @@ export function splitSpans(spans: readonly TextSpan[], at: number): [TextSpan[],
 
 const low = (unit: number) => unit >= 0xdc00 && unit <= 0xdfff;
 
-/** The spans after the text became `text`: what is the same at both ends keeps its marks; what was typed takes the marks
- * of the character before it, a link's excepted. */
+/** The spans after the text became `text`: what is the same at both ends keeps its marks. */
 export function editSpans(old: readonly TextSpan[], text: string): TextSpan[] {
   const before = plainOf(old);
   if (before === text) return [...old];

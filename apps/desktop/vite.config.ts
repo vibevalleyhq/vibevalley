@@ -1,7 +1,6 @@
 import { defineConfig } from "vite-plus";
 
-// test: the main process's rules (src/*.test.ts). e2e: the whole app under Playwright: it loads the page from
-// apps/web/dist, so the page is built first. Not cached: it starts Electron and a real server.
+// test: the main process's rules (src/*.test.ts). e2e: the whole app under Playwright: it loads the page from apps/web/dist, so the page is built first.
 export default defineConfig({
   test: { include: ["src/**/*.test.ts"], environment: "node" },
   run: {

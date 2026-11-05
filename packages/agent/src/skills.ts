@@ -1,6 +1,3 @@
-// The system prompt lists only names and when-to-use; the body is read when the model asks for it (load_skill), so a
-// hundred skills cost a hundred lines, not a hundred files.
-
 import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";

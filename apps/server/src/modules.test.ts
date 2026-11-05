@@ -1,7 +1,3 @@
-// The modules' boundary (modules.ts): every folder and file under src/ is part of one module, no module imports one
-// after it, and none reads another's part of the core state: it asks that module. A test may use any module; so may the
-// test farm (testing/, flows/).
-
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
 
@@ -51,8 +47,7 @@ const localEdges = (file: string, source = readFileSync(file, "utf8")) =>
 
 const readsSessionSnapshot = (file: string, source: string) => calls(file, source, "core", "state") && localEdges(file, source).includes("session/roster.ts");
 
-/** The read projections a module takes from another module's tables, by the table's generated file: each a query it
- * only reads with, named, never a whole file. Writes stay with the table's module. */
+/** The read projections a module takes from another module's tables, by the table's generated file: each a query it only reads with, named, never a whole file. */
 const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
   mailbox: { "channel.sql.ts": ["defaultID", "orchestratorForChannel", "inboxOf"], "issue.sql.ts": ["issueExists"] },
   inbox: { "channel_message.sql.ts": ["messageByID", "notificationReceipt", "ownerReadReports"] },

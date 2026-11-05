@@ -26,7 +26,7 @@ export function serveHost(o: {
   readonly window: MainWindow;
   readonly tray: (summary: TraySummary) => void;
   readonly updates: HostUpdates;
-  /** 「安装命令行」; absent in the app run from the repository, which has no command line of its own to link. */
+  /** Install CLI; absent in the app run from the repository, which has no command line of its own to link. */
   readonly commandLine: CommandLineInstaller | undefined;
 }) {
   const installer = () => {

@@ -1,5 +1,3 @@
-// A shape as it is on the wire, and the Schema type every shape's Schema is held to.
-
 import type { Brand, Schema } from "effect";
 
 /** A shape as it is on the wire: an id is a plain string there, branded only once read. */

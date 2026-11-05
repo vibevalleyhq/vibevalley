@@ -1,5 +1,3 @@
-// The checklist's words are src/features/issue/overview.ts's.
-
 import { For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

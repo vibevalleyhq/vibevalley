@@ -1,7 +1,3 @@
-// Made-up memories for the memory tree until the server sums them up (.agents/notes/proposed/feature/2026-10-22-memory-tree.md):
-// MemoryTree is the shape memory.tree is to answer with, and moves into the protocol then. Everything here is fixed by
-// a seed, so the page and its tests see the same tree on every load.
-
 import { currentLocale } from "@vibevalley/i18n";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 export type MemoryKind = "leaf" | "fruit" | "seed";
@@ -38,11 +34,7 @@ interface MemoryAgent {
   readonly name: string;
 }
 
-/**
- * Two memories that belong together: `from`, the second was distilled from the first (a seed from a fruit, a fruit's
- * job wrote the leaf down: EverOS's skill sources, or one session locally); `together`, recalled into the same rounds
- * `times` times (counted from each session's recalled ids).
- */
+/** Two memories that belong together: `from`, the second was distilled from the first. */
 export interface MemoryLink {
   readonly kind: "from" | "together";
   /** For `from`: the source (the fruit, the leaf). */

@@ -1,7 +1,3 @@
-// The inbox: what in it is news to the owner, and the patrol (what has waited past its kind's grace). The
-// routes listen and say it their own way: on a call the orchestrator says the news (voice), the patrol's findings wake the
-// orchestrator, and the page rings, notifies and fills the tray from the same inbox in the frame, each item worded there.
-
 import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Semaphore, Stream } from "effect";
 
 import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
@@ -150,8 +146,7 @@ const make = Effect.gen(function* () {
   });
 });
 
-/** After the sessions and issues came back: the inbox as it stands is known, and the patrol starts its rounds. The first
- * round waits one interval: right after a start, what looks hanging is mostly the restart. */
+/** After the sessions and issues came back: the inbox as it stands is known, and the patrol starts its rounds. */
 export const start = Layer.effectDiscard(
   Effect.gen(function* () {
     const config = yield* ServerConfig;

@@ -184,7 +184,7 @@ test("a card shows only what differs from its lane, an empty lane is a place to 
   const inKept = await api.issue.create({ title: "one in kept", project: kept.name });
   await page.goto("/issues");
   const todo = lane(page, "todo");
-  // A draft in 待办 with no helper and no priority: nothing to mark but its being a draft.
+  // A draft in todo with no helper and no priority: nothing to mark but its being a draft.
   await expect(card(todo, plain.id).getByTestId("card-marks").locator("svg")).toHaveCount(0);
   await expect(card(todo, urgent.id).getByTestId("card-marks").locator("svg").first()).toBeVisible();
   await expect(lane(page, "working").getByTestId("lane-empty")).toBeVisible();

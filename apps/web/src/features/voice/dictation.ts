@@ -1,7 +1,3 @@
-// Dictation: tap to talk, tap again to stop; the recording goes to the server
-// (voice.dictate), which hands it to the transcription address in 声音's 听写, and the words come back for the field it
-// was started from. Recorded as 16 kHz mono WAV, which every transcriber takes. One recording at a time.
-
 import { t } from "@vibevalley/i18n";
 
 import { api, reasonOf } from "#/infra/api.ts";

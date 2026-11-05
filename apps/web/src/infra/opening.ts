@@ -1,8 +1,3 @@
-// The cover a page starts under (public/opening.html, written into index.html) and how it goes (docs/style/design.md,
-// 打开和刷新). The workbench's cover is its own ground, and it stays until the page has what it first shows: the first
-// state frame, the reads its places started and their pictures. Then the page shows once, whole, instead of passing
-// through an empty shell, zero counts and a dialog popping in again. The farm's cover hands over to its own bar at once.
-
 import { frames } from "./frame";
 import { queries } from "./query";
 
@@ -56,8 +51,7 @@ export async function reveal() {
   if (!cover) return;
   if (cover.dataset.look === "farm") return cover.remove();
   await Promise.race([pageReady(), new Promise((done) => setTimeout(done, longest))]);
-  // What came in under the cover (a dialog opened by the address, a list's first rows) is already in: it shows where
-  // it ends, not coming in a second time. Loops (the thinking dots) go on.
+  // What came in under the cover (a dialog opened by the address, a list's first rows) is already in: it shows where it ends, not coming in a second time.
   for (const a of document.getAnimations()) {
     const target = a.effect instanceof KeyframeEffect ? a.effect.target : null;
     if (target && cover.contains(target)) continue;

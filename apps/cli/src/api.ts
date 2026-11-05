@@ -1,8 +1,3 @@
-// The farm's endpoints as they are, for whatever no task-shaped command covers (cli/reach.ts says which): `api list` names
-// every endpoint with what it does and the JSON Schema of its input, `api call <op>` calls one with --json checked
-// against that Schema before it is sent, `api state` and `api events` follow the farm's streams. Also what every command
-// stands on: --server, --dry-run, and one request over HTTP.
-
 import { Config, Effect, FileSystem, Option, Schema, Stream } from "effect";
 import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
 import { Sse } from "effect/encoding";
@@ -29,8 +24,7 @@ export const ServerFlag = GlobalFlag.Setting("server")({
   ),
 });
 
-/** --dry-run: a command that changes what cannot be taken back answers what it would do (its endpoint's dryRun) and changes
- * nothing; one that only reads runs as it is; any other is refused rather than done. */
+/** --dry-run: a command that changes what cannot be taken back answers what it would do (its endpoint's dryRun) and changes nothing. */
 export const DryRunFlag = GlobalFlag.Setting("dry-run")({
   flag: Flag.Boolean("dry-run").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.dryRun"))),
 });

@@ -249,7 +249,7 @@ describe("a compaction", () => {
 const subagentBrief = (c: Request) => messageText(c.messages[0]!);
 
 describe("the agent's own todos", () => {
-  // A and B go out together; C waits for both, then goes; each comes back to the agent as an input.
+  // A and B go out together. C waits for both, then goes.
   it.effect("sends a subagent's tasks when ready, and they come back", () => {
     const dir = home();
     const store = memoryStore();

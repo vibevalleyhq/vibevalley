@@ -1,6 +1,3 @@
-// 连接器: the chat apps the owner talks to the farm from. Polled while open: a scan on the
-// phone moves a login on without a reload.
-
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 

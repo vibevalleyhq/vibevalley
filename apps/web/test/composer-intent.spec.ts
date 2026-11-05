@@ -1,5 +1,3 @@
-// The farm chat's sending, as far as the page wires it: the channel and helper picked go into the request, a lost reply
-// is the message the server took, and a retry is the same message. When a line settles is composing.test.ts's.
 import type { Page } from "@playwright/test";
 
 import { defaultOrchestrator, type SayRequest, pathOf } from "@vibevalley/protocol";
@@ -11,8 +9,7 @@ test.use({ farm: "composer-intent" });
 async function openFarmChat(page: Page) {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
   await page.goto("/farm/");
-  // The farm chat is the farm phone's right screen: take the phone out and unfold it. The phone is the HUD's, drawn
-  // without the canvas, so the village's loading (seconds under a parallel run) is not waited for.
+  // The farm chat is the farm phone's right screen: take the phone out and unfold it.
   await page.getByTestId("phone-button").click();
   await page.getByTestId("phone-chat").click();
   return page.getByTestId("farm-chat").getByTestId("composer-input");

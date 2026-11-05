@@ -1,7 +1,3 @@
-// Every input carries a route the host does not read: the one that owns the agent says what it means and where its words go.
-// An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so they go
-// to the route of the input taken last, and the tools read that route too.
-
 import { join } from "node:path";
 
 import { Cause, Clock, Deferred, Effect, Exit, Fiber, FileSystem, Queue, Schema, Scope, Semaphore, Stream } from "effect";
@@ -34,8 +30,7 @@ export class NotAnswered extends Schema.TaggedError<NotAnswered, { readonly bran
   cause: Schema.Defect(),
 }) {}
 
-/** One answer streamed to a caller (a call's line, a chat/completions request, a brief). A newer one ends the one before.
- * Its words are read once: what came before the reader is kept for it. */
+/** One answer streamed to a caller (a call's line, a chat/completions request, a brief). A newer one ends the one before. */
 export class Caller {
   private kept: string[] = [];
   private ended = false;
@@ -115,8 +110,7 @@ export interface HostOptions<R> {
   readonly toolStart: (tool: string, args: unknown) => ToolStart;
 }
 
-/** What makes an input's text once it is its turn: whether the agent is busy (an input may be taken after a later one),
- * and what memory gained since the model last saw it. heard: the messages the text tells of, recorded on the run. */
+/** What makes an input's text once it is its turn. heard: the messages the text tells of, recorded on the run. */
 export type Build<E> = (busy: boolean, memoryNews: string) => Effect.Effect<{ readonly text: string; readonly heard?: readonly string[] }, E>;
 
 type Submitted = { readonly ok: true } | { readonly ok: false; readonly why: string; readonly run: string };
@@ -126,8 +120,7 @@ export interface AgentHost<R> {
   readonly current: () => Hosted<R>;
   /** The run a restart cut off is in the transcript. */
   readonly unfinished: Effect.Effect<boolean>;
-  /** now joins the run under way; otherwise the input waits until the run would stop. false and why when the agent
-   * cannot start: that input is recorded as a failed run of its own. */
+  /** now joins the run under way. otherwise the input waits until the run would stop. */
   readonly submit: <E>(build: Build<E>, input: Hosted<R>, now: boolean) => Effect.Effect<Submitted, E>;
   /** The run the last start was cut off in goes on, with the input it was taking, within maxAgeMs. */
   readonly resume: (maxAgeMs: number) => Effect.Effect<void>;
@@ -139,8 +132,7 @@ export interface AgentHost<R> {
   readonly markWrong: (on: number, want: string, model: string, tools: readonly string[]) => Effect.Effect<{ id: string; file: string }, ApiError>;
 }
 
-/** Made by Session.host in the owner's scope: the agent's own scope is a child of it, so the agent ends with the owner at
- * the latest; its log and its runs are kept with the sessions'. */
+/** Made by Session.host in the owner's scope: the agent's own scope is a child of it, so the agent ends with the owner at the latest. */
 export const makeHost = <R>(
   o: HostOptions<R> & { readonly memory: MemoryPort },
   journal: Journal,
@@ -183,8 +175,7 @@ export const makeHost = <R>(
       return { ok: false, why: stopped(), run: "" };
     };
 
-    // The caller (a call's line, the local chat/completions) gets the words as they grow; the chat gets the answer once
-    // it is whole, and meanwhile only that it is being written.
+    // The caller (a call's line, the local chat/completions) gets the words as they grow.
     const activity = Effect.fn("Session.activity")(function* (action: T.SessionAction, route?: R) {
       const id = sessionId(o.session.id);
       const session = core.session(id);
@@ -262,8 +253,7 @@ export const makeHost = <R>(
             if (isHosted(e.message, o.inputType)) {
               // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a custom message of this host's input type carries the route this host put in it
               const next = local.get(e.message) ?? { route: e.message.details as R, run: { by: { kind: "" } } };
-              // An input that joins the run takes the words from here on: the one before has what it got, and ends now, or a
-              // caller waiting on it (a brief, a call's line) would wait for the run's end with no words.
+              // An input that joins the run takes the words from here on.
               if (input.caller && input.caller !== next.caller) input.caller.end();
               input = next;
               toCaller = 0;
@@ -330,9 +320,7 @@ export const makeHost = <R>(
         Effect.onError(() => Scope.close(scope, Exit.void)),
       );
       o.fresh();
-      // Followed one at a time in order, on the owner's fibers, so the brain waits for none of what they start. The
-      // subscription is the owner's too: it reads on past the brain's close, which still says the run's end, to its
-      // last event.
+      // Followed one at a time in order, on the owner's fibers, so the brain waits for none of what they start.
       const events = yield* Scope.provide(made.events, owner);
       const following = yield* events.pipe(
         Stream.runForEach((e) => event(e).pipe(Effect.catchCause((c) => log(`could not follow its agent: ${Cause.pretty(c)}`)))),
@@ -458,9 +446,7 @@ export const makeHost = <R>(
 
 const isHosted = (m: BrainMessage, inputType: string): m is CustomMessage => m.role === "custom" && m.customType === inputType;
 
-/** The input that began the turn asked: logged when the input is taken, after it was made, so the message is no newer
- * than the step, and it holds the step's words (trimmed and maybe cut; the message puts what the owner adds before them).
- * Of those, the newest: an older one with the same words was taken before. -1 when none is. */
+/** The input that began the turn asked. the message puts what the owner adds before them). */
 function turnAt(lines: readonly BrainMessage[], text: string, time: number, inputType: string): number {
   const head = text.endsWith("…") ? text.slice(0, -1) : text;
   let at = -1;

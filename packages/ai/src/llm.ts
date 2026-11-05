@@ -1,5 +1,3 @@
-// The farm's models over the wire: a request (request.ts) out, its stream read (response.ts) back, as pi-ai's events.
-
 import { Clock, Context, Effect, Layer, Stream, Predicate, Schema } from "effect";
 import { HttpClient, HttpClientRequest } from "effect/http";
 
@@ -17,8 +15,7 @@ export interface StreamOptions extends RequestOptions {
   readonly apiKey: string;
 }
 
-/** The model could not be asked or its answer not read: no connection, a refusal by status, a broken stream. What the
- * model did answer (content filtered, no finish) ends the stream as an error event instead, as pi-ai's does. */
+/** The model could not be asked or its answer not read: no connection, a refusal by status, a broken stream. */
 export class LlmError extends Schema.TaggedError<LlmError, { readonly brand: unique symbol }>()("LlmError", {
   reason: Schema.Literals(["network", "status", "stream"]),
   /** The HTTP status, for status. */

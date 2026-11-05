@@ -1,7 +1,3 @@
-// A Chinese input method types full-width marks: 【 for [, （ for (, 、 for /, ＃ for #, ＠ for @. Where a pair or a
-// first character starts the editor's syntax, the marks just typed are read as that syntax, so a link, a block ref,
-// a command or a name opens without switching to English input. One 【 stays 【: it is Chinese punctuation.
-
 /** The syntax an editor takes: a doubled bracket, a / that starts the text, a # or an @. */
 export type Mark = "[[" | "]]" | "((" | "))" | "/" | "#" | "@";
 
@@ -14,8 +10,7 @@ const doubled: Readonly<Record<"[[" | "]]" | "((" | "))", readonly string[]>> = 
 };
 const single: Readonly<Record<"#" | "@", string>> = { "#": "＃", "@": "＠" };
 
-/** The text with the marks just typed before the caret as the syntax they stand for; undefined when there are none.
- * Each mark is one character for one, so the caret stays where it is: from and to say what to replace. */
+/** The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. */
 export function typedMarks(
   value: string,
   caret: number,

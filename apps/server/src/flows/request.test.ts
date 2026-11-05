@@ -1,6 +1,3 @@
-// What the page's retries rely on at the HTTP handlers: a request key does its work once, a reply's seq is shown by the
-// frame at that seq, and a set sent twice is one change.
-
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer, Queue, Stream } from "effect";
 

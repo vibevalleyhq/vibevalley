@@ -1,7 +1,3 @@
-// The farm page's own state: what is open, what is held, what the canvas shows the overlays. The farm itself is the
-// server's (useFrames/useCore); nothing here copies it: the overlays, the tool held, the chat window (open, large,
-// shown), the phone, and which project's farm `/` shows. The looks and who the next job goes to are state/prefs.ts.
-
 import { Schema } from "effect";
 import { type Accessor, createMemo } from "solid-js";
 
@@ -20,10 +16,7 @@ import type { Point } from "./world/level";
 import type { FarmPanel, Rect } from "./world/world";
 export type { FarmPanel } from "./world/world";
 
-/**
- * The layers over the farm, at most one of each kind, drawn in this order (later on top): a plot's issue, its harvest,
- * the sowing form, the watering form, a panel, the Esc menu.
- */
+/** The layers over the farm, at most one of each kind, drawn in this order (later on top). */
 export type FarmOverlay =
   | { readonly kind: "inspect"; readonly sessionId: string }
   | { readonly kind: "review"; readonly sessionId: string }
@@ -43,10 +36,7 @@ export interface BedFx {
   readonly text?: string;
 }
 
-/**
- * How the canvas shows the village, for the DOM over it: set by the canvas (null until it has drawn), replaced when the
- * framing changes. Positions are in the farm page's CSS pixels (its top left is 0, 0); art points are the level's.
- */
+/** How the canvas shows the village, for the DOM over it: set by the canvas (null until it has drawn), replaced when the framing changes. */
 export interface VillageScreen {
   /** Screen pixels per art pixel. */
   readonly scale: number;
@@ -57,7 +47,7 @@ export interface VillageScreen {
   readonly toScreen: (art: Point) => Point;
   /** A bed's box on the page. */
   readonly plotRect: (bed: number) => Rect;
-  /** Where a helper stands now (its feet), on the page; undefined when it is not drawn. Changes every frame. */
+  /** Where a helper stands now (its feet), on the page. undefined when it is not drawn. */
   readonly helperAt: (sessionId: SessionId) => Point | undefined;
   /** Calls `fn` after every drawn frame, for DOM that follows walkers; returns how to stop. */
   readonly onFrame: (fn: () => void) => () => void;
@@ -148,7 +138,7 @@ export const timeOfDay = () => createExternal(clock.subscribe, () => Math.floor(
 /** The farm's words for an issue's acts where they are its own: completing a change is a harvest here. */
 export const farmActWords: Partial<Record<IssueAct, string>> = { complete: t("web.farm.tool.harvest.label") };
 
-/** The farm calls the default channel by its words' chat.label (田头). */
+/** The farm calls the default channel by its words' chat.label (the farm chat). */
 export const farmChannelLabel = (c: Channel | undefined) => (!c || c.default ? t("web.farm.chat.label") : channelLabel(c));
 
 export const farmClock = (at: number) => {

@@ -1,5 +1,3 @@
-// The answers of the setting endpoints (packages/protocol/src/setting/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import type { SettingHandlers } from "@vibevalley/protocol/api";

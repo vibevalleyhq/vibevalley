@@ -1,8 +1,3 @@
-// The memory tree's shape, grown from the memories rather than drawn: one fixed genome (the same branches every time),
-// unfolded as far as the farm has grown, with every leaf memory a leaf in the crown and every fruit on a branch tip.
-// Pure: Scene.tsx draws what this returns. Coordinates are the tree's own: x to the right, y up, the foot at 0, 0, in
-// the scene's pixels.
-
 import type { MemoryItem } from "./mock";
 import { hash01 } from "./sky";
 interface Gene {

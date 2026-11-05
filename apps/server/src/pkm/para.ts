@@ -1,6 +1,3 @@
-// Where a page's file is in the vault: a PARA tier is a top folder, a title is a file name ("/" in a title is "__" in the
-// name, as Logseq writes namespaces).
-
 import { PkmTierValues } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 

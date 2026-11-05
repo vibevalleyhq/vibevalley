@@ -1,162 +1,99 @@
 # 核心状态和接口
 
-农场上的一切是一个值：核心状态（`WorkspaceState`），只有服务端持有，只在 `Core.apply` 里因事实（fact）而变，每条事实由纯函数 `reduce`（`apps/server/src/projection/reduce.ts`）折进去。外面的人只经两样东西碰它：`/api/v1` 下的接口（改）和三条 SSE 流（看）。说的话不在核心状态里，在频道里，按频道订阅（[频道](docs/subsystems/channel.md)）。农场里不画它本身，农场画面的全部数据都从它来。
+`WorkspaceState` 是农场实时状态的唯一内存投影，仅由服务端持有，仅在 `Core.apply` 中经纯函数 `reduce(state, fact)` 演进。外部通过 `POST /api/v1/*` 发命令，通过三条 SSE 流看状态与事件。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 核心状态怎么变：`apply`、`reduce`，每条事实的前后状态（`Transition`） | 某种事实什么时候施加、业务规则（各拥有者：[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/cron.md)、[种植计划](docs/subsystems/issue.md)） |
-| 核心状态的折叠与实时投影 | 各模块负责自己的数据库持久化与恢复（[帮工](docs/subsystems/session.md)） |
-| 给页面的帧 `StateFrame`（`frameOf`）和特效的发出 | 地里长什么、特效和账本怎么算（[游戏](docs/subsystems/game.md)、[farm-ui.md](docs/reference/farm-ui.md)） |
-| 三条 SSE 流 `/api/v1/state`、`/api/v1/events`、`/api/v1/live` | 帮工的 `/mcp`（[频道](docs/subsystems/channel.md)）、语音线路（[语音](docs/subsystems/voice.md)） |
-| 接口表 `endpoints`（`packages/protocol/src/api.ts` 拼起各概念的 `<概念>/api.ts`）、能力表 `can`、`/api/v1` 版本、命令行这张皮 | 每个接口做什么（拥有它的服务）；「连接到本机」的配对和钥匙（[连接到本机](docs/subsystems/lan.md)）；管家和帮工的工具（`apps/server/src/tool`，[管家](docs/subsystems/orchestrator.md)） |
-| 重启时核心状态怎么回来，各拥有者在哪一步接手 | 各拥有者自己怎么恢复（链接见「怎么走」） |
-| 跨模块的接口约定：调用方交意图，拥有者负责协调和结果 | 某个模块的具体动作 |
+| `WorkspaceState` 的折叠（`apply`、`reduce`）、前后状态对 `Transition` 与序号 `seq` | 事实何时发出、各表如何持久化（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/cron.md)） |
+| 派生帧 `StateFrame`（`frameOf`）与单次特效计算（`effectsOf`） | 地块画面规则与游戏账本计算（[游戏](docs/subsystems/game.md)、[农场的皮](docs/subsystems/farm.md)） |
+| 三条 SSE 流：`/api/v1/state`、`/api/v1/events`、`/api/v1/live` | 频道 WebSocket 订阅（[频道](docs/subsystems/channel.md)）、帮工 `/mcp`、语音线路（[语音](docs/subsystems/voice.md)） |
+| 接口表 `endpoints`、权限 `can`、幂等键 `requestKey`、试跑 `dryRun` 与 CLI 映射 | 各接口业务实现、「连接到本机」配对鉴权（[连接到本机](docs/subsystems/lan.md)）、模型工具（[管家](docs/subsystems/orchestrator.md)） |
 
 ## 在哪
 
-- `apps/server/src/core/core.ts`（`Core`）：施加、存盘、各条流；`services.ts` 让它最先建、最后关。
-- `packages/protocol`：核心状态的形状在 `core/shapes.ts`（`WorkspaceState`、`Fact`、`ServerEvent`、`LiveEvent`、`StateFrame`，三条流的路径 `statePath`、`eventsPath`、`livePath`）；`api.ts` 拼起的接口表 `endpoints` 和 `Handlers`（每个概念一段，`<概念>/api.ts`；共用的 `Endpoint`、`input`、`errorStatus` 在 `endpoint.ts`）、客户端 `VibeValleyApi`；`stream.ts` 的 `readStream`。
-- 折法和拼帧 `apps/server/src/projection`：`reduce.ts` 的 `reduce`、`frame.ts` 的 `frameOf`，用各模块的规则（`session/roster.ts`、`channel/messages.ts`、`issue/status.ts`、`game/view.ts`、`game/view.ts` 的 `effectsOf`、`inbox/items.ts`、`ingress/`、`mailbox/`、`cron/when.ts`）；`projection.ts` 把它们交给 `core`（`Projection`）。`emptyWorkspaceState` 在 `core.ts`。`reduce` 只在工单或帮工的集合引用变了时重算工单状态；聊天气泡、花费这类事实不重算，`projection/reduce.test.ts` 守着这条。
-- `apps/server/src/http`：`api.ts` 按 `endpoints` 挂每个接口，`streams.ts` 三条流，`app.ts` 组装和开始答 HTTP；`handlers/<概念>.ts` 各实现一段 `Handlers`，根目录的 `handlers.ts` 合起来。
-- 能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出，`docs:verify` 查它是不是最新。
-- 命令行 `apps/cli`（`@vibevalley/cli`，入口 `src/main.ts`）：一条命令一个操作（`issue status`、`channel message send`），经 `VibeValleyApi` 调服务端；`reach.ts` 写着每个接口由哪条命令用到、哪些只经 `api call`；工单的动作写成哪条命令是 `packages/protocol` 的 `actCommand`，服务端的 `next` 和 `issue show` 都用它；终端里的对话是服务端的程序 `apps/server/src/chat.ts`，命令行把终端交给它。
-- 「连接到本机」 `apps/server/src/lan/lan.ts` 的 `remoteMay`：从 `endpoints` 和三条流里挑 `can` 有 `remote` 的。
-- 页面 `apps/web/src/infra/frame.ts`（读 `/state` 和 `/live`），命令用 `VibeValleyApi`。
-- Core 不写状态文件；构造时为空，由各模块从数据库施加恢复事实。
+| 位置 | 职责 |
+|---|---|
+| `apps/server/src/core/core.ts` | `Core` 服务：持有状态、盖时间戳、发布事实与三条流 |
+| `apps/server/src/projection/` | `reduce.ts`、`frame.ts`、`projection.ts`：组装各模块规则注入 `Core` |
+| `packages/protocol/src/core/shapes.ts` | `WorkspaceState`、`Fact`、`StateFrame`、`ServerEvent`、`LiveEvent` |
+| `packages/protocol/src/api.ts`、`endpoint.ts` | 汇总各概念的 `endpoints`、`Handlers`、`Endpoint` 与 `errorStatus` |
+| `apps/server/src/http/` | `api.ts` 路由与 `requestKey` 去重、`streams.ts` 三条 SSE、`handlers/<概念>.ts` |
+| `apps/cli/src/main.ts`、`reach.ts` | CLI 命令定义与接口全覆盖表 |
+
+全部接口与权限矩阵见生成的 [capabilities.md](docs/reference/capabilities.md)。
 
 ## 模型和不变量
 
-**核心状态**
+### 核心状态与事实
 
-- **一份，只在服务端，只在 `apply` 里改**（`apply(...facts)` 一次可以给几条）。核心状态里有什么见 [architecture.md](docs/architecture.md)「核心状态」。
-- **`reduce(state, fact)` 是纯函数，返回新状态和「变没变」**。没变的事实不发、不存、不算特效；关于不在地里的帮工的事实什么也不改。变了且有工单时，工单的状态跟着重算（`withIssueStatuses`）。
-- **每种事实的名字说出发生了什么**：东西的新样子（新出现或改了）叫 `<东西>Changed`（`issueChanged`、`sessionChanged`、`messageChanged`……），从核心状态拿掉的叫 `<东西>Removed`，带着结果的事用它自己的动词（`sessionReported`、`sessionLeft`）。「事实」只指改核心状态的这一件事，别处不借这个词（[理由](.agents/notes/implemented/architecture/2026-11-04-one-meaning-of-fact.md)）。
-- **事实的时间由 `Core` 盖**：施加时把 `at` 改成当时的时钟，调用方给的不算。
-- **`Transition` 绑住一条事实和它改的那一份状态**：`before`、`fact`、`after`。消费晚了也不读当前状态去猜当时，消费者不再自己跑一遍 `reduce`。`transitions` 同一步里拿初始快照和订阅，中间不漏事实。`Transition` 拿着旧状态的引用，所以 **`reduce` 不改传进来的旧值**。
-- **`seq` 数提交**：`Core` 记着折过几次，`apply` 每一次真改了状态的提交（一批算一次，没变的事实不算）加一，`Core.seq()` 读当前值。出帧时和状态一起读，写进 `StateFrame.seq`：这一帧带着到这个号为止的每次折叠。
-- **一批是一次提交**（`apply(...facts)`）：先在局部状态上逐条折、收集 `Transition` 和特效，再一次换掉可见的状态、安排存盘，最后按原顺序逐条发事实、再发特效。每条 `Transition` 的 `after` 是这一条的结果，不是整批的最终状态；`state()` 和 `/state` 只看得到整批。HTTP 的事件格式不变，仍是一条一条的 `Fact`。计划的父子工单（工单服务一次写完的那组）走这条路。
-- **一批不代替数据库事务**：拥有者先提交数据库事务，再发核心状态；两者之间的恢复归拥有持久化的那个模块。
-- **主人做了、但不改状态的事不是事实**：看改动、语音接上，由经手的服务调 `Core.did`，只有游戏的账本听（`owner`）。
-- **工单派生状态跟着依赖重算**：`reduce` 只在工单或会话集合引用变化时重算工单状态、关注项和动作；聊天、通话等变化保留已有工单结果。会话的 `quiet` 和 `doing` 仍重算，分别显示卡住和恢复工作。
-- **给人看的话只在出帧时填**：`frameOf(state, effects)` 在状态的副本上填帮工在干什么（`phaseText`，在做的动作和这一轮每一步的 `actionText`）、定时任务什么时候跑、工单状态和可执行动作，再算 `inbox`、`view`（地块、等级、每个成就的进度）；`reduce` 和数据库记录 里没有这些话。改的是副本：阶段和 `play` 的历史复制一份再填，`Transition` 拿着的旧状态不变。特效由 `effectsOf(折之前的状态, fact)` 算，到一档成就的特效带着它的说法。动作的说法（词典 `shared` 的 `action`，页面算 `phaseText` 也用它）页面不另拿一份：帧里的这两处，加上轨迹里每个 `tool/call` 写下时带的 `actionText`（[帮工](docs/subsystems/session.md)），就是它全部的来源。
+- **单一内存投影，按事实演进**：`WorkspaceState` 只在 `Core.apply(...facts)` 中修改。未改变状态的事实不广播、不递增 `seq`、不触发特效。
+- **「事实」专指 `Core.apply` 的输入**：农机能力叫 `RuntimeSupport`，会话事件映射叫 `Reaction`，频道路由输入叫 `ChannelRouteInput`，排序键叫 `RowKeys`。
+- **事实命名表达发生了什么**：实体新增或更新叫 `<实体>Changed`，移除叫 `<实体>Removed`，生命周期结清用动词过去式（`sessionPhaseChanged`、`sessionReported`、`sessionLeft`）。
+- **批次原子可见，单条保留因果**：`apply(...facts)` 先在局部状态上逐条折叠并收集每条 `Transition`（`{ before, fact, after }`）与特效，再一次性替换可见状态并递增一次 `seq`。`reduce` 不得修改传入的旧状态。
+- **先落库，后发事实**：各模块先提交 SQLite 事务或文件，再调 `Core.apply`。Core 不存 `state.json` 文件，重启时从空状态由各模块从数据库恢复。
+- **按依赖重算工单派生状态**：`reduce` 仅在工单或会话集合引用变化时重算工单状态与动作（`withIssueStatuses`）；聊天或花费事实不触发工单重算。
+- **界面文案只在出帧时填充**：`frameOf(state, effects)` 在状态副本上填入 `phaseText`、`actionText`、`whenText`、工单 `stage` 与可执行动作；`reduce` 与持久层不含界面文案。
 
-**数据库恢复**
+### 三条 SSE 流
 
-Session 的身份、阶段、最近报告和资源恢复字段只在 session 表保存。Session 构造时加载在场行，启动阶段检查工作目录、恢复运行时上下文；中断的 Run 记为 interrupted。Core 不读取、重写或迁移旧 state.json。工单、频道、定时和游戏进度由各自数据库记录恢复，commit 数由 Game 从项目重新统计。
+| 路径 | 编码 Schema | 初始消息 | 后续推送 | 消费者 |
+|---|---|---|---|---|
+| `GET /api/v1/state` | `StateFrame` | 首帧 `StateFrame` | 200ms 窗口合并后的 `StateFrame` | 页面、`vibevalley state` |
+| `GET /api/v1/live` | `LiveEvent` | 无 | `SessionEvent`、`Notice`、`Runtime` | 页面 |
+| `GET /api/v1/events` | `ServerEvent` | `snapshot`（`WorkspaceState`） | 每条 `Fact` 及 `LiveEvent` | CLI `api events`、调试 |
 
-**三条流**（`http/streams.ts`；「连接到本机」按同样的三个路径放行）
+- **有界中继与心跳**：每条连接配容量 64 的有界 relay，每 20 秒发 `: ping` 心跳。积压满 64 条时主动断开连接并释放源订阅，客户端重连后重新拿快照或最新帧。
+- **写接口返回 `seq` 对齐画面帧**：工单写接口（`issue.create`、`issue.update`、`issue.status.update`、`issue.comment.create`）在 `Core.apply` 后返回当前 `seq`，页面以 `frame.seq >= reply.seq` 作为意图结算条件。
 
-| 流 | 连上先发 | 之后发 | 谁读 |
-|---|---|---|---|
-| `GET /api/v1/state` | 一帧 `StateFrame` | 一条事实或特效到了，再收 200 毫秒，合成一帧（带这段时间的特效）；不是事实的旁路事件不出帧 | 页面、`vibevalley state` |
-| `GET /api/v1/events` | `snapshot`（整份核心状态） | `ServerEvent`：每条事实、轨迹的一步（`step`）、提醒（`Notice`）、农机变了（`runtime`） | 命令行 `vibevalley api events`、调试 |
-| `GET /api/v1/live` | 什么也不发 | `LiveEvent` 的三种：`SessionEvent`、`Notice`、`Runtime`；不发事实和快照 | 页面 |
+### HTTP 接口与命令行
 
-- 三条流分别用 `StateFrame`、`ServerEvent`、`LiveEvent` 的 Schema 编码；不合形状的值记错误并终止这条流，不发给客户端。重启后的核心状态省略 `callReason`，不保留一个显式 `undefined`。
-- 每 20 秒一行心跳（`: ping`），免得代理关掉空闲的连接；客户端断开，这条流和出帧的那一头跟着停。
-- 三条 SSE 每个连接都有容量 64 的有界 relay。正常顺序不变；积压到上限的连接明确结束并记警告，源订阅释放，不静默丢帧，也不把发布者挡住。客户端重连取快照。内部的事实和 Transition 订阅不能靠重连补齐，不走这条会断开的 relay；Core 关闭时 shutdown 四个 PubSub。
-- 断线不补发：重连从一帧（或快照）重新开始。页面的状态流断了 1 秒后重连。
-- 命令的结果不走流：要么是 HTTP 的答复，要么是之后的事实或提醒。
-- **答复带 `seq`，帧对上它才算看见**：改帧里东西的接口在服务施加完事实以后读 `Core.seq()`，随答复带回；现在是工单的 `issue.create`、`issue.update`、`issue.status.update`，答复是 `AppliedIssue`（`Issue` 加 `seq`）；`issue.comment.create` 没有别的可答，答 `Applied`（只有 `seq`）。拥有者在返回前就施加了事实（同一个 Effect 里，不 fork），所以第一帧 `seq` 不小于答复的 `seq` 时就看得见这次改动：页面的意图照「`frame.seq ≥ reply.seq`」落定，不按答复、不按时钟（[客户端](docs/subsystems/app.md)）。号可能比改动本身大（中间别人也改了），只会多等一帧，不会早。
-
-**接口和能力表**
-
-- **一个操作是 `endpoints` 的一行**：操作名（`模块[.名词].动词`，页面里是 `api.issue.status.update(…)`）、`about`（输入里认出说的是哪一个的字段，多是 `id`；命令行把它们当位置参数）、输入和回答的 Schema、`can`（谁能调）。`can` 的取值封闭：`owner`（这台电脑上的页面、命令行）、`remote`（「连接到本机」后配对过的设备）、`orchestrator`。`Handlers` 由这张表推出，`handlers.ts` 少实现一个就编不过。成功和拒绝的答复都按同一个 Schema 编码，处理函数返回不合形状的值是服务端错误（500），不发给客户端。读写不另标，动词已经说明（`readsOnly`：`get`、`list`、`check`、`recall`、`search` 和试跑只读）。全部操作见 [capabilities.md](docs/reference/capabilities.md)。
-- **「连接到本机」只放 `can` 有 `remote` 的操作和流**（`remoteMay`），没有匹配的路径一律拒绝；`/mcp` 和 `/v1/chat/completions`（`chatCompletionsPath`，管家的 OpenAI 协议入口，放在 `/api/v1` 外面）永远不放。`can` 写错就是权限写错，改 `remote` 时在改动里单独列出。
-- **`orchestrator` 一列只是记录**：代码不按它放行，管家和帮工能调什么由 `apps/server/src/tool` 的工具表定。
-- **都是 POST，路径就是操作名**：`POST /api/v1/<模块>[/<名词>]/<动词>`，操作名的点换成斜杠（`pathOf`），`issue.status.update` 在 `/api/v1/issue/status/update`。输入只有一份，是 JSON 请求体，id 也在里面（`{ "id": "12", … }`）；没有路径参数和查询参数，空的请求体是 `{}`。只有三条 SSE 流和聊天的附件用 GET（`statePath`、`eventsPath`、`livePath`、`attachmentPath`）：`<img src>` 发不了 POST。
-- **都在 `/api/v1` 下**，包括 `/api/v1/server/health/get` 和三条流。`pathOf` 给出的就是最终路径，页面的客户端、命令行、能力表和「连接到本机」都从它来，没有第二处拼前缀。不设 `/api/...` 的别名，旧客户端拿到 404。加字段、加接口留在 v1；不兼容的改动另起 `/api/v2`，v1 留到主人的设备都升上来。`/mcp` 不带版本：MCP 有自己的版本。
-- **命名**：第一段是概念，多是拥有它的 `apps/server/src` 文件夹（`issue`、`channel`、`lan`；计划是 `graph`）；名词是模块下面的一个子概念（`issue.comment`、`channel.message`、`lan.pairing`），说的就是模块本身时省掉；每个词都用单数，和库表一样（`api.test.ts` 查）。动词一套 `list`、`get`、`create`、`update`、`delete`；`set` 换掉一个取值（`channel.default.set`、`game.title.set`）；`check` 只校验；领域动词只给不是增删改查的（`channel.message.send`、`issue.dispatch`、`issue.act`）；试跑是 `preview<动词>`（`issue.previewDelete`、`issue.status.previewUpdate`，`api.test.ts` 查）。工单的生命周期挂在工单上（`issue.status.update`）；一个意图一个操作，不用布尔开关兼两件；`update` 只改给出的字段（档案和技能的 `update` 是带 id 的整份写入）。
-- **请求键：同一个键只做一次**：`issue.create`、`issue.status.update`、`channel.thread.create`、`memory.create` 收可选的 `requestKey`（最长 64 个字符，同聊天消息的 `sendKey`），页面一次意图一个键，重试用同一个。网关（`apps/server/src/http/api.ts` 的 `requestKeys`）按操作记住每个键的结果：同一个键再来拿到第一次的答复、活只做一次；第一次还在做时到的那个等它；只记成功，被拒或失败的忘掉键，重试再做一遍。记在内存里，每个操作只留最近 500 个，重启就忘：答复丢了又碰上重启，重试会再做一次。聊天消息不走这里：`sendKey` 存在消息上，库里查重（[频道](docs/subsystems/channel.md)）。
-- **开关写成设值**：页面的重试会再发一次，开关发两次等于没发；所以表情、置顶、归档是 `channel.reaction.set`、`channel.pin.set`、`channel.archive.set`，带 `on`，设成已经是的样子什么也不改（不加修订、不推送）。
-- **一条规则，差别作为参数**：入口之间的差别传进服务，不写成两个方法。例：工单的改动收「谁在看」，主人看才算进游戏。
-
-**命令行是皮**
-
-- 命令行是自己的包 `apps/cli`，经 HTTP 调服务端，不载入服务端、不打开它的库；连哪个服务端是 `--server`、`VIBEVALLEY_SERVER`，再没有就读家目录的 `server.json`（`@vibevalley/home`：服务端监听上以后写进去、停下时收回，写着地址和 pid，pid 不在了就不认；桌面版的服务端在随机端口上，靠它找到），最后是 `http://127.0.0.1:8787`。命令搭在 `effect/cli` 上，照领域模型一条命令一个操作：`<资源> [<子资源>] <动词>`，动词是标准的 `list`、`show`、`create`、`edit`、`delete` 和接口自己的；参数照接口的字段写，经 `VibeValleyApi` 调；接口的全集经 `api list`、`api call <操作>`，后者发出去以前照接口的 Schema 查。请求、流、读写和退出都走 Effect（`HttpClient`、`Sse`、`Stdio`、`NodeRuntime.runMain`）。
-- 输出是给 agent 和人读的：默认是短文字，`--format json` 是接口的形状；失败是 stderr 最后一行的 `{"error":{…,"next":[…]}}`，退出码分得出是哪一种（[开发](docs/development.md#只用命令行派一个活)）。
-- 工单能不能挪、挪到哪由服务端判断：`issue status <号> <状态>` 调 `issue.status.update`，拒绝时带 `next`；每个动作对应的命令由 `actCommand` 写出（挪状态是 `issue status`，说话是 `issue comment`，停下是 `session stop`）。`issue show <号> --watch` 先跟着 `/state` 的帧，等它到 `in_review`、`done` 或 `canceled` 再显示。终端里的对话（`chat [农机]`）要服务端的农机、模型和配置，是服务端的程序 `apps/server/src/chat.ts`，命令行把终端交给它（`VIBEVALLEY_CHAT` 指到它，桌面版的启动脚本设）。直接聊不算农场的活：没有工单，不进核心状态、轨迹和花费。
-- **试跑**：会删、会合、会关、会让帮工走的接口在 `endpoints` 里带 `dryRun`，指向同参数、同请求体、答复 `Preview`（`{ does }`）的另一个接口；命令行的 `--dry-run` 调它。试跑归拥有规则的服务：能不能做是一处判断，真做和试跑都过它（工单的 `settledMove`，档案的 `deletableAgent`，记性的 `forgettable`……），所以试跑说能做的，真做不会因为同一个原因被拒；试跑不写库、不施加事实、不碰 git。每个 `delete` 都带试跑（`cli.test.ts` 查）。
-- **拒绝带下一步**：`Refused`、`Missing` 有 `next`，每条是 `{ say, run? }`，`run` 是能原样接在命令后面跑的话，由拒绝的那一处给出。找不到的必须说去哪儿找（`missing` 的 `next` 必填，去处在 `errors.ts` 的 `lookIn`）；工单和计划的拒绝给出它们现在能做的动作（工单的 `nextSteps`，计划的 `graphNext`、`stepNext`）；要主人想一句话或拿主意的只给 `say`。
-
-**拥有者负责协调和结果**
-
-- **调用方交意图，顺序在拥有者里面**：处理函数给工单 id 和动作，不先查最新的帮工、判状态、拼评论；完成的调用方不安排停止写入、合并、离场。新加的抽象要让调用点删掉协调代码，只搬文件、加一层同样复杂的转发不算。
-- **提交的结果属于动作本身**：保存失败沿动作返回，转发时不变成成功；依赖它的通知、叫醒、清理只在保存成功后做；档案和设置先存盘再发布内存里的结果。
-- **资源由持有者收尾**：派活的容量在 Session 里检查；关联失败释放新开的资源。跨 git、库、派帮工的失败不包成一个事务：已经合了而库没存上，照实报告做到了哪一步，分支留着。
-- **创建返回自己的身份**：服务端分配 id，和持久化在同一把锁里提交（`channel.create` 返回频道 id；`agent.create`、`skill.create` 拒绝非空 id，带 id 的 `update` 仍是 upsert）。
-- **查询带齐真实的关联**：`issue.history.list` 只给真有的帮工，找不到的明列在 `missingSessions`，不补造一个「歇着」的帮工。
-
-**开机顺序**：全部服务建好、开机的活（`start`、`ready` 这类 layer）跑过以后开始答 HTTP；开机就派出去的帮工要的 `/mcp` 地址在开始听之后才交给 `Session`（[地基](docs/subsystems/foundation.md)）。
-
-HTTP 命令入口与页面 WebSocket 共用来源判断：Host 应为回环地址，浏览器 Origin 应与 Host 同源，Fetch-Site 存在时只接受 same-origin 或 none；外部来源在解码和调用服务前返回 403。无浏览器来源头的本机 CLI 可调用；设备头不能跳过检查。LAN 入口先检查原来源，再按回环地址转发（[连接到本机](docs/subsystems/lan.md)）。
+- **统一 `POST /api/v1/<路径>`**：操作名中的 `.` 换为 `/` 即路径（如 `issue.status.update` → `/api/v1/issue/status/update`），参数统一放入 JSON 请求体。
+- **严格来源校验**：HTTP 与 WebSocket 要求 `Host` 为回环地址；若有浏览器 `Origin` 则须与 `Host` 同源，`Sec-Fetch-Site` 仅接受 `same-origin` 或 `none`，否则返回 `403`。
+- **请求幂等键 `requestKey`**：`issue.create`、`issue.status.update`、`channel.thread.create`、`memory.create` 接受 `requestKey`（最长 64 字符）。网关按操作缓存最近 500 个成功键的响应，失败不缓存。
+- **开关写成幂等设值**：回应、置顶、归档定义为带 `on: boolean` 的 `*.set` 接口，重复设置相同值不产生副作用。
+- **破坏性操作配对试跑 `dryRun`**：删除、合并、关单接口在 `endpoints` 中指向对应的 `preview<动词>` 接口。试跑与真做共用同一套前置判断函数，试跑不写库、不碰 git。
+- **拒绝响应附带下一步 `next`**：`Refused` 与 `Missing` 携带 `next: { say, run? }[]`，给出可直接运行的 CLI 命令或指引。
+- **CLI 是纯 HTTP 客户端**：`apps/cli` 不加载服务端、不直连数据库，通过 `--server`、`VIBEVALLEY_SERVER` 或 `$VIBEVALLEY_HOME/server.json` 连接服务端。
+- **拥有者负责协调与身份分配**：处理器只传业务意图，由拥有者模块协调内部步骤并在锁内分配新实体 ID；查询缺失关联时列入 `missingSessions`，不伪造缺省对象。
 
 ## 怎么走
 
-**一条事实**：
+**施加一条事实**
 
-1. 拥有者改完自己的家（库或文件），调 `Core.apply(fact)`，相关的几条一起给。
-2. `Core` 盖时间、`reduce`；没变就到此为止。
-3. 换掉可见状态，安排 500 毫秒后的存盘。
-4. 按顺序发：`/events` 的订阅者收到事实，`facts` 的订阅者收到事实，`transitions` 的订阅者（账本、计划）收到前后状态；然后发特效。
-5. `/state` 的每个连接在 200 毫秒窗口后用 `frameOf` 出一帧推给页面。
+1. 拥有者模块提交 SQLite 事务或文件后，调用 `Core.apply(...facts)`。
+2. `Core` 盖上当前时间戳并运行 `reduce`；若状态未变则直接结束。
+3. 原子替换可见状态、递增 `seq`，按序向 `/events`、`facts`、`transitions` 广播事实与特效。
+4. `/state` 连接在 200ms 窗口后调用 `frameOf` 生成 `StateFrame` 推给客户端。
 
-不改状态的旁路事件（`SessionEvent`、`Notice`、`Runtime`）不经 `reduce`，直接发到 `/events` 和 `/live`。
+**服务端重启恢复**
 
-**重启时怎么回来**（[理由](docs/subsystems/session.md#为什么这样)「重启不丢农场」）：
-
-1. Core 从空状态开始；Session 从数据库恢复在场会话，管家阶段回到 resting，通话保持 idle。
-2. 各拥有者在构造时从库里施加事实放回核心状态：工单（开着的和最近关的 50 家）、频道模块的频道和最近的对话、定时任务。这时还没有订阅者，这些事实不算进游戏。
-3. 全部服务建好以后，开机的活接手：帮工回到各自的地上歇着，停在半路的那一轮记成 `interrupted`（[帮工](docs/subsystems/session.md)「重启」）；定时任务补跑错过的（[定时任务](docs/subsystems/cron.md)）。
-4. 其余各拥有者自己恢复，次序不相干：计划跟着工单回来：停在拆的放弃，有件在做的暂停（[计划](docs/subsystems/issue.md)「重启」）。
-5. 频道里交出去还没看到的消息退回 `pending`，过一会儿再叫（[频道](docs/subsystems/channel.md)）；管家没做完的一轮接着做（[管家](docs/subsystems/orchestrator.md)「重启后接着做」）。
-6. 账本整本重折出金币、连胜、成就，规则改了重启就按新规则算（[游戏](docs/subsystems/game.md)）。
-
-**加一个能力**：写服务的方法 → 在 `<概念>/api.ts` 的那段接口表加一行（方法、路径、Schema、`can`）→ 在 `http/handlers/<概念>.ts` 实现 → `vp run capabilities`。页面的客户端、命令行的命令、「连接到本机」的放行都从同一张表来。
+1. `Core` 从空状态启动；各模块在构造阶段从数据库加载工单、频道、定时任务和在场会话并施加初始事实。
+2. 启动层（`start`/`ready`）按序恢复：Session 检查目录并标记中断 Run、Channel 恢复会话串、Mailbox 重放投递、Cron 补跑任务、Orchestrator 续接回合、Game 重折账本与统计 commit。
+3. HTTP 监听启动，写出 `server.json` 与就绪收据。
 
 ## 和谁打交道
 
-- **施加事实的**：工单、帮工、频道、定时任务、管家（`setOrchestrator`）；`orchestrator.open` 和主人说话经 `open` 让通话在线（主人从哪里说话都走 `Orchestrator.say`、`heard`，由它们开）；游戏（commit 数、`progress`、`station`）。它们都排在 `core` 后面，`core` 只用 `base`、`infra` 和 `packages/protocol`：折法和拼帧要读它们的规则，由组装时交给它的 `Projection` 带进来。
-- **订阅的**：游戏的账本和计划读 `transitions`；别的读 `facts`、`events`；账本另读 `owner`。
-- **读的**：任何服务用 `state()`、`session(id)` 读当前值；`http/streams.ts` 把三条流交给页面。
-- **外面**：页面读帧和窄流、调 `VibeValleyApi`；命令行按 `endpoints` 发 HTTP；「连接到本机」后的设备经同一套接口，由 `lan` 按 `can` 放行。
+- **施加事实的模块**：`issue`、`session`、`channel`、`connector`、`cron`、`voice`、`game`。
+- **订阅事实的模块**：`game`、`inbox`、`issue`、`channel`。
+- **外部客户端**：`apps/web`、`apps/cli` 与经 `lan` 放行的配对设备。
 
 ## 为什么这样
 
-- **核心状态只有一份，只因事实而变。** 一个帮工的状态曾经拆在服务端的行、站点里的一份行副本、页面从行推出来的作物、管家读的名册四处：每加一个功能（花费、冲突）就在几处各补一个字段；「没动静」只有管家看得到；冲突标记靠「开始干活时顺手清掉」这种副作用维持；页面比较前后两行来猜「开始了新一轮」。一份状态、一个纯函数折，新加一种状态只在形状里加字段或事实、在 `reduce` 里折，编译器逼每个视图都处理到；服务端和页面不会对不上，重启只是读回上一份。放弃了「保留行模型、只补字段」：这正是要解决的问题。代价是拿一个状态要经过 `reduce`，不能随手改一个字段。
-- **线上发事实，不发 JSON patch。** patch 只说哪个字段变了，看不出发生了什么（开始一轮还是改了标签）；账本、特效、计划要的正是「发生了什么」。
-- **折法放在组装那一层，交给 `core`。** 一条事实要用帮工、频道、工单、游戏各自的规则去折，帧要用通知、计划、定时任务、游戏的；`core` 在最下面（Platform），直接 import 它们方向就反了。放弃了每个模块各交一段折法、由组装拼起来：一个 `reduce` 里能看全每种事实怎么折，黄金数据也只比一个函数。
-- **页面读折好的帧，不折事实。** 页面再折一遍就是第二份核心状态，两边改规则靠自觉对齐（[客户端](docs/subsystems/app.md)）。给人看的话在出帧时填，不进 `reduce`：话随时会改，存进持久状态 就要兼容旧话。动作的说法也一样在帧里带好，页面不另拿一份。不变的大块说法（成就的定义）不进帧，帧每个事实都出，一次性的接口给一次就够（[游戏](docs/subsystems/game.md)）。
-- **每条事实带自己的前后状态，一批一次提交。** 放弃了「子工单先发、父工单最后发」的约定：排序不能把几次可见的更新变成一次，读的人仍会看见半个计划。放弃了每条事实都附整批的最终状态：第一条事实会背上后面事实的变化，按事件做的规则失去因果。放弃了对外的「一批事实」类型：现有的消费者都认得单条事实，内部的提交和订阅保证就够。
-- **命令走 HTTP，状态走 SSE。** 放弃了 WebSocket：命令已经有类型化的 HTTP 接口，事件只往一个方向走；SSE 重连又从快照开始，不用写补发。频道的消息另走一条 WebSocket：订阅随页面看哪个频道而变，还要按号码补齐（[频道](docs/subsystems/channel.md)「为什么这样」）。放弃了轮询：帮工的动作一秒好几次，轮询要么慢要么费。代价是事件里不能顺带回复命令。三条流分开：`/state` 让页面不折事实；`/live` 让页面不必收它用不上的快照和事实；`/events` 保留整份事实流给命令行和调试。
-- **重启不丢农场，也不自动接着干。** 见[帮工](docs/subsystems/session.md#为什么这样)：全部收工丢掉没合的活，自动接着干可能重复执行命令和花钱。Core 只接收各模块从数据库恢复出的事实，不另存完整快照。
-- **全是 POST，路径就是操作名。** 一个操作在页面的客户端、命令行、能力表和「连接到本机」的放行表里是同一个名字，看见路径就知道是哪个操作、在哪个模块。放弃了 REST 的资源路径（`PUT /issue/{id}/status`、`GET /issue/{id}/run`）：每加一个操作都要挑方法、挑哪些字段进路径、哪些进查询、哪些进请求体，同一份输入拆在三处，命令行和放行表还要从方法和路径倒推回操作；有的操作（派活、试跑、配对）也不是对资源的读写。读写由动词说明（`readsOnly`），GET 的缓存和幂等对一个只听本机的服务端没有用处。代价是 curl 要写 `-X POST -d`，浏览器地址栏打不开一个接口。
-- **接口带版本，版本在路径里。** 客户端不一起升级：桌面应用和服务端一起换，经「连接到本机」连的设备什么时候升由那台设备定；没有版本时要么形状只加不改（锁死改名），要么所有设备同一天升级（做不到）。放弃了请求头里的版本：curl、日志、「连接到本机」的放行表都要多一层解析；放弃了每个操作自己带版本：同一个概念散在几个版本里；放弃了 `/api` 当 v1 的别名：两个名字要一直维护，也分不清谁是新客户端（[不留兼容](docs/subsystems/foundation.md)）；放弃了网关映射：本机前面没有网关。v1 不能在设备升级前删，这是唯一明确的兼容负担。
-- **先有能力，再有入口，能力表和接口写在同一处。** 农场能做的事曾从七个入口各接一遍：没有命令行；「连接到本机」放什么在它自己的代码里写死；同一件事几个入口规则不一样（派活一条路排队、一条路拒绝）；加一个能力要接好几处，漏了也不报错。`can` 和接口写在 `endpoints` 的同一行里，少了它类型就不对。放弃了另放一个 YAML：加操作时会忘了改它。放弃了让命令行各自接一遍：它的命令手写，但 `apps/cli/src/reach.ts` 是一张覆盖每个接口的表，写明由哪条命令用到、或只经 `api call`，加接口不写这一行编不过。放弃了命令行直接开数据库：服务端开着时就有两份核心状态。放弃了管家的工具、MCP 也从接口生成：模型要的说明、默认值、人读的写法和回话和给程序的接口不一样，硬生成会变差；所以工具手写这些，但由接口声明，名字、字段、谁能调照接口表，测试查（[管家](docs/subsystems/orchestrator.md) 的 `apps/server/src/tool`）。放弃了工具和接口各起各的名字、各定谁能调：两边一年比一年漂，同一件事管家和帮工叫法不同，参数一个叫 `target` 一个叫 `id`。
-- **命令行是 agent 驱动农场、验证改动的入口。** 改完代码最贵的一步是证明改对了：Playwright 绑在界面的字和布局上，服务端的测试只测写好的情形；验证一个改动就是在沙箱里写一串命令、读它们的答复（`vv-acceptance/references/server.md`）。所以它的输出、退出码、试跑和下一步都按「给 agent 读」定。放弃了手写参数解析：帮助、参数类型、错误的格式 `effect/cli` 都有，和服务端是同一个运行时。
-- **命令照领域模型，一条命令一个操作。** 最早一版每个接口一条命令（从接口表拼出来）：命令是接口的形状、参数全塞 `--json`、跟不上类型。之后一版按意图收成几个动词（`work`、`say`、`accept`），由工单此刻的样子挑动作：一个词几个意思，打回这种要花钱的动作藏在「说一句」后面，动作和动词的翻译表要两边对齐。现在照 `gh issue`、Linear 的命令行：挑过的一部分接口各一条命令，名字是资源加标准动词，参数是接口的字段，合不合法由服务端说；智能体只是推进工单的负责人，命令行管的是工单。放弃了顶层一个 `search` 搜全部：它是几个操作拼的，各资源有自己的 `search`、`list`。放弃了只给 agent 开 MCP：这台电脑上的 Claude Code、Codex 在 shell 里最顺，命令行能接管道、写进脚本，不用配。放弃了默认 JSON：agent 读 JSON 费 token，人读不下去；要结构时 `--format json`。
-- **命令行是自己的包，不载入服务端。** 它跟着服务端一起装、一起起时，`vibevalley issue list` 也要先载入整个服务端的依赖。终端里的对话要服务端的农机、模型和配置，留成服务端的程序，命令行把终端交给它；放弃了把聊天也做成流式的接口：要新接口和新的流，而直接聊今天不要服务端开着也能用。命令行的测试在进程里起整个农场（`@vibevalley/server/testing`），和以前一样快；只有这一处 dev 依赖服务端。
-- **试跑是服务的一个接口，不是命令行的推算。** 放弃了命令行先 GET 再推算：那是在命令行里重写服务端的规则，迟早和真做不一致。放弃了给真做的接口的输入加一个 `dryRun` 字段：试跑的答复和真做的形状不一样，分开两个接口，各自的 Schema 都准。拆不成「判断」和「动手」两步的接口宁可不标试跑，也不说错。
-- **下一步由拒绝的一处给出。** 放弃了命令行按错误的字猜下一步：字一改提示就错。`run` 写成命令行的话，页面可以做成按钮，管家的工具把 `say` 当回话。
-- **拥有者负责协调和结果。** 放弃了只在 HTTP 入口查失败：计划自动推进、定时任务和管家不都经过 HTTP，修在拥有动作的模块里，所有调用方得到同样的结果。放弃了把 git、库和派帮工包成一个事务：它们没有共同的提交机制，一个事务的名字只会盖住跨资源的失败。放弃了为每个小步骤加接口和把只有一个实现的存储、回调改成通用接口：前者把顺序推回调用方，后者只增加导航成本。
-- **创建由服务端分配身份，查询不补造。** 客户端扫列表分配 id、保存前查重，查和写是两次请求，两台设备用同一份旧列表仍会写到同一个 id。缺帮工记录时补一个「歇着」的帮工，会把「记录没了」变成「在歇着」，按钮和统计照着不存在的阶段工作。
+- **单一内存状态 + 纯函数 `reduce`，不发 JSON patch**：新增状态由编译器强制各视图处理；发领域事实而非字段 patch，让账本和通知直接按事件语义反应。
+- **「事实」只留一个意思，成员名带语义**：非核心状态概念改回本名，事实用 `<实体>Changed`/`<实体>Removed`/动词过去式，消除名词歧义。
+- **页面读折好的帧，文案在出帧时填入**：避免前后端维护两套 `reduce`；界面文案不落盘、不进 `Transition`，改措辞或切语言无历史兼容负担。
+- **命令走 `POST /api/v1/<op>`，状态走三条 SSE**：操作名即路径，省去 REST 参数拆分；`/state`、`/live`、`/events` 按职责分离，断线重连直接拿新帧。
+- **能力表 `endpoints` 单源派生多端入口**：权限 `can`、Schema、试跑与路径写在同一行，自动生成或校验 `Handlers`、`VibeValleyApi`、`capabilities.md`、`lan` 放行表和 CLI `reach.ts`。
 
 ## 还没做的
 
-- 按概念分模块、农场只画它们的整体方向：[概念先行，农场是皮](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)。
-- `can` 只留 `owner`、`remote`，agent 能调什么写在档案上；管家派活先写工单、满了排队：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
+- `can` 只留 `owner` 与 `remote`，agent 工具按档案配置：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
+- 状态提交与外部副作用统一为事务后任务：[状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)。
 
 ## 怎么验证
 
-- `apps/server/src/core/core.test.ts` 里另有：`seq` 每次改了状态的提交加一、没变的不加，帧带着它；`http/api.test.ts` 的「a request key」：同一个键只做一次、并发的等第一个、失败不记；`flows/request.test.ts`：经处理函数，工单的建和挪、开串、记一条记性同一个键只做一次，答复的 `seq` 由第一帧不小于它的帧看见，三个设值发两次只改一次。
-- `apps/server/src/core/core.test.ts`：旧 state.json 不参与恢复且不被改写；事实盖时间、去重、阶段独立更新和合帧。Session 与私聊流程验证数据库恢复、资源上下文和位置保留。
-- `apps/server/src/core/golden.test.ts`：几千个随机事实逐个比状态、特效和视图（`reduce.jsonl.gz`）；`cron/cron.test.ts` 查折法和出帧填的话。
-- `apps/cli/src/main.test.ts`：每个接口由一条带例子的命令或 `api` 够得着、默认的文字比 JSON 短、失败时 stdout 是空的、退出码按种类、拒绝的 `next` 原样能跑、每个 `delete` 都有同形状的试跑且试跑不动东西、`lookIn` 的每条命令都在、只用命令行把一张工单从头做到尾。`apps/cli/src/golden.test.ts`：帮助、典型的错误和试跑录在 `apps/cli/src/testdata/cli.jsonl.gz`，改了 `vp run golden:update cli` 再看 diff。`scripts/verify-server.test.ts`：沙箱里只用命令行把一张工单派出去、交回来、试跑完成、完成。`lan/lan.test.ts`：「连接到本机」按 `can` 放行。
-- `packages/protocol/src/api.test.ts`：每个操作名是 `模块[.名词].动词`、单数、路径各不相同；试跑叫 `preview<动词>`；`about` 的字段输入里都有。`apps/server/src/http/api.test.ts`：接口都是 POST，输入不合 Schema 是 400，不在表里的路径 404。
-- 契约：`apps/web/test/*.spec.ts` 每个 worker 起一个真的服务端，经接口和三条流走一遍每块页面。
-- 能力表：`vp run docs:verify`（`scripts/capabilities.ts --check`）。
-- 真的服务端照 `vv-acceptance/references/server.md`：`POST /api/v1/server/health/get` 200、`GET /api/health` 404、`vibevalley state` 读到一帧。
-
-会话入场、离场、汇报和语音状态的事实分别为 session、sessionGone、sessionReport、voiceCall。sessionPhase 携带完整阶段、所在频道及可选累计花费；独立 spent 事实已删除。旧事件名不再接收。
+- `apps/server/src/core/core.test.ts`、`apps/server/src/core/golden.test.ts`：事实去重、`seq` 递增、批次原子提交与黄金数据测试。
+- `packages/protocol/src/api.test.ts`、`apps/server/src/http/api.test.ts`、`apps/server/src/flows/request.test.ts`：接口命名规范、`requestKey` 幂等与帧 `seq` 同步测试。
+- `apps/cli/src/main.test.ts`、`apps/cli/src/golden.test.ts`：CLI 全接口覆盖、试跑与错误 `next` 测试。

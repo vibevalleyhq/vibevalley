@@ -25,14 +25,12 @@ export function mainWindow(o: {
   readonly server: () => string | undefined;
 }) {
   let window: BrowserWindow | undefined;
-  /** The bar's load. Why the server did not come up waits for it: a load that cuts off the window's first one can leave
-   * the window without a page for a moment, and a server that fails at once would do that every time. */
+  /** The bar's load. */
   let bar: Promise<void> = Promise.resolve();
 
   const make = (): BrowserWindow => {
     const made = new BrowserWindow({
-      // The farm's proportions, so that it meets the window's edges (farmFraming: it is scaled by whole steps only):
-      // three times its 384 × 256, and 3 : 2 however the window is sized.
+      // The farm's proportions, so that it meets the window's edges (farmFraming.
       width: farmFraming.picture.w * 3,
       height: farmFraming.picture.h * 3,
       useContentSize: true,
@@ -46,8 +44,7 @@ export function mainWindow(o: {
       webPreferences: pageWebPreferences(join(__dirname, "preload.cjs")),
     });
     made.setAspectRatio(3 / 2);
-    // A size between two whole scales leaves bars around the farm: once a resize ends, the window takes the nearest
-    // size the farm fills. A maximized or full-screen window keeps the screen's size.
+    // A size between two whole scales leaves bars around the farm: once a resize ends, the window takes the nearest size the farm fills.
     made.on("resized", () => {
       if (made.isFullScreen() || made.isMaximized()) return;
       const [w = 0, h = 0] = made.getContentSize();

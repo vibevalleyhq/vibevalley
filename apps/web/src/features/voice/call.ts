@@ -1,8 +1,3 @@
-// Talking to the orchestrator: the server hands out the call (appId, channel, uid, one token) and starts Agora's
-// conversational AI agent in it; the page only joins, on the host's line (the phone's) or Agora's Web SDK (webRtc, below).
-// The microphone stays open, as on the phone: the agent hears when you stop, and you can talk over it. Muting is a button.
-// What was said comes over the RTC data stream as captions (captions.ts) and goes to the farm's chat (voice.heard/said).
-
 import { t } from "@vibevalley/i18n";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
@@ -15,8 +10,7 @@ import { prefsNow } from "#/state/prefs.ts";
 
 import { LiveCaptions } from "./captions";
 
-// A call's line on Agora's Web SDK, loaded when a call starts: the page's own, where the host carries none (the desktop,
-// a browser). The phone's shell carries its own (@vibevalley/protocol/host's rtc), which goes on with the screen locked.
+// A call's line on Agora's Web SDK, loaded when a call starts: the page's own, where the host carries none (the desktop, a browser).
 const webRtc: Rtc = async (grant, on) => {
   const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
   AgoraRTC.setLogLevel(3);
@@ -55,8 +49,7 @@ const webRtc: Rtc = async (grant, on) => {
     client.enableAudioVolumeIndicator();
     // Joined with the number the uid string holds: the agent listens to that uid only.
     await client.join(grant.appId, grant.channel, grant.token, Number(grant.uid));
-    // Echo cancellation, noise suppression and gain on, as a quiet laptop microphone otherwise reaches the agent too
-    // quietly for its voice detection to hear anyone talk.
+    // Echo cancellation, noise suppression and gain on, as a quiet laptop microphone otherwise reaches the agent too quietly for its voice detection to hear anyone talk.
     mic = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
     await client.publish(mic);
   } catch (e) {
@@ -85,7 +78,7 @@ export class VoiceCall {
   muted = false;
   agentHere = false;
   problem = "";
-  /** The 设置 section the problem is fixed in, when the server says a setting does. */
+  /** The Settings section the problem is fixed in, when the server says a setting does. */
   problemAt: VoiceFix | undefined = undefined;
   /** 0..100: the microphone's level and the orchestrator's. */
   micLevel = 0;

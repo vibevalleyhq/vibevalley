@@ -1,7 +1,3 @@
-// An agent's own todos: those it does itself or hands to a subagent, each waiting for
-// others. The edges' rules are protocol's (dagProblems), shared with a task graph's steps; what a task's states mean is
-// this file's. Every function here is pure: a graph in, a new graph out.
-
 import { Schema } from "effect";
 
 import { dagIDValid, dagProblems } from "./dag.ts";

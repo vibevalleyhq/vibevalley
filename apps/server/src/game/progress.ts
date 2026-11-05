@@ -1,7 +1,3 @@
-// The ledger's fold: what each entry pays and unlocks, and which entries a fact makes.
-// Outcomes earn, not effort: what counts is work that went into the main branch, never commands run or tokens spent
-// (docs/subsystems/game.md). Nothing here changes what it is given.
-
 import { dagLayers } from "@vibevalley/agent/dag";
 import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
@@ -30,7 +26,7 @@ export const harvestCoins = (commits: number, streak: number) => Math.round((30 
 
 const taskCoins = (merged: number) => 30 + 10 * merged;
 
-/** Under this, a harvested issue is cheap (一分钱一分货). */
+/** Under this, a harvested issue is cheap . */
 const cheapCNY = 0.05;
 
 interface Seen {

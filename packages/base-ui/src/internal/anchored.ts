@@ -1,6 +1,3 @@
-// A floating part kept against its anchor (the trigger) with @floating-ui/dom: placed on a side and aligned, turned to the
-// other side and pushed back in when the window edge is near, and moved along while either scrolls or resizes.
-
 import { autoUpdate, computePosition, flip, offset, type Placement, shift } from "@floating-ui/dom";
 import { createEffect, createSignal } from "solid-js";
 

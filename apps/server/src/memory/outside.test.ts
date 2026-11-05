@@ -56,11 +56,7 @@ interface NowledgeMemory {
   labels: string[];
 }
 
-/**
- * Nowledge Mem played over MCP: memory_search and memory_add as its tools/list gives them (2026-10-18, 0.10.103); any
- * other tool (memory_delete here) must never be called. A search without a query finds nothing; with labels to filter by,
- * any query finds all they hold ("*" here).
- */
+/** Nowledge Mem played over MCP: memory_search and memory_add as its tools/list gives them (2026-10-18, 0.10.103). */
 class FakeNowledge {
   memories: NowledgeMemory[] = [];
   searches: Record<string, unknown>[] = [];
@@ -190,8 +186,7 @@ class FakeEveros {
   }
 }
 
-// The fake source answers on this machine, but under a full parallel run it can take longer than the real 2 s: a test
-// about what a search finds is not one about its deadline (those give their own, like 100 ms).
+// The fake source answers on this machine, but under a full parallel run it can take longer than the real 2 s.
 const world = (timeoutMs = 20_000) =>
   Layer.effect(Memory, make(undefined, timeoutMs)).pipe(
     Layer.provideMerge(Agent.layer),

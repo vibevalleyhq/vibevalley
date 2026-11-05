@@ -1,6 +1,3 @@
-// What features/voice needs of the workbench, plus the call as an accessor for whatever shows it (the farm phone's line,
-// 田头's head and its problem).
-
 import { createExternal } from "#/base/external.ts";
 
 import { voiceCall } from "./call";

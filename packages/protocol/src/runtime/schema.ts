@@ -1,5 +1,3 @@
-// The Schemas of the coding agents on this machine: presets, what each supports, installation, usage (docs/subsystems/agent.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import { Look } from "../agent/schema";

@@ -1,7 +1,3 @@
-// A plot is a picture of where its issue stands: whatever its session's phase, the crop and the badge follow the issue's
-// attention, so the farm never says what the issue page does not.
-// Beds are here too: each project's farm lays out its own, and a saved bed never lands on one taken.
-
 import { describe, expect, it, test } from "vite-plus/test";
 
 import type { Issue, IssueStage, Session } from "@vibevalley/protocol";

@@ -1,6 +1,3 @@
-// The title screen over the farm (src/farm/title): the menu by mouse and keys, start asking for the orchestrator's key
-// first (the test server has none), continue once there is a farm, and not showing again once left.
-
 import { expect, test, defaultChannel } from "./fixtures";
 
 // A new farm: no other file's lines on its server.

@@ -1,6 +1,3 @@
-// 农具: the coding agents on this machine as oar probed them; one's account, what it takes,
-// its settings, models and inventories, and the profiles that use it. /runtimes/<id>.
-
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
@@ -55,7 +52,7 @@ const statusOf = (r: RuntimeInfo) => {
   switch (i.status) {
     case "available":
       return r.settings.enabled ? (i.version ?? t("web.runtime.available")) : t("web.runtime.disabled");
-    // The reason, not just 不支持: for vibevalley it is a missing DeepSeek key, which is the owner's to fix.
+    // The reason, not just unsupported: for vibevalley it is a missing DeepSeek key, which is the owner's to fix.
     case "unsupported":
       return i.reason || t("web.runtime.unsupported");
     case "not_found":

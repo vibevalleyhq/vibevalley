@@ -1,9 +1,3 @@
-// What happens over a plot when a tool is used on it, in pixels: drops from the watering can, a puff of spray, dust
-// from the shovel, the crop popping up at harvest, coins jumping out when the work is taken in. The core says what
-// happened (bedFx, gameFx); this draws it with the engine's particles (whole pixels, fading in steps), and a
-// harvest flashes a warm light over its plot for a moment. The words that go with them (the note, "+12") are the
-// page's labels.
-
 import { Container, type Graphics, Sprite, type Texture } from "pixi.js";
 
 import { dot, particles, type PointLight } from "@vibevalley/engine/pixi";
@@ -17,10 +11,7 @@ import { plotH } from "#/farm/world/world.ts";
 const rand = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
 interface PlotFx {
-  /**
-   * Starts what is new in the store's lists (each is started once: the store keeps them a few seconds) and moves
-   * everything on by `dt` seconds. `bedOf` is the bed a session's plot is in.
-   */
+  /** Starts what is new in the store's lists (each is started once: the store keeps them a few seconds) and moves everything on by `dt` seconds. */
   readonly update: (dt: number, fx: readonly BedFx[], rewards: readonly GameEffectReward[], bedOf: (sessionId: SessionId) => number | undefined) => void;
   /** A plot that was clicked dips a pixel for a moment: when it was, by plot index, on `clock`. */
   readonly pressedAt: Map<number, number>;

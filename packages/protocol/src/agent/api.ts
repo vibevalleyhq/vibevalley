@@ -1,6 +1,3 @@
-// The endpoints of profiles, templates and skills: their answers (AgentHandlers) and their lines in the table (api.ts puts the
-// concepts together).
-
 import { type Effect, Schema } from "effect";
 
 import { type ApiError, type Endpoint, input } from "../endpoint";
@@ -24,8 +21,7 @@ export interface AgentHandlers<R = never> {
   readonly "agent.template.list": () => Effect.Effect<T.AgentTemplate[], ApiError, R>;
   /** A new profile from a template; installing one again makes another. */
   readonly "agent.template.install": (a: { readonly id: string }) => Effect.Effect<T.Agent, ApiError, R>;
-  /** A profile made again from its template's version now: what came from the template is replaced, what is the
-   * machine's (environment, default project, on or off) stays. */
+  /** A profile made again from its template's version now. */
   readonly "agent.template.update": (a: { readonly agent: string }) => Effect.Effect<T.Agent, ApiError, R>;
   /** A template folder on this machine copied in beside the built-in ones; nothing is installed. */
   readonly "agent.template.add": (a: { readonly path: string }) => Effect.Effect<T.AgentTemplate, ApiError, R>;

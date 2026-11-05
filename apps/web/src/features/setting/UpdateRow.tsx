@@ -75,7 +75,7 @@ export function UpdateRow() {
   );
 }
 
-/** 「安装命令行」: the app's command line linked into ~/.local/bin (apps/desktop src/commandLine.ts); nothing where the
+/** Install CLI: the app's command line linked into ~/.local/bin (apps/desktop src/commandLine.ts); nothing where the
  * host has none to install. */
 export function CommandLineRow() {
   const cli = currentHost().commandLine;

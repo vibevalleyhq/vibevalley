@@ -1,9 +1,3 @@
-// What the page may ask of the program around it: the desktop's shell, the phone's, or none in a browser tab. Every host
-// gives the whole interface; a capability it lacks is null, and the page draws nothing for it. The page never asks which
-// host it is in (it finds its host in apps/web/src/infra/host.ts). What a host carries to another program goes over a
-// bridge (@vibevalley/bridge) by one of the contracts here: the desktop's preload to Electron's main (desktopBridge), the
-// phone's page to its shell (mobileBridge, whose page end is mobileHost).
-
 import { Schema } from "effect";
 
 import { call, connect, type Link, push } from "@vibevalley/bridge";
@@ -54,18 +48,14 @@ export interface RtcLine {
 /** grant: the server's for the call (voice.session). */
 export type Rtc = (grant: AgoraGrant, events: RtcEvents) => Promise<RtcLine>;
 
-/** The farm's picture in art pixels (apps/web/public/village.ldtk) and how much of it may be cut off on each side when it
- * is scaled by a whole number: the page frames the farm by it, and the desktop keeps its window at a size the farm fills. */
+/** The farm's picture in art pixels and how much of it may be cut off on each side when it is scaled by a whole number: the page frames the farm by it, and the desktop keeps its window at a size the farm fills. */
 export const farmFraming = { picture: { w: 384, h: 256 }, cut: { across: 0.05, down: 0.08 } } as const;
 
-/** Why an update cannot put itself in place: the app runs from its disk image, or where macOS moved it to run it
- * (App Translocation), or from a folder it cannot write; or the release has no build for this Mac. */
+/** Why an update cannot put itself in place. or the release has no build for this Mac. */
 export const UpdateManualValues = ["diskImage", "translocated", "readOnly", "noBuild"] as const;
 export type UpdateManual = (typeof UpdateManualValues)[number];
 
-/** The desktop's own updates (apps/desktop src/update.ts). version is the running one's; next the release's. newFarm: the
- * release's database is made from another baseline, so the farm starts over (the old one is kept aside), and it is put
- * in place only when the owner says. manual: it cannot put itself in place; page is where to download it by hand. */
+/** The desktop's own updates (apps/desktop src/update.ts). version is the running one's. */
 export type UpdateState =
   | { readonly _tag: "idle"; readonly version: string }
   | { readonly _tag: "checking"; readonly version: string }
@@ -90,8 +80,7 @@ export interface Updates {
   readonly install: () => Promise<void>;
 }
 
-/** The app's command line in ~/.local/bin (「安装命令行」, apps/desktop src/commandLine.ts): link is where it goes; onPath:
- * the login shell's PATH has that folder; taken: a file of another's is there, so it is not replaced. */
+/** The app's command line in ~/.local/bin (Install CLI, apps/desktop src/commandLine.ts): link is where it goes. */
 export interface CommandLineState {
   readonly command: string;
   readonly link: string;
@@ -126,11 +115,9 @@ export interface Host {
   /** A call the host carries itself (the phone's, which goes on with the screen locked); absent: the page joins with
    * Agora's web SDK. */
   readonly rtc?: Rtc;
-  /** The window has no title bar of its own and the page reaches its top edge: top is the strip the window is dragged
-   * by, left what its buttons (macOS's traffic lights) take at the strip's start; absent: the window has its own. */
+  /** The window has no title bar of its own and the page reaches its top edge. absent: the window has its own. */
   readonly titleBar?: { readonly top: number; readonly left: number };
-  /** Told the language the page speaks when it loads, so the host's own words (the tray's menu, the island, its dialogs)
-   * match; absent where the host says nothing of its own. */
+  /** Told the language the page speaks when it loads, so the host's own words (the tray's menu, the island, its dialogs) match. */
   readonly locale?: (locale: Locale) => void;
   /** Shows a file or folder on this machine in the system's file manager; absent where the host cannot. */
   readonly reveal?: (path: string) => void;
@@ -149,8 +136,7 @@ export const ThemeChoiceValues = ["light", "dark", "system"] as const;
 export type ThemeChoice = (typeof ThemeChoiceValues)[number];
 export const ThemeChoice: Schema.Codec<ThemeChoice> = Schema.Literals(ThemeChoiceValues);
 
-// The only way between the page and a shell's own world is a property on window. Each is declared here, once, so what
-// reads or sets one needs no cast and names it from this list.
+// The only way between the page and a shell's own world is a property on window.
 declare global {
   interface Window {
     /** The desktop's preload sets it (contextBridge). */
@@ -196,9 +182,7 @@ const DesktopStatus = Schema.Struct({
   server: Schema.optionalKey(Schema.String),
 });
 
-/** The desktop app's command line asks it (`vibevalley app …`, apps/server src/cli/app.ts) over a socket in its farm's
- * home (apps/desktop src/control.ts). open takes a path of the page's (/issues/12). Where a call is the same as the
- * page's, it has the page's name. */
+/** The desktop app's command line asks it (`vibevalley app …`, apps/server src/cli/app.ts) over a socket in its farm's home (apps/desktop src/control.ts). */
 export const desktopControl = {
   status: call({ input: Schema.Void, output: DesktopStatus }),
   open: call({ input: Schema.String.check(Schema.isPattern(/^\/[^\0]*$/u)), output: Schema.Void }),
@@ -209,9 +193,7 @@ export const desktopControl = {
   updateInstall: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
 };
 
-/** Every call and push of the page's to the desktop, and whether the command line can do it too (desktopControl has a
- * call of the same name) or only the page can: a call added without saying which does not compile, so the desktop's
- * abilities do not grow past its command line unnoticed (host.test.ts holds the names to it). */
+/** Every call and push of the page's to the desktop, and whether the command line can do it too or only the page can: a call added without saying which does not compile, so the desktop's abilities do not grow past its command line unnoticed. */
 export const desktopReach: Readonly<Record<keyof typeof desktopBridge, "control" | "page">> = {
   notify: "page",
   tray: "page",
@@ -250,8 +232,7 @@ export const mobileBridge = {
 /** The function on window the phone's shell calls with each message for the page. */
 export const fromNativeKey = "vibevalleyFromHost" satisfies keyof Window;
 
-/** The phone's host over its bridge. Only the current line hears its events; an older one keeps its own line for a late
- * leave. */
+/** The phone's host over its bridge. Only the current line hears its events. */
 export function mobileHost(link: Link): Host {
   const native = connect(mobileBridge, link);
   let next = 1;
@@ -266,8 +247,7 @@ export function mobileHost(link: Link): Host {
   return {
     name: "mobile",
     notify: (notice) => native.call.notify(notice),
-    // The phone's shell speaks the phone's language (apps/mobile words.ts).
-    // Files on the phone are not the farm's; the phone's status bar follows the system's theme.
+    // The phone's shell speaks the phone's language (apps/mobile words.ts). Files on the phone are not the farm's.
     rtc: async (grant, on) => {
       const line = next++;
       active = { line, events: on };

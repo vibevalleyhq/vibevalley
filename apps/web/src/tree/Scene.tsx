@@ -121,8 +121,7 @@ export function Scene(props: {
       for (const t of ties.together) lit.add(t.id);
     };
 
-    // The hill above the valley, by day and by night (design/pixel gen.sh tree-hill): drawn into the scene at one of its
-    // pixels to one of the scene's, so the tree drawn in code sits on the same grid. Until they load, the sky's colour.
+    // The hill above the valley, by day and by night (design/pixel gen.sh tree-hill). Until they load, the sky's colour.
     const backdrop = { day: new Image(), night: new Image(), up: new Image() };
     const sky: Record<"day" | "night", Rgb> = { day: [232, 176, 150], night: [10, 14, 34] };
     const topColour = (img: HTMLImageElement): Rgb => {
@@ -180,10 +179,7 @@ export function Scene(props: {
     /** How far the hill has sunk out of view as the view turns up, in scene pixels. */
     const liftOf = (k: number) => Math.round(upOf(k) * low.height * 0.6);
 
-    /**
-     * The night (`k`) coming over the hill: in its first half the day picture turns to the night one; in its second the
-     * view turns up, the hill sinking away and the sky seen looking up (tree-sky.png) coming down from above.
-     */
+    /** The night (`k`) coming over the hill: in its first half the day picture turns to the night one. */
     const drawBackdrop = (k: number) => {
       const dusk = Math.min(1, k * 2);
       const up = upOf(k);
@@ -467,8 +463,7 @@ export function Scene(props: {
           lc.fillStyle = `rgba(255,${190 + r * 4},110,${(0.05 + (9 - r) * 0.02) * k})`;
           disc(lc, sun.x, sun.y, r);
         }
-        // The constellations: gold where one memory grew from another, pale blue where two are recalled together. Faint
-        // until a star is hovered; then its own are bright and the rest fainter still.
+        // The constellations: gold where one memory grew from another, pale blue where two are recalled together. Faint until a star is hovered.
         const pos = new Map(placed.map((p) => [p.s.item.id, p]));
         for (const l of props.tree.links) {
           const a = pos.get(l.a);

@@ -74,8 +74,7 @@ const notClosed = (cause: unknown) => new NotClosed({ message: messageOf(cause),
 const running = Metric.gauge("vibevalley.sessions.running", { description: "Runtime sessions open now (the helpers' and the orchestrators')" });
 const closeWaitMs = 15_000;
 
-/** Calls onStall once a turn has had no record for stallMs, folded from the session's first record as its events are:
- * oar's observeStalls hears only records from when it subscribes, and misses a turn that went quiet before that. */
+/** Calls onStall once a turn has had no record for stallMs, folded from the session's first record as its events are. */
 export function watchStalls(
   session: RuntimeSession,
   stallMs: number,

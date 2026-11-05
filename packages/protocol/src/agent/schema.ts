@@ -1,5 +1,3 @@
-// The Schemas of profiles, their looks and templates, skills (docs/subsystems/agent.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";

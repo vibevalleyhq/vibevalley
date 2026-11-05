@@ -1,6 +1,3 @@
-// What every endpoint shares: who may call it, how a refusal is written, the line it has in the table (Endpoint), and
-// the input made of its ids and its body (input). The concepts' endpoints are in <concept>/api.ts.
-
 import { Schema } from "effect";
 
 import type { Handlers } from "./api";
@@ -28,13 +25,13 @@ export interface Missing {
   readonly next?: readonly Next[];
 }
 
-/** A 设置 section a voice problem is fixed in (the page's /settings/<section>). */
+/** A Settings section a voice problem is fixed in (the page's /settings/<section>). */
 export type { VoiceFix } from "./shapes";
 
 export interface VoiceUnavailable {
   readonly _tag: "VoiceUnavailable";
   readonly reason: string;
-  /** Where in 设置 the owner fixes it, when a setting does. */
+  /** Where in Settings the owner fixes it, when a setting does. */
   readonly settings?: VoiceFix;
 }
 
@@ -101,8 +98,7 @@ export interface Endpoint {
   readonly input: Schema.Codec<unknown> | undefined;
   readonly result: Schema.Codec<unknown> | undefined;
   readonly can: readonly Caller[];
-  /** It changes what cannot be taken back (deletes, merges, closes, sends helpers home): its dry run is this endpoint,
-   * which takes the same input and answers a Preview without changing anything (the command line's --dry-run). */
+  /** It changes what cannot be taken back (deletes, merges, closes, sends helpers home). */
   readonly dryRun?: keyof Handlers;
 }
 

@@ -1,5 +1,3 @@
-// How the tools word what they found.
-
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues, PriorityValues } from "@vibevalley/protocol";

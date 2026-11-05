@@ -1,5 +1,3 @@
-// 外观: how the workbench looks on this machine. The farm, the memory tree and the pixel skin are drawn and keep theirs.
-
 import { t } from "@vibevalley/i18n";
 import { type ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
 

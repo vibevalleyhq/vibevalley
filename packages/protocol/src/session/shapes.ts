@@ -1,5 +1,3 @@
-// The shapes of sessions: phases, runs, their events (docs/subsystems/session.md).
-
 import type { AgentRole } from "../agent/shapes";
 import type { IssueId, Outcome, Retry, SessionId, Spent } from "../common/shapes";
 
@@ -115,8 +113,7 @@ export interface EventTokens {
   output: number;
 }
 
-/** What an answer issue concludes, as its helper hands it back: the conclusion, what it rests on (files and lines, commands
- * and what they printed), what it is unsure of, and what to do next. */
+/** What an answer issue concludes, as its helper hands it back. */
 export interface IssueAnswer {
   conclusion: string;
   evidence: string[];
@@ -124,8 +121,7 @@ export interface IssueAnswer {
   next: string[];
 }
 
-/** How a session left: its work merged into the main branch, its issue completed otherwise (what it delivered is the
- * issue's: a kept branch, nothing, a parent issue's branch), sent home, or its workplace lost. */
+/** How a session left: its work merged into the main branch, its issue completed otherwise, sent home, or its workplace lost. */
 export const SessionCloseValues = ["merged", "completed", "dismissed", "lost"] as const;
 export type SessionClose = (typeof SessionCloseValues)[number];
 

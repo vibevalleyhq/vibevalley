@@ -1,6 +1,3 @@
-// Switch: on or off at once, no form submit needed (Base UI's Switch). A button with role switch and aria-checked; the
-// thumb carries the same state for styling.
-
 import { createContext, omit, useContext } from "solid-js";
 
 import { createControllable } from "./internal/controllable";

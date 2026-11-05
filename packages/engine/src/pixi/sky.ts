@@ -1,9 +1,3 @@
-// The light from the sky at a time of day: the ambient light, the sun (by day) or the moon (by night) from a
-// direction, cloud shadows drifting over, the morning mist, and the grade the whole picture gets: its exposure,
-// saturation, the haze that lifts the blacks, and the colours its shadows and highlights lean to. Pure numbers for
-// light.ts. The look aims at Eastward's: every time of day has a colour (bright and sunny, amber at dusk, a deep
-// readable blue at night), shadows are tinted rather than grey, nothing goes black.
-
 import { duskOf, sunOf } from "../clock";
 
 export type Rgb = readonly [number, number, number];
@@ -60,8 +54,7 @@ const NOON = 1;
 export function skyAt(tod: number): Sky {
   const day = sunOf(tod);
   const dusk = duskOf(tod);
-  // From 6:00 to 18:00 the sun crosses from the left of the picture to the right, highest at noon, a little up the
-  // screen (the light falls from the top, as painted).
+  // From 6:00 to 18:00 the sun crosses from the left of the picture to the right, highest at noon, a little up the screen.
   const crossed = clamp01((tod - 0.25) / 0.5);
   const sunDir = normal([-Math.cos(Math.PI * crossed), -0.5, 0.2 + 0.8 * Math.sin(Math.PI * crossed)]);
   const dayAmbient = mix(DAY_AMBIENT, DUSK_AMBIENT, dusk);

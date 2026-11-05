@@ -1,7 +1,3 @@
-// The page following the farm for the host around it: each new call in the inbox as a system notice while the window is
-// not in front, the farm at a glance in the tray, the key that calls the orchestrator from anywhere, and the language the
-// page speaks. Mounted once, over every page, the farm's too.
-
 import { createEffect, onSettled } from "solid-js";
 
 import { currentLocale } from "@vibevalley/i18n";

@@ -1,8 +1,3 @@
-// 声音: the line's settings in 设置 › 语音 (/settings/call: credentials, how it listens, who answers; /settings/moss:
-// MOSS Live's key; /settings/dictation) and the orchestrator's voice
-// on /orchestrator/voice (what it says, in what voice). Each part saves only its own fields over the settings as they are
-// now: the other part may have been saved meanwhile.
-
 import type { JSX } from "@solidjs/web";
 import { keepPreviousData } from "@tanstack/solid-query";
 import { createSignal, For, onSettled, Show, snapshot, untrack } from "solid-js";
@@ -54,8 +49,7 @@ import { toast } from "#/ui/toasts.ts";
 
 import { MossVerify } from "./MossVerify";
 
-// The voice form's choices: what each stage offers, the limits on the numbers and what 恢复默认 on one part touches. Why
-// settings cannot be saved is the server's answer (setting.validate).
+// The voice form's choices: what each stage offers, the limits on the numbers and what Reset to defaults on one part touches.
 
 const areaLabel: Record<Area, string> = {
   US: t("web.voice.choices.area.US"),
@@ -143,7 +137,7 @@ const numberLabel: Record<VoiceNumber, string> = {
 /** The line: credentials' area, how it listens and who answers. The agent: what it says and in what voice. */
 type VoicePart = "line" | "agent";
 
-/** What 恢复默认 on one part touches, and what saving one part sends. */
+/** What Reset to defaults on one part touches, and what saving one part sends. */
 function withPart(part: VoicePart, onto: VoiceSettings, from: VoiceSettings): VoiceSettings {
   return part === "line"
     ? {
@@ -170,8 +164,7 @@ const options = <T extends string>(labels: Record<T, string>) =>
   (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
 const plain = <T extends string>(values: readonly T[]) => values.map((value) => ({ value, label: value }));
 
-/** Which of the line's settings a page shows: the call (credentials, listening, who answers), MOSS Live's key, or
- * dictation. They save together, each only what it changed. */
+/** Which of the line's settings a page shows: the call (credentials, listening, who answers), MOSS Live's key, or dictation. */
 type LineView = "call" | "moss" | "dictation";
 
 export function VoiceForm(props: { part: VoicePart; view?: LineView }) {
@@ -284,7 +277,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
       onSave={() => void submit()}
       onUndo={undo}
       left={<Show when={error() ?? problem()}>{(e) => <p class="text-berry">{e()}</p>}</Show>}
-      // 恢复默认 puts back the call's own settings: on MOSS Live's key or dictation it would touch what is not shown.
+      // Reset to defaults puts back the call's own settings: on MOSS Live's key or dictation it would touch what is not shown.
       extra={
         <Show when={props.part === "agent" || props.view === "call"}>
           <Button tone="quiet" data-testid="reset" disabled={atDefaults()} onClick={() => set(withPart(props.part, draft(), base().voiceDefaults))}>
@@ -486,7 +479,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               </Card>
             </Show>
             <Show when={props.view === "dictation"}>
-              {/* The page's title already says 听写: the card has none of its own. */}
+              {/* The page's title already says Dictation: the card has none of its own. */}
               <Card class="max-w-4xl">
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <Segmented
@@ -690,7 +683,7 @@ function Cols(props: { children: JSX.Element }) {
   return <div class="grid gap-4 md:grid-cols-2">{props.children}</div>;
 }
 
-/** A label, what sits at its right (清掉), the control and a hint under it. */
+/** A label, what sits at its right (clear), the control and a hint under it. */
 function Labeled(props: { label: string; hint?: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
     <div class="flex flex-col gap-1">

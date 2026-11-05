@@ -1,5 +1,3 @@
-// The Schemas of issues: status, acts, history, reports, the board (docs/subsystems/issue.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";

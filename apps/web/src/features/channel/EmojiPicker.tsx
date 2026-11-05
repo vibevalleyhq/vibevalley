@@ -5,8 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { type ChatMessage, ownerId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
-/** What pressing an emoji on a message asks for: the owner's reaction off when it is on the message now, else on. Sent
- * as a set (channel.reaction.set), so a retry of the same press changes nothing more. */
+/** What pressing an emoji on a message asks for: the owner's reaction off when it is on the message now, else on. */
 export const reactionOn = (m: Pick<ChatMessage, "reactions">, emoji: string) => !(m.reactions.find((r) => r.emoji === emoji)?.by.includes(ownerId) ?? false);
 
 /** What a reaction offers first; an agent can still react with any other. */
@@ -222,8 +221,7 @@ const width = 320;
 const height = 288;
 const gap = 4;
 
-/** Where the picker goes beside the button that opened it: above when there is room, else below; inside the window. Fixed,
- * so a scrolling list around the button does not cut it off. */
+/** Where the picker goes beside the button that opened it: above when there is room, else below. inside the window. */
 function placeBy(anchor: HTMLElement | undefined) {
   const r = anchor?.getBoundingClientRect();
   if (!r) return { left: gap, top: gap };
@@ -232,8 +230,7 @@ function placeBy(anchor: HTMLElement | undefined) {
   return { left: Math.max(left, gap), top: Math.max(top, gap) };
 }
 
-/** Every emoji the farm offers, the usual ones first; a press outside or Esc closes it. On the body, so no transformed
- * ancestor (the farm's phone) moves where fixed is. */
+/** Every emoji the farm offers, the usual ones first. a press outside or Esc closes it. */
 
 const groupKeys = ["frequent", "faces", "hands", "things", "nature", "signs"] as const;
 /** A group of the picker by its id; an id with no name is shown as it is. */

@@ -24,7 +24,7 @@ export const groupingLabel: Record<Grouping, string> = {
   none: t("web.issue.boardLabels.grouping.none"),
 };
 
-/** `manual` keeps the order the rows came in: the history's, which for 待办 is the owner's own order. */
+/** `manual` keeps the order the rows came in: the history's, which for todo is the owner's own order. */
 export type Ordering = "manual" | "priority" | "updated" | "created";
 export const orderings = ["manual", "priority", "updated", "created"] as const satisfies readonly Ordering[];
 export const orderingLabel: Record<Ordering, string> = {
@@ -92,8 +92,7 @@ export interface RowGroup<T> {
   rows: T[];
 }
 
-/** By status every lane is a group, even empty, in lane order; by project or agent the named groups come by name and
- * the rows without one last. Rows keep their order inside a group. */
+/** By status every lane is a group, even empty, in lane order. by project or agent the named groups come by name and the rows without one last. */
 export function groupRows<T>(rows: T[], grouping: Grouping, facts: (row: T) => RowKeys): RowGroup<T>[] {
   switch (grouping) {
     case "none":

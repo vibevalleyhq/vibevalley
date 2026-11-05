@@ -1,7 +1,3 @@
-// The API over HTTP: every endpoint in @vibevalley/protocol/api is a POST at its op's path, routed to its handler. An input
-// that does not decode is a 400 with why (an empty body is {}); no answer is a 204; a refusal is its tagged JSON at its status.
-// The things a browser asks for by itself are GETs here too: an attachment, an artifact's version and MOSS Live's line.
-
 import { ByteSize, Cause, Deferred, Effect, Exit, Metric, Schema } from "effect";
 import { HttpIncomingMessage, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
@@ -105,8 +101,7 @@ export const attachments = HttpRouter.add(
       contentType: found.type,
       headers: {
         "cache-control": "private, max-age=31536000, immutable",
-        // Shown in the page (an image, a video, a sound) or a tab of its own (a PDF), else saved: never run as one of the
-        // farm's own pages. The browser's PDF viewer does not open under a sandbox; nosniff keeps a PDF a PDF.
+        // Shown in the page (an image, a video, a sound) or a tab of its own (a PDF), else saved: never run as one of the farm's own pages.
         "content-disposition": `${inline(found.type) ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(found.name)}`,
         "x-content-type-options": "nosniff",
         ...(pdf ? {} : { "content-security-policy": "sandbox" }),
@@ -115,8 +110,7 @@ export const attachments = HttpRouter.add(
   }).pipe(Effect.orElseSucceed(notFound)),
 );
 
-// A GET since an <iframe src> can only GET; a version never changes once made, so it is cached for good. Its headers keep
-// an HTML page from running as one of the farm's (artifact/policy.ts).
+// A GET since an <iframe src> can only GET. a version never changes once made, so it is cached for good.
 export const artifactContent = HttpRouter.add(
   "GET",
   "/api/v1/artifact/:id/:version",
@@ -136,8 +130,7 @@ export const artifactContent = HttpRouter.add(
   }).pipe(Effect.orElseSucceed(notFound)),
 );
 
-// A page's line to MOSS Live (voice/moss.ts relay): a WebSocket at mossLinePath, for the farm's own page only, as the
-// RPC socket is (rpc.ts fromTheFarm). The key stays on the server; with none saved the upgrade is refused with why.
+// A page's line to MOSS Live (voice/moss.ts relay): a WebSocket at mossLinePath, for the farm's own page only, as the RPC socket is (rpc.ts fromTheFarm).
 export const mossLine = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const voice = yield* Voice;
@@ -157,8 +150,7 @@ export const mossLine = HttpRouter.use((router) =>
   }),
 );
 
-// A client's request key: the same key again gets the first request's result, and the work is done once. A reply lost on
-// the way (the page's retry after a dropped connection) would otherwise create or move a second time.
+// A client's request key: the same key again gets the first request's result, and the work is done once.
 
 /** As long as a chat message's sendKey may be. */
 export const requestKeyMax = 64;
@@ -166,10 +158,7 @@ export const requestKeyMax = 64;
 /** Keys remembered per op: a retry comes within seconds, so the newest few hundred are plenty. */
 const remembered = 500;
 
-/**
- * One op's memo, in memory: a restart forgets every key. Duplicates that come while the first is running wait for it.
- * Only a success is remembered: a refused or failed request changed nothing, so a retry with the same key runs again.
- */
+/** One op's memo, in memory: a restart forgets every key. Duplicates that come while the first is running wait for it. */
 export function requestKeys<A>(): (key: string | undefined, work: Effect.Effect<A, ApiError>) => Effect.Effect<A, ApiError> {
   const seen = new Map<string, Deferred.Deferred<A, ApiError>>();
   return (key, work) => {

@@ -1,8 +1,3 @@
-// A git repository as the projects use it: what it can say (its main branch, whether a branch is there and where it
-// points, how far one is ahead) and what it does (commit what a session left, merge without checking out, describe a
-// branch, clear a worktree away). The git spelling is here; what is done with the answers (the merge rules, pull
-// requests, the project's check, what a release keeps) stays in project.ts.
-
 import { Effect } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -91,8 +86,7 @@ export const repository = (path: string) => {
       const args = ["commit-tree", tree, "-p", ours, "-p", theirs, "-m", message];
       return yield* git(path, ...args).pipe(Effect.catch(() => git(path, ...asFarm, ...args)));
     }),
-    /** What branch changes against main, with what is uncommitted in cwd (none for ""): its commits, each file with its
-     * lines and patch (the patches cut to a budget), its conflicts with main and how far main is ahead of it. */
+    /** What branch changes against main, with what is uncommitted in cwd (none for ""). */
     describe: Effect.fnUntraced(function* (project: string, cwd: string, branch: string | undefined) {
       const base = yield* main;
       const uncommitted: UncommittedItem[] = [];

@@ -12,8 +12,7 @@ export class ToolFailed extends Schema.TaggedError<ToolFailed, { readonly brand:
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-/** What a tool's body threw or rejected with, or the agent it started failed with, as the failed result. A body that
- * means to fail a tool returns Effect.fail(new ToolFailed(…)) and is not passed here. */
+/** What a tool's body threw or rejected with, or the agent it started failed with, as the failed result. */
 export const toolFailed = (e: unknown): ToolFailed => new ToolFailed({ message: messageOf(e), cause: e });
 
 /** A run asked of an agent that is already running one. */

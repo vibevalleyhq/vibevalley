@@ -1,5 +1,3 @@
-// Faces cut from the pixel drawings (public/pixel/sprites.json).
-
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -84,7 +82,7 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
   );
 }
 
-/** The owner: 主 in a wheat square. */
+/** The owner: owner badge in a wheat square. */
 export function OwnerFace(props: { size?: number }) {
   return (
     <span

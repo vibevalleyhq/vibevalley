@@ -1,8 +1,3 @@
-// Where memories live: this farm's database, always there and
-// first, and a memory service outside it (Nowledge Mem, EverOS), modeled on Hermes's MemoryProvider. Every read asks them
-// all at once and takes their answers in turns; a source outside the farm that fails or is slow gives nothing, with a line
-// in the log; writes to one go in the background, in order.
-
 import { Cause, Clock, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Ref, Schema, Scope, SynchronizedRef } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -256,8 +251,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
     const forkHere = yield* FiberSet.makeRuntime();
     /** Every generation not yet stopped, the current one among them, for the service's end. */
     const generations = new Set<Generation>();
-    /** The current generation and the settings it was made for; none once the service has stopped. Changed in one
-     * step, so two asks after a change make one new generation. */
+    /** The current generation and the settings it was made for. none once the service has stopped. */
     const held = yield* SynchronizedRef.make<{ readonly key: string; readonly gen: Generation } | undefined>(undefined);
     const stopped = yield* Ref.make(false);
 

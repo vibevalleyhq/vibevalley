@@ -1,8 +1,3 @@
-// The built React page (apps/web/dist) at /. A path that names no file and has no
-// extension is a route of the page's own router and gets index.html, never cached; the API never falls back, so an
-// unknown endpoint stays a 404. index.html goes out with the farm's locale on its <html> (data-locale, lang): the page
-// takes its words from it before it draws (apps/web src/main.tsx).
-
 import { extname, join, normalize } from "node:path";
 
 import { Effect, FileSystem, Option } from "effect";
@@ -31,8 +26,7 @@ export const page = (dir: string) =>
       const fs = yield* FileSystem.FileSystem;
       const info = yield* Effect.option(fs.stat(file));
       if (clean !== "/index.html" && Option.isSome(info) && info.value.type === "File") return yield* HttpServerResponse.file(file);
-      // The page itself is asked again every time (its assets carry their hash): a server updated under a phone's or a
-      // browser's cached page would otherwise keep showing the old one.
+      // The page itself is asked again every time (its assets carry their hash).
       if (extname(clean) === "" || clean === "/index.html") {
         const html = yield* fs.readFileString(join(dir, "index.html"));
         return HttpServerResponse.text(withLocale(html), { contentType: "text/html; charset=utf-8", headers: { "cache-control": "no-cache" } });

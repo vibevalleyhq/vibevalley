@@ -1,7 +1,3 @@
-// What a source file says about its edges, read from its syntax tree (oxc, as Vite parses it) rather than by pattern: an
-// import over several lines, a re-export, a dynamic import or a read through a local name is seen as the compiler sees
-// it. The structure tests (modules, layers, the contract, the pyramid) all ask these.
-
 import { parseSync } from "vite";
 
 /** One import or re-export: where from, whether it is for types only, and the names it takes ("*" for a namespace or
@@ -114,9 +110,7 @@ const isCallOf = (n: Node, object: string, method: string) =>
   nameOf(n.callee.object) === object &&
   nameOf(n.callee.property) === method;
 
-/** The fields read off what object.method() returns: right off the call (`core.state().issues`, `?.` too), through a
- * const it is kept in (`const s = core.state(); s.issues`), or destructured (`const { issues } = core.state()`). A
- * name kept is followed through the whole file, which is enough for the short functions that read it. */
+/** The fields read off what object.method() returns: right off the call (`core.state().issues`, `?.` too), through a const it is kept in (`const s = core.state(). */
 export function readsOf(path: string, source: string, object: string, method: string): string[] {
   const program = programOf(path, source);
   const parents = new Map<Node, Node | undefined>();

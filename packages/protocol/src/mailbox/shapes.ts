@@ -1,5 +1,3 @@
-// The shapes of triggers: an input as it reaches an agent, with its card (docs/subsystems/mailbox.md).
-
 import type { QuotedBlock } from "../artifact/shapes";
 import type { ChannelType } from "../channel/shapes";
 import type { RunTrigger } from "../session/shapes";

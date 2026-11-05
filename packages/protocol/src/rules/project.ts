@@ -1,5 +1,3 @@
-// What a project is made from that the page checks as the owner types and the server checks again before it clones.
-
 const githubURL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+)\/?$/u;
 
 /** Only repository home URLs: never credentials, other git transports or command-line options. */

@@ -8,11 +8,7 @@ export function usePaneWidth(pane: string, fallback: number, min: number, max: n
   return () => Math.min(max, Math.max(min, kept() ?? fallback));
 }
 
-/**
- * A pane's edge the owner drags to set its width (docs/style/design.md, 分栏): the line shows under the pointer, ← and →
- * move it 16px, a double click puts the default back. side: the edge it is on, so dragging outward widens the pane. The
- * pane is relative; the handle lies over its edge.
- */
+/** A pane's edge the owner drags to set its width (docs/style/design.md). side: the edge it is on, so dragging outward widens the pane. */
 export function Splitter(props: { pane: string; side: "left" | "right"; width: number; min: number; max: number; label: string }) {
   const [dragging, setDragging] = createSignal(false);
   const sign = () => (props.side === "left" ? -1 : 1);

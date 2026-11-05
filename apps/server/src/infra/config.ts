@@ -1,7 +1,3 @@
-// The server's configuration: the defaults, then the YAML file, then the environment
-// (VIBEVALLEY_ and the key, dots as underscores: session.stall_seconds is VIBEVALLEY_SESSION_STALL_SECONDS). A key not in
-// the defaults is never read from the environment. The keys are snake_case in the file and the environment, camelCase here.
-
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -21,7 +17,7 @@ export class ServerConfig extends Context.Service<
     readonly version: string;
     /** The farm's own folder: projects/<name> are its projects, worktrees/ the issues' worktrees. */
     readonly workRoot: string;
-    /** Empty: home/db; "memory" keeps it in memory; anything else is the database's folder. */
+    /** Empty: home/db. "memory" keeps it in memory. */
     readonly db: string;
     readonly port: number;
     /** The built page (apps/web/dist), served at / beside the API. Empty: no page. */
@@ -159,8 +155,7 @@ const readFile = Effect.fnUntraced(function* (path: string, optional: boolean) {
   });
 });
 
-/** file: the YAML to read, which must be there; empty is home/vibevalley.yaml, read if it is there. The environment wins
- * over the file: VIBEVALLEY_<KEY>, then the other services' own names (DEEPSEEK_API_KEY…). */
+/** file: the YAML to read, which must be there. empty is home/vibevalley.yaml, read if it is there. */
 export const loadConfig = Effect.fnUntraced(function* (
   file: string = "",
   env: Readonly<Record<string, string | undefined>> = process.env,

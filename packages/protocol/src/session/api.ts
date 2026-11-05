@@ -1,6 +1,3 @@
-// The endpoints of sessions: their answers (SessionHandlers) and their lines in the table (api.ts puts the
-// concepts together).
-
 import { type Effect, Schema } from "effect";
 
 import { type ApiError, type Endpoint, input } from "../endpoint";
@@ -12,7 +9,7 @@ export interface SessionHandlers<R = never> {
   readonly "session.stop": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   readonly "session.list": (a: { readonly agent?: string }) => Effect.Effect<T.Session[], ApiError, R>;
   readonly "session.get": (a: { readonly id: string }) => Effect.Effect<T.Session, ApiError, R>;
-  /** Its log, oldest first; run gives one run's only. The orchestrator's log is session orchestrator's. */
+  /** Its log, oldest first. run gives one run's only. */
   readonly "session.event.list": (a: { readonly id: string; readonly run?: string }) => Effect.Effect<T.SessionEvent[], ApiError, R>;
 }
 

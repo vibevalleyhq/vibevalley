@@ -1,6 +1,3 @@
-// The voice line's default persona, for an answerer that is not the farm's own orchestrator (Agora's model): said to
-// the model, in Chinese whatever the owner's locale; it answers in the owner's.
-
 import { ownersLanguage } from "#/prompts.ts";
 
 export const voiceOrchestratorPersona =

@@ -1,7 +1,3 @@
-// `vibevalley issue …`: the issues as a project tracker has them, a command an operation of the server's (issue.list,
-// issue.status.update…). Which moves an issue takes now is the server's to say: a refused one comes back with the
-// commands it does take (its next), and `issue show` ends with them.
-
 import { Effect, Schema, Stream } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 
@@ -158,8 +154,7 @@ const editCommand = Command.make(
   Command.withExamples([{ command: "vibevalley issue edit 12 --priority high", description: t("cli.example.issueEdit.about") }]),
 );
 
-/** `issue status 12 todo`: the issue moved to a status (sending it out, another round, done, canceled…), as the server
- * allows from where it stands; --dry-run says what that would do. */
+/** `issue status 12 todo`: the issue moved to a status (sending it out, another round, done, canceled…), as the server allows from where it stands. */
 const statusCommand = Command.make(
   "status",
   {

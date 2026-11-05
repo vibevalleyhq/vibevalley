@@ -1,5 +1,3 @@
-// The server applies the same ops with the same rule: change packages/protocol/src/rules/pkm.ts and here together.
-
 import type { PkmBlock, PkmBlockOp, PkmMarker } from "@vibevalley/protocol";
 import { applyBlockOps, flatBlocks, pkmTagTyped, treeOfBlocks } from "@vibevalley/protocol/rules";
 

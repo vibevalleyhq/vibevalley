@@ -84,7 +84,7 @@ export function IssuesPage(props: { rest: string }) {
     await act.run(() => api.issue.update(omitUndefined({ id: c.id, before })));
   };
 
-  /** Asked about first where it cannot be undone. A 待办 dropped back on its own lane goes last. */
+  /** Asked about first where it cannot be undone. A todo dropped back on its own lane goes last. */
   const drop = async (c: BoardCard, to: Lane) => {
     if (c.kind === "todo" && to === "todo") return place(c, undefined);
     const move = cardMove(c, to);
@@ -133,7 +133,7 @@ export function IssuesPage(props: { rest: string }) {
     if (done?.replied) notice(done.replied.reply);
   };
 
-  // An issue is a page of its own (docs/style/design.md): the board and the list give way to it, and Escape or 工单 comes back.
+  // An issue is a page of its own (docs/style/design.md): the board and the list give way to it, and Escape or Issues comes back.
   return (
     <div class="relative flex h-full flex-col">
       <Show
@@ -206,11 +206,7 @@ export function IssuesPage(props: { rest: string }) {
   );
 }
 
-/**
- * The open card. It is the last one found by the id, so it stays while the board is read again and while the overlay
- * closes: its panels' queries may still be settling then, and a read through a narrowed accessor would halt the page.
- * Each panel is keyed by what it shows, a plain value, for the same reason.
- */
+/** The open card. */
 function Detail(props: {
   id: string;
   cards: () => BoardCard[];
@@ -286,7 +282,7 @@ function Detail(props: {
   );
 }
 
-/** An issue's own page, at its URL: 工单 or Escape goes back to the board as it was left. */
+/** An issue's own page, at its URL: Issues or Escape goes back to the board as it was left. */
 function IssueView(props: { onBack: () => void; children: JSX.Element }) {
   onSettled(() => {
     const esc = (e: KeyboardEvent) => {
@@ -329,7 +325,7 @@ function Toolbar(props: {
   const projects = () => [...new Set(props.cards.map(cardProject).filter((p): p is string => !!p))].toSorted();
   const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
   return (
-    // Narrow, the views go on their own line above the filters, at the right where the 显示 panel opens leftwards.
+    // Narrow, the views go on their own line above the filters, at the right where the Display panel opens leftwards.
     <div class="@container px-3 pt-3 pb-2.5">
       <div class="flex flex-col-reverse gap-2 @min-[760px]:flex-row @min-[760px]:items-center">
         <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">

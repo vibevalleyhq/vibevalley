@@ -1,7 +1,3 @@
-// What the sessions keep: the hands in memory (one per session on the farm) and their rows, the runs and the order
-// their writes land in, the news and the hubs the other modules listen on, and the save on the way out. The other
-// parts of Session read and change a session through these.
-
 import { randomBytes } from "node:crypto";
 
 import { type SubagentReport } from "@botiverse/oar/agents";
@@ -50,7 +46,7 @@ export interface Hand {
   /** As the chat names it: <id>#<n>; "" when it has none. */
   launch: string;
   spoke: boolean;
-  /** What its tools carry to say whose they are; "" once it leaves. Kept in memory only. */
+  /** What its tools carry to say whose they are. "" once it leaves. */
   token: string;
   recalled: Set<string>;
   /** The inputs of the turns asked for and not opened yet, oldest first. */
@@ -99,8 +95,7 @@ export const sessionRecords = Effect.gen(function* () {
   // all ended with the service.
   const timers = yield* FiberMap.make<string>();
   const later = yield* FiberMap.runtime(timers)();
-  // For oar's callbacks (a session's events, its report, a stall), which run outside any fiber and must land in the
-  // order oar gives them: core.apply and core.notice are synchronous and need no services. Effect code yields them.
+  // For oar's callbacks (a session's events, its report, a stall), which run outside any fiber and must land in the order oar gives them.
   const apply = (...facts: FactIn[]) => runSync(core.apply(...facts));
   const notice = (level: "info" | "warn" | "error", text: string) => runSync(core.notice(level, text));
   /** Where sessions reach the farm's tools; the server says its real address once it listens (setAddress). */
@@ -136,8 +131,7 @@ export const sessionRecords = Effect.gen(function* () {
   };
   const who = (token: string) => (token === "" ? "" : ([...hands.values()].find((h) => h.token === token)?.id ?? ""));
 
-  // A session's own row keeps what taking it up again needs, so it goes with the database: one made again from a new
-  // schema brings back no session (and none on an issue the database no longer has).
+  // A session's own row keeps what taking it up again needs, so it goes with the database.
   const handRow = (h: Hand) => {
     const oar = h.oarSessionId;
     return {
@@ -306,7 +300,6 @@ export const sessionRecords = Effect.gen(function* () {
   const closeExecution = (h: Hand) => executor.close(h.id);
 
   // The sessions are let go first: a turn cut off by the shutdown is reported when the farm comes back, not on the way out.
-  // The database closes after this layer: what brings the sessions back is written while it is still open.
   yield* Effect.addFinalizer(() =>
     Effect.andThen(
       Effect.suspend(() => {

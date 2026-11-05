@@ -1,17 +1,3 @@
-/**
- * Has a model review comments by docs/style/code.md's 注释 section: what a pattern cannot judge (a name said again in
- * other words, an overview, a test telling its steps). scripts/oxlint-plugin.ts's no-comment-divider has the one kind a
- * pattern can. By default only the ones this branch adds, so the cost follows the change; --all takes every comment
- * under the paths given, for clearing out a module. It reports and edits nothing: a wrong delete loses a why
- * (.agents/skills/vv-comments).
- *
- *   vpx scripts/comment-review.ts [--base <ref>] [--dry-run]
- *   vpx scripts/comment-review.ts --all <path>... [--dry-run]
- *
- * The base is where the branch left origin/main; uncommitted changes count. Exits 1 when any comment is not kept.
- * Calls DeepSeek with DEEPSEEK_API_KEY, which costs money; --dry-run counts what it would send.
- */
-
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -87,7 +73,7 @@ export function commentsIn(file: string, src: string): Comment[] {
 export const addedComments = (comments: readonly Comment[], added: ReadonlySet<number>): Comment[] =>
   comments.filter((c) => Array.from({ length: c.endLine - c.line + 1 }, (_, i) => c.line + i).some((n) => added.has(n)));
 
-/** docs/style/code.md's 注释 section, as written: the one rule, so the review changes when it does. */
+/** the comments section of docs/style/code.md, as written: the one rule, so the review changes when it does. */
 export function rubric(styleDoc: string): string {
   const from = styleDoc.indexOf("\n## 注释");
   if (from < 0) throw new Error("docs/style/code.md has no 注释 section");

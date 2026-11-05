@@ -1,6 +1,3 @@
-// `vibevalley guide`: the common things an agent does with the farm, each with its commands, in the farm's language
-// (guide/<locale>.md, carried beside the packaged app's bundle: assets.ts).
-
 import { Effect, FileSystem } from "effect";
 import { Command } from "effect/cli";
 

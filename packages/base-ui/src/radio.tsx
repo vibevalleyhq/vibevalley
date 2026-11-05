@@ -1,6 +1,3 @@
-// RadioGroup and Radio (Base UI's): one value out of several. The group is one tab stop (the checked radio, else the
-// first enabled); the arrow keys move to the next radio and check it, as a native radio group does.
-
 import { createContext, createSignal, omit, Show, useContext } from "solid-js";
 
 import { createControllable } from "./internal/controllable";

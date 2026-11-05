@@ -1,6 +1,3 @@
-// QQ, written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's
-// message id, which QQ honours only for a while.
-
 import { Cause, Clock, Effect, Option, Queue, Schedule, Schema, Stream, Predicate } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 

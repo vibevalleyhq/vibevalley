@@ -1,12 +1,3 @@
-// The live captions of a call, from the conversational AI agent's messages on the RTC data
-// stream (the server starts it with data_channel 'datastream'). A message comes in chunks, `id|part|parts|base64`,
-// 1-based; put together and decoded, it is JSON with an `object`:
-//   user.transcription       what you said so far in a turn; `final` when the turn is over
-//   orchestrator.transcription  what the orchestrator has said so far; `turn_status` 0 while it is still talking
-//   message.interrupt        you talked over the orchestrator: its turn `turn_id` stops there
-//   message.state            the agent's state: idle, listening, thinking, speaking, silent
-// Every message of a turn carries the whole text so far, so a turn's caption is replaced, never appended to.
-
 import { recordOf } from "#/base/dom.tsx";
 
 type Speaker = "you" | "orchestrator";
@@ -21,17 +12,16 @@ interface Caption {
   interrupted: boolean;
 }
 
-/** A line said on a call as 田头 has it: whose, and its words. */
+/** A line said on a call as the farm chat has it: whose, and its words. */
 export interface SpokenLine {
   readonly speaker: Speaker;
   readonly text: string;
 }
 
-/** How long a finished turn's caption waits for its line in 田头 before it goes. */
+/** How long a finished turn's caption waits for its line in the farm chat before it goes. */
 export const captionLinger = 8_000;
 
-/** The captions to draw live in 田头 during a call, before their turns are lines there: every turn still being said, and a
- * finished one until 田头 has its words or captionLinger passes. Whoever answers, its words reach 田头 only once said. */
+/** The captions to draw live in the farm chat during a call, before their turns are lines there. */
 export function liveCaptions(turns: readonly Caption[], spoken: readonly SpokenLine[], now: number): Caption[] {
   return turns.filter((c) => {
     if (!c.text.trim()) return false;

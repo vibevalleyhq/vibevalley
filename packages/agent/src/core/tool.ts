@@ -1,5 +1,3 @@
-// A tool that fails throws (or fails, as an Effect): the model reads the error's message as a failed result.
-
 import { Effect, Schema } from "effect";
 
 import { type JsonSchema, parametersOf } from "@vibevalley/ai/tools";
@@ -63,8 +61,7 @@ interface SchemaToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends 
   readonly parameters: S;
 }
 
-/** A tool whose parameters are a Schema: the model is shown parametersOf, and the arguments are read by the Schema
- * before run (a refusal is the failed result the model reads). */
+/** A tool whose parameters are a Schema. */
 export function schemaTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: SchemaToolSpec<S>): Tool {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a tool's Struct decodes with no services
   const read = Schema.decodeUnknownSync(spec.parameters as unknown as Schema.Codec<S["Type"]>);

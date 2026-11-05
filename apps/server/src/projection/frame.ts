@@ -1,7 +1,3 @@
-// What the client gets. The words for people (a session's phaseText, a cron's
-// whenText and nextText, the graphs' actions) are said here and only here, on a copy: reduce keeps the facts, so the
-// words never reach the saved state.
-
 import { Layer } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -15,8 +11,7 @@ import { inbox } from "#/inbox/items.ts";
 
 import { reduce } from "./reduce.ts";
 
-// The core state's projection, given to the core at assembly: the fold, the effects and the frame read every module's
-// rules, so they sit with the assembly, above every module.
+// The core state's projection, given to the core at assembly.
 export const layer = Layer.succeed(Projection, { reduce, effects: effectsOf, frame: frameOf });
 
 export function frameOf(state: WorkspaceState, effects: GameEffect[] = [], seq = 0): StateFrame {

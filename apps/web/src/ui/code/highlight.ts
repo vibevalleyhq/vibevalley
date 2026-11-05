@@ -1,6 +1,3 @@
-// Code coloured off the page's thread (highlight.worker.ts): one worker for the page, started the first time code is
-// shown; the newest results are kept, so a panel opened again is coloured at once.
-
 import type { ColourRequest, Coloured } from "./highlight.worker";
 import { languageOf } from "./languages";
 
@@ -31,8 +28,7 @@ function request(code: string, lang: string): Promise<Tokens | undefined> {
   });
 }
 
-/** The lines' tokens in the language of the file or fence named, or none: a language not coloured, too long a block,
- * or a colouring that failed (the plain lines stay). */
+/** The lines' tokens in the language of the file or fence named, or none. */
 export async function highlight(lines: readonly string[], nameOrTag: string): Promise<Tokens | undefined> {
   const lang = languageOf(nameOrTag);
   if (!lang || lines.length === 0 || lines.length > maxLines) return undefined;

@@ -34,11 +34,7 @@ interface ToastInput {
   timeout?: number;
 }
 
-/**
- * The list of toasts. Each closes after its timeout (5 s by default), held while the pointer is over the stack; past
- * `limit` they hide. The list is a value of the page's (state/atom.ts); the timers, held while the pointer is over the
- * stack, are the store's.
- */
+/** The list of toasts. Each closes after its timeout (5 s by default), held while the pointer is over the stack. */
 export class ToastStore {
   private readonly list = defineAtom<readonly ToastData[]>([]);
   private readonly timers = new Map<number, ReturnType<typeof setTimeout>>();
@@ -108,10 +104,7 @@ export const toasts = new ToastStore();
 
 const tone: Record<string, string> = { warn: "bg-peach/30", error: "bg-berry/15" };
 
-/**
- * The stack of toasts, top centre over the page. The pointer over it holds their timeouts; a drag right or down past
- * 40 px closes the front one. `leading` and `kicker` replace the bell and add a line above the title (a medal, 解锁成就).
- */
+/** The stack of toasts, top centre over the page. The pointer over it holds their timeouts. */
 export function ToastViewport(props: {
   store?: ToastStore;
   leading?: (toast: ToastData) => JSX.Element;

@@ -1,6 +1,3 @@
-// An artifact opened beside the talk that made it: the blocks editor, or the isolated page, without leaving the channel
-// or issue thread it was handed in on (docs/subsystems/artifact.md).
-
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

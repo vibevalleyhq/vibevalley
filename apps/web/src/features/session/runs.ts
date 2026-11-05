@@ -1,6 +1,5 @@
 import { Predicate } from "effect";
-// A session's log by run (shownEvents, runsOf, spansOf, runMs), the work log's words and colours, the trajectory's
-// waterfall and totals, how steps arriving live merge in (mergeSteps), and the log kept per observed session (SessionLogs).
+// A session's log by run, the work log's words and colours, the trajectory's waterfall and totals, how steps arriving live merge in (mergeSteps), and the log kept per observed session (SessionLogs).
 
 import { t } from "@vibevalley/i18n";
 import type { LiveEvent, SessionEvent } from "@vibevalley/protocol";
@@ -75,7 +74,7 @@ interface Span {
   ms: number;
 }
 
-/** Each step lasts until the next one starts; the last until `end` (now, while the run goes on; else its own start). */
+/** Each step lasts until the next one starts. the last until `end` (now, while the run goes on. */
 export function spansOf(r: RunView, end: number): Span[] {
   const all = allOf(r);
   return all.map((s, i) => ({ step: s, ms: Math.max(0, (i + 1 < all.length ? all[i + 1]!.time : end) - s.time) }));
@@ -228,10 +227,7 @@ interface Waterfall {
   readonly spans: readonly LaneSpan[];
 }
 
-/** Lanes from the times the log already has; a step's time is when it began. A
- * model answer runs from what it answered (the message, a tool's result) to its llm/usage, or, with none, to the last
- * step before what stops it; a tool from its call to its result. `end` is where the last run stops (now, while it goes
- * on). */
+/** Lanes from the times the log already has. a step's time is when it began. */
 export function waterfallOf(log: readonly SessionEvent[], end: number): Waterfall {
   const top = log.filter((e) => e.under === undefined && e.type !== "run/start" && e.type !== "run/end");
   const groups = runsOf(top).map(allOf);
@@ -381,8 +377,7 @@ interface Log {
   reading: { during: SessionEvent[]; again: boolean } | undefined;
 }
 
-/** One current log per observed session. Snapshots replace the retained window; live revisions arriving during the read
- * are merged into it. Reconnecting re-reads every observed log, including a run that ended while disconnected. */
+/** One current log per observed session. Snapshots replace the retained window. */
 export class SessionLogs {
   private readonly logs = new Map<string, Log>();
   private stop: (() => void) | undefined;
@@ -443,7 +438,7 @@ export class SessionLogs {
       const snapshot = await this.read(log.id);
       if (this.logs.get(log.id) === log) this.publish(log, mergeSteps(snapshot, reading.during));
     } catch {
-      // The query retries a failed read. Keep the received steps; a reconnect or a new observer tries again.
+      // The query retries a failed read. Keep the received steps.
     } finally {
       log.reading = undefined;
       if (reading.again && this.logs.get(log.id) === log) void this.refresh(log);

@@ -1,7 +1,3 @@
-// The farm's services for tests, the same modules services.ts assembles (platform … issues), with nothing reaching this
-// machine's runtimes, GitHub or a model: runtimes come from the test (oar's scriptedRuntime), gh answers that it is not
-// there.
-
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -27,9 +23,7 @@ import { installedOnly } from "./worker.ts";
 
 const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 
-/** For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. No runtime is
- * probed (the coding agents installed here would be started and asked their models), gh is never run, the orchestrator does
- * not listen for work, and the queued issues are not tried. Under load those made the app slow enough to time tests out. */
+/** For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. */
 export const quietApp = {
   runtime: { background: false },
   project: { gh: noGitHub },
@@ -85,8 +79,7 @@ export const testIssues = (issues: Issue["Service"]) => ({
   add: (request: IssueRequest) => issues.add(request, explicitMandate()),
 });
 
-// What is said in a test farm, from the farm's start: the core state keeps no messages (a page follows a channel's
-// room), and a test reads them as the message facts told them, by channel.
+// What is said in a test farm, from the farm's start.
 
 export class Said extends Context.Service<
   Said,

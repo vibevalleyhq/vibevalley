@@ -1,9 +1,3 @@
-// MOSS Live (platform.mosi.cn): a realtime voice model the server connects to, so its key never reaches a page. A check
-// attaches a session and closes it at once: MOSS bills from session_attached to the close. A refused key fails the
-// WebSocket handshake with no reason (close 1006, as a network failure does), so a failed handshake is asked again over
-// plain HTTPS, where a refused key answers 401 or 403. A relay is a page's own line to MOSS: the page speaks MOSS's
-// protocol (JSON actions, and binary frames tagged 0x00 for audio), the server only adds the key.
-
 import { Effect, Queue, type Scope, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { Socket } from "effect/socket";
@@ -13,8 +7,7 @@ import { afterRealTime } from "#/infra/time.ts";
 
 const mossUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
 
-/** MOSS's transcription (platform.mosi.cn/docs/reference/transcriptions): OpenAI's /audio/transcriptions, with the same key
- * as MOSS Live. moss-transcribe-1.0 is the plain one; the diarize model (speakers, streaming) is not needed to dictate. */
+/** MOSS's transcription (platform.mosi.cn/docs/reference/transcriptions): OpenAI's /audio/transcriptions, with the same key as MOSS Live. */
 export const mossTranscription = { url: "https://api.mosi.cn/v1", model: "moss-transcribe-1.0" } as const;
 
 /** Real time: the handshake and the first answer each come within a few hundred ms. */

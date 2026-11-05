@@ -1,5 +1,3 @@
-// Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
-
 import { createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { Toolbar } from "@vibevalley/base-ui";

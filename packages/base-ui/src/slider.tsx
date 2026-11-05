@@ -1,7 +1,3 @@
-// Slider (Base UI's): one number in a range, picked by dragging along the control or with the keys on the thumb
-// (arrows by step, Page Up and Down by ten steps, Home and End). onValueChange hears every move, onValueCommitted the
-// value where a drag or a key press ends.
-
 import type { JSX } from "@solidjs/web";
 import { createContext, createSignal, omit, Show, useContext } from "solid-js";
 

@@ -1,7 +1,3 @@
-// What every task-shaped command (cli/issue.ts, cli/channel.ts…) stands on: the farm asked through the typed client
-// (VibeValleyApi, written from api.ts), a refusal turned into the command line's failure, the answer printed as short
-// text or, with --format json, as the protocol's shape, and --dry-run kept to what can be tried.
-
 import { Effect, Option, Predicate } from "effect";
 
 import { t } from "@vibevalley/i18n";

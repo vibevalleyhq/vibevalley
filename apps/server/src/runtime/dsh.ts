@@ -1,12 +1,3 @@
-// The DeepSeek Harness runtime: `dsh --profile acp` (DeepSeek Harness's automation ACP
-// server, dsh 0.2.1-rc.2, ACP v1) driven through oar's own ACP layer. npm oar has no dsh, and its ACP layer is not in
-// its exports: it is loaded from oar's dist by path, which holds only while oar is pinned to the version it was read
-// from (0.68.2, package.json).
-//
-// What the server offers, probed 2026-10-17: initialize with no auth methods, session/new, session/resume, session/list
-// and session/close, one prompt at a time, session/cancel, and session/set_config_option with a `model` select grouped
-// by provider and a `reasoning_effort` select in the thought_level category (off, low, high, max).
-
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 
@@ -75,9 +66,7 @@ const deepseek = "deepseek-official";
 
 const isDeepseek = (provider: string) => provider === deepseek || provider === "deepseek-account";
 
-/** The `model` option's value for a model: dsh values it by the JSON pair ["provider","model"]. "deepseek-flash" is
- * DeepSeek's; "provider/model" is that provider's; an empty model or a pair is left as it is. The retired name
- * "deepseek-v4-flash" is the same model as "deepseek-flash" (DeepSeek serves and bills it as flash). */
+/** The `model` option's value for a model: dsh values it by the JSON pair ["provider","model"]. "deepseek-flash" is DeepSeek's. */
 export function optionValue(given: string): string {
   const model = given.trim();
   if (model === "" || model.startsWith("[")) return model;
@@ -119,9 +108,7 @@ function displayName(id: string, choice: Record<string, unknown>): string {
 type Rec = Record<string, unknown>;
 const records = (v: unknown): Rec[] => (Array.isArray(v) ? v.filter(Predicate.isObject) : []);
 
-/** A session/new response's models; undefined when it has no `model` config option. dsh has no model-list method: the
- * catalog rides on every new session as the `model` option, its choices grouped by provider or flat. The effort menu
- * is the thought_level option, the same for every model; `off` is a toggle, not a level, and is dropped. */
+/** A session/new response's models. undefined when it has no `model` config option. */
 export function projectModels(response: unknown): ModelEntry[] | undefined {
   const options = records(Predicate.isObject(response) && "configOptions" in response ? response.configOptions : undefined);
   const model = options.find((o) => o.id === "model");

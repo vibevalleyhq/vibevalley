@@ -1,6 +1,3 @@
-// A Schema for each shape, one folder per concept (<concept>/schema.ts), typed by it: a field added to a shape and not
-// to its Schema (or the other way) does not compile.
-
 export type { Wire } from "./codec";
 export * from "./common/schema";
 export * from "./core/schema";

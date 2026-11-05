@@ -1,7 +1,3 @@
-// A message's placeholders: {name} puts a value in as it is; {n, plural, one {…} other {…}} picks by a count (# is the
-// count); {n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} picks by an order; {flag, select, true {…}
-// other {…}} picks by a value. The branches are messages of their own.
-
 export type Value = string | number | boolean;
 export type Params = Readonly<Record<string, Value>>;
 

@@ -1,6 +1,3 @@
-// Small pieces the farm's panels share: tags, tints, an empty note, a said line and its clock, and a harvest's line
-// counts, file rows and patch.
-
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Show } from "solid-js";
 

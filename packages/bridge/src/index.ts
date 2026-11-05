@@ -1,5 +1,3 @@
-// The two sides share no types at run time: each input, output and payload is a Schema, and the side it reaches decodes it.
-
 import { Schema } from "effect";
 
 /** Any Schema a contract may hold: its type and its encoded form, needing no services. */

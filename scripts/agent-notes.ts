@@ -1,17 +1,3 @@
-/**
- * The Agent Note tree and file format (.agents/notes/README.md), checked, and its catalog written. The lifecycle and
- * class sets are closed: this file is their single source, and the README's tables follow it. Runs on Bun:
- *
- *   vp run notes:verify                 check every note and that CATALOG.md is current; any error exits 1
- *   vp run notes:catalog                write CATALOG.md from the notes first, then check
- *
- * Checks: every folder under .agents/notes is a known lifecycle; every note sits at {lifecycle}/{class}/ with a
- * known class and a yyyy-mm-dd-topic.md name; no hand-written INDEX.md; the header block is exactly
- * `# Agent Note: <title>`, blank, `Status: …` matching the lifecycle, blank; the body opens with `## Problem` and has
- * the sections its lifecycle requires, and an implemented note has none of the proposal-era ones; CATALOG.md is what
- * the notes give. Links are checked by doc-links.ts.
- */
-
 import { existsSync, globSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 

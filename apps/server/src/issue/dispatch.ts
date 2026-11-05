@@ -1,5 +1,3 @@
-// Sending an issue to work: hiring its session, the orchestrator's turn on it, the queue, a reopen and a cron's run.
-
 import { Clock, Effect, Option, Semaphore } from "effect";
 
 import { list, t } from "@vibevalley/i18n";

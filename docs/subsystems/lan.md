@@ -1,76 +1,57 @@
 # 连接到本机
 
-「连接到本机」（`Lan`）让手机、另一台电脑和这台电脑用同一个农场：服务端在主监听之外另开一个监听，把页面放给任何人，接口只放主人在本机点过头的设备，每台一把钥匙。主人在工作台「设置」的「设备」页（`/settings/devices`）开关它、添加和移除设备；另一台设备用手机的 VibeValley 扫码，或在浏览器里打开配对链接、在 `/pair` 上请主人放行，之后用那台电脑的农场。
+「连接到本机」（`Lan`）允许局域网内的手机或另一台电脑访问本机农场。服务端在主回环监听 `127.0.0.1:8787` 之外按需开启局域网监听 `0.0.0.0:8790`，仅向经主人本机批准配对的设备转发标记了 `remote` 权限的接口与流。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 「连接到本机」的监听：开、关、重启后保持主人留下的样子 | 主监听（只听 `127.0.0.1`，[设置和配置](docs/subsystems/setting.md)） |
-| 配对：配对码、设备等主人点头、发钥匙 | 哪些接口给「连接到本机」：`api.ts` 里每个接口的 `can` 含不含 `remote`，「连接到本机」只照它放（[能力表](docs/reference/capabilities.md)） |
-| 设备：存钥匙的 SHA-256、认钥匙（`Bearer` 头或 cookie）、移除时断开它的连接 | 接口本身怎么答：「连接到本机」把放行的请求转给本机的主监听 |
-| 页面经它到别的设备上 | 页面里配对和带钥匙的那一半（[客户端](docs/subsystems/app.md)「连进来的浏览器先配对」） |
-| | 语音线路，另一个对外的监听（[语音](docs/subsystems/voice.md)「语音线路」）；帮工的 `/mcp`（[频道](docs/subsystems/channel.md)），「连接到本机」不放 |
+| 局域网监听的启停、状态持久化（`lan` 表）与上游请求转发 | 主监听本身（固定绑定 `127.0.0.1`，[设置和配置](docs/subsystems/setting.md)） |
+| 一次性 10 位配对码生成、挂起等待本机批准、签发 32 字节设备钥匙 | 接口表 `endpoints` 中哪些操作标记 `remote`（[核心状态](docs/subsystems/core.md)、[能力表](docs/reference/capabilities.md)） |
+| 配对设备管理（`lan_device` 表存 SHA-256）、鉴权与移除设备时断流 | 浏览器 `/pair` 页面与手机壳钥匙串存储（[客户端](docs/subsystems/app.md)） |
 
 ## 在哪
 
-- 服务端 `apps/server/src/lan/lan.ts`：监听、配对、设备、`guard`（每个请求先过它）、放行表 `remoteMay`、`pairLink`；`http/app.ts` 开始答 HTTP 后把主监听的地址交给它（`setUpstream`）。
-- 表：`lan`（一行，`open`）、`lan_device`（一台设备一行：名字、`key_hash`、`paired_at`、`last_seen`）；查询在 `db/queries/lan.sql`、`lan_device.sql`。
-- 接口：`lan.*`（[capabilities.md](docs/reference/capabilities.md)）。`lan.get`、`lan.update`、`lan.pairing.start`、`lan.pairing.stop`、`lan.pairing.answer`、`lan.device.delete` 只有 `owner`；`lan.pair`（`POST /api/v1/lan/pair`）和 `lan.me.get`（`POST /api/v1/lan/me/get`）也给 `remote`。形状是 `LanStatus`、`LanPairing`、`LanDevice`、`LanPaired`，拒绝是 `LanRefused`（403）。钥匙的 cookie 名是 `packages/protocol` 的 `lanKeyCookie`。
-- 配置：`lan.port`（默认 8790；0 是随便一个）。
-- 页面：`apps/web/src/features/lan/LanPage.tsx`（开关、二维码、点头、设备列表），`features/lan/PairPage.tsx`（设备上的配对），`features/lan/device.ts`（是不是远端、配没配对、cookie 怎么写、猜设备名），`main.tsx` 把没配对的远端浏览器送去 `/pair`。
+| 位置 | 职责 |
+|---|---|
+| `apps/server/src/lan/lan.ts` | 局域网监听管理、配对状态机、请求守卫 `guard`、放行表 `remoteMay` 与 HTTP/WS 代理转发 |
+| `apps/server/src/infra/db.ts`（`lan`、`lan_device` 表） | 持久化局域网开关状态与已配对设备的 `key_hash`、`paired_at`、`last_seen` |
+| `apps/web/src/features/lan/LanPage.tsx`、`PairPage.tsx` | 工作台「连接到本机」设置页与远端设备 `/pair` 配对页 |
+
+接口清单见 [capabilities.md](docs/reference/capabilities.md)（`lan.*`）。
 
 ## 模型和不变量
 
-- **主监听不动**：服务端只听 `127.0.0.1`。「连接到本机」是第二个监听，在所有网卡上听 `lan.port`，默认关着；开关存在 `lan` 表，开机照它决定开不开。端口被占时状态里写「连接开不起来」，农场照常。
-- **页面放给任何人，接口只放 `remote` 的**：不在 `/api/v1/` 下的 `GET`、`HEAD` 原样转给主监听（页面和它的图、字、脚本，里面没有农场的东西），`/mcp` 和别的方法答 404。`/api/v1/` 下的按放行表：开机时从 `endpoints` 里 `can` 含 `remote` 的条目和三条流（`/api/v1/state`、`/api/v1/events`、`/api/v1/live`）建成，按方法和路径匹配；聊天的附件（`GET /api/v1/attachment/<id>`）也放。只有「连接到本机」自己的六个管理接口没有 `remote`：一台设备进了「连接到本机」，也不能开关它、放别的设备进来。
-- **页面的 WebSocket 原样转过去**：`/api/v1/rpc` 的 upgrade 先认设备（同上），`Origin` 有的话要和 `Host` 同源，再把这个请求原样交给主监听、带上设备头，之后两头的字节对接到有一头关掉。主监听认这个设备头，不再查 `Origin`。移除设备、关掉「连接到本机」时一并断开（升级过的连接不归 HTTP 服务器关）。
-- **每个接口请求带钥匙**：`Authorization: Bearer <钥匙>`，或者 `vibevalley_lan_key` 这个 cookie（浏览器配对后存的）；只有 `POST /api/v1/lan/pair` 不要。认不出的钥匙答 401，认得但接口不放答 403，都带 `LanRefused` 的一句话。转给主监听时去掉 `Authorization` 和 `Cookie`，换成监听自己写的设备头（`x-vibevalley-lan-device`），设备自己带的这个头不认。
-- **钥匙**：32 字节随机数的 base64url，只在配对成功时给设备一次；数据库只存它的 SHA-256，比对用定长比较。`last_seen` 内存里每个请求都更新，最多一分钟写一次库。
-- **配对码**：10 位，`code(10)`，比对时去掉两头空白、转大写。同一时间只有一个配对码、只有一台设备在等；码 2 分钟有效，错 5 次作废；设备带对码来以后再等 2 分钟。主人答了（让进或不让）、过期、主人换新码或关「连接到本机」，这个码都作废。
-- **配对链接**：`http://<地址>:<端口>/pair?c=<码>`。地址是这台电脑首选网卡（`en*`、`eth*`、`wlan*`、`wl*` 在前）的私有 IPv4，端口是「连接到本机」实际听的；找不到这样的地址时不发码，状态里说「连上 Wi-Fi 或网线再试」。手机的相机扫开就是浏览器里的配对页。
-- **设备名**：配对页按浏览器猜一个（iPhone、iPad、安卓手机、Mac、Windows 电脑），设备上能改；空白合成一个空格，最长 40 个字，空的叫「一台设备」。电脑名（`LanStatus.hostName`、`LanPaired.hostName`）是这台电脑的主机名，去掉 `.local`。
-- **移除当场生效**：移除删库里的行、取消这台设备正连着的每个请求，状态流随之断开；关「连接到本机」等整个监听完成关闭，再允许重开同一端口。转发响应体经 `pipeline` 跟随下游背压，设备断开同时取消上游读取。认设备和登记它的连接在同一步里，移除和进门不会错开。
-- **能干活，不能改配置**：配对过的设备能派活、带话、在频道说话、验收、完成、定时任务、看全部状态，也能看设置（钥匙只看到最后四个字）；改配置的只在本机：设置的保存、农机设置、帮工的档案和技能书的增删改、连接器的账号，这些没有 `remote`，设备调了答 403。
-- **明文**：「连接到本机」走 HTTP，同一个网络里的人能看到内容、抓到钥匙冒充那台设备，直到主人移除它。页面上提示只在信得过的网络里开。
+- **双监听隔离，按 `can` 含 `remote` 白名单放行**：
+  - 主监听永远只绑 `127.0.0.1`；局域网监听开启时绑 `0.0.0.0:<lan.port>`。
+  - 非 `/api/v1/` 下的静态页面 `GET`/`HEAD` 直接转发；`/mcp` 与 `/v1/chat/completions` 一律返回 `404`。
+  - `/api/v1/` 下仅放行 `can` 含 `remote` 的接口、三条 SSE 流、附件与网页稿子 `GET` 以及 `/api/v1/rpc` WebSocket。
+  - 管理「连接到本机」自身及修改本机设置、档案、技能、农机、连接器的接口均不含 `remote`，远端调用返回 `403`。
+- **一次性配对码 + 本机主人点头**：
+  - 配对码为 10 位随机码，有效期 2 分钟，输错 5 次即作废，同时只允许一台设备挂起等待。
+  - 远端提交配对码后，必须由主人在本机点击「让它进来」（`lan.pairing.answer`）才签发钥匙。
+- **钥匙只发一次，库里只存 SHA-256**：
+  - 配对成功返回 32 字节 base64url 钥匙（浏览器存入 `vibevalley_lan_key` cookie，手机壳存入系统钥匙串）。
+  - 数据库仅存钥匙的 SHA-256 哈希并以定长时间比对。
+  - 转发前剥离原 `Authorization`、`Cookie` 与伪造设备头，注入已验证的 `x-vibevalley-lan-device` 头。
+- **移除设备或关闭监听当场掐断在途连接**：删除设备或关闭开关时，立即中止该设备名下登记的所有在途 HTTP/SSE 流与 WebSocket。
 
 ## 怎么走
 
-**配对**：
-
-1. 主人打开「连接到本机」（`lan.update`），点「添加设备」（`lan.pairing.start`）：「连接到本机」没开或找不到地址就拒绝；否则作废旧码、发新码，页面把 `LanPairing.link` 画成二维码，旁边是链接本身。
-2. 设备扫码或打开链接，浏览器进 `/pair?c=<码>`；没带码时页面让它填。不带 cookie 打开那台电脑上别的地址，页面先送它去 `/pair`。
-3. 设备带码和名字发 `lan.pair`，请求一直挂着，页面说「等那台电脑上的主人点头」。「连接到本机」关着、码过期、码不对、已有设备在等都当场拒绝，页面照原话说。
-4. 主人在本机看到「谁在等」（`LanPairing.asking`），点「让它进来」或「不让」（`lan.pairing.answer`）。让进：新建设备行、发钥匙，回 `LanPaired`（设备 id、钥匙、电脑名）；不让、2 分钟没答：拒绝，码作废。
-5. 页面把钥匙写进 cookie（`SameSite=Strict`，十年），回到 `/`；之后的状态流和接口都带着它。手机的壳走同一个 `lan.pair`，钥匙存在系统钥匙串，打开 WebView 时写成同一个 cookie（[客户端](docs/subsystems/app.md)「手机壳」）。
-
-电脑换了地址，设备就连不上：主人在「连接到本机」里再添加一次设备，设备扫新码重新配对。服务端停了，用这个农场的设备也连不上。
+1. 主人在本机 `/settings/devices` 打开开关并点击「添加设备」（`lan.pairing.start`），生成配对链接与二维码。
+2. 远端设备打开链接输入设备名调用 `POST /api/v1/lan/pair`，请求挂起等待本机批准（限时 2 分钟）。
+3. 主人在本机点击批准，远端收到钥匙写入 Cookie 并跳转 `/` 使用农场。
 
 ## 和谁打交道
 
-- **主监听（`http/app.ts`）**：「连接到本机」先校验浏览器的 `Origin` 与 `Sec-Fetch-Site`，再剥离来源头和设备提交的设备头，按回环地址转发并写入已验证的设备身份；`lan.me.get` 从这个头读出是哪台设备。
-- **`packages/protocol`**：`endpoints` 的 `can` 是放行表的唯一来源，同时写出能力表的「连接到本机」一列；`lanKeyCookie` 是页面和监听共用的 cookie 名。
-- **`base`、`infra`**：`lan.port` 从配置来；配对码用 `code`，设备 id 用 `newId`。
-- **页面**：没配对的远端浏览器去 `/pair`；同源的 `fetch` 自动带上 cookie，页面别处不用知道自己是不是连进来的（[客户端](docs/subsystems/app.md)）。
+- **主监听**：`http/app.ts` 接收通过守卫的转发请求，根据 `x-vibevalley-lan-device` 识别设备（供 `lan.me.get` 查询）。
+- **协议（`packages/protocol`）**：从 `endpoints` 构建 `remoteMay` 放行表，共用 `lanKeyCookie` 名称。
 
 ## 为什么这样
 
-- **另开一个监听，不把主监听改成 `0.0.0.0` 加一个全局令牌。** 帮工没有权限确认，谁连上服务端谁就能让帮工在这台机器上执行命令。改主监听最省事，可是 `/mcp` 跟着出去，令牌漏了也没法只撤一台设备；单独的监听能把口子收窄到 `remote` 的接口，每台设备一把钥匙也能单独移除。
-- **放行照 `can`，不在「连接到本机」里另写一张表。** 加一个接口就要在 `api.ts` 写清谁能调，同一张表同时喂「连接到本机」和能力表。
-- **页面放给没配对的人。** 页面是公开的代码，里面没有农场的东西；不放的话，手机扫了码也打不开配对页，还要另装一个应用。接口和流照样只认钥匙。
-- **钥匙放 cookie，页面不改。** 页面的状态流和接口都走同源的 `fetch`，cookie 自动带上；放进 `localStorage` 再逐个加头，要改每一处请求，SSE 也要另写。监听只认 cookie 和 `Bearer` 头，不把钥匙转给本机的服务端。
-- **连进来的设备不改配置。** 设备是主人自己的，可手机丢了、明文被旁人抓到钥匙时，能改的越少越好：农机设置能指定命令路径，等于让这台电脑跑任意命令；档案和技能书写进帮工的人设和环境；设置和连接器里是钥匙和账号。
-- **一次性配对码加主人点头，不把长期钥匙放进二维码。** 二维码会被截图、被旁边的人拍到；漏出去的码 2 分钟就过期、错 5 次作废，没有主人在本机点头也换不到钥匙。
-- **地址变了不做发现。** 放弃了 Bonjour（mDNS）：要维护广播，家里路由器给的地址通常很久不变；连不上就回那台电脑上重新扫。
-- **明文 HTTP，不做自签证书。** 浏览器不认自签证书，每台设备都要手动信任；代价写在页面上：只在家里、自己的热点这类网络里开。
-- **不分只读和能指挥的设备。** 都是主人自己的设备。要分的话加在设备上，由「连接到本机」的 `guard` 按接口拦。
-
-## 还没做的
-
-- 连进来的设备看得到只有主人能用的地方，点了才被拒（[客户端](docs/subsystems/app.md)「还没做的」）。
+- **独立外网监听 + 路径级白名单，不把主监听暴露到 `0.0.0.0`**：主监听挂着无需鉴权的帮工 `/mcp` 与全部管理接口；代理监听只放行 `remote` 子集，防止局域网攻击者修改农机命令或读取配置。
 
 ## 怎么验证
 
-- `apps/server/src/lan/lan.test.ts`：没开时连不上，开着时没配对的设备拿得到页面（`/`、`/pair`）、拿不到接口；配对、带钥匙或 cookie 用接口，`/mcp` 不放，管理接口和改配置的接口经「连接到本机」答 403，坏钥匙 401；主人不让、第二台设备等着；错 5 次作废；移除断开它的状态流；配对过的设备的页面 WebSocket 转得过去，没配对的 401、别的源 403，移除设备时断开。
-- `apps/web/src/features/lan/device.test.ts`：哪些地址是本机、cookie 里有没有钥匙、怎么写 cookie、按浏览器猜设备名。
-- `apps/web/test/pair.spec.ts`：配对页说服务端的拒绝、没带码时要码；一台「手机」经「连接到本机」打开工单页先被送去配对，请主人放行，主人点头后进农场、打开工单。`settings.spec.ts`：「连接到本机」页打开、出码和链接、关上。
+- `apps/server/src/lan/lan.test.ts`、`apps/web/src/features/lan/device.test.ts`：配对审批、5 次错码作废、`remote` 权限拦截、WebSocket 转发与移除设备断流测试。
+- `apps/web/test/pair.spec.ts`：远端浏览器自动跳转 `/pair`、本机批准后进入工单页端到端测试。

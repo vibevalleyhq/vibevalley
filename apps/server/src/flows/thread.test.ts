@@ -98,8 +98,7 @@ describe("an issue's thread", () => {
       expect(returned[0]!.payload.trigger.id).toBe(followup.id);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
-  // One issue, one thread: sent out, cancelled and reopened, both sessions' dispatch, reports and the person's words are
-  // in the same thread; the person's words wake the session working the issue now, and only keep when none is.
+  // One issue, one thread: sent out, cancelled and reopened, both sessions' dispatch, reports and the person's words are in the same thread.
   it.live("is one across its sessions", () => {
     // Says only that it is done: echoing its input would @ the orchestrator, who would then follow the thread.
     const f = farm({
@@ -158,8 +157,7 @@ describe("an issue's thread", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // The issue hears the owner in its thread whichever way the words came: said in the thread, they answer its question
-  // and void a pass as a comment does; a comment sent twice with one key is said once.
+  // The issue hears the owner in its thread whichever way the words came: said in the thread, they answer its question and void a pass as a comment does.
   it.live("hears the owner's words as a comment", () => {
     const first = Promise.withResolvers<void>();
     let turns = 0;

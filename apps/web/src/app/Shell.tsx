@@ -41,8 +41,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
       data-badge={props.badge !== undefined && props.badge > 0 ? props.badge : undefined}
       class={[
         "relative flex flex-col items-center justify-center gap-0.5 rounded-lg text-on-rail/65 hover:bg-on-rail/6 hover:text-on-rail focus-visible:outline-2 focus-visible:outline-focus aria-[current=page]:text-on-rail",
-        // The farm's face at the top is a square picture; a place is a square of its icon and name, of its icon alone on a
-        // phone, where the rail gives the page all it can.
+        // The farm's face at the top is a square picture.
         props.name === undefined ? "size-11 sm:size-12" : "size-12 sm:size-14",
       ]}
       style={props.current === true ? { background: "color-mix(in srgb, var(--wb-on-rail) 9%, transparent)" } : undefined}
@@ -64,7 +63,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
   );
 }
 
-/** One size up from a page's head (docs/style/design.md, 图标). */
+/** One size up from a page's head (docs/style/design.md). */
 function RailIcon(props: { name: IconName }) {
   return <Icon name={props.name} size={24} />;
 }
@@ -194,7 +193,7 @@ export function Shell(props: { children: JSX.Element }) {
     return () => window.removeEventListener("keydown", key);
   });
   return (
-    // The interface size (设置 › 外观) scales the workbench only: zoom keeps its fixed pixel sizes in proportion.
+    // The interface size (Settings > Appearance) scales the workbench only: zoom keeps its fixed pixel sizes in proportion.
     <div class="flex h-full [zoom:var(--workbench-zoom,1)]">
       <QuickSwitcher />
       <NotesSearch />

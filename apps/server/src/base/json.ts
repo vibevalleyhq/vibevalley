@@ -1,6 +1,3 @@
-// JSON read by its shape's Schema rather than cast: what this server wrote (a table's JSON column, a file in its home),
-// and what comes from outside (a vendor's body, a child process's line, a tool's output, a model's answer).
-
 import { Option, Result, Schema, type SchemaIssue } from "effect";
 
 import { currentLocale } from "@vibevalley/i18n";
@@ -41,11 +38,7 @@ export interface BlockWords<A> {
   readonly refuse?: (value: A) => string | undefined;
 }
 
-/**
- * The last fenced block of a model's text that decodes with schema and is not refused, or the words for why the last
- * one tried was not. Last first: a model that corrects itself writes the block again further down, and a later block
- * that does not read does not hide an earlier one that does.
- */
+/** The last fenced block of a model's text that decodes with schema and is not refused, or the words for why the last one tried was not. */
 export function lastJsonBlock<A>(text: string, schema: Schema.Decoder<A>, words: BlockWords<A>): Result.Result<A, string> {
   const blocks = [...text.matchAll(fencedBlock)].map((m) => m[1] ?? "");
   const decode = Schema.decodeUnknownResult(schema);
@@ -77,12 +70,9 @@ export function misfitField(issue: SchemaIssue.Issue): string | undefined {
   return undefined;
 }
 
-// What goes on the wire is JSON: a key whose value is undefined is not there. The services keep TypeScript's optional
-// fields that way (`{ ...x, callReason: undefined }`), and the Schemas say "absent or a value", so values are encoded
-// as JSON.stringify would send them: such keys dropped first, everything else still checked by the Schema.
+// What goes on the wire is JSON: a key whose value is undefined is not there.
 
-/** value with every own key set to undefined dropped, in plain objects and arrays all the way down; other objects as
- * they are (class instances, such as a tagged error, encode through their own Schema). */
+/** value with every own key set to undefined dropped, in plain objects and arrays all the way down. */
 export const wireOf = <A>(value: A): A => {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- wireOf keeps the shape and only drops the keys that hold undefined
   if (Array.isArray(value)) return value.map(wireOf) as A;

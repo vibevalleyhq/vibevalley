@@ -140,7 +140,7 @@ describe("a call's agent", () => {
       const got = vendorsFor(v, none, deepseek, line);
       return "_tag" in got ? got.reason : "";
     };
-    // Where 设置 fixes it, for the page's jump there.
+    // Where Settings fixes it, for the page's jump there.
     const fixedIn = (v: VoiceSettings, deepseek = "") => {
       const got = vendorsFor(v, none, deepseek);
       return "_tag" in got ? got.settings : undefined;
@@ -454,8 +454,7 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
-  // An issue handed back while the owner is on the call: the orchestrator's words about it are read out on the call, queued
-  // after what is being said; with no call on, nothing is read.
+  // An issue handed back while the owner is on the call: the orchestrator's words about it are read out on the call, queued after what is being said.
   it.live("tells the owner on the call when an issue comes to want the owner", () => {
     const capture = new Capture();
     return Effect.gen(function* () {

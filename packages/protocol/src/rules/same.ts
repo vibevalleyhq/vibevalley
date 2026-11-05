@@ -1,5 +1,3 @@
-// Go's reflect.DeepEqual over values decoded from JSON: a key holding undefined is no key.
-
 export function same(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;

@@ -1,6 +1,3 @@
-// `vibevalley channel …`: the farm's channels and their messages, a command an operation of the server's. A channel is
-// named as the owner names it (general, #general, @fox for a direct one), or by its id: the server knows which.
-
 import { Effect } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 

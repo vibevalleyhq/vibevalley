@@ -1,6 +1,3 @@
-// The page's routes. The farm is full-bleed, outside the workbench's shell; the shell links back to it. Each workbench
-// place gets the rest of the path after its own (/issues/<id> → "<id>").
-
 import type { JSX } from "@solidjs/web";
 import { Match, Show, Switch, untrack } from "solid-js";
 
@@ -51,10 +48,7 @@ const places: Record<string, (rest: Rest) => JSX.Element> = {
   pkm: (rest) => <PkmPage rest={rest()} />,
 };
 
-/**
- * `/farm`: the farm entered last on this machine (trusted while the projects are still coming); without one, the farm of
- * the project worked on last, so 回农场 always lands on a farm; with no project yet, the farm of the sessions without one.
- */
+/** `/farm`: the farm entered last on this machine (trusted while the projects are still coming). */
 function FarmHome() {
   const projects = useProjects();
   const last = lastFarmProject();
@@ -79,7 +73,7 @@ function Routes() {
   const rest = () => pathname().split("/").slice(2).join("/");
   return (
     <Switch fallback={<Navigate href="/" />}>
-      {/* Where this machine opens (设置 › 通用): the workbench unless the owner chose the farm. */}
+      {/* Where this machine opens (Settings > General): the workbench unless the owner chose the farm. */}
       <Match when={pathname() === "/"}>
         <Navigate href={prefsNow().start === "farm" ? "/farm" : placeList[0]!.path} />
       </Match>

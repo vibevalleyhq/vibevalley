@@ -7,8 +7,7 @@ import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { lineOf, nextForgotten, pick, type PickCue, relevance, termsList, termsOf } from "./recall.ts";
 
-// Go's math.Exp on arm64 (where the cases were recorded) is its own assembly, with fused multiply-adds; V8's is fdlibm's.
-// They can differ in the last bit, so a relevance within 1e-12 of the Go's is the same one; the picks must agree exactly.
+// Go's math.Exp on arm64 (where the cases were recorded) is its own assembly, with fused multiply-adds. V8's is fdlibm's.
 const near = (got: number | null, want: number | null) => got === want || (got !== null && want !== null && Math.abs(got - want) <= 1e-12 * Math.abs(want));
 
 test("the recorded recalls: the terms, each memory's relevance, the pick", () => {

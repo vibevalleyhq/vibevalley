@@ -1,7 +1,3 @@
-// The op rules, over one artifact held in memory: Submit loads the page in a transaction,
-// applies a batch's ops in order and writes back what changed. A stale update (baseRev behind) is taken only when the
-// block's text has not changed since baseRev; otherwise it is a conflict and the block keeps what it has.
-
 import { t } from "@vibevalley/i18n";
 import type {
   Block,
@@ -24,8 +20,7 @@ import { artifactId } from "@vibevalley/protocol/schema";
 import { or } from "#/base/order.ts";
 import { messageOf } from "#/errors.ts";
 
-// A block's text as spans. Offsets into it count Unicode code points, as the op contract
-// says; the client counts UTF-16 units and converts.
+// A block's text as spans. Offsets into it count Unicode code points, as the op contract says.
 
 const chars = (s: string) => Array.from(s);
 

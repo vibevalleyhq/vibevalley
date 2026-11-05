@@ -9,8 +9,7 @@ import { queries, ready, useQuery, useAgents } from "#/infra/query.ts";
 
 import { boardRows, historyKey } from "./cards";
 
-/** Every issue with its real sessions: the frame's issues as the frame has them, the history (issue.history.list) for the
- * sessions that left and, with `older`, the issues the frame no longer keeps (rows.ts). */
+/** Every issue with its real sessions: the frame's issues as the frame has them, the history (issue.history.list) for the sessions that left and, with `older`, the issues the frame no longer keeps (rows.ts). */
 export function useIssueHistory(older: () => boolean) {
   const core = useCore();
   // Read again only when what it adds can have changed: a move or an edit is the frame's alone.

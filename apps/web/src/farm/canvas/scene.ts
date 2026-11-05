@@ -1,9 +1,3 @@
-// The village on a Pixi stage: the map, the plots, the helpers walking between their plot and the
-// buildings, the orchestrator and the pet, the effects over the plots, and the light: the sky by the time of day, lit on
-// every pixel by the way it faces, the lamps and the helpers' lanterns after dark, shadows away from the sun; and the
-// yard's own life (life.ts). What it shows comes from the server's folded state; the scene only adds what moves with
-// the clock, and keeps only that (walkers, animation clocks, particles) in its own objects.
-
 import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
 
 import {
@@ -140,10 +134,7 @@ interface Actor {
 
 const toLifeBox = (b: Box): LifeBox => [b.x0, b.y0, b.x1, b.y1];
 
-/**
- * Draws `village` into `host` and keeps it moving. `input` is read every frame (the latest frame and the profiles);
- * `lit`: the per-pixel light, with normal maps (off, the sky still tints the picture).
- */
+/** Draws `village` into `host` and keeps it moving. `input` is read every frame (the latest frame and the profiles). */
 export async function startScene(host: HTMLElement, village: Village, input: () => SceneInput, on: SceneEvents, lit = true): Promise<Scene> {
   const { world: v, atlas } = village;
   const [pics, stage] = await Promise.all([

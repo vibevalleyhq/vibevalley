@@ -1,5 +1,3 @@
-// A runtime drawn as its farm machine, with its maker's badge: the farm's quota bottle and the workbench's runtime lists.
-
 import { Show } from "solid-js";
 
 import { RuntimeBadge } from "#/ui/RuntimeBadge.tsx";

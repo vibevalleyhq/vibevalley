@@ -3,8 +3,7 @@ import { type DefaultTreeAdapterTypes as P, parse, parseFragment } from "parse5"
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-/** One character of the page's text: the text node it is in and the source bytes it was written as (an entity is several
- * bytes for one character). node is -1 for a run of whitespace that spans nodes. */
+/** One character of the page's text: the text node it is in and the source bytes it was written as (an entity is several bytes for one character). */
 interface At {
   readonly node: number;
   readonly from: number;

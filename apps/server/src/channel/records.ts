@@ -1,7 +1,3 @@
-// The chat as it is kept: the model in memory over the database, the lock every change takes, who sits where, names and
-// targets, the frames the page reads, threads, read cursors and a message's rows. The other parts of Channel change the
-// chat through these, so the model is told each change in one place.
-
 import { Clock, Effect, PubSub, Semaphore } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -227,8 +223,7 @@ export const channelRecords = Effect.gen(function* () {
     const row = model.channel(id);
     if (row) {
       const channel = yield* counted(row);
-      // A metadata change can read a message's number before the message's own fact is applied; keep the state's
-      // last number at what was published, so that fact is still news.
+      // A metadata change can read a message's number before the message's own fact is applied.
       const published = model.publishedNumber(id);
       const last = published !== undefined && (channel.lastNumber ?? 0) > published ? published : channel.lastNumber;
       yield* core.apply({ type: "channelChanged", channel: { ...channel, ...(last === undefined ? {} : { lastNumber: last }) } });

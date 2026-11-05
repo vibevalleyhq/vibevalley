@@ -1,8 +1,3 @@
-// The farm phone (src/farm/phone): it opens over its button, a game takes the pad and its keys, Esc puts it away; a
-// new call in the inbox rings it open, and answering goes to what called. The call needs a helper and an inbox item,
-// which tests cannot make, so that test serves frames in place of the state stream: the stream ends after each, and
-// the page reconnects a second later to the next.
-
 import type { Page } from "@playwright/test";
 
 import type { InboxItem, StateFrame, SessionView } from "@vibevalley/protocol";

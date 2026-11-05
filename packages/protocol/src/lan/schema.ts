@@ -1,5 +1,3 @@
-// The Schemas of pairing and devices for lan access (docs/subsystems/lan.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";

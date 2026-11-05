@@ -1,16 +1,9 @@
-/**
- * Dead code: files nothing reaches, exports nothing imports, dependencies nothing uses (knip, configured in knip.ts).
- * Run as `vp run deadcode`, in CI's check. knip's own report says what is dead; this adds what to do about each kind, so
- * the next step is to delete it, or to name what runs it, not to keep it alive with an import.
- */
-
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 
-// Without its configuration hints: knip hints that it skips the page's stylesheets on every run, which is how it is set up
-// (knip.ts), and a line that is always there teaches the reader to skip the report.
+// Without its configuration hints: knip hints that it skips the page's stylesheets on every run, which is how it is set up (knip.ts), and a line that is always there teaches the reader to skip the report.
 const ran = spawnSync("knip", ["--no-progress", "--no-config-hints"], { cwd: root, stdio: "inherit", shell: false });
 if (ran.error) throw ran.error;
 if (ran.status !== 0) {

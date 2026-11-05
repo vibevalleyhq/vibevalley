@@ -1,5 +1,3 @@
-// The workbench's toasts, a value of the page's (state/atom.ts): ToastHost draws them, and any code adds to the list.
-
 import { defineAtom } from "#/state/atom.ts";
 
 export type Tone = "info" | "bad";

@@ -1,7 +1,3 @@
-// What the components that float over the page (Popover, Tooltip, Menu, Select) share: an open state that says why it
-// changed, the trigger and the positioner as elements, a Portal that puts the popup at the end of the body, and a
-// Positioner that keeps it against the trigger and says on which side it ended up.
-
 import { Portal as SolidPortal, type JSX } from "@solidjs/web";
 import { type Accessor, createEffect, createSignal, createUniqueId, omit, onCleanup, Show } from "solid-js";
 

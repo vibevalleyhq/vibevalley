@@ -1,11 +1,3 @@
-// The phone shell end to end on an Android emulator or an iOS simulator, against a sandboxed farm (run under
-// scripts/verify-server.ts, which sets VIBEVALLEY_SERVER): the farm opens 连接到本机 and starts a pairing, the app is
-// opened with its vibevalley://pair link, the owner lets it in, and the farm then hears from the phone with its key (its
-// page loaded through the lan listener). Leaves a screenshot in apps/mobile/.screens/. Build the app first (README.md).
-//
-//	vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts android
-//	vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts ios
-
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";

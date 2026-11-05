@@ -1,7 +1,3 @@
-// Which command each endpoint is reached by, or "api" for those only `vibevalley api call` reaches: an endpoint added
-// without a line here does not compile, so the command line's coverage is decided, not left to chance. A command named
-// here is held to exist (main.test.ts).
-
 import type { Handlers } from "@vibevalley/protocol/api";
 
 export const reach: Readonly<Record<keyof Handlers, string>> = {

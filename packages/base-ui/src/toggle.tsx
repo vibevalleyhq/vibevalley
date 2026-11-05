@@ -1,7 +1,3 @@
-// Toggle and ToggleGroup (Base UI's): a button pressed or not, and a group of them sharing one value, a list of the
-// pressed ones' values. In a group the arrow keys move among the toggles (one tab stop for the group); `multiple` lets
-// several be pressed at once, else pressing one releases the others.
-
 import { createContext, createSignal, omit, useContext } from "solid-js";
 
 import type { Orientation } from "./internal/composite";
@@ -17,7 +13,7 @@ interface GroupCtx {
   readonly tabStop: () => string | undefined;
 }
 
-// A toggle may stand alone. Solid 2 reads an undefined context as unset and throws; null is a value: no group.
+// A toggle may stand alone. Solid 2 reads an undefined context as unset and throws.
 const GroupContext = createContext<GroupCtx | null>(null);
 
 interface ToggleProps extends ButtonProps {

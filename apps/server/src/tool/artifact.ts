@@ -22,8 +22,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
     const chat = yield* Channel;
     const artifacts = yield* Artifact;
 
-    // Artifacts (artifact/): the orchestrator's and a session's take the same endpoints; a session's are made for its issue
-    // and announced in its issue thread, the orchestrator's where it is answering.
+    // Artifacts (artifact/): the orchestrator's and a session's take the same endpoints.
     const artifactSaid = (e: Effect.Effect<string, ApiError>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(reasonOf(err))));
 
     /** What a kept page will not do that its maker should hear about: the check let it through, the CSP stops it. */
@@ -34,8 +33,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
       return own?.issue ? { issue: own.issue } : own?.channel ? { channel: own.channel } : {};
     };
 
-    /** A version's words: given as they are, or read from a file in the session's working directory. The path is resolved
-     * with its links, so neither .. nor a link leads out of the directory. */
+    /** A version's words: given as they are, or read from a file in the session's working directory. The path is resolved with its links, so neither .. */
     const artifactWords = (c: Caller, content: string | undefined, file: string | undefined) =>
       Effect.gen(function* () {
         if (content !== undefined && file !== undefined) return yield* Effect.fail(refused(answers.artifact.both));
@@ -181,8 +179,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
         }),
       );
 
-    // A blocks artifact: the orchestrator's and a session's insert, rewrite and delete a block through the same op
-    // pipeline the owner's editor uses, written as the agent's profile (its session id when it has none).
+    // A blocks artifact: the orchestrator's and a session's insert, rewrite and delete a block through the same op pipeline the owner's editor uses, written as the agent's profile.
     const writer = (c: Caller) => c.agent || c.session;
 
     interface BlockCreateInput {

@@ -1,13 +1,3 @@
-// The chat apps: WeChat, Feishu and QQ, each tied to one farm channel; each app's protocol is
-// its adapter's. Only outbound connections: no public HTTP endpoint. The bots' secrets never leave the database.
-//
-// Each app's account has one generation of work at a time (receiving, the inbox, the outbox); a login or logout cancels
-// and waits for the generation before it replaces the account. What an app hands over is accepted into connector_inbound
-// (a durable acceptance, with the page's cursor) and then enters the owner's durable Channel → Mailbox route; a delivery
-// the orchestrator took but whose mark was not written yet may come again after a restart. Some apps let a bot answer only on the context of the
-// owner's latest message, and only so many times: what an app will not take waits in connector_outbox and goes when the
-// owner next says something, several as one digest.
-
 import { createHash, randomInt } from "node:crypto";
 
 import {
@@ -131,8 +121,7 @@ const make = (options: ConnectorOptions = {}) =>
     const outboxBackoff = Schedule.exponential(Duration.millis(retryFirst)).pipe(
       Schedule.modifyDelay(({ duration }) => Effect.succeed(Duration.min(duration, Duration.millis(retryMost)))),
     );
-    // The bridges' fibers (each account's generation, the status said to the core) belong to this service: they end with
-    // it and keep its services (the logger, the Clock).
+    // The bridges' fibers (each account's generation, the status said to the core) belong to this service.
     const forkHere = yield* FiberSet.makeRuntime();
     /** The database's own failures stay failures here: the status says them. */
     const tried = <A>(e: Effect.Effect<A, SqlError.SqlError | Schema.SchemaError | Cause.NoSuchElementError, SqlClient.SqlClient>) =>
@@ -158,9 +147,7 @@ const make = (options: ConnectorOptions = {}) =>
       /** The account's work now: receiving, the inbox and the outbox; or a login. */
       let current: Fiber.Fiber<unknown> | undefined;
 
-      // What the page and the tests see: the status, said to the core whenever a part of it may have changed (the error,
-      // the account, the login's progress, what waits to go out); the core keeps it only when it differs. One at a time,
-      // each read when its turn comes, so the last said is the latest.
+      // What the page and the tests see: the status, said to the core whenever a part of it may have changed. the core keeps it only when it differs.
       const telling = Semaphore.makeUnsafe(1);
       const told = () => {
         forkHere(telling.withPermits(1)(Effect.ignore(Effect.flatMap(status, (s) => core.apply({ type: "connectorChanged", status: s })))));
@@ -205,8 +192,7 @@ const make = (options: ConnectorOptions = {}) =>
         Effect.catch(e, (x) => Effect.logError("vibevalley: connector", x.message).pipe(Effect.annotateLogs({ connector: id })));
       const snapshot = () => (account ? { ...account } : undefined);
 
-      // How many wait to go out, as the status says it: counted in the database when not known, then moved by each change
-      // that commits. A change that failed, or one made while it was being counted, leaves it unknown again.
+      // How many wait to go out, as the status says it: counted in the database when not known, then moved by each change that commits.
       let pendingOut: number | undefined;
       let outChanges = 0;
       const outboxChanged = (by?: (n: number) => number) => {
@@ -279,7 +265,6 @@ const make = (options: ConnectorOptions = {}) =>
       });
 
       // The outbox: one drain at a time, in order, never cut off halfway (a message sent and not marked would go twice).
-      // True when nothing is left that it could send now.
       const draining = Semaphore.makeUnsafe(1);
       const drain = (late: boolean) =>
         draining.withPermits(1)(
@@ -369,8 +354,7 @@ const make = (options: ConnectorOptions = {}) =>
         Queue.offerUnsafe(mail.outbox, undefined);
       });
 
-      // What is held is tried again after retryFirst, then on outboxBackoff while tries fail, until one sends all (or the
-      // account is paused, which the next look checks again); new mail is tried at once, cutting the wait short.
+      // What is held is tried again after retryFirst, then on outboxBackoff while tries fail, until one sends all.
       const heldTried = Effect.retry(
         Effect.filterOrFail(
           Effect.uninterruptible(drain(false)),
@@ -468,9 +452,7 @@ const make = (options: ConnectorOptions = {}) =>
         ),
       );
 
-      /** Until the app's connection ends; what it hands over is kept durably before the app is told it is taken. Once it has
-       * ended, acceptance is sealed: a late handover (an SDK callback that outlived it) must not land after a newer
-       * account's work began. */
+      /** Until the app's connection ends. what it hands over is kept durably before the app is told it is taken. */
       const receive = (secrets: Secrets) =>
         Effect.gen(function* () {
           const row = yield* tried(Effect.catchNoSuchElement(accountQ.connectorAccount({ connector: id })));
@@ -483,8 +465,7 @@ const make = (options: ConnectorOptions = {}) =>
           };
           return yield* adapter.receive(secrets, io).pipe(Effect.ensuring(Effect.sync(() => (sealed = true))));
         });
-      // A loop, not a Schedule: each branch waits its own way (until the pause ends, a breath after a stale login, longer
-      // after every third failure), and only a failure counts toward the longer wait.
+      // A loop, not a Schedule: each branch waits its own way, and only a failure counts toward the longer wait.
       const receiving = Effect.gen(function* () {
         let failures = 0;
         for (;;) {
@@ -587,7 +568,6 @@ const make = (options: ConnectorOptions = {}) =>
           Effect.sync(() => verifyCode),
         );
         // The login's answer is taken by the coordinator, on its own fiber: replacing this generation must not cut it short.
-        // The fiber reads itself: a login that settles at once runs before fork returns it.
         return generation(
           Effect.withFiber((g) =>
             Effect.flatMap(Effect.result(login), (r) => Effect.sync(() => void forkHere(loginResult(g, r._tag === "Success" ? r.success : r.failure)))),

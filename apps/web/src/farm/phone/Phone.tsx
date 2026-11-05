@@ -1,8 +1,3 @@
-// The farm phone: a wooden handset over the phone button, its screen showing a call ringing, else the app picked on the
-// home screen; the games take the pad. It folds like a foldable: folded, a tab on its right edge says 田头 and whether
-// there is something new; unfolded, its right screen is the chat (ChatWindow), and on a narrow screen only the chat
-// shows. Esc folds it, then puts it away; put away, it comes out folded.
-
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 
@@ -49,7 +44,7 @@ export function Phone(props: { room: { w: number; h: number } }) {
   const settle = (call: InboxItem, answered: boolean) => {
     phoneCalls.settle(call, answered);
     if (!answered) return;
-    // Answering is the call: the orchestrator comes on and says what rang, on the phone unfolded to 田头; the farm shows
+    // Answering is the call: the orchestrator comes on and says what rang, on the phone unfolded to the farm chat; the farm shows
     // what called beside it.
     farm.chatOpen(true);
     void voiceCall.start(aboutOf(call));
@@ -96,7 +91,7 @@ export function Phone(props: { room: { w: number; h: number } }) {
               <HomeScreen
                 missed={missedOf(phone()).length}
                 onOpen={open}
-                // Tapping 管家 is calling it: its line on the left, 田头 unfolded beside it where what is said shows. A call
+                // Tapping the orchestrator is calling it: its line on the left, the farm chat unfolded beside it where what is said shows. A call
                 // already on is not dialed again.
                 onOrchestrator={() => {
                   open("orchestrator");
@@ -182,10 +177,7 @@ function Handset(props: {
   });
   const listening = padListening();
   const two = (n: number) => String(n).padStart(2, "0");
-  // Unfolded it is one handset with one screen, the phone's apps and the chat side by side over a thin seam, as a foldable
-  // shows two views; the screen is tall to give the chat room, large as tall as the farm's box lets it be. A handset's
-  // chrome around its screen (the speaker and the padding) is about 34 px tall, 90 with the pad, which shows only while a
-  // game takes it.
+  // Unfolded it is one handset with one screen, the phone's apps and the chat side by side over a thin seam, as a foldable shows two views.
   const chatOnly = () => props.unfolded && props.narrow;
   const pad = () => listening() && !chatOnly();
   const chrome = () => (pad() ? 90 : 34);

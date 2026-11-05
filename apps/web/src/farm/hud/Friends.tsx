@@ -1,7 +1,3 @@
-// The helpers at the HUD's bottom left: a button with the first three faces and how many are at work; open, every
-// profile with how its plots are doing and its runtime's stamina, and for each a card to send it the next job or open
-// its profile.
-
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

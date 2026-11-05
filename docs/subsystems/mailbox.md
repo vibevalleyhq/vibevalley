@@ -1,46 +1,61 @@
 # Mailbox
 
-## 一句话
-
-每条消息之后，决定谁该听到、谁现在被叫醒、谁先攒着；是四层流水线的第二层。
+`Mailbox` 是输入流水线的第二层。在外部或内部输入持久化为 `Trigger` 之后，`Mailbox` 决定受众路由、三道刹车与两级缓冲（Tier 1 工单蓄水池 → Tier 2 会话信箱），驱动空闲会话唤醒或忙时合并插话。
 
 ## 管什么，不管什么
 
-- **管**：受众路由（@、私聊、汇报、工单串、跟帖、频道）、三道刹车（跳数、冷却、熔断）、`mailbox_delivery` 状态机、叫醒/忙时提示、管家信箱、工单蓄水池与重试。
-- **不管**：频道/串/消息本身（[频道](docs/subsystems/channel.md)）、工单状态和 DAG（[工单](docs/subsystems/issue.md)）、会话怎么跑（[帮工](docs/subsystems/session.md)）。来源标准化在 [Ingress](docs/subsystems/ingress.md)。
+| 管 | 不管（谁管） |
+|---|---|
+| 受众路由与四档优先级、工单订阅（`mailbox_subscription`）与工单蓄水池（`mailbox_issue`） | 外部来源校验去重（[Ingress](docs/subsystems/ingress.md)）、频道/串/消息管理（[频道](docs/subsystems/channel.md)） |
+| Agent 间三道刹车（跳数上限 `hopLimit`、冷却 `agentWakeCooldownMs`、空唤醒熔断 `wakeBreaker`） | 工单状态机与依赖解锁（[工单](docs/subsystems/issue.md)） |
+| 会话投递状态机（`mailbox_delivery`：`pending` → `handed` → `consumed` / `dropped`）与唤醒循环 | 会话底层如何运行一轮（[帮工](docs/subsystems/session.md)） |
 
 ## 在哪
 
-- `apps/server/src/mailbox/`：`mailbox.ts` 是服务，`routing.ts` 是“谁该听到”与四档紧急度，`brakes.ts`/`deliveries.ts` 是三道刹车和投递状态，`work.ts` 是工单蓄水池与投递写入，`payload.ts` 是触发记录与载荷读写，`pump.ts` 是叫醒循环。
-- 表 `mailbox_trigger`（每条输入的 Trigger 和载荷，以及它的路由回执：所有来源的都记在这里，Ingress、频道、定时、工单经 `mailbox/payload.ts` 写）、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`；同一批收件人的投递与路由回执在同一事务里写。
+| 位置 | 职责 |
+|---|---|
+| `apps/server/src/mailbox/mailbox.ts` | 对外 `Mailbox` 服务接口 |
+| `apps/server/src/mailbox/routing.ts` | 受众计算与四档紧急度排序 |
+| `apps/server/src/mailbox/brakes.ts`、`deliveries.ts` | 三道刹车计算与未终结投递缓存 |
+| `apps/server/src/mailbox/work.ts` | 工单蓄水池（Tier 1）、退回转交（`handback`）与投递写入（`forward`） |
+| `apps/server/src/mailbox/payload.ts` | `mailbox_trigger` 记录与路由回执（`routed_at`、`routing_scope`、`routing_position`）读写 |
+| `apps/server/src/mailbox/pump.ts` | 空闲会话唤醒、忙时批次 `steer` 与管家流推送 |
 
 ## 模型和不变量
 
-- **来源先持久化，投递与回执原子提交。** Channel 提交消息与 Trigger 后直接调用 Mailbox；中途退出时，由 Channel 重放未路由消息，受众仍按频道规则计算。定时来源由 Cron 准备工单后重放，其他来源由 Mailbox 重放。
-- **宁可重复给，不丢。** 一轮没有入模回执就结束、会话关掉、服务重启，交出去的投递回到 `pending`，再交一次。
-- **跳数与冷却从投递回执恢复。** 使用路由顺序与实际投递时间；只有新的主人回执重置跳数，重复输入不重置。熔断按当前进程的连续失败计数。
-- **谁该听到是频道的账，刹车是信箱的账。** Channel 给有序收件人，Mailbox 逐条定 `heldBy` 并计数。
-- **调度只取仍需转交的输入。** 查询关联消费回执，跳过当前收件人的已转交输入和历史已消费输入；换人时只重投 pending、handed、left/reassigned 或尚无回执的输入。写入事务持有信箱写锁，再复核候选输入的消费回执；已消费输入的归属保留，仍能显式退回。
-- **一个工单只留一条等人看的 cron 输入。** 新的 cron 输入把旧的 held 输入退回（`mailbox_issue_one_held`）；别的来源的 held 各自保留，PR 的多条 review 不会被合并掉。
+- **来源先落库，投递行与路由回执同事务提交**：
+  - 上游模块先持久化消息或 `Trigger`，再调用 `Mailbox.receive`。
+  - `Mailbox` 在同一事务内写入 `mailbox_delivery` 并更新 `mailbox_trigger` 的路由回执；中途崩溃时于重启后重放。
+- **至少投递一次，真实入模才算消费（`consumed`）**：
+  - 投递交给会话时标为 `handed`；仅当收到 `Session.inputsConsumed` 回执时才标为 `consumed`。
+  - 若回合结束、会话关闭或服务重启时仍未收到回执，`handed` 自动退回 `pending` 重新投递。
+- **两级缓冲（工单蓄水池 Tier 1 → 会话信箱 Tier 2）**：
+  - 发往工单的输入先匹配 `mailbox_subscription` 进入 `mailbox_issue`。
+  - 工单排队或处于等待主人状态时，自动输入保持 `held`（同一工单仅留最新一条 cron 输入）。
+  - 工单就绪或主人新发言放行时，转入当前负责会话的 `mailbox_delivery`。
+- **三道刹车仅约束 agent 唤醒 agent，主人发言随时放行并重置**：
+  - **跳数限制（`hopLimit` = 4）**：同一频道或工单作用域内，自上次主人发言起连续自动唤醒不超过 4 次。
+  - **冷却窗口（`agentWakeCooldownMs` = 60s）**：同一帮工被其他 agent 唤醒至少间隔 60 秒。
+  - **空唤醒熔断（`wakeBreaker` = 3）**：同一帮工连续 3 次被唤醒却未开口即结束，暂停自动唤醒直至主人再次对它发言。
+  - 被拦截的投递记录 `held_by`，可随下一次合法运行一并带上。
 
 ## 怎么走
 
-1. Channel 发出消息 / Ingress 收进 Trigger。
-2. Mailbox 算收件人，上刹车，写投递行。
-3. 空闲的会话被叫醒；忙的攒成一条提示；管家的流直接推给管家。
-4. 启动/结束/关闭/压缩时回收或重投；工单变更可把等待的输入放进蓄水池。
+1. `Channel`、`Ingress`、`Issue` 或 `Cron` 持久化 `Trigger` 后调用 `Mailbox.receive`。
+2. `Mailbox` 在信箱写锁内计算受众、检查工单蓄水门禁与三道刹车，原子写入 `mailbox_delivery` 与路由回执。
+3. `pump.ts` 唤醒空闲帮工、对正忙帮工攒批（`chat.notice_batch_ms` = 3s）发送插话提示，或推入管家的 `forOrchestrator` 流。
+4. 会话换人或关单时，未消费的主人追问以确定性返回编号转交新负责人或管家。
 
 ## 和谁打交道
 
-- 依赖 Session（投递、叫醒、流）、Agent（档案）、Core（事实与投影）与数据库；不 import Channel 或 Issue 服务。
-- 频道和工单只开放具名读取：默认频道、频道管家、未读摘要与工单存在性；频道管家的线程继承和私聊选择在 Channel 的查询中解释。`modules.test.ts` 的 `foreignReads` 限定这些查询，Mailbox 不导入它们的整份查询模块，也不写它们的表。Trigger 与投递回执的事务写入归 Mailbox。
-- Channel、Issue、Cron 直接调用 `receive`；管家订阅 `forOrchestrator`。投递前刷新工单投影，Session 结束派生出的 reviewing 门禁立即生效。
+- **底层依赖（`session`、`agent`、`core`）**：调用 `Session.deliver` 投递输入，订阅 `Session.inputsConsumed` 与 `Session.news` 推进状态机。
+- **上层调用方（`channel`、`issue`、`cron`、`ingress`、`orchestrator`）**：不反向 import 上层服务；对频道与工单的只读查询经窄查询完成。
 
 ## 为什么这样
 
-- **投递状态只归一处。** 以前 Channel 既记话又记投递，两个写入方让内存和库对不上；拆出来后只有 Mailbox 写 `mailbox_delivery`。
-- **受众与投递分开。** 频道扇出只产生候选收件人；人类消息与机器任务输入先查工单订阅，命中进入 Tier 1；agent 间的提及与汇报保留频道受众，放行或无工单归属时共用 `posting.forward`。优先级、刹车、投递写入不因来源分叉。
+- **集中管理 `mailbox_trigger` 与 `mailbox_delivery`，消除双写失步**。触发记录与投递状态统一收归 Mailbox 层，保证下层不写上层表且缓存与数据库严格一致。
+- **受众计算与投递控制解耦**。频道只回答「谁在场、关注了哪个串」，工单蓄水、优先级、三道刹车和重试统一在 Mailbox 执行。
 
 ## 怎么验证
 
-- `mailbox/*.test.ts`、`flows/mailbox-order.test.ts`、`flows/returns.test.ts`、`flows/handoff.test.ts`。
+- `apps/server/src/mailbox/*.test.ts`、`apps/server/src/flows/mailbox-order.test.ts`、`flows/returns.test.ts`、`flows/handoff.test.ts`：投递顺序、三道刹车、工单蓄水、换人退回与重启重放测试。

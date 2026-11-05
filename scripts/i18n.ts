@@ -1,15 +1,3 @@
-// The owner-facing words (packages/i18n): `vpx scripts/i18n.ts <command>`.
-//
-//   gen                 writes packages/i18n/src/catalogs.ts (the catalogs and every key's params) from locales/
-//   scan                lists each key used in code (t("…")) and where; a template key counts as its prefix
-//   check               fails on a key used but missing, a key nobody uses, a language with keys zh lacks or lacking
-//                       zh's, placeholders that differ, Han in English, English that is zh word for word, a stale gen,
-//                       and a word the glossary rules out (docs/README.md 用语: 不用, and the farm's words off the skins)
-//   find <text>         the keys whose zh or en contains text
-//   migrate <words.ts>  moves a word table into a catalog and its call sites to t("…"); what it cannot, it lists
-//
-// Namespaces are the host and the module: apps/web/src/features/setting/words.ts is web.setting.
-
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -218,8 +206,7 @@ function templateOf(fn: Function): string | undefined {
   let text = a;
   names.forEach((n, i) => (text = text.split(sentinel(i)).join(`{${n}}`)));
   if (text.includes("\u0001")) return undefined;
-  // A template answers every value by putting it in as it is: a count that picks a plural, a flag or an optional value
-  // that picks a branch, or a param read as an object answers otherwise.
+  // A template answers every value by putting it in as it is.
   const filled = (v: string) => names.reduce((s, n) => s.split(`{${n}}`).join(v), text);
   for (const v of [1, 2, 7, "x", "", undefined]) if (call(names.map(() => v)) !== filled(String(v))) return undefined;
   return text;
@@ -262,7 +249,6 @@ function choiceOf(fn: Function): string | undefined {
     const yes = call(others(i, true));
     const no = call(others(i, false));
     // A param put into the text as it is prints true or false: that is a value, not a flag.
-    // A flag: whatever truthy value comes, the same text (a count or a delay that only looks like one shows itself).
     const truthy = [7, 5000, "x"].every((v) => call(others(i, v)) === yes);
     if (yes !== undefined && no !== undefined && yes !== no && truthy && !/true|false/u.test(yes + no)) {
       const message = `{${n}, select, true {${named(yes)}} other {${named(no)}}}`;

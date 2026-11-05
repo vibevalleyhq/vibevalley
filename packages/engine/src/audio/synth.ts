@@ -1,6 +1,3 @@
-// A tiny synthesizer for game sound effects: tones, filtered noise and bells, shaped by envelopes and
-// scheduled on the audio clock. No audio files. A game writes its sounds as recipes; play() runs one.
-
 /** One envelope: silent → peak in `attack` → silent again at the end. */
 interface Shape {
   /** Seconds after the sound starts. */

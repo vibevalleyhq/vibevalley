@@ -1,6 +1,3 @@
-// A real server per worker (apps/server) on a free port with a temporary home and work root, serving
-// dist/ at /. Tests drive the page with `page` (its baseURL is the server) and set things up with `api`.
-
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,15 +14,11 @@ interface Server {
   work: string;
 }
 
-// The server and the agents it runs read keys from the environment: a test must never reach a real model, voice service or
-// chat bot with the owner's keys, nor read the owner's VIBEVALLEY_* settings. HOME is the test's folder too: the coding agents'
-// own logins (~/.pi, ~/.claude, …) stay out of reach.
-// GIT_CONFIG_* go together: GIT_CONFIG_COUNT without its GIT_CONFIG_KEY_n stops every git command.
+// The server and the agents it runs read keys from the environment.
 const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_CONFIG_/u;
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !secret.test(k)));
 
-/** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json): what a test farm
- * starts with, as a farm whose agent.starters names them. */
+/** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json). */
 const starters = () =>
   (JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "server", "src", "agent", "templates", "index.json"), "utf8")) as string[])
     .filter((id) => id !== "orchestrator")
@@ -50,8 +43,7 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
         VIBEVALLEY_PORT: "0",
         VIBEVALLEY_LAN_PORT: "0",
         VIBEVALLEY_VOICE_LINE_PORT: "0",
-        // This machine's coding agents are not asked: pi is the scripted helper, doing what the words of its job say
-        // (apps/server/src/testing/helper.ts), and no other runtime is installed.
+        // This machine's coding agents are not asked.
         VIBEVALLEY_TEST_RUNTIMES: "1",
         VIBEVALLEY_AGENT_STARTERS: starters(),
       };
@@ -79,8 +71,7 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
     },
     { scope: "worker" },
   ],
-  // An error that escapes the page fails the test: Solid stops updating the whole page after one (REACTIVITY_HALTED), so
-  // the page would go on looking alive. On CI the page's console errors also go to the job's log.
+  // An error that escapes the page fails the test: Solid stops updating the whole page after one (REACTIVITY_HALTED), so the page would go on looking alive.
   page: async ({ page }, use) => {
     const escaped: string[] = [];
     page.on("pageerror", (e) => {
@@ -92,8 +83,7 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
       page.on("console", (m) => {
         if (m.type() === "error") console.log(`[page] ${m.text()}`);
       });
-    // On Solid's development build (vp run e2e:dev), what it warns of goes to the run's output, each untracked read
-    // with the stack that made it: the warning alone names no file.
+    // On Solid's development build (vp run e2e:dev), what it warns of goes to the run's output, each untracked read with the stack that made it.
     if (process.env.VIBEVALLEY_WEB_DEV === "1")
       await page.addInitScript(() => {
         const warn = console.warn.bind(console);
@@ -112,9 +102,7 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
 
 export { expect };
 
-/** The page as a screenshot should catch it: fonts in, every image decoded, two frames drawn. What a picture waits for,
- * not a while (the tests do not wait by the clock: scripts/oxlint-plugin.ts). A scene that moves on with time is moved
- * through with page.clock instead. */
+/** The page as a screenshot should catch it: fonts in, every image decoded, two frames drawn. */
 export async function settled(page: Page) {
   await page.evaluate(async () => {
     await document.fonts.ready;

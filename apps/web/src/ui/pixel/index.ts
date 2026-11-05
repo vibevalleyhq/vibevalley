@@ -1,4 +1,3 @@
-// The farm skin's components; their classes and sizes are style.ts.
 export { pxText } from "./style";
 export { DashedLine, PxWindow } from "./base";
 export { PxButton } from "./button";

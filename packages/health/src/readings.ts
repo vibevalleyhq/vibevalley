@@ -1,9 +1,3 @@
-/**
- * Readings of a repository's health, as pure functions of what collect.ts reads: the commits with their files, and the
- * source as it is now. A reading points at where to look; it is not a verdict on the code there. What counts and how
- * files group into areas is the repository's own (its Health config), so nothing here knows one repository's layout.
- */
-
 import { parseSync } from "vite";
 
 const day = 86_400_000;
@@ -42,8 +36,7 @@ export interface Source {
   readonly text: string;
 }
 
-/** A change touching more files than this is mechanical (a format, a rewrite or rename across the tree): its files did not
- * each get work. Squashed feature PRs here touch up to ~400 files (tests, catalogs, stories with the code). */
+/** A change touching more files than this is mechanical (a format, a rewrite or rename across the tree): its files did not each get work. */
 export const mechanicalFiles = 500;
 
 /** Each file under the name it has at the newest commit: newest first, a rename maps every older mention of the old name. */

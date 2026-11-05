@@ -1,5 +1,3 @@
-// The Schemas of triggers: an input as it reaches an agent, with its card (docs/subsystems/mailbox.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import { QuotedBlock } from "../artifact/schema";

@@ -1,8 +1,3 @@
-// What a test may take, by its layer of the pyramid (pyramid.ts): a run ends with the pyramid's shape (each layer's
-// files, tests and time) and each test that took more than twice its layer's budget, slowest first. It does not fail
-// the run: times differ by machine, and a slow test is a design to look at (what it waits for, what it builds), not a
-// broken one. On CI (GITHUB_STEP_SUMMARY set) the ten slowest files go in the job's summary too.
-
 import { appendFileSync } from "node:fs";
 import { basename } from "node:path";
 

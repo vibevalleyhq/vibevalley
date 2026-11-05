@@ -1,5 +1,3 @@
-// The rule both sides run (packages/protocol/src/rules/pkm.ts): change it there and here together.
-
 import type * as T from "@vibevalley/protocol";
 import { applyBlockOps } from "@vibevalley/protocol/rules";
 

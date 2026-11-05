@@ -1,7 +1,3 @@
-// The projects page's map, the farm's skin over the workbench's projects (app/ hands it to ProjectsPage): every project an
-// island on parchment, its plots its helpers' worktrees, its empty plots room for more and the sacks at its gate what
-// waits; a click opens the project, a helper's plot its issue, an empty plot a seed for the project.
-
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 
@@ -286,7 +282,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
   const at = () => plotsIn(yard(), props.island.spots.length);
   const down = () => props.cellHeight - pic().h;
   const open = () => router.navigate(`/projects/${encodeURIComponent(props.island.project)}`);
-  // 进岛: into this project's own farm.
+  // into this project's own farm.
   const enter = () => router.navigate(`/farm/${encodeURIComponent(props.island.project)}`);
   const has = (n: string) => props.atlas.has(n);
   const s = () => props.scale;

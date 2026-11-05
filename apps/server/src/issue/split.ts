@@ -1,5 +1,3 @@
-// A parent split into children, and the children's work merged back into the parent's branch as each is reviewed.
-
 import { Clock, Effect, Semaphore } from "effect";
 
 import { dagIDValid, dagProblems } from "@vibevalley/agent/dag";

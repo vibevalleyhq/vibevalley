@@ -1,8 +1,3 @@
-// Small things that fly, fall, drift and fade: dust, sparks, smoke, leaves, drops, hearts; and rings that widen and
-// fade (ripples, radio waves, where a click landed). A scene adds them where something happens and steps them once
-// a frame. Positions round to whole pixels and fading goes in steps, so it stays pixel art. Little pictures are
-// drawn from rows of '#' (`glyph`).
-
 import { type Container, Graphics } from "pixi.js";
 
 interface BitSpec {

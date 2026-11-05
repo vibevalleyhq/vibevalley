@@ -1,6 +1,3 @@
-// A launch followed: oar's events read into the session's phase and runs, its report finished and told, a stall
-// noticed; oar calls back outside any fiber, so these land synchronously in the order oar gives them.
-
 import type { Event } from "@botiverse/oar";
 import type { SubagentReport } from "@botiverse/oar/agents";
 import { Clock, Effect } from "effect";

@@ -1,6 +1,3 @@
-// The shapes the server and the page share, one folder per concept (<concept>/shapes.ts): every type on the wire and
-// on disk, and the closed sets' members. Each has a Schema in <concept>/schema.ts, typed by it, so the two cannot drift.
-
 export * from "./common/shapes";
 export * from "./core/shapes";
 export * from "./agent/shapes";

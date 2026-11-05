@@ -1,5 +1,3 @@
-// Days are YYYY-MM-DD in the machine's time zone, as the server names a journal's day.
-
 import { currentLocale, type Locale } from "@vibevalley/i18n";
 
 const two = (n: number) => String(n).padStart(2, "0");
@@ -15,7 +13,7 @@ const midnightOf = (day: string) => {
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() : Number.NaN;
 };
 
-/** A journal's title: 11月3日 周一 (the year too when it is not this year's); undefined for a value that is not a day. */
+/** A journal's title: Nov 3 Mon (the year too when it is not this year's); undefined for a value that is not a day. */
 export function dayTitle(day: string, today: string, locale: Locale = currentLocale()): string | undefined {
   const at = midnightOf(day);
   if (Number.isNaN(at)) return undefined;
@@ -23,7 +21,7 @@ export function dayTitle(day: string, today: string, locale: Locale = currentLoc
   return new Intl.DateTimeFormat(locale, { ...(otherYear ? { year: "numeric" } : {}), month: "long", day: "numeric", weekday: "short" }).format(at);
 }
 
-/** A page's title as the owner reads it: a journal by its day (11月3日周二), any other page by its title. */
+/** A page's title as the owner reads it: a journal by its day (Nov 3 Tue), any other page by its title. */
 export const titleFor = (title: string, day: string | undefined) => (day ? dayTitle(day, dayKey(Date.now())) : undefined) ?? title;
 
 /** Days from today to day: 0 today, negative once it is past; undefined for a value that is not a day. */
@@ -55,10 +53,10 @@ export function monthWeeks(year: number, month: number): MonthDay[][] {
   return weeks;
 }
 
-/** The month's name above the grid: 2026年11月. */
+/** The month's name above the grid: Nov 2026. */
 export const monthTitle = (year: number, month: number, locale: Locale = currentLocale()) =>
   new Intl.DateTimeFormat(locale, { year: "numeric", month: "long" }).format(new Date(year, month, 1));
 
-/** The weekdays over the grid's columns, Monday first: 一 二 … 日. */
+/** The weekdays over the grid's columns, Monday first: Mon..Sun. */
 export const weekdayNames = (locale: Locale = currentLocale()) =>
   Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(locale, { weekday: "narrow" }).format(new Date(2024, 0, 1 + i)));

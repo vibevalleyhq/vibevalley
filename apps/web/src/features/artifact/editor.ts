@@ -1,7 +1,3 @@
-// The blocks artifact being edited: blocks in order, the owner's edits as ops
-// waiting to go, one batch on the wire at a time. What comes back replaces the blocks, except the text of a block the
-// owner is still typing or composing a word in. The page draws it and calls in; a change notifies the subscribers.
-
 import { t } from "@vibevalley/i18n";
 import {
   type Block,
@@ -97,8 +93,7 @@ export class BlockEditor {
   private seq = 0;
   private readonly queue: Pending[] = [];
   private readonly dirty = new Set<string>();
-  // Removed here before the server has heard: an answer about one does not bring it back, but its rev still counts for an
-  // op queued against it before it went (the text typed into a block just split off, then joined back).
+  // Removed here before the server has heard.
   private readonly gone = new Map<string, EditBlock>();
   private inflight: { id: string; ops: BlockOp[]; ids: Set<string> } | undefined = undefined;
   private sending = false;
@@ -245,9 +240,7 @@ export class BlockEditor {
     this.armWriting();
   }
 
-  /** The server's block over the client's: all of it, but the text of one the owner has unsent words in or is composing
-   * in. `heard` is a change asked for, not an answer to the owner's batch: one by another writer marks the block as being
-   * written, and the block the owner is in is left as it is until they leave it. */
+  /** The server's block over the client's: all of it, but the text of one the owner has unsent words in or is composing in. */
   private put(b: Block, heard = false) {
     const mine = this.byId.get(b.id);
     const went = this.gone.get(b.id);
@@ -353,8 +346,7 @@ export class BlockEditor {
     if (!on) this.edited(b, text, text.length);
   }
 
-  /** A field's new value; `caret` where the caret is in it. A line break in a block other than code is Enter: the block
-   * splits there. */
+  /** A field's new value. `caret` where the caret is in it. */
   edited(b: EditBlock, text: string, caret: number) {
     const before = plainOf(b.spans);
     b.text = text;

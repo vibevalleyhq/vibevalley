@@ -22,7 +22,7 @@ export interface Nameable {
 
 const menuMax = 6;
 
-/** The place's orchestrator (here) is @管家, every other orchestrator its @<profile id>; everyone only when there is
+/** The place's orchestrator (here) is @the orchestrator, every other orchestrator its @<profile id>; everyone only when there is
  * more than one helper. */
 export const nameables = (sessions: SessionView[], orchestrators: readonly Agent[], here: string, now: number): Nameable[] => [
   ...sessions.filter((h) => h.role === "worker").map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),

@@ -1,5 +1,3 @@
-// The answers of the session endpoints (packages/protocol/src/session/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import { t } from "@vibevalley/i18n";

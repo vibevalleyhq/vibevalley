@@ -1,7 +1,3 @@
-// The golden files (testdata, first recorded from the server's Go version) hold the core state's rules to their answers:
-// runs of facts folded from an empty farm, the shared rules' calls, and the child issues', crons' and patrol's cases.
-// Each is compared as JSON. Times of day are read in Asia/Shanghai (vite.config.ts sets it).
-
 import { readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
 
@@ -35,8 +31,7 @@ async function lines(name: string): Promise<Record<string, unknown>[]> {
  * diff before keeping it). */
 const updating = process.env.VIBEVALLEY_GOLDEN === "update";
 
-/** Collects the first failures, so one run shows a few at once; updating, puts each answer in its place in the rows
- * (holder[key]) and writes the file back once done. */
+/** Collects the first failures, so one run shows a few at once. */
 function failures(name: string, rows: Record<string, unknown>[]) {
   const found: string[] = [];
   let changed = false;

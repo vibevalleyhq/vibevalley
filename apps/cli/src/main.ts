@@ -1,13 +1,3 @@
-// VibeValley's command line, on effect/cli, for agents first and people too. Every command is a thing to do with the
-// farm, written by hand and typed (issue.ts, channel.ts…), asking the server through the typed client; what no command
-// covers is `api` (api.ts; reach.ts says which). Answers are short text, or the protocol's shape with --format json; a
-// failure is JSON on stderr with what to do next, and an exit code that says which kind (output.ts). `chat` is a
-// conversation in the terminal: the server's program, handed this terminal (chat.ts). With no command, the help.
-//
-//	vpx src/main.ts issue list --waiting
-//	vpx src/main.ts issue status 12 todo
-//	vpx src/main.ts chat [runtime] [--cwd DIR] [--model ID] [-p PROMPT]
-
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import { Cause, Effect, Exit, Option, Predicate, Stdio } from "effect";
 import { Argument, CliError, CliOutput, Command, Flag, TerminalCapabilities } from "effect/cli";
@@ -18,8 +8,7 @@ import { setLocale, t } from "@vibevalley/i18n";
 
 import { err, exit, Failure, out, printFailure } from "./output.ts";
 
-// The command line speaks the farm's language: the locale saved in the home's settings.json. It is set before the
-// commands load, since they say their help text as they load: hence the imports below, after it.
+// The command line speaks the farm's language: the locale saved in the home's settings.json.
 setLocale(savedLocale(homeOf()));
 
 const { apiCommand, DryRunFlag, FormatFlag, ServerFlag } = await import("./api.ts");
@@ -42,9 +31,7 @@ const passed = (flags: Readonly<Record<string, Option.Option<string>>>) =>
 
 const prompt = text("prompt", t("cli.flag.prompt")).pipe(Flag.withAlias("p"));
 
-/** `chat [runtime]`: a conversation in this terminal, with VibeValley's own agent or, named, a runtime on this machine.
- * Its own command, never the bare `vibevalley`: an agent that runs the command line without words gets the help, not a
- * conversation waiting on its input. */
+/** `chat [runtime]`: a conversation in this terminal, with VibeValley's own agent or, named, a runtime on this machine. */
 const chatCommand = Command.make(
   "chat",
   {
@@ -111,9 +98,7 @@ function usageOf(e: CliError.CliError): Failure {
   });
 }
 
-/** Runs the command line on args and gives back its exit code. What effect/cli says itself goes through its Presenter
- * onto this run's Stdio: help and the version to stdout, help that came with a mistake to stderr before the failure, so
- * stdout stays the result. */
+/** Runs the command line on args and gives back its exit code. */
 export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
   const io = yield* Stdio.Stdio;
   const said = (to: typeof out, text: string) => Effect.provideService(to(text), Stdio.Stdio, io);

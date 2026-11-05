@@ -1,6 +1,3 @@
-// The endpoints of issues: their answers (IssueHandlers) and their lines in the table (api.ts puts the
-// concepts together).
-
 import { type Effect, Schema } from "effect";
 
 import { type ApiError, type Endpoint, input } from "../endpoint";
@@ -31,14 +28,11 @@ export interface IssueHandlers<R = never> {
   readonly "issue.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** What issue.delete would do, refused as it would be; nothing changes. */
   readonly "issue.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
-  /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is
-   * another round (the words are the findings; stuck, none takes the server's own); done is accepted and delivered as the
-   * issue says; canceled sends its session home. Issue.moves lists where it may go. */
+  /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is another round (the words are the findings. */
   readonly "issue.status.update": (a: { readonly id: string } & T.IssueStatusRequest) => Effect.Effect<T.AppliedIssue, ApiError, R>;
   /** What issue.status.update would do with the same body, refused as it would be; nothing changes. */
   readonly "issue.status.previewUpdate": (a: { readonly id: string } & T.IssueStatusRequest) => Effect.Effect<T.Preview, ApiError, R>;
-  /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
-   * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
+  /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then leaves. */
   readonly "issue.refine": (a: { readonly id: string } & T.IssueRefineRequest) => Effect.Effect<T.Issue, ApiError, R>;
 }
 

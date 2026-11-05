@@ -1,9 +1,3 @@
-// Previews of the links said in the chat: the page's title, description, site and image, read by the server since a
-// page cannot read another site. The server reaches only the public web: every address a name resolves to is checked
-// before each request (and each redirect), so a link cannot make it read this computer, the LAN or a cloud's metadata.
-// A name that resolves anew between that check and the request (DNS rebinding) is the gap left; nothing is sent with the
-// request but the address, and only a page's head is read back.
-
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
@@ -119,8 +113,7 @@ export function embedOf(url: string, html: string): Embed | undefined {
   };
 }
 
-/** A link's preview, or none when it cannot be read: not public, not a page, too slow, too big. Redirects are followed
- * here, not by the client, so each hop's address is checked before it is asked. */
+/** A link's preview, or none when it cannot be read: not public, not a page, too slow, too big. */
 export const readEmbed = Effect.fn("Embeds.read")(function* (link: string, resolve: Resolve = resolveAll) {
   const client = yield* HttpClient.HttpClient;
   if (!URL.canParse(link)) return undefined;

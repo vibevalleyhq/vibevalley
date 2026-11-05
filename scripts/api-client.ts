@@ -1,8 +1,3 @@
-// Writes packages/protocol/src/client.ts, the HTTP client (VibeValleyApi), from the endpoint table: each method's
-// arguments, answer and doc comment from its concept's Handlers interface (src/<concept>/api.ts), its method, path, query
-// and body from `endpoints`. Generated rather than read from `endpoints` at run time: the page would then load effect's Schema for every
-// endpoint. --check fails when the file is not what api.ts says (docs:verify runs it).
-
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

@@ -1,6 +1,3 @@
-// Toolbar (Base UI's): a row of controls that is one tab stop; the arrow keys, Home and End move among its buttons,
-// links and inputs, and Tab leaves it. The tab stop stays on the item focused last.
-
 import type { JSX } from "@solidjs/web";
 import { createContext, createSignal, omit, useContext } from "solid-js";
 

@@ -37,8 +37,7 @@ const refinementLeftNothing = (work: string, issue: T.Issue) => {
 };
 
 describe("a refined issue", () => {
-  // The plus makes an unsent issue; a session drafts it to the issue's format and leaves, the issue still in the
-  // backlog. It asks; the owner's answer makes a second draft over the first; sent out, its session is told the criteria.
+  // The plus makes an unsent issue. a session drafts it to the issue's format and leaves, the issue still in the backlog.
   it.live("is refined before it is sent", () => {
     const f = farm();
     return Effect.gen(function* () {
@@ -97,8 +96,7 @@ describe("a refined issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // A refiner that changes files and commits leaves the worktree as main has it; canceling an issue mid-draft sends the
-  // refiner home and leaves no worktree or branch.
+  // A refiner that changes files and commits leaves the worktree as main has it.
   it.live("leaves nothing behind", () => {
     const f = farm();
     return Effect.gen(function* () {

@@ -1,5 +1,3 @@
-// Said to models by the runtimes' side of the farm, in Chinese whatever the owner's locale.
-
 import { ownersLanguage } from "#/prompts.ts";
 
 /** The system prompt for VibeValley's own agent, as an oar runtime (vibevalley.ts). */

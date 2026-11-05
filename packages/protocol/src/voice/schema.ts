@@ -1,5 +1,3 @@
-// The Schemas of the call, dictation and voice settings (docs/subsystems/voice.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";

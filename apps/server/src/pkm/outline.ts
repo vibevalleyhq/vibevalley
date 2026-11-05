@@ -1,8 +1,3 @@
-// A page's file as an outline and back (Logseq's Markdown): key:: value lines at the top are the page's props; each
-// "- " bullet is a block, two spaces of indent a level; a block's key:: value lines right under its first line are its
-// props (id:: is its id); a fenced code block inside a bullet is text, whatever it holds. print(parse(x)) is x for a file
-// this printer wrote (props in their order, two-space indent, no trailing spaces).
-
 import { createHash } from "node:crypto";
 
 import { PkmMarkerValues } from "@vibevalley/protocol";
@@ -281,8 +276,7 @@ export function edgesOf(page: Pick<Page, "blocks">): Edge[] {
   return edges;
 }
 
-/** The ids of page's blocks not written in its file taken from was where a block reads the same at the same depth: a page
- * read again after another editor changed it keeps the ids of the blocks that did not change. */
+/** The ids of page's blocks not written in its file taken from was where a block reads the same at the same depth. */
 export function carryIds(was: Page, page: Page): Page {
   const free = new Map<string, string[]>();
   const key = (n: Node) => `${n.depth}\u0000${n.marker ?? ""}\u0000${n.body}`;
@@ -305,9 +299,7 @@ export function carryIds(was: Page, page: Page): Page {
   return { ...page, blocks: relabel(page.blocks) };
 }
 
-/** Typed or piped text as blocks of their own (`pkm capture`): a line a block, a leading "- " or "* " taken off, nested by
- * its indentation under the line before it, whatever the indent's width; markers and [#A] read as in a file. Ids are
- * fresh, as these blocks are new wherever they go. */
+/** Typed or piped text as blocks of their own (`pkm capture`). markers and [#A] read as in a file. */
 export function outlineOf(text: string, newId: () => string): Node[] {
   const lines = text
     .replace(/\r\n/gu, "\n")

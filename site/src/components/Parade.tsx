@@ -1,6 +1,3 @@
-// The helpers on their way to work: a row of plots behind, the path they walk, plants in front. The rows slide at
-// their own pace as the section crosses the screen (useScrollLinked); the helpers walk across at theirs (CSS, so they
-// walk without the script too).
 import type { Copy } from '../i18n/zh'
 import { useOffScreen, useReveal, useScrollLinked } from './ui'
 

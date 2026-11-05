@@ -1,16 +1,3 @@
-// @vibevalley/engine/pixi: a pixel-art stage on a canvas. The scene is drawn at its true size (one art pixel = one
-// texture pixel) into a texture, which the canvas shows scaled up by a whole number, so every pixel stays square and
-// on the grid. Over it, in the same canvas, the ui layer works in screen pixels: words stay sharp at any scale, and
-// it takes the pointer and the keyboard (ui.ts: boxes, text, hit regions). The scene only draws; what can be
-// clicked is a hit region in the ui layer over it.
-//
-// A camera can move over the scene a few pixels at a time (swayCamera): the stage keeps a margin of the world out of
-// view at every edge, and layers at other depths move more (nearer) or less (farther) than the world, for parallax.
-// A game that keeps its world still can move only what is nearer, by where the pointer leans (leanToPointer).
-// Per-frame state (where a walker is, which frame it shows) lives in plain objects here, not in React state: the game's
-// state says where things should be, this layer moves them there. No React. Light, from normal maps the
-// pictures make themselves, is light.ts.
-
 import { Application, Container, RenderTexture, Sprite, TextureStyle, UPDATE_PRIORITY } from "pixi.js";
 
 import type { Point } from "../nav";
@@ -39,10 +26,7 @@ export interface PixelStage {
   /** The whole world's size, and the part of it in view (the world less its margins), art pixels. */
   readonly size: { readonly w: number; readonly h: number };
   readonly view: { readonly w: number; readonly h: number };
-  /**
-   * A layer of the scene that moves with the camera by `depth`: the world's is 1, nearer things more, farther less.
-   * It goes over everything added to the scene before it.
-   */
+  /** A layer of the scene that moves with the camera by `depth`: the world's is 1, nearer things more, farther less. */
   readonly layer: (depth: number) => Container;
   /** A world point, as it is on the screen now: where the ui layer puts what goes with it. */
   readonly toScreen: (p: Point) => Point;
@@ -67,15 +51,9 @@ export interface PixelStageOptions {
   minScale?: number;
   /** Art pixels of the world kept out of view at every edge, for the camera to move into. */
   margin?: number;
-  /**
-   * How many of the pictures' pixels make one art pixel (their textures are loaded at this resolution): the scene
-   * is drawn at it, so the finer pictures keep their detail while everything is placed in art pixels as before.
-   */
+  /** How many of the pictures' pixels make one art pixel (their textures are loaded at this resolution). */
   density?: number;
-  /**
-   * Where the canvas goes in the host instead of the biggest whole scale that fits: its whole-number scale and its top
-   * left in the host's CSS pixels (it may stick out; the host should be positioned and clip). Asked on every resize.
-   */
+  /** Where the canvas goes in the host instead of the biggest whole scale that fits. the host should be positioned and clip). */
   frame?: (host: { w: number; h: number }, view: { w: number; h: number }) => { scale: number; x: number; y: number };
 }
 
@@ -208,10 +186,7 @@ export interface PointerLean {
   readonly stop: () => void;
 }
 
-/**
- * Leans towards where the pointer is over the canvas, easing, and drifts a little on its own. Read `at` in a frame:
- * it is up to date before the stage places its layers (HIGH).
- */
+/** Leans towards where the pointer is over the canvas, easing, and drifts a little on its own. */
 export function leanToPointer(stage: PixelStage, { pointer = 0.7, ease = 2.5 }: LeanOptions = {}): PointerLean {
   const canvas = stage.app.canvas;
   let aim = { x: 0, y: 0 };
@@ -244,10 +219,7 @@ export function leanToPointer(stage: PixelStage, { pointer = 0.7, ease = 2.5 }: 
 
 export type Facing = "down" | "up" | "left" | "right";
 
-/**
- * Something that walks: it follows a route to its target at a steady speed and knows which way it faces.
- * Call `go` whenever the target may have changed (it only re-routes when it did), `step` once a frame.
- */
+/** Something that walks: it follows a route to its target at a steady speed and knows which way it faces. */
 export class Walker {
   x: number;
   y: number;

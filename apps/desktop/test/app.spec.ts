@@ -1,6 +1,3 @@
-// The whole desktop app: Electron starts the server (apps/server) (a temporary home), the window shows the page it serves, the
-// state stream brings an issue made through the API to the board without a reload, and a notice the page sends through
-// the host interface reaches the main process. Which calls ring is apps/web/src/features/inbox/tray.ts's (its own tests).
 import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { connect as dial } from "node:net";
 import { tmpdir } from "node:os";
@@ -16,13 +13,9 @@ import { desktopControl } from "@vibevalley/protocol/host";
 
 import type { DesktopProbe } from "../src/probe";
 
-// The server and the agents it runs read keys from the environment: a test must never reach a real model, voice service or
-// chat bot with the owner's keys, nor read the owner's VIBEVALLEY_* settings. HOME is the test's folder too: the coding agents'
-// own logins (~/.pi, ~/.claude, …) stay out of reach.
-// GIT_CONFIG_* go together: GIT_CONFIG_COUNT without its GIT_CONFIG_KEY_n stops every git command.
+// The server and the agents it runs read keys from the environment.
 const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_CONFIG_/u;
-/** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json): what a test farm
- * starts with, as a farm whose agent.starters names them. */
+/** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json). */
 const starters = () =>
   (JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "server", "src", "agent", "templates", "index.json"), "utf8")) as string[])
     .filter((id) => id !== "orchestrator")
@@ -62,7 +55,7 @@ test("the desktop app shows the live board and sends a notice", async () => {
     // The page keeps the menu bar's tray to the farm, and has the key that calls the manager from anywhere.
     await expect.poll(() => app.evaluate(() => globalThis.vibevalleyProbe?.tray?.lines ?? [])).toContain("还没开工");
     expect(await page.evaluate(() => window.vibevalleyHost?.voiceShortcut?.accelerator)).toBe("Alt+Shift+Space");
-    // The window's own parts follow the theme the page chose (设置 › 外观).
+    // The window's own parts follow the theme the page chose (Settings > Appearance).
     await page.evaluate(() => window.vibevalleyHost?.theme?.("dark"));
     await expect.poll(() => app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe("dark");
     await page.evaluate(() => window.vibevalleyHost?.theme?.("system"));
@@ -135,8 +128,7 @@ test("the window opens on the bar at once, and says there why the server could n
   }
 });
 
-// The island's half that runs everywhere: the main process reads the state stream itself and keeps the glance it sends
-// the native helper (apps/island, macOS only; its own tests are Swift's). A click on a row brings the window to the issue.
+// The island's half that runs everywhere: the main process reads the state stream itself and keeps the glance it sends the native helper (apps/island, macOS only.
 test("the island follows the issues in flight and opens one", async () => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));
   const app = await electron.launch({
@@ -163,7 +155,7 @@ test("the island follows the issues in flight and opens one", async () => {
 
     const fox = await api.agent.create(scripted);
     const project = await api.project.create({ name: "clock" });
-    // The scripted helper asks with options when its job says 先问清楚: the issue waits on the owner.
+    // The scripted helper asks with options when its job says ask-first: the issue waits on the owner.
     const made = await api.issue.create({ title: "打卡页先问清楚，给选项", project: project.name, agent: fox.id });
     await api.issue.status.update({ id: made.id, status: "todo" });
     await expect

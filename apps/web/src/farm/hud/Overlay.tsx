@@ -1,7 +1,3 @@
-// The words over the village, at screen pixels so they stay sharp: each plot's card (what a click would do while
-// pointed at, a reward, a note, its badge, its project, the level that clears it), what each helper is doing over its
-// head, the orchestrator's last words, and the yard's signs, names and counts. Words let clicks through to the village.
-
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -52,7 +48,7 @@ interface Card {
   maxLines?: number;
 }
 
-/** A card centred on (x, y), its bottom there unless `ay` says otherwise; page pixels. `hop`: a sign's bob delay. */
+/** A card centred on (x, y), its bottom there unless `ay` says otherwise. page pixels. */
 interface Pin {
   key: string;
   x: number;

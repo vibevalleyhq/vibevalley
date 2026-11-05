@@ -1,5 +1,3 @@
-// The tagged errors the API answers with (@vibevalley/protocol/api), made where a service refuses.
-
 import { Effect, Predicate, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -30,8 +28,7 @@ type LookIn =
 /** Something asked for by id or name is not there. next is required: where to look for the ones that are (lookIn). */
 export const missing = (what: string, next: readonly Next[]): ApiError => ({ _tag: "Missing", what, ...(next.length > 0 ? { next } : {}) });
 
-/** Where to find the ones that are there, as the command that lists them; cli.test.ts runs each one's help, so a command
- * renamed away breaks the test, not the hint. */
+/** Where to find the ones that are there, as the command that lists them. */
 // say is read when the error is made, in the locale of the moment.
 const listed = (key: LookIn, run: readonly string[]): Next => ({
   get say() {
@@ -69,8 +66,7 @@ export const messageOf = (e: unknown): string => (e instanceof Error ? e.message
 /** A failed system call's code (ENOENT, EPERM…), or undefined for anything else. */
 export const errnoOf = (e: unknown): string | undefined => (e instanceof Error && "code" in e && typeof e.code === "string" ? e.code : undefined);
 
-/** A defect, never an expected failure: the farm's own records disagree with each other, or a caller broke a rule it is
- * held to. Died with, so it is a bug to fix, found by this name. */
+/** A defect, never an expected failure: the farm's own records disagree with each other, or a caller broke a rule it is held to. */
 export class Inconsistent extends Schema.TaggedError<Inconsistent, { readonly brand: unique symbol }>()("Inconsistent", { message: Schema.String }) {}
 
 /** A lookup's answer, or Missing (what was not found, and where to look) when it found none. */

@@ -221,9 +221,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     return shape;
   });
 
-// This farm's own memories, rows in the memory table: what each agent noted (its
-// explicit notes (from issue_report or the owner) and one line for each issue it worked. A memory that cannot be read or written never
-// stops a run: it is logged, and the run goes on without it.
+// This farm's own memories, rows in the memory table.
 
 /** One finished run, everything about it; each provider keeps what it uses. */
 export interface FinishedRun {
@@ -237,7 +235,7 @@ export interface FinishedRun {
   readonly summary: string;
 }
 
-/** What a run recalls by. peek only questions: nothing is counted as recalled (the 记性 tab's preview). */
+/** What a run recalls by. peek only questions: nothing is counted as recalled (the Memory tab's preview). */
 export interface RecallCue {
   readonly agent: string;
   readonly session?: string;
@@ -247,7 +245,7 @@ export interface RecallCue {
   readonly peek?: boolean;
 }
 
-/** A memory written outside a run: the owner's, from the 记性 tab, the orchestrator's for a profile, or a session's own. */
+/** A memory written outside a run: the owner's, from the Memory tab, the orchestrator's for a profile, or a session's own. */
 export interface Note {
   readonly agent: string;
   readonly text: string;

@@ -1,6 +1,3 @@
-// One server per home: .vibevalley.lock holds the pid of the server using it. Node has no flock, so a lock whose process
-// is gone is stale and is taken over. Where that server listens is @vibevalley/home's server.json.
-
 import { closeSync, openSync, readFileSync, realpathSync, unlinkSync, writeSync } from "node:fs";
 import { join } from "node:path";
 

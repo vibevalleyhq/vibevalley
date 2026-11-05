@@ -129,7 +129,7 @@ describe("an artifact", () => {
       expect((yield* artifacts.previewRemove(one.id)).does.length).toBeGreaterThan(0);
       yield* artifacts.remove(one.id);
       expect(yield* Effect.flip(artifacts.get(one.id))).toMatchObject({ _tag: "Missing" });
-      // 「同一页」 is still two's.
+      // the same page is still two's.
       expect(readdirSync(dir).length).toBe(1);
       yield* artifacts.remove(two.id);
       expect(existsSync(dir) ? readdirSync(dir) : []).toEqual([]);

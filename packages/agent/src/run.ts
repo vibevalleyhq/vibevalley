@@ -1,5 +1,3 @@
-// What a run cost and said. One run takes in its tool turns and the inputs that came while it went on.
-
 import { type AssistantMessage, type Usage, zeroUsage } from "@vibevalley/ai/messages";
 
 import { messageText } from "./messages.ts";

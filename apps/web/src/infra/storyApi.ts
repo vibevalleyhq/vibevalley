@@ -1,13 +1,8 @@
-// Installed by the stories' page only (src/stories.tsx); the product never imports it.
-
 type Answer = (input: unknown) => unknown;
 
 let answers: Readonly<Record<string, Answer>> = {};
 
-/**
- * What the server answers while this story is open, by the path after /api/v1/ ("issue/diff/get"). Unanswered calls
- * fail as a server that is not there would; a stream stays open with nothing on it.
- */
+/** What the server answers while this story is open, by the path after /api/v1/ ("issue/diff/get"). Unanswered calls fail as a server that is not there would. */
 export function answer(table: Readonly<Record<string, Answer>>) {
   answers = table;
 }

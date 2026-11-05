@@ -73,7 +73,7 @@ export const makeResponses = (ingress: Ingress["Service"], channel: Channel["Ser
         );
     };
 
-  /** A call-side update or ring reason. The response port is process-local; the issue-source envelope survives without it. */
+  /** A call-side update or ring reason. The response port is process-local. */
   const brief = (line: string): Effect.Effect<string, NotAnswered> =>
     Effect.gen(function* () {
       const response = open(false);

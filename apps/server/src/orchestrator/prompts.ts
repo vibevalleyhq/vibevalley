@@ -1,7 +1,3 @@
-// What the orchestrator (管家) reads: its system prompt, the head of each input by where it came from, the farm as it
-// is shown, its inbox's lines, the patrol's and the issues' and crons' lines. Said to the model, in Chinese
-// whatever the owner's locale; what it answers goes to the owner as it wrote it.
-
 /** Who an orchestrator other than the default one is, after the prompt every orchestrator shares. */
 export const identityNote = (name: string, persona: string) =>
   `\n\n你是管家「${name}」：农场里还有别的管家，主人把一些频道交给你照看，或者在私聊里直接找你。` + (persona.trim() ? "\n\n" + persona.trim() : "");

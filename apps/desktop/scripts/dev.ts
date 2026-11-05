@@ -1,7 +1,3 @@
-// vp run desktop:dev: the shell built, the page built once and then again on every change (vp build --watch), and
-// Electron in development mode (VIBEVALLEY_DEV=1, src/dev.ts): the window reloads on a new build of the page and the
-// server starts again when its code changes. Not vite dev: the page is the built one the server serves, as in the app.
-
 import { spawn, spawnSync } from "node:child_process";
 import { join } from "node:path";
 

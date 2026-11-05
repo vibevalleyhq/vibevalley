@@ -1,5 +1,3 @@
-// The shapes of what agents remember, and the orchestrator's archive (docs/subsystems/memory.md).
-
 import type { ActorKind, SessionId } from "../common/shapes";
 import type { MemorySourceInfo } from "../setting/shapes";
 
@@ -52,8 +50,7 @@ export type MemoryKind = (typeof MemoryKindValues)[number];
 export interface MemoryRequest {
   text: string;
   project?: string;
-  /** The client's key for this request: the same key again within a while returns the first one's result and does it
-   * once (a retry after a lost reply). At most 64 characters. */
+  /** The client's key for this request: the same key again within a while returns the first one's result and does it once (a retry after a lost reply). */
   requestKey?: string;
 }
 

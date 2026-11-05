@@ -1,7 +1,3 @@
-// One project's farm (/farm/<project>): the village canvas full-bleed, the DOM over it, outside the workbench's shell.
-// Each layer is its own folder's; this page only stacks them, gives the ones that draw the beds this project's part of the
-// frame (scope.ts), and owns the keys, the sounds and the phone's calls. The chat and the title are the whole farm's.
-
 import { createEffect, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -35,8 +31,7 @@ export function FarmPage(props: { project: string }) {
   const titleOpen = useFarm((s) => s.titleOpen);
   farmKeys();
   feedPhoneCalls(raw);
-  // A call starting (the chat's call button, a ring answered, the desktop's shortcut) brings the phone out unfolded: what
-  // is said on it is written into 田头 as it is said. Folded during the call, it stays folded.
+  // A call starting (the chat's call button, a ring answered, the desktop's shortcut) brings the phone out unfolded. Folded during the call, it stays folded.
   const call = createCall();
   createEffect(
     () => call().phase === "connecting" || call().phase === "live",

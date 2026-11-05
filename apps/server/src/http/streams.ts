@@ -1,7 +1,3 @@
-// The long-lived event streams: the frames for the page, the side events and the live events, as server-sent events
-// with a ping every streamHeartbeatMs, so a proxy does not close a quiet one and a reader can tell a quiet stream from a
-// dead one (packages/protocol/src/stream.ts).
-
 import { Effect, Metric, Schedule, type Schema, Stream } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
 

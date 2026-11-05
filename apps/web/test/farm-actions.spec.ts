@@ -39,10 +39,10 @@ async function handBack(api: VibeValleyApi, project: string) {
   return issue.id;
 }
 
-// The test helper commits a change on 提交 (apps/server/src/testing/helper.ts), so the review has files.
+// The test helper commits a change on commit (apps/server/src/testing/helper.ts), so the review has files.
 const commits = "提交打卡页";
 
-// The test helper idles on 发呆 until it is told again (apps/server/src/testing/helper.ts): another round is being worked.
+// The test helper idles on idle until it is told again (apps/server/src/testing/helper.ts): another round is being worked.
 const anotherRound = "发呆 then check it";
 
 const handedBack = (api: VibeValleyApi, id: string, timeout?: number) =>

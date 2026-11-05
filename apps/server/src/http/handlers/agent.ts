@@ -1,5 +1,3 @@
-// The answers of the agent endpoints (packages/protocol/src/agent/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import type { AgentHandlers } from "@vibevalley/protocol/api";

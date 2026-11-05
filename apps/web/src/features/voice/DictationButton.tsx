@@ -1,5 +1,3 @@
-// The dictation key every input row has, and the bar a workbench box shows while it listens.
-
 import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -59,8 +57,7 @@ export type Dictating = ReturnType<typeof useDictation>;
 /** Held this long, letting go stops it: push to talk. A shorter press leaves it listening until the next. */
 const holdMs = 400;
 
-/** Tap to start talking, tap again to stop, or hold to talk and let go; not set up, it opens where it is set. bar: the
- * box shows the recording itself (DictationBar), so the key does not pulse too. */
+/** Tap to start talking, tap again to stop, or hold to talk and let go. not set up, it opens where it is set. */
 export function DictationKey(props: { dictating: Dictating; bar?: boolean; size?: IconSize | undefined; class?: string | undefined }) {
   const d = () => props.dictating;
   // The press that started a recording, and whether letting go of it stopped it: its click is then not a tap.
@@ -162,9 +159,7 @@ const clock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 
-/** In a box's row while its field listens or is being transcribed, in place of what else the row holds: how long it
- * has listened, the voice's level running past, and cancel; the key beside it is done (Esc and Enter say the same, see
- * dictationKey). */
+/** In a box's row while its field listens or is being transcribed, in place of what else the row holds. */
 export function DictationBar(props: { dictating: Dictating }) {
   const d = () => props.dictating;
   const listening = () => d().state() === "recording";

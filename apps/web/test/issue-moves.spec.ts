@@ -1,6 +1,3 @@
-// Moving a card between lanes, as far as the page wires it: the card waits in the lane it was dropped on until a frame
-// shows the move, a refusal leaves it there failed, and a retry is the same request (its key). Which frame settles a
-// move is state/intent.test.ts's and features/issue/moves.test.ts's.
 import type { Page } from "@playwright/test";
 
 import { type Agent, type IssueStatusRequest, pathOf, type VibeValleyApi } from "@vibevalley/protocol";
@@ -33,7 +30,7 @@ const fox: Agent = {
 const lane = (page: Page, key: string) => page.locator(`[data-testid="lane"][data-key="${key}"]`);
 const card = (page: Page, key: string, id: string) => lane(page, key).locator(`[data-testid="issue-card"][data-key="${id}"]`);
 
-/** A to-do with a helper and a project, so 开工 may send it out. */
+/** A to-do with a helper and a project, so Start may send it out. */
 async function startable(api: VibeValleyApi, name: string) {
   const helper = await api.agent.create({ ...fox, name });
   const project = await api.project.create({ name });
@@ -62,7 +59,7 @@ test("a card dropped on 进行中 waits there, moving, until the server has it",
   const meanwhile = await api.issue.create({ title: "written while the move waits" });
   await expect(card(page, "todo", meanwhile.id)).toBeVisible();
   await expect(card(page, "working", made.id)).toHaveAttribute("data-state", "moving");
-  // From here to the issue's page the card never shows in 待办 again: no snap back, no jump.
+  // From here to the issue's page the card never shows in todo again: no snap back, no jump.
   await page.evaluate((id) => {
     new MutationObserver(() => {
       if (document.querySelector(`[data-testid="lane"][data-key="todo"] [data-testid="issue-card"][data-key="${id}"]`)) document.body.dataset.snapped = "";

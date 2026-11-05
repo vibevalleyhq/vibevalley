@@ -1,7 +1,3 @@
-// @vibevalley/engine/nav: finding a way across the ground. The world is laid out as a grid of small cells, each
-// walkable or not and some cheaper than others (a path is cheaper than grass); A* finds the cheapest way, and
-// the corners are then cut wherever a straight line is just as cheap. Plain functions.
-
 export interface Point {
   readonly x: number;
   readonly y: number;

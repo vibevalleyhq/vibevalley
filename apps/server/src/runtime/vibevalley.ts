@@ -1,7 +1,3 @@
-// VibeValley's own agent as an oar runtime, built on oar's runtime-author SPI the way oar's scripted runtime is: one turn
-// is one run of the agent until it settles. Its own todos (packages/agent todo.ts) are kept in the farm's database, table
-// runtime_todo, one open graph per keeper (a session of this runtime).
-
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -40,7 +36,7 @@ export { helperInstructions };
 export interface RuntimeOptions {
   /** $VIBEVALLEY_HOME, else ~/.vibevalley, when absent. */
   readonly home?: () => string;
-  /** Asked each session, so a key saved meanwhile is used; "" is the default model. Throws when there is no model to use. */
+  /** Asked each session, so a key saved meanwhile is used. "" is the default model. */
   readonly llm: (model: string) => ModelClient;
   /** Where a session keeps its own todos; absent, it keeps none. */
   readonly todos?: (session: string) => TodoStore;

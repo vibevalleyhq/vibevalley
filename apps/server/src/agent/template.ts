@@ -1,7 +1,3 @@
-// A profile's template: a folder of agent.json (what it is), agent.en.json (its words in English), persona.md and
-// persona.en.md, read in the farm's language. The built-in ones are templates/ beside this file, in the order of
-// templates/index.json; those added on this machine are copies in the home's agent-templates/.
-
 import { join } from "node:path";
 
 import { Effect, FileSystem, Schema } from "effect";
@@ -83,8 +79,7 @@ const readJson = <S extends Schema.Codec<unknown, unknown>>(textOf: TextOf, sche
     );
   });
 
-/** A template folder read in the farm's language (English falls back to the Chinese file by file) through textOf; it
- * fails with a TemplateProblem when it is not one. installed is filled in by who lists it. */
+/** A template folder read in the farm's language (English falls back to the Chinese file by file) through textOf. */
 export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplateSource): Effect.Effect<T.AgentTemplate, TemplateProblem> =>
   Effect.gen(function* () {
     const item = yield* readJson(textOf, TemplateFile, dir, "agent.json");
@@ -190,8 +185,7 @@ export const profileOf = (item: T.AgentTemplate, id: string, name: string): T.Ag
   from: { template: item.id, version: item.version },
 });
 
-/** A profile made again from its template's version now: what the template says of the work (duty, tags, persona and
- * how it is given) is replaced; its name, look, machine and model, and what is this machine's, stay. */
+/** A profile made again from its template's version now: what the template says of the work (duty, tags, persona and how it is given) is replaced. */
 export const updatedFrom = (item: T.AgentTemplate, a: T.Agent): T.Agent => ({
   ...a,
   duty: item.duty,

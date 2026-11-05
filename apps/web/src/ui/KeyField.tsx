@@ -1,6 +1,3 @@
-// A key or an id the owner sets. Whether it is in use is a mark, where it comes from is said on hover; removing one
-// marks it until the form is saved, and can be taken back until then.
-
 import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 

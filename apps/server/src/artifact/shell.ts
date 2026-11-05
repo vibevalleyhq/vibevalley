@@ -1,6 +1,3 @@
-// Added only to the page the workbench is served (?shell=1), never to the version kept. The page's own scripts run in
-// the same frame and can send the same message, so the workbench takes it only as data.
-
 /** Kept in step with edit.ts's hidden: what the shell skips the server skips too, so prefix and suffix agree. */
 const script = String.raw`(() => {
   const hidden = new Set(["HEAD", "SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT", "TEXTAREA", "TITLE"]);

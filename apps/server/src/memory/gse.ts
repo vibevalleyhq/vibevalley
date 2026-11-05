@@ -1,9 +1,3 @@
-// Chinese word segmentation as gse v1.1.0 cuts it (github.com/go-ego/gse, Apache-2.0): the same
-// dictionary (data/zh_s.txt.gz, gse's simplified Chinese s_1.txt) and jieba's HMM for runs the dictionary does not know
-// (data/hmm_emit.json.gz, from gse's hmm/prob_emit.go). Only the cuts the memory search uses are here: the search cut with
-// the HMM (CutSearch(text, true)) and the cut into every dictionary word (CutAll). The recorded cases
-// (terms.test.ts) hold the two to the same words.
-
 // oxlint-disable-next-line vibevalley/sync-fs -- readNow, the fallback before loadSegmenter has read the data; once per process
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -50,8 +44,7 @@ const files = { dictionary: "zh_s.txt.gz", emit: "hmm_emit.json.gz" } as const;
  * starts), and once. */
 const readNow = (file: string) => gunzipSync(readFileSync(join(dataDir, file))).toString("utf8");
 
-/** Reads the dictionary and the HMM's table on the file system, off the event loop: the memory service starts it, so a
- * first cut does not hold the server for the 2 MB dictionary. */
+/** Reads the dictionary and the HMM's table on the file system, off the event loop. */
 export const loadSegmenter = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const read = (file: string) => Effect.map(fs.readFile(join(dataDir, file)), (bytes) => gunzipSync(bytes).toString("utf8"));
@@ -92,7 +85,7 @@ function goParseFloat(text: string): number | undefined {
   return Number(text);
 }
 
-/** The word's frequency; 0 when it only begins a word; undefined when nothing begins with it (gse's Find). */
+/** The word's frequency. 0 when it only begins a word. */
 function find(word: string): number | undefined {
   const d = dict();
   const f = d.freq.get(word);

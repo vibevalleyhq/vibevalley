@@ -1,5 +1,3 @@
-// Where it stands (and what the owner may do) is the server's Issue.stage: this only words it.
-
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueStage, Session, SessionEvent, IssueStageKind, DoingView, SessionView } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
@@ -135,8 +133,7 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
       n: sessions.length,
       line: sessions.map((r) => t("web.issue.issue.historyItem", { name: r.name, id: r.id })).join(" → "),
     }),
-    /** 在等你 · 3 分钟了 · Claude 师傅 · 第 2 轮 · 共用 4 分钟 · ¥0.42; cny is all the issue's runs when known. Under a
-     * minute is 刚刚, and the time in all is left out then: two "under a minute"s said nothing. */
+    /** status summary line. cny is all the issue's runs when known. */
     statusLine(now: number, cny?: number) {
       const s = session ?? head;
       const runs = Math.round(s.runs);
@@ -166,5 +163,5 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
   };
 }
 
-/** The empty 干活过程 says why. */
+/** The empty work log says why. */
 export const noStepsText = (head: Session) => (endedAt(head) === undefined ? t("web.issue.issue.noSteps") : t("web.issue.issue.stepsGone"));

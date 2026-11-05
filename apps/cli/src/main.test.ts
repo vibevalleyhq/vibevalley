@@ -147,8 +147,8 @@ describe("the command line", () => {
       const at = (...args: string[]) => [...args, "--server", server];
       const profile = json((yield* cli(at("api", "call", "agent.create", "--json", JSON.stringify(scripted)))).out) as { id: string };
       expect((yield* cli(at("project", "create", "clock"))).code).toBe(0);
-      // The test helper asks which port when its issue says 先问清楚, with options when it says 给选项, and commits clock.ts
-      // when it says 提交.
+      // The test helper asks which port when its issue says ask-first, with options when it says with-options, and commits clock.ts
+      // when it says commit.
       const made = yield* cli(
         at("issue", "create", "打卡页先问清楚，给选项，提交", "--project", "clock", "--agent", profile.id, "--criterion", "clock-in works"),
       );

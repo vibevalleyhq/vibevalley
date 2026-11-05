@@ -1,5 +1,3 @@
-// The Schemas of the core state, its facts, the event streams and the frames the page reads (docs/subsystems/core.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import { Channel, Chat, ChatMessage, OwnerMention } from "../channel/schema";

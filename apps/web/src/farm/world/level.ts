@@ -1,8 +1,3 @@
-// The village's layout, read from village.ldtk (an LDtk project; open it in LDtk to move things):
-//   Ground (IntGrid, 4 px cells): 1 where feet can go. Plots and props are taken out by the game, so they can move.
-//   Things (entities): Plot (index), Place (place, facing), Prop (spot, sprite), Area (spot; a box), Rest (n),
-//   Light (r), Gate, Queue, Manager, Dog, Fx (kind). Points are where the entity stands (its pivot).
-
 export interface Point {
   readonly x: number;
   readonly y: number;

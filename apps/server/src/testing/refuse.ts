@@ -1,7 +1,3 @@
-// A write a test makes fail, as a full disk would: a trigger that raises. SQLite takes back everything a failed
-// transaction wrote, a count of the tries too, so a test that waits for a try listens for it in the log instead
-// (heard): the work that goes on without the write says the trigger's name there (log.ts's bestEffort).
-
 import { Cause, Effect, Logger } from "effect";
 import type { SqlClient } from "effect/sql";
 

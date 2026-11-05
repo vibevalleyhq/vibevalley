@@ -1,7 +1,3 @@
-// The workspace packages the server runs on: the ones apps/server/package.json lists as workspace:*, and theirs in
-// turn. The packaged app copies them beside the server (scripts/package.ts); in development a change in one restarts it
-// (dev.ts). Read from the package.json files, so a package added later is in both without a list to keep.
-
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 

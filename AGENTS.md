@@ -116,7 +116,7 @@ list are in the [vv-effect](.agents/skills/vv-effect/SKILL.md) skill.
 
 ## 规矩
 
-- **先有概念，再有皮**：服务端按实际的概念分模块（工单、帮工、项目、群聊……，[概念](docs/concepts.md)）；农场只画它们，每个农场里的东西都对得上一件实际的事；游戏规则只读事件、算画面，业务不调它（[提案](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）。
+- **先有概念，再有皮**：服务端按实际的概念分模块（工单、帮工、项目、频道……，[概念](docs/concepts.md)）；农场只画它们，每个农场里的东西都对得上一件实际的事；游戏规则只读事件、算画面，业务不调它（[农场的皮](docs/subsystems/farm.md)）。
 - **核心状态只有一份**：帮工或农场的新状态，在 `packages/protocol/src/<概念>/shapes.ts` 里加字段、在 `core/shapes.ts` 加事实，在 `apps/server/src/projection/reduce.ts` 的 `reduce` 里折，只由服务端 `Core.apply` 施加。不要在服务端、页面里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
 - **`packages/protocol` 只放契约**：一个概念一个文件夹 `src/<概念>/`：线上的形状写在它的 `shapes.ts`，每个形状在同一个文件夹的 `schema.ts` 有一个由它定类型的 Schema（`Codec<T.X>`：两边对不上就编不过），接口写在它的 `api.ts`，`src/shapes.ts`、`schema.ts`、`api.ts` 只汇总；`src/rules` 只放页面和服务端都要跑的纯函数，只有服务端跑的规则归拥有它的模块（`apps/server/src/<模块>`），结论写进帧给页面，页面不为了展示去调规则（`rules/contract.test.ts` 查每个导出都有服务端以外的包在用）；黄金数据（`apps/server/src/<模块>/testdata/*.jsonl.gz`）跟着规则走，有意改了规则就 `vp run golden:update` 重写，看过 diff 再留（[理由](docs/subsystems/foundation.md)）。
 - **生成的不手改**：`apps/server/db/generated` 由 `scripts/sqlite-generate.ts` 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`packages/i18n/src/catalogs.ts` 由 `vp run i18n:gen` 写，`docs:verify` 查它们（[理由](docs/subsystems/foundation.md)）。

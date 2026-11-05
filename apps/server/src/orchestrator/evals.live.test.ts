@@ -1,8 +1,3 @@
-// The orchestrator's evals on the real model, and so never in the default run: VIBEVALLEY_EVALS_LIVE=1 with DEEPSEEK_API_KEY
-// (vp run evals in apps/server), and it costs money. Each case is sampled VIBEVALLEY_EVAL_N times (5) and passes when all but one of them
-// do; VIBEVALLEY_EVALS adds a folder of cases (a home's orchestrator/evals), VIBEVALLEY_EVAL_MODEL another model, and
-// VIBEVALLEY_EVAL_ONLY (names, comma-separated) replays only those cases: after a prompt is mended for one, only it is paid for.
-
 import { writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 

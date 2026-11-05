@@ -1,6 +1,3 @@
-// Writes docs/reference/capabilities.md from the endpoint table (packages/protocol/src/api.ts): what each endpoint does,
-// in the command line's words (cli.op in the zh dictionary), and who may call it, by its `can`. --check fails when the file is not what the table says (docs:verify runs it).
-
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 

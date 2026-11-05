@@ -18,9 +18,7 @@ export type Source =
   | "cron"
   | "patrol";
 
-/** How an input of each source goes in. head: its first words, fixed per source so that the conversation's prefix stays
- * the same, and how its log names the round. now: it joins the run under way (the owner waits on it); else it waits until
- * the run would stop. trigger: what its run is started by, unless the input brings its own. */
+/** How an input of each source goes in. */
 export const intake: Readonly<Record<Source, { readonly head: string; readonly now: boolean; readonly trigger: RunTriggerKind }>> = {
   owner: { head: sourceHead.owner, now: true, trigger: "comment" },
   chat: { head: sourceHead.chat, now: false, trigger: "comment" },
@@ -60,7 +58,7 @@ interface SituationLine {
   readonly line: string;
 }
 
-/** An item ("- …", or indented) is known by the head above it too: the same "（没有帮工）" under two channels is two lines. */
+/** An item ("- …", or indented) is known by the head above it too: the same the empty-helper line under two channels is two lines. */
 function situationLines(text: string): SituationLine[] {
   const out: SituationLine[] = [];
   let at = "";
@@ -77,9 +75,7 @@ function situationLines(text: string): SituationLine[] {
 
 const has = (lines: readonly SituationLine[], l: SituationLine) => lines.some((x) => x.head === l.head && x.line === l.line);
 
-/** What changed from before to now, line by line: + for a line now has and before had not, − for one gone, each item after
- * the head it is under. The whole of now when more than half its lines changed, where a list of changes reads worse than
- * the thing; "" when nothing did. */
+/** What changed from before to now, line by line: + for a line now has and before had not, − for one gone, each item after the head it is under. */
 export function situationDelta(before: string, now: string): string {
   const was = situationLines(before);
   const is = situationLines(now);

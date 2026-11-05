@@ -1,5 +1,3 @@
-// A look at the farm: the game's screenshots (docs/images), each drifting at its own pace as the page scrolls. A click
-// opens one large, growing out of where it was; Escape, the close button or a click outside puts it back.
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Copy } from '../i18n/zh'

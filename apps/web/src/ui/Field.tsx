@@ -31,10 +31,7 @@ export function Field(props: { label: string; hint?: string | undefined; childre
   );
 }
 
-/**
- * value "" is the placeholder, and choosing it is choosing none (a placeholder needs a value type that holds ""). onChange
- * is given an option's value, typed as the options are. quiet is the side column's: no box until the pointer is over it.
- */
+/** value "" is the placeholder, and choosing it is choosing none (a placeholder needs a value type that holds ""). */
 export function Select<V extends string>(props: {
   value: V;
   onChange: (v: V) => void;

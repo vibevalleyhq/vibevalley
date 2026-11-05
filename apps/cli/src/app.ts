@@ -1,6 +1,3 @@
-// `vibevalley app …`: the desktop app's own abilities, asked of it over its socket in the farm's home
-// (desktopControl, apps/desktop src/control.ts), as the page asks them through the window.
-
 import { connect as dial, type Socket } from "node:net";
 
 import { Config, Effect, Schedule } from "effect";

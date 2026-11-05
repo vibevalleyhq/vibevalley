@@ -1,7 +1,3 @@
-// 档案: every profile as a card, the orchestrators first and then the helpers; an orchestrator's card opens its page, a
-// helper's its profile, and each group ends with a card that makes a new one. /agents/<id> is a profile, /agents/new a
-// new worker, /agents/new?role=orchestrator a new orchestrator.
-
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createMemo, For, Show } from "solid-js";
@@ -178,8 +174,7 @@ export function AgentCard(props: {
   const client = useQueryClient();
   const available = () => props.runtime?.installation.status === "available";
   const act = createAct();
-  // The API saves a whole profile, and the cached one may be older than an edit made since (in another window): the
-  // profile is read fresh just before, and only enabled is changed.
+  // The API saves a whole profile, and the cached one may be older than an edit made since (in another window).
   const toggle = () => {
     const { id, enabled } = props.agent;
     return act.run(async () => {

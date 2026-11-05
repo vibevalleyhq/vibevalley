@@ -28,8 +28,7 @@ export function Root(props: { children: JSX.Element }) {
   );
 }
 
-/** The page is up: the cover index.html started on (public/opening.html) goes once the page is ready (infra/opening.ts).
- * From then on the REST reads are read again whenever the state stream comes back. */
+/** The page is up: the cover index.html started on (public/opening.html) goes once the page is ready (infra/opening.ts). */
 function Opened() {
   onSettled(() => {
     void reveal();

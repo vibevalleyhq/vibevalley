@@ -1,10 +1,3 @@
-// An issue's status changed by the owner (a card dragged to another lane, a button on its page, a close or a reopen),
-// before the frame shows it: the move is an intent (state/intent.ts) keyed by its request key, so a lost reply sent again
-// moves the issue once. The board shows the card in the lane it was dropped on, and the issue's page shows it moving,
-// until a frame at least as new as the reply comes; then whatever the frame says (the server may have queued it in 待办
-// for want of room). The overlays set the lane or the status, the one thing the owner chose, and nothing the server
-// works out.
-
 import type { AppliedIssue, Issue, IssueStatus, IssueUpdate } from "@vibevalley/protocol";
 import { omitUndefined, same } from "@vibevalley/protocol/rules";
 
@@ -16,9 +9,9 @@ import type { BoardCard, Lane } from "./cards";
 export interface IssueMove {
   readonly id: string;
   readonly status: IssueStatus;
-  /** What the owner said with it: the findings of 打回, what a reopen asks for. */
+  /** What the owner said with it: the findings of reject, what a reopen asks for. */
   readonly text?: string;
-  /** Fields edited and not saved, saved first so the move sees them (starting a 待办). */
+  /** Fields edited and not saved, saved first so the move sees them (starting a todo). */
   readonly edit?: IssueUpdate;
   /** The lane it was dropped on, when it was dragged: where the card shows until the frame catches up. */
   readonly lane?: Lane;

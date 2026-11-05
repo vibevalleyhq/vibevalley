@@ -9,26 +9,26 @@ src/main.tsx        sends an unpaired remote browser to /pair, then renders App
 src/stories.tsx     the stories' page (stories.html, vite.stories.config.ts): every src/**/*.stories.tsx in packages/stories' viewer
 src/app/            the wiring: App (the routes, each place a feature's page), Root (router, state frames, the farm's store,
                     the query cache, <Loading>), the shell, places
-src/base/           the pure ground, touching nothing outside: times and money in words (format.ts), ordering, matching
-                    (search.ts), the shortcut table, small Solid helpers (util.tsx; external.ts: a framework-free store as
+src/base/           the pure ground, touching nothing outside: times and money in words (format.ts), ordering and matching
+                    (search.ts), typed marks (typedMarks.ts), the shortcut table, small Solid helpers (dom.tsx; external.ts: a framework-free store as
                     a signal)
-src/infra/          what talks to the outside: the state stream (frame.ts: the stream itself, framework-free, opened again
-                    when even the server's heartbeat stops coming, and its Solid store), the API client (api.ts, with request keys), rooms (gateway.ts), the live stream, REST queries (query.ts,
+src/infra/          what talks to the outside: the state stream and live stream (frame.ts: the stream itself, framework-free, opened again
+                    when even the server's heartbeat stops coming, and its Solid store), the API client (api.ts, with request keys), rooms (gateway.ts), REST queries (query.ts,
                     agents.ts), saving settings, the host, the app's updates, the router (the browser's history), the
                     opening cover (opening.ts), the stories' fake server (storyApi.ts)
 src/state/          the middle layer on Effect's Atom: atom.ts (the page's registry, useAtom, the page's values as
-                    defineAtom, a choice in the address as useSearchParam, the frames as an atom), stored.ts (a choice
+                    defineAtom, a choice in the address as useSearchParam, the frames as an atom, the newest answer of a read asked again as useLatest), stored.ts (a choice
                     kept on this machine: defineStored, the only door to the browser's storage), prefs.ts and
                     appearance.ts (this machine's choices and the look they give), intent.ts (what the owner asked for
-                    until the frame shows it), the newest answer of a read asked again (latest.ts), the tests' registry
+                    until the frame shows it), the tests' registry
                     (testing.ts)
 src/ui/             the workbench's pieces: Icon, Face, Button, Field, Dialog, Markdown, ToastHost, Segmented, Tabs, Qr, Chips, A
                     (a link), an owner's act (act.ts), the window strip, the list-and-detail layout (layout.tsx), a
                     helper's look (cast.ts); each with its X.stories.tsx beside it
 src/ui/pixel/       the pixel pieces every skin draws with (the farm, the tree, the project map, the catalog): windows, buttons,
                     fields, toasts, the atlas (atlas.ts), the sounds (sound.ts), a runtime's machine
-src/features/<x>/   one folder per concept, named as the server's module: issue, task, channel, session, agent, memory,
-                    orchestrator, project, runtime, artifact, voice, lan, connector, inbox, setting, catalog. A feature holds its
+src/features/<x>/   one folder per concept, named as the server's module: issue, channel, session, agent, memory,
+                    orchestrator, project, runtime, artifact, pkm, voice, lan, connector, inbox, setting, catalog. A feature holds its
                     pages, its reads, its rules (pure, each with its test) and its words; index.ts is what the rest may use
 src/farm/           the pixel farm at /, outside the shell (its README: who owns which folder, the store, the canvas's screen)
                     and map/, the projects page's map: app/ hands it to features/project as its ProjectsSkin

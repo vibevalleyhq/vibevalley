@@ -1,10 +1,3 @@
-// The box for saying a sentence in a channel and what it keeps for next time, as both chat windows carry it out: the
-// workbench's (features/channel/Composer.tsx) and the farm's (farm/chat/Composer.tsx). Enter sends, Shift+Enter starts a
-// line, @ names someone from a menu that follows the caret. A line sent is an intent (chatSay, state/intent.ts) keyed by
-// its send key: the box empties at once and the window shows the line until the channel has the owner's copy carrying the
-// key. A failed one stays in sight with its key, wherever the owner goes meanwhile, so a retry is the same message, not a
-// second one. A window only draws it and says where a line goes and how a failure shows.
-
 import { Schema } from "effect";
 import { type Accessor, createMemo, createSignal, flush, onSettled } from "solid-js";
 
@@ -218,9 +211,7 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
   };
 }
 
-/** What the owner is writing in each channel, kept on this machine (state/stored.ts) so a reload finds it. The message
- * answered is kept by its id and number, not as a copy: the box shows the message as it is now, and one deleted
- * meanwhile is answered no more. */
+/** What the owner is writing in each channel, kept on this machine (state/stored.ts) so a reload finds it. */
 const DraftSchema = Schema.Struct({
   text: Schema.optionalKey(Schema.String),
   reply: Schema.optionalKey(Schema.Struct({ id: Schema.String, number: Schema.Int })),

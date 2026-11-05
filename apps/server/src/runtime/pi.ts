@@ -1,6 +1,3 @@
-// What pi itself is set up with: its default model, the DeepSeek key and address it
-// uses, and its DeepSeek balance. pi keeps these in its agent folder; the farm only reads them.
-
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -74,19 +71,13 @@ async function piProvider(settings: Pick<RuntimeSettings, "defaultModel">): Prom
 
 const envName = /^\$?\{?([A-Z][A-Z0-9_]*)\}?$/u;
 
-/**
- * A value from pi's config as pi reads it: the environment variable it names when one is set (DEEPSEEK_API_KEY,
- * $DEEPSEEK_API_KEY, ${DEEPSEEK_API_KEY}), else itself. pi's `!command` values are not run.
- */
+/** A value from pi's config as pi reads it. pi's `!command` values are not run. */
 function piValue(value: string): string {
   const m = envName.exec(value);
   return (m && process.env[m[1]!]) || value;
 }
 
-/**
- * The DeepSeek key pi uses and where it sends DeepSeek's requests: the key in its auth.json, else DEEPSEEK_API_KEY, else
- * its models.json's providers.deepseek.apiKey; the base URL in models.json, else DeepSeek's own, without a trailing /v1.
- */
+/** The DeepSeek key pi uses and where it sends DeepSeek's requests. the base URL in models.json, else DeepSeek's own, without a trailing /v1. */
 async function piDeepseek(): Promise<{ key: string; base: string }> {
   const authKey = (await readJson("auth.json", AuthFile))?.deepseek?.key;
   let key = authKey ? piValue(authKey) : (process.env.DEEPSEEK_API_KEY ?? "");
@@ -100,8 +91,7 @@ async function piDeepseek(): Promise<{ key: string; base: string }> {
 
 const unavailable = (reason: string): AccountUsage => ({ status: "unavailable", reason });
 
-/** pi's balance at DeepSeek, when its default model is DeepSeek's; no other provider reports one. Whatever goes wrong is
- * an unavailable reading, with why. */
+/** pi's balance at DeepSeek, when its default model is DeepSeek's. no other provider reports one. */
 export const piBalance = (settings: Pick<RuntimeSettings, "defaultModel">): Effect.Effect<AccountUsage> =>
   Effect.gen(function* () {
     const provider = yield* Effect.promise(() => piProvider(settings));

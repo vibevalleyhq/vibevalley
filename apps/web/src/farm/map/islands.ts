@@ -1,6 +1,3 @@
-// The room on an island is roomLeft, the rule the server refuses a start by: an open plot may start now, a shut one
-// waits for the farm to free up.
-
 import { t } from "@vibevalley/i18n";
 import { type Crop, type Issue, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
 import { isBusy, phaseText, plotKeyOf, roomLeft } from "@vibevalley/protocol/rules";

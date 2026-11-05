@@ -1,5 +1,3 @@
-// The Schemas of progress, achievements, the ledger and the farm's view (docs/subsystems/game.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";

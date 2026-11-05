@@ -1,6 +1,3 @@
-// The farm's own models: VibeValley's agent talks to them (llm.ts), and the farm prices its agent's and DeepSeek
-// Harness's runs by them. pi-ai's built-in list has its own DeepSeek entries, with other prices; the farm's are these.
-
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 /** The order pi-ai clamps a level in: a level a model lacks becomes the next one up, else the next one down. */
@@ -18,8 +15,7 @@ export interface Model {
   readonly cost: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number };
   readonly contextWindow: number;
   readonly maxTokens: number;
-  /** What a level is sent as (reasoning_effort): a level not here goes as itself; null means the model has no such level,
-   * and off null means thinking cannot be turned off. */
+  /** What a level is sent as (reasoning_effort): a level not here goes as itself. */
   readonly thinkingLevelMap?: Readonly<Partial<Record<ThinkingLevel, string | null>>>;
 }
 

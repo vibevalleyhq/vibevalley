@@ -1,6 +1,3 @@
-// How a run goes, turn by turn, as the brain's loop has gone: the spec the loop is held to when it changes
-// (.agents/notes/proposed/architecture/2026-10-27-pi-in-effect.md, step 3).
-
 import { afterEach, describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 

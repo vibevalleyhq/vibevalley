@@ -1,5 +1,3 @@
-// The Schemas of chat apps (docs/subsystems/channel.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";

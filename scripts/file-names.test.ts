@@ -1,5 +1,3 @@
-// Named for what it decides, never for a word that would fit any module (docs/style/naming.md).
-
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 

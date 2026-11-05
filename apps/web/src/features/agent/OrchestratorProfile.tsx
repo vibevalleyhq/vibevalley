@@ -1,6 +1,3 @@
-// An orchestrator's profile, made or edited: its name, what it does, its persona, its DeepSeek model and its look. It
-// runs on VibeValley's own agent only, so it has no machine to pick; its memory and rounds are on its orchestrator page.
-
 import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show, untrack } from "solid-js";
 

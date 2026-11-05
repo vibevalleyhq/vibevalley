@@ -1,6 +1,3 @@
-// Admission serializes room and opening turns; each hand owns its input, handover and departure, so one worktree's
-// checks do not hold the other sessions.
-
 import { Clock, Context, Effect, Exit, FileSystem, Layer, Option, PubSub, Scope, Semaphore, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -92,8 +89,7 @@ export class Session extends Context.Service<
     /** Discard resets its branch only after the runtime has stopped writing. */
     /** closed: how it leaves, "dismissed" unless its issue was completed without a merge ("completed"). */
     readonly dismiss: (id: string, work?: "keep" | "discard", closed?: "dismissed" | "completed") => Effect.Effect<boolean, ApiError>;
-    /** A read-only round's leftovers go: its worktree back to the main branch, what it changed or committed gone; the
-     * session stays. Not while a round goes on (the next report resets it). */
+    /** A read-only round's leftovers go: its worktree back to the main branch, what it changed or committed gone. the session stays. */
     readonly discardWork: (id: string) => Effect.Effect<void, ApiError>;
     /** Removes an issue's unused workplace; an active or unclosed startup still owns it. */
     readonly clearWorkplace: (issue: string, project: string, number: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease, ApiError>;
@@ -114,11 +110,7 @@ export class Session extends Context.Service<
     readonly report: (id: string, report: T.IssueReport) => Effect.Effect<void, ApiError>;
     /** The helper working the issue now, if one is. */
     readonly onIssue: (issue: string) => string | undefined;
-    /** The session hands its workplace over and leaves as closed says: use takes the work in (Source Control's merge, pull
-     * request, merge into a parent issue's branch), given the workplace and the session's last words in full. Refused while
-     * it works. Work that does not go in keeps the session and its branch, and says in NotTakenIn what
-     * the helper is sent back with and what the owner is told; settle says who settles a conflict. A pull request left
-     * open keeps the session too. */
+    /** The session hands its workplace over and leaves as closed says. Refused while it works. */
     readonly handOver: (
       id: string,
       closed: T.SessionClose,

@@ -1,7 +1,5 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-// Nowledge Mem (https://mem.nowledge.co), a knowledge graph on this Mac, spoken to over MCP: memory_search reads, memory_add writes. It is the owner's own knowledge, and the farm only adds to it. What
-// the farm writes carries labels, vibevalley and the profile's, so that a profile reads back its own; with everything it
-// reads all that is in it. Whatever is sent is redacted: a run's words may carry a key.
+// Nowledge Mem (https://mem.nowledge.co), a knowledge graph on this Mac, spoken to over MCP: memory_search reads, memory_add writes.
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { Clock, Effect, Option, Predicate, Schema } from "effect";
 
@@ -90,8 +88,7 @@ export function nowledge(c: MemorySourceConfig): Source {
   let client: Promise<Client> | undefined;
   let transport: StreamableHTTPClientTransport | undefined;
 
-  // The session opens on first use: Nowledge not running when the farm starts must not keep it off until a restart.
-  // The SDK's connect is the one call; a connect that fails or is stopped closes what it opened.
+  // The session opens on first use: Nowledge not running when the farm starts must not keep it off until a restart. The SDK's connect is the one call.
   const connect = () => {
     const wire = new StreamableHTTPClientTransport(new URL(c.url), c.key ? { requestInit: { headers: { Authorization: `Bearer ${c.key}` } } } : {});
     transport = wire;
@@ -113,7 +110,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       throw e;
     }));
 
-  /** One tool call; its answer is the text of the result. A session that failed is dropped, so the next call opens another. */
+  /** One tool call. its answer is the text of the result. */
   const call = (tool: "memory_search" | "memory_add" | "get_memory_by_id", args: Search | Add | Detail) =>
     life.alive(
       Effect.gen(function* () {
@@ -158,8 +155,7 @@ export function nowledge(c: MemorySourceConfig): Source {
   const add = Effect.fnUntraced(function* (agent: string, text: string, project: string) {
     const body = redact(text);
     const answer = yield* call("memory_add", { content: body, title: redactedHead(body, 60), labels: nowledgeLabels(agent, project), source_app: app });
-    // The new memory's id, at the top or under memory; none when it found the same memory there already. An answer of
-    // another shape is not taken for that: the note may not have been kept, and saying so lets the source's queue log it.
+    // The new memory's id, at the top or under memory. none when it found the same memory there already.
     const added = Option.getOrUndefined(Schema.decodeOption(AddedResponse)(answer));
     if (!added) return yield* new SourceError({ message: "memory_add answered what it should not: " + head(answer, 200) });
     return added.memory_id || added.id || added.memory?.id || "";
@@ -190,7 +186,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       if (c.read !== true || q.kind === "issue") return { found: [] };
       const hits = yield* find(q.agent, q.text, q.limit, !(c.everything !== true));
       const selected = hits.slice(0, most);
-      // MCP search omits labels; only its detail result can prove a project's scope. The caller's read budget covers both.
+      // MCP search omits labels. only its detail result can prove a project's scope.
       const scopes = yield* Effect.forEach(
         selected,
         (h): Effect.Effect<MemoryScope> => {

@@ -1,6 +1,3 @@
-// A chat/completions stream read into an assistant message, as pi-ai 1.3.0's openai-completions reads DeepSeek's
-// (testdata/deepseek.jsonl.gz holds what pi-ai made of each stream), with pi-ai's events on the way.
-
 import { Predicate } from "effect";
 
 import type { AssistantMessage, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
@@ -22,7 +19,7 @@ export type AssistantMessageEvent =
   | { readonly type: "done"; readonly reason: "stop" | "length" | "toolUse"; readonly message: AssistantMessage }
   | { readonly type: "error"; readonly reason: "error" | "aborted"; readonly error: AssistantMessage };
 
-/** Server-sent events' data, one string an event; [DONE] ends them. Feed it lines; a blank line closes an event. */
+/** Server-sent events' data, one string an event. [DONE] ends them. */
 export class SseData {
   private data: string[] = [];
   done = false;

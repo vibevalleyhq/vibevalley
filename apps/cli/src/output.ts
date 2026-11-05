@@ -1,8 +1,3 @@
-// What the command line writes and how it ends, for an agent as much as a person: stdout holds the result and nothing
-// else (one JSON document, or one JSON line per frame of a stream), stderr the progress, the help on a mistake and the
-// failure as JSON with what to do next; the exit code says which kind of failure it was without reading the words.
-// Everything goes through Effect's Stdio, so a test gives the command line its own.
-
 import { Effect, Option, Schema, Stdio, Stream } from "effect";
 
 /** Exit codes a script can branch on. */

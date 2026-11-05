@@ -1,8 +1,3 @@
-// Feishu and Lark. Logging in is Feishu's scan-to-create flow: Feishu creates a personal bot app for
-// the owner and hands back its app id and secret (the device-code flow nanobot uses: accounts.feishu.cn/oauth/v1/app/
-// registration). Messages come over the official SDK's long connection, outbound only; replies go through the message
-// API to the owner's open_id, with no reply window.
-
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { Effect, FiberSet, Option, Predicate, Ref, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";

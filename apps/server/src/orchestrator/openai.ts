@@ -1,8 +1,3 @@
-// OpenAI's chat/completions for an agent that keeps its own conversation. Only the
-// newest user message is read: the agent's session is the history and its own prompt the persona, so earlier messages,
-// system messages and tools in the request are not. Only the agent's words come back, without usage. Who may ask (paths,
-// keys) is the mounting side's business.
-
 import { randomBytes } from "node:crypto";
 
 import { ByteSize, Cause, Clock, Effect, Schema, Stream } from "effect";
@@ -72,8 +67,7 @@ export function chatChunk(id: string, created: number, model: string, content: s
   );
 }
 
-/** The route's handler: the request read as OpenAI's, the answer whole or as server-sent chunks. A client that goes away
- * while it streams interrupts the response, and with it the answer. */
+/** The route's handler: the request read as OpenAI's, the answer whole or as server-sent chunks. */
 export const chatCompletions = <E>(c: ChatCompletions<E>) =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;

@@ -1,7 +1,3 @@
-// Every workbench page through axe (WCAG 2 A and AA): the roles, names and contrast a page test no longer reads off the
-// words it finds things by. The farm's canvas and the tree's scene are pictures, not controls, and are left to their own
-// tests.
-
 import AxeBuilder from "@axe-core/playwright";
 
 import { expect, test } from "./fixtures";
@@ -32,8 +28,7 @@ for (const theme of ["light", "dark"] as const)
       await page.goto(path);
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
-      // The opening bar is gone once the page is up; measured before that, its fading words read as low contrast. It waits
-      // up to 2 s for the page's reads, then fades: with every worker busy that passes the default 5 s now and then.
+      // The opening bar is gone once the page is up. measured before that, its fading words read as low contrast.
       await expect(page.locator("#opening")).toHaveCount(0, { timeout: 15_000 });
       // Measured once things have moved in (a dialog fading in reads as low contrast); a pulse that never ends is not waited for.
       await page.evaluate(() =>

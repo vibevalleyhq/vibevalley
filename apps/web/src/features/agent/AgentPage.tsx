@@ -1,7 +1,3 @@
-// One profile, made or edited: its
-// look on the left, the helper on its bed in the middle, what it is and runs on in tabs on the right; what would keep the
-// orchestrator from sending it, the server's answer (agent.validate), under them.
-
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";

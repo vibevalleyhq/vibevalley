@@ -1,6 +1,3 @@
-// The day clock: one world day lasts `daySeconds` of real time. It moves only when told how much time passed
-// (`advance`), so a test, a ticker or a debug slider drives it; `run` ties it to a timer.
-
 export interface Day {
   /** Time of day, 0..1 (0.5 is noon). */
   readonly tod: number;

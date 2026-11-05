@@ -1,6 +1,3 @@
-// The HTTP endpoints' answers: each concept's part is in http/handlers/<concept>.ts and only forwards to the service that
-// owns the rule; this puts them together.
-
 import { Effect } from "effect";
 
 import type { Handlers } from "@vibevalley/protocol/api";

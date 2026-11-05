@@ -1,6 +1,3 @@
-// The beds (the village's plots), what grows in them and what a tool does on them: the server folds the state, these
-// only read it.
-
 import { t } from "@vibevalley/i18n";
 import type { Crop, FarmView, PlotView, Session, SessionPlayView } from "@vibevalley/protocol";
 import { plotKeyOf } from "@vibevalley/protocol/rules";
@@ -50,10 +47,7 @@ export const plotOf = (view: FarmView, s: Session | undefined): PlotView => (s ?
 
 export const lockedPlot = (bed: Bed, level: number): PlotView => ({ crop: level >= (bed.unlockLevel ?? Infinity) ? "flowering" : "locked" });
 
-/**
- * What a bed shows: a cleared locked bed flowers; a session's plot not yet in the view is a sprout; `leaving` (its
- * session just left) shows the harvested soil.
- */
+/** What a bed shows: a cleared locked bed flowers. a session's plot not yet in the view is a sprout. */
 export function cropOfBed(bed: Bed, sessions: readonly Session[], view: FarmView, leaving = false): Crop {
   if (bed.unlockLevel !== undefined) return lockedPlot(bed, Math.round(view.level.level)).crop;
   const s = sessionAtStation(sessions, bed.station, view.plays);

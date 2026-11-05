@@ -1,5 +1,3 @@
-// The tools every agent has on itself. They touch only the agent's own folder; a subagent (spawn_agent) cannot send subagents.
-
 import { Effect, Schema } from "effect";
 
 import { ToolFailed } from "./core/errors.ts";

@@ -1,6 +1,3 @@
-// Checkbox: checked, unchecked or (when told) indeterminate (Base UI's Checkbox). A button with role checkbox; the
-// indicator is shown only while checked or indeterminate, unless keepMounted.
-
 import { createContext, omit, Show, useContext } from "solid-js";
 
 import { createControllable } from "./internal/controllable";

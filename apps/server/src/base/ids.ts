@@ -1,8 +1,3 @@
-// Row ids: uuidv7, which carries the time it was made, so rows sort in the order they were
-// written. Within one millisecond the 12 bits after the time count up, so a row made in the same millisecond as the one
-// before it still sorts after it; a clock that goes back across a restart can put a new id before an old one, which one
-// farm on one machine accepts.
-
 import { randomBytes, randomInt } from "node:crypto";
 
 let lastMs = -1;

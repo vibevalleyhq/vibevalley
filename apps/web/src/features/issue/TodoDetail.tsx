@@ -55,8 +55,7 @@ export const dispatchedNotice = (open: (id: string | undefined) => void) => (got
   else open(got.id);
 };
 
-/** An issue not sent yet. In the backlog it is a draft: the box says what is wanted (or answers what its refiner asked)
- * and sends a helper to draft it; the fields are the draft, each editable; 开工 sends it out. */
+/** An issue not sent yet. In the backlog it is a draft: the box says what is wanted (or answers what its refiner asked) and sends a helper to draft it. */
 export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined) => void }) {
   const [d, setD] = createSignal(untrack(() => draftOf(props.item)));
   // Until the owner edits a field, a draft coming back fills them.
@@ -193,7 +192,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   );
 
   // One place to start from: a new draft is one sentence to draft from; its description and criteria come in once drafted,
-  // written, or asked for (自己写).
+  // written, or asked for (manual entry).
   const [own, setOwn] = createSignal(false);
   const written = () => refined() || d().description.trim() !== "" || criteria().length > 0;
   const fields = () => written() || own() || !backlog();

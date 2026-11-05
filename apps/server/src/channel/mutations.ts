@@ -33,8 +33,7 @@ export function messageMutations(
     return row;
   });
 
-  /** One message changed, in one transaction with the channel's next revision; then it goes to whoever follows its
-   * channel as it now is. A change is not news: no fact, no delivery, no wake. */
+  /** One message changed, in one transaction with the channel's next revision. then it goes to whoever follows its channel as it now is. */
   const change = Effect.fnUntraced(function* (row: MsgRow, work: (revision: number, now: number) => Effect.Effect<void>) {
     const now = yield* Clock.currentTimeMillis;
     yield* tx(

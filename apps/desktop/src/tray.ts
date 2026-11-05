@@ -1,5 +1,3 @@
-// The farm at a glance in the menu bar: the page says what (Follow.tsx); a click on a line brings the window up.
-
 import { Menu, nativeImage, Tray } from "electron";
 
 import { t } from "@vibevalley/i18n";

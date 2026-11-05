@@ -1,5 +1,3 @@
-// How to start: the one warning first, what you need, and the commands to build the app, with a button that copies
-// them and says so.
 import { AnimatePresence, MotionConfig, motion, steps } from 'motion/react'
 import { useRef, useState } from 'react'
 import type { Copy } from '../i18n/zh'

@@ -1,7 +1,3 @@
-// The words said to the owner: catalogs per language and namespace (locales/<locale>/<namespace>.json), read by key.
-// zh is the source; a message missing in another language falls back to it (scripts/i18n.ts check reports the gap).
-// What is said to models is not here: it stays in each module's prompts.ts.
-
 import { catalogs, type Messages } from "./catalogs";
 import { format, type Params } from "./format";
 import { currentLocale, type Locale } from "./locale";

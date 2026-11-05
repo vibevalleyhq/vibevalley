@@ -43,9 +43,7 @@ import { type CriterionRow, issueState, noStepsText, stageTone } from "./overvie
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { issueDeliver, shownDeliver } from "./write";
 
-/** The workbench's issue page, answering the owner top to bottom: what it is, where it stands, the one thing asked of
- * the owner (only when there is one), how far it is against its criteria, what it made, and how it got here; the
- * side holds the facts. `onClose` opens the close dialog (`review`: straight on its changes). */
+/** The workbench's issue page, answering the owner top to bottom. the side holds the facts. */
 export function IssueDetail(props: {
   issue: Issue;
   sessions: Session[];
@@ -59,7 +57,7 @@ export function IssueDetail(props: {
   const live = () => issues().find((item) => item.id === props.issue.id) ?? props.issue;
   const s = createMemo(() => issueState(movedIssue(live(), moves.list()), props.sessions, props.session, issues()));
   const head = () => s().head;
-  // The box under the block holds an answer, the findings of 打回, a word to the helper, or what a reopen asks for.
+  // The box under the block holds an answer, the findings of reject, a word to the helper, or what a reopen asks for.
   const acts = createIssueActs(() => props.issue, {
     act: createAct(),
     complete: () => props.onClose(props.session ?? head(), true),

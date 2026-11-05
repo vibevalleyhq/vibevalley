@@ -1,5 +1,3 @@
-// The stories' page is static, served from the run's build: no farm server is started.
-
 import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";

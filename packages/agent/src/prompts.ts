@@ -1,7 +1,3 @@
-// What VibeValley's own agent reads: its tools' descriptions and results, its coding tool's refusals, its reminders,
-// memory and skill errors, and fragments of its own system prompt. Said to the model, in Chinese whatever the
-// owner's locale.
-
 export const mcpConfig = {
   notJson: (path: string) => `${path} 不是 JSON`,
   badShape: (path: string, error: string) => `${path} 不是 JSON 或配置形状不对：${error}`,
@@ -145,8 +141,7 @@ export const todoToolWords = {
     `〔任务〕这一轮停了，还有 ${count} 件你可以做：${ids.join("、")}。接着做；做不了的用 todo_update 标 failed 或 skipped，写明原因。\n\n${graph}`,
 };
 
-/** The agent itself: its subagent's name and no-answer fallback, its prompt's sections, its memory-news header,
- * and what it says of a tool call a restart cut off (agent.ts). */
+/** The agent itself: its subagent's name and no-answer fallback, its prompt's sections, its memory-news header, and what it says of a tool call a restart cut off (agent.ts). */
 export const agent = {
   resumedUnknown: "服务端在这个工具做完之前重启了，不知道它做没做成：先查一下现状，再决定要不要再做一遍。",
   subagentNameSuffix: "-帮手",

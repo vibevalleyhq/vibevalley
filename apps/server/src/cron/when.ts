@@ -1,8 +1,5 @@
 import { Cron as EffectCron, DateTime, Option } from "effect";
-// When a cron runs and how it is said. The next run is
-// the first matching minute strictly after the last run. A wall time skipped by a clock change is taken as the same time
-// before the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence. What is due,
-// whether a run was missed, what a run leaves, and whether a cron waits for the owner's yes.
+// When a cron runs and how it is said. The next run is the first matching minute strictly after the last run.
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -29,11 +26,7 @@ function givenZone(tz: string): DateTime.TimeZone | undefined {
   return tz.startsWith("+") || tz.startsWith("-") ? undefined : named(tz);
 }
 
-/**
- * The first run of the cron strictly after from. Cron walks the wall clock: a time a clock change skipped is taken as
- * the same time before the change (02:30 on a spring-forward night is 03:30), a repeated one is its first occurrence;
- * none at all (30 February) is undefined.
- */
+/** The first run of the cron strictly after from. */
 function nextOf(cron: EffectCron.Cron, from: number): number | undefined {
   try {
     return EffectCron.next(cron, new Date(from)).getTime();
@@ -240,11 +233,7 @@ export const isMissed = (s: T.Cron, now: number) => now - (nextRun(s) ?? now) > 
 /** A one-off runs once: then it is off. */
 export const afterRun = (s: T.Cron, now: number): T.Cron => ({ ...s, lastRun: now, enabled: s.when.kind === "once" ? false : s.enabled });
 
-/**
- * Whether a cron waits for the owner's yes before it can come due. One set on the owner's word never waits. Without
- * it, only a one-off follow-up for the asker itself goes ahead: one that comes back again, or sends a helper (who spends
- * money) straight away, waits.
- */
+/** Whether a cron waits for the owner's yes before it can come due. One set on the owner's word never waits. */
 export function needsOK(req: T.CronRequest, by: Actor): boolean {
   return !actsForOwner(by) && (req.when.kind !== "once" || (req.agent ?? "").trim() !== "");
 }
@@ -276,8 +265,6 @@ export function dueText(s: T.Cron, missed: boolean): string {
 }
 
 // Five fields, minute, hour, day of month, month and day of week, each a comma list of *, n or a-b, any with /step.
-// Day of week is 0 to 7, both 0 and 7 Sunday. As in Vixie cron, when neither day field starts with *, a day matching
-// either one is due; otherwise it must match both.
 
 function exprProblem(expr: string, now: number, tz: string | undefined): string {
   const spec = parseCron(expr);

@@ -143,8 +143,7 @@ export class VibeValleyApi {
       create: (a: { id: T.MessageId; requestKey?: string }): Promise<string> => this.call<string>("/api/v1/channel/thread/create", a),
     },
     archive: {
-      /** Out of the sidebar and the thread lists (on), or back; its messages and address stay. The default channel stays. As
-       * it already is, nothing changes. */
+      /** Out of the sidebar and the thread lists (on), or back. its messages and address stay. */
       set: (a: T.OnSet): Promise<void> => this.call<void>("/api/v1/channel/archive/set", a),
     },
     direct: {
@@ -206,8 +205,7 @@ export class VibeValleyApi {
     delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/issue/delete", a),
     /** What issue.delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/issue/previewDelete", a),
-    /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
-     * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
+    /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then leaves. */
     refine: (a: { id: string } & T.IssueRefineRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/refine", a),
     comment: {
       /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
@@ -228,9 +226,7 @@ export class VibeValleyApi {
       get: (a: { id: string }): Promise<T.IssueTimeline> => this.call<T.IssueTimeline>("/api/v1/issue/timeline/get", a),
     },
     status: {
-      /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is
-       * another round (the words are the findings; stuck, none takes the server's own); done is accepted and delivered as the
-       * issue says; canceled sends its session home. Issue.moves lists where it may go. */
+      /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is another round (the words are the findings. */
       update: (a: { id: string } & T.IssueStatusRequest): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/status/update", a),
       /** What issue.status.update would do with the same body, refused as it would be; nothing changes. */
       previewUpdate: (a: { id: string } & T.IssueStatusRequest): Promise<T.Preview> => this.call<T.Preview>("/api/v1/issue/status/previewUpdate", a),
@@ -243,7 +239,7 @@ export class VibeValleyApi {
     list: (a: { agent?: string }): Promise<T.Session[]> => this.call<T.Session[]>("/api/v1/session/list", a),
     get: (a: { id: string }): Promise<T.Session> => this.call<T.Session>("/api/v1/session/get", a),
     event: {
-      /** Its log, oldest first; run gives one run's only. The orchestrator's log is session orchestrator's. */
+      /** Its log, oldest first. run gives one run's only. */
       list: (a: { id: string; run?: string }): Promise<T.SessionEvent[]> => this.call<T.SessionEvent[]>("/api/v1/session/event/list", a),
     },
   };
@@ -269,13 +265,11 @@ export class VibeValleyApi {
       get: (a: T.ArtifactReadRequest): Promise<T.ArtifactContent> => this.call<T.ArtifactContent>("/api/v1/artifact/content/get", a),
     },
     version: {
-      /** An html one's new version over the latest; the old ones stay. Announced like the first. A blocks one is changed
-       * block by block instead. */
+      /** An html one's new version over the latest. the old ones stay. */
       create: (a: T.ArtifactVersionRequest): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/version/create", a),
     },
     html: {
-      /** The owner's words in place of some in an html one's page: the next version, the rest of its bytes as they were.
-       * Refused when the words are not found once in the page's own text, cross an element, or the version is not the latest. */
+      /** The owner's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
       edit: (a: T.ArtifactHtmlEdit): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/html/edit", a),
     },
     block: {
@@ -359,8 +353,7 @@ export class VibeValleyApi {
       list: (): Promise<T.AgentTemplate[]> => this.call<T.AgentTemplate[]>("/api/v1/agent/template/list", undefined),
       /** A new profile from a template; installing one again makes another. */
       install: (a: { id: string }): Promise<T.Agent> => this.call<T.Agent>("/api/v1/agent/template/install", a),
-      /** A profile made again from its template's version now: what came from the template is replaced, what is the
-       * machine's (environment, default project, on or off) stays. */
+      /** A profile made again from its template's version now. */
       update: (a: { agent: string }): Promise<T.Agent> => this.call<T.Agent>("/api/v1/agent/template/update", a),
       /** A template folder on this machine copied in beside the built-in ones; nothing is installed. */
       add: (a: { path: string }): Promise<T.AgentTemplate> => this.call<T.AgentTemplate>("/api/v1/agent/template/add", a),

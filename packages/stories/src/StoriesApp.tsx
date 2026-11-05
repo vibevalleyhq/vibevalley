@@ -1,6 +1,3 @@
-// Drawn with the host's token classes (bg-page, border-line…): the host's Tailwind scans this folder. Each frame contains
-// its layout, so a part fixed to the window (a toast) stays in its frame; a modal <dialog> still opens over everything.
-
 import type { JSX } from "@solidjs/web";
 import {
   Accessibility,
@@ -127,7 +124,7 @@ const isOwn = (n: globalThis.Node) => (n instanceof Element ? n : n.parentElemen
 
 export function StoriesApp(props: {
   stories: readonly Stories[];
-  /** Paths to list first, in this order, at each depth ("设计体系", "组件", "组件/工作台"). */
+  /** Paths to list first, in this order, at each depth ("Design System", "Components", "Components/Workbench"). */
   order?: readonly string[];
   /** What every story is drawn inside: the host's contexts (a router, a query cache). */
   wrap?: (story: () => JSX.Element) => JSX.Element;

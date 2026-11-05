@@ -1,5 +1,3 @@
-// The shapes of issues: status, acts, history, reports, the board (docs/subsystems/issue.md).
-
 import type { IssueId, SessionId, Spent } from "../common/shapes";
 import type { Commit, UncommittedItem } from "../project/shapes";
 import type { IssueAnswer, Run, Session } from "../session/shapes";
@@ -99,7 +97,7 @@ export interface Issue {
   createdAt: number;
   queuedAt?: number;
   closedAt?: number;
-  /** Done: what it delivered. Its verdict is the status; how its work went in is this. */
+  /** Done: what it delivered. Its verdict is the status. */
   delivered?: Delivery;
   /** Canceled: why. */
   canceled?: IssueCanceled;
@@ -116,16 +114,14 @@ export interface Issue {
   criteria: string[];
   checks: CriterionCheck[];
   refining?: IssueRefining;
-  /** Its latest run as the issue keeps it, for a run no session on the farm carries (an in-process agent's, the
-   * orchestrator's): going on while it has no end; ended, the issue waits on the owner. */
+  /** Its latest run as the issue keeps it, for a run no session on the farm carries (an in-process agent's, the orchestrator's): going on while it has no end. */
   lastRun?: Pick<Run, "startedAt" | "endedAt" | "outcome">;
   /** An answer issue's conclusion, read from what its latest round handed back; none when that round gave none it could read. */
   answer?: IssueAnswer;
   stage: IssueStage;
 }
 
-/** An issue as a change left it (issue.create, issue.update, issue.status.update), with the seq of the core's fold that
- * includes the change: the first frame whose seq is at least this one shows it. */
+/** An issue as a change left it (issue.create, issue.update, issue.status.update), with the seq of the core's fold that includes the change. */
 export interface AppliedIssue extends Issue {
   seq: number;
 }
@@ -153,14 +149,11 @@ export type IssueStageKind = (typeof IssueStageKindValues)[number];
 export const StuckReasonValues = ["failed", "conflict", "interrupted", "quiet"] as const;
 export type StuckReason = (typeof StuckReasonValues)[number];
 
-/** A button on an issue's page, by what it says. tell is a word to the helper, answer the same to its question; reject
- * sends it back with findings; acknowledge takes what an answer issue found as done; cure, resolve and resume send it
- * back with the server's own words for why it stopped. */
+/** A button on an issue's page, by what it says. tell is a word to the helper, answer the same to its question. */
 export const IssueActValues = ["start", "answer", "reject", "complete", "acknowledge", "resolve", "resume", "cure", "tell", "stop", "close", "reopen"] as const;
 export type IssueAct = (typeof IssueActValues)[number];
 
-/** since: when it came to stand so, when known. lead is the one thing the owner is asked to do, if any; acts are all
- * it can do, lead first. */
+/** since: when it came to stand so, when known. lead is the one thing the owner is asked to do, if any. */
 export interface IssueStage {
   state: IssueStageKind;
   since?: number;
@@ -257,18 +250,15 @@ export interface IssueRequest {
   autoSubmitPr?: boolean;
   /** What it must do to be accepted, each checked by whoever works it before handing back. */
   criteria?: string[];
-  /** The client's key for this request: the same key again within a while returns the first one's result and does it
-   * once (a retry after a lost reply). At most 64 characters. */
+  /** The client's key for this request: the same key again within a while returns the first one's result and does it once (a retry after a lost reply). */
   requestKey?: string;
 }
 
-/** What an issue delivers: a change (its branch, merged into the project or by a pull request), a change kept on its
- * branch for the owner to take in, or an answer (on the issue). Its helper does the same work for change and branch. */
+/** What an issue delivers: a change, a change kept on its branch for the owner to take in, or an answer (on the issue). */
 export const DeliverableValues = ["change", "branch", "answer"] as const;
 export type Deliverable = (typeof DeliverableValues)[number];
 
-/** What a completed issue delivered: its branch merged into the project's main branch, into its parent issue's branch, by a
- * pull request, its branch kept unmerged, or nothing (no change, or an answer). */
+/** What a completed issue delivered: its branch merged into the project's main branch, into its parent issue's branch, by a pull request, its branch kept unmerged, or nothing (no change, or an answer). */
 export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "kept", "none"] as const;
 export type Delivery = (typeof DeliveryValues)[number];
 
@@ -323,15 +313,12 @@ export interface IssueSplitRequest {
 
 export interface IssueStatusRequest {
   status: IssueStatus;
-  /** Moving back to todo: another round with these words (findings, while it waits for acceptance), or, while it is
-   * stuck, none for the server's own; reopening: what to do this time. */
+  /** Moving back to todo: another round with these words (findings, while it waits for acceptance), or, while it is stuck, none for the server's own. */
   text?: string;
-  /** Moving to todo: the profile that takes it on. Another than its own hands it over: the last session leaves, its branch
-   * kept, and this one goes on in the same issue. */
+  /** Moving to todo: the profile that takes it on. */
   agent?: string;
   /** Fields the owner changed and has not saved: saved first, so the act sees them. */
   edit?: IssueUpdate;
-  /** The client's key for this request: the same key again within a while returns the first one's result and does it
-   * once (a retry after a lost reply). At most 64 characters. */
+  /** The client's key for this request: the same key again within a while returns the first one's result and does it once (a retry after a lost reply). */
   requestKey?: string;
 }

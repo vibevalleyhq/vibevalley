@@ -1,8 +1,3 @@
-/**
- * What the readings are taken from: git's history and the tracked source at HEAD. "Now" is HEAD's commit time, so the
- * same commit reads the same on every machine and on every run.
- */
-
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

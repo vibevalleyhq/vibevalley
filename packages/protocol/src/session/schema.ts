@@ -1,5 +1,3 @@
-// The Schemas of sessions: phases, runs, their events (docs/subsystems/session.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";

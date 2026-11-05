@@ -1,13 +1,3 @@
-/**
- * Regression tests: the test a fix adds, named `regression: …`, is the one sample of how this code broke. An agent told
- * to make a failing test pass can do it by weakening the test, and nothing else would notice; so a pull request that
- * removes or changes one names it and says why in a `## Regression` section of its body, and a fix/ branch that adds
- * none says why there. CI runs it on a pull request against its base (docs/development.md#分支提交和-pr): the merge
- * commit it checks out has the base as its first parent.
- *
- *   vpx scripts/regression.ts --base <commit> --branch <name> --body <text>
- */
-
 import { execFileSync } from "node:child_process";
 import { parseArgs } from "node:util";
 

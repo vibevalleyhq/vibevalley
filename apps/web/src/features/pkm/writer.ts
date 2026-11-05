@@ -1,6 +1,3 @@
-// One batch on its way at a time: the next waits for the answer to the last, and the ops still waiting are applied again
-// over what the server answers; a refusal drops them and puts the server's blocks back.
-
 import type { PkmBlock, PkmBlockOp, PkmPage, PkmUndo } from "@vibevalley/protocol";
 
 import { api, reasonOf } from "#/infra/api.ts";

@@ -1,7 +1,3 @@
-// What packages:build is for, checked after it: every workspace package's exports give the others its built types
-// (types: dist/…d.ts) beside its source (default: src/…). TypeScript reads `default` when the `types` file is missing, so
-// a package whose build wrote something else (a .d.mts) would be checked by its source without a word: this says so.
-
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 

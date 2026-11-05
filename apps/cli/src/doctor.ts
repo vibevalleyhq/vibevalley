@@ -1,7 +1,3 @@
-// `vibevalley doctor`: how this machine's farm is, in one answer, a check a line: which farm the command line found, whether
-// it answers, the desktop app, the runtimes, the model's key, the LAN listener. Each says ok, and when not, why and what
-// to do next, in the words a failure uses; a farm that does not answer ends the run with its exit code.
-
 import { Effect, Schema } from "effect";
 import { Command } from "effect/cli";
 

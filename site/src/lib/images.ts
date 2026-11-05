@@ -1,16 +1,9 @@
-// The game's pictures as the site sends them: compressed copies made at build time (Astro's image service, sharp) from
-// the originals in apps/web/public and docs/images, which stay as they are: the game ships the originals. Only the pages
-// call these; the islands get the copies' addresses.
-//   - The title scene's pictures and sprites: WebP at their own size (lossy, at a quality where a zoomed crop shows no
-//     difference), a fifth to a half of the originals.
-//   - Screenshots: WebP in a few widths, for the browser to pick by the screen.
 import type { ImageMetadata } from 'astro'
 import { getImage } from 'astro:assets'
 import { byName } from './files'
 import { SCENES, SHOWN, type Scene, type SpriteName } from './scene'
 
-// Only the pictures the pages show are imported: Astro drops an original once its copy is made, but keeps every
-// imported picture it never copied. SHOWN (scene.ts) must be in this list; titleArt says so if one is not.
+// Only the pictures the pages show are imported: Astro drops an original once its copy is made, but keeps every imported picture it never copied.
 const title = byName(
   import.meta.glob<{ default: ImageMetadata }>(
   '@game/title/{cloud-big-1,cloud-wisp-1,cloud-mid-2,puff-1,puff-2,wisp-1,wisp-2,fern,grass-tall,grass-daisy,grass-low,grass-yellow,grass-dandelion,dandelion-1,dandelion-2,dandelion-3,seed-1,seed-2,seed-3,seed-4,manager-morning,manager-day,manager-evening,manager-night,dog-sit,dog-tail,dog-look,dog-sleep}.png',

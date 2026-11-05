@@ -15,9 +15,7 @@ export interface MoreItem {
   readonly onSelect: () => void;
 }
 
-/** ⋯: the actions a place has that are not its main one, in base-ui's Menu, drawn like every workbench menu. open and
- * onOpenChange when the place shows something while it is open (a toolbar that stays); render makes the trigger part of
- * a toolbar (Toolbar.Button). */
+/** ⋯: the actions a place has that are not its main one, in base-ui's Menu, drawn like every workbench menu. */
 export function MoreMenu(props: {
   label: string;
   items: readonly MoreItem[];

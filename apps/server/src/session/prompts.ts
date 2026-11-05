@@ -1,6 +1,3 @@
-// What a helper is told about the farm: the rules it works by, what it remembers, and the word that the farm restarted.
-// Said to models, in Chinese whatever the owner's locale: the helper answers in the owner's (ownersLanguage).
-
 import { pullRequestFile, type Workplace } from "#/project/workplace.ts";
 import { ownersLanguage } from "#/prompts.ts";
 export const sourceBrief = (id: string) =>

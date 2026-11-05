@@ -1,8 +1,3 @@
-// The model is shown these bytes: change a Schema only on purpose, with the orchestrator's evals replayed; tool.test.ts
-// holds every one to the bytes it was last given, and each tool's fields to its endpoint's. Unknown fields are let
-// through. requiredOrder is the order the required fields are listed in, and a struct that refuses fields it does not
-// know (parseOptions) says so in the JSON Schema too (additionalProperties false).
-
 import { Effect, Predicate, Schema } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
@@ -374,14 +369,13 @@ export const said = (e: unknown) => toFailed(e).message;
 
 export const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e), cause: e }) });
 
-/** An answer, or "没成：" and why. */
+/** An answer, or the refusal prefix and why. */
 export const answered = <E>(e: Effect.Effect<string, E>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(said(err))));
 
 // Who reads and speaks in a channel: a session as itself, the orchestrator as the orchestrator.
 export const participant = (c: Caller) => c.session || c.agent;
 
-// A tool's arguments are read by its Schema before it runs; the model's JSON Schema is made from the same one.
-// Named by its endpoint (toolName): the name is never written a second time.
+// A tool's arguments are read by its Schema before it runs. the model's JSON Schema is made from the same one.
 const toolOf =
   <All extends { readonly [op: string]: Schema.Codec<unknown, unknown> }>(
     all: All,

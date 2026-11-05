@@ -1,9 +1,3 @@
-// VibeValley's own agent, on the farm's loop (agent/loop). A message is saved before its message_end is passed on. Past its
-// budget the older part of the conversation is folded into a summary: for a request as soon as it is too long, in the
-// file once the run is over; past idleFoldAt, once it has been idle idleFoldAfterMs. The system prompt is made when the
-// agent starts and after each fold, never per request: what changes meanwhile (the time, the host's situation, new
-// memory) goes in the newest input, so the start of every request stays the cached one.
-
 import { join } from "node:path";
 
 import { Clock, Deferred, Effect, FiberHandle, FiberSet, PubSub, Ref, type Scope, Stream } from "effect";
@@ -117,8 +111,7 @@ interface Folded {
   readonly fresh: boolean;
 }
 
-/** The calls of the last answer that have no result; ok is false when there is nothing to go on with: the model spoke
- * last with nothing left to do, or the run was stopped or failed. */
+/** The calls of the last answer that have no result. */
 function unfinished(messages: readonly BrainMessage[]): {
   missing: ToolCall[];
   ok: boolean;
@@ -180,17 +173,13 @@ export interface Brain {
   readonly reset: Effect.Effect<void>;
   readonly skills: Effect.Effect<SkillInfo[]>;
   readonly mcpStatus: () => McpStatus;
-  /** What MEMORY.md gained (+) and lost (−) since the model last knew it, as one block for the newest input; "" when
-   * nothing. What it returns counts as known from then on. */
+  /** What MEMORY.md gained (+) and lost (−) since the model last knew it, as one block for the newest input. "" when nothing. */
   readonly memoryNews: Effect.Effect<string>;
-  /** Goes on with the run the conversation was cut off in; true when it does. Each call of the last answer without a
-   * result is given one, failed, saying it is not known whether it was done. Not when it is busy, the run ended or was
-   * stopped, or its last message is older than maxAgeMs. */
+  /** Goes on with the run the conversation was cut off in. true when it does. */
   readonly resume: (maxAgeMs: number) => Effect.Effect<boolean>;
 }
 
-/** Connects to its MCP servers first: one that cannot be reached is left out (mcpStatus). Everything it starts is in
- * the scope it is made in, and closing that closes it. */
+/** Connects to its MCP servers first: one that cannot be reached is left out (mcpStatus). */
 export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFailed, Scope.Scope> =>
   Effect.gen(function* () {
     const mcp = yield* Effect.acquireRelease(Effect.tryPromise({ try: (signal) => connectAll(options.mcpServers ?? [], signal), catch: agentFailed }), (m) =>
@@ -214,8 +203,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
       now,
     };
 
-    // Its events go out on a hub: a subscriber reads them in order, at its own pace, and its stream ends after
-    // agent_closed. The hub is not shut down, so a reader outliving the brain's scope still gets what came before.
+    // Its events go out on a hub: a subscriber reads them in order, at its own pace, and its stream ends after agent_closed.
     const hub = yield* PubSub.unbounded<BrainEvent>();
     const publish = (e: BrainEvent) => PubSub.publish(hub, e);
     const accounting = new RunAccounting();
@@ -323,9 +311,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
             Effect.catch((err) => Effect.logError(`agent ${options.name}: cannot save the conversation:`, err)),
           );
 
-    /** The summary is asked with the request's own start, the one the request before was sent with: its cache is read.
-     * fresh: the summary was made now, not taken from an earlier request; whoever uses it makes the prompt anew.
-     * Interrupted, it ends with no summary. */
+    /** The summary is asked with the request's own start, the one the request before was sent with: its cache is read. */
     const fold = Effect.fnUntraced(function* (
       messages: readonly BrainMessage[],
       tools: readonly ToolDeclaration[],
@@ -402,8 +388,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
       yield* refreshPrefix;
     });
 
-    // Folding when the run ends would give the owner a lossy summary a minute later; folding when they have gone keeps
-    // the conversation as it was while they are likely to go on with it.
+    // Folding when the run ends would give the owner a lossy summary a minute later.
     const idleLater = Effect.suspend(() => {
       const after = idleAfter();
       if (after < 0 || estimateTokens(history()) <= idleAt()) return Effect.void;
@@ -450,8 +435,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
         if (e.type === "agent_end") yield* FiberSet.run(fibers, Effect.andThen(loop().idle, ended));
       });
 
-    /** The fold before the prompt: a fold makes the prompt anew, and this request is the first to start with it. A stopped
-     * run asks for no summary: its request ends at once. */
+    /** The fold before the prompt: a fold makes the prompt anew, and this request is the first to start with it. */
     const prepare = (messages: readonly BrainMessage[], stoppedRun: boolean) =>
       Effect.gen(function* () {
         const tools = declared(toolset());

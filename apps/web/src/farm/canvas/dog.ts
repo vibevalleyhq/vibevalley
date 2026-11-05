@@ -1,10 +1,3 @@
-// The dog by the orchestrator's door, as the page draws it (it is not the farm's state). It sleeps most of the day and
-// stirs now and then (lifts its head and yawns, or gets up to stretch and scratch); it sits up with you while the farm
-// is open or the voice is live, and keeps busy there (a wag, a scratch, a yawn, a lie-down, a look around). It answers
-// you: pointed at, it lifts its head (awake, it wags); pressed, it ducks; patted, it wakes, and every pat after that
-// gets its next trick: a wag, a bark, a jump, rolling over for a belly rub. Three quick pats and it rolls over at once.
-// A while after the last pat (with the farm closed) it yawns and lies down again.
-
 import { cadence } from "@vibevalley/engine/pixi";
 
 type DogPicture =

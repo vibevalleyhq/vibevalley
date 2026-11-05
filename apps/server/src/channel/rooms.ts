@@ -1,9 +1,3 @@
-// What the chat keeps in memory of what it wrote: every channel, every participant, who follows each channel, how far
-// the owner has read in each channel, and where each participant last read. The database stays the record: channel.ts
-// writes there first and tells the model the same change right after, each update here doing what its query does (the
-// comments name it); a transaction that fails reloads the model, since the changes told inside it are gone from the
-// database. Only the chat writes these tables, one change at a time.
-
 import { compareText, or } from "#/base/order.ts";
 import type * as qc from "#db/channel.sql.ts";
 import type * as qp from "#db/channel_participant.sql.ts";

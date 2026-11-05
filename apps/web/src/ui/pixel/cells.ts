@@ -1,6 +1,3 @@
-// The pixel skins' plain values and pure helpers: the tick and the cross cell by cell on a 7×7 grid (both kits draw
-// them), a refusal as a pixel toast, what a draft adds to chips, and what a dropdown lists.
-
 import { type Act, createAct } from "#/ui/act.ts";
 
 import { noticeTitle, ToastType, toasts } from "./ToastViewport";
@@ -50,11 +47,7 @@ export interface PickOption {
   detail?: string;
 }
 
-/**
- * What a pick lists: with `clearable`, no value is a choice of its own, listed first as the placeholder ("所有项目",
- * "按规则挑"). Without it the list is only the options: a pick that always has a value must not offer a second entry
- * that means the same as one of them. '' is the placeholder's own value, so an option for it is dropped.
- */
+/** What a pick lists: with `clearable`, no value is a choice of its own, listed first as the placeholder. */
 export function pickItems(options: readonly PickOption[], placeholder: string, clearable: boolean): PickOption[] {
   return [...(clearable ? [{ value: "", label: placeholder }] : []), ...options.filter((o) => o.value !== "")];
 }

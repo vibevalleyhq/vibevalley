@@ -1,8 +1,7 @@
 import { t } from "@vibevalley/i18n";
 
 const replyTo = (name: string, text: string) => (text ? t("web.farm.chat.replyToText", { name, text }) : t("web.farm.chat.replyTo", { name }));
-// The rows of the farm's chat window: bubbles for what is said (yours on the right in green), a turn report with its
-// outcome, the thread a message has, the message a thread hangs from, and a long message folded to its first lines.
+// The rows of the farm's chat window: bubbles for what is said, a turn report with its outcome, the thread a message has, the message a thread hangs from, and a long message folded to its first lines.
 
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";

@@ -1,6 +1,3 @@
-// The timing of a living scene (pixi/rhythm.ts): things that happen every so often, a little irregularly, and the
-// wind. Pure, so a made-up random and clock are enough.
-
 import assert from "node:assert/strict";
 
 import { test } from "vite-plus/test";

@@ -20,8 +20,7 @@ export function Tag(props: { icon?: IconName | undefined; label: string; tone: T
   );
 }
 
-/** What a dot says (docs/style/design.md, 状态色): well or done (leaf), waiting or thinking (wheat), failed (berry),
- * information (water), nobody at work (idle), quiet (faint, muted). */
+/** What a dot says (docs/style/design.md). */
 export type DotTone = "leaf" | "wheat" | "berry" | "water" | "idle" | "faint" | "muted";
 
 const dotColor: Record<DotTone, string> = {

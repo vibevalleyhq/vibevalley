@@ -1,6 +1,3 @@
-// What the vault's pages say together, read from them in memory: which page a name means, what a ((ref)) reads, who links
-// to a page, what a search finds, what wants a look. Pure: the service holds the pages and hands them here.
-
 import type * as T from "@vibevalley/protocol";
 import { flatBlocks, plainText, slugOf } from "@vibevalley/protocol/rules";
 
@@ -56,8 +53,7 @@ export interface RefWords {
   readonly broken: (id: string) => string;
 }
 
-/** Each ((id)) on the page as it reads now, and in the blocks shown with it (its backlinks); refs inside a read-out ref
- * are read out too, two levels down, never in a circle. */
+/** Each ((id)) on the page as it reads now, and in the blocks shown with it (its backlinks). */
 export function transclusions(
   vault: Vault,
   page: Page,
@@ -172,9 +168,7 @@ export const queryWords = (text: string) => {
   return [...new Set([...lower.split(/\s+/u), ...termsList(text)].filter((w) => w !== ""))];
 };
 
-/** The blocks that match, best first, times the tier's weight; the whole query in the page's title, the block's path or
- * its text counts two more. ranked: the full-text index's score of each block it found (pkm_term), which is all that
- * match; without it, each query word found counts one. Without text, the newest pages' blocks in order. */
+/** The blocks that match, best first, times the tier's weight. the whole query in the page's title, the block's path or its text counts two more. */
 export function search(vault: Vault, req: T.PkmSearchRequest, ranked?: ReadonlyMap<string, number>): T.PkmSearchHit[] {
   const limit = req.limit !== undefined && req.limit > 0 ? req.limit : 10;
   const text = req.text?.trim() ?? "";
@@ -260,8 +254,7 @@ export function radar(vault: Vault, now: number, staleDays: number): T.PkmRadar 
   return out;
 }
 
-/** The page as plain Markdown to hand to someone: ((refs)) read out, [[links]] as their words, remarks taken off; a top
- * block with children is a heading. summary writes the tldr line. */
+/** The page as plain Markdown to hand to someone: ((refs)) read out, [[links]] as their words, remarks taken off. a top block with children is a heading. */
 export function exportMarkdown(vault: Vault, page: Page, summary: (tldr: string) => string): string {
   const lines = [`# ${page.title}`, ""];
   const tldr = page.props.tldr;

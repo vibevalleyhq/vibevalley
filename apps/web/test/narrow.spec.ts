@@ -1,7 +1,6 @@
 import { expect, test } from "./fixtures";
 
-// Every place of the workbench fits a phone's width and a narrow window: nothing runs past the window's edge, so the page
-// never scrolls sideways (docs/style/design.md, 6.5). What does not fit truncates, folds or wraps inside its own box.
+// Every place of the workbench fits a phone's width and a narrow window. What does not fit truncates, folds or wraps inside its own box.
 const places = ["/chat", "/issues", "/artifacts", "/agents", "/agents/templates", "/runtimes", "/projects", "/catalog", "/settings/general", "/orchestrator"];
 
 /** The outermost elements past the window's right edge (fixed ones are placed against the window on purpose). */

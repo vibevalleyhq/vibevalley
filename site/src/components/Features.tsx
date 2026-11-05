@@ -1,6 +1,3 @@
-// What the farm does: its numbers counting up like a game's tallies (lib/facts.ts), then card by card, and the
-// machines its helpers drive. Cards come in one after another along a row; under the pointer a card lifts a little and
-// its icon gives a wiggle.
 import type { Copy } from '../i18n/zh'
 import { FACTS } from '../lib/facts'
 import { CountUp, Heading, Section, useReveal } from './ui'

@@ -1,7 +1,3 @@
-// The notes from a terminal (`vibevalley pkm …`), a command an operation of the server's: a capture, a search, the
-// radar, a day's journal, and the pages (listed, shown as their outline, exported as Markdown, edited in $EDITOR); the
-// endpoint's answer with --format json.
-
 import { join } from "node:path";
 
 import { Clock, Config, Effect, FileSystem } from "effect";
@@ -31,7 +27,7 @@ const outline = (p: T.PkmPage) =>
     ),
   ].join("\n");
 
-/** `pkm capture 一句话`: into today's journal, or --page's end; with no words, what comes on stdin, read as an outline. */
+/** `pkm capture <text>`: into today's journal, or --page's end; with no words, what comes on stdin, read as an outline. */
 const captureCommand = Command.make(
   "capture",
   { words: words("cli.arg.capture"), page: Flag.String("page").pipe(Flag.optional, Flag.withDescription(t("cli.flag.capturePage"))) },
@@ -50,7 +46,7 @@ const captureCommand = Command.make(
   ]),
 );
 
-/** `pkm search 读书 笔记`: one hit a line, page › where: words. */
+/** `pkm search <terms>`: one hit a line, page › where: words. */
 const searchCommand = Command.make("search", { words: words("cli.arg.search") }, (o) =>
   Effect.flatMap(
     ask((api) => api.pkm.search({ text: o.words.join(" ") })),
@@ -131,8 +127,7 @@ const pageList = Command.make("list", { limit: Flag.Int("limit").pipe(Flag.withD
   Command.withExamples([{ command: "vibevalley pkm page list", description: t("cli.example.pkmPageList.about") }]),
 );
 
-/** `pkm page edit 读书`: the page's file in $VISUAL or $EDITOR (vi without either), written back when the editor closes;
- * left as it was if nothing changed. One changed meanwhile is not overwritten: the edit stays in its file, named. */
+/** `pkm page edit <page>`: the page's file in $VISUAL or $EDITOR (vi without either), written back when the editor closes. left as it was if nothing changed. */
 const pageEdit = Command.make("edit", { page: pageArgument }, (o) =>
   Effect.gen(function* () {
     const source = yield* ask((api) => api.pkm.source.get({ page: o.page }));

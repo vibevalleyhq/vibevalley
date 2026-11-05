@@ -1,41 +1,44 @@
 # Resource
 
-## 一句话
-
-给正在跑的会话一个只读、可分页、按权限裁剪的拉取口：`resource_read`，是四层流水线的第四层取数面。
+`Resource` 是输入流水线的第四层拉取面：为正在运行的管家和帮工会话提供只读、按会话权限裁剪、支持 UTF-16 偏移分页的统一资源读取接口（`resource_read` 工具，对应 `vv://...` URI）。
 
 ## 管什么，不管什么
 
-- **管**：把 Trigger、消息、工单、频道、稿子、记忆、项目等统一成只读 URI；按会话的权限裁剪；分页和快照缓存。
-- **不管**：写这些实体（各自的模块）、谁被叫醒（[信箱](docs/subsystems/mailbox.md)）、工单状态（[工单](docs/subsystems/issue.md)）。
+| 管 | 不管（谁管） |
+|---|---|
+| 解析 `vv://` URI（Trigger、工单、频道、GitHub 评审线程、稿子、记忆、项目），执行会话级读取权限校验 | 各业务实体的写入与状态变更（对应拥有者模块） |
+| 大文本按 UTF-16 偏移量分页（`offset` / `limit`）与会话作用域内的 LRU 快照缓存（`TextCache`） | 谁该收到通知或何时唤醒会话（[Mailbox](docs/subsystems/mailbox.md)） |
 
 ## 在哪
 
-- `apps/server/src/resource/resource.ts` 是服务与会话级 LRU 快照（`TextCache`）；`tool/tool.ts` 是给会话的 `resource_read` 工具。
-- 入口是 `Resource.read(session, { uri, offset?, limit? })`；协议形状在 `packages/protocol/src/shapes.ts` 的 `ResourcePage`。
+| 位置 | 职责 |
+|---|---|
+| `apps/server/src/resource/resource.ts` | `Resource` 服务、权限裁剪与会话级 LRU 快照缓存（`TextCache`） |
+| `apps/server/src/tool/tool.ts` | `resource_read` 工具封装 |
+| `packages/protocol/src/shapes.ts` | `ResourcePage`（`{ text, totalChars, nextOffset }`）返回契约 |
 
 ## 模型和不变量
 
-- **只读**：Resource 不写任何业务表；它读各模块的服务和库。
-- **权限在读取处**：会话只能读自己相关的 Trigger/工单/频道，越界返回 `ResourceError`。
-- **分页有上限**：一次只给一段，`nextOffset` 接着读；缓存按会话作用域回收。
+- **严格只读**：`Resource` 只查询各模块服务与数据库，不修改任何业务表，也不推进消息的消费回执。
+- **服务端强制权限边界**：
+  - 管家（`orchestrator`）可读全农场资源。
+  - 帮工仅可读自身所属工单、父工单、显式前置依赖工单（`blockedBy`）及所在频道的资源；越界访问直接返回 `ResourceError`。
+- **快照固定与分页上限**：首次读取（`offset = 0`）生成带字节上限的文本快照存入会话级 `TextCache`，后续分页基于同一快照返回，会话结束时自动回收。
 
 ## 怎么走
 
-1. 会话调 `resource_read`，带 URI 和偏移。
-2. Resource 解析 URI、检查会话权限，读对应模块/快照。
-3. 返回 `text`、`totalChars`、`nextOffset`；大文本分页，不一次全塞进上下文。
+1. 会话从输入卡片中看到 `vv://trigger/<id>` 或其他 `vv://` URI，按需调用 `resource_read({ uri, offset, limit })`。
+2. `Resource.read` 校验该会话对目标 URI 的访问权限，命中或生成快照后返回当前页文本与 `nextOffset`。
 
 ## 和谁打交道
 
-- 依赖 Ingress、Issue、Channel、Mailbox、Session 的查询；工具层只做参数解码和转发。
-- 页面不直接调它；它只服务会话。
+- **下层查询模块（`ingress`、`issue`、`channel`、`mailbox`、`session`）**：读取对应实体的完整载荷。
+- **工具层（`tool`、`mcp`）**：向管家和帮工暴露 `resource_read` 工具。
 
 ## 为什么这样
 
-- **拉取比推送省上下文。** 会话需要什么读什么，不把整个频道/工单塞进每轮提示；快照缓存避免重复读同一段。
-- **权限在服务端。** 不让模型自己判断能读什么；URI 解析和裁剪在 Resource 一处。
+- **按需拉取替代全量推送，权限由服务端兜底**：投递卡片只带摘要与 `vv://` 指针，避免大段日志或 PR 评论撑爆模型上下文；在读取入口统一核对工单归属，不靠提示词约束访问范围。
 
 ## 怎么验证
 
-- `resource/textCache.test.ts`、`tool/resource.test.ts`、`flows/settling.test.ts`。
+- `apps/server/src/resource/textCache.test.ts`、`apps/server/src/tool/resource.test.ts`、`apps/server/src/flows/settling.test.ts`：LRU 缓存分页、跨工单越权拦截与 Trigger 载荷读取测试。

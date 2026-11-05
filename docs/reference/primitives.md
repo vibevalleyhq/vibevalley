@@ -12,18 +12,18 @@
 | `normalSpans` | `artifact.ts` | Drops empty spans and joins neighbours with the same marks, so one text has one way to be written. |
 | `defaultOf` | `channel.ts` | The channel words go to when none is named. |
 | `channelOf` | `channel.ts` | A channel by its id; none when no id is given. |
-| `mentionLead` | `channel.ts` | What an @name may follow: anything but a Latin letter, a digit, _ or @, so a@b.com names no one while 问@w3 does |
-| `slice` | `cut.ts` | s.slice(start, end), a surrogate pair cut in half made U+FFFD (what String.prototype.toWellFormed does, which the |
+| `mentionLead` | `channel.ts` | What an @name may follow: anything but a Latin letter, a digit, _ or @, so a@b.com names no one while cjk@w3 does (Chinese runs on without spaces). |
+| `slice` | `cut.ts` | s.slice(start, end), a surrogate pair cut in half made U+FFFD. |
 | `cut` | `cut.ts` | s as it is when it fits in max units; else its first max units and an ellipsis. |
 | `oneLine` | `cut.ts` | Runs of white space are one space. |
 | `htmlSandbox` | `display.ts` | The <iframe>'s sandbox attribute; the server's CSP sandbox directive is the same tokens. |
-| `freshOf` | `inbox.ts` | The items of now that are news to known: undefined known is the first look, which knows them all and has no news. |
+| `freshOf` | `inbox.ts` | The items of now that are news to known: undefined known is the first look, which knows them all and has no news. An id is news once. |
 | `assignmentOf` | `issues.ts` | The responsibility in force now. |
 | `assignedAgentOf` | `issues.ts` |  |
 | `executionsOf` | `issues.ts` | Every execution, in assignment and start order. |
 | `sessionIdsOf` | `issues.ts` | The external helper contexts that executed it, in order. |
 | `latestSessionIdOf` | `issues.ts` |  |
-| `shortTitle` | `issues.ts` | One short line for a title: its first line, and of a long one, the first sentence, else up to its last pause that fits; |
+| `shortTitle` | `issues.ts` | One short line for a title: its first line, and of a long one, the first sentence, else up to its last pause that fits. failing those, cut. |
 | `closedText` | `issues.ts` | What its close says: done with what it delivered, or canceled and why. |
 | `omitUndefined` | `omit.ts` |  |
 | `isOneOf` | `oneOf.ts` |  |
@@ -31,14 +31,14 @@
 | `keyBetween` | `order.ts` | A key after a and before b; "" for a is the start, "" for b the end. |
 | `spanText` | `phase.ts` | A short span: seconds under a minute (at least one), else minutes. |
 | `isBusy` | `phase.ts` |  |
-| `roomLeft` | `phase.ts` | How many more may start working now: on the whole farm (workspace at once), and in the project (perProject at once, |
+| `roomLeft` | `phase.ts` | How many more may start working now: on the whole farm (workspace at once), and in the project (perProject at once, 0 for no limit of its own). |
 | `needOf` | `phase.ts` |  |
 | `phaseText` | `phase.ts` | phaseWords as said at now. |
 | `phaseWords` | `phase.ts` | What a session is doing in words, how long it has been quiet left as {span}. |
 | `slugOf` | `pkm.ts` | A page's name from its title: trimmed, lower case, spaces as dashes, "/" (or "\") as "__". |
 | `pkmTag` | `pkm.ts` | Every #tag in a text (read it with matchAll): the name is group 1. The page draws them, the server links them. |
 | `pkmTagTyped` | `pkm.ts` | A #tag being typed, ending where the text ends (the caret): its name so far is group 1. |
-| `applyBlockOps` | `pkm.ts` | The blocks after the ops in order (a copy: blocks is not changed); an op on a block not on the page changes nothing. |
+| `applyBlockOps` | `pkm.ts` | The blocks after the ops in order (a copy: blocks is not changed). an op on a block not on the page changes nothing. |
 | `flatBlocks` | `pkm.ts` | The outline as the wire has it: in order, each with its parent and the path of first lines above it. |
 | `treeOfBlocks` | `pkm.ts` |  |
 | `plainText` | `plain.ts` |  |
@@ -67,20 +67,20 @@
 | `jsonOf` | `json.ts` | Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. |
 | `jsonOrNone` | `json.ts` | Read where unreadable JSON is taken as none: a value that does not fit the Schema is none too. |
 | `localizedJson` | `json.ts` | A data file kept in each language (seeds.json and seeds.en.json), read once per language; one that does not fit its |
-| `lastJsonBlock` | `json.ts` | The last fenced block of a model's text that decodes with schema and is not refused, or the words for why the last |
+| `lastJsonBlock` | `json.ts` | The last fenced block of a model's text that decodes with schema and is not refused, or the words for why the last one tried was not. |
 | `misfitField` | `json.ts` | The field a decoding first failed on, undefined when the value itself was not an object. |
-| `wireOf` | `json.ts` | value with every own key set to undefined dropped, in plain objects and arrays all the way down; other objects as |
+| `wireOf` | `json.ts` | value with every own key set to undefined dropped, in plain objects and arrays all the way down. |
 | `wireJson` | `json.ts` | The JSON text of value as the wire carries it: wireOf, then encoded by schema (which still fails on a missing required |
 | `compareText` | `order.ts` | By UTF-8 bytes, which is by code point, not by UTF-16 unit: the order the recorded cases were sorted in. |
 | `compare` | `order.ts` |  |
 | `or` | `order.ts` |  |
 | `numberIn` | `order.ts` |  |
 | `scopedPubSub` | `pubsub.ts` | An unbounded PubSub shut down when the scope that made it (its service's layer) closes, so a subscriber's stream ends |
-| `checksFromText` | `questions.ts` | The helper's text checks, one per 标准 line; explicit issue_report.checks still win. |
+| `checksFromText` | `questions.ts` | The helper's text checks, one per criterion line; explicit issue_report.checks still win. |
 | `questionsFromText` | `questions.ts` |  |
 | `redact` | `redact.ts` |  |
 | `redactedHead` | `redact.ts` | Its first n UTF-16 units, trimmed: cut after redacting, as a secret cut first may no longer look like one. |
-| `redactOutput` | `redact.ts` | Everything the process writes to stream goes through redact first: the server's log, and what a library prints. A |
+| `redactOutput` | `redact.ts` | Everything the process writes to stream goes through redact first: the server's log, and what a library prints. |
 
 ## `apps/server/src/infra`
 
@@ -89,11 +89,11 @@
 | 名字 | 文件 | 说的是 |
 |---|---|---|
 | `baselineHash` | `baseline.ts` |  |
-| `baselineStatements` | `baseline.ts` | The baseline as single statements, in order: SQLite prepares one at a time. A trigger's body (BEGIN … END;) stays |
+| `baselineStatements` | `baseline.ts` | The baseline as single statements, in order: SQLite prepares one at a time. A trigger's body (BEGIN … END;) stays one statement. |
 | `ServerConfig` | `config.ts` |  |
 | `defaults` | `config.ts` |  |
 | `ConfigError` | `config.ts` | Why the configuration cannot be read: the file, or a key's value. |
-| `loadConfig` | `config.ts` | file: the YAML to read, which must be there; empty is home/vibevalley.yaml, read if it is there. The environment wins |
+| `loadConfig` | `config.ts` | file: the YAML to read, which must be there. empty is home/vibevalley.yaml, read if it is there. |
 | `pkmDir` | `config.ts` | The notes' vault. |
 | `dbDir` | `config.ts` | The database's folder, or "memory". |
 | `serverAddress` | `config.ts` | The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. |
@@ -101,22 +101,22 @@
 | `agentHome` | `config.ts` | A profile's folder for conversation logs, archives and evals; memory rows live in the database. |
 | `dbQueries` | `db.ts` | Every query run: what a test holds a hot path's budget to, and a reading of the farm's load. |
 | `dbFile` | `db.ts` | The database's file in its folder. |
-| `setAsideStale` | `db.ts` | A folder's database made from another baseline is moved aside, whole, to <folder>.<hash>-<time>: it is not |
-| `Database` | `db.ts` | The database as an SqlClient, with the schema in place and foreign keys on. In memory, every farm has its own: running |
+| `setAsideStale` | `db.ts` | A folder's database made from another baseline is moved aside, whole, to <folder>.<hash>-<time>. The baseline it was made from is in <folder>.schema. |
+| `Database` | `db.ts` | The database as an SqlClient, with the schema in place and foreign keys on. |
 | `causeMessage` | `db.ts` | What the database said, from under the SqlError around it. |
-| `Db` | `db.ts` | The farm's database as the services use it: a generated query (db/generated) run against it. The database is in this |
+| `Db` | `db.ts` | The farm's database as the services use it: a generated query (db/generated) run against it. |
 | `NotWritten` | `files.ts` |  |
 | `writeOnce` | `files.ts` | Writes a file named by its bytes (their hash), making its folder: the same bytes are the same file, so one already |
-| `readOrSetAside` | `files.ts` | An owner's file (config.json, settings.json) read by read. One that does not read (not JSON, or not the |
+| `readOrSetAside` | `files.ts` | An owner's file (config.json, settings.json) read by read. |
 | `keptFile` | `files.ts` | soonMs: how long a soon write waits after the first change, so a burst is one write and a crash loses no more. |
 | `HomeTaken` | `lease.ts` |  |
 | `leaseHome` | `lease.ts` | Takes the home, or throws HomeTaken; the function it returns gives it back. |
 | `callbackLog` | `log.ts` | Made in a service's make: the lines it writes end with the service and keep its logger. |
-| `bestEffort` | `log.ts` | Work the caller goes on without: a failure or a defect is logged at Warn after what (the words say what was being |
-| `timeHere` | `time.ts` | The Clock of the service that asks, as a Time: what it sleeps on runs with the service's own context, on fibers its |
+| `bestEffort` | `log.ts` | Work the caller goes on without: a failure or a defect is logged at Warn after what (the words say what was being done), and the caller carries on. |
+| `timeHere` | `time.ts` | The Clock of the service that asks, as a Time. |
 | `wallTime` | `time.ts` | The wall clock, for code with no service to ask: a class tested on its own, the command line. |
-| `withinRealTime` | `time.ts` | A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and |
-| `afterRealTime` | `time.ts` | A deadline on a real process (a command's timeout, the grace before SIGKILL): runs f after ms of real time, whatever |
+| `withinRealTime` | `time.ts` | A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and it keeps nothing alive. |
+| `afterRealTime` | `time.ts` | A deadline on a real process (a command's timeout, the grace before SIGKILL): runs f after ms of real time, whatever the Clock says. |
 | `localeMinute` | `time.ts` | To the minute: what an input says the time is, so that it does not change between two requests a few seconds apart. |
 
 ## `apps/server/src/testing`
@@ -136,11 +136,11 @@
 | `casesIn` | `evals.ts` | The cases in dir (*.json), by file name. |
 | `isInput` | `evals.ts` |  |
 | `committed` | `evals.ts` |  |
-| `stubbed` | `evals.ts` | Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once, |
+| `stubbed` | `evals.ts` | Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once, and nothing for another. |
 | `farm` | `farm.ts` | The whole farm on a free port: its address. |
 | `workingFarm` | `farm.ts` | The same with the test helper as its only runtime (pi, testing/worker.ts), so an issue can be worked from outside as |
-| `gitSync` | `git.ts` | Runs git in dir as a test user; its output, trimmed. A failure throws with what git said. |
-| `gitIn` | `git.ts` | Runs git in dir as dir's own config says (no test user); its output, trimmed. A failure throws with what git said. |
+| `gitSync` | `git.ts` | Runs git in dir as a test user. its output, trimmed. |
+| `gitIn` | `git.ts` | Runs git in dir as dir's own config says (no test user). its output, trimmed. |
 | `gitInEnv` | `git.ts` | gitIn with these in its environment (a commit's dates). |
 | `projectsDir` | `git.ts` | A projects folder of its own, under a work root of its own. |
 | `repo` | `git.ts` | A repository with `mine` commits by the test user, `others` by someone else. |
@@ -150,14 +150,14 @@
 | `testConfig` | `layers.ts` |  |
 | `testDatabase` | `layers.ts` |  |
 | `offline` | `layers.ts` | An HTTP client for a test that must not reach the network: every request dies, so one made by mistake is a failure. |
-| `whenState` | `layers.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. It |
+| `whenState` | `layers.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. |
 | `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds. |
 | `allow` | `refuse.ts` |  |
 | `heard` | `refuse.ts` | The lines the farm logs from here on, each with its cause; layer is given to what builds the farm. |
 | `releaseHeld` | `worker.ts` | Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. |
-| `helper` | `worker.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). 只起草工单 drafts; |
+| `helper` | `worker.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). draft-only drafts. |
 | `installedOnly` | `worker.ts` | A probe that finds every runtime given, bundled, and no other. |
-| `quietApp` | `world.ts` | For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. No runtime is |
+| `quietApp` | `world.ts` | For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. |
 | `worldBelowIngress` | `world.ts` | Services below Ingress for module tests. |
 | `world` | `world.ts` | The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds |
 | `testIssues` | `world.ts` | Issues a test adds are ones the owner sent, so their mandate is explicit. |
@@ -171,25 +171,25 @@
 | 名字 | 文件 | 说的是 |
 |---|---|---|
 | `autofocus` | `dom.tsx` | A ref that focuses its element once it is on the page: what React's autoFocus does on mount. |
-| `useNow` | `dom.tsx` | The time, a new reading every `ms`: for "3 分钟前" that keeps up without anything else changing. |
+| `useNow` | `dom.tsx` | The time, a new reading every `ms`: for "3m ago" that keeps up without anything else changing. |
 | `Keyed` | `dom.tsx` | Rebuilds its children whenever `key` changes, as a React key does: their state starts over. |
 | `aria` | `dom.tsx` | aria-expanded, aria-pressed, aria-selected: "true" or "false", as a boolean false would drop the attribute. |
 | `useViewport` | `dom.tsx` | The window's size, following it as it is resized. |
 | `createSettled` | `dom.tsx` | The value once it has stopped changing for `ms`: what is asked of the server while someone types. |
-| `useClickAway` | `dom.tsx` | Closes a popup when the pointer goes down outside `box` while `open`: a menu folds when you click elsewhere. Returns |
+| `useClickAway` | `dom.tsx` | Closes a popup when the pointer goes down outside `box` while `open`: a menu folds when you click elsewhere. |
 | `variant` | `dom.tsx` |  |
 | `recordOf` | `dom.tsx` | A JSON object's fields, each still to be checked; undefined for anything that is not an object. |
-| `createExternal` | `external.ts` | A store outside Solid (subscribe, get) as an accessor; it notifies when `get` returns a different value. `always`: |
+| `createExternal` | `external.ts` | A store outside Solid (subscribe, get) as an accessor. it notifies when `get` returns a different value. |
 | `ago` | `format.ts` |  |
 | `tookText` | `format.ts` |  |
 | `wallClockText` | `format.ts` |  |
 | `numberText` | `format.ts` | A whole number without its .0, as the server writes ids and counts. |
 | `momentText` | `format.ts` | A moment as a date and a time of day. |
 | `yuan` | `format.ts` |  |
-| `big` | `format.ts` | A large count: ten thousands in Chinese (1.2 万), thousands in English (12k). |
+| `big` | `format.ts` | A large count: ten thousands in Chinese (10k units), thousands in English (12k). |
 | `spentText` | `format.ts` |  |
 | `messageOf` | `format.ts` | What a thrown or rejected value says: an Error's message, anything else as text. |
-| `spanText` | `format.ts` | How long, in round words: 不到 1 分钟, 3 分钟, 2 小时, 4 天. |
+| `spanText` | `format.ts` | How long, in round words: rounded relative duration. |
 | `SpriteManifest` | `manifests.ts` |  |
 | `CursorManifest` | `manifests.ts` |  |
 | `TitleManifest` | `manifests.ts` |  |
@@ -205,7 +205,7 @@
 | `pressed` | `shortcuts.ts` | The chords matched here (mod+K, ?, C): the rest are each place's own. |
 | `useInterval` | `timer.ts` | fn every ms for as long as the owner lives. |
 | `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the owner's end clears it. |
-| `typedMarks` | `typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for; undefined when there are none. |
+| `typedMarks` | `typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. |
 
 ## `apps/web/src/infra`
 
@@ -221,16 +221,16 @@
 | `api` | `api.ts` | The page is served by the server it talks to: the same origin. |
 | `reasonOf` | `api.ts` | What a refusal says, for a toast or an inline line. |
 | `newSendKey` | `api.ts` | A client's key for one send: a retry with the same key is the same message, said once. |
-| `createRequestKey` | `api.ts` | The request key of one thing the owner may send again (a form's create, a button's): the same key until a send went |
+| `createRequestKey` | `api.ts` | The request key of one thing the owner may send again (a form's create, a button's). a new one after. |
 | `frames` | `frame.ts` |  |
 | `FramesContext` | `frame.ts` |  |
 | `createFrames` | `frame.ts` | The stream above as a store: each frame reconciles in by id, so only what changed updates. |
 | `useFrames` | `frame.ts` |  |
-| `useCore` | `frame.ts` | The folded state; undefined until the first frame. Read it inside JSX or a memo. |
+| `useCore` | `frame.ts` | The folded state. undefined until the first frame. |
 | `orchestratorSession` | `frame.ts` |  |
 | `orchestratorMood` | `frame.ts` |  |
-| `rawFrame` | `frame.ts` | The frame as the stream sent it: a new object each time, for code that compares the one before with the one after |
-| `subscribeLive` | `frame.ts` | Listens to the live stream (/api/v1/live); returns how to stop. Framework-free: the Solid side subscribes here too. |
+| `rawFrame` | `frame.ts` | The frame as the stream sent it: a new object each time, for code that compares the one before with the one after (sounds, the canvas, the host's notices). |
+| `subscribeLive` | `frame.ts` | Listens to the live stream (/api/v1/live). returns how to stop. |
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |
 | `followReports` | `gateway.ts` | The farm's reports after the one with this id (the newest when absent), then each from now on. |
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
@@ -238,7 +238,7 @@
 | `currentHost` | `host.ts` |  |
 | `reveal` | `opening.ts` | Once the page has mounted: takes the cover away when the page is ready, in one fade. |
 | `queries` | `query.ts` | REST reads besides the state stream (history, changes, …); a frame that changes what they show invalidates them. |
-| `refetchOnRelink` | `query.ts` | What changed while the state stream was lost reached no REST read either (they are invalidated by frames): each is |
+| `refetchOnRelink` | `query.ts` | What changed while the state stream was lost reached no REST read either (they are invalidated by frames). |
 | `useQuery` | `query.ts` | REST reads never hold the state stream's frame: pending and failures are result values, and ready() selects data. |
 | `ready` | `query.ts` | A query's successful data once it has arrived, else `fallback` (including disabled and failed queries). |
 | `useSprites` | `query.ts` |  |
@@ -253,7 +253,7 @@
 | `useSearch` | `router.ts` | The query string of the path the page is at, read again when it moves. |
 | `saveSettings` | `settings.ts` | Saves, and the settings the server answers with are the cached ones from then on. |
 | `useUpdates` | `settings.ts` | The desktop's own update as it is now and as it changes (Host.update); undefined where the host is not updated from |
-| `answer` | `storyApi.ts` | What the server answers while this story is open, by the path after /api/v1/ ("issue/diff/get"). Unanswered calls |
+| `answer` | `storyApi.ts` | What the server answers while this story is open, by the path after /api/v1/ ("issue/diff/get"). Unanswered calls fail as a server that is not there would. |
 | `fakeFetch` | `storyApi.ts` |  |
 | `testFrames` | `testing.ts` |  |
 | `frameAt` | `testing.ts` | An empty farm's frame at this seq. |
@@ -265,13 +265,13 @@
 | 名字 | 文件 | 说的是 |
 |---|---|---|
 | `createRegistry` | `atom.ts` |  |
-| `pageRegistry` | `atom.ts` | The page's one registry. Root gives it, and the page's own values (defineAtom, defineStored) live in it, since plain |
+| `pageRegistry` | `atom.ts` | The page's one registry. |
 | `RegistryContext` | `atom.ts` | Every atom's value lives in one registry for the page; the page's own unless a test or a story gives another. |
 | `useRegistry` | `atom.ts` |  |
 | `useAtom` | `atom.ts` | An atom's value as an accessor: subscribed while the component lives, never suspending. |
-| `onPage` | `atom.ts` | The atom held for the page's life, with a signal that only counts its changes: a read returns the registry's value |
+| `onPage` | `atom.ts` | The atom held for the page's life, with a signal that only counts its changes. |
 | `defineAtom` | `atom.ts` | A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). |
-| `useSearchParam` | `atom.ts` | A choice held in the address (`?name=value`), so a reload or a link shown to someone opens on it: read while the |
+| `useSearchParam` | `atom.ts` | A choice held in the address (`?name=value`), so a reload or a link shown to someone opens on it. |
 | `framesSource` | `atom.ts` |  |
 | `linkIn` | `atom.ts` | Whether the state stream is up now, read from its source: reading framesAtom here would open and close the stream. |
 | `framesAtom` | `atom.ts` | The state stream as an atom: subscribed to its source while anything reads it, so the stream stays open meanwhile. |
@@ -279,8 +279,8 @@
 | `useLatest` | `atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
 | `bySeq` | `intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once a frame has caught up. |
 | `defineIntent` | `intent.ts` |  |
-| `sendOnce` | `intent.ts` | An intent made by a button rather than typed (a suggestion, the project map's sow, an artifact's reply): pressed again |
-| `sendReplacing` | `intent.ts` | A setting the owner changes again before the first change showed (a reaction off and on, a level picked twice): the |
+| `sendOnce` | `intent.ts` | An intent made by a button rather than typed (a suggestion, the project map's sow, an artifact's reply). |
+| `sendReplacing` | `intent.ts` | A setting the owner changes again before the first change showed (a reaction off and on, a level picked twice). |
 | `intentsIn` | `intent.ts` | A type's intents in one registry; the same object for every caller, so its timers and watches are kept once. |
 | `useIntents` | `intent.ts` | A type's intents in the page's registry, with the list as an accessor. |
 | `ScaleValues` | `prefs.ts` | The workbench's size, in percent; the farm keeps its own whole-number scaling. |
@@ -297,7 +297,7 @@
 | `followAppearance` | `prefs.ts` | Once, as the page starts: applied now and whenever the choice or the system's theme changes. |
 | `storedAtom` | `stored.ts` | A choice's atom, for a registry of the caller's (the tests); the page's are made by defineStored. |
 | `defineStored` | `stored.ts` | A choice kept on this machine, read and set as the page's value; `name` is unique across the page. |
-| `orFallback` | `stored.ts` | A field of a stored struct that reads as `fallback` when it is missing or does not decode, so one bad field does not |
+| `orFallback` | `stored.ts` | A field of a stored struct that reads as `fallback` when it is missing or does not decode, so one bad field does not throw away the others. |
 | `testRegistry` | `testing.ts` |  |
 | `deferred` | `testing.ts` | A promise the test settles. |
 
@@ -309,23 +309,23 @@
 |---|---|---|
 | `goldenCasesAt` | `golden.ts` | The cases of one file. |
 | `jsonDiff` | `golden.ts` | Where got and want differ, as JSON (a key holding undefined is no key); undefined when they agree. |
-| `checkCases` | `golden.ts` | Runs every case through rule and collects the first disagreements. With VIBEVALLEY_GOLDEN=update, a rule changed on |
+| `checkCases` | `golden.ts` | Runs every case through rule and collects the first disagreements. |
 | `layers` | `pyramid.ts` |  |
 | `budgetMs` | `pyramid.ts` | What a test of each layer may take, in ms. |
-| `pyramid` | `pyramid.ts` | The layers of the files under root (a package's folder); paths are relative to it, as src/x/y.test.ts, and a |
+| `pyramid` | `pyramid.ts` | The layers of the files under root (a package's folder). |
 | `programOf` | `source.ts` | The file's program; path's extension says whether it is TSX. |
 | `edgesOf` | `source.ts` | Every import, export … from and dynamic import() of a string. |
 | `importsOf` | `source.ts` | What a file imports for its values: imports and re-exports that are not type-only, side-effect and dynamic ones. |
 | `exportsOf` | `source.ts` | The names a file exports itself (declarations and `export { … }` without a source), types included. |
 | `exportedValuesOf` | `source.ts` | The values a file declares and exports itself (no types), each with where its export statement starts. |
-| `readsOf` | `source.ts` | The fields read off what object.method() returns: right off the call (`core.state().issues`, `?.` too), through a |
+| `readsOf` | `source.ts` | The fields read off what object.method() returns: right off the call (`core.state().issues`, `?.` too), through a const it is kept in (`const s = core.state(). |
 | `calls` | `source.ts` | Whether the file calls object.method(…) anywhere. |
 | `tempDir` | `temp.ts` |  |
 | `waitFor` | `until.ts` | What get answers once ok holds for it. what is said if it never does (a function: read when it is given up on). |
 | `untilGot` | `until.ts` | The value get gives once it is something. |
 | `until` | `until.ts` | Once ok holds. |
-| `whenTrue` | `until.ts` | until for a test written with promises (a fake runtime, a fake model): once ok holds, asked again as waitFor does on |
+| `whenTrue` | `until.ts` | until for a test written with promises (a fake runtime, a fake model). |
 | `within` | `until.ts` | What p settles to, or a rejection naming what took longer than ms (real time): a deadline on something the test |
 | `gate` | `until.ts` | A gate a fake waits at until the test opens it: a fake that should be busy is busy until the test says, not for a |
-| `nextTurn` | `until.ts` | One turn of the event loop: whatever was set going before it (a publish taken by a forked reader, a promise already |
+| `nextTurn` | `until.ts` | One turn of the event loop: whatever was set going before it (a publish taken by a forked reader, a promise already resolved) has run. |
 | `aTurn` | `until.ts` |  |

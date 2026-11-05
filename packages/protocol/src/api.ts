@@ -1,6 +1,3 @@
-// The endpoint table, put together from each concept's (<concept>/api.ts). Each endpoint is a POST at its op's path (pathOf); the server routes and the clients call by this list
-// (apps/server/src/http/api.ts, VibeValleyApi).
-
 import { Predicate } from "effect";
 
 import { type AgentHandlers, agentEndpoints } from "./agent/api";
@@ -85,8 +82,7 @@ export const endpoints: readonly Endpoint[] = [
 
 export { pathOf };
 
-/** Endpoints with a command of their own that takes the same arguments, by that command (the command line's, apps/server
- * src/cli): what commandOf writes for them; every other endpoint is written as `api call`. */
+/** Endpoints with a command of their own that takes the same arguments, by that command (the command line's, apps/server src/cli): what commandOf writes for them. */
 const sameAs: Partial<Record<keyof Handlers, readonly string[]>> = {
   "issue.list": ["issue", "list"],
   "issue.get": ["issue", "show"],
@@ -109,9 +105,7 @@ const sameAs: Partial<Record<keyof Handlers, readonly string[]>> = {
   "pkm.page.get": ["pkm", "page", "show"],
 };
 
-/** The command that does one of an issue's acts (without `vibevalley`): a move is `issue status <n> <status>`, words to
- * its helper `issue comment <n>`, stopping its helper `session stop <helper>`. Words it still needs are not in it: words
- * says whether the act takes them, and where they go (`--comment` after a move, the words after a comment). */
+/** The command that does one of an issue's acts (without `vibevalley`). */
 export function actCommand(
   issue: { readonly number: number },
   a: IssueAction,
@@ -128,8 +122,7 @@ export function actCommand(
   }
 }
 
-/** A command that does what op does with these arguments (about: its `about` fields, in order) and input, as a next step
- * says it (without `vibevalley`): the endpoint's own command when it has one, else `api call` with the whole input. */
+/** A command that does what op does with these arguments (about. */
 export const commandOf = (op: keyof Handlers, about: readonly string[] = [], input?: Record<string, unknown>): string[] => {
   const same = sameAs[op];
   if (same && input === undefined) return [...same, ...about];

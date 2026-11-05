@@ -1,5 +1,3 @@
-// The shapes of crons (docs/subsystems/cron.md).
-
 import type { ActorKind } from "../common/shapes";
 
 /** Told apart by `kind`. */

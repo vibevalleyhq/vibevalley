@@ -1,6 +1,3 @@
-// A session opened, woken and put to rest: the room the runtimes and projects leave, an input delivered (waking it if
-// it sleeps), its workplace used while it is idle, and its leaving or handing over.
-
 import type { SessionOptions } from "@botiverse/oar";
 import { Clock, Effect, FiberMap, Predicate, Schema } from "effect";
 

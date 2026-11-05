@@ -1,9 +1,3 @@
-/**
- * `vp run release <alpha|beta|final>`: tags the next version (scripts/release-plan.ts works it out) and pushes it; the
- * repository's release workflow builds a draft release from the tag. It checks first, says what it is about to do and
- * asks; nothing leaves this machine before the owner says yes, so it runs only in a terminal.
- */
-
 import { execFileSync, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";

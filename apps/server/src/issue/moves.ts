@@ -1,7 +1,3 @@
-// The one table the board, the command line, the orchestrator's tools and the server's refusals go by. reduce works it
-// out with each issue's status and stage (withIssueStatuses), so a round that ends changes what the issue may do at
-// once, wherever it is read.
-
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues } from "@vibevalley/protocol";

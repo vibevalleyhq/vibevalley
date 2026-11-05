@@ -1,6 +1,3 @@
-// The host the page runs in (@vibevalley/protocol/host): the desktop's preload sets window.vibevalleyHost; the phone's
-// WebView brings window.ReactNativeWebView, and its host is built here, over the bridge; a browser tab has none.
-
 import type { Link } from "@vibevalley/bridge";
 import { type Host, mobileHost } from "@vibevalley/protocol/host";
 

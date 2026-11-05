@@ -83,9 +83,7 @@ export function whoMakesRoom(sessions: readonly T.Session[], max: number): T.Ses
   return sessions.filter((s) => !isBusy(s)).toSorted((a, b) => idleSince(a) - idleSince(b))[0];
 }
 
-/** What a take-in that did not go through means. The session stays with its branch and worktree either way. fix: what
- * the helper is sent back with ("" when it is left to the owner); owner: what the owner is told; notice: the farm's line;
- * short: the line a parent issue keeps. */
+/** What a take-in that did not go through means. The session stays with its branch and worktree either way. */
 export function notTakenIn(
   f: MergeFailure,
   name: string,

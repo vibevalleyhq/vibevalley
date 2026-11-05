@@ -1,5 +1,3 @@
-// The answers of the runtime endpoints (packages/protocol/src/runtime/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import type { RuntimeHandlers } from "@vibevalley/protocol/api";

@@ -1,7 +1,3 @@
-// A blocks artifact's blocks, changed only by batches of ops (ops.ts), from the owner over HTTP and from helpers through
-// their tools, all down the same pipeline. One batch at a time for every artifact: an artifact's batches are serial and
-// its seq goes up in order. Part of the Artifact service (artifact.ts), which owns the artifact's row.
-
 import { Clock, Duration, Effect, Option, PubSub, Schedule, Schema, Semaphore, Stream } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
@@ -42,7 +38,7 @@ interface BlockStore {
   /** Markdown read into blocks, inserted as one batch by actor at the end of what is there. */
   readonly fill: (id: T.ArtifactId, markdown: string, actor: string) => Effect.Effect<void, ApiError>;
   readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;
-  /** A batch of ops from actor (the owner, or a helper's profile id), in order, in one transaction. A batch id seen before is answered as it was, with its blocks as they are now. */
+  /** A batch of ops from actor (the owner, or a helper's profile id), in order, in one transaction. */
   readonly submit: (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
   /** A new block at the end of the top level, as actor; text is inline Markdown (code takes it as it is). */
   readonly append: (

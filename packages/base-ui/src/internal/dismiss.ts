@@ -1,6 +1,3 @@
-// Closing what floats over the page when the pointer goes down outside it or Escape is pressed. Layers stack: with a
-// menu open inside a popover, Escape and an outside press close the menu first, then the popover.
-
 import { createEffect } from "solid-js";
 
 type DismissReason = "escape" | "outside";

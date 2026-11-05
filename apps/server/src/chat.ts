@@ -1,10 +1,3 @@
-// The conversations in a terminal, the server's program the command line hands its terminal to (apps/cli src/chat.ts):
-// VibeValley's own agent, or a runtime on this machine. They need what only the server has: its runtimes, its models
-// and its config.
-//
-//	vpx src/chat.ts [--cwd DIR] [--name NAME] [--model ID] [--mcp FILE] [-p PROMPT]
-//	vpx src/chat.ts runtime <runtime> [--model ID] [--effort E] [--resume ID] [--cwd DIR] [-p PROMPT]
-
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import { Effect, Exit, Fiber, Option } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
@@ -24,8 +17,7 @@ const given = (o: Option.Option<string>) => Option.getOrUndefined(o);
 const prompt = text("prompt").pipe(Flag.withAlias("p"));
 const asked = (p: Option.Option<string>) => (Option.isSome(p) ? { p: p.value } : {});
 
-/** A conversation takes Ctrl+C itself (stop the turn, again to quit), so the signal that would end the program must
- * not: it runs uninterruptible, and ends when the conversation does. What went wrong is said on stderr. */
+/** A conversation takes Ctrl+C itself (stop the turn, again to quit), so the signal that would end the program must not. What went wrong is said on stderr. */
 const talk = <E>(conversation: Effect.Effect<void, E>) =>
   // oxlint-disable-next-line vibevalley/scoped-fibers -- a terminal conversation the process signal must not cut; joined at once
   Effect.uninterruptible(Effect.flatMap(Effect.forkDetach(conversation), Fiber.join)).pipe(Effect.mapError((e) => (typeof e === "string" ? e : messageOf(e))));

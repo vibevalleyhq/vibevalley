@@ -23,7 +23,7 @@ const sizes: Record<PxSize, string> = {
   custom: "",
 };
 
-/** Disabled without `onClick`. `label` names an icon button; `title` is its tooltip. `icon` goes before the words at 14 px. */
+/** Disabled without `onClick`. `label` names an icon button. */
 export function PxButton(
   props: {
     children?: JSX.Element;
@@ -35,8 +35,7 @@ export function PxButton(
   } & Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "aria-label" | "onClick">,
 ) {
   const rest = omit(props, "children", "tone", "size", "icon", "label", "onClick", "disabled", "class", "type");
-  // An icon alone is not framed: it sits inside a frame already (a window, a field, a card), and a ring per icon is a box
-  // in a box. Hover and press show it can be tapped; the focus outline stays.
+  // An icon alone is not framed: it sits inside a frame already (a window, a field, a card), and a ring per icon is a box in a box.
   const bare = () => (props.size ?? "md") === "icon" && (props.tone ?? "plain") === "plain";
   return (
     <button

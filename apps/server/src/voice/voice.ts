@@ -1,8 +1,3 @@
-// The owner's calls: Agora RTC grants, the voice agent Agora runs for a call, the voice line the
-// orchestrator answers it on, and dictation. A grant is signed for one channel and uid and lives as long as its token, or the
-// call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
-// listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
-
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer } from "node:http";
@@ -69,7 +64,7 @@ const DictationResponse = Schema.fromJsonString(
   }),
 );
 
-/** settings: the 设置 section the owner fixes it in, when a setting does; the page offers to go there. */
+/** settings: the Settings section the owner fixes it in, when a setting does; the page offers to go there. */
 const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => ({
   _tag: "VoiceUnavailable",
   reason,
@@ -104,8 +99,7 @@ type Vendors = {
   tts: MiniMaxTTS | OpenAITTS | MicrosoftTTS;
 };
 
-/** The three vendors the voice page chose, or why they cannot be: a vendor whose key is missing. Agora-hosted ones need
- * no key of their own. line undefined: the orchestrator does not answer the call itself. */
+/** The three vendors the voice page chose, or why they cannot be: a vendor whose key is missing. Agora-hosted ones need no key of their own. */
 export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: string, line?: CallLine): Vendors | VoiceUnavailable {
   const speech = {
     greetingMessage: voice.greeting,
@@ -188,8 +182,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
 
 const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN } as const)[area];
 
-/** As Agora's SDK retries on its own: 408, 429 and 5xx, twice, after what Retry-After says (at most a minute), else 1 s
- * then 2 s; the last answer is the one handed back. */
+/** As Agora's SDK retries on its own: 408, 429 and 5xx, twice, after what Retry-After says (at most a minute), else 1 s then 2 s. */
 const agoraRetries = Schedule.exponential("1 second").pipe(
   Schedule.setInputType<Response>(),
   Schedule.while(({ input, attempt }) => attempt <= 2 && ([408, 429].includes(input.status) || input.status >= 500)),
@@ -241,8 +234,7 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
         end_of_speech: { mode: "vad", vad_config: { silence_duration_ms: voice.silenceMs } },
       },
     },
-    // RTM carries transcripts and the agent's state; a client without RTM asks for the RTC data stream, which carries
-    // the transcripts (chunked); RTM is then off, or the agent keeps sending to RTM and nothing reaches the data stream.
+    // RTM carries transcripts and the agent's state. a client without RTM asks for the RTC data stream, which carries the transcripts (chunked).
     advancedFeatures: { enable_rtm: false, enable_tools: true },
     parameters: {
       audio_scenario: "chorus",
@@ -416,8 +408,7 @@ const cloudflared = (port: number) =>
     });
   });
 
-/** The line refusing a keyless request counts as an answer. Asked over the real network every 2 s; no ask starts after
- * lineReadyMs. */
+/** The line refusing a keyless request counts as an answer. Asked over the real network every 2 s. */
 export const tunnelAnswers = (client: HttpClient.HttpClient, url: string) =>
   Effect.gen(function* () {
     const deadline = (yield* Clock.currentTimeMillis) + lineReadyMs;
@@ -612,11 +603,7 @@ const make = (options: VoiceOptions = {}) =>
         ),
     );
 
-    // What is to be told on the call waits in one queue, so that it never crowds itself: the orchestrator is asked once at a
-    // time, with everything that came meanwhile (after gatherMs, for what comes together), and its answer is read out
-    // (queued after what is being said) before it is asked again. With no call on, what waits is dropped: it is on the
-    // phone and in the inbox. An answer with no words puts its things back. A failed ask ends this pass rather than
-    // repeating an input the orchestrator may already have taken.
+    // What is to be told on the call waits in one queue, so that it never crowds itself.
     const gatherMs = options.gatherMs ?? 3000;
     const waiting: string[] = [];
     let rang: string | undefined;

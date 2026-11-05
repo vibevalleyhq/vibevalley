@@ -1,7 +1,3 @@
-// The layers over the farm a click or a key opens, from the store's overlays: the harvest, the sowing and watering
-// forms, a panel (shop, warehouse, tasks, log, the orchestrator's looks, the task board) and the Esc menu. A plot's issue
-// (inspect) is IssueView's. Each is a farm dialog: Esc or the backdrop closes it.
-
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
 import { For, Match, Show, Switch } from "solid-js";
@@ -159,8 +155,7 @@ function OrchestratorLooks() {
   const client = useQueryClient();
   const current = () => orchestratorLookOf(ready(agents, []));
   const act = createPixelAct();
-  // The API saves a whole profile, and the cached one may be older than an edit made since (on the profile's page): it
-  // is read fresh just before, and only the look is changed.
+  // The API saves a whole profile, and the cached one may be older than an edit made since (on the profile's page).
   const choose = (look: OrchestratorLook) =>
     act.run(async () => {
       const me = (await api.agent.list()).find((a) => a.id === defaultOrchestrator);

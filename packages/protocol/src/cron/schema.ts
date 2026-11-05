@@ -1,5 +1,3 @@
-// The Schemas of crons (docs/subsystems/cron.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";

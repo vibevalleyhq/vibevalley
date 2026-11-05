@@ -1,6 +1,3 @@
-// The endpoints of the owner's notes: their answers (PkmHandlers) and their lines in the table (api.ts puts the
-// concepts together).
-
 import { type Effect, Schema } from "effect";
 
 import { type ApiError, type Endpoint, input } from "../endpoint";

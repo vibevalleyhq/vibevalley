@@ -13,11 +13,10 @@ export function issueBrief(pick: Pick<T.Issue, "title" | "description" | "criter
   return pick.deliver === "answer" ? answerOpening + "\n\n" + brief + "\n\n" + answerFormat : brief;
 }
 
-/** 接着修 for an answer that could not be read; cureWords is the one for a failed round. */
+/** fix-up for an answer that could not be read; cureWords is the one for a failed round. */
 export const answerCureWords = (problem: string) => t("server.issue.brief.answerUnread", { problem }) + "\n" + answerFormat;
 
-/** The first line with words is the title, the rest the description; a first line too long for a title gives its
- * short title (shortTitle) and the whole brief is the description. */
+/** The first line with words is the title, the rest the description. */
 export function splitBrief(brief: string): [string, string] {
   const lines = brief.replaceAll("\r\n", "\n").split("\n");
   const i = lines.findIndex((l) => l.trim() !== "");
@@ -36,7 +35,7 @@ export function splitBrief(brief: string): [string, string] {
 
 export const resumeWords = () => t("server.issue.brief.resume");
 
-/** Calling it twice gives the same brief: a 接着修 told before is taken off first. */
+/** Calling it twice gives the same brief: a fix-up told before is taken off first. */
 export function cureWords(brief: string): string {
   let original = brief;
   if (original.startsWith(t("server.issue.brief.cureHead"))) original = original.slice(t("server.issue.brief.cureHead").length);
@@ -68,8 +67,7 @@ function startWords(trigger: T.RunTrigger, first: boolean): [T.MilestoneKind, st
   }
 }
 
-/** runs oldest first; names: a session's name by its id. The milestones come newest first, the questions it waits on now
- * with its last run. */
+/** runs oldest first. names: a session's name by its id. */
 export function milestonesOf(issue: T.Issue, runs: readonly T.Run[], names: ReadonlyMap<string, string>): T.IssueTimeline {
   const out: T.Milestone[] = [{ at: issue.createdAt, kind: "opened", text: t("server.issue.timeline.opened") }];
   const lastDone = runs.findLastIndex((r) => r.endedAt !== undefined);

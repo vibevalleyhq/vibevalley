@@ -1,5 +1,3 @@
-// A session's log as the views read it: the issue pages (workbench and farm), the trajectory and the work log.
-
 import { type Accessor, createEffect, createSignal } from "solid-js";
 
 import type { SessionEvent } from "@vibevalley/protocol";

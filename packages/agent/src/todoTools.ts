@@ -1,8 +1,3 @@
-// The agent's own todos (todo.ts): it lists the steps of one piece of work, marks them as it goes, and reads
-// the whole graph back after each call. The runner moves it along: a subagent's task whose waits are settled goes to a
-// subagent in the background, at most max at once; what the subagent says comes back to the agent as an input. The agent's
-// own todos are its to do; nothing here does them.
-
 import { Effect, FiberSet, Schema, type Scope } from "effect";
 
 import type { Tool } from "./core/loop.ts";
@@ -86,7 +81,7 @@ export function todoTools(store: TodoStore, canHelp: boolean, changed: Effect.Ef
 export interface TodoRunner {
   /** Sends out what is ready and fits. Run after the graph changes and when a subagent comes back. */
   readonly advance: Effect.Effect<void>;
-  /** Calls the subagents back; their tasks wait again. The graph stays as it is otherwise. */
+  /** Calls the subagents back. their tasks wait again. */
   readonly stop: Effect.Effect<void>;
   /** Calls the subagents back and sends no more; their tasks stay working, for recover. */
   readonly close: Effect.Effect<void>;
@@ -94,8 +89,7 @@ export interface TodoRunner {
   readonly recover: Effect.Effect<void>;
   /** The open graph for a fold's summary: what the turns it replaces showed. */
   readonly summary: Effect.Effect<string>;
-  /** What to remind a run that stopped of: its own todos that are ready, unless the graph has not moved through
-   * maxNudges reminders already (it is stuck; the owner or another input will move it). "" for nothing. */
+  /** What to remind a run that stopped of: its own todos that are ready, unless the graph has not moved through maxNudges reminders already (it is stuck. */
   readonly nudge: Effect.Effect<string>;
 }
 

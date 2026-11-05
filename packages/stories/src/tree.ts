@@ -1,10 +1,7 @@
-// A title is a path ("组件/工作台/Button"): each part but the last is a folder, the last is the file's folder of
-// stories. A file with one story is that story itself, named by the title's last part.
-
 import type { Stories, Story } from "./format";
 
 export interface Entry {
-  /** "组件/工作台/Button:Tones": the address of one story. */
+  /** "Components/Workbench/Button:Tones": the address of one story. */
   readonly key: string;
   readonly title: string;
   readonly name: string;
@@ -17,10 +14,7 @@ export type Node =
   | { readonly kind: "folder"; readonly path: string; readonly name: string; readonly depth: number; readonly children: Node[] }
   | { readonly kind: "story"; readonly name: string; readonly depth: number; readonly entry: Entry };
 
-/**
- * Orders titles part by part: at each depth, a path named in `order` comes before one that is not, in the order given;
- * the rest by name. `order` holds paths ("设计体系", "组件/工作台"), so a level and the folders inside it are both ordered.
- */
+/** Orders titles part by part: at each depth, a path named in `order` comes before one that is not, in the order given. the rest by name. */
 export function compareTitles(order: readonly string[]) {
   const rank = (path: string) => {
     const i = order.indexOf(path);

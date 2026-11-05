@@ -1,6 +1,3 @@
-// The whole farm on a free port, for what drives it from outside: the command line's tests (apps/cli) point their
-// --server at it. @vibevalley/server/testing.
-
 import { Effect, Layer } from "effect";
 
 import { app } from "#/http/app.ts";

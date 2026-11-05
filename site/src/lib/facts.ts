@@ -1,6 +1,3 @@
-// The farm's numbers the page counts up (Features.tsx), each from the game's own lists: when one of those changes,
-// change it here. Labels are in the dictionaries (features.tally), by key.
-
 export const FACTS = [
   // The machines in use: VibeValley's own, pi, claude, codex (.agents/notes/proposed/feature/2026-10-10-other-runtimes.md).
   { key: 'machines', n: 4, icon: 'machine-tractor' },

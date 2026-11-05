@@ -1,6 +1,3 @@
-// What an agent remembers: a profile's shared memory, the orchestrator's memory, and the orchestrator's archive of conversations
-// folded away.
-
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Show } from "solid-js";
 

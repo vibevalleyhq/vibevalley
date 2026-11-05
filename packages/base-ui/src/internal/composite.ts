@@ -1,7 +1,3 @@
-// Moving through a row or column of items with the keyboard, the way a tab list, a toolbar, a menu or a listbox does:
-// arrows by orientation, Home and End, wrapping when it loops; disabled items are passed over. Pure, so it is tested
-// without a DOM.
-
 export type Orientation = "horizontal" | "vertical";
 
 /** The index the key moves to among `count` items (`enabled` says which may take it), or undefined for a key it ignores. */
@@ -36,8 +32,7 @@ export function moveIndex(
   return undefined;
 }
 
-/** The next item whose label starts with what was typed, searching from after `current` and wrapping; a repeated single
- * letter cycles through the items starting with it. */
+/** The next item whose label starts with what was typed, searching from after `current` and wrapping. */
 export function typeahead(labels: readonly string[], current: number, typed: string, enabled: (i: number) => boolean = () => true): number | undefined {
   const query = typed.toLowerCase();
   const repeated = query.length > 1 && [...query].every((c) => c === query[0]);

@@ -1,6 +1,3 @@
-// Off the page's thread: Shiki colours code into tokens whose colours are the palette's CSS variables (style.css,
-// --shiki-*), so they follow the theme without colouring twice. The JavaScript regex engine: no wasm to fetch.
-
 import { createCssVariablesTheme, createHighlighterCore, type HighlighterCore } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 

@@ -1,5 +1,3 @@
-// The shapes of the core state, its facts, the event streams and the frames the page reads (docs/subsystems/core.md).
-
 import type { Channel, Chat, ChatMessage, OwnerMention } from "../channel/shapes";
 import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes";
 import type { ConnectorStatus } from "../connector/shapes";
@@ -52,8 +50,7 @@ export const NoticeLevelValues = ["info", "warn", "error"] as const;
 export type NoticeLevel = (typeof NoticeLevelValues)[number];
 
 export interface StateFrame {
-  /** Goes up by one with every commit the core folds (Core.apply that changed the state): this frame shows every fold up
-   * to it. A reply carrying a seq (AppliedIssue) is shown by the first frame whose seq is at least that one. */
+  /** Goes up by one with every commit the core folds (Core.apply that changed the state): this frame shows every fold up to it. */
   seq: number;
   state: WorkspaceView;
   inbox: InboxItem[];

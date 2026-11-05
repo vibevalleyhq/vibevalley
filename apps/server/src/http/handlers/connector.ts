@@ -1,5 +1,3 @@
-// The answers of the connector endpoints (packages/protocol/src/connector/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import type { ConnectorHandlers } from "@vibevalley/protocol/api";

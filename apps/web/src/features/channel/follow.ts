@@ -1,8 +1,3 @@
-// What is said in each channel the page shows, framework-free: its newest page read once (channel.message.list), then
-// followed from the newest revision it has (infra/gateway.ts), older pages on asking. A channel stays read after nobody shows
-// it, and its follower comes back from where it left off; only the few last shown are kept so, the rest let go. The
-// farm's reports are a feed of their own.
-
 import { type Accessor, createEffect, createSignal } from "solid-js";
 
 import type { ChatMessage, ChannelEvent } from "@vibevalley/protocol";
@@ -66,8 +61,7 @@ function keepSingle(key: string, message: ChatMessage | undefined) {
   }
 }
 
-// Channels nobody shows now, the longest unshown first. A few stay read, so going back to one just left picks up where
-// it was without a page read again; past that each would keep every message it ever read for as long as the page is open.
+// Channels nobody shows now, the longest unshown first. A few stay read, so going back to one just left picks up where it was without a page read again.
 const idle: string[] = [];
 const idleKept = 8;
 

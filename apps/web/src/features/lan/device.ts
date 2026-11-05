@@ -1,6 +1,3 @@
-// The page opened from another device, through the farm's lan listener (连接到本机): it pairs once on /pair and keeps
-// its key in a cookie the listener reads (lanKeyCookie); on the farm's own computer it needs none.
-
 import { t } from "@vibevalley/i18n";
 import { lanKeyCookie } from "@vibevalley/protocol";
 
@@ -27,11 +24,7 @@ export function deviceGuess(userAgent: string): string {
   return t("web.lan.devices.device");
 }
 
-/**
- * Pairs this device and keeps its key. Not an Act (ui/act.ts): an unpaired device has no state stream to lose, the
- * listener answers it nothing until this has gone through, so an Act would refuse the one call that makes the link.
- * The refusal is the caller's to show, in the form.
- */
+/** Pairs this device and keeps its key. */
 export async function pair(code: string, name: string) {
   const paired = await api.lan.pair({ code, name });
   document.cookie = keyCookie(paired.key);

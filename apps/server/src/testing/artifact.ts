@@ -1,5 +1,3 @@
-// What the blocks tests write artifacts with.
-
 import type { Block, TextSpan } from "@vibevalley/protocol";
 import { artifactId, blockId } from "@vibevalley/protocol/schema";
 

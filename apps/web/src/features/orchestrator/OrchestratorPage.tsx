@@ -1,7 +1,3 @@
-// 管家: who an orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong), 旧账 (the conversation it
-// folded away) and, for the default one that answers the phone, 声音 (what it says on a call). /orchestrator/<tab> is
-// the default orchestrator's, /orchestrator/<profile id>/<tab> another's.
-
 import { Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

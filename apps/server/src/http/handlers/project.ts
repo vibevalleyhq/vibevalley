@@ -1,5 +1,3 @@
-// The answers of the project endpoints (packages/protocol/src/project/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import { t } from "@vibevalley/i18n";

@@ -1,7 +1,3 @@
-// The profiles (orchestrators and helpers), the skills and each runtime's settings: config.json in the home. A profile
-// is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
-// template when it is missing, so a farm always has one.
-
 import { join } from "node:path";
 
 import { Context, Effect, FileSystem, Layer, Predicate, Schema } from "effect";
@@ -26,8 +22,7 @@ interface Stored {
   readonly settings: Readonly<Record<string, T.RuntimeSettings>>;
 }
 
-// A profile's look may lack what withCast fills in (a build and a head): config.json from before those existed. They are
-// filled first, then the profile is read whole; anything else that does not fit makes the file unreadable.
+// A profile's look may lack what withCast fills in (a build and a head): config.json from before those existed.
 const readFile = Schema.decodeUnknownSync(
   Schema.fromJsonString(
     Schema.Struct({
@@ -189,8 +184,7 @@ const make = Effect.gen(function* () {
   const all = () => structuredClone([...s.agents]);
   const sendable = () => all().filter((a) => a.role === "worker");
 
-  /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it
-   * stays and is reached on a call; the default one stays an orchestrator. "" when it can. */
+  /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it stays and is reached on a call. */
   const roleProblem = (a: T.Agent): string => {
     if (a.id === defaultOrchestrator && a.role !== "orchestrator") return t("server.agent.defaultStaysOrchestrator");
     if (a.role === "orchestrator" && a.runtime !== orchestratorRuntime) return t("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime });

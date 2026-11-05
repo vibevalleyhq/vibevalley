@@ -38,7 +38,7 @@ export function IssueList(props: {
   const orchestrators = useOrchestrators();
   const isOrchestrator = (id: string) => orchestrators().some((a) => a.id === id);
 
-  // Only where a new 待办 belongs: the 待办 group, a project's, a helper's (not the orchestrator's), or the one group.
+  // Only where a new todo belongs: the todo group, a project's, a helper's (not the orchestrator's), or the one group.
   const canAdd = (g: RowGroup<BoardCard>) => (props.grouping === "status" ? g.lane === "todo" : props.grouping === "agent" ? !isOrchestrator(g.key) : true);
   const add = (g: RowGroup<BoardCard>) => props.onAdd(props.grouping === "project" ? { project: g.key } : props.grouping === "agent" ? { agent: g.key } : {});
   const fold = (key: string) =>

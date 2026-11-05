@@ -26,10 +26,7 @@ export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement>;
 
 export type SpanProps = JSX.HTMLAttributes<HTMLSpanElement>;
 
-/**
- * What a part renders as (Base UI's render): its own element by default, another tag, or a component that is given
- * the part's props, ref and handlers included, to spread on its own element.
- */
+/** What a part renders as (Base UI's render). */
 export type Render = "button" | "span" | "div" | "a" | ((props: RenderProps) => JSX.Element);
 
 /** What a component in `render` is given: an element's attributes, whichever element it makes. */

@@ -1,6 +1,3 @@
-// Running git and other tools: the output, the exit code and stderr; a tool
-// that is not there is code -1.
-
 import { spawn } from "node:child_process";
 
 import { Effect, Metric, Schema } from "effect";
@@ -25,10 +22,7 @@ export interface RunOptions {
   readonly timeoutMs?: number;
 }
 
-/**
- * Runs a command to its end. It runs in a process group of its own, and a timeout kills the whole group: a check's test
- * runner started by its shell does not outlive it, nor hold its output open.
- */
+/** Runs a command to its end. */
 export const run = (command: string, args: readonly string[], options: RunOptions = {}): Effect.Effect<Ran> =>
   Effect.callback<Ran>((resume) => {
     const child = spawn(command, args, {

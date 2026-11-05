@@ -1,8 +1,3 @@
-// Writes docs/reference/primitives.md: what the shared folders export (the server's base and infra, its test farm, the
-// page's base, infra and state, the protocol's rules, the test kit), each with the first line of its doc comment, so a
-// change looks there before it writes a helper again. Read from the syntax tree; --check fails when the file is not
-// what the folders say (docs:verify runs it).
-
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 

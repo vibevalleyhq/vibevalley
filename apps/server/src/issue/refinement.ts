@@ -45,7 +45,7 @@ export function refinement(d: RefinementDeps) {
   /** One draft starts at a time: two clicks do not send two sessions. */
   const drafting = Semaphore.makeUnsafe(1);
 
-  /** Who drafts: its current assignment; else whoever last worked in its project, if available; else chooseAgent. */
+  /** Who drafts: its current assignment. else whoever last worked in its project, if available. */
   const refiner = Effect.fnUntraced(function* (issue: T.Issue) {
     const candidates = yield* runtimes.candidates;
     let named = "";

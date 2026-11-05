@@ -1,5 +1,3 @@
-// The answers of the memory endpoints (packages/protocol/src/memory/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import type * as T from "@vibevalley/protocol";

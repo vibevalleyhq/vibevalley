@@ -249,8 +249,7 @@ const make = (options: OrchestratorOptions = {}) =>
         );
       });
 
-    // The situation for the next input: the whole of it, or what changed since the input before. An input given while
-    // the agent is busy may be taken after one given later, so it carries the whole, and the one after it does too.
+    // The situation for the next input: the whole of it, or what changed since the input before.
     const situationNow = (me: Instance, busy: boolean, channel: string) =>
       Effect.map(situation(channel), (now) => {
         const shownNow = !busy && me.shown !== "" ? situationDelta(me.shown, now) : now;
@@ -316,8 +315,7 @@ const make = (options: OrchestratorOptions = {}) =>
         return false;
       });
 
-    /** Every input comes in here. false: the orchestrator could not start, and the channel was told why, once. It
-     * never fails: an input that could not be taken is logged, and a caller waiting on it is failed instead of left open. */
+    /** Every input comes in here. false: the orchestrator could not start, and the channel was told why, once. */
     const take = (i: Intake): Effect.Effect<boolean> =>
       taking(i).pipe(
         Effect.catchCause((cause) =>

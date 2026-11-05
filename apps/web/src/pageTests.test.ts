@@ -1,7 +1,3 @@
-// The page layer's boundary (docs/subsystems/foundation.md, the test pyramid): a page test goes into the system only
-// through the page and the server as a user's browser does, with the fixtures, Playwright and the protocol's shapes;
-// never through the page's code or the server's.
-
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 

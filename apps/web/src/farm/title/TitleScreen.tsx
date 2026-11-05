@@ -1,8 +1,3 @@
-// The title screen over the farm: the farm at the hour it is, slowly moving; the game's name; the menu: 开始游戏,
-// 继续游戏 (when there is a farm to go back to), 设置. Arrow keys and Enter work as in a game; leaving it, it does not
-// show again on this machine. Without the orchestrator's key 开始游戏 says so in place: the workbench pages have no toasts to
-// carry it there.
-
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -25,7 +20,7 @@ type Item = "start" | "continue" | "settings";
 const deep = { "text-shadow": "4px 4px 0 #3a2a18" };
 const soft = { "text-shadow": "2px 2px 0 #3a2a18" };
 
-/** 继续游戏 needs a farm to go back to: a helper, a word said, or a coin earned. */
+/** Continue needs a farm to go back to: a helper, a word said, or a coin earned. */
 const hasFarm = (core: WorkspaceState | undefined) =>
   !!core &&
   (core.sessions.some((s) => s.role !== "orchestrator") || (core.chat?.channels ?? []).some((c) => (c.lastNumber ?? 0) > 0) || (core.progress?.coins ?? 0) > 0);
@@ -52,7 +47,7 @@ export function TitleScreen() {
     playSound("tap");
     switch (item) {
       case "start":
-        // The orchestrator cannot think without DeepSeek's key: say so under the menu, where 设置 is.
+        // The orchestrator cannot think without DeepSeek's key: say so under the menu, where Settings is.
         if (!orchestratorReady(ready(settings, undefined))) return setNote(t("web.farm.title.keyFirst"));
         farm.closeTitle();
         return void act.run(() => api.orchestrator.open());

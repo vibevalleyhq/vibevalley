@@ -1,6 +1,3 @@
-// `vibevalley project …`, `vibevalley agent …`, `vibevalley session …`, `vibevalley runtime …`: the farm's parts an agent
-// names when it gives out work: the projects, the profiles (档案), the helpers at work (帮工) and the runtimes (农机).
-
 import { Effect } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 

@@ -1,6 +1,3 @@
-// VibeValley's own agent's memory: MEMORY.md in its home, one line a note, and
-// archive/, the folded-away conversation word for word, so a summary that lost a detail can be looked up again.
-
 import { createHash } from "node:crypto";
 import { appendFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";

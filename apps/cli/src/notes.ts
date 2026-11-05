@@ -1,6 +1,3 @@
-// `vibevalley memory …`, `vibevalley cron …`, `vibevalley artifact …`: what profiles remember, what the farm does on a
-// clock, and the drafts (稿子) its helpers and the owner write; a command an operation of the server's.
-
 import { Effect } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 

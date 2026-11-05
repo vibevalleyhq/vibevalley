@@ -1,5 +1,3 @@
-// The shapes of chat apps (docs/subsystems/channel.md).
-
 export interface ConnectorStatus {
   id: ConnectorID;
   state: ConnectorState;

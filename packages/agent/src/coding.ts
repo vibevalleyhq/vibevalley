@@ -1,6 +1,3 @@
-// Tools to read and change a work directory and run commands in it. No sandbox: a host gives these only to agents that
-// are meant to change things (not the orchestrator).
-
 import { spawn } from "node:child_process";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
@@ -48,8 +45,7 @@ export interface Ran {
 
 const outputCap = 200_000;
 
-/** Past timeout it gets SIGTERM, and SIGKILL 2 s later; when signal aborts it goes at once. The whole process group is
- * killed, so a child left behind does not hold the output open. */
+/** Past timeout it gets SIGTERM, and SIGKILL 2 s later. when signal aborts it goes at once. */
 function runCommand(argv: readonly string[], cwd: string, timeoutMs: number, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<Ran> {
   if (argv.length === 0) return Promise.reject(new Error(words.noCommand));
   if (signal?.aborted === true) return Promise.reject(new Error(stopped));

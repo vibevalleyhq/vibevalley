@@ -1,6 +1,3 @@
-// Reads one of the server's SSE streams (statePath, eventsPath, livePath) with fetch rather than EventSource: a host may
-// serve the page under a scheme EventSource does not take, and fetch lets the caller pass its own.
-
 import { Cause, Exit, Schema } from "effect";
 
 import * as S from "./schema";
@@ -25,10 +22,7 @@ const decoders: { readonly [P in keyof Streams]: (json: unknown) => Exit.Exit<St
 /** The server writes a comment line on every stream this often, however quiet it is (apps/server/src/http/streams.ts). */
 export const streamHeartbeatMs = 20_000;
 
-/**
- * Nothing at all for this long, not even a heartbeat: the connection is dead though it looks open (a machine woke from
- * sleep with it half-open, a network that dropped it without a word). Two heartbeats missed, and a margin for a slow one.
- */
+/** Nothing at all for this long, not even a heartbeat. Two heartbeats missed, and a margin for a slow one. */
 export const streamSilenceMs = streamHeartbeatMs * 2 + 5_000;
 
 /** Never resolves: it rejects when the signal aborts, the stream ends, or it stays silent for `silenceMs`. */
@@ -65,8 +59,7 @@ export async function readStream<P extends keyof Streams>(
     if (early) throw early;
     if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
     const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-    // A fetcher that does not end its body on abort (a host's own) would leave the read below waiting forever. A cancel
-    // refused because fetch already errored the body says nothing new: the read throws the stop's reason either way.
+    // A fetcher that does not end its body on abort (a host's own) would leave the read below waiting forever.
     request.signal.addEventListener("abort", () => void reader.cancel().catch(() => undefined), { once: true });
     let buffer = "";
     for (;;) {

@@ -1,7 +1,3 @@
-// A trajectory a row per step: the run in the gutter, what kind of step in the tag, its text cut to a line until the
-// row is opened; a waterfall of the runs over it and their totals under it. The orchestrator's lets what it heard be
-// marked wrong, which saves it as a case of its evals.
-
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 
@@ -437,7 +433,7 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
   );
 }
 
-/** 这一轮做错了 floats over a message it heard. */
+/** Mark round wrong floats over a message it heard. */
 function Markable(props: { step: number; send: MarkWrong; file?: string | undefined; onMarked: (file: string) => void; children: JSX.Element }) {
   const [writing, setWriting] = createSignal(false);
   const act = createAct();

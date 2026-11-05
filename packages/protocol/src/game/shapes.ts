@@ -1,5 +1,3 @@
-// The shapes of progress, achievements, the ledger and the farm's view (docs/subsystems/game.md).
-
 import type { SessionId } from "../common/shapes";
 import type { Doing } from "../session/shapes";
 

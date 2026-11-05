@@ -1,8 +1,3 @@
-// A session's tools over MCP at /mcp. The tools are tool's; this serves them and says which session
-// is calling: the bearer token each session is handed names it, and its profile and project are where it works in the
-// core state, never the caller's to choose. Every answer is words a model acts on, a refusal too ("没成：……").
-// Stateless: each request is served by a server of its own, so nothing is kept between calls.
-
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";

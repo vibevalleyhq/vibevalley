@@ -1,12 +1,3 @@
-// The projects under the work root and their git: making and listing them, a session's
-// worktree on its own branch, what a branch changed, merging it into the main branch, a parent issue's branch, the project's
-// own check (.vibevalley/check), GitHub pull requests through gh, and what the code is written in.
-//
-// A merge that would conflict is not attempted: the session is asked to merge the main branch in and resolve it.
-// Merging into a parent issue's branch never checks it out: merge-tree writes the tree, commit-tree and update-ref put it on
-// the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
-// into the same branch together: each project's git work runs one at a time.
-
 import { lstat, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
@@ -305,8 +296,7 @@ const make = (hooks: ProjectHooks = {}) =>
         // git answers with real paths (on macOS /tmp is /private/tmp): compare like with like.
         const path = yield* Effect.orDie(fs.realPath(join(root, name)));
         if (dirname(path) !== (yield* Effect.orDie(fs.realPath(root)))) return yield* fail(t("server.project.outside"));
-        // A folder is a repository's top when it holds .git (a folder, or a file in a worktree): read, not asked of git,
-        // which would cost a process each time a project is used.
+        // A folder is a repository's top when it holds .git (a folder, or a file in a worktree).
         if (!(yield* exists(join(path, ".git")))) {
           yield* git(path, "init", "-q", "-b", "main");
           if (!(yield* exists(join(path, ".gitignore")))) yield* Effect.orDie(fs.writeFileString(join(path, ".gitignore"), gitignore));
@@ -404,8 +394,7 @@ const make = (hooks: ProjectHooks = {}) =>
         .describe(project, cwd, branch)
         .pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })));
 
-    /** The project's own setup for a new worktree: .vibevalley/setup (installing what it needs), run outside the project's
-     * turn and with the check's time limit; one that fails is logged, and the helper starts all the same. */
+    /** The project's own setup for a new worktree: .vibevalley/setup (installing what it needs), run outside the project's turn and with the check's time limit. */
     const projectSetup = Effect.fn("Project.projectSetup")(function* (cwd: string) {
       const file = join(cwd, ".vibevalley", "setup");
       if (!(yield* lexists(file))) return;

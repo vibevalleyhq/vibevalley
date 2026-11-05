@@ -1,17 +1,10 @@
-// A line to MOSS Live for the playground: the server relays it (mossLinePath) and adds the key; this side speaks MOSS's
-// protocol. Up: JSON actions, and the microphone as 20 ms frames of 16 kHz mono PCM, each behind a 0x00 byte. Down: JSON
-// events, and the answer as raw 48 kHz mono PCM, each piece announced by a response.audio.context before it. The words
-// and the playback's account are worked out below without touching audio or the socket, which is wired up after them.
-
 import { t } from "@vibevalley/i18n";
 import { mossLinePath } from "@vibevalley/protocol";
 
 import { recordOf } from "#/base/dom.tsx";
 import { messageOf } from "#/base/format.ts";
 
-// The turns' words as MOSS revises them, and the account of the answer's playback MOSS needs told back. MOSS sends only
-// so far ahead of what was played: every piece played is reported (playback.chunk.completed), a run played to its end too
-// (playback.completed), and a run cut off with how far it got (playback.stopped).
+// The turns' words as MOSS revises them, and the account of the answer's playback MOSS needs told back.
 
 /** One side's words in a turn; done once MOSS has settled them. */
 export interface MossTurn {
@@ -21,10 +14,7 @@ export interface MossTurn {
   readonly done: boolean;
 }
 
-/**
- * The turns with a turn's words so far (MOSS sends them whole each time); a new turn starts a new line. The owner's
- * first updates come before MOSS has named the turn: the line takes the name when it comes.
- */
+/** The turns with a turn's words so far (MOSS sends them whole each time). a new turn starts a new line. */
 export function heard(turns: readonly MossTurn[], who: MossTurn["who"], key: string, text: string, done: boolean): MossTurn[] {
   if (text === "") return [...turns];
   let last: MossTurn | undefined;
@@ -60,10 +50,7 @@ type PlaybackAction =
   | { readonly action: "playback.completed"; readonly run_id: string; readonly turn_id: string }
   | { readonly action: "playback.stopped"; readonly run_id: string; readonly turn_id: string; readonly played_audio_ms: number };
 
-/**
- * The answer's playback, on the output's clock (now, in seconds): pieces queue one after another, and each run (one
- * answer) is reported once it has been both sent whole and played, or cut off.
- */
+/** The answer's playback, on the output's clock (now, in seconds). */
 export class Playback {
   playing: Queued[] = [];
   /** Times the answer ran dry: a piece came after the one before it in the same run had finished. */

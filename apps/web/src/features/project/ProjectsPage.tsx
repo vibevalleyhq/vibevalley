@@ -1,6 +1,3 @@
-// 项目: the codebases in the work root; 全部 is the skin's map, a project the skin's head over its overview, its languages
-// (tokei's count), the calendar of a year's commits and who committed. /projects/<name>.
-
 import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query";
 import { type Component, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
@@ -44,7 +41,7 @@ const useSurvey = (project: () => string) => ({
 
 /** What a skin draws on this page; app/ hands it in, since a feature never reads a skin. */
 export interface ProjectsSkin {
-  /** 全部: every project at once. */
+  /** every project at once. */
   readonly Map: Component;
   /** Over one project's overview. */
   readonly Head: Component<{ name: string }>;
@@ -65,7 +62,7 @@ const recencyPicture: Record<Recency, string> = {
 /** `rest` is the path after /projects/. */
 export function ProjectsPage(props: { rest: string; skin: ProjectsSkin }) {
   const router = useRouter();
-  // A minute at a time: enough for 「3 小时前」.
+  // A minute at a time: enough for "3h ago".
   const now = useNow(60_000);
   const list = useProjects();
   const sorted = () => sortProjects(ready(list, []));
@@ -120,8 +117,7 @@ export function ProjectsPage(props: { rest: string; skin: ProjectsSkin }) {
         </ListCard>
       </div>
       <div class="flex min-h-[480px] min-w-0 flex-1 flex-col p-3 md:min-h-0">
-        {/* Keyed by the name, a plain value: the panel's queries are still settling when the page moves back to the map,
-            and a read through a narrowed accessor then would halt the page. */}
+        {/* Keyed by the name, a plain value: the panel's queries are still settling when the page moves back to the map, and a read through a narrowed accessor then would halt the page. */}
         <Show when={selected()?.name} keyed fallback={<props.skin.Map />}>
           {(name) => <ProjectPanel name={name} projects={sorted} now={now()} Head={props.skin.Head} />}
         </Show>
@@ -138,8 +134,7 @@ export function ProjectsPage(props: { rest: string; skin: ProjectsSkin }) {
   );
 }
 
-/** One project: the skin's head and its details. The project is the last one listed by this name, so it stays while the
- * list is asked again and while the page moves away. */
+/** One project: the skin's head and its details. */
 function ProjectPanel(props: { name: string; projects: () => ProjectSummary[]; now: number; Head: ProjectsSkin["Head"] }) {
   const project = createMemo<ProjectSummary | undefined>((last) => props.projects().find((p) => p.name === props.name) ?? last);
   return (

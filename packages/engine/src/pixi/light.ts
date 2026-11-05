@@ -1,13 +1,3 @@
-// Light on a pixel stage, worked out for every art pixel from the way it faces: the sky (ambient, and the sun or
-// the moon from a direction, with cloud shadows drifting over), up to MAX_LIGHTS point lights (lamps, lanterns,
-// fireflies, a flash), the morning mist, and then the sky's grade over the whole picture (exposure, saturation, haze,
-// tinted shadows and highlights, a vignette). Two passes a frame: the world with every sprite's picture swapped for
-// its normal map, into a texture the size of the world; then the world as painted, through a filter that lights it.
-// The light is smooth, as in Eastward; it is still worked out per art pixel, so it stays on the grid.
-//
-// Normal maps come from the pictures (normals.ts); `normalTexture` makes one for a loaded texture. A sprite without
-// one, and anything that is not a sprite (shapes, particles), is lit as the ground behind it.
-
 import { type Container, defaultFilterVert, Filter, GlProgram, Rectangle, RenderTexture, Sprite, Texture, UniformGroup, ViewContainer } from "pixi.js";
 
 import type { PixelStage } from "./index";
@@ -121,10 +111,7 @@ export const glowTexture = (radius: number, color: number, strength = 0.55) =>
     return d < 1 ? strength * (1 - d) * (1 - d) : 0;
   });
 
-/**
- * A shadow on the ground under something attention, `w` by `h`: an ellipse in two hard steps, like the rest of the
- * pixel art, darker in the middle. A soft edge would read as haze beside the feet, not as ground under them.
- */
+/** A shadow on the ground under something attention, `w` by `h`: an ellipse in two hard steps, like the rest of the pixel art, darker in the middle. */
 export const shadowTexture = (w: number, h: number, color = 0x1f160c) =>
   painted(w, h, color, (dx, dy) => {
     const d = Math.hypot(dx, dy);

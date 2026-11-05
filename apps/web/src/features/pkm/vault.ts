@@ -1,6 +1,3 @@
-// The notes are not in the frame: they are read when shown and read again every few seconds, so a file changed in another
-// editor comes up on its own (the server reads it again when its file changed).
-
 import { api } from "#/infra/api.ts";
 import { queries, useQuery } from "#/infra/query.ts";
 

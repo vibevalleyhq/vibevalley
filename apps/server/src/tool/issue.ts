@@ -110,8 +110,7 @@ export const issueTools = Effect.gen(function* () {
 
   const numberOf = (session: T.Session) => (session.issue ? issue.onBoard().find((item) => item.id === session.issue)?.number : undefined);
 
-  // Which profile takes a brief: the one named (a profile's name or id, or a runtime), else the one the owner picked for
-  // this input, else by the farm's rule. A name that matches none is said, not taken for "anyone".
+  // Which profile takes a brief: the one named (a profile's name or id, or a runtime), else the one the owner picked for this input, else by the farm's rule.
   const choose = Effect.fnUntraced(function* (brief: string, name: string, picked: string): Effect.fn.Return<T.Agent | string> {
     const key = name.trim();
     const a = yield* runtimes.choose(brief, key, picked);

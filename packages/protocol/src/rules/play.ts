@@ -1,5 +1,3 @@
-// Which farm a session is on and which plot it works: the server places and pictures it there, the page draws it there.
-
 import { type Session } from "../shapes";
 
 /** The farm a session's bed is on: each project has its own, and the sessions without one share one. */

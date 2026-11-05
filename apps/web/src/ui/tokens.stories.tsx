@@ -1,5 +1,3 @@
-// Whole class names, so Tailwind sees each one.
-
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, onSettled, Show } from "solid-js";
 

@@ -1,9 +1,3 @@
-// What Markdown becomes, for both renderers (ui/Markdown.tsx, ui/pixel/PxMarkdown.tsx): `@names` and `#12` made into
-// mentions and links in the tree before its DOM, then the DOM's links made safe and kept in the app, fenced code with
-// its language, a copy button, colours and a fold, Mermaid drawn
-// by Pele, task lists that read as lists. Messages, reports, descriptions and artifacts are agents' words: nothing here
-// may let them run as the farm's page.
-
 import type { MountOptions, Mounted } from "pele/lazy";
 
 import { t } from "@vibevalley/i18n";
@@ -16,8 +10,7 @@ import { icons } from "./icons";
 /** Past this many lines a code block starts folded. */
 const foldLines = 16;
 
-/** A link may go only here: another site over http(s), mail, or a place of the app. javascript:, data: and the like
- * would run as the farm's page, or show what is not there. */
+/** A link may go only here: another site over http(s), mail, or a place of the app. */
 export const safeHref = (href: string) => /^(https?:|mailto:)/iu.test(href) || (href.startsWith("/") && !href.startsWith("//")) || href.startsWith("#");
 
 /** `#12` outside code and links: a link to issue 12. A remark plugin, for both renderers. */
@@ -96,8 +89,7 @@ const iconOf = (name: "copy" | "expand" | "check", size = 14): Node => {
   return icon;
 };
 
-/** An SVG string as nodes, with nothing that could run or reach out: no scripts, no foreign HTML, no event handlers, no
- * links but in-page ones. Pele escapes and filters too (links and images off); this is the page's own guarantee. */
+/** An SVG string as nodes, with nothing that could run or reach out: no scripts, no foreign HTML, no event handlers, no links but in-page ones. */
 function cleanSvg(svg: string): Node {
   const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
   const root = doc.documentElement;

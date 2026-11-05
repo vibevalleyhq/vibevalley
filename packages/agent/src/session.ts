@@ -1,6 +1,3 @@
-// The agent's conversation on disk, a message a line. A compaction is a line too: reading the file back, a
-// `compactionSummary` stands in for everything before it except its `kept` most recent messages.
-
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 

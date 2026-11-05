@@ -1,6 +1,3 @@
-// The app is not signed, so macOS's own updater (Squirrel.Mac, under Electron's autoUpdater) cannot install it; this
-// does what it would. It is trusted as the first download is: GitHub's HTTPS and the release's files.
-
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { accessSync, constants, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -21,8 +18,7 @@ import { type Build, bundleOf, buildFor, ListedRelease, manifestFor, newer, plac
  * copy, to try an update). */
 const defaultFeed = "https://github.com/vibevalleyhq/vibevalley/releases/latest/download/release.json";
 
-/** GitHub's latest leaves prereleases out, so the beta and alpha apps read the list (unauthenticated: 60 asks an hour
- * from one address, and the app asks every 4 hours). */
+/** GitHub's latest leaves prereleases out, so the beta and alpha apps read the list (unauthenticated. */
 const releaseList = "https://api.github.com/repos/vibevalleyhq/vibevalley/releases?per_page=30";
 
 /** How often a running app asks again. */

@@ -1,6 +1,3 @@
-// A conversation with a model, in pi-ai's shapes (its field names, the subset the farm uses): the brain's session files
-// hold these lines, and pi-coding-agent's transcripts (through oar) are in the same shapes.
-
 export interface TextContent {
   readonly type: "text";
   readonly text: string;

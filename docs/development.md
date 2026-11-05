@@ -27,7 +27,7 @@ vp run release beta      # 第一次在 main 上：切出 release/x.y、打 beta
 vp run release final     # 在 release/x.y 上打正式版（前面要有同一版的 beta）
 ```
 
-发版分三个阶段（[计划](.agents/notes/proposed/process/2026-11-04-alpha-beta-release.md)）：alpha 给自己用，功能会变、农场可能从头来；beta 冻住功能只修错，同一条 beta 线里表结构不变；正式版和最后一个 beta 同一份代码。修错先进 `main`，再挑到 `release/x.y`。`vp run release <阶段>`（`scripts/release.ts`）不手写版本号：查工作区干净、分支对、和 origin 一致，从已有的 tag 算出下一个版本（`scripts/release-plan.ts`），beta 和正式版先跑 `vp run release:verify`、表结构和这条线的第一个 beta 比，列出要打什么、包含哪些提交、会不会让农场从头来，问过才打 tag、推送；只在终端里跑。推上去的 tag 由 release.yml 打包、建草稿 Release，看过再在 GitHub 上发布，alpha 和 beta 勾上 pre-release。
+发版分三个阶段（[客户端](docs/subsystems/app.md#发布渠道)）：alpha 给自己用，功能会变、农场可能从头来；beta 冻住功能只修错，同一条 beta 线里表结构不变；正式版和最后一个 beta 同一份代码。修错先进 `main`，再挑到 `release/x.y`。`vp run release <阶段>`（`scripts/release.ts`）不手写版本号：查工作区干净、分支对、和 origin 一致，从已有的 tag 算出下一个版本（`scripts/release-plan.ts`），beta 和正式版先跑 `vp run release:verify`、表结构和这条线的第一个 beta 比，列出要打什么、包含哪些提交、会不会让农场从头来，问过才打 tag、推送；只在终端里跑。推上去的 tag 由 release.yml 打包、建草稿 Release，看过再在 GitHub 上发布，alpha 和 beta 勾上 pre-release。
 
 `apps/desktop/scripts/package.ts` 先构建页面和壳，再把服务端用 `vp pack` 打成 `dist/main.mjs`，连同它没打进去的生产依赖和运行时要读的几样文件放进 `dist/stage/server`，最后由 electron-builder 把壳、`server/` 和 `web/` 一起打进应用；服务端在应用里用 Electron 自带的 Node 直接跑那个包。没有签名，第一次打开要在「系统设置 → 隐私与安全性」里放行。
 
@@ -45,7 +45,7 @@ vp run release final     # 在 release/x.y 上打正式版（前面要有同一�
 
 ## 分支、提交和 PR
 
-`main` 只经 PR 改，CI（`.github/workflows/ci.yml`）的 `check`、`server`、`web`、`desktop`、`site` 都过了才能合，管理员也一样；`check` 跑 `vp check --deny-warnings`，警告也不放过；每个 job 存取 Vite Task 的缓存（`node_modules/.vite/task-cache`，按 job 和分片分开，Vite+ 标为实验性）和工具链的缓存，输入没变的任务直接重放；workflow 的 token 只读，每个 action 按提交固定（`.github/dependabot.yml` 每周提 PR 跟上新版本），每个 job 20 分钟超时（CI 只跑页面的规则测试，页面的 Playwright 在本机跑：`vp run --filter @vibevalley/web e2e`；CI 不跑 `db:check`：生成器 effect-sqlc 没发布，改了 `db/` 要在有 `../effect-sqlc` 的机器上跑 `server:check`）；合并只用 squash，PR 的标题就是 `main` 上那条提交的主题、正文就是它的说明，合完分支自动删。开、改、合 PR 照 [vv-pr](.agents/skills/vv-pr/SKILL.md)。
+`main` 只经 PR 改，CI（`.github/workflows/ci.yml`）的 `check`、`server`、`web`、`desktop`、`site` 都过了才能合，管理员也一样；`check` 跑 `vp check --deny-warnings`，警告也不放过；每个 job 存取 Vite Task 的缓存（`node_modules/.vite/task-cache`，按 job 和分片分开，Vite+ 标为实验性）和工具链的缓存，输入没变的任务直接重放；workflow 的 token 只读，每个 action 按提交固定（`.github/dependabot.yml` 每周提 PR 跟上新版本），每个 job 20 分钟超时（CI 只跑页面的规则测试，页面的 Playwright 在本机跑：`vp run --filter @vibevalley/web e2e`）；合并只用 squash，PR 的标题就是 `main` 上那条提交的主题、正文就是它的说明，合完分支自动删。开、改、合 PR 照 [vv-pr](.agents/skills/vv-pr/SKILL.md)。
 
 - **分支**：`<类>/<主题>`，类是 `feat`（新行为）、`fix`、`docs`、`chore`（工具、依赖、仓库的规矩）、`refactor`、`test`（只加测试）；主题用英文小写、连字符，比如 `feat/issue-board-groups`。
 - **提交**：主题用英文，一句话说改完以后代码做什么（「The board groups issues by helper」），不写「改了什么文件」「修了一下」；界面上的中文词放进「」引用，代码和路径放进反引号；最多 100 个字（按码点数），不加句号；细节、原因和取舍写进正文，和主题之间空一行。不带 agent 的署名（`Co-Authored-By: Claude`、「Generated with …」）。这几条由 `scripts/commit-msg.ts` 查：本机是 commit-msg hook，CI 查 PR 的标题、正文和分支名；Git 自己写的（`Merge`、`Revert`、`fixup!`）不查。
@@ -56,7 +56,7 @@ vp run release final     # 在 release/x.y 上打正式版（前面要有同一�
 
 ## 改形状、规则和表
 
-- **形状**：改 `packages/protocol/src/shapes.ts`（类型）和 `schema.ts`（同一个形状的 Schema，以 `Codec<T.X>` 定类型，两边对不上就编不过；id 的品牌只在类型上，线上一侧是 `Wire<T.X>`），接口在 `api.ts` 的 `endpoints`。服务端和页面都直接 import，没有生成这一步。
+- **形状**：改 `packages/protocol/src/<概念>/shapes.ts`（类型）和 `<概念>/schema.ts`（同一个形状的 Schema，以 `Codec<T.X>` 定类型，两边对不上就编不过；id 的品牌只在类型上，线上一侧是 `Wire<T.X>`），接口在 `<概念>/api.ts`（`src/shapes.ts`、`schema.ts`、`api.ts` 只汇总；改了接口跑 `vp run api:client` 和 `vp run capabilities`）。服务端和页面都直接 import。
 - **规则**：改拥有它的包里的纯函数（几处都用的在 `packages/protocol/src/rules`），`vp run golden:update` 重写黄金数据（`vp run golden:update setting` 这样只重写一个模块的，不带名字重写全部），看 diff。页面不重写服务端的规则（[客户端问服务端](docs/subsystems/app.md)）。
 - **表和查询**：表结构是 `apps/server/db/migrations/0001_schema.up.sql` 一个文件（直接改），查询在 `apps/server/db/queries/<表>.sql`；改完跑 `vp run --filter @vibevalley/server db:generate`。`src/infra/schema.test.ts` 查表名、索引名和一张表一个查询文件。
 - **旧名字**：`vp run names:verify` 查 `apps/server/src`、`apps/web/src`、`apps/web/test`、`packages/protocol/src` 里有没有已经改掉的旧名（挂在 `docs:verify` 里）；加了新名字就把它写进 `scripts/stale-names.ts`。

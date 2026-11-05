@@ -22,7 +22,7 @@ const sample = (): BoardCard[] => {
       issue: issue(22, "看板拖拽的手感", "todo", "high", { agent: "老周", project: "vibevalley", queuedAt: now - 5 * min }),
     },
     { kind: "missing", id: "i23", lane: "todo", issue: issue(23, "灵动岛的动画", "todo", "low"), missing: ["项目"] },
-    // Dropped on 进行中, the frame not there yet; and one the server refused, to retry or put back (moves.ts).
+    // Dropped on in-progress, the frame not there yet; and one the server refused, to retry or put back (moves.ts).
     {
       kind: "todo",
       id: "i24",

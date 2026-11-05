@@ -1,6 +1,3 @@
-// Each session's thread: opened as it is hired, handed on, closed as it leaves, its report posted there; and the chat's
-// startup, which reopens them and routes what was written but not yet routed.
-
 import { Clock, Effect } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -77,10 +74,7 @@ export const sessionThreads = (r: ChannelRecords, w: ChannelWriting) =>
       });
     });
 
-    /**
-     * The issue already has its thread (reopened, or sent to another session): the next session is told of in it and follows
-     * it, in one transaction, so a restart neither says it twice nor leaves it out.
-     */
+    /** The issue already has its thread (reopened, or sent to another session). */
     const handedOn = Effect.fn("Channel.handedOn")(function* (h: T.Session, thread: string) {
       const followers = model.followers(thread);
       if (followers.includes(h.id)) return;

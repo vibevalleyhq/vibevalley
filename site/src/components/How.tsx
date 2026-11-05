@@ -1,11 +1,3 @@
-// How a job grows. With the page's script, a story told as the page scrolls: the section holds still on the screen
-// while the camera goes along a strip of field, the sky and hills slower and the grass in front faster, and the helper
-// walks from place to place and does the work of each step there (lib/story.ts): reads the ticket at the board, sows,
-// hammers at the workbench while its tools pop up and the crop comes up, and cheers over the harvest; under the field,
-// the job's git branch grows with it (forked, committed, merged) and its counters go up. Scrolling back runs it back.
-// The page is built with the story itself, at its first step, so waking it changes nothing on the page (a link to a
-// section below lands where it should). For those who ask for less motion it steps from place to place without
-// walking; without the script, the same four steps as a finished field, the merged branch and four cards (noscript).
 import { AnimatePresence, MotionConfig, motion, steps, useMotionValue, useMotionValueEvent, useScroll, useTransform, type MotionValue } from 'motion/react'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { Copy } from '../i18n/zh'
@@ -387,9 +379,7 @@ function Pop({ art, x, y }: { art: Art; x: number; y: number }) {
 /** Where the branch's marks sit across the picture (shares of its width). */
 const GIT = { fork: 0.16, commits: [0.36, 0.5, 0.64], join: 0.84 } as const
 
-/** The job's branch at a moment of the story, as a git graph: main along the bottom; the helper's branch forking up off
- *  it when the work is handed out, its commits popping on as it works, and joining main again at the harvest; its
- *  counters (commits, lines, tests) above. */
+/** The job's branch at a moment of the story, as a git graph: main along the bottom. */
 function Branch({ copy, now, check }: { copy: Copy['how']['git']; now: Moment; check: string }) {
   const b = branchAt(now)
   const lane = 30

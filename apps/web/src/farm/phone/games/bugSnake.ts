@@ -1,6 +1,3 @@
-// 贪吃虫: a snake that eats seeds and, every fifth, a bug that flies off after a while.
-// Cells are y * width + x; seeds and bugs land on free cells drawn with the run's own seeded generator, so a seed replays.
-
 import { nextRandom } from "#/farm/phone/lcd.ts";
 
 export const bugSnakeWidth = 16;

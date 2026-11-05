@@ -1,9 +1,3 @@
-/**
- * The glossary (docs/README.md 用语), read from its two tables: the words the owner is not told (不用, and the farm's
- * words outside the skins) and the code names its 代码里 column promises. `vpx scripts/i18n.ts check` reads the catalogs
- * against the words; `vpx scripts/glossary.ts` (part of `vp run docs:verify`) looks for every name in the code.
- */
-
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
@@ -11,7 +5,7 @@ import { basename, resolve } from "node:path";
 const see = "See docs/README.md 用语";
 
 export interface GlossaryRow {
-  /** The word the owner reads (叫法). */
+  /** The word the owner reads (term). */
   readonly term: string;
   readonly english: string;
   readonly code: string;
@@ -47,7 +41,7 @@ function tableAt(lines: readonly string[], from: number, first: string): { cells
   return rows;
 }
 
-/** Both tables of the 用语 section; a table that moved or lost a column fails loudly rather than checking nothing. */
+/** Both tables of the glossary section; a table that moved or lost a column fails loudly rather than checking nothing. */
 export function readGlossary(markdown: string): Glossary {
   const lines = markdown.split("\n");
   const section = lines.findIndex((l) => l.trim() === "## 用语");
@@ -80,9 +74,7 @@ export interface Avoided {
   readonly line: number;
 }
 
-/** The 不用 words of each language. A word with a note in brackets is wrong in one meaning only, so it is the reader's
- * to judge, not this check's, except the note 中文界面: wrong on the Chinese page only. An English word in the English
- * column is that language's word, not an avoided one. */
+/** The avoided words of each language. */
 export function avoidedWords(glossary: Glossary): { readonly zh: Avoided[]; readonly en: Avoided[] } {
   const englishWords = new Set(
     [...glossary.rows.map((r) => r.english), ...glossary.farm.map((r) => r.english)].flatMap((cell) =>
@@ -111,8 +103,7 @@ const ordinary: ReadonlySet<string> = new Set([
   "仓库",
 ]);
 
-/** The farm's own words, for the catalogs outside the skins. 农场 names the skin itself, which the workbench may link to
- * (回农场); the system called 农场 is the 不用 of the VibeValley row. */
+/** The farm's own words, for the catalogs outside the skins. the farm skin names the skin itself, which the workbench may link to (returning to the farm). */
 export function farmWords(glossary: Glossary): Avoided[] {
   return glossary.farm.flatMap((row) =>
     listed(row.farm)
@@ -122,8 +113,7 @@ export function farmWords(glossary: Glossary): Avoided[] {
   );
 }
 
-/** Namespaces that are a skin: the farm, the memory tree, the pixel pieces they share, the game and the art catalog.
- * The first table is the workbench's words, so a skin says what it likes. */
+/** Namespaces that are a skin: the farm, the memory tree, the pixel pieces they share, the game and the art catalog. */
 export const isSkin = (namespace: string) => /^(web\.farm|web\.tree|web\.ui\.pixel|web\.catalog|server\.game)(\.|$)/u.test(namespace);
 
 /** Keys outside a skin's namespace that still speak of the skin: the shortcuts table lists the farm's hotbar keys. */
@@ -138,7 +128,7 @@ const hasLatin = (text: string, word: string) => new RegExp(`(?<![A-Za-z])${word
 export function wordProblems(glossary: Glossary, locale: "zh" | "en", messages: ReadonlyMap<string, string>): string[] {
   const avoided = avoidedWords(glossary)[locale];
   const farm = locale === "zh" ? farmWords(glossary) : [];
-  // A word inside a word the glossary uses (定时 in 定时任务) is that word, not the avoided one.
+  // A word inside a word the glossary uses (a substring of an allowed term) is that word, not the avoided one.
   const kept = glossary.rows.flatMap((r) => listed(r.term)).toSorted((a, b) => b.length - a.length);
   const problems: string[] = [];
   for (const [key, message] of messages) {

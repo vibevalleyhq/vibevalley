@@ -1,9 +1,3 @@
-// The owner's marks on a message (a reaction, a pin) and on a channel (archived, how much of it notifies): each is a
-// set, sent as an intent (state/intent.ts), so the page shows it at once and keeps showing it until what the server
-// tells shows it too: a message's mark in its channel's copy (followed), a channel's in the frame. A refused or
-// unanswered one is let go and said in the error tone; the overlay goes with it, and the server's state shows again.
-// Each overlay sets only the field the owner set.
-
 import { type Accessor, createEffect, createMemo } from "solid-js";
 
 import { type Channel, type Chat, type ChatMessage, type Notify, ownerId, type StateFrame } from "@vibevalley/protocol";

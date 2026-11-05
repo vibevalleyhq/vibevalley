@@ -4,8 +4,7 @@ import { defineConfig } from "vite-plus";
 // CI included, runs the tests there.
 export default defineConfig({
   test: { include: ["src/**/*.test.ts"], env: { TZ: "Asia/Shanghai" } },
-  // The types other packages check against (package.json's exports: types is dist/, default the source every run
-  // compiles), declarations only, with maps back to the source for the editor.
+  // The types other packages check against (package.json's exports.
   pack: {
     entry: ["src/index.ts", "src/rules/index.ts", "src/schema.ts", "src/api.ts", "src/rpc.ts", "src/host.ts"],
     outDir: "dist",

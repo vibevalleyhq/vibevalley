@@ -1,6 +1,5 @@
 import { Clock, Context, Effect, Layer, PubSub, Stream } from "effect";
-// Every message is written to the database first. Mailbox is handed each committed message directly: it turns the
-// message into durable Session deliveries. Everything that changes the chat runs one at a time.
+// Every message is written to the database first. Mailbox is handed each committed message directly: it turns the message into durable Session deliveries.
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";

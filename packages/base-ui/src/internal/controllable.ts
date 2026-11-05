@@ -1,9 +1,6 @@
 import { createSignal } from "solid-js";
 
-/**
- * A value the caller owns when it gives one (`value()` is not undefined) and the component keeps otherwise, starting at
- * `initial`. Setting it tells `onChange` either way: that is how an owner hears of it.
- */
+/** A value the caller owns when it gives one (`value()` is not undefined) and the component keeps otherwise, starting at `initial`. */
 export function createControllable<T>(o: { value: () => T | undefined; initial: T; onChange?: ((value: T) => void) | undefined }) {
   // Boxed: a T that is itself a function would be read as an updater.
   const [kept, setKept] = createSignal<{ readonly v: T }>({ v: o.initial });

@@ -1,8 +1,3 @@
-// Markdown is how an artifact is exchanged with agents, not how it is stored.
-// What a block is that Markdown has no word for goes in an HTML comment (<!-- issue:ID -->, <!-- memory:ID -->), an
-// image's size in its title ("640x480"). Nesting is two spaces of indent per level. What the export writes, the import
-// reads back to the same blocks.
-
 import type { Block, BlockAttrs, BlockType, SpanMarks, TextSpan } from "@vibevalley/protocol";
 import { normalSpans } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
@@ -266,10 +261,7 @@ function inline(s: readonly string[], m: SpanMarks): TextSpan[] {
   return out;
 }
 
-/**
- * Where mark next starts at or after from, past at least one character when nonEmpty; escapes and code spans are stepped
- * over. -1 when it does not close.
- */
+/** Where mark next starts at or after from, past at least one character when nonEmpty. escapes and code spans are stepped over. */
 function closing(s: readonly string[], from: number, mark: string, nonEmpty: boolean): number {
   const m = Array.from(mark);
   const start = nonEmpty ? from + 1 : from;

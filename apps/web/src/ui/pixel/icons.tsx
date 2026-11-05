@@ -1,5 +1,3 @@
-// No line icons and no characters attention in for icons: the pixel font has no ✓, ✗ or ›.
-
 import type { JSX } from "@solidjs/web";
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 

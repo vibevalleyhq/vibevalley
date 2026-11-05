@@ -1,6 +1,3 @@
-// The application menu, in the farm's language: Electron's default one is English whatever the farm speaks. The roles keep
-// what each item does (and its shortcut); only the labels are ours. Built again when the page says its language.
-
 import { Menu, app, type MenuItemConstructorOptions } from "electron";
 
 import { t } from "@vibevalley/i18n";

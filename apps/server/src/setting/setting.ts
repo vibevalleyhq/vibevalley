@@ -1,7 +1,3 @@
-// settings.json in the home, readable by the owner only (0600). A key saved here wins over the configuration's and is read
-// at each use, so it takes effect at once; keys are never logged, and a page sees only where each comes from and its last
-// characters.
-
 import { join } from "node:path";
 
 import { Context, Effect, Layer, Predicate, Schema } from "effect";
@@ -66,8 +62,7 @@ interface VoiceConfig {
   readonly deepseekApiKey: string;
 }
 
-/** Read together, so an address is never paired with another one's key. MOSS's key is the one 设置 › MOSS keeps; "" when
- * none is saved. */
+/** Read together, so an address is never paired with another one's key. MOSS's key is the one Settings > MOSS keeps. */
 type DictationConfig =
   | { readonly via: "moss"; readonly key: string }
   | { readonly via: "own"; readonly url: string; readonly model: string; readonly key: string };
@@ -116,7 +111,7 @@ const make = Effect.gen(function* () {
   const file = join(config.home, "settings.json");
   const disk = yield* keptFile(file, { mode: 0o600 });
   const fromConfig = { deepseek: config.deepseek.apiKey, appId: config.agora.appId, certificate: config.agora.appCertificate };
-  // 恢复默认 goes back to these.
+  // Reset to defaults goes back to these.
   // In the farm's language, as it is when asked: the persona, greeting and failure line are words.
   const defaults = (): VoiceSettings => {
     const base = defaultVoice();

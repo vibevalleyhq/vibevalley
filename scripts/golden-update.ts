@@ -1,8 +1,3 @@
-// vp run golden:update [-- <where>…]: rewrites the golden data with what the rules answer now, then look at the diff.
-// With no <where>, every golden file; with some, only theirs: a server module (core for the core state's reduce, rules
-// and play; setting, issue, tool…: the tests in apps/server/src/<module>) or another package with golden data (ai: the
-// tests in packages/ai; cli: the command line's answers in apps/cli).
-
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";

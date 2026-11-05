@@ -1,5 +1,3 @@
-// The settings the server keeps, and the desktop's own update as the host reports it.
-
 import { createSignal, onSettled } from "solid-js";
 
 import type { SettingsUpdate } from "@vibevalley/protocol";

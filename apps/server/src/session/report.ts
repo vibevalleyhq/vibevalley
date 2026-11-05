@@ -1,5 +1,3 @@
-// Lengths are UTF-16 units.
-
 import type { FailedTurn, FailureClass, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
 
@@ -39,7 +37,7 @@ function conclusion(text: string, min: number): string {
   return tail;
 }
 
-/** What an undeclared report says in short. Questions may also come from its 要问主人 lines. */
+/** What an undeclared report says in short. Questions may also come from its question lines. */
 export const summaryOf = (text: string) => conclusion(text, 80);
 
 /** A pull request's description: the verdict, else the whole reply. */

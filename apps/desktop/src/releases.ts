@@ -1,5 +1,3 @@
-// release.json is written by scripts/package.ts beside the release's files.
-
 import { Schema } from "effect";
 
 import type { UpdateManual } from "@vibevalley/protocol/host";
@@ -66,8 +64,7 @@ export const ListedRelease = Schema.Struct({
 });
 export type ListedRelease = typeof ListedRelease.Type;
 
-/** The release.json of the latest release of a stage, from GitHub's list of releases: each channel's app updates only
- * within its own (channel.ts); drafts are not anyone's yet. */
+/** The release.json of the latest release of a stage, from GitHub's list of releases: each channel's app updates only within its own (channel.ts). */
 export function manifestFor(list: readonly ListedRelease[], stage: Stage): string | undefined {
   let best: { version: string; url: string } | undefined;
   for (const r of list) {

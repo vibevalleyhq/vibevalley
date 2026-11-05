@@ -80,7 +80,7 @@ interface LanguageShare extends Language {
   readonly share: number;
 }
 
-/** By label, aliases merged, most lines first; past `top`, the rest is one 其他 (one leftover keeps its name). */
+/** By label, aliases merged, most lines first; past `top`, the rest is one Other (one leftover keeps its name). */
 export function languageShares(counts: readonly LanguageCount[], top: number | undefined = 7): LanguageShare[] {
   const merged = new Map<string, { language: Language; lines: number; files: number }>();
   for (const c of counts) {

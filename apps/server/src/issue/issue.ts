@@ -51,13 +51,11 @@ export class Issue extends Context.Service<
     readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
     readonly scheduled: (due: Due, input: T.Trigger) => Effect.Effect<T.Issue, ApiError>;
     readonly split: (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor) => Effect.Effect<string, ApiError>;
-    /** agent: moving to todo, the profile (id or name) that takes it on; another than its own hands it over. On the owner's
-     * word only (actsForOwner). */
+    /** agent: moving to todo, the profile (id or name) that takes it on. another than its own hands it over. */
     readonly setStatus: (id: string, to: T.IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Effect.Effect<T.Issue, ApiError>;
     /** Stops the turn of the session working it; the session stays, and a word starts the next. */
     readonly stop: (id: string) => Effect.Effect<void, ApiError>;
-    /** What setStatus would do with the same request, refused as it would be; nothing changes. edit: the owner's unsaved
-     * fields, as the move would see them once saved. */
+    /** What setStatus would do with the same request, refused as it would be. nothing changes. */
     readonly previewStatus: (id: string, to: T.IssueStatus, text: string, opt?: StatusOptions, edit?: T.IssueUpdate) => Effect.Effect<T.Preview, ApiError>;
     /** What remove would do, refused as it would be; nothing changes. */
     readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
@@ -91,8 +89,7 @@ export interface IssueReviewRequest {
   readonly text?: string;
 }
 
-/** Only while the issue is still open: a completion the owner chose (kept, none) is written before its session leaves,
- * and a child issue merges into its parent, so it does not merge into main here. */
+/** Only while the issue is still open: a completion the owner chose (kept, none) is written before its session leaves, and a child issue merges into its parent, so it does not merge into main here. */
 const closingOf = (closed: T.SessionClose | undefined): { delivered: T.Delivery } | { canceled: T.IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
@@ -229,7 +226,7 @@ const make = Effect.gen(function* () {
       case "reported": {
         const e = n.report;
         const issue = worked.issueOf(e.id);
-        // A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
+        // A report's question lines are what its issue waits on the owner for; a report without them clears them.
         if (issue)
           yield* Effect.andThen(
             db.run(
@@ -421,8 +418,7 @@ const make = Effect.gen(function* () {
             yield* reopen(id, said, channel, { kind: "comment" }, taker);
             break;
           }
-          // A session on the farm hears it in its thread; with none (the orchestrator's), its doer is asked again. While it
-          // waits for acceptance the words are the findings, written down and given as the next round's brief.
+          // A session on the farm hears it in its thread. with none (the orchestrator's), its doer is asked again.
           if (sessionIdsOf(item).length === 0) yield* start(id, channel, { kind: "comment" }, said);
           else if (said && item.stage.state === "reviewing") yield* shape.review(id, { pass: false, findings: findingsOf(said) });
           else yield* comment(id, said || (yield* stuckWords(item)));
@@ -433,8 +429,7 @@ const make = Effect.gen(function* () {
         case "revive":
           yield* reopenRow(id);
           break;
-        // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the owner's choice,
-        // touches no git and opens no pull request; the rest is merged into the main branch or by a pull request.
+        // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the owner's choice, touches no git and opens no pull request.
         case "complete": {
           // Completing is the acceptance: whatever it was sent back for is settled.
           const unresolved = item.findings.some((f) => !f.resolved);
@@ -453,7 +448,6 @@ const make = Effect.gen(function* () {
             break;
           }
           // The session's leaving closes the issue too, but later: closed here, the answer already says so.
-          // Merge before settling the findings: settling them republishes the issue, and merge checks the table again.
           yield* merge(id, true);
           const updated = yield* get(id);
           if (updated.pullRequest?.state !== "open") {

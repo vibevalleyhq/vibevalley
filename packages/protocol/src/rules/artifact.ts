@@ -1,6 +1,3 @@
-// A block's text in one form: the server keeps it so (an op's text, a merge's), and the editor writes it so as it
-// splits and joins spans, so the two never disagree over the same words.
-
 import type { SpanMarks, TextSpan } from "../shapes";
 
 /** The marks as the wire has them: only those set. */

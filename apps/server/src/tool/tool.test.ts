@@ -27,8 +27,7 @@ describe("the tools", () => {
       expect(hosts.filter((h) => !said.includes(h))).toEqual([]);
   });
 
-  // A tool is its endpoint as a model sees it: named by it, taking its fields (or ones only a model uses), given to those
-  // its can names, and every endpoint an agent may call is a tool. Dry runs are the owner's: no agent is given one.
+  // A tool is its endpoint as a model sees it. Dry runs are the owner's: no agent is given one.
   it("are their endpoints: named by them, with their fields, for those their can names", () => {
     const dryRuns = new Set(endpoints.flatMap((e) => (e.dryRun ? [e.dryRun] : [])));
     for (const [caller, table] of [

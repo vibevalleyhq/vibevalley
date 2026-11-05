@@ -1,5 +1,3 @@
-// The page's words in English (at /en/), the same shape as zh.ts.
-
 import type { Copy } from './zh'
 
 export const en: Copy = {

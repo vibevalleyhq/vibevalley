@@ -69,7 +69,7 @@ export function PxField(props: {
 
 const inputBox = "border-2 border-bark-500 bg-cream-input focus-within:border-leaf-500";
 
-/** Controlled. `suggestions` are offered while typing, those containing what is typed; Enter picks the one the arrows reached. */
+/** Controlled. `suggestions` are offered while typing, those containing what is typed. */
 export function PxTextInput(props: {
   value: string;
   onChange: (value: string) => void;

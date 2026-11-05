@@ -1,6 +1,3 @@
-// The title screen's scene: the farm at the hour it is, and the fireflies over its fields at
-// dusk and night. `?tod=0.9` (as for the farm's canvas) picks another hour.
-
 export type TitleScene = "morning" | "day" | "evening" | "night";
 
 export const titleBackground = (scene: TitleScene) => `/pixel/title-${scene}.jpg`;

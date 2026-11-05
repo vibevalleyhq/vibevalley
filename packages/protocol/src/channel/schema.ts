@@ -1,5 +1,3 @@
-// The Schemas of channels, threads, messages (docs/subsystems/channel.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/schema";

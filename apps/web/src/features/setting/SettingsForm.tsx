@@ -1,6 +1,3 @@
-// The DeepSeek key (模型), the language (通用) and the memory sources (记性), a part at a time (setting.update); and what
-// the server found of gh (GitHub).
-
 import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
 
 import { t, currentLocale } from "@vibevalley/i18n";
@@ -333,8 +330,7 @@ export function GitHub() {
   );
 }
 
-/** The farm's language: the page's words, what the orchestrator and the helpers answer in, what goes to the chat apps.
- * Saved, the page opens again in it: its words are read once, when it loads (protocol words/locale.ts). */
+/** The farm's language: the page's words, what the orchestrator and the helpers answer in, what goes to the chat apps. */
 export function LanguageChoice() {
   const [error, setError] = createSignal<string>();
   const act = createAct(setError);

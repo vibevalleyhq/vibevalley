@@ -1,6 +1,3 @@
-// What a page does not need to say until asked: a bubble over its anchor while the pointer rests on it or the keyboard
-// focuses it, kept inside the window.
-
 import type { JSX } from "@solidjs/web";
 
 import { Tooltip } from "@vibevalley/base-ui";

@@ -1,19 +1,14 @@
-// A tool's parameters, from its Schema to the JSON Schema the model is shown, and a model's arguments back to what the
-// Schema reads, as pi-ai's validateToolArguments makes them (testdata/arguments.jsonl.gz).
-
 import { Schema, Predicate } from "effect";
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
-/** An object's parameters in the shape the model has always been shown (brain/tool.ts's objectSchema): no properties
- * is an open object; otherwise any property is let through and the required ones are listed. */
+/** An object's parameters in the shape the model has always been shown (brain/tool.ts's objectSchema): no properties is an open object. */
 export function objectSchema(properties: Record<string, JsonSchema> = {}, ...required: string[]): JsonSchema {
   if (Object.keys(properties).length === 0) return { type: "object", properties: {} };
   return { type: "object", properties, additionalProperties: true, ...(required.length > 0 ? { required } : {}) };
 }
 
-/** A Struct's JSON Schema in objectSchema's shape and key order: integers without the safe bounds Schema adds, numbers
- * without the non-finite strings, enums as strings. The bytes lead every request, so a change here changes the prompt. */
+/** A Struct's JSON Schema in objectSchema's shape and key order. The bytes lead every request, so a change here changes the prompt. */
 export function parametersOf(parameters: Schema.Struct<Schema.Struct.Fields>): JsonSchema {
   return Object.keys(parameters.fields).length === 0 ? objectSchema() : shaped(Schema.toJsonSchemaDocument(parameters).schema);
 }
@@ -46,9 +41,7 @@ function shaped(node: JsonSchema): JsonSchema {
   }
 }
 
-/** A model's arguments as pi-ai's validateToolArguments leaves them before checking: a null on an optional field the
- * schema does not allow null for is no field, and a value of another JSON type becomes the schema's where it reads as
- * one ("10" for 10, true for 1, 3 for "3", "true" or 1 for true; a required string's null is ""). */
+/** A model's arguments as pi-ai's validateToolArguments leaves them before checking. a required string's null is ""). */
 export function coerceArguments(args: unknown, schema: JsonSchema): unknown {
   const copy: unknown = structuredClone(args);
   dropOptionalNulls(copy, schema);
@@ -144,8 +137,7 @@ function coerce(value: unknown, schema: JsonSchema): unknown {
   return next;
 }
 
-/** A model's arguments for a tool as pi-ai's validateToolArguments takes them: coerced, or refused in its words, a line
- * a problem and then the arguments as they came (the model reads it, and its next call goes by it). */
+/** A model's arguments for a tool as pi-ai's validateToolArguments takes them. */
 export function toolArguments(name: string, args: unknown, schema: JsonSchema): { readonly ok: unknown } | { readonly refused: string } {
   const coerced = coerceArguments(args, schema);
   const problems = problemsOf(coerced, schema, "");

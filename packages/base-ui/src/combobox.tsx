@@ -1,8 +1,3 @@
-// Combobox (Base UI's; shadcn's Combobox and Command): an input with a list of options under it. The focus stays in the
-// input: the arrow keys move a highlight along the options (aria-activedescendant), Enter picks the highlighted one,
-// Escape and Tab close the list. Typing opens it and highlights the first option. Which options show for the text is
-// the caller's: it renders the ones that match inputValue; Empty shows when none do.
-
 import type { JSX } from "@solidjs/web";
 import { createContext, createSignal, createUniqueId, omit, onSettled, Show, useContext } from "solid-js";
 

@@ -1,7 +1,3 @@
-// The orchestrator's evals (orchestrator.markWrong saves them): a turn the owner marked wrong, with what the model saw before it, and
-// the checks that catch the error, written by whoever fixes it. evals.test.ts holds the committed cases (testdata/evals) to
-// their checks; evals.live.test.ts replays them on the real model.
-
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -16,9 +12,7 @@ import type { AssistantMessage, ToolCall } from "@vibevalley/ai/messages";
 import { noResult } from "#/orchestrator/prompts.ts";
 import { type Op, schemas, toolName } from "#/tool/schemas.ts";
 
-/** One check on a turn, a closed set by kind: called (tool, with argContains in its arguments' JSON and argLacks not in
- * it, each when given), notCalled (tool), silent (no words said), says (contains in the words), saysNot (contains not in
- * them). */
+/** One check on a turn, a closed set by kind. */
 export interface Expect {
   readonly kind: string;
   readonly tool?: string;
@@ -27,8 +21,7 @@ export interface Expect {
   readonly contains?: string;
 }
 
-/** As saved in evals/<id>.json under the orchestrator's home. before, input and did are lines of orchestrator.jsonl as written there:
- * what the model saw when the turn began (compactions applied), the input that began it, and the turn up to the next input. */
+/** As saved in evals/<id>.json under the orchestrator's home. */
 export interface EvalCase {
   readonly id: string;
   readonly createdAt: number;
@@ -140,10 +133,7 @@ export const committed = join(import.meta.dirname, "..", "orchestrator", "testda
 const argsKey = (args: unknown): string =>
   JSON.stringify(args, (_, v: unknown) => (Predicate.isObject(v) ? Object.fromEntries(Object.entries(v).toSorted(([a], [b]) => (a < b ? -1 : 1))) : v));
 
-/** Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once,
- * and nothing for another: the recorded turn is the wrong one, and its answer to a call the model did not make again (a
- * start it was told not to make) would tell the model it did. None touches the farm; its own tools (memory, archive) work
- * on the replay's own home. */
+/** Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once, and nothing for another. */
 export function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): Tool[] {
   const calls = new Map<string, string>();
   for (const m of did) if (m.role === "assistant") for (const c of m.content) if (c.type === "toolCall") calls.set(c.id, c.name + " " + argsKey(c.arguments));

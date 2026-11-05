@@ -21,7 +21,7 @@ const close = move("close", "canceled");
 /** session is the issue's newest one, undefined while none is on the farm. A child issue stands with its parent while its parent is open. */
 export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.IssueStage {
   const last = session?.lastRun;
-  // Completing follows what the issue delivers, not who did the work: an answer is taken (知道了), a change completed
+  // Completing follows what the issue delivers, not who did the work: an answer is taken (acknowledged), a change completed
   // (merged, or kept on its branch).
   const finish = move(t.deliver === "answer" ? "acknowledge" : "complete", "done");
   // Sent before, it is taken up again with what to do this time; never sent, it goes back to the backlog.
@@ -48,8 +48,7 @@ export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.Issu
       return { state: "working", ...at(phase?._tag === "working" ? phase.since : undefined), acts: [say("tell"), stop, close] };
     }
     case "in_review": {
-      // Run by no session on the farm (an in-process agent's): its latest run says how it ended. A failed one cannot be taken
-      // as done; another round is the issue moved back to todo.
+      // Run by no session on the farm (an in-process agent's): its latest run says how it ended. A failed one cannot be taken as done.
       if (!session && t.lastRun) {
         const ended = t.lastRun.outcome ?? "completed";
         const done = at(t.lastRun.endedAt);
@@ -66,7 +65,7 @@ export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.Issu
       const unread = t.deliver === "answer" && last?.outcome === "completed" && last.answer === undefined;
       if (last?.outcome === "failed" || unread)
         return { state: "stuck", stuck: "failed", ...at(since), lead: "cure", acts: [move("cure", "todo"), say("tell"), close] };
-      // Stopped halfway (叫停, the server restarted): the work goes on first; what is there can still be completed.
+      // Stopped halfway (stopped or restarted): the work goes on first; what is there can still be completed.
       if (last?.outcome === "interrupted")
         return { state: "stuck", stuck: "interrupted", ...at(since), lead: "resume", acts: [move("resume", "todo"), finish, say("tell"), close] };
       // Completing is the acceptance. Sending it back takes the findings, unless the orchestrator already passed it.

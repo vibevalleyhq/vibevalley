@@ -1,5 +1,3 @@
-// The page's own scripts share the shell's frame and can post anything: a message is read as data of the one shape, never trusted as more.
-
 import { Option, Schema } from "effect";
 
 import { artifactPath, type HtmlAnchor } from "@vibevalley/protocol";

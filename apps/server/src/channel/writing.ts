@@ -1,6 +1,3 @@
-// A message written: its rows in one transaction, then settled (who follows it, whom it is for, handed to the mailbox),
-// then published with its link previews read after it is out.
-
 import { Clock, Effect, FiberSet } from "effect";
 import { HttpClient } from "effect/http";
 

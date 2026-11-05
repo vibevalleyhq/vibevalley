@@ -43,8 +43,7 @@ export type PickAction =
   | { readonly kind: "open"; readonly block: string }
   | { readonly kind: "unpick" };
 
-/** What a key does to the picked blocks; undefined for one it does nothing with. A move or an indent the first (or last)
- * of them cannot make is not made for the rest either: they go together or not at all. done: nothing is picked after. */
+/** What a key does to the picked blocks. undefined for one it does nothing with. */
 export function pickAction(e: Keys, blocks: readonly PkmBlock[], shown: readonly PkmBlock[], p: Picked): PickAction | undefined {
   const ids = pickedIds(shown, p);
   if (ids.length === 0) return undefined;
@@ -74,8 +73,7 @@ export function pickAction(e: Keys, blocks: readonly PkmBlock[], shown: readonly
   return undefined;
 }
 
-/** The picked blocks and everything under them as a Markdown outline, the shallowest at no indent: what is copied, and
- * what pasting into a block reads back into blocks (editing.ts pasteAction). */
+/** The picked blocks and everything under them as a Markdown outline, the shallowest at no indent. */
 export function outlineText(blocks: readonly PkmBlock[], ids: readonly string[]): string {
   const tops = topsOf(blocks, ids);
   const base = Math.min(...tops.map((b) => b.depth));
@@ -94,12 +92,10 @@ export function outlineText(blocks: readonly PkmBlock[], ids: readonly string[])
 
 export type DropAt = "before" | "after" | "inside";
 
-/** Where a block dropped on a row goes: the row's upper half is before it; the lower half after it, or inside it as its
- * first child once the pointer is past where the row's words start (indent: how far past). */
+/** Where a block dropped on a row goes: the row's upper half is before it. */
 export const dropAt = (down: number, indent: number): DropAt => (down < 0.5 ? "before" : indent > 32 ? "inside" : "after");
 
-/** The blocks dragged (the picked ones when the one taken is picked, each with what is under it) put at target, in their
- * order; none when target is one of them or under one. */
+/** The blocks dragged (the picked ones when the one taken is picked, each with what is under it) put at target, in their order. */
 export function dropOps(blocks: readonly PkmBlock[], ids: readonly string[], target: string, at: DropAt): PkmBlockOp[] {
   const tops = topsOf(blocks, ids);
   const byId = new Map(blocks.map((b) => [b.id, b]));

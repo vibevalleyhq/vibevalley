@@ -1,7 +1,3 @@
-// A blocks artifact, written block by block with the helpers. A block shows its marks until it is clicked into; then it is
-// a plain field (marks are kept through the edit), and Enter splits it, Backspace at its start joins it to the one before,
-// Up and Down at its ends move between blocks.
-
 import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
@@ -24,8 +20,7 @@ import { BlockEditor, type EditBlock } from "./editor";
 /** The owner's lines on the attribution bar. */
 const ownerColor = "#c8a46e";
 
-/** Who wrote a block last, as the bar beside it shows: the owner's colour, or the helper's (its look's trim, else a colour
- * picked from its id, the same every time). */
+/** Who wrote a block last, as the bar beside it shows. */
 function authorColor(updatedBy: string, agent: Agent | undefined) {
   if (updatedBy === ownerId) return ownerColor;
   if (agent?.look.trim) return hexColor(agent.look.trim);
@@ -51,8 +46,7 @@ interface Row {
   readonly wanted: boolean;
 }
 
-/** Keyed by the id by its caller: one editor for the page's life, handed to onEditor for what the page's menu does
- * with it (the demo, which polls faster while it runs). */
+/** Keyed by the id by its caller: one editor for the page's life, handed to onEditor for what the page's menu does with it. */
 export interface QuoteTarget {
   readonly id: string;
   readonly rev: number;
@@ -517,7 +511,6 @@ function Field(props: { editor: BlockEditor; row: Row; focusNow: boolean; onLeav
   let el!: HTMLTextAreaElement;
   const b = () => props.row.block;
   // Clicked into: the field takes the focus once it is on the page.
-  // Read here, not in onSettled: the prop is a memo made on first read, and onSettled may not make one.
   const focusNow = untrack(() => props.focusNow);
   onSettled(() => {
     if (focusNow) el.focus();

@@ -1,7 +1,3 @@
-// Screenshots of the page on a running server, for vv-acceptance/references/page.md: each path in VIBEVALLEY_PAGES (comma-separated, default
-// the farm and every workbench place) at VIBEVALLEY_SCREEN (WxH, default 1440x900), into apps/web/.screens/<name>.png.
-// The server is VIBEVALLEY_SERVER (scripts/verify-server.ts sets it); it must serve the page (--web).
-
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 

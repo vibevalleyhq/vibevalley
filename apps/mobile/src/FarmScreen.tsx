@@ -1,6 +1,3 @@
-// The farm: the page the paired computer serves, in a WebView, with this phone as its host (@vibevalley/protocol/host's
-// mobileBridge): the page posts what it asks as text, and the shell answers and pushes by calling fromNativeKey in it.
-
 import { type ComponentType, type Ref, useEffect, useRef } from "react";
 import { StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";

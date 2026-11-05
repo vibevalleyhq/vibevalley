@@ -1,81 +1,58 @@
 # 定时任务
 
-定时任务（`Cron`）是一张工单的一种触发：到点直接保存不可变 Trigger，调用 Issue 准备工单，再经 Mailbox 交给帮工或管家的 Session。同一个定时任务复用一张工单；工单等待主人时自动输入留在信箱。定时任务存在农场的表里，主人在页面上看得到、关得掉；管家用工具定它。
+定时任务（`Cron`）是工单的时间触发器，每次到期在同一事务内更新运行时间并写入不可变 `Trigger`。服务端随后调用 `Issue.scheduled` 准备该定时任务绑定的同一张工单，交由 `Mailbox` 投递给帮工或管家。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 定时任务的模型、五种时间写法、时区、下次什么时候 | 到点以后工单怎么派、重开、带话（[工单](docs/subsystems/issue.md)，`issue/issue.ts` 的 `scheduled`） |
-| 谁定的、要不要等主人同意 | 管家怎么接住到点的那句话、答完等主人点头（`orchestrator`，[管家](docs/subsystems/orchestrator.md)） |
-| 每隔一阵看一遍、到点先存再发布、错过的补一次 | 输入归一化与重试（Ingress）、订阅和双层信箱（Mailbox） |
-| 定时任务在核心状态里的一份（`WorkspaceState.crons`） | 频道、频道的默认项目、提示怎么投递（[频道](docs/subsystems/channel.md)） |
-| | VibeValley 自己的 agent 自带的提醒（`packages/agent/src/reminders.ts` 的 `reminders.json`，工具 `reminder`、`list_reminders`、`cancel_reminder`）：只有命令行的对话开着，当管家、当帮工时关掉（`reminders: false`） |
+| 定时任务模型、五种时间规格（`CronWhen`）、时区解析与下次运行时间计算（`nextRun`） | 到期后工单如何创建、排队、重开或启动会话（[工单](docs/subsystems/issue.md)） |
+| 管家创建定时任务时的主人授权门禁（`needsOK`：是否进入 `pending` 待批） | 触发信封如何排队、受阻暂存与唤醒（[Mailbox](docs/subsystems/mailbox.md)） |
+| 周期性到期扫描（`tick`）、关机错过任务的单次补跑（`isMissed`）与未路由重放 | CLI 独立对话的本地提醒（`packages/agent/src/reminders.ts`） |
 
 ## 在哪
 
-- 服务端 `apps/server/src/cron`（`Cron`）：`cron.ts` 存取、开机读表、每次检查（`tick`）和到点发布（`due`，一条流）；`due.ts` 是只有它用的纯函数：`dueCrons`、`isMissed`、`afterRun`、`needsOK`、`cronProblem`。
-- 几处都用的规则在 `apps/server/src/cron/when.ts`：`nextRun`、`cronProblem`、`whenText`、`nextText`、`dueText`，五段 cron 的解析、下次时间、说成话；下次时间用 Effect 的 `Cron.make`、`Cron.next` 和时区，解析和报错是自己的。
-- 表：`cron`（时间写法存成 JSON 的 `spec`）、`mailbox_trigger`（来源为 cron 的不可变到期快照）；工单表的 `cron` 列指着它的定时任务。
-- 接口：`cron.create`、`cron.list`、`cron.update`、`cron.delete`（[capabilities.md](docs/reference/capabilities.md)）；`cron.update` 只有主人和「连接到本机」能调，管家不能。管家的工具 `cron_create`、`cron_list`、`cron_delete` 在 `tool/tool.ts`。
-- 配置：`cron.tick_ms`，默认 20000（20 秒看一遍；0 或更小是每毫秒）。
-- 页面：频道菜单的「定时任务」（`apps/web/src/farm/chat/ChannelMenu.tsx`）和聊天页的「定时任务」标签（`apps/web/src/features/channel/Tabs.tsx`）列出这个频道的定时任务，能开关、删、对待批的点「同意」「不要」；看板上定时任务的工单带「定时任务」标签（`apps/web/src/features/issue/cards.ts`）。
+| 位置 | 职责 |
+|---|---|
+| `apps/server/src/cron/cron.ts` | `Cron` 服务：增删改、到期与补跑判定（`dueCrons`、`isMissed`、`needsOK`）、到期事务与重放 |
+| `apps/server/src/cron/when.ts` | 五种时间规格解析、`nextRun`、`whenText` 与 `nextText` |
+| `apps/web/src/features/chat/` | 频道菜单与聊天页「定时任务」标签页 |
+
+接口清单见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对主人与 `remote` 开放）。
 
 ## 模型和不变量
 
-- **五种时间**（`CronWhen`，封闭的联合）：`once`（一个时刻）、`every`（每隔几分钟，至少 `minEveryMinutes` = 1）、`daily`（每天 `HH:MM`）、`weekly`（每周几、`HH:MM`，0–6 的整数，0 是周日）、`cron`（五段：分 时 日 月 周几）。每个定时任务带时区：IANA 名字或偏移（`+08:00`、`+0800`、`+08`，偏移可带 `GMT` 前缀），没给就用这台电脑的时区。校验、下次时间和显示共用同一个解析函数，同值的几种偏移写法在每天、每周和 cron 里都在同一时刻到点。
-- **cron 的读法**：每段是逗号隔开的 `*`、`n`、`a-b`，都能带 `/步长`；周几 0 到 7，0 和 7 都是周日；两个日子段都不以 `*` 开头时照 Vixie cron，哪个对上都算，否则两个都要对上。八年（`cronYears`）里都不会到点的（2 月 30 号）不收；`cronProblem` 说清是哪一段写错了。`whenText` 把常见的说成话（每天、工作日、周末、每周几、每月几号、每小时第几分），其余显示 `cron 0 9 1 1 *`。
-- **下次什么时候不存**，`nextRun` 从上次跑的时间（没跑过就从定好的时间）算：严格晚于它的第一个对上的分钟。`daily`、`weekly`、`cron` 沿着墙上的钟走：调钟跳过的时刻算成调钟前的同一时刻往后挪（春天拨快那晚的 02:30 是 03:30），重复的取第一次；所以写成 cron 的每天、每周和 `daily`、`weekly` 在同样的时刻到点。关着的定时任务没有下次。
-- **谁定的**（`Cron.by`）：`owner` 是主人经接口、命令行定的，`orchestrator` 是管家用 `cron_create` 定的；列表里管家定的写着「管家定的」。
-- **等主人同意**（`needsOK`）：主人定的、管家在主人这一轮里（最新那条输入有主人的话）定的，当场生效。管家不是主人叫醒时定的，只有不派帮工的一次性回头看当场生效；会反复来的、直接派帮工的存成关着、`pending`，到点也不跑，在 Inbox 里是一条 `cron-ask`。主人点「同意」是 `cron.update` 打开，同时清掉 `pending`；点「不要」是 `cron.delete`。管家的工具对待批的回「定好了，等主人同意才生效：……」，它照实告诉主人。
-- **派给谁**：写了帮工的档案（按 id，再按名字找）的派给那个档案，这时要写项目或频道有默认项目，否则不收；没写的派给它频道的管家（频道设置里照看它的那个，没设是默认管家；工单的 `agent` 就写那个管家的档案 id）。管家用的工具里不填频道就是它正在回话的频道，接口里不填是默认频道。
-- **一个定时任务一张工单**：工单模块按 cron 外键取指着这个定时任务的最近一张；每次到点是它的一轮，触发是 `RunTrigger` 的 `cron`（带着哪个定时任务、是不是补跑）。
-- **定时任务有一份**：表是家，开机读进核心状态（`cronChanged` 事实），每次改先写表再施加事实，删掉施加 `cronRemoved`；`spec` 按 `CronWhen` 的 Schema 读，`set_by` 按 `CronBy` 读，读不了或形状不对的那行不进核心状态，别的行照常恢复。增、改、删和每次检查由一把锁排成一个一个来。
+- **五种时间规格（`CronWhen`）**：
+  - 支持 `once`、`every`、`daily`、`weekly` 与五段式 `cron`（`once` 跑完自动关闭）。
+  - 每项携带 IANA 时区或偏移量，缺省取本机时区；8 年内无合法触发时刻的表达式（如 2 月 30 日）直接拒绝。
+- **下次运行时间不落库，实时从 `last_run` 推导**：
+  - `nextRun` 计算严格晚于 `last_run`（未运行过则取创建时间）的下一个匹配分钟。
+  - 夏令时跳过的时刻顺延，重复的时刻取第一次。
+  - 重新开启已关闭的周期任务时将 `last_run` 设为当前时间，不补跑关闭期间的时刻。
+- **管家非当轮授权创建的周期或派工任务须等主人同意（`needsOK`）**：
+  - 主人创建、或管家在含主人原话的当轮（`Actor.forOwner` 为真）创建的任务立即生效。
+  - 管家在后台回合自行创建时，仅「不派帮工的 `once` 回头看」直接生效。
+  - 其余后台创建的任务存为 `enabled: false, pending: true`，在 `Inbox` 生成 `cron-ask` 待主人点击同意。
+- **一个定时任务固定复用一张工单**：
+  - 未指定帮工档案时指派给所属频道管家；指定帮工档案时必须同时指定项目。
+  - 若绑定工单处于等待主人状态，新到期输入在 `Mailbox` 蓄水池中保持 `held`（同一工单只留最新一条，`mailbox_issue_one_held`）。
 
 ## 怎么走
 
-**定**：
-
-1. `cronProblem` 先查：要有名字、要写到点做什么、时区认得、一次性的在以后、间隔至少 1 分钟、`HH:MM` 写对、每周的天在 0–6、cron 每段写对。
-2. 找频道和档案；直接派帮工的没有项目就拒绝。
-3. 按 `needsOK` 定开着还是待批，写表，施加事实。管家定好后工具回给它 `whenText` 的那句话和下次时间，它能自己对一遍。
-
-**到点**（`tick`，开机后所有服务就绪时先跑一次，之后每 `cron.tick_ms` 一次）：
-
-1. `dueCrons` 挑出下次时间不晚于现在的。错过了好几次的也只算一次。
-2. 晚了超过 5 分钟（`missedAfterMs`）的算补跑：服务端没开着时错过的，开机后只补一次，提示里写「（服务端没开着时错过的，补一次）」；循环的从现在往后排，中间错过的不一个个补。
-3. 在同一事务里更新 `last_run`、关闭一次性任务并写 `mailbox_trigger`。任何写入失败都回滚，下次检查重试。
-4. 提交后施加核心事实、发布 `Due`，完整 Trigger 快照供 `vv://trigger/<id>` 读取，不写聊天消息。
-5. Cron 直接调用 `Issue.scheduled` 准备工单，再将 `cron:<id>` 订阅绑定到工单并交给 Mailbox。首次开工前登记初始输入；排队时进入 Tier 1，后续开工读取未消费输入。已经开工的工单按信箱规则投递，asking/stuck/reviewing 时保持 held；已关闭工单在新的定时触发下重开。
-6. 每次 tick 先重放未路由的 cron Trigger，再找新的到期任务。一次性任务即使已经关闭，也会完成先前的派发。Mailbox 的通用重放跳过 cron 来源，由 Cron 准备工单后再交给 Mailbox，已登记的不重复派发。
-
-**开关**：关掉只改 `enabled`；重新打开一个周期定时任务，开关和起算时间（`last_run` 记成现在）一次写入，从现在往后算，不补关着时错过的。一次性的跑过就关，列表里显示「做过了」，主人可以删。
-
-**列表里的「下次」**（`nextText`）：下次的时刻；开着却不会再到点的是「不会再到点」；待批的是「等主人同意」；跑过的一次性是「做过了」；其余「关着」。
+1. **扫描与补跑（`tick`）**：启动后及每 `cron.tick_ms` 在单锁内重放未路由 Trigger，并筛出 `nextRun <= now` 的已启用任务（错过多次只合并补跑一次）。
+2. **原子记录与投递**：在同一 SQLite 事务内更新 `cron.last_run` 并写入 `mailbox_trigger`，随后调用 `Issue.scheduled` 准备工单并交 `Mailbox.receive` 投递。
 
 ## 和谁打交道
 
-- **Mailbox**：接收已准备好工单的 Trigger，保存路由回执并投递；Cron 不依赖 Ingress。
-- **工单（`issue`）**：一个定时任务一张工单，负责创建、派活、排队、重开（[工单](docs/subsystems/issue.md)）。
-- **频道（`channel`）**：提供所属频道、默认项目和管家；定时输入不伪装成聊天消息。
-- **档案（`agent`）**：定时任务只认存在的帮工的档案；没写的交给管家，是哪个管家问频道（`orchestratorOf`）。
-- **管家（`orchestrator`、`tool`）**：用 `cron_create`、`cron_list`、`cron_delete` 定、看、删，调不了 `cron.update`。系统提示里写着：主人说「每天」「到点」时定；派了活、答应了主人一件事、在等一个结果时，可以自己定一次性的回头看；会反复来的只在主人要的时候定。管家自己的定时任务（没写档案的）快到点时，它闲着也不压缩（`wakeSoon`）。
-- **Inbox（`apps/server/src/inbox/items.ts`）**：待批的定时任务是一条 `cron-ask`，主人同意或删掉它就没了。
+- **工单与信箱（`issue`、`mailbox`）**：调用 `Issue.scheduled` 获取或创建绑定工单，通过 `Mailbox` 投递到期 `Trigger`。
+- **通知（`inbox`）**：`pending` 状态的定时任务由 `inbox/items.ts` 派生为 `cron-ask` 提醒主人审批。
 
 ## 为什么这样
 
-- **定时任务是一张工单的触发，一个定时任务一张工单。** 放弃了每次到点写一张新工单：一个「每 5 分钟」的定时任务一天写 288 张，看不出一个定时任务干过几次，也和「工单、带话都触发一轮」的模型对不上。放弃了没写档案的定时任务直接对管家说一句话：两个出口靠两个订阅者各自看「有没有写档案」分工，交给管家的那一半不进看板、没有干活的记录。
-- **管家的工单答完等主人点头，点了就完成（交付 `none`）。** 没记成不做了（`dismissed`）：收工是主人请帮工走，意思不一样，看板和统计会混在一起。答完不再自动关：一轮没崩不等于答上了（[工单](docs/subsystems/issue.md)「已完成只由主人点头」）。
-- **定时任务是农场的，不是 agent 的。** 存在农场的表里，页面能看、能关；VibeValley 自己的 agent 当管家时关掉它自带的定时任务，不留两份。
-- **下次什么时候不存。** 从上次跑的时间算，打开、重启都不用改它；错过的只补一次，不一个个补。
-- **到期记录与时间更新同事务提交。** 开机重放不依赖内存发布成功；网关登记凭据用于识别已投递的 occurrence。会话启动过程本身的崩溃恢复仍由 Session 负责。
-- **cron 自己写，不用 `robfig/cron`。** 多一个依赖，它的调钟规则和已有的四种不一样，同一个时间写成 cron 和写成每天会在不同时刻到点。五段的解析不到一百行，和每天、每周共用 `cronWallTime`。
-- **四种固定写法和 cron 并存。** 只留 cron，管家写「每天九点」时更容易写错；加更多固定种类（工作日、每月），每多一种说法多一种形状，还是有说不出的。工具说明里写明 cron 只用在前四种说不清的时候。
-- **管家没被主人叫醒时定的会反复来、会派帮工的定时任务要主人同意。** 这两种会在主人不看着时持续花钱；管家给自己定的一次性回头看不派帮工，当场生效（[分清话是谁说的](docs/subsystems/orchestrator.md)第 5 节）。
-- **醒了就说，不分后台和前台。** 放弃了「醒了先不说，要说再调工具」：能少吵，但多一套规则（哪些叫醒算后台、谁判断该不该说）。
+- **一个定时任务绑定一张工单，而非每次到期新建工单**。避免高频任务淹没看板，让历次运行记录自然归集在同一条工单串下。
+- **到期状态更新与 Trigger 同事务落库**。防止更新 `last_run` 后崩溃导致漏跑，或投递后未更新 `last_run` 导致重复触发。
 
 ## 怎么验证
 
-- `apps/server/src/cron/cron.test.ts`：黄金数据（`testdata/rules.jsonl.gz`）；错过几次只算一次、补跑、一次性跑过就关；什么要等主人同意；定、到点、说出来、存下、重开后接着；存不下的一次不发布、下次再试；cron 的定时任务存下、坏的拒绝；管家自己定的等主人同意，重启后也等。服务的时钟由测试换（`CronOptions.now`）。
-- `apps/server/src/cron/when.test.ts`：每天、每周、每隔、一次的下次时间，cron 的下次时间（两个日子字段任一到点、闰年）和夏令时前后与每天、每周一致，报错，说成话；折法留着定时任务、帧里填话。
-- 页面：`apps/web/test/chat.spec.ts`（定时任务的开关和删）。
+- `apps/server/src/cron/cron.test.ts`、`when.test.ts`：五种时间规格与夏令时、错过合并补跑、`needsOK` 门禁与事务恢复测试。
+- `apps/web/test/chat.spec.ts`：定时任务列表、开关与删除端到端测试。

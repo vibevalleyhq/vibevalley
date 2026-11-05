@@ -33,9 +33,7 @@ import * as qsession from "#db/session.sql.ts";
 
 import { Channel, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./channel.ts";
 
-/** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 is held until release (unless holds is
- * off), 「必败」 fails. A turn reads its input (read) as it goes on: a held one has not read it yet, and one the farm stops
- * while it is held never does, so what it was handed is given again after a restart. A steer is read at once. */
+/** Sessions played: a turn takes its input, says it got it and reports. the slow mode is held until release (unless holds is off), the fail mode fails. */
 class FakeSessions {
   holds = true;
   stopped = false;
@@ -346,8 +344,7 @@ describe("the chat", () => {
       }),
     ),
   );
-  // A budget, at what it takes today: one line from the owner in the general channel, written, delivered and told. A
-  // change that asks more fails here; one that asks less lowers it.
+  // A budget, at what it takes today: one line from the owner in the general channel, written, delivered and told. A change that asks more fails here.
   it.live("one line from the owner reads and writes the database a bounded number of times", () =>
     run((f) =>
       Effect.gen(function* () {

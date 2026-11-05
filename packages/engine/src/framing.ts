@@ -1,7 +1,3 @@
-// A picture in a view at a whole number of view pixels for each art pixel, as large as it can be while its edges cut off
-// at most `cut.across` of its width on each side and `cut.down` of its height above and below. A view it cannot fill
-// that way keeps bars.
-
 export interface Size {
   readonly w: number;
   readonly h: number;
@@ -58,8 +54,7 @@ export function fills(view: Size, picture: Size, cut: Cut): boolean {
   return box.x <= 0 && box.y <= 0 && box.x + box.w >= view.w && box.y + box.h >= view.h;
 }
 
-/** The view of `view`'s shape nearest in width to it, between `min` and `max`, that the picture fills; `view` itself
- * when it is filled already or none in between is. */
+/** The view of `view`'s shape nearest in width to it, between `min` and `max`, that the picture fills. */
 export function filledNear(view: Size, picture: Size, cut: Cut, min: Size, max: Size): Size {
   const shape = view.h / view.w;
   const fit = (w: number): Size | undefined => {

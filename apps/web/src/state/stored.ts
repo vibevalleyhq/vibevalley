@@ -1,8 +1,3 @@
-// This machine's choices, kept in the browser's storage under one namespace (vibevalley.<name>), each through a Schema.
-// The only door to localStorage on the page (lint vibevalley/stored-door): a value that does not decode (an older page
-// wrote it, or a hand did) reads as its fallback, and a storage that throws (a private window, a full one, a sandboxed
-// frame) leaves the choice for this page's life. Every reader in the page hears a change, and so does every other tab.
-
 import { Effect, Option, Schema } from "effect";
 import { KeyValueStore } from "effect/persistence";
 import { Atom } from "effect/reactivity";
@@ -44,10 +39,7 @@ export function storedAtom<S extends Schema.Codec<unknown, unknown>>(name: strin
 export const defineStored = <S extends Schema.Codec<unknown, unknown>>(name: string, schema: S, fallback: S["Type"]): PageAtom<S["Type"]> =>
   onPage(storedAtom(name, schema, fallback));
 
-/**
- * A field of a stored struct that reads as `fallback` when it is missing or does not decode, so one bad field does not
- * throw away the others (the prefs, written partly by a test or an older page).
- */
+/** A field of a stored struct that reads as `fallback` when it is missing or does not decode, so one bad field does not throw away the others. */
 export function orFallback<S extends Schema.Top>(schema: S, fallback: S["Type"]) {
   const tolerant = Schema.catchDecoding<S>(() => Effect.succeedSome(fallback))(schema);
   return Schema.withDecodingDefaultTypeKey<typeof tolerant>(Effect.succeed(fallback))(tolerant);

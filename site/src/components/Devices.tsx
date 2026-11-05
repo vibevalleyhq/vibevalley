@@ -1,6 +1,3 @@
-// Every screen the farm is on: the app on the Mac that runs the farm, and on phones that join it through the
-// yard gate. A Mac with the farm, two phones in front of its lower right with the farm chat and the tickets, each
-// drifting at its own pace as the page scrolls (useScrollLinked); side by side under the Mac on a narrow screen.
 import type { ReactNode } from 'react'
 import type { Copy } from '../i18n/zh'
 import { Section, cx, useReveal, useScrollLinked } from './ui'

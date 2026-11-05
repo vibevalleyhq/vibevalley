@@ -1,14 +1,10 @@
-// The shapes of the call, dictation and voice settings (docs/subsystems/voice.md).
-
 import type { KeySource } from "../common/shapes";
 
-/** The 设置 section a call's problem is fixed in (VoiceUnavailable.settings): its address under /settings. */
+/** The Settings section a call's problem is fixed in (VoiceUnavailable.settings): its address under /settings. */
 export const VoiceFixValues = ["models", "call", "dictation"] as const;
 export type VoiceFix = (typeof VoiceFixValues)[number];
 
-/** A page's line to MOSS Live: a WebSocket the server relays to wss://api.mosi.cn/v1/realtime with the saved key. The
- * page speaks MOSS's protocol: JSON actions, and binary frames whose first byte is 0x00 for audio (16 kHz mono PCM up,
- * 48 kHz down). */
+/** A page's line to MOSS Live: a WebSocket the server relays to wss://api.mosi.cn/v1/realtime with the saved key. */
 export const mossLinePath = "/api/v1/voice/moss/line";
 
 export const voiceSilenceMsMin = 200;

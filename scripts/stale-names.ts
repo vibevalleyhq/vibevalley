@@ -1,11 +1,3 @@
-/**
- * Names the code has moved past, looked for where they must not come back: the server's code, the page's and the
- * shapes'. Run as part of `vp run docs:verify`; a hit names the file, the line, and what to say instead.
- *
- * A name belongs here when renaming it was a decision (a note says why), not when the old word still means something:
- * `t.Helper`, the farm's helpers on screen and the game's harvest are not stale; an issue's state in farm words is.
- */
-
 import { existsSync, globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -39,7 +31,7 @@ const RULES: readonly Rule[] = [
     name: "a fact named for its thing, not for what happened to it",
     pattern:
       /\b(FactIssue|FactIssueGone|FactSession|FactSessionGone|FactSessionReport|FactSessionPhase|FactMessage|FactChannel|FactChannelGone|FactOwnerMentions|FactCron|FactCronGone|FactConnector|FactGameProgress|FactVoiceCall)\b|type: "(issueGone|sessionGone|sessionReport|sessionPhase|channelGone|cronGone|gameProgress|voiceCall)"/u,
-    says: "a fact says what happened: <thing>Changed (FactIssueChanged, type issueChanged), <thing>Removed, sessionReported, sessionLeft, callChanged, progressChanged (.agents/notes/implemented/architecture/2026-11-04-one-meaning-of-fact.md)",
+    says: "a fact says what happened: <thing>Changed (FactIssueChanged, type issueChanged), <thing>Removed, sessionReported, sessionLeft, callChanged, progressChanged (docs/subsystems/core.md)",
   },
   {
     name: "fact for something that is not a fact of the core state",
@@ -178,7 +170,7 @@ const RULES: readonly Rule[] = [
     name: "a helper's question under the ask name",
     pattern: /\b(Ask|Asks|openAsks|asksOf|setIssueAsks|SetIssueAsks|OwnerAsk|badgeAsks)\b|\.asks\b/u,
     says: "Question, questions, openQuestions, questionsOf; the inbox kind ask and the verb ask stay",
-    // The marker a helper writing English may put before a question (要问主人：).
+    // The marker a helper writing English may put before a question (question).
     except: /^apps\/server\/src\/session\/report\.ts$/u,
   },
   {
@@ -364,8 +356,7 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "the orchestrator in a local called manager",
-    // The village's manager sprite and keys are strings (yard.manager.hint, "manager-face"); the English @manager alias is a
-    // key the owner types (channel/mentions.ts).
+    // The village's manager sprite and keys are strings (yard.manager.hint, "manager-face").
     pattern: /\b(?:const|let|var|function)\s+manager\b|\(manager[,:)]|(?<![."\w-])manager\??\.[a-z]/u,
     says: "orchestrator (or the profile's id): manager is only the English page's word for 管家",
   },
@@ -394,13 +385,11 @@ const RULES: readonly Rule[] = [
   },
 ];
 
-// A catalog (and the test that reads the English page) says what the owner reads, in the glossary's English column
-// (docs/README.md 用语: ticket, plan, manager…); only the rules about Chinese words look into it.
+// A catalog (and the test that reads the English page) says what the owner reads, in the glossary's English column (docs/README.md glossary.
 const ownerWords = (source: string) => source.startsWith("packages/i18n/locales/") || source === "apps/web/test/english.spec.ts";
 const han = /\p{Script=Han}/u;
 
-/** Where a catalog's words are said: web.farm.phone is apps/web/src/farm/phone's, web.setting apps/web/src/features/
- * setting's, shared both sides'. The rules about a place's words look there. */
+/** Where a catalog's words are said: web.farm.phone is apps/web/src/farm/phone's, web.setting apps/web/src/features/ setting's, shared both sides'. */
 function placeOf(ns: string): string {
   if (ns === "shared") return "packages/i18n/locales/shared.json";
   const [host, ...parts] = ns.split(".");

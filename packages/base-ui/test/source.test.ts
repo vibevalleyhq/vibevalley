@@ -1,5 +1,3 @@
-// Checks on the components' source that the type checker cannot make.
-
 import { expect, test } from "vite-plus/test";
 
 const sources = import.meta.glob<string>("../src/**/*.tsx", { query: "?raw", import: "default", eager: true });

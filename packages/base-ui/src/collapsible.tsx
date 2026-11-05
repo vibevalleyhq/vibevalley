@@ -1,6 +1,3 @@
-// Collapsible: a panel shown and hidden by its trigger (Base UI's Collapsible). The trigger says whether it is expanded
-// and which panel it controls; the panel is unmounted while closed unless keepMounted, then only hidden.
-
 import { createContext, createUniqueId, omit, Show, useContext } from "solid-js";
 
 import { createControllable } from "./internal/controllable";

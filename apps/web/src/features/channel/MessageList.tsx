@@ -47,8 +47,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
     (reason) => toast(reason, "bad"),
   );
   let log: HTMLDivElement | undefined;
-  // The message an address points at: older pages are read until it is among them, then it is scrolled to and lit up a
-  // while. A string, so a change elsewhere in the list does not scroll again.
+  // The message an address points at: older pages are read until it is among them, then it is scrolled to and lit up a while.
   const [lit, setLit] = createSignal<number>();
   createEffect(
     () => {
@@ -365,8 +364,7 @@ function Frame(props: {
 }
 
 /** A dispatch: one line until it is opened, then the whole task in its place. */
-/** A dispatch said as what it is for the owner: who went to which issue. The words the helper was given, its brief and how
- * to report, stay folded: they are the helper's, not the owner's to read. */
+/** A dispatch said as what it is for the owner: who went to which issue. */
 function Dispatch(props: { m: ChatMessage }) {
   const core = useCore();
   const [open, setOpen] = createSignal(false);

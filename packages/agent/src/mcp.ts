@@ -1,6 +1,3 @@
-// MCP servers' tools for the agent. Only initialize, tools/list (every page) and tools/call: no resources, prompts or
-// sampling. A server that cannot be reached is left out and said why; the others still come.
-
 import { readFile } from "node:fs/promises";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";

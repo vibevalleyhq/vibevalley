@@ -1,5 +1,3 @@
-// An issue's title in one short line, and its state in words, as the board, the phone, the tools and the orchestrator say them.
-
 import { t } from "@vibevalley/i18n";
 
 import type { Assignment, Issue, SessionId } from "../shapes";
@@ -21,8 +19,7 @@ export const sessionIdsOf = (issue: Pick<Issue, "assignments">): SessionId[] =>
 
 export const latestSessionIdOf = (issue: Pick<Issue, "assignments">): SessionId | undefined => sessionIdsOf(issue).at(-1);
 
-/** One short line for a title: its first line, and of a long one, the first sentence, else up to its last pause that fits;
- * failing those, cut. Lengths are characters. */
+/** One short line for a title: its first line, and of a long one, the first sentence, else up to its last pause that fits. failing those, cut. */
 export function shortTitle(text: string): string {
   const line = (text.split("\n").find((l) => l.trim() !== "") ?? "").trim();
   const chars = [...line];

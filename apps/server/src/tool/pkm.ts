@@ -1,5 +1,3 @@
-// An agent never changes a block itself: what it would write is a proposal the owner accepts (pkm.comment.suggest).
-
 import { Effect } from "effect";
 
 import type * as T from "@vibevalley/protocol";

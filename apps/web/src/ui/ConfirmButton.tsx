@@ -5,11 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { Button } from "./Button";
 import type { IconName } from "./icons";
 
-/**
- * A button for what cannot be taken back (docs/style/design.md, 对话框和确认): the first press asks in place, the
- * question, the action's own button and a way back; Escape or the focus leaving takes it back. No window.confirm.
- * question: what will happen, as the owner reads it; confirm: the action's button (the label when absent).
- */
+/** A button for what cannot be taken back (docs/style/design.md): the first press asks in place, the question, the action's own button and a way back. */
 export function ConfirmButton(props: {
   label: string;
   question?: string;

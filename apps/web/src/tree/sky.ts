@@ -18,8 +18,7 @@ export function hash01(id: string): number {
   return ((h >>> 0) % 100000) / 100000;
 }
 
-// Each kind's band from the middle, as fractions of the disc's radius: the seeds are the sun, the fruits ring it, the
-// leaves are the dust outside. Within a band the older sit farther out, so the rings are time.
+// Each kind's band from the middle, as fractions of the disc's radius: the seeds are the sun, the fruits ring it, the leaves are the dust outside.
 const bands: Record<MemoryKind, readonly [inner: number, outer: number]> = {
   seed: [0, 0.1],
   fruit: [0.16, 0.48],
@@ -60,10 +59,7 @@ export function tiesOf(links: readonly MemoryLink[], id: string): Ties {
   return { from, grew, together: together.toSorted((x, y) => y.times - x.times) };
 }
 
-/**
- * A memory's constellation: what it grew from, and what that grew from, up to the leaves; and what grew from it, down to
- * the seeds. Straight up and down only: a fruit shared by two seeds does not pull the other seed in.
- */
+/** A memory's constellation: what it grew from, and what that grew from, up to the leaves. and what grew from it, down to the seeds. */
 export function constellation(links: readonly MemoryLink[], id: string): Set<string> {
   const seen = new Set([id]);
   const walk = (start: string, up: boolean) => {

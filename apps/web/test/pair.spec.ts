@@ -1,5 +1,3 @@
-// /pair, where another device joins the farm (连接到本机): the owner's link opens it through the lan listener, the
-// device asks, the owner nods, and from then on the device's browser is let in by the cookie it keeps.
 import { expect, test } from "./fixtures";
 
 test("a device names itself, asks, and is told why not", async ({ page }) => {

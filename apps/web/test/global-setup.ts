@@ -1,4 +1,3 @@
-// A folder of this run's own: two runs at once do not share one.
 import { execFileSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
@@ -8,8 +7,7 @@ const web = join(import.meta.dirname, "..");
 export default function setup() {
   const out = join(web, ".test", `run-${process.pid}`);
   process.env.VIBEVALLEY_TEST_OUT = out;
-  // VIBEVALLEY_WEB_DEV=1: Solid's development build, whose diagnostics (a read that goes untracked, a write inside a
-  // computation…) the page fixture collects (fixtures.ts).
+  // VIBEVALLEY_WEB_DEV=1: Solid's development build, whose diagnostics the page fixture collects (fixtures.ts).
   const dev = process.env.VIBEVALLEY_WEB_DEV === "1";
   execFileSync(
     "pnpm",

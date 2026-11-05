@@ -1,6 +1,3 @@
-// Writing an issue from a sentence: framework-free, for the board and the farm. The last pick is the prefs' (state/prefs.ts).
-// Besides the words that make an issue, an issue delivers and it hears words while they are on their way.
-
 import { type Applied, type AppliedIssue, type Deliverable, type Issue, VibeValleyApiError } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
@@ -9,10 +6,7 @@ import { bySeq, defineIntent, type Intent } from "#/state/intent.ts";
 import { prefsNow } from "#/state/prefs.ts";
 
 import { newIssueTitle } from "./issue";
-/**
- * The request key of the issue a box writes: the same words written again after a failure (a lost reply) are the same
- * issue, made once; other words, or the same once it went through, are another.
- */
+/** The request key of the issue a box writes: the same words written again after a failure (a lost reply) are the same issue, made once. */
 export function createWriteKey() {
   let last: { readonly words: string; readonly key: string } | undefined;
   return {
@@ -24,8 +18,7 @@ export function createWriteKey() {
   };
 }
 
-/** The plus: an issue made at once in the backlog. With words, they are its title and its draft starts from them; the
- * issue is made even when the server refuses the draft, and `refused` says why. */
+/** The plus: an issue made at once in the backlog. With words, they are its title and its draft starts from them. */
 export async function writeIssue(text: string, agent: string, project: string, requestKey: string): Promise<{ issue: Issue; refused: string }> {
   const last = prefsNow();
   const who = agent || (last.pick === "auto" ? "" : last.pick);
@@ -41,9 +34,7 @@ export async function writeIssue(text: string, agent: string, project: string, r
   }
 }
 
-// What an issue delivers, picked by the owner on its page: an intent (state/intent.ts) on issue.update, settled by the
-// frame whose seq is the reply's. Until then the pick shows the owner's choice, not the frame's old one; a refused pick
-// shows the frame's again, marked failed.
+// What an issue delivers, picked by the owner on its page: an intent (state/intent.ts) on issue.update, settled by the frame whose seq is the reply's.
 
 export interface DeliverPick {
   readonly id: string;
@@ -69,10 +60,7 @@ export function shownDeliver(
   return p.status === "failed" ? { value: frame, state: "failed" } : { value: p.input.deliver, state: "pending" };
 }
 
-// Words for the helper on an issue (an answer, 打回's findings, a word mid-turn): an intent (state/intent.ts) keyed by
-// the comment's sendKey, so a retry after a lost reply is said once. The box empties at once and the words show under it
-// until a frame at least as new as the reply comes (issue.comment.create answers the seq); a failed one stays there with
-// why, to say again with its key or take back into the box.
+// Words for the helper on an issue (an answer, reject's findings, a word mid-turn).
 
 export interface IssueSaid {
   readonly id: string;

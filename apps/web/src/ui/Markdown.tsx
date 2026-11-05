@@ -28,8 +28,7 @@ const withMentions = unified()
 /** Chat text, descriptions and reports: GitHub markdown, made richer in place (richText.ts): safe links, code, Mermaid. */
 export function Markdown(props: { text: string; class?: string; mentions?: boolean }) {
   const router = useRouter();
-  // Read through a memo of the text alone: a message object that changes without its text (a reaction, a pin) must
-  // not rebuild the DOM, which would fold an opened code block again.
+  // Read through a memo of the text alone.
   const text = createMemo(() => props.text);
   const nodes = createMemo(() => {
     const md = props.mentions === true ? withMentions : plain;
