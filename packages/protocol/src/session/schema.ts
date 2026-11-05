@@ -134,3 +134,28 @@ export const Run: Codec<T.Run> = Schema.Struct({
   summary: Schema.String,
   spent: Schema.optionalKey(Spent),
 });
+
+export const FactSessionPhaseChanged: Codec<T.FactSessionPhaseChanged> = Schema.Struct({
+  type: Schema.Literal("sessionPhaseChanged"),
+  at: Schema.Finite,
+  id: SessionId,
+  phase: Phase,
+  channel: Schema.optionalKey(Schema.String),
+  spent: Schema.optionalKey(Spent),
+  brief: Schema.optionalKey(Schema.String),
+});
+
+export const FactSessionChanged: Codec<T.FactSessionChanged> = Schema.Struct({
+  type: Schema.Literal("sessionChanged"),
+  at: Schema.Finite,
+  session: Session,
+});
+
+export const FactSessionLeft: Codec<T.FactSessionLeft> = Schema.Struct({
+  type: Schema.Literal("sessionLeft"),
+  at: Schema.Finite,
+  id: SessionId,
+  closed: Schema.optionalKey(SessionClose),
+  merged: Schema.optionalKey(Schema.Finite),
+});
+

@@ -20,7 +20,7 @@
 | `packages/protocol/src/core/shapes.ts` | `WorkspaceState`、`Fact`、`StateFrame`、`ServerEvent`、`LiveEvent` |
 | `packages/protocol/src/api.ts`、`endpoint.ts` | 汇总各概念的 `endpoints`、`Handlers`、`Endpoint` 与 `errorStatus` |
 | `apps/server/src/http/` | `api.ts` 路由与 `requestKey` 去重、`streams.ts` 三条 SSE、`handlers/<概念>.ts` |
-| `apps/cli/src/main.ts`、`farm.ts` | CLI 命令定义、全局参数与类型化请求封装 |
+| `apps/cli/src/main.ts`、`farm.ts`、`commands/` | CLI 入口、全局参数与按领域 1:1 拆分的子命令 |
 
 全部接口与权限矩阵见生成的 [capabilities.md](docs/reference/capabilities.md)。
 

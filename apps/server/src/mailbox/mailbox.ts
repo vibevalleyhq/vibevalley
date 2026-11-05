@@ -254,7 +254,8 @@ export class Mailbox extends Context.Service<
           let after = 0;
           while (true) {
             const rows = yield* db.run(qr.unroutedTriggers({ after }));
-            if (rows.length === 0) return;
+            const last = rows.at(-1);
+            if (!last) return;
             yield* Effect.forEach(
               rows,
               (row) =>
@@ -263,7 +264,7 @@ export class Mailbox extends Context.Service<
                 ),
               { discard: true },
             );
-            after = rows.at(-1)!.seq;
+            after = last.seq;
           }
         }),
         insert: work.insert,

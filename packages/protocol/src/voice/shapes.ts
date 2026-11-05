@@ -22,6 +22,13 @@ export const voiceIdleSecondsMax = 600;
 export const CallStateValues = ["idle", "connecting", "live", "ending", "error"] as const;
 export type CallState = (typeof CallStateValues)[number];
 
+export interface FactCallChanged {
+  type: "callChanged";
+  at: number;
+  state: CallState;
+  reason: string;
+}
+
 export interface VoiceCall {
   agentId: string;
 }

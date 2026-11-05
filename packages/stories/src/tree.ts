@@ -24,10 +24,12 @@ export function compareTitles(order: readonly string[]) {
     const pa = a.split("/");
     const pb = b.split("/");
     for (let i = 0; i < Math.min(pa.length, pb.length); i++) {
-      if (pa[i] === pb[i]) continue;
+      const ai = pa[i];
+      const bi = pb[i];
+      if (ai === undefined || bi === undefined || ai === bi) continue;
       const head = (p: string[]) => p.slice(0, i + 1).join("/");
       const byRank = rank(head(pa)) - rank(head(pb));
-      return byRank !== 0 ? byRank : pa[i]!.localeCompare(pb[i]!);
+      return byRank !== 0 ? byRank : ai.localeCompare(bi);
     }
     return pa.length - pb.length;
   };

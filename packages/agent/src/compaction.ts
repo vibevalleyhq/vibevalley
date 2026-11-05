@@ -24,7 +24,8 @@ export function cutPoint(messages: readonly BrainMessage[], keepRecent: number, 
   let said = messages.slice(Math.max(cut, 0)).filter(spoke).length;
   while (cut > 0 && (cut >= messages.length || !opens(messages[cut]) || said < keepSaid)) {
     cut--;
-    if (cut >= 0 && cut < messages.length && spoke(messages[cut]!)) said++;
+    const m = messages[cut];
+    if (m && spoke(m)) said++;
   }
   return Math.max(cut, 0);
 }

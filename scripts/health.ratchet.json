@@ -4,7 +4,7 @@
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 1,
+    "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
     "resultBranch": 0
@@ -50,20 +50,20 @@
     "resultBranch": 0
   },
   "packages/agent": {
-    "nonNull": 19,
+    "nonNull": 0,
     "doubleCast": 0,
-    "cast": 4,
-    "lintOff": 8,
+    "cast": 2,
+    "lintOff": 6,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 5,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "packages/ai": {
-    "nonNull": 10,
+    "nonNull": 0,
     "doubleCast": 0,
-    "cast": 2,
-    "lintOff": 3,
+    "cast": 0,
+    "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
@@ -120,7 +120,7 @@
     "resultBranch": 0
   },
   "packages/i18n": {
-    "nonNull": 4,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
@@ -130,23 +130,23 @@
     "resultBranch": 0
   },
   "packages/protocol": {
-    "nonNull": 10,
+    "nonNull": 0,
     "doubleCast": 2,
     "cast": 1,
     "lintOff": 3,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 1,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "packages/stories": {
-    "nonNull": 3,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 3,
+    "swallowed": 2,
     "resultBranch": 0
   },
   "packages/testkit": {
@@ -160,7 +160,7 @@
     "resultBranch": 0
   },
   "server: Agent Sessions": {
-    "nonNull": 9,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 2,
@@ -176,7 +176,7 @@
     "lintOff": 4,
     "orDie": 5,
     "ignored": 0,
-    "swallowed": 1,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "server: Collaboration": {
@@ -190,7 +190,7 @@
     "resultBranch": 0
   },
   "server: Gamification": {
-    "nonNull": 2,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
@@ -220,7 +220,7 @@
     "resultBranch": 0
   },
   "server: Ingress": {
-    "nonNull": 1,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
@@ -236,11 +236,11 @@
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 1,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "server: Mailbox": {
-    "nonNull": 4,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
@@ -250,10 +250,10 @@
     "resultBranch": 0
   },
   "server: Orchestrator": {
-    "nonNull": 6,
+    "nonNull": 0,
     "doubleCast": 0,
-    "cast": 1,
-    "lintOff": 1,
+    "cast": 0,
+    "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
@@ -266,11 +266,11 @@
     "lintOff": 5,
     "orDie": 2,
     "ignored": 0,
-    "swallowed": 1,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "server: Resource": {
-    "nonNull": 8,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
@@ -286,7 +286,7 @@
     "lintOff": 0,
     "orDie": 2,
     "ignored": 0,
-    "swallowed": 1,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "web: app": {

@@ -1,22 +1,20 @@
 import { fileURLToPath } from "node:url";
 
-import { Config, Effect, Option, Schema } from "effect";
+import { Config, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { t } from "@vibevalley/i18n";
 
-import { exit, Failure } from "./output.ts";
-
-/** The conversation ended with this exit code; it has said what it had to on the terminal itself. */
-class Ended extends Schema.TaggedError<Ended, { readonly brand: unique symbol }>()("Ended", { code: Schema.Finite }) {}
+import { optionalText } from "../farm.ts";
+import { Ended, exit, Failure } from "../output.ts";
 
 /** The server's chat program, or "" when there is none to run. */
 const serverChat = () => {
   try {
     return fileURLToPath(import.meta.resolve("@vibevalley/server/chat"));
-  } catch {
-    return "";
+  } catch (e) {
+    return e ? "" : "";
   }
 };
 
@@ -37,7 +35,6 @@ const converse = (args: readonly string[]) =>
     if (code !== 0) return yield* new Ended({ code });
   }).pipe(Effect.uninterruptible);
 
-const text = (name: string, description: string) => Flag.String(name).pipe(Flag.optional, Flag.withDescription(description));
 /** The flags given, as the server's conversation reads them (apps/server src/chat.ts): --name value, in order. */
 const passed = (flags: Readonly<Record<string, Option.Option<string>>>) =>
   Object.entries(flags).flatMap(([name, value]) => (Option.isSome(value) ? [`--${name}`, value.value] : []));
@@ -47,13 +44,13 @@ export const chatCommand = Command.make(
   "chat",
   {
     runtime: Argument.String("runtime").pipe(Argument.optional, Argument.withDescription(t("cli.arg.chatRuntime"))),
-    cwd: text("cwd", t("cli.flag.cwd")),
-    model: text("model", t("cli.flag.model")),
-    effort: text("effort", t("cli.flag.effort")),
-    resume: text("resume", t("cli.flag.resume")),
-    name: text("name", t("cli.flag.name")),
-    mcp: text("mcp", t("cli.flag.mcp")),
-    prompt: text("prompt", t("cli.flag.prompt")).pipe(Flag.withAlias("p")),
+    cwd: optionalText("cwd", "cli.flag.cwd"),
+    model: optionalText("model", "cli.flag.model"),
+    effort: optionalText("effort", "cli.flag.effort"),
+    resume: optionalText("resume", "cli.flag.resume"),
+    name: optionalText("name", "cli.flag.name"),
+    mcp: optionalText("mcp", "cli.flag.mcp"),
+    prompt: optionalText("prompt", "cli.flag.prompt").pipe(Flag.withAlias("p")),
   },
   ({ runtime, ...flags }) => {
     const id = Option.getOrElse(runtime, () => "vibevalley");

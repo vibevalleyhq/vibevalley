@@ -250,8 +250,8 @@ export function achievementInWords(a: AchievementDef): T.Achievement {
 }
 
 function tierTitle(a: AchievementDef, tier: number): string {
-  const titles = a.tierTitles ?? [];
-  if (tier >= 1 && tier <= titles.length) return titles[tier - 1]!;
+  const custom = tier >= 1 ? a.tierTitles?.[tier - 1] : undefined;
+  if (custom !== undefined) return custom;
   return tier === 2 ? t("server.game.tier.silver", { title: a.title }) : tier === 3 ? t("server.game.tier.gold", { title: a.title }) : a.title;
 }
 

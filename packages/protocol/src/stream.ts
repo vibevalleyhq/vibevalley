@@ -60,7 +60,7 @@ export async function readStream<P extends keyof Streams>(
     if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
     const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
     // A fetcher that does not end its body on abort (a host's own) would leave the read below waiting forever.
-    request.signal.addEventListener("abort", () => void reader.cancel().catch(() => undefined), { once: true });
+    request.signal.addEventListener("abort", () => void Promise.allSettled([reader.cancel()]), { once: true });
     let buffer = "";
     for (;;) {
       // oxlint-disable-next-line eslint/no-await-in-loop -- a stream is read a chunk at a time

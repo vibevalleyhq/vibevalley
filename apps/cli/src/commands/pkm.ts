@@ -1,18 +1,17 @@
 import { join } from "node:path";
 
 import { Clock, Config, Effect, FileSystem } from "effect";
-import { Argument, Command, Flag } from "effect/cli";
+import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { PkmMarkerValues, PkmTierValues } from "@vibevalley/protocol";
 
-import { ask, change, given, show } from "./farm.ts";
-import { exit, Failure, out, stdinText } from "./output.ts";
+import { ask, change, given, nameArg, optionalText, optionalWords, show } from "../farm.ts";
+import { exit, Failure, out, stdinText } from "../output.ts";
 
-const words = (about: Parameters<typeof t>[0]) => Argument.String("words").pipe(Argument.variadic(), Argument.withDescription(t(about)));
-const pageArgument = Argument.String("page").pipe(Argument.withDescription(t("cli.arg.page")));
+const pageArgument = nameArg("page", "cli.arg.page");
 const tierFlag = Flag.Literals("tier", PkmTierValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.tier")));
 
 /** Today on this machine, YYYY-MM-DD (sv-SE writes dates so). */
@@ -32,7 +31,7 @@ const outline = (p: T.PkmPage) =>
 /** `pkm capture <text>`: into today's journal, or --page's end; with no words, what comes on stdin, read as an outline. */
 const captureCommand = Command.make(
   "capture",
-  { words: words("cli.arg.capture"), page: Flag.String("page").pipe(Flag.optional, Flag.withDescription(t("cli.flag.capturePage"))) },
+  { words: optionalWords("cli.arg.capture"), page: optionalText("page", "cli.flag.capturePage") },
   (o) =>
     Effect.gen(function* () {
       const text = o.words.length > 0 ? o.words.join(" ") : yield* stdinText.pipe(Effect.orElseSucceed(() => ""));
@@ -52,7 +51,7 @@ const captureCommand = Command.make(
 const searchCommand = Command.make(
   "search",
   {
-    words: words("cli.arg.search"),
+    words: optionalWords("cli.arg.search"),
     tier: tierFlag,
     marker: Flag.Literals("marker", PkmMarkerValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.marker"))),
     limit: Flag.Int("limit").pipe(Flag.optional, Flag.withDescription(t("cli.flag.limit"))),
@@ -98,7 +97,7 @@ const radarCommand = Command.make("radar", {}, () =>
 );
 
 /** `pkm journal show`: a day's journal (today, or --day), made when it has none. */
-const journalShow = Command.make("show", { day: Flag.String("day").pipe(Flag.optional, Flag.withDescription(t("cli.flag.day"))) }, (o) =>
+const journalShow = Command.make("show", { day: optionalText("day", "cli.flag.day") }, (o) =>
   Effect.gen(function* () {
     const day = given(o.day) ?? (yield* today);
     yield* show(yield* ask((api) => api.pkm.journal.open({ day })), outline);
@@ -131,8 +130,8 @@ const pageExport = Command.make("export", { page: pageArgument }, (o) =>
 const pageSave = Command.make(
   "save",
   {
-    title: Argument.String("title").pipe(Argument.withDescription(t("cli.arg.pageTitle"))),
-    words: words("cli.arg.capture"),
+    title: nameArg("title", "cli.arg.pageTitle"),
+    words: optionalWords("cli.arg.capture"),
     tier: tierFlag,
   },
   (o) =>

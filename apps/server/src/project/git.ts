@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 
 import { Effect, Metric, Schema } from "effect";
 
-import { messageOf } from "#/errors.ts";
+import { errnoOf, messageOf } from "#/errors.ts";
 import { afterRealTime } from "#/infra/time.ts";
 
 export interface Ran {
@@ -38,8 +38,8 @@ export const run = (command: string, args: readonly string[], options: RunOption
     const killGroup = () => {
       try {
         if (child.pid != null && child.pid !== 0) process.kill(-child.pid, "SIGKILL");
-      } catch {
-        // Already gone.
+      } catch (e) {
+        if (errnoOf(e) !== "ESRCH") throw e;
       }
     };
     let timedOut = false;

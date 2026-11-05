@@ -152,3 +152,20 @@ export const issueEndpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
 ];
+
+/** The command that does one of an issue's acts (without `vibevalley`). */
+export function actCommand(
+  issue: { readonly number: number },
+  a: T.IssueAction,
+  session: string | undefined,
+): { readonly run: readonly string[]; readonly words: T.ActWords } | undefined {
+  const n = String(issue.number);
+  switch (a.does) {
+    case "move":
+      return { run: ["issue", "status", n, a.status], words: a.words };
+    case "say":
+      return { run: ["issue", "comment", n], words: "required" };
+    case "stop":
+      return session === undefined ? undefined : { run: ["session", "stop", session], words: "none" };
+  }
+}

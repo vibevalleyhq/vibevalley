@@ -262,3 +262,12 @@ export interface ChooseTitleRequest {
   achievement?: string;
   tier?: number;
 }
+
+export interface FactProgressChanged {
+  type: "progressChanged";
+  at: number;
+  progress?: Progress;
+  news?: ProgressNews;
+  commits?: CommitCount;
+  station?: { readonly id: SessionId; readonly station: number };
+}

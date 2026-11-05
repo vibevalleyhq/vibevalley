@@ -4,7 +4,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { Schema, Option } from "effect";
+import { Option, Predicate, Schema } from "effect";
 
 import type { JsonSchema } from "@vibevalley/ai/tools";
 
@@ -118,8 +118,8 @@ async function connectMcp(server: McpServer, signal?: AbortSignal): Promise<McpC
   };
   const client = new Client({ name: "vibevalley-agent", version: "0.1.0" });
   const close = async () => {
-    await client.close().catch(() => undefined);
-    await transport.close().catch(() => undefined);
+    await Promise.allSettled([client.close()]);
+    await Promise.allSettled([transport.close()]);
   };
   try {
     await timeout(client.connect(transport), callTimeoutMs, signal);
@@ -140,14 +140,14 @@ async function connectMcp(server: McpServer, signal?: AbortSignal): Promise<McpC
 
 function mcpTool(client: Client, server: string, t: { name: string; description?: string | undefined; inputSchema?: object | undefined }): Tool {
   const parameters: JsonSchema = t.inputSchema ? Object.fromEntries(Object.entries(t.inputSchema)) : { type: "object", properties: {} };
-  return textTool<Record<string, unknown> | null>({
+  return textTool({
     name: mcpToolName(server, t.name),
     description: mcpWords.toolDescription(server, t.description || t.name),
     parameters,
     run: async (params, tc) => {
       let r: Awaited<ReturnType<Client["callTool"]>>;
       try {
-        r = await client.callTool({ name: t.name, arguments: params ?? {} }, undefined, {
+        r = await client.callTool({ name: t.name, arguments: Predicate.isObject(params) ? params : {} }, undefined, {
           timeout: callTimeoutMs,
           signal: tc.signal,
         });
@@ -231,8 +231,8 @@ export async function readMcpConfig(path: string): Promise<McpServer[]> {
   const entries = config.mcpServers ?? {};
   const out: McpServer[] = [];
   for (const name of Object.keys(entries).toSorted()) {
-    const e = entries[name]!;
-    if (e.disabled === true) continue;
+    const e = entries[name];
+    if (!e || e.disabled === true) continue;
     if (e.url) out.push({ name, url: e.url, ...(e.headers ? { headers: e.headers } : {}) });
     else if (e.command)
       out.push({

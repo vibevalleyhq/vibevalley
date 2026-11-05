@@ -120,23 +120,24 @@ function resourceRef(uri: string): ResourceRef | undefined {
   } catch {
     return undefined;
   }
+  const [first, second, third, fourth, fifth] = path;
   switch (parsed.hostname) {
     case "trigger":
-      return path.length === 1 ? { kind: "trigger", id: path[0]! } : undefined;
+      return path.length === 1 && first ? { kind: "trigger", id: first } : undefined;
     case "envelope":
-      return path.length === 1 ? { kind: "envelope", id: path[0]! } : undefined;
+      return path.length === 1 && first ? { kind: "envelope", id: first } : undefined;
     case "issue":
-      return path.length === 1 ? { kind: "issue", id: path[0]! } : undefined;
+      return path.length === 1 && first ? { kind: "issue", id: first } : undefined;
     case "channel":
-      return path.length === 2 && path[1] === "messages" ? { kind: "channel", id: path[0]! } : undefined;
+      return path.length === 2 && first && second === "messages" ? { kind: "channel", id: first } : undefined;
     case "session":
-      return path.length === 2 && path[1] === "trajectory" ? { kind: "session", id: path[0]! } : undefined;
+      return path.length === 2 && first && second === "trajectory" ? { kind: "session", id: first } : undefined;
     case "github": {
-      if (path.length < 4 || path[1] !== "pulls") return undefined;
-      const pull = Number(path[2]);
+      if (!first || path.length < 4 || second !== "pulls") return undefined;
+      const pull = Number(third);
       if (!Number.isSafeInteger(pull) || pull <= 0) return undefined;
-      if (path[3] === "checks" && path.length === 4) return { kind: "github", project: path[0]!, pull, resource: "checks" };
-      if (path[3] === "thread" && path.length === 5) return { kind: "github", project: path[0]!, pull, resource: "thread", id: path[4]! };
+      if (fourth === "checks" && path.length === 4) return { kind: "github", project: first, pull, resource: "checks" };
+      if (fourth === "thread" && path.length === 5 && fifth) return { kind: "github", project: first, pull, resource: "thread", id: fifth };
       return undefined;
     }
     default:

@@ -33,7 +33,12 @@ const settled = (t: Todo) => t.state === "done" || t.state === "skipped";
 const find = (g: readonly Todo[], id: string) => g.findIndex((t) => t.id === id);
 
 /** Waiting, and every task it waits for settled. */
-const ready = (g: readonly Todo[], t: Todo) => t.state === "waiting" && t.after.every((x) => find(g, x) >= 0 && settled(g[find(g, x)]!));
+const ready = (g: readonly Todo[], t: Todo) =>
+  t.state === "waiting" &&
+  t.after.every((x) => {
+    const dep = g.find((item) => item.id === x);
+    return dep !== undefined && settled(dep);
+  });
 
 export const readyTodos = (g: readonly Todo[]) => g.filter((t) => ready(g, t));
 
@@ -97,8 +102,8 @@ export class TodoError extends Schema.TaggedError<TodoError, { readonly brand: u
 
 export function update(g: readonly Todo[], id: string, c: Change): Todo[] {
   const i = find(g, id);
-  if (i < 0) throw new TodoError({ message: words.notFound(id) });
-  const was = g[i]!;
+  const was = g[i];
+  if (i < 0 || !was) throw new TodoError({ message: words.notFound(id) });
   const open = was.state === "waiting" || was.state === "failed";
   if ((c.brief !== undefined || c.after !== undefined) && !open) throw new TodoError({ message: words.cannotChangeBrief(id, stateWords[was.state]) });
   let t: Todo = { ...was };

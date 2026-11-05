@@ -33,7 +33,10 @@ export function failureText(f: FailedTurn): string {
 function conclusion(text: string, min: number): string {
   const blocks = text.trim().split(/\n{2,}/u);
   let tail = "";
-  for (let i = blocks.length - 1; i >= 0 && tail.length < min; i--) tail = tail ? blocks[i] + "\n\n" + tail : blocks[i]!;
+  for (let i = blocks.length - 1; i >= 0 && tail.length < min; i--) {
+    const block = blocks[i] ?? "";
+    tail = tail ? block + "\n\n" + tail : block;
+  }
   return tail;
 }
 

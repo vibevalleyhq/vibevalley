@@ -6,6 +6,13 @@ import * as T from "../shapes";
 
 export const CallState: Codec<T.CallState> = Schema.Literals(T.CallStateValues);
 
+export const FactCallChanged: Codec<T.FactCallChanged> = Schema.Struct({
+  type: Schema.Literal("callChanged"),
+  at: Schema.Finite,
+  state: CallState,
+  reason: Schema.String,
+});
+
 export const VoiceCall: Codec<T.VoiceCall> = Schema.Struct({
   agentId: Schema.String,
 });

@@ -32,8 +32,8 @@ export function leaseHome(home: string): () => void {
         released = true;
         try {
           if (readFileSync(path, "utf8") === String(process.pid)) unlinkSync(path);
-        } catch {
-          // Already gone.
+        } catch (e) {
+          if (errnoOf(e) !== "ENOENT") throw e;
         }
       };
     } catch (e) {

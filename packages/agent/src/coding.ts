@@ -47,10 +47,11 @@ const outputCap = 200_000;
 
 /** Past timeout it gets SIGTERM, and SIGKILL 2 s later. when signal aborts it goes at once. */
 function runCommand(argv: readonly string[], cwd: string, timeoutMs: number, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<Ran> {
-  if (argv.length === 0) return Promise.reject(new Error(words.noCommand));
+  const [command, ...args] = argv;
+  if (!command) return Promise.reject(new Error(words.noCommand));
   if (signal?.aborted === true) return Promise.reject(new Error(stopped));
   return new Promise((resolve, reject) => {
-    const child = spawn(argv[0]!, argv.slice(1), {
+    const child = spawn(command, args, {
       cwd,
       env,
       detached: true,
@@ -67,8 +68,8 @@ function runCommand(argv: readonly string[], cwd: string, timeoutMs: number, env
     const kill = (sig: NodeJS.Signals) => {
       try {
         if (child.pid != null && child.pid !== 0) process.kill(-child.pid, sig);
-      } catch {
-        // Gone already.
+      } catch (e) {
+        if (errnoOf(e) !== "ESRCH") throw e;
       }
     };
     const end = () => {

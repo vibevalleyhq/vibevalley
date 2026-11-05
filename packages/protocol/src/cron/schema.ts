@@ -65,3 +65,15 @@ export const CronRequest: Codec<T.CronRequest> = Schema.Struct({
 export const CronUpdate: Codec<T.CronUpdate> = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
 });
+
+export const FactCronChanged: Codec<T.FactCronChanged> = Schema.Struct({
+  type: Schema.Literal("cronChanged"),
+  at: Schema.Finite,
+  cron: Cron,
+});
+
+export const FactCronRemoved: Codec<T.FactCronRemoved> = Schema.Struct({
+  type: Schema.Literal("cronRemoved"),
+  at: Schema.Finite,
+  id: Schema.String,
+});

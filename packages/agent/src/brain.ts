@@ -128,8 +128,8 @@ function unfinished(messages: readonly BrainMessage[]): {
       const text = messageText(last);
       if (last.isError && (text === stopped || text === "Operation aborted")) return { missing: [], ok: false };
       for (let i = messages.length - 1; i >= 0; i--) {
-        const answer = messages[i]!;
-        if (answer.role !== "assistant") continue;
+        const answer = messages[i];
+        if (answer?.role !== "assistant") continue;
         const answered = new Set(messages.slice(i + 1).flatMap((m) => (m.role === "toolResult" ? [m.toolCallId] : [])));
         return {
           missing: answer.content.filter((c): c is ToolCall => c.type === "toolCall" && !answered.has(c.id)),
@@ -228,7 +228,10 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
     let knownMemory: string[] = [];
     // Made below, before anything can call the brain: the loop needs the tools, and some tools need the loop.
     let core: Agent<Own> | undefined;
-    const loop = () => core!;
+    const loop = () => {
+      if (!core) throw new Error("the agent loop is not ready");
+      return core;
+    };
     let todos: TodoRunner | undefined;
 
     const hostTools = [...(options.tools ?? []), ...mcp.tools];

@@ -433,7 +433,7 @@ function Opened(props: {
             {(name) => (
               <ArgControl
                 name={name}
-                value={args[name]!}
+                value={args[name] ?? ""}
                 control={story.controls?.[name]}
                 fixed={mode() === "grid" && axisNames(grid).includes(name)}
                 onChange={(v) => set({ [name]: v })}

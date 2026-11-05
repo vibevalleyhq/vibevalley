@@ -157,7 +157,7 @@ function problemsOf(value: unknown, schema: JsonSchema, path: string): string[] 
   if (matches(value, "object") && Predicate.isObject(value) && Predicate.isObject(schema.properties)) {
     const object = value;
     const missing = requiredOf(schema).filter((k) => !(k in object));
-    if (missing.length > 0) return [`${at(path, missing[0]!)}: must have required properties ${missing.join(", ")}`];
+    if (missing[0] !== undefined) return [`${at(path, missing[0])}: must have required properties ${missing.join(", ")}`];
     return Object.entries(propertiesOf(schema)).flatMap(([k, p]) => (k in object ? problemsOf(object[k], p, at(path, k)) : []));
   }
   const items = schema.items;

@@ -20,9 +20,8 @@ export const recallBlock = (recalled: readonly string[]) => (recalled.length ===
 
 export function recalledIn(input: string): string {
   const parts = input.split(briefBreak);
-  if (parts.length < 2) return "";
-  const block = parts[parts.length - 2]!;
-  return block.startsWith(recallHead) ? block.split("\n").slice(1).join("\n") : "";
+  const block = parts[parts.length - 2];
+  return block?.startsWith(recallHead) ? block.split("\n").slice(1).join("\n") : "";
 }
 
 export function instructions(agent: T.Agent, library: readonly T.Skill[]): string {

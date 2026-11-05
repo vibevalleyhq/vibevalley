@@ -186,7 +186,7 @@ async function readNewSession(command: string, cwd: string, timeoutMs: number): 
     });
     const response = await request("session/new", { cwd, mcpServers: [] });
     // Best effort: the list is in hand, and the process is killed next.
-    if (typeof response.sessionId === "string") await request("session/close", { sessionId: response.sessionId }).catch(() => undefined);
+    if (typeof response.sessionId === "string") await Promise.allSettled([request("session/close", { sessionId: response.sessionId })]);
     return response;
   } finally {
     child.kill();

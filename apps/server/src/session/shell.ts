@@ -15,8 +15,8 @@ const shellWrap = /^(?:\S*\/)?(?:zsh|bash|sh) -l?c (.+)$/su;
 /** The command inside a shell's -c, read as the one shell word the shell would see; anything else comes back as it is. */
 export function shellCommand(command: string): string {
   const m = shellWrap.exec(command.trim());
-  if (!m) return command;
-  const word = shellWord(m[1]!);
+  if (!m?.[1]) return command;
+  const word = shellWord(m[1]);
   return word ?? command;
 }
 
@@ -24,7 +24,8 @@ export function shellCommand(command: string): string {
 function shellWord(s: string): string | undefined {
   let out = "";
   for (let i = 0; i < s.length;) {
-    const c = s[i]!;
+    const c = s[i];
+    if (!c) break;
     if (c === "'") {
       const end = s.indexOf("'", i + 1);
       if (end < 0) return undefined;
@@ -38,8 +39,9 @@ function shellWord(s: string): string | undefined {
           i++;
           break;
         }
-        if (s[i] === "\\" && i + 1 < s.length && '"\\$`'.includes(s[i + 1]!)) {
-          out += s[i + 1];
+        const next = s[i + 1];
+        if (s[i] === "\\" && next && '"\\$`'.includes(next)) {
+          out += next;
           i += 2;
           continue;
         }

@@ -1,63 +1,13 @@
-import { connect as dial, type Socket } from "node:net";
-
-import { Config, Effect, Schedule } from "effect";
+import { Effect, Schedule } from "effect";
 import { Argument, Command } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { connect } from "@vibevalley/bridge";
-import { socketLink } from "@vibevalley/bridge/socket";
-import { controlSocketOf, homeOf } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
-import { desktopControl } from "@vibevalley/protocol/host";
 
-import { exit, Failure, printBody } from "./output.ts";
-
-type Calls = ReturnType<typeof connect<typeof desktopControl>>["call"];
-
-/** The farm's home as the command line's environment says (VIBEVALLEY_HOME, the launcher sets it per channel), read
- * through Config so a test gives its own. */
-export const farmHome = Config.String("VIBEVALLEY_HOME").pipe(
-  Config.withDefault(""),
-  Config.map((home) => home || homeOf({})),
-);
-
-/** The app the launcher was started from, to open when it is not running; none from the repository. */
-const launchedFrom = Config.String("VIBEVALLEY_APP").pipe(Config.withDefault(""));
-
-const notOpen = (home: string, why: string) =>
-  new Failure({
-    code: exit.unreachable,
-    tag: "AppNotOpen",
-    text: t("cli.failure.appNotOpen", { home, why }),
-    next: [{ say: t("cli.next.openApp"), run: ["app", "open"] }],
-  });
-
-const dialed = Effect.flatMap(farmHome, (home) =>
-  Effect.callback<Socket, Failure>((resume) => {
-    const socket = dial(controlSocketOf(home));
-    socket.once("connect", () => resume(Effect.succeed(socket)));
-    socket.once("error", (e) => resume(Effect.fail(notOpen(home, e.message))));
-    return Effect.sync(() => socket.destroy());
-  }),
-);
-
-/** One question to the app, on a connection of its own. */
-const ask = <A>(use: (calls: Calls) => Promise<A>) =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const socket = yield* Effect.acquireRelease(dialed, (s) => Effect.sync(() => s.destroy()));
-      const asked = connect(desktopControl, socketLink(socket));
-      return yield* Effect.tryPromise({
-        try: () => use(asked.call),
-        catch: (e) => new Failure({ code: exit.refused, tag: "AppRefused", text: e instanceof Error ? e.message : String(e) }),
-      });
-    }),
-  );
+import { appStatus, askApp, farmHome, launchedFrom, notOpen } from "../farm.ts";
+import { printBody } from "../output.ts";
 
 const printed = (value: unknown) => printBody(JSON.stringify(value ?? { ok: true }));
-
-/** Which app answers on this farm's socket; fails AppNotOpen when none does (doctor reads it too). */
-export const appStatus = ask((c) => c.status());
 
 const statusCommand = Command.make("status", {}, () => Effect.flatMap(appStatus, printed)).pipe(
   Command.withDescription(t("cli.command.app.status")),
@@ -71,7 +21,7 @@ const openCommand = Command.make(
   ({ path }) =>
     Effect.gen(function* () {
       const where = path.startsWith("/") ? path : `/${path}`;
-      const open = ask((c) => c.open(where));
+      const open = askApp((c) => c.open(where));
       const app = yield* launchedFrom;
       yield* open.pipe(
         Effect.catchTag("Failure", (f) => {
@@ -96,7 +46,7 @@ const openCommand = Command.make(
 
 const quitCommand = Command.make("quit", {}, () =>
   Effect.flatMap(
-    ask((c) => c.quit()),
+    askApp((c) => c.quit()),
     printed,
   ),
 ).pipe(
@@ -106,7 +56,7 @@ const quitCommand = Command.make("quit", {}, () =>
 
 const restartCommand = Command.make("restart", {}, () =>
   Effect.flatMap(
-    ask((c) => c.restart()),
+    askApp((c) => c.restart()),
     printed,
   ),
 ).pipe(
@@ -120,14 +70,14 @@ const updateCommand = Command.make(
   { step: Argument.Literals("step", ["check", "install"]).pipe(Argument.optional, Argument.withDescription(t("cli.arg.updateStep"))) },
   ({ step }) =>
     Effect.gen(function* () {
-      if (step._tag === "Some" && step.value === "check") yield* ask((c) => c.updateCheck());
+      if (step._tag === "Some" && step.value === "check") yield* askApp((c) => c.updateCheck());
       if (step._tag === "Some" && step.value === "install")
         return yield* Effect.flatMap(
-          ask((c) => c.updateInstall()),
+          askApp((c) => c.updateInstall()),
           printed,
         );
       yield* Effect.flatMap(
-        ask((c) => c.updateState()),
+        askApp((c) => c.updateState()),
         printed,
       );
     }),

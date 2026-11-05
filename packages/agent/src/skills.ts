@@ -22,20 +22,21 @@ const frontMatterHead = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/u;
 export function frontMatter(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   const m = frontMatterBlock.exec(text);
-  if (!m || !m[1]) return out;
+  if (!m?.[1]) return out;
   const lines = m[1].split(/\r?\n/u);
   for (let i = 0; i < lines.length; i++) {
-    const kv = frontMatterKey.exec(lines[i]!);
-    if (!kv) continue;
-    let value = kv[2]!.trim();
+    const kv = frontMatterKey.exec(lines[i] ?? "");
+    const key = kv?.[1];
+    if (!kv || !key) continue;
+    let value = (kv[2] ?? "").trim();
     if (value === ">" || value === "|" || value === ">-" || value === "|-") {
       const block: string[] = [];
-      while (i + 1 < lines.length && indentedLine.test(lines[i + 1]!)) block.push(lines[++i]!.trim());
+      while (i + 1 < lines.length && indentedLine.test(lines[i + 1] ?? "")) block.push((lines[++i] ?? "").trim());
       value = block.join(value.startsWith(">") ? " " : "\n");
     }
     const q = quotedValue.exec(value);
-    if (q && q[1] === q[3]) value = q[2]!;
-    out[kv[1]!] = value;
+    if (q && q[1] === q[3] && q[2] !== undefined) value = q[2];
+    out[key] = value;
   }
   return out;
 }
@@ -48,6 +49,12 @@ const isDir = (path: string) =>
     () => false,
   );
 
+const readText = (path: string) =>
+  readFile(path, "utf8").then(
+    (text) => text,
+    () => undefined,
+  );
+
 /** One folder's skills, in its order; an unreadable folder or SKILL.md is none. */
 const skillsIn = async (dir: string) => {
   const entries = await readdir(dir).catch((): string[] => []);
@@ -55,7 +62,7 @@ const skillsIn = async (dir: string) => {
     entries.map(async (entry) => {
       if (!(await isDir(join(dir, entry)))) return undefined;
       const path = join(dir, entry, "SKILL.md");
-      const data = await readFile(path, "utf8").catch((): undefined => undefined);
+      const data = await readText(path);
       if (data === undefined) return undefined;
       const fm = frontMatter(data);
       return { name: fm.name || entry, description: fm.description ?? "", path };
@@ -94,7 +101,8 @@ export async function readSkill(skills: readonly SkillInfo[], name: string): Pro
         skills.map((x) => x.name),
       ),
     );
-  const data = await readFile(s.path, "utf8").catch((): undefined => undefined);
-  if (data === undefined) throw new Error(skillWords.cannotRead(s.path));
+  const data = await readFile(s.path, "utf8").catch((e: unknown) => {
+    throw new Error(skillWords.cannotRead(s.path), { cause: e });
+  });
   return skillWords.body(s.name, s.path, skillBody(data));
 }

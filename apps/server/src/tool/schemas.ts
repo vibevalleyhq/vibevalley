@@ -326,9 +326,8 @@ export const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>):
   return Predicate.isObject(shaped) ? Object.fromEntries(Object.entries(shaped)) : {};
 };
 
-const shown = <A extends Record<string, Schema.Struct<Schema.Struct.Fields>>>(all: A): Record<keyof A & string, JsonSchema> =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- one entry for each key of all
-  Object.fromEntries(Object.entries(all).map(([op, p]) => [op, toolParameters(p)])) as Record<keyof A & string, JsonSchema>;
+const shown = (all: Record<string, Schema.Struct<Schema.Struct.Fields>>): Record<string, JsonSchema> =>
+  Object.fromEntries(Object.entries(all).map(([op, p]) => [op, toolParameters(p)]));
 
 /** As the model is shown them, by endpoint. */
 export const schemas = shown(parameters);
@@ -379,15 +378,15 @@ export const participant = (c: Caller) => c.session || c.agent;
 const toolOf =
   <All extends { readonly [op: string]: Schema.Codec<unknown, unknown> }>(
     all: All,
-    shown: Record<keyof All & string, JsonSchema>,
+    shown: Record<string, JsonSchema>,
     words: Record<keyof All & string, string>,
   ) =>
   <K extends keyof All & Op, E>(op: K, body: (p: All[K]["Type"]) => Effect.Effect<string, E>) => {
     const read: (args: unknown) => Effect.Effect<All[K]["Type"], Schema.SchemaError> = Schema.decodeUnknownEffect<All[K]>(all[op]);
-    return effectTool<unknown>({
+    return effectTool({
       name: toolName(op),
       description: words[op],
-      parameters: shown[op],
+      parameters: shown[op] ?? {},
       run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
     });
   };
@@ -405,7 +404,7 @@ export const customTool = <A, E>(
   read: (args: unknown) => Effect.Effect<A, Schema.SchemaError>,
   body: (input: A) => Effect.Effect<string, E>,
 ) => {
-  return effectTool<unknown>({
+  return effectTool({
     name,
     description,
     parameters,

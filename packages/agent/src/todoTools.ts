@@ -139,7 +139,7 @@ export const makeTodoRunner = (
           (t) =>
             Effect.gen(function* () {
               out.add(t.id);
-              yield* FiberSet.run(fibers, send(t));
+              yield* FiberSet.run(fibers, send(subagent, t));
             }),
           { discard: true },
         );
@@ -147,9 +147,9 @@ export const makeTodoRunner = (
     });
 
     // Called back (stop, close), its fiber is interrupted before anything is recorded: stop puts the task back to waiting.
-    const send = (t: engine.Todo): Effect.Effect<void> =>
+    const send = (runSubagent: Subagent, t: engine.Todo): Effect.Effect<void> =>
       Effect.gen(function* () {
-        const { said, failed } = yield* subagent!(t.brief, t.title).pipe(
+        const { said, failed } = yield* runSubagent(t.brief, t.title).pipe(
           Effect.map((said) => ({ said, failed: false })),
           Effect.catch((e) => Effect.succeed({ said: e.message, failed: true })),
           Effect.ensuring(Effect.sync(() => out.delete(t.id))),

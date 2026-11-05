@@ -61,7 +61,7 @@ export interface Request extends Context {
   readonly options: RequestOptions;
 }
 
-export const testModel: Model = models[0]!;
+export const testModel: Model = models[0];
 
 /** The events an answer streams as, a text a character at a time (enough to see a stream move). */
 function eventsOf(model: Model, a: Answer, timestamp: number): { events: AssistantMessageEvent[]; hangsAt: number | undefined } {
@@ -101,9 +101,9 @@ function eventsOf(model: Model, a: Answer, timestamp: number): { events: Assista
     content.push(kind === "text" ? text("") : { ...block, thinking: "" });
     events.push({ type: `${kind}_start`, contentIndex: i, partial: message() });
     for (const ch of whole) {
-      const now = content[i]!;
-      if (now.type === "text") content[i] = text(now.text + ch);
-      else if (now.type === "thinking") content[i] = { ...now, thinking: now.thinking + ch };
+      const now = content[i];
+      if (now?.type === "text") content[i] = text(now.text + ch);
+      else if (now?.type === "thinking") content[i] = { ...now, thinking: now.thinking + ch };
       events.push({ type: `${kind}_delta`, contentIndex: i, delta: ch, partial: message() });
       if (kind === "text" && a.hangAfter !== undefined && ++streamed === a.hangAfter) hangsAt = events.length;
     }

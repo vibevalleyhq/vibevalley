@@ -163,9 +163,9 @@ export const makeHost = <R>(
     const current = (): Hosted<R> => {
       const messages = brain?.brain.history() ?? [];
       for (let i = messages.length - 1; i >= 0; i--) {
-        const m = messages[i]!;
+        const m = messages[i];
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a custom message of this host's input type carries the route this host put in it
-        if (isHosted(m, o.inputType)) return local.get(m) ?? { route: m.details as R, run: { by: { kind: "" } } };
+        if (m && isHosted(m, o.inputType)) return local.get(m) ?? { route: m.details as R, run: { by: { kind: "" } } };
       }
       return input;
     };
@@ -181,11 +181,12 @@ export const makeHost = <R>(
       const session = core.session(id);
       if (!session) return;
       const phase = session.phase;
+      const channel = route === undefined ? undefined : o.channel(route);
       yield* core.apply({
         type: "sessionPhaseChanged",
         id,
         phase: { _tag: "working", since: phase._tag === "working" ? phase.since : yield* Clock.currentTimeMillis, doing: { action, label: "" } },
-        ...(route === undefined || o.channel(route) === undefined ? {} : { channel: o.channel(route)! }),
+        ...(channel === undefined ? {} : { channel }),
       });
     });
 
@@ -447,7 +448,8 @@ function turnAt(lines: readonly BrainMessage[], text: string, time: number, inpu
   const head = text.endsWith("…") ? text.slice(0, -1) : text;
   let at = -1;
   lines.forEach((m, i) => {
-    if (isHosted(m, inputType) && m.timestamp <= time && messageText(m).includes(head) && (at < 0 || m.timestamp >= lines[at]!.timestamp)) at = i;
+    const prev = lines[at];
+    if (isHosted(m, inputType) && m.timestamp <= time && messageText(m).includes(head) && (!prev || m.timestamp >= prev.timestamp)) at = i;
   });
   return at;
 }

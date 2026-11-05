@@ -253,3 +253,12 @@ export const ChooseTitleRequest: Codec<T.ChooseTitleRequest> = Schema.Struct({
   achievement: Schema.optionalKey(Schema.String),
   tier: Schema.optionalKey(Schema.Finite),
 });
+
+export const FactProgressChanged: Codec<T.FactProgressChanged> = Schema.Struct({
+  type: Schema.Literal("progressChanged"),
+  at: Schema.Finite,
+  progress: Schema.optionalKey(Progress),
+  news: Schema.optionalKey(ProgressNews),
+  commits: Schema.optionalKey(CommitCount),
+  station: Schema.optionalKey(Schema.Struct({ id: SessionId, station: Schema.Finite })),
+});

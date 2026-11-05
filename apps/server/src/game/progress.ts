@@ -18,7 +18,7 @@ const isTitle = (a: AchievementDef) => a.category !== "starter";
 const tierOf = (p: T.Progress, id: string) => p.unlocked.reduce((t, u) => (u.id === id && u.tier > t ? u.tier : t), 0);
 
 /** What reaching that tier (from 1) pays: seeds.json says, for each achievement. */
-const tierCoins = (a: AchievementDef, tier: number) => (tier < 1 || tier > a.coins.length ? 0 : a.coins[tier - 1]!);
+const tierCoins = (a: AchievementDef, tier: number) => (tier >= 1 ? (a.coins[tier - 1] ?? 0) : 0);
 
 const streakMultiplier = (streak: number) => Math.min(2, 1 + 0.1 * Math.max(0, streak - 1));
 

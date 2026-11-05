@@ -13,7 +13,7 @@ function parse(text: string): Part[] {
   const parts = (until: string): Part[] => {
     const out: Part[] = [];
     let buf = "";
-    while (i < text.length && !until.includes(text[i]!)) {
+    while (i < text.length && !until.includes(text[i] ?? "")) {
       if (text[i] !== "{") {
         buf += text[i++];
         continue;
@@ -32,26 +32,27 @@ function parse(text: string): Part[] {
   };
   const placeholderAt = (start: number): Part | undefined => {
     const m = /^\{\s*([A-Za-z_$][\w$]*)\s*(?:,\s*(plural|selectordinal|select)\s*,)?/u.exec(text.slice(start));
-    if (!m) return undefined;
+    const name = m?.[1];
+    if (!m || !name) return undefined;
     i = start + m[0].length;
     const kind = kinds.find((k) => k === m[2]);
     if (!kind) {
       if (text[i] !== "}") return void (i = start);
       i++;
-      return { name: m[1]! };
+      return { name };
     }
     const cases: Record<string, Part[]> = {};
     while (true) {
       const c = /^\s*([^\s{}]+)\s*\{/u.exec(text.slice(i));
-      if (!c) break;
+      if (!c?.[1]) break;
       i += c[0].length;
-      cases[c[1]!] = parts("}");
+      cases[c[1]] = parts("}");
       i++;
     }
     while (text[i] === " ") i++;
     if (text[i] !== "}") return void (i = start);
     i++;
-    return { name: m[1]!, kind, cases };
+    return { name, kind, cases };
   };
   return parts("");
 }

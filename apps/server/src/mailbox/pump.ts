@@ -52,7 +52,8 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
   };
 
   const deliver = (recipient: string, text: string, rows: readonly DeliveryRow[]): Effect.Effect<Delivered> => {
-    const first = rows.findLast((row) => row.payload.trigger.actor.kind === "owner") ?? rows.find((row) => row.wakes && row.held_by === null) ?? rows[0]!;
+    const first = rows.findLast((row) => row.payload.trigger.actor.kind === "owner") ?? rows.find((row) => row.wakes && row.held_by === null) ?? rows[0];
+    if (!first) return Effect.succeed({ kind: "refused", reason: "empty" });
     return sessions.deliver(recipient, text, {
       trigger:
         first.payload.trigger.meta.trigger !== undefined
@@ -74,7 +75,8 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
         ([scope, allowed]) =>
           Effect.gen(function* () {
             const grouped = rows.filter((row) => row.scope === scope && row.state === "pending");
-            const primary = allowed.findLast((row) => row.payload.trigger.actor.kind === "owner") ?? allowed[0]!;
+            const primary = allowed.findLast((row) => row.payload.trigger.actor.kind === "owner") ?? allowed[0];
+            if (!primary) return;
             const messages = grouped.map(ports.message);
             yield* Effect.forEach(grouped, (row) => ports.hand(recipient, row.envelope_id, `orchestrator:${row.envelope_id}`, now), { discard: true });
             yield* ports.publishOrchestrator(recipient, messages, primary);
@@ -151,8 +153,7 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
         const accepted = new Set(input.envelopeIds);
         const messages = ports
           .pending(input.session)
-          .filter((row) => accepted.has(row.envelope_id) && row.message_id !== null)
-          .map((row) => row.message_id!);
+          .flatMap((row) => (accepted.has(row.envelope_id) && row.message_id !== null ? [row.message_id] : []));
         yield* Effect.forEach(input.envelopeIds, (id) => ports.consume(input.session, id, now), { discard: true });
         yield* ports.consumedMessages(input.session, messages);
       }),

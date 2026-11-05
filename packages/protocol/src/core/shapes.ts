@@ -1,13 +1,12 @@
-import type { Channel, Chat, ChatMessage, OwnerMention } from "../channel/shapes";
-import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes";
-import type { ConnectorStatus } from "../connector/shapes";
-import type { Cron, CronView } from "../cron/shapes";
-import type { CommitCount, FarmView, GameEffect, Progress, ProgressNews, SessionPlay } from "../game/shapes";
+import type { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactOwnerMentionsChanged } from "../channel/shapes";
+import type { ConnectorStatus, FactConnectorChanged } from "../connector/shapes";
+import type { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/shapes";
+import type { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/shapes";
 import type { InboxItem } from "../inbox/shapes";
-import type { CriterionCheck, Issue, Question } from "../issue/shapes";
+import type { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/shapes";
 import type { RuntimeInfo } from "../runtime/shapes";
-import type { IssueAnswer, Phase, PhaseResting, Session, SessionClose, SessionEvent, SessionView } from "../session/shapes";
-import type { CallState } from "../voice/shapes";
+import type { FactSessionChanged, FactSessionLeft, FactSessionPhaseChanged, Session, SessionEvent, SessionView } from "../session/shapes";
+import type { CallState, FactCallChanged } from "../voice/shapes";
 
 /** Every endpoint is a POST at its op, named as in api.ts. */
 export const pathOf = (op: string) => "/api/v1/" + op.replaceAll(".", "/");
@@ -81,136 +80,9 @@ export type Fact =
   | FactCronRemoved
   | FactConnectorChanged;
 
-export interface FactCallChanged {
-  type: "callChanged";
-  at: number;
-  state: CallState;
-  reason: string;
-}
-
-export interface FactSessionPhaseChanged {
-  type: "sessionPhaseChanged";
-  at: number;
-  id: SessionId;
-  phase: Phase;
-  channel?: string;
-  spent?: Spent;
-  brief?: string;
-}
-
-export interface FactMessageChanged {
-  type: "messageChanged";
-  at: number;
-  message: ChatMessage;
-  thread?: string;
-  answers?: SessionId;
-}
-
-export interface FactChannelChanged {
-  type: "channelChanged";
-  at: number;
-  channel: Channel;
-}
-
-/** A channel deleted, and its threads with it. */
-export interface FactChannelRemoved {
-  type: "channelRemoved";
-  at: number;
-  id: string;
-}
-
-export interface FactOwnerMentionsChanged {
-  type: "ownerMentionsChanged";
-  at: number;
-  mentions: OwnerMention[];
-}
-
-export interface FactSessionChanged {
-  type: "sessionChanged";
-  at: number;
-  session: Session;
-}
-
-export interface FactSessionReported {
-  type: "sessionReported";
-  at: number;
-  id: SessionId;
-  run?: string;
-  outcome: Outcome;
-  /** A successful turn can rest for external feedback without handing off to the owner. */
-  phase?: PhaseResting;
-  summary: string;
-  runs: number;
-  spent?: Spent;
-  questions: Question[];
-  checks: CriterionCheck[];
-  answer?: IssueAnswer;
-}
-
-export interface FactSessionLeft {
-  type: "sessionLeft";
-  at: number;
-  id: SessionId;
-  closed?: SessionClose;
-  merged?: number;
-}
-
-export interface FactIssueChanged {
-  type: "issueChanged";
-  at: number;
-  issue: Issue;
-}
-
-export interface FactIssueRemoved {
-  type: "issueRemoved";
-  at: number;
-  id: IssueId;
-}
-
-export interface FactProgressChanged {
-  type: "progressChanged";
-  at: number;
-  progress?: Progress;
-  news?: ProgressNews;
-  commits?: CommitCount;
-  station?: { readonly id: SessionId; readonly station: number };
-}
-
-export interface FactConnectorChanged {
-  type: "connectorChanged";
-  at: number;
-  status: ConnectorStatus;
-}
-
-export interface FactCronChanged {
-  type: "cronChanged";
-  at: number;
-  cron: Cron;
-}
-
-export interface FactCronRemoved {
-  type: "cronRemoved";
-  at: number;
-  id: string;
-}
-
 /** Told apart by `type`. */
 export type ServerEvent =
-  | FactCallChanged
-  | FactSessionPhaseChanged
-  | FactMessageChanged
-  | FactChannelChanged
-  | FactChannelRemoved
-  | FactOwnerMentionsChanged
-  | FactSessionChanged
-  | FactSessionReported
-  | FactSessionLeft
-  | FactProgressChanged
-  | FactIssueChanged
-  | FactIssueRemoved
-  | FactCronChanged
-  | FactCronRemoved
-  | FactConnectorChanged
+  | Fact
   | ServerEventSnapshot
   | ServerEventStep
   | ServerEventNotice

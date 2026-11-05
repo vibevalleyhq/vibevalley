@@ -85,7 +85,7 @@ export const chatCompletions = <E>(c: ChatCompletions<E>) =>
     if (!answer) return refuse(404, "invalid_request_error", "model_not_found", "no model " + model);
     const said = newestUserText(req);
     if (!said && !c.misheard) return refuse(400, "invalid_request_error", "no_user_message", "no user message to answer");
-    const words = (said ? answer(said) : Stream.succeed(c.misheard!)).pipe(
+    const words = (said ? answer(said) : Stream.succeed(c.misheard ?? "")).pipe(
       Stream.zipWithIndex,
       // How long the first words took, in the log.
       Stream.tap(([, i]) =>

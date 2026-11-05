@@ -31,3 +31,9 @@ export interface VerifyRequest {
 export interface ConnectorsChannelRequest {
   channel: string;
 }
+
+export interface FactConnectorChanged {
+  type: "connectorChanged";
+  at: number;
+  status: ConnectorStatus;
+}

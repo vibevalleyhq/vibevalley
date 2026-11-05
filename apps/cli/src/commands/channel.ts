@@ -1,10 +1,10 @@
 import { Effect } from "effect";
-import { Argument, Command, Flag } from "effect/cli";
+import { Command, Flag } from "effect/cli";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { ask, change, given, show } from "./farm.ts";
+import { ask, change, given, nameArg, show, words } from "../farm.ts";
 
 const nameOf = (c: T.Channel) => c.name ?? c.title;
 
@@ -13,8 +13,7 @@ const channelLine = (c: T.Channel) =>
 
 const messageLine = (m: T.ChatMessage) => `#${m.number}  ${m.name}: ${m.text.replace(/\s+/gu, " ").trim()}`;
 
-const channelArg = Argument.String("channel").pipe(Argument.withDescription(t("cli.arg.channel")));
-const words = (about: Parameters<typeof t>[0]) => Argument.String("words").pipe(Argument.variadic({ min: 1 }), Argument.withDescription(t(about)));
+const channelArg = nameArg("channel", "cli.arg.channel");
 
 const listCommand = Command.make("list", {}, () =>
   Effect.flatMap(

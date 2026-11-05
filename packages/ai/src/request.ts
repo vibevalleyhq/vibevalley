@@ -45,7 +45,8 @@ function chatMessages(model: Model, context: Context): Record<string, unknown>[]
   if (context.system.length > 0) out.push({ role: "system", content: sanitizeSurrogates(context.system) });
   const messages = replayable(model, context.messages);
   for (let i = 0; i < messages.length; i++) {
-    const m = messages[i]!;
+    const m = messages[i];
+    if (!m) continue;
     switch (m.role) {
       case "user": {
         if (typeof m.content === "string") {

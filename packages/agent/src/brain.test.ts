@@ -57,7 +57,7 @@ describe("the agent", () => {
     const dir = home();
     const wake = gate();
     let napping = false;
-    const nap = textTool<object>({
+    const nap = textTool({
       name: "nap",
       description: "睡一会",
       parameters: objectSchema(),
@@ -160,7 +160,7 @@ describe("the agent", () => {
     // The nap lasts until the test has said its two lines: they come while the tool runs.
     const wake = gate();
     let napping = false;
-    const nap = textTool<object>({
+    const nap = textTool({
       name: "nap",
       description: "睡一会",
       parameters: objectSchema(),
@@ -273,7 +273,7 @@ describe("the agent", () => {
     const dir = home();
     let running = 0;
     let most = 0;
-    const nap = textTool<object>({
+    const nap = textTool({
       name: "nap",
       description: "睡一会",
       parameters: objectSchema(),

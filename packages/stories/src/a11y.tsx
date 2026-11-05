@@ -20,11 +20,11 @@ export function useAxe(target: () => HTMLElement | undefined, deps: () => unknow
     if (!el) return;
     setResult(undefined);
     queue = queue.then(async () => {
-      await Promise.all(
+      await Promise.allSettled(
         document
           .getAnimations()
           .filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime ?? Infinity))
-          .map((a) => a.finished.catch(() => undefined)),
+          .map((a) => a.finished),
       );
       const { default: axe } = await import("axe-core");
       setResult(await axe.run(el, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] } }));

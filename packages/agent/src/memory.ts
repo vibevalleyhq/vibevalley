@@ -62,7 +62,7 @@ function memoryLine(line: string): MemoryLine | undefined {
   const text = line.trim();
   if (text === "" || text.startsWith("#")) return undefined;
   const m = datedLine.exec(text);
-  return m ? { id: lineID(text), date: m[1]!, text: m[2]! } : { id: lineID(text), text: text.replace(bulletHead, "") };
+  return m?.[1] && m[2] ? { id: lineID(text), date: m[1], text: m[2] } : { id: lineID(text), text: text.replace(bulletHead, "") };
 }
 
 /** updatedAt: the file's modification time, 0 when there is none. */
@@ -128,9 +128,11 @@ const localDate = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() +
 
 export async function remember(home: string, note: string, now: Date): Promise<MemoryLine> {
   await mkdir(home, { recursive: true });
-  const line = `- ${localDate(now)} ${note.replace(/\s*\n\s*/gu, " ").trim()}`;
+  const date = localDate(now);
+  const cleaned = note.replace(/\s*\n\s*/gu, " ").trim();
+  const line = `- ${date} ${cleaned}`;
   await appendFile(memoryFile(home), line + "\n");
-  return memoryLine(line)!;
+  return { id: lineID(line), date, text: cleaned };
 }
 
 async function rewriteMemory(home: string, text: string): Promise<MemorySnapshot> {

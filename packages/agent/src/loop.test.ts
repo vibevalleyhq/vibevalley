@@ -59,7 +59,7 @@ describe("a run's turns", () => {
 
   it.effect("runs no tool call of an answer cut off at its length, and says why", () => {
     let ran = 0;
-    const counted = textTool<object>({ name: "counted", description: "", parameters: objectSchema(), run: () => String(++ran) });
+    const counted = textTool({ name: "counted", description: "", parameters: objectSchema(), run: () => String(++ran) });
     return withAgent(
       home(),
       [answer([toolCall("counted", {})], { stopReason: "length" }), answer("再来")],
@@ -93,7 +93,7 @@ describe("a run's turns", () => {
   it.effect("takes every line waiting at a step boundary in one turn", () => {
     const wake = gate();
     let napping = false;
-    const nap = textTool<object>({
+    const nap = textTool({
       name: "nap",
       description: "",
       parameters: objectSchema(),
@@ -124,7 +124,7 @@ describe("a run's turns", () => {
   it.effect("runs the tools of one answer side by side, and keeps their results in the order they were called", () => {
     const slowDone = gate();
     let slowStarted = false;
-    const slow = textTool<object>({
+    const slow = textTool({
       name: "slow",
       description: "",
       parameters: objectSchema(),
@@ -134,7 +134,7 @@ describe("a run's turns", () => {
         return "慢的";
       },
     });
-    const fast = textTool<object>({ name: "fast", description: "", parameters: objectSchema(), run: () => "快的" });
+    const fast = textTool({ name: "fast", description: "", parameters: objectSchema(), run: () => "快的" });
     return withAgent(
       home(),
       [answer([text("两个"), toolCall("slow", {}), toolCall("fast", {})]), answer("都好了")],

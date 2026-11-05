@@ -8,12 +8,10 @@ import { actCommand } from "@vibevalley/protocol/api";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
-import { ask, change, frames, given, ServerFlag, show } from "./farm.ts";
-import { err, exit, Failure, stdinText } from "./output.ts";
+import { ask, change, frames, given, nameArg, optionalText, ServerFlag, show, words } from "../farm.ts";
+import { err, exit, Failure, stdinText } from "../output.ts";
 
-const issueArg = Argument.String("issue").pipe(Argument.withDescription(t("cli.arg.issue")));
-const words = (about: Parameters<typeof t>[0]) => Argument.String("words").pipe(Argument.variadic({ min: 1 }), Argument.withDescription(t(about)));
-const optionalText = (name: string, about: Parameters<typeof t>[0]) => Flag.String(name).pipe(Flag.optional, Flag.withDescription(t(about)));
+const issueArg = nameArg("issue", "cli.arg.issue");
 const priorityFlag = Flag.Literals("priority", PriorityValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.priority")));
 
 /** #12 or 12: the issue's number, as the server takes it. */

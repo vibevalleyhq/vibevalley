@@ -39,7 +39,7 @@ const billed = (content: Said, input: number, output: number, cache: number, mor
   answer(content, { usage: { input, output, cacheRead: cache }, ...more });
 const billedMessage = (content: Said, input: number, output: number, cache: number): AssistantMessage =>
   assistantMessage(content, { usage: used(input, output, cache) });
-const echo = textTool<object>({
+const echo = textTool({
   name: "echo",
   description: "",
   parameters: objectSchema(),
@@ -124,7 +124,7 @@ describe("a run's receipt", () => {
       const { promise: released, resolve: release } = Promise.withResolvers<void>();
       let calls = 0;
       let entered = false;
-      const slow = textTool<object>({
+      const slow = textTool({
         name: "echo",
         description: "",
         parameters: objectSchema(),
@@ -295,7 +295,7 @@ describe("the agent's own todos", () => {
     const dir = home();
     const store = memoryStore();
     let started = false;
-    const wait = textTool<object>({
+    const wait = textTool({
       name: "wait",
       description: "等",
       parameters: objectSchema(),

@@ -63,3 +63,15 @@ export interface CronWhenExpr {
 export interface CronUpdate {
   enabled?: boolean;
 }
+
+export interface FactCronChanged {
+  type: "cronChanged";
+  at: number;
+  cron: Cron;
+}
+
+export interface FactCronRemoved {
+  type: "cronRemoved";
+  at: number;
+  id: string;
+}

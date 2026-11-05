@@ -33,7 +33,7 @@ const deepseek = (id: string, name: string, cost: Model["cost"]): Model => ({
   thinkingLevelMap: { minimal: "high", low: "high", medium: "high", high: "high", xhigh: "max", max: "max" },
 });
 
-export const models: readonly Model[] = [
+export const models: readonly [Model, ...Model[]] = [
   deepseek("deepseek-flash", "DeepSeek V4.1 Flash", { input: 0.14, output: 0.28, cacheRead: 0.028, cacheWrite: 0 }),
   deepseek("deepseek-v4-pro", "DeepSeek V4 Pro", { input: 1.74, output: 3.48, cacheRead: 0.145, cacheWrite: 0 }),
 ];
@@ -51,7 +51,10 @@ export function clampThinkingLevel(model: Model, level: ThinkingLevel): Thinking
     : ["off"];
   if (offered.includes(level)) return level;
   const at = thinkingLevels.indexOf(level);
-  for (let i = at; i < thinkingLevels.length; i++) if (offered.includes(thinkingLevels[i]!)) return thinkingLevels[i]!;
-  for (let i = at - 1; i >= 0; i--) if (offered.includes(thinkingLevels[i]!)) return thinkingLevels[i]!;
-  return offered[0] ?? "off";
+  return (
+    thinkingLevels.slice(at).find((l) => offered.includes(l)) ??
+    thinkingLevels.slice(0, at).findLast((l) => offered.includes(l)) ??
+    offered[0] ??
+    "off"
+  );
 }

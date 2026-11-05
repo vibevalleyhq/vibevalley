@@ -175,3 +175,27 @@ export interface PhaseClosed {
   at: number;
   closed: SessionClose;
 }
+
+export interface FactSessionPhaseChanged {
+  type: "sessionPhaseChanged";
+  at: number;
+  id: SessionId;
+  phase: Phase;
+  channel?: string;
+  spent?: Spent;
+  brief?: string;
+}
+
+export interface FactSessionChanged {
+  type: "sessionChanged";
+  at: number;
+  session: Session;
+}
+
+export interface FactSessionLeft {
+  type: "sessionLeft";
+  at: number;
+  id: SessionId;
+  closed?: SessionClose;
+  merged?: number;
+}

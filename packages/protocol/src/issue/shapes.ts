@@ -1,6 +1,6 @@
-import type { IssueId, SessionId, Spent } from "../common/shapes";
+import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes";
 import type { Commit, UncommittedItem } from "../project/shapes";
-import type { IssueAnswer, Run, Session } from "../session/shapes";
+import type { IssueAnswer, PhaseResting, Run, Session } from "../session/shapes";
 
 export interface Conflict {
   base: string;
@@ -321,4 +321,32 @@ export interface IssueStatusRequest {
   edit?: IssueUpdate;
   /** The client's key for this request: the same key again within a while returns the first one's result and does it once (a retry after a lost reply). */
   requestKey?: string;
+}
+
+export interface FactSessionReported {
+  type: "sessionReported";
+  at: number;
+  id: SessionId;
+  run?: string;
+  outcome: Outcome;
+  /** A successful turn can rest for external feedback without handing off to the owner. */
+  phase?: PhaseResting;
+  summary: string;
+  runs: number;
+  spent?: Spent;
+  questions: Question[];
+  checks: CriterionCheck[];
+  answer?: IssueAnswer;
+}
+
+export interface FactIssueChanged {
+  type: "issueChanged";
+  at: number;
+  issue: Issue;
+}
+
+export interface FactIssueRemoved {
+  type: "issueRemoved";
+  at: number;
+  id: IssueId;
 }

@@ -1,25 +1,25 @@
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Cause, Effect, Exit, Predicate, Stdio } from "effect";
+import { Cause, Effect, Exit, Schema, Stdio } from "effect";
 import { CliError, CliOutput, Command, TerminalCapabilities } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
-import { homeOf, savedLocale } from "@vibevalley/home";
-import { setLocale, t } from "@vibevalley/i18n";
+import { t } from "@vibevalley/i18n";
 
-import { err, exit, Failure, out, printFailure } from "./output.ts";
-
-// The command line speaks the farm's language: the locale saved in the home's settings.json.
-setLocale(savedLocale(homeOf()));
-
-const { appCommand } = await import("./app.ts");
-const { channelCommand } = await import("./channel.ts");
-const { chatCommand } = await import("./chat.ts");
-const { doctorCommand } = await import("./doctor.ts");
-const { DryRunFlag, FormatFlag, ServerFlag } = await import("./farm.ts");
-const { issueCommand } = await import("./issue.ts");
-const { keptCommands } = await import("./notes.ts");
-const { pkmCommand } = await import("./pkm.ts");
-const { farmPartCommands } = await import("./project.ts");
+import { DryRunFlag, FormatFlag, ServerFlag } from "./farm.ts";
+import { agentCommand } from "./commands/agent.ts";
+import { appCommand } from "./commands/app.ts";
+import { artifactCommand } from "./commands/artifact.ts";
+import { channelCommand } from "./commands/channel.ts";
+import { chatCommand } from "./commands/chat.ts";
+import { cronCommand } from "./commands/cron.ts";
+import { doctorCommand } from "./commands/doctor.ts";
+import { issueCommand } from "./commands/issue.ts";
+import { memoryCommand } from "./commands/memory.ts";
+import { pkmCommand } from "./commands/pkm.ts";
+import { projectCommand } from "./commands/project.ts";
+import { runtimeCommand } from "./commands/runtime.ts";
+import { sessionCommand } from "./commands/session.ts";
+import { Ended, err, exit, Failure, out, printFailure } from "./output.ts";
 
 const version = "0.1.0";
 
@@ -29,8 +29,13 @@ const root = Command.make("vibevalley").pipe(
     issueCommand,
     pkmCommand,
     channelCommand,
-    ...farmPartCommands,
-    ...keptCommands,
+    projectCommand,
+    agentCommand,
+    sessionCommand,
+    runtimeCommand,
+    memoryCommand,
+    cronCommand,
+    artifactCommand,
     chatCommand,
     doctorCommand,
     appCommand,
@@ -76,8 +81,8 @@ export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
     Effect.catch((e) => {
       if (CliError.isCliError(e) && e._tag === "ShowHelp" && e.errors.length === 0) return Effect.succeed(exit.ok);
       // The conversation said what it had to on the terminal: only its code is left.
-      if (Predicate.isTagged(e, "Ended")) return Effect.succeed(e.code);
-      const f = Predicate.isTagged(e, "Failure") ? e : CliError.isCliError(e) ? usageOf(e) : new Failure({ code: exit.other, tag: "Error", text: String(e) });
+      if (Schema.is(Ended)(e)) return Effect.succeed(e.code);
+      const f = Schema.is(Failure)(e) ? e : CliError.isCliError(e) ? usageOf(e) : new Failure({ code: exit.other, tag: "Error", text: String(e) });
       return Effect.as(printFailure(f), f.code);
     }),
   );

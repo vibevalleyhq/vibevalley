@@ -1,7 +1,9 @@
-import { Schema } from "effect";
+import { Predicate, Schema } from "effect";
 
 import type { Handlers } from "./api";
-import { type VoiceFix, VoiceFixValues } from "./shapes";
+import { pathOf, type VoiceFix, VoiceFixValues } from "./shapes";
+
+export { pathOf };
 
 export type Caller = "owner" | "remote" | "orchestrator" | "session";
 
@@ -105,3 +107,9 @@ export interface Endpoint {
 export const input = (ids: Schema.Struct.Fields, body?: Schema.Codec<unknown>): Schema.Codec<unknown> =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every body is a Struct in schema.ts, typed Codec<T.X> there to tie it to its shape
   Schema.Struct({ ...ids, ...(body ? (body as unknown as Schema.Struct<Schema.Struct.Fields>).fields : {}) }) as unknown as Schema.Codec<unknown>;
+
+/** The fields an endpoint's input takes, what it is about among them; none when it takes nothing. */
+export const fieldsOf = (e: Endpoint): readonly string[] => {
+  const s: unknown = e.input;
+  return Predicate.hasProperty(s, "fields") && Predicate.isObject(s.fields) ? Object.keys(s.fields) : [];
+};

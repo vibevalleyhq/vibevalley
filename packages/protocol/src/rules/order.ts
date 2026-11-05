@@ -20,24 +20,28 @@ export function keyBetween(a: string, b: string): string {
   return midpoint(a, b);
 }
 
+const digitAt = (i: number) => keyDigits[i] ?? "0";
+const indexOfHead = (s: string) => keyDigits.indexOf(s[0] ?? "0");
+
 /** Steps the first digit up by one, so appending again and again adds a digit only every 61 keys. */
 const after = (a: string) => (a === "" ? "V" : stepUp(a));
 
 function stepUp(a: string): string {
-  if (a === "") return "1";
-  const i = keyDigits.indexOf(a[0]!);
-  return i < keyDigits.length - 1 ? keyDigits[i + 1]! : a[0]! + stepUp(a.slice(1));
+  const head = a[0];
+  if (head === undefined) return "1";
+  const i = keyDigits.indexOf(head);
+  return i < keyDigits.length - 1 ? digitAt(i + 1) : head + stepUp(a.slice(1));
 }
 
 /** Steps the first digit down by one; a key never ends in '0', so there is always a digit to step. */
 function before(b: string): string {
-  const i = keyDigits.indexOf(b[0]!);
-  if (i > 1) return keyDigits[i - 1]!;
+  const i = indexOfHead(b);
+  if (i > 1) return digitAt(i - 1);
   if (i === 1) return "0z";
   return "0" + before(b.slice(1));
 }
 
-const digitOf = (s: string, i: number) => (i < s.length ? s[i]! : "0");
+const digitOf = (s: string, i: number) => s[i] ?? "0";
 
 function midpoint(a: string, b: string): string {
   if (b !== "") {
@@ -45,9 +49,9 @@ function midpoint(a: string, b: string): string {
     while (n < b.length && digitOf(a, n) === b[n]) n++;
     if (n > 0) return b.slice(0, n) + midpoint(n < a.length ? a.slice(n) : "", b.slice(n));
   }
-  const lo = a !== "" ? keyDigits.indexOf(a[0]!) : 0;
-  const hi = b !== "" ? keyDigits.indexOf(b[0]!) : keyDigits.length;
-  if (hi - lo > 1) return keyDigits[Math.floor((lo + hi + 1) / 2)]!;
+  const lo = a !== "" ? indexOfHead(a) : 0;
+  const hi = b !== "" ? indexOfHead(b) : keyDigits.length;
+  if (hi - lo > 1) return digitAt(Math.floor((lo + hi + 1) / 2));
   if (b.length > 1) return b.slice(0, 1);
-  return keyDigits[lo]! + midpoint(a.length > 1 ? a.slice(1) : "", "");
+  return digitAt(lo) + midpoint(a.length > 1 ? a.slice(1) : "", "");
 }

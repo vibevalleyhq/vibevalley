@@ -20,7 +20,7 @@ const fixed = (sign: string, hours: string, minutes: string | undefined) =>
 const named = (tz: string) => (tz === "" || tz === "Local" ? undefined : Option.getOrUndefined(DateTime.zoneMakeNamed(tz)));
 
 /** One parser for accepted, scheduled and displayed zones: IANA or a fixed offset, optionally prefixed with GMT. */
-function givenZone(tz: string): DateTime.TimeZone | undefined {
+export function givenZone(tz: string): DateTime.TimeZone | undefined {
   const m = givenOffset.exec(tz);
   if (m) return fixed(m[1]!, m[2]!, m[3]);
   return tz.startsWith("+") || tz.startsWith("-") ? undefined : named(tz);

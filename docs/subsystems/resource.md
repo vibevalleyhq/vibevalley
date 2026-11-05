@@ -14,7 +14,7 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/server/src/resource/resource.ts` | `Resource` 服务、权限裁剪与会话级 LRU 快照缓存（`TextCache`） |
-| `apps/server/src/tool/tool.ts` | `resource_read` 工具封装 |
+| `apps/server/src/tool/resource.ts` | `resource_read` 工具封装 |
 | `packages/protocol/src/shapes.ts` | `ResourcePage`（`{ text, totalChars, nextOffset }`）返回契约 |
 
 ## 模型和不变量

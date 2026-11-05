@@ -218,22 +218,18 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
             ? call.argumentsError
               ? { refused: `Invalid arguments for tool "${call.name}": ${call.argumentsError}` }
               : toolArguments(call.name, call.arguments, tool.parameters)
-            : undefined;
-          const immediate = !tool
-            ? errorResult(`Tool ${call.name} not found`)
-            : "refused" in read!
-              ? errorResult(read.refused)
-              : (yield* Deferred.isDone(stop))
-                ? errorResult(operationAborted)
-                : undefined;
-          if (immediate) {
-            const outcome: Outcome = { call, result: immediate, isError: true };
-            yield* ended(call, immediate, true);
+            : { refused: `Tool ${call.name} not found` };
+          const immediate =
+            "refused" in read ? errorResult(read.refused) : (yield* Deferred.isDone(stop)) ? errorResult(operationAborted) : undefined;
+          if (immediate || !tool) {
+            const result = immediate ?? errorResult(`Tool ${call.name} not found`);
+            const outcome: Outcome = { call, result, isError: true };
+            yield* ended(call, result, true);
             entries.push(outcome);
             if (yield* Deferred.isDone(stop)) break;
             continue;
           }
-          const args = read && "ok" in read ? read.ok : undefined;
+          const args = read.ok;
           entries.push(
             Effect.gen(function* () {
               if (yield* Deferred.isDone(stop)) {
@@ -243,7 +239,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
               }
               const started = yield* Clock.currentTimeMillis;
               const ran = yield* Effect.raceFirst(
-                tool!.execute(args, { id: call.id }).pipe(
+                tool.execute(args, { id: call.id }).pipe(
                   Effect.map((r) => ({ result: r, isError: r.isError === true })),
                   Effect.catch((e) => Effect.succeed({ result: errorResult(e.message), isError: true })),
                 ),

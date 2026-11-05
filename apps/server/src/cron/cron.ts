@@ -21,7 +21,7 @@ import { Mailbox } from "#/mailbox/mailbox.ts";
 import { recordTrigger, unroutedCronTriggers } from "#/mailbox/payload.ts";
 import * as q from "#db/cron.sql.ts";
 
-import { afterRun, cronProblem, dueCrons, dueText, isMissed, needsOK, whenText } from "./when.ts";
+import { afterRun, cronProblem, dueCrons, dueText, givenZone, isMissed, needsOK, whenText } from "./when.ts";
 
 export interface Due {
   readonly id: string;
@@ -54,15 +54,7 @@ export class Cron extends Context.Service<
 /** $TZ when it names a zone, else the system's. */
 function localZone(): string {
   const tz = process.env.TZ;
-  if (tz) {
-    try {
-      new Intl.DateTimeFormat("en", { timeZone: tz });
-      return tz;
-    } catch {
-      // Not a zone: the system's.
-    }
-  }
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return tz && givenZone(tz) ? tz : Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 const make = Effect.gen(function* () {

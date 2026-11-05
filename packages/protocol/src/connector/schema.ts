@@ -34,3 +34,9 @@ export const VerifyRequest: Codec<T.VerifyRequest> = Schema.Struct({
 export const ConnectorsChannelRequest: Codec<T.ConnectorsChannelRequest> = Schema.Struct({
   channel: Schema.String,
 });
+
+export const FactConnectorChanged: Codec<T.FactConnectorChanged> = Schema.Struct({
+  type: Schema.Literal("connectorChanged"),
+  at: Schema.Finite,
+  status: ConnectorStatus,
+});

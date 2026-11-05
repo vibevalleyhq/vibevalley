@@ -245,3 +245,30 @@ export interface MessageHit {
   channel: string;
   address: string;
 }
+
+export interface FactMessageChanged {
+  type: "messageChanged";
+  at: number;
+  message: ChatMessage;
+  thread?: string;
+  answers?: SessionId;
+}
+
+export interface FactChannelChanged {
+  type: "channelChanged";
+  at: number;
+  channel: Channel;
+}
+
+/** A channel deleted, and its threads with it. */
+export interface FactChannelRemoved {
+  type: "channelRemoved";
+  at: number;
+  id: string;
+}
+
+export interface FactOwnerMentionsChanged {
+  type: "ownerMentionsChanged";
+  at: number;
+  mentions: OwnerMention[];
+}
