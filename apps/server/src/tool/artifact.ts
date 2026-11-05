@@ -16,7 +16,7 @@ import { Session } from "#/session/session.ts";
 import { answers, blockLine } from "./prompts.ts";
 import { type Caller, type Who, type Orchestrator, type SessionInput, refuse, callerOf, tool, sessionSchemaTool } from "./schemas.ts";
 
-export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue | string>) =>
+export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue, string>) =>
   Effect.gen(function* () {
     const run = yield* Session;
     const chat = yield* Channel;
@@ -55,23 +55,21 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
     const artifactList = (who: Who) =>
       tool(
         "artifact.list",
-        Effect.fn("Tool.artifactList")(function* (p: Orchestrator<"artifact.list">) {
-          yield* callerOf(who);
-          let issueId: string | undefined;
-          if (p.issue) {
-            const item = yield* findIssue(p.issue);
-            if (typeof item === "string") return item;
-            issueId = item.id;
-          }
-          const listed = (channel?: string) =>
-            Effect.map(artifacts.list({ ...(issueId ? { issue: issueId } : {}), ...(channel ? { channel } : {}) }), (all) =>
-              all.length === 0 ? answers.artifact.none : all.map(answers.artifact.line).join("\n"),
-            );
-          if (!p.channel) return yield* listed();
-          return yield* chat
-            .placeOf("", p.channel)
-            .pipe(Effect.matchEffect({ onFailure: (e) => Effect.succeed(answers.failed(reasonOf(e))), onSuccess: listed }));
-        }),
+        Effect.fn("Tool.artifactList")(
+          function* (p: Orchestrator<"artifact.list">) {
+            yield* callerOf(who);
+            const issueId = p.issue ? (yield* findIssue(p.issue)).id : undefined;
+            const listed = (channel?: string) =>
+              Effect.map(artifacts.list({ ...(issueId ? { issue: issueId } : {}), ...(channel ? { channel } : {}) }), (all) =>
+                all.length === 0 ? answers.artifact.none : all.map(answers.artifact.line).join("\n"),
+              );
+            if (!p.channel) return yield* listed();
+            return yield* chat
+              .placeOf("", p.channel)
+              .pipe(Effect.matchEffect({ onFailure: (e) => Effect.succeed(answers.failed(reasonOf(e))), onSuccess: listed }));
+          },
+          Effect.catch(Effect.succeed),
+        ),
       );
 
     const sessionArtifactList = (who: Who) =>
@@ -115,32 +113,30 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
     const artifactCreate = (who: Who) =>
       tool(
         "artifact.create",
-        Effect.fn("Tool.artifactCreate")(function* (p: Orchestrator<"artifact.create">) {
-          const c = yield* callerOf(who);
-          let issueId: string | undefined;
-          if (p.issue) {
-            const item = yield* findIssue(p.issue);
-            if (typeof item === "string") return item;
-            issueId = item.id;
-          }
-          return yield* artifactSaid(
-            Effect.gen(function* () {
-              const content = yield* artifactWords(c, p.content, undefined);
-              const made = yield* artifacts.create(
-                { from: c.agent, by: c.agent },
-                {
-                  title: p.title,
-                  kind: p.kind,
-                  content,
-                  ...(p.note ? { note: p.note } : {}),
-                  channel: p.channel ?? c.here,
-                  ...(issueId ? { issue: issueId } : {}),
-                },
-              );
-              return answers.artifact.made(made) + warnings(made, content);
-            }),
-          );
-        }),
+        Effect.fn("Tool.artifactCreate")(
+          function* (p: Orchestrator<"artifact.create">) {
+            const c = yield* callerOf(who);
+            const issueId = p.issue ? (yield* findIssue(p.issue)).id : undefined;
+            return yield* artifactSaid(
+              Effect.gen(function* () {
+                const content = yield* artifactWords(c, p.content, undefined);
+                const made = yield* artifacts.create(
+                  { from: c.agent, by: c.agent },
+                  {
+                    title: p.title,
+                    kind: p.kind,
+                    content,
+                    ...(p.note ? { note: p.note } : {}),
+                    channel: p.channel ?? c.here,
+                    ...(issueId ? { issue: issueId } : {}),
+                  },
+                );
+                return answers.artifact.made(made) + warnings(made, content);
+              }),
+            );
+          },
+          Effect.catch(Effect.succeed),
+        ),
       );
 
     const sessionArtifactCreate = (who: Who) =>

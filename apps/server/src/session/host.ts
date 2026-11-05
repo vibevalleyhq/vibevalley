@@ -338,28 +338,31 @@ export const makeHost = <R>(
         if (closing) return Effect.succeed(closeInput(hosted));
         const run: RunInput = { ...hosted.run, by: hosted.run.by.kind ? hosted.run.by : { kind: "comment" } };
         return inputs.withPermits(1)(
-          Effect.gen(function* () {
-            const b = yield* start.pipe(Effect.catch((e) => Effect.succeed(messageOf(e))));
-            if (typeof b === "string") {
-              if (closing) return closeInput(hosted);
-              const why = b;
-              const id = yield* inProcess
-                .failedStart(run, hosted.run.asked ?? "", t("server.session.host.cannotStart", { why }))
-                .pipe(
-                  Effect.catch((e) => Effect.as(core.notice("error", t("server.session.host.notRecorded", { label: o.session.name, why: e.message })), "")),
-                );
-              yield* core.notice("error", t("server.session.host.startFailed", { label: o.session.name, why }));
-              hosted.caller?.push(t("server.session.host.callerStart", { why }));
-              hosted.caller?.end();
-              return { ok: false, why, run: id } as const;
-            }
-            if (closing) return closeInput(hosted);
-            const { text, heard } = yield* build(b.busy() || (yield* b.queued), yield* b.memoryNews);
-            if (closing) return closeInput(hosted);
-            const message = customMessage(o.inputType, text, yield* Clock.currentTimeMillis, { details: hosted.route });
-            local.set(message, { ...hosted, run: { ...run, ...(heard ? { heard } : {}) } });
-            yield* now ? b.send(message) : b.later(message);
-            return { ok: true } as const;
+          Effect.matchEffect(start, {
+            onFailure: (err) =>
+              Effect.gen(function* () {
+                if (closing) return closeInput(hosted);
+                const why = messageOf(err);
+                const id = yield* inProcess
+                  .failedStart(run, hosted.run.asked ?? "", t("server.session.host.cannotStart", { why }))
+                  .pipe(
+                    Effect.catch((e) => Effect.as(core.notice("error", t("server.session.host.notRecorded", { label: o.session.name, why: e.message })), "")),
+                  );
+                yield* core.notice("error", t("server.session.host.startFailed", { label: o.session.name, why }));
+                hosted.caller?.push(t("server.session.host.callerStart", { why }));
+                hosted.caller?.end();
+                return { ok: false, why, run: id } as const;
+              }),
+            onSuccess: (b) =>
+              Effect.gen(function* () {
+                if (closing) return closeInput(hosted);
+                const { text, heard } = yield* build(b.busy() || (yield* b.queued), yield* b.memoryNews);
+                if (closing) return closeInput(hosted);
+                const message = customMessage(o.inputType, text, yield* Clock.currentTimeMillis, { details: hosted.route });
+                local.set(message, { ...hosted, run: { ...run, ...(heard ? { heard } : {}) } });
+                yield* now ? b.send(message) : b.later(message);
+                return { ok: true } as const;
+              }),
           }),
         );
       });

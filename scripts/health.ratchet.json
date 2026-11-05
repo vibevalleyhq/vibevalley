@@ -52,8 +52,8 @@
   "packages/agent": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 2,
-    "lintOff": 6,
+    "cast": 1,
+    "lintOff": 5,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,

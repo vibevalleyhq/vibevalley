@@ -75,15 +75,21 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
       const room = yield* sessions.makeRoom(agent.runtime, where);
       if ("refused" in room) return { refused: room.refused };
       const evicted = room.evicted ?? "";
-      const issue = yield* (
-        opt.issue
+      let refusal = "";
+      const recorded = yield* Effect.option(
+        (opt.issue
           ? get(opt.issue)
           : attemptAdd({ title: brief, project: where, agent: agent.id }, explicitMandate()).pipe(
               // The database failing (a full disk) is told as a refusal; a request it cannot encode is a bug.
               Effect.catchTags({ SqlError: (e) => Effect.fail(refused(causeMessage(e))), SchemaError: Effect.die }),
             )
-      ).pipe(Effect.catch((e) => Effect.succeed(t("server.issue.notRecorded", { name: agent.name, why: reasonOf(e) }))));
-      if (typeof issue === "string") return { refused: issue };
+        ).pipe(
+          Effect.mapError((e) => t("server.issue.notRecorded", { name: agent.name, why: reasonOf(e) })),
+          Effect.tapError((why) => Effect.sync(() => (refusal = why))),
+        ),
+      );
+      if (Option.isNone(recorded)) return { refused: refusal };
+      const issue = recorded.value;
       const all = yield* everyIssue;
       const blocked = blockedIssues(issue, all);
       if (blocked.length > 0) return { refused: t("server.issue.dependencies.waiting", { issues: list(blocked) }) };

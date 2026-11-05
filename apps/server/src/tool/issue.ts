@@ -77,21 +77,22 @@ export const issueTools = Effect.gen(function* () {
   };
 
   // The orchestrator names an issue by its number (#41, 41), its id, or the name or id of a helper working it.
-  const findIssue = Effect.fnUntraced(function* (key: string): Effect.fn.Return<T.Issue | string> {
+  const findIssue = Effect.fnUntraced(function* (key: string): Effect.fn.Return<T.Issue, string> {
     const k = key.trim().replace(/^#/u, "");
     const all = yield* issue.list();
-    if (/^\d+$/u.test(k)) return all.find((item) => item.number === Number(k)) ?? answers.noIssueNumber(k);
+    if (/^\d+$/u.test(k)) {
+      const byNumber = all.find((item) => item.number === Number(k));
+      return byNumber ? byNumber : yield* Effect.fail(answers.noIssueNumber(k));
+    }
     const byId = all.find((item) => item.id === k);
     if (byId) return byId;
     const session = findSession(k);
     const of = session?.issue ? all.find((item) => item.id === session.issue) : undefined;
-    return of ?? answers.noIssueOrAgent(k);
+    return of ? of : yield* Effect.fail(answers.noIssueOrAgent(k));
   });
 
   const withIssue = <E>(key: string, f: (issue: T.Issue) => Effect.Effect<string, E>) =>
-    // findIssue's text is the refusal the model reads, a result like f's: not a failure to filter out.
-    // @effect-diagnostics-next-line flatMapConditionalToFilterOrFail:off
-    Effect.flatMap(findIssue(key), (item) => (typeof item === "string" ? Effect.succeed(item) : f(item)));
+    Effect.matchEffect(findIssue(key), { onFailure: Effect.succeed, onSuccess: f });
 
   const issueTool = <E>(op: IssueTool, f: (issue: T.Issue) => Effect.Effect<string, E>) => tool(op, (p) => withIssue(p.id, f));
 
@@ -111,11 +112,11 @@ export const issueTools = Effect.gen(function* () {
   const numberOf = (session: T.Session) => (session.issue ? issue.onBoard().find((item) => item.id === session.issue)?.number : undefined);
 
   // Which profile takes a brief: the one named (a profile's name or id, or a runtime), else the one the owner picked for this input, else by the farm's rule.
-  const choose = Effect.fnUntraced(function* (brief: string, name: string, picked: string): Effect.fn.Return<T.Agent | string> {
+  const choose = Effect.fnUntraced(function* (brief: string, name: string, picked: string): Effect.fn.Return<T.Agent, string> {
     const key = name.trim();
     const a = yield* runtimes.choose(brief, key, picked);
-    if (!a) return answers.noAgentToDispatch;
-    if (key && a.id !== key && a.name !== key && a.runtime !== key) return answers.noAgentOrRuntime(key);
+    if (!a) return yield* Effect.fail(answers.noAgentToDispatch);
+    if (key && a.id !== key && a.name !== key && a.runtime !== key) return yield* Effect.fail(answers.noAgentOrRuntime(key));
     return a;
   });
 
@@ -310,8 +311,9 @@ export const issueTools = Effect.gen(function* () {
         if (p.deliver && !deliver) return answers.issueCreate.noDeliver;
         let agent: string | undefined = parent ? assignedAgentOf(parent) : undefined;
         if (p.agent || p.start === true) {
-          const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.agent ?? agent ?? "", p.start === true ? c.picked : "");
-          if (typeof a === "string") return answers.issueCreate.notRecorded(a);
+          const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.agent ?? agent ?? "", p.start === true ? c.picked : "").pipe(
+            Effect.mapError((why) => answers.issueCreate.notRecorded(why)),
+          );
           agent = a.id;
         }
         const item = yield* issue
@@ -328,15 +330,13 @@ export const issueTools = Effect.gen(function* () {
             },
             actsForOwner(c.actor) ? explicitMandate(c.envelope, p.autoSubmitPr ?? false) : inferredMandate(c.envelope),
           )
-          .pipe(Effect.catch((e) => Effect.succeed(answers.issueCreate.notRecordedFailed(said(e)))));
-        if (typeof item === "string") return item;
+          .pipe(Effect.mapError((e) => answers.issueCreate.notRecordedFailed(said(e))));
         const noted = answers.issueCreate.noted(item.number, shortTitle(item.title), item.deliver === "answer");
         if (p.start === true) {
           // Written down first: a start that fails leaves the issue in the backlog, and trying again starts it, not a second one.
           const sent = yield* issue
             .start(item.id, channel.id)
-            .pipe(Effect.catch((e) => Effect.succeed(answers.issueCreate.queuedNoStart(noted, said(e)))));
-          if (typeof sent === "string") return sent;
+            .pipe(Effect.mapError((e) => answers.issueCreate.queuedNoStart(noted, said(e))));
           if (sent.queued) return answers.issueCreate.queuedInChannel(noted, channel.name, sent.queued);
           const h = sent.session ? run.sessionOf(sent.session) : undefined;
           const branch = h?.branch ? answers.issueCreate.branchNote(h.branch) : "";
@@ -354,8 +354,10 @@ export const issueTools = Effect.gen(function* () {
           Effect.catch((e) => Effect.succeed(answers.issueCreate.draftFailed(said(e)))),
         );
         return answers.issueCreate.inBacklog(noted, refined);
-      }),
-    );
+      },
+      Effect.catch((e) => (typeof e === "string" ? Effect.succeed(e) : Effect.fail(e))),
+    ),
+  );
 
   const issueUpdate = (who: Who) =>
     tool(
@@ -408,7 +410,6 @@ export const issueTools = Effect.gen(function* () {
               let agent: string | undefined;
               if (p.agent || (to === "todo" && item.status === "backlog" && !assignedAgentOf(item))) {
                 const chosen = yield* choose(item.title + "\n" + item.description, p.agent ?? "", p.agent ? "" : c.picked);
-                if (typeof chosen === "string") return answers.issueStatus.notMoved(chosen);
                 agent = chosen.id;
               }
               const done = yield* issue.setStatus(item.id, to, p.text ?? "", c.here, c.actor, agent ? { agent: agent } : {});
@@ -417,7 +418,7 @@ export const issueTools = Effect.gen(function* () {
               if (to === "done" && done.pullRequest?.state === "open") return answers.issueStatus.prOpenNote(done.number, done.pullRequest.url);
               return answers.issueStatus.moved(issueLine(done, whoOf(done), yield* Clock.currentTimeMillis).slice(2));
             },
-            Effect.catch((e) => Effect.succeed(answers.issueStatus.notMoved(said(e)))),
+            Effect.catch((e) => Effect.succeed(answers.issueStatus.notMoved(typeof e === "string" ? e : said(e)))),
           ),
         );
       }),

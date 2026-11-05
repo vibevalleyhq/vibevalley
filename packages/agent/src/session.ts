@@ -1,9 +1,9 @@
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { Predicate } from "effect";
+import { Schema } from "effect";
 
-import type { BrainMessage, CompactionSummaryMessage } from "./messages.ts";
+import { type BrainMessage, BrainMessageSchema, type CompactionSummaryMessage } from "./messages.ts";
 
 export function applySummary(messages: readonly BrainMessage[], summary: CompactionSummaryMessage): BrainMessage[] {
   return [summary, ...(summary.kept > 0 ? messages.slice(Math.max(0, messages.length - summary.kept)) : [])];
@@ -18,18 +18,15 @@ export function replay(lines: readonly BrainMessage[]): BrainMessage[] {
   return out;
 }
 
+const decodeBrainMessage = Schema.decodeUnknownOption(Schema.fromJsonString(BrainMessageSchema));
+
 function parseLines(text: string): BrainMessage[] {
   const out: BrainMessage[] = [];
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
-    try {
-      const m: unknown = JSON.parse(line);
-      // A line cut off by a crash: the rest still reads.
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a line this file wrote: a whole one is a BrainMessage
-      if (Predicate.hasProperty(m, "role") && typeof m.role === "string") out.push(m as BrainMessage);
-    } catch {
-      continue;
-    }
+    // A line cut off by a crash: the rest still reads.
+    const decoded = decodeBrainMessage(line);
+    if (decoded._tag === "Some") out.push(decoded.value);
   }
   return out;
 }

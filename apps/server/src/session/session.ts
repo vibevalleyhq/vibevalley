@@ -368,12 +368,15 @@ const make = Effect.gen(function* () {
       if (full) return { refused: full };
       hired++;
       const id = sessionId(`w${hired}`);
-      const place = yield* (
-        issue
+      let placeError = "";
+      const openedPlace = yield* Effect.option(
+        (issue
           ? projects.workplace(project, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "")
           : contextPlace(config.workRoot, id).pipe(Effect.provideService(FileSystem.FileSystem, fs))
-      ).pipe(Effect.catch((e) => Effect.succeed(t("server.session.life.noPlace", { name: agent.name, why: e.message }))));
-      if (typeof place === "string") return { refused: place };
+        ).pipe(Effect.tapError((e) => Effect.sync(() => (placeError = t("server.session.life.noPlace", { name: agent.name, why: e.message })))))
+      );
+      if (Option.isNone(openedPlace)) return { refused: placeError };
+      const place = openedPlace.value;
       const releasePlace = issue ? projects.release(place) : releaseContextPlace(place).pipe(Effect.provideService(FileSystem.FileSystem, fs));
       let committed = false;
       let released = false;

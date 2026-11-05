@@ -245,8 +245,12 @@ const make = Effect.gen(function* () {
       const id = owner.id;
       const prior = allocations.get(id);
       if (prior) return { refused: prior.failure ?? t("server.session.life.notReturned"), retained: true };
-      const r = yield* runtimes.resolve(agent).pipe(Effect.catch((e) => Effect.succeed(reasonOf(e))));
-      if (typeof r === "string") return { refused: r, retained: false };
+      let refusal = "";
+      const resolved = yield* Effect.option(
+        runtimes.resolve(agent).pipe(Effect.tapError((e) => Effect.sync(() => (refusal = reasonOf(e))))),
+      );
+      if (Option.isNone(resolved)) return { refused: refusal, retained: false };
+      const r = resolved.value;
       const raced = allocations.get(id);
       if (raced) return { refused: raced.failure ?? t("server.session.life.notReturned"), retained: true };
       const base = r.runtime;

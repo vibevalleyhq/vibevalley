@@ -1,4 +1,17 @@
-import type { Context, ImageContent, Message, TextContent, ToolDeclaration, UserMessage } from "@vibevalley/ai/messages";
+import { Schema } from "effect";
+
+import {
+  AssistantMessageSchema,
+  type Context,
+  type ImageContent,
+  type Message,
+  type TextContent,
+  type ToolDeclaration,
+  ToolResultMessageSchema,
+  UserContentSchema,
+  type UserMessage,
+  UserMessageSchema,
+} from "@vibevalley/ai/messages";
 
 import type { AgentMessage } from "./core/loop.ts";
 import { imagePlaceholder, summary as summaryWords, transcript as transcriptWords } from "./prompts.ts";
@@ -27,6 +40,32 @@ export interface CompactionSummaryMessage {
 }
 
 export type BrainMessage = AgentMessage<CustomMessage | CompactionSummaryMessage>;
+
+export const CustomMessageSchema: Schema.Codec<CustomMessage> = Schema.Struct({
+  role: Schema.Literal("custom"),
+  customType: Schema.String,
+  content: UserContentSchema,
+  display: Schema.Boolean,
+  details: Schema.optionalKey(Schema.Unknown),
+  timestamp: Schema.Finite,
+});
+
+export const CompactionSummaryMessageSchema: Schema.Codec<CompactionSummaryMessage> = Schema.Struct({
+  role: Schema.Literal("compactionSummary"),
+  summary: Schema.String,
+  tokensBefore: Schema.Finite,
+  timestamp: Schema.Finite,
+  archive: Schema.optionalKey(Schema.String),
+  kept: Schema.Finite,
+});
+
+export const BrainMessageSchema: Schema.Codec<BrainMessage> = Schema.Union([
+  UserMessageSchema,
+  AssistantMessageSchema,
+  ToolResultMessageSchema,
+  CustomMessageSchema,
+  CompactionSummaryMessageSchema,
+]);
 
 export const customMessage = (customType: string, content: UserContent, now: number, options: { hidden?: boolean; details?: unknown } = {}): CustomMessage => ({
   role: "custom",
