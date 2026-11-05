@@ -86,15 +86,14 @@ export class Fold {
 
   /** A data event's JSON. */
   chunk(chunk: unknown): AssistantMessageEvent[] {
-    if (typeof chunk !== "object" || chunk === null) return [];
-    const c = chunk as { id?: unknown; model?: unknown; usage?: RawUsage; choices?: unknown };
-    if (typeof c.id === "string" && !this.responseId) this.responseId = c.id;
-    if (typeof c.model === "string" && c.model.length > 0 && c.model !== this.model.id) this.responseModel ??= c.model;
-    if (c.usage) this.usage = usageOf(c.usage, this.model);
+    if (!Predicate.isObject(chunk)) return [];
+    if (typeof chunk.id === "string" && !this.responseId) this.responseId = chunk.id;
+    if (typeof chunk.model === "string" && chunk.model.length > 0 && chunk.model !== this.model.id) this.responseModel ??= chunk.model;
+    if (Predicate.isObject(chunk.usage)) this.usage = usageOf(chunk.usage, this.model);
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- OpenAI's chunk as the provider sends it, not decoded on the hot path
-    const choice = Array.isArray(c.choices) ? (c.choices[0] as Choice | undefined) : undefined;
+    const choice = Array.isArray(chunk.choices) ? (chunk.choices[0] as Choice | undefined) : undefined;
     if (!choice) return [];
-    if (!c.usage && choice.usage) this.usage = usageOf(choice.usage, this.model);
+    if (!Predicate.isObject(chunk.usage) && choice.usage) this.usage = usageOf(choice.usage, this.model);
     if (choice.finish_reason) {
       this.rawStopReason = choice.finish_reason;
       const [reason, error] = stopReasonOf(choice.finish_reason);

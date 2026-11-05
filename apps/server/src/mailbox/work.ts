@@ -221,7 +221,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
     }, writtenLocked);
 
     const hand = Effect.fn("Mailbox.hand")(function* (session: string, envelope: string, launch: string, at: number) {
-      yield* db.attempt(qd.markHanded({ session_id: session, envelope_id: envelope, launch, handed_at: at }));
+      yield* db.run(qd.markHanded({ session_id: session, envelope_id: envelope, launch, handed_at: at }));
       open.handed(session, envelope, launch);
     }, writtenLocked);
 

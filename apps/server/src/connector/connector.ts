@@ -599,7 +599,7 @@ const make = (options: ConnectorOptions = {}) =>
 
       return {
         id,
-        load: reload,
+        load: kept(reload),
         status,
         offer: (m: ChatMessage) => commands.withPermits(1)(Effect.suspend(() => (closing ? Effect.void : offer(m)))),
         changed: () => {
@@ -691,7 +691,7 @@ const make = (options: ConnectorOptions = {}) =>
     const bridges = yield* Effect.forEach(adapters, (a) =>
       Effect.map(Effect.all({ outbox: Queue.sliding<void>(1), inbox: Queue.sliding<void>(1) }), (mail) => bridgeOf(a, mail)),
     );
-    yield* Effect.forEach(bridges, (b) => Effect.orDie(b.load), { discard: true });
+    yield* Effect.forEach(bridges, (b) => b.load, { discard: true });
     yield* Effect.forkScoped(
       Stream.runForEach(yield* inbox.externalChanges, () =>
         Effect.sync(() => {
