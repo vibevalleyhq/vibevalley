@@ -6,12 +6,12 @@ import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { aria } from "@/base/dom";
-import { farm, useFarm } from "@/farm/store";
-import { unreadTotal } from "@/features/channel";
-import { useCore } from "@/infra/frame";
-import { PixelCard } from "@/ui/pixel";
-import { playSound } from "@/ui/pixel/sound";
+import { aria } from "#/base/dom.tsx";
+import { farm, useFarm } from "#/farm/store.ts";
+import { unreadTotal } from "#/features/channel/index.ts";
+import { useCore } from "#/infra/frame.ts";
+import { PixelCard } from "#/ui/pixel/index.ts";
+import { playSound } from "#/ui/pixel/sound.ts";
 
 import { missedOf, phoneState } from "./calls";
 import { phoneCells } from "./lcd";

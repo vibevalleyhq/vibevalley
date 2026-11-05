@@ -4,7 +4,7 @@ import { QueryClient, QueryObserver, type QueryKey, type QueryObserverOptions, t
 import { Schema } from "effect";
 import { type Accessor, createEffect, createSignal, onSettled, untrack } from "solid-js";
 
-import { SpriteManifest } from "@/base/manifests";
+import { SpriteManifest } from "#/base/manifests.ts";
 
 import { api } from "./api";
 import type { FramesSource } from "./frame";

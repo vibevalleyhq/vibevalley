@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { carryIds, edgesOf, flatten, parse, print, spansOf, walk } from "./outline.ts";
+import { flatBlocks } from "@vibevalley/protocol/rules";
+
+import { carryIds, edgesOf, outlineOf, parse, print, spansOf, walk } from "./outline.ts";
 import { fileOf, tierOfFile, titleOfFile } from "./para.ts";
 
 const page = [
@@ -35,7 +37,7 @@ describe("the outline", () => {
     expect(read.title).toBe("Cetus Core Engine");
     expect(read.tier).toBe("project");
     expect(read.props.status).toBe("active");
-    const blocks = flatten(read.blocks);
+    const blocks = flatBlocks(read.blocks);
     expect(blocks.map((b) => b.depth)).toEqual([0, 1, 1, 2, 3, 4, 0]);
     expect(blocks[1]).toMatchObject({ marker: "DONE", priority: "A", body: "Write the round-trip spec", props: { completed: "2026-11-02" } });
     expect(blocks[2]).toMatchObject({ id: "6726f8a1-9b1c-4d2e-8f3a-123456789abc", marker: "DOING", path: "Goals and milestones" });
@@ -64,9 +66,28 @@ describe("the outline", () => {
     expect(edges.some((e) => e.page === "fake-link")).toBe(false);
   });
 
+  it("reads a bare - as an empty block, not as more of the block above", () => {
+    const read = parse("- LATER call the vet\n-\n  - under the empty one\n", "journals/2026_11_04.md", 0);
+    expect(flatBlocks(read.blocks).map((b) => [b.depth, b.body])).toEqual([
+      [0, "call the vet"],
+      [0, ""],
+      [1, "under the empty one"],
+    ]);
+  });
+
+  it("keeps a folded block folded as Logseq writes it, and an unfolded one's line goes", () => {
+    const text = "- parent\n  collapsed:: true\n  - child\n";
+    const page = parse(text, "pages/p.md", 0);
+    expect(page.blocks[0]?.props).toEqual({ collapsed: "true" });
+    expect(print(page)).toBe(text);
+    const parent = page.blocks[0]!;
+    parent.props.collapsed = "";
+    expect(print(page)).toBe("- parent\n  - child\n");
+  });
+
   it("reads a jump of two levels as one", () => {
     const read = parse("- a\n      - b\n", "00_Inbox/x.md", 0);
-    expect(flatten(read.blocks).map((b) => b.depth)).toEqual([0, 1]);
+    expect(flatBlocks(read.blocks).map((b) => b.depth)).toEqual([0, 1]);
   });
 
   it("keeps the ids of the blocks another editor did not change", () => {
@@ -84,5 +105,28 @@ describe("the outline", () => {
     expect(titleOfFile("01_Projects/Cetus-Core__Engine.md")).toBe("Cetus-Core/Engine");
     expect(tierOfFile("04_Archives/a.md")).toBe("archive");
     expect(tierOfFile("elsewhere/a.md")).toBe("inbox");
+  });
+});
+
+describe("text read as an outline", () => {
+  it("a line a block, nested by indentation whatever its width, a leading dash or not, with fresh ids", () => {
+    let n = 0;
+    const id = () => `id-${++n}`;
+    const blocks = outlineOf("    读书\n      - 第一章\n         笔记\n      第二章\n\n    TODO 还书\n", id);
+    const shape = (nodes: readonly { body: string; marker?: string; id: string; children: readonly unknown[] }[]): unknown[] =>
+      nodes.map((b) => [b.marker ?? "", b.body, shape(b.children as never)]);
+    expect(shape(blocks as never)).toEqual([
+      [
+        "",
+        "读书",
+        [
+          ["", "第一章", [["", "笔记", []]]],
+          ["", "第二章", []],
+        ],
+      ],
+      ["TODO", "还书", []],
+    ]);
+    expect([...walk(blocks)].map((b) => b.id)).toEqual(["id-1", "id-2", "id-3", "id-4", "id-5"]);
+    expect(outlineOf(" \n\n", id)).toEqual([]);
   });
 });

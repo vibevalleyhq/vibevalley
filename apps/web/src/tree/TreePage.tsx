@@ -10,12 +10,12 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
-import { useNow, useViewport } from "@/base/dom";
-import { ago } from "@/base/format";
-import { useRouter, useSearch } from "@/infra/router";
-import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "@/ui/pixel";
-import { playSound } from "@/ui/pixel/sound";
-import { toast } from "@/ui/toasts";
+import { useNow, useViewport } from "#/base/dom.tsx";
+import { ago } from "#/base/format.ts";
+import { useRouter, useSearch } from "#/infra/router.ts";
+import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "#/ui/pixel/index.ts";
+import { playSound } from "#/ui/pixel/sound.ts";
+import { toast } from "#/ui/toasts.ts";
 
 import { allOf, counts, kept, newest, stageName, type TreeFilter } from "./memories";
 import { type MemoryItem, type MemoryKind, type MemoryTree, mockTree, TreeStageValues } from "./mock";

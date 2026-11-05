@@ -10,17 +10,17 @@ import { Clock, Deferred, Effect, FiberMap, FiberSet, Queue, PubSub, Semaphore, 
 import type * as T from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import { newId } from "@/base/ids.ts";
-import { scopedPubSub } from "@/base/pubsub.ts";
-import { Core, type FactIn } from "@/core/core.ts";
-import { Executor, type ExecutionInput } from "@/executor/executor.ts";
-import { serverAddress, ServerConfig } from "@/infra/config.ts";
-import { causeMessage, Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { type Workplace } from "@/project/workplace.ts";
+import { Agent } from "#/agent/agent.ts";
+import { newId } from "#/base/ids.ts";
+import { scopedPubSub } from "#/base/pubsub.ts";
+import { Core, type FactIn } from "#/core/core.ts";
+import { Executor, type ExecutionInput } from "#/executor/executor.ts";
+import { serverAddress, ServerConfig } from "#/infra/config.ts";
+import { causeMessage, Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { type Workplace } from "#/project/workplace.ts";
+import * as qs from "#db/session.sql.ts";
 
-import * as qs from "../../db/generated/session.sql.ts";
 import { restoredSession, sessionState } from "./history.ts";
 import { NotRecorded, recording } from "./inProcessRun.ts";
 import { type Journal, makeTrajectories } from "./journal.ts";

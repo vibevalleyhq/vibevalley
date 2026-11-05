@@ -7,14 +7,14 @@ import { Deferred, Effect, Fiber, Stream } from "effect";
 import { scriptedLLM } from "@vibevalley/agent/testing";
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 
-import { owner } from "@/base/actor.ts";
-import { Core } from "@/core/core.ts";
-import { Db } from "@/infra/db.ts";
-import { Memory } from "@/memory/memory.ts";
-import { testConfig, aTurn, until } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
+import { owner } from "#/base/actor.ts";
+import { Core } from "#/core/core.ts";
+import { Db } from "#/infra/db.ts";
+import { Memory } from "#/memory/memory.ts";
+import { testConfig, aTurn, until } from "#/testing/layers.ts";
+import { world } from "#/testing/world.ts";
+import * as qs from "#db/session.sql.ts";
 
-import * as qs from "../../db/generated/session.sql.ts";
 import { Caller } from "./host.ts";
 import { Session, type RunFinished } from "./session.ts";
 import type { InputConsumed } from "./signals.ts";

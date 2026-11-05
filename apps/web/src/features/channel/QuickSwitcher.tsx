@@ -4,14 +4,16 @@ import { Combobox } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 import { channelOf } from "@vibevalley/protocol/rules";
 
-import { autofocus } from "@/base/dom";
-import { useWorkAgents } from "@/infra/agents";
-import { api } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { useRouter } from "@/infra/router";
-import { defineAtom } from "@/state/atom";
-import { createAct } from "@/ui/act";
-import { Dialog } from "@/ui/Dialog";
+import { autofocus } from "#/base/dom.tsx";
+import { notesSearch, noteTargets, pkmHref, usePkmVault } from "#/features/pkm/index.ts";
+import { useWorkAgents } from "#/infra/agents.ts";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { ready } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { defineAtom } from "#/state/atom.ts";
+import { createAct } from "#/ui/act.ts";
+import { Dialog } from "#/ui/Dialog.tsx";
 
 import { chatPath, type SwitchTarget, switchTargets } from "./places";
 import { Count } from "./presence";
@@ -35,13 +37,30 @@ function SwitcherBody(props: { onClose: () => void }) {
   const router = useRouter();
   const profiles = useWorkAgents();
   const [query, setQuery] = createSignal("");
-  const targets = createMemo(() =>
-    switchTargets(core()?.chat, query(), { issues: core()?.issues ?? [], sessions: core()?.sessions ?? [], profiles: profiles() }),
-  );
+  const vault = usePkmVault();
+  // The notes after the chat: the pages whose title has the words, and a last line to search inside them.
+  const targets = createMemo((): SwitchTarget[] => {
+    const typed = query().trim();
+    const notes = noteTargets(ready(vault, undefined)?.pages ?? [], typed).map((n): SwitchTarget => ({
+      kind: "note",
+      id: n.slug,
+      label: n.label,
+      hint: t("web.channel.switcher.note", { tier: t(`web.pkm.tier.${n.tier}`) }),
+      unread: 0,
+      at: 0,
+    }));
+    return [
+      ...switchTargets(core()?.chat, query(), { issues: core()?.issues ?? [], sessions: core()?.sessions ?? [], profiles: profiles() }),
+      ...notes,
+      ...(typed ? [{ kind: "notes", id: typed, label: t("web.channel.switcher.searchNotes", { q: typed }), hint: "", unread: 0, at: 0 } as const] : []),
+    ];
+  });
   // Made here, not in go: the dialog closes as the owner picks, and the act outlives it.
   const act = createAct();
   const go = (t: SwitchTarget) => {
     untrack(() => props.onClose)();
+    if (t.kind === "note") return router.navigate(pkmHref(t.id));
+    if (t.kind === "notes") return notesSearch.open(t.id);
     if (t.kind !== "profile") return router.navigate(chatPath(channelOf(untrack(core)?.chat, t.id)));
     const agent = t.id;
     void act.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));

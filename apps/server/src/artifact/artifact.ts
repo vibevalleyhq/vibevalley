@@ -14,16 +14,19 @@ import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { newId } from "@/base/ids.ts";
-import { Channel } from "@/channel/channel.ts";
-import { type ApiError, lookIn, missing, refused } from "@/errors.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import { writeOnce } from "@/infra/files.ts";
+import { head } from "#/base/clip.ts";
+import { newId } from "#/base/ids.ts";
+import { Channel } from "#/channel/channel.ts";
+import { type ApiError, lookIn, missing, refused } from "#/errors.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import { writeOnce } from "#/infra/files.ts";
+import * as qa from "#db/artifact.sql.ts";
+import * as qv from "#db/artifact_version.sql.ts";
 
-import * as qa from "../../db/generated/artifact.sql.ts";
-import * as qv from "../../db/generated/artifact_version.sql.ts";
 import { makeBlockStore } from "./blocks.ts";
+import { htmlCheck, htmlProblem } from "./check.ts";
+import { htmlEdit } from "./edit.ts";
 import { artifactProblem } from "./policy.ts";
 
 /** Who makes it. from: who says so in the channel (the owner, a session, an orchestrator); by: who it is kept as made by
@@ -47,6 +50,8 @@ export class Artifact extends Context.Service<
     readonly create: (maker: Maker, req: T.ArtifactRequest) => Effect.Effect<T.Artifact, ApiError>;
     /** An html one's next version; a blocks one is refused, it is changed block by block. */
     readonly version: (maker: Maker, req: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError>;
+    /** The owner's words in place of some in an html one's latest version (edit.ts), kept as its next version. */
+    readonly htmlEdit: (maker: Maker, req: T.ArtifactHtmlEdit) => Effect.Effect<T.Artifact, ApiError>;
     readonly rename: (id: T.ArtifactId, title: string) => Effect.Effect<T.Artifact, ApiError>;
     readonly previewRemove: (id: T.ArtifactId) => Effect.Effect<T.Preview, ApiError>;
     /** It and its versions or blocks go; a content file goes when no other version keeps it. Its cards stay in the channel. */
@@ -163,7 +168,7 @@ const make = () =>
       }
       const kind = req.kind ?? "markdown";
       const bytes = Buffer.from(req.content, "utf8");
-      const problem = artifactProblem({ title: req.title, kind, size: bytes.length });
+      const problem = artifactProblem({ title: req.title, kind, size: bytes.length }) || (kind === "html" ? htmlProblem(htmlCheck(req.content)) : "");
       if (problem) return yield* Effect.fail(refused(problem));
       const body: T.ArtifactBody = kind === "html" ? "html" : "blocks";
       const channel = yield* chat.placeOf(maker.from, req.channel ?? "");
@@ -201,7 +206,7 @@ const make = () =>
       const row = yield* found(req.id);
       if (row.body !== "html") return yield* Effect.fail(refused(t("server.artifact.notHtml", { title: row.title })));
       const bytes = Buffer.from(req.content, "utf8");
-      const problem = artifactProblem({ size: bytes.length });
+      const problem = artifactProblem({ size: bytes.length }) || htmlProblem(htmlCheck(req.content));
       if (problem) return yield* Effect.fail(refused(problem));
       const sha = yield* keep(bytes);
       const next = row.version + 1;
@@ -282,6 +287,20 @@ const make = () =>
       }, lock.withPermits(1)),
       version: Effect.fn("Artifact.version")(function* (maker, req) {
         return yield* version(maker, req);
+      }, lock.withPermits(1)),
+      htmlEdit: Effect.fn("Artifact.htmlEdit")(function* (maker, req) {
+        const { row, v } = yield* versionOf(req.id, req.version);
+        if (row.body !== "html") return yield* Effect.fail(refused(t("server.artifact.notHtml", { title: row.title })));
+        // Over the latest only: a later version's changes would be lost under an edit of an older one.
+        if (v.version !== row.version) return yield* Effect.fail(refused(t("server.artifact.edit.stale", { version: v.version, latest: row.version })));
+        const source = yield* Effect.tryPromise({
+          try: () => readFile(fileOf(v.sha), "utf8"),
+          catch: () => missing(t("server.artifact.noFile", { title: row.title, version: v.version }), []),
+        });
+        const edited = htmlEdit(source, req.anchor, req.text);
+        if (!edited.ok) return yield* Effect.fail(refused(edited.why));
+        const note = t("server.artifact.edit.note", { old: head(req.anchor.exact.trim(), 40), new: head(req.text.trim(), 40) });
+        return yield* version(maker, { id: req.id, content: edited.source, note });
       }, lock.withPermits(1)),
       rename: Effect.fn("Artifact.rename")(function* (id, title) {
         yield* found(id);

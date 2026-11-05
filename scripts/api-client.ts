@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { endpoints, pathOf } from "../packages/protocol/src/api.ts";
+import { endpoints, pathOf } from "@vibevalley/protocol/api";
 
 const protocol = join(import.meta.dirname, "..", "packages/protocol/src");
 const out = join(protocol, "client.ts");

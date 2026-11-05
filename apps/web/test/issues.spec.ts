@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 
 import type { VibeValleyApi } from "@vibevalley/protocol";
@@ -36,12 +37,20 @@ test("native parent issues show child navigation and can merge without a parent 
   await expect.poll(async () => (await api.issue.get({ id: parent.id })).status).toBe("done");
 });
 
-test("a quick add shows the new issue in todo without a reload", async ({ page, api }) => {
+test("the placeholder card writes a new issue in a dialog, and the board shows it in todo without a reload", async ({ page, api }) => {
   const title = "add a shortcut to the board";
   await page.goto("/issues");
   await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
-  await page.getByTestId("quick-add").fill(title);
-  await page.keyboard.press("Enter");
+  await page.getByTestId("issue-new").click();
+  const dialog = page.getByTestId("issue-new-dialog");
+  await expect(page.getByTestId("issue-new-text")).toBeFocused();
+  // Read once it has popped in: mid-way its words are still fading up.
+  await dialog.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+  const { violations } = await new AxeBuilder({ page }).include('[data-testid="issue-new-dialog"]').withTags(["wcag2a", "wcag2aa"]).analyze();
+  expect(violations.map((v) => v.id)).toEqual([]);
+  await page.getByTestId("issue-new-text").fill(title);
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await expect(dialog).toBeHidden();
   await expect.poll(async () => (await api.issue.list({})).some((i) => i.title === title)).toBe(true);
   const made = (await api.issue.list({})).find((i) => i.title === title)!;
   await expect(card(lane(page, "todo"), made.id)).toBeVisible();
@@ -54,6 +63,19 @@ test("a quick add shows the new issue in todo without a reload", async ({ page, 
   await expect(page).toHaveURL(new RegExp(`/issues/${made.id}$`, "u"));
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/issues$/u);
+});
+
+test("C opens a new issue on the board, but not while a field has the focus", async ({ page }) => {
+  await page.goto("/issues");
+  await expect(page.getByTestId("issue-new")).toBeVisible();
+  await page.getByTestId("issue-search").focus();
+  await page.keyboard.press("c");
+  await expect(page.getByTestId("issue-new-dialog")).toBeHidden();
+  await page.locator("body").click({ position: { x: 600, y: 600 } });
+  await page.keyboard.press("c");
+  await expect(page.getByTestId("issue-new-text")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("issue-new-dialog")).toBeHidden();
 });
 
 test("the list view and its grouping are kept across a reload", async ({ page, api }) => {

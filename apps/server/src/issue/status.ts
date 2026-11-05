@@ -1,8 +1,8 @@
 import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, executionsOf, isBusy, latestSessionIdOf, omitUndefined, same, stageWantsOwner } from "@vibevalley/protocol/rules";
 
-import { compare, compareText, or } from "@/base/order.ts";
-import { sessionOf } from "@/session/roster.ts";
+import { compare, compareText, or } from "#/base/order.ts";
+import { sessionOf } from "#/session/roster.ts";
 
 import { statusMoves } from "./moves.ts";
 

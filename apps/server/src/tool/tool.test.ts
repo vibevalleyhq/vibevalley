@@ -7,9 +7,10 @@ import { setLocale } from "@vibevalley/i18n";
 import type { Spent } from "@vibevalley/protocol";
 import { endpoints, fieldsOf } from "@vibevalley/protocol/api";
 
-import { checkCases, goldenCases } from "@/testing/golden.ts";
+import { htmlSources } from "#/artifact/policy.ts";
+import { checkCases, goldenCases } from "#/testing/golden.ts";
 
-import { spentText } from "./prompts.ts";
+import { descriptions, params, sessionDescriptions, spentText } from "./prompts.ts";
 import { agentOnly, type Op, parameters, schemas, sessionParameters, sessionSchemas, toolName } from "./schemas.ts";
 import { toolStart } from "./tool.ts";
 
@@ -18,6 +19,12 @@ describe("the tools", () => {
   it("keep their parameters to the byte", () => {
     const kept = readFileSync(resolve(import.meta.dirname, "testdata/parameters.json"), "utf8");
     expect(JSON.stringify({ orchestrator: schemas, session: sessionSchemas })).toBe(kept);
+  });
+
+  it("tell a helper where an HTML page may load from, from the list its display is written from", () => {
+    const hosts = [...new Set(Object.values(htmlSources).flat())].map((u) => new URL(u).host);
+    for (const said of [params.artifact.kind, descriptions["artifact.version.create"], sessionDescriptions["artifact.version.create"]])
+      expect(hosts.filter((h) => !said.includes(h))).toEqual([]);
   });
 
   // A tool is its endpoint as a model sees it: named by it, taking its fields (or ones only a model uses), given to those

@@ -7,7 +7,7 @@ import { Schema } from "effect";
 import { createSynth, type Pen, type Recipe, type Synth } from "@vibevalley/engine/audio";
 import { t } from "@vibevalley/i18n";
 
-import { defineStored } from "@/state/stored";
+import { defineStored } from "#/state/stored.ts";
 
 function grains(
   pen: Pen,

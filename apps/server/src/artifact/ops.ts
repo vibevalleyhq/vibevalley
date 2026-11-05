@@ -21,8 +21,8 @@ import type {
 import { isOneOf, keyBetween, normalSpans, sameMarks, validKey } from "@vibevalley/protocol/rules";
 import { artifactId } from "@vibevalley/protocol/schema";
 
-import { or } from "@/base/order.ts";
-import { messageOf } from "@/errors.ts";
+import { or } from "#/base/order.ts";
+import { messageOf } from "#/errors.ts";
 
 // A block's text as spans. Offsets into it count Unicode code points, as the op contract
 // says; the client counts UTF-16 units and converts.

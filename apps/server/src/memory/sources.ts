@@ -9,8 +9,8 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { messageOf } from "@/errors.ts";
-import type { MemorySourceConfig } from "@/setting/memorySources.ts";
+import { messageOf } from "#/errors.ts";
+import type { MemorySourceConfig } from "#/setting/memorySources.ts";
 
 import type { FinishedRun, MemoryStore, Note, RecallCue } from "./memory.ts";
 import {

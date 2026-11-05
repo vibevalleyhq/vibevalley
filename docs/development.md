@@ -22,10 +22,14 @@ vp run desktop:dev                           # 或者桌面版：Electron 带着
 
 ```bash
 vp run package:mac       # apps/desktop/dist：VibeValley.app（mac-arm64/）、.dmg、.zip 和 release.json
-git tag v0.2.0 && git push origin v0.2.0   # 发布：release.yml 打包、建草稿 Release，看过再在 GitHub 上发布
+vp run release alpha     # 在 main 上打下一个 alpha
+vp run release beta      # 第一次在 main 上：切出 release/x.y、打 beta.1；之后在 release/x.y 上打下一个 beta
+vp run release final     # 在 release/x.y 上打正式版（前面要有同一版的 beta）
 ```
 
-`apps/desktop/scripts/package.ts` 先构建页面和壳，再把 `apps/server` 连同它的生产依赖（`packages/protocol` 拷成真的文件夹）放进 `dist/stage/server`，最后由 electron-builder 把壳、`server/` 和 `web/` 一起打进应用；服务端在应用里照样用 Electron 自带的 Node 和 tsx 跑。没有签名，第一次打开要在「系统设置 → 隐私与安全性」里放行。
+发版分三个阶段（[计划](.agents/notes/proposed/process/2026-11-04-alpha-beta-release.md)）：alpha 给自己用，功能会变、农场可能从头来；beta 冻住功能只修错，同一条 beta 线里表结构不变；正式版和最后一个 beta 同一份代码。修错先进 `main`，再挑到 `release/x.y`。`vp run release <阶段>`（`scripts/release.ts`）不手写版本号：查工作区干净、分支对、和 origin 一致，从已有的 tag 算出下一个版本（`scripts/release-plan.ts`），beta 和正式版先跑 `vp run release:verify`、表结构和这条线的第一个 beta 比，列出要打什么、包含哪些提交、会不会让农场从头来，问过才打 tag、推送；只在终端里跑。推上去的 tag 由 release.yml 打包、建草稿 Release，看过再在 GitHub 上发布，alpha 和 beta 勾上 pre-release。
+
+`apps/desktop/scripts/package.ts` 先构建页面和壳，再把服务端用 `vp pack` 打成 `dist/main.mjs`，连同它没打进去的生产依赖和运行时要读的几样文件放进 `dist/stage/server`，最后由 electron-builder 把壳、`server/` 和 `web/` 一起打进应用；服务端在应用里用 Electron 自带的 Node 直接跑那个包。没有签名，第一次打开要在「系统设置 → 隐私与安全性」里放行。
 
 ## 检查和测试
 
@@ -45,7 +49,7 @@ git tag v0.2.0 && git push origin v0.2.0   # 发布：release.yml 打包、建�
 
 - **分支**：`<类>/<主题>`，类是 `feat`（新行为）、`fix`、`docs`、`chore`（工具、依赖、仓库的规矩）、`refactor`、`test`（只加测试）；主题用英文小写、连字符，比如 `feat/issue-board-groups`。
 - **提交**：主题用英文，一句话说改完以后代码做什么（「The board groups issues by helper」），不写「改了什么文件」「修了一下」；界面上的中文词放进「」引用，代码和路径放进反引号；最多 100 个字（按码点数），不加句号；细节、原因和取舍写进正文，和主题之间空一行。不带 agent 的署名（`Co-Authored-By: Claude`、「Generated with …」）。这几条由 `scripts/commit-msg.ts` 查：本机是 commit-msg hook，CI 查 PR 的标题、正文和分支名；Git 自己写的（`Merge`、`Revert`、`fixup!`）不查。
-- **提交前**：`vp install` 时 `prepare` 跑 `vp config --hooks`，把 git 的 hook 指到 `.vite-hooks/`，再跑 `effect-tsgo patch` 给 TypeScript 和 oxlint 打上 Effect 的语言服务（编辑器和 `vp check` 都看得到 Effect 的诊断，[地基](docs/subsystems/foundation.md)）；pre-commit 对暂存的文件跑 `vp check --fix`（`vite.config.ts` 的 `staged`）。临时跳过一次用 `git commit --no-verify`，CI 照样会查。
+- **提交前**：`vp install` 时 `prepare` 跑 `vp config --hooks`，把 git 的 hook 指到 `.vite-hooks/`（编辑器里的 TypeScript 是带 Effect 语言服务的 tsrs，见 [packages/tsrs](packages/tsrs/README.md)）；pre-commit 对暂存的文件跑 `vp check --fix`（`vite.config.ts` 的 `staged`）。临时跳过一次用 `git commit --no-verify`，CI 照样会查。
 - **PR**：标题和正文用英文，正文照模板（`.github/pull_request_template.md`）写三段：`## What changed`、`## Checks`（附 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 要的证据）、`## Not verified`。同一批工作的多个改动默认合成一个 PR，尽量少开 PR；用逻辑提交和分组正文区分修复、简化、测试和文档。
 - **回归测试**：修一个缺陷补的测试，名字以 `regression: ` 开头（`it("regression: the helper idle longest goes home", …)`），修之前失败、修之后通过。之后的 PR 删了它、或改了它（断言、选项、跳过），正文加一节 `## Regression`，逐个写出测试名和为什么；`fix/` 分支没有新的回归测试，也在这一节写为什么补不了（界面的样子用截图作证据、打包、外面的服务）。CI 用 `scripts/regression.ts` 比较 PR 和它的基线来查。
 - **死代码**：`vp run deadcode`（CI 的 check 里）用 knip 查没人用的文件、导出和依赖，什么在跑写在 `knip.ts`；报出的照 `scripts/deadcode.ts` 打出的说明处理。
@@ -63,14 +67,16 @@ git tag v0.2.0 && git push origin v0.2.0   # 发布：release.yml 打包、建�
 
 ## 只用命令行派一个活
 
-先起服务端（见上）。另开终端，命令行在根目录是 `vp run --filter @vibevalley/server cli`；下面写成 `vibevalley`。它连这台机器上用着家目录的那个服务端（家目录的 `server.json` 写着地址，桌面版的也找得到），没有就是 `http://127.0.0.1:8787`；别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
+先起服务端（见上）。另开终端，命令行在根目录是 `vp run --filter @vibevalley/cli start`；下面写成 `vibevalley`。装了桌面版的，「关于」里「安装命令行」以后终端里就有 `vibevalley`（beta 是 `vibevalley-beta`，alpha 是 `vibevalley-alpha`），连的是那个渠道的农场。`vibevalley doctor` 一次说清楚找到的是哪个农场、连不连得上、桌面版开没开、装了哪些农机、缺不缺模型的 key、连接到本机有没有问题；`vibevalley app …` 是桌面版自己的事（状态、打开到某一页、更新、退出、重启）。它连这台机器上用着家目录的那个服务端（家目录的 `server.json` 写着地址，桌面版的也找得到），没有就是 `http://127.0.0.1:8787`；别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
 
-命令行搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），接口表里每个接口是一条命令，命令的词就是操作名（`issue.create` 是 `issue create`，`issue.status.update` 是 `issue status update <id>`，操作名里的大写写成 `-`：`issue preview-delete`），`about` 的字段（多是 `<id>`）是位置参数；`vibevalley --help`、`vibevalley issue --help`、`vibevalley issue status update --help` 列出命令和参数。它的输出是给脚本和 agent 读的：
+命令行是自己的包 `apps/cli`（入口 `src/main.ts`），搭在 `effect/cli` 上，不载入服务端，给这台电脑上的 agent 用，主人也一样用。它照农场的领域模型，像 `gh issue` 那样正规：**一条命令就是服务端的一个操作**，路径是 `<资源> [<子资源>] <动词>`，资源照接口的模块和名词（`issue`、`pkm page`、`channel message`），动词是标准的 `list`、`show`、`create`、`edit`、`delete`（对接口的 `list`、`get`、`create`、`update`、`delete`）和接口自己的（`status`、`comment`、`review`、`send`、`search`、`capture`、`export`、`refresh`、`stop`）。命令行不推断、不拼操作：工单能不能挪、挪到哪，频道、档案按名字认成哪一个，都是服务端的事，拒绝时带 `next`。例外只有名字就说明了的几个：`issue show --watch`（先跟着状态流）、`pkm page edit`（读原文、编辑器、写回）、`doctor`、`chat`（服务端的对话程序）。参数照接口的字段写（`--description`、`--agent`、`--wants-owner`），经生成的 `VibeValleyApi` 调服务端，没有类型断言；工单是号（`12`、`#12`）。不带命令只打帮助。`vibevalley guide` 打出给 agent 的用法（`apps/cli/src/guide/<语言>.md`），每条命令的 `--help` 有说明和例子（`apps/cli/src/main.test.ts` 查）。
 
-- **stdout 只放结果**：一个 JSON 文档（终端里排开，不是终端时一行）；`state --watch`、`events` 一行一帧。失败时 stdout 是空的。
-- **输入** `--json` 收 JSON 文本、`-`（读标准输入）或 `@文件`，和位置参数并成一份，发出去以前照接口的 Schema 查一遍，对不上就不发，说是哪个字段；输入只有位置参数的命令不收 `--json`。
-- **试跑** `--dry-run`：会删、会合、会关、会让帮工走的命令（接口表里带 `dryRun` 的：`issue status update`、`issue act` 和每一个删除，`cli.test.ts` 查每个 `delete` 都有）只回答会做什么（`{"does":[…]}`），什么都不动；它和真做走同一处判断，所以真做会拒的，试跑也拒、话一样。只读的命令照常跑；别的改东西、还没有试跑的命令带着 `--dry-run` 会被拒（`NoDryRun`），不会悄悄做了。
-- **失败**是 stderr 最后一行的 JSON：`{"error":{"tag":…,"message":…,"next":[{"say":…,"run":[…]}]}}`，`next` 是接着能做什么，`run` 是能直接跑的命令（不带 `vibevalley`）：找不到的（`Missing`）总说去哪儿找（列出它们的命令），工单和计划的拒绝给出它们现在能做的动作。退出码分得出是哪一种：
+- **工单**：`issue list|show|create|edit|status|comment|review|diff|timeline|delete`；`issue show --watch` 先跟着它，等它到 `in_review`、`done` 或 `canceled` 再显示，像 `kubectl get -w`。状态只有一套（`backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled`）：`issue status <号> todo` 是派活或再来一轮，`done` 是完成，`canceled` 是关掉；`issue comment` 在帮工问时就是回答；`issue review --pass|--fail` 是验收的意见，完成另挪状态。停下帮工这一轮是帮工的操作：`session stop <帮工>`。
+- **接口的全集**经 `api`：`api list [--module m]` 按模块列出每个接口（`--format json` 带入参的 JSON Schema），`api call <操作> [--json 字|-|@文件]` 直接调一个，发出去以前照它的 Schema 查一遍，对不上就不发、说是哪个字段；`api state [--watch]`、`api events` 跟着服务端的流，一行一帧。哪个接口由哪条命令用到、哪些只经 `api`，写在 `apps/cli/src/reach.ts`（`Record<操作, …>`，加接口不写这一行编不过）。
+- **输出**：默认是短的文字，一件东西一行，开头是接着能用的名字（`#12  todo  修登录页`）；`issue show` 是几段短的，最后是这张工单现在能用的命令；列表默认 20 条，还有的话最后一行说怎么看下一页。`--format json` 是接口的形状，全命令行同一个参数。stdout 只放结果，失败时 stdout 是空的。
+- **笔记的命令**（`apps/cli/src/pkm.ts`）：`pkm capture 一句话`（记进今天的日记，`--page` 记到那一页末尾，不给字就读标准输入、按缩进拆成块）、`pkm search`、`pkm radar`、`pkm journal show`（`--day` 看别的一天）、`pkm page list|show|export`（大纲、给人读的 Markdown）、`pkm page edit <页>`（在 `$VISUAL`、`$EDITOR` 里改这一页文件的原文，关掉存回去；这期间页面被改过就不写，改过的留在临时文件里）。
+- **试跑** `--dry-run`：会删、会合、会关、会让帮工走的命令（接口表里带 `dryRun` 的：`issue status` 和每一个删除，`main.test.ts` 查每个 `delete` 都有）只回答会做什么，什么都不动；它和真做走同一处判断，所以真做会拒的，试跑也拒、话一样。只读的命令照常跑；别的改东西、还没有试跑的命令带着 `--dry-run` 会被拒（`NoDryRun`），不会悄悄做了。新建的收 `--key`，同一把键重发不会建两份。
+- **失败**是 stderr 最后一行的 JSON：`{"error":{"tag":…,"message":…,"next":[{"say":…,"run":[…]}]}}`，`next` 是接着能做什么，`run` 是能直接跑的命令（不带 `vibevalley`）：找不到的（`Missing`）总说去哪儿找（列出它们的命令），工单此刻不收的状态被拒时列出它能用的命令。帮助走 stdout，写错了命令时的帮助走 stderr。退出码分得出是哪一种：
 
   | 退出码 | 意思 |
   |---|---|
@@ -80,37 +86,37 @@ git tag v0.2.0 && git push origin v0.2.0   # 发布：release.yml 打包、建�
   | 3 | 服务端拒绝（`Refused`，和语音、连接器、连接到本机的拒绝） |
   | 4 | 没有这个东西（`Missing`） |
   | 5 | 连不上服务端 |
-  | 130 | 按了 Ctrl+C：`state --watch`、`issue work` 放下请求再走 |
+  | 130 | 按了 Ctrl+C：`api state --watch`、`issue show --watch` 放下请求再走 |
 
-1. 建工单。把 `…` 换成标题和项目，用返回的工单 ID 替换后面的 `<id>`。
+1. 建工单，派出去。把 `…` 换成标题和项目；答复第一个词是工单的号，后面的 `<号>` 用它。
 
    ```bash
-   vibevalley issue create --json '{"title":"…","project":"…","agent":"codex"}'
+   vibevalley issue create … --project … --agent codex --criterion '…'
+   vibevalley issue status <号> todo
    ```
 
-2. 派活。命令把备选挪到待办，等帮工交回来，再打出改动。
+2. 跟着它，等它交回来或停下来问，经过的状态写在 stderr。
 
    ```bash
-   vibevalley issue work <id>
+   vibevalley issue show <号> --watch
    ```
 
-3. 如果不满意，写清要改什么，再干一轮。
+3. 帮工在问，`issue show <号>` 的「问题」下面是它问的；评论就是回答，再跟着它。
 
    ```bash
-   vibevalley issue status update <id> --json '{"status":"todo","text":"…"}'
+   vibevalley issue comment <号> …
+   vibevalley issue show <号> --watch
    ```
 
-   反复运行下面的命令。先等 `status` 变成 `in_progress`，再等它回到 `in_review`。
+4. 看改动、给验收意见。不满意就再来一轮，说清要改什么；满意了先试跑完成，看它会怎么交付（合进主分支还是开 PR、合之前跑不跑检查），再真做。
 
    ```bash
-   vibevalley issue get <id>
-   ```
-
-4. 如果满意，收下改动。先试跑，看它会怎么交付（合进主分支还是开 PR、合之前跑不跑检查）；再去掉 `--dry-run` 真做。
-
-   ```bash
-   vibevalley issue status update <id> --dry-run --json '{"status":"done"}'
-   vibevalley issue status update <id> --json '{"status":"done"}'
+   vibevalley issue diff <号>
+   vibevalley issue review <号> --fail --finding …
+   vibevalley issue status <号> todo --comment …
+   vibevalley issue review <号> --pass
+   vibevalley issue status <号> done --dry-run
+   vibevalley issue status <号> done
    ```
 
 状态规则和理由见子系统 [工单](docs/subsystems/issue.md#怎么走)。不派真的帮工、在隔离的沙箱里把这几步走一遍，见 [vv-acceptance/references/server.md](.agents/skills/vv-acceptance/references/server.md) 的 `--scripted-helper`。

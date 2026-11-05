@@ -16,19 +16,19 @@ import {
 } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api, reasonOf } from "@/infra/api";
-import { ready, useQuery, useSettings } from "@/infra/query";
-import { saveSettings } from "@/infra/settings";
-import { createAct } from "@/ui/act";
-import { TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { IconButton } from "@/ui/IconButton";
-import { KeyField, SaveBar } from "@/ui/KeyField";
-import { Quiet, SecretInput, Toggle } from "@/ui/layout";
-import { Segmented } from "@/ui/Segmented";
-import { KeyRow, SettingRow, SettingsGroup } from "@/ui/settings";
-import { Hint, Tip } from "@/ui/Tip";
-import { toast } from "@/ui/toasts";
+import { api, reasonOf } from "#/infra/api.ts";
+import { ready, useQuery, useSettings } from "#/infra/query.ts";
+import { saveSettings } from "#/infra/settings.ts";
+import { createAct } from "#/ui/act.ts";
+import { TextInput } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import { IconButton } from "#/ui/IconButton.tsx";
+import { KeyField, SaveBar } from "#/ui/KeyField.tsx";
+import { Quiet, SecretInput, Toggle } from "#/ui/layout.tsx";
+import { Segmented } from "#/ui/Segmented.tsx";
+import { KeyRow, SettingRow, SettingsGroup } from "#/ui/settings.tsx";
+import { Hint, Tip } from "#/ui/Tip.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 type SettingsPart = "deepseek" | "memory";
 

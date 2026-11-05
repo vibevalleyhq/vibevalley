@@ -5,8 +5,8 @@ import { maybe } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { dayMs, memoryKeep } from "@vibevalley/protocol";
 
-import { clip } from "@/base/clip.ts";
-import { compare, or } from "@/base/order.ts";
+import { clip } from "#/base/clip.ts";
+import { compare, or } from "#/base/order.ts";
 
 import { cutAll, cutSearch, goLower } from "./gse.ts";
 import { recallWords } from "./prompts.ts";

@@ -26,6 +26,11 @@ interface Rule {
 
 const RULES: readonly Rule[] = [
   {
+    name: "产出 for an artifact",
+    pattern: /产出/u,
+    says: "the owner and the prompts call an artifact 稿子, and its versions 第 N 稿 (docs/README.md 用语); 产出 named nothing a person would say",
+  },
+  {
     name: "a fact split from sessionPhase or gameProgress",
     pattern: /\b(FactHired|FactLeft|FactRun|FactDoing|FactStation|FactCommits|FactProgress)\b/u,
     says: "a run or a step is sessionPhaseChanged (brief, phase.doing); a station, commits or the ledger is progressChanged",

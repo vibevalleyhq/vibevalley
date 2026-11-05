@@ -7,8 +7,8 @@ import { createSignal, omit, Show } from "solid-js";
 import { Switch } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
 
-import { aria } from "@/base/dom";
-import { currentHost } from "@/infra/host";
+import { aria } from "#/base/dom.tsx";
+import { currentHost } from "#/infra/host.ts";
 
 import { A } from "./A";
 import { TextInput } from "./Field";
@@ -16,25 +16,32 @@ import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { Hint } from "./Tip";
 
-/** A list beside its detail; under md the list stacks over it. */
-export function Split(props: { list: JSX.Element; children: JSX.Element }) {
+/** edge: a page's own list as a side column against the rail (its ListCard bare), not a card in a page that already has one. */
+export function Split(props: { list: JSX.Element; children: JSX.Element; edge?: boolean }) {
   return (
-    <div class="flex h-full min-h-0 flex-col gap-3 overflow-y-auto md:flex-row md:overflow-hidden">
-      <div class="shrink-0 md:w-70 md:overflow-y-auto">{props.list}</div>
-      <div class="min-w-0 flex-1 md:overflow-y-auto">{props.children}</div>
+    <div class={["flex h-full min-h-0 flex-col overflow-y-auto md:flex-row md:overflow-hidden", props.edge === true ? "" : "gap-3"]}>
+      <div class={["shrink-0 md:w-70 md:overflow-y-auto", props.edge === true ? "border-b border-line bg-side px-2 py-3 md:border-r md:border-b-0" : ""]}>
+        {props.list}
+      </div>
+      <div class={["min-w-0 flex-1 md:overflow-y-auto", props.edge === true ? "p-3" : ""]}>{props.children}</div>
     </div>
   );
 }
 
-/** A titled list of rows; aria-label names it for the reader. */
-export function ListCard(props: { title: string; label?: string; action?: JSX.Element; children: JSX.Element; testid?: string }) {
+/** bare: in a side column (Split edge), no box of its own. */
+export function ListCard(props: { title: string; label?: string; action?: JSX.Element; children: JSX.Element; testid?: string; bare?: boolean }) {
+  const bare = () => props.bare === true;
   return (
-    <section aria-label={props.label ?? props.title} data-testid={props.testid} class="flex flex-col rounded-lg border border-line bg-page">
-      <header class="flex h-10 shrink-0 items-center gap-2 border-b border-line px-3">
-        <h2 class="flex-1 truncate text-sm font-semibold">{props.title}</h2>
+    <section
+      aria-label={props.label ?? props.title}
+      data-testid={props.testid}
+      class={["flex flex-col", bare() ? "" : "rounded-lg border border-line bg-page"]}
+    >
+      <header class={["flex shrink-0 items-center gap-2", bare() ? "h-8 px-2" : "h-10 border-b border-line px-3"]}>
+        <h2 class={["flex-1 truncate", bare() ? "text-xs font-medium text-faint" : "text-sm font-semibold"]}>{props.title}</h2>
         {props.action}
       </header>
-      <ul class="flex flex-col p-1">{props.children}</ul>
+      <ul class={["flex flex-col", bare() ? "gap-px" : "p-1"]}>{props.children}</ul>
     </section>
   );
 }

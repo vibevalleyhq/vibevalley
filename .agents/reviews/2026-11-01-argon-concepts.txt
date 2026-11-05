@@ -108,7 +108,7 @@
   1. **违背 `core.md`「给人看的话只在出帧时填」的模型边界**：`Session` 和 `Cron` 都严格区分了领域态（`T.Session`、`T.Cron`）与出帧视图态（`T.SessionView`、`T.CronView`），因此服务端内部处理 `Session` / `Cron` 时从不需要填 `phaseText: ""` 或 `whenText: ""`。
   2. **唯独 `Task` 和 `TaskGraph` 把出帧展示字段硬塞进了领域类型**：导致服务端 `task/editing.ts`、`task/issues.ts`、`task/task.ts` 和所有测试在创建领域对象时，都得挂一个毫无意义的 `...graphView()` / `...taskView()` 假数据生成函数；更糟糕的是，在 `frame.ts` 之外拿到一个 `T.TaskGraph`（例如 `Task.graphs()` 或 `graphOf(core.state(), id)`），它的 `stateTag`、`actions`、`stateText` 全是空的假值，类型系统却告诉调用方这些字段已经就绪！
 - **保留的唯一语义**：
-  - 服务端领域层持有纯粹的 `Task` 与 `TaskGraph`（只含持久化和调度所需的领域字段）；出帧计算的派生展示字段（`stateTag`、`stateText`、`actions`、`actionText`、`canEdit`、`canRemove`、`layers`、`blockedBy`、`asksForYou`、`settled`）归入 `TaskView` 与 `TaskGraphView`（由 `frameOf` 和 `graph.list` / `graph.get` 统一经一个 `graphViewOf(graph)` 纯函数产出）。
+  - 服务端领域层持有纯粹的 `Task` 与 `TaskGraph`（只含持久化和调度所需的领域字段）；出帧计算的派生展示字段（`stateTag`、`stateText`、`actions`、`actionText`、`canEdit`、`canRemove`、`layers`、`blockedBy`、`asksForYou`、`settled`）归入 `TaskView` 与 `TaskGraphView`（由 `frameOf` 和 `graph.list` / `graph.get` 统一经一个 `graphViewOf(graph)` 纯函数稿子）。
 - **删除 / 合并 / 重命名后的边界**：
   - 删除 `apps/server/src/task/graph.ts:7-23` 的空壳填充函数 `taskView()` 和 `graphView()`，以及全仓 8 处 `...graphView()` / `...taskView()` 展开。
   - 在 `packages/protocol/src/shapes.ts` 与 `schema.ts` 中，像 `Session` / `SessionView`、`Cron` / `CronView` 一样，将领域字段留在 `Task` / `TaskGraph`，将出帧展示字段放在 `TaskView extends Task` / `TaskGraphView extends Omit<TaskGraph, "tasks"> { tasks: TaskView[] }`，`StateFrame.graphs` 和 `graph.list` / `graph.get` 返回 `TaskGraphView`。

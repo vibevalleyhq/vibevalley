@@ -1,34 +1,41 @@
 {
   "place": {
-    "label": "产出",
-    "hint": "你和帮工、管家留下要看的东西：一起写的产出、交上来的网页，都在这里"
+    "label": "稿子",
+    "hint": "你和帮工、管家留下要看的东西：一起写的稿子、交上来的网页，都在这里"
   },
   "card": {
-    "version": "第 {version} 版",
+    "version": "第 {version} 稿",
     "open": "打开「{title}」"
   },
   "page": {
     "by": "{name} 做的",
     "updated": "{when}更新",
-    "versions": "版本",
+    "versions": "每一稿",
     "open": "在新标签页打开",
     "delete": "删掉",
     "deleteAsk": "删掉「{title}」？对话里的卡片还在。",
     "deleted": "删掉了「{title}」",
-    "gone": "这个产出已经删掉了，或者没有这个产出。",
-    "frame": "「{title}」第 {version} 版",
-    "list": "全部产出",
+    "gone": "这份稿子已经删掉了，或者没有这份稿子。",
+    "frame": "「{title}」第 {version} 稿",
+    "list": "全部稿子",
     "new": "新建",
-    "none": "还没有产出：写个标题新建一篇，或者让帮工交一份上来。",
-    "all": "全部产出",
+    "none": "还没有稿子：写个标题新建一篇，或者让帮工交一份上来。",
+    "all": "全部稿子",
     "forIssue": "为 #{number} 做的",
-    "untitled": "没起名的产出",
+    "untitled": "没起名的稿子",
     "find": "按标题找",
     "nothingFound": "没有标题对得上的",
     "title": "标题",
     "more": "更多",
     "copyLink": "复制链接",
-    "copied": "链接复制好了"
+    "copied": "链接复制好了",
+    "group": {
+      "delivered": "帮工和管家交的",
+      "mine": "我写的"
+    },
+    "rail": "这篇的旁注",
+    "railShow": "打开旁注",
+    "railHide": "收起旁注"
   },
   "talk": {
     "atMessage": "在对话里",
@@ -36,11 +43,12 @@
     "replyHint": "写给做它的帮工：哪里要改",
     "send": "回复",
     "sent": "回复了",
-    "replyVersion": "回复这一版",
-    "sentVersion": "回复了第 {version} 版"
+    "replyVersion": "回复这一稿",
+    "sentVersion": "回复了第 {version} 稿",
+    "none": "还没在对话里说过：自己写的这篇，还没交给谁看。"
   },
   "issue": {
-    "title": "产出"
+    "title": "稿子"
   },
   "blocks": {
     "memoryItem": "记性",
@@ -66,9 +74,9 @@
     "start": "从这里开始写……"
   },
   "canvas": {
-    "label": "打开的产出",
+    "label": "打开的稿子",
     "close": "关掉",
-    "openPage": "在产出页打开",
+    "openPage": "在稿子页打开",
     "quote": "带话"
   },
   "suggestions": {
@@ -101,5 +109,13 @@
   "body": {
     "blocks": "一起写的",
     "html": "网页"
+  },
+  "edit": {
+    "title": "改字",
+    "hint": "选中页面里的字，就能在右边直接改掉它",
+    "older": "这是旧的一稿：回到最新的一稿再改字",
+    "to": "改成",
+    "save": "存成新的一稿",
+    "saved": "存成了第 {version} 稿"
   }
 }

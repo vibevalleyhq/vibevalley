@@ -4,7 +4,7 @@
 import { t } from "@vibevalley/i18n";
 import { quotaLow, type RuntimeInfo } from "@vibevalley/protocol";
 
-import { numberText } from "@/base/format";
+import { numberText } from "#/base/format.ts";
 
 /** A switched-off runtime's account is not the farm's business. */
 export const usableRuntimes = (all: readonly RuntimeInfo[]) => all.filter((r) => r.installation.status === "available" && r.settings.enabled);

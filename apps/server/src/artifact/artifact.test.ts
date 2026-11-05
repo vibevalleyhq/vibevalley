@@ -8,9 +8,9 @@ import { TestClock } from "effect/testing";
 import { ownerId } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
 
-import { Channel } from "@/channel/channel.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { world } from "@/testing/world.ts";
+import { Channel } from "#/channel/channel.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { world } from "#/testing/world.ts";
 
 import { Artifact } from "./artifact.ts";
 import { artifactMax } from "./policy.ts";
@@ -79,6 +79,24 @@ describe("an artifact", () => {
       expect(yield* Effect.flip(artifacts.blocks(html.id))).toMatchObject({ _tag: "Refused" });
       expect((yield* artifacts.rename(blank.id, "  第 43 周  ")).title).toBe("第 43 周");
       expect(yield* Effect.flip(artifacts.rename(blank.id, " "))).toMatchObject({ _tag: "Refused" });
+    }).pipe(Effect.scoped, Effect.provide(world())),
+  );
+
+  it.effect("takes the owner's words in place of some on the page as its next version, over the latest only", () =>
+    Effect.gen(function* () {
+      const artifacts = yield* Artifact;
+      const chat = yield* Channel;
+      const source = "<h1>Launch</h1>\n<p>Ship on Friday.</p>\n<script>document.title = 'Friday'</script>";
+      const made = yield* artifacts.create(owner, { title: "上线", kind: "html", content: source });
+      const anchor = { kind: "text" as const, exact: "Friday", prefix: "Ship on ", suffix: "." };
+      const next = yield* artifacts.htmlEdit(owner, { id: made.id, version: 1, anchor, text: "Monday" });
+      expect(next.version).toBe(2);
+      expect((yield* artifacts.content(made.id)).content).toBe(source.replace("on Friday", "on Monday"));
+      expect((yield* artifacts.content(made.id, 1)).content).toBe(source);
+      expect((yield* chat.history(chat.defaultChannel())).at(-1)!.artifact).toMatchObject({ version: 2, note: expect.stringContaining("Monday") });
+      expect(yield* Effect.flip(artifacts.htmlEdit(owner, { id: made.id, version: 1, anchor, text: "Sunday" }))).toMatchObject({ _tag: "Refused" });
+      expect(yield* Effect.flip(artifacts.htmlEdit(owner, { id: made.id, version: 2, anchor, text: "Sunday" }))).toMatchObject({ _tag: "Refused" });
+      expect((yield* artifacts.get(made.id)).version).toBe(2);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 

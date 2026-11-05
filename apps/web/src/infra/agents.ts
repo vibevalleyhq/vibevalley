@@ -2,7 +2,7 @@ import { keepPreviousData } from "@tanstack/solid-query";
 
 import { type Agent, type AgentProblem, defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
 
-import { createSettled } from "@/base/dom";
+import { createSettled } from "#/base/dom.tsx";
 
 import { api } from "./api";
 import { ready, useAgents, useQuery } from "./query";

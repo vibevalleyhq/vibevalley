@@ -1,13 +1,33 @@
 import { expect, test } from "vite-plus/test";
 
-import { bundleOf, newer, placeProblem, plistVersion, startsNewFarm } from "./releases";
+import { bundleOf, manifestFor, newer, placeProblem, plistVersion, stageOf, startsNewFarm } from "./releases";
 
-test("a version is later by its numbers, not its text; one that is not x.y.z is never later", () => {
+test("a version is later by its numbers, not its text; one that is not a version is never later", () => {
   expect(newer("0.10.0", "0.9.9")).toBe(true);
   expect(newer("1.0.0", "1.0.0")).toBe(false);
   expect(newer("0.9.9", "0.10.0")).toBe(false);
-  expect(newer("1.0.0-beta.1", "0.1.0")).toBe(false);
   expect(newer("0.2.0", "0.0.0")).toBe(true);
+  expect(newer("1.0.0-rc.1", "0.1.0")).toBe(false);
+});
+
+test("a prerelease comes before its release: alpha, then beta, each by its number", () => {
+  const order = ["0.4.0-alpha.1", "0.4.0-alpha.2", "0.4.0-alpha.10", "0.4.0-beta.1", "0.4.0-beta.2", "0.4.0", "0.4.1-alpha.1", "0.4.1"];
+  for (const [i, v] of order.entries()) for (const w of order.slice(i + 1)) expect([v, w, newer(w, v), newer(v, w)]).toEqual([v, w, true, false]);
+  expect([stageOf("0.4.0"), stageOf("0.4.0-beta.3"), stageOf("0.4.0-alpha.1"), stageOf("0.4")]).toEqual(["stable", "beta", "alpha", undefined]);
+});
+
+test("a channel updates to the latest release of its own stage, never to a draft", () => {
+  const listed = (tag: string, draft = false) => ({
+    tag_name: tag,
+    draft,
+    assets: [{ name: "release.json", browser_download_url: `https://example.test/${tag}/release.json` }],
+  });
+  const list = [listed("v0.5.0-alpha.1", true), listed("v0.4.0-beta.2"), listed("v0.4.0-alpha.3"), listed("v0.3.1"), listed("v0.5.0-alpha.0")];
+  expect(manifestFor(list, "stable")).toBe("https://example.test/v0.3.1/release.json");
+  expect(manifestFor(list, "beta")).toBe("https://example.test/v0.4.0-beta.2/release.json");
+  // Not the newer beta or release: an alpha app takes alphas.
+  expect(manifestFor([...list, listed("v0.6.0")], "alpha")).toBe("https://example.test/v0.5.0-alpha.0/release.json");
+  expect(manifestFor([listed("v0.4.0-beta.1", true)], "beta")).toBeUndefined();
 });
 
 test("the .app is found from its executable, and only one in a place it can be written is replaced", () => {

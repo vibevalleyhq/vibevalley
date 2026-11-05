@@ -2,7 +2,7 @@ import { onSettled } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { reducedMotion } from "@/ui/pixel";
+import { reducedMotion } from "#/ui/pixel/index.ts";
 
 import { growthOf, growTree, type GrownTree, type Placed } from "./grow";
 import { flashFor, kept, type TreeFilter } from "./memories";

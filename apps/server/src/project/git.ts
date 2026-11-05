@@ -5,8 +5,8 @@ import { spawn } from "node:child_process";
 
 import { Effect, Metric, Schema } from "effect";
 
-import { messageOf } from "@/errors.ts";
-import { afterRealTime } from "@/infra/time.ts";
+import { messageOf } from "#/errors.ts";
+import { afterRealTime } from "#/infra/time.ts";
 
 export interface Ran {
   readonly stdout: string;

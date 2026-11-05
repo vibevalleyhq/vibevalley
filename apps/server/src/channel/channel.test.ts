@@ -11,26 +11,26 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 import { channelOf, defaultOf, isBusy } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import { head } from "@/base/clip.ts";
-import { Core } from "@/core/core.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { dbQueries, Database, Db } from "@/infra/db.ts";
-import { wakeBreaker } from "@/mailbox/brakes.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { layer as projection } from "@/projection/frame.ts";
-import { restoredSession, sessionState } from "@/session/history.ts";
-import { summaryOf } from "@/session/report.ts";
-import { sessionOnIssue } from "@/session/roster.ts";
-import { Session, newsOf, type SessionNews } from "@/session/session.ts";
-import type { InputConsumed, InputReturned } from "@/session/signals.ts";
-import { testConfig, offline, testDatabase, until, waitFor } from "@/testing/layers.ts";
-import { allow, heard, refuse } from "@/testing/refuse.ts";
-import { Said, said } from "@/testing/world.ts";
+import { Agent } from "#/agent/agent.ts";
+import { head } from "#/base/clip.ts";
+import { Core } from "#/core/core.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { dbQueries, Database, Db } from "#/infra/db.ts";
+import { wakeBreaker } from "#/mailbox/brakes.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { layer as projection } from "#/projection/frame.ts";
+import { restoredSession, sessionState } from "#/session/history.ts";
+import { summaryOf } from "#/session/report.ts";
+import { sessionOnIssue } from "#/session/roster.ts";
+import { Session, newsOf, type SessionNews } from "#/session/session.ts";
+import type { InputConsumed, InputReturned } from "#/session/signals.ts";
+import { testConfig, offline, testDatabase, until, waitFor } from "#/testing/layers.ts";
+import { allow, heard, refuse } from "#/testing/refuse.ts";
+import { Said, said } from "#/testing/world.ts";
+import { orchestratorForChannel, setOrchestrator } from "#db/channel.sql.ts";
+import * as qm from "#db/channel_message.sql.ts";
+import * as qsession from "#db/session.sql.ts";
 
-import { orchestratorForChannel, setOrchestrator } from "../../db/generated/channel.sql.ts";
-import * as qm from "../../db/generated/channel_message.sql.ts";
-import * as qsession from "../../db/generated/session.sql.ts";
 import { Channel, catchUpMax, type Delivered, type LaunchActivity, type OrchestratorNews } from "./channel.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 is held until release (unless holds is

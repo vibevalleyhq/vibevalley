@@ -10,10 +10,10 @@ import { t } from "@vibevalley/i18n";
 import type { Channel, GameEffectReward, IssueAct, SessionId } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { createExternal } from "@/base/external";
-import { channelLabel } from "@/features/channel";
-import { defineAtom } from "@/state/atom";
-import { defineStored } from "@/state/stored";
+import { createExternal } from "#/base/external.ts";
+import { channelLabel } from "#/features/channel/index.ts";
+import { defineAtom } from "#/state/atom.ts";
+import { defineStored } from "#/state/stored.ts";
 
 import type { BedFxKind, Tool } from "./tools";
 import type { Point } from "./world/level";

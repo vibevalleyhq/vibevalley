@@ -2,8 +2,8 @@ import { expect, test } from "vite-plus/test";
 
 import type { AccountUsage, Agent, RuntimeInfo } from "@vibevalley/protocol";
 
-import { sampleAgent } from "@/agent/seed.ts";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
+import { sampleAgent } from "#/agent/seed.ts";
+import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { agentProblems, chooseAgent, supportOf, moneyStop } from "./presets.ts";
 import { quotaLeft, quotaOf, quotaText } from "./quota.ts";

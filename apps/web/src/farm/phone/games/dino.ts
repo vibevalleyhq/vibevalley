@@ -1,7 +1,7 @@
 // 小恐龙: a run is a value and `run` moves it on by some milliseconds. Sizes are the game's own
 // pixels on a 104×40 strip, y down; a seed replays.
 
-import { nextRandom } from "@/farm/phone/lcd";
+import { nextRandom } from "#/farm/phone/lcd.ts";
 
 export const dinoWidth = 104;
 export const dinoHeight = 40;

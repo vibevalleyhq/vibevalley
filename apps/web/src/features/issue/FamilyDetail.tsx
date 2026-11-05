@@ -3,11 +3,11 @@ import { For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Issue } from "@vibevalley/protocol";
 
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { TextArea } from "@/ui/Field";
-import { Markdown } from "@/ui/Markdown";
-import { toast } from "@/ui/toasts";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { TextArea } from "#/ui/Field.tsx";
+import { Markdown } from "#/ui/Markdown.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 import { ActLines } from "./ActLines";
 import { createIssueActs } from "./acts";

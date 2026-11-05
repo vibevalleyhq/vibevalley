@@ -17,10 +17,10 @@ import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
 import { githubRepository, slice } from "@vibevalley/protocol/rules";
 
-import { jsonOf, jsonOrNone } from "@/base/json.ts";
-import { numberIn, or } from "@/base/order.ts";
-import { messageOf } from "@/errors.ts";
-import { ServerConfig } from "@/infra/config.ts";
+import { jsonOf, jsonOrNone } from "#/base/json.ts";
+import { numberIn, or } from "#/base/order.ts";
+import { messageOf } from "#/errors.ts";
+import { ServerConfig } from "#/infra/config.ts";
 
 import { git, type GitError, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { asFarm, repository } from "./repository.ts";

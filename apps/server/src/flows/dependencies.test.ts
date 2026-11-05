@@ -4,13 +4,13 @@ import { Effect } from "effect";
 
 import { assignedAgentOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "@/agent/agent.ts";
-import { owner } from "@/base/actor.ts";
-import { Issue } from "@/issue/issue.ts";
-import { issueBranch, Project } from "@/project/project.ts";
-import { Session } from "@/session/session.ts";
-import { gitSync } from "@/testing/git.ts";
-import { testIssues } from "@/testing/world.ts";
+import { Agent } from "#/agent/agent.ts";
+import { owner } from "#/base/actor.ts";
+import { Issue } from "#/issue/issue.ts";
+import { issueBranch, Project } from "#/project/project.ts";
+import { Session } from "#/session/session.ts";
+import { gitSync } from "#/testing/git.ts";
+import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab } from "./farm.ts";
 

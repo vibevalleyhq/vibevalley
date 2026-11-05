@@ -14,13 +14,13 @@ import type * as T from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 import { waitFor } from "@vibevalley/testkit/until";
 
-import { Agent } from "@/agent/agent.ts";
-import { sampleAgent } from "@/agent/seed.ts";
-import { Core } from "@/core/core.ts";
-import { type ServerConfig } from "@/infra/config.ts";
-import { platform } from "@/services.ts";
-import { testConfig, nextTurn, whenTrue } from "@/testing/layers.ts";
-import { allow, heard, refuse } from "@/testing/refuse.ts";
+import { Agent } from "#/agent/agent.ts";
+import { sampleAgent } from "#/agent/seed.ts";
+import { Core } from "#/core/core.ts";
+import { type ServerConfig } from "#/infra/config.ts";
+import { platform } from "#/services.ts";
+import { testConfig, nextTurn, whenTrue } from "#/testing/layers.ts";
+import { allow, heard, refuse } from "#/testing/refuse.ts";
 
 import { piBalance } from "./pi.ts";
 import { supportOf, presetOf, runtimeIds } from "./presets.ts";

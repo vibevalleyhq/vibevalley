@@ -7,20 +7,20 @@ import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { list as listed, t } from "@vibevalley/i18n";
 import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
 
-import { Keyed } from "@/base/dom";
-import { matches } from "@/base/search";
-import { api, reasonOf } from "@/infra/api";
-import { ready, useAgents, useQuery, useRuntimes } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { A } from "@/ui/A";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { ConfirmButton } from "@/ui/ConfirmButton";
-import { AgentFace } from "@/ui/Face";
-import { Field, TextArea, TextInput } from "@/ui/Field";
-import { Card, Empty } from "@/ui/layout";
-import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
-import { runtimeName } from "@/ui/RuntimeBadge";
+import { Keyed } from "#/base/dom.tsx";
+import { matches } from "#/base/search.ts";
+import { api, reasonOf } from "#/infra/api.ts";
+import { ready, useAgents, useQuery, useRuntimes } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { A } from "#/ui/A.tsx";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
+import { AgentFace } from "#/ui/Face.tsx";
+import { Field, TextArea, TextInput } from "#/ui/Field.tsx";
+import { Card, Empty } from "#/ui/layout.tsx";
+import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
+import { runtimeName } from "#/ui/RuntimeBadge.tsx";
 
 import { type InstalledSkill, installedSkills } from "./quota";
 

@@ -8,17 +8,18 @@ import { For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 
-import { aria } from "@/base/dom";
-import { chatSay, createComposer, drafts, threadOwnerOf, useReplying } from "@/features/channel";
-import { DictationButton } from "@/features/voice";
-import { useAgent } from "@/infra/agents";
-import { api } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { useRouter } from "@/infra/router";
-import { useIntents } from "@/state/intent";
-import { setPick, usePrefs } from "@/state/prefs";
-import { AgentFace } from "@/ui/Face";
-import { createPixelAct, SpriteIcon, toasts } from "@/ui/pixel";
+import { aria } from "#/base/dom.tsx";
+import { chatMarks, chatSay, createComposer, drafts, threadOwnerOf, useReplying } from "#/features/channel/index.ts";
+import { DictationButton } from "#/features/voice/index.ts";
+import { useAgent } from "#/infra/agents.ts";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { useRouter } from "#/infra/router.ts";
+import { useIntents } from "#/state/intent.ts";
+import { setPick, usePrefs } from "#/state/prefs.ts";
+import { AgentFace } from "#/ui/Face.tsx";
+import { createPixelAct, SpriteIcon, toasts } from "#/ui/pixel/index.ts";
+import { typeMarks } from "#/ui/typedMarks.ts";
 
 /** Who the next line goes to, with a button to stop picking. */
 function PickChip(props: { named: boolean }) {
@@ -143,7 +144,10 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
             data-testid="composer-input"
             placeholder={placeholder()}
             aria-label={placeholder()}
-            onInput={(e) => box.edit(e.currentTarget.value, e.currentTarget.selectionStart)}
+            onInput={(e) => {
+              if (!e.isComposing && typeMarks(e.currentTarget, chatMarks)) return;
+              box.edit(e.currentTarget.value, e.currentTarget.selectionStart);
+            }}
             onKeyUp={box.follow}
             onClick={box.follow}
             onKeyDown={box.onKey}

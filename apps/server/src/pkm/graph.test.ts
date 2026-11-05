@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { backlinks, exportMarkdown, keepLinks, pageOf, radar, renameLinks, search, transclusions, type Vault } from "./graph.ts";
-import { applyOps } from "./ops.ts";
-import { flatten, type Page, parse, print } from "./outline.ts";
+import { flatBlocks } from "@vibevalley/protocol/rules";
+
+import { backlinks, exportMarkdown, keepLinks, pageOf, plainOf, radar, renameLinks, search, summaryOf, transclusions, type Vault } from "./graph.ts";
+import { type Page, parse } from "./outline.ts";
 
 const day = 24 * 60 * 60 * 1000;
 const now = Date.UTC(2026, 10, 3, 4);
@@ -48,6 +49,23 @@ describe("the vault's pages together", () => {
     expect(missing).toMatchObject({ found: false, body: "broken cccccccc-0000-4000-a000-000000000003" });
   });
 
+  it("reads out the refs in the blocks shown with a page, and says a hit as one plain line", () => {
+    const v = vaultOf(files);
+    const engine = pageOf(v, "engine")!;
+    const shown = Object.values(backlinks(v, "engine")).flat();
+    const read = transclusions(v, engine, { circular: (id) => id, broken: (id) => id }, shown);
+    expect(read.find((r) => r.block === ref)).toMatchObject({ found: true, body: "the core idea" });
+    expect(plainOf(v, `met about [[Engine|the engine]] and ((${ref})), ==this==^[say more] **now**`)).toBe("met about the engine and the core idea, this now");
+    const [hit] = search(v, { text: "met about" });
+    expect(hit?.plain).toBe("met about Engine and the core idea");
+  });
+
+  it("names a journal's day from its file", () => {
+    const v = vaultOf(files);
+    expect(summaryOf(pageOf(v, "2026_11_03")!).day).toBe("2026-11-03");
+    expect(summaryOf(pageOf(v, "cetus")!).day).toBeUndefined();
+  });
+
   it("groups the blocks linking to a page by PARA", () => {
     const links = backlinks(vaultOf(files), "engine");
     expect(links.projects.map((l) => l.body)).toEqual(["ship the parser [[Engine]]"]);
@@ -77,7 +95,7 @@ describe("the vault's pages together", () => {
   it("says every link to a renamed page by its new name", () => {
     const v = vaultOf(files);
     const renamed = renameLinks(pageOf(v, "old")!, "engine", "Motor")!;
-    expect(flatten(renamed.blocks)[0]!.body).toBe("the old [[Motor]] sketch");
+    expect(flatBlocks(renamed.blocks)[0]!.body).toBe("the old [[Motor]] sketch");
     expect(renameLinks(pageOf(v, "clip")!, "engine", "Motor")).toBeUndefined();
   });
 
@@ -92,56 +110,5 @@ describe("the vault's pages together", () => {
       kept: ["[[A]]", `((${ref}))`],
       restored: ["[[A]]", `((${ref}))`],
     });
-  });
-});
-
-describe("the ops on an outline", () => {
-  const blocks = () => parse("- a\n- b\n  - b1\n- c\n", "00_Inbox/x.md", 0).blocks;
-  const ids = () => flatten(blocks()).map((b) => b.id);
-  const text = (nodes: ReturnType<typeof blocks>) => print({ props: {}, blocks: nodes });
-  let n = 0;
-  const newId = () => `new-${++n}`;
-
-  it("indents and outdents a block with what is under it", () => {
-    const [a, b] = ids();
-    expect(text(applyOps(blocks(), [{ op: "indent", block: b! }], newId))).toBe("- a\n  - b\n    - b1\n- c\n");
-    expect(text(applyOps(blocks(), [{ op: "indent", block: a! }], newId))).toBe("- a\n- b\n  - b1\n- c\n");
-    const b1 = ids()[2]!;
-    expect(text(applyOps(blocks(), [{ op: "outdent", block: b1 }], newId))).toBe("- a\n- b\n- b1\n- c\n");
-  });
-
-  it("moves, inserts, updates and deletes", () => {
-    const [a, b, , c] = ids();
-    const ops = [
-      { op: "move", block: c!, direction: "up" },
-      { op: "insert_after", block: a!, id: "given", body: "after a", marker: "TODO" },
-      { op: "insert_child", block: c!, body: "under c" },
-      { op: "update", block: b!, body: "B" },
-      { op: "toggle_marker", block: a! },
-      { op: "delete", block: "nowhere" },
-      { op: "append", body: "last" },
-    ] as const;
-    expect(text(applyOps(blocks(), ops, newId))).toBe("- TODO a\n- TODO after a\n- c\n  - under c\n- B\n  - b1\n- last\n");
-  });
-
-  it("cycles a marker and takes it off", () => {
-    const [a] = ids();
-    const toggled = (times: number) =>
-      applyOps(
-        blocks(),
-        Array.from({ length: times }, () => ({ op: "toggle_marker", block: a! }) as const),
-        newId,
-      )[0]!.marker;
-    expect([toggled(1), toggled(2), toggled(3), toggled(4)]).toEqual(["TODO", "DOING", "DONE", "TODO"]);
-    expect(
-      applyOps(
-        blocks(),
-        [
-          { op: "set_marker", block: a!, marker: "LATER" },
-          { op: "set_marker", block: a! },
-        ],
-        newId,
-      )[0]!.marker,
-    ).toBeUndefined();
   });
 });

@@ -7,8 +7,8 @@ import { list, maybe, t } from "@vibevalley/i18n";
 import type { EventTokens, Question, CriterionCheck, Outcome, IssueReport } from "@vibevalley/protocol";
 import { slice } from "@vibevalley/protocol/rules";
 
-import { clip } from "@/base/clip.ts";
-import { checksFromText, questionsFromText } from "@/base/questions.ts";
+import { clip } from "#/base/clip.ts";
+import { checksFromText, questionsFromText } from "#/base/questions.ts";
 
 const summaryMax = 160;
 

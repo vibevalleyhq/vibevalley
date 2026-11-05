@@ -6,11 +6,12 @@ import { Effect } from "effect";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Artifact } from "@/artifact/artifact.ts";
-import { artifactMax } from "@/artifact/policy.ts";
-import { Channel } from "@/channel/channel.ts";
-import { messageOf, type ApiError, reasonOf, refused } from "@/errors.ts";
-import { Session } from "@/session/session.ts";
+import { Artifact } from "#/artifact/artifact.ts";
+import { htmlCheck } from "#/artifact/check.ts";
+import { artifactMax } from "#/artifact/policy.ts";
+import { Channel } from "#/channel/channel.ts";
+import { messageOf, type ApiError, reasonOf, refused } from "#/errors.ts";
+import { Session } from "#/session/session.ts";
 
 import { answers, blockLine } from "./prompts.ts";
 import { type Caller, type Who, type Orchestrator, type SessionInput, refuse, callerOf, tool, sessionSchemaTool } from "./schemas.ts";
@@ -24,6 +25,9 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
     // Artifacts (artifact/): the orchestrator's and a session's take the same endpoints; a session's are made for its issue
     // and announced in its issue thread, the orchestrator's where it is answering.
     const artifactSaid = (e: Effect.Effect<string, ApiError>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(reasonOf(err))));
+
+    /** What a kept page will not do that its maker should hear about: the check let it through, the CSP stops it. */
+    const warnings = (made: T.Artifact, content: string) => (made.body === "html" ? answers.artifact.warned(htmlCheck(content).warned) : "");
 
     const sessionArtifactScope = (session: string): { readonly channel?: string; readonly issue?: string } => {
       const own = run.sessionOf(session);
@@ -135,7 +139,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
                   ...(issueId ? { issue: issueId } : {}),
                 },
               );
-              return answers.artifact.made(made);
+              return answers.artifact.made(made) + warnings(made, content);
             }),
           );
         }),
@@ -153,7 +157,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
                 { from: c.session, by: c.agent },
                 { title: p.title, kind: p.kind, content, ...(p.note ? { note: p.note } : {}), ...sessionArtifactScope(c.session) },
               );
-              return answers.artifact.made(made);
+              return answers.artifact.made(made) + warnings(made, content);
             }),
           );
         }),
@@ -171,7 +175,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
                 { from: c.session || c.agent, by: c.agent },
                 { id: S.artifactId(p.id.trim()), content, ...(p.note ? { note: p.note } : {}) },
               );
-              return answers.artifact.versioned(made);
+              return answers.artifact.versioned(made) + warnings(made, content);
             }),
           );
         }),

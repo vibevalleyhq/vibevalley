@@ -2,7 +2,7 @@
 
 import { t } from "@vibevalley/i18n";
 import { ArtifactKindValues } from "@vibevalley/protocol";
-import { isOneOf } from "@vibevalley/protocol/rules";
+import { htmlSandbox, isOneOf } from "@vibevalley/protocol/rules";
 
 /** The largest artifact body, bytes, and title, characters. */
 export const artifactMax = 5 * 1024 * 1024;
@@ -23,21 +23,33 @@ export function artifactProblem(a: { readonly title?: string; readonly kind?: st
   return "";
 }
 
+const libraries = ["https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"];
+
 /**
- * An HTML artifact is someone else's page: it must never run as one of the farm's. sandbox without allow-same-origin
- * gives it an opaque origin (none of the farm's cookies or storage), and connect-src 'none' keeps it from calling the
- * farm's API on 127.0.0.1 or anything else; scripts, styles, pictures and fonts may come inline or over https, so a page
- * can use a chart library. In the header, not only on the page's <iframe>, so a version opened in a tab of its own is
- * kept the same way.
+ * Where an HTML artifact may load from besides its own inline code: the one list its CSP, the check before it is kept
+ * (check.ts) and the helpers' manual (tool/prompts.ts) are written from. Pictures and media are inline (data:, blob:),
+ * never a URL that tells someone the page was opened.
+ */
+export const htmlSources = {
+  script: libraries,
+  style: [...libraries, "https://fonts.googleapis.com"],
+  font: [...libraries, "https://fonts.gstatic.com"],
+} as const;
+
+/**
+ * An HTML artifact is someone else's page: it must never run as one of the farm's. The sandbox (rules/display.ts) gives
+ * it an opaque origin, connect-src 'none' keeps it from calling the farm's API on 127.0.0.1 or anything else, and
+ * nothing loads from outside htmlSources. In the header, not only on the page's <iframe>, so a version opened in a tab of
+ * its own is kept the same way.
  */
 export const htmlPolicy = [
-  "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox",
+  `sandbox ${htmlSandbox}`,
   "default-src 'none'",
-  "script-src 'unsafe-inline' https:",
-  "style-src 'unsafe-inline' https:",
-  "img-src data: blob: https:",
-  "font-src data: https:",
-  "media-src data: blob: https:",
+  ["script-src 'unsafe-inline'", ...htmlSources.script].join(" "),
+  ["style-src 'unsafe-inline'", ...htmlSources.style].join(" "),
+  "img-src data: blob:",
+  ["font-src data:", ...htmlSources.font].join(" "),
+  "media-src data: blob:",
   "connect-src 'none'",
   "form-action 'none'",
   "base-uri 'none'",

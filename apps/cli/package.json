@@ -1,0 +1,30 @@
+{
+  "name": "@vibevalley/cli",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "exports": {
+    "./assets": "./src/assets.ts"
+  },
+  "scripts": {
+    "start": "vpx src/main.ts"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@vibevalley/bridge": "workspace:*",
+    "@vibevalley/home": "workspace:*",
+    "@vibevalley/i18n": "workspace:*",
+    "@vibevalley/protocol": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "@vibevalley/server": "workspace:*",
+    "@vibevalley/testkit": "workspace:*",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
+  }
+}

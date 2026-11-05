@@ -2,9 +2,9 @@ import { maybe, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { executionsOf } from "@vibevalley/protocol/rules";
 
-import type { WrittenKind, WrittenTemplate } from "@/agent/seed.ts";
+import type { WrittenKind, WrittenTemplate } from "#/agent/seed.ts";
+import type { AddIssueParams } from "#db/issue.sql.ts";
 
-import type { AddIssueParams } from "../../db/generated/issue.sql.ts";
 import { isForOrchestrator } from "./status.ts";
 
 export const maxChildren = 12;
@@ -21,6 +21,7 @@ export const issueRow = (id: string, req: T.IssueRequest, mandate: T.IssueMandat
   parent: req.parent ?? null,
   blocked_by: (req.blockedBy?.length ?? 0) > 0 ? JSON.stringify(req.blockedBy) : null,
   constraints: req.constraints ? JSON.stringify(req.constraints) : null,
+  criteria: (req.criteria?.length ?? 0) > 0 ? JSON.stringify(req.criteria) : null,
   priority: req.priority ?? "medium",
   created_at: at,
   cron: cron ?? null,

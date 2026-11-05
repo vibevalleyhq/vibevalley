@@ -60,6 +60,25 @@ export const ArtifactVersionRequest: Codec<T.ArtifactVersionRequest> = Schema.St
   note: Schema.optionalKey(Schema.String),
 });
 
+export const HtmlAnchor: Codec<T.HtmlAnchor> = Schema.Struct({
+  kind: Schema.Literal("text"),
+  exact: Schema.String,
+  prefix: Schema.String,
+  suffix: Schema.String,
+});
+
+export const ArtifactHtmlEdit: Codec<T.ArtifactHtmlEdit> = Schema.Struct({
+  id: ArtifactId,
+  version: Schema.Finite,
+  anchor: HtmlAnchor,
+  text: Schema.String,
+});
+
+export const HtmlShellMessage: Codec<T.HtmlShellMessage> = Schema.Struct({
+  vibevalley: Schema.Literal("selection"),
+  anchor: HtmlAnchor,
+});
+
 export const ArtifactListRequest: Codec<T.ArtifactListRequest> = Schema.Struct({
   channel: Schema.optionalKey(Schema.String),
   issue: Schema.optionalKey(Schema.String),

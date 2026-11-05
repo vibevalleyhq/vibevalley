@@ -17,14 +17,14 @@ import {
 } from "@vibevalley/protocol";
 import { isOneOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
-import { aria, useNow } from "@/base/dom";
-import { tookText, wallClockText } from "@/base/format";
-import { playBedFx } from "@/farm/commands";
-import { tint } from "@/farm/panels/rows";
-import { farm, farmActWords, overlayOf, useFarm } from "@/farm/store";
-import { useVillage } from "@/farm/world/load";
-import { cropLabel, issueOf, plotOf, stationOfSession } from "@/farm/world/plots";
-import { issueThreadOf } from "@/features/channel";
+import { aria, useNow } from "#/base/dom.tsx";
+import { tookText, wallClockText } from "#/base/format.ts";
+import { playBedFx } from "#/farm/commands.ts";
+import { tint } from "#/farm/panels/rows.tsx";
+import { farm, farmActWords, overlayOf, useFarm } from "#/farm/store.ts";
+import { useVillage } from "#/farm/world/load.ts";
+import { cropLabel, issueOf, plotOf, stationOfSession } from "#/farm/world/plots.ts";
+import { issueThreadOf } from "#/features/channel/index.ts";
 import {
   createIssueActs,
   changesLine,
@@ -42,15 +42,15 @@ import {
   useIssueHistory,
   useIssueRuns,
   useIssueTimeline,
-} from "@/features/issue";
-import { createSessionEvents, WorkLog } from "@/features/session";
-import { useAgent } from "@/infra/agents";
-import { useCore, useFrames } from "@/infra/frame";
-import { ready } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { sendReplacing, useIntents } from "@/state/intent";
-import { castPrefix, outfitLabel, speciesLabel } from "@/ui/cast";
-import { createPixelAct, FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "@/ui/pixel";
+} from "#/features/issue/index.ts";
+import { createSessionEvents, WorkLog } from "#/features/session/index.ts";
+import { useAgent } from "#/infra/agents.ts";
+import { useCore, useFrames } from "#/infra/frame.ts";
+import { ready } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { sendReplacing, useIntents } from "#/state/intent.ts";
+import { castPrefix, outfitLabel, speciesLabel } from "#/ui/cast.ts";
+import { createPixelAct, FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
 
 const tones: Record<string, string> = { berry: "#c84a3a", wheat: "#e5a93c", water: "#4f8fbd", leaf: "#74a046", faint: "#c8a46e", muted: "#9b7550" };
 const body = "text-[13px] leading-[1.5] text-bark-800";
@@ -161,6 +161,11 @@ function IssueBody(props: {
     () => s().showsChanges,
   );
   const changed = () => ready(changes, undefined);
+  const madeLabel = () => {
+    const c = changed();
+    if (!c) return t("web.farm.plot.made");
+    return nothingChanged(c) ? t("web.farm.plot.madeNothing") : t("web.farm.plot.madeFiles", { n: c.files.length });
+  };
   const timelineQuery = useIssueTimeline(
     () => props.issue,
     () => s().head.runs,
@@ -353,15 +358,7 @@ function IssueBody(props: {
             )}
           </Show>
           <Show when={s().showsChanges && props.issue.deliver !== "answer"}>
-            <Fold
-              label={
-                changed()
-                  ? nothingChanged(changed()!)
-                    ? t("web.farm.plot.madeNothing")
-                    : t("web.farm.plot.madeFiles", { n: changed()!.files.length })
-                  : t("web.farm.plot.made")
-              }
-            >
+            <Fold label={madeLabel()}>
               <Show when={changed()} fallback={<p class={body}>{changes.isPending ? t("web.farm.reading") : t("web.farm.plot.changesUnread")}</p>}>
                 {(c) => (
                   <div class="flex flex-col">

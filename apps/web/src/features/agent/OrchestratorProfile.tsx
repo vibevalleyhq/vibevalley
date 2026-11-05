@@ -9,15 +9,15 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, defaultOrchestrator, orchestratorRuntime, type OrchestratorLook, OrchestratorLookValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { orchestratorHref, orchestratorLooks } from "@/features/orchestrator";
-import { api } from "@/infra/api";
-import { useRouter } from "@/infra/router";
-import { A } from "@/ui/A";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { ConfirmButton } from "@/ui/ConfirmButton";
-import { OrchestratorFace } from "@/ui/Face";
-import { Field, TextArea, TextInput } from "@/ui/Field";
+import { orchestratorHref, orchestratorLooks } from "#/features/orchestrator/index.ts";
+import { api } from "#/infra/api.ts";
+import { useRouter } from "#/infra/router.ts";
+import { A } from "#/ui/A.tsx";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
+import { OrchestratorFace } from "#/ui/Face.tsx";
+import { Field, TextArea, TextInput } from "#/ui/Field.tsx";
 
 import { FromTemplate } from "./FromTemplate";
 
@@ -81,7 +81,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
 
   return (
     <div class="h-full overflow-y-auto px-4 pb-8">
-      <div class="mx-auto flex max-w-3xl flex-col gap-4">
+      <div class="flex max-w-3xl flex-col gap-4">
         <div
           data-testid="profile-bar"
           data-state={isNew ? "new" : dirty() ? "dirty" : "saved"}

@@ -137,6 +137,13 @@
     "restartQuestion": "Restart into the new version?",
     "workingQuestion": "{n} helpers are working; restarting cuts them off. Restart now?",
     "newFarmQuestion": "The new version starts from fresh data; the old stays in the home folder. Restart now?",
-    "download": "Download"
+    "download": "Download",
+    "cli": "Command line",
+    "cliHint": "Once installed, {command} reads and writes this farm from a terminal, for agents on this Mac too",
+    "cliReady": "Use {command} in a terminal; agents on this Mac can read and write this farm with it",
+    "cliNotOnPath": "Installed at {link}, but ~/.local/bin is not on your PATH: add export PATH=\"$HOME/.local/bin:$PATH\" to ~/.zshrc",
+    "cliTaken": "{link} is another program's file and was not replaced: move it away, then install",
+    "cliInstall": "Install",
+    "cliRemove": "Remove"
   }
 }

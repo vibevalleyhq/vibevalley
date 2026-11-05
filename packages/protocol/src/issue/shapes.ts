@@ -255,6 +255,8 @@ export interface IssueRequest {
   priority?: Priority;
   deliver?: Deliverable;
   autoSubmitPr?: boolean;
+  /** What it must do to be accepted, each checked by whoever works it before handing back. */
+  criteria?: string[];
   /** The client's key for this request: the same key again within a while returns the first one's result and does it
    * once (a retry after a lost reply). At most 64 characters. */
   requestKey?: string;

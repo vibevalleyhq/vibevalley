@@ -90,6 +90,30 @@ export interface Updates {
   readonly install: () => Promise<void>;
 }
 
+/** The app's command line in ~/.local/bin (「安装命令行」, apps/desktop src/commandLine.ts): link is where it goes; onPath:
+ * the login shell's PATH has that folder; taken: a file of another's is there, so it is not replaced. */
+export interface CommandLineState {
+  readonly command: string;
+  readonly link: string;
+  readonly installed: boolean;
+  readonly onPath: boolean;
+  readonly taken: boolean;
+}
+
+export const CommandLineState: Schema.Codec<CommandLineState> = Schema.Struct({
+  command: Schema.String,
+  link: Schema.String,
+  installed: Schema.Boolean,
+  onPath: Schema.Boolean,
+  taken: Schema.Boolean,
+});
+
+export interface CommandLine {
+  readonly state: () => Promise<CommandLineState>;
+  readonly install: () => Promise<CommandLineState>;
+  readonly remove: () => Promise<CommandLineState>;
+}
+
 export interface Host {
   /** For logs and the about box only. */
   readonly name: "desktop" | "mobile" | "browser";
@@ -115,6 +139,9 @@ export interface Host {
   readonly theme?: (theme: ThemeChoice) => void;
   /** The app's own updates; absent where the host is not updated from here (a browser tab, the phone's store app). */
   readonly update?: Updates;
+  /** Installing the app's command line; absent where there is none to install (a browser tab, the app from the
+   * repository). */
+  readonly commandLine?: CommandLine;
 }
 
 /** Light, dark, or as the system is. */
@@ -153,8 +180,52 @@ export const desktopBridge = {
   // Both wait for a download.
   updateCheck: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
   updateInstall: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
+  cliState: call({ input: Schema.Void, output: CommandLineState }),
+  cliInstall: call({ input: Schema.Void, output: CommandLineState }),
+  cliRemove: call({ input: Schema.Void, output: CommandLineState }),
   voiceShortcut: push(Schema.Void),
   update: push(UpdateState),
+};
+
+/** Which app this is and how it is: what `vibevalley app status` says. server: its farm's address, absent while it is not
+ * up. */
+const DesktopStatus = Schema.Struct({
+  name: Schema.String,
+  version: Schema.String,
+  channel: Schema.String,
+  server: Schema.optionalKey(Schema.String),
+});
+
+/** The desktop app's command line asks it (`vibevalley app …`, apps/server src/cli/app.ts) over a socket in its farm's
+ * home (apps/desktop src/control.ts). open takes a path of the page's (/issues/12). Where a call is the same as the
+ * page's, it has the page's name. */
+export const desktopControl = {
+  status: call({ input: Schema.Void, output: DesktopStatus }),
+  open: call({ input: Schema.String.check(Schema.isPattern(/^\/[^\0]*$/u)), output: Schema.Void }),
+  quit: call({ input: Schema.Void, output: Schema.Void }),
+  restart: call({ input: Schema.Void, output: Schema.Void }),
+  updateState: call({ input: Schema.Void, output: UpdateState }),
+  updateCheck: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
+  updateInstall: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }),
+};
+
+/** Every call and push of the page's to the desktop, and whether the command line can do it too (desktopControl has a
+ * call of the same name) or only the page can: a call added without saying which does not compile, so the desktop's
+ * abilities do not grow past its command line unnoticed (host.test.ts holds the names to it). */
+export const desktopReach: Readonly<Record<keyof typeof desktopBridge, "control" | "page">> = {
+  notify: "page",
+  tray: "page",
+  locale: "page",
+  reveal: "page",
+  theme: "page",
+  updateState: "control",
+  updateCheck: "control",
+  updateInstall: "control",
+  cliState: "page",
+  cliInstall: "page",
+  cliRemove: "page",
+  voiceShortcut: "page",
+  update: "page",
 };
 
 const Line = { line: Schema.Finite };

@@ -9,7 +9,7 @@
 | Writing Effect services（`Context.Service` 的类、`static layer`、`X.of`、`X["Service"]`） | 照做，24 个服务都是这个写法（`AGENTS.md`「服务端的服务」）；layer 按 `apps/server/src/services.ts` 的次序叠 |
 | Error handling（`Schema.TaggedError`，`catchTag`、`catchTags`、`catchReason`） | 照做，错误都是 `Schema.TaggedError`（`preferSchemaTaggedError`、`extendsNativeError` 查）；按标签接，不用 `instanceof` |
 | Managing resources and Scopes（`acquireRelease`、`Layer.effectDiscard`、`LayerMap`） | 照做；后台的 fiber 归服务的作用域，外面回调用 `FiberSet.makeRuntime*`（[地基](docs/subsystems/foundation.md)） |
-| Running Effect programs（`NodeRuntime.runMain`、`Layer.launch`） | 服务端的入口 `apps/server/src/main.ts`；命令行 `apps/server/src/cli.ts` |
+| Running Effect programs（`NodeRuntime.runMain`、`Layer.launch`） | 服务端的入口 `apps/server/src/main.ts`；命令行 `apps/cli/src/main.ts` |
 | Broadcasting messages with PubSub | 用在核心状态和事件往上走的流（下层经 `Stream` 告诉上层） |
 | Working with Streams | 用：SSE 的帧、帮工的事件、频道的消息；有界的 relay 见 [architecture.md](docs/architecture.md) |
 | Integrating Effect into existing applications（`ManagedRuntime`） | 少用：Promise 一侧只剩外面库的一次调用；桌面壳不是 Effect，页面只有中间层用 Effect（见下一行） |
@@ -25,6 +25,6 @@
 | Building HttpApi servers | 不用：接口表是 `packages/protocol/src/api.ts` 自己的，处理在 `apps/server/src/handlers.ts` |
 | Typed GraphQL clients | 不用 |
 | Working with child processes（`ChildProcessSpawner`） | 用：git 和外部命令（`apps/server/src/project/git.ts`） |
-| Building CLI applications（`effect/cli`） | 用：`apps/server/src/cli.ts` |
+| Building CLI applications（`effect/cli`） | 用：`apps/cli/src/main.ts` |
 | Working with AI modules | 不用：模型在 `packages/ai`，大脑在 `packages/agent`，都是自己的 |
 | Building distributed applications with cluster | 不用：服务端只有一个进程 |

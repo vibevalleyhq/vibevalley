@@ -4,10 +4,10 @@ import { describe, expect, it } from "vite-plus/test";
 import type { Doing, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { clip } from "@/base/clip.ts";
-import { conflictOf } from "@/issue/status.ts";
-import { MergeFailure } from "@/project/workplace.ts";
-import { inCny } from "@/runtime/price.ts";
+import { clip } from "#/base/clip.ts";
+import { conflictOf } from "#/issue/status.ts";
+import { MergeFailure } from "#/project/workplace.ts";
+import { inCny } from "#/runtime/price.ts";
 
 import { briefBreak, conflictBrief, noRoom, notTakenIn, sessionName, whoMakesRoom, withRecall } from "./briefing.ts";
 import { recallHead } from "./prompts.ts";

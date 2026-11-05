@@ -60,7 +60,7 @@ export function createFloating<R extends string>(props: FloatingRootProps<R>, fi
   };
 }
 
-interface PortalProps {
+export interface PortalProps {
   children?: JSX.Element;
   /** Where to put it; by default the modal dialog the trigger is in, else the body. */
   container?: HTMLElement | undefined;
@@ -78,7 +78,7 @@ export function makePortal(use: () => FloatingParts) {
   };
 }
 
-interface PositionerProps extends DivProps {
+export interface PositionerProps extends DivProps {
   side?: Side | undefined;
   align?: Align | undefined;
   /** Gap to the trigger, px. */

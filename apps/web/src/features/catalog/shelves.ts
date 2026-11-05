@@ -5,8 +5,8 @@ import { t } from "@vibevalley/i18n";
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { compareText, or } from "@/base/search";
-import { outfitLabel, speciesLabel } from "@/ui/cast";
+import { compareText, or, spelled } from "#/base/search.ts";
+import { outfitLabel, speciesLabel } from "#/ui/cast.ts";
 
 export interface Picture {
   readonly name: string;
@@ -135,5 +135,5 @@ export function pictureMatches(p: Picture, query: string) {
   const shelf = shelves.find((s) => s.id === shelfOf(p.name));
   const species = SpeciesValues.find((s) => p.name.startsWith(`${s}-`));
   const outfit = species && OutfitValues.find((o) => p.name.startsWith(`${species}-${o}-`));
-  return [p.name, shelf?.label ?? "", species ? speciesLabel[species] : "", outfit ? outfitLabel[outfit] : ""].some((w) => w.toLowerCase().includes(q));
+  return [p.name, shelf?.label ?? "", species ? speciesLabel[species] : "", outfit ? outfitLabel[outfit] : ""].some((w) => spelled(w, q));
 }

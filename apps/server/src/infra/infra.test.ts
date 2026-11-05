@@ -11,7 +11,7 @@ import { tempDir } from "@vibevalley/testkit/temp";
 import { waitFor } from "@vibevalley/testkit/until";
 
 import { keptFile } from "./files.ts";
-import { announce, announced, HomeTaken, leaseHome } from "./lease.ts";
+import { HomeTaken, leaseHome } from "./lease.ts";
 
 describe("a kept file", () => {
   it.effect("is saved whole at once, written soon after the first change with the later ones joining, and last as its scope closes", () =>
@@ -45,16 +45,4 @@ test("one server per home; a stale lock is taken over", () => {
   again();
   writeFileSync(join(home, ".vibevalley.lock"), "999999");
   leaseHome(home)();
-});
-
-test("a server says where it listens in its home while it runs, and a stopped one's word is not taken", () => {
-  const home = tempDir("vv-announce-");
-  expect(announced(home)).toBeUndefined();
-  const withdraw = announce(home, "http://127.0.0.1:56048");
-  expect(announced(home)).toBe("http://127.0.0.1:56048");
-  withdraw();
-  expect(announced(home)).toBeUndefined();
-  // Left behind by a server that died: its pid is not running.
-  writeFileSync(join(home, "server.json"), JSON.stringify({ url: "http://127.0.0.1:1", pid: 2 ** 22 + 7 }));
-  expect(announced(home)).toBeUndefined();
 });

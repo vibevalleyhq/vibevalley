@@ -5,11 +5,11 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { Agent } from "@/agent/agent.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Project } from "@/project/project.ts";
-import { gitSync } from "@/testing/git.ts";
-import { testIssues } from "@/testing/world.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Project } from "#/project/project.ts";
+import { gitSync } from "#/testing/git.ts";
+import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab } from "./farm.ts";
 

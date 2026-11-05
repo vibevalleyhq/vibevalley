@@ -5,10 +5,10 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { LiveEvent, ServerEvent, StateFrame } from "@vibevalley/protocol";
 
-import { Core } from "@/core/core.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { layer as projection } from "@/projection/frame.ts";
-import { testConfig } from "@/testing/layers.ts";
+import { Core } from "#/core/core.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { layer as projection } from "#/projection/frame.ts";
+import { testConfig } from "#/testing/layers.ts";
 
 import { streams } from "./streams.ts";
 

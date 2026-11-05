@@ -12,9 +12,11 @@
 | `normalSpans` | `artifact.ts` | Drops empty spans and joins neighbours with the same marks, so one text has one way to be written. |
 | `defaultOf` | `channel.ts` | The channel words go to when none is named. |
 | `channelOf` | `channel.ts` | A channel by its id; none when no id is given. |
+| `mentionLead` | `channel.ts` | What an @name may follow: anything but a Latin letter, a digit, _ or @, so a@b.com names no one while 问@w3 does |
 | `slice` | `cut.ts` | s.slice(start, end), a surrogate pair cut in half made U+FFFD (what String.prototype.toWellFormed does, which the |
 | `cut` | `cut.ts` | s as it is when it fits in max units; else its first max units and an ellipsis. |
 | `oneLine` | `cut.ts` | Runs of white space are one space. |
+| `htmlSandbox` | `display.ts` | The <iframe>'s sandbox attribute; the server's CSP sandbox directive is the same tokens. |
 | `freshOf` | `inbox.ts` | The items of now that are news to known: undefined known is the first look, which knows them all and has no news. |
 | `assignmentOf` | `issues.ts` | The responsibility in force now. |
 | `assignedAgentOf` | `issues.ts` |  |
@@ -34,6 +36,11 @@
 | `phaseText` | `phase.ts` | phaseWords as said at now. |
 | `phaseWords` | `phase.ts` | What a session is doing in words, how long it has been quiet left as {span}. |
 | `slugOf` | `pkm.ts` | A page's name from its title: trimmed, lower case, spaces as dashes, "/" (or "\") as "__". |
+| `pkmTag` | `pkm.ts` | Every #tag in a text (read it with matchAll): the name is group 1. The page draws them, the server links them. |
+| `pkmTagTyped` | `pkm.ts` | A #tag being typed, ending where the text ends (the caret): its name so far is group 1. |
+| `applyBlockOps` | `pkm.ts` | The blocks after the ops in order (a copy: blocks is not changed); an op on a block not on the page changes nothing. |
+| `flatBlocks` | `pkm.ts` | The outline as the wire has it: in order, each with its parent and the path of first lines above it. |
+| `treeOfBlocks` | `pkm.ts` |  |
 | `plainText` | `plain.ts` |  |
 | `farmOf` | `play.ts` | The farm a session's bed is on: each project has its own, and the sessions without one share one. |
 | `plotKeyOf` | `play.ts` | The plot a session works, the key of `FarmView.plots`: its issue, so a reopened issue keeps its plot; one with no issue is its own. |
@@ -104,9 +111,6 @@
 | `keptFile` | `files.ts` | soonMs: how long a soon write waits after the first change, so a burst is one write and a crash loses no more. |
 | `HomeTaken` | `lease.ts` |  |
 | `leaseHome` | `lease.ts` | Takes the home, or throws HomeTaken; the function it returns gives it back. |
-| `homeOf` | `lease.ts` | The home a server or the command line uses: VIBEVALLEY_HOME, or ~/.vibevalley (as loadConfig reads it). |
-| `announce` | `lease.ts` | Says where this server listens, for as long as it does; the function it returns takes it back. |
-| `announced` | `lease.ts` | Where the server using this home listens; undefined when none says so or it has stopped. |
 | `callbackLog` | `log.ts` | Made in a service's make: the lines it writes end with the service and keep its logger. |
 | `bestEffort` | `log.ts` | Work the caller goes on without: a failure or a defect is logged at Warn after what (the words say what was being |
 | `timeHere` | `time.ts` | The Clock of the service that asks, as a Time: what it sleeps on runs with the service's own context, on fibers its |
@@ -125,8 +129,6 @@
 | `bold` | `artifact.ts` |  |
 | `para` | `artifact.ts` |  |
 | `sample` | `artifact.ts` | Every kind of block, and inline marks, as the export writes them. |
-| `farm` | `cli.ts` | The whole farm on a free port; the command line is pointed at it. |
-| `cli` | `cli.ts` | One run, with a Stdio of its own and no environment: its exit code, what it put on stdout and on stderr, and the |
 | `kinds` | `evals.ts` |  |
 | `orchestratorToolNames` | `evals.ts` | The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). |
 | `problemOf` | `evals.ts` | "" when it is whole: the fields its kind reads are there. |
@@ -135,6 +137,8 @@
 | `isInput` | `evals.ts` |  |
 | `committed` | `evals.ts` |  |
 | `stubbed` | `evals.ts` | Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once, |
+| `farm` | `farm.ts` | The whole farm on a free port: its address. |
+| `workingFarm` | `farm.ts` | The same with the test helper as its only runtime (pi, testing/worker.ts), so an issue can be worked from outside as |
 | `gitSync` | `git.ts` | Runs git in dir as a test user; its output, trimmed. A failure throws with what git said. |
 | `gitIn` | `git.ts` | Runs git in dir as dir's own config says (no test user); its output, trimmed. A failure throws with what git said. |
 | `gitInEnv` | `git.ts` | gitIn with these in its environment (a commit's dates). |
@@ -189,15 +193,19 @@
 | `SpriteManifest` | `manifests.ts` |  |
 | `CursorManifest` | `manifests.ts` |  |
 | `TitleManifest` | `manifests.ts` |  |
-| `matches` | `search.ts` | Every word of the query is somewhere in the texts, ignoring case; an empty query matches everything. |
+| `pinyinLoaded` | `search.ts` | Settles once pinyin matches too (tests wait on it). |
+| `spelled` | `search.ts` | The text holds the query, ignoring case, or spells it in pinyin; query is lower case. |
+| `matches` | `search.ts` | Every word of the query is somewhere in the texts (spelled), ignoring case; an empty query matches everything. |
 | `compareText` | `search.ts` |  |
 | `or` | `search.ts` |  |
 | `shortcutPlaces` | `shortcuts.ts` |  |
 | `shortcuts` | `shortcuts.ts` |  |
 | `keyCap` | `shortcuts.ts` | A key's cap on the sheet. |
-| `pressed` | `shortcuts.ts` | Whether a keydown is one of the shell's chords (mod+K, ?): the rest are each place's own. |
+| `inField` | `shortcuts.ts` |  |
+| `pressed` | `shortcuts.ts` | The chords matched here (mod+K, ?, C): the rest are each place's own. |
 | `useInterval` | `timer.ts` | fn every ms for as long as the owner lives. |
 | `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the owner's end clears it. |
+| `typedMarks` | `typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for; undefined when there are none. |
 
 ## `apps/web/src/infra`
 

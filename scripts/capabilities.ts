@@ -1,12 +1,20 @@
-// Writes docs/reference/capabilities.md from the endpoint table (packages/protocol/src/api.ts): who may call each
-// endpoint, by its `can`. --check fails when the file is not what the table says (docs:verify runs it).
+// Writes docs/reference/capabilities.md from the endpoint table (packages/protocol/src/api.ts): what each endpoint does,
+// in the command line's words (cli.op in the zh dictionary), and who may call it, by its `can`. --check fails when the file is not what the table says (docs:verify runs it).
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { endpoints, pathOf } from "../packages/protocol/src/api.ts";
+import { endpoints, pathOf } from "@vibevalley/protocol/api";
 
 const out = join(import.meta.dirname, "..", "docs/reference/capabilities.md");
+
+const words: unknown = JSON.parse(readFileSync(join(import.meta.dirname, "..", "packages/i18n/locales/zh/cli.json"), "utf8"));
+/** The line of help an op has, by its dotted path in the dictionary. */
+const said = (path: readonly string[]): string => {
+  let at: unknown = words;
+  for (const key of path) at = typeof at === "object" && at !== null ? Object.entries(at).find(([k]) => k === key)?.[1] : undefined;
+  return typeof at === "string" ? at : "";
+};
 
 const head = `# 能力表
 
@@ -30,9 +38,9 @@ for (const e of endpoints) {
 const mark = (on: boolean) => (on ? "✓" : " ");
 let text = head;
 for (const [g, list] of groups) {
-  text += `\n## ${g}\n\n| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |\n|---|---|---|---|---|---|\n`;
+  text += `\n## ${g}\n\n${said(["group", g, "about"])}\n\n| 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |\n|---|---|---|---|---|---|---|\n`;
   for (const e of list)
-    text += `| \`${e.op}\` | \`${pathOf(e.op)}\` | ${mark(e.can.includes("owner"))} | ${mark(e.can.includes("remote"))} | ${mark(e.can.includes("orchestrator"))} | ${mark(e.can.includes("session"))} |\n`;
+    text += `| \`${e.op}\` | ${said(["op", ...e.op.split(".")])} | \`${pathOf(e.op)}\` | ${mark(e.can.includes("owner"))} | ${mark(e.can.includes("remote"))} | ${mark(e.can.includes("orchestrator"))} | ${mark(e.can.includes("session"))} |\n`;
 }
 
 if (process.argv.includes("--check")) {

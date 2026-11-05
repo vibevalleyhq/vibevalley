@@ -2,8 +2,8 @@
 
 import { type Accessor, createSignal, onSettled } from "solid-js";
 
-import { messageOf } from "@/base/format";
-import { loadAtlas, type SpriteAtlas } from "@/ui/pixel/atlas";
+import { messageOf } from "#/base/format.ts";
+import { loadAtlas, type SpriteAtlas } from "#/ui/pixel/atlas.ts";
 
 import { Level } from "./level";
 import { VillageWorld } from "./world";

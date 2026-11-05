@@ -3,7 +3,8 @@ import { join } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
-import { pathOf } from "../packages/protocol/src/shapes.ts";
+import { pathOf } from "@vibevalley/protocol";
+
 import { runVerification, readyAddress } from "./verify-server";
 
 test("only a machine receipt from the owned process announces readiness", () => {
@@ -26,7 +27,7 @@ test("sandbox owns isolation, readiness, validation failure and cleanup", async 
     const created = await fetch(server + '/api/v1/issue/create', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:'sandbox fixture'})});
     if (!created.ok) throw new Error('create failed: ' + await created.text());
     const issue = await created.json();
-    const cli = spawnSync(process.env.VIBEVALLEY_VERIFY_CLI, ['state'], {env:process.env, encoding:'utf8'});
+    const cli = spawnSync(process.env.VIBEVALLEY_VERIFY_CLI, ['api', 'state'], {env:process.env, encoding:'utf8'});
     if (cli.status !== 0) throw new Error('state failed');
     const frame = JSON.parse(cli.stdout);
     if (!frame.state.issues.some(i => i.id === issue.id)) throw new Error('fixture absent from state');
@@ -71,11 +72,13 @@ test("with the scripted helper, an issue goes out, comes back and is completed t
       "-c",
       `set -e
       vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
-      vv issue create --json '{"title":"写打卡并提交","project":"clock","agent":"docs"}' > /dev/null
-      vv issue work 1
-      vv issue status update 1 --dry-run --json '{"status":"done"}'
-      vv issue status update 1 --json '{"status":"done"}'
-      project=$(vv project list | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8"))[0].path)')
+      vv issue create 写打卡并提交 --project clock --agent docs > /dev/null
+      vv issue status 1 todo > /dev/null
+      vv issue show 1 --watch --timeout 60 > /dev/null
+      vv issue diff 1 --format json
+      vv issue status 1 done --dry-run --format json
+      vv issue status 1 done --format json
+      project=$(vv project list --format json | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8"))[0].path)')
       git -C "$project" ls-tree --name-only main clock.ts`,
     ],
     { scriptedHelper: true },

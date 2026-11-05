@@ -36,6 +36,8 @@
   },
   "rail": "Workbench",
   "farm": "Back to the farm",
+  "farmShort": "Farm",
+  "update": "Update",
   "working": "Open · {n} working",
   "off": "Not open",
   "chips": {
@@ -165,6 +167,7 @@
       "everywhere": "Everywhere",
       "composer": "Message box",
       "lists": "Menus and lists",
+      "issues": "Issues",
       "pictures": "Pictures",
       "farm": "Farm",
       "desktop": "Desktop app (system-wide)"
@@ -186,7 +189,8 @@
       "farmMenu": "Put the tool down, or open the menu",
       "debug": "Debug console",
       "voice": "Talk to the manager (changeable in settings)",
-      "command": "Commands: a ticket, remember, stop, a direct message"
+      "command": "Commands: a ticket, remember, stop, a direct message",
+      "newIssue": "New issue"
     }
   },
   "rich": {

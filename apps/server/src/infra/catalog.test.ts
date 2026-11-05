@@ -8,7 +8,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 
-import { testDatabase } from "@/testing/layers.ts";
+import { testDatabase } from "#/testing/layers.ts";
 
 const generated = join(import.meta.dirname, "../../db/generated");
 

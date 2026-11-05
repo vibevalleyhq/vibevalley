@@ -12,5 +12,8 @@ export default defineConfig({
     include: ["test/**/*.test.tsx", "test/**/*.test.ts"],
     browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: "chromium" }] },
   },
-  run: { tasks: { test: "vp test run" } },
+  // The types other packages check against (package.json's exports: types is dist/, default the source every run
+  // compiles), declarations only, with maps back to the source for the editor.
+  pack: { entry: ["src/index.ts"], outDir: "dist", clean: true, fixedExtension: false, dts: { sourcemap: true, emitDtsOnly: true } },
+  run: { tasks: { build: { command: "vp pack", cache: { input: [{ auto: true }, "!dist/**"] } }, test: "vp test run" } },
 });

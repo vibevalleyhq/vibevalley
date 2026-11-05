@@ -3,11 +3,11 @@ import { rmSync } from "node:fs";
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { Core } from "@/core/core.ts";
-import { emptyPatrol, patrolStep } from "@/inbox/patrol.ts";
-import { frameOf } from "@/projection/frame.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
+import { Core } from "#/core/core.ts";
+import { emptyPatrol, patrolStep } from "#/inbox/patrol.ts";
+import { frameOf } from "#/projection/frame.ts";
+import { testConfig } from "#/testing/layers.ts";
+import { world } from "#/testing/world.ts";
 
 import { Channel } from "./channel.ts";
 const mentionIds = (core: Core["Service"]) =>

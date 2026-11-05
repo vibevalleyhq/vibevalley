@@ -4,9 +4,9 @@
 import { type Applied, type AppliedIssue, type Deliverable, type Issue, VibeValleyApiError } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api, newSendKey } from "@/infra/api";
-import { bySeq, defineIntent, type Intent } from "@/state/intent";
-import { prefsNow } from "@/state/prefs";
+import { api, newSendKey } from "#/infra/api.ts";
+import { bySeq, defineIntent, type Intent } from "#/state/intent.ts";
+import { prefsNow } from "#/state/prefs.ts";
 
 import { newIssueTitle } from "./issue";
 /**

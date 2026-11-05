@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 
 import { PkmMarkerValues } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
-import { slugOf } from "@vibevalley/protocol/rules";
+import { pkmTag, slugOf } from "@vibevalley/protocol/rules";
 
 import { tierOfFile, titleOfFile } from "./para.ts";
 
@@ -69,16 +69,16 @@ const pageOrder = [
   "snapshot",
   "tldr",
 ];
-const blockOrder = ["id", "completed", "deadline", "scheduled", "render", "caption", "source-anchor", "comment"];
+const blockOrder = ["collapsed", "id", "completed", "deadline", "scheduled", "render", "caption", "source-anchor", "comment"];
 
 const propLine = /^([a-zA-Z0-9_-]+)::\s*(.*)$/u;
-const bulletLine = /^(\s*)-\s(.*)$/u;
+/** A bullet; a bare - (an empty block, its space trimmed by an editor) is one too. */
+const bulletLine = /^(\s*)-(?:\s(.*))?$/u;
 const markerLead = new RegExp(`^(${PkmMarkerValues.join("|")})(?:\\s+\\[#([ABC])\\])?\\s+(.*)$`, "su");
 const priorityLead = /^\[#([ABC])\]\s+(.*)$/su;
 const fenceLead = /^(`{3,}|~{3,})/u;
 export const wikiLink = /\[\[([^[\]]+?)\]\]/gu;
 export const blockRef = /\(\(([0-9a-fA-F-]{8,36})\)\)/gu;
-const tagRef = /(?:^|\s)#([\p{L}\p{N}_/-]+)/gu;
 const spanRemark = /==([^=]+)==\^\[([^\]]+)\]/gu;
 
 const shaOf = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
@@ -91,9 +91,6 @@ function seededId(seed: string): string {
 
 const isMarker = (word: string | undefined): word is T.PkmMarker => PkmMarkerValues.some((m) => m === word);
 const isPriority = (word: string | undefined): word is T.PkmPriority => word === "A" || word === "B" || word === "C";
-
-/** A block's first line without a heading's #s: how it is named in a path. */
-const headOf = (body: string) => (body.split("\n")[0] ?? "").replace(/^#+\s*/u, "").trim();
 
 /** The file's text as a page; ids not written in it are made from where the block is (seededId). */
 export function parse(text: string, file: string, mtime: number): Page {
@@ -274,7 +271,7 @@ export function edgesOf(page: Pick<Page, "blocks">): Edge[] {
       if (target && !target.startsWith(".")) edges.push({ block: node.id, page: slugOf(target), kind: "wikilink" });
     }
     for (const m of text.matchAll(blockRef)) edges.push({ block: node.id, target: m[1] ?? "", kind: "block_ref" });
-    for (const m of text.matchAll(tagRef)) edges.push({ block: node.id, page: slugOf(m[1] ?? ""), kind: "tag" });
+    for (const m of text.matchAll(pkmTag)) edges.push({ block: node.id, page: slugOf(m[1] ?? ""), kind: "tag" });
     for (const value of Object.values(node.props))
       for (const m of value.matchAll(wikiLink)) {
         const target = (m[1] ?? "").split("|")[0]?.trim() ?? "";
@@ -282,28 +279,6 @@ export function edgesOf(page: Pick<Page, "blocks">): Edge[] {
       }
   }
   return edges;
-}
-
-/** The outline as the wire has it: in order, each with its parent and the path of first lines above it. */
-export function flatten(nodes: readonly Node[]): T.PkmBlock[] {
-  const out: T.PkmBlock[] = [];
-  const go = (list: readonly Node[], parent: string | undefined, path: readonly string[]) => {
-    for (const node of list) {
-      out.push({
-        id: node.id,
-        ...(parent ? { parent } : {}),
-        depth: node.depth,
-        ...(node.marker ? { marker: node.marker } : {}),
-        ...(node.priority ? { priority: node.priority } : {}),
-        body: node.body,
-        props: { ...node.props },
-        path: path.join(" > "),
-      });
-      go(node.children, node.id, [...path, headOf(node.body)]);
-    }
-  };
-  go(nodes, undefined, []);
-  return out;
 }
 
 /** The ids of page's blocks not written in its file taken from was where a block reads the same at the same depth: a page
@@ -328,4 +303,28 @@ export function carryIds(was: Page, page: Page): Page {
       return { ...n, id, children: relabel(n.children) };
     });
   return { ...page, blocks: relabel(page.blocks) };
+}
+
+/** Typed or piped text as blocks of their own (`pkm capture`): a line a block, a leading "- " or "* " taken off, nested by
+ * its indentation under the line before it, whatever the indent's width; markers and [#A] read as in a file. Ids are
+ * fresh, as these blocks are new wherever they go. */
+export function outlineOf(text: string, newId: () => string): Node[] {
+  const lines = text
+    .replace(/\r\n/gu, "\n")
+    .split("\n")
+    .filter((l) => l.trim() !== "");
+  if (lines.length === 0) return [];
+  const width = (l: string) => l.length - l.trimStart().length;
+  const least = Math.min(...lines.map(width));
+  // The widths of the lines still open above, outermost first: a line goes under the last narrower one.
+  const open: number[] = [];
+  const markdown = lines.map((l) => {
+    const w = width(l) - least;
+    while (open.length > 0 && (open.at(-1) ?? 0) >= w) open.pop();
+    const depth = open.length;
+    open.push(w);
+    return `${"  ".repeat(depth)}- ${l.trim().replace(/^[-*]\s+/u, "")}`;
+  });
+  const fresh = (nodes: readonly Node[]): Node[] => nodes.map((n) => ({ ...n, id: newId(), explicit: false, children: fresh(n.children) }));
+  return fresh(parse(markdown.join("\n") + "\n", "captured.md", 0).blocks);
 }

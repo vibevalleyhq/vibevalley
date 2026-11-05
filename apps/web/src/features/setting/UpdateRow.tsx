@@ -1,17 +1,18 @@
-import { Match, Show, Switch } from "solid-js";
+import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
+import type { CommandLineState } from "@vibevalley/protocol/host";
 import { isBusy } from "@vibevalley/protocol/rules";
 
-import { variant } from "@/base/dom";
-import { reasonOf } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { currentHost } from "@/infra/host";
-import { useUpdates } from "@/infra/settings";
-import { Button } from "@/ui/Button";
-import { ConfirmButton } from "@/ui/ConfirmButton";
-import { SettingRow } from "@/ui/settings";
-import { toast } from "@/ui/toasts";
+import { variant } from "#/base/dom.tsx";
+import { reasonOf } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { currentHost } from "#/infra/host.ts";
+import { useUpdates } from "#/infra/settings.ts";
+import { Button } from "#/ui/Button.tsx";
+import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
+import { SettingRow } from "#/ui/settings.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 export function UpdateRow() {
   const update = currentHost().update;
@@ -68,6 +69,47 @@ export function UpdateRow() {
               )}
             </Match>
           </Switch>
+        </SettingRow>
+      )}
+    </Show>
+  );
+}
+
+/** 「安装命令行」: the app's command line linked into ~/.local/bin (apps/desktop src/commandLine.ts); nothing where the
+ * host has none to install. */
+export function CommandLineRow() {
+  const cli = currentHost().commandLine;
+  const [state, setState] = createSignal<CommandLineState>();
+  // The app run from the repository has none: it answers so, and the row stays away.
+  onSettled(() => void cli?.state().then(setState, () => undefined));
+  const act = (step: () => Promise<CommandLineState> | undefined) => void step()?.then(setState, (e: unknown) => toast(reasonOf(e), "bad"));
+  const hint = (s: CommandLineState) =>
+    s.taken
+      ? t("web.setting.about.cliTaken", { link: s.link })
+      : !s.installed
+        ? t("web.setting.about.cliHint", { command: s.command })
+        : s.onPath
+          ? t("web.setting.about.cliReady", { command: s.command })
+          : t("web.setting.about.cliNotOnPath", { link: s.link });
+  return (
+    <Show when={state()}>
+      {(s) => (
+        <SettingRow label={t("web.setting.about.cli")} hint={hint(s())}>
+          <span data-testid="cli-state" data-installed={String(s().installed)} class="font-mono text-xs text-muted">
+            {s().command}
+          </span>
+          <Show
+            when={s().installed}
+            fallback={
+              <Button icon="terminal" data-testid="cli-install" disabled={s().taken} onClick={() => act(() => cli?.install())}>
+                {t("web.setting.about.cliInstall")}
+              </Button>
+            }
+          >
+            <Button data-testid="cli-remove" onClick={() => act(() => cli?.remove())}>
+              {t("web.setting.about.cliRemove")}
+            </Button>
+          </Show>
         </SettingRow>
       )}
     </Show>

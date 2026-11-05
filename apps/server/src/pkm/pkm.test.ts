@@ -5,9 +5,9 @@ import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
-import { pkmDir, ServerConfig } from "@/infra/config.ts";
-import { Database, Db } from "@/infra/db.ts";
-import { testConfig } from "@/testing/layers.ts";
+import { pkmDir, ServerConfig } from "#/infra/config.ts";
+import { Database, Db } from "#/infra/db.ts";
+import { testConfig } from "#/testing/layers.ts";
 
 import { make, Pkm } from "./pkm.ts";
 
@@ -85,6 +85,56 @@ describe("pkm", () => {
         ["LATER", "buy milk #inbox"],
       ]);
       expect((yield* pkm.search({ marker: "LATER" })).length).toBe(2);
+    }).pipe(Effect.provide(farm())),
+  );
+
+  it.effect("captures an outline: into the journal each top line a LATER for the inbox, onto a page as it is", () =>
+    Effect.gen(function* () {
+      const pkm = yield* Pkm;
+      const journal = yield* pkm.capture("读完第三章\n  记下两句\nTODO 还书");
+      expect(journal.blocks.map((b) => [b.depth, b.marker ?? "", b.body])).toEqual([
+        [0, "LATER", "读完第三章 #inbox"],
+        [1, "", "记下两句"],
+        [0, "TODO", "还书 #inbox"],
+      ]);
+      yield* pkm.save({ title: "读书", markdown: "- 书单\n" });
+      const page = yield* pkm.capture("- 《置身事内》\n  - 第四章", undefined, "读书");
+      expect(page.blocks.map((b) => [b.depth, b.marker ?? "", b.body])).toEqual([
+        [0, "", "书单"],
+        [0, "", "《置身事内》"],
+        [1, "", "第四章"],
+      ]);
+      // A page by another name: the closest are named.
+      const wrong = yield* Effect.flip(pkm.capture("x", undefined, "读"));
+      expect(wrong).toMatchObject({ _tag: "Missing" });
+      expect("what" in wrong ? wrong.what : "").toContain("读书");
+    }).pipe(Effect.provide(farm())),
+  );
+
+  it.effect("a page's file is read as written and written back from its edited text, not over a change made since", () =>
+    Effect.gen(function* () {
+      const pkm = yield* Pkm;
+      yield* pkm.save({ title: "Garden", markdown: "- bulbs\n  - tomatoes\n" });
+      const source = yield* pkm.source("garden");
+      expect(source).toMatchObject({ page: "garden", title: "Garden" });
+      expect(source.markdown).toContain("- bulbs");
+      const edited = yield* pkm.sourceUpdate({ page: "garden", markdown: source.markdown.replace("tomatoes", "tomatoes, basil"), updated: source.updated });
+      expect(edited.blocks.map((b) => b.body)).toEqual(["bulbs", "tomatoes, basil"]);
+      // Read before that write: refused, nothing written.
+      const stale = yield* Effect.flip(pkm.sourceUpdate({ page: "garden", markdown: "- gone\n", updated: source.updated - 1 }));
+      expect(stale).toMatchObject({ _tag: "Refused" });
+      expect((yield* pkm.page("garden")).page.blocks.map((b) => b.body)).toEqual(["bulbs", "tomatoes, basil"]);
+    }).pipe(Effect.provide(farm())),
+  );
+
+  it.effect("opens a day's journal, making it with a block to write in when it is not there", () =>
+    Effect.gen(function* () {
+      const pkm = yield* Pkm;
+      const made = yield* pkm.journal("2026-11-02");
+      expect([made.title, made.tier, made.file, made.blocks.map((b) => b.body)]).toEqual(["2026_11_02", "journal", "journals/2026_11_02.md", [""]]);
+      const again = yield* pkm.journal("2026-11-02");
+      expect(again.blocks.map((b) => b.id)).toEqual(made.blocks.map((b) => b.id));
+      expect((yield* pkm.list()).pages.map((p) => [p.slug, p.day])).toEqual([["2026_11_02", "2026-11-02"]]);
     }).pipe(Effect.provide(farm())),
   );
 

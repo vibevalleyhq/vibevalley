@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import { RuleTester } from "vite-plus/lint/plugins-dev";
 import { describe, expect, it } from "vite-plus/test";
@@ -51,7 +51,7 @@ tester.run("no-comment-divider", rule("no-comment-divider"), {
 });
 
 tester.run("no-cjk-literal", rule("no-cjk-literal"), {
-  valid: ['t("web.issue.title")', "/[，。]/.test(s)", "const a = 'plain'"],
+  valid: ['t("web.issue.title")', "/[，。]/.test(s)", "const a = 'plain'", String.raw`const typed = ["[", "\u3010"]`],
   invalid: [
     { code: "const a = '工单'", errors: [{ messageId: "cjk" }] },
     { code: "const a = `${n} 个`", errors: [{ messageId: "cjk" }] },
@@ -105,50 +105,72 @@ tester.run("page-layers", rule("page-layers"), {
     { code: "import { a } from './rules';", filename: page("features/issue/Board.tsx") },
     { code: "import { a } from '../../features/issue';", filename: page("farm/panels/Board.tsx") },
     { code: "import { a } from '../ui/A';", filename: "/repo/apps/server/src/x.ts" },
-    { code: "import { a } from '@/infra/router';", filename: page("ui/A.tsx") },
-    { code: "import { a } from '@/features/issue';", filename: page("farm/panels/Board.tsx") },
-    { code: "import { a } from '@/infra/frame';", filename: page("state/atom.ts") },
-    { code: "import { a } from '@/base/format';", filename: page("infra/api.ts") },
+    { code: "import { a } from '#/infra/router';", filename: page("ui/A.tsx") },
+    { code: "import { a } from '#/features/issue';", filename: page("farm/panels/Board.tsx") },
+    { code: "import { a } from '#/infra/frame';", filename: page("state/atom.ts") },
+    { code: "import { a } from '#/base/format';", filename: page("infra/api.ts") },
   ],
   invalid: [
     { code: "import { a } from '../features/issue';", filename: page("ui/A.tsx"), errors: [{ messageId: "layer" }] },
-    { code: "import { a } from '@/infra/api';", filename: page("base/format.ts"), errors: [{ messageId: "layer" }] },
-    { code: "import { a } from '@/state/atom';", filename: page("infra/frame.ts"), errors: [{ messageId: "layer" }] },
+    { code: "import { a } from '#/infra/api';", filename: page("base/format.ts"), errors: [{ messageId: "layer" }] },
+    { code: "import { a } from '#/state/atom';", filename: page("infra/frame.ts"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../../farm/scene';", filename: page("features/issue/Board.tsx"), errors: [{ messageId: "layer" }] },
     { code: "import { a } from '../issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "index" }] },
     { code: "export { a } from '../tree/x';", filename: page("farm/a.ts"), errors: [{ messageId: "sibling" }] },
-    { code: "import { a } from '@/features/issue';", filename: page("ui/A.tsx"), errors: [{ messageId: "layer" }] },
-    { code: "import { a } from '@/issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "layer" }] },
-    { code: "import { a } from '@/features/issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "index" }] },
+    { code: "import { a } from '#/features/issue';", filename: page("ui/A.tsx"), errors: [{ messageId: "layer" }] },
+    { code: "import { a } from '#/issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "layer" }] },
+    { code: "import { a } from '#/features/issue/rules';", filename: page("features/channel/Chat.tsx"), errors: [{ messageId: "index" }] },
   ],
 });
 
 tester.run("parent-import", rule("parent-import"), {
   valid: [
     { code: "import { a } from './rules';", filename: page("features/issue/Board.tsx") },
-    { code: "import { a } from '@/infra/router';", filename: page("ui/A.tsx") },
-    { code: "import { a } from '../../db/generated/x.ts';", filename: "/repo/apps/server/src/issue/issue.ts" },
+    { code: "import { a } from '#/infra/router';", filename: page("ui/A.tsx") },
+    { code: "import { a } from '../../db/x.ts';", filename: "/repo/apps/server/src/issue/issue.ts" },
     { code: "import { a } from '../x';", filename: "/repo/packages/agent/src/core/loop.ts" },
   ],
   invalid: [
     {
+      code: "import { a } from '../../db/generated/x.sql.ts';",
+      filename: "/repo/apps/server/src/issue/issue.ts",
+      errors: [{ messageId: "parent" }],
+      output: "import { a } from '#db/x.sql.ts';",
+    },
+    {
       code: "import { a } from '../infra/router';",
       filename: page("ui/A.tsx"),
       errors: [{ messageId: "parent" }],
-      output: "import { a } from '@/infra/router';",
+      output: "import { a } from '#/infra/router';",
     },
     {
       code: "export * from '../issue/rules.ts';",
       filename: "/repo/apps/server/src/task/x.ts",
       errors: [{ messageId: "parent" }],
-      output: "export * from '@/issue/rules.ts';",
+      output: "export * from '#/issue/rules.ts';",
     },
     {
       code: "const m = import('../../ui/A');",
       filename: page("features/issue/Board.tsx"),
       errors: [{ messageId: "parent" }],
-      output: "const m = import('@/ui/A');",
+      output: "const m = import('#/ui/A');",
     },
+  ],
+});
+
+// Real paths: which package a file is in is read from the package.json files above it.
+const inRepo = (path: string) => join(import.meta.dirname, "..", path);
+
+tester.run("no-cross-package-path", rule("no-cross-package-path"), {
+  valid: [
+    { code: "import { a } from './api-client.ts';", filename: inRepo("scripts/capabilities.ts") },
+    { code: "import { a } from '../infra/lease.ts';", filename: inRepo("apps/server/src/chat/chat.ts") },
+    { code: "import { a } from '@vibevalley/protocol/api';", filename: inRepo("scripts/capabilities.ts") },
+  ],
+  invalid: [
+    { code: "import { a } from '../packages/protocol/src/api.ts';", filename: inRepo("scripts/capabilities.ts"), errors: [{ messageId: "cross" }] },
+    { code: "export * from '../../server/src/assets.ts';", filename: inRepo("apps/desktop/scripts/package.ts"), errors: [{ messageId: "cross" }] },
+    { code: "const m = import('../../../packages/i18n/src/format.ts');", filename: inRepo("apps/web/src/base/x.ts"), errors: [{ messageId: "cross" }] },
   ],
 });
 
@@ -465,7 +487,7 @@ tester.run("protocol-namespace", rule("protocol-namespace"), {
   valid: [
     { code: 'import type * as T from "@vibevalley/protocol";', filename: server },
     { code: 'import { type IssueStatus, ownerId } from "@vibevalley/protocol";', filename: server },
-    { code: 'import { Issue } from "@/issue/issue.ts";', filename: server },
+    { code: 'import { Issue } from "#/issue/issue.ts";', filename: server },
     { code: 'import * as S from "@vibevalley/protocol/schema";', filename: server },
   ],
   invalid: [

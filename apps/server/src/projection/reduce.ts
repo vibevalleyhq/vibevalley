@@ -3,10 +3,10 @@
 import type * as T from "@vibevalley/protocol";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 
-import { withChannel, withMessage, withOwnerMentions } from "@/channel/messages.ts";
-import { emptyPlay, freeStation, playedDoing, playedRun, playOf, stationed } from "@/game/view.ts";
-import { withIssue, withIssueStatuses } from "@/issue/status.ts";
-import { sessionOf, withSession } from "@/session/roster.ts";
+import { withChannel, withMessage, withOwnerMentions } from "#/channel/messages.ts";
+import { emptyPlay, freeStation, playedDoing, playedRun, playOf, stationed } from "#/game/view.ts";
+import { withIssue, withIssueStatuses } from "#/issue/status.ts";
+import { sessionOf, withSession } from "#/session/roster.ts";
 
 const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 

@@ -8,15 +8,15 @@ import { t } from "@vibevalley/i18n";
 import type { SessionId, SessionView } from "@vibevalley/protocol";
 import { defaultOf } from "@vibevalley/protocol/rules";
 
-import { farmState, useFarm } from "@/farm/store";
-import { aimTool } from "@/farm/tools";
-import { useVillage } from "@/farm/world/load";
-import type { Village } from "@/farm/world/load";
-import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "@/farm/world/plots";
-import { plotH, yardPlaces } from "@/farm/world/world";
-import { useFollowed } from "@/features/channel";
-import { useFrames } from "@/infra/frame";
-import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "@/ui/pixel";
+import { farmState, useFarm } from "#/farm/store.ts";
+import { aimTool } from "#/farm/tools.ts";
+import { useVillage } from "#/farm/world/load.ts";
+import type { Village } from "#/farm/world/load.ts";
+import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "#/farm/world/plots.ts";
+import { plotH, yardPlaces } from "#/farm/world/world.ts";
+import { useFollowed } from "#/features/channel/index.ts";
+import { useFrames } from "#/infra/frame.ts";
+import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "#/ui/pixel/index.ts";
 
 import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./readout";
 

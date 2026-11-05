@@ -5,7 +5,7 @@ import { Effect } from "effect";
 import { ownerId } from "@vibevalley/protocol";
 import type { PkmHandlers } from "@vibevalley/protocol/api";
 
-import { Pkm } from "@/pkm/pkm.ts";
+import { Pkm } from "#/pkm/pkm.ts";
 
 export const pkmHandlers = Effect.gen(function* () {
   const pkm = yield* Pkm;
@@ -18,7 +18,10 @@ export const pkmHandlers = Effect.gen(function* () {
     "pkm.page.export": ({ page }) => Effect.map(pkm.markdown(page), (markdown) => ({ markdown })),
     "pkm.block.apply": (req) => pkm.apply(req),
     "pkm.search": (req) => pkm.search(req),
-    "pkm.capture": ({ text }) => pkm.capture(text),
+    "pkm.capture": ({ text, page }) => pkm.capture(text, undefined, page),
+    "pkm.source.get": ({ page }) => pkm.source(page),
+    "pkm.source.update": (req) => pkm.sourceUpdate(req),
+    "pkm.journal.open": ({ day }) => pkm.journal(day),
     "pkm.radar.get": ({ staleDays }) => pkm.radar(staleDays),
     "pkm.comment.list": ({ page }) => pkm.comments(page),
     "pkm.comment.suggest": (req) => pkm.suggest(req, ownerId),

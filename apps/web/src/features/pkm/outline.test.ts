@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 
 import type { PkmBlock, PkmPageSummary } from "@vibevalley/protocol";
 
-import { byTier, hasChildren, keyOp, piecesOf, visibleBlocks, wordDiff } from "./outline";
+import { byTier, hasChildren, piecesOf, visibleBlocks, wordDiff } from "./outline";
 
 const page = (slug: string, tier: PkmPageSummary["tier"]): PkmPageSummary => ({ slug, title: slug, tier, file: `${slug}.md`, tldr: "", updated: 0, open: 0 });
 const block = (id: string, depth: number): PkmBlock => ({ id, depth, body: id, props: {}, path: "" });
@@ -21,17 +21,6 @@ test("hides the blocks under a collapsed one, not its siblings", () => {
   expect(hasChildren(blocks, 4)).toBe(false);
 });
 
-test("maps the editor's keys to ops", () => {
-  const keys = { key: "", shiftKey: false, altKey: false, metaKey: false, ctrlKey: false };
-  expect(keyOp({ ...keys, key: "Tab" }, "x")).toEqual({ op: "indent", block: "x" });
-  expect(keyOp({ ...keys, key: "Tab", shiftKey: true }, "x")).toEqual({ op: "outdent", block: "x" });
-  expect(keyOp({ ...keys, key: "ArrowUp", altKey: true }, "x")).toEqual({ op: "move", block: "x", direction: "up" });
-  expect(keyOp({ ...keys, key: "ArrowDown", altKey: true }, "x")).toEqual({ op: "move", block: "x", direction: "down" });
-  expect(keyOp({ ...keys, key: "Enter", metaKey: true }, "x")).toEqual({ op: "toggle_marker", block: "x" });
-  expect(keyOp({ ...keys, key: "Enter" }, "x")).toBeUndefined();
-  expect(keyOp({ ...keys, key: "ArrowUp" }, "x")).toBeUndefined();
-});
-
 test("reads links, tags and refs out of a block's text", () => {
   expect(piecesOf("see [[Cetus Core|core]] and ((6726f8a1-9b1c-4d2e-8f3a-123456789abc)) #pkm")).toEqual([
     { kind: "text", text: "see " },
@@ -46,6 +35,12 @@ test("reads links, tags and refs out of a block's text", () => {
     { kind: "text", text: " first" },
   ]);
   expect(piecesOf("issue#3 is not a tag")).toEqual([{ kind: "text", text: "issue#3 is not a tag" }]);
+  expect(piecesOf("今天读了#读书，很好")).toEqual([
+    { kind: "text", text: "今天读了" },
+    { kind: "tag", page: "读书", text: "#读书" },
+    { kind: "text", text: "，很好" },
+  ]);
+  expect(piecesOf("## 标题 and C# and a.com/#top")).toEqual([{ kind: "text", text: "## 标题 and C# and a.com/#top" }]);
   expect(piecesOf("a ==sharp words==^[💬 too strong] b")).toEqual([
     { kind: "text", text: "a " },
     { kind: "remark", text: "sharp words", remark: "too strong" },

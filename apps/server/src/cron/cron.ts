@@ -2,24 +2,25 @@ import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Se
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { ownerId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import type { Actor } from "@/base/actor.ts";
-import { newId } from "@/base/ids.ts";
-import { jsonOrNone } from "@/base/json.ts";
-import { scopedPubSub } from "@/base/pubsub.ts";
-import { Channel } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import { messageOf, type ApiError, missing, refused, lookIn } from "@/errors.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { recordTrigger, unroutedCronTriggers } from "@/mailbox/payload.ts";
+import { Agent } from "#/agent/agent.ts";
+import type { Actor } from "#/base/actor.ts";
+import { newId } from "#/base/ids.ts";
+import { jsonOrNone } from "#/base/json.ts";
+import { scopedPubSub } from "#/base/pubsub.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import { messageOf, type ApiError, missing, refused, lookIn } from "#/errors.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { recordTrigger, unroutedCronTriggers } from "#/mailbox/payload.ts";
+import * as q from "#db/cron.sql.ts";
 
-import * as q from "../../db/generated/cron.sql.ts";
 import { afterRun, cronProblem, dueCrons, dueText, isMissed, needsOK, whenText } from "./when.ts";
 
 export interface Due {
@@ -200,7 +201,8 @@ const make = Effect.gen(function* () {
       const at = now();
       const problem = cronProblem(req, at);
       if (problem) return yield* Effect.fail(refused(problem));
-      const want = req.channel ?? chat.defaultChannel();
+      // A channel as the owner names it (general, #general) as well as by id.
+      const want = req.channel === undefined ? chat.defaultChannel() : yield* chat.placeOf(ownerId, req.channel);
       const channel = (yield* chat.channels()).find((c) => c.id === want);
       if (!channel) return yield* Effect.fail(refused(t("server.cron.noChannel", { name: want }), [lookIn.channel]));
       const named = (req.agent ?? "").trim();

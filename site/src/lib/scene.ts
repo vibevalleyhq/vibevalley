@@ -4,7 +4,7 @@
 // placed in shares of the scene's own pixels (1536 x 1024), so it stays put on the picture however the page crops it.
 // Only where things are and how big: the pictures' addresses come from images.ts (compressed copies, made at build).
 
-import sizes from '../../../apps/web/public/title/sprites.json'
+import sizes from '@game/title/sprites.json'
 
 export const SCENE = { w: 1536, h: 1024 } as const
 

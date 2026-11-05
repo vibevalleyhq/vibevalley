@@ -10,14 +10,14 @@ import { maxRunning } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema } from "@vibevalley/protocol/api";
 import { isBusy } from "@vibevalley/protocol/rules";
 
-import { Agent } from "@/agent/agent.ts";
-import { newId } from "@/base/ids.ts";
-import { Core } from "@/core/core.ts";
-import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
-import { Executor, type Started } from "@/executor/executor.ts";
-import { Memory } from "@/memory/memory.ts";
-import { Project } from "@/project/project.ts";
-import { type Merged, MergeFailure, type ProjectError, type Workplace } from "@/project/workplace.ts";
+import { Agent } from "#/agent/agent.ts";
+import { newId } from "#/base/ids.ts";
+import { Core } from "#/core/core.ts";
+import { type ApiError, missing, lookIn, reasonOf, refused } from "#/errors.ts";
+import { Executor, type Started } from "#/executor/executor.ts";
+import { Memory } from "#/memory/memory.ts";
+import { Project } from "#/project/project.ts";
+import { type Merged, MergeFailure, type ProjectError, type Workplace } from "#/project/workplace.ts";
 
 import { briefBreak, instructions, noRoom, notTakenIn, recallBlock, type SessionLimits, type Settle, toOarMcp, withRecall } from "./briefing.ts";
 import { channelRules, restartedContextNote, restartedNote, workplaceRules } from "./prompts.ts";

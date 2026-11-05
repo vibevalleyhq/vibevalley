@@ -3,7 +3,7 @@ import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { ready } from "@/infra/query";
+import { ready } from "#/infra/query.ts";
 
 import { ArtifactCard, useArtifacts } from "./ArtifactCard";
 

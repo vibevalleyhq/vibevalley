@@ -2,7 +2,7 @@ import { t } from "@vibevalley/i18n";
 import { type Chat, type ChatMessage, type Channel, type Issue, type Session, type WorkspaceState } from "@vibevalley/protocol";
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
-import { compareText, or } from "@/base/search";
+import { compareText, or, spelled } from "#/base/search.ts";
 
 const isTop = (c: Channel) => c.type !== "thread";
 
@@ -234,8 +234,8 @@ export function workbenchClock(at: number) {
 }
 
 export interface SwitchTarget {
-  readonly kind: "channel" | "direct" | "thread" | "profile";
-  /** The channel's id; a profile's id for one with no direct channel yet. */
+  readonly kind: "channel" | "direct" | "thread" | "profile" | "note" | "notes";
+  /** The channel's id; a profile's id for one with no direct channel yet; a note's slug; the words to search the notes for. */
   readonly id: string;
   readonly label: string;
   /** Where it is or what picking it does: a channel's group, a thread's channel. */
@@ -279,13 +279,14 @@ export function switchTargets(
       .filter((p) => !peers.has(`profile:${p.id}`))
       .map((p): SwitchTarget => ({ kind: "profile", id: p.id, label: `@${p.name}`, hint: t("web.channel.switcher.newDirect"), unread: 0, at: 0 })),
   ];
-  const typed = query.trim().toLowerCase();
+  // ＃ and ＠ are what a Chinese input method types for # and @.
+  const typed = query.trim().toLowerCase().replace(/^＃/u, "#").replace(/^＠/u, "@");
   const only = typed.startsWith("#") ? "hash" : typed.startsWith("@") ? "at" : undefined;
   const words = only ? typed.slice(1) : typed;
   const kept = targets.filter((target) => {
     if (only === "hash" && target.kind !== "channel" && target.kind !== "thread") return false;
     if (only === "at" && target.kind !== "direct" && target.kind !== "profile") return false;
-    return target.label.toLowerCase().includes(words);
+    return spelled(target.label, words);
   });
   const starts = (target: SwitchTarget) => (words !== "" && target.label.toLowerCase().replace(/^[#@]/u, "").startsWith(words) ? 0 : 1);
   return kept.toSorted((a, b) => or(starts(a) - starts(b), b.unread - a.unread, b.at - a.at, compareText(a.id, b.id))).slice(0, switchMax);

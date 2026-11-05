@@ -8,10 +8,10 @@ import { Effect, Layer } from "effect";
 import type { Issue } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { ServerConfig } from "@/infra/config.ts";
-import { githubSnapshot } from "@/ingress/github.ts";
-import { gitSync, projectsDir, repo, write } from "@/testing/git.ts";
-import { testConfig } from "@/testing/layers.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { githubSnapshot } from "#/ingress/github.ts";
+import { gitSync, projectsDir, repo, write } from "#/testing/git.ts";
+import { testConfig } from "#/testing/layers.ts";
 
 import { Project, githubOrigin, type GitHubRun, probeGitHub, type ProjectHooks } from "./project.ts";
 

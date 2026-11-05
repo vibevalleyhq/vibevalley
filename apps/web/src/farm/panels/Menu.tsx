@@ -4,11 +4,11 @@ import { For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { muted } from "@/farm/cues";
-import { farm } from "@/farm/store";
-import { webRoutes, yardPlaces } from "@/farm/world/world";
-import { useRouter } from "@/infra/router";
-import { FarmSection, PxButton } from "@/ui/pixel";
+import { muted } from "#/farm/cues.ts";
+import { farm } from "#/farm/store.ts";
+import { webRoutes, yardPlaces } from "#/farm/world/world.ts";
+import { useRouter } from "#/infra/router.ts";
+import { FarmSection, PxButton } from "#/ui/pixel/index.ts";
 
 const elsewhere = [
   { label: t("web.farm.menu.chat"), to: "/chat" },

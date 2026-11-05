@@ -8,8 +8,8 @@ import { Effect, Queue, type Scope, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { Socket } from "effect/socket";
 
-import { jsonOrNone } from "@/base/json.ts";
-import { afterRealTime } from "@/infra/time.ts";
+import { jsonOrNone } from "#/base/json.ts";
+import { afterRealTime } from "#/infra/time.ts";
 
 const mossUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
 

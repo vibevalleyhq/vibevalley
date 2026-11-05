@@ -5,8 +5,8 @@ import { Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Look } from "@vibevalley/protocol";
 
-import { orchestratorLookOf } from "@/infra/agents";
-import { ready, useAgents, useSprites } from "@/infra/query";
+import { orchestratorLookOf } from "#/infra/agents.ts";
+import { ready, useAgents, useSprites } from "#/infra/query.ts";
 
 import { castPrefix } from "./cast";
 import { RuntimeBadge } from "./RuntimeBadge";
@@ -88,7 +88,8 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
 export function OwnerFace(props: { size?: number }) {
   return (
     <span
-      class="inline-flex shrink-0 items-center justify-center rounded-sm bg-wheat text-xs font-semibold text-ink"
+      // The owner is who reads the page: their mark is quiet, the helpers' faces are what is looked for.
+      class="inline-flex shrink-0 items-center justify-center rounded-sm bg-selected text-xs font-semibold text-muted"
       style={{ width: `${props.size ?? 24}px`, height: `${props.size ?? 24}px` }}
       aria-hidden="true"
     >

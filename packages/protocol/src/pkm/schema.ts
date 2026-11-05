@@ -29,6 +29,7 @@ export const PkmPageSummary: Codec<T.PkmPageSummary> = Schema.Struct({
   tldr: Schema.String,
   updated: Schema.Finite,
   open: Schema.Int,
+  day: Schema.optionalKey(Schema.String),
 });
 
 export const PkmVault: Codec<T.PkmVault> = Schema.Struct({
@@ -115,6 +116,7 @@ const pkmNewBlock = {
 const pkmOn = { block: Schema.String };
 export const PkmBlockOp: Codec<T.PkmBlockOp> = Schema.Union([
   Schema.Struct({ op: Schema.tag("append"), ...pkmNewBlock }),
+  Schema.Struct({ op: Schema.tag("insert_before"), ...pkmOn, ...pkmNewBlock }),
   Schema.Struct({ op: Schema.tag("insert_after"), ...pkmOn, ...pkmNewBlock }),
   Schema.Struct({ op: Schema.tag("insert_child"), ...pkmOn, ...pkmNewBlock }),
   Schema.Struct({
@@ -130,6 +132,7 @@ export const PkmBlockOp: Codec<T.PkmBlockOp> = Schema.Union([
   Schema.Struct({ op: Schema.tag("indent"), ...pkmOn }),
   Schema.Struct({ op: Schema.tag("outdent"), ...pkmOn }),
   Schema.Struct({ op: Schema.tag("move"), ...pkmOn, direction: Schema.Literals(["up", "down"]) }),
+  Schema.Struct({ op: Schema.tag("move_to"), ...pkmOn, target: Schema.String, at: Schema.Literals(["before", "after", "inside"]) }),
 ]);
 
 export const PkmMutation: Codec<T.PkmMutation> = Schema.Struct({ page: Schema.String, ops: Schema.mutable(Schema.Array(PkmBlockOp)) });
@@ -150,11 +153,18 @@ export const PkmSearchHit: Codec<T.PkmSearchHit> = Schema.Struct({
   marker: Schema.optionalKey(PkmMarker),
   path: Schema.String,
   body: Schema.String,
+  plain: Schema.String,
   score: Schema.Finite,
   children: Schema.mutable(Schema.Array(PkmBlock)),
 });
 
-export const PkmCaptureRequest: Codec<T.PkmCaptureRequest> = Schema.Struct({ text: Schema.String });
+export const PkmCaptureRequest: Codec<T.PkmCaptureRequest> = Schema.Struct({ text: Schema.String, page: Schema.optionalKey(Schema.String) });
+
+export const PkmSource: Codec<T.PkmSource> = Schema.Struct({ page: Schema.String, title: Schema.String, markdown: Schema.String, updated: Schema.Finite });
+
+export const PkmSourceUpdate: Codec<T.PkmSourceUpdate> = Schema.Struct({ page: Schema.String, markdown: Schema.String, updated: Schema.Finite });
+
+export const PkmJournalRequest: Codec<T.PkmJournalRequest> = Schema.Struct({ day: Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/u)) });
 
 export const PkmStaleProject: Codec<T.PkmStaleProject> = Schema.Struct({
   slug: Schema.String,
@@ -170,6 +180,7 @@ export const PkmOverdue: Codec<T.PkmOverdue> = Schema.Struct({
   block: Schema.String,
   page: Schema.String,
   body: Schema.String,
+  plain: Schema.String,
   deadline: Schema.String,
 });
 

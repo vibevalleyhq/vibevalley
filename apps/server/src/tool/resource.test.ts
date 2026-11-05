@@ -4,12 +4,12 @@ import { Effect, Schema } from "effect";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { sampleAgent } from "@/agent/seed.ts";
-import { owner, session as sessionActor } from "@/base/actor.ts";
-import { Channel } from "@/channel/channel.ts";
-import { Issue } from "@/issue/issue.ts";
-import { testIssues, world } from "@/testing/world.ts";
+import { Agent } from "#/agent/agent.ts";
+import { sampleAgent } from "#/agent/seed.ts";
+import { owner, session as sessionActor } from "#/base/actor.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Issue } from "#/issue/issue.ts";
+import { testIssues, world } from "#/testing/world.ts";
 
 import { Tool } from "./tool.ts";
 

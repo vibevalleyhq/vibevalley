@@ -1,0 +1,13 @@
+diff --git a/dist/effect-tsgo.cjs b/dist/effect-tsgo.cjs
+index 44b7277af0b385bd7e3b944dfe5ce65db5afd28b..2a34d1cc9f1a42ebe27bd973083ece43a0e21683 100755
+--- a/dist/effect-tsgo.cjs
++++ b/dist/effect-tsgo.cjs
+@@ -61093,7 +61093,7 @@ const discoverBinaries = (cwd, preferredTypescriptPackage) => gen(function* () {
+ 	const cwdRequire = node_module.createRequire(path.join(cwd, "noop.js"));
+ 	const typescript = yield* discoverTypeScript(cwdRequire, preferredTypescriptPackage);
+ 	const oxlint = yield* discoverOxlint(cwdRequire);
+-	const vitePlusOxlint = yield* discoverVitePlusOxlint(cwdRequire);
++	const vitePlusOxlint = (yield* optionally(discoverVitePlusOxlint(cwdRequire))) ?? [];
+ 	const tsrs = yield* discoverTsrs(cwdRequire);
+ 	const discovered = [...new Map([
+ 		...typescript,

@@ -7,21 +7,21 @@ import { createEffect, createMemo, createSignal, Show, snapshot } from "solid-js
 import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
 
-import { createExternal } from "@/base/external";
-import { messageOf } from "@/base/format";
-import { CursorManifest } from "@/base/manifests";
-import { clickBed, openPlace } from "@/farm/commands";
-import { commands, farmFrameOf } from "@/farm/frames";
-import { farm, farmProject, farmState, subscribeFarm } from "@/farm/store";
-import { useVillage } from "@/farm/world/load";
-import { beds } from "@/farm/world/plots";
-import { textureProgress } from "@/farm/world/textures";
-import { yardPlace } from "@/farm/world/world";
-import { frames } from "@/infra/frame";
-import { ready, useAgents, useQuery } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { spriteUrl } from "@/ui/pixel/atlas";
-import { playSound } from "@/ui/pixel/sound";
+import { createExternal } from "#/base/external.ts";
+import { messageOf } from "#/base/format.ts";
+import { CursorManifest } from "#/base/manifests.ts";
+import { clickBed, openPlace } from "#/farm/commands.ts";
+import { commands, farmFrameOf } from "#/farm/frames.ts";
+import { farm, farmProject, farmState, subscribeFarm } from "#/farm/store.ts";
+import { useVillage } from "#/farm/world/load.ts";
+import { beds } from "#/farm/world/plots.ts";
+import { textureProgress } from "#/farm/world/textures.ts";
+import { yardPlace } from "#/farm/world/world.ts";
+import { frames } from "#/infra/frame.ts";
+import { ready, useAgents, useQuery } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { spriteUrl } from "#/ui/pixel/atlas.ts";
+import { playSound } from "#/ui/pixel/sound.ts";
 
 import { startScene, type Scene } from "./scene";
 import { background, cssCursor, holdTimeOfDay, lightOn, screenOf } from "./screen";

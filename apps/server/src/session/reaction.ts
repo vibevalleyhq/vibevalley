@@ -7,9 +7,9 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 
-import { clip } from "@/base/clip.ts";
-import type { FactIn } from "@/core/core.ts";
-import type { Rate } from "@/runtime/price.ts";
+import { clip } from "#/base/clip.ts";
+import type { FactIn } from "#/core/core.ts";
+import type { Rate } from "#/runtime/price.ts";
 
 import { briefBreak, recalledIn } from "./briefing.ts";
 import { failureText } from "./report.ts";

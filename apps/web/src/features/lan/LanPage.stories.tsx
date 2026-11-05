@@ -1,7 +1,7 @@
 import type { LanDevice, LanStatus } from "@vibevalley/protocol";
 import { stories, story, type Story } from "@vibevalley/stories";
 
-import { answer } from "@/infra/storyApi";
+import { answer } from "#/infra/storyApi.ts";
 
 import { LanPage } from "./LanPage";
 

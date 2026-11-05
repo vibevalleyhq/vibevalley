@@ -11,7 +11,7 @@ import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome,
 import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
 import { nextTurn, whenTrue } from "@vibevalley/testkit/until";
 
-import { wallTime } from "@/infra/time.ts";
+import { wallTime } from "#/infra/time.ts";
 
 import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
 
@@ -49,7 +49,7 @@ async function open(steps: readonly Step[], extra: { resume?: string; home?: str
   const cwd = extra.cwd ?? home();
   const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: await owner(), home: () => h, llm: () => llm });
   const session = await runtime.session(
-    { via: "bundled" },
+    { kind: "available", via: "bundled" },
     {
       cwd,
       ...(extra.resume ? { resume: extra.resume } : {}),
@@ -86,7 +86,7 @@ describe("VibeValley's runtime", () => {
       },
     };
     const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: await owner(), home, llm: () => held });
-    const session = await runtime.session({ via: "bundled" }, { cwd: home() });
+    const session = await runtime.session({ kind: "available", via: "bundled" }, { cwd: home() });
     sessions.push(session);
     const events: Event[] = [];
     session.events((event) => events.push(event), { cursor: { sessionId: session.id, afterSeq: -1 } });
@@ -130,7 +130,7 @@ describe("VibeValley's runtime", () => {
     );
     const held = { ...llm, service: { ...llm.service, stream: () => Stream.fromEffect(waiting).pipe(Stream.drain) } };
     const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: parent, home, llm: () => held });
-    const session = await runtime.session({ via: "bundled" }, { cwd: home() });
+    const session = await runtime.session({ kind: "available", via: "bundled" }, { cwd: home() });
     sessions.push(session);
     await session.prompt("work");
     await whenTrue(() => started, "the model started");
@@ -246,7 +246,7 @@ rl.on('line', (line) => {
       true,
     );
     expect(await runtime.installation()).toEqual({ kind: "available", via: "bundled" });
-    await expect(runtime.session({ via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/u);
+    await expect(runtime.session({ kind: "available", via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/u);
     const keyless = vibevalleyRuntimeOf({
       time: wallTime,
       owner: await owner(),

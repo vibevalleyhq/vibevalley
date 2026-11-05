@@ -4,7 +4,7 @@ import type { Block, BlockAttrs, BlockOp, BlockOpStatus, BlockType, TextSpan } f
 import { keyBetween, normalSpans, validKey } from "@vibevalley/protocol/rules";
 import type { Wire } from "@vibevalley/protocol/schema";
 
-import { bold, para, sample, span } from "@/testing/artifact.ts";
+import { bold, para, sample, span } from "#/testing/artifact.ts";
 
 import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
 import { ordered, Page, plain, runeLen, sameText, splitAt } from "./ops.ts";

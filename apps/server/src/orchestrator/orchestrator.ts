@@ -7,27 +7,29 @@ import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, ownerId } from "@vibevalley/protocol";
 
-import { Agent, modelClient, noDeepSeekKey } from "@/agent/agent.ts";
-import { traitsOf } from "@/agent/prompts.ts";
-import { orchestrator } from "@/base/actor.ts";
-import { Channel, type OrchestratorNews } from "@/channel/channel.ts";
-import { Cron } from "@/cron/cron.ts";
-import { nextRun } from "@/cron/when.ts";
-import { type ApiError, refused } from "@/errors.ts";
-import { agentHome, projectsDir, ServerConfig } from "@/infra/config.ts";
-import { localeMinute } from "@/infra/time.ts";
-import { Ingress } from "@/ingress/ingress.ts";
-import type { Picked } from "@/mailbox/envelope.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { Project } from "@/project/project.ts";
-import { ownersLanguage } from "@/prompts.ts";
-import { runtimeLabel } from "@/runtime/presets.ts";
-import { Runtime } from "@/runtime/runtime.ts";
-import { type AgentHost, type Caller, type NotAnswered } from "@/session/host.ts";
-import { type NotRecorded, Session } from "@/session/session.ts";
-import { Setting } from "@/setting/setting.ts";
-import { channelLine } from "@/tool/prompts.ts";
-import { Tool } from "@/tool/tool.ts";
+import { Agent, modelClient, noDeepSeekKey } from "#/agent/agent.ts";
+import { traitsOf } from "#/agent/prompts.ts";
+import { orchestrator } from "#/base/actor.ts";
+import { head } from "#/base/clip.ts";
+import { Channel, type OrchestratorNews } from "#/channel/channel.ts";
+import { Cron } from "#/cron/cron.ts";
+import { nextRun } from "#/cron/when.ts";
+import { type ApiError, refused } from "#/errors.ts";
+import { agentHome, projectsDir, ServerConfig } from "#/infra/config.ts";
+import { localeMinute } from "#/infra/time.ts";
+import { Ingress } from "#/ingress/ingress.ts";
+import type { Picked } from "#/mailbox/envelope.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { Pkm } from "#/pkm/pkm.ts";
+import { Project } from "#/project/project.ts";
+import { ownersLanguage } from "#/prompts.ts";
+import { runtimeLabel } from "#/runtime/presets.ts";
+import { Runtime } from "#/runtime/runtime.ts";
+import { type AgentHost, type Caller, type NotAnswered } from "#/session/host.ts";
+import { type NotRecorded, Session } from "#/session/session.ts";
+import { Setting } from "#/setting/setting.ts";
+import { answers as toolAnswers, channelLine } from "#/tool/prompts.ts";
+import { Tool } from "#/tool/tool.ts";
 
 import type { Answer } from "./openai.ts";
 import { agentPrompt, identityNote, lineWords, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
@@ -35,6 +37,9 @@ import { makeResponses } from "./response.ts";
 import { deepseekModel, intake, orchestratorInboxLines, quotaText, situationDelta, type Source } from "./situation.ts";
 
 const keepEvents = 1000;
+/** The owner's project pages the situation shows; notesRecalled is how many note blocks an input's words call up. */
+const notesShown = 8;
+const notesRecalled = 3;
 /** A run cut off longer ago than this is left: what it was for has likely moved on. */
 const resumeWithinMs = 30 * 60_000;
 
@@ -101,6 +106,7 @@ const make = (options: OrchestratorOptions = {}) =>
     const settings = yield* Setting;
     const runtimes = yield* Runtime;
     const projects = yield* Project;
+    const notes = yield* Pkm;
     const run = yield* Session;
     const chat = yield* Channel;
     const mailbox = yield* Mailbox;
@@ -231,9 +237,11 @@ const make = (options: OrchestratorOptions = {}) =>
         });
         const all = yield* projects.list();
         const folders = all.length > 0 ? situationWords.projects(all.map((p) => p.name)) : situationWords.noProjects;
+        const working = (yield* notes.list()).pages.filter((p) => p.tier === "project").slice(0, notesShown);
         return situationWords.whole(
           projects.root,
           folders,
+          situationWords.notes(working.map((p) => situationWords.noteProject(p.title, p.tldr, p.open))),
           sessions.join("\n"),
           byChannel.join("\n"),
           here.direct ? situationWords.direct(here.target) : here.target,
@@ -254,6 +262,11 @@ const make = (options: OrchestratorOptions = {}) =>
       Effect.map(mailbox.orchestratorDigest(me.id), (digest) =>
         digest.length === 0 ? ["", []] : [situationWords.news(orchestratorInboxLines(digest)), digest.map((m) => m.id)],
       );
+
+    const recall = (i: Intake) =>
+      i.source !== "owner" || i.line.trim().length < 4
+        ? Effect.succeed("")
+        : Effect.map(notes.search({ text: head(i.line, 200), limit: notesRecalled }), (hits) => situationWords.recalled(hits.map(toolAnswers.pkm.hit)));
 
     const taking = (i: Intake) =>
       Effect.gen(function* () {
@@ -277,6 +290,7 @@ const make = (options: OrchestratorOptions = {}) =>
                 situationWords.now(localeMinute(new Date(yield* Clock.currentTimeMillis))),
                 yield* situationNow(me, busy, i.channel),
                 memoryNews,
+                yield* recall(i),
                 heard,
                 asked,
               ]

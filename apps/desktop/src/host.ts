@@ -8,10 +8,13 @@ import { desktopBridge, type TraySummary, type UpdateState } from "@vibevalley/p
 
 import { revealable } from "./boundary";
 import { mainLink } from "./bridge";
+import type { commandLine } from "./commandLine";
 import { setAppMenu } from "./menu";
 import { farmHome } from "./paths";
 import { probe } from "./probe";
 import type { MainWindow } from "./window";
+
+type CommandLineInstaller = ReturnType<typeof commandLine>;
 
 interface HostUpdates {
   readonly state: () => UpdateState;
@@ -19,7 +22,17 @@ interface HostUpdates {
   readonly install: () => Promise<void>;
 }
 
-export function serveHost(o: { readonly window: MainWindow; readonly tray: (summary: TraySummary) => void; readonly updates: HostUpdates }) {
+export function serveHost(o: {
+  readonly window: MainWindow;
+  readonly tray: (summary: TraySummary) => void;
+  readonly updates: HostUpdates;
+  /** 「安装命令行」; absent in the app run from the repository, which has no command line of its own to link. */
+  readonly commandLine: CommandLineInstaller | undefined;
+}) {
+  const installer = () => {
+    if (!o.commandLine) throw new Error("this app has no command line to install: it runs from the repository");
+    return o.commandLine;
+  };
   return serve(
     desktopBridge,
     mainLink(() => o.window.current()?.webContents),
@@ -50,6 +63,9 @@ export function serveHost(o: { readonly window: MainWindow; readonly tray: (summ
       updateState: () => o.updates.state(),
       updateCheck: () => o.updates.check(),
       updateInstall: () => o.updates.install(),
+      cliState: () => installer().state(),
+      cliInstall: () => installer().install(),
+      cliRemove: () => installer().remove(),
     },
   );
 }

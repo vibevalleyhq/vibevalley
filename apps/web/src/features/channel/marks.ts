@@ -8,10 +8,10 @@ import { type Accessor, createEffect, createMemo } from "solid-js";
 
 import { type Channel, type Chat, type ChatMessage, type Notify, ownerId, type StateFrame } from "@vibevalley/protocol";
 
-import { api } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { defineAtom } from "@/state/atom";
-import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "@/state/intent";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { defineAtom } from "#/state/atom.ts";
+import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "#/state/intent.ts";
 
 import { type Followed, followed, useFollowed } from "./follow";
 import { newestUnread } from "./places";

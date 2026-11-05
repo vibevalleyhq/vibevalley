@@ -8,10 +8,10 @@ import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
 import type { Rtc, RtcLine } from "@vibevalley/protocol/host";
 
-import { messageOf } from "@/base/format";
-import { api, reasonOf } from "@/infra/api";
-import { currentHost } from "@/infra/host";
-import { prefsNow } from "@/state/prefs";
+import { messageOf } from "#/base/format.ts";
+import { api, reasonOf } from "#/infra/api.ts";
+import { currentHost } from "#/infra/host.ts";
+import { prefsNow } from "#/state/prefs.ts";
 
 import { LiveCaptions } from "./captions";
 

@@ -35,22 +35,22 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { variant, aria, createSettled, Keyed } from "@/base/dom";
-import { api, reasonOf } from "@/infra/api";
-import { ready, useQuery, useSettings } from "@/infra/query";
-import { saveSettings } from "@/infra/settings";
-import { A } from "@/ui/A";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { Select, TextArea, TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { IconLink, OutLink } from "@/ui/IconButton";
-import { KeyField, SaveBar } from "@/ui/KeyField";
-import { Card, Quiet, SecretInput } from "@/ui/layout";
-import { Segmented } from "@/ui/Segmented";
-import { KeyRow, SettingsGroup } from "@/ui/settings";
-import { Hint } from "@/ui/Tip";
-import { toast } from "@/ui/toasts";
+import { variant, aria, createSettled, Keyed } from "#/base/dom.tsx";
+import { api, reasonOf } from "#/infra/api.ts";
+import { ready, useQuery, useSettings } from "#/infra/query.ts";
+import { saveSettings } from "#/infra/settings.ts";
+import { A } from "#/ui/A.tsx";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { Select, TextArea, TextInput } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import { IconLink, OutLink } from "#/ui/IconButton.tsx";
+import { KeyField, SaveBar } from "#/ui/KeyField.tsx";
+import { Card, Quiet, SecretInput } from "#/ui/layout.tsx";
+import { Segmented } from "#/ui/Segmented.tsx";
+import { KeyRow, SettingsGroup } from "#/ui/settings.tsx";
+import { Hint } from "#/ui/Tip.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 import { MossVerify } from "./MossVerify";
 

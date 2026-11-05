@@ -83,19 +83,25 @@ export const situationWords = {
   noHelpers: "  （没有帮工）",
   noProjects: "（还没有）",
   projects: (list: readonly string[]) => list.join("、"),
-  whole: (root: string, folders: string, agents: string, channels: string, here: string, language: string) =>
+  whole: (root: string, folders: string, notes: string, agents: string, channels: string, here: string, language: string) =>
     "【现状】\n主人的语言：" +
     language +
     "（你说的话、写给主人和帮工的都用它）\n项目（工作目录 " +
     root +
     " 下的文件夹）：" +
     folders +
+    notes +
     "\n可以派的帮工：\n" +
     agents +
     "\n各频道里在场的帮工：\n" +
     channels +
     "\n你正在回话的地方：" +
     here,
+  /** The owner's notes' project pages, as the line under the folders; "" when there are none. */
+  notes: (lines: readonly string[]) => (lines.length === 0 ? "" : "\n主人笔记里在做的项目（pkm_page_get 读整页）：\n" + lines.join("\n")),
+  noteProject: (title: string, tldr: string, open: number) => `- 《${title}》` + (tldr ? "：" + tldr : "") + (open > 0 ? `（${open} 件没做完）` : ""),
+  /** Blocks of the owner's notes the words of an input may be about, before it; "" when none came up. */
+  recalled: (lines: readonly string[]) => (lines.length === 0 ? "" : "【笔记里可能相关的】（主人自己记的；用得上就用，用不上不提）\n" + lines.join("\n")),
   direct: (target: string) => "和主人的私聊 " + target + "（只有你们两个；派的活和定时照旧落在默认频道）",
   changed: "【现状变了】",
   now: (time: string) => "【现在】" + time,

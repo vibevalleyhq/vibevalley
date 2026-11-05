@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { exportedValuesOf } from "../packages/testkit/src/source.ts";
+import { exportedValuesOf } from "@vibevalley/testkit/source";
 
 const root = join(import.meta.dirname, "..");
 const out = join(root, "docs/reference/primitives.md");

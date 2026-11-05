@@ -5,15 +5,15 @@ import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import type { Channel } from "@/channel/channel.ts";
-import type { Core } from "@/core/core.ts";
-import { type ApiError, missing, lookIn, reasonOf, refused } from "@/errors.ts";
-import type { Db } from "@/infra/db.ts";
-import { issueBranch, type Project } from "@/project/project.ts";
-import { type Merged, MergeFailure, type ProjectError, type Workplace } from "@/project/workplace.ts";
-import type { NotTakenIn, Session } from "@/session/session.ts";
+import type { Channel } from "#/channel/channel.ts";
+import type { Core } from "#/core/core.ts";
+import { type ApiError, missing, lookIn, reasonOf, refused } from "#/errors.ts";
+import type { Db } from "#/infra/db.ts";
+import { issueBranch, type Project } from "#/project/project.ts";
+import { type Merged, MergeFailure, type ProjectError, type Workplace } from "#/project/workplace.ts";
+import type { NotTakenIn, Session } from "#/session/session.ts";
+import * as q from "#db/issue.sql.ts";
 
-import * as q from "../../db/generated/issue.sql.ts";
 import { pullRequestConclusion } from "./brief.ts";
 import { acceptanceAncestors } from "./dependencies.ts";
 import { statusMove } from "./moves.ts";

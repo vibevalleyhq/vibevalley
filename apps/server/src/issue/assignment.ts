@@ -3,11 +3,11 @@ import { Effect } from "effect";
 import type * as T from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { newId } from "@/base/ids.ts";
-import { compare, compareText, or } from "@/base/order.ts";
+import { newId } from "#/base/ids.ts";
+import { compare, compareText, or } from "#/base/order.ts";
+import * as q from "#db/issue_assignment.sql.ts";
+import type * as qe from "#db/issue_assignment_execution.sql.ts";
 
-import * as q from "../../db/generated/issue_assignment.sql.ts";
-import type * as qe from "../../db/generated/issue_assignment_execution.sql.ts";
 import { nullText } from "./rows.ts";
 
 /** Called in the transaction that changes responsibility. */

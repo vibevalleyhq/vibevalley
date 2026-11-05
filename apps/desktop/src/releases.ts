@@ -27,15 +27,56 @@ export const Release = Schema.Struct({
 });
 export type Release = typeof Release.Type;
 
-const parts = (v: string) => /^(\d+)\.(\d+)\.(\d+)$/u.exec(v)?.slice(1).map(Number);
+/** x.y.z, or a prerelease of it: x.y.z-alpha.n, x.y.z-beta.n (the tag without its v; scripts/release.ts makes them). */
+const versionPattern = /^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta)\.(\d+))?$/u;
 
-/** a is a later version than b; one that is not x.y.z is never later. */
+/** A version's place in the order: its numbers, then its stage (alpha before beta before the release), then n. */
+function rankOf(v: string): number[] | undefined {
+  const m = versionPattern.exec(v);
+  if (!m) return undefined;
+  const stage = m[4] === "alpha" ? 0 : m[4] === "beta" ? 1 : 2;
+  return [Number(m[1]), Number(m[2]), Number(m[3]), stage, Number(m[5] ?? 0)];
+}
+
+export const isVersion = (v: string) => versionPattern.test(v);
+
+/** a is a later version than b: 0.4.0-alpha.2 < 0.4.0-beta.1 < 0.4.0 < 0.4.1; one that is neither is never later. */
 export function newer(a: string, b: string): boolean {
-  const x = parts(a);
-  const y = parts(b);
+  const x = rankOf(a);
+  const y = rankOf(b);
   if (!x || !y) return false;
-  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return (x[i] ?? 0) > (y[i] ?? 0);
+  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return (x[i] ?? 0) > (y[i] ?? 0);
   return false;
+}
+
+/** A release, a beta or an alpha. */
+export type Stage = "stable" | "beta" | "alpha";
+
+/** The release, beta or alpha a version is; undefined for one that is not a version. */
+export function stageOf(v: string): Stage | undefined {
+  const m = versionPattern.exec(v);
+  return m ? (m[4] === "alpha" ? "alpha" : m[4] === "beta" ? "beta" : "stable") : undefined;
+}
+
+/** One of GitHub's releases as its list gives it, the fields read here. */
+export const ListedRelease = Schema.Struct({
+  tag_name: Schema.String,
+  draft: Schema.Boolean,
+  assets: Schema.Array(Schema.Struct({ name: Schema.String, browser_download_url: Schema.String })),
+});
+export type ListedRelease = typeof ListedRelease.Type;
+
+/** The release.json of the latest release of a stage, from GitHub's list of releases: each channel's app updates only
+ * within its own (channel.ts); drafts are not anyone's yet. */
+export function manifestFor(list: readonly ListedRelease[], stage: Stage): string | undefined {
+  let best: { version: string; url: string } | undefined;
+  for (const r of list) {
+    const version = r.tag_name.replace(/^v/u, "");
+    const url = r.assets.find((a) => a.name === "release.json")?.browser_download_url;
+    if (r.draft || stageOf(version) !== stage || url === undefined) continue;
+    if (best === undefined || newer(version, best.version)) best = { version, url };
+  }
+  return best?.url;
 }
 
 export const buildFor = (release: Release, arch: string) => release.builds.find((b) => b.arch === arch);

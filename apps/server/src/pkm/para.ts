@@ -55,3 +55,12 @@ export const journalTitle = (at: number) => {
 
 /** The day of at as deadline:: values are written: 2026-11-03. */
 export const dayOf = (at: number) => journalTitle(at).replace(/_/gu, "-");
+
+/** A journal's day from its file (journals/2026_11_03.md → 2026-11-03); none for a file not named for a day. */
+export function journalDay(file: string): string | undefined {
+  const m = /^journals\/(\d{4})_(\d{2})_(\d{2})\.md$/u.exec(file);
+  return m ? `${m[1] ?? ""}-${m[2] ?? ""}-${m[3] ?? ""}` : undefined;
+}
+
+/** 2026-11-03 → 2026_11_03, as journalTitle names today's: change them together. */
+export const journalTitleOf = (day: string) => day.replace(/-/gu, "_");

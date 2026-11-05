@@ -7,19 +7,19 @@ import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Semaphore,
 import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 
-import { scopedPubSub } from "@/base/pubsub.ts";
-import { Channel } from "@/channel/channel.ts";
-import { toMessage } from "@/channel/contracts.ts";
-import { Core } from "@/core/core.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { recordTrigger } from "@/mailbox/payload.ts";
-import { Session } from "@/session/session.ts";
+import { scopedPubSub } from "#/base/pubsub.ts";
+import { Channel } from "#/channel/channel.ts";
+import { toMessage } from "#/channel/contracts.ts";
+import { Core } from "#/core/core.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { recordTrigger } from "#/mailbox/payload.ts";
+import { Session } from "#/session/session.ts";
+import { messageByID, notificationReceipt, ownerReadReports } from "#db/channel_message.sql.ts";
 
-import { messageByID, notificationReceipt, ownerReadReports } from "../../db/generated/channel_message.sql.ts";
 import { forOwner, inbox, inboxEntries } from "./items.ts";
 import { emptyPatrol, type PatrolMemory, type PatrolNote, patrolStep } from "./patrol.ts";
 import { patrolText } from "./prompts.ts";

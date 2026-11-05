@@ -4,7 +4,7 @@ import { Effect } from "effect";
 
 import type { GameHandlers } from "@vibevalley/protocol/api";
 
-import { Game } from "@/game/game.ts";
+import { Game } from "#/game/game.ts";
 
 export const gameHandlers = Effect.gen(function* () {
   const game = yield* Game;

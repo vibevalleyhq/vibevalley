@@ -11,18 +11,24 @@ import { gunzipSync } from "node:zlib";
 
 import { Effect, FileSystem } from "effect";
 
-const dataDir = join(import.meta.dirname, "data");
+import { serverFile } from "#/assets.ts";
+
+const dataDir = serverFile("src/memory/data");
 
 /** Go's strings.ToLower where it differs from JavaScript's: İ is a plain i (JavaScript adds a combining dot). */
 export const goLower = (s: string) => s.replace(/İ/gu, "i").toLowerCase();
 
 const isLetterOrNumber = /[\p{L}\p{N}]/u;
+/** A letter keyOf might lower: below U+0800, from A up (digits and marks are kept as they are either way). */
+const lowerable = /[A-Za-z\u00aa-\u07ff]/u;
 
 /**
  * How gse keys a dictionary word: letters and digits of one or two UTF-8 bytes (Latin, Greek, Cyrillic…) lowered, the rest
  * as it is (SplitTextToWords, toLow).
  */
 function keyOf(text: string): string {
+  // Most words are all CJK, past U+0800: nothing in them is lowered.
+  if (!lowerable.test(text)) return text;
   let out = "";
   for (const ch of text) out += ch.codePointAt(0)! < 0x800 && isLetterOrNumber.test(ch) ? goLower(ch) : ch;
   return out;
@@ -69,7 +75,8 @@ function dictionaryOf(text: string): Dictionary {
     const freqText = (second < 0 ? rest : rest.slice(0, second)).trim();
     let f = goParseFloat(freqText);
     if (f === undefined || f < 2) continue;
-    if ([...word].length < 2) f = 2;
+    // One character: one UTF-16 unit, or a surrogate pair.
+    if (word.length < 2 || (word.length === 2 && word.charCodeAt(0) >= 0xd800 && word.charCodeAt(0) <= 0xdbff)) f = 2;
     const key = keyOf(word);
     // The first of two lines for one word stands.
     if (freq.has(key)) continue;

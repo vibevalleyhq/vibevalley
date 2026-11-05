@@ -15,15 +15,21 @@ import { Schema } from "effect";
 import type { UpdateState } from "@vibevalley/protocol/host";
 
 import { reasonOf } from "./lines";
-import { type Build, bundleOf, buildFor, newer, placeProblem, plistVersion, Release, startsNewFarm } from "./releases";
+import { type Build, bundleOf, buildFor, ListedRelease, manifestFor, newer, placeProblem, plistVersion, Release, type Stage, startsNewFarm } from "./releases";
 
-/** The latest release's manifest; VIBEVALLEY_UPDATE_FEED points elsewhere (a local copy, to try an update). */
-export const defaultFeed = "https://github.com/vibevalleyhq/vibevalley/releases/latest/download/release.json";
+/** The latest release's manifest, what the stable channel reads; VIBEVALLEY_UPDATE_FEED names one in its place (a local
+ * copy, to try an update). */
+const defaultFeed = "https://github.com/vibevalleyhq/vibevalley/releases/latest/download/release.json";
+
+/** GitHub's latest leaves prereleases out, so the beta and alpha apps read the list (unauthenticated: 60 asks an hour
+ * from one address, and the app asks every 4 hours). */
+const releaseList = "https://api.github.com/repos/vibevalleyhq/vibevalley/releases?per_page=30";
 
 /** How often a running app asks again. */
 const everyMs = 4 * 60 * 60 * 1000;
 
 const readRelease = Schema.decodeUnknownSync(Release);
+const readList = Schema.decodeUnknownSync(Schema.Array(ListedRelease));
 
 const writable = (path: string) => {
   try {
@@ -55,7 +61,10 @@ export function updater(o: {
   readonly home: string;
   /** Where downloads go, a folder a version. */
   readonly dir: string;
-  readonly feed: string;
+  /** One manifest in place of the stage's latest (VIBEVALLEY_UPDATE_FEED). */
+  readonly feed: string | undefined;
+  /** The stage this app's channel takes (channel.ts). */
+  readonly stage: Stage;
   readonly heard: (state: UpdateState) => void;
 }) {
   let state: UpdateState = { _tag: "idle", version: o.version };
@@ -65,12 +74,21 @@ export function updater(o: {
     o.heard(next);
   };
 
-  const download = async (release: Release, build: Build, bundle: string) => {
+  /** The manifest of the latest release the channel takes; undefined when there is none yet. */
+  const manifest = async (): Promise<string | undefined> => {
+    if (o.feed !== undefined) return o.feed;
+    if (o.stage === "stable") return defaultFeed;
+    const res = await fetch(releaseList, { headers: { accept: "application/vnd.github+json" } });
+    if (!res.ok) throw new Error(`releases: ${res.status}`);
+    return manifestFor(readList(await res.json()), o.stage);
+  };
+
+  const download = async (release: Release, build: Build, bundle: string, feed: string) => {
     const folder = join(o.dir, release.version);
     rmSync(folder, { recursive: true, force: true });
     mkdirSync(folder, { recursive: true });
     const zip = join(folder, build.file);
-    const res = await fetch(new URL(build.file, o.feed));
+    const res = await fetch(new URL(build.file, feed));
     if (!res.ok || !res.body) throw new Error(`${build.file}: ${res.status}`);
     const hash = createHash("sha512");
     let got = 0;
@@ -99,7 +117,9 @@ export function updater(o: {
     if (state._tag === "checking" || state._tag === "downloading" || state._tag === "ready") return;
     set({ _tag: "checking", version: o.version });
     try {
-      const res = await fetch(o.feed);
+      const feed = await manifest();
+      if (feed === undefined) return set({ _tag: "idle", version: o.version });
+      const res = await fetch(feed);
       // No release yet.
       if (res.status === 404) return set({ _tag: "idle", version: o.version });
       if (!res.ok) throw new Error(`release.json: ${res.status}`);
@@ -112,7 +132,7 @@ export function updater(o: {
       const bundle = bundleOf(o.exe);
       const problem = bundle === undefined ? "readOnly" : placeProblem(bundle, writable(bundle) && writable(dirname(bundle)));
       if (bundle === undefined || problem !== undefined) return manual(problem ?? "readOnly");
-      staged = await download(release, build, bundle);
+      staged = await download(release, build, bundle, feed);
       set({ _tag: "ready", version: o.version, next: release.version, notes: release.notes, newFarm: staged.newFarm });
     } catch (e) {
       set({ _tag: "failed", version: o.version, why: reasonOf(e) });

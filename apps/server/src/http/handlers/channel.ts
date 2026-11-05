@@ -5,11 +5,11 @@ import { Effect } from "effect";
 import { ownerId } from "@vibevalley/protocol";
 import type { ChannelHandlers } from "@vibevalley/protocol/api";
 
-import { Channel } from "@/channel/channel.ts";
-import { missing, lookIn, reasonOf } from "@/errors.ts";
-import { Game } from "@/game/game.ts";
-import { requestKeys } from "@/http/api.ts";
-import { Ingress } from "@/ingress/ingress.ts";
+import { Channel } from "#/channel/channel.ts";
+import { missing, lookIn, reasonOf } from "#/errors.ts";
+import { Game } from "#/game/game.ts";
+import { requestKeys } from "#/http/api.ts";
+import { Ingress } from "#/ingress/ingress.ts";
 
 export const channelHandlers = Effect.gen(function* () {
   const channels = yield* Channel;

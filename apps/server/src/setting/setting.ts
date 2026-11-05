@@ -2,18 +2,17 @@
 // at each use, so it takes effect at once; keys are never logged, and a page sees only where each comes from and its last
 // characters.
 
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { Context, Effect, Layer, Predicate, Schema } from "effect";
 
 import { t, setLocale } from "@vibevalley/i18n";
-import type { Validation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
+import type { Validation, KeySource, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOf, jsonOrNone } from "@/base/json.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { keptFile, readOrSetAside } from "@/infra/files.ts";
+import { jsonOf } from "#/base/json.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { keptFile, readOrSetAside } from "#/infra/files.ts";
 
 import { keyHint, memorySourcesOver, settingsProblem } from "./memorySources.ts";
 import { defaultVoice, voiceOverrides, voiceSettingsOver } from "./voice.ts";
@@ -108,17 +107,6 @@ export class Setting extends Context.Service<
 }
 
 const secret = (value: string | undefined, source: KeySource): KeyStatus => (value ? { source, hint: keyHint(value) } : {});
-
-const savedSettingsLocale = jsonOrNone(Schema.Struct({ locale: Schema.optionalKey(Schema.String) }));
-
-/** The locale saved in a home's settings.json, for a process that does not run the farm (the command line). */
-export function savedLocale(home: string): Locale {
-  try {
-    return savedSettingsLocale(readFileSync(join(home, "settings.json"), "utf8"))?.locale === "en" ? "en" : "zh";
-  } catch {
-    return "zh";
-  }
-}
 
 /** Fields set to "" or nothing leave the file. */
 const compact = (s: Record<string, unknown>) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined && v !== ""));

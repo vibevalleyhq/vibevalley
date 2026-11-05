@@ -28,7 +28,14 @@
     "title": "Title",
     "more": "More",
     "copyLink": "Copy link",
-    "copied": "Link copied"
+    "copied": "Link copied",
+    "group": {
+      "delivered": "Handed in by helpers",
+      "mine": "Written by you"
+    },
+    "rail": "Beside this artifact",
+    "railShow": "Show the side panel",
+    "railHide": "Hide the side panel"
   },
   "talk": {
     "atMessage": "In the conversation",
@@ -37,7 +44,8 @@
     "send": "Reply",
     "sent": "Replied",
     "replyVersion": "Reply to this version",
-    "sentVersion": "Replied to version {version}"
+    "sentVersion": "Replied to version {version}",
+    "none": "Not said in any conversation yet: you wrote this one and have not handed it to anyone."
   },
   "issue": {
     "title": "Artifacts"
@@ -101,5 +109,13 @@
   "body": {
     "blocks": "Written together",
     "html": "Web page"
+  },
+  "edit": {
+    "title": "Change words",
+    "hint": "Select words in the page to change them on the right",
+    "older": "This is an older version: go to the latest to change words",
+    "to": "Change to",
+    "save": "Save as a new version",
+    "saved": "Saved as version {version}"
   }
 }

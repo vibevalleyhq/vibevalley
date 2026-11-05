@@ -4,17 +4,17 @@ import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOrNone } from "@/base/json.ts";
-import { type ApiError } from "@/errors.ts";
-import { type InboxMessage, type Meta, metaOf, type Picked, senderKind } from "@/mailbox/envelope.ts";
+import { jsonOrNone } from "#/base/json.ts";
+import { type ApiError } from "#/errors.ts";
+import { type InboxMessage, type Meta, metaOf, type Picked, senderKind } from "#/mailbox/envelope.ts";
+import type * as qm from "#db/channel_message.sql.ts";
 
-import type * as qm from "../../db/generated/channel_message.sql.ts";
 import { type ChannelRow } from "./rooms.ts";
 
-export type { ChannelAudience, ChannelEnvelopeRow, ChannelRouteInput, Meta, OrchestratorNews } from "@/mailbox/envelope.ts";
-export type { InboxMessage, Picked } from "@/mailbox/envelope.ts";
-export { channelType, inboxMore, metaOf, metaText, senderKind } from "@/mailbox/envelope.ts";
-export type { Delivered, LaunchActivity, SessionNews } from "@/session/signals.ts";
+export type { ChannelAudience, ChannelEnvelopeRow, ChannelRouteInput, Meta, OrchestratorNews } from "#/mailbox/envelope.ts";
+export type { InboxMessage, Picked } from "#/mailbox/envelope.ts";
+export { channelType, inboxMore, metaOf, metaText, senderKind } from "#/mailbox/envelope.ts";
+export type { Delivered, LaunchActivity, SessionNews } from "#/session/signals.ts";
 
 export type MsgRow = qm.MessageByIDResult;
 
@@ -222,7 +222,7 @@ export interface ChannelService {
   readonly unread: (who: string) => Effect.Effect<T.ChannelUnread[]>;
   /** Every channel and direct channel as a page lists them, the default first. */
   readonly list: () => Effect.Effect<T.Channel[]>;
-  readonly history: (channel: string, before?: number, limit?: number) => Effect.Effect<T.ChatMessage[]>;
+  readonly history: (channel: string, before?: number, limit?: number) => Effect.Effect<T.ChatMessage[], ApiError>;
   /** A message's durable location; the recent state may hold neither the message nor its thread. */
   readonly messageLocation: (id: T.MessageId) => Effect.Effect<{ readonly channel: T.Channel; readonly top: string } | undefined>;
   readonly envelopeResource: (id: T.MessageId) => Effect.Effect<EnvelopeResource | undefined>;

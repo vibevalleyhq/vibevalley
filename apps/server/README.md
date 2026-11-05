@@ -1,12 +1,13 @@
 # apps/server
 
 The farm's server: every service, the HTTP API, the three state streams, `/mcp` for the helpers, and the page at `/`.
-Effect v4 on Node 24, run from source with tsx (`vp run start`); the database is SQLite (`node:sqlite`). How it is built and why:
+Effect v4 on Node 24, run from source with vpx (`vp run start`) and bundled with `vp pack` for the desktop app (`vp run build`, dist/); the database is SQLite (`node:sqlite`). How it is built and why:
 [foundation](docs/subsystems/foundation.md); what each service does: [the subsystems](docs/subsystems/README.md).
 
 ```
 src/main.ts        the server: loads the configuration, takes the home's lease, serves; --ready-json, --web
-src/cli.ts         the command line: every endpoint, state and events, issue work, chatting with a runtime or the farm's own agent
+src/chat.ts        the conversations in a terminal (a runtime, or the farm's own agent; chat/): the command line (apps/cli) hands its
+                   terminal to this program, as they need the server's runtimes, models and config
 src/services.ts    every service in build order, then what runs at start
 src/handlers.ts    every endpoint's answer, put together from src/http/handlers/<concept>.ts (each hands it to the service that owns it)
 src/http/          the router over the endpoint table, the streams, /mcp and /v1/chat/completions, the page

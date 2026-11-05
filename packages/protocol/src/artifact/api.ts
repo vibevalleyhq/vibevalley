@@ -23,6 +23,9 @@ export interface ArtifactHandlers<R = never> {
   /** An html one's new version over the latest; the old ones stay. Announced like the first. A blocks one is changed
    * block by block instead. */
   readonly "artifact.version.create": (a: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError, R>;
+  /** The owner's words in place of some in an html one's page: the next version, the rest of its bytes as they were.
+   * Refused when the words are not found once in the page's own text, cross an element, or the version is not the latest. */
+  readonly "artifact.html.edit": (a: T.ArtifactHtmlEdit) => Effect.Effect<T.Artifact, ApiError, R>;
   /** Its title, as the owner renames it. */
   readonly "artifact.update": (a: { readonly id: T.ArtifactId; readonly title: string }) => Effect.Effect<T.Artifact, ApiError, R>;
   readonly "artifact.delete": (a: { readonly id: T.ArtifactId }) => Effect.Effect<void, ApiError, R>;
@@ -87,6 +90,13 @@ export const artifactEndpoints: readonly Endpoint[] = [
     input: S.ArtifactVersionRequest,
     result: S.Artifact,
     can: ["owner", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.html.edit",
+    about: ["id"],
+    input: S.ArtifactHtmlEdit,
+    result: S.Artifact,
+    can: ["owner", "remote"],
   },
   {
     op: "artifact.update",

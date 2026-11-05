@@ -3,12 +3,30 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./rules": "./src/rules/index.ts",
-    "./schema": "./src/schema.ts",
-    "./api": "./src/api.ts",
-    "./rpc": "./src/rpc.ts",
-    "./host": "./src/host.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./rules": {
+      "types": "./dist/rules/index.d.ts",
+      "default": "./src/rules/index.ts"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "default": "./src/schema.ts"
+    },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "default": "./src/api.ts"
+    },
+    "./rpc": {
+      "types": "./dist/rpc.d.ts",
+      "default": "./src/rpc.ts"
+    },
+    "./host": {
+      "types": "./dist/host.d.ts",
+      "default": "./src/host.ts"
+    }
   },
   "dependencies": {
     "@vibevalley/bridge": "workspace:*",

@@ -1,7 +1,7 @@
 // The pixel skins' plain values and pure helpers: the tick and the cross cell by cell on a 7×7 grid (both kits draw
 // them), a refusal as a pixel toast, what a draft adds to chips, and what a dropdown lists.
 
-import { type Act, createAct } from "@/ui/act";
+import { type Act, createAct } from "#/ui/act.ts";
 
 import { noticeTitle, ToastType, toasts } from "./ToastViewport";
 

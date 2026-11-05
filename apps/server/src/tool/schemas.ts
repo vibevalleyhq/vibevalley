@@ -8,11 +8,12 @@ import { Effect, Predicate, Schema } from "effect";
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import { effectTool } from "@vibevalley/agent/core/tool";
 import type { JsonSchema } from "@vibevalley/ai/tools";
+import { PkmTierValues } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema, type Handlers } from "@vibevalley/protocol/api";
 
-import type { Actor } from "@/base/actor.ts";
-import { messageOf, reasonOf } from "@/errors.ts";
-import { maxChildren as maxTasks } from "@/issue/creation.ts";
+import type { Actor } from "#/base/actor.ts";
+import { messageOf, reasonOf } from "#/errors.ts";
+import { maxChildren as maxTasks } from "#/issue/creation.ts";
 
 import { answers, descriptions, params, sessionDescriptions } from "./prompts.ts";
 
@@ -49,6 +50,21 @@ const artifactRead = Schema.Struct({
   id: artifactId,
   version: Schema.optionalKey(Schema.Int.annotate({ description: params.artifact.version })),
 });
+
+const pkmParameters = {
+  "pkm.search": Schema.Struct({
+    limit: Schema.optionalKey(Schema.Int.annotate({ description: params.pkm.limit })),
+    text: Schema.String.annotate({ description: params.pkm.text }),
+    tier: Schema.optionalKey(Schema.Literals(PkmTierValues).annotate({ description: params.pkm.tier })),
+  }).annotate({ requiredOrder: ["text"] }),
+  "pkm.page.get": Schema.Struct({ page: Schema.String.annotate({ description: params.pkm.page }) }),
+  "pkm.capture": Schema.Struct({ text: Schema.String.annotate({ description: params.pkm.capture }) }),
+  "pkm.comment.suggest": Schema.Struct({
+    block: Schema.String.annotate({ description: params.pkm.block }),
+    rationale: Schema.optionalKey(Schema.String.annotate({ description: params.pkm.rationale })),
+    suggested: Schema.String.annotate({ description: params.pkm.suggested }),
+  }).annotate({ requiredOrder: ["block", "suggested"] }),
+};
 
 const channelRead = Schema.Struct({
   before: Schema.optionalKey(Schema.Finite),
@@ -184,6 +200,7 @@ export const parameters = {
     text: Schema.optionalKey(Schema.String.annotate({ description: params.searchText })),
   }),
   "project.list": Schema.Struct({}),
+  ...pkmParameters,
   "cron.create": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.cron.agent })),
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.cron.channel })),
@@ -266,6 +283,7 @@ export const sessionParameters = {
     text: Schema.optionalKey(Schema.String.annotate({ description: params.searchText })),
   }),
   "session.list": Schema.Struct({}),
+  ...pkmParameters,
 };
 
 const safe = Number.MAX_SAFE_INTEGER;

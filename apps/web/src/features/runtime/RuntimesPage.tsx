@@ -20,23 +20,23 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { variant, Keyed } from "@/base/dom";
-import { momentText, wallClockText, yuan } from "@/base/format";
-import { useWorkAgents } from "@/infra/agents";
-import { api, reasonOf } from "@/infra/api";
-import { ready, useRuntimes } from "@/infra/query";
-import { A } from "@/ui/A";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { KeyValueEditor } from "@/ui/Chips";
-import { AgentFace } from "@/ui/Face";
-import { Select, TextInput } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "@/ui/layout";
-import { SpriteIcon } from "@/ui/pixel";
-import { RuntimeIcon } from "@/ui/pixel/RuntimeIcon";
-import { Segmented } from "@/ui/Segmented";
-import { Hint } from "@/ui/Tip";
+import { variant, Keyed } from "#/base/dom.tsx";
+import { momentText, wallClockText, yuan } from "#/base/format.ts";
+import { useWorkAgents } from "#/infra/agents.ts";
+import { api, reasonOf } from "#/infra/api.ts";
+import { ready, useRuntimes } from "#/infra/query.ts";
+import { A } from "#/ui/A.tsx";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { KeyValueEditor } from "#/ui/Chips.tsx";
+import { AgentFace } from "#/ui/Face.tsx";
+import { Select, TextInput } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "#/ui/layout.tsx";
+import { SpriteIcon } from "#/ui/pixel/index.ts";
+import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
+import { Segmented } from "#/ui/Segmented.tsx";
+import { Hint } from "#/ui/Tip.tsx";
 
 import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
 
@@ -80,7 +80,7 @@ function Stamina(props: { quota: Quota; cells?: number; width: number; height: n
       style={{ width: `${props.width}px`, height: `${props.height}px` }}
     >
       <For each={Array.from({ length: cells() }, (_, i) => i)}>
-        {(i) => <span class={["flex-1 rounded-xs", i < lit() ? levelInk[props.quota.level] : "bg-on-rail/13"]} />}
+        {(i) => <span class={["flex-1 rounded-xs", i < lit() ? levelInk[props.quota.level] : "bg-line"]} />}
       </For>
     </Meter.Root>
   );
@@ -102,10 +102,11 @@ export function RuntimesPage(props: { rest: string }) {
         </p>
       }
     >
-      <div class="h-full p-3">
+      <div class="h-full">
         <Split
+          edge
           list={
-            <ListCard title={t("web.runtime.title")} label={t("web.runtime.list")} testid="runtimes">
+            <ListCard bare title={t("web.runtime.title")} label={t("web.runtime.list")} testid="runtimes">
               <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.runtime.intro")}</li>
               <For each={list()}>
                 {(r) => {

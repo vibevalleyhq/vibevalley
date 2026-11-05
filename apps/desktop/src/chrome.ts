@@ -6,4 +6,4 @@ export const trafficLights = { x: 12, y: 8 };
 
 /** The workbench's page in either theme (apps/web style.css): what the window is painted with between one page and the
  * next, so a reload goes from the page to the same ground (apps/web public/opening.html) and back. */
-export const ground = (dark: boolean) => (dark ? "#1d1813" : "#fffaf0");
+export const ground = (dark: boolean) => (dark ? "#151413" : "#fcfcfb");

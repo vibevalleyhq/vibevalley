@@ -1,6 +1,6 @@
 import type { JSX } from "@solidjs/web";
 
-import { CardColors } from "@/ui/pixel";
+import { CardColors } from "#/ui/pixel/index.ts";
 
 /** A wooden card the height of the HUD's row, an icon and words. */
 export function HudCard(props: { height?: number; bright?: boolean; children: JSX.Element }) {

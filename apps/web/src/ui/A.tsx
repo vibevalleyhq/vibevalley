@@ -1,7 +1,7 @@
 import type { JSX } from "@solidjs/web";
-import { omit, onSettled } from "solid-js";
+import { createEffect, omit } from "solid-js";
 
-import { useRouter } from "@/infra/router";
+import { useRouter } from "#/infra/router.ts";
 
 /** A link inside the page: a plain click moves the router, a click with a modifier (a new tab) is the browser's. */
 export function A(props: { href: string; replace?: boolean } & Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "href">) {
@@ -23,6 +23,10 @@ export function A(props: { href: string; replace?: boolean } & Omit<JSX.AnchorHT
 /** Moves to `href` once drawn, in place of the entry it is in: where a path the page does not know lands. */
 export function Navigate(props: { href: string }) {
   const router = useRouter();
-  onSettled(() => router.navigate(props.href, { replace: true }));
+  // href read in the compute: a prop's getter can build a memo, which an effect's callback may not.
+  createEffect(
+    () => props.href,
+    (href) => router.navigate(href, { replace: true }),
+  );
   return null;
 }

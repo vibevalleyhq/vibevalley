@@ -2,16 +2,19 @@
 // apps/web/dist and the island apps/island's release build (scripts/build.ts); a packaged app has them in its resources
 // (server/, web/, island/).
 
-import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { app } from "electron";
 
+import { channelOf, farmHomeOf } from "./channel";
+
 interface AppPaths {
   /** The farm's home (VIBEVALLEY_HOME): settings.json, the database, the logs. */
   readonly home: string;
-  /** apps/server: src/main.ts and its node_modules. */
+  /** apps/server, or the packaged app's copy (its bundle in dist/ and its node_modules). */
   readonly server: string;
+  /** What runs the server (server.ts ServerFiles). */
+  readonly command: readonly [string, ...string[]];
   /** The built page, served at / on the server's origin; opening.html and the pictures are read from it too. */
   readonly web: string;
   readonly island: string;
@@ -23,9 +26,16 @@ interface AppPaths {
   readonly trayIcon: string;
   /** Downloaded updates, one folder a version (update.ts). */
   readonly updates: string;
+  /** The login shell's PATH as it said it last (server.ts shellPath). */
+  readonly shellPath: string;
+  /** Node's compile cache for the server's modules. */
+  readonly compileCache: string;
 }
 
-export const farmHome = () => process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
+/** This app's channel (channel.ts): its version's stage once packaged, dev from the repository. */
+export const currentChannel = () => channelOf(app.getVersion(), app.isPackaged);
+
+export const farmHome = () => farmHomeOf(currentChannel(), process.env);
 
 export function appPaths(): AppPaths {
   const repo = join(app.getAppPath(), "..");
@@ -34,6 +44,8 @@ export function appPaths(): AppPaths {
   return {
     home,
     server: app.isPackaged ? join(process.resourcesPath, "server") : join(repo, "server"),
+    // vpx reads the server's tsconfig, whose paths are its @/ imports, from the folder it runs in.
+    command: app.isPackaged ? [process.execPath, "dist/main.mjs"] : [join(repo, "server", "node_modules", ".bin", "vpx"), "src/main.ts"],
     web,
     island: app.isPackaged ? join(process.resourcesPath, "island", "VibeValleyIsland") : join(repo, "island", ".build", "release", "VibeValleyIsland"),
     log: join(home, "logs", "desktop-server.log"),
@@ -41,5 +53,7 @@ export function appPaths(): AppPaths {
     dockIcon: join(web, "icons", "app-256.png"),
     trayIcon: join(web, "pixel", "app-sprout.png"),
     updates: join(app.getPath("userData"), "updates"),
+    shellPath: join(app.getPath("userData"), "shell-path"),
+    compileCache: join(app.getPath("userData"), "compile-cache"),
   };
 }

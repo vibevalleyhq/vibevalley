@@ -8,17 +8,17 @@ import { t } from "@vibevalley/i18n";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
 import { defaultOf } from "@vibevalley/protocol/rules";
 
-import { Keyed } from "@/base/dom";
-import { momentText, wallClockText } from "@/base/format";
-import { channelLabel, topsOf } from "@/features/channel";
-import { api } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { Field, Select, TextInput } from "@/ui/Field";
-import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "@/ui/layout";
-import { SpriteIcon } from "@/ui/pixel";
-import { Qr } from "@/ui/Qr";
+import { Keyed } from "#/base/dom.tsx";
+import { momentText, wallClockText } from "#/base/format.ts";
+import { channelLabel, topsOf } from "#/features/channel/index.ts";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { Field, Select, TextInput } from "#/ui/Field.tsx";
+import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "#/ui/layout.tsx";
+import { SpriteIcon } from "#/ui/pixel/index.ts";
+import { Qr } from "#/ui/Qr.tsx";
 
 const connectorLabel: Record<ConnectorID, string> = {
   weixin: t("web.connector.connectors.label.weixin"),

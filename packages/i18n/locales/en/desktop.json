@@ -34,5 +34,8 @@
     "zoom": "Zoom",
     "front": "Bring All to Front",
     "close": "Close Window"
+  },
+  "commandLine": {
+    "taken": "{link} is another program's file and was not replaced: move it away, then install again"
   }
 }

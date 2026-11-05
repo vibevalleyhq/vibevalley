@@ -92,7 +92,7 @@
 在这里：已有：id 带 `Brand`（`packages/protocol/src/shapes.ts` 的 `IssueId`、`SessionId`）；时间和单位写进名字（`…Ms`，[命名](docs/style/naming.md)）；穷尽检查的 lint。改写：`default` 允许并说明。以后做：两个以上布尔字段的形状进体检的报告，作为「没写出来的状态」的候选（`shapes.ts` 现有 60 个布尔字段，很多是独立的开关）。
 
 **1.4 处方式报错。** 白皮书：用 ast-grep 写规则，每条的 message 写三样：为什么拦（危害）、正确写法的模板（能照抄）、仓库里标准范例的路径和行号。给了三条示例：拦裸调子进程（Bun.spawn、child_process.spawn/exec，导向受管进程原语）、拦常驻服务里的无界 new Map（导向带淘汰的有界容器）、拦没有删除日期的 @deprecated（要求 removeBy 日期）。
-在这里：已做：三样的格式（`says`、`refused`，测试查）；规则算得出改法的算出来（`no-cjk-literal` 给出词典文件和 `t()` 的键，`parent-import` 给出 `@/…` 并自动修复）；结构测试和体检的报错同一个格式。改写：用 oxlint 插件，不另加 ast-grep（已经在 `vp check` 里、带类型）。三条示例：子进程只在拥有它的模块里起，现在是约定（`project/git.ts`、`runtime/dsh.ts`、`voice/voice.ts`），以后做成 import 限制；常驻集合由谁删，以后逐处清点（服务端 7 处 `new Map(`）；`@deprecated` 不做 removeBy，内部不留兼容，旧的直接删（`typescript/no-deprecated` 拦用到已弃用的 API）。
+在这里：已做：三样的格式（`says`、`refused`，测试查）；规则算得出改法的算出来（`no-cjk-literal` 给出词典文件和 `t()` 的键，`parent-import` 给出 `#/…` 并自动修复）；结构测试和体检的报错同一个格式。改写：用 oxlint 插件，不另加 ast-grep（已经在 `vp check` 里、带类型）。三条示例：子进程只在拥有它的模块里起，现在是约定（`project/git.ts`、`runtime/dsh.ts`、`voice/voice.ts`），以后做成 import 限制；常驻集合由谁删，以后逐处清点（服务端 7 处 `new Map(`）；`@deprecated` 不做 removeBy，内部不留兼容，旧的直接删（`typescript/no-deprecated` 拦用到已弃用的 API）。
 
 **1.5 死代码断头台。** 白皮书：CI 里接 knip（TypeScript）或 deadcode（Go），零容忍；没人引用的导出、没用的类型、过了 removeBy 的废弃函数，直接挡住合并。
 在这里：已做：`vp run deadcode`（`knip.ts`、`scripts/deadcode.ts`），在 CI 的 check 里，零容忍。

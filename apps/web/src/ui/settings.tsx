@@ -7,7 +7,7 @@ import { createContext, Show, useContext, type Accessor } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { KeyStatus } from "@vibevalley/protocol";
 
-import { matches } from "@/base/search";
+import { matches } from "#/base/search.ts";
 
 import { IconButton, OutLink } from "./IconButton";
 import { KeyMark } from "./KeyField";

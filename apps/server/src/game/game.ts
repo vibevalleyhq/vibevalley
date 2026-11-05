@@ -8,14 +8,14 @@ import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, 
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { newId } from "@/base/ids.ts";
-import { jsonOrNone } from "@/base/json.ts";
-import { Core } from "@/core/core.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import { Project } from "@/project/project.ts";
+import { newId } from "#/base/ids.ts";
+import { jsonOrNone } from "#/base/json.ts";
+import { Core } from "#/core/core.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import { Project } from "#/project/project.ts";
+import * as q from "#db/game_ledger.sql.ts";
 
-import * as q from "../../db/generated/game_ledger.sql.ts";
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
 
 /** The person plants on an empty plot and then says what to do; the orchestrator hires a session for it some seconds later. */

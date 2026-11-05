@@ -7,16 +7,16 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { causeMessage, Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { inputContext } from "@/mailbox/payload.ts";
-import { inboxLines, talkBrief } from "@/mailbox/prompts.ts";
-import { NotRecorded, Session } from "@/session/session.ts";
+import { Agent } from "#/agent/agent.ts";
+import { causeMessage, Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { inputContext } from "#/mailbox/payload.ts";
+import { inboxLines, talkBrief } from "#/mailbox/prompts.ts";
+import { NotRecorded, Session } from "#/session/session.ts";
+import * as qm from "#db/channel_message.sql.ts";
+import * as qp from "#db/channel_participant.sql.ts";
 
-import * as qm from "../../db/generated/channel_message.sql.ts";
-import * as qp from "../../db/generated/channel_participant.sql.ts";
 import { type MsgRow, type ChannelService } from "./contracts.ts";
 import type { ChannelRecords } from "./records.ts";
 import type { SessionThreads } from "./threads.ts";

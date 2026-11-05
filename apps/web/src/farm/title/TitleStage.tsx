@@ -5,9 +5,9 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 // dandelions, fireflies at dusk and night, and on the hill the farmer (breathing; a lantern at night) with the chosen
 // pet. The motions are style.css's title-*.
 
-import { TitleManifest } from "@/base/manifests";
-import { ready, useQuery } from "@/infra/query";
-import { usePrefs } from "@/state/prefs";
+import { TitleManifest } from "#/base/manifests.ts";
+import { ready, useQuery } from "#/infra/query.ts";
+import { usePrefs } from "#/state/prefs.ts";
 
 import {
   chimney,

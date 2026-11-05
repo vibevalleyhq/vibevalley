@@ -2,10 +2,12 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（27 篇）
+## proposed（30 篇）
 
 ### feature
 
+- 2026-11-04 [网页稿子照 porthole 的思路：一份显示规格、交之前查、页面里的锚点、划词改字](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)
+- 2026-11-04 [桌面版的渠道和命令行](.agents/notes/proposed/feature/2026-11-04-desktop-channels-and-cli.md)
 - 2026-10-27 [自己的实时模型经本机 WebSocket 接电话，其余照旧走声网](.agents/notes/proposed/feature/2026-10-27-realtime-calls-over-websocket.md)
 - 2026-10-22 [记忆树：让主人看见农场在长](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
 - 2026-10-21 [管家给主人报告：早报、项目健康度、工单之间的关系和分拣建议](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)
@@ -36,6 +38,7 @@
 
 ### process
 
+- 2026-11-04 [alpha、beta 和正式版](.agents/notes/proposed/process/2026-11-04-alpha-beta-release.md)
 - 2026-10-30 [白皮书里还没做的：骨架、重复 lint、流切片、常驻集合和体检，各在什么时候做](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)
 - 2026-10-30 [代码治理范围：先修边界与生命周期，再按证据收回复杂度](.agents/notes/proposed/process/2026-10-30-code-quality-ratchets-and-boundaries.md)
 - 2026-10-29 [给仓库做体检：按复杂度的三种症状读数，只有类型逃生口是棘轮](.agents/notes/proposed/process/2026-10-29-repo-health-readings.md)

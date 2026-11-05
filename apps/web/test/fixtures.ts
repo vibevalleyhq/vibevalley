@@ -56,8 +56,10 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
         VIBEVALLEY_AGENT_STARTERS: starters(),
       };
       const args = ["--ready-json", "--web", join(out, "dist")];
-      const child: ChildProcess = spawn("node", ["--import", "tsx", "src/main.ts", ...args], {
-        cwd: join(import.meta.dirname, "..", "..", "server"),
+      const server = join(import.meta.dirname, "..", "..", "server");
+      // vpx runs the source as `vp run start` does; it becomes the server's own process (exec), so stopping it stops it.
+      const child: ChildProcess = spawn(join(server, "node_modules", ".bin", "vpx"), ["src/main.ts", ...args], {
+        cwd: server,
         env,
         stdio: ["ignore", "pipe", "inherit"],
       });

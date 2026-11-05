@@ -4,43 +4,14 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { maxRunning } from "@vibevalley/protocol";
 
-import { autofocus } from "@/base/dom";
-import { Icon } from "@/ui/Icon";
-import { Segmented } from "@/ui/Segmented";
-import { Hint } from "@/ui/Tip";
+import { Icon } from "#/ui/Icon.tsx";
+import { Segmented } from "#/ui/Segmented.tsx";
+import { Hint } from "#/ui/Tip.tsx";
 
 import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./cards";
 import { laneOrder, type Ordering } from "./display";
 import { useIssues, useNameOf } from "./history";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
-
-/** One sentence, enter, and it is a 待办: the board's lane and the list's groups both use it. */
-export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTMLInputElement) => void; autofocus?: boolean }) {
-  const [text, setText] = createSignal("");
-  const focus = autofocus();
-  const submit = (e: KeyboardEvent) => {
-    if (e.key !== "Enter" || e.isComposing) return;
-    const t = text().trim();
-    if (!t) return;
-    setText("");
-    props.onAdd(t);
-  };
-  return (
-    <input
-      ref={(el) => {
-        props.ref?.(el);
-        if (props.autofocus === true) focus(el);
-      }}
-      value={text()}
-      onInput={(e) => setText(e.currentTarget.value)}
-      onKeyDown={submit}
-      data-testid="quick-add"
-      placeholder={t("web.issue.board.add")}
-      aria-label={t("web.issue.board.addLabel")}
-      class="h-8 w-full rounded-md border border-dashed border-line bg-page/70 px-2.5 text-sm outline-none placeholder:text-faint hover:border-faint focus:border-solid focus:border-focus focus:bg-page"
-    />
-  );
-}
 
 /** Under the closed ones: how many older are folded away, or back to the recent ones. */
 export function OlderLink(props: { hidden: number; onClick: () => void }) {
@@ -71,8 +42,8 @@ interface BoardProps {
   onRetry: (card: BoardCard) => void;
   onPutBack: (card: BoardCard) => void;
   onPlace: (card: BoardCard, before: string | undefined) => void;
-  onAdd: (text: string) => void;
-  onWrite: () => void;
+  /** The 待办 lane's placeholder card. */
+  onNew: () => void;
 }
 
 type Drag = { dragging: () => BoardCard | undefined; setDragging: (c: BoardCard | undefined) => void };
@@ -81,7 +52,6 @@ type Drag = { dragging: () => BoardCard | undefined; setDragging: (c: BoardCard 
 export function IssueBoard(props: BoardProps) {
   const [lane, setLane] = createSignal<Lane>("todo");
   const [dragging, setDragging] = createSignal<BoardCard>();
-  let addInput: HTMLInputElement | undefined;
   const drag: Drag = { dragging, setDragging: (c) => setDragging(() => c) };
   return (
     <div class="@container flex min-h-0 flex-1 flex-col px-3 pb-3">
@@ -96,32 +66,14 @@ export function IssueBoard(props: BoardProps) {
       </div>
       <div class="flex min-h-0 flex-1 gap-2.5 overflow-x-auto">
         <For each={lanes}>
-          {(l) => (
-            <LaneView
-              board={props}
-              lane={l}
-              shownNarrow={l === lane()}
-              cards={props.cards.filter((c) => c.lane === l)}
-              drag={drag}
-              addRef={(el) => (addInput = el)}
-              focusAdd={() => addInput?.focus()}
-            />
-          )}
+          {(l) => <LaneView board={props} lane={l} shownNarrow={l === lane()} cards={props.cards.filter((c) => c.lane === l)} drag={drag} />}
         </For>
       </div>
     </div>
   );
 }
 
-function LaneView(props: {
-  board: BoardProps;
-  lane: Lane;
-  cards: BoardCard[];
-  shownNarrow: boolean;
-  drag: Drag;
-  addRef: (el: HTMLInputElement) => void;
-  focusAdd: () => void;
-}) {
+function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; shownNarrow: boolean; drag: Drag }) {
   const [over, setOver] = createSignal(false);
   const p = () => props.board;
   const folded = () => props.lane === "closed" && !p().older && props.cards.length > closedShown;
@@ -167,9 +119,16 @@ function LaneView(props: {
         <Hint text={emptyText[props.lane]} />
       </header>
       <Show when={props.lane === "todo"}>
-        <div class="mt-1.5">
-          <QuickAdd onAdd={(t) => p().onAdd(t)} ref={props.addRef} />
-        </div>
+        <button
+          type="button"
+          data-testid="issue-new"
+          onClick={() => p().onNew()}
+          aria-label={t("web.issue.new.title")}
+          class="mt-1.5 flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-line text-sm text-faint transition-colors duration-120 hover:border-faint/50 hover:bg-page hover:text-muted"
+        >
+          <Icon name="add" size={14} />
+          {t("web.issue.new.card")}
+        </button>
       </Show>
       <div class="mt-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
         <Switch
@@ -198,7 +157,8 @@ function LaneView(props: {
           <Match when={p().loading}>
             <p class="px-1 text-xs text-faint">{t("web.issue.reading")}</p>
           </Match>
-          <Match when={props.cards.length === 0}>
+          {/* The 待办 lane has its placeholder card: no second empty box under it. */}
+          <Match when={props.cards.length === 0 && props.lane !== "todo"}>
             <div data-testid="lane-empty" class={["h-12 rounded-md border border-dashed", over() ? "border-leaf" : "border-line"]} />
           </Match>
         </Switch>

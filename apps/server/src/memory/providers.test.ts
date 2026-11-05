@@ -5,13 +5,13 @@ import { FetchHttpClient } from "effect/http";
 
 import type * as T from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { owner as ownerActor } from "@/base/actor.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Database, Db } from "@/infra/db.ts";
-import type { MemorySourceConfig } from "@/setting/memorySources.ts";
-import { Setting } from "@/setting/setting.ts";
-import { testConfig, whenTrue } from "@/testing/layers.ts";
+import { Agent } from "#/agent/agent.ts";
+import { owner as ownerActor } from "#/base/actor.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Database, Db } from "#/infra/db.ts";
+import type { MemorySourceConfig } from "#/setting/memorySources.ts";
+import { Setting } from "#/setting/setting.ts";
+import { testConfig, whenTrue } from "#/testing/layers.ts";
 
 import { type BuildSource, type FinishedRun, foundText, type Found, Memory, make, type Note, type RecallCue, type SearchQuery } from "./memory.ts";
 import { localName, recallChars, recallCount, searchLimit } from "./recall.ts";

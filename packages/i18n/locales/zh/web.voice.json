@@ -141,12 +141,18 @@
     "recording": "在听…再点一下停",
     "transcribing": "在认字…",
     "failed": "上次没认出来：{why}",
-    "start": "听写：点一下开始说，再点一下停",
+    "start": "听写：点一下开始，再点一下停；也可以按住说，松开就停",
     "stop": "停下听写",
     "label": "听写",
     "noMic": "录不了音：没有麦克风权限",
     "cannot": "录不了音：{why}",
-    "nothing": "没录上"
+    "nothing": "没录上",
+    "listening": "已经听了多久",
+    "keys": "Esc 取消 · Enter 完成",
+    "cancel": "不要这段",
+    "done": "说完了，转成字",
+    "again": "再说一次",
+    "dismiss": "知道了"
   },
   "call": {
     "renew": "令牌续期失败：{why}",

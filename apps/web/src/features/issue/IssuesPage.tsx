@@ -5,18 +5,20 @@ import { list, t } from "@vibevalley/i18n";
 import type { Issue, Session } from "@vibevalley/protocol";
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 
-import { variant } from "@/base/dom";
-import { useOrchestrators } from "@/infra/agents";
-import { api, reasonOf } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { useRouter } from "@/infra/router";
-import { useSearchParam } from "@/state/atom";
-import { useIntents } from "@/state/intent";
-import { createAct } from "@/ui/act";
-import { Select } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import { Segmented } from "@/ui/Segmented";
-import { toast } from "@/ui/toasts";
+import { variant } from "#/base/dom.tsx";
+import { inField, pressed } from "#/base/shortcuts.ts";
+import { useOrchestrators } from "#/infra/agents.ts";
+import { api, reasonOf } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { useRouter } from "#/infra/router.ts";
+import { useSearchParam } from "#/state/atom.ts";
+import { useIntents } from "#/state/intent.ts";
+import { rememberPick } from "#/state/prefs.ts";
+import { createAct } from "#/ui/act.ts";
+import { Select } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import { Segmented } from "#/ui/Segmented.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 import { IssueBoard } from "./Board";
 import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, type Lane, noFilter } from "./cards";
@@ -29,6 +31,7 @@ import { issueIs } from "./issue";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { issueMove, movedCards, sendMove } from "./moves";
+import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 import { createWriteKey, writeIssue } from "./write";
 
@@ -69,7 +72,6 @@ export function IssuesPage(props: { rest: string }) {
   const orchestratorIds = createMemo(() => new Set(orchestrators().map((a) => a.id)));
   const moves = useIntents(issueMove);
   const act = createAct();
-  const writeKey = createWriteKey();
   const all = createMemo(() => movedCards(buildCards(history.rows() ?? [], core(), orchestratorIds()), moves.list()));
   const shown = () => all().filter((c) => filterShows(filter(), c));
   const card = () => {
@@ -99,18 +101,32 @@ export function IssuesPage(props: { rest: string }) {
     else if (move === "reopen" && (c.kind === "issue" || c.kind === "family")) setReopening({ issue: c.issue, lane: to });
   };
 
-  const add = async (text: string, where: { project?: string; agent?: string } = {}) => {
+  const [newAt, setNewAt] = createSignal<NewIssueAt>();
+  const startNew = (where: NewIssueAt) => {
     const f = filter();
-    const words = text.trim();
-    const made = await act.run(() => writeIssue(text, where.agent || f.agent, where.project || f.project, writeKey.for(words)));
+    const project = where.project || f.project;
+    const agent = where.agent || f.agent;
+    setNewAt({ ...(project ? { project } : {}), ...(agent ? { agent } : {}) });
+  };
+  const addInList: ListAdd = (where) => startNew(where);
+  // C, unless a field has focus, a dialog is up or an issue is open.
+  onSettled(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!pressed(e, "newIssue") || inField() || id() !== undefined || document.querySelector("dialog[open]")) return;
+      e.preventDefault();
+      startNew({});
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  });
+  const writeKey = createWriteKey();
+  const keepNew = async (words: string, where: NewIssueAt) => {
+    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.project ?? "", writeKey.for(words)));
     if (!made) return;
     writeKey.used();
+    rememberPick(where.agent ?? "", where.project ?? "");
     if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));
-    // A line written in a lane stays on the board, among the others; only a blank one to write out opens its page.
-    if (!text.trim()) open(made.issue.id);
   };
-  const addInList: ListAdd = (text, where) => void add(text, where);
-  const write = () => void add("");
   const retry = async (c: BoardCard) => {
     if (c.move?.state !== "failed") return;
     const done = await moves.retry(c.move.key);
@@ -160,8 +176,7 @@ export function IssuesPage(props: { rest: string }) {
                 onRetry={(c) => void retry(c)}
                 onPutBack={(c) => c.move && moves.drop(c.move.key)}
                 onPlace={(c, before) => void place(c, before)}
-                onAdd={(t) => void add(t)}
-                onWrite={write}
+                onNew={() => startNew({})}
               />
             </Show>
           </>
@@ -180,6 +195,7 @@ export function IssuesPage(props: { rest: string }) {
           </IssueView>
         )}
       </Show>
+      <Show when={newAt()}>{(at) => <NewIssue at={at()} onKeep={(words, where) => void keepNew(words, where)} onClose={() => setNewAt(undefined)} />}</Show>
       <Show when={closing()}>
         {(c) => <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} lane={c().lane} onClose={() => setClosing(undefined)} />}
       </Show>

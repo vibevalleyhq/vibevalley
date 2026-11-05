@@ -6,25 +6,25 @@ import { type Channel, type ChatMessage, type MessageHit, defaultOrchestrator, o
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 import { artifactId as brandArtifactId, blockId as brandBlockId } from "@vibevalley/protocol/schema";
 
-import { aria, autofocus, Keyed, useNow } from "@/base/dom";
-import { tookText } from "@/base/format";
-import { ArtifactCanvas, type QuoteTarget } from "@/features/artifact";
-import { useAgent, useOrchestrators } from "@/infra/agents";
-import { api } from "@/infra/api";
-import { orchestratorMood, orchestratorSession, type OrchestratorMood, useCore } from "@/infra/frame";
-import { ready, useAgents } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { useLatest } from "@/state/atom";
-import { useIntents } from "@/state/intent";
-import { createAct } from "@/ui/act";
-import { Dialog } from "@/ui/Dialog";
-import { OrchestratorFace } from "@/ui/Face";
-import { Select } from "@/ui/Field";
-import { Icon } from "@/ui/Icon";
-import type { IconName } from "@/ui/icons";
-import { Splitter, usePaneWidth } from "@/ui/Splitter";
-import { Tabs } from "@/ui/Tabs";
-import { toast } from "@/ui/toasts";
+import { aria, autofocus, Keyed, useNow } from "#/base/dom.tsx";
+import { tookText } from "#/base/format.ts";
+import { ArtifactCanvas, type QuoteTarget } from "#/features/artifact/index.ts";
+import { useAgent, useOrchestrators } from "#/infra/agents.ts";
+import { api } from "#/infra/api.ts";
+import { orchestratorMood, orchestratorSession, type OrchestratorMood, useCore } from "#/infra/frame.ts";
+import { ready, useAgents } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { useLatest } from "#/state/atom.ts";
+import { useIntents } from "#/state/intent.ts";
+import { createAct } from "#/ui/act.ts";
+import { Dialog } from "#/ui/Dialog.tsx";
+import { OrchestratorFace } from "#/ui/Face.tsx";
+import { Select } from "#/ui/Field.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import type { IconName } from "#/ui/icons.ts";
+import { Splitter, usePaneWidth } from "#/ui/Splitter.tsx";
+import { Tabs } from "#/ui/Tabs.tsx";
+import { toast } from "#/ui/toasts.ts";
 
 import { Composer, FileDrop, type QuotedBlockDraft } from "./Composer";
 import { ChannelSettingsDialog, NewChannelDialog, notifyOptions } from "./Dialogs";
@@ -193,7 +193,7 @@ function ChannelMain(props: {
         <button type="button" class={[iconButton, "md:hidden"]} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
           <Icon name="chat" size={20} />
         </button>
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">{markOf(props.channel)}</span>
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-selected text-lg font-semibold text-muted">{markOf(props.channel)}</span>
         <div class="flex min-w-0 flex-1 flex-col">
           <h1 class="truncate text-lg font-semibold" title={props.channel?.default === true ? t("web.channel.defaultHint") : undefined}>
             {name()}
@@ -722,7 +722,9 @@ function Members(props: { channel: Channel }) {
     >
       <p class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.channel.members.title")}</p>
       <div class="flex items-center gap-2 px-1 py-1 text-sm">
-        <span class="flex size-7 items-center justify-center rounded-full bg-wheat text-xs font-semibold">{t("web.channel.members.owner").slice(0, 1)}</span>
+        <span class="flex size-7 items-center justify-center rounded-full bg-selected text-xs font-semibold text-muted">
+          {t("web.channel.members.owner").slice(0, 1)}
+        </span>
         {t("web.channel.members.owner")}
       </div>
       <div data-testid="member-orchestrator" data-key={here()} class="flex items-center gap-2 px-1 py-1 text-sm">

@@ -32,14 +32,13 @@ import {
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
 
-import { code as newCode, newId } from "@/base/ids.ts";
-import { lookIn, messageOf, missing } from "@/errors.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import { callbackLog } from "@/infra/log.ts";
-
-import * as lanQ from "../../db/generated/lan.sql.ts";
-import * as q from "../../db/generated/lan_device.sql.ts";
+import { code as newCode, newId } from "#/base/ids.ts";
+import { lookIn, messageOf, missing } from "#/errors.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import { callbackLog } from "#/infra/log.ts";
+import * as lanQ from "#db/lan.sql.ts";
+import * as q from "#db/lan_device.sql.ts";
 
 /** A device's asking gets as long again for the owner to answer. */
 const pairingForMs = 2 * 60_000;

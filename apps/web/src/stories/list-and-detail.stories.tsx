@@ -2,11 +2,11 @@ import { For, Show } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
-import { useRouter } from "@/infra/router";
-import { Button } from "@/ui/Button";
-import { IconButton } from "@/ui/IconButton";
-import { Card, Empty, ListCard, ListRow, Quiet, Split } from "@/ui/layout";
-import { Dot, type DotTone } from "@/ui/Tag";
+import { useRouter } from "#/infra/router.ts";
+import { Button } from "#/ui/Button.tsx";
+import { IconButton } from "#/ui/IconButton.tsx";
+import { Card, Empty, ListCard, ListRow, Quiet, Split } from "#/ui/layout.tsx";
+import { Dot, type DotTone } from "#/ui/Tag.tsx";
 
 const projects: { id: string; line: string; tone: DotTone; about?: string }[] = [
   { id: "vibevalley", line: "3 个在做 · 1 个等你", tone: "leaf", about: "本机管编码 agent 的工作台。" },

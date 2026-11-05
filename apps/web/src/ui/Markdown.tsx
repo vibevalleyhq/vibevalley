@@ -5,7 +5,7 @@ import remarkRehype from "remark-rehype";
 import { createMemo, onCleanup } from "solid-js";
 import { type Plugin, unified } from "unified";
 
-import { useRouter } from "@/infra/router";
+import { useRouter } from "#/infra/router.ts";
 
 import { fragmentOf, markdownClass, remarkIssueRefs, remarkMentions, richen } from "./richText";
 

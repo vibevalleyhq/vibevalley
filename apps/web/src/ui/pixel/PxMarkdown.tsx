@@ -5,7 +5,7 @@ import remarkRehype from "remark-rehype";
 import { createMemo, onCleanup } from "solid-js";
 import { type Plugin, unified } from "unified";
 
-import { fragmentOf, remarkIssueRefs, richen } from "@/ui/richText";
+import { fragmentOf, remarkIssueRefs, richen } from "#/ui/richText.ts";
 
 import { cx, pxText } from "./style";
 

@@ -4,10 +4,10 @@
 import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
-import { Mcp } from "@/mcp/mcp.ts";
-import { chatCompletions } from "@/orchestrator/openai.ts";
-import { Orchestrator } from "@/orchestrator/orchestrator.ts";
-import { chatCompletionsPath } from "@/orchestrator/situation.ts";
+import { Mcp } from "#/mcp/mcp.ts";
+import { chatCompletions } from "#/orchestrator/openai.ts";
+import { Orchestrator } from "#/orchestrator/orchestrator.ts";
+import { chatCompletionsPath } from "#/orchestrator/situation.ts";
 
 export const mcpRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {

@@ -3,12 +3,12 @@ import { describe, expect, it, test } from "vite-plus/test";
 import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
-import type { ChannelAudience } from "@/channel/contracts.ts";
-import { brakes, type BrakeInput } from "@/mailbox/brakes.ts";
-import type { InboxMessage, UnreadRow } from "@/mailbox/envelope.ts";
-import { messageLine, wakeInput } from "@/mailbox/prompts.ts";
-import { whoHears } from "@/mailbox/routing.ts";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
+import type { ChannelAudience } from "#/channel/contracts.ts";
+import { brakes, type BrakeInput } from "#/mailbox/brakes.ts";
+import type { InboxMessage, UnreadRow } from "#/mailbox/envelope.ts";
+import { messageLine, wakeInput } from "#/mailbox/prompts.ts";
+import { whoHears } from "#/mailbox/routing.ts";
+import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { channelNameProblem, mentionsIn, parseChatTarget } from "./mentions.ts";
 import { parseSearch } from "./messages.ts";
@@ -57,6 +57,12 @@ test("the recorded cases", () => {
     }
   });
   expect(failed).toEqual([]);
+});
+
+test("an @ right after Chinese names someone, and one inside a Latin word or an address does not", () => {
+  expect(mentionsIn("问@w3 看看")).toEqual(["w3"]);
+  expect(mentionsIn("「@w3」你呢")).toEqual(["w3"]);
+  expect(mentionsIn("mail a@w3.dev, x@@w3")).toEqual([]);
 });
 
 test("with several orchestrators: the place's hears the owner, 管家 is the place's, and each is named by its id", () => {

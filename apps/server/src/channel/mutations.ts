@@ -7,15 +7,15 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { attachmentMax } from "@vibevalley/protocol";
 
-import { bounded } from "@/core/core.ts";
-import { missing, lookIn, refused } from "@/errors.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import { writeOnce } from "@/infra/files.ts";
+import { bounded } from "#/core/core.ts";
+import { missing, lookIn, refused } from "#/errors.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import { writeOnce } from "#/infra/files.ts";
+import * as qc from "#db/channel.sql.ts";
+import * as qa from "#db/channel_attachment.sql.ts";
+import * as qm from "#db/channel_message.sql.ts";
 
-import * as qc from "../../db/generated/channel.sql.ts";
-import * as qa from "../../db/generated/channel_attachment.sql.ts";
-import * as qm from "../../db/generated/channel_message.sql.ts";
 import { toMessage, reactionsOf, reactionsText, type MsgRow, type ChannelService } from "./contracts.ts";
 import type { ChatModel } from "./rooms.ts";
 

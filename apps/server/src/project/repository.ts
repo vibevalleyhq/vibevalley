@@ -8,7 +8,7 @@ import { Effect } from "effect";
 import { t } from "@vibevalley/i18n";
 import type { Changes, ChangedFile, UncommittedItem } from "@vibevalley/protocol";
 
-import { numberIn } from "@/base/order.ts";
+import { numberIn } from "#/base/order.ts";
 
 import { git, GitError, gitOk, gitQuiet, gitRun, type Ran, reason } from "./git.ts";
 

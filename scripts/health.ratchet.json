@@ -1,4 +1,14 @@
 {
+  "apps/cli": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 1,
+    "lintOff": 0,
+    "orDie": 1,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
   "apps/desktop": {
     "nonNull": 0,
     "doubleCast": 0,
@@ -6,7 +16,7 @@
     "lintOff": 3,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 3,
+    "swallowed": 2,
     "resultBranch": 0
   },
   "apps/mobile": {
@@ -99,6 +109,16 @@
     "swallowed": 0,
     "resultBranch": 0
   },
+  "packages/home": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
   "packages/i18n": {
     "nonNull": 4,
     "doubleCast": 0,
@@ -182,9 +202,9 @@
   "server: Gateway": {
     "nonNull": 7,
     "doubleCast": 0,
-    "cast": 13,
-    "lintOff": 7,
-    "orDie": 3,
+    "cast": 6,
+    "lintOff": 3,
+    "orDie": 2,
     "ignored": 6,
     "swallowed": 0,
     "resultBranch": 10
@@ -246,7 +266,7 @@
     "lintOff": 6,
     "orDie": 3,
     "ignored": 0,
-    "swallowed": 2,
+    "swallowed": 1,
     "resultBranch": 0
   },
   "server: Resource": {
@@ -270,7 +290,7 @@
     "resultBranch": 1
   },
   "web: app": {
-    "nonNull": 9,
+    "nonNull": 7,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
@@ -290,7 +310,7 @@
     "resultBranch": 0
   },
   "web: farm": {
-    "nonNull": 64,
+    "nonNull": 61,
     "doubleCast": 0,
     "cast": 1,
     "lintOff": 4,
@@ -310,7 +330,7 @@
     "resultBranch": 0
   },
   "web: features/artifact": {
-    "nonNull": 4,
+    "nonNull": 3,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 1,
@@ -410,7 +430,7 @@
     "resultBranch": 0
   },
   "web: features/project": {
-    "nonNull": 13,
+    "nonNull": 10,
     "doubleCast": 0,
     "cast": 1,
     "lintOff": 1,
@@ -430,7 +450,7 @@
     "resultBranch": 0
   },
   "web: features/session": {
-    "nonNull": 14,
+    "nonNull": 13,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
@@ -453,7 +473,7 @@
     "nonNull": 7,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 2,
+    "lintOff": 1,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 6,

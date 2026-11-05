@@ -1,0 +1,14 @@
+{
+  "error": "\n出错了：{why}",
+  "compacted": "（前面的对话压成了摘要，原文在 {archive}）",
+  "usage": "{aborted, select, true {（停下了，输入 {input}，缓存 {cached}，输出 {output}）} other {（输入 {input}，缓存 {cached}，输出 {output}）}}",
+  "hello": "{skills} 个技能，{tools} 个 MCP 工具。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。",
+  "forgot": "忘掉了。",
+  "noRuntime": "没有 {id} 这个农机",
+  "unknownInstall": "{id} 看不出装没装",
+  "unusable": "{id} 用不了：{kind}",
+  "resumed": "（接着）",
+  "direct": "直接聊：不经过 VibeValley，不记轨迹和花费。Ctrl+C 停这一轮，空着时再按退出。",
+  "rejected": "没接住：{why}",
+  "notSent": "没送进去：{why}"
+}

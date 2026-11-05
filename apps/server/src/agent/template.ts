@@ -11,7 +11,9 @@ import type * as T from "@vibevalley/protocol";
 import { AgentRoleValues, orchestratorRuntime, OrchestratorLookValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-export const builtInDir = join(import.meta.dirname, "templates");
+import { serverFile } from "#/assets.ts";
+
+export const builtInDir = serverFile("src/agent/templates");
 const addedDir = (home: string) => join(home, "agent-templates");
 
 /** The files a template is made of: nothing else in its folder is read or copied. */
@@ -66,7 +68,7 @@ const textOnDisk =
       Effect.map((text): string | undefined => text),
       Effect.catchIf(
         (e) => e.reason._tag === "NotFound",
-        () => Effect.succeed(undefined),
+        () => Effect.undefined,
       ),
       Effect.mapError((e) => new TemplateProblem({ message: t("server.agent.template.unreadable", { file: path, why: e.message }) })),
     );

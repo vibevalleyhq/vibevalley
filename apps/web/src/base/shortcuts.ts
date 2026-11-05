@@ -3,9 +3,9 @@
 // inside one place (a list's arrows, the farm's tools) keep their handlers there; their rows here say what they are.
 
 /** Where a shortcut works, as the sheet groups them. */
-type ShortcutPlace = "everywhere" | "composer" | "lists" | "pictures" | "farm" | "desktop";
+type ShortcutPlace = "everywhere" | "composer" | "lists" | "issues" | "pictures" | "farm" | "desktop";
 
-export const shortcutPlaces: readonly ShortcutPlace[] = ["everywhere", "composer", "lists", "pictures", "farm", "desktop"];
+export const shortcutPlaces: readonly ShortcutPlace[] = ["everywhere", "composer", "lists", "issues", "pictures", "farm", "desktop"];
 
 /** A key as the sheet shows it: mod is ⌘ on a Mac and Ctrl elsewhere. */
 export type Key = "mod" | "shift" | "alt" | "enter" | "esc" | "up" | "down" | "left" | "right" | "space" | "tab" | (string & {});
@@ -29,6 +29,7 @@ export const shortcuts = [
   { id: "dropReply", place: "composer", keys: ["esc"] },
   { id: "move", place: "lists", keys: ["up", "down"] },
   { id: "pick", place: "lists", keys: ["enter"] },
+  { id: "newIssue", place: "issues", keys: ["C"] },
   { id: "flip", place: "pictures", keys: ["left", "right"] },
   { id: "tool", place: "farm", keys: ["1…6"] },
   { id: "names", place: "farm", keys: ["alt"] },
@@ -56,9 +57,22 @@ const glyphs: Record<string, () => string> = {
 /** A key's cap on the sheet. */
 export const keyCap = (key: Key) => glyphs[key]?.() ?? key;
 
-/** Whether a keydown is one of the shell's chords (mod+K, ?): the rest are each place's own. */
-export function pressed(e: KeyboardEvent, id: "switcher" | "sheet") {
+// A field's keys are its own: a letter there is typed, not a shortcut.
+export const inField = () => {
+  const el = document.activeElement;
+  return (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLSelectElement ||
+    (el instanceof HTMLElement && el.isContentEditable)
+  );
+};
+
+/** The chords matched here (mod+K, ?, C): the rest are each place's own. */
+export function pressed(e: KeyboardEvent, id: "switcher" | "sheet" | "newIssue") {
   switch (id) {
+    case "newIssue":
+      return !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "c";
     case "switcher":
       return (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k";
     case "sheet":

@@ -18,18 +18,18 @@ import { t } from "@vibevalley/i18n";
 import { type AgoraGrant, type Area, type Validation, type Dictated, defaultOrchestrator, type VoiceCall, type VoiceSettings } from "@vibevalley/protocol";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 
-import { Channel } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import { messageOf, errnoOf } from "@/errors.ts";
-import { Inbox } from "@/inbox/inbox.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { callbackLog, bestEffort } from "@/infra/log.ts";
-import { afterRealTime } from "@/infra/time.ts";
-import { Ingress } from "@/ingress/ingress.ts";
-import { chatCompletions } from "@/orchestrator/openai.ts";
-import { Orchestrator } from "@/orchestrator/orchestrator.ts";
-import { orchestratorModel } from "@/orchestrator/situation.ts";
-import { type AgoraCredentials, Setting, type VoiceKeys } from "@/setting/setting.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import { messageOf, errnoOf } from "#/errors.ts";
+import { Inbox } from "#/inbox/inbox.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { callbackLog, bestEffort } from "#/infra/log.ts";
+import { afterRealTime } from "#/infra/time.ts";
+import { Ingress } from "#/ingress/ingress.ts";
+import { chatCompletions } from "#/orchestrator/openai.ts";
+import { Orchestrator } from "#/orchestrator/orchestrator.ts";
+import { orchestratorModel } from "#/orchestrator/situation.ts";
+import { type AgoraCredentials, Setting, type VoiceKeys } from "#/setting/setting.ts";
 
 import { verifyMoss, type MossTransport, mossTranscription, relay } from "./moss.ts";
 import { noticeLine, onCallLine } from "./prompts.ts";
@@ -634,7 +634,7 @@ const make = (options: VoiceOptions = {}) =>
         const said = yield* response.brief(onCallLine(texts, ring)).pipe(
           Effect.mapError(callStepFailed),
           Effect.raceFirst(Effect.as(aborted(call.life.signal), undefined)),
-          Effect.catch((e) => (stopped || call.ending || calls.get(on) !== call ? Effect.succeed(undefined) : Effect.fail(e))),
+          Effect.catch((e) => (stopped || call.ending || calls.get(on) !== call ? Effect.undefined : Effect.fail(e))),
         );
         if (said === undefined || stopped || call.ending || calls.get(on) !== call) break;
         if (said) {

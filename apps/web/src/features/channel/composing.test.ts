@@ -2,12 +2,12 @@ import { createRoot, flush } from "solid-js";
 import type * as solid from "solid-js";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 
-import { api } from "@/infra/api";
-import { frames } from "@/infra/frame";
-import { testFrames } from "@/infra/testing";
-import { framesSource, pageRegistry } from "@/state/atom";
-import { type Intent, intentsIn } from "@/state/intent";
-import { deferred, testRegistry } from "@/state/testing";
+import { api } from "#/infra/api.ts";
+import { frames } from "#/infra/frame.ts";
+import { testFrames } from "#/infra/testing.ts";
+import { framesSource, pageRegistry } from "#/state/atom.ts";
+import { type Intent, intentsIn } from "#/state/intent.ts";
+import { deferred, testRegistry } from "#/state/testing.ts";
 
 import { chatSay, createComposer, type ComposerWays, pendingLines, type Said } from "./composing";
 import { followed } from "./follow";

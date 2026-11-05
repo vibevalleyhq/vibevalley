@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { type Issue, defaultOrchestrator, type ProjectStack, type Run } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { templateCatalog } from "@/agent/seed.ts";
+import { templateCatalog } from "#/agent/seed.ts";
 
 import { pullRequestConclusion, issueBrief, milestonesOf, splitBrief } from "./brief.ts";
 import { filledKinds, filledTemplate, mandateNoteFits, sentTitles } from "./creation.ts";

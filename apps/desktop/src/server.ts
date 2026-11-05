@@ -1,10 +1,11 @@
 // The server for the desktop app (apps/server): started as a child process on a port it picks (VIBEVALLEY_PORT=0), ready
 // when it prints its address as one JSON line (--ready-json, ServerReady), stopped with SIGTERM so it saves on the way out.
-// It runs on Electron's own Node (ELECTRON_RUN_AS_NODE), unbundled: the migrations, the word lists and the
-// coding agents' SDKs are found beside their packages, so the server keeps its node_modules.
+// Packaged, it is the bundle (apps/server's `vp pack`, dist/main.mjs) on Electron's own Node (ELECTRON_RUN_AS_NODE), with
+// its dependencies' node_modules beside it; run from the repository, it is the source through vpx, as `vp run start` runs
+// it (paths.ts says which).
 
 import { execFile, spawn } from "node:child_process";
-import { createWriteStream, mkdirSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { Schema } from "effect";
@@ -23,7 +24,7 @@ const shellPathTimeoutMs = 5_000;
 
 /** The PATH a terminal has. An app opened from Finder or at login gets launchd's short one, which has none of pi,
  * claude or codex; the login shell's is the one the owner installed them on. Unanswered, the app's own. */
-export function loginShellPath(env: NodeJS.ProcessEnv): Promise<string | undefined> {
+function loginShellPath(env: NodeJS.ProcessEnv): Promise<string | undefined> {
   const sh = env.SHELL || "/bin/zsh";
   return new Promise((resolve) => {
     // The markers keep out what a profile prints on its own.
@@ -34,13 +35,50 @@ export function loginShellPath(env: NodeJS.ProcessEnv): Promise<string | undefin
   });
 }
 
+/**
+ * The PATH to start the server with: the login shell's as it said it last time, kept in `kept`, so the server does not
+ * wait on the shell (a profile can take a second or more); the shell is asked again all the same and its answer kept for
+ * the next start. With none kept yet (the first start) it waits. A tool installed since is found from the next start.
+ */
+export async function shellPath(
+  kept: string,
+  env: NodeJS.ProcessEnv,
+  ask = loginShellPath,
+): Promise<{ readonly path: string | undefined; readonly refreshed: Promise<unknown> }> {
+  let last: string | undefined;
+  // None kept is the first start; one that cannot be read is told and the shell asked as on a first start.
+  if (existsSync(kept))
+    try {
+      last = readFileSync(kept, "utf8").trim() || undefined;
+    } catch (e) {
+      console.error("vibevalley: the kept PATH could not be read; the login shell is waited on:", e);
+    }
+  const asked = ask(env).then((path) => {
+    if (path && path !== last)
+      try {
+        mkdirSync(dirname(kept), { recursive: true });
+        writeFileSync(kept, path);
+      } catch (e) {
+        // Safe to go on: this start has its PATH; the next one asks the shell again.
+        console.error("vibevalley: the login shell's PATH could not be kept:", e);
+      }
+    return path;
+  });
+  // refreshed: the shell answered and what it said is kept.
+  return last === undefined ? { path: await asked, refreshed: asked } : { path: last, refreshed: asked };
+}
+
 export interface ServerFiles {
-  /** apps/server: src/main.ts and its node_modules. */
+  /** apps/server, or the packaged app's copy: the folder the server runs in. */
   server: string;
+  /** What runs it, before its own flags: the executable and its arguments. */
+  command: readonly [string, ...string[]];
   /** The built page (apps/web/dist), served at / on the server's origin. */
   web: string;
   /** Appended to: the server's stdout and stderr. */
   log: string;
+  /** Node's compile cache for the server (NODE_COMPILE_CACHE): its modules' compiled code, kept between starts. */
+  compileCache: string;
 }
 
 export interface RunningServer {
@@ -58,10 +96,10 @@ function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0): Prom
   mkdirSync(dirname(files.log), { recursive: true });
   const log = createWriteStream(files.log, { flags: "a" });
   log.write(`--- ${new Date().toISOString()} vibevalley: starting ${files.server}\n`);
-  // tsx and the tsconfig (whose paths are the server's @/ imports) are found from the cwd: the server's own.
-  const child = spawn(process.execPath, ["--import", "tsx", "src/main.ts", "--ready-json", "--web", files.web], {
+  const [bin, ...args] = files.command;
+  const child = spawn(bin, [...args, "--ready-json", "--web", files.web], {
     cwd: files.server,
-    env: { ...env, ELECTRON_RUN_AS_NODE: "1", VIBEVALLEY_PORT: String(port) },
+    env: { ...env, ELECTRON_RUN_AS_NODE: "1", VIBEVALLEY_PORT: String(port), NODE_COMPILE_CACHE: files.compileCache },
     stdio: ["ignore", "pipe", "pipe"],
   });
   child.stderr.pipe(log, { end: false });

@@ -5,7 +5,7 @@ import type { Tool } from "@vibevalley/agent/core/loop";
 import type { BrainMessage } from "@vibevalley/agent/messages";
 import { assistantMessage, toolCall } from "@vibevalley/ai/testing";
 
-import { check, committed, type Expect, casesIn, isInput, kinds, orchestratorToolNames, problemOf, stubbed } from "@/testing/evals.ts";
+import { check, committed, type Expect, casesIn, isInput, kinds, orchestratorToolNames, problemOf, stubbed } from "#/testing/evals.ts";
 
 import { noResult } from "./prompts.ts";
 

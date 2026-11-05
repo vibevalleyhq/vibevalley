@@ -5,9 +5,9 @@ import { Effect } from "effect";
 import { ownerId } from "@vibevalley/protocol";
 import type { ArtifactHandlers } from "@vibevalley/protocol/api";
 
-import { Agent } from "@/agent/agent.ts";
-import { Artifact } from "@/artifact/artifact.ts";
-import { Issue } from "@/issue/issue.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Artifact } from "#/artifact/artifact.ts";
+import { Issue } from "#/issue/issue.ts";
 
 export const artifactHandlers = Effect.gen(function* () {
   const agents = yield* Agent;
@@ -15,16 +15,15 @@ export const artifactHandlers = Effect.gen(function* () {
   const issues = yield* Issue;
   const done: ArtifactHandlers = {
     "artifact.list": ({ channel, issue }) =>
-      Effect.flatMap(issue ? issues.idOf(issue) : Effect.succeed(undefined), (id) =>
-        artifacts.list({ ...(channel ? { channel } : {}), ...(id ? { issue: id } : {}) }),
-      ),
+      Effect.flatMap(issue ? issues.idOf(issue) : Effect.undefined, (id) => artifacts.list({ ...(channel ? { channel } : {}), ...(id ? { issue: id } : {}) })),
     "artifact.get": ({ id }) => artifacts.get(id),
     "artifact.content.get": ({ id, version }) => Effect.map(artifacts.content(id, version), (c) => ({ version: c.version, content: c.content })),
     "artifact.create": (req) =>
-      Effect.flatMap(req.issue ? issues.idOf(req.issue) : Effect.succeed(undefined), (issue) =>
+      Effect.flatMap(req.issue ? issues.idOf(req.issue) : Effect.undefined, (issue) =>
         artifacts.create({ from: ownerId, by: ownerId }, { ...req, ...(issue ? { issue } : {}) }),
       ),
     "artifact.version.create": (req) => artifacts.version({ from: ownerId, by: ownerId }, req),
+    "artifact.html.edit": (req) => artifacts.htmlEdit({ from: ownerId, by: ownerId }, req),
     "artifact.update": ({ id, title }) => artifacts.rename(id, title),
     "artifact.delete": ({ id }) => artifacts.remove(id),
     "artifact.previewDelete": ({ id }) => artifacts.previewRemove(id),

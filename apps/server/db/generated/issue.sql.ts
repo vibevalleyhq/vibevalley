@@ -207,17 +207,18 @@ export const AddIssueParams = Schema.Struct({
   ["parent"]: Schema.NullOr(Schema.String),
   ["blocked_by"]: Schema.NullOr(Schema.String),
   ["constraints"]: Schema.NullOr(Schema.String),
+  ["criteria"]: Schema.NullOr(Schema.String),
 })
 export type AddIssueParams = typeof AddIssueParams.Type
 
 
-export const AddIssueSql = "-- name: AddIssue :exec\ninsert into issue (id, number, title, description, origin_trigger_id, mandate_strength, max_bot_review_rounds, auto_submit_pr,\n                   project, priority, rank, created_at, cron, deliver, parent, blocked_by, constraints)\nvalues (?1, (select coalesce(max(number), 0) + 1 from issue), ?2, ?3, ?4,\n        ?5, ?6, ?7, ?8, ?9,\n        (select coalesce(max(rank), 0) + 1 from issue), ?10, ?11, ?12, ?13, ?14, ?15);"
+export const AddIssueSql = "-- name: AddIssue :exec\ninsert into issue (id, number, title, description, origin_trigger_id, mandate_strength, max_bot_review_rounds, auto_submit_pr,\n                   project, priority, rank, created_at, cron, deliver, parent, blocked_by, constraints, criteria)\nvalues (?1, (select coalesce(max(number), 0) + 1 from issue), ?2, ?3, ?4,\n        ?5, ?6, ?7, ?8, ?9,\n        (select coalesce(max(rank), 0) + 1 from issue), ?10, ?11, ?12, ?13, ?14, ?15, ?16);"
 
 export const addIssue = Effect.fn("AddIssue")(function* (params: AddIssueParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: AddIssueParams,
-    execute: (p) => sql.unsafe(AddIssueSql, [p["id"], p["title"], p["description"], p["origin_trigger_id"], p["mandate_strength"], p["max_bot_review_rounds"], p["auto_submit_pr"], p["project"], p["priority"], p["created_at"], p["cron"], p["deliver"], p["parent"], p["blocked_by"], p["constraints"]]),
+    execute: (p) => sql.unsafe(AddIssueSql, [p["id"], p["title"], p["description"], p["origin_trigger_id"], p["mandate_strength"], p["max_bot_review_rounds"], p["auto_submit_pr"], p["project"], p["priority"], p["created_at"], p["cron"], p["deliver"], p["parent"], p["blocked_by"], p["constraints"], p["criteria"]]),
   })(params)
 })
 

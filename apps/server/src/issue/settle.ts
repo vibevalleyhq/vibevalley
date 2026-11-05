@@ -7,12 +7,12 @@ import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues } from "@vibevalley/protocol";
 import { assignmentOf, assignedAgentOf, isOneOf, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "@/agent/agent.ts";
-import { lookIn, refused } from "@/errors.ts";
-import { issueBranch, Project } from "@/project/project.ts";
-import { Runtime } from "@/runtime/runtime.ts";
-import { conflictBrief } from "@/session/briefing.ts";
-import { Session } from "@/session/session.ts";
+import { Agent } from "#/agent/agent.ts";
+import { lookIn, refused } from "#/errors.ts";
+import { issueBranch, Project } from "#/project/project.ts";
+import { Runtime } from "#/runtime/runtime.ts";
+import { conflictBrief } from "#/session/briefing.ts";
+import { Session } from "#/session/session.ts";
 
 import { answerCureWords, cureWords, findingsOf, resumeWords } from "./brief.ts";
 import type { IssueDispatch } from "./dispatch.ts";

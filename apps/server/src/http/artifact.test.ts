@@ -3,11 +3,11 @@ import { Context, Effect, Layer } from "effect";
 
 import { artifactPath, ownerId } from "@vibevalley/protocol";
 
-import { Artifact } from "@/artifact/artifact.ts";
-import { htmlPolicy } from "@/artifact/policy.ts";
-import { remoteMay } from "@/lan/lan.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { quietApp } from "@/testing/world.ts";
+import { Artifact } from "#/artifact/artifact.ts";
+import { htmlPolicy } from "#/artifact/policy.ts";
+import { remoteMay } from "#/lan/lan.ts";
+import { testConfig } from "#/testing/layers.ts";
+import { quietApp } from "#/testing/world.ts";
 
 import { app } from "./app.ts";
 
@@ -38,6 +38,11 @@ describe("an artifact's content", () => {
       // The test reads the server as a browser does, through the platform's own fetch.
       // @effect-diagnostics-next-line globalFetchInEffect:off
       expect(yield* Effect.promise(async () => (await fetch(`http://${address}${artifactPath(html.id, 2)}`)).text())).toBe("<p>第二版</p>");
+      const shown = yield* get(`${artifactPath(html.id, 1)}?shell=1`);
+      expect(shown.headers.get("content-security-policy")).toBe(htmlPolicy);
+      const shownText = yield* Effect.promise(() => shown.text());
+      expect([shownText.startsWith("<p>第一版</p>\n<script>"), shownText.includes('vibevalley: "selection"')]).toEqual([true, true]);
+      expect((yield* artifacts.content(html.id, 1)).content).toBe("<p>第一版</p>");
       const md = yield* artifacts.create(owner, { title: "说明", kind: "markdown", content: "# 题\n\n<script>no</script>" });
       for (const path of [
         artifactPath(md.id, 0),

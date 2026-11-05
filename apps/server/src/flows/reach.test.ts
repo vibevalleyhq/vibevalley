@@ -2,9 +2,9 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { Issue } from "@/issue/issue.ts";
-import { Session } from "@/session/session.ts";
-import { testConfig } from "@/testing/layers.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Session } from "#/session/session.ts";
+import { testConfig } from "#/testing/layers.ts";
 
 import { farm, lab, mustHire, watch } from "./farm.ts";
 

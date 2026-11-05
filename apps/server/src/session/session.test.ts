@@ -11,15 +11,15 @@ import { TestClock } from "effect/testing";
 import type * as T from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import type { LaunchActivity } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import { watchStalls } from "@/executor/executor.ts";
-import { Project } from "@/project/project.ts";
-import { MergeFailure } from "@/project/workplace.ts";
-import { gitIn } from "@/testing/git.ts";
-import { starter, testConfig, until, waitFor } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
+import { Agent } from "#/agent/agent.ts";
+import type { LaunchActivity } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import { watchStalls } from "#/executor/executor.ts";
+import { Project } from "#/project/project.ts";
+import { MergeFailure } from "#/project/workplace.ts";
+import { gitIn } from "#/testing/git.ts";
+import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
+import { world } from "#/testing/world.ts";
 
 import { NotRecorded, Session } from "./session.ts";
 import type { DeliveryInput } from "./signals.ts";

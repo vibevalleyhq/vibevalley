@@ -10,12 +10,13 @@ import { artifactPrefix, attachmentMax, attachmentPath, mossLinePath } from "@vi
 import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers, pathOf } from "@vibevalley/protocol/api";
 import { artifactId } from "@vibevalley/protocol/schema";
 
-import { Artifact } from "@/artifact/artifact.ts";
-import { artifactHeaders } from "@/artifact/policy.ts";
-import { wireOf } from "@/base/json.ts";
-import { Channel } from "@/channel/channel.ts";
-import { messageOf, refused } from "@/errors.ts";
-import { Voice } from "@/voice/voice.ts";
+import { Artifact } from "#/artifact/artifact.ts";
+import { artifactHeaders } from "#/artifact/policy.ts";
+import { withShell } from "#/artifact/shell.ts";
+import { wireOf } from "#/base/json.ts";
+import { Channel } from "#/channel/channel.ts";
+import { messageOf, refused } from "#/errors.ts";
+import { Voice } from "#/voice/voice.ts";
 
 import { fromTheFarm } from "./rpc.ts";
 
@@ -43,7 +44,10 @@ function serve(endpoint: Endpoint, handle: (input: unknown) => Effect.Effect<unk
       // A body that says it is too big is refused before it is read; one that grows past the limit on the way stops there.
       const length = Number(request.headers["content-length"] ?? 0);
       if (length > max) return HttpServerResponse.text(`the body is ${length} bytes, at most ${max}\n`, { status: 413 });
-      const text = yield* Effect.provideService(request.text, HttpIncomingMessage.MaxBodySize, ByteSize.bytes(max));
+      const text = yield* Effect.provideService(request.text, HttpIncomingMessage.MaxBodySize, ByteSize.bytes(max)).pipe(
+        Effect.catchReason("HttpServerError", "RequestParseError", (e) => (e.reason === "BodyTooLarge" ? Effect.undefined : Effect.fail(e))),
+      );
+      if (text === undefined) return HttpServerResponse.text(`the body grew past ${max} bytes\n`, { status: 413 });
       const decoded = Schema.decodeExit(Schema.fromJsonString(endpoint.input))(text === "" ? "{}" : text);
       if (decoded._tag === "Failure") return badRequest(Cause.pretty(decoded.cause));
       input = decoded.value;
@@ -123,7 +127,12 @@ export const artifactContent = HttpRouter.add(
     if (!/^[0-9a-f-]{36}$/u.test(id) || !/^[1-9]\d*$/u.test(version)) return notFound();
     const path = yield* artifacts.file(artifactId(id), Number(version));
     if (!path) return notFound();
-    return yield* HttpServerResponse.file(path, { contentType: artifactHeaders["content-type"]!, headers: artifactHeaders });
+    const contentType = artifactHeaders["content-type"]!;
+    if (new URL(request.url, "http://farm").searchParams.get("shell") !== "1")
+      return yield* HttpServerResponse.file(path, { contentType, headers: artifactHeaders });
+    // The workbench's view: the page with the shell after it (artifact/shell.ts).
+    const page = yield* artifacts.content(artifactId(id), Number(version));
+    return HttpServerResponse.text(withShell(page.content), { contentType, headers: artifactHeaders });
   }).pipe(Effect.orElseSucceed(notFound)),
 );
 

@@ -8,14 +8,14 @@ import { TestClock } from "effect/testing";
 import type { Repo, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { Core } from "@/core/core.ts";
-import { Project } from "@/project/project.ts";
-import { sessionOf } from "@/session/roster.ts";
-import { gitSync, repo } from "@/testing/git.ts";
-import { testConfig, waitFor as until } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
+import { Core } from "#/core/core.ts";
+import { Project } from "#/project/project.ts";
+import { sessionOf } from "#/session/roster.ts";
+import { gitSync, repo } from "#/testing/git.ts";
+import { testConfig, waitFor as until } from "#/testing/layers.ts";
+import { world } from "#/testing/world.ts";
+import * as q from "#db/game_ledger.sql.ts";
 
-import * as q from "../../db/generated/game_ledger.sql.ts";
 import { Game, start as gameStart } from "./game.ts";
 import { playOf } from "./view.ts";
 

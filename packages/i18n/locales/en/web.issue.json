@@ -9,8 +9,6 @@
   "orchestrator": "Manager",
   "noHelper": "No helper yet",
   "board": {
-    "add": "+ Write one, Enter saves it",
-    "addLabel": "Write a to-do",
     "earlier": "{n} earlier",
     "recent": "Recent only",
     "empty": {
@@ -349,5 +347,13 @@
     "changes": "{branch} → {base} · {commits} commits · +{added} -{removed}",
     "changesUncommitted": "{branch} → {base} · {commits} commits · +{added} -{removed} · {uncommitted} uncommitted",
     "justNow": "just now"
+  },
+  "new": {
+    "title": "New issue",
+    "card": "New issue",
+    "words": "What to do",
+    "placeholder": "What needs doing? A sentence is enough; it is drafted from your words",
+    "keys": "⌘ Enter to save",
+    "keep": "Save"
   }
 }

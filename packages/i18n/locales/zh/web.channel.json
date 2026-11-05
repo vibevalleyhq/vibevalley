@@ -191,7 +191,9 @@
     "none": "没有找到",
     "direct": "私聊",
     "newDirect": "开一个私聊",
-    "keys": "{mac, select, true {⌘K} other {Ctrl K}}"
+    "keys": "{mac, select, true {⌘K} other {Ctrl K}}",
+    "note": "笔记 · {tier}",
+    "searchNotes": "在笔记里搜「{q}」"
   },
   "farmSearch": {
     "open": "全部搜索",

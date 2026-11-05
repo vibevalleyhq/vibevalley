@@ -3,9 +3,9 @@ import { createEffect, createMemo, deep } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type Issue, type IssueHistory, defaultOrchestrator, type Session } from "@vibevalley/protocol";
 
-import { api } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { queries, ready, useQuery, useAgents } from "@/infra/query";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { queries, ready, useQuery, useAgents } from "#/infra/query.ts";
 
 import { boardRows, historyKey } from "./cards";
 

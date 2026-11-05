@@ -12,10 +12,10 @@ import { type HttpClient, HttpClientRequest } from "effect/http";
 import { t } from "@vibevalley/i18n";
 import type { MemoryKind } from "@vibevalley/protocol";
 
-import { clip } from "@/base/clip.ts";
-import { newId } from "@/base/ids.ts";
-import { redact, type RedactedString, redactedHead } from "@/base/redact.ts";
-import type { MemorySourceConfig } from "@/setting/memorySources.ts";
+import { clip } from "#/base/clip.ts";
+import { newId } from "#/base/ids.ts";
+import { redact, type RedactedString, redactedHead } from "#/base/redact.ts";
+import type { MemorySourceConfig } from "#/setting/memorySources.ts";
 
 import { everosWords, recallWords } from "./prompts.ts";
 import { recallCount, type MemoryScope } from "./recall.ts";

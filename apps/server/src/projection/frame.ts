@@ -8,10 +8,10 @@ import { t } from "@vibevalley/i18n";
 import { type Doing, type DoingView, type GameEffect, type StateFrame, type WorkspaceState, type WorkspaceView } from "@vibevalley/protocol";
 import { phaseWords } from "@vibevalley/protocol/rules";
 
-import { Projection } from "@/core/core.ts";
-import { nextText, whenText } from "@/cron/when.ts";
-import { effectsOf, viewOf } from "@/game/view.ts";
-import { inbox } from "@/inbox/items.ts";
+import { Projection } from "#/core/core.ts";
+import { nextText, whenText } from "#/cron/when.ts";
+import { effectsOf, viewOf } from "#/game/view.ts";
+import { inbox } from "#/inbox/items.ts";
 
 import { reduce } from "./reduce.ts";
 

@@ -3,17 +3,17 @@ import { Context, Effect, Layer, Schedule, Schema } from "effect";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import { Artifact } from "@/artifact/artifact.ts";
-import { Channel, type SayMore } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import type { ApiError } from "@/errors.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import type { Picked } from "@/mailbox/envelope.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { keepSourceTrigger, keptTrigger, triggerOf, type TriggerInput } from "@/mailbox/payload.ts";
-import type { ProjectError } from "@/project/workplace.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Artifact } from "#/artifact/artifact.ts";
+import { Channel, type SayMore } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import type { ApiError } from "#/errors.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import type { Picked } from "#/mailbox/envelope.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { keepSourceTrigger, keptTrigger, triggerOf, type TriggerInput } from "#/mailbox/payload.ts";
+import type { ProjectError } from "#/project/workplace.ts";
 
 import { githubInputs, type GitHubPullIngress } from "./github.ts";
 

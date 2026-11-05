@@ -21,13 +21,13 @@ import { models } from "@vibevalley/ai/models";
 import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
-import { newId } from "@/base/ids.ts";
-import { jsonOrNone } from "@/base/json.ts";
-import { messageOf } from "@/errors.ts";
-import { Db } from "@/infra/db.ts";
-import type { Time } from "@/infra/time.ts";
+import { newId } from "#/base/ids.ts";
+import { jsonOrNone } from "#/base/json.ts";
+import { messageOf } from "#/errors.ts";
+import { Db } from "#/infra/db.ts";
+import type { Time } from "#/infra/time.ts";
+import * as q from "#db/runtime_todo.sql.ts";
 
-import * as q from "../../db/generated/runtime_todo.sql.ts";
 import { helperInstructions } from "./prompts.ts";
 
 const vibevalleyRuntime = "vibevalley";

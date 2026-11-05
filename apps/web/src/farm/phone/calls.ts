@@ -7,10 +7,10 @@ import { type Accessor, createEffect, onSettled } from "solid-js";
 import type { InboxItem, StateFrame } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 
-import { createExternal } from "@/base/external";
-import { farm, farmState, subscribeFarm } from "@/farm/store";
-import { voiceCall } from "@/features/voice";
-import { playSound } from "@/ui/pixel/sound";
+import { createExternal } from "#/base/external.ts";
+import { farm, farmState, subscribeFarm } from "#/farm/store.ts";
+import { voiceCall } from "#/features/voice/index.ts";
+import { playSound } from "#/ui/pixel/sound.ts";
 
 interface PhoneLogEntry {
   readonly call: InboxItem;

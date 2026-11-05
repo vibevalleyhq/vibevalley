@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import presetsEn from "@/runtime/presets.en.json";
-import presetsZh from "@/runtime/presets.json";
+import presetsEn from "#/runtime/presets.en.json";
+import presetsZh from "#/runtime/presets.json";
 
 import seedsEn from "./seeds.en.json";
 import seedsZh from "./seeds.json";

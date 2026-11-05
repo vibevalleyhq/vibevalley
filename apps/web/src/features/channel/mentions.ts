@@ -1,5 +1,8 @@
 import { t } from "@vibevalley/i18n";
 import { type Agent, everyone, defaultOrchestrator, ownerId, type Session, type SessionView } from "@vibevalley/protocol";
+import { mentionLead } from "@vibevalley/protocol/rules";
+
+import { spelled } from "#/base/search.ts";
 
 import { phaseText } from "./presence";
 const mentionOf: Record<string, string> = {
@@ -35,20 +38,20 @@ export const nameables = (sessions: SessionView[], orchestrators: readonly Agent
   ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: t("web.channel.names.everyone"), note: t("web.channel.names.everyoneNote") }] : []),
 ];
 
-const typed = /(^|[^\p{L}\p{N}_@])@([\p{L}\p{N}_]*)$/u;
+const typed = new RegExp(String.raw`${mentionLead}@([\p{L}\p{N}_]*)$`, "u");
 
 /** The @name being typed before the caret: where its @ is and what follows it. */
 export function typedName(text: string, caret: number) {
   if (caret < 0 || caret > text.length) return undefined;
   const m = typed.exec(text.slice(0, caret));
   if (!m) return undefined;
-  const query = m[2] ?? "";
+  const query = m[1] ?? "";
   return { start: caret - query.length - 1, query };
 }
 
 export function offeredFor(all: Nameable[], query: string) {
   const q = query.toLowerCase();
-  return all.filter((n) => n.token.slice(1).toLowerCase().startsWith(q) || n.name.toLowerCase().includes(q)).slice(0, menuMax);
+  return all.filter((n) => n.token.slice(1).toLowerCase().startsWith(q) || spelled(n.name, q)).slice(0, menuMax);
 }
 
 export function insertName(text: string, caret: number, start: number, token: string) {

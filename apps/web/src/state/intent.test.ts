@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from "vite-plus/test";
 
 import { VibeValleyApiError } from "@vibevalley/protocol";
 
-import { frameAt, testFrames } from "@/infra/testing";
+import { frameAt, testFrames } from "#/infra/testing.ts";
 
 import { bySeq, defineIntent, intentsIn, sendOnce, sendReplacing } from "./intent";
 import { deferred, testRegistry } from "./testing";

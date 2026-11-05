@@ -5,9 +5,9 @@ import { Effect, Layer } from "effect";
 
 import { mossLinePath } from "@vibevalley/protocol";
 
-import { testConfig, whenTrue } from "@/testing/layers.ts";
-import { quietApp } from "@/testing/world.ts";
-import type { MossTransport } from "@/voice/moss.ts";
+import { testConfig, whenTrue } from "#/testing/layers.ts";
+import { quietApp } from "#/testing/world.ts";
+import type { MossTransport } from "#/voice/moss.ts";
 
 import { app } from "./app.ts";
 

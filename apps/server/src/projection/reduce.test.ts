@@ -2,7 +2,7 @@ import { expect, it } from "vite-plus/test";
 
 import type { FactCallChanged, Issue } from "@vibevalley/protocol";
 
-import { emptyWorkspaceState } from "@/core/core.ts";
+import { emptyWorkspaceState } from "#/core/core.ts";
 
 import { reduce } from "./reduce.ts";
 

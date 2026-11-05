@@ -6,7 +6,7 @@
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, OrchestratorLook } from "@vibevalley/protocol";
 
-import { api } from "@/infra/api";
+import { api } from "#/infra/api.ts";
 
 /** The orchestrators' looks: sprite manager-<id>, the plain one is farmer. */
 export const orchestratorLooks: readonly { readonly id: OrchestratorLook; readonly name: string; readonly blurb: string }[] = [

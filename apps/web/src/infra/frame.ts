@@ -15,7 +15,7 @@ import {
   type WorkspaceView,
 } from "@vibevalley/protocol";
 
-import { createExternal } from "@/base/external";
+import { createExternal } from "#/base/external.ts";
 
 export type Link = "connecting" | "open" | "lost";
 

@@ -1,0 +1,14 @@
+{
+  "error": "\nSomething went wrong: {why}",
+  "compacted": "(the conversation so far was compacted into a summary; the original is in {archive})",
+  "usage": "{aborted, select, true {(stopped, input {input}, cached {cached}, output {output})} other {(input {input}, cached {cached}, output {output})}}",
+  "hello": "{skills} skills, {tools} MCP tools. /reset forgets the conversation, /exit quits, Ctrl+C stops.",
+  "forgot": "Forgotten.",
+  "noRuntime": "There is no machine {id}",
+  "unknownInstall": "Cannot tell whether {id} is installed",
+  "unusable": "{id} cannot be used: {kind}",
+  "resumed": " (resumed)",
+  "direct": "Talking directly: not through VibeValley, no trajectory, no spending. Ctrl+C stops this turn; again when idle quits.",
+  "rejected": "Not taken: {why}",
+  "notSent": "Not delivered: {why}"
+}

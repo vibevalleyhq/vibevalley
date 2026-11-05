@@ -27,3 +27,6 @@ design/mockups/v2
 # Claude Code session state
 .claude/scheduled_tasks.lock
 .vitest/
+
+# What a workspace package builds for the others (its vite.config.ts pack block).
+packages/*/dist/

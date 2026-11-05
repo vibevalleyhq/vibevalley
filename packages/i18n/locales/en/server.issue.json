@@ -36,7 +36,7 @@
   "notRecorded": "{name}'s ticket was not recorded: {why}",
   "workKept": "{refused}; ticket #{n} and its changes are kept, and it can be sent again",
   "drafting": "{name} is drafting it: start it once the draft comes back",
-  "pickHint": "Once picked, give it when moving to To do: {command}, with --json status \"todo\" and agent (the profile's id)",
+  "pickHint": "Once picked: issue edit {n} --agent <profile>, then issue status {n} todo",
   "noAssignee": "No helper has been picked yet",
   "profileGone": "The profile {id} is gone",
   "sendFailed": "It could not be sent",
@@ -125,9 +125,9 @@
     "reopen": "Moving a closed ticket back to To do reopens it with a few words",
     "revive": "A ticket canceled before it started goes back to Backlog first",
     "cannot": "Cannot move from {from} to {to}",
-    "sayWithText": "{label}: {command}, with --json the text to say",
     "moveTo": "Move to {status}",
-    "roundWithText": "{say}: {command}, with --json status \"{to}\" and the text of what to do this round"
+    "roundWithText": "{say}: {command}, with … as what this round is for",
+    "withWords": "{say}: {command}, with … as what to say"
   },
   "template": {
     "commands": {

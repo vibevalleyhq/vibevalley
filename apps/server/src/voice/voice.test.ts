@@ -11,14 +11,14 @@ import { TestClock } from "effect/testing";
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
 import { sessionId, issueId } from "@vibevalley/protocol/schema";
 
-import { Core } from "@/core/core.ts";
-import { Orchestrator } from "@/orchestrator/orchestrator.ts";
-import { inboxStart } from "@/services.ts";
-import { NotAnswered } from "@/session/host.ts";
-import { Setting } from "@/setting/setting.ts";
-import { defaultVoice } from "@/setting/voice.ts";
-import { testConfig, until } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
+import { Core } from "#/core/core.ts";
+import { Orchestrator } from "#/orchestrator/orchestrator.ts";
+import { inboxStart } from "#/services.ts";
+import { NotAnswered } from "#/session/host.ts";
+import { Setting } from "#/setting/setting.ts";
+import { defaultVoice } from "#/setting/voice.ts";
+import { testConfig, until } from "#/testing/layers.ts";
+import { world } from "#/testing/world.ts";
 
 import { onCallLine } from "./prompts.ts";
 import {

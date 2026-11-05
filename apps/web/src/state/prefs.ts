@@ -8,7 +8,7 @@ import type { Accessor } from "solid-js";
 
 import { ThemeChoice } from "@vibevalley/protocol/host";
 
-import { currentHost } from "@/infra/host";
+import { currentHost } from "#/infra/host.ts";
 
 import { defineStored, orFallback } from "./stored";
 

@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { inspect } from "node:util";
 
-import { pathOf } from "../packages/protocol/src/shapes.ts";
+import { pathOf } from "@vibevalley/protocol";
 
 export interface VerificationResult {
   code: number;
@@ -75,11 +75,11 @@ export async function runVerification(command: string[] = [], options: Verificat
   for (const path of [home, work, binaries]) mkdirSync(path);
   const env: Record<string, string> = { ...isolatedEnvironment(home, work), ...(options.scriptedHelper === true ? { VIBEVALLEY_TEST_RUNTIMES: "1" } : {}) };
   const serverDir = join(root, "apps", "server");
-  // The command line from any folder: tsx is the server's own, and so is its tsconfig (tsx looks for one from the cwd,
-  // and the server's @/ imports are its paths).
+  // The command line from any folder, on the command line's own vpx (its #/ imports are its package.json's).
   const cli = join(binaries, "vv");
-  const tsx = [join(serverDir, "node_modules", ".bin", "tsx"), "--tsconfig", join(serverDir, "tsconfig.json"), join(serverDir, "src", "cli.ts")];
-  writeFileSync(cli, `#!/bin/sh\nexec ${tsx.map((a) => JSON.stringify(a)).join(" ")} "$@"\n`, { mode: 0o755 });
+  const cliDir = join(root, "apps", "cli");
+  const vpx = [join(cliDir, "node_modules", ".bin", "vpx"), join(cliDir, "src", "main.ts")];
+  writeFileSync(cli, `#!/bin/sh\nexec ${vpx.map((a) => JSON.stringify(a)).join(" ")} "$@"\n`, { mode: 0o755 });
   const log = join(evidence, "server.stdout.log");
   /** A child in a process group of its own; exited settles with its exit code. */
   interface Child {
@@ -144,16 +144,20 @@ export async function runVerification(command: string[] = [], options: Verificat
   };
   try {
     if (interrupted) throw new Error("verification interrupted before startup");
-    // node itself, so the receipt's pid is the child's; it logs to stdout.
+    // vpx execs node in its own process, so the receipt's pid is the child's; it logs to stdout.
     // The built page, when there is one, so vv-acceptance can screenshot it on the same server.
     const web = join(root, "apps", "web", "dist");
     const serverErr = openSync(join(evidence, "server.stderr.log"), "w");
-    const spawned = spawn("node", ["--import", "tsx", "src/main.ts", "--ready-json", ...(existsSync(join(web, "index.html")) ? ["--web", web] : [])], {
-      cwd: serverDir,
-      env,
-      detached: true,
-      stdio: ["ignore", "pipe", serverErr],
-    });
+    const spawned = spawn(
+      join(serverDir, "node_modules", ".bin", "vpx"),
+      ["src/main.ts", "--ready-json", ...(existsSync(join(web, "index.html")) ? ["--web", web] : [])],
+      {
+        cwd: serverDir,
+        env,
+        detached: true,
+        stdio: ["ignore", "pipe", serverErr],
+      },
+    );
     closeSync(serverErr);
     const running = own(spawned);
     owned.add(running);
@@ -207,7 +211,7 @@ export async function runVerification(command: string[] = [], options: Verificat
       /* oxlint-enable eslint/no-await-in-loop */
     }
     if (!address || !existsSync(join(evidence, "health.json"))) throw new Error(`server did not become healthy; see ${log}`);
-    const run = command.length > 0 ? command : [cli, "server", "health"];
+    const run = command.length > 0 ? command : [cli, "api", "call", "server.health.get"];
     const task = launch(run, root, "command", { ...env, VIBEVALLEY_SERVER: address, VIBEVALLEY_VERIFY_CLI: cli });
     code = await task.exited;
     if (interrupted) code = 130;
@@ -230,7 +234,11 @@ export async function runVerification(command: string[] = [], options: Verificat
     process.off("SIGTERM", interrupt);
     writeFileSync(
       join(evidence, "result.json"),
-      JSON.stringify({ code, address, stopped: failures.length === 0, command: command[0] ?? "server health", cleanupErrors: failures.map(String) }, null, 2),
+      JSON.stringify(
+        { code, address, stopped: failures.length === 0, command: command[0] ?? "api call server.health.get", cleanupErrors: failures.map(String) },
+        null,
+        2,
+      ),
     );
     if (failures.length === 0) for (const path of [home, work, binaries]) rmSync(path, { recursive: true, force: true });
     console.log(`verification evidence: ${evidence}`);

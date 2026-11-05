@@ -3,7 +3,7 @@ import type * as T from "@vibevalley/protocol";
 import { everyone, ownerId, type Notify } from "@vibevalley/protocol";
 import { cut, defaultOf, latestSessionIdOf, needOf, omitUndefined, oneLine, slice } from "@vibevalley/protocol/rules";
 
-import { clip } from "@/base/clip.ts";
+import { clip } from "#/base/clip.ts";
 
 import { patrolBrief, patrolWho } from "./prompts.ts";
 

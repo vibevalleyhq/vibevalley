@@ -28,6 +28,12 @@ const host: Host = {
     check: () => main.call.updateCheck(),
     install: () => main.call.updateInstall(),
   },
+  // The app run from the repository answers that it has none; the page then shows nothing of it.
+  commandLine: {
+    state: () => main.call.cliState(),
+    install: () => main.call.cliInstall(),
+    remove: () => main.call.cliRemove(),
+  },
 };
 
 contextBridge.exposeInMainWorld(hostKey, host);

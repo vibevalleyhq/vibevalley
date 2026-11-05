@@ -8,13 +8,13 @@ import { SqlClient } from "effect/sql";
 
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "@/agent/agent.ts";
-import { Ingress } from "@/ingress/ingress.ts";
-import { explicitMandate } from "@/issue/creation.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Project } from "@/project/project.ts";
-import { Session } from "@/session/session.ts";
-import { testConfig } from "@/testing/layers.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Ingress } from "#/ingress/ingress.ts";
+import { explicitMandate } from "#/issue/creation.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Project } from "#/project/project.ts";
+import { Session } from "#/session/session.ts";
+import { testConfig } from "#/testing/layers.ts";
 
 import { await_, farm, git, lab, until } from "./farm.ts";
 

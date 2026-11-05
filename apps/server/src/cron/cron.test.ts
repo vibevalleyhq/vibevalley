@@ -7,15 +7,15 @@ import { test } from "vite-plus/test";
 import type * as T from "@vibevalley/protocol";
 import { CronWhenWeekly } from "@vibevalley/protocol/schema";
 
-import { orchestrator, owner } from "@/base/actor.ts";
-import { Channel } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import { type ServerConfig } from "@/infra/config.ts";
-import { checkCases, goldenCases } from "@/testing/golden.ts";
-import { testConfig, aTurn } from "@/testing/layers.ts";
-import { world } from "@/testing/world.ts";
+import { orchestrator, owner } from "#/base/actor.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import { type ServerConfig } from "#/infra/config.ts";
+import { checkCases, goldenCases } from "#/testing/golden.ts";
+import { testConfig, aTurn } from "#/testing/layers.ts";
+import { world } from "#/testing/world.ts";
+import * as q from "#db/cron.sql.ts";
 
-import * as q from "../../db/generated/cron.sql.ts";
 import { type Due, Cron } from "./cron.ts";
 import { afterRun, dueCrons, isMissed, needsOK, nextText } from "./when.ts";
 
@@ -110,8 +110,10 @@ describe("crons", () => {
         expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "nobody" }), owner))).toMatchObject({
           reason: expect.stringContaining("没有叫 nobody"),
         });
+        // A channel is named as the owner names it: one there is not is not found.
         expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { channel: "elsewhere" }), owner))).toMatchObject({
-          reason: expect.stringContaining("elsewhere"),
+          _tag: "Missing",
+          what: expect.stringContaining("elsewhere"),
         });
         const every = yield* s.add(req("巡检", "跑一遍检查", { kind: "every", minutes: 5 }, { agent: "lab", project: "demo" }), owner);
         expect([every.agent, every.project]).toEqual(["lab", "demo"]);

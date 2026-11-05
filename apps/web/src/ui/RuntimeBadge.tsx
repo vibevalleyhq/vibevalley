@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import type { RuntimeInfo } from "@vibevalley/protocol";
 
-import { ready, useRuntimes, useSprites } from "@/infra/query";
+import { ready, useRuntimes, useSprites } from "#/infra/query.ts";
 
 /** The catalog's label for it; the runtime's id when the catalog does not list it. */
 export const runtimeName = (catalog: readonly RuntimeInfo[], runtime: string) => catalog.find((r) => r.id === runtime)?.preset.label ?? runtime;

@@ -94,11 +94,10 @@ export default stories({
             onRetry={(card) => setCards(cards().map((c): BoardCard => (c.id === card.id ? { ...c, move: retried } : c)))}
             onPutBack={(card) => setCards(cards().map((c): BoardCard => (c.id === card.id ? putBack(c) : c)))}
             onPlace={() => undefined}
-            onAdd={(text) => {
+            onNew={() => {
               const n = next++;
-              setCards([{ kind: "todo", id: `i${n}`, lane: "todo", issue: issue(n, text, "backlog", "medium", { createdAt: now }) }, ...cards()]);
+              setCards([{ kind: "todo", id: `i${n}`, lane: "todo", issue: issue(n, `New issue ${n}`, "backlog", "medium", { createdAt: now }) }, ...cards()]);
             }}
-            onWrite={() => undefined}
           />
         );
       },

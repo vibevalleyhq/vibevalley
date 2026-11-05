@@ -1,8 +1,9 @@
-// How the notes page lays out what the server gives (docs/subsystems/pkm.md): pages by PARA tier, which blocks show under
-// collapsed ones, a block's text in pieces to draw, the editor's keys as ops, and a word diff for a suggested rewrite.
+import type { PkmBlock, PkmPageSummary, PkmTier } from "@vibevalley/protocol";
+import { pkmTag, slugOf } from "@vibevalley/protocol/rules";
 
-import type { PkmBlock, PkmBlockOp, PkmPageSummary, PkmTier } from "@vibevalley/protocol";
-import { slugOf } from "@vibevalley/protocol/rules";
+import { spelled } from "#/base/search.ts";
+
+import { titleFor } from "./days";
 
 /** The tiers in the list's order: what is worked on first, what is done with last. */
 export const tierOrder: readonly PkmTier[] = ["project", "area", "resource", "inbox", "journal", "archive"];
@@ -27,22 +28,6 @@ export function visibleBlocks(blocks: readonly PkmBlock[], collapsed: ReadonlySe
   return out;
 }
 
-export interface Keys {
-  readonly key: string;
-  readonly shiftKey: boolean;
-  readonly altKey: boolean;
-  readonly metaKey: boolean;
-  readonly ctrlKey: boolean;
-}
-
-/** The op an editing key sends for the block; undefined for any other key. */
-export function keyOp(e: Keys, block: string): PkmBlockOp | undefined {
-  if (e.key === "Tab") return { op: e.shiftKey ? "outdent" : "indent", block };
-  if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) return { op: "move", block, direction: e.key === "ArrowUp" ? "up" : "down" };
-  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) return { op: "toggle_marker", block };
-  return undefined;
-}
-
 export type Piece =
   | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "link"; readonly page: string; readonly text: string }
@@ -50,7 +35,7 @@ export type Piece =
   | { readonly kind: "ref"; readonly id: string }
   | { readonly kind: "remark"; readonly text: string; readonly remark: string };
 
-const inline = /==([^=]+)==\^\[([^\]]+)\]|\[\[([^[\]]+?)\]\]|\(\(([0-9a-fA-F-]{8,36})\)\)|(^|\s)#([\p{L}\p{N}_/-]+)/gu;
+const inline = new RegExp(String.raw`==([^=]+)==\^\[([^\]]+)\]|\[\[([^[\]]+?)\]\]|\(\(([0-9a-fA-F-]{8,36})\)\)|` + pkmTag.source, "gu");
 
 /** A block's text as pieces: ==words==^[remark] inline remarks, [[page]] or [[page|words]] links, #tags, ((block)) refs
  * and the text between. */
@@ -73,9 +58,8 @@ export function piecesOf(body: string): Piece[] {
       text(body.slice(at, start));
       out.push({ kind: "ref", id: m[4] });
     } else {
-      const lead = m[5] ?? "";
-      text(body.slice(at, start) + lead);
-      out.push({ kind: "tag", page: slugOf(m[6] ?? ""), text: `#${m[6] ?? ""}` });
+      text(body.slice(at, start));
+      out.push({ kind: "tag", page: slugOf(m[5] ?? ""), text: `#${m[5] ?? ""}` });
     }
     at = start + m[0].length;
   }
@@ -122,4 +106,22 @@ export function wordDiff(was: string, now: string): DiffPiece[] {
   while (i < n) push("del", a[i++] ?? "");
   while (j < m) push("add", b[j++] ?? "");
   return out;
+}
+
+export interface NoteTarget {
+  readonly slug: string;
+  readonly label: string;
+  readonly tier: PkmTier;
+}
+
+/** The pages whose title (a journal's day too) has what was typed in it, the newest first; none for nothing typed. */
+export function noteTargets(pages: readonly PkmPageSummary[], query: string, max = 6): NoteTarget[] {
+  const typed = query.trim().toLowerCase();
+  if (typed === "") return [];
+  return pages
+    .map((p) => ({ slug: p.slug, label: titleFor(p.title, p.day), tier: p.tier, updated: p.updated, title: p.title }))
+    .filter((p) => spelled(p.label, typed) || spelled(p.title, typed))
+    .toSorted((a, b) => b.updated - a.updated)
+    .slice(0, max)
+    .map(({ slug, label, tier }) => ({ slug, label, tier }));
 }

@@ -10,17 +10,17 @@ import { isBusy } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { session as sessionActor } from "@/base/actor.ts";
-import { jsonOrNone } from "@/base/json.ts";
-import { Core } from "@/core/core.ts";
-import { type ApiError, reasonOf, refused } from "@/errors.ts";
-import { Executor } from "@/executor/executor.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { causeMessage, Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { Memory } from "@/memory/memory.ts";
-import { Project } from "@/project/project.ts";
-import { type Merged, type MergeFailure, type ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "@/project/workplace.ts";
+import { session as sessionActor } from "#/base/actor.ts";
+import { jsonOrNone } from "#/base/json.ts";
+import { Core } from "#/core/core.ts";
+import { type ApiError, reasonOf, refused } from "#/errors.ts";
+import { Executor } from "#/executor/executor.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { causeMessage, Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { Memory } from "#/memory/memory.ts";
+import { Project } from "#/project/project.ts";
+import { type Merged, type MergeFailure, type ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/project/workplace.ts";
 
 import { sessionName, type Settle, whoMakesRoom, withRecall } from "./briefing.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
@@ -35,8 +35,8 @@ export type { SessionNews };
 export type { RunFinished, RunStore };
 export { NotTakenIn };
 export { NotRecorded };
-import * as qs from "../../db/generated/session.sql.ts";
-import * as qr from "../../db/generated/session_run.sql.ts";
+import * as qs from "#db/session.sql.ts";
+import * as qr from "#db/session_run.sql.ts";
 
 /** The ended sessions a list shows, newest first: their trajectories expire after days anyway. */
 const endedListed = 200;

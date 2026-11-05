@@ -7,17 +7,17 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Agent, FarmView, Session } from "@vibevalley/protocol";
 
-import { aria, useClickAway } from "@/base/dom";
-import { farm, useFarm } from "@/farm/store";
-import { isBusy, isRipe, plotOf } from "@/farm/world/plots";
-import { webRoutes } from "@/farm/world/world";
-import { bottleSprite, quotaOf } from "@/features/runtime";
-import { useCore, useFrames } from "@/infra/frame";
-import { ready, useAgents, useRuntimes } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { setPick, usePrefs } from "@/state/prefs";
-import { AgentFace } from "@/ui/Face";
-import { PxButton, SpriteIcon } from "@/ui/pixel";
+import { aria, useClickAway } from "#/base/dom.tsx";
+import { farm, useFarm } from "#/farm/store.ts";
+import { isBusy, isRipe, plotOf } from "#/farm/world/plots.ts";
+import { webRoutes } from "#/farm/world/world.ts";
+import { bottleSprite, quotaOf } from "#/features/runtime/index.ts";
+import { useCore, useFrames } from "#/infra/frame.ts";
+import { ready, useAgents, useRuntimes } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { setPick, usePrefs } from "#/state/prefs.ts";
+import { AgentFace } from "#/ui/Face.tsx";
+import { PxButton, SpriteIcon } from "#/ui/pixel/index.ts";
 
 import { HudCard } from "./HudCard";
 

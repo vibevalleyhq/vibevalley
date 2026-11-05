@@ -6,17 +6,17 @@ import { t } from "@vibevalley/i18n";
 import type { Changes, Issue, Session } from "@vibevalley/protocol";
 import { assignedAgentOf } from "@vibevalley/protocol/rules";
 
-import { useNow } from "@/base/dom";
-import { ago } from "@/base/format";
-import { commands } from "@/farm/frames";
-import { harvestedOf } from "@/farm/hud/readout";
-import { issueOf } from "@/farm/world/plots";
-import { changeKind, lineCounts, nothingChanged, issueTitle, useIssueChanges } from "@/features/issue";
-import { reasonOf } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { ready, useAgents } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { createPixelAct, FarmSection, PxButton, SpriteIcon } from "@/ui/pixel";
+import { useNow } from "#/base/dom.tsx";
+import { ago } from "#/base/format.ts";
+import { commands } from "#/farm/frames.ts";
+import { harvestedOf } from "#/farm/hud/readout.ts";
+import { issueOf } from "#/farm/world/plots.ts";
+import { changeKind, lineCounts, nothingChanged, issueTitle, useIssueChanges } from "#/features/issue/index.ts";
+import { reasonOf } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { ready, useAgents } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { createPixelAct, FarmSection, PxButton, SpriteIcon } from "#/ui/pixel/index.ts";
 
 import { FarmEmpty, FarmTag, FileRow, PlusMinus, tint, Tinted } from "./rows";
 
@@ -26,8 +26,8 @@ export function HarvestReview(props: { session: Session; onDone: () => void }) {
   const changes = useIssueChanges(() => issueOf(props.session));
   return (
     <Switch>
-      <Match when={changes.isSuccess}>
-        <ReadyView session={props.session} changes={changes.data!} onDone={() => props.onDone()} />
+      <Match when={changes.isSuccess ? changes.data : undefined}>
+        {(data) => <ReadyView session={props.session} changes={data()} onDone={() => props.onDone()} />}
       </Match>
       <Match when={changes.error}>
         {(error) => (

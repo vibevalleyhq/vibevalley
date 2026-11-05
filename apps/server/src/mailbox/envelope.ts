@@ -5,10 +5,9 @@ import { ownerId } from "@vibevalley/protocol";
 import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOrNone } from "@/base/json.ts";
-import type { Db } from "@/infra/db.ts";
-
-import { inboxOf } from "../../db/generated/channel.sql.ts";
+import { jsonOrNone } from "#/base/json.ts";
+import type { Db } from "#/infra/db.ts";
+import { inboxOf } from "#db/channel.sql.ts";
 
 export interface Meta {
   run?: string;

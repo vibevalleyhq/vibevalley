@@ -3,21 +3,66 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./brain": "./src/brain.ts",
-    "./coding": "./src/coding.ts",
-    "./core/errors": "./src/core/errors.ts",
-    "./core/loop": "./src/core/loop.ts",
-    "./core/tool": "./src/core/tool.ts",
-    "./dag": "./src/dag.ts",
-    "./mcp": "./src/mcp.ts",
-    "./mcpTransport": "./src/mcpTransport.ts",
-    "./memory": "./src/memory.ts",
-    "./messages": "./src/messages.ts",
-    "./self": "./src/self.ts",
-    "./session": "./src/session.ts",
-    "./testing": "./src/testing.ts",
-    "./todo": "./src/todo.ts",
-    "./todoStore": "./src/todoStore.ts"
+    "./brain": {
+      "types": "./dist/brain.d.ts",
+      "default": "./src/brain.ts"
+    },
+    "./coding": {
+      "types": "./dist/coding.d.ts",
+      "default": "./src/coding.ts"
+    },
+    "./core/errors": {
+      "types": "./dist/core/errors.d.ts",
+      "default": "./src/core/errors.ts"
+    },
+    "./core/loop": {
+      "types": "./dist/core/loop.d.ts",
+      "default": "./src/core/loop.ts"
+    },
+    "./core/tool": {
+      "types": "./dist/core/tool.d.ts",
+      "default": "./src/core/tool.ts"
+    },
+    "./dag": {
+      "types": "./dist/dag.d.ts",
+      "default": "./src/dag.ts"
+    },
+    "./mcp": {
+      "types": "./dist/mcp.d.ts",
+      "default": "./src/mcp.ts"
+    },
+    "./mcpTransport": {
+      "types": "./dist/mcpTransport.d.ts",
+      "default": "./src/mcpTransport.ts"
+    },
+    "./memory": {
+      "types": "./dist/memory.d.ts",
+      "default": "./src/memory.ts"
+    },
+    "./messages": {
+      "types": "./dist/messages.d.ts",
+      "default": "./src/messages.ts"
+    },
+    "./self": {
+      "types": "./dist/self.d.ts",
+      "default": "./src/self.ts"
+    },
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "default": "./src/session.ts"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.ts"
+    },
+    "./todo": {
+      "types": "./dist/todo.d.ts",
+      "default": "./src/todo.ts"
+    },
+    "./todoStore": {
+      "types": "./dist/todoStore.d.ts",
+      "default": "./src/todoStore.ts"
+    }
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",

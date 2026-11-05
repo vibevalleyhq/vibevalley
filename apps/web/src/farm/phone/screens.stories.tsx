@@ -3,7 +3,7 @@ import type { JSX } from "@solidjs/web";
 import type { InboxItem, InboxKind } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 
-import type { CallPhase } from "@/features/voice";
+import type { CallPhase } from "#/features/voice/index.ts";
 
 import { lcd } from "./lcd";
 import { OrchestratorLine, RingingScreen } from "./screens";

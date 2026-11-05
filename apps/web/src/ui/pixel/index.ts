@@ -6,7 +6,7 @@ export { PxPick } from "./choice";
 export { FarmDialog, type FarmDialogSize, FarmSection } from "./dialog";
 export { PxTextArea, PxTextInput } from "./field";
 export { reducedMotion, SpriteIcon } from "./icons";
-export { numberText } from "@/base/format";
+export { numberText } from "#/base/format.ts";
 export { plainText } from "./PxMarkdown";
 export { EarnedMedal } from "./glyphs";
 export { badgeColors, CardColors, PixelCard, type Piece } from "./PixelCard";

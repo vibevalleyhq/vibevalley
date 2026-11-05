@@ -11,9 +11,9 @@ import { Effect } from "effect";
 
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
-import { answerOpening, criteriaHead } from "@/issue/prompts.ts";
-import { supportOf, presetOf } from "@/runtime/presets.ts";
-import { briefBreak } from "@/session/briefing.ts";
+import { answerOpening, criteriaHead } from "#/issue/prompts.ts";
+import { supportOf, presetOf } from "#/runtime/presets.ts";
+import { briefBreak } from "#/session/briefing.ts";
 
 import { until } from "./layers.ts";
 
@@ -153,9 +153,11 @@ export const helper = (turns: ScriptedTurn[] = [], before?: (turn: ScriptedTurn,
       let notes = "";
       if (input.includes("先问清楚") && !input.includes("用 8797"))
         notes += "\n\n要问主人：用 8787 还是 8797？" + (input.includes("给选项") ? "（选项：用 8787｜用 8797）" : "");
-      const criteria = turn.input.includes(criteriaHead)
-        ? turn.input
-            .slice(turn.input.indexOf(criteriaHead))
+      // Its brief as an agent remembers it: an answer later in the session is still checked against the brief's criteria.
+      const brief = turns.findLast((t) => t.options === turn.options && t.input.includes(criteriaHead))?.input ?? "";
+      const criteria = brief
+        ? brief
+            .slice(brief.indexOf(criteriaHead))
             .split("\n")
             .filter((l) => /^\d+\. /u.test(l))
         : [];

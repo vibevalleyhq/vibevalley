@@ -8,25 +8,25 @@ import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, executionsOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import { newId } from "@/base/ids.ts";
-import { Core } from "@/core/core.ts";
-import { type ApiError, Inconsistent, missing, lookIn, refused } from "@/errors.ts";
-import { causeMessage, Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { recordTrigger } from "@/mailbox/payload.ts";
-import { issueBranch, Project } from "@/project/project.ts";
-import { NotRecorded, Session } from "@/session/session.ts";
+import { Agent } from "#/agent/agent.ts";
+import { newId } from "#/base/ids.ts";
+import { Core } from "#/core/core.ts";
+import { type ApiError, Inconsistent, missing, lookIn, refused } from "#/errors.ts";
+import { causeMessage, Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { recordTrigger } from "#/mailbox/payload.ts";
+import { issueBranch, Project } from "#/project/project.ts";
+import { NotRecorded, Session } from "#/session/session.ts";
+import * as q from "#db/issue.sql.ts";
+import * as qs from "#db/issue_assignment.sql.ts";
+import * as qe from "#db/issue_assignment_execution.sql.ts";
 
-import * as q from "../../db/generated/issue.sql.ts";
-import * as qs from "../../db/generated/issue_assignment.sql.ts";
-import * as qe from "../../db/generated/issue_assignment_execution.sql.ts";
 import { assignTo, Assignments } from "./assignment.ts";
 import { issueBrief, splitBrief } from "./brief.ts";
 import { issueRow } from "./creation.ts";
 import { dependencyProblems } from "./dependencies.ts";
-import { openQuestions } from "./refinement.ts";
+import { kept, openQuestions } from "./refinement.ts";
 import { issueRows, jsonOrNull } from "./rows.ts";
 import { isClosed, issueOrder } from "./status.ts";
 
@@ -136,6 +136,7 @@ export const issueRecords = Effect.gen(function* () {
               title,
               description,
               blockedBy,
+              ...(req.criteria ? { criteria: kept(req.criteria) } : {}),
               ...(project ? { project } : {}),
               ...(parent ? { parent: parent.id } : {}),
               deliver: req.deliver ?? (store.isOrchestrator(req.agent ?? "") ? "answer" : "change"),

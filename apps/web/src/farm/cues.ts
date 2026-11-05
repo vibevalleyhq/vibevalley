@@ -2,7 +2,7 @@ import { type Accessor, createEffect, onSettled } from "solid-js";
 
 import type { GameEffect, Issue, Session } from "@vibevalley/protocol";
 
-import { isMuted, playSound, setMuted, type SoundName, unlockSound } from "@/ui/pixel/sound";
+import { isMuted, playSound, setMuted, type SoundName, unlockSound } from "#/ui/pixel/sound.ts";
 
 import type { BedFxKind } from "./tools";
 const BED_SOUND = { water: "water", spray: "spray", harvest: "harvest", shovel: "shovel", note: "nope" } as const satisfies Record<BedFxKind, SoundName>;

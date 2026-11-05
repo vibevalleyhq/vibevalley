@@ -4,7 +4,7 @@ import { Effect } from "effect";
 
 import type { VoiceHandlers } from "@vibevalley/protocol/api";
 
-import { Voice } from "@/voice/voice.ts";
+import { Voice } from "#/voice/voice.ts";
 
 export const voiceHandlers = Effect.gen(function* () {
   const voice = yield* Voice;

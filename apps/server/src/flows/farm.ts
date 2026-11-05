@@ -8,14 +8,14 @@ import { Effect, Stream } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 
-import { Core } from "@/core/core.ts";
-import type { ServerConfig } from "@/infra/config.ts";
-import { agentSessionsStart, collaborationStart, gamification, inboxStart, mailboxReady } from "@/services.ts";
-import { type Hired } from "@/session/session.ts";
-import { gitIn } from "@/testing/git.ts";
-import { starter, testConfig, until as untilHeld, waitFor } from "@/testing/layers.ts";
-import { helper } from "@/testing/worker.ts";
-import { world, type WorldOptions } from "@/testing/world.ts";
+import { Core } from "#/core/core.ts";
+import type { ServerConfig } from "#/infra/config.ts";
+import { agentSessionsStart, collaborationStart, gamification, inboxStart, mailboxReady } from "#/services.ts";
+import { type Hired } from "#/session/session.ts";
+import { gitIn } from "#/testing/git.ts";
+import { starter, testConfig, until as untilHeld, waitFor } from "#/testing/layers.ts";
+import { helper } from "#/testing/worker.ts";
+import { world, type WorldOptions } from "#/testing/world.ts";
 
 /** The seed profile on pi, with no effort: the scripted runtime has no models, so no effort levels. */
 export const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });

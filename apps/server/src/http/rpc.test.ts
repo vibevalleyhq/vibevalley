@@ -8,9 +8,9 @@ import { Socket } from "effect/socket";
 
 import { Subscriptions, rpcPath } from "@vibevalley/protocol/rpc";
 
-import { Channel } from "@/channel/channel.ts";
-import { testConfig } from "@/testing/layers.ts";
-import { quietApp } from "@/testing/world.ts";
+import { Channel } from "#/channel/channel.ts";
+import { testConfig } from "#/testing/layers.ts";
+import { quietApp } from "#/testing/world.ts";
 
 import { app } from "./app.ts";
 import { fromTheFarm } from "./rpc.ts";

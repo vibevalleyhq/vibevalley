@@ -7,7 +7,7 @@ import { basename, dirname, join } from "node:path";
 
 import { Clock, Effect, FiberHandle, FileSystem, Schema, Semaphore } from "effect";
 
-import { messageOf } from "@/errors.ts";
+import { messageOf } from "#/errors.ts";
 
 export class NotWritten extends Schema.TaggedError<NotWritten, { readonly brand: unique symbol }>()("NotWritten", {
   message: Schema.String,
@@ -42,7 +42,7 @@ export const readOrSetAside = <A>(file: string, read: (text: string) => A, start
       Effect.map((t): string | undefined => t),
       Effect.catchIf(
         (e) => e.reason._tag === "NotFound",
-        () => Effect.succeed(undefined),
+        () => Effect.undefined,
       ),
       Effect.orDie,
     );

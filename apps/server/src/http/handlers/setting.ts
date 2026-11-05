@@ -4,8 +4,8 @@ import { Effect } from "effect";
 
 import type { SettingHandlers } from "@vibevalley/protocol/api";
 
-import { refused } from "@/errors.ts";
-import { Setting } from "@/setting/setting.ts";
+import { refused } from "#/errors.ts";
+import { Setting } from "#/setting/setting.ts";
 
 export const settingHandlers = Effect.gen(function* () {
   const setting = yield* Setting;

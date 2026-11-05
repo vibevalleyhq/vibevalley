@@ -2,7 +2,7 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { closedText, plainText, shortTitle } from "@vibevalley/protocol/rules";
 
-import { or } from "@/base/order.ts";
+import { or } from "#/base/order.ts";
 
 import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
 /** The criteria go last, so whoever works it checks each one before handing the work back; an answer issue reports its answer through issue_report. */

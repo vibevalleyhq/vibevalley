@@ -141,12 +141,18 @@
     "recording": "Listening… click again to stop",
     "transcribing": "Transcribing…",
     "failed": "Last time it was not recognized: {why}",
-    "start": "Dictation: click to start speaking, again to stop",
+    "start": "Dictation: click to start and again to stop, or hold to talk and let go",
     "stop": "Stop dictation",
     "label": "Dictation",
     "noMic": "Cannot record: no microphone permission",
     "cannot": "Cannot record: {why}",
-    "nothing": "Nothing was recorded"
+    "nothing": "Nothing was recorded",
+    "listening": "How long it has listened",
+    "keys": "Esc cancel · Enter done",
+    "cancel": "Discard this recording",
+    "done": "Done, turn it into text",
+    "again": "Try again",
+    "dismiss": "Dismiss"
   },
   "call": {
     "renew": "Renewing the token failed: {why}",

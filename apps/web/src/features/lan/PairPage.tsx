@@ -5,9 +5,9 @@ import { createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { reasonOf } from "@/infra/api";
-import { Button } from "@/ui/Button";
-import { Field, TextInput } from "@/ui/Field";
+import { reasonOf } from "#/infra/api.ts";
+import { Button } from "#/ui/Button.tsx";
+import { Field, TextInput } from "#/ui/Field.tsx";
 
 import { deviceGuess, pair } from "./device";
 

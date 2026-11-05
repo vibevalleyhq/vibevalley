@@ -12,12 +12,12 @@ import { t } from "@vibevalley/i18n";
 import type { Outcome, RunTrigger, Spent } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
-import { newId } from "@/base/ids.ts";
-import { Inconsistent } from "@/errors.ts";
-import { causeMessage, Db } from "@/infra/db.ts";
+import { newId } from "#/base/ids.ts";
+import { Inconsistent } from "#/errors.ts";
+import { causeMessage, Db } from "#/infra/db.ts";
+import * as qr from "#db/session_run.sql.ts";
+import * as qi from "#db/session_run_issue.sql.ts";
 
-import * as qr from "../../db/generated/session_run.sql.ts";
-import * as qi from "../../db/generated/session_run_issue.sql.ts";
 import type { Journal } from "./journal.ts";
 import type { ToolStart } from "./reaction.ts";
 import type { RunStore } from "./session.ts";

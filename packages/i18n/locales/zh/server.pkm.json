@@ -13,5 +13,8 @@
   "clipHeading": "## 核心论点与金句摘录",
   "clusterHeading": "## {topic}：聚到一起的素材",
   "clusterLine": "来自 [[{title}]]：(({id}))",
-  "clusterTldr": "围绕 {topic} 聚到一起的 {count} 条素材"
+  "clusterTldr": "围绕 {topic} 聚到一起的 {count} 条素材",
+  "notedBy": "{text}（{name} 记）",
+  "noPageLike": "没有「{page}」这一页；最像的是 {like}",
+  "changedSince": "「{page}」在读出以后又被改过，没有写：重新读一次再改"
 }

@@ -2,27 +2,17 @@ import { createSignal, For, onSettled } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { keyCap, pressed, shortcutPlaces, shortcuts } from "@/base/shortcuts";
+import { inField, keyCap, pressed, shortcutPlaces, shortcuts } from "#/base/shortcuts.ts";
 
 import { Dialog } from "./Dialog";
-
-/** Whether the focus is in a field, whose keys are its own: ? there is a question mark. */
-const typing = () => {
-  const el = document.activeElement;
-  return (
-    el instanceof HTMLInputElement ||
-    el instanceof HTMLTextAreaElement ||
-    el instanceof HTMLSelectElement ||
-    (el instanceof HTMLElement && el.isContentEditable)
-  );
-};
 
 /** Every shortcut, by where it works, drawn from base/shortcuts.ts: ? off a text field opens it. */
 export function ShortcutSheet() {
   const [open, setOpen] = createSignal(false);
   onSettled(() => {
     const key = (e: KeyboardEvent) => {
-      if (!pressed(e, "sheet") || typing() || document.querySelector("dialog[open]")) return;
+      // In a field ? is a question mark.
+      if (!pressed(e, "sheet") || inField() || document.querySelector("dialog[open]")) return;
       e.preventDefault();
       setOpen(true);
     };

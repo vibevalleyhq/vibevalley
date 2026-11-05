@@ -4,9 +4,9 @@ import { t } from "@vibevalley/i18n";
 import { type Issue, type IssueAct, type IssueAction, type IssueStatus } from "@vibevalley/protocol";
 import { latestSessionIdOf, omitUndefined } from "@vibevalley/protocol/rules";
 
-import { api } from "@/infra/api";
-import { useIntents } from "@/state/intent";
-import type { Act } from "@/ui/act";
+import { api } from "#/infra/api.ts";
+import { useIntents } from "#/state/intent.ts";
+import type { Act } from "#/ui/act.ts";
 
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { issueSay, pendingWords } from "./write";

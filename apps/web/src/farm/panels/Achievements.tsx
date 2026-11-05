@@ -7,14 +7,14 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { Achievement, AchievementCategory, AchievementStanding, Progress } from "@vibevalley/protocol";
 
-import { aria, useClickAway } from "@/base/dom";
-import { commands } from "@/farm/frames";
-import { thousands } from "@/farm/hud/readout";
-import { beds } from "@/farm/world/plots";
-import { api } from "@/infra/api";
-import { useCore, useFrames } from "@/infra/frame";
-import { ready, useQuery } from "@/infra/query";
-import { createPixelAct, numberText, SpriteIcon } from "@/ui/pixel";
+import { aria, useClickAway } from "#/base/dom.tsx";
+import { commands } from "#/farm/frames.ts";
+import { thousands } from "#/farm/hud/readout.ts";
+import { beds } from "#/farm/world/plots.ts";
+import { api } from "#/infra/api.ts";
+import { useCore, useFrames } from "#/infra/frame.ts";
+import { ready, useQuery } from "#/infra/query.ts";
+import { createPixelAct, numberText, SpriteIcon } from "#/ui/pixel/index.ts";
 
 import { tint, Tinted } from "./rows";
 

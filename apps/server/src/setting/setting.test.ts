@@ -5,8 +5,8 @@ import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
-import { ServerConfig } from "@/infra/config.ts";
-import { testConfig } from "@/testing/layers.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { testConfig } from "#/testing/layers.ts";
 
 import { Setting } from "./setting.ts";
 import { defaultVoice } from "./voice.ts";

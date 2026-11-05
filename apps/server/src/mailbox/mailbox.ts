@@ -6,12 +6,12 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Agent } from "@/agent/agent.ts";
-import { Core } from "@/core/core.ts";
-import { type ApiError, refused, missing, lookIn } from "@/errors.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
+import { Agent } from "#/agent/agent.ts";
+import { Core } from "#/core/core.ts";
+import { type ApiError, refused, missing, lookIn } from "#/errors.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
 import {
   type ChannelAudience,
   type ChannelEnvelopeRow,
@@ -20,12 +20,12 @@ import {
   type OrchestratorNews,
   senderKind,
   unreadSummaryOf,
-} from "@/mailbox/envelope.ts";
-import { type NotRecorded, Session } from "@/session/session.ts";
+} from "#/mailbox/envelope.ts";
+import { type NotRecorded, Session } from "#/session/session.ts";
+import { defaultID, orchestratorForChannel } from "#db/channel.sql.ts";
+import * as qd from "#db/mailbox_delivery.sql.ts";
+import * as qr from "#db/mailbox_trigger.sql.ts";
 
-import { defaultID, orchestratorForChannel } from "../../db/generated/channel.sql.ts";
-import * as qd from "../../db/generated/mailbox_delivery.sql.ts";
-import * as qr from "../../db/generated/mailbox_trigger.sql.ts";
 import { type Recipient, Reach, WakeBreaker } from "./brakes.ts";
 import { Deliveries, type DeliveryRow, type DeliveryDraft } from "./deliveries.ts";
 import { inputOf, orchestratorSource, deliveryScope, type InputContext } from "./payload.ts";

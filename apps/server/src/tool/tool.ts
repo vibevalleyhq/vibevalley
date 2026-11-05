@@ -4,19 +4,20 @@ import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { maybe, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { Agent } from "@/agent/agent.ts";
-import { head } from "@/base/clip.ts";
-import { Channel, type Spoken } from "@/channel/channel.ts";
-import { Cron } from "@/cron/cron.ts";
-import { inboxLines } from "@/mailbox/prompts.ts";
-import { foundText, Memory, type SearchQuery } from "@/memory/memory.ts";
-import { Project } from "@/project/project.ts";
-import { resourceWords } from "@/resource/prompts.ts";
-import { Resource, ResourceRequest } from "@/resource/resource.ts";
-import type { ToolStart } from "@/session/reaction.ts";
+import { Agent } from "#/agent/agent.ts";
+import { head } from "#/base/clip.ts";
+import { Channel, type Spoken } from "#/channel/channel.ts";
+import { Cron } from "#/cron/cron.ts";
+import { inboxLines } from "#/mailbox/prompts.ts";
+import { foundText, Memory, type SearchQuery } from "#/memory/memory.ts";
+import { Project } from "#/project/project.ts";
+import { resourceWords } from "#/resource/prompts.ts";
+import { Resource, ResourceRequest } from "#/resource/resource.ts";
+import type { ToolStart } from "#/session/reaction.ts";
 
 import { artifactTools } from "./artifact.ts";
 import { issueTools } from "./issue.ts";
+import { pkmTools } from "./pkm.ts";
 import { answers, channelLine, cronLine, memoryWhere, ownerAgentWord, parseTime, sessionLine } from "./prompts.ts";
 import {
   answered,
@@ -365,6 +366,7 @@ const make = Effect.gen(function* () {
     orchestratorBlockDelete,
   } = yield* artifactTools(findIssue);
   const { memorySearch, memoryCreate } = yield* memoryTools;
+  const notes = yield* pkmTools;
   const { cronCreate, cronList, cronDelete } = yield* cronTools;
   const resourceRead = yield* resourceTools;
 
@@ -399,6 +401,7 @@ const make = Effect.gen(function* () {
       cronDelete,
       memorySearch(who, true),
       memoryCreate(who, true),
+      ...notes.orchestrator(who),
       artifactList(who),
       artifactGet("orchestrator")(who),
       artifactContent("orchestrator")(who),
@@ -416,6 +419,7 @@ const make = Effect.gen(function* () {
       sessionList,
       memorySearch(who, false),
       memoryCreate(who, false),
+      ...notes.session(who),
       blockCreate(who),
       blockUpdate(who),
       blockDelete(who),

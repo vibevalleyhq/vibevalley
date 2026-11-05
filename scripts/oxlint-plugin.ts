@@ -1,5 +1,5 @@
 import { existsSync, globSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 import { definePlugin, defineRule, type ESTree, type Context, type Scope } from "vite-plus/lint/plugins";
 
@@ -196,7 +196,7 @@ const han = /[\p{Script=Han}、，。：；（）！？「」【】〔〕]/u;
  * file's place (apps/web/src/farm/phone/x.tsx: web.farm.phone, then web.farm, then web).
  */
 export function catalogOf(filename: string): string {
-  const at = /\/apps\/(server|web|desktop|mobile)\/(?:src\/)?(.*)$/u.exec(filename.replaceAll("\\", "/"));
+  const at = /\/apps\/(server|web|desktop|mobile|cli)\/(?:src\/)?(.*)$/u.exec(filename.replaceAll("\\", "/"));
   const host = at?.[1];
   const rest = at?.[2];
   if (host === undefined || rest === undefined) return "shared";
@@ -224,11 +224,13 @@ const noCjkLiteral = defineRule({
   create(context) {
     const data = { catalog: catalogOf(context.filename) };
     return {
+      // Read as written: a character spelled as a \u escape is a code point on purpose (a keystroke an input method
+      // types, base/typedMarks.ts), not words.
       Literal(node) {
-        if (typeof node.value === "string" && han.test(node.value)) context.report({ node, messageId: "cjk", data });
+        if (typeof node.value === "string" && han.test(node.raw ?? node.value)) context.report({ node, messageId: "cjk", data });
       },
       TemplateLiteral(node) {
-        if (node.quasis.some((q) => han.test(q.value.cooked ?? q.value.raw))) context.report({ node, messageId: "cjk", data });
+        if (node.quasis.some((q) => han.test(q.value.raw))) context.report({ node, messageId: "cjk", data });
       },
       JSXText(node) {
         if (han.test(node.value)) context.report({ node, messageId: "cjk", data });
@@ -295,7 +297,7 @@ const pageLayersRule = defineRule({
       ),
       index: says(
         "a file inside another feature is its own business, free to change",
-        'import it from "@/{{unit}}", and export it from {{unit}}/index.ts if it is meant to be shared',
+        'import it from its index ("#/{{unit}}/index.ts"), and export it there if it is meant to be shared',
         "apps/web/README.md",
       ),
       sibling: says(
@@ -311,8 +313,9 @@ const pageLayersRule = defineRule({
     const from = pageUnit(at);
     type Verdict = { messageId: "layer" | "index" | "sibling"; data: Record<string, string> };
     const verdict = (spec: unknown): Verdict | undefined => {
-      if (typeof spec !== "string" || !(spec.startsWith(".") || spec.startsWith("@/"))) return;
-      const target = spec.startsWith("@/") ? spec.slice(2) : joinPath(at, spec);
+      if (typeof spec !== "string" || !(spec.startsWith(".") || spec.startsWith("#/"))) return;
+      // A file is the same unit whether or not its import names its extension.
+      const target = (spec.startsWith("#/") ? spec.slice(2) : joinPath(at, spec)).replace(/\.tsx?$/u, "");
       if (target.startsWith("..")) return;
       const to = pageUnit(target);
       if (to.unit === from.unit) return;
@@ -703,7 +706,7 @@ const droppedTimer = defineRule({
     messages: {
       dropped: says(
         "a timer whose handle is dropped cannot be cleared, so it still fires after the part that set it is gone",
-        "`useTimeout()` or `useInterval(fn, ms)` from `@/base/timer` in a component; in an effect, keep the handle and return `() => clearTimeout(t)`; a store that lives as long as the page keeps the handle too, or says why it need not with a disable comment",
+        "`useTimeout()` or `useInterval(fn, ms)` from `#/base/timer.ts` in a component; in an effect, keep the handle and return `() => clearTimeout(t)`; a store that lives as long as the page keeps the handle too, or says why it need not with a disable comment",
         "apps/web/src/base/timer.ts",
       ),
     },
@@ -903,13 +906,22 @@ const failureTone = defineRule({
   },
 });
 
+/** A subpath import names its file (package.json imports map exactly): the target with the extension it has on disk, or
+ * its folder's index; as it was when nothing is found. */
+function withExtension(filename: string, spec: string, target: string) {
+  if (/\.[cm]?[jt]sx?$/u.test(spec)) return target;
+  const base = resolve(dirname(filename), spec);
+  const found = [".ts", ".tsx", "/index.ts", "/index.tsx"].find((ext) => existsSync(base + ext));
+  return found === undefined ? target : target + found;
+}
+
 const parentImportRule = defineRule({
   meta: {
     messages: {
       parent: says(
         "an import that climbs out of its folder reads differently from every file and changes when the file moves",
         "write it as `{{alias}}` (vp check --fix does it)",
-        "apps/{{app}}/tsconfig.json",
+        "apps/{{app}}/package.json",
       ),
     },
     fixable: "code",
@@ -922,11 +934,55 @@ const parentImportRule = defineRule({
       if (source?.type !== "Literal" || typeof source.value !== "string" || !source.value.startsWith("../")) return;
       const spec = source.value;
       const ups = spec.split("/").filter((p) => p === "..").length;
-      // Out of src (the server's db/generated): no alias reaches it.
-      if (ups >= at.split("/").length) return;
-      const alias = `@/${joinPath(at, spec)}`;
+      // Out of src: the server's generated queries are #db/ (its package.json imports); nothing else is reached.
+      const out = ups >= at.split("/").length;
+      const generated = /^(?:\.\.\/)+db\/generated\/(.+)$/u.exec(spec)?.[1];
+      if (out && (app !== "server" || generated === undefined)) return;
+      const alias = out ? `#db/${generated}` : `#/${withExtension(context.filename, spec, joinPath(at, spec))}`;
       const [start, end] = source.range;
       context.report({ node: source, messageId: "parent", data: { alias, app }, fix: (fixer) => fixer.replaceTextRange([start + 1, end - 1], alias) });
+    };
+    return {
+      ImportDeclaration: (node) => check(node.source),
+      ImportExpression: (node) => check(node.source),
+      ExportNamedDeclaration: (node) => check(node.source),
+      ExportAllDeclaration: (node) => check(node.source),
+    };
+  },
+});
+
+/** The folder of the package a path is in (the nearest package.json above it), and that package's name. */
+const packages = new Map<string, { dir: string; name: string } | undefined>();
+function packageOf(path: string): { dir: string; name: string } | undefined {
+  const dir = dirname(path);
+  if (packages.has(dir)) return packages.get(dir);
+  const manifest = resolve(dir, "package.json");
+  const found = existsSync(manifest)
+    ? { dir, name: /"name":\s*"([^"]+)"/u.exec(readFileSync(manifest, "utf8"))?.[1] ?? dir }
+    : dir === dirname(dir)
+      ? undefined
+      : packageOf(dir);
+  packages.set(dir, found);
+  return found;
+}
+
+const noCrossPackagePath = defineRule({
+  meta: {
+    messages: {
+      cross: says(
+        "`{{spec}}` reaches into {{to}}'s files by a path: it breaks when either moves, and skips what {{to}} says it gives (its package.json exports)",
+        "import it by its name (`{{to}}/…`), adding an exports entry to {{to}}'s package.json and {{to}} to this package's dependencies if they are missing",
+        "docs/subsystems/foundation.md",
+      ),
+    },
+  },
+  create(context) {
+    const from = packageOf(context.filename);
+    if (from === undefined) return {};
+    const check = (source: { type: string; value?: unknown; range: [number, number] } | null | undefined) => {
+      if (source?.type !== "Literal" || typeof source.value !== "string" || !source.value.startsWith(".")) return;
+      const to = packageOf(resolve(dirname(context.filename), source.value));
+      if (to !== undefined && to.dir !== from.dir) context.report({ node: source, messageId: "cross", data: { spec: source.value, to: to.name } });
     };
     return {
       ImportDeclaration: (node) => check(node.source),
@@ -1246,6 +1302,7 @@ export default definePlugin({
     "design-tokens": designTokens,
     "page-layers": pageLayersRule,
     "parent-import": parentImportRule,
+    "no-cross-package-path": noCrossPackagePath,
     "db-door": dbDoor,
     "child-process-door": childProcessDoor,
     "dropped-timer": droppedTimer,

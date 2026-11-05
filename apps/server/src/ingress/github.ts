@@ -5,16 +5,16 @@ import { Clock, Effect, Schema, Semaphore } from "effect";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { compareText, or } from "@/base/order.ts";
-import type { ApiError } from "@/errors.ts";
-import { Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { Issue } from "@/issue/issue.ts";
-import { knownGitHubEvents } from "@/mailbox/payload.ts";
-import { Project } from "@/project/project.ts";
-import { ProjectError } from "@/project/workplace.ts";
+import { compareText, or } from "#/base/order.ts";
+import type { ApiError } from "#/errors.ts";
+import { Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { Issue } from "#/issue/issue.ts";
+import { knownGitHubEvents } from "#/mailbox/payload.ts";
+import { Project } from "#/project/project.ts";
+import { ProjectError } from "#/project/workplace.ts";
+import * as q from "#db/ingress_github.sql.ts";
 
-import * as q from "../../db/generated/ingress_github.sql.ts";
 import type { SourceEvent } from "./ingress.ts";
 
 interface GitHubCheck {

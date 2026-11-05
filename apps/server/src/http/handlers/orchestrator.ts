@@ -6,10 +6,10 @@ import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import type { OrchestratorHandlers } from "@vibevalley/protocol/api";
 
-import { Core } from "@/core/core.ts";
-import { missing, lookIn } from "@/errors.ts";
-import { Memory } from "@/memory/memory.ts";
-import { Orchestrator } from "@/orchestrator/orchestrator.ts";
+import { Core } from "#/core/core.ts";
+import { missing, lookIn } from "#/errors.ts";
+import { Memory } from "#/memory/memory.ts";
+import { Orchestrator } from "#/orchestrator/orchestrator.ts";
 
 export const orchestratorHandlers = Effect.gen(function* () {
   const core = yield* Core;

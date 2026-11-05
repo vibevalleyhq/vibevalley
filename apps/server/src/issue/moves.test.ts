@@ -3,8 +3,8 @@ import { describe, expect, it } from "vite-plus/test";
 import type { Fact, Issue, IssueStatus, Session } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { emptyWorkspaceState } from "@/core/core.ts";
-import { reduce } from "@/projection/reduce.ts";
+import { emptyWorkspaceState } from "#/core/core.ts";
+import { reduce } from "#/projection/reduce.ts";
 
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
 import { issueStageOf } from "./status.ts";
@@ -183,14 +183,15 @@ describe("next steps after a refusal", () => {
       },
     } as unknown as Issue;
     const next = nextSteps(t);
+    // Each act as the command that does it: a move is issue status, stopping is its helper's session stop.
     expect(next.filter((n) => n.run).map((n) => n.run)).toEqual([
-      ["issue", "status", "update", "41", "--json", '{"status":"done"}'],
+      ["issue", "status", "41", "done"],
       ["session", "stop", "w1"],
-      ["issue", "status", "update", "41", "--json", '{"status":"canceled"}'],
+      ["issue", "status", "41", "canceled"],
     ]);
     expect(next.filter((n) => !n.run).map((n) => n.say)).toEqual([
-      "带话：issue comment create 41，--json 带要说的 text",
-      "挪到待办：issue status update 41，--json 带 status「todo」和这一轮要它做什么的 text",
+      "带话：issue comment 41 …，… 换成要说的话",
+      "挪到待办：issue status 41 todo --comment …，… 换成这一轮要它做什么",
     ]);
   });
 });

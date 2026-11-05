@@ -13,10 +13,10 @@ import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { type ApiError, missing, refused, lookIn } from "@/errors.ts";
-import { ServerConfig } from "@/infra/config.ts";
-import { keptFile, readOrSetAside } from "@/infra/files.ts";
-import { defaultSettings } from "@/runtime/presets.ts";
+import { type ApiError, missing, refused, lookIn } from "#/errors.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { keptFile, readOrSetAside } from "#/infra/files.ts";
+import { defaultSettings } from "#/runtime/presets.ts";
 
 import { addedTemplates, builtInTemplates, copyTemplate, profileOf, readTemplate, removeTemplate, updatedFrom } from "./template.ts";
 

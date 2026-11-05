@@ -9,18 +9,17 @@ import { createMemo, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type Agent, type AgentTally, defaultOrchestrator, type RuntimeInfo } from "@vibevalley/protocol";
 
-import { orchestratorHref } from "@/features/orchestrator";
-import { useSkills } from "@/features/runtime";
-import { useAgentProblems, useOrchestrators, useWorkAgents } from "@/infra/agents";
-import { api } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { ready, useRuntimes } from "@/infra/query";
-import { A } from "@/ui/A";
-import { createAct } from "@/ui/act";
-import { hexColor } from "@/ui/cast";
-import { AgentFace, OrchestratorFace } from "@/ui/Face";
-import { Icon } from "@/ui/Icon";
-import { Hint } from "@/ui/Tip";
+import { orchestratorHref } from "#/features/orchestrator/index.ts";
+import { useSkills } from "#/features/runtime/index.ts";
+import { useAgentProblems, useOrchestrators, useWorkAgents } from "#/infra/agents.ts";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { ready, useRuntimes } from "#/infra/query.ts";
+import { A } from "#/ui/A.tsx";
+import { createAct } from "#/ui/act.ts";
+import { hexColor } from "#/ui/cast.ts";
+import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
+import { Icon } from "#/ui/Icon.tsx";
 
 import { AgentPage } from "./AgentPage";
 import { TemplatesPage } from "./TemplatesPage";
@@ -44,12 +43,8 @@ function AgentsPage() {
   const problems = useAgentProblems(agents);
   return (
     <div class="h-full overflow-y-auto">
-      <div class="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-4 pb-8 sm:px-6">
-        <div class="flex flex-wrap items-end justify-between gap-3">
-          <div class="flex items-center gap-1.5">
-            <h1 class="text-2xl font-semibold">{t("web.agent.list.title")}</h1>
-            <Hint text={t("web.agent.list.intro")} />
-          </div>
+      <div class="flex flex-col gap-6 px-4 pt-4 pb-8">
+        <div class="flex flex-wrap items-end justify-end gap-3">
           <span class="flex flex-wrap items-center gap-2">
             <A
               href="/agents/templates"
@@ -71,7 +66,7 @@ function AgentsPage() {
           </span>
         </div>
         <h2 class="text-sm font-semibold text-muted">{t("web.agent.list.orchestrators")}</h2>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           <For each={orchestrators()}>{(a) => <OrchestratorCard agent={a} />}</For>
           <A
             href="/agents/new?role=orchestrator"
@@ -87,12 +82,12 @@ function AgentsPage() {
         {/* The default orchestrator is always there: once it shows, the profiles are read. */}
         <Show when={orchestrators().length > 0 && agents().length === 0}>
           <p class="text-sm text-muted">
-            <A href="/agents/templates" class="underline">
+            <A href="/agents/templates" class="hover:text-ink hover:underline">
               {t("web.agent.templates.none")}
             </A>
           </p>
         </Show>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           <For each={agents()}>
             {(a) => (
               <AgentCard

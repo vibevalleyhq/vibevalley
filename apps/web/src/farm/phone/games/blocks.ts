@@ -1,7 +1,7 @@
 // 方块: a game is a value, each move a function to the next. Pieces come from a seven-bag
 // drawn with the game's own seeded generator, so a seed replays.
 
-import { nextRandom } from "@/farm/phone/lcd";
+import { nextRandom } from "#/farm/phone/lcd.ts";
 
 export const blocksWidth = 10;
 export const blocksHeight = 18;

@@ -9,16 +9,16 @@ import { For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
 
-import { aria, Keyed } from "@/base/dom";
-import { farm, type FarmOverlay, type FarmPanel, useFarm } from "@/farm/store";
-import { useVillage } from "@/farm/world/load";
-import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "@/features/orchestrator";
-import { orchestratorLookOf } from "@/infra/agents";
-import { api } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { ready, useAgents } from "@/infra/query";
-import { setPet, usePrefs } from "@/state/prefs";
-import { createPixelAct, FarmDialog, type FarmDialogSize, SpriteIcon } from "@/ui/pixel";
+import { aria, Keyed } from "#/base/dom.tsx";
+import { farm, type FarmOverlay, type FarmPanel, useFarm } from "#/farm/store.ts";
+import { useVillage } from "#/farm/world/load.ts";
+import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "#/features/orchestrator/index.ts";
+import { orchestratorLookOf } from "#/infra/agents.ts";
+import { api } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { ready, useAgents } from "#/infra/query.ts";
+import { setPet, usePrefs } from "#/state/prefs.ts";
+import { createPixelAct, FarmDialog, type FarmDialogSize, SpriteIcon } from "#/ui/pixel/index.ts";
 
 import { Achievements } from "./Achievements";
 import { FarmLog } from "./FarmLog";

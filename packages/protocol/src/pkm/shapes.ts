@@ -38,6 +38,8 @@ export interface PkmPageSummary {
   updated: number;
   /** Its blocks marked TODO, DOING, NOW, LATER or WAITING. */
   open: number;
+  /** A journal's day (YYYY-MM-DD), read from its file's name; none for other pages. */
+  day?: string;
 }
 
 export interface PkmVault {
@@ -72,6 +74,7 @@ export interface PkmBacklink {
   page: string;
   pageTitle: string;
   tier: PkmTier;
+  /** Where it is: the first lines of the blocks above it, as plain words. */
   path: string;
   body: string;
 }
@@ -142,6 +145,7 @@ interface PkmNewBlock {
 /** One change to a page's outline. Ops on a block not on the page change nothing. */
 export type PkmBlockOp =
   | ({ op: "append" } & PkmNewBlock)
+  | ({ op: "insert_before"; block: string } & PkmNewBlock)
   | ({ op: "insert_after"; block: string } & PkmNewBlock)
   | ({ op: "insert_child"; block: string } & PkmNewBlock)
   | { op: "update"; block: string; body?: string; priority?: PkmPriority; props?: Record<string, string> }
@@ -152,7 +156,9 @@ export type PkmBlockOp =
   | { op: "delete"; block: string }
   | { op: "indent"; block: string }
   | { op: "outdent"; block: string }
-  | { op: "move"; block: string; direction: "up" | "down" };
+  | { op: "move"; block: string; direction: "up" | "down" }
+  /** With everything under it, before or after target, or inside it as its first child; none into itself or under itself. */
+  | { op: "move_to"; block: string; target: string; at: "before" | "after" | "inside" };
 
 export interface PkmMutation {
   page: string;
@@ -175,15 +181,42 @@ export interface PkmSearchHit {
   pageTitle: string;
   tier: PkmTier;
   marker?: PkmMarker;
+  /** Where it is: the first lines of the blocks above it, as plain words. */
   path: string;
   body: string;
+  /** The block's text as one line: a [[link]] as its words, a ((ref)) read out, remarks and Markdown marks taken off. */
+  plain: string;
   score: number;
   /** The blocks under it, so a hit reads whole. */
   children: PkmBlock[];
 }
 
 export interface PkmCaptureRequest {
+  /** One line, or an outline: a line a block, nested by its indentation, a leading "- " or not. */
   text: string;
+  /** A page's slug, title or alias: the blocks go at its end as they are. None: today's journal, each top block a
+   * LATER tagged #inbox. */
+  page?: string;
+}
+
+/** A page's file as it is written (its id:: lines included), and when it was last written: what `pkm page edit` opens. */
+export interface PkmSource {
+  page: string;
+  title: string;
+  markdown: string;
+  updated: number;
+}
+
+/** The page's file written anew from markdown; refused when the file changed since updated (it was read). */
+export interface PkmSourceUpdate {
+  page: string;
+  markdown: string;
+  updated: number;
+}
+
+export interface PkmJournalRequest {
+  /** YYYY-MM-DD. */
+  day: string;
 }
 
 export interface PkmStaleProject {
@@ -200,6 +233,8 @@ export interface PkmOverdue {
   block: string;
   page: string;
   body: string;
+  /** The block's text as one line, as a search hit has it. */
+  plain: string;
   deadline: string;
 }
 

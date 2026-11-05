@@ -1,0 +1,4 @@
+#!/bin/sh
+# The editor's TypeScript (.vscode/settings.json's js/ts.tsdk.path is this folder; the extension starts `tsgo --lsp
+# --stdio` in it): tsrs with Effect's language service, run by @effect/tsgo without patching node_modules.
+exec "${0%/*}/../node_modules/.bin/effect-tsgo" tsrs "$@"

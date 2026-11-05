@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { artifactMax, artifactHeaders, artifactProblem, htmlPolicy } from "./policy.ts";
+import { htmlSandbox } from "@vibevalley/protocol/rules";
+
+import { artifactMax, artifactHeaders, artifactProblem, htmlPolicy, htmlSources } from "./policy.ts";
 
 describe("what an artifact may be", () => {
   it("takes a title, a kind it knows and a size within bounds; a version alone is judged by its size", () => {
@@ -25,8 +27,26 @@ describe("what an artifact may be", () => {
     expect(sandbox).not.toContain("allow-same-origin");
     expect(sandbox).not.toContain("allow-top-navigation");
     expect(sandbox).not.toContain("allow-forms");
+    expect(sandbox).toBe(`sandbox ${htmlSandbox}`);
     expect(htmlPolicy).toContain("connect-src 'none'");
     expect(htmlPolicy).toContain("form-action 'none'");
     expect(html["x-content-type-options"]).toBe("nosniff");
+  });
+
+  it("loads nothing from outside the list: no https: of any host, pictures and media only inline", () => {
+    const sources = (name: string) =>
+      htmlPolicy
+        .split("; ")
+        .find((d) => d.startsWith(name + " "))
+        ?.split(" ")
+        .slice(1);
+    expect(sources("script-src")).toEqual(["'unsafe-inline'", ...htmlSources.script]);
+    expect(sources("style-src")).toEqual(["'unsafe-inline'", ...htmlSources.style]);
+    expect(sources("font-src")).toEqual(["data:", ...htmlSources.font]);
+    expect([sources("img-src"), sources("media-src")]).toEqual([
+      ["data:", "blob:"],
+      ["data:", "blob:"],
+    ]);
+    expect(htmlPolicy).not.toMatch(/https:(?!\/\/)|\*/u);
   });
 });

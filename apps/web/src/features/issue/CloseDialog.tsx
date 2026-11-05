@@ -3,17 +3,17 @@ import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "s
 import { t } from "@vibevalley/i18n";
 import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
 
-import { aria, autofocus } from "@/base/dom";
-import { ago } from "@/base/format";
-import { reasonOf } from "@/infra/api";
-import { useCore } from "@/infra/frame";
-import { ready } from "@/infra/query";
-import { useIntents } from "@/state/intent";
-import { createAct } from "@/ui/act";
-import { Button } from "@/ui/Button";
-import { highlight, type Tokens } from "@/ui/code/highlight";
-import { Dialog } from "@/ui/Dialog";
-import { TextArea } from "@/ui/Field";
+import { aria, autofocus } from "#/base/dom.tsx";
+import { ago } from "#/base/format.ts";
+import { reasonOf } from "#/infra/api.ts";
+import { useCore } from "#/infra/frame.ts";
+import { ready } from "#/infra/query.ts";
+import { useIntents } from "#/state/intent.ts";
+import { createAct } from "#/ui/act.ts";
+import { Button } from "#/ui/Button.tsx";
+import { highlight, type Tokens } from "#/ui/code/highlight.ts";
+import { Dialog } from "#/ui/Dialog.tsx";
+import { TextArea } from "#/ui/Field.tsx";
 
 import { actionOf, perform } from "./acts";
 import { type Lane } from "./cards";

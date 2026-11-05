@@ -7,14 +7,14 @@ import { Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { ArchivePanel, OrchestratorMemoryPanel } from "@/features/memory";
-import { TrajectoryLog } from "@/features/session";
-import { VoiceForm } from "@/features/voice";
-import { useAgent } from "@/infra/agents";
-import { useRouter } from "@/infra/router";
-import { A } from "@/ui/A";
-import { OrchestratorFace } from "@/ui/Face";
-import { Tabs } from "@/ui/Tabs";
+import { ArchivePanel, OrchestratorMemoryPanel } from "#/features/memory/index.ts";
+import { TrajectoryLog } from "#/features/session/index.ts";
+import { VoiceForm } from "#/features/voice/index.ts";
+import { useAgent } from "#/infra/agents.ts";
+import { useRouter } from "#/infra/router.ts";
+import { A } from "#/ui/A.tsx";
+import { OrchestratorFace } from "#/ui/Face.tsx";
+import { Tabs } from "#/ui/Tabs.tsx";
 
 import { markWrongOf, orchestratorLooks } from "./looks";
 
@@ -105,7 +105,7 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
       </Match>
       <Match when={at() !== "trajectory"}>
         <div class="h-full overflow-y-auto px-4 pb-4">
-          <div class="mx-auto flex max-w-4xl flex-col gap-4">
+          <div class="flex max-w-4xl flex-col gap-4">
             {head()}
             {bar()}
             <Switch>

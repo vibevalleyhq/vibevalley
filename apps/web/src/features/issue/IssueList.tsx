@@ -4,20 +4,22 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { IssueStatus } from "@vibevalley/protocol";
 
-import { ago } from "@/base/format";
-import { useOrchestrators } from "@/infra/agents";
-import { OrchestratorFace } from "@/ui/Face";
-import { Icon } from "@/ui/Icon";
-import { IconButton } from "@/ui/IconButton";
+import { ago } from "#/base/format.ts";
+import { useOrchestrators } from "#/infra/agents.ts";
+import { OrchestratorFace } from "#/ui/Face.tsx";
+import { Icon } from "#/ui/Icon.tsx";
+import { IconButton } from "#/ui/IconButton.tsx";
 
-import { EmptyNote, OlderLink, QuickAdd } from "./Board";
+import { EmptyNote, OlderLink } from "./Board";
 import { type BoardCard, cardAgent, cardLook, cardProject, closedShown, laneLabel, laneStatus } from "./cards";
 import { type Grouping, groupRows, laneOrder, type Ordering, orderRows, type RowGroup, rowKeys } from "./display";
 import { useIssues, useNameOf } from "./history";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
+import type { NewIssueAt } from "./NewIssue";
 
 /** The quick add, with the group's project or helper when grouped by one. */
-export type ListAdd = (text: string, where: { project?: string; agent?: string }) => void;
+/** where: the group's project or helper the new issue starts in. */
+export type ListAdd = (where: NewIssueAt) => void;
 
 /** The issues as rows, grouped as the owner picked: Linear's list. A row opens the issue as a card does. */
 export function IssueList(props: {
@@ -32,17 +34,13 @@ export function IssueList(props: {
   onAdd: ListAdd;
 }) {
   const [folded, setFolded] = createSignal<ReadonlySet<string>>(new Set());
-  const [adding, setAdding] = createSignal<string>();
   const nameOf = useNameOf();
   const orchestrators = useOrchestrators();
   const isOrchestrator = (id: string) => orchestrators().some((a) => a.id === id);
 
   // Only where a new 待办 belongs: the 待办 group, a project's, a helper's (not the orchestrator's), or the one group.
   const canAdd = (g: RowGroup<BoardCard>) => (props.grouping === "status" ? g.lane === "todo" : props.grouping === "agent" ? !isOrchestrator(g.key) : true);
-  const add = (g: RowGroup<BoardCard>, text: string) => {
-    setAdding(undefined);
-    props.onAdd(text, props.grouping === "project" ? { project: g.key } : props.grouping === "agent" ? { agent: g.key } : {});
-  };
+  const add = (g: RowGroup<BoardCard>) => props.onAdd(props.grouping === "project" ? { project: g.key } : props.grouping === "agent" ? { agent: g.key } : {});
   const fold = (key: string) =>
     setFolded((f) => {
       const n = new Set(f);
@@ -106,19 +104,10 @@ export function IssueList(props: {
                     <span class="text-xs text-muted">{g().rows.length}</span>
                   </button>
                   <Show when={canAdd(g())}>
-                    <IconButton
-                      icon="add"
-                      label={t("web.issue.list.writeIn", { group: label() })}
-                      onClick={() => setAdding(adding() === g().key ? undefined : g().key)}
-                    />
+                    <IconButton icon="add" label={t("web.issue.list.writeIn", { group: label() })} onClick={() => add(g())} />
                   </Show>
                 </header>
                 <Show when={!isFolded()}>
-                  <Show when={adding() === g().key}>
-                    <div class="px-3 py-1.5">
-                      <QuickAdd autofocus onAdd={(t) => add(g(), t)} />
-                    </div>
-                  </Show>
                   <For each={rows()} keyed={(c) => c.id}>
                     {(c) => (
                       <Row

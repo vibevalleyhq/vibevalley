@@ -4,27 +4,26 @@ import { Clock, Effect, Option, Semaphore } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { commandOf } from "@vibevalley/protocol/api";
 import { assignedAgentOf, closedText, cut, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "@/agent/agent.ts";
-import { newId } from "@/base/ids.ts";
-import { Channel } from "@/channel/channel.ts";
-import { Core } from "@/core/core.ts";
-import type { Due } from "@/cron/cron.ts";
-import { type ApiError, Inconsistent, missing, lookIn, reasonOf, refused } from "@/errors.ts";
-import { causeMessage, Db } from "@/infra/db.ts";
-import { bestEffort } from "@/infra/log.ts";
-import { Mailbox } from "@/mailbox/mailbox.ts";
-import { recordTrigger } from "@/mailbox/payload.ts";
-import { issueBranch, Project } from "@/project/project.ts";
-import { Runtime } from "@/runtime/runtime.ts";
-import { conflictBrief } from "@/session/briefing.ts";
-import { askedMax } from "@/session/journal.ts";
-import { type HireOptions, type NotRecorded, Session } from "@/session/session.ts";
+import { Agent } from "#/agent/agent.ts";
+import { newId } from "#/base/ids.ts";
+import { Channel } from "#/channel/channel.ts";
+import { Core } from "#/core/core.ts";
+import type { Due } from "#/cron/cron.ts";
+import { type ApiError, Inconsistent, missing, lookIn, reasonOf, refused } from "#/errors.ts";
+import { causeMessage, Db } from "#/infra/db.ts";
+import { bestEffort } from "#/infra/log.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
+import { recordTrigger } from "#/mailbox/payload.ts";
+import { issueBranch, Project } from "#/project/project.ts";
+import { Runtime } from "#/runtime/runtime.ts";
+import { conflictBrief } from "#/session/briefing.ts";
+import { askedMax } from "#/session/journal.ts";
+import { type HireOptions, type NotRecorded, Session } from "#/session/session.ts";
+import * as q from "#db/issue.sql.ts";
+import * as qe from "#db/issue_assignment_execution.sql.ts";
 
-import * as q from "../../db/generated/issue.sql.ts";
-import * as qe from "../../db/generated/issue_assignment_execution.sql.ts";
 import { assignTo } from "./assignment.ts";
 import { issueBrief } from "./brief.ts";
 import { explicitMandate, inferredMandate } from "./creation.ts";
@@ -124,7 +123,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
     /** Starting it and its dry run ask the same, so neither refuses what the other allows. */
     const readyOf = Effect.fn("Issue.readyOf")(function* (issue: T.Issue, assignedAgent: string | undefined = assignedAgentOf(issue)) {
       if (issue.refining) return yield* Effect.fail(refused(t("server.issue.drafting", { name: issue.refining.name })));
-      const pick = [lookIn.agent, { say: t("server.issue.pickHint", { command: commandOf("issue.status.update", [String(issue.number)]).join(" ") }) }];
+      const pick = [lookIn.agent, { say: t("server.issue.pickHint", { n: issue.number }) }];
       if (!assignedAgent) return yield* Effect.fail(refused(t("server.issue.noAssignee"), pick));
       const agent = store.agent(assignedAgent);
       if (!agent) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: assignedAgent }), pick));

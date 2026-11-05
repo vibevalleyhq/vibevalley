@@ -5,15 +5,14 @@ import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { artifactPath } from "@vibevalley/protocol";
+import { htmlSandbox } from "@vibevalley/protocol/rules";
 
-import { reasonOf } from "@/infra/api";
-import { ready } from "@/infra/query";
-import { Icon } from "@/ui/Icon";
+import { reasonOf } from "#/infra/api.ts";
+import { ready } from "#/infra/query.ts";
+import { Icon } from "#/ui/Icon.tsx";
 
 import { bodyIcon, bodyLabel, useArtifact } from "./ArtifactCard";
 import { BlocksView, type QuoteTarget } from "./BlocksView";
-
-const sandbox = "allow-scripts allow-popups allow-popups-to-escape-sandbox";
 
 export function ArtifactCanvas(props: { id: string; version?: number | undefined; onClose?: () => void; onQuote?: (block: QuoteTarget) => void }) {
   const artifact = useArtifact(() => props.id);
@@ -74,7 +73,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
               <iframe
                 title={t("web.artifact.page.frame", { title: a().title, version: props.version ?? a().version })}
                 src={artifactPath(a().id, props.version ?? a().version)}
-                sandbox={sandbox}
+                sandbox={htmlSandbox}
                 class="min-h-0 w-full flex-1 border-0 bg-page"
               />
             }

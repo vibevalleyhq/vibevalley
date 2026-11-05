@@ -21,8 +21,14 @@ export interface PkmHandlers<R = never> {
   /** The ops in order on the page as its file is now, written back once. */
   readonly "pkm.block.apply": (a: T.PkmMutation) => Effect.Effect<T.PkmPage, ApiError, R>;
   readonly "pkm.search": (a: T.PkmSearchRequest) => Effect.Effect<T.PkmSearchHit[], ApiError, R>;
-  /** A LATER line in today's journal, tagged #inbox. */
+  /** Into today's journal as LATER lines tagged #inbox (an agent's says who noted it), or at the end of a page. */
   readonly "pkm.capture": (a: T.PkmCaptureRequest) => Effect.Effect<T.PkmPage, ApiError, R>;
+  /** The page's file as written, ids and all, with when it was written. */
+  readonly "pkm.source.get": (a: T.PkmPageRef) => Effect.Effect<T.PkmSource, ApiError, R>;
+  /** The page written anew from its file's text; refused when the file changed after it was read. */
+  readonly "pkm.source.update": (a: T.PkmSourceUpdate) => Effect.Effect<T.PkmPage, ApiError, R>;
+  /** The journal of a day, made empty when it has none yet. */
+  readonly "pkm.journal.open": (a: T.PkmJournalRequest) => Effect.Effect<T.PkmPage, ApiError, R>;
   readonly "pkm.radar.get": (a: { readonly staleDays?: number }) => Effect.Effect<T.PkmRadar, ApiError, R>;
   readonly "pkm.comment.list": (a: { readonly page?: string }) => Effect.Effect<T.PkmComment[], ApiError, R>;
   /** A rewrite of a block for the owner to accept: it keeps every [[link]] and ((ref)) the block had. */
@@ -51,7 +57,7 @@ export const pkmEndpoints: readonly Endpoint[] = [
     about: ["page"],
     input: S.PkmPageRef,
     result: S.PkmPageView,
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "orchestrator", "session"],
   },
   {
     op: "pkm.page.save",
@@ -93,12 +99,33 @@ export const pkmEndpoints: readonly Endpoint[] = [
     about: [],
     input: S.PkmSearchRequest,
     result: Schema.mutable(Schema.Array(S.PkmSearchHit)),
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "orchestrator", "session"],
   },
   {
     op: "pkm.capture",
     about: [],
     input: S.PkmCaptureRequest,
+    result: S.PkmPage,
+    can: ["owner", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "pkm.source.get",
+    about: ["page"],
+    input: S.PkmPageRef,
+    result: S.PkmSource,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "pkm.source.update",
+    about: ["page"],
+    input: S.PkmSourceUpdate,
+    result: S.PkmPage,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "pkm.journal.open",
+    about: ["day"],
+    input: S.PkmJournalRequest,
     result: S.PkmPage,
     can: ["owner", "remote"],
   },
@@ -121,7 +148,7 @@ export const pkmEndpoints: readonly Endpoint[] = [
     about: ["block"],
     input: S.PkmProposalRequest,
     result: S.PkmProposal,
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "orchestrator", "session"],
   },
   {
     op: "pkm.comment.resolve",

@@ -7,9 +7,9 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { ChangedFile } from "@vibevalley/protocol";
 
-import { aria } from "@/base/dom";
-import { changeKind, patchLines, patchMarkOf } from "@/features/issue";
-import { SpriteIcon } from "@/ui/pixel";
+import { aria } from "#/base/dom.tsx";
+import { changeKind, patchLines, patchMarkOf } from "#/features/issue/index.ts";
+import { SpriteIcon } from "#/ui/pixel/index.ts";
 
 /** A colour at `alpha` of its strength over cream. */
 export const tint = (hex: string, alpha: number) => `color-mix(in srgb, ${hex} ${Math.round(alpha * 100)}%, #f7e8c4)`;
@@ -44,7 +44,7 @@ export function FarmEmpty(props: { text: string }) {
 /** What the server answered, under the button that asked. */
 
 /** Hours and minutes of a time. */
-export { farmClock as clockOf } from "@/farm/store";
+export { farmClock as clockOf } from "#/farm/store.ts";
 
 export function PlusMinus(props: { added: number; removed: number }) {
   return (

@@ -3,7 +3,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./format": {
+      "types": "./dist/format.d.ts",
+      "default": "./src/format.ts"
+    }
   },
   "devDependencies": {
     "@types/node": "catalog:"

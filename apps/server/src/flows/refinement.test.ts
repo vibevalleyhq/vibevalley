@@ -7,13 +7,13 @@ import { Effect } from "effect";
 import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "@/agent/agent.ts";
-import { owner } from "@/base/actor.ts";
-import { Core } from "@/core/core.ts";
-import { Issue } from "@/issue/issue.ts";
-import { Session } from "@/session/session.ts";
-import { releaseHeld } from "@/testing/worker.ts";
-import { Said, testIssues } from "@/testing/world.ts";
+import { Agent } from "#/agent/agent.ts";
+import { owner } from "#/base/actor.ts";
+import { Core } from "#/core/core.ts";
+import { Issue } from "#/issue/issue.ts";
+import { Session } from "#/session/session.ts";
+import { releaseHeld } from "#/testing/worker.ts";
+import { Said, testIssues } from "#/testing/world.ts";
 
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 

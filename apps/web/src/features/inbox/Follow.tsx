@@ -7,10 +7,10 @@ import { createEffect, onSettled } from "solid-js";
 import { currentLocale } from "@vibevalley/i18n";
 import { freshOf } from "@vibevalley/protocol/rules";
 
-import { unreadTotal } from "@/features/channel";
-import { voiceCall } from "@/features/voice";
-import { rawFrame } from "@/infra/frame";
-import { currentHost } from "@/infra/host";
+import { unreadTotal } from "#/features/channel/index.ts";
+import { voiceCall } from "#/features/voice/index.ts";
+import { rawFrame } from "#/infra/frame.ts";
+import { currentHost } from "#/infra/host.ts";
 
 import { tabTitle, traySummary, waitingOnOwner } from "./tray";
 

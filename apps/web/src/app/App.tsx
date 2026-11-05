@@ -4,29 +4,29 @@
 import type { JSX } from "@solidjs/web";
 import { Match, Show, Switch, untrack } from "solid-js";
 
-import { Keyed } from "@/base/dom";
-import { FarmPage } from "@/farm/FarmPage";
-import { projectMap } from "@/farm/map/ProjectMap";
-import { lastFarmProject } from "@/farm/store";
-import { AgentsRoute } from "@/features/agent";
-import { ArtifactsPage } from "@/features/artifact";
-import { CatalogPage } from "@/features/catalog";
-import { ChatPage, chatSay } from "@/features/channel";
-import { Follow } from "@/features/inbox";
-import { IssuesPage } from "@/features/issue";
-import { PairPage } from "@/features/lan";
-import { OrchestratorPage } from "@/features/orchestrator";
-import { PkmPage } from "@/features/pkm";
-import { ProjectsPage, sortProjects } from "@/features/project";
-import { RuntimesPage } from "@/features/runtime";
-import { SettingsPage } from "@/features/setting";
-import { ready, useProjects } from "@/infra/query";
-import { useRouter } from "@/infra/router";
-import { prefsNow } from "@/state/prefs";
-import { TreePage } from "@/tree/TreePage";
-import { Navigate } from "@/ui/A";
-import { WindowStrip } from "@/ui/layout";
-import { ToastHost } from "@/ui/ToastHost";
+import { Keyed } from "#/base/dom.tsx";
+import { FarmPage } from "#/farm/FarmPage.tsx";
+import { projectMap } from "#/farm/map/ProjectMap.tsx";
+import { lastFarmProject } from "#/farm/store.ts";
+import { AgentsRoute } from "#/features/agent/index.ts";
+import { ArtifactsPage } from "#/features/artifact/index.ts";
+import { CatalogPage } from "#/features/catalog/index.ts";
+import { ChatPage, chatSay } from "#/features/channel/index.ts";
+import { Follow } from "#/features/inbox/index.ts";
+import { IssuesPage } from "#/features/issue/index.ts";
+import { PairPage } from "#/features/lan/index.ts";
+import { OrchestratorPage } from "#/features/orchestrator/index.ts";
+import { PkmPage } from "#/features/pkm/index.ts";
+import { ProjectsPage, sortProjects } from "#/features/project/index.ts";
+import { RuntimesPage } from "#/features/runtime/index.ts";
+import { SettingsPage } from "#/features/setting/index.ts";
+import { ready, useProjects } from "#/infra/query.ts";
+import { useRouter } from "#/infra/router.ts";
+import { prefsNow } from "#/state/prefs.ts";
+import { TreePage } from "#/tree/TreePage.tsx";
+import { Navigate } from "#/ui/A.tsx";
+import { WindowStrip } from "#/ui/layout.tsx";
+import { ToastHost } from "#/ui/ToastHost.tsx";
 
 import { places as placeList } from "./places";
 import { Root } from "./Root";
@@ -62,7 +62,7 @@ function FarmHome() {
   const enter = (name: string) => <Navigate href={`/farm/${encodeURIComponent(name)}`} />;
   return (
     <Switch>
-      <Match when={last && (!list() || list()!.some((p) => p.name === last))}>{enter(last!)}</Match>
+      <Match when={last !== undefined && (!list() || list()!.some((p) => p.name === last)) ? last : undefined}>{(name) => enter(name())}</Match>
       <Match when={list()?.length === 0 || projects.isError}>
         <FarmPage project="" />
       </Match>

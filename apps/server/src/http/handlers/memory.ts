@@ -5,10 +5,10 @@ import { Effect } from "effect";
 import type * as T from "@vibevalley/protocol";
 import type { MemoryHandlers } from "@vibevalley/protocol/api";
 
-import { Agent } from "@/agent/agent.ts";
-import { owner } from "@/base/actor.ts";
-import { requestKeys } from "@/http/api.ts";
-import { Memory } from "@/memory/memory.ts";
+import { Agent } from "#/agent/agent.ts";
+import { owner } from "#/base/actor.ts";
+import { requestKeys } from "#/http/api.ts";
+import { Memory } from "#/memory/memory.ts";
 
 export const memoryHandlers = Effect.gen(function* () {
   const agents = yield* Agent;
