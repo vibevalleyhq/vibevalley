@@ -43,7 +43,8 @@
     "reviewComment": "Words with the review",
     "statusComment": "Words with the move: what to change, when it goes for another round",
     "title": "The new title",
-    "wantsOwner": "Only those waiting on the owner, the longest waiting first"
+    "wantsOwner": "Only those waiting on the owner, the longest waiting first",
+    "issueWatch": "Follow it until in_review, done or canceled, then show it; each status on stderr"
   },
   "command": {
     "root": "VibeValley's command line, one operation a command: answers are short text, --format json gives the protocol's shape; guide says how to use it, chat talks in the terminal",
@@ -97,15 +98,14 @@
     "issue": {
       "edit": "Change an issue's title, description, project, profile or priority",
       "list": "List issues: one a line, number first",
-      "show": "Show an issue: where it stands, its questions and criteria, what can be done now (--diff adds its change, --log its timeline and cost)",
+      "show": "Show an issue: its status, where it is now, its questions and criteria, the commands it takes now (--watch follows it first)",
       "comment": "Comment on an issue: the answer when its helper asks, read by it in its next round otherwise",
       "create": "Write a new issue",
       "delete": "Delete an issue",
       "diff": "An issue's change: its commits and files",
       "review": "Review what was handed back: pass or fail; completing it is issue status … done",
       "status": "Move an issue's status: todo sends it out or for another round, done completes it, canceled closes it; the server says which it takes",
-      "timeline": "An issue's timeline and cost",
-      "watch": "Follow an issue until it is in_review, done or canceled, each status on stderr"
+      "timeline": "An issue's timeline and cost"
     },
     "memory": {
       "create": "Keep a memory for a profile",
@@ -471,7 +471,7 @@
       "about": "GitHub: whether gh is installed and logged in"
     },
     "issue": {
-      "about": "Issues: write, edit, move, comment, review, follow"
+      "about": "Issues: write, edit, move, comment, review"
     },
     "lan": {
       "about": "Connect to this machine: on or off, pairing, devices"
@@ -716,7 +716,7 @@
       "about": "The issues waiting on the owner, the longest waiting first"
     },
     "issueWatch": {
-      "about": "Follow #12, ten minutes at most"
+      "about": "Follow #12 until it is handed back or over, then show it; ten minutes at most"
     },
     "memoryCreate": {
       "run": "vibevalley memory create docs 'the port is 8797'",

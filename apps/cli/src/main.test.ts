@@ -154,12 +154,12 @@ describe("the command line", () => {
       );
       const n = /^#(\d+)/u.exec(made.out)?.[1] ?? "";
       expect((yield* cli(at("issue", "status", n, "todo"))).code).toBe(0);
-      expect((yield* cli(at("issue", "watch", n, "--timeout", "30"))).code).toBe(0);
+      expect((yield* cli(at("issue", "show", n, "--watch", "--timeout", "30"))).code).toBe(0);
       const asking = (yield* cli(at("issue", "show", n))).out;
       expect(asking).toContain("用 8797");
       expect(asking).toContain(`vibevalley issue comment ${n} …`);
       expect((yield* cli(at("issue", "comment", n, "用 8797"))).code).toBe(0);
-      expect((yield* cli(at("issue", "watch", n, "--timeout", "30"))).code).toBe(0);
+      expect((yield* cli(at("issue", "show", n, "--watch", "--timeout", "30"))).code).toBe(0);
       const handedBack = (yield* cli(at("issue", "show", n))).out;
       expect(handedBack.split("\n")[1]).toMatch(/^in_review/u);
       expect(handedBack).not.toContain("用 8797");

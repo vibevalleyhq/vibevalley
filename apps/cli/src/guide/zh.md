@@ -17,7 +17,7 @@ vibevalley issue show 12                # 一张工单：状态、现在在哪�
 ```bash
 vibevalley issue create 修登录页 --project web --agent docs --criterion '过期后回到登录页' --key login-1
 vibevalley issue status 13 todo         # 派出去：交给它的负责人
-vibevalley issue watch 13 --timeout 600 # 跟着它，等它到 in_review、done 或 canceled；经过的状态写在 stderr
+vibevalley issue show 13 --watch --timeout 600   # 跟着它，等它到 in_review、done 或 canceled 再显示；经过的状态写在 stderr
 ```
 
 `--key`：同一把键重发不会建两张，网络断了重试放心。
@@ -27,7 +27,7 @@ vibevalley issue watch 13 --timeout 600 # 跟着它，等它到 in_review、done
 ```bash
 vibevalley issue show 13                # 「问题」下面是它在问的，括号里是它想到的答案
 vibevalley issue comment 13 用 8797     # 评论：在问时就是回答；在干活时它下一轮会看到
-vibevalley issue watch 13
+vibevalley issue show 13 --watch
 ```
 
 ## 验收

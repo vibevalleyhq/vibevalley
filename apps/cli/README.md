@@ -9,7 +9,7 @@ it loads none of the server and works out nothing the server decides. How it rea
 ```
 src/main.ts        the root: the groups below, the global flags (--server, --dry-run, --format), how help and failures are said
 src/farm.ts        what every command stands on: ask (the typed client), show (text or --format json), change (--dry-run)
-src/issue.ts       issue list|show|create|edit|status|comment|review|diff|timeline|delete|watch
+src/issue.ts       issue list|show [--watch]|create|edit|status|comment|review|diff|timeline|delete
 src/channel.ts     channel list, channel message list|send|search
 src/pkm.ts         the notes: pkm capture|search|radar, pkm journal show, pkm page list|show|export|edit
 src/project.ts     project list|create, agent list, session list|show|stop, runtime list|refresh

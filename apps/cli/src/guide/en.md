@@ -17,7 +17,7 @@ An issue's status is one of `backlog`, `todo`, `in_progress`, `in_review`, `done
 ```bash
 vibevalley issue create 'fix the login page' --project web --agent docs --criterion 'an expired session goes back to login' --key login-1
 vibevalley issue status 13 todo         # send it out: to its assignee
-vibevalley issue watch 13 --timeout 600 # follow it until in_review, done or canceled; each status on stderr
+vibevalley issue show 13 --watch --timeout 600   # follow it until in_review, done or canceled, then show it; each status on stderr
 ```
 
 `--key`: sending again with the same key does not make a second issue, so a retry is safe.
@@ -27,7 +27,7 @@ vibevalley issue watch 13 --timeout 600 # follow it until in_review, done or can
 ```bash
 vibevalley issue show 13                # under "Questions", what it asks, with the answers it thought of
 vibevalley issue comment 13 'use 8797'  # a comment: the answer when it asks; read in its next round while it works
-vibevalley issue watch 13
+vibevalley issue show 13 --watch
 ```
 
 ## Review

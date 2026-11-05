@@ -74,7 +74,7 @@ test("with the scripted helper, an issue goes out, comes back and is completed t
       vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
       vv issue create 写打卡并提交 --project clock --agent docs > /dev/null
       vv issue status 1 todo > /dev/null
-      vv issue watch 1 --timeout 60 > /dev/null
+      vv issue show 1 --watch --timeout 60 > /dev/null
       vv issue diff 1 --format json
       vv issue status 1 done --dry-run --format json
       vv issue status 1 done --format json

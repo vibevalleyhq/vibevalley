@@ -49,6 +49,7 @@ export const catalogs = {
         statusComment: "一起说的话：再来一轮时说要改什么",
         title: "新的标题",
         wantsOwner: "只看在等主人的，等得最久的在前",
+        issueWatch: "跟着它，等它到 in_review、done 或 canceled 再显示；经过的状态写在 stderr",
       },
       command: {
         root: "VibeValley 的命令行，一条命令一个操作：答复是短文字，--format json 给接口的形状；不知道怎么用看 guide，在终端里对话用 chat",
@@ -86,7 +87,7 @@ export const catalogs = {
         issue: {
           edit: "改工单的标题、描述、项目、档案或优先级",
           list: "列出工单：一张一行，号在前",
-          show: "看一张工单：在哪一步、问题、验收标准、现在能做什么（--diff 加上改动，--log 加上时间线和花费）",
+          show: "看一张工单：状态、现在在哪一步、问题、验收标准、现在能用的命令（--watch 先跟着它）",
           comment: "给工单写一条评论：帮工在问时就是回答，在干活时下一轮会看到",
           create: "写一张新工单",
           delete: "删掉一张工单",
@@ -94,7 +95,6 @@ export const catalogs = {
           review: "验收交回来的活：通过或不通过；完成另用 issue status 挪到 done",
           status: "挪工单的状态：todo 是派活或再来一轮，done 是完成，canceled 是关掉；能不能挪由服务端说",
           timeline: "工单的时间线和花费",
-          watch: "跟着一张工单，等它到了 in_review、done 或 canceled，经过的状态写在 stderr",
         },
         memory: { create: "给一份档案记一条记性", delete: "删掉档案的一条记性", list: "列出一份档案的记性", search: "搜记性；不指定档案就搜全部" },
         project: { list: "列出项目", create: "新建项目（--repo 从 GitHub 克隆）" },
@@ -306,7 +306,7 @@ export const catalogs = {
         cron: { about: "定时任务" },
         game: { about: "里程碑和称号" },
         github: { about: "GitHub 的检测：gh 装没装、登没登录" },
-        issue: { about: "工单：写、改、挪状态、评论、验收、跟着" },
+        issue: { about: "工单：写、改、挪状态、评论、验收" },
         lan: { about: "连接到本机：开关、配对、设备" },
         memory: { about: "档案的记性" },
         orchestrator: { about: "管家：上线、停下、旧账、评测" },
@@ -413,7 +413,7 @@ export const catalogs = {
         issueStatus: { about: "派 12 号出去（或再来一轮）" },
         issueTimeline: { about: "12 号的时间线和花费" },
         issueWantsOwner: { about: "在等主人的工单，等得最久的在前" },
-        issueWatch: { about: "跟着 12 号，最多等十分钟" },
+        issueWatch: { about: "跟着 12 号，等它交回来或完了再看，最多等十分钟" },
         memoryCreate: { run: "vibevalley memory create docs 端口用 8797", about: "让 docs 记住端口用 8797" },
         memoryDelete: { about: "先试删 docs 的 m1" },
         memoryList: { about: "docs 记着的" },
@@ -3954,6 +3954,7 @@ export const catalogs = {
         statusComment: "Words with the move: what to change, when it goes for another round",
         title: "The new title",
         wantsOwner: "Only those waiting on the owner, the longest waiting first",
+        issueWatch: "Follow it until in_review, done or canceled, then show it; each status on stderr",
       },
       command: {
         root: "VibeValley's command line, one operation a command: answers are short text, --format json gives the protocol's shape; guide says how to use it, chat talks in the terminal",
@@ -4001,7 +4002,7 @@ export const catalogs = {
         issue: {
           edit: "Change an issue's title, description, project, profile or priority",
           list: "List issues: one a line, number first",
-          show: "Show an issue: where it stands, its questions and criteria, what can be done now (--diff adds its change, --log its timeline and cost)",
+          show: "Show an issue: its status, where it is now, its questions and criteria, the commands it takes now (--watch follows it first)",
           comment: "Comment on an issue: the answer when its helper asks, read by it in its next round otherwise",
           create: "Write a new issue",
           delete: "Delete an issue",
@@ -4009,7 +4010,6 @@ export const catalogs = {
           review: "Review what was handed back: pass or fail; completing it is issue status … done",
           status: "Move an issue's status: todo sends it out or for another round, done completes it, canceled closes it; the server says which it takes",
           timeline: "An issue's timeline and cost",
-          watch: "Follow an issue until it is in_review, done or canceled, each status on stderr",
         },
         memory: {
           create: "Keep a memory for a profile",
@@ -4256,7 +4256,7 @@ export const catalogs = {
         cron: { about: "Scheduled tasks" },
         game: { about: "Achievements and titles" },
         github: { about: "GitHub: whether gh is installed and logged in" },
-        issue: { about: "Issues: write, edit, move, comment, review, follow" },
+        issue: { about: "Issues: write, edit, move, comment, review" },
         lan: { about: "Connect to this machine: on or off, pairing, devices" },
         memory: { about: "A profile's memories" },
         orchestrator: { about: "The manager: online, stop, archive, evals" },
@@ -4383,7 +4383,7 @@ export const catalogs = {
         issueStatus: { about: "Send #12 out (or for another round)" },
         issueTimeline: { about: "#12's timeline and cost" },
         issueWantsOwner: { about: "The issues waiting on the owner, the longest waiting first" },
-        issueWatch: { about: "Follow #12, ten minutes at most" },
+        issueWatch: { about: "Follow #12 until it is handed back or over, then show it; ten minutes at most" },
         memoryCreate: { run: "vibevalley memory create docs 'the port is 8797'", about: "Have docs remember the port is 8797" },
         memoryDelete: { about: "Try deleting docs' m1 first" },
         memoryList: { about: "What docs remembers" },
@@ -8162,7 +8162,6 @@ export interface Messages {
   "cli.command.issue.show": undefined;
   "cli.command.issue.status": undefined;
   "cli.command.issue.timeline": undefined;
-  "cli.command.issue.watch": undefined;
   "cli.command.memory.create": undefined;
   "cli.command.memory.delete": undefined;
   "cli.command.memory.list": undefined;
@@ -8303,6 +8302,7 @@ export interface Messages {
   "cli.flag.format": undefined;
   "cli.flag.issue": undefined;
   "cli.flag.issueStatus": undefined;
+  "cli.flag.issueWatch": undefined;
   "cli.flag.json": undefined;
   "cli.flag.key": undefined;
   "cli.flag.limit": undefined;

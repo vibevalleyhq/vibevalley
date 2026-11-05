@@ -94,16 +94,6 @@ const listCommand = Command.make(
   ]),
 );
 
-const showCommand = Command.make("show", { issue: issueArg }, (o) =>
-  Effect.flatMap(
-    ask((api) => api.issue.get({ id: ref(o.issue) })),
-    (i) => show(i, issueText),
-  ),
-).pipe(
-  Command.withDescription(t("cli.command.issue.show")),
-  Command.withExamples([{ command: "vibevalley issue show 12", description: t("cli.example.issueShow.about") }]),
-);
-
 /** --description: as given, or `-` for what comes on stdin. */
 const descriptionOf = (said: string | undefined) => (said === "-" ? stdinText.pipe(Effect.orElseSucceed(() => "")) : Effect.succeed(said));
 
@@ -279,54 +269,64 @@ const deleteCommand = Command.make("delete", { issue: issueArg }, (o) =>
   Command.withExamples([{ command: "vibevalley issue delete 12 --dry-run", description: t("cli.example.issueDelete.about") }]),
 );
 
-/** Only what `issue watch` reads of a frame; the rest is left as it came. */
+/** Only what `issue show --watch` reads of a frame; the rest is left as it came. */
 const IssuesOfFrame = Schema.fromJsonString(
   Schema.Struct({ state: Schema.Struct({ issues: Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus })) }) }),
 );
-/** Where it waits on the owner or is over: what watching it waits for. */
+/** Where it waits on the owner or is over: what --watch waits for. */
 const settled = new Set<T.IssueStatus>(["in_review", "done", "canceled"]);
 
-/** `issue watch 12`: follows the issue in the core state until it waits on the owner or is over, each status on stderr,
- * then prints it. One that already does returns at once. */
-const watchCommand = Command.make(
-  "watch",
-  { issue: issueArg, timeout: Flag.Int("timeout").pipe(Flag.optional, Flag.withDescription(t("cli.flag.timeout"))) },
+/** Follows the issue in the core state until it waits on the owner or is over, each status on stderr; one that already
+ * does is not waited for. */
+const followed = (issue: T.Issue, timeout: number | undefined) =>
+  Effect.gen(function* () {
+    const base = yield* ServerFlag;
+    const follow = frames(base, statePath).pipe(
+      Stream.mapEffect((data) =>
+        Schema.decodeEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Server", text: e.message }))),
+      ),
+      Stream.mapEffect((frame) => {
+        const now = frame.state.issues.find((i) => i.id === issue.id);
+        return now
+          ? Effect.succeed(now.status)
+          : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
+      }),
+      Stream.changes,
+      Stream.tap((status) => err(JSON.stringify({ issue: issue.number, status }))),
+      Stream.takeUntil((status) => settled.has(status)),
+      Stream.runDrain,
+    );
+    yield* timeout === undefined
+      ? follow
+      : follow.pipe(
+          Effect.timeoutOrElse({
+            duration: `${timeout} seconds`,
+            orElse: () => new Failure({ code: exit.other, tag: "Timeout", text: t("cli.issue.timeout", { issue: `#${issue.number}`, seconds: timeout }) }),
+          }),
+        );
+  });
+
+/** `issue show 12`: the issue; --watch follows it first, until it waits on the owner or is over (as `kubectl get -w`). */
+const showCommand = Command.make(
+  "show",
+  {
+    issue: issueArg,
+    watch: Flag.Boolean("watch").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.issueWatch"))),
+    timeout: Flag.Int("timeout").pipe(Flag.optional, Flag.withDescription(t("cli.flag.timeout"))),
+  },
   (o) =>
     Effect.gen(function* () {
       const issue = yield* ask((api) => api.issue.get({ id: ref(o.issue) }));
-      const base = yield* ServerFlag;
-      const follow = frames(base, statePath).pipe(
-        Stream.mapEffect((data) =>
-          Schema.decodeEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Server", text: e.message }))),
-        ),
-        Stream.mapEffect((frame) => {
-          const now = frame.state.issues.find((i) => i.id === issue.id);
-          return now
-            ? Effect.succeed(now.status)
-            : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
-        }),
-        Stream.changes,
-        Stream.tap((status) => err(JSON.stringify({ issue: issue.number, status }))),
-        Stream.takeUntil((status) => settled.has(status)),
-        Stream.runDrain,
-      );
-      const timeout = given(o.timeout);
-      yield* timeout === undefined
-        ? follow
-        : follow.pipe(
-            Effect.timeoutOrElse({
-              duration: `${timeout} seconds`,
-              orElse: () => new Failure({ code: exit.other, tag: "Timeout", text: t("cli.issue.timeout", { issue: `#${issue.number}`, seconds: timeout }) }),
-            }),
-          );
-      yield* Effect.flatMap(
-        ask((api) => api.issue.get({ id: issue.id })),
-        (now) => show(now, issueLine),
-      );
+      if (!o.watch) return yield* show(issue, issueText);
+      yield* followed(issue, given(o.timeout));
+      yield* show(yield* ask((api) => api.issue.get({ id: issue.id })), issueText);
     }),
 ).pipe(
-  Command.withDescription(t("cli.command.issue.watch")),
-  Command.withExamples([{ command: "vibevalley issue watch 12 --timeout 600", description: t("cli.example.issueWatch.about") }]),
+  Command.withDescription(t("cli.command.issue.show")),
+  Command.withExamples([
+    { command: "vibevalley issue show 12", description: t("cli.example.issueShow.about") },
+    { command: "vibevalley issue show 12 --watch --timeout 600", description: t("cli.example.issueWatch.about") },
+  ]),
 );
 
 export const issueCommand = Command.make("issue").pipe(
@@ -341,7 +341,6 @@ export const issueCommand = Command.make("issue").pipe(
     diffCommand,
     timelineCommand,
     deleteCommand,
-    watchCommand,
   ]),
   Command.withDescription(t("cli.group.issue.about")),
 );

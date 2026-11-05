@@ -43,7 +43,8 @@
     "reviewComment": "验收的话",
     "statusComment": "一起说的话：再来一轮时说要改什么",
     "title": "新的标题",
-    "wantsOwner": "只看在等主人的，等得最久的在前"
+    "wantsOwner": "只看在等主人的，等得最久的在前",
+    "issueWatch": "跟着它，等它到 in_review、done 或 canceled 再显示；经过的状态写在 stderr"
   },
   "command": {
     "root": "VibeValley 的命令行，一条命令一个操作：答复是短文字，--format json 给接口的形状；不知道怎么用看 guide，在终端里对话用 chat",
@@ -97,15 +98,14 @@
     "issue": {
       "edit": "改工单的标题、描述、项目、档案或优先级",
       "list": "列出工单：一张一行，号在前",
-      "show": "看一张工单：在哪一步、问题、验收标准、现在能做什么（--diff 加上改动，--log 加上时间线和花费）",
+      "show": "看一张工单：状态、现在在哪一步、问题、验收标准、现在能用的命令（--watch 先跟着它）",
       "comment": "给工单写一条评论：帮工在问时就是回答，在干活时下一轮会看到",
       "create": "写一张新工单",
       "delete": "删掉一张工单",
       "diff": "看工单的改动：提交和文件",
       "review": "验收交回来的活：通过或不通过；完成另用 issue status 挪到 done",
       "status": "挪工单的状态：todo 是派活或再来一轮，done 是完成，canceled 是关掉；能不能挪由服务端说",
-      "timeline": "工单的时间线和花费",
-      "watch": "跟着一张工单，等它到了 in_review、done 或 canceled，经过的状态写在 stderr"
+      "timeline": "工单的时间线和花费"
     },
     "memory": {
       "create": "给一份档案记一条记性",
@@ -471,7 +471,7 @@
       "about": "GitHub 的检测：gh 装没装、登没登录"
     },
     "issue": {
-      "about": "工单：写、改、挪状态、评论、验收、跟着"
+      "about": "工单：写、改、挪状态、评论、验收"
     },
     "lan": {
       "about": "连接到本机：开关、配对、设备"
@@ -716,7 +716,7 @@
       "about": "在等主人的工单，等得最久的在前"
     },
     "issueWatch": {
-      "about": "跟着 12 号，最多等十分钟"
+      "about": "跟着 12 号，等它交回来或完了再看，最多等十分钟"
     },
     "memoryCreate": {
       "run": "vibevalley memory create docs 端口用 8797",

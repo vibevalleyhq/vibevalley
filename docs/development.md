@@ -69,9 +69,9 @@ vp run release final     # 在 release/x.y 上打正式版（前面要有同一�
 
 先起服务端（见上）。另开终端，命令行在根目录是 `vp run --filter @vibevalley/cli start`；下面写成 `vibevalley`。装了桌面版的，「关于」里「安装命令行」以后终端里就有 `vibevalley`（beta 是 `vibevalley-beta`，alpha 是 `vibevalley-alpha`），连的是那个渠道的农场。`vibevalley doctor` 一次说清楚找到的是哪个农场、连不连得上、桌面版开没开、装了哪些农机、缺不缺模型的 key、连接到本机有没有问题；`vibevalley app …` 是桌面版自己的事（状态、打开到某一页、更新、退出、重启）。它连这台机器上用着家目录的那个服务端（家目录的 `server.json` 写着地址，桌面版的也找得到），没有就是 `http://127.0.0.1:8787`；别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
 
-命令行是自己的包 `apps/cli`（入口 `src/main.ts`），搭在 `effect/cli` 上，不载入服务端，给这台电脑上的 agent 用，主人也一样用。它照农场的领域模型，像 `gh issue` 那样正规：**一条命令就是服务端的一个操作**，路径是 `<资源> [<子资源>] <动词>`，资源照接口的模块和名词（`issue`、`pkm page`、`channel message`），动词是标准的 `list`、`show`、`create`、`edit`、`delete`（对接口的 `list`、`get`、`create`、`update`、`delete`）和接口自己的（`status`、`comment`、`review`、`send`、`search`、`capture`、`export`、`refresh`、`stop`）。命令行不推断、不拼操作：工单能不能挪、挪到哪，频道、档案按名字认成哪一个，都是服务端的事，拒绝时带 `next`。例外只有名字就说明了的几个：`issue watch`（跟着状态流）、`pkm page edit`（读原文、编辑器、写回）、`doctor`、`chat`（服务端的对话程序）。参数照接口的字段写（`--description`、`--agent`、`--wants-owner`），经生成的 `VibeValleyApi` 调服务端，没有类型断言；工单是号（`12`、`#12`）。不带命令只打帮助。`vibevalley guide` 打出给 agent 的用法（`apps/cli/src/guide/<语言>.md`），每条命令的 `--help` 有说明和例子（`apps/cli/src/main.test.ts` 查）。
+命令行是自己的包 `apps/cli`（入口 `src/main.ts`），搭在 `effect/cli` 上，不载入服务端，给这台电脑上的 agent 用，主人也一样用。它照农场的领域模型，像 `gh issue` 那样正规：**一条命令就是服务端的一个操作**，路径是 `<资源> [<子资源>] <动词>`，资源照接口的模块和名词（`issue`、`pkm page`、`channel message`），动词是标准的 `list`、`show`、`create`、`edit`、`delete`（对接口的 `list`、`get`、`create`、`update`、`delete`）和接口自己的（`status`、`comment`、`review`、`send`、`search`、`capture`、`export`、`refresh`、`stop`）。命令行不推断、不拼操作：工单能不能挪、挪到哪，频道、档案按名字认成哪一个，都是服务端的事，拒绝时带 `next`。例外只有名字就说明了的几个：`issue show --watch`（先跟着状态流）、`pkm page edit`（读原文、编辑器、写回）、`doctor`、`chat`（服务端的对话程序）。参数照接口的字段写（`--description`、`--agent`、`--wants-owner`），经生成的 `VibeValleyApi` 调服务端，没有类型断言；工单是号（`12`、`#12`）。不带命令只打帮助。`vibevalley guide` 打出给 agent 的用法（`apps/cli/src/guide/<语言>.md`），每条命令的 `--help` 有说明和例子（`apps/cli/src/main.test.ts` 查）。
 
-- **工单**：`issue list|show|create|edit|status|comment|review|diff|timeline|delete|watch`。状态只有一套（`backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled`）：`issue status <号> todo` 是派活或再来一轮，`done` 是完成，`canceled` 是关掉；`issue comment` 在帮工问时就是回答；`issue review --pass|--fail` 是验收的意见，完成另挪状态。停下帮工这一轮是帮工的操作：`session stop <帮工>`。
+- **工单**：`issue list|show|create|edit|status|comment|review|diff|timeline|delete`；`issue show --watch` 先跟着它，等它到 `in_review`、`done` 或 `canceled` 再显示，像 `kubectl get -w`。状态只有一套（`backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled`）：`issue status <号> todo` 是派活或再来一轮，`done` 是完成，`canceled` 是关掉；`issue comment` 在帮工问时就是回答；`issue review --pass|--fail` 是验收的意见，完成另挪状态。停下帮工这一轮是帮工的操作：`session stop <帮工>`。
 - **接口的全集**经 `api`：`api list [--module m]` 按模块列出每个接口（`--format json` 带入参的 JSON Schema），`api call <操作> [--json 字|-|@文件]` 直接调一个，发出去以前照它的 Schema 查一遍，对不上就不发、说是哪个字段；`api state [--watch]`、`api events` 跟着服务端的流，一行一帧。哪个接口由哪条命令用到、哪些只经 `api`，写在 `apps/cli/src/reach.ts`（`Record<操作, …>`，加接口不写这一行编不过）。
 - **输出**：默认是短的文字，一件东西一行，开头是接着能用的名字（`#12  todo  修登录页`）；`issue show` 是几段短的，最后是这张工单现在能用的命令；列表默认 20 条，还有的话最后一行说怎么看下一页。`--format json` 是接口的形状，全命令行同一个参数。stdout 只放结果，失败时 stdout 是空的。
 - **笔记的命令**（`apps/cli/src/pkm.ts`）：`pkm capture 一句话`（记进今天的日记，`--page` 记到那一页末尾，不给字就读标准输入、按缩进拆成块）、`pkm search`、`pkm radar`、`pkm journal show`（`--day` 看别的一天）、`pkm page list|show|export`（大纲、给人读的 Markdown）、`pkm page edit <页>`（在 `$VISUAL`、`$EDITOR` 里改这一页文件的原文，关掉存回去；这期间页面被改过就不写，改过的留在临时文件里）。
@@ -86,7 +86,7 @@ vp run release final     # 在 release/x.y 上打正式版（前面要有同一�
   | 3 | 服务端拒绝（`Refused`，和语音、连接器、连接到本机的拒绝） |
   | 4 | 没有这个东西（`Missing`） |
   | 5 | 连不上服务端 |
-  | 130 | 按了 Ctrl+C：`api state --watch`、`issue watch` 放下请求再走 |
+  | 130 | 按了 Ctrl+C：`api state --watch`、`issue show --watch` 放下请求再走 |
 
 1. 建工单，派出去。把 `…` 换成标题和项目；答复第一个词是工单的号，后面的 `<号>` 用它。
 
@@ -98,14 +98,14 @@ vp run release final     # 在 release/x.y 上打正式版（前面要有同一�
 2. 跟着它，等它交回来或停下来问，经过的状态写在 stderr。
 
    ```bash
-   vibevalley issue watch <号>
+   vibevalley issue show <号> --watch
    ```
 
 3. 帮工在问，`issue show <号>` 的「问题」下面是它问的；评论就是回答，再跟着它。
 
    ```bash
    vibevalley issue comment <号> …
-   vibevalley issue watch <号>
+   vibevalley issue show <号> --watch
    ```
 
 4. 看改动、给验收意见。不满意就再来一轮，说清要改什么；满意了先试跑完成，看它会怎么交付（合进主分支还是开 PR、合之前跑不跑检查），再真做。
