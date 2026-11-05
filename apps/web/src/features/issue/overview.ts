@@ -1,8 +1,8 @@
 import { t } from "@vibevalley/i18n";
-import type { Issue, IssueStage, Session, SessionEvent, IssueStageKind, DoingView, SessionView } from "@vibevalley/protocol";
+import type { DoingView, Issue, IssueStage, IssueStageKind, Session, SessionEvent, SessionView } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 
-import { tookText, spanText } from "#/base/format.ts";
+import { spanText, tookText } from "#/base/format.ts";
 
 import type { Tone } from "./cards";
 import { endedAt, issueTitle } from "./issue";
@@ -84,9 +84,21 @@ function ownerQuestion(stage: IssueStage, issue: Issue, head: Session): OwnerQue
   }
 }
 
+const emptySession = (issue: Issue): Session => ({
+  id: issue.id,
+  name: "",
+  agent: "",
+  runtime: "",
+  phase: { _tag: "idle" },
+  hiredAt: issue.createdAt,
+  brief: issue.title,
+  runs: 0,
+});
+
 /** `sessions` oldest first; `session` the one on the farm now, if any. */
 export function issueState(issue: Issue, sessions: Session[], session: SessionView | undefined, issues: Issue[]) {
-  const head = session ?? sessions[sessions.length - 1]!;
+  const head = session ?? sessions.at(-1) ?? emptySession(issue);
+  const first = sessions[0] ?? head;
   const parent = issues.find((item) => item.id === issue.parent);
   const stage = issue.stage;
   const current = session ? doingOf(session) : nothing;
@@ -138,14 +150,15 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
       const s = session ?? head;
       const runs = Math.round(s.runs);
       const waited = stage.since !== undefined ? now - stage.since : undefined;
-      const used = (endedAt(head) ?? now) - sessions[0]!.hiredAt;
+      const used = (endedAt(head) ?? now) - first.hiredAt;
+      const spentCny = cny ?? s.spent?.cny;
       return [
         t(`shared.stage.${stage.state}`),
         ...(waited === undefined ? [] : [waited < 60_000 ? t("web.issue.issue.justNow") : t("web.issue.issue.since", { span: spanText(waited) })]),
         head.name,
         ...(runs > 0 ? [t("web.issue.issue.ran", { n: runs })] : []),
         ...(used >= 60_000 ? [t("web.issue.issue.used", { span: spanText(used) })] : []),
-        ...((cny ?? s.spent?.cny) !== undefined ? [`¥${(cny ?? s.spent!.cny!).toFixed(2)}`] : []),
+        ...(spentCny !== undefined ? [`¥${spentCny.toFixed(2)}`] : []),
       ].join(" · ");
     },
     usedLine(steps: SessionEvent[], now: number) {

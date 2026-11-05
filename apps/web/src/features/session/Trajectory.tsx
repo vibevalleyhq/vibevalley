@@ -167,12 +167,13 @@ export function Trajectory(props: {
       for (const step of view.asked ? [view.asked, ...view.steps] : view.steps) {
         const tag = tagOf(step, props.asked, step.seq === firstAsked);
         if (q && !haystack(step, tag).includes(q)) continue;
+        const firstStep = view.asked ?? view.steps[0] ?? step;
         out.push(
           omitUndefined({
             step,
             tag,
             gutter: first ? (view.run !== undefined ? t("web.session.trajectory.run", { n }) : t("web.session.trajectory.earlier")) : undefined,
-            when: first ? ago((view.asked ?? view.steps[0]!).time, props.now) : undefined,
+            when: first ? ago(firstStep.time, props.now) : undefined,
             markable: !!props.onMarkWrong && step.type === "user/message" && step.under === undefined,
           }),
         );
@@ -391,11 +392,17 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
       lefts.push(x);
       x += w + between;
     }
-    const at = (r: number, t: number) => lefts[r]! + (took[r]! > 0 ? ((t - runs[r]![0]) / took[r]!) * widths[r]! : 0);
+    const at = (r: number, t: number) => {
+      const left = lefts[r] ?? 0;
+      const runTook = took[r] ?? 0;
+      const runStart = runs[r]?.[0] ?? 0;
+      const runWidth = widths[r] ?? 0;
+      return left + (runTook > 0 ? ((t - runStart) / runTook) * runWidth : 0);
+    };
     let r = 0;
     return fall.spans.map((span) => {
-      while (r + 1 < runs.length && span.start >= runs[r + 1]![0]) r++;
-      while (r > 0 && span.start < runs[r]![0]) r--;
+      while (r + 1 < runs.length && span.start >= (runs[r + 1]?.[0] ?? 0)) r++;
+      while (r > 0 && span.start < (runs[r]?.[0] ?? 0)) r--;
       const left = at(r, span.start);
       return {
         seq: span.seq,

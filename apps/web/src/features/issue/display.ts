@@ -143,7 +143,7 @@ export function rowKeys(c: BoardCard): RowKeys {
 function closedAt(c: BoardCard) {
   switch (c.kind) {
     case "issue":
-      return c.issue.closedAt ?? c.sessions[c.sessions.length - 1]!.hiredAt;
+      return c.issue.closedAt ?? c.sessions.at(-1)?.hiredAt ?? c.issue.createdAt;
     default:
       return c.issue.closedAt ?? c.issue.createdAt;
   }

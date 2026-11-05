@@ -30,8 +30,8 @@ function makeGenome(seed: number): Gene[] {
   const rnd = random(seed);
   const genes: Gene[] = [{ parent: -1, depth: 0, angle: 0, length: 0.26, birth: 0 }];
   const grow = (at: number) => {
-    const g = genes[at]!;
-    if (g.depth >= maxDepth) return;
+    const g = genes[at];
+    if (!g || g.depth >= maxDepth) return;
     // The trunk forks in three, the boughs in two, now and then three.
     const n = g.depth === 0 ? 3 : 2 + (g.depth < 3 && rnd() < 0.35 ? 1 : 0);
     const spread = 0.62 - g.depth * 0.06;
@@ -99,11 +99,12 @@ export function growthOf(rounds: number): number {
  * bends the tips, the wind.
  */
 export function growTree(items: readonly MemoryItem[], growth: number, height: number, sway = 0): GrownTree {
+  const rootEnd = { x: 0, y: 0, angle: 0, shown: true, tip: true };
   const ends: { x: number; y: number; angle: number; shown: boolean; tip: boolean }[] = [];
   const segments: Segment[] = [];
   let top = 0;
   genome.forEach((g) => {
-    const from = g.parent < 0 ? { x: 0, y: 0, angle: 0, shown: true } : ends[g.parent]!;
+    const from = g.parent < 0 ? rootEnd : (ends[g.parent] ?? rootEnd);
     const grown = Math.max(0, Math.min(1, (growth - g.birth) / unfold));
     const shown = from.shown && grown > 0;
     const angle = g.angle + sway * g.depth * 0.25;
@@ -111,23 +112,25 @@ export function growTree(items: readonly MemoryItem[], growth: number, height: n
     const x = from.x + Math.sin(angle) * len;
     const y = from.y + Math.cos(angle) * len;
     ends.push({ x, y, angle, shown, tip: true });
-    if (g.parent >= 0 && shown) ends[g.parent]!.tip = false;
+    const parentEnd = g.parent >= 0 ? ends[g.parent] : undefined;
+    if (parentEnd && shown) parentEnd.tip = false;
     if (!shown) return;
     top = Math.max(top, y);
     segments.push({ x0: from.x, y0: from.y, x1: x, y1: y, width: Math.max(1, (1 + 6 * growth) * Math.pow(0.6, g.depth)), depth: g.depth, tip: true });
     if (g.parent >= 0) {
       const parent = segments.findIndex((s) => s.x1 === from.x && s.y1 === from.y);
-      if (parent >= 0) segments[parent] = { ...segments[parent]!, tip: false };
+      const parentSeg = parent >= 0 ? segments[parent] : undefined;
+      if (parentSeg) segments[parent] = { ...parentSeg, tip: false };
     }
   });
   // Where leaves grow: every bough's end, not the trunk's, so the crown covers the branches; a sprout has only its top.
-  const boughs = ends.filter((e, i) => e.shown && genome[i]!.depth >= 1);
+  const boughs = ends.filter((e, i) => e.shown && (genome[i]?.depth ?? 0) >= 1);
   const anchors = boughs.length > 0 ? boughs : ends.filter((e) => e.shown);
-  const fruitAnchors = ends.filter((e, i) => e.shown && genome[i]!.depth >= 2 && growth > 0.3);
+  const fruitAnchors = ends.filter((e, i) => e.shown && (genome[i]?.depth ?? 0) >= 2 && growth > 0.3);
   const hung = new Map<(typeof anchors)[number], number>();
   const place = (item: MemoryItem, list: typeof anchors, reach: number): Placed | undefined => {
-    if (list.length === 0) return undefined;
-    const a = list[Math.floor(hash01(item.id) * list.length)]!;
+    const a = list[Math.floor(hash01(item.id) * list.length)];
+    if (!a) return undefined;
     if (item.kind === "leaf") hung.set(a, (hung.get(a) ?? 0) + 1);
     const r = reach * Math.sqrt(hash01(`${item.id}r`));
     const t = hash01(`${item.id}t`) * Math.PI * 2;

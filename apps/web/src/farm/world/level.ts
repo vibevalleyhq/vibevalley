@@ -1,3 +1,5 @@
+import { Schema } from "effect";
+
 export interface Point {
   readonly x: number;
   readonly y: number;
@@ -20,27 +22,41 @@ interface Thing {
   readonly field: (name: string) => unknown;
 }
 
-interface LdtkEntity {
-  readonly __identifier: string;
-  readonly px: readonly [number, number];
-  readonly width: number;
-  readonly height: number;
-  readonly __pivot: readonly [number, number];
-  readonly fieldInstances: readonly { readonly __identifier: string; readonly __value: unknown }[];
-}
+const LdtkEntitySchema = Schema.Struct({
+  __identifier: Schema.String,
+  px: Schema.Tuple([Schema.Number, Schema.Number]),
+  width: Schema.Number,
+  height: Schema.Number,
+  __pivot: Schema.Tuple([Schema.Number, Schema.Number]),
+  fieldInstances: Schema.Array(
+    Schema.Struct({
+      __identifier: Schema.String,
+      __value: Schema.Unknown,
+    }),
+  ),
+});
 
-interface LdtkLayer {
-  readonly __identifier: string;
-  readonly __cWid: number;
-  readonly __cHei: number;
-  readonly __gridSize: number;
-  readonly intGridCsv: readonly number[];
-  readonly entityInstances: readonly LdtkEntity[];
-}
+const LdtkLayerSchema = Schema.Struct({
+  __identifier: Schema.String,
+  __cWid: Schema.Number,
+  __cHei: Schema.Number,
+  __gridSize: Schema.Number,
+  intGridCsv: Schema.Array(Schema.Number),
+  entityInstances: Schema.Array(LdtkEntitySchema),
+});
+type LdtkLayer = typeof LdtkLayerSchema.Type;
 
-interface LdtkProject {
-  readonly levels: readonly { readonly pxWid: number; readonly pxHei: number; readonly layerInstances: readonly LdtkLayer[] }[];
-}
+const LdtkProjectSchema = Schema.Struct({
+  levels: Schema.Array(
+    Schema.Struct({
+      pxWid: Schema.Number,
+      pxHei: Schema.Number,
+      layerInstances: Schema.Array(LdtkLayerSchema),
+    }),
+  ),
+});
+
+const decodeLdtkProject = Schema.decodeUnknownSync(Schema.fromJsonString(LdtkProjectSchema));
 
 export class Level {
   readonly width: number;
@@ -55,8 +71,7 @@ export class Level {
   }
 
   static parse(text: string): Level {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written into public/ by design/'s build and shipped with this page
-    const level = (JSON.parse(text) as LdtkProject).levels[0];
+    const level = decodeLdtkProject(text).levels[0];
     if (!level) throw new Error("village.ldtk: no level");
     const layer = (name: string) => {
       const l = level.layerInstances.find((x) => x.__identifier === name);

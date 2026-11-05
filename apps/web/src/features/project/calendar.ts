@@ -31,7 +31,7 @@ export function calendarOf(days: readonly { day: string; commits: number }[], no
   const weekday = (today.getDay() + 6) % 7;
   const start = plusDays(plusDays(today, -weekday), -(weeks - 1) * 7);
   const busyDays = [...commits.values()].filter((n) => n > 0).toSorted((a, b) => a - b);
-  const q = busyDays.length === 0 ? 0 : busyDays[Math.min(busyDays.length - 1, Math.max(0, Math.floor(0.95 * busyDays.length)))]!;
+  const q = busyDays.length === 0 ? 0 : (busyDays[Math.min(busyDays.length - 1, Math.max(0, Math.floor(0.95 * busyDays.length)))] ?? 0);
   const busy = q < 1 ? 1 : q;
   const level = (n: number) => (n <= 0 ? 0 : Math.min(4, Math.max(0, Math.ceil((4 * n) / busy))));
   const grid: CalendarDay[][] = [];
@@ -48,7 +48,9 @@ export function calendarOf(days: readonly { day: string; commits: number }[], no
     }
     grid.push(column);
   }
-  if (months.length > 1 && months[1]!.week - months[0]!.week < 3) months.shift();
+  const m0 = months[0];
+  const m1 = months[1];
+  if (m0 && m1 && m1.week - m0.week < 3) months.shift();
   return { weeks: grid, months };
 }
 
@@ -74,7 +76,7 @@ export function streaksOf(calendar: Calendar): Streaks {
   }
   let current = 0;
   const last = days.at(-1);
-  for (let i = days.length - 1 - (last && last.commits === 0 ? 1 : 0); i >= 0 && days[i]!.commits > 0; i--) current++;
+  for (let i = days.length - 1 - (last && last.commits === 0 ? 1 : 0); i >= 0 && (days[i]?.commits ?? 0) > 0; i--) current++;
   return { total: days.reduce((n, d) => n + d.commits, 0), days: days.filter((d) => d.commits > 0).length, longest, current, ...(busiest ? { busiest } : {}) };
 }
 

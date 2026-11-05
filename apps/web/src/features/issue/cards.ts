@@ -1,11 +1,11 @@
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, IssueHistory, IssueStatus, Priority, Session, SessionView, WorkspaceView } from "@vibevalley/protocol";
-import { assignedAgentOf, executionsOf, stageWantsOwner, omitUndefined, sessionIdsOf, shortTitle } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle, stageWantsOwner } from "@vibevalley/protocol/rules";
 
 import { ago, tookText } from "#/base/format.ts";
 import { matches } from "#/base/search.ts";
 
-import { endedAt, issueSession, isForOrchestrator, issueTag, type IssueTag, issueTitle, tagText, tagOpen } from "./issue";
+import { endedAt, isForOrchestrator, issueSession, issueTag, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
 
@@ -127,8 +127,8 @@ function cardWords(c: BoardCard): (string | undefined)[] {
     case "missing":
       return [c.issue.title, c.issue.description, c.issue.project];
     case "issue": {
-      const head = c.sessions[c.sessions.length - 1]!;
-      return [c.issue.title, c.issue.description, head.name, c.issue.project, c.issue.id, head.lastRun?.summary];
+      const head = c.sessions.at(-1);
+      return [c.issue.title, c.issue.description, head?.name, c.issue.project, c.issue.id, head?.lastRun?.summary];
     }
     case "orchestrator":
       return [c.issue.title, c.issue.description, c.issue.project, c.issue.id, t("web.issue.card.orchestrator")];
@@ -193,7 +193,11 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
     }
     case "issue": {
       const { issue, sessions, tag, session } = c;
-      const head = sessions[sessions.length - 1]!;
+      const head = sessions.at(-1);
+      if (!head) {
+        return { number: numberOf(issue), title: shortTitle(issueTitle(issue, issues)), status: issue.status, priority: issue.priority, flags, detail: "" };
+      }
+      const first = sessions[0] ?? head;
       const phase = session?.phase;
       const now0 = session ?? head;
       // The board says what the page says: the stage, when it waits on the owner.
@@ -215,7 +219,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       const cny = now0.spent?.cny;
       const took = tagOpen(tag)
         ? t("web.issue.card.open", { took: tookText(now - head.hiredAt) })
-        : t("web.issue.card.used", { took: tookText((issue.closedAt ?? endedAt(head) ?? now) - sessions[0]!.hiredAt) });
+        : t("web.issue.card.used", { took: tookText((issue.closedAt ?? endedAt(head) ?? now) - first.hiredAt) });
       lines.push(
         [
           tag === "working" ? t("web.issue.card.run", { n: runs + 1 }) : t("web.issue.card.runs", { n: runs }),

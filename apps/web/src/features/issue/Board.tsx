@@ -227,8 +227,10 @@ function CardView(props: {
         title={look().detail}
         draggable={props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving" ? "true" : "false"}
         onDragStart={(e) => {
-          e.dataTransfer!.effectAllowed = "move";
-          e.dataTransfer!.setData("text/plain", props.card.id);
+          if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", props.card.id);
+          }
           props.drag.setDragging(props.card);
         }}
         onDragEnd={() => props.drag.setDragging(undefined)}

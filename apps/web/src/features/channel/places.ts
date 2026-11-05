@@ -100,11 +100,7 @@ export const newestUnread = (c: Channel) => (unreadIn(c) > 0 ? c.lastNumber : un
 export const unreadUnder = (chat: Chat | undefined, channel: Channel) =>
   (chat?.channels ?? []).filter((c) => c.id === channel.id || c.parent === channel.id).reduce((n, c) => n + unreadIn(c), 0);
 
-const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => {
-  if (!xs) return undefined;
-  for (let i = xs.length - 1; i >= 0; i--) if (test(xs[i]!)) return xs[i];
-  return undefined;
-};
+const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => xs?.findLast(test);
 
 /** One thread per issue, kept across the sessions that work it. */
 export const issueThreadOf = (chat: Chat | undefined, issue: string) => findLast(chat?.channels, (c) => c.subjectKind === "issue" && c.subjectId === issue);

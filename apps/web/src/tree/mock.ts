@@ -62,7 +62,7 @@ export interface MemoryTree {
   readonly links: readonly MemoryLink[];
 }
 
-const agentsZh: MemoryAgent[] = [
+const agentsZh: readonly [MemoryAgent, ...MemoryAgent[]] = [
   { id: "fox", name: "阿郑" },
   { id: "bear", name: "老周" },
   { id: "rabbit", name: "小吴" },
@@ -70,9 +70,9 @@ const agentsZh: MemoryAgent[] = [
   { id: "owl", name: "Grok" },
 ];
 
-const projectsZh = ["vibevalley", "字幕面板", "官网", "billing"];
+const projectsZh = ["vibevalley", "字幕面板", "官网", "billing"] as const;
 
-const notesZh = [
+const notesZh: readonly [string, ...string[]] = [
   "表名用单数：issue、issue_assignment",
   "改完 db/queries 要跑 vp run db:generate",
   "主人不要兼容层，旧数据直接作废",
@@ -95,7 +95,7 @@ const notesZh = [
   "billing 的 webhook 要验签名",
 ];
 
-const casesZh: MemoryCase[] = [
+const casesZh: readonly [MemoryCase, ...MemoryCase[]] = [
   { intent: "字幕面板加拖动对齐", approach: "先写时间轴的纯函数，再接拖动", insight: "吸附阈值按像素算，不按毫秒" },
   { intent: "表名改成单数", approach: "直接改 0001_schema，重生成查询", insight: "schema.test.ts 会查出漏改的索引名" },
   { intent: "官网首页换成像素风", approach: "复用 public/pixel 的图", insight: "图片放大用整数倍，不然像素会糊" },
@@ -116,7 +116,7 @@ const skillsZh = [
   "billing 金额的算法",
 ];
 
-const agentsEn: MemoryAgent[] = [
+const agentsEn: readonly [MemoryAgent, ...MemoryAgent[]] = [
   { id: "fox", name: "Zheng" },
   { id: "bear", name: "Zhou" },
   { id: "rabbit", name: "Wu" },
@@ -124,9 +124,9 @@ const agentsEn: MemoryAgent[] = [
   { id: "owl", name: "Grok" },
 ];
 
-const projectsEn = ["vibevalley", "subtitle-panel", "site", "billing"];
+const projectsEn = ["vibevalley", "subtitle-panel", "site", "billing"] as const;
 
-const notesEn = [
+const notesEn: readonly [string, ...string[]] = [
   "Table names are singular: issue, issue_assignment",
   "After changing db/queries, run vp run db:generate",
   "The owner wants no compatibility layers; old data is dropped",
@@ -149,7 +149,7 @@ const notesEn = [
   "billing webhooks must check their signature",
 ];
 
-const casesEn: MemoryCase[] = [
+const casesEn: readonly [MemoryCase, ...MemoryCase[]] = [
   { intent: "Drag to align in the subtitle panel", approach: "Pure functions for the timeline first, dragging after", insight: "Snap by pixels, not by ms" },
   {
     intent: "Make table names singular",
@@ -209,7 +209,7 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
   const en = currentLocale() === "en";
   const [agents, projects, notes, cases, skills] = en ? [agentsEn, projectsEn, notesEn, casesEn, skillsEn] : [agentsZh, projectsZh, notesZh, casesZh, skillsZh];
   const rnd = random(20261022);
-  const pick = <T>(list: readonly T[]) => list[Math.floor(rnd() * list.length)]!;
+  const pick = <T>(list: readonly [T, ...T[]]): T => list[Math.floor(rnd() * list.length)] ?? list[0];
   const since = now - 46 * day;
   const at = () => since + Math.pow(rnd(), 0.8) * (now - since);
   const items: MemoryItem[] = [];
@@ -261,9 +261,9 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
     omitUndefined({
       id: "fruit-now",
       kind: "fruit" as const,
-      body: cases[0]!.insight,
+      body: cases[0].insight,
       agent: "fox",
-      project: projects[1]!,
+      project: projects[1],
       at: now - 6 * day,
       recalled: 4,
       recalledAt: now - 40_000,
@@ -293,24 +293,24 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
     const before = fruits.filter((f) => f.at < seed.at);
     const n = Math.min(before.length, 3 + Math.floor(rnd() * 3));
     for (let i = 0; i < n; i++) {
-      const f = before[Math.floor(rnd() * before.length)]!;
-      if (!links.some((l) => l.a === f.id && l.b === seed.id)) links.push({ kind: "from", a: f.id, b: seed.id, times: 1 });
+      const f = before[Math.floor(rnd() * before.length)];
+      if (f && !links.some((l) => l.a === f.id && l.b === seed.id)) links.push({ kind: "from", a: f.id, b: seed.id, times: 1 });
     }
   }
   for (const f of fruits) {
     const near = leaves.filter((l) => l.agent === f.agent && Math.abs(l.at - f.at) < 4 * day);
     const n = Math.min(near.length, 1 + Math.floor(rnd() * 3));
     for (let i = 0; i < n; i++) {
-      const l = near[Math.floor(rnd() * near.length)]!;
-      if (!links.some((x) => x.a === l.id && x.b === f.id)) links.push({ kind: "from", a: l.id, b: f.id, times: 1 });
+      const l = near[Math.floor(rnd() * near.length)];
+      if (l && !links.some((x) => x.a === l.id && x.b === f.id)) links.push({ kind: "from", a: l.id, b: f.id, times: 1 });
     }
   }
   // Recalled together: pairs among the memories recalled at all, the most used most often.
   const used = items.filter((m) => m.recalled > 2);
   for (let i = 0; i < 48; i++) {
-    const a = used[Math.floor(rnd() * used.length)]!;
-    const b = used[Math.floor(rnd() * used.length)]!;
-    if (a === b || links.some((l) => l.kind === "together" && ((l.a === a.id && l.b === b.id) || (l.a === b.id && l.b === a.id)))) continue;
+    const a = used[Math.floor(rnd() * used.length)];
+    const b = used[Math.floor(rnd() * used.length)];
+    if (!a || !b || a === b || links.some((l) => l.kind === "together" && ((l.a === a.id && l.b === b.id) || (l.a === b.id && l.b === a.id)))) continue;
     links.push({ kind: "together", a: a.id, b: b.id, times: 2 + Math.floor(rnd() * Math.min(a.recalled, b.recalled)) });
   }
   return omitUndefined({

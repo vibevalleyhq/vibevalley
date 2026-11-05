@@ -17,6 +17,8 @@ interface LangDef {
   readonly names: readonly string[];
 }
 
+const otherLang: LangDef = { label: t("web.project.otherLang"), color: "#a08c70", names: [] };
+
 const langs: Record<string, LangDef> = {
   typescript: { label: "TypeScript", color: "#3178c6", names: ["typescript", "tsx", "ts"] },
   javascript: { label: "JavaScript", color: "#f1e05a", names: ["javascript", "jsx", "js", "mjs", "cjs"] },
@@ -53,7 +55,7 @@ const langs: Record<string, LangDef> = {
   sass: { label: "Sass", color: "#c6538c", names: ["scss", "sass"] },
   powershell: { label: "PowerShell", color: "#012456", names: ["powershell", "ps1"] },
   terraform: { label: "Terraform", color: "#844fba", names: ["hcl", "terraform", "tf"] },
-  other: { label: t("web.project.otherLang"), color: "#a08c70", names: [] },
+  other: otherLang,
 };
 
 const byName = new Map(Object.entries(langs).flatMap(([id, def]) => def.names.map((n) => [n, id] as const)));
@@ -66,7 +68,7 @@ export interface Language {
 
 function languageOf(name: string): Language {
   const id = byName.get(name.trim().toLowerCase()) ?? "other";
-  const def = langs[id]!;
+  const def = langs[id] ?? otherLang;
   return { id, label: id === "other" && name.trim() ? name.trim() : def.label, color: def.color };
 }
 
@@ -96,9 +98,8 @@ export function languageShares(counts: readonly LanguageCount[], top: number | u
   const shares = kept.map((e) => ({ ...e.language, lines: e.lines, files: e.files, share: total > 0 ? e.lines / total : 0 }));
   if (rest.length <= 1) return shares;
   const lines = rest.reduce((n, e) => n + e.lines, 0);
-  const other = langs.other!;
   return [
     ...shares,
-    { id: "other", label: other.label, color: other.color, lines, files: rest.reduce((n, e) => n + e.files, 0), share: total > 0 ? lines / total : 0 },
+    { id: "other", label: otherLang.label, color: otherLang.color, lines, files: rest.reduce((n, e) => n + e.files, 0), share: total > 0 ? lines / total : 0 },
   ];
 }

@@ -54,14 +54,19 @@ export function IssueList(props: {
       <div class="@container min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         <For each={groupRows(props.cards, props.grouping, rowKeys)} keyed={(g) => g.key}>
           {(g) => {
-            const folding = () => g().lane === "closed" && !props.older && ordered().length > closedShown;
-            const ordered = () => (g().lane ? laneOrder(g().lane!, g().rows, props.ordering) : orderRows(g().rows, props.ordering, rowKeys));
+            const groupLane = () => g().lane;
+            const folding = () => groupLane() === "closed" && !props.older && ordered().length > closedShown;
+            const ordered = () => {
+              const l = groupLane();
+              return l ? laneOrder(l, g().rows, props.ordering) : orderRows(g().rows, props.ordering, rowKeys);
+            };
             const rows = () => (folding() ? ordered().slice(0, closedShown) : ordered());
             const hidden = () => (folding() ? ordered().length - closedShown : 0);
             const isFolded = () => folded().has(g().key);
-            const label = () =>
-              props.grouping === "status"
-                ? laneLabel[g().lane!]
+            const label = () => {
+              const l = groupLane();
+              return props.grouping === "status" && l
+                ? laneLabel[l]
                 : props.grouping === "project"
                   ? g().key || t("web.issue.list.noProject")
                   : props.grouping === "agent"
@@ -69,11 +74,13 @@ export function IssueList(props: {
                       ? nameOf()(g().key)
                       : t("web.issue.noHelper")
                     : t("web.issue.list.all");
+            };
             const icon = (): JSX.Element => {
               const key = g().key;
+              const l = groupLane();
               switch (props.grouping) {
                 case "status":
-                  return <StatusMark status={laneStatus[g().lane!]} />;
+                  return l ? <StatusMark status={laneStatus[l]} /> : undefined;
                 case "project":
                   return <Icon name="folder" size={14} />;
                 case "agent":
@@ -109,18 +116,21 @@ export function IssueList(props: {
                 </header>
                 <Show when={!isFolded()}>
                   <For each={rows()} keyed={(c) => c.id}>
-                    {(c) => (
-                      <Row
-                        card={c()}
-                        selected={c().id === props.selected}
-                        showProject={props.grouping !== "project"}
-                        groupStatus={props.grouping === "status" ? laneStatus[g().lane!] : undefined}
-                        onOpen={props.onOpen}
-                        nameOf={nameOf()}
-                      />
-                    )}
+                    {(c) => {
+                      const l = groupLane();
+                      return (
+                        <Row
+                          card={c()}
+                          selected={c().id === props.selected}
+                          showProject={props.grouping !== "project"}
+                          groupStatus={props.grouping === "status" && l ? laneStatus[l] : undefined}
+                          onOpen={props.onOpen}
+                          nameOf={nameOf()}
+                        />
+                      );
+                    }}
                   </For>
-                  <Show when={hidden() > 0 || (g().lane === "closed" && props.older && g().rows.length > closedShown)}>
+                  <Show when={hidden() > 0 || (groupLane() === "closed" && props.older && g().rows.length > closedShown)}>
                     <OlderLink hidden={hidden()} onClick={props.onOlder} />
                   </Show>
                 </Show>

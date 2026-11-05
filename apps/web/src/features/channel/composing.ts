@@ -172,7 +172,8 @@ export function createComposer(core: () => WorkspaceView | undefined, input: () 
       }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        choose(list[Math.min(active(), list.length - 1)]!);
+        const picked = list[Math.min(active(), list.length - 1)];
+        if (picked) choose(picked);
         return;
       }
       if (e.key === "Escape") {

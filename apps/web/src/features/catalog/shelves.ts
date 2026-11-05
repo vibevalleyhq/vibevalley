@@ -26,10 +26,10 @@ export function picturesOf(manifest: Record<string, Record<string, unknown>>): P
   return Object.entries(manifest).map(([name, m]) =>
     omitUndefined({
       name,
-      w: art(m.w)!,
-      h: art(m.h)!,
-      ax: art(m.ax)!,
-      ay: art(m.ay)!,
+      w: art(m.w) ?? Number.NaN,
+      h: art(m.h) ?? Number.NaN,
+      ax: art(m.ax) ?? Number.NaN,
+      ay: art(m.ay) ?? Number.NaN,
       hx: art(m.hx),
       hy: art(m.hy),
       sheet: typeof m.sheet === "string" ? m.sheet : undefined,
@@ -82,8 +82,8 @@ export function naturalCompare(a: string, b: string): number {
   const pa = parts(a);
   const pb = parts(b);
   for (let i = 0; i < pa.length && i < pb.length; i++) {
-    const x = pa[i]!;
-    const y = pb[i]!;
+    const x = pa[i] ?? "";
+    const y = pb[i] ?? "";
     const c = /^\d+$/u.test(x) && /^\d+$/u.test(y) ? Number(x) - Number(y) : compareText(x, y);
     if (c !== 0) return c;
   }
@@ -113,8 +113,10 @@ export function framesOf(name: string, has: (n: string) => boolean): string[] | 
   const base = /^(.*)-(\d+)$/u.exec(name)?.[1] ?? name;
   const numbered: string[] = [];
   for (let n = 1; has(`${base}-${n}`); n++) numbered.push(`${base}-${n}`);
-  if (numbered.length < 2) return undefined;
-  const frames = has(base) && numbered.length === 2 ? [numbered[0]!, base, numbered[1]!, base] : numbered;
+  const first = numbered[0];
+  const second = numbered[1];
+  if (!first || !second) return undefined;
+  const frames = has(base) && numbered.length === 2 ? [first, base, second, base] : numbered;
   return frames.includes(name) ? frames : undefined;
 }
 

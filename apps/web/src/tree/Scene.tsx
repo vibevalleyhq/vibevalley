@@ -64,7 +64,8 @@ function line(c: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y
 function pattern(c: CanvasRenderingContext2D, rows: readonly string[], x: number, y: number, ink: Record<string, string>) {
   rows.forEach((row, dy) => {
     for (let dx = 0; dx < row.length; dx++) {
-      const colour = ink[row[dx]!];
+      const ch = row[dx];
+      const colour = ch ? ink[ch] : undefined;
       if (!colour) continue;
       c.fillStyle = colour;
       c.fillRect(Math.round(x) + dx, Math.round(y) + dy, 1, 1);
@@ -78,6 +79,17 @@ const knoll = { x: 0.36, y: 0.71 };
 
 const fruitRows = [" ooo ", "offfo", "ohffo", "offfo", " ooo "];
 const sackRows = ["  g  ", " sgs ", "sssss", "sSsss", "sssSs", " sss "];
+
+const fallbackItem: MemoryItem = {
+  id: "center",
+  kind: "leaf",
+  body: "",
+  agent: "",
+  project: null,
+  at: 0,
+  recalled: 0,
+  fading: false,
+};
 
 export function Scene(props: {
   tree: MemoryTree;
@@ -93,11 +105,12 @@ export function Scene(props: {
   const still = reducedMotion();
 
   onSettled(() => {
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext("2d");
     const low = document.createElement("canvas");
-    const lc = low.getContext("2d")!;
+    const lc = low.getContext("2d");
     const layer = document.createElement("canvas");
-    const tc = layer.getContext("2d")!;
+    const tc = layer.getContext("2d");
+    if (!ctx || !lc || !tc) return;
     const now = Date.now();
     const stars = starsOf(props.tree, now);
     const starOf = new Map<string, Star>(stars.map((s) => [s.item.id, s]));
@@ -124,14 +137,15 @@ export function Scene(props: {
     // The hill above the valley, by day and by night (design/pixel gen.sh tree-hill). Until they load, the sky's colour.
     const backdrop = { day: new Image(), night: new Image(), up: new Image() };
     const sky: Record<"day" | "night", Rgb> = { day: [232, 176, 150], night: [10, 14, 34] };
-    const topColour = (img: HTMLImageElement): Rgb => {
-      const c = document.createElement("canvas").getContext("2d")!;
+    const topColour = (img: HTMLImageElement, fallback: Rgb): Rgb => {
+      const c = document.createElement("canvas").getContext("2d");
+      if (!c) return fallback;
       c.drawImage(img, 0, 0);
-      const [r, g, b] = c.getImageData(backdropSize.w / 2, 0, 1, 1).data;
-      return [r!, g!, b!];
+      const [r = fallback[0], g = fallback[1], b = fallback[2]] = c.getImageData(backdropSize.w / 2, 0, 1, 1).data;
+      return [r, g, b];
     };
-    backdrop.day.onload = () => (sky.day = topColour(backdrop.day));
-    backdrop.night.onload = () => (sky.night = topColour(backdrop.night));
+    backdrop.day.onload = () => (sky.day = topColour(backdrop.day, sky.day));
+    backdrop.night.onload = () => (sky.night = topColour(backdrop.night, sky.night));
     backdrop.day.src = "/pixel/tree-hill.png";
     backdrop.night.src = "/pixel/tree-hill-night.png";
     backdrop.up.src = "/pixel/tree-sky.png";
@@ -345,13 +359,13 @@ export function Scene(props: {
         }
       }
       const key = `${growth.toFixed(3)}|${props.filter.agent}|${props.filter.project}|${props.until}|${w}x${h}|${f.x},${f.y},${f.height}`;
-      if (key !== layerKey) {
+      if (key !== layerKey || !grown) {
         layerKey = key;
         grown = growTree(written(), growth, f.height);
         tc.clearRect(0, 0, w, h);
         drawTree(tc, grown, f.x, f.y);
       }
-      const tree = grown!;
+      const tree = grown;
       hits = [];
       if (k < 1) {
         lc.globalAlpha = 1 - k;
@@ -440,12 +454,13 @@ export function Scene(props: {
             return [{ s, x: start.x + (to.x - start.x) * kk, y: start.y + (to.y - start.y) * kk, depth: to.depth }];
           })
           .toSorted((a, b) => b.depth - a.depth);
+        const anchorItem = placed[0]?.s.item ?? props.tree.items[0] ?? fallbackItem;
         // The disc's own faint light and its rings (time, the older farther out), so its shape reads first.
         const ring = (r: number, step: number, fill: boolean) => {
           if (fill) lc.beginPath();
           for (let i = 0; i <= 96; i += step) {
             const a = (i / 96) * Math.PI * 2;
-            const p = project({ item: props.tree.items[0]!, x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r, size: 0 }, t);
+            const p = project({ item: anchorItem, x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r, size: 0 }, t);
             if (!fill) lc.fillRect(Math.floor(p.x), Math.floor(p.y), 1, 1);
             else if (i === 0) lc.moveTo(p.x, p.y);
             else lc.lineTo(p.x, p.y);
@@ -458,7 +473,7 @@ export function Scene(props: {
         }
         lc.fillStyle = `rgba(170,200,255,${0.1 * k})`;
         for (const r of [0.25, 0.5, 0.75, 1]) ring(r, 2, false);
-        const sun = project({ item: placed[0]?.s.item ?? props.tree.items[0]!, x: 0, y: 0, z: 0, size: 0 }, t);
+        const sun = project({ item: anchorItem, x: 0, y: 0, z: 0, size: 0 }, t);
         for (let r = 9; r >= 1; r--) {
           lc.fillStyle = `rgba(255,${190 + r * 4},110,${(0.05 + (9 - r) * 0.02) * k})`;
           disc(lc, sun.x, sun.y, r);

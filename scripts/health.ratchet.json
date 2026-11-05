@@ -312,8 +312,8 @@
   "web: farm": {
     "nonNull": 61,
     "doubleCast": 0,
-    "cast": 1,
-    "lintOff": 4,
+    "cast": 0,
+    "lintOff": 3,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 1,
@@ -340,7 +340,7 @@
     "resultBranch": 0
   },
   "web: features/catalog": {
-    "nonNull": 11,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
@@ -350,7 +350,7 @@
     "resultBranch": 0
   },
   "web: features/channel": {
-    "nonNull": 13,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 2,
@@ -380,7 +380,7 @@
     "resultBranch": 0
   },
   "web: features/issue": {
-    "nonNull": 18,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
@@ -430,7 +430,7 @@
     "resultBranch": 0
   },
   "web: features/project": {
-    "nonNull": 10,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
@@ -450,7 +450,7 @@
     "resultBranch": 0
   },
   "web: features/session": {
-    "nonNull": 13,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
@@ -500,7 +500,7 @@
     "resultBranch": 0
   },
   "web: tree": {
-    "nonNull": 25,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,

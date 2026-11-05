@@ -1,4 +1,4 @@
-import { Predicate } from "effect";
+import { Schema } from "effect";
 // A session's log by run, the work log's words and colours, the trajectory's waterfall and totals, how steps arriving live merge in (mergeSteps), and the log kept per observed session (SessionLogs).
 
 import { t } from "@vibevalley/i18n";
@@ -45,8 +45,8 @@ export interface RunView {
 /** The last top-level thing it said, if any. */
 export function answerOf(r: RunView) {
   for (let i = r.steps.length - 1; i >= 0; i--) {
-    const s = r.steps[i]!;
-    if (s.type === "assistant/message" && s.under === undefined) return s;
+    const s = r.steps[i];
+    if (s && s.type === "assistant/message" && s.under === undefined) return s;
   }
   return undefined;
 }
@@ -77,7 +77,7 @@ interface Span {
 /** Each step lasts until the next one starts. the last until `end` (now, while the run goes on. */
 export function spansOf(r: RunView, end: number): Span[] {
   const all = allOf(r);
-  return all.map((s, i) => ({ step: s, ms: Math.max(0, (i + 1 < all.length ? all[i + 1]!.time : end) - s.time) }));
+  return all.map((s, i) => ({ step: s, ms: Math.max(0, (all[i + 1]?.time ?? end) - s.time) }));
 }
 
 export function runMs(r: RunView, end: number) {
@@ -250,7 +250,7 @@ export function waterfallOf(log: readonly SessionEvent[], end: number): Waterfal
     steps.forEach((e, i) => {
       switch (e.type) {
         case "user/message":
-          spans.push({ lane: "asked", start: e.time, end: i + 1 < steps.length ? steps[i + 1]!.time : to, seq: e.seq });
+          spans.push({ lane: "asked", start: e.time, end: steps[i + 1]?.time ?? to, seq: e.seq });
           waiting = e.time;
           break;
         case "assistant/thinking":
@@ -421,7 +421,14 @@ export class SessionLogs {
   }
 
   private publish(log: Log, steps: SessionEvent[]) {
-    if (steps.length === log.steps.length && steps.every((s, i) => s.seq === log.steps[i]!.seq && s.revision === log.steps[i]!.revision)) return;
+    if (
+      steps.length === log.steps.length &&
+      steps.every((s, i) => {
+        const prev = log.steps[i];
+        return prev !== undefined && s.seq === prev.seq && s.revision === prev.revision;
+      })
+    )
+      return;
     log.steps = steps;
     for (const listener of log.listeners) listener(steps);
   }
