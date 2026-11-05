@@ -1,6 +1,6 @@
 # Effect v4 的实践、反模式和 v3 → v4 的陷阱
 
-2026-10-31 的调研（官方文档、Effect-TS 的仓库和 skill、社区的文章和 skill）里，这个仓库用得上的部分。每个 API 名字都对过 effect 4.0.5 的 `node_modules/effect/src`；以后升级 effect，名字以那时的源码为准。入口见 [SKILL.md](.agents/skills/vv-effect/SKILL.md)。
+2026-10-31 的调研（官方文档、Effect-TS 的仓库和 skill、社区的文章和 skill）里，这个仓库用得上的部分。每个 API 名字都对过 effect 4.0.5 的 `node_modules/effect/src`；以后升级 effect，名字以那时的源码为准。入口见 [SKILL.md](.agents/skills/vv-effect/SKILL.md)。成对的代码（不建议和建议）见 [cases.md](.agents/skills/vv-effect/references/cases.md)。
 
 目录：[资料信谁](#资料信谁) · [反模式](#反模式) · [策略](#策略) · [v3--v4](#v3--v4)
 
