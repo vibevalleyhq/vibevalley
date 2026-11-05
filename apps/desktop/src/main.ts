@@ -13,13 +13,11 @@ import { devMode } from "./dev";
 import { serveHost } from "./host";
 import { startIsland } from "./island";
 import { reasonOf } from "./lines";
-import { followSavedLocale } from "./locale";
 import { claimMachine, releaseMachine } from "./machine";
-import { setAppMenu } from "./menu";
-import { appPaths, currentChannel, farmHome } from "./paths";
+import { menuBar, setAppMenu } from "./menu";
+import { appPaths, currentChannel, farmHome, followSavedLocale } from "./paths";
 import { probe } from "./probe";
 import { shellPath, type ServerKeeper, serverKeeper } from "./server";
-import { menuBar } from "./tray";
 import { type Updater, updater } from "./update";
 import { mainWindow } from "./window";
 

@@ -8,8 +8,8 @@ import { actCommand } from "@vibevalley/protocol/api";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
-import { ask, change, frames, given, nameArg, optionalText, ServerFlag, show, words } from "../farm.ts";
-import { err, exit, Failure, stdinText } from "../output.ts";
+import { ask, change, frames, given, nameArg, optionalText, ServerFlag, show, words } from "#/farm.ts";
+import { err, exit, Failure, stdinText } from "#/output.ts";
 
 const issueArg = nameArg("issue", "cli.arg.issue");
 const priorityFlag = Flag.Literals("priority", PriorityValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.priority")));

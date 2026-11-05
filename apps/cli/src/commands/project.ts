@@ -4,7 +4,7 @@ import { Command, Flag } from "effect/cli";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { ask, change, given, nameArg, show } from "../farm.ts";
+import { ask, change, given, nameArg, show } from "#/farm.ts";
 
 const projectLine = (p: T.ProjectSummary) => [p.name, p.path, p.git ? "git" : "", p.pullRequest.available ? "pr" : ""].filter((x) => x !== "").join("  ");
 

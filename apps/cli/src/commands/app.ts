@@ -4,8 +4,8 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { t } from "@vibevalley/i18n";
 
-import { appStatus, askApp, farmHome, launchedFrom, notOpen } from "../farm.ts";
-import { printBody } from "../output.ts";
+import { appStatus, askApp, farmHome, launchedFrom, notOpen } from "#/farm.ts";
+import { printBody } from "#/output.ts";
 
 const printed = (value: unknown) => printBody(JSON.stringify(value ?? { ok: true }));
 

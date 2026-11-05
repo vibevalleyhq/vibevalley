@@ -6,8 +6,8 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { t } from "@vibevalley/i18n";
 
-import { optionalText } from "../farm.ts";
-import { Ended, exit, Failure } from "../output.ts";
+import { optionalText } from "#/farm.ts";
+import { Ended, exit, Failure } from "#/output.ts";
 
 /** The server's chat program, or "" when there is none to run. */
 const serverChat = () => {

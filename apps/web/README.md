@@ -96,7 +96,7 @@ test/               Playwright against a real server per worker (fixtures.ts); s
 - **Design tokens.** The workbench's colours, corners, type sizes, shadows, motion and layers are the tokens in
   `src/style.css` (lint: `vibevalley/no-hex-color`, `vibevalley/design-tokens`); which one to pick, the atoms' looks and
   the checklist before handing a page in are in docs/style/design.md. The pixel skins and faces are drawn and keep theirs.
-- **Stories.** Every part in `src/ui` (and `src/ui/pixel`) has an `X.stories.tsx` beside it (`src/stories.test.ts`;
+- **Stories.** Every part in `src/ui` (and `src/ui/pixel`) has an `X.stories.tsx` beside it (`src/stories/stories.test.ts`;
   the few without say why there): its states with made-up data, in both themes, at a few widths. A title's first part
   is its level (`src/storyLevels.ts`): 设计体系, 组件, 交互 (parts working together, in `src/stories/`), 界面 (a
   feature's view from made-up data, beside it in the feature). A part that answers the pointer has a `States` story

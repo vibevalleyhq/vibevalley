@@ -6,8 +6,7 @@ import { filledNear } from "@vibevalley/engine/framing";
 import { currentLocale } from "@vibevalley/i18n";
 import { farmFraming } from "@vibevalley/protocol/host";
 
-import { navigationOf, pageWebPreferences } from "./boundary";
-import { ground, trafficLights } from "./chrome";
+import { ground, navigationOf, pageWebPreferences, trafficLights } from "./boundary";
 
 /** The smallest window: twice the farm. */
 const minSize = { w: farmFraming.picture.w * 2, h: farmFraming.picture.h * 2 };

@@ -5,8 +5,7 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, Vi
 import { t } from "@vibevalley/i18n";
 
 import type { FarmConnection, Pairing } from "./farm";
-import { parsePairLink } from "./pairing";
-import { colors } from "./style";
+import { colors, parsePairLink } from "./pairing";
 
 export function PairScreen({ connection, choice }: { connection: FarmConnection; choice: Pairing }) {
   const [typed, setTyped] = useState("");

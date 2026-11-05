@@ -8,8 +8,7 @@ import { fromNativeKey } from "@vibevalley/protocol/host";
 
 import type { Farm } from "./farm";
 import { nativeHost } from "./host";
-import { isPairPage, keyScript } from "./pairing";
-import { colors } from "./style";
+import { colors, isPairPage, keyScript } from "./pairing";
 
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the package types its props as WebViewProps & P with P = undefined, which is never: the props it takes, as they are
 const Web = WebView as unknown as ComponentType<WebViewProps & { ref?: Ref<WebView<object>> }>;

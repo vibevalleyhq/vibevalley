@@ -2,11 +2,12 @@ import { Effect, FiberSet, Schema, type Scope } from "effect";
 
 import type { Tool } from "./core/loop.ts";
 import { schemaEffectTool } from "./core/tool.ts";
-import { head } from "./head.ts";
 import { todoToolWords as words } from "./prompts.ts";
 import type { Subagent } from "./self.ts";
 import * as engine from "./todo.ts";
 import type { TodoStore } from "./todoStore.ts";
+
+const { head } = engine;
 
 /** Every change, whoever makes it, is told to changed. */
 export function watchedStore(store: TodoStore, changed: (g: engine.Todo[]) => Effect.Effect<void>): TodoStore {

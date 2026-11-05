@@ -12,7 +12,7 @@ import { fakeFetch } from "./infra/storyApi";
 import { createRegistry, RegistryContext } from "./state/atom";
 import { order } from "./storyLevels";
 
-import "./stories.css";
+import "./stories/stories.css";
 
 const found = import.meta.glob<{ default: Stories }>("./**/*.stories.tsx", { eager: true });
 
@@ -33,25 +33,27 @@ const follow = () => (document.documentElement.dataset.theme = dark.matches ? "d
 follow();
 dark.addEventListener("change", follow);
 
-render(
-  () => (
-    <StoriesApp
-      stories={Object.values(found).map((m) => m.default)}
-      order={order}
-      locales={LocaleValues}
-      prepare={fresh}
-      wrap={(story) => (
-        <RouterContext value={still()}>
-          <FramesContext value={{ frame: undefined, link: "open", count: 0 }}>
-            <RegistryContext value={createRegistry()}>
-              <QueryClientProvider client={queries}>
-                <Loading>{story()}</Loading>
-              </QueryClientProvider>
-            </RegistryContext>
-          </FramesContext>
-        </RouterContext>
-      )}
-    />
-  ),
-  document.getElementById("root")!,
-);
+const root = document.getElementById("root");
+if (root)
+  render(
+    () => (
+      <StoriesApp
+        stories={Object.values(found).map((m) => m.default)}
+        order={order}
+        locales={LocaleValues}
+        prepare={fresh}
+        wrap={(story) => (
+          <RouterContext value={still()}>
+            <FramesContext value={{ frame: undefined, link: "open", count: 0 }}>
+              <RegistryContext value={createRegistry()}>
+                <QueryClientProvider client={queries}>
+                  <Loading>{story()}</Loading>
+                </QueryClientProvider>
+              </RegistryContext>
+            </FramesContext>
+          </RouterContext>
+        )}
+      />
+    ),
+    root,
+  );

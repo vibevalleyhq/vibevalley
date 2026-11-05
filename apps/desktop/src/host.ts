@@ -1,13 +1,12 @@
 import { homedir } from "node:os";
 
-import { nativeTheme, Notification, shell } from "electron";
+import { type IpcMainEvent, ipcMain, nativeTheme, Notification, shell, type WebContents } from "electron";
 
-import { serve } from "@vibevalley/bridge";
+import { type Link, serve } from "@vibevalley/bridge";
 import { currentLocale, setLocale } from "@vibevalley/i18n";
 import { desktopBridge, type TraySummary, type UpdateState } from "@vibevalley/protocol/host";
 
 import { revealable } from "./boundary";
-import { mainLink } from "./bridge";
 import type { commandLine } from "./commandLine";
 import { setAppMenu } from "./menu";
 import { farmHome } from "./paths";
@@ -21,6 +20,20 @@ interface HostUpdates {
   readonly check: () => Promise<void>;
   readonly install: () => Promise<void>;
 }
+
+const channel = "vibevalley:bridge";
+
+/** Only the page in page() is heard: what another sender says is not. */
+const mainLink = (page: () => WebContents | undefined): Link => ({
+  send: (m) => page()?.send(channel, m),
+  receive: (fn) => {
+    const heard = (event: IpcMainEvent, m: unknown) => {
+      if (event.sender === page()) fn(m);
+    };
+    ipcMain.on(channel, heard);
+    return () => void ipcMain.off(channel, heard);
+  },
+});
 
 export function serveHost(o: {
   readonly window: MainWindow;

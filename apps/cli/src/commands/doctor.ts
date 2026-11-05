@@ -4,8 +4,8 @@ import { Command } from "effect/cli";
 import { announced } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
 
-import { appStatus, ask, farmHome, ServerFlag } from "../farm.ts";
-import { exit, Failure, type Next, printBody } from "../output.ts";
+import { appStatus, ask, farmHome, ServerFlag } from "#/farm.ts";
+import { exit, Failure, type Next, printBody } from "#/output.ts";
 
 interface Check {
   readonly check: string;

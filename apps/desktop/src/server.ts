@@ -169,7 +169,7 @@ export function serverKeeper(
       }
     },
     stop: async () => {
-      const it = running ?? (await starting?.catch(() => undefined));
+      const it = running ?? (await starting?.then((s) => s, () => undefined));
       running = undefined;
       await it?.stop();
     },

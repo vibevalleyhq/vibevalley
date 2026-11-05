@@ -161,8 +161,8 @@ export class FarmConnection {
         try {
           const said: unknown = JSON.parse(text);
           if (typeof said === "object" && said !== null && "reason" in said && typeof said.reason === "string") problem = said.reason;
-        } catch {
-          // Not the farm's refusal: its text as it is.
+        } catch (e) {
+          if (!e) problem = text;
         }
         throw new Error(problem || t("mobile.answered", { status: response.status }));
       }
