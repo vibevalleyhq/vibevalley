@@ -340,14 +340,16 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
           Effect.catchCause((cause) => Effect.as(Effect.logWarning(line(Cause.pretty(cause))), otherwise)),
         );
 
-    const readAll = <T>(g: Generation, what: string, ask: (one: Source) => Effect.Effect<T[], SourceError>, all = g.all) =>
-      Effect.forEach(
+    const readAll = <T>(g: Generation, what: string, ask: (one: Source) => Effect.Effect<T[], SourceError>, all = g.all) => {
+      const empty: T[] = [];
+      return Effect.forEach(
         all,
-        (one) => logged((why) => `memory from ${one.name} for ${what}: ${why}`)(one === local ? ask(one) : leased(g, within(ask(one), timeoutMs)), [] as T[]),
+        (one) => logged((why) => `memory from ${one.name} for ${what}: ${why}`)(one === local ? ask(one) : leased(g, within(ask(one), timeoutMs)), empty),
         {
           concurrency: "unbounded",
         },
       );
+    };
 
     const enqueue = (what: string, write: (one: Source) => Effect.Effect<unknown, SourceError>) =>
       Effect.flatMap(snapshot, (g) =>

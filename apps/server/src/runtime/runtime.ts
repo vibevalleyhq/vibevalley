@@ -243,10 +243,8 @@ const make = (options: RuntimeOptions = {}) =>
     /** What the runtime takes: seeds.json's support, with what it refuses taken from the adapter and the farm's policy laid over it. */
     function support(id: string) {
       const f = supportOf(id);
-      return {
-        ...f,
-        refused: { ...registry.get(id)?.refusedSessionOptions, ...f.refused } as Record<string, string>,
-      };
+      const refused: Record<string, string> = { ...registry.get(id)?.refusedSessionOptions, ...f.refused };
+      return { ...f, refused };
     }
 
     /** What a probe found, as the farm shows it: its preset, support and today's spend laid over. */

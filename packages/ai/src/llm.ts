@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Layer, Stream, Predicate, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Option, Predicate, Schema, Stream } from "effect";
 import { HttpClient, HttpClientRequest } from "effect/http";
 
 import type { AssistantMessage, Context as LlmContext } from "./messages.ts";
@@ -59,6 +59,7 @@ export const failedMessage = (model: Model, timestamp: number, e: LlmError): Ass
 
 const ErrorBody = Schema.fromJsonString(Schema.Struct({ error: Schema.Record(Schema.String, Schema.Unknown) }));
 const decodeErrorBody = Schema.decodeUnknownOption(ErrorBody);
+const decodeStreamChunk = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
 /** As pi-ai words a refusal: the status and the body's error object, else its text. */
 function statusMessage(status: number, text: string): string {
@@ -93,8 +94,9 @@ export const make = Effect.gen(function* () {
           Stream.splitLines,
           Stream.mapEffect((line) => {
             const data = sse.line(line);
-            if (data === undefined) return Effect.succeed([] as AssistantMessageEvent[]);
-            return Effect.try({ try: () => JSON.parse(data) as unknown, catch: () => failed("stream", `Not JSON in the stream: ${data.slice(0, 200)}`) }).pipe(
+            if (data === undefined) return Effect.succeed<AssistantMessageEvent[]>([]);
+            return decodeStreamChunk(data).pipe(
+              Effect.mapError(() => failed("stream", `Not JSON in the stream: ${data.slice(0, 200)}`)),
               Effect.flatMap((chunk) => {
                 const error: unknown = Predicate.hasProperty(chunk, "error") ? chunk.error : undefined;
                 return error !== undefined && error !== null

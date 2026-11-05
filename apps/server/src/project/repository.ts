@@ -34,9 +34,9 @@ export const repository = (path: string) => {
   const commit = (message: string) => git(path, "commit", "-q", "-m", message).pipe(Effect.catch(() => git(path, ...asFarm, "commit", "-q", "-m", message)));
 
   /** The files merging branch into base would conflict on; none when it merges cleanly. */
-  const conflicts = Effect.fnUntraced(function* (base: string, branch: string) {
+  const conflicts = Effect.fnUntraced(function* (base: string, branch: string): Effect.fn.Return<string[], GitError> {
     const r = yield* gitRun(path, "merge-tree", "--write-tree", "--name-only", "--no-messages", base, branch);
-    if (r.code === 0) return [] as string[];
+    if (r.code === 0) return [];
     if (r.code !== 1) return yield* GitError.of(r.code, r.code < 0 ? r.stderr : t("server.project.mergeTree", { code: r.code }));
     // First line: the tree it would write; then each conflicted file.
     return [

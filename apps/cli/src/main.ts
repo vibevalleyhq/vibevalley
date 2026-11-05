@@ -72,7 +72,7 @@ export const run = Effect.fn("Cli.run")(function* (args: readonly string[]) {
   // Run bare, it was asked what it can do: the help, on stdout as with --help.
   return yield* Command.runWith(root, { version, renderErrors: false })(args.length === 0 ? ["--help"] : args).pipe(
     Effect.provide(CliOutput.layerPresenter(presenter)),
-    Effect.as(exit.ok as number),
+    Effect.as<number>(exit.ok),
     Effect.catch((e) => {
       if (CliError.isCliError(e) && e._tag === "ShowHelp" && e.errors.length === 0) return Effect.succeed(exit.ok);
       // The conversation said what it had to on the terminal: only its code is left.

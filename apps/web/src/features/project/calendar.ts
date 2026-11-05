@@ -110,9 +110,7 @@ export const dateText = (at: number) => {
   return t("web.base.time.date", { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() });
 };
 
-export const dayText = (d: Date) =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- getDay() is 0 to 6
-  t("web.base.time.day", { m: d.getMonth() + 1, d: d.getDate(), weekday: t(`web.base.time.weekdays.${d.getDay() as Weekday}`) });
+const weekdayKeys = ["0", "1", "2", "3", "4", "5", "6"] as const;
 
-/** A day of the week as Date.getDay counts it, Sunday first. */
-type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export const dayText = (d: Date) =>
+  t("web.base.time.day", { m: d.getMonth() + 1, d: d.getDate(), weekday: t(`web.base.time.weekdays.${weekdayKeys[d.getDay()] ?? "0"}`) });

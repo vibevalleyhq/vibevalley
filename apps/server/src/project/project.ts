@@ -636,7 +636,7 @@ const make = (hooks: ProjectHooks = {}) =>
         if (!base) return undefined;
         const files = yield* repository(path)
           .conflicts(base, place.branch)
-          .pipe(Effect.orElseSucceed(() => [] as string[]));
+          .pipe(Effect.orElseSucceed((): string[] => []));
         return files.length > 0 ? { base, files } : undefined;
       }),
       merge: Effect.fn("Project.merge")(function* (place) {

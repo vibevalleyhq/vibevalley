@@ -2,7 +2,7 @@
   "apps/cli": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 1,
+    "cast": 0,
     "lintOff": 0,
     "orDie": 1,
     "ignored": 0,
@@ -51,9 +51,9 @@
   },
   "packages/agent": {
     "nonNull": 19,
-    "doubleCast": 2,
-    "cast": 5,
-    "lintOff": 10,
+    "doubleCast": 0,
+    "cast": 4,
+    "lintOff": 8,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 5,
@@ -62,7 +62,7 @@
   "packages/ai": {
     "nonNull": 10,
     "doubleCast": 0,
-    "cast": 7,
+    "cast": 5,
     "lintOff": 3,
     "orDie": 1,
     "ignored": 0,
@@ -172,7 +172,7 @@
   "server: Agents": {
     "nonNull": 34,
     "doubleCast": 1,
-    "cast": 8,
+    "cast": 2,
     "lintOff": 4,
     "orDie": 5,
     "ignored": 0,
@@ -182,7 +182,7 @@
   "server: Collaboration": {
     "nonNull": 36,
     "doubleCast": 0,
-    "cast": 1,
+    "cast": 0,
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
@@ -202,7 +202,7 @@
   "server: Gateway": {
     "nonNull": 7,
     "doubleCast": 0,
-    "cast": 6,
+    "cast": 2,
     "lintOff": 3,
     "orDie": 2,
     "ignored": 0,
@@ -232,8 +232,8 @@
   "server: Issues": {
     "nonNull": 24,
     "doubleCast": 0,
-    "cast": 2,
-    "lintOff": 2,
+    "cast": 0,
+    "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 1,
@@ -282,7 +282,7 @@
   "server: Source Control": {
     "nonNull": 34,
     "doubleCast": 0,
-    "cast": 2,
+    "cast": 0,
     "lintOff": 0,
     "orDie": 2,
     "ignored": 0,
@@ -322,7 +322,7 @@
   "web: features/agent": {
     "nonNull": 3,
     "doubleCast": 0,
-    "cast": 1,
+    "cast": 0,
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
@@ -382,7 +382,7 @@
   "web: features/issue": {
     "nonNull": 18,
     "doubleCast": 0,
-    "cast": 2,
+    "cast": 0,
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
@@ -432,8 +432,8 @@
   "web: features/project": {
     "nonNull": 10,
     "doubleCast": 0,
-    "cast": 1,
-    "lintOff": 1,
+    "cast": 0,
+    "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
@@ -442,8 +442,8 @@
   "web: features/runtime": {
     "nonNull": 4,
     "doubleCast": 0,
-    "cast": 1,
-    "lintOff": 1,
+    "cast": 0,
+    "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
@@ -472,8 +472,8 @@
   "web: features/voice": {
     "nonNull": 7,
     "doubleCast": 0,
-    "cast": 1,
-    "lintOff": 1,
+    "cast": 0,
+    "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 6,
@@ -485,7 +485,7 @@
     "cast": 0,
     "lintOff": 1,
     "orDie": 0,
-    "ignored": 1,
+    "ignored": 0,
     "swallowed": 1,
     "resultBranch": 0
   },

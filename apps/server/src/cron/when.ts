@@ -5,9 +5,9 @@ import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
 import { actsForOwner, type Actor } from "#/base/actor.ts";
+const weekdayKeys = ["0", "1", "2", "3", "4", "5", "6"] as const;
 /** A day of the week by its number, Sunday 0. */
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a cron day of the week is 0 to 6
-const weekday = (d: number) => t(`server.cron.weekdays.${d as 0 | 1 | 2 | 3 | 4 | 5 | 6}`);
+const weekday = (d: number) => t(`server.cron.weekdays.${weekdayKeys[d] ?? "0"}`);
 const minEveryMinutes = 1;
 
 const cronTime = /^([01]?\d|2[0-3]):([0-5]\d)$/u;
@@ -109,11 +109,11 @@ interface CronSpec {
 
 /** The bounds of the five fields; server.cron.expr.fields names them, in this order. */
 const cronFields = [
-  { min: 0, max: 59 },
-  { min: 0, max: 23 },
-  { min: 1, max: 31 },
-  { min: 1, max: 12 },
-  { min: 0, max: 7 },
+  { min: 0, max: 59, key: "0" },
+  { min: 0, max: 23, key: "1" },
+  { min: 1, max: 31, key: "2" },
+  { min: 1, max: 12, key: "3" },
+  { min: 0, max: 7, key: "4" },
 ] as const;
 
 /** Go's strconv.Atoi: an optional sign and ASCII digits, within 64 bits. */
@@ -127,9 +127,8 @@ function atoi(s: string): number | undefined {
 const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/u).filter((f) => f !== "");
 
 function cronField(field: string, i: number): Set<number> | string {
-  const { min: lo, max: hi } = cronFields[i]!;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- i indexes cronFields' five fields
-  const bad = t("server.cron.expr.badField", { name: t(`server.cron.expr.fields.${i as 0 | 1 | 2 | 3 | 4}`), field });
+  const { min: lo, max: hi, key } = cronFields[i]!;
+  const bad = t("server.cron.expr.badField", { name: t(`server.cron.expr.fields.${key}`), field });
   const bits = new Set<number>();
   for (const item of field.split(",")) {
     const slash = item.indexOf("/");

@@ -124,7 +124,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         break;
       default: {
         const exhaustive: never = asr;
-        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.asr"), vendor: (exhaustive as { vendor: string }).vendor }));
+        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.asr"), vendor: String(Reflect.get(exhaustive, "vendor") ?? "") }));
       }
     }
     let llm: OpenAI;
@@ -152,7 +152,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         break;
       default: {
         const exhaustive: never = answer;
-        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.llm"), vendor: (exhaustive as { vendor: string }).vendor }));
+        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.llm"), vendor: String(Reflect.get(exhaustive, "vendor") ?? "") }));
       }
     }
     let tts: Vendors["tts"];
@@ -170,7 +170,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         break;
       default: {
         const exhaustive: never = item;
-        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.tts"), vendor: (exhaustive as { vendor: string }).vendor }));
+        return unavailable(t("server.voice.unknown", { what: t("server.voice.part.tts"), vendor: String(Reflect.get(exhaustive, "vendor") ?? "") }));
       }
     }
     return { stt, llm, tts };

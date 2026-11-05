@@ -36,7 +36,7 @@ function run<E>(
   const fiber = runtime.runFork(
     Effect.gen(function* () {
       yield* Stream.runForEach(stream(yield* SubscriptionsClient), (e) => Effect.sync(() => on(e)));
-    }).pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => void (stopped || ended?.())))),
+    }).pipe(Effect.ignore({ log: "Debug" }), Effect.ensuring(Effect.sync(() => void (stopped || ended?.())))),
   );
   return () => {
     stopped = true;

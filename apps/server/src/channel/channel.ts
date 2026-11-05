@@ -511,7 +511,7 @@ const make = Effect.gen(function* () {
       return yield* locked(
         inboxRows(who).pipe(
           Effect.map((rows) => rows.map(({ target, ...r }): T.ChannelUnread => ({ channel: target, ...r }))),
-          Effect.catchCause((c) => Effect.as(Effect.logWarning(`chat: unread of ${who}: ${String(c)}`), [] as T.ChannelUnread[])),
+          Effect.catchCause((c) => Effect.as<T.ChannelUnread[]>(Effect.logWarning(`chat: unread of ${who}: ${String(c)}`), [])),
         ),
       );
     }),

@@ -400,6 +400,10 @@ type Tab = "who" | "runtime" | "persona" | "skills" | "tools" | "env" | "memory"
 function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch; nameTaken: boolean; isNew: boolean; onTrajectories: () => void }) {
   const [tab, setTab] = createSignal<Tab>("who");
   const support = () => supportOf(props.runtime);
+  const savedTabs: [Tab, string][] = [
+    ["memory", t("web.agent.tab.memory")],
+    ["trajectories", t("web.agent.trajectories")],
+  ];
   const tabs = (): [Tab, string][] => [
     ["who", t("web.agent.tab.who")],
     ["runtime", t("web.agent.tab.runtime")],
@@ -407,12 +411,7 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefined; pa
     ["skills", t("web.agent.tab.skills")],
     ["tools", t("web.agent.tab.tools")],
     ["env", t("web.agent.tab.env")],
-    ...(props.isNew
-      ? []
-      : ([
-          ["memory", t("web.agent.tab.memory")],
-          ["trajectories", t("web.agent.trajectories")],
-        ] as [Tab, string][])),
+    ...(props.isNew ? [] : savedTabs),
   ];
   const envRefused = () => support().refused[sessionEnv];
   const draft = () => props.draft;

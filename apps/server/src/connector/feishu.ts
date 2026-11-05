@@ -203,18 +203,16 @@ export class FeishuClient implements FeishuApi {
 }
 
 function text(m: Message): string {
-  if (m.messageType !== "text")
-    return (
-      (
-        {
-          image: t("server.connector.media.image"),
-          file: t("server.connector.media.file"),
-          audio: t("server.connector.media.audio"),
-          media: t("server.connector.media.video"),
-          sticker: t("server.connector.media.sticker"),
-        } as Record<string, string>
-      )[m.messageType] ?? t("server.connector.media.message")
-    );
+  if (m.messageType !== "text") {
+    const media: Record<string, string> = {
+      image: t("server.connector.media.image"),
+      file: t("server.connector.media.file"),
+      audio: t("server.connector.media.audio"),
+      media: t("server.connector.media.video"),
+      sticker: t("server.connector.media.sticker"),
+    };
+    return media[m.messageType] ?? t("server.connector.media.message");
+  }
   return (textContent(m.content)?.text ?? "").trim();
 }
 

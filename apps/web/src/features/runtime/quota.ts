@@ -20,14 +20,15 @@ export function windowLabel(label: string) {
   return label.replace(/·\s*1 week/u, t("web.runtime.quota.oneWeek"));
 }
 
+const weekdayKeys = ["0", "1", "2", "3", "4", "5", "6"] as const;
+
 export function resetText(at: number, now = Date.now()) {
   const ms = at - now;
   if (ms <= 0) return t("web.runtime.quota.now");
   const hours = ms / 3600000;
   if (hours < 1) return t("web.runtime.quota.minutes", { m: Math.min(60, Math.max(1, Math.round(ms / 60000))) });
   if (hours < 24) return t("web.runtime.quota.hours", { h: Math.round(hours) });
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- getDay() is 0 to 6
-  return t("web.runtime.quota.on", { weekday: t(`web.runtime.quota.weekdays.${new Date(at).getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6}`) });
+  return t("web.runtime.quota.on", { weekday: t(`web.runtime.quota.weekdays.${weekdayKeys[new Date(at).getDay()] ?? "0"}`) });
 }
 
 export interface Quota {

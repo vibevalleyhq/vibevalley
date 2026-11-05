@@ -310,7 +310,7 @@ const makeMemoryStore = Effect.gen(function* () {
       return Object.fromEntries(rows.map((r) => [r.id, r.score ?? 0]));
     },
     (effect, agent) =>
-      effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`searching ${agent}'s memories: ${String(e)}`), {} as Record<string, number>))),
+      effect.pipe(Effect.catch((e) => Effect.as<Record<string, number>>(Effect.logWarning(`searching ${agent}'s memories: ${String(e)}`), {}))),
   );
 
   /** What a run would recall; nothing is counted as recalled until markRecalled. */
@@ -327,7 +327,7 @@ const makeMemoryStore = Effect.gen(function* () {
       });
       return pick(all, picked);
     },
-    (effect, cue) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), [] as T.Memory[]))),
+    (effect, cue) => effect.pipe(Effect.catch((e) => Effect.as<T.Memory[]>(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), []))),
   );
 
   const markRecalled = (ids: readonly string[]) =>
@@ -368,7 +368,7 @@ const makeMemoryStore = Effect.gen(function* () {
       const fading = new Set(nextForgotten(all, fadingSoon));
       return all.map((m) => ({ ...m, fading: fading.has(m.id) }));
     },
-    (effect, agent) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memories of ${agent}: ${String(e)}`), [] as T.Memory[]))),
+    (effect, agent) => effect.pipe(Effect.catch((e) => Effect.as<T.Memory[]>(Effect.logWarning(`memories of ${agent}: ${String(e)}`), []))),
   );
 
   const write = Effect.fnUntraced(function* (n: Note) {

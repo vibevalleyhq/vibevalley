@@ -62,9 +62,8 @@ interface SchemaToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends 
 }
 
 /** A tool whose parameters are a Schema. */
-export function schemaTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: SchemaToolSpec<S>): Tool {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a tool's Struct decodes with no services
-  const read = Schema.decodeUnknownSync(spec.parameters as unknown as Schema.Codec<S["Type"]>);
+export function schemaTool<S extends Schema.Struct<Schema.Struct.Fields> & Schema.Codec<S["Type"]>>(spec: SchemaToolSpec<S>): Tool {
+  const read = Schema.decodeUnknownSync(spec.parameters);
   return textTool<unknown>({ ...spec, parameters: parametersOf(spec.parameters), run: (p, tc) => spec.run(read(p), tc) });
 }
 
@@ -72,12 +71,11 @@ interface SchemaEffectToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> ex
   readonly parameters: S;
 }
 
-export function schemaEffectTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: SchemaEffectToolSpec<S>): Tool {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a tool's Struct decodes with no services
-  const read = Schema.decodeUnknownSync(spec.parameters as unknown as Schema.Codec<S["Type"]>);
+export function schemaEffectTool<S extends Schema.Struct<Schema.Struct.Fields> & Schema.Codec<S["Type"]>>(spec: SchemaEffectToolSpec<S>): Tool {
+  const read = Schema.decodeUnknownEffect(spec.parameters);
   return effectTool<unknown>({
     ...spec,
     parameters: parametersOf(spec.parameters),
-    run: (p) => Effect.flatMap(Effect.try({ try: () => read(p), catch: toolFailed }), spec.run),
+    run: (p) => Effect.flatMap(Effect.mapError(read(p), toolFailed), spec.run),
   });
 }

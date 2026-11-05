@@ -159,9 +159,7 @@ type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey"
 
 const keyFrom: Record<KeySource, string> = { settings: t("web.base.form.from.settings"), config: t("web.base.form.from.config") };
 
-const options = <T extends string>(labels: Record<T, string>) =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- labels is written out as a literal, one key per T and no more
-  (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
+const options = <T extends string>(values: readonly T[], labels: Record<T, string>) => values.map((value) => ({ value, label: labels[value] }));
 const plain = <T extends string>(values: readonly T[]) => values.map((value) => ({ value, label: value }));
 
 /** Which of the line's settings a page shows: the call (credentials, listening, who answers), MOSS Live's key, or dictation. */
@@ -373,7 +371,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       label={t("web.voice.voice.asr")}
                       testid="voice-asr"
                       value={asr().vendor}
-                      options={options(asrLabel)}
+                      options={options(["ares", "deepgram", "microsoft"] as const, asrLabel)}
                       onChange={(v) => set({ ...draft(), asr: v === asr().vendor ? asr() : asrStart[v] })}
                     />
                   </Labeled>
@@ -424,7 +422,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     label={t("web.voice.voice.who")}
                     testid="voice-answer"
                     value={answer().vendor}
-                    options={options(answerLabel)}
+                    options={options(["orchestrator", "agora", "deepseek", "openai"] as const, answerLabel)}
                     onChange={(v) => set({ ...draft(), answer: v === answer().vendor ? answer() : answerStart[v] })}
                   />
                 </Labeled>
@@ -595,7 +593,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 label={t("web.voice.voice.persona.tts")}
                 testid="voice-tts"
                 value={tts().vendor}
-                options={options(ttsLabel)}
+                options={options(["minimax", "openai", "microsoft"] as const, ttsLabel)}
                 onChange={(v) => set({ ...draft(), tts: v === tts().vendor ? tts() : ttsStart[v] })}
               />
             </Labeled>
