@@ -146,7 +146,7 @@ const channelLayer = (x: FakeSessions) =>
       const sessions = {
         present: (id: string) => x.core.session(id) !== undefined,
         sessionOf: (id: string) => x.core.session(id),
-        presentSessions: () => x.core.state().sessions,
+        presentSessions: () => x.core.state().sessions.filter((s) => s.role === "worker"),
         deliver: (id: string, text: string, input: Parameters<Session["Service"]["deliver"]>[2]) =>
           Effect.sync(() => x.deliver(id, text, () => x.consumed({ session: id, envelopeIds: [...input.envelopeIds] }))),
         runOf: () => undefined,
@@ -826,6 +826,35 @@ describe("the chat", () => {
           }),
         config,
       );
+    });
+  });
+
+  it.live("regression: a message that cannot be routed is tried once at startup, not again and again", () => {
+    const config = { ...testConfig(), db: "" };
+    let thread: T.Channel;
+    return Effect.gen(function* () {
+      yield* run(
+        (f, x) =>
+          Effect.gen(function* () {
+            x.holds = false;
+            thread = yield* hireAndRun(f, x, "w16", "write route", "chat-stuck");
+            const stuck = (yield* f.chat.say("this one cannot be routed", thread.id, "stuck")).message;
+            yield* until(async () => (await f.deliveryOf("w16", stuck.id))?.state === "consumed", "the first route");
+            // A receipt that no longer reads: routing it fails every time it is tried.
+            yield* f.sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null, trigger_json = 'not json' where id = ${stuck.id}`;
+          }),
+        config,
+      );
+      // The farm comes up past the row it cannot route, and takes new words.
+      yield* run(
+        (f, x) =>
+          Effect.gen(function* () {
+            x.holds = false;
+            yield* f.chat.say("after the stuck one", thread.id, "after");
+            yield* until(() => x.runsOf("w16").some((input) => input.includes("after the stuck one")), "a message after the stuck one");
+          }),
+        config,
+      ).pipe(Effect.timeoutOrElse({ duration: "20 seconds", orElse: () => Effect.die(new Error("the farm did not come up past the stuck row")) }));
     });
   });
 

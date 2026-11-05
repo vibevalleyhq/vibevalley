@@ -189,5 +189,6 @@ join channel c on c.id = m.channel_id
 left join channel ch on ch.id = c.parent_id
 left join mailbox_trigger r on r.id = m.id
 where r.routed_at is null and m.deleted_at is null
+  and (m.channel_id, m.number) > (sqlc.arg(after_channel)::text, sqlc.arg(after_number)::int)
 order by m.channel_id, m.number
 limit 1000;

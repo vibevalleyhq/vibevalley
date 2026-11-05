@@ -147,10 +147,14 @@ export const sessionThreads = (r: ChannelRecords, w: ChannelWriting) =>
     }, locked);
     const start = Effect.gen(function* () {
       yield* locked(Effect.forEach(presentSessions(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), { discard: true }));
+      // Each row once, in order: one that cannot be routed stays unrouted, and is not fetched again.
+      let after = { after_channel: "", after_number: 0 };
       while (true) {
-        const rows = yield* db.run(qm.unroutedChannelMessages());
-        if (rows.length === 0) break;
+        const rows = yield* db.run(qm.unroutedChannelMessages(after));
+        const last = rows.at(-1);
+        if (!last) break;
         yield* Effect.forEach(rows, (row) => replayDelivery(row).pipe(bestEffort(`chat: route ${row.envelope_id}`)), { discard: true });
+        after = { after_channel: last.channel_id, after_number: last.number };
       }
     });
     yield* Effect.addFinalizer(() =>
