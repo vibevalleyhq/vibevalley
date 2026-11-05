@@ -83,11 +83,11 @@ function gen() {
 }
 
 const sources = () =>
-  execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", "apps", "packages"], { cwd: root, encoding: "utf8" })
+  execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", "apps", "packages", "scripts/capabilities.ts"], { cwd: root, encoding: "utf8" })
     .split("\n")
     .filter(
       (f) =>
-        (/^(apps|packages)\/[^/]+\/src\/.*\.tsx?$/u.test(f) || /^apps\/[^/]+\/vite\.config\.ts$/u.test(f)) &&
+        (/^(apps|packages)\/[^/]+\/src\/.*\.tsx?$/u.test(f) || /^apps\/[^/]+\/vite\.config\.ts$/u.test(f) || f === "scripts/capabilities.ts") &&
         !f.endsWith("packages/i18n/src/catalogs.ts") &&
         existsSync(join(root, f)),
     );

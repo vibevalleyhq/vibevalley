@@ -5,9 +5,6 @@
   "imports": {
     "#/*": "./src/*"
   },
-  "exports": {
-    "./assets": "./src/assets.ts"
-  },
   "scripts": {
     "start": "vpx src/main.ts"
   },

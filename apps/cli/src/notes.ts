@@ -3,7 +3,7 @@ import { Argument, Command, Flag } from "effect/cli";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { artifactId } from "@vibevalley/protocol/schema";
+import { ArtifactId } from "@vibevalley/protocol/schema";
 
 import { ask, change, given, show } from "./farm.ts";
 import { exit, Failure } from "./output.ts";
@@ -188,7 +188,7 @@ const cronGroup = Command.make("cron").pipe(
 
 const artifactLine = (a: T.Artifact) =>
   [a.id, a.title, a.body, `@${a.byName}`, a.issue === undefined ? "" : `issue ${a.issue}`].filter((x) => x !== "").join("  ");
-const artifactArg = Argument.String("artifact").pipe(Argument.withDescription(t("cli.arg.artifact")));
+const artifactArg = Argument.String("artifact").pipe(Argument.withSchema(ArtifactId), Argument.withDescription(t("cli.arg.artifact")));
 
 const artifactGroup = Command.make("artifact").pipe(
   Command.withSubcommands([
@@ -204,7 +204,7 @@ const artifactGroup = Command.make("artifact").pipe(
     ),
     Command.make("show", { artifact: artifactArg }, (o) =>
       Effect.flatMap(
-        ask((api) => api.artifact.get({ id: artifactId(o.artifact) })),
+        ask((api) => api.artifact.get({ id: o.artifact })),
         (a) => show(a, artifactLine),
       ),
     ).pipe(
@@ -213,7 +213,7 @@ const artifactGroup = Command.make("artifact").pipe(
     ),
     Command.make("read", { artifact: artifactArg }, (o) =>
       Effect.flatMap(
-        ask((api) => api.artifact.content.get({ id: artifactId(o.artifact) })),
+        ask((api) => api.artifact.content.get({ id: o.artifact })),
         (c) => show(c, (x) => x.content),
       ),
     ).pipe(

@@ -23,7 +23,7 @@
 | `$VIBEVALLEY_HOME/agent/<档案 id>/` | 对话文件 `<档案 id>.jsonl`、压缩归档 `archive/` 与错轮评测 `evals/` |
 | `apps/web/src/features/orchestrator/OrchestratorPage.tsx` | 工作台管家页（记性、轨迹、旧账、声音） |
 
-接口见 [capabilities.md](docs/reference/capabilities.md)（`orchestrator.*`），CLI 命令为 `vibevalley orchestrator ...`。
+接口见 [capabilities.md](docs/reference/capabilities.md)（`orchestrator.*`）。
 
 ## 模型和不变量
 

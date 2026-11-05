@@ -4,20 +4,71 @@ import { Effect } from "effect";
 import { endpoints } from "@vibevalley/protocol/api";
 import { Preview } from "@vibevalley/protocol/schema";
 
-import { reach } from "./reach.ts";
 import { cli, farm, lookIn, memoriesOf, workingFarm } from "./testing.ts";
 
 const json = (text: string): unknown => JSON.parse(text);
 
+const cliCommands = [
+  "agent create",
+  "agent delete",
+  "agent list",
+  "app open",
+  "app quit",
+  "app restart",
+  "app status",
+  "app update",
+  "artifact list",
+  "artifact read",
+  "artifact show",
+  "channel list",
+  "channel message list",
+  "channel message search",
+  "channel message send",
+  "chat",
+  "cron create",
+  "cron delete",
+  "cron edit",
+  "cron list",
+  "doctor",
+  "issue comment",
+  "issue create",
+  "issue delete",
+  "issue diff",
+  "issue edit",
+  "issue list",
+  "issue review",
+  "issue show",
+  "issue status",
+  "issue timeline",
+  "memory create",
+  "memory delete",
+  "memory list",
+  "memory search",
+  "pkm capture",
+  "pkm journal show",
+  "pkm page edit",
+  "pkm page export",
+  "pkm page list",
+  "pkm page save",
+  "pkm page show",
+  "pkm radar",
+  "pkm search",
+  "project create",
+  "project list",
+  "runtime list",
+  "runtime refresh",
+  "session list",
+  "session show",
+  "session stop",
+] as const;
+
 describe("the command line", () => {
-  it.effect("reaches every endpoint: by the command reach.ts names, which is there with an example, or through api", () =>
+  it.effect("gives every command a description and an example", () =>
     Effect.gen(function* () {
-      for (const command of new Set(Object.values(reach).filter((c) => c !== "api"))) {
+      for (const command of cliCommands) {
         const help = yield* cli([...command.split(" "), "--help"]);
         expect({ command, code: help.code, examples: help.out.includes("EXAMPLES") }).toEqual({ command, code: 0, examples: true });
       }
-      const listed = new Set((yield* cli(["api", "list"])).out.split("\n").map((l) => l.trim().split("  ")[0]));
-      expect(endpoints.map((e) => e.op).filter((op) => !listed.has(op))).toEqual([]);
     }),
   );
 
@@ -99,26 +150,7 @@ describe("the command line", () => {
       const id = added.out.split("  ")[0]!;
       expect((yield* cli(at("cron", "delete", id, "--dry-run"))).out).toContain("删掉定时任务「早上看看」");
       expect((yield* cli(at("cron", "list"))).out).toContain(id);
-    }),
-  );
-
-  it.live("api call reaches any endpoint, its --json checked against the endpoint's Schema before it is sent", () =>
-    Effect.gen(function* () {
-      const server = yield* farm;
-      const at = (...args: string[]) => [...args, "--server", server];
-      yield* cli(at("issue", "create", "直接调"));
-      expect(json((yield* cli(at("api", "call", "issue.get", "--json", JSON.stringify({ id: "1" })))).out)).toMatchObject({ number: 1, title: "直接调" });
-      expect((yield* cli(at("api", "call", "issue.get", "--json", "-"), JSON.stringify({ id: "1" }))).code).toBe(0);
-      const wrongBody = yield* cli(at("api", "call", "issue.create", "--json", JSON.stringify({ title: 1 })));
-      expect([wrongBody.code, wrongBody.failure?.tag]).toEqual([2, "InvalidValue"]);
-      expect(wrongBody.failure?.message).toContain("title");
-      const noOp = yield* cli(at("api", "call", "issue.nothing"));
-      expect([noOp.code, noOp.failure?.next?.[0]?.run]).toEqual([4, ["api", "list"]]);
-      const preview = json((yield* cli(at("api", "call", "agent.delete", "--json", JSON.stringify({ id: "docs" }), "--dry-run"))).out) as { does: string[] };
-      expect(preview.does[0]).toContain("删掉档案");
-      const schemas = json((yield* cli(at("api", "list", "--module", "issue", "--format", "json"))).out) as { op: string; input: unknown }[];
-      expect(schemas.find((e) => e.op === "issue.create")?.input).toMatchObject({ type: "object" });
-      expect(json((yield* cli(at("api", "state"))).out)).toHaveProperty("state");
+      expect((yield* cli(at("agent", "delete", "docs", "--dry-run"))).out).toContain("删掉档案");
     }),
   );
 
@@ -145,12 +177,12 @@ describe("the command line", () => {
     Effect.gen(function* () {
       const server = yield* workingFarm;
       const at = (...args: string[]) => [...args, "--server", server];
-      const profile = json((yield* cli(at("api", "call", "agent.create", "--json", JSON.stringify(scripted)))).out) as { id: string };
+      const profile = (yield* cli(at("agent", "create", "fox", "--runtime", "pi"))).out.split("  ")[0]!;
       expect((yield* cli(at("project", "create", "clock"))).code).toBe(0);
       // The test helper asks which port when its issue says ask-first, with options when it says with-options, and commits clock.ts
       // when it says commit.
       const made = yield* cli(
-        at("issue", "create", "打卡页先问清楚，给选项，提交", "--project", "clock", "--agent", profile.id, "--criterion", "clock-in works"),
+        at("issue", "create", "打卡页先问清楚，给选项，提交", "--project", "clock", "--agent", profile, "--criterion", "clock-in works"),
       );
       const n = /^#(\d+)/u.exec(made.out)?.[1] ?? "";
       expect((yield* cli(at("issue", "status", n, "todo"))).code).toBe(0);
@@ -169,25 +201,3 @@ describe("the command line", () => {
     }),
   );
 });
-
-/** A profile on the test helper (the farm's pi is it: testing/worker.ts). */
-const scripted = {
-  id: "",
-  name: "fox",
-  role: "worker",
-  duty: "",
-  enabled: true,
-  runtime: "pi",
-  model: "",
-  effort: "",
-  persona: "",
-  personaMode: "append",
-  skills: [],
-  mcpServers: [],
-  disallowedTools: [],
-  env: {},
-  workdir: "",
-  worktree: true,
-  tags: [],
-  look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
-};

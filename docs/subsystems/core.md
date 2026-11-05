@@ -20,7 +20,7 @@
 | `packages/protocol/src/core/shapes.ts` | `WorkspaceState`、`Fact`、`StateFrame`、`ServerEvent`、`LiveEvent` |
 | `packages/protocol/src/api.ts`、`endpoint.ts` | 汇总各概念的 `endpoints`、`Handlers`、`Endpoint` 与 `errorStatus` |
 | `apps/server/src/http/` | `api.ts` 路由与 `requestKey` 去重、`streams.ts` 三条 SSE、`handlers/<概念>.ts` |
-| `apps/cli/src/main.ts`、`reach.ts` | CLI 命令定义与接口全覆盖表 |
+| `apps/cli/src/main.ts`、`farm.ts` | CLI 命令定义、全局参数与类型化请求封装 |
 
 全部接口与权限矩阵见生成的 [capabilities.md](docs/reference/capabilities.md)。
 
@@ -40,9 +40,9 @@
 
 | 路径 | 编码 Schema | 初始消息 | 后续推送 | 消费者 |
 |---|---|---|---|---|
-| `GET /api/v1/state` | `StateFrame` | 首帧 `StateFrame` | 200ms 窗口合并后的 `StateFrame` | 页面、`vibevalley state` |
+| `GET /api/v1/state` | `StateFrame` | 首帧 `StateFrame` | 200ms 窗口合并后的 `StateFrame` | 页面、`issue show --watch` |
 | `GET /api/v1/live` | `LiveEvent` | 无 | `SessionEvent`、`Notice`、`Runtime` | 页面 |
-| `GET /api/v1/events` | `ServerEvent` | `snapshot`（`WorkspaceState`） | 每条 `Fact` 及 `LiveEvent` | CLI `api events`、调试 |
+| `GET /api/v1/events` | `ServerEvent` | `snapshot`（`WorkspaceState`） | 每条 `Fact` 及 `LiveEvent` | 调试 |
 
 - **有界中继与心跳**：每条连接配容量 64 的有界 relay，每 20 秒发 `: ping` 心跳。积压满 64 条时主动断开连接并释放源订阅，客户端重连后重新拿快照或最新帧。
 - **写接口返回 `seq` 对齐画面帧**：工单写接口（`issue.create`、`issue.update`、`issue.status.update`、`issue.comment.create`）在 `Core.apply` 后返回当前 `seq`，页面以 `frame.seq >= reply.seq` 作为意图结算条件。
@@ -85,7 +85,7 @@
 - **「事实」只留一个意思，成员名带语义**：非核心状态概念改回本名，事实用 `<实体>Changed`/`<实体>Removed`/动词过去式，消除名词歧义。
 - **页面读折好的帧，文案在出帧时填入**：避免前后端维护两套 `reduce`；界面文案不落盘、不进 `Transition`，改措辞或切语言无历史兼容负担。
 - **命令走 `POST /api/v1/<op>`，状态走三条 SSE**：操作名即路径，省去 REST 参数拆分；`/state`、`/live`、`/events` 按职责分离，断线重连直接拿新帧。
-- **能力表 `endpoints` 单源派生多端入口**：权限 `can`、Schema、试跑与路径写在同一行，自动生成或校验 `Handlers`、`VibeValleyApi`、`capabilities.md`、`lan` 放行表和 CLI `reach.ts`。
+- **能力表 `endpoints` 单源派生多端入口**：权限 `can`、Schema、试跑与路径写在同一行，自动生成或校验 `Handlers`、`VibeValleyApi`、`capabilities.md` 与 `lan` 放行表。
 
 ## 还没做的
 

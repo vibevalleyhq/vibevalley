@@ -4,9 +4,8 @@ import { Command } from "effect/cli";
 import { announced } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
 
-import { ServerFlag } from "./api.ts";
 import { appStatus, farmHome } from "./app.ts";
-import { ask } from "./farm.ts";
+import { ask, ServerFlag } from "./farm.ts";
 import { exit, Failure, type Next, printBody } from "./output.ts";
 
 interface Check {

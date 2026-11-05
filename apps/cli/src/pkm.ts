@@ -6,12 +6,14 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { PkmMarkerValues, PkmTierValues } from "@vibevalley/protocol";
 
-import { ask, given, show } from "./farm.ts";
+import { ask, change, given, show } from "./farm.ts";
 import { exit, Failure, out, stdinText } from "./output.ts";
 
 const words = (about: Parameters<typeof t>[0]) => Argument.String("words").pipe(Argument.variadic(), Argument.withDescription(t(about)));
 const pageArgument = Argument.String("page").pipe(Argument.withDescription(t("cli.arg.page")));
+const tierFlag = Flag.Literals("tier", PkmTierValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.tier")));
 
 /** Today on this machine, YYYY-MM-DD (sv-SE writes dates so). */
 const today = Effect.map(Clock.currentTimeMillis, (ms) => new Date(ms).toLocaleDateString("sv-SE"));
@@ -47,11 +49,31 @@ const captureCommand = Command.make(
 );
 
 /** `pkm search <terms>`: one hit a line, page › where: words. */
-const searchCommand = Command.make("search", { words: words("cli.arg.search") }, (o) =>
-  Effect.flatMap(
-    ask((api) => api.pkm.search({ text: o.words.join(" ") })),
-    (hits) => show(hits, (hs) => hs.map((h) => `${h.pageTitle} › ${h.path === "" ? "" : `${h.path}: `}${h.plain}`).join("\n")),
-  ),
+const searchCommand = Command.make(
+  "search",
+  {
+    words: words("cli.arg.search"),
+    tier: tierFlag,
+    marker: Flag.Literals("marker", PkmMarkerValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.marker"))),
+    limit: Flag.Int("limit").pipe(Flag.optional, Flag.withDescription(t("cli.flag.limit"))),
+  },
+  (o) => {
+    const text = o.words.join(" ");
+    const tier = given(o.tier);
+    const marker = given(o.marker);
+    const limit = given(o.limit);
+    return Effect.flatMap(
+      ask((api) =>
+        api.pkm.search({
+          ...(text === "" ? {} : { text }),
+          ...(tier === undefined ? {} : { tier }),
+          ...(marker === undefined ? {} : { marker }),
+          ...(limit === undefined ? {} : { limit }),
+        }),
+      ),
+      (hits) => show(hits, (hs) => hs.map((h) => `${h.pageTitle} › ${h.path === "" ? "" : `${h.path}: `}${h.plain}`).join("\n")),
+    );
+  },
 ).pipe(
   Command.withDescription(t("cli.command.pkm.search")),
   Command.withExamples([{ command: t("cli.example.pkmSearch.run"), description: t("cli.example.pkmSearch.about") }]),
@@ -106,6 +128,33 @@ const pageExport = Command.make("export", { page: pageArgument }, (o) =>
   Command.withExamples([{ command: t("cli.example.pkmPageExport.run"), description: t("cli.example.pkmPageExport.about") }]),
 );
 
+const pageSave = Command.make(
+  "save",
+  {
+    title: Argument.String("title").pipe(Argument.withDescription(t("cli.arg.pageTitle"))),
+    words: words("cli.arg.capture"),
+    tier: tierFlag,
+  },
+  (o) =>
+    Effect.gen(function* () {
+      const markdown = o.words.length > 0 ? o.words.join(" ") : yield* stdinText.pipe(Effect.orElseSucceed(() => ""));
+      const tier = given(o.tier);
+      yield* change({
+        name: "pkm page save",
+        does: (api) =>
+          api.pkm.page.save({
+            title: o.title,
+            ...(tier === undefined ? {} : { tier }),
+            ...(markdown === "" ? {} : { markdown }),
+          }),
+        said: (p) => t("cli.pkm.saved", { page: p.title }),
+      });
+    }),
+).pipe(
+  Command.withDescription(t("cli.command.pkm.pageSave")),
+  Command.withExamples([{ command: t("cli.example.pkmPageSave.run"), description: t("cli.example.pkmPageSave.about") }]),
+);
+
 /** $VISUAL, else $EDITOR, else vi: a command line, the file added as its last word. */
 const editorCommand = Config.all({
   visual: Config.String("VISUAL").pipe(Config.withDefault("")),
@@ -158,7 +207,7 @@ const pageEdit = Command.make("edit", { page: pageArgument }, (o) =>
 const journalGroup = Command.make("journal").pipe(Command.withSubcommands([journalShow]), Command.withDescription(t("cli.group.pkm.journal.about")));
 
 const pageGroup = Command.make("page").pipe(
-  Command.withSubcommands([pageList, pageShow, pageExport, pageEdit]),
+  Command.withSubcommands([pageList, pageShow, pageSave, pageExport, pageEdit]),
   Command.withDescription(t("cli.group.pkm.page.about")),
 );
 

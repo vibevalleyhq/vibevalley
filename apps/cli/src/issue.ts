@@ -8,8 +8,7 @@ import { actCommand } from "@vibevalley/protocol/api";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
-import { frames, ServerFlag } from "./api.ts";
-import { ask, change, given, show } from "./farm.ts";
+import { ask, change, frames, given, ServerFlag, show } from "./farm.ts";
 import { err, exit, Failure, stdinText } from "./output.ts";
 
 const issueArg = Argument.String("issue").pipe(Argument.withDescription(t("cli.arg.issue")));
@@ -273,33 +272,32 @@ const settled = new Set<T.IssueStatus>(["in_review", "done", "canceled"]);
 
 /** Follows the issue in the core state until it waits on the owner or is over, each status on stderr; one that already
  * does is not waited for. */
-const followed = (issue: T.Issue, timeout: number | undefined) =>
-  Effect.gen(function* () {
-    const base = yield* ServerFlag;
-    const follow = frames(base, statePath).pipe(
-      Stream.mapEffect((data) =>
-        Schema.decodeEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Server", text: e.message }))),
-      ),
-      Stream.mapEffect((frame) => {
-        const now = frame.state.issues.find((i) => i.id === issue.id);
-        return now
-          ? Effect.succeed(now.status)
-          : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
-      }),
-      Stream.changes,
-      Stream.tap((status) => err(JSON.stringify({ issue: issue.number, status }))),
-      Stream.takeUntil((status) => settled.has(status)),
-      Stream.runDrain,
-    );
-    yield* timeout === undefined
-      ? follow
-      : follow.pipe(
-          Effect.timeoutOrElse({
-            duration: `${timeout} seconds`,
-            orElse: () => new Failure({ code: exit.other, tag: "Timeout", text: t("cli.issue.timeout", { issue: `#${issue.number}`, seconds: timeout }) }),
-          }),
-        );
-  });
+const followed = Effect.fn("Cli.followed")(function* (issue: T.Issue, timeout: number | undefined) {
+  const base = yield* ServerFlag;
+  const follow = frames(base, statePath).pipe(
+    Stream.mapEffect((data) =>
+      Schema.decodeEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Server", text: e.message }))),
+    ),
+    Stream.mapEffect((frame) => {
+      const now = frame.state.issues.find((i) => i.id === issue.id);
+      return now
+        ? Effect.succeed(now.status)
+        : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
+    }),
+    Stream.changes,
+    Stream.tap((status) => err(JSON.stringify({ issue: issue.number, status }))),
+    Stream.takeUntil((status) => settled.has(status)),
+    Stream.runDrain,
+  );
+  yield* timeout === undefined
+    ? follow
+    : follow.pipe(
+        Effect.timeoutOrElse({
+          duration: `${timeout} seconds`,
+          orElse: () => new Failure({ code: exit.other, tag: "Timeout", text: t("cli.issue.timeout", { issue: `#${issue.number}`, seconds: timeout }) }),
+        }),
+      );
+});
 
 /** `issue show 12`: the issue; --watch follows it first, until it waits on the owner or is over (as `kubectl get -w`). */
 const showCommand = Command.make(

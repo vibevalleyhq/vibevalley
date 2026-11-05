@@ -27,7 +27,7 @@
 2. 调这次改动的接口、看状态：
 
    ```bash
-   vpx scripts/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" issue list && "$VIBEVALLEY_VERIFY_CLI" api state'
+   vpx scripts/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" issue list --format json'
    ```
 
    要造数据或断言，写进同一个子命令。

@@ -103,7 +103,7 @@
 **新增或修改协议接口**
 
 1. 修改 `packages/protocol/src/<概念>/` 下的 `shapes.ts`、`schema.ts` 和 `api.ts`。
-2. 在 `apps/server/src/http/handlers/<概念>.ts` 实现接口，在 `apps/cli/src/reach.ts` 登记 CLI 覆盖。
+2. 在 `apps/server/src/http/handlers/<概念>.ts` 实现接口。
 3. 运行 `vp run api:client` 和 `vp run capabilities` 更新生成的客户端与能力表。
 
 **修改纯函数规则与黄金数据**

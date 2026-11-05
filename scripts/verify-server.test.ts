@@ -27,10 +27,10 @@ test("sandbox owns isolation, readiness, validation failure and cleanup", async 
     const created = await fetch(server + '/api/v1/issue/create', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:'sandbox fixture'})});
     if (!created.ok) throw new Error('create failed: ' + await created.text());
     const issue = await created.json();
-    const cli = spawnSync(process.env.VIBEVALLEY_VERIFY_CLI, ['api', 'state'], {env:process.env, encoding:'utf8'});
-    if (cli.status !== 0) throw new Error('state failed');
-    const frame = JSON.parse(cli.stdout);
-    if (!frame.state.issues.some(i => i.id === issue.id)) throw new Error('fixture absent from state');
+    const cli = spawnSync(process.env.VIBEVALLEY_VERIFY_CLI, ['issue', 'list', '--format', 'json'], {env:process.env, encoding:'utf8'});
+    if (cli.status !== 0) throw new Error('issue list failed');
+    const issues = JSON.parse(cli.stdout);
+    if (!issues.some(i => i.id === issue.id)) throw new Error('fixture absent from issue list');
     const descendant = spawn('sh', ['-c', 'sleep 30 & wait'], {stdio:'ignore'});
     console.log(JSON.stringify({issue:issue.id,title:issue.title,address:server,descendant:descendant.pid}));
     process.exit(23);

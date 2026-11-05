@@ -30,11 +30,11 @@ export const missing = (what: string, next: readonly Next[]): ApiError => ({ _ta
 
 /** Where to find the ones that are there, as the command that lists them. */
 // say is read when the error is made, in the locale of the moment.
-const listed = (key: LookIn, run: readonly string[]): Next => ({
+const listed = (key: LookIn, run?: readonly string[]): Next => ({
   get say() {
     return t(`server.lookIn.${key}`);
   },
-  run: [...run],
+  ...(run ? { run: [...run] } : {}),
 });
 
 export const lookIn = {
@@ -43,11 +43,11 @@ export const lookIn = {
   project: listed("project", commandOf("project.list")),
   runtime: listed("runtime", commandOf("runtime.list")),
   agent: listed("agent", commandOf("agent.list")),
-  skill: listed("skill", commandOf("skill.list")),
-  template: listed("template", commandOf("agent.template.list")),
+  skill: listed("skill"),
+  template: listed("template"),
   cron: listed("cron", commandOf("cron.list")),
-  device: listed("device", commandOf("lan.get")),
-  archive: listed("archive", commandOf("orchestrator.archive.list")),
+  device: listed("device"),
+  archive: listed("archive"),
   channel: listed("channel", commandOf("channel.list")),
   artifact: listed("artifact", commandOf("artifact.list")),
   pkm: listed("pkm", commandOf("pkm.page.list")),

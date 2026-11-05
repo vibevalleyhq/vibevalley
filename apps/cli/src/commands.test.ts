@@ -10,8 +10,7 @@ describe("the hand-written commands", () => {
     Effect.gen(function* () {
       const server = yield* farm;
       const at = (...args: string[]) => [...args, "--server", server];
-      // Making a page has no command of its own: it goes through api.
-      expect((yield* cli(at("api", "call", "pkm.page.save", "--json", JSON.stringify({ title: "Garden", markdown: "- bulbs\n" })))).code).toBe(0);
+      expect((yield* cli(at("pkm", "page", "save", "Garden"), "- bulbs\n")).code).toBe(0);
 
       const noted = yield* cli(at("pkm", "capture", "--page", "Garden"), "tomatoes\n  basil\n");
       expect([noted.code, noted.out]).toEqual([0, "记进了「Garden」"]);

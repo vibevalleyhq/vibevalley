@@ -92,9 +92,9 @@ flowchart LR
 
 | 路径 | 连接初值 | 后续推送 | 消费者 |
 |---|---|---|---|
-| `GET /api/v1/state` | 当前 `StateFrame` | 200ms 窗口合并后的 `StateFrame` | 页面、`vibevalley state` |
+| `GET /api/v1/state` | 当前 `StateFrame` | 200ms 窗口合并后的 `StateFrame` | 页面、`issue show --watch` |
 | `GET /api/v1/live` | 无 | `LiveEvent`（`SessionEvent`、`Notice`、`Runtime`） | 页面 |
-| `GET /api/v1/events` | `snapshot`（`WorkspaceState`） | `ServerEvent`（每条 `Fact` 及 `LiveEvent`） | `vibevalley api events`、调试 |
+| `GET /api/v1/events` | `snapshot`（`WorkspaceState`） | `ServerEvent`（每条 `Fact` 及 `LiveEvent`） | 调试 |
 
 ## HTTP 接口
 

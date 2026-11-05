@@ -32,10 +32,9 @@ describe("the command line's answers", () => {
           }
           case "dry": {
             const r = yield* cli([...at, "--dry-run"]);
-            // A task command's dry run is lines of text; api call's is the endpoint's JSON.
             answers.set(c.line, {
               code: r.code,
-              out: r.out === "" ? null : r.out.startsWith("{") ? (JSON.parse(r.out) as unknown) : r.out.split("\n"),
+              out: r.out === "" ? null : r.out.split("\n"),
               error: r.failure,
             });
             break;

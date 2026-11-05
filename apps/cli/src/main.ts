@@ -1,6 +1,6 @@
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Cause, Effect, Exit, Option, Predicate, Stdio } from "effect";
-import { Argument, CliError, CliOutput, Command, Flag, TerminalCapabilities } from "effect/cli";
+import { Cause, Effect, Exit, Predicate, Stdio } from "effect";
+import { CliError, CliOutput, Command, TerminalCapabilities } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
 import { homeOf, savedLocale } from "@vibevalley/home";
@@ -11,12 +11,11 @@ import { err, exit, Failure, out, printFailure } from "./output.ts";
 // The command line speaks the farm's language: the locale saved in the home's settings.json.
 setLocale(savedLocale(homeOf()));
 
-const { apiCommand, DryRunFlag, FormatFlag, ServerFlag } = await import("./api.ts");
 const { appCommand } = await import("./app.ts");
 const { channelCommand } = await import("./channel.ts");
-const { converse } = await import("./chat.ts");
+const { chatCommand } = await import("./chat.ts");
 const { doctorCommand } = await import("./doctor.ts");
-const { guideCommand } = await import("./guide.ts");
+const { DryRunFlag, FormatFlag, ServerFlag } = await import("./farm.ts");
 const { issueCommand } = await import("./issue.ts");
 const { keptCommands } = await import("./notes.ts");
 const { pkmCommand } = await import("./pkm.ts");
@@ -24,53 +23,8 @@ const { farmPartCommands } = await import("./project.ts");
 
 const version = "0.1.0";
 
-const text = (name: string, description: string) => Flag.String(name).pipe(Flag.optional, Flag.withDescription(description));
-/** The flags given, as the server's conversation reads them (apps/server src/chat.ts): --name value, in order. */
-const passed = (flags: Readonly<Record<string, Option.Option<string>>>) =>
-  Object.entries(flags).flatMap(([name, value]) => (Option.isSome(value) ? [`--${name}`, value.value] : []));
-
-const prompt = text("prompt", t("cli.flag.prompt")).pipe(Flag.withAlias("p"));
-
-/** `chat [runtime]`: a conversation in this terminal, with VibeValley's own agent or, named, a runtime on this machine. */
-const chatCommand = Command.make(
-  "chat",
-  {
-    runtime: Argument.String("runtime").pipe(Argument.optional, Argument.withDescription(t("cli.arg.chatRuntime"))),
-    cwd: text("cwd", t("cli.flag.cwd")),
-    model: text("model", t("cli.flag.model")),
-    effort: text("effort", t("cli.flag.effort")),
-    resume: text("resume", t("cli.flag.resume")),
-    name: text("name", t("cli.flag.name")),
-    mcp: text("mcp", t("cli.flag.mcp")),
-    prompt,
-  },
-  ({ runtime, ...flags }) => {
-    const id = Option.getOrElse(runtime, () => "vibevalley");
-    const own = id === "vibevalley";
-    // Each flag is one side's: --name and --mcp are the farm's agent's, --effort and --resume a runtime's.
-    const stray = own ? (["effort", "resume"] as const) : (["name", "mcp"] as const);
-    const given = stray.filter((f) => Option.isSome(flags[f]));
-    if (given.length > 0)
-      return Effect.fail(
-        new Failure({ code: exit.usage, tag: "InvalidValue", text: t("cli.failure.chatFlag", { flags: given.map((f) => `--${f}`).join(" "), runtime: id }) }),
-      );
-    return converse(
-      own
-        ? passed({ cwd: flags.cwd, name: flags.name, model: flags.model, mcp: flags.mcp, prompt: flags.prompt })
-        : ["runtime", id, ...passed({ model: flags.model, effort: flags.effort, resume: flags.resume, cwd: flags.cwd, prompt: flags.prompt })],
-    );
-  },
-).pipe(
-  Command.withDescription(t("cli.command.chat")),
-  Command.withExamples([
-    { command: "vibevalley chat", description: t("cli.example.chat.about") },
-    { command: "vibevalley chat claude", description: t("cli.example.runtimeChat.about") },
-  ]),
-);
-
 const root = Command.make("vibevalley").pipe(
   Command.withDescription(t("cli.command.root")),
-  // By what a person or an agent does; what no command covers is reached through api (reach.ts says which).
   Command.withSubcommands([
     issueCommand,
     pkmCommand,
@@ -80,8 +34,6 @@ const root = Command.make("vibevalley").pipe(
     chatCommand,
     doctorCommand,
     appCommand,
-    guideCommand,
-    apiCommand,
   ]),
   Command.withGlobalFlags([ServerFlag, DryRunFlag, FormatFlag]),
 );

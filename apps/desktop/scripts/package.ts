@@ -5,7 +5,6 @@ import { join } from "node:path";
 
 import { build, Platform } from "electron-builder";
 
-import { cliFiles } from "@vibevalley/cli/assets";
 import { serverFiles } from "@vibevalley/server/assets";
 import { baselineHash } from "@vibevalley/server/baseline";
 
@@ -40,9 +39,8 @@ for (const name of readdirSync(server))
 cpSync(assets, server, { recursive: true });
 rmSync(assets, { recursive: true, force: true });
 rmSync(join(server, "node_modules", "@vibevalley"), { recursive: true, force: true });
-// The command line is one bundle with nothing beside it but its guide: it loads none of the server.
+// The command line is one standalone bundle: it loads none of the server.
 sh(join(repo, "apps/cli"), "vp", "pack", "--out-dir", join(cli, "dist"));
-for (const path of cliFiles) cpSync(join(repo, "apps/cli", path), join(cli, path), { recursive: true });
 // Nor what only an editor reads: the dependencies' source maps and type declarations, a third of the server's files.
 const devOnly = /\.(?:js|mjs|cjs|ts|mts|cts)\.map$|\.d\.(?:ts|mts|cts)$/u;
 for (const name of readdirSync(join(server, "node_modules", ".pnpm"), { recursive: true, encoding: "utf8" }))

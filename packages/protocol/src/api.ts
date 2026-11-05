@@ -82,8 +82,8 @@ export const endpoints: readonly Endpoint[] = [
 
 export { pathOf };
 
-/** Endpoints with a command of their own that takes the same arguments, by that command (the command line's, apps/server src/cli): what commandOf writes for them. */
-const sameAs: Partial<Record<keyof Handlers, readonly string[]>> = {
+/** Endpoints with a CLI command that takes the same positional arguments. */
+const sameAs = {
   "issue.list": ["issue", "list"],
   "issue.get": ["issue", "show"],
   "issue.diff.get": ["issue", "diff"],
@@ -103,7 +103,9 @@ const sameAs: Partial<Record<keyof Handlers, readonly string[]>> = {
   "artifact.content.get": ["artifact", "read"],
   "pkm.page.list": ["pkm", "page", "list"],
   "pkm.page.get": ["pkm", "page", "show"],
-};
+} as const satisfies Partial<Record<keyof Handlers, readonly string[]>>;
+
+export type CommandOp = keyof typeof sameAs;
 
 /** The command that does one of an issue's acts (without `vibevalley`). */
 export function actCommand(
@@ -122,17 +124,8 @@ export function actCommand(
   }
 }
 
-/** A command that does what op does with these arguments (about. */
-export const commandOf = (op: keyof Handlers, about: readonly string[] = [], input?: Record<string, unknown>): string[] => {
-  const same = sameAs[op];
-  if (same && input === undefined) return [...same, ...about];
-  const names = endpoints.find((e) => e.op === op)?.about ?? [];
-  const fields = { ...Object.fromEntries(names.flatMap((name, i) => (about[i] === undefined ? [] : [[name, about[i]]]))), ...input };
-  return ["api", "call", op, ...(Object.keys(fields).length > 0 ? ["--json", JSON.stringify(fields)] : [])];
-};
-
-/** Only get, list, check, recall and preview read; every other verb may change something. */
-export const readsOnly = (op: string) => /^(get|list|check|recall|search|preview[A-Z]\w*)$/u.test(op.split(".").at(-1) ?? "");
+/** A command that does what op does with these arguments. */
+export const commandOf = (op: CommandOp, about: readonly string[] = []): string[] => [...sameAs[op], ...about];
 
 /** The fields an endpoint's input takes, what it is about among them; none when it takes nothing. */
 export const fieldsOf = (e: Endpoint): readonly string[] => {
