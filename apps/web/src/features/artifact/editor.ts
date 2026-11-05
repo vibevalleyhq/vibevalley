@@ -439,9 +439,8 @@ export class BlockEditor {
   backspaceAtStart(b: EditBlock) {
     if (b.type !== "paragraph" && hasText(b.type)) return this.setType(b, "paragraph", {});
     const i = this.blocks.indexOf(b);
-    if (i <= 0) return;
-    const prev = this.blocks[i - 1]!;
-    if (!knownTypes.has(prev.type)) return;
+    const prev = i > 0 ? this.blocks[i - 1] : undefined;
+    if (!prev || !knownTypes.has(prev.type)) return;
     if (!hasText(prev.type)) {
       this.byId.delete(prev.id);
       this.gone.set(prev.id, prev);
@@ -496,7 +495,10 @@ export class BlockEditor {
 
   /** The nearest block with text above (-1) or below (1). */
   neighbour(b: EditBlock, step: 1 | -1) {
-    for (let j = this.blocks.indexOf(b) + step; j >= 0 && j < this.blocks.length; j += step) if (hasText(this.blocks[j]!.type)) return this.blocks[j];
+    for (let j = this.blocks.indexOf(b) + step; j >= 0 && j < this.blocks.length; j += step) {
+      const candidate = this.blocks[j];
+      if (candidate && hasText(candidate.type)) return candidate;
+    }
     return undefined;
   }
 

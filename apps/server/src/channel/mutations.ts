@@ -42,7 +42,8 @@ export function messageMutations(
         yield* work(revision, now);
       }),
     );
-    const message = toMessage((yield* db.one(qm.messageByID({ id: row.id })))!);
+    const updated = yield* db.one(qm.messageByID({ id: row.id }));
+    const message = toMessage(updated ?? row);
     yield* PubSub.publish(said, message);
     yield* publishChannel(row.channel_id);
     return message;

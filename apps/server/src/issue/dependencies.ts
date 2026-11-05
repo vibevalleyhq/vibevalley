@@ -3,8 +3,8 @@ import type * as T from "@vibevalley/protocol";
 
 export function dependencyProblems(issues: readonly Pick<T.Issue, "id" | "parent" | "blockedBy">[]) {
   const children = Map.groupBy(
-    issues.filter((issue) => issue.parent !== undefined),
-    (issue) => issue.parent!,
+    issues.filter((issue): issue is Pick<T.Issue, "id" | "blockedBy"> & { readonly parent: T.IssueId } => issue.parent !== undefined),
+    (issue) => issue.parent,
   );
   return dagProblems(issues.map((issue) => ({ id: issue.id, after: [...issue.blockedBy, ...(children.get(issue.id) ?? []).map((child) => child.id)] })));
 }

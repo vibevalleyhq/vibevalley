@@ -35,12 +35,14 @@ export function moveIndex(
 /** The next item whose label starts with what was typed, searching from after `current` and wrapping. */
 export function typeahead(labels: readonly string[], current: number, typed: string, enabled: (i: number) => boolean = () => true): number | undefined {
   const query = typed.toLowerCase();
-  const repeated = query.length > 1 && [...query].every((c) => c === query[0]);
-  const search = repeated ? query[0]! : query;
+  const first = query[0] ?? "";
+  const repeated = query.length > 1 && [...query].every((c) => c === first);
+  const search = repeated ? first : query;
   const start = search.length === 1 || repeated ? current + 1 : Math.max(current, 0);
   for (let i = 0; i < labels.length; i++) {
     const at = (start + i) % labels.length;
-    if (enabled(at) && labels[at]!.trim().toLowerCase().startsWith(search)) return at;
+    const label = labels[at];
+    if (label !== undefined && enabled(at) && label.trim().toLowerCase().startsWith(search)) return at;
   }
   return undefined;
 }

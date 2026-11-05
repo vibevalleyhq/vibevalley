@@ -118,7 +118,7 @@ export function merging(d: MergeDeps) {
       yield* sessions
         .handOver(id, closed, (place) => projects.finishPullRequest(place.project, issue.number))
         .pipe(Effect.catchTag("NotTakenIn", (e) => Effect.fail(refused(e.failure.reasonText))));
-    else yield* projects.finishPullRequest(issue.project!, issue.number).pipe(Effect.mapError((e) => refused(e.message)));
+    else if (issue.project) yield* projects.finishPullRequest(issue.project, issue.number).pipe(Effect.mapError((e) => refused(e.message)));
     yield* db.inTx(
       Effect.andThen(
         db.run(

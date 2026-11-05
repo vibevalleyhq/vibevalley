@@ -183,7 +183,7 @@ export class VoiceCall {
               if (!mine()) return;
               try {
                 const fresh = await api.voice.grant.renew({ channel: session.channel, uid: session.uid });
-                if (mine()) await line!.renew(fresh.token);
+                if (mine()) await line?.renew(fresh.token);
               } catch (e) {
                 if (!mine()) return;
                 this.problem = t("web.voice.call.renew", { why: reasonOf(e) });

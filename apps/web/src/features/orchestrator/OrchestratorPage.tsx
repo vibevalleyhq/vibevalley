@@ -63,7 +63,7 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
         <h1 class="text-2xl font-semibold">{profile()?.name || t("web.orchestrator.orchestrator.title")}</h1>
         <p class="text-sm text-muted">
           {t("web.orchestrator.orchestrator.intro")}
-          {look() ? t("web.orchestrator.orchestrator.look", { name: look()!.name }) : ""}{" "}
+          {look() ? t("web.orchestrator.orchestrator.look", { name: look()?.name ?? "" }) : ""}{" "}
           <A href={`/agents/${encodeURIComponent(props.agent)}`} class="underline">
             {t("web.orchestrator.orchestrator.profile")}
           </A>

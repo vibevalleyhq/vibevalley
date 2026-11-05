@@ -145,7 +145,7 @@ export const channelRecords = Effect.gen(function* () {
   };
   const talkSession = (channel: string) => presentSessions().find((h) => directOfSession(h) === channel);
   const channelOfSession = (h: T.Session) => directOfSession(h) ?? (h.channel && channelName(h.channel) !== undefined ? h.channel : model.defaultId());
-  const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? row.parent_id! : row.id);
+  const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? (row.parent_id ?? row.id) : row.id);
   /** Where the owner talks with peer alone, from either side. */
   const directWith = (who: string, other: string) => {
     const peer = who === ownerId ? other : other === ownerId ? who : "";

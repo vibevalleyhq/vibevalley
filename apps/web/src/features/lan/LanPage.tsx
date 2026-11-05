@@ -99,7 +99,7 @@ export function LanPage() {
           )}
         </Show>
       </Card>
-      <Show when={s() && s()!.devices.length > 0 ? s() : undefined}>
+      <Show when={s() && (s()?.devices.length ?? 0) > 0 ? s() : undefined}>
         {(s) => (
           <Card title={t("web.lan.lan.devices")} action={<span class="text-sm text-muted">{t("web.lan.lan.deviceCount", { n: s().devices.length })}</span>}>
             <For each={s().devices}>

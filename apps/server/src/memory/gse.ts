@@ -25,7 +25,7 @@ function keyOf(text: string): string {
   // Most words are all CJK, past U+0800: nothing in them is lowered.
   if (!lowerable.test(text)) return text;
   let out = "";
-  for (const ch of text) out += ch.codePointAt(0)! < 0x800 && isLetterOrNumber.test(ch) ? goLower(ch) : ch;
+  for (const ch of text) out += (ch.codePointAt(0) ?? 0) < 0x800 && isLetterOrNumber.test(ch) ? goLower(ch) : ch;
   return out;
 }
 
@@ -98,10 +98,10 @@ function find(word: string): number | undefined {
   let hi = keys.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (keys[mid]! < word) lo = mid + 1;
+    if ((keys[mid] ?? "") < word) lo = mid + 1;
     else hi = mid;
   }
-  return lo < keys.length && keys[lo]!.startsWith(word) ? 0 : undefined;
+  return keys[lo]?.startsWith(word) === true ? 0 : undefined;
 }
 
 /** For each start, the ends of the dictionary words that start there; itself when none does. */
@@ -111,14 +111,14 @@ function dagOf(runes: readonly string[]): number[][] {
   for (let k = 0; k < n; k++) {
     const ends: number[] = [];
     let i = k;
-    let frag = runes[k]!;
+    let frag = runes[k] ?? "";
     for (;;) {
       const f = find(frag);
       if (f === undefined) break;
       if (f > 0) ends.push(i);
       i++;
       if (i >= n) break;
-      frag += runes[i]!;
+      frag += runes[i] ?? "";
     }
     dag.push(ends.length > 0 ? ends : [k]);
   }
@@ -134,12 +134,12 @@ function routesOf(runes: readonly string[]): { freq: number; index: number }[] {
   const logT = Math.log(dict().totalFreq);
   for (let idx = n - 1; idx >= 0; idx--) {
     let best: { freq: number; index: number } | undefined;
-    for (const i of dag[idx]!) {
+    for (const i of dag[idx] ?? []) {
       const f = find(runes.slice(idx, i + 1).join(""));
-      const r = { freq: (f === undefined ? Math.log(1) : Math.log(f)) - logT + routes[i + 1]!.freq, index: i };
+      const r = { freq: (f === undefined ? Math.log(1) : Math.log(f)) - logT + (routes[i + 1]?.freq ?? 0), index: i };
       if (!best || best.freq < r.freq || (best.freq === r.freq && best.index < r.index)) best = r;
     }
-    routes[idx] = best!;
+    routes[idx] = best ?? { freq: 0, index: idx };
   }
   return routes;
 }
@@ -168,30 +168,34 @@ const better = (a: { prob: number; state: State }, b: { prob: number; state: Sta
 
 function viterbi(obs: readonly string[]): State[] {
   const e = emit();
-  let vtb: Record<string, number> = {};
-  let path: Record<string, State[]> = {};
+  let vtb: Record<State, number> = { B: minFloat, M: minFloat, E: minFloat, S: minFloat };
+  let path: Record<State, State[]> = { B: ["B"], M: ["M"], E: ["E"], S: ["S"] };
+  const first = obs[0] ?? "";
   for (const y of states) {
-    vtb[y] = (e[y][obs[0]!] ?? minFloat) + probStart[y];
+    vtb[y] = (e[y][first] ?? minFloat) + probStart[y];
     path[y] = [y];
   }
   for (let t = 1; t < obs.length; t++) {
-    const next: Record<string, number> = {};
-    const newPath: Record<string, State[]> = {};
+    const next: Record<State, number> = { B: minFloat, M: minFloat, E: minFloat, S: minFloat };
+    const newPath: Record<State, State[]> = { B: [], M: [], E: [], S: [] };
+    const ch = obs[t] ?? "";
     for (const y of states) {
-      const emP = e[y][obs[t]!] ?? minFloat;
-      let best: { prob: number; state: State } | undefined;
+      const emP = e[y][ch] ?? minFloat;
+      let best = { prob: minFloat, state: prevStatus[y][0] ?? ("S" as State) };
+      let firstChoice = true;
       for (const y0 of prevStatus[y]) {
-        const p = { prob: vtb[y0]! + (probTrans[y0][y] ?? minFloat) + emP, state: y0 };
-        best = best ? better(best, p) : p;
+        const p = { prob: vtb[y0] + (probTrans[y0][y] ?? minFloat) + emP, state: y0 };
+        best = firstChoice ? p : better(best, p);
+        firstChoice = false;
       }
-      next[y] = best!.prob;
-      newPath[y] = [...path[best!.state]!, y];
+      next[y] = best.prob;
+      newPath[y] = [...path[best.state], y];
     }
     vtb = next;
     path = newPath;
   }
-  const last = better({ prob: vtb.E!, state: "E" }, { prob: vtb.S!, state: "S" });
-  return path[last.state]!;
+  const last = better({ prob: vtb.E, state: "E" }, { prob: vtb.S, state: "S" });
+  return path[last.state];
 }
 
 function hmmInternal(text: string): string[] {
@@ -248,7 +252,7 @@ function hmmCut(input: string): string[] {
         continue;
       }
     }
-    const at = !cut && !nonCut ? undefined : !cut ? nonCut!.index : !nonCut || cut.index < nonCut.index ? cut.index : nonCut.index;
+    const at = cut && nonCut ? Math.min(cut.index, nonCut.index) : (cut?.index ?? nonCut?.index);
     if (at === undefined) {
       out.push(text);
       break;
@@ -272,13 +276,13 @@ function cutDAG(input: string): string[] {
   const out: string[] = [];
   let buf: string[] = [];
   const flush = () => {
-    if (buf.length === 1) out.push(buf[0]!);
+    if (buf.length === 1 && buf[0] !== undefined) out.push(buf[0]);
     else if (buf.length > 1) out.push(...hmmRun(buf));
     buf = [];
   };
   for (let x = 0; x < runes.length;) {
-    const y = routes[x]!.index + 1;
-    if (y - x === 1) buf.push(runes[x]!);
+    const y = (routes[x]?.index ?? x) + 1;
+    if (y - x === 1) buf.push(runes[x] ?? "");
     else {
       flush();
       out.push(runes.slice(x, y).join(""));
@@ -313,10 +317,11 @@ export function cutAll(text: string): string[] {
   const out: string[] = [];
   let start = -1;
   for (let k = 0; k < dag.length; k++) {
-    const ends = dag[k]!;
-    if (ends.length === 1 && k > start) {
-      out.push(runes.slice(k, ends[0]! + 1).join(""));
-      start = ends[0]!;
+    const ends = dag[k] ?? [];
+    const [onlyEnd] = ends;
+    if (ends.length === 1 && onlyEnd !== undefined && k > start) {
+      out.push(runes.slice(k, onlyEnd + 1).join(""));
+      start = onlyEnd;
       continue;
     }
     for (const j of ends) {

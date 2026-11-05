@@ -56,26 +56,26 @@ function FarmHome() {
   const enter = (name: string) => <Navigate href={`/farm/${encodeURIComponent(name)}`} />;
   return (
     <Switch>
-      <Match when={last !== undefined && (!list() || list()!.some((p) => p.name === last)) ? last : undefined}>{(name) => enter(name())}</Match>
+      <Match when={last !== undefined && (list()?.some((p) => p.name === last) ?? true) ? last : undefined}>{(name) => enter(name())}</Match>
       <Match when={list()?.length === 0 || projects.isError}>
         <FarmPage project="" />
       </Match>
       {/* Entered once, by the list as it is now. */}
-      <Match when={list()}>{(all) => enter(untrack(() => sortProjects(all())[0]!.name))}</Match>
+      <Match when={list()}>{(all) => enter(untrack(() => sortProjects(all())[0]?.name ?? ""))}</Match>
     </Switch>
   );
 }
 
 function Routes() {
   const router = useRouter();
-  const pathname = () => router.path().split("?")[0]!;
+  const pathname = () => router.path().split("?")[0] ?? "/";
   const place = () => pathname().split("/")[1] ?? "";
   const rest = () => pathname().split("/").slice(2).join("/");
   return (
     <Switch fallback={<Navigate href="/" />}>
       {/* Where this machine opens (Settings > General): the workbench unless the owner chose the farm. */}
       <Match when={pathname() === "/"}>
-        <Navigate href={prefsNow().start === "farm" ? "/farm" : placeList[0]!.path} />
+        <Navigate href={prefsNow().start === "farm" ? "/farm" : (placeList[0]?.path ?? "/issues")} />
       </Match>
       {/* Before the farms by project: /farm/ (empty) is the farm of the sessions without one. */}
       <Match when={pathname() === "/farm"}>
@@ -94,8 +94,8 @@ function Routes() {
       <Match when={place() in places}>
         <Shell>
           {/* One place at a time: moving within a place keeps its page, moving to another builds that one. */}
-          <Show when={place()} keyed>
-            {(p) => places[p]!(rest)}
+          <Show when={places[place()]} keyed>
+            {(render) => render(rest)}
           </Show>
         </Shell>
       </Match>

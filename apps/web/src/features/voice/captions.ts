@@ -112,7 +112,10 @@ export class LiveCaptions {
   }
 
   private find(speaker: Speaker, turn: number) {
-    for (let i = this.turns.length - 1; i >= 0; i--) if (this.turns[i]!.speaker === speaker && this.turns[i]!.turn === turn) return this.turns[i];
+    for (let i = this.turns.length - 1; i >= 0; i--) {
+      const entry = this.turns[i];
+      if (entry && entry.speaker === speaker && entry.turn === turn) return entry;
+    }
     return undefined;
   }
 

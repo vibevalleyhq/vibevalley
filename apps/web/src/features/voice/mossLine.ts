@@ -398,7 +398,7 @@ export class MossLine {
     }
     const buffer = out.createBuffer(1, pcm.length, outRate);
     const samples = buffer.getChannelData(0);
-    for (let i = 0; i < pcm.length; i++) samples[i] = pcm[i]! / 0x8000;
+    for (let i = 0; i < pcm.length; i++) samples[i] = (pcm[i] ?? 0) / 0x8000;
     const source = out.createBufferSource();
     source.buffer = buffer;
     source.connect(out.destination);

@@ -293,7 +293,7 @@ const make = (options: ConnectorOptions = {}) =>
             if (pending.length === 0) return true;
             const batches =
               late && pending.length > digestOver
-                ? [{ ids: pending.map((r) => r.id), text: flushText(pending.map((r) => r.body))[0]! }]
+                ? [{ ids: pending.map((r) => r.id), text: flushText(pending.map((r) => r.body))[0] ?? "" }]
                 : pending.map((r) => ({ ids: [r.id], text: r.body }));
             for (const out of batches) {
               const sent = yield* adapter.send(a.secrets, a.owner, out.text, a.replyContext).pipe(

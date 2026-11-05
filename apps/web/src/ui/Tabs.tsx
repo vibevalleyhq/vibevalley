@@ -51,7 +51,7 @@ export function Tabs<T extends string>(props: {
             <Base.Tab
               value={item.value}
               data-key={item.value}
-              render={item.href === undefined ? undefined : (p) => <A {...p} href={item.href!} />}
+              render={item.href === undefined ? undefined : (p) => <A {...p} href={item.href ?? ""} />}
               class={look().tab}
             >
               <Show when={item.icon}>

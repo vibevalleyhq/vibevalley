@@ -507,7 +507,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       yield* db.run(qs.resolveArtifactSuggestion({ id: suggestion, status: "accepted", resolved_at: yield* Clock.currentTimeMillis, resolved_by: actor }));
       const updated = yield* db.one(qs.artifactSuggestionByID({ id: suggestion }));
       yield* publishSuggestions(artifact);
-      return suggestionOf(updated!);
+      return suggestionOf(updated ?? row);
     }, lock.withPermits(1));
 
     const rejectSuggestion = Effect.fn("Artifact.rejectSuggestion")(function* (artifact: T.ArtifactId, suggestion: string, actor: string) {
@@ -517,7 +517,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       yield* db.run(qs.resolveArtifactSuggestion({ id: suggestion, status: "rejected", resolved_at: yield* Clock.currentTimeMillis, resolved_by: actor }));
       const updated = yield* db.one(qs.artifactSuggestionByID({ id: suggestion }));
       yield* publishSuggestions(artifact);
-      return suggestionOf(updated!);
+      return suggestionOf(updated ?? row);
     }, lock.withPermits(1));
 
     const suggestionStream = (id: T.ArtifactId): Stream.Stream<T.SuggestionEvent, ApiError> =>

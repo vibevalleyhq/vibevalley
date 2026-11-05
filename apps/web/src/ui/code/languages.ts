@@ -78,4 +78,4 @@ export function languageOf(nameOrTag: string): string | undefined {
   return byExtension[ext];
 }
 
-export const loadLanguage = (lang: string) => loaders[lang]!().then((m) => m.default);
+export const loadLanguage = (lang: string) => loaders[lang]?.().then((m) => m.default) ?? Promise.resolve(undefined);

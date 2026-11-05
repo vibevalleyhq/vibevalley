@@ -16,7 +16,7 @@ export function windowLabel(label: string) {
   if (label === "Current session") return t("web.runtime.quota.session");
   if (label === "Weekly included usage") return t("web.runtime.quota.weekly");
   const week = /^Current week \((.+)\)$/u.exec(label);
-  if (week) return t("web.runtime.quota.week", { models: week[1]! });
+  if (week?.[1]) return t("web.runtime.quota.week", { models: week[1] });
   return label.replace(/·\s*1 week/u, t("web.runtime.quota.oneWeek"));
 }
 

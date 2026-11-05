@@ -27,10 +27,12 @@ export const remarkIssueRefs = () => (tree: MdNode) => {
     const out: MdNode[] = [];
     let last = 0;
     for (const m of value.matchAll(issueRef)) {
-      const at = m.index + m[1]!.length;
+      const prefix = m[1] ?? "";
+      const num = m[2] ?? "";
+      const at = m.index + prefix.length;
       if (at > last) out.push({ type: "text", value: value.slice(last, at) });
-      out.push({ type: "link", url: `/issues/${m[2]}`, children: [{ type: "text", value: `#${m[2]}` }] });
-      last = at + 1 + m[2]!.length;
+      out.push({ type: "link", url: `/issues/${num}`, children: [{ type: "text", value: `#${num}` }] });
+      last = at + 1 + num.length;
     }
     if (last < value.length) out.push({ type: "text", value: value.slice(last) });
     return out;
@@ -47,10 +49,12 @@ function splitMentions(value: string): MdNode[] {
   const out: MdNode[] = [];
   let last = 0;
   for (const m of value.matchAll(mention)) {
-    const at = m.index + m[1]!.length;
+    const prefix = m[1] ?? "";
+    const tag = m[2] ?? "";
+    const at = m.index + prefix.length;
     if (at > last) out.push({ type: "text", value: value.slice(last, at) });
-    out.push({ type: "emphasis", data: { hName: "span", hProperties: { className: "mention" } }, children: [{ type: "text", value: m[2]! }] });
-    last = at + m[2]!.length;
+    out.push({ type: "emphasis", data: { hName: "span", hProperties: { className: "mention" } }, children: [{ type: "text", value: tag }] });
+    last = at + tag.length;
   }
   if (last < value.length) out.push({ type: "text", value: value.slice(last) });
   return out;
@@ -127,7 +131,8 @@ export function richen(root: ParentNode, o: RichOptions = {}): Undo {
     box.closest("li")?.classList.add("task");
   }
   for (const code of [...root.querySelectorAll("pre > code")]) {
-    const pre = code.parentElement!;
+    const pre = code.parentElement;
+    if (!pre) continue;
     const lang = [...code.classList].find((c) => c.startsWith("language-"))?.slice("language-".length) ?? "";
     const text = code.textContent.replace(/\n$/u, "");
     if (lang === "mermaid") undo.push(diagram(pre, text));

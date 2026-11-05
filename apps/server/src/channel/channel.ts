@@ -117,7 +117,7 @@ const make = Effect.gen(function* () {
       return direct.id;
     }
     let channel = model.defaultId();
-    const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/u, "").split(":")[0]!;
+    const name = parsed.kind === "channel" ? parsed.name : (target.trim().replace(/^#/u, "").split(":")[0] ?? "");
     if (name) {
       const found = model.channelByName(name);
       if (!found) return yield* Effect.fail(missing(t("server.channel.noChannelNamed", { name, tags: list(channelTags()) }), [lookIn.channel]));
@@ -504,7 +504,8 @@ const make = Effect.gen(function* () {
       for (const participant of model.lastRead.keys())
         if (participant !== ownerId && !agents.isOrchestrator(participant) && !sessions.present(participant)) model.lastRead.delete(participant);
       model.lastRead.set(who, target);
-      const older = rows.length > 0 && (yield* db.run(qm.messagesBefore({ channel_id: channel, number: rows[0]!.number, n: 1 }))).length > 0;
+      const oldest = rows[0];
+      const older = oldest !== undefined && (yield* db.run(qm.messagesBefore({ channel_id: channel, number: oldest.number, n: 1 }))).length > 0;
       return { target, messages: rows.map((m) => inboxOf(m, target)), older };
     }, locked),
     unread: Effect.fn("Channel.unread")(function* (who) {
@@ -706,16 +707,16 @@ const make = Effect.gen(function* () {
     topOf: Effect.fn("Channel.topOf")((channel) =>
       Effect.sync(() => {
         const row = model.channel(channel);
-        const top = model.channel(row && row.type !== "direct" ? channelIdOf(row) : model.defaultId());
-        return infoOf(top ?? model.channel(model.defaultId())!);
+        const top = model.channel(row && row.type !== "direct" ? channelIdOf(row) : model.defaultId()) ?? model.channel(model.defaultId());
+        return top ? infoOf(top) : { id: model.defaultId(), name: "general", description: "", project: "", default: true };
       }),
     ),
     addressOf: Effect.fn("Channel.addressOf")((channel) =>
       Effect.sync(() => {
         const row = model.channel(channel);
         if (row?.type === "direct") return { direct: true, target: targetOfChannel(row) };
-        const top = model.channel(row ? channelIdOf(row) : model.defaultId()) ?? model.channel(model.defaultId())!;
-        return { direct: false, target: targetOfChannel(top) };
+        const top = model.channel(row ? channelIdOf(row) : model.defaultId()) ?? model.channel(model.defaultId());
+        return { direct: false, target: top ? targetOfChannel(top) : "#general" };
       }),
     ),
     channelByName: Effect.fn("Channel.channelByName")((name) =>

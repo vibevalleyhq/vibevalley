@@ -75,7 +75,8 @@ export const nextReplySeq = (seqs: Map<string, number>, msgId: string) => {
   const next = (seqs.get(msgId) ?? 0) + 1;
   seqs.delete(msgId);
   seqs.set(msgId, next);
-  if (seqs.size > repliesKept) seqs.delete(seqs.keys().next().value!);
+  const oldest = seqs.keys().next().value;
+  if (seqs.size > repliesKept && oldest !== undefined) seqs.delete(oldest);
   return next;
 };
 

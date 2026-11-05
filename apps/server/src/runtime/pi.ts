@@ -74,7 +74,7 @@ const envName = /^\$?\{?([A-Z][A-Z0-9_]*)\}?$/u;
 /** A value from pi's config as pi reads it. pi's `!command` values are not run. */
 function piValue(value: string): string {
   const m = envName.exec(value);
-  return (m && process.env[m[1]!]) || value;
+  return (m?.[1] && process.env[m[1]]) || value;
 }
 
 /** The DeepSeek key pi uses and where it sends DeepSeek's requests. the base URL in models.json, else DeepSeek's own, without a trailing /v1. */

@@ -37,7 +37,7 @@ export const wallTime: Time = {
       }
       function abort() {
         clearTimeout(timer);
-        reject(signal!.reason);
+        reject(signal?.reason);
       }
       signal?.addEventListener("abort", abort, { once: true });
     }),

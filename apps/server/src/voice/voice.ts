@@ -333,7 +333,12 @@ export function speakPieces(text: string, max = 480): string[] {
     const chars = [...rest];
     let fit = 0;
     let used = 0;
-    while (fit < chars.length && used + bytes(chars[fit]!) <= max) used += bytes(chars[fit++]!);
+    for (const ch of chars) {
+      const len = bytes(ch);
+      if (used + len > max) break;
+      used += len;
+      fit++;
+    }
     const head = chars.slice(0, fit).join("");
     const end = Math.max(-1, ...[...head.matchAll(/[。！？!?；;\n]/gu)].map((m) => m.index));
     const cut = end > 0 ? [...head.slice(0, end + 1)].length : fit;
@@ -484,8 +489,8 @@ const make = (options: VoiceOptions = {}) =>
     const lineHandler = Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
       const m = route.exec(request.url.split("?")[0] ?? "");
-      if (request.method !== "POST" || !m) return HttpServerResponse.empty({ status: 404 });
-      const key = keys.get(m[1]!);
+      if (request.method !== "POST" || !m?.[1]) return HttpServerResponse.empty({ status: 404 });
+      const key = keys.get(m[1]);
       if (!key || request.headers.authorization !== "Bearer " + key)
         return HttpServerResponse.jsonUnsafe({ error: { message: "unauthorized" } }, { status: 401 });
       return yield* answer;

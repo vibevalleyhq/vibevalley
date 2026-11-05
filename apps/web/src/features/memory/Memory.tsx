@@ -226,7 +226,9 @@ function RecallPreview(props: { agent: string }) {
     <Section
       title={t("web.memory.memory.next")}
       aside={
-        lines().length > 0 && preview() ? t("web.memory.memory.preview", { n: lines().length, chars: preview()!.chars, limit: preview()!.limit }) : undefined
+        lines().length > 0 && preview()
+          ? t("web.memory.memory.preview", { n: lines().length, chars: preview()?.chars ?? 0, limit: preview()?.limit ?? 0 })
+          : undefined
       }
     >
       <div class="flex flex-col gap-1.5 sm:flex-row">
@@ -360,7 +362,7 @@ export function ArchivePanel(props: { agent: string }) {
                       </span>
                     </button>
                     <Show when={open()?.name === f().name}>
-                      <pre class="max-h-96 overflow-y-auto border-t border-line px-3 py-2 text-sm whitespace-pre-wrap select-text">{open()!.text}</pre>
+                      <pre class="max-h-96 overflow-y-auto border-t border-line px-3 py-2 text-sm whitespace-pre-wrap select-text">{open()?.text}</pre>
                     </Show>
                   </div>
                 )}

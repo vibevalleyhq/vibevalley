@@ -121,7 +121,7 @@ export const artifactContent = HttpRouter.add(
     if (!/^[0-9a-f-]{36}$/u.test(id) || !/^[1-9]\d*$/u.test(version)) return notFound();
     const path = yield* artifacts.file(artifactId(id), Number(version));
     if (!path) return notFound();
-    const contentType = artifactHeaders["content-type"]!;
+    const contentType = artifactHeaders["content-type"] ?? "text/html; charset=utf-8";
     if (new URL(request.url, "http://farm").searchParams.get("shell") !== "1")
       return yield* HttpServerResponse.file(path, { contentType, headers: artifactHeaders });
     // The workbench's view: the page with the shell after it (artifact/shell.ts).

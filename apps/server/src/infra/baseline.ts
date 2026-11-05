@@ -14,7 +14,8 @@ export function baselineStatements(sql: string = baselineSql()): string[] {
   let i = 0;
   const code = (text: string) => text.replace(/--[^\n]*/gu, "").trim();
   while (i < sql.length) {
-    const ch = sql[i]!;
+    const ch = sql[i];
+    if (!ch) break;
     if (ch === "-" && sql[i + 1] === "-") {
       const end = sql.indexOf("\n", i);
       const stop = end === -1 ? sql.length : end;

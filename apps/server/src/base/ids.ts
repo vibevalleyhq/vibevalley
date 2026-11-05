@@ -21,7 +21,7 @@ export function newId(now = Date.now()): string {
   for (let i = 0; i < 6; i++) b[i] = Math.floor(ms / 2 ** (8 * (5 - i))) & 0xff;
   b[6] = 0x70 | (seq >> 8);
   b[7] = seq & 0xff;
-  b[8] = (b[8]! & 0x3f) | 0x80;
+  b[8] = ((b[8] ?? 0) & 0x3f) | 0x80;
   const hex = b.toString("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }

@@ -37,9 +37,8 @@ export const nowledgeLabels = (agent: string, project: string) =>
 
 const scopeOf = (labels: unknown): MemoryScope => {
   if (!Array.isArray(labels) || !labels.every((l): l is string => typeof l === "string") || !labels.includes(app)) return { kind: "unknown" };
-  const scopes = labels.filter((l) => l === globalLabel || l.startsWith(projectLabel));
-  if (scopes.length !== 1) return { kind: "unknown" };
-  const only = scopes[0]!;
+  const [only, ...extra] = labels.filter((l) => l === globalLabel || l.startsWith(projectLabel));
+  if (!only || extra.length > 0) return { kind: "unknown" };
   if (only === globalLabel) return { kind: "global" };
   const encoded = only.slice(projectLabel.length);
   if (!/^(?:[0-9a-f]{2})+$/u.test(encoded)) return { kind: "unknown" };
@@ -212,7 +211,7 @@ export function nowledge(c: MemorySourceConfig): Source {
           fading: false,
           source: "nowledge",
           score: h.relevance_score ?? 0,
-          scope: scopes[index]!,
+          scope: scopes[index] ?? { kind: "unknown" },
         })),
       };
     }),

@@ -31,7 +31,10 @@ export const runeLen = (spans: readonly TextSpan[]) => spans.reduce((n, s) => n 
 export function sameText(a: readonly TextSpan[], b: readonly TextSpan[]): boolean {
   const x = normalSpans(a);
   const y = normalSpans(b);
-  return x.length === y.length && x.every((s, i) => s.t === y[i]!.t && sameMarks(s.marks, y[i]!.marks));
+  return x.length === y.length && x.every((s, i) => {
+    const other = y[i];
+    return other !== undefined && s.t === other.t && sameMarks(s.marks, other.marks);
+  });
 }
 
 /** Cuts spans at a code-point offset, 0 ≤ at ≤ runeLen(spans). */

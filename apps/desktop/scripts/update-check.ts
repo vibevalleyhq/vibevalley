@@ -69,7 +69,10 @@ async function run(feedUrl: string) {
     await app.evaluate(({ app }) => app.quit());
     return settled;
   } finally {
-    await app.close().catch(() => undefined);
+    await app.close().then(
+      () => undefined,
+      () => undefined,
+    );
   }
 }
 

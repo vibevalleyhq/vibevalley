@@ -250,8 +250,9 @@ export class Walker {
   /** Moves on by `dt` seconds. */
   step(dt: number) {
     let left = this.speed * dt;
-    while (left > 0 && this.path.length > 0) {
-      const next = this.path[0]!;
+    while (left > 0) {
+      const next = this.path[0];
+      if (!next) break;
       const dx = next.x - this.x;
       const dy = next.y - this.y;
       const d = Math.hypot(dx, dy);

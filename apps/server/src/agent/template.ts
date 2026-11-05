@@ -103,7 +103,7 @@ export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplat
       name: words?.name ?? item.name,
       duty: words?.duty ?? item.duty ?? "",
       tags: [...(words?.tags ?? item.tags ?? [])],
-      runtime: item.role === "orchestrator" ? orchestratorRuntime : item.runtime!,
+      runtime: item.role === "orchestrator" ? orchestratorRuntime : (item.runtime ?? orchestratorRuntime),
       model: item.model ?? "",
       effort: item.effort ?? "",
       personaMode: item.personaMode ?? "append",

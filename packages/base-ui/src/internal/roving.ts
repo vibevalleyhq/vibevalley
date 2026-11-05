@@ -8,11 +8,18 @@ export const disabled = (el: HTMLElement) => el.hasAttribute("data-disabled") ||
 export function roveFocus(e: KeyboardEvent, root: HTMLElement, item: string, o: { orientation: Orientation | "both"; loop: boolean }): HTMLElement | undefined {
   const items = itemsIn(root, item);
   const current = items.findIndex((el) => el === document.activeElement);
-  const at = moveIndex(e.key, current, items.length, { ...o, enabled: (i) => !disabled(items[i]!) });
-  if (at === undefined) return undefined;
+  const at = moveIndex(e.key, current, items.length, {
+    ...o,
+    enabled: (i) => {
+      const target = items[i];
+      return target !== undefined && !disabled(target);
+    },
+  });
+  const next = at !== undefined ? items[at] : undefined;
+  if (!next) return undefined;
   e.preventDefault();
-  items[at]!.focus();
-  return items[at];
+  next.focus();
+  return next;
 }
 
 /** Typing letters moves the focus to the next item whose text starts with them; returns that item. */
@@ -31,11 +38,15 @@ export function createTypeahead() {
       items.map((el) => el.dataset.label ?? el.textContent),
       items.findIndex((el) => el === document.activeElement),
       typed,
-      (i) => !disabled(items[i]!),
+      (i) => {
+        const target = items[i];
+        return target !== undefined && !disabled(target);
+      },
     );
-    if (at === undefined) return undefined;
+    const next = at !== undefined ? items[at] : undefined;
+    if (!next) return undefined;
     e.preventDefault();
-    items[at]!.focus();
-    return items[at];
+    next.focus();
+    return next;
   };
 }

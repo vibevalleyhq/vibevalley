@@ -20,8 +20,9 @@ export const answerCureWords = (problem: string) => t("server.issue.brief.answer
 export function splitBrief(brief: string): [string, string] {
   const lines = brief.replaceAll("\r\n", "\n").split("\n");
   const i = lines.findIndex((l) => l.trim() !== "");
-  if (i < 0) return ["", ""];
-  const first = lines[i]!.trim();
+  const firstLine = lines[i];
+  if (i < 0 || firstLine === undefined) return ["", ""];
+  const first = firstLine.trim();
   const title = shortTitle(first);
   if (title !== first) return [title, lines.slice(i).join("\n").trim()];
   return [

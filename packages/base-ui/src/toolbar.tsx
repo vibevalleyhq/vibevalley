@@ -21,7 +21,11 @@ function Root(props: DivProps & { orientation?: Orientation | undefined; loop?: 
   const ctx: Ctx = {
     orientation: () => props.orientation ?? "horizontal",
     // Until an item has had the focus, the first enabled one is the stop.
-    isStop: (el) => (el ? (stop() && stop()!.isConnected ? stop() === el : root !== undefined && itemsIn(root, `${item}:not([disabled])`)[0] === el) : false),
+    isStop: (el) => {
+      if (!el) return false;
+      const s = stop();
+      return s?.isConnected === true ? s === el : root !== undefined && itemsIn(root, `${item}:not([disabled])`)[0] === el;
+    },
   };
   return (
     <Context value={ctx}>

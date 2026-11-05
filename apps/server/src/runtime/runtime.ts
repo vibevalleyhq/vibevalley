@@ -353,9 +353,10 @@ const make = (options: RuntimeOptions = {}) =>
           const read = (probes.get(id) ?? 0) + 1;
           probes.set(id, read);
           // The settings are the farm's own, whatever stands in for the machine.
-          const next = options.probe
+          const customProbe = options.probe;
+          const next = customProbe
             ? yield* Effect.map(
-                Effect.promise(() => options.probe!(id)),
+                Effect.promise(() => customProbe(id)),
                 (i): Observation => ({ info: { ...i, settings: store.settings(id) }, read: 0 }),
               )
             : yield* probe(id);

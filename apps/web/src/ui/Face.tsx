@@ -17,7 +17,8 @@ export function AgentFace(props: { agentId: string; runtime?: string | undefined
     const all = ready(sprites, undefined);
     if (!all) return undefined;
     const name = `${castPrefix(props.look, props.agentId, (n) => n in all)}-down`;
-    const sp = all[name] ?? all["bear-farmer-down"]!;
+    const sp = all[name] ?? all["bear-farmer-down"];
+    if (!sp) return undefined;
     const k = size() / (sp.h * 0.5);
     const cx = sp.w / 2;
     const cy = sp.h * 0.25 + sp.h * 0.03;
@@ -57,7 +58,8 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
     if (!all) return undefined;
     const look = props.look ?? orchestratorLookOf(ready(agents, []), props.agent);
     const name = `manager-${look}-face` in all ? `manager-${look}-face` : "manager-face";
-    const sp = all[name]!;
+    const sp = all[name];
+    if (!sp) return undefined;
     const k = size() / (sp.w * 0.86);
     return { name, left: (size() - sp.w * k) / 2, top: size() * 0.04, width: sp.w * k, height: sp.h * k };
   };

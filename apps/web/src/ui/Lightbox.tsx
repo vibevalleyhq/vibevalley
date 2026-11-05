@@ -54,7 +54,7 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
               <Show when={count() > 1}>
                 <IconButton icon="previous" label={t("web.base.lightbox.prev")} onClick={() => go(-1)} />
                 <span class="px-1 text-xs text-muted">
-                  {props.at! + 1} / {count()}
+                  {(props.at ?? 0) + 1} / {count()}
                 </span>
                 <IconButton icon="next" label={t("web.base.lightbox.next")} onClick={() => go(1)} />
               </Show>

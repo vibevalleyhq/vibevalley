@@ -13,18 +13,18 @@ const waiting = new Map<number, (lines: Tokens | undefined) => void>();
 const done = new Map<string, Tokens>();
 
 function request(code: string, lang: string): Promise<Tokens | undefined> {
-  worker ??= (() => {
+  const active = (worker ??= (() => {
     const w = new Worker(new URL("./highlight.worker.ts", import.meta.url), { type: "module" });
     w.onmessage = (e: MessageEvent<Coloured>) => {
       waiting.get(e.data.id)?.(e.data.lines);
       waiting.delete(e.data.id);
     };
     return w;
-  })();
+  })());
   const id = next++;
   return new Promise((resolve) => {
     waiting.set(id, resolve);
-    worker!.postMessage({ id, code, lang } satisfies ColourRequest);
+    active.postMessage({ id, code, lang } satisfies ColourRequest);
   });
 }
 
@@ -39,7 +39,8 @@ export async function highlight(lines: readonly string[], nameOrTag: string): Pr
   const got = await request(code, lang);
   if (got) {
     done.set(key, got);
-    if (done.size > keep) done.delete(done.keys().next().value!);
+    const oldest = done.keys().next().value;
+    if (done.size > keep && oldest !== undefined) done.delete(oldest);
   }
   return got;
 }

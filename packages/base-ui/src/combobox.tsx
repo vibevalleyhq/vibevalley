@@ -123,7 +123,8 @@ function Input(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
   const step = (by: 1 | -1) => {
     const all = options();
     if (all.length === 0) return;
-    const at = all.indexOf(c.highlighted()!);
+    const h = c.highlighted();
+    const at = h ? all.indexOf(h) : -1;
     c.highlight(all[at < 0 ? (by === 1 ? 0 : all.length - 1) : Math.min(all.length - 1, Math.max(0, at + by))]);
   };
   return (

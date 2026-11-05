@@ -270,7 +270,7 @@ function Usage(props: { info: RuntimeInfo }) {
                         </p>
                         <p class="text-sm text-muted">
                           {(props.info.settings.dailyBudget ?? 0) > 0
-                            ? t("web.runtime.spentTodayBudget", { spent: yuan(props.info.spentToday ?? 0), budget: yuan(props.info.settings.dailyBudget!) })
+                            ? t("web.runtime.spentTodayBudget", { spent: yuan(props.info.spentToday ?? 0), budget: yuan(props.info.settings.dailyBudget ?? 0) })
                             : t("web.runtime.spentToday", { spent: yuan(props.info.spentToday ?? 0) })}
                         </p>
                       </>
@@ -561,7 +561,7 @@ function InventoryCard(props: { title: string; entries: InventoryEntry[] | null 
         <Match when={!props.entries}>
           <Quiet>{t("web.runtime.unreported")}</Quiet>
         </Match>
-        <Match when={props.entries!.length === 0}>
+        <Match when={props.entries?.length === 0}>
           <Quiet>{t("web.runtime.none")}</Quiet>
         </Match>
       </Switch>

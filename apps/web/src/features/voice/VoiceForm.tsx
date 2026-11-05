@@ -297,7 +297,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
         ? t("web.voice.voice.answer.agora")
         : answer().vendor === "deepseek"
           ? base().deepseekApiKey.source
-            ? t("web.voice.voice.answer.deepseek", { from: keyFrom[base().deepseekApiKey.source!] })
+            ? t("web.voice.voice.answer.deepseek", { from: keyFrom[base().deepseekApiKey.source ?? "none"] })
             : t("web.voice.voice.answer.noDeepseek")
           : t("web.voice.voice.answer.openai");
 

@@ -58,7 +58,7 @@ export const hasText = (type: string) => textTypes.has(type);
 /** A paragraph that starts with Markdown for another block: its type, its attrs, and how much of the start to drop. */
 export function markdownShortcut(text: string): { type: BlockType; attrs: BlockAttrs; strip: number } | undefined {
   const heading = /^(#{1,3}) /u.exec(text);
-  if (heading) return { type: "heading", attrs: { level: heading[1]!.length }, strip: heading[0].length };
+  if (heading?.[1]) return { type: "heading", attrs: { level: heading[1].length }, strip: heading[0].length };
   const todo = /^\[( |x)?\] /u.exec(text);
   if (todo) return { type: "todo", attrs: { checked: todo[1] === "x" }, strip: todo[0].length };
   const bullet = /^[-*] /u.exec(text);

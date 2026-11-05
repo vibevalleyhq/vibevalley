@@ -35,8 +35,10 @@ export function SkillsPage(props: { id?: string | undefined }) {
   const installed = () => installedSkills(catalog());
   const own = () => ready(skills, []);
   const creating = () => props.id === "new";
-  const shownInstalled = () =>
-    props.id?.startsWith(installedPrefix) === true ? installed().find((s) => s.name === props.id!.slice(installedPrefix.length)) : undefined;
+  const shownInstalled = () => {
+    const id = props.id;
+    return id?.startsWith(installedPrefix) === true ? installed().find((s) => s.name === id.slice(installedPrefix.length)) : undefined;
+  };
   const selected = () =>
     creating() || shownInstalled() ? undefined : (own().find((s) => s.id === props.id) ?? (installed().length > 0 ? undefined : own()[0]));
   const first = () => (props.id === undefined ? installed()[0] : undefined);

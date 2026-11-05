@@ -53,7 +53,7 @@ const readStored = (text: string): Stored => {
 function castHash(s: string): number {
   let h = 0;
   for (const ch of s) {
-    const cp = ch.codePointAt(0)!;
+    const cp = ch.codePointAt(0) ?? 0;
     const unit = cp > 0xffff ? 0xd800 + ((cp - 0x10000) >> 10) : cp;
     h = (Math.imul(h, 31) + unit) >>> 0;
   }
@@ -65,7 +65,7 @@ export function withCast(a: T.Agent): T.Agent {
   const look = { ...a.look };
   look.build ||= "biped";
   look.head ||= "rounded";
-  look.species ??= SpeciesValues[castHash(a.id) % SpeciesValues.length]!;
+  look.species ??= SpeciesValues[castHash(a.id) % SpeciesValues.length] ?? "cat";
   look.outfit ??= "farmer";
   if (a.role === "orchestrator") look.orchestrator ??= "farmer";
   else delete look.orchestrator;

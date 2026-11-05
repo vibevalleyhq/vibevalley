@@ -141,13 +141,13 @@ export function localSource(m: MemoryStore, profiles: () => string[]): Source {
 const idOf = (one: Source, id: string) => (one.name === localName || id === "" ? id : `${one.name}:${id}`);
 
 /** Which source an id is from, and the id as that source knows it. */
-function owner(all: readonly Source[], id: string): [Source, string] {
+function owner(all: readonly [Source, ...Source[]], id: string): [Source, string] {
   const colon = id.indexOf(":");
   if (colon >= 0) {
     const named = all.find((s) => s.name === id.slice(0, colon));
     if (named) return [named, id.slice(colon + 1)];
   }
-  return [all[0]!, id];
+  return [all[0], id];
 }
 
 /** The cue as one source gets it: only its own ids to skip, as it knows them. */
@@ -170,9 +170,9 @@ export function interleave<T>(groups: readonly (readonly T[])[], text: (item: T)
   for (let rank = 0; ; rank++) {
     let more = false;
     for (const g of groups) {
-      if (rank >= g.length) continue;
+      const one = g[rank];
+      if (one === undefined) continue;
       more = true;
-      const one = g[rank]!;
       const terms = termsOf(text(one));
       if (texts.includes(text(one)) || seen.some((item) => memoryLikeness(item, terms) >= 0.8)) continue;
       if (!keep(one)) continue;
@@ -422,8 +422,8 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
             readAll(g, `the memories of ${agent}`, (one) => one.list(agent), listing),
             (groups) => ({
               memories: groups.flatMap((listed, i) => {
-                const one = listing[i]!;
-                return listed.map((m) => ({ ...m, id: idOf(one, m.id), ...(one.name !== localName ? { source: one.name } : {}) }));
+                const one = listing[i];
+                return one ? listed.map((m) => ({ ...m, id: idOf(one, m.id), ...(one.name !== localName ? { source: one.name } : {}) })) : [];
               }),
               sources: infoOf(g),
             }),

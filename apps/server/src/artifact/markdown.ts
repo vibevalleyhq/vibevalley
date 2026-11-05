@@ -91,7 +91,9 @@ function inlineOf(spans: readonly TextSpan[]): string {
       let t = s.marks.code === true ? codeSpan(s.t) : escape(s.t);
       if (s.marks.italic === true) {
         // Against a letter or digit an underscore would read as part of a word: a star does not.
-        const mark = (i > 0 && wordy(Array.from(all[i - 1]!.t).at(-1))) || (i + 1 < all.length && wordy(Array.from(all[i + 1]!.t)[0])) ? "*" : "_";
+        const prev = all[i - 1];
+        const next = all[i + 1];
+        const mark = (prev !== undefined && wordy(Array.from(prev.t).at(-1))) || (next !== undefined && wordy(Array.from(next.t)[0])) ? "*" : "_";
         t = mark + t + mark;
       }
       if (s.marks.bold === true) t = "**" + t + "**";
@@ -114,7 +116,7 @@ const issueLine = /^<!-- issue:(\S+) -->$/u;
 const memoryLine = /^<!-- memory:(\S+) -->(?: (.*))?$/su;
 const fenceLine = /^```(\S*)$/u;
 const quoteLine = /^> ?(.*)$/su;
-const indentOf = (s: string) => /^ */u.exec(s)![0].length;
+const indentOf = (s: string) => (/^ */u.exec(s)?.[0] ?? "").length;
 
 /** One line (its indent taken off) read as the start of a block; the text is still Markdown. */
 interface LineKind {
@@ -125,23 +127,23 @@ interface LineKind {
 
 function classify(line: string): LineKind {
   let m: RegExpExecArray | null;
-  if ((m = headingLine.exec(line))) return { type: "heading", attrs: { level: m[1]!.length }, rest: m[2]! };
+  if ((m = headingLine.exec(line))) return { type: "heading", attrs: { level: (m[1] ?? "#").length }, rest: m[2] ?? "" };
   if (dividerLine.test(line)) return { type: "divider", attrs: {}, rest: "" };
-  if ((m = todoLine.exec(line))) return { type: "todo", attrs: { checked: m[1] !== " " }, rest: m[2]! };
-  if ((m = bulletLine.exec(line))) return { type: "bulleted", attrs: {}, rest: m[1]! };
-  if ((m = numberLine.exec(line))) return { type: "numbered", attrs: {}, rest: m[1]! };
+  if ((m = todoLine.exec(line))) return { type: "todo", attrs: { checked: m[1] !== " " }, rest: m[2] ?? "" };
+  if ((m = bulletLine.exec(line))) return { type: "bulleted", attrs: {}, rest: m[1] ?? "" };
+  if ((m = numberLine.exec(line))) return { type: "numbered", attrs: {}, rest: m[1] ?? "" };
   if ((m = fenceLine.exec(line))) return { type: "code", attrs: m[1] ? { language: m[1] } : {}, rest: "" };
-  if ((m = quoteLine.exec(line))) return { type: "quote", attrs: {}, rest: m[1]! };
+  if ((m = quoteLine.exec(line))) return { type: "quote", attrs: {}, rest: m[1] ?? "" };
   if ((m = imageLine.exec(line))) {
-    const attrs: BlockAttrs = { alt: plain(inlineSpans(m[1]!)), src: m[2]! };
+    const attrs: BlockAttrs = { alt: plain(inlineSpans(m[1] ?? "")), src: m[2] ?? "" };
     if (m[3]) {
       attrs.width = Number(m[3]);
       attrs.height = Number(m[4]);
     }
     return { type: "image", attrs, rest: "" };
   }
-  if ((m = issueLine.exec(line))) return { type: "issue_ref", attrs: { issueId: issueId(m[1]!) }, rest: "" };
-  if ((m = memoryLine.exec(line))) return { type: "memory_item", attrs: { memoryId: m[1]! }, rest: m[2] ?? "" };
+  if ((m = issueLine.exec(line))) return { type: "issue_ref", attrs: { issueId: issueId(m[1] ?? "") }, rest: "" };
+  if ((m = memoryLine.exec(line))) return { type: "memory_item", attrs: { memoryId: m[1] ?? "" }, rest: m[2] ?? "" };
   return { type: "paragraph", attrs: {}, rest: line };
 }
 
@@ -154,7 +156,7 @@ export function blocksOfMarkdown(md: string): MdBlock[] {
   // A deeper line goes under the one before it, never deeper than one past it.
   let open = 0;
   for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i]!;
+    const raw = lines[i] ?? "";
     if (blank(raw)) continue;
     const spaces = indentOf(raw);
     const depth = Math.min(Math.floor(spaces / 2), open);
@@ -164,7 +166,7 @@ export function blocksOfMarkdown(md: string): MdBlock[] {
     if (k.type === "code") {
       const body: string[] = [];
       for (i++; i < lines.length; i++) {
-        const [l] = strip(lines[i]!);
+        const [l] = strip(lines[i] ?? "");
         if (l === "```") break;
         body.push(l);
       }
@@ -172,17 +174,18 @@ export function blocksOfMarkdown(md: string): MdBlock[] {
     } else if (k.type === "quote") {
       const text = [k.rest];
       while (i + 1 < lines.length) {
-        const [l, ok] = strip(lines[i + 1]!);
+        const nextLine = lines[i + 1] ?? "";
+        const [l, ok] = strip(nextLine);
         const m = quoteLine.exec(l);
-        if (!ok || !m || blank(lines[i + 1]!)) break;
-        text.push(m[1]!);
+        if (!ok || !m || blank(nextLine)) break;
+        text.push(m[1] ?? "");
         i++;
       }
       k.rest = text.join("\n");
     } else if (k.type === "paragraph") {
       const text = [line];
-      while (i + 1 < lines.length && !blank(lines[i + 1]!)) {
-        const [l, ok] = strip(lines[i + 1]!);
+      while (i + 1 < lines.length && !blank(lines[i + 1] ?? "")) {
+        const [l, ok] = strip(lines[i + 1] ?? "");
         if (!ok || indentOf(l) > 0 || classify(l).type !== "paragraph") break;
         text.push(l);
         i++;
@@ -206,7 +209,7 @@ function inline(s: readonly string[], m: SpanMarks): TextSpan[] {
     buf = "";
   };
   for (let i = 0; i < s.length; i++) {
-    const c = s[i]!;
+    const c = s[i] ?? "";
     if (c === "\\" && i + 1 < s.length) {
       i++;
       buf += s[i];

@@ -613,7 +613,7 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined
           refusedEffort() ??
           (levels().length === 0
             ? model()?.name
-              ? t("web.agent.noEffortModel", { model: model()!.name })
+              ? t("web.agent.noEffortModel", { model: model()?.name ?? "" })
               : t("web.agent.noEffort")
             : t("web.agent.effortDefault"))
         }
@@ -765,9 +765,9 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
     const n = name().trim();
     const wanted = target().trim();
     if (!n || !wanted) return;
-    const words = wanted.split(/\s+/u);
+    const [command = "", ...args] = wanted.split(/\s+/u);
     const server: MCPServer =
-      type() === "stdio" ? { type: "stdio", name: n, command: words[0]!, args: words.slice(1), env: {} } : { type: "http", name: n, url: wanted, headers: {} };
+      type() === "stdio" ? { type: "stdio", name: n, command, args, env: {} } : { type: "http", name: n, url: wanted, headers: {} };
     props.patch({ ...props.draft, mcpServers: [...props.draft.mcpServers.filter((s) => s.name !== n), server] });
     setName("");
     setTarget("");
@@ -889,7 +889,7 @@ function Inventory(props: { entries: InventoryEntry[] | null }) {
       <Match when={!props.entries}>
         <span class="text-xs text-muted">{t("web.agent.unreported")}</span>
       </Match>
-      <Match when={props.entries!.length === 0}>
+      <Match when={props.entries?.length === 0}>
         <span class="text-xs text-muted">{t("web.agent.none")}</span>
       </Match>
     </Switch>

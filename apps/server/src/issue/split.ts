@@ -45,7 +45,8 @@ export const issueSplitting = (r: IssueRecords) =>
           return yield* Effect.fail(refused(t("server.issue.split.notCurrent")));
       } else if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
       if (isClosed(parent.status)) return yield* Effect.fail(refused(t("server.issue.dependencies.closedParent")));
-      if (!parent.project) return yield* Effect.fail(refused(t("server.issue.noProject")));
+      const parentProject = parent.project;
+      if (!parentProject) return yield* Effect.fail(refused(t("server.issue.noProject")));
       if ((yield* everyIssue).some((item) => item.parent === parent.id)) return yield* Effect.fail(refused(t("server.issue.split.already")));
       if (
         drafts.length === 0 ||
@@ -54,8 +55,9 @@ export const issueSplitting = (r: IssueRecords) =>
         dagProblems(drafts.map((draft) => ({ id: draft.id, after: draft.needs ?? [] }))).length > 0
       )
         return yield* Effect.fail(refused(t("server.issue.split.invalid", { max: maxChildren })));
-      const ids = new Map(drafts.map((draft) => [draft.id, issueId(newId())]));
-      const rows = yield* Effect.forEach(drafts, (draft) =>
+      const withIds = drafts.map((draft) => ({ draft, childId: issueId(newId()) }));
+      const ids = new Map(withIds.map(({ draft, childId }) => [draft.id, childId]));
+      const rows = yield* Effect.forEach(withIds, ({ draft, childId }) =>
         Effect.gen(function* () {
           const named = draft.agent?.trim() || assignedAgentOf(parent);
           const agent = store.agents().find((candidate) => candidate.id === named || candidate.name === named);
@@ -70,13 +72,16 @@ export const issueSplitting = (r: IssueRecords) =>
             title: childTitle,
             description,
             parent: parent.id,
-            project: parent.project!,
+            project: parentProject,
             agent: agent.id,
             priority: parent.priority,
-            blockedBy: (draft.needs ?? []).map((need) => ids.get(need)!),
+            blockedBy: (draft.needs ?? []).flatMap((need) => {
+              const dep = ids.get(need);
+              return dep ? [dep] : [];
+            }),
             constraints: { acceptance: draft.acceptance === true, scope: draft.scope ?? [], frozen: [], ...(check ? { check } : {}) },
           };
-          return { id: ids.get(draft.id)!, req };
+          return { id: childId, req };
         }),
       );
       const session = latestSessionIdOf(parent);
@@ -149,11 +154,12 @@ export const issueSplitting = (r: IssueRecords) =>
       function* () {
         const all = yield* everyIssue;
         yield* Effect.forEach(
-          all.filter((item) => item.parent !== undefined && item.stage.state === "reviewing"),
+          all.filter((item): item is T.Issue & { readonly parent: T.IssueId } => item.parent !== undefined && item.stage.state === "reviewing"),
           (child) =>
             Effect.gen(function* () {
-              const parent = yield* get(child.parent!);
-              if (!parent.project || isClosed(parent.status)) return;
+              const parent = yield* get(child.parent);
+              const parentProject = parent.project;
+              if (!parentProject || isClosed(parent.status)) return;
               const session = latestSessionIdOf(child);
               if (!session || !sessions.present(session)) return;
               const parentSession = latestSessionIdOf(parent);
@@ -173,7 +179,7 @@ export const issueSplitting = (r: IssueRecords) =>
                           ? yield* sessions
                               .withIdleWorkplace(parentSession, mergeIntoParent)
                               .pipe(Effect.mapError((error) => (error._tag === "MergeFailure" ? error : MergeFailure.error(reasonOf(error)))))
-                          : yield* Effect.flatMap(projects.workplace(parent.project!, parent.number, true, ""), mergeIntoParent);
+                          : yield* Effect.flatMap(projects.workplace(parentProject, parent.number, true, ""), mergeIntoParent);
                       yield* complete(child.id, "merged_into_parent");
                       return merged;
                     }),

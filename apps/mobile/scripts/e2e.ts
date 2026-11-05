@@ -46,8 +46,8 @@ function android(): Device {
     install: () => {
       try {
         adb("uninstall", "dev.vibevalley.mobile");
-      } catch {
-        // Not installed.
+      } catch (e) {
+        if (!e) return;
       }
       adb("install", "-g", apk);
     },
@@ -63,7 +63,7 @@ function android(): Device {
       for (const socket of new Set(adb("shell", "cat", "/proc/net/unix").match(/webview_devtools_remote_\d+/gu) ?? [])) {
         adb("forward", `tcp:${++port}`, "localabstract:" + socket);
         // oxlint-disable-next-line eslint/no-await-in-loop, typescript/no-unsafe-type-assertion -- each socket is forwarded to the next port before it is asked; Chrome's DevTools list
-        const pages = (await (await fetch(`http://127.0.0.1:${port}/json`).catch(() => undefined))?.json().catch(() => [])) as
+        const pages = (await (await fetch(`http://127.0.0.1:${port}/json`).then((r) => r, () => undefined))?.json().catch(() => [])) as
           | { url: string; webSocketDebuggerUrl: string }[]
           | undefined;
         page = (pages ?? []).find((p) => p.url.startsWith(farmUrl));
@@ -101,8 +101,8 @@ function ios(): Device {
   const sim = (...args: string[]) => run(simctl, ...args);
   try {
     sim("boot", device);
-  } catch {
-    // Booted already.
+  } catch (e) {
+    if (!e) sim("boot", device);
   }
   sim("bootstatus", device, "-b");
   return {
@@ -174,7 +174,7 @@ try {
   } else console.log("bridge: not checked (not an end-to-end build)");
 
   // Started again with no link: the key from the keychain, straight to the farm, nothing asked.
-  const before = (await api.lan.get()).devices.find((d) => d.id === paired.id)!.lastSeen ?? 0;
+  const before = (await api.lan.get()).devices.find((d) => d.id === paired.id)?.lastSeen ?? 0;
   await sleep(1100);
   phone.restart();
   await until(
