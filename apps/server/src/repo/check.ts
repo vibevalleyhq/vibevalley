@@ -1,6 +1,6 @@
 import { delimiter, join } from "node:path";
 
-import { Effect } from "effect";
+import { Config, Effect } from "effect";
 
 import { t } from "@vibevalley/i18n";
 
@@ -11,7 +11,11 @@ import { MergeFailure } from "./workplace.ts";
 export const checkRepository = Effect.fn("Repo.checkRepository")(function* (cwd: string, timeoutMs: number, execute: typeof run) {
   const file = join(cwd, ".vibevalley", "check");
   if (!(yield* lexists(file))) return "not-run" as const;
-  const path = [join(cwd, "node_modules", ".bin"), ...(process.env.PATH ?? "").split(delimiter).filter((p) => !p.includes("node_modules/.bin"))];
+  const inheritedPath = yield* Config.String("PATH").pipe(
+    Config.withDefault(""),
+    Effect.mapError((e) => MergeFailure.failedCheck(t("server.repo.check.failed", { why: e.message }))),
+  );
+  const path = [join(cwd, "node_modules", ".bin"), ...inheritedPath.split(delimiter).filter((p) => !p.includes("node_modules/.bin"))];
   const r = yield* execute(file, [], { cwd, timeoutMs, env: { ...process.env, PATH: path.join(delimiter) } });
   if (r.code === 0) return "passed" as const;
   const why = r.timedOut

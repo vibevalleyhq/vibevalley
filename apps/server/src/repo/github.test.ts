@@ -382,7 +382,7 @@ describe("GitHub", () => {
         gh: gh((args) => {
           calls++;
           expect(args.slice(0, 2)).toEqual(["pr", "list"]);
-          return { out: `[{"url":"https://github.com/test/sample/pull/4","number":4}]` };
+          return { out: `[{"url":"https://github.com/test/sample/pull/4","number":4,"isCrossRepository":false,"state":"OPEN"}]` };
         }),
       },
     );

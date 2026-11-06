@@ -135,4 +135,5 @@ export interface BranchPublication {
   readonly url?: string;
   readonly number?: number;
   readonly reused?: boolean;
+  readonly state?: "open";
 }

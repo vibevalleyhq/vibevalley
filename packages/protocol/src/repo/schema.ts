@@ -132,4 +132,5 @@ export const BranchPublication: Codec<T.BranchPublication> = Schema.Struct({
   url: Schema.optionalKey(Schema.String),
   number: Schema.optionalKey(Schema.Int),
   reused: Schema.optionalKey(Schema.Boolean),
+  state: Schema.optionalKey(Schema.Literals(["open"])),
 });

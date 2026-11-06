@@ -13,7 +13,7 @@ import { ServerConfig } from "#/infra/config.ts";
 import { gitSync, repo, write } from "#/testing/git.ts";
 import { testConfig } from "#/testing/layers.ts";
 
-import { run } from "./git.ts";
+import { GitError, run } from "./git.ts";
 import { type GitHubRun } from "./github.ts";
 import { hostedOrigin } from "./hosting.ts";
 import { Repo, type RepoHooks } from "./repo.ts";
@@ -42,7 +42,10 @@ function fixture(platform: T.PublishPlatform = "github", script = "#!/bin/sh\nex
       if (args[0] === "auth") return { ok: true, missing: false, out: "" };
       if (args.includes("defaultBranchRef")) return { ok: true, missing: false, out: JSON.stringify({ defaultBranchRef: { name: "main" } }) };
       if (args[1] === "projects/team%2Frepo") return { ok: true, missing: false, out: JSON.stringify({ default_branch: "main" }) };
-      const item = platform === "github" ? { number: 7, url } : { iid: 7, web_url: url };
+      const item =
+        platform === "github"
+          ? { number: 7, url, isCrossRepository: false, state: "OPEN" }
+          : { iid: 7, web_url: url, source_project_id: 1, target_project_id: 1, state: "opened" };
       if (args[1] === "list" || args[1]?.includes("?state=opened") === true) return { ok: true, missing: false, out: JSON.stringify(created ? [item] : []) };
       created = true;
       return { ok: true, missing: false, out: platform === "github" ? url : JSON.stringify(item) };
@@ -121,7 +124,10 @@ for (const scenario of [
     if (scenario === "wrong-branch") req = { ...req, branch: "feat/other" };
     if (scenario === "wrong-sha") req = { ...req, sha: "0".repeat(40) };
     if (scenario === "detached") gitSync(f.cwd, "checkout", "--detach");
-    if (scenario === "default") req = { ...req, base: req.branch };
+    if (scenario === "default") {
+      gitSync(f.cwd, "checkout", "main");
+      req = { ...req, branch: "main", sha: gitSync(f.cwd, "rev-parse", "HEAD") };
+    }
     if (scenario === "invalid-ref") req = { ...req, base: "main~1" };
     if (scenario === "pushurl") gitSync(f.cwd, "remote", "set-url", "--push", "origin", "https://github.com/other/repo.git");
     if (scenario === "ambiguous") gitSync(f.cwd, "remote", "add", "other", "https://gitlab.com/other/repo.git");
@@ -156,7 +162,14 @@ for (const stage of ["missing", "auth", "decode", "create"] as const) {
 
 it("only known hosting domains are recognized", () => {
   expect(hostedOrigin("git@gitlab.com:group/subgroup/repo.git")).toMatchObject({ platform: "gitlab", name: "group/subgroup/repo" });
-  for (const url of ["git@unknown.test:group/repo", "https://token@gitlab.com/g/r", "https://gitlab.com.evil/g/r", "git@github.com:org/repo/extra"])
+  for (const url of [
+    "git@github.com/team/repo",
+    "https://github.com:team/repo",
+    "git@unknown.test:group/repo",
+    "https://token@gitlab.com/g/r",
+    "https://gitlab.com.evil/g/r",
+    "git@github.com:org/repo/extra",
+  ])
     expect(hostedOrigin(url)).toBeUndefined();
 });
 
@@ -227,4 +240,39 @@ it.effect("worktrees list their branch and safe removal preserves dirty files an
     expect(existsSync(f.cwd)).toBe(true);
     expect(yield* r.head).toBe(f.req.sha);
   }).pipe(Effect.provide(NodeServices.layer));
+});
+
+it.effect("conflicting base changes are refused before running a check or pushing", () => {
+  const f = fixture();
+  gitSync(f.cwd, "checkout", "main");
+  write(join(f.cwd, ".vibevalley"), "base owns this path");
+  gitSync(f.cwd, "add", ".vibevalley");
+  gitSync(f.cwd, "commit", "-m", "base change");
+  gitSync(f.cwd, "push", f.bare, "main");
+  gitSync(f.cwd, "checkout", "feat/publish");
+  return Effect.gen(function* () {
+    const error = yield* Effect.flip((yield* Repo).submitBranch(f.req));
+    expect(error).toMatchObject({ _tag: "MergeFailure", kind: "conflict" });
+    expect(f.pushed).toEqual([]);
+    expect(gitSync(f.cwd, "status", "--porcelain")).toBe("");
+  }).pipe(Effect.provide(f.layer));
+});
+
+it.effect("a failed push is reported separately from a failed PR creation", () => {
+  const f = fixture();
+  const layer = Repo.layer({
+    ...f.hooks,
+    publication: {
+      tip: (_cwd, _url, branch) => repository(f.bare).tip(branch),
+      fetch: (cwd, _url, branch) => repository(cwd).fetch(f.bare, branch),
+      push: () => Effect.fail(GitError.of(1, "transport closed")),
+    },
+  }).pipe(Layer.provide(Layer.merge(NodeServices.layer, Layer.succeed(ServerConfig, testConfig()))));
+  return Effect.gen(function* () {
+    const error = yield* Effect.flip((yield* Repo).submitBranch(f.req));
+    expect(error.message).toContain(f.req.sha);
+    expect(error.message).toContain("推送未确认成功");
+    expect(f.calls.some((args) => args[0] === "pr")).toBe(false);
+    expect(existsSync(f.cwd)).toBe(true);
+  }).pipe(Effect.provide(layer));
 });

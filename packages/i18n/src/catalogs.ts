@@ -1169,6 +1169,7 @@ export const catalogs = {
       "publish.platformFailed": "托管平台调用失败：{stage}。请检查工具安装与登录状态。",
       "publish.pushedWithoutLink": "SHA {sha} 已推送，但未确认 PR/MR 链接：{why}。可重试查询已有请求。",
       "publish.ownerOnly": "只有本机主人可以发布已有分支",
+      "publish.pushUnconfirmed": "SHA {sha} 的推送未确认成功。尚未尝试创建 PR/MR；重试前请核对远端。",
     },
     "server.runtime": {
       date: "{month} 月 {day} 日 {time}",
@@ -5168,6 +5169,7 @@ export const catalogs = {
       "publish.platformFailed": "Hosting platform failed: {stage}. Check installation and login.",
       "publish.pushedWithoutLink": "SHA {sha} was pushed, but no PR/MR link was confirmed: {why}. Retry to recover an open request.",
       "publish.ownerOnly": "Only the local owner can publish an existing branch",
+      "publish.pushUnconfirmed": "Push of SHA {sha} was not confirmed. No PR/MR creation was attempted; inspect the remote before retrying.",
     },
     "server.runtime": {
       date: "{month}/{day} {time}",
@@ -9222,6 +9224,7 @@ export interface Messages {
   "server.repo.parentHasChanges": undefined;
   "server.repo.publish.ownerOnly": undefined;
   "server.repo.publish.platformFailed": { readonly stage: string | number };
+  "server.repo.publish.pushUnconfirmed": { readonly sha: string | number };
   "server.repo.publish.pushedWithoutLink": { readonly sha: string | number; readonly why: string | number };
   "server.repo.publish.refused": { readonly detail: string | number };
   "server.repo.tokeiFailed": { readonly why: string | number };

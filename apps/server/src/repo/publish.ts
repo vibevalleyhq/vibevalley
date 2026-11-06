@@ -100,7 +100,9 @@ export const publisher = (env: {
           )
             return yield* refused("remote changed during check");
           yield* unchanged();
-          yield* transport.push(cwd, remote.write, req.branch, req.sha);
+          yield* transport
+            .push(cwd, remote.write, req.branch, req.sha)
+            .pipe(Effect.mapError((cause) => new RepoError({ message: t("server.repo.publish.pushUnconfirmed", { sha: req.sha }), cause })));
           const published = yield* Effect.gen(function* () {
             const existing = yield* host.find(req.branch, req.base);
             const receipt = existing ?? (yield* host.create(req));

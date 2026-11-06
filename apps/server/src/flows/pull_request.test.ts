@@ -59,7 +59,8 @@ describe("a pull request", () => {
           if (args[0] === "--version") return ok("gh version 2.80.0");
           if (args[0] === "auth") return ok("Logged in to github.com account gardener (keyring)");
           if (args[0] === "repo") return ok(`{"viewerPermission":"WRITE","defaultBranchRef":{"name":"main"}}`);
-          if (args[0] === "pr" && args[1] === "list") return ok(creates > 0 ? '[{"url":"https://github.com/test/clock/pull/7","number":7}]' : "[]");
+          if (args[0] === "pr" && args[1] === "list")
+            return ok(creates > 0 ? '[{"url":"https://github.com/test/clock/pull/7","number":7,"isCrossRepository":false,"state":"OPEN"}]' : "[]");
           if (args[0] === "pr" && args[1] === "create") {
             creates++;
             for (const word of ["--head", branch, "--base", "main", "--title", issue!.title]) expect(args).toContain(word);
