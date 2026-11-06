@@ -147,7 +147,8 @@ describe("a talk with a helper profile", () => {
         "both inputs consumed",
       );
       expect(after.map((d) => d.state)).toEqual(["consumed", "consumed"]);
-      // Seen only once its turn has started: handed first, consumed no earlier than the run it opened.
+      // Seen only once its turn has started: handed first, consumed no earlier than the run it opened. Read from the
+      // times, not from a state caught in between, which a fast write passes before anyone looks.
       const [first] = yield* db.run(
         sql<{
           handed_at: number;

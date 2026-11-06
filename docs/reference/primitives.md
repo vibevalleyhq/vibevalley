@@ -59,9 +59,20 @@
 | `orchestrator` | `actor.ts` | forOwner: the owner's own words are in the run it acts in. |
 | `session` | `actor.ts` |  |
 | `actsForOwner` | `actor.ts` | On the owner's word: the owner, or the orchestrator in a run the owner's words are in. |
+| `serverFiles` | `assets.ts` | What the package script copies beside the bundle: every path serverFile is given lies under one of these. |
+| `serverFile` | `assets.ts` |  |
 | `clip` | `clip.ts` | s on one line and trimmed, at most max units with the ellipsis. |
 | `head` | `clip.ts` | The first n UTF-16 units of s, never half a surrogate pair. |
 | `compactCard` | `clip.ts` |  |
+| `refused` | `errors.ts` |  |
+| `missing` | `errors.ts` | Something asked for by id or name is not there. next is required: where to look for the ones that are (lookIn). |
+| `lookIn` | `errors.ts` |  |
+| `memoriesOf` | `errors.ts` | Where an agent's memories are listed. |
+| `reasonOf` | `errors.ts` | An error's words, whatever its tag. |
+| `messageOf` | `errors.ts` | What a thrown or rejected value says: an Error's message, anything else as text. |
+| `errnoOf` | `errors.ts` | A failed system call's code (ENOENT, EPERM…), or undefined for anything else. |
+| `Inconsistent` | `errors.ts` | A defect, never an expected failure: the farm's own records disagree with each other, or a caller broke a rule it is held to. |
+| `orMissing` | `errors.ts` | A lookup's answer, or Missing (what was not found, and where to look) when it found none. |
 | `newId` | `ids.ts` |  |
 | `code` | `ids.ts` | A short human code, for pairing a device: not an id, and never a key. |
 | `jsonOf` | `json.ts` | Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. |
@@ -75,6 +86,7 @@
 | `compare` | `order.ts` |  |
 | `or` | `order.ts` |  |
 | `numberIn` | `order.ts` |  |
+| `ownersLanguage` | `prompts.ts` |  |
 | `scopedPubSub` | `pubsub.ts` | An unbounded PubSub shut down when the scope that made it (its service's layer) closes, so a subscriber's stream ends |
 | `checksFromText` | `questions.ts` | The helper's text checks, one per criterion line; explicit issue_report.checks still win. |
 | `questionsFromText` | `questions.ts` |  |
@@ -178,7 +190,6 @@
 | `createSettled` | `dom.tsx` | The value once it has stopped changing for `ms`: what is asked of the server while someone types. |
 | `useClickAway` | `dom.tsx` | Closes a popup when the pointer goes down outside `box` while `open`: a menu folds when you click elsewhere. |
 | `variant` | `dom.tsx` |  |
-| `recordOf` | `dom.tsx` | A JSON object's fields, each still to be checked; undefined for anything that is not an object. |
 | `createExternal` | `external.ts` | A store outside Solid (subscribe, get) as an accessor. it notifies when `get` returns a different value. |
 | `ago` | `format.ts` |  |
 | `tookText` | `format.ts` |  |
