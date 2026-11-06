@@ -33,3 +33,11 @@ src/testdata/      the golden answers: help, typical mistakes, refusals and dry 
   the home's files are `@vibevalley/home`'s.
 - Run it from the repository with `vp run --filter @vibevalley/cli start <command…>`; the desktop app bundles it
   (`vp pack`, dist/) and installs it as `vibevalley` (`-beta`, `-alpha`).
+
+## Publish an existing branch
+
+The local owner calls `repo pr submit --cwd /absolute/checkout --branch feat/topic --sha <full-sha> --base main --title <title> --body <body>`.
+Add `--dry-run --format json` to inspect the request without fetching, checking, pushing, or creating a PR/MR.
+The command calls `repo.pr.submit` on the server. It does not run Git, gh, or glab locally.
+The checkout may be outside the space. A published response includes the confirmed URL and the check status;
+`not-run` means that `.vibevalley/check` was absent. See [repository publication](docs/subsystems/repo.md).

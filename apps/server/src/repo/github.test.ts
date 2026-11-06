@@ -13,18 +13,28 @@ import { actionsJobOf, githubSnapshot } from "#/ingress/github.ts";
 import { gitSync, reposDir, repo, write } from "#/testing/git.ts";
 import { testConfig } from "#/testing/layers.ts";
 
+import { GitError, run } from "./git.ts";
 import { Repo, githubOrigin, type GitHubRun, probeGitHub, type RepoHooks } from "./repo.ts";
+import { repository } from "./repository.ts";
 
 const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 const gh =
   (answer: (args: string[]) => { out: string; ok?: boolean; missing?: boolean }): GitHubRun =>
   (...args) =>
-    Effect.sync(() => ({ ok: true, missing: false, ...answer(args) }));
+    Effect.sync(() => ({
+      ok: true,
+      missing: false,
+      ...(args.includes("defaultBranchRef")
+        ? { out: '{"defaultBranchRef":{"name":"main"}}' }
+        : args[0] === "auth" && args.length === 4
+          ? { out: "logged in" }
+          : answer(args)),
+    }));
 
 const repos = <A, E>(root: string, body: Effect.Effect<A, E, Repo>, change: Partial<ServerConfig["Service"]> = {}, hooks: RepoHooks = {}) =>
   body.pipe(
     Effect.provide(
-      Repo.layer({ gh: noGitHub, ...hooks }).pipe(
+      Repo.layer({ gh: noGitHub, command: (file, args, options) => run("sh", [file, ...args], options), ...hooks }).pipe(
         Layer.provide(Layer.merge(Layer.succeed(ServerConfig, testConfig({ workRoot: dirname(root), ...change })), NodeServices.layer)),
       ),
     ),
@@ -360,7 +370,15 @@ describe("GitHub", () => {
       }),
       {},
       {
-        push: () => Effect.sync(() => (pushes++, !pushFails)),
+        publication: {
+          tip: (cwd) => repository(cwd).tip("main"),
+          fetch: () => Effect.void,
+          push: () =>
+            Effect.suspend(() => {
+              pushes++;
+              return pushFails ? Effect.fail(GitError.of(1, "push refused")) : Effect.void;
+            }),
+        },
         gh: gh((args) => {
           calls++;
           expect(args.slice(0, 2)).toEqual(["pr", "list"]);
@@ -378,12 +396,12 @@ describe("GitHub", () => {
         const p = yield* Repo;
         const place = yield* p.workplace("sample", 1, true, "");
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
-        expect((yield* Effect.flip(p.submitPullRequest(place, issue, "done"))).message).toBe("无法读取已有 PR");
+        expect((yield* Effect.flip(p.submitPullRequest(place, issue, "done"))).message).toContain("已推送");
         expect((yield* Effect.flip(p.pullRequestState("sample", 3))).message).toBe("无法读取 PR #3 状态");
       }),
       {},
       {
-        push: () => Effect.succeed(true),
+        publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Effect.void, push: () => Effect.void },
         gh: gh((args) => ({ out: args[1] === "list" ? `[{"html_url":"https://github.com/test/sample/pull/4"}]` : "null" })),
       },
     );
@@ -410,7 +428,7 @@ describe("GitHub", () => {
           }),
           {},
           {
-            push: () => Effect.succeed(true),
+            publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Effect.void, push: () => Effect.void },
             gh: gh((args) => {
               if (args[1] === "list") return { out: "[]" };
               body = args.at(-1)!;
@@ -439,7 +457,7 @@ describe("GitHub", () => {
       }),
       {},
       {
-        push: () => Effect.succeed(true),
+        publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Effect.void, push: () => Effect.void },
         gh: gh((given) => {
           if (given[1] === "list") return { out: "[]" };
           args = given;

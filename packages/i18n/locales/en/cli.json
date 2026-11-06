@@ -25,9 +25,8 @@
     "key": "A request key: sent again with the same key, it is done once",
     "limit": "At most this many",
     "priority": "The priority",
-    "repo": "The repo's name",
-    "reply": "Reply to this message number",
     "repo": "The GitHub repository's address",
+    "reply": "Reply to this message number",
     "text": "Words the title or description contains",
     "timeout": "Wait at most this many seconds",
     "closed": "Only closed ones (done, canceled)",
@@ -383,7 +382,10 @@
       "template": {
         "list": "A repo's ticket templates, filled in for its stack"
       },
-      "validate": "The first thing creating a repo would refuse, without creating it"
+      "validate": "The first thing creating a repo would refuse, without creating it",
+      "pr": {
+        "submit": "Publish an existing local branch"
+      }
     },
     "runtime": {
       "list": "List every machine",
@@ -770,5 +772,8 @@
   },
   "agent": {
     "deleted": "Deleted the profile {agent}"
-  }
+  },
+  "repo.publish": "Publish an existing branch as a GitHub PR or GitLab MR",
+  "repo.check": "Repository check: {check}",
+  "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run"
 }

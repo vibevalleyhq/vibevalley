@@ -1,4 +1,5 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
+import { HttpServerRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 import type { RepoHandlers } from "@vibevalley/protocol/api";
@@ -11,6 +12,12 @@ export const repoHandlers = Effect.gen(function* () {
   const repos = yield* Repo;
   const issues = yield* Issue;
   const done: RepoHandlers = {
+    "repo.pr.submit": (body) =>
+      Effect.gen(function* () {
+        const request = yield* Effect.serviceOption(HttpServerRequest.HttpServerRequest);
+        if (Option.isNone(request) || request.value.headers.authorization !== undefined) return yield* Effect.fail(refused(t("server.repo.publish.ownerOnly")));
+        return yield* repos.submitBranch(body).pipe(Effect.mapError((e) => refused(e.message)));
+      }),
     "github.refresh": () => Effect.tap(repos.refreshGitHub(), () => issues.refreshPullRequests),
     "github.get": () => Effect.sync(repos.githubStatus),
     "repo.list": () => repos.summaries(),

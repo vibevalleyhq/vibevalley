@@ -11,8 +11,11 @@ import { githubRepository, slice } from "@vibevalley/protocol/rules";
 import { numberIn } from "#/base/order.ts";
 import { reposDir, ServerConfig, worktreesDir } from "#/infra/config.ts";
 
+import { checkRepository } from "./check.ts";
 import { git, type GitError, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { cloneTimeoutMs, githubOrigin, type GitHubRun, makeRepoGitHub, probeGitHub, runGitHub } from "./github.ts";
+import { runGitLab } from "./hosting.ts";
+import { publisher, type PublishNetwork } from "./publish.ts";
 import { asFarm, repository } from "./repository.ts";
 import { activityOf, contributionsOf, countsOf, lexists, secondsOf, tokeiArgs, yearDays } from "./stats.ts";
 import {
@@ -57,7 +60,7 @@ const unchangedBranch = Effect.fnUntraced(function* (path: string, branch: strin
 const cleanupMerged = Effect.fnUntraced(function* (place: Workplace, path: string, branch: string) {
   const removed = yield* repository(path).removeWorktree(place.cwd, true);
   if (removed) return t("server.repo.mergedWorktreeLeft", { cwd: place.cwd, branch, why: removed });
-  const deleted = yield* repository(path).deleteBranch(branch);
+  const deleted = yield* repository(path).deleteBranch(branch, true);
   if (deleted) return t("server.repo.mergedBranchLeft", { branch, why: deleted });
   return "";
 });
@@ -98,6 +101,7 @@ export class Repo extends Context.Service<
     readonly githubStatus: () => T.GitHubStatus;
     readonly refreshGitHub: () => Effect.Effect<T.GitHubStatus>;
     readonly usesPullRequests: (name: string) => boolean;
+    readonly submitBranch: (req: T.SubmitBranch) => Effect.Effect<T.BranchPublication, MergeFailure | RepoError>;
     readonly submitPullRequest: (place: Workplace, issue: T.Issue, conclusion: string) => Effect.Effect<T.PullRequest, MergeFailure | RepoError>;
     readonly pullRequestState: (name: string, n: number) => Effect.Effect<T.PullRequestState, RepoError>;
     readonly githubRequest: GitHubRun;
@@ -112,7 +116,9 @@ export class Repo extends Context.Service<
 /** What tests change: gh, and git's network. */
 export interface RepoHooks {
   readonly gh?: GitHubRun;
-  readonly push?: (cwd: string, branch: string) => Effect.Effect<boolean>;
+  readonly publication?: PublishNetwork;
+  readonly glab?: GitHubRun;
+  readonly command?: typeof run;
   readonly fetch?: (path: string, branch: string) => Effect.Effect<boolean>;
 }
 
@@ -134,7 +140,8 @@ const make = (hooks: RepoHooks = {}) =>
     // A repo's lock lives while someone holds it or waits for it, so a removed repo leaves none behind.
     const queues = new Map<string, { readonly lock: Semaphore.Semaphore; users: number }>();
     const serially = <A, E, R>(repo: string, effect: Effect.Effect<A, E, R>) =>
-      Effect.suspend(() => {
+      Effect.gen(function* () {
+        repo = yield* fs.realPath(resolve(root, repo)).pipe(Effect.orElseSucceed(() => resolve(root, repo)));
         let q = queues.get(repo);
         if (!q) {
           q = { lock: Semaphore.makeUnsafe(1), users: 0 };
@@ -142,7 +149,7 @@ const make = (hooks: RepoHooks = {}) =>
         }
         const held = q;
         held.users++;
-        return held.lock
+        return yield* held.lock
           .withPermits(1)(effect)
           .pipe(
             Effect.ensuring(
@@ -261,28 +268,11 @@ const make = (hooks: RepoHooks = {}) =>
       if (r.code !== 0) yield* Effect.logWarning(`${file} exited ${r.code}${r.timedOut ? " (timed out)" : ""}: ${(r.stdout + r.stderr).slice(-2000)}`);
     });
 
-    /** The repo's own check: .vibevalley/check, run in the worktree, killed with everything it started when it runs too long. */
-    const repoCheck = Effect.fn("Repo.repoCheck")(function* (cwd: string) {
-      const file = join(cwd, ".vibevalley", "check");
-      if (!(yield* lexists(file))) return;
-      const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
-      if (r.code === 0) return;
-      const why = r.timedOut
-        ? t("server.repo.check.timedOut", { seconds: checkTimeoutMs / 1000 })
-        : r.code < 0
-          ? t("server.repo.check.failed", { why: reason(r.stderr) })
-          : t("server.repo.check.exited", { code: r.code });
-      const lines = (r.stdout + r.stderr)
-        .slice(-64 * 1024)
-        .trim()
-        .split("\n")
-        .slice(-40);
-      return yield* MergeFailure.failedCheck(why + "\n" + lines.join("\n"));
-    });
+    const repoCheck = (cwd: string) => checkRepository(cwd, checkTimeoutMs, hooks.command ?? run);
 
     /** The helper commits its own work: a merge or a PR starts only from a clean worktree, under the repository's own commit rules. */
     const requireCommitted = Effect.fnUntraced(function* (cwd: string) {
-      if ((yield* git(cwd, "status", "--porcelain")) !== "") return yield* MergeFailure.error(t("server.repo.commit.uncommitted"));
+      if ((yield* repository(cwd).status) !== "") return yield* MergeFailure.error(t("server.repo.commit.uncommitted"));
     });
 
     /** Commit and check outside the repo's turn; publication rechecks the head and conflicts in it. */
@@ -332,11 +322,20 @@ const make = (hooks: RepoHooks = {}) =>
     });
 
     const toMergeFailure = <A, R>(e: Effect.Effect<A, MergeFailure | GitError | RepoError, R>) => Effect.mapError(e, failed);
+    const submitBranch = publisher({
+      fs,
+      gh,
+      glab: hooks.glab ?? runGitLab,
+      timeoutMs: checkTimeoutMs,
+      command: hooks.command ?? run,
+      network: hooks.publication,
+      serially,
+    });
     const github = makeRepoGitHub({
       root,
       fs,
       gh,
-      push: hooks.push,
+      submitBranch,
       prRepos,
       list,
       exists,
@@ -344,14 +343,12 @@ const make = (hooks: RepoHooks = {}) =>
       issueBranch,
       issueWorkplace,
       syncMain,
-      checkMerge,
-      unchangedBranch,
-      toMergeFailure,
     });
     const { capability: _capability, ...githubMethods } = github;
 
     const shape = Repo.of({
       root,
+      submitBranch,
       limit: perRepo,
       maxSessions,
       validate: (req) => ({ problem: repoProblem(req) }),
@@ -453,7 +450,15 @@ const make = (hooks: RepoHooks = {}) =>
               if (!worktree) return { repo, cwd: path };
               const place = issueWorkplace(repo, issueNumber);
               const { branch, cwd } = place;
-              if (yield* exists(cwd)) return place;
+              if (yield* exists(cwd)) {
+                if (
+                  !(yield* repository(path).worktrees).includes("branch refs/heads/" + branch + "\0") ||
+                  (yield* repository(cwd).commonDirectory) !== (yield* repository(path).commonDirectory) ||
+                  (yield* repository(cwd).main) !== branch
+                )
+                  return yield* fail(t("server.repo.github.wrongBranch"));
+                return place;
+              }
               yield* fs.makeDirectory(trees, { recursive: true });
               const branchThere = yield* repository(path)
                 .hasBranch(branch)
@@ -463,8 +468,7 @@ const make = (hooks: RepoHooks = {}) =>
                 const main = yield* syncMain(repo);
                 from ||= main;
               }
-              const args = branchThere ? ["worktree", "add", "-q", cwd, branch] : ["worktree", "add", "-q", "-b", branch, cwd, from || "HEAD"];
-              yield* git(path, ...args);
+              yield* repository(path).addWorktree(cwd, branch, branchThere ? undefined : from || "HEAD");
               made = true;
               return { repo, cwd, branch };
             }),

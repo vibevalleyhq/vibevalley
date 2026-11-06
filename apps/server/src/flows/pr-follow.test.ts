@@ -13,6 +13,7 @@ import { Ingress } from "#/ingress/ingress.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Repo } from "#/repo/repo.ts";
+import { repository } from "#/repo/repository.ts";
 import { Session } from "#/session/session.ts";
 import { testConfig } from "#/testing/layers.ts";
 
@@ -37,17 +38,17 @@ for (const submittedReport of [false, true]) {
             const ok = (out: string) => ({ out, ok: true, missing: false });
             if (args[0] === "--version") return ok("gh version 2.80.0");
             if (args[0] === "auth") return ok("Logged in to github.com account gardener (keyring)");
-            if (args[0] === "repo") return ok('{"viewerPermission":"WRITE"}');
+            if (args[0] === "repo") return ok('{"viewerPermission":"WRITE","defaultBranchRef":{"name":"main"}}');
             if (args[0] === "pr" && args[1] === "list") return ok("[]");
             if (args[0] === "pr" && args[1] === "create") return ok("https://github.com/test/follow/pull/1");
             if (args[0] === "pr" && args[1] === "view") return ok('{"state":"OPEN","mergedAt":null}');
             return { out: "", ok: false, missing: false };
           }),
-        push: (cwd, branch) =>
-          Effect.sync(() => {
-            git(cwd, "push", bare, branch);
-            return true;
-          }),
+        publication: {
+          tip: () => repository(path).head,
+          fetch: () => Effect.void,
+          push: (cwd, _url, branch, sha) => repository(cwd).push(bare, branch, sha),
+        },
         fetch: () => Effect.succeed(false),
       },
       runtime: scriptedRuntime({

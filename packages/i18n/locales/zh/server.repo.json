@@ -60,14 +60,9 @@
     "noPermission": "无法检测 GitHub 仓库权限",
     "readOnly": "没有写权限",
     "wrongBranch": "工单分支不匹配",
-    "changedDuringCheck": "检查期间工作目录发生了变化，提交改动后再提交 PR",
-    "pushFailed": "推送工单分支失败，请检查 origin 和登录后重试",
-    "listFailed": "查询已有 PR 失败；分支已推送，可重试",
-    "listUnread": "无法读取已有 PR",
     "checked": ".vibevalley/check 通过。",
     "noCheck": "这个仓库没有 .vibevalley/check，没跑检查。",
     "body": "工单 #{n}\n\n{conclusion}\n\n{check}",
-    "createFailed": "创建 PR 失败；分支已推送，可重试",
     "urlUnread": "无法读取新建 PR 的地址；可重试查询",
     "viewFailed": "查询 PR #{n} 失败",
     "stateUnread": "无法读取 PR #{n} 状态",
@@ -78,5 +73,9 @@
   },
   "mergeTree": "git merge-tree 出错（{code}）",
   "moreLines": "… 还有 {n} 行没显示",
-  "conflict": "合进 {base} 有冲突"
+  "conflict": "合进 {base} 有冲突",
+  "publish.refused": "分支发布被拒绝：{detail}",
+  "publish.platformFailed": "托管平台调用失败：{stage}。请检查工具安装与登录状态。",
+  "publish.pushedWithoutLink": "SHA {sha} 已推送，但未确认 PR/MR 链接：{why}。可重试查询已有请求。",
+  "publish.ownerOnly": "只有本机主人可以发布已有分支"
 }

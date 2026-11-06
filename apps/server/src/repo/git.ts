@@ -75,7 +75,10 @@ export const run = (command: string, args: readonly string[], options: RunOption
         timedOut,
       }),
     );
-    return Effect.sync(killGroup);
+    return Effect.sync(() => {
+      cancelTimer?.();
+      killGroup();
+    });
   });
 
 export class GitError extends Schema.TaggedError<GitError, { readonly brand: unique symbol }>()("GitError", {
@@ -91,7 +94,11 @@ export class GitError extends Schema.TaggedError<GitError, { readonly brand: uni
 /** Every git command run: what a test holds a path's budget to (listing issues runs none). */
 export const gitRuns = Metric.counter("vibevalley.git.runs", { description: "git commands run", incremental: true });
 
-export const gitRun = (cwd: string, ...args: string[]) => Effect.andThen(Metric.update(gitRuns, 1), run("git", args, { cwd }));
+export const gitRun = (cwd: string, ...args: string[]) =>
+  Effect.andThen(
+    Metric.update(gitRuns, 1),
+    run("git", args, { cwd, timeoutMs: 180_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" } }),
+  );
 
 /** The output, trimmed; a failure is a GitError with what git said. */
 export const git = (cwd: string, ...args: string[]): Effect.Effect<string, GitError> =>

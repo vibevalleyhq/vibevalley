@@ -180,6 +180,20 @@
 | `runtime.refresh` | 重新探测一台农机 | `/api/v1/runtime/refresh` | ✓ | ✓ |   |   |
 | `runtime.setting.update` | 改一台农机的设置：开关、路径、默认模型、预算 | `/api/v1/runtime/setting/update` | ✓ |   |   |   |
 
+## repo
+
+仓库：工作目录下的 git 仓库
+
+| 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
+|---|---|---|---|---|---|---|
+| `repo.pr.submit` | 发布已有本地分支 | `/api/v1/repo/pr/submit` | ✓ |   |   |   |
+| `repo.list` | 列出全部仓库 | `/api/v1/repo/list` | ✓ | ✓ | ✓ |   |
+| `repo.validate` | 新建仓库会被拒的第一处，不真建 | `/api/v1/repo/validate` | ✓ | ✓ |   |   |
+| `repo.create` | 新建一个仓库 | `/api/v1/repo/create` | ✓ | ✓ |   |   |
+| `repo.language.list` | 仓库用了哪些语言 | `/api/v1/repo/language/list` | ✓ | ✓ |   |   |
+| `repo.template.list` | 仓库的工单模板，按它的栈填好 | `/api/v1/repo/template/list` | ✓ | ✓ |   |   |
+| `repo.activity.get` | 仓库的提交：每天几次、谁提交的 | `/api/v1/repo/activity/get` | ✓ | ✓ |   |   |
+
 ## github
 
 GitHub 的检测：gh 装没装、登没登录
@@ -188,19 +202,6 @@ GitHub 的检测：gh 装没装、登没登录
 |---|---|---|---|---|---|---|
 | `github.get` | 看 gh 装没装、登没登录 | `/api/v1/github/get` | ✓ | ✓ |   |   |
 | `github.refresh` | 重新检测 GitHub，顺带刷新开着的 PR | `/api/v1/github/refresh` | ✓ | ✓ |   |   |
-
-## repo
-
-仓库：工作目录下的 git 仓库
-
-| 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
-|---|---|---|---|---|---|---|
-| `repo.list` | 列出全部仓库 | `/api/v1/repo/list` | ✓ | ✓ | ✓ |   |
-| `repo.validate` | 新建仓库会被拒的第一处，不真建 | `/api/v1/repo/validate` | ✓ | ✓ |   |   |
-| `repo.create` | 新建一个仓库 | `/api/v1/repo/create` | ✓ | ✓ |   |   |
-| `repo.language.list` | 仓库用了哪些语言 | `/api/v1/repo/language/list` | ✓ | ✓ |   |   |
-| `repo.template.list` | 仓库的工单模板，按它的栈填好 | `/api/v1/repo/template/list` | ✓ | ✓ |   |   |
-| `repo.activity.get` | 仓库的提交：每天几次、谁提交的 | `/api/v1/repo/activity/get` | ✓ | ✓ |   |   |
 
 ## agent
 

@@ -15,6 +15,7 @@ import { Ingress } from "#/ingress/ingress.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Repo } from "#/repo/repo.ts";
+import { repository } from "#/repo/repository.ts";
 import { Resource } from "#/resource/resource.ts";
 import { Session } from "#/session/session.ts";
 import { gitIn } from "#/testing/git.ts";
@@ -57,8 +58,8 @@ describe("a pull request", () => {
           const ok = (out: string) => ({ out, ok: true, missing: false });
           if (args[0] === "--version") return ok("gh version 2.80.0");
           if (args[0] === "auth") return ok("Logged in to github.com account gardener (keyring)");
-          if (args[0] === "repo") return ok(`{"viewerPermission":"WRITE"}`);
-          if (args[0] === "pr" && args[1] === "list") return ok("[]");
+          if (args[0] === "repo") return ok(`{"viewerPermission":"WRITE","defaultBranchRef":{"name":"main"}}`);
+          if (args[0] === "pr" && args[1] === "list") return ok(creates > 0 ? '[{"url":"https://github.com/test/clock/pull/7","number":7}]' : "[]");
           if (args[0] === "pr" && args[1] === "create") {
             creates++;
             for (const word of ["--head", branch, "--base", "main", "--title", issue!.title]) expect(args).toContain(word);
@@ -150,7 +151,15 @@ describe("a pull request", () => {
         });
       const hooks = {
         gh,
-        push: (cwd: string, b: string) => Effect.sync(() => (pushes++, quiet(cwd, "push", "-u", "origin", b))),
+        publication: {
+          tip: () => repository(path).head,
+          fetch: () => Effect.void,
+          push: (cwd: string, _url: string, branch: string, sha: string) =>
+            Effect.andThen(
+              Effect.sync(() => pushes++),
+              repository(cwd).push(bare, branch, sha),
+            ),
+        },
         fetch: (cwd: string, b: string) => Effect.sync(() => quiet(cwd, "fetch", bare, b)),
       };
       let ready = false;
@@ -196,7 +205,6 @@ describe("a pull request", () => {
           [branch, cwd] = [sessions.sessionOf(id)!.branch!, sessions.cwdOf(id)!];
           git(work, "init", "--bare", bare);
           git(path, "remote", "add", "origin", "https://github.com/test/clock.git");
-          git(path, "remote", "set-url", "--push", "origin", bare);
           const main = git(path, "rev-parse", "main");
           yield* repos.refreshGitHub();
           const running = sessions.runOf(id);

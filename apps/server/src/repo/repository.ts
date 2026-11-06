@@ -43,6 +43,38 @@ export const repository = (path: string) => {
 
   return {
     main,
+    head: git(path, "rev-parse", "--verify", "HEAD^{commit}"),
+    status: git(path, "status", "--porcelain=v1", "--untracked-files=all"),
+    commonDirectory: git(path, "rev-parse", "--path-format=absolute", "--git-common-dir"),
+    location: Effect.map(git(path, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"), (out) => {
+      const [top = "", common = ""] = out.split("\n");
+      return { top, common };
+    }),
+    checkout: Effect.map(git(path, "status", "--porcelain=v2", "--branch", "--untracked-files=all"), (out) => {
+      const lines = out.split("\n");
+      return {
+        branch: lines.find((line) => line.startsWith("# branch.head "))?.slice(14) ?? "",
+        sha: lines.find((line) => line.startsWith("# branch.oid "))?.slice(13) ?? "",
+        clean: lines.every((line) => line.startsWith("# ") || line === ""),
+      };
+    }),
+    configuration: Effect.map(git(path, "config", "--null", "--list"), (out) =>
+      out
+        .split("\0")
+        .filter(Boolean)
+        .map((entry) => {
+          const at = entry.indexOf("\n");
+          return { key: at < 0 ? entry : entry.slice(0, at), value: at < 0 ? "" : entry.slice(at + 1) };
+        }),
+    ),
+    validBranch: (branch: string) => gitOk(path, "check-ref-format", "refs/heads/" + branch),
+    fetch: (url: string, branch: string) => git(path, "fetch", "--no-tags", "--no-write-fetch-head", "--", url, "refs/heads/" + branch),
+    push: (url: string, branch: string, sha: string) =>
+      git(path, "push", "--porcelain", "--no-follow-tags", "--recurse-submodules=no", "--", url, sha + ":refs/heads/" + branch),
+    remoteTip: (url: string, branch: string) => git(path, "ls-remote", "--exit-code", "--refs", "--", url, "refs/heads/" + branch),
+    worktrees: git(path, "worktree", "list", "--porcelain", "-z"),
+    addWorktree: (cwd: string, branch: string, from?: string) =>
+      git(path, "worktree", "add", ...(from === undefined ? [] : ["-b", branch]), "--", cwd, from ?? branch),
     /** The same, or "" when git cannot say. */
     mainOrNone: gitQuiet(path, "symbolic-ref", "--short", "HEAD"),
     /** Whether refs/heads/<branch> is there; a git that cannot tell fails. */
@@ -61,7 +93,7 @@ export const repository = (path: string) => {
     /** "" when the worktree at cwd is gone; without force, one with changes stays. */
     removeWorktree: (cwd: string, force: boolean) => why(gitRun(path, "worktree", "remove", ...(force ? ["--force"] : []), cwd)),
     /** "" when the branch is gone. */
-    deleteBranch: (branch: string) => why(gitRun(path, "branch", "-D", branch)),
+    deleteBranch: (branch: string, force = false) => why(gitRun(path, "branch", force ? "-D" : "-d", branch)),
     commit,
     conflicts,
     /** A merge commit of theirs into ours, made without checking either out: merge-tree writes the tree. */

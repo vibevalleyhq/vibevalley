@@ -1,6 +1,6 @@
 # 仓库
 
-仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。`apps/server/src/repo` 负责仓库新建与克隆、工单 worktree 与分支管理、冲突预检、`.vibevalley/check` 执行、分支合并、GitHub PR 交互及提交统计。
+仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。`apps/server/src/repo` 负责仓库新建与克隆、工单 worktree 与分支管理、冲突预检、`.vibevalley/check` 执行、分支合并、GitHub PR / GitLab.com MR 发布及提交统计。
 
 ## 管什么，不管什么
 
@@ -18,6 +18,7 @@
 |---|---|
 | `apps/server/src/repo/repo.ts` | 对外 `Repo` 服务：新建/克隆、worktree、检查与合并、PR 提交、GitHub 检测与 commit 计数 |
 | `apps/server/src/repo/repository.ts`、`git.ts` | 底层 git 命令拼装（`merge-tree`、`commit-tree`、`update-ref`、清理）与子进程限时执行 |
+| `apps/server/src/repo/publish.ts`、`hosting.ts`、`check.ts` | 已有分支与工单共用的检查、按 SHA 推送、平台适配与检查脚本执行 |
 | `apps/server/src/repo/workplace.ts` | 仓库技术栈识别、PR 标题正文读取（`vibevalley-pr.md`）与对外形状（`Workplace`、`MergeFailure`） |
 | `apps/web/src/features/repo/ReposPage.tsx` | 工作台仓库页（新建、概况、语言占比、提交日历） |
 | `apps/web/src/farm/map/RepoMap.tsx`、`islands.ts` | 像素农场群岛地图与岛屿空位计算 |
@@ -28,7 +29,7 @@
 
 - **仓库即 `repos/<名字>` 下的直接子目录**：名字仅含字母、数字、`-`、`_`、`.`（最长 64 字符），禁止符号链接跳出 `repos/`。派活目标仓库不存在时自动 `git init -b main` 并生成初始提交。
 - **一张工单固定一个 worktree 与一条分支**：路径为 `worktrees/<仓库>.<工单号>`，分支为 `vibevalley/issue-<工单号>`；重开或换帮工直接复用，首次创建时从基分支切出并在锁外跑一次 `.vibevalley/setup`（安装依赖并构建各包的 `dist/` 声明）。
-- **同仓库写操作串行，耗时检查在锁外执行**：每个仓库一把信号量锁 `serially` 保护新建、开 worktree、合并与清理；`.vibevalley/check`（默认限时 1200 秒）在锁外运行，通过后重新进锁核对分支与基分支未变才执行合并。
+- **同仓库写操作串行，本地合并的耗时检查在锁外执行**：每个仓库一把信号量锁 `serially` 保护新建、开 worktree、合并与清理；`.vibevalley/check`（默认限时 1200 秒）在锁外运行，通过后重新进锁核对分支与基分支未变才执行合并。
 - **清理回执区分现场是否保留（`WorkplaceRelease`）**：`release` 与 `clear` 返回 `{ kept, why? }`；有未提交改动或未合入提交时保留现场，仅 `kept: false` 时允许删除工单身份。
 - **冲突预检与合入父分支均不污染工作区**：
   - 冲突检测用 `git merge-tree --write-tree`；子工单合入父分支（`mergeInto`）用 `merge-tree` + `commit-tree` + 带旧值校验的 `update-ref`。
@@ -42,13 +43,25 @@
 1. 校验仓库名与可选的 `https://github.com/<owner>/<repo>` 地址，在仓库锁内排他创建目录。
 2. 无地址时初始化空仓库并生成首个提交；有地址时，已登录 `gh` 用 `gh repo clone`，未登录用禁用交互凭据的 `git clone`（限时 3 分钟，失败删除残留目录）。
 
-**合并与提交 PR**
+**本地合并**
 
 1. **锁外准备**：要求工作树干净，用 `merge-tree` 预检冲突，执行 `.vibevalley/check`（`vp check --deny-warnings`、`server:check`/`web:check` 按改动范围、`docs:verify`）并记录当前分支 commit。
 2. **进锁复核与执行**：确认分支 commit 未变、主分支无新增未检提交且无冲突：
    - **本地合并（`merge`）**：在仓库主检出执行 `git merge --no-edit`，成功后强制删除工单 worktree 与分支。
    - **合入父分支（`mergeInto`）**：通过 `commit-tree` 与 `update-ref` 原子推进父分支引用，清理子工单 worktree 与分支。
-   - **提交 PR（`submitPullRequest`）**：`git push -u origin <分支>`，读取 `.git/vibevalley-pr.md` 调 `gh pr create` 或复用已有开放 PR。
+
+
+**发布已有分支（`repo.pr.submit`）**
+
+本机主人显式给出检出根目录、分支、完整 SHA、base、标题和正文。检出可在空间外，不注册仓库。接口仅标注 owner，HTTP 拒绝 Bearer 身份；远程设备、管家和帮工工具不暴露此操作。本机回环监听仍是主人的信任边界。
+
+发布按仓库共用 Git 目录串行，拒绝脏目录、detached HEAD、分支或 SHA 不符、默认/base 分支、多远端、多个 URL、读写仓库不一致及 URL 重写配置。GitHub.com 用 gh，GitLab.com 用 glab；工具缺失、未登录、返回无法解码均拒绝。未知主机与自建 GitLab 不支持。
+
+正式发布取得目标分支，预检冲突，执行检出的 `.vibevalley/check`，再核对工作树、HEAD、远端配置和 base SHA。检查的 PATH 优先使用目标检出的 `node_modules/.bin`，移除宿主带入的其他检出工具路径。推送使用明确 URL 和 `<SHA>:refs/heads/<branch>`，不强推，不自动提交或切分支。平台查询开放 PR/MR 后复用或创建；只有得到校验过的链接才返回发布成功。
+
+`dryRun` 只读取检出与平台信息，不 fetch、不运行检查、不推送或创建请求。回执的 `check` 区分 `preview`、`passed`、`not-run`；没有脚本不算检查通过。推送后平台失败明确说明 SHA 已推送但链接未确认；重试查询已有请求。失败、取消和成功均保留主人的原检出。网络中断或取消时，远端可能已接收操作，应查询后重试。
+
+工单入口继续验证 `vibevalley/issue-N`，读取 Git 目录内的 `vibevalley-pr.md`，调用同一发布流程。GitLab 支持主人已有分支发布；仓库创建、工单 PR 检测、CI/评审跟随和完成清理仍限 GitHub，不提供 GitLab 自动合并。
 
 ## 和谁打交道
 

@@ -265,6 +265,7 @@ export const catalogs = {
           list: "列出全部仓库",
           template: { list: "仓库的工单模板，按它的栈填好" },
           validate: "新建仓库会被拒的第一处，不真建",
+          pr: { submit: "发布已有本地分支" },
         },
         runtime: { list: "列出全部农机", refresh: "重新探测一台农机", setting: { update: "改一台农机的设置：开关、路径、默认模型、预算" } },
         server: { health: { get: "服务端在不在、是哪个版本" } },
@@ -431,6 +432,9 @@ export const catalogs = {
       session: { stopped: "停下了帮工 {session}" },
       memory: { deleted: "删掉了记性 {memory}" },
       agent: { deleted: "删掉了档案 {agent}" },
+      "repo.publish": "将已有分支发布为 GitHub PR 或 GitLab MR",
+      "repo.check": "仓库检查：{check}",
+      "repo.preview": "预览：将 {branch} 的 {sha} 发布到 {base}；尚未运行检查",
     },
     desktop: {
       open: "打开 VibeValley",
@@ -1147,14 +1151,9 @@ export const catalogs = {
         noPermission: "无法检测 GitHub 仓库权限",
         readOnly: "没有写权限",
         wrongBranch: "工单分支不匹配",
-        changedDuringCheck: "检查期间工作目录发生了变化，提交改动后再提交 PR",
-        pushFailed: "推送工单分支失败，请检查 origin 和登录后重试",
-        listFailed: "查询已有 PR 失败；分支已推送，可重试",
-        listUnread: "无法读取已有 PR",
         checked: ".vibevalley/check 通过。",
         noCheck: "这个仓库没有 .vibevalley/check，没跑检查。",
         body: "工单 #{n}\n\n{conclusion}\n\n{check}",
-        createFailed: "创建 PR 失败；分支已推送，可重试",
         urlUnread: "无法读取新建 PR 的地址；可重试查询",
         viewFailed: "查询 PR #{n} 失败",
         stateUnread: "无法读取 PR #{n} 状态",
@@ -1166,6 +1165,10 @@ export const catalogs = {
       mergeTree: "git merge-tree 出错（{code}）",
       moreLines: "… 还有 {n} 行没显示",
       conflict: "合进 {base} 有冲突",
+      "publish.refused": "分支发布被拒绝：{detail}",
+      "publish.platformFailed": "托管平台调用失败：{stage}。请检查工具安装与登录状态。",
+      "publish.pushedWithoutLink": "SHA {sha} 已推送，但未确认 PR/MR 链接：{why}。可重试查询已有请求。",
+      "publish.ownerOnly": "只有本机主人可以发布已有分支",
     },
     "server.runtime": {
       date: "{month} 月 {day} 日 {time}",
@@ -4200,6 +4203,7 @@ export const catalogs = {
           list: "List every repo",
           template: { list: "A repo's ticket templates, filled in for its stack" },
           validate: "The first thing creating a repo would refuse, without creating it",
+          pr: { submit: "Publish an existing local branch" },
         },
         runtime: {
           list: "List every machine",
@@ -4400,6 +4404,9 @@ export const catalogs = {
       session: { stopped: "Stopped helper {session}" },
       memory: { deleted: "Deleted the memory {memory}" },
       agent: { deleted: "Deleted the profile {agent}" },
+      "repo.publish": "Publish an existing branch as a GitHub PR or GitLab MR",
+      "repo.check": "Repository check: {check}",
+      "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run",
     },
     desktop: {
       open: "Open VibeValley",
@@ -5143,14 +5150,9 @@ export const catalogs = {
         noPermission: "The repository's permissions could not be checked",
         readOnly: "No write permission",
         wrongBranch: "The ticket's branch does not match",
-        changedDuringCheck: "The worktree changed during validation; commit the changes before submitting the PR again",
-        pushFailed: "Pushing the ticket's branch failed: check origin and the sign-in, then retry",
-        listFailed: "Looking up existing PRs failed; the branch is pushed, so it can be retried",
-        listUnread: "The existing PRs could not be read",
         checked: ".vibevalley/check passed.",
         noCheck: "This repo has no .vibevalley/check, so no check was run.",
         body: "Ticket #{n}\n\n{conclusion}\n\n{check}",
-        createFailed: "Creating the PR failed; the branch is pushed, so it can be retried",
         urlUnread: "The new PR's address could not be read; the lookup can be retried",
         viewFailed: "Looking up PR #{n} failed",
         stateUnread: "PR #{n}'s state could not be read",
@@ -5162,6 +5164,10 @@ export const catalogs = {
       mergeTree: "git merge-tree failed ({code})",
       moreLines: "… {n} more lines not shown",
       conflict: "merging into {base} conflicts",
+      "publish.refused": "Branch publication refused: {detail}",
+      "publish.platformFailed": "Hosting platform failed: {stage}. Check installation and login.",
+      "publish.pushedWithoutLink": "SHA {sha} was pushed, but no PR/MR link was confirmed: {why}. Retry to recover an open request.",
+      "publish.ownerOnly": "Only the local owner can publish an existing branch",
     },
     "server.runtime": {
       date: "{month}/{day} {time}",
@@ -8481,6 +8487,7 @@ export interface Messages {
   "cli.op.repo.create": undefined;
   "cli.op.repo.language.list": undefined;
   "cli.op.repo.list": undefined;
+  "cli.op.repo.pr.submit": undefined;
   "cli.op.repo.template.list": undefined;
   "cli.op.repo.validate": undefined;
   "cli.op.runtime.list": undefined;
@@ -8517,6 +8524,9 @@ export interface Messages {
   "cli.pkm.saved": { readonly page: string | number };
   "cli.pkm.stale": { readonly days: string | number; readonly page: string | number };
   "cli.pkm.unchanged": { readonly page: string | number };
+  "cli.repo.check": { readonly check: string | number };
+  "cli.repo.preview": { readonly base: string | number; readonly branch: string | number; readonly sha: string | number };
+  "cli.repo.publish": undefined;
   "cli.session.stopped": { readonly session: string | number };
   "desktop.cannotStart": undefined;
   "desktop.commandLine.taken": { readonly link: string | number };
@@ -9175,15 +9185,10 @@ export interface Messages {
   "server.repo.gh.signedOut": undefined;
   "server.repo.github.body": { readonly check: string | number; readonly conclusion: string | number; readonly n: string | number };
   "server.repo.github.branchLeft": { readonly why: string | number };
-  "server.repo.github.changedDuringCheck": undefined;
   "server.repo.github.checked": undefined;
-  "server.repo.github.createFailed": undefined;
-  "server.repo.github.listFailed": undefined;
-  "server.repo.github.listUnread": undefined;
   "server.repo.github.noCheck": undefined;
   "server.repo.github.noPermission": undefined;
   "server.repo.github.notGithub": undefined;
-  "server.repo.github.pushFailed": undefined;
   "server.repo.github.readOnly": undefined;
   "server.repo.github.resolveFailed": undefined;
   "server.repo.github.stateUnknown": { readonly n: string | number };
@@ -9215,6 +9220,10 @@ export interface Messages {
   "server.repo.outside": undefined;
   "server.repo.parentBranchChanged": undefined;
   "server.repo.parentHasChanges": undefined;
+  "server.repo.publish.ownerOnly": undefined;
+  "server.repo.publish.platformFailed": { readonly stage: string | number };
+  "server.repo.publish.pushedWithoutLink": { readonly sha: string | number; readonly why: string | number };
+  "server.repo.publish.refused": { readonly detail: string | number };
   "server.repo.tokeiFailed": { readonly why: string | number };
   "server.repo.tokeiUnread": undefined;
   "server.repoRef": { readonly id: string | number };

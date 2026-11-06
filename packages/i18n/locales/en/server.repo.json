@@ -60,14 +60,9 @@
     "noPermission": "The repository's permissions could not be checked",
     "readOnly": "No write permission",
     "wrongBranch": "The ticket's branch does not match",
-    "changedDuringCheck": "The worktree changed during validation; commit the changes before submitting the PR again",
-    "pushFailed": "Pushing the ticket's branch failed: check origin and the sign-in, then retry",
-    "listFailed": "Looking up existing PRs failed; the branch is pushed, so it can be retried",
-    "listUnread": "The existing PRs could not be read",
     "checked": ".vibevalley/check passed.",
     "noCheck": "This repo has no .vibevalley/check, so no check was run.",
     "body": "Ticket #{n}\n\n{conclusion}\n\n{check}",
-    "createFailed": "Creating the PR failed; the branch is pushed, so it can be retried",
     "urlUnread": "The new PR's address could not be read; the lookup can be retried",
     "viewFailed": "Looking up PR #{n} failed",
     "stateUnread": "PR #{n}'s state could not be read",
@@ -78,5 +73,9 @@
   },
   "mergeTree": "git merge-tree failed ({code})",
   "moreLines": "… {n} more lines not shown",
-  "conflict": "merging into {base} conflicts"
+  "conflict": "merging into {base} conflicts",
+  "publish.refused": "Branch publication refused: {detail}",
+  "publish.platformFailed": "Hosting platform failed: {stage}. Check installation and login.",
+  "publish.pushedWithoutLink": "SHA {sha} was pushed, but no PR/MR link was confirmed: {why}. Retry to recover an open request.",
+  "publish.ownerOnly": "Only the local owner can publish an existing branch"
 }

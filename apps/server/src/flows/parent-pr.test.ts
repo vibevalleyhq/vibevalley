@@ -11,6 +11,7 @@ import { owner } from "#/base/actor.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Repo } from "#/repo/repo.ts";
+import { repository } from "#/repo/repository.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { await_, farm, git, lab } from "./farm.ts";
@@ -31,17 +32,17 @@ for (const ending of ["MERGED", "CLOSED"] as const) {
             const ok = (out: string) => ({ out, ok: true, missing: false });
             if (args[0] === "--version") return ok("gh version 2.80.0");
             if (args[0] === "auth") return ok("Logged in to github.com account gardener (keyring)");
-            if (args[0] === "repo") return ok('{"viewerPermission":"WRITE"}');
+            if (args[0] === "repo") return ok('{"viewerPermission":"WRITE","defaultBranchRef":{"name":"main"}}');
             if (args[0] === "pr" && args[1] === "list") return ok("[]");
             if (args[0] === "pr" && args[1] === "create") return ok("https://github.com/test/family-pr/pull/1");
             if (args[0] === "pr" && args[1] === "view") return ok(JSON.stringify({ state, mergedAt: null }));
             return { out: "", ok: false, missing: false };
           }),
-        push: (cwd, branch) =>
-          Effect.sync(() => {
-            git(cwd, "push", bare, branch);
-            return true;
-          }),
+        publication: {
+          tip: () => repository(path).head,
+          fetch: () => Effect.void,
+          push: (cwd, _url, branch, sha) => repository(cwd).push(bare, branch, sha),
+        },
         fetch: () => Effect.succeed(false),
       },
     });

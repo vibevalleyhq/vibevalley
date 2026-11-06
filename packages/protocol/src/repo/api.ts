@@ -5,6 +5,7 @@ import * as S from "../schema";
 import type * as T from "../shapes";
 
 export interface RepoHandlers<R = never> {
+  readonly "repo.pr.submit": (a: T.SubmitBranch) => Effect.Effect<T.BranchPublication, ApiError, R>;
   readonly "github.get": () => Effect.Effect<T.GitHubStatus, ApiError, R>;
   readonly "github.refresh": () => Effect.Effect<T.GitHubStatus, ApiError, R>;
   readonly "repo.list": () => Effect.Effect<T.RepoSummary[], ApiError, R>;
@@ -18,6 +19,7 @@ export interface RepoHandlers<R = never> {
 }
 
 export const repoEndpoints: readonly Endpoint[] = [
+  { op: "repo.pr.submit", about: [], input: S.SubmitBranch, result: S.BranchPublication, can: ["owner"] },
   {
     op: "github.get",
     about: [],

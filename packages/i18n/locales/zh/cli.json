@@ -25,9 +25,8 @@
     "key": "请求键：同一把键重发只做一次",
     "limit": "最多几条",
     "priority": "优先级",
-    "repo": "仓库的名字",
-    "reply": "回复这一号消息",
     "repo": "GitHub 仓库的地址",
+    "reply": "回复这一号消息",
     "text": "标题或描述里有这些字",
     "timeout": "最多等几秒",
     "closed": "只看关掉的（done、canceled）",
@@ -383,7 +382,10 @@
       "template": {
         "list": "仓库的工单模板，按它的栈填好"
       },
-      "validate": "新建仓库会被拒的第一处，不真建"
+      "validate": "新建仓库会被拒的第一处，不真建",
+      "pr": {
+        "submit": "发布已有本地分支"
+      }
     },
     "runtime": {
       "list": "列出全部农机",
@@ -770,5 +772,8 @@
   },
   "agent": {
     "deleted": "删掉了档案 {agent}"
-  }
+  },
+  "repo.publish": "将已有分支发布为 GitHub PR 或 GitLab MR",
+  "repo.check": "仓库检查：{check}",
+  "repo.preview": "预览：将 {branch} 的 {sha} 发布到 {base}；尚未运行检查"
 }

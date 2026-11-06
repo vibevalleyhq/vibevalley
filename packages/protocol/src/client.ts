@@ -316,16 +316,14 @@ export class VibeValleyApi {
     },
   };
 
-  readonly github = {
-    get: (): Promise<T.GitHubStatus> => this.call<T.GitHubStatus>("/api/v1/github/get", undefined),
-    refresh: (): Promise<T.GitHubStatus> => this.call<T.GitHubStatus>("/api/v1/github/refresh", undefined),
-  };
-
   readonly repo = {
     list: (): Promise<T.RepoSummary[]> => this.call<T.RepoSummary[]>("/api/v1/repo/list", undefined),
     /** The first thing Create would refuse in this repo, without making it. */
     validate: (a: T.NewRepo): Promise<T.Validation> => this.call<T.Validation>("/api/v1/repo/validate", a),
     create: (a: T.NewRepo): Promise<T.RepoSummary> => this.call<T.RepoSummary>("/api/v1/repo/create", a),
+    pr: {
+      submit: (a: T.SubmitBranch): Promise<T.BranchPublication> => this.call<T.BranchPublication>("/api/v1/repo/pr/submit", a),
+    },
     language: {
       list: (a: { id: string }): Promise<T.RepoLanguages> => this.call<T.RepoLanguages>("/api/v1/repo/language/list", a),
     },
@@ -336,6 +334,11 @@ export class VibeValleyApi {
     activity: {
       get: (a: { id: string }): Promise<T.RepoActivity> => this.call<T.RepoActivity>("/api/v1/repo/activity/get", a),
     },
+  };
+
+  readonly github = {
+    get: (): Promise<T.GitHubStatus> => this.call<T.GitHubStatus>("/api/v1/github/get", undefined),
+    refresh: (): Promise<T.GitHubStatus> => this.call<T.GitHubStatus>("/api/v1/github/refresh", undefined),
   };
 
   readonly agent = {

@@ -55,6 +55,7 @@ const cliCommands = [
   "pkm search",
   "repo create",
   "repo list",
+  "repo pr submit",
   "runtime list",
   "runtime refresh",
   "session list",

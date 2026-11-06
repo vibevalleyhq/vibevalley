@@ -108,3 +108,31 @@ export interface UncommittedItem {
   path: string;
   status: string;
 }
+
+export interface SubmitBranch {
+  readonly cwd: string;
+  readonly branch: string;
+  readonly sha: string;
+  readonly base: string;
+  readonly title: string;
+  readonly body: string;
+  readonly dryRun?: boolean;
+}
+
+export const PublishPlatformValues = ["github", "gitlab"] as const;
+export type PublishPlatform = (typeof PublishPlatformValues)[number];
+export const BranchCheckValues = ["preview", "passed", "not-run"] as const;
+export type BranchCheck = (typeof BranchCheckValues)[number];
+
+export interface BranchPublication {
+  readonly platform: PublishPlatform;
+  readonly repository: string;
+  readonly branch: string;
+  readonly sha: string;
+  readonly base: string;
+  readonly check: BranchCheck;
+  readonly pushed: boolean;
+  readonly url?: string;
+  readonly number?: number;
+  readonly reused?: boolean;
+}

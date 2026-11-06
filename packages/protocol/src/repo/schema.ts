@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
-import type * as T from "../shapes";
+import * as T from "../shapes";
 
 export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
   installed: Schema.Boolean,
@@ -109,4 +109,27 @@ export const Commit: Codec<T.Commit> = Schema.Struct({
 export const UncommittedItem: Codec<T.UncommittedItem> = Schema.Struct({
   path: Schema.String,
   status: Schema.String,
+});
+
+export const SubmitBranch: Codec<T.SubmitBranch> = Schema.Struct({
+  cwd: Schema.String,
+  branch: Schema.String,
+  sha: Schema.String,
+  base: Schema.String,
+  title: Schema.String,
+  body: Schema.String,
+  dryRun: Schema.optionalKey(Schema.Boolean),
+});
+
+export const BranchPublication: Codec<T.BranchPublication> = Schema.Struct({
+  platform: Schema.Literals(T.PublishPlatformValues),
+  repository: Schema.String,
+  branch: Schema.String,
+  sha: Schema.String,
+  base: Schema.String,
+  check: Schema.Literals(T.BranchCheckValues),
+  pushed: Schema.Boolean,
+  url: Schema.optionalKey(Schema.String),
+  number: Schema.optionalKey(Schema.Int),
+  reused: Schema.optionalKey(Schema.Boolean),
 });

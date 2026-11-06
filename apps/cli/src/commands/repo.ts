@@ -4,12 +4,44 @@ import { Command, Flag } from "effect/cli";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { ask, change, given, nameArg, show } from "#/farm.ts";
+import { ask, change, DryRunFlag, given, nameArg, show } from "#/farm.ts";
 
 const repoLine = (p: T.RepoSummary) => [p.name, p.path, p.git ? "git" : "", p.pullRequest.available ? "pr" : ""].filter((x) => x !== "").join("  ");
 
 export const repoCommand = Command.make("repo").pipe(
   Command.withSubcommands([
+    Command.make("pr").pipe(
+      Command.withDescription(t("cli.repo.publish")),
+      Command.withSubcommands([
+        Command.make(
+          "submit",
+          {
+            cwd: Flag.String("cwd"),
+            branch: Flag.String("branch"),
+            sha: Flag.String("sha"),
+            base: Flag.String("base"),
+            title: Flag.String("title"),
+            body: Flag.String("body"),
+          },
+          (o) =>
+            Effect.gen(function* () {
+              const dryRun = yield* DryRunFlag;
+              const result = yield* ask((api) => api.repo.pr.submit({ ...o, dryRun }));
+              yield* show(result, (r) =>
+                r.url ? r.url + "\n" + t("cli.repo.check", { check: r.check }) : t("cli.repo.preview", { branch: r.branch, sha: r.sha, base: r.base }),
+              );
+            }),
+        ).pipe(
+          Command.withDescription(t("cli.repo.publish")),
+          Command.withExamples([
+            {
+              command: "vibevalley repo pr submit --cwd /path/to/repo --branch feat/topic --sha <full-sha> --base main --title <title> --body <body> --dry-run",
+              description: t("cli.repo.publish"),
+            },
+          ]),
+        ),
+      ]),
+    ),
     Command.make("list", {}, () =>
       Effect.flatMap(
         ask((api) => api.repo.list()),
