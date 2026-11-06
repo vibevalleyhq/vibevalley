@@ -66,7 +66,7 @@ describe("a talk with a helper profile", () => {
       const dm = yield* channels.direct("lab");
       expect(yield* channels.direct("lab")).toBe(dm);
       const channel = channelOf(core.state().chat, dm);
-      expect([channel?.type, channel?.peer, channel?.subjectKind, channel?.subjectId]).toEqual(["direct", "profile:lab", undefined, undefined]);
+      expect([channel?.type, channel?.peer, channel?.subjectKind, channel?.subjectId]).toEqual(["direct", "profile:lab", null, undefined]);
       const answers = () => saidIn(dm).filter((m) => m.kind === "report").length;
       yield* channels.say("你好，记得这段对话", dm, "");
       yield* until(() => answers() === 1, "the first answer");

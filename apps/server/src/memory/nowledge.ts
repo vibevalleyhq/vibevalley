@@ -216,6 +216,7 @@ export function nowledge(c: MemorySourceConfig): Source {
           agent: q.agent,
           kind: "note" as const,
           text: hitText(h),
+          author: "system" as const,
           at: 0,
           recalled: 0,
           fading: false,
@@ -229,7 +230,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     list: Effect.fnUntraced(function* (agent) {
       if (c.read !== true) return [];
       const hits = yield* find(agent, "", most, false);
-      return hits.map((h): T.Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0, fading: false }));
+      return hits.map((h): T.Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), author: "system", at: 0, recalled: 0, fading: false }));
     }),
     syncTurn: () => Effect.void,
     sessionEnded: () => Effect.void,
@@ -238,7 +239,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       const repo = n.repo.trim();
       const id = yield* add(n.agent, n.text, repo);
       const at = yield* Clock.currentTimeMillis;
-      return { id, agent: n.agent, kind: "note", text: n.text, at, recalled: 0, fading: false, ...(repo ? { repo } : {}) } satisfies T.Memory;
+      return { id, agent: n.agent, kind: "note", text: n.text, author: "system", at, recalled: 0, fading: false, ...(repo ? { repo } : {}) } satisfies T.Memory;
     }),
     forget: () => Effect.fail(new SourceError({ message: t("server.memory.nowledgeForget") })),
     can: { list: true, forget: false, transcripts: false },

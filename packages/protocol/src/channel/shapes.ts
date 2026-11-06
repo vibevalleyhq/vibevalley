@@ -17,7 +17,7 @@ export interface ChatMessage {
   mentions: string[];
   session?: SessionId;
   run?: string;
-  outcome?: Outcome;
+  outcome: Outcome | null;
   spent?: Spent;
   spoken: boolean;
   /** The key the owner's send carried, on the owner's own messages: a page knows its line by it. */
@@ -96,14 +96,14 @@ export interface Channel {
   position?: number;
   archived?: number;
   /** What of it counts for the owner; absent is all. */
-  notify?: Notify;
+  notify: Notify;
   /** The message a thread hangs under, and its number there. */
   root?: MessageId;
   rootNumber?: number;
   name?: string;
   description: string;
   repo?: string;
-  subjectKind?: SubjectKind;
+  subjectKind: SubjectKind | null;
   subjectId?: string;
   lastNumber?: number;
   replies: number;

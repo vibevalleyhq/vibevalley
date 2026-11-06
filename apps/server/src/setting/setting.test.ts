@@ -25,7 +25,7 @@ describe("settings", () => {
       Effect.gen(function* () {
         const s = yield* Setting;
         expect(s.status().deepseekApiKey).toEqual({ source: "config", hint: "…0000" });
-        expect(s.status().agoraAppId).toEqual({});
+        expect(s.status().agoraAppId).toEqual({ source: null });
         const after = yield* s.save({ deepseekApiKey: " sk-saved-in-settings-1234 ", agoraAppId: appId, agoraAppCertificate: cert });
         expect(after.deepseekApiKey).toEqual({ source: "settings", hint: "…1234" });
         expect(after.agoraAppId).toEqual({ source: "settings", value: appId });
@@ -112,7 +112,7 @@ describe("settings", () => {
       config,
       Effect.gen(function* () {
         const s = yield* Setting;
-        expect(s.status().ttsKey).toEqual({});
+        expect(s.status().ttsKey).toEqual({ source: null });
         const tts = { vendor: "microsoft", region: "eastasia", voiceName: "zh-CN-XiaoxiaoNeural" } as const;
         const after = yield* s.save({ voice: { tts }, ttsKey: " azure-speech-key-9f3a " });
         expect(after.voice.tts).toEqual(tts);
@@ -130,13 +130,13 @@ describe("settings", () => {
       config,
       Effect.gen(function* () {
         const s = yield* Setting;
-        expect([s.status().mossKey, s.mossKey()]).toEqual([{}, ""]);
+        expect([s.status().mossKey, s.mossKey()]).toEqual([{ source: null }, ""]);
         const after = yield* s.save({ mossKey: " sk-moss-live-key-6b9c " });
         expect(after.mossKey).toEqual({ source: "settings", hint: "…6b9c" });
         expect(JSON.stringify(after)).not.toContain("sk-moss");
         expect(s.mossKey()).toBe("sk-moss-live-key-6b9c");
         expect(s.validate({ mossKey: "sk with space" }).problem).toBeDefined();
-        expect((yield* s.save({ mossKey: "" })).mossKey).toEqual({});
+        expect((yield* s.save({ mossKey: "" })).mossKey).toEqual({ source: null });
         expect(s.mossKey()).toBe("");
       }),
     );

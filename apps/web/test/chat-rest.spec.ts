@@ -191,7 +191,7 @@ const helper: Agent = {
   workdir: "",
   worktree: true,
   tags: [],
-  look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
+  look: { orchestrator: null, species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
 };
 
 test("regression: a profile's direct chat uses a session without a hidden issue", async ({ page, api }) => {

@@ -61,9 +61,13 @@ export interface IssueMandate {
   autoSubmitPr: boolean;
 }
 
+export const IssueReportMemoryScopeValues = ["repo", "all"] as const;
+/** Where a memory written from a report holds: this repo, or every repo. */
+export type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];
+
 export interface IssueReportMemory {
   text: string;
-  scope: "repo" | "all";
+  scope: IssueReportMemoryScope;
 }
 
 export interface IssueReport {

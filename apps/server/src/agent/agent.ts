@@ -37,7 +37,7 @@ const lookFilled = (raw: unknown): unknown =>
   Predicate.isObject(raw) && Predicate.isObject(raw.look)
     ? {
         ...raw,
-        look: { ...raw.look, build: raw.look.build ?? "biped", head: raw.look.head ?? "rounded" },
+        look: { species: null, outfit: null, orchestrator: null, ...raw.look, build: raw.look.build ?? "biped", head: raw.look.head ?? "rounded" },
       }
     : raw;
 const readStored = (text: string): Stored => {
@@ -67,8 +67,7 @@ export function withCast(a: T.Agent): T.Agent {
   look.head ||= "rounded";
   look.species ??= SpeciesValues[castHash(a.id) % SpeciesValues.length] ?? "cat";
   look.outfit ??= "farmer";
-  if (a.role === "orchestrator") look.orchestrator ??= "farmer";
-  else delete look.orchestrator;
+  look.orchestrator = a.role === "orchestrator" ? (look.orchestrator ?? "farmer") : null;
   return { ...a, look };
 }
 

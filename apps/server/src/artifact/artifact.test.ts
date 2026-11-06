@@ -71,7 +71,7 @@ describe("an artifact", () => {
       const artifacts = yield* Artifact;
       const chat = yield* Channel;
       const before = (yield* chat.history(chat.defaultChannel())).length;
-      const blank = yield* artifacts.create(owner, { title: "周报" });
+      const blank = yield* artifacts.create(owner, { title: "周报", kind: "markdown" });
       expect(blank).toMatchObject({ body: "blocks", version: 0, seq: 0, by: ownerId });
       expect(blank.channel).toBeUndefined();
       expect([(yield* artifacts.blocks(blank.id)).blocks, (yield* chat.history(chat.defaultChannel())).length]).toEqual([[], before]);

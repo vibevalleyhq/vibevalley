@@ -8,8 +8,8 @@ const page = (slug: string, tier: PkmPageSummary["tier"]): PkmPageSummary => ({ 
 const block = (id: string, depth: number): PkmBlock => ({ id, depth, body: id, props: {}, path: "" });
 
 test("groups pages by tier in PARA order, empty tiers left out", () => {
-  const groups = byTier([page("j", "journal"), page("p", "repo"), page("r", "resource")]);
-  expect(groups.map((g) => g.tier)).toEqual(["repo", "resource", "journal"]);
+  const groups = byTier([page("j", "journal"), page("p", "project"), page("r", "resource")]);
+  expect(groups.map((g) => g.tier)).toEqual(["project", "resource", "journal"]);
 });
 
 test("hides the blocks under a collapsed one, not its siblings", () => {

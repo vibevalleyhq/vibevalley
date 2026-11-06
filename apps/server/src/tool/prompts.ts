@@ -225,7 +225,7 @@ export const params = {
   pkm: {
     text: "要找什么，几个词或一句话",
     limit: "最多几条，默认 10",
-    tier: "只找这一层的页：repo（在做的仓库）、area（长期负责的领域）、resource（资料）、inbox（收件箱）、journal（日记）、archive（归档）",
+    tier: "只找这一层的页：project（在做的项目）、area（长期负责的领域）、resource（资料）、inbox（收件箱）、journal（日记）、archive（归档）",
     page: "页的标题（或别名）",
     capture: "要记的一句话：写清楚是什么、为什么值得记",
     block: "块的 id：pkm_search、pkm_page_get 的回答里〔〕中的那串",
@@ -302,7 +302,7 @@ export const params = {
 };
 
 const pkmTierWord: Record<T.PkmTier, string> = {
-  repo: "仓库",
+  project: "项目",
   area: "领域",
   resource: "资料",
   inbox: "收件箱",
@@ -357,7 +357,7 @@ export const descriptions = {
     "开一个新频道：一件长期的事、一个仓库，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，repo 是它的默认仓库（在这里派的活默认在这个仓库里干）。主人要求了才开。",
   "channel.update": "改一个频道是做什么的（description），或它的默认仓库（repo，写空字符串就是不要默认仓库）。",
   "pkm.search":
-    "在主人的笔记里找：主人自己记的仓库、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
+    "在主人的笔记里找：主人自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
   "pkm.page.get": "读主人笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
   "pkm.capture":
     "往主人今天的日记里记一句，标成 LATER #inbox，写上是你记的：主人让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",
@@ -389,7 +389,7 @@ export const sessionDescriptions = {
   "channel.message.send":
     "在群聊里发一条消息。id 不填就是你自己的工单串；#<频道> 是一个频道；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
   "pkm.search":
-    "在主人的笔记里找：主人自己记的仓库、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
+    "在主人的笔记里找：主人自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
   "pkm.page.get": "读主人笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
   "pkm.capture":
     "往主人今天的日记里记一句，标成 LATER #inbox，写上是你记的：主人让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",

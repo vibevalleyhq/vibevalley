@@ -1,6 +1,6 @@
 // PKM (docs/subsystems/pkm.md): the owner's notes as Logseq-style outlines in PARA folders. The files are the truth.
 
-export const PkmTierValues = ["inbox", "repo", "area", "resource", "archive", "journal"] as const;
+export const PkmTierValues = ["inbox", "project", "area", "resource", "archive", "journal"] as const;
 /** Where a page sits in PARA, which is the folder its file is in. */
 export type PkmTier = (typeof PkmTierValues)[number];
 
@@ -11,6 +11,12 @@ export const PkmPriorityValues = ["A", "B", "C"] as const;
 export type PkmPriority = (typeof PkmPriorityValues)[number];
 
 /** One bullet of a page, in the page's order (pre-order); parent and depth say the outline. */
+export const PkmMoveDirectionValues = ["up", "down"] as const;
+export type PkmMoveDirection = (typeof PkmMoveDirectionValues)[number];
+
+export const PkmMoveAtValues = ["before", "after", "inside"] as const;
+export type PkmMoveAt = (typeof PkmMoveAtValues)[number];
+
 export interface PkmBlock {
   id: string;
   parent?: string;
@@ -78,7 +84,7 @@ export interface PkmBacklink {
 
 /** The blocks of other pages that link here, by where they are in PARA. */
 export interface PkmBacklinks {
-  repos: PkmBacklink[];
+  projects: PkmBacklink[];
   journals: PkmBacklink[];
   areas: PkmBacklink[];
   archives: PkmBacklink[];
@@ -153,9 +159,9 @@ export type PkmBlockOp =
   | { op: "delete"; block: string }
   | { op: "indent"; block: string }
   | { op: "outdent"; block: string }
-  | { op: "move"; block: string; direction: "up" | "down" }
+  | { op: "move"; block: string; direction: PkmMoveDirection }
   /** With everything under it, before or after target, or inside it as its first child; none into itself or under itself. */
-  | { op: "move_to"; block: string; target: string; at: "before" | "after" | "inside" };
+  | { op: "move_to"; block: string; target: string; at: PkmMoveAt };
 
 export interface PkmMutation {
   page: string;
@@ -216,7 +222,7 @@ export interface PkmJournalRequest {
   day: string;
 }
 
-export interface PkmStaleRepo {
+export interface PkmStaleProject {
   slug: string;
   title: string;
   days: number;
@@ -235,10 +241,10 @@ export interface PkmOverdue {
   deadline: string;
 }
 
-/** What wants a look: pages left in the inbox, repos untouched for staleDays, blocks past their deadline::. */
+/** What wants a look: pages left in the inbox, projects untouched for staleDays, blocks past their deadline::. */
 export interface PkmRadar {
   inbox: number;
-  stale: PkmStaleRepo[];
+  stale: PkmStaleProject[];
   overdue: PkmOverdue[];
 }
 

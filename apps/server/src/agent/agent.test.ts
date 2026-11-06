@@ -35,7 +35,7 @@ const draft = (change: Partial<T.Agent> = {}): T.Agent => ({
   workdir: "",
   worktree: false,
   tags: [],
-  look: { build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
+  look: { species: null, outfit: null, orchestrator: null, build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
   ...change,
 });
 
@@ -153,7 +153,7 @@ describe("profiles", () => {
       const got = withCast({ id } as T.Agent);
       expect([got.look.species, got.look.outfit]).toEqual([want, "farmer"]);
     }
-    const kept = withCast({ id: "backend", look: { species: "owl", outfit: "rain" } } as T.Agent);
+    const kept = withCast({ id: "backend", look: { orchestrator: null, species: "owl", outfit: "rain" } } as T.Agent);
     expect([kept.look.species, kept.look.outfit]).toEqual(["owl", "rain"]);
   });
 
@@ -284,7 +284,7 @@ describe("profiles", () => {
         expect((yield* Effect.flip(s.create(draft({ id: "mine" }))))._tag).toBe("Refused");
         const saved = yield* s.save({
           ...draft({ id: "agent-7" }),
-          look: { body: "", trim: "", hat: "", eye: "" } as T.Agent["look"],
+          look: { species: null, outfit: null, orchestrator: null, body: "", trim: "", hat: "", eye: "" } as T.Agent["look"],
         });
         expect([saved.look.species, saved.look.outfit, saved.look.build, saved.look.head]).toEqual(["fox", "farmer", "biped", "rounded"]);
       }),

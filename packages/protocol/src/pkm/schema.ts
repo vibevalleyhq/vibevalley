@@ -2,6 +2,7 @@ import { Schema } from "effect";
 
 import type { Codec } from "../codec";
 import * as T from "../shapes";
+import { PkmMoveAtValues, PkmMoveDirectionValues } from "./shapes";
 
 const pkmProps = Schema.Record(Schema.String, Schema.String);
 export const PkmTier: Codec<T.PkmTier> = Schema.Literals(T.PkmTierValues);
@@ -66,7 +67,7 @@ export const PkmBacklink: Codec<T.PkmBacklink> = Schema.Struct({
 
 const pkmBacklinks = Schema.mutable(Schema.Array(PkmBacklink));
 export const PkmBacklinks: Codec<T.PkmBacklinks> = Schema.Struct({
-  repos: pkmBacklinks,
+  projects: pkmBacklinks,
   journals: pkmBacklinks,
   areas: pkmBacklinks,
   archives: pkmBacklinks,
@@ -129,8 +130,8 @@ export const PkmBlockOp: Codec<T.PkmBlockOp> = Schema.Union([
   Schema.Struct({ op: Schema.tag("delete"), ...pkmOn }),
   Schema.Struct({ op: Schema.tag("indent"), ...pkmOn }),
   Schema.Struct({ op: Schema.tag("outdent"), ...pkmOn }),
-  Schema.Struct({ op: Schema.tag("move"), ...pkmOn, direction: Schema.Literals(["up", "down"]) }),
-  Schema.Struct({ op: Schema.tag("move_to"), ...pkmOn, target: Schema.String, at: Schema.Literals(["before", "after", "inside"]) }),
+  Schema.Struct({ op: Schema.tag("move"), ...pkmOn, direction: Schema.Literals(PkmMoveDirectionValues) }),
+  Schema.Struct({ op: Schema.tag("move_to"), ...pkmOn, target: Schema.String, at: Schema.Literals(PkmMoveAtValues) }),
 ]);
 
 export const PkmMutation: Codec<T.PkmMutation> = Schema.Struct({ page: Schema.String, ops: Schema.mutable(Schema.Array(PkmBlockOp)) });
@@ -164,7 +165,7 @@ export const PkmSourceUpdate: Codec<T.PkmSourceUpdate> = Schema.Struct({ page: S
 
 export const PkmJournalRequest: Codec<T.PkmJournalRequest> = Schema.Struct({ day: Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/u)) });
 
-export const PkmStaleRepo: Codec<T.PkmStaleRepo> = Schema.Struct({
+export const PkmStaleProject: Codec<T.PkmStaleProject> = Schema.Struct({
   slug: Schema.String,
   title: Schema.String,
   days: Schema.Int,
@@ -184,7 +185,7 @@ export const PkmOverdue: Codec<T.PkmOverdue> = Schema.Struct({
 
 export const PkmRadar: Codec<T.PkmRadar> = Schema.Struct({
   inbox: Schema.Int,
-  stale: Schema.mutable(Schema.Array(PkmStaleRepo)),
+  stale: Schema.mutable(Schema.Array(PkmStaleProject)),
   overdue: Schema.mutable(Schema.Array(PkmOverdue)),
 });
 

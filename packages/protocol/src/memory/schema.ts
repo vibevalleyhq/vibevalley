@@ -36,7 +36,7 @@ const memoryFields = {
   agent: Schema.String,
   kind: MemoryKind,
   text: Schema.String,
-  author: Schema.optionalKey(ActorKind),
+  author: ActorKind,
   repo: Schema.optionalKey(Schema.String),
   session: Schema.optionalKey(SessionId),
   at: Schema.Finite,

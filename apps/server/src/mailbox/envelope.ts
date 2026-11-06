@@ -1,11 +1,13 @@
 import { Effect, Option, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { ownerId, VoiceModeValues } from "@vibevalley/protocol";
 import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOrNone } from "#/base/json.ts";
+
+const IngressSourceValues = ["issue", "cron", "patrol", "connector", "voice", "github"] as const;
 import type { Db } from "#/infra/db.ts";
 import { inboxOf } from "#db/channel.sql.ts";
 
@@ -46,12 +48,12 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   artifact: Schema.optionalKey(S.ArtifactCard),
   blocks: Schema.optionalKey(Schema.mutable(Schema.Array(S.QuotedBlock))),
   picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), repo: Schema.optionalKey(Schema.String) })),
-  ingressSource: Schema.optionalKey(Schema.Literals(["issue", "cron", "patrol", "connector", "voice", "github"])),
+  ingressSource: Schema.optionalKey(Schema.Literals(IngressSourceValues)),
   ingressRecipient: Schema.optionalKey(Schema.String),
   issue: Schema.optionalKey(Schema.String),
   trigger: Schema.optionalKey(S.RunTrigger),
   responsePort: Schema.optionalKey(Schema.String),
-  voiceMode: Schema.optionalKey(Schema.Literals(["dictated", "conversation", "api"])),
+  voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
 });
 
 /** Anything unreadable is no meta. */

@@ -4,7 +4,7 @@
     "hint": "Your own notes: daily journals, outline pages sorted by PARA, backlinks and suggested rewrites"
   },
   "tier": {
-    "repo": "Repos",
+    "project": "Projects",
     "area": "Areas",
     "resource": "Resources",
     "inbox": "Inbox",
@@ -107,7 +107,7 @@
   "backlinks": {
     "title": "Linked here · {n}",
     "none": "No other page links here yet",
-    "repos": "Repos",
+    "projects": "Projects",
     "journals": "Journals",
     "areas": "Areas and resources",
     "archives": "Archive"
@@ -122,7 +122,7 @@
     "on": "“{span}”"
   },
   "tierOne": {
-    "repo": "Repo",
+    "project": "Project",
     "area": "Area",
     "resource": "Resource",
     "inbox": "Inbox",

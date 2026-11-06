@@ -148,9 +148,10 @@ function routesOf(runes: readonly string[]): { freq: number; index: number }[] {
 }
 
 // As jieba's HMM: it cuts a run of single characters the dictionary does not know.
-type State = "B" | "E" | "M" | "S";
+const HmmStateValues = ["B", "E", "M", "S"] as const;
+type State = (typeof HmmStateValues)[number];
 
-const EmitTable = Schema.Record(Schema.Literals(["B", "E", "M", "S"]), Schema.Record(Schema.String, Schema.Finite));
+const EmitTable = Schema.Record(Schema.Literals(HmmStateValues), Schema.Record(Schema.String, Schema.Finite));
 let emitTable: Record<State, Record<string, number>> | undefined;
 const emitOf = jsonOf(EmitTable);
 const emit = () => (emitTable ??= emitOf(readNow(files.emit)));

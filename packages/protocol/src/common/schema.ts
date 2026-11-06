@@ -44,7 +44,7 @@ export const Applied: Codec<T.Applied> = Schema.Struct({ seq: Schema.Finite });
 export const KeySource: Codec<T.KeySource> = Schema.Literals(T.KeySourceValues);
 
 export const KeyStatus: Codec<T.KeyStatus> = Schema.Struct({
-  source: Schema.optionalKey(KeySource),
+  source: Schema.NullOr(KeySource),
   hint: Schema.optionalKey(Schema.String),
 });
 

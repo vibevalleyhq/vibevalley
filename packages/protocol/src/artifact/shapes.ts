@@ -76,7 +76,7 @@ export interface Artifact {
 /** Without content, an empty blocks artifact to write in, not announced (the owner's New). */
 export interface ArtifactRequest {
   title: string;
-  kind?: ArtifactKind;
+  kind: ArtifactKind;
   content?: string;
   note?: string;
   channel?: string;

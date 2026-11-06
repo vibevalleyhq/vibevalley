@@ -171,7 +171,7 @@ describe("mcp", () => {
       const issues = yield* Issue;
       const mcp = yield* Mcp;
       const pkm = yield* Pkm;
-      yield* pkm.save({ title: "Beehives", tier: "repo", markdown: "- check the queens every week\n- order frames\n" });
+      yield* pkm.save({ title: "Beehives", tier: "project", markdown: "- check the queens every week\n- order frames\n" });
       yield* issues.hire(lab(), "看看蜂箱", "chat-j");
       yield* until(() => tokens.length > 0, "the session's token");
       const c = client(mcp, tokens[0]!);
@@ -333,7 +333,7 @@ describe("mcp", () => {
       const mcp = yield* Mcp;
       const artifacts = yield* Artifact;
       yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab" });
-      const d = yield* artifacts.create({ from: ownerId, by: ownerId }, { title: "周报" });
+      const d = yield* artifacts.create({ from: ownerId, by: ownerId }, { title: "周报", kind: "markdown" });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
       const added = yield* tool("artifact_block_create", { id: d.id, text: "这周做完了**第一步**" });

@@ -23,7 +23,7 @@ const fox: Agent = {
   workdir: "",
   worktree: true,
   tags: [],
-  look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
+  look: { orchestrator: null, species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
 };
 
 test("a dispatch links its issue, and what waits on the owner is counted on the rail and in the title", async ({ page, api }) => {

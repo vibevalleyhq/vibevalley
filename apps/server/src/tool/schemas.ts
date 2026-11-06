@@ -3,7 +3,7 @@ import { Effect, Predicate, Schema } from "effect";
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import { effectTool } from "@vibevalley/agent/core/tool";
 import type { JsonSchema } from "@vibevalley/ai/tools";
-import { PkmTierValues } from "@vibevalley/protocol";
+import { ArtifactKindValues, CronWhenKindValues, DeliverableValues, PkmTierValues } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema, type Handlers } from "@vibevalley/protocol/api";
 
 import type { Actor } from "#/base/actor.ts";
@@ -39,7 +39,7 @@ const artifactText = {
   content: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.content })),
   note: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.note })),
 };
-const artifactKind = Schema.Literals(["html", "markdown"]).annotate({ description: params.artifact.kind });
+const artifactKind = Schema.Literals(ArtifactKindValues).annotate({ description: params.artifact.kind });
 const artifactId = Schema.String.annotate({ description: params.artifact.id });
 const artifactRead = Schema.Struct({
   id: artifactId,
@@ -137,7 +137,7 @@ export const parameters = {
     autoSubmitPr: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueCreate.autoSubmitPr })),
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.channel })),
     deliver: Schema.optionalKey(
-      Schema.Literals(["change", "branch", "answer"]).annotate({
+      Schema.Literals(DeliverableValues).annotate({
         description: params.issueCreate.deliver,
       }),
     ),
@@ -177,7 +177,7 @@ export const parameters = {
   "issue.update": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.agent })),
     criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.issueUpdate.criteria })),
-    deliver: Schema.optionalKey(Schema.Literals(["change", "branch", "answer"]).annotate({ description: params.issueUpdate.deliver })),
+    deliver: Schema.optionalKey(Schema.Literals(DeliverableValues).annotate({ description: params.issueUpdate.deliver })),
     description: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.description })),
     id: Schema.String.annotate({ description: params.issueNumber }),
     priority: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.priority })),
@@ -207,7 +207,7 @@ export const parameters = {
       at: Schema.optionalKey(Schema.String.annotate({ description: params.cron.at })),
       days: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.Finite))),
       expr: Schema.optionalKey(Schema.String.annotate({ description: params.cron.expr })),
-      kind: Schema.Literals(["once", "every", "daily", "weekly", "cron"]),
+      kind: Schema.Literals(CronWhenKindValues),
       minutes: Schema.optionalKey(Schema.Finite),
       time: Schema.optionalKey(Schema.String.annotate({ description: "HH:MM" })),
     }).annotate({ description: params.cron.when }),

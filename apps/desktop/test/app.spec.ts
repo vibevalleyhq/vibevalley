@@ -189,5 +189,15 @@ const scripted = {
   workdir: "",
   worktree: true,
   tags: [],
-  look: { species: "fox" as const, outfit: "farmer" as const, build: "biped" as const, head: "rounded" as const, body: "", trim: "", hat: "", eye: "" },
+  look: {
+    orchestrator: null,
+    species: "fox" as const,
+    outfit: "farmer" as const,
+    build: "biped" as const,
+    head: "rounded" as const,
+    body: "",
+    trim: "",
+    hat: "",
+    eye: "",
+  },
 };

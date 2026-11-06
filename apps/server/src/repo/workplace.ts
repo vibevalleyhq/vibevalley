@@ -29,10 +29,12 @@ export interface Merged {
   readonly warning?: string;
 }
 
+const MergeFailureKindValues = ["conflict", "check", "error"] as const;
+
 /** Why a merge did not go in: a conflict (and with what), the check, or git. */
 /** Work that did not merge: a conflict (with the base and its files), a failed check, or anything else. */
 export class MergeFailure extends Schema.TaggedError<MergeFailure, { readonly brand: unique symbol }>()("MergeFailure", {
-  kind: Schema.Literals(["conflict", "check", "error"]),
+  kind: Schema.Literals(MergeFailureKindValues),
   reasonText: Schema.String,
   base: Schema.String,
   files: Schema.Array(Schema.String),

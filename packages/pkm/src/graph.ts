@@ -76,7 +76,7 @@ export function transclusions(
 
 /** The blocks of other pages that link to slug, newest page first, by where their page is in PARA. */
 export function backlinks(vault: Vault, slug: string): T.PkmBacklinks {
-  const groups: T.PkmBacklinks = { repos: [], journals: [], areas: [], archives: [] };
+  const groups: T.PkmBacklinks = { projects: [], journals: [], areas: [], archives: [] };
   const linking = allEdges(vault)
     .filter(({ page }) => page.slug !== slug)
     .toSorted((a, b) => b.page.mtime - a.page.mtime);
@@ -94,8 +94,8 @@ export function backlinks(vault: Vault, slug: string): T.PkmBacklinks {
         body: block.body,
       };
       switch (page.tier) {
-        case "repo":
-          groups.repos.push(link);
+        case "project":
+          groups.projects.push(link);
           break;
         case "journal":
           groups.journals.push(link);
@@ -232,7 +232,7 @@ export function radar(vault: Vault, now: number, staleDays: number): T.PkmRadar 
   for (const page of [...vault.values()].toSorted((a, b) => a.slug.localeCompare(b.slug))) {
     if (page.tier === "inbox") out.inbox += 1;
     const status = page.props.status;
-    if (page.tier === "repo" && status !== "completed" && status !== "archived" && now - page.mtime >= staleDays * dayMs) {
+    if (page.tier === "project" && status !== "completed" && status !== "archived" && now - page.mtime >= staleDays * dayMs) {
       const count = { todo: 0, doing: 0, done: 0 };
       for (const node of walk(page.blocks)) {
         if (node.marker === "TODO" || node.marker === "LATER") count.todo += 1;

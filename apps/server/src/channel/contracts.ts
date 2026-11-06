@@ -46,7 +46,7 @@ export function toMessage(row: MsgRow): T.ChatMessage {
     mentions: meta.mentions ?? [],
     ...(meta.session ? { session: meta.session } : {}),
     ...(meta.run ? { run: meta.run } : {}),
-    ...(meta.outcome ? { outcome: meta.outcome } : {}),
+    outcome: meta.outcome ?? null,
     ...(meta.spent ? { spent: meta.spent } : {}),
     spoken: meta.spoken ?? false,
     ...(row.send_key && row.sender_id === ownerId ? { sendKey: row.send_key } : {}),

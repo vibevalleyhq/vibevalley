@@ -62,7 +62,7 @@ export interface Preview {
 export { LocaleValues, type Locale } from "@vibevalley/i18n";
 
 export interface KeyStatus {
-  source?: KeySource;
+  source: KeySource | null;
   hint?: string;
 }
 

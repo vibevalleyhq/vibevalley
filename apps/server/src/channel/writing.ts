@@ -115,7 +115,7 @@ export const channelWriting = (r: ChannelRecords) =>
         ...(addressed ? { addressed } : {}),
         roles: Object.fromEntries(recipients.map((recipient) => [recipient, agents.isOrchestrator(recipient) ? "orchestrator" : "worker"])),
 
-        ...(meta.outcome === undefined ? {} : { outcome: meta.outcome }),
+        ...(meta.outcome ? { outcome: meta.outcome } : {}),
       };
       const { trigger, mail } = channelInput(fact, inputContext(asInbox(fact.row)));
       const routed = yield* Effect.gen(function* () {

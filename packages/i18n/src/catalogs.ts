@@ -3176,7 +3176,7 @@ export const catalogs = {
     },
     "web.pkm": {
       place: { label: "笔记", hint: "你自己的笔记：每天的日记、PARA 分好的大纲页、反链和润色建议" },
-      tier: { repo: "仓库", area: "领域", resource: "资源", inbox: "收件箱", journal: "日记", archive: "归档" },
+      tier: { project: "项目", area: "领域", resource: "资源", inbox: "收件箱", journal: "日记", archive: "归档" },
       list: { label: "页面和日历", find: "搜笔记", open: "{n} 项没做完", today: "今天" },
       calendar: { label: "日历", previous: "上个月", next: "下个月" },
       radar: { inbox: "收件箱", stale: "搁着", overdue: "过期", days: "{n} 天没动" },
@@ -3225,9 +3225,9 @@ export const catalogs = {
         pages: "页面",
         none: "没有找到",
       },
-      backlinks: { title: "链到这里的 · {n}", none: "还没有别的页链到这里", repos: "仓库", journals: "日记", areas: "领域和资源", archives: "归档" },
+      backlinks: { title: "链到这里的 · {n}", none: "还没有别的页链到这里", projects: "项目", journals: "日记", areas: "领域和资源", archives: "归档" },
       comments: { title: "评论 · {n}", count: "{n} 条评论", accept: "采纳", reject: "不要", accepted: "采纳了", rejected: "不要了", on: "「{span}」" },
-      tierOne: { repo: "仓库", area: "领域", resource: "资料", inbox: "收件箱", journal: "日记", archive: "归档" },
+      tierOne: { project: "项目", area: "领域", resource: "资料", inbox: "收件箱", journal: "日记", archive: "归档" },
     },
     "web.repo": {
       title: "仓库",
@@ -7297,7 +7297,7 @@ export const catalogs = {
     },
     "web.pkm": {
       place: { label: "Notes", hint: "Your own notes: daily journals, outline pages sorted by PARA, backlinks and suggested rewrites" },
-      tier: { repo: "Repos", area: "Areas", resource: "Resources", inbox: "Inbox", journal: "Journals", archive: "Archive" },
+      tier: { project: "Projects", area: "Areas", resource: "Resources", inbox: "Inbox", journal: "Journals", archive: "Archive" },
       list: { label: "Pages and calendar", find: "Search notes", open: "{n} open", today: "Today" },
       calendar: { label: "Calendar", previous: "Previous month", next: "Next month" },
       radar: { inbox: "Inbox", stale: "Stale", overdue: "Overdue", days: "{n} days untouched" },
@@ -7365,7 +7365,7 @@ export const catalogs = {
       backlinks: {
         title: "Linked here · {n}",
         none: "No other page links here yet",
-        repos: "Repos",
+        projects: "Projects",
         journals: "Journals",
         areas: "Areas and resources",
         archives: "Archive",
@@ -7379,7 +7379,7 @@ export const catalogs = {
         rejected: "Dismissed",
         on: "“{span}”",
       },
-      tierOne: { repo: "Repo", area: "Area", resource: "Resource", inbox: "Inbox", journal: "Journal", archive: "Archive" },
+      tierOne: { project: "Project", area: "Area", resource: "Resource", inbox: "Inbox", journal: "Journal", archive: "Archive" },
     },
     "web.repo": {
       title: "Repos",
@@ -11306,7 +11306,7 @@ export interface Messages {
   "web.pkm.backlinks.areas": undefined;
   "web.pkm.backlinks.journals": undefined;
   "web.pkm.backlinks.none": undefined;
-  "web.pkm.backlinks.repos": undefined;
+  "web.pkm.backlinks.projects": undefined;
   "web.pkm.backlinks.title": { readonly n: string | number };
   "web.pkm.calendar.label": undefined;
   "web.pkm.calendar.next": undefined;
@@ -11385,13 +11385,13 @@ export interface Messages {
   "web.pkm.tier.area": undefined;
   "web.pkm.tier.inbox": undefined;
   "web.pkm.tier.journal": undefined;
-  "web.pkm.tier.repo": undefined;
+  "web.pkm.tier.project": undefined;
   "web.pkm.tier.resource": undefined;
   "web.pkm.tierOne.archive": undefined;
   "web.pkm.tierOne.area": undefined;
   "web.pkm.tierOne.inbox": undefined;
   "web.pkm.tierOne.journal": undefined;
-  "web.pkm.tierOne.repo": undefined;
+  "web.pkm.tierOne.project": undefined;
   "web.pkm.tierOne.resource": undefined;
   "web.pkm.toolbar.down": undefined;
   "web.pkm.toolbar.indent": undefined;

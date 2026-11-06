@@ -72,7 +72,7 @@ export interface MossVerifyRequest {
 }
 
 export interface AgoraAppID {
-  source?: KeySource;
+  source: KeySource | null;
   value?: string;
 }
 

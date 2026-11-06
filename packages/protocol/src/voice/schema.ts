@@ -25,7 +25,7 @@ export const AgoraGrant: Codec<T.AgoraGrant> = Schema.Struct({
 });
 
 export const AgoraAppID: Codec<T.AgoraAppID> = Schema.Struct({
-  source: Schema.optionalKey(KeySource),
+  source: Schema.NullOr(KeySource),
   value: Schema.optionalKey(Schema.String),
 });
 

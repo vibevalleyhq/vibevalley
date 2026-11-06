@@ -4,7 +4,8 @@ import { stories, story } from "@vibevalley/stories";
 import { KeyField, KeyMark, SaveBar } from "./KeyField";
 import { SecretInput } from "./layout";
 
-const statusOf = (source: string, hint: string): KeyStatus => (source === "settings" || source === "config" ? { source, ...(hint ? { hint } : {}) } : {});
+const statusOf = (source: string, hint: string): KeyStatus =>
+  source === "settings" || source === "config" ? { source, ...(hint ? { hint } : {}) } : { source: null };
 
 export default stories({
   title: "组件/工作台/KeyField",
@@ -31,7 +32,7 @@ export default stories({
     Marks: story({
       render: () => (
         <div class="flex items-center gap-4">
-          <KeyMark status={{}} />
+          <KeyMark status={{ source: null }} />
           <KeyMark status={{ source: "settings", hint: "a1b2" }} />
           <KeyMark status={{ source: "config" }} />
           <KeyMark status={{ source: "settings", hint: "a1b2" }} removing />

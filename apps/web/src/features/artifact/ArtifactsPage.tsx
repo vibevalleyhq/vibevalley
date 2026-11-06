@@ -59,7 +59,7 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
   const making = createAct();
   const create = () =>
     making.run(async () => {
-      const made = await api.artifact.create({ title: t("web.artifact.page.untitled") });
+      const made = await api.artifact.create({ title: t("web.artifact.page.untitled"), kind: "markdown" });
       justMade.set(made.id);
       await queries.invalidateQueries({ queryKey: ["artifacts"] });
       router.navigate(artifactHref(made.id));

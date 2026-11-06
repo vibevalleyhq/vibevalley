@@ -15,9 +15,11 @@ export interface Inbound {
   readonly quoted: string;
 }
 
+const AppFailedKindValues = ["restricted", "stale", "failed"] as const;
+
 /** Why an app did not do what it was asked. The message is what the owner sees. */
 export class AppFailed extends Schema.TaggedError<AppFailed, { readonly brand: unique symbol }>()("AppFailed", {
-  kind: Schema.Literals(["restricted", "stale", "failed"]),
+  kind: Schema.Literals(AppFailedKindValues),
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}

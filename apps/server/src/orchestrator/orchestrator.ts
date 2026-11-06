@@ -237,7 +237,7 @@ const make = (options: OrchestratorOptions = {}) =>
         });
         const all = yield* repos.list();
         const folders = all.length > 0 ? situationWords.repos(all.map((p) => p.name)) : situationWords.noRepos;
-        const working = (yield* notes.list()).pages.filter((p) => p.tier === "repo").slice(0, notesShown);
+        const working = (yield* notes.list()).pages.filter((p) => p.tier === "project").slice(0, notesShown);
         return situationWords.whole(
           repos.root,
           folders,

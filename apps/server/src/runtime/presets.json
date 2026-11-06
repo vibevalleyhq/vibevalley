@@ -11,6 +11,9 @@
     "label": "",
     "blurb": "VibeValley 还没有专属外形的 runtime。",
     "look": {
+      "species": null,
+      "outfit": null,
+      "orchestrator": null,
       "build": "biped",
       "head": "rounded",
       "body": "#f1e8d8",
@@ -25,6 +28,9 @@
       "label": "Claude Code",
       "blurb": "Anthropic 的命令行编码 agent。",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "biped",
         "head": "rounded",
@@ -38,6 +44,9 @@
       "label": "Codex",
       "blurb": "OpenAI 的编码 agent，走 app-server。",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "treads",
         "head": "terminal",
@@ -51,6 +60,9 @@
       "label": "opencode",
       "blurb": "开源的终端编码 agent，走 ACP。",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "biped",
         "head": "terminal",
@@ -64,6 +76,9 @@
       "label": "vibevalley",
       "blurb": "VibeValley 自己的 agent（DeepSeek），跑在 server 进程里。",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "hopper",
         "head": "orb",
@@ -77,6 +92,9 @@
       "label": "Pi",
       "blurb": "跑在 server 进程里的编码 agent SDK。",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "hopper",
         "head": "dome",
@@ -90,6 +108,9 @@
       "label": "Cursor",
       "blurb": "Cursor 的 agent SDK，跑在 server 进程里。",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "wheel",
         "head": "saucer",
@@ -103,6 +124,9 @@
       "label": "Grok",
       "blurb": "xAI 的 grok CLI，走 ACP。",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "wheel",
         "head": "dome",
@@ -116,6 +140,9 @@
       "label": "Kimi",
       "blurb": "Moonshot 的 kimi CLI，走 ACP。",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "hopper",
         "head": "orb",
@@ -129,6 +156,9 @@
       "label": "Antigravity",
       "blurb": "Google 的 Antigravity agent，走 ACP。",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "hover",
         "head": "saucer",
@@ -142,6 +172,9 @@
       "label": "DeepSeek Harness",
       "blurb": "DeepSeek 的 dsh，走 ACP。",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "treads",
         "head": "orb",

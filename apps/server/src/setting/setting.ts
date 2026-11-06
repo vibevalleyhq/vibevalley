@@ -101,7 +101,7 @@ export class Setting extends Context.Service<
   );
 }
 
-const secret = (value: string | undefined, source: KeySource): KeyStatus => (value ? { source, hint: keyHint(value) } : {});
+const secret = (value: string | undefined, source: KeySource): KeyStatus => (value ? { source, hint: keyHint(value) } : { source: null });
 
 /** Fields set to "" or nothing leave the file. */
 const compact = (s: Record<string, unknown>) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined && v !== ""));
@@ -136,9 +136,9 @@ const make = Effect.gen(function* () {
       paths: { repos: reposDir(config), worktrees: worktreesDir(config), pkm: pkmDir(config) },
       version: config.version,
       locale: s.locale ?? "zh",
-      deepseekApiKey: deepseek ? secret(deepseek[0], deepseek[1]) : {},
-      agoraAppId: appId ? { source: appId[1], value: appId[0] } : {},
-      agoraAppCertificate: certificate ? secret(certificate[0], certificate[1]) : {},
+      deepseekApiKey: deepseek ? secret(deepseek[0], deepseek[1]) : { source: null },
+      agoraAppId: appId ? { source: appId[1], value: appId[0] } : { source: null },
+      agoraAppCertificate: certificate ? secret(certificate[0], certificate[1]) : { source: null },
       voice: voiceOf(s),
       voiceDefaults: defaults(),
       asrKey: secret(s.asrKey, "settings"),

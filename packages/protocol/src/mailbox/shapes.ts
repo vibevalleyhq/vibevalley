@@ -8,7 +8,16 @@ export type TriggerSource = (typeof TriggerSourceValues)[number];
 export const TriggerActorKindValues = ["owner", "collaborator", "bot", "ci", "session", "orchestrator", "system"] as const;
 export type TriggerActorKind = (typeof TriggerActorKindValues)[number];
 
-export type TriggerAddressing = "direct" | "mention" | "thread_owner" | "unaddressed";
+export const TriggerAddressingValues = ["direct", "mention", "thread_owner", "unaddressed"] as const;
+export type TriggerAddressing = (typeof TriggerAddressingValues)[number];
+
+export const TriggerKindValues = ["ci", "review", "comment"] as const;
+/** What a GitHub trigger is: a check, a review, or a comment. */
+export type TriggerKind = (typeof TriggerKindValues)[number];
+
+export const VoiceModeValues = ["dictated", "conversation", "api"] as const;
+/** How words came in: dictated, on a call, or through the API. */
+export type VoiceMode = (typeof VoiceModeValues)[number];
 
 export interface TriggerActor {
   readonly kind: TriggerActorKind;
@@ -50,7 +59,7 @@ export interface TriggerContext {
   readonly blocks?: readonly QuotedBlock[];
   readonly picked?: { readonly agent?: string; readonly repo?: string };
   readonly responsePort?: string;
-  readonly voiceMode?: "dictated" | "conversation" | "api";
+  readonly voiceMode?: VoiceMode;
 }
 
 export interface TriggerMeta {
@@ -61,7 +70,7 @@ export interface TriggerMeta {
   readonly cron?: string;
   readonly repo?: string;
   readonly pr?: number;
-  readonly kind?: "ci" | "review" | "comment";
+  readonly kind?: TriggerKind;
   readonly head?: string;
   readonly fingerprint?: string;
   readonly failed?: boolean;
@@ -71,7 +80,7 @@ export interface TriggerMeta {
   readonly inputContext?: TriggerContext;
   readonly channelType?: ChannelType;
   readonly responsePort?: string;
-  readonly voiceMode?: "dictated" | "conversation" | "api";
+  readonly voiceMode?: VoiceMode;
 }
 
 export interface Trigger {

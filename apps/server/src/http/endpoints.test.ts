@@ -55,7 +55,7 @@ describe("the endpoints the agents' tools stand on", () => {
 
       expect(yield* call(() => api.memory.search({ text: "登录" }))).toMatchObject({ found: [] });
 
-      const doc = yield* call(() => api.artifact.create({ title: "说明" }));
+      const doc = yield* call(() => api.artifact.create({ title: "说明", kind: "markdown" }));
       const made = yield* call(() => api.artifact.block.create({ id: doc.id, type: "heading", level: 1, text: "开头" }));
       expect(made).toMatchObject({ status: "applied", rev: 1 });
       expect(yield* call(() => api.artifact.block.update({ id: doc.id, block: made.blockId, baseRev: 1, text: "新的开头" }))).toMatchObject({
@@ -137,7 +137,7 @@ describe("the endpoints the agents' tools stand on", () => {
     Effect.gen(function* () {
       const api = yield* farm;
       const before = Date.now();
-      const made = yield* call(() => api.artifact.create({ title: "插入" }));
+      const made = yield* call(() => api.artifact.create({ title: "插入", kind: "markdown" }));
       const inserted = newId();
       yield* call(() =>
         api.artifact.submit({

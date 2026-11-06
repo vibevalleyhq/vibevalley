@@ -5,6 +5,7 @@ import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
 import { Commit, UncommittedItem } from "../repo/schema";
 import { IssueAnswer, PhaseResting, Session } from "../session/schema";
 import * as T from "../shapes";
+import { IssueReportMemoryScopeValues } from "./shapes";
 
 export const Conflict: Codec<T.Conflict> = Schema.Struct({
   base: Schema.String,
@@ -111,7 +112,7 @@ export const IssueMandate: Codec<T.IssueMandate> = Schema.Struct({
   autoSubmitPr: Schema.Boolean,
 });
 
-export const IssueReportMemory: Codec<T.IssueReportMemory> = Schema.Struct({ text: Schema.String, scope: Schema.Literals(["repo", "all"]) });
+export const IssueReportMemory: Codec<T.IssueReportMemory> = Schema.Struct({ text: Schema.String, scope: Schema.Literals(IssueReportMemoryScopeValues) });
 
 export const IssueReport: Codec<T.IssueReport> = Schema.Struct({
   summary: Schema.String,

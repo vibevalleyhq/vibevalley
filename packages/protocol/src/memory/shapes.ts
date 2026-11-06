@@ -34,7 +34,7 @@ export interface Memory {
   agent: string;
   kind: MemoryKind;
   text: string;
-  author?: ActorKind;
+  author: ActorKind;
   repo?: string;
   session?: SessionId;
   at: number;

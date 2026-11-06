@@ -45,7 +45,7 @@ export const Artifact: Codec<T.Artifact> = Schema.Struct({
 
 export const ArtifactRequest: Codec<T.ArtifactRequest> = Schema.Struct({
   title: Schema.String,
-  kind: Schema.optionalKey(ArtifactKind),
+  kind: ArtifactKind,
   content: Schema.optionalKey(Schema.String),
   note: Schema.optionalKey(Schema.String),
   channel: Schema.optionalKey(Schema.String),

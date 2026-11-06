@@ -6,7 +6,17 @@ import { Detail } from "./RuntimesPage";
 const now = Date.now();
 const hour = 3_600_000;
 
-const look: Look = { species: "bear", outfit: "farmer", build: "treads", head: "terminal", body: "#b07a45", trim: "#3a2a18", hat: "#e8b84a", eye: "#22341a" };
+const look: Look = {
+  species: "bear",
+  outfit: "farmer",
+  orchestrator: null,
+  build: "treads",
+  head: "terminal",
+  body: "#b07a45",
+  trim: "#3a2a18",
+  hat: "#e8b84a",
+  eye: "#22341a",
+};
 
 const ready: Installation = { status: "available", via: "executable", command: "/opt/homebrew/bin/claude", version: "2.1.4" };
 

@@ -45,7 +45,7 @@ test("regression: a focused block applies a deferred socket update when focus le
 
 test("regression: pushed writer indicators expire on the page's clock", async ({ page, api }) => {
   await page.clock.install();
-  const made = await api.artifact.create({ title: "writer activity" });
+  const made = await api.artifact.create({ title: "writer activity", kind: "markdown" });
   await page.goto(`/artifacts/${made.id}`);
   const blocks = page.getByTestId("artifact-blocks");
   await expect(blocks).toBeVisible();

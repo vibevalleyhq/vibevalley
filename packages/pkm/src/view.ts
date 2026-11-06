@@ -4,7 +4,7 @@ import { pkmTag, slugOf } from "@vibevalley/protocol/rules";
 import { titleFor } from "./days.ts";
 
 /** The tiers in the list's order: what is worked on first, what is done with last. */
-export const tierOrder: readonly PkmTier[] = ["repo", "area", "resource", "inbox", "journal", "archive"];
+export const tierOrder: readonly PkmTier[] = ["project", "area", "resource", "inbox", "journal", "archive"];
 
 export function byTier(pages: readonly PkmPageSummary[]): { readonly tier: PkmTier; readonly pages: readonly PkmPageSummary[] }[] {
   return tierOrder.map((tier) => ({ tier, pages: pages.filter((p) => p.tier === tier) })).filter((g) => g.pages.length > 0);

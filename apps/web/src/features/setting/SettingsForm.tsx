@@ -243,7 +243,7 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
           />
           <KeyField
             label="key"
-            status={props.draft.saved?.key ?? {}}
+            status={props.draft.saved?.key ?? { source: null }}
             removing={props.draft.keyCleared}
             onRemove={(keyCleared) => props.set({ keyCleared })}
             tip={t("web.setting.source.noKey")}

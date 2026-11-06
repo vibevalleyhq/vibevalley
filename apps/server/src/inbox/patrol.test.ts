@@ -35,6 +35,7 @@ describe("the patrol", () => {
     const message: ChatMessage = {
       id: messageId("seen-message"),
       number: 1,
+      outcome: null,
       channel: "seen-channel",
       from: "w1",
       fromKind: "session",
@@ -52,7 +53,21 @@ describe("the patrol", () => {
     const state: SpaceState = {
       ...emptySpaceState(),
       chat: {
-        channels: [{ id: "seen-channel", type: "channel", default: true, name: "田头", category: "", description: "", title: "", at: 0, replies: 0 }],
+        channels: [
+          {
+            id: "seen-channel",
+            type: "channel",
+            default: true,
+            name: "田头",
+            category: "",
+            description: "",
+            title: "",
+            at: 0,
+            replies: 0,
+            notify: "all",
+            subjectKind: null,
+          },
+        ],
         ownerMentions: [{ message, channel: "seen-channel", address: "#田头:1" }],
       },
     };
@@ -81,6 +96,7 @@ describe("what reaches the owner off the farm", () => {
     attachments: [],
     embeds: [],
     ...more,
+    outcome: more.outcome ?? null,
   });
   it("follows how much the place it is said in counts", () => {
     const named = said({ mentions: [ownerId] });

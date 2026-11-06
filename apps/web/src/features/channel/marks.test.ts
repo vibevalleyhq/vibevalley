@@ -48,6 +48,7 @@ const message = (id: string, over: Partial<ChatMessage> = {}): ChatMessage => ({
   attachments: [],
   embeds: [],
   ...over,
+  outcome: over.outcome ?? null,
 });
 
 const kept = <I>(input: I, over: Partial<Intent<I, never>> = {}): Intent<I, never> => ({ key: "k", input, status: "pending", queued: false, ...over });
@@ -62,6 +63,8 @@ const channel = (over: Partial<Channel> = {}): Channel => ({
   title: "",
   at: 0,
   ...over,
+  notify: over.notify ?? "all",
+  subjectKind: over.subjectKind ?? null,
 });
 
 test("a reaction on its way shows as the owner's at once, beside the others', and only on its message", () => {

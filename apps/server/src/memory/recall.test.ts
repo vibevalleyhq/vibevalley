@@ -38,6 +38,7 @@ const memory = (id: string, text: string, change: Partial<Memory> = {}): Memory 
   recalled: 0,
   fading: false,
   ...change,
+  author: change.author ?? "system",
 });
 const cue = (text: string, change: Partial<PickCue> = {}): PickCue => ({ session: "w9", repo: "clock", text, skip: new Set(), now, ...change });
 const ids = (ms: readonly Memory[]) => ms.map((m) => m.id);

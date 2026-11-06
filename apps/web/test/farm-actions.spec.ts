@@ -27,7 +27,7 @@ const scripted: Agent = {
   workdir: "",
   worktree: true,
   tags: [],
-  look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
+  look: { orchestrator: null, species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
 };
 
 async function handBack(api: VibeValleyApi, repo: string) {
