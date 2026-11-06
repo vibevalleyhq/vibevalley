@@ -64,7 +64,7 @@ const sessionFields = {
   agent: Schema.String,
   runtime: Schema.String,
   brief: Schema.String,
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   branch: Schema.optionalKey(Schema.String),
   worktree: Schema.optionalKey(Schema.String),
   hiredAt: Schema.Finite,

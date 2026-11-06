@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vite-plus/test";
+import { parseSync } from "vite";
+import type * as Vite from "vite";
+import { describe, expect, it, vi } from "vite-plus/test";
 
-import { calls, edgesOf, exportsOf, importsOf, readsOf } from "./source.ts";
+import { analyzeSource, calls, edgesOf, exportsOf, importsOf, readsOf } from "./source.ts";
+
+vi.mock("vite", async (load) => {
+  const actual = await load<typeof Vite>();
+  return { ...actual, parseSync: vi.fn(actual.parseSync) };
+});
 
 const file = `import type { A } from "./a";
 import { type B } from "./b";
@@ -23,6 +30,25 @@ export type Q = 1;
 `;
 
 describe("a source file's edges", () => {
+  it("regression: one analysis parses once for imports, calls and state reads", () => {
+    vi.mocked(parseSync).mockClear();
+    const analysis = analyzeSource("a.ts", file);
+    expect(analysis.edges).toHaveLength(8);
+    expect(analysis.reads("core", "state").toSorted()).toEqual(["connectors", "crons", "issues", "sessions"]);
+    expect(analysis.calls("core", "session")).toBe(true);
+    expect(analysis.calls("core", "apply")).toBe(false);
+    expect(analysis.reads("other", "state")).toEqual([]);
+    expect(parseSync).toHaveBeenCalledTimes(1);
+  });
+
+  it("regression: the same path with different source gets a different analysis", () => {
+    const first = analyzeSource("a.ts", 'import { x } from "./a"; core.state().issues;');
+    const second = analyzeSource("a.ts", 'import { y } from "./b"; core.state().sessions;');
+    expect(first.edges[0]?.from).toBe("./a");
+    expect(second.edges[0]?.from).toBe("./b");
+    expect(first.reads("core", "state")).toEqual(["issues"]);
+    expect(second.reads("core", "state")).toEqual(["sessions"]);
+  });
   it("sees every import, re-export and dynamic import, over several lines too", () => {
     expect(edgesOf("a.ts", file)).toEqual([
       { from: "./a", typeOnly: true, names: ["A"] },

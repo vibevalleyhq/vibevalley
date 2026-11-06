@@ -29,7 +29,7 @@ describe("@vibevalley/artifact domain engine", () => {
         op: "insert_block",
         block: {
           id: b1,
-          orderKey: "a0",
+          orderKey: "a1",
           type: "heading",
           attrs: { level: 2 },
           text: inlineSpans("Hello **world**"),

@@ -3,7 +3,7 @@ import { describe, expect, it, test } from "vite-plus/test";
 import type { Issue, IssueStage, Session } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { emptyWorkspaceState } from "#/core/core.ts";
+import { emptySpaceState } from "#/core/core.ts";
 import { reduce } from "#/projection/reduce.ts";
 
 import { emptyPlay, playOf, plotOf, viewOf } from "./view.ts";
@@ -75,34 +75,34 @@ describe("a plot", () => {
     const t = issue({ state: "working", acts: [{ act: "tell", does: "say" }] }, { status: "in_progress" });
     const first = { ...session({ _tag: "working", since: 1, doing: { action: "none", label: "" } }), hiredAt: 1 };
     const again = { ...session({ _tag: "working", since: 2, doing: { action: "none", label: "" } }), id: sessionId("w2"), hiredAt: 2 };
-    const before = viewOf({ ...emptyWorkspaceState(), sessions: [first], issues: [t] }).plots;
-    const after = viewOf({ ...emptyWorkspaceState(), sessions: [again], issues: [t] }).plots;
+    const before = viewOf({ ...emptySpaceState(), sessions: [first], issues: [t] }).plots;
+    const after = viewOf({ ...emptySpaceState(), sessions: [again], issues: [t] }).plots;
     expect([Object.keys(before), Object.keys(after)]).toEqual([["t1"], ["t1"]]);
     expect(after["t1"]).toEqual({ crop: "sprout" });
     // Both still here for a moment: the later hired is the one the plot pictures.
-    expect(viewOf({ ...emptyWorkspaceState(), sessions: [again, first], issues: [t] }).plots).toEqual(after);
+    expect(viewOf({ ...emptySpaceState(), sessions: [again, first], issues: [t] }).plots).toEqual(after);
   });
 });
 
 describe("a bed", () => {
-  const worker = (id: string, project?: string): Session => ({
+  const worker = (id: string, repo?: string): Session => ({
     id: sessionId(id),
     role: "worker",
     name: id,
     agent: "a",
     runtime: "nobody",
     brief: "",
-    ...(project !== undefined ? { project } : {}),
+    ...(repo !== undefined ? { repo } : {}),
     hiredAt: 0,
     runs: 0,
     phase: { _tag: "working", since: 0 } as Session["phase"],
     refining: false,
   });
 
-  const hire = (state = emptyWorkspaceState(), h: Session) => reduce(state, { type: "sessionChanged", at: 0, session: h })[0];
-  const bed = (state: ReturnType<typeof emptyWorkspaceState>, id: string) => playOf(state.plays, id).station;
+  const hire = (state = emptySpaceState(), h: Session) => reduce(state, { type: "sessionChanged", at: 0, session: h })[0];
+  const bed = (state: ReturnType<typeof emptySpaceState>, id: string) => playOf(state.plays, id).station;
 
-  test("each project's farm has its own beds: the first of each is on bed 0", () => {
+  test("each repo's farm has its own beds: the first of each is on bed 0", () => {
     let s = hire(undefined, worker("a1", "alpha"));
     s = hire(s, worker("b1", "beta"));
     s = hire(s, worker("a2", "alpha"));
@@ -110,7 +110,7 @@ describe("a bed", () => {
     expect([bed(s, "a1"), bed(s, "b1"), bed(s, "a2"), bed(s, "x1")]).toEqual([0, 0, 1, 0]);
   });
 
-  test("a bed taken on another project's farm is free on this one, and taken on its own is not", () => {
+  test("a bed taken on another repo's farm is free on this one, and taken on its own is not", () => {
     let s = hire(undefined, worker("a1", "alpha"));
     s = hire(s, worker("b1", "beta"));
     const [moved, changed] = reduce(s, { type: "progressChanged", at: 0, station: { id: sessionId("b1"), station: 3 } });
@@ -122,7 +122,7 @@ describe("a bed", () => {
   });
 
   test("a saved bed another session of its farm holds moves to a free one", () => {
-    let s = emptyWorkspaceState();
+    let s = emptySpaceState();
     for (const h of [worker("a1", "alpha"), worker("a2", "alpha"), worker("b1", "beta")]) s = hire(s, h);
     s = reduce(s, { type: "progressChanged", at: 0, station: { id: sessionId("a1"), station: 3 } })[0];
     s = reduce(s, { type: "progressChanged", at: 0, station: { id: sessionId("a2"), station: 3 } })[0];

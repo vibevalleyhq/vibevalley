@@ -1,13 +1,13 @@
-import { Effect, Option, Schema } from "effect";
+import { Option, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { ownerId } from "@vibevalley/protocol";
+import { ownerId, VoiceModeValues } from "@vibevalley/protocol";
 import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOrNone } from "#/base/json.ts";
-import type { Db } from "#/infra/db.ts";
-import { inboxOf } from "#db/channel.sql.ts";
+
+const IngressSourceValues = ["issue", "cron", "patrol", "connector", "voice", "github"] as const;
 
 export interface Meta {
   run?: string;
@@ -27,7 +27,7 @@ export interface Meta {
   picked?: Picked;
   ingressSource?: "issue" | "cron" | "patrol" | "connector" | "voice" | "github";
   ingressRecipient?: string;
-  issue?: string;
+  issue?: T.IssueId;
   trigger?: T.RunTrigger;
   responsePort?: string;
   voiceMode?: "dictated" | "conversation" | "api";
@@ -45,13 +45,13 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   embeds: Schema.optionalKey(Schema.mutable(Schema.Array(S.Embed))),
   artifact: Schema.optionalKey(S.ArtifactCard),
   blocks: Schema.optionalKey(Schema.mutable(Schema.Array(S.QuotedBlock))),
-  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
-  ingressSource: Schema.optionalKey(Schema.Literals(["issue", "cron", "patrol", "connector", "voice", "github"])),
+  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), repo: Schema.optionalKey(Schema.String) })),
+  ingressSource: Schema.optionalKey(Schema.Literals(IngressSourceValues)),
   ingressRecipient: Schema.optionalKey(Schema.String),
-  issue: Schema.optionalKey(Schema.String),
+  issue: Schema.optionalKey(S.IssueId),
   trigger: Schema.optionalKey(S.RunTrigger),
   responsePort: Schema.optionalKey(Schema.String),
-  voiceMode: Schema.optionalKey(Schema.Literals(["dictated", "conversation", "api"])),
+  voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
 });
 
 /** Anything unreadable is no meta. */
@@ -98,10 +98,10 @@ export function targetOf(c: Pick<T.Channel, "type" | "rootNumber" | "name">, cha
   return "#" + (c.name ?? channelName);
 }
 
-/** What the owner picked beside a message in the farm's form: the profile and the project the work is for. */
+/** What the owner picked beside a message in the farm's form: the profile and the repo the work is for. */
 export interface Picked {
   readonly agent?: string;
-  readonly project?: string;
+  readonly repo?: string;
 }
 
 export interface InboxMessage extends T.TriggerContext {
@@ -121,17 +121,6 @@ export interface UnreadRow {
 }
 
 export const summaryChannels = 20;
-
-/** What a participant has not read, as the mailbox and the channel both report it. */
-export const unreadSummaryOf = (db: Db["Service"], participant: string, channel: string): Effect.Effect<UnreadRow[]> =>
-  Effect.map(db.run(inboxOf({ participant, channel })), (rows) =>
-    rows.slice(0, summaryChannels).map((r) => ({
-      target: targetOf({ type: channelType(r.type), ...(r.root_number !== null ? { rootNumber: r.root_number } : {}) }, r.channel_name || ""),
-      unread: r.unread ?? 0,
-      mentionsYou: r.mentions_you === true,
-      ...(r.latest_sender_name ? { latest: r.latest_sender_name } : {}),
-    })),
-  );
 
 /** The same words from the same sender in the same place this soon again are a retry, not a new message. */
 export const retryWindowMs = 60_000;

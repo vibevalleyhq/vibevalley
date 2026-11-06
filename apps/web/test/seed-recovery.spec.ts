@@ -6,9 +6,9 @@ import { expect, test } from "./fixtures";
 
 const draft = "keep the idea I just wrote";
 
-async function openBag(page: Page, project: string) {
+async function openBag(page: Page, repo: string) {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
-  await page.goto(`/farm/${project}`);
+  await page.goto(`/farm/${repo}`);
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   const box = (await page.getByTestId("village").locator("canvas").boundingBox())!;
   const scale = box.width / 384;
@@ -16,24 +16,24 @@ async function openBag(page: Page, project: string) {
   return page.getByTestId("sow");
 }
 
-test("one lost seed request retries through the query observer and loads the real project templates", async ({ page, api }) => {
-  const project = await api.project.create({ name: "seed-retry-once" });
+test("one lost seed request retries through the query observer and loads the real repo templates", async ({ page, api }) => {
+  const repo = await api.repo.create({ name: "seed-retry-once" });
   let attempts = 0;
-  await page.route(`**${pathOf("project.template.list")}`, (route) => (++attempts === 1 ? route.abort("connectionrefused") : route.continue()));
-  const bag = await openBag(page, project.name);
+  await page.route(`**${pathOf("repo.template.list")}`, (route) => (++attempts === 1 ? route.abort("connectionrefused") : route.continue()));
+  const bag = await openBag(page, repo.name);
   await expect(bag.getByTestId("seed-kinds")).toBeVisible();
   expect(attempts).toBe(2);
 });
 
 test("the seed bag can retry after the server is reachable again without losing the owner's draft", async ({ page, api }) => {
-  const project = await api.project.create({ name: "seed-recover" });
+  const repo = await api.repo.create({ name: "seed-recover" });
   let unavailable = true;
   let attempts = 0;
-  await page.route(`**${pathOf("project.template.list")}`, (route) => {
+  await page.route(`**${pathOf("repo.template.list")}`, (route) => {
     attempts++;
     return unavailable ? route.abort("connectionrefused") : route.continue();
   });
-  const bag = await openBag(page, project.name);
+  const bag = await openBag(page, repo.name);
   const problem = bag.getByRole("alert");
   await expect(problem).toBeVisible();
   expect(attempts).toBe(2);

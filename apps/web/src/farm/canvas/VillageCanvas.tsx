@@ -10,7 +10,7 @@ import { messageOf } from "#/base/format.ts";
 import { CursorManifest } from "#/base/manifests.ts";
 import { clickBed, openPlace } from "#/farm/commands.ts";
 import { commands, farmFrameOf } from "#/farm/frames.ts";
-import { farm, farmProject, farmState, subscribeFarm } from "#/farm/store.ts";
+import { farm, farmRepo, farmState, subscribeFarm } from "#/farm/store.ts";
 import { useVillage } from "#/farm/world/load.ts";
 import { beds } from "#/farm/world/plots.ts";
 import { textureProgress } from "#/farm/world/textures.ts";
@@ -49,7 +49,7 @@ export function VillageCanvas() {
       let live = true;
       let scene: Scene | undefined;
       let stopFit = () => {};
-      const latest = () => ({ frame: farmFrameOf(frames.get().frame, farmProject()), agents: agents() });
+      const latest = () => ({ frame: farmFrameOf(frames.get().frame, farmRepo()), agents: agents() });
       void startScene(
         host,
         village,

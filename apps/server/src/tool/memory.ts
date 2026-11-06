@@ -32,10 +32,10 @@ export const memoryTools = Effect.gen(function* () {
 
   const notWorking = answers.notWorking;
 
-  const query = (q: Partial<SearchQuery>): SearchQuery => ({ agent: "", project: "", text: "", kind: "", limit: 0, ...q });
+  const query = (q: Partial<SearchQuery>): SearchQuery => ({ agent: "", repo: "", text: "", kind: "", limit: 0, ...q });
 
-  // A session's memories are its profile's: "" is every project, none is the one it works in.
-  const sessionScope = (c: Caller, project: string | undefined) => (project === undefined ? c.project : project.trim());
+  // A session's memories are its profile's: "" is every repo, none is the one it works in.
+  const sessionScope = (c: Caller, repo: string | undefined) => (repo === undefined ? c.repo : repo.trim());
 
   const memorySearch = (who: Who, forOrchestrator: boolean) =>
     forOrchestrator
@@ -43,7 +43,7 @@ export const memoryTools = Effect.gen(function* () {
           "memory.search",
           Effect.fn("Tool.memorySearch")(function* (p: Orchestrator<"memory.search">) {
             const agent = p.agent?.trim() ? yield* profile(p.agent) : "";
-            const q = query({ text: p.text ?? "", project: (p.project ?? "").trim(), ...(agent ? { agent } : {}) });
+            const q = query({ text: p.text ?? "", repo: (p.repo ?? "").trim(), ...(agent ? { agent } : {}) });
             return foundText(yield* memory.search(q), q);
           }, answered),
         )
@@ -52,7 +52,7 @@ export const memoryTools = Effect.gen(function* () {
           Effect.fn("Tool.memorySearch")(function* (p: SessionInput<"memory.search">) {
             const c = yield* callerOf(who);
             if (!c.agent) return yield* refuse(notWorking);
-            const q = query({ agent: c.agent, project: sessionScope(c, p.project), text: p.text ?? "" });
+            const q = query({ agent: c.agent, repo: sessionScope(c, p.repo), text: p.text ?? "" });
             return foundText(yield* memory.search(q), q);
           }),
         );
@@ -64,7 +64,7 @@ export const memoryTools = Effect.gen(function* () {
           Effect.fn("Tool.memoryCreate")(function* (p: Orchestrator<"memory.create">) {
             const id = yield* profile(p.agent);
             const c = yield* callerOf(who);
-            const m = yield* memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: c.actor });
+            const m = yield* memory.remember({ agent: id, text: p.text, repo: p.repo ?? "", by: c.actor });
             return answers.memory.rememberedFor(id, memoryWhere(m), m.id);
           }, answered),
         )
@@ -73,7 +73,7 @@ export const memoryTools = Effect.gen(function* () {
           Effect.fn("Tool.memoryCreate")(function* (p: SessionInput<"memory.create">) {
             const c = yield* callerOf(who);
             if (!c.agent) return yield* refuse(notWorking);
-            const m = yield* memory.remember({ agent: c.agent, text: p.text, project: sessionScope(c, p.project), by: c.actor });
+            const m = yield* memory.remember({ agent: c.agent, text: p.text, repo: sessionScope(c, p.repo), by: c.actor });
             return answers.memory.remembered(memoryWhere(m), m.id);
           }),
         );

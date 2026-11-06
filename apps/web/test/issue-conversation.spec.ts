@@ -1,0 +1,43 @@
+import AxeBuilder from "@axe-core/playwright";
+
+import { expect, test } from "./fixtures";
+
+test("regression: an issue keeps its discussion through refinement and dispatch", async ({ page, api }, testInfo) => {
+  const issue = await api.issue.create({ title: "看板拖卡", agent: "docs" });
+  await api.issue.refine({ id: issue.id, text: "看板拖卡" });
+  await expect.poll(async () => (await api.issue.get({ id: issue.id })).criteria.length).toBeGreaterThan(0);
+  await expect.poll(async () => (await api.issue.get({ id: issue.id })).refining).toBeUndefined();
+  await page.goto(`/issues/${issue.id}`);
+  const conversation = page.getByTestId("issue-conversation");
+  await expect(conversation.getByTestId("issue-message")).not.toHaveCount(0);
+  const thread = await api.issue.conversation.get({ id: issue.id });
+  expect(thread).not.toBeNull();
+  await api.issue.refine({ id: issue.id, text: "用 8797" });
+  await expect.poll(async () => (await api.issue.get({ id: issue.id })).criteria.length).toBe(2);
+  await expect.poll(async () => (await api.issue.get({ id: issue.id })).refining).toBeUndefined();
+  const drafted = await api.issue.get({ id: issue.id });
+  expect(drafted.status).toBe("backlog");
+  expect(drafted.repo).toBeUndefined();
+  await page.screenshot({ path: testInfo.outputPath("discussion-desktop.png"), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: testInfo.outputPath("discussion-narrow.png"), fullPage: true });
+  const repo = await api.repo.create({ name: "conversation" });
+  await api.issue.update({ id: issue.id, repo: repo.name, title: "写打卡并提交" });
+  await api.issue.status.update({ id: issue.id, status: "todo" });
+  await expect.poll(async () => (await api.issue.get({ id: issue.id })).status).toBe("in_review");
+  await expect(page.getByTestId("issue-now")).toHaveAttribute("data-state", "reviewing");
+  await expect(page.getByTestId("issue-requirement")).toBeVisible();
+  expect(await api.issue.conversation.get({ id: issue.id })).toBe(thread);
+  await expect(conversation.getByTestId("issue-message")).not.toHaveCount(0);
+  await expect(page.getByTestId("changed-file")).toHaveCount(1);
+  await page.screenshot({ path: testInfo.outputPath("delivery-narrow.png"), fullPage: true });
+  await conversation.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("thread-narrow.png"), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByTestId("issue-now").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("delivery-desktop.png"), fullPage: true });
+  await conversation.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("thread-desktop.png"), fullPage: true });
+  const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+  expect(violations.map((violation) => violation.id)).toEqual([]);
+});

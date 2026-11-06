@@ -20,7 +20,7 @@ prop-less. The HUD mounts `Phone` (with the chat in it) over its button, giving 
 | The chat and the plot | `chat/`, `issue/` | 田头 (with the call and dictation buttons, `features/voice`), a plot's issue and its work log |
 | The phone and the title | `phone/`, `title/` | the farm's phone and its games, the title screen |
 | The debug console | `debug/` | ` opens it: the farm's calls, the clock, local effects, the frames seen |
-| The project map | `map/` | not on `/`: the islands on the workbench's projects page, which `app/` hands to `features/project` (`projectMap`, a `ProjectsSkin`) |
+| The repo map | `map/` | not on `/`: the islands on the workbench's repos page, which `app/` hands to `features/repo` (`repoMap`, a `ReposSkin`) |
 
 Shared: `world/`, `store.ts`, `commands.ts`, `tools.ts`, `cues.ts`, `effects.ts` (effects made on the page), the pixel pieces
 (`src/ui/pixel`),
@@ -43,7 +43,7 @@ Which part draws which overlay (`FarmUi.overlays`):
 The farm page's state is an atom of the page's (`defineAtom`, `state/atom.ts`): `farmState()` reads it anywhere and,
 read in a component or a computation, follows it; `useFarm(select)` is a slice that changes only when the
 slice does; `subscribeFarm(fn)` listens from plain code. What this machine keeps (the title seen, the farm entered last,
-read by `farmProject()` and `lastFarmProject()`) is stored (`defineStored`, `state/stored.ts`). Changes only through
+read by `farmRepo()` and `lastFarmRepo()`) is stored (`defineStored`, `state/stored.ts`). Changes only through
 `farm.*`:
 
 | Action | Does |
@@ -58,7 +58,7 @@ read by `farmProject()` and `lastFarmProject()`) is stored (`defineStored`, `sta
 | `chatOpen(open)`, `chatLarge(large)`, `showChat(channel \| undefined)` | the chat: unfolding takes the phone out, putting the phone away folds it; undefined is the general channel |
 | `phoneOpen(open)`, `friendsOpen(open)` | |
 | `closeTitle()`, `showTitle()` | the title screen; closing it marks this machine as seen (stored as `vibevalley.title.seen`) |
-| `setProject(project)` | the farm on the page, set by the route; `/farm` opens it next (stored as `vibevalley.farm.project`) |
+| `setRepo(repo)` | the farm on the page, set by the route; `/farm` opens it next (stored as `vibevalley.farm.repo`) |
 | `bedFx(bed, kind, text?)` | a bed's effect for 2.2 s (`water`, `spray`, `harvest`, `shovel`, `note`); the commands call it |
 | `reward(effect)` | a reward for 4 s; FarmPage pushes each frame's rewards |
 | `setScreen(screen \| undefined)` | set by the canvas only (below) |

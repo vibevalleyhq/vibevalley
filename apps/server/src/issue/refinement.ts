@@ -1,4 +1,4 @@
-import { Clock, Effect, Result, Schema, Semaphore } from "effect";
+import { Effect, Result, Schema, Semaphore } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -11,18 +11,14 @@ import { lastJsonBlock, misfitField } from "#/base/json.ts";
 import { questionsFromText } from "#/base/questions.ts";
 import type { Channel } from "#/channel/channel.ts";
 import type { Core } from "#/core/core.ts";
-import type { Db } from "#/infra/db.ts";
-import type { WorkplaceRelease } from "#/project/workplace.ts";
+import type { WorkplaceRelease } from "#/repo/workplace.ts";
 import { chooseAgent } from "#/runtime/presets.ts";
 import type { Runtime } from "#/runtime/runtime.ts";
 import type { Hired, HireOptions, Session } from "#/session/session.ts";
-import * as q from "#db/issue.sql.ts";
-import * as qs from "#db/issue_assignment.sql.ts";
 
-import { assignTo, type Assignments } from "./assignment.ts";
 import { splitBrief } from "./brief.ts";
+import type { IssueLifecycle } from "./lifecycle.ts";
 import { draftMatch, refinementBrief } from "./prompts.ts";
-import { jsonOrNull, nullText } from "./rows.ts";
 import { isForOrchestrator } from "./status.ts";
 
 interface RefinementDeps {
@@ -31,21 +27,20 @@ interface RefinementDeps {
   readonly runtimes: Runtime["Service"];
   readonly sessions: Session["Service"];
   readonly chat: Channel["Service"];
-  readonly db: Db["Service"];
   readonly get: (ref: string) => Effect.Effect<T.Issue, ApiError>;
   /** The issue while it was never sent. */
   readonly unsent: (id: string) => Effect.Effect<T.Issue, ApiError>;
-  readonly hire: (agent: T.Agent, brief: string, project: string, opt?: HireOptions) => Effect.Effect<Hired, ApiError>;
-  readonly publish: (id: string) => Effect.Effect<void>;
-  readonly assignments: Assignments;
+  readonly hire: (agent: T.Agent, brief: string, repo: string, opt?: HireOptions) => Effect.Effect<Hired, ApiError>;
+  readonly lastAssigneeIn: IssueLifecycle["lastAssigneeIn"];
+  readonly saveEdit: IssueLifecycle["saveEdit"];
+  readonly saveRefinement: IssueLifecycle["saveRefinement"];
 }
 
 export function refinement(d: RefinementDeps) {
-  const { core, store, runtimes, sessions, chat, db, get, unsent, hire, publish } = d;
+  const { core, store, runtimes, sessions, chat, get, unsent, hire, lastAssigneeIn, saveEdit, saveRefinement } = d;
   /** One draft starts at a time: two clicks do not send two sessions. */
   const drafting = Semaphore.makeUnsafe(1);
 
-  /** Who drafts: its current assignment. else whoever last worked in its project, if available. */
   const refiner = Effect.fnUntraced(function* (issue: T.Issue) {
     const candidates = yield* runtimes.candidates;
     let named = "";
@@ -53,8 +48,8 @@ export function refinement(d: RefinementDeps) {
     if (agent) {
       if (!store.agent(agent)) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: agent })));
       named = agent;
-    } else if (issue.project) {
-      const last = (yield* db.one(qs.lastAssigneeIn({ project: issue.project })))?.agent;
+    } else if (issue.repo) {
+      const last = yield* lastAssigneeIn(issue.repo);
       if (last && candidates.some((c) => c.agent.id === last && c.usable)) named = last;
     }
     const chosen = chooseAgent(candidates, draftMatch(issue.title), named, "");
@@ -65,42 +60,20 @@ export function refinement(d: RefinementDeps) {
   const beforeRefinement = Effect.fnUntraced(function* (issue: T.Issue, word: string, agent: string, where: string) {
     let [title, description] = [issue.title, issue.description];
     if (word && issue.questions.length === 0 && !description && issue.criteria.length === 0) [title, description] = splitBrief(word);
-    const at = yield* Clock.currentTimeMillis;
-    const assignment = yield* db.inTx(
-      db.run(
-        Effect.gen(function* () {
-          yield* q.editIssue({
-            title,
-            description,
-            project: nullText(issue.project ?? where),
-            priority: issue.priority,
-            criteria: jsonOrNull(issue.criteria, issue.criteria.length > 0),
-            deliver: issue.deliver,
-            id: issue.id,
-          });
-          if (word && issue.questions.length > 0) yield* q.setIssueQuestions({ id: issue.id, questions: null });
-          return yield* assignTo(issue.id, assignedAgentOf(issue) ?? agent, at);
-        }),
-      ),
-    );
-    d.assignments.changed(assignment.changed);
-    yield* publish(issue.id);
+    yield* saveEdit(issue.id, {
+      title,
+      description,
+      repo: issue.repo ?? (where || undefined),
+      priority: issue.priority,
+      criteria: issue.criteria,
+      deliver: issue.deliver,
+      agent: assignedAgentOf(issue) ?? agent,
+      clearQuestions: Boolean(word && issue.questions.length > 0),
+    });
   });
 
-  const refined = Effect.fnUntraced(function* (id: string, d: IssueRefinement, questions: readonly T.Question[] | undefined) {
-    const criteria = kept(d.criteria);
-    const open = openQuestions(questions);
-    yield* db.run(
-      q.refineIssue({
-        id,
-        title: d.title,
-        description: refinementDescription(d),
-        criteria: jsonOrNull(criteria, criteria.length > 0),
-        questions: jsonOrNull(open, open.length > 0),
-      }),
-    );
-    yield* publish(id);
-  });
+  const refined = (id: string, draftResult: IssueRefinement, questions: readonly T.Question[] | undefined) =>
+    saveRefinement(id, draftResult.title, refinementDescription(draftResult), kept(draftResult.criteria), questions);
 
   const draft = Effect.fn("Issue.refine")(
     function* (id: string, word: string, channel: string) {
@@ -109,19 +82,19 @@ export function refinement(d: RefinementDeps) {
       if (item.status !== "backlog") return yield* Effect.fail(refused(t("server.issue.refinement.onlyBacklog")));
       if (item.refining) return yield* Effect.fail(refused(t("server.issue.refinement.drafting", { name: item.refining.name })));
       const chosen = yield* refiner(item);
-      const where = item.project ?? chosen.workdir.trim();
-      if (!where) return yield* Effect.fail(refused(t("server.issue.refinement.noProject")));
+      const where = item.repo ?? chosen.workdir.trim();
       const said = word.trim();
-      const brief = refinementBrief(item, said, where);
+      const thread = yield* chat.issueThread(item.id, item.title, channel || undefined);
+      const history = yield* chat.history(thread, undefined, 40);
+      const brief = refinementBrief(item, said, where, history.map((message) => message.text).join("\n\n"));
+      if (said) yield* chat.say(said, thread, "");
       yield* beforeRefinement(item, said, chosen.id, where);
       // A draft cut short (a restart) may have left the worktree as its refiner had it: each draft starts from main.
-      const kept = yield* sessions.clearWorkplace(item.id, where, item.number);
-      if (kept.kept) yield* Effect.logInfo(`vibevalley: issue ${item.id}: before its draft: ${kept.reason}`);
-      // Always a worktree, even for a profile that works in the project folder: the reset after it must not touch the owner's checkout.
+      const kept = where ? yield* sessions.clearWorkplace(item.id, where, item.number) : { kept: false };
+      if (kept.kept) yield* Effect.logInfo(`vibevalley: issue ${item.id}: retained draft workplace`);
+      // Always a worktree, even for a profile that works in the repo folder: the reset after it must not touch the owner's checkout.
       const hired = yield* hire(chosen, brief, where, { worktree: true, channel, issue: id, trigger: { kind: "refine" }, refining: true });
       if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")));
-      // Its moves no longer hold todo while it drafts.
-      yield* publish(id);
       return yield* get(id);
     },
     (effect) => drafting.withPermits(1)(effect),
@@ -137,16 +110,21 @@ export function refinement(d: RefinementDeps) {
     if (f.outcome === "completed") {
       const { draft: d, problem } = parseRefinement(said);
       if (!d) yield* tell(t("server.issue.refinement.unread", { name: h.name, problem }));
-      else yield* refined(id, d, f.questions && f.questions.length > 0 ? f.questions : questionsFromText(said));
+      else {
+        const questions = f.questions && f.questions.length > 0 ? f.questions : questionsFromText(said);
+        yield* refined(id, d, questions);
+        yield* tell(
+          [d.title, refinementDescription(d), ...d.criteria, ...questions.map((question) => [question.question, ...question.options].join("\n"))].join("\n\n"),
+        );
+      }
     } else yield* tell(t("server.issue.refinement.unfinished", { name: h.name, summary: f.summary }));
     yield* sessions.dismiss(f.id, "discard");
-    yield* publish(id);
   });
 
   const clearRefinement = Effect.fn("Issue.clearRefinement")(function* (issue: T.Issue): Effect.fn.Return<WorkplaceRelease, ApiError> {
     if (issue.refining) yield* sessions.dismiss(issue.refining.session, "discard");
-    if (issue.project) {
-      const kept = yield* sessions.clearWorkplace(issue.id, issue.project, issue.number);
+    if (issue.repo) {
+      const kept = yield* sessions.clearWorkplace(issue.id, issue.repo, issue.number);
       if (kept.kept) yield* core.notice("warn", t("server.issue.refinement.canceled", { title: cut(issue.title, 40), why: kept.reason }));
       return kept;
     }

@@ -30,6 +30,7 @@ export function randomLook(random: () => number = Math.random): Look {
   return {
     species: one(SpeciesValues, random),
     outfit: one(OutfitValues, random),
+    orchestrator: null,
     build: one(BuildValues, random),
     head: one(HeadValues, random),
     body: one(swatches.body, random),

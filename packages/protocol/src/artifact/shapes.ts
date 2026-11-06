@@ -60,7 +60,7 @@ export interface Artifact {
   channel?: string;
   /** The message that first announced it: a blocks one's comments are the replies to it. */
   said?: { channel: string; number: number };
-  issue?: string;
+  issue?: IssueId;
   by: string;
   byName: string;
   /** html: the latest version; blocks: 0. */
@@ -76,7 +76,7 @@ export interface Artifact {
 /** Without content, an empty blocks artifact to write in, not announced (the owner's New). */
 export interface ArtifactRequest {
   title: string;
-  kind?: ArtifactKind;
+  kind: ArtifactKind;
   content?: string;
   note?: string;
   channel?: string;

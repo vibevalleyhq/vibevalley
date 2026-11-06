@@ -3,15 +3,15 @@ import { createSignal, untrack } from "solid-js";
 import { t } from "@vibevalley/i18n";
 
 import { useWorkAgents } from "#/infra/agents.ts";
-import { ready, useProjects } from "#/infra/query.ts";
+import { ready, useRepos } from "#/infra/query.ts";
 import { prefsNow } from "#/state/prefs.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Dialog } from "#/ui/Dialog.tsx";
 import { Select, TextArea } from "#/ui/Field.tsx";
 
-/** The project and helper the board is filtered to, or the list group it was opened in. */
+/** The repo and helper the board is filtered to, or the list group it was opened in. */
 export interface NewIssueAt {
-  readonly project?: string;
+  readonly repo?: string;
   readonly agent?: string;
 }
 
@@ -19,15 +19,15 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
   const [text, setText] = createSignal("");
   // What it was opened with, else what the last issue was given: shown as it will be used (write.ts falls back the same).
   const last = prefsNow();
-  const [project, setProject] = createSignal(untrack(() => props.at.project ?? last.project));
+  const [repo, setRepo] = createSignal(untrack(() => props.at.repo ?? last.repo));
   const [agent, setAgent] = createSignal(untrack(() => props.at.agent ?? (last.pick === "auto" ? "" : last.pick)));
   const agents = useWorkAgents(true);
-  const projectList = useProjects();
-  const projects = () => ready(projectList, []).map((p) => p.name);
+  const repoList = useRepos();
+  const repos = () => ready(repoList, []).map((p) => p.name);
   const keep = () => {
     const words = text().trim();
     if (!words) return;
-    props.onKeep(words, { ...(project() ? { project: project() } : {}), ...(agent() ? { agent: agent() } : {}) });
+    props.onKeep(words, { ...(repo() ? { repo: repo() } : {}), ...(agent() ? { agent: agent() } : {}) });
     props.onClose();
   };
   return (
@@ -58,12 +58,12 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           <Select
             quiet
             size="control"
-            label={t("web.issue.task.project")}
-            testid="issue-new-project"
-            value={project()}
-            placeholder={t("web.issue.todo.whichProject")}
-            onChange={setProject}
-            options={[...new Set([...projects(), ...(project() ? [project()] : [])])].map((p) => ({ value: p, label: p }))}
+            label={t("web.issue.task.repo")}
+            testid="issue-new-repo"
+            value={repo()}
+            placeholder={t("web.issue.todo.whichRepo")}
+            onChange={setRepo}
+            options={[...new Set([...repos(), ...(repo() ? [repo()] : [])])].map((p) => ({ value: p, label: p }))}
           />
           <Select
             quiet

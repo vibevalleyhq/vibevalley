@@ -34,19 +34,19 @@ export const CreateChannelParams = Schema.Struct({
   ["is_default"]: SqliteBoolean,
   ["name"]: Schema.NullOr(Schema.String),
   ["description"]: Schema.NullOr(Schema.String),
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
 })
 export type CreateChannelParams = typeof CreateChannelParams.Type
 
 
-export const CreateChannelSql = "-- name: CreateChannel :exec\ninsert into channel (id, type, is_default, name, description, project, created_at)\nvalues (?1, 'channel', ?2, ?3, ?4, ?5, ?6);"
+export const CreateChannelSql = "-- name: CreateChannel :exec\ninsert into channel (id, type, is_default, name, description, repo, created_at)\nvalues (?1, 'channel', ?2, ?3, ?4, ?5, ?6);"
 
 export const createChannel = Effect.fn("CreateChannel")(function* (params: CreateChannelParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: CreateChannelParams,
-    execute: (p) => sql.unsafe(CreateChannelSql, [p["id"], p["is_default"], p["name"], p["description"], p["project"], p["created_at"]]),
+    execute: (p) => sql.unsafe(CreateChannelSql, [p["id"], p["is_default"], p["name"], p["description"], p["repo"], p["created_at"]]),
   })(params)
 })
 
@@ -102,19 +102,19 @@ export const makeDefault = Effect.fn("MakeDefault")(function* (params: MakeDefau
 
 export const UpdateChannelParams = Schema.Struct({
   ["description"]: Schema.NullOr(Schema.String),
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
 })
 export type UpdateChannelParams = typeof UpdateChannelParams.Type
 
 
-export const UpdateChannelSql = "-- name: UpdateChannel :exec\nupdate channel set description = ?1, project = ?2 where id = ?3 and type = 'channel';"
+export const UpdateChannelSql = "-- name: UpdateChannel :exec\nupdate channel set description = ?1, repo = ?2 where id = ?3 and type = 'channel';"
 
 export const updateChannel = Effect.fn("UpdateChannel")(function* (params: UpdateChannelParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: UpdateChannelParams,
-    execute: (p) => sql.unsafe(UpdateChannelSql, [p["description"], p["project"], p["id"]]),
+    execute: (p) => sql.unsafe(UpdateChannelSql, [p["description"], p["repo"], p["id"]]),
   })(params)
 })
 
@@ -159,7 +159,7 @@ export const AllChannelsResult = Schema.Struct({
   ["created_at"]: Schema.Number,
   ["name"]: Schema.NullOr(Schema.String),
   ["description"]: Schema.NullOr(Schema.String),
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["parent_id"]: Schema.NullOr(Schema.String),
   ["peer_id"]: Schema.NullOr(Schema.String),
   ["revision"]: Schema.Int,
@@ -202,7 +202,7 @@ export const RecentChannelsResult = Schema.Struct({
   ["created_at"]: Schema.Number,
   ["name"]: Schema.NullOr(Schema.String),
   ["description"]: Schema.NullOr(Schema.String),
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["parent_id"]: Schema.NullOr(Schema.String),
   ["peer_id"]: Schema.NullOr(Schema.String),
   ["revision"]: Schema.Int,

@@ -9,8 +9,9 @@ afterEach(() => vi.useRealTimers());
 function serverStream() {
   const encoder = new TextEncoder();
   let write: (text: string) => void = () => {};
-  const body = new ReadableStream<Uint8Array>({ start: (c) => void (write = (text) => c.enqueue(encoder.encode(text))) });
-  return { response: new Response(body, { headers: { "content-type": "text/event-stream" } }), write: (text: string) => write(text) };
+  const cancel = vi.fn();
+  const body = new ReadableStream<Uint8Array>({ start: (c) => void (write = (text) => c.enqueue(encoder.encode(text))), cancel });
+  return { response: new Response(body, { headers: { "content-type": "text/event-stream" } }), write: (text: string) => write(text), cancel };
 }
 
 const settle = () => vi.advanceTimersByTimeAsync(0);
@@ -46,6 +47,7 @@ test("a stream that only pings is alive; one silent past the limit is given up a
   await vi.advanceTimersByTimeAsync(streamSilenceMs);
   expect(String(await ended)).toContain("nothing for");
   expect(heard).toEqual([notice]);
+  expect(server.cancel).toHaveBeenCalledOnce();
 });
 
 test("the caller's abort ends it at once", async () => {
@@ -78,4 +80,47 @@ test("a frame not in its stream's shape ends the stream with why", async () => {
   server.write(`data: {"type":"notice","at":"soon"}\n\n`);
   expect(String(await ended)).toContain("a frame not in its shape");
   expect(heard).toEqual([]);
+});
+
+for (const failure of ["frame", "callback", "http", "abort"] as const) {
+  test(`regression: ${failure} exits release the stream and its request`, async () => {
+    const server = serverStream();
+    const caller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    const callbackError = new Error("listener failed");
+    const ended = readStream(
+      "",
+      livePath,
+      () => {
+        if (failure === "callback") throw callbackError;
+      },
+      caller.signal,
+      (_url, init) => {
+        requestSignal = init.signal ?? undefined;
+        return Promise.resolve(failure === "http" ? new Response(server.response.body, { status: 503 }) : server.response);
+      },
+    ).catch((error: unknown) => error);
+    if (failure === "abort") caller.abort();
+    else if (failure !== "http") server.write(`data: ${JSON.stringify(failure === "frame" ? { type: "notice", at: "soon" } : notice)}\n\n`);
+    const error = await ended;
+    expect(error).toBeInstanceOf(Error);
+    if (failure === "callback") expect(error).toBe(callbackError);
+    expect(requestSignal?.aborted).toBe(true);
+    expect(server.cancel).toHaveBeenCalledOnce();
+  });
+}
+
+test("regression: cancellation failure does not replace the frame error", async () => {
+  const body = new ReadableStream<Uint8Array>({
+    start: (controller) => controller.enqueue(new TextEncoder().encode('data: {"type":"notice","at":"soon"}\n\n')),
+    cancel: () => Promise.reject(new Error("cancel failed")),
+  });
+  const error = await readStream(
+    "",
+    livePath,
+    () => {},
+    new AbortController().signal,
+    () => Promise.resolve(new Response(body)),
+  ).catch((e: unknown) => e);
+  expect(String(error)).toContain("a frame not in its shape");
 });

@@ -69,7 +69,7 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
   return (
     <div class="flex flex-col">
       <div class="flex flex-wrap items-center gap-1.5">
-        <FarmTag text={t("web.farm.harvest.project", { project: props.changes.project })} fill="#a5743f" ink="#f7e8c4" />
+        <FarmTag text={t("web.farm.harvest.repo", { repo: props.changes.repo })} fill="#a5743f" ink="#f7e8c4" />
         <Show when={props.changes.branch}>
           <FarmTag text={`${props.changes.branch} → ${props.changes.base}`} ink="#46301d" />
         </Show>
@@ -182,7 +182,7 @@ export function Warehouse() {
               <span class="min-w-0 flex-1">
                 <span class="line-clamp-2 text-[13px]">{issueTitle(i, issues())}</span>
                 <span class={["mt-1 block", xs]}>
-                  {[agentName(i), i.project, i.closedAt !== undefined ? t("web.farm.harvest.taken", { ago: ago(i.closedAt, now()) }) : undefined]
+                  {[agentName(i), i.repo, i.closedAt !== undefined ? t("web.farm.harvest.taken", { ago: ago(i.closedAt, now()) }) : undefined]
                     .filter(Boolean)
                     .join(" · ")}
                 </span>

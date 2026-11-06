@@ -20,7 +20,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [mailbox.md](docs/subsystems/mailbox.md) | 信箱：谁该听到、三道刹车、投递状态机、叫醒与工单蓄水池 |
 | [resource.md](docs/subsystems/resource.md) | Resource：只读、分页、按会话权限裁剪的 `resource_read` |
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
-| [project.md](docs/subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测、地契 |
+| [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、GitHub 检测、地契 |
 | [artifact.md](docs/subsystems/artifact.md) | 稿子：主人和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
 | [pkm.md](docs/subsystems/pkm.md) | 笔记：主人的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
 | [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、谁听见、工单串、连接器、Inbox |
@@ -74,17 +74,18 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 工单 | ticket | issue（`Issue`） | 一件活，从写下到关上一个 id；每派一次是一个帮工 | job、ticket |
 | 稿子 | artifact | artifact（`Artifact`，正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的，或交上来一稿一稿换的网页（第 N 稿）；交上来的带卡片挂在频道和工单上 | 产出、文档（指稿子时）、doc（指稿子时） |
 | 笔记 | notes | pkm（`Pkm`，一页 `PkmPage`，一块 `PkmBlock`） | 你自己的知识库：PARA 几个文件夹里的大纲页面和每天的日记，工作台的「笔记」页（`/pkm`）；文件在笔记库里，别的编辑器也能改 | |
-| 项目 | project | project（`ProjectSummary`） | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
-| 大地图 | the map | `WorkspaceState`；目录是 `ServerConfig` 的 `workRoot`、`home` | 全部项目、工单、频道和档案；工作台「项目」页的「全部」 | 世界、全图 |
-| 空位 | spot | `ServerConfig.project.maxSessions`（配置 `project.max_sessions`）、`Session.makeRoom`；每台农机另有 `maxWorking` | 一个项目（和整个 VibeValley）同时能在做的工单数；满了的待办排队，有空位自动开工 | 并发位、空地 |
+| 仓库 | repo | repo（`RepoSummary`） | 空间 `repos/` 下的一个 git 仓库；农场里是一座岛，工作台的「仓库」页（`/repos`，「全部」是整张地图） | 一块地 |
+| 空间 | space | `SpaceState`；目录是 `ServerConfig` 的 `workRoot` | 一套独立的仓库、工作树、工单、频道和笔记；工作台「仓库」页的「全部」 | 世界、全图 |
+| 宿主 | host | `ServerConfig.home`（`$VIBEVALLEY_HOME`） | 本机跨空间共用的运行状态：密钥、农机、全局档案模板和日志 | |
+| 空位 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.makeRoom`；每台农机另有 `maxWorking` | 一个仓库（和整个 VibeValley）同时能在做的工单数；满了的待办排队，有空位自动开工 | 并发位、空地 |
 | 档案模板 | profile template | `AgentTemplate`（`agent.template.*`） | 一份 agent 的配方：`agent.json` 加人设 `persona.md`；装一份就多一份档案，界面上在档案页叫「模板」 | 种子、预设 |
-| 工单模板 | ticket template | issue template（`IssueTemplate`、`project.template.list`） | 写工单的现成模板：一个标题和一行完成线，按项目的栈填好命令；代码里的 seed 只指种子数据（`seeds.json`） | seed |
+| 工单模板 | ticket template | issue template（`IssueTemplate`、`repo.template.list`） | 写工单的现成模板：一个标题和一行完成线，按仓库的栈填好命令；代码里的 seed 只指种子数据（`seeds.json`） | seed |
 | 阶段 | what it is doing | phase（`Session.phase`） | 帮工到哪了：刚派出去、在干活、交回来了、没做成、歇着、走了 | 状态（指阶段时） |
-| 核心状态 | core state | `WorkspaceState` | 大地图上的一切，只有服务端持有 | |
+| 核心状态 | core state | `SpaceState` | 大地图上的一切，只有服务端持有 | |
 | VibeValley | VibeValley | 服务端、整个系统 | 说系统做了什么时的叫法（「VibeValley 会建好」「VibeValley 重启了」）；农场是它的一张皮，不是它的名字 | 农场（指系统时） |
 | 事实 | fact | `Fact` | 改核心状态的一件事 | patch |
 | 改动 | changes | `Changes`（`issue.diff.get`） | 工单分支上的提交、改的文件和 diff，合进去会不会冲突 | 差异、PR 详情、收成清单 |
-| 完成 | complete | 动作 `complete`；工单挪到 `done`（已完成） | 主人点头，工单关成已完成；交付了什么另记（`delivered`）：合进了主分支（`github.pr_projects` 里的项目是推分支、开 PR，PR 合了才关）、分支留着没合、没有改动要合 | 收获、合并（指完成时：合并只是交付的一种） |
+| 完成 | complete | 动作 `complete`；工单挪到 `done`（已完成） | 主人点头，工单关成已完成；交付了什么另记（`delivered`）：合进了主分支（`github.pr_repos` 里的仓库是推分支、开 PR，PR 合了才关）、分支留着没合、没有改动要合 | 收获、合并（指完成时：合并只是交付的一种） |
 | 取消 | cancel | 动作 `close`；工单挪到 `canceled`（已取消） | 不做了：帮工收工，分支上有提交就留着 | 收工（指取消时：那是帮工离开） |
 | 关上 | closed | `isClosed`：`done` 或 `canceled` | 已完成和已取消的合称：看板的「已关」一列 | |
 | 聊清楚、安排活、完成 | talk it through, get it worked, finish | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` | 一张工单的三段 | |
@@ -111,7 +112,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 频道 | channel | channel（`Channel`） | 另开的说话的地方；微信、飞书、QQ 各接一个 | 群（指频道时）、群聊 |
 | 串 | thread | thread | 挂在一条消息下面的话题串；派活时开的叫工单串 | 子频道 |
 | 附件 | attachment | `Attachment`（`channel_attachment` 表） | 一条消息带的文件和图 | |
-| 工作目录 | working folder | `Workplace`（`workdir`） | 帮工干活的目录：项目目录或工单的 worktree；VibeValley 自己的是 `VIBEVALLEY_WORK_ROOT` | 工作区 |
+| 工作目录 | working folder | `Workplace`（`workdir`） | 帮工干活的目录：仓库目录或工单的 worktree；VibeValley 自己的是 `VIBEVALLEY_WORK_ROOT` | 工作区 |
 | 定时任务 | scheduled task | cron（`Cron`） | 一张工单的一种触发：到点开它的一轮，派给帮工或管家 | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
 | Inbox | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 要你处理的事，从核心状态现算 | 通知（指 Inbox 时）、来电（农场的皮里用） |
 | 提醒 | notice | `Core.notice`、`NoticeLevel`（事件流里是 `ServerEventNotice`） | VibeValley 一闪而过地告诉你一句：信息、警告或出错；不进 Inbox | |
@@ -128,7 +129,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 农场里 | English | 实际是 | 代码里 |
 |---|---|---|---|
-| 地 | plot | 一张工单（开 worktree 的代码工单带一个 worktree）；一座岛上的空位是这个项目的空位 | `FarmView.plots` 按工单的 id 做键（`plotKeyOf`：重开的工单还是这块地）；像素村里的位置是 station，画出来的那块地在客户端叫 `Bed` |
+| 地 | plot | 一张工单（开 worktree 的代码工单带一个 worktree）；一座岛上的空位是这个仓库的空位 | `FarmView.plots` 按工单的 id 做键（`plotKeyOf`：重开的工单还是这块地）；像素村里的位置是 station，画出来的那块地在客户端叫 `Bed` |
 | 种子袋 | seed bag | 待办（排队等空位的工单） | `todo`、`queued_at` |
 | 播种袋里的种子 | seeds | 工单模板 | `IssueTemplate` |
 | 播种、发芽、长叶 | sow, sprout, leafy | 处理中 | `in_progress`，帮工 `working` |

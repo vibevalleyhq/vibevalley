@@ -2,6 +2,7 @@ import { Schema } from "effect";
 
 import type { Codec } from "../codec";
 import * as T from "../shapes";
+import { PkmMoveAtValues, PkmMoveDirectionValues } from "./shapes";
 
 const pkmProps = Schema.Record(Schema.String, Schema.String);
 export const PkmTier: Codec<T.PkmTier> = Schema.Literals(T.PkmTierValues);
@@ -49,7 +50,7 @@ export const PkmPage: Codec<T.PkmPage> = Schema.Struct({
 export const PkmTransclusion: Codec<T.PkmTransclusion> = Schema.Struct({
   block: Schema.String,
   found: Schema.Boolean,
-  circular: Schema.optionalKey(Schema.Boolean),
+  circular: Schema.Boolean,
   page: Schema.optionalKey(Schema.String),
   pageTitle: Schema.optionalKey(Schema.String),
   body: Schema.String,
@@ -129,8 +130,8 @@ export const PkmBlockOp: Codec<T.PkmBlockOp> = Schema.Union([
   Schema.Struct({ op: Schema.tag("delete"), ...pkmOn }),
   Schema.Struct({ op: Schema.tag("indent"), ...pkmOn }),
   Schema.Struct({ op: Schema.tag("outdent"), ...pkmOn }),
-  Schema.Struct({ op: Schema.tag("move"), ...pkmOn, direction: Schema.Literals(["up", "down"]) }),
-  Schema.Struct({ op: Schema.tag("move_to"), ...pkmOn, target: Schema.String, at: Schema.Literals(["before", "after", "inside"]) }),
+  Schema.Struct({ op: Schema.tag("move"), ...pkmOn, direction: Schema.Literals(PkmMoveDirectionValues) }),
+  Schema.Struct({ op: Schema.tag("move_to"), ...pkmOn, target: Schema.String, at: Schema.Literals(PkmMoveAtValues) }),
 ]);
 
 export const PkmMutation: Codec<T.PkmMutation> = Schema.Struct({ page: Schema.String, ops: Schema.mutable(Schema.Array(PkmBlockOp)) });

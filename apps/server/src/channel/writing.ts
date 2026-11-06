@@ -10,18 +10,18 @@ import { newId } from "#/base/ids.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
-import { inputContext, keepChannelTrigger } from "#/mailbox/payload.ts";
+import { inputContext } from "#/mailbox/payload.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qmn from "#db/channel_mention.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 
 import { metaOf, metaText, type MsgRow, senderKind, messageKind, channelType, type Write, type Written, type ChannelRouteInput } from "./contracts.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
+import type { ChannelHub } from "./hub.ts";
 import { mentionsIn } from "./mentions.ts";
 import { channelInput } from "./messages.ts";
-import type { ChannelRecords } from "./records.ts";
 
-export const channelWriting = (r: ChannelRecords) =>
+export const channelWriting = (r: ChannelHub) =>
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient;
     const agents = yield* Agent;
@@ -115,11 +115,11 @@ export const channelWriting = (r: ChannelRecords) =>
         ...(addressed ? { addressed } : {}),
         roles: Object.fromEntries(recipients.map((recipient) => [recipient, agents.isOrchestrator(recipient) ? "orchestrator" : "worker"])),
 
-        ...(meta.outcome === undefined ? {} : { outcome: meta.outcome }),
+        ...(meta.outcome ? { outcome: meta.outcome } : {}),
       };
       const { trigger, mail } = channelInput(fact, inputContext(asInbox(fact.row)));
       const routed = yield* Effect.gen(function* () {
-        const original = yield* keepChannelTrigger(db, trigger, fact.row.body, fact.row.channel_id);
+        const original = yield* mailbox.recordChannelTrigger(trigger, fact.row.body, fact.row.channel_id);
         return yield* mailbox.receive(original, mail);
       }).pipe(Effect.catch((error) => Effect.as(Effect.logWarning(`chat: route ${trigger.id}`, error), { heldNotice: "" })));
       const written: Written = { absent: [], heldNotice: "", thread: "", again: false, row };

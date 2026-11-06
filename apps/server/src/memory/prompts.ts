@@ -7,10 +7,10 @@ export function carriedMemory(lines: readonly string[]): string {
 }
 
 export const recallWords = {
-  everywhere: "所有项目",
-  here: "这个项目",
-  project: (name: string) => "项目 " + name,
-  unknownScope: "项目范围未知",
+  everywhere: "所有仓库",
+  here: "这个仓库",
+  repo: (name: string) => "仓库 " + name,
+  unknownScope: "仓库范围未知",
   issue: (where: string, text: string) => `- 做过（${where}）：${text}`,
   note: (where: string, text: string) => `- （${where}）${text}`,
   /** A finished issue's memory: its brief, and what came of it. */
@@ -32,6 +32,6 @@ export const recallWords = {
 /** What a session's run says to EverOS, as the turns it keeps. */
 export const everosWords = {
   failed: "（这一轮没做成）",
-  remember: (project: string, text: string) => `记住（${project ? `项目 ${project}` : "所有项目"}）：${text}`,
+  remember: (repo: string, text: string) => `记住（${repo ? `仓库 ${repo}` : "所有仓库"}）：${text}`,
   noted: (text: string) => `记下了：${text}`,
 };

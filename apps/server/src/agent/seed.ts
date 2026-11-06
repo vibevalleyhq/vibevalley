@@ -58,6 +58,6 @@ export const sampleAgent = (a: Partial<T.Agent> & Pick<T.Agent, "id">): T.Agent 
   workdir: "",
   worktree: false,
   tags: [],
-  look: { build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
+  look: { species: null, outfit: null, orchestrator: null, build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
   ...a,
 });

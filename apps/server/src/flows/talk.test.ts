@@ -66,14 +66,14 @@ describe("a talk with a helper profile", () => {
       const dm = yield* channels.direct("lab");
       expect(yield* channels.direct("lab")).toBe(dm);
       const channel = channelOf(core.state().chat, dm);
-      expect([channel?.type, channel?.peer, channel?.subjectKind, channel?.subjectId]).toEqual(["direct", "profile:lab", undefined, undefined]);
+      expect([channel?.type, channel?.peer, channel?.subjectKind, channel?.subjectId]).toEqual(["direct", "profile:lab", null, undefined]);
       const answers = () => saidIn(dm).filter((m) => m.kind === "report").length;
       yield* channels.say("你好，记得这段对话", dm, "");
       yield* until(() => answers() === 1, "the first answer");
       const first = sessions.presentSessions().find((s) => s.channel === dm);
       expect(first).toMatchObject({ agent: "lab", channel: dm });
       expect(first?.issue).toBeUndefined();
-      expect(first?.project).toBeUndefined();
+      expect(first?.repo).toBeUndefined();
       yield* TestClock.adjust(10 * 60_000);
       yield* until(() => disposed === 1, "the idle execution suspended");
       expect(sessions.presentSessions().find((s) => s.channel === dm)?.id).toBe(first?.id);

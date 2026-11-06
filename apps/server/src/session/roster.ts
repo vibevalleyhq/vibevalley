@@ -1,17 +1,17 @@
 import type * as T from "@vibevalley/protocol";
 
 // Finding and changing a session in the core state. Nothing here changes what it is given.
-export const sessionOf = (state: T.WorkspaceState, id: string) => state.sessions.find((h) => h.id === id);
+export const sessionOf = (state: T.SpaceState, id: string) => state.sessions.find((h) => h.id === id);
 
 /** The session working the issue now: the latest hired of those on it. */
-export function sessionOnIssue(state: T.WorkspaceState, issue: string): T.Session | undefined {
+export function sessionOnIssue(state: T.SpaceState, issue: string): T.Session | undefined {
   let on: T.Session | undefined;
   for (const h of state.sessions) if (h.issue === issue && (!on || h.hiredAt >= on.hiredAt)) on = h;
   return on;
 }
 
 /** The very same state when there is no such session. */
-export function withSession(state: T.WorkspaceState, id: string, change: (h: T.Session) => T.Session): [T.WorkspaceState, boolean] {
+export function withSession(state: T.SpaceState, id: string, change: (h: T.Session) => T.Session): [T.SpaceState, boolean] {
   const i = state.sessions.findIndex((h) => h.id === id);
   const current = state.sessions[i];
   if (i < 0 || !current) return [state, false];

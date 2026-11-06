@@ -13,7 +13,7 @@ export const KeepSessionParams = Schema.Struct({
   ["name"]: Schema.String,
   ["runtime"]: Schema.String,
   ["brief"]: Schema.String,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["channel"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
@@ -21,13 +21,13 @@ export const KeepSessionParams = Schema.Struct({
 export type KeepSessionParams = typeof KeepSessionParams.Type
 
 
-export const KeepSessionSql = "-- name: KeepSession :exec\ninsert into session (id, role, agent, name, runtime, brief, project, issue, channel, hired_at)\nvalues (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)\non conflict (id) do nothing;"
+export const KeepSessionSql = "-- name: KeepSession :exec\ninsert into session (id, role, agent, name, runtime, brief, repo, issue, channel, hired_at)\nvalues (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)\non conflict (id) do nothing;"
 
 export const keepSession = Effect.fn("KeepSession")(function* (params: KeepSessionParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: KeepSessionParams,
-    execute: (p) => sql.unsafe(KeepSessionSql, [p["id"], p["role"], p["agent"], p["name"], p["runtime"], p["brief"], p["project"], p["issue"], p["channel"], p["hired_at"]]),
+    execute: (p) => sql.unsafe(KeepSessionSql, [p["id"], p["role"], p["agent"], p["name"], p["runtime"], p["brief"], p["repo"], p["issue"], p["channel"], p["hired_at"]]),
   })(params)
 })
 
@@ -78,7 +78,7 @@ export const SessionByIDResult = Schema.Struct({
   ["name"]: Schema.String,
   ["runtime"]: Schema.String,
   ["brief"]: Schema.String,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["channel"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
@@ -123,7 +123,7 @@ export const EndedSessionsResult = Schema.Struct({
   ["name"]: Schema.String,
   ["runtime"]: Schema.String,
   ["brief"]: Schema.String,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["channel"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,
@@ -266,7 +266,7 @@ export const ActiveSessionsResult = Schema.Struct({
   ["name"]: Schema.String,
   ["runtime"]: Schema.String,
   ["brief"]: Schema.String,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["issue"]: Schema.NullOr(Schema.String),
   ["channel"]: Schema.NullOr(Schema.String),
   ["hired_at"]: Schema.Number,

@@ -1,16 +1,17 @@
-import { Effect, Predicate, Schema } from "effect";
+import { Effect, Predicate, Schema, SchemaGetter, SchemaIssue } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import { effectTool } from "@vibevalley/agent/core/tool";
 import type { JsonSchema } from "@vibevalley/ai/tools";
-import { PkmTierValues } from "@vibevalley/protocol";
+import { ArtifactKindValues, CronWhenKindValues, DeliverableValues, PkmTierValues } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema, type Handlers } from "@vibevalley/protocol/api";
+import * as S from "@vibevalley/protocol/schema";
 
 import type { Actor } from "#/base/actor.ts";
 import { messageOf, reasonOf } from "#/base/errors.ts";
 import { maxChildren as maxTasks } from "#/issue/creation.ts";
 
-import { answers, descriptions, params, sessionDescriptions } from "./prompts.ts";
+import { answers, descriptions, params, priorityNames, sessionDescriptions, statusNames } from "./prompts.ts";
 
 /** A tool is an endpoint as a model sees it: its name is the endpoint's (toolName), its fields are the endpoint's. */
 export type Op = keyof Handlers;
@@ -39,8 +40,42 @@ const artifactText = {
   content: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.content })),
   note: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.note })),
 };
-const artifactKind = Schema.Literals(["html", "markdown"]).annotate({ description: params.artifact.kind });
-const artifactId = Schema.String.annotate({ description: params.artifact.id });
+const artifactKind = Schema.Literals(ArtifactKindValues).annotate({ description: params.artifact.kind });
+const artifactId = Schema.String.annotate({ description: params.artifact.id }).pipe(
+  Schema.decodeTo(S.ArtifactId, {
+    decode: SchemaGetter.transform((s: string) => S.artifactId(s.trim())),
+    encode: SchemaGetter.passthrough(),
+  }),
+);
+const blockId = (description: string) =>
+  Schema.String.annotate({ description }).pipe(
+    Schema.decodeTo(S.BlockId, {
+      decode: SchemaGetter.transform(S.blockId),
+      encode: SchemaGetter.passthrough(),
+    }),
+  );
+const aliasOf = <A extends string>(names: Readonly<Record<string, A>>) =>
+  SchemaGetter.transformEffect<A, string>((word, options) => {
+    const key = word.trim();
+    const value = Object.hasOwn(names, key) ? names[key] : undefined;
+    return value !== undefined
+      ? Effect.succeed(value)
+      : Effect.fail(new SchemaIssue.InvalidValue({ message: `Expected one of: ${Object.keys(names).join(", ")}` }, word, options));
+  });
+const statusField = (description: string) =>
+  Schema.String.annotate({ description }).pipe(
+    Schema.decodeTo(S.IssueStatus, {
+      decode: aliasOf(statusNames),
+      encode: SchemaGetter.passthroughSupertype(),
+    }),
+  );
+const priorityField = (description: string) =>
+  Schema.String.annotate({ description }).pipe(
+    Schema.decodeTo(S.Priority, {
+      decode: aliasOf(priorityNames),
+      encode: SchemaGetter.passthroughSupertype(),
+    }),
+  );
 const artifactRead = Schema.Struct({
   id: artifactId,
   version: Schema.optionalKey(Schema.Int.annotate({ description: params.artifact.version })),
@@ -70,18 +105,18 @@ const channelRead = Schema.Struct({
 
 const blockCreateParameters = Schema.Struct({
   id: artifactId,
-  afterBlock: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.afterBlock })),
+  afterBlock: Schema.optionalKey(blockId(params.blockCreate.afterBlock)),
   checked: Schema.optionalKey(Schema.Boolean.annotate({ description: params.blockCreate.checked })),
   language: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.language })),
   level: Schema.optionalKey(Schema.Int.annotate({ description: params.blockCreate.level })),
-  parentId: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.parentId })),
+  parentId: Schema.optionalKey(blockId(params.blockCreate.parentId)),
   text: Schema.String.annotate({ description: params.blockCreate.text }),
   type: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.type })),
 }).annotate({ requiredOrder: ["id", "text"] });
 
 const blockUpdateParameters = Schema.Struct({
   baseRev: Schema.Int.annotate({ description: params.blockUpdate.baseRev }),
-  block: Schema.String.annotate({ description: params.blockUpdate.block }),
+  block: blockId(params.blockUpdate.block),
   checked: Schema.optionalKey(Schema.Boolean.annotate({ description: params.blockUpdate.checked })),
   id: artifactId,
   language: Schema.optionalKey(Schema.String.annotate({ description: params.blockUpdate.language })),
@@ -91,7 +126,7 @@ const blockUpdateParameters = Schema.Struct({
 }).annotate({ requiredOrder: ["id", "block", "baseRev"] });
 
 const blockDeleteParameters = Schema.Struct({
-  block: Schema.String.annotate({ description: params.blockDelete.block }),
+  block: blockId(params.blockDelete.block),
   id: artifactId,
 }).annotate({ requiredOrder: ["id", "block"] });
 
@@ -117,14 +152,14 @@ export const parameters = {
   "channel.create": Schema.Struct({
     description: Schema.optionalKey(Schema.String),
     name: Schema.String,
-    project: Schema.optionalKey(Schema.String),
+    repo: Schema.optionalKey(Schema.String),
   }),
   "channel.list": Schema.Struct({}),
   "channel.message.list": channelRead,
   "channel.update": Schema.Struct({
     description: Schema.optionalKey(Schema.String),
     id: Schema.String.annotate({ description: params.channelRef }),
-    project: Schema.optionalKey(Schema.String),
+    repo: Schema.optionalKey(Schema.String),
   }),
   "issue.comment.create": Schema.Struct({
     id: Schema.String.annotate({ description: params.issueOrAgent }),
@@ -137,14 +172,14 @@ export const parameters = {
     autoSubmitPr: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueCreate.autoSubmitPr })),
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.channel })),
     deliver: Schema.optionalKey(
-      Schema.Literals(["change", "branch", "answer"]).annotate({
+      Schema.Literals(DeliverableValues).annotate({
         description: params.issueCreate.deliver,
       }),
     ),
     description: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.description })),
     draft: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueCreate.draft })),
-    priority: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.priority })),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.project })),
+    priority: Schema.optionalKey(priorityField(params.issueCreate.priority)),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.repo })),
     start: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueCreate.start })),
     title: Schema.String.annotate({ description: params.issueCreate.title }),
   }),
@@ -157,8 +192,8 @@ export const parameters = {
   "issue.list": Schema.Struct({
     closed: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.closed })),
     limit: Schema.optionalKey(Schema.Finite.annotate({ description: params.issueList.limit })),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.project })),
-    status: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.status })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.repo })),
+    status: Schema.optionalKey(statusField(params.issueList.status)),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.text })),
     wantsOwner: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.wantsOwner })),
   }),
@@ -171,43 +206,43 @@ export const parameters = {
   "issue.status.update": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.agent })),
     id: Schema.String.annotate({ description: params.issueNumber }),
-    status: Schema.String.annotate({ description: params.issueStatus.status }),
+    status: statusField(params.issueStatus.status),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.text })),
   }).annotate({ requiredOrder: ["id", "status"] }),
   "issue.update": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.agent })),
     criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.issueUpdate.criteria })),
-    deliver: Schema.optionalKey(Schema.Literals(["change", "branch", "answer"]).annotate({ description: params.issueUpdate.deliver })),
+    deliver: Schema.optionalKey(Schema.Literals(DeliverableValues).annotate({ description: params.issueUpdate.deliver })),
     description: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.description })),
     id: Schema.String.annotate({ description: params.issueNumber }),
-    priority: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.priority })),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.project })),
+    priority: Schema.optionalKey(priorityField(params.issueUpdate.priority)),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.repo })),
     title: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.title })),
   }),
   "memory.create": Schema.Struct({
     agent: Schema.String.annotate({ description: params.agentProfile }),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.memoryCreate.project })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.memoryCreate.repo })),
     text: Schema.String.annotate({ description: params.memoryCreate.text }),
   }),
   "memory.search": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.agentProfile })),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.projectFolder })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.repoFolder })),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.searchText })),
   }),
-  "project.list": Schema.Struct({}),
+  "repo.list": Schema.Struct({}),
   ...pkmParameters,
   "cron.create": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.cron.agent })),
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.cron.channel })),
     name: Schema.String.annotate({ description: params.cron.name }),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.cron.project })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.cron.repo })),
     text: Schema.String.annotate({ description: params.cron.text }),
     tz: Schema.optionalKey(Schema.String.annotate({ description: params.cron.tz })),
     when: Schema.Struct({
       at: Schema.optionalKey(Schema.String.annotate({ description: params.cron.at })),
       days: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.Finite))),
       expr: Schema.optionalKey(Schema.String.annotate({ description: params.cron.expr })),
-      kind: Schema.Literals(["once", "every", "daily", "weekly", "cron"]),
+      kind: Schema.Literals(CronWhenKindValues),
       minutes: Schema.optionalKey(Schema.Finite),
       time: Schema.optionalKey(Schema.String.annotate({ description: "HH:MM" })),
     }).annotate({ description: params.cron.when }),
@@ -270,11 +305,11 @@ export const sessionParameters = {
     title: Schema.optionalKey(Schema.String.annotate({ description: params.issueSplit.title })),
   }),
   "memory.create": Schema.Struct({
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.sessionMemory.createProject })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.sessionMemory.createRepo })),
     text: Schema.String.annotate({ description: params.sessionMemory.text }),
   }),
   "memory.search": Schema.Struct({
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.sessionMemory.searchProject })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.sessionMemory.searchRepo })),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.searchText })),
   }),
   "session.list": Schema.Struct({}),
@@ -340,9 +375,9 @@ export type SessionInput<K extends keyof typeof sessionParameters> = (typeof ses
 export interface Caller {
   /** The profile: an orchestrator's own id for an orchestrator. */
   readonly agent: string;
-  /** The session working as agent, and the project it works in; both empty for the orchestrator. */
+  /** The session working as agent, and the repo it works in; both empty for the orchestrator. */
   readonly session: string;
-  readonly project: string;
+  readonly repo: string;
   /** The channel the orchestrator is answering. A session's default is its own issue thread, which the channel service knows. */
   readonly here: string;
   /** The profile the owner picked for this input, if any: dispatch prefers it. */

@@ -95,7 +95,7 @@ export const InventoryEntry: Codec<T.InventoryEntry> = Schema.Struct({
   name: Schema.String,
   description: Schema.String,
   source: Schema.String,
-  enabled: Schema.optionalKey(Schema.Boolean),
+  enabled: Schema.Boolean,
 });
 
 export const RuntimeSettings: Codec<T.RuntimeSettings> = Schema.Struct({

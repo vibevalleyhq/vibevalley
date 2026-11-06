@@ -1,5 +1,5 @@
 import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes";
-import type { Commit, UncommittedItem } from "../project/shapes";
+import type { Commit, UncommittedItem } from "../repo/shapes";
 import type { IssueAnswer, PhaseResting, Run, Session } from "../session/shapes";
 
 export interface Conflict {
@@ -8,7 +8,7 @@ export interface Conflict {
 }
 
 export interface Changes {
-  project: string;
+  repo: string;
   base: string;
   branch?: string;
   commits: Commit[];
@@ -61,9 +61,13 @@ export interface IssueMandate {
   autoSubmitPr: boolean;
 }
 
+export const IssueReportMemoryScopeValues = ["repo", "all"] as const;
+/** Where a memory written from a report holds: this repo, or every repo. */
+export type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];
+
 export interface IssueReportMemory {
   text: string;
-  scope: "project" | "all";
+  scope: IssueReportMemoryScope;
 }
 
 export interface IssueReport {
@@ -90,7 +94,7 @@ export interface Issue {
   mandate: IssueMandate;
   constraints?: IssueConstraints;
   conflict?: Conflict;
-  project?: string;
+  repo?: string;
   assignments: Assignment[];
   priority: Priority;
   rank?: number;
@@ -102,7 +106,7 @@ export interface Issue {
   /** Canceled: why. */
   canceled?: IssueCanceled;
   parent?: IssueId;
-  blockedBy: string[];
+  blockedBy: IssueId[];
   cron?: string;
   status: IssueStatus;
   moves: IssueStatus[];
@@ -220,7 +224,7 @@ export type Priority = (typeof PriorityValues)[number];
 export interface IssueUpdate {
   title?: string;
   description?: string;
-  project?: string;
+  repo?: string;
   agent?: string;
   priority?: Priority;
   criteria?: string[];
@@ -243,7 +247,7 @@ export interface IssueRequest {
   blockedBy?: IssueId[];
   constraints?: IssueConstraints;
   description?: string;
-  project?: string;
+  repo?: string;
   agent?: string;
   priority?: Priority;
   deliver?: Deliverable;
@@ -255,11 +259,11 @@ export interface IssueRequest {
 }
 
 /** What an issue delivers: a change, a change kept on its branch for the owner to take in, or an answer (on the issue). */
-export const DeliverableValues = ["change", "branch", "answer"] as const;
+export const DeliverableValues = ["change", "branch", "answer", "pull_request"] as const;
 export type Deliverable = (typeof DeliverableValues)[number];
 
-/** What a completed issue delivered: its branch merged into the project's main branch, into its parent issue's branch, by a pull request, its branch kept unmerged, or nothing (no change, or an answer). */
-export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "kept", "none"] as const;
+/** What a completed issue delivered: its branch merged into the repo's main branch, into its parent issue's branch, by a pull request, its branch kept unmerged, or nothing (no change, or an answer). */
+export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
 export type Delivery = (typeof DeliveryValues)[number];
 
 /** Why an issue is not done: the owner closed it, or its workplace was lost. */
@@ -284,7 +288,7 @@ export interface IssueFilter {
   status?: IssueStatus;
   /** Words that the title or description all contain. */
   text?: string;
-  project?: string;
+  repo?: string;
   /** At most this many; none is all. */
   limit?: number;
   closed?: boolean;

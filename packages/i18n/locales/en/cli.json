@@ -25,9 +25,8 @@
     "key": "A request key: sent again with the same key, it is done once",
     "limit": "At most this many",
     "priority": "The priority",
-    "project": "The project's name",
-    "reply": "Reply to this message number",
     "repo": "The GitHub repository's address",
+    "reply": "Reply to this message number",
     "text": "Words the title or description contains",
     "timeout": "Wait at most this many seconds",
     "closed": "Only closed ones (done, canceled)",
@@ -61,7 +60,7 @@
     "doctor": "See this machine's farm at once: which one was found, whether it answers, the desktop app, runtimes, the model's key, the LAN listener",
     "pkm": {
       "capture": "Note something in today's journal (--page: on that page); no words reads stdin, lines split into blocks by indentation",
-      "radar": "What wants a look: the inbox, projects left alone, what is overdue",
+      "radar": "What wants a look: the inbox, repos left alone, what is overdue",
       "journalShow": "A day's journal (--day for another), made when there is none",
       "pageEdit": "Edit a whole page's file in $EDITOR; it is saved when the editor closes",
       "pageExport": "A page as Markdown to read: refs read out, remarks taken off",
@@ -93,7 +92,7 @@
       "edit": "Turn a scheduled task on or off"
     },
     "issue": {
-      "edit": "Change an issue's title, description, project, profile or priority",
+      "edit": "Change an issue's title, description, repo, profile or priority",
       "list": "List issues: one a line, number first",
       "show": "Show an issue: its status, where it is now, its questions and criteria, the commands it takes now (--watch follows it first)",
       "comment": "Comment on an issue: the answer when its helper asks, read by it in its next round otherwise",
@@ -110,9 +109,9 @@
       "list": "List a profile's memories",
       "search": "Search the memories; every profile's when none is named"
     },
-    "project": {
-      "list": "List projects",
-      "create": "Make a project (--repo clones it from GitHub)"
+    "repo": {
+      "list": "List repos",
+      "create": "Make a repo (--repo clones it from GitHub)"
     },
     "runtime": {
       "list": "List the runtimes: installed or not, their versions",
@@ -294,7 +293,10 @@
       "timeline": {
         "get": "A ticket's milestones and what all its rounds cost"
       },
-      "update": "Update a ticket"
+      "update": "Update a ticket",
+      "conversation": {
+        "get": "The issue conversation location"
+      }
     },
     "lan": {
       "device": {
@@ -319,7 +321,7 @@
       "delete": "Delete one of a profile's memories",
       "list": "List a profile's memories, from the database and its sources",
       "previewDelete": "Preview deleting a memory: say what would go, without deleting",
-      "recall": "What a profile would recall for this project and text",
+      "recall": "What a profile would recall for this repo and text",
       "search": "Search memories by words, every profile's if none is named"
     },
     "orchestrator": {
@@ -361,7 +363,7 @@
         "save": "Create a page, or set the properties and folder of the one with that title"
       },
       "radar": {
-        "get": "The review radar: inbox pages, stale projects, overdue blocks"
+        "get": "The review radar: inbox pages, stale repos, overdue blocks"
       },
       "scan": "Read again every note file changed on disk",
       "search": "Search the notes",
@@ -371,19 +373,22 @@
         "update": "Write a page anew from its edited text; refused if the file changed meanwhile"
       }
     },
-    "project": {
+    "repo": {
       "activity": {
-        "get": "A project's commits: how many per day, and by whom"
+        "get": "A repo's commits: how many per day, and by whom"
       },
-      "create": "Create a project",
+      "create": "Create a repo",
       "language": {
-        "list": "The languages a project is written in"
+        "list": "The languages a repo is written in"
       },
-      "list": "List every project",
+      "list": "List every repo",
       "template": {
-        "list": "A project's ticket templates, filled in for its stack"
+        "list": "A repo's ticket templates, filled in for its stack"
       },
-      "validate": "The first thing creating a project would refuse, without creating it"
+      "validate": "The first thing creating a repo would refuse, without creating it",
+      "pr": {
+        "submit": "Publish an existing local branch"
+      }
     },
     "runtime": {
       "list": "List every machine",
@@ -481,8 +486,8 @@
         "about": "Journals: a page a day"
       }
     },
-    "project": {
-      "about": "Projects: the git repositories in the working folder"
+    "repo": {
+      "about": "Repos: the git repositories in the working folder"
     },
     "runtime": {
       "about": "Machines: the coding agents on this computer"
@@ -531,7 +536,7 @@
     "cronName": "The scheduled task's name",
     "issue": "An issue: its number (12 or #12)",
     "page": "A page: its title, slug or an alias",
-    "projectName": "The new project's name",
+    "repoName": "The new repo's name",
     "session": "The helper's id, such as w3",
     "chatRuntime": "A runtime (claude, codex…); none for VibeValley's own agent",
     "appPath": "A page of the desktop app, such as /issues/12; the start page if none",
@@ -596,8 +601,8 @@
     "pkmRadar": {
       "about": "What wants a look"
     },
-    "projectList": {
-      "about": "Which projects there are"
+    "repoList": {
+      "about": "Which repos there are"
     },
     "runtimeList": {
       "about": "Which runtimes are installed"
@@ -666,7 +671,7 @@
       "about": "Turn c1 off for now"
     },
     "issueCreate": {
-      "run": "vibevalley issue create 'fix the login page' --project web --agent docs --criterion 'an expired session goes back to login'",
+      "run": "vibevalley issue create 'fix the login page' --repo web --agent docs --criterion 'an expired session goes back to login'",
       "about": "Write an issue for docs"
     },
     "issueDelete": {
@@ -730,8 +735,8 @@
       "run": "vibevalley pkm search 'reading list'",
       "about": "Find “reading list” in the notes"
     },
-    "projectCreate": {
-      "about": "Clone a project from GitHub"
+    "repoCreate": {
+      "about": "Clone a repo from GitHub"
     },
     "runtimeRefresh": {
       "about": "Look again after installing a new Claude Code"
@@ -770,5 +775,8 @@
   },
   "agent": {
     "deleted": "Deleted the profile {agent}"
-  }
+  },
+  "repo.publish": "Publish an existing branch as a GitHub PR or GitLab MR",
+  "repo.check": "Repository check: {check}",
+  "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run"
 }

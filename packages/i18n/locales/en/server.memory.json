@@ -11,9 +11,9 @@
   "forgetThere": "Memories in {source} are deleted there",
   "coverage": {
     "failed": "reading failed, was canceled or timed out; this source is not included",
-    "everosAcross": "searching across projects is not supported: name a project; EverOS is not included this time",
+    "everosAcross": "searching across repos is not supported: name a repo; EverOS is not included this time",
     "everosAgent": "this search needs a profile; EverOS is not included this time",
-    "unconfirmed": "some hits' project could not be confirmed and were left out of this project's search",
+    "unconfirmed": "some hits' repo could not be confirmed and were left out of this repo's search",
     "note": "{source}: {note}"
   },
   "everosList": "EverOS memories are not listed here",

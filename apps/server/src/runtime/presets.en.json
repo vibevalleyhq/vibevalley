@@ -11,6 +11,9 @@
     "label": "",
     "blurb": "A runtime VibeValley has no look of its own for yet.",
     "look": {
+      "species": null,
+      "outfit": null,
+      "orchestrator": null,
       "build": "biped",
       "head": "rounded",
       "body": "#f1e8d8",
@@ -25,6 +28,9 @@
       "label": "Claude Code",
       "blurb": "Anthropic's command-line coding agent.",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "biped",
         "head": "rounded",
@@ -38,6 +44,9 @@
       "label": "Codex",
       "blurb": "OpenAI's coding agent, through app-server.",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "treads",
         "head": "terminal",
@@ -51,6 +60,9 @@
       "label": "opencode",
       "blurb": "An open-source terminal coding agent, through ACP.",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "biped",
         "head": "terminal",
@@ -64,6 +76,9 @@
       "label": "vibevalley",
       "blurb": "VibeValley's own agent (DeepSeek), running inside the server process.",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "hopper",
         "head": "orb",
@@ -77,6 +92,9 @@
       "label": "Pi",
       "blurb": "A coding agent SDK running inside the server process.",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "hopper",
         "head": "dome",
@@ -90,6 +108,9 @@
       "label": "Cursor",
       "blurb": "Cursor's agent SDK, running inside the server process.",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "wheel",
         "head": "saucer",
@@ -103,6 +124,9 @@
       "label": "Grok",
       "blurb": "xAI's grok CLI, through ACP.",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "wheel",
         "head": "dome",
@@ -116,6 +140,9 @@
       "label": "Kimi",
       "blurb": "Moonshot's kimi CLI, through ACP.",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "hopper",
         "head": "orb",
@@ -129,6 +156,9 @@
       "label": "Antigravity",
       "blurb": "Google's Antigravity agent, through ACP.",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "hover",
         "head": "saucer",
@@ -142,6 +172,9 @@
       "label": "DeepSeek Harness",
       "blurb": "DeepSeek's dsh, through ACP.",
       "look": {
+        "species": null,
+        "outfit": null,
+        "orchestrator": null,
         "eye": "#a6f4ff",
         "build": "treads",
         "head": "orb",

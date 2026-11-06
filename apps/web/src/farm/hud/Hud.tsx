@@ -9,7 +9,7 @@ import { yuan } from "#/base/format.ts";
 import { commands } from "#/farm/frames.ts";
 import { Phone } from "#/farm/phone/Phone.tsx";
 import { PhoneButton } from "#/farm/phone/PhoneButton.tsx";
-import { farm, farmProject, timeOfDay, useFarm } from "#/farm/store.ts";
+import { farm, farmRepo, timeOfDay, useFarm } from "#/farm/store.ts";
 import { tools } from "#/farm/tools.ts";
 import { nextClearing } from "#/farm/world/plots.ts";
 import { webRoutes } from "#/farm/world/world.ts";
@@ -55,10 +55,9 @@ function HudTap(props: { label: string; testid?: string; onClick: () => void; se
 /** Where the sign's post stands, in the village's pixels: on the grass right of the mast (village.ldtk: its top at 18, 73). */
 const signFoot = { x: 44, y: 104 };
 
-/** The project sign by the mast: whose farm this is (every plot here is that project's); a click goes back to the projects' map to enter another island. */
-function ProjectSign() {
+function RepoSign() {
   const screen = useFarm((s) => s.screen);
-  const project = farmProject;
+  const repo = farmRepo;
   const router = useRouter();
   const foot = () => screen()?.toScreen(signFoot);
   return (
@@ -66,20 +65,20 @@ function ProjectSign() {
       {(at) => (
         <button
           type="button"
-          data-testid="project-sign"
-          data-key={project()}
-          aria-label={t("web.farm.sign.label", { project: project() || t("web.farm.sign.noProject") })}
+          data-testid="repo-sign"
+          data-key={repo()}
+          aria-label={t("web.farm.sign.label", { repo: repo() || t("web.farm.sign.noRepo") })}
           title={t("web.farm.sign.hint")}
           onClick={() => {
             playSound("open");
-            router.navigate("/projects");
+            router.navigate("/repos");
           }}
           class="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-full cursor-pointer flex-col items-center font-pixel hover:brightness-110"
           style={{ left: `${at().x}px`, top: `${at().y}px` }}
         >
           <span class="flex max-w-40 flex-col items-center border-2 border-bark-900 bg-bark-500 px-2.5 py-1 text-cream-50 shadow-px-shade">
-            <span class="text-[10px] leading-3 text-cream-200">{t("web.farm.sign.project")}</span>
-            <span class="max-w-full truncate text-[13px] leading-4">{project() || t("web.farm.sign.noProject")}</span>
+            <span class="text-[10px] leading-3 text-cream-200">{t("web.farm.sign.repo")}</span>
+            <span class="max-w-full truncate text-[13px] leading-4">{repo() || t("web.farm.sign.noRepo")}</span>
           </span>
           <span class="w-1.5 bg-bark-900" style={{ height: `${Math.round((screen()?.scale ?? 3) * 5)}px` }} />
         </button>
@@ -93,7 +92,7 @@ export function Hud() {
   return (
     <div class="pointer-events-none absolute inset-0" aria-label={t("web.farm.hud.label")}>
       <Overlay />
-      <ProjectSign />
+      <RepoSign />
       <Show when={shown()}>
         {(box) => (
           <div class="absolute" style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px` }}>
@@ -200,8 +199,8 @@ function TopRight() {
           {t("web.farm.hud.tree")}
         </HudCard>
       </HudTap>
-      <Show when={webRoutes.includes("/projects")}>
-        <HudTap label={t("web.farm.hud.mapHint")} testid="hud-map" onClick={() => go("/projects")}>
+      <Show when={webRoutes.includes("/repos")}>
+        <HudTap label={t("web.farm.hud.mapHint")} testid="hud-map" onClick={() => go("/repos")}>
           <HudCard height={top}>
             <SpriteIcon name="icon-map" size={20} />
             {t("web.farm.hud.map")}

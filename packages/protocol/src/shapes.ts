@@ -3,7 +3,7 @@ export * from "./core/shapes";
 export * from "./agent/shapes";
 export * from "./runtime/shapes";
 export * from "./memory/shapes";
-export * from "./project/shapes";
+export * from "./repo/shapes";
 export * from "./session/shapes";
 export * from "./mailbox/shapes";
 export * from "./channel/shapes";

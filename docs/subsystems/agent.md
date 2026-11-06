@@ -35,7 +35,7 @@
 - **外观确定性补齐（`withCast`）**：缺省外观按档案 `id` 哈希取模补齐，前后端 `castOf` 算法一致。
 - **十台注册农机与能力合并（`RuntimeSupport`）**：固定顺序为 `claude`、`codex`、`opencode`、`vibevalley`、`pi`、`cursor`、`grok`、`kimi`、`antigravity`、`dsh`；`support` 合并 oar `refusedSessionOptions` 与 `presets.json` 限制。
 - **预检与开会话共用同一套规则（`agentProblems`）**：合并农机默认设置与档案覆盖后，统一检查农机安装、额度预算与选项兼容性；预检与派活调同一函数，唤醒已有 `Session` 时不重复检查启停与派活预算。
-- **探测代数防倒退**：完整探测分配递增序号，慢返回的旧探测不覆盖新缓存；探测结果经 `/api/v1/live` 的 `Runtime` 窄事件推送，不进 `WorkspaceState`。
+- **探测代数防倒退**：完整探测分配递增序号，慢返回的旧探测不覆盖新缓存；探测结果经 `/api/v1/live` 的 `Runtime` 窄事件推送，不进 `SpaceState`。
 
 ## 内置的模板
 
@@ -78,7 +78,7 @@
 - **派活针对档案而非直接针对农机**：同一台农机配不同人设、模型、技能和 `worktree` 策略即构成不同工种，且同一档案可并发派出多个 `Session`。
 - **模板按需安装，更新需主人确认**：不在首次开机强灌全部帮工，避免未装农机报错；更新模板只覆盖职责与人设，不覆盖主人的模型与环境设置。
 - **本机已装技能只读展示，不复制进 `config.json`**：各农机自带技能由农机按需加载，避免双份副本失步。
-- **农机观察走 `/api/v1/live` 窄流，不进 `WorkspaceState`**：避免每次 token 花费变动都触发全局状态折叠与广播。
+- **农机观察走 `/api/v1/live` 窄流，不进 `SpaceState`**：避免每次 token 花费变动都触发全局状态折叠与广播。
 
 ## 还没做的
 

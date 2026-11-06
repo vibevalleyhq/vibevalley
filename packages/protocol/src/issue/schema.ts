@@ -2,9 +2,10 @@ import { Schema } from "effect";
 
 import type { Codec } from "../codec";
 import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
-import { Commit, UncommittedItem } from "../project/schema";
+import { Commit, UncommittedItem } from "../repo/schema";
 import { IssueAnswer, PhaseResting, Session } from "../session/schema";
 import * as T from "../shapes";
+import { IssueReportMemoryScopeValues } from "./shapes";
 
 export const Conflict: Codec<T.Conflict> = Schema.Struct({
   base: Schema.String,
@@ -111,7 +112,7 @@ export const IssueMandate: Codec<T.IssueMandate> = Schema.Struct({
   autoSubmitPr: Schema.Boolean,
 });
 
-export const IssueReportMemory: Codec<T.IssueReportMemory> = Schema.Struct({ text: Schema.String, scope: Schema.Literals(["project", "all"]) });
+export const IssueReportMemory: Codec<T.IssueReportMemory> = Schema.Struct({ text: Schema.String, scope: Schema.Literals(IssueReportMemoryScopeValues) });
 
 export const IssueReport: Codec<T.IssueReport> = Schema.Struct({
   summary: Schema.String,
@@ -137,7 +138,7 @@ const issueFields = {
   description: Schema.String,
   mandate: IssueMandate,
   conflict: Schema.optionalKey(Conflict),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   assignments: Schema.mutable(Schema.Array(Assignment)),
   priority: Priority,
   rank: Schema.optionalKey(Schema.Finite),
@@ -147,7 +148,7 @@ const issueFields = {
   delivered: Schema.optionalKey(Delivery),
   canceled: Schema.optionalKey(IssueCanceled),
   parent: Schema.optionalKey(IssueId),
-  blockedBy: Schema.mutable(Schema.Array(Schema.String)),
+  blockedBy: Schema.mutable(Schema.Array(IssueId)),
   cron: Schema.optionalKey(Schema.String),
   status: IssueStatus,
   moves: Schema.mutable(Schema.Array(IssueStatus)),
@@ -177,7 +178,7 @@ export const AppliedIssue: Codec<T.AppliedIssue> = Schema.Struct({ ...issueField
 export const IssueUpdate: Codec<T.IssueUpdate> = Schema.Struct({
   title: Schema.optionalKey(Schema.String),
   description: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   agent: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
@@ -194,7 +195,7 @@ export const ChangedFile: Codec<T.ChangedFile> = Schema.Struct({
 });
 
 export const Changes: Codec<T.Changes> = Schema.Struct({
-  project: Schema.String,
+  repo: Schema.String,
   base: Schema.String,
   branch: Schema.optionalKey(Schema.String),
   commits: Schema.mutable(Schema.Array(Commit)),
@@ -221,7 +222,7 @@ export const IssueRequest: Codec<T.IssueRequest> = Schema.Struct({
   parent: Schema.optionalKey(IssueId),
   blockedBy: Schema.optionalKey(Schema.mutable(Schema.Array(IssueId))),
   description: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   agent: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
   deliver: Schema.optionalKey(Deliverable),
@@ -244,7 +245,7 @@ export const IssueReviewRequest: Codec<T.IssueReviewRequest> = Schema.Struct({
 export const IssueFilter: Codec<T.IssueFilter> = Schema.Struct({
   status: Schema.optionalKey(IssueStatus),
   text: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   limit: Schema.optionalKey(Schema.Finite),
   closed: Schema.optionalKey(Schema.Boolean),
   wantsOwner: Schema.optionalKey(Schema.Boolean),

@@ -16,9 +16,9 @@
       "label": "Machines",
       "hint": "The coding agents on this computer"
     },
-    "projects": {
-      "label": "Projects",
-      "hint": "An island for each project"
+    "repos": {
+      "label": "Repos",
+      "hint": "An island for each repo"
     },
     "catalog": {
       "label": "Catalog",

@@ -20,7 +20,7 @@ window.fetch = fakeFetch(window.fetch.bind(window));
 queries.setDefaultOptions({ queries: { retry: false, staleTime: Infinity, refetchInterval: false } });
 const fresh = () => {
   queries.clear();
-  for (const key of ["agents", "agent-templates", "projects", "runtimes"]) queries.setQueryData([key], []);
+  for (const key of ["agents", "agent-templates", "repos", "runtimes"]) queries.setQueryData([key], []);
 };
 
 const still = (): Router => {

@@ -52,7 +52,7 @@ export const agentCommand = Command.make("agent").pipe(
               workdir: "",
               worktree: true,
               tags: [],
-              look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
+              look: { orchestrator: null, species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
             }),
           said: agentLine,
         }),

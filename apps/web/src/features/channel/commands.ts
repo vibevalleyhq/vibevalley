@@ -31,8 +31,8 @@ async function once<T>(line: string, make: (requestKey: string) => Promise<T>): 
 
 const run: Record<CommandName, (text: string, at: CommandPlace) => Promise<CommandDone>> = {
   issue: async (title, at) => {
-    const project = at.channel?.project;
-    const made = await once(`issue\n${project ?? ""}\n${title}`, (requestKey) => api.issue.create({ title, requestKey, ...(project ? { project } : {}) }));
+    const repo = at.channel?.repo;
+    const made = await once(`issue\n${repo ?? ""}\n${title}`, (requestKey) => api.issue.create({ title, requestKey, ...(repo ? { repo } : {}) }));
     return { say: t("web.channel.commands.done.issue", { n: made.number }) };
   },
   remember: async (text, at) => {

@@ -1,5 +1,7 @@
 import type { ActorKind } from "../common/shapes";
 
+export const CronWhenKindValues = ["once", "every", "daily", "weekly", "cron"] as const;
+
 /** Told apart by `kind`. */
 export type CronWhen = CronWhenOnce | CronWhenEvery | CronWhenDaily | CronWhenWeekly | CronWhenExpr;
 
@@ -9,7 +11,7 @@ export interface Cron {
   text: string;
   channel: string;
   agent?: string;
-  project?: string;
+  repo?: string;
   when: CronWhen;
   tz: string;
   enabled: boolean;
@@ -29,7 +31,7 @@ export interface CronRequest {
   text: string;
   channel?: string;
   agent?: string;
-  project?: string;
+  repo?: string;
   when: CronWhen;
   tz?: string;
 }

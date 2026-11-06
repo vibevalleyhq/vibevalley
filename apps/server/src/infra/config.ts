@@ -15,7 +15,7 @@ export class ServerConfig extends Context.Service<
     /** VIBEVALLEY_HOME, or ~/.vibevalley; the YAML file is in it, so it cannot be set there. */
     readonly home: string;
     readonly version: string;
-    /** The farm's own folder: projects/<name> are its projects, worktrees/ the issues' worktrees. */
+    /** The space's own folder: repos/<name> are its repositories, worktrees/ the issues' worktrees, pkm/ the notes. */
     readonly workRoot: string;
     /** Empty: home/db. "memory" keeps it in memory. */
     readonly db: string;
@@ -41,12 +41,12 @@ export class ServerConfig extends Context.Service<
     readonly cron: { readonly tickMs: number };
     /** stallSeconds: quiet this long, a session is shown as stuck; trajectoryDays: a gone session's steps are deleted after it (0 or less keeps them). */
     readonly session: { readonly stallSeconds: number; readonly trajectoryDays: number };
-    readonly project: { readonly maxSessions: number; readonly checkTimeoutSeconds: number };
-    readonly github: { readonly prProjects: readonly string[]; readonly prPollSeconds: number };
+    readonly repo: { readonly maxSessions: number; readonly checkTimeoutSeconds: number };
+    readonly github: { readonly prRepos: readonly string[]; readonly prPollSeconds: number };
     readonly chat: { readonly noticeBatchMs: number; readonly retryWakeMs: number };
     /** An OTLP collector (http://127.0.0.1:4318): the spans, logs and metrics go there; none when empty. */
     readonly otlp: { readonly url: string };
-    /** The notes' vault (pkm/): its PARA folders and journals. Empty: home/pkm. */
+    /** The notes' vault (pkm/): its PARA folders and journals. Empty: <workRoot>/pkm. */
     readonly pkm: { readonly root: string };
   }
 >()("vibevalley/ServerConfig") {}
@@ -72,8 +72,8 @@ export function defaults(home = homedir()): ServerConfig["Service"] {
     patrol: { heartbeatMinutes: 10 },
     cron: { tickMs: 20_000 },
     session: { stallSeconds: 240, trajectoryDays: 30 },
-    project: { maxSessions: 3, checkTimeoutSeconds: 1200 },
-    github: { prProjects: [], prPollSeconds: 180 },
+    repo: { maxSessions: 3, checkTimeoutSeconds: 1200 },
+    github: { prRepos: [], prPollSeconds: 180 },
     chat: { noticeBatchMs, retryWakeMs: 3_000 },
     otlp: { url: "" },
     pkm: { root: "" },
@@ -123,14 +123,14 @@ const keys = (d: ServerConfig["Service"]) =>
       Keys.all({ stallSeconds: number("stall_seconds", d.session.stallSeconds), trajectoryDays: number("trajectory_days", d.session.trajectoryDays) }),
       "session",
     ),
-    project: Keys.nested(
+    repo: Keys.nested(
       Keys.all({
-        maxSessions: number("max_sessions", d.project.maxSessions),
-        checkTimeoutSeconds: number("check_timeout_seconds", d.project.checkTimeoutSeconds),
+        maxSessions: number("max_sessions", d.repo.maxSessions),
+        checkTimeoutSeconds: number("check_timeout_seconds", d.repo.checkTimeoutSeconds),
       }),
-      "project",
+      "repo",
     ),
-    github: Keys.nested(Keys.all({ prProjects: list("pr_projects"), prPollSeconds: number("pr_poll_seconds", d.github.prPollSeconds) }), "github"),
+    github: Keys.nested(Keys.all({ prRepos: list("pr_repos"), prPollSeconds: number("pr_poll_seconds", d.github.prPollSeconds) }), "github"),
     chat: Keys.nested(
       Keys.all({ noticeBatchMs: number("notice_batch_ms", d.chat.noticeBatchMs), retryWakeMs: number("retry_wake_ms", d.chat.retryWakeMs) }),
       "chat",
@@ -193,8 +193,7 @@ export const loadConfig = Effect.fnUntraced(function* (
   };
 });
 
-/** The notes' vault. */
-export const pkmDir = (c: ServerConfig["Service"]) => c.pkm.root || join(c.home, "pkm");
+export const pkmDir = (c: ServerConfig["Service"]) => c.pkm.root || join(c.workRoot, "pkm");
 
 /** The database's folder, or "memory". */
 export function dbDir(c: ServerConfig["Service"]): string {
@@ -206,8 +205,11 @@ export function dbDir(c: ServerConfig["Service"]): string {
 /** The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. */
 export const serverAddress = (c: ServerConfig["Service"]) => `127.0.0.1:${c.port}`;
 
-/** Where the projects are: each folder in it is one. */
-export const projectsDir = (c: ServerConfig["Service"]) => join(c.workRoot, "projects");
+/** Where the space's repositories are: each folder in it is one. */
+export const reposDir = (c: ServerConfig["Service"]) => join(c.workRoot, "repos");
+
+/** Where the issues' worktrees are: <repo>.<issue number> under it. */
+export const worktreesDir = (c: ServerConfig["Service"]) => join(c.workRoot, "worktrees");
 
 /** A profile's folder for conversation logs, archives and evals; memory rows live in the database. */
 export const agentHome = (c: ServerConfig["Service"], agent: string) => join(c.home, "agent", agent);

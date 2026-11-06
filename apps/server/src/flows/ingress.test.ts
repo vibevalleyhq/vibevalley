@@ -42,11 +42,11 @@ it.live("regression: the mandate grants its worker access to the original trigge
       text: "original requirement",
       at: 1,
     }))!;
-    const item = yield* issues.add({ title: "authorized work", project: "mandate", agent: "lab" }, explicitMandate(source.id));
+    const item = yield* issues.add({ title: "authorized work", repo: "mandate", agent: "lab" }, explicitMandate(source.id));
     const started = yield* testIssues(issues).start(item.id, "");
     yield* until(() => inputs.some((input) => input.includes(source.card.readUri)), "the worker given the original source");
     expect((yield* resource.read(started.session!, { uri: source.card.readUri })).text).toContain("original requirement");
-    const other = yield* issues.add({ title: "unrelated work", project: "unrelated", agent: "lab" }, explicitMandate());
+    const other = yield* issues.add({ title: "unrelated work", repo: "unrelated", agent: "lab" }, explicitMandate());
     const second = yield* testIssues(issues).start(other.id, "");
     expect(yield* Effect.flip(resource.read(second.session!, { uri: source.card.readUri }))).toMatchObject({ _tag: "ResourceError" });
   }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -106,7 +106,7 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
     const mailbox = yield* Mailbox;
     const chat = yield* Channel;
     yield* (yield* Agent).save(lab());
-    const issue = yield* issues.add({ title: "work", project: "machine-trigger", agent: "lab" });
+    const issue = yield* issues.add({ title: "work", repo: "machine-trigger", agent: "lab" });
     const started = yield* issues.start(issue.id, "");
     const session = started.session!;
     yield* until(() => sessions.sessionOf(session)?.phase._tag === "done", "the worker waiting");
@@ -189,7 +189,7 @@ it.live("regression: issue input waits without a session and an owner followup r
     const ingress = yield* Ingress;
     const sql = yield* SqlClient.SqlClient;
     yield* (yield* Agent).save(lab());
-    const issue = yield* issues.add({ title: "subscription work", project: "source-routing", agent: "lab" });
+    const issue = yield* issues.add({ title: "subscription work", repo: "source-routing", agent: "lab" });
     yield* mailbox.subscribe(issue.id, ["github:source-routing#7"]);
     const ownerEvent = {
       source: "connector" as const,

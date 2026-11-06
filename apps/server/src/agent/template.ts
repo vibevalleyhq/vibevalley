@@ -110,6 +110,9 @@ export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplat
       worktree: item.worktree ?? item.role === "worker",
       look: {
         ...look,
+        species: look.species ?? null,
+        outfit: look.outfit ?? null,
+        orchestrator: look.orchestrator ?? null,
         build: look.build ?? "biped",
         head: look.head ?? "rounded",
         body: look.body ?? "",

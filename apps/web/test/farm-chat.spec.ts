@@ -46,7 +46,7 @@ const scripted: Agent = {
   workdir: "",
   worktree: true,
   tags: [],
-  look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
+  look: { orchestrator: null, species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
 };
 
 test("a sentence said in the farm chat shows in the window, and the orchestrator answers it", async ({ page, api }) => {
@@ -127,10 +127,10 @@ test("the channel menu makes a channel and shows it; folding keeps it, Esc folds
 // A dispatch note is one line until opened, truncated inside its column: a long one once ran past the window's edge.
 test("a dispatch note stays inside its column", async ({ page, api }) => {
   const fox = await api.agent.create(scripted);
-  const project = await api.project.create({ name: "clock" });
+  const repo = await api.repo.create({ name: "clock" });
   const made = await api.issue.create({
     title: "add a make-up clock-in button that asks for a reason and tells the team lead, and keep it inside its column",
-    project: project.name,
+    repo: repo.name,
     agent: fox.id,
   });
   await api.issue.status.update({ id: made.id, status: "todo" });

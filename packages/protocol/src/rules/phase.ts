@@ -9,15 +9,15 @@ export const spanText = (ms: number) =>
   ms < 60_000 ? t("shared.seconds", { n: Math.max(1, Math.round(ms / 1000)) }) : t("shared.minutes", { n: Math.round(ms / 60_000) });
 export const isBusy = (h: Pick<Session, "phase">) => h.phase._tag === "working";
 
-/** How many more may start working now: on the whole farm (workspace at once), and in the project (perProject at once, 0 for no limit of its own). */
-export function roomLeft(sessions: readonly Pick<Session, "id" | "project" | "phase">[], project: string, workspace: number, perProject: number, except = "") {
+/** How many more may start working now: on the whole farm (space at once), and in the repo (perRepo at once, 0 for no limit of its own). */
+export function roomLeft(sessions: readonly Pick<Session, "id" | "repo" | "phase">[], repo: string, space: number, perRepo: number, except = "") {
   const busy = sessions.filter((h) => isBusy(h) && h.id !== except);
-  const inProject = busy.filter((h) => h.project === project).length;
+  const inRepo = busy.filter((h) => h.repo === repo).length;
   return {
-    farm: Math.max(0, workspace - busy.length),
-    project: perProject > 0 ? Math.max(0, perProject - inProject) : Infinity,
+    farm: Math.max(0, space - busy.length),
+    repo: perRepo > 0 ? Math.max(0, perRepo - inRepo) : Infinity,
     busy: busy.length,
-    inProject,
+    inRepo,
   };
 }
 

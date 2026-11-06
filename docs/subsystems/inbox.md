@@ -9,7 +9,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 从 `WorkspaceState` 实时派生 `InboxEntry[]`，预填手机、通知、托盘与电话播报文案 | 工单阶段与帮工状态本身的计算（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)） |
+| 从 `SpaceState` 实时派生 `InboxEntry[]`，预填手机、通知、托盘与电话播报文案 | 工单阶段与帮工状态本身的计算（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)） |
 | 识别刚出现的事项（`freshOf`），向语音模块广播 `Inbox.news` | 手机响铃动画、系统通知弹窗与语音合成播报（[农场的皮](docs/subsystems/farm.md)、[客户端](docs/subsystems/app.md)、[语音](docs/subsystems/voice.md)） |
 | 周期性巡查（`patrol`）：将超过宽限期未处理的事项交给频道管家 | 管家如何向主人转达巡查提醒（[管家](docs/subsystems/orchestrator.md)） |
 | 人类交接门禁（`toOwner`）：判定哪些消息可外推给连接器及何时撤回 | 连接器平台的实际发送与退避重试（[频道](docs/subsystems/channel.md)） |
@@ -40,7 +40,7 @@
 | `cron-ask` | 管家创建的定时任务处于 `pending` 等待主人同意 | — |
 
 - **纯函数实时派生，不落库**：
-  - `InboxEntry[]` 直接从 `WorkspaceState` 算出，放入每帧 `StateFrame.inbox`。
+  - `InboxEntry[]` 直接从 `SpaceState` 算出，放入每帧 `StateFrame.inbox`。
   - 每条记录具有稳定 ID，附带 `who` 与预填好的多端文案 `words`（`label`、`title`、`body`、`tray`）。
   - 原生子工单成功完成后自动合入父分支，不单独产生 `review` 条目。
 - **启动已有事项不响铃（`freshOf`）**：服务端启动 `prime` 与页面首次打开均先记下存量 ID；仅后续新出现的 ID 触发响铃与通知，且同一 ID 只响一次。

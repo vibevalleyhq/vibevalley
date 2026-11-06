@@ -16,13 +16,13 @@ import { ownersLanguage } from "#/base/prompts.ts";
 import { Channel, type OrchestratorNews } from "#/channel/channel.ts";
 import { Cron } from "#/cron/cron.ts";
 import { nextRun } from "#/cron/when.ts";
-import { agentHome, projectsDir, ServerConfig } from "#/infra/config.ts";
+import { agentHome, reposDir, ServerConfig } from "#/infra/config.ts";
 import { localeMinute } from "#/infra/time.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import type { Picked } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Pkm } from "#/pkm/pkm.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
 import { runtimeLabel } from "#/runtime/presets.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 import { type AgentHost, type Caller, type NotAnswered } from "#/session/host.ts";
@@ -37,7 +37,6 @@ import { makeResponses } from "./response.ts";
 import { deepseekModel, intake, orchestratorInboxLines, quotaText, situationDelta, type Source } from "./situation.ts";
 
 const keepEvents = 1000;
-/** The owner's project pages the situation shows; notesRecalled is how many note blocks an input's words call up. */
 const notesShown = 8;
 const notesRecalled = 3;
 /** A run cut off longer ago than this is left: what it was for has likely moved on. */
@@ -105,7 +104,7 @@ const make = (options: OrchestratorOptions = {}) =>
     const store = yield* Agent;
     const settings = yield* Setting;
     const runtimes = yield* Runtime;
-    const projects = yield* Project;
+    const repos = yield* Repo;
     const notes = yield* Pkm;
     const run = yield* Session;
     const chat = yield* Channel;
@@ -123,7 +122,7 @@ const make = (options: OrchestratorOptions = {}) =>
     const toolsFor = (id: string) => (current: () => Route) =>
       tool.orchestrator(() => {
         const at = current();
-        return { agent: id, session: "", project: "", here: at.channel, picked: at.agent ?? "", envelope: at.envelope, actor: orchestrator(at.owner ?? false) };
+        return { agent: id, session: "", repo: "", here: at.channel, picked: at.agent ?? "", envelope: at.envelope, actor: orchestrator(at.owner ?? false) };
       });
 
     /** One orchestrator: its own host (conversation, queue, run), home, model, and what it was last shown and told. */
@@ -177,7 +176,7 @@ const make = (options: OrchestratorOptions = {}) =>
                 },
                 inputType: "orchestratorInput",
                 home,
-                cwd: projectsDir(config),
+                cwd: reposDir(config),
                 // The default orchestrator's prefix is the one its evals hold; another says who it is after it.
                 instructions: systemPrompt + agentPrompt + (id === defaultOrchestrator || !profile ? "" : identityNote(profile.name, profile.persona)),
                 llm: llmOf,
@@ -235,13 +234,13 @@ const make = (options: OrchestratorOptions = {}) =>
           const head = channelLine(c);
           return head + "\n" + (theirs.length > 0 ? theirs.join("\n") : situationWords.noHelpers);
         });
-        const all = yield* projects.list();
-        const folders = all.length > 0 ? situationWords.projects(all.map((p) => p.name)) : situationWords.noProjects;
+        const all = yield* repos.list();
+        const folders = all.length > 0 ? situationWords.repos(all.map((p) => p.name)) : situationWords.noRepos;
         const working = (yield* notes.list()).pages.filter((p) => p.tier === "project").slice(0, notesShown);
         return situationWords.whole(
-          projects.root,
+          repos.root,
           folders,
-          situationWords.notes(working.map((p) => situationWords.noteProject(p.title, p.tldr, p.open))),
+          situationWords.notes(working.map((p) => situationWords.noteRepo(p.title, p.tldr, p.open))),
           sessions.join("\n"),
           byChannel.join("\n"),
           here.direct ? situationWords.direct(here.target) : here.target,
@@ -332,7 +331,7 @@ const make = (options: OrchestratorOptions = {}) =>
       let note = "";
       const a = picked.agent ? store.agent(picked.agent) : undefined;
       if (a) note += lineWords.pickedAgent(a.name);
-      if (picked.project) note += lineWords.pickedProject(picked.project);
+      if (picked.repo) note += lineWords.pickedRepo(picked.repo);
       return note;
     };
 

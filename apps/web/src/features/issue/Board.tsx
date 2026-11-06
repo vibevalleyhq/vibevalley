@@ -8,7 +8,7 @@ import { Icon } from "#/ui/Icon.tsx";
 import { Segmented } from "#/ui/Segmented.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
-import { type BoardCard, cardAgent, cardLook, cardMove, cardProject, closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./cards";
+import { type BoardCard, cardAgent, cardLook, cardMove, cardRepo, closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "./cards";
 import { laneOrder, type Ordering } from "./display";
 import { useIssues, useNameOf } from "./history";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
@@ -180,7 +180,7 @@ function CardView(props: {
   const issues = useIssues();
   const look = () => cardLook(props.card, nameOf(), issues(), Date.now());
   const [before, setBefore] = createSignal(false);
-  const where = () => [look().number, cardProject(props.card)].filter(Boolean).join(" · ");
+  const where = () => [look().number, cardRepo(props.card)].filter(Boolean).join(" · ");
   const loud = () => {
     const pr = look().priority;
     return pr === "urgent" || pr === "high" ? pr : undefined;

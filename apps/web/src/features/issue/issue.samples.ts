@@ -90,7 +90,7 @@ export const acts = {
 } satisfies Record<string, IssueAction>;
 
 export const sampleChanges: Changes = {
-  project: "vibevalley",
+  repo: "vibevalley",
   base: "main",
   branch: "issue-18-login",
   behind: 0,

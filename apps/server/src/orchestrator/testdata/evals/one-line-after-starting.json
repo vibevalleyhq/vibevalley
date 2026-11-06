@@ -52,7 +52,7 @@
           "arguments": {
             "title": "登录页加「记住我」",
             "description": "勾上后 token 存 30 天，不勾就关浏览器失效；登录相关的测试要过",
-            "project": "clock-in",
+            "repo": "clock-in",
             "start": true
           }
         }

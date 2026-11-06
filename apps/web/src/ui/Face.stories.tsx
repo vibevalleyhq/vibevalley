@@ -6,7 +6,17 @@ import { stories, story } from "@vibevalley/stories";
 import { AgentFace, OrchestratorFace, OwnerFace } from "./Face";
 
 const runtimes = ["claude", "codex", "pi", "cursor", "opencode", "kimi", "grok", "antigravity", "dsh"];
-const lookOf = (species: Species): Look => ({ species, outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" });
+const lookOf = (species: Species): Look => ({
+  species,
+  outfit: "farmer",
+  orchestrator: null,
+  build: "biped",
+  head: "rounded",
+  body: "",
+  trim: "",
+  hat: "",
+  eye: "",
+});
 const looks = ["farmer", "auntie", "foreman", "gardener", "grandpa", "robot"];
 
 export default stories({

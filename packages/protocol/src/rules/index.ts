@@ -13,4 +13,4 @@ export * from "./artifact";
 export * from "./display";
 export * from "./channel";
 export * from "./pkm";
-export * from "./project";
+export * from "./repo";

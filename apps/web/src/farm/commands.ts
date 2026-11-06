@@ -27,8 +27,8 @@ interface FarmCommands {
   /** Stops one at work; asks one not at work to leave. */
   shovel(s: Session): Promise<void>;
   stop(s: Session): Promise<void>;
-  /** `station`: the plot it was sown on. `project`: the one chosen on the sowing form. */
-  plant(text: string, sendKey: string, o?: { station?: number; agent?: string; project?: string }): Promise<void>;
+  /** `station`: the plot it was sown on. `repo`: the one chosen on the sowing form. */
+  plant(text: string, sendKey: string, o?: { station?: number; agent?: string; repo?: string }): Promise<void>;
   /** The pointer's tool, target and hint, read from one frame. */
   aim(bed: Bed): PlotAim;
   /** Acts on a click; a tool that does not apply says why over the bed. */
@@ -86,7 +86,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
       if (!said) return;
       const id = frame()?.state.chat?.channels.find((c) => c.default)?.id;
       if (!id) return;
-      await api.channel.message.send(omitUndefined({ id, text: said, station: o.station, agent: o.agent, project: o.project, sendKey }));
+      await api.channel.message.send(omitUndefined({ id, text: said, station: o.station, agent: o.agent, repo: o.repo, sendKey }));
     },
     aim: (bed) => aimAt(bed, farmState().tool),
     async act({ bed, tool, session: pointed }) {

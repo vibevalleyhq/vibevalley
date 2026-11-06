@@ -9,7 +9,7 @@ import { check, committed, type Expect, casesIn, isInput, kinds, orchestratorToo
 
 import { noResult } from "./prompts.ts";
 
-const call = assistantMessage([toolCall("issue_create", { title: "加个 README", project: "demo", start: true }, "c1")]);
+const call = assistantMessage([toolCall("issue_create", { title: "加个 README", repo: "demo", start: true }, "c1")]);
 const turn: BrainMessage[] = [
   call,
   { role: "toolResult", toolCallId: "c1", toolName: "issue_create", content: [{ type: "text", text: "派了" }], isError: false, timestamp: 0 },
@@ -22,8 +22,8 @@ describe("the orchestrator's evals", () => {
     const passed = new Set<string>();
     const cases: [Expect, BrainMessage[], boolean][] = [
       [{ kind: "called", tool: "issue_create" }, turn, true],
-      [{ kind: "called", tool: "issue_create", argContains: `"project":"demo"` }, turn, true],
-      [{ kind: "called", tool: "issue_create", argContains: `"project":"notes"` }, turn, false],
+      [{ kind: "called", tool: "issue_create", argContains: `"repo":"demo"` }, turn, true],
+      [{ kind: "called", tool: "issue_create", argContains: `"repo":"notes"` }, turn, false],
       [{ kind: "called", tool: "issue_create", argLacks: `"start":true` }, turn, false],
       [{ kind: "called", tool: "issue_create", argLacks: `"draft":true` }, turn, true],
       [{ kind: "called", tool: "task" }, turn, false],

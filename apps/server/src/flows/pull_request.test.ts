@@ -11,10 +11,12 @@ import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
 import { owner } from "#/base/actor.ts";
+import { Channel } from "#/channel/channel.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
+import { repository } from "#/repo/repository.ts";
 import { Resource } from "#/resource/resource.ts";
 import { Session } from "#/session/session.ts";
 import { gitIn } from "#/testing/git.ts";
@@ -32,17 +34,16 @@ const quiet = (cwd: string, ...args: string[]) => {
 };
 
 describe("a pull request", () => {
-  // In a project that merges by pull request, done pushes the branch and opens one. the issue waits in review.
-  for (const ending of ["MERGED", "CLOSED"] as const) {
+  for (const ending of ["MERGED", "CLOSED", "ACCEPTED", "SUBMITTED"] as const) {
     it.live(`merges by PR, and closes when the PR is ${ending.toLowerCase()}`, () => {
       const base = testConfig();
       const config = {
         ...base,
         db: join(base.home, "db"),
-        github: { ...base.github, prProjects: ["clock"] },
+        github: { ...base.github, prRepos: ["clock"] },
       };
       const work = config.workRoot;
-      const path = join(work, "projects", "clock");
+      const path = join(work, "repos", "clock");
       const bare = join(work, "origin.git");
       let creates = 0;
       let pushes = 0;
@@ -57,8 +58,9 @@ describe("a pull request", () => {
           const ok = (out: string) => ({ out, ok: true, missing: false });
           if (args[0] === "--version") return ok("gh version 2.80.0");
           if (args[0] === "auth") return ok("Logged in to github.com account gardener (keyring)");
-          if (args[0] === "repo") return ok(`{"viewerPermission":"WRITE"}`);
-          if (args[0] === "pr" && args[1] === "list") return ok("[]");
+          if (args[0] === "repo") return ok(`{"viewerPermission":"WRITE","defaultBranchRef":{"name":"main"}}`);
+          if (args[0] === "pr" && args[1] === "list")
+            return ok(creates > 0 ? '[{"url":"https://github.com/test/clock/pull/7","number":7,"isCrossRepository":false,"state":"OPEN"}]' : "[]");
           if (args[0] === "pr" && args[1] === "create") {
             creates++;
             for (const word of ["--head", branch, "--base", "main", "--title", issue!.title]) expect(args).toContain(word);
@@ -150,7 +152,15 @@ describe("a pull request", () => {
         });
       const hooks = {
         gh,
-        push: (cwd: string, b: string) => Effect.sync(() => (pushes++, quiet(cwd, "push", "-u", "origin", b))),
+        publication: {
+          tip: () => repository(path).head,
+          fetch: () => Effect.void,
+          push: (cwd: string, _url: string, branch: string, sha: string) =>
+            Effect.andThen(
+              Effect.sync(() => pushes++),
+              repository(cwd).push(bare, branch, sha),
+            ),
+        },
         fetch: (cwd: string, b: string) => Effect.sync(() => quiet(cwd, "fetch", bare, b)),
       };
       let ready = false;
@@ -176,7 +186,7 @@ describe("a pull request", () => {
           await handoff();
         },
       });
-      const before = farm({ config, projects: hooks, runtime });
+      const before = farm({ config, repoHooks: hooks, runtime });
       let id = "";
       let cwd = "";
       return Effect.gen(function* () {
@@ -184,11 +194,11 @@ describe("a pull request", () => {
           const w = yield* watch;
           const issues = yield* Issue;
           const sessions = yield* Session;
-          const projects = yield* Project;
+          const repos = yield* Repo;
           const run = Effect.runPromiseWith(yield* Effect.context());
           handoff = () => run(sessions.report(id, { summary: "ready for review", questions: [], checks: [], remember: [], prSubmit: false }));
           yield* (yield* Agent).save(lab());
-          issue = yield* issues.add({ title: "写版本A", project: "clock", agent: "lab" }, explicitMandate("", true));
+          issue = yield* issues.add({ title: "写版本A", repo: "clock", agent: "lab" }, explicitMandate("", true));
           yield* issues.start(issue.id, "");
           yield* until(() => ready, "the working branch committed");
           issue = yield* issues.get(issue.id);
@@ -196,17 +206,30 @@ describe("a pull request", () => {
           [branch, cwd] = [sessions.sessionOf(id)!.branch!, sessions.cwdOf(id)!];
           git(work, "init", "--bare", bare);
           git(path, "remote", "add", "origin", "https://github.com/test/clock.git");
-          git(path, "remote", "set-url", "--push", "origin", bare);
           const main = git(path, "rev-parse", "main");
-          yield* projects.refreshGitHub();
+          yield* repos.refreshGitHub();
           const running = sessions.runOf(id);
           expect(sessions.sessionOf(id)?.phase._tag).toBe("working");
-          yield* issues.submitPullRequest(id);
+          if (ending !== "SUBMITTED") yield* issues.submitPullRequest(id);
           expect(sessions.sessionOf(id)?.phase._tag).toBe("working");
           expect(sessions.runOf(id)).toBe(running);
-          expect((yield* issues.get(issue.id)).pullRequest?.state).toBe("open");
+          expect((yield* issues.get(issue.id)).pullRequest?.state).toBe(ending === "SUBMITTED" ? undefined : "open");
+          if (ending === "ACCEPTED" || ending === "SUBMITTED") yield* issues.edit(issue.id, { deliver: "pull_request" }, owner);
           release();
           yield* w.nextReport;
+          if (ending === "ACCEPTED" || ending === "SUBMITTED") {
+            if (ending === "ACCEPTED") writeFileSync(join(cwd, "uncommitted.txt"), "retain this work");
+            const accepted = yield* issues.setStatus(issue.id, "done", "", "", owner);
+            expect([accepted.status, accepted.delivered, accepted.pullRequest?.state]).toEqual(["done", "submitted", "open"]);
+            expect(existsSync(join(cwd, "uncommitted.txt"))).toBe(ending === "ACCEPTED");
+            expect(git(path, "rev-parse", "main")).toBe(main);
+            state = "MERGED";
+            yield* issues.refreshPullRequests;
+            const refreshed = yield* issues.get(issue.id);
+            expect([refreshed.status, refreshed.pullRequest?.state]).toEqual(["done", "merged"]);
+            expect(existsSync(join(cwd, "uncommitted.txt"))).toBe(ending === "ACCEPTED");
+            return;
+          }
           issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
           expect(issue.pullRequest).toMatchObject({
             number: 7,
@@ -220,14 +243,20 @@ describe("a pull request", () => {
           yield* w.nextReport;
           issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
           expect([creates, pushes]).toEqual([1, 3]);
+          const chat = yield* Channel;
+          const thread = yield* chat.issueThread(issue.id, issue.title);
+          expect(
+            (yield* chat.history(thread)).filter((message) => message.kind === "notice" && message.text.includes("https://github.com/test/clock/pull/7")),
+          ).toHaveLength(1);
           expect(git(bare, "rev-parse", branch)).toBe(git(cwd, "rev-parse", "HEAD"));
         }).pipe(Effect.scoped, Effect.provide(before.layer));
 
-        const after = farm({ config, projects: hooks });
+        if (ending === "ACCEPTED" || ending === "SUBMITTED") return;
+        const after = farm({ config, repoHooks: hooks });
         yield* Effect.gen(function* () {
           const issues = yield* Issue;
           const sessions = yield* Session;
-          yield* (yield* Project).refreshGitHub();
+          yield* (yield* Repo).refreshGitHub();
           const restored = yield* issues.get(issue!.id);
           expect(restored.pullRequest?.number).toBe(7);
           const ingress = yield* Ingress;
@@ -239,7 +268,7 @@ describe("a pull request", () => {
             threads: [`issue:${restored.id}`, "github:clock#7"],
             text: "review-bot[bot] CHANGES_REQUESTED\nround 1",
             at: 1,
-            meta: { project: "clock", pr: 7, kind: "review", botRound: 1, botRoundKey: "review-bot[bot]:review:R1" },
+            meta: { repo: "clock", pr: 7, kind: "review", botRound: 1, botRoundKey: "review-bot[bot]:review:R1" },
           });
           yield* ingress.refreshGitHub;
           yield* ingress.refreshGitHub;

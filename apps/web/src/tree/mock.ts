@@ -16,8 +16,8 @@ export interface MemoryItem {
   readonly body: string;
   /** The helper profile whose memory it is. */
   readonly agent: string;
-  /** null: for every project. */
-  readonly project: string | null;
+  /** null: for every repo. */
+  readonly repo: string | null;
   /** When it was written, ms. */
   readonly at: number;
   readonly recalled: number;
@@ -57,7 +57,7 @@ export interface MemoryTree {
   readonly stage: TreeStage;
   readonly nextStageIn?: number;
   readonly agents: readonly MemoryAgent[];
-  readonly projects: readonly string[];
+  readonly repos: readonly string[];
   readonly items: readonly MemoryItem[];
   readonly links: readonly MemoryLink[];
 }
@@ -70,7 +70,7 @@ const agentsZh: readonly [MemoryAgent, ...MemoryAgent[]] = [
   { id: "owl", name: "Grok" },
 ];
 
-const projectsZh = ["vibevalley", "字幕面板", "官网", "billing"] as const;
+const reposZh = ["vibevalley", "字幕面板", "官网", "billing"] as const;
 
 const notesZh: readonly [string, ...string[]] = [
   "表名用单数：issue、issue_assignment",
@@ -101,7 +101,7 @@ const casesZh: readonly [MemoryCase, ...MemoryCase[]] = [
   { intent: "官网首页换成像素风", approach: "复用 public/pixel 的图", insight: "图片放大用整数倍，不然像素会糊" },
   { intent: "billing 补退款", approach: "先补黄金数据，再改规则", insight: "退款金额要从原单的分算，不能反推" },
   { intent: "修 SSE 断线不重连", approach: "加心跳和指数退避", insight: "代理会吞掉空闲超过 60 秒的连接" },
-  { intent: "管家派活时带上项目", approach: "在工具描述里写明默认项目", insight: "改了工具描述要跑 evals" },
+  { intent: "管家派活时带上仓库", approach: "在工具描述里写明默认仓库", insight: "改了工具描述要跑 evals" },
   { intent: "农场的时钟和真实时间对齐", approach: "日钟的速度可调，默认 600 秒一天", insight: "测试里把速度设成 0" },
   { intent: "手机壳扫码配对", approach: "一台设备一把钥匙", insight: "配对页不能放 /mcp" },
 ];
@@ -124,7 +124,7 @@ const agentsEn: readonly [MemoryAgent, ...MemoryAgent[]] = [
   { id: "owl", name: "Grok" },
 ];
 
-const projectsEn = ["vibevalley", "subtitle-panel", "site", "billing"] as const;
+const reposEn = ["vibevalley", "subtitle-panel", "site", "billing"] as const;
 
 const notesEn: readonly [string, ...string[]] = [
   "Table names are singular: issue, issue_assignment",
@@ -172,8 +172,8 @@ const casesEn: readonly [MemoryCase, ...MemoryCase[]] = [
     insight: "Proxies drop connections idle for over 60 seconds",
   },
   {
-    intent: "The orchestrator sends work with its project",
-    approach: "Name the default project in the tool's description",
+    intent: "The orchestrator sends work with its repo",
+    approach: "Name the default repo in the tool's description",
     insight: "Changing a tool description means running the evals",
   },
   { intent: "The farm's clock keeps real time", approach: "The day clock's speed is set, 600 seconds a day by default", insight: "Tests set the speed to 0" },
@@ -207,7 +207,7 @@ const day = 86_400_000;
 /** The made-up tree; `stage` from the address (`/tree?stage=3`) lets the owner see each stage. */
 export function mockTree(now: number, stage?: TreeStage): MemoryTree {
   const en = currentLocale() === "en";
-  const [agents, projects, notes, cases, skills] = en ? [agentsEn, projectsEn, notesEn, casesEn, skillsEn] : [agentsZh, projectsZh, notesZh, casesZh, skillsZh];
+  const [agents, repos, notes, cases, skills] = en ? [agentsEn, reposEn, notesEn, casesEn, skillsEn] : [agentsZh, reposZh, notesZh, casesZh, skillsZh];
   const rnd = random(20261022);
   const pick = <T>(list: readonly [T, ...T[]]): T => list[Math.floor(rnd() * list.length)] ?? list[0];
   const since = now - 46 * day;
@@ -222,7 +222,7 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
         kind: "leaf" as const,
         body: pick(notes),
         agent: pick(agents).id,
-        project: rnd() < 0.25 ? null : pick(projects),
+        repo: rnd() < 0.25 ? null : pick(repos),
         at: written,
         recalled,
         recalledAt: recalled > 0 ? written + rnd() * (now - written) : undefined,
@@ -247,7 +247,7 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
         kind: "fruit" as const,
         body: c.insight,
         agent: pick(agents).id,
-        project: pick(projects),
+        repo: pick(repos),
         at: written,
         recalled,
         recalledAt: recalled > 0 ? written + rnd() * (now - written) : undefined,
@@ -263,7 +263,7 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
       kind: "fruit" as const,
       body: cases[0].insight,
       agent: "fox",
-      project: projects[1],
+      repo: repos[1],
       at: now - 6 * day,
       recalled: 4,
       recalledAt: now - 40_000,
@@ -277,7 +277,7 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
       kind: "seed",
       body: name,
       agent: pick(agents).id,
-      project: null,
+      repo: null,
       at: since + ((i + 1) / (skills.length + 1)) * (now - since),
       recalled: Math.floor(rnd() * 20),
       fading: false as const,
@@ -320,7 +320,7 @@ export function mockTree(now: number, stage?: TreeStage): MemoryTree {
     stage: stage ?? 5,
     nextStageIn: (stage ?? 5) < 5 ? 24 : undefined,
     agents,
-    projects,
+    repos,
     items,
     links,
   });

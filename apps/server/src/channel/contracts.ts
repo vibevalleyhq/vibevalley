@@ -46,7 +46,7 @@ export function toMessage(row: MsgRow): T.ChatMessage {
     mentions: meta.mentions ?? [],
     ...(meta.session ? { session: meta.session } : {}),
     ...(meta.run ? { run: meta.run } : {}),
-    ...(meta.outcome ? { outcome: meta.outcome } : {}),
+    outcome: meta.outcome ?? null,
     ...(meta.spent ? { spent: meta.spent } : {}),
     spoken: meta.spoken ?? false,
     ...(row.send_key && row.sender_id === ownerId ? { sendKey: row.send_key } : {}),
@@ -68,7 +68,7 @@ export interface Info {
   readonly id: string;
   readonly name: string;
   readonly description: string;
-  readonly project: string;
+  readonly repo: string;
   readonly default: boolean;
 }
 
@@ -122,11 +122,11 @@ interface EnvelopeResource {
   readonly around: readonly T.ChatMessage[];
 }
 
-export const infoOf = (row: Pick<ChannelRow, "id" | "name" | "description" | "project" | "is_default">): Info => ({
+export const infoOf = (row: Pick<ChannelRow, "id" | "name" | "description" | "repo" | "is_default">): Info => ({
   id: row.id,
   name: row.name ?? "",
   description: row.description ?? "",
-  project: row.project ?? "",
+  repo: row.repo ?? "",
   default: row.is_default,
 });
 
@@ -197,6 +197,7 @@ export interface ChannelService {
   /** The thread under a channel's message, opened if it has none. */
   readonly threadUnder: (id: T.MessageId) => Effect.Effect<string, ApiError>;
   readonly issueThread: (issue: string, title: string, channel?: string) => Effect.Effect<string, ApiError>;
+  readonly issueThreadId: (issue: string) => Effect.Effect<string | null>;
   readonly issueMessages: (issue: string) => Effect.Effect<InboxMessage[]>;
   readonly search: (text: string, channel?: string) => Effect.Effect<T.MessageHit[], ApiError>;
   readonly attach: (upload: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError>;
@@ -215,7 +216,7 @@ export interface ChannelService {
   /** An orchestrator's words (from: its profile id), one whole message each: it shows once said in full. */
   readonly orchestratorSays: (channel: string, text: string, run: string, from: string) => Effect.Effect<void>;
   /** code names the kind, for dropping repeats. */
-  readonly notice: (channel: string, text: string, code: string) => Effect.Effect<void>;
+  readonly notice: (channel: string, text: string, code: string, sendKey?: string) => Effect.Effect<void>;
   readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
   /** The places who has not read all of, the newest first, by their addresses. */
   readonly unread: (who: string) => Effect.Effect<T.ChannelUnread[]>;
@@ -238,9 +239,8 @@ export interface ChannelService {
    * Subscribed before it returns. */
   readonly ownerInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: T.ChatMessage }>, never, Scope.Scope>;
   readonly channels: () => Effect.Effect<Info[]>;
-  readonly openChannel: (name: string, description: string, project: string) => Effect.Effect<Info, ApiError>;
-  /** description undefined or empty: as it was; project undefined: as it was, empty: none. */
-  /** Each field given changes: a channel's description, project, name, group and place; a thread's title. */
+  readonly openChannel: (name: string, description: string, repo: string) => Effect.Effect<Info, ApiError>;
+  /** description undefined or empty: as it was; repo undefined: as it was, empty: none. */
   readonly updateChannel: (id: string, upd: T.ChannelUpdate) => Effect.Effect<void, ApiError>;
   /** Archived or not; as it already is, nothing changes. */
   readonly archive: (id: string, on: boolean) => Effect.Effect<void, ApiError>;

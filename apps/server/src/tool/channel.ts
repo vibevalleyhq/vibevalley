@@ -89,8 +89,8 @@ export const channelTools = Effect.gen(function* () {
   const channelCreate = tool(
     "channel.create",
     Effect.fn("Tool.channelCreate")(function* (p: Orchestrator<"channel.create">) {
-      const c = yield* chat.openChannel(p.name, p.description ?? "", p.project ?? "");
-      return answers.openChannel.opened(c.name, c.project);
+      const c = yield* chat.openChannel(p.name, p.description ?? "", p.repo ?? "");
+      return answers.openChannel.opened(c.name, c.repo);
     }),
   );
 
@@ -101,7 +101,7 @@ export const channelTools = Effect.gen(function* () {
       if (!c) return yield* refuse(answers.channelSettings.noChannel(p.id));
       yield* chat.updateChannel(c.id, {
         ...(p.description !== undefined ? { description: p.description } : {}),
-        ...(p.project !== undefined ? { project: p.project } : {}),
+        ...(p.repo !== undefined ? { repo: p.repo } : {}),
       });
       return answers.channelSettings.updated(c.name);
     }),

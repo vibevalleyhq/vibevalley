@@ -1,15 +1,6 @@
 import { type Accessor, createContext, createStore, onSettled, reconcile, useContext } from "solid-js";
 
-import {
-  defaultOrchestrator,
-  type LiveEvent,
-  livePath,
-  readStream,
-  type StateFrame,
-  statePath,
-  type WorkspaceState,
-  type WorkspaceView,
-} from "@vibevalley/protocol";
+import { defaultOrchestrator, type LiveEvent, livePath, readStream, type StateFrame, statePath, type SpaceState, type SpaceView } from "@vibevalley/protocol";
 
 import { createExternal } from "#/base/external.ts";
 
@@ -95,17 +86,17 @@ export function createFrames(): Frames {
 export const useFrames = () => useContext(FramesContext);
 
 /** The folded state. undefined until the first frame. */
-export function useCore(): () => WorkspaceView | undefined {
+export function useCore(): () => SpaceView | undefined {
   const f = useFrames();
   return () => f.frame?.state;
 }
 
 export type OrchestratorMood = "idle" | "listening" | "thinking" | "speaking";
 
-export const orchestratorSession = (state: WorkspaceState | undefined, agent = defaultOrchestrator) =>
+export const orchestratorSession = (state: SpaceState | undefined, agent = defaultOrchestrator) =>
   state?.sessions.find((session) => session.role === "orchestrator" && session.agent === agent);
 
-export function orchestratorMood(state: WorkspaceState | undefined, agent = defaultOrchestrator): OrchestratorMood {
+export function orchestratorMood(state: SpaceState | undefined, agent = defaultOrchestrator): OrchestratorMood {
   const phase = orchestratorSession(state, agent)?.phase;
   if (!phase || phase._tag === "closed") return "idle";
   if (phase._tag !== "working") return "listening";

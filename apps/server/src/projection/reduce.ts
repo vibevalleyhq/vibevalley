@@ -9,12 +9,12 @@ import { sessionOf, withSession } from "#/session/roster.ts";
 const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 
 /** A fact that changes nothing says so (false), and is not sent. facts about sessions not on the farm change nothing. */
-export function reduce(state: T.WorkspaceState, fact: T.Fact): [T.WorkspaceState, boolean] {
+export function reduce(state: T.SpaceState, fact: T.Fact): [T.SpaceState, boolean] {
   const [next, changed] = fold(state, fact);
   return changed && (next.issues !== state.issues || next.sessions !== state.sessions) ? [withIssueStatuses(next), true] : [next, changed];
 }
 
-function fold(state: T.WorkspaceState, f: T.Fact): [T.WorkspaceState, boolean] {
+function fold(state: T.SpaceState, f: T.Fact): [T.SpaceState, boolean] {
   switch (f.type) {
     case "callChanged": {
       if (state.call === f.state && state.callReason === f.reason) return [state, false];

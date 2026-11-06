@@ -19,10 +19,10 @@ import * as qr from "#db/channel_read_cursor.sql.ts";
 
 import { type SayMore, type Spoken, type Meta, metaOf, metaText, toMessage, inboxMore, type ChannelService } from "./contracts.ts";
 import { channelDirectory } from "./directory.ts";
+import { channelHub, lastMax, lineOf } from "./hub.ts";
 import { mentionOf, parseChatTarget } from "./mentions.ts";
 import { parseSearch } from "./messages.ts";
 import { channelStreams } from "./mutations.ts";
-import { channelRecords, lastMax, lineOf } from "./records.ts";
 import { directTalk } from "./talk.ts";
 import { sessionThreads } from "./threads.ts";
 import { channelWriting } from "./writing.ts";
@@ -50,7 +50,7 @@ export class Channel extends Context.Service<Channel, ChannelService>()("vibeval
 const make = Effect.gen(function* () {
   const sessions = yield* Session;
   const mailbox = yield* Mailbox;
-  const r = yield* channelRecords;
+  const r = yield* channelHub;
   const dir = yield* channelDirectory(r);
   const w = yield* channelWriting(r);
   const th = yield* sessionThreads(r, w);
@@ -279,6 +279,9 @@ const make = Effect.gen(function* () {
       });
       return written.thread;
     }, locked),
+    issueThreadId: Effect.fn("Channel.issueThreadId")(function* (issue) {
+      return yield* Effect.sync(() => model.threadOfSubject("issue", issue) ?? null);
+    }),
     issueMessages: Effect.fn("Channel.issueMessages")(function* (issue) {
       const thread = model.threadOfSubject("issue", issue);
       if (!thread) return [];
@@ -429,8 +432,8 @@ const make = Effect.gen(function* () {
       yield* locked(Effect.andThen(seat(from), write({ channel, from, kind: "chat", text, meta: run ? { run } : {} })));
     }, bestEffort("chat: the orchestrator's words")),
     notice: Effect.fn("Channel.notice")(
-      function* (channel, text, code) {
-        return yield* write({ channel, from: "system", kind: "notice", text, meta: { code } });
+      function* (channel, text, code, sendKey = "") {
+        return yield* write({ channel, from: "system", kind: "notice", text, meta: { code }, sendKey });
       },
       locked,
       bestEffort("chat: notice"),

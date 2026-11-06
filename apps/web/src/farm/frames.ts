@@ -6,18 +6,17 @@ import { farmOf } from "@vibevalley/protocol/rules";
 import { type Frames, frames, rawFrame } from "#/infra/frame.ts";
 
 import { farmCommands } from "./commands";
-import { farmProject } from "./store";
+import { farmRepo } from "./store";
 
-// One project's farm: the frame with only that project's sessions on it (protocol's farmOf), for what the farm page draws and does with its beds.
-const made = new WeakMap<StateFrame, { project: string; frame: StateFrame }>();
+const made = new WeakMap<StateFrame, { repo: string; frame: StateFrame }>();
 
-/** The same frame and project give back the same object, so a reader comparing frames sees no change. */
-export function farmFrameOf(frame: StateFrame | undefined, project: string): StateFrame | undefined {
+/** The same frame and repo give back the same object, so a reader comparing frames sees no change. */
+export function farmFrameOf(frame: StateFrame | undefined, repo: string): StateFrame | undefined {
   if (!frame) return undefined;
   const was = made.get(frame);
-  if (was?.project === project) return was.frame;
-  const scoped = { ...frame, state: { ...frame.state, sessions: frame.state.sessions.filter((h) => farmOf(h) === project) } };
-  made.set(frame, { project, frame: scoped });
+  if (was?.repo === repo) return was.frame;
+  const scoped = { ...frame, state: { ...frame.state, sessions: frame.state.sessions.filter((h) => farmOf(h) === repo) } };
+  made.set(frame, { repo, frame: scoped });
   return scoped;
 }
 
@@ -39,12 +38,12 @@ export const localEffects = {
 /** The frame as sent, with only this farm's sessions: for the canvas, the sounds and the effects. */
 export function rawFarmFrame(): Accessor<StateFrame | undefined> {
   const raw = rawFrame();
-  return createMemo(() => farmFrameOf(raw(), farmProject()));
+  return createMemo(() => farmFrameOf(raw(), farmRepo()));
 }
 
 /** The frames store with only this farm's sessions, for the farm's DOM (FarmPage provides it to the parts that draw the beds. */
-export function createFarmFrames(outer: Frames, project: Accessor<string>): Frames {
-  const sessions = createMemo(() => outer.frame?.state.sessions.filter((h) => farmOf(h) === project()) ?? [], {
+export function createFarmFrames(outer: Frames, repo: Accessor<string>): Frames {
+  const sessions = createMemo(() => outer.frame?.state.sessions.filter((h) => farmOf(h) === repo()) ?? [], {
     equals: (a, b) => a.length === b.length && a.every((h, i) => h === b[i]),
   });
   const frame = createMemo(() => {
@@ -67,4 +66,4 @@ export function createFarmFrames(outer: Frames, project: Accessor<string>): Fram
 }
 
 /** The farm's commands, over this farm's part of the frame the page has now. */
-export const commands = farmCommands(() => farmFrameOf(frames.get().frame, farmProject()));
+export const commands = farmCommands(() => farmFrameOf(frames.get().frame, farmRepo()));

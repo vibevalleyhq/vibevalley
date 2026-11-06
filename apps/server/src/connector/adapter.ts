@@ -4,20 +4,23 @@ import type { ConnectorID, ConnectorLogin, ConnectorState } from "@vibevalley/pr
 
 import { messageOf } from "#/base/errors.ts";
 
-export interface Inbound {
+export const Inbound = Schema.Struct({
   /** Each is taken once. */
-  readonly id: string;
-  readonly from: string;
-  readonly text: string;
+  id: Schema.String,
+  from: Schema.String,
+  text: Schema.String,
   /** WeChat's context token, QQ's message id; "" for none. */
-  readonly reply: string;
+  reply: Schema.String,
   /** The app's id of the message this one quotes; "" for none. */
-  readonly quoted: string;
-}
+  quoted: Schema.String,
+});
+export type Inbound = typeof Inbound.Type;
+
+const AppFailedKindValues = ["restricted", "stale", "failed"] as const;
 
 /** Why an app did not do what it was asked. The message is what the owner sees. */
 export class AppFailed extends Schema.TaggedError<AppFailed, { readonly brand: unique symbol }>()("AppFailed", {
-  kind: Schema.Literals(["restricted", "stale", "failed"]),
+  kind: Schema.Literals(AppFailedKindValues),
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}

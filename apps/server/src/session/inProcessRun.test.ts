@@ -46,7 +46,7 @@ const records = Effect.gen(function* () {
       name: "管家",
       runtime: "vibevalley",
       brief: "",
-      project: null,
+      repo: null,
       issue: null,
       channel: null,
       hired_at: 0,

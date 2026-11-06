@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
-import { SessionId } from "../common/schema";
+import { IssueId, SessionId } from "../common/schema";
 import { doingFields } from "../session/schema";
 import * as T from "../shapes";
 
@@ -154,7 +154,7 @@ export const LedgerEntryHarvested: Codec<T.LedgerEntryHarvested> = Schema.Struct
   at: Schema.Finite,
   session: SessionId,
   agent: Schema.optionalKey(Schema.String),
-  project: Schema.String,
+  repo: Schema.String,
   runtime: Schema.String,
   commits: Schema.Finite,
   cny: Schema.optionalKey(Schema.Finite),
@@ -189,7 +189,7 @@ export const LedgerEntryReviewed: Codec<T.LedgerEntryReviewed> = Schema.Struct({
 export const LedgerEntryFamily: Codec<T.LedgerEntryFamily> = Schema.Struct({
   kind: Schema.Literal("family"),
   at: Schema.Finite,
-  issue: Schema.String,
+  issue: IssueId,
   merged: Schema.Finite,
   parallel: Schema.Boolean,
 });

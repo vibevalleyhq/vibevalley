@@ -8,11 +8,9 @@ base=$(git merge-base "$main" HEAD)
 changed=$(git diff --name-only --no-renames "$base")
 server=false
 web=false
-docs=false
 while IFS= read -r path; do
     case "$path" in apps/server/*|packages/protocol/*) server=true ;; esac
     case "$path" in apps/web/*|apps/desktop/*|packages/*) web=true ;; esac
-    case "$path" in docs/*|.agents/*|AGENTS.md|*.md) docs=true ;; esac
 done <<PATHS
 $changed
 PATHS
@@ -25,14 +23,13 @@ for key in $(env | cut -d= -f1); do
 done
 
 # The same checks AGENTS.md asks for, narrowest first: a fresh worktree may not have installed yet.
-vp install
-vp check
+vp install --frozen-lockfile
+vp check --deny-warnings
 if "$server"; then
     vp run server:check
 fi
 if "$web"; then
     vp run web:check
 fi
-if "$docs"; then
-    vp run docs:verify
-fi
+# Docs, the notes' catalog and our primitives drift with any change, not only a docs one.
+vp run docs:verify

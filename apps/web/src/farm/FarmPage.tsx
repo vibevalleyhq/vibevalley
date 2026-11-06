@@ -18,14 +18,14 @@ import { farm, useFarm } from "./store";
 import { TitleScreen } from "./title/TitleScreen";
 import { farmKeys } from "./tools";
 
-/** `project`: whose farm ("" for the sessions without a project). */
-export function FarmPage(props: { project: string }) {
+/** `repo`: whose farm ("" for the sessions without a repo). */
+export function FarmPage(props: { repo: string }) {
   const frames = useFrames();
-  const scoped = createFarmFrames(frames, () => props.project);
+  const scoped = createFarmFrames(frames, () => props.repo);
   // The farm on the page, and the one `/` opens next time.
   createEffect(
-    () => props.project,
-    (project) => farm.setProject(project),
+    () => props.repo,
+    (repo) => farm.setRepo(repo),
   );
   const raw = rawFarmFrame();
   const titleOpen = useFarm((s) => s.titleOpen);

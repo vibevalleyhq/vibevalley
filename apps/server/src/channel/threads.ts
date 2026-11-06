@@ -13,12 +13,12 @@ import * as qm from "#db/channel_message.sql.ts";
 import * as qp from "#db/channel_participant.sql.ts";
 
 import { type Meta, subjectOf, type ChannelEnvelopeRow, type SessionNews } from "./contracts.ts";
-import type { ChannelRecords } from "./records.ts";
+import type { ChannelHub } from "./hub.ts";
 import type { ChannelWriting } from "./writing.ts";
 
 const reportMax = 1500;
 
-export const sessionThreads = (r: ChannelRecords, w: ChannelWriting) =>
+export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
   Effect.gen(function* () {
     const db = yield* Db;
     const sessions = yield* Session;
@@ -68,7 +68,7 @@ export const sessionThreads = (r: ChannelRecords, w: ChannelWriting) =>
         channel: channel,
         from: by,
         kind: "dispatch",
-        text: t("server.channel.dispatch.sent", { id: h.id, name: h.name, project: h.project ?? t("server.channel.dispatch.project"), what }),
+        text: t("server.channel.dispatch.sent", { id: h.id, name: h.name, repo: h.repo ?? t("server.channel.dispatch.repo"), what }),
         meta: { session: h.id },
         thread: subject,
       });
@@ -113,7 +113,7 @@ export const sessionThreads = (r: ChannelRecords, w: ChannelWriting) =>
       run: string | undefined,
     ) {
       const w = sessionOf(id);
-      if (!w || outcome === "interrupted") return;
+      if (!w || w.refining || outcome === "interrupted") return;
       const thread = yield* threadOfSession(id);
       if (!thread) return;
       const said = outcome === "completed" ? sessions.reportOf(id) : "";

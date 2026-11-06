@@ -556,8 +556,8 @@ export function TrajectoryList(props: { agent: string }) {
                       >
                         <span class="flex flex-wrap items-center gap-2">
                           <span class="text-sm font-medium">{h().name}</span>
-                          <Show when={h().project}>
-                            <span class="text-xs text-muted">{h().project}</span>
+                          <Show when={h().repo}>
+                            <span class="text-xs text-muted">{h().repo}</span>
                           </Show>
                           <Show when={ended() === undefined}>
                             <span class="rounded bg-hat px-1.5 text-xs text-bark-900">{t("web.session.trajectory.here")}</span>

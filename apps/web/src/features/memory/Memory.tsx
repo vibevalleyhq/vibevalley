@@ -9,13 +9,13 @@ import { aria, useNow } from "#/base/dom.tsx";
 import { ago } from "#/base/format.ts";
 import { api, createRequestKey, reasonOf } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { queries, ready, useProjects, useQuery } from "#/infra/query.ts";
+import { queries, ready, useRepos, useQuery } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Quiet } from "#/ui/layout.tsx";
 
-/** Notes not tied to a project. */
+/** Notes not tied to a repo. */
 const everywhere = "*";
 
 const item = "rounded-md border border-line bg-page";
@@ -87,8 +87,8 @@ export function MemoryPanel(props: { agent: string }) {
   const sources = () => new Map((view()?.sources ?? []).map((s) => [s.name, s]));
   const notes = () => all().filter((m) => m.kind === "note");
   const done = () => all().filter((m) => m.kind === "issue");
-  const projects = () => [...new Set(all().flatMap((m) => (m.project ? [m.project] : [])))].toSorted();
-  const filtered = () => notes().filter((m) => shown() === "" || (shown() === everywhere ? m.project === undefined : m.project === shown()));
+  const repos = () => [...new Set(all().flatMap((m) => (m.repo ? [m.repo] : [])))].toSorted();
+  const filtered = () => notes().filter((m) => shown() === "" || (shown() === everywhere ? m.repo === undefined : m.repo === shown()));
   const whose = (m: Memory) =>
     m.author === "owner"
       ? t("web.memory.memory.yours")
@@ -112,7 +112,7 @@ export function MemoryPanel(props: { agent: string }) {
                 <div class="flex flex-col gap-0.5 px-3 py-2">
                   <span class="flex flex-wrap gap-2 text-xs text-muted">
                     <span class="font-medium text-ink">{sessionNameOf(m().session)}</span>
-                    <span>{m().project ?? t("web.memory.memory.allProjects")}</span>
+                    <span>{m().repo ?? t("web.memory.memory.allRepos")}</span>
                     <span>{ago(m().at, now())}</span>
                   </span>
                   <span class="text-sm">{m().text}</span>
@@ -123,16 +123,12 @@ export function MemoryPanel(props: { agent: string }) {
         </Show>
       </Section>
       <RecallPreview agent={props.agent} />
-      <WriteNote agent={props.agent} withProject />
+      <WriteNote agent={props.agent} withRepo />
       <Section title={t("web.memory.memory.notes")} count={notes().length}>
-        <Show when={projects().length > 0}>
+        <Show when={repos().length > 0}>
           <div class="flex flex-wrap gap-1">
             <For
-              each={[
-                ["", t("web.memory.memory.all")] as const,
-                [everywhere, t("web.memory.memory.allProjects")] as const,
-                ...projects().map((p) => [p, p] as const),
-              ]}
+              each={[["", t("web.memory.memory.all")] as const, [everywhere, t("web.memory.memory.allRepos")] as const, ...repos().map((p) => [p, p] as const)]}
             >
               {([value, label]) => <Pill label={label} on={shown() === value} onClick={() => setShown(value)} />}
             </For>
@@ -154,7 +150,7 @@ export function MemoryPanel(props: { agent: string }) {
                       faded={m().fading === true}
                       onForget={() => forget(m().id)}
                       meta={[
-                        m().project ?? t("web.memory.memory.allProjects"),
+                        m().repo ?? t("web.memory.memory.allRepos"),
                         whose(m()),
                         ago(m().at, now()),
                         m().recalled > 0 ? recalledText(m().recalled, m().recalledAt, now()) : t("web.memory.memory.neverRecalled"),
@@ -209,15 +205,15 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
 
 /** The pick the server would make, without counting it (memory.recall). */
 function RecallPreview(props: { agent: string }) {
-  const projectsQuery = useProjects();
-  const projects = () => ready(projectsQuery, []).map((p) => p.name);
-  const [project, setProject] = createSignal("");
+  const reposQuery = useRepos();
+  const repos = () => ready(reposQuery, []).map((p) => p.name);
+  const [repo, setRepo] = createSignal("");
   const [text, setText] = createSignal("");
-  const where = () => project() || projects()[0] || "";
+  const where = () => repo() || repos()[0] || "";
   const memory = useMemory(() => props.agent);
   const previewQuery = useQuery(() => ({
     queryKey: ["recall", props.agent, where(), text(), memory.dataUpdatedAt],
-    queryFn: () => api.memory.recall({ agent: props.agent, project: where(), text: text() }),
+    queryFn: () => api.memory.recall({ agent: props.agent, repo: where(), text: text() }),
     enabled: where() !== "",
   }));
   const preview = () => ready(previewQuery, undefined);
@@ -237,8 +233,8 @@ function RecallPreview(props: { agent: string }) {
           label={t("web.memory.memory.where")}
           placeholder={t("web.memory.memory.pick")}
           value={where()}
-          options={projects().map((p) => ({ value: p, label: p }))}
-          onChange={setProject}
+          options={repos().map((p) => ({ value: p, label: p }))}
+          onChange={setRepo}
         />
         <TextInput
           aria-label={t("web.memory.memory.words")}
@@ -247,7 +243,7 @@ function RecallPreview(props: { agent: string }) {
           onInput={(e) => setText(e.currentTarget.value)}
         />
       </div>
-      <Show when={lines().length > 0} fallback={<Quiet>{where() ? t("web.memory.memory.blank") : t("web.memory.memory.noProjects")}</Quiet>}>
+      <Show when={lines().length > 0} fallback={<Quiet>{where() ? t("web.memory.memory.blank") : t("web.memory.memory.noRepos")}</Quiet>}>
         <p class={[item, "px-3 py-2 text-sm whitespace-pre-wrap"]}>{lines().join("\n")}</p>
       </Show>
     </Section>
@@ -375,21 +371,21 @@ export function ArchivePanel(props: { agent: string }) {
   );
 }
 
-function WriteNote(props: { agent: string; withProject?: boolean }) {
+function WriteNote(props: { agent: string; withRepo?: boolean }) {
   const [text, setText] = createSignal("");
-  const [project, setProject] = createSignal("");
+  const [repo, setRepo] = createSignal("");
   const [error, setError] = createSignal<string>();
-  const projectsQuery = useProjects();
+  const reposQuery = useRepos();
   // A refusal shows under the box, where the words are; the key stays until a note went in, so a retry is that note.
   const act = createAct(setError);
   const key = createRequestKey();
   const write = async () => {
     const agent = props.agent;
     const words = text();
-    const at = props.withProject === true ? project().trim() || undefined : undefined;
+    const at = props.withRepo === true ? repo().trim() || undefined : undefined;
     setError(undefined);
     const done = await act.run(async () => {
-      await api.memory.create(omitUndefined({ agent, text: words, project: at, requestKey: key.now() }));
+      await api.memory.create(omitUndefined({ agent, text: words, repo: at, requestKey: key.now() }));
       key.used();
       await reload(agent);
       return true;
@@ -403,22 +399,22 @@ function WriteNote(props: { agent: string; withProject?: boolean }) {
         data-testid="note-input"
         aria-label={t("web.memory.memory.note")}
         rows={2}
-        placeholder={props.withProject === true ? t("web.memory.memory.noteProject") : t("web.memory.memory.noteOrchestrator")}
+        placeholder={props.withRepo === true ? t("web.memory.memory.noteRepo") : t("web.memory.memory.noteOrchestrator")}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
       />
       <div class="flex items-center gap-2 pt-1">
-        <Show when={props.withProject} fallback={<span class="flex-1" />}>
+        <Show when={props.withRepo} fallback={<span class="flex-1" />}>
           <TextInput
-            aria-label={t("web.memory.memory.project")}
+            aria-label={t("web.memory.memory.repo")}
             class="font-mono"
-            placeholder={t("web.memory.memory.projectHint")}
-            list="memory-projects"
-            value={project()}
-            onInput={(e) => setProject(e.currentTarget.value)}
+            placeholder={t("web.memory.memory.repoHint")}
+            list="memory-repos"
+            value={repo()}
+            onInput={(e) => setRepo(e.currentTarget.value)}
           />
-          <datalist id="memory-projects">
-            <For each={ready(projectsQuery, [])}>{(p) => <option value={p.name} />}</For>
+          <datalist id="memory-repos">
+            <For each={ready(reposQuery, [])}>{(p) => <option value={p.name} />}</For>
           </datalist>
         </Show>
         <Button tone="primary" data-testid="note-write" disabled={!text().trim() || act.busy()} onClick={() => void write()}>
@@ -427,9 +423,7 @@ function WriteNote(props: { agent: string; withProject?: boolean }) {
       </div>
       <Show
         when={error()}
-        fallback={
-          <span class="text-xs text-faint">{props.withProject === true ? t("web.memory.memory.noteHintProject") : t("web.memory.memory.noteHint")}</span>
-        }
+        fallback={<span class="text-xs text-faint">{props.withRepo === true ? t("web.memory.memory.noteHintRepo") : t("web.memory.memory.noteHint")}</span>}
       >
         <span class="text-xs text-berry">{error()}</span>
       </Show>

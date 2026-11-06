@@ -25,9 +25,8 @@
     "key": "请求键：同一把键重发只做一次",
     "limit": "最多几条",
     "priority": "优先级",
-    "project": "项目的名字",
-    "reply": "回复这一号消息",
     "repo": "GitHub 仓库的地址",
+    "reply": "回复这一号消息",
     "text": "标题或描述里有这些字",
     "timeout": "最多等几秒",
     "closed": "只看关掉的（done、canceled）",
@@ -61,7 +60,7 @@
     "doctor": "一条命令看清这台电脑上的农场：找到的是哪个、连不连得上、桌面版、农机、模型的 key、连接到本机",
     "pkm": {
       "capture": "记一句话进今天的日记（--page 记到那一页）；不给字就读标准输入，多行按缩进拆成块",
-      "radar": "要看一眼的：收件箱、搁着的项目、过期的",
+      "radar": "要看一眼的：收件箱、搁着的仓库、过期的",
       "journalShow": "一天的日记（--day 看别的一天），没有就建",
       "pageEdit": "在 $EDITOR 里改一整页的原文，关掉编辑器存回去",
       "pageExport": "把一页导出成给人读的 Markdown：引用读成字，批注去掉",
@@ -93,7 +92,7 @@
       "edit": "开或关一个定时任务"
     },
     "issue": {
-      "edit": "改工单的标题、描述、项目、档案或优先级",
+      "edit": "改工单的标题、描述、仓库、档案或优先级",
       "list": "列出工单：一张一行，号在前",
       "show": "看一张工单：状态、现在在哪一步、问题、验收标准、现在能用的命令（--watch 先跟着它）",
       "comment": "给工单写一条评论：帮工在问时就是回答，在干活时下一轮会看到",
@@ -110,9 +109,9 @@
       "list": "列出一份档案的记性",
       "search": "搜记性；不指定档案就搜全部"
     },
-    "project": {
-      "list": "列出项目",
-      "create": "新建项目（--repo 从 GitHub 克隆）"
+    "repo": {
+      "list": "列出仓库",
+      "create": "新建仓库（--repo 从 GitHub 克隆）"
     },
     "runtime": {
       "list": "列出农机：装没装、版本",
@@ -294,7 +293,10 @@
       "timeline": {
         "get": "工单的时间线和每一轮加起来的花费"
       },
-      "update": "改一张工单"
+      "update": "改一张工单",
+      "conversation": {
+        "get": "工单讨论串的位置"
+      }
     },
     "lan": {
       "device": {
@@ -319,7 +321,7 @@
       "delete": "删掉档案的一条记性",
       "list": "列出一份档案的记性：库里的和配置的来源",
       "previewDelete": "试删一条记性：说会删掉什么，不真删",
-      "recall": "看档案对这个项目和这句话会想起什么",
+      "recall": "看档案对这个仓库和这句话会想起什么",
       "search": "按字搜记性，不指定档案就搜全部"
     },
     "orchestrator": {
@@ -361,7 +363,7 @@
         "save": "新建一页，或改同名那页的属性和文件夹"
       },
       "radar": {
-        "get": "回顾雷达：收件箱里的、搁着的项目、过期的块"
+        "get": "回顾雷达：收件箱里的、搁着的仓库、过期的块"
       },
       "scan": "重读磁盘上改过的笔记文件",
       "search": "搜笔记",
@@ -371,19 +373,22 @@
         "update": "用改过的原文重写一页；这期间文件被改过就不写"
       }
     },
-    "project": {
+    "repo": {
       "activity": {
-        "get": "项目的提交：每天几次、谁提交的"
+        "get": "仓库的提交：每天几次、谁提交的"
       },
-      "create": "新建一个项目",
+      "create": "新建一个仓库",
       "language": {
-        "list": "项目用了哪些语言"
+        "list": "仓库用了哪些语言"
       },
-      "list": "列出全部项目",
+      "list": "列出全部仓库",
       "template": {
-        "list": "项目的工单模板，按它的栈填好"
+        "list": "仓库的工单模板，按它的栈填好"
       },
-      "validate": "新建项目会被拒的第一处，不真建"
+      "validate": "新建仓库会被拒的第一处，不真建",
+      "pr": {
+        "submit": "发布已有本地分支"
+      }
     },
     "runtime": {
       "list": "列出全部农机",
@@ -481,8 +486,8 @@
         "about": "日记：一天一页"
       }
     },
-    "project": {
-      "about": "项目：工作目录下的 git 仓库"
+    "repo": {
+      "about": "仓库：工作目录下的 git 仓库"
     },
     "runtime": {
       "about": "农机：机器上的编码 agent"
@@ -531,7 +536,7 @@
     "cronName": "定时任务的名字",
     "issue": "工单：号（12 或 #12）",
     "page": "页：标题、slug 或别名",
-    "projectName": "新项目的名字",
+    "repoName": "新仓库的名字",
     "session": "帮工的 id，比如 w3",
     "chatRuntime": "农机（claude、codex…）；不给是 VibeValley 自己的 agent",
     "appPath": "桌面版里的一页，比如 /issues/12；不填是首页",
@@ -596,8 +601,8 @@
     "pkmRadar": {
       "about": "要看一眼的"
     },
-    "projectList": {
-      "about": "看有哪些项目"
+    "repoList": {
+      "about": "看有哪些仓库"
     },
     "runtimeList": {
       "about": "看装了哪些农机"
@@ -666,7 +671,7 @@
       "about": "先关掉 c1"
     },
     "issueCreate": {
-      "run": "vibevalley issue create 修登录页 --project web --agent docs --criterion '过期后回到登录页'",
+      "run": "vibevalley issue create 修登录页 --repo web --agent docs --criterion '过期后回到登录页'",
       "about": "写一张工单，交给 docs"
     },
     "issueDelete": {
@@ -730,8 +735,8 @@
       "run": "vibevalley pkm search 置身事内",
       "about": "在笔记里找「置身事内」"
     },
-    "projectCreate": {
-      "about": "从 GitHub 克隆一个项目"
+    "repoCreate": {
+      "about": "从 GitHub 克隆一个仓库"
     },
     "runtimeRefresh": {
       "about": "装了新的 Claude Code 以后重新探测"
@@ -770,5 +775,8 @@
   },
   "agent": {
     "deleted": "删掉了档案 {agent}"
-  }
+  },
+  "repo.publish": "将已有分支发布为 GitHub PR 或 GitLab MR",
+  "repo.check": "仓库检查：{check}",
+  "repo.preview": "预览：将 {branch} 的 {sha} 发布到 {base}；尚未运行检查"
 }

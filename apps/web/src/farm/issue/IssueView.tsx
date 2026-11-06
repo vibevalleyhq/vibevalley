@@ -208,8 +208,8 @@ function IssueBody(props: {
           <h3 class="min-w-0 flex-1 truncate text-[16px]" title={s().title}>
             {s().title}
           </h3>
-          <Show when={s().project}>
-            <span class={xs}>{s().project}</span>
+          <Show when={s().repo}>
+            <span class={xs}>{s().repo}</span>
           </Show>
         </div>
         <p

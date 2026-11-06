@@ -33,23 +33,23 @@
     "reset": "恢复默认"
   },
   "list": {
-    "noProject": "没有项目",
+    "noRepo": "没有仓库",
     "all": "全部工单",
     "unfold": "展开 {group}",
     "fold": "收起 {group}",
     "writeIn": "在「{group}」写一张"
   },
   "page": {
-    "pickFirst": "还差一点：选好派哪个帮工、在哪个项目里做，再点「开工」。",
+    "pickFirst": "还差一点：选好派哪个帮工、在哪个仓库里做，再点「开工」。",
     "notDrafted": "先没起草：{why}",
     "historyUnread": "工单记录没读到：",
     "notFound": "找不到这张工单",
     "notFoundLine": "没有 {id} 这张工单：可能已经删掉了，或者链接写错了。",
-    "find": "找工单：标题、帮工、项目",
+    "find": "找工单：标题、帮工、仓库",
     "findLabel": "找工单",
     "filter": "筛选",
-    "byProject": "按项目看",
-    "allProjects": "所有项目",
+    "byRepo": "按仓库看",
+    "allRepos": "所有仓库",
     "byHelper": "按帮工看",
     "allHelpers": "所有帮工",
     "shown": "{shown} / {of} 张",
@@ -81,7 +81,7 @@
   "close": {
     "title": "关上「{issue}」",
     "working": "{who} 还在干这张工单。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
-    "completable": "完成就是把 {who} 的分支合进项目的主分支，先看一遍改动；取消就是让它收工，改动不合进去。",
+    "completable": "完成就是把 {who} 的分支合进仓库的主分支，先看一遍改动；取消就是让它收工，改动不合进去。",
     "notCompletable": "这张工单现在不能完成。取消会让 {who} 离开，改动不合进主分支。",
     "review": "看改动，完成",
     "stopAndCancel": "叫停并取消",
@@ -95,8 +95,6 @@
     "resolveHow": "让它在自己的分支上把 {base} 合进来、解决冲突、跑一遍测试再提交；解决了再来完成。",
     "behind": "它干活这段时间，{base} 上多了 {n} 个提交；完成时会合在一起（多一个合并提交）。",
     "uncommitted": "还有 {n} 个文件没提交，完成时会先帮它提交：",
-    "letGo": "完成，请它收工",
-    "merge": "完成，合进 {base}",
     "resolve": "让它解决冲突",
     "moved": "工单状态变了，先回到工单看看要你做的事。",
     "counts": "{commits} 个提交 · {files} 个文件",
@@ -190,7 +188,7 @@
     "conflict": "合进 {base} 会冲突：{files}"
   },
   "task": {
-    "project": "项目",
+    "repo": "仓库",
     "written": "写于"
   },
   "todo": {
@@ -223,19 +221,19 @@
     "draftStatus": "草稿",
     "todoStatus": "待办",
     "pickForMe": "起草时替你挑",
-    "whichProject": "在哪个项目里做",
-    "firstProject": "还没有项目：新建一个",
-    "newProjectLink": "＋ 新建项目",
+    "whichRepo": "在哪个仓库里做",
+    "firstRepo": "还没有仓库：新建一个",
+    "newRepoLink": "＋ 新建仓库",
     "priority": "优先级",
     "inQueue": "排队中：{ago}排上的，有空位就按看板上的先后自动开工。",
     "unqueue": "不排了",
     "pickHelper": "先选好帮工",
-    "start": "开工",
+    "start": "确认需求并派发",
     "save": "存下改动",
     "remove": "删掉",
-    "newProject": "新建项目",
-    "projectHint": "项目名，也是工作目录下的文件夹名",
-    "projectName": "项目名",
+    "newRepo": "新建仓库",
+    "repoHint": "仓库名，也是工作目录下的文件夹名",
+    "repoName": "仓库名",
     "create": "新建",
     "writeOwn": "自己写说明"
   },
@@ -246,7 +244,7 @@
     },
     "grouping": {
       "status": "状态",
-      "project": "项目",
+      "repo": "仓库",
       "agent": "帮工",
       "none": "不分组"
     },
@@ -289,7 +287,7 @@
     "queued": "排队中",
     "cron": "定时任务",
     "noHelper": "还没选帮工",
-    "pickFirst": "没选帮工或项目，开工前要选好",
+    "pickFirst": "没选帮工或仓库，开工前要选好",
     "waiting": "等空位，{ago}排上的",
     "written": "写于 {ago}",
     "lost": "丢了",
@@ -355,5 +353,10 @@
     "placeholder": "要做什么？一句话就行，帮工会照它起草",
     "keys": "⌘ 回车记下",
     "keep": "记下"
+  },
+  "conversation": {
+    "title": "讨论与交付记录",
+    "older": "加载更早的消息",
+    "empty": "需求讨论、执行反馈与交付会保留在这里"
   }
 }

@@ -2,13 +2,14 @@ import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
+import type { IssueId } from "@vibevalley/protocol";
 
 import { ready } from "#/infra/query.ts";
 
 import { ArtifactCard, useArtifacts } from "./ArtifactCard";
 
 /** The artifacts made for an issue, latest version each; nothing when there are none. */
-export function IssueArtifacts(props: { issue: string; heading: JSX.Element }) {
+export function IssueArtifacts(props: { issue: IssueId; heading: JSX.Element }) {
   const all = useArtifacts(() => ({ issue: props.issue }));
   return (
     <Show when={(ready(all, undefined) ?? []).length > 0 ? ready(all, undefined) : undefined}>

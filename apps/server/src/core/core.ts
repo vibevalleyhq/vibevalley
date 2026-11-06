@@ -1,10 +1,10 @@
-import { type Cause, Clock, Context, Effect, Layer, PubSub, Queue, type Scope, Stream, SubscriptionRef } from "effect";
+import { type Cause, Clock, Context, Effect, Layer, PubSub, Queue, Scheduler, type Scope, Stream, SubscriptionRef } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 
 import { scopedPubSub } from "#/base/pubsub.ts";
 
-export const emptyWorkspaceState = (): T.WorkspaceState => ({
+export const emptySpaceState = (): T.SpaceState => ({
   call: "idle",
   callReason: "",
   sessions: [],
@@ -19,11 +19,11 @@ export const emptyWorkspaceState = (): T.WorkspaceState => ({
 export class Projection extends Context.Service<
   Projection,
   {
-    readonly reduce: (state: T.WorkspaceState, fact: T.Fact) => [T.WorkspaceState, boolean];
+    readonly reduce: (state: T.SpaceState, fact: T.Fact) => [T.SpaceState, boolean];
     /** What a fact sets off on the farm, from the state before it. */
-    readonly effects: (before: T.WorkspaceState, fact: T.Fact) => T.GameEffect[];
+    readonly effects: (before: T.SpaceState, fact: T.Fact) => T.GameEffect[];
     /** seq: the core's count of folds the state includes (StateFrame.seq). */
-    readonly frame: (state: T.WorkspaceState, effects?: T.GameEffect[], seq?: number) => T.StateFrame;
+    readonly frame: (state: T.SpaceState, effects?: T.GameEffect[], seq?: number) => T.StateFrame;
   }
 >()("vibevalley/Projection") {}
 
@@ -36,9 +36,9 @@ export type FactIn = T.Fact extends infer F ? (F extends T.Fact ? Omit<F, "at"> 
 
 /** A fact with exactly the state it changed, even when it is read late. */
 interface Transition {
-  readonly before: T.WorkspaceState;
+  readonly before: T.SpaceState;
   readonly fact: T.Fact;
-  readonly after: T.WorkspaceState;
+  readonly after: T.SpaceState;
 }
 
 /** What the owner did that changes no state (so it is no fact), said by the service it went through: the game counts some. */
@@ -47,7 +47,7 @@ type OwnerDid = { readonly kind: "reviewed"; readonly session: T.SessionId } | {
 export class Core extends Context.Service<
   Core,
   {
-    readonly state: () => T.WorkspaceState;
+    readonly state: () => T.SpaceState;
     readonly session: (id: string) => T.Session | undefined;
     /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
     readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
@@ -61,7 +61,7 @@ export class Core extends Context.Service<
     readonly runtime: (info: T.RuntimeInfo) => Effect.Effect<void>;
     readonly did: (d: OwnerDid) => Effect.Effect<void>;
     /** The state now, then the transitions from here on. */
-    readonly transitions: Effect.Effect<readonly [T.WorkspaceState, Stream.Stream<Transition>], never, Scope.Scope>;
+    readonly transitions: Effect.Effect<readonly [T.SpaceState, Stream.Stream<Transition>], never, Scope.Scope>;
     /** A snapshot of the state, then every side event. */
     readonly events: Stream.Stream<T.ServerEvent>;
     /** Every side event from now on, subscribed before this returns: none applied after it is missed. */
@@ -107,7 +107,7 @@ const isFact = (e: T.ServerEvent): e is T.Fact => {
 
 const make = Effect.gen(function* () {
   const { reduce, effects: effectsOf, frame: frameOf } = yield* Projection;
-  const held = yield* SubscriptionRef.make({ state: emptyWorkspaceState(), seq: 0 });
+  const held = yield* SubscriptionRef.make({ state: emptySpaceState(), seq: 0 });
   const current = () => SubscriptionRef.getUnsafe(held);
 
   const events = yield* scopedPubSub<T.ServerEvent>();
@@ -148,7 +148,11 @@ const make = Effect.gen(function* () {
         },
         updated,
       ] as const;
-    }).pipe(Effect.map((tell) => tell?.()));
+    }).pipe(
+      Effect.map((tell) => tell?.()),
+      // oar callbacks use runSync: do not yield with the permit held or before publishing the folded facts.
+      Effect.provideService(Scheduler.PreventSchedulerYield, true),
+    );
   });
 
   const side = (e: T.ServerEvent) => Effect.sync(() => publish(e));

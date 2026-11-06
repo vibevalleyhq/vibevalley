@@ -1,4 +1,4 @@
-import type { SessionId } from "../common/shapes";
+import type { IssueId, SessionId } from "../common/shapes";
 import type { Doing } from "../session/shapes";
 
 export const AchievementCategoryValues = ["starter", "harvest", "craft", "thrift", "team", "secret"] as const;
@@ -177,7 +177,7 @@ export interface LedgerEntryHarvested {
   at: number;
   session: SessionId;
   agent?: string;
-  project: string;
+  repo: string;
   runtime: string;
   commits: number;
   cny?: number;
@@ -212,7 +212,7 @@ export interface LedgerEntryReviewed {
 export interface LedgerEntryFamily {
   kind: "family";
   at: number;
-  issue: string;
+  issue: IssueId;
   merged: number;
   parallel: boolean;
 }

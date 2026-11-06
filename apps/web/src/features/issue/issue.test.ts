@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { IssueStatusValues, type Issue, type IssueHistory, type IssueStatus, type WorkspaceView } from "@vibevalley/protocol";
+import { IssueStatusValues, type Issue, type IssueHistory, type IssueStatus, type SpaceView } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { boardRows, buildCards, historyKey, laneOf, lanes, laneStatus, moveOf, ownStatus } from "./cards";
@@ -99,7 +99,7 @@ test("regression: a parent without sessions keeps its review lane and unsent chi
 });
 
 describe("rows", () => {
-  const core = (over: Partial<WorkspaceView>): WorkspaceView => ({
+  const core = (over: Partial<SpaceView>): SpaceView => ({
     call: "idle",
     callReason: "",
     sessions: [],

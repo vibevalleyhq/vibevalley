@@ -30,32 +30,23 @@ type Detail = { readonly memory_id: string };
 /** Its labels are words without spaces or commas (the list is comma-separated). */
 const label = (kind: string, name: string) => `${app}-${kind}-${name.replace(/[\s,]+/gu, "-")}`;
 
-const projectLabel = `${app}-scope-project-`;
+const repoLabel = `${app}-scope-repo-`;
 const globalLabel = `${app}-scope-global`;
-export const nowledgeLabels = (agent: string, project: string) =>
-  [app, label("agent", agent), project ? projectLabel + Buffer.from(project, "utf8").toString("hex") : globalLabel].join(",");
+export const nowledgeLabels = (agent: string, repo: string) =>
+  [app, label("agent", agent), repo ? repoLabel + Buffer.from(repo, "utf8").toString("hex") : globalLabel].join(",");
 
 const scopeOf = (labels: readonly string[] | undefined): MemoryScope => {
   if (!labels || !labels.includes(app)) return { kind: "unknown" };
-  const [only, ...extra] = labels.filter((l) => l === globalLabel || l.startsWith(projectLabel));
+  const [only, ...extra] = labels.filter((l) => l === globalLabel || l.startsWith(repoLabel));
   if (!only || extra.length > 0) return { kind: "unknown" };
   if (only === globalLabel) return { kind: "global" };
-  const encoded = only.slice(projectLabel.length);
+  const encoded = only.slice(repoLabel.length);
   if (!/^(?:[0-9a-f]{2})+$/u.test(encoded)) return { kind: "unknown" };
-  const project = Buffer.from(encoded, "hex").toString("utf8");
-  return Buffer.from(project, "utf8").toString("hex") === encoded ? { kind: "project", project } : { kind: "unknown" };
+  const repo = Buffer.from(encoded, "hex").toString("utf8");
+  return Buffer.from(repo, "utf8").toString("hex") === encoded ? { kind: "repo", repo } : { kind: "unknown" };
 };
 
-interface Hit {
-  readonly id?: string;
-  readonly memory_id?: string;
-  readonly title?: string;
-  readonly content?: string;
-  readonly content_preview?: string;
-  readonly relevance_score?: number;
-}
-
-const HitSchema: Schema.Codec<Hit> = Schema.Struct({
+const HitSchema = Schema.Struct({
   id: Schema.optionalKey(Schema.String),
   memory_id: Schema.optionalKey(Schema.String),
   title: Schema.optionalKey(Schema.String),
@@ -63,6 +54,7 @@ const HitSchema: Schema.Codec<Hit> = Schema.Struct({
   content_preview: Schema.optionalKey(Schema.String),
   relevance_score: Schema.optionalKey(Schema.Finite),
 });
+type Hit = typeof HitSchema.Type;
 const SearchResponse = Schema.fromJsonString(Schema.Struct({ results: Schema.optionalKey(Schema.mutable(Schema.Array(HitSchema))) }));
 const AddedResponse = Schema.fromJsonString(
   Schema.Struct({
@@ -161,9 +153,9 @@ export function nowledge(c: MemorySourceConfig): Source {
     });
   });
 
-  const add = Effect.fnUntraced(function* (agent: string, text: string, project: string) {
+  const add = Effect.fnUntraced(function* (agent: string, text: string, repo: string) {
     const body = redact(text);
-    const answer = yield* call("memory_add", { content: body, title: redactedHead(body, 60), labels: nowledgeLabels(agent, project), source_app: app });
+    const answer = yield* call("memory_add", { content: body, title: redactedHead(body, 60), labels: nowledgeLabels(agent, repo), source_app: app });
     // The new memory's id, at the top or under memory. none when it found the same memory there already.
     const added = Option.getOrUndefined(Schema.decodeOption(AddedResponse)(answer));
     if (!added) return yield* new SourceError({ message: "memory_add answered what it should not: " + head(answer, 200) });
@@ -195,7 +187,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       if (c.read !== true || q.kind === "issue") return { found: [] };
       const hits = yield* find(q.agent, q.text, q.limit, !(c.everything !== true));
       const selected = hits.slice(0, most);
-      // MCP search omits labels. only its detail result can prove a project's scope.
+      // MCP search omits labels. only its detail result can prove a repo's scope.
       const scopes = yield* Effect.forEach(
         selected,
         (h): Effect.Effect<MemoryScope> => {
@@ -204,7 +196,7 @@ export function nowledge(c: MemorySourceConfig): Source {
           return call("get_memory_by_id", { memory_id: id }).pipe(
             Effect.flatMap(Schema.decodeUnknownEffect(DetailResponse)),
             Effect.map((detail) => scopeOf(detail.labels)),
-            // An unreadable detail does not turn an unknown project into a global memory.
+            // An unreadable detail does not turn an unknown repo into a global memory.
             Effect.orElseSucceed((): MemoryScope => ({ kind: "unknown" })),
           );
         },
@@ -216,6 +208,7 @@ export function nowledge(c: MemorySourceConfig): Source {
           agent: q.agent,
           kind: "note" as const,
           text: hitText(h),
+          author: "system" as const,
           at: 0,
           recalled: 0,
           fading: false,
@@ -225,20 +218,20 @@ export function nowledge(c: MemorySourceConfig): Source {
         })),
       };
     }),
-    // The farm's own; Nowledge does not say which project each is for.
+    // The farm's own; Nowledge does not say which repo each is for.
     list: Effect.fnUntraced(function* (agent) {
       if (c.read !== true) return [];
       const hits = yield* find(agent, "", most, false);
-      return hits.map((h): T.Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0, fading: false }));
+      return hits.map((h): T.Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), author: "system", at: 0, recalled: 0, fading: false }));
     }),
     syncTurn: () => Effect.void,
     sessionEnded: () => Effect.void,
     add: Effect.fnUntraced(function* (n) {
       if (c.write !== true) return undefined;
-      const project = n.project.trim();
-      const id = yield* add(n.agent, n.text, project);
+      const repo = n.repo.trim();
+      const id = yield* add(n.agent, n.text, repo);
       const at = yield* Clock.currentTimeMillis;
-      return { id, agent: n.agent, kind: "note", text: n.text, at, recalled: 0, fading: false, ...(project ? { project } : {}) } satisfies T.Memory;
+      return { id, agent: n.agent, kind: "note", text: n.text, author: "system", at, recalled: 0, fading: false, ...(repo ? { repo } : {}) } satisfies T.Memory;
     }),
     forget: () => Effect.fail(new SourceError({ message: t("server.memory.nowledgeForget") })),
     can: { list: true, forget: false, transcripts: false },

@@ -37,7 +37,7 @@ export function newOrchestrator(): Agent {
     workdir: "",
     worktree: false,
     tags: [],
-    look: { build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "", orchestrator: "foreman" },
+    look: { species: null, outfit: null, build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "", orchestrator: "foreman" },
   };
 }
 

@@ -7,7 +7,7 @@ import type * as T from "@vibevalley/protocol";
 import { ask, change, given, nameArg, show } from "#/farm.ts";
 
 const sessionLine = (s: T.Session) =>
-  [s.id, s.name, `@${s.agent}`, s.phase._tag, s.issue === undefined ? "" : `issue ${s.issue}`, s.project === undefined ? "" : `[${s.project}]`]
+  [s.id, s.name, `@${s.agent}`, s.phase._tag, s.issue === undefined ? "" : `issue ${s.issue}`, s.repo === undefined ? "" : `[${s.repo}]`]
     .filter((x) => x !== "")
     .join("  ");
 

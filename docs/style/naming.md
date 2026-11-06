@@ -39,8 +39,8 @@
 
 | 复数是必要的 | 复数是多余的 |
 |---|---|
-| `issues: Issue[]`、`WorkspaceState.issues` | 服务 `Issue`（服务是一个，写 `Issue`） |
-| `issue.list`、`project.list`（返回好几个） | 管一张表的存取对象 `Memory`（写 `MemoryStore`） |
+| `issues: Issue[]`、`SpaceState.issues` | 服务 `Issue`（服务是一个，写 `Issue`） |
+| `issue.list`、`repo.list`（返回好几个） | 管一张表的存取对象 `Memory`（写 `MemoryStore`） |
 | `runsOf(session)`、`questionsOf(issue)`（返回好几个） | 只放一样东西的文件 `memories.ts`（写 `store.ts`） |
 | 一个数：`maxTasks`、`keepClosedIssues`、`autoRetries` | 返回一样东西的函数用复数名 |
 | 在内存里装着一组的：`Assignments`、`Deliveries`、`Trajectories` | |
@@ -103,7 +103,7 @@
 |---|---|---|
 | rules | 测试金字塔的规则层 | 业务的纯函数（按它决定的事起名，不叫 `rules.ts`）；lint 规则（`scripts/oxlint-plugin.ts`）；写给 agent 的规矩用「规矩」，不用 rules |
 
-已经分开的：语音的授予是 `voice.grant.*`、通话是 `voice.call.*`（`VoiceCall`），不再借 session 和 agent；校验一份输入是 `validate`（`setting.validate`、`project.validate`、`agent.validate`，结果是 `Validation`），试一把钥匙是 `voice.moss.verify`，check 只指跑一遍检查（`vp check`、项目的 `.vibevalley/check`、验收标准的 `CriterionCheck`）。
+已经分开的：语音的授予是 `voice.grant.*`、通话是 `voice.call.*`（`VoiceCall`），不再借 session 和 agent；校验一份输入是 `validate`（`setting.validate`、`repo.validate`、`agent.validate`，结果是 `Validation`），试一把钥匙是 `voice.moss.verify`，check 只指跑一遍检查（`vp check`、仓库的 `.vibevalley/check`、验收标准的 `CriterionCheck`）。
 
 ## 改名
 

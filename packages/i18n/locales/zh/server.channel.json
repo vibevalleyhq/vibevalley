@@ -14,8 +14,8 @@
   "breaker": "{name} 连续 {failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。",
   "dispatch": {
     "draft": "看代码，起草这张工单",
-    "project": "项目",
-    "sent": "派 @{id}（{name}）去 {project}：{what}",
+    "repo": "仓库",
+    "sent": "派 @{id}（{name}）去 {repo}：{what}",
     "redraft": "这张工单交给 @{id}（{name}）再起草一版",
     "handedOn": "这张工单交给 @{id}（{name}）接着做，第 {nth} 次派活"
   },

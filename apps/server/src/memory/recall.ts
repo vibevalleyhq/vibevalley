@@ -17,7 +17,7 @@ export const recallChars = 1600;
 export interface PickCue {
   /** What it left itself is in its own session already. */
   readonly session?: string;
-  readonly project: string;
+  readonly repo: string;
   readonly text: string;
   readonly skip?: ReadonlySet<string>;
   readonly now: number;
@@ -30,12 +30,12 @@ const recallMatchMost = 5;
 const recallMatchWeight = 0.3;
 const recallSharedWeight = 0.5;
 
-/** Another project's note only when it plainly shares the turn's words; another project's issue never. */
+/** Another repo's note only when it plainly shares the turn's words; another repo's issue never. */
 export function relevance(m: T.Memory, cue: PickCue, terms: ReadonlySet<string>): number | undefined {
   if (cue.skip?.has(m.id) === true || (m.session !== undefined && m.session === cue.session)) return undefined;
   const shared = termsInCommon(termsOf(m.text), terms);
-  const here = m.project !== undefined && m.project === cue.project;
-  const everywhere = m.project === undefined;
+  const here = m.repo !== undefined && m.repo === cue.repo;
+  const everywhere = m.repo === undefined;
   if (m.kind === "issue") {
     if (!here) return undefined;
   } else if (!here && !everywhere && shared < recallElsewhere) return undefined;
@@ -47,9 +47,9 @@ export function relevance(m: T.Memory, cue: PickCue, terms: ReadonlySet<string>)
   return kind + place + Math.min(shared, 8) * recallSharedWeight + matched + Math.exp(-age / 30);
 }
 
-export function lineOf(m: T.Memory, project: string): string {
+export function lineOf(m: T.Memory, repo: string): string {
   const w = recallWords;
-  const where = m.project === undefined ? w.everywhere : m.project === project ? w.here : w.project(m.project);
+  const where = m.repo === undefined ? w.everywhere : m.repo === repo ? w.here : w.repo(m.repo);
   return m.kind === "issue" ? w.issue(where, m.text) : w.note(where, m.text);
 }
 
@@ -66,7 +66,7 @@ export function pick(memories: readonly T.Memory[], cue: PickCue): T.Memory[] {
   let issues = 0;
   for (const { m } of ranked) {
     if (picked.length === recallCount) break;
-    const length = lineOf(m, cue.project).length + 1;
+    const length = lineOf(m, cue.repo).length + 1;
     if ((m.kind === "issue" && issues === recallIssues) || chars + length > recallChars) continue;
     picked.push(m);
     chars += length;
@@ -96,10 +96,10 @@ export function memoryLikeness(a: ReadonlySet<string>, b: ReadonlySet<string>): 
   return all === 0 ? 0 : shared / all;
 }
 
-/** project undefined: every project. */
-export function memoryIsNewNote(memories: readonly Pick<T.Memory, "kind" | "text" | "project">[], text: string, project: string | undefined): boolean {
+/** repo undefined: every repo. */
+export function memoryIsNewNote(memories: readonly Pick<T.Memory, "kind" | "text" | "repo">[], text: string, repo: string | undefined): boolean {
   const terms = termsOf(text);
-  return !memories.some((m) => m.kind === "note" && m.project === project && (m.text === text || memoryLikeness(termsOf(m.text), terms) >= 0.8));
+  return !memories.some((m) => m.kind === "note" && m.repo === repo && (m.text === text || memoryLikeness(termsOf(m.text), terms) >= 0.8));
 }
 
 export const noteMaxChars = noteMax;
@@ -107,7 +107,7 @@ export const noteMaxChars = noteMax;
 /** What memory_search questions. agent "": every profile (only the orchestrator may ask so). */
 export interface SearchQuery {
   readonly agent: string;
-  readonly project: string;
+  readonly repo: string;
   readonly text: string;
   readonly kind: T.MemoryKind | "";
   readonly limit: number;
@@ -123,8 +123,7 @@ export interface SourceSearch {
   readonly coverage?: string;
 }
 
-export const inProject = (scope: T.MemoryScope, project: string) =>
-  project === "" || scope.kind === "global" || (scope.kind === "project" && scope.project === project);
+export const inRepo = (scope: T.MemoryScope, repo: string) => repo === "" || scope.kind === "global" || (scope.kind === "repo" && scope.repo === repo);
 
 export const searchLimit = 10;
 export const localName = "local";
@@ -136,12 +135,12 @@ export function search(memories: readonly T.Memory[], q: SearchQuery, matches: R
   const whole = q.text.toLowerCase().trim();
   const out: Found[] = [];
   for (const m of memories) {
-    const scope: T.MemoryScope = m.project === undefined ? { kind: "global" } : { kind: "project", project: m.project };
-    if ((q.kind !== "" && m.kind !== q.kind) || !inProject(scope, q.project)) continue;
+    const scope: T.MemoryScope = m.repo === undefined ? { kind: "global" } : { kind: "repo", repo: m.repo };
+    if ((q.kind !== "" && m.kind !== q.kind) || !inRepo(scope, q.repo)) continue;
     let score = (matches[m.id] ?? 0) + termsInCommon(termsOf(m.text), terms) * recallSharedWeight;
     if (whole !== "" && m.text.toLowerCase().includes(whole)) score += 2;
     if (whole !== "" && score === 0) continue;
-    if (q.project !== "" && m.project !== undefined) score += 0.5;
+    if (q.repo !== "" && m.repo !== undefined) score += 0.5;
     out.push({ ...m, source: localName, score, scope });
   }
   out.sort((a, b) => or(compare(b.score, a.score), compare(b.at, a.at)));
@@ -154,9 +153,8 @@ export const sourceLabel = (name: string) => maybe(`server.memory.source.${name}
 export function foundText(result: SearchResult, q: SearchQuery): string {
   const lines = result.found.length === 0 ? [q.text.trim() === "" ? recallWords.none : recallWords.notFound(q.text)] : [recallWords.found];
   for (const f of result.found) {
-    const scope =
-      f.scope.kind === "unknown" ? recallWords.unknownScope : f.scope.kind === "global" ? recallWords.everywhere : recallWords.project(f.scope.project);
-    let line = f.source !== "" && f.source !== localName ? recallWords.fromSource(sourceLabel(f.source), scope, f.text) : lineOf(f, q.project);
+    const scope = f.scope.kind === "unknown" ? recallWords.unknownScope : f.scope.kind === "global" ? recallWords.everywhere : recallWords.repo(f.scope.repo);
+    let line = f.source !== "" && f.source !== localName ? recallWords.fromSource(sourceLabel(f.source), scope, f.text) : lineOf(f, q.repo);
     if (q.agent === "" && f.agent !== "") line = recallWords.byAgent(f.agent, line);
     lines.push(recallWords.withId(line, f.id));
   }

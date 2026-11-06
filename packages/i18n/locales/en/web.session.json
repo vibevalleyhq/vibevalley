@@ -88,7 +88,7 @@
     "wrong": "This round went wrong",
     "marked": "Marked as a wrong round and kept as an eval",
     "want": "What this round should have done",
-    "wantHint": "What it should do: such as \"ask me which project first, do not send work right away\"",
+    "wantHint": "What it should do: such as \"ask me which repo first, do not send work right away\"",
     "neverSent": "Nothing sent out yet.",
     "sent": "Helpers sent out",
     "here": "Here",

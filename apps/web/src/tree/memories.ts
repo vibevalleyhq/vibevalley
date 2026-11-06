@@ -5,16 +5,16 @@ import type { MemoryItem, MemoryKind, TreeStage } from "./mock";
 export const stageName = (stage: TreeStage) => t(`web.tree.stage.${stage}`);
 
 export interface TreeFilter {
-  /** "" is every helper, every project. */
+  /** "" is every helper, every repo. */
   readonly agent: string;
-  readonly project: string;
+  readonly repo: string;
 }
 
-export const allOf: TreeFilter = { agent: "", project: "" };
+export const allOf: TreeFilter = { agent: "", repo: "" };
 
-/** A memory for every project is kept under any project. */
+/** A memory for every repo is kept under any repo. */
 export function kept(item: MemoryItem, filter: TreeFilter): boolean {
-  return (filter.agent === "" || item.agent === filter.agent) && (filter.project === "" || item.project === null || item.project === filter.project);
+  return (filter.agent === "" || item.agent === filter.agent) && (filter.repo === "" || item.repo === null || item.repo === filter.repo);
 }
 
 export function counts(items: readonly MemoryItem[]): Record<MemoryKind | "fading", number> {

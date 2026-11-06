@@ -19,7 +19,7 @@
 | `apps/server/src/pkm/pkm.ts` | 文件读写、单写锁、批注表（`pkm_comment`）与撤销表（`pkm_change`） |
 | `apps/server/src/pkm/outline.ts`、`ops.ts`、`para.ts`、`graph.ts` | 服务端薄适配层：消费 `@vibevalley/pkm` 并绑定 `memory/recall.ts` 的 `termsList` 分词 |
 | `packages/protocol/src/pkm/`、`rules/pkm.ts` | 笔记契约与前后端共用的 `applyBlockOps`、`flatBlocks` |
-| `$VIBEVALLEY_HOME/pkm/` | 默认笔记根目录（`00_Inbox`–`04_Archives`、`journals/`、`.pkm/snapshots/`） |
+| `$VIBEVALLEY_WORK_ROOT/pkm/` | 默认笔记根目录（`00_Inbox`–`04_Archives`、`journals/`、`.pkm/snapshots/`） |
 | `apps/web/src/features/pkm/` | 工作台笔记页、大纲编辑器组件（消费 `@vibevalley/pkm`） |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`pkm.*`），CLI 命令为 `vibevalley pkm ...`。

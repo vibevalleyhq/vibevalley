@@ -52,7 +52,7 @@ export const cronTools = Effect.gen(function* () {
               channel: channel.id,
               when,
               ...(p.agent ? { agent: p.agent } : {}),
-              ...(p.project ? { project: p.project } : {}),
+              ...(p.repo ? { repo: p.repo } : {}),
               ...(p.tz ? { tz: p.tz } : {}),
             },
             c.actor,

@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import { type Chat, type ChatMessage, type Channel, type Issue, type Session, type WorkspaceState } from "@vibevalley/protocol";
+import { type Chat, type ChatMessage, type Channel, type Issue, type Session, type SpaceState } from "@vibevalley/protocol";
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
 import { compareText, or, spelled } from "#/base/search.ts";
@@ -198,7 +198,7 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
 
 /** An orchestrator's dots in a channel: one is thinking or writing its answer there, as the server says. */
 export function orchestratorTyping(
-  state: WorkspaceState | undefined,
+  state: SpaceState | undefined,
   channel: Channel | undefined,
 ): { readonly agent: string; readonly mood: "thinking" | "speaking"; readonly since?: number } | undefined {
   if (!channel) return undefined;

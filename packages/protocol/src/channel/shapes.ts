@@ -17,7 +17,7 @@ export interface ChatMessage {
   mentions: string[];
   session?: SessionId;
   run?: string;
-  outcome?: Outcome;
+  outcome: Outcome | null;
   spent?: Spent;
   spoken: boolean;
   /** The key the owner's send carried, on the owner's own messages: a page knows its line by it. */
@@ -96,14 +96,14 @@ export interface Channel {
   position?: number;
   archived?: number;
   /** What of it counts for the owner; absent is all. */
-  notify?: Notify;
+  notify: Notify;
   /** The message a thread hangs under, and its number there. */
   root?: MessageId;
   rootNumber?: number;
   name?: string;
   description: string;
-  project?: string;
-  subjectKind?: SubjectKind;
+  repo?: string;
+  subjectKind: SubjectKind | null;
   subjectId?: string;
   lastNumber?: number;
   replies: number;
@@ -172,13 +172,13 @@ export interface SayRequest {
   attachments?: string[];
   station?: number;
   agent?: string;
-  project?: string;
+  repo?: string;
   sendKey?: string;
 }
 
 export interface ChannelUpdate {
   description?: string;
-  project?: string;
+  repo?: string;
   /** A channel's name (unique, written in its address), or a thread's title. */
   name?: string;
   /** A channel's group; empty takes it out of one. */
@@ -192,7 +192,7 @@ export interface ChannelUpdate {
 export interface ChannelRequest {
   name: string;
   description?: string;
-  project?: string;
+  repo?: string;
 }
 
 export interface ChatReadRequest {

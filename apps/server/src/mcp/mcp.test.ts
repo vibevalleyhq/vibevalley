@@ -307,12 +307,12 @@ describe("mcp", () => {
       const core = yield* Core;
       const mcp = yield* Mcp;
       const memory = yield* Memory;
-      yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab", project: "demo" });
-      yield* memory.write({ agent: "scout", text: "这个项目测试用 make check", project: "demo", by: owner });
+      yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab", repo: "demo" });
+      yield* memory.write({ agent: "scout", text: "这个仓库测试用 make check", repo: "demo", by: owner });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
-      expect(yield* tool("memory_create", { text: "这个项目测试用 pnpm test" })).toContain("记下了（项目 demo）");
-      expect(yield* tool("memory_create", { text: "提交信息写中文", project: "" })).toContain("记下了（所有项目）");
+      expect(yield* tool("memory_create", { text: "这个仓库测试用 pnpm test" })).toContain("记下了（仓库 demo）");
+      expect(yield* tool("memory_create", { text: "提交信息写中文", repo: "" })).toContain("记下了（所有仓库）");
       // There is no profile to name: what it writes is its own, whatever it says.
       yield* tool("memory_create", { text: "冒名记一条", agent: "scout" });
       expect((yield* memory.list("scout")).some((m) => m.text === "冒名记一条")).toBe(false);
@@ -333,7 +333,7 @@ describe("mcp", () => {
       const mcp = yield* Mcp;
       const artifacts = yield* Artifact;
       yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab" });
-      const d = yield* artifacts.create({ from: ownerId, by: ownerId }, { title: "周报" });
+      const d = yield* artifacts.create({ from: ownerId, by: ownerId }, { title: "周报", kind: "markdown" });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
       const added = yield* tool("artifact_block_create", { id: d.id, text: "这周做完了**第一步**" });

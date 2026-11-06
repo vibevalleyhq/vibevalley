@@ -12,7 +12,8 @@ import { Agent } from "#/agent/agent.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
+import { repository } from "#/repo/repository.ts";
 import { Session } from "#/session/session.ts";
 import { testConfig } from "#/testing/layers.ts";
 
@@ -25,29 +26,29 @@ for (const submittedReport of [false, true]) {
     const inputs: string[] = [];
     let background: ReturnType<ScriptedTurn["task"]> | undefined;
     const base = testConfig();
-    const config = { ...base, project: { ...base.project, maxSessions: 1 }, github: { ...base.github, prProjects: ["follow"] } };
-    const path = join(config.workRoot, "projects", "follow");
+    const config = { ...base, repo: { ...base.repo, maxSessions: 1 }, github: { ...base.github, prRepos: ["follow"] } };
+    const path = join(config.workRoot, "repos", "follow");
     const bare = join(config.workRoot, "origin.git");
     const f = farm({
       config,
       repos: ["follow"],
-      projects: {
+      repoHooks: {
         gh: (...args) =>
           Effect.sync(() => {
             const ok = (out: string) => ({ out, ok: true, missing: false });
             if (args[0] === "--version") return ok("gh version 2.80.0");
             if (args[0] === "auth") return ok("Logged in to github.com account gardener (keyring)");
-            if (args[0] === "repo") return ok('{"viewerPermission":"WRITE"}');
+            if (args[0] === "repo") return ok('{"viewerPermission":"WRITE","defaultBranchRef":{"name":"main"}}');
             if (args[0] === "pr" && args[1] === "list") return ok("[]");
             if (args[0] === "pr" && args[1] === "create") return ok("https://github.com/test/follow/pull/1");
             if (args[0] === "pr" && args[1] === "view") return ok('{"state":"OPEN","mergedAt":null}');
             return { out: "", ok: false, missing: false };
           }),
-        push: (cwd, branch) =>
-          Effect.sync(() => {
-            git(cwd, "push", bare, branch);
-            return true;
-          }),
+        publication: {
+          tip: () => repository(path).head,
+          fetch: () => Effect.void,
+          push: (cwd, _url, branch, sha) => repository(cwd).push(bare, branch, sha),
+        },
         fetch: () => Effect.succeed(false),
       },
       runtime: scriptedRuntime({
@@ -73,8 +74,8 @@ for (const submittedReport of [false, true]) {
       yield* (yield* Agent).save(lab());
       git(config.workRoot, "init", "--bare", bare);
       git(path, "remote", "add", "origin", "https://github.com/test/follow.git");
-      yield* (yield* Project).refreshGitHub();
-      const issue = yield* issues.add({ title: "work", project: "follow", agent: "lab" }, explicitMandate("", true));
+      yield* (yield* Repo).refreshGitHub();
+      const issue = yield* issues.add({ title: "work", repo: "follow", agent: "lab" }, explicitMandate("", true));
       yield* issues.start(issue.id, "");
       const id = latestSessionIdOf(yield* issues.get(issue.id))!;
       yield* until(() => inputs.length === 1, "the implementation committed");

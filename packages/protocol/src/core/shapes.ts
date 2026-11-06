@@ -24,7 +24,7 @@ export interface ServerReady {
   pid: number;
 }
 
-export interface WorkspaceState {
+export interface SpaceState {
   call: CallState;
   callReason: string;
   /** Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle. */
@@ -40,7 +40,7 @@ export interface WorkspaceState {
   connectors: ConnectorStatus[];
 }
 
-export interface WorkspaceView extends Omit<WorkspaceState, "sessions" | "crons" | "plays"> {
+export interface SpaceView extends Omit<SpaceState, "sessions" | "crons" | "plays"> {
   sessions: SessionView[];
   crons: CronView[];
 }
@@ -51,7 +51,7 @@ export type NoticeLevel = (typeof NoticeLevelValues)[number];
 export interface StateFrame {
   /** Goes up by one with every commit the core folds (Core.apply that changed the state): this frame shows every fold up to it. */
   seq: number;
-  state: WorkspaceView;
+  state: SpaceView;
   inbox: InboxItem[];
   view: FarmView;
   effects: GameEffect[];
@@ -86,7 +86,7 @@ export type ServerEvent = Fact | ServerEventSnapshot | ServerEventStep | ServerE
 export interface ServerEventSnapshot {
   type: "snapshot";
   at: number;
-  state: WorkspaceState;
+  state: SpaceState;
 }
 
 export interface ServerEventStep {

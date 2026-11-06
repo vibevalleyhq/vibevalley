@@ -21,12 +21,12 @@ interface Page {
 }
 
 const resting = (more: Partial<SessionView> = {}) =>
-  sampleSession("w1", "老周", { _tag: "resting" }, { project: "vibevalley", branch: "issue-18-login", runs: 3, ...more });
+  sampleSession("w1", "老周", { _tag: "resting" }, { repo: "vibevalley", branch: "issue-18-login", runs: 3, ...more });
 
 const lastRun = (outcome: "completed" | "failed" | "interrupted", summary: string) => ({ outcome, summary, at: now - 6 * min });
 
 const base = (more: SampleIssue) =>
-  sampleIssue(18, "修好登录过期", "in_review", "high", omitUndefined({ description, criteria, project: "vibevalley", agent: "老周", ...more }));
+  sampleIssue(18, "修好登录过期", "in_review", "high", omitUndefined({ description, criteria, repo: "vibevalley", agent: "老周", ...more }));
 
 // Each state as the server sends it; the buttons follow apps/server/src/issue/stage.ts.
 const pages: Record<string, Page> = {
@@ -43,7 +43,7 @@ const pages: Record<string, Page> = {
     issue: base({ status: "todo", queuedAt: now - 3 * min, stage: { state: "queued", since: now - 3 * min, acts: [acts.close] } }),
   },
   在做: (() => {
-    const s = sampleSession("w1", "老周", working(now - 4 * min), { project: "vibevalley", branch: "issue-18-login" });
+    const s = sampleSession("w1", "老周", working(now - 4 * min), { repo: "vibevalley", branch: "issue-18-login" });
     return {
       note: "帮工在干：能说一句、叫停或关掉。",
       issue: base({ status: "in_progress", sessionIds: [s.id], stage: { state: "working", since: now - 4 * min, acts: [acts.tell, acts.stop, acts.close] } }),
@@ -52,7 +52,7 @@ const pages: Record<string, Page> = {
     };
   })(),
   没动静: (() => {
-    const s = sampleSession("w1", "老周", working(now - 30 * min, now - 12 * min), { project: "vibevalley", branch: "issue-18-login" });
+    const s = sampleSession("w1", "老周", working(now - 30 * min, now - 12 * min), { repo: "vibevalley", branch: "issue-18-login" });
     return {
       note: "在做，可是十几分钟没动静：主动作是叫停。",
       issue: base({
@@ -125,12 +125,7 @@ const pages: Record<string, Page> = {
     };
   })(),
   完成: (() => {
-    const s = sampleSession(
-      "w1",
-      "老周",
-      { _tag: "done" },
-      { project: "vibevalley", branch: "issue-18-login", lastRun: lastRun("completed", "合进了 main。") },
-    );
+    const s = sampleSession("w1", "老周", { _tag: "done" }, { repo: "vibevalley", branch: "issue-18-login", lastRun: lastRun("completed", "合进了 main。") });
     return {
       note: "合进了主分支；还能重开。",
       issue: base({

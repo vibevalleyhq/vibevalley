@@ -18,7 +18,6 @@ import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
-import { recordTrigger, unroutedCronTriggers } from "#/mailbox/payload.ts";
 import * as q from "#db/cron.sql.ts";
 
 import { afterRun, cronProblem, dueCrons, dueText, givenZone, isMissed, needsOK, whenText } from "./when.ts";
@@ -57,6 +56,8 @@ function localZone(): string {
   return tz && givenZone(tz) ? tz : Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
+const whenOf = jsonOrNone(S.CronWhen);
+
 const make = Effect.gen(function* () {
   const core = yield* Core;
   const store = yield* Agent;
@@ -72,7 +73,7 @@ const make = Effect.gen(function* () {
   const dueHub = yield* scopedPubSub<Due>();
 
   for (const row of yield* db.run(q.crons())) {
-    const when = jsonOrNone(S.CronWhen)(row.spec);
+    const when = whenOf(row.spec);
     // A cron whose time or owner this code cannot read any more is left out.
     if (!when || !Schema.is(S.ActorKind)(row.set_by)) continue;
     const s: T.Cron = {
@@ -81,7 +82,7 @@ const make = Effect.gen(function* () {
       text: row.body,
       channel: row.channel_id,
       ...(row.agent ? { agent: row.agent } : {}),
-      ...(row.project ? { project: row.project } : {}),
+      ...(row.repo ? { repo: row.repo } : {}),
       when,
       tz: row.tz,
       enabled: row.enabled,
@@ -104,7 +105,7 @@ const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const s = due.cron;
       const thread = `cron:${s.id}`;
-      return yield* recordTrigger(db, {
+      return yield* mailbox.recordTrigger({
         source: "cron",
         key: due.id,
         actor: { kind: "system", id: s.id },
@@ -132,26 +133,13 @@ const make = Effect.gen(function* () {
       }
     }).pipe(bestEffort(`cron occurrence ${due.id}`));
 
-  const replay = Effect.gen(function* () {
-    let after = 0;
-    while (true) {
-      const rows = yield* unroutedCronTriggers(db, after);
-      const last = rows.at(-1);
-      if (!last) return;
-      yield* Effect.forEach(
-        rows,
-        (row) =>
-          Effect.gen(function* () {
-            const trigger = yield* Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(row.trigger_json);
-            const payload = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({ data: S.Cron })))(row.payload_json);
-            const by = trigger.meta.trigger;
-            yield* handle({ id: row.id, cron: payload.data, missed: by?.kind === "cron" && by.missed === true }, trigger);
-          }).pipe(bestEffort(`cron: replay ${row.id}`)),
-        { discard: true },
-      );
-      after = last.seq;
-    }
-  });
+  const replay = mailbox.replayCronTriggers((trigger, data) =>
+    Effect.gen(function* () {
+      const cron = yield* Schema.decodeUnknownEffect(S.Cron)(data);
+      const by = trigger.meta.trigger;
+      yield* handle({ id: trigger.id, cron, missed: by?.kind === "cron" && by.missed === true }, trigger);
+    }),
+  );
 
   const tick = lock.withPermits(1)(
     Effect.gen(function* () {
@@ -201,8 +189,8 @@ const make = Effect.gen(function* () {
       const agents = store.agents();
       const agent = named ? (agents.find((a) => a.id === named) ?? agents.find((a) => a.name === named)) : undefined;
       if (named && !agent) return yield* Effect.fail(refused(t("server.cron.noProfile", { name: req.agent ?? "" }), [lookIn.agent]));
-      const project = (req.project ?? "").trim();
-      if (agent && !project && !channel.project) return yield* Effect.fail(refused(t("server.cron.noProject", { channel: channel.name })));
+      const repo = (req.repo ?? "").trim();
+      if (agent && !repo && !channel.repo) return yield* Effect.fail(refused(t("server.cron.noRepo", { channel: channel.name })));
       const tz = req.tz ?? localZone();
       const pending = needsOK(req, by);
       const s: T.Cron = {
@@ -211,7 +199,7 @@ const make = Effect.gen(function* () {
         text: req.text.trim(),
         channel: channel.id,
         ...(agent ? { agent: agent.id } : {}),
-        ...(project ? { project } : {}),
+        ...(repo ? { repo } : {}),
         when: req.when,
         tz,
         // Counted from now, by the same clock that ticks.
@@ -227,7 +215,7 @@ const make = Effect.gen(function* () {
           body: s.text,
           channel_id: s.channel,
           agent: s.agent ?? null,
-          project: s.project ?? null,
+          repo: s.repo ?? null,
           spec: JSON.stringify(s.when),
           tz,
           set_by: by.kind,

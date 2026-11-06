@@ -16,6 +16,7 @@ const memory = (text: string, more: Partial<Memory> = {}): Memory => ({
   recalledAt: now - day,
   fading: false,
   ...more,
+  author: more.author ?? "owner",
 });
 
 export default stories({
@@ -28,7 +29,7 @@ export default stories({
       render: (a) => (
         <div class="w-[30rem]">
           <MemoryItem
-            memory={memory("这个项目的测试用 vp test；不要开 next dev。", { fading: a.state === "fading" })}
+            memory={memory("这个仓库的测试用 vp test；不要开 next dev。", { fading: a.state === "fading" })}
             meta={["主人写的", "vibevalley", "想起过 4 次"]}
             faded={a.state === "fading"}
             warning={a.state === "fading" ? "30 天没想起，下周会忘掉" : undefined}

@@ -34,7 +34,7 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   mentions: Schema.mutable(Schema.Array(Schema.String)),
   session: Schema.optionalKey(SessionId),
   run: Schema.optionalKey(Schema.String),
-  outcome: Schema.optionalKey(Outcome),
+  outcome: Schema.NullOr(Outcome),
   spent: Schema.optionalKey(Spent),
   spoken: Schema.Boolean,
   sendKey: Schema.optionalKey(Schema.String),
@@ -65,13 +65,13 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   category: Schema.String,
   position: Schema.optionalKey(Schema.Finite),
   archived: Schema.optionalKey(Schema.Finite),
-  notify: Schema.optionalKey(Notify),
+  notify: Notify,
   root: Schema.optionalKey(MessageId),
   rootNumber: Schema.optionalKey(Schema.Finite),
   name: Schema.optionalKey(Schema.String),
   description: Schema.String,
-  project: Schema.optionalKey(Schema.String),
-  subjectKind: Schema.optionalKey(SubjectKind),
+  repo: Schema.optionalKey(Schema.String),
+  subjectKind: Schema.NullOr(SubjectKind),
   subjectId: Schema.optionalKey(Schema.String),
   lastNumber: Schema.optionalKey(Schema.Finite),
   replies: Schema.Finite,
@@ -103,13 +103,13 @@ export const SayRequest: Codec<T.SayRequest> = Schema.Struct({
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   station: Schema.optionalKey(Schema.Finite),
   agent: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   sendKey: Schema.optionalKey(Schema.String),
 });
 
 export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
   description: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   name: Schema.optionalKey(Schema.String),
   category: Schema.optionalKey(Schema.String),
   before: Schema.optionalKey(Schema.String),
@@ -119,7 +119,7 @@ export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
 export const ChannelRequest: Codec<T.ChannelRequest> = Schema.Struct({
   name: Schema.String,
   description: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
 });
 
 export const ChatReadRequest: Codec<T.ChatReadRequest> = Schema.Struct({

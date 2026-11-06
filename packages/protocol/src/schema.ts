@@ -4,7 +4,7 @@ export * from "./core/schema";
 export * from "./agent/schema";
 export * from "./runtime/schema";
 export * from "./memory/schema";
-export * from "./project/schema";
+export * from "./repo/schema";
 export * from "./session/schema";
 export * from "./mailbox/schema";
 export * from "./channel/schema";

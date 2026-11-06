@@ -36,42 +36,42 @@ describe("memory", () => {
   it("builds issue memories and compares explicit notes", () => {
     expect(issueMemoryText("给打卡接口加分页", "加好了（3f2a1bc）", "completed")).toBe("给打卡接口加分页 → 加好了（3f2a1bc）");
     expect(issueMemoryText("给打卡接口加分页", "pnpm test 没过", "failed")).toBe("给打卡接口加分页 → 没做成：pnpm test 没过");
-    const known = [{ id: "1", agent: "lab", kind: "note", text: "这个项目用 pnpm test 跑测试", project: "clock", at: 0, recalled: 0 }] as never;
-    expect(memoryIsNewNote(known, "这个项目用 pnpm test 跑测试", "clock")).toBe(false);
-    expect(memoryIsNewNote(known, "这个项目用 pnpm test 跑测试", "blog")).toBe(true);
+    const known = [{ id: "1", agent: "lab", kind: "note", text: "这个仓库用 pnpm test 跑测试", repo: "clock", at: 0, recalled: 0 }] as never;
+    expect(memoryIsNewNote(known, "这个仓库用 pnpm test 跑测试", "clock")).toBe(false);
+    expect(memoryIsNewNote(known, "这个仓库用 pnpm test 跑测试", "blog")).toBe(true);
     expect(memoryIsNewNote(known, "数据库迁移放在 db/migrations", "clock")).toBe(true);
   });
 
   it.effect("runs are kept, recalled and counted; notes written and forgotten", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "这个项目用 pnpm test 跑测试", project: "clock", by: session("w1") });
-      yield* m.write({ agent: "lab", text: "提交信息写中文", project: "", by: session("w1") });
+      yield* m.write({ agent: "lab", text: "这个仓库用 pnpm test 跑测试", repo: "clock", by: session("w1") });
+      yield* m.write({ agent: "lab", text: "提交信息写中文", repo: "", by: session("w1") });
       yield* m.keep({
         agent: "lab",
         session: "w1",
         issue: "i1",
-        project: "clock",
+        repo: "clock",
         brief: "加分页",
         outcome: "completed",
-        said: "记住：这个项目用 pnpm test 跑测试\n记住（所有项目）：提交信息写中文\n结论：加好了",
+        said: "记住：这个仓库用 pnpm test 跑测试\n记住（所有仓库）：提交信息写中文\n结论：加好了",
         summary: "加好了",
       });
       yield* m.keep({
         agent: "lab",
         session: "w1",
         issue: "i1",
-        project: "clock",
+        repo: "clock",
         brief: "加分页",
         outcome: "failed",
-        said: "记住：这个项目用 pnpm test 跑测试",
+        said: "记住：这个仓库用 pnpm test 跑测试",
         summary: "测试没过",
       });
       yield* m.keep({
         agent: "lab",
         session: "w2",
         issue: "i2",
-        project: "clock",
+        repo: "clock",
         brief: "不算",
         outcome: "interrupted",
         said: "记住：停下的不算",
@@ -81,16 +81,16 @@ describe("memory", () => {
       expect(all.map((x) => `${x.kind}:${x.text}`).toSorted()).toEqual([
         "issue:加分页 → 没做成：测试没过",
         "note:提交信息写中文",
-        "note:这个项目用 pnpm test 跑测试",
+        "note:这个仓库用 pnpm test 跑测试",
       ]);
-      expect(all.find((x) => x.text === "提交信息写中文")?.project).toBeUndefined();
-      const picked = yield* m.recall({ agent: "lab", session: "w9", project: "clock", text: "跑测试" });
+      expect(all.find((x) => x.text === "提交信息写中文")?.repo).toBeUndefined();
+      const picked = yield* m.recall({ agent: "lab", session: "w9", repo: "clock", text: "跑测试" });
       expect(picked.ids).toHaveLength(3);
-      expect(picked.lines[0]).toBe("- （这个项目）这个项目用 pnpm test 跑测试");
+      expect(picked.lines[0]).toBe("- （这个仓库）这个仓库用 pnpm test 跑测试");
       for (const x of yield* m.list("lab")) expect([x.recalled, x.recalledAt !== undefined]).toEqual([1, true]);
-      const note = yield* m.write({ agent: "lab", text: "  周末别派夜班  ", project: " clock ", by: owner });
-      expect([note.text, note.project, note.kind]).toEqual(["周末别派夜班", "clock", "note"]);
-      expect(yield* Effect.flip(m.write({ agent: "lab", text: "  ", project: "", by: owner }))).toMatchObject({ _tag: "Refused", reason: "要记的话是空的" });
+      const note = yield* m.write({ agent: "lab", text: "  周末别派夜班  ", repo: " clock ", by: owner });
+      expect([note.text, note.repo, note.kind]).toEqual(["周末别派夜班", "clock", "note"]);
+      expect(yield* Effect.flip(m.write({ agent: "lab", text: "  ", repo: "", by: owner }))).toMatchObject({ _tag: "Refused", reason: "要记的话是空的" });
       yield* m.forget("lab", note.id);
       // One that is not there is missing, not silently passed over.
       expect((yield* Effect.flip(m.forget("lab", "not-a-number")))._tag).toBe("Missing");
@@ -105,7 +105,7 @@ describe("memory", () => {
       const m = yield* Memory;
       const port = m.forAgent(defaultOrchestrator, defaultOrchestrator);
       yield* port.remember("agent note");
-      const written = yield* m.remember({ agent: defaultOrchestrator, text: "owner note", project: "", by: owner });
+      const written = yield* m.remember({ agent: defaultOrchestrator, text: "owner note", repo: "", by: owner });
       expect((yield* m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.author)).toEqual(["owner", "orchestrator"]);
       expect((yield* port.read()).prompt).toContain("主人交代：owner note");
       yield* port.rewrite("# notes\n- replacement note\n- 主人交代：owner note");
@@ -138,14 +138,14 @@ describe("memory", () => {
   it.effect("a preview picks without counting, and the longest unused fade", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "clock 的测试用 pnpm test", project: "clock", by: owner });
-      yield* m.write({ agent: "lab", text: "提交前跑 lint", project: "", by: owner });
+      yield* m.write({ agent: "lab", text: "clock 的测试用 pnpm test", repo: "clock", by: owner });
+      yield* m.write({ agent: "lab", text: "提交前跑 lint", repo: "", by: owner });
       const preview = yield* m.recallOf("lab", "clock", "");
-      expect(preview.lines).toEqual(["- （这个项目）clock 的测试用 pnpm test", "- （所有项目）提交前跑 lint"]);
+      expect(preview.lines).toEqual(["- （这个仓库）clock 的测试用 pnpm test", "- （所有仓库）提交前跑 lint"]);
       expect(preview.limit).toBe(recallChars);
       for (const x of yield* m.list("lab")) expect([x.recalled, x.fading]).toEqual([0, false]);
       expect((yield* m.recallOf("lab", "", "")).lines).toEqual([]);
-      for (let i = 0; i < 300 - 10; i++) yield* m.write({ agent: "lab", text: `第 ${i} 条，各不相同 ${i * 7919}`, project: "", by: owner });
+      for (let i = 0; i < 300 - 10; i++) yield* m.write({ agent: "lab", text: `第 ${i} 条，各不相同 ${i * 7919}`, repo: "", by: owner });
       expect((yield* m.list("lab")).filter((x) => x.fading)).toHaveLength(2);
     }).pipe(Effect.provide(world())),
   );
@@ -153,13 +153,13 @@ describe("memory", () => {
   it.effect("the search index follows the table", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
-      const note = yield* m.write({ agent: "lab", text: "这个项目测试用 pnpm test", project: "demo", by: owner });
-      yield* m.write({ agent: "other", text: "测试前先装依赖", project: "demo", by: owner });
-      const found = (yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 })).found;
+      const note = yield* m.write({ agent: "lab", text: "这个仓库测试用 pnpm test", repo: "demo", by: owner });
+      yield* m.write({ agent: "other", text: "测试前先装依赖", repo: "demo", by: owner });
+      const found = (yield* m.search({ agent: "lab", repo: "", text: "跑一遍测试", kind: "", limit: 0 })).found;
       expect(found.map((f) => f.id)).toEqual([note.id]);
       expect(found[0]!.score).toBeGreaterThan(0.5);
       yield* m.forget("lab", note.id);
-      expect((yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 })).found).toEqual([]);
+      expect((yield* m.search({ agent: "lab", repo: "", text: "跑一遍测试", kind: "", limit: 0 })).found).toEqual([]);
     }).pipe(Effect.provide(world())),
   );
 
@@ -179,7 +179,7 @@ describe("memory", () => {
     agent: "lab",
     session,
     issue: "i1",
-    project: "demo",
+    repo: "demo",
     brief: "work",
     said,
     summary: "",
@@ -189,13 +189,13 @@ describe("memory", () => {
   it.effect("regression: a chat run keeps explicit notes without recording work on an issue", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
-      yield* m.keep({ agent: "lab", session: "chat", project: "demo", brief: "解释一下测试", outcome: "completed", said: "解释好了", summary: "解释好了" });
+      yield* m.keep({ agent: "lab", session: "chat", repo: "demo", brief: "解释一下测试", outcome: "completed", said: "解释好了", summary: "解释好了" });
       expect(yield* m.list("lab")).toEqual([]);
-      yield* m.write({ agent: "lab", text: "这个项目用 pnpm test 跑测试", project: "", by: session("chat") });
+      yield* m.write({ agent: "lab", text: "这个仓库用 pnpm test 跑测试", repo: "", by: session("chat") });
       expect((yield* m.list("lab")).map(({ kind, text, session }) => ({ kind, text, session }))).toEqual([
-        { kind: "note", text: "这个项目用 pnpm test 跑测试", session: "chat" },
+        { kind: "note", text: "这个仓库用 pnpm test 跑测试", session: "chat" },
       ]);
-      expect((yield* m.list("lab"))[0]?.project).toBeUndefined();
+      expect((yield* m.list("lab"))[0]?.repo).toBeUndefined();
     }).pipe(Effect.provide(world())),
   );
 
@@ -218,8 +218,8 @@ describe("memory", () => {
   it.effect("explicit notes are independent records", () =>
     Effect.gen(function* () {
       const m = yield* Memory;
-      yield* m.write({ agent: "lab", text: "use pnpm test", project: "demo", by: session("s1") });
-      yield* m.write({ agent: "lab", text: "use pnpm test", project: "demo", by: session("s1") });
+      yield* m.write({ agent: "lab", text: "use pnpm test", repo: "demo", by: session("s1") });
+      yield* m.write({ agent: "lab", text: "use pnpm test", repo: "demo", by: session("s1") });
       expect(yield* m.list("lab")).toHaveLength(2);
     }).pipe(Effect.provide(world())),
   );
@@ -231,15 +231,14 @@ describe("memory", () => {
       const m = yield* Memory;
       for (let i = 0; i < memoryKeep; i++) {
         const id = `old-${String(i).padStart(3, "0")}`;
-        if (i % 2 === 0)
-          yield* q.addNote({ id, agent: "lab", body: id, terms: "", terms_of: 0, project: null, session: null, author: "session", created_at: 1 });
-        else yield* q.keepIssueMemory({ id, agent: "lab", body: id, terms: "", terms_of: 0, project: null, session: id, created_at: 1 });
+        if (i % 2 === 0) yield* q.addNote({ id, agent: "lab", body: id, terms: "", terms_of: 0, repo: null, session: null, author: "session", created_at: 1 });
+        else yield* q.keepIssueMemory({ id, agent: "lab", body: id, terms: "", terms_of: 0, repo: null, session: id, created_at: 1 });
       }
       const before = yield* m.list("lab");
       const predicted = before.filter((x) => x.fading).map((x) => x.id);
       yield* Effect.forEach(
         ["apple", "banana", "cherry", "durian", "elephant", "flamingo", "giraffe", "hamster"],
-        (text, index) => m.write({ agent: "lab", text, project: "", by: session(String(index)) }),
+        (text, index) => m.write({ agent: "lab", text, repo: "", by: session(String(index)) }),
         { discard: true },
       );
       yield* m.keep(run("0", ""));
@@ -255,7 +254,7 @@ describe("memory", () => {
     mkdirSync(join(agentHome(config, defaultOrchestrator), "MEMORY.md"), { recursive: true });
     return Effect.gen(function* () {
       const m = yield* Memory;
-      const note = yield* m.remember({ agent: defaultOrchestrator, text: "database memory", project: "", by: owner });
+      const note = yield* m.remember({ agent: defaultOrchestrator, text: "database memory", repo: "", by: owner });
       expect((yield* m.memoriesOf(defaultOrchestrator)).memories[0]?.id).toBe(note.id);
       expect((yield* Effect.flip(m.previewForget("orchestrator", "m1")))._tag).toBe("Missing");
       expect((yield* Effect.flip(m.forget("orchestrator", "m1")))._tag).toBe("Missing");

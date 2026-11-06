@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import type { ControlOutcome, Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
@@ -10,10 +10,10 @@ import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
 
 import { type ApiError, messageOf, reasonOf, refused } from "#/base/errors.ts";
-import { projectsDir, ServerConfig } from "#/infra/config.ts";
+import { reposDir, ServerConfig } from "#/infra/config.ts";
 import { probeInstallation, Runtime } from "#/runtime/runtime.ts";
 
-type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "project" | "issue" | "channel">;
+type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "repo" | "issue" | "channel">;
 
 /** An acquired execution remains present until every runtime resource confirms disposal. */
 export interface Execution {
@@ -268,7 +268,7 @@ const make = Effect.gen(function* () {
         runtimes: { get: (rid) => (rid === base.id ? mine : undefined) },
         maxRunning,
         maxDepth: 1,
-        cwd: resolve(projectsDir(config)),
+        cwd: reposDir(config),
         logDir: join(config.home, "logs"),
       });
       const allocation: Allocation = {
@@ -277,7 +277,7 @@ const make = Effect.gen(function* () {
           id,
           agent: owner.agent,
           runtime: owner.runtime,
-          ...(owner.project === undefined ? {} : { project: owner.project }),
+          ...(owner.repo === undefined ? {} : { repo: owner.repo }),
           ...(owner.issue === undefined ? {} : { issue: owner.issue }),
           ...(owner.channel === undefined ? {} : { channel: owner.channel }),
         },

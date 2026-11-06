@@ -3,8 +3,10 @@ import { Schema } from "effect";
 import { QuotedBlock } from "../artifact/schema";
 import { ChannelType } from "../channel/schema";
 import type { Codec } from "../codec";
+import { IssueId } from "../common/schema";
 import { RunTrigger } from "../session/schema";
 import * as T from "../shapes";
+import { TriggerAddressingValues, TriggerKindValues, VoiceModeValues } from "./shapes";
 
 const CardAttachmentSchema: Codec<T.CardAttachment> = Schema.Struct({
   id: Schema.String,
@@ -38,20 +40,20 @@ export const TriggerContext: Codec<T.TriggerContext> = Schema.Struct({
   attachments: Schema.optionalKey(Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String }))),
   artifact: Schema.optionalKey(Schema.Struct({ id: Schema.String, title: Schema.String, version: Schema.Int })),
   blocks: Schema.optionalKey(Schema.Array(QuotedBlock)),
-  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
+  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), repo: Schema.optionalKey(Schema.String) })),
   responsePort: Schema.optionalKey(Schema.String),
-  voiceMode: Schema.optionalKey(Schema.Literals(["dictated", "conversation", "api"])),
+  voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
 });
 
 export const TriggerMeta: Codec<T.TriggerMeta> = Schema.Struct({
-  issue: Schema.optionalKey(Schema.String),
+  issue: Schema.optionalKey(IssueId),
   ingressRecipient: Schema.optionalKey(Schema.String),
   trigger: Schema.optionalKey(RunTrigger),
   dispatch: Schema.optionalKey(Schema.Boolean),
   cron: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   pr: Schema.optionalKey(Schema.Int),
-  kind: Schema.optionalKey(Schema.Literals(["ci", "review", "comment"])),
+  kind: Schema.optionalKey(Schema.Literals(TriggerKindValues)),
   head: Schema.optionalKey(Schema.String),
   fingerprint: Schema.optionalKey(Schema.String),
   failed: Schema.optionalKey(Schema.Boolean),
@@ -61,18 +63,18 @@ export const TriggerMeta: Codec<T.TriggerMeta> = Schema.Struct({
   inputContext: Schema.optionalKey(TriggerContext),
   channelType: Schema.optionalKey(ChannelType),
   responsePort: Schema.optionalKey(Schema.String),
-  voiceMode: Schema.optionalKey(Schema.Literals(["dictated", "conversation", "api"])),
+  voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
 });
 
 export const Trigger: Codec<T.Trigger> = Schema.Struct({
   id: Schema.String,
   source: Schema.Literals(T.TriggerSourceValues),
   actor: Schema.Struct({ kind: Schema.Literals(T.TriggerActorKindValues), id: Schema.String, name: Schema.optionalKey(Schema.String) }),
-  addressed: Schema.Literals(["direct", "mention", "thread_owner", "unaddressed"]),
+  addressed: Schema.Literals(TriggerAddressingValues),
   threads: Schema.Array(Schema.String),
   replyTo: Schema.optionalKey(Schema.String),
   replyChannel: Schema.optionalKey(Schema.String),
-  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
+  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), repo: Schema.optionalKey(Schema.String) })),
   card: CompactCard,
   meta: TriggerMeta,
   at: Schema.Finite,

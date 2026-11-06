@@ -8,28 +8,18 @@ import type { Tool } from "./core/loop.ts";
 import { schemaTool } from "./core/tool.ts";
 import { reminders as reminderWords } from "./prompts.ts";
 
-export interface Reminder {
-  readonly id: string;
-  readonly name: string;
-  readonly message: string;
-  /** One of: a cron expression, a moment (ISO), every so many minutes. */
-  readonly cron?: string;
-  readonly at?: string;
-  readonly everyMinutes?: number;
-  readonly created: string;
-  readonly lastRun?: string;
-}
-
-const ReminderSchema: Schema.Codec<Reminder> = Schema.Struct({
+const ReminderSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   message: Schema.String,
+  /** One of: a cron expression, a moment (ISO), every so many minutes. */
   cron: Schema.optionalKey(Schema.String),
   at: Schema.optionalKey(Schema.String),
   everyMinutes: Schema.optionalKey(Schema.Finite),
   created: Schema.String,
   lastRun: Schema.optionalKey(Schema.String),
 });
+export type Reminder = typeof ReminderSchema.Type;
 
 const parseDate = (text: string) => {
   const d = new Date(text.trim());

@@ -12,7 +12,7 @@ import { type ServerConfig } from "#/infra/config.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import type { Issue } from "#/issue/issue.ts";
 import { Mcp } from "#/mcp/mcp.ts";
-import { type GitHubRun, type ProjectHooks } from "#/project/project.ts";
+import { type GitHubRun, type RepoHooks } from "#/repo/repo.ts";
 import { registryOf } from "#/runtime/runtime.ts";
 import { agentSessions, agents, collaboration, ingress, issues, mailbox, platform, resources, type ServiceOptions, sourceControl } from "#/services.ts";
 import { Tool } from "#/tool/tool.ts";
@@ -26,7 +26,7 @@ const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: 
 /** For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. */
 export const quietApp = {
   runtime: { background: false },
-  project: { gh: noGitHub },
+  repo: { gh: noGitHub },
   orchestrator: { listen: false },
 } satisfies ServiceOptions;
 
@@ -34,8 +34,8 @@ export interface WorldOptions {
   readonly config?: ServerConfig["Service"];
   /** The runtimes sessions run on; each is probed as installed. */
   readonly runtimes?: readonly Runtime[];
-  readonly projects?: ProjectHooks;
-  /** Projects made before the farm starts, each a git repository with one commit. */
+  readonly repoHooks?: RepoHooks;
+  /** Repos made before the farm starts, each a git repository with one commit. */
   readonly repos?: readonly string[];
   readonly stallMs?: number;
   /** What a runtime's account says of its quota or balance; none when absent. */
@@ -49,14 +49,14 @@ export function worldBelowIngress(options: WorldOptions = {}) {
   const base = options.config ?? testConfig();
   const config = options.stallMs !== undefined ? { ...base, session: { ...base.session, stallSeconds: options.stallMs / 1000 } } : base;
   for (const name of options.repos ?? []) {
-    const dir = join(config.workRoot, "projects", name);
+    const dir = join(config.workRoot, "repos", name);
     mkdirSync(dir, { recursive: true });
     repo(dir, 1, 0);
   }
   const given = options.runtimes ?? [];
   const o: ServiceOptions = {
     runtime: { registry: registryOf(given), background: false, probe: installedOnly(given, options.usage), usageOf: async () => options.usage?.() ?? null },
-    project: { gh: noGitHub, ...options.projects },
+    repo: { gh: noGitHub, ...options.repoHooks },
   };
   const below = platform(config);
   return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), agentSessions, mailbox, collaboration, issues);

@@ -1,6 +1,6 @@
 # @vibevalley/tsrs
 
-TypeScript here runs on [tsrs](https://github.com/oxc-project/tsrs), the Rust port of TypeScript 7, in two places:
+TypeScript here runs on [tsrs](https://github.com/oxc-repo/tsrs), the Rust port of TypeScript 7, in two places:
 
 - **`vp check`**: oxlint's type-aware rules and the type check (`typeAware`, `typeCheck` in the root
   `vite.config.ts`) run through a tsgolint binary that Vite+ resolves from `oxlint-tsgolint`. This package stands in

@@ -12,7 +12,6 @@ import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
-import { recordTrigger } from "#/mailbox/payload.ts";
 import { Session } from "#/session/session.ts";
 import { messageByID, notificationReceipt, ownerReadReports } from "#db/channel_message.sql.ts";
 
@@ -113,16 +112,18 @@ const make = Effect.gen(function* () {
       byChannel,
       ([channel, notes]) =>
         Effect.flatMap(chat.topOf(channel), (top) =>
-          recordTrigger(db, {
-            key: `${channel}:${now}:${notes.map((note) => note.key).join(",")}`,
-            source: "patrol",
-            actor: { kind: "system", id: "patrol" },
-            addressed: "direct",
-            threads: [],
-            replyChannel: channel,
-            at: now,
-            text: patrolText(top.name, notes),
-          }).pipe(Effect.flatMap(mailbox.receive)),
+          mailbox
+            .recordTrigger({
+              key: `${channel}:${now}:${notes.map((note) => note.key).join(",")}`,
+              source: "patrol",
+              actor: { kind: "system", id: "patrol" },
+              addressed: "direct",
+              threads: [],
+              replyChannel: channel,
+              at: now,
+              text: patrolText(top.name, notes),
+            })
+            .pipe(Effect.flatMap(mailbox.receive)),
         ),
       { discard: true },
     ).pipe(bestEffort("vibevalley: patrol inputs were not kept"));

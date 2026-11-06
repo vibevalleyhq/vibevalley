@@ -3,7 +3,7 @@ import { stories, story } from "@vibevalley/stories";
 
 import { AgentCard } from "./AgentsPage";
 
-const look: Look = { species: "bear", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" };
+const look: Look = { species: "bear", outfit: "farmer", orchestrator: null, build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" };
 
 const agent = (more: Partial<Agent> = {}): Agent => ({
   id: "backend",

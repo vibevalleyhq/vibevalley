@@ -33,7 +33,7 @@ describe("the endpoints the agents' tools stand on", () => {
       expect(channels.map((c) => c.type)).toEqual(["channel", "direct"]);
       expect(yield* call(() => api.channel.unread.list())).toEqual([]);
 
-      const open = yield* call(() => api.issue.create({ title: "修登录", project: "app" }));
+      const open = yield* call(() => api.issue.create({ title: "修登录", repo: "app" }));
       const read = yield* call(() => api.issue.get({ id: open.id }));
       for (const id of [open.id, String(open.number), `#${open.number}`]) {
         expect(yield* call(() => api.issue.get({ id }))).toEqual(read);
@@ -47,7 +47,7 @@ describe("the endpoints the agents' tools stand on", () => {
       }
       yield* call(() => api.issue.create({ title: "加打卡" }));
       expect((yield* call(() => api.issue.list({}))).map((t) => t.title).toSorted()).toEqual(["修登录", "加打卡"]);
-      expect((yield* call(() => api.issue.list({ project: "app" }))).map((t) => t.title)).toEqual(["修登录"]);
+      expect((yield* call(() => api.issue.list({ repo: "app" }))).map((t) => t.title)).toEqual(["修登录"]);
       expect(yield* call(() => api.issue.list({ status: "done" }))).toEqual([]);
       // Nothing was handed back to review, and no session works it to split it.
       expect(yield* refusal(() => api.issue.review({ id: `#${open.number}`, pass: true }))).toBe("Refused");
@@ -55,7 +55,7 @@ describe("the endpoints the agents' tools stand on", () => {
 
       expect(yield* call(() => api.memory.search({ text: "登录" }))).toMatchObject({ found: [] });
 
-      const doc = yield* call(() => api.artifact.create({ title: "说明" }));
+      const doc = yield* call(() => api.artifact.create({ title: "说明", kind: "markdown" }));
       const made = yield* call(() => api.artifact.block.create({ id: doc.id, type: "heading", level: 1, text: "开头" }));
       expect(made).toMatchObject({ status: "applied", rev: 1 });
       expect(yield* call(() => api.artifact.block.update({ id: doc.id, block: made.blockId, baseRev: 1, text: "新的开头" }))).toMatchObject({
@@ -137,7 +137,7 @@ describe("the endpoints the agents' tools stand on", () => {
     Effect.gen(function* () {
       const api = yield* farm;
       const before = Date.now();
-      const made = yield* call(() => api.artifact.create({ title: "插入" }));
+      const made = yield* call(() => api.artifact.create({ title: "插入", kind: "markdown" }));
       const inserted = newId();
       yield* call(() =>
         api.artifact.submit({

@@ -18,13 +18,16 @@
 | `apps/server/src/mailbox/routing.ts` | 受众计算与四档紧急度排序 |
 | `apps/server/src/mailbox/brakes.ts`、`deliveries.ts` | 三道刹车计算与未终结投递缓存 |
 | `apps/server/src/mailbox/work.ts` | 工单蓄水池（Tier 1）、退回转交（`handback`）与投递写入（`forward`） |
-| `apps/server/src/mailbox/payload.ts` | `mailbox_trigger` 记录与路由回执（`routed_at`、`routing_scope`、`routing_position`）读写 |
+| `apps/server/src/mailbox/triggers.ts` | 服务内部的触发器记录、读取、来源查询与 cron 重放 |
+| `apps/server/src/mailbox/payload.ts`、`envelope.ts` | 共享形状、编码与纯转换，不读写数据库 |
 | `apps/server/src/mailbox/pump.ts` | 空闲会话唤醒、忙时批次 `steer` 与管家流推送 |
 
 ## 模型和不变量
 
+- **触发器存储只经 Mailbox 服务**：上游调用 `recordTrigger`、`recordChannelTrigger`、`readTrigger`、`knownGitHubEvents` 与 `replayCronTriggers`，不传 `Db` 或 SQL 参数。记录方法参与调用方的事务，不另起纤程、不投递或唤醒；重复来源保留第一次记录的触发器和原文。`unreadSummary` 统一读取未读摘要。
+- **跨模块入口由检查限定**：外部只导入 `mailbox.ts` 服务或 `payload.ts`、`envelope.ts`、`prompts.ts` 共享契约。共享契约不能导入数据库、基础设施或模块内部实现；`modules.test.ts` 同时检查直接导入、重导出与字面量动态导入。
 - **来源先落库，投递行与路由回执同事务提交**：
-  - 上游模块先持久化消息或 `Trigger`，再调用 `Mailbox.receive`。
+  - 上游经 Mailbox 记录 `Trigger`，来源游标可与它在同一事务内提交；提交后再调用 `Mailbox.receive`。
   - `Mailbox` 在同一事务内写入 `mailbox_delivery` 并更新 `mailbox_trigger` 的路由回执；中途崩溃时于重启后重放。
 - **至少投递一次，真实入模才算消费（`consumed`）**：
   - 投递交给会话时标为 `handed`；仅当收到 `Session.inputsConsumed` 回执时才标为 `consumed`。
@@ -41,7 +44,7 @@
 
 ## 怎么走
 
-1. `Channel`、`Ingress`、`Issue` 或 `Cron` 持久化 `Trigger` 后调用 `Mailbox.receive`。
+1. `Channel`、`Ingress`、`Issue` 或 `Cron` 经 Mailbox 服务持久化 `Trigger`，提交后调用 `Mailbox.receive`。
 2. `Mailbox` 在信箱写锁内计算受众、检查工单蓄水门禁与三道刹车，原子写入 `mailbox_delivery` 与路由回执。
 3. `pump.ts` 唤醒空闲帮工、对正忙帮工攒批（`chat.notice_batch_ms` = 3s）发送插话提示，或推入管家的 `forOrchestrator` 流。
 4. 会话换人或关单时，未消费的主人追问以确定性返回编号转交新负责人或管家。
@@ -58,4 +61,5 @@
 
 ## 怎么验证
 
+- `apps/server/src/mailbox/triggers.test.ts`：来源游标与触发器共同回滚、重复来源保留原文、记录与重放读取不隐式路由。
 - `apps/server/src/mailbox/*.test.ts`、`apps/server/src/flows/mailbox-order.test.ts`、`flows/returns.test.ts`、`flows/handoff.test.ts`：投递顺序、三道刹车、工单蓄水、换人退回与重启重放测试。

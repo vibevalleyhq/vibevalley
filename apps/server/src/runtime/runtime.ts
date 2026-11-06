@@ -15,7 +15,7 @@ import type * as T from "@vibevalley/protocol";
 import { Agent, modelClient } from "#/agent/agent.ts";
 import { type ApiError, messageOf, refused } from "#/base/errors.ts";
 import { Core } from "#/core/core.ts";
-import { projectsDir, ServerConfig } from "#/infra/config.ts";
+import { reposDir, ServerConfig } from "#/infra/config.ts";
 import { timeHere, withinRealTime } from "#/infra/time.ts";
 import { Setting } from "#/setting/setting.ts";
 
@@ -296,7 +296,7 @@ const make = (options: RuntimeOptions = {}) =>
               version: found.version || null,
             }
           : { status: "available", via: "bundled", command: id, version: null };
-      const cwd = projectsDir(config);
+      const cwd = reposDir(config);
       const listModels = runtime.listModels;
       const [models, usage, skills, mcpServers, tools] = yield* Effect.all(
         [
@@ -321,7 +321,7 @@ const make = (options: RuntimeOptions = {}) =>
             name: s.name,
             description: s.description ?? "",
             source: s.path || s.source || "",
-            ...(s.enabled !== undefined ? { enabled: s.enabled } : {}),
+            enabled: s.enabled ?? true,
           })),
           inventory(runtime.mcpServers, found, cwd, (m) => {
             const parts = [m.status, m.toolCount !== undefined ? t("server.runtime.tools", { n: m.toolCount }) : ""].filter(Boolean);
@@ -329,14 +329,14 @@ const make = (options: RuntimeOptions = {}) =>
               name: m.name,
               description: parts.join(" · "),
               source: m.source ?? "",
-              ...(m.enabled !== undefined ? { enabled: m.enabled } : {}),
+              enabled: m.enabled ?? true,
             };
           }),
           inventory(runtime.tools, found, cwd, (item) => ({
             name: item.name,
             description: item.description ?? "",
             source: item.mcpServerId || item.source || "",
-            ...(item.enabled !== undefined ? { enabled: item.enabled } : {}),
+            enabled: item.enabled ?? true,
           })),
         ],
         { concurrency: 4 },

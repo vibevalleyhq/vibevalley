@@ -142,7 +142,7 @@ function ChannelMain(props: {
   const [membersOpen, setMembersOpen] = createSignal(false);
   const name = () => channelName(props.channel);
   const about = () =>
-    [props.channel?.description, props.channel?.project ? t("web.channel.defaultProject", { project: props.channel.project }) : ""].filter(Boolean).join(" · ");
+    [props.channel?.description, props.channel?.repo ? t("web.channel.defaultRepo", { repo: props.channel.repo }) : ""].filter(Boolean).join(" · ");
   return (
     <section class="flex min-w-0 flex-1 flex-col" aria-label={channelLabel(props.channel)}>
       <header data-testid="channel-head" data-key={props.channel?.id} class={[channelHeadClass, "gap-3 px-4"]}>

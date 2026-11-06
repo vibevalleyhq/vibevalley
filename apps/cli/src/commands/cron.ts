@@ -69,12 +69,12 @@ export const cronCommand = Command.make("cron").pipe(
         at: optionalText("at", "cli.flag.at"),
         channel: optionalText("channel", "cli.flag.channel"),
         agent: optionalText("agent", "cli.flag.agent"),
-        project: optionalText("project", "cli.flag.project"),
+        repo: optionalText("repo", "cli.flag.repo"),
       },
       (o) =>
         Effect.gen(function* () {
           const when = yield* whenOf({ every: given(o.every), daily: given(o.daily), cron: given(o.cron), at: given(o.at) });
-          const fields = { channel: given(o.channel), agent: given(o.agent), project: given(o.project) };
+          const fields = { channel: given(o.channel), agent: given(o.agent), repo: given(o.repo) };
           yield* change({
             name: "cron create",
             does: (api) =>
@@ -84,7 +84,7 @@ export const cronCommand = Command.make("cron").pipe(
                 when,
                 ...(fields.channel ? { channel: fields.channel } : {}),
                 ...(fields.agent ? { agent: fields.agent } : {}),
-                ...(fields.project ? { project: fields.project } : {}),
+                ...(fields.repo ? { repo: fields.repo } : {}),
               }),
             said: cronLine,
           });

@@ -59,7 +59,7 @@ it.live("regression: cancelling a close caller leaves disposal owned by the exec
     if (id === undefined) return;
     yield* until(() => sessions.sessionOf(id)?.phase._tag === "working", "the active turn");
     const acquired = executor.find(id)!;
-    expect(Object.keys(acquired.owner).toSorted()).toEqual(["agent", "id", "issue", "project", "runtime"]);
+    expect(Object.keys(acquired.owner).toSorted()).toEqual(["agent", "id", "issue", "repo", "runtime"]);
     expect(Object.keys(acquired).toSorted()).toEqual(["attached", "closing", "owner", "pendingTasks", "sessionId"]);
     const closing = yield* Effect.forkChild(executor.close(id));
     yield* Effect.promise(() => disposing);

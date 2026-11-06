@@ -7,23 +7,23 @@ import { intake, orchestratorInboxLines, situationDelta } from "./situation.ts";
 describe("the orchestrator's rules", () => {
   it("say what changed in the farm, or the whole when most did", () => {
     const before =
-      "【现状】\n项目：demo\n可以派的帮工：\n- 老周\n- 小吴\n- 阿郑\n各频道里在场的帮工：\n#general\n  （没有帮工）\n#clock-in\n  （没有帮工）\n你正在回话的频道：#general";
+      "【现状】\n仓库：demo\n可以派的帮工：\n- 老周\n- 小吴\n- 阿郑\n各频道里在场的帮工：\n#general\n  （没有帮工）\n#clock-in\n  （没有帮工）\n你正在回话的频道：#general";
     const cases: [string, string, string][] = [
       ["unchanged", before, ""],
       [
         "a line added",
-        "【现状】\n项目：demo\n可以派的帮工：\n- 老周\n- 小吴\n- 阿郑\n各频道里在场的帮工：\n#general\n  （没有帮工）\n#clock-in\n- w1 在 clock-in\n你正在回话的频道：#general",
+        "【现状】\n仓库：demo\n可以派的帮工：\n- 老周\n- 小吴\n- 阿郑\n各频道里在场的帮工：\n#general\n  （没有帮工）\n#clock-in\n- w1 在 clock-in\n你正在回话的频道：#general",
         "【现状变了】\n#clock-in\n+ - w1 在 clock-in\n−   （没有帮工）",
       ],
       [
         "a line gone",
-        "【现状】\n项目：demo\n可以派的帮工：\n- 老周\n- 阿郑\n各频道里在场的帮工：\n#general\n  （没有帮工）\n#clock-in\n  （没有帮工）\n你正在回话的频道：#general",
+        "【现状】\n仓库：demo\n可以派的帮工：\n- 老周\n- 阿郑\n各频道里在场的帮工：\n#general\n  （没有帮工）\n#clock-in\n  （没有帮工）\n你正在回话的频道：#general",
         "【现状变了】\n可以派的帮工：\n− - 小吴",
       ],
       [
         "most of it changed",
-        "【现状】\n项目：notes\n可以派的帮工：\n- 老吴\n各频道里在场的帮工：\n#general\n- w2\n你正在回话的频道：#clock-in",
-        "【现状】\n项目：notes\n可以派的帮工：\n- 老吴\n各频道里在场的帮工：\n#general\n- w2\n你正在回话的频道：#clock-in",
+        "【现状】\n仓库：notes\n可以派的帮工：\n- 老吴\n各频道里在场的帮工：\n#general\n- w2\n你正在回话的频道：#clock-in",
+        "【现状】\n仓库：notes\n可以派的帮工：\n- 老吴\n各频道里在场的帮工：\n#general\n- w2\n你正在回话的频道：#clock-in",
       ],
     ];
     for (const [name, now, want] of cases) expect({ name, got: situationDelta(before, now) }).toEqual({ name, got: want });

@@ -129,7 +129,7 @@ export function Overlay() {
           center: true,
           rows: [
             [words(plotTitle(bed, session, plot.crop))],
-            ...(session?.project ? [[words(session.project, CardColors.muted)]] : []),
+            ...(session?.repo ? [[words(session.repo, CardColors.muted)]] : []),
             [words(aim.ok ? t("web.farm.overlay.click", { text: aim.text }) : aim.text, aim.ok ? CardColors.good : CardColors.muted)],
           ],
         };
@@ -139,10 +139,10 @@ export function Overlay() {
         card = { rows: [[words(note.text ?? "")]] };
       } else if (plot.badge) {
         const [paper, ink] = badgeColors[plot.badge.tone];
-        card = { paper, ink, rows: [[words(plot.badge.text)], ...(session?.project ? [[words(session.project, ink)]] : [])] };
-      } else if (session?.project) {
-        // Plots of several projects share the farm: each says whose it is.
-        card = { padX: 3, padY: 0, rows: [[words(session.project, CardColors.muted)]] };
+        card = { paper, ink, rows: [[words(plot.badge.text)], ...(session?.repo ? [[words(session.repo, ink)]] : [])] };
+      } else if (session?.repo) {
+        // Plots of several repos share the farm: each says whose it is.
+        card = { padX: 3, padY: 0, rows: [[words(session.repo, CardColors.muted)]] };
       } else if (bed.unlockLevel !== undefined && plot.crop === "locked") {
         where = "middle";
         card = { rows: [[words(t("web.farm.overlay.clearAt", { level: bed.unlockLevel }))]] };

@@ -8,6 +8,7 @@ const issueDeleteInput = input({ id: Schema.String });
 const issueStatusUpdateInput = input({ id: Schema.String }, S.IssueStatusRequest);
 
 export interface IssueHandlers<R = never> {
+  readonly "issue.conversation.get": (a: { readonly id: string }) => Effect.Effect<string | null, ApiError, R>;
   /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
   readonly "issue.comment.create": (a: { readonly id: string } & T.CommentRequest) => Effect.Effect<T.Applied, ApiError, R>;
   readonly "issue.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
@@ -37,6 +38,7 @@ export interface IssueHandlers<R = never> {
 }
 
 export const issueEndpoints: readonly Endpoint[] = [
+  { op: "issue.conversation.get", about: ["id"], input: input({ id: Schema.String }), result: Schema.NullOr(Schema.String), can: ["owner", "remote"] },
   {
     op: "issue.comment.create",
     about: ["id"],

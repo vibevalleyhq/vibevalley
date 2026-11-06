@@ -586,7 +586,7 @@ export default defineConfig({
         files: ["apps/**", "packages/**"],
         excludeFiles: [
           "**/scripts/**",
-          "apps/server/src/project/git.ts",
+          "apps/server/src/repo/git.ts",
           "apps/server/src/runtime/dsh.ts",
           "apps/server/src/voice/line.ts",
           "apps/server/src/testing/git.ts",

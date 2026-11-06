@@ -19,7 +19,7 @@ Status: proposed
 
 ## Acceptance criteria
 
-- 每台新启用农机均可在真实项目 worktree 中完成改代码、跑测试、调用 `issue_report` 汇报并合入主分支。
+- 每台新启用农机均可在真实仓库 worktree 中完成改代码、跑测试、调用 `issue_report` 汇报并合入主分支。
 
 ## Risks
 

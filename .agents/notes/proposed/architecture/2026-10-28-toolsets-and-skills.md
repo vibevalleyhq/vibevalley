@@ -20,14 +20,14 @@ Status: proposed
 
 | 优先级 | 来源 | 路径 | 能否在工作台修改 |
 |---|---|---|---|
-| 1 | 项目技能 | `<项目>/.agents/skills/`、`.claude/skills/` | 否（随项目仓库） |
+| 1 | 仓库技能 | `<仓库>/.agents/skills/`、`.claude/skills/` | 否（随仓库仓库） |
 | 2 | 农场技能书 | `$VIBEVALLEY_HOME/skills/<name>/`（取代 `config.json` 的 `skills` 段） | 能（新建、编辑、删除、从本机目录导入） |
 | 3 | 本机全局 | `~/.agents/skills/`、`~/.claude/skills/` | 否 |
 | 4 | 农机自带 | oar 探测清单 | 否（仅展示） |
 
 ### 2. 只给目录，正文按需读
 
-- **进程内 `Brain`（管家、`vibevalley` 农机、CLI）**：去掉管家的 `noSkills`；将档案勾选的技能（及项目技能）目录注入系统提示 `skills` 段，模型调 `load_skill` 时再读 `SKILL.md` 正文。
+- **进程内 `Brain`（管家、`vibevalley` 农机、CLI）**：去掉管家的 `noSkills`；将档案勾选的技能（及仓库技能）目录注入系统提示 `skills` 段，模型调 `load_skill` 时再读 `SKILL.md` 正文。
 - **外部农机帮工**：在任务说明末尾附上已勾选技能的「名称、简介、`SKILL.md` 绝对路径」，由农机用自身读文件工具按需读取（农机自身已能扫到的不重复列）。
 
 ### 3. 档案级工具集（`Agent.toolsets`）
@@ -38,7 +38,7 @@ Status: proposed
 |---|---|---|
 | `chat` | 频道读写、回应与收件箱查询 | 管家、帮工 |
 | `memory` | 记性检索、新增与重写 | 管家、帮工 |
-| `look` | 工单、帮工、diff、项目、笔记与资源的只读查询 | 管家、帮工 |
+| `look` | 工单、帮工、diff、仓库、笔记与资源的只读查询 | 管家、帮工 |
 | `issue` | 工单创建、修改、挪状态、派活、拆子工单、叫停与验收 | 管家（赋给帮工即为领班） |
 | `cron` | 定时任务创建、查询与删除 | 管家 |
 | `channel` | 频道创建与设置修改 | 管家 |
@@ -56,7 +56,7 @@ Status: proposed
 ## Alternatives considered
 
 - **技能正文继续整段拼进人设**：每勾一个技能每轮都重复计费，且无法携带附属参考文件。
-- **把技能复制进帮工 worktree 的 `.claude/skills/`**：会污染项目工作区的 `git status`，收工还需清理；在说明中给出绝对路径让帮工按需读取更干净。
+- **把技能复制进帮工 worktree 的 `.claude/skills/`**：会污染仓库工作区的 `git status`，收工还需清理；在说明中给出绝对路径让帮工按需读取更干净。
 - **在前端把 `/` 技能展开成全文再发进频道**：会让聊天记录塞满几百行技能指令；在服务端投递给 agent 那一步展开，频道只留主人原话与标签。
 - **为 `/` 命令另起 `skill.invoke` 接口**：复用 `channel.message.send` 才能直接继承 `sendKey` 幂等、工单串归属与 Mailbox 路由。
 

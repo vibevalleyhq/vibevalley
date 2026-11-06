@@ -14,7 +14,7 @@ import { lanHandlers } from "./handlers/lan.ts";
 import { memoryHandlers } from "./handlers/memory.ts";
 import { orchestratorHandlers } from "./handlers/orchestrator.ts";
 import { pkmHandlers } from "./handlers/pkm.ts";
-import { projectHandlers } from "./handlers/project.ts";
+import { repoHandlers } from "./handlers/repo.ts";
 import { runtimeHandlers } from "./handlers/runtime.ts";
 import { sessionHandlers } from "./handlers/session.ts";
 import { settingHandlers } from "./handlers/setting.ts";
@@ -29,7 +29,7 @@ export const handlers = Effect.gen(function* () {
     ...(yield* voiceHandlers),
     ...(yield* connectorHandlers),
     ...(yield* lanHandlers),
-    ...(yield* projectHandlers),
+    ...(yield* repoHandlers),
     ...(yield* channelHandlers),
     ...(yield* settingHandlers),
     ...(yield* agentHandlers),

@@ -11,8 +11,8 @@ const lane = (page: Page, key: string) => page.locator(`[data-testid="lane"][dat
 const card = (scope: Page | ReturnType<Page["locator"]>, id: string) => scope.locator(`[data-testid="issue-card"][data-key="${id}"]`);
 
 test("native parent issues show child navigation and can merge without a parent session", async ({ page, api }, testInfo) => {
-  const project = await api.project.create({ name: "native-family" });
-  const parent = await api.issue.create({ title: "父子工单验收", project: project.name, agent: "docs" });
+  const repo = await api.repo.create({ name: "native-family" });
+  const parent = await api.issue.create({ title: "父子工单验收", repo: repo.name, agent: "docs" });
   await api.issue.split({ id: parent.id, tasks: [{ id: "clock", brief: "写打卡并提交", check: "test -f clock.ts" }] });
   await expect.poll(async () => (await api.issue.get({ id: parent.id })).status).toBe("in_review");
   const child = (await api.issue.history.list()).find((row) => row.issue.parent === parent.id)!.issue;
@@ -54,8 +54,8 @@ test("the placeholder card writes a new issue in a dialog, and the board shows i
   await expect.poll(async () => (await api.issue.list({})).some((i) => i.title === title)).toBe(true);
   const made = (await api.issue.list({})).find((i) => i.title === title)!;
   await expect(card(lane(page, "todo"), made.id)).toBeVisible();
-  // With no helper and no project the server refuses the draft, after asking the runtimes (a few seconds); the board stays.
-  await expect(page.getByTestId("toast").first()).toBeVisible({ timeout: 20_000 });
+  await expect.poll(async () => (await api.issue.get({ id: made.id })).refining).toBeUndefined();
+  expect((await api.issue.get({ id: made.id })).status).toBe("backlog");
   await expect(page).toHaveURL(/\/issues$/u);
   await expect(card(lane(page, "todo"), made.id)).toBeVisible();
   // Its own page, and Escape back to the board.
@@ -84,12 +84,12 @@ test("the list view and its grouping are kept across a reload", async ({ page, a
   const view = page.getByTestId("issue-view");
   await view.locator('[data-key="list"]').click();
   await page.getByTestId("display").click();
-  await page.getByTestId("grouping").locator('[data-key="project"]').click();
-  const noProject = page.locator('[data-testid="issue-group"][data-key=""]');
-  await expect(noProject).toBeVisible();
+  await page.getByTestId("grouping").locator('[data-key="repo"]').click();
+  const noRepo = page.locator('[data-testid="issue-group"][data-key=""]');
+  await expect(noRepo).toBeVisible();
   await page.reload();
   await expect(view.locator('[data-key="list"]')).toHaveAttribute("aria-pressed", "true");
-  await expect(card(noProject, made.id)).toBeVisible();
+  await expect(card(noRepo, made.id)).toBeVisible();
   await page.getByTestId("display").click();
   await page.getByTestId("display-reset").click();
   await view.locator('[data-key="board"]').click();
@@ -154,25 +154,25 @@ test("the search keeps only the cards it matches, and clearing it brings them ba
   await expect(card(todo, banana.id)).toBeVisible();
 });
 
-test("the board's filter by project and helper is in the address: a reload and an issue opened and closed keep it", async ({ page, api }) => {
-  const kept = await api.project.create({ name: "in-the-address" });
-  const inKept = await api.issue.create({ title: "one in the address", project: kept.name });
+test("the board's filter by repo and helper is in the address: a reload and an issue opened and closed keep it", async ({ page, api }) => {
+  const kept = await api.repo.create({ name: "in-the-address" });
+  const inKept = await api.issue.create({ title: "one in the address", repo: kept.name });
   const other = await issue(api, "one elsewhere");
   await page.goto("/issues");
   const todo = lane(page, "todo");
-  await page.getByTestId("filter-project").click();
+  await page.getByTestId("filter-repo").click();
   await page.locator(`[role="option"][data-key="${kept.name}"]`).click();
-  await expect(page).toHaveURL(/[?&]project=in-the-address/u);
+  await expect(page).toHaveURL(/[?&]repo=in-the-address/u);
   await page.reload();
-  await expect(page.getByTestId("filter-project")).toHaveAttribute("data-value", kept.name);
+  await expect(page.getByTestId("filter-repo")).toHaveAttribute("data-value", kept.name);
   await expect(card(todo, inKept.id)).toBeVisible();
   await expect(card(todo, other.id)).toHaveCount(0);
   await card(todo, inKept.id).click();
-  await expect(page).toHaveURL(new RegExp(`/issues/${inKept.id}\\?project=in-the-address$`, "u"));
+  await expect(page).toHaveURL(new RegExp(`/issues/${inKept.id}\\?repo=in-the-address$`, "u"));
   await page.keyboard.press("Escape");
-  await expect(page).toHaveURL(/\/issues\?project=in-the-address$/u);
+  await expect(page).toHaveURL(/\/issues\?repo=in-the-address$/u);
   await page.getByTestId("filter-clear").click();
-  await expect(page).not.toHaveURL(/project=/u);
+  await expect(page).not.toHaveURL(/repo=/u);
   await expect(card(todo, other.id)).toBeVisible();
 });
 
@@ -180,8 +180,8 @@ test("a card shows only what differs from its lane, an empty lane is a place to 
   const plain = await issue(api, "a plain draft");
   const urgent = await issue(api, "an urgent draft");
   await api.issue.update({ id: urgent.id, priority: "urgent" });
-  const kept = await api.project.create({ name: "kept" });
-  const inKept = await api.issue.create({ title: "one in kept", project: kept.name });
+  const kept = await api.repo.create({ name: "kept" });
+  const inKept = await api.issue.create({ title: "one in kept", repo: kept.name });
   await page.goto("/issues");
   const todo = lane(page, "todo");
   // A draft in todo with no helper and no priority: nothing to mark but its being a draft.
@@ -191,9 +191,9 @@ test("a card shows only what differs from its lane, an empty lane is a place to 
   const working = await lane(page, "working").boundingBox();
   expect(working!.height).toBeLessThan(200);
 
-  await page.getByTestId("filter-project").click();
+  await page.getByTestId("filter-repo").click();
   await page.locator('[role="option"][data-key="kept"]').click();
-  await expect(page.getByTestId("filter-project")).toHaveAttribute("data-value", "kept");
+  await expect(page.getByTestId("filter-repo")).toHaveAttribute("data-value", "kept");
   await expect(card(todo, inKept.id)).toBeVisible();
   await expect(card(todo, plain.id)).toHaveCount(0);
   await page.getByTestId("filter-clear").click();

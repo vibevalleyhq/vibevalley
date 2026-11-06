@@ -21,7 +21,7 @@ export const ListIssuesResult = Schema.Struct({
   ["mandate_strength"]: Sqlite_issue_mandate_strength,
   ["max_bot_review_rounds"]: Schema.Int,
   ["auto_submit_pr"]: SqliteBoolean,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["priority"]: Sqlite_issue_priority,
   ["rank"]: Schema.Int,
   ["parent"]: Schema.NullOr(Schema.String),
@@ -75,7 +75,7 @@ export const GetIssueResult = Schema.Struct({
   ["mandate_strength"]: Sqlite_issue_mandate_strength,
   ["max_bot_review_rounds"]: Schema.Int,
   ["auto_submit_pr"]: SqliteBoolean,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["priority"]: Sqlite_issue_priority,
   ["rank"]: Schema.Int,
   ["parent"]: Schema.NullOr(Schema.String),
@@ -152,7 +152,7 @@ export const IssueByNumberResult = Schema.Struct({
   ["mandate_strength"]: Sqlite_issue_mandate_strength,
   ["max_bot_review_rounds"]: Schema.Int,
   ["auto_submit_pr"]: SqliteBoolean,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["priority"]: Sqlite_issue_priority,
   ["rank"]: Schema.Int,
   ["parent"]: Schema.NullOr(Schema.String),
@@ -199,7 +199,7 @@ export const AddIssueParams = Schema.Struct({
   ["mandate_strength"]: Sqlite_issue_mandate_strength,
   ["max_bot_review_rounds"]: Schema.Int,
   ["auto_submit_pr"]: SqliteBoolean,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["priority"]: Sqlite_issue_priority,
   ["created_at"]: Schema.Number,
   ["cron"]: Schema.NullOr(Schema.String),
@@ -212,13 +212,13 @@ export const AddIssueParams = Schema.Struct({
 export type AddIssueParams = typeof AddIssueParams.Type
 
 
-export const AddIssueSql = "-- name: AddIssue :exec\ninsert into issue (id, number, title, description, origin_trigger_id, mandate_strength, max_bot_review_rounds, auto_submit_pr,\n                   project, priority, rank, created_at, cron, deliver, parent, blocked_by, constraints, criteria)\nvalues (?1, (select coalesce(max(number), 0) + 1 from issue), ?2, ?3, ?4,\n        ?5, ?6, ?7, ?8, ?9,\n        (select coalesce(max(rank), 0) + 1 from issue), ?10, ?11, ?12, ?13, ?14, ?15, ?16);"
+export const AddIssueSql = "-- name: AddIssue :exec\ninsert into issue (id, number, title, description, origin_trigger_id, mandate_strength, max_bot_review_rounds, auto_submit_pr,\n                   repo, priority, rank, created_at, cron, deliver, parent, blocked_by, constraints, criteria)\nvalues (?1, (select coalesce(max(number), 0) + 1 from issue), ?2, ?3, ?4,\n        ?5, ?6, ?7, ?8, ?9,\n        (select coalesce(max(rank), 0) + 1 from issue), ?10, ?11, ?12, ?13, ?14, ?15, ?16);"
 
 export const addIssue = Effect.fn("AddIssue")(function* (params: AddIssueParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: AddIssueParams,
-    execute: (p) => sql.unsafe(AddIssueSql, [p["id"], p["title"], p["description"], p["origin_trigger_id"], p["mandate_strength"], p["max_bot_review_rounds"], p["auto_submit_pr"], p["project"], p["priority"], p["created_at"], p["cron"], p["deliver"], p["parent"], p["blocked_by"], p["constraints"], p["criteria"]]),
+    execute: (p) => sql.unsafe(AddIssueSql, [p["id"], p["title"], p["description"], p["origin_trigger_id"], p["mandate_strength"], p["max_bot_review_rounds"], p["auto_submit_pr"], p["repo"], p["priority"], p["created_at"], p["cron"], p["deliver"], p["parent"], p["blocked_by"], p["constraints"], p["criteria"]]),
   })(params)
 })
 
@@ -242,7 +242,7 @@ export const setIssueConstraints = Effect.fn("SetIssueConstraints")(function* (p
 export const EditIssueParams = Schema.Struct({
   ["title"]: Schema.String,
   ["description"]: Schema.String,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["priority"]: Sqlite_issue_priority,
   ["criteria"]: Schema.NullOr(Schema.String),
   ["deliver"]: Sqlite_issue_deliver,
@@ -251,13 +251,13 @@ export const EditIssueParams = Schema.Struct({
 export type EditIssueParams = typeof EditIssueParams.Type
 
 
-export const EditIssueSql = "-- name: EditIssue :exec\nupdate issue set title = ?1, description = ?2, project = ?3,\n  priority = ?4, criteria = ?5, deliver = ?6 where issue.id = ?7;"
+export const EditIssueSql = "-- name: EditIssue :exec\nupdate issue set title = ?1, description = ?2, repo = ?3,\n  priority = ?4, criteria = ?5, deliver = ?6 where issue.id = ?7;"
 
 export const editIssue = Effect.fn("EditIssue")(function* (params: EditIssueParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: EditIssueParams,
-    execute: (p) => sql.unsafe(EditIssueSql, [p["title"], p["description"], p["project"], p["priority"], p["criteria"], p["deliver"], p["id"]]),
+    execute: (p) => sql.unsafe(EditIssueSql, [p["title"], p["description"], p["repo"], p["priority"], p["criteria"], p["deliver"], p["id"]]),
   })(params)
 })
 
@@ -494,7 +494,7 @@ export const KeptIssuesResult = Schema.Struct({
   ["mandate_strength"]: Sqlite_issue_mandate_strength,
   ["max_bot_review_rounds"]: Schema.Int,
   ["auto_submit_pr"]: SqliteBoolean,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["priority"]: Sqlite_issue_priority,
   ["rank"]: Schema.Int,
   ["parent"]: Schema.NullOr(Schema.String),
@@ -548,7 +548,7 @@ export const FamilyResult = Schema.Struct({
   ["mandate_strength"]: Sqlite_issue_mandate_strength,
   ["max_bot_review_rounds"]: Schema.Int,
   ["auto_submit_pr"]: SqliteBoolean,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["priority"]: Sqlite_issue_priority,
   ["rank"]: Schema.Int,
   ["parent"]: Schema.NullOr(Schema.String),
@@ -602,7 +602,7 @@ export const LatestOfCronResult = Schema.Struct({
   ["mandate_strength"]: Sqlite_issue_mandate_strength,
   ["max_bot_review_rounds"]: Schema.Int,
   ["auto_submit_pr"]: SqliteBoolean,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["priority"]: Sqlite_issue_priority,
   ["rank"]: Schema.Int,
   ["parent"]: Schema.NullOr(Schema.String),

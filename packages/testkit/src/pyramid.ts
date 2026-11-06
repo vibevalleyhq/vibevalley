@@ -13,7 +13,7 @@ export const budgetMs: Record<Layer, number> = { rule: 20, module: 300, flow: 2_
 /** Imports that leave the process: the database, child processes, the network. */
 const outside = /^(node:child_process|node:net|node:http|node:https|node:sqlite|@effect\/sql-sqlite-node|@effect\/platform-node)$/u;
 
-interface WorkspacePackage {
+interface SpacePackage {
   readonly dir: string;
   readonly exports: Readonly<Record<string, string>>;
 }
@@ -25,14 +25,14 @@ type Target = string | { readonly types?: string; readonly default?: string };
 const sourceOf = (t: Target): string => (typeof t === "string" ? t : (t.default ?? ""));
 
 /** The packages under the workspace's packages/ folder, by name; none when root is not inside a workspace. */
-function workspacePackages(root: string): Map<string, WorkspacePackage> {
+function workspacePackages(root: string): Map<string, SpacePackage> {
   let at = root;
   while (!existsSync(join(at, "pnpm-workspace.yaml"))) {
     const up = dirname(at);
     if (up === at) return new Map();
     at = up;
   }
-  const out = new Map<string, WorkspacePackage>();
+  const out = new Map<string, SpacePackage>();
   for (const d of readdirSync(join(at, "packages"))) {
     const manifest = join(at, "packages", d, "package.json");
     if (!existsSync(manifest)) continue;
@@ -59,7 +59,7 @@ function exported(exports: Readonly<Record<string, string>>, sub: string): strin
 export function pyramid(root: string) {
   const packages = workspacePackages(root);
   /** Where an import of a workspace package leads, relative to root; undefined for anything else. */
-  const inWorkspace = (spec: string): string | undefined => {
+  const inSpace = (spec: string): string | undefined => {
     const [scope, name, ...rest] = spec.split("/");
     const pkg = packages.get(`${scope}/${name}`);
     const target = pkg && exported(pkg.exports, rest.length > 0 ? `./${rest.join("/")}` : ".");
@@ -90,7 +90,7 @@ export function pyramid(root: string) {
       const target = spec.startsWith(".")
         ? relative(root, join(root, dirname(file), spec))
         : spec.startsWith("@vibevalley/")
-          ? inWorkspace(spec)
+          ? inSpace(spec)
           : // An app's #/ is its own src/ and #db/ the server's generated queries (their package.json imports); the
             // workspace packages do not use them.
             spec.startsWith("#/") && !file.startsWith("..")

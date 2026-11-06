@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import type { ChatMessage, WorkspaceState, Crop, Issue, Session, DoingView, SessionView } from "@vibevalley/protocol";
+import type { ChatMessage, SpaceState, Crop, Issue, Session, DoingView, SessionView } from "@vibevalley/protocol";
 
 import { beds, cropLabel, type Bed } from "#/farm/world/plots.ts";
 
@@ -13,7 +13,7 @@ export function clockText(tod: number) {
 export const thousands = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
 
 /** The issues harvested into their main branch (merged here, or by a pull request), newest first: the warehouse. */
-export const harvestedOf = (s: WorkspaceState | undefined): Issue[] =>
+export const harvestedOf = (s: SpaceState | undefined): Issue[] =>
   (s?.issues ?? []).filter((i) => i.delivered === "merged" || i.delivered === "pull_request").toSorted((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0));
 
 const nothing: DoingView = { action: "none", label: "", actionText: "" };

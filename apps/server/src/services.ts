@@ -23,8 +23,8 @@ import { Mcp, type McpOptions } from "./mcp/mcp.ts";
 import { Memory } from "./memory/memory.ts";
 import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
 import { Pkm } from "./pkm/pkm.ts";
-import { Project, type ProjectHooks, start as projectStart } from "./project/project.ts";
 import { layer as projection } from "./projection/frame.ts";
+import { Repo, type RepoHooks, start as repoStart } from "./repo/repo.ts";
 import { Resource } from "./resource/resource.ts";
 import { type RuntimeOptions, Runtime } from "./runtime/runtime.ts";
 import { Session, ready as sessionReady } from "./session/session.ts";
@@ -41,7 +41,7 @@ const on =
 /** What a test changes in a module: the farm's own otherwise. */
 export interface ServiceOptions {
   readonly runtime?: RuntimeOptions;
-  readonly project?: ProjectHooks;
+  readonly repo?: RepoHooks;
   readonly orchestrator?: OrchestratorOptions;
   readonly mcp?: McpOptions;
   readonly lan?: LanOptions;
@@ -72,7 +72,7 @@ export const agents =
 export const sourceControl =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(Project.layer(o.project)));
+    below.pipe(on(Repo.layer(o.repo)));
 
 /** Agent Sessions: an agent at work on an issue in a workplace. */
 export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Executor.layer), on(Session.layer));
@@ -110,7 +110,7 @@ const gateway =
     below.pipe(on(Mcp.layer(o.mcp)), on(Lan.layer(o.lan)), on(Voice.layer(o.voice)), on(Connector.layer(o.connector)));
 
 /** Source Control's startup: the first look at GitHub. */
-const sourceControlStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(projectStart));
+const sourceControlStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(repoStart));
 /** Agent Sessions' startup: the sessions on the farm when it stopped are taken up again, or let go. */
 export const agentSessionsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(sessionReady));
 /** Collaboration's startup, after the sessions came back: their threads, and what waited for them. */

@@ -6,7 +6,7 @@ import { sessionId } from "@vibevalley/protocol/schema";
 
 import { clip } from "#/base/clip.ts";
 import { conflictOf } from "#/issue/status.ts";
-import { MergeFailure } from "#/project/workplace.ts";
+import { MergeFailure } from "#/repo/workplace.ts";
 import { inCny } from "#/runtime/price.ts";
 
 import { briefBreak, conflictBrief, noRoom, notTakenIn, sessionName, whoMakesRoom, withRecall } from "./briefing.ts";
@@ -23,7 +23,7 @@ const base = (): Session =>
     agent: "zhou",
     runtime: "pi",
     brief: "加接口",
-    project: "clock-in",
+    repo: "clock-in",
     phase: { _tag: "working", since: 0, doing: { action: "none", label: "" } },
   }) as Session;
 const working = (doing: Doing): Session => ({ ...base(), phase: { _tag: "working", since: 0, doing } });
@@ -40,11 +40,11 @@ describe("a session's events", () => {
   });
 
   it("a run is reminded of memories", () => {
-    const block = recallHead + "你以前记下的……\n- （这个项目）测试用 pnpm test";
+    const block = recallHead + "你以前记下的……\n- （这个仓库）测试用 pnpm test";
     const r = reactionTo(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + briefBreak + withRecall(block, "加一个查询接口") }), base(), none, ctx);
     expect(r.journal).toEqual([
       { type: "prompt", text: "加一个查询接口" },
-      { type: "note", kind: "memory/recalled", text: "- （这个项目）测试用 pnpm test" },
+      { type: "note", kind: "memory/recalled", text: "- （这个仓库）测试用 pnpm test" },
     ]);
   });
 
@@ -219,29 +219,29 @@ describe("a run's report", () => {
 });
 
 describe("room and names", () => {
-  const h = (id: string, runtime: string, project: string, busy: boolean) =>
-    ({ id, name: id, agent: "zhou", runtime, project, phase: busy ? { _tag: "working", doing: thinking } : { _tag: "done" } }) as Session;
-  const limits = { workspace: 3, perRuntime: 2, perProject: 2 };
+  const h = (id: string, runtime: string, repo: string, busy: boolean) =>
+    ({ id, name: id, agent: "zhou", runtime, repo, phase: busy ? { _tag: "working", doing: thinking } : { _tag: "done" } }) as Session;
+  const limits = { space: 3, perRuntime: 2, perRepo: 2 };
 
-  it("room in the workspace", () => {
+  it("room in the space", () => {
     expect(noRoom([], "pi", "a", limits)).toBe("");
     expect(noRoom([h("w1", "pi", "a", true), h("w2", "claude", "b", true), h("w3", "codex", "c", true)], "pi", "a", limits)).toMatch(
       /已经有 3 个帮工在干活了/u,
     );
     expect(noRoom([h("w1", "pi", "a", true), h("w2", "pi", "b", true)], "pi", "c", limits)).toMatch(/最多同时 2 个（在「农机」页可以改）/u);
-    expect(noRoom([h("w1", "pi", "a", true), h("w2", "claude", "a", true)], "codex", "a", limits)).toMatch(/项目 a 里已经有 2 个帮工在干活/u);
+    expect(noRoom([h("w1", "pi", "a", true), h("w2", "claude", "a", true)], "codex", "a", limits)).toMatch(/仓库 a 里已经有 2 个帮工在干活/u);
     const two = [h("w1", "pi", "a", true), h("w2", "pi", "a", true)];
     expect(noRoom([h("w1", "pi", "a", false), h("w2", "pi", "a", false)], "pi", "a", limits)).toBe("");
     expect(noRoom(two, "pi", "a", limits)).not.toBe("");
-    expect(noRoom(two, "pi", "a", { workspace: 6, perRuntime: 0, perProject: 0 })).toBe("");
-    expect(noRoom(two, "pi", "a", { workspace: 3, perRuntime: 3, perProject: 3 }, "w1")).toBe("");
+    expect(noRoom(two, "pi", "a", { space: 6, perRuntime: 0, perRepo: 0 })).toBe("");
+    expect(noRoom(two, "pi", "a", { space: 3, perRuntime: 3, perRepo: 3 }, "w1")).toBe("");
   });
 
-  it("gives an owner follow-up one workspace slot without bypassing project or runtime limits", () => {
+  it("gives an owner follow-up one space slot without bypassing repo or runtime limits", () => {
     const full = [h("w1", "pi", "a", true), h("w2", "claude", "b", true), h("w3", "codex", "c", true)];
     expect(noRoom(full, "dsh", "d", limits, "", true)).toBe("");
     expect(noRoom(full, "pi", "d", { ...limits, perRuntime: 1 }, "", true)).not.toBe("");
-    expect(noRoom(full, "dsh", "a", { ...limits, perProject: 1 }, "", true)).not.toBe("");
+    expect(noRoom(full, "dsh", "a", { ...limits, perRepo: 1 }, "", true)).not.toBe("");
   });
 
   it("session names", () => {
@@ -269,7 +269,7 @@ describe("shell", () => {
 describe("work that does not go in", () => {
   it("sends the helper back with what to fix; a conflict only when the helper settles it", () => {
     const check = notTakenIn(MergeFailure.failedCheck("测试没过"), "阿狐", "owner");
-    expect([check.fix, check.short]).toEqual(["测试没过\n请修好检查，再交回来。", "项目检查没通过"]);
+    expect([check.fix, check.short]).toEqual(["测试没过\n请修好检查，再交回来。", "仓库检查没通过"]);
     const conflict = MergeFailure.conflict("main", ["a.ts", "b.ts"]);
     expect(notTakenIn(conflict, "阿狐", "owner").fix).toBe("");
     expect(notTakenIn(conflict, "阿狐", "owner").owner).toContain("要它解决就用 tell 告诉它");

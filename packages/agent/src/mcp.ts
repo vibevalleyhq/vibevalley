@@ -194,17 +194,7 @@ export interface McpServer {
   readonly cwd?: string;
 }
 
-interface McpEntry {
-  readonly command?: string;
-  readonly args?: string[];
-  readonly env?: Record<string, string>;
-  readonly cwd?: string;
-  readonly url?: string;
-  readonly headers?: Record<string, string>;
-  readonly disabled?: boolean;
-}
-
-const McpEntrySchema: Schema.Codec<McpEntry> = Schema.Struct({
+const McpEntrySchema = Schema.Struct({
   command: Schema.optionalKey(Schema.String),
   args: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   env: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
@@ -213,6 +203,7 @@ const McpEntrySchema: Schema.Codec<McpEntry> = Schema.Struct({
   headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
   disabled: Schema.optionalKey(Schema.Boolean),
 });
+type McpEntry = typeof McpEntrySchema.Type;
 const McpConfigSchema = Schema.fromJsonString(Schema.Struct({ mcpServers: Schema.optionalKey(Schema.Record(Schema.String, McpEntrySchema)) }));
 
 /** A missing file has none; unreadable JSON or a wrong shape is an error. */

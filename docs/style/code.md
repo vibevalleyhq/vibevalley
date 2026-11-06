@@ -12,7 +12,7 @@
 
 ## 叫法
 
-- 代码、接口和服务端的文档用实际的概念：`Issue`、`Session`、`Project`（[概念](docs/concepts.md)）。不用旧叫法 ticket，也不用网页时代的名字。
+- 代码、接口和服务端的文档用实际的概念：`Issue`、`Session`、`Repo`（[概念](docs/concepts.md)）。不用旧叫法 ticket，也不用网页时代的名字。
 - 对主人说的话写进词典（`packages/i18n/locales`），中英各一份，代码里写 `t("key")`；对模型说的写进 `prompts.ts`，用中文（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。用农场的叫法（[用语表](docs/README.md#用语)）。
 - 注释用英文。
 
@@ -23,7 +23,7 @@
 | 写法 | 什么时候 | 例子 |
 |---|---|---|
 | 必有的字段，给默认值 | 没有和「空」是一回事：列表 `[]`、表 `{}`、开关 `false`、说给人看的字 `""` | `mentions: []`、`description: ""`、`problem: ""`（`xProblem` 没问题就是 `""`） |
-| `x?: T`（不写） | 没有本身就是一种情况：没跑过就没有 `lastRun`，没连到别处就没有 `project`、`channel`；请求里不写就是不改；宿主没有这项本事就没有 `notify` | `lastRun?: LastRun`、`IssueUpdate.title?` |
+| `x?: T`（不写） | 没有本身就是一种情况：没跑过就没有 `lastRun`，没连到别处就没有 `repo`、`channel`；请求里不写就是不改；宿主没有这项本事就没有 `notify` | `lastRun?: LastRun`、`IssueUpdate.title?` |
 | `x: T \| undefined` | 内存里会被清空的状态（类的字段、一次运行的记录）；查找没找到 | `sess: OarSession \| undefined`、`Map.get` |
 | `null` | 只在外面说 `null` 的地方：库表的列（`db/generated`）、DOM 和浏览器的接口、JSX 什么都不画；线上只有「问过、没答案」用它，和「答了、是空」分开 | `models: ModelEntry[] \| null`（农机没列出来） |
 
@@ -31,7 +31,7 @@
 - 读必有的字段不写 `?? []`、`?.`：类型说它在，它就在。从外面读进来（老的存档、测试的黄金数据、外面库的返回）类型说不准的，在读进来的那一处补齐，不在用的地方兜。
 - 必有的字放 `""` 以后，「没有就用别的」写 `||`，不写 `??`：`n.conclusion || "做完了"`。数字和布尔不这样：`0`、`false` 是值，写 `??`（lint 的 `prefer-nullish-coalescing` 查）。
 - 条件里只放布尔和字符串（`""` 是没有）：数字写 `n > 0`、`n !== 0`，可能没有的布尔写 `=== true`，可能没有的对象直接判（lint 的 `strict-boolean-expressions` 查）。比较函数一层层比，写 `or(…)`（`apps/server/src/base/order.ts`、`apps/web/src/base/search.ts`），不写 `a - b || …`。
-- 给人看的话只在帧上：核心形状（`Session`、`Cron`、`Doing`）只有事实，帧用视图形状（`SessionView`、`CronView`、`WorkspaceView`）带上必有的说法；读说法的函数收视图形状，只读事实的收核心形状（视图形状能当核心形状用）。
+- 给人看的话只在帧上：核心形状（`Session`、`Cron`、`Doing`）只有事实，帧用视图形状（`SessionView`、`CronView`、`SpaceView`）带上必有的说法；读说法的函数收视图形状，只读事实的收核心形状（视图形状能当核心形状用）。
 - 闭合的一组词在库里是带 `check (列 in (…))` 的 `text` 列（`schema.test.ts` 查），`scripts/sqlite-generate.ts` 生成的查询读出来就是词的联合；从字符串认一个词用 `isOneOf`，按 `_tag`、`kind` 取联合里的一种用 `variant`（页面），都不写 `as`。
 
 ## 检查管着的写法
@@ -53,7 +53,7 @@
 | 写什么 | 例子 |
 |---|---|
 | 为什么这样做 | `// A worktree with changes stays where it is: removing it would lose them.` |
-| 顺序和锁 | `// Inside the semaphore: one merge per project at a time.`<br>`// The tasks first, so that the graph is whole when its parent issue changes.` |
+| 顺序和锁 | `// Inside the semaphore: one merge per repo at a time.`<br>`// The tasks first, so that the graph is whole when its parent issue changes.` |
 | 安全边界 | `// Only repository home URLs: never credentials, other git transports or command-line options.` |
 | 格式、单位、取值，`null`、`0`、`""` 的意思 | `// As the chat names it: <id>#<n>; "" when it has none.`<br>`// 0..1, 0.5 is noon.` |
 | 要和别处保持一致的 | `// As Node's util.parseEnv: …`<br>`// As keyBetween in packages/protocol: change them there and here together.` |

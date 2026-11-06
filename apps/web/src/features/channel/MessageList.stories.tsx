@@ -27,6 +27,7 @@ const msg = (fromKind: ChatMessage["fromKind"], from: string, name: string, text
   attachments: [],
   embeds: [],
   ...more,
+  outcome: more.outcome ?? null,
 });
 
 const owner = (text: string, more: Partial<ChatMessage> = {}) => msg("owner", "owner", "主人", text, more);

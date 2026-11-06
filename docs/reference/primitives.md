@@ -31,7 +31,7 @@
 | `keyBetween` | `order.ts` | A key after a and before b; "" for a is the start, "" for b the end. |
 | `spanText` | `phase.ts` | A short span: seconds under a minute (at least one), else minutes. |
 | `isBusy` | `phase.ts` |  |
-| `roomLeft` | `phase.ts` | How many more may start working now: on the whole farm (workspace at once), and in the project (perProject at once, 0 for no limit of its own). |
+| `roomLeft` | `phase.ts` | How many more may start working now: on the whole farm (space at once), and in the repo (perRepo at once, 0 for no limit of its own). |
 | `needOf` | `phase.ts` |  |
 | `phaseText` | `phase.ts` | phaseWords as said at now. |
 | `phaseWords` | `phase.ts` | What a session is doing in words, how long it has been quiet left as {span}. |
@@ -42,9 +42,9 @@
 | `flatBlocks` | `pkm.ts` | The outline as the wire has it: in order, each with its parent and the path of first lines above it. |
 | `treeOfBlocks` | `pkm.ts` |  |
 | `plainText` | `plain.ts` |  |
-| `farmOf` | `play.ts` | The farm a session's bed is on: each project has its own, and the sessions without one share one. |
+| `farmOf` | `play.ts` | The farm a session's bed is on: each repo has its own, and the sessions without one share one. |
 | `plotKeyOf` | `play.ts` | The plot a session works, the key of `FarmView.plots`: its issue, so a reopened issue keeps its plot; one with no issue is its own. |
-| `githubRepository` | `project.ts` | Only repository home URLs: never credentials, other git transports or command-line options. |
+| `githubRepository` | `repo.ts` | Only repository home URLs: never credentials, other git transports or command-line options. |
 | `same` | `same.ts` |  |
 | `stageWantsOwner` | `stage.ts` | Questions the owner for something: the page leads with it, the board flags it. |
 
@@ -106,10 +106,11 @@
 | `defaults` | `config.ts` |  |
 | `ConfigError` | `config.ts` | Why the configuration cannot be read: the file, or a key's value. |
 | `loadConfig` | `config.ts` | file: the YAML to read, which must be there. empty is home/vibevalley.yaml, read if it is there. |
-| `pkmDir` | `config.ts` | The notes' vault. |
+| `pkmDir` | `config.ts` |  |
 | `dbDir` | `config.ts` | The database's folder, or "memory". |
 | `serverAddress` | `config.ts` | The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. |
-| `projectsDir` | `config.ts` | Where the projects are: each folder in it is one. |
+| `reposDir` | `config.ts` | Where the space's repositories are: each folder in it is one. |
+| `worktreesDir` | `config.ts` | Where the issues' worktrees are: <repo>.<issue number> under it. |
 | `agentHome` | `config.ts` | A profile's folder for conversation logs, archives and evals; memory rows live in the database. |
 | `dbQueries` | `db.ts` | Every query run: what a test holds a hot path's budget to, and a reading of the farm's load. |
 | `dbFile` | `db.ts` | The database's file in its folder. |
@@ -154,7 +155,7 @@
 | `gitSync` | `git.ts` | Runs git in dir as a test user. its output, trimmed. |
 | `gitIn` | `git.ts` | Runs git in dir as dir's own config says (no test user). its output, trimmed. |
 | `gitInEnv` | `git.ts` | gitIn with these in its environment (a commit's dates). |
-| `projectsDir` | `git.ts` | A projects folder of its own, under a work root of its own. |
+| `reposDir` | `git.ts` |  |
 | `repo` | `git.ts` | A repository with `mine` commits by the test user, `others` by someone else. |
 | `write` | `git.ts` |  |
 | `goldenCases` | `golden.ts` | The cases of a module's file, by the module's folder under src. |
@@ -255,7 +256,7 @@
 | `useSprites` | `query.ts` |  |
 | `useAgents` | `query.ts` | Every profile, the orchestrator's too. |
 | `useAgentTemplates` | `query.ts` | The templates a profile installs from: the built-in ones, then those added on this machine. |
-| `useProjects` | `query.ts` |  |
+| `useRepos` | `query.ts` |  |
 | `useSettings` | `query.ts` |  |
 | `useRuntimes` | `query.ts` | The runtimes on this machine; probed again every few minutes on the server. |
 | `RouterContext` | `router.ts` |  |
@@ -290,7 +291,7 @@
 | `useLatest` | `atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
 | `bySeq` | `intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once a frame has caught up. |
 | `defineIntent` | `intent.ts` |  |
-| `sendOnce` | `intent.ts` | An intent made by a button rather than typed (a suggestion, the project map's sow, an artifact's reply). |
+| `sendOnce` | `intent.ts` | An intent made by a button rather than typed (a suggestion, the repo map's sow, an artifact's reply). |
 | `sendReplacing` | `intent.ts` | A setting the owner changes again before the first change showed (a reaction off and on, a level picked twice). |
 | `intentsIn` | `intent.ts` | A type's intents in one registry; the same object for every caller, so its timers and watches are kept once. |
 | `useIntents` | `intent.ts` | A type's intents in the page's registry, with the list as an accessor. |
@@ -330,6 +331,7 @@
 | `exportsOf` | `source.ts` | The names a file exports itself (declarations and `export { … }` without a source), types included. |
 | `exportedValuesOf` | `source.ts` | The values a file declares and exports itself (no types), each with where its export statement starts. |
 | `readsOf` | `source.ts` | The fields read off what object.method() returns: right off the call (`core.state().issues`, `?.` too), through a const it is kept in (`const s = core.state(). |
+| `analyzeSource` | `source.ts` |  |
 | `calls` | `source.ts` | Whether the file calls object.method(…) anywhere. |
 | `tempDir` | `temp.ts` |  |
 | `waitFor` | `until.ts` | What get answers once ok holds for it. what is said if it never does (a function: read when it is given up on). |

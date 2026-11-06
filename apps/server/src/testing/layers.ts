@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { Effect, Layer, Option, Stream } from "effect";
 import { HttpClient } from "effect/http";
 
-import { type Agent, defaultOrchestrator, type WorkspaceState } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator, type SpaceState } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { withCast } from "#/agent/agent.ts";
@@ -54,7 +54,7 @@ export const offline = Layer.succeed(
 );
 
 /** What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. */
-export const whenState = <A>(pick: (state: WorkspaceState) => A | undefined | false, what: string | (() => string), ms = 5_000) =>
+export const whenState = <A>(pick: (state: SpaceState) => A | undefined | false, what: string | (() => string), ms = 5_000) =>
   Effect.scoped(
     Effect.gen(function* () {
       const core = yield* Core;

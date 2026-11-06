@@ -18,7 +18,7 @@ export const CronsResult = Schema.Struct({
   ["body"]: Schema.String,
   ["channel_id"]: Schema.String,
   ["agent"]: Schema.NullOr(Schema.String),
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["spec"]: Schema.String,
   ["tz"]: Schema.String,
   ["enabled"]: SqliteBoolean,
@@ -47,7 +47,7 @@ export const AddCronParams = Schema.Struct({
   ["body"]: Schema.String,
   ["channel_id"]: Schema.String,
   ["agent"]: Schema.NullOr(Schema.String),
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["spec"]: Schema.String,
   ["tz"]: Schema.String,
   ["pending"]: SqliteBoolean,
@@ -57,13 +57,13 @@ export const AddCronParams = Schema.Struct({
 export type AddCronParams = typeof AddCronParams.Type
 
 
-export const AddCronSql = "-- name: AddCron :exec\n-- One waiting for the owner is stored off (pending).\ninsert into cron (id, name, body, channel_id, agent, project, spec, tz, enabled, set_by, pending, created_at)\nvalues (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,\n        not ?9, ?10, ?9, ?11);"
+export const AddCronSql = "-- name: AddCron :exec\n-- One waiting for the owner is stored off (pending).\ninsert into cron (id, name, body, channel_id, agent, repo, spec, tz, enabled, set_by, pending, created_at)\nvalues (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,\n        not ?9, ?10, ?9, ?11);"
 
 export const addCron = Effect.fn("AddCron")(function* (params: AddCronParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: AddCronParams,
-    execute: (p) => sql.unsafe(AddCronSql, [p["id"], p["name"], p["body"], p["channel_id"], p["agent"], p["project"], p["spec"], p["tz"], p["pending"], p["set_by"], p["created_at"]]),
+    execute: (p) => sql.unsafe(AddCronSql, [p["id"], p["name"], p["body"], p["channel_id"], p["agent"], p["repo"], p["spec"], p["tz"], p["pending"], p["set_by"], p["created_at"]]),
   })(params)
 })
 

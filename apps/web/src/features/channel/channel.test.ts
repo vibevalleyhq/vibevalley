@@ -1,10 +1,21 @@
 import { expect, test } from "vite-plus/test";
 
-import type { Channel, Session, WorkspaceState } from "@vibevalley/protocol";
+import type { Channel, Session, SpaceState } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { orchestratorTyping, archivedOf, groupsOf, linkedMessages, messagePath, pointedAt, switchTargets, threadsIn, topsOf } from "./places";
-const at = (id: string): Channel => ({ id, type: "channel", default: false, category: "", description: "", title: "", replies: 0, at: 0 });
+const at = (id: string): Channel => ({
+  id,
+  type: "channel",
+  default: false,
+  category: "",
+  description: "",
+  title: "",
+  replies: 0,
+  at: 0,
+  notify: "all",
+  subjectKind: null,
+});
 const orchestratorSession = (action: "thinking" | "speaking_text" | "none", channel?: string, agent = "orchestrator", since = 0): Session => ({
   id: sessionId(agent),
   role: "orchestrator",
@@ -18,7 +29,7 @@ const orchestratorSession = (action: "thinking" | "speaking_text" | "none", chan
   phase: action === "none" ? { _tag: "resting" } : { _tag: "working", since, doing: { action, label: "" } },
   ...(channel ? { channel } : {}),
 });
-const state = (...sessions: Session[]): WorkspaceState => ({
+const state = (...sessions: Session[]): SpaceState => ({
   call: "idle",
   callReason: "",
   sessions,

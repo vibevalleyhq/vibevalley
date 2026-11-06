@@ -17,7 +17,7 @@ export const issueRow = (id: string, req: T.IssueRequest, mandate: T.IssueMandat
   mandate_strength: mandate.strength,
   max_bot_review_rounds: mandate.maxBotReviewRounds,
   auto_submit_pr: mandate.autoSubmitPr,
-  project: req.project?.trim() || null,
+  repo: req.repo?.trim() || null,
   parent: req.parent ?? null,
   blocked_by: (req.blockedBy?.length ?? 0) > 0 ? JSON.stringify(req.blockedBy) : null,
   constraints: req.constraints ? JSON.stringify(req.constraints) : null,
@@ -53,9 +53,9 @@ const recentTitles = 5;
 /** A title longer than this is a long instruction, not one to send again. */
 const recentTitleLength = 60;
 
-export function sentTitles(all: readonly T.Issue[], project: string, orchestrator: (id: string) => boolean): string[] {
+export function sentTitles(all: readonly T.Issue[], repo: string, orchestrator: (id: string) => boolean): string[] {
   const mine = all
-    .filter((i) => i.project === project && executionsOf(i).length > 0 && i.parent === undefined && i.cron === undefined && !isForOrchestrator(i, orchestrator))
+    .filter((i) => i.repo === repo && executionsOf(i).length > 0 && i.parent === undefined && i.cron === undefined && !isForOrchestrator(i, orchestrator))
     .toSorted((a, b) => b.createdAt - a.createdAt);
   const out: string[] = [];
   for (const i of mine) {
@@ -70,7 +70,7 @@ export function sentTitles(all: readonly T.Issue[], project: string, orchestrato
 const commandHoles = /\s?\{(test|lint|build)\}\s?/gu;
 
 /** A known command goes in as code, spaced from the words around it; an unknown one is a plain word, unspaced as Chinese is. */
-export function filledTemplate(s: WrittenTemplate, stack: Partial<T.ProjectStack>): T.IssueTemplate {
+export function filledTemplate(s: WrittenTemplate, stack: Partial<T.RepoStack>): T.IssueTemplate {
   const commands: Record<string, string | undefined> = { test: stack.test, lint: stack.lint, build: stack.build };
   const done = s.done.replace(commandHoles, (hole, name: string) =>
     commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : (maybe(`server.issue.template.commands.${name}`) ?? hole),
@@ -80,7 +80,7 @@ export function filledTemplate(s: WrittenTemplate, stack: Partial<T.ProjectStack
   return { id: s.id, title: s.title, done, text, ...(blank ? { blank } : {}) };
 }
 
-export const filledKinds = (kinds: readonly WrittenKind[], stack: Partial<T.ProjectStack>): T.TemplateKind[] =>
+export const filledKinds = (kinds: readonly WrittenKind[], stack: Partial<T.RepoStack>): T.TemplateKind[] =>
   kinds.map((k) => ({ ...k, templates: k.templates.map((template) => filledTemplate(template, stack)) }));
 
 function firstBlank(text: string): T.TemplateBlank | undefined {

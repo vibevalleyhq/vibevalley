@@ -163,7 +163,7 @@ describe("pkm", () => {
       yield* pkm.save({ title: "Roadmap", tier: "project", markdown: `- builds on ((${id}))\n` });
       expect(readFileSync(join(pkm.root, "03_Resources/Ideas.md"), "utf8")).toContain(`id:: ${id}`);
       const view = yield* pkm.page("roadmap");
-      expect(view.transclusions).toEqual([{ block: id, found: true, page: "ideas", pageTitle: "Ideas", body: "an idea about engines" }]);
+      expect(view.transclusions).toEqual([{ block: id, found: true, circular: false, page: "ideas", pageTitle: "Ideas", body: "an idea about engines" }]);
       const cluster = yield* pkm.cluster({ topic: "engines", title: "Engines" });
       expect(cluster.blocks).toEqual([id]);
     }).pipe(Effect.provide(farm())),

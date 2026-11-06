@@ -85,7 +85,7 @@ const fallbackItem: MemoryItem = {
   kind: "leaf",
   body: "",
   agent: "",
-  project: null,
+  repo: null,
   at: 0,
   recalled: 0,
   fading: false,
@@ -222,7 +222,7 @@ export function Scene(props: {
     };
 
     const drawTree = (c: CanvasRenderingContext2D, t: GrownTree, bx: number, by: number) => {
-      const filtering = props.filter.agent !== "" || props.filter.project !== "";
+      const filtering = props.filter.agent !== "" || props.filter.repo !== "";
       // The crown's shadow on the grass, dithered, as wide as the crown.
       const spread = t.clumps.length > 0 ? Math.max(...t.clumps.map((k) => Math.abs(k.x) + k.r)) : 6;
       c.fillStyle = "rgba(30,52,24,0.35)";
@@ -328,7 +328,7 @@ export function Scene(props: {
       }
     };
 
-    const project = (s: Star, t: number) => {
+    const repo = (s: Star, t: number) => {
       const w = low.width;
       const h = low.height;
       const radius = Math.min(w * 0.4, (h * 0.32) / Math.max(0.3, Math.sin(tilt)));
@@ -358,7 +358,7 @@ export function Scene(props: {
           lc.fillRect(Math.floor(x * w), Math.floor(y * h), 1, 1);
         }
       }
-      const key = `${growth.toFixed(3)}|${props.filter.agent}|${props.filter.project}|${props.until}|${w}x${h}|${f.x},${f.y},${f.height}`;
+      const key = `${growth.toFixed(3)}|${props.filter.agent}|${props.filter.repo}|${props.until}|${w}x${h}|${f.x},${f.y},${f.height}`;
       if (key !== layerKey || !grown) {
         layerKey = key;
         grown = growTree(written(), growth, f.height);
@@ -448,7 +448,7 @@ export function Scene(props: {
           .flatMap((item) => {
             const s = starOf.get(item.id);
             if (!s) return [];
-            const to = project(s, t);
+            const to = repo(s, t);
             const start = from.get(item.id) ?? { x: f.x, y: f.y };
             const kk = Math.min(1, Math.max(0, k * 1.25 - hash01(`${item.id}d`) * 0.25));
             return [{ s, x: start.x + (to.x - start.x) * kk, y: start.y + (to.y - start.y) * kk, depth: to.depth }];
@@ -460,7 +460,7 @@ export function Scene(props: {
           if (fill) lc.beginPath();
           for (let i = 0; i <= 96; i += step) {
             const a = (i / 96) * Math.PI * 2;
-            const p = project({ item: anchorItem, x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r, size: 0 }, t);
+            const p = repo({ item: anchorItem, x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r, size: 0 }, t);
             if (!fill) lc.fillRect(Math.floor(p.x), Math.floor(p.y), 1, 1);
             else if (i === 0) lc.moveTo(p.x, p.y);
             else lc.lineTo(p.x, p.y);
@@ -473,7 +473,7 @@ export function Scene(props: {
         }
         lc.fillStyle = `rgba(170,200,255,${0.1 * k})`;
         for (const r of [0.25, 0.5, 0.75, 1]) ring(r, 2, false);
-        const sun = project({ item: anchorItem, x: 0, y: 0, z: 0, size: 0 }, t);
+        const sun = repo({ item: anchorItem, x: 0, y: 0, z: 0, size: 0 }, t);
         for (let r = 9; r >= 1; r--) {
           lc.fillStyle = `rgba(255,${190 + r * 4},110,${(0.05 + (9 - r) * 0.02) * k})`;
           disc(lc, sun.x, sun.y, r);

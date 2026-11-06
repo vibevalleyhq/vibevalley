@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues, PriorityValues, statePath } from "@vibevalley/protocol";
 import { actCommand } from "@vibevalley/protocol/api";
-import { latestSessionIdOf } from "@vibevalley/protocol/rules";
+import { latestSessionIdOf, stageWantsOwner } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import { ask, change, frames, given, nameArg, optionalText, ServerFlag, show, words } from "#/farm.ts";
@@ -22,7 +22,7 @@ const agentOf = (i: T.Issue) => i.assignments.at(-1)?.agent;
 
 /** One line an issue: its number first, then its status, its title, whose it is and where. */
 const issueLine = (i: T.Issue) =>
-  [`#${i.number}`, i.status, i.title, agentOf(i) === undefined ? "" : `@${agentOf(i)}`, i.project === undefined ? "" : `[${i.project}]`]
+  [`#${i.number}`, i.status, i.title, agentOf(i) === undefined ? "" : `@${agentOf(i)}`, i.repo === undefined ? "" : `[${i.repo}]`]
     .filter((p) => p !== "")
     .join("  ");
 
@@ -38,7 +38,7 @@ const doable = (i: T.Issue) =>
 const issueText = (i: T.Issue) =>
   [
     `#${i.number}  ${i.title}`,
-    [i.status, i.priority, i.project ? `[${i.project}]` : "", agentOf(i) ? `@${agentOf(i)}` : ""].filter((p) => p !== "").join("  "),
+    [i.status, i.priority, i.repo ? `[${i.repo}]` : "", agentOf(i) ? `@${agentOf(i)}` : ""].filter((p) => p !== "").join("  "),
     t("cli.issue.stage", { stage: i.stage.stuck ? `${i.stage.state} (${i.stage.stuck})` : i.stage.state }),
     ...(i.description.trim() === "" ? [] : ["", i.description.trim()]),
     ...(i.criteria.length === 0 ? [] : ["", t("cli.issue.criteria"), ...i.criteria.map((c, n) => `  ${n + 1}. ${c}`)]),
@@ -52,7 +52,7 @@ const listCommand = Command.make(
   "list",
   {
     status: Flag.Literals("status", IssueStatusValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.issueStatus"))),
-    project: optionalText("project", "cli.flag.project"),
+    repo: optionalText("repo", "cli.flag.repo"),
     text: optionalText("text", "cli.flag.text"),
     wantsOwner: Flag.Boolean("wants-owner").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.wantsOwner"))),
     closed: Flag.Boolean("closed").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.closed"))),
@@ -61,13 +61,13 @@ const listCommand = Command.make(
   (o) =>
     Effect.gen(function* () {
       const status = given(o.status);
-      const project = given(o.project);
+      const repo = given(o.repo);
       const text = given(o.text);
       const issues = yield* ask((api) =>
         api.issue.list({
           limit: o.limit + 1,
           ...(status ? { status } : {}),
-          ...(project ? { project } : {}),
+          ...(repo ? { repo } : {}),
           ...(text ? { text } : {}),
           ...(o.wantsOwner ? { wantsOwner: true } : {}),
           ...(o.closed ? { closed: true } : {}),
@@ -95,7 +95,7 @@ const createCommand = Command.make(
   {
     title: words("cli.arg.title"),
     description: optionalText("description", "cli.flag.description"),
-    project: optionalText("project", "cli.flag.project"),
+    repo: optionalText("repo", "cli.flag.repo"),
     agent: optionalText("agent", "cli.flag.agent"),
     priority: priorityFlag,
     criterion: Flag.String("criterion").pipe(Flag.atLeast(0), Flag.withDescription(t("cli.flag.criterion"))),
@@ -104,11 +104,11 @@ const createCommand = Command.make(
   (o) =>
     Effect.gen(function* () {
       const description = yield* descriptionOf(given(o.description));
-      const fields = { project: given(o.project), agent: given(o.agent), priority: given(o.priority), requestKey: given(o.key) };
+      const fields = { repo: given(o.repo), agent: given(o.agent), priority: given(o.priority), requestKey: given(o.key) };
       const request: T.IssueRequest = {
         title: o.title.join(" "),
         ...(description ? { description } : {}),
-        ...(fields.project ? { project: fields.project } : {}),
+        ...(fields.repo ? { repo: fields.repo } : {}),
         ...(fields.agent ? { agent: fields.agent } : {}),
         ...(fields.priority ? { priority: fields.priority } : {}),
         ...(o.criterion.length > 0 ? { criteria: [...o.criterion] } : {}),
@@ -127,7 +127,7 @@ const editCommand = Command.make(
     issue: issueArg,
     title: optionalText("title", "cli.flag.title"),
     description: optionalText("description", "cli.flag.description"),
-    project: optionalText("project", "cli.flag.project"),
+    repo: optionalText("repo", "cli.flag.repo"),
     agent: optionalText("agent", "cli.flag.agent"),
     priority: priorityFlag,
     criterion: Flag.String("criterion").pipe(Flag.atLeast(0), Flag.withDescription(t("cli.flag.criteria"))),
@@ -135,11 +135,11 @@ const editCommand = Command.make(
   (o) =>
     Effect.gen(function* () {
       const description = yield* descriptionOf(given(o.description));
-      const fields = { title: given(o.title), project: given(o.project), agent: given(o.agent), priority: given(o.priority) };
+      const fields = { title: given(o.title), repo: given(o.repo), agent: given(o.agent), priority: given(o.priority) };
       const update: T.IssueUpdate = {
         ...(fields.title ? { title: fields.title } : {}),
         ...(description ? { description } : {}),
-        ...(fields.project ? { project: fields.project } : {}),
+        ...(fields.repo ? { repo: fields.repo } : {}),
         ...(fields.agent ? { agent: fields.agent } : {}),
         ...(fields.priority ? { priority: fields.priority } : {}),
         ...(o.criterion.length > 0 ? { criteria: [...o.criterion] } : {}),
@@ -263,7 +263,11 @@ const deleteCommand = Command.make("delete", { issue: issueArg }, (o) =>
 
 /** Only what `issue show --watch` reads of a frame; the rest is left as it came. */
 const IssuesOfFrame = Schema.fromJsonString(
-  Schema.Struct({ state: Schema.Struct({ issues: Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus })) }) }),
+  Schema.Struct({
+    state: Schema.Struct({
+      issues: Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus, stage: Schema.Struct({ state: S.IssueStageKind }) })),
+    }),
+  }),
 );
 /** Where it waits on the owner or is over: what --watch waits for. */
 const settled = new Set<T.IssueStatus>(["in_review", "done", "canceled"]);
@@ -278,13 +282,11 @@ const followed = Effect.fn("Cli.followed")(function* (issue: T.Issue, timeout: n
     ),
     Stream.mapEffect((frame) => {
       const now = frame.state.issues.find((i) => i.id === issue.id);
-      return now
-        ? Effect.succeed(now.status)
-        : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
+      return now ? Effect.succeed(now) : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
     }),
-    Stream.changes,
-    Stream.tap((status) => err(JSON.stringify({ issue: issue.number, status }))),
-    Stream.takeUntil((status) => settled.has(status)),
+    Stream.changesWith((a, b) => a.status === b.status && a.stage.state === b.stage.state),
+    Stream.tap((now) => err(JSON.stringify({ issue: issue.number, status: now.status, stage: now.stage.state }))),
+    Stream.takeUntil((now) => settled.has(now.status) || stageWantsOwner(now.stage.state)),
     Stream.runDrain,
   );
   yield* timeout === undefined

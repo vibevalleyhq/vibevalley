@@ -74,7 +74,7 @@ export interface Intents<I, R> {
   readonly all: () => readonly Intent<I, R>[];
 }
 
-/** An intent made by a button rather than typed (a suggestion, the project map's sow, an artifact's reply). */
+/** An intent made by a button rather than typed (a suggestion, the repo map's sow, an artifact's reply). */
 export function sendOnce<I, R>(intents: Intents<I, R>, input: I): Promise<Intent<I, R> | undefined> {
   const kept = intents.all().find((i) => same(i.input, input));
   if (!kept) return intents.send(input).done;

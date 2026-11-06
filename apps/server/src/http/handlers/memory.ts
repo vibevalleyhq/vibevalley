@@ -14,10 +14,10 @@ export const memoryHandlers = Effect.gen(function* () {
   const memoryOnce = requestKeys<T.Memory>();
   const done: MemoryHandlers = {
     "memory.list": ({ agent }) => memory.memoriesOf(agent),
-    "memory.recall": ({ agent, project, text }) => memory.recallOf(agent, project ?? "", text ?? ""),
-    "memory.search": ({ agent, project, text }) =>
-      memory.search({ agent: agent ? (agents.named(agent)?.id ?? agent) : "", project: project ?? "", text: text ?? "", kind: "", limit: 0 }),
-    "memory.create": ({ agent, ...body }) => memoryOnce(body.requestKey, memory.remember({ agent, text: body.text, project: body.project ?? "", by: owner })),
+    "memory.recall": ({ agent, repo, text }) => memory.recallOf(agent, repo ?? "", text ?? ""),
+    "memory.search": ({ agent, repo, text }) =>
+      memory.search({ agent: agent ? (agents.named(agent)?.id ?? agent) : "", repo: repo ?? "", text: text ?? "", kind: "", limit: 0 }),
+    "memory.create": ({ agent, ...body }) => memoryOnce(body.requestKey, memory.remember({ agent, text: body.text, repo: body.repo ?? "", by: owner })),
     "memory.delete": ({ agent, memory: id }) => memory.forget(agent, id),
     "memory.previewDelete": ({ agent, memory: id }) => memory.previewForget(agent, id),
   };

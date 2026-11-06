@@ -3,8 +3,8 @@ import { Match, Show, Switch, untrack } from "solid-js";
 
 import { Keyed } from "#/base/dom.tsx";
 import { FarmPage } from "#/farm/FarmPage.tsx";
-import { projectMap } from "#/farm/map/ProjectMap.tsx";
-import { lastFarmProject } from "#/farm/store.ts";
+import { repoMap } from "#/farm/map/RepoMap.tsx";
+import { lastFarmRepo } from "#/farm/store.ts";
 import { AgentsRoute } from "#/features/agent/index.ts";
 import { ArtifactsPage } from "#/features/artifact/index.ts";
 import { CatalogPage } from "#/features/catalog/index.ts";
@@ -14,10 +14,10 @@ import { IssuesPage } from "#/features/issue/index.ts";
 import { PairPage } from "#/features/lan/index.ts";
 import { OrchestratorPage } from "#/features/orchestrator/index.ts";
 import { PkmPage } from "#/features/pkm/index.ts";
-import { ProjectsPage, sortProjects } from "#/features/project/index.ts";
+import { ReposPage, sortRepos } from "#/features/repo/index.ts";
 import { RuntimesPage } from "#/features/runtime/index.ts";
 import { SettingsPage } from "#/features/setting/index.ts";
-import { ready, useProjects } from "#/infra/query.ts";
+import { ready, useRepos } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { prefsNow } from "#/state/prefs.ts";
 import { TreePage } from "#/tree/TreePage.tsx";
@@ -42,26 +42,26 @@ const places: Record<string, (rest: Rest) => JSX.Element> = {
   orchestrator: (rest) => <OrchestratorPage rest={rest()} />,
   agents: (rest) => <AgentsRoute rest={rest()} />,
   runtimes: (rest) => <RuntimesPage rest={rest()} />,
-  projects: (rest) => <ProjectsPage rest={rest()} skin={projectMap} />,
+  repos: (rest) => <ReposPage rest={rest()} skin={repoMap} />,
   catalog: (rest) => <CatalogPage rest={rest()} />,
   artifacts: (rest) => <ArtifactsPage rest={rest()} say={chatSay} />,
   pkm: (rest) => <PkmPage rest={rest()} />,
 };
 
-/** `/farm`: the farm entered last on this machine (trusted while the projects are still coming). */
+/** The farm entered last on this machine, trusted while the repos are still loading. */
 function FarmHome() {
-  const projects = useProjects();
-  const last = lastFarmProject();
-  const list = () => ready(projects, undefined);
+  const repos = useRepos();
+  const last = lastFarmRepo();
+  const list = () => ready(repos, undefined);
   const enter = (name: string) => <Navigate href={`/farm/${encodeURIComponent(name)}`} />;
   return (
     <Switch>
       <Match when={last !== undefined && (list()?.some((p) => p.name === last) ?? true) ? last : undefined}>{(name) => enter(name())}</Match>
-      <Match when={list()?.length === 0 || projects.isError}>
-        <FarmPage project="" />
+      <Match when={list()?.length === 0 || repos.isError}>
+        <FarmPage repo="" />
       </Match>
       {/* Entered once, by the list as it is now. */}
-      <Match when={list()}>{(all) => enter(untrack(() => sortProjects(all())[0]?.name ?? ""))}</Match>
+      <Match when={list()}>{(all) => enter(untrack(() => sortRepos(all())[0]?.name ?? ""))}</Match>
     </Switch>
   );
 }
@@ -77,13 +77,13 @@ function Routes() {
       <Match when={pathname() === "/"}>
         <Navigate href={prefsNow().start === "farm" ? "/farm" : (placeList[0]?.path ?? "/issues")} />
       </Match>
-      {/* Before the farms by project: /farm/ (empty) is the farm of the sessions without one. */}
+      {/* Before the farms by repo: /farm/ (empty) is the farm of the sessions without one. */}
       <Match when={pathname() === "/farm"}>
         <FarmHome />
       </Match>
       <Match when={place() === "farm"}>
-        {/* One farm per project: entering another builds its farm anew. */}
-        <Keyed key={decodeURIComponent(rest())}>{() => <FarmPage project={untrack(() => decodeURIComponent(rest()))} />}</Keyed>
+        {/* One farm per repo: entering another builds its farm anew. */}
+        <Keyed key={decodeURIComponent(rest())}>{() => <FarmPage repo={untrack(() => decodeURIComponent(rest()))} />}</Keyed>
       </Match>
       <Match when={pathname() === "/tree"}>
         <TreePage />

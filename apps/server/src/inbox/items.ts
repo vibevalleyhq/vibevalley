@@ -31,18 +31,18 @@ export function forOwner(m: T.ChatMessage, notify: Notify = "all"): boolean {
 }
 
 /** Newest first; items of the same moment in the order they are gathered. */
-export const inbox = (state: T.WorkspaceState): T.InboxItem[] =>
+export const inbox = (state: T.SpaceState): T.InboxItem[] =>
   inboxEntries(state)
     .map((e) => e.item)
     .toSorted((a, b) => b.at - a.at);
 
 type Unworded = Omit<InboxEntry, "item"> & { readonly item: Omit<T.InboxItem, "who" | "words"> };
 
-export function inboxEntries(state: T.WorkspaceState): InboxEntry[] {
+export function inboxEntries(state: T.SpaceState): InboxEntry[] {
   return gathered(state).map((e) => ({ ...e, item: worded(e.item) }));
 }
 
-function gathered(state: T.WorkspaceState): Unworded[] {
+function gathered(state: T.SpaceState): Unworded[] {
   const chat = state.chat;
   const general = defaultOf(chat)?.id;
   const out: Unworded[] = [];
@@ -174,7 +174,7 @@ type Want =
   | { readonly kind: "quiet"; readonly since: number };
 
 /** What a session questions of the owner. Its issue's stage says it, the one the issue page and the phone both read. */
-function wantOf(h: T.Session, state: T.WorkspaceState): Want | undefined {
+function wantOf(h: T.Session, state: T.SpaceState): Want | undefined {
   const issue = h.issue === undefined ? undefined : state.issues.find((item) => item.id === h.issue && latestSessionIdOf(item) === h.id);
   if (!issue) {
     const need = needOf(h);

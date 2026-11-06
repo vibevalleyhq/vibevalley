@@ -13,7 +13,7 @@ import { owner } from "#/base/actor.ts";
 import { Core } from "#/core/core.ts";
 import { inbox } from "#/inbox/items.ts";
 import { Issue } from "#/issue/issue.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
 import { Session } from "#/session/session.ts";
 import { gitSync } from "#/testing/git.ts";
 import { testIssues } from "#/testing/world.ts";
@@ -39,11 +39,11 @@ it.live("regression: a parent without a session can receive and resolve its own 
   return Effect.gen(function* () {
     const issues = yield* Issue;
     yield* (yield* Agent).save(lab());
-    const root = join(f.config.workRoot, "projects", "parent-conflict");
+    const root = join(f.config.workRoot, "repos", "parent-conflict");
     writeFileSync(join(root, "same.ts"), "base\n");
     gitSync(root, "add", ".");
     gitSync(root, "commit", "-m", "Prepare conflict file");
-    const parent = yield* testIssues(issues).add({ title: "parent", project: "parent-conflict", agent: "lab" });
+    const parent = yield* testIssues(issues).add({ title: "parent", repo: "parent-conflict", agent: "lab" });
     yield* issues.split(parent.id, "", [{ id: "child", title: "child", brief: "child work" }], owner);
     yield* await_(
       () => issues.get(parent.id),
@@ -88,7 +88,7 @@ it.live("regression: splitting creates real queued issues whose dependencies mer
     const service = yield* Issue;
     const issues = testIssues(service);
     yield* (yield* Agent).save(lab());
-    const parent = yield* issues.add({ title: "parent", agent: "lab", project: "split" });
+    const parent = yield* issues.add({ title: "parent", agent: "lab", repo: "split" });
     yield* service.split(
       parent.id,
       "split parent",
@@ -122,7 +122,7 @@ it.live("regression: splitting creates real queued issues whose dependencies mer
     expect(waiting).toHaveLength(1);
     expect(waiting[0]?.target).toEqual({ kind: "issue", id: parent.id });
     expect((yield* service.changes(parent.id, owner)).commits.length).toBeGreaterThan(0);
-    const place = yield* (yield* Project).workplace("split", parent.number, true, "");
+    const place = yield* (yield* Repo).workplace("split", parent.number, true, "");
     expect(readFileSync(join(place.cwd, "second.txt"), "utf8")).toBe("done");
     yield* service.setStatus(parent.id, "done", "", "", owner);
     const core = yield* Core;
@@ -142,7 +142,7 @@ it.live("regression: a failed split commits no child, assignment, queue entry or
     const issues = testIssues(service);
     const sql = yield* SqlClient.SqlClient;
     yield* (yield* Agent).save(lab());
-    const parent = yield* issues.add({ title: "parent", agent: "lab", project: "split-failure" });
+    const parent = yield* issues.add({ title: "parent", agent: "lab", repo: "split-failure" });
     yield* sql
       .unsafe(
         "create trigger reject_child before insert on issue for each row when (NEW.title = 'second') begin select raise(abort, 'child write failed'); end",

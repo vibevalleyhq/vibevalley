@@ -161,7 +161,7 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
               <div class="flex flex-wrap gap-2">
                 <Show when={acts().includes("complete")}>
                   <Button tone="primary" data-act="complete" onClick={() => void take()}>
-                    {empty() ? t("web.issue.changes.letGo") : t("web.issue.changes.merge", { base: c().base })}
+                    {t("shared.act.complete")}
                   </Button>
                 </Show>
                 <Show when={acts().includes("resolve")}>
@@ -188,7 +188,7 @@ export function ChangesHead(props: { changes: Changes }) {
   return (
     <div class="flex flex-wrap items-center gap-2 text-sm">
       <span class="rounded bg-selected px-1.5 text-xs">
-        {t("web.issue.task.project")} {props.changes.project}
+        {t("web.issue.task.repo")} {props.changes.repo}
       </span>
       <Show when={props.changes.branch}>
         <span class="font-mono text-xs">

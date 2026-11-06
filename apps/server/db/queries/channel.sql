@@ -4,8 +4,8 @@
 select id from channel where is_default;
 
 -- name: CreateChannel :exec
-insert into channel (id, type, is_default, name, description, project, created_at)
-values (sqlc.arg(id), 'channel', sqlc.arg(is_default), sqlc.arg(name), sqlc.narg(description), sqlc.narg(project), sqlc.arg(created_at));
+insert into channel (id, type, is_default, name, description, repo, created_at)
+values (sqlc.arg(id), 'channel', sqlc.arg(is_default), sqlc.arg(name), sqlc.narg(description), sqlc.narg(repo), sqlc.arg(created_at));
 
 -- name: CreateDirect :exec
 -- At most one with each peer (peer_id is unique): a second for the same peer is not made.
@@ -20,7 +20,7 @@ update channel set is_default = false where is_default;
 update channel set is_default = true where id = sqlc.arg(id) and type = 'channel';
 
 -- name: UpdateChannel :exec
-update channel set description = sqlc.narg(description), project = sqlc.narg(project) where id = sqlc.arg(id) and type = 'channel';
+update channel set description = sqlc.narg(description), repo = sqlc.narg(repo) where id = sqlc.arg(id) and type = 'channel';
 
 -- name: CreateThread :exec
 insert into channel (id, type, root_id, root_number, subject_kind, subject_id, parent_id, created_at)

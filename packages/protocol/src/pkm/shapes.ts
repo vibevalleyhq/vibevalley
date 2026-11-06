@@ -11,6 +11,12 @@ export const PkmPriorityValues = ["A", "B", "C"] as const;
 export type PkmPriority = (typeof PkmPriorityValues)[number];
 
 /** One bullet of a page, in the page's order (pre-order); parent and depth say the outline. */
+export const PkmMoveDirectionValues = ["up", "down"] as const;
+export type PkmMoveDirection = (typeof PkmMoveDirectionValues)[number];
+
+export const PkmMoveAtValues = ["before", "after", "inside"] as const;
+export type PkmMoveAt = (typeof PkmMoveAtValues)[number];
+
 export interface PkmBlock {
   id: string;
   parent?: string;
@@ -60,7 +66,7 @@ export interface PkmPage {
 export interface PkmTransclusion {
   block: string;
   found: boolean;
-  circular?: boolean;
+  circular: boolean;
   page?: string;
   pageTitle?: string;
   body: string;
@@ -153,9 +159,9 @@ export type PkmBlockOp =
   | { op: "delete"; block: string }
   | { op: "indent"; block: string }
   | { op: "outdent"; block: string }
-  | { op: "move"; block: string; direction: "up" | "down" }
+  | { op: "move"; block: string; direction: PkmMoveDirection }
   /** With everything under it, before or after target, or inside it as its first child; none into itself or under itself. */
-  | { op: "move_to"; block: string; target: string; at: "before" | "after" | "inside" };
+  | { op: "move_to"; block: string; target: string; at: PkmMoveAt };
 
 export interface PkmMutation {
   page: string;

@@ -72,14 +72,14 @@ test("with the scripted helper, an issue goes out, comes back and is completed t
       "-c",
       `set -e
       vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
-      vv issue create 写打卡并提交 --project clock --agent docs > /dev/null
+      vv issue create 写打卡并提交 --repo clock --agent docs > /dev/null
       vv issue status 1 todo > /dev/null
       vv issue show 1 --watch --timeout 60 > /dev/null
       vv issue diff 1 --format json
       vv issue status 1 done --dry-run --format json
       vv issue status 1 done --format json
-      project=$(vv project list --format json | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8"))[0].path)')
-      git -C "$project" ls-tree --name-only main clock.ts`,
+      repo=$(vv repo list --format json | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8"))[0].path)')
+      git -C "$repo" ls-tree --name-only main clock.ts`,
     ],
     { scriptedHelper: true },
   );

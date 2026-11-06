@@ -39,9 +39,9 @@ export const Build: Codec<T.Build> = Schema.Literals(T.BuildValues);
 export const Head: Codec<T.Head> = Schema.Literals(T.HeadValues);
 
 export const Look: Codec<T.Look> = Schema.Struct({
-  species: Schema.optionalKey(Species),
-  outfit: Schema.optionalKey(Outfit),
-  orchestrator: Schema.optionalKey(Schema.Literals(T.OrchestratorLookValues)),
+  species: Schema.NullOr(Species),
+  outfit: Schema.NullOr(Outfit),
+  orchestrator: Schema.NullOr(Schema.Literals(T.OrchestratorLookValues)),
   build: Build,
   head: Head,
   body: Schema.String,

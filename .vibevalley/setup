@@ -1,5 +1,6 @@
 #!/bin/sh
-# A new worktree has no node_modules: install them, so the helper's first check runs (AGENTS.md, 命令).
+# A new worktree has no node_modules or package declarations: install both, so the helper's first check runs.
 set -eu
 cd "$(git rev-parse --show-toplevel)"
-vp install
+vp install --frozen-lockfile
+vp run packages:build

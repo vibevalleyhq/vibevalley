@@ -69,7 +69,7 @@ export const useAgents = () => useQuery(() => ({ queryKey: ["agents"], queryFn: 
 /** The templates a profile installs from: the built-in ones, then those added on this machine. */
 export const useAgentTemplates = () => useQuery(() => ({ queryKey: ["agent-templates"], queryFn: () => api.agent.template.list() }));
 
-export const useProjects = () => useQuery(() => ({ queryKey: ["projects"], queryFn: () => api.project.list(), refetchInterval: 30_000 }));
+export const useRepos = () => useQuery(() => ({ queryKey: ["repos"], queryFn: () => api.repo.list(), refetchInterval: 30_000 }));
 
 export const useSettings = () => useQuery(() => ({ queryKey: ["settings"], queryFn: () => api.setting.get() }));
 

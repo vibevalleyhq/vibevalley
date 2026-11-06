@@ -51,6 +51,6 @@ test("a pick lists its placeholder only when clearable", () => {
     { value: "", label: "所有" },
     { value: "p", label: "岛" },
   ];
-  expect(pickItems(options, "所有项目", false).map((o) => o.value)).toEqual(["p"]);
-  expect(pickItems(options, "所有项目", true).map((o) => o.label)).toEqual(["所有项目", "岛"]);
+  expect(pickItems(options, "所有仓库", false).map((o) => o.value)).toEqual(["p"]);
+  expect(pickItems(options, "所有仓库", true).map((o) => o.label)).toEqual(["所有仓库", "岛"]);
 });

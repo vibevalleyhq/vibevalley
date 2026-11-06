@@ -133,7 +133,7 @@ const channelLayer = (x: FakeSessions) =>
           name: "管家",
           runtime: "vibevalley",
           brief: "",
-          project: null,
+          repo: null,
           issue: null,
           channel: null,
           hired_at: 0,
@@ -159,7 +159,7 @@ const channelLayer = (x: FakeSessions) =>
           db.run(
             qsession.keepSession({
               ...session,
-              project: null,
+              repo: null,
               issue: null,
               channel: null,
               hired_at: 0,
@@ -242,12 +242,12 @@ const farm = Effect.gen(function* () {
 type Farm = Effect.Success<typeof farm>;
 
 const keepSession = (f: Farm, session: T.Session) =>
-  f.sql`insert into session (id, role, agent, name, runtime, brief, project, issue, channel, hired_at, phase, refining, runs)
-        values (${session.id}, ${session.role}, ${session.agent}, ${session.name}, ${session.runtime}, ${session.brief}, ${session.project ?? null},
+  f.sql`insert into session (id, role, agent, name, runtime, brief, repo, issue, channel, hired_at, phase, refining, runs)
+        values (${session.id}, ${session.role}, ${session.agent}, ${session.name}, ${session.runtime}, ${session.brief}, ${session.repo ?? null},
                 ${session.issue ?? null}, ${session.channel ?? null}, ${session.hiredAt}, ${JSON.stringify(session.phase)}, ${session.refining}, ${session.runs})
         on conflict (id) do nothing`;
 
-const hire = (f: Farm, x: FakeSessions, id: string, brief: string, project: string, channel?: string, issue?: string) =>
+const hire = (f: Farm, x: FakeSessions, id: string, brief: string, repo: string, channel?: string, issue?: string) =>
   Effect.gen(function* () {
     const session: T.Session = {
       id: sessionId(id),
@@ -256,7 +256,7 @@ const hire = (f: Farm, x: FakeSessions, id: string, brief: string, project: stri
       agent: "lab",
       runtime: "pi",
       brief,
-      project,
+      repo,
       hiredAt: Date.now(),
       runs: 0,
       phase: { _tag: "resting" },
@@ -274,9 +274,9 @@ const hire = (f: Farm, x: FakeSessions, id: string, brief: string, project: stri
   });
 
 /** Hired, and its first turn reported in its thread. */
-const hireAndRun = (f: Farm, x: FakeSessions, id: string, brief: string, project: string, channel?: string) =>
+const hireAndRun = (f: Farm, x: FakeSessions, id: string, brief: string, repo: string, channel?: string) =>
   Effect.gen(function* () {
-    const thread = yield* hire(f, x, id, brief, project, channel);
+    const thread = yield* hire(f, x, id, brief, repo, channel);
     expect(x.deliver(id, brief).kind).toBe("run");
     yield* until(() => f.messagesOf(thread.id).some((m) => m.kind === "report" && m.from === id), "its first report");
     return thread;
@@ -309,7 +309,7 @@ describe("the chat", () => {
   it.live("regression: freshness pages advance the read cursor without skipping older messages", () =>
     run((f, x) =>
       Effect.gen(function* () {
-        yield* hireAndRun(f, x, "w-page", "work", "paging-project");
+        yield* hireAndRun(f, x, "w-page", "work", "paging-repo");
         const channel = yield* f.chat.openChannel("paging", "", "");
         for (const text of ["first", "second", "third", "fourth", "fifth"]) yield* f.chat.say(text, channel.id, "");
         const options = { target: "#paging", confirm: true };
@@ -461,8 +461,8 @@ describe("the chat", () => {
       Effect.gen(function* () {
         const a = (yield* f.chat.openChannel("aa", "", "")).id;
         const b = (yield* f.chat.openChannel("bb", "", "")).id;
-        yield* f.chat.updateChannel(a, { name: "前端", category: "项目" });
-        expect(f.channel(a)).toMatchObject({ name: "前端", category: "项目" });
+        yield* f.chat.updateChannel(a, { name: "前端", category: "仓库" });
+        expect(f.channel(a)).toMatchObject({ name: "前端", category: "仓库" });
         expect(yield* Effect.flip(f.chat.updateChannel(b, { name: "前端" }))).toMatchObject({ _tag: "Refused" });
         yield* f.chat.updateChannel(b, { before: a });
         expect((yield* f.chat.channels()).map((c) => c.name)).toEqual(["general", "bb", "前端"]);
@@ -554,7 +554,7 @@ describe("the chat", () => {
     run((f, x) =>
       Effect.gen(function* () {
         const channel = yield* f.chat.openChannel("#clock-in", "打卡页", "chat-ch");
-        expect(channel).toMatchObject({ name: "clock-in", project: "chat-ch", description: "打卡页" });
+        expect(channel).toMatchObject({ name: "clock-in", repo: "chat-ch", description: "打卡页" });
         expect(yield* Effect.flip(f.chat.openChannel("clock-in", "", ""))).toMatchObject({ reason: expect.stringContaining("已经有") });
         expect((yield* f.chat.channels()).map((c) => c.name)).toEqual(["general", "clock-in"]);
         const thread = yield* hireAndRun(f, x, "w4", "写 hello", "chat-ch", channel.id);
@@ -575,9 +575,9 @@ describe("the chat", () => {
           what: expect.stringContaining("没有叫 #nowhere 的频道"),
         });
         expect((yield* f.chat.topOf(thread.id)).name).toBe("clock-in");
-        yield* f.chat.updateChannel(channel.id, { project: "" });
-        expect(yield* f.chat.channelByName("clock-in")).toMatchObject({ project: "", description: "打卡页" });
-        expect(channelOf(f.core.state().chat, channel.id)?.project).toBeUndefined();
+        yield* f.chat.updateChannel(channel.id, { repo: "" });
+        expect(yield* f.chat.channelByName("clock-in")).toMatchObject({ repo: "", description: "打卡页" });
+        expect(channelOf(f.core.state().chat, channel.id)?.repo).toBeUndefined();
         const general = f.chat.defaultChannel();
         yield* f.chat.makeDefault(channel.id);
         expect([f.chat.defaultChannel(), defaultOf(f.core.state().chat)?.id, channelOf(f.core.state().chat, general)?.default]).toEqual([

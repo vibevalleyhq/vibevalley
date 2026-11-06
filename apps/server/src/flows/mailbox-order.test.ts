@@ -111,7 +111,7 @@ it.live("regression: queued triggers enter the first model request in receipt or
     const issues = testIssues(yield* Issue);
     const ingress = yield* Ingress;
     yield* (yield* Agent).save(lab());
-    const issue = yield* issues.add({ title: "work", agent: "lab", project: "fifo" });
+    const issue = yield* issues.add({ title: "work", agent: "lab", repo: "fifo" });
     const markers = ["FIFO_FIRST_CARD", "FIFO_SECOND_CARD", "FIFO_THIRD_CARD"];
     for (const [index, text] of markers.entries())
       yield* ingress.record({
@@ -153,7 +153,7 @@ it.live("regression: an independent agent wake restores cooldown using receipt t
     const mailbox = yield* Mailbox;
     const ingress = yield* Ingress;
     yield* (yield* Agent).save(lab());
-    const issue = yield* issues.add({ title: "work", agent: "lab", project: "cooldown" });
+    const issue = yield* issues.add({ title: "work", agent: "lab", repo: "cooldown" });
     const started = yield* issues.start(issue.id, "");
     const threads = [`issue:${issue.id}`];
     const first = (yield* ingress.accept(signal("first-wake", "session", threads)))!;

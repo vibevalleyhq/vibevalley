@@ -6,8 +6,8 @@ import { sessionOf } from "#/session/roster.ts";
 
 import { statusMoves } from "./moves.ts";
 
-const awaitsPullRequest = (issue: Pick<T.Issue, "pullRequest">, session: Pick<T.Session, "phase" | "lastRun"> | undefined) =>
-  issue.pullRequest?.state === "open" && session?.phase._tag === "resting" && session.lastRun?.outcome === "completed";
+const awaitsFeedback = (issue: Pick<T.Issue, "questions">, session: Pick<T.Session, "phase" | "lastRun"> | undefined) =>
+  session?.phase._tag === "resting" && session.lastRun?.outcome === "completed" && issue.questions.length === 0;
 
 /** The conflict a preview of the issue's branch shows; none when it goes in clean. */
 export const conflictOf = (changes: { readonly base: string; readonly conflicts?: readonly string[] }): T.Conflict | undefined =>
@@ -39,13 +39,15 @@ export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.Issu
     case "todo":
       return { state: "queued", since: t.queuedAt ?? t.createdAt, acts: [close] };
     case "in_progress": {
-      if (awaitsPullRequest(t, session)) return { state: "working", ...at(last?.at), lead: "tell", acts: [say("tell"), close] };
-      // Run by no session on the farm: nobody to tell or stop from here; it can still be closed.
-      if (session?.phase._tag !== "working") return { state: "working", ...at(t.lastRun?.startedAt ?? t.createdAt), acts: [close] };
-      const phase = session?.phase;
-      if (phase?._tag === "working" && phase.quietSince !== undefined)
-        return { state: "stuck", stuck: "quiet", since: phase.quietSince, lead: "stop", acts: [stop, say("tell"), close] };
-      return { state: "working", ...at(phase?._tag === "working" ? phase.since : undefined), acts: [say("tell"), stop, close] };
+      if (awaitsFeedback(t, session)) return { state: "working", ...at(last?.at), lead: "tell", acts: [say("tell"), close] };
+      if (session?.phase._tag === "working") {
+        const phase = session.phase;
+        if (phase.quietSince !== undefined) return { state: "stuck", stuck: "quiet", since: phase.quietSince, lead: "stop", acts: [stop, say("tell"), close] };
+        return { state: "working", since: phase.since, acts: [say("tell"), stop, close] };
+      }
+      if (!session?.lastRun && (!t.lastRun || t.lastRun.endedAt === undefined))
+        return { state: "working", since: t.lastRun?.startedAt ?? t.createdAt, acts: [close] };
+      return issueStageOf({ ...t, status: "in_review" }, session);
     }
     case "in_review": {
       // Run by no session on the farm (an in-process agent's): its latest run says how it ended. A failed one cannot be taken as done.
@@ -59,7 +61,8 @@ export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.Issu
       }
       const since = last?.at;
       // Stuck, moving it back to todo with no words is the server's own for why: settle the conflict, mend, go on.
-      if (t.conflict) return { state: "stuck", stuck: "conflict", ...at(since), lead: "resolve", acts: [move("resolve", "todo"), say("tell"), close] };
+      if (t.conflict && t.deliver === "change")
+        return { state: "stuck", stuck: "conflict", ...at(since), lead: "resolve", acts: [move("resolve", "todo"), say("tell"), close] };
       if (t.questions.length > 0) return { state: "asking", ...at(since), lead: "answer", acts: [say("answer"), close] };
       // An answer issue's round that handed back no answer it could read did not get it done either.
       const unread = t.deliver === "answer" && last?.outcome === "completed" && last.answer === undefined;
@@ -77,7 +80,7 @@ export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.Issu
 
 const at = (since: number | undefined) => (since !== undefined ? { since } : {});
 
-export function issueStageIn(t: T.Issue, state: T.WorkspaceState): T.IssueStage {
+export function issueStageIn(t: T.Issue, state: T.SpaceState): T.IssueStage {
   const last = latestSessionIdOf(t);
   return issueStageOf(t, last === undefined ? undefined : sessionOf(state, last));
 }
@@ -88,19 +91,19 @@ const spaces = /\s+/u;
  * the owner, the longest waiting first. */
 export function pickIssues(all: readonly T.Issue[], f: T.IssueFilter, now: number): T.Issue[] {
   const words = (f.text ?? "").split(spaces).filter(Boolean);
-  const project = (f.project ?? "").trim();
+  const repo = (f.repo ?? "").trim();
   let found = all.filter(
     (item) =>
       (f.status ? item.status === f.status : f.closed === true || (item.status !== "done" && item.status !== "canceled")) &&
       (f.wantsOwner !== true || stageWantsOwner(item.stage.state)) &&
-      (!project || item.project === project) &&
+      (!repo || item.repo === repo) &&
       words.every((w) => (item.title + "\n" + item.description).includes(w)),
   );
   if (f.wantsOwner === true) found = found.toSorted((a, b) => (a.stage.since ?? now) - (b.stage.since ?? now));
   return f.limit != null && f.limit > 0 ? found.slice(0, Math.trunc(f.limit)) : found;
 }
 
-export function issueStatusOf(t: T.Issue, state: T.WorkspaceState): T.IssueStatus {
+export function issueStatusOf(t: T.Issue, state: T.SpaceState): T.IssueStatus {
   // Closed, the verdict is written down: done with what it delivered, else canceled (a close that does not say how too).
   if (t.delivered !== undefined || t.canceled !== undefined || t.closedAt !== undefined) return t.delivered !== undefined ? "done" : "canceled";
   const active = latestSessionIdOf(t);
@@ -114,10 +117,12 @@ export function issueStatusOf(t: T.Issue, state: T.WorkspaceState): T.IssueStatu
   const latestSession = latestSessionIdOf(t);
   if (latestSession !== undefined) {
     const h = sessionOf(state, latestSession);
-    return !h ? "todo" : isBusy(h) || awaitsPullRequest(t, h) ? "in_progress" : "in_review";
+    if (!h) return "todo";
+    const unfinished = t.questions.length > 0 || h.lastRun?.outcome !== "completed" || (t.deliver === "answer" && !h.lastRun.answer);
+    return isBusy(h) || awaitsFeedback(t, h) || unfinished ? "in_progress" : "in_review";
   }
   if (t.queuedAt !== undefined) return "todo";
-  if (t.lastRun) return t.lastRun.endedAt === undefined ? "in_progress" : "in_review";
+  if (t.lastRun) return t.lastRun.endedAt === undefined || t.lastRun.outcome !== "completed" || t.questions.length > 0 ? "in_progress" : "in_review";
   return t.queuedAt !== undefined ? "todo" : "backlog";
 }
 
@@ -145,13 +150,13 @@ export function withIssue(all: readonly T.Issue[] | undefined, t: T.Issue): T.Is
   return next.toSorted(issueOrder);
 }
 
-export function issueRefiningOf(t: T.Issue, state: T.WorkspaceState): T.IssueRefining | undefined {
+export function issueRefiningOf(t: T.Issue, state: T.SpaceState): T.IssueRefining | undefined {
   const h = state.sessions.find((h) => h.refining && h.issue === t.id);
   return h ? { session: h.id, name: h.name } : undefined;
 }
 
 /** The same array when none changed. */
-export function withIssueStatuses(state: T.WorkspaceState): T.WorkspaceState {
+export function withIssueStatuses(state: T.SpaceState): T.SpaceState {
   let next: T.Issue[] | undefined;
   state.issues.forEach((t, i) => {
     const status = issueStatusOf(t, state);

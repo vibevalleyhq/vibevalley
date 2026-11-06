@@ -5,11 +5,11 @@ import { mockTree } from "./mock";
 import { constellation, starsOf, tiesOf } from "./sky";
 const now = Date.parse("2026-10-22T12:00:00+08:00");
 
-test("a memory for every project is kept under any project; a helper filter keeps only its own", () => {
+test("a memory for every repo is kept under any repo; a helper filter keeps only its own", () => {
   const tree = mockTree(now);
-  const shared = tree.items.find((m) => m.project === null && m.kind === "leaf")!;
-  expect(kept(shared, { agent: "", project: "官网" })).toBe(true);
-  expect(kept(shared, { agent: shared.agent === "fox" ? "bear" : "fox", project: "" })).toBe(false);
+  const shared = tree.items.find((m) => m.repo === null && m.kind === "leaf")!;
+  expect(kept(shared, { agent: "", repo: "官网" })).toBe(true);
+  expect(kept(shared, { agent: shared.agent === "fox" ? "bear" : "fox", repo: "" })).toBe(false);
   expect(tree.items.filter((m) => kept(m, allOf))).toHaveLength(tree.items.length);
 });
 

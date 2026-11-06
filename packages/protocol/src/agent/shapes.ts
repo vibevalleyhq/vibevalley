@@ -84,10 +84,11 @@ export interface AgentTemplate {
 }
 
 export interface Look {
-  species?: Species;
-  outfit?: Outfit;
-  /** An orchestrator's look: its sprites are manager-<look>, the plain one is farmer. A helper has none. */
-  orchestrator?: OrchestratorLook;
+  /** null until the server fills it from the id. */
+  species: Species | null;
+  outfit: Outfit | null;
+  /** An orchestrator's look: its sprites are manager-<look>, the plain one is farmer. A helper has null. */
+  orchestrator: OrchestratorLook | null;
   build: Build;
   head: Head;
   body: string;

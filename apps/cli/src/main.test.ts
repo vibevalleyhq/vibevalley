@@ -53,8 +53,9 @@ const cliCommands = [
   "pkm page show",
   "pkm radar",
   "pkm search",
-  "project create",
-  "project list",
+  "repo create",
+  "repo list",
+  "repo pr submit",
   "runtime list",
   "runtime refresh",
   "session list",
@@ -173,19 +174,20 @@ describe("the command line", () => {
     }),
   );
 
-  it.live("an agent does an issue from start to end with these commands alone, reading their text", () =>
+  it.live("regression: CLI watch returns for questions while the issue remains in progress", () =>
     Effect.gen(function* () {
       const server = yield* workingFarm;
       const at = (...args: string[]) => [...args, "--server", server];
       const profile = (yield* cli(at("agent", "create", "fox", "--runtime", "pi"))).out.split("  ")[0]!;
-      expect((yield* cli(at("project", "create", "clock"))).code).toBe(0);
+      expect((yield* cli(at("repo", "create", "clock"))).code).toBe(0);
       // The test helper asks which port when its issue says ask-first, with options when it says with-options, and commits clock.ts
       // when it says commit.
-      const made = yield* cli(at("issue", "create", "打卡页先问清楚，给选项，提交", "--project", "clock", "--agent", profile, "--criterion", "clock-in works"));
+      const made = yield* cli(at("issue", "create", "打卡页先问清楚，给选项，提交", "--repo", "clock", "--agent", profile, "--criterion", "clock-in works"));
       const n = /^#(\d+)/u.exec(made.out)?.[1] ?? "";
       expect((yield* cli(at("issue", "status", n, "todo"))).code).toBe(0);
       expect((yield* cli(at("issue", "show", n, "--watch", "--timeout", "30"))).code).toBe(0);
       const asking = (yield* cli(at("issue", "show", n))).out;
+      expect(asking.split("\n")[1]).toMatch(/^in_progress/u);
       expect(asking).toContain("用 8797");
       expect(asking).toContain(`vibevalley issue comment ${n} …`);
       expect((yield* cli(at("issue", "comment", n, "用 8797"))).code).toBe(0);

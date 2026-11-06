@@ -1,8 +1,8 @@
 -- Every session, on the farm or ended (session/sessions.ts).
 
 -- name: KeepSession :exec
-insert into session (id, role, agent, name, runtime, brief, project, issue, channel, hired_at)
-values (sqlc.arg(id), sqlc.arg(role), sqlc.arg(agent), sqlc.arg(name), sqlc.arg(runtime), sqlc.arg(brief), sqlc.narg(project), sqlc.narg(issue), sqlc.narg(channel), sqlc.arg(hired_at))
+insert into session (id, role, agent, name, runtime, brief, repo, issue, channel, hired_at)
+values (sqlc.arg(id), sqlc.arg(role), sqlc.arg(agent), sqlc.arg(name), sqlc.arg(runtime), sqlc.arg(brief), sqlc.narg(repo), sqlc.narg(issue), sqlc.narg(channel), sqlc.arg(hired_at))
 on conflict (id) do nothing;
 
 -- name: ForgetSession :exec

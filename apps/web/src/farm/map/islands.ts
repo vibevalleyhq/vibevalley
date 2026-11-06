@@ -1,9 +1,9 @@
 import { t } from "@vibevalley/i18n";
-import { type Crop, type Issue, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
+import { type Crop, type Issue, maxRunning, type PlotView, type RepoSummary, type Session } from "@vibevalley/protocol";
 import { isBusy, phaseText, plotKeyOf, roomLeft } from "@vibevalley/protocol/rules";
 
 import { compareText, or } from "#/base/search.ts";
-import { type Recency, recencyOf } from "#/features/project/index.ts";
+import { type Recency, recencyOf } from "#/features/repo/index.ts";
 import type { Pose } from "#/ui/cast.ts";
 
 type Spot =
@@ -12,9 +12,9 @@ type Spot =
   | { readonly kind: "shut" };
 
 export interface Island {
-  readonly project: string;
-  /** Undefined for a project the list does not have (any more) that helpers are still in. */
-  readonly summary?: ProjectSummary;
+  readonly repo: string;
+  /** Undefined for a repo the list does not have (any more) that helpers are still in. */
+  readonly summary?: RepoSummary;
   readonly spots: readonly Spot[];
   readonly working: number;
   readonly maxSessions: number;
@@ -25,32 +25,32 @@ export const openOf = (i: Island) => i.spots.filter((s) => s.kind === "open").le
 
 const isFull = (i: Island) => i.working >= i.maxSessions;
 
-const queuedIn = (issues: readonly Issue[], project: string) =>
-  issues.filter((i) => i.project === project && i.status === "todo" && i.queuedAt !== undefined).toSorted((a, b) => (a.queuedAt ?? 0) - (b.queuedAt ?? 0));
+const queuedIn = (issues: readonly Issue[], repo: string) =>
+  issues.filter((i) => i.repo === repo && i.status === "todo" && i.queuedAt !== undefined).toSorted((a, b) => (a.queuedAt ?? 0) - (b.queuedAt ?? 0));
 
 /** Peopled or waited on first, then the newest commit, then by name. */
 export function islandsOf({
-  projects,
+  repos,
   sessions,
   plots,
   issues,
 }: {
-  projects: readonly ProjectSummary[];
+  repos: readonly RepoSummary[];
   sessions: readonly Session[];
   plots: Readonly<Record<string, PlotView>>;
   issues: readonly Issue[];
 }): Island[] {
-  const known = new Map(projects.map((p) => [p.name, p]));
-  const names = new Set([...known.keys(), ...sessions.flatMap((h) => (h.project ? [h.project] : []))]);
+  const known = new Map(repos.map((p) => [p.name, p]));
+  const names = new Set([...known.keys(), ...sessions.flatMap((h) => (h.repo ? [h.repo] : []))]);
   const islands = [...names].map((name) => {
     const summary = known.get(name);
-    const mine = sessions.filter((h) => h.project === name).toSorted((a, b) => a.hiredAt - b.hiredAt);
+    const mine = sessions.filter((h) => h.repo === name).toSorted((a, b) => a.hiredAt - b.hiredAt);
     const working = mine.filter(isBusy).length;
-    // A project the list does not have takes no more work: only its helpers show.
+    // A repo the list does not have takes no more work: only its helpers show.
     const maxSessions = summary ? Math.round(summary.maxSessions) : working;
     const left = roomLeft(sessions, name, maxRunning, maxSessions);
     // No more plots are drawn than the farm has places.
-    const room = Math.max(0, Math.min(maxSessions > 0 ? left.project : 0, maxRunning - mine.length));
+    const room = Math.max(0, Math.min(maxSessions > 0 ? left.repo : 0, maxRunning - mine.length));
     const open = Math.min(room, left.farm);
     const spots: Spot[] = [
       ...mine.map((h): Spot => {
@@ -60,13 +60,13 @@ export function islandsOf({
       ...Array.from({ length: open }, (): Spot => ({ kind: "open" })),
       ...Array.from({ length: room - open }, (): Spot => ({ kind: "shut" })),
     ];
-    return { project: name, ...(summary ? { summary } : {}), spots, working, maxSessions, queued: queuedIn(issues, name) };
+    return { repo: name, ...(summary ? { summary } : {}), spots, working, maxSessions, queued: queuedIn(issues, name) };
   });
   const quiet = (i: Island) => (i.spots.some((s) => s.kind === "taken") || i.queued.length > 0 ? 0 : 1);
-  return islands.toSorted((a, b) => or(quiet(a) - quiet(b), (b.summary?.last ?? 0) - (a.summary?.last ?? 0), compareText(a.project, b.project)));
+  return islands.toSorted((a, b) => or(quiet(a) - quiet(b), (b.summary?.last ?? 0) - (a.summary?.last ?? 0), compareText(a.repo, b.repo)));
 }
 
-export const homeless = (sessions: readonly Session[]) => sessions.filter((h) => h.project === undefined);
+export const homeless = (sessions: readonly Session[]) => sessions.filter((h) => h.repo === undefined);
 
 export const mapTally = (islands: readonly Island[]) => ({
   peopled: islands.filter((i) => i.spots.some((s) => s.kind === "taken")).length,
@@ -150,13 +150,13 @@ export function islandScale(width: number, cell: number, gap: number) {
 
 export const islandLooks = ["island-meadow", "island-orchard", "island-pond", "island-pines", "island-windmill", "island-lavender"];
 
-export function islandLook(project: string) {
+export function islandLook(repo: string) {
   let h = 0;
-  for (const c of project) h = (h * 31 + (c.codePointAt(0) ?? 0)) & 0x7fffffff;
+  for (const c of repo) h = (h * 31 + (c.codePointAt(0) ?? 0)) & 0x7fffffff;
   return islandLooks[h % islandLooks.length] ?? "island-meadow";
 }
 
-/** The crop a project's newest commit grows: the workbench's recency in the farm's picture and words. */
+/** The crop a repo's newest commit grows: the workbench's recency in the farm's picture and words. */
 const cropOf: Record<Recency, Crop> = { never: "empty", day: "flowering", week: "leafy", month: "sprout", quarter: "dry", older: "withered" };
 
 export function growthOf(last: number | undefined, now: number): { readonly crop: Crop; readonly label: string } {

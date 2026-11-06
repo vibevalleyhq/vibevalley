@@ -51,8 +51,8 @@
           "name": "issue_create",
           "arguments": {
             "title": "给 demo 写 README",
-            "description": "项目简介、怎么跑起来、目录结构",
-            "project": "demo",
+            "description": "仓库简介、怎么跑起来、目录结构",
+            "repo": "demo",
             "start": true
           }
         }

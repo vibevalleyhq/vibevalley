@@ -4,7 +4,7 @@ import { expect, test } from "vite-plus/test";
 
 import type { Cron, CronRequest, CronWhen } from "@vibevalley/protocol";
 
-import { emptyWorkspaceState } from "#/core/core.ts";
+import { emptySpaceState } from "#/core/core.ts";
 import { frameOf } from "#/projection/frame.ts";
 import { reduce } from "#/projection/reduce.ts";
 
@@ -93,7 +93,7 @@ test("when it runs, in words", () => {
 
 test("the fold keeps the facts; the words are the frame's", () => {
   const s = make();
-  const [one] = reduce(emptyWorkspaceState(), { type: "cronChanged", at: 1, cron: s });
+  const [one] = reduce(emptySpaceState(), { type: "cronChanged", at: 1, cron: s });
   expect(one.crons).toEqual([s]);
   expect(frameOf(one).state.crons).toEqual([{ ...s, whenText: "每天 09:00", nextText: "10/12 09:00" }]);
   expect(reduce(one, { type: "cronChanged", at: 2, cron: s })[1]).toBe(false);
@@ -101,7 +101,7 @@ test("the fold keeps the facts; the words are the frame's", () => {
   expect(frameOf(off).state.crons[0]?.nextText).toBe("关着");
   const [gone] = reduce(off, { type: "cronRemoved", at: 4, id: "c1" });
   expect(gone.crons).toEqual([]);
-  expect(reduce(emptyWorkspaceState(), { type: "cronRemoved", at: 5, id: "c9" })[1]).toBe(false);
+  expect(reduce(emptySpaceState(), { type: "cronRemoved", at: 5, id: "c9" })[1]).toBe(false);
 });
 
 test("cron's next run", () => {

@@ -182,9 +182,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
   const asr = () => draft().asr;
   const answer = () => draft().answer;
   const credentialsReady = () =>
-    answer().vendor === "moss"
-      ? base().mossKey.source !== undefined
-      : base().agoraAppId.source !== undefined && base().agoraAppCertificate.source !== undefined;
+    answer().vendor === "moss" ? base().mossKey.source !== null : base().agoraAppId.source !== null && base().agoraAppCertificate.source !== null;
   const answerHint = () => {
     const source = base().deepseekApiKey.source;
     return answer().vendor === "orchestrator"
@@ -194,7 +192,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
         : answer().vendor === "agora"
           ? t("web.voice.voice.answer.agora")
           : answer().vendor === "deepseek"
-            ? source !== undefined
+            ? source !== null
               ? t("web.voice.voice.answer.deepseek", { from: keyFrom[source] })
               : t("web.voice.voice.answer.noDeepseek")
             : t("web.voice.voice.answer.openai");

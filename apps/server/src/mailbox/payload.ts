@@ -1,16 +1,13 @@
 import { createHash } from "node:crypto";
 
-import { Effect, Schema } from "effect";
+import { Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { compactCard } from "#/base/clip.ts";
-import { refused } from "#/base/errors.ts";
-import { type Db, causeMessage } from "#/infra/db.ts";
 import { senderKind } from "#/mailbox/envelope.ts";
 import type { InboxMessage, OrchestratorNews } from "#/mailbox/envelope.ts";
-import * as qr from "#db/mailbox_trigger.sql.ts";
 
 export type InputContext = T.TriggerContext;
 export interface DeliveryPayload {
@@ -39,7 +36,7 @@ export interface TriggerInput {
   readonly replyChannel?: string;
   readonly replyTo?: string;
   readonly picked?: T.Trigger["picked"];
-  readonly meta?: T.TriggerMeta;
+  readonly meta?: Omit<T.TriggerMeta, "issue"> & { readonly issue?: string };
   readonly at: number;
   readonly data?: unknown;
 }
@@ -48,6 +45,7 @@ export const triggerOf = (input: TriggerInput): T.Trigger => {
   const id = createHash("sha256")
     .update(JSON.stringify([input.source, input.key]))
     .digest("hex");
+  const { issue, ...restMeta } = input.meta ?? {};
   return {
     id,
     source: input.source,
@@ -55,7 +53,7 @@ export const triggerOf = (input: TriggerInput): T.Trigger => {
     addressed: input.addressed,
     threads: [...new Set(input.threads)],
     card: compactCard(input.text, `vv://trigger/${id}`, 600),
-    meta: input.meta ?? {},
+    meta: { ...restMeta, ...(issue !== undefined ? { issue: S.issueId(issue) } : {}) },
     at: input.at,
     ...(input.replyChannel === undefined ? {} : { replyChannel: input.replyChannel }),
     ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
@@ -63,54 +61,17 @@ export const triggerOf = (input: TriggerInput): T.Trigger => {
   };
 };
 
-/** A source's trigger as Ingress encoded it, kept once by (source, key): an event read again is the trigger it was. */
-export const keepSourceTrigger = (db: Db["Service"], row: qr.RecordTriggerParams) => db.run(qr.recordTrigger(row));
+export interface TriggerResource {
+  readonly trigger: T.Trigger;
+  readonly payload: { readonly text: string; readonly data: unknown };
+}
 
-/** A kept trigger's words and payload, as they were written. */
-export const keptTrigger = (db: Db["Service"], id: string) => db.one(qr.triggerById({ id }));
-
-/** The events already kept for one pull request: their keys, whether routed, and the bot's review rounds. */
-export const knownGitHubEvents = (db: Db["Service"], project: string, pr: number) => db.run(qr.knownGitHubEvents({ project, pr_number: pr }));
-
-/** The caller's transaction includes this row, so it can advance its source cursor atomically. */
-export const recordTrigger = (db: Db["Service"], input: TriggerInput) =>
-  Effect.gen(function* () {
-    const trigger = triggerOf(input);
-    yield* db
-      .attempt(
-        qr.recordTrigger({
-          id: trigger.id,
-          source: trigger.source,
-          source_key: input.key,
-          occurred_at: trigger.at,
-          trigger_json: JSON.stringify(trigger),
-          payload_json: JSON.stringify({ text: input.text, data: input.data ?? null }),
-        }),
-      )
-      .pipe(Effect.mapError((cause) => refused(causeMessage(cause))));
-    return trigger;
-  });
-
-export const keepChannelTrigger = (db: Db["Service"], trigger: T.Trigger, body: string, channelId: string) =>
-  Effect.gen(function* () {
-    yield* db.run(
-      qr.recordTrigger({
-        id: trigger.id,
-        source: trigger.source,
-        source_key: trigger.id,
-        occurred_at: trigger.at,
-        trigger_json: JSON.stringify(trigger),
-        payload_json: JSON.stringify({
-          text: body,
-          data: { kind: "channel_message", message: trigger.id, channel: channelId },
-        }),
-      }),
-    );
-    const saved = yield* db.one(qr.triggerById({ id: trigger.id }));
-    return saved ? yield* Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(saved.trigger_json) : trigger;
-  });
-
-export const unroutedCronTriggers = (db: Db["Service"], after: number) => db.run(qr.unroutedCronTriggers({ after }));
+export interface KnownGitHubEvent {
+  readonly key: string;
+  readonly routed: boolean;
+  readonly botRoundKey?: string;
+  readonly botRound?: number;
+}
 
 export const deliveryScope = (channel: string, issue?: string) => (issue ? `issue:${issue}` : `channel:${channel}`);
 
@@ -123,7 +84,7 @@ export function triggerPayload(trigger: T.Trigger, issue?: string, note?: string
       ...trigger,
       meta: {
         ...sourceMeta,
-        ...(issue ? { issue } : {}),
+        ...(issue ? { issue: S.issueId(issue) } : {}),
       },
     },
     context: inputContext ?? {

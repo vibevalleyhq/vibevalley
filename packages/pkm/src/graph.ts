@@ -61,10 +61,10 @@ export function transclusions(
   const readOut = (id: string, seen: ReadonlySet<string>, depth: number): T.PkmTransclusion => {
     if (seen.has(id) || depth >= 2) return { block: id, found: true, circular: true, body: words.circular(id) };
     const at = blockOf(vault, id);
-    if (!at) return { block: id, found: false, body: words.broken(id) };
+    if (!at) return { block: id, found: false, circular: false, body: words.broken(id) };
     const next = new Set([...seen, id]);
     const body = at.node.body.replace(blockRef, (_whole, inner: string) => readOut(inner, next, depth + 1).body);
-    return { block: id, found: true, page: at.page.slug, pageTitle: at.page.title, body };
+    return { block: id, found: true, circular: false, page: at.page.slug, pageTitle: at.page.title, body };
   };
   for (const { block, body } of [...walk(page.blocks).map((node) => ({ block: node.id, body: node.body })), ...shownWith])
     for (const m of body.matchAll(blockRef)) {

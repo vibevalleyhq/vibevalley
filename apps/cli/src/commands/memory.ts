@@ -9,7 +9,7 @@ import { ask, change, given, nameArg, optionalText, show, words } from "#/farm.t
 const agentArg = nameArg("agent", "cli.arg.agent");
 
 const memoryLine = (m: T.Memory) =>
-  [m.id, `@${m.agent}`, m.kind, m.project === undefined ? "" : `[${m.project}]`, m.text.replace(/\s+/gu, " ")].filter((x) => x !== "").join("  ");
+  [m.id, `@${m.agent}`, m.kind, m.repo === undefined ? "" : `[${m.repo}]`, m.text.replace(/\s+/gu, " ")].filter((x) => x !== "").join("  ");
 
 export const memoryCommand = Command.make("memory").pipe(
   Command.withSubcommands([
@@ -24,12 +24,12 @@ export const memoryCommand = Command.make("memory").pipe(
     ),
     Command.make(
       "search",
-      { words: words("cli.arg.search"), agent: optionalText("agent", "cli.flag.agent"), project: optionalText("project", "cli.flag.project") },
+      { words: words("cli.arg.search"), agent: optionalText("agent", "cli.flag.agent"), repo: optionalText("repo", "cli.flag.repo") },
       (o) => {
         const agent = given(o.agent);
-        const project = given(o.project);
+        const repo = given(o.repo);
         return Effect.flatMap(
-          ask((api) => api.memory.search({ text: o.words.join(" "), ...(agent ? { agent } : {}), ...(project ? { project } : {}) })),
+          ask((api) => api.memory.search({ text: o.words.join(" "), ...(agent ? { agent } : {}), ...(repo ? { repo } : {}) })),
           (found) => show(found, (f) => f.found.map(memoryLine).join("\n")),
         );
       },
@@ -39,13 +39,13 @@ export const memoryCommand = Command.make("memory").pipe(
     ),
     Command.make(
       "create",
-      { agent: agentArg, words: words("cli.arg.memory"), project: optionalText("project", "cli.flag.project"), key: optionalText("key", "cli.flag.key") },
+      { agent: agentArg, words: words("cli.arg.memory"), repo: optionalText("repo", "cli.flag.repo"), key: optionalText("key", "cli.flag.key") },
       (o) => {
-        const project = given(o.project);
+        const repo = given(o.repo);
         const requestKey = given(o.key);
         return change({
           name: "memory create",
-          does: (api) => api.memory.create({ agent: o.agent, text: o.words.join(" "), ...(project ? { project } : {}), ...(requestKey ? { requestKey } : {}) }),
+          does: (api) => api.memory.create({ agent: o.agent, text: o.words.join(" "), ...(repo ? { repo } : {}), ...(requestKey ? { requestKey } : {}) }),
           said: memoryLine,
         });
       },

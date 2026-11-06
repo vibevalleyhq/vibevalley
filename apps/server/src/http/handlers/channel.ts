@@ -18,19 +18,13 @@ export const channelHandlers = Effect.gen(function* () {
     "channel.message.send": (body) =>
       Effect.andThen(
         Effect.sync(() => body.station !== undefined && game.want(body.station)),
-        ingress.say(
-          body.text,
-          { ...(body.agent ? { agent: body.agent } : {}), ...(body.project ? { project: body.project } : {}) },
-          body.id,
-          body.sendKey ?? "",
-          {
-            ...(body.replyTo !== undefined ? { replyTo: body.replyTo } : {}),
-            ...(body.attachments ? { attachments: body.attachments } : {}),
-            ...(body.blocks ? { blockRefs: body.blocks } : {}),
-          },
-        ),
+        ingress.say(body.text, { ...(body.agent ? { agent: body.agent } : {}), ...(body.repo ? { repo: body.repo } : {}) }, body.id, body.sendKey ?? "", {
+          ...(body.replyTo !== undefined ? { replyTo: body.replyTo } : {}),
+          ...(body.attachments ? { attachments: body.attachments } : {}),
+          ...(body.blocks ? { blockRefs: body.blocks } : {}),
+        }),
       ),
-    "channel.create": (body) => Effect.map(channels.openChannel(body.name, body.description ?? "", body.project ?? ""), (c) => c.id),
+    "channel.create": (body) => Effect.map(channels.openChannel(body.name, body.description ?? "", body.repo ?? ""), (c) => c.id),
     "channel.update": ({ id, ...body }) => channels.updateChannel(id, body),
     "channel.archive.set": ({ id, on }) => channels.archive(id, on),
     "channel.delete": ({ id }) => channels.removeChannel(id),

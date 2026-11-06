@@ -30,9 +30,8 @@ export const catalogs = {
         key: "请求键：同一把键重发只做一次",
         limit: "最多几条",
         priority: "优先级",
-        project: "项目的名字",
-        reply: "回复这一号消息",
         repo: "GitHub 仓库的地址",
+        reply: "回复这一号消息",
         text: "标题或描述里有这些字",
         timeout: "最多等几秒",
         closed: "只看关掉的（done、canceled）",
@@ -66,7 +65,7 @@ export const catalogs = {
         doctor: "一条命令看清这台电脑上的农场：找到的是哪个、连不连得上、桌面版、农机、模型的 key、连接到本机",
         pkm: {
           capture: "记一句话进今天的日记（--page 记到那一页）；不给字就读标准输入，多行按缩进拆成块",
-          radar: "要看一眼的：收件箱、搁着的项目、过期的",
+          radar: "要看一眼的：收件箱、搁着的仓库、过期的",
           journalShow: "一天的日记（--day 看别的一天），没有就建",
           pageEdit: "在 $EDITOR 里改一整页的原文，关掉编辑器存回去",
           pageExport: "把一页导出成给人读的 Markdown：引用读成字，批注去掉",
@@ -80,7 +79,7 @@ export const catalogs = {
         channel: { list: "列出频道和私聊", messageList: "列出一个频道最近的消息", messageSearch: "在全部频道里搜消息", messageSend: "在频道里发一条消息" },
         cron: { list: "列出定时任务", create: "新建定时任务：--every、--daily、--cron、--at 给一个", delete: "删掉一个定时任务", edit: "开或关一个定时任务" },
         issue: {
-          edit: "改工单的标题、描述、项目、档案或优先级",
+          edit: "改工单的标题、描述、仓库、档案或优先级",
           list: "列出工单：一张一行，号在前",
           show: "看一张工单：状态、现在在哪一步、问题、验收标准、现在能用的命令（--watch 先跟着它）",
           comment: "给工单写一条评论：帮工在问时就是回答，在干活时下一轮会看到",
@@ -92,7 +91,7 @@ export const catalogs = {
           timeline: "工单的时间线和花费",
         },
         memory: { create: "给一份档案记一条记性", delete: "删掉档案的一条记性", list: "列出一份档案的记性", search: "搜记性；不指定档案就搜全部" },
-        project: { list: "列出项目", create: "新建项目（--repo 从 GitHub 克隆）" },
+        repo: { list: "列出仓库", create: "新建仓库（--repo 从 GitHub 克隆）" },
         runtime: { list: "列出农机：装没装、版本", refresh: "重新探测一台农机：装了新的或升了版本以后" },
         session: { list: "列出帮工：id、名字、档案、在做什么", show: "看一个帮工", stop: "停下帮工这一轮" },
         chat: "在终端里对话：不给农机是 VibeValley 自己的 agent，给了就和那个农机直接聊（不记轨迹和花费）",
@@ -215,6 +214,7 @@ export const catalogs = {
           status: { previewUpdate: "试挪工单的状态：说会发生什么，不动手", update: "挪工单的状态：派活、再来一轮、完成或取消" },
           timeline: { get: "工单的时间线和每一轮加起来的花费" },
           update: "改一张工单",
+          conversation: { get: "工单讨论串的位置" },
         },
         lan: {
           device: { delete: "移除一台配对过的设备", previewDelete: "试移除一台设备：说会怎样，不真移除" },
@@ -229,7 +229,7 @@ export const catalogs = {
           delete: "删掉档案的一条记性",
           list: "列出一份档案的记性：库里的和配置的来源",
           previewDelete: "试删一条记性：说会删掉什么，不真删",
-          recall: "看档案对这个项目和这句话会想起什么",
+          recall: "看档案对这个仓库和这句话会想起什么",
           search: "按字搜记性，不指定档案就搜全部",
         },
         orchestrator: {
@@ -253,19 +253,20 @@ export const catalogs = {
             rename: "给一页改名或并进同名的页，链接跟着改",
             save: "新建一页，或改同名那页的属性和文件夹",
           },
-          radar: { get: "回顾雷达：收件箱里的、搁着的项目、过期的块" },
+          radar: { get: "回顾雷达：收件箱里的、搁着的仓库、过期的块" },
           scan: "重读磁盘上改过的笔记文件",
           search: "搜笔记",
           undo: "撤销笔记的上一次改动",
           source: { get: "一页文件的原文（带块的 id）和它上次写的时间", update: "用改过的原文重写一页；这期间文件被改过就不写" },
         },
-        project: {
-          activity: { get: "项目的提交：每天几次、谁提交的" },
-          create: "新建一个项目",
-          language: { list: "项目用了哪些语言" },
-          list: "列出全部项目",
-          template: { list: "项目的工单模板，按它的栈填好" },
-          validate: "新建项目会被拒的第一处，不真建",
+        repo: {
+          activity: { get: "仓库的提交：每天几次、谁提交的" },
+          create: "新建一个仓库",
+          language: { list: "仓库用了哪些语言" },
+          list: "列出全部仓库",
+          template: { list: "仓库的工单模板，按它的栈填好" },
+          validate: "新建仓库会被拒的第一处，不真建",
+          pr: { submit: "发布已有本地分支" },
         },
         runtime: { list: "列出全部农机", refresh: "重新探测一台农机", setting: { update: "改一台农机的设置：开关、路径、默认模型、预算" } },
         server: { health: { get: "服务端在不在、是哪个版本" } },
@@ -299,7 +300,7 @@ export const catalogs = {
         memory: { about: "档案的记性" },
         orchestrator: { about: "管家：上线、停下、旧账、评测" },
         pkm: { about: "笔记：记一句、搜、雷达、日记和页", page: { about: "笔记的页：列出、看大纲、导出、改原文" }, journal: { about: "日记：一天一页" } },
-        project: { about: "项目：工作目录下的 git 仓库" },
+        repo: { about: "仓库：工作目录下的 git 仓库" },
         runtime: { about: "农机：机器上的编码 agent" },
         server: { about: "服务端本身" },
         session: { about: "帮工" },
@@ -335,7 +336,7 @@ export const catalogs = {
         cronName: "定时任务的名字",
         issue: "工单：号（12 或 #12）",
         page: "页：标题、slug 或别名",
-        projectName: "新项目的名字",
+        repoName: "新仓库的名字",
         session: "帮工的 id，比如 w3",
         chatRuntime: "农机（claude、codex…）；不给是 VibeValley 自己的 agent",
         appPath: "桌面版里的一页，比如 /issues/12；不填是首页",
@@ -368,7 +369,7 @@ export const catalogs = {
         pkmCapture: { run: "vibevalley pkm capture 给登录页加个记住我", about: "记一句进今天的日记" },
         pkmCapturePage: { run: "pbpaste | vibevalley pkm capture --page 读书", about: "把剪贴板里的大纲记到「读书」那一页" },
         pkmRadar: { about: "要看一眼的" },
-        projectList: { about: "看有哪些项目" },
+        repoList: { about: "看有哪些仓库" },
         runtimeList: { about: "看装了哪些农机" },
         sessionList: { about: "看在干活的帮工" },
         sessionShow: { about: "看帮工 w3" },
@@ -389,7 +390,7 @@ export const catalogs = {
         cronCreate: { run: "vibevalley cron create 早上看看 看看昨天的改动 --daily 09:00", about: "每天早上九点让管家看看昨天的改动" },
         cronDelete: { about: "先试删，看会删掉什么" },
         cronEdit: { about: "先关掉 c1" },
-        issueCreate: { run: "vibevalley issue create 修登录页 --project web --agent docs --criterion '过期后回到登录页'", about: "写一张工单，交给 docs" },
+        issueCreate: { run: "vibevalley issue create 修登录页 --repo web --agent docs --criterion '过期后回到登录页'", about: "写一张工单，交给 docs" },
         issueDelete: { about: "先试删，看会删掉什么" },
         issueDone: { about: "先试一下完成，看会怎么交付" },
         issueReviewFail: { run: "vibevalley issue review 12 --fail --finding '过期后没回到登录页'", about: "不通过，说哪里不对" },
@@ -408,7 +409,7 @@ export const catalogs = {
         pkmPageList: { about: "最近改过的页" },
         pkmPageShow: { run: "vibevalley pkm page show 读书", about: "「读书」这一页的大纲" },
         pkmSearch: { run: "vibevalley pkm search 置身事内", about: "在笔记里找「置身事内」" },
-        projectCreate: { about: "从 GitHub 克隆一个项目" },
+        repoCreate: { about: "从 GitHub 克隆一个仓库" },
         runtimeRefresh: { about: "装了新的 Claude Code 以后重新探测" },
         pkmPageSave: { run: 'vibevalley pkm page save 读书 "- 置身事内"', about: "新建或更新「读书」这一页" },
         agentCreate: { about: "新建一份用 Claude Code 的档案" },
@@ -432,6 +433,9 @@ export const catalogs = {
       session: { stopped: "停下了帮工 {session}" },
       memory: { deleted: "删掉了记性 {memory}" },
       agent: { deleted: "删掉了档案 {agent}" },
+      "repo.publish": "将已有分支发布为 GitHub PR 或 GitLab MR",
+      "repo.check": "仓库检查：{check}",
+      "repo.preview": "预览：将 {branch} 的 {sha} 发布到 {base}；尚未运行检查",
     },
     desktop: {
       open: "打开 VibeValley",
@@ -502,7 +506,7 @@ export const catalogs = {
       lookIn: {
         issue: "列出工单，找它的编号",
         session: "列出帮工，找它的 id",
-        project: "列出项目，找它的名字",
+        repo: "列出仓库，找它的名字",
         runtime: "列出农机，找它的 id",
         agent: "列出档案，找它的 id",
         skill: "列出技能，找它的 id",
@@ -516,7 +520,7 @@ export const catalogs = {
         artifact: "列出稿子，找它的 id",
         pkm: "列出笔记页，找它的名字",
       },
-      projectRef: "项目 {id}",
+      repoRef: "仓库 {id}",
       helperRef: "帮工 {id}",
       archiveRef: "旧账 {name}",
     },
@@ -679,8 +683,8 @@ export const catalogs = {
       breaker: "{name} 连续 {failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。",
       dispatch: {
         draft: "看代码，起草这张工单",
-        project: "项目",
-        sent: "派 @{id}（{name}）去 {project}：{what}",
+        repo: "仓库",
+        sent: "派 @{id}（{name}）去 {repo}：{what}",
         redraft: "这张工单交给 @{id}（{name}）再起草一版",
         handedOn: "这张工单交给 @{id}（{name}）接着做，第 {nth} 次派活",
       },
@@ -818,7 +822,7 @@ export const catalogs = {
       noCron: "没有 {id} 号定时任务",
       noChannel: "没有 {name} 这个频道",
       noProfile: "没有叫 {name} 的档案",
-      noProject: "#{channel} 没有默认项目：直接派给帮工的定时任务要写 project",
+      noRepo: "#{channel} 没有默认仓库：直接派给帮工的定时任务要写 repo",
       removeWhen: "删掉定时任务「{name}」（{when}）：以后不再到点开工，它开过的工单留着",
     },
     "server.game": {
@@ -848,7 +852,7 @@ export const catalogs = {
         invalid: "请提供 1–{max} 张子工单，短 ID 唯一合法，依赖只引用这次拆单且不能成环。",
         agent: "每张子工单需要指定已启用、角色为帮工的档案：{agent}",
         commitFirst: "请先提交父工单的改动，再拆成子工单。",
-        needsBranch: "父工单需要独立工作分支才能拆单；当前帮工直接在项目目录工作。",
+        needsBranch: "父工单需要独立工作分支才能拆单；当前帮工直接在仓库目录工作。",
         created: "已在 #{n} 下创建 {count} 张子工单。",
       },
       verification: {
@@ -859,14 +863,14 @@ export const catalogs = {
       },
       dependencies: {
         closedParent: "父工单已经关闭，不能再加子工单",
-        project: "子工单必须和父工单使用同一个项目",
+        repo: "子工单必须和父工单使用同一个仓库",
         invalid: "工单依赖不能成环，也不能引用不存在的工单",
         waiting: "等待前置工单完成：{issues}",
       },
       issueNumbered: "工单 #{n}",
       issueRef: "工单 {ref}",
       helperRef: "帮工 {id}",
-      projectRef: "项目 {name}",
+      repoRef: "仓库 {name}",
       helper: "帮工",
       notStarted: "这张工单还没开工",
       started: "这张工单已经开工了",
@@ -874,7 +878,7 @@ export const catalogs = {
       orchestratorNotHelper: "管家不当帮工：派给一个帮工",
       disabled: "{name} 被停用了",
       cannotSend: "{name} 派不出去：{why}",
-      noProject: "没说在哪个项目里做：项目是工作目录下的一个文件夹",
+      noRepo: "没说在哪个仓库里做：仓库是工作目录下的一个文件夹",
       notRecorded: "{name} 的工单没记下来：{why}",
       workKept: "{refused}；工单 #{n} 和它的改动留着，可以接着派这张工单",
       drafting: "{name} 正在起草：等它交回来再开工",
@@ -897,7 +901,7 @@ export const catalogs = {
       noStatus: "没有这个状态：{to}",
       roundNeedsWords: "再干一轮要说一句：这一轮要它做什么",
       closed: "这张工单关上了",
-      cannotMoveProject: "工单 #{n} 还不能换项目：{why}",
+      cannotMoveRepo: "工单 #{n} 还不能换仓库：{why}",
       cannotDelete: "工单 #{n} 还不能删：{why}",
       noConflict: "{name} 和主分支没有冲突",
       orchestratorAnswers: "这是派给管家的工单：管家答完就关",
@@ -907,7 +911,7 @@ export const catalogs = {
         toOrchestrator: "{n} 交给管家答",
         sendTo: "{n} 派给 {agent}",
         noRoom: "现在没空位（{full}）：排进待办，有空位就自动开工",
-        startIn: "{n} 派 {agent} 去 {project} 开工",
+        startIn: "{n} 派 {agent} 去 {repo} 开工",
         start: "{n} 派 {agent} 开工",
         unqueue: "{n} 不排了，挪回备选",
         leaves: "{helper} 收工，分支留着",
@@ -920,7 +924,7 @@ export const catalogs = {
         completeKept: "{n} 关成已完成：分支留着没合（{commits} 个提交）",
         helperLeaves: "{helper} 收工",
         commitFirst: "先替 {helper} 提交 {files} 个没提交的文件",
-        check: "合之前跑项目的检查（.vibevalley/check，有的话）：没过就不合，工单留在等你看",
+        check: "合之前跑仓库的检查（.vibevalley/check，有的话）：没过就不合，工单留在等你看",
         pullRequest: "推分支、开 PR（{commits} 个提交）：PR 合了才关成已完成",
         cancel: "{n} 关成已取消",
         cancelLeaves: "{helper} 收工，分支上有提交就留着",
@@ -948,7 +952,7 @@ export const catalogs = {
         closed: "\n它是怎么关的：{closed}",
         lastRun: "\n最后一轮{outcome}：{summary}",
         previous: "\n这条分支上已经有上次的提交，接着做。",
-        end: "\n先看看项目现在的样子，再接着做。",
+        end: "\n先看看仓库现在的样子，再接着做。",
         failedHead: "验收没过，这几处要修：",
         failedEnd: "\n\n修好以后在结论里逐条说怎么修的。",
         resume: "上一轮停在了半路，接着把它做完。",
@@ -994,7 +998,6 @@ export const catalogs = {
         orchestrator: "这是派给管家的工单：管家自己会看",
         onlyBacklog: "只有备选里的工单能起草：先挪回备选",
         drafting: "{name} 正在起草：等它交回来",
-        noProject: "没说在哪个项目里做：先选一个项目",
         unread: "{name} 交回来的草稿读不出来（{problem}），工单没动：再起草一次",
         unfinished: "{name} 没起草完（{summary}），工单没动：再起草一次",
         canceled: "「{title}」取消了：{why}",
@@ -1012,7 +1015,11 @@ export const catalogs = {
       noProfileNamed: "没有叫 {key} 的档案",
       prSubmitNotAllowed: "这张工单没有主人明确授予的自行提交 PR 权限",
       prSubmitNotCurrent: "只有当前处理这张工单的帮工能提交 PR",
-      prSubmitUnavailable: "这张工单的项目没有启用 PR 交付",
+      prSubmitUnavailable: "这张工单的仓库没有启用 PR 交付",
+      deliveryNeedsPr: "请先交付一个有效的 PR/MR，再验收完成",
+      acceptSubmittedPr: "验收已提交的 PR/MR，保留未合入的分支和未提交的改动",
+      prDelivered: "已交付 PR/MR：{url}",
+      confirmedRequirements: "已确认并派发：{title}\n\n{description}\n\n验收标准：\n{criteria}",
     },
     "server.lan": {
       aDevice: "一台设备",
@@ -1052,9 +1059,9 @@ export const catalogs = {
       forgetThere: "{source} 里的记忆到它自己那里删",
       coverage: {
         failed: "读取失败、已取消或超时，未包含此来源",
-        everosAcross: "不支持跨项目检索，请指定一个项目；本次未包含 EverOS",
+        everosAcross: "不支持跨仓库检索，请指定一个仓库；本次未包含 EverOS",
         everosAgent: "此查询需要指定档案，本次未包含 EverOS",
-        unconfirmed: "有命中的项目范围未经确认，已从本项目检索中排除",
+        unconfirmed: "有命中的仓库范围未经确认，已从本仓库检索中排除",
         note: "{source}：{note}",
       },
       everosList: "EverOS 的记忆不在这里列出",
@@ -1091,10 +1098,10 @@ export const catalogs = {
       noPageLike: "没有「{page}」这一页；最像的是 {like}",
       changedSince: "「{page}」在读出以后又被改过，没有写：重新读一次再改",
     },
-    "server.project": {
+    "server.repo": {
       parentBranchChanged: "父工单工作目录已切换分支，不能自动合入",
       parentHasChanges: "父工单还有未提交的改动，提交后再合入子工单",
-      badName: "项目名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符",
+      badName: "仓库名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符",
       badGithub: "请填 GitHub 仓库地址，例如 https://github.com/botiverse/raft-source",
       branchMoved: "分支在检查以后又变了，请重新检查再合",
       mainMoved: "主分支在检查期间又变了，请重新检查再合",
@@ -1103,28 +1110,33 @@ export const catalogs = {
       noTokei: "统计代码要用 tokei，这台机器上没找到：装一个（brew install tokei，或 cargo install tokei）再点统计",
       noName: "无名",
       gh: { missing: "没装 gh", failed: "gh 检测失败", signedOut: "没登录 GitHub", noAccount: "无法确认 GitHub 登录账号" },
-      notProjectName: "「{name}」不能当项目名：用一个简单的英文文件夹名，比如 clock-in",
-      outside: "项目必须在工作目录里面，不能链接到外面",
-      commit: { initial: "初始提交（VibeValley 建的项目）", initialShort: "初始提交", leftOver: "合并前把没提交的改动一并提交", merge: "合并 {branch}" },
-      notChecked: "尚未检测项目，请刷新 GitHub 状态",
+      notRepoName: "「{name}」不能当仓库名：用一个简单的英文文件夹名，比如 clock-in",
+      outside: "仓库必须在工作目录里面，不能链接到外面",
+      commit: {
+        initial: "初始提交（VibeValley 建的仓库）",
+        initialShort: "初始提交",
+        uncommitted: "工作树里还有没提交的改动。请自己按仓库的提交规范提交，然后再来合并或提 PR。",
+        merge: "合并 {branch}",
+      },
+      notChecked: "尚未检测仓库，请刷新 GitHub 状态",
       check: {
-        timedOut: "项目检查 .vibevalley/check 超时（{seconds}s）",
-        failed: "项目检查 .vibevalley/check 没通过：{why}",
-        exited: "项目检查 .vibevalley/check 没通过：exit status {code}",
+        timedOut: "仓库检查 .vibevalley/check 超时（{seconds}s）",
+        failed: "仓库检查 .vibevalley/check 没通过：{why}",
+        exited: "仓库检查 .vibevalley/check 没通过：exit status {code}",
       },
       mergeFailed: "合并进 {main} 没成功，{kept}：{why}",
       mergeStuck: "合并进 {main} 没成功，{kept}：{why}；退出合并也没成功（{abort}），{main} 停在合并到一半，要手动收拾",
-      exists: "「{name}」已经存在，请换个项目名",
+      exists: "「{name}」已经存在，请换个仓库名",
       cloneFailedGh: "下载失败：请确认 GitHub 登录、仓库权限和网络后重试",
       cloneFailed: "下载失败：请确认仓库公开、地址正确且网络可用；超过 3 分钟会停止，可重试",
       tokeiFailed: "tokei 没数完：{why}",
       tokeiUnread: "tokei 的输出读不懂：换个新一点的 tokei 试试",
       noBranchRead: "没能读取分支 {branch}：{why}",
-      inProjectNoBranch: "它直接在项目里干活，没有要合并的分支",
-      inProjectNothing: "它直接在项目里干活，没有分支可合",
+      inRepoNoBranch: "它直接在仓库里干活，没有要合并的分支",
+      inRepoNothing: "它直接在仓库里干活，没有分支可合",
       keptBoth: "{branch} 分支和 worktree 都留着",
       keptBranch: "{branch} 分支留着",
-      merged: "{ahead} 个提交合进了 {project} 的 {main}",
+      merged: "{ahead} 个提交合进了 {repo} 的 {main}",
       nothingNew: "这一单没有新的提交",
       nothingNewInPlan: "计划分支上没有新的提交",
       branchLeft: "；改动已合并，分支 {branch} 尚未清理：{why}",
@@ -1143,14 +1155,9 @@ export const catalogs = {
         noPermission: "无法检测 GitHub 仓库权限",
         readOnly: "没有写权限",
         wrongBranch: "工单分支不匹配",
-        changedDuringCheck: "检查期间工作目录发生了变化，提交改动后再提交 PR",
-        pushFailed: "推送工单分支失败，请检查 origin 和登录后重试",
-        listFailed: "查询已有 PR 失败；分支已推送，可重试",
-        listUnread: "无法读取已有 PR",
         checked: ".vibevalley/check 通过。",
-        noCheck: "这个项目没有 .vibevalley/check，没跑检查。",
+        noCheck: "这个仓库没有 .vibevalley/check，没跑检查。",
         body: "工单 #{n}\n\n{conclusion}\n\n{check}",
-        createFailed: "创建 PR 失败；分支已推送，可重试",
         urlUnread: "无法读取新建 PR 的地址；可重试查询",
         viewFailed: "查询 PR #{n} 失败",
         stateUnread: "无法读取 PR #{n} 状态",
@@ -1162,6 +1169,11 @@ export const catalogs = {
       mergeTree: "git merge-tree 出错（{code}）",
       moreLines: "… 还有 {n} 行没显示",
       conflict: "合进 {base} 有冲突",
+      "publish.refused": "分支发布被拒绝：{detail}",
+      "publish.platformFailed": "托管平台调用失败：{stage}。请检查工具安装与登录状态。",
+      "publish.pushedWithoutLink": "SHA {sha} 已推送，但未确认 PR/MR 链接：{why}。可重试查询已有请求。",
+      "publish.ownerOnly": "只有本机主人可以发布已有分支",
+      "publish.pushUnconfirmed": "SHA {sha} 的推送未确认成功。尚未尝试创建 PR/MR；重试前请核对远端。",
     },
     "server.runtime": {
       date: "{month} 月 {day} 日 {time}",
@@ -1225,7 +1237,7 @@ export const catalogs = {
       noRoom: {
         farm: "已经有 {max} 个帮工在干活了",
         runtime: "{runtime} 上已经有 {on} 个帮工在干活，最多同时 {max} 个（在「农机」页可以改）",
-        project: "项目 {project} 里已经有 {on} 个帮工在干活，最多同时 {max} 个：人多了容易改到同一个文件",
+        repo: "仓库 {repo} 里已经有 {on} 个帮工在干活，最多同时 {max} 个：人多了容易改到同一个文件",
       },
       notTaken: {
         conflictOwner: "没合进去：合进 {base} 会冲突（{files}）。{name} 还在，分支和 worktree 都在。要它解决就用 tell 告诉它：{brief}",
@@ -1234,7 +1246,7 @@ export const catalogs = {
         checkFix: "{reason}\n请修好检查，再交回来。",
         owner: "没合进去：{why}。{name} 还在",
         notice: "{name} 的活没合进去：{why}",
-        checkShort: "项目检查没通过",
+        checkShort: "仓库检查没通过",
       },
       log: {
         stopped: "VibeValley 停下了，这一轮中断了",
@@ -1308,8 +1320,8 @@ export const catalogs = {
     },
     "server.setting": {
       deepseekKey: "DeepSeek 的 API Key 看着不对：一串不带空格的字，通常以 sk- 开头",
-      agoraId: "Agora 的 App ID 是 32 位的十六进制，在声网控制台的项目里找",
-      agoraCertificate: "Agora 的 App Certificate 是 32 位的十六进制，在声网控制台的项目里找",
+      agoraId: "Agora 的 App ID 是 32 位的十六进制，在声网控制台的仓库里找",
+      agoraCertificate: "Agora 的 App Certificate 是 32 位的十六进制，在声网控制台的仓库里找",
       voiceKeySpace: "语音服务的 key 里不该有空格",
       dictationUrl: "听写的地址要是 http(s) 开头的完整地址，到 /v1 为止，比如本机的 http://127.0.0.1:8080/v1",
       dictationModel: "听写要填模型名，比如本机 speech-server 的 qwen3，或 OpenAI 的 gpt-4o-mini-transcribe",
@@ -1335,7 +1347,7 @@ export const catalogs = {
     },
     "server.tool": {
       labels: {
-        project_list: "项目",
+        repo_list: "仓库",
         channel_list: "频道",
         channel_create: "开频道",
         channel_update: "改频道",
@@ -1431,10 +1443,17 @@ export const catalogs = {
         none: "",
       },
       outcome: { completed: "做完了", failed: "没做成", interrupted: "停在半路" },
-      status: { backlog: "备选", todo: "待办", in_progress: "处理中", in_review: "等你看", done: "已完成", canceled: "已取消" },
+      status: { backlog: "备选", todo: "待办", in_progress: "处理中", in_review: "待验收", done: "已完成", canceled: "已取消" },
       priority: { urgent: "紧急", high: "高", medium: "普通", low: "低" },
-      deliverable: { change: "改动，合进项目", branch: "改动，分支留着不合", answer: "结论，只查不改代码" },
-      delivered: { merged: "合进了主分支", merged_into_parent: "合进了计划的分支", pull_request: "PR 合进去了", kept: "分支留着没合", none: "没有改动要合" },
+      deliverable: { change: "改动，合进仓库", branch: "改动，分支留着不合", answer: "结论，只查不改代码", pull_request: "提交 PR/MR" },
+      delivered: {
+        merged: "合进了主分支",
+        merged_into_parent: "合进了计划的分支",
+        pull_request: "PR 合进去了",
+        kept: "分支留着没合",
+        none: "没有改动要合",
+        submitted: "已提交 PR/MR",
+      },
       canceled: { dismissed: "取消了", lost: "干活的目录丢了" },
       doneWith: "已完成，{what}",
       canceledFor: "已取消，{why}",
@@ -1518,11 +1537,11 @@ export const catalogs = {
       tagsHint: "前端、测试、文档…",
       enabled: "启用",
       enabledHint: "停用后管家不会派它，名字点到也会拒绝。",
-      workdir: "默认项目",
-      workdirTip: "工作目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。管家派活没说项目时用它；留空时派活必须说在哪个项目。",
+      workdir: "默认仓库",
+      workdirTip: "工作目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。管家派活没说仓库时用它；留空时派活必须说在哪个仓库。",
       workdirHint: "比如 clock-in",
       worktree: "每个帮工一个 git worktree",
-      worktreeHint: "每个帮工在自己的分支上改，几个帮工不会互相覆盖；完成时合进项目。关掉就直接在项目里改，没有分支可合。",
+      worktreeHint: "每个帮工在自己的分支上改，几个帮工不会互相覆盖；完成时合进仓库。关掉就直接在仓库里改，没有分支可合。",
       env: "环境变量",
       envHint: "叠加在 农机设置的环境变量之上。",
       machine: "农机",
@@ -1611,7 +1630,7 @@ export const catalogs = {
         modelHint: "deepseek-v4-flash",
         dutyTip: "一句话：它专管什么。",
         personaTip: "它是谁、怎么说话、专管什么，接在管家的提示后面。",
-        personaHint: "你专管 clock-in 这个项目，先看测试再派活……",
+        personaHint: "你专管 clock-in 这个仓库，先看测试再派活……",
         look: "长相",
       },
       list: {
@@ -1743,7 +1762,7 @@ export const catalogs = {
         issues: { label: "工单", hint: "每张工单从写下到关上" },
         agents: { label: "档案", hint: "档案：管家和帮工" },
         runtimes: { label: "农机", hint: "机器上的编码 agent" },
-        projects: { label: "项目", hint: "每个项目一座岛" },
+        repos: { label: "仓库", hint: "每个仓库一座岛" },
         catalog: { label: "图鉴", hint: "素材：农场用的每张图、每个指针、每个声音，和工作台的界面零件" },
         settings: { label: "设置", hint: "通用、外观、模型、记性、技能、语音、连接" },
       },
@@ -1902,20 +1921,20 @@ export const catalogs = {
         dog: { label: "狗", hint: "睡、醒、伸懒腰、摇尾巴、叫、跳、翻肚皮……" },
         plots: { label: "地块", hint: "从空地到熟了，长草、干了、枯了、锁着" },
         yard: { label: "院子", hint: "地图、道具、镜头前的草木、小动物" },
-        map: { label: "地图", hint: "每个项目一座岛，罗盘、云、排队的种子袋、空位的木桩" },
+        map: { label: "地图", hint: "每个仓库一座岛，罗盘、云、排队的种子袋、空位的木桩" },
         machines: { label: "农机", hint: "每台是一种 runtime" },
         icons: { label: "图标", hint: "面板、入口和提示用的" },
         acts: { label: "在做什么", hint: "帮工头上的小图标：读、改、跑命令、搜……" },
         medals: { label: "奖章与成就", hint: "奖章、成就图案、印章、金币" },
         logos: { hint: "农机上的 agent、聊天软件、网页和桌面的图标" },
-        langs: { label: "语言", hint: "项目页上种了什么" },
+        langs: { label: "语言", hint: "仓库页上种了什么" },
         ui: { label: "界面", hint: "精力瓶、田头的按钮、日历的格子" },
         other: { label: "其他", hint: "没归上类的" },
       },
     },
     "web.channel": {
       tab: { chat: "聊天", issues: "工单", crons: "定时任务" },
-      defaultProject: "默认项目 {project}",
+      defaultRepo: "默认仓库 {repo}",
       channels: "频道列表",
       defaultHint: "默认的频道：你、管家和帮工都在这儿",
       findHint: "在这个频道里找…",
@@ -1941,16 +1960,16 @@ export const catalogs = {
       sayInThread: "在串里说，{name}会看到",
       reply: "回复这个串",
       dialog: {
-        projectExample: "比如 clock-in",
+        repoExample: "比如 clock-in",
         cancel: "取消",
         name: "名称",
         nameHint: "字母、数字、汉字、- 和 _，不超过 24 个字",
         nameExample: "例如 clock-in",
         description: "描述（可不填）",
         descriptionHint: "这个频道是做什么的？",
-        project: "默认项目（可不填）",
-        projectHint: "在这个频道里派活、没说项目时，就在这个项目里干",
-        projectNone: "空着就没有：派活时管家要问在哪个项目",
+        repo: "默认仓库（可不填）",
+        repoHint: "在这个频道里派活、没说仓库时，就在这个仓库里干",
+        repoNone: "空着就没有：派活时管家要问在哪个仓库",
         settingsOf: "# {name} 的设置",
         save: "保存",
       },
@@ -2111,7 +2130,7 @@ export const catalogs = {
       },
       threadWidth: "串的宽窄（拖动，双击回默认）",
       commands: {
-        issue: { name: "记一张工单", note: "/issue 标题：记进备选，在这个频道的项目里", needs: "/issue 后面写工单的标题" },
+        issue: { name: "记一张工单", note: "/issue 标题：记进备选，在这个频道的仓库里", needs: "/issue 后面写工单的标题" },
         remember: { name: "让管家记住", note: "/remember 一句话：记进照看这里的管家的记性", needs: "/remember 后面写要它记住的话" },
         stop: { name: "叫停管家", note: "照看这里的管家停下这一轮，派出去的帮工照常干活", needs: "" },
         dm: { name: "私聊", note: "/dm 名字：打开和这份档案的私聊", needs: "/dm 后面写档案的名字或 id" },
@@ -2283,12 +2302,12 @@ export const catalogs = {
       },
       sow: {
         notDrafted: "先没起草",
-        homeless: "这座农场不是哪个项目的",
-        toMap: "种地要先进一个项目的农场：回地图挑一座岛。",
-        noProjects: "工作台里还没有项目：先在「项目」页开一个。",
+        homeless: "这座农场不是哪个仓库的",
+        toMap: "种地要先进一个仓库的农场：回地图挑一座岛。",
+        noRepos: "工作台里还没有仓库：先在「仓库」页开一个。",
         map: "去地图",
-        makeProject: "去开一个项目",
-        plantIn: "种在 {project}",
+        makeRepo: "去开一个仓库",
+        plantIn: "种在 {repo}",
         rummaging: "在翻种子袋……",
         noSeeds: "种子袋没拿到：",
         retry: "重新拿种子袋",
@@ -2299,7 +2318,7 @@ export const catalogs = {
         job: "工单",
         who: "谁来种",
         orchestratorPicks: "管家挑",
-        how: "开始：管家把这句话交给帮工，在 {project} 里马上开工。草稿：帮工读过代码写成工单，你看过再开工。",
+        how: "开始：管家把这句话交给帮工，在 {repo} 里马上开工。草稿：帮工读过代码写成工单，你看过再开工。",
         draft: "草稿",
         start: "开始",
       },
@@ -2315,7 +2334,7 @@ export const catalogs = {
       },
       harvest: {
         reading: "正在看它改了什么…",
-        project: "项目 {project}",
+        repo: "仓库 {repo}",
         counts: "{commits} 个提交 · {files} 个文件",
         none: "这一单没有改动。收获就是请它收工。",
         conflict: "合进 {base} 会冲突，先没法收",
@@ -2356,7 +2375,7 @@ export const catalogs = {
         runtimes: "农具",
         skills: "技能书",
         connectors: "连接器",
-        projects: "项目",
+        repos: "仓库",
         catalog: "图鉴",
         resume: "继续",
         home: "回到首页",
@@ -2421,22 +2440,22 @@ export const catalogs = {
         channel: "频道：{channel}，点开切换或开新频道",
         channels: "频道",
         directs: "私聊",
-        projectTag: "项目 {project}",
+        repoTag: "仓库 {repo}",
         newChannel: "开新频道",
         pageAndSchedules: "频道页和定时任务",
         settingsLink: "设置",
         back2: "返回",
-        newChannelLine: "一件长期的事、一个项目，单独一个地方说话、派活。在这里叫管家，活就派在这里。",
+        newChannelLine: "一件长期的事、一个仓库，单独一个地方说话、派活。在这里叫管家，活就派在这里。",
         nameHint: "名字，比如 clock-in",
         name: "频道名",
         descriptionHint: "做什么的（可以不填）",
         description: "频道说明",
-        projectHint: "默认项目（可以不填）",
-        project: "默认项目",
+        repoHint: "默认仓库（可以不填）",
+        repo: "默认仓库",
         open: "开",
         settingsOf: "{channel} 的设置",
         what: "做什么的",
-        projectNone: "默认项目（空着就没有）",
+        repoNone: "默认仓库（空着就没有）",
         save: "存",
         sendTo: "派给{name}",
         anyone: "不指定帮工",
@@ -2498,7 +2517,7 @@ export const catalogs = {
         workbench: "工作台",
         treeHint: "记忆树：农场学会了什么",
         tree: "记忆树",
-        mapHint: "地图：每个项目一座岛",
+        mapHint: "地图：每个仓库一座岛",
         map: "地图",
         channelsUnread: "频道，{n} 条没读",
         menuHint: "菜单（Esc）",
@@ -2531,7 +2550,7 @@ export const catalogs = {
         helpers: "帮工",
       },
       fx: { coins: "{detail} · +{coins} 金币", notice: "提示", levelUp: "农场升到 Lv.{level}", level: "农场 Lv.{level}", cleared: "开垦了一块新地" },
-      sign: { label: "项目牌：{project}", noProject: "没有项目", hint: "这座农场是这个项目的；点它回地图，进别的岛", project: "项目" },
+      sign: { label: "仓库牌：{repo}", noRepo: "没有仓库", hint: "这座农场是这个仓库的；点它回地图，进别的岛", repo: "仓库" },
       overlay: {
         click: "点击：{text}",
         clearAt: "Lv.{level} 开垦",
@@ -2615,27 +2634,27 @@ export const catalogs = {
       stake: "空位，点了派活",
       locked: "空位都占着",
       sack: "排队的活",
-      send: "派一件活 · {project}",
+      send: "派一件活 · {repo}",
       plot: "{name}的地",
-      open: "空位，派一件活到 {project}",
+      open: "空位，派一件活到 {repo}",
       wait: "等地",
       queuedTip: "排队：{title}",
       queuedLabel: "排队的活：{title}",
-      enter: "进{project}的农场",
+      enter: "进{repo}的农场",
       enterWord: "进岛",
-      homeless: "不在哪个项目里：",
-      sea: "工作目录下还没有项目，地图上还是一片海。",
+      homeless: "不在哪个仓库里：",
+      sea: "工作目录下还没有仓库，地图上还是一片海。",
       notDrafted: "先没起草：{why}",
-      sowIntro: "种在 {project}：写一句要做的事，管家派帮工来干；或者先写成待办，看过再开工。",
+      sowIntro: "种在 {repo}：写一句要做的事，管家派帮工来干；或者先写成待办，看过再开工。",
       job: "要做的事",
       jobExample: "比如：登录页加一个「记住我」",
       todo: "先写成待办",
       sow: "种下",
-      gone: "工作目录里没有这个项目了，只剩还在岛上的帮工。",
+      gone: "工作目录里没有这个仓库了，只剩还在岛上的帮工。",
       worktrees: "worktree · {n} 个",
       noHelpers: "岛上还没有帮工：每派一件活来，就多一个 worktree。",
       noMore: "不再往这里派活。",
-      canSend: "还能再派 {n} 件活，马上开工（这个项目最多同时 {of} 个帮工）。",
+      canSend: "还能再派 {n} 件活，马上开工（这个仓库最多同时 {of} 个帮工）。",
       shut: "已经有 {n} 张工单在做，派来的活先排队。",
       full: "满了：{n} 个帮工都在干活，派来的活先排队。",
       queue: "排队 · {n} 件",
@@ -2777,18 +2796,18 @@ export const catalogs = {
         order: "排序",
         reset: "恢复默认",
       },
-      list: { noProject: "没有项目", all: "全部工单", unfold: "展开 {group}", fold: "收起 {group}", writeIn: "在「{group}」写一张" },
+      list: { noRepo: "没有仓库", all: "全部工单", unfold: "展开 {group}", fold: "收起 {group}", writeIn: "在「{group}」写一张" },
       page: {
-        pickFirst: "还差一点：选好派哪个帮工、在哪个项目里做，再点「开工」。",
+        pickFirst: "还差一点：选好派哪个帮工、在哪个仓库里做，再点「开工」。",
         notDrafted: "先没起草：{why}",
         historyUnread: "工单记录没读到：",
         notFound: "找不到这张工单",
         notFoundLine: "没有 {id} 这张工单：可能已经删掉了，或者链接写错了。",
-        find: "找工单：标题、帮工、项目",
+        find: "找工单：标题、帮工、仓库",
         findLabel: "找工单",
         filter: "筛选",
-        byProject: "按项目看",
-        allProjects: "所有项目",
+        byRepo: "按仓库看",
+        allRepos: "所有仓库",
         byHelper: "按帮工看",
         allHelpers: "所有帮工",
         shown: "{shown} / {of} 张",
@@ -2813,7 +2832,7 @@ export const catalogs = {
       close: {
         title: "关上「{issue}」",
         working: "{who} 还在干这张工单。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
-        completable: "完成就是把 {who} 的分支合进项目的主分支，先看一遍改动；取消就是让它收工，改动不合进去。",
+        completable: "完成就是把 {who} 的分支合进仓库的主分支，先看一遍改动；取消就是让它收工，改动不合进去。",
         notCompletable: "这张工单现在不能完成。取消会让 {who} 离开，改动不合进主分支。",
         review: "看改动，完成",
         stopAndCancel: "叫停并取消",
@@ -2827,8 +2846,6 @@ export const catalogs = {
         resolveHow: "让它在自己的分支上把 {base} 合进来、解决冲突、跑一遍测试再提交；解决了再来完成。",
         behind: "它干活这段时间，{base} 上多了 {n} 个提交；完成时会合在一起（多一个合并提交）。",
         uncommitted: "还有 {n} 个文件没提交，完成时会先帮它提交：",
-        letGo: "完成，请它收工",
-        merge: "完成，合进 {base}",
         resolve: "让它解决冲突",
         moved: "工单状态变了，先回到工单看看要你做的事。",
         counts: "{commits} 个提交 · {files} 个文件",
@@ -2917,7 +2934,7 @@ export const catalogs = {
         next: "建议接着做",
         conflict: "合进 {base} 会冲突：{files}",
       },
-      task: { project: "项目", written: "写于" },
+      task: { repo: "仓库", written: "写于" },
       todo: {
         queued: "排上队了：空位都满了，有空位就自动开工。",
         refining: "{who}在起草",
@@ -2948,25 +2965,25 @@ export const catalogs = {
         draftStatus: "草稿",
         todoStatus: "待办",
         pickForMe: "起草时替你挑",
-        whichProject: "在哪个项目里做",
-        firstProject: "还没有项目：新建一个",
-        newProjectLink: "＋ 新建项目",
+        whichRepo: "在哪个仓库里做",
+        firstRepo: "还没有仓库：新建一个",
+        newRepoLink: "＋ 新建仓库",
         priority: "优先级",
         inQueue: "排队中：{ago}排上的，有空位就按看板上的先后自动开工。",
         unqueue: "不排了",
         pickHelper: "先选好帮工",
-        start: "开工",
+        start: "确认需求并派发",
         save: "存下改动",
         remove: "删掉",
-        newProject: "新建项目",
-        projectHint: "项目名，也是工作目录下的文件夹名",
-        projectName: "项目名",
+        newRepo: "新建仓库",
+        repoHint: "仓库名，也是工作目录下的文件夹名",
+        repoName: "仓库名",
         create: "新建",
         writeOwn: "自己写说明",
       },
       boardLabels: {
         view: { board: "看板", list: "列表" },
-        grouping: { status: "状态", project: "项目", agent: "帮工", none: "不分组" },
+        grouping: { status: "状态", repo: "仓库", agent: "帮工", none: "不分组" },
         ordering: { manual: "默认", priority: "优先级", updated: "最近更新", created: "创建时间" },
         lane: { todo: "待办", working: "处理中", waiting: "等你看", closed: "已关" },
         stage: { talk: "聊清楚", work: "安排活", finish: "完成" },
@@ -2989,7 +3006,7 @@ export const catalogs = {
         queued: "排队中",
         cron: "定时任务",
         noHelper: "还没选帮工",
-        pickFirst: "没选帮工或项目，开工前要选好",
+        pickFirst: "没选帮工或仓库，开工前要选好",
         waiting: "等空位，{ago}排上的",
         written: "写于 {ago}",
         lost: "丢了",
@@ -3036,6 +3053,7 @@ export const catalogs = {
         justNow: "刚刚",
       },
       new: { title: "新工单", card: "新工单", words: "要做什么", placeholder: "要做什么？一句话就行，帮工会照它起草", keys: "⌘ 回车记下", keep: "记下" },
+      conversation: { title: "讨论与交付记录", older: "加载更早的消息", empty: "需求讨论、执行反馈与交付会保留在这里" },
     },
     "web.lan": {
       lan: {
@@ -3094,7 +3112,7 @@ export const catalogs = {
         issues: "手上的工单",
         noIssues: "它的帮工还没做完过一轮。",
         helper: "帮工",
-        allProjects: "所有项目",
+        allRepos: "所有仓库",
         notes: "记下的",
         all: "全部",
         emptyHere: "这一栏没有。",
@@ -3114,12 +3132,12 @@ export const catalogs = {
         sourcesNote: "在开头的「设置」里接上、关掉，或改读写。",
         next: "下回开工会想起",
         preview: "{n} 条 · {chars} / {limit} 字",
-        where: "在哪个项目开工",
-        pick: "选项目",
+        where: "在哪个仓库开工",
+        pick: "选仓库",
         words: "这一轮的话",
         wordsHint: "这一轮的话（可以不填）",
-        blank: "在这个项目里开工，什么也想不起来。",
-        noProjects: "还没有项目。",
+        blank: "在这个仓库里开工，什么也想不起来。",
+        noRepos: "还没有仓库。",
         orchestratorReading: "在读管家的记性……",
         orchestratorIntro: "管家开工时和每次压缩后读一遍记性；中间记下、忘掉的，它下一句就知道。",
         orchestratorNothing: "还没记下什么。跟管家说「记住……」，或者你在上面替它记。",
@@ -3134,12 +3152,12 @@ export const catalogs = {
         noArchive: "还没有：管家的对话还没长到要压缩。",
         chars: "{n} 字",
         note: "替它记一条",
-        noteProject: "比如：clock-in 的测试用 pnpm test，别用 npm",
+        noteRepo: "比如：clock-in 的测试用 pnpm test，别用 npm",
         noteOrchestrator: "比如：提交信息写中文；周末别派夜班",
-        project: "项目",
-        projectHint: "项目（可以不填）",
+        repo: "仓库",
+        repoHint: "仓库（可以不填）",
         noteHint: "写成下次一看就懂的一句话。",
-        noteHintProject: "写成下次一看就懂的一句话。项目留空就是所有项目都用得上。",
+        noteHintRepo: "写成下次一看就懂的一句话。仓库留空就是所有仓库都用得上。",
         forget: "忘掉",
         recalled: "想起过 {n} 次",
         recalledLast: "想起过 {n} 次，上次 {last}",
@@ -3225,16 +3243,16 @@ export const catalogs = {
       comments: { title: "评论 · {n}", count: "{n} 条评论", accept: "采纳", reject: "不要", accepted: "采纳了", rejected: "不要了", on: "「{span}」" },
       tierOne: { project: "项目", area: "领域", resource: "资料", inbox: "收件箱", journal: "日记", archive: "归档" },
     },
-    "web.project": {
-      title: "项目",
-      list: "项目列表",
-      add: "新增项目",
+    "web.repo": {
+      title: "仓库",
+      list: "仓库列表",
+      add: "新增仓库",
       repos: "代码库",
       all: "全部",
-      allLine: "整张地图：每个项目一座岛",
+      allLine: "整张地图：每个仓库一座岛",
       notGit: "还不是 git 仓库",
       finding: "在找……",
-      none: "工作目录下还没有项目。点「新增项目」新建一个，或从 GitHub 下载一个。",
+      none: "工作目录下还没有仓库。点「新增仓库」新建一个，或从 GitHub 下载一个。",
       copied: "复制好了：{path}",
       notCopied: "复制不了：选中路径自己复制吧。",
       recency: {
@@ -3291,16 +3309,16 @@ export const catalogs = {
       fresh: "新建一个",
       github: "去别人家看看",
       githubAddress: "GitHub 地址",
-      githubHint: "公开仓库的主页地址。下载到本地后，就能查看项目和安排帮工。",
-      name: "项目名",
-      nameHint: "保存在工作目录里；已有同名项目不会被覆盖。",
+      githubHint: "公开仓库的主页地址。下载到本地后，就能查看仓库和安排帮工。",
+      name: "仓库名",
+      nameHint: "保存在工作目录里；已有同名仓库不会被覆盖。",
       nameExample: "比如 raft-source",
       downloading: "正在下载仓库… 大仓库需要多等一会儿，最多 3 分钟。",
       making: "正在新建…",
       cancel: "取消",
       busy: "进行中…",
       download: "下载到工作目录",
-      create: "创建项目",
+      create: "创建仓库",
       otherLang: "其他",
     },
     "web.runtime": {
@@ -3498,7 +3516,7 @@ export const catalogs = {
         wrong: "这一轮做错了",
         marked: "标成了做错的一轮，存成了一条评测",
         want: "这一轮应该怎样",
-        wantHint: "它应该怎样：比如「先问我是哪个项目，别直接派活」",
+        wantHint: "它应该怎样：比如「先问我是哪个仓库，别直接派活」",
         neverSent: "还没派出去过。",
         sent: "派出去的帮工",
         here: "在场",
@@ -3538,7 +3556,7 @@ export const catalogs = {
       },
       github: {
         noGh: "没装 gh",
-        note: "能提 PR 的项目在「项目」里看；完成时提 PR 要在配置里打开（github.pr_projects）。",
+        note: "能提 PR 的仓库在「仓库」里看；完成时提 PR 要在配置里打开（github.pr_repos）。",
         recheck: "重新检测",
         cli: "gh 命令行",
         cliHint: "合并时开 PR、读仓库用它",
@@ -3601,6 +3619,12 @@ export const catalogs = {
         homeHint: "VibeValley 的一切都在这里",
         settings: "设置文件",
         settingsHint: "钥匙和这几页的设置",
+        repos: "仓库目录",
+        reposHint: "这个空间的仓库，每个文件夹都是一个 git 仓库",
+        worktrees: "工作树目录",
+        worktreesHint: "帮工干活时每张工单自己的检出",
+        pkm: "笔记库",
+        pkmHint: "这个空间的 PARA 目录和日记",
         copy: "复制路径",
         copied: "路径复制好了",
         reveal: "在访达里显示",
@@ -3652,9 +3676,9 @@ export const catalogs = {
       day: "第 {n} 天",
       byHelper: "只看哪个帮工的",
       allHelpers: "全部帮工",
-      byProject: "只看哪个项目的",
-      allProjects: "全部项目",
-      everyProject: "所有项目",
+      byRepo: "只看哪个仓库的",
+      allRepos: "全部仓库",
+      everyRepo: "所有仓库",
       title: "农场的记忆树",
       stats: "第 {days} 天 · {rounds} 轮 · 想起 {recalls} 次",
       nextStage: "再干 {rounds} 轮长成{stage}",
@@ -3747,7 +3771,7 @@ export const catalogs = {
         console: "声网控制台",
         hex: "32 位十六进制",
         area: "区域",
-        areaHint: "Agora 接口的区域，选离服务端近的；中国大陆的项目选中国大陆。",
+        areaHint: "Agora 接口的区域，选离服务端近的；中国大陆的仓库选中国大陆。",
         listen: "听",
         listenParts: "识别 · VAD 断句",
         asr: "识别",
@@ -3924,9 +3948,8 @@ export const catalogs = {
         key: "A request key: sent again with the same key, it is done once",
         limit: "At most this many",
         priority: "The priority",
-        project: "The project's name",
-        reply: "Reply to this message number",
         repo: "The GitHub repository's address",
+        reply: "Reply to this message number",
         text: "Words the title or description contains",
         timeout: "Wait at most this many seconds",
         closed: "Only closed ones (done, canceled)",
@@ -3960,7 +3983,7 @@ export const catalogs = {
         doctor: "See this machine's farm at once: which one was found, whether it answers, the desktop app, runtimes, the model's key, the LAN listener",
         pkm: {
           capture: "Note something in today's journal (--page: on that page); no words reads stdin, lines split into blocks by indentation",
-          radar: "What wants a look: the inbox, projects left alone, what is overdue",
+          radar: "What wants a look: the inbox, repos left alone, what is overdue",
           journalShow: "A day's journal (--day for another), made when there is none",
           pageEdit: "Edit a whole page's file in $EDITOR; it is saved when the editor closes",
           pageExport: "A page as Markdown to read: refs read out, remarks taken off",
@@ -3984,7 +4007,7 @@ export const catalogs = {
           edit: "Turn a scheduled task on or off",
         },
         issue: {
-          edit: "Change an issue's title, description, project, profile or priority",
+          edit: "Change an issue's title, description, repo, profile or priority",
           list: "List issues: one a line, number first",
           show: "Show an issue: its status, where it is now, its questions and criteria, the commands it takes now (--watch follows it first)",
           comment: "Comment on an issue: the answer when its helper asks, read by it in its next round otherwise",
@@ -4001,7 +4024,7 @@ export const catalogs = {
           list: "List a profile's memories",
           search: "Search the memories; every profile's when none is named",
         },
-        project: { list: "List projects", create: "Make a project (--repo clones it from GitHub)" },
+        repo: { list: "List repos", create: "Make a repo (--repo clones it from GitHub)" },
         runtime: { list: "List the runtimes: installed or not, their versions", refresh: "Look for a runtime again, after installing or upgrading it" },
         session: { list: "List helpers: id, name, profile, what it is doing", show: "Show a helper", stop: "Stop a helper's round" },
         chat: "Talk in the terminal: with no runtime, VibeValley's own agent; with one, that runtime directly (no trajectory, no spending)",
@@ -4128,6 +4151,7 @@ export const catalogs = {
           },
           timeline: { get: "A ticket's milestones and what all its rounds cost" },
           update: "Update a ticket",
+          conversation: { get: "The issue conversation location" },
         },
         lan: {
           device: { delete: "Remove a paired device", previewDelete: "Preview removing a device: say what would go, without removing it" },
@@ -4147,7 +4171,7 @@ export const catalogs = {
           delete: "Delete one of a profile's memories",
           list: "List a profile's memories, from the database and its sources",
           previewDelete: "Preview deleting a memory: say what would go, without deleting",
-          recall: "What a profile would recall for this project and text",
+          recall: "What a profile would recall for this repo and text",
           search: "Search memories by words, every profile's if none is named",
         },
         orchestrator: {
@@ -4175,7 +4199,7 @@ export const catalogs = {
             rename: "Rename a page or merge it into one of that name; links follow",
             save: "Create a page, or set the properties and folder of the one with that title",
           },
-          radar: { get: "The review radar: inbox pages, stale projects, overdue blocks" },
+          radar: { get: "The review radar: inbox pages, stale repos, overdue blocks" },
           scan: "Read again every note file changed on disk",
           search: "Search the notes",
           undo: "Undo the last change to the notes",
@@ -4184,13 +4208,14 @@ export const catalogs = {
             update: "Write a page anew from its edited text; refused if the file changed meanwhile",
           },
         },
-        project: {
-          activity: { get: "A project's commits: how many per day, and by whom" },
-          create: "Create a project",
-          language: { list: "The languages a project is written in" },
-          list: "List every project",
-          template: { list: "A project's ticket templates, filled in for its stack" },
-          validate: "The first thing creating a project would refuse, without creating it",
+        repo: {
+          activity: { get: "A repo's commits: how many per day, and by whom" },
+          create: "Create a repo",
+          language: { list: "The languages a repo is written in" },
+          list: "List every repo",
+          template: { list: "A repo's ticket templates, filled in for its stack" },
+          validate: "The first thing creating a repo would refuse, without creating it",
+          pr: { submit: "Publish an existing local branch" },
         },
         runtime: {
           list: "List every machine",
@@ -4242,7 +4267,7 @@ export const catalogs = {
           page: { about: "Notes pages: list, outline, export, edit the file" },
           journal: { about: "Journals: a page a day" },
         },
-        project: { about: "Projects: the git repositories in the working folder" },
+        repo: { about: "Repos: the git repositories in the working folder" },
         runtime: { about: "Machines: the coding agents on this computer" },
         server: { about: "The server itself" },
         session: { about: "Helpers" },
@@ -4278,7 +4303,7 @@ export const catalogs = {
         cronName: "The scheduled task's name",
         issue: "An issue: its number (12 or #12)",
         page: "A page: its title, slug or an alias",
-        projectName: "The new project's name",
+        repoName: "The new repo's name",
         session: "The helper's id, such as w3",
         chatRuntime: "A runtime (claude, codex…); none for VibeValley's own agent",
         appPath: "A page of the desktop app, such as /issues/12; the start page if none",
@@ -4315,7 +4340,7 @@ export const catalogs = {
         pkmCapture: { run: "vibevalley pkm capture 'a remember-me box on the login page'", about: "Note a line in today's journal" },
         pkmCapturePage: { run: "pbpaste | vibevalley pkm capture --page Reading", about: "Put the outline on the clipboard on the Reading page" },
         pkmRadar: { about: "What wants a look" },
-        projectList: { about: "Which projects there are" },
+        repoList: { about: "Which repos there are" },
         runtimeList: { about: "Which runtimes are installed" },
         sessionList: { about: "The helpers at work" },
         sessionShow: { about: "Helper w3" },
@@ -4343,7 +4368,7 @@ export const catalogs = {
         cronDelete: { about: "Try it first: what it would delete" },
         cronEdit: { about: "Turn c1 off for now" },
         issueCreate: {
-          run: "vibevalley issue create 'fix the login page' --project web --agent docs --criterion 'an expired session goes back to login'",
+          run: "vibevalley issue create 'fix the login page' --repo web --agent docs --criterion 'an expired session goes back to login'",
           about: "Write an issue for docs",
         },
         issueDelete: { about: "Try it first: what it would delete" },
@@ -4367,7 +4392,7 @@ export const catalogs = {
         pkmPageList: { about: "The pages changed last" },
         pkmPageShow: { run: "vibevalley pkm page show reading", about: "The page “reading” as its outline" },
         pkmSearch: { run: "vibevalley pkm search 'reading list'", about: "Find “reading list” in the notes" },
-        projectCreate: { about: "Clone a project from GitHub" },
+        repoCreate: { about: "Clone a repo from GitHub" },
         runtimeRefresh: { about: "Look again after installing a new Claude Code" },
         pkmPageSave: { run: 'vibevalley pkm page save Reading "- bulbs"', about: "Create or update the Reading page" },
         agentCreate: { about: "Create a profile on Claude Code" },
@@ -4391,6 +4416,9 @@ export const catalogs = {
       session: { stopped: "Stopped helper {session}" },
       memory: { deleted: "Deleted the memory {memory}" },
       agent: { deleted: "Deleted the profile {agent}" },
+      "repo.publish": "Publish an existing branch as a GitHub PR or GitLab MR",
+      "repo.check": "Repository check: {check}",
+      "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run",
     },
     desktop: {
       open: "Open VibeValley",
@@ -4470,7 +4498,7 @@ export const catalogs = {
       lookIn: {
         issue: "List the tickets and find its number",
         session: "List the helpers and find its id",
-        project: "List the projects and find its name",
+        repo: "List the repos and find its name",
         runtime: "List the machines and find its id",
         agent: "List the profiles and find its id",
         skill: "List the skills and find its id",
@@ -4484,7 +4512,7 @@ export const catalogs = {
         artifact: "List the artifacts to find its id",
         pkm: "List the notes’ pages to find its name",
       },
-      projectRef: "project {id}",
+      repoRef: "repo {id}",
       helperRef: "helper {id}",
       archiveRef: "archive {name}",
     },
@@ -4647,8 +4675,8 @@ export const catalogs = {
       breaker: "{name} failed {failed} times in a row as soon as it was woken, so it is not woken again for now; telling it something directly tries again.",
       dispatch: {
         draft: "reading the code and drafting this ticket",
-        project: "the project",
-        sent: "Sent @{id} ({name}) to {project}: {what}",
+        repo: "the repo",
+        sent: "Sent @{id} ({name}) to {repo}: {what}",
         redraft: "This ticket goes to @{id} ({name}) for another draft",
         handedOn: "This ticket goes to @{id} ({name}) to carry on, sent for the {nth, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} time",
       },
@@ -4786,7 +4814,7 @@ export const catalogs = {
       noCron: "There is no scheduled task {id}",
       noChannel: "There is no channel {name}",
       noProfile: "There is no profile called {name}",
-      noProject: "#{channel} has no default project: a scheduled task sent straight to a helper needs a project",
+      noRepo: "#{channel} has no default repo: a scheduled task sent straight to a helper needs a repo",
       removeWhen: 'Delete the scheduled task "{name}" ({when}): it no longer starts work when due; the tickets it opened stay',
     },
     "server.game": {
@@ -4826,7 +4854,7 @@ export const catalogs = {
         invalid: "Provide 1–{max} child issues with unique valid IDs and acyclic dependencies within this split.",
         agent: "Choose an enabled helper profile for each child issue: {agent}",
         commitFirst: "Commit the parent issue's changes before splitting it.",
-        needsBranch: "The parent issue needs its own working branch before splitting; its helper is currently working directly in the project directory.",
+        needsBranch: "The parent issue needs its own working branch before splitting; its helper is currently working directly in the repo directory.",
         created: "Created {count} child issues under #{n}.",
       },
       verification: {
@@ -4837,14 +4865,14 @@ export const catalogs = {
       },
       dependencies: {
         closedParent: "A closed parent issue cannot accept child issues",
-        project: "A child issue must use its parent's project",
+        repo: "A child issue must use its parent's repo",
         invalid: "Issue dependencies must be acyclic and refer to existing issues",
         waiting: "Waiting for prerequisite issues: {issues}",
       },
       issueNumbered: "ticket #{n}",
       issueRef: "ticket {ref}",
       helperRef: "helper {id}",
-      projectRef: "project {name}",
+      repoRef: "repo {name}",
       helper: "the helper",
       notStarted: "This ticket has not started yet",
       started: "This ticket has already started",
@@ -4852,7 +4880,7 @@ export const catalogs = {
       orchestratorNotHelper: "The manager is not a helper: send it to a helper",
       disabled: "{name} is disabled",
       cannotSend: "{name} cannot be sent: {why}",
-      noProject: "No project was named: a project is a folder in the work folder",
+      noRepo: "No repo was named: a repo is a folder in the work folder",
       notRecorded: "{name}'s ticket was not recorded: {why}",
       workKept: "{refused}; ticket #{n} and its changes are kept, and it can be sent again",
       drafting: "{name} is drafting it: start it once the draft comes back",
@@ -4875,7 +4903,7 @@ export const catalogs = {
       noStatus: "There is no such status: {to}",
       roundNeedsWords: "Another round needs a few words: what it should do this round",
       closed: "This ticket is closed",
-      cannotMoveProject: "Ticket #{n} cannot change project yet: {why}",
+      cannotMoveRepo: "Ticket #{n} cannot change repo yet: {why}",
       cannotDelete: "Ticket #{n} cannot be deleted yet: {why}",
       noConflict: "{name} has no conflict with main",
       orchestratorAnswers: "This ticket is the manager's: it closes once the manager answers",
@@ -4885,7 +4913,7 @@ export const catalogs = {
         toOrchestrator: "{n} goes to the manager to answer",
         sendTo: "{n} is sent to {agent}",
         noRoom: "No room now ({full}): it is queued in To do and starts as soon as there is room",
-        startIn: "{n} sends {agent} to work in {project}",
+        startIn: "{n} sends {agent} to work in {repo}",
         start: "{n} sends {agent} to work",
         unqueue: "{n} leaves the queue, back to Backlog",
         leaves: "{helper} leaves, the branch is kept",
@@ -4898,7 +4926,7 @@ export const catalogs = {
         completeKept: "{n} closes as done: the branch is kept, not merged ({commits} commits)",
         helperLeaves: "{helper} leaves",
         commitFirst: "First commit {helper}'s {files} uncommitted files for it",
-        check: "Run the project's check before merging (.vibevalley/check, if any): if it fails nothing is merged and the ticket stays for you to see",
+        check: "Run the repo's check before merging (.vibevalley/check, if any): if it fails nothing is merged and the ticket stays for you to see",
         pullRequest: "Push the branch and open a PR ({commits} commits): it closes as done once the PR is merged",
         cancel: "{n} closes as canceled",
         cancelLeaves: "{helper} leaves; a branch with commits is kept",
@@ -4926,7 +4954,7 @@ export const catalogs = {
         closed: "\nHow it was closed: {closed}",
         lastRun: "\nThe last round {outcome}: {summary}",
         previous: "\nThis branch already has last time's commits; carry on from them.",
-        end: "\nFirst look at the project as it is now, then carry on.",
+        end: "\nFirst look at the repo as it is now, then carry on.",
         failedHead: "The acceptance failed; these need fixing:",
         failedEnd: "\n\nOnce fixed, say how each was fixed in your conclusion.",
         resume: "The last round stopped halfway; carry on and finish it.",
@@ -4972,7 +5000,6 @@ export const catalogs = {
         orchestrator: "This ticket is the manager's: the manager reads it itself",
         onlyBacklog: "Only a ticket in Backlog can be drafted: move it back to Backlog first",
         drafting: "{name} is drafting it: wait for it to come back",
-        noProject: "No project was named: pick a project first",
         unread: "The draft {name} handed back could not be read ({problem}); the ticket is unchanged: draft it again",
         unfinished: "{name} did not finish the draft ({summary}); the ticket is unchanged: draft it again",
         canceled: '"{title}" was canceled: {why}',
@@ -4990,7 +5017,11 @@ export const catalogs = {
       noProfileNamed: "No profile is named {key}",
       prSubmitNotAllowed: "The owner did not explicitly authorize this ticket to submit its own pull request",
       prSubmitNotCurrent: "Only the helper currently handling this ticket can submit its pull request",
-      prSubmitUnavailable: "Pull-request delivery is not enabled for this ticket's project",
+      prSubmitUnavailable: "Pull-request delivery is not enabled for this ticket's repo",
+      deliveryNeedsPr: "Deliver a valid PR/MR before accepting this issue",
+      acceptSubmittedPr: "Accept the submitted PR/MR and retain the unmerged branch and uncommitted changes",
+      prDelivered: "Delivered PR/MR: {url}",
+      confirmedRequirements: "Confirmed and dispatched: {title}\n\n{description}\n\nAcceptance criteria:\n{criteria}",
     },
     "server.lan": {
       aDevice: "A device",
@@ -5030,9 +5061,9 @@ export const catalogs = {
       forgetThere: "Memories in {source} are deleted there",
       coverage: {
         failed: "reading failed, was canceled or timed out; this source is not included",
-        everosAcross: "searching across projects is not supported: name a project; EverOS is not included this time",
+        everosAcross: "searching across repos is not supported: name a repo; EverOS is not included this time",
         everosAgent: "this search needs a profile; EverOS is not included this time",
-        unconfirmed: "some hits' project could not be confirmed and were left out of this project's search",
+        unconfirmed: "some hits' repo could not be confirmed and were left out of this repo's search",
         note: "{source}: {note}",
       },
       everosList: "EverOS memories are not listed here",
@@ -5071,10 +5102,10 @@ export const catalogs = {
       noPageLike: 'There is no page "{page}"; the closest are {like}',
       changedSince: '"{page}" was changed after it was read and was not written: read it again, then edit',
     },
-    "server.project": {
+    "server.repo": {
       parentBranchChanged: "The parent worktree changed branches; the child cannot be merged automatically",
       parentHasChanges: "Commit the parent's outstanding changes before merging the child",
-      badName: "A project name starts with a letter or a digit and has only letters, digits, -, _ and ., up to 64 characters",
+      badName: "A repo name starts with a letter or a digit and has only letters, digits, -, _ and ., up to 64 characters",
       badGithub: "Give a GitHub repository address, such as https://github.com/botiverse/raft-source",
       branchMoved: "The branch changed after the check: check again before merging",
       mainMoved: "Main changed during the check: check again before merging",
@@ -5088,34 +5119,34 @@ export const catalogs = {
         signedOut: "not signed in to GitHub",
         noAccount: "the GitHub account could not be confirmed",
       },
-      notProjectName: '"{name}" cannot be a project name: use a simple English folder name, such as clock-in',
-      outside: "A project must be inside the work folder, not linked to somewhere outside it",
+      notRepoName: '"{name}" cannot be a repo name: use a simple English folder name, such as clock-in',
+      outside: "A repo must be inside the work folder, not linked to somewhere outside it",
       commit: {
-        initial: "Initial commit (a project VibeValley made)",
+        initial: "Initial commit (a repo VibeValley made)",
         initialShort: "Initial commit",
-        leftOver: "Commit what was left uncommitted before merging",
+        uncommitted: "The worktree has uncommitted changes. Commit them yourself, with a message that follows this repository's rules, then ask again.",
         merge: "Merge {branch}",
       },
-      notChecked: "The project has not been checked: refresh GitHub's state",
+      notChecked: "The repo has not been checked: refresh GitHub's state",
       check: {
-        timedOut: "The project's check .vibevalley/check timed out ({seconds}s)",
-        failed: "The project's check .vibevalley/check failed: {why}",
-        exited: "The project's check .vibevalley/check failed: exit status {code}",
+        timedOut: "The repo's check .vibevalley/check timed out ({seconds}s)",
+        failed: "The repo's check .vibevalley/check failed: {why}",
+        exited: "The repo's check .vibevalley/check failed: exit status {code}",
       },
       mergeFailed: "Merging into {main} failed, {kept}: {why}",
       mergeStuck: "Merging into {main} failed, {kept}: {why}; aborting the merge failed too ({abort}), and {main} is stuck halfway: it needs tidying by hand",
-      exists: '"{name}" already exists: pick another project name',
+      exists: '"{name}" already exists: pick another repo name',
       cloneFailedGh: "The download failed: check the GitHub sign-in, the repository's permissions and the network, then retry",
       cloneFailed:
         "The download failed: check that the repository is public, the address is right and the network works; it stops after 3 minutes, and can be retried",
       tokeiFailed: "tokei did not finish counting: {why}",
       tokeiUnread: "tokei's output cannot be read: try a newer tokei",
       noBranchRead: "Could not read the branch {branch}: {why}",
-      inProjectNoBranch: "It works right in the project, so there is no branch to merge",
-      inProjectNothing: "It works right in the project, so there is no branch to merge",
+      inRepoNoBranch: "It works right in the repo, so there is no branch to merge",
+      inRepoNothing: "It works right in the repo, so there is no branch to merge",
       keptBoth: "the {branch} branch and its worktree are kept",
       keptBranch: "the {branch} branch is kept",
-      merged: "{ahead} commits merged into {project}'s {main}",
+      merged: "{ahead} commits merged into {repo}'s {main}",
       nothingNew: "This one has no new commits",
       nothingNewInPlan: "The plan's branch has no new commits",
       branchLeft: "; the changes are merged, the branch {branch} is not cleared yet: {why}",
@@ -5134,14 +5165,9 @@ export const catalogs = {
         noPermission: "The repository's permissions could not be checked",
         readOnly: "No write permission",
         wrongBranch: "The ticket's branch does not match",
-        changedDuringCheck: "The worktree changed during validation; commit the changes before submitting the PR again",
-        pushFailed: "Pushing the ticket's branch failed: check origin and the sign-in, then retry",
-        listFailed: "Looking up existing PRs failed; the branch is pushed, so it can be retried",
-        listUnread: "The existing PRs could not be read",
         checked: ".vibevalley/check passed.",
-        noCheck: "This project has no .vibevalley/check, so no check was run.",
+        noCheck: "This repo has no .vibevalley/check, so no check was run.",
         body: "Ticket #{n}\n\n{conclusion}\n\n{check}",
-        createFailed: "Creating the PR failed; the branch is pushed, so it can be retried",
         urlUnread: "The new PR's address could not be read; the lookup can be retried",
         viewFailed: "Looking up PR #{n} failed",
         stateUnread: "PR #{n}'s state could not be read",
@@ -5153,6 +5179,11 @@ export const catalogs = {
       mergeTree: "git merge-tree failed ({code})",
       moreLines: "… {n} more lines not shown",
       conflict: "merging into {base} conflicts",
+      "publish.refused": "Branch publication refused: {detail}",
+      "publish.platformFailed": "Hosting platform failed: {stage}. Check installation and login.",
+      "publish.pushedWithoutLink": "SHA {sha} was pushed, but no PR/MR link was confirmed: {why}. Retry to recover an open request.",
+      "publish.ownerOnly": "Only the local owner can publish an existing branch",
+      "publish.pushUnconfirmed": "Push of SHA {sha} was not confirmed. No PR/MR creation was attempted; inspect the remote before retrying.",
     },
     "server.runtime": {
       date: "{month}/{day} {time}",
@@ -5216,7 +5247,7 @@ export const catalogs = {
       noRoom: {
         farm: "{max} helpers are already at work",
         runtime: "{on} helpers are already at work on {runtime}, at most {max} at once (the Runtimes page can change it)",
-        project: "{on} helpers are already at work in {project}, at most {max} at once: more would edit the same files",
+        repo: "{on} helpers are already at work in {repo}, at most {max} at once: more would edit the same files",
       },
       notTaken: {
         conflictOwner:
@@ -5226,7 +5257,7 @@ export const catalogs = {
         checkFix: "{reason}\nFix the check and hand it back.",
         owner: "Not merged: {why}. {name} is still here",
         notice: "{name}'s work was not merged: {why}",
-        checkShort: "the project's check failed",
+        checkShort: "the repo's check failed",
       },
       log: {
         stopped: "VibeValley stopped, and this round was cut short",
@@ -5300,8 +5331,8 @@ export const catalogs = {
     },
     "server.setting": {
       deepseekKey: "The DeepSeek API Key does not look right: a string with no spaces, usually starting with sk-",
-      agoraId: "Agora's App ID is 32 hexadecimal digits: find it in your project on Agora's console",
-      agoraCertificate: "Agora's App Certificate is 32 hexadecimal digits: find it in your project on Agora's console",
+      agoraId: "Agora's App ID is 32 hexadecimal digits: find it in your repo on Agora's console",
+      agoraCertificate: "Agora's App Certificate is 32 hexadecimal digits: find it in your repo on Agora's console",
       voiceKeySpace: "A voice service's key should have no spaces",
       dictationUrl: "The dictation address is a full address starting with http(s), up to /v1, such as http://127.0.0.1:8080/v1 on this machine",
       dictationModel: "Dictation needs a model name, such as qwen3 for a local speech-server, or OpenAI's gpt-4o-mini-transcribe",
@@ -5331,7 +5362,7 @@ export const catalogs = {
     },
     "server.tool": {
       labels: {
-        project_list: "Projects",
+        repo_list: "Repos",
         channel_list: "Channels",
         channel_create: "Open a channel",
         channel_update: "Change a channel",
@@ -5427,15 +5458,21 @@ export const catalogs = {
         none: "",
       },
       outcome: { completed: "done", failed: "failed", interrupted: "stopped halfway" },
-      status: { backlog: "Backlog", todo: "To do", in_progress: "In progress", in_review: "For you to see", done: "Done", canceled: "Canceled" },
+      status: { backlog: "Backlog", todo: "To do", in_progress: "In progress", in_review: "In review", done: "Done", canceled: "Canceled" },
       priority: { urgent: "Urgent", high: "High", medium: "Normal", low: "Low" },
-      deliverable: { change: "A change, merged into the project", branch: "A change, left on its branch", answer: "An answer, reading only" },
+      deliverable: {
+        change: "A change, merged into the repo",
+        branch: "A change, left on its branch",
+        answer: "An answer, reading only",
+        pull_request: "Submit PR/MR",
+      },
       delivered: {
         merged: "merged into main",
         merged_into_parent: "merged into the plan's branch",
         pull_request: "its PR was merged",
         kept: "branch kept, not merged",
         none: "nothing to merge",
+        submitted: "PR/MR submitted",
       },
       canceled: { dismissed: "canceled", lost: "its working folder is gone" },
       doneWith: "Done, {what}",
@@ -5529,13 +5566,13 @@ export const catalogs = {
       tagsHint: "frontend, tests, docs…",
       enabled: "Enabled",
       enabledHint: "Disabled, the manager does not send it, and refuses when it is named.",
-      workdir: "Default project",
+      workdir: "Default repo",
       workdirTip:
-        "A folder under the work folder (VIBEVALLEY_WORK_ROOT). Used when the manager sends work without naming a project; when empty, the project must be named.",
+        "A folder under the work folder (VIBEVALLEY_WORK_ROOT). Used when the manager sends work without naming a repo; when empty, the repo must be named.",
       workdirHint: "such as clock-in",
       worktree: "A git worktree for each helper",
       worktreeHint:
-        "Each helper changes its own branch, so helpers do not overwrite each other; completing merges it into the project. Off, it changes the project directly, with no branch to merge.",
+        "Each helper changes its own branch, so helpers do not overwrite each other; completing merges it into the repo. Off, it changes the repo directly, with no branch to merge.",
       env: "Environment variables",
       envHint: "On top of the runtime's own environment variables.",
       machine: "Machine",
@@ -5627,7 +5664,7 @@ export const catalogs = {
         modelHint: "deepseek-v4-flash",
         dutyTip: "One sentence: what it looks after.",
         personaTip: "Who it is, how it talks, what it looks after; it follows the manager's prompt.",
-        personaHint: "You look after the clock-in project; read the tests before sending work…",
+        personaHint: "You look after the clock-in repo; read the tests before sending work…",
         look: "Look",
       },
       list: {
@@ -5759,7 +5796,7 @@ export const catalogs = {
         issues: { label: "Tickets", hint: "Every ticket from written to closed" },
         agents: { label: "Profiles", hint: "Profiles: managers and helpers" },
         runtimes: { label: "Machines", hint: "The coding agents on this computer" },
-        projects: { label: "Projects", hint: "An island for each project" },
+        repos: { label: "Repos", hint: "An island for each repo" },
         catalog: { label: "Catalog", hint: "Assets: every picture, cursor and sound the farm uses, and the workbench's kit" },
         settings: { label: "Settings", hint: "General, appearance, models, memory, skills, voice, connections" },
       },
@@ -5940,20 +5977,20 @@ export const catalogs = {
         dog: { label: "Dog", hint: "Sleep, wake, stretch, wag, bark, jump, roll over…" },
         plots: { label: "Plots", hint: "From bare soil to ripe, weedy, dry, withered and locked" },
         yard: { label: "Yard", hint: "The map, props, plants in front of the camera, little animals" },
-        map: { label: "Map", hint: "An island for each project, the compass, clouds, queued seed bags, stumps for free spots" },
+        map: { label: "Map", hint: "An island for each repo, the compass, clouds, queued seed bags, stumps for free spots" },
         machines: { label: "Machines", hint: "Each is a runtime" },
         icons: { label: "Icons", hint: "For panels, entries and hints" },
         acts: { label: "Doing", hint: "The little icons over a helper's head: read, edit, run a command, search…" },
         medals: { label: "Medals and badges", hint: "Medals, badge emblems, stamps, coins" },
         logos: { hint: "The agents on the machines, the chat apps, the web and desktop icons" },
-        langs: { label: "Languages", hint: "What a project page has planted" },
+        langs: { label: "Languages", hint: "What a repo page has planted" },
         ui: { label: "Interface", hint: "The energy bottle, the farm chat's buttons, the calendar's cells" },
         other: { label: "Other", hint: "What fits no shelf" },
       },
     },
     "web.channel": {
       tab: { chat: "Chat", issues: "Tickets", crons: "Scheduled tasks" },
-      defaultProject: "default project {project}",
+      defaultRepo: "default repo {repo}",
       channels: "Channels",
       defaultHint: "The default channel: you, the manager and the helpers are all here",
       findHint: "Find in this channel…",
@@ -5979,16 +6016,16 @@ export const catalogs = {
       sayInThread: "Say it in the thread; {name} sees it",
       reply: "Reply in this thread",
       dialog: {
-        projectExample: "such as clock-in",
+        repoExample: "such as clock-in",
         cancel: "Cancel",
         name: "Name",
         nameHint: "Letters, digits, Chinese characters, - and _, up to 24",
         nameExample: "such as clock-in",
         description: "Description (optional)",
         descriptionHint: "What is this channel for?",
-        project: "Default project (optional)",
-        projectHint: "Work sent in this channel without a project goes to this one",
-        projectNone: "Empty means none: the manager asks which project when sending work",
+        repo: "Default repo (optional)",
+        repoHint: "Work sent in this channel without a repo goes to this one",
+        repoNone: "Empty means none: the manager asks which repo when sending work",
         settingsOf: "Settings of # {name}",
         save: "Save",
       },
@@ -6156,7 +6193,7 @@ export const catalogs = {
       },
       threadWidth: "Thread width (drag; double-click for the default)",
       commands: {
-        issue: { name: "Write a ticket", note: "/issue title: into the backlog, in this channel's project", needs: "Write the ticket's title after /issue" },
+        issue: { name: "Write a ticket", note: "/issue title: into the backlog, in this channel's repo", needs: "Write the ticket's title after /issue" },
         remember: {
           name: "Have the manager remember",
           note: "/remember a sentence: into the memory of the manager looking after this",
@@ -6335,12 +6372,12 @@ export const catalogs = {
       },
       sow: {
         notDrafted: "Not drafted",
-        homeless: "This farm belongs to no project",
-        toMap: "To plant, enter a project's farm first: go back to the map and pick an island.",
-        noProjects: "No projects in the workbench yet: make one on the Projects page first.",
+        homeless: "This farm belongs to no repo",
+        toMap: "To plant, enter a repo's farm first: go back to the map and pick an island.",
+        noRepos: "No repos in the workbench yet: make one on the Repos page first.",
         map: "Go to the map",
-        makeProject: "Make a project",
-        plantIn: "Planting in {project}",
+        makeRepo: "Make a repo",
+        plantIn: "Planting in {repo}",
         rummaging: "Rummaging in the seed bags…",
         noSeeds: "The seed bags could not be fetched: ",
         retry: "Fetch the seed bags again",
@@ -6351,7 +6388,7 @@ export const catalogs = {
         job: "Ticket",
         who: "Who plants it",
         orchestratorPicks: "Manager picks",
-        how: "Start: the manager hands this to a helper, who starts in {project} at once. Draft: a helper reads the code and writes it up as a ticket for you to look over before starting.",
+        how: "Start: the manager hands this to a helper, who starts in {repo} at once. Draft: a helper reads the code and writes it up as a ticket for you to look over before starting.",
         draft: "Draft",
         start: "Start",
       },
@@ -6367,7 +6404,7 @@ export const catalogs = {
       },
       harvest: {
         reading: "Looking at what it changed…",
-        project: "Project {project}",
+        repo: "Repo {repo}",
         counts: "{commits} commits · {files} files",
         none: "This one has no changes. Harvesting just lets it go.",
         conflict: "Merging into {base} would conflict, so it cannot be harvested yet",
@@ -6408,7 +6445,7 @@ export const catalogs = {
         runtimes: "Machines",
         skills: "Skill book",
         connectors: "Connectors",
-        projects: "Projects",
+        repos: "Repos",
         catalog: "Catalog",
         resume: "Resume",
         home: "Back to the title",
@@ -6484,22 +6521,22 @@ export const catalogs = {
         channel: "Channel: {channel}; click to switch or open a new one",
         channels: "Channels",
         directs: "Direct messages",
-        projectTag: "project {project}",
+        repoTag: "repo {repo}",
         newChannel: "New channel",
         pageAndSchedules: "Channel page and scheduled tasks",
         settingsLink: "Settings",
         back2: "Back",
-        newChannelLine: "A long-running matter or a project gets a place of its own to talk and send work. Call the manager here and the work is sent here.",
+        newChannelLine: "A long-running matter or a repo gets a place of its own to talk and send work. Call the manager here and the work is sent here.",
         nameHint: "Name, such as clock-in",
         name: "Channel name",
         descriptionHint: "What it is for (optional)",
         description: "Channel description",
-        projectHint: "Default project (optional)",
-        project: "Default project",
+        repoHint: "Default repo (optional)",
+        repo: "Default repo",
         open: "Open",
         settingsOf: "Settings of {channel}",
         what: "What it is for",
-        projectNone: "Default project (empty for none)",
+        repoNone: "Default repo (empty for none)",
         save: "Save",
         sendTo: "Send to {name}",
         anyone: "Any helper",
@@ -6566,7 +6603,7 @@ export const catalogs = {
         workbench: "Workbench",
         treeHint: "Memory tree: what the farm has learned",
         tree: "Memory tree",
-        mapHint: "Map: an island for each project",
+        mapHint: "Map: an island for each repo",
         map: "Map",
         channelsUnread: "Channels, {n} unread",
         menuHint: "Menu (Esc)",
@@ -6606,10 +6643,10 @@ export const catalogs = {
         cleared: "A new plot was cleared",
       },
       sign: {
-        label: "Project sign: {project}",
-        noProject: "No project",
-        hint: "This farm belongs to this project; click it to go back to the map and visit another island",
-        project: "Project",
+        label: "Repo sign: {repo}",
+        noRepo: "No repo",
+        hint: "This farm belongs to this repo; click it to go back to the map and visit another island",
+        repo: "Repo",
       },
       overlay: {
         click: "Click: {text}",
@@ -6694,27 +6731,27 @@ export const catalogs = {
       stake: "A free spot: click to send work",
       locked: "Every spot taken",
       sack: "Queued work",
-      send: "Send a ticket · {project}",
+      send: "Send a ticket · {repo}",
       plot: "{name}'s plot",
-      open: "A free spot: send a ticket to {project}",
+      open: "A free spot: send a ticket to {repo}",
       wait: "Waiting for a plot",
       queuedTip: "Queued: {title}",
       queuedLabel: "Queued work: {title}",
-      enter: "Enter {project}'s farm",
+      enter: "Enter {repo}'s farm",
       enterWord: "Enter",
-      homeless: "Not in any project: ",
-      sea: "No projects in the work folder yet: the map is all sea.",
+      homeless: "Not in any repo: ",
+      sea: "No repos in the work folder yet: the map is all sea.",
       notDrafted: "Not drafted: {why}",
-      sowIntro: "Planting in {project}: write a line on what to do, and the manager sends a helper; or write it as a to-do first and start it after a look.",
+      sowIntro: "Planting in {repo}: write a line on what to do, and the manager sends a helper; or write it as a to-do first and start it after a look.",
       job: "What to do",
       jobExample: "Such as: add Remember me to the sign-in page",
       todo: "Write it as a to-do",
       sow: "Plant it",
-      gone: "This project is no longer in the work folder; only the helpers still on the island are left.",
+      gone: "This repo is no longer in the work folder; only the helpers still on the island are left.",
       worktrees: "worktrees · {n}",
       noHelpers: "No helpers on the island yet: each ticket sent here adds a worktree.",
       noMore: "No more work is sent here.",
-      canSend: "{n} more tickets can start at once (this project takes at most {of} helpers at a time).",
+      canSend: "{n} more tickets can start at once (this repo takes at most {of} helpers at a time).",
       shut: "{n} tickets are already being worked on: new work queues.",
       full: "Full: all {n} helpers are working, so new work queues.",
       queue: "Queued · {n}",
@@ -6880,18 +6917,18 @@ export const catalogs = {
         order: "Order",
         reset: "Reset",
       },
-      list: { noProject: "No project", all: "All tickets", unfold: "Unfold {group}", fold: "Fold {group}", writeIn: 'Write one in "{group}"' },
+      list: { noRepo: "No repo", all: "All tickets", unfold: "Unfold {group}", fold: "Fold {group}", writeIn: 'Write one in "{group}"' },
       page: {
-        pickFirst: "Almost: pick which helper and which project, then press Start.",
+        pickFirst: "Almost: pick which helper and which repo, then press Start.",
         notDrafted: "Not drafted: {why}",
         historyUnread: "The tickets' records could not be read: ",
         notFound: "No such ticket",
         notFoundLine: "There is no ticket {id}: it may have been deleted, or the link is wrong.",
-        find: "Find a ticket: title, helper, project",
+        find: "Find a ticket: title, helper, repo",
         findLabel: "Find a ticket",
         filter: "Filter",
-        byProject: "By project",
-        allProjects: "All projects",
+        byRepo: "By repo",
+        allRepos: "All repos",
         byHelper: "By helper",
         allHelpers: "All helpers",
         shown: "{shown} / {of}",
@@ -6917,7 +6954,7 @@ export const catalogs = {
         title: 'Close "{issue}"',
         working: "{who} is still working on this ticket. Canceling stops it and lets it go; the changes on its branch are not merged into main.",
         completable:
-          "Completing merges {who}'s branch into the project's main branch, after you look over the changes; canceling lets it go without merging them.",
+          "Completing merges {who}'s branch into the repo's main branch, after you look over the changes; canceling lets it go without merging them.",
         notCompletable: "This ticket cannot be completed now. Canceling lets {who} go, and its changes are not merged into main.",
         review: "See the changes, complete",
         stopAndCancel: "Stop and cancel",
@@ -6931,8 +6968,6 @@ export const catalogs = {
         resolveHow: "Have it merge {base} into its own branch, resolve the conflicts, run the tests and commit; then complete it.",
         behind: "While it worked, {base} got {n} more commits; completing joins them (with one merge commit).",
         uncommitted: "{n} files are not committed yet; completing commits them first:",
-        letGo: "Complete, let it go",
-        merge: "Complete, merge into {base}",
         resolve: "Have it resolve the conflict",
         moved: "The ticket's status changed: go back to the ticket and see what it asks of you.",
         counts: "{commits} commits · {files} files",
@@ -7022,7 +7057,7 @@ export const catalogs = {
         next: "Suggested next",
         conflict: "Merging into {base} would conflict: {files}",
       },
-      task: { project: "Project", written: "Written" },
+      task: { repo: "Repo", written: "Written" },
       todo: {
         queued: "Queued: every spot is taken, and it starts by itself when one frees up.",
         refining: "{who} is drafting",
@@ -7053,25 +7088,25 @@ export const catalogs = {
         draftStatus: "Draft",
         todoStatus: "To do",
         pickForMe: "Picked for you when drafting",
-        whichProject: "Which project",
-        firstProject: "No project yet: make one",
-        newProjectLink: "+ New project",
+        whichRepo: "Which repo",
+        firstRepo: "No repo yet: make one",
+        newRepoLink: "+ New repo",
         priority: "Priority",
         inQueue: "Queued {ago}: it starts by itself in the board's order when a spot frees up.",
         unqueue: "Unqueue",
         pickHelper: "Pick a helper first",
-        start: "Start",
+        start: "Confirm and dispatch",
         save: "Save",
         remove: "Delete",
-        newProject: "New project",
-        projectHint: "The project's name, which is also its folder under the work folder",
-        projectName: "Project name",
+        newRepo: "New repo",
+        repoHint: "The repo's name, which is also its folder under the work folder",
+        repoName: "Repo name",
         create: "Create",
         writeOwn: "Write it yourself",
       },
       boardLabels: {
         view: { board: "Board", list: "List" },
-        grouping: { status: "Status", project: "Project", agent: "Helper", none: "No grouping" },
+        grouping: { status: "Status", repo: "Repo", agent: "Helper", none: "No grouping" },
         ordering: { manual: "Default", priority: "Priority", updated: "Last updated", created: "Created" },
         lane: { todo: "To do", working: "In progress", waiting: "For you to see", closed: "Closed" },
         stage: { talk: "Talk it through", work: "Get it worked", finish: "Finish" },
@@ -7094,7 +7129,7 @@ export const catalogs = {
         queued: "Queued",
         cron: "Scheduled task",
         noHelper: "No helper yet",
-        pickFirst: "No helper or project picked: pick them before starting",
+        pickFirst: "No helper or repo picked: pick them before starting",
         waiting: "waiting for a free spot, queued {ago}",
         written: "written {ago}",
         lost: "Lost",
@@ -7148,6 +7183,7 @@ export const catalogs = {
         keys: "⌘ Enter to save",
         keep: "Save",
       },
+      conversation: { title: "Discussion and delivery", older: "Load earlier messages", empty: "Requirements, execution feedback and deliveries stay here" },
     },
     "web.lan": {
       lan: {
@@ -7208,7 +7244,7 @@ export const catalogs = {
         issues: "Tickets in hand",
         noIssues: "Its helpers have not finished a round yet.",
         helper: "Helper",
-        allProjects: "All projects",
+        allRepos: "All repos",
         notes: "Remembered",
         all: "All",
         emptyHere: "Nothing here.",
@@ -7228,12 +7264,12 @@ export const catalogs = {
         sourcesNote: "Connect, turn off, or change reading and writing under Settings.",
         next: "Recalled at the next start",
         preview: "{n} · {chars} / {limit} characters",
-        where: "Which project it starts in",
-        pick: "Pick a project",
+        where: "Which repo it starts in",
+        pick: "Pick a repo",
         words: "This round's words",
         wordsHint: "This round's words (optional)",
-        blank: "Starting in this project, nothing comes to mind.",
-        noProjects: "No projects yet.",
+        blank: "Starting in this repo, nothing comes to mind.",
+        noRepos: "No repos yet.",
         orchestratorReading: "Reading the manager's memory…",
         orchestratorIntro:
           "The manager reads its memory when it starts and after each compaction; what is remembered or forgotten in between, it knows by its next line.",
@@ -7250,12 +7286,12 @@ export const catalogs = {
         noArchive: "None yet: the manager's conversation has not grown long enough to compact.",
         chars: "{n} characters",
         note: "Write one for it",
-        noteProject: "Such as: clock-in's tests run with pnpm test, not npm",
+        noteRepo: "Such as: clock-in's tests run with pnpm test, not npm",
         noteOrchestrator: "Such as: write commit messages in English; no night shifts on weekends",
-        project: "Project",
-        projectHint: "Project (optional)",
+        repo: "Repo",
+        repoHint: "Repo (optional)",
         noteHint: "A sentence that is clear at a glance next time.",
-        noteHintProject: "A sentence that is clear at a glance next time. With no project it holds for every project.",
+        noteHintRepo: "A sentence that is clear at a glance next time. With no repo it holds for every repo.",
         forget: "Forget",
         recalled: "recalled {n} times",
         recalledLast: "recalled {n} times, last {last}",
@@ -7372,16 +7408,16 @@ export const catalogs = {
       },
       tierOne: { project: "Project", area: "Area", resource: "Resource", inbox: "Inbox", journal: "Journal", archive: "Archive" },
     },
-    "web.project": {
-      title: "Projects",
-      list: "Projects",
-      add: "New project",
+    "web.repo": {
+      title: "Repos",
+      list: "Repos",
+      add: "New repo",
       repos: "Code bases",
       all: "All",
-      allLine: "The whole map: an island for each project",
+      allLine: "The whole map: an island for each repo",
       notGit: "Not a git repository yet",
       finding: "Looking…",
-      none: "No projects in the work folder yet. Press New project to add one, or download one from GitHub.",
+      none: "No repos in the work folder yet. Press New repo to add one, or download one from GitHub.",
       copied: "Copied: {path}",
       notCopied: "Cannot copy: select the path and copy it yourself.",
       recency: {
@@ -7438,16 +7474,16 @@ export const catalogs = {
       fresh: "Start empty",
       github: "Visit a neighbor",
       githubAddress: "GitHub address",
-      githubHint: "A public repository's home page. Once downloaded, you can see the project and set helpers on it.",
-      name: "Project name",
-      nameHint: "Kept in the work folder; a project of the same name is never overwritten.",
+      githubHint: "A public repository's home page. Once downloaded, you can see the repo and set helpers on it.",
+      name: "Repo name",
+      nameHint: "Kept in the work folder; a repo of the same name is never overwritten.",
       nameExample: "such as raft-source",
       downloading: "Downloading the repository… a big one takes longer, up to 3 minutes.",
       making: "Creating…",
       cancel: "Cancel",
       busy: "Working…",
       download: "Download to the work folder",
-      create: "Create the project",
+      create: "Create the repo",
       otherLang: "Other",
     },
     "web.runtime": {
@@ -7658,7 +7694,7 @@ export const catalogs = {
         wrong: "This round went wrong",
         marked: "Marked as a wrong round and kept as an eval",
         want: "What this round should have done",
-        wantHint: 'What it should do: such as "ask me which project first, do not send work right away"',
+        wantHint: 'What it should do: such as "ask me which repo first, do not send work right away"',
         neverSent: "Nothing sent out yet.",
         sent: "Helpers sent out",
         here: "Here",
@@ -7698,7 +7734,7 @@ export const catalogs = {
       },
       github: {
         noGh: "gh is not installed",
-        note: "Which projects can open PRs is on the Projects page; opening a PR on completion is turned on in the configuration (github.pr_projects).",
+        note: "Which repos can open PRs is on the Repos page; opening a PR on completion is turned on in the configuration (github.pr_repos).",
         recheck: "Check again",
         cli: "gh command line",
         cliHint: "Used to open PRs and read repositories when merging",
@@ -7761,6 +7797,12 @@ export const catalogs = {
         homeHint: "Everything VibeValley keeps is here",
         settings: "Settings file",
         settingsHint: "The keys and these pages' settings",
+        repos: "Repositories",
+        reposHint: "The space's repos; each folder is a git repository",
+        worktrees: "Worktrees",
+        worktreesHint: "Each issue's own checkout while a helper works",
+        pkm: "Notes vault",
+        pkmHint: "The space's PARA folders and journals",
         copy: "Copy the path",
         copied: "Path copied",
         reveal: "Show in Finder",
@@ -7812,9 +7854,9 @@ export const catalogs = {
       day: "Day {n}",
       byHelper: "Only one helper's",
       allHelpers: "All helpers",
-      byProject: "Only one project's",
-      allProjects: "All projects",
-      everyProject: "Every project",
+      byRepo: "Only one repo's",
+      allRepos: "All repos",
+      everyRepo: "Every repo",
       title: "The farm's memory tree",
       stats: "Day {days} · {rounds} rounds · recalled {recalls} times",
       nextStage: "{rounds} more rounds to a {stage}",
@@ -7907,7 +7949,7 @@ export const catalogs = {
         console: "Agora console",
         hex: "32 hex characters",
         area: "Region",
-        areaHint: "The region of Agora's endpoints: pick one near the server; projects in mainland China pick Mainland China.",
+        areaHint: "The region of Agora's endpoints: pick one near the server; repos in mainland China pick Mainland China.",
         listen: "Listen",
         listenParts: "Recognition · VAD",
         asr: "Recognition",
@@ -8099,7 +8141,7 @@ export interface Messages {
   "cli.arg.message": undefined;
   "cli.arg.page": undefined;
   "cli.arg.pageTitle": undefined;
-  "cli.arg.projectName": undefined;
+  "cli.arg.repoName": undefined;
   "cli.arg.runtime": undefined;
   "cli.arg.search": undefined;
   "cli.arg.session": undefined;
@@ -8152,8 +8194,8 @@ export interface Messages {
   "cli.command.pkm.pageShow": undefined;
   "cli.command.pkm.radar": undefined;
   "cli.command.pkm.search": undefined;
-  "cli.command.project.create": undefined;
-  "cli.command.project.list": undefined;
+  "cli.command.repo.create": undefined;
+  "cli.command.repo.list": undefined;
   "cli.command.root": undefined;
   "cli.command.runtime.list": undefined;
   "cli.command.runtime.refresh": undefined;
@@ -8234,8 +8276,8 @@ export interface Messages {
   "cli.example.pkmRadar.about": undefined;
   "cli.example.pkmSearch.about": undefined;
   "cli.example.pkmSearch.run": undefined;
-  "cli.example.projectCreate.about": undefined;
-  "cli.example.projectList.about": undefined;
+  "cli.example.repoCreate.about": undefined;
+  "cli.example.repoList.about": undefined;
   "cli.example.runtimeChat.about": undefined;
   "cli.example.runtimeList.about": undefined;
   "cli.example.runtimeRefresh.about": undefined;
@@ -8282,7 +8324,6 @@ export interface Messages {
   "cli.flag.name": undefined;
   "cli.flag.pass": undefined;
   "cli.flag.priority": undefined;
-  "cli.flag.project": undefined;
   "cli.flag.prompt": undefined;
   "cli.flag.reply": undefined;
   "cli.flag.repo": undefined;
@@ -8312,7 +8353,7 @@ export interface Messages {
   "cli.group.pkm.about": undefined;
   "cli.group.pkm.journal.about": undefined;
   "cli.group.pkm.page.about": undefined;
-  "cli.group.project.about": undefined;
+  "cli.group.repo.about": undefined;
   "cli.group.runtime.about": undefined;
   "cli.group.server.about": undefined;
   "cli.group.session.about": undefined;
@@ -8407,6 +8448,7 @@ export interface Messages {
   "cli.op.github.get": undefined;
   "cli.op.github.refresh": undefined;
   "cli.op.issue.comment.create": undefined;
+  "cli.op.issue.conversation.get": undefined;
   "cli.op.issue.create": undefined;
   "cli.op.issue.delete": undefined;
   "cli.op.issue.diff.get": undefined;
@@ -8463,12 +8505,13 @@ export interface Messages {
   "cli.op.pkm.source.get": undefined;
   "cli.op.pkm.source.update": undefined;
   "cli.op.pkm.undo": undefined;
-  "cli.op.project.activity.get": undefined;
-  "cli.op.project.create": undefined;
-  "cli.op.project.language.list": undefined;
-  "cli.op.project.list": undefined;
-  "cli.op.project.template.list": undefined;
-  "cli.op.project.validate": undefined;
+  "cli.op.repo.activity.get": undefined;
+  "cli.op.repo.create": undefined;
+  "cli.op.repo.language.list": undefined;
+  "cli.op.repo.list": undefined;
+  "cli.op.repo.pr.submit": undefined;
+  "cli.op.repo.template.list": undefined;
+  "cli.op.repo.validate": undefined;
   "cli.op.runtime.list": undefined;
   "cli.op.runtime.refresh": undefined;
   "cli.op.runtime.setting.update": undefined;
@@ -8503,6 +8546,9 @@ export interface Messages {
   "cli.pkm.saved": { readonly page: string | number };
   "cli.pkm.stale": { readonly days: string | number; readonly page: string | number };
   "cli.pkm.unchanged": { readonly page: string | number };
+  "cli.repo.check": { readonly check: string | number };
+  "cli.repo.preview": { readonly base: string | number; readonly branch: string | number; readonly sha: string | number };
+  "cli.repo.publish": undefined;
   "cli.session.stopped": { readonly session: string | number };
   "desktop.cannotStart": undefined;
   "desktop.commandLine.taken": { readonly link: string | number };
@@ -8710,12 +8756,12 @@ export interface Messages {
   "server.channel.deletesDeliveries": { readonly n: string | number };
   "server.channel.dispatch.draft": undefined;
   "server.channel.dispatch.handedOn": { readonly id: string | number; readonly name: string | number; readonly nth: number };
-  "server.channel.dispatch.project": undefined;
   "server.channel.dispatch.redraft": { readonly id: string | number; readonly name: string | number };
+  "server.channel.dispatch.repo": undefined;
   "server.channel.dispatch.sent": {
     readonly id: string | number;
     readonly name: string | number;
-    readonly project: string | number;
+    readonly repo: string | number;
     readonly what: string | number;
   };
   "server.channel.empty": undefined;
@@ -8828,7 +8874,7 @@ export interface Messages {
   "server.cron.noChannel": { readonly name: string | number };
   "server.cron.noCron": { readonly id: string | number };
   "server.cron.noProfile": { readonly name: string | number };
-  "server.cron.noProject": { readonly channel: string | number };
+  "server.cron.noRepo": { readonly channel: string | number };
   "server.cron.problem.days": undefined;
   "server.cron.problem.every": { readonly min: string | number };
   "server.cron.problem.noName": undefined;
@@ -8891,6 +8937,7 @@ export interface Messages {
   "server.inbox.item.review.title": { readonly who: string | number };
   "server.inbox.item.review.tray": { readonly who: string | number };
   "server.inbox.orchestrator": undefined;
+  "server.issue.acceptSubmittedPr": undefined;
   "server.issue.brief.answer": { readonly conclusion: string | number };
   "server.issue.brief.answerUnread": { readonly problem: string | number };
   "server.issue.brief.closed": { readonly closed: string | number };
@@ -8909,13 +8956,15 @@ export interface Messages {
   "server.issue.brief.reopened": { readonly id: string | number; readonly name: string | number };
   "server.issue.brief.resume": undefined;
   "server.issue.cannotDelete": { readonly n: string | number; readonly why: string | number };
-  "server.issue.cannotMoveProject": { readonly n: string | number; readonly why: string | number };
+  "server.issue.cannotMoveRepo": { readonly n: string | number; readonly why: string | number };
   "server.issue.cannotSend": { readonly name: string | number; readonly why: string | number };
   "server.issue.closed": undefined;
   "server.issue.closedReopen": undefined;
+  "server.issue.confirmedRequirements": { readonly criteria: string | number; readonly description: string | number; readonly title: string | number };
+  "server.issue.deliveryNeedsPr": undefined;
   "server.issue.dependencies.closedParent": undefined;
   "server.issue.dependencies.invalid": undefined;
-  "server.issue.dependencies.project": undefined;
+  "server.issue.dependencies.repo": undefined;
   "server.issue.dependencies.waiting": { readonly issues: string | number };
   "server.issue.disabled": { readonly name: string | number };
   "server.issue.does.cancel": { readonly n: string | number };
@@ -8946,7 +8995,7 @@ export interface Messages {
   "server.issue.does.round": { readonly helper: string | number; readonly said: string | number };
   "server.issue.does.sendTo": { readonly agent: string | number; readonly n: string | number };
   "server.issue.does.start": { readonly agent: string | number; readonly n: string | number };
-  "server.issue.does.startIn": { readonly agent: string | number; readonly n: string | number; readonly project: string | number };
+  "server.issue.does.startIn": { readonly agent: string | number; readonly n: string | number; readonly repo: string | number };
   "server.issue.does.takesOver": { readonly taker: string | number };
   "server.issue.does.thisTime": { readonly said: string | number };
   "server.issue.does.toOrchestrator": { readonly n: string | number };
@@ -8977,7 +9026,7 @@ export interface Messages {
   "server.issue.noAssignee": undefined;
   "server.issue.noConflict": { readonly name: string | number };
   "server.issue.noProfileNamed": { readonly key: string | number };
-  "server.issue.noProject": undefined;
+  "server.issue.noRepo": undefined;
   "server.issue.noStatus": { readonly to: string | number };
   "server.issue.noTitle": undefined;
   "server.issue.notRecorded": { readonly name: string | number; readonly why: string | number };
@@ -8986,11 +9035,11 @@ export interface Messages {
   "server.issue.orchestratorAnswers": undefined;
   "server.issue.orchestratorNotHelper": undefined;
   "server.issue.pickHint": { readonly n: string | number };
+  "server.issue.prDelivered": { readonly url: string | number };
   "server.issue.prSubmitNotAllowed": undefined;
   "server.issue.prSubmitNotCurrent": undefined;
   "server.issue.prSubmitUnavailable": undefined;
   "server.issue.profileGone": { readonly id: string | number };
-  "server.issue.projectRef": { readonly name: string | number };
   "server.issue.queued": { readonly full: string | number };
   "server.issue.queuedBack": { readonly title: string | number; readonly why: string | number };
   "server.issue.queuedStarted": { readonly session: string | number; readonly title: string | number };
@@ -9001,7 +9050,6 @@ export interface Messages {
   "server.issue.refinement.lines": { readonly field: string | number };
   "server.issue.refinement.noBlock": undefined;
   "server.issue.refinement.noDrafter": undefined;
-  "server.issue.refinement.noProject": undefined;
   "server.issue.refinement.noTitle": undefined;
   "server.issue.refinement.notDoing": undefined;
   "server.issue.refinement.notObject": undefined;
@@ -9013,6 +9061,7 @@ export interface Messages {
   "server.issue.refinement.unread": { readonly name: string | number; readonly problem: string | number };
   "server.issue.refinement.unreadable": { readonly why: string | number };
   "server.issue.refinement.why": undefined;
+  "server.issue.repoRef": { readonly name: string | number };
   "server.issue.roundNeedsWords": undefined;
   "server.issue.sendFailed": undefined;
   "server.issue.senderGone": { readonly id: string | number };
@@ -9083,7 +9132,7 @@ export interface Messages {
   "server.lookIn.issue": undefined;
   "server.lookIn.memories": undefined;
   "server.lookIn.pkm": undefined;
-  "server.lookIn.project": undefined;
+  "server.lookIn.repo": undefined;
   "server.lookIn.runtime": undefined;
   "server.lookIn.session": undefined;
   "server.lookIn.skill": undefined;
@@ -9133,82 +9182,77 @@ export interface Messages {
   "server.pkm.notedBy": { readonly name: string | number; readonly text: string | number };
   "server.pkm.sameName": undefined;
   "server.pkm.summary": { readonly tldr: string | number };
-  "server.project.badGithub": undefined;
-  "server.project.badName": undefined;
-  "server.project.branchLeft": { readonly branch: string | number; readonly why: string | number };
-  "server.project.branchMoved": undefined;
-  "server.project.check.exited": { readonly code: string | number };
-  "server.project.check.failed": { readonly why: string | number };
-  "server.project.check.timedOut": { readonly seconds: string | number };
-  "server.project.clear.branchLeft": { readonly branch: string | number; readonly why: string | number };
-  "server.project.clear.notWorktree": { readonly cwd: string | number };
-  "server.project.clear.uncommitted": { readonly branch: string | number; readonly cwd: string | number };
-  "server.project.clear.unconfirmed": { readonly branch: string | number; readonly why: string | number };
-  "server.project.clear.unmerged": { readonly ahead: string | number; readonly branch: string | number };
-  "server.project.clear.unmergedKept": { readonly branch: string | number };
-  "server.project.clear.worktreeLeft": { readonly cwd: string | number; readonly why: string | number };
-  "server.project.cloneFailed": undefined;
-  "server.project.cloneFailedGh": undefined;
-  "server.project.commit.initial": undefined;
-  "server.project.commit.initialShort": undefined;
-  "server.project.commit.leftOver": undefined;
-  "server.project.commit.merge": { readonly branch: string | number };
-  "server.project.conflict": { readonly base: string | number };
-  "server.project.exists": { readonly name: string | number };
-  "server.project.gh.failed": undefined;
-  "server.project.gh.missing": undefined;
-  "server.project.gh.noAccount": undefined;
-  "server.project.gh.signedOut": undefined;
-  "server.project.github.body": { readonly check: string | number; readonly conclusion: string | number; readonly n: string | number };
-  "server.project.github.branchLeft": { readonly why: string | number };
-  "server.project.github.changedDuringCheck": undefined;
-  "server.project.github.checked": undefined;
-  "server.project.github.createFailed": undefined;
-  "server.project.github.listFailed": undefined;
-  "server.project.github.listUnread": undefined;
-  "server.project.github.noCheck": undefined;
-  "server.project.github.noPermission": undefined;
-  "server.project.github.notGithub": undefined;
-  "server.project.github.pushFailed": undefined;
-  "server.project.github.readOnly": undefined;
-  "server.project.github.resolveFailed": undefined;
-  "server.project.github.stateUnknown": { readonly n: string | number };
-  "server.project.github.stateUnread": { readonly n: string | number };
-  "server.project.github.unchecked": undefined;
-  "server.project.github.urlUnread": undefined;
-  "server.project.github.viewFailed": { readonly n: string | number };
-  "server.project.github.worktreeLeft": { readonly why: string | number };
-  "server.project.github.wrongBranch": undefined;
-  "server.project.inProjectNoBranch": undefined;
-  "server.project.inProjectNothing": undefined;
-  "server.project.keptBoth": { readonly branch: string | number };
-  "server.project.keptBranch": { readonly branch: string | number };
-  "server.project.mainMoved": undefined;
-  "server.project.mergeFailed": { readonly kept: string | number; readonly main: string | number; readonly why: string | number };
-  "server.project.mergeStuck": {
-    readonly abort: string | number;
-    readonly kept: string | number;
-    readonly main: string | number;
-    readonly why: string | number;
-  };
-  "server.project.mergeTree": { readonly code: string | number };
-  "server.project.merged": { readonly ahead: string | number; readonly main: string | number; readonly project: string | number };
-  "server.project.mergedBranchLeft": { readonly branch: string | number; readonly why: string | number };
-  "server.project.mergedWorktreeLeft": { readonly branch: string | number; readonly cwd: string | number; readonly why: string | number };
-  "server.project.moreLines": { readonly n: string | number };
-  "server.project.noBranchRead": { readonly branch: string | number; readonly why: string | number };
-  "server.project.noName": undefined;
-  "server.project.noTokei": undefined;
-  "server.project.notChecked": undefined;
-  "server.project.notProjectName": { readonly name: string | number };
-  "server.project.nothingNew": undefined;
-  "server.project.nothingNewInPlan": undefined;
-  "server.project.outside": undefined;
-  "server.project.parentBranchChanged": undefined;
-  "server.project.parentHasChanges": undefined;
-  "server.project.tokeiFailed": { readonly why: string | number };
-  "server.project.tokeiUnread": undefined;
-  "server.projectRef": { readonly id: string | number };
+  "server.repo.badGithub": undefined;
+  "server.repo.badName": undefined;
+  "server.repo.branchLeft": { readonly branch: string | number; readonly why: string | number };
+  "server.repo.branchMoved": undefined;
+  "server.repo.check.exited": { readonly code: string | number };
+  "server.repo.check.failed": { readonly why: string | number };
+  "server.repo.check.timedOut": { readonly seconds: string | number };
+  "server.repo.clear.branchLeft": { readonly branch: string | number; readonly why: string | number };
+  "server.repo.clear.notWorktree": { readonly cwd: string | number };
+  "server.repo.clear.uncommitted": { readonly branch: string | number; readonly cwd: string | number };
+  "server.repo.clear.unconfirmed": { readonly branch: string | number; readonly why: string | number };
+  "server.repo.clear.unmerged": { readonly ahead: string | number; readonly branch: string | number };
+  "server.repo.clear.unmergedKept": { readonly branch: string | number };
+  "server.repo.clear.worktreeLeft": { readonly cwd: string | number; readonly why: string | number };
+  "server.repo.cloneFailed": undefined;
+  "server.repo.cloneFailedGh": undefined;
+  "server.repo.commit.initial": undefined;
+  "server.repo.commit.initialShort": undefined;
+  "server.repo.commit.merge": { readonly branch: string | number };
+  "server.repo.commit.uncommitted": undefined;
+  "server.repo.conflict": { readonly base: string | number };
+  "server.repo.exists": { readonly name: string | number };
+  "server.repo.gh.failed": undefined;
+  "server.repo.gh.missing": undefined;
+  "server.repo.gh.noAccount": undefined;
+  "server.repo.gh.signedOut": undefined;
+  "server.repo.github.body": { readonly check: string | number; readonly conclusion: string | number; readonly n: string | number };
+  "server.repo.github.branchLeft": { readonly why: string | number };
+  "server.repo.github.checked": undefined;
+  "server.repo.github.noCheck": undefined;
+  "server.repo.github.noPermission": undefined;
+  "server.repo.github.notGithub": undefined;
+  "server.repo.github.readOnly": undefined;
+  "server.repo.github.resolveFailed": undefined;
+  "server.repo.github.stateUnknown": { readonly n: string | number };
+  "server.repo.github.stateUnread": { readonly n: string | number };
+  "server.repo.github.unchecked": undefined;
+  "server.repo.github.urlUnread": undefined;
+  "server.repo.github.viewFailed": { readonly n: string | number };
+  "server.repo.github.worktreeLeft": { readonly why: string | number };
+  "server.repo.github.wrongBranch": undefined;
+  "server.repo.inRepoNoBranch": undefined;
+  "server.repo.inRepoNothing": undefined;
+  "server.repo.keptBoth": { readonly branch: string | number };
+  "server.repo.keptBranch": { readonly branch: string | number };
+  "server.repo.mainMoved": undefined;
+  "server.repo.mergeFailed": { readonly kept: string | number; readonly main: string | number; readonly why: string | number };
+  "server.repo.mergeStuck": { readonly abort: string | number; readonly kept: string | number; readonly main: string | number; readonly why: string | number };
+  "server.repo.mergeTree": { readonly code: string | number };
+  "server.repo.merged": { readonly ahead: string | number; readonly main: string | number; readonly repo: string | number };
+  "server.repo.mergedBranchLeft": { readonly branch: string | number; readonly why: string | number };
+  "server.repo.mergedWorktreeLeft": { readonly branch: string | number; readonly cwd: string | number; readonly why: string | number };
+  "server.repo.moreLines": { readonly n: string | number };
+  "server.repo.noBranchRead": { readonly branch: string | number; readonly why: string | number };
+  "server.repo.noName": undefined;
+  "server.repo.noTokei": undefined;
+  "server.repo.notChecked": undefined;
+  "server.repo.notRepoName": { readonly name: string | number };
+  "server.repo.nothingNew": undefined;
+  "server.repo.nothingNewInPlan": undefined;
+  "server.repo.outside": undefined;
+  "server.repo.parentBranchChanged": undefined;
+  "server.repo.parentHasChanges": undefined;
+  "server.repo.publish.ownerOnly": undefined;
+  "server.repo.publish.platformFailed": { readonly stage: string | number };
+  "server.repo.publish.pushUnconfirmed": { readonly sha: string | number };
+  "server.repo.publish.pushedWithoutLink": { readonly sha: string | number; readonly why: string | number };
+  "server.repo.publish.refused": { readonly detail: string | number };
+  "server.repo.tokeiFailed": { readonly why: string | number };
+  "server.repo.tokeiUnread": undefined;
+  "server.repoRef": { readonly id: string | number };
   "server.runtime.balanceGone": { readonly provider: string | number };
   "server.runtime.budget": { readonly budget: string | number; readonly spent: string | number };
   "server.runtime.cannotDrive": { readonly runtime: string | number };
@@ -9319,7 +9363,7 @@ export interface Messages {
   "server.session.log.stopped": undefined;
   "server.session.log.stoppedByOwner": undefined;
   "server.session.noRoom.farm": { readonly max: string | number };
-  "server.session.noRoom.project": { readonly max: string | number; readonly on: string | number; readonly project: string | number };
+  "server.session.noRoom.repo": { readonly max: string | number; readonly on: string | number; readonly repo: string | number };
   "server.session.noRoom.runtime": { readonly max: string | number; readonly on: string | number; readonly runtime: string | number };
   "server.session.notTaken.checkFix": { readonly reason: string | number };
   "server.session.notTaken.checkShort": undefined;
@@ -9394,8 +9438,8 @@ export interface Messages {
   "server.tool.labels.issue_update": undefined;
   "server.tool.labels.memory_create": undefined;
   "server.tool.labels.memory_search": undefined;
-  "server.tool.labels.project_list": undefined;
   "server.tool.labels.remember": undefined;
+  "server.tool.labels.repo_list": undefined;
   "server.tool.labels.rewrite_memory": undefined;
   "server.tool.labels.search_archive": undefined;
   "server.tool.labels.session_list": undefined;
@@ -9472,11 +9516,13 @@ export interface Messages {
   "shared.deliverable.answer": undefined;
   "shared.deliverable.branch": undefined;
   "shared.deliverable.change": undefined;
+  "shared.deliverable.pull_request": undefined;
   "shared.delivered.kept": undefined;
   "shared.delivered.merged": undefined;
   "shared.delivered.merged_into_parent": undefined;
   "shared.delivered.none": undefined;
   "shared.delivered.pull_request": undefined;
+  "shared.delivered.submitted": undefined;
   "shared.doneWith": { readonly what: string | number };
   "shared.greeting": undefined;
   "shared.join.and": { readonly a: string | number; readonly b: string | number };
@@ -9851,8 +9897,8 @@ export interface Messages {
   "web.base.place.chat.label": undefined;
   "web.base.place.issues.hint": undefined;
   "web.base.place.issues.label": undefined;
-  "web.base.place.projects.hint": undefined;
-  "web.base.place.projects.label": undefined;
+  "web.base.place.repos.hint": undefined;
+  "web.base.place.repos.label": undefined;
   "web.base.place.runtimes.hint": undefined;
   "web.base.place.runtimes.label": undefined;
   "web.base.place.settings.hint": undefined;
@@ -10050,17 +10096,17 @@ export interface Messages {
   "web.channel.crons.removeWhich": { readonly name: string | number };
   "web.channel.crons.sure": undefined;
   "web.channel.defaultHint": undefined;
-  "web.channel.defaultProject": { readonly project: string | number };
+  "web.channel.defaultRepo": { readonly repo: string | number };
   "web.channel.dialog.cancel": undefined;
   "web.channel.dialog.description": undefined;
   "web.channel.dialog.descriptionHint": undefined;
   "web.channel.dialog.name": undefined;
   "web.channel.dialog.nameExample": undefined;
   "web.channel.dialog.nameHint": undefined;
-  "web.channel.dialog.project": undefined;
-  "web.channel.dialog.projectExample": undefined;
-  "web.channel.dialog.projectHint": undefined;
-  "web.channel.dialog.projectNone": undefined;
+  "web.channel.dialog.repo": undefined;
+  "web.channel.dialog.repoExample": undefined;
+  "web.channel.dialog.repoHint": undefined;
+  "web.channel.dialog.repoNone": undefined;
   "web.channel.dialog.save": undefined;
   "web.channel.dialog.settingsOf": { readonly name: string | number };
   "web.channel.direct.add": undefined;
@@ -10391,13 +10437,13 @@ export interface Messages {
   "web.farm.chat.phase.off": undefined;
   "web.farm.chat.phase.speaking": undefined;
   "web.farm.chat.phase.thinking": undefined;
-  "web.farm.chat.project": undefined;
-  "web.farm.chat.projectHint": undefined;
-  "web.farm.chat.projectNone": undefined;
-  "web.farm.chat.projectTag": { readonly project: string | number };
   "web.farm.chat.replies": { readonly n: number };
   "web.farm.chat.replyTo": { readonly name: string | number };
   "web.farm.chat.replyToText": { readonly name: string | number; readonly text: string | number };
+  "web.farm.chat.repo": undefined;
+  "web.farm.chat.repoHint": undefined;
+  "web.farm.chat.repoNone": undefined;
+  "web.farm.chat.repoTag": { readonly repo: string | number };
   "web.farm.chat.restore": undefined;
   "web.farm.chat.retrySend": undefined;
   "web.farm.chat.save": undefined;
@@ -10487,8 +10533,8 @@ export interface Messages {
   "web.farm.harvest.files": undefined;
   "web.farm.harvest.letGo": undefined;
   "web.farm.harvest.none": undefined;
-  "web.farm.harvest.project": { readonly project: string | number };
   "web.farm.harvest.reading": undefined;
+  "web.farm.harvest.repo": { readonly repo: string | number };
   "web.farm.harvest.resolve": undefined;
   "web.farm.harvest.resolveHow": { readonly base: string | number };
   "web.farm.harvest.take": { readonly base: string | number };
@@ -10519,7 +10565,7 @@ export interface Messages {
   "web.farm.map.crop.older": undefined;
   "web.farm.map.crop.quarter": undefined;
   "web.farm.map.crop.week": undefined;
-  "web.farm.map.enter": { readonly project: string | number };
+  "web.farm.map.enter": { readonly repo: string | number };
   "web.farm.map.enterWord": undefined;
   "web.farm.map.finding": undefined;
   "web.farm.map.full": { readonly n: string | number };
@@ -10540,7 +10586,7 @@ export interface Messages {
   "web.farm.map.noHelpers": undefined;
   "web.farm.map.noMore": undefined;
   "web.farm.map.notDrafted": { readonly why: string | number };
-  "web.farm.map.open": { readonly project: string | number };
+  "web.farm.map.open": { readonly repo: string | number };
   "web.farm.map.peopled": { readonly n: string | number };
   "web.farm.map.plot": { readonly name: string | number };
   "web.farm.map.queue": { readonly n: string | number };
@@ -10550,10 +10596,10 @@ export interface Messages {
   "web.farm.map.sack": undefined;
   "web.farm.map.sea": undefined;
   "web.farm.map.see": undefined;
-  "web.farm.map.send": { readonly project: string | number };
+  "web.farm.map.send": { readonly repo: string | number };
   "web.farm.map.shut": { readonly n: string | number };
   "web.farm.map.sow": undefined;
-  "web.farm.map.sowIntro": { readonly project: string | number };
+  "web.farm.map.sowIntro": { readonly repo: string | number };
   "web.farm.map.stake": undefined;
   "web.farm.map.todo": undefined;
   "web.farm.map.wait": undefined;
@@ -10566,7 +10612,7 @@ export interface Messages {
   "web.farm.menu.elsewhere": undefined;
   "web.farm.menu.home": undefined;
   "web.farm.menu.issues": undefined;
-  "web.farm.menu.projects": undefined;
+  "web.farm.menu.repos": undefined;
   "web.farm.menu.resume": undefined;
   "web.farm.menu.runtimes": undefined;
   "web.farm.menu.skills": undefined;
@@ -10790,23 +10836,23 @@ export interface Messages {
   "web.farm.quota.unreported": undefined;
   "web.farm.reading": undefined;
   "web.farm.sign.hint": undefined;
-  "web.farm.sign.label": { readonly project: string | number };
-  "web.farm.sign.noProject": undefined;
-  "web.farm.sign.project": undefined;
+  "web.farm.sign.label": { readonly repo: string | number };
+  "web.farm.sign.noRepo": undefined;
+  "web.farm.sign.repo": undefined;
   "web.farm.sow.draft": undefined;
   "web.farm.sow.homeless": undefined;
-  "web.farm.sow.how": { readonly project: string | number };
+  "web.farm.sow.how": { readonly repo: string | number };
   "web.farm.sow.job": undefined;
   "web.farm.sow.jobHint": undefined;
   "web.farm.sow.kinds": undefined;
-  "web.farm.sow.makeProject": undefined;
+  "web.farm.sow.makeRepo": undefined;
   "web.farm.sow.map": undefined;
-  "web.farm.sow.noProjects": undefined;
+  "web.farm.sow.noRepos": undefined;
   "web.farm.sow.noSeeds": undefined;
   "web.farm.sow.notDrafted": undefined;
   "web.farm.sow.orchestratorPicks": undefined;
   "web.farm.sow.own": undefined;
-  "web.farm.sow.plantIn": { readonly project: string | number };
+  "web.farm.sow.plantIn": { readonly repo: string | number };
   "web.farm.sow.recent": undefined;
   "web.farm.sow.retry": undefined;
   "web.farm.sow.rummaging": undefined;
@@ -10880,7 +10926,7 @@ export interface Messages {
   "web.issue.board.whichLane": undefined;
   "web.issue.boardLabels.grouping.agent": undefined;
   "web.issue.boardLabels.grouping.none": undefined;
-  "web.issue.boardLabels.grouping.project": undefined;
+  "web.issue.boardLabels.grouping.repo": undefined;
   "web.issue.boardLabels.grouping.status": undefined;
   "web.issue.boardLabels.lane.closed": undefined;
   "web.issue.boardLabels.lane.todo": undefined;
@@ -10922,8 +10968,6 @@ export interface Messages {
   "web.issue.changes.conflictMark": undefined;
   "web.issue.changes.counts": { readonly commits: string | number; readonly files: string | number };
   "web.issue.changes.files": { readonly n: string | number };
-  "web.issue.changes.letGo": undefined;
-  "web.issue.changes.merge": { readonly base: string | number };
   "web.issue.changes.moved": undefined;
   "web.issue.changes.none": undefined;
   "web.issue.changes.reading": undefined;
@@ -10938,6 +10982,9 @@ export interface Messages {
   "web.issue.close.stopAndCancel": undefined;
   "web.issue.close.title": { readonly issue: string | number };
   "web.issue.close.working": { readonly who: string | number };
+  "web.issue.conversation.empty": undefined;
+  "web.issue.conversation.older": undefined;
+  "web.issue.conversation.title": undefined;
   "web.issue.detail.answer": undefined;
   "web.issue.detail.answerTo": { readonly question: string | number };
   "web.issue.detail.answered": undefined;
@@ -11069,7 +11116,7 @@ export interface Messages {
   "web.issue.later": undefined;
   "web.issue.list.all": undefined;
   "web.issue.list.fold": { readonly group: string | number };
-  "web.issue.list.noProject": undefined;
+  "web.issue.list.noRepo": undefined;
   "web.issue.list.unfold": { readonly group: string | number };
   "web.issue.list.writeIn": { readonly group: string | number };
   "web.issue.marks.priority": { readonly word: string | number };
@@ -11083,10 +11130,10 @@ export interface Messages {
   "web.issue.noHelper": undefined;
   "web.issue.orchestrator": undefined;
   "web.issue.page.allHelpers": undefined;
-  "web.issue.page.allProjects": undefined;
+  "web.issue.page.allRepos": undefined;
   "web.issue.page.backToBoard": undefined;
   "web.issue.page.byHelper": undefined;
-  "web.issue.page.byProject": undefined;
+  "web.issue.page.byRepo": undefined;
   "web.issue.page.clear": undefined;
   "web.issue.page.filter": undefined;
   "web.issue.page.find": undefined;
@@ -11111,7 +11158,7 @@ export interface Messages {
   "web.issue.sheet.less": undefined;
   "web.issue.sheet.more": undefined;
   "web.issue.sheet.stageDone": { readonly stage: string | number };
-  "web.issue.task.project": undefined;
+  "web.issue.task.repo": undefined;
   "web.issue.task.written": undefined;
   "web.issue.todo.againHint": undefined;
   "web.issue.todo.answerHint": undefined;
@@ -11126,16 +11173,14 @@ export interface Messages {
   "web.issue.todo.draftStatus": undefined;
   "web.issue.todo.drafted": undefined;
   "web.issue.todo.draftedLine": undefined;
-  "web.issue.todo.firstProject": undefined;
+  "web.issue.todo.firstRepo": undefined;
   "web.issue.todo.inQueue": { readonly ago: string | number };
-  "web.issue.todo.newProject": undefined;
-  "web.issue.todo.newProjectLink": undefined;
+  "web.issue.todo.newRepo": undefined;
+  "web.issue.todo.newRepoLink": undefined;
   "web.issue.todo.noCriteria": undefined;
   "web.issue.todo.pickForMe": undefined;
   "web.issue.todo.pickHelper": undefined;
   "web.issue.todo.priority": undefined;
-  "web.issue.todo.projectHint": undefined;
-  "web.issue.todo.projectName": undefined;
   "web.issue.todo.questions": { readonly n: number };
   "web.issue.todo.questionsLine": undefined;
   "web.issue.todo.queued": undefined;
@@ -11143,6 +11188,8 @@ export interface Messages {
   "web.issue.todo.refining": { readonly who: string | number };
   "web.issue.todo.refiningLine": undefined;
   "web.issue.todo.remove": undefined;
+  "web.issue.todo.repoHint": undefined;
+  "web.issue.todo.repoName": undefined;
   "web.issue.todo.save": undefined;
   "web.issue.todo.start": undefined;
   "web.issue.todo.status": undefined;
@@ -11155,7 +11202,7 @@ export interface Messages {
   "web.issue.todo.whatHint": undefined;
   "web.issue.todo.whatLabel": undefined;
   "web.issue.todo.whatLine": undefined;
-  "web.issue.todo.whichProject": undefined;
+  "web.issue.todo.whichRepo": undefined;
   "web.issue.todo.writeOwn": undefined;
   "web.issue.trigger.comment": undefined;
   "web.issue.trigger.commentNumbered": { readonly id: string | number };
@@ -11205,7 +11252,7 @@ export interface Messages {
   "web.lan.pair.title": undefined;
   "web.lan.pair.waiting": undefined;
   "web.memory.memory.all": undefined;
-  "web.memory.memory.allProjects": undefined;
+  "web.memory.memory.allRepos": undefined;
   "web.memory.memory.archiveIntro": undefined;
   "web.memory.memory.blank": undefined;
   "web.memory.memory.chars": { readonly n: string | number };
@@ -11227,12 +11274,12 @@ export interface Messages {
   "web.memory.memory.next": undefined;
   "web.memory.memory.noArchive": undefined;
   "web.memory.memory.noIssues": undefined;
-  "web.memory.memory.noProjects": undefined;
+  "web.memory.memory.noRepos": undefined;
   "web.memory.memory.note": undefined;
   "web.memory.memory.noteHint": undefined;
-  "web.memory.memory.noteHintProject": undefined;
+  "web.memory.memory.noteHintRepo": undefined;
   "web.memory.memory.noteOrchestrator": undefined;
-  "web.memory.memory.noteProject": undefined;
+  "web.memory.memory.noteRepo": undefined;
   "web.memory.memory.notes": undefined;
   "web.memory.memory.nothing": undefined;
   "web.memory.memory.off": { readonly why: string | number };
@@ -11245,10 +11292,10 @@ export interface Messages {
   "web.memory.memory.own": undefined;
   "web.memory.memory.pick": undefined;
   "web.memory.memory.preview": { readonly chars: string | number; readonly limit: string | number; readonly n: string | number };
-  "web.memory.memory.project": undefined;
-  "web.memory.memory.projectHint": undefined;
   "web.memory.memory.recalled": { readonly n: string | number };
   "web.memory.memory.recalledLast": { readonly last: string | number; readonly n: string | number };
+  "web.memory.memory.repo": undefined;
+  "web.memory.memory.repoHint": undefined;
   "web.memory.memory.search": undefined;
   "web.memory.memory.searchHint": undefined;
   "web.memory.memory.sessions": { readonly name: string | number };
@@ -11391,90 +11438,90 @@ export interface Messages {
   "web.pkm.toolbar.outdent": undefined;
   "web.pkm.toolbar.todo": undefined;
   "web.pkm.toolbar.up": undefined;
-  "web.project.add": undefined;
-  "web.project.all": undefined;
-  "web.project.allLine": undefined;
-  "web.project.busiest": { readonly day: string | number; readonly n: string | number };
-  "web.project.busy": undefined;
-  "web.project.byLines": undefined;
-  "web.project.calendar": undefined;
-  "web.project.cancel": undefined;
-  "web.project.code": undefined;
-  "web.project.commitCount": undefined;
-  "web.project.commits": { readonly n: string | number };
-  "web.project.copied": { readonly path: string | number };
-  "web.project.copyPath": undefined;
-  "web.project.countedAgo": { readonly ago: string | number };
-  "web.project.counting": undefined;
-  "web.project.create": undefined;
-  "web.project.current": undefined;
-  "web.project.dayCommits": { readonly level: string | number; readonly n: string | number };
-  "web.project.days": { readonly n: number };
-  "web.project.daysWorked": undefined;
-  "web.project.download": undefined;
-  "web.project.downloading": undefined;
-  "web.project.empty": undefined;
-  "web.project.fewer": undefined;
-  "web.project.finding": undefined;
-  "web.project.firstCommit": undefined;
-  "web.project.fresh": undefined;
-  "web.project.github": undefined;
-  "web.project.githubAddress": undefined;
-  "web.project.githubHint": undefined;
-  "web.project.how": undefined;
-  "web.project.inYear": undefined;
-  "web.project.install": undefined;
-  "web.project.kinds": { readonly n: string | number };
-  "web.project.languages": undefined;
-  "web.project.level.0": undefined;
-  "web.project.level.1": undefined;
-  "web.project.level.2": undefined;
-  "web.project.level.3": undefined;
-  "web.project.level.4": undefined;
-  "web.project.lines": { readonly n: string | number };
-  "web.project.linesAndFiles": { readonly files: string | number; readonly lines: string | number };
-  "web.project.list": undefined;
-  "web.project.longest": undefined;
-  "web.project.making": undefined;
-  "web.project.more": undefined;
-  "web.project.name": undefined;
-  "web.project.nameExample": undefined;
-  "web.project.nameHint": undefined;
-  "web.project.noCommits": undefined;
-  "web.project.noCommitsThatDay": undefined;
-  "web.project.noTokei": undefined;
-  "web.project.none": undefined;
-  "web.project.notCopied": undefined;
-  "web.project.notGit": undefined;
-  "web.project.or": undefined;
-  "web.project.otherLang": undefined;
-  "web.project.readingCommits": undefined;
-  "web.project.recency.day": undefined;
-  "web.project.recency.label": { readonly label: string | number };
-  "web.project.recency.month": undefined;
-  "web.project.recency.never": undefined;
-  "web.project.recency.older": undefined;
-  "web.project.recency.quarter": undefined;
-  "web.project.recency.week": undefined;
-  "web.project.recount": undefined;
-  "web.project.repos": undefined;
-  "web.project.rest": { readonly commits: string | number; readonly people: string | number };
-  "web.project.rows.0": undefined;
-  "web.project.rows.1": undefined;
-  "web.project.rows.2": undefined;
-  "web.project.rows.3": undefined;
-  "web.project.rows.4": undefined;
-  "web.project.rows.5": undefined;
-  "web.project.rows.6": undefined;
-  "web.project.thenRecount": undefined;
-  "web.project.times": { readonly n: string | number };
-  "web.project.title": undefined;
-  "web.project.uncounted": undefined;
-  "web.project.whatLanguages": undefined;
-  "web.project.who": undefined;
-  "web.project.whoWhen": undefined;
-  "web.project.year": undefined;
-  "web.project.yearLabel": { readonly commits: string | number; readonly days: string | number };
+  "web.repo.add": undefined;
+  "web.repo.all": undefined;
+  "web.repo.allLine": undefined;
+  "web.repo.busiest": { readonly day: string | number; readonly n: string | number };
+  "web.repo.busy": undefined;
+  "web.repo.byLines": undefined;
+  "web.repo.calendar": undefined;
+  "web.repo.cancel": undefined;
+  "web.repo.code": undefined;
+  "web.repo.commitCount": undefined;
+  "web.repo.commits": { readonly n: string | number };
+  "web.repo.copied": { readonly path: string | number };
+  "web.repo.copyPath": undefined;
+  "web.repo.countedAgo": { readonly ago: string | number };
+  "web.repo.counting": undefined;
+  "web.repo.create": undefined;
+  "web.repo.current": undefined;
+  "web.repo.dayCommits": { readonly level: string | number; readonly n: string | number };
+  "web.repo.days": { readonly n: number };
+  "web.repo.daysWorked": undefined;
+  "web.repo.download": undefined;
+  "web.repo.downloading": undefined;
+  "web.repo.empty": undefined;
+  "web.repo.fewer": undefined;
+  "web.repo.finding": undefined;
+  "web.repo.firstCommit": undefined;
+  "web.repo.fresh": undefined;
+  "web.repo.github": undefined;
+  "web.repo.githubAddress": undefined;
+  "web.repo.githubHint": undefined;
+  "web.repo.how": undefined;
+  "web.repo.inYear": undefined;
+  "web.repo.install": undefined;
+  "web.repo.kinds": { readonly n: string | number };
+  "web.repo.languages": undefined;
+  "web.repo.level.0": undefined;
+  "web.repo.level.1": undefined;
+  "web.repo.level.2": undefined;
+  "web.repo.level.3": undefined;
+  "web.repo.level.4": undefined;
+  "web.repo.lines": { readonly n: string | number };
+  "web.repo.linesAndFiles": { readonly files: string | number; readonly lines: string | number };
+  "web.repo.list": undefined;
+  "web.repo.longest": undefined;
+  "web.repo.making": undefined;
+  "web.repo.more": undefined;
+  "web.repo.name": undefined;
+  "web.repo.nameExample": undefined;
+  "web.repo.nameHint": undefined;
+  "web.repo.noCommits": undefined;
+  "web.repo.noCommitsThatDay": undefined;
+  "web.repo.noTokei": undefined;
+  "web.repo.none": undefined;
+  "web.repo.notCopied": undefined;
+  "web.repo.notGit": undefined;
+  "web.repo.or": undefined;
+  "web.repo.otherLang": undefined;
+  "web.repo.readingCommits": undefined;
+  "web.repo.recency.day": undefined;
+  "web.repo.recency.label": { readonly label: string | number };
+  "web.repo.recency.month": undefined;
+  "web.repo.recency.never": undefined;
+  "web.repo.recency.older": undefined;
+  "web.repo.recency.quarter": undefined;
+  "web.repo.recency.week": undefined;
+  "web.repo.recount": undefined;
+  "web.repo.repos": undefined;
+  "web.repo.rest": { readonly commits: string | number; readonly people: string | number };
+  "web.repo.rows.0": undefined;
+  "web.repo.rows.1": undefined;
+  "web.repo.rows.2": undefined;
+  "web.repo.rows.3": undefined;
+  "web.repo.rows.4": undefined;
+  "web.repo.rows.5": undefined;
+  "web.repo.rows.6": undefined;
+  "web.repo.thenRecount": undefined;
+  "web.repo.times": { readonly n: string | number };
+  "web.repo.title": undefined;
+  "web.repo.uncounted": undefined;
+  "web.repo.whatLanguages": undefined;
+  "web.repo.who": undefined;
+  "web.repo.whoWhen": undefined;
+  "web.repo.year": undefined;
+  "web.repo.yearLabel": { readonly commits: string | number; readonly days: string | number };
   "web.runtime.acceptsAll": undefined;
   "web.runtime.account": undefined;
   "web.runtime.afterInstall": undefined;
@@ -11702,8 +11749,12 @@ export interface Messages {
   "web.setting.about.manual.readOnly": { readonly next: string | number };
   "web.setting.about.manual.translocated": { readonly next: string | number };
   "web.setting.about.newFarmQuestion": undefined;
+  "web.setting.about.pkm": undefined;
+  "web.setting.about.pkmHint": undefined;
   "web.setting.about.ready": { readonly next: string | number };
   "web.setting.about.readyNewFarm": { readonly next: string | number };
+  "web.setting.about.repos": undefined;
+  "web.setting.about.reposHint": undefined;
   "web.setting.about.restart": undefined;
   "web.setting.about.restartQuestion": undefined;
   "web.setting.about.reveal": undefined;
@@ -11715,6 +11766,8 @@ export interface Messages {
   "web.setting.about.version": undefined;
   "web.setting.about.versionHint": undefined;
   "web.setting.about.workingQuestion": { readonly n: string | number };
+  "web.setting.about.worktrees": undefined;
+  "web.setting.about.worktreesHint": undefined;
   "web.setting.appearance.intro": undefined;
   "web.setting.appearance.scale": undefined;
   "web.setting.appearance.scaleHint": undefined;
@@ -11797,15 +11850,15 @@ export interface Messages {
   "web.setting.words.skills": undefined;
   "web.tree.aboutToFall": undefined;
   "web.tree.allHelpers": undefined;
-  "web.tree.allProjects": undefined;
+  "web.tree.allRepos": undefined;
   "web.tree.approach": undefined;
   "web.tree.back": undefined;
   "web.tree.byHelper": undefined;
-  "web.tree.byProject": undefined;
+  "web.tree.byRepo": undefined;
   "web.tree.day": { readonly n: string | number };
   "web.tree.distilled": { readonly n: string | number };
   "web.tree.earliest": undefined;
-  "web.tree.everyProject": undefined;
+  "web.tree.everyRepo": undefined;
   "web.tree.experience": undefined;
   "web.tree.fading": { readonly n: string | number };
   "web.tree.fadingNote": undefined;

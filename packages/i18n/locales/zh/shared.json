@@ -21,7 +21,7 @@
     "backlog": "备选",
     "todo": "待办",
     "in_progress": "处理中",
-    "in_review": "等你看",
+    "in_review": "待验收",
     "done": "已完成",
     "canceled": "已取消"
   },
@@ -32,16 +32,18 @@
     "low": "低"
   },
   "deliverable": {
-    "change": "改动，合进项目",
+    "change": "改动，合进仓库",
     "branch": "改动，分支留着不合",
-    "answer": "结论，只查不改代码"
+    "answer": "结论，只查不改代码",
+    "pull_request": "提交 PR/MR"
   },
   "delivered": {
     "merged": "合进了主分支",
     "merged_into_parent": "合进了计划的分支",
     "pull_request": "PR 合进去了",
     "kept": "分支留着没合",
-    "none": "没有改动要合"
+    "none": "没有改动要合",
+    "submitted": "已提交 PR/MR"
   },
   "canceled": {
     "dismissed": "取消了",

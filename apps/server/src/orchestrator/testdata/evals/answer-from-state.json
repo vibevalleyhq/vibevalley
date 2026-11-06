@@ -51,7 +51,7 @@
           "name": "issue_create",
           "arguments": {
             "title": "看看哪些工单在等主人",
-            "project": "demo",
+            "repo": "demo",
             "start": true
           }
         }

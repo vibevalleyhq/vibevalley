@@ -34,8 +34,8 @@ export interface Memory {
   agent: string;
   kind: MemoryKind;
   text: string;
-  author?: ActorKind;
-  project?: string;
+  author: ActorKind;
+  repo?: string;
   session?: SessionId;
   at: number;
   recalled: number;
@@ -49,13 +49,13 @@ export type MemoryKind = (typeof MemoryKindValues)[number];
 
 export interface MemoryRequest {
   text: string;
-  project?: string;
+  repo?: string;
   /** The client's key for this request: the same key again within a while returns the first one's result and does it once (a retry after a lost reply). */
   requestKey?: string;
 }
 
-/** Where a memory holds: for every project, one project, or a source that does not say. */
-export type MemoryScope = { kind: "global" } | { kind: "project"; project: string } | { kind: "unknown" };
+/** "unknown": the source did not declare a scope. */
+export type MemoryScope = { kind: "global" } | { kind: "repo"; repo: string } | { kind: "unknown" };
 
 /** A memory a search found, with the source it came from and how well it matched. */
 export interface MemoryFound extends Memory {

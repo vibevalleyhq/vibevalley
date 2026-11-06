@@ -19,19 +19,23 @@ import {
   type InboxMessage,
   type OrchestratorNews,
   senderKind,
-  unreadSummaryOf,
+  channelType,
+  targetOf,
+  summaryChannels,
+  type UnreadRow,
 } from "#/mailbox/envelope.ts";
 import { type NotRecorded, Session } from "#/session/session.ts";
-import { defaultID, orchestratorForChannel } from "#db/channel.sql.ts";
+import { defaultID, orchestratorForChannel, inboxOf } from "#db/channel.sql.ts";
 import * as qd from "#db/mailbox_delivery.sql.ts";
 import * as qr from "#db/mailbox_trigger.sql.ts";
 
 import { type Recipient, Reach, WakeBreaker } from "./brakes.ts";
 import { Deliveries, type DeliveryRow, type DeliveryDraft } from "./deliveries.ts";
-import { inputOf, orchestratorSource, deliveryScope, type InputContext } from "./payload.ts";
+import { inputOf, orchestratorSource, deliveryScope, type InputContext, type TriggerInput, type TriggerResource, type KnownGitHubEvent } from "./payload.ts";
 import { wakeInput } from "./prompts.ts";
 import { makePump } from "./pump.ts";
 import { channelRecipients, waitsForHuman } from "./routing.ts";
+import { triggerJournal } from "./triggers.ts";
 import { makeWorkMailbox } from "./work.ts";
 
 export interface InsertDelivery {
@@ -66,6 +70,12 @@ export interface TalkRow {
 export class Mailbox extends Context.Service<
   Mailbox,
   {
+    readonly recordTrigger: (input: TriggerInput) => Effect.Effect<T.Trigger, ApiError>;
+    readonly recordChannelTrigger: (trigger: T.Trigger, text: string, channel: string) => Effect.Effect<T.Trigger, ApiError>;
+    readonly readTrigger: (id: string) => Effect.Effect<TriggerResource | undefined, Schema.SchemaError>;
+    readonly knownGitHubEvents: (repo: string, pr: number) => Effect.Effect<readonly KnownGitHubEvent[]>;
+    readonly replayCronTriggers: (consume: (trigger: T.Trigger, data: unknown) => Effect.Effect<void, ApiError | Schema.SchemaError>) => Effect.Effect<void>;
+    readonly unreadSummary: (participant: string, channel: string) => Effect.Effect<UnreadRow[]>;
     readonly queuedInputs: Effect.Effect<readonly QueuedInput[]>;
     readonly issueInputs: (issue: string) => Effect.Effect<readonly T.Trigger[]>;
     readonly retireDispatches: (issue: string, at: number) => Effect.Effect<void>;
@@ -100,6 +110,7 @@ export class Mailbox extends Context.Service<
     Mailbox,
     Effect.gen(function* () {
       const db = yield* Db;
+      const journal = yield* triggerJournal;
       const core = yield* Core;
       const sessions = yield* Session;
       const agents = yield* Agent;
@@ -113,10 +124,20 @@ export class Mailbox extends Context.Service<
           const own = (yield* db.one(orchestratorForChannel({ id: channel })))?.agent;
           return own && agents.isOrchestrator(own) ? own : defaultOrchestrator;
         });
+      const unreadSummary = Effect.fn("Mailbox.unreadSummary")((participant: string, channel: string): Effect.Effect<UnreadRow[]> =>
+        Effect.map(db.run(inboxOf({ participant, channel })), (rows) =>
+          rows.slice(0, summaryChannels).map((row) => ({
+            target: targetOf({ type: channelType(row.type), ...(row.root_number !== null ? { rootNumber: row.root_number } : {}) }, row.channel_name || ""),
+            unread: row.unread ?? 0,
+            mentionsYou: row.mentions_you === true,
+            ...(row.latest_sender_name ? { latest: row.latest_sender_name } : {}),
+          })),
+        ),
+      );
       const deliveryUnread = Effect.fn("Mailbox.deliveryUnread")(function* (who: string) {
         const h = sessions.sessionOf(who);
         const channel = h?.channel ?? (yield* defaultChannelOf);
-        return yield* unreadSummaryOf(db, who, channel);
+        return yield* unreadSummary(who, channel);
       });
       const open = new Deliveries();
       const reach = new Reach();
@@ -223,6 +244,8 @@ export class Mailbox extends Context.Service<
       });
 
       const api = Mailbox.of({
+        ...journal,
+        unreadSummary,
         registered: work.registered,
         queuedInputs: work.queuedInputs,
         issueInputs: work.issueInputs,
@@ -402,7 +425,7 @@ export class Mailbox extends Context.Service<
       );
 
       const bindIssue = (issue: T.Issue) =>
-        work.subscribe(issue.id, [`issue:${issue.id}`, ...(issue.project && issue.pullRequest ? [`github:${issue.project}#${issue.pullRequest.number}`] : [])]);
+        work.subscribe(issue.id, [`issue:${issue.id}`, ...(issue.repo && issue.pullRequest ? [`github:${issue.repo}#${issue.pullRequest.number}`] : [])]);
       const onFact = (fact: T.ServerEvent) =>
         Effect.gen(function* () {
           if (fact.type === "issueChanged") {

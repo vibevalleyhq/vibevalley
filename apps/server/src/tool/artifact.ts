@@ -86,19 +86,19 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
     const artifactGet = (table: "orchestrator" | "session") => (who: Who) =>
       (table === "orchestrator" ? tool : sessionSchemaTool)(
         "artifact.get",
-        Effect.fn("Tool.artifactGet")(function* (p: { readonly id: string }) {
+        Effect.fn("Tool.artifactGet")(function* (p: { readonly id: T.ArtifactId }) {
           yield* callerOf(who);
-          return yield* artifactSaid(Effect.map(artifacts.get(S.artifactId(p.id.trim())), answers.artifact.detail));
+          return yield* artifactSaid(Effect.map(artifacts.get(p.id), answers.artifact.detail));
         }),
       );
 
     const artifactContent = (table: "orchestrator" | "session") => (who: Who) =>
       (table === "orchestrator" ? tool : sessionSchemaTool)(
         "artifact.content.get",
-        Effect.fn("Tool.artifactContent")(function* (p: { readonly id: string; readonly version?: number }) {
+        Effect.fn("Tool.artifactContent")(function* (p: { readonly id: T.ArtifactId; readonly version?: number }) {
           yield* callerOf(who);
           return yield* artifactSaid(
-            Effect.flatMap(artifacts.get(S.artifactId(p.id.trim())), (a) =>
+            Effect.flatMap(artifacts.get(p.id), (a) =>
               a.body === "blocks"
                 ? Effect.map(artifacts.blocks(a.id), (snap) => [answers.block.header(a.title, snap.blocks.length), ...snap.blocks.map(blockLine)].join("\n"))
                 : Effect.map(artifacts.content(a.id, p.version), (c) => answers.artifact.content(a.title, c.version, c.content)),
@@ -154,15 +154,17 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
     const artifactVersion = (table: "orchestrator" | "session") => (who: Who) =>
       (table === "orchestrator" ? tool : sessionSchemaTool)(
         "artifact.version.create",
-        Effect.fn("Tool.artifactVersion")(function* (p: { readonly id: string; readonly content?: string; readonly file?: string; readonly note?: string }) {
+        Effect.fn("Tool.artifactVersion")(function* (p: {
+          readonly id: T.ArtifactId;
+          readonly content?: string;
+          readonly file?: string;
+          readonly note?: string;
+        }) {
           const c = yield* callerOf(who);
           return yield* artifactSaid(
             Effect.gen(function* () {
               const content = yield* artifactWords(c, p.content, p.file);
-              const made = yield* artifacts.version(
-                { from: c.session || c.agent, by: c.agent },
-                { id: S.artifactId(p.id.trim()), content, ...(p.note ? { note: p.note } : {}) },
-              );
+              const made = yield* artifacts.version({ from: c.session || c.agent, by: c.agent }, { id: p.id, content, ...(p.note ? { note: p.note } : {}) });
               return answers.artifact.versioned(made) + warnings(made, content);
             }),
           );
@@ -173,19 +175,19 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
     const writer = (c: Caller) => c.agent || c.session;
 
     interface BlockCreateInput {
-      readonly id: string;
+      readonly id: T.ArtifactId;
       readonly type?: string;
       readonly level?: number;
       readonly checked?: boolean;
       readonly language?: string;
       readonly text: string;
-      readonly afterBlock?: string;
-      readonly parentId?: string;
+      readonly afterBlock?: T.BlockId;
+      readonly parentId?: T.BlockId;
     }
 
     interface BlockUpdateInput {
-      readonly id: string;
-      readonly block: string;
+      readonly id: T.ArtifactId;
+      readonly block: T.BlockId;
       readonly baseRev: number;
       readonly text?: string;
       readonly type?: string;
@@ -196,14 +198,14 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
 
     const insert = (c: Caller, p: BlockCreateInput) =>
       Effect.gen(function* () {
-        const r = yield* artifacts.insertBlock(S.artifactId(p.id.trim()), writer(c), {
+        const r = yield* artifacts.insertBlock(p.id, writer(c), {
           text: p.text,
           ...(p.type !== undefined ? { type: p.type } : {}),
           ...(p.level !== undefined ? { level: p.level } : {}),
           ...(p.checked !== undefined ? { checked: p.checked } : {}),
           ...(p.language !== undefined ? { language: p.language } : {}),
-          ...(p.afterBlock !== undefined ? { afterBlock: S.blockId(p.afterBlock) } : {}),
-          ...(p.parentId !== undefined && p.parentId.trim() !== "" ? { parentId: S.blockId(p.parentId) } : {}),
+          ...(p.afterBlock !== undefined ? { afterBlock: p.afterBlock } : {}),
+          ...(p.parentId !== undefined && p.parentId.trim() !== "" ? { parentId: S.blockId(p.parentId.trim()) } : {}),
         });
         if (r.status !== "applied") return yield* refuse(r.reason ?? "");
         return answers.block.appended(r.blockId, r.rev ?? 0);
@@ -211,8 +213,8 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
 
     const update = (c: Caller, p: BlockUpdateInput) =>
       Effect.gen(function* () {
-        const r = yield* artifacts.updateBlock(S.artifactId(p.id.trim()), writer(c), {
-          block: S.blockId(p.block),
+        const r = yield* artifacts.updateBlock(p.id, writer(c), {
+          block: p.block,
           baseRev: p.baseRev,
           ...(p.text !== undefined ? { text: p.text } : {}),
           ...(p.type !== undefined ? { type: p.type } : {}),
@@ -222,16 +224,16 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue,
         });
         if (r.status === "applied") return answers.block.updated(r.blockId, r.rev);
         if (r.status === "conflict") {
-          const now = yield* Effect.orElseSucceed(artifacts.blocks(S.artifactId(p.id.trim())), () => undefined);
+          const now = yield* Effect.orElseSucceed(artifacts.blocks(p.id), () => undefined);
           const x = now?.blocks.find((b) => b.id === r.blockId);
           return answers.block.notUpdated(r.reason, r.rev, x ? blockLine(x) : "");
         }
         return yield* refuse(r.reason ?? "");
       });
 
-    const remove = (c: Caller, p: { readonly id: string; readonly block: string }) =>
+    const remove = (c: Caller, p: { readonly id: T.ArtifactId; readonly block: T.BlockId }) =>
       Effect.gen(function* () {
-        const r = yield* artifacts.deleteBlock(S.artifactId(p.id.trim()), writer(c), { block: S.blockId(p.block) });
+        const r = yield* artifacts.deleteBlock(p.id, writer(c), { block: p.block });
         if (r.status === "applied") return answers.block.deleted(r.blockId);
         if (r.status === "noop") return answers.block.alreadyDeleted(r.blockId);
         return yield* refuse(r.reason ?? "");

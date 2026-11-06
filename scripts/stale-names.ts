@@ -102,8 +102,8 @@ const RULES: readonly Rule[] = [
   {
     name: "an agent tool under its name before it was its endpoint's",
     pattern:
-      /\b(channel_say|channel_read|read_chat|channel_inbox|channel_settings|open_channel|list_crons|cancel_cron|issue_status|graph_action|task_action|task_edit|task_add|task_update|task_graph|memory_add|doc_read|doc_append|doc_update|wants_owner|all_projects|base_rev)\b/u,
-    says: "a tool is named by its endpoint (tool/schemas.ts toolName): channel_message_send, channel_message_list, channel_unread_list, channel_update, channel_create, cron_list, cron_delete, issue_status_update, graph_act, graph_task_act, graph_task_update, memory_create, doc_get, doc_block_create, doc_block_update; an agent's own todo is todo_add, todo_update, todo_list; fields as the endpoint's (wantsOwner, project, baseRev)",
+      /\b(channel_say|channel_read|read_chat|channel_inbox|channel_settings|open_channel|list_crons|cancel_cron|issue_status|graph_action|task_action|task_edit|task_add|task_update|task_graph|memory_add|doc_read|doc_append|doc_update|wants_owner|all_repos|base_rev)\b/u,
+    says: "a tool is named by its endpoint (tool/schemas.ts toolName): channel_message_send, channel_message_list, channel_unread_list, channel_update, channel_create, cron_list, cron_delete, issue_status_update, graph_act, graph_task_act, graph_task_update, memory_create, doc_get, doc_block_create, doc_block_update; an agent's own todo is todo_add, todo_update, todo_list; fields as the endpoint's (wantsOwner, repo, baseRev)",
     // Nowledge Mem's own tools, which the memory source calls.
     except: /^apps\/server\/src\/memory\/(nowledge|outside)(\.test)?\.ts$/u,
   },
@@ -136,19 +136,19 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "an issue template under the seed name",
-    pattern: /\b(ProjectSeeds|SeedKind|SeedBlank|Seed|SeedCatalog|seedCatalog|projectSeedsProvider)\b|project\.seeds|(?<!\.)\/seeds\b|seed_catalog/u,
-    says: "ProjectTemplates, TemplateKind, TemplateBlank, IssueTemplate, TemplateCatalog, project.templates; seed is only the seed data (seeds.json, SeedAgents)",
+    pattern: /\b(RepoSeeds|SeedKind|SeedBlank|Seed|SeedCatalog|seedCatalog|repoSeedsProvider)\b|repo\.seeds|(?<!\.)\/seeds\b|seed_catalog/u,
+    says: "RepoTemplates, TemplateKind, TemplateBlank, IssueTemplate, TemplateCatalog, repo.templates; seed is only the seed data (seeds.json, SeedAgents)",
   },
   {
     name: "连接到本机 under the gate name",
     pattern:
       /internal\/gate\b|\/api\/v1\/gate\b|\/settings\/gate\b|workbench\/gate\b|\bgate_device\b|\bGate(Status|Update|StartPairing|StopPairing|AnswerPairing|DeleteDevice|Pair|Me|Page|Api|Open)\b|\.Gate\b|\bgate\.Service\b|yard gate/u,
-    says: "lan: internal/lan, lan.Service, Workspace.Lan, lan.* routes under /api/v1/lan, the lan and lan_device tables, LanPage at /settings/lan; the village's gate is only the picture",
+    says: "lan: internal/lan, lan.Service, Space.Lan, lan.* routes under /api/v1/lan, the lan and lan_device tables, LanPage at /settings/lan; the village's gate is only the picture",
   },
   {
-    name: "a project's max sessions under the slots name",
-    pattern: /\bSlots\(\)|ProjectSummary\.slots|summary\.slots|island\.slots|['"]slots['"]/u,
-    says: "MaxSessions (json maxSessions): it is project.max_sessions",
+    name: "a repo's max sessions under the slots name",
+    pattern: /\bSlots\(\)|RepoSummary\.slots|summary\.slots|island\.slots|['"]slots['"]/u,
+    says: "MaxSessions (json maxSessions): it is repo.max_sessions",
   },
   {
     name: "the lan host's name under the farm name",
@@ -176,7 +176,7 @@ const RULES: readonly Rule[] = [
   {
     name: "the read model under the core name",
     pattern: /\b(CoreState|emptyCoreState)\b/u,
-    says: "WorkspaceState, emptyWorkspaceState; Core is the service that holds it",
+    says: "SpaceState, emptySpaceState; Core is the service that holds it",
   },
   {
     name: "an issue's stage under the standing name",
@@ -264,15 +264,15 @@ const RULES: readonly Rule[] = [
     except: /\.test\.ts$|^apps\/web\/src\/ui\/pixel\//u,
   },
   {
-    name: "the project map's farm words in the workbench",
-    pattern: /\b(growthOf|Growth|TillingCalendar|Deed|Planted|logoInBed|SowHere|plotsIn|sessionInPlot|onSow)\b|web\.project\.(map|project|growth)\b/u,
-    says: "the projects page says recency (recencyOf, Recency), Overview, Languages, CommitCalendar, logoInBar; the map, its plots and its sowing are the farm's (apps/web/src/farm/map, web.farm.map.*), handed in as ProjectsSkin",
+    name: "the repo map's farm words in the workbench",
+    pattern: /\b(growthOf|Growth|TillingCalendar|Deed|Planted|logoInBed|SowHere|plotsIn|sessionInPlot|onSow)\b|web\.repo\.(map|repo|growth)\b/u,
+    says: "the repos page says recency (recencyOf, Recency), Overview, Languages, CommitCalendar, logoInBar; the map, its plots and its sowing are the farm's (apps/web/src/farm/map, web.farm.map.*), handed in as ReposSkin",
     dirs: ["apps/web/src/features", "apps/web/src/base", "apps/web/src/ui"],
   },
   {
     name: "the one orchestrator under its old names",
     pattern: /\b(orchestratorAgent|orchestratorHome|orchestratorLook|setOrchestratorLook|orchestratorChannel)\b/u,
-    says: "a profile's role (isOrchestrator, role: \"orchestrator\"); defaultOrchestrator only for what names none; agentHome; the profile's look.manager; WorkspaceState.orchestrators[id].channel",
+    says: "a profile's role (isOrchestrator, role: \"orchestrator\"); defaultOrchestrator only for what names none; agentHome; the profile's look.manager; SpaceState.orchestrators[id].channel",
   },
   {
     name: "a profile called a helper's where the owner reads it",
@@ -306,13 +306,13 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "validating under the word check",
-    pattern: /\b(setting|project|agent)[./]check\b(?![.\w])|voice[./]moss[./]check\b|\b(MossCheck\w*|AgentCheck\w*|checkMoss)\b/u,
-    says: "a form's input is validated (setting.validate, project.validate, agent.validate, Validation, AgentValidation); a key is verified (voice.moss.verify, verifyMoss, MossVerify); check is running checks",
+    pattern: /\b(setting|repo|agent)[./]check\b(?![.\w])|voice[./]moss[./]check\b|\b(MossCheck\w*|AgentCheck\w*|checkMoss)\b/u,
+    says: "a form's input is validated (setting.validate, repo.validate, agent.validate, Validation, AgentValidation); a key is verified (voice.moss.verify, verifyMoss, MossVerify); check is running checks",
   },
   {
     name: "a service method repeating its service, or the startup config as Settings",
     pattern:
-      /\b(saveAgent|createAgent|deleteAgent|previewDeleteAgent|deleteSkill|previewDeleteSkill|deleteTemplate|previewDeleteTemplate|forgetOf|previewForgetOf)\b|yield\* (Settings|Config)\b/u,
+      /\b(saveAgent|createAgent|deleteAgent|previewDeleteAgent|deleteSkill|previewDeleteSkill|deleteTemplate|previewDeleteTemplate|forgetOf|previewForgetOf)\b|yield\* (?:Settings\b|Config\b(?!\s*\.))/u,
     says: "agents.save, create, remove, previewRemove, removeSkill, removeTemplate; memories.forget, previewForget; the startup config is the ServerConfig service (yield* ServerConfig)",
   },
   {
@@ -371,15 +371,15 @@ const RULES: readonly Rule[] = [
   {
     name: "a service under a plural name",
     pattern:
-      /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Projects|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Projects|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,
-    says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Executor, Issue, Memory, Project, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)',
+      /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,
+    says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Executor, Issue, Memory, Repo, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)',
     dirs: ["apps/server/src"],
   },
   {
     name: "a module under its retired grab-bag or metaphor filename",
     pattern:
-      /["'`](?:\.\.?\/|@\/)(?:channel\/(?:chat|folded|model)|mailbox\/chat|session\/(?:takeIn|shapes)|farm\/support|base\/util|ui\/richRules|project\/shapes|testing\/(?:helper|until|issues|said|agents)|farm\/world\/places|features\/voice\/(?:agora|moss)|features\/channel\/(?:emoji|feed|switcher|draft)|features\/issue\/(?:lanes|rows|queries)|features\/artifact\/queries|memory\/store|artifact\/spans|tool\/(?:cron|memory|channel|definition)|infra\/live|state\/latest)(?:\.tsx?)?["'`]/u,
-    says: "channel/channel.ts, channel/messages.ts, channel/rooms.ts, mailbox/envelope.ts, session/briefing.ts, farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts, project/workplace.ts, session/signals.ts, features/issue/{history,cards}.ts, features/artifact/ArtifactCard.tsx, testing/{worker,layers,world}.ts, farm/world/world.ts, features/voice/{call,mossLine}.ts, features/channel/{EmojiPicker.tsx,places.ts,composing.ts}, memory/memory.ts, artifact/ops.ts, tool/{tool,schemas}.ts, infra/frame.ts, state/atom.ts",
+      /["'`](?:\.\.?\/|@\/)(?:channel\/(?:chat|folded|model|records)|issue\/records|mailbox\/chat|session\/(?:takeIn|shapes|records)|farm\/support|base\/util|ui\/richRules|repo\/shapes|testing\/(?:helper|until|issues|said|agents)|farm\/world\/places|features\/voice\/(?:agora|moss)|features\/channel\/(?:emoji|feed|switcher|draft)|features\/issue\/(?:lanes|rows|queries)|features\/artifact\/queries|memory\/store|artifact\/spans|tool\/(?:cron|memory|channel|definition)|infra\/live|state\/latest)(?:\.tsx?)?["'`]|\b(issueRecords|IssueRecords|sessionRecords|SessionRecords|channelRecords|ChannelRecords)\b/u,
+    says: "channel/{channel,messages,rooms,hub}.ts, issue/lifecycle.ts, mailbox/envelope.ts, session/{briefing,registry,signals}.ts, farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts, repo/workplace.ts, features/issue/{history,cards}.ts, features/artifact/ArtifactCard.tsx, testing/{worker,layers,world}.ts, farm/world/world.ts, features/voice/{call,mossLine}.ts, features/channel/{EmojiPicker.tsx,places.ts,composing.ts}, memory/memory.ts, artifact/ops.ts, tool/{tool,schemas}.ts, infra/frame.ts, state/atom.ts",
     // The retired files were the server's and the page's; the contract's concept folders (session/shapes.ts) are today's.
     dirs: ["apps/server/src", "apps/web/src"],
   },
@@ -399,11 +399,9 @@ function placeOf(ns: string): string {
     : `apps/${host}/src/${[...parts, "words.ts"].join("/")}`;
 }
 
-const catalogs = globSync("packages/i18n/locales/*/*.json", { cwd: root }).toSorted();
-const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{ts,tsx}`, { cwd: root })).toSorted();
-const hits: string[] = [];
-for (const source of [...files, ...catalogs]) {
-  const lines = readFileSync(resolve(root, source), "utf8").split("\n");
+export function staleNamesIn(source: string, text: string): string[] {
+  const hits: string[] = [];
+  const lines = text.split("\n");
   const file = source.startsWith("packages/i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
@@ -413,7 +411,14 @@ for (const source of [...files, ...catalogs]) {
       if (rule.pattern.test(line)) hits.push(`${source}:${i + 1}: ${rule.name} — ${rule.says}`);
     }
   }
+  return hits;
 }
-for (const hit of hits) console.error(`stale names: ${hit}`);
-if (hits.length > 0) process.exit(1);
-console.log(`stale names: ${files.length} files and ${catalogs.length} catalogs ok`);
+
+if (import.meta.main) {
+  const catalogs = globSync("packages/i18n/locales/*/*.json", { cwd: root }).toSorted();
+  const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{ts,tsx}`, { cwd: root })).toSorted();
+  const hits = [...files, ...catalogs].flatMap((source) => staleNamesIn(source, readFileSync(resolve(root, source), "utf8")));
+  for (const hit of hits) console.error(`stale names: ${hit}`);
+  if (hits.length > 0) process.exit(1);
+  console.log(`stale names: ${files.length} files and ${catalogs.length} catalogs ok`);
+}

@@ -24,7 +24,7 @@
 | Effect HttpClient | 外面的 HTTP 经 `HttpClient`（[地基](docs/subsystems/foundation.md)）；Promise 一侧还有几处直接 `fetch` |
 | Building HttpApi servers | 不用：接口表是 `packages/protocol/src/api.ts` 自己的，处理在 `apps/server/src/http/handlers.ts` |
 | Typed GraphQL clients | 不用 |
-| Working with child processes（`ChildProcessSpawner`） | 用：git 和外部命令（`apps/server/src/project/git.ts`） |
+| Working with child processes（`ChildProcessSpawner`） | 用：git 和外部命令（`apps/server/src/repo/git.ts`） |
 | Building CLI applications（`effect/cli`） | 用：`apps/cli/src/main.ts` |
 | Working with AI modules | 不用：模型在 `packages/ai`，大脑在 `packages/agent`，都是自己的 |
 | Building distributed applications with cluster | 不用：服务端只有一个进程 |

@@ -57,7 +57,7 @@
 |---|---|
 | 1. 机器能拦住的错，不花一个 token：架构规范写成毫秒级的类型检查和 AST 静态门禁，用退出码 1 代替说教 | 已有：四层手段的第 1、2 层；`vp check` 带类型的 lint、仓库自己的 oxlint 插件、结构测试、CI |
 | 2. 报错就是提示词：报错不只说不许做什么，印出标准写法的模板和参考文件的行号 | 已做：每个检查的话写错在哪、`Fix:`、`See`（`scripts/oxlint-plugin.ts` 的 `says`，测试查 `See` 的文件在不在）；改写：写文件不写行号（行号一改就错，文件挪了测试会报） |
-| 3. 收回公共控制流，只让 AI 填空：超时、重试、配额、事务回滚、子进程回收焊死在高阶函数里，AI 只写 50 行以内的业务插件 | 已有：帮工经 oar 驱动，核心状态只由 `Core.apply` 改，git 子进程在 `project/git.ts` 杀整个进程组。以后做：扩展点只填空 |
+| 3. 收回公共控制流，只让 AI 填空：超时、重试、配额、事务回滚、子进程回收焊死在高阶函数里，AI 只写 50 行以内的业务插件 | 已有：帮工经 oar 驱动，核心状态只由 `Core.apply` 改，git 子进程在 `repo/git.ts` 杀整个进程组。以后做：扩展点只填空 |
 | 4. 物理锁死契约和验收测试：协议 Schema、核心接口签名、验收测试目录只读；修 bug 先锁定必败的红灯测试 | 改写：不锁目录（主人和 agent 是同一个用户，锁不住），让改动被看见：`regression: ` 测试删改要点名，生成的文件不手改（`docs:verify`、`server:check` 查），黄金数据改了看 diff。帮工那边已有：验收先红、写好冻结 |
 | 5. 写新功能和做抽象拆成两张单：每合入 3 个功能单，插 1 个「不改行为、只减行数」的纯重构单 | 改写：功能和重构分成不同的 PR（`feat/`、`refactor/`），清哪里由体检的热点和 deadcode 决定，不按 3:1 的固定比例 |
 | 6. 跨 5 个以上文件的修改不许 AI 手改，必须写 AST 转换脚本（codemod）一次批量做 | 改写：写不成检查（分不出机械的和逐处判断的），写成做法：[SKILL.md](.agents/skills/vv-governance/SKILL.md#5-一次改很多文件)；漏改由 `tsc` 和 `stale-names.ts` 兜底 |
@@ -83,7 +83,7 @@
 ### 第 1 层：物理环境与编译器铁笼
 
 **1.1 沙箱和命令防火墙。** 白皮书：每张编码工单在独立的 git worktree 和容器沙箱（Docker、MicroVM、macOS sandbox-exec）里开工；执行任何 shell 命令前，过一层用正则和语法树的确定性拦截（不让模型判断安全）：文件系统围栏（拒绝 worktree 之外的写，拦 .. 穿越、改 ~/.ssh、~/.zshrc）；特权文件写保护（普通功能单里 package.json、lockfile、go.mod、tsconfig.json、.eslintrc 只读，防私自装库、调低严格度）；进程组连坐回收（外部 CLI 子进程经绑定生命周期的受管服务起，超时或取消时向整个进程组发 SIGKILL，并 git worktree unlock）。
-在这里：已有：工单按档案在项目目录或自己的 worktree 里干活；git 子进程超时杀整个进程组（`apps/server/src/project/git.ts`）。不做：命令防火墙和特权文件只读：帮工没有权限确认是常驻规矩，边界是本机、工作目录和「连接到本机」（[帮工](docs/subsystems/session.md#为什么这样)）；依赖和配置的变化在 PR 的 diff 里看得见，放松检查的写法在逃生口的棘轮里。
+在这里：已有：工单按档案在仓库目录或自己的 worktree 里干活；git 子进程超时杀整个进程组（`apps/server/src/repo/git.ts`）。不做：命令防火墙和特权文件只读：帮工没有权限确认是常驻规矩，边界是本机、工作目录和「连接到本机」（[帮工](docs/subsystems/session.md#为什么这样)）；依赖和配置的变化在 PR 的 diff 里看得见，放松检查的写法在逃生口的棘轮里。
 
 **1.2 自举的双核隔离。** 白皮书：用调度工具改它自己时，运行中的宿主（控制面）总从只读目录加载签过名的稳定版二进制；被改的源码只是工作区（目标面）。合入前在隔离端口起金丝雀版本，跑通「启动、建分支、跑假任务、存盘自检、零退出码关停」的自举冒烟，防止把自己改到脑死亡。
 在这里：已做：[发布渠道](docs/subsystems/app.md#发布渠道)与[工单合并检查](docs/subsystems/issue.md)：干活的农场和正在改的代码分开（渠道）、合并前跑检查。已有：验收起一个和主人数据隔开的服务端（`scripts/verify-server.ts`）。
@@ -92,7 +92,7 @@
 在这里：已有：id 带 `Brand`（`packages/protocol/src/shapes.ts` 的 `IssueId`、`SessionId`）；时间和单位写进名字（`…Ms`，[命名](docs/style/naming.md)）；穷尽检查的 lint。改写：`default` 允许并说明。以后做：两个以上布尔字段的形状进体检的报告，作为「没写出来的状态」的候选（`shapes.ts` 现有 60 个布尔字段，很多是独立的开关）。
 
 **1.4 处方式报错。** 白皮书：用 ast-grep 写规则，每条的 message 写三样：为什么拦（危害）、正确写法的模板（能照抄）、仓库里标准范例的路径和行号。给了三条示例：拦裸调子进程（Bun.spawn、child_process.spawn/exec，导向受管进程原语）、拦常驻服务里的无界 new Map（导向带淘汰的有界容器）、拦没有删除日期的 @deprecated（要求 removeBy 日期）。
-在这里：已做：三样的格式（`says`、`refused`，测试查）；规则算得出改法的算出来（`no-cjk-literal` 给出词典文件和 `t()` 的键，`parent-import` 给出 `#/…` 并自动修复）；结构测试和体检的报错同一个格式。改写：用 oxlint 插件，不另加 ast-grep（已经在 `vp check` 里、带类型）。三条示例：子进程只在拥有它的模块里起，现在是约定（`project/git.ts`、`runtime/dsh.ts`、`voice/voice.ts`），以后做成 import 限制；常驻集合由谁删，以后逐处清点（服务端 7 处 `new Map(`）；`@deprecated` 不做 removeBy，内部不留兼容，旧的直接删（`typescript/no-deprecated` 拦用到已弃用的 API）。
+在这里：已做：三样的格式（`says`、`refused`，测试查）；规则算得出改法的算出来（`no-cjk-literal` 给出词典文件和 `t()` 的键，`parent-import` 给出 `#/…` 并自动修复）；结构测试和体检的报错同一个格式。改写：用 oxlint 插件，不另加 ast-grep（已经在 `vp check` 里、带类型）。三条示例：子进程只在拥有它的模块里起，现在是约定（`repo/git.ts`、`runtime/dsh.ts`、`voice/voice.ts`），以后做成 import 限制；常驻集合由谁删，以后逐处清点（服务端 7 处 `new Map(`）；`@deprecated` 不做 removeBy，内部不留兼容，旧的直接删（`typescript/no-deprecated` 拦用到已弃用的 API）。
 
 **1.5 死代码断头台。** 白皮书：CI 里接 knip（TypeScript）或 deadcode（Go），零容忍；没人引用的导出、没用的类型、过了 removeBy 的废弃函数，直接挡住合并。
 在这里：已做：`vp run deadcode`（`knip.ts`、`scripts/deadcode.ts`），在 CI 的 check 里，零容忍。

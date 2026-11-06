@@ -35,8 +35,8 @@ function tail(s: string, n: number): string {
 const paths = (items: readonly T.UncommittedItem[]) => items.map((f) => f.path).join("、");
 
 export function changesText(c: T.Changes): string {
-  if (!c.branch) return `它直接在项目 ${c.project} 里干活，没有分支可合。没提交的改动：${c.uncommitted.length > 0 ? paths(c.uncommitted) : "没有"}`;
-  const lines = [`${c.branch} → ${c.project} 的 ${c.base}：${c.commits.length} 个提交，改了 ${c.files.length} 个文件。`];
+  if (!c.branch) return `它直接在仓库 ${c.repo} 里干活，没有分支可合。没提交的改动：${c.uncommitted.length > 0 ? paths(c.uncommitted) : "没有"}`;
+  const lines = [`${c.branch} → ${c.repo} 的 ${c.base}：${c.commits.length} 个提交，改了 ${c.files.length} 个文件。`];
   for (const x of c.commits.slice(0, 10)) lines.push("- " + x.hash + " " + x.subject);
   if (c.files.length > 0)
     lines.push(
@@ -58,15 +58,15 @@ export function sessionLine(h: T.Session, now: number, number?: number): string 
   if (h.lastRun) {
     last = "；上一轮" + t(`shared.outcome.${h.lastRun.outcome}`) + "：" + head(h.lastRun.summary, 80);
   }
-  const project = h.project ?? "";
-  const where = h.branch ? "在 " + project + " 的 " + h.branch : "在 " + project;
+  const repo = h.repo ?? "";
+  const where = h.branch ? "在 " + repo + " 的 " + h.branch : "在 " + repo;
   const spent = h.spent ? "；花了" + spentText(h.spent) : "";
   const issue = number !== undefined ? `#${number} ` : "";
   return `- ${h.name}（${h.id}，${runtimeLabel(h.runtime)}，${where}）工单 ${issue}「${head(h.brief, 60)}」，${phaseText(h, now)}${last}${spent}`;
 }
 
 /** The words for a status: its label (wording().status), a few the owner says for it, and its own name. */
-const statusNames: Readonly<Record<string, T.IssueStatus>> = {
+export const statusNames: Readonly<Record<string, T.IssueStatus>> = {
   ...Object.fromEntries(IssueStatusValues.map((s) => [t(`shared.status.${s}`), s])),
   草稿: "backlog",
   在做: "in_progress",
@@ -75,9 +75,8 @@ const statusNames: Readonly<Record<string, T.IssueStatus>> = {
   取消: "canceled",
   ...Object.fromEntries(IssueStatusValues.map((s) => [s, s])),
 };
-export const statusOf = (word: string): T.IssueStatus | undefined => statusNames[word.trim()];
 
-const priorityNames: Readonly<Record<string, T.Priority>> = {
+export const priorityNames: Readonly<Record<string, T.Priority>> = {
   紧急: "urgent",
   高: "high",
   普通: "medium",
@@ -85,14 +84,9 @@ const priorityNames: Readonly<Record<string, T.Priority>> = {
   低: "low",
   ...Object.fromEntries(PriorityValues.map((p) => [p, p])),
 };
-export const priorityOf = (word: string): T.Priority | undefined => priorityNames[word.trim()];
 
-export const noSuchStatus = (word: string, allowed: readonly T.IssueStatus[]) =>
-  "没有「" + word + "」这个状态：" + allowed.map((s) => t(`shared.status.${s}`)).join("、");
-export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => t(`shared.priority.${p}`)).join("、");
-
-export const channelLine = (c: { readonly name: string; readonly default?: boolean; readonly description?: string; readonly project?: string }) =>
-  "#" + c.name + (c.default === true ? "（默认）" : "") + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : "");
+export const channelLine = (c: { readonly name: string; readonly default?: boolean; readonly description?: string; readonly repo?: string }) =>
+  "#" + c.name + (c.default === true ? "（默认）" : "") + (c.description ? "：" + c.description : "") + (c.repo ? "（默认仓库 " + c.repo + "）" : "");
 
 /** How long, in round words. */
 function spanWords(ms: number): string {
@@ -107,7 +101,7 @@ export function issueLine(issue: T.Issue, who: string, now: number): string {
   const st = issue.stage;
   const stuck = st.stuck ? "（" + t(`shared.stuck.${st.stuck}`) + "）" : "";
   const parts = [`#${issue.number}「${shortTitle(issue.title)}」${t(`shared.stage.${st.state}`)}${stuck}`];
-  if (issue.project) parts.push(issue.project);
+  if (issue.repo) parts.push(issue.repo);
   if (who) parts.push(who);
   if (issue.priority !== "medium") parts.push(t(`shared.priority.${issue.priority}`) + "优先级");
   if (stageWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
@@ -137,7 +131,7 @@ export function issueDetail(issue: T.Issue, who: string, timeline: T.IssueTimeli
 }
 
 export function cronLine(s: T.Cron, channel: string): string {
-  const direct = s.agent ? "，直接派给 " + s.agent + (s.project ? " 去 " + s.project : "") : "";
+  const direct = s.agent ? "，直接派给 " + s.agent + (s.repo ? " 去 " + s.repo : "") : "";
   const next = s.enabled ? "下次 " + nextText(s) : nextText(s);
   return `- ${s.id} 号「${s.name}」#${channel} ${whenText(s.when, s.tz)}${direct}；${next}\n  ${s.text}`;
 }
@@ -153,7 +147,7 @@ export function parseTime(s: string): number | undefined {
 // Parameter descriptions shared by several tools' schemas (tool/schemas.ts).
 const issueOrAgent = "工单编号（#41 或 41）；也可以写在做它的帮工的名字";
 const issueNumber = "工单编号（#41 或 41）";
-const projectFolder = "项目文件夹名";
+const repoFolder = "仓库文件夹名";
 const agentProfile = "帮工档案的名字或 id";
 const searchText = "要找什么，几个词或一句话；不填就列出最新的";
 const channelRef = "频道：#clock-in 这样的名字，或它的 id";
@@ -177,7 +171,7 @@ export const params = {
   },
   issueOrAgent,
   issueNumber,
-  projectFolder,
+  repoFolder,
   agentProfile,
   searchText,
   channelRef,
@@ -192,11 +186,11 @@ export const params = {
     autoSubmitPr: "主人明确允许帮工在检查通过后自行开立或更新 PR 时才填 true；推送分支不等于合并主分支",
     channel: "工单串开在哪个频道，比如 #clock-in；不填就是你正在回话的频道",
     deliver:
-      "交付什么：change 是改代码、合进项目（不填就是它）；branch 是改代码但分支留着不合（主人说「先别合」「分支留着」）；answer 是只查清楚、交回一份带依据的结论，不改代码（「查一下」「看看为什么」「是不是」）",
+      "交付什么：change 是改代码、合进仓库（不填就是它）；branch 是改代码但分支留着不合（主人说「先别合」「分支留着」）；answer 是只查清楚、交回一份带依据的结论，不改代码（「查一下」「看看为什么」「是不是」）",
     description: `给帮工的附言，最多 ${mandateNoteWordLimit} 词（中英文都按词分段）。一手原话自动绑定来源，让帮工用 resource_read 读取；不复述原话，不替帮工编实施方案。`,
     draft: "要不要让帮工读过代码起草（写成标题、说明、验收标准）；会花钱，主人只是随口记一句时不用",
     priority: "紧急、高、普通、低；不填是普通",
-    project: "项目文件夹名；频道有默认项目时可以不填；新项目起一个简短的英文名，开工时会新建",
+    repo: "仓库文件夹名；频道有默认仓库时可以不填；新仓库起一个简短的英文名，开工时会新建",
     start: "记下就开工（没空位就排队）：只在主人要马上做时填 true；记一下、先别开始、只是指派都不填",
     title: "一句话的标题",
   },
@@ -206,18 +200,18 @@ export const params = {
     status: "挪到：备选、待办、已完成、已取消",
   },
   issueUpdate: {
-    deliver: "交付方式：change（合进项目）、branch（分支留着不合）、answer（只交结论）",
+    deliver: "交付方式：change（合进仓库）、branch（分支留着不合）、answer（只交结论）",
     agent: "谁来做：帮工的名字或 id（派出去以前才能改）",
     criteria: "验收标准，一条一个主人能照着验的点；给空列表就是清掉（派出去以前才能改）",
     description: "说明（派出去以前才能改）",
     priority: "紧急、高、普通、低",
-    project: "项目（派出去以前才能改）",
+    repo: "仓库（派出去以前才能改）",
     title: "标题（派出去以前才能改）",
   },
   issueList: {
     closed: "也列关上的（已完成、已取消）；不填只列开着的",
     limit: "最多列几张，默认 20",
-    project: "只看这个项目的",
+    repo: "只看这个仓库的",
     status: "只看这个状态的：备选、待办、处理中、等你看、已完成、已取消",
     text: "标题或说明里有这些字的（找重复、找某件事时用）",
     wantsOwner: "只看在等主人的：等回答、等验收、卡住了；按等了多久排，久的在前",
@@ -233,7 +227,7 @@ export const params = {
     rationale: "为什么这样改，一句话，主人接受前会看到",
   },
   memoryCreate: {
-    project: "只在这个项目里用：项目文件夹名",
+    repo: "只在这个仓库里用：仓库文件夹名",
     text: "要它记住的一句话",
   },
   channelMessageList: {
@@ -245,7 +239,7 @@ export const params = {
     channel: "在哪个频道，比如 #clock-in；不填是你正在回话的频道",
     expr: "五段 cron：分 时 日 月 周几",
     name: "简短的名字，比如 每日测试",
-    project: "直接派活时的项目；不填用频道的默认项目",
+    repo: "直接派活时的仓库；不填用频道的默认仓库",
     text: "到点时说的话：要做的事",
     tz: "时区，比如 Asia/Shanghai；不填是这台电脑的",
     when: "什么时候：kind 是 once（填 at）、every（填 minutes）、daily（填 time）、weekly（填 days 和 time）、cron（填 expr）",
@@ -256,8 +250,8 @@ export const params = {
 
   // The session's own schemas, where they differ from the orchestrator's.
   sessionMemory: {
-    createProject: "不填记在你现在干活的项目；写空字符串是所有项目都用得上",
-    searchProject: "不填找你现在干活的项目和所有项目都用的；写空字符串也找别的项目的",
+    createRepo: "不填记在你现在干活的仓库；写空字符串是所有仓库都用得上",
+    searchRepo: "不填找你现在干活的仓库和所有仓库都用的；写空字符串也找别的仓库的",
     text: "一句以后还用得上的话：约定、坑、命令",
   },
   channelMessageSend: {
@@ -319,22 +313,22 @@ export const issueReportRecorded = (recorded: boolean) => (recorded ? "报告已
 export const issueHandbackDescription = "把当前工单收到、但超出这张工单授权范围的一条输入退回网关；envelope 填输入卡片的 ID，reason 说明为什么应重新分流。";
 export const issueHandbackRecorded = "已退回管家重新分流。";
 export const issuePrSubmitDescription =
-  "在当前工单获主人明确授权、项目启用 PR 且本地检查通过后，在本轮运行中推送分支并开立或更新 PR。summary 可填写这次实际改动，作为 PR 说明。它不会合并主分支或结束当前会话。";
+  "在当前工单获主人明确授权、仓库启用 PR 且本地检查通过后，在本轮运行中推送分支并开立或更新 PR。summary 可填写这次实际改动，作为 PR 说明。它不会合并主分支或结束当前会话。";
 export const issuePrSubmitted = (result: string) => "PR 已提交：" + result;
 
 /** A blocks artifact's block in one line: its id, revision, type and text (artifact_content_get, artifact_block_update's conflict). */
 export const blockLine = (b: T.Block) => `- 〔${b.id} · 第 ${b.rev} 版 · ${b.type}〕${b.text.map((s) => s.t).join("")}`;
 
 /** Where a memory applies, for the tools' answers. */
-export const memoryWhere = (m: T.Memory) => (m.project ? "项目 " + m.project : "所有项目");
+export const memoryWhere = (m: T.Memory) => (m.repo ? "仓库 " + m.repo : "所有仓库");
 
 /** The orchestrator's tools' descriptions, shown to the model alongside each name and parameters (tool.ts). */
 export const descriptions = {
-  "project.list": "列出工作目录下的项目（每个文件夹是一个项目），以及是不是 git 仓库。",
-  "channel.list": "列出频道：名字、哪个是默认的、是做什么的、默认项目。频道是安排活的地方。",
+  "repo.list": "列出工作目录下的仓库（每个文件夹是一个仓库），以及是不是 git 仓库。",
+  "channel.list": "列出频道：名字、哪个是默认的、是做什么的、默认仓库。频道是安排活的地方。",
   "session.list": "列出在场的所有帮工：在做什么、上一轮的结果。",
   "issue.get": "看一张工单的全部：要做的、验收标准做到哪了、在等主人什么、来龙去脉；有帮工在做时加上它上一轮的完整汇报。",
-  "issue.diff.get": "看完成一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者完成前想确认时用。",
+  "issue.diff.get": "看完成一张工单会合进仓库什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者完成前想确认时用。",
   "channel.message.list":
     "读一个频道或一个串里说的话。id 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），管家读和主人的私聊写 @owner；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
   "issue.review":
@@ -342,11 +336,11 @@ export const descriptions = {
   "issue.comment.create": "给在做一张工单的帮工带话：发在工单串里。它正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
   "session.stop": "叫停在做一张工单的帮工正在做的这一轮：工单和改动都留着，带句话就接着做。",
   "issue.list":
-    "找工单、看一批工单：主人问「哪些在等我」（wantsOwner）、「某个项目有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；看一张的全部用 issue_get。每行是编号、短标题、现在怎样、项目、谁在做、等了多久。",
+    "找工单、看一批工单：主人问「哪些在等我」（wantsOwner）、「某个仓库有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；看一张的全部用 issue_get。每行是编号、短标题、现在怎样、仓库、谁在做、等了多久。",
   "issue.create":
     "记下一张工单。不填 start 就放进备选、不开工：主人说「记一下」「回头做」「先写下来」「让某某做、先别开始」时这样用。主人要马上做（「去做」「帮我改一下」）才填 start: true，记下就开工，没空位就排队。已经有工单的事不要再建：开工、接着做、换人用 issue_status_update。记之前先用 issue_list 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱），和 start 不一起用。",
   "issue.update":
-    "改一张工单：优先级、交付方式随时能改；标题、说明、项目、谁来做、验收标准只在派出去以前能改。只在主人叫你改时用：你自己看出来该改的，先在频道里问主人。",
+    "改一张工单：优先级、交付方式随时能改；标题、说明、仓库、谁来做、验收标准只在派出去以前能改。只在主人叫你改时用：你自己看出来该改的，先在频道里问主人。",
   "issue.status.update":
     "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空位就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮，卡住了不带话就照原因接着修、解决冲突、接着做；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 session_stop）；等你看挪到已完成是完成，也就是验收通过：照工单的交付方式，有提交就合进主分支或开 PR，branch 的分支留着不合，没有改动不碰 git（主人要分支留着，先用 issue_update 把 deliver 改成 branch）；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
   "cron.create":
@@ -354,19 +348,19 @@ export const descriptions = {
   "cron.list": "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。",
   "cron.delete": "删掉一个定时（编号从 cron_list 看）。",
   "channel.create":
-    "开一个新频道：一件长期的事、一个项目，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，project 是它的默认项目（在这里派的活默认在这个项目里干）。主人要求了才开。",
-  "channel.update": "改一个频道是做什么的（description），或它的默认项目（project，写空字符串就是不要默认项目）。",
+    "开一个新频道：一件长期的事、一个仓库，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，repo 是它的默认仓库（在这里派的活默认在这个仓库里干）。主人要求了才开。",
+  "channel.update": "改一个频道是做什么的（description），或它的默认仓库（repo，写空字符串就是不要默认仓库）。",
   "pkm.search":
-    "在主人的笔记里找：主人自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个项目的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
+    "在主人的笔记里找：主人自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
   "pkm.page.get": "读主人笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
   "pkm.capture":
     "往主人今天的日记里记一句，标成 LATER #inbox，写上是你记的：主人让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",
   "pkm.comment.suggest":
     "对主人笔记里的一块提一个改写：不直接改，主人在笔记页看到差异、接受了才换。主人让你整理、改写、纠正他记的东西时用；先用 pkm_page_get 读到块的 id 和现在的字。",
   "memory.search":
-    "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；project 只找那个项目的和所有项目都用的。派活前想知道某个项目有什么约定、谁做过类似的活时用。",
+    "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；repo 只找那个仓库的和所有仓库都用的。派活前想知道某个仓库有什么约定、谁做过类似的活时用。",
   "memory.create":
-    "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。主人要某个帮工以后都记得一件事时用；不填 project 就是所有项目都用。主人对你自己说的偏好用 remember。",
+    "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。主人要某个帮工以后都记得一件事时用；不填 repo 就是所有仓库都用。主人对你自己说的偏好用 remember。",
   "artifact.list": "列出稿子：在一个频道里说过的，或为一张工单做的；都不填列出最近的。每行是 id、标题、种类、第几稿、谁做的、最新这一稿改了什么。",
   "artifact.get": "看一份稿子：每一稿是谁做的、改了什么、在对话里哪条消息（主人的评论就是对它的回复）。",
   "artifact.content.get":
@@ -384,21 +378,21 @@ export const descriptions = {
 /** A session's tools' descriptions; channel_message_list is the orchestrator's. */
 export const sessionDescriptions = {
   "channel.message.list": descriptions["channel.message.list"],
-  "session.list": "现在谁在场：每个帮工的编号、名字、农机、在哪个项目、在做什么。",
+  "session.list": "现在谁在场：每个帮工的编号、名字、农机、在哪个仓库、在做什么。",
   "channel.unread.list": "列出你还没读的对话：在哪、几条、有没有提到你、最后是谁说的。",
   "channel.message.send":
     "在群聊里发一条消息。id 不填就是你自己的工单串；#<频道> 是一个频道；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
   "pkm.search":
-    "在主人的笔记里找：主人自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个项目的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
+    "在主人的笔记里找：主人自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。主人提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
   "pkm.page.get": "读主人笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
   "pkm.capture":
     "往主人今天的日记里记一句，标成 LATER #inbox，写上是你记的：主人让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",
   "pkm.comment.suggest":
     "对主人笔记里的一块提一个改写：不直接改，主人在笔记页看到差异、接受了才换。主人让你整理、改写、纠正他记的东西时用；先用 pkm_page_get 读到块的 id 和现在的字。",
   "memory.search":
-    "在你的记性里找：你和主人以前替你的档案记下的话、做过的活。不填 project 只找这个项目的和所有项目都用的；project 写空字符串也找别的项目的。干到一半想知道「这个项目的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
+    "在你的记性里找：你和主人以前替你的档案记下的话、做过的活。不填 repo 只找这个仓库的和所有仓库都用的；repo 写空字符串也找别的仓库的。干到一半想知道「这个仓库的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
   "memory.create":
-    "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。不填 project 记这个项目的；project 写空字符串记成所有项目都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
+    "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。不填 repo 记这个仓库的；repo 写空字符串记成所有仓库都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
   "artifact.block.create":
     "在一个一起写的稿子里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 artifact_block_update。",
   "artifact.block.update":
@@ -461,8 +455,8 @@ export const answers = {
   noProfileNamed: (key: string) => "没有叫 " + key + " 的帮工档案",
   notWorking: "你不在场：记性只给在干活的帮工用",
 
-  projects: {
-    empty: (root: string) => "工作目录（" + root + "）下还没有项目。",
+  repos: {
+    empty: (root: string) => "工作目录（" + root + "）下还没有仓库。",
     notGitYet: "（还不是 git 仓库，第一次派活时会建）",
   },
   roster: {
@@ -477,8 +471,8 @@ export const answers = {
   },
   sessionList: {
     intro: "在场的有主人、管家，和这些帮工：",
-    row: (id: string, name: string, runtime: string, project: string, phase: string, brief: string) =>
-      `- ${id} ${name}（${runtime}，在 ${project}；${phase}）工单：${brief}`,
+    row: (id: string, name: string, runtime: string, repo: string, phase: string, brief: string) =>
+      `- ${id} ${name}（${runtime}，在 ${repo}；${phase}）工单：${brief}`,
     wake: "要叫醒谁，就在 channel_message_send 的话里写 @ 加编号（如 @w3）、@管家、@主人；只是提到，不带 @。",
   },
   spoken: {
@@ -527,8 +521,7 @@ export const answers = {
     draftWithStartRefused: "没记：起草交回来以前开不了工。要马上做就不起草；要起草就先不开工。",
     noteTooLong: `没记：附言最多 ${mandateNoteWordLimit} 词。一手输入已自动绑定，删去复述和实施方案后再提交。`,
     noChannel: (name: string) => "没有 " + name + " 这个频道：先用 channel_list 看看有哪些，或者用 channel_create 开一个。",
-    noDefaultProject: (channel: string) => "#" + channel + " 没有默认项目：填上 project。",
-    noDeliver: "没记：deliver 是 change（改代码）、branch（改代码，分支留着）或 answer（只查、交结论）",
+    noDefaultRepo: (channel: string) => "#" + channel + " 没有默认仓库：填上 repo。",
     notRecorded: (why: string) => "没记：" + why,
     notRecordedFailed: (why: string) => "没记下：" + why,
     noted: (number: number, title: string, answerOnly: boolean) => `记下了：#${number}「${title}」` + (answerOnly ? "（只查、交结论，不改代码）" : ""),
@@ -537,7 +530,7 @@ export const answers = {
     branchNote: (branch: string) => "，分支 " + branch,
     noAgentFallback: "帮工",
     who: (name: string, id: string) => name + "（" + id + "）",
-    dispatched: (noted: string, channel: string, who: string, project: string, branch: string) => `${noted}，已在 #${channel} 派 ${who}去 ${project}${branch}`,
+    dispatched: (noted: string, channel: string, who: string, repo: string, branch: string) => `${noted}，已在 #${channel} 派 ${who}去 ${repo}${branch}`,
     notStartedNote: "，没开工",
     inBacklog: (noted: string, suffix: string) => `${noted}，在备选里${suffix}`,
     draftingNote: "，帮工在起草",
@@ -568,7 +561,7 @@ export const answers = {
     canceled: (name: string) => "删掉了「" + name + "」。",
   },
   openChannel: {
-    opened: (name: string, project: string) => "开好了 #" + name + (project ? "，默认项目 " + project : "") + "。",
+    opened: (name: string, repo: string) => "开好了 #" + name + (repo ? "，默认仓库 " + repo : "") + "。",
   },
   channelSettings: {
     noChannel: (name: string) => "没有 " + name + " 这个频道",

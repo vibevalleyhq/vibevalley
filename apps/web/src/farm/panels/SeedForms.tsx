@@ -2,18 +2,18 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type ProjectTemplates, type Session } from "@vibevalley/protocol";
+import { type RepoTemplates, type Session } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { aria } from "#/base/dom.tsx";
 import { commands } from "#/farm/frames.ts";
-import { farmProject } from "#/farm/store.ts";
+import { farmRepo } from "#/farm/store.ts";
 import { issueOf } from "#/farm/world/plots.ts";
 import { createWriteKey, writeIssue } from "#/features/issue/index.ts";
 import { useWorkAgents } from "#/infra/agents.ts";
 import { api, reasonOf, newSendKey } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { ready, useProjects, useQuery } from "#/infra/query.ts";
+import { ready, useRepos, useQuery } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { usePrefs } from "#/state/prefs.ts";
 import { AgentFace } from "#/ui/Face.tsx";
@@ -25,7 +25,7 @@ const xs = "text-[12px] text-bark-600";
 const byOrchestrator = "auto";
 
 /** The bag's seeds: the recent words, and each kind that has templates, with them. */
-function seedsOf(bag: ProjectTemplates | undefined) {
+function seedsOf(bag: RepoTemplates | undefined) {
   return {
     recent: bag?.recent ?? [],
     kinds: (bag?.kinds ?? []).flatMap((k) => (k.templates.length > 0 ? [{ kind: k, templates: k.templates }] : [])),
@@ -63,10 +63,10 @@ function WhoTile(props: { active: boolean; label: string; onClick: () => void; c
 }
 
 export function SowForm(props: { station: number; onDone: () => void }) {
-  const projectsQuery = useProjects();
-  const projects = () => ready(projectsQuery, []).map((p) => p.name);
-  // Every plot here is sown in this farm's project.
-  const project = () => farmProject() || undefined;
+  const reposQuery = useRepos();
+  const repos = () => ready(reposQuery, []).map((p) => p.name);
+  // Every plot here is sown in this farm's repo.
+  const repo = () => farmRepo() || undefined;
   const pick = usePrefs((p) => p.pick);
   const agents = useWorkAgents(true);
   const router = useRouter();
@@ -81,9 +81,9 @@ export function SowForm(props: { station: number; onDone: () => void }) {
   let words: HTMLTextAreaElement | undefined;
 
   const templates = useQuery(() => ({
-    queryKey: ["templates", project()],
-    queryFn: () => api.project.template.list({ id: project()! }),
-    enabled: !!project(),
+    queryKey: ["templates", repo()],
+    queryFn: () => api.repo.template.list({ id: repo()! }),
+    enabled: !!repo(),
   }));
   const sower = () => who() ?? (agents().some((a) => a.id === pick()) ? pick() : byOrchestrator);
   const agentOf = (w: string) => (w === byOrchestrator ? undefined : w);
@@ -95,17 +95,17 @@ export function SowForm(props: { station: number; onDone: () => void }) {
     words?.focus();
   };
   const sow = () => {
-    const p = project();
+    const p = repo();
     if (!canSow() || !p) return;
     playSound("plant");
     // The form closes at once; a refusal is said in a toast.
-    const sowing = omitUndefined({ station: props.station, agent: agentOf(sower()), project: p });
+    const sowing = omitUndefined({ station: props.station, agent: agentOf(sower()), repo: p });
     const said = text();
     void act.run(() => commands.plant(said, sowKey, sowing));
     props.onDone();
   };
   const write = async () => {
-    const p = project();
+    const p = repo();
     if (!canSow() || !p) return;
     try {
       const words = text().trim();
@@ -126,22 +126,22 @@ export function SowForm(props: { station: number; onDone: () => void }) {
 
   return (
     <Show
-      when={project()}
+      when={repo()}
       fallback={
         <div data-testid="sow-homeless" class="flex flex-col items-start gap-2.5">
           <p class="text-[14px] text-bark-900">{t("web.farm.sow.homeless")}</p>
-          <p class={xs}>{projects().length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noProjects")}</p>
-          <PxButton tone="primary" data-testid="sow-to-map" onClick={() => (props.onDone(), router.navigate("/projects"))}>
-            {projects().length > 0 ? t("web.farm.sow.map") : t("web.farm.sow.makeProject")}
+          <p class={xs}>{repos().length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noRepos")}</p>
+          <PxButton tone="primary" data-testid="sow-to-map" onClick={() => (props.onDone(), router.navigate("/repos"))}>
+            {repos().length > 0 ? t("web.farm.sow.map") : t("web.farm.sow.makeRepo")}
           </PxButton>
         </div>
       }
     >
       {(p) => (
-        <div data-testid="sow-form" data-project={p()} class="flex flex-col">
+        <div data-testid="sow-form" data-repo={p()} class="flex flex-col">
           <div class="flex items-center gap-2">
             <p class="min-w-0 flex-1 truncate text-[14px] text-bark-900">
-              {t("web.farm.sow.plantIn", { project: p() })}
+              {t("web.farm.sow.plantIn", { repo: p() })}
               <Show when={bag()?.stack.label}>
                 <span class={["ml-2", xs]}>{bag()!.stack.label}</span>
               </Show>
@@ -149,7 +149,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
           </div>
           <div class="mt-3 flex flex-col">
             <Switch>
-              <Match when={templates.isPending && !!project()}>
+              <Match when={templates.isPending && !!repo()}>
                 <p class={["mt-2.5", xs]}>{t("web.farm.sow.rummaging")}</p>
               </Match>
               <Match when={templates.error}>
@@ -233,7 +233,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               </For>
             </div>
             <div class="mt-3 flex items-center gap-2">
-              <p class={["min-w-0 flex-1", xs]}>{t("web.farm.sow.how", { project: p() })}</p>
+              <p class={["min-w-0 flex-1", xs]}>{t("web.farm.sow.how", { repo: p() })}</p>
               <PxButton data-testid="sow-draft" disabled={!canSow()} onClick={() => void write()}>
                 {t("web.farm.sow.draft")}
               </PxButton>

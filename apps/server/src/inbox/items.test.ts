@@ -1,9 +1,9 @@
 import { expect, test } from "vite-plus/test";
 
-import type { WorkspaceState, Issue, Session } from "@vibevalley/protocol";
+import type { SpaceState, Issue, Session } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 
-import { emptyWorkspaceState } from "#/core/core.ts";
+import { emptySpaceState } from "#/core/core.ts";
 
 import { inbox } from "./items.ts";
 
@@ -25,8 +25,8 @@ test("a helper handed back with questions asks the owner to answer, not to compl
   } as unknown as Session;
   const issue = { id: "t1", number: 41, title: "写打卡", assignments, questions: [{ question: "用 8787 还是 8797？" }] } as unknown as Issue;
   // As the server writes it: the questions make the stage.
-  const state = (questions: Issue["questions"]): WorkspaceState => ({
-    ...emptyWorkspaceState(),
+  const state = (questions: Issue["questions"]): SpaceState => ({
+    ...emptySpaceState(),
     sessions: [session],
     issues: [{ ...issue, questions, stage: { state: questions.length > 0 ? "asking" : "reviewing", acts: [] } }],
   });
@@ -56,9 +56,9 @@ test("the inbox says what the issue's stage says: a round stopped halfway wants 
     questions: [],
     stage: { state: "stuck", stuck: "interrupted", since: 2, acts: [] },
   } as unknown as Issue;
-  expect(inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [issue] }).map((i) => i.kind)).toEqual(["interrupted"]);
+  expect(inbox({ ...emptySpaceState(), sessions: [session], issues: [issue] }).map((i) => i.kind)).toEqual(["interrupted"]);
   // Closed by the owner, the helper still on the farm asks nothing.
-  expect(inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [{ ...issue, stage: { state: "canceled", acts: [] } }] })).toEqual([]);
+  expect(inbox({ ...emptySpaceState(), sessions: [session], issues: [{ ...issue, stage: { state: "canceled", acts: [] } }] })).toEqual([]);
 });
 
 test("each item is worded for every route: the phone, the system notice, the tray", () => {
@@ -76,8 +76,8 @@ test("each item is worded for every route: the phone, the system notice, the tra
     refining: false,
   } as unknown as Session;
   const issue = { id: "t1", number: 41, title: "写打卡", assignments, questions: [], stage: { state: "reviewing", acts: [] } } as unknown as Issue;
-  const cron = { id: "s1", name: "每天看测试", channel: "c1", created: 3, pending: true } as unknown as NonNullable<WorkspaceState["crons"]>[number];
-  const [handedBack, asked] = [...inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [issue], crons: [cron] })].toSorted((a, b) => a.at - b.at);
+  const cron = { id: "s1", name: "每天看测试", channel: "c1", created: 3, pending: true } as unknown as NonNullable<SpaceState["crons"]>[number];
+  const [handedBack, asked] = [...inbox({ ...emptySpaceState(), sessions: [session], issues: [issue], crons: [cron] })].toSorted((a, b) => a.at - b.at);
   expect([handedBack!.who, handedBack!.words]).toEqual(["小吴", { label: "等你看", title: "小吴 做完了", body: "打卡 写好了", tray: "小吴 做完了，等你看" }]);
   expect([asked!.who, asked!.words]).toEqual([
     "管家",

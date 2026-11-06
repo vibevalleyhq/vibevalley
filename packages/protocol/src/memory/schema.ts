@@ -36,8 +36,8 @@ const memoryFields = {
   agent: Schema.String,
   kind: MemoryKind,
   text: Schema.String,
-  author: Schema.optionalKey(ActorKind),
-  project: Schema.optionalKey(Schema.String),
+  author: ActorKind,
+  repo: Schema.optionalKey(Schema.String),
   session: Schema.optionalKey(SessionId),
   at: Schema.Finite,
   recalled: Schema.Finite,
@@ -50,13 +50,13 @@ export const Memory: Codec<T.Memory> = Schema.Struct(memoryFields);
 
 export const MemoryRequest: Codec<T.MemoryRequest> = Schema.Struct({
   text: Schema.String,
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   requestKey: Schema.optionalKey(Schema.String),
 });
 
 export const MemoryScope: Codec<T.MemoryScope> = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("global") }),
-  Schema.Struct({ kind: Schema.Literal("project"), project: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal("repo"), repo: Schema.String }),
   Schema.Struct({ kind: Schema.Literal("unknown") }),
 ]);
 

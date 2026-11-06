@@ -33,7 +33,7 @@ it.live("regression: a consumed trigger can be handed back once without losing i
     const ingress = yield* Ingress;
     const sql = yield* SqlClient.SqlClient;
     yield* (yield* Agent).save(lab());
-    const issue = yield* issues.add({ title: "work", project: "handback-trigger", agent: "lab" });
+    const issue = yield* issues.add({ title: "work", repo: "handback-trigger", agent: "lab" });
     const started = yield* issues.start(issue.id, "");
     const trigger = (yield* ingress.accept(event(issue.id, "beyond-original-scope")))!;
     const receipt = yield* sql`select routed_at, routing_scope, routing_position from mailbox_trigger where id = ${trigger.id}`;
@@ -71,7 +71,7 @@ it.live("regression: closing an unassigned issue returns its held owner input wi
     const ingress = yield* Ingress;
     const chat = yield* Channel;
     const sql = yield* SqlClient.SqlClient;
-    const issue = yield* issues.add({ title: "waiting", project: "unassigned-return" });
+    const issue = yield* issues.add({ title: "waiting", repo: "unassigned-return" });
     const source = event(issue.id, "unread-owner-followup");
     const trigger = (yield* ingress.accept(source))!;
     yield* service.setStatus(issue.id, "canceled", "", "", owner);

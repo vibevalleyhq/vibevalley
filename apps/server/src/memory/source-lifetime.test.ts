@@ -30,7 +30,7 @@ test("a late Nowledge connection cannot issue a tool call or reopen after the so
   });
   const call = vi.spyOn(Client.prototype, "callTool");
   const source = nowledge({ kind: "nowledge", url: "http://unused/mcp", enabled: true, read: true });
-  const query = { agent: "lab", project: "", text: "query", kind: "" as const, limit: 1 };
+  const query = { agent: "lab", repo: "", text: "query", kind: "" as const, limit: 1 };
   const pending = ended(source.search(query));
   await started;
   await Effect.runPromise(source.stop);
@@ -58,7 +58,7 @@ test("EverOS flushes completed writes but a canceled late response creates no ne
   const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));
   const run = <A, E>(e: Effect.Effect<A, E>) => Effect.provideService(e, FetchHttpClient.Fetch, fetch);
   const source = everos({ kind: "everos", url: "http://unused", enabled: true, write: true }, http);
-  const turn = { agent: "lab", session: "done", project: "demo", brief: "brief", outcome: "completed" as const, said: "done", summary: "done" };
+  const turn = { agent: "lab", session: "done", repo: "demo", brief: "brief", outcome: "completed" as const, said: "done", summary: "done" };
   expect(await ended(run(source.syncTurn(turn)))).toBe("completed");
   const pending = ended(run(source.syncTurn({ ...turn, session: "late" })));
   await started;
@@ -85,7 +85,7 @@ test("regression: a late failed Nowledge call does not discard a replacement con
     return result.promise;
   });
   const source = nowledge({ kind: "nowledge", url: "http://unused/mcp", enabled: true, read: true });
-  const search = () => ended(source.search({ agent: "lab", project: "", text: "query", kind: "", limit: 1 }));
+  const search = () => ended(source.search({ agent: "lab", repo: "", text: "query", kind: "", limit: 1 }));
   const first = search(),
     second = search();
   await whenTrue(() => calls.length === 2, "two original calls");

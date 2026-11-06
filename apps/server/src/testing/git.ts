@@ -19,9 +19,8 @@ export const gitIn = (dir: string, ...args: string[]) => gitInEnv(dir, {}, ...ar
 export const gitInEnv = (dir: string, env: Record<string, string>, ...args: string[]) =>
   execFileSync("git", args, { cwd: dir, encoding: "utf8", env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] }).trim();
 
-/** A projects folder of its own, under a work root of its own. */
-export function projectsDir(): string {
-  const root = join(tempDir("vibevalley-work-"), "projects");
+export function reposDir(): string {
+  const root = join(tempDir("vibevalley-work-"), "repos");
   mkdirSync(root);
   return root;
 }

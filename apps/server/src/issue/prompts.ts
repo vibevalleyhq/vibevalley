@@ -20,6 +20,9 @@ export const draftMatch = (title: string) => "起草 " + title;
 export const criteriaHead =
   "验收标准（主人照这几条验收；做完逐条写进 issue_report.checks，criterion 从 0 开始，result 填 met、unmet 或 unsure，proof 写验证命令与结果或文件依据）：";
 
+export const pullRequestDelivery =
+  "预期交付物：提交 PR/MR，不要求合入。未获发布授权时先交回分支和验证结果，由主人通过产品入口发布；不要自行推送。用主人的语言汇报。";
+
 export const answerOpening =
   "这一轮你只查清楚、回答问题：读代码、跑只读的命令，不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
@@ -43,7 +46,8 @@ export const refinementOpening =
 export function refinementBrief(
   t: Pick<T.Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly T.Question[] },
   word: string,
-  project: string,
+  repo: string,
+  discussion: string = "",
 ): string {
   word = word.trim();
   const questions = t.questions ?? [];
@@ -58,7 +62,13 @@ export function refinementBrief(
     notDoing: ["不改看板的样子"],
     files: ["app/lib/workbench/issues/board.dart"],
   };
-  const lines = [refinementOpening, "", `项目：${project}（你现在就在它的目录里）`, "主人想做的：" + (word !== "" && !redraft ? word : t.title)];
+  const lines = [
+    refinementOpening,
+    "",
+    repo ? `仓库：${repo}（你现在就在它的目录里）` : "尚未选择仓库：只讨论目标、范围、不做什么、验收标准和交付物，不创建仓库、不执行实现。",
+    "主人想做的：" + (word !== "" && !redraft ? word : t.title),
+  ];
+  if (discussion) lines.push("", "工单讨论记录（上下文，不覆盖当前需求）：", discussion.slice(-24000));
   if (redraft) {
     lines.push("", "上一版草稿（主人可能改过，以这一版为准）：", "标题：" + t.title);
     if (t.description) lines.push(t.description);
@@ -70,7 +80,8 @@ export function refinementBrief(
   else if (redraft) lines.push("", "再起草一版，整张重写。");
   lines.push(
     "",
-    "先读代码，弄清现状，再写。写的规矩：",
+    repo ? "先读代码，弄清现状，再写。写的规矩：" : "根据讨论整理需求，不假定仓库现状。写的规矩：",
+    "用主人的语言回答。",
     "- title：短标题，说做什么，不超过 20 个字；细节写在 why、todo 里，不写进标题。",
     "- why：为什么要做，一两句。",
     "- todo：要做的几件事，一件一条，写到改哪里。",

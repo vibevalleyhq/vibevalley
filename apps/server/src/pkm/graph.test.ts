@@ -40,7 +40,7 @@ describe("the vault's pages together", () => {
     const v = vaultOf({ ...files, "00_Inbox/Broken.md": "- ((cccccccc-0000-4000-a000-000000000003))\n" });
     const journal = pageOf(v, "2026_11_03")!;
     expect(transclusions(v, journal, { circular: (id) => `circular ${id}`, broken: (id) => `broken ${id}` })).toEqual([
-      { block: ref, found: true, page: "cetus", pageTitle: "Cetus", body: "the core idea" },
+      { block: ref, found: true, circular: false, page: "cetus", pageTitle: "Cetus", body: "the core idea" },
     ]);
     const engine = pageOf(v, "engine")!;
     const [self] = transclusions(v, engine, { circular: (id) => `circular ${id}`, broken: (id) => `broken ${id}` });

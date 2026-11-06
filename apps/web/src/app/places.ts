@@ -28,7 +28,7 @@ export const places: readonly Place[] = [
   { id: "pkm", label: t("web.pkm.place.label"), hint: t("web.pkm.place.hint"), icon: "notes", path: "/pkm", group: "work" },
   { id: "agents", label: t("web.base.place.agents.label"), hint: t("web.base.place.agents.hint"), icon: "agents", path: "/agents", group: "setup" },
   { id: "runtimes", label: t("web.base.place.runtimes.label"), hint: t("web.base.place.runtimes.hint"), icon: "runtimes", path: "/runtimes", group: "setup" },
-  { id: "projects", label: t("web.base.place.projects.label"), hint: t("web.base.place.projects.hint"), icon: "projects", path: "/projects", group: "setup" },
+  { id: "repos", label: t("web.base.place.repos.label"), hint: t("web.base.place.repos.hint"), icon: "repos", path: "/repos", group: "setup" },
   { id: "catalog", label: t("web.base.place.catalog.label"), hint: t("web.base.place.catalog.hint"), icon: "catalog", path: "/catalog", group: "reference" },
   settingsPlace,
 ];

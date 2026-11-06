@@ -49,11 +49,11 @@
   "tagsHint": "frontend, tests, docs…",
   "enabled": "Enabled",
   "enabledHint": "Disabled, the manager does not send it, and refuses when it is named.",
-  "workdir": "Default project",
-  "workdirTip": "A folder under the work folder (VIBEVALLEY_WORK_ROOT). Used when the manager sends work without naming a project; when empty, the project must be named.",
+  "workdir": "Default repo",
+  "workdirTip": "A folder under the work folder (VIBEVALLEY_WORK_ROOT). Used when the manager sends work without naming a repo; when empty, the repo must be named.",
   "workdirHint": "such as clock-in",
   "worktree": "A git worktree for each helper",
-  "worktreeHint": "Each helper changes its own branch, so helpers do not overwrite each other; completing merges it into the project. Off, it changes the project directly, with no branch to merge.",
+  "worktreeHint": "Each helper changes its own branch, so helpers do not overwrite each other; completing merges it into the repo. Off, it changes the repo directly, with no branch to merge.",
   "env": "Environment variables",
   "envHint": "On top of the runtime's own environment variables.",
   "machine": "Machine",
@@ -152,7 +152,7 @@
     "modelHint": "deepseek-v4-flash",
     "dutyTip": "One sentence: what it looks after.",
     "personaTip": "Who it is, how it talks, what it looks after; it follows the manager's prompt.",
-    "personaHint": "You look after the clock-in project; read the tests before sending work…",
+    "personaHint": "You look after the clock-in repo; read the tests before sending work…",
     "look": "Look"
   },
   "list": {

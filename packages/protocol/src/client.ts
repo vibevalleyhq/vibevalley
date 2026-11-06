@@ -207,6 +207,9 @@ export class VibeValleyApi {
     previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/issue/previewDelete", a),
     /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then leaves. */
     refine: (a: { id: string } & T.IssueRefineRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/refine", a),
+    conversation: {
+      get: (a: { id: string }): Promise<string | null> => this.call<string | null>("/api/v1/issue/conversation/get", a),
+    },
     comment: {
       /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
       create: (a: { id: string } & T.CommentRequest): Promise<T.Applied> => this.call<T.Applied>("/api/v1/issue/comment/create", a),
@@ -316,26 +319,28 @@ export class VibeValleyApi {
     },
   };
 
+  readonly repo = {
+    list: (): Promise<T.RepoSummary[]> => this.call<T.RepoSummary[]>("/api/v1/repo/list", undefined),
+    /** The first thing Create would refuse in this repo, without making it. */
+    validate: (a: T.NewRepo): Promise<T.Validation> => this.call<T.Validation>("/api/v1/repo/validate", a),
+    create: (a: T.NewRepo): Promise<T.RepoSummary> => this.call<T.RepoSummary>("/api/v1/repo/create", a),
+    pr: {
+      submit: (a: T.SubmitBranch): Promise<T.BranchPublication> => this.call<T.BranchPublication>("/api/v1/repo/pr/submit", a),
+    },
+    language: {
+      list: (a: { id: string }): Promise<T.RepoLanguages> => this.call<T.RepoLanguages>("/api/v1/repo/language/list", a),
+    },
+    template: {
+      list: (a: { id: string }): Promise<T.RepoTemplates> => this.call<T.RepoTemplates>("/api/v1/repo/template/list", a),
+    },
+    activity: {
+      get: (a: { id: string }): Promise<T.RepoActivity> => this.call<T.RepoActivity>("/api/v1/repo/activity/get", a),
+    },
+  };
+
   readonly github = {
     get: (): Promise<T.GitHubStatus> => this.call<T.GitHubStatus>("/api/v1/github/get", undefined),
     refresh: (): Promise<T.GitHubStatus> => this.call<T.GitHubStatus>("/api/v1/github/refresh", undefined),
-  };
-
-  readonly project = {
-    list: (): Promise<T.ProjectSummary[]> => this.call<T.ProjectSummary[]>("/api/v1/project/list", undefined),
-    /** The first thing Create would refuse in this project, without making it. */
-    validate: (a: T.NewProject): Promise<T.Validation> => this.call<T.Validation>("/api/v1/project/validate", a),
-    create: (a: T.NewProject): Promise<T.ProjectSummary> => this.call<T.ProjectSummary>("/api/v1/project/create", a),
-    language: {
-      list: (a: { id: string }): Promise<T.ProjectLanguages> => this.call<T.ProjectLanguages>("/api/v1/project/language/list", a),
-    },
-    template: {
-      /** The issue templates for the project: its stack, the titles sent out there before, and the template catalog filled in for it. */
-      list: (a: { id: string }): Promise<T.ProjectTemplates> => this.call<T.ProjectTemplates>("/api/v1/project/template/list", a),
-    },
-    activity: {
-      get: (a: { id: string }): Promise<T.ProjectActivity> => this.call<T.ProjectActivity>("/api/v1/project/activity/get", a),
-    },
   };
 
   readonly agent = {
@@ -430,11 +435,11 @@ export class VibeValleyApi {
   readonly memory = {
     /** An agent's memories from the database and its configured sources. */
     list: (a: { agent: string }): Promise<T.MemoryList> => this.call<T.MemoryList>("/api/v1/memory/list", a),
-    /** What the agent would recall for this project and input. */
-    recall: (a: { agent: string; project?: string; text?: string }): Promise<T.RecallPreview> => this.call<T.RecallPreview>("/api/v1/memory/recall", a),
+    /** What the agent would recall for this repo and input. */
+    recall: (a: { agent: string; repo?: string; text?: string }): Promise<T.RecallPreview> => this.call<T.RecallPreview>("/api/v1/memory/recall", a),
     create: (a: { agent: string } & T.MemoryRequest): Promise<T.Memory> => this.call<T.Memory>("/api/v1/memory/create", a),
     /** Memories whose words match, from every source the agent has; none named is every profile's. */
-    search: (a: { agent?: string; project?: string; text?: string }): Promise<T.MemorySearch> => this.call<T.MemorySearch>("/api/v1/memory/search", a),
+    search: (a: { agent?: string; repo?: string; text?: string }): Promise<T.MemorySearch> => this.call<T.MemorySearch>("/api/v1/memory/search", a),
     delete: (a: { agent: string; memory: string }): Promise<void> => this.call<void>("/api/v1/memory/delete", a),
     /** What delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { agent: string; memory: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/memory/previewDelete", a),

@@ -38,8 +38,9 @@ const memory = (id: string, text: string, change: Partial<Memory> = {}): Memory 
   recalled: 0,
   fading: false,
   ...change,
+  author: change.author ?? "system",
 });
-const cue = (text: string, change: Partial<PickCue> = {}): PickCue => ({ session: "w9", project: "clock", text, skip: new Set(), now, ...change });
+const cue = (text: string, change: Partial<PickCue> = {}): PickCue => ({ session: "w9", repo: "clock", text, skip: new Set(), now, ...change });
 const ids = (ms: readonly Memory[]) => ms.map((m) => m.id);
 
 test("terms leave out the too common", () => {
@@ -47,34 +48,34 @@ test("terms leave out the too common", () => {
   expect(termsOf("我们需要一个接口").has("一个")).toBe(false);
 });
 
-test("notes: this project's, everyone's, and another's only when it plainly shares the words", () => {
+test("notes: this repo's, everyone's, and another's only when it plainly shares the words", () => {
   const memories = [
-    memory("here", "迁移文件在 db/migrations，改表先写迁移", { project: "clock" }),
+    memory("here", "迁移文件在 db/migrations，改表先写迁移", { repo: "clock" }),
     memory("everywhere", "主人要提交信息写中文"),
-    memory("other", "博客用 hugo 生成", { project: "blog" }),
-    memory("other-related", "分页接口用 limit 和 offset 参数，默认 20 条", { project: "blog" }),
+    memory("other", "博客用 hugo 生成", { repo: "blog" }),
+    memory("other-related", "分页接口用 limit 和 offset 参数，默认 20 条", { repo: "blog" }),
   ];
   expect(ids(pick(memories, cue("打卡记录的接口加个分页")))).toEqual(["here", "everywhere"]);
   expect(ids(pick(memories, cue("分页接口加上 limit 和 offset 参数")))).toEqual(["other-related", "here", "everywhere"]);
 });
 
-test("issues: this project's only, three at most, not its own session's", () => {
+test("issues: this repo's only, three at most, not its own session's", () => {
   const memories = [
     ...Array.from({ length: 5 }, (_, i) =>
-      memory(`issue${i}`, `第 ${i} 件活 → 做好了`, { kind: "issue", project: "clock", session: sessionId(`w${i}`), at: now - i * dayMs }),
+      memory(`issue${i}`, `第 ${i} 件活 → 做好了`, { kind: "issue", repo: "clock", session: sessionId(`w${i}`), at: now - i * dayMs }),
     ),
-    memory("note", "迁移文件在 db/migrations", { project: "clock" }),
-    memory("issue-blog", "博客的活 → 做好了", { kind: "issue", project: "blog", session: sessionId("w8") }),
+    memory("note", "迁移文件在 db/migrations", { repo: "clock" }),
+    memory("issue-blog", "博客的活 → 做好了", { kind: "issue", repo: "blog", session: sessionId("w8") }),
   ];
   expect(ids(pick(memories, cue("随便做点什么")))).toEqual(["note", "issue0", "issue1", "issue2"]);
   expect(ids(pick(memories, cue("随便做点什么", { session: "w0", skip: new Set(["note"]) })))).toEqual(["issue1", "issue2", "issue3"]);
-  const many = Array.from({ length: 20 }, (_, i) => memory(`n${i}`, `这个项目的第 ${i} 条约定`, { project: "clock" }));
+  const many = Array.from({ length: 20 }, (_, i) => memory(`n${i}`, `这个仓库的第 ${i} 条约定`, { repo: "clock" }));
   expect(pick(many, cue("做点什么"))).toHaveLength(8);
 });
 
 test("lines, and what goes first when there are too many", () => {
-  expect(lineOf(memory("1", "迁移文件在 db/migrations", { project: "clock" }), "clock")).toBe("- （这个项目）迁移文件在 db/migrations");
-  expect(lineOf(memory("2", "主人要提交信息写中文"), "clock")).toBe("- （所有项目）主人要提交信息写中文");
+  expect(lineOf(memory("1", "迁移文件在 db/migrations", { repo: "clock" }), "clock")).toBe("- （这个仓库）迁移文件在 db/migrations");
+  expect(lineOf(memory("2", "主人要提交信息写中文"), "clock")).toBe("- （所有仓库）主人要提交信息写中文");
   const many = Array.from({ length: memoryKeep - 1 }, (_, i) => memory(`n${i}`, `第 ${i} 条`, { at: now - i * dayMs }));
   expect(nextForgotten(many, 1)).toEqual([]);
   const recalled = many.map((m) => (m.id === `n${memoryKeep - 2}` ? { ...m, recalledAt: now } : m));
@@ -95,7 +96,7 @@ test("the words are gse's, as recorded", () => {
 
 test("words, and code whole", () => {
   for (const [text, want] of [
-    ["这个项目测试用 pnpm test", ["项目", "测试", "pnpm", "test"]],
+    ["这个仓库测试用 pnpm test", ["仓库", "测试", "pnpm", "test"]],
     ["迁移文件在 db/migrations", ["迁移", "文件", "db/migrations"]],
     ["登录态统一走 refreshSession()", ["登录", "统一", "refreshsession"]],
     ["表名单数", ["名单", "单数"]],

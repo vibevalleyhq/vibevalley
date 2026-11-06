@@ -1,5 +1,6 @@
 import type { QuotedBlock } from "../artifact/shapes";
 import type { ChannelType } from "../channel/shapes";
+import type { IssueId } from "../common/shapes";
 import type { RunTrigger } from "../session/shapes";
 
 export const TriggerSourceValues = ["workbench", "channel", "connector", "voice", "github", "cron", "patrol"] as const;
@@ -8,7 +9,15 @@ export type TriggerSource = (typeof TriggerSourceValues)[number];
 export const TriggerActorKindValues = ["owner", "collaborator", "bot", "ci", "session", "orchestrator", "system"] as const;
 export type TriggerActorKind = (typeof TriggerActorKindValues)[number];
 
-export type TriggerAddressing = "direct" | "mention" | "thread_owner" | "unaddressed";
+export const TriggerAddressingValues = ["direct", "mention", "thread_owner", "unaddressed"] as const;
+export type TriggerAddressing = (typeof TriggerAddressingValues)[number];
+
+export const TriggerKindValues = ["ci", "review", "comment"] as const;
+export type TriggerKind = (typeof TriggerKindValues)[number];
+
+export const VoiceModeValues = ["dictated", "conversation", "api"] as const;
+/** "conversation": on a call. */
+export type VoiceMode = (typeof VoiceModeValues)[number];
 
 export interface TriggerActor {
   readonly kind: TriggerActorKind;
@@ -48,20 +57,20 @@ export interface TriggerContext {
   readonly attachments?: readonly { readonly name: string; readonly path: string }[];
   readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
   readonly blocks?: readonly QuotedBlock[];
-  readonly picked?: { readonly agent?: string; readonly project?: string };
+  readonly picked?: { readonly agent?: string; readonly repo?: string };
   readonly responsePort?: string;
-  readonly voiceMode?: "dictated" | "conversation" | "api";
+  readonly voiceMode?: VoiceMode;
 }
 
 export interface TriggerMeta {
-  readonly issue?: string;
+  readonly issue?: IssueId;
   readonly ingressRecipient?: string;
   readonly trigger?: RunTrigger;
   readonly dispatch?: boolean;
   readonly cron?: string;
-  readonly project?: string;
+  readonly repo?: string;
   readonly pr?: number;
-  readonly kind?: "ci" | "review" | "comment";
+  readonly kind?: TriggerKind;
   readonly head?: string;
   readonly fingerprint?: string;
   readonly failed?: boolean;
@@ -71,7 +80,7 @@ export interface TriggerMeta {
   readonly inputContext?: TriggerContext;
   readonly channelType?: ChannelType;
   readonly responsePort?: string;
-  readonly voiceMode?: "dictated" | "conversation" | "api";
+  readonly voiceMode?: VoiceMode;
 }
 
 export interface Trigger {
@@ -82,7 +91,7 @@ export interface Trigger {
   readonly threads: readonly string[];
   readonly replyTo?: string;
   readonly replyChannel?: string;
-  readonly picked?: { readonly agent?: string; readonly project?: string };
+  readonly picked?: { readonly agent?: string; readonly repo?: string };
   readonly card: CompactCard;
   readonly meta: TriggerMeta;
   readonly at: number;

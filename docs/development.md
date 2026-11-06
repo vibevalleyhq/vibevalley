@@ -13,7 +13,7 @@ vp run --filter @vibevalley/server start --web ../web/dist   # 监听 127.0.0.1:
 vp run desktop:dev                           # 桌面版：Electron 拉起服务端并打开页面；改页面自动刷新，改服务端空闲时自动重启
 ```
 
-- **目录**：帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下运行，项目在 `projects/`，worktree 在 `worktrees/`；设置与数据在 `~/.vibevalley`（`VIBEVALLEY_HOME`），详情见[设置和配置](docs/subsystems/setting.md#模型和不变量)。
+- **目录**：帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下运行，仓库在 `repos/`，worktree 在 `worktrees/`；设置与数据在 `~/.vibevalley`（`VIBEVALLEY_HOME`），详情见[设置和配置](docs/subsystems/setting.md#模型和不变量)。
 - **语音**：凭据配置见 [语音](docs/subsystems/voice.md)，未配置时仍可文字交互。
 - **重载**：独立运行时服务端不自动重载，修改 `apps/server` 需重启；页面修改后需重新构建（不开 `vite dev`）。
 - **表结构**：直接修改 `apps/server/db/migrations/0001_schema.up.sql` 并运行 `vp run --filter @vibevalley/server db:generate`。开机时若哈希变化，旧库自动移至 `db.<旧哈希>-<时间>` 并建新库，不写增量迁移（AGENTS.md「不留兼容」）。
@@ -94,7 +94,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 1. 创建并派发工单：
 
    ```bash
-   vibevalley issue create … --project … --agent codex --criterion '…'
+   vibevalley issue create … --repo … --agent codex --criterion '…'
    vibevalley issue status <号> todo
    ```
 

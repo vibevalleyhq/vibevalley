@@ -4,12 +4,13 @@ import { closedText, plainText, shortTitle } from "@vibevalley/protocol/rules";
 
 import { or } from "#/base/order.ts";
 
-import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
+import { answerFormat, answerOpening, criteriaHead, pullRequestDelivery } from "./prompts.ts";
 /** The criteria go last, so whoever works it checks each one before handing the work back; an answer issue reports its answer through issue_report. */
 export function issueBrief(pick: Pick<T.Issue, "title" | "description" | "criteria"> & { readonly deliver?: T.Deliverable }): string {
   let brief = pick.title;
   if (pick.description) brief += "\n\n" + pick.description;
   if (pick.criteria.length > 0) brief += "\n\n" + criteriaHead + "\n" + pick.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
+  if (pick.deliver === "pull_request") brief += "\n\n" + pullRequestDelivery;
   return pick.deliver === "answer" ? answerOpening + "\n\n" + brief + "\n\n" + answerFormat : brief;
 }
 

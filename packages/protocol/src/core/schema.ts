@@ -12,7 +12,7 @@ import { FactSessionChanged, FactSessionLeft, FactSessionPhaseChanged, Session, 
 import * as T from "../shapes";
 import { CallState, FactCallChanged } from "../voice/schema";
 
-const workspaceFields = {
+const spaceFields = {
   call: CallState,
   callReason: Schema.String,
   chat: Schema.optionalKey(Chat),
@@ -22,15 +22,15 @@ const workspaceFields = {
   connectors: Schema.mutable(Schema.Array(ConnectorStatus)),
 };
 
-export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
-  ...workspaceFields,
+export const SpaceState: Codec<T.SpaceState> = Schema.Struct({
+  ...spaceFields,
   sessions: Schema.mutable(Schema.Array(Session)),
   crons: Schema.mutable(Schema.Array(Cron)),
   plays: Schema.optionalKey(Schema.Record(Schema.String, SessionPlay)),
 });
 
-export const WorkspaceView: Codec<T.WorkspaceView> = Schema.Struct({
-  ...workspaceFields,
+export const SpaceView: Codec<T.SpaceView> = Schema.Struct({
+  ...spaceFields,
   sessions: Schema.mutable(Schema.Array(SessionView)),
   crons: Schema.mutable(Schema.Array(CronView)),
 });
@@ -39,7 +39,7 @@ export const NoticeLevel: Codec<T.NoticeLevel> = Schema.Literals(T.NoticeLevelVa
 
 export const StateFrame: Codec<T.StateFrame> = Schema.Struct({
   seq: Schema.Finite,
-  state: WorkspaceView,
+  state: SpaceView,
   inbox: Schema.mutable(Schema.Array(InboxItem)),
   view: FarmView,
   effects: Schema.mutable(Schema.Array(GameEffect)),
@@ -71,7 +71,7 @@ export const Fact: Codec<T.Fact> = Schema.Union([
 export const ServerEventSnapshot: Codec<T.ServerEventSnapshot> = Schema.Struct({
   type: Schema.Literal("snapshot"),
   at: Schema.Finite,
-  state: WorkspaceState,
+  state: SpaceState,
 });
 
 export const ServerEventStep: Codec<T.ServerEventStep> = Schema.Struct({

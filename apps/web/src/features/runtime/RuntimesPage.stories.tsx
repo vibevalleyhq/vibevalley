@@ -6,7 +6,17 @@ import { Detail } from "./RuntimesPage";
 const now = Date.now();
 const hour = 3_600_000;
 
-const look: Look = { species: "bear", outfit: "farmer", build: "treads", head: "terminal", body: "#b07a45", trim: "#3a2a18", hat: "#e8b84a", eye: "#22341a" };
+const look: Look = {
+  species: "bear",
+  outfit: "farmer",
+  orchestrator: null,
+  build: "treads",
+  head: "terminal",
+  body: "#b07a45",
+  trim: "#3a2a18",
+  hat: "#e8b84a",
+  eye: "#22341a",
+};
 
 const ready: Installation = { status: "available", via: "executable", command: "/opt/homebrew/bin/claude", version: "2.1.4" };
 
@@ -28,12 +38,12 @@ const info = (more: Partial<RuntimeInfo> = {}): RuntimeInfo => ({
       { label: "本周", usedPercent: 61, resetsAt: now + 50 * hour },
     ],
   },
-  skills: [{ name: "review", description: "按项目的规矩审一遍改动", source: "~/.claude/skills" }],
+  skills: [{ name: "review", description: "按仓库的规矩审一遍改动", source: "~/.claude/skills", enabled: true }],
   mcpServers: [{ name: "github", description: "读写 GitHub 的工单和 PR", source: "", enabled: true }],
   tools: [
-    { name: "Bash", description: "", source: "" },
-    { name: "Edit", description: "", source: "" },
-    { name: "Read", description: "", source: "" },
+    { name: "Bash", description: "", source: "", enabled: true },
+    { name: "Edit", description: "", source: "", enabled: true },
+    { name: "Read", description: "", source: "", enabled: true },
   ],
   settings: { enabled: true, binPath: "", defaultModel: "opus", defaultEffort: "medium", env: {} },
   checkedAt: now - 2 * 60_000,

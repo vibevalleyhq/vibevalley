@@ -16,9 +16,9 @@
       "label": "农机",
       "hint": "机器上的编码 agent"
     },
-    "projects": {
-      "label": "项目",
-      "hint": "每个项目一座岛"
+    "repos": {
+      "label": "仓库",
+      "hint": "每个仓库一座岛"
     },
     "catalog": {
       "label": "图鉴",

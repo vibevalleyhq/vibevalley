@@ -105,7 +105,7 @@ describe("crons", () => {
         expect(s.list()[0]!.enabled).toBe(false);
         yield* s.tick;
         expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "lab" }), owner))).toMatchObject({
-          reason: expect.stringContaining("默认项目"),
+          reason: expect.stringContaining("默认仓库"),
         });
         expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "nobody" }), owner))).toMatchObject({
           reason: expect.stringContaining("没有叫 nobody"),
@@ -115,8 +115,8 @@ describe("crons", () => {
           _tag: "Missing",
           what: expect.stringContaining("elsewhere"),
         });
-        const every = yield* s.add(req("巡检", "跑一遍检查", { kind: "every", minutes: 5 }, { agent: "lab", project: "demo" }), owner);
-        expect([every.agent, every.project]).toEqual(["lab", "demo"]);
+        const every = yield* s.add(req("巡检", "跑一遍检查", { kind: "every", minutes: 5 }, { agent: "lab", repo: "demo" }), owner);
+        expect([every.agent, every.repo]).toEqual(["lab", "demo"]);
         everyId = every.id;
         yield* s.setEnabled(every.id, false);
       }).pipe(Effect.scoped, Effect.provide(farm(config)));
@@ -196,7 +196,7 @@ describe("crons", () => {
               body: "",
               channel_id: channel,
               agent: null,
-              project: null,
+              repo: null,
               spec,
               tz: "UTC",
               pending: false,

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { parseArgs } from "node:util";
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
@@ -10,7 +11,7 @@ import type { ServerReady } from "@vibevalley/protocol";
 
 import { redactOutput } from "./base/redact.ts";
 import { app } from "./http/app.ts";
-import { loadConfig, projectsDir } from "./infra/config.ts";
+import { loadConfig, pkmDir, reposDir, worktreesDir } from "./infra/config.ts";
 import { leaseHome } from "./infra/lease.ts";
 
 const { values: flags } = parseArgs({
@@ -42,7 +43,17 @@ const main = Effect.gen(function* () {
   const runtime = testRuntimesAsked ? yield* testRuntimes : undefined;
   const fs = yield* FileSystem.FileSystem;
   yield* fs.makeDirectory(config.home, { recursive: true });
-  yield* fs.makeDirectory(projectsDir(config), { recursive: true });
+  const repos = reposDir(config);
+  const notes = pkmDir(config);
+  const oldRepos = join(config.workRoot, "projects");
+  const oldNotes = join(config.home, "pkm");
+  if ((yield* fs.exists(oldRepos)) && !(yield* fs.exists(repos)))
+    yield* Effect.logWarning(`vibevalley: ${oldRepos} is no longer read; move its repositories into ${repos}`);
+  if (config.pkm.root === "" && (yield* fs.exists(oldNotes)) && !(yield* fs.exists(notes)))
+    yield* Effect.logWarning(`vibevalley: ${oldNotes} is no longer read; move its notes into ${notes}`);
+  yield* fs.makeDirectory(repos, { recursive: true });
+  yield* fs.makeDirectory(worktreesDir(config), { recursive: true });
+  yield* fs.makeDirectory(notes, { recursive: true });
   // The home is this server's until it stops.
   yield* Effect.acquireRelease(
     Effect.try(() => leaseHome(config.home)),

@@ -10,11 +10,11 @@ function chunked(id: string, message: Record<string, unknown>, parts: number) {
 
 test("chunks arrive out of order; the turn is captioned once all are in", () => {
   const c = new LiveCaptions();
-  const [first, second] = chunked("m1", { object: "user.transcription", turn_id: 3, text: "我想看看项目", final: false }, 2);
+  const [first, second] = chunked("m1", { object: "user.transcription", turn_id: 3, text: "我想看看仓库", final: false }, 2);
   expect(c.feed(second!)).toBe(false);
   expect(c.turns).toHaveLength(0);
   expect(c.feed(first!)).toBe(true);
-  expect(c.turns.map((t) => [t.text, t.speaker, t.done])).toEqual([["我想看看项目", "you", false]]);
+  expect(c.turns.map((t) => [t.text, t.speaker, t.done])).toEqual([["我想看看仓库", "you", false]]);
 });
 
 test("a turn's text is replaced as it grows, and ends with final or turn_status", () => {

@@ -5,18 +5,19 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOf, jsonOrNone } from "#/base/json.ts";
-import { type Workplace } from "#/project/workplace.ts";
+import { type Workplace } from "#/repo/workplace.ts";
 import type * as qs from "#db/session.sql.ts";
 import type * as qr from "#db/session_run.sql.ts";
 
 const triggerOf = jsonOrNone(S.RunTrigger);
 export const heardOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
+export const pendingReportOf = jsonOrNone(S.IssueReport);
 const spentOf = jsonOrNone(S.Spent);
 const phaseOf = jsonOf(S.Phase);
 const lastRunOf = jsonOf(S.LastRun);
 const strictSpentOf = jsonOf(S.Spent);
 export const placeOf = jsonOrNone(
-  Schema.Struct({ project: Schema.String, cwd: Schema.String, branch: Schema.optionalKey(Schema.String) }) satisfies Schema.Codec<Workplace>,
+  Schema.Struct({ repo: Schema.String, cwd: Schema.String, branch: Schema.optionalKey(Schema.String) }) satisfies Schema.Codec<Workplace>,
 );
 
 export function runOf(r: qr.RunsOfSessionResult): T.Run {
@@ -50,7 +51,7 @@ export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSe
     runs: runs.length,
     phase: { _tag: "closed", at: r.ended_at ?? 0, closed: r.closed ?? "dismissed" },
     refining: false,
-    ...(r.project !== null ? { project: r.project } : {}),
+    ...(r.repo !== null ? { repo: r.repo } : {}),
     ...(r.issue !== null ? { issue: issueId(r.issue) } : {}),
     ...(r.channel !== null ? { channel: r.channel } : {}),
   };
@@ -100,7 +101,7 @@ export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
     refining: row.refining,
     runs: row.runs,
     phase: row.role === "orchestrator" ? { _tag: "resting" } : phase,
-    ...(row.project === null ? {} : { project: row.project }),
+    ...(row.repo === null ? {} : { repo: row.repo }),
     ...(row.issue === null ? {} : { issue: issueId(row.issue) }),
     ...(row.channel === null ? {} : { channel: row.channel }),
     ...(place?.branch ? { branch: place.branch, worktree: place.cwd } : {}),

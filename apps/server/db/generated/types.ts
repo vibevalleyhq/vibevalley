@@ -48,10 +48,10 @@ export type Sqlite_cron_set_by = typeof Sqlite_cron_set_by.Type
 export const Sqlite_issue_canceled = Schema.Literals(["dismissed","lost"])
 export type Sqlite_issue_canceled = typeof Sqlite_issue_canceled.Type
 
-export const Sqlite_issue_deliver = Schema.Literals(["change","branch","answer"])
+export const Sqlite_issue_deliver = Schema.Literals(["change","branch","answer","pull_request"])
 export type Sqlite_issue_deliver = typeof Sqlite_issue_deliver.Type
 
-export const Sqlite_issue_delivered = Schema.Literals(["merged","merged_into_parent","pull_request","kept","none"])
+export const Sqlite_issue_delivered = Schema.Literals(["merged","merged_into_parent","pull_request","submitted","kept","none"])
 export type Sqlite_issue_delivered = typeof Sqlite_issue_delivered.Type
 
 export const Sqlite_issue_mandate_strength = Schema.Literals(["explicit","inferred"])

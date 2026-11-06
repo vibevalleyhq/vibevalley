@@ -39,13 +39,13 @@ export function Filters(props: { tree: MemoryTree; filter: TreeFilter; setFilter
         onChange={(agent) => props.setFilter({ ...props.filter, agent })}
       />
       <PxPick
-        label={t("web.tree.byProject")}
-        testid="tree-by-project"
-        placeholder={t("web.tree.allProjects")}
+        label={t("web.tree.byRepo")}
+        testid="tree-by-repo"
+        placeholder={t("web.tree.allRepos")}
         clearable
-        value={props.filter.project}
-        options={props.tree.projects.map((p) => ({ value: p, label: p }))}
-        onChange={(project) => props.setFilter({ ...props.filter, project })}
+        value={props.filter.repo}
+        options={props.tree.repos.map((p) => ({ value: p, label: p }))}
+        onChange={(repo) => props.setFilter({ ...props.filter, repo })}
       />
     </div>
   );
@@ -106,7 +106,7 @@ export function Panel(props: {
             aside={<PxButton size="sm" label={t("web.tree.fold")} icon="button-close" onClick={props.unpick} />}
           >
             <p class={[pxText.xs, "text-bark-500"]}>
-              {props.agentName(m().agent)} · {m().project ?? t("web.tree.everyProject")} · {ago(m().at, props.now)}
+              {props.agentName(m().agent)} · {m().repo ?? t("web.tree.everyRepo")} · {ago(m().at, props.now)}
             </p>
             <Show when={m().case} fallback={<p class={pxText.sm}>{m().body}</p>}>
               {(c) => (
@@ -247,7 +247,6 @@ function Section(props: { title: string; icon?: string; aside?: JSX.Element; chi
   );
 }
 
-/** What is under the pointer: whose, which project, what it says. */
 export function Tip(props: { hover: SceneHover; tree: MemoryTree; agentName: (id: string) => string; now: number }) {
   const m = () => props.hover.item;
   const ties = () => tieWords(m().kind, tiesOf(props.tree.links, m().id));
@@ -258,7 +257,7 @@ export function Tip(props: { hover: SceneHover; tree: MemoryTree; agentName: (id
       <div class="flex items-center gap-1.5">
         <SpriteIcon name={kindIcon[m().kind]} size={14} />
         <span class={pxText.xs}>
-          {props.agentName(m().agent)} · {m().project ?? t("web.tree.everyProject")}
+          {props.agentName(m().agent)} · {m().repo ?? t("web.tree.everyRepo")}
         </span>
       </div>
       <p class={[pxText.sm, "mt-1"]}>{m().body}</p>

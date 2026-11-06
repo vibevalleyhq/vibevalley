@@ -5,7 +5,7 @@ import { Effect, FileSystem } from "effect";
 import { t } from "@vibevalley/i18n";
 
 import { messageOf } from "#/base/errors.ts";
-import { ProjectError, type Workplace, type WorkplaceRelease } from "#/project/workplace.ts";
+import { RepoError, type Workplace, type WorkplaceRelease } from "#/repo/workplace.ts";
 
 // codex runs every command as `/bin/zsh -lc '<command>'`; the label shows the
 // command, not the shell around it.
@@ -61,24 +61,24 @@ function shellWord(s: string): string | undefined {
   return out;
 }
 
-/** Context files survive suspension and never share a project checkout. */
+/** Context files survive suspension and never share a repo checkout. */
 export const contextPlace = Effect.fn("Session.contextPlace")(function* (
   workRoot: string,
   id: string,
-): Effect.fn.Return<Workplace, ProjectError, FileSystem.FileSystem> {
+): Effect.fn.Return<Workplace, RepoError, FileSystem.FileSystem> {
   const fs = yield* FileSystem.FileSystem;
   const root = join(workRoot, "contexts");
   const make = Effect.gen(function* () {
     yield* fs.makeDirectory(root, { recursive: true });
     const work = yield* fs.realPath(workRoot);
     const parent = yield* fs.realPath(root);
-    if (dirname(parent) !== work) return yield* new ProjectError({ message: t("server.project.outside") });
+    if (dirname(parent) !== work) return yield* new RepoError({ message: t("server.repo.outside") });
     const directory = yield* fs.makeTempDirectory({ directory: parent, prefix: id + "-" });
     const cwd = yield* fs.realPath(directory);
-    if (dirname(cwd) !== parent) return yield* new ProjectError({ message: t("server.project.outside") });
-    return { project: "", cwd };
+    if (dirname(cwd) !== parent) return yield* new RepoError({ message: t("server.repo.outside") });
+    return { repo: "", cwd };
   });
-  return yield* make.pipe(Effect.mapError((cause) => new ProjectError({ message: messageOf(cause), cause })));
+  return yield* make.pipe(Effect.mapError((cause) => new RepoError({ message: messageOf(cause), cause })));
 });
 
 /** A failed opening can discard only an empty context directory. */

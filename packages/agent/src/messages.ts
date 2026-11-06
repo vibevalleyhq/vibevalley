@@ -18,54 +18,37 @@ import { imagePlaceholder, summary as summaryWords, transcript as transcriptWord
 
 type UserContent = string | readonly (TextContent | ImageContent)[];
 
-export interface CustomMessage {
-  readonly role: "custom";
-  readonly customType: string;
-  readonly content: UserContent;
-  /** pi's display: false is hidden. */
-  readonly display: boolean;
-  readonly details?: unknown;
-  readonly timestamp: number;
-}
-
-export interface CompactionSummaryMessage {
-  readonly role: "compactionSummary";
-  readonly summary: string;
-  readonly tokensBefore: number;
-  readonly timestamp: number;
-  /** Absent when not archived. */
-  readonly archive?: string;
-  /** How many messages before it in the session file stay after it, as they were. */
-  readonly kept: number;
-}
-
-export type BrainMessage = AgentMessage<CustomMessage | CompactionSummaryMessage>;
-
-const CustomMessageSchema: Schema.Codec<CustomMessage> = Schema.Struct({
+const CustomMessageSchema = Schema.Struct({
   role: Schema.Literal("custom"),
   customType: Schema.String,
   content: UserContentSchema,
+  /** false: hidden. */
   display: Schema.Boolean,
   details: Schema.optionalKey(Schema.Unknown),
   timestamp: Schema.Finite,
 });
+export type CustomMessage = typeof CustomMessageSchema.Type;
 
-const CompactionSummaryMessageSchema: Schema.Codec<CompactionSummaryMessage> = Schema.Struct({
+const CompactionSummaryMessageSchema = Schema.Struct({
   role: Schema.Literal("compactionSummary"),
   summary: Schema.String,
   tokensBefore: Schema.Finite,
   timestamp: Schema.Finite,
+  /** Absent when not archived. */
   archive: Schema.optionalKey(Schema.String),
+  /** How many messages before it in the session file stay after it, as they were. */
   kept: Schema.Finite,
 });
+export type CompactionSummaryMessage = typeof CompactionSummaryMessageSchema.Type;
 
-export const BrainMessageSchema: Schema.Codec<BrainMessage> = Schema.Union([
+export const BrainMessageSchema = Schema.Union([
   UserMessageSchema,
   AssistantMessageSchema,
   ToolResultMessageSchema,
   CustomMessageSchema,
   CompactionSummaryMessageSchema,
 ]);
+export type BrainMessage = AgentMessage<CustomMessage | CompactionSummaryMessage>;
 
 export const customMessage = (customType: string, content: UserContent, now: number, options: { hidden?: boolean; details?: unknown } = {}): CustomMessage => ({
   role: "custom",
