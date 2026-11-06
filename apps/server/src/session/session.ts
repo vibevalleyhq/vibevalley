@@ -8,9 +8,9 @@ import { sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { session as sessionActor } from "#/base/actor.ts";
+import { type ApiError, reasonOf, refused } from "#/base/errors.ts";
 import { jsonOrNone } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";
-import { type ApiError, reasonOf, refused } from "#/base/errors.ts";
 import { Executor } from "#/executor/executor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
@@ -373,7 +373,7 @@ const make = Effect.gen(function* () {
         (issue
           ? projects.workplace(project, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "")
           : contextPlace(config.workRoot, id).pipe(Effect.provideService(FileSystem.FileSystem, fs))
-        ).pipe(Effect.tapError((e) => Effect.sync(() => (placeError = t("server.session.life.noPlace", { name: agent.name, why: e.message })))))
+        ).pipe(Effect.tapError((e) => Effect.sync(() => (placeError = t("server.session.life.noPlace", { name: agent.name, why: e.message }))))),
       );
       if (Option.isNone(openedPlace)) return { refused: placeError };
       const place = openedPlace.value;
@@ -559,9 +559,7 @@ const make = Effect.gen(function* () {
           if (work === "discard" && !current?.issue) return yield* Effect.fail(refused(t("server.session.life.noIssue")));
           yield* closeExecution(h);
           if (work === "discard" && h.place.branch)
-            yield* projects.reset(h.place).pipe(
-              Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name, why: e.message }))),
-            );
+            yield* projects.reset(h.place).pipe(Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name, why: e.message }))));
           yield* leave(h, closed, 0);
           const kept = current?.issue ? yield* projects.release(h.place) : { kept: false as const };
           if (kept.kept) yield* core.notice("info", t("server.session.life.left", { name, why: kept.reason }));
@@ -577,9 +575,7 @@ const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const s = core.session(id);
           if (hands.get(id) !== h || !s || isBusy(s)) return;
-          yield* projects.reset(h.place).pipe(
-            Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name: s.name, why: e.message }))),
-          );
+          yield* projects.reset(h.place).pipe(Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name: s.name, why: e.message }))));
         }),
       );
     }),

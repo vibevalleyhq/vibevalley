@@ -7,12 +7,12 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import type { Actor } from "#/base/actor.ts";
+import { messageOf, type ApiError, missing, refused, lookIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { jsonOrNone } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
-import { messageOf, type ApiError, missing, refused, lookIn } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";

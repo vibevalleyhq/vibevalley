@@ -26,13 +26,7 @@ export class PageWriter {
   private waiting: PkmBlockOp[] = [];
   private flying = false;
 
-  constructor(
-    slug: string,
-    blocks: PkmBlock[],
-    to: PageServer,
-    hooks: WriterHooks,
-    formatError: (e: unknown) => string = defaultFormatError,
-  ) {
+  constructor(slug: string, blocks: PkmBlock[], to: PageServer, hooks: WriterHooks, formatError: (e: unknown) => string = defaultFormatError) {
     this.slug = slug;
     this.to = to;
     this.hooks = hooks;

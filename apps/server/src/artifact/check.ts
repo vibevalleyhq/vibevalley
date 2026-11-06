@@ -1,7 +1,1 @@
-export {
-  type HtmlCheck,
-  htmlCheck,
-  htmlProblem,
-  type HtmlRefusal,
-  type HtmlWarning,
-} from "@vibevalley/artifact/html";
+export { htmlCheck, htmlProblem, type HtmlWarning } from "@vibevalley/artifact/html";

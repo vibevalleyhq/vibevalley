@@ -1,8 +1,4 @@
 export {
-  base64Of,
-  DictationResponseSchema,
-  dictateFormats,
-  dictateMaxBytes,
   dictateRate,
   dictateWorkletCode,
   encodeWavBase64,
@@ -11,5 +7,4 @@ export {
   rmsLevel,
   type TranscriptionFailure,
   transcribeAudio,
-  wavOf,
 } from "./transcribe/transcribe.ts";

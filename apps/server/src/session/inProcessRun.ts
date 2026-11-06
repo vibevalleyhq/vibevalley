@@ -8,8 +8,8 @@ import { t } from "@vibevalley/i18n";
 import type { Outcome, RunTrigger, Spent } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
-import { newId } from "#/base/ids.ts";
 import { Inconsistent } from "#/base/errors.ts";
+import { newId } from "#/base/ids.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import * as qr from "#db/session_run.sql.ts";
 import * as qi from "#db/session_run_issue.sql.ts";

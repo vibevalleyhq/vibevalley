@@ -5,9 +5,9 @@ import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
+import { type ApiError, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import type { Channel } from "#/channel/channel.ts";
 import type { Core } from "#/core/core.ts";
-import { type ApiError, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import type { Db } from "#/infra/db.ts";
 import { issueBranch, type Project } from "#/project/project.ts";
 import { type Merged, MergeFailure, type ProjectError, type Workplace } from "#/project/workplace.ts";
@@ -132,20 +132,15 @@ export function merging(d: MergeDeps) {
     yield* publish(issue.id);
   });
 
-  const refreshPullRequests = Effect.fn("Issue.refreshPullRequests")(
-    function* () {
-      for (const issue of yield* list) {
-        if (issue.pullRequest?.state !== "open" || !issue.project) continue;
-        yield* projects.pullRequestState(issue.project, issue.pullRequest.number).pipe(
-          Effect.flatMap((state) => (state === "open" ? Effect.void : finishPullRequest(issue, state))),
-          Effect.catch((e) =>
-            Effect.logWarning(`vibevalley: refresh pull requests: issue #${issue.number}: ${e instanceof Error ? e.message : reasonOf(e)}`),
-          ),
-        );
-      }
-    },
-    prLock.withPermits(1),
-  );
+  const refreshPullRequests = Effect.fn("Issue.refreshPullRequests")(function* () {
+    for (const issue of yield* list) {
+      if (issue.pullRequest?.state !== "open" || !issue.project) continue;
+      yield* projects.pullRequestState(issue.project, issue.pullRequest.number).pipe(
+        Effect.flatMap((state) => (state === "open" ? Effect.void : finishPullRequest(issue, state))),
+        Effect.catch((e) => Effect.logWarning(`vibevalley: refresh pull requests: issue #${issue.number}: ${e instanceof Error ? e.message : reasonOf(e)}`)),
+      );
+    }
+  }, prLock.withPermits(1));
 
   const submit = Effect.fn("Issue.submitWorkingPullRequest")(function* (id: string, session: string, summary?: string) {
     const submitted = yield* sessions

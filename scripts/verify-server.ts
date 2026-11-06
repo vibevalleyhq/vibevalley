@@ -231,11 +231,7 @@ export async function runVerification(command: string[] = [], options: Verificat
     process.off("SIGTERM", interrupt);
     writeFileSync(
       join(evidence, "result.json"),
-      JSON.stringify(
-        { code, address, stopped: failures.length === 0, command: command[0] ?? "issue list", cleanupErrors: failures.map(String) },
-        null,
-        2,
-      ),
+      JSON.stringify({ code, address, stopped: failures.length === 0, command: command[0] ?? "issue list", cleanupErrors: failures.map(String) }, null, 2),
     );
     if (failures.length === 0) for (const path of [home, work, binaries]) rmSync(path, { recursive: true, force: true });
     console.log(`verification evidence: ${evidence}`);

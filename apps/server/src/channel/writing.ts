@@ -5,8 +5,8 @@ import type * as T from "@vibevalley/protocol";
 import { everyone, ownerId } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
-import { newId } from "#/base/ids.ts";
 import { Inconsistent } from "#/base/errors.ts";
+import { newId } from "#/base/ids.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";

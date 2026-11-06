@@ -43,7 +43,7 @@ export function liveCaptions(turns: readonly Caption[], spoken: readonly SpokenL
   });
 }
 
-export const CaptionMessageSchema = Schema.Struct({
+const CaptionMessageSchema = Schema.Struct({
   object: Schema.optionalKey(Schema.String),
   turn_id: Schema.optionalKey(Schema.Finite),
   turn_status: Schema.optionalKey(Schema.Finite),

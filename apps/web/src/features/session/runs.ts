@@ -177,9 +177,9 @@ const JsonObjectInput = Schema.fromJsonString(Schema.Record(Schema.String, Schem
 export function readableInput(step: SessionEvent) {
   const raw = step.input?.trim() ?? "";
   if (!raw) return "";
-  const obj = Schema.decodeUnknownOption(JsonObjectInput)(raw);
+  const obj = Schema.decodeOption(JsonObjectInput)(raw);
   if (obj._tag === "Some") {
-    const cmd = Schema.decodeUnknownOption(CommandInput)(raw);
+    const cmd = Schema.decodeOption(CommandInput)(raw);
     if (cmd._tag === "Some" && cmd.value.command !== undefined) return `$ ${cmd.value.command}`;
     return JSON.stringify(obj.value, null, 2);
   }

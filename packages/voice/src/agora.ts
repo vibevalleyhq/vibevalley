@@ -1,5 +1,4 @@
 export {
-  type AgoraCredentials,
   agentFor,
   alreadyStopping,
   buildVendors,
@@ -18,6 +17,5 @@ export {
   unavailable,
   type VendorMessages,
   type Vendors,
-  type VoiceKeys,
   voiceAgentUid,
 } from "./agora/server.ts";

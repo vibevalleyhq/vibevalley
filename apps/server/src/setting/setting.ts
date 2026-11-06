@@ -179,9 +179,7 @@ const make = Effect.gen(function* () {
     if (u.voice) next.voice = voiceOverrides(defaults(), voiceSettingsOver(defaults(), u.voice));
     if (Predicate.isObject(next.voice) && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
-    const kept = yield* Schema.decodeEffect(Stored)(compact(next)).pipe(
-      Effect.mapError((e) => new SettingRefused({ message: e.message, cause: e })),
-    );
+    const kept = yield* Schema.decodeEffect(Stored)(compact(next)).pipe(Effect.mapError((e) => new SettingRefused({ message: e.message, cause: e })));
     yield* disk
       .save(JSON.stringify(kept, null, 2) + "\n")
       .pipe(Effect.mapError((e) => new SettingRefused({ message: t("server.setting.notSaved", { file, why: e.message }), cause: e })));

@@ -6,9 +6,9 @@ import { assignedAgentOf, executionsOf, latestSessionIdOf } from "@vibevalley/pr
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
+import { type ApiError, Inconsistent, missing, lookIn, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
-import { type ApiError, Inconsistent, missing, lookIn, refused } from "#/base/errors.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";

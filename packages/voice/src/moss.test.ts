@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
+import { type MossEvents, type MossTransport, verifyMoss } from "./moss-server.ts";
 import {
   heard,
   levelOf,
@@ -13,7 +14,6 @@ import {
   packTaggedAudio,
   unpackPcm16,
 } from "./moss.ts";
-import { type MossEvents, type MossTransport, verifyMoss } from "./moss-server.ts";
 
 /** A MOSS that answers the way script says, after the socket opens; status is what plain HTTPS answers. */
 const fake = (script: (on: MossEvents, sent: string[]) => void, status: MossTransport["status"] = () => Effect.succeed({ code: 400, body: "" })) => {
@@ -167,9 +167,7 @@ describe("Playback", () => {
     const p2 = new Playback();
     p2.ended(p2.queue(piece("c1"), 0.2, 0));
     p2.queue(piece("c2"), 0.2, 0.2);
-    expect(p2.cutSampleAccurate("r1", "t1", 75).actions).toEqual([
-      { action: "playback.stopped", run_id: "r1", turn_id: "t1", played_audio_ms: 275 },
-    ]);
+    expect(p2.cutSampleAccurate("r1", "t1", 75).actions).toEqual([{ action: "playback.stopped", run_id: "r1", turn_id: "t1", played_audio_ms: 275 }]);
   });
 
   it("says nothing when cutting a run it never heard of", () => {
@@ -263,4 +261,3 @@ describe("MossEngine end-to-end session state machine", () => {
     expect(extractMossToolCall(JSON.stringify({ action: "session_attached" }))).toBeUndefined();
   });
 });
-

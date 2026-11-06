@@ -7,7 +7,7 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
 import { jsonOrNone } from "#/base/json.ts";
-import { numberIn, or } from "#/base/order.ts";
+import { or } from "#/base/order.ts";
 
 import { gitQuiet } from "./git.ts";
 
@@ -111,7 +111,7 @@ export const lexists = (path: string) =>
 const skipDirs = new Set(["node_modules", ".git", ".venv", "vendor", "dist", "build", "target", ".next"]);
 
 /** The repositories under dir, at most depth folders down; a repository's own folders are not looked into. */
-export const repoDirs = (dir: string, depth: number): Effect.Effect<string[]> =>
+const repoDirs = (dir: string, depth: number): Effect.Effect<string[]> =>
   Effect.gen(function* () {
     const entries = yield* Effect.tryPromise({ try: () => readdir(dir, { withFileTypes: true }), catch: () => [] }).pipe(Effect.orElseSucceed(() => []));
     if (entries.some((e) => e.name === ".git")) return [dir];

@@ -40,7 +40,9 @@ const runtime = Command.make(
 
 const chat = Command.make("chat", { cwd: text("cwd"), name: text("name"), model: text("model"), mcp: text("mcp"), prompt }, (o) => {
   const p = given(o.prompt);
-  return talk(ownChat({ cwd: given(o.cwd) ?? "", name: given(o.name) ?? "vibevalley", model: given(o.model) ?? "", mcp: given(o.mcp) ?? "", ...(p ? { p } : {}) }));
+  return talk(
+    ownChat({ cwd: given(o.cwd) ?? "", name: given(o.name) ?? "vibevalley", model: given(o.model) ?? "", mcp: given(o.mcp) ?? "", ...(p ? { p } : {}) }),
+  );
 }).pipe(Command.withSubcommands([runtime]));
 
 Command.runWith(chat, { version: "0.1.0" })(process.argv.slice(2)).pipe(

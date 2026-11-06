@@ -41,9 +41,7 @@ export class Ended extends Schema.TaggedError<Ended, { readonly brand: unique sy
 }) {}
 
 const line = (to: "stdout" | "stderr", text: string) =>
-  Effect.flatMap(Stdio.Stdio, (io) => Stream.run(Stream.make(text + "\n"), io[to]({ endOnDone: false }))).pipe(
-    Effect.catch(() => Effect.void),
-  );
+  Effect.flatMap(Stdio.Stdio, (io) => Stream.run(Stream.make(text + "\n"), io[to]({ endOnDone: false }))).pipe(Effect.ignore({ log: "Debug" }));
 
 export const out = (text: string) => line("stdout", text);
 export const err = (text: string) => line("stderr", text);

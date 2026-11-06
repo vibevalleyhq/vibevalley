@@ -873,4 +873,3 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 });
-

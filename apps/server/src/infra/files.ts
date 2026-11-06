@@ -14,19 +14,16 @@ const notWritten = (cause: unknown) => new NotWritten({ message: messageOf(cause
 
 /** Writes a file named by its bytes (their hash), making its folder: the same bytes are the same file, so one already
  * there is left as it is. */
-export const writeOnce = Effect.fn("Files.writeOnce")(
-  function* (path: string, bytes: Uint8Array) {
-    const fs = yield* FileSystem.FileSystem;
-    yield* fs.makeDirectory(dirname(path), { recursive: true });
-    yield* fs.writeFile(path, bytes, { flag: "wx" }).pipe(
-      Effect.catchIf(
-        (e) => e.reason._tag === "AlreadyExists",
-        () => Effect.void,
-      ),
-    );
-  },
-  Effect.mapError(notWritten),
-);
+export const writeOnce = Effect.fn("Files.writeOnce")(function* (path: string, bytes: Uint8Array) {
+  const fs = yield* FileSystem.FileSystem;
+  yield* fs.makeDirectory(dirname(path), { recursive: true });
+  yield* fs.writeFile(path, bytes, { flag: "wx" }).pipe(
+    Effect.catchIf(
+      (e) => e.reason._tag === "AlreadyExists",
+      () => Effect.void,
+    ),
+  );
+}, Effect.mapError(notWritten));
 
 /** An owner's file (config.json, settings.json) read by read. */
 export const readOrSetAside = <A>(file: string, read: (text: string) => A, startsFrom: string): Effect.Effect<A | undefined, never, FileSystem.FileSystem> =>

@@ -4,8 +4,8 @@ import { type HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 
-import { jsonOrNone } from "#/base/json.ts";
 import { Inconsistent } from "#/base/errors.ts";
+import { jsonOrNone } from "#/base/json.ts";
 
 import { type Adapter, type AppFailed, failedOf, failedWith } from "./adapter.ts";
 

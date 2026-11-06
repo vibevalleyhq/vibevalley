@@ -8,7 +8,7 @@ import { edgesOf, exportsOf } from "@vibevalley/testkit/source";
 const root = join(import.meta.dirname, "../../../..");
 const here = import.meta.dirname;
 /** What runs beside the server: the page and the shells around it. */
-const outside = ["apps/web/src", "apps/web/test", "apps/mobile/src", "apps/desktop/src", "packages/engine/src"];
+const outside = ["apps/web/src", "apps/web/test", "apps/mobile/src", "apps/desktop/src", "packages/artifact/src", "packages/engine/src", "packages/pkm/src"];
 
 function files(dir: string): string[] {
   let names: string[];

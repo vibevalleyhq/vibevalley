@@ -4,7 +4,18 @@ import { Agent } from "#/agent/agent.ts";
 import { foundText, Memory, type SearchQuery } from "#/memory/memory.ts";
 
 import { answers, memoryWhere, ownerAgentWord } from "./prompts.ts";
-import { answered, callerOf, refuse, sessionSchemaTool, tool, type Caller, type Orchestrator, type SessionInput, type ToolRefusal, type Who } from "./schemas.ts";
+import {
+  answered,
+  callerOf,
+  refuse,
+  sessionSchemaTool,
+  tool,
+  type Caller,
+  type Orchestrator,
+  type SessionInput,
+  type ToolRefusal,
+  type Who,
+} from "./schemas.ts";
 
 export const memoryTools = Effect.gen(function* () {
   const agents = yield* Agent;

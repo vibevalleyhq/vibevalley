@@ -81,12 +81,7 @@ export type Fact =
   | FactConnectorChanged;
 
 /** Told apart by `type`. */
-export type ServerEvent =
-  | Fact
-  | ServerEventSnapshot
-  | ServerEventStep
-  | ServerEventNotice
-  | ServerEventRuntime;
+export type ServerEvent = Fact | ServerEventSnapshot | ServerEventStep | ServerEventNotice | ServerEventRuntime;
 
 export interface ServerEventSnapshot {
   type: "snapshot";

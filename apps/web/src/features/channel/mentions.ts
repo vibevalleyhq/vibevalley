@@ -35,7 +35,9 @@ export const nameables = (sessions: SessionView[], orchestrators: readonly Agent
   ...orchestrators
     .filter((a) => a.id !== here)
     .map((a) => ({ token: `@${a.id}`, name: a.name, note: a.duty || t("web.channel.names.orchestratorNote"), orchestrator: a.id })),
-  ...(sessions.length > 1 ? [{ token: mentionOf[everyone] ?? "@everyone", name: t("web.channel.names.everyone"), note: t("web.channel.names.everyoneNote") }] : []),
+  ...(sessions.length > 1
+    ? [{ token: mentionOf[everyone] ?? "@everyone", name: t("web.channel.names.everyone"), note: t("web.channel.names.everyoneNote") }]
+    : []),
 ];
 
 const typed = new RegExp(String.raw`${mentionLead}@([\p{L}\p{N}_]*)$`, "u");

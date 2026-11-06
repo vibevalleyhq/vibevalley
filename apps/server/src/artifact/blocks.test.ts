@@ -8,8 +8,8 @@ import type { ArtifactId, BlockOp } from "@vibevalley/protocol";
 import { artifactId, blockId, type Wire } from "@vibevalley/protocol/schema";
 
 import { sampleAgent } from "#/agent/seed.ts";
-import { newId } from "#/base/ids.ts";
 import { orMissing } from "#/base/errors.ts";
+import { newId } from "#/base/ids.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Database, Db } from "#/infra/db.ts";
 import { bold, para, sample, span } from "#/testing/artifact.ts";

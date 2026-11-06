@@ -1,19 +1,6 @@
 import { createHash, randomInt } from "node:crypto";
 
-import {
-  Cause,
-  Clock,
-  Deferred,
-  Duration,
-  Effect,
-  Fiber,
-  Option,
-  Predicate,
-  Queue,
-  Schedule,
-  Schema,
-  Semaphore,
-} from "effect";
+import { Cause, Clock, Deferred, Duration, Effect, Fiber, Option, Predicate, Queue, Schedule, Schema, Semaphore } from "effect";
 import type { SqlClient, SqlError } from "effect/sql";
 
 import { t } from "@vibevalley/i18n";
@@ -24,11 +11,11 @@ import { messageId } from "@vibevalley/protocol/schema";
 
 import { reasonOf } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { Channel } from "#/channel/channel.ts";
-import { Core } from "#/core/core.ts";
-import { Inbox } from "#/inbox/inbox.ts";
+import type { Channel } from "#/channel/channel.ts";
+import type { Core } from "#/core/core.ts";
+import type { Inbox } from "#/inbox/inbox.ts";
 import { causeMessage } from "#/infra/db.ts";
-import { Ingress } from "#/ingress/ingress.ts";
+import type { Ingress } from "#/ingress/ingress.ts";
 import * as accountQ from "#db/connector_account.sql.ts";
 import * as inboundQ from "#db/connector_inbound.sql.ts";
 import * as outboxQ from "#db/connector_outbox.sql.ts";
@@ -91,11 +78,7 @@ export interface BridgeEnv {
 
 import type { Context } from "effect";
 
-export const makeBridge = (
-  env: BridgeEnv,
-  adapter: Adapter,
-  mail: { readonly outbox: Queue.Queue<void>; readonly inbox: Queue.Queue<void> },
-) => {
+export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly outbox: Queue.Queue<void>; readonly inbox: Queue.Queue<void> }) => {
   const { now, chat, ingress, core, inbox, retryFirst, retryMost, forkHere, tried, inTx, isClosing } = env;
   const id = adapter.id;
   const outboxBackoff = Schedule.exponential(Duration.millis(retryFirst)).pipe(

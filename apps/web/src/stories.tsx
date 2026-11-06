@@ -12,7 +12,7 @@ import { fakeFetch } from "./infra/storyApi";
 import { createRegistry, RegistryContext } from "./state/atom";
 import { order } from "./storyLevels";
 
-import "./stories/stories.css";
+import "./stories.css";
 
 const found = import.meta.glob<{ default: Stories }>("./**/*.stories.tsx", { eager: true });
 

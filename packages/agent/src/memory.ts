@@ -32,8 +32,8 @@ interface MemorySnapshot {
 
 export interface MemoryPort {
   readonly read: () => Effect.Effect<{ readonly prompt: string; readonly lines: readonly string[] }>;
-  readonly remember: (note: string) => Effect.Effect<void, unknown>;
-  readonly rewrite: (content: string) => Effect.Effect<number, unknown>;
+  readonly remember: (note: string) => Effect.Effect<void, AgentFailed>;
+  readonly rewrite: (content: string) => Effect.Effect<number, AgentFailed>;
 }
 
 export const fileMemory = (home: string, now: () => number): MemoryPort => ({

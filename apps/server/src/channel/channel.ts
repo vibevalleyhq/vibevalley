@@ -3,19 +3,19 @@ import { Clock, Context, Effect, Layer, PubSub, Stream } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { defaultOrchestrator, ownerId } from "@vibevalley/protocol";
+import { ownerId } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
-import { Core } from "#/core/core.ts";
 import { type ApiError, refused, lookIn, missing } from "#/base/errors.ts";
+import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { heldShown, type InboxMessage, retryWindowMs } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Session } from "#/session/session.ts";
-import * as qc from "#db/channel.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
+import * as qr from "#db/channel_read_cursor.sql.ts";
 
 import { type SayMore, type Spoken, type Meta, metaOf, metaText, toMessage, inboxMore, type ChannelService } from "./contracts.ts";
 import { channelDirectory } from "./directory.ts";
@@ -59,6 +59,7 @@ const make = Effect.gen(function* () {
     model,
     tx,
     locked,
+    seat,
     said,
     ownerReadHub,
     channelTags,
@@ -70,7 +71,6 @@ const make = Effect.gen(function* () {
     toChannel,
     counted,
     publishChannel,
-    publishOwnerMentions,
     threadOfSession,
     threadFor,
     setRead,
@@ -127,8 +127,6 @@ const make = Effect.gen(function* () {
     if (number === undefined) return;
     if (!(yield* db.one(qm.messageByNumber({ channel_id: channel, number })))) return yield* Effect.fail(refused(t("server.channel.noMessage", { n: number })));
   });
-
-
 
   const ownerSays = Effect.fnUntraced(function* (
     text: string,
@@ -461,7 +459,7 @@ const make = Effect.gen(function* () {
       return yield* locked(
         inboxRows(who).pipe(
           Effect.map((rows) => rows.map(({ target, ...r }): T.ChannelUnread => ({ channel: target, ...r }))),
-          Effect.catchCause((c) => Effect.as<T.ChannelUnread[]>(Effect.logWarning(`chat: unread of ${who}: ${String(c)}`), [])),
+          Effect.catchCause((c) => Effect.as(Effect.logWarning(`chat: unread of ${who}: ${String(c)}`), [])),
         ),
       );
     }),

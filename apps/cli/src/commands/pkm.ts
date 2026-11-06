@@ -29,16 +29,13 @@ const outline = (p: T.PkmPage) =>
   ].join("\n");
 
 /** `pkm capture <text>`: into today's journal, or --page's end; with no words, what comes on stdin, read as an outline. */
-const captureCommand = Command.make(
-  "capture",
-  { words: optionalWords("cli.arg.capture"), page: optionalText("page", "cli.flag.capturePage") },
-  (o) =>
-    Effect.gen(function* () {
-      const text = o.words.length > 0 ? o.words.join(" ") : yield* stdinText.pipe(Effect.orElseSucceed(() => ""));
-      const page = given(o.page);
-      const written = yield* ask((api) => api.pkm.capture({ text, ...(page === undefined ? {} : { page }) }));
-      yield* show(written, (w) => t("cli.pkm.captured", { page: w.title }));
-    }),
+const captureCommand = Command.make("capture", { words: optionalWords("cli.arg.capture"), page: optionalText("page", "cli.flag.capturePage") }, (o) =>
+  Effect.gen(function* () {
+    const text = o.words.length > 0 ? o.words.join(" ") : yield* stdinText.pipe(Effect.orElseSucceed(() => ""));
+    const page = given(o.page);
+    const written = yield* ask((api) => api.pkm.capture({ text, ...(page === undefined ? {} : { page }) }));
+    yield* show(written, (w) => t("cli.pkm.captured", { page: w.title }));
+  }),
 ).pipe(
   Command.withDescription(t("cli.command.pkm.capture")),
   Command.withExamples([

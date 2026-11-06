@@ -23,14 +23,7 @@ import { Composer, FileDrop } from "./Composer";
 import { notifyOptions } from "./Dialogs";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "./marks";
 import { MessageList } from "./MessageList";
-import {
-  chatPath,
-  messagePath,
-  threadOwnerOf,
-  threadsIn,
-  threadTitle,
-  workbenchClock,
-} from "./places";
+import { chatPath, messagePath, threadOwnerOf, threadsIn, threadTitle, workbenchClock } from "./places";
 import { HelperFace, PhaseGlyph, phaseText } from "./presence";
 
 const bad = (reason: string) => toast(reason, "bad");

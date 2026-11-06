@@ -9,9 +9,9 @@ import { artifactId } from "@vibevalley/protocol/schema";
 import { Artifact } from "#/artifact/artifact.ts";
 import { artifactHeaders } from "#/artifact/policy.ts";
 import { withShell } from "#/artifact/shell.ts";
+import { messageOf, refused } from "#/base/errors.ts";
 import { wireOf } from "#/base/json.ts";
 import { Channel } from "#/channel/channel.ts";
-import { messageOf, refused } from "#/base/errors.ts";
 import { Voice } from "#/voice/voice.ts";
 
 import { fromTheFarm } from "./rpc.ts";

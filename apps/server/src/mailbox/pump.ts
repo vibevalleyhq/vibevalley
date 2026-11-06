@@ -151,9 +151,7 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
       Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis;
         const accepted = new Set(input.envelopeIds);
-        const messages = ports
-          .pending(input.session)
-          .flatMap((row) => (accepted.has(row.envelope_id) && row.message_id !== null ? [row.message_id] : []));
+        const messages = ports.pending(input.session).flatMap((row) => (accepted.has(row.envelope_id) && row.message_id !== null ? [row.message_id] : []));
         yield* Effect.forEach(input.envelopeIds, (id) => ports.consume(input.session, id, now), { discard: true });
         yield* ports.consumedMessages(input.session, messages);
       }),

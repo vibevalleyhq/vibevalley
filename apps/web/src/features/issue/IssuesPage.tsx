@@ -229,7 +229,7 @@ function Detail(props: {
   const shows = (kind: BoardCard["kind"]) => {
     const c = card();
     if (c?.kind !== kind) return undefined;
-    return c.kind === "issue" ? `issue:${c.sessions[c.sessions.length - 1]!.id}` : `${c.kind}:${c.id}`;
+    return c.kind === "issue" ? `issue:${c.sessions.at(-1)?.id ?? ""}` : `${c.kind}:${c.id}`;
   };
   return (
     <Switch>

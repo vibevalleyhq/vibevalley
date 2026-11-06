@@ -82,13 +82,15 @@ export const issueTools = Effect.gen(function* () {
     const all = yield* issue.list();
     if (/^\d+$/u.test(k)) {
       const byNumber = all.find((item) => item.number === Number(k));
-      return byNumber ? byNumber : yield* Effect.fail(answers.noIssueNumber(k));
+      if (!byNumber) return yield* Effect.fail(answers.noIssueNumber(k));
+      return byNumber;
     }
     const byId = all.find((item) => item.id === k);
     if (byId) return byId;
     const session = findSession(k);
     const of = session?.issue ? all.find((item) => item.id === session.issue) : undefined;
-    return of ? of : yield* Effect.fail(answers.noIssueOrAgent(k));
+    if (!of) return yield* Effect.fail(answers.noIssueOrAgent(k));
+    return of;
   });
 
   const withIssue = <E>(key: string, f: (issue: T.Issue) => Effect.Effect<string, E>) =>
@@ -291,73 +293,75 @@ export const issueTools = Effect.gen(function* () {
   const issueCreate = (who: Who) =>
     tool(
       "issue.create",
-      Effect.fn("Tool.issueCreate")(function* (p: Orchestrator<"issue.create">) {
-        const c = yield* callerOf(who);
-        if (p.draft === true && p.start === true) return answers.issueCreate.draftWithStartRefused;
-        if (!mandateNoteFits(p.description ?? "")) return answers.issueCreate.noteTooLong;
-        let channel: Info;
-        if (p.channel) {
-          const byName = yield* chat.channelByName(p.channel);
-          if (!byName) return answers.issueCreate.noChannel(p.channel);
-          channel = byName;
-        } else channel = yield* chat.topOf(c.here);
-        const parent = p.parent ? yield* issue.get(yield* issue.idOf(p.parent)) : undefined;
-        const blockedBy = yield* Effect.forEach(p.blockedBy ?? [], (ref) => Effect.map(issue.idOf(ref), S.issueId));
-        const project = (p.project ?? parent?.project ?? "").trim() || channel.project;
-        if (p.start === true && !project) return answers.issueCreate.noDefaultProject(channel.name);
-        const priority = p.priority ? priorityOf(p.priority) : undefined;
-        if (p.priority && !priority) return noSuchPriority(p.priority);
-        const deliver = p.deliver ? DeliverableValues.find((d) => d === p.deliver) : undefined;
-        if (p.deliver && !deliver) return answers.issueCreate.noDeliver;
-        let agent: string | undefined = parent ? assignedAgentOf(parent) : undefined;
-        if (p.agent || p.start === true) {
-          const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.agent ?? agent ?? "", p.start === true ? c.picked : "").pipe(
-            Effect.mapError((why) => answers.issueCreate.notRecorded(why)),
+      Effect.fn("Tool.issueCreate")(
+        function* (p: Orchestrator<"issue.create">) {
+          const c = yield* callerOf(who);
+          if (p.draft === true && p.start === true) return answers.issueCreate.draftWithStartRefused;
+          if (!mandateNoteFits(p.description ?? "")) return answers.issueCreate.noteTooLong;
+          let channel: Info;
+          if (p.channel) {
+            const byName = yield* chat.channelByName(p.channel);
+            if (!byName) return answers.issueCreate.noChannel(p.channel);
+            channel = byName;
+          } else channel = yield* chat.topOf(c.here);
+          const parent = p.parent ? yield* issue.get(yield* issue.idOf(p.parent)) : undefined;
+          const blockedBy = yield* Effect.forEach(p.blockedBy ?? [], (ref) => Effect.map(issue.idOf(ref), S.issueId));
+          const project = (p.project ?? parent?.project ?? "").trim() || channel.project;
+          if (p.start === true && !project) return answers.issueCreate.noDefaultProject(channel.name);
+          const priority = p.priority ? priorityOf(p.priority) : undefined;
+          if (p.priority && !priority) return noSuchPriority(p.priority);
+          const deliver = p.deliver ? DeliverableValues.find((d) => d === p.deliver) : undefined;
+          if (p.deliver && !deliver) return answers.issueCreate.noDeliver;
+          let agent: string | undefined = parent ? assignedAgentOf(parent) : undefined;
+          if (p.agent || p.start === true) {
+            const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.agent ?? agent ?? "", p.start === true ? c.picked : "").pipe(
+              Effect.mapError((why) => answers.issueCreate.notRecorded(why)),
+            );
+            agent = a.id;
+          }
+          const item = yield* issue
+            .add(
+              {
+                title: p.title,
+                ...(parent ? { parent: parent.id } : {}),
+                ...(blockedBy.length > 0 ? { blockedBy } : {}),
+                ...(p.description ? { description: p.description } : {}),
+                ...(project ? { project } : {}),
+                ...(agent ? { agent } : {}),
+                ...(priority ? { priority } : {}),
+                ...(deliver ? { deliver } : {}),
+              },
+              actsForOwner(c.actor) ? explicitMandate(c.envelope, p.autoSubmitPr ?? false) : inferredMandate(c.envelope),
+            )
+            .pipe(Effect.mapError((e) => answers.issueCreate.notRecordedFailed(said(e))));
+          const noted = answers.issueCreate.noted(item.number, shortTitle(item.title), item.deliver === "answer");
+          if (p.start === true) {
+            // Written down first: a start that fails leaves the issue in the backlog, and trying again starts it, not a second one.
+            const sent = yield* issue.start(item.id, channel.id).pipe(Effect.mapError((e) => answers.issueCreate.queuedNoStart(noted, said(e))));
+            if (sent.queued) return answers.issueCreate.queuedInChannel(noted, channel.name, sent.queued);
+            const h = sent.session ? run.sessionOf(sent.session) : undefined;
+            const branch = h?.branch ? answers.issueCreate.branchNote(h.branch) : "";
+            return answers.issueCreate.dispatched(
+              noted,
+              channel.name,
+              h ? answers.issueCreate.who(h.name, h.id) : answers.issueCreate.noAgentFallback,
+              h?.project ?? project,
+              branch,
+            );
+          }
+          if (p.draft !== true) return answers.issueCreate.inBacklog(noted, answers.issueCreate.notStartedNote);
+          const refined = yield* issue.refine(item.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id).pipe(
+            Effect.as(answers.issueCreate.draftingNote),
+            Effect.catch((e) => Effect.succeed(answers.issueCreate.draftFailed(said(e)))),
           );
-          agent = a.id;
-        }
-        const item = yield* issue
-          .add(
-            {
-              title: p.title,
-              ...(parent ? { parent: parent.id } : {}),
-              ...(blockedBy.length > 0 ? { blockedBy } : {}),
-              ...(p.description ? { description: p.description } : {}),
-              ...(project ? { project } : {}),
-              ...(agent ? { agent } : {}),
-              ...(priority ? { priority } : {}),
-              ...(deliver ? { deliver } : {}),
-            },
-            actsForOwner(c.actor) ? explicitMandate(c.envelope, p.autoSubmitPr ?? false) : inferredMandate(c.envelope),
-          )
-          .pipe(Effect.mapError((e) => answers.issueCreate.notRecordedFailed(said(e))));
-        const noted = answers.issueCreate.noted(item.number, shortTitle(item.title), item.deliver === "answer");
-        if (p.start === true) {
-          // Written down first: a start that fails leaves the issue in the backlog, and trying again starts it, not a second one.
-          const sent = yield* issue
-            .start(item.id, channel.id)
-            .pipe(Effect.mapError((e) => answers.issueCreate.queuedNoStart(noted, said(e))));
-          if (sent.queued) return answers.issueCreate.queuedInChannel(noted, channel.name, sent.queued);
-          const h = sent.session ? run.sessionOf(sent.session) : undefined;
-          const branch = h?.branch ? answers.issueCreate.branchNote(h.branch) : "";
-          return answers.issueCreate.dispatched(
-            noted,
-            channel.name,
-            h ? answers.issueCreate.who(h.name, h.id) : answers.issueCreate.noAgentFallback,
-            h?.project ?? project,
-            branch,
-          );
-        }
-        if (p.draft !== true) return answers.issueCreate.inBacklog(noted, answers.issueCreate.notStartedNote);
-        const refined = yield* issue.refine(item.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id).pipe(
-          Effect.as(answers.issueCreate.draftingNote),
-          Effect.catch((e) => Effect.succeed(answers.issueCreate.draftFailed(said(e)))),
-        );
-        return answers.issueCreate.inBacklog(noted, refined);
-      },
-      Effect.catch((e) => (typeof e === "string" ? Effect.succeed(e) : Effect.fail(e))),
-    ),
-  );
+          return answers.issueCreate.inBacklog(noted, refined);
+        },
+        Effect.catchIf(
+          (e) => typeof e === "string",
+          (e) => Effect.succeed(e),
+        ),
+      ),
+    );
 
   const issueUpdate = (who: Who) =>
     tool(

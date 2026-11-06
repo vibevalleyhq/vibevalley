@@ -302,6 +302,9 @@ catalogs:
     typescript:
       specifier: ^7.0.2
       version: 7.0.2
+    undici:
+      specifier: 8.12.3
+      version: 8.12.3
     unified:
       specifier: ^11.0.5
       version: 11.0.5
@@ -472,9 +475,6 @@ importers:
       '@vibevalley/bridge':
         specifier: workspace:*
         version: link:../../packages/bridge
-      '@vibevalley/cli':
-        specifier: workspace:*
-        version: link:../cli
       '@vibevalley/engine':
         specifier: workspace:*
         version: link:../../packages/engine
@@ -619,15 +619,9 @@ importers:
       agora-agents:
         specifier: 'catalog:'
         version: 2.13.0
-      agora-token:
-        specifier: 'catalog:'
-        version: 2.0.7
       effect:
         specifier: 'catalog:'
         version: 4.1.2
-      parse5:
-        specifier: 'catalog:'
-        version: 8.1.0
       yaml:
         specifier: 'catalog:'
         version: 2.9.1
@@ -1020,6 +1014,9 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.1.2
+      undici:
+        specifier: 'catalog:'
+        version: 8.12.3
     devDependencies:
       '@effect/vitest':
         specifier: 'catalog:'

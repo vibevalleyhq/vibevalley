@@ -86,7 +86,7 @@ export class MossLine implements VoiceDriver<MossSetup, "owner" | "moss"> {
       onText: (data) => this.engine.socketText(data),
       onBinary: (data) => this.engine.socketBinary(data),
       onAudioMeta: (byteLength, samples, level) => {
-        this.engine.socketBinary(new ArrayBuffer(samples * 2 || byteLength));
+        this.engine.socketBinary(new ArrayBuffer(samples > 0 ? samples * 2 : byteLength));
         this.engine.outLevelChanged(level, this.engine.qos.aheadMs);
       },
       onMicSent: (byteLength, level) => this.engine.micSentFromWorker(byteLength, level),
@@ -110,9 +110,7 @@ export class MossLine implements VoiceDriver<MossSetup, "owner" | "moss"> {
   private async openMedia(): Promise<void> {
     try {
       const outContext = new AudioContext({ sampleRate: mossOutRate });
-      await outContext.audioWorklet.addModule(
-        (playbackUrl ??= URL.createObjectURL(new Blob([mossPlaybackWorkletCode], { type: "text/javascript" }))),
-      );
+      await outContext.audioWorklet.addModule((playbackUrl ??= URL.createObjectURL(new Blob([mossPlaybackWorkletCode], { type: "text/javascript" }))));
       const outNode = new AudioWorkletNode(outContext, "vibevalley-moss-playback", { outputChannelCount: [1] });
       outNode.connect(outContext.destination);
       this.out = { context: outContext, node: outNode };
@@ -121,9 +119,7 @@ export class MossLine implements VoiceDriver<MossSetup, "owner" | "moss"> {
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
       const inContext = new AudioContext({ sampleRate: mossInRate });
-      await inContext.audioWorklet.addModule(
-        (captureUrl ??= URL.createObjectURL(new Blob([mossCaptureWorkletCode], { type: "text/javascript" }))),
-      );
+      await inContext.audioWorklet.addModule((captureUrl ??= URL.createObjectURL(new Blob([mossCaptureWorkletCode], { type: "text/javascript" }))));
       if (this.phase !== "connecting") {
         stream.getTracks().forEach((x) => x.stop());
         void inContext.close();

@@ -36,9 +36,7 @@
     "@vibevalley/protocol": "workspace:*",
     "@vibevalley/voice": "workspace:*",
     "agora-agents": "catalog:",
-    "agora-token": "catalog:",
     "effect": "catalog:",
-    "parse5": "catalog:",
     "yaml": "catalog:"
   },
   "devDependencies": {

@@ -1,4 +1,1 @@
-export {
-  type HtmlEdited,
-  htmlEdit,
-} from "@vibevalley/artifact/html";
+export { htmlEdit } from "@vibevalley/artifact/html";

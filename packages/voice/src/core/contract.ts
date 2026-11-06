@@ -28,13 +28,7 @@ export interface VoiceDriver<Setup = void, Who extends string = VoiceSpeaker> {
 }
 
 /** Pure reducer updating or appending a speaker's turn in place; an empty text is ignored and a settled turn starts a new line next time. */
-export function appendVoiceTurn<Who extends string>(
-  turns: readonly VoiceTurn<Who>[],
-  who: Who,
-  key: string,
-  text: string,
-  done: boolean,
-): VoiceTurn<Who>[] {
+export function appendVoiceTurn<Who extends string>(turns: readonly VoiceTurn<Who>[], who: Who, key: string, text: string, done: boolean): VoiceTurn<Who>[] {
   if (text === "") return [...turns];
   let last: VoiceTurn<Who> | undefined;
   for (const x of turns) if (x.who === who && !x.done && (x.key === "" || key === "" || x.key === key)) last = x;

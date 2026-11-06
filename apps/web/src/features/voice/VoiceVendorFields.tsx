@@ -55,7 +55,7 @@ export const answerLabel: Record<VoiceAnswer["vendor"], string> = {
   deepseek: "DeepSeek",
   openai: t("web.voice.choices.answer.openai"),
 };
-export const ttsLabel: Record<VoiceTTS["vendor"], string> = {
+const ttsLabel: Record<VoiceTTS["vendor"], string> = {
   minimax: "MiniMax",
   openai: "OpenAI",
   microsoft: t("web.voice.choices.asr.microsoft"),
@@ -74,7 +74,7 @@ export const answerStart: Record<VoiceAnswer["vendor"], VoiceAnswer> = {
   deepseek: { vendor: "deepseek", model: "deepseek-chat" },
   openai: { vendor: "openai", url: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini" },
 };
-export const ttsStart: Record<VoiceTTS["vendor"], VoiceTTS> = {
+const ttsStart: Record<VoiceTTS["vendor"], VoiceTTS> = {
   minimax: { vendor: "minimax", model: "speech_2_6_turbo", voiceId: "Chinese (Mandarin)_Gentle_Youth" },
   openai: { vendor: "openai", voice: "nova" },
   microsoft: { vendor: "microsoft", region: "eastasia", voiceName: "zh-CN-XiaoxiaoNeural" },
@@ -160,12 +160,7 @@ export function Labeled(props: { label: string; hint?: string; aside?: JSX.Eleme
   );
 }
 
-export function VoiceAgentSection(props: {
-  draft: VoiceSettings;
-  set: (next: VoiceSettings) => void;
-  ttsKeyField: JSX.Element;
-  bar: JSX.Element;
-}) {
+export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: VoiceSettings) => void; ttsKeyField: JSX.Element; bar: JSX.Element }) {
   const tts = () => props.draft.tts;
   const answer = () => props.draft.answer;
   return (
@@ -209,10 +204,7 @@ export function VoiceAgentSection(props: {
       </Card>
       <Card title={t("web.voice.voice.persona.speak")} action={<span class="text-sm text-muted">{ttsLabel[tts().vendor]}</span>}>
         <Cols>
-          <Labeled
-            label={t("web.voice.voice.persona.tts")}
-            hint={tts().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}
-          >
+          <Labeled label={t("web.voice.voice.persona.tts")} hint={tts().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}>
             <Segmented
               label={t("web.voice.voice.persona.tts")}
               testid="voice-tts"

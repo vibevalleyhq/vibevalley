@@ -19,14 +19,7 @@ import { Composer, FileDrop, type QuotedBlockDraft } from "./Composer";
 import { ChannelSettingsDialog, NewChannelDialog } from "./Dialogs";
 import { useMarkedChat } from "./marks";
 import { MessageList } from "./MessageList";
-import {
-  channelLabel,
-  channelName,
-  chatPath,
-  pointedAt,
-  topOf,
-  topsOf,
-} from "./places";
+import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "./places";
 import { Crons, Sessions } from "./Tabs";
 
 /** /chat is the general; /chat/<id> a channel, or a thread shown beside its channel. */
@@ -36,10 +29,7 @@ export function ChatPage() {
 
 function Chat() {
   const router = useRouter();
-  const id = () =>
-    decodeURIComponent(
-      (router.path().split("?")[0] ?? "").replace(/^\/chat\/?/u, ""),
-    ) || undefined;
+  const id = () => decodeURIComponent((router.path().split("?")[0] ?? "").replace(/^\/chat\/?/u, "")) || undefined;
   const chat = useMarkedChat();
   const shown = createMemo(() => channelOf(chat(), id()));
   const channel = createMemo(() => topOf(chat(), shown()) ?? topsOf(chat())[0]);

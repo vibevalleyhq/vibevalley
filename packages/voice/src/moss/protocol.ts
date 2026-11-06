@@ -7,15 +7,15 @@ export const mossRealtimeUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.
 export const mossInRate = 16000;
 export const mossOutRate = 48000;
 export const mossFrameSamples = 320;
-export const mossFrameBytes = mossFrameSamples * 2;
+const mossFrameBytes = mossFrameSamples * 2;
 export const mossTaggedFrameBytes = 1 + mossFrameBytes;
 export const mossAudioTag = 0x00;
 
-export const MossErrorObjectSchema = Schema.Struct({
+const MossErrorObjectSchema = Schema.Struct({
   message: Schema.optionalKey(Schema.String),
 });
 
-export const MossEventPayloadSchema = Schema.Struct({
+const MossEventPayloadSchema = Schema.Struct({
   text: Schema.optionalKey(Schema.String),
   turn: Schema.optionalKey(Schema.String),
   turn_id: Schema.optionalKey(Schema.String),
@@ -28,7 +28,7 @@ export const MossEventPayloadSchema = Schema.Struct({
   error: Schema.optionalKey(Schema.Union([Schema.String, MossErrorObjectSchema])),
 });
 
-export const MossFrameSchema = Schema.fromJsonString(
+const MossFrameSchema = Schema.fromJsonString(
   Schema.Struct({
     action: Schema.optionalKey(Schema.String),
     type: Schema.optionalKey(Schema.String),
@@ -42,7 +42,7 @@ export const MossFrameSchema = Schema.fromJsonString(
 
 export const decodeMossFrame = Schema.decodeUnknownOption(MossFrameSchema);
 
-export const MossAskOrchestratorArgsSchema = Schema.fromJsonString(
+const MossAskOrchestratorArgsSchema = Schema.fromJsonString(
   Schema.Struct({
     question: Schema.optionalKey(Schema.String),
     text: Schema.optionalKey(Schema.String),
@@ -68,8 +68,7 @@ export function extractMossToolCall(raw: string): MossToolCall | undefined {
   const callId = frame.data?.call_id ?? frame.call_id ?? "";
   const rawArgs = frame.data?.arguments ?? frame.arguments ?? "";
   const parsedArgs = decodeAskArgs(rawArgs);
-  const question =
-    parsedArgs._tag === "Some" ? (parsedArgs.value.question ?? parsedArgs.value.text ?? "").trim() : (frame.data?.text ?? rawArgs).trim();
+  const question = parsedArgs._tag === "Some" ? (parsedArgs.value.question ?? parsedArgs.value.text ?? "").trim() : (frame.data?.text ?? rawArgs).trim();
   return question ? { callId, name, question } : undefined;
 }
 
@@ -77,8 +76,7 @@ export function extractMossToolCall(raw: string): MossToolCall | undefined {
 export const mossOrchestratorTool = {
   type: "function",
   name: "ask_orchestrator",
-  description:
-    "Ask the farm's orchestrator whenever the owner asks about farm status, issues, helpers, memories, notes, or wants work dispatched.",
+  description: "Ask the farm's orchestrator whenever the owner asks about farm status, issues, helpers, memories, notes, or wants work dispatched.",
   parameters: {
     type: "object",
     properties: {

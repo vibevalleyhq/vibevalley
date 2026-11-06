@@ -321,9 +321,7 @@ export function IssueDetail(props: {
       <Show when={props.issue.closedAt}>{(at) => <Property label={t("web.issue.detail.closedAt")}>{wallClockText(at())}</Property>}</Show>
       <SheetLabel>{t("web.issue.detail.who")}</SheetLabel>
       <Property label={t("web.issue.detail.helper")}>{s().whoLine}</Property>
-      <Show when={agent()?.model}>
-        {(model) => <Property label={t("web.issue.detail.model")}>{model()}</Property>}
-      </Show>
+      <Show when={agent()?.model}>{(model) => <Property label={t("web.issue.detail.model")}>{model()}</Property>}</Show>
       <Show when={!s().inFamily}>
         <Property label={t("web.issue.detail.deliver")}>
           <Pick

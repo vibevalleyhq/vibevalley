@@ -46,8 +46,8 @@ function android(): Device {
     install: () => {
       try {
         adb("uninstall", "dev.vibevalley.mobile");
-      } catch (e) {
-        if (!e) return;
+      } catch {
+        console.warn("e2e: uninstall refused; installing anyway");
       }
       adb("install", "-g", apk);
     },
@@ -56,19 +56,31 @@ function android(): Device {
     screenshot: (file) => writeFileSync(file, execFileSync(join(sdk, "platform-tools/adb"), ["exec-out", "screencap", "-p"])),
     // The WebView's DevTools socket, open in an end-to-end build (EXPO_PUBLIC_VIBEVALLEY_E2E=1, FarmScreen.tsx).
     evaluate: async (expression) => {
+      type DevtoolsPage = { url: string; webSocketDebuggerUrl: string };
+      const isDevtoolsPage = (value: unknown): value is DevtoolsPage =>
+        typeof value === "object" &&
+        value !== null &&
+        "url" in value &&
+        typeof value.url === "string" &&
+        "webSocketDebuggerUrl" in value &&
+        typeof value.webSocketDebuggerUrl === "string";
+      const tried = (why: string) => (e: unknown) => {
+        console.warn(`e2e: ${why}`, e);
+        return undefined;
+      };
       // Every WebView in the emulator has one; the app's is the one showing the farm's page.
-      let page: { url: string; webSocketDebuggerUrl: string } | undefined;
-      // A port each: a kept-alive connection to one port would still reach the socket it was forwarded to before.
-      let port = 9333;
-      for (const socket of new Set(adb("shell", "cat", "/proc/net/unix").match(/webview_devtools_remote_\d+/gu) ?? [])) {
-        adb("forward", `tcp:${++port}`, "localabstract:" + socket);
-        // oxlint-disable-next-line eslint/no-await-in-loop, typescript/no-unsafe-type-assertion -- each socket is forwarded to the next port before it is asked; Chrome's DevTools list
-        const pages = (await (await fetch(`http://127.0.0.1:${port}/json`).then((r) => r, () => undefined))?.json().catch(() => [])) as
-          | { url: string; webSocketDebuggerUrl: string }[]
-          | undefined;
-        page = (pages ?? []).find((p) => p.url.startsWith(farmUrl));
-        if (page) break;
-      }
+      const findPage = async (sockets: readonly string[], port: number): Promise<DevtoolsPage | undefined> => {
+        const [socket, ...rest] = sockets;
+        if (socket === undefined) return undefined;
+        // A port each: a kept-alive connection to one port would still reach the socket it was forwarded to before.
+        const next = port + 1;
+        adb("forward", `tcp:${next}`, "localabstract:" + socket);
+        const response = await fetch(`http://127.0.0.1:${next}/json`).catch(tried("the DevTools list did not answer"));
+        const listed = await response?.json().catch(tried("the DevTools list was not JSON"));
+        const page = (Array.isArray(listed) ? listed : []).filter(isDevtoolsPage).find((candidate) => candidate.url.startsWith(farmUrl));
+        return page ?? findPage(rest, next);
+      };
+      const page = await findPage([...new Set(adb("shell", "cat", "/proc/net/unix").match(/webview_devtools_remote_\d+/gu) ?? [])], 9333);
       if (!page) return undefined;
       const ws = new WebSocket(page.webSocketDebuggerUrl);
       await new Promise((r) => ws.addEventListener("open", r, { once: true }));
@@ -101,8 +113,8 @@ function ios(): Device {
   const sim = (...args: string[]) => run(simctl, ...args);
   try {
     sim("boot", device);
-  } catch (e) {
-    if (!e) sim("boot", device);
+  } catch {
+    console.warn("e2e: boot reported an error; checking whether it is up anyway");
   }
   sim("bootstatus", device, "-b");
   return {

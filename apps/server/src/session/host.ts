@@ -13,9 +13,9 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
+import { messageOf, type ApiError, missing, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
-import { messageOf, type ApiError, missing, refused } from "#/base/errors.ts";
 
 import { makeInProcessRun, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";
@@ -413,7 +413,10 @@ export const makeHost = <R>(
         const lines = yield* Effect.promise(() => readLines(transcript));
         const at = turnAt(lines, asked.text, asked.time, o.inputType);
         if (at < 0) return yield* Effect.fail(refused(t("server.session.host.notInConversation", { on, label: o.session.name })));
-        const memoryText = (yield* Effect.promise(() => o.memory.read())).prompt;
+        const memoryText = yield* Effect.mapBoth(o.memory.read(), {
+          onFailure: (e) => refused(messageOf(e)),
+          onSuccess: (read) => read.prompt,
+        });
         const id = newId();
         const evalCase = {
           id,

@@ -175,7 +175,12 @@ export class Fold {
     return { type, contentIndex: this.blocks.length - 1, partial: this.message() };
   }
 
-  private toolBlock(index: number | undefined, id: string | undefined, name: string | undefined, events: AssistantMessageEvent[]): Extract<Block, { kind: "tool" }> {
+  private toolBlock(
+    index: number | undefined,
+    id: string | undefined,
+    name: string | undefined,
+    events: AssistantMessageEvent[],
+  ): Extract<Block, { kind: "tool" }> {
     let block = index !== undefined ? this.toolsByIndex.get(index) : undefined;
     if (!block && id) block = this.toolsById.get(id);
     if (!block) {

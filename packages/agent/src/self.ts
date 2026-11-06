@@ -48,10 +48,10 @@ export function selfTools(o: SelfOptions): Tool[] {
     parameters: Schema.Struct({ content: Schema.String }),
     run: (p) =>
       memory
-        ? memory.rewrite(p.content).pipe(
-            Effect.map((n) => selfWords.rewritten(n)),
-            Effect.mapError(toolFailed),
-          )
+        ? Effect.mapBoth(memory.rewrite(p.content), {
+            onSuccess: (n) => selfWords.rewritten(n),
+            onFailure: toolFailed,
+          })
         : Effect.fail(new ToolFailed({ message: "Memory tools are disabled" })),
   });
   const search = schemaTool({

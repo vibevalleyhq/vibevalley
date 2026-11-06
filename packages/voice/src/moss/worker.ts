@@ -8,7 +8,7 @@ import { decodeMossFrame, levelOf, unpackPcm16 } from "./protocol.ts";
  * - Downlink 48 kHz PCM `ArrayBuffer` chunks flow `WebSocket -> Worker -> PlaybackWorklet` via zero-copy transferable buffers,
  *   while only lightweight numeric metadata (`byteLength`, `samples`, `level`, `bufferedAmount`) goes to the UI main thread.
  */
-export const mossRelayWorkerCode = `
+const mossRelayWorkerCode = `
 let ws = null;
 let opened = false;
 let capturePort = null;
@@ -199,10 +199,7 @@ export function openMossRelayBridge(url: string, handlers: MossRelayHandlers): M
           );
           break;
         case "mic_sent":
-          handlers.onMicSent(
-            typeof d["byteLength"] === "number" ? d["byteLength"] : 0,
-            typeof d["level"] === "number" ? d["level"] : 0,
-          );
+          handlers.onMicSent(typeof d["byteLength"] === "number" ? d["byteLength"] : 0, typeof d["level"] === "number" ? d["level"] : 0);
           break;
         case "chunk_ended":
           handlers.onChunkEnded(
@@ -213,17 +210,10 @@ export function openMossRelayBridge(url: string, handlers: MossRelayHandlers): M
           );
           break;
         case "out_level":
-          handlers.onOutLevel(
-            typeof d["level"] === "number" ? d["level"] : 0,
-            typeof d["aheadMs"] === "number" ? d["aheadMs"] : 0,
-          );
+          handlers.onOutLevel(typeof d["level"] === "number" ? d["level"] : 0, typeof d["aheadMs"] === "number" ? d["aheadMs"] : 0);
           break;
         case "close":
-          handlers.onClose(
-            Boolean(d["opened"]),
-            typeof d["code"] === "number" ? d["code"] : 1006,
-            typeof d["reason"] === "string" ? d["reason"] : "",
-          );
+          handlers.onClose(Boolean(d["opened"]), typeof d["code"] === "number" ? d["code"] : 1006, typeof d["reason"] === "string" ? d["reason"] : "");
           break;
         default:
           break;
@@ -287,7 +277,7 @@ export function openMossRelayBridge(url: string, handlers: MossRelayHandlers): M
       if (ws.readyState === WebSocket.OPEN) ws.send(text);
     },
     sendBinary: (bytes) => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(bytes);
+      if (ws.readyState === WebSocket.OPEN) ws.send(new Uint8Array(bytes));
     },
     attachWorkletPorts: (capture, playback) => {
       playbackPort = playback;
@@ -311,10 +301,7 @@ export function openMossRelayBridge(url: string, handlers: MossRelayHandlers): M
             typeof d["aheadMs"] === "number" ? d["aheadMs"] : 0,
           );
         } else if (d["type"] === "out_level") {
-          handlers.onOutLevel(
-            typeof d["level"] === "number" ? d["level"] : 0,
-            typeof d["aheadMs"] === "number" ? d["aheadMs"] : 0,
-          );
+          handlers.onOutLevel(typeof d["level"] === "number" ? d["level"] : 0, typeof d["aheadMs"] === "number" ? d["aheadMs"] : 0);
         }
       };
     },

@@ -5,7 +5,7 @@ import { expect, test } from "vite-plus/test";
 
 import { levels } from "#/storyLevels.ts";
 
-const ui = join(import.meta.dirname, "../ui");
+const ui = join(import.meta.dirname, "ui");
 
 const without: Record<string, string> = {
   "A.tsx": "a link that moves the router: it draws a plain <a>",
@@ -24,7 +24,7 @@ test("no reason is kept for a part that is gone or has stories", () => {
 });
 
 test("every stories file sits on a level of the pyramid", () => {
-  const src = join(import.meta.dirname, "..");
+  const src = import.meta.dirname;
   const off = readdirSync(src, { recursive: true, encoding: "utf8" })
     .filter((f) => f.endsWith(".stories.tsx"))
     .map((f) => [f, /title: "([^"]+)"/u.exec(readFileSync(join(src, f), "utf8"))?.[1] ?? ""] as const)

@@ -1,6 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import type { DoingView, Issue, IssueStage, IssueStageKind, Session, SessionEvent, SessionView } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { spanText, tookText } from "#/base/format.ts";
 
@@ -85,14 +86,16 @@ function ownerQuestion(stage: IssueStage, issue: Issue, head: Session): OwnerQue
 }
 
 const emptySession = (issue: Issue): Session => ({
-  id: issue.id,
+  id: sessionId(issue.id),
+  role: "worker",
   name: "",
   agent: "",
   runtime: "",
-  phase: { _tag: "idle" },
+  phase: { _tag: "resting" },
   hiredAt: issue.createdAt,
   brief: issue.title,
   runs: 0,
+  refining: false,
 });
 
 /** `sessions` oldest first; `session` the one on the farm now, if any. */

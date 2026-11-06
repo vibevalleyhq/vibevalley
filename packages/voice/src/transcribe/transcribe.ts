@@ -9,9 +9,9 @@ export const dictateRate = 16000;
 export const mossTranscription = { url: "https://api.mosi.cn/v1", model: "moss-transcribe-1.0" } as const;
 
 /** OpenAI's own cap on one recording. */
-export const dictateMaxBytes = 25 << 20;
+const dictateMaxBytes = 25 << 20;
 
-export const dictateFormats: Record<string, string> = {
+const dictateFormats: Record<string, string> = {
   wav: "audio/wav",
   m4a: "audio/mp4",
   mp3: "audio/mpeg",
@@ -20,7 +20,7 @@ export const dictateFormats: Record<string, string> = {
   flac: "audio/flac",
 };
 
-export const DictationResponseSchema = Schema.fromJsonString(
+const DictationResponseSchema = Schema.fromJsonString(
   Schema.Struct({
     text: Schema.optionalKey(Schema.String),
     error: Schema.optionalKey(Schema.Struct({ message: Schema.optionalKey(Schema.String) })),
@@ -48,7 +48,7 @@ export const dictateWorkletCode = `registerProcessor("vibevalley-capture", class
 });`;
 
 /** Mono 16-bit PCM in a WAV file. */
-export function wavOf(samples: Float32Array, sampleRate = dictateRate): Uint8Array {
+function wavOf(samples: Float32Array, sampleRate = dictateRate): Uint8Array {
   const out = new DataView(new ArrayBuffer(44 + samples.length * 2));
   const text = (at: number, s: string) => [...s].forEach((c, i) => out.setUint8(at + i, c.charCodeAt(0)));
   text(0, "RIFF");
@@ -68,7 +68,7 @@ export function wavOf(samples: Float32Array, sampleRate = dictateRate): Uint8Arr
   return new Uint8Array(out.buffer);
 }
 
-export const base64Of = (bytes: Uint8Array): string => {
+const base64Of = (bytes: Uint8Array): string => {
   let s = "";
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);

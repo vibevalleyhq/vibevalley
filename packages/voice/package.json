@@ -36,7 +36,8 @@
     "@vibevalley/protocol": "workspace:*",
     "agora-agents": "catalog:",
     "agora-token": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "undici": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

@@ -6,11 +6,11 @@ import { assignedAgentOf, cut } from "@vibevalley/protocol/rules";
 
 import type { Agent } from "#/agent/agent.ts";
 import { clip } from "#/base/clip.ts";
+import { type ApiError, refused, lookIn, messageOf } from "#/base/errors.ts";
 import { lastJsonBlock, misfitField } from "#/base/json.ts";
 import { questionsFromText } from "#/base/questions.ts";
 import type { Channel } from "#/channel/channel.ts";
 import type { Core } from "#/core/core.ts";
-import { type ApiError, refused, lookIn, messageOf } from "#/base/errors.ts";
 import type { Db } from "#/infra/db.ts";
 import type { WorkplaceRelease } from "#/project/workplace.ts";
 import { chooseAgent } from "#/runtime/presets.ts";

@@ -181,9 +181,7 @@ describe("the command line", () => {
       expect((yield* cli(at("project", "create", "clock"))).code).toBe(0);
       // The test helper asks which port when its issue says ask-first, with options when it says with-options, and commits clock.ts
       // when it says commit.
-      const made = yield* cli(
-        at("issue", "create", "打卡页先问清楚，给选项，提交", "--project", "clock", "--agent", profile, "--criterion", "clock-in works"),
-      );
+      const made = yield* cli(at("issue", "create", "打卡页先问清楚，给选项，提交", "--project", "clock", "--agent", profile, "--criterion", "clock-in works"));
       const n = /^#(\d+)/u.exec(made.out)?.[1] ?? "";
       expect((yield* cli(at("issue", "status", n, "todo"))).code).toBe(0);
       expect((yield* cli(at("issue", "show", n, "--watch", "--timeout", "30"))).code).toBe(0);

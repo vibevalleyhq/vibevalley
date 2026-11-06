@@ -103,7 +103,9 @@ const shellScript = String.raw`(() => {
       let found = null;
       try {
         found = anchor();
-      } catch {}
+      } catch {
+        found = null;
+      }
       if (found) parent.postMessage({ vibevalley: "selection", anchor: found }, "*");
     }, 150);
   });
@@ -155,7 +157,7 @@ function pageText(source: string): { text: string; at: At[] } {
       if (n.nodeName !== "#text" || !loc) continue;
       node += 1;
       const raw = source.slice(loc.startOffset, loc.endOffset);
-      for (let i = 0; i < raw.length; ) {
+      for (let i = 0; i < raw.length;) {
         const ref = raw[i] === "&" ? reference.exec(raw.slice(i))?.[0] : undefined;
         const written = ref ?? raw[i] ?? "";
         for (const c of (ref ? decoded(ref) : written).split(""))
@@ -383,7 +385,7 @@ function refusalText(f: HtmlRefusal): string {
     case "load":
       return loadText[f.need](f.line, f.url);
     case "form":
-      return t("server.artifact.check.form", { line, url: f.url });
+      return t("server.artifact.check.form", { line: f.line, url: f.url });
     case "refresh":
       return t("server.artifact.check.refresh", { line: f.line });
     case "base":

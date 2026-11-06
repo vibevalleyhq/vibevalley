@@ -4,13 +4,13 @@ import { NodeHttpServer } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 
-import { handlers } from "./handlers.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { Lan } from "#/lan/lan.ts";
 import { type ServiceOptions, services } from "#/services.ts";
 import { Session } from "#/session/session.ts";
 
 import { api, artifactContent, attachments, mossLine } from "./api.ts";
+import { handlers } from "./handlers.ts";
 import { mcpRoute } from "./mcp.ts";
 import { page } from "./page.ts";
 import { subscriptions } from "./rpc.ts";

@@ -219,16 +219,20 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
               ? { refused: `Invalid arguments for tool "${call.name}": ${call.argumentsError}` }
               : toolArguments(call.name, call.arguments, tool.parameters)
             : { refused: `Tool ${call.name} not found` };
-          const immediate =
-            "refused" in read ? errorResult(read.refused) : (yield* Deferred.isDone(stop)) ? errorResult(operationAborted) : undefined;
-          if (immediate || !tool) {
-            const result = immediate ?? errorResult(`Tool ${call.name} not found`);
-            const outcome: Outcome = { call, result, isError: true };
-            yield* ended(call, result, true);
+          if ("refused" in read) {
+            const outcome: Outcome = { call, result: errorResult(read.refused), isError: true };
+            yield* ended(call, outcome.result, true);
             entries.push(outcome);
             if (yield* Deferred.isDone(stop)) break;
             continue;
           }
+          if (yield* Deferred.isDone(stop)) {
+            const outcome: Outcome = { call, result: errorResult(operationAborted), isError: true };
+            yield* ended(call, outcome.result, true);
+            entries.push(outcome);
+            break;
+          }
+          if (!tool) continue;
           const args = read.ok;
           entries.push(
             Effect.gen(function* () {

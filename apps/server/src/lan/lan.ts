@@ -23,8 +23,8 @@ import {
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
 
-import { code as newCode, newId } from "#/base/ids.ts";
 import { lookIn, messageOf, missing } from "#/base/errors.ts";
+import { code as newCode, newId } from "#/base/ids.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { callbackLog } from "#/infra/log.ts";

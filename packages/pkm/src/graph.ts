@@ -158,10 +158,7 @@ export const wireOf = (page: Page): T.PkmPage => ({
   updated: page.mtime,
 });
 
-const defaultTokenize = (text: string): readonly string[] =>
-  text
-    .toLowerCase()
-    .match(/[\p{Script=Han}]{2,}|[a-z0-9_][a-z0-9_.\-/]*[a-z0-9_]/gu) ?? [];
+const defaultTokenize = (text: string): readonly string[] => text.toLowerCase().match(/[\p{Script=Han}]{2,}|[a-z0-9_][a-z0-9_.\-/]*[a-z0-9_]/gu) ?? [];
 
 /** The words a search matches on: the whole query, its space-separated words and the words the tokenizer cuts it into. */
 export const queryWords = (text: string, tokenize: (s: string) => readonly string[] = defaultTokenize): string[] => {

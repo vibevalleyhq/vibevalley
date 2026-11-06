@@ -8,11 +8,11 @@ import { issueId } from "@vibevalley/protocol/schema";
 import { Agent } from "#/agent/agent.ts";
 import { templateCatalog } from "#/agent/seed.ts";
 import { actsForOwner, type Actor } from "#/base/actor.ts";
+import { type ApiError, missing, lookIn, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import type { Due } from "#/cron/cron.ts";
-import { type ApiError, missing, lookIn, refused } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
@@ -244,7 +244,7 @@ const make = Effect.gen(function* () {
           const conflict = (yield* get(issue)).conflict;
           if (conflict) yield* setConflict(issue, yield* sessions.withWorkplace(e.id, (place) => projects.conflict(place, conflict.base)));
         }
-        yield* joinChildren;
+        yield* joinChildren();
         return;
       }
       case "hired":
@@ -538,7 +538,7 @@ const make = Effect.gen(function* () {
       return { project: name, stack, recent: sentTitles(yield* everyIssue, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
     }),
     hire,
-    refreshPullRequests,
+    refreshPullRequests: refreshPullRequests(),
     refreshQueue: refreshQueue(),
   });
   return shape;

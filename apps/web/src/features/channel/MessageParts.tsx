@@ -569,7 +569,9 @@ function LinkedCard(props: { at: LinkedMessage }) {
     >
       <span class="flex items-baseline gap-2 text-xs text-muted">
         <span class="font-semibold text-ink">
-          <Show when={m()} fallback={`#${props.at.number}`}>{(said) => nameOf(said())}</Show>
+          <Show when={m()} fallback={`#${props.at.number}`}>
+            {(said) => nameOf(said())}
+          </Show>
         </span>
         <span>{channelLabel(where())}</span>
         <Show when={m()}>{(said) => <span>{workbenchClock(said().at)}</span>}</Show>

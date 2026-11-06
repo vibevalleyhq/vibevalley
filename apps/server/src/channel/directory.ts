@@ -43,19 +43,7 @@ export const channelDirectory = (r: ChannelRecords) =>
     const core = yield* Core;
     const agents = yield* Agent;
     const db = yield* Db;
-    const {
-      model,
-      reload,
-      tx,
-      locked,
-      seat,
-      orchestratorOfRow,
-      channelOfSession,
-      presentSessions,
-      targetOfChannel,
-      publishChannel,
-      publishOwnerMentions,
-    } = r;
+    const { model, reload, tx, locked, seat, orchestratorOfRow, channelOfSession, presentSessions, targetOfChannel, publishChannel, publishOwnerMentions } = r;
 
     /** A channel nothing points at any more; refused with what still does. */
     const removable = Effect.fnUntraced(function* (id: string) {

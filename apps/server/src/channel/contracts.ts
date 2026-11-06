@@ -4,8 +4,8 @@ import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { jsonOrNone } from "#/base/json.ts";
 import { type ApiError } from "#/base/errors.ts";
+import { jsonOrNone } from "#/base/json.ts";
 import { type InboxMessage, type Meta, metaOf, type Picked, senderKind } from "#/mailbox/envelope.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 

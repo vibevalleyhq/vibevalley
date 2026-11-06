@@ -6,11 +6,11 @@ import type * as T from "@vibevalley/protocol";
 import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
+import { type ApiError, lookIn, refused, messageOf } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { jsonOf } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { bounded } from "#/core/core.ts";
-import { type ApiError, lookIn, refused, messageOf } from "#/base/errors.ts";
 import { Db } from "#/infra/db.ts";
 import * as qa from "#db/artifact.sql.ts";
 import * as qb from "#db/artifact_block.sql.ts";

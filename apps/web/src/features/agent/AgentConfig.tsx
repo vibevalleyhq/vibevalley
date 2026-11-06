@@ -396,8 +396,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
     const wanted = target().trim();
     if (!n || !wanted) return;
     const [command = "", ...args] = wanted.split(/\s+/u);
-    const server: MCPServer =
-      type() === "stdio" ? { type: "stdio", name: n, command, args, env: {} } : { type: "http", name: n, url: wanted, headers: {} };
+    const server: MCPServer = type() === "stdio" ? { type: "stdio", name: n, command, args, env: {} } : { type: "http", name: n, url: wanted, headers: {} };
     props.patch({ ...props.draft, mcpServers: [...props.draft.mcpServers.filter((s) => s.name !== n), server] });
     setName("");
     setTarget("");

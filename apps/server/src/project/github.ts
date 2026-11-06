@@ -10,22 +10,14 @@ import { jsonOrNone } from "#/base/json.ts";
 import { git, type GitError, gitQuiet, reason, run } from "./git.ts";
 import { repository } from "./repository.ts";
 import { lexists } from "./stats.ts";
-import {
-  type Merged,
-  MergeFailure,
-  ProjectError,
-  type ProjectFolder,
-  pullRequestFile,
-  pullRequestText,
-  type Workplace,
-} from "./workplace.ts";
+import { type Merged, MergeFailure, ProjectError, type ProjectFolder, pullRequestFile, pullRequestText, type Workplace } from "./workplace.ts";
 
 export const cloneTimeoutMs = 3 * 60_000;
 
 // What the gh commands below print with --json; anything else is not taken as their answer.
-export const repoView = jsonOrNone(Schema.Struct({ viewerPermission: Schema.optional(Schema.NullOr(Schema.String)) }));
-export const openPullRequests = jsonOrNone(Schema.Array(Schema.Struct({ url: Schema.String, number: Schema.Int })));
-export const pullRequestView = jsonOrNone(Schema.Struct({ state: Schema.String, mergedAt: Schema.optional(Schema.NullOr(Schema.String)) }));
+const repoView = jsonOrNone(Schema.Struct({ viewerPermission: Schema.optional(Schema.NullOr(Schema.String)) }));
+const openPullRequests = jsonOrNone(Schema.Array(Schema.Struct({ url: Schema.String, number: Schema.Int })));
+const pullRequestView = jsonOrNone(Schema.Struct({ state: Schema.String, mergedAt: Schema.optional(Schema.NullOr(Schema.String)) }));
 
 const ghVersion = /^gh version ([0-9]+\.[0-9]+\.[0-9]+)/mu;
 const ghAccount = /Logged in to github\.com account ([A-Za-z0-9-]+)(?:\s|$)/u;
@@ -84,22 +76,7 @@ export interface ProjectGitHubEnv {
 }
 
 export const makeProjectGitHub = (env: ProjectGitHubEnv) => {
-  const {
-    root,
-    fs,
-    gh,
-    push,
-    prProjects,
-    list,
-    exists,
-    serially,
-    issueBranch,
-    issueWorkplace,
-    syncMain,
-    checkMerge,
-    unchangedBranch,
-    toMergeFailure,
-  } = env;
+  const { root, fs, gh, push, prProjects, list, exists, serially, issueBranch, issueWorkplace, syncMain, checkMerge, unchangedBranch, toMergeFailure } = env;
   let status: T.GitHubStatus | undefined;
   let capabilities = new Map<string, T.PullRequestCapability>();
 

@@ -5,11 +5,11 @@ import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, closedText, cut, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
+import { type ApiError, Inconsistent, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import type { Due } from "#/cron/cron.ts";
-import { type ApiError, Inconsistent, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
@@ -266,7 +266,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
     /** In the board's order: one that cannot go any more leaves the queue. */
     const refreshQueue = Effect.fn("Issue.refreshQueue")(function* () {
       const inputs = yield* mailbox.queuedInputs;
-      yield* joinChildren.pipe(bestEffort("vibevalley: child issues could not be merged"));
+      yield* joinChildren().pipe(bestEffort("vibevalley: child issues could not be merged"));
       const all = yield* everyIssue;
       for (const issue of all) {
         if (issue.status !== "todo" || isForOrchestrator(issue, store.isOrchestrator)) continue;

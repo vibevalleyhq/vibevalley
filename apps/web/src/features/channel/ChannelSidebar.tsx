@@ -16,17 +16,7 @@ import { OrchestratorFace } from "#/ui/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 
 import { useMarkedChat } from "./marks";
-import {
-  archivedOf,
-  channelName,
-  chatPath,
-  directsOf,
-  groupsOf,
-  sessionThreadOf,
-  topsOf,
-  unreadIn,
-  unreadUnder,
-} from "./places";
+import { archivedOf, channelName, chatPath, directsOf, groupsOf, sessionThreadOf, topsOf, unreadIn, unreadUnder } from "./places";
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots, phaseDot, phaseText } from "./presence";
 import { switcher } from "./QuickSwitcher";
 

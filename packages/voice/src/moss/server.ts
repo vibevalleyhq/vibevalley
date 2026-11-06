@@ -1,11 +1,12 @@
 import { Effect, Queue, type Scope } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { Socket } from "effect/socket";
+import { WebSocket } from "undici";
 
 import { decodeMossFrame, mossErrorMessage, mossRealtimeUrl } from "./protocol.ts";
 
 /** Real time: the handshake and the first answer each come within a few hundred ms. */
-export const mossDeadlineMs = 8_000;
+const mossDeadlineMs = 8_000;
 
 export type MossVerify =
   | { readonly kind: "ok" }
@@ -51,7 +52,7 @@ const defaultAfterRealTime = (ms: number, fn: () => void) => {
   return () => clearTimeout(t);
 };
 
-export const nodeMossTransport: MossTransport = {
+const nodeMossTransport: MossTransport = {
   connect: (key, on) => {
     const ws = new WebSocket(mossRealtimeUrl, { headers: { Authorization: `Bearer ${key}` } });
     ws.binaryType = "arraybuffer";
@@ -62,7 +63,7 @@ export const nodeMossTransport: MossTransport = {
     });
     ws.addEventListener("close", (e) => on.down(e.reason));
     ws.addEventListener("error", () => on.down(""));
-    return { send: (text) => ws.send(text), close: () => ws.close() };
+    return { send: (text) => ws.send(typeof text === "string" ? text : new Uint8Array(text)), close: () => ws.close() };
   },
   status: (key) =>
     Effect.gen(function* () {

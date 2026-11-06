@@ -7,8 +7,8 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { attachmentMax } from "@vibevalley/protocol";
 
-import { bounded } from "#/core/core.ts";
 import { missing, lookIn, refused } from "#/base/errors.ts";
+import { bounded } from "#/core/core.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { writeOnce } from "#/infra/files.ts";

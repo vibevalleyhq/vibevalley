@@ -158,4 +158,3 @@ export const FactSessionLeft: Codec<T.FactSessionLeft> = Schema.Struct({
   closed: Schema.optionalKey(SessionClose),
   merged: Schema.optionalKey(Schema.Finite),
 });
-

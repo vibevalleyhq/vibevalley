@@ -24,10 +24,10 @@ interface Thing {
 
 const LdtkEntitySchema = Schema.Struct({
   __identifier: Schema.String,
-  px: Schema.Tuple([Schema.Number, Schema.Number]),
-  width: Schema.Number,
-  height: Schema.Number,
-  __pivot: Schema.Tuple([Schema.Number, Schema.Number]),
+  px: Schema.Tuple([Schema.Finite, Schema.Finite]),
+  width: Schema.Finite,
+  height: Schema.Finite,
+  __pivot: Schema.Tuple([Schema.Finite, Schema.Finite]),
   fieldInstances: Schema.Array(
     Schema.Struct({
       __identifier: Schema.String,
@@ -38,10 +38,10 @@ const LdtkEntitySchema = Schema.Struct({
 
 const LdtkLayerSchema = Schema.Struct({
   __identifier: Schema.String,
-  __cWid: Schema.Number,
-  __cHei: Schema.Number,
-  __gridSize: Schema.Number,
-  intGridCsv: Schema.Array(Schema.Number),
+  __cWid: Schema.Finite,
+  __cHei: Schema.Finite,
+  __gridSize: Schema.Finite,
+  intGridCsv: Schema.Array(Schema.Finite),
   entityInstances: Schema.Array(LdtkEntitySchema),
 });
 type LdtkLayer = typeof LdtkLayerSchema.Type;
@@ -49,8 +49,8 @@ type LdtkLayer = typeof LdtkLayerSchema.Type;
 const LdtkProjectSchema = Schema.Struct({
   levels: Schema.Array(
     Schema.Struct({
-      pxWid: Schema.Number,
-      pxHei: Schema.Number,
+      pxWid: Schema.Finite,
+      pxHei: Schema.Finite,
       layerInstances: Schema.Array(LdtkLayerSchema),
     }),
   ),

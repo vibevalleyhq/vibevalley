@@ -22,8 +22,8 @@
   "apps/mobile": {
     "nonNull": 0,
     "doubleCast": 1,
-    "cast": 2,
-    "lintOff": 4,
+    "cast": 1,
+    "lintOff": 3,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
@@ -64,6 +64,16 @@
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
+  "packages/artifact": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 1,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
@@ -129,6 +139,16 @@
     "swallowed": 0,
     "resultBranch": 0
   },
+  "packages/pkm": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
   "packages/protocol": {
     "nonNull": 0,
     "doubleCast": 2,
@@ -154,6 +174,16 @@
     "doubleCast": 0,
     "cast": 6,
     "lintOff": 1,
+    "orDie": 0,
+    "ignored": 0,
+    "swallowed": 0,
+    "resultBranch": 0
+  },
+  "packages/voice": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
     "swallowed": 0,
@@ -333,10 +363,10 @@
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 1,
+    "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 1,
+    "swallowed": 0,
     "resultBranch": 0
   },
   "web: features/catalog": {
@@ -456,7 +486,7 @@
     "lintOff": 0,
     "orDie": 0,
     "ignored": 0,
-    "swallowed": 2,
+    "swallowed": 1,
     "resultBranch": 0
   },
   "web: features/setting": {
@@ -518,12 +548,5 @@
     "ignored": 0,
     "swallowed": 2,
     "resultBranch": 0
-  },
-  "packages/voice": {
-    "cast": 0,
-    "nonNull": 0,
-    "lintOff": 0,
-    "swallowed": 0,
-    "recordOf": 0
   }
 }

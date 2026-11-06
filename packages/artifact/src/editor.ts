@@ -178,8 +178,9 @@ export class BlockEditor {
         this.take(snap, true, true);
         redraw = true;
       }
-    } catch {
+    } catch (e) {
       // The next tick asks again.
+      console.debug("artifact: the block list could not be read", e);
     }
     if (redraw) this.changed();
   }

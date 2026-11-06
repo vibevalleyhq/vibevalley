@@ -5,9 +5,9 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { Artifact } from "#/artifact/artifact.ts";
+import type { ApiError } from "#/base/errors.ts";
 import { Channel, type SayMore } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
-import type { ApiError } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import type { Picked } from "#/mailbox/envelope.ts";

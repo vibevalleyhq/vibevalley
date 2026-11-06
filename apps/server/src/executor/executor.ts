@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import type { ControlOutcome, Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { applyTaskEvent, initialStatus, initialTasks, observeSessionView, reduceStatus, stallOf, type TaskMap } from "@botiverse/oar/observe";
-import { Clock, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Schema } from "effect";
+import { Clock, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Option, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -246,9 +246,7 @@ const make = Effect.gen(function* () {
       const prior = allocations.get(id);
       if (prior) return { refused: prior.failure ?? t("server.session.life.notReturned"), retained: true };
       let refusal = "";
-      const resolved = yield* Effect.option(
-        runtimes.resolve(agent).pipe(Effect.tapError((e) => Effect.sync(() => (refusal = reasonOf(e))))),
-      );
+      const resolved = yield* Effect.option(runtimes.resolve(agent).pipe(Effect.tapError((e) => Effect.sync(() => (refusal = reasonOf(e))))));
       if (Option.isNone(resolved)) return { refused: refusal, retained: false };
       const r = resolved.value;
       const raced = allocations.get(id);

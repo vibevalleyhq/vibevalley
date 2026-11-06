@@ -328,7 +328,7 @@ export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFail
       if (known) return { result: applyPlan(plan, known), fresh: false };
       yield* publish({ type: "compaction_start", reason });
       const { summary, usage } = yield* compactInPlace(plan, with_, prefix, tools).pipe(
-        Effect.catchDefect((err) => Effect.as<Summarized>(Effect.logError(`agent ${options.name}: cannot fold the conversation:`, err), {})),
+        Effect.catchDefect((err) => Effect.map(Effect.logError(`agent ${options.name}: cannot fold the conversation:`, err), (): Summarized => ({}))),
         Effect.onInterrupt(() => publish({ type: "compaction_end", reason })),
       );
       yield* publish({ type: "compaction_end", reason, ...(summary ? { compaction: summary } : {}), ...(usage ? { usage } : {}) });

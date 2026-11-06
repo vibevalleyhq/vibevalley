@@ -41,7 +41,7 @@ export interface CompactionSummaryMessage {
 
 export type BrainMessage = AgentMessage<CustomMessage | CompactionSummaryMessage>;
 
-export const CustomMessageSchema: Schema.Codec<CustomMessage> = Schema.Struct({
+const CustomMessageSchema: Schema.Codec<CustomMessage> = Schema.Struct({
   role: Schema.Literal("custom"),
   customType: Schema.String,
   content: UserContentSchema,
@@ -50,7 +50,7 @@ export const CustomMessageSchema: Schema.Codec<CustomMessage> = Schema.Struct({
   timestamp: Schema.Finite,
 });
 
-export const CompactionSummaryMessageSchema: Schema.Codec<CompactionSummaryMessage> = Schema.Struct({
+const CompactionSummaryMessageSchema: Schema.Codec<CompactionSummaryMessage> = Schema.Struct({
   role: Schema.Literal("compactionSummary"),
   summary: Schema.String,
   tokensBefore: Schema.Finite,

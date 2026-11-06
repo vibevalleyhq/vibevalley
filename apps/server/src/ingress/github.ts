@@ -5,8 +5,8 @@ import { Clock, Effect, Schema, Semaphore } from "effect";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { compareText, or } from "#/base/order.ts";
 import type { ApiError } from "#/base/errors.ts";
+import { compareText, or } from "#/base/order.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Issue } from "#/issue/issue.ts";

@@ -107,24 +107,24 @@ export const zeroUsage = (): Usage => ({
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 });
 
-export const TextContentSchema: Schema.Codec<TextContent> = Schema.Struct({
+const TextContentSchema: Schema.Codec<TextContent> = Schema.Struct({
   type: Schema.Literal("text"),
   text: Schema.String,
 });
 
-export const ThinkingContentSchema: Schema.Codec<ThinkingContent> = Schema.Struct({
+const ThinkingContentSchema: Schema.Codec<ThinkingContent> = Schema.Struct({
   type: Schema.Literal("thinking"),
   thinking: Schema.String,
   thinkingSignature: Schema.optionalKey(Schema.String),
 });
 
-export const ImageContentSchema: Schema.Codec<ImageContent> = Schema.Struct({
+const ImageContentSchema: Schema.Codec<ImageContent> = Schema.Struct({
   type: Schema.Literal("image"),
   data: Schema.String,
   mimeType: Schema.String,
 });
 
-export const ToolCallSchema: Schema.Codec<ToolCall> = Schema.Struct({
+const ToolCallSchema: Schema.Codec<ToolCall> = Schema.Struct({
   type: Schema.Literal("toolCall"),
   id: Schema.String,
   name: Schema.String,
@@ -132,7 +132,7 @@ export const ToolCallSchema: Schema.Codec<ToolCall> = Schema.Struct({
   argumentsError: Schema.optionalKey(Schema.String),
 });
 
-export const UsageSchema: Schema.Codec<Usage> = Schema.Struct({
+const UsageSchema: Schema.Codec<Usage> = Schema.Struct({
   input: Schema.Finite,
   output: Schema.Finite,
   cacheRead: Schema.Finite,

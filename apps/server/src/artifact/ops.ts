@@ -1,12 +1,1 @@
-export {
-  ordered,
-  Page,
-  plain,
-  type Revision,
-  runeLen,
-  sameText,
-  splitAt,
-  textFor,
-  unmarked,
-  wire,
-} from "@vibevalley/artifact/ops";
+export { ordered, Page, plain, runeLen, sameText, splitAt, unmarked, wire } from "@vibevalley/artifact/ops";

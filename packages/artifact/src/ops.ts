@@ -86,12 +86,7 @@ export interface Revision {
   readonly kind: "normal" | "conflict";
 }
 
-function result(
-  status: BlockOpStatus,
-  blockId: BlockId,
-  rev = 0,
-  more: { yours?: TextSpan[] | undefined; reason?: string | undefined } = {},
-): BlockOpResult {
+function result(status: BlockOpStatus, blockId: BlockId, rev = 0, more: { yours?: TextSpan[] | undefined; reason?: string | undefined } = {}): BlockOpResult {
   return { status, blockId, ...(rev !== 0 ? { rev } : {}), ...(more.yours ? { yours: more.yours } : {}), ...(more.reason ? { reason: more.reason } : {}) };
 }
 
@@ -313,7 +308,7 @@ export class Page {
     } catch (e) {
       return rejected(b.id, messageOf(e));
     }
-    for (let at = parent ?? ""; at !== ""; ) {
+    for (let at = parent ?? ""; at !== "";) {
       if (at === b.id) return rejected(b.id, t("server.artifact.op.underSelf"));
       const up = this.find(at);
       at = up ? parentOf(up) : "";

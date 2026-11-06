@@ -128,7 +128,7 @@ const SessionNewResponse = Schema.Struct({
   configOptions: Schema.optionalKey(Schema.Array(Schema.Unknown)),
 });
 
-const decodeItems = <S extends Schema.Top>(schema: S, items: readonly unknown[] | undefined): S["Type"][] => {
+const decodeItems = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, items: readonly unknown[] | undefined): S["Type"][] => {
   if (!items) return [];
   const decode = Schema.decodeUnknownOption(schema);
   return items.flatMap((item) => {
@@ -215,10 +215,9 @@ async function readNewSession(command: string, cwd: string, timeoutMs: number): 
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
     });
     const response = await request("session/new", { cwd, mcpServers: [] });
-    const decoded = Schema.decodeUnknownOption(SessionNewResponse)(response);
+    const decoded = Schema.decodeOption(SessionNewResponse)(response);
     // Best effort: the list is in hand, and the process is killed next.
-    if (decoded._tag === "Some" && decoded.value.sessionId)
-      await Promise.allSettled([request("session/close", { sessionId: decoded.value.sessionId })]);
+    if (decoded._tag === "Some" && decoded.value.sessionId) await Promise.allSettled([request("session/close", { sessionId: decoded.value.sessionId })]);
     return response;
   } finally {
     child.kill();
@@ -255,7 +254,7 @@ export const dshRuntime = defineRuntime({
   listModels: async (installation, options): Promise<ListModelsResult> => {
     if (installation.via !== "executable" || !("command" in installation))
       return { kind: "unsupported", reason: "dsh model listing requires the dsh executable" };
-    let response: Rec;
+    let response: unknown;
     try {
       response = await readNewSession(installation.command, listingCwd(options ?? {}), options?.timeoutMs ?? 30_000);
     } catch (e) {

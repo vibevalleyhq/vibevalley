@@ -10,7 +10,7 @@ const Manifest = Schema.fromJsonString(
   }),
 );
 
-const manifest = (dir: string) => Schema.decodeUnknownSync(Manifest)(readFileSync(join(dir, "package.json"), "utf8"));
+const manifest = (dir: string) => Schema.decodeSync(Manifest)(readFileSync(join(dir, "package.json"), "utf8"));
 
 /** name → folder under packages/. */
 function workspacePackages(repo: string): Map<string, string> {

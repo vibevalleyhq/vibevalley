@@ -13,8 +13,8 @@ import { Ended, exit, Failure } from "#/output.ts";
 const serverChat = () => {
   try {
     return fileURLToPath(import.meta.resolve("@vibevalley/server/chat"));
-  } catch (e) {
-    return e ? "" : "";
+  } catch {
+    return "";
   }
 };
 

@@ -120,11 +120,9 @@ export const readEmbed = Effect.fn("Embeds.read")(function* (link: string, resol
   for (let hop = 0; hop <= redirectsMax; hop++) {
     const at = url;
     if (!(yield* reachable(at, resolve))) return undefined;
-    const answered = yield* client.get(at, { headers: { accept: "text/html", "user-agent": "VibeValley link preview" } }).pipe(
-      Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
-      Effect.timeout(timeoutMs),
-      Effect.option,
-    );
+    const answered = yield* client
+      .get(at, { headers: { accept: "text/html", "user-agent": "VibeValley link preview" } })
+      .pipe(Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }), Effect.timeout(timeoutMs), Effect.option);
     if (Option.isNone(answered)) return undefined;
     const res = answered.value;
     if (res.status >= 300 && res.status < 400) {

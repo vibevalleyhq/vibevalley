@@ -46,15 +46,12 @@ const files = { dictionary: "zh_s.txt.gz", emit: "hmm_emit.json.gz" } as const;
 const readNow = (file: string) => gunzipSync(readFileSync(join(dataDir, file))).toString("utf8");
 
 /** Reads the dictionary and the HMM's table on the file system, off the event loop. */
-export const loadSegmenter = Effect.fn("Gse.loadSegmenter")(
-  function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const read = (file: string) => Effect.map(fs.readFile(join(dataDir, file)), (bytes) => gunzipSync(bytes).toString("utf8"));
-    dictionary ??= dictionaryOf(yield* read(files.dictionary));
-    emitTable ??= yield* Schema.decodeUnknownEffect(Schema.fromJsonString(EmitTable))(yield* read(files.emit));
-  },
-  Effect.orDie,
-);
+export const loadSegmenter = Effect.fn("Gse.loadSegmenter")(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const read = (file: string) => Effect.map(fs.readFile(join(dataDir, file)), (bytes) => gunzipSync(bytes).toString("utf8"));
+  dictionary ??= dictionaryOf(yield* read(files.dictionary));
+  emitTable ??= yield* Schema.decodeEffect(Schema.fromJsonString(EmitTable))(yield* read(files.emit));
+}, Effect.orDie);
 
 const dict = (): Dictionary => (dictionary ??= dictionaryOf(readNow(files.dictionary)));
 

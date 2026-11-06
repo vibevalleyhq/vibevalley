@@ -51,10 +51,5 @@ export function clampThinkingLevel(model: Model, level: ThinkingLevel): Thinking
     : ["off"];
   if (offered.includes(level)) return level;
   const at = thinkingLevels.indexOf(level);
-  return (
-    thinkingLevels.slice(at).find((l) => offered.includes(l)) ??
-    thinkingLevels.slice(0, at).findLast((l) => offered.includes(l)) ??
-    offered[0] ??
-    "off"
-  );
+  return thinkingLevels.slice(at).find((l) => offered.includes(l)) ?? thinkingLevels.slice(0, at).findLast((l) => offered.includes(l)) ?? offered[0] ?? "off";
 }

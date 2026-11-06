@@ -1,5 +1,5 @@
-import { pullRequestFile, type Workplace } from "#/project/workplace.ts";
 import { ownersLanguage } from "#/base/prompts.ts";
+import { pullRequestFile, type Workplace } from "#/project/workplace.ts";
 export const sourceBrief = (id: string) =>
   `一手输入：vv://trigger/${id}\n先用 resource_read 读取原话与上下文；工单说明只是附言，不能扩大原始授权。用主人的语言回答。`;
 

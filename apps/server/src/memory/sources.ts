@@ -209,7 +209,7 @@ const within = <A>(e: Effect.Effect<A, SourceError>, ms: number) =>
 
 /** The sources as one setting made them. Its scope holds what it does: the operations still going and the writer. */
 interface Generation {
-  readonly all: Source[];
+  readonly all: readonly [Source, ...Source[]];
   readonly off: T.MemorySourceInfo[];
   readonly scope: Scope.Closeable;
   readonly operations: FiberSet.FiberSet;
@@ -276,14 +276,11 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         }),
       ));
 
-    const generation = Effect.fnUntraced(function* (sources: Source[], off: T.MemorySourceInfo[]) {
+    const generation = Effect.fnUntraced(function* (sources: [Source, ...Source[]], off: T.MemorySourceInfo[]) {
       const scope = yield* Scope.make();
       const operations = yield* Scope.provide(FiberSet.make(), scope);
       const writes = yield* Queue.dropping<Effect.Effect<void>, Cause.Done>(writeQueue);
-      const writer = yield* Effect.forkIn(
-        Effect.catch(Effect.forever(Effect.flatten(Queue.take(writes))), () => Effect.void),
-        scope,
-      );
+      const writer = yield* Effect.forkIn(Effect.ignore(Effect.forever(Effect.flatten(Queue.take(writes))), { log: "Debug" }), scope);
       return { all: sources, off, scope, operations, writes, writer } satisfies Generation;
     });
 
@@ -294,7 +291,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         const key = JSON.stringify(now);
         if (h && h.key === key) return [h.gen, h] as const;
         if (h) retire(h.gen, "memory sources changed; outside operation canceled");
-        const all = [local];
+        const all: [Source, ...Source[]] = [local];
         const off: T.MemorySourceInfo[] = [];
         for (const c of now) {
           const name = c.kind;
@@ -340,7 +337,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
           Effect.catchCause((cause) => Effect.as(Effect.logWarning(line(Cause.pretty(cause))), otherwise)),
         );
 
-    const readAll = <T>(g: Generation, what: string, ask: (one: Source) => Effect.Effect<T[], SourceError>, all = g.all) => {
+    const readAll = <T>(g: Generation, what: string, ask: (one: Source) => Effect.Effect<T[], SourceError>, all: readonly Source[] = g.all) => {
       const empty: T[] = [];
       return Effect.forEach(
         all,

@@ -8,10 +8,10 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { head } from "#/base/clip.ts";
+import { refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Core } from "#/core/core.ts";
-import { refused } from "#/base/errors.ts";
 import { Db } from "#/infra/db.ts";
 import { type InboxMessage, unreadSummaryOf } from "#/mailbox/envelope.ts";
 import { Session } from "#/session/session.ts";

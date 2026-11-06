@@ -24,6 +24,7 @@ import {
   agentFor,
   alreadyStopping,
   type CallLine,
+  type CallStepFailed,
   callStepFailed,
   clientOf,
   failed,
@@ -40,21 +41,9 @@ import {
   voiceUnknown,
 } from "./agora.ts";
 import { type LineFailed, makeVoiceLine, type Tunnel, tunnelAnswers } from "./line.ts";
-import { noticeLine, onCallLine } from "./prompts.ts";
+import { mossInstructions, noticeLine, onCallLine } from "./prompts.ts";
 
-export {
-  agentFor,
-  type CallLine,
-  clientOf,
-  retrying,
-  type Run,
-  speakPieces,
-  tokenSeconds,
-  tunnelAnswers,
-  vendorsFor,
-  voiceAgentUid,
-  voiceUnknown,
-};
+export { agentFor, type CallLine, clientOf, retrying, speakPieces, tokenSeconds, tunnelAnswers, vendorsFor, voiceAgentUid, voiceUnknown };
 
 /** Succeeds once the signal aborts. */
 const aborted = (signal: AbortSignal) =>
@@ -461,7 +450,13 @@ const make = (options: VoiceOptions = {}) =>
               release();
               if (grants.get(key) === g) grants.delete(key);
               const opening = openingLine;
-              if (opening && !callLine) forkHere(Effect.ignore(Effect.map(Fiber.join(opening), (opened) => voiceLine.close(opened.id)), { log: "Debug" }));
+              if (opening && !callLine)
+                forkHere(
+                  Effect.ignore(
+                    Effect.map(Fiber.join(opening), (opened) => voiceLine.close(opened.id)),
+                    { log: "Debug" },
+                  ),
+                );
               const pending = starting;
               const agora = client;
               if (pending && agora)
@@ -565,7 +560,7 @@ const make = (options: VoiceOptions = {}) =>
               action: "session.update",
               session: {
                 persona: { prompt: v.persona },
-                instructions: v.greeting ? `开场先简短问候：「${v.greeting}」。涉及农场现状、工单、帮工或派活时调用 ask_orchestrator。` : "涉及农场现状、工单、帮工或派活时调用 ask_orchestrator。",
+                instructions: mossInstructions(v.greeting),
                 tools: [mossOrchestratorTool],
               },
             });
@@ -592,9 +587,7 @@ const make = (options: VoiceOptions = {}) =>
                     );
                   }),
                 ),
-                Effect.andThen((answer) =>
-                  answer ? chat.spoken(defaultOrchestrator, answer, "") : Effect.void,
-                ),
+                Effect.andThen((answer) => (answer ? chat.spoken(defaultOrchestrator, answer, "") : Effect.void)),
                 Effect.ignore({ log: "Warn", message: "vibevalley: voice: ask_orchestrator tool call on MOSS line failed" }),
               ),
             );
