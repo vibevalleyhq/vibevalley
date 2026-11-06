@@ -16,7 +16,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/infra/config.ts` | `ServerConfig`、`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`projectsDir` |
+| `apps/server/src/infra/config.ts` | `ServerConfig`、`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`reposDir`、`worktreesDir`、`pkmDir` |
 | `apps/server/src/setting/` | `setting.ts`、`saving.ts`、`keys.ts`、`memorySources.ts`、`voice.ts` 与黄金数据 `testdata/` |
 | `apps/server/src/base/redact.ts` | 日志与出站文本密钥脱敏（`redact`、`redactOutput`） |
 | `apps/web/src/features/setting/` | 工作台设置页（`SettingsPage.tsx`、`SettingsForm.tsx`） |
@@ -36,7 +36,7 @@
 
 | 配置键 | 用途 | 默认值 |
 |---|---|---|
-| `work_root` | 项目（`projects/`）与工单 `worktrees/` 根目录 | `~/vibevalley-dev` |
+| `work_root` | 工作空间：项目（`repos/`）、工单 `worktrees/` 与笔记 `pkm/` 的根目录 | `~/vibevalley-dev` |
 | `db` | SQLite 数据库目录（设为 `memory` 则使用内存库） | `$VIBEVALLEY_HOME/db` |
 | `port` | 主 HTTP 与 `/mcp` 监听端口（仅绑定 `127.0.0.1`，`0` 为随机端口） | `8787` |
 | `web` | 在 `/` 托管的前端静态产物目录（也可由 `--web` 指定） | 无 |
@@ -52,11 +52,12 @@
 | `project.max_sessions` / `project.check_timeout_seconds` | 单项目并发帮工上限、`.vibevalley/check` 超时秒数 | `3` / `1200` |
 | `github.pr_projects` / `github.pr_poll_seconds` | 完成时走 PR 的项目名列表、开放 PR 轮询间隔秒数 | `[]` / `180` |
 | `chat.notice_batch_ms` / `chat.retry_wake_ms` | 忙时提示合并毫秒数、唤醒失败重试间隔毫秒数 | `3000` / `3000` |
-| `otlp.url` / `pkm.root` | OpenTelemetry 收集器地址、笔记库根目录 | 空 / `$VIBEVALLEY_HOME/pkm` |
+| `otlp.url` / `pkm.root` | OpenTelemetry 收集器地址、笔记库根目录（空：`<work_root>/pkm`） | 空 / 空 |
 
 ### 动态设置（`Setting`）与脱敏
 
 - **设置优先于配置，按需实时读取**：`deepseekApiKey()` 与 `agora()` 优先取 `settings.json`，为空时回退 `ServerConfig`，保存后立即生效。
+- **暴露当前空间的实际路径**：`SettingsStatus.paths` 给出 `repos`、`worktrees` 与 `pkm` 的绝对路径，关于页逐行显示。
 - **密钥不出服务端，损坏文件保留备份**：
   - `setting.get` 对密钥仅返回来源 `settings`/`config` 与末四位提示（`…xxxx`）。
   - `settings.json` 以 `0600` 权限经临时文件原子改名写入；启动时若文件损坏，改名为 `settings.json.unreadable-<毫秒>` 备份并从空设置启动。

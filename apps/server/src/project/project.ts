@@ -9,7 +9,7 @@ import { maxRunning } from "@vibevalley/protocol";
 import { githubRepository, slice } from "@vibevalley/protocol/rules";
 
 import { numberIn } from "#/base/order.ts";
-import { ServerConfig } from "#/infra/config.ts";
+import { reposDir, ServerConfig, worktreesDir } from "#/infra/config.ts";
 
 import { git, type GitError, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { cloneTimeoutMs, githubOrigin, type GitHubRun, makeProjectGitHub, probeGitHub, runGitHub } from "./github.ts";
@@ -119,13 +119,12 @@ export interface ProjectHooks {
 const make = (hooks: ProjectHooks = {}) =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
-    const work = resolve(config.workRoot);
-    const root = join(work, "projects");
+    const root = reposDir(config);
     // A file call that fails where the sync one would have thrown: a defect, as before.
     const fs = yield* FileSystem.FileSystem;
     const exists = (path: string) => Effect.orDie(fs.exists(path));
     yield* Effect.orDie(fs.makeDirectory(root, { recursive: true }));
-    const trees = join(work, "worktrees");
+    const trees = worktreesDir(config);
     const perProject = config.project.maxSessions;
     const checkTimeoutMs = config.project.checkTimeoutSeconds * 1000;
     const tokei = config.tokei || "tokei";
@@ -281,9 +280,14 @@ const make = (hooks: ProjectHooks = {}) =>
       return yield* MergeFailure.failedCheck(why + "\n" + lines.join("\n"));
     });
 
+    /** The helper commits its own work: a merge or a PR starts only from a clean worktree, under the repository's own commit rules. */
+    const requireCommitted = Effect.fnUntraced(function* (cwd: string) {
+      if ((yield* git(cwd, "status", "--porcelain")) !== "") return yield* MergeFailure.error(t("server.project.commit.uncommitted"));
+    });
+
     /** Commit and check outside the project's turn; publication rechecks the head and conflicts in it. */
     const checkMerge = Effect.fn("Project.checkMerge")(function* (place: Workplace, branch: string, target: string) {
-      yield* repository(place.cwd).commitLeft(t("server.project.commit.leftOver"));
+      yield* requireCommitted(place.cwd);
       const path = join(root, place.project);
       const into = target || (yield* repository(path).main);
       const checked = yield* repository(path).tip(branch);
@@ -294,7 +298,7 @@ const make = (hooks: ProjectHooks = {}) =>
     });
 
     const checkLocalMerge = Effect.fn("Project.checkLocalMerge")(function* (place: Workplace, branch: string) {
-      yield* repository(place.cwd).commitLeft(t("server.project.commit.leftOver"));
+      yield* requireCommitted(place.cwd);
       const path = join(root, place.project);
       const main = yield* serially(
         place.project,
@@ -662,7 +666,7 @@ const make = (hooks: ProjectHooks = {}) =>
         return { ok: r.code === 0, output };
       }),
       houseRules: Effect.fn("Project.houseRules")(function* () {
-        return yield* Effect.orElseSucceed(fs.readFileString(join(work, "AGENTS.md")), () => "");
+        return yield* Effect.orElseSucceed(fs.readFileString(join(resolve(config.workRoot), "AGENTS.md")), () => "");
       }),
       ...githubMethods,
     });

@@ -54,7 +54,7 @@ describe("an issue", () => {
       const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
-      const project = join(f.config.workRoot, "projects", "clock");
+      const project = join(f.config.workRoot, "repos", "clock");
       const closed = (id: string) =>
         await_(
           () => issues.get(id),
@@ -346,7 +346,7 @@ describe("an issue", () => {
       yield* w.nextReport;
       issue = yield* move(issue.id, "done");
       expect(issue.status).toBe("done");
-      expect(git(join(f.config.workRoot, "projects", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/u);
+      expect(git(join(f.config.workRoot, "repos", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/u);
       expect(issue.moves).toEqual(["todo"]);
 
       let dropped = yield* issues.add({ title: "算了" });
@@ -369,7 +369,9 @@ describe("an issue", () => {
       const cwd = sessions.cwdOf(helper.id)!;
       mkdirSync(join(cwd, ".vibevalley"), { recursive: true });
       write(join(cwd, ".vibevalley/check"), "#!/bin/sh\necho merge-check-failed\nexit 1\n", 0o755);
-      const project = join(f.config.workRoot, "projects", "clock");
+      git(cwd, "add", ".vibevalley/check");
+      git(cwd, "commit", "-qm", "the check that fails");
+      const project = join(f.config.workRoot, "repos", "clock");
       const before = git(project, "rev-parse", "main");
       refusedWith(yield* Effect.flip(issues.setStatus(helper.issue!, "done", "", "", owner)), "merge-check-failed");
       // Not done; the helper is already told what failed (issue/merge.ts notTaken) and may be at it (in_progress).
@@ -480,7 +482,7 @@ describe("an issue", () => {
       const w = yield* watch;
       const issues = testIssues(yield* Issue);
       yield* (yield* Agent).save(lab());
-      const project = join(f.config.workRoot, "projects", "clock");
+      const project = join(f.config.workRoot, "repos", "clock");
       const committed = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
       const before = git(project, "log", "--format=%s", "main");
@@ -517,7 +519,7 @@ describe("an issue", () => {
       const { in: saidIn } = yield* Said;
       const chat = yield* Channel;
       yield* (yield* Agent).save(lab());
-      const project = join(f.config.workRoot, "projects", "clock");
+      const project = join(f.config.workRoot, "repos", "clock");
       const asked = yield* issues.add({
         title: "查一下打卡为什么慢，顺手提交",
         project: "clock",
@@ -702,7 +704,7 @@ describe("an issue", () => {
 
       issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
       expect([issue.status, openFindings(issue)]).toEqual(["done", 0]);
-      expect(git(join(f.config.workRoot, "projects", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/u);
+      expect(git(join(f.config.workRoot, "repos", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/u);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

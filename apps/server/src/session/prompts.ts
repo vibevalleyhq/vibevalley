@@ -16,7 +16,7 @@ export function workplaceRules(place: Workplace, house: string, id: string, pull
     "- 汇报时写上 commit 号，以及你是怎么验证的（跑了什么命令、结果如何）。",
     ...(pullRequest && place.branch
       ? [
-          `- 这个项目经 PR 交付：交回来以前，把这次改动的 PR 标题和正文写进 \`git rev-parse --git-path ${pullRequestFile}\` 说的那个文件（第一行是标题，空一行，下面是正文），照项目的 PR 约定写（看它的 AGENTS.md）。它不进提交；VibeValley 开 PR 时用它，没有就用工单的标题。`,
+          `- 这个项目经 PR 交付：交回来以前，把这次改动的 PR 标题和正文写进 \`git rev-parse --git-path ${pullRequestFile}\` 说的那个文件。第一行是英文标题，照仓库的提交规范写成 \`type(scope): summary\`，一句话说改完以后的行为，不超过 100 字，不带句号；空一行后是英文正文，至少包含 \`## What changed\`、\`## Checks\`、\`## Not verified\` 三段；改过名字以 \`regression: \` 开头的测试时，再加 \`## Regression\` 逐条写测试名和原因。照项目的 AGENTS.md、scripts/commit-msg.ts 和 scripts/regression.ts 核对。它不进提交；VibeValley 开 PR 时用它，没有就用工单的标题。`,
           "- 获授权后，用 issue_report(prSubmit=true) 提交并继续跟随 CI/评审；需要先提交、再继续本轮工作时用 issue_pr_submit。已提交的 PR 只等外部反馈时可以直接结束本轮；最终交给主人验收用 issue_report(prSubmit=false)。",
         ]
       : []),

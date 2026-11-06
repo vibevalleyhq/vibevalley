@@ -49,7 +49,7 @@ export function worldBelowIngress(options: WorldOptions = {}) {
   const base = options.config ?? testConfig();
   const config = options.stallMs !== undefined ? { ...base, session: { ...base.session, stallSeconds: options.stallMs / 1000 } } : base;
   for (const name of options.repos ?? []) {
-    const dir = join(config.workRoot, "projects", name);
+    const dir = join(config.workRoot, "repos", name);
     mkdirSync(dir, { recursive: true });
     repo(dir, 1, 0);
   }

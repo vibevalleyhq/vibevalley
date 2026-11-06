@@ -42,7 +42,7 @@ describe("a pull request", () => {
         github: { ...base.github, prProjects: ["clock"] },
       };
       const work = config.workRoot;
-      const path = join(work, "projects", "clock");
+      const path = join(work, "repos", "clock");
       const bare = join(work, "origin.git");
       let creates = 0;
       let pushes = 0;

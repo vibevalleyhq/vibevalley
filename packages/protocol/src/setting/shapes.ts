@@ -11,10 +11,21 @@ export interface MemorySourceInfo {
   transcripts: boolean;
 }
 
+export interface SpacePaths {
+  /** The space's git repositories; each folder is a project. */
+  repos: string;
+  /** The issues' worktrees, named <project>.<issue number>. */
+  worktrees: string;
+  /** The notes vault. */
+  pkm: string;
+}
+
 export interface SettingsStatus {
   file: string;
   /** The farm's home ($VIBEVALLEY_HOME) and the server's version, for About. */
   home: string;
+  /** Where the current space keeps its repositories, worktrees and notes. */
+  paths: SpacePaths;
   version: string;
   locale: Locale;
   deepseekApiKey: KeyStatus;

@@ -6,7 +6,7 @@
 
 - 打开 macOS 应用（[客户端](docs/subsystems/app.md)），服务端在里面；或者在终端里跑服务端，在浏览器里打开它的地址（[development.md](docs/development.md)「跑起来」）。
 - 管家要 DeepSeek 的钥匙：「设置」的 DeepSeek 里填（首页点「设置」或工作台左下的扳手），或者本机的 pi 已经配好。帮工用本机登录好的农机（pi、Claude Code、codex……），在「农具」页启用。
-- 项目放在工作目录的 `projects/` 下，一个文件夹一个；没有的管家会建。工作目录默认是 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）。
+- 项目放在工作空间的 `repos/` 下，一个文件夹一个；没有的管家会建。工作目录默认是 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）。
 
 ## 1. 派第一张工单
 

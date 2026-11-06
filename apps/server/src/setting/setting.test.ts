@@ -50,6 +50,21 @@ describe("settings", () => {
     );
   });
 
+  it.effect("names the space's repositories, worktrees and notes", () => {
+    const config = testConfig();
+    return run(
+      config,
+      Effect.gen(function* () {
+        const s = yield* Setting;
+        expect(s.status().paths).toEqual({
+          repos: join(config.workRoot, "repos"),
+          worktrees: join(config.workRoot, "worktrees"),
+          pkm: join(config.workRoot, "pkm"),
+        });
+      }),
+    );
+  });
+
   it.effect("nothing is saved when something cannot be right", () =>
     run(
       testConfig(),

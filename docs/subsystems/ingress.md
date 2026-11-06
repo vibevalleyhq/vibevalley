@@ -26,6 +26,7 @@
 - **GitHub 快照完整性与同轮评审归并**：
   - 拉取 PR 的检查、评审、评论与评审线程时，任一分页请求失败即放弃本次快照，不将残缺列表当成空结果。
   - 同一次 Review 及其附带的多条行内评论共享同一个 `botRoundKey`，只消耗一次 `maxBotReviewRounds` 额度。
+  - 失败的 Actions 检查若带 job 链接，轮询时用 `gh run view --job <id> --log-failed --repo <owner/name>` 取回末尾 40 行，和检查名一起交给帮工。
 
 ## 怎么走
 

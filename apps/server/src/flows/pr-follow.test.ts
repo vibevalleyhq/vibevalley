@@ -26,7 +26,7 @@ for (const submittedReport of [false, true]) {
     let background: ReturnType<ScriptedTurn["task"]> | undefined;
     const base = testConfig();
     const config = { ...base, project: { ...base.project, maxSessions: 1 }, github: { ...base.github, prProjects: ["follow"] } };
-    const path = join(config.workRoot, "projects", "follow");
+    const path = join(config.workRoot, "repos", "follow");
     const bare = join(config.workRoot, "origin.git");
     const f = farm({
       config,

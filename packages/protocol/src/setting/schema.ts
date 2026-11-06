@@ -28,9 +28,16 @@ export const MemorySource: Codec<T.MemorySource> = Schema.Struct({
   key: KeyStatus,
 });
 
+export const SpacePaths: Codec<T.SpacePaths> = Schema.Struct({
+  repos: Schema.String,
+  worktrees: Schema.String,
+  pkm: Schema.String,
+});
+
 export const SettingsStatus: Codec<T.SettingsStatus> = Schema.Struct({
   file: Schema.String,
   home: Schema.String,
+  paths: SpacePaths,
   version: Schema.String,
   locale: Locale,
   deepseekApiKey: KeyStatus,

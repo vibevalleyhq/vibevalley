@@ -6,7 +6,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer } from "effect";
 
 import { ServerConfig } from "#/infra/config.ts";
-import { gitInEnv, gitSync, projectsDir, repo, write } from "#/testing/git.ts";
+import { gitInEnv, gitSync, reposDir, repo, write } from "#/testing/git.ts";
 import { testConfig, untilGot as until } from "#/testing/layers.ts";
 
 import { Project, activityOf, countsOf, type GitHubRun, type ProjectHooks, projectProblem, tokeiArgs } from "./project.ts";
@@ -41,7 +41,7 @@ describe("projects", () => {
   });
 
   it.effect("a new project has a first commit; an existing folder is refused and left alone; one of two at once", () => {
-    const root = projectsDir();
+    const root = reposDir();
     mkdirSync(join(root, "existing"));
     writeFileSync(join(root, "existing", "keep"), "mine");
     return projects(
@@ -60,7 +60,7 @@ describe("projects", () => {
   });
 
   it.effect("a clone, offline; a failed one is cleaned up and can be tried again", () => {
-    const root = projectsDir();
+    const root = reposDir();
     const source = join(root, ".source");
     mkdirSync(source);
     gitSync(root, "init", "-q", "-b", "main", source);
@@ -93,7 +93,7 @@ describe("projects", () => {
   });
 
   it.effect("a parent issue's branch: a child merges into it, it merges into main", () => {
-    const root = projectsDir();
+    const root = reposDir();
     return projects(
       root,
       Effect.gen(function* () {
@@ -101,6 +101,8 @@ describe("projects", () => {
         yield* p.openBranch("task", "vibevalley/task-1");
         const place = yield* p.workplace("task", 1, true, "vibevalley/task-1");
         writeFileSync(join(place.cwd, "a.txt"), "a\n");
+        gitSync(place.cwd, "add", "a.txt");
+        gitSync(place.cwd, "commit", "-qm", "a");
         expect((yield* p.mergeInto(place, "vibevalley/task-1")).hashes).toHaveLength(1);
         const changes = yield* p.branchChanges("task", "vibevalley/task-1");
         expect(changes!.files.map((f) => f.path)).toEqual(["a.txt"]);
@@ -116,7 +118,7 @@ describe("projects", () => {
   });
 
   it.effect("a branch's changes: each file's letter, its lines and its patch, a binary one with none", () => {
-    const root = projectsDir();
+    const root = reposDir();
     const path = join(root, "described");
     repo(path, 1, 0);
     writeFileSync(join(path, "keep.txt"), "a\nb\n");
@@ -151,7 +153,7 @@ describe("projects", () => {
   });
 
   it.effect("a new worktree runs the project's .vibevalley/setup once, and one that fails still opens", () => {
-    const root = projectsDir();
+    const root = reposDir();
     return projects(
       root,
       Effect.gen(function* () {
@@ -175,7 +177,7 @@ describe("projects", () => {
   });
 
   it.effect("a branch opens where another stands", () => {
-    const root = projectsDir();
+    const root = reposDir();
     return projects(
       root,
       Effect.gen(function* () {
@@ -191,7 +193,7 @@ describe("projects", () => {
   });
 
   it.effect("the files changed since the base, a rename under both names", () => {
-    const root = projectsDir();
+    const root = reposDir();
     return projects(
       root,
       Effect.gen(function* () {
@@ -201,12 +203,18 @@ describe("projects", () => {
           Effect.tap(p.workplace("task", Number(id.slice(1)), true, "vibevalley/task-1"), (place) =>
             Effect.sync(() => files.forEach((f) => writeFileSync(join(place.cwd, f), id + "\n"))),
           );
-        yield* p.mergeInto(yield* work("w1", "a.txt", "b.txt"), "vibevalley/task-1");
+        const first = yield* work("w1", "a.txt", "b.txt");
+        gitSync(first.cwd, "add", ".");
+        gitSync(first.cwd, "commit", "-qm", "w1");
+        yield* p.mergeInto(first, "vibevalley/task-1");
         const mine = yield* work("w2", "a.txt");
         gitSync(mine.cwd, "commit", "-qam", "a");
         gitSync(mine.cwd, "mv", "b.txt", "c.txt");
         writeFileSync(join(mine.cwd, "new.txt"), "new\n");
-        yield* p.mergeInto(yield* work("w3", "later.txt"), "vibevalley/task-1");
+        const third = yield* work("w3", "later.txt");
+        gitSync(third.cwd, "add", ".");
+        gitSync(third.cwd, "commit", "-qm", "w3");
+        yield* p.mergeInto(third, "vibevalley/task-1");
         expect(yield* p.changedFiles(mine.cwd, "vibevalley/task-1")).toEqual(["a.txt", "b.txt", "c.txt", "new.txt"]);
       }),
     );
@@ -268,7 +276,7 @@ describe("projects", () => {
   });
 
   const workRoot = () => {
-    const root = projectsDir();
+    const root = reposDir();
     const app = join(root, "app");
     mkdirSync(app);
     gitSync(app, "init", "-q", "-b", "main");
@@ -329,7 +337,7 @@ describe("projects", () => {
       ] as const)
         expect(
           yield* projects(
-            projectsDir(),
+            reposDir(),
             Effect.map(Project, (p) => p.maxSessions()),
             { project: { maxSessions: limit, checkTimeoutSeconds: 1200 } },
           ),
@@ -368,8 +376,8 @@ describe("projects", () => {
     ),
   );
 
-  it.effect("what a session left is committed without caches", () => {
-    const root = projectsDir();
+  it.effect("a merge refuses uncommitted work, and caches stay out of what is committed", () => {
+    const root = reposDir();
     return projects(
       root,
       Effect.gen(function* () {
@@ -378,6 +386,12 @@ describe("projects", () => {
         mkdirSync(join(place.cwd, "__pycache__"));
         writeFileSync(join(place.cwd, "__pycache__", "greet.cpython-312.pyc"), "cache");
         writeFileSync(join(place.cwd, "greet.py"), "def greet(): pass\n");
+        const refused = yield* Effect.flip(p.merge(place));
+        expect(refused.kind).toBe("error");
+        expect(refused.message).toMatch(/没提交/u);
+        expect(existsSync(place.cwd)).toBe(true);
+        gitSync(place.cwd, "add", "greet.py");
+        gitSync(place.cwd, "commit", "-qm", "greet");
         yield* p.merge(place);
         expect(gitSync(join(root, "left"), "ls-files").split("\n")).toEqual([".gitignore", "README.md", "greet.py"]);
       }),
@@ -387,7 +401,7 @@ describe("projects", () => {
   it.effect("a published merge keeps its receipt when the worktree cannot be cleaned up", () =>
     Effect.gen(function* () {
       for (const intoTask of [false, true]) {
-        const root = projectsDir();
+        const root = reposDir();
         yield* projects(
           root,
           Effect.gen(function* () {
@@ -396,6 +410,8 @@ describe("projects", () => {
             if (intoTask) yield* p.openBranch("demo", target);
             const place = yield* p.workplace("demo", 1, true, intoTask ? target : "");
             writeFileSync(join(place.cwd, "result.txt"), "kept");
+            gitSync(place.cwd, "add", ".");
+            gitSync(place.cwd, "commit", "-qm", "result");
             gitSync(join(root, "demo"), "worktree", "lock", place.cwd);
             const merged = intoTask ? yield* p.mergeInto(place, target) : yield* p.merge(place);
             expect(merged.commits).toBe(1);
@@ -412,7 +428,7 @@ describe("projects", () => {
     Effect.gen(function* () {
       for (const into of [false, true]) {
         for (const check of ["absent", "pass", "fail"]) {
-          const root = projectsDir();
+          const root = reposDir();
           yield* projects(
             root,
             Effect.gen(function* () {
@@ -429,6 +445,8 @@ describe("projects", () => {
                 if (check === "fail") body += "exit 7\n";
                 write(join(place.cwd, ".vibevalley/check"), body, 0o755);
               }
+              gitSync(place.cwd, "add", ".");
+              gitSync(place.cwd, "commit", "-qm", "work");
               const result = yield* Effect.result(into ? p.mergeInto(place, target) : p.merge(place));
               if (check === "fail") {
                 expect(result._tag).toBe("Failure");
@@ -451,7 +469,7 @@ describe("projects", () => {
   it.effect(
     "a check that runs too long is stopped with its children, and its last lines said",
     () => {
-      const root = projectsDir();
+      const root = reposDir();
       return projects(
         root,
         Effect.gen(function* () {
@@ -463,6 +481,8 @@ describe("projects", () => {
             "#!/bin/sh\necho discarded-first-line\ni=0\nwhile [ $i -lt 60 ]; do echo line-$i; i=$((i+1)); done\nsleep 30\n",
             0o755,
           );
+          gitSync(place.cwd, "add", ".");
+          gitSync(place.cwd, "commit", "-qm", "check");
           const started = Date.now();
           const e = yield* Effect.flip(p.merge(place));
           expect(e.message).toMatch(/超时/u);
@@ -478,7 +498,7 @@ describe("projects", () => {
   );
 
   it.effect("a check that cannot run refuses", () => {
-    const root = projectsDir();
+    const root = reposDir();
     return projects(
       root,
       Effect.gen(function* () {
@@ -486,6 +506,8 @@ describe("projects", () => {
         const place = yield* p.workplace("permissions", 1, true, "");
         mkdirSync(join(place.cwd, ".vibevalley"));
         write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\nexit 0\n", 0o644);
+        gitSync(place.cwd, "add", ".");
+        gitSync(place.cwd, "commit", "-qm", "a check that is not executable");
         const e = yield* Effect.flip(p.merge(place));
         expect(e.kind).toBe("check");
         expect(existsSync(place.cwd)).toBe(true);
@@ -494,7 +516,7 @@ describe("projects", () => {
   });
 
   it.effect("a failed git inspection does not claim an issue's branch was released", () => {
-    const root = projectsDir();
+    const root = reposDir();
     return projects(
       root,
       Effect.gen(function* () {
@@ -512,7 +534,7 @@ describe("projects", () => {
   });
 
   it.effect("an issue's worktree: reset to main, cleared with an empty branch, a branch with commits kept", () => {
-    const root = projectsDir();
+    const root = reposDir();
     return projects(
       root,
       Effect.gen(function* () {
@@ -553,7 +575,7 @@ describe("projects", () => {
   it.effect("an issue comes back to the same worktree, whatever happened to the last session", () =>
     Effect.gen(function* () {
       for (const mode of ["existing", "cancelled", "merged", "dirty", "base"]) {
-        const root = projectsDir();
+        const root = reposDir();
         yield* projects(
           root,
           Effect.gen(function* () {
@@ -600,7 +622,7 @@ describe("projects", () => {
       Effect.gen(function* () {
         for (const into of [false, true]) {
           for (const changed of [false, true]) {
-            const root = projectsDir();
+            const root = reposDir();
             yield* projects(
               root,
               Effect.gen(function* () {
@@ -609,11 +631,13 @@ describe("projects", () => {
                 if (into) yield* p.openBranch("demo", target);
                 const place = yield* p.workplace("demo", 1, true, into ? target : "");
                 const before = gitSync(join(root, "demo"), "rev-parse", target);
-                const signal = projectsDir();
+                const signal = reposDir();
                 const started = join(signal, "started");
                 const release = join(signal, "release");
                 mkdirSync(join(place.cwd, ".vibevalley"));
                 write(join(place.cwd, ".vibevalley/check"), `#!/bin/sh\ntouch '${started}'\nwhile [ ! -f '${release}' ]; do sleep 0.05; done\n`, 0o755);
+                gitSync(place.cwd, "add", ".");
+                gitSync(place.cwd, "commit", "-qm", "check");
                 const merging = yield* Effect.forkChild(Effect.result(into ? p.mergeInto(place, target) : p.merge(place)));
                 yield* until(() => existsSync(started), "the check started");
                 yield* p.workplace("demo", 2, true, "").pipe(Effect.timeout(2000));
@@ -635,7 +659,7 @@ describe("projects", () => {
   );
 
   it.effect("a local merge checks the tree with main's changes in it", () => {
-    const root = projectsDir();
+    const root = reposDir();
     return projects(
       root,
       Effect.gen(function* () {
@@ -647,14 +671,16 @@ describe("projects", () => {
         gitSync(path, "commit", "-qm", "main advanced");
         mkdirSync(join(place.cwd, ".vibevalley"));
         write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\ntest -f main-only\n", 0o755);
+        gitSync(place.cwd, "add", ".");
+        gitSync(place.cwd, "commit", "-qm", "check");
         yield* p.merge(place);
       }),
     );
   });
 
   it.effect("a project symlinked outside the work root is refused", () => {
-    const root = projectsDir();
-    const outside = projectsDir();
+    const root = reposDir();
+    const outside = reposDir();
     repo(join(outside, "elsewhere"), 1, 0);
     symlinkSync(join(outside, "elsewhere"), join(root, "linked"));
     return projects(

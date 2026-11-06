@@ -43,7 +43,7 @@ const farm = (runtimes = [busy]) => {
 const git = gitIn;
 
 const noWorktree = (root: string) => {
-  const dir = join(root, "projects", "demo");
+  const dir = join(root, "repos", "demo");
   expect(git(dir, "worktree", "list", "--porcelain").split("worktree ").length - 1).toBe(1);
   expect(git(dir, "branch", "--list", "vibevalley/*").trim()).toBe("");
 };
@@ -602,7 +602,7 @@ describe("issues", () => {
       yield* (yield* Agent).save(lab());
       const hired = yield* issues.hire({ ...lab(), worktree: true }, "keep my work", "demo");
       yield* until(() => sessions.sessionOf(hired.session!.id)?.phase._tag === "done", "the report");
-      const repo = join(f.config.workRoot, "projects", "demo");
+      const repo = join(f.config.workRoot, "repos", "demo");
       renameSync(join(repo, ".git"), join(repo, ".git-hidden"));
       expect((yield* Effect.flip(issues.previewStatus(hired.session!.issue!, "done", "")))._tag).toBe("Refused");
       expect((yield* Effect.flip(issues.setStatus(hired.session!.issue!, "done", "", chat.defaultChannel(), owner)))._tag).toBe("Refused");

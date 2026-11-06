@@ -1,12 +1,12 @@
 # 项目
 
-项目（`Project`）是工作目录 `$VIBEVALLEY_WORK_ROOT/projects/` 下的一个 git 仓库，在农场地图上画成一座岛。`apps/server/src/project` 负责项目新建与克隆、工单 worktree 与分支管理、冲突预检、`.vibevalley/check` 执行、分支合并、GitHub PR 交互及提交统计。
+项目（`Project`）是工作空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。`apps/server/src/project` 负责项目新建与克隆、工单 worktree 与分支管理、冲突预检、`.vibevalley/check` 执行、分支合并、GitHub PR 交互及提交统计。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 工作目录（`projects/`、`worktrees/` 与全局 `AGENTS.md`）、项目新建与 GitHub 克隆 | 工作目录根路径配置（`work_root`，[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
+| 工作空间（`repos/`、`worktrees/` 与全局 `AGENTS.md`）、项目新建与 GitHub 克隆 | 工作目录根路径配置（`work_root`，[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
 | 工单 worktree 与分支 `vibevalley/issue-<号>` 的创建、复用、重置与清理 | 何时派活、何时触发检查与合并、PR 轮询调度（[工单](docs/subsystems/issue.md#怎么走)） |
 | 分支改动读取（`Changes`）、冲突预检（`git merge-tree`）、运行 `.vibevalley/check` | 会话生命周期与并发槽位准入控制（[帮工](docs/subsystems/session.md)） |
 | 本地合并、无检出合入父分支（`mergeInto`）、推送分支与 `gh` PR 创建/查询 | 经验值、等级与成就计算（[游戏](docs/subsystems/game.md#模型和不变量)） |
@@ -26,13 +26,13 @@
 
 ## 模型和不变量
 
-- **项目即 `projects/<名字>` 下的直接子目录**：名字仅含字母、数字、`-`、`_`、`.`（最长 64 字符），禁止符号链接跳出 `projects/`。派活目标项目不存在时自动 `git init -b main` 并生成初始提交。
-- **一张工单固定一个 worktree 与一条分支**：路径为 `worktrees/<项目>.<工单号>`，分支为 `vibevalley/issue-<工单号>`；重开或换帮工直接复用，首次创建时从基分支切出并在锁外跑一次 `.vibevalley/setup`。
+- **项目即 `repos/<名字>` 下的直接子目录**：名字仅含字母、数字、`-`、`_`、`.`（最长 64 字符），禁止符号链接跳出 `repos/`。派活目标项目不存在时自动 `git init -b main` 并生成初始提交。
+- **一张工单固定一个 worktree 与一条分支**：路径为 `worktrees/<项目>.<工单号>`，分支为 `vibevalley/issue-<工单号>`；重开或换帮工直接复用，首次创建时从基分支切出并在锁外跑一次 `.vibevalley/setup`（安装依赖并构建各包的 `dist/` 声明）。
 - **同项目写操作串行，耗时检查在锁外执行**：每个项目一把信号量锁 `serially` 保护新建、开 worktree、合并与清理；`.vibevalley/check`（默认限时 1200 秒）在锁外运行，通过后重新进锁核对分支与基分支未变才执行合并。
 - **清理回执区分现场是否保留（`WorkplaceRelease`）**：`release` 与 `clear` 返回 `{ kept, why? }`；有未提交改动或未合入提交时保留现场，仅 `kept: false` 时允许删除工单身份。
 - **冲突预检与合入父分支均不污染工作区**：
   - 冲突检测用 `git merge-tree --write-tree`；子工单合入父分支（`mergeInto`）用 `merge-tree` + `commit-tree` + 带旧值校验的 `update-ref`。
-  - 合并前自动提交剩余文件时强制排除 `node_modules`、`__pycache__` 等缓存目录。
+- **合并和提 PR 前工作树必须干净**：`checkMerge` 先看 `git status --porcelain`；有未提交改动就以 `MergeFailure` 退回，让帮工按仓库自己的提交规范提交，不再代它生成不合规的提交说明。
 - **PR 能力只读检测缓存**：开机与调 `github.refresh` 时检测 `gh` 登录及各项目 `origin` 写权限并缓存；判断 `usesPullRequests` 只读该缓存与 `github.pr_projects` 配置。
 
 ## 怎么走
@@ -44,7 +44,7 @@
 
 **合并与提交 PR**
 
-1. **锁外准备**：自动提交剩余改动，用 `merge-tree` 预检冲突，执行 `.vibevalley/check` 并记录当前分支 commit。
+1. **锁外准备**：要求工作树干净，用 `merge-tree` 预检冲突，执行 `.vibevalley/check`（`vp check --deny-warnings`、`server:check`/`web:check` 按改动范围、`docs:verify`）并记录当前分支 commit。
 2. **进锁复核与执行**：确认分支 commit 未变、主分支无新增未检提交且无冲突：
    - **本地合并（`merge`）**：在项目主检出执行 `git merge --no-edit`，成功后强制删除工单 worktree 与分支。
    - **合入父分支（`mergeInto`）**：通过 `commit-tree` 与 `update-ref` 原子推进父分支引用，清理子工单 worktree 与分支。
@@ -60,6 +60,7 @@
 - **按工单隔离 git worktree，锁外跑检查、锁内验引用**：每个工单在独立目录修改互不踩踏；耗时测试放锁外，进锁复核 commit 未变再合并，兼顾并发开单与主分支质量。
 - **用 git 底层树操作实现无检出预检与父分支合入**：`merge-tree` 和 `commit-tree` 不碰工作区文件，父工单无需维持常驻 worktree 即可接收子工单合入。
 - **GitHub 检测与克隆收紧边界**：克隆仅收标准 GitHub 主页地址并禁用终端交互弹窗，PR 权限统一走后台缓存，避免网络抖动阻塞看板操作。
+- **不让服务端代写提交**：自动生成的单行提交说明过不了仓库自己的提交门禁（`scripts/commit-msg.ts`）；退回帮工自己提交，每个 commit 和 PR 才都符合项目规范。
 
 ## 还没做的
 
@@ -68,5 +69,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/project/project.test.ts`、`github.test.ts`、`stack.test.ts`：项目创建与克隆、worktree 复用与释放回执、`.vibevalley/check` 门禁、无检出合入父分支与 commit 统计测试。
-- `apps/server/src/flows/pull_request.test.ts`、`apps/web/test/projects.spec.ts`：PR 提交与合入全流程、工作台项目新建与群岛地图测试。
+- `apps/server/src/project/project.test.ts`、`github.test.ts`、`stack.test.ts`：项目创建与克隆、worktree 复用与释放回执、未提交改动拒绝合并、`.vibevalley/check` 门禁、无检出合入父分支与 commit 统计测试。
+- `apps/server/src/flows/pull_request.test.ts`、`apps/server/src/flows/pr-follow.test.ts`、`apps/web/test/projects.spec.ts`：PR 提交与合入全流程、CI 回流、工作台项目新建与群岛地图测试。

@@ -74,7 +74,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 工单 | ticket | issue（`Issue`） | 一件活，从写下到关上一个 id；每派一次是一个帮工 | job、ticket |
 | 稿子 | artifact | artifact（`Artifact`，正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的，或交上来一稿一稿换的网页（第 N 稿）；交上来的带卡片挂在频道和工单上 | 产出、文档（指稿子时）、doc（指稿子时） |
 | 笔记 | notes | pkm（`Pkm`，一页 `PkmPage`，一块 `PkmBlock`） | 你自己的知识库：PARA 几个文件夹里的大纲页面和每天的日记，工作台的「笔记」页（`/pkm`）；文件在笔记库里，别的编辑器也能改 | |
-| 项目 | project | project（`ProjectSummary`） | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
+| 项目 | project | project（`ProjectSummary`） | 工作空间 `repos/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
 | 大地图 | the map | `WorkspaceState`；目录是 `ServerConfig` 的 `workRoot`、`home` | 全部项目、工单、频道和档案；工作台「项目」页的「全部」 | 世界、全图 |
 | 空位 | spot | `ServerConfig.project.maxSessions`（配置 `project.max_sessions`）、`Session.makeRoom`；每台农机另有 `maxWorking` | 一个项目（和整个 VibeValley）同时能在做的工单数；满了的待办排队，有空位自动开工 | 并发位、空地 |
 | 档案模板 | profile template | `AgentTemplate`（`agent.template.*`） | 一份 agent 的配方：`agent.json` 加人设 `persona.md`；装一份就多一份档案，界面上在档案页叫「模板」 | 种子、预设 |

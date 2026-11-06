@@ -20,7 +20,7 @@
   "commit": {
     "initial": "Initial commit (a project VibeValley made)",
     "initialShort": "Initial commit",
-    "leftOver": "Commit what was left uncommitted before merging",
+    "uncommitted": "The worktree has uncommitted changes. Commit them yourself, with a message that follows this repository's rules, then ask again.",
     "merge": "Merge {branch}"
   },
   "notChecked": "The project has not been checked: refresh GitHub's state",

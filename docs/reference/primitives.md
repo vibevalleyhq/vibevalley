@@ -106,10 +106,11 @@
 | `defaults` | `config.ts` |  |
 | `ConfigError` | `config.ts` | Why the configuration cannot be read: the file, or a key's value. |
 | `loadConfig` | `config.ts` | file: the YAML to read, which must be there. empty is home/vibevalley.yaml, read if it is there. |
-| `pkmDir` | `config.ts` | The notes' vault. |
+| `pkmDir` | `config.ts` | The notes' vault: <workRoot>/pkm unless the owner put it elsewhere. |
 | `dbDir` | `config.ts` | The database's folder, or "memory". |
 | `serverAddress` | `config.ts` | The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. |
-| `projectsDir` | `config.ts` | Where the projects are: each folder in it is one. |
+| `reposDir` | `config.ts` | Where the space's repositories are: each folder in it is one. |
+| `worktreesDir` | `config.ts` | Where the issues' worktrees are: <project>.<issue number> under it. |
 | `agentHome` | `config.ts` | A profile's folder for conversation logs, archives and evals; memory rows live in the database. |
 | `dbQueries` | `db.ts` | Every query run: what a test holds a hot path's budget to, and a reading of the farm's load. |
 | `dbFile` | `db.ts` | The database's file in its folder. |
@@ -154,7 +155,7 @@
 | `gitSync` | `git.ts` | Runs git in dir as a test user. its output, trimmed. |
 | `gitIn` | `git.ts` | Runs git in dir as dir's own config says (no test user). its output, trimmed. |
 | `gitInEnv` | `git.ts` | gitIn with these in its environment (a commit's dates). |
-| `projectsDir` | `git.ts` | A projects folder of its own, under a work root of its own. |
+| `reposDir` | `git.ts` | A repositories folder of its own, under a work root of its own. |
 | `repo` | `git.ts` | A repository with `mine` commits by the test user, `others` by someone else. |
 | `write` | `git.ts` |  |
 | `goldenCases` | `golden.ts` | The cases of a module's file, by the module's folder under src. |

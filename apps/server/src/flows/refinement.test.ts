@@ -31,7 +31,7 @@ const hasBranch = (project: string, branch: string) => {
 /** Nothing a draft did stays: reset to main, its worktree is clean, so it goes with its refiner, and so does its branch,
  * which has nothing main does not. */
 const refinementLeftNothing = (work: string, issue: T.Issue) => {
-  const project = join(work, "projects", issue.project!);
+  const project = join(work, "repos", issue.project!);
   const tree = join(work, "worktrees", `${issue.project}.${issue.number}`);
   return until(() => !existsSync(tree) && !hasBranch(project, `vibevalley/issue-${issue.number}`), "its worktree and branch are gone");
 };
@@ -112,7 +112,7 @@ describe("a refined issue", () => {
       );
       yield* until(() => !drafting(core), "the refiner left");
       yield* refinementLeftNothing(f.config.workRoot, issue);
-      const project = join(f.config.workRoot, "projects", "board");
+      const project = join(f.config.workRoot, "repos", "board");
       expect(git(project, "log", "--format=%s", "--all")).not.toContain("起草时不该有的提交");
 
       const canceled = yield* issues.add({ title: "新工单", project: "board", agent: "lab" });

@@ -81,9 +81,9 @@
 主人将工单挪到 `done` 时，服务端按 `deliver` 与分支状态判定交付：
 
 1. **无代码改动（`none`）**：管家工单、`deliver: answer` 或分支无新提交时，直接记 `delivered: none` 并关闭会话。
-2. **保留分支（`kept`）**：`deliver: branch` 且有提交时，提交工作区文件，保留分支并关闭会话，记 `delivered: kept`。
+2. **保留分支（`kept`）**：`deliver: branch` 且有提交时，保留分支并关闭会话，记 `delivered: kept`；工作树里未提交的改动不代提交。
 3. **合并或提 PR（`change`）**：
-   - 在锁外自动提交未提交文件，用 `git merge-tree` 预检冲突；若冲突则标上 `Issue.conflict` 并留在 `in_review`。
+   - 在锁外要求工作树干净；有未提交改动就退回帮工，按仓库自己的提交规范提交后再来。干净时用 `git merge-tree` 预检冲突；若冲突则标上 `Issue.conflict` 并留在 `in_review`。
    - 在锁外运行 `.vibevalley/check`；若失败则将末尾 40 行输出交回帮工修复。
    - 进项目锁复核分支未变：子工单合入父分支记 `merged_into_parent`；普通工单本地合入主分支记 `merged`，或推送分支创建/更新 PR。
 4. **PR 轮询结清**：每 `github.pr_poll_seconds` 秒轮询开放 PR；合并后记 `delivered: pull_request` 并清理 worktree，关闭未合则记 `canceled: dismissed`。

@@ -19,7 +19,7 @@ Workspace（工作目录，一张大地图）
 
 档案私聊也使用 Session，直接关联频道，不需要工单或 Assignment。Session 的工作目录和默认回复频道独立于每条输入的来源。
 
-现在只有一个 Workspace：工作目录 `VIBEVALLEY_WORK_ROOT`（项目在 `projects/`，worktree 在 `worktrees/`）和家目录 `VIBEVALLEY_HOME`。
+现在只有一个 Workspace：工作空间 `VIBEVALLEY_WORK_ROOT`（项目在 `repos/`，worktree 在 `worktrees/`，笔记在 `pkm/`）和家目录 `VIBEVALLEY_HOME`。
 
 ## 一件活怎么走
 

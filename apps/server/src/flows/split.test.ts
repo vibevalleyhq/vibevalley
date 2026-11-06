@@ -39,7 +39,7 @@ it.live("regression: a parent without a session can receive and resolve its own 
   return Effect.gen(function* () {
     const issues = yield* Issue;
     yield* (yield* Agent).save(lab());
-    const root = join(f.config.workRoot, "projects", "parent-conflict");
+    const root = join(f.config.workRoot, "repos", "parent-conflict");
     writeFileSync(join(root, "same.ts"), "base\n");
     gitSync(root, "add", ".");
     gitSync(root, "commit", "-m", "Prepare conflict file");

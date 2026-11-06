@@ -7,7 +7,7 @@ import { Effect } from "effect";
 
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { type ServerConfig, dbDir, loadConfig, serverAddress } from "./config.ts";
+import { type ServerConfig, dbDir, loadConfig, pkmDir, reposDir, serverAddress, worktreesDir } from "./config.ts";
 
 const temp = () => tempDir("vibevalley-config-");
 const load = loadConfig;
@@ -56,6 +56,17 @@ it.effect("what it cannot read is refused", () =>
 it.effect("the server's own address is always loopback", () =>
   Effect.gen(function* () {
     expect(serverAddress(yield* load("", { VIBEVALLEY_HOME: temp(), VIBEVALLEY_HOST: "0.0.0.0", VIBEVALLEY_PORT: "9100" }))).toBe("127.0.0.1:9100");
+  }).pipe(Effect.provide(NodeServices.layer)),
+);
+
+it.effect("a space keeps its repos, worktrees and notes under its work root", () =>
+  Effect.gen(function* () {
+    const home = temp();
+    const c = yield* load("", { VIBEVALLEY_HOME: home });
+    expect([reposDir(c), worktreesDir(c), pkmDir(c)]).toEqual([join(c.workRoot, "repos"), join(c.workRoot, "worktrees"), join(c.workRoot, "pkm")]);
+    const notes = join(home, "notes");
+    const own = yield* load("", { VIBEVALLEY_HOME: home, VIBEVALLEY_PKM_ROOT: notes });
+    expect(pkmDir(own)).toBe(notes);
   }).pipe(Effect.provide(NodeServices.layer)),
 );
 

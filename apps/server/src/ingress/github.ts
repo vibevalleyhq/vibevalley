@@ -236,12 +236,27 @@ export const githubSnapshot = (projects: Project["Service"]) =>
 const failedChecks = new Set(["FAILURE", "ERROR", "CANCELLED", "CANCELED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"]);
 const finishedChecks = new Set(["COMPLETED", "SUCCESS", "FAILURE", "ERROR"]);
 
+/** The Actions job id in a check's details URL, or "" for a check that is not an Actions job. */
+export const actionsJobOf = (url: string) => /\/job\/(\d+)/u.exec(url)?.[1] ?? "";
+
 export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, ApiError | Schema.SchemaError>) =>
   Effect.gen(function* () {
     const db = yield* Db;
     const issues = yield* Issue;
-    const snapshot = githubSnapshot(yield* Project);
+    const projects = yield* Project;
+    const snapshot = githubSnapshot(projects);
     const polling = yield* Semaphore.make(1);
+
+    /** A failed Actions job's last lines, fetched with gh so the helper need not open the browser. */
+    const jobLog = Effect.fnUntraced(function* (project: string, url: string) {
+      const job = actionsJobOf(url);
+      if (!job) return "";
+      const remote = yield* projects.githubRemote(project).pipe(Effect.orElseSucceed(() => ""));
+      if (!remote) return "";
+      const log = yield* projects.githubRequest("run", "view", "--job", job, "--log-failed", "--repo", remote);
+      if (!log.ok) return "";
+      return log.out.trim().split("\n").slice(-40).join("\n").slice(-4000);
+    });
 
     const poll = Effect.fn("Ingress.pollPullRequest")(function* (issue: T.Issue) {
       const pr = issue.pullRequest;
@@ -260,13 +275,18 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
       if (fingerprint !== cursor.check_fingerprint) {
         const revision = cursor.check_revision + 1;
         const failed = checks.filter((check) => failedChecks.has((check.conclusion || check.status).toUpperCase()));
+        const failedText = yield* Effect.forEach(
+          failed,
+          (check) => Effect.map(jobLog(project, check.url), (log) => `${check.name}: ${check.conclusion || check.status}${log ? "\n" + log : ""}`),
+          { concurrency: 3 },
+        );
         const finished = checks.length > 0 && checks.every((check) => check.conclusion !== "" || finishedChecks.has(check.status.toUpperCase()));
         if (failed.length > 0 || finished)
           yield* accept({
             ...base,
             key: `${project}#${pr.number}:ci:${revision}`,
             actor: { kind: "ci", id: `github:${project}#${pr.number}` },
-            text: (failed.length > 0 ? failed : checks).map((check) => `${check.name}: ${check.conclusion || check.status}`).join("\n"),
+            text: (failed.length > 0 ? failedText : checks.map((check) => `${check.name}: ${check.conclusion || check.status}`)).join("\n"),
             data: { head: current.head, checks },
             meta: { ...scope, kind: "ci", head: current.head, fingerprint, failed: failed.length > 0 },
           });

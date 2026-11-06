@@ -87,7 +87,7 @@ it.live("regression: child changes merge into the parent worktree and reach main
     const place = yield* projects.workplace("merge-family", parent.number, true, "");
     expect(readFileSync(join(place.cwd, "child.txt"), "utf8")).toBe("child result");
     expect(gitSync(place.cwd, "status", "--porcelain")).toBe("");
-    const main = join(f.config.workRoot, "projects", "merge-family");
+    const main = join(f.config.workRoot, "repos", "merge-family");
     expect(existsSync(join(main, "child.txt"))).toBe(false);
     yield* service.setStatus(parent.id, "done", "", "", owner);
     expect(readFileSync(join(main, "child.txt"), "utf8")).toBe("child result");

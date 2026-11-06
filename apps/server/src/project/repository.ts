@@ -13,15 +13,6 @@ const patchesMax = 400_000;
 /** As vibevalley when the machine has no git user. */
 export const asFarm = ["-c", "user.name=vibevalley", "-c", "user.email=vibevalley@localhost"];
 
-/** What a session's left-over changes are committed without, whatever the project ignores (pathspecs for git add). */
-const neverCommitted = [
-  ":(exclude,glob)**/__pycache__/**",
-  ":(exclude,glob)**/*.pyc",
-  ":(exclude,glob)**/.pytest_cache/**",
-  ":(exclude,glob)**/node_modules/**",
-  ":(exclude,glob)**/.DS_Store",
-];
-
 /** "" when it went through, else the first line git said. */
 const why = (ran: Effect.Effect<Ran>) => Effect.map(ran, (r) => (r.code === 0 ? "" : reason(r.stderr)));
 
@@ -72,13 +63,6 @@ export const repository = (path: string) => {
     /** "" when the branch is gone. */
     deleteBranch: (branch: string) => why(gitRun(path, "branch", "-D", branch)),
     commit,
-    /** Commits what is left in the worktree, without what is never committed; nothing when nothing is left. */
-    commitLeft: Effect.fnUntraced(function* (message: string) {
-      if ((yield* git(path, "status", "--porcelain")) === "") return;
-      yield* git(path, "add", "-A", "--", ".", ...neverCommitted);
-      if ((yield* git(path, "diff", "--cached", "--name-only")) === "") return;
-      yield* commit(message);
-    }),
     conflicts,
     /** A merge commit of theirs into ours, made without checking either out: merge-tree writes the tree. */
     mergeCommit: Effect.fnUntraced(function* (ours: string, theirs: string, message: string) {

@@ -19,7 +19,7 @@ for (const ending of ["MERGED", "CLOSED"] as const) {
   it.live(`regression: a parent without a session closes after its PR is ${ending.toLowerCase()}`, () => {
     const base = testConfig();
     const config = { ...base, github: { ...base.github, prProjects: ["family-pr"] } };
-    const path = join(config.workRoot, "projects", "family-pr");
+    const path = join(config.workRoot, "repos", "family-pr");
     const bare = join(config.workRoot, "origin.git");
     let state = "OPEN";
     const f = farm({

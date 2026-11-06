@@ -7,7 +7,7 @@ import type { Validation, KeySource, KeyStatus, SettingsStatus, SettingsUpdate, 
 import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOf } from "#/base/json.ts";
-import { ServerConfig } from "#/infra/config.ts";
+import { pkmDir, reposDir, ServerConfig, worktreesDir } from "#/infra/config.ts";
 import { keptFile, readOrSetAside } from "#/infra/files.ts";
 
 import { keyHint, memorySourcesOver, settingsProblem } from "./memorySources.ts";
@@ -133,6 +133,7 @@ const make = Effect.gen(function* () {
     return {
       file,
       home: config.home,
+      paths: { repos: reposDir(config), worktrees: worktreesDir(config), pkm: pkmDir(config) },
       version: config.version,
       locale: s.locale ?? "zh",
       deepseekApiKey: deepseek ? secret(deepseek[0], deepseek[1]) : {},

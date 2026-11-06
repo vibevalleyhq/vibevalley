@@ -109,12 +109,12 @@ describe("the game", () => {
 
   it.live("counts a session's commits once per repository", () => {
     const config = testConfig();
-    const app = join(config.workRoot, "projects", "app");
+    const app = join(config.workRoot, "repos", "app");
     repo(app, 3, 2);
     const tree = join(config.workRoot, "worktrees", "w1");
     gitSync(app, "worktree", "add", "-q", "-b", "vibevalley/w1", tree);
     gitSync(tree, "commit", "-q", "--allow-empty", "-m", "session work");
-    repo(join(config.workRoot, "projects", "tools", "cli"), 1, 0);
+    repo(join(config.workRoot, "repos", "tools", "cli"), 1, 0);
     return Effect.gen(function* () {
       const game = yield* Game;
       const count = yield* game.count();

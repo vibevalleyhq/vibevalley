@@ -16,7 +16,7 @@ import { ownersLanguage } from "#/base/prompts.ts";
 import { Channel, type OrchestratorNews } from "#/channel/channel.ts";
 import { Cron } from "#/cron/cron.ts";
 import { nextRun } from "#/cron/when.ts";
-import { agentHome, projectsDir, ServerConfig } from "#/infra/config.ts";
+import { agentHome, reposDir, ServerConfig } from "#/infra/config.ts";
 import { localeMinute } from "#/infra/time.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import type { Picked } from "#/mailbox/envelope.ts";
@@ -177,7 +177,7 @@ const make = (options: OrchestratorOptions = {}) =>
                 },
                 inputType: "orchestratorInput",
                 home,
-                cwd: projectsDir(config),
+                cwd: reposDir(config),
                 // The default orchestrator's prefix is the one its evals hold; another says who it is after it.
                 instructions: systemPrompt + agentPrompt + (id === defaultOrchestrator || !profile ? "" : identityNote(profile.name, profile.persona)),
                 llm: llmOf,

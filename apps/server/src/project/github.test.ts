@@ -9,8 +9,8 @@ import type { Issue } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { ServerConfig } from "#/infra/config.ts";
-import { githubSnapshot } from "#/ingress/github.ts";
-import { gitSync, projectsDir, repo, write } from "#/testing/git.ts";
+import { actionsJobOf, githubSnapshot } from "#/ingress/github.ts";
+import { gitSync, reposDir, repo, write } from "#/testing/git.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { Project, githubOrigin, type GitHubRun, probeGitHub, type ProjectHooks } from "./project.ts";
@@ -38,8 +38,13 @@ const loggedIn = (permission: () => string) =>
   });
 
 describe("GitHub", () => {
+  it("finds the Actions job in a check's URL, and none elsewhere", () => {
+    expect(actionsJobOf("https://github.com/o/r/actions/runs/1/job/127709499860")).toBe("127709499860");
+    expect(actionsJobOf("https://example.test/checks/1")).toBe("");
+  });
+
   it.effect("regression: GitHub snapshots read all collection pages and overflowing review threads", () => {
-    const root = projectsDir();
+    const root = reposDir();
     const resolved: string[] = [];
     let failReviews = false;
     const author = (login: string) => ({ login, __typename: login.endsWith("[bot]") ? "Bot" : "User" });
@@ -223,7 +228,7 @@ describe("GitHub", () => {
     let calls = 0;
     const counted: GitHubRun = (...args) => Effect.tap(loggedIn(() => permission)(...args), () => Effect.sync(() => calls++));
     return projects(
-      projectsDir(),
+      reposDir(),
       Effect.gen(function* () {
         const p = yield* Project;
         const made = yield* p.create({ name: "garden" });
@@ -257,7 +262,7 @@ describe("GitHub", () => {
           ? Effect.succeed({ out: "token: secret", ok: false, missing: false })
           : loggedIn(() => "WRITE")(...args);
     return projects(
-      projectsDir(),
+      reposDir(),
       Effect.gen(function* () {
         const p = yield* Project;
         const made = yield* p.create({ name: "garden" });
@@ -280,7 +285,7 @@ describe("GitHub", () => {
   });
 
   it.effect("a private repository is cloned by the logged-in gh", () => {
-    const root = projectsDir();
+    const root = reposDir();
     const cloning = gh((args) => {
       if (args[0] === "--version") return { out: "gh version 2.80.0" };
       if (args[0] === "auth") return { out: "Logged in to github.com account gardener (keyring)" };
@@ -305,7 +310,7 @@ describe("GitHub", () => {
 
   it.effect("pull requests need the project opted in and the permission", () =>
     projects(
-      projectsDir(),
+      reposDir(),
       Effect.gen(function* () {
         const p = yield* Project;
         for (const name of ["enabled", "other"]) {
@@ -328,7 +333,7 @@ describe("GitHub", () => {
     let pushFails = true;
     const issue = { number: 1, title: "sample" } as Issue;
     return projects(
-      projectsDir(),
+      reposDir(),
       Effect.gen(function* () {
         const p = yield* Project;
         const place = yield* p.workplace("sample", 1, true, "");
@@ -336,14 +341,19 @@ describe("GitHub", () => {
         mkdirSync(join(place.cwd, ".vibevalley"));
         const check = join(place.cwd, ".vibevalley/check");
         write(check, "#!/bin/sh\necho check-failed\nexit 1\n", 0o755);
+        gitSync(place.cwd, "add", ".vibevalley/check");
+        gitSync(place.cwd, "commit", "-qm", "check");
         yield* Effect.flip(p.submitPullRequest(place, issue, "done"));
         expect([pushes, calls]).toEqual([0, 0]);
         write(check, "#!/bin/sh\nprintf changed > generated.ts\nexit 0\n", 0o755);
+        gitSync(place.cwd, "commit", "-qam", "check again");
         yield* Effect.flip(p.submitPullRequest(place, issue, "done"));
         expect([pushes, calls]).toEqual([0, 0]);
         write(check, "#!/bin/sh\nexit 0\n", 0o755);
+        gitSync(place.cwd, "commit", "-qam", "passing check");
         yield* Effect.flip(p.submitPullRequest(place, issue, "done"));
         expect(calls).toBe(0);
+        gitSync(place.cwd, "clean", "-fd");
         pushFails = false;
         expect((yield* p.submitPullRequest(place, issue, "done")).number).toBe(4);
         expect(calls).toBe(1);
@@ -363,7 +373,7 @@ describe("GitHub", () => {
   it.effect("an answer from gh that is not the shape asked for is refused, not taken as a pull request", () => {
     const issue = { number: 1, title: "sample" } as Issue;
     return projects(
-      projectsDir(),
+      reposDir(),
       Effect.gen(function* () {
         const p = yield* Project;
         const place = yield* p.workplace("sample", 1, true, "");
@@ -384,7 +394,7 @@ describe("GitHub", () => {
       for (const hasCheck of [false, true]) {
         let body = "";
         yield* projects(
-          projectsDir(),
+          reposDir(),
           Effect.gen(function* () {
             const p = yield* Project;
             const place = yield* p.workplace("sample", 1, true, "");
@@ -392,6 +402,8 @@ describe("GitHub", () => {
             if (hasCheck) {
               mkdirSync(join(place.cwd, ".vibevalley"));
               write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\nexit 0\n", 0o755);
+              gitSync(place.cwd, "add", ".vibevalley/check");
+              gitSync(place.cwd, "commit", "-qm", "check");
             }
             yield* p.submitPullRequest(place, { number: 1, title: "sample" } as Issue, "done");
             expect(body).toBe("工单 #1\n\ndone\n\n" + (hasCheck ? ".vibevalley/check 通过。" : "这个项目没有 .vibevalley/check，没跑检查。"));
@@ -413,7 +425,7 @@ describe("GitHub", () => {
   it.effect("the helper's own title and body, left in the worktree's git directory, open the pull request", () => {
     let args: string[] = [];
     return projects(
-      projectsDir(),
+      reposDir(),
       Effect.gen(function* () {
         const p = yield* Project;
         const place = yield* p.workplace("sample", 1, true, "");
@@ -440,7 +452,7 @@ describe("GitHub", () => {
   it.effect("a new issue starts from origin's main when it can be fast-forwarded to", () =>
     Effect.gen(function* () {
       for (const mode of ["checked-out", "other-branch", "dirty", "diverged", "fetch-failure", "not-enabled"]) {
-        const root = projectsDir();
+        const root = reposDir();
         const hooks: ProjectHooks = {
           gh: loggedIn(() => (mode === "not-enabled" ? "READ" : "WRITE")),
         };
@@ -506,7 +518,7 @@ describe("GitHub", () => {
   );
 
   it.effect("contributions count once per repository, its worktrees too", () => {
-    const root = projectsDir();
+    const root = reposDir();
     const nested = join(root, "nested", "repo");
     repo(nested, 2, 1);
     gitSync(nested, "worktree", "add", "-q", "-b", "side", join(dirname(root), "worktrees", "copy"));

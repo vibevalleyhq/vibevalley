@@ -1105,7 +1105,12 @@ export const catalogs = {
       gh: { missing: "没装 gh", failed: "gh 检测失败", signedOut: "没登录 GitHub", noAccount: "无法确认 GitHub 登录账号" },
       notProjectName: "「{name}」不能当项目名：用一个简单的英文文件夹名，比如 clock-in",
       outside: "项目必须在工作目录里面，不能链接到外面",
-      commit: { initial: "初始提交（VibeValley 建的项目）", initialShort: "初始提交", leftOver: "合并前把没提交的改动一并提交", merge: "合并 {branch}" },
+      commit: {
+        initial: "初始提交（VibeValley 建的项目）",
+        initialShort: "初始提交",
+        uncommitted: "工作树里还有没提交的改动。请自己按仓库的提交规范提交，然后再来合并或提 PR。",
+        merge: "合并 {branch}",
+      },
       notChecked: "尚未检测项目，请刷新 GitHub 状态",
       check: {
         timedOut: "项目检查 .vibevalley/check 超时（{seconds}s）",
@@ -3601,6 +3606,12 @@ export const catalogs = {
         homeHint: "VibeValley 的一切都在这里",
         settings: "设置文件",
         settingsHint: "钥匙和这几页的设置",
+        repos: "仓库目录",
+        reposHint: "这个空间的项目，每个文件夹都是一个 git 仓库",
+        worktrees: "工作树目录",
+        worktreesHint: "帮工干活时每张工单自己的检出",
+        pkm: "笔记库",
+        pkmHint: "这个空间的 PARA 目录和日记",
         copy: "复制路径",
         copied: "路径复制好了",
         reveal: "在访达里显示",
@@ -5093,7 +5104,7 @@ export const catalogs = {
       commit: {
         initial: "Initial commit (a project VibeValley made)",
         initialShort: "Initial commit",
-        leftOver: "Commit what was left uncommitted before merging",
+        uncommitted: "The worktree has uncommitted changes. Commit them yourself, with a message that follows this repository's rules, then ask again.",
         merge: "Merge {branch}",
       },
       notChecked: "The project has not been checked: refresh GitHub's state",
@@ -7761,6 +7772,12 @@ export const catalogs = {
         homeHint: "Everything VibeValley keeps is here",
         settings: "Settings file",
         settingsHint: "The keys and these pages' settings",
+        repos: "Repositories",
+        reposHint: "The space's projects; each folder is a git repository",
+        worktrees: "Worktrees",
+        worktreesHint: "Each issue's own checkout while a helper works",
+        pkm: "Notes vault",
+        pkmHint: "The space's PARA folders and journals",
         copy: "Copy the path",
         copied: "Path copied",
         reveal: "Show in Finder",
@@ -9151,8 +9168,8 @@ export interface Messages {
   "server.project.cloneFailedGh": undefined;
   "server.project.commit.initial": undefined;
   "server.project.commit.initialShort": undefined;
-  "server.project.commit.leftOver": undefined;
   "server.project.commit.merge": { readonly branch: string | number };
+  "server.project.commit.uncommitted": undefined;
   "server.project.conflict": { readonly base: string | number };
   "server.project.exists": { readonly name: string | number };
   "server.project.gh.failed": undefined;
@@ -11702,8 +11719,12 @@ export interface Messages {
   "web.setting.about.manual.readOnly": { readonly next: string | number };
   "web.setting.about.manual.translocated": { readonly next: string | number };
   "web.setting.about.newFarmQuestion": undefined;
+  "web.setting.about.pkm": undefined;
+  "web.setting.about.pkmHint": undefined;
   "web.setting.about.ready": { readonly next: string | number };
   "web.setting.about.readyNewFarm": { readonly next: string | number };
+  "web.setting.about.repos": undefined;
+  "web.setting.about.reposHint": undefined;
   "web.setting.about.restart": undefined;
   "web.setting.about.restartQuestion": undefined;
   "web.setting.about.reveal": undefined;
@@ -11715,6 +11736,8 @@ export interface Messages {
   "web.setting.about.version": undefined;
   "web.setting.about.versionHint": undefined;
   "web.setting.about.workingQuestion": { readonly n: string | number };
+  "web.setting.about.worktrees": undefined;
+  "web.setting.about.worktreesHint": undefined;
   "web.setting.appearance.intro": undefined;
   "web.setting.appearance.scale": undefined;
   "web.setting.appearance.scaleHint": undefined;

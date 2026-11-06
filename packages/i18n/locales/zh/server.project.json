@@ -20,7 +20,7 @@
   "commit": {
     "initial": "初始提交（VibeValley 建的项目）",
     "initialShort": "初始提交",
-    "leftOver": "合并前把没提交的改动一并提交",
+    "uncommitted": "工作树里还有没提交的改动。请自己按仓库的提交规范提交，然后再来合并或提 PR。",
     "merge": "合并 {branch}"
   },
   "notChecked": "尚未检测项目，请刷新 GitHub 状态",

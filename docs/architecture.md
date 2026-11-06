@@ -122,11 +122,11 @@ flowchart LR
 | `agent/<档案 id>/` | 管家对话 `<档案 id>.jsonl`、压缩归档 `archive/`、评测样例 `evals/` |
 | `logs/` | 帮工原始运行日志与桌面端服务端日志 |
 | `artifacts/<sha256>` | 网页稿子内容文件（按内容哈希去重，[稿子](docs/subsystems/artifact.md)） |
-| `pkm/` | 笔记库（PARA 目录与日记 Markdown，可通过 `pkm.root` 修改，[笔记](docs/subsystems/pkm.md)） |
 
-工作目录 `$VIBEVALLEY_WORK_ROOT`（默认 `~/vibevalley-dev`）下：
-- `projects/`：项目 git 仓库。
+工作空间 `$VIBEVALLEY_WORK_ROOT`（默认 `~/vibevalley-dev`）下：
+- `repos/`：项目的 git 仓库。
 - `worktrees/`：工单分支的 git worktree（`worktrees/<项目>.<工单号>`）。
+- `pkm/`：笔记库（PARA 目录与日记 Markdown，可通过 `pkm.root` 改到别处，[笔记](docs/subsystems/pkm.md)）。
 - `contexts/<Session id>-<后缀>/`：非工单聊天会话的独立工作目录。
 
 页面偏好（主题、音量、看板视图、草稿）保存在浏览器 `localStorage`（统一经 `apps/web/src/state/stored.ts` 读写）。

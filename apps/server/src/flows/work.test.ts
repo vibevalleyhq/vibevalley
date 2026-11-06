@@ -70,7 +70,7 @@ describe("a session's work", () => {
       expect(session.branch).toMatch(/^vibevalley\//u);
       expect(said).toMatchObject({ status: "done", delivered: "merged" });
       yield* until(() => w.notes.some((note) => /1 个提交合进了 clock 的 main/u.test(note)), "the merge notice");
-      const project = join(f.config.workRoot, "projects", "clock");
+      const project = join(f.config.workRoot, "repos", "clock");
       expect(git(project, "log", "--format=%s", "main")).toMatch(/加上打卡/u);
       expect(existsSync(join(project, "clock.ts"))).toBe(true);
       expect(git(project, "worktree", "list").split("\n")).toHaveLength(1);
@@ -250,7 +250,7 @@ describe("a session's work", () => {
       const core = yield* Core;
       yield* until(() => core.state().issues.find((issue) => issue.id === b.issue)?.conflict === undefined, "the conflict mark cleared");
       expect(yield* issues.setStatus(b.issue!, "done", "", "", owner)).toMatchObject({ status: "done", delivered: "merged" });
-      const project = join(f.config.workRoot, "projects", "clash");
+      const project = join(f.config.workRoot, "repos", "clash");
       expect(git(project, "show", "main:same.ts")).toBe("export const v = 'A+B'");
       expect(git(project, "status", "--porcelain")).toBe("");
       yield* until(() => core.state().progress?.counts.untangle === 1, "the issue conflict credited to its resolver");
