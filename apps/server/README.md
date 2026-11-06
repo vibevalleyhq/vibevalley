@@ -6,7 +6,7 @@ Effect v4 on Node 24, run from source with vpx (`vp run start`) and bundled with
 
 ```
 src/main.ts        the server: loads the configuration, takes the home's lease, serves; --ready-json, --web
-src/chat.ts        the conversations in a terminal (a runtime, or the farm's own agent; chat/): the command line (apps/cli) hands its
+src/chat/main.ts   the conversations in a terminal (a runtime, or the farm's own agent; chat/): the command line (apps/cli) hands its
                    terminal to this program, as they need the server's runtimes, models and config
 src/services.ts    every service in build order, then what runs at start
 src/handlers.ts    every endpoint's answer, put together from src/http/handlers/<concept>.ts (each hands it to the service that owns it)
@@ -19,6 +19,9 @@ src/flows/         tests that go through several services: a whole farm and a he
 src/testing/       test layers: a temporary home, an in-memory database, a whole farm, git repositories, golden data
 db/                migrations/0001_schema.up.sql (the one schema), queries/<table>.sql, generated/ (scripts/sqlite-generate.ts)
 ```
+
+The desktop bundle emits `dist/main.mjs` from `src/main.ts` and `dist/chat.mjs` from `src/chat/main.ts`.
+Runtime assets resolve from the package root through `#package` in both source and deployed builds.
 
 ## Rules
 

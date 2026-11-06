@@ -22,7 +22,7 @@
 | `packages/agent/src/brain.ts`、`session.ts`、`compaction.ts`、`prefix.ts` | `makeBrain` 入口、`.jsonl` 读写、上下文压缩与前缀分段 SHA-256 校验 |
 | `packages/agent/src/self.ts`、`skills.ts`、`memory.ts`、`mcp.ts`、`reminders.ts` | 自身内置工具、技能目录扫描、记忆接口、MCP 客户端与定时提醒 |
 | `packages/agent/src/todo.ts`、`todoTools.ts`、`coding.ts`、`dag.ts` | 自身任务图 `Todo`、本地文件/shell 编码工具与通用 DAG 算法 |
-| `apps/server/src/session/host.ts`、`runtime/vibevalley.ts`、`chat.ts` | 管家宿主 `AgentHost`、oar 农机适配（含 `runtime_todo` 表存储）与 CLI 终端对话 |
+| `apps/server/src/session/host.ts`、`runtime/vibevalley.ts`、`chat/main.ts` | 管家宿主 `AgentHost`、oar 农机适配（含 `runtime_todo` 表存储）与 CLI 终端对话 |
 
 ## 模型和不变量
 
@@ -76,7 +76,7 @@
 
 ## 和谁打交道
 
-- **四个宿主**：管家 `session/host.ts`、帮工农机 `runtime/vibevalley.ts`、终端对话 `chat.ts` 与内部 `spawn_agent`。
+- **四个宿主**：管家 `session/host.ts`、帮工农机 `runtime/vibevalley.ts`、终端对话 `chat/main.ts` 与内部 `spawn_agent`。
 - **资源服务（`resource`）**：管家与帮工的 `resource_read` 工具经 `apps/server/src/resource/` 按会话权限分页读取 `vv://` 资源。
 
 ## 为什么这样

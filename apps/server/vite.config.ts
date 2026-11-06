@@ -13,7 +13,7 @@ export default defineConfig({
   },
   // The packaged app's server and its terminal conversations (apps/desktop/scripts/package.ts).
   pack: {
-    entry: ["src/main.ts", "src/chat.ts"],
+    entry: { main: "src/main.ts", chat: "src/chat/main.ts" },
     format: "esm",
     platform: "node",
     target: "node24",
