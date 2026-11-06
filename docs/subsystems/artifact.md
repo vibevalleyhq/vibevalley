@@ -16,13 +16,12 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/artifact/artifact.ts` | 稿子增删改查、HTML 版本文件读写（`$VIBEVALLEY_HOME/artifacts/<sha256>`）与频道卡片发送 |
-| `apps/server/src/artifact/blocks.ts`、`ops.ts`、`spans.ts` | 块存储、`BlockOp` 纯函数施加、Unicode 码点切分 |
-| `apps/server/src/artifact/markdown.ts`、`demo.ts` | Markdown 互转与多帮工协同写入演示 |
-| `apps/server/src/artifact/policy.ts`、`check.ts`、`edit.ts`、`shell.ts` | HTML 资源白名单、CSP 响应头、`parse5` 提交前检查、划词源码替换与外壳脚本 |
+| [`packages/artifact/`](packages/artifact/README.md) | 独立稿子纯领域包（`@vibevalley/artifact`）：块状态机 `Page` 与码点切分（`ops.ts`）、Markdown 互转（`markdown.ts`）、HTML CSP 响应头与 `parse5` 白名单检查及划词改字（`html.ts`）、前端块跨度计算与协同编辑器状态机（`blocks.ts`、`editor.ts`） |
+| `apps/server/src/artifact/artifact.ts`、`blocks.ts` | 稿子增删改查、块与建议 SQLite 持久化、HTML 版本文件读写（`$VIBEVALLEY_HOME/artifacts/<sha256>`）与频道卡片发送 |
+| `apps/server/src/artifact/ops.ts`、`markdown.ts`、`policy.ts`、`check.ts`、`edit.ts`、`shell.ts` | 服务端薄消费出口（转发 `@vibevalley/artifact`） |
 | `packages/protocol/src/rules/order.ts`、`display.ts` | 前后端共用的分数顺序键 `keyBetween` 与沙箱常量 `htmlSandbox` |
 | 表 `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` | 稿子、HTML 版本、块、块修订、操作批次与改写建议表 |
-| `apps/web/src/features/artifact/` | `ArtifactsPage.tsx`、`ArtifactCanvas.tsx`、`BlocksView.tsx`、`editor.ts`、`blocks.ts`、`shell.ts` |
+| `apps/web/src/features/artifact/` | `ArtifactsPage.tsx`、`ArtifactCanvas.tsx`、`BlocksView.tsx` 及消费 `@vibevalley/artifact` 的薄层适配 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`artifact.*` 及 `GET /api/v1/artifact/<id>/<version>`）。
 

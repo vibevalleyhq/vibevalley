@@ -1,0 +1,42 @@
+{
+  "name": "@vibevalley/artifact",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./blocks": {
+      "types": "./dist/blocks.d.ts",
+      "default": "./src/blocks.ts"
+    },
+    "./editor": {
+      "types": "./dist/editor.d.ts",
+      "default": "./src/editor.ts"
+    },
+    "./html": {
+      "types": "./dist/html.d.ts",
+      "default": "./src/html.ts"
+    },
+    "./markdown": {
+      "types": "./dist/markdown.d.ts",
+      "default": "./src/markdown.ts"
+    },
+    "./ops": {
+      "types": "./dist/ops.d.ts",
+      "default": "./src/ops.ts"
+    }
+  },
+  "dependencies": {
+    "@vibevalley/i18n": "workspace:*",
+    "@vibevalley/protocol": "workspace:*",
+    "effect": "catalog:",
+    "parse5": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vibevalley/testkit": "workspace:*",
+    "vite-plus": "catalog:"
+  }
+}

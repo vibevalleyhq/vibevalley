@@ -29,6 +29,7 @@
     "@modelcontextprotocol/sdk": "catalog:",
     "@vibevalley/agent": "workspace:*",
     "@vibevalley/ai": "workspace:*",
+    "@vibevalley/artifact": "workspace:*",
     "@vibevalley/home": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/pkm": "workspace:*",

@@ -36,6 +36,7 @@ packages/agent/            VibeValley 自己的 agent：core/ 是循环和工具
                            不认识农场，lint 查方向（ai ← agent ← apps/server）
 packages/voice/            语音引擎与协议：MOSS Live 实时双向帧 Schema、播放时钟与中继、WAV 编码与听写转写、声网 ConvoAI 与字幕拼块
 packages/pkm/              知识库与双链大纲引擎：Logseq 风格 Markdown 解析与打印、PARA 目录规则、双链图谱与嵌入展开、前端大纲键盘编辑与框选状态机
+packages/artifact/         稿子（块文档与 HTML 页）引擎：块操作并发状态机 Page、Markdown 双向互转、HTML CSP 沙箱与 AST 检查、前端协同编辑器 BlockEditor
 packages/bridge/           宿主之间的调用：一份契约（每个调用的入参、出参，每个推送的载荷，都是 Schema），两头由它生成，传输是各宿主的适配器
 packages/home/             农场的家目录在磁盘上的约定：在哪、服务端在哪个端口（server.json）、语言（settings.json）、桌面版的 socket；服务端、命令行、桌面版都用它
 packages/testkit/          测试共用的：黄金数据、在真实时间上等条件、测试金字塔（只在 devDependencies）
