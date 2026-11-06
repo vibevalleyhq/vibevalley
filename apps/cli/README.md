@@ -59,3 +59,18 @@ The checkout may be outside the space. A published response includes the confirm
 例如在完整命令后追加 `report '{"summary":"完成","prSubmit":false,"checks":[{"criterion":0,"result":"met","proof":"tests passed"}]}'`。参数不能选择其他会话。缺失、无效或撤销凭证不会回退主人 HTTP；工具拒绝返回非零退出码，stderr 保留有界且脱敏的原因。
 
 源码入口带绝对 Node 和 Vite+ 加载器路径；桌面包入口为 `Resources/cli/dist/worker.mjs`，仅此次 CLI 调用设置 `ELECTRON_RUN_AS_NODE=1`。生命周期与启动门槛见[会话](docs/subsystems/session.md)。
+
+## 观察工单执行
+
+`vibevalley issue watch 12` 输出服务端的工单阶段、动作、工具输入和结果、连接失败、提交与交付状态；没有估算百分比。默认在交回、提问、阻塞、完成或取消时退出，开始观察时已经处于这些阶段的也立即退出。`--follow` 持续跟随下一轮和新会话；Ctrl-C 只断开观察，不停止帮工。原 `issue show --watch` 仍等待状态，并在 stdout 返回一个工单文档。
+
+`issue watch 12 --jsonl` 的 stdout 是独立的 JSONL 契约，每行一个 JSON 对象，`version: 1`，其余字段如下。`--format json` 对 watch 返回用法错误，保留全局单文档语义。
+
+| `kind` | 字段与语义 |
+|---|---|
+| `state` | `issue`、`sessions` 是服务端状态；`sessionIds` 是观察的会话；`settled` 决定默认退出；`omittedSessions` 是未读取的较早会话数 |
+| `event` | `session`、`event`（`SessionEvent`）；主键是会话与 `seq`，更大的 `revision` 替换旧内容，`run` 标识轮次 |
+| `gap` | `session`、`before`；该会话 `seq < before` 的历史不再保留，不能保证补齐；没有 `before` 表示归档会话已无保留日志 |
+| `missing` | `issue`；工单已离开观察范围，结束观察 |
+
+只读取最近 8 个会话，每个至多 241 条事件（240 条已保留事件及一条草稿）；保留日志中的文本截断规则不变。重连补历史、去重，每会话最多保存 256 个事件 revision，较旧序号不再重放。断线重试间隔 1 秒；协议错误和 HTTP 拒绝直接失败。每次连接独立接收当前状态，宿主重启后 `StateFrame.seq` 从零开始不会阻止继续观察。传输和历史接线见[工单](docs/subsystems/issue.md#观察执行)。

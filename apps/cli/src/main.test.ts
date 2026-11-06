@@ -40,6 +40,7 @@ const cliCommands = [
   "issue show",
   "issue status",
   "issue timeline",
+  "issue watch",
   "memory create",
   "memory delete",
   "memory list",

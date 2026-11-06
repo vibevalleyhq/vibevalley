@@ -51,6 +51,8 @@ export const catalogs = {
         runtime: "农机",
         role: "档案角色",
         duty: "职责说明",
+        follow: "交回后继续观察新一轮",
+        jsonl: "输出独立的版本化 JSONL 事件流",
       },
       command: {
         root: "VibeValley 的命令行，一条命令一个操作：答复是短文字，--format json 给接口的形状；在终端里对话用 chat",
@@ -89,6 +91,7 @@ export const catalogs = {
           review: "验收交回来的活：通过或不通过；完成另用 issue status 挪到 done",
           status: "挪工单的状态：todo 是派活或再来一轮，done 是完成，canceled 是关掉；能不能挪由服务端说",
           timeline: "工单的时间线和花费",
+          watch: "观察工单状态和执行轨迹",
         },
         memory: { create: "给一份档案记一条记性", delete: "删掉档案的一条记性", list: "列出一份档案的记性", search: "搜记性；不指定档案就搜全部" },
         repo: { list: "列出仓库", create: "新建仓库（--repo 从 GitHub 克隆）" },
@@ -414,6 +417,7 @@ export const catalogs = {
         pkmPageSave: { run: 'vibevalley pkm page save 读书 "- 置身事内"', about: "新建或更新「读书」这一页" },
         agentCreate: { about: "新建一份用 Claude Code 的档案" },
         agentDelete: { about: "先试删，看会删掉什么" },
+        issueObserve: { about: "以 JSONL 跟随工单执行" },
       },
       issue: {
         can: "能做：",
@@ -428,6 +432,10 @@ export const catalogs = {
         deleted: "删掉了 {issue}",
         passOrFail: "给 --pass 或 --fail，只给一个",
         stage: "现在：{stage}",
+        watchGap: "{session} 的 seq {before} 之前历史已截断",
+        watchMissing: "工单 {issue} 已不在观察范围",
+        watchFormat: "issue watch 请用 --jsonl；--format json 保留单文档语义",
+        watchUnavailable: "{session} 已无保留轨迹，历史不可恢复",
       },
       more: "还有更多：{flag}",
       session: { stopped: "停下了帮工 {session}" },
@@ -3982,6 +3990,8 @@ export const catalogs = {
         runtime: "The runtime",
         role: "The profile's role",
         duty: "What the profile does",
+        follow: "Keep observing after handoff",
+        jsonl: "Write the versioned JSONL event stream",
       },
       command: {
         root: "VibeValley's command line, one operation a command: answers are short text, --format json gives the protocol's shape; chat talks in the terminal",
@@ -4030,6 +4040,7 @@ export const catalogs = {
           review: "Review what was handed back: pass or fail; completing it is issue status … done",
           status: "Move an issue's status: todo sends it out or for another round, done completes it, canceled closes it; the server says which it takes",
           timeline: "An issue's timeline and cost",
+          watch: "Observe issue state and execution history",
         },
         memory: {
           create: "Keep a memory for a profile",
@@ -4410,6 +4421,7 @@ export const catalogs = {
         pkmPageSave: { run: 'vibevalley pkm page save Reading "- bulbs"', about: "Create or update the Reading page" },
         agentCreate: { about: "Create a profile on Claude Code" },
         agentDelete: { about: "Try it first: what it would delete" },
+        issueObserve: { about: "Follow execution as JSONL" },
       },
       issue: {
         can: "What can be done:",
@@ -4424,6 +4436,10 @@ export const catalogs = {
         deleted: "Deleted {issue}",
         passOrFail: "Give --pass or --fail, one of them",
         stage: "Now: {stage}",
+        watchGap: "{session}: history before seq {before} is unavailable",
+        watchMissing: "Issue {issue} is no longer available",
+        watchFormat: "Use --jsonl for issue watch; --format json remains a single document",
+        watchUnavailable: "{session}: no retained journal is available",
       },
       more: "There is more: {flag}",
       session: { stopped: "Stopped helper {session}" },
@@ -8208,6 +8224,7 @@ export interface Messages {
   "cli.command.issue.show": undefined;
   "cli.command.issue.status": undefined;
   "cli.command.issue.timeline": undefined;
+  "cli.command.issue.watch": undefined;
   "cli.command.memory.create": undefined;
   "cli.command.memory.delete": undefined;
   "cli.command.memory.list": undefined;
@@ -8272,6 +8289,7 @@ export interface Messages {
   "cli.example.issueDone.about": undefined;
   "cli.example.issueEdit.about": undefined;
   "cli.example.issueList.about": undefined;
+  "cli.example.issueObserve.about": undefined;
   "cli.example.issueReviewFail.about": undefined;
   "cli.example.issueReviewFail.run": undefined;
   "cli.example.issueReviewPass.about": undefined;
@@ -8339,10 +8357,12 @@ export interface Messages {
   "cli.flag.every": undefined;
   "cli.flag.fail": undefined;
   "cli.flag.finding": undefined;
+  "cli.flag.follow": undefined;
   "cli.flag.format": undefined;
   "cli.flag.issue": undefined;
   "cli.flag.issueStatus": undefined;
   "cli.flag.issueWatch": undefined;
+  "cli.flag.jsonl": undefined;
   "cli.flag.key": undefined;
   "cli.flag.limit": undefined;
   "cli.flag.marker": undefined;
@@ -8399,6 +8419,10 @@ export interface Messages {
   "cli.issue.spent": { readonly cny: string | number; readonly tokens: string | number };
   "cli.issue.stage": { readonly stage: string | number };
   "cli.issue.timeout": { readonly issue: string | number; readonly seconds: string | number };
+  "cli.issue.watchFormat": undefined;
+  "cli.issue.watchGap": { readonly before: string | number; readonly session: string | number };
+  "cli.issue.watchMissing": { readonly issue: string | number };
+  "cli.issue.watchUnavailable": { readonly session: string | number };
   "cli.memory.deleted": { readonly memory: string | number };
   "cli.more": { readonly flag: string | number };
   "cli.next.help": undefined;

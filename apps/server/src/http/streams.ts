@@ -1,11 +1,14 @@
 import { Effect, Metric, Schedule, type Schema, Stream } from "effect";
-import { HttpRouter, HttpServerResponse } from "effect/http";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { eventsPath, livePath, statePath, streamHeartbeatMs, type Streams } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { wireJson } from "#/base/json.ts";
 import { bounded, Core } from "#/core/core.ts";
+import { Issue } from "#/issue/issue.ts";
+import { watchIssue } from "#/issue/watch.ts";
+import { Session } from "#/session/session.ts";
 
 /** Each stream's Schema: what readStream (packages/protocol/src/stream.ts) takes its payloads to be. */
 const schemas = { [statePath]: S.StateFrame, [eventsPath]: S.ServerEvent, [livePath]: S.LiveEvent } satisfies {
@@ -59,6 +62,28 @@ export const streams = HttpRouter.use((router) =>
       "GET",
       livePath,
       Effect.sync(() => sse("live", core.live, schemas[livePath])),
+    );
+  }),
+);
+
+export const issueWatchStream = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    const core = yield* Core;
+    const issues = yield* Issue;
+    const sessions = yield* Session;
+    yield* router.add(
+      "GET",
+      "/api/v1/issue/watch/:id",
+      Effect.gen(function* () {
+        const request = yield* HttpServerRequest.HttpServerRequest;
+        const id = new URL(request.url, "http://farm").pathname.split("/").at(-1) ?? "";
+        const initial = yield* issues.get(id);
+        return sse("issue.watch", watchIssue(initial, core, sessions), S.IssueWatch);
+      }).pipe(
+        Effect.catchTag(["Missing", "Refused", "VoiceUnavailable", "VoiceCallFailed", "ConnectorRefused", "LanRefused"], () =>
+          Effect.succeed(HttpServerResponse.empty({ status: 404 })),
+        ),
+      ),
     );
   }),
 );

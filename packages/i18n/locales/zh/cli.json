@@ -45,7 +45,9 @@
     "marker": "待办标记",
     "runtime": "农机",
     "role": "档案角色",
-    "duty": "职责说明"
+    "duty": "职责说明",
+    "follow": "交回后继续观察新一轮",
+    "jsonl": "输出独立的版本化 JSONL 事件流"
   },
   "command": {
     "root": "VibeValley 的命令行，一条命令一个操作：答复是短文字，--format json 给接口的形状；在终端里对话用 chat",
@@ -101,7 +103,8 @@
       "diff": "看工单的改动：提交和文件",
       "review": "验收交回来的活：通过或不通过；完成另用 issue status 挪到 done",
       "status": "挪工单的状态：todo 是派活或再来一轮，done 是完成，canceled 是关掉；能不能挪由服务端说",
-      "timeline": "工单的时间线和花费"
+      "timeline": "工单的时间线和花费",
+      "watch": "观察工单状态和执行轨迹"
     },
     "memory": {
       "create": "给一份档案记一条记性",
@@ -750,6 +753,9 @@
     },
     "agentDelete": {
       "about": "先试删，看会删掉什么"
+    },
+    "issueObserve": {
+      "about": "以 JSONL 跟随工单执行"
     }
   },
   "issue": {
@@ -764,7 +770,11 @@
     "commented": "评论了 {issue}",
     "deleted": "删掉了 {issue}",
     "passOrFail": "给 --pass 或 --fail，只给一个",
-    "stage": "现在：{stage}"
+    "stage": "现在：{stage}",
+    "watchGap": "{session} 的 seq {before} 之前历史已截断",
+    "watchMissing": "工单 {issue} 已不在观察范围",
+    "watchFormat": "issue watch 请用 --jsonl；--format json 保留单文档语义",
+    "watchUnavailable": "{session} 已无保留轨迹，历史不可恢复"
   },
   "more": "还有更多：{flag}",
   "session": {

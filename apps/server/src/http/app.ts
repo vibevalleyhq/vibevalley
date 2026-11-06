@@ -14,12 +14,13 @@ import { handlers } from "./handlers.ts";
 import { mcpRoute } from "./mcp.ts";
 import { page } from "./page.ts";
 import { subscriptions } from "./rpc.ts";
-import { streams } from "./streams.ts";
+import { issueWatchStream, streams } from "./streams.ts";
 
 const routes = (config: ServerConfig["Service"]) =>
   Layer.mergeAll(
     Layer.unwrap(Effect.map(handlers, (h) => api(h))),
     streams,
+    issueWatchStream,
     attachments,
     artifactContent,
     subscriptions,

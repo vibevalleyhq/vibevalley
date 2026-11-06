@@ -45,7 +45,9 @@
     "marker": "The task marker",
     "runtime": "The runtime",
     "role": "The profile's role",
-    "duty": "What the profile does"
+    "duty": "What the profile does",
+    "follow": "Keep observing after handoff",
+    "jsonl": "Write the versioned JSONL event stream"
   },
   "command": {
     "root": "VibeValley's command line, one operation a command: answers are short text, --format json gives the protocol's shape; chat talks in the terminal",
@@ -101,7 +103,8 @@
       "diff": "An issue's change: its commits and files",
       "review": "Review what was handed back: pass or fail; completing it is issue status … done",
       "status": "Move an issue's status: todo sends it out or for another round, done completes it, canceled closes it; the server says which it takes",
-      "timeline": "An issue's timeline and cost"
+      "timeline": "An issue's timeline and cost",
+      "watch": "Observe issue state and execution history"
     },
     "memory": {
       "create": "Keep a memory for a profile",
@@ -750,6 +753,9 @@
     },
     "agentDelete": {
       "about": "Try it first: what it would delete"
+    },
+    "issueObserve": {
+      "about": "Follow execution as JSONL"
     }
   },
   "issue": {
@@ -764,7 +770,11 @@
     "commented": "Commented on {issue}",
     "deleted": "Deleted {issue}",
     "passOrFail": "Give --pass or --fail, one of them",
-    "stage": "Now: {stage}"
+    "stage": "Now: {stage}",
+    "watchGap": "{session}: history before seq {before} is unavailable",
+    "watchMissing": "Issue {issue} is no longer available",
+    "watchFormat": "Use --jsonl for issue watch; --format json remains a single document",
+    "watchUnavailable": "{session}: no retained journal is available"
   },
   "more": "There is more: {flag}",
   "session": {

@@ -1,6 +1,6 @@
 import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes";
 import type { Commit, UncommittedItem } from "../repo/shapes";
-import type { IssueAnswer, PhaseResting, Run, Session } from "../session/shapes";
+import type { IssueAnswer, PhaseResting, Run, Session, SessionEvent } from "../session/shapes";
 
 export interface Conflict {
   base: string;
@@ -354,3 +354,10 @@ export interface FactIssueRemoved {
   at: number;
   id: IssueId;
 }
+
+export type IssueWatch =
+  | { kind: "history"; session: string; events: SessionEvent[] }
+  | { kind: "state"; issue: Issue; sessions: Session[]; sessionIds: string[]; settled: boolean; omittedSessions: number }
+  | { kind: "event"; session: string; event: SessionEvent }
+  | { kind: "gap"; session: string; before?: number }
+  | { kind: "missing"; issue: string };

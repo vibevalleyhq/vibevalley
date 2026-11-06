@@ -9,6 +9,8 @@ import { latestSessionIdOf, stageWantsOwner } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import { ask, change, frames, given, nameArg, optionalText, ServerFlag, show, words } from "#/farm.ts";
+import { FormatFlag } from "#/format.ts";
+import { observeIssue } from "#/issue-watch.ts";
 import { err, exit, Failure, stdinText } from "#/output.ts";
 
 const issueArg = nameArg("issue", "cli.arg.issue");
@@ -322,10 +324,29 @@ const showCommand = Command.make(
   ]),
 );
 
+const watchCommand = Command.make(
+  "watch",
+  {
+    issue: issueArg,
+    follow: Flag.Boolean("follow").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.follow"))),
+    jsonl: Flag.Boolean("jsonl").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.jsonl"))),
+  },
+  (o) =>
+    Effect.gen(function* () {
+      if ((yield* FormatFlag) === "json") return yield* new Failure({ code: exit.usage, tag: "WatchFormat", text: t("cli.issue.watchFormat") });
+      const issue = yield* ask((api) => api.issue.get({ id: ref(o.issue) }));
+      yield* observeIssue(yield* ServerFlag, issue.id, o.follow, o.jsonl);
+    }),
+).pipe(
+  Command.withDescription(t("cli.command.issue.watch")),
+  Command.withExamples([{ command: "vibevalley issue watch 12 --jsonl", description: t("cli.example.issueObserve.about") }]),
+);
+
 export const issueCommand = Command.make("issue").pipe(
   Command.withSubcommands([
     listCommand,
     showCommand,
+    watchCommand,
     createCommand,
     editCommand,
     statusCommand,
