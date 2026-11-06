@@ -197,6 +197,7 @@ export interface ChannelService {
   /** The thread under a channel's message, opened if it has none. */
   readonly threadUnder: (id: T.MessageId) => Effect.Effect<string, ApiError>;
   readonly issueThread: (issue: string, title: string, channel?: string) => Effect.Effect<string, ApiError>;
+  readonly issueThreadId: (issue: string) => Effect.Effect<string | null>;
   readonly issueMessages: (issue: string) => Effect.Effect<InboxMessage[]>;
   readonly search: (text: string, channel?: string) => Effect.Effect<T.MessageHit[], ApiError>;
   readonly attach: (upload: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError>;
@@ -215,7 +216,7 @@ export interface ChannelService {
   /** An orchestrator's words (from: its profile id), one whole message each: it shows once said in full. */
   readonly orchestratorSays: (channel: string, text: string, run: string, from: string) => Effect.Effect<void>;
   /** code names the kind, for dropping repeats. */
-  readonly notice: (channel: string, text: string, code: string) => Effect.Effect<void>;
+  readonly notice: (channel: string, text: string, code: string, sendKey?: string) => Effect.Effect<void>;
   readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
   /** The places who has not read all of, the newest first, by their addresses. */
   readonly unread: (who: string) => Effect.Effect<T.ChannelUnread[]>;

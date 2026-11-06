@@ -174,7 +174,7 @@ describe("the command line", () => {
     }),
   );
 
-  it.live("an agent does an issue from start to end with these commands alone, reading their text", () =>
+  it.live("regression: CLI watch returns for questions while the issue remains in progress", () =>
     Effect.gen(function* () {
       const server = yield* workingFarm;
       const at = (...args: string[]) => [...args, "--server", server];
@@ -187,6 +187,7 @@ describe("the command line", () => {
       expect((yield* cli(at("issue", "status", n, "todo"))).code).toBe(0);
       expect((yield* cli(at("issue", "show", n, "--watch", "--timeout", "30"))).code).toBe(0);
       const asking = (yield* cli(at("issue", "show", n))).out;
+      expect(asking.split("\n")[1]).toMatch(/^in_progress/u);
       expect(asking).toContain("用 8797");
       expect(asking).toContain(`vibevalley issue comment ${n} …`);
       expect((yield* cli(at("issue", "comment", n, "用 8797"))).code).toBe(0);

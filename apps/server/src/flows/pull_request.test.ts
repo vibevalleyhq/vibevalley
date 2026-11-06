@@ -11,6 +11,7 @@ import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
 import { owner } from "#/base/actor.ts";
+import { Channel } from "#/channel/channel.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
@@ -34,7 +35,7 @@ const quiet = (cwd: string, ...args: string[]) => {
 
 describe("a pull request", () => {
   // In a repo that merges by pull request, done pushes the branch and opens one. the issue waits in review.
-  for (const ending of ["MERGED", "CLOSED"] as const) {
+  for (const ending of ["MERGED", "CLOSED", "ACCEPTED", "SUBMITTED"] as const) {
     it.live(`merges by PR, and closes when the PR is ${ending.toLowerCase()}`, () => {
       const base = testConfig();
       const config = {
@@ -210,12 +211,26 @@ describe("a pull request", () => {
           yield* repos.refreshGitHub();
           const running = sessions.runOf(id);
           expect(sessions.sessionOf(id)?.phase._tag).toBe("working");
-          yield* issues.submitPullRequest(id);
+          if (ending !== "SUBMITTED") yield* issues.submitPullRequest(id);
           expect(sessions.sessionOf(id)?.phase._tag).toBe("working");
           expect(sessions.runOf(id)).toBe(running);
-          expect((yield* issues.get(issue.id)).pullRequest?.state).toBe("open");
+          expect((yield* issues.get(issue.id)).pullRequest?.state).toBe(ending === "SUBMITTED" ? undefined : "open");
+          if (ending === "ACCEPTED" || ending === "SUBMITTED") yield* issues.edit(issue.id, { deliver: "pull_request" }, owner);
           release();
           yield* w.nextReport;
+          if (ending === "ACCEPTED" || ending === "SUBMITTED") {
+            if (ending === "ACCEPTED") writeFileSync(join(cwd, "uncommitted.txt"), "retain this work");
+            const accepted = yield* issues.setStatus(issue.id, "done", "", "", owner);
+            expect([accepted.status, accepted.delivered, accepted.pullRequest?.state]).toEqual(["done", "submitted", "open"]);
+            expect(existsSync(join(cwd, "uncommitted.txt"))).toBe(ending === "ACCEPTED");
+            expect(git(path, "rev-parse", "main")).toBe(main);
+            state = "MERGED";
+            yield* issues.refreshPullRequests;
+            const refreshed = yield* issues.get(issue.id);
+            expect([refreshed.status, refreshed.pullRequest?.state]).toEqual(["done", "merged"]);
+            expect(existsSync(join(cwd, "uncommitted.txt"))).toBe(ending === "ACCEPTED");
+            return;
+          }
           issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
           expect(issue.pullRequest).toMatchObject({
             number: 7,
@@ -229,9 +244,15 @@ describe("a pull request", () => {
           yield* w.nextReport;
           issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
           expect([creates, pushes]).toEqual([1, 3]);
+          const chat = yield* Channel;
+          const thread = yield* chat.issueThread(issue.id, issue.title);
+          expect(
+            (yield* chat.history(thread)).filter((message) => message.kind === "notice" && message.text.includes("https://github.com/test/clock/pull/7")),
+          ).toHaveLength(1);
           expect(git(bare, "rev-parse", branch)).toBe(git(cwd, "rev-parse", "HEAD"));
         }).pipe(Effect.scoped, Effect.provide(before.layer));
 
+        if (ending === "ACCEPTED" || ending === "SUBMITTED") return;
         const after = farm({ config, repoHooks: hooks });
         yield* Effect.gen(function* () {
           const issues = yield* Issue;

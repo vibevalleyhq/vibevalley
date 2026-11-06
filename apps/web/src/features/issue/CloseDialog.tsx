@@ -161,7 +161,7 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
               <div class="flex flex-wrap gap-2">
                 <Show when={acts().includes("complete")}>
                   <Button tone="primary" data-act="complete" onClick={() => void take()}>
-                    {empty() ? t("web.issue.changes.letGo") : t("web.issue.changes.merge", { base: c().base })}
+                    {t("shared.act.complete")}
                   </Button>
                 </Show>
                 <Show when={acts().includes("resolve")}>

@@ -9,6 +9,7 @@ import { assignedAgentOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
 import { owner } from "#/base/actor.ts";
+import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Session } from "#/session/session.ts";
@@ -37,6 +38,43 @@ const refinementLeftNothing = (work: string, issue: T.Issue) => {
 };
 
 describe("a refined issue", () => {
+  it.live("regression: repository-free drafts preserve discussion without dispatching work", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const issues = testIssues(yield* Issue);
+      const chat = yield* Channel;
+      const sessions = yield* Session;
+      yield* (yield* Agent).save({ ...lab(), workdir: "" });
+      const issue = yield* issues.add({ title: "讨论看板", agent: "lab" });
+      yield* issues.comment(issue.id, "只讨论桌面端，不做移动端");
+      yield* issues.refine(issue.id, "看板拖卡", "");
+      yield* await_(
+        () => issues.get(issue.id),
+        (i) => i.criteria.length > 0 && !i.refining,
+        "first draft",
+      );
+      yield* issues.refine(issue.id, "用 8797", "");
+      const drafted = yield* await_(
+        () => issues.get(issue.id),
+        (i) => i.title.includes("8797") && !i.refining,
+        "second draft",
+      );
+      expect(drafted.repo).toBeUndefined();
+      expect(drafted.status).toBe("backlog");
+      expect(sessionIdsOf(drafted)).toEqual([]);
+      expect(existsSync(join(f.config.workRoot, "repos", "board"))).toBe(false);
+      const thread = yield* chat.issueThread(issue.id, issue.title);
+      const messages = yield* chat.history(thread);
+      expect(messages.filter((m) => m.fromKind === "owner").map((m) => m.text)).toEqual(["只讨论桌面端，不做移动端", "看板拖卡", "用 8797"]);
+      expect(messages.some((m) => m.text.includes("看板拖卡改用 8797"))).toBe(true);
+      const runs = yield* sessions.issueRuns(issue.id);
+      expect(runs).toHaveLength(2);
+      expect(runs.every((run) => run.triggeredBy.kind === "refine")).toBe(true);
+      const latest = runs.at(-1);
+      expect(latest).toBeDefined();
+      if (latest) expect((yield* sessions.get(latest.session))?.brief).toContain("只讨论桌面端，不做移动端");
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
   // The plus makes an unsent issue. a session drafts it to the issue's format and leaves, the issue still in the backlog.
   it.live("is refined before it is sent", () => {
     const f = farm();
@@ -91,6 +129,7 @@ describe("a refined issue", () => {
       expect(sessionIdsOf(issue)).toHaveLength(1);
       const session = sessionIdsOf(issue)[0];
       if (session === undefined) throw new Error("the issue has no execution session");
+      expect((yield* Effect.flip(issues.edit(issue.id, { description: "replace the confirmed goal" }, owner)))._tag).toBe("Refused");
       const brief = sessions.sessionOf(session)!.brief;
       for (const want of ["看板拖卡改用 8797 端口", "验收标准", "1. 拖到待办就开工\n2. 端口是 8797"]) expect(brief).toContain(want);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

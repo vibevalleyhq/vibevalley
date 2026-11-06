@@ -95,8 +95,6 @@
     "resolveHow": "Have it merge {base} into its own branch, resolve the conflicts, run the tests and commit; then complete it.",
     "behind": "While it worked, {base} got {n} more commits; completing joins them (with one merge commit).",
     "uncommitted": "{n} files are not committed yet; completing commits them first:",
-    "letGo": "Complete, let it go",
-    "merge": "Complete, merge into {base}",
     "resolve": "Have it resolve the conflict",
     "moved": "The ticket's status changed: go back to the ticket and see what it asks of you.",
     "counts": "{commits} commits · {files} files",
@@ -230,7 +228,7 @@
     "inQueue": "Queued {ago}: it starts by itself in the board's order when a spot frees up.",
     "unqueue": "Unqueue",
     "pickHelper": "Pick a helper first",
-    "start": "Start",
+    "start": "Confirm and dispatch",
     "save": "Save",
     "remove": "Delete",
     "newRepo": "New repo",
@@ -355,5 +353,10 @@
     "placeholder": "What needs doing? A sentence is enough; it is drafted from your words",
     "keys": "⌘ Enter to save",
     "keep": "Save"
+  },
+  "conversation": {
+    "title": "Discussion and delivery",
+    "older": "Load earlier messages",
+    "empty": "Requirements, execution feedback and deliveries stay here"
   }
 }

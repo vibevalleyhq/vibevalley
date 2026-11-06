@@ -72,6 +72,8 @@ export function merging(d: MergeDeps) {
     const pr = yield* repos
       .submitPullRequest(place, issue, pullRequestConclusion(said))
       .pipe(Effect.mapError((e) => (Predicate.isTagged(e, "MergeFailure") ? e : MergeFailure.error(e.message))));
+    const thread = yield* chat.issueThread(issue.id, issue.title).pipe(Effect.mapError((e) => MergeFailure.error(reasonOf(e))));
+    yield* chat.notice(thread, t("server.issue.prDelivered", { url: pr.url }), "issue_pr_delivery", `issue-pr:${issue.id}:${pr.url}`);
     yield* savePullRequest(issue.id, pr).pipe(Effect.mapError((e) => MergeFailure.error(reasonOf(e))));
     return { pullRequest: pr, text: t("shared.join.labeled", { label: "PR", text: pr.url }), commits: 0 };
   });
@@ -119,7 +121,12 @@ export function merging(d: MergeDeps) {
     for (const issue of yield* list) {
       if (issue.pullRequest?.state !== "open" || !issue.repo) continue;
       yield* repos.pullRequestState(issue.repo, issue.pullRequest.number).pipe(
-        Effect.flatMap((state) => (state === "open" ? Effect.void : finishPullRequest(issue, state))),
+        Effect.flatMap((state) => {
+          if (state === "open") return Effect.void;
+          if ((issue.deliver === "pull_request" || issue.closedAt !== undefined) && issue.pullRequest)
+            return savePullRequest(issue.id, { ...issue.pullRequest, state });
+          return finishPullRequest(issue, state);
+        }),
         Effect.catch((e) => Effect.logWarning(`vibevalley: refresh pull requests: issue #${issue.number}: ${e instanceof Error ? e.message : reasonOf(e)}`)),
       );
     }
@@ -140,7 +147,7 @@ export function merging(d: MergeDeps) {
         }),
       );
     return submitted.text;
-  });
+  }, prLock.withPermits(1));
 
   return { merge, refreshPullRequests, submit };
 }

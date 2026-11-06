@@ -279,6 +279,9 @@ const make = Effect.gen(function* () {
       });
       return written.thread;
     }, locked),
+    issueThreadId: Effect.fn("Channel.issueThreadId")(function* (issue) {
+      return yield* Effect.sync(() => model.threadOfSubject("issue", issue) ?? null);
+    }),
     issueMessages: Effect.fn("Channel.issueMessages")(function* (issue) {
       const thread = model.threadOfSubject("issue", issue);
       if (!thread) return [];
@@ -429,8 +432,8 @@ const make = Effect.gen(function* () {
       yield* locked(Effect.andThen(seat(from), write({ channel, from, kind: "chat", text, meta: run ? { run } : {} })));
     }, bestEffort("chat: the orchestrator's words")),
     notice: Effect.fn("Channel.notice")(
-      function* (channel, text, code) {
-        return yield* write({ channel, from: "system", kind: "notice", text, meta: { code } });
+      function* (channel, text, code, sendKey = "") {
+        return yield* write({ channel, from: "system", kind: "notice", text, meta: { code }, sendKey });
       },
       locked,
       bestEffort("chat: notice"),

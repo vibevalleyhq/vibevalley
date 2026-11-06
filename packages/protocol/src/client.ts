@@ -207,6 +207,9 @@ export class VibeValleyApi {
     previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/issue/previewDelete", a),
     /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then leaves. */
     refine: (a: { id: string } & T.IssueRefineRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/refine", a),
+    conversation: {
+      get: (a: { id: string }): Promise<string | null> => this.call<string | null>("/api/v1/issue/conversation/get", a),
+    },
     comment: {
       /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
       create: (a: { id: string } & T.CommentRequest): Promise<T.Applied> => this.call<T.Applied>("/api/v1/issue/comment/create", a),

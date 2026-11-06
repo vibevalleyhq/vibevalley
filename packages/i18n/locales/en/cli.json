@@ -293,7 +293,10 @@
       "timeline": {
         "get": "A ticket's milestones and what all its rounds cost"
       },
-      "update": "Update a ticket"
+      "update": "Update a ticket",
+      "conversation": {
+        "get": "The issue conversation location"
+      }
     },
     "lan": {
       "device": {

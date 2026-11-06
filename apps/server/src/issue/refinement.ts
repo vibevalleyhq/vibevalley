@@ -64,7 +64,7 @@ export function refinement(d: RefinementDeps) {
     yield* saveEdit(issue.id, {
       title,
       description,
-      repo: issue.repo ?? where,
+      repo: issue.repo ?? (where || undefined),
       priority: issue.priority,
       criteria: issue.criteria,
       deliver: issue.deliver,
@@ -84,13 +84,15 @@ export function refinement(d: RefinementDeps) {
       if (item.refining) return yield* Effect.fail(refused(t("server.issue.refinement.drafting", { name: item.refining.name })));
       const chosen = yield* refiner(item);
       const where = item.repo ?? chosen.workdir.trim();
-      if (!where) return yield* Effect.fail(refused(t("server.issue.refinement.noRepo")));
       const said = word.trim();
-      const brief = refinementBrief(item, said, where);
+      const thread = yield* chat.issueThread(item.id, item.title, channel || undefined);
+      const history = yield* chat.history(thread, undefined, 40);
+      const brief = refinementBrief(item, said, where, history.map((message) => message.text).join("\n\n"));
+      if (said) yield* chat.say(said, thread, "");
       yield* beforeRefinement(item, said, chosen.id, where);
       // A draft cut short (a restart) may have left the worktree as its refiner had it: each draft starts from main.
-      const kept = yield* sessions.clearWorkplace(item.id, where, item.number);
-      if (kept.kept) yield* Effect.logInfo(`vibevalley: issue ${item.id}: before its draft: ${kept.reason}`);
+      const kept = where ? yield* sessions.clearWorkplace(item.id, where, item.number) : { kept: false };
+      if (kept.kept) yield* Effect.logInfo(`vibevalley: issue ${item.id}: retained draft workplace`);
       // Always a worktree, even for a profile that works in the repo folder: the reset after it must not touch the owner's checkout.
       const hired = yield* hire(chosen, brief, where, { worktree: true, channel, issue: id, trigger: { kind: "refine" }, refining: true });
       if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")));
@@ -109,7 +111,13 @@ export function refinement(d: RefinementDeps) {
     if (f.outcome === "completed") {
       const { draft: d, problem } = parseRefinement(said);
       if (!d) yield* tell(t("server.issue.refinement.unread", { name: h.name, problem }));
-      else yield* refined(id, d, f.questions && f.questions.length > 0 ? f.questions : questionsFromText(said));
+      else {
+        const questions = f.questions && f.questions.length > 0 ? f.questions : questionsFromText(said);
+        yield* refined(id, d, questions);
+        yield* tell(
+          [d.title, refinementDescription(d), ...d.criteria, ...questions.map((question) => [question.question, ...question.options].join("\n"))].join("\n\n"),
+        );
+      }
     } else yield* tell(t("server.issue.refinement.unfinished", { name: h.name, summary: f.summary }));
     yield* sessions.dismiss(f.id, "discard");
   });

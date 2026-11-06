@@ -20,6 +20,7 @@ import { toast } from "#/ui/toasts.ts";
 
 import { ActLines } from "./ActLines";
 import { isRefined, newIssueTitle } from "./issue";
+import { IssueThread } from "./IssueThread";
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 
@@ -236,7 +237,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           placeholder={questions().length > 0 ? t("web.issue.todo.answerHint") : refined() ? t("web.issue.todo.againHint") : t("web.issue.todo.whatHint")}
           aria-label={t("web.issue.todo.whatLabel")}
         />
-        <div class="mt-2.5">
+        <div class="mt-2.5 flex flex-wrap gap-2">
+          <Show when={backlog()}>
+            <Button
+              tone={written() ? "primary" : "plain"}
+              data-testid="issue-start"
+              disabled={!startable()}
+              title={d().agent ? undefined : t("web.issue.todo.pickHelper")}
+              onClick={() => void start()}
+            >
+              {t("web.issue.todo.start")}
+            </Button>
+          </Show>
           <Button tone={written() ? "plain" : "primary"} disabled={!canRefine()} onClick={() => void draft()}>
             {refined() ? t("web.issue.todo.redraft") : t("web.issue.todo.draft")}
           </Button>
@@ -292,6 +304,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         </div>
         {talk}
       </Show>
+      <IssueThread issue={props.item.id} />
       <IssueArtifacts issue={props.item.id} heading={<SheetLabel>{t("web.artifact.issue.title")}</SheetLabel>} />
     </>
   );
@@ -362,17 +375,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         <ActLines issue={props.item.id} />
       </div>
       <div class="flex flex-wrap gap-2">
-        <Show when={backlog()}>
-          <Button
-            tone={written() ? "primary" : "plain"}
-            data-testid="issue-start"
-            disabled={!startable()}
-            title={d().agent ? undefined : t("web.issue.todo.pickHelper")}
-            onClick={() => void start()}
-          >
-            {t("web.issue.todo.start")}
-          </Button>
-        </Show>
         <Show when={edited()}>
           <Button
             data-testid="issue-save"

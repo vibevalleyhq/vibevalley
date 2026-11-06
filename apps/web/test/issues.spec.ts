@@ -54,8 +54,8 @@ test("the placeholder card writes a new issue in a dialog, and the board shows i
   await expect.poll(async () => (await api.issue.list({})).some((i) => i.title === title)).toBe(true);
   const made = (await api.issue.list({})).find((i) => i.title === title)!;
   await expect(card(lane(page, "todo"), made.id)).toBeVisible();
-  // With no helper and no repo the server refuses the draft, after asking the runtimes (a few seconds); the board stays.
-  await expect(page.getByTestId("toast").first()).toBeVisible({ timeout: 20_000 });
+  await expect.poll(async () => (await api.issue.get({ id: made.id })).refining).toBeUndefined();
+  expect((await api.issue.get({ id: made.id })).status).toBe("backlog");
   await expect(page).toHaveURL(/\/issues$/u);
   await expect(card(lane(page, "todo"), made.id)).toBeVisible();
   // Its own page, and Escape back to the board.

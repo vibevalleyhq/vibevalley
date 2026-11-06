@@ -21,7 +21,7 @@
     "backlog": "Backlog",
     "todo": "To do",
     "in_progress": "In progress",
-    "in_review": "For you to see",
+    "in_review": "In review",
     "done": "Done",
     "canceled": "Canceled"
   },
@@ -34,14 +34,16 @@
   "deliverable": {
     "change": "A change, merged into the repo",
     "branch": "A change, left on its branch",
-    "answer": "An answer, reading only"
+    "answer": "An answer, reading only",
+    "pull_request": "Submit PR/MR"
   },
   "delivered": {
     "merged": "merged into main",
     "merged_into_parent": "merged into the plan's branch",
     "pull_request": "its PR was merged",
     "kept": "branch kept, not merged",
-    "none": "nothing to merge"
+    "none": "nothing to merge",
+    "submitted": "PR/MR submitted"
   },
   "canceled": {
     "dismissed": "canceled",

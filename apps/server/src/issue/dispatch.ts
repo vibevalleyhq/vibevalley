@@ -65,7 +65,7 @@ export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["j
       for (const i of yield* runtimes.problemsOf(agent))
         if (i.level === "error") return { refused: t("server.issue.cannotSend", { name: agent.name, why: i.text }) };
       const where = repo.trim() || agent.workdir.trim();
-      if (!where) return { refused: t("server.issue.noRepo") };
+      if (!where && opt.refining !== true) return { refused: t("server.issue.noRepo") };
       const room = yield* sessions.makeRoom(agent.runtime, where);
       if ("refused" in room) return { refused: room.refused };
       const evicted = room.evicted ?? "";

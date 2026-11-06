@@ -113,7 +113,7 @@ export const sessionThreads = (r: ChannelHub, w: ChannelWriting) =>
       run: string | undefined,
     ) {
       const w = sessionOf(id);
-      if (!w || outcome === "interrupted") return;
+      if (!w || w.refining || outcome === "interrupted") return;
       const thread = yield* threadOfSession(id);
       if (!thread) return;
       const said = outcome === "completed" ? sessions.reportOf(id) : "";

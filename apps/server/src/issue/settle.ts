@@ -47,7 +47,8 @@ export const issueSettling = (r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
       if (!a) return yield* Effect.fail(refused(t("server.issue.noProfileNamed", { key }), [lookIn.agent]));
       if (a.id === assignedAgentOf(issue)) return undefined;
       if (to !== "todo") return yield* Effect.fail(refused(t("server.issue.handOverOnTodo")));
-      if (issue.status === "in_progress") return yield* Effect.fail(refused(t("server.issue.stopFirst", { n: issue.number })));
+      if (issue.status === "in_progress" && issue.stage.state === "working")
+        return yield* Effect.fail(refused(t("server.issue.stopFirst", { n: issue.number })));
       if (!a.enabled) return yield* Effect.fail(refused(t("server.issue.disabled", { name: a.name })));
       for (const i of yield* runtimes.problemsOf(a))
         if (i.level === "error") return yield* Effect.fail(refused(t("server.issue.cannotSend", { name: a.name, why: i.text })));
@@ -84,11 +85,13 @@ export const issueSettling = (r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
       if (move === "none") return yield* Effect.fail(refused(why, nextSteps(issue)));
       // Stuck, it goes back with the server's own words for why; otherwise the owner says what this round is for.
       if (move === "round" && !taker && !said && issue.stage.state !== "stuck") return yield* Effect.fail(refused(t("server.issue.roundNeedsWords")));
-      let delivery: "kept" | "none" | "merge" | undefined;
+      let delivery: "kept" | "none" | "merge" | "submitted" | "submit" | undefined;
       let commits = 0;
       if (move === "complete") {
+        const needsPr = issue.deliver === "pull_request" && (!issue.pullRequest || issue.pullRequest.state === "closed");
+        if (needsPr && (!issue.repo || !repos.usesPullRequests(issue.repo))) return yield* Effect.fail(refused(t("server.issue.deliveryNeedsPr")));
         commits = yield* commitsOf(issue);
-        delivery = commits === 0 ? "none" : issue.deliver === "branch" ? "kept" : "merge";
+        delivery = needsPr ? "submit" : issue.deliver === "pull_request" ? "submitted" : commits === 0 ? "none" : issue.deliver === "branch" ? "kept" : "merge";
       }
       return { issue, to, move, said, taker, delivery, commits };
     });
@@ -162,6 +165,7 @@ export const issueSettling = (r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
         case "revive":
           return [t("server.issue.does.revive", { n })];
         case "complete": {
+          if (p.delivery === "submitted") return [t("server.issue.acceptSubmittedPr")];
           if (p.delivery === "none") return [t("server.issue.does.completeNone", { n }), t("server.issue.does.helperLeaves", { helper: helperName(item) })];
           if (p.delivery === "kept")
             return [t("server.issue.does.completeKept", { n, commits: p.commits }), t("server.issue.does.helperLeaves", { helper: helperName(item) })];

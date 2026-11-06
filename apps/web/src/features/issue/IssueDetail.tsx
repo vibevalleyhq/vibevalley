@@ -1,4 +1,4 @@
-import { createMemo, For, Match, Show, Switch } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
 import { DeliverableValues, type Issue, type IssueAct, type Session, type SessionView } from "@vibevalley/protocol";
@@ -25,6 +25,7 @@ import { changesLine } from "./changes";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
 import { useIssueChanges, useIssues, useIssueTimeline } from "./history";
 import { AnswerView, Criteria, OrchestratorIssueDetail, Question, Runs, stepsLine, Story, WorkLog } from "./IssueSections";
+import { IssueThread } from "./IssueThread";
 import { issueMove, movedIssue } from "./moves";
 import { issueState, noStepsText, stageTone } from "./overview";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
@@ -59,10 +60,8 @@ export function IssueDetail(props: {
   const doAct = acts.send;
   const sayAct = acts.say;
   const agent = useAgent(() => head().agent);
-  const steps = createSessionEvents(
-    () => head().id,
-    () => true,
-  );
+  const [showSteps, setShowSteps] = createSignal(false);
+  const steps = createSessionEvents(() => head().id, showSteps);
   const changesQuery = useIssueChanges(
     () => props.issue.id,
     () => s().showsChanges,
@@ -103,6 +102,7 @@ export function IssueDetail(props: {
       </div>
       <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={t("web.issue.detail.now")} data-testid="issue-now" data-state={s().stage.state}>
         <Dot tone={tone()} size={8} ring={false} />
+        <span>{t(`shared.status.${props.issue.status}`)} ·</span>
         <span class={tone() === "berry" ? "text-berry" : "text-ink/80"}>{s().statusLine(now(), timeline()?.spent?.cny)}</span>
       </div>
     </div>
@@ -110,6 +110,12 @@ export function IssueDetail(props: {
 
   const main = (
     <>
+      <Show when={s().description}>
+        <section data-testid="issue-requirement">
+          <SheetLabel>{t("web.issue.detail.full")}</SheetLabel>
+          <Markdown class="text-sm text-ink" text={s().description} />
+        </section>
+      </Show>
       <ActLines issue={props.issue.id} words={acts.words()} onSayAgain={acts.sayAgain} onTakeBack={acts.takeBack} />
       <Show when={s().ask}>
         {(ask) => (
@@ -267,6 +273,7 @@ export function IssueDetail(props: {
         </Show>
       </section>
 
+      <IssueThread issue={props.issue.id} />
       <IssueArtifacts issue={props.issue.id} heading={<SheetLabel>{t("web.artifact.issue.title")}</SheetLabel>} />
 
       <section aria-label={t("web.issue.detail.story")} data-testid="issue-story">
@@ -275,16 +282,19 @@ export function IssueDetail(props: {
           {(line) => <Story milestones={line().milestones} />}
         </Show>
         <div class="mt-3 border-t border-line">
-          <Show when={s().description}>
-            <Fold label={t("web.issue.detail.full")}>
-              <Markdown class="text-sm text-ink/90" text={s().description} />
-            </Fold>
-          </Show>
-          <Fold label={t("web.issue.detail.steps")} summary={steps().length > 0 ? stepsLine(steps()) : undefined}>
-            <Show when={steps().length > 0 ? steps() : undefined} fallback={<p class="text-xs text-faint">{noStepsText(head())}</p>}>
-              {(st) => <WorkLog steps={st()} />}
+          <details onToggle={(event) => setShowSteps(event.currentTarget.open)}>
+            <summary class="cursor-pointer py-2.5 text-sm font-semibold">
+              {t("web.issue.detail.steps")}
+              <Show when={steps().length > 0}>
+                <span class="ml-2 font-normal text-muted">{stepsLine(steps())}</span>
+              </Show>
+            </summary>
+            <Show when={showSteps()}>
+              <Show when={steps().length > 0 ? steps() : undefined} fallback={<p class="text-xs text-faint">{noStepsText(head())}</p>}>
+                {(st) => <WorkLog steps={st()} />}
+              </Show>
             </Show>
-          </Fold>
+          </details>
           <Fold label={t("web.issue.detail.runs")} summary={s().historyLine}>
             <Runs issue={props.issue.id} version={`${props.issue.stage.state}:${props.session?.runs}:${props.session?.phase._tag}`} />
           </Fold>

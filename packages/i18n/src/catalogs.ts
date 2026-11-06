@@ -214,6 +214,7 @@ export const catalogs = {
           status: { previewUpdate: "试挪工单的状态：说会发生什么，不动手", update: "挪工单的状态：派活、再来一轮、完成或取消" },
           timeline: { get: "工单的时间线和每一轮加起来的花费" },
           update: "改一张工单",
+          conversation: { get: "工单讨论串的位置" },
         },
         lan: {
           device: { delete: "移除一台配对过的设备", previewDelete: "试移除一台设备：说会怎样，不真移除" },
@@ -997,7 +998,6 @@ export const catalogs = {
         orchestrator: "这是派给管家的工单：管家自己会看",
         onlyBacklog: "只有备选里的工单能起草：先挪回备选",
         drafting: "{name} 正在起草：等它交回来",
-        noRepo: "没说在哪个仓库里做：先选一个仓库",
         unread: "{name} 交回来的草稿读不出来（{problem}），工单没动：再起草一次",
         unfinished: "{name} 没起草完（{summary}），工单没动：再起草一次",
         canceled: "「{title}」取消了：{why}",
@@ -1016,6 +1016,10 @@ export const catalogs = {
       prSubmitNotAllowed: "这张工单没有主人明确授予的自行提交 PR 权限",
       prSubmitNotCurrent: "只有当前处理这张工单的帮工能提交 PR",
       prSubmitUnavailable: "这张工单的仓库没有启用 PR 交付",
+      deliveryNeedsPr: "请先交付一个有效的 PR/MR，再验收完成",
+      acceptSubmittedPr: "验收已提交的 PR/MR，保留未合入的分支和未提交的改动",
+      prDelivered: "已交付 PR/MR：{url}",
+      confirmedRequirements: "已确认并派发：{title}\n\n{description}\n\n验收标准：\n{criteria}",
     },
     "server.lan": {
       aDevice: "一台设备",
@@ -1439,10 +1443,17 @@ export const catalogs = {
         none: "",
       },
       outcome: { completed: "做完了", failed: "没做成", interrupted: "停在半路" },
-      status: { backlog: "备选", todo: "待办", in_progress: "处理中", in_review: "等你看", done: "已完成", canceled: "已取消" },
+      status: { backlog: "备选", todo: "待办", in_progress: "处理中", in_review: "待验收", done: "已完成", canceled: "已取消" },
       priority: { urgent: "紧急", high: "高", medium: "普通", low: "低" },
-      deliverable: { change: "改动，合进仓库", branch: "改动，分支留着不合", answer: "结论，只查不改代码" },
-      delivered: { merged: "合进了主分支", merged_into_parent: "合进了计划的分支", pull_request: "PR 合进去了", kept: "分支留着没合", none: "没有改动要合" },
+      deliverable: { change: "改动，合进仓库", branch: "改动，分支留着不合", answer: "结论，只查不改代码", pull_request: "提交 PR/MR" },
+      delivered: {
+        merged: "合进了主分支",
+        merged_into_parent: "合进了计划的分支",
+        pull_request: "PR 合进去了",
+        kept: "分支留着没合",
+        none: "没有改动要合",
+        submitted: "已提交 PR/MR",
+      },
       canceled: { dismissed: "取消了", lost: "干活的目录丢了" },
       doneWith: "已完成，{what}",
       canceledFor: "已取消，{why}",
@@ -2835,8 +2846,6 @@ export const catalogs = {
         resolveHow: "让它在自己的分支上把 {base} 合进来、解决冲突、跑一遍测试再提交；解决了再来完成。",
         behind: "它干活这段时间，{base} 上多了 {n} 个提交；完成时会合在一起（多一个合并提交）。",
         uncommitted: "还有 {n} 个文件没提交，完成时会先帮它提交：",
-        letGo: "完成，请它收工",
-        merge: "完成，合进 {base}",
         resolve: "让它解决冲突",
         moved: "工单状态变了，先回到工单看看要你做的事。",
         counts: "{commits} 个提交 · {files} 个文件",
@@ -2963,7 +2972,7 @@ export const catalogs = {
         inQueue: "排队中：{ago}排上的，有空位就按看板上的先后自动开工。",
         unqueue: "不排了",
         pickHelper: "先选好帮工",
-        start: "开工",
+        start: "确认需求并派发",
         save: "存下改动",
         remove: "删掉",
         newRepo: "新建仓库",
@@ -3044,6 +3053,7 @@ export const catalogs = {
         justNow: "刚刚",
       },
       new: { title: "新工单", card: "新工单", words: "要做什么", placeholder: "要做什么？一句话就行，帮工会照它起草", keys: "⌘ 回车记下", keep: "记下" },
+      conversation: { title: "讨论与交付记录", older: "加载更早的消息", empty: "需求讨论、执行反馈与交付会保留在这里" },
     },
     "web.lan": {
       lan: {
@@ -4141,6 +4151,7 @@ export const catalogs = {
           },
           timeline: { get: "A ticket's milestones and what all its rounds cost" },
           update: "Update a ticket",
+          conversation: { get: "The issue conversation location" },
         },
         lan: {
           device: { delete: "Remove a paired device", previewDelete: "Preview removing a device: say what would go, without removing it" },
@@ -4989,7 +5000,6 @@ export const catalogs = {
         orchestrator: "This ticket is the manager's: the manager reads it itself",
         onlyBacklog: "Only a ticket in Backlog can be drafted: move it back to Backlog first",
         drafting: "{name} is drafting it: wait for it to come back",
-        noRepo: "No repo was named: pick a repo first",
         unread: "The draft {name} handed back could not be read ({problem}); the ticket is unchanged: draft it again",
         unfinished: "{name} did not finish the draft ({summary}); the ticket is unchanged: draft it again",
         canceled: '"{title}" was canceled: {why}',
@@ -5008,6 +5018,10 @@ export const catalogs = {
       prSubmitNotAllowed: "The owner did not explicitly authorize this ticket to submit its own pull request",
       prSubmitNotCurrent: "Only the helper currently handling this ticket can submit its pull request",
       prSubmitUnavailable: "Pull-request delivery is not enabled for this ticket's repo",
+      deliveryNeedsPr: "Deliver a valid PR/MR before accepting this issue",
+      acceptSubmittedPr: "Accept the submitted PR/MR and retain the unmerged branch and uncommitted changes",
+      prDelivered: "Delivered PR/MR: {url}",
+      confirmedRequirements: "Confirmed and dispatched: {title}\n\n{description}\n\nAcceptance criteria:\n{criteria}",
     },
     "server.lan": {
       aDevice: "A device",
@@ -5444,15 +5458,21 @@ export const catalogs = {
         none: "",
       },
       outcome: { completed: "done", failed: "failed", interrupted: "stopped halfway" },
-      status: { backlog: "Backlog", todo: "To do", in_progress: "In progress", in_review: "For you to see", done: "Done", canceled: "Canceled" },
+      status: { backlog: "Backlog", todo: "To do", in_progress: "In progress", in_review: "In review", done: "Done", canceled: "Canceled" },
       priority: { urgent: "Urgent", high: "High", medium: "Normal", low: "Low" },
-      deliverable: { change: "A change, merged into the repo", branch: "A change, left on its branch", answer: "An answer, reading only" },
+      deliverable: {
+        change: "A change, merged into the repo",
+        branch: "A change, left on its branch",
+        answer: "An answer, reading only",
+        pull_request: "Submit PR/MR",
+      },
       delivered: {
         merged: "merged into main",
         merged_into_parent: "merged into the plan's branch",
         pull_request: "its PR was merged",
         kept: "branch kept, not merged",
         none: "nothing to merge",
+        submitted: "PR/MR submitted",
       },
       canceled: { dismissed: "canceled", lost: "its working folder is gone" },
       doneWith: "Done, {what}",
@@ -6948,8 +6968,6 @@ export const catalogs = {
         resolveHow: "Have it merge {base} into its own branch, resolve the conflicts, run the tests and commit; then complete it.",
         behind: "While it worked, {base} got {n} more commits; completing joins them (with one merge commit).",
         uncommitted: "{n} files are not committed yet; completing commits them first:",
-        letGo: "Complete, let it go",
-        merge: "Complete, merge into {base}",
         resolve: "Have it resolve the conflict",
         moved: "The ticket's status changed: go back to the ticket and see what it asks of you.",
         counts: "{commits} commits · {files} files",
@@ -7077,7 +7095,7 @@ export const catalogs = {
         inQueue: "Queued {ago}: it starts by itself in the board's order when a spot frees up.",
         unqueue: "Unqueue",
         pickHelper: "Pick a helper first",
-        start: "Start",
+        start: "Confirm and dispatch",
         save: "Save",
         remove: "Delete",
         newRepo: "New repo",
@@ -7165,6 +7183,7 @@ export const catalogs = {
         keys: "⌘ Enter to save",
         keep: "Save",
       },
+      conversation: { title: "Discussion and delivery", older: "Load earlier messages", empty: "Requirements, execution feedback and deliveries stay here" },
     },
     "web.lan": {
       lan: {
@@ -8429,6 +8448,7 @@ export interface Messages {
   "cli.op.github.get": undefined;
   "cli.op.github.refresh": undefined;
   "cli.op.issue.comment.create": undefined;
+  "cli.op.issue.conversation.get": undefined;
   "cli.op.issue.create": undefined;
   "cli.op.issue.delete": undefined;
   "cli.op.issue.diff.get": undefined;
@@ -8917,6 +8937,7 @@ export interface Messages {
   "server.inbox.item.review.title": { readonly who: string | number };
   "server.inbox.item.review.tray": { readonly who: string | number };
   "server.inbox.orchestrator": undefined;
+  "server.issue.acceptSubmittedPr": undefined;
   "server.issue.brief.answer": { readonly conclusion: string | number };
   "server.issue.brief.answerUnread": { readonly problem: string | number };
   "server.issue.brief.closed": { readonly closed: string | number };
@@ -8939,6 +8960,8 @@ export interface Messages {
   "server.issue.cannotSend": { readonly name: string | number; readonly why: string | number };
   "server.issue.closed": undefined;
   "server.issue.closedReopen": undefined;
+  "server.issue.confirmedRequirements": { readonly criteria: string | number; readonly description: string | number; readonly title: string | number };
+  "server.issue.deliveryNeedsPr": undefined;
   "server.issue.dependencies.closedParent": undefined;
   "server.issue.dependencies.invalid": undefined;
   "server.issue.dependencies.repo": undefined;
@@ -9012,6 +9035,7 @@ export interface Messages {
   "server.issue.orchestratorAnswers": undefined;
   "server.issue.orchestratorNotHelper": undefined;
   "server.issue.pickHint": { readonly n: string | number };
+  "server.issue.prDelivered": { readonly url: string | number };
   "server.issue.prSubmitNotAllowed": undefined;
   "server.issue.prSubmitNotCurrent": undefined;
   "server.issue.prSubmitUnavailable": undefined;
@@ -9026,7 +9050,6 @@ export interface Messages {
   "server.issue.refinement.lines": { readonly field: string | number };
   "server.issue.refinement.noBlock": undefined;
   "server.issue.refinement.noDrafter": undefined;
-  "server.issue.refinement.noRepo": undefined;
   "server.issue.refinement.noTitle": undefined;
   "server.issue.refinement.notDoing": undefined;
   "server.issue.refinement.notObject": undefined;
@@ -9493,11 +9516,13 @@ export interface Messages {
   "shared.deliverable.answer": undefined;
   "shared.deliverable.branch": undefined;
   "shared.deliverable.change": undefined;
+  "shared.deliverable.pull_request": undefined;
   "shared.delivered.kept": undefined;
   "shared.delivered.merged": undefined;
   "shared.delivered.merged_into_parent": undefined;
   "shared.delivered.none": undefined;
   "shared.delivered.pull_request": undefined;
+  "shared.delivered.submitted": undefined;
   "shared.doneWith": { readonly what: string | number };
   "shared.greeting": undefined;
   "shared.join.and": { readonly a: string | number; readonly b: string | number };
@@ -10943,8 +10968,6 @@ export interface Messages {
   "web.issue.changes.conflictMark": undefined;
   "web.issue.changes.counts": { readonly commits: string | number; readonly files: string | number };
   "web.issue.changes.files": { readonly n: string | number };
-  "web.issue.changes.letGo": undefined;
-  "web.issue.changes.merge": { readonly base: string | number };
   "web.issue.changes.moved": undefined;
   "web.issue.changes.none": undefined;
   "web.issue.changes.reading": undefined;
@@ -10959,6 +10982,9 @@ export interface Messages {
   "web.issue.close.stopAndCancel": undefined;
   "web.issue.close.title": { readonly issue: string | number };
   "web.issue.close.working": { readonly who: string | number };
+  "web.issue.conversation.empty": undefined;
+  "web.issue.conversation.older": undefined;
+  "web.issue.conversation.title": undefined;
   "web.issue.detail.answer": undefined;
   "web.issue.detail.answerTo": { readonly question: string | number };
   "web.issue.detail.answered": undefined;

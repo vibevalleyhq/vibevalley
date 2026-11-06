@@ -293,7 +293,10 @@
       "timeline": {
         "get": "工单的时间线和每一轮加起来的花费"
       },
-      "update": "改一张工单"
+      "update": "改一张工单",
+      "conversation": {
+        "get": "工单讨论串的位置"
+      }
     },
     "lan": {
       "device": {

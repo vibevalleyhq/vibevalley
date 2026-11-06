@@ -43,6 +43,9 @@ export function statusMove(issue: T.Issue, to: T.IssueStatus): [Move, string] {
       if (to === "canceled") return ["drop", ""];
       break;
     case "in_progress":
+      if (to === "done" && issue.stage.stuck === "failed") return ["none", t("server.issue.move.failed")];
+      if (to === "todo" && (issue.stage.state === "asking" || (issue.stage.state === "stuck" && issue.stage.stuck !== "quiet"))) return ["round", ""];
+      if (to === "done" && issue.stage.stuck === "interrupted") return ["complete", ""];
       return to === "canceled" ? ["cancel", ""] : ["none", t("server.issue.move.working")];
     case "in_review":
       if (to === "todo") return ["round", ""];

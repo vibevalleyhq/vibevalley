@@ -368,14 +368,14 @@ const make = Effect.gen(function* () {
       const id = sessionId(`w${hired}`);
       let placeError = "";
       const openedPlace = yield* Effect.option(
-        (issue
+        (issue && repo
           ? repos.workplace(repo, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "")
           : contextPlace(config.workRoot, id).pipe(Effect.provideService(FileSystem.FileSystem, fs))
         ).pipe(Effect.tapError((e) => Effect.sync(() => (placeError = t("server.session.life.noPlace", { name: agent.name, why: e.message }))))),
       );
       if (Option.isNone(openedPlace)) return { refused: placeError };
       const place = openedPlace.value;
-      const releasePlace = issue ? repos.release(place) : releaseContextPlace(place).pipe(Effect.provideService(FileSystem.FileSystem, fs));
+      const releasePlace = place.repo ? repos.release(place) : releaseContextPlace(place).pipe(Effect.provideService(FileSystem.FileSystem, fs));
       let committed = false;
       let released = false;
       let registeredRow = false;
@@ -559,7 +559,9 @@ const make = Effect.gen(function* () {
           if (work === "discard" && h.place.branch)
             yield* repos.reset(h.place).pipe(Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name, why: e.message }))));
           yield* leave(h, closed, 0);
-          const kept = current?.issue ? yield* repos.release(h.place) : { kept: false as const };
+          const kept = h.place.repo
+            ? yield* repos.release(h.place)
+            : yield* releaseContextPlace(h.place).pipe(Effect.provideService(FileSystem.FileSystem, fs));
           if (kept.kept) yield* core.notice("info", t("server.session.life.left", { name, why: kept.reason }));
           return true;
         }),

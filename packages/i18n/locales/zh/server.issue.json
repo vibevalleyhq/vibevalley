@@ -162,7 +162,6 @@
     "orchestrator": "这是派给管家的工单：管家自己会看",
     "onlyBacklog": "只有备选里的工单能起草：先挪回备选",
     "drafting": "{name} 正在起草：等它交回来",
-    "noRepo": "没说在哪个仓库里做：先选一个仓库",
     "unread": "{name} 交回来的草稿读不出来（{problem}），工单没动：再起草一次",
     "unfinished": "{name} 没起草完（{summary}），工单没动：再起草一次",
     "canceled": "「{title}」取消了：{why}",
@@ -180,5 +179,9 @@
   "noProfileNamed": "没有叫 {key} 的档案",
   "prSubmitNotAllowed": "这张工单没有主人明确授予的自行提交 PR 权限",
   "prSubmitNotCurrent": "只有当前处理这张工单的帮工能提交 PR",
-  "prSubmitUnavailable": "这张工单的仓库没有启用 PR 交付"
+  "prSubmitUnavailable": "这张工单的仓库没有启用 PR 交付",
+  "deliveryNeedsPr": "请先交付一个有效的 PR/MR，再验收完成",
+  "acceptSubmittedPr": "验收已提交的 PR/MR，保留未合入的分支和未提交的改动",
+  "prDelivered": "已交付 PR/MR：{url}",
+  "confirmedRequirements": "已确认并派发：{title}\n\n{description}\n\n验收标准：\n{criteria}"
 }

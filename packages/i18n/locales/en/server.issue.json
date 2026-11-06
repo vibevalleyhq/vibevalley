@@ -162,7 +162,6 @@
     "orchestrator": "This ticket is the manager's: the manager reads it itself",
     "onlyBacklog": "Only a ticket in Backlog can be drafted: move it back to Backlog first",
     "drafting": "{name} is drafting it: wait for it to come back",
-    "noRepo": "No repo was named: pick a repo first",
     "unread": "The draft {name} handed back could not be read ({problem}); the ticket is unchanged: draft it again",
     "unfinished": "{name} did not finish the draft ({summary}); the ticket is unchanged: draft it again",
     "canceled": "\"{title}\" was canceled: {why}",
@@ -180,5 +179,9 @@
   "noProfileNamed": "No profile is named {key}",
   "prSubmitNotAllowed": "The owner did not explicitly authorize this ticket to submit its own pull request",
   "prSubmitNotCurrent": "Only the helper currently handling this ticket can submit its pull request",
-  "prSubmitUnavailable": "Pull-request delivery is not enabled for this ticket's repo"
+  "prSubmitUnavailable": "Pull-request delivery is not enabled for this ticket's repo",
+  "deliveryNeedsPr": "Deliver a valid PR/MR before accepting this issue",
+  "acceptSubmittedPr": "Accept the submitted PR/MR and retain the unmerged branch and uncommitted changes",
+  "prDelivered": "Delivered PR/MR: {url}",
+  "confirmedRequirements": "Confirmed and dispatched: {title}\n\n{description}\n\nAcceptance criteria:\n{criteria}"
 }

@@ -625,7 +625,7 @@ describe("an issue", () => {
         (i) => i.stage.stuck === "failed",
         "stuck: failed",
       );
-      expect(failed.status).toBe("in_review");
+      expect(failed.status).toBe("in_progress");
       expect(failed.moves).toEqual(["todo", "canceled"]);
       refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");
       refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");

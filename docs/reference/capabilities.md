@@ -105,6 +105,7 @@
 
 | 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|---|
+| `issue.conversation.get` | 工单讨论串的位置 | `/api/v1/issue/conversation/get` | ✓ | ✓ |   |   |
 | `issue.comment.create` | 给工单带一句话，交给它最新的帮工 | `/api/v1/issue/comment/create` | ✓ | ✓ | ✓ |   |
 | `issue.diff.get` | 看工单的改动：提交、文件和 diff | `/api/v1/issue/diff/get` | ✓ | ✓ | ✓ |   |
 | `issue.history.list` | 工单和它们的帮工历史，缺了记录的也列出 | `/api/v1/issue/history/list` | ✓ | ✓ |   |   |

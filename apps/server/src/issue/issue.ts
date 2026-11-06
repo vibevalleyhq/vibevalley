@@ -354,6 +354,11 @@ const make = Effect.gen(function* () {
         case "start":
           if (taker) yield* shape.edit(id, { agent: taker.id }, by);
           yield* start(id, channel);
+          yield* chat.notice(
+            yield* chat.issueThread(id, item.title, channel || undefined),
+            t("server.issue.confirmedRequirements", { title: item.title, description: item.description, criteria: item.criteria.join("\n") }),
+            "issue_confirmed",
+          );
           break;
         case "unqueue":
           yield* setQueued(id, false, chat.defaultChannel());
@@ -387,10 +392,12 @@ const make = Effect.gen(function* () {
               item.reviewedAt ?? 0,
               item.findings.map((f) => ({ ...f, resolved: true })),
             );
-          if (delivery === "kept" || delivery === "none") {
+          if (delivery === "submit") yield* merge(id, true);
+          const acceptedDelivery = delivery === "submit" ? "submitted" : delivery;
+          if (acceptedDelivery === "kept" || acceptedDelivery === "none" || acceptedDelivery === "submitted") {
             if (unresolved) yield* settleFindings();
             // Written down before its session goes home, so that leaving does not take it for canceled.
-            yield* complete(id, delivery);
+            yield* complete(id, acceptedDelivery);
             const last = latestSessionIdOf(item);
             if (last !== undefined && sessions.present(last)) yield* sessions.dismiss(last, "keep", "completed");
             break;

@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues, PriorityValues, statePath } from "@vibevalley/protocol";
 import { actCommand } from "@vibevalley/protocol/api";
-import { latestSessionIdOf } from "@vibevalley/protocol/rules";
+import { latestSessionIdOf, stageWantsOwner } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import { ask, change, frames, given, nameArg, optionalText, ServerFlag, show, words } from "#/farm.ts";
@@ -263,7 +263,11 @@ const deleteCommand = Command.make("delete", { issue: issueArg }, (o) =>
 
 /** Only what `issue show --watch` reads of a frame; the rest is left as it came. */
 const IssuesOfFrame = Schema.fromJsonString(
-  Schema.Struct({ state: Schema.Struct({ issues: Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus })) }) }),
+  Schema.Struct({
+    state: Schema.Struct({
+      issues: Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus, stage: Schema.Struct({ state: S.IssueStageKind }) })),
+    }),
+  }),
 );
 /** Where it waits on the owner or is over: what --watch waits for. */
 const settled = new Set<T.IssueStatus>(["in_review", "done", "canceled"]);
@@ -278,13 +282,11 @@ const followed = Effect.fn("Cli.followed")(function* (issue: T.Issue, timeout: n
     ),
     Stream.mapEffect((frame) => {
       const now = frame.state.issues.find((i) => i.id === issue.id);
-      return now
-        ? Effect.succeed(now.status)
-        : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
+      return now ? Effect.succeed(now) : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
     }),
-    Stream.changes,
-    Stream.tap((status) => err(JSON.stringify({ issue: issue.number, status }))),
-    Stream.takeUntil((status) => settled.has(status)),
+    Stream.changesWith((a, b) => a.status === b.status && a.stage.state === b.stage.state),
+    Stream.tap((now) => err(JSON.stringify({ issue: issue.number, status: now.status, stage: now.stage.state }))),
+    Stream.takeUntil((now) => settled.has(now.status) || stageWantsOwner(now.stage.state)),
     Stream.runDrain,
   );
   yield* timeout === undefined

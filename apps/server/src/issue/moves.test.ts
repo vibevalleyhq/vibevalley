@@ -7,7 +7,7 @@ import { emptySpaceState } from "#/core/core.ts";
 import { reduce } from "#/projection/reduce.ts";
 
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
-import { issueStageOf } from "./status.ts";
+import { issueStageOf, withIssueStatuses } from "./status.ts";
 const assigned = (sessions: string[] = ["w1"]) =>
   [
     {
@@ -60,6 +60,57 @@ describe("status moves", () => {
 });
 
 describe("moves and the stage", () => {
+  it("regression: questions and failed execution remain in progress with recovery actions", () => {
+    const seed: Issue = {
+      id: issueId("t1"),
+      number: 1,
+      title: "Task",
+      description: "",
+      createdAt: 0,
+      priority: "medium",
+      deliver: "change",
+      status: "backlog",
+      assignments: assigned(),
+      mandate: { strength: "explicit", autoSubmitPr: false, maxBotReviewRounds: 3 },
+      blockedBy: [],
+      findings: [],
+      questions: [],
+      criteria: [],
+      checks: [],
+      moves: [],
+      stage: { state: "draft", acts: [] },
+    };
+    for (const outcome of ["failed", "interrupted", "completed"] as const) {
+      const worker: Session = {
+        id: sessionId("w1"),
+        role: "worker",
+        name: "Helper",
+        agent: "lab",
+        runtime: "pi",
+        hiredAt: 0,
+        brief: "Task",
+        runs: 1,
+        refining: false,
+        phase: { _tag: "done" },
+        lastRun: { outcome, summary: "Result", at: 1 },
+      };
+      const questions = outcome === "completed" ? [{ question: "Which scope?", options: [] }] : [];
+      const state = withIssueStatuses({ ...emptySpaceState(), sessions: [worker], issues: [{ ...seed, questions }] });
+      expect(state.issues[0]?.status).toBe("in_progress");
+      expect(state.issues[0]?.stage.lead).toBe(outcome === "failed" ? "cure" : outcome === "interrupted" ? "resume" : "answer");
+      const delivered = withIssueStatuses({
+        ...state,
+        sessions: [{ ...worker, lastRun: { outcome: "completed", summary: "Delivered", at: 2 } }],
+        issues: [seed],
+      });
+      expect(delivered.issues[0]?.status).toBe("in_review");
+      const resting = withIssueStatuses({
+        ...delivered,
+        sessions: [{ ...worker, phase: { _tag: "resting" }, lastRun: { outcome: "completed", summary: "Exited", at: 2 } }],
+      });
+      expect(resting.issues[0]?.status).toBe("in_progress");
+    }
+  });
   const session = (lastRun: "completed" | "failed" | "interrupted") =>
     ({ id: "w1", phase: { _tag: "done" }, lastRun: { outcome: lastRun, summary: "", at: 1 } }) as unknown as Session;
   const base = { status: "in_review", assignments: assigned(), questions: [], findings: [], createdAt: 0 } as unknown as Issue;

@@ -149,10 +149,10 @@ CREATE TABLE issue (
   queued_at   real,
   closed_at   real,
   -- Closed, an issue is done with what it delivered, or canceled with why; never both.
-  delivered   text check (delivered in ('merged', 'merged_into_parent', 'pull_request', 'kept', 'none')),
+  delivered   text check (delivered in ('merged', 'merged_into_parent', 'pull_request', 'submitted', 'kept', 'none')),
   canceled    text check (canceled in ('dismissed', 'lost')),
   pull_request text,
-  deliver text not null default 'change' check (deliver in ('change', 'branch', 'answer')),
+  deliver text not null default 'change' check (deliver in ('change', 'branch', 'answer', 'pull_request')),
   reviewed_at real,
   findings    text,
   questions        text,

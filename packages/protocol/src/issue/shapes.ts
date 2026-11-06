@@ -259,11 +259,11 @@ export interface IssueRequest {
 }
 
 /** What an issue delivers: a change, a change kept on its branch for the owner to take in, or an answer (on the issue). */
-export const DeliverableValues = ["change", "branch", "answer"] as const;
+export const DeliverableValues = ["change", "branch", "answer", "pull_request"] as const;
 export type Deliverable = (typeof DeliverableValues)[number];
 
 /** What a completed issue delivered: its branch merged into the repo's main branch, into its parent issue's branch, by a pull request, its branch kept unmerged, or nothing (no change, or an answer). */
-export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "kept", "none"] as const;
+export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
 export type Delivery = (typeof DeliveryValues)[number];
 
 /** Why an issue is not done: the owner closed it, or its workplace was lost. */

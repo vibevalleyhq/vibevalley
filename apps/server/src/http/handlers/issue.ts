@@ -23,6 +23,7 @@ export const issueHandlers = Effect.gen(function* () {
   const createOnce = requestKeys<T.AppliedIssue>();
   const statusOnce = requestKeys<T.AppliedIssue>();
   const done: IssueHandlers = {
+    "issue.conversation.get": ({ id }) => Effect.flatMap(issues.get(id), (issue) => channels.issueThreadId(issue.id)),
     "issue.list": (filter) => issues.query(filter),
     "issue.review": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.review(id, body)),
     "issue.split": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.split(id, body.title ?? "", body.tasks, owner)),

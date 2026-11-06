@@ -6,8 +6,8 @@ import { sessionOf } from "#/session/roster.ts";
 
 import { statusMoves } from "./moves.ts";
 
-const awaitsPullRequest = (issue: Pick<T.Issue, "pullRequest">, session: Pick<T.Session, "phase" | "lastRun"> | undefined) =>
-  issue.pullRequest?.state === "open" && session?.phase._tag === "resting" && session.lastRun?.outcome === "completed";
+const awaitsFeedback = (issue: Pick<T.Issue, "questions">, session: Pick<T.Session, "phase" | "lastRun"> | undefined) =>
+  session?.phase._tag === "resting" && session.lastRun?.outcome === "completed" && issue.questions.length === 0;
 
 /** The conflict a preview of the issue's branch shows; none when it goes in clean. */
 export const conflictOf = (changes: { readonly base: string; readonly conflicts?: readonly string[] }): T.Conflict | undefined =>
@@ -39,13 +39,15 @@ export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.Issu
     case "todo":
       return { state: "queued", since: t.queuedAt ?? t.createdAt, acts: [close] };
     case "in_progress": {
-      if (awaitsPullRequest(t, session)) return { state: "working", ...at(last?.at), lead: "tell", acts: [say("tell"), close] };
-      // Run by no session on the farm: nobody to tell or stop from here; it can still be closed.
-      if (session?.phase._tag !== "working") return { state: "working", ...at(t.lastRun?.startedAt ?? t.createdAt), acts: [close] };
-      const phase = session?.phase;
-      if (phase?._tag === "working" && phase.quietSince !== undefined)
-        return { state: "stuck", stuck: "quiet", since: phase.quietSince, lead: "stop", acts: [stop, say("tell"), close] };
-      return { state: "working", ...at(phase?._tag === "working" ? phase.since : undefined), acts: [say("tell"), stop, close] };
+      if (awaitsFeedback(t, session)) return { state: "working", ...at(last?.at), lead: "tell", acts: [say("tell"), close] };
+      if (session?.phase._tag === "working") {
+        const phase = session.phase;
+        if (phase.quietSince !== undefined) return { state: "stuck", stuck: "quiet", since: phase.quietSince, lead: "stop", acts: [stop, say("tell"), close] };
+        return { state: "working", since: phase.since, acts: [say("tell"), stop, close] };
+      }
+      if (!session?.lastRun && (!t.lastRun || t.lastRun.endedAt === undefined))
+        return { state: "working", since: t.lastRun?.startedAt ?? t.createdAt, acts: [close] };
+      return issueStageOf({ ...t, status: "in_review" }, session);
     }
     case "in_review": {
       // Run by no session on the farm (an in-process agent's): its latest run says how it ended. A failed one cannot be taken as done.
@@ -59,7 +61,8 @@ export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.Issu
       }
       const since = last?.at;
       // Stuck, moving it back to todo with no words is the server's own for why: settle the conflict, mend, go on.
-      if (t.conflict) return { state: "stuck", stuck: "conflict", ...at(since), lead: "resolve", acts: [move("resolve", "todo"), say("tell"), close] };
+      if (t.conflict && t.deliver === "change")
+        return { state: "stuck", stuck: "conflict", ...at(since), lead: "resolve", acts: [move("resolve", "todo"), say("tell"), close] };
       if (t.questions.length > 0) return { state: "asking", ...at(since), lead: "answer", acts: [say("answer"), close] };
       // An answer issue's round that handed back no answer it could read did not get it done either.
       const unread = t.deliver === "answer" && last?.outcome === "completed" && last.answer === undefined;
@@ -114,10 +117,12 @@ export function issueStatusOf(t: T.Issue, state: T.SpaceState): T.IssueStatus {
   const latestSession = latestSessionIdOf(t);
   if (latestSession !== undefined) {
     const h = sessionOf(state, latestSession);
-    return !h ? "todo" : isBusy(h) || awaitsPullRequest(t, h) ? "in_progress" : "in_review";
+    if (!h) return "todo";
+    const unfinished = t.questions.length > 0 || h.lastRun?.outcome !== "completed" || (t.deliver === "answer" && !h.lastRun.answer);
+    return isBusy(h) || awaitsFeedback(t, h) || unfinished ? "in_progress" : "in_review";
   }
   if (t.queuedAt !== undefined) return "todo";
-  if (t.lastRun) return t.lastRun.endedAt === undefined ? "in_progress" : "in_review";
+  if (t.lastRun) return t.lastRun.endedAt === undefined || t.lastRun.outcome !== "completed" || t.questions.length > 0 ? "in_progress" : "in_review";
   return t.queuedAt !== undefined ? "todo" : "backlog";
 }
 
