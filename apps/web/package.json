@@ -18,6 +18,7 @@
     "@vibevalley/bridge": "workspace:*",
     "@vibevalley/engine": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
+    "@vibevalley/pkm": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "@vibevalley/stories": "workspace:*",
     "@vibevalley/voice": "workspace:*",

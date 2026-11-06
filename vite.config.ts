@@ -76,7 +76,7 @@ export default defineConfig({
       "server:check": [
         "vp run packages:build",
         "vp check",
-        "vp run --filter @vibevalley/protocol --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/voice test",
+        "vp run --filter @vibevalley/protocol --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/voice --filter @vibevalley/pkm test",
         "vp run effect:check",
         "vp run --filter @vibevalley/server db:check",
         "vp run --filter @vibevalley/server test",
@@ -99,6 +99,7 @@ export default defineConfig({
         "effect-tsgo diagnostics --project packages/agent/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/ai/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/voice/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project packages/pkm/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/protocol/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/home/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/bridge/tsconfig.json --strict",

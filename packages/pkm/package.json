@@ -1,0 +1,52 @@
+{
+  "name": "@vibevalley/pkm",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./days": {
+      "types": "./dist/days.d.ts",
+      "default": "./src/days.ts"
+    },
+    "./editing": {
+      "types": "./dist/editing.d.ts",
+      "default": "./src/editing.ts"
+    },
+    "./graph": {
+      "types": "./dist/graph.d.ts",
+      "default": "./src/graph.ts"
+    },
+    "./markdown": {
+      "types": "./dist/markdown.d.ts",
+      "default": "./src/markdown.ts"
+    },
+    "./para": {
+      "types": "./dist/para.d.ts",
+      "default": "./src/para.ts"
+    },
+    "./selection": {
+      "types": "./dist/selection.d.ts",
+      "default": "./src/selection.ts"
+    },
+    "./view": {
+      "types": "./dist/view.d.ts",
+      "default": "./src/view.ts"
+    },
+    "./writer": {
+      "types": "./dist/writer.d.ts",
+      "default": "./src/writer.ts"
+    }
+  },
+  "dependencies": {
+    "@vibevalley/i18n": "workspace:*",
+    "@vibevalley/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vibevalley/testkit": "workspace:*",
+    "vite-plus": "catalog:"
+  }
+}
