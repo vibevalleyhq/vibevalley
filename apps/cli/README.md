@@ -9,7 +9,9 @@ it loads none of the server and works out nothing the server decides. How it rea
 ```
 src/main.ts        the root: the groups below, the global flags (--server, --dry-run, --format), how help and failures are said
 src/farm.ts        what every command stands on: global flags, SSE frames, ask (the typed client), show (text or --format json), change (--dry-run)
-src/issue.ts       issue list|show [--watch]|create|edit|status|comment|review|diff|timeline|delete
+src/commands/issue.ts  issue list|show [--watch]|watch [--jsonl] [--follow]|create|edit|status|comment|review|diff|timeline|delete
+src/worker.ts      separate session-authenticated entry; commands/worker.ts implements report, pr-submit, context, read, doctor
+src/issue-watch.ts bounded observation, revisions and reconnects
 src/channel.ts     channel list, channel message list|send|search
 src/pkm.ts         the notes: pkm capture|search|radar, pkm journal show, pkm page list|show|save|export|edit
 src/repo.ts     repo list|create, agent list|create|delete, session list|show|stop, runtime list|refresh

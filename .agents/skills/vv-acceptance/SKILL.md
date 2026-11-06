@@ -23,7 +23,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 
 不用它：只改了纯函数、黄金数据和单元测试已经覆盖的；只改了注释和文档。
 
-**管家的评测连网、花钱：跑之前先问主人。** 没问、没钥匙时只做那份分册里离线的部分，汇报里写明在线的那半没跑。这里也不派真的帮工（要本机登录的农机或钥匙）；要走一遍派活，用沙箱的 `--scripted-helper`（[server.md](.agents/skills/vv-acceptance/references/server.md)）。
+**管家的评测连网、花钱：跑之前先问主人。** 没问、没钥匙时只做那份分册里离线的部分，汇报里写明在线的那半没跑。默认不派真的帮工（要本机登录的农机或钥匙）；主人明确授权验证真实帮工 CLI 时，按服务端分册的「真实帮工的 CLI 与连接观测」执行。普通派活使用沙箱的 `--scripted-helper`（[server.md](.agents/skills/vv-acceptance/references/server.md)）。
 
 ## 准备
 
