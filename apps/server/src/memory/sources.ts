@@ -39,7 +39,7 @@ interface Abilities {
 export interface EndedSession {
   readonly agent: string;
   readonly session: string;
-  readonly project: string;
+  readonly repo: string;
 }
 
 /** Why a source did not answer: a service down, a bad answer, stopped. */
@@ -103,11 +103,11 @@ export function localSource(m: MemoryStore, profiles: () => string[]): Source {
         Effect.gen(function* () {
           let picked: T.Memory[];
           if (cue.peek === true) {
-            if (cue.project === "") return [];
+            if (cue.repo === "") return [];
             const all = yield* m.list(cue.agent);
-            picked = pick(all, { project: cue.project, text: cue.text, now: yield* Clock.currentTimeMillis, matches: yield* m.matches(cue.agent, cue.text) });
+            picked = pick(all, { repo: cue.repo, text: cue.text, now: yield* Clock.currentTimeMillis, matches: yield* m.matches(cue.agent, cue.text) });
           } else picked = yield* m.recallable(cue);
-          return picked.map((x, i) => ({ id: x.id, line: lineOf(x, cue.project), score: picked.length - i }));
+          return picked.map((x, i) => ({ id: x.id, line: lineOf(x, cue.repo), score: picked.length - i }));
         }),
       ),
     syncTurn: (r) => said(m.keep(r)),

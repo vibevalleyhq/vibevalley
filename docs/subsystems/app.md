@@ -78,8 +78,8 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 **工作台路由**
 
-- `/` 打开默认页（`/chat` 或设备偏好的农场页），`/farm` 与 `/farm/<项目>` 打开像素农场，`/pair` 为局域网配对页。
-- `Shell` 外框包含 `/chat`、`/issues`、`/artifacts`、`/pkm`、`/agents`、`/runtimes`、`/projects`、`/catalog`、`/settings`。
+- `/` 打开默认页（`/chat` 或设备偏好的农场页），`/farm` 与 `/farm/<仓库>` 打开像素农场，`/pair` 为局域网配对页。
+- `Shell` 外框包含 `/chat`、`/issues`、`/artifacts`、`/pkm`、`/agents`、`/runtimes`、`/repos`、`/catalog`、`/settings`。
 
 **打包与自更新**
 

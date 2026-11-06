@@ -171,7 +171,7 @@ describe("mcp", () => {
       const issues = yield* Issue;
       const mcp = yield* Mcp;
       const pkm = yield* Pkm;
-      yield* pkm.save({ title: "Beehives", tier: "project", markdown: "- check the queens every week\n- order frames\n" });
+      yield* pkm.save({ title: "Beehives", tier: "repo", markdown: "- check the queens every week\n- order frames\n" });
       yield* issues.hire(lab(), "看看蜂箱", "chat-j");
       yield* until(() => tokens.length > 0, "the session's token");
       const c = client(mcp, tokens[0]!);
@@ -307,12 +307,12 @@ describe("mcp", () => {
       const core = yield* Core;
       const mcp = yield* Mcp;
       const memory = yield* Memory;
-      yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab", project: "demo" });
-      yield* memory.write({ agent: "scout", text: "这个项目测试用 make check", project: "demo", by: owner });
+      yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab", repo: "demo" });
+      yield* memory.write({ agent: "scout", text: "这个仓库测试用 make check", repo: "demo", by: owner });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
-      expect(yield* tool("memory_create", { text: "这个项目测试用 pnpm test" })).toContain("记下了（项目 demo）");
-      expect(yield* tool("memory_create", { text: "提交信息写中文", project: "" })).toContain("记下了（所有项目）");
+      expect(yield* tool("memory_create", { text: "这个仓库测试用 pnpm test" })).toContain("记下了（仓库 demo）");
+      expect(yield* tool("memory_create", { text: "提交信息写中文", repo: "" })).toContain("记下了（所有仓库）");
       // There is no profile to name: what it writes is its own, whatever it says.
       yield* tool("memory_create", { text: "冒名记一条", agent: "scout" });
       expect((yield* memory.list("scout")).some((m) => m.text === "冒名记一条")).toBe(false);

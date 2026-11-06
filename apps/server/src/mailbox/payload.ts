@@ -70,7 +70,7 @@ export const keepSourceTrigger = (db: Db["Service"], row: qr.RecordTriggerParams
 export const keptTrigger = (db: Db["Service"], id: string) => db.one(qr.triggerById({ id }));
 
 /** The events already kept for one pull request: their keys, whether routed, and the bot's review rounds. */
-export const knownGitHubEvents = (db: Db["Service"], project: string, pr: number) => db.run(qr.knownGitHubEvents({ project, pr_number: pr }));
+export const knownGitHubEvents = (db: Db["Service"], repo: string, pr: number) => db.run(qr.knownGitHubEvents({ repo, pr_number: pr }));
 
 /** The caller's transaction includes this row, so it can advance its source cursor atomically. */
 export const recordTrigger = (db: Db["Service"], input: TriggerInput) =>

@@ -3,7 +3,7 @@ import type * as T from "@vibevalley/protocol";
 
 export const tierFolder: Readonly<Record<T.PkmTier, string>> = {
   inbox: "00_Inbox",
-  project: "01_Projects",
+  repo: "01_Repos",
   area: "02_Areas",
   resource: "03_Resources",
   archive: "04_Archives",
@@ -12,7 +12,7 @@ export const tierFolder: Readonly<Record<T.PkmTier, string>> = {
 
 /** How much a hit in each tier counts in a search: what is being worked on first, what is archived last. */
 export const tierWeight: Readonly<Record<T.PkmTier, number>> = {
-  project: 2,
+  repo: 2,
   area: 1.5,
   journal: 1.4,
   resource: 1.2,

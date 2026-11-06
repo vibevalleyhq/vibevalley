@@ -45,7 +45,7 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   embeds: Schema.optionalKey(Schema.mutable(Schema.Array(S.Embed))),
   artifact: Schema.optionalKey(S.ArtifactCard),
   blocks: Schema.optionalKey(Schema.mutable(Schema.Array(S.QuotedBlock))),
-  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), project: Schema.optionalKey(Schema.String) })),
+  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), repo: Schema.optionalKey(Schema.String) })),
   ingressSource: Schema.optionalKey(Schema.Literals(["issue", "cron", "patrol", "connector", "voice", "github"])),
   ingressRecipient: Schema.optionalKey(Schema.String),
   issue: Schema.optionalKey(Schema.String),
@@ -98,10 +98,10 @@ export function targetOf(c: Pick<T.Channel, "type" | "rootNumber" | "name">, cha
   return "#" + (c.name ?? channelName);
 }
 
-/** What the owner picked beside a message in the farm's form: the profile and the project the work is for. */
+/** What the owner picked beside a message in the farm's form: the profile and the repo the work is for. */
 export interface Picked {
   readonly agent?: string;
-  readonly project?: string;
+  readonly repo?: string;
 }
 
 export interface InboxMessage extends T.TriggerContext {

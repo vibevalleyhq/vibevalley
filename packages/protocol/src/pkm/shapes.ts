@@ -1,6 +1,6 @@
 // PKM (docs/subsystems/pkm.md): the owner's notes as Logseq-style outlines in PARA folders. The files are the truth.
 
-export const PkmTierValues = ["inbox", "project", "area", "resource", "archive", "journal"] as const;
+export const PkmTierValues = ["inbox", "repo", "area", "resource", "archive", "journal"] as const;
 /** Where a page sits in PARA, which is the folder its file is in. */
 export type PkmTier = (typeof PkmTierValues)[number];
 
@@ -78,7 +78,7 @@ export interface PkmBacklink {
 
 /** The blocks of other pages that link here, by where they are in PARA. */
 export interface PkmBacklinks {
-  projects: PkmBacklink[];
+  repos: PkmBacklink[];
   journals: PkmBacklink[];
   areas: PkmBacklink[];
   archives: PkmBacklink[];
@@ -216,7 +216,7 @@ export interface PkmJournalRequest {
   day: string;
 }
 
-export interface PkmStaleProject {
+export interface PkmStaleRepo {
   slug: string;
   title: string;
   days: number;
@@ -235,10 +235,10 @@ export interface PkmOverdue {
   deadline: string;
 }
 
-/** What wants a look: pages left in the inbox, projects untouched for staleDays, blocks past their deadline::. */
+/** What wants a look: pages left in the inbox, repos untouched for staleDays, blocks past their deadline::. */
 export interface PkmRadar {
   inbox: number;
-  stale: PkmStaleProject[];
+  stale: PkmStaleRepo[];
   overdue: PkmOverdue[];
 }
 

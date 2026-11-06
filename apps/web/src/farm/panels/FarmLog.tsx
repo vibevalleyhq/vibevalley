@@ -1,7 +1,7 @@
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
+import type { ChatMessage, SpaceState, Issue, Outcome } from "@vibevalley/protocol";
 import { defaultOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { spentText } from "#/base/format.ts";
@@ -19,7 +19,7 @@ const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
   interrupted: [t("shared.outcome.interrupted"), "#e2c995", "#67482d"],
 };
 
-const issueOfSession = (s: WorkspaceState | undefined, session: string): Issue | undefined =>
+const issueOfSession = (s: SpaceState | undefined, session: string): Issue | undefined =>
   (s?.issues ?? []).find((i) => sessionIdsOf(i).some((id) => id === session));
 
 type Row = { kind: "said" | "report"; message: ChatMessage };

@@ -33,9 +33,9 @@ const page = [
 
 describe("the outline", () => {
   it("reads a file and writes the same file back", () => {
-    const read = parse(page, "01_Projects/Cetus-Core-Engine.md", 0);
+    const read = parse(page, "01_Repos/Cetus-Core-Engine.md", 0);
     expect(read.title).toBe("Cetus Core Engine");
-    expect(read.tier).toBe("project");
+    expect(read.tier).toBe("repo");
     expect(read.props.status).toBe("active");
     const blocks = flatBlocks(read.blocks);
     expect(blocks.map((b) => b.depth)).toEqual([0, 1, 1, 2, 3, 4, 0]);
@@ -58,7 +58,7 @@ describe("the outline", () => {
   });
 
   it("finds links, tags and refs outside code only", () => {
-    const read = parse(page, "01_Projects/Cetus-Core-Engine.md", 0);
+    const read = parse(page, "01_Repos/Cetus-Core-Engine.md", 0);
     const edges = edgesOf(read);
     expect(edges.filter((e) => e.kind === "wikilink").map((e) => e.page)).toEqual(["engineering"]);
     expect(edges.filter((e) => e.kind === "tag").map((e) => e.page)).toEqual(["outliner"]);
@@ -101,8 +101,8 @@ describe("the outline", () => {
   });
 
   it("puts a title in the file it names", () => {
-    expect(fileOf("project", "Cetus Core/Engine")).toBe("01_Projects/Cetus-Core__Engine.md");
-    expect(titleOfFile("01_Projects/Cetus-Core__Engine.md")).toBe("Cetus-Core/Engine");
+    expect(fileOf("repo", "Cetus Core/Engine")).toBe("01_Repos/Cetus-Core__Engine.md");
+    expect(titleOfFile("01_Repos/Cetus-Core__Engine.md")).toBe("Cetus-Core/Engine");
     expect(tierOfFile("04_Archives/a.md")).toBe("archive");
     expect(tierOfFile("elsewhere/a.md")).toBe("inbox");
   });

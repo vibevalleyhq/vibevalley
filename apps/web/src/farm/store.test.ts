@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
 
-import { farm, farmProject, farmState, lastFarmProject, overlayOf, resetFarm } from "./store";
+import { farm, farmRepo, farmState, lastFarmRepo, overlayOf, resetFarm } from "./store";
 import { aimTool, farmKey } from "./tools";
 import { beds } from "./world/plots";
 afterEach(() => {
@@ -46,9 +46,9 @@ test("the title, once closed, stays closed on this machine; the farm entered is 
   farm.closeTitle();
   resetFarm();
   expect(farmState().titleOpen).toBe(false);
-  farm.setProject("clock-in");
-  expect(farmProject()).toBe("clock-in");
-  expect(lastFarmProject()).toBe("clock-in");
-  farm.setProject("");
-  expect(lastFarmProject()).toBe("");
+  farm.setRepo("clock-in");
+  expect(farmRepo()).toBe("clock-in");
+  expect(lastFarmRepo()).toBe("clock-in");
+  farm.setRepo("");
+  expect(lastFarmRepo()).toBe("");
 });

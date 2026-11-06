@@ -7,7 +7,7 @@ import { Effect } from "effect";
 
 import { Agent } from "#/agent/agent.ts";
 import { Issue } from "#/issue/issue.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
 import { gitSync } from "#/testing/git.ts";
 import { testIssues } from "#/testing/world.ts";
 
@@ -36,7 +36,7 @@ for (const mode of ["pass", "frozen", "failed"] as const) {
       return Effect.gen(function* () {
         const issues = testIssues(yield* Issue);
         yield* (yield* Agent).save(lab());
-        const parent = yield* issues.add({ title: "parent", agent: "lab", project: "acceptance" });
+        const parent = yield* issues.add({ title: "parent", agent: "lab", repo: "acceptance" });
         const acceptance = yield* issues.add({
           title: "seed-red-test",
           parent: parent.id,
@@ -56,7 +56,7 @@ for (const mode of ["pass", "frozen", "failed"] as const) {
           (item) => (mode === "pass" ? item.status === "done" : item.questions.length > 0),
           "the implementation verified",
         );
-        const place = yield* (yield* Project).workplace("acceptance", parent.number, true, "");
+        const place = yield* (yield* Repo).workplace("acceptance", parent.number, true, "");
         expect(readFileSync(join(place.cwd, "check.sh"), "utf8")).toBe("test -f result.txt\n");
         if (mode === "pass") {
           expect(result.delivered).toBe("merged_into_parent");

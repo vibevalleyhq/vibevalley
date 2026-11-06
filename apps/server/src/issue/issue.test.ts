@@ -19,7 +19,7 @@ import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Cron } from "#/cron/cron.ts";
 import { Db, dbQueries } from "#/infra/db.ts";
-import { gitRuns } from "#/project/git.ts";
+import { gitRuns } from "#/repo/git.ts";
 import { Session } from "#/session/session.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
@@ -32,7 +32,7 @@ const busy = scriptedRuntime({ id: "pi", turn: (turn) => new Promise<void>((reso
 
 const config = () => {
   const c = testConfig();
-  return { ...c, project: { ...c.project, maxSessions: 1 } };
+  return { ...c, repo: { ...c.repo, maxSessions: 1 } };
 };
 
 const farm = (runtimes = [busy]) => {
@@ -58,7 +58,7 @@ const occupied = (core: Core["Service"], runtime: string) =>
       agent: "x",
       runtime,
       brief: "",
-      project: "demo",
+      repo: "demo",
       hiredAt: 0,
       runs: 0,
       phase: { _tag: "working", since: 0, doing: { action: "thinking", label: "" } },
@@ -71,7 +71,7 @@ describe("issues", () => {
     const f = farm();
     return Effect.gen(function* () {
       const issues = testIssues(yield* Issue);
-      const issue = yield* issues.add({ title: "unstarted responsibility", agent: " lab ", project: "demo" });
+      const issue = yield* issues.add({ title: "unstarted responsibility", agent: " lab ", repo: "demo" });
       const original = (yield* issues.get(issue.id)).assignments;
       expect(original).toHaveLength(1);
       expect(original[0]).toMatchObject({ issue: issue.id, agent: "lab", executions: [] });
@@ -139,7 +139,7 @@ describe("issues", () => {
       const issues = testIssues(yield* Issue);
       const chat = yield* Channel;
       yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({ title: "continued responsibility", agent: "lab", project: "demo" });
+      const issue = yield* issues.add({ title: "continued responsibility", agent: "lab", repo: "demo" });
       const [original] = (yield* issues.get(issue.id)).assignments;
       const ready = (count: number) => waitFor(issues.get(issue.id), (i) => i.status === "in_review" && sessionIdsOf(i).length === count, "the next execution");
       yield* issues.setStatus(issue.id, "todo", "", chat.defaultChannel(), owner);
@@ -181,7 +181,7 @@ describe("issues", () => {
     return Effect.gen(function* () {
       const issues = testIssues(yield* Issue);
       const before = (yield* Metric.value(dbQueries)).count;
-      for (let n = 1; n <= 20; n++) yield* issues.add({ title: `第 ${n} 件`, project: "demo" });
+      for (let n = 1; n <= 20; n++) yield* issues.add({ title: `第 ${n} 件`, repo: "demo" });
       // The counter counts: adding them asked the database.
       expect((yield* Metric.value(dbQueries)).count).toBeGreaterThan(before);
       const [queries, gits] = [(yield* Metric.value(dbQueries)).count, (yield* Metric.value(gitRuns)).count];
@@ -353,8 +353,8 @@ describe("issues", () => {
       const kept = yield* issues.list();
       expect(kept).toHaveLength(1);
       expect(kept[0]).toMatchObject({ number: 1, title: "first work", assignments: [{ agent: "lab", executions: [] }] });
-      expect((yield* Effect.result(issues.edit(kept[0]!.id, { project: "elsewhere" }, owner)))._tag).toBe("Failure");
-      expect((yield* issues.get(kept[0]!.id)).project).toBe("demo");
+      expect((yield* Effect.result(issues.edit(kept[0]!.id, { repo: "elsewhere" }, owner)))._tag).toBe("Failure");
+      expect((yield* issues.get(kept[0]!.id)).repo).toBe("demo");
       expect((yield* Effect.result(issues.remove(kept[0]!.id)))._tag).toBe("Failure");
       expect((yield* issues.list()).map((i) => i.id)).toEqual([kept[0]!.id]);
       yield* sql.unsafe("drop trigger reject_link").pipe(Effect.orDie);
@@ -404,7 +404,7 @@ describe("issues", () => {
       const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({ title: "draft", project: "demo", agent: "lab" });
+      const issue = yield* issues.add({ title: "draft", repo: "demo", agent: "lab" });
       yield* issues.refine(issue.id, "keep reading", "");
       yield* until(() => started, "the writer");
       expect((yield* issues.get(issue.id)).assignments.map((a) => [a.agent, a.executions])).toEqual([["lab", []]]);
@@ -442,8 +442,8 @@ describe("issues", () => {
     return Effect.gen(function* () {
       const issues = testIssues(yield* Issue);
       yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({ title: "draft", project: "demo", agent: "lab" });
-      yield* issues.refine(issue.id, "read the project", "");
+      const issue = yield* issues.add({ title: "draft", repo: "demo", agent: "lab" });
+      yield* issues.refine(issue.id, "read the repo", "");
       yield* until(() => started, "the drafting writer");
       yield* issues.setStatus(issue.id, "canceled", "", "", owner);
       noWorktree(f.config.workRoot);
@@ -521,7 +521,7 @@ describe("issues", () => {
       expect(sessions.presentSessions()).toEqual([]);
       noWorktree(f.config.workRoot);
 
-      const existing = yield* issues.add({ title: "already queued", project: "demo", agent: agent.id });
+      const existing = yield* issues.add({ title: "already queued", repo: "demo", agent: agent.id });
       yield* occupied(core, "pi");
       yield* (yield* Agent).save(agent);
       const queued = yield* issues.setStatus(existing.id, "todo", "", "", owner);
@@ -552,7 +552,7 @@ describe("issues", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("two sends at once honour the project's room", () => {
+  it.live("two sends at once honour the repo's room", () => {
     const f = farm();
     return Effect.gen(function* () {
       const sessions = yield* Session;
@@ -642,7 +642,7 @@ describe("issues", () => {
       const first = yield* chat.openChannel("first", "", "demo");
       const second = yield* chat.openChannel("second", "", "demo");
       yield* occupied(core, "pi");
-      const issue = yield* issues.add({ title: "queued", agent: "lab", project: "demo" });
+      const issue = yield* issues.add({ title: "queued", agent: "lab", repo: "demo" });
       for (const channel of [first.id, second.id]) expect((yield* issues.start(issue.id, channel)).queued).toBeDefined();
       yield* (yield* Issue).refreshQueue;
       expect(
@@ -685,7 +685,7 @@ describe("issues", () => {
       const first = yield* chat.openChannel("queue-old", "", "demo");
       const second = yield* chat.openChannel("queue-new", "", "demo");
       yield* occupied(core, "pi");
-      const item = yield* issues.add({ title: "queued", description: "old-dispatch-context", agent: "lab", project: "demo" });
+      const item = yield* issues.add({ title: "queued", description: "old-dispatch-context", agent: "lab", repo: "demo" });
       yield* issues.start(item.id, first.id);
       yield* (yield* Issue).refreshQueue;
       yield* issues.setStatus(item.id, "backlog", "", "", owner);
@@ -738,7 +738,7 @@ describe("issues", () => {
       const chat = yield* Channel;
       yield* (yield* Agent).save(lab());
       yield* occupied(core, "pi");
-      const issue = yield* issues.add({ title: "queued", agent: "lab", project: "demo" });
+      const issue = yield* issues.add({ title: "queued", agent: "lab", repo: "demo" });
       expect((yield* issues.start(issue.id, chat.defaultChannel())).queued).toBeDefined();
       const queued = yield* issues.get(issue.id);
       yield* (yield* Issue).refreshQueue;
@@ -759,7 +759,7 @@ describe("issues", () => {
       const agents = yield* Agent;
       yield* agents.save(lab());
       yield* agents.save({ ...lab(), id: "lab2", name: "Lab Two" });
-      const issue = yield* issues.add({ title: "write hello", agent: "lab", project: "demo" });
+      const issue = yield* issues.add({ title: "write hello", agent: "lab", repo: "demo" });
       const original = (yield* issues.get(issue.id)).assignments;
       const inReview = (n: number) => waitFor(issues.get(issue.id), (t) => t.status === "in_review" && sessionIdsOf(t).length === n, "round " + n);
       yield* issues.setStatus(issue.id, "todo", "", chat.defaultChannel(), owner);
@@ -797,7 +797,7 @@ describe("issues", () => {
       const agents = yield* Agent;
       yield* agents.save(lab());
       yield* agents.save({ ...lab(), id: "lab2", name: "Lab Two" });
-      const issue = yield* issues.add({ title: "work on", agent: "lab", project: "demo" });
+      const issue = yield* issues.add({ title: "work on", agent: "lab", repo: "demo" });
       yield* issues.setStatus(issue.id, "todo", "", chat.defaultChannel(), owner);
       yield* waitFor(issues.get(issue.id), (t) => t.status === "in_progress", "working");
       expect(reasonOf(yield* Effect.flip(issues.setStatus(issue.id, "todo", "", chat.defaultChannel(), owner, { agent: "lab2" })))).toContain(
@@ -812,7 +812,7 @@ describe("issues", () => {
     return Effect.gen(function* () {
       const issues = testIssues(yield* Issue);
       const sessions = yield* Session;
-      const issue = yield* issues.add({ title: "history", project: "demo", agent: "lab" });
+      const issue = yield* issues.add({ title: "history", repo: "demo", agent: "lab" });
       const first = (yield* issues.hire(lab(), "first", "demo", { issue: issue.id })).session!;
       yield* until(() => sessions.sessionOf(first.id)?.phase._tag === "done", "the first report");
       yield* sessions.dismiss(first.id);

@@ -7,7 +7,7 @@ import { IconButton } from "./IconButton";
 import { Card, Empty, ListCard, ListRow, Quiet, SecretInput, TextLink, Toggle } from "./layout";
 import { Dot } from "./Tag";
 
-const projects = [
+const repos = [
   { id: "vibevalley", line: "3 个在做 · 1 个等你", tone: "leaf" as const },
   { id: "site", line: "没有在做的", tone: "idle" as const },
   { id: "island", line: "1 个出了问题", tone: "berry" as const },
@@ -19,12 +19,12 @@ export default stories({
     "List card": story({
       note: "列表和详情怎么放在一起，见「交互 / 列表和详情」。",
       args: { active: "vibevalley" },
-      controls: { active: { kind: "choice", options: projects.map((p) => p.id) } },
+      controls: { active: { kind: "choice", options: repos.map((p) => p.id) } },
       render: (a) => (
         <div class="w-72">
-          <ListCard title="项目" action={<IconButton icon="add" label="新建项目" onClick={() => undefined} />}>
-            <For each={projects}>
-              {(p) => <ListRow to={`/projects/${p.id}`} item={p.id} active={a.active === p.id} title={p.id} line={p.line} leading={<Dot tone={p.tone} />} />}
+          <ListCard title="仓库" action={<IconButton icon="add" label="新建仓库" onClick={() => undefined} />}>
+            <For each={repos}>
+              {(p) => <ListRow to={`/repos/${p.id}`} item={p.id} active={a.active === p.id} title={p.id} line={p.line} leading={<Dot tone={p.tone} />} />}
             </For>
           </ListCard>
         </div>
@@ -50,7 +50,7 @@ export default stories({
       grid: { rows: ["active", [false, true]], cols: "pseudo" },
       render: (a) => (
         <ul class="w-56">
-          <ListRow to="/projects/vibevalley" title="vibevalley" line="3 个在做" active={a.active} leading={<Dot tone="leaf" />} />
+          <ListRow to="/repos/vibevalley" title="vibevalley" line="3 个在做" active={a.active} leading={<Dot tone="leaf" />} />
         </ul>
       ),
     }),

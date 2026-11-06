@@ -33,23 +33,23 @@
     "reset": "Reset"
   },
   "list": {
-    "noProject": "No project",
+    "noRepo": "No repo",
     "all": "All tickets",
     "unfold": "Unfold {group}",
     "fold": "Fold {group}",
     "writeIn": "Write one in \"{group}\""
   },
   "page": {
-    "pickFirst": "Almost: pick which helper and which project, then press Start.",
+    "pickFirst": "Almost: pick which helper and which repo, then press Start.",
     "notDrafted": "Not drafted: {why}",
     "historyUnread": "The tickets' records could not be read: ",
     "notFound": "No such ticket",
     "notFoundLine": "There is no ticket {id}: it may have been deleted, or the link is wrong.",
-    "find": "Find a ticket: title, helper, project",
+    "find": "Find a ticket: title, helper, repo",
     "findLabel": "Find a ticket",
     "filter": "Filter",
-    "byProject": "By project",
-    "allProjects": "All projects",
+    "byRepo": "By repo",
+    "allRepos": "All repos",
     "byHelper": "By helper",
     "allHelpers": "All helpers",
     "shown": "{shown} / {of}",
@@ -81,7 +81,7 @@
   "close": {
     "title": "Close \"{issue}\"",
     "working": "{who} is still working on this ticket. Canceling stops it and lets it go; the changes on its branch are not merged into main.",
-    "completable": "Completing merges {who}'s branch into the project's main branch, after you look over the changes; canceling lets it go without merging them.",
+    "completable": "Completing merges {who}'s branch into the repo's main branch, after you look over the changes; canceling lets it go without merging them.",
     "notCompletable": "This ticket cannot be completed now. Canceling lets {who} go, and its changes are not merged into main.",
     "review": "See the changes, complete",
     "stopAndCancel": "Stop and cancel",
@@ -190,7 +190,7 @@
     "conflict": "Merging into {base} would conflict: {files}"
   },
   "task": {
-    "project": "Project",
+    "repo": "Repo",
     "written": "Written"
   },
   "todo": {
@@ -223,9 +223,9 @@
     "draftStatus": "Draft",
     "todoStatus": "To do",
     "pickForMe": "Picked for you when drafting",
-    "whichProject": "Which project",
-    "firstProject": "No project yet: make one",
-    "newProjectLink": "+ New project",
+    "whichRepo": "Which repo",
+    "firstRepo": "No repo yet: make one",
+    "newRepoLink": "+ New repo",
     "priority": "Priority",
     "inQueue": "Queued {ago}: it starts by itself in the board's order when a spot frees up.",
     "unqueue": "Unqueue",
@@ -233,9 +233,9 @@
     "start": "Start",
     "save": "Save",
     "remove": "Delete",
-    "newProject": "New project",
-    "projectHint": "The project's name, which is also its folder under the work folder",
-    "projectName": "Project name",
+    "newRepo": "New repo",
+    "repoHint": "The repo's name, which is also its folder under the work folder",
+    "repoName": "Repo name",
     "create": "Create",
     "writeOwn": "Write it yourself"
   },
@@ -246,7 +246,7 @@
     },
     "grouping": {
       "status": "Status",
-      "project": "Project",
+      "repo": "Repo",
       "agent": "Helper",
       "none": "No grouping"
     },
@@ -289,7 +289,7 @@
     "queued": "Queued",
     "cron": "Scheduled task",
     "noHelper": "No helper yet",
-    "pickFirst": "No helper or project picked: pick them before starting",
+    "pickFirst": "No helper or repo picked: pick them before starting",
     "waiting": "waiting for a free spot, queued {ago}",
     "written": "written {ago}",
     "lost": "Lost",

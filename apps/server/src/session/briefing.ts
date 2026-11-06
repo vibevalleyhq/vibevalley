@@ -4,7 +4,7 @@ import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { isBusy, roomLeft } from "@vibevalley/protocol/rules";
 
-import type { MergeFailure } from "#/project/workplace.ts";
+import type { MergeFailure } from "#/repo/workplace.ts";
 import { runtimeLabel } from "#/runtime/presets.ts";
 
 import { recallHead, recallIntro } from "./prompts.ts";
@@ -45,26 +45,26 @@ export const conflictBrief = (base: string, files: readonly string[]) => t("serv
 export type Settle = "owner" | "helper";
 
 export interface SessionLimits {
-  readonly workspace: number;
+  readonly space: number;
   readonly perRuntime: number;
-  readonly perProject: number;
+  readonly perRepo: number;
 }
 
 /** Why one more cannot start; except is a session about to work again, which does not count against itself. */
 export function noRoom(
-  sessions: readonly Pick<T.Session, "id" | "runtime" | "project" | "phase">[],
+  sessions: readonly Pick<T.Session, "id" | "runtime" | "repo" | "phase">[],
   runtime: string,
-  project: string,
+  repo: string,
   limits: SessionLimits,
   except = "",
   byOwnerComment = false,
 ): string {
-  const room = roomLeft(sessions, project, limits.workspace + (byOwnerComment ? 1 : 0), limits.perProject, except);
-  if (room.farm === 0) return t("server.session.noRoom.farm", { max: limits.workspace });
+  const room = roomLeft(sessions, repo, limits.space + (byOwnerComment ? 1 : 0), limits.perRepo, except);
+  if (room.farm === 0) return t("server.session.noRoom.farm", { max: limits.space });
   const onRuntime = sessions.filter((h) => isBusy(h) && h.id !== except && h.runtime === runtime).length;
   if (limits.perRuntime > 0 && onRuntime >= limits.perRuntime)
     return t("server.session.noRoom.runtime", { runtime: runtimeLabel(runtime), on: onRuntime, max: limits.perRuntime });
-  if (room.project === 0) return t("server.session.noRoom.project", { project, on: room.inProject, max: limits.perProject });
+  if (room.repo === 0) return t("server.session.noRoom.repo", { repo, on: room.inRepo, max: limits.perRepo });
   return "";
 }
 

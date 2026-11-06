@@ -70,7 +70,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   rootNumber: Schema.optionalKey(Schema.Finite),
   name: Schema.optionalKey(Schema.String),
   description: Schema.String,
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   subjectKind: Schema.optionalKey(SubjectKind),
   subjectId: Schema.optionalKey(Schema.String),
   lastNumber: Schema.optionalKey(Schema.Finite),
@@ -103,13 +103,13 @@ export const SayRequest: Codec<T.SayRequest> = Schema.Struct({
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   station: Schema.optionalKey(Schema.Finite),
   agent: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   sendKey: Schema.optionalKey(Schema.String),
 });
 
 export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
   description: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   name: Schema.optionalKey(Schema.String),
   category: Schema.optionalKey(Schema.String),
   before: Schema.optionalKey(Schema.String),
@@ -119,7 +119,7 @@ export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
 export const ChannelRequest: Codec<T.ChannelRequest> = Schema.Struct({
   name: Schema.String,
   description: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
 });
 
 export const ChatReadRequest: Codec<T.ChatReadRequest> = Schema.Struct({

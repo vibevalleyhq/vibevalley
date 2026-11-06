@@ -73,7 +73,7 @@ describe("a talk with a helper profile", () => {
       const first = sessions.presentSessions().find((s) => s.channel === dm);
       expect(first).toMatchObject({ agent: "lab", channel: dm });
       expect(first?.issue).toBeUndefined();
-      expect(first?.project).toBeUndefined();
+      expect(first?.repo).toBeUndefined();
       yield* TestClock.adjust(10 * 60_000);
       yield* until(() => disposed === 1, "the idle execution suspended");
       expect(sessions.presentSessions().find((s) => s.channel === dm)?.id).toBe(first?.id);

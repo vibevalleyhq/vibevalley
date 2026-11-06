@@ -51,7 +51,7 @@
           "name": "issue_create",
           "arguments": {
             "title": "在 demo 里写 README",
-            "project": "demo"
+            "repo": "demo"
           }
         }
       ],

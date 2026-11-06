@@ -6,9 +6,9 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
 });
 
-/** A project's farm, or the farm of the sessions without one. */
-async function openFarm(page: Page, project = "") {
-  await page.goto(`/farm/${project}`);
+/** A repo's farm, or the farm of the sessions without one. */
+async function openFarm(page: Page, repo = "") {
+  await page.goto(`/farm/${repo}`);
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
 }
 
@@ -51,13 +51,13 @@ test("each panel opens from the HUD and Esc closes it", async ({ page }) => {
   await expect(menu).toHaveCount(0);
 });
 
-test("a project's farm names it on the sign; an empty plot sows in it, and a draft makes the issue in the backlog", async ({ page, api }) => {
-  await api.project.create({ name: "farm-hud" });
+test("a repo's farm names it on the sign; an empty plot sows in it, and a draft makes the issue in the backlog", async ({ page, api }) => {
+  await api.repo.create({ name: "farm-hud" });
   await openFarm(page, "farm-hud");
-  await expect(page.getByTestId("project-sign")).toHaveAttribute("data-key", "farm-hud");
+  await expect(page.getByTestId("repo-sign")).toHaveAttribute("data-key", "farm-hud");
   await clickFirstPlot(page);
   const sow = page.getByTestId("sow");
-  await expect(sow.getByTestId("sow-form")).toHaveAttribute("data-project", "farm-hud");
+  await expect(sow.getByTestId("sow-form")).toHaveAttribute("data-repo", "farm-hud");
   // One kind of seed at a time, behind its tab.
   await sow.locator('[role="tab"][data-key="test"]').click();
   await expect(sow.locator('[data-testid="seed"][data-key="recent"]')).toBeVisible();
@@ -72,14 +72,14 @@ test("a project's farm names it on the sign; an empty plot sows in it, and a dra
   await sow.getByTestId("sow-draft").click();
   await expect(page).toHaveURL(/\/issues\/.+/u);
   const made = (await api.issue.list({})).find((i) => i.title.includes("night mode"));
-  expect([made?.project, made?.status]).toEqual(["farm-hud", "backlog"]);
+  expect([made?.repo, made?.status]).toEqual(["farm-hud", "backlog"]);
   await page.goto("/farm/farm-hud");
-  await page.getByTestId("project-sign").click();
-  await expect(page).toHaveURL(/\/projects$/u);
+  await page.getByTestId("repo-sign").click();
+  await expect(page).toHaveURL(/\/repos$/u);
 });
 
-test("/farm opens the farm entered last, and a farm with no project sends sowing to the map", async ({ page, api }) => {
-  await api.project.create({ name: "farm-home" });
+test("/farm opens the farm entered last, and a farm with no repo sends sowing to the map", async ({ page, api }) => {
+  await api.repo.create({ name: "farm-home" });
   // A device that never entered a farm still lands on one: going back to the farm never strands it on the map.
   await page.goto("/farm");
   await expect(page).toHaveURL(/\/farm\/.+/u);
@@ -91,7 +91,7 @@ test("/farm opens the farm entered last, and a farm with no project sends sowing
   const sow = page.getByTestId("sow");
   await expect(sow.getByTestId("sow-homeless")).toBeVisible();
   await sow.getByTestId("sow-to-map").click();
-  await expect(page).toHaveURL(/\/projects$/u);
+  await expect(page).toHaveURL(/\/repos$/u);
 });
 
 test("the helpers open, and a click elsewhere folds them and a helper's card", async ({ page }) => {

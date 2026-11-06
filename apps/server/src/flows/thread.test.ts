@@ -34,7 +34,7 @@ describe("an issue's thread", () => {
       const chat = yield* Channel;
       const mailbox = yield* Mailbox;
       yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({ title: "还在处理", project: "release-input", agent: "lab" });
+      const issue = yield* issues.add({ title: "还在处理", repo: "release-input", agent: "lab" });
       const started = yield* issues.start(issue.id, "");
       const thread = (yield* await_(
         () => chat.threadOfSession(started.session!),
@@ -73,7 +73,7 @@ describe("an issue's thread", () => {
       const channels = yield* Channel;
       const sessions = yield* Session;
       yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({ title: "等待派发", project: "queued", agent: "lab" });
+      const issue = yield* issues.add({ title: "等待派发", repo: "queued", agent: "lab" });
       yield* issues.comment(issue.id, "先记下验收要求", "queued-comment");
       yield* issues.comment(issue.id, "先记下验收要求", "queued-comment");
       const thread = yield* channels.issueThread(issue.id, issue.title);
@@ -112,7 +112,7 @@ describe("an issue's thread", () => {
       const { in: saidIn } = yield* Said;
       const sql = yield* SqlClient.SqlClient;
       yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({ title: "写打卡", project: "one-thread", agent: "lab" });
+      const issue = yield* issues.add({ title: "写打卡", repo: "one-thread", agent: "lab" });
       const sent = yield* issues.start(issue.id, "");
       const first = sent.session!;
       expect(first).toBeDefined();
@@ -179,7 +179,7 @@ describe("an issue's thread", () => {
       yield* (yield* Agent).save(lab());
       const issue = yield* issues.add({
         title: "先问清楚，再写打卡",
-        project: "clock",
+        repo: "clock",
         agent: "lab",
       });
       const sent = yield* issues.start(issue.id, "");

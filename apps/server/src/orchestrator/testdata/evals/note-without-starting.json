@@ -98,7 +98,7 @@
           "name": "issue_create",
           "arguments": {
             "title": "登录页偶尔白屏",
-            "project": "demo",
+            "repo": "demo",
             "start": true
           }
         }

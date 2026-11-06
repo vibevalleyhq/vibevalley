@@ -1,7 +1,7 @@
 {
   "deepseekKey": "DeepSeek 的 API Key 看着不对：一串不带空格的字，通常以 sk- 开头",
-  "agoraId": "Agora 的 App ID 是 32 位的十六进制，在声网控制台的项目里找",
-  "agoraCertificate": "Agora 的 App Certificate 是 32 位的十六进制，在声网控制台的项目里找",
+  "agoraId": "Agora 的 App ID 是 32 位的十六进制，在声网控制台的仓库里找",
+  "agoraCertificate": "Agora 的 App Certificate 是 32 位的十六进制，在声网控制台的仓库里找",
   "voiceKeySpace": "语音服务的 key 里不该有空格",
   "dictationUrl": "听写的地址要是 http(s) 开头的完整地址，到 /v1 为止，比如本机的 http://127.0.0.1:8080/v1",
   "dictationModel": "听写要填模型名，比如本机 speech-server 的 qwen3，或 OpenAI 的 gpt-4o-mini-transcribe",

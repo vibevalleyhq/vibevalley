@@ -11,7 +11,7 @@
 | `Session` 的创建、恢复、带话、叫停、交接与离场 | 工单状态机、排队、验收与合并决策（[工单](docs/subsystems/issue.md)） |
 | `Executor`：oar 实例生命周期、静默检测（`stalls`）与关闭确认 | 农机安装探测、模型列表与档案校验（[档案和农机](docs/subsystems/agent.md)） |
 | `Run` 记录（`session_run`）：触发来源、消费输入、结局与花费 | 谁该被唤醒、刹车与投递状态机（[Mailbox](docs/subsystems/mailbox.md)） |
-| oar 事件转核心状态事实（`reactionTo`）与轨迹日志（`events/<id>.json`） | git worktree、分支与合并实现（[项目](docs/subsystems/project.md)） |
+| oar 事件转核心状态事实（`reactionTo`）与轨迹日志（`events/<id>.json`） | git worktree、分支与合并实现（[仓库](docs/subsystems/repo.md)） |
 | 并发槽位上限（`noRoom`）、腾位置（`makeRoom`）与每日花费记账 | 记忆的存储与检索算法（[记性](docs/subsystems/memory.md)） |
 | 进程内 `AgentHost` 与 `InProcessRun`（供管家运行、记录轨迹与评测） | 管家的编排提示词与工具集（[管家](docs/subsystems/orchestrator.md)） |
 
@@ -63,7 +63,7 @@
 ### 容量上限、轨迹与花费
 
 - **三级并发上限（`noRoom`）**：
-  - 全农场最多 6 个在忙帮工 `maxRunning`，单台农机按 `maxWorking` 限制，单项目默认最多 3 个 `project.max_sessions`。
+  - 全农场最多 6 个在忙帮工 `maxRunning`，单台农机按 `maxWorking` 限制，单仓库默认最多 3 个 `repo.max_sessions`。
   - 槽位满 6 个又来新活时，`makeRoom` 让最久闲置的工单会话收工或让私聊会话休眠。
 - **无沙箱与无逐条权限确认**：帮工在 `$VIBEVALLEY_WORK_ROOT` 下直接执行命令，不弹权限确认；安全边界是服务端只听 `127.0.0.1`。
 - **只追加的轨迹日志**：`events/<id>.json` 按序记录每一步事件，流式草稿按 `revision` 递增推送，落盘后不改。帮工留最近 240 条、管家留 1000 条，离场默认 30 天后清理文件。
@@ -75,7 +75,7 @@
 
 **派出帮工（`Session.send`）**
 
-1. 在准入锁内检查容量上限，分配 `w<n>` 编号，调用 `Project.workplace` 准备目录，调用 `Runtime.resolve` 确定农机与模型。
+1. 在准入锁内检查容量上限，分配 `w<n>` 编号，调用 `Repo.workplace` 准备目录，调用 `Runtime.resolve` 确定农机与模型。
 2. 召回档案记忆，拼装规矩、人设、技能与任务说明，通过 `Executor` 启动 oar 会话。
 3. 释放准入锁，调用 `hiring` 回调登记工单 `Assignment` 执行关联或私聊投递；若失败则关闭执行器并释放现场。
 4. 写 `session` 表并施加 `sessionChanged` 事实，启动事件监听与静默计时器（默认 240 秒无事件报 `quiet`）。
@@ -101,7 +101,7 @@
 
 - **工单（`issue`）**：调用 `send`、`deliver`、`handOver`、`dismiss`；订阅 `Session.news` 与 `finishedRuns`。
 - **信箱与频道（`mailbox`、`channel`）**：Mailbox 调 `deliver` 并订阅 `inputsConsumed`；Channel 订阅 `news` 管理工单串与汇报。
-- **项目、农机与记性（`project`、`runtime`、`memory`）**：提供工作目录、农机探测/计费和每轮前后的记忆召回与写入。
+- **仓库、农机与记性（`repo`、`runtime`、`memory`）**：提供工作目录、农机探测/计费和每轮前后的记忆召回与写入。
 - **管家（`orchestrator`）**：通过 `Session.host` 创建进程内 `AgentHost`，共用 `session` 与 `session_run` 表。
 
 ## 为什么这样
@@ -110,7 +110,7 @@
 - **区分 `Session`、`Run` 与 oar 会话三层**：`Session` 代表跨轮次工作现场，`Run` 记单轮触发与花费，底层 oar 会话可随时替换而不丢工单归属。
 - **不做命令级权限确认，靠工作目录与回环监听划边界**：放弃将权限请求做成地里杂草逐条批准（会让帮工停在命令上等人，与无人值守冲突）。
 - **显式传递农机 `binPath`，不写进程环境变量**：避免多配置并发时互相覆盖 `process.env`。
-- **轨迹单存文件，重启停在 `resting` 不自动重跑**：避免高频工具输出撑大 `WorkspaceState`，也避免重启后自动重跑外部 shell 命令导致重复副作用。
+- **轨迹单存文件，重启停在 `resting` 不自动重跑**：避免高频工具输出撑大 `SpaceState`，也避免重启后自动重跑外部 shell 命令导致重复副作用。
 
 ## 还没做的
 

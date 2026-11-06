@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import type { Issue, IssueStatus, Run, RunTrigger, Session, SessionView, WorkspaceView } from "@vibevalley/protocol";
+import type { Issue, IssueStatus, Run, RunTrigger, Session, SessionView, SpaceView } from "@vibevalley/protocol";
 import { assignedAgentOf, closedText, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 /** An orchestrator answers it: no helper works it. */
 export const isForOrchestrator = (issue: Issue, orchestrators: ReadonlySet<string>) => orchestrators.has(assignedAgentOf(issue) ?? "");
@@ -9,7 +9,7 @@ export const issueIs = (issue: Issue, id: string) => issue.id === id || sessionI
 /** undefined while it is still running. */
 export const endedAt = (s: Session) => (s.phase._tag === "closed" ? s.phase.at : undefined);
 
-export function issueSession(core: WorkspaceView | undefined, issue: Issue): SessionView | undefined {
+export function issueSession(core: SpaceView | undefined, issue: Issue): SessionView | undefined {
   if (!core || issue.closedAt !== undefined) return undefined;
   const last = latestSessionIdOf(issue);
   if (last === undefined) return undefined;

@@ -1,5 +1,5 @@
 import { list, t } from "@vibevalley/i18n";
-import type { Issue, IssueHistory, IssueStatus, Priority, Session, SessionView, WorkspaceView } from "@vibevalley/protocol";
+import type { Issue, IssueHistory, IssueStatus, Priority, Session, SessionView, SpaceView } from "@vibevalley/protocol";
 import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle, stageWantsOwner } from "@vibevalley/protocol/rules";
 
 import { ago, tookText } from "#/base/format.ts";
@@ -49,7 +49,7 @@ export const closedShown = 15;
 
 /** Each issue the frame keeps, its sessions found on the farm, in the history, or (one that left after the history was read) as the frame last had it. */
 export function boardRows(
-  core: WorkspaceView | undefined,
+  core: SpaceView | undefined,
   history: readonly IssueHistory[] | undefined,
   older: boolean,
   seen: ReadonlyMap<string, Session> = new Map(),
@@ -71,7 +71,7 @@ export function boardRows(
 }
 
 /** What the history adds to the frame changes only when an issue gets a session or one leaves the farm. */
-export const historyKey = (core: WorkspaceView | undefined): string =>
+export const historyKey = (core: SpaceView | undefined): string =>
   core
     ? `${core.issues
         .filter((i) => sessionIdsOf(i).length > 0)
@@ -93,10 +93,10 @@ export type BoardCard = (
   | { kind: "family"; id: string; lane: Lane; issue: Issue; children: Issue[] }
 ) & { readonly move?: CardMove };
 
-export const cardProject = (c: BoardCard) => c.issue.project;
+export const cardRepo = (c: BoardCard) => c.issue.repo;
 export const cardAgent = (c: BoardCard) => assignedAgentOf(c.issue);
 
-export function buildCards(rows: IssueHistory[], core: WorkspaceView | undefined, orchestrators: ReadonlySet<string>): BoardCard[] {
+export function buildCards(rows: IssueHistory[], core: SpaceView | undefined, orchestrators: ReadonlySet<string>): BoardCard[] {
   const cards: BoardCard[] = [];
   const families = new Map<string, Issue[]>();
   for (const row of rows) {
@@ -125,26 +125,26 @@ function cardWords(c: BoardCard): (string | undefined)[] {
     case "family":
     case "todo":
     case "missing":
-      return [c.issue.title, c.issue.description, c.issue.project];
+      return [c.issue.title, c.issue.description, c.issue.repo];
     case "issue": {
       const head = c.sessions.at(-1);
-      return [c.issue.title, c.issue.description, head?.name, c.issue.project, c.issue.id, head?.lastRun?.summary];
+      return [c.issue.title, c.issue.description, head?.name, c.issue.repo, c.issue.id, head?.lastRun?.summary];
     }
     case "orchestrator":
-      return [c.issue.title, c.issue.description, c.issue.project, c.issue.id, t("web.issue.card.orchestrator")];
+      return [c.issue.title, c.issue.description, c.issue.repo, c.issue.id, t("web.issue.card.orchestrator")];
   }
 }
 
 export interface BoardFilter {
   query: string;
-  project: string;
+  repo: string;
   agent: string;
 }
 
-export const noFilter: BoardFilter = { query: "", project: "", agent: "" };
-export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.project !== "" || f.agent !== "";
+export const noFilter: BoardFilter = { query: "", repo: "", agent: "" };
+export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.repo !== "" || f.agent !== "";
 export const filterShows = (f: BoardFilter, c: BoardCard) =>
-  (f.project === "" || cardProject(c) === f.project) && (f.agent === "" || cardAgent(c) === f.agent) && matches(f.query, cardWords(c));
+  (f.repo === "" || cardRepo(c) === f.repo) && (f.agent === "" || cardAgent(c) === f.agent) && matches(f.query, cardWords(c));
 
 /** What a card and a list row both show. `detail` is everything else: it is the hover tip. */
 interface CardLook {
@@ -183,7 +183,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       if (item.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
       const agent = assignedAgentOf(item);
       lines.push(agent === undefined ? t("web.issue.card.noHelper") : nameOf(agent));
-      if (agent === undefined || item.project === undefined) lines.push(t("web.issue.card.pickFirst"));
+      if (agent === undefined || item.repo === undefined) lines.push(t("web.issue.card.pickFirst"));
       lines.push(
         item.queuedAt !== undefined
           ? t("web.issue.card.waiting", { ago: ago(item.queuedAt, now) })

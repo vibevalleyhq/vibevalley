@@ -28,7 +28,7 @@ const info = (more: Partial<RuntimeInfo> = {}): RuntimeInfo => ({
       { label: "本周", usedPercent: 61, resetsAt: now + 50 * hour },
     ],
   },
-  skills: [{ name: "review", description: "按项目的规矩审一遍改动", source: "~/.claude/skills" }],
+  skills: [{ name: "review", description: "按仓库的规矩审一遍改动", source: "~/.claude/skills" }],
   mcpServers: [{ name: "github", description: "读写 GitHub 的工单和 PR", source: "", enabled: true }],
   tools: [
     { name: "Bash", description: "", source: "" },

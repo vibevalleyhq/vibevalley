@@ -22,7 +22,7 @@
 | `scripts/oxlint-plugin.ts`、`deadcode.ts`、`regression.ts` | 仓库自定义 lint 规则、`knip` 死代码检查、PR 回归测试修改门禁 |
 | `scripts/comment-review.ts`、`verify-server.ts` | 调用模型审查新增注释、启动隔离沙箱服务端 |
 | `packages/health/`、`scripts/health.config.ts`、`health.ratchet.json` | 热点分析与类型/错误逃生口棘轮检查 |
-| `.agents/notes/`、`.agents/skills/` | Agent Notes 目录与项目 skills（`.claude/skills` 软链至此） |
+| `.agents/notes/`、`.agents/skills/` | Agent Notes 目录与仓库 skills（`.claude/skills` 软链至此） |
 | `design/pixel/gen.sh`、`process.py`、`design/art.sh` | 像素素材生成、去品红切格缩放脚本与原图仓库软链 |
 
 ## 模型和不变量

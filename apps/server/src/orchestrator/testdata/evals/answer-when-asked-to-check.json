@@ -51,7 +51,7 @@
           "name": "issue_create",
           "arguments": {
             "title": "打卡为什么慢",
-            "project": "clock-in",
+            "repo": "clock-in",
             "start": true
           }
         }

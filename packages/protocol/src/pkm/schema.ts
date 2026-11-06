@@ -66,7 +66,7 @@ export const PkmBacklink: Codec<T.PkmBacklink> = Schema.Struct({
 
 const pkmBacklinks = Schema.mutable(Schema.Array(PkmBacklink));
 export const PkmBacklinks: Codec<T.PkmBacklinks> = Schema.Struct({
-  projects: pkmBacklinks,
+  repos: pkmBacklinks,
   journals: pkmBacklinks,
   areas: pkmBacklinks,
   archives: pkmBacklinks,
@@ -164,7 +164,7 @@ export const PkmSourceUpdate: Codec<T.PkmSourceUpdate> = Schema.Struct({ page: S
 
 export const PkmJournalRequest: Codec<T.PkmJournalRequest> = Schema.Struct({ day: Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/u)) });
 
-export const PkmStaleProject: Codec<T.PkmStaleProject> = Schema.Struct({
+export const PkmStaleRepo: Codec<T.PkmStaleRepo> = Schema.Struct({
   slug: Schema.String,
   title: Schema.String,
   days: Schema.Int,
@@ -184,7 +184,7 @@ export const PkmOverdue: Codec<T.PkmOverdue> = Schema.Struct({
 
 export const PkmRadar: Codec<T.PkmRadar> = Schema.Struct({
   inbox: Schema.Int,
-  stale: Schema.mutable(Schema.Array(PkmStaleProject)),
+  stale: Schema.mutable(Schema.Array(PkmStaleRepo)),
   overdue: Schema.mutable(Schema.Array(PkmOverdue)),
 });
 

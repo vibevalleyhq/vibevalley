@@ -189,18 +189,18 @@ GitHub 的检测：gh 装没装、登没登录
 | `github.get` | 看 gh 装没装、登没登录 | `/api/v1/github/get` | ✓ | ✓ |   |   |
 | `github.refresh` | 重新检测 GitHub，顺带刷新开着的 PR | `/api/v1/github/refresh` | ✓ | ✓ |   |   |
 
-## project
+## repo
 
-项目：工作目录下的 git 仓库
+仓库：工作目录下的 git 仓库
 
 | 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|---|
-| `project.list` | 列出全部项目 | `/api/v1/project/list` | ✓ | ✓ | ✓ |   |
-| `project.validate` | 新建项目会被拒的第一处，不真建 | `/api/v1/project/validate` | ✓ | ✓ |   |   |
-| `project.create` | 新建一个项目 | `/api/v1/project/create` | ✓ | ✓ |   |   |
-| `project.language.list` | 项目用了哪些语言 | `/api/v1/project/language/list` | ✓ | ✓ |   |   |
-| `project.template.list` | 项目的工单模板，按它的栈填好 | `/api/v1/project/template/list` | ✓ | ✓ |   |   |
-| `project.activity.get` | 项目的提交：每天几次、谁提交的 | `/api/v1/project/activity/get` | ✓ | ✓ |   |   |
+| `repo.list` | 列出全部仓库 | `/api/v1/repo/list` | ✓ | ✓ | ✓ |   |
+| `repo.validate` | 新建仓库会被拒的第一处，不真建 | `/api/v1/repo/validate` | ✓ | ✓ |   |   |
+| `repo.create` | 新建一个仓库 | `/api/v1/repo/create` | ✓ | ✓ |   |   |
+| `repo.language.list` | 仓库用了哪些语言 | `/api/v1/repo/language/list` | ✓ | ✓ |   |   |
+| `repo.template.list` | 仓库的工单模板，按它的栈填好 | `/api/v1/repo/template/list` | ✓ | ✓ |   |   |
+| `repo.activity.get` | 仓库的提交：每天几次、谁提交的 | `/api/v1/repo/activity/get` | ✓ | ✓ |   |   |
 
 ## agent
 
@@ -251,7 +251,7 @@ GitHub 的检测：gh 装没装、登没登录
 | `pkm.source.get` | 一页文件的原文（带块的 id）和它上次写的时间 | `/api/v1/pkm/source/get` | ✓ | ✓ |   |   |
 | `pkm.source.update` | 用改过的原文重写一页；这期间文件被改过就不写 | `/api/v1/pkm/source/update` | ✓ | ✓ |   |   |
 | `pkm.journal.open` | 打开某一天的日记，没有就建 | `/api/v1/pkm/journal/open` | ✓ | ✓ |   |   |
-| `pkm.radar.get` | 回顾雷达：收件箱里的、搁着的项目、过期的块 | `/api/v1/pkm/radar/get` | ✓ | ✓ |   |   |
+| `pkm.radar.get` | 回顾雷达：收件箱里的、搁着的仓库、过期的块 | `/api/v1/pkm/radar/get` | ✓ | ✓ |   |   |
 | `pkm.comment.list` | 列出批注和改写，可以只看一页的 | `/api/v1/pkm/comment/list` | ✓ | ✓ |   |   |
 | `pkm.comment.suggest` | 对一块提改写，留住它的链接和引用 | `/api/v1/pkm/comment/suggest` | ✓ | ✓ | ✓ | ✓ |
 | `pkm.comment.resolve` | 接受或拒绝一条改写 | `/api/v1/pkm/comment/resolve` | ✓ | ✓ |   |   |
@@ -267,7 +267,7 @@ GitHub 的检测：gh 装没装、登没登录
 | 操作 | 做什么 | 路径（POST） | 主人 | 连进来的设备 | 管家 | 帮工 |
 |---|---|---|---|---|---|---|
 | `memory.list` | 列出一份档案的记性：库里的和配置的来源 | `/api/v1/memory/list` | ✓ | ✓ |   |   |
-| `memory.recall` | 看档案对这个项目和这句话会想起什么 | `/api/v1/memory/recall` | ✓ | ✓ |   |   |
+| `memory.recall` | 看档案对这个仓库和这句话会想起什么 | `/api/v1/memory/recall` | ✓ | ✓ |   |   |
 | `memory.create` | 给一份档案记一条记性 | `/api/v1/memory/create` | ✓ | ✓ | ✓ | ✓ |
 | `memory.search` | 按字搜记性，不指定档案就搜全部 | `/api/v1/memory/search` | ✓ | ✓ | ✓ | ✓ |
 | `memory.delete` | 删掉档案的一条记性 | `/api/v1/memory/delete` | ✓ | ✓ |   |   |

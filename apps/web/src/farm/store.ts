@@ -78,8 +78,8 @@ export interface FarmUi {
 /** The title screen was closed once on this machine: it does not open by itself again (Playwright sets it to start past it). */
 const titleSeen = defineStored("title.seen", Schema.Boolean, false);
 
-/** The project whose farm was on the page last ("" for the sessions without one), the one `/farm` opens; null before any. */
-const lastFarm = defineStored("farm.project", Schema.NullOr(Schema.String), null);
+/** The repo whose farm was on the page last ("" for the sessions without one), the one `/farm` opens; null before any. */
+const lastFarm = defineStored("farm.repo", Schema.NullOr(Schema.String), null);
 
 const farmUi = defineAtom<FarmUi>({
   overlays: [],
@@ -112,11 +112,11 @@ export const useFarm = <T>(select: (s: FarmUi) => T): Accessor<T> => createMemo(
 
 export const subscribeFarm = farmUi.subscribe;
 
-/** The project whose farm is on the page ("" for the sessions without one): the route sets it. */
-export const farmProject = () => lastFarm.get() ?? "";
+/** The repo whose farm is on the page ("" for the sessions without one): the route sets it. */
+export const farmRepo = () => lastFarm.get() ?? "";
 
 /** The farm `/farm` opens: the one entered last on this machine, if any. */
-export const lastFarmProject = () => lastFarm.get() ?? undefined;
+export const lastFarmRepo = () => lastFarm.get() ?? undefined;
 
 const replace = (kind: FarmOverlay["kind"], next: FarmOverlay | undefined) =>
   set((s) => ({
@@ -193,7 +193,7 @@ export const farm = {
     setTimeout(() => set((s) => ({ rewards: s.rewards.filter((x) => x !== r) })), rewardLinger);
   },
   setScreen: (screen: VillageScreen | undefined) => set({ screen }),
-  setProject: (project: string) => lastFarm.set(project),
+  setRepo: (repo: string) => lastFarm.set(repo),
 };
 
 /** For tests and leaving the page: everything but the title's seen flag back to the start. */

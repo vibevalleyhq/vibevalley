@@ -26,7 +26,7 @@ test("the orchestrator's trajectory shows what it was told, and a round it never
   await expect(round).toBeVisible({ timeout: 15_000 });
   await round.hover();
   await round.getByTestId("mark-wrong").click();
-  await round.getByTestId("mark-want").fill("ask me which project first");
+  await round.getByTestId("mark-want").fill("ask me which repo first");
   await round.getByTestId("mark-submit").click();
   // The server refuses it, and the page says so.
   await expect(page.getByTestId("toast")).toBeVisible();

@@ -46,7 +46,7 @@ const LdtkLayerSchema = Schema.Struct({
 });
 type LdtkLayer = typeof LdtkLayerSchema.Type;
 
-const LdtkProjectSchema = Schema.Struct({
+const LdtkRepoSchema = Schema.Struct({
   levels: Schema.Array(
     Schema.Struct({
       pxWid: Schema.Finite,
@@ -56,7 +56,7 @@ const LdtkProjectSchema = Schema.Struct({
   ),
 });
 
-const decodeLdtkProject = Schema.decodeUnknownSync(Schema.fromJsonString(LdtkProjectSchema));
+const decodeLdtkRepo = Schema.decodeUnknownSync(Schema.fromJsonString(LdtkRepoSchema));
 
 export class Level {
   readonly width: number;
@@ -71,7 +71,7 @@ export class Level {
   }
 
   static parse(text: string): Level {
-    const level = decodeLdtkProject(text).levels[0];
+    const level = decodeLdtkRepo(text).levels[0];
     if (!level) throw new Error("village.ldtk: no level");
     const layer = (name: string) => {
       const l = level.layerInstances.find((x) => x.__identifier === name);

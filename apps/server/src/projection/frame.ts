@@ -1,7 +1,7 @@
 import { Layer } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import { type Doing, type DoingView, type GameEffect, type StateFrame, type WorkspaceState, type WorkspaceView } from "@vibevalley/protocol";
+import { type Doing, type DoingView, type GameEffect, type StateFrame, type SpaceState, type SpaceView } from "@vibevalley/protocol";
 import { phaseWords } from "@vibevalley/protocol/rules";
 
 import { Projection } from "#/core/core.ts";
@@ -14,11 +14,11 @@ import { reduce } from "./reduce.ts";
 // The core state's projection, given to the core at assembly.
 export const layer = Layer.succeed(Projection, { reduce, effects: effectsOf, frame: frameOf });
 
-export function frameOf(state: WorkspaceState, effects: GameEffect[] = [], seq = 0): StateFrame {
+export function frameOf(state: SpaceState, effects: GameEffect[] = [], seq = 0): StateFrame {
   return { seq, state: withWords(state), inbox: inbox(state), view: viewOf(state), effects };
 }
 
-function withWords(state: WorkspaceState): WorkspaceView {
+function withWords(state: SpaceState): SpaceView {
   const doing = (d: Doing): DoingView => ({ ...d, actionText: t(`shared.action.${d.action}`) });
   const { plays: _plays, ...rest } = state;
   return {

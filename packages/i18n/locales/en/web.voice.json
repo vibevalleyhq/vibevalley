@@ -24,7 +24,7 @@
     "console": "Agora console",
     "hex": "32 hex characters",
     "area": "Region",
-    "areaHint": "The region of Agora's endpoints: pick one near the server; projects in mainland China pick Mainland China.",
+    "areaHint": "The region of Agora's endpoints: pick one near the server; repos in mainland China pick Mainland China.",
     "listen": "Listen",
     "listenParts": "Recognition · VAD",
     "asr": "Recognition",

@@ -122,8 +122,8 @@ const say = Effect.fn("Channel.say")(function* (text: string) {
 ```ts
 const ship = (id: string) =>
   issues.get(id).pipe(
-    Effect.andThen((issue) => projects.get(issue.project)),
-    Effect.andThen((project) => git.push(project.path)),
+    Effect.andThen((issue) => repos.get(issue.repo)),
+    Effect.andThen((repo) => git.push(repo.path)),
     Effect.andThen(() => issues.markShipped(id)),
   );
 ```
@@ -133,8 +133,8 @@ const ship = (id: string) =>
 ```ts
 const ship = Effect.fn("Issue.ship")(function* (id: string) {
   const issue = yield* issues.get(id);
-  const project = yield* projects.get(issue.project);
-  yield* git.push(project.path);
+  const repo = yield* repos.get(issue.repo);
+  yield* git.push(repo.path);
   yield* issues.markShipped(id);
 });
 ```

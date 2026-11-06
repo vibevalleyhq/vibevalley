@@ -13,7 +13,7 @@ src/handlers.ts    every endpoint's answer, put together from src/http/handlers/
 src/http/          the router over the endpoint table, the streams, /mcp and /v1/chat/completions, the page
 src/base/          what touches nothing outside: ids, JSON, order, redaction
 src/infra/         what deals with the process and the machine: configuration, database, files, the home's lease, logs, time
-src/<module>/      one service each (modules.ts): core setting agent runtime memory project executor session mailbox channel artifact pkm
+src/<module>/      one service each (modules.ts): core setting agent runtime memory repo executor session mailbox channel artifact pkm
                    issue cron ingress resource inbox orchestrator tool game, and http mcp lan connector voice at the top
 src/flows/         tests that go through several services: a whole farm and a helper that works by the words of its job
 src/testing/       test layers: a temporary home, an in-memory database, a whole farm, git repositories, golden data

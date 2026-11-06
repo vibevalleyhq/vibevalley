@@ -12,7 +12,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 账本（`game_ledger`）：从事实提取条目（`entriesFor`）并折叠出 `Progress` | 工单状态流转、验收与合并本身（[工单](docs/subsystems/issue.md)） |
-| 等级计算（`farmLevelOf`）、周期性触发 commit 统计与升级横幅判定 | 扫描 git 仓库统计 commit 的实现（[项目](docs/subsystems/project.md) 的 `contributions`） |
+| 等级计算（`farmLevelOf`）、周期性触发 commit 统计与升级横幅判定 | 扫描 git 仓库统计 commit 的实现（[仓库](docs/subsystems/repo.md) 的 `contributions`） |
 | 地块视图计算（`plotOf`、`viewOf`）、地块槽位分配与单次特效（`effectsOf`） | 像素画布、精灵动画与合成音效的渲染播放（[农场的皮](docs/subsystems/farm.md)） |
 
 ## 在哪
@@ -51,13 +51,13 @@
 ## 怎么走
 
 1. **监听事实记账**：订阅 `Core.transitions` 与 `Core.owner` 提取账本条目，写入 `game_ledger` 后施加 `progressChanged` 事实。
-2. **统计 commit**：启动就绪、每 2 分钟及 `sessionReported` 后 15 秒调用 `Project.contributions`，变化时更新 `progressChanged.commits`。
+2. **统计 commit**：启动就绪、每 2 分钟及 `sessionReported` 后 15 秒调用 `Repo.contributions`，变化时更新 `progressChanged.commits`。
 3. **指定空地播种**：主人点击空地发消息附带 `station`（0–5），`Game.want` 保留预约 10 秒，期间新派出的帮工自动移至该地块。
 
 ## 和谁打交道
 
 - **核心状态与组装层（`core`、`projection`）**：`projection` 调用 `viewOf` 与 `effectsOf` 拼帧；`Game` 订阅 `Core` 并回写 `progressChanged`。
-- **项目（`project`）**：调用 `Project.contributions` 获取 commit 计数。
+- **仓库（`repo`）**：调用 `Repo.contributions` 获取 commit 计数。
 
 ## 为什么这样
 

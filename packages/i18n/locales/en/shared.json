@@ -32,7 +32,7 @@
     "low": "Low"
   },
   "deliverable": {
-    "change": "A change, merged into the project",
+    "change": "A change, merged into the repo",
     "branch": "A change, left on its branch",
     "answer": "An answer, reading only"
   },

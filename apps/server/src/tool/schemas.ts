@@ -117,14 +117,14 @@ export const parameters = {
   "channel.create": Schema.Struct({
     description: Schema.optionalKey(Schema.String),
     name: Schema.String,
-    project: Schema.optionalKey(Schema.String),
+    repo: Schema.optionalKey(Schema.String),
   }),
   "channel.list": Schema.Struct({}),
   "channel.message.list": channelRead,
   "channel.update": Schema.Struct({
     description: Schema.optionalKey(Schema.String),
     id: Schema.String.annotate({ description: params.channelRef }),
-    project: Schema.optionalKey(Schema.String),
+    repo: Schema.optionalKey(Schema.String),
   }),
   "issue.comment.create": Schema.Struct({
     id: Schema.String.annotate({ description: params.issueOrAgent }),
@@ -144,7 +144,7 @@ export const parameters = {
     description: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.description })),
     draft: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueCreate.draft })),
     priority: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.priority })),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.project })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.repo })),
     start: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueCreate.start })),
     title: Schema.String.annotate({ description: params.issueCreate.title }),
   }),
@@ -157,7 +157,7 @@ export const parameters = {
   "issue.list": Schema.Struct({
     closed: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.closed })),
     limit: Schema.optionalKey(Schema.Finite.annotate({ description: params.issueList.limit })),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.project })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.repo })),
     status: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.status })),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.text })),
     wantsOwner: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.wantsOwner })),
@@ -181,26 +181,26 @@ export const parameters = {
     description: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.description })),
     id: Schema.String.annotate({ description: params.issueNumber }),
     priority: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.priority })),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.project })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.repo })),
     title: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.title })),
   }),
   "memory.create": Schema.Struct({
     agent: Schema.String.annotate({ description: params.agentProfile }),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.memoryCreate.project })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.memoryCreate.repo })),
     text: Schema.String.annotate({ description: params.memoryCreate.text }),
   }),
   "memory.search": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.agentProfile })),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.projectFolder })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.repoFolder })),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.searchText })),
   }),
-  "project.list": Schema.Struct({}),
+  "repo.list": Schema.Struct({}),
   ...pkmParameters,
   "cron.create": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.cron.agent })),
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.cron.channel })),
     name: Schema.String.annotate({ description: params.cron.name }),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.cron.project })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.cron.repo })),
     text: Schema.String.annotate({ description: params.cron.text }),
     tz: Schema.optionalKey(Schema.String.annotate({ description: params.cron.tz })),
     when: Schema.Struct({
@@ -270,11 +270,11 @@ export const sessionParameters = {
     title: Schema.optionalKey(Schema.String.annotate({ description: params.issueSplit.title })),
   }),
   "memory.create": Schema.Struct({
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.sessionMemory.createProject })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.sessionMemory.createRepo })),
     text: Schema.String.annotate({ description: params.sessionMemory.text }),
   }),
   "memory.search": Schema.Struct({
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.sessionMemory.searchProject })),
+    repo: Schema.optionalKey(Schema.String.annotate({ description: params.sessionMemory.searchRepo })),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.searchText })),
   }),
   "session.list": Schema.Struct({}),
@@ -340,9 +340,9 @@ export type SessionInput<K extends keyof typeof sessionParameters> = (typeof ses
 export interface Caller {
   /** The profile: an orchestrator's own id for an orchestrator. */
   readonly agent: string;
-  /** The session working as agent, and the project it works in; both empty for the orchestrator. */
+  /** The session working as agent, and the repo it works in; both empty for the orchestrator. */
   readonly session: string;
-  readonly project: string;
+  readonly repo: string;
   /** The channel the orchestrator is answering. A session's default is its own issue thread, which the channel service knows. */
   readonly here: string;
   /** The profile the owner picked for this input, if any: dispatch prefers it. */

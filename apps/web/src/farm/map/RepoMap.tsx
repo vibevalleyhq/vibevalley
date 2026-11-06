@@ -9,10 +9,10 @@ import { variant, autofocus } from "#/base/dom.tsx";
 import { useInterval } from "#/base/timer.ts";
 import { chatSay } from "#/features/channel/index.ts";
 import { writeIssue } from "#/features/issue/index.ts";
-import { type ProjectsSkin, since } from "#/features/project/index.ts";
+import { type ReposSkin, since } from "#/features/repo/index.ts";
 import { createRequestKey } from "#/infra/api.ts";
 import { useCore, useFrames } from "#/infra/frame.ts";
-import { ready, useAgents, useProjects } from "#/infra/query.ts";
+import { ready, useAgents, useRepos } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { sendOnce, useIntents } from "#/state/intent.ts";
 import { createAct } from "#/ui/act.ts";
@@ -52,19 +52,19 @@ const parchment = "#ebd9ae";
 function useIslands(): () => Island[] {
   const core = useCore();
   const frames = useFrames();
-  const projects = useProjects();
+  const repos = useRepos();
   return createMemo(() =>
-    islandsOf({ projects: ready(projects, []), sessions: core()?.sessions ?? [], plots: frames.frame?.view.plots ?? {}, issues: core()?.issues ?? [] }),
+    islandsOf({ repos: ready(repos, []), sessions: core()?.sessions ?? [], plots: frames.frame?.view.plots ?? {}, issues: core()?.issues ?? [] }),
   );
 }
 
 const go = (navigate: (to: string) => void, id: string) => navigate(`/issues/${encodeURIComponent(id)}`);
 
-function ProjectMap() {
+function RepoMap() {
   const atlas = useAtlas();
   const islands = useIslands();
-  const projects = useProjects();
-  const loading = () => !ready(projects, undefined);
+  const repos = useRepos();
+  const loading = () => !ready(repos, undefined);
   const core = useCore();
   const [sowing, setSowing] = createSignal<string>();
   const [width, setWidth] = createSignal(0);
@@ -127,10 +127,10 @@ function ProjectMap() {
               <Show when={atlas()} keyed>
                 {(a) => (
                   <div class="flex flex-wrap justify-center" style={{ gap: `${gap}px` }}>
-                    <For each={islands()} keyed={(i) => i.project}>
+                    <For each={islands()} keyed={(i) => i.repo}>
                       {(i) => (
                         <div style={{ width: `${cell().w * scale()}px` }}>
-                          <IslandView island={i()} atlas={a} scale={scale()} cellHeight={cell().h} onSow={() => setSowing(i().project)} />
+                          <IslandView island={i()} atlas={a} scale={scale()} cellHeight={cell().h} onSow={() => setSowing(i().repo)} />
                         </div>
                       )}
                     </For>
@@ -143,7 +143,7 @@ function ProjectMap() {
               <Quiet>{t("web.farm.map.finding")}</Quiet>
             </Match>
             <Match when={islands().length === 0}>
-              <NoProjects />
+              <NoRepos />
             </Match>
           </Switch>
           <Show when={stray().length > 0}>
@@ -151,8 +151,8 @@ function ProjectMap() {
           </Show>
         </div>
       </div>
-      <Dialog open={sowing() !== undefined} onClose={() => setSowing(undefined)} title={t("web.farm.map.send", { project: sowing() ?? "" })}>
-        <Show when={sowing()}>{(p) => <SowHere project={p()} onDone={() => setSowing(undefined)} />}</Show>
+      <Dialog open={sowing() !== undefined} onClose={() => setSowing(undefined)} title={t("web.farm.map.send", { repo: sowing() ?? "" })}>
+        <Show when={sowing()}>{(p) => <SowHere repo={p()} onDone={() => setSowing(undefined)} />}</Show>
       </Dialog>
     </div>
   );
@@ -272,7 +272,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
   const router = useRouter();
   const all = useAgents();
   const agents = createMemo(() => new Map(ready(all, []).map((a): [string, Agent] => [a.id, a])));
-  const pic = () => props.atlas.first([islandLook(props.island.project), ...islandLooks]);
+  const pic = () => props.atlas.first([islandLook(props.island.repo), ...islandLooks]);
   const yard = () => {
     const y = pic().yard;
     return y
@@ -281,9 +281,9 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
   };
   const at = () => plotsIn(yard(), props.island.spots.length);
   const down = () => props.cellHeight - pic().h;
-  const open = () => router.navigate(`/projects/${encodeURIComponent(props.island.project)}`);
-  // into this project's own farm.
-  const enter = () => router.navigate(`/farm/${encodeURIComponent(props.island.project)}`);
+  const open = () => router.navigate(`/repos/${encodeURIComponent(props.island.repo)}`);
+  // into this repo's own farm.
+  const enter = () => router.navigate(`/farm/${encodeURIComponent(props.island.repo)}`);
   const has = (n: string) => props.atlas.has(n);
   const s = () => props.scale;
   const gate = () => ({ x: yard().left + yard().width / 2, y: yard().top + yard().height + down() });
@@ -294,8 +294,8 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
         <button
           type="button"
           data-testid="island"
-          data-key={props.island.project}
-          aria-label={t("shared.join.labeled", { label: props.island.project, text: islandText(props.island) })}
+          data-key={props.island.repo}
+          aria-label={t("shared.join.labeled", { label: props.island.repo, text: islandText(props.island) })}
           onClick={open}
           class="absolute inset-x-0 bottom-0 cursor-pointer"
         >
@@ -360,7 +360,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                     scale={s()}
                     onClick={props.onSow}
                     tip={tip()}
-                    label={t("web.farm.map.open", { project: props.island.project })}
+                    label={t("web.farm.map.open", { repo: props.island.repo })}
                   >
                     <Art sp={props.atlas.get("plot-empty")} scale={s()} />
                   </Placed>
@@ -406,9 +406,9 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
       <button
         type="button"
         data-testid="enter-island"
-        data-key={props.island.project}
+        data-key={props.island.repo}
         onClick={enter}
-        aria-label={t("web.farm.map.enter", { project: props.island.project })}
+        aria-label={t("web.farm.map.enter", { repo: props.island.repo })}
         class="group cursor-pointer"
       >
         <PixelCard
@@ -416,7 +416,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
           maxWidth={pic().w * s() - 24}
           maxLines={1}
           rows={[
-            [{ kind: "words", text: props.island.project, size: 14 }],
+            [{ kind: "words", text: props.island.repo, size: 14 }],
             [{ kind: "words", text: islandText(props.island), color: CardColors.muted }],
             [
               { kind: "words", text: t("web.farm.map.enterWord"), color: CardColors.good },
@@ -446,7 +446,7 @@ function Homeless(props: { sessions: Session[] }) {
   );
 }
 
-function NoProjects() {
+function NoRepos() {
   return (
     <div class="mx-auto flex w-fit flex-col items-center gap-3 rounded-lg border border-line bg-page p-4">
       <p class="text-sm text-muted">{t("web.farm.map.sea")}</p>
@@ -454,8 +454,8 @@ function NoProjects() {
   );
 }
 
-/** Work for this project: sent now (the orchestrator sends a helper), or written down as a todo to fill in. */
-function SowHere(props: { project: string; onDone: () => void }) {
+/** Work for this repo: sent now (the orchestrator sends a helper), or written down as a todo to fill in. */
+function SowHere(props: { repo: string; onDone: () => void }) {
   const [text, setText] = createSignal("");
   const [sending, setSending] = createSignal(false);
   const writing = createAct();
@@ -468,7 +468,7 @@ function SowHere(props: { project: string; onDone: () => void }) {
     const id = defaultOf(core()?.chat)?.id;
     if (!id) return;
     setSending(true);
-    const end = await sendOnce(says, { id, text: text().trim(), project: props.project });
+    const end = await sendOnce(says, { id, text: text().trim(), repo: props.repo });
     setSending(false);
     if (end?.status === "failed") toast(end.reason ?? "", "bad");
     else props.onDone();
@@ -476,11 +476,11 @@ function SowHere(props: { project: string; onDone: () => void }) {
   // The same key until the issue went in: a retry after a lost reply is that issue, not a second.
   const key = createRequestKey();
   const write = () => {
-    const project = props.project;
+    const repo = props.repo;
     const words = text();
     const done = props.onDone;
     return writing.run(async () => {
-      const got = await writeIssue(words, "", project, key.now());
+      const got = await writeIssue(words, "", repo, key.now());
       key.used();
       if (got.refused) toast(t("web.farm.map.notDrafted", { why: got.refused }));
       done();
@@ -489,7 +489,7 @@ function SowHere(props: { project: string; onDone: () => void }) {
   };
   return (
     <div class="flex flex-col gap-3">
-      <p class="text-sm text-muted">{t("web.farm.map.sowIntro", { project: props.project })}</p>
+      <p class="text-sm text-muted">{t("web.farm.map.sowIntro", { repo: props.repo })}</p>
       <TextArea
         ref={autofocus()}
         aria-label={t("web.farm.map.job")}
@@ -527,7 +527,7 @@ function IslandDetail(props: { island: Island }) {
   const taken = () => props.island.spots.flatMap((s) => (s.kind === "taken" ? [s] : []));
   const open = () => openOf(props.island);
   return (
-    <Card title={props.island.project} action={<span class="text-sm text-muted">{islandText(props.island)}</span>}>
+    <Card title={props.island.repo} action={<span class="text-sm text-muted">{islandText(props.island)}</span>}>
       <div class="flex items-center gap-2.5">
         <SpriteIcon name={`plot-${growth().crop}`} size={36} />
         <p class="text-sm text-muted">{growthText()}</p>
@@ -598,11 +598,11 @@ function IslandDetail(props: { island: Island }) {
   );
 }
 
-/** The head over one project's overview: its island, when it has one. */
+/** The head over one repo's overview: its island, when it has one. */
 function IslandHead(props: { name: string }) {
   const islands = useIslands();
-  const island = () => islands().find((i) => i.project === props.name);
+  const island = () => islands().find((i) => i.repo === props.name);
   return <Show when={island()}>{(i) => <IslandDetail island={i()} />}</Show>;
 }
 
-export const projectMap: ProjectsSkin = { Map: ProjectMap, Head: IslandHead, picture: islandLook };
+export const repoMap: ReposSkin = { Map: RepoMap, Head: IslandHead, picture: islandLook };

@@ -32,7 +32,7 @@
   },
   "github": {
     "noGh": "gh is not installed",
-    "note": "Which projects can open PRs is on the Projects page; opening a PR on completion is turned on in the configuration (github.pr_projects).",
+    "note": "Which repos can open PRs is on the Repos page; opening a PR on completion is turned on in the configuration (github.pr_repos).",
     "recheck": "Check again",
     "cli": "gh command line",
     "cliHint": "Used to open PRs and read repositories when merging",
@@ -116,7 +116,7 @@
     "settings": "Settings file",
     "settingsHint": "The keys and these pages' settings",
     "repos": "Repositories",
-    "reposHint": "The space's projects; each folder is a git repository",
+    "reposHint": "The space's repos; each folder is a git repository",
     "worktrees": "Worktrees",
     "worktreesHint": "Each issue's own checkout while a helper works",
     "pkm": "Notes vault",

@@ -52,7 +52,7 @@ describe("AgentHost", () => {
         answer("看完了，一切正常"),
       ]);
       const memory = yield* Memory;
-      yield* memory.remember({ agent: "orchestrator", text: "database preference", project: "", by: owner });
+      yield* memory.remember({ agent: "orchestrator", text: "database preference", repo: "", by: owner });
       const finished: RunFinished[] = [];
       const consumed: InputConsumed[] = [];
       const answeringRuns: (string | undefined)[] = [];

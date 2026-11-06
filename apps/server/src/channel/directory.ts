@@ -92,7 +92,7 @@ export const channelDirectory = (r: ChannelRecords) =>
 
     return {
       channels: Effect.fn("Channel.channels")(() => Effect.sync(() => model.channels().map(infoOf))),
-      openChannel: Effect.fn("Channel.openChannel")(function* (name, description, project) {
+      openChannel: Effect.fn("Channel.openChannel")(function* (name, description, repo) {
         const clean = name.trim().replace(/^#/u, "");
         const rows = model.channels();
         const problem = channelNameProblem(
@@ -101,10 +101,10 @@ export const channelDirectory = (r: ChannelRecords) =>
         );
         if (problem) return yield* Effect.fail(refused(problem));
         const desc = optional(description);
-        const proj = optional(project);
+        const proj = optional(repo);
         const id = newId();
         const created_at = yield* Clock.currentTimeMillis;
-        yield* db.run(qc.createChannel({ id, is_default: false, name: clean, description: desc, project: proj, created_at }));
+        yield* db.run(qc.createChannel({ id, is_default: false, name: clean, description: desc, repo: proj, created_at }));
         model.created({
           id,
           type: "channel",
@@ -118,7 +118,7 @@ export const channelDirectory = (r: ChannelRecords) =>
           created_at,
           name: clean,
           description: desc,
-          project: proj,
+          repo: proj,
           parent_id: null,
           peer_id: null,
           revision: 0,
@@ -129,17 +129,13 @@ export const channelDirectory = (r: ChannelRecords) =>
           orchestrator: null,
         });
         yield* publishChannel(id);
-        return infoOf({ id, name: clean, description: desc, project: proj, is_default: false });
+        return infoOf({ id, name: clean, description: desc, repo: proj, is_default: false });
       }, locked),
       updateChannel: Effect.fn("Channel.updateChannel")(function* (id, upd) {
         const row = model.channel(id);
         if (!row || row.type === "direct") return yield* Effect.fail(missing(t("server.channel.noChannel", { id }), [lookIn.channel]));
         const onlyName =
-          upd.description === undefined &&
-          upd.project === undefined &&
-          upd.category === undefined &&
-          upd.before === undefined &&
-          upd.orchestrator === undefined;
+          upd.description === undefined && upd.repo === undefined && upd.category === undefined && upd.before === undefined && upd.orchestrator === undefined;
         if (row.type === "thread" && !onlyName) return yield* Effect.fail(refused(t("server.channel.threadOnlyTitle")));
         let name = row.name;
         if (upd.name !== undefined) {
@@ -155,7 +151,7 @@ export const channelDirectory = (r: ChannelRecords) =>
           }
         }
         const desc = (upd.description !== undefined ? optional(upd.description) : null) ?? row.description;
-        const proj = upd.project !== undefined ? optional(upd.project) : row.project;
+        const proj = upd.repo !== undefined ? optional(upd.repo) : row.repo;
         const category = upd.category !== undefined ? optional(upd.category) : row.category;
         // The default orchestrator is kept as none, so a channel follows whichever is the default.
         const wanted = upd.orchestrator?.trim();
@@ -176,7 +172,7 @@ export const channelDirectory = (r: ChannelRecords) =>
               })();
         yield* tx(
           Effect.gen(function* () {
-            if (row.type === "channel") yield* db.run(qc.updateChannel({ description: desc, project: proj, id }));
+            if (row.type === "channel") yield* db.run(qc.updateChannel({ description: desc, repo: proj, id }));
             if (name !== row.name) yield* db.run(qc.renameChannel({ name, id }));
             if (category !== row.category) yield* db.run(qc.setCategory({ category, id }));
             if (orchestrator !== row.orchestrator) yield* db.run(qc.setOrchestrator({ orchestrator, id }));
@@ -263,7 +259,7 @@ export const channelDirectory = (r: ChannelRecords) =>
       topOf: Effect.fn("Channel.topOf")((channel) =>
         Effect.sync(() => {
           const top = model.topChannel(channel);
-          return top ? infoOf(top) : { id: model.defaultId(), name: "general", description: "", project: "", default: true };
+          return top ? infoOf(top) : { id: model.defaultId(), name: "general", description: "", repo: "", default: true };
         }),
       ),
       addressOf: Effect.fn("Channel.addressOf")((channel) =>

@@ -1,7 +1,7 @@
 # apps/cli
 
 `vibevalley`, the command line: for the agents on this machine first (Claude Code, Codex, the helpers) and for people
-too. It follows the farm's model as a project tracker's does (`gh issue`): one command is one operation of the server's,
+too. It follows the farm's model as a repo tracker's does (`gh issue`): one command is one operation of the server's,
 `<resource> [<sub-resource>] <verb>`, typed with effect/cli and asking the server through the generated `VibeValleyApi`;
 it loads none of the server and works out nothing the server decides. How it reads and why: [development](docs/development.md#只用命令行派一个活),
 [the core](docs/subsystems/core.md).
@@ -12,7 +12,7 @@ src/farm.ts        what every command stands on: global flags, SSE frames, ask (
 src/issue.ts       issue list|show [--watch]|create|edit|status|comment|review|diff|timeline|delete
 src/channel.ts     channel list, channel message list|send|search
 src/pkm.ts         the notes: pkm capture|search|radar, pkm journal show, pkm page list|show|save|export|edit
-src/project.ts     project list|create, agent list|create|delete, session list|show|stop, runtime list|refresh
+src/repo.ts     repo list|create, agent list|create|delete, session list|show|stop, runtime list|refresh
 src/notes.ts       memory list|search|create|delete, cron list|create|edit|delete, artifact list|show|read
 src/app.ts         the desktop app's own abilities, over its socket in the farm's home (@vibevalley/home)
 src/doctor.ts      this machine's farm: found, reachable, the app, the runtimes, the keys, connecting to this machine

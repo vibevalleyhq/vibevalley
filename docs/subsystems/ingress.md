@@ -36,7 +36,7 @@
 
 ## 和谁打交道
 
-- **信箱、频道与项目（`mailbox`、`channel`、`project`）**：通过 `Project` 调 `gh` 接口，通过 `Channel` 落库主人消息，将 `Trigger` 交给 `Mailbox`。
+- **信箱、频道与仓库（`mailbox`、`channel`、`repo`）**：通过 `Repo` 调 `gh` 接口，通过 `Channel` 落库主人消息，将 `Trigger` 交给 `Mailbox`。
 - **资源（`resource`）**：向 `Resource.read` 提供 `vv://trigger/<id>` 与 `vv://github/...` 线程载荷读取。
 
 ## 为什么这样

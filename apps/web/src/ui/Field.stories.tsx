@@ -21,13 +21,13 @@ export default stories({
           {a.kind === "select" ? (
             <Select label="农机" value="claude" options={runtimes} disabled={a.disabled} onChange={() => undefined} />
           ) : (
-            <TextInput aria-label="项目名" value={a.value} disabled={a.disabled} />
+            <TextInput aria-label="仓库名" value={a.value} disabled={a.disabled} />
           )}
         </div>
       ),
     }),
     Text: story({
-      args: { label: "项目名", hint: "工作目录下的文件夹名", placeholder: "vibevalley", disabled: false },
+      args: { label: "仓库名", hint: "工作目录下的文件夹名", placeholder: "vibevalley", disabled: false },
       render: (a) => (
         <div class="w-80">
           <Field label={a.label} hint={a.hint || undefined}>

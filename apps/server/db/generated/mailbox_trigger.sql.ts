@@ -77,7 +77,7 @@ export const unroutedTriggers = Effect.fn("UnroutedTriggers")(function* (params:
 })
 
 export const KnownGitHubEventsParams = Schema.Struct({
-  ["project"]: Schema.String,
+  ["repo"]: Schema.String,
   ["pr_number"]: Schema.Int,
 })
 export type KnownGitHubEventsParams = typeof KnownGitHubEventsParams.Type
@@ -92,14 +92,14 @@ export const KnownGitHubEventsResult = Schema.Struct({
 export type KnownGitHubEventsResult = typeof KnownGitHubEventsResult.Type
 
 
-export const KnownGitHubEventsSql = "-- name: KnownGitHubEvents :many\n-- bound: accepted event identities for one pull request.\nselect source_key, cast((trigger_json -> 'meta' ->> 'botRoundKey') as text) as bot_round_key,\n       (routed_at is not null) as routed,\n       cast((trigger_json -> 'meta' ->> 'botRound') as integer) as bot_round\nfrom mailbox_trigger where source = 'github' and trigger_json -> 'meta' ->> 'project' = ?1\n  and trigger_json -> 'meta' ->> 'pr' = ?2;"
+export const KnownGitHubEventsSql = "-- name: KnownGitHubEvents :many\n-- bound: accepted event identities for one pull request.\nselect source_key, cast((trigger_json -> 'meta' ->> 'botRoundKey') as text) as bot_round_key,\n       (routed_at is not null) as routed,\n       cast((trigger_json -> 'meta' ->> 'botRound') as integer) as bot_round\nfrom mailbox_trigger where source = 'github' and trigger_json -> 'meta' ->> 'repo' = ?1\n  and trigger_json -> 'meta' ->> 'pr' = ?2;"
 
 export const knownGitHubEvents = Effect.fn("KnownGitHubEvents")(function* (params: KnownGitHubEventsParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
     Request: KnownGitHubEventsParams,
     Result: KnownGitHubEventsResult,
-    execute: (p) => sql.unsafe(KnownGitHubEventsSql, [p["project"], p["pr_number"]]),
+    execute: (p) => sql.unsafe(KnownGitHubEventsSql, [p["repo"], p["pr_number"]]),
   })(params)
 })
 

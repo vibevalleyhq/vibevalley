@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { githubRepository } from "./project";
+import { githubRepository } from "./repo";
 
 test("a GitHub repository's home URL, and nothing else that could reach git", () => {
   expect(githubRepository(" https://github.com/botiverse/raft-source.git/ ")).toEqual({

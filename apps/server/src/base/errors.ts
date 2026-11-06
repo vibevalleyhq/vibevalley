@@ -11,7 +11,7 @@ export const refused = (reason: string, next?: readonly Next[]): ApiError => ({ 
 type LookIn =
   | "issue"
   | "session"
-  | "project"
+  | "repo"
   | "runtime"
   | "agent"
   | "skill"
@@ -40,7 +40,7 @@ const listed = (key: LookIn, run?: readonly string[]): Next => ({
 export const lookIn = {
   issue: listed("issue", ["issue", "list"]),
   session: listed("session", ["session", "list"]),
-  project: listed("project", ["project", "list"]),
+  repo: listed("repo", ["repo", "list"]),
   runtime: listed("runtime", ["runtime", "list"]),
   agent: listed("agent", ["agent", "list"]),
   skill: listed("skill"),

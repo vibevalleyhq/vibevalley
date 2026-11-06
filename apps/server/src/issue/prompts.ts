@@ -43,7 +43,7 @@ export const refinementOpening =
 export function refinementBrief(
   t: Pick<T.Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly T.Question[] },
   word: string,
-  project: string,
+  repo: string,
 ): string {
   word = word.trim();
   const questions = t.questions ?? [];
@@ -58,7 +58,7 @@ export function refinementBrief(
     notDoing: ["不改看板的样子"],
     files: ["app/lib/workbench/issues/board.dart"],
   };
-  const lines = [refinementOpening, "", `项目：${project}（你现在就在它的目录里）`, "主人想做的：" + (word !== "" && !redraft ? word : t.title)];
+  const lines = [refinementOpening, "", `仓库：${repo}（你现在就在它的目录里）`, "主人想做的：" + (word !== "" && !redraft ? word : t.title)];
   if (redraft) {
     lines.push("", "上一版草稿（主人可能改过，以这一版为准）：", "标题：" + t.title);
     if (t.description) lines.push(t.description);

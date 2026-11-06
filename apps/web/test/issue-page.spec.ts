@@ -17,7 +17,7 @@ const json = (body: unknown) => (route: Route) => route.fulfill({ status: 200, c
 
 const minute = 60_000;
 
-const nothingYet: Changes = { project: "farm-site", base: "main", branch: "vibevalley/1", commits: [], files: [], uncommitted: [], conflicts: [], behind: 0 };
+const nothingYet: Changes = { repo: "farm-site", base: "main", branch: "vibevalley/1", commits: [], files: [], uncommitted: [], conflicts: [], behind: 0 };
 
 /** Serves the issue (as the server would have it with `more`) and its helper, and opens its page. */
 async function openIssue(
@@ -49,7 +49,7 @@ async function openIssue(
     ...helper,
   };
   const closed = stage.state === "done" || stage.state === "canceled";
-  const issue: Issue = withIssueSession({ ...made, project: "farm-site", stage, ...more }, sessionId("w1"));
+  const issue: Issue = withIssueSession({ ...made, repo: "farm-site", stage, ...more }, sessionId("w1"));
   const fixture: StateFrame = { ...frame, state: { ...frame.state, sessions: closed ? [] : [session], issues: [issue] } };
   const history: IssueHistory[] = [
     { issue, sessions: [closed ? { ...session, phase: { _tag: "closed", at: now, closed: "merged" } } : session], missingSessions: [] },
@@ -94,8 +94,8 @@ const answer = "用 8797";
 
 test("a real round: the helper asks with options, one click answers, and it hands back with its word on each criterion", async ({ page, api }) => {
   const fox = await api.agent.create(scripted);
-  const project = await api.project.create({ name: "clock" });
-  const made = await api.issue.create({ title: asksWithOptions, project: project.name, agent: fox.id });
+  const repo = await api.repo.create({ name: "clock" });
+  const made = await api.issue.create({ title: asksWithOptions, repo: repo.name, agent: fox.id });
   await api.issue.update({ id: made.id, criteria: ["clock-in works"] });
   await api.issue.status.update({ id: made.id, status: "todo" });
   await page.goto(`/issues/${made.id}`);
@@ -113,7 +113,7 @@ test("a real round: the helper asks with options, one click answers, and it hand
 });
 
 test("a helper waiting on a question: its options answer it, and nothing offers to complete it", async ({ page, server, api }) => {
-  const made = await api.issue.create({ title: "assess the farm-site project" });
+  const made = await api.issue.create({ title: "assess the farm-site repo" });
   const now = Date.now();
   const options = ["all to w3", "split it"];
   const view = await openIssue(

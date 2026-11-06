@@ -51,7 +51,7 @@
           "name": "issue_create",
           "arguments": {
             "title": "首页白屏（阿狐接手）",
-            "project": "demo",
+            "repo": "demo",
             "start": true,
             "agent": "阿狐"
           }

@@ -724,7 +724,7 @@ const childProcessDoor = defineRule({
     messages: {
       spawn: says(
         "a process started here is one more place that must kill its whole group on a timeout and keep what it printed, which the doors already do",
-        "git through `apps/server/src/project/git.ts` (tests: `gitSync`, `gitIn` in `apps/server/src/testing/git.ts`), a helper's command through `runtime/dsh.ts`; a new kind of process gets its own door, added to the list in vite.config.ts",
+        "git through `apps/server/src/repo/git.ts` (tests: `gitSync`, `gitIn` in `apps/server/src/testing/git.ts`), a helper's command through `runtime/dsh.ts`; a new kind of process gets its own door, added to the list in vite.config.ts",
         "docs/subsystems/foundation.md",
       ),
     },

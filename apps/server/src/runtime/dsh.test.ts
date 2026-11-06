@@ -6,7 +6,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { dshRuntime, modelId, optionValue, projectModels } from "./dsh.ts";
+import { dshRuntime, modelId, optionValue, repoModels } from "./dsh.ts";
 
 const answersFile = resolve(import.meta.dirname, "testdata/dsh-acp-0.2.1-rc.2.json");
 const answers = JSON.parse(readFileSync(answersFile, "utf8")) as Record<string, unknown>;
@@ -57,7 +57,7 @@ describe("DeepSeek Harness", () => {
   });
 
   it("reads the models of a new session, grouped by provider", () => {
-    const models = projectModels(answers["session/new"])!;
+    const models = repoModels(answers["session/new"])!;
     expect(models.map((m) => m.id)).toEqual(["deepseek-official/deepseek-flash", "deepseek-official/deepseek-v4-pro"]);
     for (const m of models) expect([m.effortLevels, m.defaultEffort]).toEqual([["low", "high", "max"], "high"]);
     expect([models[0]!.default, models[1]!.displayName, models[0]!.displayName]).toEqual([true, "DeepSeek-V4-Pro", "DeepSeek-V4.1-Flash-1017"]);

@@ -43,16 +43,16 @@ function setup(target: ReturnType<ComposerWays["target"]> = { id: "channel" }) {
 
 test("a line is on its way at once: the box empties, and every routing field goes with it under the line's key", async () => {
   const send = vi.spyOn(api.channel.message, "send").mockResolvedValue(undefined);
-  const s = setup({ id: "thread", agent: "a", project: "p", station: 1 });
+  const s = setup({ id: "thread", agent: "a", repo: "p", station: 1 });
   try {
     s.type(" 同一句 ");
     const sending = s.box.send();
     flush();
     expect(s.box.text()).toBe("");
     const [line] = s.says.all();
-    expect(line).toMatchObject({ status: "pending", input: { id: "thread", agent: "a", project: "p", station: 1, text: "同一句" } });
+    expect(line).toMatchObject({ status: "pending", input: { id: "thread", agent: "a", repo: "p", station: 1, text: "同一句" } });
     await sending;
-    expect(send).toHaveBeenCalledWith({ id: "thread", agent: "a", project: "p", station: 1, text: "同一句", sendKey: line?.key });
+    expect(send).toHaveBeenCalledWith({ id: "thread", agent: "a", repo: "p", station: 1, text: "同一句", sendKey: line?.key });
   } finally {
     s.dispose();
   }

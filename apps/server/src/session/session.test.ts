@@ -15,8 +15,8 @@ import { Agent } from "#/agent/agent.ts";
 import type { LaunchActivity } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { watchStalls } from "#/executor/executor.ts";
-import { Project } from "#/project/project.ts";
-import { MergeFailure } from "#/project/workplace.ts";
+import { Repo } from "#/repo/repo.ts";
+import { MergeFailure } from "#/repo/workplace.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
@@ -117,7 +117,7 @@ describe("sessions", () => {
       expect((yield* sessions.list("lab")).map((s) => s.id)).toEqual([id]);
     }).pipe(
       Effect.scoped,
-      Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
+      Effect.provide(world({ config: { ...testConfig(), repo: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
     );
   });
 
@@ -181,7 +181,7 @@ describe("sessions", () => {
       expect(opens).toBe(2);
     }).pipe(
       Effect.scoped,
-      Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
+      Effect.provide(world({ config: { ...testConfig(), repo: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
     );
   });
 
@@ -273,8 +273,8 @@ describe("sessions", () => {
       expect(both.map((r) => r.triggeredBy.kind)).toEqual(["issue", "comment"]);
       expect(seen.some((a) => a.kind === "handedOff" && a.id === id)).toBe(true);
 
-      const projects = yield* Project;
-      const merged = yield* sessions.handOver(id, "merged", (place) => projects.merge(place));
+      const repos = yield* Repo;
+      const merged = yield* sessions.handOver(id, "merged", (place) => repos.merge(place));
       expect(merged.commits).toBe(2);
       expect(core.session(id)).toBeUndefined();
       const gone = (yield* sessions.get(id))!;
@@ -341,7 +341,7 @@ describe("sessions", () => {
     }).pipe(
       Effect.ensuring(Effect.sync(complete)),
       Effect.scoped,
-      Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
+      Effect.provide(world({ config: { ...testConfig(), repo: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
     );
   });
 
@@ -460,7 +460,7 @@ describe("sessions", () => {
       expect(next.session).toBeUndefined();
     }).pipe(
       Effect.scoped,
-      Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
+      Effect.provide(world({ config: { ...testConfig(), repo: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
     );
   });
 });

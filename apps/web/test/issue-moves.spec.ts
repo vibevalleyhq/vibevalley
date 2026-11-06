@@ -30,11 +30,11 @@ const fox: Agent = {
 const lane = (page: Page, key: string) => page.locator(`[data-testid="lane"][data-key="${key}"]`);
 const card = (page: Page, key: string, id: string) => lane(page, key).locator(`[data-testid="issue-card"][data-key="${id}"]`);
 
-/** A to-do with a helper and a project, so Start may send it out. */
+/** A to-do with a helper and a repo, so Start may send it out. */
 async function startable(api: VibeValleyApi, name: string) {
   const helper = await api.agent.create({ ...fox, name });
-  const project = await api.project.create({ name });
-  return api.issue.create({ title: `the ${name} one`, project: project.name, agent: helper.id });
+  const repo = await api.repo.create({ name });
+  return api.issue.create({ title: `the ${name} one`, repo: repo.name, agent: helper.id });
 }
 
 const statusUpdates = (page: Page) => {

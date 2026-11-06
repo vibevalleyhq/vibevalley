@@ -19,22 +19,22 @@ const sample = (): BoardCard[] => {
       kind: "todo",
       id: "i22",
       lane: "todo",
-      issue: issue(22, "看板拖拽的手感", "todo", "high", { agent: "老周", project: "vibevalley", queuedAt: now - 5 * min }),
+      issue: issue(22, "看板拖拽的手感", "todo", "high", { agent: "老周", repo: "vibevalley", queuedAt: now - 5 * min }),
     },
-    { kind: "missing", id: "i23", lane: "todo", issue: issue(23, "灵动岛的动画", "todo", "low"), missing: ["项目"] },
+    { kind: "missing", id: "i23", lane: "todo", issue: issue(23, "灵动岛的动画", "todo", "low"), missing: ["仓库"] },
     // Dropped on in-progress, the frame not there yet; and one the server refused, to retry or put back (moves.ts).
     {
       kind: "todo",
       id: "i24",
       lane: "working",
-      issue: issue(24, "首页的加载条", "todo", "medium", { agent: "小林", project: "vibevalley" }),
+      issue: issue(24, "首页的加载条", "todo", "medium", { agent: "小林", repo: "vibevalley" }),
       move: { key: "k24", state: "moving" },
     },
     {
       kind: "todo",
       id: "i25",
       lane: "working",
-      issue: issue(25, "换一个更短的标题", "todo", "medium", { agent: "小林", project: "vibevalley" }),
+      issue: issue(25, "换一个更短的标题", "todo", "medium", { agent: "小林", repo: "vibevalley" }),
       move: { key: "k25", state: "failed", reason: "进行中满了：同时最多 3 件" },
     },
     {

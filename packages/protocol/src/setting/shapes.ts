@@ -12,9 +12,9 @@ export interface MemorySourceInfo {
 }
 
 export interface SpacePaths {
-  /** The space's git repositories; each folder is a project. */
+  /** The space's git repositories; each folder is a repo. */
   repos: string;
-  /** The issues' worktrees, named <project>.<issue number>. */
+  /** The issues' worktrees, named <repo>.<issue number>. */
   worktrees: string;
   /** The notes vault. */
   pkm: string;

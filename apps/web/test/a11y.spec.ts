@@ -19,7 +19,7 @@ for (const theme of ["light", "dark"] as const)
       "/agents/templates",
       "/orchestrator",
       "/runtimes",
-      "/projects",
+      "/repos",
       "/catalog",
       ...sections.map((s) => `/settings/${s}`),
     ];

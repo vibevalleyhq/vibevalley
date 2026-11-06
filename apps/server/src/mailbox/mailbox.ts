@@ -402,7 +402,7 @@ export class Mailbox extends Context.Service<
       );
 
       const bindIssue = (issue: T.Issue) =>
-        work.subscribe(issue.id, [`issue:${issue.id}`, ...(issue.project && issue.pullRequest ? [`github:${issue.project}#${issue.pullRequest.number}`] : [])]);
+        work.subscribe(issue.id, [`issue:${issue.id}`, ...(issue.repo && issue.pullRequest ? [`github:${issue.repo}#${issue.pullRequest.number}`] : [])]);
       const onFact = (fact: T.ServerEvent) =>
         Effect.gen(function* () {
           if (fact.type === "issueChanged") {

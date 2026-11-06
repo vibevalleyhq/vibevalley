@@ -10,7 +10,7 @@ import { Agent } from "#/agent/agent.ts";
 import { owner } from "#/base/actor.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { await_, farm, git, lab } from "./farm.ts";
@@ -18,14 +18,14 @@ import { await_, farm, git, lab } from "./farm.ts";
 for (const ending of ["MERGED", "CLOSED"] as const) {
   it.live(`regression: a parent without a session closes after its PR is ${ending.toLowerCase()}`, () => {
     const base = testConfig();
-    const config = { ...base, github: { ...base.github, prProjects: ["family-pr"] } };
+    const config = { ...base, github: { ...base.github, prRepos: ["family-pr"] } };
     const path = join(config.workRoot, "repos", "family-pr");
     const bare = join(config.workRoot, "origin.git");
     let state = "OPEN";
     const f = farm({
       config,
       repos: ["family-pr"],
-      projects: {
+      repoHooks: {
         gh: (...args) =>
           Effect.sync(() => {
             const ok = (out: string) => ({ out, ok: true, missing: false });
@@ -47,12 +47,12 @@ for (const ending of ["MERGED", "CLOSED"] as const) {
     });
     return Effect.gen(function* () {
       const issues = yield* Issue;
-      const projects = yield* Project;
+      const repos = yield* Repo;
       yield* (yield* Agent).save(lab());
       git(config.workRoot, "init", "--bare", bare);
       git(path, "remote", "add", "origin", "https://github.com/test/family-pr.git");
-      yield* projects.refreshGitHub();
-      const parent = yield* issues.add({ title: "parent", project: "family-pr", agent: "lab" }, explicitMandate());
+      yield* repos.refreshGitHub();
+      const parent = yield* issues.add({ title: "parent", repo: "family-pr", agent: "lab" }, explicitMandate());
       yield* issues.split(parent.id, "", [{ id: "clock", brief: "写打卡并提交" }], owner);
       yield* await_(
         () => issues.get(parent.id),
@@ -62,7 +62,7 @@ for (const ending of ["MERGED", "CLOSED"] as const) {
       const submitted = yield* issues.setStatus(parent.id, "done", "", "", owner);
       expect(latestSessionIdOf(submitted)).toBeUndefined();
       expect(submitted.pullRequest?.state).toBe("open");
-      const place = yield* projects.workplace("family-pr", parent.number, true, "");
+      const place = yield* repos.workplace("family-pr", parent.number, true, "");
       expect(existsSync(place.cwd)).toBe(true);
       state = ending;
       yield* issues.refreshPullRequests;

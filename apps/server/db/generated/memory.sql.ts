@@ -16,7 +16,7 @@ export const MemoriesOfResult = Schema.Struct({
   ["id"]: Schema.String,
   ["kind"]: Sqlite_memory_kind,
   ["body"]: Schema.String,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["session"]: Schema.NullOr(Schema.String),
   ["author"]: Sqlite_memory_author,
   ["created_at"]: Schema.Number,
@@ -26,7 +26,7 @@ export const MemoriesOfResult = Schema.Struct({
 export type MemoriesOfResult = typeof MemoriesOfResult.Type
 
 
-export const MemoriesOfSql = "-- name: MemoriesOf :many\n-- bound: one agent's current memories; superseded ones are left out.\n-- An agent's own, the superseded ones left out.\nselect id, kind, body, project, session, author, created_at, recalled, recalled_at\nfrom memory where agent = ?1 and replaced_by is null order by created_at desc, id desc;"
+export const MemoriesOfSql = "-- name: MemoriesOf :many\n-- bound: one agent's current memories; superseded ones are left out.\n-- An agent's own, the superseded ones left out.\nselect id, kind, body, repo, session, author, created_at, recalled, recalled_at\nfrom memory where agent = ?1 and replaced_by is null order by created_at desc, id desc;"
 
 export const memoriesOf = Effect.fn("MemoriesOf")(function* (params: MemoriesOfParams) {
   const sql = yield* SqlClient.SqlClient
@@ -43,7 +43,7 @@ export const AddNoteParams = Schema.Struct({
   ["body"]: Schema.String,
   ["terms"]: Schema.String,
   ["terms_of"]: Schema.Int,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["session"]: Schema.NullOr(Schema.String),
   ["author"]: Sqlite_memory_author,
   ["created_at"]: Schema.Number,
@@ -51,13 +51,13 @@ export const AddNoteParams = Schema.Struct({
 export type AddNoteParams = typeof AddNoteParams.Type
 
 
-export const AddNoteSql = "-- name: AddNote :exec\ninsert into memory (id, scope, agent, kind, body, terms, terms_of, project, session, author, created_at, updated_at)\nvalues (?1, 'agent', ?2, 'note', ?3, ?4, ?5, ?6,\n        ?7, ?8, ?9, ?9);"
+export const AddNoteSql = "-- name: AddNote :exec\ninsert into memory (id, scope, agent, kind, body, terms, terms_of, repo, session, author, created_at, updated_at)\nvalues (?1, 'agent', ?2, 'note', ?3, ?4, ?5, ?6,\n        ?7, ?8, ?9, ?9);"
 
 export const addNote = Effect.fn("AddNote")(function* (params: AddNoteParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: AddNoteParams,
-    execute: (p) => sql.unsafe(AddNoteSql, [p["id"], p["agent"], p["body"], p["terms"], p["terms_of"], p["project"], p["session"], p["author"], p["created_at"]]),
+    execute: (p) => sql.unsafe(AddNoteSql, [p["id"], p["agent"], p["body"], p["terms"], p["terms_of"], p["repo"], p["session"], p["author"], p["created_at"]]),
   })(params)
 })
 
@@ -84,20 +84,20 @@ export const KeepIssueMemoryParams = Schema.Struct({
   ["body"]: Schema.String,
   ["terms"]: Schema.String,
   ["terms_of"]: Schema.Int,
-  ["project"]: Schema.NullOr(Schema.String),
+  ["repo"]: Schema.NullOr(Schema.String),
   ["session"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
 })
 export type KeepIssueMemoryParams = typeof KeepIssueMemoryParams.Type
 
 
-export const KeepIssueMemorySql = "-- name: KeepIssueMemory :exec\n-- One issue memory for each session: written again as the session goes on.\ninsert into memory (id, scope, agent, kind, body, terms, terms_of, project, session, author, created_at, updated_at)\nvalues (?1, 'agent', ?2, 'issue', ?3, ?4, ?5, ?6,\n        ?7, 'system', ?8, ?8)\non conflict (agent, session) where kind = 'issue'\ndo update set body = excluded.body, terms = excluded.terms, terms_of = excluded.terms_of, project = excluded.project,\n              created_at = excluded.created_at, updated_at = excluded.updated_at;"
+export const KeepIssueMemorySql = "-- name: KeepIssueMemory :exec\n-- One issue memory for each session: written again as the session goes on.\ninsert into memory (id, scope, agent, kind, body, terms, terms_of, repo, session, author, created_at, updated_at)\nvalues (?1, 'agent', ?2, 'issue', ?3, ?4, ?5, ?6,\n        ?7, 'system', ?8, ?8)\non conflict (agent, session) where kind = 'issue'\ndo update set body = excluded.body, terms = excluded.terms, terms_of = excluded.terms_of, repo = excluded.repo,\n              created_at = excluded.created_at, updated_at = excluded.updated_at;"
 
 export const keepIssueMemory = Effect.fn("KeepIssueMemory")(function* (params: KeepIssueMemoryParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: KeepIssueMemoryParams,
-    execute: (p) => sql.unsafe(KeepIssueMemorySql, [p["id"], p["agent"], p["body"], p["terms"], p["terms_of"], p["project"], p["session"], p["created_at"]]),
+    execute: (p) => sql.unsafe(KeepIssueMemorySql, [p["id"], p["agent"], p["body"], p["terms"], p["terms_of"], p["repo"], p["session"], p["created_at"]]),
   })(params)
 })
 

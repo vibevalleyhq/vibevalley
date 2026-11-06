@@ -8,7 +8,7 @@ import { Channel } from "#/channel/channel.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
-import type { ProjectError } from "#/project/workplace.ts";
+import type { RepoError } from "#/repo/workplace.ts";
 import { Session } from "#/session/session.ts";
 
 import { resourceWords } from "./prompts.ts";
@@ -33,7 +33,7 @@ const refuse = (message: string) => Effect.fail(new ResourceError({ message }));
 export class Resource extends Context.Service<
   Resource,
   {
-    readonly read: (session: string, input: ReadResource) => Effect.Effect<ResourcePage, ResourceError | ApiError | ProjectError>;
+    readonly read: (session: string, input: ReadResource) => Effect.Effect<ResourcePage, ResourceError | ApiError | RepoError>;
   }
 >()("vibevalley/Resource") {
   static readonly layer = Layer.effect(
@@ -48,7 +48,7 @@ type ResourceRef =
   | { readonly kind: "issue"; readonly id: string }
   | { readonly kind: "channel"; readonly id: string }
   | { readonly kind: "session"; readonly id: string }
-  | { readonly kind: "github"; readonly project: string; readonly pull: number; readonly resource: "checks" | "thread"; readonly id?: string };
+  | { readonly kind: "github"; readonly repo: string; readonly pull: number; readonly resource: "checks" | "thread"; readonly id?: string };
 
 const defaultLimit = 4000;
 const maxLimit = 16_000;
@@ -136,8 +136,8 @@ function resourceRef(uri: string): ResourceRef | undefined {
       if (!first || path.length < 4 || second !== "pulls") return undefined;
       const pull = Number(third);
       if (!Number.isSafeInteger(pull) || pull <= 0) return undefined;
-      if (fourth === "checks" && path.length === 4) return { kind: "github", project: first, pull, resource: "checks" };
-      if (fourth === "thread" && path.length === 5 && fifth) return { kind: "github", project: first, pull, resource: "thread", id: fifth };
+      if (fourth === "checks" && path.length === 4) return { kind: "github", repo: first, pull, resource: "checks" };
+      if (fourth === "thread" && path.length === 5 && fifth) return { kind: "github", repo: first, pull, resource: "thread", id: fifth };
       return undefined;
     }
     default:
@@ -234,10 +234,10 @@ const make = Effect.gen(function* () {
         return textOf({ events });
       }
       case "github": {
-        const issue = (yield* issues.list()).find((item) => item.project === ref.project && item.pullRequest?.number === ref.pull);
+        const issue = (yield* issues.list()).find((item) => item.repo === ref.repo && item.pullRequest?.number === ref.pull);
         if (!issue) return yield* refuse(resourceWords.missing(uri));
         if (!orchestrator && (session === undefined || !(yield* mayReadIssue(session, issue)))) return yield* refuse(resourceWords.forbidden(uri));
-        const snapshot = yield* ingress.githubSnapshot(ref.project, ref.pull);
+        const snapshot = yield* ingress.githubSnapshot(ref.repo, ref.pull);
         if (ref.resource === "checks") return textOf({ head: snapshot.head, checks: snapshot.checks });
         const review = snapshot.reviews.find((item) => item.id === ref.id);
         const comment = snapshot.comments.find((item) => item.id === ref.id || item.databaseId === ref.id || item.threadId === ref.id);

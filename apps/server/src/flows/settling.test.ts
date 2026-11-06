@@ -28,7 +28,7 @@ for (const mode of ["settle", "handoff", "stop", "failed", "late"] as const) {
       let task: ReturnType<ScriptedTurn["task"]> | undefined;
       let child: ReturnType<ScriptedTurn["task"]> | undefined;
       const f = farm({
-        change: (config) => ({ ...config, project: { ...config.project, maxSessions: 1 } }),
+        change: (config) => ({ ...config, repo: { ...config.repo, maxSessions: 1 } }),
         runtime: scriptedRuntime({
           id: "pi",
           turn: async (turn) => {
@@ -46,7 +46,7 @@ for (const mode of ["settle", "handoff", "stop", "failed", "late"] as const) {
         const events: LaunchActivity[] = [];
         yield* Effect.forkScoped(Stream.runForEach(yield* sessions.launches, (event) => Effect.sync(() => events.push(event))));
         yield* (yield* Agent).save(lab());
-        const issue = yield* issues.add({ title: "work", project: "background", agent: "lab" });
+        const issue = yield* issues.add({ title: "work", repo: "background", agent: "lab" });
         const sent = yield* issues.start(issue.id, "");
         const id = sent.session!;
         yield* until(() => task !== undefined && sessions.runOf(id) !== undefined, "a background task and open run");

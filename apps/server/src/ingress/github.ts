@@ -11,8 +11,8 @@ import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Issue } from "#/issue/issue.ts";
 import { knownGitHubEvents } from "#/mailbox/payload.ts";
-import { Project } from "#/project/project.ts";
-import { ProjectError } from "#/project/workplace.ts";
+import { Repo } from "#/repo/repo.ts";
+import { RepoError } from "#/repo/workplace.ts";
 import * as q from "#db/ingress_github.sql.ts";
 
 import type { SourceEvent } from "./ingress.ts";
@@ -115,12 +115,12 @@ const authorOf = (author: typeof Actor.Type) => ({
   bot: author?.__typename === "Bot" || author?.login.endsWith("[bot]") === true,
 });
 
-export const githubSnapshot = (projects: Project["Service"]) =>
-  Effect.fn("Ingress.githubSnapshot")(function* (name: string, n: number): Effect.fn.Return<GitHubPullIngress, ProjectError> {
-    const repo = yield* projects.githubRemote(name);
-    const unread = () => new ProjectError({ message: t("server.project.github.stateUnread", { n }) });
+export const githubSnapshot = (repos: Repo["Service"]) =>
+  Effect.fn("Ingress.githubSnapshot")(function* (name: string, n: number): Effect.fn.Return<GitHubPullIngress, RepoError> {
+    const repo = yield* repos.githubRemote(name);
+    const unread = () => new RepoError({ message: t("server.repo.github.stateUnread", { n }) });
     const read = Effect.fn("Ingress.githubRead")(function* <A, I>(schema: Schema.Codec<A, I>, args: readonly string[]) {
-      const response = yield* projects.githubRequest(...args);
+      const response = yield* repos.githubRequest(...args);
       if (!response.ok) return yield* unread();
       return yield* Schema.decodeEffect(Schema.fromJsonString(schema))(response.out).pipe(Effect.mapError(unread));
     });
@@ -243,31 +243,31 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
   Effect.gen(function* () {
     const db = yield* Db;
     const issues = yield* Issue;
-    const projects = yield* Project;
-    const snapshot = githubSnapshot(projects);
+    const repos = yield* Repo;
+    const snapshot = githubSnapshot(repos);
     const polling = yield* Semaphore.make(1);
 
     /** A failed Actions job's last lines, fetched with gh so the helper need not open the browser. */
-    const jobLog = Effect.fnUntraced(function* (project: string, url: string) {
+    const jobLog = Effect.fnUntraced(function* (repo: string, url: string) {
       const job = actionsJobOf(url);
       if (!job) return "";
-      const remote = yield* projects.githubRemote(project).pipe(Effect.orElseSucceed(() => ""));
+      const remote = yield* repos.githubRemote(repo).pipe(Effect.orElseSucceed(() => ""));
       if (!remote) return "";
-      const log = yield* projects.githubRequest("run", "view", "--job", job, "--log-failed", "--repo", remote);
+      const log = yield* repos.githubRequest("run", "view", "--job", job, "--log-failed", "--repo", remote);
       if (!log.ok) return "";
       return log.out.trim().split("\n").slice(-40).join("\n").slice(-4000);
     });
 
     const poll = Effect.fn("Ingress.pollPullRequest")(function* (issue: T.Issue) {
       const pr = issue.pullRequest;
-      const project = issue.project;
-      if (!project || pr?.state !== "open") return;
-      const current = yield* snapshot(project, pr.number);
-      yield* db.run(q.ensureGitHubCursor({ project, pr_number: pr.number }));
-      const cursor = yield* db.run(q.gitHubCursor({ project, pr_number: pr.number }));
+      const repo = issue.repo;
+      if (!repo || pr?.state !== "open") return;
+      const current = yield* snapshot(repo, pr.number);
+      yield* db.run(q.ensureGitHubCursor({ repo, pr_number: pr.number }));
+      const cursor = yield* db.run(q.gitHubCursor({ repo, pr_number: pr.number }));
       const at = yield* Clock.currentTimeMillis;
-      const scope = { project, pr: pr.number };
-      const base = { source: "github" as const, addressed: "thread_owner" as const, threads: [`issue:${issue.id}`, `github:${project}#${pr.number}`], at };
+      const scope = { repo, pr: pr.number };
+      const base = { source: "github" as const, addressed: "thread_owner" as const, threads: [`issue:${issue.id}`, `github:${repo}#${pr.number}`], at };
       const checks = current.checks.toSorted((a, b) => or(compareText(a.name, b.name), compareText(a.url, b.url)));
       const fingerprint = createHash("sha256")
         .update(JSON.stringify({ head: current.head, checks }))
@@ -277,22 +277,22 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
         const failed = checks.filter((check) => failedChecks.has((check.conclusion || check.status).toUpperCase()));
         const failedText = yield* Effect.forEach(
           failed,
-          (check) => Effect.map(jobLog(project, check.url), (log) => `${check.name}: ${check.conclusion || check.status}${log ? "\n" + log : ""}`),
+          (check) => Effect.map(jobLog(repo, check.url), (log) => `${check.name}: ${check.conclusion || check.status}${log ? "\n" + log : ""}`),
           { concurrency: 3 },
         );
         const finished = checks.length > 0 && checks.every((check) => check.conclusion !== "" || finishedChecks.has(check.status.toUpperCase()));
         if (failed.length > 0 || finished)
           yield* accept({
             ...base,
-            key: `${project}#${pr.number}:ci:${revision}`,
-            actor: { kind: "ci", id: `github:${project}#${pr.number}` },
+            key: `${repo}#${pr.number}:ci:${revision}`,
+            actor: { kind: "ci", id: `github:${repo}#${pr.number}` },
             text: (failed.length > 0 ? failedText : checks.map((check) => `${check.name}: ${check.conclusion || check.status}`)).join("\n"),
             data: { head: current.head, checks },
             meta: { ...scope, kind: "ci", head: current.head, fingerprint, failed: failed.length > 0 },
           });
-        yield* db.run(q.observeGitHubChecks({ project, pr_number: pr.number, check_fingerprint: fingerprint, check_revision: revision }));
+        yield* db.run(q.observeGitHubChecks({ repo, pr_number: pr.number, check_fingerprint: fingerprint, check_revision: revision }));
       }
-      const known = yield* knownGitHubEvents(db, project, pr.number);
+      const known = yield* knownGitHubEvents(db, repo, pr.number);
       const keys = new Set(known.filter((event) => event.routed).map((event) => event.source_key));
       const rounds = new Map(
         known.flatMap((event) => (event.bot_round_key !== null && event.bot_round !== null ? [[event.bot_round_key, event.bot_round] as const] : [])),
@@ -301,7 +301,7 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
       for (const round of rounds.values()) botRound = Math.max(botRound, round);
       const events = [
         ...current.reviews.map((review) => ({
-          key: `${project}#${pr.number}:review:${review.id}`,
+          key: `${repo}#${pr.number}:review:${review.id}`,
           author: review.author,
           bot: review.bot,
           round: `${review.author}:review:${review.id}`,
@@ -311,7 +311,7 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
           kind: "review" as const,
         })),
         ...current.comments.map((comment) => ({
-          key: `${project}#${pr.number}:comment:${comment.id}`,
+          key: `${repo}#${pr.number}:comment:${comment.id}`,
           author: comment.author,
           bot: comment.bot,
           round: comment.reviewId ? `${comment.author}:review:${comment.reviewId}` : `${comment.author}:comment:${comment.id}`,

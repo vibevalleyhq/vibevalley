@@ -9,22 +9,22 @@ import { ServerConfig } from "#/infra/config.ts";
 import { gitInEnv, gitSync, reposDir, repo, write } from "#/testing/git.ts";
 import { testConfig, untilGot as until } from "#/testing/layers.ts";
 
-import { Project, activityOf, countsOf, type GitHubRun, type ProjectHooks, projectProblem, tokeiArgs } from "./project.ts";
+import { Repo, activityOf, countsOf, type GitHubRun, type RepoHooks, repoProblem, tokeiArgs } from "./repo.ts";
 import { type MergeFailure } from "./workplace.ts";
 
 /** gh is not installed. */
 export const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 
-const projects = <A, E>(root: string, body: Effect.Effect<A, E, Project>, change: Partial<ServerConfig["Service"]> = {}, hooks: ProjectHooks = {}) =>
+const repos = <A, E>(root: string, body: Effect.Effect<A, E, Repo>, change: Partial<ServerConfig["Service"]> = {}, hooks: RepoHooks = {}) =>
   body.pipe(
     Effect.provide(
-      Project.layer({ gh: noGitHub, ...hooks }).pipe(
+      Repo.layer({ gh: noGitHub, ...hooks }).pipe(
         Layer.provide(Layer.merge(Layer.succeed(ServerConfig, testConfig({ workRoot: dirname(root), ...change })), NodeServices.layer)),
       ),
     ),
   );
 
-describe("projects", () => {
+describe("repos", () => {
   it("names and addresses", () => {
     for (const github of [
       "file:///tmp/repo",
@@ -34,20 +34,20 @@ describe("projects", () => {
       "--upload-pack=bad",
       "https://github.com/x/..",
     ])
-      expect(projectProblem({ name: "ok", github })).not.toBe("");
-    for (const name of ["../bad", "/tmp/bad", ".hidden", "-option", "a/b"]) expect(projectProblem({ name })).not.toBe("");
-    expect(projectProblem({ name: "ok-name_1.2" })).toBe("");
-    expect(projectProblem({ name: "x", github: "https://gitlab.com/a/b" })).toMatch(/GitHub/u);
+      expect(repoProblem({ name: "ok", github })).not.toBe("");
+    for (const name of ["../bad", "/tmp/bad", ".hidden", "-option", "a/b"]) expect(repoProblem({ name })).not.toBe("");
+    expect(repoProblem({ name: "ok-name_1.2" })).toBe("");
+    expect(repoProblem({ name: "x", github: "https://gitlab.com/a/b" })).toMatch(/GitHub/u);
   });
 
-  it.effect("a new project has a first commit; an existing folder is refused and left alone; one of two at once", () => {
+  it.effect("a new repo has a first commit; an existing folder is refused and left alone; one of two at once", () => {
     const root = reposDir();
     mkdirSync(join(root, "existing"));
     writeFileSync(join(root, "existing", "keep"), "mine");
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const made = yield* p.create({ name: "garden" });
         expect(made.git).toBe(true);
         expect(gitSync(made.path, "rev-parse", "HEAD")).not.toBe("");
@@ -78,10 +78,10 @@ describe("projects", () => {
       if (was === undefined) delete process.env.GIT_CONFIG_GLOBAL;
       else process.env.GIT_CONFIG_GLOBAL = was;
     };
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const cloned = yield* p.create({ name: "visit", github: "https://github.com/test/source" });
         expect(gitSync(cloned.path, "log", "-1", "--format=%s")).toBe("seed");
         expect(gitSync(cloned.path, "config", "--get", "remote.origin.url")).toBe("https://github.com/test/source.git");
@@ -94,10 +94,10 @@ describe("projects", () => {
 
   it.effect("a parent issue's branch: a child merges into it, it merges into main", () => {
     const root = reposDir();
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         yield* p.openBranch("task", "vibevalley/task-1");
         const place = yield* p.workplace("task", 1, true, "vibevalley/task-1");
         writeFileSync(join(place.cwd, "a.txt"), "a\n");
@@ -125,10 +125,10 @@ describe("projects", () => {
     writeFileSync(join(path, "gone.txt"), "x\n");
     gitSync(path, "add", ".");
     gitSync(path, "commit", "-qm", "base");
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const place = yield* p.workplace("described", 1, true, "");
         writeFileSync(join(place.cwd, "keep.txt"), "a\nB\nc\n");
         writeFileSync(join(place.cwd, "b.bin"), Buffer.from([0, 1, 2]));
@@ -152,12 +152,12 @@ describe("projects", () => {
     );
   });
 
-  it.effect("a new worktree runs the project's .vibevalley/setup once, and one that fails still opens", () => {
+  it.effect("a new worktree runs the repo's .vibevalley/setup once, and one that fails still opens", () => {
     const root = reposDir();
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const made = yield* p.create({ name: "setup" });
         mkdirSync(join(made.path, ".vibevalley"));
         write(join(made.path, ".vibevalley/setup"), "#!/bin/sh\necho once >> ready.txt\n", 0o755);
@@ -178,10 +178,10 @@ describe("projects", () => {
 
   it.effect("a branch opens where another stands", () => {
     const root = reposDir();
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const place = yield* p.workplace("task", 1, true, "");
         writeFileSync(join(place.cwd, "a.txt"), "before the split\n");
         gitSync(place.cwd, "add", "a.txt");
@@ -194,10 +194,10 @@ describe("projects", () => {
 
   it.effect("the files changed since the base, a rename under both names", () => {
     const root = reposDir();
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         yield* p.openBranch("task", "vibevalley/task-1");
         const work = (id: string, ...files: string[]) =>
           Effect.tap(p.workplace("task", Number(id.slice(1)), true, "vibevalley/task-1"), (place) =>
@@ -308,12 +308,12 @@ describe("projects", () => {
     return root;
   };
 
-  it.effect("projects with their newest commit", () => {
+  it.effect("repos with their newest commit", () => {
     const root = workRoot();
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const byName = Object.fromEntries((yield* (yield* Project).summaries()).map((p) => [p.name, p]));
+        const byName = Object.fromEntries((yield* (yield* Repo).summaries()).map((p) => [p.name, p]));
         expect(byName.app!.git).toBe(true);
         expect(byName.app!.last).toBeGreaterThan(0);
         expect(byName.notes).toEqual({
@@ -321,13 +321,13 @@ describe("projects", () => {
           path: join(realpathSync(root), "notes"),
           git: false,
           maxSessions: 3,
-          pullRequest: { available: false, reason: "尚未检测项目，请刷新 GitHub 状态" },
+          pullRequest: { available: false, reason: "尚未检测仓库，请刷新 GitHub 状态" },
         });
       }),
     );
   });
 
-  it.effect("the project limit is within maxRunning", () =>
+  it.effect("the repo limit is within maxRunning", () =>
     Effect.gen(function* () {
       for (const [limit, want] of [
         [3, 3],
@@ -336,10 +336,10 @@ describe("projects", () => {
         [9, 6],
       ] as const)
         expect(
-          yield* projects(
+          yield* repos(
             reposDir(),
-            Effect.map(Project, (p) => p.maxSessions()),
-            { project: { maxSessions: limit, checkTimeoutSeconds: 1200 } },
+            Effect.map(Repo, (p) => p.maxSessions()),
+            { repo: { maxSessions: limit, checkTimeoutSeconds: 1200 } },
           ),
         ).toBe(want);
     }),
@@ -347,10 +347,10 @@ describe("projects", () => {
 
   it.effect("a year of commits; merges do not count; only folders the work directory has", () => {
     const root = workRoot();
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const activity = (yield* p.activity("app"))!;
         expect(activity.total).toBe(2);
         expect(activity.days.map((d) => d.day)).toEqual(["2026-10-01", "2026-10-02"]);
@@ -367,10 +367,10 @@ describe("projects", () => {
   });
 
   it.effect("without tokei, it says how to get it", () =>
-    projects(
+    repos(
       workRoot(),
       Effect.gen(function* () {
-        expect((yield* Effect.flip((yield* Project).languages("app"))).message).toMatch(/tokei/u);
+        expect((yield* Effect.flip((yield* Repo).languages("app"))).message).toMatch(/tokei/u);
       }),
       { tokei: "/nowhere/tokei" },
     ),
@@ -378,10 +378,10 @@ describe("projects", () => {
 
   it.effect("a merge refuses uncommitted work, and caches stay out of what is committed", () => {
     const root = reposDir();
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const place = yield* p.workplace("left", 1, true, "");
         mkdirSync(join(place.cwd, "__pycache__"));
         writeFileSync(join(place.cwd, "__pycache__", "greet.cpython-312.pyc"), "cache");
@@ -402,10 +402,10 @@ describe("projects", () => {
     Effect.gen(function* () {
       for (const intoTask of [false, true]) {
         const root = reposDir();
-        yield* projects(
+        yield* repos(
           root,
           Effect.gen(function* () {
-            const p = yield* Project;
+            const p = yield* Repo;
             const target = intoTask ? "task" : "main";
             if (intoTask) yield* p.openBranch("demo", target);
             const place = yield* p.workplace("demo", 1, true, intoTask ? target : "");
@@ -424,15 +424,15 @@ describe("projects", () => {
     }),
   );
 
-  it.effect("a merge runs the project's check: absent, passing, failing with its output", () =>
+  it.effect("a merge runs the repo's check: absent, passing, failing with its output", () =>
     Effect.gen(function* () {
       for (const into of [false, true]) {
         for (const check of ["absent", "pass", "fail"]) {
           const root = reposDir();
-          yield* projects(
+          yield* repos(
             root,
             Effect.gen(function* () {
-              const p = yield* Project;
+              const p = yield* Repo;
               const target = into ? "vibevalley/task-1" : "main";
               if (into) yield* p.openBranch("checked", target);
               const place = yield* p.workplace("checked", 1, true, into ? target : "");
@@ -470,10 +470,10 @@ describe("projects", () => {
     "a check that runs too long is stopped with its children, and its last lines said",
     () => {
       const root = reposDir();
-      return projects(
+      return repos(
         root,
         Effect.gen(function* () {
-          const p = yield* Project;
+          const p = yield* Repo;
           const place = yield* p.workplace("timeout", 1, true, "");
           mkdirSync(join(place.cwd, ".vibevalley"));
           write(
@@ -491,7 +491,7 @@ describe("projects", () => {
           expect(Date.now() - started).toBeLessThan(10_000);
           expect(existsSync(place.cwd)).toBe(true);
         }),
-        { project: { maxSessions: 3, checkTimeoutSeconds: 2 } },
+        { repo: { maxSessions: 3, checkTimeoutSeconds: 2 } },
       );
     },
     20_000,
@@ -499,10 +499,10 @@ describe("projects", () => {
 
   it.effect("a check that cannot run refuses", () => {
     const root = reposDir();
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const place = yield* p.workplace("permissions", 1, true, "");
         mkdirSync(join(place.cwd, ".vibevalley"));
         write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\nexit 0\n", 0o644);
@@ -517,10 +517,10 @@ describe("projects", () => {
 
   it.effect("a failed git inspection does not claim an issue's branch was released", () => {
     const root = reposDir();
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         yield* p.openBranch("demo", "vibevalley/issue-9");
         const path = join(root, "demo");
         renameSync(join(path, ".git"), join(path, ".git-held"));
@@ -535,10 +535,10 @@ describe("projects", () => {
 
   it.effect("an issue's worktree: reset to main, cleared with an empty branch, a branch with commits kept", () => {
     const root = reposDir();
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const path = join(root, "demo");
         const place = yield* p.workplace("demo", 7, true, "");
         const main = gitSync(path, "rev-parse", "main");
@@ -552,7 +552,7 @@ describe("projects", () => {
           "",
           place.branch,
         ]);
-        yield* Effect.flip(p.reset({ project: "demo", cwd: path }));
+        yield* Effect.flip(p.reset({ repo: "demo", cwd: path }));
         writeFileSync(join(place.cwd, "scratch.txt"), "y");
         expect(yield* p.clear("demo", 7, "preserve")).toMatchObject({ kept: true });
         expect(existsSync(join(place.cwd, "scratch.txt"))).toBe(true);
@@ -576,10 +576,10 @@ describe("projects", () => {
     Effect.gen(function* () {
       for (const mode of ["existing", "cancelled", "merged", "dirty", "base"]) {
         const root = reposDir();
-        yield* projects(
+        yield* repos(
           root,
           Effect.gen(function* () {
-            const p = yield* Project;
+            const p = yield* Repo;
             const path = join(root, "demo");
             let base = "";
             let baseHead = "";
@@ -617,16 +617,16 @@ describe("projects", () => {
   );
 
   it.live(
-    "the check runs outside the project's turn; a branch changed meanwhile is refused",
+    "the check runs outside the repo's turn; a branch changed meanwhile is refused",
     () =>
       Effect.gen(function* () {
         for (const into of [false, true]) {
           for (const changed of [false, true]) {
             const root = reposDir();
-            yield* projects(
+            yield* repos(
               root,
               Effect.gen(function* () {
-                const p = yield* Project;
+                const p = yield* Repo;
                 const target = into ? "vibevalley/task-42" : "main";
                 if (into) yield* p.openBranch("demo", target);
                 const place = yield* p.workplace("demo", 1, true, into ? target : "");
@@ -660,10 +660,10 @@ describe("projects", () => {
 
   it.effect("a local merge checks the tree with main's changes in it", () => {
     const root = reposDir();
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const place = yield* p.workplace("combined", 1, true, "");
         const path = join(root, "combined");
         writeFileSync(join(path, "main-only"), "main");
@@ -678,15 +678,15 @@ describe("projects", () => {
     );
   });
 
-  it.effect("a project symlinked outside the work root is refused", () => {
+  it.effect("a repo symlinked outside the work root is refused", () => {
     const root = reposDir();
     const outside = reposDir();
     repo(join(outside, "elsewhere"), 1, 0);
     symlinkSync(join(outside, "elsewhere"), join(root, "linked"));
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        expect((yield* Effect.flip((yield* Project).workplace("linked", 1, true, ""))).message).toMatch(/工作目录里面/u);
+        expect((yield* Effect.flip((yield* Repo).workplace("linked", 1, true, ""))).message).toMatch(/工作目录里面/u);
       }),
     );
   });

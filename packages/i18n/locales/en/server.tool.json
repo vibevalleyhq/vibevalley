@@ -1,6 +1,6 @@
 {
   "labels": {
-    "project_list": "Projects",
+    "repo_list": "Repos",
     "channel_list": "Channels",
     "channel_create": "Open a channel",
     "channel_update": "Change a channel",

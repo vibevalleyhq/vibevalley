@@ -1,5 +1,5 @@
 import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes";
-import type { Commit, UncommittedItem } from "../project/shapes";
+import type { Commit, UncommittedItem } from "../repo/shapes";
 import type { IssueAnswer, PhaseResting, Run, Session } from "../session/shapes";
 
 export interface Conflict {
@@ -8,7 +8,7 @@ export interface Conflict {
 }
 
 export interface Changes {
-  project: string;
+  repo: string;
   base: string;
   branch?: string;
   commits: Commit[];
@@ -63,7 +63,7 @@ export interface IssueMandate {
 
 export interface IssueReportMemory {
   text: string;
-  scope: "project" | "all";
+  scope: "repo" | "all";
 }
 
 export interface IssueReport {
@@ -90,7 +90,7 @@ export interface Issue {
   mandate: IssueMandate;
   constraints?: IssueConstraints;
   conflict?: Conflict;
-  project?: string;
+  repo?: string;
   assignments: Assignment[];
   priority: Priority;
   rank?: number;
@@ -220,7 +220,7 @@ export type Priority = (typeof PriorityValues)[number];
 export interface IssueUpdate {
   title?: string;
   description?: string;
-  project?: string;
+  repo?: string;
   agent?: string;
   priority?: Priority;
   criteria?: string[];
@@ -243,7 +243,7 @@ export interface IssueRequest {
   blockedBy?: IssueId[];
   constraints?: IssueConstraints;
   description?: string;
-  project?: string;
+  repo?: string;
   agent?: string;
   priority?: Priority;
   deliver?: Deliverable;
@@ -258,7 +258,7 @@ export interface IssueRequest {
 export const DeliverableValues = ["change", "branch", "answer"] as const;
 export type Deliverable = (typeof DeliverableValues)[number];
 
-/** What a completed issue delivered: its branch merged into the project's main branch, into its parent issue's branch, by a pull request, its branch kept unmerged, or nothing (no change, or an answer). */
+/** What a completed issue delivered: its branch merged into the repo's main branch, into its parent issue's branch, by a pull request, its branch kept unmerged, or nothing (no change, or an answer). */
 export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "kept", "none"] as const;
 export type Delivery = (typeof DeliveryValues)[number];
 
@@ -284,7 +284,7 @@ export interface IssueFilter {
   status?: IssueStatus;
   /** Words that the title or description all contain. */
   text?: string;
-  project?: string;
+  repo?: string;
   /** At most this many; none is all. */
   limit?: number;
   closed?: boolean;

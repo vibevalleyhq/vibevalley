@@ -254,8 +254,8 @@
         },
         {
           "id": "survey",
-          "title": "Get to know the project",
-          "done": "Say what the project does, how to run it and its tests ({test}), how the folders are laid out and where it is messiest; do not change code"
+          "title": "Get to know the repo",
+          "done": "Say what the repo does, how to run it and its tests ({test}), how the folders are laid out and where it is messiest; do not change code"
         },
         {
           "id": "deps-audit",

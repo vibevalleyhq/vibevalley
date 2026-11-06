@@ -7,7 +7,7 @@ import { Clock, Effect, Fiber, Layer, PubSub, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { vi } from "vite-plus/test";
 
-import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
+import type { SpaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { emptyProgress } from "#/game/progress.ts";
@@ -15,7 +15,7 @@ import { ServerConfig } from "#/infra/config.ts";
 import { layer as projection } from "#/projection/frame.ts";
 import { testConfig, whenState } from "#/testing/layers.ts";
 
-import { bounded, Core, emptyWorkspaceState, stateEveryMs } from "./core.ts";
+import { bounded, Core, emptySpaceState, stateEveryMs } from "./core.ts";
 
 const helper: Session = {
   id: sessionId("w1"),
@@ -74,8 +74,8 @@ describe("core", () => {
 
   it.effect("regression: the core ignores legacy state.json and starts from its empty projection", () => {
     const config = testConfig();
-    const was: WorkspaceState = {
-      ...emptyWorkspaceState(),
+    const was: SpaceState = {
+      ...emptySpaceState(),
       call: "live",
       callReason: "挂了",
       sessions: [helper],
@@ -100,7 +100,7 @@ describe("core", () => {
     return Effect.gen(function* () {
       yield* Effect.scoped(
         Effect.gen(function* () {
-          expect((yield* Core).state()).toEqual(emptyWorkspaceState());
+          expect((yield* Core).state()).toEqual(emptySpaceState());
         }).pipe(
           Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))),
         ),

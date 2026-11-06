@@ -16,8 +16,8 @@ import { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Memory } from "#/memory/memory.ts";
-import { Project } from "#/project/project.ts";
-import { type Merged, type MergeFailure, type ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/project/workplace.ts";
+import { Repo } from "#/repo/repo.ts";
+import { type Merged, type MergeFailure, type RepoError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/repo/workplace.ts";
 
 import { sessionName, type Settle, whoMakesRoom, withRecall } from "./briefing.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
@@ -49,7 +49,7 @@ export interface Hired {
 
 export interface HireOptions {
   readonly inputs?: readonly T.Trigger[];
-  /** The branch its own branch starts from; empty: the project's main branch. */
+  /** The branch its own branch starts from; empty: the repo's main branch. */
   readonly base?: string;
   readonly worktree?: boolean;
   readonly channel?: string;
@@ -75,10 +75,10 @@ interface SendOptions extends Omit<HireOptions, "issue"> {
 export class Session extends Context.Service<
   Session,
   {
-    readonly noRoom: (runtime: string, project: string) => string;
-    /** Room for one more on runtime in project: refused when either is at its limit; a full farm sends home whoever has
+    readonly noRoom: (runtime: string, repo: string) => string;
+    /** Room for one more on runtime in repo: refused when either is at its limit; a full farm sends home whoever has
      * been idle longest, and says who. */
-    readonly makeRoom: (runtime: string, project: string) => Effect.Effect<{ readonly refused: string } | { readonly evicted?: string }>;
+    readonly makeRoom: (runtime: string, repo: string) => Effect.Effect<{ readonly refused: string } | { readonly evicted?: string }>;
     readonly send: (agent: T.Agent, brief: string, where: string, opt: SendOptions) => Effect.Effect<Hired>;
     readonly deliver: (id: string, text: string, input: DeliveryInput) => Effect.Effect<Delivered>;
     readonly stop: (id: string) => Effect.Effect<boolean>;
@@ -92,7 +92,7 @@ export class Session extends Context.Service<
     /** A read-only round's leftovers go: its worktree back to the main branch, what it changed or committed gone. the session stays. */
     readonly discardWork: (id: string) => Effect.Effect<void, ApiError>;
     /** Removes an issue's unused workplace; an active or unclosed startup still owns it. */
-    readonly clearWorkplace: (issue: string, project: string, number: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease, ApiError>;
+    readonly clearWorkplace: (issue: string, repo: string, number: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease, ApiError>;
     /** A session on the farm now, as the core state has it: what another module reads a session by. */
     readonly sessionOf: (id: string) => T.Session | undefined;
     readonly presentSessions: () => readonly T.Session[];
@@ -114,7 +114,7 @@ export class Session extends Context.Service<
     readonly handOver: (
       id: string,
       closed: T.SessionClose,
-      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | ProjectError>,
+      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | RepoError>,
       settle?: Settle,
     ) => Effect.Effect<Merged, ApiError | NotTakenIn>;
     /** Every session of the agent, or of every agent when it is empty: on the farm and ended, newest first. */
@@ -151,7 +151,7 @@ export class Session extends Context.Service<
 }
 
 /** A session's own fact as news; the rest are not the sessions'. */
-export function newsOf(fact: T.Fact, after: T.WorkspaceState): SessionNews | undefined {
+export function newsOf(fact: T.Fact, after: T.SpaceState): SessionNews | undefined {
   switch (fact.type) {
     case "sessionChanged": {
       const session = after.sessions.find((h) => h.id === fact.session.id);
@@ -210,7 +210,7 @@ const make = Effect.gen(function* () {
   const core = yield* Core;
   const fs = yield* FileSystem.FileSystem;
   const memories = yield* Memory;
-  const projects = yield* Project;
+  const repos = yield* Repo;
   const executor = yield* Executor;
   const db = yield* Db;
   yield* Effect.forkScoped(
@@ -320,7 +320,7 @@ const make = Effect.gen(function* () {
           yield* Effect.forEach(
             restoredReport.remember,
             (memory) =>
-              memories.write({ agent: session.agent, text: memory.text, project: memory.scope === "all" ? "" : place.project, by: sessionActor(session.id) }),
+              memories.write({ agent: session.agent, text: memory.text, repo: memory.scope === "all" ? "" : place.repo, by: sessionActor(session.id) }),
             { discard: true },
           ).pipe(bestEffort(`vibevalley: ${session.id}'s restored memories were not kept`));
         yield* db.inTx(
@@ -337,8 +337,8 @@ const make = Effect.gen(function* () {
   });
   const shape = Session.of({
     noRoom: roomFor,
-    makeRoom: Effect.fn("Session.makeRoom")(function* (runtime, project): Effect.fn.Return<{ readonly refused: string } | { readonly evicted?: string }> {
-      const full = roomFor(runtime, project);
+    makeRoom: Effect.fn("Session.makeRoom")(function* (runtime, repo): Effect.fn.Return<{ readonly refused: string } | { readonly evicted?: string }> {
+      const full = roomFor(runtime, repo);
       if (full) return { refused: full };
       const oldest = whoMakesRoom(
         core.state().sessions.filter((s) => executor.find(s.id) !== undefined),
@@ -355,7 +355,7 @@ const make = Effect.gen(function* () {
       );
       const issue = opt.context.kind === "issue" ? opt.context.issue : undefined;
       const channel = opt.context.kind === "channel" ? opt.context.channel : opt.channel;
-      const project = issue ? where : "";
+      const repo = issue ? where : "";
       const unclosed = executor
         .all()
         .find((a) => (issue ? a.owner.issue === issue.id : !a.owner.issue && a.owner.agent === agent.id && a.owner.channel === channel));
@@ -364,20 +364,20 @@ const make = Effect.gen(function* () {
           refused: unclosed.failure ?? t(issue ? "server.session.life.issueNotReturned" : "server.session.life.notReturned"),
           retainedWork: true as const,
         };
-      const full = roomFor(agent.runtime, project);
+      const full = roomFor(agent.runtime, repo);
       if (full) return { refused: full };
       hired++;
       const id = sessionId(`w${hired}`);
       let placeError = "";
       const openedPlace = yield* Effect.option(
         (issue
-          ? projects.workplace(project, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "")
+          ? repos.workplace(repo, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "")
           : contextPlace(config.workRoot, id).pipe(Effect.provideService(FileSystem.FileSystem, fs))
         ).pipe(Effect.tapError((e) => Effect.sync(() => (placeError = t("server.session.life.noPlace", { name: agent.name, why: e.message }))))),
       );
       if (Option.isNone(openedPlace)) return { refused: placeError };
       const place = openedPlace.value;
-      const releasePlace = issue ? projects.release(place) : releaseContextPlace(place).pipe(Effect.provideService(FileSystem.FileSystem, fs));
+      const releasePlace = issue ? repos.release(place) : releaseContextPlace(place).pipe(Effect.provideService(FileSystem.FileSystem, fs));
       let committed = false;
       let released = false;
       let registeredRow = false;
@@ -409,7 +409,7 @@ const make = Effect.gen(function* () {
         report: undefined,
       };
       const starting = Effect.gen(function* () {
-        const recall = yield* remind(agent.id, id, place.project, brief, recalled);
+        const recall = yield* remind(agent.id, id, place.repo, brief, recalled);
         const hiredAt = yield* Clock.currentTimeMillis;
         const session: T.Session = {
           id,
@@ -418,7 +418,7 @@ const make = Effect.gen(function* () {
           agent: agent.id,
           runtime: agent.runtime,
           brief,
-          ...(place.project ? { project: place.project } : {}),
+          ...(place.repo ? { repo: place.repo } : {}),
           hiredAt,
           runs: 0,
           phase: { _tag: "working", since: hiredAt, doing: { action: "none", label: "" } },
@@ -559,9 +559,9 @@ const make = Effect.gen(function* () {
           if (work === "discard" && !current?.issue) return yield* Effect.fail(refused(t("server.session.life.noIssue")));
           yield* closeExecution(h);
           if (work === "discard" && h.place.branch)
-            yield* projects.reset(h.place).pipe(Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name, why: e.message }))));
+            yield* repos.reset(h.place).pipe(Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name, why: e.message }))));
           yield* leave(h, closed, 0);
-          const kept = current?.issue ? yield* projects.release(h.place) : { kept: false as const };
+          const kept = current?.issue ? yield* repos.release(h.place) : { kept: false as const };
           if (kept.kept) yield* core.notice("info", t("server.session.life.left", { name, why: kept.reason }));
           return true;
         }),
@@ -575,15 +575,15 @@ const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const s = core.session(id);
           if (hands.get(id) !== h || !s || isBusy(s)) return;
-          yield* projects.reset(h.place).pipe(Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name: s.name, why: e.message }))));
+          yield* repos.reset(h.place).pipe(Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name: s.name, why: e.message }))));
         }),
       );
     }),
-    clearWorkplace: Effect.fn("Session.clearWorkplace")(function* (issue, project, number, work) {
+    clearWorkplace: Effect.fn("Session.clearWorkplace")(function* (issue, repo, number, work) {
       const unclosed = executor.all().find((a) => a.owner.issue === issue);
       if (unclosed) return yield* Effect.fail(refused(unclosed.failure ?? t("server.session.life.issueNotReturned")));
       if (core.state().sessions.some((s) => s.issue === issue)) return yield* Effect.fail(refused(t("server.session.life.stillHasHelper")));
-      return yield* projects.clear(project, number, work);
+      return yield* repos.clear(repo, number, work);
     }, admission.withPermits(1)),
     handOver,
     withIdleWorkplace: Effect.fn("Session.withIdleWorkplace")(function* <A, E>(id: string, use: (place: Workplace) => Effect.Effect<A, E>) {

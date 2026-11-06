@@ -81,7 +81,7 @@ const make = Effect.gen(function* () {
       text: row.body,
       channel: row.channel_id,
       ...(row.agent ? { agent: row.agent } : {}),
-      ...(row.project ? { project: row.project } : {}),
+      ...(row.repo ? { repo: row.repo } : {}),
       when,
       tz: row.tz,
       enabled: row.enabled,
@@ -201,8 +201,8 @@ const make = Effect.gen(function* () {
       const agents = store.agents();
       const agent = named ? (agents.find((a) => a.id === named) ?? agents.find((a) => a.name === named)) : undefined;
       if (named && !agent) return yield* Effect.fail(refused(t("server.cron.noProfile", { name: req.agent ?? "" }), [lookIn.agent]));
-      const project = (req.project ?? "").trim();
-      if (agent && !project && !channel.project) return yield* Effect.fail(refused(t("server.cron.noProject", { channel: channel.name })));
+      const repo = (req.repo ?? "").trim();
+      if (agent && !repo && !channel.repo) return yield* Effect.fail(refused(t("server.cron.noRepo", { channel: channel.name })));
       const tz = req.tz ?? localZone();
       const pending = needsOK(req, by);
       const s: T.Cron = {
@@ -211,7 +211,7 @@ const make = Effect.gen(function* () {
         text: req.text.trim(),
         channel: channel.id,
         ...(agent ? { agent: agent.id } : {}),
-        ...(project ? { project } : {}),
+        ...(repo ? { repo } : {}),
         when: req.when,
         tz,
         // Counted from now, by the same clock that ticks.
@@ -227,7 +227,7 @@ const make = Effect.gen(function* () {
           body: s.text,
           channel_id: s.channel,
           agent: s.agent ?? null,
-          project: s.project ?? null,
+          repo: s.repo ?? null,
           spec: JSON.stringify(s.when),
           tz,
           set_by: by.kind,

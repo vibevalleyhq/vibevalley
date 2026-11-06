@@ -12,12 +12,12 @@ where issue = sqlc.arg(issue) and ended_at is null and (sqlc.narg(agent)::text i
 returning *;
 
 -- name: LastAssigneeIn :one
--- Who actually worked in a project, even after the issue was assigned to another profile.
+-- Who actually worked in a repo, even after the issue was assigned to another profile.
 select issue_assignment.agent from issue_assignment
 join issue on issue.id = issue_assignment.issue
 join issue_assignment_execution on issue_assignment_execution.assignment = issue_assignment.id
 join session on session.id = issue_assignment_execution.executor
-where issue.project = sqlc.arg(project) and session.role = 'worker'
+where issue.repo = sqlc.arg(repo) and session.role = 'worker'
 order by issue_assignment_execution.started_at desc, issue_assignment_execution.executor desc limit 1;
 
 -- name: AllAssignments :many

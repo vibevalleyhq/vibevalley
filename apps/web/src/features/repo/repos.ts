@@ -1,10 +1,10 @@
 import { t } from "@vibevalley/i18n";
-import { type LanguageCount, type ProjectSummary } from "@vibevalley/protocol";
+import { type LanguageCount, type RepoSummary } from "@vibevalley/protocol";
 
 import { compareText, or } from "#/base/search.ts";
 
 /** Newest commit first, then by name. */
-export const sortProjects = (list: readonly ProjectSummary[]) => [...list].toSorted((a, b) => or((b.last ?? 0) - (a.last ?? 0), compareText(a.name, b.name)));
+export const sortRepos = (list: readonly RepoSummary[]) => [...list].toSorted((a, b) => or((b.last ?? 0) - (a.last ?? 0), compareText(a.name, b.name)));
 
 /** As toLocaleString('zh-CN') writes it: 「12,345」. */
 export const number = (n: number) => (n < 0 ? "-" : "") + String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
@@ -17,7 +17,7 @@ interface LangDef {
   readonly names: readonly string[];
 }
 
-const otherLang: LangDef = { label: t("web.project.otherLang"), color: "#a08c70", names: [] };
+const otherLang: LangDef = { label: t("web.repo.otherLang"), color: "#a08c70", names: [] };
 
 const langs: Record<string, LangDef> = {
   typescript: { label: "TypeScript", color: "#3178c6", names: ["typescript", "tsx", "ts"] },

@@ -11,14 +11,14 @@ import { Icon } from "#/ui/Icon.tsx";
 import { IconButton } from "#/ui/IconButton.tsx";
 
 import { EmptyNote, OlderLink } from "./Board";
-import { type BoardCard, cardAgent, cardLook, cardProject, closedShown, laneLabel, laneStatus } from "./cards";
+import { type BoardCard, cardAgent, cardLook, cardRepo, closedShown, laneLabel, laneStatus } from "./cards";
 import { type Grouping, groupRows, laneOrder, type Ordering, orderRows, type RowGroup, rowKeys } from "./display";
 import { useIssues, useNameOf } from "./history";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 import type { NewIssueAt } from "./NewIssue";
 
-/** The quick add, with the group's project or helper when grouped by one. */
-/** where: the group's project or helper the new issue starts in. */
+/** The quick add, with the group's repo or helper when grouped by one. */
+/** where: the group's repo or helper the new issue starts in. */
 export type ListAdd = (where: NewIssueAt) => void;
 
 /** The issues as rows, grouped as the owner picked: Linear's list. A row opens the issue as a card does. */
@@ -38,9 +38,9 @@ export function IssueList(props: {
   const orchestrators = useOrchestrators();
   const isOrchestrator = (id: string) => orchestrators().some((a) => a.id === id);
 
-  // Only where a new todo belongs: the todo group, a project's, a helper's (not the orchestrator's), or the one group.
+  // Only where a new todo belongs: the todo group, a repo's, a helper's (not the orchestrator's), or the one group.
   const canAdd = (g: RowGroup<BoardCard>) => (props.grouping === "status" ? g.lane === "todo" : props.grouping === "agent" ? !isOrchestrator(g.key) : true);
-  const add = (g: RowGroup<BoardCard>) => props.onAdd(props.grouping === "project" ? { project: g.key } : props.grouping === "agent" ? { agent: g.key } : {});
+  const add = (g: RowGroup<BoardCard>) => props.onAdd(props.grouping === "repo" ? { repo: g.key } : props.grouping === "agent" ? { agent: g.key } : {});
   const fold = (key: string) =>
     setFolded((f) => {
       const n = new Set(f);
@@ -67,8 +67,8 @@ export function IssueList(props: {
               const l = groupLane();
               return props.grouping === "status" && l
                 ? laneLabel[l]
-                : props.grouping === "project"
-                  ? g().key || t("web.issue.list.noProject")
+                : props.grouping === "repo"
+                  ? g().key || t("web.issue.list.noRepo")
                   : props.grouping === "agent"
                     ? g().key
                       ? nameOf()(g().key)
@@ -81,7 +81,7 @@ export function IssueList(props: {
               switch (props.grouping) {
                 case "status":
                   return l ? <StatusMark status={laneStatus[l]} /> : undefined;
-                case "project":
+                case "repo":
                   return <Icon name="folder" size={14} />;
                 case "agent":
                   return !key ? (
@@ -122,7 +122,7 @@ export function IssueList(props: {
                         <Row
                           card={c()}
                           selected={c().id === props.selected}
-                          showProject={props.grouping !== "project"}
+                          showRepo={props.grouping !== "repo"}
                           groupStatus={props.grouping === "status" && l ? laneStatus[l] : undefined}
                           onOpen={props.onOpen}
                           nameOf={nameOf()}
@@ -146,7 +146,7 @@ export function IssueList(props: {
 function Row(props: {
   card: BoardCard;
   selected: boolean;
-  showProject: boolean;
+  showRepo: boolean;
   /** The status the group stands for, when grouped by it: a row says its own only when it differs. */
   groupStatus?: IssueStatus | undefined;
   onOpen: (id: string) => void;
@@ -155,7 +155,7 @@ function Row(props: {
   const issues = useIssues();
   const now = () => Date.now();
   const look = () => cardLook(props.card, props.nameOf, issues(), now());
-  const project = () => cardProject(props.card);
+  const repo = () => cardRepo(props.card);
   return (
     <div
       role="button"
@@ -192,8 +192,8 @@ function Row(props: {
           </span>
         )}
       </For>
-      <Show when={props.showProject}>
-        <span class="hidden w-[120px] shrink-0 truncate text-xs text-muted @min-[640px]:block">{project()}</span>
+      <Show when={props.showRepo}>
+        <span class="hidden w-[120px] shrink-0 truncate text-xs text-muted @min-[640px]:block">{repo()}</span>
       </Show>
       <span class="flex w-[18px] shrink-0 justify-center">
         <Show when={cardAgent(props.card) || props.card.kind === "orchestrator"}>

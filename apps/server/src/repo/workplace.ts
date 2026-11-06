@@ -1,12 +1,12 @@
 import { Option, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import type { ProjectStack, PullRequest } from "@vibevalley/protocol";
+import type { RepoStack, PullRequest } from "@vibevalley/protocol";
 
 export interface Workplace {
-  readonly project: string;
+  readonly repo: string;
   readonly cwd: string;
-  /** Empty when it works in the project folder itself. */
+  /** Empty when it works in the repo folder itself. */
   readonly branch?: string;
 }
 
@@ -14,7 +14,7 @@ export interface Workplace {
 export type WorkplaceRelease = { readonly kept: false } | { readonly kept: true; readonly reason: string };
 export type WorkplaceCleanup = "discard" | "preserve";
 
-export interface ProjectFolder {
+export interface RepoFolder {
   readonly name: string;
   readonly path: string;
   readonly git: boolean;
@@ -44,7 +44,7 @@ export class MergeFailure extends Schema.TaggedError<MergeFailure, { readonly br
       reasonText: "",
       base,
       files,
-      message: t("server.project.conflict", { base }),
+      message: t("server.repo.conflict", { base }),
     });
   }
   static failedCheck(why: string) {
@@ -55,7 +55,7 @@ export class MergeFailure extends Schema.TaggedError<MergeFailure, { readonly br
   }
 }
 
-export class ProjectError extends Schema.TaggedError<ProjectError, { readonly brand: unique symbol }>()("ProjectError", {
+export class RepoError extends Schema.TaggedError<RepoError, { readonly brand: unique symbol }>()("RepoError", {
   message: Schema.String,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
@@ -71,12 +71,12 @@ export function pullRequestText(text: string): { readonly title: string; readonl
   return title === "" ? undefined : { title, body: rest.join("\n").trim() };
 }
 
-// What a project is built with, from the markers at its root, first one wins.
+// What a repo is built with, from the markers at its root, first one wins.
 
-const emptyStack: ProjectStack = { name: "", label: "" };
+const emptyStack: RepoStack = { name: "", label: "" };
 
-/** Commands the project has none of are left out, as the Go leaves out an empty one. */
-const withCommands = ({ test, lint, build, ...s }: ProjectStack): ProjectStack => ({
+/** Commands the repo has none of are left out, as the Go leaves out an empty one. */
+const withCommands = ({ test, lint, build, ...s }: RepoStack): RepoStack => ({
   ...s,
   ...(test ? { test } : {}),
   ...(lint ? { lint } : {}),
@@ -88,7 +88,7 @@ export const stackFiles = [
   "Cargo.toml",
   "pubspec.yaml",
   "package.json",
-  "pyproject.toml",
+  "pyrepo.toml",
   "requirements.txt",
   "setup.py",
   "bun.lock",
@@ -98,10 +98,10 @@ export const stackFiles = [
 ] as const;
 
 /** files: the ones of stackFiles that are there, by name, with what they say. */
-export function stackOf(files: ReadonlyMap<string, string>): ProjectStack {
+export function stackOf(files: ReadonlyMap<string, string>): RepoStack {
   const read = (name: (typeof stackFiles)[number]) => files.get(name);
   const has = (name: (typeof stackFiles)[number]) => files.has(name);
-  const stack = (s: Partial<ProjectStack>) => withCommands({ ...emptyStack, ...s });
+  const stack = (s: Partial<RepoStack>) => withCommands({ ...emptyStack, ...s });
   if (has("go.mod"))
     return stack({
       name: "go",
@@ -125,13 +125,13 @@ export function stackOf(files: ReadonlyMap<string, string>): ProjectStack {
       : stack({ name: "dart", label: "Dart", test: "dart test", lint: "dart analyze" });
   const pkg = read("package.json");
   if (pkg !== undefined) return nodeStack(pkg, has);
-  const pyproject = read("pyproject.toml");
-  if (pyproject !== undefined || has("requirements.txt") || has("setup.py"))
+  const pyrepo = read("pyrepo.toml");
+  if (pyrepo !== undefined || has("requirements.txt") || has("setup.py"))
     return stack({
       name: "python",
       label: "Python",
       test: "pytest",
-      lint: pyproject?.includes("ruff") === true ? "ruff check ." : "",
+      lint: pyrepo?.includes("ruff") === true ? "ruff check ." : "",
     });
   return emptyStack;
 }
@@ -142,7 +142,7 @@ const scriptsOf = Schema.decodeUnknownOption(
 );
 
 /** The package orchestrator is the lockfile's; a command is there only when package.json has that script, always as `<pm> run <script>`. */
-function nodeStack(pkg: string, has: (name: (typeof stackFiles)[number]) => boolean): ProjectStack {
+function nodeStack(pkg: string, has: (name: (typeof stackFiles)[number]) => boolean): RepoStack {
   const pm = has("bun.lock") || has("bun.lockb") ? "bun" : has("pnpm-lock.yaml") ? "pnpm" : has("yarn.lock") ? "yarn" : "npm";
   const scripts: Readonly<Record<string, string>> = Option.match(scriptsOf(pkg), { onNone: () => ({}), onSome: (p) => p.scripts ?? {} });
   const runScript = (s: string) => (scripts[s]?.trim() ? `${pm} run ${s}` : "");

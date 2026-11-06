@@ -32,7 +32,7 @@ describe("resource_read", () => {
     Effect.gen(function* () {
       const channels = yield* Channel;
       const tools = yield* Tool;
-      const caller = () => ({ agent: defaultOrchestrator, session: "", project: "", here: channels.defaultChannel(), picked: "", envelope: "", actor: owner });
+      const caller = () => ({ agent: defaultOrchestrator, session: "", repo: "", here: channels.defaultChannel(), picked: "", envelope: "", actor: owner });
       const read = tools.orchestrator(caller).find((item) => item.name === "resource_read");
       if (read === undefined) throw new Error("resource_read is missing");
       const original = "甲".repeat(500);
@@ -63,13 +63,13 @@ describe("resource_read", () => {
       const message = (yield* channels.say("owner only", secret.id, "")).message;
       const agent = sampleAgent({ id: "lab" });
       yield* agents.save(agent);
-      const issue = yield* issues.add({ title: "work", project: "demo", agent: agent.id });
+      const issue = yield* issues.add({ title: "work", repo: "demo", agent: agent.id });
       const hired = (yield* issues.hire(agent, "work", "demo", { issue: issue.id })).session;
       if (hired === undefined) throw new Error("worker was not hired");
       const caller = () => ({
         agent: agent.id,
         session: hired.id,
-        project: "demo",
+        repo: "demo",
         here: channels.defaultChannel(),
         picked: "",
         envelope: "",

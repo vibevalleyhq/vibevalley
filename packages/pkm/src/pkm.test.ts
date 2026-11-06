@@ -52,16 +52,16 @@ const samplePage = [
 
 describe("@vibevalley/pkm domain engine", () => {
   it("parses and prints Logseq-flavoured Markdown round-trip and extracts edges and spans", () => {
-    const read = parse(samplePage, "01_Projects/Cetus-Core-Engine.md", 0);
+    const read = parse(samplePage, "01_Repos/Cetus-Core-Engine.md", 0);
     expect(read.title).toBe("Cetus Core Engine");
-    expect(read.tier).toBe("project");
+    expect(read.tier).toBe("repo");
     expect(print(read)).toBe(samplePage);
     const edges = edgesOf(read);
     expect(edges.filter((e) => e.kind === "wikilink").map((e) => e.page)).toEqual(["engineering"]);
     expect(edges.filter((e) => e.kind === "tag").map((e) => e.page)).toEqual(["outliner"]);
     expect(spansOf("with ==words==^[say it better]")).toEqual([{ text: "words", remark: "say it better" }]);
-    expect(fileOf("project", "Cetus Core/Engine")).toBe("01_Projects/Cetus-Core__Engine.md");
-    expect(titleOfFile("01_Projects/Cetus-Core__Engine.md")).toBe("Cetus-Core/Engine");
+    expect(fileOf("repo", "Cetus Core/Engine")).toBe("01_Repos/Cetus-Core__Engine.md");
+    expect(titleOfFile("01_Repos/Cetus-Core__Engine.md")).toBe("Cetus-Core/Engine");
     expect(tierOfFile("04_Archives/a.md")).toBe("archive");
   });
 
@@ -84,7 +84,7 @@ describe("@vibevalley/pkm domain engine", () => {
   it("resolves vault graph queries, transclusions, backlinks, search, radar, and Markdown export", () => {
     const ref = "aaaaaaaa-0000-4000-a000-000000000001";
     const files: Record<string, string> = {
-      "01_Projects/Cetus.md": `alias:: Whale\ndeadline:: 2026-11-15\n\n- TODO ship the parser [[Engine]]\n  deadline:: 2026-11-01\n- the core idea\n  id:: ${ref}\n`,
+      "01_Repos/Cetus.md": `alias:: Whale\ndeadline:: 2026-11-15\n\n- TODO ship the parser [[Engine]]\n  deadline:: 2026-11-01\n- the core idea\n  id:: ${ref}\n`,
       "journals/2026_11_03.md": `- met about [[Engine]] and ((${ref}))\n  - its notes\n`,
       "03_Resources/Engine.md": `- what an engine is\n`,
     };
@@ -105,7 +105,7 @@ describe("@vibevalley/pkm domain engine", () => {
       ]);
       expect(exportMarkdown(vault, journal, (t) => `> ${t}`)).toBe("# 2026_11_03\n\n### met about Engine and the core idea\n\n- its notes\n");
     }
-    expect(backlinks(vault, "engine").projects.map((l) => l.body)).toEqual(["ship the parser [[Engine]]"]);
+    expect(backlinks(vault, "engine").repos.map((l) => l.body)).toEqual(["ship the parser [[Engine]]"]);
     expect(search(vault, { text: "engine" })[0]?.page).toBe("cetus");
     expect(radar(vault, nowMs, 14).overdue.map((o) => o.body)).toEqual(["ship the parser [[Engine]]"]);
     expect(plainOf(vault, `see [[Engine|the engine]] and ((${ref}))`)).toBe("see the engine and the core idea");

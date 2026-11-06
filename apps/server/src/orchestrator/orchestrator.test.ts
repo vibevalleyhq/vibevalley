@@ -71,7 +71,7 @@ const respond = (c: Request): Answer => {
     return answer([
       toolCall(
         "issue_create",
-        want.includes("CHANGELOG") ? { title: want, project: "notes", agent: "lab", start: true } : { title: want, project: "demo", start: true },
+        want.includes("CHANGELOG") ? { title: want, repo: "notes", agent: "lab", start: true } : { title: want, repo: "demo", start: true },
       ),
     ]);
   if (lastLine(c).includes("定时任务")) return answer("到点了，看了一眼");
@@ -122,7 +122,7 @@ describe("the orchestrator", () => {
     const f = farm((request) =>
       answeredWith(request) !== undefined
         ? answer("stopped")
-        : answer([toolCall("issue_create", { title: "oversized note", description: "word ".repeat(31), project: "demo" })]),
+        : answer([toolCall("issue_create", { title: "oversized note", description: "word ".repeat(31), repo: "demo" })]),
     );
     return Effect.gen(function* () {
       yield* (yield* Ingress).say("record the work", {}, undefined, "");
@@ -166,9 +166,9 @@ describe("the orchestrator", () => {
       expect(ask!.type).toBe("user/message");
       expect(ask!.text).toMatch(/^\[来源：主人\][\s\S]*加个 README/u);
       expect(tool).toMatchObject({ tool: "issue_create", text: "记一张工单：demo" });
-      expect(tool!.input).toContain(`"project":"demo"`);
+      expect(tool!.input).toContain(`"repo":"demo"`);
       expect(answer!.text).toBe("好，记下了");
-      expect(sessions.presentSessions().map((session) => session.project)).toEqual(["demo"]);
+      expect(sessions.presentSessions().map((session) => session.repo)).toEqual(["demo"]);
       const worker = sessions.presentSessions()[0]!;
       expect((yield* (yield* Resource).read(worker.id, { uri: `vv://trigger/${origin.id}` })).text).toContain(origin.text);
       yield* until(() => sessions.presentSessions()[0]?.lastRun, "its report");
@@ -185,16 +185,16 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("is shown the owner's note projects, and the notes the owner's words call up", () => {
+  it.live("is shown the owner's note repos, and the notes the owner's words call up", () => {
     const f = farm();
     return Effect.gen(function* () {
       const ingress = yield* Ingress;
       const pkm = yield* Pkm;
-      yield* pkm.save({ title: "Beehives", tier: "project", markdown: "- TODO check the queens every week\n" });
+      yield* pkm.save({ title: "Beehives", tier: "repo", markdown: "- TODO check the queens every week\n" });
       yield* ingress.say("蜂箱的 queens 怎么样了", {}, undefined, "");
       yield* until(() => f.requests.length > 0, "the orchestrator asked");
       const input = lastInput(f.requests.at(-1)!);
-      expect(input).toMatch(/主人笔记里在做的项目[\s\S]*- 《Beehives》（1 件没做完）/u);
+      expect(input).toMatch(/主人笔记里在做的仓库[\s\S]*- 《Beehives》（1 件没做完）/u);
       expect(input).toMatch(/【笔记里可能相关的】[\s\S]*《Beehives》TODO check the queens every week/u);
       expect(f.requests.filter((r) => lastInput(r).includes("【笔记里可能相关的】")).length).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -462,17 +462,17 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // A seed sown from the farm's form carries its profile and project: the orchestrator is told both, beside the words.
+  // A seed sown from the farm's form carries its profile and repo: the orchestrator is told both, beside the words.
   it.live("is told the sowing form's pick", () => {
     const f = farm();
     return Effect.gen(function* () {
       const ingress = yield* Ingress;
       const lab = yield* enableLab;
       const words = yield* said;
-      yield* ingress.say("修一个 bug：登录闪退", { agent: lab.id, project: " notes " }, undefined, "");
+      yield* ingress.say("修一个 bug：登录闪退", { agent: lab.id, repo: " notes " }, undefined, "");
       yield* until(() => words().length >= 1, "its words");
       expect(lastLine(f.requests[0]!)).toMatch(
-        new RegExp(`（主人在对话框里选定了帮工：${lab.name}）\n（主人选定了项目：notes，派活就派在这个项目里）\n主人说：修一个 bug：登录闪退$`, "u"),
+        new RegExp(`（主人在对话框里选定了帮工：${lab.name}）\n（主人选定了仓库：notes，派活就派在这个仓库里）\n主人说：修一个 bug：登录闪退$`, "u"),
       );
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -544,7 +544,7 @@ describe("the orchestrator", () => {
       const result = answeredWith(c);
       if (result !== undefined) return answer("工单：" + result);
       const line = lastLine(c);
-      if (line.includes("记一下")) return answer([toolCall("issue_create", { title: "首页偶尔白屏", project: "demo", agent: "lab" })]);
+      if (line.includes("记一下")) return answer([toolCall("issue_create", { title: "首页偶尔白屏", repo: "demo", agent: "lab" })]);
       if (line.includes("开工")) return answer([toolCall("issue_status_update", { id: "#" + number, status: "待办" })]);
       if (line.includes("在等我")) return answer([toolCall("issue_list", { wantsOwner: true })]);
       return respond(c);

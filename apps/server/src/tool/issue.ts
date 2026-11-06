@@ -141,7 +141,7 @@ export const issueTools = Effect.gen(function* () {
             h.id,
             h.name,
             h.runtime,
-            h.project ?? "?",
+            h.repo ?? "?",
             phaseText(h, clock.currentTimeMillisUnsafe()),
             head(h.brief.replace(spaces, " "), 60),
           ),
@@ -306,8 +306,8 @@ export const issueTools = Effect.gen(function* () {
           } else channel = yield* chat.topOf(c.here);
           const parent = p.parent ? yield* issue.get(yield* issue.idOf(p.parent)) : undefined;
           const blockedBy = yield* Effect.forEach(p.blockedBy ?? [], (ref) => Effect.map(issue.idOf(ref), S.issueId));
-          const project = (p.project ?? parent?.project ?? "").trim() || channel.project;
-          if (p.start === true && !project) return answers.issueCreate.noDefaultProject(channel.name);
+          const repo = (p.repo ?? parent?.repo ?? "").trim() || channel.repo;
+          if (p.start === true && !repo) return answers.issueCreate.noDefaultRepo(channel.name);
           const priority = p.priority ? priorityOf(p.priority) : undefined;
           if (p.priority && !priority) return noSuchPriority(p.priority);
           const deliver = p.deliver ? DeliverableValues.find((d) => d === p.deliver) : undefined;
@@ -326,7 +326,7 @@ export const issueTools = Effect.gen(function* () {
                 ...(parent ? { parent: parent.id } : {}),
                 ...(blockedBy.length > 0 ? { blockedBy } : {}),
                 ...(p.description ? { description: p.description } : {}),
-                ...(project ? { project } : {}),
+                ...(repo ? { repo } : {}),
                 ...(agent ? { agent } : {}),
                 ...(priority ? { priority } : {}),
                 ...(deliver ? { deliver } : {}),
@@ -345,7 +345,7 @@ export const issueTools = Effect.gen(function* () {
               noted,
               channel.name,
               h ? answers.issueCreate.who(h.name, h.id) : answers.issueCreate.noAgentFallback,
-              h?.project ?? project,
+              h?.repo ?? repo,
               branch,
             );
           }
@@ -384,7 +384,7 @@ export const issueTools = Effect.gen(function* () {
                 {
                   ...(p.title !== undefined ? { title: p.title } : {}),
                   ...(p.description !== undefined ? { description: p.description } : {}),
-                  ...(p.project !== undefined ? { project: p.project } : {}),
+                  ...(p.repo !== undefined ? { repo: p.repo } : {}),
                   ...(agent ? { agent } : {}),
                   ...(priority ? { priority } : {}),
                   ...(p.deliver ? { deliver: p.deliver } : {}),

@@ -6,8 +6,8 @@ select * from cron order by id;
 
 -- name: AddCron :exec
 -- One waiting for the owner is stored off (pending).
-insert into cron (id, name, body, channel_id, agent, project, spec, tz, enabled, set_by, pending, created_at)
-values (sqlc.arg(id), sqlc.arg(name), sqlc.arg(body), sqlc.arg(channel_id), sqlc.narg(agent), sqlc.narg(project), sqlc.arg(spec), sqlc.arg(tz),
+insert into cron (id, name, body, channel_id, agent, repo, spec, tz, enabled, set_by, pending, created_at)
+values (sqlc.arg(id), sqlc.arg(name), sqlc.arg(body), sqlc.arg(channel_id), sqlc.narg(agent), sqlc.narg(repo), sqlc.arg(spec), sqlc.arg(tz),
         not sqlc.arg(pending)::boolean, sqlc.arg(set_by), sqlc.arg(pending), sqlc.arg(created_at));
 
 -- name: CronRan :exec

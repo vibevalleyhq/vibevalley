@@ -17,14 +17,9 @@ export const emptyPlay = (): T.SessionPlay => ({ station: -1, history: [], tools
 
 export const playOf = (plays: Readonly<Record<string, T.SessionPlay>> | undefined, id: string): T.SessionPlay => plays?.[id] ?? emptyPlay();
 
-/** A free bed on `project`'s farm: `prefer` when it is free there, else the first free one, else -1. */
-export function freeStation(
-  plays: Readonly<Record<string, T.SessionPlay>> | undefined,
-  sessions: readonly T.Session[],
-  project: string,
-  prefer?: number,
-): number {
-  const taken = new Set(sessions.filter((h) => farmOf(h) === project).map((h) => playOf(plays, h.id).station));
+/** A free bed on `repo`'s farm: `prefer` when it is free there, else the first free one, else -1. */
+export function freeStation(plays: Readonly<Record<string, T.SessionPlay>> | undefined, sessions: readonly T.Session[], repo: string, prefer?: number): number {
+  const taken = new Set(sessions.filter((h) => farmOf(h) === repo).map((h) => playOf(plays, h.id).station));
   if (prefer !== undefined && prefer >= 0 && prefer < maxRunning && !taken.has(prefer)) return prefer;
   for (let i = 0; i < maxRunning; i++) if (!taken.has(i)) return i;
   return -1;
@@ -69,7 +64,7 @@ export function playedDoing(p: T.SessionPlay, f: { readonly at: number; readonly
 }
 
 /** Only to a bed that is free on its own farm; a session already there, or a bed taken, changes nothing. */
-export function stationed(state: T.WorkspaceState, f: { readonly id: T.SessionId; readonly station: number }): [T.WorkspaceState, boolean] {
+export function stationed(state: T.SpaceState, f: { readonly id: T.SessionId; readonly station: number }): [T.SpaceState, boolean] {
   const h = sessionOf(state, f.id);
   const plays = state.plays ?? {};
   const play = playOf(plays, f.id);
@@ -91,7 +86,7 @@ export function levelForCommits(total: number): [level: number, xp: number] {
   return [level, rest];
 }
 
-function farmLevelOf(state: T.WorkspaceState): T.FarmLevel {
+function farmLevelOf(state: T.SpaceState): T.FarmLevel {
   const [level, xp] = levelForCommits(state.commits?.total ?? 0);
   return { level, xp, need: xpToNext(level) };
 }
@@ -198,7 +193,7 @@ function levelUps(before: number | undefined, after: number): T.GameEffect[] {
   return out;
 }
 
-export function effectsOf(before: T.WorkspaceState, fact: T.Fact): T.GameEffect[] {
+export function effectsOf(before: T.SpaceState, fact: T.Fact): T.GameEffect[] {
   switch (fact.type) {
     case "progressChanged": {
       const out: T.GameEffect[] = [];
@@ -220,7 +215,7 @@ export function effectsOf(before: T.WorkspaceState, fact: T.Fact): T.GameEffect[
 }
 
 /** A plot is its issue, so a reopened issue's new session draws on the same one; if two are here, the later hired. */
-export function viewOf(state: T.WorkspaceState): T.FarmView {
+export function viewOf(state: T.SpaceState): T.FarmView {
   const latest = new Map<string, T.Session>();
   for (const h of state.sessions) {
     if (h.role === "orchestrator") continue;

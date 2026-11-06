@@ -7,7 +7,7 @@ import { assignmentOf, assignedAgentOf, isOneOf, latestSessionIdOf, sessionIdsOf
 
 import { Agent } from "#/agent/agent.ts";
 import { lookIn, refused } from "#/base/errors.ts";
-import { issueBranch, Project } from "#/project/project.ts";
+import { issueBranch, Repo } from "#/repo/repo.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 import { conflictBrief } from "#/session/briefing.ts";
 import { Session } from "#/session/session.ts";
@@ -27,15 +27,15 @@ export interface StatusOptions {
 export const issueSettling = (r: IssueRecords, d: Pick<IssueDispatch, "readyOf">) =>
   Effect.gen(function* () {
     const store = yield* Agent;
-    const projects = yield* Project;
+    const repos = yield* Repo;
     const runtimes = yield* Runtime;
     const sessions = yield* Session;
     const { unsent, changesOf } = r;
     const { readyOf } = d;
-    /** The commits on the issue's branch that the main branch does not have; none for one without a project or branch. */
+    /** The commits on the issue's branch that the main branch does not have; none for one without a repo or branch. */
     const commitsOf = (issue: T.Issue) =>
-      issue.project
-        ? Effect.mapBoth(projects.branchChanges(issue.project, issueBranch(issue.number)), {
+      issue.repo
+        ? Effect.mapBoth(repos.branchChanges(issue.repo, issueBranch(issue.number)), {
             onFailure: (e) => refused(e.message),
             onSuccess: (c) => c?.commits.length ?? 0,
           })
@@ -129,11 +129,11 @@ export const issueSettling = (r: IssueRecords, d: Pick<IssueDispatch, "readyOf">
       switch (p.move) {
         case "start": {
           if (isForOrchestrator(item, store.isOrchestrator)) return [t("server.issue.does.toOrchestrator", { n })];
-          const [, agent, project] = yield* readyOf(item, p.taker?.id);
-          const full = sessions.noRoom(agent.runtime, project);
+          const [, agent, repo] = yield* readyOf(item, p.taker?.id);
+          const full = sessions.noRoom(agent.runtime, repo);
           return full
             ? [t("server.issue.does.sendTo", { n, agent: agent.name }), t("server.issue.does.noRoom", { full })]
-            : [project ? t("server.issue.does.startIn", { n, agent: agent.name, project }) : t("server.issue.does.start", { n, agent: agent.name })];
+            : [repo ? t("server.issue.does.startIn", { n, agent: agent.name, repo }) : t("server.issue.does.start", { n, agent: agent.name })];
         }
         case "unqueue":
           return [t("server.issue.does.unqueue", { n })];
@@ -166,7 +166,7 @@ export const issueSettling = (r: IssueRecords, d: Pick<IssueDispatch, "readyOf">
           if (p.delivery === "kept")
             return [t("server.issue.does.completeKept", { n, commits: p.commits }), t("server.issue.does.helperLeaves", { helper: helperName(item) })];
           const changes = yield* changesOf(item);
-          const pr = item.project !== undefined && (item.pullRequest?.state === "open" || projects.usesPullRequests(item.project));
+          const pr = item.repo !== undefined && (item.pullRequest?.state === "open" || repos.usesPullRequests(item.repo));
           const out: string[] = [];
           if (changes && changes.uncommitted.length > 0)
             out.push(t("server.issue.does.commitFirst", { helper: helperName(item), files: changes.uncommitted.length }));

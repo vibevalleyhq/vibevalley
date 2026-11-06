@@ -14,7 +14,7 @@ import { Executor, type ExecutionInput } from "#/executor/executor.ts";
 import { serverAddress, ServerConfig } from "#/infra/config.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
-import { type Workplace } from "#/project/workplace.ts";
+import { type Workplace } from "#/repo/workplace.ts";
 import * as qs from "#db/session.sql.ts";
 
 import { restoredSession, sessionState } from "./history.ts";
@@ -181,7 +181,7 @@ export const sessionRecords = Effect.gen(function* () {
     const hiredAt = yield* Clock.currentTimeMillis;
     yield* keepRow({
       ...session,
-      project: null,
+      repo: null,
       issue: null,
       channel: null,
       hired_at: hiredAt,
@@ -214,7 +214,7 @@ export const sessionRecords = Effect.gen(function* () {
       name: s.name,
       runtime: s.runtime,
       brief: s.brief,
-      project: s.project ?? null,
+      repo: s.repo ?? null,
       issue: s.issue ?? null,
       channel: s.channel ?? null,
       hired_at: s.hiredAt,

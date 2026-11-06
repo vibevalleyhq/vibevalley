@@ -28,7 +28,7 @@ it.live("regression: splitting an in-place session cannot create children with a
     const service = yield* Issue;
     const issues = testIssues(service);
     yield* (yield* Agent).save(lab());
-    const parent = yield* issues.add({ title: "parent", project: "in-place", agent: "lab" });
+    const parent = yield* issues.add({ title: "parent", repo: "in-place", agent: "lab" });
     const helper = mustHire(yield* issues.hire(lab(), "work in place", "in-place", { issue: parent.id, worktree: false }));
     expect(helper.branch).toBeUndefined();
     expect((yield* Effect.flip(service.split(parent.id, "", steps, sessionActor(helper.id))))._tag).toBe("Refused");
@@ -60,7 +60,7 @@ it.live("regression: splitting preserves the parent's assignment and branch ance
     const issues = testIssues(yield* Issue);
     const sessions = yield* Session;
     yield* (yield* Agent).save(lab());
-    const issue = yield* issues.add({ title: "整个看板重做", description: "像 Linear 那样", project: "board", agent: "lab" });
+    const issue = yield* issues.add({ title: "整个看板重做", description: "像 Linear 那样", repo: "board", agent: "lab" });
     yield* issues.edit(issue.id, { criteria: ["卡片紧凑"] }, owner);
     const helper = mustHire(yield* issues.hire(lab(), "hold-parent", "board", { issue: issue.id, worktree: true }));
     const service = yield* Issue;

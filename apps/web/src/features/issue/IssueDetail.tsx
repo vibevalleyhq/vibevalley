@@ -98,7 +98,7 @@ export function IssueDetail(props: {
           {s().title}
         </h1>
         <span class="shrink-0 text-xs text-muted @max-[560px]:basis-full">
-          {[s().project, t(`shared.priority.${props.issue.priority}`)].filter(Boolean).join(" · ")}
+          {[s().repo, t(`shared.priority.${props.issue.priority}`)].filter(Boolean).join(" · ")}
         </span>
       </div>
       <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={t("web.issue.detail.now")} data-testid="issue-now" data-state={s().stage.state}>

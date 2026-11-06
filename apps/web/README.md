@@ -25,13 +25,13 @@ src/state/          the middle layer on Effect's Atom: atom.ts (the page's regis
 src/ui/             the workbench's pieces: Icon, Face, Button, Field, Dialog, Markdown, ToastHost, Segmented, Tabs, Qr, Chips, A
                     (a link), an owner's act (act.ts), the window strip, the list-and-detail layout (layout.tsx), a
                     helper's look (cast.ts); each with its X.stories.tsx beside it
-src/ui/pixel/       the pixel pieces every skin draws with (the farm, the tree, the project map, the catalog): windows, buttons,
+src/ui/pixel/       the pixel pieces every skin draws with (the farm, the tree, the repo map, the catalog): windows, buttons,
                     fields, toasts, the atlas (atlas.ts), the sounds (sound.ts), a runtime's machine
 src/features/<x>/   one folder per concept, named as the server's module: issue, channel, session, agent, memory,
-                    orchestrator, project, runtime, artifact, pkm, voice, lan, connector, inbox, setting, catalog. A feature holds its
+                    orchestrator, repo, runtime, artifact, pkm, voice, lan, connector, inbox, setting, catalog. A feature holds its
                     pages, its reads, its rules (pure, each with its test) and its words; index.ts is what the rest may use
 src/farm/           the pixel farm at /, outside the shell (its README: who owns which folder, the store, the canvas's screen)
-                    and map/, the projects page's map: app/ hands it to features/project as its ProjectsSkin
+                    and map/, the repos page's map: app/ hands it to features/repo as its ReposSkin
 src/tree/           the memory tree at /tree, outside the shell like the farm: the tree grown from the memories, its panel and the
                     memory sky, on one canvas; made-up
                     memories (mock.ts) until the server sums them up (.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
@@ -72,7 +72,7 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   `kvs`): the key is `vibevalley.<name>`, what does not decode reads as the fallback (`orFallback` per field of a
   struct), a storage that throws keeps it for the page's life, and every reader, in this tab and the others, hears a
   change. A choice worth a link or a reload goes in the address (`useSearchParam`, on `Atom.searchParam`: the board's
-  project and helper); a passing one (the words in a search box) stays a signal in its component. A `createSignal` or
+  repo and helper); a passing one (the words in a search box) stays a signal in its component. A `createSignal` or
   `createStore` made outside any function in `features/`, `farm/` or `ui/` is reported (lint `vibevalley/page-store`),
   and so is `localStorage` or `sessionStorage` anywhere but `state/stored.ts` (`vibevalley/stored-door`). What moves on
   its own (the state stream's source, the live stream, the day clock, the textures loading, the phone's calls, the
@@ -86,7 +86,7 @@ test/               Playwright against a real server per worker (fixtures.ts); s
   (`src/layers.test.ts`). A piece two features both need (a word, a format, a query) goes down to the layer under both,
   or each keeps its own copy of a word; it does not make one feature reach into the other. The skins read features; no
   feature or piece knows a skin: a workbench page that shows a piece of a skin takes it as a prop, and `app/` passes
-  it in (`ProjectsSkin`, from `farm/map`). Why: docs/subsystems/app.md, 为什么这样.
+  it in (`ReposSkin`, from `farm/map`). Why: docs/subsystems/app.md, 为什么这样.
 - **Words** are in `packages/i18n/locales/{zh,en}/web.<feature>.json`, read as `t("web.<feature>.…")`, following the glossary (docs/README.md#用语);
   farm words only in the skins and `ui/pixel`.
 - **Icons come in two sets.** The workbench's are reicon's line icons, one picture to a meaning in `src/ui/icons.ts`

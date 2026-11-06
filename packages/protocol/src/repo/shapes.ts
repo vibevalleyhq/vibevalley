@@ -1,5 +1,5 @@
-export interface ProjectActivity {
-  project: string;
+export interface RepoActivity {
+  repo: string;
   at: number;
   days: DayCount[];
   authors: Author[];
@@ -13,20 +13,20 @@ export interface DayCount {
   commits: number;
 }
 
-export interface ProjectLanguages {
-  project: string;
+export interface RepoLanguages {
+  repo: string;
   at: number;
   languages: LanguageCount[];
 }
 
-export interface ProjectTemplates {
-  project: string;
-  stack: ProjectStack;
+export interface RepoTemplates {
+  repo: string;
+  stack: RepoStack;
   recent: string[];
   kinds: TemplateKind[];
 }
 
-export interface ProjectStack {
+export interface RepoStack {
   name: string;
   label: string;
   test?: string;
@@ -79,7 +79,7 @@ export interface PullRequestCapability {
   reason: string;
 }
 
-export interface ProjectSummary {
+export interface RepoSummary {
   name: string;
   path: string;
   git: boolean;
@@ -88,7 +88,7 @@ export interface ProjectSummary {
   pullRequest: PullRequestCapability;
 }
 
-export interface NewProject {
+export interface NewRepo {
   name: string;
   github?: string;
 }

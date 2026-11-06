@@ -102,7 +102,7 @@ export interface Channel {
   rootNumber?: number;
   name?: string;
   description: string;
-  project?: string;
+  repo?: string;
   subjectKind?: SubjectKind;
   subjectId?: string;
   lastNumber?: number;
@@ -172,13 +172,13 @@ export interface SayRequest {
   attachments?: string[];
   station?: number;
   agent?: string;
-  project?: string;
+  repo?: string;
   sendKey?: string;
 }
 
 export interface ChannelUpdate {
   description?: string;
-  project?: string;
+  repo?: string;
   /** A channel's name (unique, written in its address), or a thread's title. */
   name?: string;
   /** A channel's group; empty takes it out of one. */
@@ -192,7 +192,7 @@ export interface ChannelUpdate {
 export interface ChannelRequest {
   name: string;
   description?: string;
-  project?: string;
+  repo?: string;
 }
 
 export interface ChatReadRequest {

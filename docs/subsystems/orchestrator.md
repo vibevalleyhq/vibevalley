@@ -70,7 +70,7 @@
 
 - 按档案配 `toolsets`、管家加载技能与 `/` 调用：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
 - 按动作分档授权与跨轮同意：[管家的授权](.agents/notes/proposed/feature/2026-10-21-orchestrator-authorization.md)。
-- 项目健康度、早报、工单关系与分拣建议：[管家给主人报告](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)。
+- 仓库健康度、早报、工单关系与分拣建议：[管家给主人报告](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)。
 
 ## 怎么验证
 

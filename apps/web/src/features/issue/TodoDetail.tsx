@@ -9,7 +9,7 @@ import { ago, wallClockText } from "#/base/format.ts";
 import { IssueArtifacts } from "#/features/artifact/index.ts";
 import { useWorkAgents } from "#/infra/agents.ts";
 import { api } from "#/infra/api.ts";
-import { ready, queries, useProjects } from "#/infra/query.ts";
+import { ready, queries, useRepos } from "#/infra/query.ts";
 import { useIntents } from "#/state/intent.ts";
 import { rememberPick } from "#/state/prefs.ts";
 import { createAct } from "#/ui/act.ts";
@@ -27,7 +27,7 @@ interface Draft {
   title: string;
   description: string;
   criteria: string;
-  project: string;
+  repo: string;
   agent: string;
   priority: Priority;
   deliver: Deliverable;
@@ -37,7 +37,7 @@ const draftOf = (i: Issue): Draft => ({
   title: i.title,
   description: i.description,
   criteria: i.criteria.join("\n"),
-  project: i.project ?? "",
+  repo: i.repo ?? "",
   agent: assignedAgentOf(i) ?? "",
   priority: i.priority,
   deliver: i.deliver,
@@ -65,10 +65,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const move = () => issueMoveOf(props.item.id, moves.list());
   const busy = () => act.busy() || move()?.state === "moving";
   const [word, setWord] = createSignal("");
-  const [newProject, setNewProject] = createSignal(false);
+  const [newRepo, setNewRepo] = createSignal(false);
   const agents = useWorkAgents(true);
-  const projectList = useProjects();
-  const projects = () => ready(projectList, []).map((p) => p.name);
+  const repoList = useRepos();
+  const repos = () => ready(repoList, []).map((p) => p.name);
 
   // The issue as the server has it now replaces the draft, unless the owner has started changing it.
   createEffect(
@@ -88,7 +88,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     return {
       title: x.title,
       description: x.description,
-      project: x.project,
+      repo: x.repo,
       agent: x.agent,
       priority: x.priority,
       deliver: x.deliver,
@@ -101,7 +101,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const unsaved = (): IssueUpdate | undefined => {
     if (!edited()) return undefined;
     const x = d();
-    rememberPick(x.agent, x.project);
+    rememberPick(x.agent, x.repo);
     return update(x);
   };
   const saved = <T,>(got: T) => {
@@ -140,7 +140,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const start = () => {
     const id = props.item.id;
     const x = d();
-    rememberPick(x.agent, x.project);
+    rememberPick(x.agent, x.repo);
     const told = dispatchedNotice(props.onDone);
     // A start the server refused shows on the board's card with why; the same start again is sent with the same key.
     return sendMove(moves, { id, status: "todo", edit: update(x) }).done.then((done) => {
@@ -314,18 +314,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           options={agents().map((a) => ({ value: a.id, label: a.runtime ? `${a.name} · ${a.runtime}` : a.name }))}
         />
       </Property>
-      <Property label={t("web.issue.task.project")}>
+      <Property label={t("web.issue.task.repo")}>
         <Pick
-          label={t("web.issue.task.project")}
-          testid="issue-project"
-          value={d().project}
-          placeholder={t("web.issue.todo.whichProject")}
-          onChange={(v) => edit({ project: v })}
-          options={[...new Set([...projects(), ...(d().project ? [d().project] : [])])].map((p) => ({ value: p, label: p }))}
+          label={t("web.issue.task.repo")}
+          testid="issue-repo"
+          value={d().repo}
+          placeholder={t("web.issue.todo.whichRepo")}
+          onChange={(v) => edit({ repo: v })}
+          options={[...new Set([...repos(), ...(d().repo ? [d().repo] : [])])].map((p) => ({ value: p, label: p }))}
         />
       </Property>
-      <button type="button" onClick={() => setNewProject(true)} class="mb-1 ml-[76px] cursor-pointer self-start text-xs text-water hover:underline">
-        {projects().length === 0 ? t("web.issue.todo.firstProject") : t("web.issue.todo.newProjectLink")}
+      <button type="button" onClick={() => setNewRepo(true)} class="mb-1 ml-[76px] cursor-pointer self-start text-xs text-water hover:underline">
+        {repos().length === 0 ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}
       </button>
       <Property label={t("web.issue.todo.priority")}>
         <Pick
@@ -390,12 +390,12 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           {t("web.issue.todo.remove")}
         </Button>
       </div>
-      <Show when={newProject()}>
-        <NewProjectDialog
-          onClose={() => setNewProject(false)}
+      <Show when={newRepo()}>
+        <NewRepoDialog
+          onClose={() => setNewRepo(false)}
           onMade={(name) => {
-            setNewProject(false);
-            edit({ project: name });
+            setNewRepo(false);
+            edit({ repo: name });
           }}
         />
       </Show>
@@ -404,25 +404,25 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   return <IssueSheet heading={heading} main={main} side={side} />;
 }
 
-function NewProjectDialog(props: { onClose: () => void; onMade: (name: string) => void }) {
+function NewRepoDialog(props: { onClose: () => void; onMade: (name: string) => void }) {
   const [name, setName] = createSignal("");
   const act = createAct();
   const make = async () => {
     const wanted = name().trim();
-    const made = await act.run(() => api.project.create({ name: wanted }));
+    const made = await act.run(() => api.repo.create({ name: wanted }));
     if (!made) return;
-    await queries.invalidateQueries({ queryKey: ["projects"] });
+    await queries.invalidateQueries({ queryKey: ["repos"] });
     props.onMade(made.name);
   };
   return (
-    <Dialog open onClose={props.onClose} title={t("web.issue.todo.newProject")}>
+    <Dialog open onClose={props.onClose} title={t("web.issue.todo.newRepo")}>
       <TextInput
         ref={autofocus()}
         value={name()}
         onInput={(e) => setName(e.currentTarget.value)}
         onKeyDown={(e) => e.key === "Enter" && name().trim() && void make()}
-        placeholder={t("web.issue.todo.projectHint")}
-        aria-label={t("web.issue.todo.projectName")}
+        placeholder={t("web.issue.todo.repoHint")}
+        aria-label={t("web.issue.todo.repoName")}
       />
       <div class="mt-5 flex justify-end gap-2">
         <Button onClick={() => props.onClose()}>{t("web.issue.never")}</Button>

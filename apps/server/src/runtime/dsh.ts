@@ -138,7 +138,7 @@ const decodeItems = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, ite
 };
 
 /** A session/new response's models. undefined when it has no `model` config option. */
-export function projectModels(response: unknown): ModelEntry[] | undefined {
+export function repoModels(response: unknown): ModelEntry[] | undefined {
   const parsed = Schema.decodeUnknownOption(SessionNewResponse)(response);
   if (parsed._tag === "None") return undefined;
   const options = decodeItems(ConfigOption, parsed.value.configOptions);
@@ -261,7 +261,7 @@ export const dshRuntime = defineRuntime({
       if (Predicate.isObject(e) && "code" in e && e.code === -32601) return { kind: "unsupported", reason: "this dsh build has no session/new method" };
       throw e;
     }
-    const models = projectModels(response);
+    const models = repoModels(response);
     return models
       ? { kind: "ok", models }
       : {

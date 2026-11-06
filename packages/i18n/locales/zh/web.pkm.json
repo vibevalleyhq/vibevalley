@@ -4,7 +4,7 @@
     "hint": "你自己的笔记：每天的日记、PARA 分好的大纲页、反链和润色建议"
   },
   "tier": {
-    "project": "项目",
+    "repo": "仓库",
     "area": "领域",
     "resource": "资源",
     "inbox": "收件箱",
@@ -107,7 +107,7 @@
   "backlinks": {
     "title": "链到这里的 · {n}",
     "none": "还没有别的页链到这里",
-    "projects": "项目",
+    "repos": "仓库",
     "journals": "日记",
     "areas": "领域和资源",
     "archives": "归档"
@@ -122,7 +122,7 @@
     "on": "「{span}」"
   },
   "tierOne": {
-    "project": "项目",
+    "repo": "仓库",
     "area": "领域",
     "resource": "资料",
     "inbox": "收件箱",

@@ -15,8 +15,8 @@ import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { recordTrigger } from "#/mailbox/payload.ts";
-import { issueBranch, Project } from "#/project/project.ts";
-import { MergeFailure, type Workplace } from "#/project/workplace.ts";
+import { issueBranch, Repo } from "#/repo/repo.ts";
+import { MergeFailure, type Workplace } from "#/repo/workplace.ts";
 import { Session } from "#/session/session.ts";
 import * as q from "#db/issue.sql.ts";
 
@@ -30,7 +30,7 @@ import { isClosed } from "./status.ts";
 export const issueSplitting = (r: IssueRecords) =>
   Effect.gen(function* () {
     const store = yield* Agent;
-    const projects = yield* Project;
+    const repos = yield* Repo;
     const sessions = yield* Session;
     const chat = yield* Channel;
     const mailbox = yield* Mailbox;
@@ -45,8 +45,8 @@ export const issueSplitting = (r: IssueRecords) =>
           return yield* Effect.fail(refused(t("server.issue.split.notCurrent")));
       } else if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
       if (isClosed(parent.status)) return yield* Effect.fail(refused(t("server.issue.dependencies.closedParent")));
-      const parentProject = parent.project;
-      if (!parentProject) return yield* Effect.fail(refused(t("server.issue.noProject")));
+      const parentRepo = parent.repo;
+      if (!parentRepo) return yield* Effect.fail(refused(t("server.issue.noRepo")));
       if ((yield* everyIssue).some((item) => item.parent === parent.id)) return yield* Effect.fail(refused(t("server.issue.split.already")));
       if (
         drafts.length === 0 ||
@@ -72,7 +72,7 @@ export const issueSplitting = (r: IssueRecords) =>
             title: childTitle,
             description,
             parent: parent.id,
-            project: parentProject,
+            repo: parentRepo,
             agent: agent.id,
             priority: parent.priority,
             blockedBy: (draft.needs ?? []).flatMap((need) => {
@@ -104,7 +104,7 @@ export const issueSplitting = (r: IssueRecords) =>
                 id,
                 title: title.trim(),
                 description: current.description,
-                project: current.project,
+                repo: current.repo,
                 priority: current.priority,
                 criteria: current.criteria,
                 deliver: current.deliver,
@@ -157,8 +157,8 @@ export const issueSplitting = (r: IssueRecords) =>
         (child) =>
           Effect.gen(function* () {
             const parent = yield* get(child.parent);
-            const parentProject = parent.project;
-            if (!parentProject || isClosed(parent.status)) return;
+            const parentRepo = parent.repo;
+            if (!parentRepo || isClosed(parent.status)) return;
             const session = latestSessionIdOf(child);
             if (!session || !sessions.present(session)) return;
             const parentSession = latestSessionIdOf(parent);
@@ -170,15 +170,15 @@ export const issueSplitting = (r: IssueRecords) =>
                 "completed",
                 (place) =>
                   Effect.gen(function* () {
-                    const constraints = yield* verifyChild(projects, child, parent, all, place);
+                    const constraints = yield* verifyChild(repos, child, parent, all, place);
                     if (constraints) yield* db.run(q.setIssueConstraints({ id: child.id, constraints: JSON.stringify(constraints) }));
-                    const mergeIntoParent = (target: Workplace) => projects.mergeInto(place, issueBranch(parent.number), target.cwd);
+                    const mergeIntoParent = (target: Workplace) => repos.mergeInto(place, issueBranch(parent.number), target.cwd);
                     const merged =
                       parentSession && sessions.present(parentSession)
                         ? yield* sessions
                             .withIdleWorkplace(parentSession, mergeIntoParent)
                             .pipe(Effect.mapError((error) => (error._tag === "MergeFailure" ? error : MergeFailure.error(reasonOf(error)))))
-                        : yield* Effect.flatMap(projects.workplace(parentProject, parent.number, true, ""), mergeIntoParent);
+                        : yield* Effect.flatMap(repos.workplace(parentRepo, parent.number, true, ""), mergeIntoParent);
                     yield* complete(child.id, "merged_into_parent");
                     return merged;
                   }),

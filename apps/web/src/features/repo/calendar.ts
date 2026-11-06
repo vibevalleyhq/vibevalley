@@ -80,7 +80,7 @@ export function streaksOf(calendar: Calendar): Streaks {
   return { total: days.reduce((n, d) => n + d.commits, 0), days: days.filter((d) => d.commits > 0).length, longest, current, ...(busiest ? { busiest } : {}) };
 }
 
-/** How long ago the newest commit was, as the project list, its card and the map's crops show it. */
+/** How long ago the newest commit was, as the repo list, its card and the map's crops show it. */
 export type Recency = "never" | "day" | "week" | "month" | "quarter" | "older";
 
 export function recencyOf(last: number | undefined, now: number): Recency {
@@ -93,7 +93,7 @@ export function recencyOf(last: number | undefined, now: number): Recency {
   return "older";
 }
 
-export const recencyText = (r: Recency) => t(`web.project.recency.${r}`);
+export const recencyText = (r: Recency) => t(`web.repo.recency.${r}`);
 
 export function since(at: number, now: number) {
   const minutes = Math.max(0, (now - at) / 60000);

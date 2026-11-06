@@ -26,7 +26,7 @@ import { carriedMemory, fromOwner } from "./prompts.ts";
 import {
   foundText,
   type Found,
-  inProject,
+  inRepo,
   issueMemoryText,
   nextForgotten,
   noteMaxChars,
@@ -61,7 +61,7 @@ export class Memory extends Context.Service<
     readonly forget: (agent: string, id: string) => Effect.Effect<void, ApiError>;
     /** What forget would do, refused as it would be; nothing changes. */
     readonly previewForget: (agent: string, id: string) => Effect.Effect<T.Preview, ApiError>;
-    readonly recallOf: (agent: string, project: string, text: string) => Effect.Effect<T.RecallPreview, ApiError>;
+    readonly recallOf: (agent: string, repo: string, text: string) => Effect.Effect<T.RecallPreview, ApiError>;
     /** What a run is told as it starts; only what is told is counted as recalled. */
     readonly recall: (cue: RecallCue) => Effect.Effect<Recalled>;
     /** Behind memory_search: every source's best, taken in turns, the same memory once. */
@@ -117,8 +117,8 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     const forget = (agent: string, id: string) => Effect.mapError(sources.forget(agent, id), (e) => refused(e.message));
 
-    const preview = (agent: string, project: string, text: string) =>
-      Effect.map(sources.prefetch({ agent, project, text, peek: true }), (groups): T.RecallPreview => {
+    const preview = (agent: string, repo: string, text: string) =>
+      Effect.map(sources.prefetch({ agent, repo, text, peek: true }), (groups): T.RecallPreview => {
         const lines = mergeRecalled(groups);
         return { lines: lines.map((l) => l.line), chars: lines.reduce((n, l) => n + l.line.length + 1, 0), limit: recallChars };
       });
@@ -146,7 +146,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
                 return { lines, prompt: carriedMemory(lines) };
               },
             ),
-          remember: (text) => Effect.asVoid(local.write({ agent, text, project: "", by }).pipe(Effect.mapError(agentFailed))),
+          remember: (text) => Effect.asVoid(local.write({ agent, text, repo: "", by }).pipe(Effect.mapError(agentFailed))),
           rewrite: (text) =>
             Effect.gen(function* () {
               const owners = new Set((yield* local.list(agent)).filter((note) => note.author === "owner").map((note) => note.text));
@@ -173,8 +173,8 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
           does: [t("server.memory.forget", { agent, text: m.text })],
         };
       }),
-      recallOf: Effect.fn("Memory.recallOf")(function* (agent, project, text) {
-        return yield* preview(agent, project, text);
+      recallOf: Effect.fn("Memory.recallOf")(function* (agent, repo, text) {
+        return yield* preview(agent, repo, text);
       }),
       recall: Effect.fn("Memory.recall")(function* (cue) {
         const told = mergeRecalled(yield* sources.prefetch(cue));
@@ -187,13 +187,13 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         const pages = yield* sources.search(query);
         const coverage = pages.flatMap((page) => {
           const notes = page.coverage ? [page.coverage] : [];
-          if (query.project && page.found.some((f) => f.scope.kind === "unknown")) notes.push(t("server.memory.coverage.unconfirmed"));
+          if (query.repo && page.found.some((f) => f.scope.kind === "unknown")) notes.push(t("server.memory.coverage.unconfirmed"));
           return notes.map((note) => t("server.memory.coverage.note", { source: sourceLabel(page.source), note }));
         });
         const found = interleave(
           pages.map((page) => page.found),
           (f) => f.text,
-          (f) => inProject(f.scope, query.project),
+          (f) => inRepo(f.scope, query.repo),
         ).slice(0, query.limit);
         return { found, coverage };
       }),
@@ -227,7 +227,7 @@ export interface FinishedRun {
   readonly agent: string;
   readonly session: string;
   readonly issue?: string;
-  readonly project: string;
+  readonly repo: string;
   readonly brief: string;
   readonly outcome: T.Outcome;
   readonly said: string;
@@ -238,7 +238,7 @@ export interface FinishedRun {
 export interface RecallCue {
   readonly agent: string;
   readonly session?: string;
-  readonly project: string;
+  readonly repo: string;
   readonly text: string;
   readonly skip?: ReadonlySet<string>;
   readonly peek?: boolean;
@@ -248,7 +248,7 @@ export interface RecallCue {
 export interface Note {
   readonly agent: string;
   readonly text: string;
-  readonly project: string;
+  readonly repo: string;
   /** Who writes it: a session's note is kept with the session. */
   readonly by: Actor;
 }
@@ -279,14 +279,14 @@ const makeMemoryStore = Effect.gen(function* () {
           at: r.created_at,
           recalled: r.recalled,
           fading: false,
-          ...(r.project !== null ? { project: r.project } : {}),
+          ...(r.repo !== null ? { repo: r.repo } : {}),
           ...(r.session !== null ? { session: sessionId(r.session) } : {}),
           ...(r.recalled_at !== null ? { recalledAt: r.recalled_at } : {}),
         })),
       ),
     );
 
-  const insertNote = Effect.fnUntraced(function* (agent: string, body: string, project: string | undefined, session: string | undefined, author: T.ActorKind) {
+  const insertNote = Effect.fnUntraced(function* (agent: string, body: string, repo: string | undefined, session: string | undefined, author: T.ActorKind) {
     const at = yield* Clock.currentTimeMillis;
     const id = newId();
     yield* db.attempt(
@@ -296,7 +296,7 @@ const makeMemoryStore = Effect.gen(function* () {
         body,
         terms: termsText(body),
         terms_of: termsVersion,
-        project: project ?? null,
+        repo: repo ?? null,
         session: session ?? null,
         author,
         created_at: at,
@@ -322,7 +322,7 @@ const makeMemoryStore = Effect.gen(function* () {
       const all = yield* list(cue.agent);
       const picked: PickCue = omitUndefined({
         session: cue.session,
-        project: cue.project,
+        repo: cue.repo,
         text: cue.text,
         skip: cue.skip,
         now: yield* Clock.currentTimeMillis,
@@ -354,7 +354,7 @@ const makeMemoryStore = Effect.gen(function* () {
                     body: text,
                     terms: termsText(text),
                     terms_of: termsVersion,
-                    project: run.project,
+                    repo: run.repo,
                     session: run.session,
                     created_at: yield* Clock.currentTimeMillis,
                   }),
@@ -377,9 +377,9 @@ const makeMemoryStore = Effect.gen(function* () {
   const write = Effect.fnUntraced(function* (n: Note) {
     const body = clip(n.text, noteMaxChars);
     if (body === "") return yield* new MemoryRefused({ message: t("server.memory.empty") });
-    const project = n.project.trim() || undefined;
+    const repo = n.repo.trim() || undefined;
     const session = n.by.kind === "session" ? n.by.id || undefined : undefined;
-    const { id, at } = yield* insertNote(n.agent, body, project, session, n.by.kind).pipe(
+    const { id, at } = yield* insertNote(n.agent, body, repo, session, n.by.kind).pipe(
       Effect.catchTag("SqlError", (e) =>
         Effect.andThen(
           Effect.logWarning(`a note for ${n.agent}: ${String(e)}`),
@@ -396,7 +396,7 @@ const makeMemoryStore = Effect.gen(function* () {
       at,
       recalled: 0,
       fading: false,
-      ...(project ? { project } : {}),
+      ...(repo ? { repo } : {}),
       ...(session ? { session: sessionId(session) } : {}),
     } satisfies T.Memory;
   });
@@ -407,7 +407,7 @@ const makeMemoryStore = Effect.gen(function* () {
     db.attemptTx(
       Effect.gen(function* () {
         yield* q.clearManagedNotes({ agent });
-        yield* Effect.forEach(texts, (text) => write({ agent, text, project: "", by }), { discard: true });
+        yield* Effect.forEach(texts, (text) => write({ agent, text, repo: "", by }), { discard: true });
         return texts.length;
       }),
     );

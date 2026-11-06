@@ -18,8 +18,8 @@ export type Start = (typeof StartValues)[number];
 const PrefsSchema = Schema.Struct({
   /** Who the next job goes to: a profile's id, or "auto" for the orchestrator to choose. */
   pick: orFallback(Schema.NonEmptyString, "auto"),
-  /** The project the last issue was given to on this machine ("" none), for the next quick add. */
-  project: orFallback(Schema.String, ""),
+  /** The repo the last issue was given to on this machine ("" none), for the next quick add. */
+  repo: orFallback(Schema.String, ""),
   pet: orFallback(Schema.NonEmptyString, "dog"),
   theme: orFallback(ThemeChoice, "system"),
   scale: orFallback(Schema.Literals(ScaleValues), 100),
@@ -30,7 +30,7 @@ const PrefsSchema = Schema.Struct({
 
 type Prefs = typeof PrefsSchema.Type;
 
-const prefs = defineStored("prefs", PrefsSchema, { pick: "auto", project: "", pet: "dog", theme: "system", scale: 100, start: "workbench", widths: {} });
+const prefs = defineStored("prefs", PrefsSchema, { pick: "auto", repo: "", pet: "dog", theme: "system", scale: 100, start: "workbench", widths: {} });
 
 /** The choices now; read in a computation or a component, it follows them. */
 export const prefsNow = prefs.get;
@@ -52,9 +52,9 @@ export const setWidth = (pane: string, width: number | undefined) =>
   });
 
 /** Who and where an issue was given to, for the next quick add and the farm's next job: "" for no one is the orchestrator's. */
-export const rememberPick = (agent: string, project: string) => {
-  if (!agent && !project) return;
-  set({ pick: agent || "auto", project });
+export const rememberPick = (agent: string, repo: string) => {
+  if (!agent && !repo) return;
+  set({ pick: agent || "auto", repo });
 };
 
 /** One of the choices, following it. */

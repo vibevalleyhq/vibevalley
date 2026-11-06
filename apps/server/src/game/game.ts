@@ -8,7 +8,7 @@ import { jsonOrNone } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
 import * as q from "#db/game_ledger.sql.ts";
 
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
@@ -32,7 +32,7 @@ export class Game extends Context.Service<
     /** The next session hired within ten seconds goes to this station, if it is still free. */
     readonly want: (station: number) => void;
     readonly record: (entry: Entry) => Effect.Effect<void>;
-    /** Commits on every project, a repository with several worktrees once: "yours" by author email. */
+    /** Commits on every repo, a repository with several worktrees once: "yours" by author email. */
     readonly count: () => Effect.Effect<CommitCount>;
     /** The count and its write, serialized with run-end refreshes. */
     readonly refresh: Effect.Effect<void>;
@@ -50,7 +50,7 @@ const make = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const config = yield* ServerConfig;
   const core = yield* Core;
-  const projects = yield* Project;
+  const repos = yield* Repo;
   const db = yield* Db;
 
   // A row this code cannot read any more is left out of the fold.
@@ -83,8 +83,8 @@ const make = Effect.gen(function* () {
 
   const extra = config.gitEmails.map((e) => e.trim().toLowerCase()).filter((e) => e !== "");
   const count = Effect.fn("Game.count")(function* (): Effect.fn.Return<CommitCount> {
-    const repos = yield* projects.contributions(extra);
-    return { repos, total: repos.reduce((n, r) => n + r.commits, 0) };
+    const counted = yield* repos.contributions(extra);
+    return { repos: counted, total: counted.reduce((n, r) => n + r.commits, 0) };
   });
   // The ticker and a run's end both count: one at a time, so an older count never lands after a newer one.
   const counting = yield* Semaphore.make(1);

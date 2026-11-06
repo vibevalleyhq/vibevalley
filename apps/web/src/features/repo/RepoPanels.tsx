@@ -2,7 +2,7 @@ import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query"
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
-import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
+import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
 import { githubRepository } from "@vibevalley/protocol/rules";
 
 import { autofocus } from "#/base/dom.tsx";
@@ -18,7 +18,7 @@ import { SpriteIcon } from "#/ui/pixel/index.ts";
 import { Segmented } from "#/ui/Segmented.tsx";
 
 import { calendarOf, type CalendarDay, dayText, streaksOf } from "./calendar";
-import { langIcon, languageShares, number, percent } from "./projects";
+import { langIcon, languageShares, number, percent } from "./repos";
 
 export type Asked<A> = QueryObserverResult<A>;
 
@@ -43,14 +43,14 @@ function Bar(props: { share: number; color: string }) {
 /** A share wide enough carries its language's picture in the bar. */
 const logoInBar = 0.07;
 
-export function Languages(props: { languages: Asked<ProjectLanguages> }) {
+export function Languages(props: { languages: Asked<RepoLanguages> }) {
   const data = () => ready(props.languages, undefined);
   const shares = () => {
     const d = data();
     return d ? languageShares(d.languages) : [];
   };
   return (
-    <Card title={t("web.project.whatLanguages")} action={<span class="text-xs text-muted">{t("web.project.byLines")}</span>}>
+    <Card title={t("web.repo.whatLanguages")} action={<span class="text-xs text-muted">{t("web.repo.byLines")}</span>}>
       <Switch
         fallback={
           <>
@@ -81,7 +81,7 @@ export function Languages(props: { languages: Asked<ProjectLanguages> }) {
                         <span class="text-muted">{percent(s.share)}</span>
                       </span>
                       <Bar share={s.share < 0.02 ? 0.02 : s.share} color={s.color} />
-                      <span class="text-xs text-muted">{t("web.project.linesAndFiles", { lines: number(s.lines), files: number(s.files) })}</span>
+                      <span class="text-xs text-muted">{t("web.repo.linesAndFiles", { lines: number(s.lines), files: number(s.files) })}</span>
                     </div>
                   </div>
                 )}
@@ -97,7 +97,7 @@ export function Languages(props: { languages: Asked<ProjectLanguages> }) {
           <div class="h-12 rounded-md bg-hover" />
         </Match>
         <Match when={shares().length === 0}>
-          <Quiet>{t("web.project.empty")}</Quiet>
+          <Quiet>{t("web.repo.empty")}</Quiet>
         </Match>
       </Switch>
     </Card>
@@ -109,54 +109,54 @@ function NotCounted(props: { reason: string }) {
   const code = (text: string) => <code class="rounded bg-selected px-1.5 py-px font-mono text-sm">{text}</code>;
   return (
     <div class="flex flex-col gap-2 rounded-lg bg-hover p-3 text-sm">
-      <p>{install() ? t("web.project.noTokei") : props.reason}</p>
+      <p>{install() ? t("web.repo.noTokei") : props.reason}</p>
       <Show when={install()}>
         <p class="text-muted">
-          {t("web.project.install")}
+          {t("web.repo.install")}
           {code("brew install tokei")}
-          {t("web.project.or")}
+          {t("web.repo.or")}
           {code("cargo install tokei")}
-          {t("web.project.thenRecount")}
+          {t("web.repo.thenRecount")}
         </p>
       </Show>
     </div>
   );
 }
 
-const levelName = (level: number) => (level === 0 || level === 1 || level === 2 || level === 3 || level === 4 ? t(`web.project.level.${level}`) : "");
+const levelName = (level: number) => (level === 0 || level === 1 || level === 2 || level === 3 || level === 4 ? t(`web.repo.level.${level}`) : "");
 const tile = 12;
 const tileGap = 3;
 
-export function CommitCalendar(props: { activity: Asked<ProjectActivity> }) {
+export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
   const [pointed, setPointed] = createSignal<CalendarDay>();
   const worked = () => ready(props.activity, undefined);
   const calendar = createMemo(() => calendarOf(worked()?.days ?? [], new Date()));
   const streaks = createMemo(() => streaksOf(calendar()));
-  const aside = () => <span class="text-xs text-muted">{t("web.project.year")}</span>;
+  const aside = () => <span class="text-xs text-muted">{t("web.repo.year")}</span>;
   const line = () => {
     const p = pointed();
     const busiest = streaks().busiest;
     return p && !p.future
-      ? `${dayText(p.at)} · ${p.commits > 0 ? t("web.project.dayCommits", { n: p.commits, level: levelName(p.level) }) : t("web.project.noCommitsThatDay")}`
+      ? `${dayText(p.at)} · ${p.commits > 0 ? t("web.repo.dayCommits", { n: p.commits, level: levelName(p.level) }) : t("web.repo.noCommitsThatDay")}`
       : busiest
-        ? t("web.project.busiest", { day: dayText(new Date(`${busiest.day}T12:00`)), n: busiest.commits })
+        ? t("web.repo.busiest", { day: dayText(new Date(`${busiest.day}T12:00`)), n: busiest.commits })
         : " ";
   };
   return (
     <Show
       when={!(props.activity.error && !worked())}
       fallback={
-        <Card title={t("web.project.calendar")} action={aside()}>
+        <Card title={t("web.repo.calendar")} action={aside()}>
           <p class="text-sm">{reasonOf(props.activity.error)}</p>
         </Card>
       }
     >
-      <Card title={t("web.project.calendar")} action={aside()}>
+      <Card title={t("web.repo.calendar")} action={aside()}>
         <div class="grid grid-cols-4 gap-6">
-          <Stat label={t("web.project.inYear")} value={worked() ? t("web.project.commits", { n: number(streaks().total) }) : "…"} />
-          <Stat label={t("web.project.daysWorked")} value={worked() ? t("web.project.days", { n: streaks().days }) : "…"} />
-          <Stat label={t("web.project.longest")} value={worked() ? t("web.project.days", { n: streaks().longest }) : "…"} />
-          <Stat label={t("web.project.current")} value={worked() ? t("web.project.days", { n: streaks().current }) : "…"} />
+          <Stat label={t("web.repo.inYear")} value={worked() ? t("web.repo.commits", { n: number(streaks().total) }) : "…"} />
+          <Stat label={t("web.repo.daysWorked")} value={worked() ? t("web.repo.days", { n: streaks().days }) : "…"} />
+          <Stat label={t("web.repo.longest")} value={worked() ? t("web.repo.days", { n: streaks().longest }) : "…"} />
+          <Stat label={t("web.repo.current")} value={worked() ? t("web.repo.days", { n: streaks().current }) : "…"} />
         </div>
         <div class="overflow-x-auto pb-1">
           <div class="min-w-[704px]">
@@ -171,12 +171,12 @@ export function CommitCalendar(props: { activity: Asked<ProjectActivity> }) {
             </div>
             <div
               role="img"
-              aria-label={worked() ? t("web.project.yearLabel", { commits: streaks().total, days: streaks().days }) : t("web.project.readingCommits")}
+              aria-label={worked() ? t("web.repo.yearLabel", { commits: streaks().total, days: streaks().days }) : t("web.repo.readingCommits")}
               class="mt-1 flex"
               onMouseLeave={() => setPointed(undefined)}
             >
               <div class="flex w-5 flex-col" style={{ gap: `${tileGap}px` }}>
-                <For each={([0, 1, 2, 3, 4, 5, 6] as const).map((i) => t(`web.project.rows.${i}`))}>
+                <For each={([0, 1, 2, 3, 4, 5, 6] as const).map((i) => t(`web.repo.rows.${i}`))}>
                   {(d) => (
                     <span class="flex items-center text-2xs leading-none text-muted" style={{ height: `${tile}px` }}>
                       {d}
@@ -203,7 +203,7 @@ export function CommitCalendar(props: { activity: Asked<ProjectActivity> }) {
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="text-xs text-muted">{line()}</span>
           <span class="flex items-center gap-1 text-xs text-muted">
-            {t("web.project.fewer")}
+            {t("web.repo.fewer")}
             <For each={[0, 1, 2, 3, 4]}>
               {(l) => (
                 <span title={levelName(l)}>
@@ -211,7 +211,7 @@ export function CommitCalendar(props: { activity: Asked<ProjectActivity> }) {
                 </span>
               )}
             </For>
-            {t("web.project.more")}
+            {t("web.repo.more")}
           </span>
         </div>
       </Card>
@@ -221,7 +221,7 @@ export function CommitCalendar(props: { activity: Asked<ProjectActivity> }) {
 
 const hands = 8;
 
-export function Hands(props: { activity?: ProjectActivity | undefined }) {
+export function Hands(props: { activity?: RepoActivity | undefined }) {
   const agents = useWorkAgents();
   const authors = () => props.activity?.authors ?? [];
   const top = () => {
@@ -234,7 +234,7 @@ export function Hands(props: { activity?: ProjectActivity | undefined }) {
       .reduce((n, a) => n + a.commits, 0);
   return (
     <Show when={authors().length > 0}>
-      <Card title={t("web.project.who")} action={<span class="text-xs text-muted">{t("web.project.whoWhen")}</span>}>
+      <Card title={t("web.repo.who")} action={<span class="text-xs text-muted">{t("web.repo.whoWhen")}</span>}>
         <div class="grid gap-2.5 sm:grid-cols-2">
           <For each={authors().slice(0, hands)}>
             {(author) => {
@@ -254,7 +254,7 @@ export function Hands(props: { activity?: ProjectActivity | undefined }) {
                   <div class="flex min-w-0 flex-1 flex-col gap-1">
                     <span class="flex text-sm">
                       <span class="min-w-0 flex-1 truncate font-medium">{author.name}</span>
-                      <span class="text-xs text-muted">{t("web.project.times", { n: number(author.commits) })}</span>
+                      <span class="text-xs text-muted">{t("web.repo.times", { n: number(author.commits) })}</span>
                     </span>
                     <Bar share={author.commits / top()} color="#74a046" />
                   </div>
@@ -264,7 +264,7 @@ export function Hands(props: { activity?: ProjectActivity | undefined }) {
           </For>
         </div>
         <Show when={rest() > 0}>
-          <p class="text-xs text-muted">{t("web.project.rest", { people: authors().length - hands, commits: number(rest()) })}</p>
+          <p class="text-xs text-muted">{t("web.repo.rest", { people: authors().length - hands, commits: number(rest()) })}</p>
         </Show>
       </Card>
     </Show>
@@ -272,7 +272,7 @@ export function Hands(props: { activity?: ProjectActivity | undefined }) {
 }
 
 /** The name follows the repository's until it is typed by hand; what would be refused is the server's answer. */
-export function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
+export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
   const client = useQueryClient();
   const [importing, setImporting] = createSignal<"new" | "github">("github");
   const [github, setGithub] = createSignal("");
@@ -289,13 +289,13 @@ export function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void 
     const done = props.onDone;
     setError(undefined);
     await act.run(async () => {
-      const problem = (await api.project.validate(request)).problem;
+      const problem = (await api.repo.validate(request)).problem;
       if (problem) {
         setError(problem);
         return;
       }
-      const made = await api.project.create(request);
-      await client.invalidateQueries({ queryKey: ["projects"] });
+      const made = await api.repo.create(request);
+      await client.invalidateQueries({ queryKey: ["repos"] });
       done(made);
     });
   };
@@ -309,12 +309,12 @@ export function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void 
     >
       <div>
         <Segmented
-          label={t("web.project.how")}
-          testid="project-how"
+          label={t("web.repo.how")}
+          testid="repo-how"
           value={importing()}
           options={[
-            { value: "new", label: t("web.project.fresh"), disabled: busy() },
-            { value: "github", label: t("web.project.github"), disabled: busy() },
+            { value: "new", label: t("web.repo.fresh"), disabled: busy() },
+            { value: "github", label: t("web.repo.github"), disabled: busy() },
           ]}
           onChange={(v) => {
             setImporting(v);
@@ -323,11 +323,11 @@ export function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void 
         />
       </div>
       <Show when={importing() === "github"}>
-        <Field label={t("web.project.githubAddress")} hint={t("web.project.githubHint")}>
+        <Field label={t("web.repo.githubAddress")} hint={t("web.repo.githubHint")}>
           <TextInput
             ref={autofocus()}
-            data-testid="project-github"
-            aria-label={t("web.project.githubAddress")}
+            data-testid="repo-github"
+            aria-label={t("web.repo.githubAddress")}
             disabled={busy()}
             placeholder={t("web.base.form.example", { value: "https://github.com/botiverse/raft-source" })}
             value={github()}
@@ -340,12 +340,12 @@ export function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void 
           />
         </Field>
       </Show>
-      <Field label={t("web.project.name")} hint={t("web.project.nameHint")}>
+      <Field label={t("web.repo.name")} hint={t("web.repo.nameHint")}>
         <TextInput
-          data-testid="project-name"
-          aria-label={t("web.project.name")}
+          data-testid="repo-name"
+          aria-label={t("web.repo.name")}
           disabled={busy()}
-          placeholder={t("web.project.nameExample")}
+          placeholder={t("web.repo.nameExample")}
           value={name()}
           onInput={(e) => {
             setNamed(true);
@@ -360,14 +360,14 @@ export function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void 
         </p>
       </Show>
       <Show when={busy()}>
-        <p class="text-sm text-muted">{importing() === "github" ? t("web.project.downloading") : t("web.project.making")}</p>
+        <p class="text-sm text-muted">{importing() === "github" ? t("web.repo.downloading") : t("web.repo.making")}</p>
       </Show>
       <div class="flex justify-end gap-2 pt-2">
         <Button disabled={busy()} data-testid="cancel" onClick={() => props.onDone()}>
-          {t("web.project.cancel")}
+          {t("web.repo.cancel")}
         </Button>
         <Button type="submit" tone="primary" data-testid="submit" disabled={!canSubmit()}>
-          {busy() ? t("web.project.busy") : importing() === "github" ? t("web.project.download") : t("web.project.create")}
+          {busy() ? t("web.repo.busy") : importing() === "github" ? t("web.repo.download") : t("web.repo.create")}
         </Button>
       </div>
     </form>

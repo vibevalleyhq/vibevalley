@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
+import { type Agent, type ChatMessage, type Channel, type SpaceState } from "@vibevalley/protocol";
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
 import { useNow } from "#/base/dom.tsx";
@@ -52,7 +52,7 @@ const phaseWords: Record<ChatPhase, string> = {
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 
 /** What the orchestrator is doing: on a call, what the call says; else from the farm's state. */
-const phaseOf = (v: VoiceCall, s: WorkspaceState | undefined): ChatPhase => {
+const phaseOf = (v: VoiceCall, s: SpaceState | undefined): ChatPhase => {
   if (v.phase === "connecting" || v.phase === "ending") return "connecting";
   if (v.phase === "live")
     return !v.agentHere ? "connecting" : v.agentState === "speaking" ? "speaking" : v.agentState === "thinking" ? "thinking" : "listening";

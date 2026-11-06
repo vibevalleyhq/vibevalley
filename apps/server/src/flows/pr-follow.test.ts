@@ -12,7 +12,7 @@ import { Agent } from "#/agent/agent.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
 import { Session } from "#/session/session.ts";
 import { testConfig } from "#/testing/layers.ts";
 
@@ -25,13 +25,13 @@ for (const submittedReport of [false, true]) {
     const inputs: string[] = [];
     let background: ReturnType<ScriptedTurn["task"]> | undefined;
     const base = testConfig();
-    const config = { ...base, project: { ...base.project, maxSessions: 1 }, github: { ...base.github, prProjects: ["follow"] } };
+    const config = { ...base, repo: { ...base.repo, maxSessions: 1 }, github: { ...base.github, prRepos: ["follow"] } };
     const path = join(config.workRoot, "repos", "follow");
     const bare = join(config.workRoot, "origin.git");
     const f = farm({
       config,
       repos: ["follow"],
-      projects: {
+      repoHooks: {
         gh: (...args) =>
           Effect.sync(() => {
             const ok = (out: string) => ({ out, ok: true, missing: false });
@@ -73,8 +73,8 @@ for (const submittedReport of [false, true]) {
       yield* (yield* Agent).save(lab());
       git(config.workRoot, "init", "--bare", bare);
       git(path, "remote", "add", "origin", "https://github.com/test/follow.git");
-      yield* (yield* Project).refreshGitHub();
-      const issue = yield* issues.add({ title: "work", project: "follow", agent: "lab" }, explicitMandate("", true));
+      yield* (yield* Repo).refreshGitHub();
+      const issue = yield* issues.add({ title: "work", repo: "follow", agent: "lab" }, explicitMandate("", true));
       yield* issues.start(issue.id, "");
       const id = latestSessionIdOf(yield* issues.get(issue.id))!;
       yield* until(() => inputs.length === 1, "the implementation committed");

@@ -30,7 +30,7 @@ export interface Todo {
   readonly tries?: number;
 }
 
-/** A graph past this is a project, not one piece of work: it belongs in issues. */
+/** A graph past this is a repo, not one piece of work: it belongs in issues. */
 const maxTodos = 30;
 
 /** Retries a subagent's task gets after its first failure. */

@@ -4,7 +4,7 @@
     "issues": "工单",
     "crons": "定时任务"
   },
-  "defaultProject": "默认项目 {project}",
+  "defaultRepo": "默认仓库 {repo}",
   "channels": "频道列表",
   "defaultHint": "默认的频道：你、管家和帮工都在这儿",
   "findHint": "在这个频道里找…",
@@ -35,16 +35,16 @@
   "sayInThread": "在串里说，{name}会看到",
   "reply": "回复这个串",
   "dialog": {
-    "projectExample": "比如 clock-in",
+    "repoExample": "比如 clock-in",
     "cancel": "取消",
     "name": "名称",
     "nameHint": "字母、数字、汉字、- 和 _，不超过 24 个字",
     "nameExample": "例如 clock-in",
     "description": "描述（可不填）",
     "descriptionHint": "这个频道是做什么的？",
-    "project": "默认项目（可不填）",
-    "projectHint": "在这个频道里派活、没说项目时，就在这个项目里干",
-    "projectNone": "空着就没有：派活时管家要问在哪个项目",
+    "repo": "默认仓库（可不填）",
+    "repoHint": "在这个频道里派活、没说仓库时，就在这个仓库里干",
+    "repoNone": "空着就没有：派活时管家要问在哪个仓库",
     "settingsOf": "# {name} 的设置",
     "save": "保存"
   },
@@ -247,7 +247,7 @@
   "commands": {
     "issue": {
       "name": "记一张工单",
-      "note": "/issue 标题：记进备选，在这个频道的项目里",
+      "note": "/issue 标题：记进备选，在这个频道的仓库里",
       "needs": "/issue 后面写工单的标题"
     },
     "remember": {

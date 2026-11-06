@@ -13,8 +13,8 @@ import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
 import { Executor, type Started } from "#/executor/executor.ts";
 import { Memory } from "#/memory/memory.ts";
-import { Project } from "#/project/project.ts";
-import { type Merged, MergeFailure, type ProjectError, type Workplace } from "#/project/workplace.ts";
+import { Repo } from "#/repo/repo.ts";
+import { type Merged, MergeFailure, type RepoError, type Workplace } from "#/repo/workplace.ts";
 
 import { briefBreak, instructions, noRoom, notTakenIn, recallBlock, type SessionLimits, type Settle, toOarMcp, withRecall } from "./briefing.ts";
 import { channelRules, restartedContextNote, restartedNote, workplaceRules } from "./prompts.ts";
@@ -44,7 +44,7 @@ export const sessionLaunch = (r: SessionRecords, wt: SessionWatch) =>
     const core = yield* Core;
     const store = yield* Agent;
     const memories = yield* Memory;
-    const projects = yield* Project;
+    const repos = yield* Repo;
     const executor = yield* Executor;
     const clock = yield* Clock.Clock;
     const {
@@ -76,7 +76,7 @@ export const sessionLaunch = (r: SessionRecords, wt: SessionWatch) =>
       const text = [
         instructions(agent, store.skills()),
         owner.issue
-          ? workplaceRules(place, yield* projects.houseRules(), owner.id, projects.usesPullRequests(place.project))
+          ? workplaceRules(place, yield* repos.houseRules(), owner.id, repos.usesPullRequests(place.repo))
           : channelRules(place.cwd, owner.channel ?? "", owner.id),
       ]
         .filter((s) => s !== "")
@@ -113,7 +113,7 @@ export const sessionLaunch = (r: SessionRecords, wt: SessionWatch) =>
       revokeToken(h);
       hands.delete(h.id);
       const session = core.session(h.id);
-      if (session) yield* memories.endSession({ agent: session.agent, session: h.id, project: h.place.project });
+      if (session) yield* memories.endSession({ agent: session.agent, session: h.id, repo: h.place.repo });
       yield* core.apply({ type: "sessionLeft", id: h.id, closed, ...(merged > 0 ? { merged } : {}) });
       save();
     });
@@ -142,7 +142,7 @@ export const sessionLaunch = (r: SessionRecords, wt: SessionWatch) =>
       );
     });
 
-    const capacity = (): Pick<T.Session, "id" | "agent" | "runtime" | "project" | "phase">[] => {
+    const capacity = (): Pick<T.Session, "id" | "agent" | "runtime" | "repo" | "phase">[] => {
       const visible = core.state().sessions.filter((s) => s.role === "worker");
       return [
         ...visible.map((s) => {
@@ -160,15 +160,15 @@ export const sessionLaunch = (r: SessionRecords, wt: SessionWatch) =>
     };
 
     const limits = (runtime: string): SessionLimits => ({
-      workspace: maxRunning,
-      perProject: projects.limit,
+      space: maxRunning,
+      perRepo: repos.limit,
       perRuntime: store.settings(runtime).maxWorking ?? 0,
     });
 
-    const roomFor = (runtime: string, project: string) => noRoom(capacity(), runtime, project.trim(), limits(runtime));
+    const roomFor = (runtime: string, repo: string) => noRoom(capacity(), runtime, repo.trim(), limits(runtime));
 
-    const remind = Effect.fn("Session.remind")(function* (agent: string, session: string, project: string, input: string, recalled: Set<string>) {
-      const found = yield* memories.recall({ agent, session, project, text: input, skip: new Set(recalled) });
+    const remind = Effect.fn("Session.remind")(function* (agent: string, session: string, repo: string, input: string, recalled: Set<string>) {
+      const found = yield* memories.recall({ agent, session, repo, text: input, skip: new Set(recalled) });
       for (const id of found.ids) recalled.add(id);
       if (found.ids.length > 0) save();
       return recallBlock(found.lines);
@@ -186,7 +186,7 @@ export const sessionLaunch = (r: SessionRecords, wt: SessionWatch) =>
       let opened = yield* open(agent, session, h, h.place, withRecall(recall, input), resume);
       if (!opened.execution && !opened.retained && resume) {
         h.recalled.clear();
-        const again = yield* remind(session.agent, h.id, h.place.project, input, h.recalled);
+        const again = yield* remind(session.agent, h.id, h.place.repo, input, h.recalled);
         opened = yield* open(agent, session, h, h.place, withRecall(again, (session.issue ? restartedNote : restartedContextNote) + input), "");
       }
       if (!opened.execution) return { kind: "refused", reason: t("server.session.life.cannotWake", { name: session.name, why: opened.refused }) };
@@ -207,9 +207,9 @@ export const sessionLaunch = (r: SessionRecords, wt: SessionWatch) =>
             const starts = !isBusy(session);
             let recall = "";
             if (starts) {
-              const full = noRoom(capacity(), session.runtime, h.place.project, limits(session.runtime), id, input.byOwnerComment);
+              const full = noRoom(capacity(), session.runtime, h.place.repo, limits(session.runtime), id, input.byOwnerComment);
               if (full) return { kind: "refused", reason: t("server.session.life.noRoom", { name: session.name, full }) };
-              recall = yield* remind(session.agent, id, h.place.project, text, h.recalled);
+              recall = yield* remind(session.agent, id, h.place.repo, text, h.recalled);
             }
             if (execution?.attached !== true || !h.launch) {
               expect(h, input);
@@ -249,7 +249,7 @@ export const sessionLaunch = (r: SessionRecords, wt: SessionWatch) =>
     const handOver = Effect.fn("Session.handOver")(function* (
       id: string,
       closed: T.SessionClose,
-      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | ProjectError>,
+      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, MergeFailure | RepoError>,
       settle: Settle = "owner",
     ) {
       const h = hands.get(id);

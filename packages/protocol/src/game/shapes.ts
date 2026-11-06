@@ -177,7 +177,7 @@ export interface LedgerEntryHarvested {
   at: number;
   session: SessionId;
   agent?: string;
-  project: string;
+  repo: string;
   runtime: string;
   commits: number;
   cny?: number;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { type Issue, defaultOrchestrator, type ProjectStack, type Run } from "@vibevalley/protocol";
+import { type Issue, defaultOrchestrator, type RepoStack, type Run } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { templateCatalog } from "#/agent/seed.ts";
@@ -28,8 +28,8 @@ describe("an issue as a brief", () => {
   });
 
   it("a brief written as one long line keeps a short title and all of it as the description", () => {
-    const brief = "通读 vibevalley 项目，给主人一份整体架构和当前进度的评估。1）技术栈 2）模块 3）测试 4）最该推进的三件事";
-    expect(splitBrief(brief)).toEqual(["通读 vibevalley 项目，给主人一份整体架构和当前进度的评估", brief]);
+    const brief = "通读 vibevalley 仓库，给主人一份整体架构和当前进度的评估。1）技术栈 2）模块 3）测试 4）最该推进的三件事";
+    expect(splitBrief(brief)).toEqual(["通读 vibevalley 仓库，给主人一份整体架构和当前进度的评估", brief]);
   });
 
   it("the story of an issue, newest first", () => {
@@ -135,7 +135,7 @@ describe("drafts", () => {
 
   it("briefs", () => {
     const first = refinementBrief({ title: "新工单", description: "", criteria: [] }, "看板拖卡还在调旧接口", "board");
-    for (const want of [refinementOpening, "项目：board", "主人想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问主人："])
+    for (const want of [refinementOpening, "仓库：board", "主人想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问主人："])
       expect(first).toContain(want);
     expect(first).not.toContain("上一版草稿");
     const refined = {
@@ -161,7 +161,7 @@ describe("drafts", () => {
 });
 
 describe("templates", () => {
-  const goStack: ProjectStack = { name: "go", label: "Go", test: "go test ./...", lint: "go vet ./...", build: "go build ./..." };
+  const goStack: RepoStack = { name: "go", label: "Go", test: "go test ./...", lint: "go vet ./...", build: "go build ./..." };
 
   it("the catalog is well formed", () => {
     const kinds = templateCatalog();
@@ -203,31 +203,31 @@ describe("templates", () => {
 
   it("issue.list's filter keeps the open ones by default, and what waits on the owner the longest waiting first", () => {
     const issue = (title: string, status: Issue["status"], more: Partial<Issue> = {}) =>
-      ({ title, status, project: "app", stage: { state: "working", acts: [] }, ...more }) as Issue;
+      ({ title, status, repo: "app", stage: { state: "working", acts: [] }, ...more }) as Issue;
     const waiting = (since: number) => ({ stage: { state: "reviewing" as const, acts: [], since } });
     const all = [
       issue("修登录 按钮", "in_review", waiting(5)),
       issue("加打卡", "todo"),
       issue("修登录 页面", "in_review", waiting(2)),
       issue("老的", "done"),
-      issue("别处的", "todo", { project: "web" }),
+      issue("别处的", "todo", { repo: "web" }),
     ];
     const titles = (f: Parameters<typeof pickIssues>[1]) => pickIssues(all, f, 10).map((t) => t.title);
     expect(titles({})).toEqual(["修登录 按钮", "加打卡", "修登录 页面", "别处的"]);
     expect(titles({ closed: true, limit: 2 })).toEqual(["修登录 按钮", "加打卡"]);
     expect(titles({ status: "done" })).toEqual(["老的"]);
     expect(titles({ text: "修登录 页面" })).toEqual(["修登录 页面"]);
-    expect(titles({ project: "web" })).toEqual(["别处的"]);
+    expect(titles({ repo: "web" })).toEqual(["别处的"]);
     expect(titles({ wantsOwner: true })).toEqual(["修登录 页面", "修登录 按钮"]);
   });
 
-  it("recent titles are the project's own sent issues", () => {
-    const issue = (title: string, project: string, at: number, more: Partial<Issue> & { readonly sent?: boolean; readonly agent?: string } = {}) => {
+  it("recent titles are the repo's own sent issues", () => {
+    const issue = (title: string, repo: string, at: number, more: Partial<Issue> & { readonly sent?: boolean; readonly agent?: string } = {}) => {
       const { sent = true, agent = "lab", ...fields } = more;
       const id = issueId(`i-${at}-${title}`);
       return {
         title,
-        project,
+        repo,
         createdAt: at,
         assignments: sent
           ? [{ id: `a-${at}-${title}`, issue: id, agent, assignedAt: at, executions: [{ kind: "worker", session: sessionId("s"), startedAt: at }] }]
@@ -239,7 +239,7 @@ describe("templates", () => {
       issue("修登录", "app", 1),
       issue("  加  打卡 ", "app", 5),
       issue("修登录", "app", 4),
-      issue("别的项目", "web", 9),
+      issue("别的仓库", "web", 9),
       issue("没派过", "app", 8, { sent: false }),
       issue("计划里的一步", "app", 8, { parent: issueId("g") }),
       issue("定时任务", "app", 8, { cron: "s1" }),

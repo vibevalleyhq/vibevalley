@@ -25,9 +25,9 @@ import { tierOrder, wordDiff } from "./outline";
 import { Outline } from "./OutlineView";
 import { pkmHref, refreshPkm, usePkmPage } from "./vault";
 
-/** A tier as a group of pages (the sidebar's heads): Projects. */
+/** A tier as a group of pages (the sidebar's heads): Repos. */
 export const tierLabel = (tier: PkmTier) => t(`web.pkm.tier.${tier}`);
-/** A tier as where one page is: Project. */
+/** A tier as where one page is: Repo. */
 const tierOfOne = (tier: PkmTier) => t(`web.pkm.tierOne.${tier}`);
 
 const rail = defineStored("pkm.rail", Schema.Boolean, true);
@@ -347,12 +347,12 @@ function CommentCard(props: { comment: PkmComment; body: string; slug: string })
   );
 }
 
-const backlinkGroups = ["projects", "journals", "areas", "archives"] as const;
+const backlinkGroups = ["repos", "journals", "areas", "archives"] as const;
 
 function Backlinks(props: { view: PkmPageView; pages: readonly PkmPageSummary[] }) {
   const count = () => {
     const b = props.view.backlinks;
-    return b.projects.length + b.journals.length + b.areas.length + b.archives.length;
+    return b.repos.length + b.journals.length + b.areas.length + b.archives.length;
   };
   return (
     <section data-testid="pkm-backlinks" class="flex flex-col gap-2">

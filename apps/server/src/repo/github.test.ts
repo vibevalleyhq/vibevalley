@@ -13,7 +13,7 @@ import { actionsJobOf, githubSnapshot } from "#/ingress/github.ts";
 import { gitSync, reposDir, repo, write } from "#/testing/git.ts";
 import { testConfig } from "#/testing/layers.ts";
 
-import { Project, githubOrigin, type GitHubRun, probeGitHub, type ProjectHooks } from "./project.ts";
+import { Repo, githubOrigin, type GitHubRun, probeGitHub, type RepoHooks } from "./repo.ts";
 
 const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 const gh =
@@ -21,10 +21,10 @@ const gh =
   (...args) =>
     Effect.sync(() => ({ ok: true, missing: false, ...answer(args) }));
 
-const projects = <A, E>(root: string, body: Effect.Effect<A, E, Project>, change: Partial<ServerConfig["Service"]> = {}, hooks: ProjectHooks = {}) =>
+const repos = <A, E>(root: string, body: Effect.Effect<A, E, Repo>, change: Partial<ServerConfig["Service"]> = {}, hooks: RepoHooks = {}) =>
   body.pipe(
     Effect.provide(
-      Project.layer({ gh: noGitHub, ...hooks }).pipe(
+      Repo.layer({ gh: noGitHub, ...hooks }).pipe(
         Layer.provide(Layer.merge(Layer.succeed(ServerConfig, testConfig({ workRoot: dirname(root), ...change })), NodeServices.layer)),
       ),
     ),
@@ -64,11 +64,11 @@ describe("GitHub", () => {
     const pull = (key: string, nodes: unknown[]) => ({ data: { repository: { pullRequest: { [key]: { nodes } } } } });
     repo(join(root, "sample"), 1, 0);
     gitSync(join(root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const project = yield* Project;
-        const snapshot = yield* githubSnapshot(project)("sample", 7);
+        const repo = yield* Repo;
+        const snapshot = yield* githubSnapshot(repo)("sample", 7);
         expect(snapshot.viewer).toBe("gardener");
         expect(snapshot.checks).toEqual([
           { name: "test", status: "COMPLETED", conclusion: "FAILURE", url: "https://checks/1" },
@@ -85,8 +85,8 @@ describe("GitHub", () => {
         });
         expect(snapshot.comments.find((comment) => comment.id === "SECOND")).toMatchObject({ threadId: "PRRT_second", resolved: true });
         failReviews = true;
-        expect((yield* Effect.flip(githubSnapshot(project)("sample", 7)))._tag).toBe("ProjectError");
-        yield* project.resolveReviewThread("sample", "PRRT_9");
+        expect((yield* Effect.flip(githubSnapshot(repo)("sample", 7)))._tag).toBe("RepoError");
+        yield* repo.resolveReviewThread("sample", "PRRT_9");
         expect(resolved).toEqual(["PRRT_9"]);
       }),
       {},
@@ -227,10 +227,10 @@ describe("GitHub", () => {
     let permission = "WRITE";
     let calls = 0;
     const counted: GitHubRun = (...args) => Effect.tap(loggedIn(() => permission)(...args), () => Effect.sync(() => calls++));
-    return projects(
+    return repos(
       reposDir(),
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const made = yield* p.create({ name: "garden" });
         gitSync(made.path, "remote", "add", "origin", "git@github.com:owner/repo.git");
         for (const perm of ["WRITE", "ADMIN", "MAINTAIN", "READ", "TRIAGE"]) {
@@ -261,10 +261,10 @@ describe("GitHub", () => {
         : mode === "logged out" && args[0] !== "--version"
           ? Effect.succeed({ out: "token: secret", ok: false, missing: false })
           : loggedIn(() => "WRITE")(...args);
-    return projects(
+    return repos(
       reposDir(),
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const made = yield* p.create({ name: "garden" });
         gitSync(made.path, "remote", "add", "origin", "https://github.com/owner/repo.git");
         yield* p.refreshGitHub();
@@ -293,11 +293,11 @@ describe("GitHub", () => {
       gitSync(root, "init", "-q", "-b", "main", args[3]!);
       return { out: "" };
     });
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
         expect(
-          (yield* (yield* Project).create({
+          (yield* (yield* Repo).create({
             name: "private",
             github: "https://github.com/owner/private",
           })).git,
@@ -308,11 +308,11 @@ describe("GitHub", () => {
     );
   });
 
-  it.effect("pull requests need the project opted in and the permission", () =>
-    projects(
+  it.effect("pull requests need the repo opted in and the permission", () =>
+    repos(
       reposDir(),
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         for (const name of ["enabled", "other"]) {
           const made = yield* p.create({ name });
           gitSync(made.path, "remote", "add", "origin", `https://github.com/owner/${name}.git`);
@@ -322,7 +322,7 @@ describe("GitHub", () => {
         expect(p.usesPullRequests("enabled")).toBe(true);
         expect(p.usesPullRequests("other")).toBe(false);
       }),
-      { github: { prProjects: ["enabled"], prPollSeconds: 180 } },
+      { github: { prRepos: ["enabled"], prPollSeconds: 180 } },
       { gh: loggedIn(() => "WRITE") },
     ),
   );
@@ -332,10 +332,10 @@ describe("GitHub", () => {
     let calls = 0;
     let pushFails = true;
     const issue = { number: 1, title: "sample" } as Issue;
-    return projects(
+    return repos(
       reposDir(),
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const place = yield* p.workplace("sample", 1, true, "");
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         mkdirSync(join(place.cwd, ".vibevalley"));
@@ -372,10 +372,10 @@ describe("GitHub", () => {
 
   it.effect("an answer from gh that is not the shape asked for is refused, not taken as a pull request", () => {
     const issue = { number: 1, title: "sample" } as Issue;
-    return projects(
+    return repos(
       reposDir(),
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const place = yield* p.workplace("sample", 1, true, "");
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         expect((yield* Effect.flip(p.submitPullRequest(place, issue, "done"))).message).toBe("无法读取已有 PR");
@@ -393,10 +393,10 @@ describe("GitHub", () => {
     Effect.gen(function* () {
       for (const hasCheck of [false, true]) {
         let body = "";
-        yield* projects(
+        yield* repos(
           reposDir(),
           Effect.gen(function* () {
-            const p = yield* Project;
+            const p = yield* Repo;
             const place = yield* p.workplace("sample", 1, true, "");
             gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
             if (hasCheck) {
@@ -406,7 +406,7 @@ describe("GitHub", () => {
               gitSync(place.cwd, "commit", "-qm", "check");
             }
             yield* p.submitPullRequest(place, { number: 1, title: "sample" } as Issue, "done");
-            expect(body).toBe("工单 #1\n\ndone\n\n" + (hasCheck ? ".vibevalley/check 通过。" : "这个项目没有 .vibevalley/check，没跑检查。"));
+            expect(body).toBe("工单 #1\n\ndone\n\n" + (hasCheck ? ".vibevalley/check 通过。" : "这个仓库没有 .vibevalley/check，没跑检查。"));
           }),
           {},
           {
@@ -424,10 +424,10 @@ describe("GitHub", () => {
 
   it.effect("the helper's own title and body, left in the worktree's git directory, open the pull request", () => {
     let args: string[] = [];
-    return projects(
+    return repos(
       reposDir(),
       Effect.gen(function* () {
-        const p = yield* Project;
+        const p = yield* Repo;
         const place = yield* p.workplace("sample", 1, true, "");
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         const file = gitSync(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", "vibevalley-pr.md").trim();
@@ -453,15 +453,15 @@ describe("GitHub", () => {
     Effect.gen(function* () {
       for (const mode of ["checked-out", "other-branch", "dirty", "diverged", "fetch-failure", "not-enabled"]) {
         const root = reposDir();
-        const hooks: ProjectHooks = {
+        const hooks: RepoHooks = {
           gh: loggedIn(() => (mode === "not-enabled" ? "READ" : "WRITE")),
         };
         let failFetch = false;
         let originPath = "";
-        yield* projects(
+        yield* repos(
           root,
           Effect.gen(function* () {
-            const p = yield* Project;
+            const p = yield* Repo;
             yield* p.create({ name: "sample" });
             const path = join(root, "sample");
             const origin = join(tempDir("vibevalley-origin-"), "origin.git");
@@ -501,7 +501,7 @@ describe("GitHub", () => {
               expect(gitSync(path, "rev-parse", "main")).toBe(gitSync(remote, "rev-parse", "HEAD"));
             }
           }),
-          { github: { prProjects: ["sample"], prPollSeconds: 180 } },
+          { github: { prRepos: ["sample"], prPollSeconds: 180 } },
           {
             ...hooks,
             fetch: (cwd, branch) =>
@@ -522,10 +522,10 @@ describe("GitHub", () => {
     const nested = join(root, "nested", "repo");
     repo(nested, 2, 1);
     gitSync(nested, "worktree", "add", "-q", "-b", "side", join(dirname(root), "worktrees", "copy"));
-    return projects(
+    return repos(
       root,
       Effect.gen(function* () {
-        const repos = yield* (yield* Project).contributions([]);
+        const repos = yield* (yield* Repo).contributions([]);
         expect(repos.map((r) => r.commits)).toEqual([2]);
       }),
     );

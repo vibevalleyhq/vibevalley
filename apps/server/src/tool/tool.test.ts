@@ -61,11 +61,11 @@ describe("the tools", () => {
   });
 
   it("read in the trajectory by label and what they name", () => {
-    expect(toolStart("issue_create", { title: "加个 README", project: "demo", start: true })).toEqual({
+    expect(toolStart("issue_create", { title: "加个 README", repo: "demo", start: true })).toEqual({
       text: "记一张工单：demo",
       action: "other",
       tool: "issue_create",
-      input: `{"title":"加个 README","project":"demo","start":true}`,
+      input: `{"title":"加个 README","repo":"demo","start":true}`,
     });
     expect(toolStart("unknown", undefined).text).toBe("unknown");
   });

@@ -22,7 +22,7 @@ order by t.seq limit 1000;
 select source_key, (trigger_json -> 'meta' ->> 'botRoundKey')::text? as bot_round_key,
        (routed_at is not null)::bool as routed,
        (trigger_json -> 'meta' ->> 'botRound')::int? as bot_round
-from mailbox_trigger where source = 'github' and trigger_json -> 'meta' ->> 'project' = sqlc.arg(project)::text
+from mailbox_trigger where source = 'github' and trigger_json -> 'meta' ->> 'repo' = sqlc.arg(repo)::text
   and trigger_json -> 'meta' ->> 'pr' = sqlc.arg(pr_number)::int;
 
 -- name: MarkRouted :one

@@ -63,7 +63,7 @@ export function issueRows(core: Core["Service"]) {
         maxBotReviewRounds: row.max_bot_review_rounds,
         autoSubmitPr: row.auto_submit_pr,
       },
-      ...(row.project !== null ? { project: row.project } : {}),
+      ...(row.repo !== null ? { repo: row.repo } : {}),
       assignments: [...assignments],
       priority: row.priority,
       createdAt: row.created_at,

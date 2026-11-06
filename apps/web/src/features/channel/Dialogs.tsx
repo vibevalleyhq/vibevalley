@@ -9,7 +9,7 @@ import { autofocus } from "#/base/dom.tsx";
 import { useOrchestrators } from "#/infra/agents.ts";
 import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { ready, useProjects } from "#/infra/query.ts";
+import { ready, useRepos } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Dialog } from "#/ui/Dialog.tsx";
@@ -18,19 +18,19 @@ import { Segmented } from "#/ui/Segmented.tsx";
 
 import { channelName } from "./places";
 
-function ProjectInput(props: { value: string; onChange: (v: string) => void }) {
-  const projects = useProjects();
+function RepoInput(props: { value: string; onChange: (v: string) => void }) {
+  const repos = useRepos();
   return (
     <>
       <TextInput
-        data-testid="channel-project"
+        data-testid="channel-repo"
         value={props.value}
         onInput={(e) => props.onChange(e.currentTarget.value)}
-        placeholder={t("web.channel.dialog.projectExample")}
-        list="chat-projects"
+        placeholder={t("web.channel.dialog.repoExample")}
+        list="chat-repos"
       />
-      <datalist id="chat-projects">
-        <For each={ready(projects, [])}>{(p) => <option value={p.name} />}</For>
+      <datalist id="chat-repos">
+        <For each={ready(repos, [])}>{(p) => <option value={p.name} />}</For>
       </datalist>
     </>
   );
@@ -80,14 +80,14 @@ export function createChannelForm(channel?: Channel) {
   const was = untrack(() => ({
     name: channel?.name ?? "",
     description: channel?.description ?? "",
-    project: channel?.project ?? "",
+    repo: channel?.repo ?? "",
     category: channel?.category ?? "",
     notify: channel?.notify ?? "all",
     orchestrator: channel?.orchestrator ?? defaultOrchestrator,
   }));
   const [name, setName] = createSignal(was.name);
   const [description, setDescription] = createSignal(was.description);
-  const [project, setProject] = createSignal(was.project);
+  const [repo, setRepo] = createSignal(was.repo);
   const [category, setCategory] = createSignal(was.category);
   const [notify, setNotify] = createSignal<Notify>(was.notify);
   const [orchestrator, setOrchestrator] = createSignal(was.orchestrator);
@@ -103,22 +103,20 @@ export function createChannelForm(channel?: Channel) {
     const now = {
       name: name().trim(),
       description: description(),
-      project: project(),
+      repo: repo(),
       category: category().trim(),
       notify: notify(),
       orchestrator: orchestrator(),
     };
     return act.run(async () => {
       if (!channel)
-        return api.channel.create(
-          omitUndefined({ name: now.name, description: now.description.trim() || undefined, project: now.project.trim() || undefined }),
-        );
+        return api.channel.create(omitUndefined({ name: now.name, description: now.description.trim() || undefined, repo: now.repo.trim() || undefined }));
       // A direct channel has only its notifications to change.
       if (channel.type === "channel")
         await api.channel.update({
           id: channel.id,
           description: now.description,
-          project: now.project,
+          repo: now.repo,
           category: now.category,
           ...(now.name !== was.name ? { name: now.name } : {}),
           ...(now.orchestrator !== was.orchestrator ? { orchestrator: now.orchestrator } : {}),
@@ -136,8 +134,8 @@ export function createChannelForm(channel?: Channel) {
     },
     description,
     setDescription,
-    project,
-    setProject,
+    repo,
+    setRepo,
     category,
     setCategory,
     notify,
@@ -191,8 +189,8 @@ function NewChannelForm(props: { onClose: () => void; onCreated: (id: string) =>
           placeholder={t("web.channel.dialog.descriptionHint")}
         />
       </Field>
-      <Field label={t("web.channel.dialog.project")} hint={t("web.channel.dialog.projectHint")}>
-        <ProjectInput value={form.project()} onChange={form.setProject} />
+      <Field label={t("web.channel.dialog.repo")} hint={t("web.channel.dialog.repoHint")}>
+        <RepoInput value={form.repo()} onChange={form.setRepo} />
       </Field>
     </Form>
   );
@@ -244,8 +242,8 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
               placeholder={t("web.channel.dialog.descriptionHint")}
             />
           </Field>
-          <Field label={t("web.channel.dialog.project")} hint={t("web.channel.dialog.projectNone")}>
-            <ProjectInput value={form.project()} onChange={form.setProject} />
+          <Field label={t("web.channel.dialog.repo")} hint={t("web.channel.dialog.repoNone")}>
+            <RepoInput value={form.repo()} onChange={form.setRepo} />
           </Field>
           <Show when={orchestrators().length > 1}>
             <Field label={t("web.channel.manage.orchestrator")} hint={t("web.channel.manage.orchestratorHint")}>

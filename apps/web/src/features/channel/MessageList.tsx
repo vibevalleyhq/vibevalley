@@ -400,7 +400,7 @@ function Dispatch(props: { m: ChatMessage }) {
                   <A href={`/issues/${i().id}`} data-testid="dispatch-issue" class="min-w-0 truncate font-medium text-water hover:underline">
                     #{i().number} {i().title}
                   </A>
-                  <Show when={i().project}>{(p) => <span class="shrink-0 text-xs text-muted">{p()}</span>}</Show>
+                  <Show when={i().repo}>{(p) => <span class="shrink-0 text-xs text-muted">{p()}</span>}</Show>
                 </p>
               )}
             </Show>

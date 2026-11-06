@@ -11,7 +11,7 @@ import { type LanHandlers, lanEndpoints } from "./lan/api";
 import { type MemoryHandlers, memoryEndpoints } from "./memory/api";
 import { type OrchestratorHandlers, orchestratorEndpoints } from "./orchestrator/api";
 import { type PkmHandlers, pkmEndpoints } from "./pkm/api";
-import { type ProjectHandlers, projectEndpoints } from "./project/api";
+import { type RepoHandlers, repoEndpoints } from "./repo/api";
 import { type RuntimeHandlers, runtimeEndpoints } from "./runtime/api";
 import { type SessionHandlers, sessionEndpoints } from "./session/api";
 import { type SettingHandlers, settingEndpoints } from "./setting/api";
@@ -31,7 +31,7 @@ export type { LanHandlers } from "./lan/api";
 export type { MemoryHandlers } from "./memory/api";
 export type { OrchestratorHandlers } from "./orchestrator/api";
 export type { PkmHandlers } from "./pkm/api";
-export type { ProjectHandlers } from "./project/api";
+export type { RepoHandlers } from "./repo/api";
 export type { RuntimeHandlers } from "./runtime/api";
 export type { SessionHandlers } from "./session/api";
 export type { SettingHandlers } from "./setting/api";
@@ -51,7 +51,7 @@ export interface Handlers<R = never>
     ArtifactHandlers<R>,
     GameHandlers<R>,
     RuntimeHandlers<R>,
-    ProjectHandlers<R>,
+    RepoHandlers<R>,
     AgentHandlers<R>,
     PkmHandlers<R>,
     MemoryHandlers<R>,
@@ -70,7 +70,7 @@ export const endpoints: readonly Endpoint[] = [
   ...artifactEndpoints,
   ...gameEndpoints,
   ...runtimeEndpoints,
-  ...projectEndpoints,
+  ...repoEndpoints,
   ...agentEndpoints,
   ...pkmEndpoints,
   ...memoryEndpoints,

@@ -3,12 +3,12 @@
 -- name: MemoriesOf :many
 -- bound: one agent's current memories; superseded ones are left out.
 -- An agent's own, the superseded ones left out.
-select id, kind, body, project, session, author, created_at, recalled, recalled_at
+select id, kind, body, repo, session, author, created_at, recalled, recalled_at
 from memory where agent = sqlc.arg(agent) and replaced_by is null order by created_at desc, id desc;
 
 -- name: AddNote :exec
-insert into memory (id, scope, agent, kind, body, terms, terms_of, project, session, author, created_at, updated_at)
-values (sqlc.arg(id), 'agent', sqlc.arg(agent), 'note', sqlc.arg(body), sqlc.arg(terms), sqlc.arg(terms_of), sqlc.narg(project),
+insert into memory (id, scope, agent, kind, body, terms, terms_of, repo, session, author, created_at, updated_at)
+values (sqlc.arg(id), 'agent', sqlc.arg(agent), 'note', sqlc.arg(body), sqlc.arg(terms), sqlc.arg(terms_of), sqlc.narg(repo),
         sqlc.narg(session), sqlc.arg(author), sqlc.arg(created_at), sqlc.arg(created_at));
 
 -- name: Recalled :exec
@@ -16,11 +16,11 @@ update memory set recalled = recalled + 1, recalled_at = sqlc.arg(recalled_at) w
 
 -- name: KeepIssueMemory :exec
 -- One issue memory for each session: written again as the session goes on.
-insert into memory (id, scope, agent, kind, body, terms, terms_of, project, session, author, created_at, updated_at)
-values (sqlc.arg(id), 'agent', sqlc.arg(agent), 'issue', sqlc.arg(body), sqlc.arg(terms), sqlc.arg(terms_of), sqlc.arg(project),
+insert into memory (id, scope, agent, kind, body, terms, terms_of, repo, session, author, created_at, updated_at)
+values (sqlc.arg(id), 'agent', sqlc.arg(agent), 'issue', sqlc.arg(body), sqlc.arg(terms), sqlc.arg(terms_of), sqlc.arg(repo),
         sqlc.arg(session), 'system', sqlc.arg(created_at), sqlc.arg(created_at))
 on conflict (agent, session) where kind = 'issue'
-do update set body = excluded.body, terms = excluded.terms, terms_of = excluded.terms_of, project = excluded.project,
+do update set body = excluded.body, terms = excluded.terms, terms_of = excluded.terms_of, repo = excluded.repo,
               created_at = excluded.created_at, updated_at = excluded.updated_at;
 
 -- name: Forget :exec

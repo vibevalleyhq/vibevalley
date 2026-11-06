@@ -4,14 +4,14 @@ import { gunzipSync } from "node:zlib";
 import { Effect, Schema } from "effect";
 import { expect, test } from "vite-plus/test";
 
-import type { WorkspaceState } from "@vibevalley/protocol";
+import type { SpaceState } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { wireJson } from "#/base/json.ts";
 import { frameOf } from "#/projection/frame.ts";
 import { reduce } from "#/projection/reduce.ts";
 
-import { emptyWorkspaceState } from "./core.ts";
+import { emptySpaceState } from "./core.ts";
 
 const encodeFrame = wireJson(S.StateFrame);
 
@@ -24,17 +24,17 @@ test("the golden runs and the frames made of them decode", async () => {
     .map((l) => JSON.parse(l) as Record<string, unknown>);
   const decode = {
     fact: Schema.decodeUnknownSync(S.Fact),
-    state: Schema.decodeUnknownSync(S.WorkspaceState),
+    state: Schema.decodeUnknownSync(S.SpaceState),
     view: Schema.decodeUnknownSync(S.FarmView),
     inbox: Schema.decodeUnknownSync(Schema.Array(S.InboxItem)),
     frame: Schema.decodeUnknownSync(S.StateFrame),
   };
-  let state: WorkspaceState = emptyWorkspaceState();
+  let state: SpaceState = emptySpaceState();
   let run = -1;
   for (const row of rows) {
-    if (row.run !== run) [run, state] = [row.run as number, emptyWorkspaceState()];
+    if (row.run !== run) [run, state] = [row.run as number, emptySpaceState()];
     const fact = decode.fact(row.fact);
-    expect(decode.state(row.state)).toEqual(row.state as WorkspaceState);
+    expect(decode.state(row.state)).toEqual(row.state as SpaceState);
     decode.view(row.view);
     decode.inbox(row.inbox);
     state = reduce(state, fact)[0];

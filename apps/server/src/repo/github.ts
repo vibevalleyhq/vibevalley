@@ -10,7 +10,7 @@ import { jsonOrNone } from "#/base/json.ts";
 import { git, type GitError, gitQuiet, reason, run } from "./git.ts";
 import { repository } from "./repository.ts";
 import { lexists } from "./stats.ts";
-import { type Merged, MergeFailure, ProjectError, type ProjectFolder, pullRequestFile, pullRequestText, type Workplace } from "./workplace.ts";
+import { type Merged, MergeFailure, RepoError, type RepoFolder, pullRequestFile, pullRequestText, type Workplace } from "./workplace.ts";
 
 export const cloneTimeoutMs = 3 * 60_000;
 
@@ -43,47 +43,47 @@ export const runGitHub: GitHubRun = (...args) =>
     (r) => ({ out: r.stdout + r.stderr, ok: r.code === 0, missing: r.missing }),
   );
 
-export const probeGitHub = Effect.fn("Project.probeGitHub")(function* (gh: GitHubRun) {
+export const probeGitHub = Effect.fn("Repo.probeGitHub")(function* (gh: GitHubRun) {
   const s: T.GitHubStatus = { checkedAt: yield* Clock.currentTimeMillis, installed: false, loggedIn: false, reason: "" };
   const version = yield* gh("--version");
-  if (!version.ok) return { ...s, reason: version.missing ? t("server.project.gh.missing") : t("server.project.gh.failed") };
+  if (!version.ok) return { ...s, reason: version.missing ? t("server.repo.gh.missing") : t("server.repo.gh.failed") };
   const v = ghVersion.exec(version.out)?.[1];
   const installed: T.GitHubStatus = { ...s, installed: true, ...(v ? { version: v } : {}) };
   const auth = yield* gh("auth", "status", "--hostname", "github.com", "--active");
-  if (!auth.ok) return { ...installed, reason: t("server.project.gh.signedOut") };
+  if (!auth.ok) return { ...installed, reason: t("server.repo.gh.signedOut") };
   const account = ghAccount.exec(auth.out)?.[1];
-  if (!account) return { ...installed, reason: t("server.project.gh.noAccount") };
+  if (!account) return { ...installed, reason: t("server.repo.gh.noAccount") };
   return { ...installed, loggedIn: true, account };
 });
 
-const fail = (message: string) => Effect.fail(new ProjectError({ message }));
+const fail = (message: string) => Effect.fail(new RepoError({ message }));
 
-export interface ProjectGitHubEnv {
+export interface RepoGitHubEnv {
   readonly root: string;
   readonly fs: FileSystem.FileSystem;
   readonly gh: GitHubRun;
   readonly push?: ((cwd: string, branch: string) => Effect.Effect<boolean>) | undefined;
-  readonly prProjects: ReadonlySet<string>;
-  readonly list: () => Effect.Effect<ProjectFolder[]>;
+  readonly prRepos: ReadonlySet<string>;
+  readonly list: () => Effect.Effect<RepoFolder[]>;
   readonly exists: (path: string) => Effect.Effect<boolean>;
-  readonly serially: <A, E, R>(project: string, effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+  readonly serially: <A, E, R>(repo: string, effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
   readonly issueBranch: (n: number) => string;
   readonly issueWorkplace: (name: string, n: number) => Workplace & { readonly branch: string };
   readonly syncMain: (name: string) => Effect.Effect<string>;
-  readonly checkMerge: (place: Workplace, branch: string, target: string) => Effect.Effect<string, MergeFailure | GitError | ProjectError>;
+  readonly checkMerge: (place: Workplace, branch: string, target: string) => Effect.Effect<string, MergeFailure | GitError | RepoError>;
   readonly unchangedBranch: (path: string, branch: string, checked: string) => Effect.Effect<void, MergeFailure | GitError>;
-  readonly toMergeFailure: <A, R>(e: Effect.Effect<A, MergeFailure | GitError | ProjectError, R>) => Effect.Effect<A, MergeFailure, R>;
+  readonly toMergeFailure: <A, R>(e: Effect.Effect<A, MergeFailure | GitError | RepoError, R>) => Effect.Effect<A, MergeFailure, R>;
 }
 
-export const makeProjectGitHub = (env: ProjectGitHubEnv) => {
-  const { root, fs, gh, push, prProjects, list, exists, serially, issueBranch, issueWorkplace, syncMain, checkMerge, unchangedBranch, toMergeFailure } = env;
+export const makeRepoGitHub = (env: RepoGitHubEnv) => {
+  const { root, fs, gh, push, prRepos, list, exists, serially, issueBranch, issueWorkplace, syncMain, checkMerge, unchangedBranch, toMergeFailure } = env;
   let status: T.GitHubStatus | undefined;
   let capabilities = new Map<string, T.PullRequestCapability>();
 
   const capability = (name: string): T.PullRequestCapability =>
-    capabilities.get(name) ?? (status?.reason ? { available: false, reason: status.reason } : { available: false, reason: t("server.project.notChecked") });
+    capabilities.get(name) ?? (status?.reason ? { available: false, reason: status.reason } : { available: false, reason: t("server.repo.notChecked") });
 
-  const usesPullRequests = (name: string) => prProjects.has(name) && capability(name).available;
+  const usesPullRequests = (name: string) => prRepos.has(name) && capability(name).available;
 
   return {
     capability,
@@ -95,9 +95,9 @@ export const makeProjectGitHub = (env: ProjectGitHubEnv) => {
             checkedAt: 0,
             installed: false,
             loggedIn: false,
-            reason: t("server.project.github.unchecked"),
+            reason: t("server.repo.github.unchecked"),
           },
-    refreshGitHub: Effect.fn("Project.refreshGitHub")(function* () {
+    refreshGitHub: Effect.fn("Repo.refreshGitHub")(function* () {
       const probed = yield* probeGitHub(gh);
       const next = new Map<string, T.PullRequestCapability>();
       yield* Effect.forEach(
@@ -107,16 +107,16 @@ export const makeProjectGitHub = (env: ProjectGitHubEnv) => {
             let c: T.PullRequestCapability = { available: false, reason: probed.reason };
             if (probed.loggedIn) {
               const repo = githubOrigin(yield* repository(p.path).origin);
-              if (!p.git || repo === "") c = { available: false, reason: t("server.project.github.notGithub") };
+              if (!p.git || repo === "") c = { available: false, reason: t("server.repo.github.notGithub") };
               else {
                 const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
                 const permission = view.ok ? repoView(view.out)?.viewerPermission : undefined;
                 c =
                   permission === undefined
-                    ? { available: false, reason: t("server.project.github.noPermission") }
+                    ? { available: false, reason: t("server.repo.github.noPermission") }
                     : ["ADMIN", "MAINTAIN", "WRITE"].includes(permission ?? "")
                       ? { available: true, reason: "" }
-                      : { available: false, reason: t("server.project.github.readOnly") };
+                      : { available: false, reason: t("server.repo.github.readOnly") };
               }
             }
             next.set(p.name, c);
@@ -127,22 +127,22 @@ export const makeProjectGitHub = (env: ProjectGitHubEnv) => {
       capabilities = next;
       return probed;
     }),
-    submitPullRequest: Effect.fn("Project.submitPullRequest")(function* (place: Workplace, issue: T.Issue, conclusion: string) {
+    submitPullRequest: Effect.fn("Repo.submitPullRequest")(function* (place: Workplace, issue: T.Issue, conclusion: string) {
       const branch = place.branch;
-      if (!branch || branch !== issueBranch(issue.number)) return yield* fail(t("server.project.github.wrongBranch"));
+      if (!branch || branch !== issueBranch(issue.number)) return yield* fail(t("server.repo.github.wrongBranch"));
       const checked = yield* toMergeFailure(checkMerge(place, branch, ""));
       return yield* serially(
-        place.project,
+        place.repo,
         Effect.gen(function* () {
-          const path = join(root, place.project);
+          const path = join(root, place.repo);
           yield* toMergeFailure(unchangedBranch(path, branch, checked));
-          if ((yield* toMergeFailure(git(place.cwd, "status", "--porcelain"))) !== "") return yield* fail(t("server.project.github.changedDuringCheck"));
+          if ((yield* toMergeFailure(git(place.cwd, "status", "--porcelain"))) !== "") return yield* fail(t("server.repo.github.changedDuringCheck"));
           const repo = githubOrigin(yield* repository(path).origin);
-          if (repo === "") return yield* fail(t("server.project.github.notGithub"));
-          const main = yield* repository(path).main.pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })));
+          if (repo === "") return yield* fail(t("server.repo.github.notGithub"));
+          const main = yield* repository(path).main.pipe(Effect.mapError((e) => new RepoError({ message: reason(e), cause: e })));
           const files = yield* repository(path)
             .conflicts(main, checked)
-            .pipe(Effect.mapError((e) => new ProjectError({ message: reason(e), cause: e })));
+            .pipe(Effect.mapError((e) => new RepoError({ message: reason(e), cause: e })));
           if (files.length > 0) return yield* MergeFailure.conflict(main, files);
           const pushed = push
             ? yield* push(place.cwd, branch)
@@ -150,16 +150,16 @@ export const makeProjectGitHub = (env: ProjectGitHubEnv) => {
                 cwd: place.cwd,
                 timeoutMs: cloneTimeoutMs,
               })).code === 0;
-          if (!pushed) return yield* fail(t("server.project.github.pushFailed"));
+          if (!pushed) return yield* fail(t("server.repo.github.pushFailed"));
           if (issue.pullRequest?.state === "open") return issue.pullRequest;
           // Recover a creation whose receipt was lost before it was saved.
           const listed = yield* gh("pr", "list", "--repo", repo, "--head", branch, "--base", main, "--state", "open", "--json", "url,number");
-          if (!listed.ok) return yield* fail(t("server.project.github.listFailed"));
+          if (!listed.ok) return yield* fail(t("server.repo.github.listFailed"));
           const existing = openPullRequests(listed.out);
-          if (!existing) return yield* fail(t("server.project.github.listUnread"));
+          if (!existing) return yield* fail(t("server.repo.github.listUnread"));
           const [firstPr] = existing;
           if (firstPr) return { ...firstPr, state: "open" as const };
-          const check = (yield* lexists(join(place.cwd, ".vibevalley/check"))) ? t("server.project.github.checked") : t("server.project.github.noCheck");
+          const check = (yield* lexists(join(place.cwd, ".vibevalley/check"))) ? t("server.repo.github.checked") : t("server.repo.github.noCheck");
           // The helper's own title and body when it wrote them (session/prompts.ts tells it where), else the issue's.
           const written = yield* gitQuiet(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", pullRequestFile);
           const given = written === "" ? undefined : pullRequestText(yield* fs.readFileString(written).pipe(Effect.orElseSucceed(() => "")));
@@ -175,40 +175,40 @@ export const makeProjectGitHub = (env: ProjectGitHubEnv) => {
             "--title",
             given?.title ?? issue.title,
             "--body",
-            given?.body || t("server.project.github.body", { n: issue.number, conclusion, check }),
+            given?.body || t("server.repo.github.body", { n: issue.number, conclusion, check }),
           );
-          if (!created.ok) return yield* fail(t("server.project.github.createFailed"));
+          if (!created.ok) return yield* fail(t("server.repo.github.createFailed"));
           const url = created.out.trim();
           const prefix = `https://github.com/${repo}/pull/`;
           const number = Number(url.slice(prefix.length));
-          if (!url.startsWith(prefix) || !Number.isSafeInteger(number) || number <= 0) return yield* fail(t("server.project.github.urlUnread"));
+          if (!url.startsWith(prefix) || !Number.isSafeInteger(number) || number <= 0) return yield* fail(t("server.repo.github.urlUnread"));
           return { url, number, state: "open" as const };
         }),
       );
     }),
-    pullRequestState: Effect.fn("Project.pullRequestState")(function* (name: string, n: number) {
+    pullRequestState: Effect.fn("Repo.pullRequestState")(function* (name: string, n: number) {
       const repo = githubOrigin(yield* repository(join(root, name)).origin);
-      if (repo === "") return yield* fail(t("server.project.github.notGithub"));
+      if (repo === "") return yield* fail(t("server.repo.github.notGithub"));
       const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
-      if (!viewed.ok) return yield* fail(t("server.project.github.viewFailed", { n }));
+      if (!viewed.ok) return yield* fail(t("server.repo.github.viewFailed", { n }));
       const result = pullRequestView(viewed.out);
-      if (!result) return yield* fail(t("server.project.github.stateUnread", { n }));
+      if (!result) return yield* fail(t("server.repo.github.stateUnread", { n }));
       if (result.mergedAt || result.state === "MERGED") return "merged" as const;
       if (result.state === "OPEN") return "open" as const;
       if (result.state === "CLOSED") return "closed" as const;
-      return yield* fail(t("server.project.github.stateUnknown", { n }));
+      return yield* fail(t("server.repo.github.stateUnknown", { n }));
     }),
-    githubRequest: Effect.fn("Project.githubRequest")(function* (...args: string[]) {
+    githubRequest: Effect.fn("Repo.githubRequest")(function* (...args: string[]) {
       return yield* gh(...args);
     }),
-    githubRemote: Effect.fn("Project.githubRemote")(function* (name: string) {
+    githubRemote: Effect.fn("Repo.githubRemote")(function* (name: string) {
       const repo = githubOrigin(yield* repository(join(root, name)).origin);
-      if (repo === "") return yield* fail(t("server.project.github.notGithub"));
+      if (repo === "") return yield* fail(t("server.repo.github.notGithub"));
       return repo;
     }),
-    resolveReviewThread: Effect.fn("Project.resolveReviewThread")(function* (name: string, thread: string) {
+    resolveReviewThread: Effect.fn("Repo.resolveReviewThread")(function* (name: string, thread: string) {
       const repo = githubOrigin(yield* repository(join(root, name)).origin);
-      if (repo === "") return yield* fail(t("server.project.github.notGithub"));
+      if (repo === "") return yield* fail(t("server.repo.github.notGithub"));
       const resolved = yield* gh(
         "api",
         "graphql",
@@ -217,9 +217,9 @@ export const makeProjectGitHub = (env: ProjectGitHubEnv) => {
         "-F",
         `thread=${thread}`,
       );
-      if (!resolved.ok) return yield* fail(t("server.project.github.resolveFailed"));
+      if (!resolved.ok) return yield* fail(t("server.repo.github.resolveFailed"));
     }),
-    finishPullRequest: Effect.fn("Project.finishPullRequest")(function* (name: string, n: number): Effect.fn.Return<Merged, ProjectError> {
+    finishPullRequest: Effect.fn("Repo.finishPullRequest")(function* (name: string, n: number): Effect.fn.Return<Merged, RepoError> {
       return yield* serially(
         name,
         Effect.gen(function* () {
@@ -228,7 +228,7 @@ export const makeProjectGitHub = (env: ProjectGitHubEnv) => {
           const path = join(root, name);
           if (yield* exists(place.cwd)) {
             const removed = yield* repository(path).removeWorktree(place.cwd, true);
-            if (removed) return yield* fail(t("server.project.github.worktreeLeft", { why: removed }));
+            if (removed) return yield* fail(t("server.repo.github.worktreeLeft", { why: removed }));
           }
           if (
             yield* repository(path)
@@ -236,7 +236,7 @@ export const makeProjectGitHub = (env: ProjectGitHubEnv) => {
               .pipe(Effect.orElseSucceed(() => false))
           ) {
             const deleted = yield* repository(path).deleteBranch(place.branch);
-            if (deleted) return yield* fail(t("server.project.github.branchLeft", { why: deleted }));
+            if (deleted) return yield* fail(t("server.repo.github.branchLeft", { why: deleted }));
           }
           return { text: "", commits: 0 };
         }),

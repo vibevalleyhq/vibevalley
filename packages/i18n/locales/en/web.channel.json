@@ -4,7 +4,7 @@
     "issues": "Tickets",
     "crons": "Scheduled tasks"
   },
-  "defaultProject": "default project {project}",
+  "defaultRepo": "default repo {repo}",
   "channels": "Channels",
   "defaultHint": "The default channel: you, the manager and the helpers are all here",
   "findHint": "Find in this channel…",
@@ -35,16 +35,16 @@
   "sayInThread": "Say it in the thread; {name} sees it",
   "reply": "Reply in this thread",
   "dialog": {
-    "projectExample": "such as clock-in",
+    "repoExample": "such as clock-in",
     "cancel": "Cancel",
     "name": "Name",
     "nameHint": "Letters, digits, Chinese characters, - and _, up to 24",
     "nameExample": "such as clock-in",
     "description": "Description (optional)",
     "descriptionHint": "What is this channel for?",
-    "project": "Default project (optional)",
-    "projectHint": "Work sent in this channel without a project goes to this one",
-    "projectNone": "Empty means none: the manager asks which project when sending work",
+    "repo": "Default repo (optional)",
+    "repoHint": "Work sent in this channel without a repo goes to this one",
+    "repoNone": "Empty means none: the manager asks which repo when sending work",
     "settingsOf": "Settings of # {name}",
     "save": "Save"
   },
@@ -247,7 +247,7 @@
   "commands": {
     "issue": {
       "name": "Write a ticket",
-      "note": "/issue title: into the backlog, in this channel's project",
+      "note": "/issue title: into the backlog, in this channel's repo",
       "needs": "Write the ticket's title after /issue"
     },
     "remember": {

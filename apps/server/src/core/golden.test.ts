@@ -3,7 +3,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import type { Channel, WorkspaceState, Fact, Issue, Cron, CronRequest, Session, Conflict } from "@vibevalley/protocol";
+import type { Channel, SpaceState, Fact, Issue, Cron, CronRequest, Session, Conflict } from "@vibevalley/protocol";
 import { latestSessionIdOf, phaseText, stageWantsOwner } from "@vibevalley/protocol/rules";
 import { jsonDiff } from "@vibevalley/testkit/golden";
 
@@ -15,7 +15,7 @@ import { issueStageOf, withIssueStatuses } from "#/issue/status.ts";
 import { reduce } from "#/projection/reduce.ts";
 import { yuan } from "#/runtime/quota.ts";
 
-import { emptyWorkspaceState } from "./core.ts";
+import { emptySpaceState } from "./core.ts";
 
 const testdata = new URL("./testdata/", import.meta.url);
 
@@ -57,12 +57,12 @@ describe("the golden files", () => {
     expect(rows.length).toBeGreaterThan(1000);
     const f = failures("reduce.jsonl.gz", rows);
     let run = -1;
-    let state: WorkspaceState = emptyWorkspaceState();
+    let state: SpaceState = emptySpaceState();
     rows.forEach((row, i) => {
       const line = i + 1;
       if (row.run !== run) {
         run = row.run as number;
-        state = emptyWorkspaceState();
+        state = emptySpaceState();
       }
       const fact = row.fact as Fact;
       const effects = effectsOf(state, fact);
@@ -130,7 +130,7 @@ describe("the golden files", () => {
           break;
         }
         case "patrol":
-          same("inbox", inbox(input.state as WorkspaceState));
+          same("inbox", inbox(input.state as SpaceState));
           break;
         default:
           throw new Error(`line ${line}: no kind ${kind}`);

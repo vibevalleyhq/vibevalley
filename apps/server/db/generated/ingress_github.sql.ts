@@ -5,24 +5,24 @@ import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
 export const EnsureGitHubCursorParams = Schema.Struct({
-  ["project"]: Schema.String,
+  ["repo"]: Schema.String,
   ["pr_number"]: Schema.Int,
 })
 export type EnsureGitHubCursorParams = typeof EnsureGitHubCursorParams.Type
 
 
-export const EnsureGitHubCursorSql = "-- name: EnsureGitHubCursor :exec\ninsert into ingress_github (project, pr_number) values (?1, ?2) on conflict do nothing;"
+export const EnsureGitHubCursorSql = "-- name: EnsureGitHubCursor :exec\ninsert into ingress_github (repo, pr_number) values (?1, ?2) on conflict do nothing;"
 
 export const ensureGitHubCursor = Effect.fn("EnsureGitHubCursor")(function* (params: EnsureGitHubCursorParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: EnsureGitHubCursorParams,
-    execute: (p) => sql.unsafe(EnsureGitHubCursorSql, [p["project"], p["pr_number"]]),
+    execute: (p) => sql.unsafe(EnsureGitHubCursorSql, [p["repo"], p["pr_number"]]),
   })(params)
 })
 
 export const GitHubCursorParams = Schema.Struct({
-  ["project"]: Schema.String,
+  ["repo"]: Schema.String,
   ["pr_number"]: Schema.Int,
 })
 export type GitHubCursorParams = typeof GitHubCursorParams.Type
@@ -35,32 +35,32 @@ export const GitHubCursorResult = Schema.Struct({
 export type GitHubCursorResult = typeof GitHubCursorResult.Type
 
 
-export const GitHubCursorSql = "-- name: GitHubCursor :one\nselect check_fingerprint, check_revision from ingress_github where project = ?1 and pr_number = ?2;"
+export const GitHubCursorSql = "-- name: GitHubCursor :one\nselect check_fingerprint, check_revision from ingress_github where repo = ?1 and pr_number = ?2;"
 
 export const gitHubCursor = Effect.fn("GitHubCursor")(function* (params: GitHubCursorParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findOne({
     Request: GitHubCursorParams,
     Result: GitHubCursorResult,
-    execute: (p) => sql.unsafe(GitHubCursorSql, [p["project"], p["pr_number"]]),
+    execute: (p) => sql.unsafe(GitHubCursorSql, [p["repo"], p["pr_number"]]),
   })(params)
 })
 
 export const ObserveGitHubChecksParams = Schema.Struct({
   ["check_fingerprint"]: Schema.String,
   ["check_revision"]: Schema.Int,
-  ["project"]: Schema.String,
+  ["repo"]: Schema.String,
   ["pr_number"]: Schema.Int,
 })
 export type ObserveGitHubChecksParams = typeof ObserveGitHubChecksParams.Type
 
 
-export const ObserveGitHubChecksSql = "-- name: ObserveGitHubChecks :exec\nupdate ingress_github set check_fingerprint = ?1, check_revision = ?2\nwhere project = ?3 and pr_number = ?4;"
+export const ObserveGitHubChecksSql = "-- name: ObserveGitHubChecks :exec\nupdate ingress_github set check_fingerprint = ?1, check_revision = ?2\nwhere repo = ?3 and pr_number = ?4;"
 
 export const observeGitHubChecks = Effect.fn("ObserveGitHubChecks")(function* (params: ObserveGitHubChecksParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: ObserveGitHubChecksParams,
-    execute: (p) => sql.unsafe(ObserveGitHubChecksSql, [p["check_fingerprint"], p["check_revision"], p["project"], p["pr_number"]]),
+    execute: (p) => sql.unsafe(ObserveGitHubChecksSql, [p["check_fingerprint"], p["check_revision"], p["repo"], p["pr_number"]]),
   })(params)
 })

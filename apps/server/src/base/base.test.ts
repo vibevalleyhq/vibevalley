@@ -27,7 +27,7 @@ test("secrets are taken out of text, and the rest is left", () => {
     expect(redact(input!)).toBe(want);
   }
   for (const kept of [
-    "这个项目测试用 pnpm test",
+    "这个仓库测试用 pnpm test",
     "登录态统一走 refreshSession()",
     "the token is refreshed every hour",
     "迁移文件放 db/migrations，表名用单数",

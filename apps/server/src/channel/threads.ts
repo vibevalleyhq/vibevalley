@@ -68,7 +68,7 @@ export const sessionThreads = (r: ChannelRecords, w: ChannelWriting) =>
         channel: channel,
         from: by,
         kind: "dispatch",
-        text: t("server.channel.dispatch.sent", { id: h.id, name: h.name, project: h.project ?? t("server.channel.dispatch.project"), what }),
+        text: t("server.channel.dispatch.sent", { id: h.id, name: h.name, repo: h.repo ?? t("server.channel.dispatch.repo"), what }),
         meta: { session: h.id },
         thread: subject,
       });

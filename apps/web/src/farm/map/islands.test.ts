@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import type { Issue, Phase, ProjectSummary, Session } from "@vibevalley/protocol";
+import type { Issue, Phase, RepoSummary, Session } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { growthOf, type Island, islandScale, islandsOf, islandText, homeless, mapPose, mapTally, plotsIn } from "./islands";
 
-test("a project's crop grows by its newest commit", () => {
+test("a repo's crop grows by its newest commit", () => {
   const day = 86400000;
   expect(growthOf(undefined, 0).crop).toBe("empty");
   expect(growthOf(0, day / 2).label).toBe("正旺");
@@ -16,7 +16,7 @@ test("a project's crop grows by its newest commit", () => {
 });
 
 const working: Phase = { _tag: "working", since: 0, doing: { action: "edit_file", label: "src/a.ts" } };
-const project = (name: string, last?: number, maxSessions = 3): ProjectSummary => ({
+const repo = (name: string, last?: number, maxSessions = 3): RepoSummary => ({
   name,
   path: `/work/${name}`,
   git: true,
@@ -25,16 +25,16 @@ const project = (name: string, last?: number, maxSessions = 3): ProjectSummary =
   ...(last !== undefined ? { last } : {}),
 });
 const todo = (id: string, p: string, queuedAt?: number) =>
-  ({ id, title: `活 ${id}`, project: p, status: queuedAt === undefined ? "backlog" : "todo", ...(queuedAt !== undefined ? { queuedAt } : {}) }) as Issue;
+  ({ id, title: `活 ${id}`, repo: p, status: queuedAt === undefined ? "backlog" : "todo", ...(queuedAt !== undefined ? { queuedAt } : {}) }) as Issue;
 const hired = (id: string, p: string | undefined, phase: Phase, at = 0, more: Partial<Session> = {}) =>
-  ({ id, name: `帮工${id}`, agent: "a", hiredAt: at, phase, brief: "", ...(p ? { project: p } : {}), ...more, refining: false }) as Session;
+  ({ id, name: `帮工${id}`, agent: "a", hiredAt: at, phase, brief: "", ...(p ? { repo: p } : {}), ...more, refining: false }) as Session;
 const kinds = (i: Island) => i.spots.map((s) => (s.kind === "taken" ? s.session.id : s.kind));
 
 describe("islands", () => {
-  const projects = [project("clock-in", 9), project("docs", 5), project("task-smoke", 7)];
-  test("worktrees in the order the helpers came, then the room the project and the farm leave", () => {
+  const repos = [repo("clock-in", 9), repo("docs", 5), repo("task-smoke", 7)];
+  test("worktrees in the order the helpers came, then the room the repo and the farm leave", () => {
     const islands = islandsOf({
-      projects,
+      repos,
       sessions: [
         hired("w2", "clock-in", { _tag: "done" }, 2),
         hired("w1", "clock-in", working, 1, { issue: issueId("t1") }),
@@ -45,7 +45,7 @@ describe("islands", () => {
       plots: { t1: { crop: "leafy" } },
       issues: [todo("b2", "docs", 8), todo("b1", "docs", 3), todo("b3", "clock-in")],
     });
-    expect(islands.map((i) => i.project)).toEqual(["clock-in", "docs", "task-smoke"]);
+    expect(islands.map((i) => i.repo)).toEqual(["clock-in", "docs", "task-smoke"]);
     const clock = islands[0]!;
     expect(kinds(clock)).toEqual(["w1", "w2", "w4", "open", "open"]);
     expect([clock.working, clock.maxSessions]).toEqual([1, 3]);
@@ -59,21 +59,21 @@ describe("islands", () => {
     expect(mapTally(islands)).toEqual({ peopled: 2, working: 2, queued: 2 });
   });
 
-  test("a full project has no room; when every bed is working, its open plots are shut", () => {
-    const full = islandsOf({ projects, sessions: ["a", "b", "c"].map((id) => hired(id, "clock-in", working)), plots: {}, issues: [] })[0]!;
+  test("a full repo has no room; when every bed is working, its open plots are shut", () => {
+    const full = islandsOf({ repos, sessions: ["a", "b", "c"].map((id) => hired(id, "clock-in", working)), plots: {}, issues: [] })[0]!;
     expect(kinds(full)).toEqual(["a", "b", "c"]);
     expect(islandText(full)).toBe("在干 3/3（满了）");
     const busy = islandsOf({
-      projects,
+      repos,
       sessions: Array.from({ length: 6 }, (_, i) => hired(`h${i}`, i % 2 === 0 ? "clock-in" : "docs", working)),
       plots: {},
       issues: [],
     });
-    expect(kinds(busy.find((i) => i.project === "task-smoke")!)).toEqual(["shut", "shut", "shut"]);
+    expect(kinds(busy.find((i) => i.repo === "task-smoke")!)).toEqual(["shut", "shut", "shut"]);
   });
 
-  test("a project gone from the list keeps its helpers and takes no more", () => {
-    const gone = islandsOf({ projects: [], sessions: [hired("w1", "old", { _tag: "done" })], plots: {}, issues: [] });
+  test("a repo gone from the list keeps its helpers and takes no more", () => {
+    const gone = islandsOf({ repos: [], sessions: [hired("w1", "old", { _tag: "done" })], plots: {}, issues: [] });
     expect(gone).toHaveLength(1);
     expect(gone[0]!.summary).toBeUndefined();
     expect(kinds(gone[0]!)).toEqual(["w1"]);
@@ -82,7 +82,7 @@ describe("islands", () => {
 
   test("a yard holds six plots at most", () => {
     const crowded = islandsOf({
-      projects: [project("big", undefined, 6)],
+      repos: [repo("big", undefined, 6)],
       sessions: Array.from({ length: 5 }, (_, i) => hired(`r${i}`, "big", { _tag: "resting" })),
       plots: {},
       issues: [],

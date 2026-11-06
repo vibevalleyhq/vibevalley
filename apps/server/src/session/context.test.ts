@@ -11,7 +11,7 @@ import { Agent } from "#/agent/agent.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Executor } from "#/executor/executor.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
@@ -22,7 +22,7 @@ const profile = () => ({ ...starter("lab"), effort: "" });
 const delivery = (trigger: DeliveryInput["trigger"]): DeliveryInput => ({ trigger, envelopeIds: [], byOwnerComment: false });
 
 describe("an agent's channel context", () => {
-  it.live("regression: a channel context resumes without an issue or a project checkout", () => {
+  it.live("regression: a channel context resumes without an issue or a repo checkout", () => {
     const config = testConfig();
     const turns: ScriptedTurn[] = [];
     const runtime = scriptedRuntime({
@@ -37,7 +37,7 @@ describe("an agent's channel context", () => {
       const sessions = yield* Session;
       const executor = yield* Executor;
       const core = yield* Core;
-      const projects = yield* Project;
+      const repos = yield* Repo;
       const channel = (yield* Channel).defaultChannel();
       const agent = profile();
       yield* (yield* Agent).save(agent);
@@ -47,10 +47,10 @@ describe("an agent's channel context", () => {
       if (!session) return;
       yield* until(() => core.session(session.id)?.phase._tag === "done", "the first answer");
       expect(session.issue).toBeUndefined();
-      expect(session.project).toBeUndefined();
+      expect(session.repo).toBeUndefined();
       expect(session.channel).toBe(channel);
       expect(core.state().issues).toEqual([]);
-      expect(yield* projects.list()).toEqual([]);
+      expect(yield* repos.list()).toEqual([]);
       const cwd = turns[0]?.options.cwd ?? "";
       expect(dirname(cwd)).toBe(join(realpathSync(config.workRoot), "contexts"));
       expect(basename(cwd).startsWith(session.id + "-")).toBe(true);

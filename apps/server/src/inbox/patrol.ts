@@ -1,4 +1,4 @@
-import { type InboxKind, type WorkspaceState } from "@vibevalley/protocol";
+import { type InboxKind, type SpaceState } from "@vibevalley/protocol";
 
 import { inboxEntries } from "./items.ts";
 import { patrolAgo } from "./prompts.ts";
@@ -32,7 +32,7 @@ export const emptyPatrol = (): PatrolMemory => ({ firstSeen: {}, reported: {} })
 
 /** Things no longer hanging are forgotten, so if they come back they are new. */
 export function patrolStep(
-  state: WorkspaceState,
+  state: SpaceState,
   now: number,
   memory: PatrolMemory,
   ownerSeen: Readonly<Record<string, number>> = {},

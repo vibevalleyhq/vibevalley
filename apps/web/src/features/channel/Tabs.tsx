@@ -43,7 +43,7 @@ export function Sessions(props: { channel: Channel }) {
                   <span class="truncate text-sm">
                     <span class="font-semibold">{h.name}</span>
                     <span class="text-xs text-muted">
-                      {"  "}@{h.id} {h.project ?? ""}
+                      {"  "}@{h.id} {h.repo ?? ""}
                       {h.branch ? ` · ${h.branch}` : ""}
                     </span>
                   </span>

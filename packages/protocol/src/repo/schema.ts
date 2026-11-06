@@ -22,8 +22,8 @@ export const Author: Codec<T.Author> = Schema.Struct({
   commits: Schema.Finite,
 });
 
-export const ProjectActivity: Codec<T.ProjectActivity> = Schema.Struct({
-  project: Schema.String,
+export const RepoActivity: Codec<T.RepoActivity> = Schema.Struct({
+  repo: Schema.String,
   at: Schema.Finite,
   days: Schema.mutable(Schema.Array(DayCount)),
   authors: Schema.mutable(Schema.Array(Author)),
@@ -40,13 +40,13 @@ export const LanguageCount: Codec<T.LanguageCount> = Schema.Struct({
   blanks: Schema.Finite,
 });
 
-export const ProjectLanguages: Codec<T.ProjectLanguages> = Schema.Struct({
-  project: Schema.String,
+export const RepoLanguages: Codec<T.RepoLanguages> = Schema.Struct({
+  repo: Schema.String,
   at: Schema.Finite,
   languages: Schema.mutable(Schema.Array(LanguageCount)),
 });
 
-export const ProjectStack: Codec<T.ProjectStack> = Schema.Struct({
+export const RepoStack: Codec<T.RepoStack> = Schema.Struct({
   name: Schema.String,
   label: Schema.String,
   test: Schema.optionalKey(Schema.String),
@@ -74,9 +74,9 @@ export const TemplateKind: Codec<T.TemplateKind> = Schema.Struct({
   templates: Schema.mutable(Schema.Array(IssueTemplate)),
 });
 
-export const ProjectTemplates: Codec<T.ProjectTemplates> = Schema.Struct({
-  project: Schema.String,
-  stack: ProjectStack,
+export const RepoTemplates: Codec<T.RepoTemplates> = Schema.Struct({
+  repo: Schema.String,
+  stack: RepoStack,
   recent: Schema.mutable(Schema.Array(Schema.String)),
   kinds: Schema.mutable(Schema.Array(TemplateKind)),
 });
@@ -86,7 +86,7 @@ export const PullRequestCapability: Codec<T.PullRequestCapability> = Schema.Stru
   reason: Schema.String,
 });
 
-export const ProjectSummary: Codec<T.ProjectSummary> = Schema.Struct({
+export const RepoSummary: Codec<T.RepoSummary> = Schema.Struct({
   name: Schema.String,
   path: Schema.String,
   git: Schema.Boolean,
@@ -95,7 +95,7 @@ export const ProjectSummary: Codec<T.ProjectSummary> = Schema.Struct({
   pullRequest: PullRequestCapability,
 });
 
-export const NewProject: Codec<T.NewProject> = Schema.Struct({
+export const NewRepo: Codec<T.NewRepo> = Schema.Struct({
   name: Schema.String,
   github: Schema.optionalKey(Schema.String),
 });

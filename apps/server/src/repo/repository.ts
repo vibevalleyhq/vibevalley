@@ -18,7 +18,7 @@ const why = (ran: Effect.Effect<Ran>) => Effect.map(ran, (r) => (r.code === 0 ? 
 
 /** The repository (or a worktree of it) at path. */
 export const repository = (path: string) => {
-  /** The branch checked out: in a project's own folder, its main. */
+  /** The branch checked out: in a repo's own folder, its main. */
   const main = git(path, "symbolic-ref", "--short", "HEAD");
 
   /** As the machine's git user, else as vibevalley. */
@@ -28,7 +28,7 @@ export const repository = (path: string) => {
   const conflicts = Effect.fnUntraced(function* (base: string, branch: string): Effect.fn.Return<string[], GitError> {
     const r = yield* gitRun(path, "merge-tree", "--write-tree", "--name-only", "--no-messages", base, branch);
     if (r.code === 0) return [];
-    if (r.code !== 1) return yield* GitError.of(r.code, r.code < 0 ? r.stderr : t("server.project.mergeTree", { code: r.code }));
+    if (r.code !== 1) return yield* GitError.of(r.code, r.code < 0 ? r.stderr : t("server.repo.mergeTree", { code: r.code }));
     // First line: the tree it would write; then each conflicted file.
     return [
       ...new Set(
@@ -71,7 +71,7 @@ export const repository = (path: string) => {
       return yield* git(path, ...args).pipe(Effect.catch(() => git(path, ...asFarm, ...args)));
     }),
     /** What branch changes against main, with what is uncommitted in cwd (none for ""). */
-    describe: Effect.fnUntraced(function* (project: string, cwd: string, branch: string | undefined) {
+    describe: Effect.fnUntraced(function* (repo: string, cwd: string, branch: string | undefined) {
       const base = yield* main;
       const uncommitted: UncommittedItem[] = [];
       if (cwd !== "") {
@@ -86,7 +86,7 @@ export const repository = (path: string) => {
         }
       }
       const changes: Changes = {
-        project,
+        repo,
         base,
         commits: [],
         files: [],
@@ -140,8 +140,7 @@ export const repository = (path: string) => {
             // A chunk cut out of the middle of the diff lost its trailing newline to the split.
             let chunk = i < chunks.length - 1 ? found + "\n" : found;
             const lines = chunk.split("\n");
-            if (lines.length > patchLines)
-              chunk = lines.slice(0, patchLines).join("\n") + "\n" + t("server.project.moreLines", { n: lines.length - patchLines });
+            if (lines.length > patchLines) chunk = lines.slice(0, patchLines).join("\n") + "\n" + t("server.repo.moreLines", { n: lines.length - patchLines });
             if (chunk.length <= budget) {
               budget -= chunk.length;
               changed.patch = chunk;

@@ -77,7 +77,7 @@ export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.Issu
 
 const at = (since: number | undefined) => (since !== undefined ? { since } : {});
 
-export function issueStageIn(t: T.Issue, state: T.WorkspaceState): T.IssueStage {
+export function issueStageIn(t: T.Issue, state: T.SpaceState): T.IssueStage {
   const last = latestSessionIdOf(t);
   return issueStageOf(t, last === undefined ? undefined : sessionOf(state, last));
 }
@@ -88,19 +88,19 @@ const spaces = /\s+/u;
  * the owner, the longest waiting first. */
 export function pickIssues(all: readonly T.Issue[], f: T.IssueFilter, now: number): T.Issue[] {
   const words = (f.text ?? "").split(spaces).filter(Boolean);
-  const project = (f.project ?? "").trim();
+  const repo = (f.repo ?? "").trim();
   let found = all.filter(
     (item) =>
       (f.status ? item.status === f.status : f.closed === true || (item.status !== "done" && item.status !== "canceled")) &&
       (f.wantsOwner !== true || stageWantsOwner(item.stage.state)) &&
-      (!project || item.project === project) &&
+      (!repo || item.repo === repo) &&
       words.every((w) => (item.title + "\n" + item.description).includes(w)),
   );
   if (f.wantsOwner === true) found = found.toSorted((a, b) => (a.stage.since ?? now) - (b.stage.since ?? now));
   return f.limit != null && f.limit > 0 ? found.slice(0, Math.trunc(f.limit)) : found;
 }
 
-export function issueStatusOf(t: T.Issue, state: T.WorkspaceState): T.IssueStatus {
+export function issueStatusOf(t: T.Issue, state: T.SpaceState): T.IssueStatus {
   // Closed, the verdict is written down: done with what it delivered, else canceled (a close that does not say how too).
   if (t.delivered !== undefined || t.canceled !== undefined || t.closedAt !== undefined) return t.delivered !== undefined ? "done" : "canceled";
   const active = latestSessionIdOf(t);
@@ -145,13 +145,13 @@ export function withIssue(all: readonly T.Issue[] | undefined, t: T.Issue): T.Is
   return next.toSorted(issueOrder);
 }
 
-export function issueRefiningOf(t: T.Issue, state: T.WorkspaceState): T.IssueRefining | undefined {
+export function issueRefiningOf(t: T.Issue, state: T.SpaceState): T.IssueRefining | undefined {
   const h = state.sessions.find((h) => h.refining && h.issue === t.id);
   return h ? { session: h.id, name: h.name } : undefined;
 }
 
 /** The same array when none changed. */
-export function withIssueStatuses(state: T.WorkspaceState): T.WorkspaceState {
+export function withIssueStatuses(state: T.SpaceState): T.SpaceState {
   let next: T.Issue[] | undefined;
   state.issues.forEach((t, i) => {
     const status = issueStatusOf(t, state);

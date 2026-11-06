@@ -2,7 +2,7 @@
   "lookIn": {
     "issue": "列出工单，找它的编号",
     "session": "列出帮工，找它的 id",
-    "project": "列出项目，找它的名字",
+    "repo": "列出仓库，找它的名字",
     "runtime": "列出农机，找它的 id",
     "agent": "列出档案，找它的 id",
     "skill": "列出技能，找它的 id",
@@ -16,7 +16,7 @@
     "artifact": "列出稿子，找它的 id",
     "pkm": "列出笔记页，找它的名字"
   },
-  "projectRef": "项目 {id}",
+  "repoRef": "仓库 {id}",
   "helperRef": "帮工 {id}",
   "archiveRef": "旧账 {name}"
 }

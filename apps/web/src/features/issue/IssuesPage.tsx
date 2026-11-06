@@ -21,7 +21,7 @@ import { Segmented } from "#/ui/Segmented.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 import { IssueBoard } from "./Board";
-import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardProject, filterAny, filterShows, type Lane, noFilter } from "./cards";
+import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardRepo, filterAny, filterShows, type Lane, noFilter } from "./cards";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { type BoardLook, boardLook, boardViews, viewLabel } from "./display";
 import { DisplayMenu } from "./DisplayMenu";
@@ -42,15 +42,15 @@ export function IssuesPage(props: { rest: string }) {
   const router = useRouter();
   const core = useCore();
   const id = () => props.rest || undefined;
-  // The project and the helper are in the address, so a reload or a link keeps the board as filtered; the words typed
+  // The repo and the helper are in the address, so a reload or a link keeps the board as filtered; the words typed
   // are not, being half a thought.
-  const [project, setProject] = useSearchParam("project");
+  const [repo, setRepo] = useSearchParam("repo");
   const [agent, setAgent] = useSearchParam("agent");
   const [query, setQuery] = createSignal("");
-  const filter = (): BoardFilter => ({ query: query(), project: project(), agent: agent() });
+  const filter = (): BoardFilter => ({ query: query(), repo: repo(), agent: agent() });
   const setFilter = (f: BoardFilter) => {
     setQuery(f.query);
-    setProject(f.project);
+    setRepo(f.repo);
     setAgent(f.agent);
   };
   const [older, setOlder] = createSignal(false);
@@ -62,7 +62,7 @@ export function IssuesPage(props: { rest: string }) {
   const setLook = boardLook.set;
   // The filter's part of the address goes along, so closing an issue comes back to the board as filtered.
   const kept = () => {
-    const search = new URLSearchParams(Object.entries({ project: project(), agent: agent() }).filter(([, v]) => v !== "")).toString();
+    const search = new URLSearchParams(Object.entries({ repo: repo(), agent: agent() }).filter(([, v]) => v !== "")).toString();
     return search ? `?${search}` : "";
   };
   const open = (to: string | undefined) => router.navigate((to === undefined ? "/issues" : `/issues/${encodeURIComponent(to)}`) + kept());
@@ -89,7 +89,7 @@ export function IssuesPage(props: { rest: string }) {
     if (c.kind === "todo" && to === "todo") return place(c, undefined);
     const move = cardMove(c, to);
     if (move === "start" && (c.kind === "todo" || c.kind === "family")) {
-      if (!assignedAgentOf(c.issue) || !c.issue.project) {
+      if (!assignedAgentOf(c.issue) || !c.issue.repo) {
         open(c.id);
         toast(t("web.issue.page.pickFirst"));
         return;
@@ -104,9 +104,9 @@ export function IssuesPage(props: { rest: string }) {
   const [newAt, setNewAt] = createSignal<NewIssueAt>();
   const startNew = (where: NewIssueAt) => {
     const f = filter();
-    const project = where.project || f.project;
+    const repo = where.repo || f.repo;
     const agent = where.agent || f.agent;
-    setNewAt({ ...(project ? { project } : {}), ...(agent ? { agent } : {}) });
+    setNewAt({ ...(repo ? { repo } : {}), ...(agent ? { agent } : {}) });
   };
   const addInList: ListAdd = (where) => startNew(where);
   // C, unless a field has focus, a dialog is up or an issue is open.
@@ -121,10 +121,10 @@ export function IssuesPage(props: { rest: string }) {
   });
   const writeKey = createWriteKey();
   const keepNew = async (words: string, where: NewIssueAt) => {
-    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.project ?? "", writeKey.for(words)));
+    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", writeKey.for(words)));
     if (!made) return;
     writeKey.used();
-    rememberPick(where.agent ?? "", where.project ?? "");
+    rememberPick(where.agent ?? "", where.repo ?? "");
     if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));
   };
   const retry = async (c: BoardCard) => {
@@ -322,7 +322,7 @@ function Toolbar(props: {
   onLook: (l: BoardLook) => void;
 }) {
   const nameOf = useNameOf();
-  const projects = () => [...new Set(props.cards.map(cardProject).filter((p): p is string => !!p))].toSorted();
+  const repos = () => [...new Set(props.cards.map(cardRepo).filter((p): p is string => !!p))].toSorted();
   const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
   return (
     // Narrow, the views go on their own line above the filters, at the right where the Display panel opens leftwards.
@@ -344,13 +344,13 @@ function Toolbar(props: {
           <Select
             size="control"
             class="max-w-48"
-            label={t("web.issue.page.byProject")}
-            testid="filter-project"
+            label={t("web.issue.page.byRepo")}
+            testid="filter-repo"
             filter
-            value={props.filter.project}
-            placeholder={t("web.issue.page.allProjects")}
-            options={projects().map((p) => ({ value: p, label: p }))}
-            onChange={(project) => props.onFilter({ ...props.filter, project })}
+            value={props.filter.repo}
+            placeholder={t("web.issue.page.allRepos")}
+            options={repos().map((p) => ({ value: p, label: p }))}
+            onChange={(repo) => props.onFilter({ ...props.filter, repo })}
           />
           <Select
             size="control"

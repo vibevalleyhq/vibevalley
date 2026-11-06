@@ -19,14 +19,14 @@
 | 单轮结局 | `Run.outcome` | `completed` 做完了、`failed` 没做成、`interrupted` 停在半路 | 单次 `Run` 结束时写入 |
 | 会话阶段 | `Session.phase` | `arriving` 刚派出、`working` 在干活、`done` 交回来、`failed` 没做成、`resting` 歇着、`closed` 走了 | 会话生命周期更新 |
 
-固定术语：帮工提问叫**问题** `questions`，打回意见叫**验收意见** `findings`，待合入内容叫**改动** `changes`，拆出的工单叫**子工单**，项目并发上限叫**空位**。
+固定术语：帮工提问叫**问题** `questions`，打回意见叫**验收意见** `findings`，待合入内容叫**改动** `changes`，拆出的工单叫**子工单**，仓库并发上限叫**空位**。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
 | 工单模型、状态派生、原生父子依赖（`parent` / `blockedBy`）与合法状态流转 | 会话如何跑一轮、轨迹日志记录（[帮工](docs/subsystems/session.md)） |
-| 起草（`refine`）：派帮工只读看代码生成草稿、写回工单、重置 worktree | worktree 创建、重置与清理实现（[项目](docs/subsystems/project.md)） |
+| 起草（`refine`）：派帮工只读看代码生成草稿、写回工单、重置 worktree | worktree 创建、重置与清理实现（[仓库](docs/subsystems/repo.md)） |
 | 派活、排队重试、拆分子工单（`split`）、换人、重开与取消 | 档案选择算法（[管家](docs/subsystems/orchestrator.md#模型和不变量)） |
 | 验收、打回意见、问题清理与验收标准自评（`checks`） | 信箱投递、三道刹车与唤醒调度（[Mailbox](docs/subsystems/mailbox.md)） |
 | 完成与交付：冲突预检、跑 `.vibevalley/check`、合入父分支或主分支、提 PR 与轮询 | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)） |
@@ -49,7 +49,7 @@
 ## 模型和不变量
 
 - **生命周期统一走 `setStatus` 状态机**：主人只能将工单移至 `backlog`、`todo`、`done`、`canceled`；`in_progress` 与 `in_review` 从在场会话实时派生。
-- **核心状态保留活跃与近期工单**：全量工单存 `issue` 表；`WorkspaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
+- **核心状态保留活跃与近期工单**：全量工单存 `issue` 表；`SpaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
 - **责任关系与执行分离**：指派档案写 `issue_assignment`（换人或清空才写 `ended_at`）；实际运行的 `Session` 记在 `issue_assignment_execution`。
 - **写操作收敛为「挪状态」与「说话」**：流转调 `issue.status.update`，评论调 `issue.comment.create`。前端按钮（`stage.acts`）自带请求参数，不重写判断。
 - **引用解析统一在服务内完成**：接口支持传入 `#41`、`41`、工单 UUID 或曾执行该工单的 `Session` ID（`Issue.idOf`）。
@@ -66,7 +66,7 @@
 
 **起草（`issue.refine`）**
 
-1. 主人对 `backlog` 工单发一句话，服务端按当前指派、项目历史或 `chooseAgent` 选定帮工档案。
+1. 主人对 `backlog` 工单发一句话，服务端按当前指派、仓库历史或 `chooseAgent` 选定帮工档案。
 2. 在该工单专属 worktree 中启动 `refining` 会话（只读代码，不改文件、不进 `issue_assignment_execution`）。
 3. 帮工返回草稿 JSON 块与问题；服务端解析写回工单，再以 `discard` 模式关闭会话并将 worktree 重置回主分支。
 
@@ -85,13 +85,13 @@
 3. **合并或提 PR（`change`）**：
    - 在锁外要求工作树干净；有未提交改动就退回帮工，按仓库自己的提交规范提交后再来。干净时用 `git merge-tree` 预检冲突；若冲突则标上 `Issue.conflict` 并留在 `in_review`。
    - 在锁外运行 `.vibevalley/check`；若失败则将末尾 40 行输出交回帮工修复。
-   - 进项目锁复核分支未变：子工单合入父分支记 `merged_into_parent`；普通工单本地合入主分支记 `merged`，或推送分支创建/更新 PR。
+   - 进仓库锁复核分支未变：子工单合入父分支记 `merged_into_parent`；普通工单本地合入主分支记 `merged`，或推送分支创建/更新 PR。
 4. **PR 轮询结清**：每 `github.pr_poll_seconds` 秒轮询开放 PR；合并后记 `delivered: pull_request` 并清理 worktree，关闭未合则记 `canceled: dismissed`。
 
 ## 和谁打交道
 
 - **帮工（`session`）**：调用 `send`、`deliver`、`handOver`、`dismiss`；订阅 `Session.news` 更新工单状态、问题与冲突。
-- **项目（`project`）**：管理 worktree、冲突预检、`.vibevalley/check`、分支合并与 `gh` PR 操作。
+- **仓库（`repo`）**：管理 worktree、冲突预检、`.vibevalley/check`、分支合并与 `gh` PR 操作。
 - **信箱与频道（`mailbox`、`channel`）**：排队输入经 `Mailbox` 投递；主人发言经 `Channel.ownerInThread` 清空问题并作废旧验收标记。
 - **接入（`ingress`）**：轮询 GitHub PR 的 CI 与 Review 事件，转为 `Trigger` 投入工单信箱。
 

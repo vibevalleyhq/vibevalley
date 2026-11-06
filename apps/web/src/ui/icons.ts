@@ -89,7 +89,7 @@ export const icons = {
   notes: NotebookBookmark,
   agents: Users,
   runtimes: Cpu,
-  projects: Folder2,
+  repos: Folder2,
   catalog: Widget,
   settings: Settings2,
   farm: Leaf,

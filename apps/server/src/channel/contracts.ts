@@ -68,7 +68,7 @@ export interface Info {
   readonly id: string;
   readonly name: string;
   readonly description: string;
-  readonly project: string;
+  readonly repo: string;
   readonly default: boolean;
 }
 
@@ -122,11 +122,11 @@ interface EnvelopeResource {
   readonly around: readonly T.ChatMessage[];
 }
 
-export const infoOf = (row: Pick<ChannelRow, "id" | "name" | "description" | "project" | "is_default">): Info => ({
+export const infoOf = (row: Pick<ChannelRow, "id" | "name" | "description" | "repo" | "is_default">): Info => ({
   id: row.id,
   name: row.name ?? "",
   description: row.description ?? "",
-  project: row.project ?? "",
+  repo: row.repo ?? "",
   default: row.is_default,
 });
 
@@ -238,9 +238,9 @@ export interface ChannelService {
    * Subscribed before it returns. */
   readonly ownerInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: T.ChatMessage }>, never, Scope.Scope>;
   readonly channels: () => Effect.Effect<Info[]>;
-  readonly openChannel: (name: string, description: string, project: string) => Effect.Effect<Info, ApiError>;
-  /** description undefined or empty: as it was; project undefined: as it was, empty: none. */
-  /** Each field given changes: a channel's description, project, name, group and place; a thread's title. */
+  readonly openChannel: (name: string, description: string, repo: string) => Effect.Effect<Info, ApiError>;
+  /** description undefined or empty: as it was; repo undefined: as it was, empty: none. */
+  /** Each field given changes: a channel's description, repo, name, group and place; a thread's title. */
   readonly updateChannel: (id: string, upd: T.ChannelUpdate) => Effect.Effect<void, ApiError>;
   /** Archived or not; as it already is, nothing changes. */
   readonly archive: (id: string, on: boolean) => Effect.Effect<void, ApiError>;

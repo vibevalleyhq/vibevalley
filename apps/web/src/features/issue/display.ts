@@ -15,11 +15,11 @@ export const boardViews = ["board", "list"] as const satisfies readonly BoardVie
 export const viewLabel: Record<BoardView, string> = { board: t("web.issue.boardLabels.view.board"), list: t("web.issue.boardLabels.view.list") };
 
 /** Groups of the list view. The board keeps its status lanes whatever this is: a drag between lanes moves status. */
-export type Grouping = "status" | "project" | "agent" | "none";
-export const groupings = ["status", "project", "agent", "none"] as const satisfies readonly Grouping[];
+export type Grouping = "status" | "repo" | "agent" | "none";
+export const groupings = ["status", "repo", "agent", "none"] as const satisfies readonly Grouping[];
 export const groupingLabel: Record<Grouping, string> = {
   status: t("web.issue.boardLabels.grouping.status"),
-  project: t("web.issue.boardLabels.grouping.project"),
+  repo: t("web.issue.boardLabels.grouping.repo"),
   agent: t("web.issue.boardLabels.grouping.agent"),
   none: t("web.issue.boardLabels.grouping.none"),
 };
@@ -59,7 +59,7 @@ export interface RowKeys {
   priority?: Priority;
   createdAt: number;
   updatedAt: number;
-  project?: string;
+  repo?: string;
   agent?: string;
 }
 
@@ -85,26 +85,26 @@ export function orderRows<T>(rows: T[], ordering: Ordering, facts: (row: T) => R
     .map((e) => e.row);
 }
 
-/** `key` is the lane, the project, the agent id, or "" for rows without one (and for the single group of `none`). */
+/** `key` is the lane, the repo, the agent id, or "" for rows without one (and for the single group of `none`). */
 export interface RowGroup<T> {
   key: string;
   lane?: Lane;
   rows: T[];
 }
 
-/** By status every lane is a group, even empty, in lane order. by project or agent the named groups come by name and the rows without one last. */
+/** By status every lane is a group, even empty, in lane order. by repo or agent the named groups come by name and the rows without one last. */
 export function groupRows<T>(rows: T[], grouping: Grouping, facts: (row: T) => RowKeys): RowGroup<T>[] {
   switch (grouping) {
     case "none":
       return [{ key: "", rows }];
     case "status":
       return lanes.map((lane) => ({ key: lane, lane, rows: rows.filter((r) => facts(r).lane === lane) }));
-    case "project":
+    case "repo":
     case "agent": {
       const by = new Map<string, T[]>();
       for (const r of rows) {
         const f = facts(r);
-        const k = (grouping === "project" ? f.project : f.agent) ?? "";
+        const k = (grouping === "repo" ? f.repo : f.agent) ?? "";
         by.set(k, [...(by.get(k) ?? []), r]);
       }
       return [...by].toSorted(([a], [b]) => or(Number(a === "") - Number(b === ""), compareText(a, b))).map(([key, rows]) => ({ key, rows }));
@@ -125,7 +125,7 @@ export function rowKeys(c: BoardCard): RowKeys {
         priority: c.issue.priority,
         createdAt: c.issue.createdAt,
         updatedAt: issueUpdated(c.issue),
-        project: c.issue.project,
+        repo: c.issue.repo,
         agent: assignedAgentOf(c.issue),
       });
     case "issue":
@@ -134,7 +134,7 @@ export function rowKeys(c: BoardCard): RowKeys {
         priority: c.issue.priority,
         createdAt: c.issue.createdAt,
         updatedAt: Math.max(issueUpdated(c.issue), ...c.sessions.flatMap((s) => [s.hiredAt, s.lastRun?.at ?? 0, endedAt(s) ?? 0])),
-        project: c.issue.project,
+        repo: c.issue.repo,
         agent: assignedAgentOf(c.issue),
       });
   }

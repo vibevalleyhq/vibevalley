@@ -13,7 +13,7 @@ import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { recordTrigger } from "#/mailbox/payload.ts";
-import { issueBranch, Project } from "#/project/project.ts";
+import { issueBranch, Repo } from "#/repo/repo.ts";
 import { NotRecorded, Session } from "#/session/session.ts";
 import * as q from "#db/issue.sql.ts";
 import * as qs from "#db/issue_assignment.sql.ts";
@@ -31,7 +31,7 @@ export const issueRecords = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const core = yield* Core;
   const store = yield* Agent;
-  const projects = yield* Project;
+  const repos = yield* Repo;
   const sessions = yield* Session;
   const mailbox = yield* Mailbox;
   const db = yield* Db;
@@ -114,8 +114,8 @@ export const issueRecords = Effect.gen(function* () {
     const id = newId();
     const parent = req.parent ? yield* get(req.parent) : undefined;
     if (parent && isClosed(parent.status)) return yield* Effect.fail(refused(t("server.issue.dependencies.closedParent")));
-    const project = req.project ?? parent?.project;
-    if (parent && project !== parent.project) return yield* Effect.fail(refused(t("server.issue.dependencies.project")));
+    const repo = req.repo ?? parent?.repo;
+    if (parent && repo !== parent.repo) return yield* Effect.fail(refused(t("server.issue.dependencies.repo")));
     const blockedBy = [...new Set(req.blockedBy ?? [])];
     if (parent || blockedBy.length > 0) {
       const all = yield* everyIssue;
@@ -134,7 +134,7 @@ export const issueRecords = Effect.gen(function* () {
               description,
               blockedBy,
               ...(req.criteria ? { criteria: kept(req.criteria) } : {}),
-              ...(project ? { project } : {}),
+              ...(repo ? { repo } : {}),
               ...(parent ? { parent: parent.id } : {}),
               deliver: req.deliver ?? (store.isOrchestrator(req.agent ?? "") ? "answer" : "change"),
             },
@@ -168,10 +168,8 @@ export const issueRecords = Effect.gen(function* () {
   const changesOf = Effect.fn("Issue.changesOf")(function* (item: T.Issue) {
     const session = latestSessionIdOf(item);
     if (session && sessions.present(session))
-      return yield* sessions.withWorkplace(session, (place) => projects.changes(place).pipe(Effect.mapError((error) => refused(error.message))));
-    return item.project
-      ? yield* projects.branchChanges(item.project, issueBranch(item.number)).pipe(Effect.mapError((error) => refused(error.message)))
-      : undefined;
+      return yield* sessions.withWorkplace(session, (place) => repos.changes(place).pipe(Effect.mapError((error) => refused(error.message))));
+    return item.repo ? yield* repos.branchChanges(item.repo, issueBranch(item.number)).pipe(Effect.mapError((error) => refused(error.message))) : undefined;
   });
 
   const setConflict = Effect.fn("Issue.setConflict")(function* (id: string, conflict: T.Conflict | undefined) {

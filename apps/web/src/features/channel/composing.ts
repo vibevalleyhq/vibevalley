@@ -2,7 +2,7 @@ import { Schema } from "effect";
 import { type Accessor, createMemo, createSignal, flush, onSettled } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type Attachment, type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, VibeValleyApi, type WorkspaceView } from "@vibevalley/protocol";
+import { type Attachment, type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, VibeValleyApi, type SpaceView } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import type { Mark } from "#/base/typedMarks.ts";
@@ -23,7 +23,7 @@ export type Said = Omit<SayRequest, "sendKey">;
 
 const arrived = (key: string, messages: readonly Pick<ChatMessage, "sendKey">[]) => messages.some((m) => m.sendKey === key);
 
-/** Every line the owner says in a channel: from either composer, the project map, an artifact's reply, a suggestion. */
+/** Every line the owner says in a channel: from either composer, the repo map, an artifact's reply, a suggestion. */
 export const chatSay = defineIntent<Said, void>({
   send: (body, key) => api.channel.message.send({ ...body, sendKey: key }),
   // The channel is followed while the line is kept, so its copy is seen even after the window that sent it closed.
@@ -79,7 +79,7 @@ export interface ComposerWays {
  * someone. */
 export const chatMarks: readonly Mark[] = ["/", "@"];
 
-export function createComposer(core: () => WorkspaceView | undefined, input: () => HTMLTextAreaElement | undefined, ways: ComposerWays) {
+export function createComposer(core: () => SpaceView | undefined, input: () => HTMLTextAreaElement | undefined, ways: ComposerWays) {
   const [text, setText] = createSignal(ways.initial ?? "");
   const [caret, setCaret] = createSignal(0);
   const [active, setActive] = createSignal(0);

@@ -26,7 +26,7 @@
    ls ~/.vibevalley/orchestrator/evals/
    ```
 
-   读 `want`，在 `expect` 里写几条判断（`kind` 只有 `called`、`notCalled`、`silent`、`says`、`saysNot`，字段见 `apps/server/src/testing/evals.ts` 的 `Expect`）。去掉私人的内容（名字、路径、项目、钥匙），文件名起成一句话的英文（`think-before-dispatch.json`），放进 `apps/server/src/orchestrator/testdata/evals/`，再跑第 1 步：它报这个样例的 `missed` 是 `false`，说明 `expect` 抓不住录下的错，重写它。
+   读 `want`，在 `expect` 里写几条判断（`kind` 只有 `called`、`notCalled`、`silent`、`says`、`saysNot`，字段见 `apps/server/src/testing/evals.ts` 的 `Expect`）。去掉私人的内容（名字、路径、仓库、钥匙），文件名起成一句话的英文（`think-before-dispatch.json`），放进 `apps/server/src/orchestrator/testdata/evals/`，再跑第 1 步：它报这个样例的 `missed` 是 `false`，说明 `expect` 抓不住录下的错，重写它。
 
 3. 钥匙在环境变量里：`DEEPSEEK_API_KEY`。不要把它写进命令、日志或汇报。
 

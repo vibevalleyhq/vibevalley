@@ -32,7 +32,7 @@
     "low": "低"
   },
   "deliverable": {
-    "change": "改动，合进项目",
+    "change": "改动，合进仓库",
     "branch": "改动，分支留着不合",
     "answer": "结论，只查不改代码"
   },

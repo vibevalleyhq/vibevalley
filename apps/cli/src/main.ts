@@ -15,7 +15,7 @@ import { doctorCommand } from "./commands/doctor.ts";
 import { issueCommand } from "./commands/issue.ts";
 import { memoryCommand } from "./commands/memory.ts";
 import { pkmCommand } from "./commands/pkm.ts";
-import { projectCommand } from "./commands/project.ts";
+import { repoCommand } from "./commands/repo.ts";
 import { runtimeCommand } from "./commands/runtime.ts";
 import { sessionCommand } from "./commands/session.ts";
 import { DryRunFlag, FormatFlag, ServerFlag } from "./farm.ts";
@@ -29,7 +29,7 @@ const root = Command.make("vibevalley").pipe(
     issueCommand,
     pkmCommand,
     channelCommand,
-    projectCommand,
+    repoCommand,
     agentCommand,
     sessionCommand,
     runtimeCommand,

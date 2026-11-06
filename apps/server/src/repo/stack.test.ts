@@ -30,7 +30,7 @@ test.each([
   ["node without scripts", { "package.json": `{"name":"x"}` }, { name: "node", label: "Node（npm）" }],
   ["node with a lint script", { "package.json": `{"scripts":{"lint":"eslint ."}}` }, { name: "node", label: "Node（npm）", lint: "npm run lint" }],
   ["unreadable package.json", { "package.json": "{" }, { name: "node", label: "Node（npm）" }],
-  ["pyproject with ruff", { "pyproject.toml": "[tool.ruff]\n" }, { name: "python", label: "Python", test: "pytest", lint: "ruff check ." }],
+  ["pyrepo with ruff", { "pyrepo.toml": "[tool.ruff]\n" }, { name: "python", label: "Python", test: "pytest", lint: "ruff check ." }],
   ["requirements.txt", { "requirements.txt": "requests\n" }, { name: "python", label: "Python", test: "pytest" }],
   ["node whose scripts are not all text", { "package.json": `{"scripts":{"test":1}}` }, { name: "node", label: "Node（npm）" }],
 ])("the stack is read off the marker at the root: %s", (_name, files, want) => {

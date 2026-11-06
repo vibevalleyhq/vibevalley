@@ -5,7 +5,7 @@ import { expect, test } from "./fixtures";
 const outline = "- first thought\n- second thought\n  - under it\n- third thought\n";
 
 test("a page is written in place: Enter starts a block, Tab nests it, and the server gets them in order", async ({ page, api }) => {
-  await api.pkm.page.save({ title: "Garden", tier: "project", props: { status: "active", deadline: "2099-01-01" }, markdown: outline });
+  await api.pkm.page.save({ title: "Garden", tier: "repo", props: { status: "active", deadline: "2099-01-01" }, markdown: outline });
   await page.goto("/pkm/garden");
   const blocks = page.getByTestId("pkm-block");
   await expect(blocks).toHaveCount(4);
@@ -41,7 +41,7 @@ test("a page is written in place: Enter starts a block, Tab nests it, and the se
 });
 
 test("a Chinese input method's 【【 opens a link, ＃ after Chinese a tag, and pinyin finds the page", async ({ page, api }) => {
-  await api.pkm.page.save({ title: "Herbs", tier: "project", markdown: "- first thought\n" });
+  await api.pkm.page.save({ title: "Herbs", tier: "repo", markdown: "- first thought\n" });
   await api.pkm.page.save({ title: "读书", tier: "area", markdown: "- 书单\n" });
   await page.goto("/pkm/herbs");
   const blocks = page.getByTestId("pkm-block");

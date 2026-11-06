@@ -45,7 +45,7 @@ export interface Session {
   agent: string;
   runtime: string;
   brief: string;
-  project?: string;
+  repo?: string;
   branch?: string;
   worktree?: string;
   hiredAt: number;

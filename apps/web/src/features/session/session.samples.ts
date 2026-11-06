@@ -25,7 +25,7 @@ const inRun = (run: string, log: SessionEvent[]): SessionEvent[] => log.map((e) 
 export const finishedRun: SessionEvent[] = inRun("run-1", [
   ev(0, "run/start", ""),
   ev(0, "user/message", "修好登录过期：过期就回到登录页，说清楚为什么。"),
-  ev(1, "memory/recalled", "这个项目的测试用 vp test；会话的有效期在 session.ts。"),
+  ev(1, "memory/recalled", "这个仓库的测试用 vp test；会话的有效期在 session.ts。"),
   ev(2, "assistant/thinking", "先看 session.ts 怎么判断过期，再找登录页。"),
   ...tool(4, 1, "read_file", "read", "apps/web/src/base/session.ts", "export function session() { … }"),
   ...tool(8, 2, "edit_file", "edit", "apps/web/src/base/session.ts", "+5 −1"),

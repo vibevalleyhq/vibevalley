@@ -122,7 +122,7 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
     title,
     /** The whole of a title too long for the page's first line goes with the description. */
     description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
-    project: issue.project ?? head.project,
+    repo: issue.repo ?? head.repo,
     parentText: parent?.title ?? issue.parent ?? "",
     ask: ownerQuestion(stage, issue, head),
     /** The lead act and the rest the owner may do, as the server says. */

@@ -69,7 +69,7 @@
     },
     "map": {
       "label": "Map",
-      "hint": "An island for each project, the compass, clouds, queued seed bags, stumps for free spots"
+      "hint": "An island for each repo, the compass, clouds, queued seed bags, stumps for free spots"
     },
     "machines": {
       "label": "Machines",
@@ -92,7 +92,7 @@
     },
     "langs": {
       "label": "Languages",
-      "hint": "What a project page has planted"
+      "hint": "What a repo page has planted"
     },
     "ui": {
       "label": "Interface",

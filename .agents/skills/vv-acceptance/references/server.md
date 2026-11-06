@@ -38,13 +38,13 @@
    vpx scripts/verify-server.ts --scripted-helper -- sh -c '
      vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
      set -e
-     vv issue create 写打卡并提交 --project clock --agent docs
+     vv issue create 写打卡并提交 --repo clock --agent docs
      vv issue status 1 todo
      vv issue show 1 --watch --timeout 60
      vv issue diff 1 --format json
      vv issue status 1 done --dry-run --format json
      vv issue status 1 done --format json
-     git -C "$(vv project list --format json | jq -r ".[0].path")" log --oneline main
+     git -C "$(vv repo list --format json | jq -r ".[0].path")" log --oneline main
    '
    ```
 

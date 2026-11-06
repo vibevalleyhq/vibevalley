@@ -16,7 +16,7 @@ import type { Due } from "#/cron/cron.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 import { type Hired, type HireOptions, type SessionNews, Session } from "#/session/session.ts";
 import * as q from "#db/issue.sql.ts";
@@ -68,9 +68,9 @@ export class Issue extends Context.Service<
     readonly refine: (id: string, word: string, channel: string) => Effect.Effect<T.Issue, ApiError>;
     readonly history: () => Effect.Effect<T.IssueHistory[]>;
     readonly timeline: (id: string) => Effect.Effect<T.IssueTimeline, ApiError>;
-    readonly templates: (project: string) => Effect.Effect<T.ProjectTemplates, ApiError>;
+    readonly templates: (repo: string) => Effect.Effect<T.RepoTemplates, ApiError>;
     /** Sends a session for work that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the brief. */
-    readonly hire: (agent: T.Agent, brief: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
+    readonly hire: (agent: T.Agent, brief: string, repo: string, opt?: HireOptions) => Effect.Effect<Hired>;
     readonly refreshPullRequests: Effect.Effect<void>;
     readonly refreshQueue: Effect.Effect<void>;
     readonly submitPullRequest: (session: string, summary?: string) => Effect.Effect<string, ApiError>;
@@ -104,7 +104,7 @@ function failedText(findings: readonly T.Finding[], text: string): string {
 const make = Effect.gen(function* () {
   const core = yield* Core;
   const store = yield* Agent;
-  const projects = yield* Project;
+  const repos = yield* Repo;
   const runtimes = yield* Runtime;
   const sessions = yield* Session;
   const chat = yield* Channel;
@@ -143,7 +143,7 @@ const make = Effect.gen(function* () {
   const { merge, refreshPullRequests, submit } = merging({
     core,
     sessions,
-    projects,
+    repos,
     chat,
     db,
     get,
@@ -159,7 +159,7 @@ const make = Effect.gen(function* () {
     const item = yield* get(issue);
     if (latestSessionIdOf(item) !== session) return yield* Effect.fail(refused(t("server.issue.prSubmitNotCurrent")));
     if (item.mandate.strength !== "explicit" || !item.mandate.autoSubmitPr) return yield* Effect.fail(refused(t("server.issue.prSubmitNotAllowed")));
-    if (!item.project || !projects.usesPullRequests(item.project)) return yield* Effect.fail(refused(t("server.issue.prSubmitUnavailable")));
+    if (!item.repo || !repos.usesPullRequests(item.repo)) return yield* Effect.fail(refused(t("server.issue.prSubmitUnavailable")));
     return yield* submit(item.id, session, summary);
   });
 
@@ -242,7 +242,7 @@ const make = Effect.gen(function* () {
         yield* handedBack(e);
         if (issue) {
           const conflict = (yield* get(issue)).conflict;
-          if (conflict) yield* setConflict(issue, yield* sessions.withWorkplace(e.id, (place) => projects.conflict(place, conflict.base)));
+          if (conflict) yield* setConflict(issue, yield* sessions.withWorkplace(e.id, (place) => repos.conflict(place, conflict.base)));
         }
         yield* joinChildren();
         return;
@@ -341,7 +341,7 @@ const make = Effect.gen(function* () {
       const whileOpen =
         upd.title === undefined &&
         upd.description === undefined &&
-        upd.project === undefined &&
+        upd.repo === undefined &&
         upd.agent === undefined &&
         upd.priority === undefined &&
         upd.criteria === undefined &&
@@ -352,9 +352,9 @@ const make = Effect.gen(function* () {
         if (isClosed(was.status)) return yield* Effect.fail(refused(t("server.issue.closed")));
       } else was = yield* unsent(id);
       const [title, description] = yield* issueWords({ title: upd.title ?? was.title, description: upd.description ?? was.description });
-      if (upd.project !== undefined && upd.project !== was.project && was.project) {
-        const released = yield* sessions.clearWorkplace(was.id, was.project, was.number, "preserve");
-        if (released.kept) return yield* Effect.fail(refused(t("server.issue.cannotMoveProject", { n: was.number, why: released.reason })));
+      if (upd.repo !== undefined && upd.repo !== was.repo && was.repo) {
+        const released = yield* sessions.clearWorkplace(was.id, was.repo, was.number, "preserve");
+        if (released.kept) return yield* Effect.fail(refused(t("server.issue.cannotMoveRepo", { n: was.number, why: released.reason })));
       }
       const criteria = upd.criteria !== undefined ? kept(upd.criteria) : was.criteria;
       const agent = upd.agent ?? assignedAgentOf(was);
@@ -365,7 +365,7 @@ const make = Effect.gen(function* () {
             yield* q.editIssue({
               title,
               description,
-              project: nullText(upd.project ?? was.project),
+              repo: nullText(upd.repo ?? was.repo),
               priority: upd.priority ?? was.priority,
               criteria: jsonOrNull(criteria, criteria.length > 0),
               deliver: upd.deliver ?? was.deliver,
@@ -478,7 +478,7 @@ const make = Effect.gen(function* () {
         does: [
           t("server.issue.does.deleteIssue", { n: item.number, title: shortTitle(item.title) }),
           ...(item.refining ? [t("server.issue.does.drafterLeaves", { name: item.refining.name })] : []),
-          ...(item.project ? [t("server.issue.does.cleanWorktree")] : []),
+          ...(item.repo ? [t("server.issue.does.cleanWorktree")] : []),
         ],
       };
     }),
@@ -533,9 +533,9 @@ const make = Effect.gen(function* () {
       }));
     }),
     templates: Effect.fn("Issue.templates")(function* (name) {
-      const stack = yield* projects.stack(name);
-      if (!stack) return yield* Effect.fail(missing(t("server.issue.projectRef", { name }), [lookIn.project]));
-      return { project: name, stack, recent: sentTitles(yield* everyIssue, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
+      const stack = yield* repos.stack(name);
+      if (!stack) return yield* Effect.fail(missing(t("server.issue.repoRef", { name }), [lookIn.repo]));
+      return { repo: name, stack, recent: sentTitles(yield* everyIssue, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
     }),
     hire,
     refreshPullRequests: refreshPullRequests(),

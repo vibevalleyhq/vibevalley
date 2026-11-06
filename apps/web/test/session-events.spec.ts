@@ -28,8 +28,8 @@ const profile: Agent = {
 
 async function finishedIssue(api: VibeValleyApi) {
   const agent = await api.agent.create(profile);
-  const project = await api.project.create({ name: `log-${Date.now()}` });
-  const issue = await api.issue.create({ title: first, project: project.name, agent: agent.id });
+  const repo = await api.repo.create({ name: `log-${Date.now()}` });
+  const issue = await api.issue.create({ title: first, repo: repo.name, agent: agent.id });
   await api.issue.status.update({ id: issue.id, status: "todo" });
   await expect.poll(async () => (await api.issue.get({ id: issue.id })).stage.state).toBe("reviewing");
   const sessions = (await api.issue.get({ id: issue.id })).assignments.flatMap((assignment) =>

@@ -28,7 +28,7 @@
   "noRoom": {
     "farm": "{max} helpers are already at work",
     "runtime": "{on} helpers are already at work on {runtime}, at most {max} at once (the Runtimes page can change it)",
-    "project": "{on} helpers are already at work in {project}, at most {max} at once: more would edit the same files"
+    "repo": "{on} helpers are already at work in {repo}, at most {max} at once: more would edit the same files"
   },
   "notTaken": {
     "conflictOwner": "Not merged: merging into {base} would conflict ({files}). {name} is still here, with its branch and worktree. To have it resolve this, tell it: {brief}",
@@ -37,7 +37,7 @@
     "checkFix": "{reason}\nFix the check and hand it back.",
     "owner": "Not merged: {why}. {name} is still here",
     "notice": "{name}'s work was not merged: {why}",
-    "checkShort": "the project's check failed"
+    "checkShort": "the repo's check failed"
   },
   "log": {
     "stopped": "VibeValley stopped, and this round was cut short",

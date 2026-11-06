@@ -11,7 +11,7 @@ import { or } from "#/base/order.ts";
 
 import { gitQuiet } from "./git.ts";
 
-/** Not what a project is written in: gitignore patterns, as tokei's --exclude takes them. */
+/** Not what a repo is written in: gitignore patterns, as tokei's --exclude takes them. */
 const leftOut = [
   "pnpm-lock.yaml",
   "package-lock.json",
@@ -88,7 +88,7 @@ export function activityOf(log: string, dayOf: (ms: number) => string = localDay
     if (!Number.isFinite(seconds) || seconds <= 0 || line.slice(0, tab).trim() === "") continue;
     const day = dayOf(Math.trunc(seconds * 1000));
     byDay.set(day, (byDay.get(day) ?? 0) + 1);
-    const name = line.slice(tab + 1).trim() || t("server.project.noName");
+    const name = line.slice(tab + 1).trim() || t("server.repo.noName");
     byAuthor.set(name, (byAuthor.get(name) ?? 0) + 1);
   }
   const days = [...byDay].map(([day, commits]) => ({ day, commits })).toSorted((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
@@ -124,7 +124,7 @@ const repoDirs = (dir: string, depth: number): Effect.Effect<string[]> =>
     return under.flat();
   });
 
-export const contributionsOf = Effect.fn("Project.contributions")(function* (root: string, extra: readonly string[]) {
+export const contributionsOf = Effect.fn("Repo.contributions")(function* (root: string, extra: readonly string[]) {
   const global = (yield* gitQuiet("", "config", "--global", "user.email")).toLowerCase();
   const seen = new Set<string>();
   const out: T.Repo[] = [];

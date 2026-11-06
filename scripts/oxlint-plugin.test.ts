@@ -432,7 +432,7 @@ tester.run("service-method-names", rule("service-method-names"), {
   ],
   invalid: [
     { code: "Core.of({ open: () => Effect.suspend(() => go) })", errors: [{ messageId: "unnamed", data: { service: "Core", method: "open" } }] },
-    { code: "Game.of({ count: () => projects.contributions(e).pipe(Effect.map(total)) })", errors: [{ messageId: "unnamed" }] },
+    { code: "Game.of({ count: () => repos.contributions(e).pipe(Effect.map(total)) })", errors: [{ messageId: "unnamed" }] },
     { code: "Notice.of({ say(text) { if (!text) return Effect.void; return Effect.log(text); } })", errors: [{ messageId: "unnamed" }] },
     {
       code: "const apply = (f) => Effect.sync(() => f);\nCore.of({ apply, setCommits: (c) => apply(c) })",

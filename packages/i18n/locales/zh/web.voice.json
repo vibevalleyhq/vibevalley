@@ -24,7 +24,7 @@
     "console": "声网控制台",
     "hex": "32 位十六进制",
     "area": "区域",
-    "areaHint": "Agora 接口的区域，选离服务端近的；中国大陆的项目选中国大陆。",
+    "areaHint": "Agora 接口的区域，选离服务端近的；中国大陆的仓库选中国大陆。",
     "listen": "听",
     "listenParts": "识别 · VAD 断句",
     "asr": "识别",

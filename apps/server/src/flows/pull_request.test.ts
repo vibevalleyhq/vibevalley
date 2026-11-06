@@ -14,7 +14,7 @@ import { owner } from "#/base/actor.ts";
 import { Ingress } from "#/ingress/ingress.ts";
 import { explicitMandate } from "#/issue/creation.ts";
 import { Issue } from "#/issue/issue.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
 import { Resource } from "#/resource/resource.ts";
 import { Session } from "#/session/session.ts";
 import { gitIn } from "#/testing/git.ts";
@@ -32,14 +32,14 @@ const quiet = (cwd: string, ...args: string[]) => {
 };
 
 describe("a pull request", () => {
-  // In a project that merges by pull request, done pushes the branch and opens one. the issue waits in review.
+  // In a repo that merges by pull request, done pushes the branch and opens one. the issue waits in review.
   for (const ending of ["MERGED", "CLOSED"] as const) {
     it.live(`merges by PR, and closes when the PR is ${ending.toLowerCase()}`, () => {
       const base = testConfig();
       const config = {
         ...base,
         db: join(base.home, "db"),
-        github: { ...base.github, prProjects: ["clock"] },
+        github: { ...base.github, prRepos: ["clock"] },
       };
       const work = config.workRoot;
       const path = join(work, "repos", "clock");
@@ -176,7 +176,7 @@ describe("a pull request", () => {
           await handoff();
         },
       });
-      const before = farm({ config, projects: hooks, runtime });
+      const before = farm({ config, repoHooks: hooks, runtime });
       let id = "";
       let cwd = "";
       return Effect.gen(function* () {
@@ -184,11 +184,11 @@ describe("a pull request", () => {
           const w = yield* watch;
           const issues = yield* Issue;
           const sessions = yield* Session;
-          const projects = yield* Project;
+          const repos = yield* Repo;
           const run = Effect.runPromiseWith(yield* Effect.context());
           handoff = () => run(sessions.report(id, { summary: "ready for review", questions: [], checks: [], remember: [], prSubmit: false }));
           yield* (yield* Agent).save(lab());
-          issue = yield* issues.add({ title: "写版本A", project: "clock", agent: "lab" }, explicitMandate("", true));
+          issue = yield* issues.add({ title: "写版本A", repo: "clock", agent: "lab" }, explicitMandate("", true));
           yield* issues.start(issue.id, "");
           yield* until(() => ready, "the working branch committed");
           issue = yield* issues.get(issue.id);
@@ -198,7 +198,7 @@ describe("a pull request", () => {
           git(path, "remote", "add", "origin", "https://github.com/test/clock.git");
           git(path, "remote", "set-url", "--push", "origin", bare);
           const main = git(path, "rev-parse", "main");
-          yield* projects.refreshGitHub();
+          yield* repos.refreshGitHub();
           const running = sessions.runOf(id);
           expect(sessions.sessionOf(id)?.phase._tag).toBe("working");
           yield* issues.submitPullRequest(id);
@@ -223,11 +223,11 @@ describe("a pull request", () => {
           expect(git(bare, "rev-parse", branch)).toBe(git(cwd, "rev-parse", "HEAD"));
         }).pipe(Effect.scoped, Effect.provide(before.layer));
 
-        const after = farm({ config, projects: hooks });
+        const after = farm({ config, repoHooks: hooks });
         yield* Effect.gen(function* () {
           const issues = yield* Issue;
           const sessions = yield* Session;
-          yield* (yield* Project).refreshGitHub();
+          yield* (yield* Repo).refreshGitHub();
           const restored = yield* issues.get(issue!.id);
           expect(restored.pullRequest?.number).toBe(7);
           const ingress = yield* Ingress;
@@ -239,7 +239,7 @@ describe("a pull request", () => {
             threads: [`issue:${restored.id}`, "github:clock#7"],
             text: "review-bot[bot] CHANGES_REQUESTED\nround 1",
             at: 1,
-            meta: { project: "clock", pr: 7, kind: "review", botRound: 1, botRoundKey: "review-bot[bot]:review:R1" },
+            meta: { repo: "clock", pr: 7, kind: "review", botRound: 1, botRoundKey: "review-bot[bot]:review:R1" },
           });
           yield* ingress.refreshGitHub;
           yield* ingress.refreshGitHub;

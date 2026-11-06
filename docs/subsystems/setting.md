@@ -36,7 +36,7 @@
 
 | 配置键 | 用途 | 默认值 |
 |---|---|---|
-| `work_root` | 工作空间：项目（`repos/`）、工单 `worktrees/` 与笔记 `pkm/` 的根目录 | `~/vibevalley-dev` |
+| `work_root` | 空间：仓库（`repos/`）、工单 `worktrees/` 与笔记 `pkm/` 的根目录 | `~/vibevalley-dev` |
 | `db` | SQLite 数据库目录（设为 `memory` 则使用内存库） | `$VIBEVALLEY_HOME/db` |
 | `port` | 主 HTTP 与 `/mcp` 监听端口（仅绑定 `127.0.0.1`，`0` 为随机端口） | `8787` |
 | `web` | 在 `/` 托管的前端静态产物目录（也可由 `--web` 指定） | 无 |
@@ -49,8 +49,8 @@
 | `cny_per_usd` | 美元单价折算人民币汇率 | `7.2` |
 | `patrol.heartbeat_minutes` / `cron.tick_ms` | Inbox 巡查间隔（分钟，`0` 关闭）、定时任务检查间隔（毫秒） | `10` / `20000` |
 | `session.stall_seconds` / `session.trajectory_days` | 帮工静默告警秒数、离场后轨迹保留天数（`0` 永久保留） | `240` / `30` |
-| `project.max_sessions` / `project.check_timeout_seconds` | 单项目并发帮工上限、`.vibevalley/check` 超时秒数 | `3` / `1200` |
-| `github.pr_projects` / `github.pr_poll_seconds` | 完成时走 PR 的项目名列表、开放 PR 轮询间隔秒数 | `[]` / `180` |
+| `repo.max_sessions` / `repo.check_timeout_seconds` | 单仓库并发帮工上限、`.vibevalley/check` 超时秒数 | `3` / `1200` |
+| `github.pr_repos` / `github.pr_poll_seconds` | 完成时走 PR 的仓库名列表、开放 PR 轮询间隔秒数 | `[]` / `180` |
 | `chat.notice_batch_ms` / `chat.retry_wake_ms` | 忙时提示合并毫秒数、唤醒失败重试间隔毫秒数 | `3000` / `3000` |
 | `otlp.url` / `pkm.root` | OpenTelemetry 收集器地址、笔记库根目录（空：`<work_root>/pkm`） | 空 / 空 |
 

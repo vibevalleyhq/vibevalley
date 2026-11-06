@@ -3,7 +3,7 @@ import { describe, expect, test } from "vite-plus/test";
 import type { LanguageCount } from "@vibevalley/protocol";
 
 import { calendarOf, recencyOf, since, streaksOf } from "./calendar";
-import { languageShares, number } from "./projects";
+import { languageShares, number } from "./repos";
 const lang = (name: string, code: number, comments = 0, files = 1): LanguageCount => ({ name, files, code, comments, blanks: 0 });
 
 describe("languages", () => {

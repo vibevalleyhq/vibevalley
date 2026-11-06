@@ -81,7 +81,7 @@ describe("memory", () => {
         questions: [],
         checks: [],
         remember: [
-          { text: "这个项目用 pnpm test 跑测试", scope: "project" },
+          { text: "这个仓库用 pnpm test 跑测试", scope: "repo" },
           { text: "提交信息写中文", scope: "all" },
         ],
         prSubmit: false,
@@ -96,11 +96,11 @@ describe("memory", () => {
       expect(mine).toHaveLength(3);
       const done = mine.find((m) => m.kind === "issue")!;
       expect(done.text).toMatch(/^写上班打卡，记一笔 → /u);
-      const rows = (ms: T.Memory[]) => ms.map((m) => [m.kind, m.text, m.project ?? "所有项目", m.session ?? ""].join("|")).toSorted();
+      const rows = (ms: T.Memory[]) => ms.map((m) => [m.kind, m.text, m.repo ?? "所有仓库", m.session ?? ""].join("|")).toSorted();
       expect(rows(mine)).toEqual(
         [
-          ["note", "这个项目用 pnpm test 跑测试", "memo", first.id],
-          ["note", "提交信息写中文", "所有项目", first.id],
+          ["note", "这个仓库用 pnpm test 跑测试", "memo", first.id],
+          ["note", "提交信息写中文", "所有仓库", first.id],
           ["issue", done.text, "memo", first.id],
         ]
           .map((r) => r.join("|"))
@@ -113,7 +113,7 @@ describe("memory", () => {
       let [recalled, asked] = reminded(yield* nextPrompt(f, next, 1));
       expect(asked).toBe("再加一个下班打卡");
       expect([...recalled].toSorted()).toEqual(
-        ["- （这个项目）这个项目用 pnpm test 跑测试", "- （所有项目）提交信息写中文", "- 做过（这个项目）：" + done.text].toSorted(),
+        ["- （这个仓库）这个仓库用 pnpm test 跑测试", "- （所有仓库）提交信息写中文", "- 做过（这个仓库）：" + done.text].toSorted(),
       );
       yield* w.nextReport;
       const steps = (yield* sessions.events(second.id)) ?? [];
@@ -128,17 +128,17 @@ describe("memory", () => {
       yield* memories.write({
         agent: "scribe",
         text: "下班打卡也要有测试",
-        project: "memo",
+        repo: "memo",
         by: owner,
       });
       expect((yield* sessions.deliver(second.id, "顺手把下班打卡的测试也补上", delivery({ kind: "comment" }))).kind).toBe("run");
       [recalled, asked] = reminded(yield* nextPrompt(f, next, 2));
-      expect([recalled, asked]).toEqual([["- （这个项目）下班打卡也要有测试"], "顺手把下班打卡的测试也补上"]);
+      expect([recalled, asked]).toEqual([["- （这个仓库）下班打卡也要有测试"], "顺手把下班打卡的测试也补上"]);
       yield* w.nextReport;
 
       mustHire(yield* issues.hire(scribe(), "写一篇博客", "memo-blog"));
       [recalled, asked] = reminded(yield* nextPrompt(f, next, 3));
-      expect([recalled, asked]).toEqual([["- （所有项目）提交信息写中文"], "写一篇博客"]);
+      expect([recalled, asked]).toEqual([["- （所有仓库）提交信息写中文"], "写一篇博客"]);
       yield* w.nextReport;
 
       const other = mustHire(yield* issues.hire(refiner(), "跑一遍 pnpm test 测试，看看上班打卡", "memo"));
@@ -172,7 +172,7 @@ describe("memory", () => {
           questions: [],
           checks: [],
           remember: [
-            { text: "这个项目用 pnpm test 跑测试", scope: "project" },
+            { text: "这个仓库用 pnpm test 跑测试", scope: "repo" },
             { text: "提交信息写中文", scope: "all" },
           ],
           prSubmit: false,

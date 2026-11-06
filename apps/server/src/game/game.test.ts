@@ -5,11 +5,11 @@ import { Deferred, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
-import type { Repo, Session } from "@vibevalley/protocol";
+import type { Repo as RepoRecord, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Core } from "#/core/core.ts";
-import { Project } from "#/project/project.ts";
+import { Repo } from "#/repo/repo.ts";
 import { sessionOf } from "#/session/roster.ts";
 import { gitSync, repo } from "#/testing/git.ts";
 import { testConfig, waitFor as until } from "#/testing/layers.ts";
@@ -47,7 +47,7 @@ describe("the game", () => {
       const before = yield* Effect.gen(function* () {
         const game = yield* Game;
         const core = yield* Core;
-        yield* game.record({ kind: "harvested", session: sessionId("w1"), agent: "lab", project: "demo", runtime: "pi", commits: 1, runs: 1 });
+        yield* game.record({ kind: "harvested", session: sessionId("w1"), agent: "lab", repo: "demo", runtime: "pi", commits: 1, runs: 1 });
         const p = core.state().progress!;
         expect(p.coins).toBeGreaterThanOrEqual(35);
         expect(p.counts.harvests).toBe(1);
@@ -82,10 +82,10 @@ describe("the game", () => {
           id: "bad-infinity",
           kind: "harvested",
           at: 1,
-          payload: `{"session":"bad","project":"demo","runtime":"pi","commits":1e999,"runs":1}`,
+          payload: `{"session":"bad","repo":"demo","runtime":"pi","commits":1e999,"runs":1}`,
         });
         yield* q.addLedgerEntry({ id: "bad-shape", kind: "level", at: 2, payload: `{"level":"high"}` });
-        yield* q.addLedgerEntry({ id: "good", kind: "harvested", at: 3, payload: `{"session":"good","project":"demo","runtime":"pi","commits":1,"runs":1}` });
+        yield* q.addLedgerEntry({ id: "good", kind: "harvested", at: 3, payload: `{"session":"good","repo":"demo","runtime":"pi","commits":1,"runs":1}` });
       }).pipe(Effect.orDie, Effect.scoped, Effect.provide(farm(config)));
       yield* Effect.gen(function* () {
         const progress = (yield* Core).state().progress!;
@@ -157,17 +157,17 @@ describe("the game", () => {
         const first = yield* Deferred.make<void>();
         const second = yield* Deferred.make<void>();
         let calls = 0;
-        const contributions: Effect.Effect<Repo[]> = Effect.suspend(() => {
+        const contributions: Effect.Effect<RepoRecord[]> = Effect.suspend(() => {
           calls++;
           if (calls === 1) return Deferred.await(first).pipe(Effect.as([{ path: "old", commits: 1 }]));
           if (calls === 2) return Deferred.await(second).pipe(Effect.as([{ path: "new", commits: 2 }]));
           return Effect.succeed([]);
         });
         const config = testConfig();
-        const projects = Layer.unwrap(
-          Effect.map(Project, (current) => Layer.succeed(Project, Project.of({ ...current, contributions: () => contributions }))),
-        ).pipe(Layer.provideMerge(world({ config })));
-        const app = gameStart.pipe(Layer.provideMerge(Game.layer), Layer.provideMerge(projects));
+        const repos = Layer.unwrap(Effect.map(Repo, (current) => Layer.succeed(Repo, Repo.of({ ...current, contributions: () => contributions })))).pipe(
+          Layer.provideMerge(world({ config })),
+        );
+        const app = gameStart.pipe(Layer.provideMerge(Game.layer), Layer.provideMerge(repos));
         yield* Effect.scoped(
           Effect.gen(function* () {
             const core = yield* Core;

@@ -21,7 +21,7 @@ const ref = "aaaaaaaa-0000-4000-a000-000000000001";
 const loop = "bbbbbbbb-0000-4000-a000-000000000002";
 
 const files = {
-  "01_Projects/Cetus.md": `alias:: Whale\ndeadline:: 2026-11-15\n\n- TODO ship the parser [[Engine]]\n  deadline:: 2026-11-01\n- DOING the editor\n- the core idea\n  id:: ${ref}\n`,
+  "01_Repos/Cetus.md": `alias:: Whale\ndeadline:: 2026-11-15\n\n- TODO ship the parser [[Engine]]\n  deadline:: 2026-11-01\n- DOING the editor\n- the core idea\n  id:: ${ref}\n`,
   "journals/2026_11_03.md": `- met about [[Engine]] and ((${ref}))\n  - its notes\n`,
   "03_Resources/Engine.md": `- what an engine is\n- loops ((${loop}))\n  id:: ${loop}\n`,
   "04_Archives/Old.md": "- the old [[Engine]] sketch\n",
@@ -68,7 +68,7 @@ describe("the vault's pages together", () => {
 
   it("groups the blocks linking to a page by PARA", () => {
     const links = backlinks(vaultOf(files), "engine");
-    expect(links.projects.map((l) => l.body)).toEqual(["ship the parser [[Engine]]"]);
+    expect(links.repos.map((l) => l.body)).toEqual(["ship the parser [[Engine]]"]);
     expect(links.journals.map((l) => l.page)).toEqual(["2026_11_03"]);
     expect(links.archives).toHaveLength(1);
     expect(links.areas).toEqual([]);
@@ -84,7 +84,7 @@ describe("the vault's pages together", () => {
     expect(search(vaultOf(files), { linkedTo: "Engine", tier: "archive" }).map((h) => h.page)).toEqual(["old"]);
   });
 
-  it("says the inbox, the stale projects and what is overdue", () => {
+  it("says the inbox, the stale repos and what is overdue", () => {
     const r = radar(vaultOf(files, now - 20 * day), now, 14);
     expect(r.inbox).toBe(1);
     expect(r.stale).toEqual([{ slug: "cetus", title: "Cetus", days: 20, deadline: "2026-11-15", todo: 1, doing: 1, done: 0 }]);

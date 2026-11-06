@@ -30,10 +30,10 @@ const scripted: Agent = {
   look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
 };
 
-async function handBack(api: VibeValleyApi, project: string) {
+async function handBack(api: VibeValleyApi, repo: string) {
   const fox = await api.agent.create(scripted);
-  await api.project.create({ name: project });
-  const issue = await api.issue.create({ title: commits, agent: fox.id, project });
+  await api.repo.create({ name: repo });
+  const issue = await api.issue.create({ title: commits, agent: fox.id, repo });
   await api.issue.status.update({ id: issue.id, status: "todo" });
   await handedBack(api, issue.id, 20_000);
   return issue.id;

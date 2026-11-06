@@ -13,7 +13,7 @@ import { type ApiError, messageOf, reasonOf, refused } from "#/base/errors.ts";
 import { reposDir, ServerConfig } from "#/infra/config.ts";
 import { probeInstallation, Runtime } from "#/runtime/runtime.ts";
 
-type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "project" | "issue" | "channel">;
+type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "repo" | "issue" | "channel">;
 
 /** An acquired execution remains present until every runtime resource confirms disposal. */
 export interface Execution {
@@ -277,7 +277,7 @@ const make = Effect.gen(function* () {
           id,
           agent: owner.agent,
           runtime: owner.runtime,
-          ...(owner.project === undefined ? {} : { project: owner.project }),
+          ...(owner.repo === undefined ? {} : { repo: owner.repo }),
           ...(owner.issue === undefined ? {} : { issue: owner.issue }),
           ...(owner.channel === undefined ? {} : { channel: owner.channel }),
         },

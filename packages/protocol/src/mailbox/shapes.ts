@@ -48,7 +48,7 @@ export interface TriggerContext {
   readonly attachments?: readonly { readonly name: string; readonly path: string }[];
   readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
   readonly blocks?: readonly QuotedBlock[];
-  readonly picked?: { readonly agent?: string; readonly project?: string };
+  readonly picked?: { readonly agent?: string; readonly repo?: string };
   readonly responsePort?: string;
   readonly voiceMode?: "dictated" | "conversation" | "api";
 }
@@ -59,7 +59,7 @@ export interface TriggerMeta {
   readonly trigger?: RunTrigger;
   readonly dispatch?: boolean;
   readonly cron?: string;
-  readonly project?: string;
+  readonly repo?: string;
   readonly pr?: number;
   readonly kind?: "ci" | "review" | "comment";
   readonly head?: string;
@@ -82,7 +82,7 @@ export interface Trigger {
   readonly threads: readonly string[];
   readonly replyTo?: string;
   readonly replyChannel?: string;
-  readonly picked?: { readonly agent?: string; readonly project?: string };
+  readonly picked?: { readonly agent?: string; readonly repo?: string };
   readonly card: CompactCard;
   readonly meta: TriggerMeta;
   readonly at: number;

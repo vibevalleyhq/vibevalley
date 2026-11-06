@@ -1,6 +1,6 @@
 # 农场的皮
 
-像素农场（`apps/web/src/farm`）是从 `StateFrame` 渲染出的像素小院，每个项目对应一座岛与一座院子。农场将工单画成地块、帮工画成小动物、待处理事项画成折叠屏手机来电，只读服务端状态驱动动画与合成音效。
+像素农场（`apps/web/src/farm`）是从 `StateFrame` 渲染出的像素小院，每个仓库对应一座岛与一座院子。农场将工单画成地块、帮工画成小动物、待处理事项画成折叠屏手机来电，只读服务端状态驱动动画与合成音效。
 
 ## 管什么，不管什么
 
@@ -8,8 +8,8 @@
 |---|---|
 | 384×256 像素村画布、整数倍缩放裁边、LDtk 地图、A* 寻路、昼夜光照与粒子动效 | 地块庄稼与木牌状态计算（`game/view.ts` 的 `plotOf`，[游戏](docs/subsystems/game.md)） |
 | 帮工在院子里的去处（`Whereabouts`）、朝向、姿势与 800ms 最短保持时间 | 帮工真实阶段与工单状态流转（[帮工](docs/subsystems/session.md)、[工单](docs/subsystems/issue.md)） |
-| 快捷栏 6 把农具的指向提示（`aimTool`）与点击派发（`commands.ts`） | 农具调用的底层接口规则与播种模板填充（[工单](docs/subsystems/issue.md)、[项目](docs/subsystems/project.md)） |
-| 项目群岛地图（`ProjectMap`）、折叠屏手机（来电、田头窗、小游戏）、合成音效与图鉴（`/catalog`） | 哪些事项进 Inbox（[Inbox](docs/subsystems/inbox.md)）与各面板详细元素（[farm-ui.md](docs/reference/farm-ui.md)） |
+| 快捷栏 6 把农具的指向提示（`aimTool`）与点击派发（`commands.ts`） | 农具调用的底层接口规则与播种模板填充（[工单](docs/subsystems/issue.md)、[仓库](docs/subsystems/repo.md)） |
+| 仓库群岛地图（`RepoMap`）、折叠屏手机（来电、田头窗、小游戏）、合成音效与图鉴（`/catalog`） | 哪些事项进 Inbox（[Inbox](docs/subsystems/inbox.md)）与各面板详细元素（[farm-ui.md](docs/reference/farm-ui.md)） |
 
 目录结构与画布-DOM 同步见 [apps/web/src/farm/README.md](apps/web/src/farm/README.md)。
 
@@ -21,14 +21,14 @@
 | `apps/web/src/farm/world/` | `world.ts`（地点映射 `placeOfAction`、节流 `Whereabouts`、命中 `villageHitAt`、缩放 `frameVillage`）、`level.ts`、`plots.ts`、`sprites.ts` |
 | `apps/web/src/farm/hud/`、`panels/`、`issue/` | 顶栏 HUD、播种袋 `SeedForms.tsx`、收成清单、仓库、成就与农场工单详情 `IssueView.tsx` |
 | `apps/web/src/farm/phone/`、`chat/` | 折叠屏手机 `Phone.tsx`、来电状态 `calls.ts`、5 个纯函数小游戏 `games/*.ts`、田头聊天窗 `ChatWindow.tsx` |
-| `apps/web/src/farm/map/` | 项目群岛地图 `ProjectMap.tsx` 与纯函数 `islands.ts` |
+| `apps/web/src/farm/map/` | 仓库群岛地图 `RepoMap.tsx` 与纯函数 `islands.ts` |
 | `apps/web/src/farm/tools.ts`、`commands.ts`、`cues.ts` | 农具定义、点击命令映射与状态驱动音效 |
 | `packages/engine/` | `nav`（网格 A* 寻路）、`pixi`（法线光照、天色、粒子）、`audio`（K 计权合成器）、`clock.ts`、`framing.ts` |
 | `apps/web/src/features/catalog/` | 素材图鉴（读取 `public/pixel/sprites.json`、`cursors.json` 与 `ui/pixel/sound.ts`） |
 
 ## 模型和不变量
 
-- **一个项目一座院子，皮里无第二份业务状态**：`farmFrameOf` 按当前项目过滤帮工与地块（顶栏等级、田头和来电仍看全农场）；坐标、已接来电与小游戏棋盘仅存当前页面内存。
+- **一个仓库一座院子，皮里无第二份业务状态**：`farmFrameOf` 按当前仓库过滤帮工与地块（顶栏等级、田头和来电仍看全农场）；坐标、已接来电与小游戏棋盘仅存当前页面内存。
 - **一块地对应一张工单（`plotKeyOf`）**：9 块地前 6 块对应并发槽位 `station` 0–5，后 3 块在 Lv.5、Lv.8、Lv.12 解锁为装饰花坛；庄稼与木牌由服务端 `plotOf` 按工单 `stage` 算出：
 
 | 工单阶段（`Issue.stage`） | 庄稼贴图（`Crop`） | 木牌提示 |
@@ -54,13 +54,13 @@
 
 **渲染一帧**
 
-1. 收到 `StateFrame` 后过滤当前项目的在场帮工，按工单 ID 查找 `view.plots` 更新每块地的庄稼与木牌。
+1. 收到 `StateFrame` 后过滤当前仓库的在场帮工，按工单 ID 查找 `view.plots` 更新每块地的庄稼与木牌。
 2. 计算每个帮工的目标地点与姿势，沿网格 A* 路径逐帧移动，按脚底 y 坐标排序绘制精灵与光照，最后叠加 DOM HUD。
 
 **空地播种（`SeedForms.tsx`）**
 
-1. 点击空地或项目岛空位打开播种袋，调用 `project.template.list` 获取近期工单标题与按项目技术栈填好验证命令的常见模板。
-2. 点击「开始」向默认频道发送带项目、档案和地块号 `station` 的消息交管家派活；点击「草稿」创建 `backlog` 工单并启动 `issue.refine` 起草。
+1. 点击空地或仓库岛空位打开播种袋，调用 `repo.template.list` 获取近期工单标题与按仓库技术栈填好验证命令的常见模板。
+2. 点击「开始」向默认频道发送带仓库、档案和地块号 `station` 的消息交管家派活；点击「草稿」创建 `backlog` 工单并启动 `issue.refine` 起草。
 
 ## 和谁打交道
 

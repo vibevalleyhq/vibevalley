@@ -14,7 +14,7 @@ import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { recordTrigger } from "#/mailbox/payload.ts";
-import { issueBranch, Project } from "#/project/project.ts";
+import { issueBranch, Repo } from "#/repo/repo.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 import { conflictBrief } from "#/session/briefing.ts";
 import { askedMax } from "#/session/journal.ts";
@@ -55,7 +55,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
   Effect.gen(function* () {
     const core = yield* Core;
     const store = yield* Agent;
-    const projects = yield* Project;
+    const repos = yield* Repo;
     const runtimes = yield* Runtime;
     const sessions = yield* Session;
     const chat = yield* Channel;
@@ -65,13 +65,13 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
     /** One round of the queue at a time. */
     const trying = yield* Semaphore.make(1);
 
-    const hire = Effect.fn("Issue.hire")(function* (agent: T.Agent, brief: string, project: string, opt: HireOptions = {}) {
+    const hire = Effect.fn("Issue.hire")(function* (agent: T.Agent, brief: string, repo: string, opt: HireOptions = {}) {
       if (store.isOrchestrator(agent.id)) return { refused: t("server.issue.orchestratorNotHelper") };
       if (!agent.enabled) return { refused: t("server.issue.disabled", { name: agent.name }) };
       for (const i of yield* runtimes.problemsOf(agent))
         if (i.level === "error") return { refused: t("server.issue.cannotSend", { name: agent.name, why: i.text }) };
-      const where = project.trim() || agent.workdir.trim();
-      if (!where) return { refused: t("server.issue.noProject") };
+      const where = repo.trim() || agent.workdir.trim();
+      if (!where) return { refused: t("server.issue.noRepo") };
       const room = yield* sessions.makeRoom(agent.runtime, where);
       if ("refused" in room) return { refused: room.refused };
       const evicted = room.evicted ?? "";
@@ -79,7 +79,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
       const recorded = yield* Effect.option(
         (opt.issue
           ? get(opt.issue)
-          : attemptAdd({ title: brief, project: where, agent: agent.id }, explicitMandate()).pipe(
+          : attemptAdd({ title: brief, repo: where, agent: agent.id }, explicitMandate()).pipe(
               // The database failing (a full disk) is told as a refusal; a request it cannot encode is a bug.
               Effect.catchTags({ SqlError: (e) => Effect.fail(refused(causeMessage(e))), SchemaError: Effect.die }),
             )
@@ -96,7 +96,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
       const parent = issue.parent ? yield* Effect.option(get(issue.parent)) : Option.none();
       const base = opt.base ?? (Option.isSome(parent) ? issueBranch(parent.value.number) : undefined);
       if (Option.isSome(parent)) {
-        const placeError = yield* projects.workplace(where, parent.value.number, true, "").pipe(
+        const placeError = yield* repos.workplace(where, parent.value.number, true, "").pipe(
           Effect.as(""),
           Effect.catch((e) => Effect.succeed(e.message)),
         );
@@ -133,7 +133,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
       if (!assignedAgent) return yield* Effect.fail(refused(t("server.issue.noAssignee"), pick));
       const agent = store.agent(assignedAgent);
       if (!agent) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: assignedAgent }), pick));
-      return [issue, agent, issue.project ?? agent.workdir] as const;
+      return [issue, agent, issue.repo ?? agent.workdir] as const;
     });
 
     const ready = (id: string) => Effect.flatMap(unsent(id), readyOf);
@@ -141,7 +141,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
     const send = (
       issue: T.Issue,
       agent: T.Agent,
-      project: string,
+      repo: string,
       channel: string,
       by?: T.RunTrigger,
       inputs: readonly T.Trigger[] = [],
@@ -150,7 +150,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
         : undefined,
     ) =>
       Effect.flatMap(
-        hire(agent, issueBrief(issue), project, { channel, issue: issue.id, inputs, ...(by ? { trigger: by } : {}), ...(hiring ? { hiring } : {}) }),
+        hire(agent, issueBrief(issue), repo, { channel, issue: issue.id, inputs, ...(by ? { trigger: by } : {}), ...(hiring ? { hiring } : {}) }),
         (hired) => (hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")))),
       );
 
@@ -220,9 +220,9 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
         const children = (yield* everyIssue).filter((child) => child.parent === mine.value.id);
         if (children.length > 0) {
           if (by?.kind === "comment" && children.every((child) => isClosed(child.status))) {
-            const [, agent, project] = yield* readyOf(mine.value);
+            const [, agent, repo] = yield* readyOf(mine.value);
             const instruction = said || (mine.value.conflict ? conflictBrief(mine.value.conflict.base, mine.value.conflict.files) : "");
-            const hired = yield* hire(agent, [issueBrief(mine.value), instruction].filter(Boolean).join("\n\n"), project, {
+            const hired = yield* hire(agent, [issueBrief(mine.value), instruction].filter(Boolean).join("\n\n"), repo, {
               channel,
               issue: id,
               trigger: by,
@@ -245,11 +245,11 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
         yield* toOrchestrator(mine.value, channel, by ?? { kind: "issue" }, said);
         return {};
       }
-      const [issue, agent, project] = yield* ready(id);
+      const [issue, agent, repo] = yield* ready(id);
       if (issue.queuedAt !== undefined) return { queued: t("server.issue.waitingDispatch") };
       const where = channel;
       const trigger = by;
-      const full = sessions.noRoom(agent.runtime, project);
+      const full = sessions.noRoom(agent.runtime, repo);
       const blocked = issue.blockedBy.length > 0 ? blockedIssues(issue, yield* everyIssue) : [];
       if (blocked.length > 0) {
         yield* queueRow(issue.id, true, (yield* chat.topOf(where)).id, trigger, initial[0]);
@@ -259,7 +259,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
         yield* queueRow(issue.id, true, (yield* chat.topOf(where)).id, trigger, initial[0]);
         return { queued: t("server.issue.queued", { full }) };
       }
-      const sent = yield* send(issue, agent, project, where, trigger, initial);
+      const sent = yield* send(issue, agent, repo, where, trigger, initial);
       return { session: sent };
     });
 
@@ -273,8 +273,8 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
         if (blockedIssues(issue, all).length > 0) continue;
         const title = cut(issue.title, 40);
         yield* Effect.gen(function* () {
-          const [, agent, project] = yield* ready(issue.id);
-          if (sessions.noRoom(agent.runtime, project)) return "";
+          const [, agent, repo] = yield* ready(issue.id);
+          if (sessions.noRoom(agent.runtime, repo)) return "";
           const issueInputs = inputs.filter((item) => item.issue === issue.id).map((item) => item.trigger);
           const input = issueInputs[0];
           if (!input) return "";
@@ -282,7 +282,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
             ...(input.meta.trigger ?? { kind: "issue" }),
             message: input.id,
           };
-          return yield* send(issue, agent, project, input.replyChannel ?? chat.defaultChannel(), by, issueInputs).pipe(
+          return yield* send(issue, agent, repo, input.replyChannel ?? chat.defaultChannel(), by, issueInputs).pipe(
             Effect.catch((error) => Effect.as(core.notice("warn", t("server.issue.queuedStuck", { title, why: reasonOf(error) })), "")),
           );
         }).pipe(
@@ -324,8 +324,8 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
       if (!isClosed(issue.status)) return yield* Effect.fail(refused(t("server.issue.stillWorking", { name: last.name })));
       const agent = to ?? store.agent(last.agent);
       if (!agent) return yield* Effect.fail(refused(t("server.issue.senderGone", { id: last.agent })));
-      const where = issue.project ?? "";
-      const changes = yield* projects.branchChanges(where, issueBranch(issue.number)).pipe(Effect.mapError((e) => refused(e.message)));
+      const where = issue.repo ?? "";
+      const changes = yield* repos.branchChanges(where, issueBranch(issue.number)).pipe(Effect.mapError((e) => refused(e.message)));
       const previous = (changes?.commits.length ?? 0) > 0;
       const brief = reopenBrief(issue, last, text, previous, agent.id !== last.agent);
       const hired = yield* hire(agent, brief, where, { channel, issue: issue.id, trigger: by, inputs });
@@ -338,11 +338,11 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
       const channel = yield* chat.topOf(s.channel);
       const by: T.RunTrigger = { kind: "cron", cron: s.id, message: input.id, ...(due.missed ? { missed: true } : {}) };
       const found = yield* ofCron(s.id);
-      const project = s.project ?? (channel.project || undefined);
+      const repo = s.repo ?? (channel.repo || undefined);
       const issue =
         found ??
         (yield* add(
-          { title: s.name, description: s.text, ...(project ? { project } : {}), agent: s.agent ?? chat.orchestratorOf(channel.id) },
+          { title: s.name, description: s.text, ...(repo ? { repo } : {}), agent: s.agent ?? chat.orchestratorOf(channel.id) },
           inferredMandate(input.id),
           s.id,
         ));

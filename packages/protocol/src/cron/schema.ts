@@ -38,7 +38,7 @@ const cronFields = {
   text: Schema.String,
   channel: Schema.String,
   agent: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   when: CronWhen,
   tz: Schema.String,
   enabled: Schema.Boolean,
@@ -57,7 +57,7 @@ export const CronRequest: Codec<T.CronRequest> = Schema.Struct({
   text: Schema.String,
   channel: Schema.optionalKey(Schema.String),
   agent: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
   when: CronWhen,
   tz: Schema.optionalKey(Schema.String),
 });

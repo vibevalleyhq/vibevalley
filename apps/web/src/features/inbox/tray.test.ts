@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import type { WorkspaceState, InboxItem, Session } from "@vibevalley/protocol";
+import type { SpaceState, InboxItem, Session } from "@vibevalley/protocol";
 
 import { tabTitle, traySummary, waitingOnOwner } from "./tray";
 
@@ -16,12 +16,12 @@ const call = (id: string, kind: InboxItem["kind"], tray?: string): InboxItem => 
 });
 
 describe("the tray", () => {
-  const state = (call: WorkspaceState["call"], working: number) =>
+  const state = (call: SpaceState["call"], working: number) =>
     ({
       call,
       sessions: Array.from({ length: working }, (_, i) => ({ id: `w${i}`, role: "worker", phase: { _tag: "working" } }) as unknown as Session),
       chat: undefined,
-    }) as unknown as WorkspaceState;
+    }) as unknown as SpaceState;
 
   test("says whether the farm is open, what waits and what is unread", () => {
     expect(traySummary(state("idle", 0), [])).toEqual({ title: "", lines: ["还没开工"] });

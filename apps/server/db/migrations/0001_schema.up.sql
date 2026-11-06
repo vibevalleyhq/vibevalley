@@ -30,7 +30,7 @@ CREATE TABLE channel (
   created_at    real not null,
   name          text,
   description   text,
-  project       text,
+  repo       text,
   parent_id     text references channel (id),
   -- A direct channel is the owner's and one other participant's: the peer.
   peer_id       text unique references channel_participant (id),
@@ -122,11 +122,11 @@ CREATE TABLE mailbox_trigger (
   unique (source, source_key)
 );
 CREATE TABLE ingress_github (
-  project text not null,
+  repo text not null,
   pr_number integer not null,
   check_fingerprint text not null default '',
   check_revision integer not null default 0,
-  primary key (project, pr_number)
+  primary key (repo, pr_number)
 );
 
 CREATE TABLE issue (
@@ -138,7 +138,7 @@ CREATE TABLE issue (
   mandate_strength text not null check (mandate_strength in ('explicit', 'inferred')),
   max_bot_review_rounds integer not null,
   auto_submit_pr boolean not null,
-  project     text,
+  repo     text,
   priority    text not null default 'medium' check (priority in ('urgent', 'high', 'medium', 'low')),
   rank        integer not null default 0,
   parent      text references issue (id) on delete cascade,
@@ -178,7 +178,7 @@ CREATE TABLE session (
   name        text not null,
   runtime     text not null,
   brief       text not null,
-  project     text,
+  repo     text,
   issue       text,
   channel     text,
   hired_at    real not null,
@@ -275,7 +275,7 @@ CREATE TABLE cron (
   body        text not null,
   channel_id  text not null references channel (id) on delete cascade,
   agent       text,
-  project     text,
+  repo     text,
   spec        text not null,
   tz          text not null,
   enabled     boolean not null default true,
@@ -303,7 +303,7 @@ CREATE TABLE memory (
   terms_of     integer not null default 0, -- which cut: memory.TermsVersion
   labels       text not null default '[]', -- JSON array
   importance   integer not null default 0 check (importance between 0 and 3),
-  project      text,                -- null: every project
+  repo      text,                -- null: every repo
   session      text,                -- the Session it came from
   author       text not null check (author in ('owner', 'orchestrator', 'session', 'system')),
   replaced_by  text,                -- the memory that superseded it; never recalled again

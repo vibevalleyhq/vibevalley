@@ -1,7 +1,7 @@
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import type { SettingsStatus, WorkspaceState } from "@vibevalley/protocol";
+import type { SettingsStatus, SpaceState } from "@vibevalley/protocol";
 
 import { farm } from "#/farm/store.ts";
 import { api } from "#/infra/api.ts";
@@ -21,7 +21,7 @@ const deep = { "text-shadow": "4px 4px 0 #3a2a18" };
 const soft = { "text-shadow": "2px 2px 0 #3a2a18" };
 
 /** Continue needs a farm to go back to: a helper, a word said, or a coin earned. */
-const hasFarm = (core: WorkspaceState | undefined) =>
+const hasFarm = (core: SpaceState | undefined) =>
   !!core &&
   (core.sessions.some((s) => s.role !== "orchestrator") || (core.chat?.channels ?? []).some((c) => (c.lastNumber ?? 0) > 0) || (core.progress?.coins ?? 0) > 0);
 

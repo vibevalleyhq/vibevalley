@@ -165,7 +165,7 @@ export const progressFold = (entries: readonly T.LedgerEntry[], from: Folded = e
 
 const fullHouse = 6;
 
-const working = (state: T.WorkspaceState) => state.sessions.filter((h) => h.role === "worker" && h.phase._tag === "working").length;
+const working = (state: T.SpaceState) => state.sessions.filter((h) => h.role === "worker" && h.phase._tag === "working").length;
 
 function familyEntry(id: string, children: readonly T.Issue[]): Entry {
   const merged = new Set<string>(children.filter((issue) => issue.delivered === "merged_into_parent").map((issue) => issue.id));
@@ -177,7 +177,7 @@ function familyEntry(id: string, children: readonly T.Issue[]): Entry {
 
 /** Only what the person does in the app (a voice call, a review, a title) is recorded where it happens: everything the
  * farm does is told by its facts. */
-export function entriesFor(before: T.WorkspaceState, fact: T.Fact, after: T.WorkspaceState): Entry[] {
+export function entriesFor(before: T.SpaceState, fact: T.Fact, after: T.SpaceState): Entry[] {
   const out: Entry[] = [];
   switch (fact.type) {
     case "sessionReported": {
@@ -212,7 +212,7 @@ export function entriesFor(before: T.WorkspaceState, fact: T.Fact, after: T.Work
           kind: "harvested",
           session: fact.id,
           agent: h.agent,
-          project: h.project ?? "",
+          repo: h.repo ?? "",
           runtime: h.runtime,
           commits: fact.merged,
           ...(h.spent?.cny !== undefined ? { cny: h.spent.cny } : {}),
@@ -250,7 +250,7 @@ export function entriesFor(before: T.WorkspaceState, fact: T.Fact, after: T.Work
 }
 
 /** A farm level the ledger has not told yet, from commits counted before it. */
-export function catchUp(state: T.WorkspaceState): Entry[] {
+export function catchUp(state: T.SpaceState): Entry[] {
   const [level] = levelForCommits(state.commits?.total ?? 0);
   const known = state.progress?.counts.farm_level ?? 1;
   return level > known ? [{ kind: "level", level }] : [];

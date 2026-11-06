@@ -32,12 +32,12 @@ describe("pkm", () => {
   it.effect("makes a page in its tier's folder, moves it, and reads what another editor wrote", () =>
     Effect.gen(function* () {
       const pkm = yield* Pkm;
-      const made = yield* pkm.save({ title: "Cetus Core", tier: "project", props: { status: "active" }, markdown: "- TODO the parser\n- DOING the editor\n" });
-      expect(made.file).toBe("01_Projects/Cetus-Core.md");
+      const made = yield* pkm.save({ title: "Cetus Core", tier: "repo", props: { status: "active" }, markdown: "- TODO the parser\n- DOING the editor\n" });
+      expect(made.file).toBe("01_Repos/Cetus-Core.md");
       expect(readFileSync(join(pkm.root, made.file), "utf8")).toBe("title:: Cetus Core\nstatus:: active\n\n- TODO the parser\n- DOING the editor\n");
       const moved = yield* pkm.move({ page: "cetus-core", tier: "archive" });
       expect(moved.file).toBe("04_Archives/Cetus-Core.md");
-      expect(existsSync(join(pkm.root, "01_Projects/Cetus-Core.md"))).toBe(false);
+      expect(existsSync(join(pkm.root, "01_Repos/Cetus-Core.md"))).toBe(false);
 
       const kept = moved.blocks[0]!.id;
       edit(pkm.root, moved.file, "title:: Cetus Core\nstatus:: active\n\n- NOW written elsewhere\n- TODO the parser\n- DOING the editor\n");
@@ -160,7 +160,7 @@ describe("pkm", () => {
       const pkm = yield* Pkm;
       const target = yield* pkm.save({ title: "Ideas", tier: "resource", markdown: "- an idea about engines\n" });
       const id = target.blocks[0]!.id;
-      yield* pkm.save({ title: "Roadmap", tier: "project", markdown: `- builds on ((${id}))\n` });
+      yield* pkm.save({ title: "Roadmap", tier: "repo", markdown: `- builds on ((${id}))\n` });
       expect(readFileSync(join(pkm.root, "03_Resources/Ideas.md"), "utf8")).toContain(`id:: ${id}`);
       const view = yield* pkm.page("roadmap");
       expect(view.transclusions).toEqual([{ block: id, found: true, page: "ideas", pageTitle: "Ideas", body: "an idea about engines" }]);
@@ -209,7 +209,7 @@ describe("pkm", () => {
   it.effect("searches the blocks through the full-text index, which follows the files", () =>
     Effect.gen(function* () {
       const pkm = yield* Pkm;
-      yield* pkm.save({ title: "解析器", tier: "project", markdown: "- 单遍状态机的解析器\n  - 支持代码块\n- 渲染引擎 rendering engine\n" });
+      yield* pkm.save({ title: "解析器", tier: "repo", markdown: "- 单遍状态机的解析器\n  - 支持代码块\n- 渲染引擎 rendering engine\n" });
       yield* pkm.save({ title: "旧方案", tier: "archive", markdown: "- 以前的解析器\n" });
       const found = yield* pkm.search({ text: "解析器" });
       // The page's title is indexed with each of its blocks; the one whose own words say it is first.

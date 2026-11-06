@@ -13,7 +13,7 @@ import { Db } from "#/infra/db.ts";
 import type { Picked } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { keepSourceTrigger, keptTrigger, triggerOf, type TriggerInput } from "#/mailbox/payload.ts";
-import type { ProjectError } from "#/project/workplace.ts";
+import type { RepoError } from "#/repo/workplace.ts";
 
 import { githubInputs, type GitHubPullIngress } from "./github.ts";
 
@@ -44,7 +44,7 @@ export class Ingress extends Context.Service<
     readonly say: (text: string, pick: Picked, channel: string | undefined, sendKey: string, more?: SayMore) => Effect.Effect<void, ApiError>;
     readonly accept: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, Schema.SchemaError | ApiError>;
     readonly refreshGitHub: Effect.Effect<void>;
-    readonly githubSnapshot: (project: string, pr: number) => Effect.Effect<GitHubPullIngress, ProjectError>;
+    readonly githubSnapshot: (repo: string, pr: number) => Effect.Effect<GitHubPullIngress, RepoError>;
     readonly record: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, Schema.SchemaError>;
     readonly read: (id: string) => Effect.Effect<TriggerResource | undefined, Schema.SchemaError>;
   }
@@ -120,13 +120,13 @@ const make = Effect.gen(function* () {
     }),
     say: Effect.fn("Ingress.say")(function* (text, pick, channel, sendKey, more) {
       const a = pick.agent ? store.agent(pick.agent) : undefined;
-      const picked: Picked = { ...(a ? { agent: a.id } : {}), ...(pick.project?.trim() ? { project: pick.project.trim() } : {}) };
+      const picked: Picked = { ...(a ? { agent: a.id } : {}), ...(pick.repo?.trim() ? { repo: pick.repo.trim() } : {}) };
       const blocks = yield* quote(more?.blockRefs);
       yield* core.open();
       yield* chat.say(text, channel, sendKey, {
         ...more,
         ...(blocks.length > 0 ? { blocks } : {}),
-        ...(picked.agent || picked.project ? { picked } : {}),
+        ...(picked.agent || picked.repo ? { picked } : {}),
       });
     }),
     accept,

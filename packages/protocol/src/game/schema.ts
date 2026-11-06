@@ -154,7 +154,7 @@ export const LedgerEntryHarvested: Codec<T.LedgerEntryHarvested> = Schema.Struct
   at: Schema.Finite,
   session: SessionId,
   agent: Schema.optionalKey(Schema.String),
-  project: Schema.String,
+  repo: Schema.String,
   runtime: Schema.String,
   commits: Schema.Finite,
   cny: Schema.optionalKey(Schema.Finite),

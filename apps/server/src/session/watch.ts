@@ -155,7 +155,7 @@ export const sessionWatch = (r: SessionRecords) =>
           agent: session.agent,
           session: h.id,
           ...(session.issue ? { issue: session.issue } : {}),
-          project: h.place.project,
+          repo: h.place.repo,
           brief: session.brief,
           outcome: read.outcome,
           said: read.text,
@@ -166,8 +166,7 @@ export const sessionWatch = (r: SessionRecords) =>
         fire(
           Effect.forEach(
             declared.remember,
-            (memory) =>
-              memories.write({ agent: session.agent, text: memory.text, project: memory.scope === "all" ? "" : h.place.project, by: sessionActor(h.id) }),
+            (memory) => memories.write({ agent: session.agent, text: memory.text, repo: memory.scope === "all" ? "" : h.place.repo, by: sessionActor(h.id) }),
             { discard: true },
           ).pipe(bestEffort(`vibevalley: ${h.id}'s declared memories were not kept`)),
         );

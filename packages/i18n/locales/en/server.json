@@ -2,7 +2,7 @@
   "lookIn": {
     "issue": "List the tickets and find its number",
     "session": "List the helpers and find its id",
-    "project": "List the projects and find its name",
+    "repo": "List the repos and find its name",
     "runtime": "List the machines and find its id",
     "agent": "List the profiles and find its id",
     "skill": "List the skills and find its id",
@@ -16,7 +16,7 @@
     "artifact": "List the artifacts to find its id",
     "pkm": "List the notes’ pages to find its name"
   },
-  "projectRef": "project {id}",
+  "repoRef": "repo {id}",
   "helperRef": "helper {id}",
   "archiveRef": "archive {name}"
 }

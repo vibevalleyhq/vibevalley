@@ -29,7 +29,7 @@ interface Message {
 
 /** What goes to EverOS: every message's words redacted. */
 type Sent = Omit<Message, "content"> & { readonly content: RedactedString };
-type Scoped = { readonly app_id: string; readonly project_id: string };
+type Scoped = { readonly app_id: string; readonly repo_id: string };
 type Body =
   | (Scoped & { readonly session_id: string; readonly messages: Sent[] })
   | (Scoped & { readonly session_id: string })
@@ -37,7 +37,7 @@ type Body =
 
 interface FoundBody {
   readonly data?: {
-    readonly episodes?: readonly { id: string; subject?: string; summary?: string; episode?: string; score?: number; app_id?: string; project_id?: string }[];
+    readonly episodes?: readonly { id: string; subject?: string; summary?: string; episode?: string; score?: number; app_id?: string; repo_id?: string }[];
     readonly agent_cases?: readonly {
       id: string;
       task_intent?: string;
@@ -45,7 +45,7 @@ interface FoundBody {
       key_insight?: string;
       score?: number;
       app_id?: string;
-      project_id?: string;
+      repo_id?: string;
     }[];
   };
 }
@@ -57,7 +57,7 @@ const Episode = Schema.Struct({
   episode: Schema.optionalKey(Schema.String),
   score: Schema.optionalKey(Schema.Finite),
   app_id: Schema.optionalKey(Schema.String),
-  project_id: Schema.optionalKey(Schema.String),
+  repo_id: Schema.optionalKey(Schema.String),
 });
 const AgentCase = Schema.Struct({
   id: Schema.String,
@@ -66,15 +66,15 @@ const AgentCase = Schema.Struct({
   key_insight: Schema.optionalKey(Schema.String),
   score: Schema.optionalKey(Schema.Finite),
   app_id: Schema.optionalKey(Schema.String),
-  project_id: Schema.optionalKey(Schema.String),
+  repo_id: Schema.optionalKey(Schema.String),
 });
 const FoundPayload: Schema.Codec<FoundBody> = Schema.Struct({
   data: Schema.optionalKey(Schema.Struct({ episodes: Schema.optionalKey(Schema.Array(Episode)), agent_cases: Schema.optionalKey(Schema.Array(AgentCase)) })),
 });
 const FoundBodySchema = Schema.fromJsonString(FoundPayload);
 
-// EverOS scope ids are ASCII and at most 128 characters; a real project named "global" must stay separate from global notes.
-const scopeOf = (project: string) => (project ? "project-" + createHash("sha256").update(project).digest("hex") : "global");
+// EverOS scope ids are ASCII and at most 128 characters; a real repo named "global" must stay separate from global notes.
+const scopeOf = (repo: string) => (repo ? "repo-" + createHash("sha256").update(repo).digest("hex") : "global");
 
 /** A farm's session ids (w1, w2…) are its own only: another farm on the same EverOS has a w1 too. */
 const sessionOf = (session: string) => `${app}-${session}`;
@@ -104,21 +104,20 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     return closing ? answer : life.alive(answer);
   };
 
-  const add = Effect.fnUntraced(function* (session: string, project: string, messages: Message[]) {
+  const add = Effect.fnUntraced(function* (session: string, repo: string, messages: Message[]) {
     const sent: Sent[] = messages.map((m) => ({ ...m, content: redact(m.content) }));
-    yield* post("add", { session_id: session, messages: sent, app_id: app, project_id: scopeOf(project) });
-    pending.set(session, project);
+    yield* post("add", { session_id: session, messages: sent, app_id: app, repo_id: scopeOf(repo) });
+    pending.set(session, repo);
   });
 
-  const flush = (session: string, project: string, closing = false) =>
-    post("flush", { session_id: session, app_id: app, project_id: scopeOf(project) }, closing);
+  const flush = (session: string, repo: string, closing = false) => post("flush", { session_id: session, app_id: app, repo_id: scopeOf(repo) }, closing);
 
   /** A profile's cases, or with kind issue the owner's episodes. */
-  const findIn = Effect.fnUntraced(function* (agent: string, query: string, limit: number, kind: MemoryKind, project: string) {
-    const scope = scopeOf(project);
+  const findIn = Effect.fnUntraced(function* (agent: string, query: string, limit: number, kind: MemoryKind, repo: string) {
+    const scope = scopeOf(repo);
     const body = {
       app_id: app,
-      project_id: scope,
+      repo_id: scope,
       query: redactedHead(redact(query), 1000),
       top_k: Math.max(1, Math.min(limit, most)),
       ...(kind === "issue" ? { user_id: user } : { agent_id: agentOf(agent) }),
@@ -128,8 +127,8 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       Schema.decodeEffect(FoundBodySchema)(text),
       () => new SourceError({ message: "memory/search answered what it should not: " + text.slice(0, 200) }),
     );
-    const ownership = (hit: { app_id?: string; project_id?: string }): MemoryScope =>
-      hit.app_id !== app || hit.project_id !== scope ? { kind: "unknown" } : project ? { kind: "project", project } : { kind: "global" };
+    const ownership = (hit: { app_id?: string; repo_id?: string }): MemoryScope =>
+      hit.app_id !== app || hit.repo_id !== scope ? { kind: "unknown" } : repo ? { kind: "repo", repo } : { kind: "global" };
     const hits: { id: string; text: string; score: number; scope: MemoryScope }[] = [];
     for (const k of found.data?.agent_cases ?? [])
       hits.push({
@@ -145,9 +144,9 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     return hits;
   });
 
-  const find = (agent: string, query: string, limit: number, kind: MemoryKind, project: string) =>
+  const find = (agent: string, query: string, limit: number, kind: MemoryKind, repo: string) =>
     Effect.map(
-      Effect.forEach(project ? [project, ""] : [""], (p) => findIn(agent, query, limit, kind, p), { concurrency: "unbounded" }),
+      Effect.forEach(repo ? [repo, ""] : [""], (p) => findIn(agent, query, limit, kind, p), { concurrency: "unbounded" }),
       (all) => all.flat().toSorted((a, b) => b.score - a.score),
     );
 
@@ -162,14 +161,14 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       told.clear();
       yield* Effect.forEach(
         all,
-        ([session, project]) =>
-          Effect.ignore(flush(session, project, true), { log: "Warn", message: `vibevalley: everos: session ${session} was not flushed at stop` }),
+        ([session, repo]) =>
+          Effect.ignore(flush(session, repo, true), { log: "Warn", message: `vibevalley: everos: session ${session} was not flushed at stop` }),
         { concurrency: "unbounded", discard: true },
       ).pipe(Effect.timeoutOption(prefetchTimeoutMs));
     }),
     prefetch: Effect.fnUntraced(function* (cue) {
       if (c.read !== true || cue.text.trim() === "") return [];
-      const hits = yield* find(cue.agent, cue.text, recallCount, "note", cue.project);
+      const hits = yield* find(cue.agent, cue.text, recallCount, "note", cue.repo);
       return hits
         .filter((h) => cue.skip?.has(h.id) !== true && h.text !== "" && h.scope.kind !== "unknown")
         .slice(0, recallCount)
@@ -178,10 +177,10 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     // A search over every profile has no one owner to ask with: it gives nothing here.
     search: Effect.fnUntraced(function* (q) {
       if (c.read !== true || q.text.trim() === "") return { found: [] };
-      if (q.project === "") return { found: [], coverage: t("server.memory.coverage.everosAcross") };
+      if (q.repo === "") return { found: [], coverage: t("server.memory.coverage.everosAcross") };
       if (q.agent === "" && q.kind !== "issue") return { found: [], coverage: t("server.memory.coverage.everosAgent") };
       const kind: MemoryKind = q.kind || "note";
-      const hits = yield* find(q.agent, q.text, q.limit, kind, q.project);
+      const hits = yield* find(q.agent, q.text, q.limit, kind, q.repo);
       return {
         found: hits
           .filter((h) => h.text !== "")
@@ -199,28 +198,28 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       if (run.outcome === "failed") said = everosWords.failed + said;
       if (said.trim() !== "") messages.push({ sender_id: agentOf(run.agent), role: "assistant", timestamp: at, content: said });
       if (messages.length === 0) return;
-      yield* add(sessionOf(run.session), run.project, messages);
+      yield* add(sessionOf(run.session), run.repo, messages);
       told.add(run.session);
     }),
     sessionEnded: Effect.fnUntraced(function* (s) {
       const session = sessionOf(s.session);
-      const project = pending.get(session);
+      const repo = pending.get(session);
       pending.delete(session);
       told.delete(s.session);
-      if (project !== undefined) yield* flush(session, project);
+      if (repo !== undefined) yield* flush(session, repo);
     }),
     // A note written outside a run is a conversation of its own, extracted at once.
     add: Effect.fnUntraced(function* (n) {
       if (c.write !== true) return undefined;
       const session = `vibevalley-note-${n.agent}-${newId()}`;
-      const project = n.project.trim();
+      const repo = n.repo.trim();
       const at = yield* Clock.currentTimeMillis;
-      yield* add(session, project, [
-        { sender_id: user, role: "user", timestamp: at, content: everosWords.remember(project, n.text) },
+      yield* add(session, repo, [
+        { sender_id: user, role: "user", timestamp: at, content: everosWords.remember(repo, n.text) },
         { sender_id: agentOf(n.agent), role: "assistant", timestamp: at, content: everosWords.noted(n.text) },
       ]);
       yield* Effect.ensuring(
-        flush(session, project),
+        flush(session, repo),
         Effect.sync(() => pending.delete(session)),
       );
       return undefined;

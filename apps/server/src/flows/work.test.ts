@@ -54,7 +54,7 @@ describe("a session's work", () => {
     return Effect.gen(function* () {
       const issues = yield* Issue;
       expect((yield* issues.hire({ ...lab(), enabled: false }, "随便做点什么", "demo")).refused).toBe(lab().name + " 被停用了");
-      expect((yield* issues.hire(lab(), "随便做点什么", "../../etc")).refused).toMatch(/不能当项目名/u);
+      expect((yield* issues.hire(lab(), "随便做点什么", "../../etc")).refused).toMatch(/不能当仓库名/u);
       expect((yield* issues.hire(lab(), "随便做点什么", "")).refused).toBeTruthy();
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -70,10 +70,10 @@ describe("a session's work", () => {
       expect(session.branch).toMatch(/^vibevalley\//u);
       expect(said).toMatchObject({ status: "done", delivered: "merged" });
       yield* until(() => w.notes.some((note) => /1 个提交合进了 clock 的 main/u.test(note)), "the merge notice");
-      const project = join(f.config.workRoot, "repos", "clock");
-      expect(git(project, "log", "--format=%s", "main")).toMatch(/加上打卡/u);
-      expect(existsSync(join(project, "clock.ts"))).toBe(true);
-      expect(git(project, "worktree", "list").split("\n")).toHaveLength(1);
+      const repo = join(f.config.workRoot, "repos", "clock");
+      expect(git(repo, "log", "--format=%s", "main")).toMatch(/加上打卡/u);
+      expect(existsSync(join(repo, "clock.ts"))).toBe(true);
+      expect(git(repo, "worktree", "list").split("\n")).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -159,7 +159,7 @@ describe("a session's work", () => {
       const steps = (yield* sessions.events(session.id)) ?? [];
       yield* sessions.dismiss(session.id);
       const after = (yield* sessions.get(session.id))!;
-      expect([after.brief, after.agent, after.project, after.phase._tag]).toEqual(["看看目录", "lab", "steps", "closed"]);
+      expect([after.brief, after.agent, after.repo, after.phase._tag]).toEqual(["看看目录", "lab", "steps", "closed"]);
       const want = ["run/start", "user/message", "tool/call", "tool/result", "assistant/message", "run/end"];
       const kept = (yield* sessions.events(session.id)) ?? [];
       expect(kept.map((e) => e.type)).toEqual(want);
@@ -250,9 +250,9 @@ describe("a session's work", () => {
       const core = yield* Core;
       yield* until(() => core.state().issues.find((issue) => issue.id === b.issue)?.conflict === undefined, "the conflict mark cleared");
       expect(yield* issues.setStatus(b.issue!, "done", "", "", owner)).toMatchObject({ status: "done", delivered: "merged" });
-      const project = join(f.config.workRoot, "repos", "clash");
-      expect(git(project, "show", "main:same.ts")).toBe("export const v = 'A+B'");
-      expect(git(project, "status", "--porcelain")).toBe("");
+      const repo = join(f.config.workRoot, "repos", "clash");
+      expect(git(repo, "show", "main:same.ts")).toBe("export const v = 'A+B'");
+      expect(git(repo, "status", "--porcelain")).toBe("");
       yield* until(() => core.state().progress?.counts.untangle === 1, "the issue conflict credited to its resolver");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -283,7 +283,7 @@ describe("a session's work", () => {
     });
   });
 
-  it.live("is held to the project's and the runtime's limits", () => {
+  it.live("is held to the repo's and the runtime's limits", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
@@ -292,7 +292,7 @@ describe("a session's work", () => {
       const agents = yield* Agent;
       const busy: T.Session[] = [];
       for (const i of ["1", "2", "3"]) busy.push(mustHire(yield* issues.hire(lab(), "发呆 " + i, "crowded")));
-      expect((yield* issues.hire(lab(), "发呆 4", "crowded")).refused).toMatch(/项目 crowded 里已经有 3 个帮工在干活/u);
+      expect((yield* issues.hire(lab(), "发呆 4", "crowded")).refused).toMatch(/仓库 crowded 里已经有 3 个帮工在干活/u);
       const settings = agents.settings("pi");
       yield* agents.saveSettings("pi", { ...settings, maxWorking: 3 });
       expect((yield* issues.hire(lab(), "发呆 5", "roomy")).refused).toMatch(/最多同时 3 个/u);
@@ -305,7 +305,7 @@ describe("a session's work", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("two sent to a new project at once both work", () => {
+  it.live("two sent to a new repo at once both work", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;

@@ -7,7 +7,7 @@ import { aria, useClickAway } from "#/base/dom.tsx";
 import { farm, farmChannelLabel } from "#/farm/store.ts";
 import { createChannelForm, directsOf, topsOf, chatPath, unreadUnder } from "#/features/channel/index.ts";
 import { useCore } from "#/infra/frame.ts";
-import { ready, useProjects } from "#/infra/query.ts";
+import { ready, useRepos } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { PxButton, PxTextInput, SpriteIcon } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
@@ -111,7 +111,7 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
   const core = useCore();
   const c = () => props.channel;
   const unread = () => unreadUnder(core()?.chat, c());
-  const line = () => [c().description, c().project ? t("web.farm.chat.projectTag", { project: c().project! }) : undefined].filter(Boolean).join(" · ");
+  const line = () => [c().description, c().repo ? t("web.farm.chat.repoTag", { repo: c().repo! }) : undefined].filter(Boolean).join(" · ");
   const here = () => c().id === props.current?.id;
   return (
     <button
@@ -151,8 +151,8 @@ function FormButtons(props: { onBack: () => void; submit: string; onSubmit?: (()
 }
 
 function NewChannel(props: { onDone: () => void; onBack: () => void }) {
-  const projects = useProjects();
-  const names = () => ready(projects, []).map((p) => p.name);
+  const repos = useRepos();
+  const names = () => ready(repos, []).map((p) => p.name);
   const form = createChannelForm();
   const submit = async () => {
     const made = await form.save();
@@ -180,10 +180,10 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
         label={t("web.farm.chat.description")}
       />
       <PxTextInput
-        value={form.project()}
-        onChange={form.setProject}
-        placeholder={t("web.farm.chat.projectHint")}
-        label={t("web.farm.chat.project")}
+        value={form.repo()}
+        onChange={form.setRepo}
+        placeholder={t("web.farm.chat.repoHint")}
+        label={t("web.farm.chat.repo")}
         suggestions={names()}
       />
       <Show when={form.error()}>
@@ -195,8 +195,8 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
 }
 
 function ChannelSettings(props: { channel: Channel; onDone: () => void; onBack: () => void }) {
-  const projects = useProjects();
-  const names = () => ready(projects, []).map((p) => p.name);
+  const repos = useRepos();
+  const names = () => ready(repos, []).map((p) => p.name);
   // It starts from the channel as it is when opened.
   const form = createChannelForm(untrack(() => props.channel));
   const submit = async () => {
@@ -207,10 +207,10 @@ function ChannelSettings(props: { channel: Channel; onDone: () => void; onBack: 
       <p class="text-[13px]">{t("web.farm.chat.settingsOf", { channel: farmChannelLabel(props.channel) })}</p>
       <PxTextInput value={form.description()} onChange={form.setDescription} placeholder={t("web.farm.chat.what")} label={t("web.farm.chat.description")} />
       <PxTextInput
-        value={form.project()}
-        onChange={form.setProject}
-        placeholder={t("web.farm.chat.projectNone")}
-        label={t("web.farm.chat.project")}
+        value={form.repo()}
+        onChange={form.setRepo}
+        placeholder={t("web.farm.chat.repoNone")}
+        label={t("web.farm.chat.repo")}
         suggestions={names()}
       />
       <Show when={form.error()}>

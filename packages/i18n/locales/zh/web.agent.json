@@ -49,11 +49,11 @@
   "tagsHint": "前端、测试、文档…",
   "enabled": "启用",
   "enabledHint": "停用后管家不会派它，名字点到也会拒绝。",
-  "workdir": "默认项目",
-  "workdirTip": "工作目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。管家派活没说项目时用它；留空时派活必须说在哪个项目。",
+  "workdir": "默认仓库",
+  "workdirTip": "工作目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。管家派活没说仓库时用它；留空时派活必须说在哪个仓库。",
   "workdirHint": "比如 clock-in",
   "worktree": "每个帮工一个 git worktree",
-  "worktreeHint": "每个帮工在自己的分支上改，几个帮工不会互相覆盖；完成时合进项目。关掉就直接在项目里改，没有分支可合。",
+  "worktreeHint": "每个帮工在自己的分支上改，几个帮工不会互相覆盖；完成时合进仓库。关掉就直接在仓库里改，没有分支可合。",
   "env": "环境变量",
   "envHint": "叠加在 农机设置的环境变量之上。",
   "machine": "农机",
@@ -152,7 +152,7 @@
     "modelHint": "deepseek-v4-flash",
     "dutyTip": "一句话：它专管什么。",
     "personaTip": "它是谁、怎么说话、专管什么，接在管家的提示后面。",
-    "personaHint": "你专管 clock-in 这个项目，先看测试再派活……",
+    "personaHint": "你专管 clock-in 这个仓库，先看测试再派活……",
     "look": "长相"
   },
   "list": {

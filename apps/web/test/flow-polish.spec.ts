@@ -28,8 +28,8 @@ const fox: Agent = {
 
 test("a dispatch links its issue, and what waits on the owner is counted on the rail and in the title", async ({ page, api }) => {
   const helper = await api.agent.create(fox);
-  const project = await api.project.create({ name: "polish" });
-  const made = await api.issue.create({ title: "打卡页先问清楚", project: project.name, agent: helper.id });
+  const repo = await api.repo.create({ name: "polish" });
+  const made = await api.issue.create({ title: "打卡页先问清楚", repo: repo.name, agent: helper.id });
   await page.goto("/chat");
   await expect(page.locator('[data-testid="rail"] [data-place="issues"]')).not.toHaveAttribute("data-badge");
   await api.issue.status.update({ id: made.id, status: "todo" });

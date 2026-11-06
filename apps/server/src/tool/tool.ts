@@ -13,8 +13,8 @@ import { cronTools } from "./cron.ts";
 import { issueTools } from "./issue.ts";
 import { memoryTools } from "./memory.ts";
 import { pkmTools } from "./pkm.ts";
-import { projectTools } from "./project.ts";
 import { sessionLine } from "./prompts.ts";
+import { repoTools } from "./repo.ts";
 import { resourceTools } from "./resource.ts";
 import type { Who } from "./schemas.ts";
 
@@ -36,7 +36,7 @@ export class Tool extends Context.Service<
   );
 }
 
-const named = ["id", "agent", "session", "project", "name", "title", "text", "note", "goal"];
+const named = ["id", "agent", "session", "repo", "name", "title", "text", "note", "goal"];
 
 export function toolStart(name: string, args: unknown): ToolStart {
   let about = "";
@@ -98,7 +98,7 @@ const make = Effect.gen(function* () {
   const notes = yield* pkmTools;
   const { cronCreate, cronList, cronDelete } = yield* cronTools;
   const resourceRead = yield* resourceTools;
-  const projectList = yield* projectTools;
+  const repoList = yield* repoTools;
 
   return Tool.of({
     orchestrator: (who) => [
@@ -117,7 +117,7 @@ const make = Effect.gen(function* () {
       channelList,
       channelCreate,
       channelUpdate,
-      projectList,
+      repoList,
       cronCreate(who),
       cronList,
       cronDelete,

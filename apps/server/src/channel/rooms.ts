@@ -120,9 +120,9 @@ export class ChatModel {
   }
 
   /** UpdateChannel. */
-  channelUpdated(id: string, description: string | null, project: string | null) {
+  channelUpdated(id: string, description: string | null, repo: string | null) {
     const c = this.byId.get(id);
-    if (c && c.type !== "thread") this.byId.set(id, { ...c, description, project });
+    if (c && c.type !== "thread") this.byId.set(id, { ...c, description, repo });
   }
 
   /** RenameChannel, SetCategory, PlaceChannel, SetArchived, SetNotify. */

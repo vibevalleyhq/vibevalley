@@ -28,7 +28,7 @@
   "noRoom": {
     "farm": "已经有 {max} 个帮工在干活了",
     "runtime": "{runtime} 上已经有 {on} 个帮工在干活，最多同时 {max} 个（在「农机」页可以改）",
-    "project": "项目 {project} 里已经有 {on} 个帮工在干活，最多同时 {max} 个：人多了容易改到同一个文件"
+    "repo": "仓库 {repo} 里已经有 {on} 个帮工在干活，最多同时 {max} 个：人多了容易改到同一个文件"
   },
   "notTaken": {
     "conflictOwner": "没合进去：合进 {base} 会冲突（{files}）。{name} 还在，分支和 worktree 都在。要它解决就用 tell 告诉它：{brief}",
@@ -37,7 +37,7 @@
     "checkFix": "{reason}\n请修好检查，再交回来。",
     "owner": "没合进去：{why}。{name} 还在",
     "notice": "{name} 的活没合进去：{why}",
-    "checkShort": "项目检查没通过"
+    "checkShort": "仓库检查没通过"
   },
   "log": {
     "stopped": "VibeValley 停下了，这一轮中断了",

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { type ChatMessage, ownerId, type WorkspaceState } from "@vibevalley/protocol";
+import { type ChatMessage, ownerId, type SpaceState } from "@vibevalley/protocol";
 import { messageId } from "@vibevalley/protocol/schema";
 
-import { emptyWorkspaceState } from "#/core/core.ts";
+import { emptySpaceState } from "#/core/core.ts";
 import { checkCases, goldenCases } from "#/testing/golden.ts";
 
 import { forOwner, inboxEntries } from "./items.ts";
@@ -14,11 +14,11 @@ describe("the patrol", () => {
   it("find for the patrol what was recorded", () => {
     const failed = checkCases(goldenCases("inbox"), (c) => {
       if (c.fn !== "patrol") throw new Error(`unknown fn ${c.fn}`);
-      const given = c.in as { state: WorkspaceState; nows: number[] };
+      const given = c.in as { state: SpaceState; nows: number[] };
       let memory = emptyPatrol();
       return given.nows.map((now, r) => {
         let report: PatrolNote[];
-        [report, memory] = patrolStep(r % 5 === 4 ? emptyWorkspaceState() : given.state, now, memory);
+        [report, memory] = patrolStep(r % 5 === 4 ? emptySpaceState() : given.state, now, memory);
         return {
           now,
           report: report.map((n) => ({ Key: n.key, Channel: n.channel ?? null, Text: n.text })),
@@ -49,8 +49,8 @@ describe("the patrol", () => {
       attachments: [],
       embeds: [],
     };
-    const state: WorkspaceState = {
-      ...emptyWorkspaceState(),
+    const state: SpaceState = {
+      ...emptySpaceState(),
       chat: {
         channels: [{ id: "seen-channel", type: "channel", default: true, name: "田头", category: "", description: "", title: "", at: 0, replies: 0 }],
         ownerMentions: [{ message, channel: "seen-channel", address: "#田头:1" }],
