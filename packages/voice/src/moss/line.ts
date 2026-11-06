@@ -1,5 +1,6 @@
 import { mossLinePath } from "@vibevalley/protocol";
 
+import type { VoiceDriver } from "../core/contract.ts";
 import { MossEngine } from "./engine.ts";
 import { type MossEvent, mossInRate, type MossMessages, mossOutRate, type MossPhase, type MossQos, type MossSetup, type MossTurn, noQos } from "./protocol.ts";
 import { openMossRelayBridge, type MossRelayBridge } from "./worker.ts";
@@ -9,12 +10,12 @@ let captureUrl: string | undefined;
 let playbackUrl: string | undefined;
 
 /**
- * Thin reactive MOSS Live controller for the browser UI:
+ * Thin reactive MOSS Live controller implementing the unified `VoiceDriver` contract:
  * - Delegates all protocol framing, playback progress accounting, and transcript assembly to `MossEngine`.
  * - Connects `CaptureWorklet` (16 kHz) and `PlaybackWorklet` (48 kHz ring buffer) directly to the `MossRelayBridge`
  *   Web Worker via `MessageChannel` ports so zero audio bytes pass through the UI main thread.
  */
-export class MossLine {
+export class MossLine implements VoiceDriver<MossSetup, "owner" | "moss"> {
   phase: MossPhase = "idle";
   problem: string | undefined = undefined;
   muted = false;
@@ -48,6 +49,14 @@ export class MossLine {
     });
   }
 
+  get inputLevel(): number {
+    return this.micLevel;
+  }
+
+  get outputLevel(): number {
+    return this.mossLevel;
+  }
+
   subscribe = (f: () => void) => {
     this.listeners.add(f);
     return () => this.listeners.delete(f);
@@ -77,8 +86,6 @@ export class MossLine {
       onText: (data) => this.engine.socketText(data),
       onBinary: (data) => this.engine.socketBinary(data),
       onAudioMeta: (byteLength, samples, level) => {
-        // Synthesizes a dummy buffer view of the same sample count for engine timing & QoS accounting
-        // while the actual PCM ArrayBuffer was transferred zero-copy from the Worker to PlaybackWorklet.
         this.engine.socketBinary(new ArrayBuffer(samples * 2 || byteLength));
         this.engine.outLevelChanged(level, this.engine.qos.aheadMs);
       },
@@ -129,8 +136,6 @@ export class MossLine {
       inNode.connect(inContext.destination);
       this.mic = { stream, context: inContext, node: inNode };
 
-      // Bridge CaptureWorklet and PlaybackWorklet directly to the transport Worker via MessageChannels
-      // so audio frames never cross the UI main thread.
       const captureChannel = new MessageChannel();
       const playbackChannel = new MessageChannel();
       inNode.port.postMessage({ type: "connect", port: captureChannel.port1 }, [captureChannel.port1]);

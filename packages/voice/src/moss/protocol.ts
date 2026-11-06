@@ -1,5 +1,7 @@
 import { Schema } from "effect";
 
+import { appendVoiceTurn, pcm16RmsLevel, type VoicePhase, type VoiceTurn } from "../core/contract.ts";
+
 export const mossRealtimeUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
 
 export const mossInRate = 16000;
@@ -40,30 +42,15 @@ export const mossErrorMessage = (body: string): string => {
   return msg ? msg : body.slice(0, 200);
 };
 
-/** One side's words in a turn; done once MOSS has settled them. */
-export interface MossTurn {
-  readonly who: "owner" | "moss";
-  readonly key: string;
-  readonly text: string;
-  readonly done: boolean;
-}
+/** One side's words in a MOSS turn; specialization of the core `VoiceTurn`. */
+export type MossTurn = VoiceTurn<"owner" | "moss">;
 
 /** The turns with a turn's words so far (MOSS sends them whole each time). A new turn starts a new line. */
-export function heard(turns: readonly MossTurn[], who: MossTurn["who"], key: string, text: string, done: boolean): MossTurn[] {
-  if (text === "") return [...turns];
-  let last: MossTurn | undefined;
-  for (const x of turns) if (x.who === who && !x.done && (x.key === "" || key === "" || x.key === key)) last = x;
-  if (!last) return [...turns, { who, key, text, done }];
-  return turns.map((x) => (x === last ? { ...x, key: key || x.key, text, done } : x));
-}
+export const heard = (turns: readonly MossTurn[], who: MossTurn["who"], key: string, text: string, done: boolean): MossTurn[] =>
+  appendVoiceTurn(turns, who, key, text, done);
 
 /** 0..100 from a frame's loudness. */
-export function levelOf(pcm: Int16Array): number {
-  if (pcm.length === 0) return 0;
-  let sum = 0;
-  for (const s of pcm) sum += (s / 0x8000) ** 2;
-  return Math.min(100, Math.round(Math.sqrt(sum / pcm.length) * 300));
-}
+export const levelOf = pcm16RmsLevel;
 
 /** Packs 16-bit PCM samples into MOSS Live's tagged-v1 binary frame (leading 0x00 tag byte + PCM payload, or silence when muted). */
 export function packTaggedAudio(pcm: Int16Array, muted = false): Uint8Array {
@@ -78,7 +65,7 @@ export function unpackPcm16(data: ArrayBuffer): Int16Array {
   return new Int16Array(data, 0, Math.floor(data.byteLength / 2));
 }
 
-export type MossPhase = "idle" | "connecting" | "live" | "ending";
+export type MossPhase = VoicePhase;
 
 /** An action sent or an event received, as JSON; the noisy ones (words as they grow, audio announcements) are left out. */
 export interface MossEvent {

@@ -7,7 +7,17 @@ export {
   liveCaptions,
   type Speaker,
   type SpokenLine,
+  voiceTurnsOfCaptions,
 } from "./captions.ts";
+export {
+  appendVoiceTurn,
+  float32RmsLevel,
+  pcm16RmsLevel,
+  type VoiceDriver,
+  type VoicePhase,
+  type VoiceSpeaker,
+  type VoiceTurn,
+} from "./core.ts";
 export {
   decodeMossFrame,
   heard,
@@ -41,7 +51,7 @@ export {
   noQos,
   noisyMossActions,
   openMossRelayBridge,
-   type Piece,
+  type Piece,
   Playback,
   type PlaybackAction,
   packTaggedAudio,

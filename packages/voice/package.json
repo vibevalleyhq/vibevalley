@@ -7,6 +7,10 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "default": "./src/core.ts"
+    },
     "./agora": {
       "types": "./dist/agora.d.ts",
       "default": "./src/agora.ts"

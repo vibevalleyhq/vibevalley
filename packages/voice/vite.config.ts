@@ -5,7 +5,7 @@ export default defineConfig({
   test: { include: ["src/**/*.test.ts"], reporters: [...configDefaults.reporters, "@vibevalley/testkit/budgets"] },
   // The types other packages check against (package.json's exports.
   pack: {
-    entry: ["src/index.ts", "src/agora.ts", "src/captions.ts", "src/moss.ts", "src/moss-server.ts", "src/transcribe.ts"],
+    entry: ["src/index.ts", "src/core.ts", "src/agora.ts", "src/captions.ts", "src/moss.ts", "src/moss-server.ts", "src/transcribe.ts"],
     outDir: "dist",
     clean: true,
     fixedExtension: false,

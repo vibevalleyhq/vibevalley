@@ -2,6 +2,7 @@ import { t } from "@vibevalley/i18n";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
 import type { Rtc, RtcLine } from "@vibevalley/protocol/host";
+import { type VoiceDriver, type VoicePhase, type VoiceTurn, voiceTurnsOfCaptions } from "@vibevalley/voice";
 
 import { messageOf } from "#/base/format.ts";
 import { api, reasonOf } from "#/infra/api.ts";
@@ -65,7 +66,7 @@ const webRtc: Rtc = async (grant, on) => {
   };
 };
 
-export type CallPhase = "idle" | "connecting" | "live" | "ending";
+export type CallPhase = VoicePhase;
 
 // Rejects the Promise a call's setup races against when the owner hangs up; the page's call code is not Effect.
 // @effect-diagnostics-next-line extendsNativeError:off
@@ -73,7 +74,7 @@ class Cancelled extends Error {}
 
 const sendKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
 
-export class VoiceCall {
+export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orchestrator"> {
   phase: CallPhase = "idle";
   muted = false;
   agentHere = false;
@@ -100,6 +101,18 @@ export class VoiceCall {
     this.agentPick = agentPick;
     this.captions.onHeard = (text) => this.caption(text, true);
     this.captions.onAnswered = (text) => this.caption(text, false);
+  }
+
+  get inputLevel(): number {
+    return this.micLevel;
+  }
+
+  get outputLevel(): number {
+    return this.orchestratorLevel;
+  }
+
+  get turns(): readonly VoiceTurn<"owner" | "orchestrator">[] {
+    return voiceTurnsOfCaptions(this.captions.turns);
   }
 
   get agentState() {
@@ -137,7 +150,7 @@ export class VoiceCall {
   private caption(text: string, owner: boolean) {
     if (this.phase === "idle" || this.phase === "ending") return;
     const c = { text, owner, ...(owner ? { picked: this.agentPick(), key: sendKey() } : {}) };
-    if (this.agentId) this.send(this.agentId, c);
+    if (this.agentId) this.send(agentIdOf(this.agentId), c);
     else this.pending.push(c);
   }
 
@@ -266,6 +279,8 @@ export class VoiceCall {
     await line?.leave().catch(() => undefined);
   }
 }
+
+const agentIdOf = (id: string) => id;
 
 /** The farm's one call; what is said in it goes to the helper picked in the farm's chat, if one is. */
 export const voiceCall = new VoiceCall(() => {

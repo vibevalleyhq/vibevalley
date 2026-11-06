@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { captionLinger, LiveCaptions, liveCaptions } from "./captions.ts";
+import { captionLinger, LiveCaptions, liveCaptions, voiceTurnsOfCaptions } from "./captions.ts";
 
 function chunked(id: string, message: Record<string, unknown>, parts: number) {
   const encoded = Buffer.from(JSON.stringify(message), "utf8").toString("base64");
@@ -26,6 +26,10 @@ test("a turn's text is replaced as it grows, and ends with final or turn_status"
   expect(c.turns.map((t) => [t.speaker, t.text, t.done])).toEqual([
     ["you", "你好，农场怎么样", true],
     ["orchestrator", "挺好的，地里有一个帮工。", true],
+  ]);
+  expect(voiceTurnsOfCaptions(c.turns)).toEqual([
+    { who: "owner", key: "1", text: "你好，农场怎么样", done: true },
+    { who: "orchestrator", key: "1", text: "挺好的，地里有一个帮工。", done: true },
   ]);
 });
 
@@ -57,7 +61,6 @@ test("live captions draw what is being said until 田头 has the line", () => {
   c.apply({ object: "user.transcription", turn_id: 1, text: "帮我看看", final: false });
   c.apply({ object: "assistant.transcription", turn_id: 1, text: "好，我看", turn_status: 0 });
   const said = (turns: typeof c.turns) => turns.map((t) => [t.speaker, t.text]);
-  // Whoever answers, its words reach the farm chat only once said: both sides are drawn as they are said.
   expect(said(liveCaptions(c.turns, [], Date.now()))).toEqual([
     ["you", "帮我看看"],
     ["orchestrator", "好，我看"],
@@ -65,7 +68,6 @@ test("live captions draw what is being said until 田头 has the line", () => {
   c.apply({ object: "user.transcription", turn_id: 1, text: "帮我看看进度", final: true });
   const done = c.turns.find((t) => t.speaker === "you")!;
   expect([done.done, done.doneAt !== undefined]).toEqual([true, true]);
-  // Finished, it stays until the farm chat has the line, or for captionLinger at most.
   const you = (turns: typeof c.turns) => said(turns.filter((t) => t.speaker === "you"));
   expect(you(liveCaptions(c.turns, [], Date.now()))).toEqual([["you", "帮我看看进度"]]);
   expect(you(liveCaptions(c.turns, [{ speaker: "you", text: "帮我看看进度" }], Date.now()))).toEqual([]);
