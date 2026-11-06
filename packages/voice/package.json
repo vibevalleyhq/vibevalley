@@ -1,0 +1,43 @@
+{
+  "name": "@vibevalley/voice",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./agora": {
+      "types": "./dist/agora.d.ts",
+      "default": "./src/agora.ts"
+    },
+    "./captions": {
+      "types": "./dist/captions.d.ts",
+      "default": "./src/captions.ts"
+    },
+    "./moss": {
+      "types": "./dist/moss.d.ts",
+      "default": "./src/moss.ts"
+    },
+    "./moss-server": {
+      "types": "./dist/moss-server.d.ts",
+      "default": "./src/moss-server.ts"
+    },
+    "./transcribe": {
+      "types": "./dist/transcribe.d.ts",
+      "default": "./src/transcribe.ts"
+    }
+  },
+  "dependencies": {
+    "@vibevalley/protocol": "workspace:*",
+    "agora-agents": "catalog:",
+    "agora-token": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "@vibevalley/testkit": "workspace:*",
+    "vite-plus": "catalog:"
+  }
+}

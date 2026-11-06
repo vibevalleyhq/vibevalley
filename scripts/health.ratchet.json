@@ -518,5 +518,12 @@
     "ignored": 0,
     "swallowed": 2,
     "resultBranch": 0
+  },
+  "packages/voice": {
+    "cast": 0,
+    "nonNull": 0,
+    "lintOff": 0,
+    "swallowed": 0,
+    "recordOf": 0
   }
 }

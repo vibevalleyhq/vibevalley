@@ -1,11 +1,13 @@
 import { type AgoraClient } from "agora-agents";
-import { type Cause, Clock, Context, Effect, Fiber, FiberSet, Layer, Queue, Schema, type Scope, Stream } from "effect";
-import { HttpBody, HttpClient, type HttpClientError } from "effect/http";
+import { Clock, Context, Effect, Fiber, FiberSet, Layer, Queue, type Scope, Stream } from "effect";
+import { HttpClient } from "effect/http";
 import type { Socket } from "effect/socket";
 
 import { t } from "@vibevalley/i18n";
 import { type AgoraGrant, type Dictated, defaultOrchestrator, type Validation, type VoiceCall } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
+import { type MossTransport, relay, verifyMoss } from "@vibevalley/voice/moss-server";
+import { mossTranscription, type TranscriptionFailure, transcribeAudio } from "@vibevalley/voice/transcribe";
 
 import { messageOf } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
@@ -26,8 +28,8 @@ import {
   failed,
   newChannel,
   newUid,
-  retrying,
   type Run,
+  retrying,
   sign,
   speakPieces,
   tokenSeconds,
@@ -37,7 +39,6 @@ import {
   voiceUnknown,
 } from "./agora.ts";
 import { type LineFailed, makeVoiceLine, type Tunnel, tunnelAnswers } from "./line.ts";
-import { type MossTransport, mossTranscription, relay, verifyMoss } from "./moss.ts";
 import { noticeLine, onCallLine } from "./prompts.ts";
 
 export {
@@ -63,26 +64,24 @@ const aborted = (signal: AbortSignal) =>
     return Effect.sync(() => signal.removeEventListener("abort", done));
   });
 
-/** OpenAI's own cap on one recording. */
-const dictateMaxBytes = 25 << 20;
-const dictateFormats: Record<string, string> = {
-  wav: "audio/wav",
-  m4a: "audio/mp4",
-  mp3: "audio/mpeg",
-  webm: "audio/webm",
-  ogg: "audio/ogg",
-  flac: "audio/flac",
+const mapTranscriptionFailure = (e: TranscriptionFailure): ApiError => {
+  switch (e._tag) {
+    case "UnsupportedFormat":
+      return { _tag: "Refused", reason: t("server.voice.dictation.format", { format: JSON.stringify(e.format) }) };
+    case "EmptyAudio":
+      return { _tag: "Refused", reason: t("server.voice.dictation.empty") };
+    case "AudioTooLong":
+      return { _tag: "Refused", reason: t("server.voice.dictation.tooLong") };
+    case "Unreachable":
+      return unavailable(t("server.voice.dictation.unreachable", { why: e.why }), "dictation");
+    case "Cut":
+      return unavailable(t("server.voice.dictation.cut", { why: e.why }), "call");
+    case "HttpStatus":
+      return unavailable(t("server.voice.dictation.status", { status: e.status, detail: e.detail }));
+    case "InvalidResponse":
+      return unavailable(t("server.voice.dictation.shape"));
+  }
 };
-const DictationResponse = Schema.fromJsonString(
-  Schema.Struct({
-    text: Schema.optionalKey(Schema.String),
-    error: Schema.optionalKey(Schema.Struct({ message: Schema.optionalKey(Schema.String) })),
-  }),
-);
-
-/** What an HTTP call's failure says to the owner: the network's own words (refused, reset), not the client's wrapper. */
-const causeText = (e: HttpClientError.HttpClientError | Cause.TimeoutError) =>
-  e._tag === "HttpClientError" && "cause" in e.reason && e.reason.cause !== undefined ? messageOf(e.reason.cause) : e.message;
 
 interface Grant {
   readonly credentials: AgoraCredentials;
@@ -485,48 +484,10 @@ const make = (options: VoiceOptions = {}) =>
         if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "dictation"));
         if (d.via === "moss" && d.key === "") return yield* Effect.fail(unavailable(t("server.voice.dictation.noMossKey"), "dictation"));
         const { url, model } = d.via === "moss" ? mossTranscription : d;
-        const format = given.trim().replace(/^\./u, "").toLowerCase();
-        const kind = dictateFormats[format];
-        if (!kind)
-          return yield* Effect.fail<ApiError>({
-            _tag: "Refused",
-            reason: t("server.voice.dictation.format", { format: JSON.stringify(format) }),
-          });
-        const audio = Buffer.from(audio64, "base64");
-        if (audio.length === 0 || audio.toString("base64").replace(/=+$/u, "") !== audio64.replace(/=+$/u, "").replace(/\s/gu, ""))
-          return yield* Effect.fail<ApiError>({
-            _tag: "Refused",
-            reason: t("server.voice.dictation.empty"),
-          });
-        if (audio.length > dictateMaxBytes)
-          return yield* Effect.fail<ApiError>({
-            _tag: "Refused",
-            reason: t("server.voice.dictation.tooLong"),
-          });
-        const form = new FormData();
-        form.append("file", new Blob([audio], { type: kind }), `dictation.${format}`);
-        form.append("model", model);
-        form.append("response_format", "json");
-        // A local model's first request loads it, which takes a while.
-        // An interrupted dictation (the page went away) stops its upload, as the timeout does.
-        const res = yield* httpClient
-          .post(url + "/audio/transcriptions", { headers: d.key ? { authorization: "Bearer " + d.key } : {}, body: HttpBody.formData(form) })
-          .pipe(
-            Effect.timeout("120 seconds"),
-            Effect.mapError((e) => unavailable(t("server.voice.dictation.unreachable", { why: causeText(e) }), "dictation")),
-          );
-        const raw = (yield* res.text.pipe(Effect.mapError((e) => unavailable(t("server.voice.dictation.cut", { why: causeText(e) }), "call")))).slice(
-          0,
-          1 << 20,
+        return yield* transcribeAudio({ url, model, key: d.key, audio64, format: given }).pipe(
+          Effect.provideService(HttpClient.HttpClient, httpClient),
+          Effect.mapError(mapTranscriptionFailure),
         );
-        const got = Schema.decodeOption(DictationResponse)(raw);
-        const detail = got._tag === "Some" ? got.value.error?.message : undefined;
-        if (res.status < 200 || res.status >= 300)
-          return yield* Effect.fail(
-            unavailable(t("server.voice.dictation.status", { status: res.status, detail: [...(detail || raw.trim())].slice(0, 200).join("") })),
-          );
-        if (got._tag === "None") return yield* Effect.fail(unavailable(t("server.voice.dictation.shape")));
-        return { text: (got.value.text ?? "").trim() };
       }),
       lines: voiceLine.lines,
       speak: Effect.fn("Voice.speak")(function* (text) {

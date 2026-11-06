@@ -20,6 +20,7 @@
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "@vibevalley/stories": "workspace:*",
+    "@vibevalley/voice": "workspace:*",
     "agora-rtc-sdk-ng": "catalog:",
     "effect": "catalog:",
     "hast-util-to-dom": "catalog:",

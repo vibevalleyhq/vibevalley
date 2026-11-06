@@ -32,6 +32,7 @@
     "@vibevalley/home": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
+    "@vibevalley/voice": "workspace:*",
     "agora-agents": "catalog:",
     "agora-token": "catalog:",
     "effect": "catalog:",

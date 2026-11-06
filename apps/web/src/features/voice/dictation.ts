@@ -1,58 +1,13 @@
 import { t } from "@vibevalley/i18n";
+import { dictateRate, dictateWorkletCode, encodeWavBase64, insertDictated, rmsLevel } from "@vibevalley/voice/transcribe";
 
 import { api, reasonOf } from "#/infra/api.ts";
 
+export { insertDictated };
+
 export type DictationPhase = "idle" | "recording" | "transcribing";
 
-const rate = 16000;
-
-// An AudioWorklet's module, as a script of its own: it hands the microphone's samples on in runs of 4096, so the page
-// is not woken every 128.
-const capture = `registerProcessor("vibevalley-capture", class extends AudioWorkletProcessor {
-  run = new Float32Array(4096);
-  at = 0;
-  process(inputs) {
-    const samples = inputs[0]?.[0];
-    if (samples)
-      for (const s of samples) {
-        this.run[this.at++] = s;
-        if (this.at === this.run.length) {
-          this.port.postMessage(this.run);
-          this.run = new Float32Array(4096);
-          this.at = 0;
-        }
-      }
-    return true;
-  }
-});`;
 let captureUrl: string | undefined;
-
-/** Mono 16-bit PCM in a WAV file. */
-function wavOf(samples: Float32Array, sampleRate = rate): Uint8Array {
-  const out = new DataView(new ArrayBuffer(44 + samples.length * 2));
-  const text = (at: number, s: string) => [...s].forEach((c, i) => out.setUint8(at + i, c.charCodeAt(0)));
-  text(0, "RIFF");
-  out.setUint32(4, 36 + samples.length * 2, true);
-  text(8, "WAVE");
-  text(12, "fmt ");
-  out.setUint32(16, 16, true);
-  out.setUint16(20, 1, true);
-  out.setUint16(22, 1, true);
-  out.setUint32(24, sampleRate, true);
-  out.setUint32(28, sampleRate * 2, true);
-  out.setUint16(32, 2, true);
-  out.setUint16(34, 16, true);
-  text(36, "data");
-  out.setUint32(40, samples.length * 2, true);
-  samples.forEach((s, i) => out.setInt16(44 + i * 2, Math.max(-1, Math.min(1, s)) * 0x7fff, true));
-  return new Uint8Array(out.buffer);
-}
-
-const base64Of = (bytes: Uint8Array) => {
-  let s = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(s);
-};
 
 interface Recording {
   readonly stream: MediaStream;
@@ -107,8 +62,8 @@ class Dictation {
     };
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
-      context = new AudioContext({ sampleRate: rate });
-      await context.audioWorklet.addModule((captureUrl ??= URL.createObjectURL(new Blob([capture], { type: "text/javascript" }))));
+      context = new AudioContext({ sampleRate: dictateRate });
+      await context.audioWorklet.addModule((captureUrl ??= URL.createObjectURL(new Blob([dictateWorkletCode], { type: "text/javascript" }))));
       // After every wait: the field may have been released, or another may have stopped it, meanwhile.
       if (this.owner !== owner) return drop();
       const node = new AudioWorkletNode(context, "vibevalley-capture", { channelCount: 1 });
@@ -144,9 +99,7 @@ class Dictation {
     const r = this.recording;
     if (!r) return 0;
     r.meter.getFloatTimeDomainData(this.samples);
-    let sum = 0;
-    for (const s of this.samples) sum += s * s;
-    return Math.min(1, Math.sqrt(sum / this.samples.length) * 4);
+    return rmsLevel(this.samples);
   }
 
   /** Stops and transcribes what `owner` started. */
@@ -198,14 +151,9 @@ class Dictation {
     if (!r) return this.set("idle");
     this.set("transcribing");
     try {
-      const all = new Float32Array(r.chunks.reduce((n, c) => n + c.length, 0));
-      let at = 0;
-      for (const c of r.chunks) {
-        all.set(c, at);
-        at += c.length;
-      }
-      if (all.length === 0) throw new Error(t("web.voice.dictation.nothing"));
-      const said = await api.voice.dictate({ audio: base64Of(wavOf(all)), format: "wav" });
+      const audio = encodeWavBase64(r.chunks);
+      if (!audio) throw new Error(t("web.voice.dictation.nothing"));
+      const said = await api.voice.dictate({ audio, format: "wav" });
       if (this.owner === owner && said.text) r.onWords(said.text);
       this.set("idle", "");
     } catch (e) {
@@ -219,12 +167,3 @@ class Dictation {
 
 /** The page's one recorder. */
 export const dictation = new Dictation();
-
-/** Dictated words at the caret, or at the end: a space only between two Latin words, as Chinese runs on without one. */
-export function insertDictated(value: string, start: number, end: number, words: string) {
-  const before = value.slice(0, start);
-  const ascii = /[A-Za-z0-9]/u;
-  const gap = before && ascii.test(before.at(-1) ?? "") && ascii.test(words[0] ?? "") ? " " : "";
-  const inserted = gap + words;
-  return { value: before + inserted + value.slice(end), caret: start + inserted.length };
-}
