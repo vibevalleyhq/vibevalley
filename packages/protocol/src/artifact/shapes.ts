@@ -60,7 +60,7 @@ export interface Artifact {
   channel?: string;
   /** The message that first announced it: a blocks one's comments are the replies to it. */
   said?: { channel: string; number: number };
-  issue?: string;
+  issue?: IssueId;
   by: string;
   byName: string;
   /** html: the latest version; blocks: 0. */

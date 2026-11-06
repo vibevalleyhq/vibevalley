@@ -19,10 +19,10 @@ import * as qr from "#db/channel_read_cursor.sql.ts";
 
 import { type SayMore, type Spoken, type Meta, metaOf, metaText, toMessage, inboxMore, type ChannelService } from "./contracts.ts";
 import { channelDirectory } from "./directory.ts";
+import { channelHub, lastMax, lineOf } from "./hub.ts";
 import { mentionOf, parseChatTarget } from "./mentions.ts";
 import { parseSearch } from "./messages.ts";
 import { channelStreams } from "./mutations.ts";
-import { channelRecords, lastMax, lineOf } from "./records.ts";
 import { directTalk } from "./talk.ts";
 import { sessionThreads } from "./threads.ts";
 import { channelWriting } from "./writing.ts";
@@ -50,7 +50,7 @@ export class Channel extends Context.Service<Channel, ChannelService>()("vibeval
 const make = Effect.gen(function* () {
   const sessions = yield* Session;
   const mailbox = yield* Mailbox;
-  const r = yield* channelRecords;
+  const r = yield* channelHub;
   const dir = yield* channelDirectory(r);
   const w = yield* channelWriting(r);
   const th = yield* sessionThreads(r, w);

@@ -1,4 +1,4 @@
-import { Effect, Option, Schema } from "effect";
+import { Option, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 import { ownerId, VoiceModeValues } from "@vibevalley/protocol";
@@ -8,8 +8,6 @@ import * as S from "@vibevalley/protocol/schema";
 import { jsonOrNone } from "#/base/json.ts";
 
 const IngressSourceValues = ["issue", "cron", "patrol", "connector", "voice", "github"] as const;
-import type { Db } from "#/infra/db.ts";
-import { inboxOf } from "#db/channel.sql.ts";
 
 export interface Meta {
   run?: string;
@@ -29,7 +27,7 @@ export interface Meta {
   picked?: Picked;
   ingressSource?: "issue" | "cron" | "patrol" | "connector" | "voice" | "github";
   ingressRecipient?: string;
-  issue?: string;
+  issue?: T.IssueId;
   trigger?: T.RunTrigger;
   responsePort?: string;
   voiceMode?: "dictated" | "conversation" | "api";
@@ -50,7 +48,7 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), repo: Schema.optionalKey(Schema.String) })),
   ingressSource: Schema.optionalKey(Schema.Literals(IngressSourceValues)),
   ingressRecipient: Schema.optionalKey(Schema.String),
-  issue: Schema.optionalKey(Schema.String),
+  issue: Schema.optionalKey(S.IssueId),
   trigger: Schema.optionalKey(S.RunTrigger),
   responsePort: Schema.optionalKey(Schema.String),
   voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
@@ -123,17 +121,6 @@ export interface UnreadRow {
 }
 
 export const summaryChannels = 20;
-
-/** What a participant has not read, as the mailbox and the channel both report it. */
-export const unreadSummaryOf = (db: Db["Service"], participant: string, channel: string): Effect.Effect<UnreadRow[]> =>
-  Effect.map(db.run(inboxOf({ participant, channel })), (rows) =>
-    rows.slice(0, summaryChannels).map((r) => ({
-      target: targetOf({ type: channelType(r.type), ...(r.root_number !== null ? { rootNumber: r.root_number } : {}) }, r.channel_name || ""),
-      unread: r.unread ?? 0,
-      mentionsYou: r.mentions_you === true,
-      ...(r.latest_sender_name ? { latest: r.latest_sender_name } : {}),
-    })),
-  );
 
 /** The same words from the same sender in the same place this soon again are a retry, not a new message. */
 export const retryWindowMs = 60_000;

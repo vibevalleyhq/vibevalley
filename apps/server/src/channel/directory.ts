@@ -16,8 +16,8 @@ import * as qp from "#db/channel_participant.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
 
 import { type ChannelService, infoOf, notifyOf, optional } from "./contracts.ts";
+import { type ChannelHub, profileId, threadTitleMax } from "./hub.ts";
 import { channelNameProblem } from "./mentions.ts";
-import { type ChannelRecords, profileId, threadTitleMax } from "./records.ts";
 
 type DirectoryMethods = Pick<
   ChannelService,
@@ -38,7 +38,7 @@ type DirectoryMethods = Pick<
   | "channelByName"
 >;
 
-export const channelDirectory = (r: ChannelRecords) =>
+export const channelDirectory = (r: ChannelHub) =>
   Effect.gen(function* () {
     const core = yield* Core;
     const agents = yield* Agent;

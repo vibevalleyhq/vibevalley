@@ -1,16 +1,17 @@
-import { Effect, Predicate, Schema } from "effect";
+import { Effect, Predicate, Schema, SchemaGetter, SchemaIssue } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import { effectTool } from "@vibevalley/agent/core/tool";
 import type { JsonSchema } from "@vibevalley/ai/tools";
 import { ArtifactKindValues, CronWhenKindValues, DeliverableValues, PkmTierValues } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema, type Handlers } from "@vibevalley/protocol/api";
+import * as S from "@vibevalley/protocol/schema";
 
 import type { Actor } from "#/base/actor.ts";
 import { messageOf, reasonOf } from "#/base/errors.ts";
 import { maxChildren as maxTasks } from "#/issue/creation.ts";
 
-import { answers, descriptions, params, sessionDescriptions } from "./prompts.ts";
+import { answers, descriptions, params, priorityNames, sessionDescriptions, statusNames } from "./prompts.ts";
 
 /** A tool is an endpoint as a model sees it: its name is the endpoint's (toolName), its fields are the endpoint's. */
 export type Op = keyof Handlers;
@@ -40,7 +41,41 @@ const artifactText = {
   note: Schema.optionalKey(Schema.String.annotate({ description: params.artifact.note })),
 };
 const artifactKind = Schema.Literals(ArtifactKindValues).annotate({ description: params.artifact.kind });
-const artifactId = Schema.String.annotate({ description: params.artifact.id });
+const artifactId = Schema.String.annotate({ description: params.artifact.id }).pipe(
+  Schema.decodeTo(S.ArtifactId, {
+    decode: SchemaGetter.transform((s: string) => S.artifactId(s.trim())),
+    encode: SchemaGetter.passthrough(),
+  }),
+);
+const blockId = (description: string) =>
+  Schema.String.annotate({ description }).pipe(
+    Schema.decodeTo(S.BlockId, {
+      decode: SchemaGetter.transform(S.blockId),
+      encode: SchemaGetter.passthrough(),
+    }),
+  );
+const aliasOf = <A extends string>(names: Readonly<Record<string, A>>) =>
+  SchemaGetter.transformEffect<A, string>((word, options) => {
+    const key = word.trim();
+    const value = Object.hasOwn(names, key) ? names[key] : undefined;
+    return value !== undefined
+      ? Effect.succeed(value)
+      : Effect.fail(new SchemaIssue.InvalidValue({ message: `Expected one of: ${Object.keys(names).join(", ")}` }, word, options));
+  });
+const statusField = (description: string) =>
+  Schema.String.annotate({ description }).pipe(
+    Schema.decodeTo(S.IssueStatus, {
+      decode: aliasOf(statusNames),
+      encode: SchemaGetter.passthroughSupertype(),
+    }),
+  );
+const priorityField = (description: string) =>
+  Schema.String.annotate({ description }).pipe(
+    Schema.decodeTo(S.Priority, {
+      decode: aliasOf(priorityNames),
+      encode: SchemaGetter.passthroughSupertype(),
+    }),
+  );
 const artifactRead = Schema.Struct({
   id: artifactId,
   version: Schema.optionalKey(Schema.Int.annotate({ description: params.artifact.version })),
@@ -70,18 +105,18 @@ const channelRead = Schema.Struct({
 
 const blockCreateParameters = Schema.Struct({
   id: artifactId,
-  afterBlock: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.afterBlock })),
+  afterBlock: Schema.optionalKey(blockId(params.blockCreate.afterBlock)),
   checked: Schema.optionalKey(Schema.Boolean.annotate({ description: params.blockCreate.checked })),
   language: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.language })),
   level: Schema.optionalKey(Schema.Int.annotate({ description: params.blockCreate.level })),
-  parentId: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.parentId })),
+  parentId: Schema.optionalKey(blockId(params.blockCreate.parentId)),
   text: Schema.String.annotate({ description: params.blockCreate.text }),
   type: Schema.optionalKey(Schema.String.annotate({ description: params.blockCreate.type })),
 }).annotate({ requiredOrder: ["id", "text"] });
 
 const blockUpdateParameters = Schema.Struct({
   baseRev: Schema.Int.annotate({ description: params.blockUpdate.baseRev }),
-  block: Schema.String.annotate({ description: params.blockUpdate.block }),
+  block: blockId(params.blockUpdate.block),
   checked: Schema.optionalKey(Schema.Boolean.annotate({ description: params.blockUpdate.checked })),
   id: artifactId,
   language: Schema.optionalKey(Schema.String.annotate({ description: params.blockUpdate.language })),
@@ -91,7 +126,7 @@ const blockUpdateParameters = Schema.Struct({
 }).annotate({ requiredOrder: ["id", "block", "baseRev"] });
 
 const blockDeleteParameters = Schema.Struct({
-  block: Schema.String.annotate({ description: params.blockDelete.block }),
+  block: blockId(params.blockDelete.block),
   id: artifactId,
 }).annotate({ requiredOrder: ["id", "block"] });
 
@@ -143,7 +178,7 @@ export const parameters = {
     ),
     description: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.description })),
     draft: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueCreate.draft })),
-    priority: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.priority })),
+    priority: Schema.optionalKey(priorityField(params.issueCreate.priority)),
     repo: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.repo })),
     start: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueCreate.start })),
     title: Schema.String.annotate({ description: params.issueCreate.title }),
@@ -158,7 +193,7 @@ export const parameters = {
     closed: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.closed })),
     limit: Schema.optionalKey(Schema.Finite.annotate({ description: params.issueList.limit })),
     repo: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.repo })),
-    status: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.status })),
+    status: Schema.optionalKey(statusField(params.issueList.status)),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.text })),
     wantsOwner: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.wantsOwner })),
   }),
@@ -171,7 +206,7 @@ export const parameters = {
   "issue.status.update": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.agent })),
     id: Schema.String.annotate({ description: params.issueNumber }),
-    status: Schema.String.annotate({ description: params.issueStatus.status }),
+    status: statusField(params.issueStatus.status),
     text: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.text })),
   }).annotate({ requiredOrder: ["id", "status"] }),
   "issue.update": Schema.Struct({
@@ -180,7 +215,7 @@ export const parameters = {
     deliver: Schema.optionalKey(Schema.Literals(DeliverableValues).annotate({ description: params.issueUpdate.deliver })),
     description: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.description })),
     id: Schema.String.annotate({ description: params.issueNumber }),
-    priority: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.priority })),
+    priority: Schema.optionalKey(priorityField(params.issueUpdate.priority)),
     repo: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.repo })),
     title: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.title })),
   }),

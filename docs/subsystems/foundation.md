@@ -46,6 +46,7 @@
 ### 模块和服务
 
 - **13 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
+- **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
 - **单数概念名，一模块一服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）。
 - **组装与启动分两阶段**：`services.ts` 先构建全部模块 layer 并完成流订阅，再按顺序执行各模块的 `start`/`ready` layer。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
 - **操作主体 `Actor` 由入口构造**：HTTP 为 `owner`，管家工具为 `orchestrator`（带 `forOwner`），`/mcp` 为对应 `session`，定时与巡查为 `system`。落库枚举统一用 `actor_kind`。
@@ -68,6 +69,14 @@
 - **单连接进程内 SQLite**：`infra/db.ts` 用 `node:sqlite` 打开 `vibevalley.db`。时间存毫秒 `real`，布尔存 `0`/`1`，枚举存 `text check (列 in (...))`，新建行主键用 `base/ids.ts` 的 UUIDv7（`newId()`）。
 - **SQL 按表隔离**：`db/queries/<表>.sql` 只写所属表，跨模块只读查询受 `modules.test.ts` 的 `foreignReads` 约束。服务通过 `Db` 服务调用生成函数（`vibevalley/db-door` 检查）。
 - **单一表结构基线，内部不留兼容**：`0001_schema.up.sql` 是唯一迁移文件。启动时若 `db.schema` 哈希不匹配，自动将旧库移至 `db.<旧哈希>-<时间>` 并建新库。
+
+### 边界审计
+
+- **传输层解析，契约层验证**：`JSON.parse` 可以把报文读成 `unknown`，再交给契约解码器；验证后的值才进入业务层。桥接的 socket 只拆包，`packages/bridge/src/index.ts` 验证调用入参、返回值与推送载荷，不在两层重复验证同一契约。
+- **按值对象复用 Schema**：数据库 JSON 列与线上字段代表同一个值对象时可共用 Schema；两者模型不同时才分开定义。是否直接调用解码器、是否先保存为变量，不改变这项判断。
+- **文本扫描只提供审计提示**：`vpx scripts/schema-audit.ts` 的 `[review]` 提示依赖命名和源码写法，不证明存在缺陷，也不证明验证覆盖完整。可选值、裸字符串、枚举转换与重复形状需要沿调用链判断，不设零命中门槛，不按文件名豁免 JSON 解析提示。
+- **已映射的 SQL 枚举有硬检查**：脚本的 `storedEnums` 指定「表.列 ↔ 协议枚举」，直接读取该协议枚举，按集合比较 SQL 的字面量 `IN CHECK`。丢失表、列或约束，以及成员增删，均产生 `[error]` 并使检查失败；取值顺序不影响结果。它不读取 SQL 生成物，也不用其他枚举的相同取值代替。存储专用枚举不必进入协议，新增共享枚举应补映射。
+- **检查自身有正反例**：`scripts/schema-audit.test.ts` 测最小源码和 SQL 样例，包括换行、提取解码器、注释、缺失约束与错误归属；仓库检查只阻断已确认的契约不一致。错误给出列、协议枚举、`Fix:` 与本节链接，审计提示给出 `Review:`。
 
 ### 测试金字塔
 

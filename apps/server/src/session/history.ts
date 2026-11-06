@@ -11,6 +11,7 @@ import type * as qr from "#db/session_run.sql.ts";
 
 const triggerOf = jsonOrNone(S.RunTrigger);
 export const heardOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
+export const pendingReportOf = jsonOrNone(S.IssueReport);
 const spentOf = jsonOrNone(S.Spent);
 const phaseOf = jsonOf(S.Phase);
 const lastRunOf = jsonOf(S.LastRun);

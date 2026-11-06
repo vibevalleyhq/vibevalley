@@ -50,7 +50,7 @@ export const PkmPage: Codec<T.PkmPage> = Schema.Struct({
 export const PkmTransclusion: Codec<T.PkmTransclusion> = Schema.Struct({
   block: Schema.String,
   found: Schema.Boolean,
-  circular: Schema.optionalKey(Schema.Boolean),
+  circular: Schema.Boolean,
   page: Schema.optionalKey(Schema.String),
   pageTitle: Schema.optionalKey(Schema.String),
   body: Schema.String,

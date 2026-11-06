@@ -20,7 +20,7 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/server/src/executor/executor.ts`、`stalls.ts` | 管理 oar `Subagents` 实例启停、投递、中断与静默间隔检测 |
-| `apps/server/src/session/session.ts`、`records.ts`、`recording.ts` | 对外 `Session` 服务、内存会话表、数据库持久化与 `/mcp` 令牌 |
+| `apps/server/src/session/session.ts`、`registry.ts`、`recording.ts` | 对外 `Session` 服务、在场会话与运行登记表（`Hands`）、数据库持久化与 `/mcp` 令牌 |
 | `apps/server/src/session/launch.ts`、`watch.ts` | 并发准入、唤醒/休眠、事件跟踪与 `settling` 后台收尾 |
 | `apps/server/src/session/reaction.ts`、`report.ts`、`hiring.ts`、`briefing.ts` | 事件映射、汇报解析、容量检查与任务说明拼装纯函数 |
 | `apps/server/src/session/journal.ts`、`host.ts`、`inProcessRun.ts` | 轨迹日志文件读写、进程内 `AgentHost` 与 `InProcessRun` |

@@ -3,6 +3,7 @@ import { Schema } from "effect";
 import { QuotedBlock } from "../artifact/schema";
 import { ChannelType } from "../channel/schema";
 import type { Codec } from "../codec";
+import { IssueId } from "../common/schema";
 import { RunTrigger } from "../session/schema";
 import * as T from "../shapes";
 import { TriggerAddressingValues, TriggerKindValues, VoiceModeValues } from "./shapes";
@@ -45,7 +46,7 @@ export const TriggerContext: Codec<T.TriggerContext> = Schema.Struct({
 });
 
 export const TriggerMeta: Codec<T.TriggerMeta> = Schema.Struct({
-  issue: Schema.optionalKey(Schema.String),
+  issue: Schema.optionalKey(IssueId),
   ingressRecipient: Schema.optionalKey(Schema.String),
   trigger: Schema.optionalKey(RunTrigger),
   dispatch: Schema.optionalKey(Schema.Boolean),

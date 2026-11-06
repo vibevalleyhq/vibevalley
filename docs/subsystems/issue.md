@@ -35,7 +35,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/issue/issue.ts`、`records.ts` | 对外 `Issue` 服务、数据库读写、内存派工关联（`Assignments`）与事实发布 |
+| `apps/server/src/issue/issue.ts`、`lifecycle.ts` | 对外 `Issue` 服务、生命周期写操作、内存派工关联（`Assignments`）与事实发布 |
 | `apps/server/src/issue/dispatch.ts`、`settle.ts` | 派活、排队刷新、重开、定时触发、状态流转前置判定与试跑预览 |
 | `apps/server/src/issue/refinement.ts`、`split.ts`、`merge.ts` | 工单起草、原生父子拆单与合入父分支、本地合并与 PR 轮询 |
 | `apps/server/src/issue/status.ts`、`stage.ts`、`moves.ts` | 状态派生（`issueStatusOf`）、展示阶段（`issueStageOf`）与合法挪动（`statusMove`） |

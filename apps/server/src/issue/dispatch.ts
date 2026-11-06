@@ -1,33 +1,28 @@
-import { Clock, Effect, Option, Semaphore } from "effect";
+import { Effect, Option, Semaphore } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, closedText, cut, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { type ApiError, Inconsistent, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
-import { newId } from "#/base/ids.ts";
+import { type ApiError, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import type { Due } from "#/cron/cron.ts";
-import { causeMessage, Db } from "#/infra/db.ts";
+import { causeMessage } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
-import { recordTrigger } from "#/mailbox/payload.ts";
 import { issueBranch, Repo } from "#/repo/repo.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 import { conflictBrief } from "#/session/briefing.ts";
 import { askedMax } from "#/session/journal.ts";
 import { type HireOptions, type NotRecorded, Session } from "#/session/session.ts";
-import * as q from "#db/issue.sql.ts";
-import * as qe from "#db/issue_assignment_execution.sql.ts";
 
-import { assignTo } from "./assignment.ts";
 import { issueBrief } from "./brief.ts";
 import { explicitMandate, inferredMandate } from "./creation.ts";
 import { acceptanceAncestors, blockedIssues } from "./dependencies.ts";
+import type { IssueLifecycle } from "./lifecycle.ts";
 import { workConstraints } from "./prompts.ts";
-import type { IssueRecords } from "./records.ts";
 import type { IssueSplitting } from "./split.ts";
 import { isClosed, isForOrchestrator } from "./status.ts";
 
@@ -51,7 +46,7 @@ function reopenBrief(issue: T.Issue, last: T.Session, text: string, previous: bo
   return out + t("server.issue.brief.end");
 }
 
-export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joinChildren"]) =>
+export const issueDispatch = (r: IssueLifecycle, joinChildren: IssueSplitting["joinChildren"]) =>
   Effect.gen(function* () {
     const core = yield* Core;
     const store = yield* Agent;
@@ -60,8 +55,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
     const sessions = yield* Session;
     const chat = yield* Channel;
     const mailbox = yield* Mailbox;
-    const db = yield* Db;
-    const { worked, reloadAssignments, everyIssue, get, publish, unsent, attemptAdd, add, ran, queueRow } = r;
+    const { everyIssue, get, ofCron, unsent, attemptAdd, add, remove, recordWorkerStart, recordOrchestratorStart, setQueued } = r;
     /** One round of the queue at a time. */
     const trying = yield* Semaphore.make(1);
 
@@ -113,14 +107,12 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
         context: { kind: "issue", issue },
         hiring: (w: T.Session, launch: string) =>
           Effect.gen(function* () {
-            if (opt.refining !== true) yield* ran(issue.id, w);
+            if (opt.refining !== true) yield* recordWorkerStart(issue.id, w);
             if (opt.hiring) yield* opt.hiring(w, launch);
           }),
       });
       if (!hired.session && !opt.issue && !hired.retainedWork) {
-        yield* db.run(q.removeIssue({ id: issue.id }));
-        yield* reloadAssignments;
-        yield* core.apply({ type: "issueRemoved", id: issue.id });
+        yield* remove(issue.id);
       }
       if (hired.retainedWork) return { ...hired, refused: t("server.issue.workKept", { refused: hired.refused ?? "", n: issue.number }) };
       return hired.session && evicted ? { ...hired, evicted } : hired;
@@ -168,40 +160,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
           .register({ id: profile.id, agent: profile.id, name: profile.name, role: profile.role, runtime: profile.runtime, brief: profile.duty })
           .pipe(Effect.mapError((error) => refused(error.message)));
       }
-      const assignedAt = yield* Clock.currentTimeMillis;
-      let dispatch: T.Trigger | undefined;
-      const linked = yield* db.run(
-        db.attemptTx(
-          Effect.gen(function* () {
-            if (isClosed(issue.status)) yield* q.reopenIssue({ id: issue.id });
-            yield* q.queueIssue({ id: issue.id, at: assignedAt });
-            const assignment = yield* assignTo(issue.id, agent, assignedAt);
-            if (!assignment.assigned) return yield* Effect.die(new Inconsistent({ message: "an orchestrator's profile must own its assignment" }));
-            const execution = yield* qe.addExecution({
-              assignment: assignment.assigned.id,
-              executor: agent,
-              started_at: assignedAt,
-            });
-            if (input)
-              dispatch = yield* recordTrigger(db, {
-                source: "workbench",
-                key: newId(),
-                actor: { kind: "system", id: "system" },
-                text: input.text,
-                threads: [`issue:${issue.id}`],
-                addressed: "thread_owner",
-                replyChannel: channel,
-                meta: { ingressRecipient: agent, issue: issue.id, trigger: input.by, dispatch: true },
-                at: assignedAt,
-              });
-            return { assignment, execution };
-          }),
-        ),
-      );
-      if (dispatch) yield* mailbox.receive(dispatch).pipe(bestEffort(`issue: route ${dispatch.id}`));
-      worked.changed(linked.assignment.changed);
-      worked.executed(issue.id, linked.execution);
-      yield* publish(issue.id);
+      yield* recordOrchestratorStart(issue, agent, channel, input);
     });
     const toOrchestrator = Effect.fn("Issue.toOrchestrator")(function* (issue: T.Issue, channel: string, by: T.RunTrigger, said?: string) {
       yield* beginOrchestrator(issue, channel, { text: [issue.title, issue.description, said ?? ""].filter(Boolean).join("\n\n"), by });
@@ -252,11 +211,11 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
       const full = sessions.noRoom(agent.runtime, repo);
       const blocked = issue.blockedBy.length > 0 ? blockedIssues(issue, yield* everyIssue) : [];
       if (blocked.length > 0) {
-        yield* queueRow(issue.id, true, (yield* chat.topOf(where)).id, trigger, initial[0]);
+        yield* setQueued(issue.id, true, (yield* chat.topOf(where)).id, trigger, initial[0]);
         return { queued: t("server.issue.dependencies.waiting", { issues: list(blocked) }) };
       }
       if (full) {
-        yield* queueRow(issue.id, true, (yield* chat.topOf(where)).id, trigger, initial[0]);
+        yield* setQueued(issue.id, true, (yield* chat.topOf(where)).id, trigger, initial[0]);
         return { queued: t("server.issue.queued", { full }) };
       }
       const sent = yield* send(issue, agent, repo, where, trigger, initial);
@@ -289,7 +248,7 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
           Effect.tap((session) => (session !== "" ? core.notice("info", t("server.issue.queuedStarted", { title, session })) : Effect.void)),
           Effect.catch((failure) => {
             const why = reasonOf(failure);
-            return queueRow(issue.id, false, chat.defaultChannel()).pipe(
+            return setQueued(issue.id, false, chat.defaultChannel()).pipe(
               Effect.matchEffect({
                 onFailure: () => core.notice("warn", t("server.issue.queuedStuck", { title, why })),
                 onSuccess: () => core.notice("warn", t("server.issue.queuedBack", { title, why })),
@@ -355,12 +314,6 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
         else if (isClosed(issue.status) || newest === undefined) yield* reopen(issue.id, input.card.summary, channel.id, by, undefined, [input]);
       }
       return yield* get(issue.id);
-    });
-
-    const ofCron = Effect.fn("Issue.ofCron")(function* (id: string) {
-      const row = yield* db.one(q.latestOfCron({ cron: id }));
-      if (!row) return undefined;
-      return Option.getOrUndefined(yield* Effect.option(get(row.id)));
     });
 
     return { hire, readyOf, ready, send, beginOrchestrator, toOrchestrator, start, refreshQueue, reopen, scheduled, ofCron };

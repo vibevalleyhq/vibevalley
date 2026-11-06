@@ -33,7 +33,7 @@ export const Artifact: Codec<T.Artifact> = Schema.Struct({
   body: ArtifactBody,
   channel: Schema.optionalKey(Schema.String),
   said: Schema.optionalKey(Schema.Struct({ channel: Schema.String, number: Schema.Finite })),
-  issue: Schema.optionalKey(Schema.String),
+  issue: Schema.optionalKey(IssueId),
   by: Schema.String,
   byName: Schema.String,
   version: Schema.Finite,

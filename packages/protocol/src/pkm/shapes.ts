@@ -66,7 +66,7 @@ export interface PkmPage {
 export interface PkmTransclusion {
   block: string;
   found: boolean;
-  circular?: boolean;
+  circular: boolean;
   page?: string;
   pageTitle?: string;
   body: string;

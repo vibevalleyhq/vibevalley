@@ -123,16 +123,13 @@ const attempting: Readonly<Record<string, string>> = {
   "connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
   "cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
   "game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",
-  "issue/dispatch.ts": "an orchestrator's turn that is not linked to its issue is told as a refusal",
-  "issue/issue.ts": "an edit that is not saved is told as a refusal",
-  "issue/records.ts": "an issue that is not saved, or a session not linked to its issue, is told as a refusal",
-  "issue/split.ts": "children that cannot be saved are told as a refusal, and the parent stays unsplit",
-  "mailbox/payload.ts": "the source cursor and trigger commit together; a failed cron input is logged and retried without advancing its clock",
+  "issue/lifecycle.ts": "an issue that is not saved, split, edited, or linked to its session or orchestrator is told as a refusal",
+  "mailbox/triggers.ts": "the source cursor and trigger commit together; a failed cron input is logged and retried without advancing its clock",
   "mailbox/work.ts":
     "a Session's first direct deliveries are registered atomically; a failed insert is returned so Session startup can stop and report NotRecorded",
   "memory/memory.ts": "a memory read or write that fails is logged and taken as none",
   "session/inProcessRun.ts": "a run write fails as NotRecorded so an in-process run retries its end before accepting another input",
-  "session/records.ts": "a session's own record that is not kept is logged without discarding its live execution",
+  "session/registry.ts": "a session's own record that is not kept is logged without discarding its live execution",
   "session/session.ts": "a report handed in that cannot be kept is told as a refusal, and the turn does not take it",
 };
 

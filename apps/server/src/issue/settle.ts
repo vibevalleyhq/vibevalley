@@ -14,8 +14,8 @@ import { Session } from "#/session/session.ts";
 
 import { answerCureWords, cureWords, findingsOf, resumeWords } from "./brief.ts";
 import type { IssueDispatch } from "./dispatch.ts";
+import type { IssueLifecycle } from "./lifecycle.ts";
 import { nextSteps, statusMove } from "./moves.ts";
-import type { IssueRecords } from "./records.ts";
 import { nullText } from "./rows.ts";
 import { isForOrchestrator } from "./status.ts";
 
@@ -24,7 +24,7 @@ export interface StatusOptions {
   readonly agent?: string;
 }
 
-export const issueSettling = (r: IssueRecords, d: Pick<IssueDispatch, "readyOf">) =>
+export const issueSettling = (r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf">) =>
   Effect.gen(function* () {
     const store = yield* Agent;
     const repos = yield* Repo;

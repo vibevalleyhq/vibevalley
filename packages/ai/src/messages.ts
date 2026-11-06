@@ -1,86 +1,104 @@
 import { Schema } from "effect";
 
-export interface TextContent {
-  readonly type: "text";
-  readonly text: string;
-}
+const TextContentSchema = Schema.Struct({
+  type: Schema.Literal("text"),
+  text: Schema.String,
+});
+export type TextContent = typeof TextContentSchema.Type;
 
-export interface ThinkingContent {
-  readonly type: "thinking";
-  readonly thinking: string;
+const ThinkingContentSchema = Schema.Struct({
+  type: Schema.Literal("thinking"),
+  thinking: Schema.String,
   /** The response field the thinking came in (reasoning_content): it goes back under that name. */
-  readonly thinkingSignature?: string;
-}
+  thinkingSignature: Schema.optionalKey(Schema.String),
+});
+export type ThinkingContent = typeof ThinkingContentSchema.Type;
 
-export interface ImageContent {
-  readonly type: "image";
+const ImageContentSchema = Schema.Struct({
+  type: Schema.Literal("image"),
   /** Base64. */
-  readonly data: string;
-  readonly mimeType: string;
-}
+  data: Schema.String,
+  mimeType: Schema.String,
+});
+export type ImageContent = typeof ImageContentSchema.Type;
 
-export interface ToolCall {
-  readonly type: "toolCall";
-  readonly id: string;
-  readonly name: string;
-  readonly arguments: Readonly<Record<string, unknown>>;
+const ToolCallSchema = Schema.Struct({
+  type: Schema.Literal("toolCall"),
+  id: Schema.String,
+  name: Schema.String,
+  arguments: Schema.Record(Schema.String, Schema.Unknown),
   /** Set when the model's arguments were not a JSON object; arguments is then {}. */
-  readonly argumentsError?: string;
-}
+  argumentsError: Schema.optionalKey(Schema.String),
+});
+export type ToolCall = typeof ToolCallSchema.Type;
 
-export interface Usage {
+const UsageSchema = Schema.Struct({
   /** Prompt tokens not read from the cache. */
-  readonly input: number;
-  readonly output: number;
-  readonly cacheRead: number;
-  readonly cacheWrite: number;
+  input: Schema.Finite,
+  output: Schema.Finite,
+  cacheRead: Schema.Finite,
+  cacheWrite: Schema.Finite,
   /** Of output; set when the provider reports it. */
-  readonly reasoning?: number;
-  readonly totalTokens: number;
+  reasoning: Schema.optionalKey(Schema.Finite),
+  totalTokens: Schema.Finite,
   /** Dollars. */
-  readonly cost: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number; readonly total: number };
-}
+  cost: Schema.Struct({
+    input: Schema.Finite,
+    output: Schema.Finite,
+    cacheRead: Schema.Finite,
+    cacheWrite: Schema.Finite,
+    total: Schema.Finite,
+  }),
+});
+export type Usage = typeof UsageSchema.Type;
 
-export type StopReason = "stop" | "length" | "toolUse" | "error" | "aborted";
+const StopReasonValues = ["stop", "length", "toolUse", "error", "aborted"] as const;
+const StopReasonSchema = Schema.Literals(StopReasonValues);
+export type StopReason = typeof StopReasonSchema.Type;
 
-export interface UserMessage {
-  readonly role: "user";
-  readonly content: string | readonly (TextContent | ImageContent)[];
+export const UserContentSchema = Schema.Union([Schema.String, Schema.Array(Schema.Union([TextContentSchema, ImageContentSchema]))]);
+
+export const UserMessageSchema = Schema.Struct({
+  role: Schema.Literal("user"),
+  content: UserContentSchema,
   /** Milliseconds. */
-  readonly timestamp: number;
-}
+  timestamp: Schema.Finite,
+});
+export type UserMessage = typeof UserMessageSchema.Type;
 
-export interface AssistantMessage {
-  readonly role: "assistant";
-  readonly content: readonly (TextContent | ThinkingContent | ToolCall)[];
-  readonly api: string;
-  readonly provider: string;
+export const AssistantMessageSchema = Schema.Struct({
+  role: Schema.Literal("assistant"),
+  content: Schema.Array(Schema.Union([TextContentSchema, ThinkingContentSchema, ToolCallSchema])),
+  api: Schema.String,
+  provider: Schema.String,
   /** The model asked; responseModel is the one that answered when it says another. */
-  readonly model: string;
-  readonly usage: Usage;
-  readonly stopReason: StopReason;
-  readonly timestamp: number;
-  readonly responseId?: string;
-  readonly responseModel?: string;
+  model: Schema.String,
+  usage: UsageSchema,
+  stopReason: StopReasonSchema,
+  timestamp: Schema.Finite,
+  responseId: Schema.optionalKey(Schema.String),
+  responseModel: Schema.optionalKey(Schema.String),
   /** The provider's own finish_reason. */
-  readonly rawStopReason?: string;
-  readonly errorMessage?: string;
+  rawStopReason: Schema.optionalKey(Schema.String),
+  errorMessage: Schema.optionalKey(Schema.String),
   /** The level the loop asked for, off when none. */
-  readonly thinkingLevel?: string;
+  thinkingLevel: Schema.optionalKey(Schema.String),
   /** From the request to the last of its stream. */
-  readonly durationMs?: number;
-}
+  durationMs: Schema.optionalKey(Schema.Finite),
+});
+export type AssistantMessage = typeof AssistantMessageSchema.Type;
 
-export interface ToolResultMessage {
-  readonly role: "toolResult";
-  readonly toolCallId: string;
-  readonly toolName: string;
-  readonly content: readonly (TextContent | ImageContent)[];
-  readonly isError: boolean;
-  readonly timestamp: number;
+export const ToolResultMessageSchema = Schema.Struct({
+  role: Schema.Literal("toolResult"),
+  toolCallId: Schema.String,
+  toolName: Schema.String,
+  content: Schema.Array(Schema.Union([TextContentSchema, ImageContentSchema])),
+  isError: Schema.Boolean,
+  timestamp: Schema.Finite,
   /** How long the tool ran. */
-  readonly durationMs?: number;
-}
+  durationMs: Schema.optionalKey(Schema.Finite),
+});
+export type ToolResultMessage = typeof ToolResultMessageSchema.Type;
 
 export type Message = UserMessage | AssistantMessage | ToolResultMessage;
 
@@ -105,80 +123,4 @@ export const zeroUsage = (): Usage => ({
   cacheWrite: 0,
   totalTokens: 0,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-});
-
-const TextContentSchema: Schema.Codec<TextContent> = Schema.Struct({
-  type: Schema.Literal("text"),
-  text: Schema.String,
-});
-
-const ThinkingContentSchema: Schema.Codec<ThinkingContent> = Schema.Struct({
-  type: Schema.Literal("thinking"),
-  thinking: Schema.String,
-  thinkingSignature: Schema.optionalKey(Schema.String),
-});
-
-const ImageContentSchema: Schema.Codec<ImageContent> = Schema.Struct({
-  type: Schema.Literal("image"),
-  data: Schema.String,
-  mimeType: Schema.String,
-});
-
-const ToolCallSchema: Schema.Codec<ToolCall> = Schema.Struct({
-  type: Schema.Literal("toolCall"),
-  id: Schema.String,
-  name: Schema.String,
-  arguments: Schema.Record(Schema.String, Schema.Unknown),
-  argumentsError: Schema.optionalKey(Schema.String),
-});
-
-const UsageSchema: Schema.Codec<Usage> = Schema.Struct({
-  input: Schema.Finite,
-  output: Schema.Finite,
-  cacheRead: Schema.Finite,
-  cacheWrite: Schema.Finite,
-  reasoning: Schema.optionalKey(Schema.Finite),
-  totalTokens: Schema.Finite,
-  cost: Schema.Struct({
-    input: Schema.Finite,
-    output: Schema.Finite,
-    cacheRead: Schema.Finite,
-    cacheWrite: Schema.Finite,
-    total: Schema.Finite,
-  }),
-});
-
-export const UserContentSchema = Schema.Union([Schema.String, Schema.Array(Schema.Union([TextContentSchema, ImageContentSchema]))]);
-
-export const UserMessageSchema: Schema.Codec<UserMessage> = Schema.Struct({
-  role: Schema.Literal("user"),
-  content: UserContentSchema,
-  timestamp: Schema.Finite,
-});
-
-export const AssistantMessageSchema: Schema.Codec<AssistantMessage> = Schema.Struct({
-  role: Schema.Literal("assistant"),
-  content: Schema.Array(Schema.Union([TextContentSchema, ThinkingContentSchema, ToolCallSchema])),
-  api: Schema.String,
-  provider: Schema.String,
-  model: Schema.String,
-  usage: UsageSchema,
-  stopReason: Schema.Literals(["stop", "length", "toolUse", "error", "aborted"]),
-  timestamp: Schema.Finite,
-  responseId: Schema.optionalKey(Schema.String),
-  responseModel: Schema.optionalKey(Schema.String),
-  rawStopReason: Schema.optionalKey(Schema.String),
-  errorMessage: Schema.optionalKey(Schema.String),
-  thinkingLevel: Schema.optionalKey(Schema.String),
-  durationMs: Schema.optionalKey(Schema.Finite),
-});
-
-export const ToolResultMessageSchema: Schema.Codec<ToolResultMessage> = Schema.Struct({
-  role: Schema.Literal("toolResult"),
-  toolCallId: Schema.String,
-  toolName: Schema.String,
-  content: Schema.Array(Schema.Union([TextContentSchema, ImageContentSchema])),
-  isError: Schema.Boolean,
-  timestamp: Schema.Finite,
-  durationMs: Schema.optionalKey(Schema.Finite),
 });

@@ -66,7 +66,7 @@ export interface InventoryEntry {
   name: string;
   description: string;
   source: string;
-  enabled?: boolean;
+  enabled: boolean;
 }
 
 export interface RuntimeSettings {

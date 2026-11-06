@@ -24,6 +24,7 @@ const strings = Schema.mutable(Schema.Array(Schema.String));
 const column = {
   constraints: jsonOrNone(S.IssueConstraints),
   conflict: jsonOrNone(S.Conflict),
+  issueIds: jsonOrNone(Schema.mutable(Schema.Array(S.IssueId))),
   strings: jsonOrNone(strings),
   checks: jsonOrNone(Schema.mutable(Schema.Array(S.CriterionCheck))),
   pullRequest: jsonOrNone(S.PullRequest),
@@ -35,7 +36,7 @@ const column = {
 export function issueRows(core: Core["Service"]) {
   return function issueOf(row: Row, assignments: readonly T.Assignment[]): T.Issue {
     const state = core.state();
-    const blockedBy = column.strings(row.blocked_by);
+    const blockedBy = column.issueIds(row.blocked_by);
     const criteria = column.strings(row.criteria);
     const checks = column.checks(row.checks);
     const pullRequest = column.pullRequest(row.pull_request);

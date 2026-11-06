@@ -20,19 +20,11 @@ import * as accountQ from "#db/connector_account.sql.ts";
 import * as inboundQ from "#db/connector_inbound.sql.ts";
 import * as outboxQ from "#db/connector_outbox.sql.ts";
 
-import { type Adapter, type AppFailed, failedWith, type Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
+import { type Adapter, type AppFailed, failedWith, Inbound, type Linked, type Progress, type Secrets } from "./adapter.ts";
 import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./digest.ts";
 
 /** WeChat's official client rests this long too. */
 const stalePauseMs = 60 * 60_000;
-
-const InboundSchema: Schema.Codec<Inbound> = Schema.Struct({
-  id: Schema.String,
-  from: Schema.String,
-  text: Schema.String,
-  reply: Schema.String,
-  quoted: Schema.String,
-});
 
 const SecretsSchema = Schema.Record(Schema.String, Schema.String);
 
@@ -396,7 +388,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
   const drainInbox = Effect.gen(function* () {
     const rows = yield* tried(inboundQ.pendingInbound({ connector: id }));
     for (const row of rows) {
-      const m = Schema.decodeOption(Schema.fromJsonString(InboundSchema))(row.payload);
+      const m = Schema.decodeOption(Schema.fromJsonString(Inbound))(row.payload);
       if (Option.isNone(m) || m.value.id !== row.ext_id) {
         // A malformed row can never be delivered; settle it explicitly so later valid messages are not blocked.
         yield* Effect.logError(`vibevalley: discarding malformed durable inbound ${row.ext_id}`).pipe(Effect.annotateLogs({ connector: id }));

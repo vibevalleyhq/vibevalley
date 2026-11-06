@@ -148,7 +148,7 @@ const issueFields = {
   delivered: Schema.optionalKey(Delivery),
   canceled: Schema.optionalKey(IssueCanceled),
   parent: Schema.optionalKey(IssueId),
-  blockedBy: Schema.mutable(Schema.Array(Schema.String)),
+  blockedBy: Schema.mutable(Schema.Array(IssueId)),
   cron: Schema.optionalKey(Schema.String),
   status: IssueStatus,
   moves: Schema.mutable(Schema.Array(IssueStatus)),

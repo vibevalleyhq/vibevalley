@@ -1,4 +1,4 @@
-import { Clock, Effect, Semaphore } from "effect";
+import { Effect, Semaphore } from "effect";
 
 import { dagIDValid, dagProblems } from "@vibevalley/agent/dag";
 import { t } from "@vibevalley/i18n";
@@ -8,34 +8,26 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { actsForOwner, type Actor } from "#/base/actor.ts";
-import { missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
+import { reasonOf, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
-import { causeMessage, Db } from "#/infra/db.ts";
-import { bestEffort } from "#/infra/log.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
-import { recordTrigger } from "#/mailbox/payload.ts";
 import { issueBranch, Repo } from "#/repo/repo.ts";
 import { MergeFailure, type Workplace } from "#/repo/workplace.ts";
 import { Session } from "#/session/session.ts";
-import * as q from "#db/issue.sql.ts";
 
-import { assignTo } from "./assignment.ts";
-import { issueRow, maxChildren } from "./creation.ts";
+import { maxChildren } from "./creation.ts";
+import type { IssueLifecycle } from "./lifecycle.ts";
 import { verifyChild } from "./merge.ts";
 import { needsOwner } from "./prompts.ts";
-import type { IssueRecords } from "./records.ts";
 import { isClosed } from "./status.ts";
 
-export const issueSplitting = (r: IssueRecords) =>
+export const issueSplitting = (r: IssueLifecycle) =>
   Effect.gen(function* () {
     const store = yield* Agent;
     const repos = yield* Repo;
     const sessions = yield* Session;
     const chat = yield* Channel;
-    const mailbox = yield* Mailbox;
-    const db = yield* Db;
-    const { worked, everyIssue, get, publish, issueWords, complete, changesOf, setConflict, asked } = r;
+    const { everyIssue, get, publish, issueWords, changesOf, setConflict, asked, saveSplit, completeChild } = r;
     const splitting = yield* Semaphore.make(1);
     const split = Effect.fn("Issue.split")(function* (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor) {
       const parent = yield* get(id);
@@ -91,57 +83,7 @@ export const issueSplitting = (r: IssueRecords) =>
         if (changes && changes.uncommitted.length > 0) return yield* Effect.fail(refused(t("server.issue.split.commitFirst")));
       }
       const channel = (yield* chat.topOf(session ? (sessions.sessionOf(session)?.channel ?? "") : "")).id;
-      const at = yield* Clock.currentTimeMillis;
-      const dispatches: T.Trigger[] = [];
-      const assignments = yield* db
-        .attemptTx(
-          Effect.gen(function* () {
-            const current = yield* q.getIssue({ id });
-            const family = yield* q.family({ id });
-            if (current.closed_at !== null || family.some((item) => item.parent === id)) return yield* Effect.fail(refused(t("server.issue.split.already")));
-            if (title.trim())
-              yield* q.editIssue({
-                id,
-                title: title.trim(),
-                description: current.description,
-                repo: current.repo,
-                priority: current.priority,
-                criteria: current.criteria,
-                deliver: current.deliver,
-              });
-            return yield* Effect.forEach(rows, (row) =>
-              Effect.gen(function* () {
-                yield* q.addIssue(issueRow(row.id, row.req, parent.mandate, at));
-                dispatches.push(
-                  yield* recordTrigger(db, {
-                    source: "workbench",
-                    key: newId(),
-                    actor: { kind: "system", id: "system" },
-                    text: [row.req.title, row.req.description].filter(Boolean).join("\n\n"),
-                    threads: [`issue:${row.id}`],
-                    addressed: "thread_owner",
-                    replyChannel: channel,
-                    meta: { ingressRecipient: row.req.agent ?? "", issue: row.id, trigger: { kind: "issue" }, dispatch: true },
-                    at,
-                  }),
-                );
-                yield* q.queueIssue({ id: row.id, at });
-                return yield* assignTo(row.id, row.req.agent, at);
-              }),
-            );
-          }),
-        )
-        .pipe(
-          Effect.catchTags({
-            SqlError: (error) => Effect.fail(refused(causeMessage(error))),
-            SchemaError: Effect.die,
-            NoSuchElementError: () => Effect.fail(missing(t("server.issue.issueRef", { ref: id }), [lookIn.issue])),
-          }),
-        );
-      for (const assignment of assignments) worked.changed(assignment.changed);
-      yield* Effect.forEach(dispatches, (dispatch) => mailbox.receive(dispatch).pipe(bestEffort(`issue: route ${dispatch.id}`)), { discard: true });
-      yield* Effect.forEach(rows, (row) => publish(row.id), { discard: true });
-      yield* publish(id);
+      yield* saveSplit(id, title, channel, parent.mandate, rows);
       return (
         t("server.issue.split.created", { n: parent.number, count: rows.length }) +
         "\n" +
@@ -171,7 +113,6 @@ export const issueSplitting = (r: IssueRecords) =>
                 (place) =>
                   Effect.gen(function* () {
                     const constraints = yield* verifyChild(repos, child, parent, all, place);
-                    if (constraints) yield* db.run(q.setIssueConstraints({ id: child.id, constraints: JSON.stringify(constraints) }));
                     const mergeIntoParent = (target: Workplace) => repos.mergeInto(place, issueBranch(parent.number), target.cwd);
                     const merged =
                       parentSession && sessions.present(parentSession)
@@ -179,7 +120,7 @@ export const issueSplitting = (r: IssueRecords) =>
                             .withIdleWorkplace(parentSession, mergeIntoParent)
                             .pipe(Effect.mapError((error) => (error._tag === "MergeFailure" ? error : MergeFailure.error(reasonOf(error)))))
                         : yield* Effect.flatMap(repos.workplace(parentRepo, parent.number, true, ""), mergeIntoParent);
-                    yield* complete(child.id, "merged_into_parent");
+                    yield* completeChild(child.id, constraints);
                     return merged;
                   }),
                 "helper",

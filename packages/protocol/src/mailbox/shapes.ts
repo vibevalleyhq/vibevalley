@@ -1,5 +1,6 @@
 import type { QuotedBlock } from "../artifact/shapes";
 import type { ChannelType } from "../channel/shapes";
+import type { IssueId } from "../common/shapes";
 import type { RunTrigger } from "../session/shapes";
 
 export const TriggerSourceValues = ["workbench", "channel", "connector", "voice", "github", "cron", "patrol"] as const;
@@ -63,7 +64,7 @@ export interface TriggerContext {
 }
 
 export interface TriggerMeta {
-  readonly issue?: string;
+  readonly issue?: IssueId;
   readonly ingressRecipient?: string;
   readonly trigger?: RunTrigger;
   readonly dispatch?: boolean;

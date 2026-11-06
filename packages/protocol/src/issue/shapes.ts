@@ -106,7 +106,7 @@ export interface Issue {
   /** Canceled: why. */
   canceled?: IssueCanceled;
   parent?: IssueId;
-  blockedBy: string[];
+  blockedBy: IssueId[];
   cron?: string;
   status: IssueStatus;
   moves: IssueStatus[];

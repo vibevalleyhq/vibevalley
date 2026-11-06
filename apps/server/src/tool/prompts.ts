@@ -66,7 +66,7 @@ export function sessionLine(h: T.Session, now: number, number?: number): string 
 }
 
 /** The words for a status: its label (wording().status), a few the owner says for it, and its own name. */
-const statusNames: Readonly<Record<string, T.IssueStatus>> = {
+export const statusNames: Readonly<Record<string, T.IssueStatus>> = {
   ...Object.fromEntries(IssueStatusValues.map((s) => [t(`shared.status.${s}`), s])),
   草稿: "backlog",
   在做: "in_progress",
@@ -75,9 +75,8 @@ const statusNames: Readonly<Record<string, T.IssueStatus>> = {
   取消: "canceled",
   ...Object.fromEntries(IssueStatusValues.map((s) => [s, s])),
 };
-export const statusOf = (word: string): T.IssueStatus | undefined => statusNames[word.trim()];
 
-const priorityNames: Readonly<Record<string, T.Priority>> = {
+export const priorityNames: Readonly<Record<string, T.Priority>> = {
   紧急: "urgent",
   高: "high",
   普通: "medium",
@@ -85,11 +84,6 @@ const priorityNames: Readonly<Record<string, T.Priority>> = {
   低: "low",
   ...Object.fromEntries(PriorityValues.map((p) => [p, p])),
 };
-export const priorityOf = (word: string): T.Priority | undefined => priorityNames[word.trim()];
-
-export const noSuchStatus = (word: string, allowed: readonly T.IssueStatus[]) =>
-  "没有「" + word + "」这个状态：" + allowed.map((s) => t(`shared.status.${s}`)).join("、");
-export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => t(`shared.priority.${p}`)).join("、");
 
 export const channelLine = (c: { readonly name: string; readonly default?: boolean; readonly description?: string; readonly repo?: string }) =>
   "#" + c.name + (c.default === true ? "（默认）" : "") + (c.description ? "：" + c.description : "") + (c.repo ? "（默认仓库 " + c.repo + "）" : "");
@@ -528,7 +522,6 @@ export const answers = {
     noteTooLong: `没记：附言最多 ${mandateNoteWordLimit} 词。一手输入已自动绑定，删去复述和实施方案后再提交。`,
     noChannel: (name: string) => "没有 " + name + " 这个频道：先用 channel_list 看看有哪些，或者用 channel_create 开一个。",
     noDefaultRepo: (channel: string) => "#" + channel + " 没有默认仓库：填上 repo。",
-    noDeliver: "没记：deliver 是 change（改代码）、branch（改代码，分支留着）或 answer（只查、交结论）",
     notRecorded: (why: string) => "没记：" + why,
     notRecordedFailed: (why: string) => "没记下：" + why,
     noted: (number: number, title: string, answerOnly: boolean) => `记下了：#${number}「${title}」` + (answerOnly ? "（只查、交结论，不改代码）" : ""),

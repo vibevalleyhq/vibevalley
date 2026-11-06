@@ -1,4 +1,4 @@
-import type { SessionId } from "../common/shapes";
+import type { IssueId, SessionId } from "../common/shapes";
 import type { Doing } from "../session/shapes";
 
 export const AchievementCategoryValues = ["starter", "harvest", "craft", "thrift", "team", "secret"] as const;
@@ -212,7 +212,7 @@ export interface LedgerEntryReviewed {
 export interface LedgerEntryFamily {
   kind: "family";
   at: number;
-  issue: string;
+  issue: IssueId;
   merged: number;
   parallel: boolean;
 }

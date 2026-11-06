@@ -1,4 +1,4 @@
-import { Clock, Effect, Semaphore, Predicate } from "effect";
+import { Effect, Semaphore, Predicate } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -8,11 +8,9 @@ import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import type { Channel } from "#/channel/channel.ts";
 import type { Core } from "#/core/core.ts";
-import type { Db } from "#/infra/db.ts";
 import { issueBranch, type Repo } from "#/repo/repo.ts";
 import { type Merged, MergeFailure, type RepoError, type Workplace } from "#/repo/workplace.ts";
 import type { NotTakenIn, Session } from "#/session/session.ts";
-import * as q from "#db/issue.sql.ts";
 
 import { pullRequestConclusion } from "./brief.ts";
 import { acceptanceAncestors } from "./dependencies.ts";
@@ -23,17 +21,17 @@ interface MergeDeps {
   readonly sessions: Session["Service"];
   readonly repos: Repo["Service"];
   readonly chat: Channel["Service"];
-  readonly db: Db["Service"];
   readonly get: (ref: string) => Effect.Effect<T.Issue, ApiError>;
   readonly list: Effect.Effect<T.Issue[]>;
   /** The issue's latest session while it is on the farm. */
   readonly liveSession: (id: string) => Effect.Effect<string, ApiError>;
-  readonly publish: (id: string) => Effect.Effect<void>;
   readonly setConflict: (id: string, conflict: T.Conflict | undefined) => Effect.Effect<void>;
+  readonly savePullRequest: (id: string, pr: T.PullRequest) => Effect.Effect<void>;
+  readonly finishPullRequest: (issue: T.Issue, state: T.PullRequestState) => Effect.Effect<void>;
 }
 
 export function merging(d: MergeDeps) {
-  const { core, sessions, repos, chat, db, get, list, liveSession, publish } = d;
+  const { core, sessions, repos, chat, get, list, liveSession, savePullRequest, finishPullRequest: finishPullRequestRecord } = d;
   /** Merges by pull request and the poll of their states, one at a time. */
   const prLock = Semaphore.makeUnsafe(1);
 
@@ -68,11 +66,6 @@ export function merging(d: MergeDeps) {
     const merged = yield* handedOver(id, (place) => repos.merge(place));
     yield* core.notice("info", t("server.issue.merge.merged", { name: session.name, text: merged.text }));
     return merged.text;
-  });
-
-  const savePullRequest = Effect.fnUntraced(function* (id: string, pr: T.PullRequest) {
-    yield* db.run(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) }));
-    yield* publish(id);
   });
 
   const pullRequestOf = Effect.fnUntraced(function* (place: Workplace, issue: T.Issue, said: string) {
@@ -119,17 +112,7 @@ export function merging(d: MergeDeps) {
         .handOver(id, closed, (place) => repos.finishPullRequest(place.repo, issue.number))
         .pipe(Effect.catchTag("NotTakenIn", (e) => Effect.fail(refused(e.failure.reasonText))));
     else if (issue.repo) yield* repos.finishPullRequest(issue.repo, issue.number).pipe(Effect.mapError((e) => refused(e.message)));
-    yield* db.inTx(
-      Effect.andThen(
-        db.run(
-          state === "closed"
-            ? q.cancelIssue({ id: issue.id, canceled: "dismissed", closed_at: yield* Clock.currentTimeMillis })
-            : q.completeIssue({ id: issue.id, delivered: "pull_request", closed_at: yield* Clock.currentTimeMillis }),
-        ),
-        db.run(q.setIssuePullRequest({ id: issue.id, pull_request: JSON.stringify({ ...issue.pullRequest, state }) })),
-      ),
-    );
-    yield* publish(issue.id);
+    yield* finishPullRequestRecord(issue, state);
   });
 
   const refreshPullRequests = Effect.fn("Issue.refreshPullRequests")(function* () {

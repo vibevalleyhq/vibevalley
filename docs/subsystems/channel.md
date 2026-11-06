@@ -17,7 +17,7 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/server/src/channel/channel.ts`、`contracts.ts` | 对外 `Channel` 服务接口 |
-| `apps/server/src/channel/records.ts`、`rooms.ts` | 内存视图缓存、单写锁、数据库读写与已读游标 |
+| `apps/server/src/channel/hub.ts`、`rooms.ts` | 频道与消息中枢、内存视图缓存、单写锁、数据库读写与已读游标 |
 | `apps/server/src/channel/writing.ts`、`route.ts` | 消息落库、生成 `Trigger`、计算候选受众并交 `Mailbox` |
 | `apps/server/src/channel/threads.ts`、`talk.ts` | 工单串创建/恢复、汇报贴出、私聊会话按需拉起 |
 | `apps/server/src/channel/messages.ts`、`embeds.ts` | 地址解析、`@` 识别、搜索过滤与公网链接预览抓取 |
@@ -37,7 +37,7 @@
   - `channel`：具名频道，可设说明、分组、排序、默认仓库和负责管家；全农场唯一默认频道（`is_default = 1`，初始 `general`）不可归档或删除。
   - `direct`：主人与单个管家或帮工档案的私聊；与帮工私聊直接拉起绑定该频道的 `Session`（用独立 `contexts/` 目录，闲置 10 分钟休眠），不建隐藏工单。
   - `thread`：挂在父频道某条消息下的串；每张工单固定一个工单串（`subject_kind: "issue"`），重开或换帮工复用同一串。
-- **单连接串行写库，消息号从 `1` 递增**：所有写操作经 `records.ts` 信号量串行提交，对外地址为 `#<频道>:<消息号>`。
+- **单连接串行写库，消息号从 `1` 递增**：所有写操作经 `hub.ts` 信号量串行提交，对外地址为 `#<频道>:<消息号>`。
 - **核心状态只留近期摘要，正文按频道订阅**：`SpaceState.chat` 仅保留最近 100 个频道/串摘要与全量未处理的 `ownerMentions`。正文经 `/api/v1/rpc` 的 `channel.follow({ id, after })` 订阅：消息增改删或置顶均递增 `revision`，重连落后 200 条以内按修订号补齐，超出则回 `Reset` 重拉最新页。
 - **主动阅读与被动消费分开记账**：
   - 调读取接口推进 `channel_read_cursor.read_number`。

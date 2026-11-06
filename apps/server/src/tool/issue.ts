@@ -1,7 +1,7 @@
 import { Clock, Effect, Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
-import { DeliverableValues, IssueStatusValues, defaultOrchestrator } from "@vibevalley/protocol";
+import { defaultOrchestrator } from "@vibevalley/protocol";
 import { assignedAgentOf, closedText, latestSessionIdOf, phaseText, shortTitle } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -27,12 +27,8 @@ import {
   issuePrSubmitted,
   issueReportDescription,
   issueReportRecorded,
-  noSuchPriority,
-  noSuchStatus,
   ownerAgentWord,
-  priorityOf,
   sessionLine,
-  statusOf,
 } from "./prompts.ts";
 import {
   type Who,
@@ -273,10 +269,8 @@ export const issueTools = Effect.gen(function* () {
   const issueList = tool(
     "issue.list",
     Effect.fn("Tool.issueList")(function* (p: Orchestrator<"issue.list">) {
-      const status = p.status ? statusOf(p.status) : undefined;
-      if (p.status && !status) return noSuchStatus(p.status, IssueStatusValues);
-      const { limit: _, status: __, ...rest } = p;
-      const found = yield* issue.query({ ...rest, ...(status ? { status } : {}) });
+      const { limit: _, ...rest } = p;
+      const found = yield* issue.query(rest);
       if (found.length === 0) return p.wantsOwner === true ? answers.issues.noneWaiting : answers.issues.none;
       const now = yield* Clock.currentTimeMillis;
       const limit = p.limit != null && p.limit > 0 ? Math.trunc(p.limit) : 20;
@@ -308,10 +302,6 @@ export const issueTools = Effect.gen(function* () {
           const blockedBy = yield* Effect.forEach(p.blockedBy ?? [], (ref) => Effect.map(issue.idOf(ref), S.issueId));
           const repo = (p.repo ?? parent?.repo ?? "").trim() || channel.repo;
           if (p.start === true && !repo) return answers.issueCreate.noDefaultRepo(channel.name);
-          const priority = p.priority ? priorityOf(p.priority) : undefined;
-          if (p.priority && !priority) return noSuchPriority(p.priority);
-          const deliver = p.deliver ? DeliverableValues.find((d) => d === p.deliver) : undefined;
-          if (p.deliver && !deliver) return answers.issueCreate.noDeliver;
           let agent: string | undefined = parent ? assignedAgentOf(parent) : undefined;
           if (p.agent || p.start === true) {
             const a = yield* choose(p.title + "\n" + (p.description ?? ""), p.agent ?? agent ?? "", p.start === true ? c.picked : "").pipe(
@@ -328,8 +318,8 @@ export const issueTools = Effect.gen(function* () {
                 ...(p.description ? { description: p.description } : {}),
                 ...(repo ? { repo } : {}),
                 ...(agent ? { agent } : {}),
-                ...(priority ? { priority } : {}),
-                ...(deliver ? { deliver } : {}),
+                ...(p.priority ? { priority: p.priority } : {}),
+                ...(p.deliver ? { deliver: p.deliver } : {}),
               },
               actsForOwner(c.actor) ? explicitMandate(c.envelope, p.autoSubmitPr ?? false) : inferredMandate(c.envelope),
             )
@@ -370,8 +360,6 @@ export const issueTools = Effect.gen(function* () {
         function* (p: Orchestrator<"issue.update">) {
           const c = yield* callerOf(who);
           return yield* withIssue(p.id, (item) => {
-            const priority = p.priority ? priorityOf(p.priority) : undefined;
-            if (p.priority && !priority) return Effect.succeed(noSuchPriority(p.priority));
             let agent: string | undefined;
             if (p.agent) {
               const a = agents.named(p.agent);
@@ -386,7 +374,7 @@ export const issueTools = Effect.gen(function* () {
                   ...(p.description !== undefined ? { description: p.description } : {}),
                   ...(p.repo !== undefined ? { repo: p.repo } : {}),
                   ...(agent ? { agent } : {}),
-                  ...(priority ? { priority } : {}),
+                  ...(p.priority ? { priority: p.priority } : {}),
                   ...(p.deliver ? { deliver: p.deliver } : {}),
                   ...(p.criteria !== undefined ? { criteria: p.criteria } : {}),
                 },
@@ -404,8 +392,7 @@ export const issueTools = Effect.gen(function* () {
       "issue.status.update",
       Effect.fn("Tool.issueStatus")(function* (p: Orchestrator<"issue.status.update">) {
         const c = yield* callerOf(who);
-        const to = statusOf(p.status);
-        if (!to) return noSuchStatus(p.status, ["backlog", "todo", "done", "canceled"]);
+        const to = p.status;
         return yield* withIssue(
           p.id,
           Effect.fnUntraced(

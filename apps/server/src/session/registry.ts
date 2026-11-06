@@ -72,7 +72,7 @@ export interface RunStore {
   readonly register: (session: string, currentRun: () => string) => void;
 }
 
-export const sessionRecords = Effect.gen(function* () {
+export const sessionRegistry = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const core = yield* Core;
   const store = yield* Agent;
@@ -372,4 +372,4 @@ export const sessionRecords = Effect.gen(function* () {
   };
 });
 
-export type SessionRecords = Effect.Success<typeof sessionRecords>;
+export type SessionRegistry = Effect.Success<typeof sessionRegistry>;

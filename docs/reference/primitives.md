@@ -331,6 +331,7 @@
 | `exportsOf` | `source.ts` | The names a file exports itself (declarations and `export { … }` without a source), types included. |
 | `exportedValuesOf` | `source.ts` | The values a file declares and exports itself (no types), each with where its export statement starts. |
 | `readsOf` | `source.ts` | The fields read off what object.method() returns: right off the call (`core.state().issues`, `?.` too), through a const it is kept in (`const s = core.state(). |
+| `analyzeSource` | `source.ts` |  |
 | `calls` | `source.ts` | Whether the file calls object.method(…) anywhere. |
 | `tempDir` | `temp.ts` |  |
 | `waitFor` | `until.ts` | What get answers once ok holds for it. what is said if it never does (a function: read when it is given up on). |

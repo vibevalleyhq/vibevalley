@@ -46,16 +46,7 @@ const scopeOf = (labels: readonly string[] | undefined): MemoryScope => {
   return Buffer.from(repo, "utf8").toString("hex") === encoded ? { kind: "repo", repo } : { kind: "unknown" };
 };
 
-interface Hit {
-  readonly id?: string;
-  readonly memory_id?: string;
-  readonly title?: string;
-  readonly content?: string;
-  readonly content_preview?: string;
-  readonly relevance_score?: number;
-}
-
-const HitSchema: Schema.Codec<Hit> = Schema.Struct({
+const HitSchema = Schema.Struct({
   id: Schema.optionalKey(Schema.String),
   memory_id: Schema.optionalKey(Schema.String),
   title: Schema.optionalKey(Schema.String),
@@ -63,6 +54,7 @@ const HitSchema: Schema.Codec<Hit> = Schema.Struct({
   content_preview: Schema.optionalKey(Schema.String),
   relevance_score: Schema.optionalKey(Schema.Finite),
 });
+type Hit = typeof HitSchema.Type;
 const SearchResponse = Schema.fromJsonString(Schema.Struct({ results: Schema.optionalKey(Schema.mutable(Schema.Array(HitSchema))) }));
 const AddedResponse = Schema.fromJsonString(
   Schema.Struct({

@@ -13,10 +13,10 @@ export interface Streams {
 
 /** Each payload is decoded with the Schema its stream is written with: a server of another version is told, not taken
  * for the shape. */
-const decoders: { readonly [P in keyof Streams]: (json: unknown) => Exit.Exit<Streams[P], Schema.SchemaError> } = {
-  [statePath]: Schema.decodeUnknownExit(S.StateFrame),
-  [eventsPath]: Schema.decodeUnknownExit(S.ServerEvent),
-  [livePath]: Schema.decodeUnknownExit(S.LiveEvent),
+const decoders: { readonly [P in keyof Streams]: (json: string) => Exit.Exit<Streams[P], Schema.SchemaError> } = {
+  [statePath]: Schema.decodeUnknownExit(Schema.fromJsonString(S.StateFrame)),
+  [eventsPath]: Schema.decodeUnknownExit(Schema.fromJsonString(S.ServerEvent)),
+  [livePath]: Schema.decodeUnknownExit(Schema.fromJsonString(S.LiveEvent)),
 };
 
 /** The server writes a comment line on every stream this often, however quiet it is (apps/server/src/http/streams.ts). */
@@ -52,15 +52,17 @@ export async function readStream<P extends keyof Streams>(
     clearTimeout(quiet);
     quiet = setTimeout(() => end(new Error(`${url}: nothing for ${silenceMs} ms`)), silenceMs);
   };
+  let res: Response | undefined;
+  let reader: ReadableStreamDefaultReader<string> | undefined;
   try {
     heard();
-    const res = await fetcher(url, { headers: { Accept: "text/event-stream" }, signal: request.signal });
+    res = await fetcher(url, { headers: { Accept: "text/event-stream" }, signal: request.signal });
     const early = stoppedFor();
     if (early) throw early;
     if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
-    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
     // A fetcher that does not end its body on abort (a host's own) would leave the read below waiting forever.
-    request.signal.addEventListener("abort", () => void Promise.allSettled([reader.cancel()]), { once: true });
+    request.signal.addEventListener("abort", () => void Promise.allSettled([reader?.cancel()]), { once: true });
     let buffer = "";
     for (;;) {
       // oxlint-disable-next-line eslint/no-await-in-loop -- a stream is read a chunk at a time
@@ -80,7 +82,7 @@ export async function readStream<P extends keyof Streams>(
           .join("\n");
         buffer = buffer.slice(end + 2);
         if (!data) continue;
-        const decoded = decoders[path](JSON.parse(data));
+        const decoded = decoders[path](data);
         if (Exit.isFailure(decoded)) throw new Error(`${url}: a frame not in its shape: ${Cause.pretty(decoded.cause)}`);
         onEvent(decoded.value);
       }
@@ -88,5 +90,8 @@ export async function readStream<P extends keyof Streams>(
   } finally {
     clearTimeout(quiet);
     signal.removeEventListener("abort", stop);
+    request.abort();
+    await Promise.allSettled([reader ? reader.cancel() : res?.body?.cancel()]);
+    reader?.releaseLock();
   }
 }

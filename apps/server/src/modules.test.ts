@@ -3,14 +3,11 @@ import { dirname, join, normalize, relative } from "node:path";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { calls, edgesOf, readsOf } from "@vibevalley/testkit/source";
+import { analyzeSource, type Edge } from "@vibevalley/testkit/source";
 
 import { moduleOf, modules, outside } from "./modules.ts";
 
 const src = import.meta.dirname;
-
-/** Imports that still go the wrong way, each with the step of the proposal that removes it; a new one fails, and so does one
- * that is gone and still listed. */
 const pending: Readonly<Record<string, string>> = {};
 
 function files(dir: string): string[] {
@@ -22,8 +19,6 @@ function files(dir: string): string[] {
 
 const rel = (p: string) => relative(src, p).split("\\").join("/");
 const rank = (path: string) => modules.findIndex((m) => m === moduleOf(path));
-
-/** Whose part of the core state each field is; the call and the orchestrator's state are the core's own. */
 const owners: Readonly<Record<string, string>> = {
   sessions: "Agent Sessions",
   chat: "Collaboration",
@@ -33,41 +28,61 @@ const owners: Readonly<Record<string, string>> = {
   commits: "Gamification",
   connectors: "Gateway",
 };
-
-/** Reads of another module's part that stay, each with why: none. */
 const reads: Readonly<Record<string, string>> = {
   "mailbox/mailbox.ts -> issues": "Tier 1 issue reservoir checks the issue's stage and assigned agent synchronously without keeping a second copy of the board",
 };
 
-/** What a file imports from under src, type-only imports too (they tie the modules all the same), as paths from src. */
-const localEdges = (file: string, source = readFileSync(file, "utf8")) =>
-  edgesOf(file, source).flatMap(({ from: spec }) =>
+const localEdges = (file: string, edges: readonly Edge[]) =>
+  edges.flatMap(({ from: spec }) =>
     spec.startsWith("#/") ? [normalize(spec.slice(2))] : spec.startsWith("./") || spec.startsWith("../") ? [rel(normalize(join(dirname(file), spec)))] : [],
   );
 
-const readsSessionSnapshot = (file: string, source: string) => calls(file, source, "core", "state") && localEdges(file, source).includes("session/roster.ts");
+function inspect(file: string, text: string) {
+  const source = analyzeSource(file, text);
+  const local = localEdges(file, source.edges);
+  const sessionSnapshot = source.calls("core", "state") && local.includes("session/roster.ts");
+  const parts = source.reads("core", "state");
+  if (source.calls("core", "session") || sessionSnapshot) parts.push("sessions");
+  return { file, from: rel(file), edges: source.edges, local, parts: [...new Set(parts)], sessionSnapshot };
+}
 
-/** The read projections a module takes from another module's tables, by the table's generated file: each a query it only reads with, named, never a whole file. */
+// Built inside the first check, so its time includes reading and parsing, not hidden in test collection.
+let snapshot: ReturnType<typeof inspect>[] | undefined;
+const sources = () =>
+  (snapshot ??= files(src)
+    .filter((file) => !file.endsWith(".test.ts") && !outside.includes(rel(file).split("/")[0]!))
+    .map((file) => inspect(file, readFileSync(file, "utf8"))));
+
 const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
   mailbox: { "channel.sql.ts": ["defaultID", "orchestratorForChannel", "inboxOf"], "issue.sql.ts": ["issueExists"] },
   inbox: { "channel_message.sql.ts": ["messageByID", "notificationReceipt", "ownerReadReports"] },
 };
-
-/** The module a table's generated file belongs to: the table's name is <module> or <module>_<concept>. */
+const folders = readdirSync(src).filter((name) => statSync(join(src, name)).isDirectory());
 const tableModule = (name: string) => {
   const table = name.replace(/\.sql\.ts$/u, "");
-  return readdirSync(src).find((m) => table === m || table.startsWith(`${m}_`));
+  return folders.find((module) => table === module || table.startsWith(`${module}_`));
 };
-
-const foreignQueries = (file: string, source: string) => {
+const foreignQueries = (file: string, edges: readonly Edge[]) => {
   const module = rel(file).split("/")[0]!;
-  return edgesOf(file, source).flatMap((edge) => {
+  return edges.flatMap((edge) => {
     if (!edge.from.startsWith("#db/")) return [];
     const name = edge.from.split("/").at(-1) ?? "";
     if (name === "types.ts" || tableModule(name) === module) return [];
     const allowed = foreignReads[module]?.[name] ?? [];
     return edge.names.filter((symbol) => !allowed.includes(symbol)).map((symbol) => `${name}:${symbol}`);
   });
+};
+
+const mailboxContracts = new Set(["mailbox/envelope.ts", "mailbox/payload.ts", "mailbox/prompts.ts"]);
+const mailboxLeaks = (source: ReturnType<typeof inspect>) => {
+  const privateImports = source.local.filter(
+    (to) => !source.from.startsWith("mailbox/") && to.startsWith("mailbox/") && to !== "mailbox/mailbox.ts" && !mailboxContracts.has(to),
+  );
+  if (mailboxContracts.has(source.from)) {
+    privateImports.push(...source.local.filter((to) => !to.startsWith("base/") && !mailboxContracts.has(to)));
+    privateImports.push(...source.edges.filter((edge) => edge.from.startsWith("#db/")).map((edge) => edge.from));
+  }
+  return privateImports;
 };
 
 describe("the modules", () => {
@@ -80,12 +95,9 @@ describe("the modules", () => {
   });
 
   it("import only the modules before them", () => {
-    const found: string[] = [];
-    for (const file of files(src)) {
-      const from = rel(file);
-      if (from.endsWith(".test.ts") || outside.includes(from.split("/")[0]!)) continue;
-      for (const to of localEdges(file)) if (moduleOf(to) !== moduleOf(from) && rank(to) > rank(from)) found.push(`${from} -> ${to}`);
-    }
+    const found = sources().flatMap(({ from, local }) =>
+      local.filter((to) => moduleOf(to) !== moduleOf(from) && rank(to) > rank(from)).map((to) => `${from} -> ${to}`),
+    );
     expect(
       found.filter((f) => !(f in pending)),
       "a module imports one after it in modules.ts, so the two lean on each other. Fix: move what both need into the earlier module (or base), or have the later one hand it down as a Stream; a shape they share lives in the module that defines it. See docs/architecture.md",
@@ -97,9 +109,7 @@ describe("the modules", () => {
   });
 
   it("use only their own tables' queries, besides named read projections", () => {
-    const found = files(src)
-      .filter((file) => !file.endsWith(".test.ts") && !outside.includes(rel(file).split("/")[0]!))
-      .flatMap((file) => foreignQueries(file, readFileSync(file, "utf8")).map((query) => `${rel(file)} -> ${query}`));
+    const found = sources().flatMap(({ file, from, edges }) => foreignQueries(file, edges).map((query) => `${from} -> ${query}`));
     expect(
       found,
       "a module imports another module's table queries, so it writes (or reads beyond what was named) under that module. Fix: call that module's service, or name the read in foreignReads; writes stay with the table's module. See docs/subsystems/foundation.md",
@@ -108,21 +118,23 @@ describe("the modules", () => {
 
   it("regression: namespace imports and foreign writes cannot hide behind a read projection", () => {
     const file = join(src, "mailbox/mailbox.ts");
-    expect(foreignQueries(file, 'import { orchestratorForChannel as route } from "#db/channel.sql.ts";')).toEqual([]);
-    expect(foreignQueries(file, 'import * as q from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
-    expect(foreignQueries(file, 'import { setOrchestrator } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:setOrchestrator"]);
-    expect(foreignQueries(file, 'export * from "#db/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);
-    expect(foreignQueries(join(src, "ingress/ingress.ts"), 'import { recordTrigger } from "#db/mailbox_trigger.sql.ts";')).toEqual([
+    const queries = (text: string) => foreignQueries(file, inspect(file, text).edges);
+    expect(queries('import { orchestratorForChannel as route } from "#db/channel.sql.ts";')).toEqual([]);
+    expect(queries('import * as q from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
+    expect(queries('import { setOrchestrator } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:setOrchestrator"]);
+    expect(queries('export * from "#db/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);
+    const ingress = join(src, "ingress/ingress.ts");
+    expect(foreignQueries(ingress, inspect(ingress, 'import { recordTrigger } from "#db/mailbox_trigger.sql.ts";').edges)).toEqual([
       "mailbox_trigger.sql.ts:recordTrigger",
     ]);
   });
 
   it("keep base pure: it imports nothing else under src", () => {
-    const found: string[] = [];
-    for (const file of files(join(src, "base"))) {
-      const from = rel(file);
-      for (const to of localEdges(file)) if (to.split("/")[0] !== "base") found.push(`${from} -> ${to}`);
-    }
+    const base = sources().filter(({ from }) => from.startsWith("base/"));
+    const tests = files(join(src, "base"))
+      .filter((file) => file.endsWith(".test.ts"))
+      .map((file) => inspect(file, readFileSync(file, "utf8")));
+    const found = [...base, ...tests].flatMap(({ from, local }) => local.filter((to) => to.split("/")[0] !== "base").map((to) => `${from} -> ${to}`));
     expect(
       found,
       "a file in base imports something else under src, so the pure ground leans on what talks to the outside. Fix: move the file to infra (or the module it serves), or move what it needs down into base. See apps/server/src/modules.ts",
@@ -130,20 +142,11 @@ describe("the modules", () => {
   });
 
   it("read only their own part of the core state", () => {
-    const found: string[] = [];
-    for (const file of files(src)) {
-      const from = rel(file);
-      const top = from.split("/")[0]!;
-      if (from.endsWith(".test.ts") || outside.includes(top) || top === "core" || top === "projection") continue;
-      const text = readFileSync(file, "utf8");
-      const parts = readsOf(file, text, "core", "state");
-      if (calls(file, text, "core", "session")) parts.push("sessions");
-      if (readsSessionSnapshot(file, text)) parts.push("sessions");
-      for (const part of new Set(parts)) {
-        const owner = owners[part];
-        if (owner && owner !== moduleOf(from)?.name) found.push(`${from} -> ${part}`);
-      }
-    }
+    const found = sources().flatMap(({ from, parts }) => {
+      const top = from.split("/")[0];
+      if (top === "core" || top === "projection") return [];
+      return parts.filter((part) => owners[part] !== undefined && owners[part] !== moduleOf(from)?.name).map((part) => `${from} -> ${part}`);
+    });
     expect(
       found.filter((f) => !(f in reads)),
       "a module reads another's part of the core state, so the owner's rules are skipped. Fix: ask the owning module's service for it (a method or a Stream), and keep core.state() reads to the module that owns the field. See docs/subsystems/core.md",
@@ -156,9 +159,30 @@ describe("the modules", () => {
 
   it("regression: session snapshot helpers cannot hide a service's cross-module read", () => {
     const file = join(src, "issue/issue.ts");
-    expect(readsSessionSnapshot(file, 'import { sessionOf } from "#/session/roster.ts"; const state = core.state(); sessionOf(state, id);')).toBe(true);
-    expect(readsSessionSnapshot(file, 'import { sessionOf } from "../session/roster.ts"; sessionOf(core.state(), id);')).toBe(true);
-    expect(readsSessionSnapshot(file, 'import { sessionOf } from "#/session/roster.ts"; export const rule = (state, id) => sessionOf(state, id);')).toBe(false);
-    expect(readsSessionSnapshot(file, "const state = core.state(); live.sessionOf(id); state.issues.find(item => item.id === id);")).toBe(false);
+    const readsSessionSnapshot = (text: string) => inspect(file, text).sessionSnapshot;
+    expect(readsSessionSnapshot('import { sessionOf } from "#/session/roster.ts"; const state = core.state(); sessionOf(state, id);')).toBe(true);
+    expect(readsSessionSnapshot('import { sessionOf } from "../session/roster.ts"; sessionOf(core.state(), id);')).toBe(true);
+    expect(readsSessionSnapshot('import { sessionOf } from "#/session/roster.ts"; export const rule = (state, id) => sessionOf(state, id);')).toBe(false);
+    expect(readsSessionSnapshot("const state = core.state(); live.sessionOf(id); state.issues.find(item => item.id === id);")).toBe(false);
+  });
+
+  it("keep mailbox persistence behind its service, not its shared contracts", () => {
+    const found = sources().flatMap((source) => mailboxLeaks(source).map((to) => `${source.from} -> ${to}`));
+    expect(
+      found,
+      "Mailbox storage leaked through an internal import or a shared contract. Fix: call Mailbox; keep payload, envelope and prompts free of storage imports. See docs/subsystems/mailbox.md",
+    ).toEqual([]);
+  });
+
+  it("regression: a mailbox helper or re-export cannot bypass its service", () => {
+    const channel = join(src, "channel/writing.ts");
+    expect(mailboxLeaks(inspect(channel, 'import { Mailbox } from "#/mailbox/mailbox.ts";'))).toEqual([]);
+    expect(mailboxLeaks(inspect(channel, 'import { triggerOf } from "#/mailbox/payload.ts";'))).toEqual([]);
+    expect(mailboxLeaks(inspect(channel, 'export * from "../mailbox/triggers.ts";'))).toEqual(["mailbox/triggers.ts"]);
+    expect(mailboxLeaks(inspect(channel, 'const journal = import("#/mailbox/triggers.ts");'))).toEqual(["mailbox/triggers.ts"]);
+    const payload = join(src, "mailbox/payload.ts");
+    expect(mailboxLeaks(inspect(payload, 'export { triggerJournal } from "./triggers.ts";'))).toEqual(["mailbox/triggers.ts"]);
+    expect(mailboxLeaks(inspect(payload, 'import { Db } from "#/infra/db.ts";'))).toEqual(["infra/db.ts"]);
+    expect(mailboxLeaks(inspect(payload, 'import * as q from "#db/mailbox_trigger.sql.ts";'))).toEqual(["#db/mailbox_trigger.sql.ts"]);
   });
 });

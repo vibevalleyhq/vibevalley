@@ -321,7 +321,7 @@ const make = (options: RuntimeOptions = {}) =>
             name: s.name,
             description: s.description ?? "",
             source: s.path || s.source || "",
-            ...(s.enabled !== undefined ? { enabled: s.enabled } : {}),
+            enabled: s.enabled ?? true,
           })),
           inventory(runtime.mcpServers, found, cwd, (m) => {
             const parts = [m.status, m.toolCount !== undefined ? t("server.runtime.tools", { n: m.toolCount }) : ""].filter(Boolean);
@@ -329,14 +329,14 @@ const make = (options: RuntimeOptions = {}) =>
               name: m.name,
               description: parts.join(" · "),
               source: m.source ?? "",
-              ...(m.enabled !== undefined ? { enabled: m.enabled } : {}),
+              enabled: m.enabled ?? true,
             };
           }),
           inventory(runtime.tools, found, cwd, (item) => ({
             name: item.name,
             description: item.description ?? "",
             source: item.mcpServerId || item.source || "",
-            ...(item.enabled !== undefined ? { enabled: item.enabled } : {}),
+            enabled: item.enabled ?? true,
           })),
         ],
         { concurrency: 4 },

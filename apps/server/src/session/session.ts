@@ -5,11 +5,9 @@ import type * as T from "@vibevalley/protocol";
 import { dayMs, maxRunning } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
-import * as S from "@vibevalley/protocol/schema";
 
 import { session as sessionActor } from "#/base/actor.ts";
 import { type ApiError, reasonOf, refused } from "#/base/errors.ts";
-import { jsonOrNone } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";
 import { Executor } from "#/executor/executor.ts";
 import { ServerConfig } from "#/infra/config.ts";
@@ -168,13 +166,13 @@ export function newsOf(fact: T.Fact, after: T.SpaceState): SessionNews | undefin
   }
 }
 
-import { restoredSession, sessionState, runOf, endedSession, placeOf, heardOf } from "./history.ts";
+import { restoredSession, sessionState, runOf, endedSession, placeOf, heardOf, pendingReportOf } from "./history.ts";
 import { NotTakenIn, reasonText, sessionLaunch } from "./launch.ts";
-import { type Hand, type RunFinished, type RunStore, sessionRecords } from "./records.ts";
+import { type Hand, type RunFinished, type RunStore, sessionRegistry } from "./registry.ts";
 import { sessionWatch } from "./watch.ts";
 export { runOf } from "./history.ts";
 const make = Effect.gen(function* () {
-  const r = yield* sessionRecords;
+  const r = yield* sessionRegistry;
   const wt = yield* sessionWatch(r);
   const l = yield* sessionLaunch(r, wt);
   const {
@@ -283,7 +281,7 @@ const make = Effect.gen(function* () {
         oarSessionId: row.oar_session ?? "",
         lastText: row.last_text ?? "",
         recalled: heardOf(row.recalled) ?? [],
-        report: row.pending_report === null ? undefined : jsonOrNone(S.IssueReport)(row.pending_report),
+        report: pendingReportOf(row.pending_report),
       };
       hands.set(session.id, {
         id: session.id,

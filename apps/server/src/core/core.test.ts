@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Clock, Effect, Fiber, Layer, PubSub, Queue, Stream } from "effect";
+import { Clock, Effect, Fiber, Layer, PubSub, Queue, Scheduler, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { vi } from "vite-plus/test";
 
@@ -240,6 +240,26 @@ describe("core", () => {
       expect(core.session("orchestrator")).toMatchObject({ phase: { _tag: "resting" } });
       expect(core.session("orchestrator")?.channel).toBeUndefined();
       expect(core.session("lead")?.phase).toEqual(phaseOf("speaking", expect.any(Number)));
+    }).pipe(
+      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
+    ),
+  );
+
+  it.effect("regression: a scheduler yield cannot leave the core locked against a synchronous callback", () =>
+    Effect.gen(function* () {
+      const runSync = Effect.runSyncWith(yield* Effect.context());
+      const core = yield* Core;
+      const rounds = Array.from({ length: 32 }, (_, i) => i);
+      const writer = Effect.forEach(rounds, (i) => core.apply({ type: "callChanged", state: "live", reason: `writer-${i}` }), { discard: true }).pipe(
+        Effect.provideService(Scheduler.MaxOpsBeforeYield, 32),
+      );
+      const callbacks = Effect.forEach(
+        rounds,
+        (i) => Effect.sync(() => runSync(core.apply({ type: "callChanged", state: "idle", reason: `callback-${i}` }))).pipe(Effect.andThen(Effect.yieldNow)),
+        { discard: true },
+      );
+      yield* Effect.all([writer, callbacks], { concurrency: "unbounded", discard: true });
+      expect(core.seq()).toBe(rounds.length * 2);
     }).pipe(
       Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
     ),

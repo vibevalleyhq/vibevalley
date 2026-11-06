@@ -167,7 +167,7 @@ const fullHouse = 6;
 
 const working = (state: T.SpaceState) => state.sessions.filter((h) => h.role === "worker" && h.phase._tag === "working").length;
 
-function familyEntry(id: string, children: readonly T.Issue[]): Entry {
+function familyEntry(id: T.IssueId, children: readonly T.Issue[]): Entry {
   const merged = new Set<string>(children.filter((issue) => issue.delivered === "merged_into_parent").map((issue) => issue.id));
   const parallel = dagLayers(children.map((issue) => ({ id: issue.id, after: issue.blockedBy }))).some(
     (layer) => layer.filter((id) => merged.has(id)).length >= 2,

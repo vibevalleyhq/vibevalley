@@ -13,7 +13,8 @@ import { newId } from "#/base/ids.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
-import { type InboxMessage, unreadSummaryOf } from "#/mailbox/envelope.ts";
+import { type InboxMessage } from "#/mailbox/envelope.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Session } from "#/session/session.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qf from "#db/channel_follow.sql.ts";
@@ -48,10 +49,11 @@ export const lastMax = 80;
 /** The first n units of text, on one line. */
 export const lineOf = (text: string, n: number) => head(oneLine(text).trim(), n);
 
-export const channelRecords = Effect.gen(function* () {
+export const channelHub = Effect.gen(function* () {
   const core = yield* Core;
   const agents = yield* Agent;
   const db = yield* Db;
+  const mailbox = yield* Mailbox;
   const sessions = yield* Session;
   const model = new ChatModel();
   const follow = (channel: string, participant: string, reason: qf.FollowParams["reason"], from: number) =>
@@ -390,7 +392,7 @@ export const channelRecords = Effect.gen(function* () {
   const inboxRows = Effect.fn("Channel.deliveryUnread")(function* (who: string) {
     const h = sessionOf(who);
     const channel = h ? channelOfSession(h) : model.defaultId();
-    return yield* unreadSummaryOf(db, who, channel);
+    return yield* mailbox.unreadSummary(who, channel);
   });
 
   yield* locked(
@@ -461,4 +463,4 @@ export const channelRecords = Effect.gen(function* () {
   };
 });
 
-export type ChannelRecords = Effect.Success<typeof channelRecords>;
+export type ChannelHub = Effect.Success<typeof channelHub>;

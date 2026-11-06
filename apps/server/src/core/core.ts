@@ -1,4 +1,4 @@
-import { type Cause, Clock, Context, Effect, Layer, PubSub, Queue, type Scope, Stream, SubscriptionRef } from "effect";
+import { type Cause, Clock, Context, Effect, Layer, PubSub, Queue, Scheduler, type Scope, Stream, SubscriptionRef } from "effect";
 
 import type * as T from "@vibevalley/protocol";
 
@@ -148,7 +148,11 @@ const make = Effect.gen(function* () {
         },
         updated,
       ] as const;
-    }).pipe(Effect.map((tell) => tell?.()));
+    }).pipe(
+      Effect.map((tell) => tell?.()),
+      // oar callbacks use runSync: do not yield with the permit held or before publishing the folded facts.
+      Effect.provideService(Scheduler.PreventSchedulerYield, true),
+    );
   });
 
   const side = (e: T.ServerEvent) => Effect.sync(() => publish(e));

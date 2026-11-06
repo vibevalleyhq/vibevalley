@@ -1,4 +1,4 @@
--- Triggers: each input as it reaches an agent, kept before Mailbox routes it (mailbox/payload.ts), and its routing receipt.
+-- Triggers: each input as it reaches an agent, kept before Mailbox routes it (mailbox/triggers.ts), and its routing receipt.
 
 
 -- name: RecordTrigger :exec

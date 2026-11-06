@@ -10,7 +10,7 @@ import { compareText, or } from "#/base/order.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Issue } from "#/issue/issue.ts";
-import { knownGitHubEvents } from "#/mailbox/payload.ts";
+import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Repo } from "#/repo/repo.ts";
 import { RepoError } from "#/repo/workplace.ts";
 import * as q from "#db/ingress_github.sql.ts";
@@ -242,6 +242,7 @@ export const actionsJobOf = (url: string) => /\/job\/(\d+)/u.exec(url)?.[1] ?? "
 export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Trigger | undefined, ApiError | Schema.SchemaError>) =>
   Effect.gen(function* () {
     const db = yield* Db;
+    const mailbox = yield* Mailbox;
     const issues = yield* Issue;
     const repos = yield* Repo;
     const snapshot = githubSnapshot(repos);
@@ -292,10 +293,10 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
           });
         yield* db.run(q.observeGitHubChecks({ repo, pr_number: pr.number, check_fingerprint: fingerprint, check_revision: revision }));
       }
-      const known = yield* knownGitHubEvents(db, repo, pr.number);
-      const keys = new Set(known.filter((event) => event.routed).map((event) => event.source_key));
+      const known = yield* mailbox.knownGitHubEvents(repo, pr.number);
+      const keys = new Set(known.filter((event) => event.routed).map((event) => event.key));
       const rounds = new Map(
-        known.flatMap((event) => (event.bot_round_key !== null && event.bot_round !== null ? [[event.bot_round_key, event.bot_round] as const] : [])),
+        known.flatMap((event) => (event.botRoundKey !== undefined && event.botRound !== undefined ? [[event.botRoundKey, event.botRound] as const] : [])),
       );
       let botRound = 0;
       for (const round of rounds.values()) botRound = Math.max(botRound, round);

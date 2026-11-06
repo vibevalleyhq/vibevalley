@@ -107,7 +107,7 @@ const make = () =>
         body: row.body,
         ...(row.channel_id !== null ? { channel: row.channel_id } : {}),
         ...(row.said_channel !== null && row.said_number !== null ? { said: { channel: row.said_channel, number: row.said_number } } : {}),
-        ...(row.issue !== null ? { issue: row.issue } : {}),
+        ...(row.issue !== null ? { issue: S.issueId(row.issue) } : {}),
         by: row.by_id,
         byName: row.by_name,
         version: row.version,

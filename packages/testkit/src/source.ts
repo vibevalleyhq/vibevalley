@@ -48,8 +48,12 @@ const literal = (n: unknown): string | undefined => (isNode(n) && n.type === "Li
 
 /** Every import, export … from and dynamic import() of a string. */
 export function edgesOf(path: string, source: string): Edge[] {
+  return edgesIn(walk(programOf(path, source)));
+}
+
+function edgesIn(entries: Iterable<{ readonly node: Node }>): Edge[] {
   const out: Edge[] = [];
-  for (const { node } of walk(programOf(path, source))) {
+  for (const { node } of entries) {
     if (node.type === "ImportDeclaration") {
       const specifiers = nodes(node.specifiers);
       const names = specifiers.map((s) =>
@@ -112,13 +116,14 @@ const isCallOf = (n: Node, object: string, method: string) =>
 
 /** The fields read off what object.method() returns: right off the call (`core.state().issues`, `?.` too), through a const it is kept in (`const s = core.state(). */
 export function readsOf(path: string, source: string, object: string, method: string): string[] {
-  const program = programOf(path, source);
-  const parents = new Map<Node, Node | undefined>();
+  return readsIn([...walk(programOf(path, source))], object, method);
+}
+
+function readsIn(entries: readonly { readonly node: Node; readonly parent: Node | undefined }[], object: string, method: string): string[] {
   const out = new Set<string>();
   const kept = new Set<string>();
-  for (const { node, parent } of walk(program)) parents.set(node, parent);
   const fieldOf = (member: Node) => (member.computed === true ? undefined : nameOf(member.property));
-  for (const [node, parent] of parents) {
+  for (const { node, parent } of entries) {
     if (!isCallOf(node, object, method) || !parent) continue;
     // `x?.y` wraps the member in a ChainExpression; the call may be the object of the member inside it.
     if (parent.type === "MemberExpression" && parent.object === node) {
@@ -135,12 +140,21 @@ export function readsOf(path: string, source: string, object: string, method: st
     }
   }
   if (kept.size > 0)
-    for (const node of parents.keys())
+    for (const { node } of entries)
       if (node.type === "MemberExpression" && isNode(node.object) && node.object.type === "Identifier" && kept.has(nameOf(node.object) ?? "")) {
         const f = fieldOf(node);
         if (f) out.add(f);
       }
   return [...out];
+}
+
+export function analyzeSource(path: string, source: string) {
+  const entries = [...walk(programOf(path, source))];
+  return {
+    edges: edgesIn(entries),
+    reads: (object: string, method: string) => readsIn(entries, object, method),
+    calls: (object: string, method: string) => entries.some(({ node }) => isCallOf(node, object, method)),
+  };
 }
 
 /** Whether the file calls object.method(…) anywhere. */

@@ -101,7 +101,7 @@ describe("@vibevalley/pkm domain engine", () => {
     if (journal) {
       expect(summaryOf(journal).day).toBe("2026-11-03");
       expect(transclusions(vault, journal, { circular: (id) => id, broken: (id) => id })).toEqual([
-        { block: ref, found: true, page: "cetus", pageTitle: "Cetus", body: "the core idea" },
+        { block: ref, found: true, circular: false, page: "cetus", pageTitle: "Cetus", body: "the core idea" },
       ]);
       expect(exportMarkdown(vault, journal, (t) => `> ${t}`)).toBe("# 2026_11_03\n\n### met about Engine and the core idea\n\n- its notes\n");
     }

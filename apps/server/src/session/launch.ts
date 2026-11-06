@@ -18,7 +18,7 @@ import { type Merged, MergeFailure, type RepoError, type Workplace } from "#/rep
 
 import { briefBreak, instructions, noRoom, notTakenIn, recallBlock, type SessionLimits, type Settle, toOarMcp, withRecall } from "./briefing.ts";
 import { channelRules, restartedContextNote, restartedNote, workplaceRules } from "./prompts.ts";
-import type { Hand, SessionRecords } from "./records.ts";
+import type { Hand, SessionRegistry } from "./registry.ts";
 import type { Delivered, DeliveryInput } from "./signals.ts";
 import type { SessionWatch } from "./watch.ts";
 
@@ -39,7 +39,7 @@ export const reasonText = (e: unknown): string => (e instanceof Error ? e.messag
 /** A turn submitted and not opened yet, counted from since: its slot is taken, as one thinking. */
 const reserved = (since: number): T.Session["phase"] => ({ _tag: "working", since, doing: { action: "thinking", label: "" } });
 
-export const sessionLaunch = (r: SessionRecords, wt: SessionWatch) =>
+export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
   Effect.gen(function* () {
     const core = yield* Core;
     const store = yield* Agent;

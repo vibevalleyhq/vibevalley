@@ -46,16 +46,7 @@ const ItemSchema: Schema.Codec<Item> = Schema.Struct({
   ),
 });
 
-export interface Message {
-  readonly message_id?: string;
-  readonly from_user_id?: string;
-  readonly message_type?: number;
-  readonly context_token?: string;
-  readonly group_id?: string;
-  readonly item_list?: readonly Item[];
-}
-
-const MessageSchema: Schema.Codec<Message> = Schema.Struct({
+const MessageSchema = Schema.Struct({
   message_id: Schema.optionalKey(Schema.String),
   from_user_id: Schema.optionalKey(Schema.String),
   message_type: Schema.optionalKey(Schema.Finite),
@@ -63,17 +54,9 @@ const MessageSchema: Schema.Codec<Message> = Schema.Struct({
   group_id: Schema.optionalKey(Schema.String),
   item_list: Schema.optionalKey(Schema.Array(ItemSchema)),
 });
+export type Message = typeof MessageSchema.Type;
 
-export interface Updates {
-  readonly ret?: number;
-  readonly errcode?: number;
-  readonly errmsg?: string;
-  readonly msgs?: readonly Message[];
-  readonly get_updates_buf?: string;
-  readonly longpolling_timeout_ms?: number;
-}
-
-const UpdatesSchema: Schema.Codec<Updates> = Schema.Struct({
+const UpdatesSchema = Schema.Struct({
   ret: Schema.optionalKey(Schema.Finite),
   errcode: Schema.optionalKey(Schema.Finite),
   errmsg: Schema.optionalKey(Schema.String),
@@ -81,6 +64,7 @@ const UpdatesSchema: Schema.Codec<Updates> = Schema.Struct({
   get_updates_buf: Schema.optionalKey(Schema.String),
   longpolling_timeout_ms: Schema.optionalKey(Schema.Finite),
 });
+export type Updates = typeof UpdatesSchema.Type;
 
 export const decodeUpdates = Schema.decodeUnknownSync(UpdatesSchema);
 

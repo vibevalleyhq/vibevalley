@@ -15,11 +15,11 @@ import { Runtime } from "#/runtime/runtime.ts";
 
 import { type Journal } from "./journal.ts";
 import { reactionTo, phaseFact, type Op, since } from "./reaction.ts";
-import type { Hand, SessionRecords } from "./records.ts";
+import type { Hand, SessionRegistry } from "./registry.ts";
 import { handsToOwner, readReport } from "./report.ts";
 import type { LaunchActivity } from "./signals.ts";
 
-export const sessionWatch = (r: SessionRecords) =>
+export const sessionWatch = (r: SessionRegistry) =>
   Effect.gen(function* () {
     const config = yield* ServerConfig;
     const core = yield* Core;
