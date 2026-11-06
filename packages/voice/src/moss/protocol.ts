@@ -22,18 +22,74 @@ export const MossEventPayloadSchema = Schema.Struct({
   chunk_id: Schema.optionalKey(Schema.String),
   run_id: Schema.optionalKey(Schema.String),
   reason: Schema.optionalKey(Schema.String),
+  call_id: Schema.optionalKey(Schema.String),
+  name: Schema.optionalKey(Schema.String),
+  arguments: Schema.optionalKey(Schema.String),
   error: Schema.optionalKey(Schema.Union([Schema.String, MossErrorObjectSchema])),
 });
 
 export const MossFrameSchema = Schema.fromJsonString(
   Schema.Struct({
     action: Schema.optionalKey(Schema.String),
+    type: Schema.optionalKey(Schema.String),
+    call_id: Schema.optionalKey(Schema.String),
+    name: Schema.optionalKey(Schema.String),
+    arguments: Schema.optionalKey(Schema.String),
     error: Schema.optionalKey(MossErrorObjectSchema),
     data: Schema.optionalKey(MossEventPayloadSchema),
   }),
 );
 
 export const decodeMossFrame = Schema.decodeUnknownOption(MossFrameSchema);
+
+export const MossAskOrchestratorArgsSchema = Schema.fromJsonString(
+  Schema.Struct({
+    question: Schema.optionalKey(Schema.String),
+    text: Schema.optionalKey(Schema.String),
+  }),
+);
+const decodeAskArgs = Schema.decodeUnknownOption(MossAskOrchestratorArgsSchema);
+
+export interface MossToolCall {
+  readonly callId: string;
+  readonly name: string;
+  readonly question: string;
+}
+
+/** Extracts an `ask_orchestrator` tool call from a MOSS / realtime WebSocket JSON frame when present. */
+export function extractMossToolCall(raw: string): MossToolCall | undefined {
+  const decoded = decodeMossFrame(raw);
+  if (decoded._tag === "None") return undefined;
+  const frame = decoded.value;
+  const action = frame.action ?? frame.type ?? "";
+  if (action !== "response.function_call_arguments.done" && action !== "tool.call" && action !== "function_call") return undefined;
+  const name = frame.data?.name ?? frame.name ?? "";
+  if (name !== "ask_orchestrator") return undefined;
+  const callId = frame.data?.call_id ?? frame.call_id ?? "";
+  const rawArgs = frame.data?.arguments ?? frame.arguments ?? "";
+  const parsedArgs = decodeAskArgs(rawArgs);
+  const question =
+    parsedArgs._tag === "Some" ? (parsedArgs.value.question ?? parsedArgs.value.text ?? "").trim() : (frame.data?.text ?? rawArgs).trim();
+  return question ? { callId, name, question } : undefined;
+}
+
+/** Tool definition registered on MOSS / realtime sessions so the voice model delegates farm operations to the Orchestrator. */
+export const mossOrchestratorTool = {
+  type: "function",
+  name: "ask_orchestrator",
+  description:
+    "Ask the farm's orchestrator whenever the owner asks about farm status, issues, helpers, memories, notes, or wants work dispatched.",
+  parameters: {
+    type: "object",
+    properties: {
+      question: {
+        type: "string",
+        description: "The owner's exact request or question for the orchestrator.",
+      },
+    },
+    required: ["question"],
+  },
+} as const;
 
 /** The message of a refusal's JSON body ({ error: { message } }), or the body itself, cut short. */
 export const mossErrorMessage = (body: string): string => {

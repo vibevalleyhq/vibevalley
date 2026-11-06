@@ -20,8 +20,10 @@ export {
 } from "./core.ts";
 export {
   decodeMossFrame,
+  extractMossToolCall,
   heard,
   levelOf,
+  MossAskOrchestratorArgsSchema,
   mossAudioTag,
   mossCaptureWorkletCode,
   MossEngine,
@@ -36,6 +38,7 @@ export {
   mossInRate,
   MossLine,
   type MossMessages,
+  mossOrchestratorTool,
   type MossOutboundAction,
   mossOutRate,
   type MossPhase,
@@ -47,6 +50,7 @@ export {
   mossRelayWorkerCode,
   type MossSetup,
   mossTaggedFrameBytes,
+  type MossToolCall,
   type MossTurn,
   noQos,
   noisyMossActions,

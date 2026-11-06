@@ -55,6 +55,10 @@ export const VoiceAnswerOrchestrator: Codec<T.VoiceAnswerOrchestrator> = Schema.
   vendor: Schema.Literal("orchestrator"),
 });
 
+export const VoiceAnswerMoss: Codec<T.VoiceAnswerMoss> = Schema.Struct({
+  vendor: Schema.Literal("moss"),
+});
+
 export const VoiceAnswerAgoraModel: Codec<T.VoiceAnswerAgoraModel> = Schema.Literals(T.VoiceAnswerAgoraModelValues);
 
 export const VoiceAnswerAgora: Codec<T.VoiceAnswerAgora> = Schema.Struct({
@@ -73,7 +77,13 @@ export const VoiceAnswerOpenai: Codec<T.VoiceAnswerOpenai> = Schema.Struct({
   model: Schema.String,
 });
 
-export const VoiceAnswer: Codec<T.VoiceAnswer> = Schema.Union([VoiceAnswerOrchestrator, VoiceAnswerAgora, VoiceAnswerDeepseek, VoiceAnswerOpenai]);
+export const VoiceAnswer: Codec<T.VoiceAnswer> = Schema.Union([
+  VoiceAnswerOrchestrator,
+  VoiceAnswerMoss,
+  VoiceAnswerAgora,
+  VoiceAnswerDeepseek,
+  VoiceAnswerOpenai,
+]);
 
 export const VoiceTTSMinimaxModel: Codec<T.VoiceTTSMinimaxModel> = Schema.Literals(T.VoiceTTSMinimaxModelValues);
 

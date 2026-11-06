@@ -6,7 +6,8 @@ import type { Socket } from "effect/socket";
 import { t } from "@vibevalley/i18n";
 import { type AgoraGrant, type Dictated, defaultOrchestrator, type Validation, type VoiceCall } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
-import { type MossTransport, relay, verifyMoss } from "@vibevalley/voice/moss-server";
+import { decodeMossFrame, extractMossToolCall, mossOrchestratorTool } from "@vibevalley/voice/moss";
+import { type MossLink, type MossTransport, relay, verifyMoss } from "@vibevalley/voice/moss-server";
 import { mossTranscription, type TranscriptionFailure, transcribeAudio } from "@vibevalley/voice/transcribe";
 
 import { messageOf } from "#/base/errors.ts";
@@ -83,22 +84,32 @@ const mapTranscriptionFailure = (e: TranscriptionFailure): ApiError => {
   }
 };
 
-interface Grant {
-  readonly credentials: AgoraCredentials;
-  expires: number;
-  starting: boolean;
-  agent: string;
-}
+type Grant =
+  | {
+      readonly kind: "agora";
+      readonly credentials: AgoraCredentials;
+      expires: number;
+      starting: boolean;
+      agent: string;
+    }
+  | {
+      readonly kind: "moss";
+      expires: number;
+      starting: boolean;
+      agent: string;
+    };
 
 /** A call's agent session: what it says goes through it, with the session's own ConvoAI token. */
 type CallSession = ReturnType<ReturnType<typeof agentFor>["createSession"]>;
 
 interface Call {
+  readonly kind: "agora" | "moss";
   readonly grant: string;
-  readonly client: AgoraClient;
-  readonly session: CallSession;
+  readonly client?: AgoraClient | undefined;
+  readonly session?: CallSession | undefined;
+  readonly say: (piece: string) => Effect.Effect<void, CallStepFailed>;
   readonly release: () => void;
-  /** Agora's model answers, so its words reach the default channel only through said; the orchestrator's own reach it as it says them. */
+  /** A quick/realtime model answers on its own, so its words reach the default channel through `said` and the owner's reach `heard`. */
   readonly quick: boolean;
   /** Said at every pickup; not worth keeping in the chat. */
   readonly greeting: string;
@@ -114,7 +125,7 @@ export class Voice extends Context.Service<
     /** about: what rang, when the call answers a ring: the orchestrator says it first, in place of the greeting. */
     readonly start: (channel: string, uid: string, about?: string) => Effect.Effect<VoiceCall, ApiError>;
     readonly stop: (agentId: string) => Effect.Effect<void, ApiError>;
-    /** What the owner said on a call: the orchestrator overhears it when Agora's model answers. */
+    /** What the owner said on a call: the orchestrator overhears it when Agora's model or MOSS answers. */
     readonly heard: (agentId: string, text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
     /** The relay without a call id: the one call on. */
     readonly heardCurrent: (text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
@@ -165,16 +176,16 @@ const make = (options: VoiceOptions = {}) =>
     const chat = yield* Channel;
     const ingress = yield* Ingress;
     const response = yield* Orchestrator;
-    // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
     const httpClient = yield* HttpClient.HttpClient;
-    // Fibers started from callbacks belong to this service: they end with it, and sleep on its Clock.
     const forkHere = yield* FiberSet.makeRuntime();
     const runHere: Run = yield* FiberSet.makeRuntimePromise();
     const now = () => clock.currentTimeMillisUnsafe();
 
     const grants = new Map<string, Grant>();
     const calls = new Map<string, Call>();
+    let activeMoss: { readonly link: MossLink; readonly sendToPage: (frame: string) => void } | undefined;
+    const pendingMossSpeaks: string[] = [];
     let stopped = false;
     const keyOf = (channel: string, uid: string) => channel + "\u0000" + uid;
 
@@ -189,12 +200,19 @@ const make = (options: VoiceOptions = {}) =>
       return c ? Effect.succeed(c) : Effect.fail(unavailable(t("server.voice.noAgora"), "call"));
     };
 
+    const deliverMossPiece = (piece: string, target: { readonly link: MossLink; readonly sendToPage: (frame: string) => void }) => {
+      target.link.send(JSON.stringify({ action: "input.text", data: { text: piece } }));
+      target.sendToPage(JSON.stringify({ action: "output.transcript.done", data: { turn_id: `brief-${now()}`, text: piece } }));
+    };
+
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         stopped = true;
         for (const call of calls.values()) call.life.abort();
         calls.clear();
         grants.clear();
+        pendingMossSpeaks.length = 0;
+        activeMoss = undefined;
       }),
     );
 
@@ -220,13 +238,9 @@ const make = (options: VoiceOptions = {}) =>
       function* (agentId: string, text: string) {
         const call = calls.get(agentId);
         if (!call || call.ending) return false;
-        // Through the session: a bare agents.speak carries no token, and Agora answers 401.
         for (const piece of speakPieces(text)) {
           if (stopped || call.ending || calls.get(agentId) !== call) return false;
-          yield* Effect.tryPromise({
-            try: () => call.session.say(piece, { priority: "APPEND", interruptable: true }),
-            catch: callStepFailed,
-          });
+          yield* call.say(piece);
         }
         return true;
       },
@@ -241,9 +255,6 @@ const make = (options: VoiceOptions = {}) =>
         ),
     );
 
-    // What is to be told on the call waits in one queue, read by one fiber, so that it never crowds itself: a round gathers
-    // for gatherMs, then asks one answer of everything that waited. A round ends when nothing more waits, the call ends or
-    // three answers in a row are empty; what still waits then is dropped.
     const gatherMs = options.gatherMs ?? 3000;
     const told = yield* Queue.unbounded<Told>();
     const round = Effect.gen(function* () {
@@ -255,7 +266,6 @@ const make = (options: VoiceOptions = {}) =>
         const call = on ? calls.get(on) : undefined;
         if (!on || !call || stopped) break;
         const { texts, ring } = mergedTold(pending);
-        // The call ending ends the wait for the brief (not the orchestrator's run).
         const said = yield* response.brief(onCallLine(texts, ring)).pipe(
           Effect.mapError(callStepFailed),
           Effect.raceFirst(Effect.as(aborted(call.life.signal), undefined)),
@@ -278,8 +288,6 @@ const make = (options: VoiceOptions = {}) =>
       if (!stopped && (texts.length > 0 || ring)) Queue.offerUnsafe(told, { texts, ring });
     };
 
-    // What came into the inbox: with a call on, the orchestrator says it on the call; with none, the page's phone rings
-    // with the same items.
     yield* Effect.forkScoped(
       Stream.runForEach(yield* inbox.news, (items) =>
         Effect.sync(() => {
@@ -290,16 +298,28 @@ const make = (options: VoiceOptions = {}) =>
 
     const heard = Effect.fn("Voice.heard")(function* (agentId: string, text: string, picked: string, sendKey: string) {
       const call = yield* callOf(agentId);
-      // Both transcript directions use the answer mode captured by this call, never the current settings.
       if (!call.quick) return;
       yield* ingress.owner({ source: "voice", text, envelope: sendKey, ...(picked ? { picked: { agent: picked } } : {}) });
     });
 
     return Voice.of({
       session: Effect.fn("Voice.session")(function* () {
-        const c = yield* creds();
+        const currentVoice = settings.voice();
         const channel = newChannel(yield* Clock.currentTimeMillis);
         const uid = newUid();
+        if (currentVoice.answer.vendor === "moss") {
+          if (settings.mossKey() === "") return yield* Effect.fail(unavailable(t("server.voice.moss.noKey"), "moss"));
+          if (stopped) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
+          prune();
+          grants.set(keyOf(channel, uid), {
+            kind: "moss",
+            expires: now() + tokenSeconds * 1000,
+            starting: false,
+            agent: "",
+          });
+          return { appId: "moss", channel, uid, token: "moss" };
+        }
+        const c = yield* creds();
         const issued = yield* Effect.try({
           try: () => sign(c, channel, uid),
           catch: (e) => unavailable(t("server.voice.noToken", { why: messageOf(e) })),
@@ -307,6 +327,7 @@ const make = (options: VoiceOptions = {}) =>
         if (stopped) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
         prune();
         grants.set(keyOf(channel, uid), {
+          kind: "agora",
           credentials: c,
           expires: now() + tokenSeconds * 1000,
           starting: false,
@@ -318,6 +339,10 @@ const make = (options: VoiceOptions = {}) =>
         prune();
         const g = grants.get(keyOf(channel, uid));
         if (!g) return yield* Effect.fail(unavailable(t("server.voice.grantGone")));
+        if (g.kind === "moss") {
+          g.expires = now() + tokenSeconds * 1000;
+          return { appId: "moss", channel, uid, token: "moss" };
+        }
         const issued = yield* Effect.try({
           try: () => sign(g.credentials, channel, uid),
           catch: (e) => unavailable(t("server.voice.noToken", { why: messageOf(e) })),
@@ -331,6 +356,41 @@ const make = (options: VoiceOptions = {}) =>
         const g = grants.get(key);
         if (!g) return yield* Effect.fail(unavailable(t("server.voice.grantGone")));
         if (g.starting || g.agent) return yield* Effect.fail(unavailable(t("server.voice.connecting")));
+        if (g.kind === "moss") {
+          if (settings.mossKey() === "") return yield* Effect.fail(unavailable(t("server.voice.moss.noKey"), "moss"));
+          if (stopped) return yield* Effect.fail(unavailable(t("server.voice.stopped")));
+          const voice = settings.voice();
+          const id = `moss-${channel}`;
+          g.agent = id;
+          g.starting = false;
+          calls.set(id, {
+            kind: "moss",
+            grant: key,
+            say: (piece) =>
+              Effect.gen(function* () {
+                if (activeMoss) deliverMossPiece(piece, activeMoss);
+                else pendingMossSpeaks.push(piece);
+                yield* Effect.ignore(chat.spoken(defaultOrchestrator, piece, ""), {
+                  log: "Warn",
+                  message: "vibevalley: voice: the orchestrator's spoken words were not kept",
+                });
+              }),
+            release: () => {
+              pendingMossSpeaks.length = 0;
+              activeMoss?.link.close();
+              activeMoss = undefined;
+            },
+            quick: true,
+            greeting: (about ? "" : voice.greeting).trim(),
+            // @effect-diagnostics-next-line abortControllerInEffect:off
+            life: new AbortController(),
+            ending: false,
+          });
+          if (about) tell([], about);
+          yield* core.did({ kind: "talked" });
+          return { agentId: id };
+        }
+
         g.starting = true;
         let release = () => {};
         let callLine: CallLine | undefined;
@@ -341,7 +401,6 @@ const make = (options: VoiceOptions = {}) =>
         const started = Effect.gen(function* () {
           const { voice, keys: vendorKeys, deepseekApiKey } = settings.voiceConfig();
           if (voice.answer.vendor === "orchestrator") {
-            // Opened on the service's fibers: a start given up on still closes a line that opens late.
             const opening = forkHere(voiceLine.open);
             openingLine = opening;
             callLine = yield* Fiber.join(opening).pipe(Effect.mapError((e) => unavailable(t("server.voice.lineFailed", { why: e.message }))));
@@ -353,7 +412,6 @@ const make = (options: VoiceOptions = {}) =>
               voiceLine.close(opened.id);
             };
           }
-          // Answering a ring, the orchestrator's first words are what rang: no greeting before them.
           const forCall = about ? { ...voice, greeting: "" } : voice;
           const vendors = vendorsFor(forCall, vendorKeys, deepseekApiKey, callLine);
           if ("_tag" in vendors) return yield* Effect.fail(vendors);
@@ -376,13 +434,18 @@ const make = (options: VoiceOptions = {}) =>
           g.agent = id;
           g.starting = false;
           calls.set(id, {
+            kind: "agora",
             grant: key,
             client: agora,
             session,
+            say: (piece) =>
+              Effect.tryPromise({
+                try: () => session.say(piece, { priority: "APPEND", interruptable: true }),
+                catch: callStepFailed,
+              }),
             release,
             quick: callLine === undefined,
             greeting: forCall.greeting.trim(),
-            // The call's life spans its fibers (the answer it waits on, the words it reads out): ended when the call ends.
             // @effect-diagnostics-next-line abortControllerInEffect:off
             life: new AbortController(),
             ending: false,
@@ -401,7 +464,6 @@ const make = (options: VoiceOptions = {}) =>
               if (opening && !callLine) forkHere(Effect.ignore(Effect.map(Fiber.join(opening), (opened) => voiceLine.close(opened.id)), { log: "Debug" }));
               const pending = starting;
               const agora = client;
-              // An agent that joins after its start was given up on is stopped; one that never joined has nothing to stop.
               if (pending && agora)
                 forkHere(
                   Effect.tryPromise({ try: () => pending, catch: callStepFailed }).pipe(
@@ -421,11 +483,19 @@ const make = (options: VoiceOptions = {}) =>
         yield* core.did({ kind: "talked" });
         return agent;
       }),
-      // A call keeps the client it started with, even when settings change before hangup.
       stop: Effect.fn("Voice.stop")(function* (agentId) {
         const call = calls.get(agentId);
+        if (call?.kind === "moss") {
+          grants.delete(call.grant);
+          call.ending = true;
+          call.life.abort();
+          call.release();
+          calls.delete(agentId);
+          return;
+        }
+        if (!call && agentId.startsWith("moss-")) return;
         let client: AgoraClient;
-        if (call) {
+        if (call && call.client) {
           grants.delete(call.grant);
           call.ending = true;
           call.life.abort();
@@ -449,7 +519,6 @@ const make = (options: VoiceOptions = {}) =>
         if (!only) return yield* Effect.fail(failed(t("server.voice.noCall")));
         return yield* heard(only[0], text, picked, sendKey);
       }),
-      // Only a call still on, that Agora's model answers: a late turn after hangup, or the orchestrator's words, are not kept twice.
       said: Effect.fn("Voice.said")(function* (agentId, text) {
         const call = yield* callOf(agentId);
         if (call.quick && text.trim() !== call.greeting)
@@ -477,7 +546,60 @@ const make = (options: VoiceOptions = {}) =>
       }),
       mossProblem: () => (settings.mossKey() === "" ? t("server.voice.moss.noKey") : undefined),
       mossLine: Effect.fn("Voice.mossLine")(function* (page) {
-        return yield* relay(page, settings.mossKey(), options.moss);
+        return yield* relay(page, settings.mossKey(), options.moss, {
+          onOpen: (link, sendToPage) => {
+            const target = { link, sendToPage };
+            activeMoss = target;
+            for (const piece of pendingMossSpeaks.splice(0)) deliverMossPiece(piece, target);
+            return () => {
+              if (activeMoss === target) activeMoss = undefined;
+            };
+          },
+          onPageText: (data) => {
+            const decoded = decodeMossFrame(data);
+            if (decoded._tag === "None" || decoded.value.action !== "session.update") return data;
+            // When a farm call is on (or will be), attach the farm's persona and the ask_orchestrator tool.
+            const v = settings.voice();
+            if (v.answer.vendor !== "moss" && ![...calls.values()].some((c) => c.kind === "moss" && !c.ending)) return data;
+            return JSON.stringify({
+              action: "session.update",
+              session: {
+                persona: { prompt: v.persona },
+                instructions: v.greeting ? `开场先简短问候：「${v.greeting}」。涉及农场现状、工单、帮工或派活时调用 ask_orchestrator。` : "涉及农场现状、工单、帮工或派活时调用 ask_orchestrator。",
+                tools: [mossOrchestratorTool],
+              },
+            });
+          },
+          onMossText: (data, link, sendToPage) => {
+            const toolCall = extractMossToolCall(data);
+            if (!toolCall) return;
+            forkHere(
+              response.brief(toolCall.question).pipe(
+                Effect.tap((answer) =>
+                  Effect.sync(() => {
+                    if (!answer) return;
+                    link.send(
+                      JSON.stringify({
+                        action: "tool.output",
+                        data: { call_id: toolCall.callId, output: answer },
+                      }),
+                    );
+                    sendToPage(
+                      JSON.stringify({
+                        action: "output.transcript.done",
+                        data: { turn_id: toolCall.callId || `tool-${now()}`, text: answer },
+                      }),
+                    );
+                  }),
+                ),
+                Effect.andThen((answer) =>
+                  answer ? chat.spoken(defaultOrchestrator, answer, "") : Effect.void,
+                ),
+                Effect.ignore({ log: "Warn", message: "vibevalley: voice: ask_orchestrator tool call on MOSS line failed" }),
+              ),
+            );
+          },
+        });
       }),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const d = settings.dictation();

@@ -50,6 +50,7 @@ export const asrLabel: Record<VoiceASR["vendor"], string> = {
 };
 export const answerLabel: Record<VoiceAnswer["vendor"], string> = {
   orchestrator: t("web.base.orchestrator"),
+  moss: "MOSS Live",
   agora: t("web.voice.choices.answer.agora"),
   deepseek: "DeepSeek",
   openai: t("web.voice.choices.answer.openai"),
@@ -68,6 +69,7 @@ export const asrStart: Record<VoiceASR["vendor"], VoiceASR> = {
 };
 export const answerStart: Record<VoiceAnswer["vendor"], VoiceAnswer> = {
   orchestrator: { vendor: "orchestrator" },
+  moss: { vendor: "moss" },
   agora: { vendor: "agora", model: "gpt-4.1-mini" },
   deepseek: { vendor: "deepseek", model: "deepseek-chat" },
   openai: { vendor: "openai", url: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini" },

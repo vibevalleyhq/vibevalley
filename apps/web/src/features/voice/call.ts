@@ -3,6 +3,7 @@ import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
 import type { Rtc, RtcLine } from "@vibevalley/protocol/host";
 import { type VoiceDriver, type VoicePhase, type VoiceTurn, voiceTurnsOfCaptions } from "@vibevalley/voice";
+import { MossLine } from "@vibevalley/voice/moss";
 
 import { messageOf } from "#/base/format.ts";
 import { api, reasonOf } from "#/infra/api.ts";
@@ -10,6 +11,93 @@ import { currentHost } from "#/infra/host.ts";
 import { prefsNow } from "#/state/prefs.ts";
 
 import { LiveCaptions } from "./captions";
+
+// A call's line on MOSS Live over local WebSocket (/api/v1/voice/moss/line): needs no Agora credentials or tunnel.
+const mossRtc: Rtc = async (_grant, on) => {
+  const moss = new MossLine({
+    closed: () => t("web.voice.moss.closed"),
+    noMic: () => t("web.voice.call.noMic"),
+    formatError: messageOf,
+  });
+  let connected = false;
+  let gone = false;
+  let lastMic = 0;
+  let lastMoss = 0;
+  let lastState = "";
+  let nextTurnId = 1;
+  const turnIds = new Map<number, number>();
+  const sentTurns = new Map<number, { text: string; done: boolean }>();
+
+  return new Promise<RtcLine>((resolve, reject) => {
+    const off = moss.subscribe(() => {
+      if (gone) return;
+      if (moss.micLevel !== lastMic || moss.mossLevel !== lastMoss) {
+        lastMic = moss.micLevel;
+        lastMoss = moss.mossLevel;
+        on.levels(lastMic, lastMoss);
+      }
+      const nextState = moss.mossLevel > 0 ? "speaking" : "listening";
+      if (connected && nextState !== lastState) {
+        lastState = nextState;
+        on.stream(JSON.stringify({ object: "message.state", state: nextState }));
+      }
+      moss.turns.forEach((turn, idx) => {
+        let turnId = turnIds.get(idx);
+        if (turnId === undefined) {
+          turnId = nextTurnId++;
+          turnIds.set(idx, turnId);
+        }
+        const prev = sentTurns.get(idx);
+        if (prev && prev.text === turn.text && prev.done === turn.done) return;
+        sentTurns.set(idx, { text: turn.text, done: turn.done });
+        if (turn.who === "owner") {
+          on.stream(
+            JSON.stringify({
+              object: "user.transcription",
+              turn_id: turnId,
+              text: turn.text,
+              final: turn.done,
+            }),
+          );
+        } else {
+          on.stream(
+            JSON.stringify({
+              object: "assistant.transcription",
+              turn_id: turnId,
+              text: turn.text,
+              turn_status: turn.done ? 1 : 0,
+            }),
+          );
+        }
+      });
+
+      if (!connected && moss.phase === "live") {
+        connected = true;
+        on.joined();
+        resolve({
+          mute: async (muted) => {
+            moss.mute(muted);
+          },
+          renew: async () => {},
+          leave: async () => {
+            gone = true;
+            off();
+            moss.end();
+          },
+        });
+      } else if (moss.phase === "idle") {
+        off();
+        if (!connected) {
+          reject(new Error(moss.problem || t("web.voice.moss.closed")));
+        } else if (!gone) {
+          if (moss.problem) on.problem(moss.problem);
+          on.left();
+        }
+      }
+    });
+    void moss.start({ persona: "", instructions: "" });
+  });
+};
 
 // A call's line on Agora's Web SDK, loaded when a call starts: the page's own, where the host carries none (the desktop, a browser).
 const webRtc: Rtc = async (grant, on) => {
@@ -178,8 +266,9 @@ export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orc
       const session = await until(api.voice.grant.create());
       let line: RtcLine | undefined;
       const mine = () => !cancelled && this.line === line;
+      const transport = session.appId === "moss" ? mossRtc : (currentHost().rtc ?? webRtc);
       line = await until(
-        (currentHost().rtc ?? webRtc)(session, {
+        transport(session, {
           joined: () => mine() && ((this.agentHere = true), this.changed()),
           left: () => mine() && ((this.agentHere = false), this.changed()),
           stream: (text) => mine() && this.captions.feed(text) && this.changed(),
@@ -212,6 +301,7 @@ export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orc
         }),
       );
       this.line = line;
+      if (session.appId === "moss") this.agentHere = true;
       const agent = await until(
         api.voice.call.start({ channel: session.channel, uid: session.uid, ...(about ? { about } : {}) }).then(async (a) => {
           if (cancelled) {

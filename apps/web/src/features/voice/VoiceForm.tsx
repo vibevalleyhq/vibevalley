@@ -181,17 +181,22 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
 
   const asr = () => draft().asr;
   const answer = () => draft().answer;
-  const credentialsReady = () => base().agoraAppId.source !== undefined && base().agoraAppCertificate.source !== undefined;
+  const credentialsReady = () =>
+    answer().vendor === "moss"
+      ? base().mossKey.source !== undefined
+      : base().agoraAppId.source !== undefined && base().agoraAppCertificate.source !== undefined;
   const answerHint = () =>
     answer().vendor === "orchestrator"
       ? t("web.voice.voice.answer.orchestrator")
-      : answer().vendor === "agora"
-        ? t("web.voice.voice.answer.agora")
-        : answer().vendor === "deepseek"
-          ? base().deepseekApiKey.source
-            ? t("web.voice.voice.answer.deepseek", { from: keyFrom[base().deepseekApiKey.source] })
-            : t("web.voice.voice.answer.noDeepseek")
-          : t("web.voice.voice.answer.openai");
+      : answer().vendor === "moss"
+        ? t("web.voice.voice.answer.moss")
+        : answer().vendor === "agora"
+          ? t("web.voice.voice.answer.agora")
+          : answer().vendor === "deepseek"
+            ? base().deepseekApiKey.source
+              ? t("web.voice.voice.answer.deepseek", { from: keyFrom[base().deepseekApiKey.source] })
+              : t("web.voice.voice.answer.noDeepseek")
+            : t("web.voice.voice.answer.openai");
 
   return (
     <Show
@@ -314,10 +319,20 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     label={t("web.voice.voice.who")}
                     testid="voice-answer"
                     value={answer().vendor}
-                    options={options(["orchestrator", "agora", "deepseek", "openai"] as const, answerLabel)}
+                    options={options(["orchestrator", "moss", "agora", "deepseek", "openai"] as const, answerLabel)}
                     onChange={(v) => set({ ...draft(), answer: v === answer().vendor ? answer() : answerStart[v] })}
                   />
                 </Labeled>
+                <Show when={variant(answer(), "vendor", "moss")}>
+                  {() => (
+                    <Cols>
+                      {secret("mossKey", "MOSS API Key", () => base().mossKey, {
+                        href: "https://platform.mosi.cn/",
+                        label: t("web.voice.voice.moss.console"),
+                      })}
+                    </Cols>
+                  )}
+                </Show>
                 <Show when={variant(answer(), "vendor", "agora")}>
                   {(a) => (
                     <Labeled label={t("web.voice.voice.model")}>

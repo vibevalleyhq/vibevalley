@@ -114,6 +114,7 @@ export function buildVendors(
     const answer = voice.answer;
     switch (answer.vendor) {
       case "orchestrator":
+      case "moss":
         if (!line) return unavailable(messages.noLine());
         llm = new OpenAI({ apiKey: line.key, url: line.url, model: orchestratorModel, ...speech });
         break;

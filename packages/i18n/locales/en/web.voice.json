@@ -8,6 +8,7 @@
     "saved": "Saved: the next call uses it.",
     "answer": {
       "orchestrator": "The channel's manager itself takes the call: it sees how things are, sends work itself, and remembers what you said. Agora reaches one endpoint on this computer through a public address (voice.line.url in the configuration, such as Tailscale Funnel; cloudflared opened for the call when unset); only that endpoint is exposed, with a key per call.",
+      "moss": "MOSS Live takes the call directly over a local WebSocket with your MOSS key — no Agora credentials or tunnel needed — and hands farm work to the manager.",
       "agora": "A model hosted by Agora, no other key needed.",
       "deepseek": "Uses the DeepSeek key in the settings ({from}).",
       "noDeepseek": "Uses the DeepSeek key in the settings, which is not there yet: fill it in under Settings.",

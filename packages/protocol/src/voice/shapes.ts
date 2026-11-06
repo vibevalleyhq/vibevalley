@@ -1,7 +1,7 @@
 import type { KeySource } from "../common/shapes";
 
 /** The Settings section a call's problem is fixed in (VoiceUnavailable.settings): its address under /settings. */
-export const VoiceFixValues = ["models", "call", "dictation"] as const;
+export const VoiceFixValues = ["models", "call", "moss", "dictation"] as const;
 export type VoiceFix = (typeof VoiceFixValues)[number];
 
 /** A page's line to MOSS Live: a WebSocket the server relays to wss://api.mosi.cn/v1/realtime with the saved key. */
@@ -103,10 +103,14 @@ export interface VoiceASRMicrosoft {
 }
 
 /** Told apart by `vendor`. */
-export type VoiceAnswer = VoiceAnswerOrchestrator | VoiceAnswerAgora | VoiceAnswerDeepseek | VoiceAnswerOpenai;
+export type VoiceAnswer = VoiceAnswerOrchestrator | VoiceAnswerMoss | VoiceAnswerAgora | VoiceAnswerDeepseek | VoiceAnswerOpenai;
 
 export interface VoiceAnswerOrchestrator {
   vendor: "orchestrator";
+}
+
+export interface VoiceAnswerMoss {
+  vendor: "moss";
 }
 
 export const VoiceAnswerAgoraModelValues = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-5-nano", "gpt-5-mini"] as const;
