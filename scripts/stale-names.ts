@@ -312,7 +312,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a service method repeating its service, or the startup config as Settings",
     pattern:
-      /\b(saveAgent|createAgent|deleteAgent|previewDeleteAgent|deleteSkill|previewDeleteSkill|deleteTemplate|previewDeleteTemplate|forgetOf|previewForgetOf)\b|yield\* (Settings|Config)\b/u,
+      /\b(saveAgent|createAgent|deleteAgent|previewDeleteAgent|deleteSkill|previewDeleteSkill|deleteTemplate|previewDeleteTemplate|forgetOf|previewForgetOf)\b|yield\* (?:Settings\b|Config\b(?!\s*\.))/u,
     says: "agents.save, create, remove, previewRemove, removeSkill, removeTemplate; memories.forget, previewForget; the startup config is the ServerConfig service (yield* ServerConfig)",
   },
   {
@@ -399,11 +399,9 @@ function placeOf(ns: string): string {
     : `apps/${host}/src/${[...parts, "words.ts"].join("/")}`;
 }
 
-const catalogs = globSync("packages/i18n/locales/*/*.json", { cwd: root }).toSorted();
-const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{ts,tsx}`, { cwd: root })).toSorted();
-const hits: string[] = [];
-for (const source of [...files, ...catalogs]) {
-  const lines = readFileSync(resolve(root, source), "utf8").split("\n");
+export function staleNamesIn(source: string, text: string): string[] {
+  const hits: string[] = [];
+  const lines = text.split("\n");
   const file = source.startsWith("packages/i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
@@ -413,7 +411,14 @@ for (const source of [...files, ...catalogs]) {
       if (rule.pattern.test(line)) hits.push(`${source}:${i + 1}: ${rule.name} — ${rule.says}`);
     }
   }
+  return hits;
 }
-for (const hit of hits) console.error(`stale names: ${hit}`);
-if (hits.length > 0) process.exit(1);
-console.log(`stale names: ${files.length} files and ${catalogs.length} catalogs ok`);
+
+if (import.meta.main) {
+  const catalogs = globSync("packages/i18n/locales/*/*.json", { cwd: root }).toSorted();
+  const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{ts,tsx}`, { cwd: root })).toSorted();
+  const hits = [...files, ...catalogs].flatMap((source) => staleNamesIn(source, readFileSync(resolve(root, source), "utf8")));
+  for (const hit of hits) console.error(`stale names: ${hit}`);
+  if (hits.length > 0) process.exit(1);
+  console.log(`stale names: ${files.length} files and ${catalogs.length} catalogs ok`);
+}
