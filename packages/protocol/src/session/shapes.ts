@@ -38,6 +38,14 @@ export interface LastRun {
   answer?: IssueAnswer;
 }
 
+export const ToolConnectionStatusValues = ["unknown", "starting", "ready", "failed", "cancelled"] as const;
+
+export interface ToolConnection {
+  server: string;
+  status: (typeof ToolConnectionStatusValues)[number];
+  reason?: string;
+}
+
 export interface Session {
   id: SessionId;
   role: AgentRole;
@@ -56,6 +64,7 @@ export interface Session {
   channel?: string;
   issue?: IssueId;
   refining: boolean;
+  toolConnections?: ToolConnection[];
 }
 
 /** reduce never sees these: the words are the frame's (projection/frame.ts). */
@@ -105,6 +114,7 @@ export interface SessionEvent {
   output?: string;
   ok?: boolean;
   tokens?: EventTokens;
+  connection?: ToolConnection;
 }
 
 export interface EventTokens {
@@ -198,4 +208,17 @@ export interface FactSessionLeft {
   id: SessionId;
   closed?: SessionClose;
   merged?: number;
+}
+
+export interface FactSessionToolChanged {
+  type: "sessionToolChanged";
+  at: number;
+  id: SessionId;
+  connection: ToolConnection;
+}
+
+export interface FactSessionToolsReset {
+  type: "sessionToolsReset";
+  at: number;
+  id: SessionId;
 }

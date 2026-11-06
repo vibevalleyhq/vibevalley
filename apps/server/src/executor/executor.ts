@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { ControlOutcome, Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { applyTaskEvent, initialStatus, initialTasks, observeSessionView, reduceStatus, stallOf, type TaskMap } from "@botiverse/oar/observe";
-import { Clock, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Option, Schema } from "effect";
+import { Clock, Config as Keys, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Option, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -11,6 +11,7 @@ import { maxRunning } from "@vibevalley/protocol";
 
 import { type ApiError, messageOf, reasonOf, refused } from "#/base/errors.ts";
 import { reposDir, ServerConfig } from "#/infra/config.ts";
+import { loopbackEnvironment, observeToolConnections } from "#/runtime/access.ts";
 import { probeInstallation, Runtime } from "#/runtime/runtime.ts";
 
 type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "repo" | "issue" | "channel">;
@@ -35,6 +36,7 @@ interface StartExecution {
 }
 
 interface ExecutionObserver {
+  readonly connection: (connection: T.ToolConnection) => void;
   readonly event: (event: Event) => void;
   readonly input: (input: ExecutionInput) => void;
   readonly report: (report: SubagentReport) => void;
@@ -60,6 +62,7 @@ interface Allocation extends Omit<Execution, "pendingTasks"> {
   tasks: TaskMap;
   readonly subagents: Subagents;
   readonly resources: Set<RuntimeSession>;
+  readonly servers: readonly string[];
   agent?: Subagent;
   sessionId: string;
   attached: boolean;
@@ -144,6 +147,10 @@ export class Executor extends Context.Service<
 
 const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
+  const inherited = {
+    NO_PROXY: yield* Keys.String("NO_PROXY").pipe(Keys.withDefault("")),
+    no_proxy: yield* Keys.String("no_proxy").pipe(Keys.withDefault("")),
+  };
   const runtimes = yield* Runtime;
   const clock = yield* Clock.Clock;
   const forkHere = yield* FiberSet.makeRuntime();
@@ -257,12 +264,18 @@ const make = Effect.gen(function* () {
         ...base,
         installation: () => (r.installation ? Promise.resolve(r.installation) : probeInstallation(base, r.binPath)),
         session: (installation, opts) =>
-          base.session(installation, { ...opts, ...options }).then((session) => {
-            let disposing: Promise<void> | undefined;
-            const tracked: RuntimeSession = { ...session, dispose: () => (disposing ??= Promise.resolve().then(() => session.dispose())) };
-            resources.add(tracked);
-            return tracked;
-          }),
+          base
+            .session(installation, {
+              ...opts,
+              ...options,
+              env: loopbackEnvironment({ ...opts.env, ...options.env }, inherited, base.refusedSessionOptions?.env),
+            })
+            .then((session) => {
+              let disposing: Promise<void> | undefined;
+              const tracked: RuntimeSession = { ...session, dispose: () => (disposing ??= Promise.resolve().then(() => session.dispose())) };
+              resources.add(tracked);
+              return tracked;
+            }),
       };
       const subagents = createSubagents({
         runtimes: { get: (rid) => (rid === base.id ? mine : undefined) },
@@ -283,6 +296,7 @@ const make = Effect.gen(function* () {
         },
         subagents,
         resources,
+        servers: [...new Set(options.mcpServers?.map((server) => server.name) ?? [])],
         sessionId: "",
         attached: false,
         detached: false,
@@ -376,6 +390,9 @@ const make = Effect.gen(function* () {
         { cursor: { sessionId: session.id, afterSeq: -1 } },
       );
       const inputStates = new Map<string, ExecutionInput["kind"]>();
+      const stopConnections = observeToolConnections(session, allocation.owner.runtime, allocation.servers, (connection) => {
+        if (!allocation.detached) observer.connection(connection);
+      });
       const stopInputs = observeSessionView(session, (view) => {
         if (allocation.detached) return;
         const placed = new Set(
@@ -414,6 +431,7 @@ const make = Effect.gen(function* () {
       );
       allocation.stop = () => {
         stopEvents();
+        stopConnections();
         stopInputs();
         stopReports();
         stopStalls();

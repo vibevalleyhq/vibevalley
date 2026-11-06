@@ -195,9 +195,14 @@ export const sessionWatch = (r: SessionRegistry) =>
       h.spoke = false;
       if (s.sessionId) h.oarSessionId = s.sessionId;
       h.tracking = omitUndefined({ ...h.tracking, oarTokens: undefined });
+      apply({ type: "sessionToolsReset", id: h.id });
       const completedBefore = core.session(h.id)?.runs ?? 0;
       executor.observe(h.id, {
         event: watch(h, launch, runtime),
+        connection: (connection) => {
+          h.journal.connection(connection);
+          apply({ type: "sessionToolChanged", id: h.id, connection });
+        },
         input: (input) => inputChanged(h, input),
         report: (report) => applyReport(h, report, completedBefore),
         tasksChanged: (pending) => {

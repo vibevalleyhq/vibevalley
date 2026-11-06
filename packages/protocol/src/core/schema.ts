@@ -8,7 +8,16 @@ import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, Sessi
 import { InboxItem } from "../inbox/schema";
 import { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/schema";
 import { RuntimeInfo } from "../runtime/schema";
-import { FactSessionChanged, FactSessionLeft, FactSessionPhaseChanged, Session, SessionEvent, SessionView } from "../session/schema";
+import {
+  FactSessionToolChanged,
+  FactSessionToolsReset,
+  FactSessionChanged,
+  FactSessionLeft,
+  FactSessionPhaseChanged,
+  Session,
+  SessionEvent,
+  SessionView,
+} from "../session/schema";
 import * as T from "../shapes";
 import { CallState, FactCallChanged } from "../voice/schema";
 
@@ -52,6 +61,8 @@ export const Health: Codec<T.Health> = Schema.Struct({
 
 export const Fact: Codec<T.Fact> = Schema.Union([
   FactCallChanged,
+  FactSessionToolChanged,
+  FactSessionToolsReset,
   FactSessionPhaseChanged,
   FactMessageChanged,
   FactChannelChanged,
@@ -96,6 +107,8 @@ export const ServerEventRuntime: Codec<T.ServerEventRuntime> = Schema.Struct({
 
 export const ServerEvent: Codec<T.ServerEvent> = Schema.Union([
   FactCallChanged,
+  FactSessionToolChanged,
+  FactSessionToolsReset,
   FactSessionPhaseChanged,
   FactMessageChanged,
   FactChannelChanged,
