@@ -7,7 +7,7 @@ import { clip } from "#/base/clip.ts";
 
 import { patrolBrief, patrolWho } from "./prompts.ts";
 
-/** channel undefined: the general channel; since undefined: from when the reader first saw it. brief is for the orchestrator, {ago} filled with how long it has waited. */
+/** channel undefined: the general channel. since undefined: from when the reader first saw it. */
 export interface InboxEntry {
   readonly item: T.InboxItem;
   readonly channel?: string;
@@ -173,8 +173,7 @@ type Want =
   | { readonly kind: "review" | "fix" | "interrupted" | "conflict" }
   | { readonly kind: "quiet"; readonly since: number };
 
-/** What a session questions of the owner. Its issue's stage says it, the one the issue page and the phone both read; a
- * session whose issue the state does not hold says it by its phase. */
+/** What a session questions of the owner. Its issue's stage says it, the one the issue page and the phone both read. */
 function wantOf(h: T.Session, state: T.WorkspaceState): Want | undefined {
   const issue = h.issue === undefined ? undefined : state.issues.find((item) => item.id === h.issue && latestSessionIdOf(item) === h.id);
   if (!issue) {

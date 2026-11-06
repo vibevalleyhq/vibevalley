@@ -1,7 +1,3 @@
-// What the projects hand to the modules that use them (a workplace, what a merge did or why it did not) and the rules
-// read off a project's files: shapes, errors and pure functions only, so a rule elsewhere can name them without the git
-// and processes behind project.ts.
-
 import { Option, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -64,8 +60,7 @@ export class ProjectError extends Schema.TaggedError<ProjectError, { readonly br
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-/** Where, in a worktree's git directory (git rev-parse --git-path), its helper leaves the pull request's title and body:
- * outside the tree, so it is never committed. */
+/** Where, in a worktree's git directory (git rev-parse --git-path), its helper leaves the pull request's title and body. */
 export const pullRequestFile = "vibevalley-pr.md";
 
 /** The title and body a helper wrote: the first line (a leading # dropped) and what follows it; undefined when it gave

@@ -1,6 +1,3 @@
-// The command line run in a test: in the process, with a Stdio of its own and no environment, pointed at a whole farm
-// (@vibevalley/server/testing).
-
 import { NodeServices } from "@effect/platform-node";
 import { ConfigProvider, Effect, Layer, Option, Schema, Sink, Stdio, Stream } from "effect";
 import { TerminalCapabilities } from "effect/cli";

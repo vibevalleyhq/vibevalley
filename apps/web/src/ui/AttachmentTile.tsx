@@ -17,10 +17,7 @@ const kindIcon: Record<FileKind, IconName> = { image: "file", video: "play", aud
 export const sizeText = (bytes: number) =>
   bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-/**
- * A file as a tile (docs/style/design.md, 附件): a picture's thumbnail or the icon of its kind, its name and its size.
- * onRemove: a file not sent yet, which the owner may take back.
- */
+/** A file as a tile (docs/style/design.md): a picture's thumbnail or the icon of its kind, its name and its size. */
 export function AttachmentTile(props: { file: Attachment; onRemove?: (() => void) | undefined; testid?: string }) {
   const kind = () => fileKind(props.file.type);
   return (

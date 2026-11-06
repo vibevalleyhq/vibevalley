@@ -1,6 +1,3 @@
-// A Chinese name is also found by its pinyin, whole or by initials or both (guanjia, gj, guanj → 管家; both readings
-// of a character, cq and zq → 重庆). The dictionary is large, so it loads after the page opens; until it has, only the
-// characters themselves match.
 let spell: ((text: string, query: string) => boolean) | undefined;
 
 /** Settles once pinyin matches too (tests wait on it). */

@@ -19,7 +19,7 @@
 - **同时干好几件活**：最多 6 个帮工同时在地里干活；用 worktree 的帮工各有独立分支。
 - **地图**：每个项目是一座小岛，岛上的地对着它在做的工单和还能派活的空位，排队的活是院门外的种子袋；点空位就给这个项目写一张工单。
 - **看得见过程**：每个帮工的每一步都记成轨迹，包括收到的话、每条命令和输出、说的话。哪一步不对，可以就那一步写评论，它会接着改。
-- **种植计划**：长任务先派一个帮工读代码、拆成一张有先后的步骤图，你看过草稿再开工。互不依赖的步骤同时做，每一步过了检查才合进计划分支，最后一次收进主分支。修 bug 时第一步先写一个**会失败的验收测试**，后面的步骤不能改它，最后一步要让它通过。
+- **拆成子工单**：长任务可以拆成有先后的子工单。互不依赖的子工单同时做，每一张过了检查才合进父工单分支，最后一次合进主分支。修 bug 时第一步先写一个**会失败的验收测试**，后面的子工单不能改它，最后一步要让它通过。
 - **频道、定时和巡查**：按项目开频道；「每天九点跑一遍测试」这样的定时任务；不调模型的巡查，提醒没人回的提问、没动静的帮工、做完没收的活。
 - **帮工档案和记性**：给帮工捏人设、选农机和模型、装技能。帮工在汇报里写的「记住：……」，下次开工时会想起来。
 - **语音**：按住说话，语音管家（Agora Conversational AI）听你说完，交给同一个管家去派活。
@@ -38,7 +38,7 @@ flowchart LR
   server -- SSE：折好的核心状态 --> app
   subgraph server[TypeScript 服务端 127.0.0.1:8787]
     manager[管家<br/>vibevalley 自己的 agent]
-    chat[田头<br/>PGlite]
+    chat[田头<br/>SQLite]
     site[核心状态<br/>只由事实改变]
     sessions[帮工<br/>oar]
   end
@@ -48,11 +48,11 @@ flowchart LR
   rt --> repo[(你的项目<br/>项目目录或工单的 worktree)]
 ```
 
-- **服务端**（`apps/server`，TypeScript，Effect v4，跑在 Node 上）：管家、帮工、田头、项目和收获、种植计划、语音、连接器都在这一个进程里，数据在 PGlite。帮工由 [oar](https://github.com/botiverse/oar) 驱动，它统一驱动不同的编码 agent 程序。
+- **服务端**（`apps/server`，TypeScript，Effect v4，跑在 Node 上）：管家、帮工、田头、项目和收获、稿子和笔记、语音、连接器都在这一个进程里，数据在 SQLite。帮工由 [oar](https://github.com/botiverse/oar) 驱动，它统一驱动不同的编码 agent 程序。
 - **核心状态只有一份**：农场上的一切是一个值，只因「事实」而变（雇了一个帮工、开始一轮、跑了一条命令……）。服务端用纯函数把事实折进状态，页面只读折好的结果。
-- **页面**（`apps/web`，Solid 2）：农场和像素村、田头、工单、文档、配置页、语音，由服务端在 `/` 提供；浏览器直接打开就能用。
-- **桌面版**（`apps/desktop`，Electron）：带着服务端起来、打开它的页面，加上通知、菜单栏和语音的快捷键。
-- **形状只写一次**：接口和数据形状写在 `packages/protocol`（`shapes.ts`、`schema.ts`、`api.ts`），服务端和页面 import 同一份，两边不会对不上。
+- **页面**（`apps/web`，Solid 2）：农场和像素村、田头、工单、稿子、笔记、配置页、语音，由服务端在 `/` 提供；浏览器直接打开就能用。
+- **桌面版**（`apps/desktop`，Electron）：带着服务端起来、打开它的页面，加上通知、菜单栏、灵动岛和语音的快捷键。
+- **形状只写一次**：接口和数据形状按概念写在 `packages/protocol/src/<概念>/`（`shapes.ts`、`schema.ts`、`api.ts`），服务端、页面和命令行 import 同一份，两边不会对不上。
 
 更多见 [docs/architecture.md](docs/architecture.md)。
 
@@ -103,10 +103,11 @@ vp run --filter @vibevalley/server start --web ../web/dist   # 服务端，127.0
 ## 目录
 
 ```
-apps/server/       TypeScript 服务端（Effect v4、PGlite）：src/ 按概念分的服务（工单、执行、项目、群聊、管家、频道和连接器、游戏……），db/ 表结构和查询
-apps/web/          页面（Solid 2）：农场、像素村、田头、工单、文档、配置页、语音；服务端在 / 提供
+apps/server/       TypeScript 服务端（Effect v4、SQLite）：src/ 按概念分的服务（工单、帮工、信箱、项目、频道、稿子、笔记、管家、连接器、游戏……），db/ 表结构和查询
+apps/cli/          命令行（vibevalley）：照领域模型一条命令一个操作，经 VibeValleyApi 调服务端
+apps/web/          页面（Solid 2）：农场、像素村、田头、工单、稿子、笔记、配置页、语音；服务端在 / 提供
 apps/desktop/      Electron 壳：带着服务端起来，打开它的页面；package:mac 打成 macOS 应用
-packages/protocol/ 形状、接口、几处共用的规则和宿主接口的唯一来源，服务端、页面和两个壳都 import 它
+packages/protocol/ 形状、接口、几处共用的规则和宿主接口的唯一来源，服务端、命令行、页面和两个壳都 import 它
 site/              官网 vibevalley.dev（Astro）
 design/            像素素材的生图提示词、脚本和切图规则（原图和效果图在单独的仓库 vibevalley-art）
 docs/              文档：现在怎么用、怎么开发、各部分怎么工作
@@ -123,7 +124,7 @@ docs/              文档：现在怎么用、怎么开发、各部分怎么工�
 ## 致谢
 
 - [oar](https://github.com/botiverse/oar)（botiverse，Apache-2.0）：驱动编码 agent 的运行时。田头的频道、工单串和外部渠道参照了 botiverse 的 Raft。
-- [Effect](https://effect.website/)、[PGlite](https://pglite.dev/)、[Solid](https://www.solidjs.com/) 和 [Electron](https://www.electronjs.org/)：服务端、数据库、页面和桌面版。
+- [Effect](https://effect.website/)、[SQLite](https://www.sqlite.org/)、[Solid](https://www.solidjs.com/) 和 [Electron](https://www.electronjs.org/)：服务端、数据库、页面和桌面版。
 - [Agora Conversational AI](https://www.agora.io/)：语音管家；服务端照它的官方示例 [agent-quickstart-nextjs](https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs)（MIT）改写。
 - [DeepSeek](https://www.deepseek.com/)：管家用的模型。
 - [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font)（OFL）：像素字体。

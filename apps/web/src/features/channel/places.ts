@@ -79,8 +79,7 @@ export interface LinkedMessage {
 
 const farmLink = /https?:\/\/([^/\s]+)\/chat(?:\/([0-9a-f-]{36}))?\?m=(\d+)/gu;
 
-/** The farm messages a text links to, once each, at most three: a link to a channel the chat knows, from any address the
- * farm is reached at (a phone has its own); the default channel's, which names none, only at the page's own host. */
+/** The farm messages a text links to, once each, at most three: a link to a channel the chat knows, from any address the farm is reached at (a phone has its own). */
 export function linkedMessages(text: string, chat: Chat | undefined, host: string): LinkedMessage[] {
   const out: LinkedMessage[] = [];
   for (const m of text.matchAll(farmLink)) {
@@ -101,11 +100,7 @@ export const newestUnread = (c: Channel) => (unreadIn(c) > 0 ? c.lastNumber : un
 export const unreadUnder = (chat: Chat | undefined, channel: Channel) =>
   (chat?.channels ?? []).filter((c) => c.id === channel.id || c.parent === channel.id).reduce((n, c) => n + unreadIn(c), 0);
 
-const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => {
-  if (!xs) return undefined;
-  for (let i = xs.length - 1; i >= 0; i--) if (test(xs[i]!)) return xs[i];
-  return undefined;
-};
+const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => xs?.findLast(test);
 
 /** One thread per issue, kept across the sessions that work it. */
 export const issueThreadOf = (chat: Chat | undefined, issue: string) => findLast(chat?.channels, (c) => c.subjectKind === "issue" && c.subjectId === issue);
@@ -226,7 +221,7 @@ function dayLabel(at: number, now = new Date()) {
   return t("web.base.time.monthDay", { month: d.getMonth() + 1, day: d.getDate() });
 }
 
-/** 12-hour, two digits: 下午03:07, 03:07 PM. */
+/** 12-hour, two digits: 03:07 PM. */
 export function workbenchClock(at: number) {
   const d = new Date(Math.round(at));
   const h12 = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12;
@@ -235,7 +230,7 @@ export function workbenchClock(at: number) {
 
 export interface SwitchTarget {
   readonly kind: "channel" | "direct" | "thread" | "profile" | "note" | "notes";
-  /** The channel's id; a profile's id for one with no direct channel yet; a note's slug; the words to search the notes for. */
+  /** The channel's id. a profile's id for one with no direct channel yet. */
   readonly id: string;
   readonly label: string;
   /** Where it is or what picking it does: a channel's group, a thread's channel. */
@@ -247,8 +242,7 @@ export interface SwitchTarget {
 
 const switchMax = 12;
 
-/** The places for what is typed: `#` keeps channels and threads, `@` direct channels and profiles; the rest matches the
- * name anywhere, a name starting with it first, then the unread, then the newest talked in. Archived places are left out. */
+/** The places for what is typed: `#` keeps channels and threads, `@` direct channels and profiles. */
 export function switchTargets(
   chat: Chat | undefined,
   query: string,

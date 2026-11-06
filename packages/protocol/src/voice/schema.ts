@@ -1,5 +1,3 @@
-// The Schemas of the call, dictation and voice settings (docs/subsystems/voice.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
@@ -7,6 +5,13 @@ import { KeySource } from "../common/schema";
 import * as T from "../shapes";
 
 export const CallState: Codec<T.CallState> = Schema.Literals(T.CallStateValues);
+
+export const FactCallChanged: Codec<T.FactCallChanged> = Schema.Struct({
+  type: Schema.Literal("callChanged"),
+  at: Schema.Finite,
+  state: CallState,
+  reason: Schema.String,
+});
 
 export const VoiceCall: Codec<T.VoiceCall> = Schema.Struct({
   agentId: Schema.String,
@@ -50,6 +55,10 @@ export const VoiceAnswerOrchestrator: Codec<T.VoiceAnswerOrchestrator> = Schema.
   vendor: Schema.Literal("orchestrator"),
 });
 
+export const VoiceAnswerMoss: Codec<T.VoiceAnswerMoss> = Schema.Struct({
+  vendor: Schema.Literal("moss"),
+});
+
 export const VoiceAnswerAgoraModel: Codec<T.VoiceAnswerAgoraModel> = Schema.Literals(T.VoiceAnswerAgoraModelValues);
 
 export const VoiceAnswerAgora: Codec<T.VoiceAnswerAgora> = Schema.Struct({
@@ -68,7 +77,13 @@ export const VoiceAnswerOpenai: Codec<T.VoiceAnswerOpenai> = Schema.Struct({
   model: Schema.String,
 });
 
-export const VoiceAnswer: Codec<T.VoiceAnswer> = Schema.Union([VoiceAnswerOrchestrator, VoiceAnswerAgora, VoiceAnswerDeepseek, VoiceAnswerOpenai]);
+export const VoiceAnswer: Codec<T.VoiceAnswer> = Schema.Union([
+  VoiceAnswerOrchestrator,
+  VoiceAnswerMoss,
+  VoiceAnswerAgora,
+  VoiceAnswerDeepseek,
+  VoiceAnswerOpenai,
+]);
 
 export const VoiceTTSMinimaxModel: Codec<T.VoiceTTSMinimaxModel> = Schema.Literals(T.VoiceTTSMinimaxModelValues);
 

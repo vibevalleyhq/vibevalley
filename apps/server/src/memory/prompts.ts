@@ -1,6 +1,3 @@
-// What the memories say to models: the lines of what a helper recalls and what memory_search answers, how a note of
-// the owner's and a finished issue are kept, and what goes to EverOS. In Chinese whatever the owner's locale.
-
 /** Authorship stays explicit when database notes become model input. */
 export const fromOwner = "主人交代：";
 

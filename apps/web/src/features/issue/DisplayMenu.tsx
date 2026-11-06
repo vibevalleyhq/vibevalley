@@ -8,7 +8,7 @@ import { Segmented } from "#/ui/Segmented.tsx";
 
 import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "./display";
 
-/** 显示: a small panel under its button with how the list groups and how both views order. */
+/** Display: a small panel under its button with how the list groups and how both views order. */
 export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) => void }) {
   const changed = () => props.look.grouping !== defaultLook.grouping || props.look.ordering !== defaultLook.ordering;
   const notes = () =>

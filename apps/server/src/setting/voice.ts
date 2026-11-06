@@ -9,7 +9,7 @@ import {
   voiceSilenceMsMax,
   voiceSilenceMsMin,
 } from "@vibevalley/protocol";
-import { same } from "@vibevalley/protocol/rules";
+import { omitUndefined, same } from "@vibevalley/protocol/rules";
 
 import { voiceOrchestratorPersona } from "./prompts.ts";
 
@@ -45,14 +45,7 @@ export function voiceProblem(v: SettingsUpdateVoice): string {
 const voiceKeys = ["area", "language", "asr", "answer", "tts", "persona", "greeting", "failureMessage", "silenceMs", "interruptMs", "idleSeconds"] as const;
 
 export function voiceSettingsOver(defaults: VoiceSettings, overrides: SettingsUpdateVoice): VoiceSettings {
-  const out: VoiceSettings = { ...defaults };
-  // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- one K ties out[key] to overrides[key]: with the union, TypeScript cannot.
-  const take = <K extends (typeof voiceKeys)[number]>(key: K) => {
-    const value = overrides[key];
-    if (value !== undefined) out[key] = value;
-  };
-  for (const key of voiceKeys) take(key);
-  return out;
+  return { ...defaults, ...omitUndefined(overrides) };
 }
 
 export function voiceOverrides(defaults: VoiceSettings, settings: VoiceSettings): SettingsUpdateVoice {

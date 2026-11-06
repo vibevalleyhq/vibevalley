@@ -1,5 +1,3 @@
-// Times, numbers and money in words: how long ago, how long it took, the time of day, a moment, what a round cost.
-
 import { currentLocale, t } from "@vibevalley/i18n";
 import type { Spent } from "@vibevalley/protocol";
 
@@ -41,7 +39,7 @@ export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? t("web.base.money.
 
 const wan = (n: number) => (n >= 10000 ? big(n, n >= 100000 ? 0 : 1) : `${Math.round(n)}`);
 
-/** A large count: ten thousands in Chinese (1.2 万), thousands in English (12k). */
+/** A large count: ten thousands in Chinese (10k units), thousands in English (12k). */
 export const big = (n: number, digits: number) => t("web.base.big", { n: currentLocale() === "zh" ? (n / 10000).toFixed(digits) : Math.round(n / 1000) });
 
 export const spentText = (spent: Spent) =>
@@ -50,7 +48,7 @@ export const spentText = (spent: Spent) =>
 /** What a thrown or rejected value says: an Error's message, anything else as text. */
 export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-/** How long, in round words: 不到 1 分钟, 3 分钟, 2 小时, 4 天. */
+/** How long, in round words: rounded relative duration. */
 export function spanText(ms: number) {
   const m = Math.floor(Math.max(0, ms) / 60_000);
   if (m < 1) return t("web.base.time.round.underMinute");

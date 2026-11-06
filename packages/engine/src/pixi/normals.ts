@@ -1,10 +1,3 @@
-// Normal maps for pixel art, made from the pictures themselves: no one paints them. A sprite is shaped like a pillow
-// (it rises with the distance from its outline), with a little relief from how light each painted pixel is; the
-// slope of that height is the normal. Pure: pixels in, pixels out (light.ts turns them into textures).
-//
-// Normals are in screen terms: x to the right, y down the screen, z out of it towards the viewer. Stored as RGBA,
-// each axis from -1..1 to 0..255 (128 is 0), the picture's own alpha kept.
-
 export interface NormalOptions {
   /** How far in from the outline, in pixels, a sprite keeps rising: how round it looks. 0: no rounding. */
   readonly bevel: number;
@@ -90,10 +83,7 @@ export function normalsOf(rgba: Uint8ClampedArray, w: number, h: number, o: Norm
   return out;
 }
 
-/**
- * The normal map for a sprite drawn mirrored (a negative x scale). The sprite's flip mirrors the pixels already; what
- * is left is that each one now faces the other way.
- */
+/** The normal map for a sprite drawn mirrored (a negative x scale). The sprite's flip mirrors the pixels already. */
 export function mirrorNormals(normals: Uint8ClampedArray): Uint8ClampedArray {
   const out = new Uint8ClampedArray(normals);
   for (let i = 0; i < out.length; i += 4) out[i] = 255 - (normals[i] ?? 128);

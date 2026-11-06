@@ -1,8 +1,3 @@
-// What a change does to the contract, for its reviewer: the lines changed in the places other code stands on (the wire's
-// shapes and endpoints, the schema, each service's interface, the golden data), the areas it touches, and how many
-// lines of everything there are for each contract line, the review's compression. Printed as Markdown; CI appends it to
-// the job's summary (`vpx scripts/contract-diff.ts --base HEAD^1 >> "$GITHUB_STEP_SUMMARY"`).
-
 import { execFileSync } from "node:child_process";
 
 /** A file changed, with its lines added and removed (a binary one counts none). */

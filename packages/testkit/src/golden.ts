@@ -1,6 +1,3 @@
-// Recorded cases (a testdata/*.jsonl.gz beside the rule): each a rule's input and what it made of it, compared as JSON.
-// With VIBEVALLEY_GOLDEN=update a run writes the rule's answers back (vp run golden:update).
-
 import { readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
 
@@ -60,8 +57,7 @@ function diff(a: unknown, b: unknown, path: string): string | undefined {
   return undefined;
 }
 
-/** Runs every case through rule and collects the first disagreements. With VIBEVALLEY_GOLDEN=update, a rule changed on
- * purpose writes its answers back over the recorded ones instead (look at the diff before keeping it). */
+/** Runs every case through rule and collects the first disagreements. */
 export function checkCases(cases: readonly Case[], rule: (c: Case) => unknown): string[] {
   if (process.env.VIBEVALLEY_GOLDEN === "update") {
     update(cases, rule);

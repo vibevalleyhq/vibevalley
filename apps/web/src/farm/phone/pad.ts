@@ -1,7 +1,3 @@
-// The phone's game pad: a cross and A, B under the screen, and the keys that stand for them. The game on screen takes
-// them through `usePad`; its keys are caught on the window's capture phase, before the farm's own
-// (tools, Esc), while it is up.
-
 import { type Accessor, createEffect, onSettled } from "solid-js";
 
 import { defineAtom } from "#/state/atom.ts";

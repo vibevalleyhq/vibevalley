@@ -1,6 +1,3 @@
-// The channel switcher in the farm chat window's head: the channels with what they are for and their unread lines, the
-// owner's direct channels, a new channel, the current one's settings, and the way to its full page (its crons are there).
-
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

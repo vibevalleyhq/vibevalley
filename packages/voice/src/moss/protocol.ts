@@ -1,0 +1,178 @@
+import { Schema } from "effect";
+
+import { appendVoiceTurn, pcm16RmsLevel, type VoicePhase, type VoiceTurn } from "../core/contract.ts";
+
+export const mossRealtimeUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
+
+export const mossInRate = 16000;
+export const mossOutRate = 48000;
+export const mossFrameSamples = 320;
+const mossFrameBytes = mossFrameSamples * 2;
+export const mossTaggedFrameBytes = 1 + mossFrameBytes;
+export const mossAudioTag = 0x00;
+
+const MossErrorObjectSchema = Schema.Struct({
+  message: Schema.optionalKey(Schema.String),
+});
+
+const MossEventPayloadSchema = Schema.Struct({
+  text: Schema.optionalKey(Schema.String),
+  turn: Schema.optionalKey(Schema.String),
+  turn_id: Schema.optionalKey(Schema.String),
+  chunk_id: Schema.optionalKey(Schema.String),
+  run_id: Schema.optionalKey(Schema.String),
+  reason: Schema.optionalKey(Schema.String),
+  call_id: Schema.optionalKey(Schema.String),
+  name: Schema.optionalKey(Schema.String),
+  arguments: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(Schema.Union([Schema.String, MossErrorObjectSchema])),
+});
+
+const MossFrameSchema = Schema.fromJsonString(
+  Schema.Struct({
+    action: Schema.optionalKey(Schema.String),
+    type: Schema.optionalKey(Schema.String),
+    call_id: Schema.optionalKey(Schema.String),
+    name: Schema.optionalKey(Schema.String),
+    arguments: Schema.optionalKey(Schema.String),
+    error: Schema.optionalKey(MossErrorObjectSchema),
+    data: Schema.optionalKey(MossEventPayloadSchema),
+  }),
+);
+
+export const decodeMossFrame = Schema.decodeUnknownOption(MossFrameSchema);
+
+const MossAskOrchestratorArgsSchema = Schema.fromJsonString(
+  Schema.Struct({
+    question: Schema.optionalKey(Schema.String),
+    text: Schema.optionalKey(Schema.String),
+  }),
+);
+const decodeAskArgs = Schema.decodeUnknownOption(MossAskOrchestratorArgsSchema);
+
+export interface MossToolCall {
+  readonly callId: string;
+  readonly name: string;
+  readonly question: string;
+}
+
+/** Extracts an `ask_orchestrator` tool call from a MOSS / realtime WebSocket JSON frame when present. */
+export function extractMossToolCall(raw: string): MossToolCall | undefined {
+  const decoded = decodeMossFrame(raw);
+  if (decoded._tag === "None") return undefined;
+  const frame = decoded.value;
+  const action = frame.action ?? frame.type ?? "";
+  if (action !== "response.function_call_arguments.done" && action !== "tool.call" && action !== "function_call") return undefined;
+  const name = frame.data?.name ?? frame.name ?? "";
+  if (name !== "ask_orchestrator") return undefined;
+  const callId = frame.data?.call_id ?? frame.call_id ?? "";
+  const rawArgs = frame.data?.arguments ?? frame.arguments ?? "";
+  const parsedArgs = decodeAskArgs(rawArgs);
+  const question = parsedArgs._tag === "Some" ? (parsedArgs.value.question ?? parsedArgs.value.text ?? "").trim() : (frame.data?.text ?? rawArgs).trim();
+  return question ? { callId, name, question } : undefined;
+}
+
+/** Tool definition registered on MOSS / realtime sessions so the voice model delegates farm operations to the Orchestrator. */
+export const mossOrchestratorTool = {
+  type: "function",
+  name: "ask_orchestrator",
+  description: "Ask the farm's orchestrator whenever the owner asks about farm status, issues, helpers, memories, notes, or wants work dispatched.",
+  parameters: {
+    type: "object",
+    properties: {
+      question: {
+        type: "string",
+        description: "The owner's exact request or question for the orchestrator.",
+      },
+    },
+    required: ["question"],
+  },
+} as const;
+
+/** The message of a refusal's JSON body ({ error: { message } }), or the body itself, cut short. */
+export const mossErrorMessage = (body: string): string => {
+  const decoded = decodeMossFrame(body);
+  const msg = decoded._tag === "Some" ? decoded.value.error?.message : undefined;
+  return msg ? msg : body.slice(0, 200);
+};
+
+/** One side's words in a MOSS turn; specialization of the core `VoiceTurn`. */
+export type MossTurn = VoiceTurn<"owner" | "moss">;
+
+/** The turns with a turn's words so far (MOSS sends them whole each time). A new turn starts a new line. */
+export const heard = (turns: readonly MossTurn[], who: MossTurn["who"], key: string, text: string, done: boolean): MossTurn[] =>
+  appendVoiceTurn(turns, who, key, text, done);
+
+/** 0..100 from a frame's loudness. */
+export const levelOf = pcm16RmsLevel;
+
+/** Packs 16-bit PCM samples into MOSS Live's tagged-v1 binary frame (leading 0x00 tag byte + PCM payload, or silence when muted). */
+export function packTaggedAudio(pcm: Int16Array, muted = false): Uint8Array {
+  const bytes = new Uint8Array(1 + pcm.byteLength);
+  bytes[0] = mossAudioTag;
+  if (!muted) bytes.set(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength), 1);
+  return bytes;
+}
+
+/** Views an incoming binary audio buffer as 16-bit PCM samples. */
+export function unpackPcm16(data: ArrayBuffer): Int16Array {
+  return new Int16Array(data, 0, Math.floor(data.byteLength / 2));
+}
+
+export type MossPhase = VoicePhase;
+
+/** An action sent or an event received, as JSON; the noisy ones (words as they grow, audio announcements) are left out. */
+export interface MossEvent {
+  readonly up: boolean;
+  readonly text: string;
+}
+
+/** How the line is doing, worked out once a second from what passed on it. */
+export interface MossQos {
+  /** kbit/s over the last second, both ways, audio and JSON together. */
+  upKbps: number;
+  downKbps: number;
+  /** Microphone frames sent in the last second: 50 when capture and the socket keep up. */
+  framesPerSecond: number;
+  /** Bytes the socket holds that have not gone out yet: grows when the way up is too slow. */
+  backlog: number;
+  /** The answer's audio already here and not yet played, ms. */
+  aheadMs: number;
+  /** Times the answer ran dry: a piece came after the one before had finished playing, in the same answer. */
+  gaps: number;
+  /** From the end of the owner's words (input.speech.stopped) to MOSS's first sound arriving, ms: the last and the mean. */
+  replyMs?: number;
+  replyMeanMs?: number;
+  replies: number;
+  /** Answers MOSS stopped itself, by the reason it gave (response.audio.stop). */
+  stops: Record<string, number>;
+}
+
+export const noQos = (): MossQos => ({
+  upKbps: 0,
+  downKbps: 0,
+  framesPerSecond: 0,
+  backlog: 0,
+  aheadMs: 0,
+  gaps: 0,
+  replies: 0,
+  stops: {},
+});
+
+export interface MossSetup {
+  readonly persona: string;
+  readonly instructions: string;
+}
+
+export interface MossMessages {
+  readonly closed: () => string;
+  readonly noMic: () => string;
+  readonly formatError: (e: unknown) => string;
+}
+
+export const noisyMossActions: ReadonlySet<string> = new Set([
+  "input.transcript.updated",
+  "output.transcript.updated",
+  "response.audio.context",
+  "playback.chunk.completed",
+]);

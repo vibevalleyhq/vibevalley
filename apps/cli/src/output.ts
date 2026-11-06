@@ -1,8 +1,3 @@
-// What the command line writes and how it ends, for an agent as much as a person: stdout holds the result and nothing
-// else (one JSON document, or one JSON line per frame of a stream), stderr the progress, the help on a mistake and the
-// failure as JSON with what to do next; the exit code says which kind of failure it was without reading the words.
-// Everything goes through Effect's Stdio, so a test gives the command line its own.
-
 import { Effect, Option, Schema, Stdio, Stream } from "effect";
 
 /** Exit codes a script can branch on. */
@@ -40,8 +35,13 @@ export class Failure extends Schema.TaggedError<Failure, { readonly brand: uniqu
   next: Schema.optionalKey(Schema.Array(NextStep)),
 }) {}
 
+/** The conversation ended with this exit code; it has said what it had to on the terminal itself. */
+export class Ended extends Schema.TaggedError<Ended, { readonly brand: unique symbol }>()("Ended", {
+  code: Schema.Finite,
+}) {}
+
 const line = (to: "stdout" | "stderr", text: string) =>
-  Effect.flatMap(Stdio.Stdio, (io) => Stream.run(Stream.make(text + "\n"), io[to]({ endOnDone: false }))).pipe(Effect.orDie);
+  Effect.flatMap(Stdio.Stdio, (io) => Stream.run(Stream.make(text + "\n"), io[to]({ endOnDone: false }))).pipe(Effect.ignore({ log: "Debug" }));
 
 export const out = (text: string) => line("stdout", text);
 export const err = (text: string) => line("stderr", text);

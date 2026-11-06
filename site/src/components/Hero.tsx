@@ -1,12 +1,3 @@
-// The title scene as the game draws it, over the page's first two screens. The scene holds on the screen through the
-// first screen of scrolling while a whole day goes by, dawn to night (the pictures fade one over the other as the page
-// goes, back as it comes back), a line of the verse for each hour (copy.hero.verses, rhyming), the camera pushing in a
-// little, the nearer layers more, and the opening words fading; then the whole scene goes up off the screen, its
-// layers parting, the farther the slower. The layers: the clouds; the farm's
-// picture with its smoke, fireflies, the farmer and his dog; the plants along the bottom; and right in front of the
-// camera, the plants that frame the village in the game. They also move against the pointer, on springs. The hours'
-// buttons go to that point of the scroll. The scene's own motions are CSS (the theme's animate-*); following the
-// scroll is Motion's scroll() (useScrollLinked: on the browser's own scroll timelines where it has them).
 import { MotionConfig, motion, useMotionValue, useMotionValueEvent, useScroll, useSpring, useTransform, type MotionValue } from 'motion/react'
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import type { Copy } from '../i18n/zh'
@@ -18,8 +9,7 @@ const AT: Record<Scene, string> = { morning: 'morning:opacity-100', day: 'day:op
 /** The hour's own button looks pressed while the farm is at that hour. */
 const PRESSED: Record<Scene, string> = { morning: 'morning:bg-wheat', day: 'day:bg-wheat', evening: 'evening:bg-wheat', night: 'night:bg-wheat' }
 
-/** The plants in front of the camera that frame the village in the game (apps/web/src/farm/canvas): at the hero's
- *  corners, mostly past its edges. Two art pixels a pixel, three on a wide screen. */
+/** The plants in front of the camera that frame the village in the game (apps/web/src/farm/canvas): at the hero's corners, mostly past its edges. */
 const FRAME = [
   { name: 'branchLeft', className: 'top-[-44px] left-[-60px] w-[206px] lg:top-[-66px] lg:left-[-90px] lg:w-[309px]' },
   { name: 'branchRight', className: 'top-[-48px] right-[-52px] w-[194px] lg:top-[-72px] lg:right-[-78px] lg:w-[291px]' },
@@ -34,8 +24,7 @@ const HOLDING = ['start start', 'end end'] as ['start start', 'end end']
 /** The second, while the scene goes up off the screen. */
 const LEAVING = ['end end', 'end start'] as ['end end', 'end start']
 
-/** How far through the holding screen each later hour has faded in: dawn's picture lies under the others, each later
- *  one comes in over the one before. The hours' lights and poses turn halfway through each fade. */
+/** How far through the holding screen each later hour has faded in: dawn's picture lies under the others, each later one comes in over the one before. */
 const COMES: Record<Exclude<Scene, 'morning'>, [number, number]> = { day: [0.14, 0.3], evening: [0.42, 0.58], night: [0.7, 0.86] }
 const TURNS: [number, Scene][] = [
   [0, 'morning'],
@@ -43,8 +32,7 @@ const TURNS: [number, Scene][] = [
   [0.5, 'evening'],
   [0.78, 'night'],
 ]
-/** Each later hour's line of the verse, through the holding screen: coming in, in, going, gone (the night's stays).
- *  Dawn's line is with the opening words, which are gone by 0.22. */
+/** Each later hour's line of the verse, through the holding screen: coming in, in, going, gone (the night's stays). */
 const SAYS: Record<Exclude<Scene, 'morning'>, [number, number, number, number]> = {
   day: [0.24, 0.3, 0.44, 0.5],
   evening: [0.52, 0.58, 0.7, 0.76],
@@ -369,17 +357,14 @@ export default function Hero({ copy, art, backgrounds, hint: arrow, frame, githu
   )
 }
 
-/** A later hour's picture, fading in over the earlier ones as the page goes through the holding screen (and out as it
- *  comes back). A fade, not a motion, so it follows the scroll for everyone. */
+/** A later hour's picture, fading in over the earlier ones as the page goes through the holding screen (and out as it comes back). */
 function Comes({ hour, src, hero }: { hour: Exclude<Scene, 'morning'>; src: string; hero: RefObject<HTMLElement | null> }) {
   const [from, to] = COMES[hour]
   const ref = useScrollLinked<HTMLImageElement>(hero, HOLDING, () => [{ keyframes: { opacity: [0, 0, 1, 1] }, times: [0, from, to, 1] }], { still: true })
   return <img ref={ref} data-scene={hour} data-src={src} alt="" draggable={false} className="absolute inset-0 size-full max-w-none opacity-0 select-none pixelated" />
 }
 
-/** An hour's line of the verse, big where the opening words were: in, held and out as the page goes through the holding
- *  screen (the night's stays until the scene leaves). It shows and hides for everyone; only those who allow motion see
- *  it rise as well. */
+/** An hour's line of the verse, big where the opening words were. It shows and hides for everyone. */
 function Line({ verse, at, stays, hero }: { verse: string[]; at: [number, number, number, number]; stays: boolean; hero: RefObject<HTMLElement | null> }) {
   const [a, b, c, d] = at
   const seen = useScrollLinked<HTMLDivElement>(
@@ -409,13 +394,7 @@ function Line({ verse, at, stays, hero }: { verse: string[]; at: [number, number
   )
 }
 
-/**
- * One layer of the scene. While the scene holds, it pushes in toward its origin by its zoom (the nearer, the more);
- * while the scene goes up off the screen, it lags behind the page by its share of the scroll (the farther, the more:
- * at half, it goes up at half the page's pace; below zero, ahead of it); and it moves against the pointer by up to its
- * pixels (the nearer, the more). Nearer layers only ever go up past the farther ones, so a layer never shows what is
- * behind its edge.
- */
+/** One layer of the scene. While the scene holds, it pushes in toward its origin by its zoom (the nearer, the more). */
 function Layer({
   lag,
   zoom,

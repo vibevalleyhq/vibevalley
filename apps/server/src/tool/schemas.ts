@@ -1,8 +1,3 @@
-// The model is shown these bytes: change a Schema only on purpose, with the orchestrator's evals replayed; tool.test.ts
-// holds every one to the bytes it was last given, and each tool's fields to its endpoint's. Unknown fields are let
-// through. requiredOrder is the order the required fields are listed in, and a struct that refuses fields it does not
-// know (parseOptions) says so in the JSON Schema too (additionalProperties false).
-
 import { Effect, Predicate, Schema } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
@@ -12,7 +7,7 @@ import { PkmTierValues } from "@vibevalley/protocol";
 import { ApiError as ApiErrorSchema, type Handlers } from "@vibevalley/protocol/api";
 
 import type { Actor } from "#/base/actor.ts";
-import { messageOf, reasonOf } from "#/errors.ts";
+import { messageOf, reasonOf } from "#/base/errors.ts";
 import { maxChildren as maxTasks } from "#/issue/creation.ts";
 
 import { answers, descriptions, params, sessionDescriptions } from "./prompts.ts";
@@ -331,9 +326,8 @@ export const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>):
   return Predicate.isObject(shaped) ? Object.fromEntries(Object.entries(shaped)) : {};
 };
 
-const shown = <A extends Record<string, Schema.Struct<Schema.Struct.Fields>>>(all: A): Record<keyof A & string, JsonSchema> =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- one entry for each key of all
-  Object.fromEntries(Object.entries(all).map(([op, p]) => [op, toolParameters(p)])) as Record<keyof A & string, JsonSchema>;
+const shown = (all: Record<string, Schema.Struct<Schema.Struct.Fields>>): Record<string, JsonSchema> =>
+  Object.fromEntries(Object.entries(all).map(([op, p]) => [op, toolParameters(p)]));
 
 /** As the model is shown them, by endpoint. */
 export const schemas = shown(parameters);
@@ -374,26 +368,25 @@ export const said = (e: unknown) => toFailed(e).message;
 
 export const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e), cause: e }) });
 
-/** An answer, or "没成：" and why. */
+/** An answer, or the refusal prefix and why. */
 export const answered = <E>(e: Effect.Effect<string, E>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(said(err))));
 
 // Who reads and speaks in a channel: a session as itself, the orchestrator as the orchestrator.
 export const participant = (c: Caller) => c.session || c.agent;
 
-// A tool's arguments are read by its Schema before it runs; the model's JSON Schema is made from the same one.
-// Named by its endpoint (toolName): the name is never written a second time.
+// A tool's arguments are read by its Schema before it runs. the model's JSON Schema is made from the same one.
 const toolOf =
   <All extends { readonly [op: string]: Schema.Codec<unknown, unknown> }>(
     all: All,
-    shown: Record<keyof All & string, JsonSchema>,
+    shown: Record<string, JsonSchema>,
     words: Record<keyof All & string, string>,
   ) =>
   <K extends keyof All & Op, E>(op: K, body: (p: All[K]["Type"]) => Effect.Effect<string, E>) => {
     const read: (args: unknown) => Effect.Effect<All[K]["Type"], Schema.SchemaError> = Schema.decodeUnknownEffect<All[K]>(all[op]);
-    return effectTool<unknown>({
+    return effectTool({
       name: toolName(op),
       description: words[op],
-      parameters: shown[op],
+      parameters: shown[op] ?? {},
       run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toFailed),
     });
   };
@@ -411,7 +404,7 @@ export const customTool = <A, E>(
   read: (args: unknown) => Effect.Effect<A, Schema.SchemaError>,
   body: (input: A) => Effect.Effect<string, E>,
 ) => {
-  return effectTool<unknown>({
+  return effectTool({
     name,
     description,
     parameters,

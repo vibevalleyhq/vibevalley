@@ -16,7 +16,7 @@ prop-less. The HUD mounts `Phone` (with the chat in it) over its button, giving 
 | Part | Folder | Draws |
 |---|---|---|
 | The canvas | `canvas/` | the village on Pixi: the map, plots, walking helpers, the dog, light and life, bed effects |
-| The HUD and the panels | `hud/`, `panels/` | the bars, quota bottle, island cards, the effects layer; harvest, seed forms, achievements, warehouse, task board, menu |
+| The HUD and the panels | `hud/`, `panels/` | the bars, quota bottle, island cards, the effects layer; harvest, seed forms, achievements, warehouse, menu |
 | The chat and the plot | `chat/`, `issue/` | 田头 (with the call and dictation buttons, `features/voice`), a plot's issue and its work log |
 | The phone and the title | `phone/`, `title/` | the farm's phone and its games, the title screen |
 | The debug console | `debug/` | ` opens it: the farm's calls, the clock, local effects, the frames seen |
@@ -50,9 +50,8 @@ read by `farmProject()` and `lastFarmProject()`) is stored (`defineStored`, `sta
 |---|---|
 | `select(sessionId \| undefined)` | opens / closes a plot's issue (`inspect`) |
 | `review(id \| undefined)`, `sow(station \| undefined)`, `water(id \| undefined)` | the harvest, the sowing form, the watering form |
-| `panel(FarmPanel \| undefined)` | `shop`, `warehouse`, `graphs`, `log`, `manager`, `taskBoard` |
+| `panel(FarmPanel \| undefined)` | `shop`, `warehouse`, `log`, `manager` |
 | `menu(open)`, `closeTop()` | the Esc menu; closing the top layer (false when none) |
-| `openTaskBoard(graph?)`, `showGraph(graph \| undefined)` | the task board, at a graph |
 | `hold(tool)` | the tool in hand (`tools.ts`: hand, water, bug, weed, harvest, shovel; keys 1–6) |
 | `hover(bed \| null, spot \| undefined)` | set by the canvas: the bed and the yard place under the pointer |
 | `revealNames(on)` | Alt held: every name tag shows |

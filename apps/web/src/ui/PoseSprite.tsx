@@ -26,7 +26,7 @@ export function PoseSprite(props: { cast: Cast; pose: Pose; height: number }) {
         const has = (n: string) => n in sprites();
         const name = () => {
           const frames = props.pose === "walk" ? walkFrames(props.cast, has) : [castSprite(props.cast, props.pose, has)];
-          return frames[frame() % frames.length]!;
+          return frames[frame() % frames.length] ?? frames[0] ?? "";
         };
         const size = () => sprites()[name()] ?? { w: 1, h: 1 };
         // A new img for each pose: its animation (the pose-* class) starts over.

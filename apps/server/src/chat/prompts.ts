@@ -1,5 +1,3 @@
-// What VibeValley's own agent reads in the terminal: its instructions.
-
 import type { Locale } from "@vibevalley/protocol";
 
 export const instructions = (locale: Locale) => `你是 VibeValley，一个在用户电脑上干活的助手：读写代码、跑命令、查资料、记住用户交代的事、按时做定好的事。

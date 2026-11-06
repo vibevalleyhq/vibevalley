@@ -1,6 +1,3 @@
-// Each calls the server, then plays the bed's effect. A caller runs it through its Act (createPixelAct), which says a
-// refusal.
-
 import { t } from "@vibevalley/i18n";
 import type { IssueAct, Session, SessionPlayView, StateFrame } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
@@ -21,7 +18,7 @@ export const playBedFx = (s: Session, plays: Record<string, SessionPlayView> | u
 };
 
 interface FarmCommands {
-  /** Words for a helper; one at work hears them mid-turn. The key is the form's, kept until they went through. */
+  /** Words for a helper. one at work hears them mid-turn. */
   water(s: Session, text: string, sendKey: string): Promise<void>;
   /** The server tells it what its conflicts are and to settle them. */
   resolve(s: Session): Promise<void>;
@@ -30,8 +27,7 @@ interface FarmCommands {
   /** Stops one at work; asks one not at work to leave. */
   shovel(s: Session): Promise<void>;
   stop(s: Session): Promise<void>;
-  /** `station`: the plot it was sown on; `project`: the one chosen on the sowing form. The orchestrator is told to sow it.
-   * `sendKey` is the form's, so the same words sent again are said once. */
+  /** `station`: the plot it was sown on. `project`: the one chosen on the sowing form. */
   plant(text: string, sendKey: string, o?: { station?: number; agent?: string; project?: string }): Promise<void>;
   /** The pointer's tool, target and hint, read from one frame. */
   aim(bed: Bed): PlotAim;
@@ -124,10 +120,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
   return commands;
 }
 
-/**
- * A click keeps its tool and target; the command checks the latest issue before acting. Returns the pointer's decision
- * so the caller can play its sound (a tap when it applies).
- */
+/** A click keeps its tool and target. the command checks the latest issue before acting. */
 export async function clickBed(commands: FarmCommands, bed: Bed): Promise<PlotAim> {
   const aim = commands.aim(bed);
   let got: ToolResult;

@@ -9,21 +9,20 @@ import * as S from "@vibevalley/protocol/schema";
 import { Artifact } from "#/artifact/artifact.ts";
 import { htmlCheck } from "#/artifact/check.ts";
 import { artifactMax } from "#/artifact/policy.ts";
+import { messageOf, type ApiError, reasonOf, refused } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
-import { messageOf, type ApiError, reasonOf, refused } from "#/errors.ts";
 import { Session } from "#/session/session.ts";
 
 import { answers, blockLine } from "./prompts.ts";
-import { type Caller, type Who, type Orchestrator, type SessionInput, refuse, callerOf, tool, sessionSchemaTool } from "./schemas.ts";
+import { answered, type Caller, type Who, type Orchestrator, type SessionInput, refuse, callerOf, tool, sessionSchemaTool } from "./schemas.ts";
 
-export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue | string>) =>
+export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue, string>) =>
   Effect.gen(function* () {
     const run = yield* Session;
     const chat = yield* Channel;
     const artifacts = yield* Artifact;
 
-    // Artifacts (artifact/): the orchestrator's and a session's take the same endpoints; a session's are made for its issue
-    // and announced in its issue thread, the orchestrator's where it is answering.
+    // Artifacts (artifact/): the orchestrator's and a session's take the same endpoints.
     const artifactSaid = (e: Effect.Effect<string, ApiError>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(reasonOf(err))));
 
     /** What a kept page will not do that its maker should hear about: the check let it through, the CSP stops it. */
@@ -34,8 +33,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
       return own?.issue ? { issue: own.issue } : own?.channel ? { channel: own.channel } : {};
     };
 
-    /** A version's words: given as they are, or read from a file in the session's working directory. The path is resolved
-     * with its links, so neither .. nor a link leads out of the directory. */
+    /** A version's words: given as they are, or read from a file in the session's working directory. The path is resolved with its links, so neither .. */
     const artifactWords = (c: Caller, content: string | undefined, file: string | undefined) =>
       Effect.gen(function* () {
         if (content !== undefined && file !== undefined) return yield* Effect.fail(refused(answers.artifact.both));
@@ -59,12 +57,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
         "artifact.list",
         Effect.fn("Tool.artifactList")(function* (p: Orchestrator<"artifact.list">) {
           yield* callerOf(who);
-          let issueId: string | undefined;
-          if (p.issue) {
-            const item = yield* findIssue(p.issue);
-            if (typeof item === "string") return item;
-            issueId = item.id;
-          }
+          const issueId = p.issue ? (yield* findIssue(p.issue)).id : undefined;
           const listed = (channel?: string) =>
             Effect.map(artifacts.list({ ...(issueId ? { issue: issueId } : {}), ...(channel ? { channel } : {}) }), (all) =>
               all.length === 0 ? answers.artifact.none : all.map(answers.artifact.line).join("\n"),
@@ -73,7 +66,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
           return yield* chat
             .placeOf("", p.channel)
             .pipe(Effect.matchEffect({ onFailure: (e) => Effect.succeed(answers.failed(reasonOf(e))), onSuccess: listed }));
-        }),
+        }, answered),
       );
 
     const sessionArtifactList = (who: Who) =>
@@ -119,12 +112,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
         "artifact.create",
         Effect.fn("Tool.artifactCreate")(function* (p: Orchestrator<"artifact.create">) {
           const c = yield* callerOf(who);
-          let issueId: string | undefined;
-          if (p.issue) {
-            const item = yield* findIssue(p.issue);
-            if (typeof item === "string") return item;
-            issueId = item.id;
-          }
+          const issueId = p.issue ? (yield* findIssue(p.issue)).id : undefined;
           return yield* artifactSaid(
             Effect.gen(function* () {
               const content = yield* artifactWords(c, p.content, undefined);
@@ -142,7 +130,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
               return answers.artifact.made(made) + warnings(made, content);
             }),
           );
-        }),
+        }, answered),
       );
 
     const sessionArtifactCreate = (who: Who) =>
@@ -181,8 +169,7 @@ export const artifactTools = (findIssue: (key: string) => Effect.Effect<T.Issue 
         }),
       );
 
-    // A blocks artifact: the orchestrator's and a session's insert, rewrite and delete a block through the same op
-    // pipeline the owner's editor uses, written as the agent's profile (its session id when it has none).
+    // A blocks artifact: the orchestrator's and a session's insert, rewrite and delete a block through the same op pipeline the owner's editor uses, written as the agent's profile.
     const writer = (c: Caller) => c.agent || c.session;
 
     interface BlockCreateInput {

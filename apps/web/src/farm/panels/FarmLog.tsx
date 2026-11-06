@@ -1,6 +1,3 @@
-// The farm's log: what you and the orchestrator said in the general channel and every helper's turn report, newest first.
-// Voice captions carry no times, so the log keeps to the typed lines.
-
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

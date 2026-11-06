@@ -1,5 +1,3 @@
-// The shapes of settings and keys (docs/subsystems/setting.md).
-
 import type { KeyStatus, Locale } from "../common/shapes";
 import type { AgoraAppID, Dictation, SettingsUpdateVoice, VoiceSettings } from "../voice/shapes";
 
@@ -15,7 +13,7 @@ export interface MemorySourceInfo {
 
 export interface SettingsStatus {
   file: string;
-  /** The farm's home ($VIBEVALLEY_HOME) and the server's version, for 关于. */
+  /** The farm's home ($VIBEVALLEY_HOME) and the server's version, for About. */
   home: string;
   version: string;
   locale: Locale;

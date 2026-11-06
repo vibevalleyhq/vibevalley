@@ -1,11 +1,9 @@
-// The phone's current farm: one choice owns its pending pairing, durable key and published page. Native keychain writes
-// cannot be aborted, so they are serialized and a superseded write restores the last committed choice before the next one.
-
+import { Option, Schema } from "effect";
 import * as SecureStore from "expo-secure-store";
 
 import { t } from "@vibevalley/i18n";
 import { pathOf } from "@vibevalley/protocol";
-import type { LanPaired } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 
 import { type PairLink, parsePairLink } from "./pairing";
 
@@ -27,27 +25,20 @@ type FarmChoice = { readonly kind: "loading" } | { readonly kind: "farm"; readon
 
 const where = "vibevalley.farm";
 
-/** The farm's answer to a pairing, as LanPaired says: checked, it comes from the network. */
-const isPaired = (v: unknown): v is LanPaired =>
-  typeof v === "object" &&
-  v !== null &&
-  "device" in v &&
-  typeof v.device === "string" &&
-  "key" in v &&
-  typeof v.key === "string" &&
-  "hostName" in v &&
-  typeof v.hostName === "string";
+const StoredFarm = Schema.fromJsonString(
+  Schema.Struct({
+    url: Schema.NonEmptyString,
+    key: Schema.NonEmptyString,
+    hostName: Schema.String,
+  }),
+);
+const PairedAnswer = Schema.fromJsonString(S.LanPaired);
+const RefusedAnswer = Schema.fromJsonString(Schema.Struct({ reason: Schema.NonEmptyString }));
 
 async function readFarm(): Promise<Farm | undefined> {
   const text = await SecureStore.getItemAsync(where);
   if (!text) return undefined;
-  try {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the paired computer's answer, in the shape of its version of protocol
-    const farm = JSON.parse(text) as Farm;
-    return farm.url && farm.key ? farm : undefined;
-  } catch {
-    return undefined;
-  }
+  return Option.getOrUndefined(Schema.decodeUnknownOption(StoredFarm)(text));
 }
 
 const writeFarm = (farm: Farm | undefined) => (farm ? SecureStore.setItemAsync(where, JSON.stringify(farm)) : SecureStore.deleteItemAsync(where));
@@ -160,17 +151,12 @@ export class FarmConnection {
       const text = await response.text();
       if (!this.owns(revision)) return;
       if (!response.ok) {
-        let problem = text;
-        try {
-          const said: unknown = JSON.parse(text);
-          if (typeof said === "object" && said !== null && "reason" in said && typeof said.reason === "string") problem = said.reason;
-        } catch {
-          // Not the farm's refusal: its text as it is.
-        }
+        const refused = Option.getOrUndefined(Schema.decodeUnknownOption(RefusedAnswer)(text));
+        const problem = refused?.reason ?? text;
         throw new Error(problem || t("mobile.answered", { status: response.status }));
       }
-      const paired: unknown = JSON.parse(text);
-      if (!isPaired(paired)) throw new Error(t("mobile.answered", { status: response.status }));
+      const paired = Option.getOrUndefined(Schema.decodeUnknownOption(PairedAnswer)(text));
+      if (!paired) throw new Error(t("mobile.answered", { status: response.status }));
       const farm: Farm = { url: choice.link.url, key: paired.key, hostName: paired.hostName };
       await this.serialize(async () => {
         if (!this.owns(revision)) return;

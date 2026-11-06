@@ -3,11 +3,7 @@ import { createEffect } from "solid-js";
 
 import { Dialog as Base } from "@vibevalley/base-ui";
 
-/**
- * The native modal <dialog> (the top layer, a focus trap, the page behind inert), shown while `open`. Escape and a click
- * on the backdrop ask onClose; the dialog stays open until `open` turns false, so the caller owns it. Every modal in
- * both skins goes through this, so they close the same way.
- */
+/** The native modal <dialog> (the top layer, a focus trap, the page behind inert), shown while `open`. Escape and a click on the backdrop ask onClose. */
 export function createModal(open: () => boolean, onClose: () => void) {
   let dialog!: HTMLDialogElement;
   createEffect(open, (on) => {

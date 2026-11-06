@@ -1,5 +1,3 @@
-// The server's cuts of text, on the shared measure (packages/protocol/src/rules/cut.ts).
-
 import type { CardAttachment, CompactCard, ParentPreview } from "@vibevalley/protocol";
 import { oneLine, slice } from "@vibevalley/protocol/rules";
 

@@ -1,7 +1,3 @@
-// Dialog and AlertDialog (Base UI's), on the native <dialog>: shown with showModal it is in the top layer, keeps the
-// focus inside and makes the page behind inert, and the browser gives the focus back to what had it when it closes.
-// Escape and (for a Dialog, not an AlertDialog) a press on the backdrop ask to close; whether it is open is the Root's.
-
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createEffect, createSignal, createUniqueId, omit, onSettled, Show, useContext } from "solid-js";
 

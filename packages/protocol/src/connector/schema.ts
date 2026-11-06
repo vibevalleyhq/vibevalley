@@ -1,5 +1,3 @@
-// The Schemas of chat apps (docs/subsystems/channel.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
@@ -35,4 +33,10 @@ export const VerifyRequest: Codec<T.VerifyRequest> = Schema.Struct({
 
 export const ConnectorsChannelRequest: Codec<T.ConnectorsChannelRequest> = Schema.Struct({
   channel: Schema.String,
+});
+
+export const FactConnectorChanged: Codec<T.FactConnectorChanged> = Schema.Struct({
+  type: Schema.Literal("connectorChanged"),
+  at: Schema.Finite,
+  status: ConnectorStatus,
 });

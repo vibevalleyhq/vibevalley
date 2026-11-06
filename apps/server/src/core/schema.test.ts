@@ -1,6 +1,3 @@
-// The protocol's schemas (packages/protocol/src/schema.ts) take every fact, state, view and inbox in the golden runs (testdata), and
-// the frames the rules make of them.
-
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 
@@ -41,8 +38,7 @@ test("the golden runs and the frames made of them decode", async () => {
     decode.view(row.view);
     decode.inbox(row.inbox);
     state = reduce(state, fact)[0];
-    // As /state sends it: the frame encoded by its Schema is the same JSON the plain object would make, so the Schema
-    // neither refuses a frame the farm makes nor drops a field of it.
+    // As /state sends it: the frame encoded by its Schema is the same JSON the plain object would make, so the Schema neither refuses a frame the farm makes nor drops a field of it.
     const frame = frameOf(state);
     const sent = Effect.runSync(encodeFrame(frame));
     expect(JSON.parse(sent)).toEqual(JSON.parse(JSON.stringify(frame)));

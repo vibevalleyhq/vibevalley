@@ -1,5 +1,3 @@
-// The page's words in Chinese, the site's first language (at /). en.ts has the same shape.
-
 export const zh = {
   lang: 'zh-CN',
   home: '/',
@@ -12,7 +10,7 @@ export const zh = {
     aka: 'VibeValley',
     tagline: '写代码，如收菜。',
     lead: '一群编码 agent，住在一座像素农场里，替你写代码、跑测试。',
-    // A day on the farm, a line for each hour as the page goes down; every line ends on 菜's rhyme.
+    // A day on the farm, a line for each hour as the page goes down; every line ends on the same rhyme.
     verses: {
       morning: ['清早说一句，', '活儿派出来。'],
       day: ['帮工满地跑，', '浇水又除害。'],

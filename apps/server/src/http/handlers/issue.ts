@@ -1,5 +1,3 @@
-// The answers of the issue endpoints (packages/protocol/src/issue/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import type * as T from "@vibevalley/protocol";

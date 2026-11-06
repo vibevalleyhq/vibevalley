@@ -1,5 +1,3 @@
-// The shapes of channels, threads, messages (docs/subsystems/channel.md).
-
 import type { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/shapes";
 import type { ActorKind, MessageId, Outcome, SessionId, Spent } from "../common/shapes";
 
@@ -88,9 +86,7 @@ export interface Channel {
   default: boolean;
   /** A direct channel's other participant: an orchestrator, or a helper profile. The owner talks with it there alone. */
   peer?: string;
-  /** The orchestrator that looks after the place, by its profile id, as the server resolves it: a channel's own (the
-   * default one when it has none), a thread's channel's, a direct channel's peer when that is an orchestrator. The
-   * owner's words there go to it. */
+  /** The orchestrator that looks after the place, by its profile id, as the server resolves it. The owner's words there go to it. */
   orchestrator?: string;
   /** A thread's channel. */
   parent?: string;
@@ -248,4 +244,31 @@ export interface MessageHit {
   message: ChatMessage;
   channel: string;
   address: string;
+}
+
+export interface FactMessageChanged {
+  type: "messageChanged";
+  at: number;
+  message: ChatMessage;
+  thread?: string;
+  answers?: SessionId;
+}
+
+export interface FactChannelChanged {
+  type: "channelChanged";
+  at: number;
+  channel: Channel;
+}
+
+/** A channel deleted, and its threads with it. */
+export interface FactChannelRemoved {
+  type: "channelRemoved";
+  at: number;
+  id: string;
+}
+
+export interface FactOwnerMentionsChanged {
+  type: "ownerMentionsChanged";
+  at: number;
+  mentions: OwnerMention[];
 }

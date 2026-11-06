@@ -1,9 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-// Nowledge Mem (https://mem.nowledge.co), a knowledge graph on this Mac, spoken to over MCP: memory_search reads, memory_add writes. It is the owner's own knowledge, and the farm only adds to it. What
-// the farm writes carries labels, vibevalley and the profile's, so that a profile reads back its own; with everything it
-// reads all that is in it. Whatever is sent is redacted: a run's words may carry a key.
+// Nowledge Mem (https://mem.nowledge.co), a knowledge graph on this Mac, spoken to over MCP: memory_search reads, memory_add writes.
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { Clock, Effect, Option, Predicate, Schema } from "effect";
+import { Clock, Effect, Option, Schema } from "effect";
 
 import { asTransport } from "@vibevalley/agent/mcpTransport";
 import { t } from "@vibevalley/i18n";
@@ -37,11 +35,10 @@ const globalLabel = `${app}-scope-global`;
 export const nowledgeLabels = (agent: string, project: string) =>
   [app, label("agent", agent), project ? projectLabel + Buffer.from(project, "utf8").toString("hex") : globalLabel].join(",");
 
-const scopeOf = (labels: unknown): MemoryScope => {
-  if (!Array.isArray(labels) || !labels.every((l): l is string => typeof l === "string") || !labels.includes(app)) return { kind: "unknown" };
-  const scopes = labels.filter((l) => l === globalLabel || l.startsWith(projectLabel));
-  if (scopes.length !== 1) return { kind: "unknown" };
-  const only = scopes[0]!;
+const scopeOf = (labels: readonly string[] | undefined): MemoryScope => {
+  if (!labels || !labels.includes(app)) return { kind: "unknown" };
+  const [only, ...extra] = labels.filter((l) => l === globalLabel || l.startsWith(projectLabel));
+  if (!only || extra.length > 0) return { kind: "unknown" };
   if (only === globalLabel) return { kind: "global" };
   const encoded = only.slice(projectLabel.length);
   if (!/^(?:[0-9a-f]{2})+$/u.test(encoded)) return { kind: "unknown" };
@@ -74,7 +71,18 @@ const AddedResponse = Schema.fromJsonString(
     memory: Schema.optionalKey(Schema.Struct({ id: Schema.optionalKey(Schema.String) })),
   }),
 );
-const DetailResponse = Schema.fromJsonString(Schema.Struct({ labels: Schema.optionalKey(Schema.Unknown) }));
+const DetailResponse = Schema.fromJsonString(Schema.Struct({ labels: Schema.optionalKey(Schema.Array(Schema.String)) }));
+const ToolAnswer = Schema.Struct({
+  content: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        type: Schema.optionalKey(Schema.String),
+        text: Schema.optionalKey(Schema.String),
+      }),
+    ),
+  ),
+  isError: Schema.optionalKey(Schema.Boolean),
+});
 
 const hitID = (h: Hit) => h.memory_id || h.id || "";
 
@@ -90,8 +98,7 @@ export function nowledge(c: MemorySourceConfig): Source {
   let client: Promise<Client> | undefined;
   let transport: StreamableHTTPClientTransport | undefined;
 
-  // The session opens on first use: Nowledge not running when the farm starts must not keep it off until a restart.
-  // The SDK's connect is the one call; a connect that fails or is stopped closes what it opened.
+  // The session opens on first use: Nowledge not running when the farm starts must not keep it off until a restart. The SDK's connect is the one call.
   const connect = () => {
     const wire = new StreamableHTTPClientTransport(new URL(c.url), c.key ? { requestInit: { headers: { Authorization: `Bearer ${c.key}` } } } : {});
     transport = wire;
@@ -113,7 +120,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       throw e;
     }));
 
-  /** One tool call; its answer is the text of the result. A session that failed is dropped, so the next call opens another. */
+  /** One tool call. its answer is the text of the result. */
   const call = (tool: "memory_search" | "memory_add" | "get_memory_by_id", args: Search | Add | Detail) =>
     life.alive(
       Effect.gen(function* () {
@@ -129,10 +136,9 @@ export function nowledge(c: MemorySourceConfig): Source {
             return sourceError(e);
           },
         });
-        const text = (Array.isArray(res.content) ? res.content : [])
-          .map((x: unknown) => (Predicate.isObject(x) && "type" in x && x.type === "text" && "text" in x && typeof x.text === "string" ? x.text : ""))
-          .join("");
-        if (res.isError === true) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
+        const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(ToolAnswer)(res));
+        const text = (parsed?.content ?? []).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
+        if (parsed?.isError === true) return yield* new SourceError({ message: `${tool}: ${head(text, 300)}` });
         return text;
       }),
     );
@@ -158,8 +164,7 @@ export function nowledge(c: MemorySourceConfig): Source {
   const add = Effect.fnUntraced(function* (agent: string, text: string, project: string) {
     const body = redact(text);
     const answer = yield* call("memory_add", { content: body, title: redactedHead(body, 60), labels: nowledgeLabels(agent, project), source_app: app });
-    // The new memory's id, at the top or under memory; none when it found the same memory there already. An answer of
-    // another shape is not taken for that: the note may not have been kept, and saying so lets the source's queue log it.
+    // The new memory's id, at the top or under memory. none when it found the same memory there already.
     const added = Option.getOrUndefined(Schema.decodeOption(AddedResponse)(answer));
     if (!added) return yield* new SourceError({ message: "memory_add answered what it should not: " + head(answer, 200) });
     return added.memory_id || added.id || added.memory?.id || "";
@@ -175,7 +180,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       const was = transport;
       client = undefined;
       transport = undefined;
-      if (was) yield* Effect.promise(() => was.close().catch(() => {}));
+      if (was) yield* Effect.tryPromise({ try: () => was.close(), catch: sourceError }).pipe(Effect.ignore({ log: "Debug" }));
     }),
     // Nothing to ask with, nothing asked: listing its newest would only be noise at the start of a run.
     prefetch: Effect.fnUntraced(function* (cue) {
@@ -190,7 +195,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       if (c.read !== true || q.kind === "issue") return { found: [] };
       const hits = yield* find(q.agent, q.text, q.limit, !(c.everything !== true));
       const selected = hits.slice(0, most);
-      // MCP search omits labels; only its detail result can prove a project's scope. The caller's read budget covers both.
+      // MCP search omits labels. only its detail result can prove a project's scope.
       const scopes = yield* Effect.forEach(
         selected,
         (h): Effect.Effect<MemoryScope> => {
@@ -216,7 +221,7 @@ export function nowledge(c: MemorySourceConfig): Source {
           fading: false,
           source: "nowledge",
           score: h.relevance_score ?? 0,
-          scope: scopes[index]!,
+          scope: scopes[index] ?? { kind: "unknown" },
         })),
       };
     }),

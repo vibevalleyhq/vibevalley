@@ -1,0 +1,392 @@
+import { t } from "@vibevalley/i18n";
+import type {
+  ArtifactId,
+  Block,
+  BlockAttrs,
+  BlockId,
+  BlockInput,
+  BlockOp,
+  BlockOpMergeBlocks,
+  BlockOpMoveBlock,
+  BlockOpResult,
+  BlockOpSplitBlock,
+  BlockOpStatus,
+  BlockOpUpdateText,
+  TextSpan,
+} from "@vibevalley/protocol";
+import { isOneOf, keyBetween, normalSpans, sameMarks, validKey } from "@vibevalley/protocol/rules";
+import { artifactId } from "@vibevalley/protocol/schema";
+
+const chars = (s: string) => Array.from(s);
+const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+const or = (...c: number[]) => c.find((x) => x !== 0) ?? 0;
+
+export const plain = (spans: readonly TextSpan[]) => spans.map((s) => s.t).join("");
+
+export const runeLen = (spans: readonly TextSpan[]) => spans.reduce((n, s) => n + chars(s.t).length, 0);
+
+export function sameText(a: readonly TextSpan[], b: readonly TextSpan[]): boolean {
+  const x = normalSpans(a);
+  const y = normalSpans(b);
+  return (
+    x.length === y.length &&
+    x.every((s, i) => {
+      const other = y[i];
+      return other !== undefined && s.t === other.t && sameMarks(s.marks, other.marks);
+    })
+  );
+}
+
+/** Cuts spans at a code-point offset, 0 ≤ at ≤ runeLen(spans). */
+export function splitAt(spans: readonly TextSpan[], at: number): [TextSpan[], TextSpan[]] {
+  const left: TextSpan[] = [];
+  const right: TextSpan[] = [];
+  for (const s of spans) {
+    const r = chars(s.t);
+    if (at <= 0) right.push(s);
+    else if (at >= r.length) left.push(s);
+    else {
+      left.push({ t: r.slice(0, at).join(""), marks: s.marks });
+      right.push({ t: r.slice(at).join(""), marks: s.marks });
+    }
+    at -= r.length;
+  }
+  return [normalSpans(left), normalSpans(right)];
+}
+
+const joined = (a: readonly TextSpan[], b: readonly TextSpan[]) => normalSpans([...a, ...b]);
+
+/** Code has no marks. */
+export function unmarked(spans: readonly TextSpan[]): TextSpan[] {
+  const t = plain(spans);
+  return t !== "" ? [{ t, marks: {} }] : [];
+}
+
+const withText: Readonly<Record<string, boolean>> = {
+  paragraph: true,
+  heading: true,
+  bulleted: true,
+  numbered: true,
+  todo: true,
+  quote: true,
+  code: true,
+  memory_item: true,
+  divider: false,
+  image: false,
+  issue_ref: false,
+};
+
+const knownType = (text: string) => text in withText;
+
+export interface Revision {
+  readonly block: string;
+  readonly rev: number;
+  readonly spans: TextSpan[];
+  readonly kind: "normal" | "conflict";
+}
+
+function result(status: BlockOpStatus, blockId: BlockId, rev = 0, more: { yours?: TextSpan[] | undefined; reason?: string | undefined } = {}): BlockOpResult {
+  return { status, blockId, ...(rev !== 0 ? { rev } : {}), ...(more.yours ? { yours: more.yours } : {}), ...(more.reason ? { reason: more.reason } : {}) };
+}
+
+const applied = (b: Block) => result("applied", b.id, b.rev);
+const rejected = (id: BlockId, reason: string) => result("rejected", id, 0, { reason });
+const gone = (b: Block) => result("conflict", b.id, b.rev, { reason: t("server.artifact.op.deleted") });
+
+const parentOf = (b: Block) => b.parentId ?? "";
+
+export function textFor(type: string, spans: readonly TextSpan[] | undefined): TextSpan[] {
+  if (withText[type] !== true) return [];
+  if (type === "code") return unmarked(spans ?? []);
+  return normalSpans(spans);
+}
+
+const attrsOf = (a: BlockAttrs | undefined): BlockAttrs => Object.fromEntries(Object.entries(a ?? {}).filter(([, v]) => v !== undefined && v !== null));
+
+const attrNames = ["level", "checked", "language", "src", "width", "height", "alt", "issueId", "memoryId"] as const;
+
+function patched(attrs: BlockAttrs, patch: BlockAttrs, unset: readonly string[] = []): BlockAttrs {
+  const out: Record<string, unknown> = { ...attrs };
+  for (const name of attrNames) if (patch[name] !== undefined) out[name] = patch[name];
+  for (const name of unset) {
+    if (!isOneOf(attrNames, name)) throw new Error(t("server.artifact.op.noAttr", { name }));
+    delete out[name];
+  }
+  return out;
+}
+
+/** A block as the wire has it: no parent, and not deleted, are left out. */
+export function wire(b: Block): Block {
+  const { parentId, deleted, ...rest } = b;
+  return { ...rest, ...(parentId !== undefined ? { parentId } : {}), ...(deleted === true ? { deleted: true } : {}) };
+}
+
+export class Page {
+  readonly blocks = new Map<string, Block>();
+  readonly changed: string[] = [];
+  readonly revisions: Revision[] = [];
+  base: (block: string, rev: number) => TextSpan[] | undefined = () => undefined;
+  taken: (id: string) => boolean = () => false;
+
+  readonly artifact: ArtifactId;
+  readonly actor: string;
+  readonly now: number;
+  constructor(artifact: ArtifactId, actor: string, now: number, blocks: readonly Block[]) {
+    this.artifact = artifact;
+    this.actor = actor;
+    this.now = now;
+    for (const b of blocks) this.blocks.set(b.id, { ...b });
+  }
+
+  changedBlocks(): Block[] {
+    return this.changed.flatMap((id) => {
+      const b = this.blocks.get(id);
+      return b ? [wire(b)] : [];
+    });
+  }
+
+  private touch(b: Block) {
+    b.rev++;
+    b.updatedBy = this.actor;
+    b.updated = this.now;
+    if (!this.changed.includes(b.id)) this.changed.push(b.id);
+    this.revisions.push({ block: b.id, rev: b.rev, spans: b.text, kind: "normal" });
+  }
+
+  find(id: string) {
+    return this.blocks.get(id);
+  }
+
+  children(parent: string): Block[] {
+    return [...this.blocks.values()].filter((b) => parentOf(b) === parent).toSorted((a, b) => or(compare(a.orderKey, b.orderKey), compare(a.id, b.id)));
+  }
+
+  private liveParent(parent: string): BlockId | undefined {
+    while (parent !== "") {
+      const b = this.find(parent);
+      if (!b) throw new Error(t("server.artifact.op.noBlock", { id: parent }));
+      if (b.deleted !== true) return b.id;
+      parent = parentOf(b);
+    }
+    return undefined;
+  }
+
+  private fresh(b: BlockInput): Block | string {
+    if (b.id === "") return t("server.artifact.op.noId");
+    if (this.find(b.id) || this.taken(b.id)) return t("server.artifact.op.taken", { id: b.id });
+    if (!knownType(b.type)) return t("server.artifact.op.unknownType", { type: b.type });
+    if (!validKey(b.orderKey)) return t("server.artifact.op.badKey", { key: b.orderKey });
+    let parent: BlockId | undefined;
+    try {
+      parent = this.liveParent(b.parentId ?? "");
+    } catch (e) {
+      return messageOf(e);
+    }
+    return {
+      id: b.id,
+      orderKey: b.orderKey,
+      type: b.type,
+      ...(parent !== undefined ? { parentId: parent } : {}),
+      artifactId: this.artifact,
+      rev: 0,
+      attrs: attrsOf(b.attrs),
+      text: textFor(b.type, b.text),
+      updatedBy: "",
+      updated: 0,
+    };
+  }
+
+  private unchangedSince(b: Block, rev: number) {
+    if (rev === b.rev) return true;
+    const base = this.base(b.id, rev);
+    return base !== undefined && sameText(base, b.text);
+  }
+
+  apply(op: BlockOp): BlockOpResult {
+    switch (op.op) {
+      case "insert_block": {
+        const b = this.fresh(op.block);
+        if (typeof b === "string") return rejected(op.block.id, b);
+        this.blocks.set(b.id, b);
+        this.touch(b);
+        return applied(b);
+      }
+      case "update_text":
+        return this.updateText(op);
+      case "set_attrs": {
+        const b = this.find(op.blockId);
+        if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
+        if (b.deleted === true) return gone(b);
+        try {
+          b.attrs = patched(b.attrs, op.attrs, op.unset);
+        } catch (e) {
+          return rejected(b.id, messageOf(e));
+        }
+        this.touch(b);
+        return applied(b);
+      }
+      case "set_type": {
+        const b = this.find(op.blockId);
+        if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
+        if (b.deleted === true) return gone(b);
+        if (!knownType(op.type)) return rejected(b.id, t("server.artifact.op.unknownType", { type: op.type }));
+        b.type = op.type;
+        b.attrs = attrsOf(op.attrs);
+        b.text = textFor(op.type, b.text);
+        this.touch(b);
+        return applied(b);
+      }
+      case "move_block":
+        return this.move(op);
+      case "delete_block": {
+        const b = this.find(op.blockId);
+        if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
+        if (b.deleted === true) return result("noop", b.id, b.rev);
+        this.setDeleted(b, true);
+        return applied(b);
+      }
+      case "restore_block": {
+        const b = this.find(op.blockId);
+        if (!b) return rejected(op.blockId, t("server.artifact.op.missing"));
+        if (b.deleted !== true) return result("noop", b.id, b.rev);
+        try {
+          const parent = this.liveParent(parentOf(b));
+          if (parent === undefined) delete b.parentId;
+          else b.parentId = parent;
+        } catch (e) {
+          return rejected(b.id, messageOf(e));
+        }
+        this.setDeleted(b, false);
+        return applied(b);
+      }
+      case "split_block":
+        return this.split(op);
+      case "merge_blocks":
+        return this.merge(op);
+    }
+  }
+
+  private updateText(o: BlockOpUpdateText): BlockOpResult {
+    const b = this.find(o.blockId);
+    if (!b) return rejected(o.blockId, t("server.artifact.op.missing"));
+    if (withText[b.type] !== true) return rejected(b.id, t("server.artifact.op.noText"));
+    if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, t("server.artifact.op.noRev", { rev: o.baseRev }));
+    const yours = textFor(b.type, o.text);
+    if (b.deleted === true) {
+      this.lost(b, yours);
+      return gone(b);
+    }
+    if (!this.unchangedSince(b, o.baseRev)) {
+      this.lost(b, yours);
+      return result("conflict", b.id, b.rev, { yours, reason: t("server.artifact.op.changed") });
+    }
+    if (sameText(yours, b.text)) return applied(b);
+    b.text = yours;
+    this.touch(b);
+    return applied(b);
+  }
+
+  private lost(b: Block, yours: TextSpan[]) {
+    this.revisions.push({ block: b.id, rev: b.rev, spans: yours, kind: "conflict" });
+  }
+
+  private setDeleted(b: Block, deleted: boolean) {
+    b.deleted = deleted;
+    this.touch(b);
+    for (const c of this.children(b.id)) if (!(c.deleted !== true) !== deleted) this.setDeleted(c, deleted);
+  }
+
+  private move(o: BlockOpMoveBlock): BlockOpResult {
+    const b = this.find(o.blockId);
+    if (!b) return rejected(o.blockId, t("server.artifact.op.missing"));
+    if (b.deleted === true) return gone(b);
+    if (!validKey(o.orderKey)) return rejected(b.id, t("server.artifact.op.badKey", { key: o.orderKey }));
+    let parent: BlockId | undefined;
+    try {
+      parent = this.liveParent(o.parentId ?? "");
+    } catch (e) {
+      return rejected(b.id, messageOf(e));
+    }
+    for (let at = parent ?? ""; at !== "";) {
+      if (at === b.id) return rejected(b.id, t("server.artifact.op.underSelf"));
+      const up = this.find(at);
+      at = up ? parentOf(up) : "";
+    }
+    if (parent === undefined) delete b.parentId;
+    else b.parentId = parent;
+    b.orderKey = o.orderKey;
+    this.touch(b);
+    return applied(b);
+  }
+
+  private split(o: BlockOpSplitBlock): BlockOpResult {
+    const b = this.find(o.blockId);
+    if (!b) return rejected(o.blockId, t("server.artifact.op.missing"));
+    if (withText[b.type] !== true) return rejected(b.id, t("server.artifact.op.noText"));
+    if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, t("server.artifact.op.noRev", { rev: o.baseRev }));
+    if (b.deleted === true) return gone(b);
+    const nb = this.fresh(o.newBlock);
+    if (typeof nb === "string") return rejected(b.id, nb);
+    let status: BlockOpStatus = "applied";
+    let reason: string | undefined;
+    let at = o.offset;
+    if (!this.unchangedSince(b, o.baseRev)) {
+      at = runeLen(b.text);
+      status = "conflict";
+      reason = t("server.artifact.op.splitAtEnd");
+    } else if (at < 0 || at > runeLen(b.text)) return rejected(b.id, t("server.artifact.op.splitOutside", { at, length: runeLen(b.text) }));
+    const [left, right] = splitAt(b.text, at);
+    b.text = left;
+    nb.text = textFor(nb.type, right);
+    this.blocks.set(nb.id, nb);
+    this.touch(b);
+    this.touch(nb);
+    return result(status, b.id, b.rev, { reason });
+  }
+
+  private merge(o: BlockOpMergeBlocks): BlockOpResult {
+    const target = this.find(o.targetId);
+    const source = this.find(o.sourceId);
+    if (!target) return rejected(o.targetId, t("server.artifact.op.missing"));
+    if (!source) return rejected(o.sourceId, t("server.artifact.op.missing"));
+    if (target.id === source.id) return rejected(target.id, t("server.artifact.op.intoSelf"));
+    if (source.deleted === true) return result("noop", target.id, target.rev);
+    if (target.deleted === true) return gone(target);
+    if (withText[target.type] !== true) return rejected(target.id, t("server.artifact.op.noText"));
+    target.text = textFor(target.type, joined(target.text, source.text));
+    let last = this.children(target.id).at(-1)?.orderKey ?? "";
+    for (const c of this.children(source.id)) {
+      let key: string;
+      try {
+        key = keyBetween(last, "");
+      } catch (e) {
+        return rejected(c.id, messageOf(e));
+      }
+      c.parentId = target.id;
+      c.orderKey = key;
+      last = key;
+      this.touch(c);
+    }
+    this.touch(target);
+    source.deleted = true;
+    this.touch(source);
+    return applied(target);
+  }
+}
+
+/** The live blocks in artifact order: each block, then its children. */
+export function ordered(blocks: readonly Block[]): Block[] {
+  const p = new Page(blocks[0]?.artifactId ?? artifactId(""), "", 0, blocks);
+  const out: Block[] = [];
+  const walk = (parent: string) => {
+    for (const b of p.children(parent)) {
+      if (b.deleted === true) continue;
+      out.push(b);
+      walk(b.id);
+    }
+  };
+  walk("");
+  for (const b of blocks) if (b.deleted !== true && b.parentId !== undefined && !p.find(b.parentId)) out.push(b);
+  return out.map(wire);
+}

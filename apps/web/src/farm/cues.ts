@@ -84,8 +84,7 @@ export function farmCues(prev: FarmSoundInput, next: FarmSoundInput): Cue[] {
   return cues;
 }
 
-// A finished job ripens, pays and may earn an achievement in the same moment, and played together those are one muddy chord: each waits for the
-// one before, then holds the floor.
+// A finished job ripens, pays and may earn an achievement in the same moment, and played together those are one muddy chord.
 let floorFree = 0;
 
 function inTurn(name: SoundName, hold: number) {

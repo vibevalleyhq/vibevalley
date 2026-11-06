@@ -1,17 +1,13 @@
-// The agent's own todos (todo.ts): it lists the steps of one piece of work, marks them as it goes, and reads
-// the whole graph back after each call. The runner moves it along: a subagent's task whose waits are settled goes to a
-// subagent in the background, at most max at once; what the subagent says comes back to the agent as an input. The agent's
-// own todos are its to do; nothing here does them.
-
 import { Effect, FiberSet, Schema, type Scope } from "effect";
 
 import type { Tool } from "./core/loop.ts";
 import { schemaEffectTool } from "./core/tool.ts";
-import { head } from "./head.ts";
 import { todoToolWords as words } from "./prompts.ts";
 import type { Subagent } from "./self.ts";
 import * as engine from "./todo.ts";
 import type { TodoStore } from "./todoStore.ts";
+
+const { head } = engine;
 
 /** Every change, whoever makes it, is told to changed. */
 export function watchedStore(store: TodoStore, changed: (g: engine.Todo[]) => Effect.Effect<void>): TodoStore {
@@ -86,7 +82,7 @@ export function todoTools(store: TodoStore, canHelp: boolean, changed: Effect.Ef
 export interface TodoRunner {
   /** Sends out what is ready and fits. Run after the graph changes and when a subagent comes back. */
   readonly advance: Effect.Effect<void>;
-  /** Calls the subagents back; their tasks wait again. The graph stays as it is otherwise. */
+  /** Calls the subagents back. their tasks wait again. */
   readonly stop: Effect.Effect<void>;
   /** Calls the subagents back and sends no more; their tasks stay working, for recover. */
   readonly close: Effect.Effect<void>;
@@ -94,8 +90,7 @@ export interface TodoRunner {
   readonly recover: Effect.Effect<void>;
   /** The open graph for a fold's summary: what the turns it replaces showed. */
   readonly summary: Effect.Effect<string>;
-  /** What to remind a run that stopped of: its own todos that are ready, unless the graph has not moved through
-   * maxNudges reminders already (it is stuck; the owner or another input will move it). "" for nothing. */
+  /** What to remind a run that stopped of: its own todos that are ready, unless the graph has not moved through maxNudges reminders already (it is stuck. */
   readonly nudge: Effect.Effect<string>;
 }
 
@@ -145,7 +140,7 @@ export const makeTodoRunner = (
           (t) =>
             Effect.gen(function* () {
               out.add(t.id);
-              yield* FiberSet.run(fibers, send(t));
+              yield* FiberSet.run(fibers, send(subagent, t));
             }),
           { discard: true },
         );
@@ -153,9 +148,9 @@ export const makeTodoRunner = (
     });
 
     // Called back (stop, close), its fiber is interrupted before anything is recorded: stop puts the task back to waiting.
-    const send = (t: engine.Todo): Effect.Effect<void> =>
+    const send = (runSubagent: Subagent, t: engine.Todo): Effect.Effect<void> =>
       Effect.gen(function* () {
-        const { said, failed } = yield* subagent!(t.brief, t.title).pipe(
+        const { said, failed } = yield* runSubagent(t.brief, t.title).pipe(
           Effect.map((said) => ({ said, failed: false })),
           Effect.catch((e) => Effect.succeed({ said: e.message, failed: true })),
           Effect.ensuring(Effect.sync(() => out.delete(t.id))),

@@ -1,5 +1,3 @@
-// Where the page points: the repository, and the commands that build the app from it.
-
 export const GITHUB = 'https://github.com/vibevalleyhq/vibevalley'
 
 export const COMMANDS = [

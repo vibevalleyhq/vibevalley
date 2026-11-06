@@ -1,6 +1,3 @@
-// What the owner sees of a real round, beyond the issue page (issue-page.spec.ts): the dispatch as who went to which
-// issue, the rail and the window's title counting what waits on the owner, and reports read without their marks.
-
 import type { Agent } from "@vibevalley/protocol";
 
 import { expect, test } from "./fixtures";
@@ -13,7 +10,7 @@ const fox: Agent = {
   role: "worker",
   duty: "",
   enabled: true,
-  // The test server's pi is the scripted helper (fixtures.ts); 先问清楚 has it ask the owner.
+  // The test server's pi is the scripted helper (fixtures.ts); ask-first has it ask the owner.
   runtime: "pi",
   model: "",
   effort: "",

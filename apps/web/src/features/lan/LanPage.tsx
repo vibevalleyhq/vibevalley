@@ -1,6 +1,3 @@
-// 连接到本机: lets the phones and computers on this network use this farm once paired, the owner
-// saying yes to each here. Only this machine manages it: a paired device is refused the status and shown why.
-
 import { useQueryClient } from "@tanstack/solid-query";
 import { For, Show, untrack } from "solid-js";
 
@@ -102,7 +99,7 @@ export function LanPage() {
           )}
         </Show>
       </Card>
-      <Show when={s() && s()!.devices.length > 0 ? s() : undefined}>
+      <Show when={s() && (s()?.devices.length ?? 0) > 0 ? s() : undefined}>
         {(s) => (
           <Card title={t("web.lan.lan.devices")} action={<span class="text-sm text-muted">{t("web.lan.lan.deviceCount", { n: s().devices.length })}</span>}>
             <For each={s().devices}>

@@ -1,6 +1,3 @@
-// What the phone works out with no device in the way: where a pairing link points, what to call this phone, how the
-// page is told its key. The rest of the shell (App.tsx and its pieces) only wires these to the native modules.
-
 import { t } from "@vibevalley/i18n";
 import { lanKeyCookie } from "@vibevalley/protocol";
 
@@ -10,8 +7,7 @@ export interface PairLink {
   readonly code: string;
 }
 
-/** The QR code's link (http://<address>:<port>/pair?c=<code>), or the app's own (vibevalley://pair?u=<address>&c=<code>),
- * which a link opened elsewhere hands to the app; anything else is undefined. */
+/** The QR code's link, or the app's own, which a link opened elsewhere hands to the app. anything else is undefined. */
 export function parsePairLink(text: string): PairLink | undefined {
   let u: URL;
   try {
@@ -45,8 +41,7 @@ export function deviceName(os: string, model: string | undefined): string {
   return os === "ios" ? "iPhone" : os === "android" ? t("mobile.android") : t("mobile.phone");
 }
 
-/** The script that puts the key where the page's requests carry it, before the page runs: the cookie the farm's lan
- * listener reads (lan.ts), as a paired browser keeps it. */
+/** The script that puts the key where the page's requests carry it, before the page runs. */
 export const keyScript = (key: string) =>
   `document.cookie = ${JSON.stringify(`${lanKeyCookie}=${encodeURIComponent(key)}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Strict`)}; true;`;
 
@@ -62,3 +57,5 @@ export const isPairPage = (farm: string, url: string) => {
 
 /** A volume from Agora's 0..255 as the page's 0..100. */
 export const level = (volume: number | undefined) => Math.round(((volume ?? 0) * 100) / 255);
+
+export const colors = { page: "#fcfcfb", side: "#f6f5f3", ink: "#1c1917", muted: "#5e5852", line: "#1c191714", accent: "#4d7a2a", berry: "#a83a2c" } as const;

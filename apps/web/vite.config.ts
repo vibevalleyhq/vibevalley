@@ -6,8 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import type { Plugin } from "vite-plus";
 
-// The bar's words in every language, from the catalogs: the bar shows before any script of the page, so it cannot call
-// t(). Named here so that scripts/i18n.ts check counts them as used.
+// The bar's words in every language, from the catalogs: the bar shows before any script of the page, so it cannot call t().
 const openingKeys = { waking: "web.opening.waking", label: "web.opening.label", cannotStart: "web.opening.cannotStart" } as const;
 const openingWords = () => {
   const locales = join(import.meta.dirname, "../../packages/i18n/locales");
@@ -15,7 +14,7 @@ const openingWords = () => {
   for (const locale of readdirSync(locales)) {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by scripts/i18n.ts
     const catalog = JSON.parse(readFileSync(join(locales, locale, "web.json"), "utf8")) as { opening: Record<string, string> };
-    words[locale] = Object.fromEntries(Object.entries(openingKeys).map(([name, key]) => [name, catalog.opening[key.slice("web.opening.".length)]!]));
+    words[locale] = Object.fromEntries(Object.entries(openingKeys).map(([name, key]) => [name, catalog.opening[key.slice("web.opening.".length)] ?? ""]));
   }
   return JSON.stringify(words);
 };
@@ -24,9 +23,7 @@ const withOpeningWords = (html: string) => {
   return html.replace('"__OPENING_WORDS__"', openingWords());
 };
 
-// index.html starts on the bar public/opening.html shows (its comment says why): the part between its markers, written
-// where index.html has the opening marker, so that the two cannot drift apart. The desktop app loads opening.html itself
-// from the build, so the copy there gets its words too.
+// index.html starts on the bar public/opening.html shows (its comment says why).
 const opening = (): Plugin => ({
   name: "vibevalley-opening",
   transformIndexHtml(html) {
@@ -50,10 +47,7 @@ export default defineConfig({
   server: { proxy: { "/api": { target: "http://127.0.0.1:8787", ws: true } } },
   // The rules' tests, pure, without a DOM (the Solid plugin would give them jsdom); test/ is Playwright's.
   test: { include: ["src/**/*.test.ts"], environment: "node" },
-  // test: the rules' tests; e2e (package.json) is Playwright against real servers, not cached. The build's input leaves
-  // out the listing of this package's node_modules (only links into the root's .pnpm, whose files stay tracked) and
-  // .vite-temp, where Vite writes its bundled config and removes it: else the cache misses whenever that folder comes
-  // or goes, as on CI's fresh checkout.
+  // test: the rules' tests. e2e (package.json) is Playwright against real servers, not cached.
   run: {
     tasks: {
       test: "vp test run",

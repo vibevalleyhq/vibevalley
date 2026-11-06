@@ -1,9 +1,3 @@
-/**
- * What the pages take from the game before a build, into public/gen/ (not kept in git): the pixel font cut down to
- * the characters the pages use (the whole font is 5 MB of Chinese; the pages use a few hundred characters), and the
- * app's icon for the tab and the home screen, the font's licence, and each language's share card (card.ts). Runs before `astro check` and `astro build` (package.json).
- */
-
 import { copyFileSync, globSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import subsetFont from 'subset-font'

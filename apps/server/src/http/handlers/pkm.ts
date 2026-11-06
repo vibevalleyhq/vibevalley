@@ -1,5 +1,3 @@
-// The answers of the pkm endpoints (packages/protocol/src/pkm/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import { ownerId } from "@vibevalley/protocol";

@@ -316,7 +316,7 @@ describe("mcp", () => {
       // There is no profile to name: what it writes is its own, whatever it says.
       yield* tool("memory_create", { text: "冒名记一条", agent: "scout" });
       expect((yield* memory.list("scout")).some((m) => m.text === "冒名记一条")).toBe(false);
-      // What it wrote is its own, not the owner's: the 记性 tab says which helper wrote it.
+      // What it wrote is its own, not the owner's: the Memory tab says which helper wrote it.
       for (const m of yield* memory.list("lab")) expect([m.author, m.session]).toEqual(["session", "w1"]);
       const found = yield* tool("memory_search", { text: "测试" });
       expect(found).toContain("pnpm test");
@@ -326,8 +326,7 @@ describe("mcp", () => {
     }).pipe(Effect.scoped, Effect.provide(world({ who: (token) => token }))),
   );
 
-  // A helper writes a blocks artifact through its tools: the same ops as the owner's editor, written as its profile; a
-  // stale rewrite over the owner's change is not taken and says what the block has now.
+  // A helper writes a blocks artifact through its tools: the same ops as the owner's editor, written as its profile.
   it.live("lets a helper write in a blocks artifact", () =>
     Effect.gen(function* () {
       const core = yield* Core;

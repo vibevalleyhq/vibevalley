@@ -8,7 +8,7 @@ import { models } from "./models.ts";
 import { requestBody } from "./request.ts";
 import { chunk, http, type Sent } from "./testing.ts";
 
-const flash = models[0]!;
+const flash = models[0];
 const context: Context = { system: "你是管家。", tools: [], messages: [{ role: "user", content: "你好", timestamp: 1 }] };
 const answer = chunk({ reasoning_content: "想" }) + chunk({ content: "你" }) + chunk({ content: "好" }) + chunk({}, "stop") + "data: [DONE]\n\n";
 

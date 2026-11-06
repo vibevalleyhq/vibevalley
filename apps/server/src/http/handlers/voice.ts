@@ -1,5 +1,3 @@
-// The answers of the voice endpoints (packages/protocol/src/voice/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import type { VoiceHandlers } from "@vibevalley/protocol/api";

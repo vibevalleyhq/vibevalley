@@ -1,11 +1,3 @@
-// The village's own life, as the farm sets it up from the engine's pieces (@vibevalley/engine/pixi: particles, critters,
-// rhythm, materialOf): smoke from the chimneys, butterflies by day and birds flying over, fireflies after dark, the
-// pond's ripples, glints and fish, leaves on the wind, the dog's Zzz, dust where helpers walk. What helpers are doing
-// shows where they do it: the anvil sparks while someone runs commands at the workshop, pages flutter at the book
-// house, the mast sends while someone is on the web, Zzz over the bench; ripe plots twinkle. A click where nothing
-// else takes it answers by what is painted there: dust from the soil, bits from the grass, a splash from the pond.
-// None of it is the farm's state: it is drawn from it, every frame.
-
 import { Container, Sprite, type Texture } from "pixi.js";
 
 import {
@@ -121,8 +113,7 @@ export function villageLife(layers: LifeLayers, v: LifeWorld): Life {
   const { due } = cadence();
   const puff = glowTexture(4, 0xebe6dc, 0.9);
   const dustPuff = glowTexture(3, 0xf6e7c6, 0.8);
-  // The critters' pictures (design/pixel critters), or their glyphs when a picture is missing. Butterflies are drawn
-  // white and take their colour; birds keep theirs.
+  // The critters' pictures (design/pixel critters), or their glyphs when a picture is missing. Butterflies are drawn white and take their colour.
   const flap = (name: string, glyphs: Flap): Flap => (has(`${name}-1`) && has(`${name}-2`) ? [texture(`${name}-1`), texture(`${name}-2`)] : glyphs);
   const birdFrames = flap("critter-bird", BIRD);
   const butterflies = flutterers(lit, {

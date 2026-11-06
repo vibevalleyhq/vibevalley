@@ -1,6 +1,3 @@
-// The page's one WebSocket to the farm (rpcPath): the Subscriptions RPCs (packages/protocol/src/rpc.ts), whose answers it
-// decodes by their Schema. Effect stays in this file; the rest of the page reads features/channel/follow.ts.
-
 import { Context, Effect, Layer, ManagedRuntime, Stream } from "effect";
 import { RpcClient, type RpcClientError, RpcSerialization } from "effect/rpc";
 import { Socket } from "effect/socket";
@@ -11,8 +8,7 @@ import { Subscriptions, rpcPath } from "@vibevalley/protocol/rpc";
 
 const makeClient = RpcClient.make(Subscriptions);
 
-// The client lives as long as the runtime: built in its layer, the socket stays open between subscriptions, and the
-// protocol reopens it (with backoff) when it drops.
+// The client lives as long as the runtime.
 class SubscriptionsClient extends Context.Service<SubscriptionsClient, Effect.Success<typeof makeClient>>()("vibevalley/web/SubscriptionsClient") {
   static readonly layer = Layer.effect(SubscriptionsClient, makeClient).pipe(
     Layer.provide(RpcClient.layerProtocolSocket({ retryTransientErrors: true })),
@@ -29,8 +25,7 @@ import.meta.hot?.dispose(() => {
   void runtime?.dispose();
 });
 
-/** Each event of one subscription until stop() is called, or until it ends (the farm ended it, or the line broke): then
- * ended(), and the caller follows again from what it has. */
+/** Each event of one subscription until stop() is called, or until it ends (the farm ended it, or the line broke). */
 function run<E>(
   stream: (c: SubscriptionsClient["Service"]) => Stream.Stream<E, RpcClientError.RpcClientError | ApiError>,
   on: (e: E) => void,
@@ -41,7 +36,7 @@ function run<E>(
   const fiber = runtime.runFork(
     Effect.gen(function* () {
       yield* Stream.runForEach(stream(yield* SubscriptionsClient), (e) => Effect.sync(() => on(e)));
-    }).pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => void (stopped || ended?.())))),
+    }).pipe(Effect.ignore({ log: "Debug" }), Effect.ensuring(Effect.sync(() => void (stopped || ended?.())))),
   );
   return () => {
     stopped = true;

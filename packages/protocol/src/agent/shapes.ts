@@ -1,5 +1,3 @@
-// The shapes of profiles, their looks and templates, skills (docs/subsystems/agent.md).
-
 export const AgentIssueLevelValues = ["error", "warn"] as const;
 export type AgentProblemLevel = (typeof AgentIssueLevelValues)[number];
 
@@ -25,7 +23,7 @@ export interface Skill {
   body: string;
 }
 
-/** What a profile is: an orchestrator (管家) stays and coordinates; a worker (帮工) is sent on an issue. */
+/** What a profile is: an orchestrator (the orchestrator) stays and coordinates; a worker (worker) is sent on an issue. */
 export const AgentRoleValues = ["orchestrator", "worker"] as const;
 export type AgentRole = (typeof AgentRoleValues)[number];
 
@@ -33,7 +31,7 @@ export interface Agent {
   id: string;
   name: string;
   role: AgentRole;
-  /** What it does, in a sentence (职责): orchestrators read it to pick who takes a job. */
+  /** What it does, in a sentence (duty): orchestrators read it to pick who takes a job. */
   duty: string;
   enabled: boolean;
   runtime: string;
@@ -63,8 +61,7 @@ export interface AgentFrom {
 export const AgentTemplateSourceValues = ["builtIn", "added"] as const;
 export type AgentTemplateSource = (typeof AgentTemplateSourceValues)[number];
 
-/** A recipe for a profile (agent.json and persona.md in a folder), in the farm's language: installing it makes a profile.
- * An orchestrator's always runs on VibeValley's own agent. */
+/** A recipe for a profile (agent.json and persona.md in a folder), in the farm's language: installing it makes a profile. */
 export interface AgentTemplate {
   id: string;
   /** Raised when the template changes: a profile installed at a lower one has an update. */

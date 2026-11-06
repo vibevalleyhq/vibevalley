@@ -1,6 +1,5 @@
-// For the stories only; the product never imports it.
-
-import type { Changes, Issue, IssueAction, IssueStage, IssueId, IssueStatus, Priority, SessionId, PhaseView, SessionView } from "@vibevalley/protocol";
+import type { Changes, Issue, IssueAction, IssueStage, IssueStatus, Priority, SessionId, PhaseView, SessionView } from "@vibevalley/protocol";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 export const now = Date.now();
 export const min = 60_000;
 
@@ -16,7 +15,7 @@ const issueStageOf: Record<IssueStatus, IssueStage["state"]> = {
 export type SampleIssue = Omit<Partial<Issue>, "assignments"> & { readonly agent?: string | null; readonly sessionIds?: SessionId[] };
 
 export const sampleIssue = (number: number, title: string, status: IssueStatus, priority: Priority, more: SampleIssue = {}): Issue => {
-  const id = `i${number}` as IssueId;
+  const id = issueId(`i${number}`);
   const { agent, sessionIds = [], mandate = { strength: "explicit", maxBotReviewRounds: 3, autoSubmitPr: false }, ...fields } = more;
   const assignments =
     agent || sessionIds.length > 0
@@ -53,7 +52,7 @@ export const sampleIssue = (number: number, title: string, status: IssueStatus, 
 };
 
 export const sampleSession = (id: string, agent: string, phase: PhaseView, more: Partial<SessionView> = {}): SessionView => ({
-  id: id as SessionId,
+  id: sessionId(id),
   role: "worker",
   name: agent,
   agent,

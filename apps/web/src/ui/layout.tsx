@@ -1,6 +1,3 @@
-// What the workbench's list-and-detail pages share: a list card of rows on the left, the open one's card on the right,
-// the few controls their forms use, the empty state, and the strip that drags the desktop window.
-
 import type { JSX } from "@solidjs/web";
 import { createSignal, omit, Show } from "solid-js";
 
@@ -93,7 +90,7 @@ export function Quiet(props: { children: JSX.Element }) {
   return <p class="text-sm text-muted">{props.children}</p>;
 }
 
-/** A place with nothing in it yet (docs/style/design.md, 空状态): its icon, why it is empty, and the next step if there is one. */
+/** A place with nothing in it yet (docs/style/design.md): its icon, why it is empty, and the next step if there is one. */
 export function Empty(props: { icon: IconName; children: JSX.Element; action?: JSX.Element; testid?: string }) {
   return (
     <div data-testid={props.testid ?? "empty"} class="flex h-full min-h-48 items-center justify-center p-6">
@@ -184,10 +181,7 @@ export function TextLink(props: { children: JSX.Element; href?: string; onClick?
   );
 }
 
-/**
- * The strip's height, and where the window's buttons end along it; both 0 where the window has its own title bar.
- * Read on first use, not at import: parts of the workbench load in tests, where there is no window.
- */
+/** The strip's height, and where the window's buttons end along it. both 0 where the window has its own title bar. */
 let bar: { top: number; left: number } | undefined;
 const barOf = () => (bar ??= currentHost().titleBar ?? { top: 0, left: 0 });
 export const titleBar = {
@@ -199,11 +193,7 @@ export const titleBar = {
   },
 };
 
-/**
- * A strip along the page's top edge drags the desktop window, which has no title bar of its own (the host's titleBar);
- * what is clickable in the strip stays clickable (style.css). First in the page, so that what comes after it can take
- * its clicks back (no-drag goes over drag in page order).
- */
+/** A strip along the page's top edge drags the desktop window, which has no title bar of its own (the host's titleBar). */
 export function WindowStrip() {
   return (
     <Show when={titleBar.top > 0}>

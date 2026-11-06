@@ -1,7 +1,3 @@
-// What moves over the title's picture: clouds crossing, smoke from the chimney, plants
-// swaying along the bottom, seeds blowing off the dandelions, the farmer and the pet on the hill. Everything is placed in
-// the scene's own pixels (1536 × 1024, as the pictures are drawn), so it stays put however the screen crops it.
-
 import type { TitleScene } from "./scene";
 
 const sceneW = 1536;

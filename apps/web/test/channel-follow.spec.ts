@@ -1,6 +1,3 @@
-// What is said in a channel reaches every page showing it through the page's WebSocket (/api/v1/rpc), each
-// line once; the sender's own line takes the place of its sending copy.
-
 import { composerOn, expect, test } from "./fixtures";
 
 test.use({ farm: "channel-follow" });

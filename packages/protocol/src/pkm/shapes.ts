@@ -1,7 +1,4 @@
-// The shapes of the owner's notes (docs/subsystems/pkm.md).
-
-// PKM (docs/subsystems/pkm.md): the owner's notes as Logseq-style outlines in PARA folders. The files are the truth; the
-// server reads them into an index and writes them back, so another editor may change them too.
+// PKM (docs/subsystems/pkm.md): the owner's notes as Logseq-style outlines in PARA folders. The files are the truth.
 
 export const PkmTierValues = ["inbox", "project", "area", "resource", "archive", "journal"] as const;
 /** Where a page sits in PARA, which is the folder its file is in. */

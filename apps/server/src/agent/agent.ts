@@ -1,7 +1,3 @@
-// The profiles (orchestrators and helpers), the skills and each runtime's settings: config.json in the home. A profile
-// is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
-// template when it is missing, so a farm always has one.
-
 import { join } from "node:path";
 
 import { Context, Effect, FileSystem, Layer, Predicate, Schema } from "effect";
@@ -13,7 +9,7 @@ import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { type ApiError, missing, refused, lookIn } from "#/errors.ts";
+import { type ApiError, Inconsistent, lookIn, missing, refused } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { keptFile, readOrSetAside } from "#/infra/files.ts";
 import { defaultSettings } from "#/runtime/presets.ts";
@@ -26,8 +22,7 @@ interface Stored {
   readonly settings: Readonly<Record<string, T.RuntimeSettings>>;
 }
 
-// A profile's look may lack what withCast fills in (a build and a head): config.json from before those existed. They are
-// filled first, then the profile is read whole; anything else that does not fit makes the file unreadable.
+// A profile's look may lack what withCast fills in (a build and a head): config.json from before those existed.
 const readFile = Schema.decodeUnknownSync(
   Schema.fromJsonString(
     Schema.Struct({
@@ -58,7 +53,7 @@ const readStored = (text: string): Stored => {
 function castHash(s: string): number {
   let h = 0;
   for (const ch of s) {
-    const cp = ch.codePointAt(0)!;
+    const cp = ch.codePointAt(0) ?? 0;
     const unit = cp > 0xffff ? 0xd800 + ((cp - 0x10000) >> 10) : cp;
     h = (Math.imul(h, 31) + unit) >>> 0;
   }
@@ -70,7 +65,7 @@ export function withCast(a: T.Agent): T.Agent {
   const look = { ...a.look };
   look.build ||= "biped";
   look.head ||= "rounded";
-  look.species ??= SpeciesValues[castHash(a.id) % SpeciesValues.length]!;
+  look.species ??= SpeciesValues[castHash(a.id) % SpeciesValues.length] ?? "cat";
   look.outfit ??= "farmer";
   if (a.role === "orchestrator") look.orchestrator ??= "farmer";
   else delete look.orchestrator;
@@ -171,7 +166,7 @@ const make = Effect.gen(function* () {
   s = (yield* readOrSetAside(file, readStored, "the profiles start from the starters")) ?? seed;
   // The default orchestrator is always there, and always an orchestrator: a farm is never without one.
   const orchestrator = builtInOf(defaultOrchestrator);
-  if (!orchestrator) return yield* Effect.die(new Error(`the built-in template ${defaultOrchestrator} is not in agent/templates`));
+  if (!orchestrator) return yield* Effect.die(new Inconsistent({ message: `the built-in template ${defaultOrchestrator} is not in agent/templates` }));
   const agents = s.agents.some((a) => a.id === defaultOrchestrator)
     ? s.agents.map((a) => (a.id === defaultOrchestrator ? { ...a, role: "orchestrator" as const } : a))
     : [installed(orchestrator, s.agents, defaultOrchestrator), ...s.agents];
@@ -189,8 +184,7 @@ const make = Effect.gen(function* () {
   const all = () => structuredClone([...s.agents]);
   const sendable = () => all().filter((a) => a.role === "worker");
 
-  /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it
-   * stays and is reached on a call; the default one stays an orchestrator. "" when it can. */
+  /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it stays and is reached on a call. */
   const roleProblem = (a: T.Agent): string => {
     if (a.id === defaultOrchestrator && a.role !== "orchestrator") return t("server.agent.defaultStaysOrchestrator");
     if (a.role === "orchestrator" && a.runtime !== orchestratorRuntime) return t("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime });

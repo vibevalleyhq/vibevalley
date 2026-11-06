@@ -1,6 +1,3 @@
-// The steps and what they prove: acceptance desktop-update.md. The farm's home and Electron's user data are temporary;
-// the owner's app and ~/.vibevalley are not touched.
-
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -72,7 +69,10 @@ async function run(feedUrl: string) {
     await app.evaluate(({ app }) => app.quit());
     return settled;
   } finally {
-    await app.close().catch(() => undefined);
+    await app.close().then(
+      () => undefined,
+      () => undefined,
+    );
   }
 }
 

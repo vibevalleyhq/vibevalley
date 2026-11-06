@@ -1,6 +1,3 @@
-// 小恐龙 on the phone: the rules are farm/phone/games/dino.ts; here the clock, the pad and the drawing, zoomed whole.
-// A or up jumps, down or B ducks; leaving the game ends the run.
-
 import { createEffect, createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

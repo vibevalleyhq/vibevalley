@@ -1,16 +1,13 @@
 import { Cron as EffectCron, DateTime, Option } from "effect";
-// When a cron runs and how it is said. The next run is
-// the first matching minute strictly after the last run. A wall time skipped by a clock change is taken as the same time
-// before the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence. What is due,
-// whether a run was missed, what a run leaves, and whether a cron waits for the owner's yes.
+// When a cron runs and how it is said. The next run is the first matching minute strictly after the last run.
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
 import { actsForOwner, type Actor } from "#/base/actor.ts";
+const weekdayKeys = ["0", "1", "2", "3", "4", "5", "6"] as const;
 /** A day of the week by its number, Sunday 0. */
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a cron day of the week is 0 to 6
-const weekday = (d: number) => t(`server.cron.weekdays.${d as 0 | 1 | 2 | 3 | 4 | 5 | 6}`);
+const weekday = (d: number) => t(`server.cron.weekdays.${weekdayKeys[d] ?? "0"}`);
 const minEveryMinutes = 1;
 
 const cronTime = /^([01]?\d|2[0-3]):([0-5]\d)$/u;
@@ -23,17 +20,13 @@ const fixed = (sign: string, hours: string, minutes: string | undefined) =>
 const named = (tz: string) => (tz === "" || tz === "Local" ? undefined : Option.getOrUndefined(DateTime.zoneMakeNamed(tz)));
 
 /** One parser for accepted, scheduled and displayed zones: IANA or a fixed offset, optionally prefixed with GMT. */
-function givenZone(tz: string): DateTime.TimeZone | undefined {
+export function givenZone(tz: string): DateTime.TimeZone | undefined {
   const m = givenOffset.exec(tz);
-  if (m) return fixed(m[1]!, m[2]!, m[3]);
+  if (m?.[1] && m[2]) return fixed(m[1], m[2], m[3]);
   return tz.startsWith("+") || tz.startsWith("-") ? undefined : named(tz);
 }
 
-/**
- * The first run of the cron strictly after from. Cron walks the wall clock: a time a clock change skipped is taken as
- * the same time before the change (02:30 on a spring-forward night is 03:30), a repeated one is its first occurrence;
- * none at all (30 February) is undefined.
- */
+/** The first run of the cron strictly after from. */
 function nextOf(cron: EffectCron.Cron, from: number): number | undefined {
   try {
     return EffectCron.next(cron, new Date(from)).getTime();
@@ -116,11 +109,11 @@ interface CronSpec {
 
 /** The bounds of the five fields; server.cron.expr.fields names them, in this order. */
 const cronFields = [
-  { min: 0, max: 59 },
-  { min: 0, max: 23 },
-  { min: 1, max: 31 },
-  { min: 1, max: 12 },
-  { min: 0, max: 7 },
+  { min: 0, max: 59, key: "0" },
+  { min: 0, max: 23, key: "1" },
+  { min: 1, max: 31, key: "2" },
+  { min: 1, max: 12, key: "3" },
+  { min: 0, max: 7, key: "4" },
 ] as const;
 
 /** Go's strconv.Atoi: an optional sign and ASCII digits, within 64 bits. */
@@ -133,10 +126,9 @@ function atoi(s: string): number | undefined {
 /** Go's strings.Fields: split on Unicode white space, as Go's unicode.IsSpace has it. */
 const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/u).filter((f) => f !== "");
 
-function cronField(field: string, i: number): Set<number> | string {
-  const { min: lo, max: hi } = cronFields[i]!;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- i indexes cronFields' five fields
-  const bad = t("server.cron.expr.badField", { name: t(`server.cron.expr.fields.${i as 0 | 1 | 2 | 3 | 4}`), field });
+function cronField(field: string, spec: (typeof cronFields)[number]): Set<number> | string {
+  const { min: lo, max: hi, key } = spec;
+  const bad = t("server.cron.expr.badField", { name: t(`server.cron.expr.fields.${key}`), field });
   const bits = new Set<number>();
   for (const item of field.split(",")) {
     const slash = item.indexOf("/");
@@ -167,17 +159,21 @@ function cronField(field: string, i: number): Set<number> | string {
 }
 
 function parseCron(expr: string): CronSpec | string {
-  const f = fields(expr);
-  if (f.length !== 5) return t("server.cron.expr.fiveFields");
-  const bits: Set<number>[] = [];
-  for (let i = 0; i < 5; i++) {
-    const b = cronField(f[i]!, i);
-    if (typeof b === "string") return b;
-    bits.push(b);
-  }
-  const dow = bits[4]!;
+  const [f0, f1, f2, f3, f4, ...rest] = fields(expr);
+  if (f0 === undefined || f1 === undefined || f2 === undefined || f3 === undefined || f4 === undefined || rest.length > 0)
+    return t("server.cron.expr.fiveFields");
+  const b0 = cronField(f0, cronFields[0]);
+  if (typeof b0 === "string") return b0;
+  const b1 = cronField(f1, cronFields[1]);
+  if (typeof b1 === "string") return b1;
+  const b2 = cronField(f2, cronFields[2]);
+  if (typeof b2 === "string") return b2;
+  const b3 = cronField(f3, cronFields[3]);
+  if (typeof b3 === "string") return b3;
+  const dow = cronField(f4, cronFields[4]);
+  if (typeof dow === "string") return dow;
   if (dow.delete(7)) dow.add(0);
-  return { minutes: bits[0]!, hours: bits[1]!, days: bits[2]!, months: bits[3]!, weekdays: dow, and: f[2]!.startsWith("*") || f[4]!.startsWith("*") };
+  return { minutes: b0, hours: b1, days: b2, months: b3, weekdays: dow, and: f2.startsWith("*") || f4.startsWith("*") };
 }
 
 function cronNext(from: number, expr: string, tz: string): number | undefined {
@@ -189,13 +185,13 @@ function cronNext(from: number, expr: string, tz: string): number | undefined {
 
 /** The common shapes in words, the rest as the expression itself. */
 function cronText(expr: string): string {
-  const f = fields(expr);
+  const [f0 = "", f1 = "", f2 = "", f3 = "", f4 = ""] = fields(expr);
   if (typeof parseCron(expr) === "string") return t("server.cron.when.cron", { expr });
-  const mi = atoi(f[0]!);
-  const h = atoi(f[1]!);
+  const mi = atoi(f0);
+  const h = atoi(f1);
   const clock = mi !== undefined && h !== undefined ? String(100 + h).slice(1) + ":" + String(100 + mi).slice(1) : "";
-  if (clock !== "" && f[2] === "*" && f[3] === "*") {
-    switch (f[4]) {
+  if (clock !== "" && f2 === "*" && f3 === "*") {
+    switch (f4) {
       case "*":
         return t("server.cron.when.daily", { time: clock });
       case "1-5":
@@ -205,11 +201,11 @@ function cronText(expr: string): string {
       case "6,7":
       case "6-7":
         return t("server.cron.when.weekend", { time: clock });
-      case undefined:
+      case "":
         break;
     }
     const days: number[] = [];
-    for (const d of f[4]!.split(",")) {
+    for (const d of f4.split(",")) {
       const n = atoi(d);
       if (n === undefined) return t("server.cron.when.cron", { expr });
       days.push(n % 7);
@@ -217,11 +213,11 @@ function cronText(expr: string): string {
     const sorted = [...new Set(days)].toSorted((a, b) => a - b);
     return t("server.cron.when.weekly", { days: list(sorted.map(weekday)), time: clock });
   }
-  if (clock !== "" && f[3] === "*" && f[4] === "*") {
-    const d = atoi(f[2]!);
+  if (clock !== "" && f3 === "*" && f4 === "*") {
+    const d = atoi(f2);
     return d !== undefined ? t("server.cron.when.monthly", { day: d, time: clock }) : t("server.cron.when.cron", { expr });
   }
-  if (mi !== undefined && f[1] === "*" && f[2] === "*" && f[3] === "*" && f[4] === "*") return t("server.cron.when.hourly", { minute: mi });
+  if (mi !== undefined && f1 === "*" && f2 === "*" && f3 === "*" && f4 === "*") return t("server.cron.when.hourly", { minute: mi });
   return t("server.cron.when.cron", { expr });
 }
 
@@ -240,11 +236,7 @@ export const isMissed = (s: T.Cron, now: number) => now - (nextRun(s) ?? now) > 
 /** A one-off runs once: then it is off. */
 export const afterRun = (s: T.Cron, now: number): T.Cron => ({ ...s, lastRun: now, enabled: s.when.kind === "once" ? false : s.enabled });
 
-/**
- * Whether a cron waits for the owner's yes before it can come due. One set on the owner's word never waits. Without
- * it, only a one-off follow-up for the asker itself goes ahead: one that comes back again, or sends a helper (who spends
- * money) straight away, waits.
- */
+/** Whether a cron waits for the owner's yes before it can come due. One set on the owner's word never waits. */
 export function needsOK(req: T.CronRequest, by: Actor): boolean {
   return !actsForOwner(by) && (req.when.kind !== "once" || (req.agent ?? "").trim() !== "");
 }
@@ -276,12 +268,10 @@ export function dueText(s: T.Cron, missed: boolean): string {
 }
 
 // Five fields, minute, hour, day of month, month and day of week, each a comma list of *, n or a-b, any with /step.
-// Day of week is 0 to 7, both 0 and 7 Sunday. As in Vixie cron, when neither day field starts with *, a day matching
-// either one is due; otherwise it must match both.
 
 function exprProblem(expr: string, now: number, tz: string | undefined): string {
   const spec = parseCron(expr);
   if (typeof spec === "string") return spec;
-  const timeZone = tz === undefined ? DateTime.zoneMakeLocal() : givenZone(tz)!;
+  const timeZone = tz === undefined ? DateTime.zoneMakeLocal() : (givenZone(tz) ?? DateTime.zoneMakeLocal());
   return nextOf(EffectCron.make({ ...spec, tz: timeZone }), now) === undefined ? t("server.cron.expr.never", { expr }) : "";
 }

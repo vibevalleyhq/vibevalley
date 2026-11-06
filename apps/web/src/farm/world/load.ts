@@ -1,5 +1,3 @@
-// The level and the atlas, fetched once per page (public/village.ldtk, public/pixel).
-
 import { type Accessor, createSignal, onSettled } from "solid-js";
 
 import { messageOf } from "#/base/format.ts";

@@ -1,13 +1,11 @@
-// The answers of the orchestrator endpoints (packages/protocol/src/orchestrator/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import type { OrchestratorHandlers } from "@vibevalley/protocol/api";
 
+import { missing, lookIn } from "#/base/errors.ts";
 import { Core } from "#/core/core.ts";
-import { missing, lookIn } from "#/errors.ts";
 import { Memory } from "#/memory/memory.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
 

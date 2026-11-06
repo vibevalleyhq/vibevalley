@@ -1,6 +1,3 @@
-// 推箱子 on the phone: the rules are farm/phone/games/sokoban.ts; the warehouse is kept while the phone is away or a
-// call comes in.
-
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

@@ -1,5 +1,3 @@
-// The shapes of chat apps (docs/subsystems/channel.md).
-
 export interface ConnectorStatus {
   id: ConnectorID;
   state: ConnectorState;
@@ -32,4 +30,10 @@ export interface VerifyRequest {
 
 export interface ConnectorsChannelRequest {
   channel: string;
+}
+
+export interface FactConnectorChanged {
+  type: "connectorChanged";
+  at: number;
+  status: ConnectorStatus;
 }

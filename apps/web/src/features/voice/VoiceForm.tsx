@@ -1,49 +1,27 @@
-// 声音: the line's settings in 设置 › 语音 (/settings/call: credentials, how it listens, who answers; /settings/moss:
-// MOSS Live's key; /settings/dictation) and the orchestrator's voice
-// on /orchestrator/voice (what it says, in what voice). Each part saves only its own fields over the settings as they are
-// now: the other part may have been saved meanwhile.
-
-import type { JSX } from "@solidjs/web";
 import { keepPreviousData } from "@tanstack/solid-query";
-import { createSignal, For, onSettled, Show, snapshot, untrack } from "solid-js";
+import { createSignal, Show, snapshot, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import {
-  type Area,
   AreaValues,
   type Dictation,
-  type KeySource,
   type KeyStatus,
-  type Language,
   LanguageValues,
   ModelValues,
   type SettingsStatus,
   type SettingsUpdate,
-  type VoiceAnswer,
   VoiceAnswerAgoraModelValues,
-  type VoiceASR,
-  voiceIdleSecondsMax,
-  voiceIdleSecondsMin,
-  voiceInterruptMsMax,
-  voiceInterruptMsMin,
   type VoiceSettings,
-  voiceSilenceMsMax,
-  voiceSilenceMsMin,
-  type VoiceTTS,
-  VoiceTTSMinimaxModelValues,
-  VoiceValues,
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { variant, aria, createSettled, Keyed } from "#/base/dom.tsx";
+import { createSettled, Keyed, variant } from "#/base/dom.tsx";
 import { api, reasonOf } from "#/infra/api.ts";
 import { ready, useQuery, useSettings } from "#/infra/query.ts";
 import { saveSettings } from "#/infra/settings.ts";
-import { A } from "#/ui/A.tsx";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
-import { Select, TextArea, TextInput } from "#/ui/Field.tsx";
-import { Icon } from "#/ui/Icon.tsx";
+import { Select, TextInput } from "#/ui/Field.tsx";
 import { IconLink, OutLink } from "#/ui/IconButton.tsx";
 import { KeyField, SaveBar } from "#/ui/KeyField.tsx";
 import { Card, Quiet, SecretInput } from "#/ui/layout.tsx";
@@ -53,125 +31,31 @@ import { Hint } from "#/ui/Tip.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 import { MossVerify } from "./MossVerify";
-
-// The voice form's choices: what each stage offers, the limits on the numbers and what 恢复默认 on one part touches. Why
-// settings cannot be saved is the server's answer (setting.validate).
-
-const areaLabel: Record<Area, string> = {
-  US: t("web.voice.choices.area.US"),
-  EU: t("web.voice.choices.area.EU"),
-  AP: t("web.voice.choices.area.AP"),
-  CN: t("web.voice.choices.area.CN"),
-};
-const languageLabel: Record<Language, string> = {
-  "zh-CN": t("web.voice.choices.language.zh-CN"),
-  "zh-HK": t("web.voice.choices.language.zh-HK"),
-  "zh-TW": t("web.voice.choices.language.zh-TW"),
-  "en-US": t("web.voice.choices.language.en-US"),
-  "ja-JP": t("web.voice.choices.language.ja-JP"),
-  "ko-KR": t("web.voice.choices.language.ko-KR"),
-};
-
-const asrLabel: Record<VoiceASR["vendor"], string> = {
-  ares: t("web.voice.choices.asr.ares"),
-  deepgram: "Deepgram",
-  microsoft: t("web.voice.choices.asr.microsoft"),
-};
-const answerLabel: Record<VoiceAnswer["vendor"], string> = {
-  orchestrator: t("web.base.orchestrator"),
-  agora: t("web.voice.choices.answer.agora"),
-  deepseek: "DeepSeek",
-  openai: t("web.voice.choices.answer.openai"),
-};
-const ttsLabel: Record<VoiceTTS["vendor"], string> = { minimax: "MiniMax", openai: "OpenAI", microsoft: t("web.voice.choices.asr.microsoft") };
-
-/** What each starts with when picked: the one in use if it is the same vendor, else these. */
-const asrStart: Record<VoiceASR["vendor"], VoiceASR> = {
-  ares: { vendor: "ares" },
-  deepgram: { vendor: "deepgram", model: "nova-3" },
-  microsoft: { vendor: "microsoft", region: "eastasia" },
-};
-const answerStart: Record<VoiceAnswer["vendor"], VoiceAnswer> = {
-  orchestrator: { vendor: "orchestrator" },
-  agora: { vendor: "agora", model: "gpt-4.1-mini" },
-  deepseek: { vendor: "deepseek", model: "deepseek-chat" },
-  openai: { vendor: "openai", url: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini" },
-};
-const ttsStart: Record<VoiceTTS["vendor"], VoiceTTS> = {
-  minimax: { vendor: "minimax", model: "speech_2_6_turbo", voiceId: "Chinese (Mandarin)_Gentle_Youth" },
-  openai: { vendor: "openai", voice: "nova" },
-  microsoft: { vendor: "microsoft", region: "eastasia", voiceName: "zh-CN-XiaoxiaoNeural" },
-};
-
-/** Any other id can be typed. */
-const minimaxVoices = [
-  { id: "Chinese (Mandarin)_Gentle_Youth", label: t("web.voice.choices.minimax.gentle") },
-  { id: "male-qn-qingse", label: t("web.voice.choices.minimax.qingse") },
-  { id: "male-qn-jingying", label: t("web.voice.choices.minimax.jingying") },
-  { id: "male-qn-badao", label: t("web.voice.choices.minimax.badao") },
-  { id: "male-qn-daxuesheng", label: t("web.voice.choices.minimax.student") },
-  { id: "female-shaonv", label: t("web.voice.choices.minimax.girl") },
-  { id: "female-yujie", label: t("web.voice.choices.minimax.yujie") },
-  { id: "female-chengshu", label: t("web.voice.choices.minimax.mature") },
-  { id: "female-tianmei", label: t("web.voice.choices.minimax.sweet") },
-  { id: "presenter_male", label: t("web.voice.choices.minimax.presenterMale") },
-  { id: "presenter_female", label: t("web.voice.choices.minimax.presenterFemale") },
-  { id: "audiobook_male_1", label: t("web.voice.choices.minimax.audiobookMale") },
-  { id: "audiobook_female_1", label: t("web.voice.choices.minimax.audiobookFemale") },
-] as const;
-
-/** Any other name can be typed. */
-const microsoftVoices = ["zh-CN-XiaoxiaoNeural", "zh-CN-YunxiNeural", "zh-CN-XiaoyiNeural", "zh-CN-YunjianNeural", "en-US-JennyNeural", "en-US-GuyNeural"];
-
-/** A MiniMax voice's sample in the repository (public/voice-samples): anything but letters, digits, _ and - is _. */
-const voiceSample = (id: string) => (minimaxVoices.some((v) => v.id === id) ? `/voice-samples/${id.replace(/[^\w-]/gu, "_")}.mp3` : undefined);
-
-type VoiceNumber = "silenceMs" | "interruptMs" | "idleSeconds";
-
-const voiceLimits: Record<VoiceNumber, { min: number; max: number }> = {
-  silenceMs: { min: voiceSilenceMsMin, max: voiceSilenceMsMax },
-  interruptMs: { min: voiceInterruptMsMin, max: voiceInterruptMsMax },
-  idleSeconds: { min: voiceIdleSecondsMin, max: voiceIdleSecondsMax },
-};
-
-const numberLabel: Record<VoiceNumber, string> = {
-  silenceMs: t("web.voice.choices.number.silenceMs"),
-  interruptMs: t("web.voice.choices.number.interruptMs"),
-  idleSeconds: t("web.voice.choices.number.idleSeconds"),
-};
-
-/** The line: credentials' area, how it listens and who answers. The agent: what it says and in what voice. */
-type VoicePart = "line" | "agent";
-
-/** What 恢复默认 on one part touches, and what saving one part sends. */
-function withPart(part: VoicePart, onto: VoiceSettings, from: VoiceSettings): VoiceSettings {
-  return part === "line"
-    ? {
-        ...onto,
-        area: from.area,
-        language: from.language,
-        asr: from.asr,
-        answer: from.answer,
-        silenceMs: from.silenceMs,
-        interruptMs: from.interruptMs,
-        idleSeconds: from.idleSeconds,
-      }
-    : { ...onto, persona: from.persona, greeting: from.greeting, failureMessage: from.failureMessage, tts: from.tts };
-}
+import {
+  answerLabel,
+  answerStart,
+  areaLabel,
+  asrLabel,
+  asrStart,
+  Cols,
+  keyFrom,
+  Labeled,
+  languageLabel,
+  numberLabel,
+  options,
+  plain,
+  VoiceAgentSection,
+  voiceLimits,
+  type VoiceNumber,
+  type VoicePart,
+  withPart,
+} from "./VoiceVendorFields";
 
 const sameVoice = (a: VoiceSettings, b: VoiceSettings) => same(a, b);
 
 type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey" | "mossKey";
 
-const keyFrom: Record<KeySource, string> = { settings: t("web.base.form.from.settings"), config: t("web.base.form.from.config") };
-
-const options = <T extends string>(labels: Record<T, string>) =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- labels is written out as a literal, one key per T and no more
-  (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
-const plain = <T extends string>(values: readonly T[]) => values.map((value) => ({ value, label: value }));
-
-/** Which of the line's settings a page shows: the call (credentials, listening, who answers), MOSS Live's key, or
- * dictation. They save together, each only what it changed. */
+/** Which of the line's settings a page shows: the call (credentials, listening, who answers), MOSS Live's key, or dictation. */
 type LineView = "call" | "moss" | "dictation";
 
 export function VoiceForm(props: { part: VoicePart; view?: LineView }) {
@@ -284,7 +168,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
       onSave={() => void submit()}
       onUndo={undo}
       left={<Show when={error() ?? problem()}>{(e) => <p class="text-berry">{e()}</p>}</Show>}
-      // 恢复默认 puts back the call's own settings: on MOSS Live's key or dictation it would touch what is not shown.
+      // Reset to defaults puts back the call's own settings: on MOSS Live's key or dictation it would touch what is not shown.
       extra={
         <Show when={props.part === "agent" || props.view === "call"}>
           <Button tone="quiet" data-testid="reset" disabled={atDefaults()} onClick={() => set(withPart(props.part, draft(), base().voiceDefaults))}>
@@ -295,20 +179,26 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
     />
   );
 
-  const tts = () => draft().tts;
   const asr = () => draft().asr;
   const answer = () => draft().answer;
-  const credentialsReady = () => base().agoraAppId.source !== undefined && base().agoraAppCertificate.source !== undefined;
-  const answerHint = () =>
-    answer().vendor === "orchestrator"
+  const credentialsReady = () =>
+    answer().vendor === "moss"
+      ? base().mossKey.source !== undefined
+      : base().agoraAppId.source !== undefined && base().agoraAppCertificate.source !== undefined;
+  const answerHint = () => {
+    const source = base().deepseekApiKey.source;
+    return answer().vendor === "orchestrator"
       ? t("web.voice.voice.answer.orchestrator")
-      : answer().vendor === "agora"
-        ? t("web.voice.voice.answer.agora")
-        : answer().vendor === "deepseek"
-          ? base().deepseekApiKey.source
-            ? t("web.voice.voice.answer.deepseek", { from: keyFrom[base().deepseekApiKey.source!] })
-            : t("web.voice.voice.answer.noDeepseek")
-          : t("web.voice.voice.answer.openai");
+      : answer().vendor === "moss"
+        ? t("web.voice.voice.answer.moss")
+        : answer().vendor === "agora"
+          ? t("web.voice.voice.answer.agora")
+          : answer().vendor === "deepseek"
+            ? source !== undefined
+              ? t("web.voice.voice.answer.deepseek", { from: keyFrom[source] })
+              : t("web.voice.voice.answer.noDeepseek")
+            : t("web.voice.voice.answer.openai");
+  };
 
   return (
     <Show
@@ -380,7 +270,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       label={t("web.voice.voice.asr")}
                       testid="voice-asr"
                       value={asr().vendor}
-                      options={options(asrLabel)}
+                      options={options(["ares", "deepgram", "microsoft"] as const, asrLabel)}
                       onChange={(v) => set({ ...draft(), asr: v === asr().vendor ? asr() : asrStart[v] })}
                     />
                   </Labeled>
@@ -431,10 +321,18 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                     label={t("web.voice.voice.who")}
                     testid="voice-answer"
                     value={answer().vendor}
-                    options={options(answerLabel)}
+                    options={options(["orchestrator", "moss", "agora", "deepseek", "openai"] as const, answerLabel)}
                     onChange={(v) => set({ ...draft(), answer: v === answer().vendor ? answer() : answerStart[v] })}
                   />
                 </Labeled>
+                <Show when={answer().vendor === "moss"}>
+                  <Cols>
+                    {secret("mossKey", "MOSS API Key", () => base().mossKey, {
+                      href: "https://platform.mosi.cn/",
+                      label: t("web.voice.voice.moss.console"),
+                    })}
+                  </Cols>
+                </Show>
                 <Show when={variant(answer(), "vendor", "agora")}>
                   {(a) => (
                     <Labeled label={t("web.voice.voice.model")}>
@@ -486,7 +384,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               </Card>
             </Show>
             <Show when={props.view === "dictation"}>
-              {/* The page's title already says 听写: the card has none of its own. */}
+              {/* The page's title already says Dictation: the card has none of its own. */}
               <Card class="max-w-4xl">
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <Segmented
@@ -554,205 +452,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
         </div>
       }
     >
-      <div class="flex max-w-4xl flex-col gap-3">
-        <p class="text-sm text-muted">
-          {t("web.voice.voice.persona.intro")}
-          <A class="underline" href="/settings/call">
-            {t("web.voice.voice.section.label")}
-          </A>
-          {t("web.voice.voice.persona.page")}
-        </p>
-        <Card title={t("web.voice.voice.persona.open")} action={<span class="text-sm text-muted">{t("web.voice.voice.persona.openParts")}</span>}>
-          {/* The persona is the quick model's only: the orchestrator answering is itself, with its own prompt. */}
-          <Show when={answer().vendor !== "orchestrator"} fallback={<p class="text-sm text-muted">{t("web.voice.voice.persona.ownCall")}</p>}>
-            <Labeled label={t("web.voice.voice.persona.persona")} hint={t("web.voice.voice.persona.personaHint")}>
-              <TextArea
-                aria-label={t("web.voice.voice.persona.persona")}
-                rows={8}
-                value={draft().persona}
-                onInput={(e) => set({ ...draft(), persona: e.currentTarget.value })}
-              />
-            </Labeled>
-          </Show>
-          <Cols>
-            <Labeled label={t("web.voice.voice.persona.greeting")} hint={t("web.voice.voice.persona.greetingHint")}>
-              <TextInput
-                data-testid="greeting"
-                aria-label={t("web.voice.voice.persona.greeting")}
-                value={draft().greeting}
-                onInput={(e) => set({ ...draft(), greeting: e.currentTarget.value })}
-              />
-            </Labeled>
-            <Labeled label={t("web.voice.voice.persona.failure")} hint={t("web.voice.voice.persona.failureHint")}>
-              <TextInput
-                aria-label={t("web.voice.voice.persona.failure")}
-                value={draft().failureMessage}
-                onInput={(e) => set({ ...draft(), failureMessage: e.currentTarget.value })}
-              />
-            </Labeled>
-          </Cols>
-        </Card>
-        <Card title={t("web.voice.voice.persona.speak")} action={<span class="text-sm text-muted">{ttsLabel[tts().vendor]}</span>}>
-          <Cols>
-            <Labeled
-              label={t("web.voice.voice.persona.tts")}
-              hint={tts().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}
-            >
-              <Segmented
-                label={t("web.voice.voice.persona.tts")}
-                testid="voice-tts"
-                value={tts().vendor}
-                options={options(ttsLabel)}
-                onChange={(v) => set({ ...draft(), tts: v === tts().vendor ? tts() : ttsStart[v] })}
-              />
-            </Labeled>
-            <Show when={variant(tts(), "vendor", "minimax")}>
-              {(narrowed) => (
-                <Labeled label={t("web.voice.voice.persona.ttsModel")}>
-                  <Segmented
-                    label={t("web.voice.voice.persona.ttsModel")}
-                    testid="voice-tts-model"
-                    value={narrowed().model}
-                    options={plain(VoiceTTSMinimaxModelValues)}
-                    onChange={(model) => set({ ...draft(), tts: { ...narrowed(), model } })}
-                  />
-                </Labeled>
-              )}
-            </Show>
-            <Show when={variant(tts(), "vendor", "openai")}>
-              {(narrowed) => (
-                <Labeled label={t("web.voice.voice.persona.voice")} hint={t("web.voice.voice.persona.openaiVoice")}>
-                  <Segmented
-                    label={t("web.voice.voice.persona.voice")}
-                    testid="voice-voice"
-                    value={narrowed().voice}
-                    options={plain(VoiceValues)}
-                    onChange={(voice) => set({ ...draft(), tts: { ...narrowed(), voice } })}
-                  />
-                </Labeled>
-              )}
-            </Show>
-            <Show when={variant(tts(), "vendor", "microsoft")}>
-              {(narrowed) => (
-                <>
-                  <Labeled label={t("web.voice.voice.azureArea")}>
-                    <TextInput
-                      aria-label={t("web.voice.voice.persona.ttsArea")}
-                      class="font-mono"
-                      value={narrowed().region}
-                      onInput={(e) => set({ ...draft(), tts: { ...narrowed(), region: e.currentTarget.value } })}
-                    />
-                  </Labeled>
-                  <Labeled label={t("web.voice.voice.persona.voice")} hint={t("web.voice.voice.persona.azureVoice")}>
-                    <TextInput
-                      aria-label={t("web.voice.voice.persona.microsoftVoice")}
-                      class="font-mono"
-                      list="microsoft-voices"
-                      value={narrowed().voiceName}
-                      onInput={(e) => set({ ...draft(), tts: { ...narrowed(), voiceName: e.currentTarget.value } })}
-                    />
-                    <datalist id="microsoft-voices">
-                      <For each={microsoftVoices}>{(v) => <option value={v} />}</For>
-                    </datalist>
-                  </Labeled>
-                  {secret("ttsKey", t("web.voice.voice.microsoftKey"), () => base().ttsKey)}
-                </>
-              )}
-            </Show>
-          </Cols>
-          <Show when={variant(tts(), "vendor", "minimax")}>
-            {(narrowed) => (
-              <>
-                <Labeled label={t("web.voice.voice.persona.voice")} hint={t("web.voice.voice.persona.minimaxVoice")}>
-                  <MiniMaxVoices value={narrowed().voiceId} onChange={(voiceId) => set({ ...draft(), tts: { ...narrowed(), voiceId } })} />
-                </Labeled>
-                <Cols>
-                  <Labeled label={t("web.voice.voice.persona.voiceId")}>
-                    <TextInput
-                      aria-label={t("web.voice.voice.persona.voiceId")}
-                      class="font-mono"
-                      value={narrowed().voiceId}
-                      onInput={(e) => set({ ...draft(), tts: { ...narrowed(), voiceId: e.currentTarget.value } })}
-                    />
-                  </Labeled>
-                </Cols>
-              </>
-            )}
-          </Show>
-        </Card>
-        {bar()}
-      </div>
+      <VoiceAgentSection draft={draft()} set={set} ttsKeyField={secret("ttsKey", t("web.voice.voice.microsoftKey"), () => base().ttsKey)} bar={bar()} />
     </Show>
-  );
-}
-
-function Cols(props: { children: JSX.Element }) {
-  return <div class="grid gap-4 md:grid-cols-2">{props.children}</div>;
-}
-
-/** A label, what sits at its right (清掉), the control and a hint under it. */
-function Labeled(props: { label: string; hint?: string; aside?: JSX.Element; children: JSX.Element }) {
-  return (
-    <div class="flex flex-col gap-1">
-      <div class="flex items-center gap-1.5">
-        <span class="text-xs font-medium text-muted">{props.label}</span>
-        <Show when={props.hint}>{(h) => <Hint text={h()} />}</Show>
-        <span class="flex-1" />
-        {props.aside}
-      </div>
-      <div>{props.children}</div>
-    </div>
-  );
-}
-
-/** The MiniMax voices with a sample each: one plays at a time, pressed again it stops. */
-function MiniMaxVoices(props: { value: string; onChange: (id: string) => void }) {
-  const [playing, setPlaying] = createSignal<string>();
-  let audio: HTMLAudioElement | undefined;
-  onSettled(() => () => audio?.pause());
-  const play = (id: string, src: string) => {
-    audio?.pause();
-    if (playing() === id) return setPlaying(undefined);
-    const a = new Audio(src);
-    audio = a;
-    a.onended = a.onerror = () => setPlaying((p) => (p === id ? undefined : p));
-    setPlaying(id);
-    a.play().catch(() => setPlaying(undefined));
-  };
-  return (
-    <div class="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-      <For each={minimaxVoices}>
-        {(v) => {
-          const sample = voiceSample(v.id);
-          const chosen = () => v.id === props.value;
-          return (
-            <div class={["flex h-[34px] items-center rounded-md border", chosen() ? "border-ink/40 bg-selected" : "border-line bg-page"]}>
-              <button
-                type="button"
-                disabled={!sample}
-                title={sample ? t("web.voice.voice.persona.sample", { greeting: t("shared.greeting") }) : t("web.voice.voice.persona.noSample")}
-                aria-label={playing() === v.id ? t("web.voice.voice.persona.stop", { name: v.label }) : t("web.voice.voice.persona.play", { name: v.label })}
-                class="ml-0.5 inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded hover:bg-hover disabled:cursor-default disabled:opacity-50"
-                onClick={() => sample && play(v.id, sample)}
-              >
-                <Icon name={playing() === v.id ? "stop" : "play"} size={16} />
-              </button>
-              <button
-                type="button"
-                title={v.id}
-                aria-pressed={aria(chosen())}
-                class={[
-                  "h-full min-w-0 flex-1 cursor-pointer truncate pr-2 pl-1 text-left text-sm",
-                  chosen() ? "font-semibold" : "text-bark-800 hover:text-ink",
-                ]}
-                onClick={() => props.onChange(v.id)}
-              >
-                {v.label}
-              </button>
-            </div>
-          );
-        }}
-      </For>
-    </div>
   );
 }

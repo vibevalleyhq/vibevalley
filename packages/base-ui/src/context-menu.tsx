@@ -1,6 +1,3 @@
-// ContextMenu (Base UI's): the Menu that a right click (or the context menu key) opens at the pointer over an area.
-// Its popup, items and keys are the Menu's; it closes the same ways and gives the focus back to the area.
-
 import { createContext, createSignal, omit, useContext } from "solid-js";
 
 import { call, type DivProps, flag, refs } from "./internal/element";

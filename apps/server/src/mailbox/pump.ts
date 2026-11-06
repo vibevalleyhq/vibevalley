@@ -1,5 +1,4 @@
-import { Clock, Effect, type Schema } from "effect";
-import type { SqlError } from "effect/sql";
+import { Clock, Effect } from "effect";
 
 import { isBusy } from "@vibevalley/protocol/rules";
 
@@ -10,7 +9,7 @@ import type { DeliveryRow } from "./deliveries.ts";
 
 interface PumpPorts<Message> {
   readonly pending: (session: string) => readonly DeliveryRow[];
-  readonly hand: (session: string, envelope: string, launch: string, at: number) => Effect.Effect<void, SqlError.SqlError | Schema.SchemaError>;
+  readonly hand: (session: string, envelope: string, launch: string, at: number) => Effect.Effect<void>;
   readonly consume: (session: string, envelope: string, at: number) => Effect.Effect<void>;
   readonly returnHanded: (session: string) => Effect.Effect<readonly string[]>;
   readonly returnOne: (session: string, envelope: string) => Effect.Effect<void>;
@@ -53,7 +52,8 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
   };
 
   const deliver = (recipient: string, text: string, rows: readonly DeliveryRow[]): Effect.Effect<Delivered> => {
-    const first = rows.findLast((row) => row.payload.trigger.actor.kind === "owner") ?? rows.find((row) => row.wakes && row.held_by === null) ?? rows[0]!;
+    const first = rows.findLast((row) => row.payload.trigger.actor.kind === "owner") ?? rows.find((row) => row.wakes && row.held_by === null) ?? rows[0];
+    if (!first) return Effect.succeed({ kind: "refused", reason: "empty" });
     return sessions.deliver(recipient, text, {
       trigger:
         first.payload.trigger.meta.trigger !== undefined
@@ -75,11 +75,10 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
         ([scope, allowed]) =>
           Effect.gen(function* () {
             const grouped = rows.filter((row) => row.scope === scope && row.state === "pending");
-            const primary = allowed.findLast((row) => row.payload.trigger.actor.kind === "owner") ?? allowed[0]!;
+            const primary = allowed.findLast((row) => row.payload.trigger.actor.kind === "owner") ?? allowed[0];
+            if (!primary) return;
             const messages = grouped.map(ports.message);
-            yield* Effect.forEach(grouped, (row) => ports.hand(recipient, row.envelope_id, `orchestrator:${row.envelope_id}`, now), { discard: true }).pipe(
-              Effect.orDie,
-            );
+            yield* Effect.forEach(grouped, (row) => ports.hand(recipient, row.envelope_id, `orchestrator:${row.envelope_id}`, now), { discard: true });
             yield* ports.publishOrchestrator(recipient, messages, primary);
           }),
         { discard: true },
@@ -98,7 +97,7 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
     const delivered = yield* deliver(recipient, yield* ports.wakeInput(recipient, batch, messages), batch);
     if (delivered.kind === "refused") return yield* Effect.logInfo(`mailbox: ${recipient} not woken: ${delivered.reason}`);
     const now = yield* Clock.currentTimeMillis;
-    yield* Effect.forEach(batch, (row) => Effect.orDie(ports.hand(recipient, row.envelope_id, delivered.launch ?? "", now)), { discard: true });
+    yield* Effect.forEach(batch, (row) => ports.hand(recipient, row.envelope_id, delivered.launch ?? "", now), { discard: true });
   });
 
   const notify = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
@@ -111,7 +110,7 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
     const delivered = yield* deliver(recipient, yield* ports.wakeInput(recipient, rows, rows.map(ports.message)), rows);
     if (delivered.kind === "refused") return;
     const now = yield* Clock.currentTimeMillis;
-    yield* Effect.forEach(rows, (row) => Effect.orDie(ports.hand(recipient, row.envelope_id, delivered.launch ?? "", now)), { discard: true });
+    yield* Effect.forEach(rows, (row) => ports.hand(recipient, row.envelope_id, delivered.launch ?? "", now), { discard: true });
   });
 
   const activity = Effect.fnUntraced(function* (activity: LaunchActivity): Effect.fn.Return<void> {
@@ -152,10 +151,7 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
       Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis;
         const accepted = new Set(input.envelopeIds);
-        const messages = ports
-          .pending(input.session)
-          .filter((row) => accepted.has(row.envelope_id) && row.message_id !== null)
-          .map((row) => row.message_id!);
+        const messages = ports.pending(input.session).flatMap((row) => (accepted.has(row.envelope_id) && row.message_id !== null ? [row.message_id] : []));
         yield* Effect.forEach(input.envelopeIds, (id) => ports.consume(input.session, id, now), { discard: true });
         yield* ports.consumedMessages(input.session, messages);
       }),

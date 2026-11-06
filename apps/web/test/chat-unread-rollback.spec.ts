@@ -1,5 +1,3 @@
-// 标为未读 as far as the page wires it: the read goes back at once, and a refused one gives the read back and says why.
-// When a mark settles is features/channel/marks.test.ts's.
 import { pathOf, type VibeValleyApi } from "@vibevalley/protocol";
 
 import { expect, gate, test } from "./fixtures";

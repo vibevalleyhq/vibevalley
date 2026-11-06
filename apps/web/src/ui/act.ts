@@ -1,8 +1,3 @@
-// One mutation that shows nothing before the server has it (an overlay is an intent's, state/intent.ts): busy while it
-// runs, however it ends, and a refusal said in the error tone. While the state stream is lost it is not sent: what it
-// changes would not show, and the owner could not tell whether it went in. It sits beside the toasts rather than in
-// state/, which comes before ui/ and so cannot say anything.
-
 import { type Accessor, createSignal } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

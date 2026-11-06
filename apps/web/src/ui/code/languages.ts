@@ -1,6 +1,3 @@
-// The languages code is coloured in, by a file's extension, each loaded the first time a file of it is shown: an import
-// per language, so the page's bundle carries none of them (Vite splits each into its own chunk).
-
 import type { LanguageInput } from "shiki/core";
 
 type Load = () => Promise<{ default: LanguageInput }>;
@@ -81,4 +78,4 @@ export function languageOf(nameOrTag: string): string | undefined {
   return byExtension[ext];
 }
 
-export const loadLanguage = (lang: string) => loaders[lang]!().then((m) => m.default);
+export const loadLanguage = (lang: string) => loaders[lang]?.().then((m) => m.default) ?? Promise.resolve(undefined);

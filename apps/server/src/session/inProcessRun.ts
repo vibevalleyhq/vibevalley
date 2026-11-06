@@ -1,7 +1,3 @@
-// One agent loop (agent_start to agent_end) is one run: it starts when the loop takes its first input and ends with the loop; a loop
-// that takes inputs for several issues keeps the first in session_run.issue and links all of them in session_run_issue.
-// An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
-
 import { Clock, Effect, Schema } from "effect";
 import type { SqlClient } from "effect/sql";
 
@@ -12,8 +8,8 @@ import { t } from "@vibevalley/i18n";
 import type { Outcome, RunTrigger, Spent } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
+import { Inconsistent } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { Inconsistent } from "#/errors.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import * as qr from "#db/session_run.sql.ts";
 import * as qi from "#db/session_run_issue.sql.ts";

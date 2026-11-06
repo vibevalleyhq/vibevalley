@@ -1,5 +1,3 @@
-// The Schemas of channels, threads, messages (docs/subsystems/channel.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/schema";
@@ -152,3 +150,29 @@ export const ChannelUnread: Codec<T.ChannelUnread> = Schema.Struct({
 });
 
 export const MessageHit: Codec<T.MessageHit> = Schema.Struct({ message: ChatMessage, channel: Schema.String, address: Schema.String });
+
+export const FactMessageChanged: Codec<T.FactMessageChanged> = Schema.Struct({
+  type: Schema.Literal("messageChanged"),
+  at: Schema.Finite,
+  message: ChatMessage,
+  thread: Schema.optionalKey(Schema.String),
+  answers: Schema.optionalKey(SessionId),
+});
+
+export const FactChannelChanged: Codec<T.FactChannelChanged> = Schema.Struct({
+  type: Schema.Literal("channelChanged"),
+  at: Schema.Finite,
+  channel: Channel,
+});
+
+export const FactChannelRemoved: Codec<T.FactChannelRemoved> = Schema.Struct({
+  type: Schema.Literal("channelRemoved"),
+  at: Schema.Finite,
+  id: Schema.String,
+});
+
+export const FactOwnerMentionsChanged: Codec<T.FactOwnerMentionsChanged> = Schema.Struct({
+  type: Schema.Literal("ownerMentionsChanged"),
+  at: Schema.Finite,
+  mentions: Schema.mutable(Schema.Array(OwnerMention)),
+});

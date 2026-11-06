@@ -1,6 +1,3 @@
-// The endpoints of the server itself: their answers (CoreHandlers) and their lines in the table (api.ts puts the
-// concepts together).
-
 import { type Effect } from "effect";
 
 import { type ApiError, type Endpoint } from "../endpoint";

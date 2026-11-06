@@ -1,12 +1,9 @@
-// The page applies an op at once, before the server answers: the two cannot disagree over what an op does.
-
 import type { PkmBlock, PkmBlockOp, PkmMarker, PkmPriority } from "../shapes";
 
 /** A page's name from its title: trimmed, lower case, spaces as dashes, "/" (or "\") as "__". */
 export const slugOf = (title: string) => title.trim().replace(/\\/gu, "/").replace(/\//gu, "__").replace(/\s+/gu, "-").toLowerCase();
 
-// What a #tag may follow: anything but a Latin letter, a digit or one of _ / & # (so C#, issue#12, a link's #part, an
-// entity and a ## heading are not tags). Chinese runs on without spaces, so 今天读了#读书 and 「#读书」 are tags.
+// What a #tag may follow: anything but a Latin letter, a digit or one of _ / & # (so C#, issue#12, a link's #part, an entity and a ## heading are not tags).
 const tagLead = String.raw`(?<![\p{Script=Latin}\p{N}_/&#])#`;
 const tagName = String.raw`[\p{L}\p{N}_/-]`;
 
@@ -45,8 +42,7 @@ function locate(siblings: PkmTreeNode[], id: string, parent?: PkmTreeNode): Plac
 
 const cycle: Partial<Record<PkmMarker, PkmMarker>> = { TODO: "DOING", DOING: "DONE", DONE: "TODO", LATER: "NOW", NOW: "DONE" };
 
-/** The blocks after the ops in order (a copy: blocks is not changed); an op on a block not on the page changes nothing.
- * made turns what an insert gives into a block of the caller's kind; newId names one inserted without an id. */
+/** The blocks after the ops in order (a copy: blocks is not changed). an op on a block not on the page changes nothing. */
 export function applyBlockOps<N extends PkmTreeNode>(
   blocks: readonly N[],
   ops: readonly PkmBlockOp[],

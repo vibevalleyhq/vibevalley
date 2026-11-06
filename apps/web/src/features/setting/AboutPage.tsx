@@ -1,5 +1,3 @@
-// 关于: the server's version, and where the farm keeps its files; copied, or shown in Finder where the host can.
-
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

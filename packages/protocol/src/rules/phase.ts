@@ -1,5 +1,3 @@
-// What a session is doing and what it waits on.
-
 import { list, t } from "@vibevalley/i18n";
 
 import type { Conflict, Retry, Session } from "../shapes";
@@ -11,9 +9,7 @@ export const spanText = (ms: number) =>
   ms < 60_000 ? t("shared.seconds", { n: Math.max(1, Math.round(ms / 1000)) }) : t("shared.minutes", { n: Math.round(ms / 60_000) });
 export const isBusy = (h: Pick<Session, "phase">) => h.phase._tag === "working";
 
-/** How many more may start working now: on the whole farm (workspace at once), and in the project (perProject at once,
- * 0 for no limit of its own). except is a session about to work again, which does not count against itself. The server
- * refuses a start by it (noRoom) and the map draws its open plots by it. */
+/** How many more may start working now: on the whole farm (workspace at once), and in the project (perProject at once, 0 for no limit of its own). */
 export function roomLeft(sessions: readonly Pick<Session, "id" | "project" | "phase">[], project: string, workspace: number, perProject: number, except = "") {
   const busy = sessions.filter((h) => isBusy(h) && h.id !== except);
   const inProject = busy.filter((h) => h.project === project).length;

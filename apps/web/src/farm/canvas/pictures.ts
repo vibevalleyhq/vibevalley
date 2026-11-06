@@ -1,7 +1,3 @@
-// Every picture of the atlas as a texture, with the normal maps the light needs (the map is ground, plots are low, the
-// rest stand up), and the map's own pixels, for what is painted where (life.ts). Poses change every frame, so all of
-// them are loaded before the village is drawn.
-
 import type { Texture } from "pixi.js";
 
 import { GROUND_NORMALS, LOW_NORMALS, normalTexture, pixelsOf, SPRITE_NORMALS, type Normals } from "@vibevalley/engine/pixi";
@@ -18,8 +14,7 @@ export interface Pictures {
 
 const shapeOf = (name: string) => (name === "map" ? GROUND_NORMALS : name.startsWith("plot-") ? LOW_NORMALS : SPRITE_NORMALS);
 
-// The normal maps, made once per page like the textures they come from (world/textures.ts): a canvas started again
-// (another project's farm, back from the workbench) reuses them instead of a few hundred milliseconds more.
+// The normal maps, made once per page like the textures they come from (world/textures.ts).
 const normals = new WeakMap<Texture, Normals | null>();
 
 /** `lit`: make the normal maps (a few hundred milliseconds the first time); without them the light treats everything as ground. */

@@ -6,7 +6,7 @@ export const chatNamed: Readonly<Record<string, string>> = {
   管家: defaultOrchestrator,
   主人: ownerId,
   所有人: everyone,
-  // @manager is what the English page says for 管家 (server.channel.mention.orchestrator); @orchestrator already names the
+  // @manager is what the English page says for the orchestrator (server.channel.mention.orchestrator); @orchestrator already names the
   // default by its profile id.
   manager: defaultOrchestrator,
   owner: ownerId,
@@ -42,8 +42,9 @@ export function mentionsIn(text: string, names: Nameable = onlyDefault): string[
   const prose = text.replace(chatFence, " ").replace(chatTick, " ");
   const found: string[] = [];
   for (const m of prose.matchAll(pattern)) {
-    const named = chatNamed[m[1]!];
-    const id = named === defaultOrchestrator ? names.here : (named ?? m[1]!);
+    const token = m[1] ?? "";
+    const named = chatNamed[token];
+    const id = named === defaultOrchestrator ? names.here : (named ?? token);
     if (!found.includes(id)) found.push(id);
   }
   return found;
@@ -72,9 +73,9 @@ const int64Max = 9223372036854775807n;
 /** A channel's name, a thread's parent number, or @ the one a direct channel is with; a number past int64 is not one. */
 export function parseChatTarget(target: string): ChatTarget | undefined {
   const direct = chatDirectTarget.exec(target.trim());
-  if (direct) return { kind: "direct", peer: chatNamed[direct[1]!] ?? direct[1]! };
+  if (direct?.[1]) return { kind: "direct", peer: chatNamed[direct[1]] ?? direct[1] };
   const text = target.trim().replace(/^#/u, "");
   const m = chatThreadTarget.exec(text);
-  if (m) return BigInt(m[1]!) > int64Max ? undefined : { kind: "thread", root: Number(m[1]) };
+  if (m?.[1]) return BigInt(m[1]) > int64Max ? undefined : { kind: "thread", root: Number(m[1]) };
   return channelNamePattern.test(text) ? { kind: "channel", name: text } : undefined;
 }

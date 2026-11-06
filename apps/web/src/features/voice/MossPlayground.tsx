@@ -1,6 +1,3 @@
-// 设置 › MOSS Live: talk to MOSS Live on its own, to hear how it answers. What was said, and every action and event
-// on the line, are shown as they come; nothing goes to the farm's chat.
-
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -108,7 +105,7 @@ export function MossLineView(props: { line: MossLineState; onTalk: (setup: MossS
         <div class="flex flex-wrap gap-2 p-4" role="group" aria-label={t("web.voice.moss.qos.title")} data-testid="moss-qos">
           <Stat
             label={t("web.voice.moss.qos.reply")}
-            value={line().qos.replyMs === undefined ? "—" : t("web.voice.moss.qos.ms", { last: line().qos.replyMs!, mean: line().qos.replyMeanMs! })}
+            value={line().qos.replyMs === undefined ? "—" : t("web.voice.moss.qos.ms", { last: line().qos.replyMs ?? 0, mean: line().qos.replyMeanMs ?? 0 })}
             tip={t("web.voice.moss.qos.replyTip", { n: line().qos.replies })}
             bad={(line().qos.replyMs ?? 0) > 2500}
           />

@@ -1,14 +1,10 @@
-// Feishu and Lark. Logging in is Feishu's scan-to-create flow: Feishu creates a personal bot app for
-// the owner and hands back its app id and secret (the device-code flow nanobot uses: accounts.feishu.cn/oauth/v1/app/
-// registration). Messages come over the official SDK's long connection, outbound only; replies go through the message
-// API to the owner's open_id, with no reply window.
-
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { Effect, FiberSet, Option, Predicate, Ref, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 
 import { t } from "@vibevalley/i18n";
 
+import { Inconsistent } from "#/base/errors.ts";
 import { jsonOrNone } from "#/base/json.ts";
 
 import { type Adapter, type AppFailed, failedOf, failedWith } from "./adapter.ts";
@@ -55,12 +51,27 @@ export interface FeishuApi {
 }
 
 /** What the registration endpoint answers; it answers JSON even with an error status (a pending poll is a 400). */
-const Registration = Schema.Record(Schema.String, Schema.Unknown);
-
-const str = (m: unknown, key: string) => {
-  const v = Predicate.isObject(m) ? m[key] : undefined;
-  return typeof v === "string" ? v : "";
-};
+const RegistrationInit = Schema.Struct({
+  supported_auth_methods: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+const RegistrationBegin = Schema.Struct({
+  device_code: Schema.optionalKey(Schema.String),
+  verification_uri_complete: Schema.optionalKey(Schema.String),
+  interval: Schema.optionalKey(Schema.Finite),
+  expires_in: Schema.optionalKey(Schema.Finite),
+  expire_in: Schema.optionalKey(Schema.Finite),
+});
+const RegistrationPoll = Schema.Struct({
+  client_id: Schema.optionalKey(Schema.String),
+  client_secret: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(Schema.String),
+  user_info: Schema.optionalKey(
+    Schema.Struct({
+      tenant_brand: Schema.optionalKey(Schema.String),
+      open_id: Schema.optionalKey(Schema.String),
+    }),
+  ),
+});
 
 type Polled =
   | { readonly status: "succeeded"; readonly app: App; readonly owner: string }
@@ -73,22 +84,26 @@ export class FeishuClient implements FeishuApi {
     this.http = http;
   }
 
-  private form(domain: Domain, fields: Record<string, string>) {
+  private form<S extends Schema.Top>(domain: Domain, fields: Record<string, string>, schema: S) {
     return this.http.execute(HttpClientRequest.bodyUrlParams(HttpClientRequest.post(accounts[domain] + "/oauth/v1/app/registration"), fields)).pipe(
       Effect.flatMap((res) => res.json),
-      Effect.flatMap(Schema.decodeUnknownEffect(Registration)),
+      Effect.flatMap(Schema.decodeUnknownEffect(schema)),
       Effect.timeoutOrElse({ duration: 10_000, orElse: () => Effect.fail(failedWith(t("server.connector.feishu.registerTimeout"))) }),
       Effect.mapError((e) => (Predicate.isTagged(e, "AppFailed") ? e : failedWith(t("server.connector.feishu.register", { why: e.message })))),
     );
   }
 
   private readonly register = Effect.gen({ self: this }, function* () {
-    const init = yield* this.form("feishu", { action: "init" });
-    const methods = Array.isArray(init.supported_auth_methods) ? init.supported_auth_methods : [];
+    const init = yield* this.form("feishu", { action: "init" }, RegistrationInit);
+    const methods = init.supported_auth_methods ?? [];
     if (!methods.includes("client_secret")) return yield* failedWith(t("server.connector.feishu.noQr"));
-    const begin = yield* this.form("feishu", { action: "begin", archetype: "PersonalAgent", auth_method: "client_secret", request_user_info: "open_id" });
-    const deviceCode = str(begin, "device_code");
-    let link = str(begin, "verification_uri_complete");
+    const begin = yield* this.form(
+      "feishu",
+      { action: "begin", archetype: "PersonalAgent", auth_method: "client_secret", request_user_info: "open_id" },
+      RegistrationBegin,
+    );
+    const deviceCode = begin.device_code ?? "";
+    let link = begin.verification_uri_complete ?? "";
     if (!deviceCode || !link) return yield* failedWith(t("server.connector.feishu.noLink"));
     // Personal-agent codes land on /page/cli (as nanobot does it); keep the query as it is.
     if (URL.canParse(link)) {
@@ -98,19 +113,19 @@ export class FeishuClient implements FeishuApi {
         link = parsed.toString();
       }
     }
-    const interval = typeof begin.interval === "number" ? begin.interval : 5;
-    const expires = typeof begin.expires_in === "number" ? begin.expires_in : typeof begin.expire_in === "number" ? begin.expire_in : 600;
+    const interval = begin.interval ?? 5;
+    const expires = begin.expires_in ?? begin.expire_in ?? 600;
     return { deviceCode, link, intervalMs: Math.max(2, interval) * 1000, expiresMs: expires * 1000 };
   });
 
   /** One poll; one that does not answer reads as still pending. */
   private poll(deviceCode: string, domain: Domain): Effect.Effect<Polled> {
-    return this.form(domain, { action: "poll", device_code: deviceCode, tp: "ob_app" }).pipe(
+    return this.form(domain, { action: "poll", device_code: deviceCode, tp: "ob_app" }, RegistrationPoll).pipe(
       Effect.map((res) => {
         const user = res.user_info;
-        const where: Domain = str(user, "tenant_brand") === "lark" ? "lark" : domain;
-        if (typeof res.client_id === "string" && typeof res.client_secret === "string")
-          return { status: "succeeded" as const, app: { appId: res.client_id, appSecret: res.client_secret, domain: where }, owner: str(user, "open_id") };
+        const where: Domain = user?.tenant_brand === "lark" ? "lark" : domain;
+        if (res.client_id !== undefined && res.client_secret !== undefined)
+          return { status: "succeeded" as const, app: { appId: res.client_id, appSecret: res.client_secret, domain: where }, owner: user?.open_id ?? "" };
         if (res.error === "access_denied") return { status: "failed" as const, reason: t("server.connector.feishu.denied") };
         if (res.error === "expired_token") return { status: "failed" as const, reason: t("server.connector.feishu.qrExpired") };
         return { status: "pending" as const, domain: where };
@@ -136,7 +151,12 @@ export class FeishuClient implements FeishuApi {
         return Option.none<LoginAccount>();
       });
       const polling: Effect.Effect<LoginAccount, AppFailed> = Effect.repeat(Effect.delay(once, reg.intervalMs), { until: Option.isSome }).pipe(
-        Effect.map(Option.getOrThrow),
+        Effect.flatMap(
+          Option.match({
+            onNone: () => Effect.die(new Inconsistent({ message: "the login poll stopped without an account" })),
+            onSome: Effect.succeed,
+          }),
+        ),
       );
       return yield* polling.pipe(
         Effect.timeoutOrElse({ duration: reg.expiresMs, orElse: () => Effect.fail(failedWith(t("server.connector.feishu.tooLong"))) }),
@@ -202,18 +222,16 @@ export class FeishuClient implements FeishuApi {
 }
 
 function text(m: Message): string {
-  if (m.messageType !== "text")
-    return (
-      (
-        {
-          image: t("server.connector.media.image"),
-          file: t("server.connector.media.file"),
-          audio: t("server.connector.media.audio"),
-          media: t("server.connector.media.video"),
-          sticker: t("server.connector.media.sticker"),
-        } as Record<string, string>
-      )[m.messageType] ?? t("server.connector.media.message")
-    );
+  if (m.messageType !== "text") {
+    const media: Record<string, string> = {
+      image: t("server.connector.media.image"),
+      file: t("server.connector.media.file"),
+      audio: t("server.connector.media.audio"),
+      media: t("server.connector.media.video"),
+      sticker: t("server.connector.media.sticker"),
+    };
+    return media[m.messageType] ?? t("server.connector.media.message");
+  }
   return (textContent(m.content)?.text ?? "").trim();
 }
 

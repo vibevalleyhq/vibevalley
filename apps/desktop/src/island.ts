@@ -1,7 +1,3 @@
-// The island at the notch (apps/island): a native helper this process starts and feeds. The farm at a glance comes from
-// the server's state stream, read here rather than by the page, so that it goes on with the window closed. Each change
-// goes to the helper as one line on its stdin; a click on a row comes back on its stdout as the issue to open.
-
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 
@@ -13,7 +9,7 @@ import { latestSessionIdOf, phaseText, stageWantsOwner } from "@vibevalley/proto
 
 import { jsonLines } from "./lines";
 
-/** How a row is drawn. The shapes here are apps/island IslandCore Messages.swift's; keep the two the same. */
+/** How a row is drawn. The shapes here are apps/island IslandCore Messages.swift's. */
 export type Tone = "working" | "waiting" | "stuck";
 
 interface IslandRow {

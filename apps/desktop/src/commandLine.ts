@@ -1,6 +1,3 @@
-// 「安装命令行」: the app's command line (Resources/bin/<command>, written by scripts/package.ts) linked into ~/.local/bin,
-// which needs no administrator and outlives the app's updates (the link names where the app is, not a version).
-
 import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 

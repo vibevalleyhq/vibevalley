@@ -64,10 +64,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
   );
 }
 
-/**
- * The dialog's buttons. A move is an intent: the dialog closes once it is sent, and the board and the issue's page show it
- * moving, or refused with a retry. Anything else runs through the Act, the dialog waiting for it.
- */
+/** The dialog's buttons. A move is an intent: the dialog closes once it is sent, and the board and the issue's page show it moving, or refused with a retry. */
 function createPresses(lane: () => Lane | undefined) {
   const moves = useIntents(issueMove);
   const act = createAct();
@@ -285,8 +282,7 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
 
 const patchLook = { added: "bg-leaf/20 text-accent", removed: "bg-berry/10 text-berry", hunk: "text-water", plain: "" } as const;
 
-/** A file's patch: each line marked added or removed, its code coloured in the file's language once the colours come
- * (ui/code: off the page's thread; until then, and for a language not coloured, plain). */
+/** A file's patch: each line marked added or removed, its code coloured in the file's language once the colours come (ui/code: off the page's thread. */
 function Patch(props: { text: string; path: string }) {
   const lines = () => patchLines(props.text);
   // The code without its +, - or space: coloured as one block, so a line reads in the context of those above it.

@@ -11,8 +11,7 @@ import { A } from "#/ui/A.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 
-// Artifacts (docs/subsystems/artifact.md) are not in the frame: they are read when shown, and read again every few
-// seconds while shown, so a new version a helper hands in comes up on its own.
+// Artifacts (docs/subsystems/artifact.md) are not in the frame.
 const fresh = 5_000;
 
 export const useArtifact = (id: () => string) =>

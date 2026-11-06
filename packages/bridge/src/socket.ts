@@ -1,6 +1,3 @@
-// A link over a local stream socket, one JSON message a line: the desktop app answers its command line on it
-// (apps/desktop src/control.ts), the command line asks on it (apps/server src/cli/app.ts).
-
 import type { Socket } from "node:net";
 
 import type { Link } from "./index";

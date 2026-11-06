@@ -11,16 +11,9 @@ import type { Act } from "#/ui/act.ts";
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { issueSay, pendingWords } from "./write";
 
-// The owner's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx)
-// and the farm's (farm/issue/IssueView.tsx). What a button sends is the server's (Issue.stage.acts); a move and words
-// go as intents (moves.ts, write.ts), shown on the page until the frame has them, and the rest through the page's Act.
-// This says which take words from the box, which open the box first, which open a dialog, what a reopen tells, and keeps
-// the box and its words. A page only says how it runs a button its own way (the farm's commands with their effects).
+// The owner's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx) and the farm's (farm/issue/IssueView.tsx).
 
-/**
- * An action sent once, without an overlay (the farm's bed tools, which play their effect after it). Words said take the
- * caller's sendKey, kept until they went through, so said again they are said once.
- */
+/** An action sent once, without an overlay (the farm's bed tools, which play their effect after it). */
 export function perform(issue: Issue, a: IssueAction, words = "", sendKey = ""): Promise<unknown> {
   switch (a.does) {
     case "move":
@@ -36,7 +29,7 @@ export function perform(issue: Issue, a: IssueAction, words = "", sendKey = ""):
 
 export const actionOf = (issue: Issue, act: IssueAct) => issue.stage.acts.find((a) => a.act === act);
 
-/** The box under an issue's ask: the findings of 打回, or a word to the helper. */
+/** The box under an issue's ask: the findings of reject, or a word to the helper. */
 type ActBox = "reject" | "tell";
 
 interface ActWays {
@@ -99,7 +92,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
     }
   };
 
-  /** The box's words as the act's; nothing said, nothing sent. The box empties and closes once it went through. */
+  /** The box's words as the act's. nothing said, nothing sent. */
   const say = (a: IssueAct) => {
     const words = text().trim();
     if (!words) return;
@@ -174,7 +167,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
           : (ways.words?.[a] ?? t(`shared.act.${a}`)),
     /** Pressing it now would send nothing. */
     disabled: (a: IssueAct) => busy() || (a === "answer" && !text().trim()) || (a === "reject" && box() === "reject" && !text().trim()),
-    /** 打回 with its box open is the red one. */
+    /** reject with its box open is the red one. */
     rejecting: (a: IssueAct) => a === "reject" && box() === "reject",
   };
 }

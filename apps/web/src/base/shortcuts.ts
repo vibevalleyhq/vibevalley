@@ -1,7 +1,3 @@
-// Every keyboard shortcut of the page, in one table: the shortcuts sheet (? anywhere off a text field) is drawn from it,
-// and the chords the shell listens for are matched through it, so the sheet and the keys cannot drift apart. Keys handled
-// inside one place (a list's arrows, the farm's tools) keep their handlers there; their rows here say what they are.
-
 /** Where a shortcut works, as the sheet groups them. */
 type ShortcutPlace = "everywhere" | "composer" | "lists" | "issues" | "pictures" | "farm" | "desktop";
 

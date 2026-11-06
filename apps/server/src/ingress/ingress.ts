@@ -5,9 +5,9 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { Artifact } from "#/artifact/artifact.ts";
+import type { ApiError } from "#/base/errors.ts";
 import { Channel, type SayMore } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
-import type { ApiError } from "#/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import type { Picked } from "#/mailbox/envelope.ts";
@@ -120,7 +120,7 @@ const make = Effect.gen(function* () {
     }),
     say: Effect.fn("Ingress.say")(function* (text, pick, channel, sendKey, more) {
       const a = pick.agent ? store.agent(pick.agent) : undefined;
-      const picked: Picked = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
+      const picked: Picked = { ...(a ? { agent: a.id } : {}), ...(pick.project?.trim() ? { project: pick.project.trim() } : {}) };
       const blocks = yield* quote(more?.blockRefs);
       yield* core.open();
       yield* chat.say(text, channel, sendKey, {

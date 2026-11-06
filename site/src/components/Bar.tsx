@@ -1,5 +1,3 @@
-// The bar along the top: the farm's name, the sections, the other language. See-through over the scene, solid once
-// the page is scrolled past it.
 import { useMotionValueEvent, useScroll } from 'motion/react'
 import { useEffect, useState } from 'react'
 import type { Copy } from '../i18n/zh'

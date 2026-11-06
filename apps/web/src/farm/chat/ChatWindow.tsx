@@ -1,8 +1,3 @@
-// The farm's chat, 田头: the right screen of the farm phone when it is unfolded (Phone.tsx), filling it: a head (the channel
-// menu and what the orchestrator is doing, or a thread's title and its helper), the messages newest at the bottom with the
-// lines just sent and not yet back from the server, a few lines to say, and the input row. Double-clicking the head makes
-// the phone large.
-
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -154,8 +149,7 @@ export function ChatWindow() {
   const says = useIntents(chatSay);
   const sending = createMemo(() => pendingLines(says.list(), shown()?.id, said().messages));
   const notSent = (reason: string | undefined) => setProblem(t("web.farm.chat.notSent", { why: reason ?? "" }));
-  // What is being said on the call, drawn as it is said: the turns 田头 does not have as lines yet. A copy each time, so
-  // the rows read the words they grew to.
+  // What is being said on the call, drawn as it is said: the turns the farm chat does not have as lines yet.
   const tick = useNow(1000);
   const captions = createMemo(() => {
     const c = call();

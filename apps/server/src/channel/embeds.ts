@@ -1,9 +1,3 @@
-// Previews of the links said in the chat: the page's title, description, site and image, read by the server since a
-// page cannot read another site. The server reaches only the public web: every address a name resolves to is checked
-// before each request (and each redirect), so a link cannot make it read this computer, the LAN or a cloud's metadata.
-// A name that resolves anew between that check and the request (DNS rebinding) is the gap left; nothing is sent with the
-// request but the address, and only a page's head is read back.
-
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
@@ -71,15 +65,14 @@ const resolveAll: Resolve = (host) =>
       );
 
 /** May the server ask for this address: http(s), and every address its name has is on the public web. */
-export const reachable = (url: URL, resolve: Resolve = resolveAll): Effect.Effect<boolean> =>
-  Effect.gen(function* () {
-    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-    if (url.username || url.password) return false;
-    const host = url.hostname.replace(/^\[|\]$/gu, "");
-    if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
-    const addresses = yield* resolve(host);
-    return addresses.length > 0 && addresses.every((a) => !privateAddress(a));
-  });
+export const reachable = Effect.fn("Embeds.reachable")(function* (url: URL, resolve: Resolve = resolveAll): Effect.fn.Return<boolean> {
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  if (url.username || url.password) return false;
+  const host = url.hostname.replace(/^\[|\]$/gu, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
+  const addresses = yield* resolve(host);
+  return addresses.length > 0 && addresses.every((a) => !privateAddress(a));
+});
 
 const entities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " " };
 const decode = (s: string) => s.replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/gu, (_, e: string) => entities[e] ?? _).trim();
@@ -119,8 +112,7 @@ export function embedOf(url: string, html: string): Embed | undefined {
   };
 }
 
-/** A link's preview, or none when it cannot be read: not public, not a page, too slow, too big. Redirects are followed
- * here, not by the client, so each hop's address is checked before it is asked. */
+/** A link's preview, or none when it cannot be read: not public, not a page, too slow, too big. */
 export const readEmbed = Effect.fn("Embeds.read")(function* (link: string, resolve: Resolve = resolveAll) {
   const client = yield* HttpClient.HttpClient;
   if (!URL.canParse(link)) return undefined;
@@ -128,11 +120,9 @@ export const readEmbed = Effect.fn("Embeds.read")(function* (link: string, resol
   for (let hop = 0; hop <= redirectsMax; hop++) {
     const at = url;
     if (!(yield* reachable(at, resolve))) return undefined;
-    const answered = yield* client.get(at, { headers: { accept: "text/html", "user-agent": "VibeValley link preview" } }).pipe(
-      Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
-      Effect.timeoutOption(timeoutMs),
-      Effect.catch(() => Effect.succeedNone),
-    );
+    const answered = yield* client
+      .get(at, { headers: { accept: "text/html", "user-agent": "VibeValley link preview" } })
+      .pipe(Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }), Effect.timeout(timeoutMs), Effect.option);
     if (Option.isNone(answered)) return undefined;
     const res = answered.value;
     if (res.status >= 300 && res.status < 400) {

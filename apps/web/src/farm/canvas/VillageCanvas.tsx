@@ -1,8 +1,6 @@
 import { Schema } from "effect";
 import { createEffect, createMemo, createSignal, Show, snapshot } from "solid-js";
-// The village on the farm page: starts the scene (farm/canvas/scene.ts) once the level is loaded, feeds it the latest
-// frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the
-// DOM over it (store screen), and wears the tool's cursor.
+// The village on the farm page: starts the scene (farm/canvas/scene.ts) once the level is loaded, feeds it the latest frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the DOM over it (store screen), and wears the tool's cursor.
 
 import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
@@ -96,7 +94,6 @@ export function VillageCanvas() {
   );
 
   // The cursor: the tool in hand, and whether it can be used where it points.
-  // The hotspots taken in the compute part: the apply part runs untracked, on every pointer move.
   createEffect(
     () => {
       const h = hotspots();
@@ -154,10 +151,7 @@ export function VillageCanvas() {
   );
 }
 
-/**
- * Until the village is drawn: the map first, then its pictures one by one (most of the wait), then the light worked out
- * from them. The bar follows the pictures; the map and the light take its two ends.
- */
+/** Until the village is drawn: the map first, then its pictures one by one (most of the wait), then the light worked out from them. */
 function Entering(props: { mapped: boolean }) {
   const pictures = createExternal(textureProgress.subscribe, textureProgress.get);
   const fill = () => {

@@ -11,7 +11,7 @@ state's fold and the frame (`apps/server/src/projection`). No files, no network.
 | `@vibevalley/protocol/api` | `endpoints` (method, path, parameters, request and answer Schemas, who may call) and `Handlers`, put together from each concept's `src/<concept>/api.ts`; `errorStatus`, `Endpoint` and `input` from `src/endpoint.ts` |
 | `@vibevalley/protocol/rpc` | `Subscriptions`: the RPCs a page follows a channel and the farm's reports by, over the WebSocket at `rpcPath` |
 | `@vibevalley/protocol/host` | `Host`: what the page may ask of the desktop's shell or the phone's (below); `desktopBridge` and `mobileBridge`, the contracts each host's calls go over (`@vibevalley/bridge`), and `mobileHost`, the page's end of the phone's |
-| `@vibevalley/protocol/rules` | the core state's fold (`reduce`, `frameOf`), the inbox, plots and achievements, task graphs, schedules, the doc's order keys, text as JavaScript measures it |
+| `@vibevalley/protocol/rules` | pure rules both the server and the page run: phase and action words (`phase.ts`), issue titles and stage helpers (`issues.ts`, `stage.ts`), channel lookup (`channel.ts`), block order keys (`order.ts`), PKM outline operations (`pkm.ts`), sandbox attributes (`display.ts`), project name validation (`project.ts`) |
 
 The golden cases of the fold and the frame are the server's (`apps/server/src/core/testdata`, `core/golden.test.ts`).
 

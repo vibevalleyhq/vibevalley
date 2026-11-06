@@ -1,6 +1,3 @@
-// Which VibeValley this is: one app, one farm and one command a channel, so they open side by side and an alpha never
-// touches the farm in daily use (.agents/notes/proposed/feature/2026-11-04-desktop-channels-and-cli.md).
-
 import { homedir } from "node:os";
 import { join } from "node:path";
 

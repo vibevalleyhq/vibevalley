@@ -1,6 +1,3 @@
-// 设置's parts: a page is groups of rows, a row a setting's name and a line on what it does on the left, its control on
-// the right. One shape for every section, so a section reads like the others and the search finds its rows.
-
 import type { JSX } from "@solidjs/web";
 import { createContext, Show, useContext, type Accessor } from "solid-js";
 
@@ -14,7 +11,7 @@ import { KeyMark } from "./KeyField";
 import { SecretInput } from "./layout";
 import { Hint } from "./Tip";
 
-/** What is being searched for in 设置, lower-cased; "" when nothing. */
+/** What is being searched for in Settings, lower-cased; "" when nothing. */
 export const SettingsSearch = createContext<Accessor<string>>(() => "");
 
 /** A section's page: its name, what it is about on hover, and what goes beside the name (a link, where it is stored). */
@@ -48,10 +45,7 @@ export function SettingsGroup(props: { title?: string; note?: JSX.Element; child
   );
 }
 
-/**
- * One setting: its name and one line on what it does (hint), more on hover (tip), its control on the right. wide puts the
- * control under the words, for a field too wide to sit beside them.
- */
+/** One setting: its name and one line on what it does (hint), more on hover (tip), its control on the right. */
 export function SettingRow(props: {
   label: string;
   hint?: string | undefined;
@@ -82,10 +76,7 @@ export function SettingRow(props: {
   );
 }
 
-/**
- * A key as a row: whether one is in use (and its last four characters) as a mark, a field to type a new one, removing
- * it (marked until saved, as KeyField does), where to get one, and what goes after (a check).
- */
+/** A key as a row: whether one is in use as a mark, a field to type a new one, removing it, where to get one, and what goes after (a check). */
 export function KeyRow(props: {
   label: string;
   hint?: string;

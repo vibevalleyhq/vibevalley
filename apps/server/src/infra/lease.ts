@@ -1,6 +1,3 @@
-// One server per home: .vibevalley.lock holds the pid of the server using it. Node has no flock, so a lock whose process
-// is gone is stale and is taken over. Where that server listens is @vibevalley/home's server.json.
-
 import { closeSync, openSync, readFileSync, realpathSync, unlinkSync, writeSync } from "node:fs";
 import { join } from "node:path";
 
@@ -8,7 +5,7 @@ import { Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 
-import { errnoOf } from "#/errors.ts";
+import { errnoOf } from "#/base/errors.ts";
 
 const alive = (pid: number) => {
   try {
@@ -35,8 +32,8 @@ export function leaseHome(home: string): () => void {
         released = true;
         try {
           if (readFileSync(path, "utf8") === String(process.pid)) unlinkSync(path);
-        } catch {
-          // Already gone.
+        } catch (e) {
+          if (errnoOf(e) !== "ENOENT") throw e;
         }
       };
     } catch (e) {

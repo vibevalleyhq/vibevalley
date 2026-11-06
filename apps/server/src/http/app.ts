@@ -1,19 +1,16 @@
-// The farm over HTTP on loopback: every route on the farm's services. main.ts runs it; tests
-// run it on a free port.
-
 import { createServer } from "node:http";
 
 import { NodeHttpServer } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 
-import { handlers } from "#/handlers.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { Lan } from "#/lan/lan.ts";
 import { type ServiceOptions, services } from "#/services.ts";
 import { Session } from "#/session/session.ts";
 
 import { api, artifactContent, attachments, mossLine } from "./api.ts";
+import { handlers } from "./handlers.ts";
 import { mcpRoute } from "./mcp.ts";
 import { page } from "./page.ts";
 import { subscriptions } from "./rpc.ts";
@@ -56,8 +53,7 @@ export const app = (
   const server = createServer();
   return HttpRouter.serve(routes(config), { disableListenLog: true, disableLogger: true }).pipe(
     Layer.merge(ready(listening)),
-    // Stopping waits for every socket to close, and an event stream whose client has gone keeps its socket until its
-    // next write (a frame, or the ping 20 s on): every connection is closed first, before the server's own close.
+    // Stopping waits for every socket to close, and an event stream whose client has gone keeps its socket until its next write: every connection is closed first, before the server's own close.
     Layer.merge(Layer.effectDiscard(Effect.addFinalizer(() => Effect.sync(() => server.closeAllConnections())))),
     Layer.provideMerge(services(config, options)),
     Layer.provide(NodeHttpServer.layer(() => server, { host: "127.0.0.1", port })),

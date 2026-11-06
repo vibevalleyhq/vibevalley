@@ -1,7 +1,3 @@
-// A session's log, written to events/<id>.json: what is written is never rewritten, later steps only follow it, and the step
-// still being written (the draft) is on disk only once it is sealed. A step that grows (text still streaming in, a tool that
-// has not returned) is pushed again under the same number.
-
 import { join } from "node:path";
 
 import { Effect, Exit, FileSystem, Schema, Scope } from "effect";
@@ -11,6 +7,7 @@ import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibe
 import { cut } from "@vibevalley/protocol/rules";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 
+import { jsonOrNone } from "#/base/json.ts";
 import { type KeptFile, keptFile } from "#/infra/files.ts";
 import { type Time, timeHere } from "#/infra/time.ts";
 
@@ -26,7 +23,7 @@ const outputHead = 2000;
 const outputTail = 4000;
 const pushAfterMs = 300;
 const saveAfterMs = 1500;
-const decodeEvents = Schema.decodeUnknownSync(Schema.Array(SessionEventSchema));
+const decodeEvents = jsonOrNone(Schema.Array(SessionEventSchema));
 
 function clipOutput(text: string): string {
   const n = text.length;
@@ -34,17 +31,16 @@ function clipOutput(text: string): string {
   return `${text.slice(0, outputHead)}\n${t("server.session.log.clipped", { n: n - outputHead - outputTail })}\n${text.slice(n - outputTail)}`;
 }
 
-/** A log kept on disk; none when there is none. One not in today's shape is deleted: persisted shapes have no
- * compatibility path, and the next run starts a new current-format log. */
+/** A log kept on disk. none when there is none. */
 export const readJournal = (file: string): Effect.Effect<SessionEvent[] | undefined, never, FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const body = yield* Effect.option(fs.readFileString(file));
     if (body._tag === "None") return undefined;
-    const events = yield* Effect.option(Effect.try(() => [...decodeEvents(JSON.parse(body.value))]));
-    if (events._tag === "Some") return events.value;
+    const events = decodeEvents(body.value);
+    if (events !== undefined) return [...events];
     // Another reader may already have removed it.
-    yield* Effect.ignore(fs.remove(file));
+    yield* Effect.ignore(fs.remove(file), { log: "Debug" });
     return undefined;
   });
 
@@ -243,8 +239,7 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
 /** Nothing that leads out of the folder. */
 const knownId = /^[A-Za-z0-9_-]+$/u;
 
-/** Each session's log, events/<id>.json: the open ones in memory as they grow, the others on disk. Each open log has a
- * scope of its own under the service's: closing it writes the log out, and the service's end closes those still open. */
+/** Each session's log, events/<id>.json: the open ones in memory as they grow, the others on disk. */
 export interface Trajectories {
   /** A session's log, carried on from what it kept: a session back from a restart goes on where it was. */
   readonly openLog: (id: string, keep?: number) => Effect.Effect<Journal>;
@@ -282,8 +277,7 @@ export const makeTrajectories = (home: string, push: (id: string, e: SessionEven
     return {
       openLog: (id, keep = 0) =>
         Effect.gen(function* () {
-          // A log opened again (a session taken up again) is a new one read from disk; the one before still writes
-          // what it is told until its scope, a child of the service's, closes.
+          // A log opened again (a session taken up again) is a new one read from disk.
           const own = yield* Scope.fork(logs);
           const disk = yield* keptFile(fileOf(id), { soonMs: saveAfterMs }).pipe(Scope.provide(own), withFs);
           const initial = (yield* withFs(readJournal(fileOf(id)))) ?? [];
@@ -298,6 +292,6 @@ export const makeTrajectories = (home: string, push: (id: string, e: SessionEven
           const all = open.get(id)?.journal.events() ?? (yield* withFs(readJournal(fileOf(id)))) ?? [];
           return run ? all.filter((e) => e.run === run) : all;
         }),
-      forget: (id) => (knownId.test(id) ? Effect.ignore(fs.remove(fileOf(id))) : Effect.void),
+      forget: (id) => (knownId.test(id) ? Effect.ignore(fs.remove(fileOf(id)), { log: "Debug" }) : Effect.void),
     } satisfies Trajectories;
   });

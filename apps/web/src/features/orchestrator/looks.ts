@@ -1,8 +1,3 @@
-// The orchestrators' looks (an orchestrator's profile keeps its own) and the pets the owner can pick (state/prefs.ts
-// keeps the choice), and their sprites; and the owner's "this round went wrong" on the orchestrator's trajectory, kept
-// as an eval case: handed to the trajectory, whose mark runs it in its Act (features/session's Markable), so its busy and
-// refusal are said there.
-
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, OrchestratorLook } from "@vibevalley/protocol";
 

@@ -1,10 +1,3 @@
-// What the owner asked for and the page has not seen happen yet: a move, a line said. An intent is kept by its request
-// key in an atom family, so it outlives the component that made it (a retry after leaving the channel reuses the key);
-// it goes when what the owner sees shows the change (the frame whose seq is at least the reply's, or the kind's own
-// check), never when the reply comes or a timer runs out. A timeout or a refusal leaves it failed and in sight, to retry
-// with the same key or let go. A feature shows its intents through a pure overlay of its own that sets only the field the
-// owner set (features/issue/moves.ts); the page still folds no facts.
-
 import { Atom, type AtomRegistry } from "effect/reactivity";
 import { type Accessor } from "solid-js";
 
@@ -35,10 +28,7 @@ export interface Intent<I, R> {
 interface IntentKind<I, R> {
   /** Sends it with its key; a repeat with the same key is the same request. */
   readonly send: (input: I, key: string) => Promise<R>;
-  /**
-   * What the owner sees shows the change; asked on every frame, whenever `watch` says, and when the server answers.
-   * A kind whose change carries its key (a line's sendKey) may say so before any reply, a lost one included.
-   */
+  /** What the owner sees shows the change. asked on every frame, whenever `watch` says, and when the server answers. */
   readonly confirmed: (frame: StateFrame | undefined, intent: Intent<I, R>) => boolean;
   /** A source the check reads besides the frame (a channel's messages): watched while the intent is kept. */
   readonly watch?: (input: I, changed: () => void) => () => void;
@@ -68,8 +58,7 @@ export function defineIntent<I, R>(kind: IntentKind<I, R>): IntentType<I, R> {
   return { kind, one, keys, all, runners: new WeakMap() };
 }
 
-/** An intent on its way: `done` is the intent once the server answered (`replied`) or it failed (`status`), undefined
- * when it was let go first. A retry answers for itself. */
+/** An intent on its way: `done` is the intent once the server answered (`replied`) or it failed (`status`), undefined when it was let go first. */
 export interface Sent<I, R> {
   readonly key: string;
   readonly done: Promise<Intent<I, R> | undefined>;
@@ -85,20 +74,14 @@ export interface Intents<I, R> {
   readonly all: () => readonly Intent<I, R>[];
 }
 
-/**
- * An intent made by a button rather than typed (a suggestion, the project map's sow, an artifact's reply): pressed again
- * while one with the same input is kept, it is that one, sent again with its key if it failed.
- */
+/** An intent made by a button rather than typed (a suggestion, the project map's sow, an artifact's reply). */
 export function sendOnce<I, R>(intents: Intents<I, R>, input: I): Promise<Intent<I, R> | undefined> {
   const kept = intents.all().find((i) => same(i.input, input));
   if (!kept) return intents.send(input).done;
   return kept.status === "failed" ? intents.retry(kept.key) : Promise.resolve(kept);
 }
 
-/**
- * A setting the owner changes again before the first change showed (a reaction off and on, a level picked twice): the
- * newer is the one kept, and the older is let go, so the overlay shows the last choice and one failure at most.
- */
+/** A setting the owner changes again before the first change showed (a reaction off and on, a level picked twice). */
 export function sendReplacing<I, R>(intents: Intents<I, R>, input: I, sameTarget: (a: I, b: I) => boolean): Sent<I, R> {
   for (const kept of intents.all()) if (sameTarget(kept.input, input)) intents.drop(kept.key);
   return intents.send(input);

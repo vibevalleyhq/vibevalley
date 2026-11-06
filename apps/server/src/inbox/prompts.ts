@@ -1,6 +1,3 @@
-// What the orchestrator's patrol reads about each item waiting on the owner (InboxEntry.brief): said to the model, in
-// Chinese whatever the owner's locale (the orchestrator answers in the owner's). {ago} is filled with how long it waited.
-
 import type { PatrolNote } from "./patrol.ts";
 
 export const patrolBrief = {

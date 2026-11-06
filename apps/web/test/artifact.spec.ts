@@ -1,6 +1,3 @@
-// An artifact (docs/subsystems/artifact.md): its card in the conversation, its page in a sandbox of its own, its
-// versions, a reply to one, and the issue it was made for.
-
 import AxeBuilder from "@axe-core/playwright";
 
 import { expect, test } from "./fixtures";

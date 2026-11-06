@@ -1,6 +1,3 @@
-// The schema as the database itself reads it: every generated query compiles against it, and every foreign key has an
-// index that starts with it. schema.test.ts reads the SQL's text for the rules about names; this asks SQLite's pragmas.
-
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 

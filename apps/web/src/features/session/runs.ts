@@ -1,6 +1,5 @@
-import { Predicate } from "effect";
-// A session's log by run (shownEvents, runsOf, spansOf, runMs), the work log's words and colours, the trajectory's
-// waterfall and totals, how steps arriving live merge in (mergeSteps), and the log kept per observed session (SessionLogs).
+import { Schema } from "effect";
+// A session's log by run, the work log's words and colours, the trajectory's waterfall and totals, how steps arriving live merge in (mergeSteps), and the log kept per observed session (SessionLogs).
 
 import { t } from "@vibevalley/i18n";
 import type { LiveEvent, SessionEvent } from "@vibevalley/protocol";
@@ -46,8 +45,8 @@ export interface RunView {
 /** The last top-level thing it said, if any. */
 export function answerOf(r: RunView) {
   for (let i = r.steps.length - 1; i >= 0; i--) {
-    const s = r.steps[i]!;
-    if (s.type === "assistant/message" && s.under === undefined) return s;
+    const s = r.steps[i];
+    if (s && s.type === "assistant/message" && s.under === undefined) return s;
   }
   return undefined;
 }
@@ -75,10 +74,10 @@ interface Span {
   ms: number;
 }
 
-/** Each step lasts until the next one starts; the last until `end` (now, while the run goes on; else its own start). */
+/** Each step lasts until the next one starts. the last until `end` (now, while the run goes on. */
 export function spansOf(r: RunView, end: number): Span[] {
   const all = allOf(r);
-  return all.map((s, i) => ({ step: s, ms: Math.max(0, (i + 1 < all.length ? all[i + 1]!.time : end) - s.time) }));
+  return all.map((s, i) => ({ step: s, ms: Math.max(0, (all[i + 1]?.time ?? end) - s.time) }));
 }
 
 export function runMs(r: RunView, end: number) {
@@ -171,19 +170,18 @@ export function spanColor(step: SessionEvent) {
   }
 }
 
+const CommandInput = Schema.fromJsonString(Schema.Struct({ command: Schema.optionalKey(Schema.String) }));
+const JsonObjectInput = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown));
+
 /** A call's input as it reads best: a command as `$ …`, JSON indented, anything else as it came. */
 export function readableInput(step: SessionEvent) {
   const raw = step.input?.trim() ?? "";
   if (!raw) return "";
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (Predicate.isObject(parsed)) {
-      const command = Predicate.hasProperty(parsed, "command") ? parsed.command : undefined;
-      if (!Array.isArray(parsed) && typeof command === "string") return `$ ${command}`;
-      return JSON.stringify(parsed, null, 2);
-    }
-  } catch {
-    // Not JSON (or clipped): shown as it came.
+  const obj = Schema.decodeOption(JsonObjectInput)(raw);
+  if (obj._tag === "Some") {
+    const cmd = Schema.decodeOption(CommandInput)(raw);
+    if (cmd._tag === "Some" && cmd.value.command !== undefined) return `$ ${cmd.value.command}`;
+    return JSON.stringify(obj.value, null, 2);
   }
   return raw;
 }
@@ -228,10 +226,7 @@ interface Waterfall {
   readonly spans: readonly LaneSpan[];
 }
 
-/** Lanes from the times the log already has; a step's time is when it began. A
- * model answer runs from what it answered (the message, a tool's result) to its llm/usage, or, with none, to the last
- * step before what stops it; a tool from its call to its result. `end` is where the last run stops (now, while it goes
- * on). */
+/** Lanes from the times the log already has. a step's time is when it began. */
 export function waterfallOf(log: readonly SessionEvent[], end: number): Waterfall {
   const top = log.filter((e) => e.under === undefined && e.type !== "run/start" && e.type !== "run/end");
   const groups = runsOf(top).map(allOf);
@@ -255,7 +250,7 @@ export function waterfallOf(log: readonly SessionEvent[], end: number): Waterfal
     steps.forEach((e, i) => {
       switch (e.type) {
         case "user/message":
-          spans.push({ lane: "asked", start: e.time, end: i + 1 < steps.length ? steps[i + 1]!.time : to, seq: e.seq });
+          spans.push({ lane: "asked", start: e.time, end: steps[i + 1]?.time ?? to, seq: e.seq });
           waiting = e.time;
           break;
         case "assistant/thinking":
@@ -381,8 +376,7 @@ interface Log {
   reading: { during: SessionEvent[]; again: boolean } | undefined;
 }
 
-/** One current log per observed session. Snapshots replace the retained window; live revisions arriving during the read
- * are merged into it. Reconnecting re-reads every observed log, including a run that ended while disconnected. */
+/** One current log per observed session. Snapshots replace the retained window. */
 export class SessionLogs {
   private readonly logs = new Map<string, Log>();
   private stop: (() => void) | undefined;
@@ -427,7 +421,14 @@ export class SessionLogs {
   }
 
   private publish(log: Log, steps: SessionEvent[]) {
-    if (steps.length === log.steps.length && steps.every((s, i) => s.seq === log.steps[i]!.seq && s.revision === log.steps[i]!.revision)) return;
+    if (
+      steps.length === log.steps.length &&
+      steps.every((s, i) => {
+        const prev = log.steps[i];
+        return prev !== undefined && s.seq === prev.seq && s.revision === prev.revision;
+      })
+    )
+      return;
     log.steps = steps;
     for (const listener of log.listeners) listener(steps);
   }
@@ -443,7 +444,7 @@ export class SessionLogs {
       const snapshot = await this.read(log.id);
       if (this.logs.get(log.id) === log) this.publish(log, mergeSteps(snapshot, reading.during));
     } catch {
-      // The query retries a failed read. Keep the received steps; a reconnect or a new observer tries again.
+      // The query retries a failed read. Keep the received steps.
     } finally {
       log.reading = undefined;
       if (reading.again && this.logs.get(log.id) === log) void this.refresh(log);

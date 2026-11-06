@@ -1,17 +1,3 @@
-// Writes db/generated from db/migrations and db/queries for SQLite, in the shape effect-sqlc writes for Postgres: per
-// query file a <file>.sql.ts with each query's Params and Result Schemas, its SQL and an Effect.fn that runs it on the
-// SqlClient; types.ts holds the closed sets of words (a text column's check (col in (…))) and the 0/1 boolean. --check
-// fails when db/generated is stale.
-//
-// The schema runs in node:sqlite in memory; each query is prepared there, and StatementSync.columns() says which table's
-// column a result column is. What SQLite cannot say is written in the query:
-//   sqlc.arg(name), sqlc.narg(name)  a parameter (narg: may be null); the same name is the same ?N
-//   expr::T as name                  a computed result column's type: int, real, text, bool, json, or table.column for
-//                                    that column's; T? when it may be null
-//   sqlc.arg(name)::T                a parameter's type, when no column next to it says it; text[] and int[] are an array,
-//                                    bound as JSON text for json_each(…)
-// Anything else ::T is a cast: int, real and text become cast(… as …), bool and json are left as they are.
-
 import { readdirSync, readFileSync, rmSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";

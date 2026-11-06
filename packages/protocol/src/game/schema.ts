@@ -1,5 +1,3 @@
-// The Schemas of progress, achievements, the ledger and the farm's view (docs/subsystems/game.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
@@ -254,4 +252,13 @@ export const LedgerEntry: Codec<T.LedgerEntry> = Schema.Union([
 export const ChooseTitleRequest: Codec<T.ChooseTitleRequest> = Schema.Struct({
   achievement: Schema.optionalKey(Schema.String),
   tier: Schema.optionalKey(Schema.Finite),
+});
+
+export const FactProgressChanged: Codec<T.FactProgressChanged> = Schema.Struct({
+  type: Schema.Literal("progressChanged"),
+  at: Schema.Finite,
+  progress: Schema.optionalKey(Progress),
+  news: Schema.optionalKey(ProgressNews),
+  commits: Schema.optionalKey(CommitCount),
+  station: Schema.optionalKey(Schema.Struct({ id: SessionId, station: Schema.Finite })),
 });

@@ -22,12 +22,12 @@ export interface Nameable {
 
 const menuMax = 6;
 
-/** The place's orchestrator (here) is @管家, every other orchestrator its @<profile id>; everyone only when there is
+/** The place's orchestrator (here) is @the orchestrator, every other orchestrator its @<profile id>; everyone only when there is
  * more than one helper. */
 export const nameables = (sessions: SessionView[], orchestrators: readonly Agent[], here: string, now: number): Nameable[] => [
   ...sessions.filter((h) => h.role === "worker").map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
   {
-    token: mentionOf[defaultOrchestrator]!,
+    token: mentionOf[defaultOrchestrator] ?? "@orchestrator",
     name: orchestrators.find((a) => a.id === here)?.name || t("web.base.orchestrator"),
     note: t("web.channel.names.orchestratorNote"),
     orchestrator: here,
@@ -35,7 +35,9 @@ export const nameables = (sessions: SessionView[], orchestrators: readonly Agent
   ...orchestrators
     .filter((a) => a.id !== here)
     .map((a) => ({ token: `@${a.id}`, name: a.name, note: a.duty || t("web.channel.names.orchestratorNote"), orchestrator: a.id })),
-  ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: t("web.channel.names.everyone"), note: t("web.channel.names.everyoneNote") }] : []),
+  ...(sessions.length > 1
+    ? [{ token: mentionOf[everyone] ?? "@everyone", name: t("web.channel.names.everyone"), note: t("web.channel.names.everyoneNote") }]
+    : []),
 ];
 
 const typed = new RegExp(String.raw`${mentionLead}@([\p{L}\p{N}_]*)$`, "u");

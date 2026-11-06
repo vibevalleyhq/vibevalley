@@ -1,7 +1,3 @@
-// The message box's slash commands (docs/style/design.md, 输入框): / at the start of the box offers them as @ offers
-// names, and a line that is one of them runs it instead of being said. A command is an endpoint of the API (api.ts),
-// not a second way of doing things: what it may do and what it refuses is the server's.
-
 import { t } from "@vibevalley/i18n";
 import type { Channel } from "@vibevalley/protocol";
 
@@ -23,8 +19,7 @@ type CommandDone = { readonly say: string } | { readonly open: string };
 /** Whether a command needs words after it (a title, a note, a profile). */
 const needsText: Record<CommandName, boolean> = { issue: true, remember: true, stop: false, dm: true };
 
-// A command that makes something keeps its request key per line until it went through: the box keeps a refused line,
-// and Enter on it again (its reply lost, the change made) makes the one thing, not a second.
+// A command that makes something keeps its request key per line until it went through.
 const keys = new Map<string, ReturnType<typeof createRequestKey>>();
 async function once<T>(line: string, make: (requestKey: string) => Promise<T>): Promise<T> {
   const key = keys.get(line) ?? createRequestKey();

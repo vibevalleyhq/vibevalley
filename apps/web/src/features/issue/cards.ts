@@ -1,11 +1,11 @@
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, IssueHistory, IssueStatus, Priority, Session, SessionView, WorkspaceView } from "@vibevalley/protocol";
-import { assignedAgentOf, executionsOf, stageWantsOwner, omitUndefined, sessionIdsOf, shortTitle } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle, stageWantsOwner } from "@vibevalley/protocol/rules";
 
 import { ago, tookText } from "#/base/format.ts";
 import { matches } from "#/base/search.ts";
 
-import { endedAt, issueSession, isForOrchestrator, issueTag, type IssueTag, issueTitle, tagText, tagOpen } from "./issue";
+import { endedAt, isForOrchestrator, issueSession, issueTag, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
 
@@ -23,7 +23,7 @@ export const laneLabel: Record<Lane, string> = {
 /** The status a lane's header is drawn with: the one its cards mostly have. */
 export const laneStatus: Record<Lane, IssueStatus> = { todo: "todo", working: "in_progress", waiting: "in_review", closed: "done" };
 
-/** A card says its own status only where its lane does not: a draft in 待办 says so by its 草稿 flag instead. */
+/** A card says its own status only where its lane does not: a draft in todo says so by its draft flag instead. */
 export const ownStatus = (lane: Lane, status: IssueStatus) => status !== laneStatus[lane] && !(lane === "todo" && status === "backlog");
 
 export function laneOf(s: IssueStatus): Lane {
@@ -45,14 +45,9 @@ export function moveOf(from: Lane, to: Lane, moves: IssueStatus[]): Move | undef
 
 export const closedShown = 15;
 
-// The board's and the list's rows. The frame keeps every open issue and the newest closed ones (with the sessions on the
-// farm now), so those are read from it alone and a move shows on the next frame; issue.history.list adds what the frame
-// does not keep: the sessions that have left, and with 更早的 the older closed issues. An issue is held once, by the frame.
+// The board's and the list's rows.
 
-/**
- * Each issue the frame keeps, its sessions found on the farm, in the history, or (one that left after the history was
- * read) as the frame last had it; the history's own rows after them with `older`. undefined before the first frame.
- */
+/** Each issue the frame keeps, its sessions found on the farm, in the history, or (one that left after the history was read) as the frame last had it. */
 export function boardRows(
   core: WorkspaceView | undefined,
   history: readonly IssueHistory[] | undefined,
@@ -75,10 +70,7 @@ export function boardRows(
   return [...live, ...history.filter((r) => !kept.has(r.issue.id))];
 }
 
-/**
- * What the history adds to the frame changes only when an issue gets a session or one leaves the farm: the history is
- * read again when this does, not on every move or edit.
- */
+/** What the history adds to the frame changes only when an issue gets a session or one leaves the farm. */
 export const historyKey = (core: WorkspaceView | undefined): string =>
   core
     ? `${core.issues
@@ -135,8 +127,8 @@ function cardWords(c: BoardCard): (string | undefined)[] {
     case "missing":
       return [c.issue.title, c.issue.description, c.issue.project];
     case "issue": {
-      const head = c.sessions[c.sessions.length - 1]!;
-      return [c.issue.title, c.issue.description, head.name, c.issue.project, c.issue.id, head.lastRun?.summary];
+      const head = c.sessions.at(-1);
+      return [c.issue.title, c.issue.description, head?.name, c.issue.project, c.issue.id, head?.lastRun?.summary];
     }
     case "orchestrator":
       return [c.issue.title, c.issue.description, c.issue.project, c.issue.id, t("web.issue.card.orchestrator")];
@@ -201,11 +193,15 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
     }
     case "issue": {
       const { issue, sessions, tag, session } = c;
-      const head = sessions[sessions.length - 1]!;
+      const head = sessions.at(-1);
+      if (!head) {
+        return { number: numberOf(issue), title: shortTitle(issueTitle(issue, issues)), status: issue.status, priority: issue.priority, flags, detail: "" };
+      }
+      const first = sessions[0] ?? head;
       const phase = session?.phase;
       const now0 = session ?? head;
       // The board says what the page says: the stage, when it waits on the owner.
-      // A stuck issue says why on the board as on its page (有冲突, 没做成…).
+      // A stuck issue says why on the board as on its page (conflict).
       const st = issue.stage;
       if (stageWantsOwner(st.state))
         flags.push({
@@ -223,7 +219,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       const cny = now0.spent?.cny;
       const took = tagOpen(tag)
         ? t("web.issue.card.open", { took: tookText(now - head.hiredAt) })
-        : t("web.issue.card.used", { took: tookText((issue.closedAt ?? endedAt(head) ?? now) - sessions[0]!.hiredAt) });
+        : t("web.issue.card.used", { took: tookText((issue.closedAt ?? endedAt(head) ?? now) - first.hiredAt) });
       lines.push(
         [
           tag === "working" ? t("web.issue.card.run", { n: runs + 1 }) : t("web.issue.card.runs", { n: runs }),

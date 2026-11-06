@@ -50,8 +50,7 @@ export function OutLink(props: { href: string; label: string }) {
   );
 }
 
-/** A link that is only its icon, to a page of the workbench. A link out to another site says where it goes (OutLink):
- * the address type keeps one from being drawn as an icon alone. */
+/** A link that is only its icon, to a page of the workbench. */
 export function IconLink(props: { href: `/${string}`; label: string; icon?: IconName }) {
   return (
     <Tip text={props.label}>

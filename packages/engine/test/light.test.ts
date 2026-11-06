@@ -1,7 +1,3 @@
-// The pure half of the light and the yard (pixi/normals.ts, pixi/sky.ts, pixi/material.ts): normal maps made from
-// pictures, the sky through a day, and what a painted pixel is made of. The rest (the passes and the filter) is
-// looked at on the pixel page.
-
 import assert from "node:assert/strict";
 
 import { test } from "vite-plus/test";

@@ -1,5 +1,3 @@
-// The answers of the lan endpoints (packages/protocol/src/lan/api.ts): each forwards to the service that owns the rule.
-
 import { Effect, Option } from "effect";
 import { HttpServerRequest } from "effect/http";
 

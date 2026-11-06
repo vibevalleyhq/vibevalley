@@ -1,5 +1,3 @@
-// The answers of the core endpoints (the server's own): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import type { CoreHandlers } from "@vibevalley/protocol/api";

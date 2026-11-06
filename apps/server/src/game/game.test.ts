@@ -118,7 +118,7 @@ describe("the game", () => {
     return Effect.gen(function* () {
       const game = yield* Game;
       const count = yield* game.count();
-      // The worktree is not a second repository; 3 + 1 on the worktree branch in app, 1 in cli; the colleague's 2 do not count.
+      // The worktree is not a second repository. 3 + 1 on the worktree branch in app, 1 in cli.
       expect(count.repos.length).toBe(2);
       expect(count.total).toBe(5);
       expect(count.repos.map((r) => r.commits).toSorted((a, b) => a - b)).toEqual([1, 4]);

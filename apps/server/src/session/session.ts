@@ -1,6 +1,3 @@
-// Admission serializes room and opening turns; each hand owns its input, handover and departure, so one worktree's
-// checks do not hold the other sessions.
-
 import { Clock, Context, Effect, Exit, FileSystem, Layer, Option, PubSub, Scope, Semaphore, Stream } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -11,9 +8,9 @@ import { sessionId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { session as sessionActor } from "#/base/actor.ts";
+import { type ApiError, reasonOf, refused } from "#/base/errors.ts";
 import { jsonOrNone } from "#/base/json.ts";
 import { Core } from "#/core/core.ts";
-import { type ApiError, reasonOf, refused } from "#/errors.ts";
 import { Executor } from "#/executor/executor.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
@@ -92,8 +89,7 @@ export class Session extends Context.Service<
     /** Discard resets its branch only after the runtime has stopped writing. */
     /** closed: how it leaves, "dismissed" unless its issue was completed without a merge ("completed"). */
     readonly dismiss: (id: string, work?: "keep" | "discard", closed?: "dismissed" | "completed") => Effect.Effect<boolean, ApiError>;
-    /** A read-only round's leftovers go: its worktree back to the main branch, what it changed or committed gone; the
-     * session stays. Not while a round goes on (the next report resets it). */
+    /** A read-only round's leftovers go: its worktree back to the main branch, what it changed or committed gone. the session stays. */
     readonly discardWork: (id: string) => Effect.Effect<void, ApiError>;
     /** Removes an issue's unused workplace; an active or unclosed startup still owns it. */
     readonly clearWorkplace: (issue: string, project: string, number: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease, ApiError>;
@@ -114,11 +110,7 @@ export class Session extends Context.Service<
     readonly report: (id: string, report: T.IssueReport) => Effect.Effect<void, ApiError>;
     /** The helper working the issue now, if one is. */
     readonly onIssue: (issue: string) => string | undefined;
-    /** The session hands its workplace over and leaves as closed says: use takes the work in (Source Control's merge, pull
-     * request, merge into a parent issue's branch), given the workplace and the session's last words in full. Refused while
-     * it works. Work that does not go in keeps the session and its branch, and says in NotTakenIn what
-     * the helper is sent back with and what the owner is told; settle says who settles a conflict. A pull request left
-     * open keeps the session too. */
+    /** The session hands its workplace over and leaves as closed says. Refused while it works. */
     readonly handOver: (
       id: string,
       closed: T.SessionClose,
@@ -376,13 +368,15 @@ const make = Effect.gen(function* () {
       if (full) return { refused: full };
       hired++;
       const id = sessionId(`w${hired}`);
-      const placed = yield* Effect.result(
-        issue
+      let placeError = "";
+      const openedPlace = yield* Effect.option(
+        (issue
           ? projects.workplace(project, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "")
-          : contextPlace(config.workRoot, id).pipe(Effect.provideService(FileSystem.FileSystem, fs)),
+          : contextPlace(config.workRoot, id).pipe(Effect.provideService(FileSystem.FileSystem, fs))
+        ).pipe(Effect.tapError((e) => Effect.sync(() => (placeError = t("server.session.life.noPlace", { name: agent.name, why: e.message }))))),
       );
-      if (placed._tag === "Failure") return { refused: t("server.session.life.noPlace", { name: agent.name, why: placed.failure.message }) };
-      const place = placed.success;
+      if (Option.isNone(openedPlace)) return { refused: placeError };
+      const place = openedPlace.value;
       const releasePlace = issue ? projects.release(place) : releaseContextPlace(place).pipe(Effect.provideService(FileSystem.FileSystem, fs));
       let committed = false;
       let released = false;
@@ -500,11 +494,11 @@ const make = Effect.gen(function* () {
             const allocation = executor.find(id);
             if (allocation?.attached === true) return;
             if (allocation) {
-              const stopped = yield* Effect.result(executor.close(id));
-              if (stopped._tag === "Failure") {
-                yield* core.notice("error", allocation.failure ?? reasonOf(stopped.failure));
-                return;
-              }
+              const stopFailed = yield* executor.close(id).pipe(
+                Effect.as(false),
+                Effect.catch((e) => Effect.as(core.notice("error", allocation.failure ?? reasonOf(e)), true)),
+              );
+              if (stopFailed) return;
             }
             if (registeredRow) yield* forget(id);
             revokeToken(h);
@@ -564,10 +558,8 @@ const make = Effect.gen(function* () {
           const name = current?.name ?? id;
           if (work === "discard" && !current?.issue) return yield* Effect.fail(refused(t("server.session.life.noIssue")));
           yield* closeExecution(h);
-          if (work === "discard" && h.place.branch) {
-            const reset = yield* Effect.result(projects.reset(h.place));
-            if (reset._tag === "Failure") yield* core.notice("warn", t("server.session.life.notReset", { name, why: reset.failure.message }));
-          }
+          if (work === "discard" && h.place.branch)
+            yield* projects.reset(h.place).pipe(Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name, why: e.message }))));
           yield* leave(h, closed, 0);
           const kept = current?.issue ? yield* projects.release(h.place) : { kept: false as const };
           if (kept.kept) yield* core.notice("info", t("server.session.life.left", { name, why: kept.reason }));
@@ -583,8 +575,7 @@ const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const s = core.session(id);
           if (hands.get(id) !== h || !s || isBusy(s)) return;
-          const reset = yield* Effect.result(projects.reset(h.place));
-          if (reset._tag === "Failure") yield* core.notice("warn", t("server.session.life.notReset", { name: s.name, why: reset.failure.message }));
+          yield* projects.reset(h.place).pipe(Effect.catch((e) => core.notice("warn", t("server.session.life.notReset", { name: s.name, why: e.message }))));
         }),
       );
     }),

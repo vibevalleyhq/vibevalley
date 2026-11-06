@@ -1,17 +1,12 @@
-// Chinese word segmentation as gse v1.1.0 cuts it (github.com/go-ego/gse, Apache-2.0): the same
-// dictionary (data/zh_s.txt.gz, gse's simplified Chinese s_1.txt) and jieba's HMM for runs the dictionary does not know
-// (data/hmm_emit.json.gz, from gse's hmm/prob_emit.go). Only the cuts the memory search uses are here: the search cut with
-// the HMM (CutSearch(text, true)) and the cut into every dictionary word (CutAll). The recorded cases
-// (terms.test.ts) hold the two to the same words.
-
 // oxlint-disable-next-line vibevalley/sync-fs -- readNow, the fallback before loadSegmenter has read the data; once per process
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 
-import { Effect, FileSystem } from "effect";
+import { Effect, FileSystem, Schema } from "effect";
 
-import { serverFile } from "#/assets.ts";
+import { serverFile } from "#/base/assets.ts";
+import { jsonOf } from "#/base/json.ts";
 
 const dataDir = serverFile("src/memory/data");
 
@@ -30,7 +25,7 @@ function keyOf(text: string): string {
   // Most words are all CJK, past U+0800: nothing in them is lowered.
   if (!lowerable.test(text)) return text;
   let out = "";
-  for (const ch of text) out += ch.codePointAt(0)! < 0x800 && isLetterOrNumber.test(ch) ? goLower(ch) : ch;
+  for (const ch of text) out += (ch.codePointAt(0) ?? 0) < 0x800 && isLetterOrNumber.test(ch) ? goLower(ch) : ch;
   return out;
 }
 
@@ -50,15 +45,13 @@ const files = { dictionary: "zh_s.txt.gz", emit: "hmm_emit.json.gz" } as const;
  * starts), and once. */
 const readNow = (file: string) => gunzipSync(readFileSync(join(dataDir, file))).toString("utf8");
 
-/** Reads the dictionary and the HMM's table on the file system, off the event loop: the memory service starts it, so a
- * first cut does not hold the server for the 2 MB dictionary. */
-export const loadSegmenter = Effect.gen(function* () {
+/** Reads the dictionary and the HMM's table on the file system, off the event loop. */
+export const loadSegmenter = Effect.fn("Gse.loadSegmenter")(function* () {
   const fs = yield* FileSystem.FileSystem;
   const read = (file: string) => Effect.map(fs.readFile(join(dataDir, file)), (bytes) => gunzipSync(bytes).toString("utf8"));
   dictionary ??= dictionaryOf(yield* read(files.dictionary));
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the segmenter's table, shipped with the package
-  emitTable ??= JSON.parse(yield* read(files.emit)) as Record<State, Record<string, number>>;
-}).pipe(Effect.orDie);
+  emitTable ??= yield* Schema.decodeEffect(Schema.fromJsonString(EmitTable))(yield* read(files.emit));
+}, Effect.orDie);
 
 const dict = (): Dictionary => (dictionary ??= dictionaryOf(readNow(files.dictionary)));
 
@@ -92,7 +85,7 @@ function goParseFloat(text: string): number | undefined {
   return Number(text);
 }
 
-/** The word's frequency; 0 when it only begins a word; undefined when nothing begins with it (gse's Find). */
+/** The word's frequency. 0 when it only begins a word. */
 function find(word: string): number | undefined {
   const d = dict();
   const f = d.freq.get(word);
@@ -102,29 +95,32 @@ function find(word: string): number | undefined {
   let hi = keys.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (keys[mid]! < word) lo = mid + 1;
+    if ((keys[mid] ?? "") < word) lo = mid + 1;
     else hi = mid;
   }
-  return lo < keys.length && keys[lo]!.startsWith(word) ? 0 : undefined;
+  return keys[lo]?.startsWith(word) === true ? 0 : undefined;
 }
 
+type Ends = readonly [number, ...number[]];
+
 /** For each start, the ends of the dictionary words that start there; itself when none does. */
-function dagOf(runes: readonly string[]): number[][] {
+function dagOf(runes: readonly string[]): Ends[] {
   const n = runes.length;
-  const dag: number[][] = [];
+  const dag: Ends[] = [];
   for (let k = 0; k < n; k++) {
     const ends: number[] = [];
     let i = k;
-    let frag = runes[k]!;
+    let frag = runes[k] ?? "";
     for (;;) {
       const f = find(frag);
       if (f === undefined) break;
       if (f > 0) ends.push(i);
       i++;
       if (i >= n) break;
-      frag += runes[i]!;
+      frag += runes[i] ?? "";
     }
-    dag.push(ends.length > 0 ? ends : [k]);
+    const [first, ...rest] = ends;
+    dag.push(first !== undefined ? [first, ...rest] : [k]);
   }
   return dag;
 }
@@ -133,17 +129,20 @@ function dagOf(runes: readonly string[]): number[][] {
 function routesOf(runes: readonly string[]): { freq: number; index: number }[] {
   const dag = dagOf(runes);
   const n = runes.length;
-  const routes: { freq: number; index: number }[] = [];
-  routes[n] = { freq: 0, index: 0 };
+  const routes: { freq: number; index: number }[] = Array.from({ length: n + 1 }, () => ({ freq: 0, index: 0 }));
   const logT = Math.log(dict().totalFreq);
+  const score = (idx: number, end: number) => {
+    const f = find(runes.slice(idx, end + 1).join(""));
+    return { freq: (f === undefined ? 0 : Math.log(f)) - logT + (routes[end + 1]?.freq ?? 0), index: end };
+  };
   for (let idx = n - 1; idx >= 0; idx--) {
-    let best: { freq: number; index: number } | undefined;
-    for (const i of dag[idx]!) {
-      const f = find(runes.slice(idx, i + 1).join(""));
-      const r = { freq: (f === undefined ? Math.log(1) : Math.log(f)) - logT + routes[i + 1]!.freq, index: i };
-      if (!best || best.freq < r.freq || (best.freq === r.freq && best.index < r.index)) best = r;
+    const [first, ...rest] = dag[idx] ?? [idx];
+    let best = score(idx, first);
+    for (const end of rest) {
+      const r = score(idx, end);
+      if (r.freq > best.freq || (r.freq === best.freq && r.index > best.index)) best = r;
     }
-    routes[idx] = best!;
+    routes[idx] = best;
   }
   return routes;
 }
@@ -151,13 +150,13 @@ function routesOf(runes: readonly string[]): { freq: number; index: number }[] {
 // As jieba's HMM: it cuts a run of single characters the dictionary does not know.
 type State = "B" | "E" | "M" | "S";
 
+const EmitTable = Schema.Record(Schema.Literals(["B", "E", "M", "S"]), Schema.Record(Schema.String, Schema.Finite));
 let emitTable: Record<State, Record<string, number>> | undefined;
-const emit = () =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the segmenter's table, shipped with the package
-  (emitTable ??= JSON.parse(readNow(files.emit)) as Record<State, Record<string, number>>);
+const emitOf = jsonOf(EmitTable);
+const emit = () => (emitTable ??= emitOf(readNow(files.emit)));
 
 const minFloat = -3.14e100;
-const prevStatus: Record<State, readonly State[]> = { B: ["E", "S"], M: ["M", "B"], S: ["S", "E"], E: ["B", "M"] };
+const prevStatus: Record<State, readonly [State, State]> = { B: ["E", "S"], M: ["M", "B"], S: ["S", "E"], E: ["B", "M"] };
 const probStart: Record<State, number> = { B: -0.26268660809250016, E: -3.14e100, M: -3.14e100, S: -1.4652633398537678 };
 const probTrans: Record<State, Partial<Record<State, number>>> = {
   B: { E: -0.51082562376599, M: -0.916290731874155 },
@@ -172,30 +171,29 @@ const better = (a: { prob: number; state: State }, b: { prob: number; state: Sta
 
 function viterbi(obs: readonly string[]): State[] {
   const e = emit();
-  let vtb: Record<string, number> = {};
-  let path: Record<string, State[]> = {};
+  let vtb: Record<State, number> = { B: minFloat, M: minFloat, E: minFloat, S: minFloat };
+  let path: Record<State, State[]> = { B: ["B"], M: ["M"], E: ["E"], S: ["S"] };
+  const first = obs[0] ?? "";
   for (const y of states) {
-    vtb[y] = (e[y][obs[0]!] ?? minFloat) + probStart[y];
+    vtb[y] = (e[y][first] ?? minFloat) + probStart[y];
     path[y] = [y];
   }
-  for (let t = 1; t < obs.length; t++) {
-    const next: Record<string, number> = {};
-    const newPath: Record<string, State[]> = {};
+  for (const ch of obs.slice(1)) {
+    const next: Record<State, number> = { B: minFloat, M: minFloat, E: minFloat, S: minFloat };
+    const newPath: Record<State, State[]> = { B: [], M: [], E: [], S: [] };
     for (const y of states) {
-      const emP = e[y][obs[t]!] ?? minFloat;
-      let best: { prob: number; state: State } | undefined;
-      for (const y0 of prevStatus[y]) {
-        const p = { prob: vtb[y0]! + (probTrans[y0][y] ?? minFloat) + emP, state: y0 };
-        best = best ? better(best, p) : p;
-      }
-      next[y] = best!.prob;
-      newPath[y] = [...path[best!.state]!, y];
+      const emP = e[y][ch] ?? minFloat;
+      const stepFrom = (y0: State) => ({ prob: vtb[y0] + (probTrans[y0][y] ?? minFloat) + emP, state: y0 });
+      const [s0, s1] = prevStatus[y];
+      const best = better(stepFrom(s0), stepFrom(s1));
+      next[y] = best.prob;
+      newPath[y] = [...path[best.state], y];
     }
     vtb = next;
     path = newPath;
   }
-  const last = better({ prob: vtb.E!, state: "E" }, { prob: vtb.S!, state: "S" });
-  return path[last.state]!;
+  const last = better({ prob: vtb.E, state: "E" }, { prob: vtb.S, state: "S" });
+  return path[last.state];
 }
 
 function hmmInternal(text: string): string[] {
@@ -252,7 +250,7 @@ function hmmCut(input: string): string[] {
         continue;
       }
     }
-    const at = !cut && !nonCut ? undefined : !cut ? nonCut!.index : !nonCut || cut.index < nonCut.index ? cut.index : nonCut.index;
+    const at = cut && nonCut ? Math.min(cut.index, nonCut.index) : (cut?.index ?? nonCut?.index);
     if (at === undefined) {
       out.push(text);
       break;
@@ -276,13 +274,13 @@ function cutDAG(input: string): string[] {
   const out: string[] = [];
   let buf: string[] = [];
   const flush = () => {
-    if (buf.length === 1) out.push(buf[0]!);
+    if (buf.length === 1 && buf[0] !== undefined) out.push(buf[0]);
     else if (buf.length > 1) out.push(...hmmRun(buf));
     buf = [];
   };
   for (let x = 0; x < runes.length;) {
-    const y = routes[x]!.index + 1;
-    if (y - x === 1) buf.push(runes[x]!);
+    const y = (routes[x]?.index ?? x) + 1;
+    if (y - x === 1) buf.push(runes[x] ?? "");
     else {
       flush();
       out.push(runes.slice(x, y).join(""));
@@ -316,19 +314,18 @@ export function cutAll(text: string): string[] {
   const dag = dagOf(runes);
   const out: string[] = [];
   let start = -1;
-  for (let k = 0; k < dag.length; k++) {
-    const ends = dag[k]!;
-    if (ends.length === 1 && k > start) {
-      out.push(runes.slice(k, ends[0]! + 1).join(""));
-      start = ends[0]!;
-      continue;
+  dag.forEach(([first, ...rest], k) => {
+    if (rest.length === 0 && k > start) {
+      out.push(runes.slice(k, first + 1).join(""));
+      start = first;
+      return;
     }
-    for (const j of ends) {
+    for (const j of [first, ...rest]) {
       if (j > k) {
         out.push(runes.slice(k, j + 1).join(""));
         start = j;
       }
     }
-  }
+  });
   return out;
 }

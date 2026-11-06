@@ -1,5 +1,3 @@
-// The answers of the artifact endpoints (packages/protocol/src/artifact/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import { ownerId } from "@vibevalley/protocol";

@@ -1,7 +1,3 @@
-// The server's two event streams: the state (/api/v1/state), and the Solid store the page reads it through, holding one
-// stream while anyone listens and the frames as they came for the code that compares them (rawFrame below); and the
-// notices (/api/v1/live), which the page's framework-free code (the farm, the session logs) subscribes to.
-
 import { type Accessor, createContext, createStore, onSettled, reconcile, useContext } from "solid-js";
 
 import {
@@ -41,8 +37,7 @@ function set(next: Frames) {
   for (const l of listeners) l();
 }
 
-// One stream while anyone listens; it reconnects a second after it drops, or after it went silent past the server's
-// heartbeat (readStream), and closes with the last listener.
+// One stream while anyone listens.
 function connect(signal: AbortSignal) {
   readStream("", statePath, (frame) => set({ frame, link: "open", count: current.count + 1 }), signal).catch(() => {
     if (signal.aborted) return;
@@ -99,7 +94,7 @@ export function createFrames(): Frames {
 
 export const useFrames = () => useContext(FramesContext);
 
-/** The folded state; undefined until the first frame. Read it inside JSX or a memo. */
+/** The folded state. undefined until the first frame. */
 export function useCore(): () => WorkspaceView | undefined {
   const f = useFrames();
   return () => f.frame?.state;
@@ -117,10 +112,7 @@ export function orchestratorMood(state: WorkspaceState | undefined, agent = defa
   return phase.doing.action === "speaking_text" ? "speaking" : "thinking";
 }
 
-/**
- * The frame as the stream sent it: a new object each time, for code that compares the one before with the one after
- * (sounds, the canvas, the host's notices). UI reads the store above, which keeps objects and updates only what changed.
- */
+/** The frame as the stream sent it: a new object each time, for code that compares the one before with the one after (sounds, the canvas, the host's notices). */
 export const rawFrame = (): Accessor<StateFrame | undefined> => createExternal(frames.subscribe, () => frames.get().frame);
 
 type LiveListener = (e: LiveEvent) => void;
@@ -148,7 +140,7 @@ function connectLive(signal: AbortSignal) {
   });
 }
 
-/** Listens to the live stream (/api/v1/live); returns how to stop. Framework-free: the Solid side subscribes here too. */
+/** Listens to the live stream (/api/v1/live). returns how to stop. */
 export function subscribeLive(l: LiveListener, connected?: () => void) {
   liveListeners.add(l);
   if (connected) liveConnections.add(connected);

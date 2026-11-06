@@ -1,5 +1,3 @@
-// aimTool is the rule: the screen shows it while pointing and follows it on a click.
-
 import { onSettled } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

@@ -205,7 +205,7 @@ export function Composer(props: {
               data-testid="cancel-reply"
               aria-label={t("web.channel.composer.cancelReply")}
               title={t("web.channel.composer.cancelReply")}
-              onClick={() => drafts.reply(props.channel!.id, undefined)}
+              onClick={() => props.channel && drafts.reply(props.channel.id, undefined)}
             >
               <Icon name="close" size={12} />
             </button>
@@ -215,7 +215,7 @@ export function Composer(props: {
       <Show when={draft().files.length > 0 || uploading().length > 0}>
         <div class="mb-1.5 flex flex-wrap gap-1.5">
           <For each={draft().files} keyed={(f) => f.id}>
-            {(f) => <AttachmentTile testid="pending-file" file={f()} onRemove={() => drafts.drop(props.channel!.id, f().id)} />}
+            {(f) => <AttachmentTile testid="pending-file" file={f()} onRemove={() => props.channel && drafts.drop(props.channel.id, f().id)} />}
           </For>
           <For each={uploading()} keyed={(u) => u.key}>
             {(u) => (

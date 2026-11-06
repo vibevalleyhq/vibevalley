@@ -1,7 +1,3 @@
-// The phone's button at the HUD's bottom left: it opens and closes the phone, shakes while a call rings, counts the missed
-// ones, and says when 田头 has something new while the phone is not unfolded to it. The phone itself is Phone.tsx, over
-// the button.
-
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

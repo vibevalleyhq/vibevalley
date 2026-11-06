@@ -1,11 +1,9 @@
-// The answers of the project endpoints (packages/protocol/src/project/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type { ProjectHandlers } from "@vibevalley/protocol/api";
 
-import { lookIn, refused, orMissing } from "#/errors.ts";
+import { lookIn, refused, orMissing } from "#/base/errors.ts";
 import { Issue } from "#/issue/issue.ts";
 import { Project } from "#/project/project.ts";
 

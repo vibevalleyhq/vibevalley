@@ -1,12 +1,3 @@
-/**
- * The project's skills in .agents/skills: each folder has a SKILL.md whose frontmatter `name` is the folder's name and
- * whose `description` is not empty, and keeps whatever else it reads under references/ (no other .md beside SKILL.md);
- * vv-acceptance's SKILL.md and each of its parts (references/*.md) have the fixed sections create-verification-skill
- * asks for, and its table lists every part and nothing else; the README's table
- * lists every skill and nothing else; .claude/skills links to .agents/skills, so Claude Code
- * and Codex read the same files. Run as part of `vp run docs:verify`; anything wrong exits 1.
- */
-
 import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync } from "node:fs";
 import { resolve } from "node:path";
 

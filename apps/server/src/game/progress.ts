@@ -1,7 +1,3 @@
-// The ledger's fold: what each entry pays and unlocks, and which entries a fact makes.
-// Outcomes earn, not effort: what counts is work that went into the main branch, never commands run or tokens spent
-// (docs/subsystems/game.md). Nothing here changes what it is given.
-
 import { dagLayers } from "@vibevalley/agent/dag";
 import { everyone, defaultOrchestrator, ownerId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
@@ -22,7 +18,7 @@ const isTitle = (a: AchievementDef) => a.category !== "starter";
 const tierOf = (p: T.Progress, id: string) => p.unlocked.reduce((t, u) => (u.id === id && u.tier > t ? u.tier : t), 0);
 
 /** What reaching that tier (from 1) pays: seeds.json says, for each achievement. */
-const tierCoins = (a: AchievementDef, tier: number) => (tier < 1 || tier > a.coins.length ? 0 : a.coins[tier - 1]!);
+const tierCoins = (a: AchievementDef, tier: number) => (tier >= 1 ? (a.coins[tier - 1] ?? 0) : 0);
 
 const streakMultiplier = (streak: number) => Math.min(2, 1 + 0.1 * Math.max(0, streak - 1));
 
@@ -30,7 +26,7 @@ export const harvestCoins = (commits: number, streak: number) => Math.round((30 
 
 const taskCoins = (merged: number) => 30 + 10 * merged;
 
-/** Under this, a harvested issue is cheap (一分钱一分货). */
+/** Under this, a harvested issue is cheap . */
 const cheapCNY = 0.05;
 
 interface Seen {

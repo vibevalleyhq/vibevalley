@@ -1,7 +1,3 @@
-// What the agent reminded itself to do later, in reminders.json in its home. One missed while the agent was away runs once
-// when it is back, not once per miss. Cron is in the machine's time zone. The list is held in memory and written when it
-// changes; a fiber sleeps until the next one is due.
-
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -85,11 +81,7 @@ interface Reminders {
   readonly claimDue: (now: Date) => Effect.Effect<string[], AgentFailed>;
 }
 
-/**
- * The reminders in home: read once, then held; a fiber of the scope sleeps until the next is due and hands what came due
- * to wake. What came due while the agent was away is due at once. A file that does not read is left as it is: nothing
- * runs and the tools refuse, until the owner mends it.
- */
+/** The reminders in home: read once, then held. a fiber of the scope sleeps until the next is due and hands what came due to wake. */
 export const makeReminders = (home: string, now: () => number, wake: (due: string[]) => Effect.Effect<void>): Effect.Effect<Reminders, never, Scope.Scope> =>
   Effect.gen(function* () {
     const file = join(home, "reminders.json");

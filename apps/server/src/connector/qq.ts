@@ -1,6 +1,3 @@
-// QQ, written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's
-// message id, which QQ honours only for a while.
-
 import { Cause, Clock, Effect, Option, Queue, Schedule, Schema, Stream, Predicate } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
 
@@ -78,7 +75,8 @@ export const nextReplySeq = (seqs: Map<string, number>, msgId: string) => {
   const next = (seqs.get(msgId) ?? 0) + 1;
   seqs.delete(msgId);
   seqs.set(msgId, next);
-  if (seqs.size > repliesKept) seqs.delete(seqs.keys().next().value!);
+  const oldest = seqs.keys().next().value;
+  if (seqs.size > repliesKept && oldest !== undefined) seqs.delete(oldest);
   return next;
 };
 
@@ -221,12 +219,13 @@ export class QQClient implements QQApi {
         Effect.timeoutOrElse({ duration: 25_000, orElse: () => Effect.fail(failedWith(t("server.connector.qq.send", { why: "timed out" }))) }),
         Effect.mapError((e) => (Predicate.isTagged(e, "AppFailed") ? e : failedWith(t("server.connector.qq.send", { why: e.message })))),
       );
-      const body = yield* Effect.result(Effect.flatMap(res.json, Schema.decodeUnknownEffect(SendResponse)));
-      const read = body._tag === "Success" ? body.success : undefined;
-      if (res.status < 200 || res.status > 299)
+      const decoded = Effect.flatMap(res.json, Schema.decodeUnknownEffect(SendResponse));
+      if (res.status < 200 || res.status > 299) {
+        const read = Option.getOrUndefined(yield* Effect.option(decoded));
         return yield* sendFailure(res.status, t("server.connector.qq.send", { why: `${read?.code ?? res.status} ${read?.message ?? ""}`.trim() }));
-      if (body._tag === "Failure") return yield* failedWith(t("server.connector.qq.unread", { why: body.failure.message }));
-      if (!read?.id || (read.code !== undefined && read.code !== 0)) return yield* failedWith(t("server.connector.qq.noId", { why: read?.message ?? "" }));
+      }
+      const read = yield* Effect.mapError(decoded, (e) => failedWith(t("server.connector.qq.unread", { why: e.message })));
+      if (!read.id || (read.code !== undefined && read.code !== 0)) return yield* failedWith(t("server.connector.qq.noId", { why: read.message ?? "" }));
       return read.id;
     });
   }

@@ -1,7 +1,3 @@
-// Progress and Meter (Base UI's): a value within a range, read out as a progress bar (a task going) or a meter (a
-// level, a quota). Progress with a null value is indeterminate. The indicator carries its share as a width (or height)
-// percentage, the value part says it in words; a Label names the root.
-
 import type { JSX } from "@solidjs/web";
 import { createContext, createUniqueId, omit, onSettled, createSignal, Show, useContext } from "solid-js";
 

@@ -1,6 +1,3 @@
-// The village's named positions, read from the level, where a helper stands, how long a pose shows, what a tap lands on,
-// what a click in the yard opens, and how the village sits in a window.
-
 import { type Framing, frameWhole, type Rect, type Size } from "@vibevalley/engine/framing";
 import { navMap, type NavMap } from "@vibevalley/engine/nav";
 import { t } from "@vibevalley/i18n";
@@ -10,8 +7,7 @@ import { farmFraming } from "@vibevalley/protocol/host";
 import { add, type Box, inBox, type Level, type Point } from "./level";
 import { bedOfStation, isRipe } from "./plots";
 
-// What a click in the yard opens. The ids match the LDtk Prop and Area `spot` fields;
-// a place opens a farm panel, a workbench page, or the chat (the phone unfolded to 田头).
+// What a click in the yard opens. The ids match the LDtk Prop and Area `spot` fields.
 
 export type FarmPanel = "shop" | "warehouse" | "graphs" | "log" | "orchestrator";
 
@@ -32,7 +28,7 @@ export const yardPlaces: readonly YardPlace[] = [
   { id: "log", label: t("web.farm.panel.log"), hint: t("web.farm.yard.log.hint"), panel: "log" },
   { id: "taskBoard", label: t("web.farm.menu.issues"), hint: t("web.farm.yard.taskBoard.hint"), route: "/issues" },
   { id: "agents", label: t("web.farm.menu.agents"), hint: t("web.farm.yard.agents.hint"), route: "/agents" },
-  // Changing its look is the HUD's face (换管家的样子); the orchestrator in the yard is someone to talk to.
+  // Changing its look is the HUD's face; the orchestrator in the yard is someone to talk to.
   { id: "manager", label: t("web.farm.orchestrator"), hint: t("web.farm.yard.manager.hint"), chat: true },
   { id: "runtimes", label: t("web.farm.yard.runtimes.label"), hint: t("web.farm.yard.runtimes.hint"), route: "/runtimes" },
   { id: "skills", label: t("web.farm.yard.skills.label"), hint: t("web.farm.yard.skills.hint"), route: "/settings/skills" },
@@ -202,8 +198,7 @@ export type Pose = "cheer" | "worry" | "idle" | "work" | "think";
 /** How long one pose stays on screen, so fast tool calls are seen one at a time. */
 export const poseMinMs = 800;
 
-/** The pose an actor shows: the newest wanted one, but only after the last change has been up for poseMinMs. A burst of
- * actions keeps only the newest, and when the burst ends the picture catches up within one poseMinMs. */
+/** The pose an actor shows: the newest wanted one, but only after the last change has been up for poseMinMs. */
 export class PoseHold {
   private shown: Pose;
   private wanted: Pose;
@@ -309,8 +304,7 @@ export interface Stroll {
   readonly until: number;
 }
 
-// The village in a window (@vibevalley/engine/framing): a whole number of screen pixels for each art pixel, at most 5% of
-// its width cut off on each side and 8% of its height above and below (farmFraming); a window it cannot fill keeps bars.
+// The village in a window (@vibevalley/engine/framing). a window it cannot fill keeps bars.
 
 export type { Rect };
 

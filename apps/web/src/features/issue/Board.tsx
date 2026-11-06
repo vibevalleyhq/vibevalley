@@ -42,7 +42,7 @@ interface BoardProps {
   onRetry: (card: BoardCard) => void;
   onPutBack: (card: BoardCard) => void;
   onPlace: (card: BoardCard, before: string | undefined) => void;
-  /** The 待办 lane's placeholder card. */
+  /** The todo lane's placeholder card. */
   onNew: () => void;
 }
 
@@ -143,7 +143,7 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; sh
                     onRetry={p().onRetry}
                     onPutBack={p().onPutBack}
                     drag={props.drag}
-                    // Anything but manual hides the owner's order of 待办, so a card cannot be dropped between two there.
+                    // Anything but manual hides the owner's order of todo, so a card cannot be dropped between two there.
                     onPlace={c().kind === "todo" && p().ordering === "manual" ? (moved) => p().onPlace(moved, c().id) : undefined}
                   />
                 )}
@@ -157,7 +157,7 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; sh
           <Match when={p().loading}>
             <p class="px-1 text-xs text-faint">{t("web.issue.reading")}</p>
           </Match>
-          {/* The 待办 lane has its placeholder card: no second empty box under it. */}
+          {/* The todo lane has its placeholder card: no second empty box under it. */}
           <Match when={props.cards.length === 0 && props.lane !== "todo"}>
             <div data-testid="lane-empty" class={["h-12 rounded-md border border-dashed", over() ? "border-leaf" : "border-line"]} />
           </Match>
@@ -227,8 +227,10 @@ function CardView(props: {
         title={look().detail}
         draggable={props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving" ? "true" : "false"}
         onDragStart={(e) => {
-          e.dataTransfer!.effectAllowed = "move";
-          e.dataTransfer!.setData("text/plain", props.card.id);
+          if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", props.card.id);
+          }
           props.drag.setDragging(props.card);
         }}
         onDragEnd={() => props.drag.setDragging(undefined)}

@@ -1,5 +1,3 @@
-// The pieces the islands share: the game's button, a section with its heading, and how parts come in as they reach
-// the screen. Styles are Tailwind utilities on the game's theme (styles/global.css).
 import { animate, inView, resize, scroll, steps, useInView, type DOMKeyframesDefinition } from 'motion/react'
 import { useEffect, useRef, useState, type AnchorHTMLAttributes, type CSSProperties, type ReactNode, type Ref, type RefObject } from 'react'
 
@@ -20,14 +18,7 @@ export interface ScrollPart {
   times?: number[]
 }
 
-/**
- * Plays animations of an element as the page scrolls past a target, with Motion's scroll(): the browser runs them on
- * a native scroll or view timeline where it has them (in step with the scroll, off the main thread), Motion in script
- * where it has not. The offset is the stretch of scroll, as Motion's ('start end' to 'end start': while the target
- * crosses the screen); parts() gives the animations from the target's size, again whenever that changes. Transform
- * and opacity only, so they stay on the compositor. Nothing moves for those who ask for less motion, unless the
- * animation is no motion at all (fading: still: true).
- */
+/** Plays animations of an element as the page scrolls past a target, with Motion's scroll(). */
 export function useScrollLinked<T extends HTMLElement>(
   target: RefObject<HTMLElement | null> | 'self',
   offset: ScrollOffset,
@@ -116,12 +107,7 @@ export function Heading({ id, className, children }: { id?: string; className?: 
   )
 }
 
-/**
- * Brings in the parts of an island marked data-reveal as they reach the screen: up and into view in a few pixel
- * steps, data-reveal's milliseconds after the others in its row. Only what is still below the screen when the island
- * wakes is hidden first, so nothing on screen blinks; without the script, or for those who ask for less motion, every
- * part simply stays where it is.
- */
+/** Brings in the parts of an island marked data-reveal as they reach the screen. */
 export function useReveal<T extends HTMLElement>() {
   const ref = useRef<T>(null)
   useEffect(() => {
@@ -147,8 +133,7 @@ export function useReveal<T extends HTMLElement>() {
   return ref
 }
 
-/** A number counting up from 0 the first time it comes on screen, in steps like a game's counter. The page is built
- *  with the number itself, which stays for those who ask for less motion. */
+/** A number counting up from 0 the first time it comes on screen, in steps like a game's counter. */
 export function CountUp({ to, className }: { to: number; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null)
   const seen = useInView(ref, { once: true, margin: '0px 0px -10% 0px' })

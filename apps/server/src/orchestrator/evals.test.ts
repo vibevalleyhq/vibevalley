@@ -68,8 +68,7 @@ describe("the orchestrator's evals", () => {
     }
   });
 
-  // A replay answers a call only as the case recorded that same call: the recorded turn is the wrong one, and its answer to a
-  // start the model was told not to make would tell the model it made one.
+  // A replay answers a call only as the case recorded that same call.
   it("answer in a replay only the call the case recorded, once", async () => {
     const issueCreate: Tool = { name: "issue_create", description: "", parameters: {}, execute: () => Effect.die("not stubbed") };
     const recorded: BrainMessage[] = [

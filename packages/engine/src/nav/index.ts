@@ -1,7 +1,3 @@
-// @vibevalley/engine/nav: finding a way across the ground. The world is laid out as a grid of small cells, each
-// walkable or not and some cheaper than others (a path is cheaper than grass); A* finds the cheapest way, and
-// the corners are then cut wherever a straight line is just as cheap. Plain functions.
-
 export interface Point {
   readonly x: number;
   readonly y: number;
@@ -46,7 +42,8 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
   const far = new Float32Array(n);
   for (let i = 0; i < n; i++) far[i] = free[i] === 1 ? 1e9 : 0;
   const relax = (i: number, j: number, d: number) => {
-    if (far[j]! + d < far[i]!) far[i] = far[j]! + d;
+    const next = (far[j] ?? 0) + d;
+    if (next < (far[i] ?? 0)) far[i] = next;
   };
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -76,7 +73,8 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
   const weight = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const base = Math.max(1, cost?.(centre(i)) ?? 1);
-    weight[i] = base + (far[i]! < room ? (room - far[i]!) / room : 0);
+    const f = far[i] ?? 0;
+    weight[i] = base + (f < room ? (room - f) / room : 0);
   }
 
   /** The nearest walkable cell, searching outwards ring by ring. */
@@ -127,7 +125,7 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
       const i = heap.pop();
       if (i === goal) {
         const cells = [i];
-        for (let k = came[i]!; k >= 0; k = came[k]!) cells.push(k);
+        for (let k = came[i] ?? -1; k >= 0; k = came[k] ?? -1) cells.push(k);
         return cells.toReversed();
       }
       if (closed[i] === 1) continue;
@@ -144,9 +142,9 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
           if (free[j] !== 1 || closed[j] === 1) continue;
           // No squeezing diagonally between two blocked cells.
           if (dr !== 0 && dc !== 0 && (free[r * cols + nc] !== 1 || free[nr * cols + c] !== 1)) continue;
-          const step = (dr !== 0 && dc !== 0 ? SQRT2 : 1) * (weight[i]! + weight[j]!) * 0.5;
-          const tentative = g[i]! + step;
-          if (tentative < g[j]!) {
+          const step = (dr !== 0 && dc !== 0 ? SQRT2 : 1) * ((weight[i] ?? 1) + (weight[j] ?? 1)) * 0.5;
+          const tentative = (g[i] ?? Infinity) + step;
+          if (tentative < (g[j] ?? Infinity)) {
             g[j] = tentative;
             came[j] = i;
             heap.push(j, tentative + h(j));
@@ -165,7 +163,7 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
     for (let s = 0; s <= steps; s++) {
       const i = index({ x: a.x + ((b.x - a.x) * s) / steps, y: a.y + ((b.y - a.y) * s) / steps });
       if (free[i] !== 1) return Infinity;
-      sum += weight[i]!;
+      sum += weight[i] ?? 1;
     }
     return (sum / (steps + 1)) * (length / cell);
   };
@@ -188,19 +186,21 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
       points[points.length - 1] = to;
       // What the grid way costs up to each point, to judge shortcuts against.
       const spent = [0];
-      for (let k = 1; k < points.length; k++) spent.push(spent[k - 1]! + stepCost(points[k - 1]!, points[k]!));
+      for (let k = 1; k < points.length; k++) spent.push((spent[k - 1] ?? 0) + stepCost(points[k - 1] ?? from, points[k] ?? to));
       // Cut corners: from each kept point, jump to the farthest one a straight line reaches no dearer.
       const kept: Point[] = [points[0]];
       let at = 0;
       while (at < points.length - 1) {
         let next = at + 1;
+        const atPoint = points[at] ?? from;
+        const atSpent = spent[at] ?? 0;
         for (let k = points.length - 1; k > at + 1; k--) {
-          if (lineCost(points[at]!, points[k]!) <= (spent[k]! - spent[at]!) * 1.03) {
+          if (lineCost(atPoint, points[k] ?? to) <= ((spent[k] ?? 0) - atSpent) * 1.03) {
             next = k;
             break;
           }
         }
-        kept.push(points[next]!);
+        kept.push(points[next] ?? to);
         at = next;
       }
       return kept;
@@ -230,9 +230,11 @@ class MinHeap {
     keys.push(key);
     while (i > 0) {
       const parent = (i - 1) >> 1;
-      if (keys[parent]! <= key) break;
-      items[i] = items[parent]!;
-      keys[i] = keys[parent]!;
+      const parentKey = keys[parent] ?? 0;
+      const parentItem = items[parent] ?? 0;
+      if (parentKey <= key) break;
+      items[i] = parentItem;
+      keys[i] = parentKey;
       i = parent;
     }
     items[i] = item;
@@ -252,10 +254,12 @@ class MinHeap {
         const left = i * 2 + 1;
         if (left >= items.length) break;
         const right = left + 1;
-        const child = right < items.length && keys[right]! < keys[left]! ? right : left;
-        if (keys[child]! >= lastKey) break;
-        items[i] = items[child]!;
-        keys[i] = keys[child]!;
+        const child = right < items.length && (keys[right] ?? Infinity) < (keys[left] ?? Infinity) ? right : left;
+        const childKey = keys[child] ?? Infinity;
+        const childItem = items[child] ?? 0;
+        if (childKey >= lastKey) break;
+        items[i] = childItem;
+        keys[i] = childKey;
         i = child;
       }
       items[i] = lastItem;

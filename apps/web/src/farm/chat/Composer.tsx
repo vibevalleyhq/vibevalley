@@ -1,8 +1,3 @@
-// The farm chat's input row, at the foot of the unfolded phone's right screen: who the next job goes to, the box (Enter
-// sends, Shift+Enter starts a line, @ names someone), dictation, and the stop button while the orchestrator thinks. Calling
-// the orchestrator is the phone's (its 管家), so the row has no call key. A line sent shows in the window above
-// (ChatWindow) until it is in the channel; a failed one stays there with its key, to send again as the same message.
-
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

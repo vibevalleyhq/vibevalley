@@ -7,8 +7,8 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { attachmentMax } from "@vibevalley/protocol";
 
+import { missing, lookIn, refused } from "#/base/errors.ts";
 import { bounded } from "#/core/core.ts";
-import { missing, lookIn, refused } from "#/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { writeOnce } from "#/infra/files.ts";
@@ -33,8 +33,7 @@ export function messageMutations(
     return row;
   });
 
-  /** One message changed, in one transaction with the channel's next revision; then it goes to whoever follows its
-   * channel as it now is. A change is not news: no fact, no delivery, no wake. */
+  /** One message changed, in one transaction with the channel's next revision. then it goes to whoever follows its channel as it now is. */
   const change = Effect.fnUntraced(function* (row: MsgRow, work: (revision: number, now: number) => Effect.Effect<void>) {
     const now = yield* Clock.currentTimeMillis;
     yield* tx(
@@ -43,7 +42,8 @@ export function messageMutations(
         yield* work(revision, now);
       }),
     );
-    const message = toMessage((yield* db.one(qm.messageByID({ id: row.id })))!);
+    const updated = yield* db.one(qm.messageByID({ id: row.id }));
+    const message = toMessage(updated ?? row);
     yield* PubSub.publish(said, message);
     yield* publishChannel(row.channel_id);
     return message;

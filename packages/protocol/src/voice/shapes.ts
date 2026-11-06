@@ -1,14 +1,10 @@
-// The shapes of the call, dictation and voice settings (docs/subsystems/voice.md).
-
 import type { KeySource } from "../common/shapes";
 
-/** The 设置 section a call's problem is fixed in (VoiceUnavailable.settings): its address under /settings. */
-export const VoiceFixValues = ["models", "call", "dictation"] as const;
+/** The Settings section a call's problem is fixed in (VoiceUnavailable.settings): its address under /settings. */
+export const VoiceFixValues = ["models", "call", "moss", "dictation"] as const;
 export type VoiceFix = (typeof VoiceFixValues)[number];
 
-/** A page's line to MOSS Live: a WebSocket the server relays to wss://api.mosi.cn/v1/realtime with the saved key. The
- * page speaks MOSS's protocol: JSON actions, and binary frames whose first byte is 0x00 for audio (16 kHz mono PCM up,
- * 48 kHz down). */
+/** A page's line to MOSS Live: a WebSocket the server relays to wss://api.mosi.cn/v1/realtime with the saved key. */
 export const mossLinePath = "/api/v1/voice/moss/line";
 
 export const voiceSilenceMsMin = 200;
@@ -25,6 +21,13 @@ export const voiceIdleSecondsMax = 600;
 
 export const CallStateValues = ["idle", "connecting", "live", "ending", "error"] as const;
 export type CallState = (typeof CallStateValues)[number];
+
+export interface FactCallChanged {
+  type: "callChanged";
+  at: number;
+  state: CallState;
+  reason: string;
+}
 
 export interface VoiceCall {
   agentId: string;
@@ -100,10 +103,14 @@ export interface VoiceASRMicrosoft {
 }
 
 /** Told apart by `vendor`. */
-export type VoiceAnswer = VoiceAnswerOrchestrator | VoiceAnswerAgora | VoiceAnswerDeepseek | VoiceAnswerOpenai;
+export type VoiceAnswer = VoiceAnswerOrchestrator | VoiceAnswerMoss | VoiceAnswerAgora | VoiceAnswerDeepseek | VoiceAnswerOpenai;
 
 export interface VoiceAnswerOrchestrator {
   vendor: "orchestrator";
+}
+
+export interface VoiceAnswerMoss {
+  vendor: "moss";
 }
 
 export const VoiceAnswerAgoraModelValues = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-5-nano", "gpt-5-mini"] as const;

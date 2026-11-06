@@ -1,5 +1,3 @@
-// A run makes hundreds of farms, repositories and homes; left behind, they fill the disk.
-
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

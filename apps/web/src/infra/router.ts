@@ -1,6 +1,3 @@
-// The page's router: the path is a signal over the browser's history, and moving pushes (or replaces) an entry. The
-// routes are matched in app/App.tsx.
-
 import { type Accessor, createContext, createSignal, onSettled, useContext } from "solid-js";
 
 export interface Router {

@@ -1,9 +1,3 @@
-// The runtimes the farm can run helpers on: oar's, VibeValley's own agent and DeepSeek Harness.
-// Each is probed for whether it is installed, its models, its account's quota and what it carries (skills, MCP servers,
-// tools); probing runs a runtime's own commands, so the answers are kept and asked again only on a refresh, the quota
-// every five minutes and soon after a run. What each runtime spent today is kept in the database, and a runtime past its
-// day's budget takes no work.
-
 import {
   type AvailableInstallation,
   defaultRuntimes,
@@ -19,8 +13,8 @@ import { currentLocale, type Locale, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
 import { Agent, modelClient } from "#/agent/agent.ts";
+import { type ApiError, messageOf, refused } from "#/base/errors.ts";
 import { Core } from "#/core/core.ts";
-import { type ApiError, messageOf, refused } from "#/errors.ts";
 import { projectsDir, ServerConfig } from "#/infra/config.ts";
 import { timeHere, withinRealTime } from "#/infra/time.ts";
 import { Setting } from "#/setting/setting.ts";
@@ -94,8 +88,7 @@ export class Runtime extends Context.Service<
         const keys = yield* Setting;
         const time = yield* timeHere;
         const service = yield* Llm;
-        // It reads the DeepSeek key each session, so one saved meanwhile is used. The sessions' brains run on this service's
-        // fibers, in scopes of its own: they end with it at the latest.
+        // It reads the DeepSeek key each session, so one saved meanwhile is used.
         const own = vibevalleyRuntimeOf({
           home: () => config.home,
           llm: (model) => modelClient(model, keys.deepseekApiKey, service),
@@ -136,21 +129,10 @@ interface Observation {
   locale?: Locale;
 }
 
-/**
- * oar's installation probes read the binary from OAR_<ID>_BIN as they start: it is set for that moment only, so two
- * runtimes (or two farms in one process) never see each other's. An empty path looks on PATH, ignoring the variable.
- */
+/** oar's installation probes take the binary from OAR_<ID>_BIN in their env overlay. An empty path looks on PATH, ignoring the host's variable. */
 export function probeInstallation(runtime: OarRuntime, binPath: string): Promise<InstallationSnapshot> {
   if (!runtime.installation) return Promise.resolve({ kind: "not_found" });
-  const name = `OAR_${runtime.id.toUpperCase()}_BIN`;
-  const before = process.env[name];
-  process.env[name] = binPath;
-  try {
-    return runtime.installation();
-  } finally {
-    if (before === undefined) delete process.env[name];
-    else process.env[name] = before;
-  }
+  return runtime.installation({ env: { [`OAR_${runtime.id.toUpperCase()}_BIN`]: binPath } });
 }
 
 function fromOar(usage: Awaited<ReturnType<NonNullable<OarRuntime["accountUsage"]>>>): T.AccountUsage {
@@ -220,8 +202,7 @@ const make = (options: RuntimeOptions = {}) =>
     const relabeling = new Set<string>();
     /** Each full probe's number, per runtime: a usage read merges into the probe it read from, only while that one is held. */
     const probes = new Map<string, number>();
-    /** Runtimes with a probe out: a refresh's is not in the cache until it lands (the old value is shown meanwhile), so a
-     * list that finds nothing held asks for none of its own while one is out. */
+    /** Runtimes with a probe out: a refresh's is not in the cache until it lands, so a list that finds nothing held asks for none of its own while one is out. */
     const probing = new Map<string, number>();
     const out = <A, E>(id: string, e: Effect.Effect<A, E>) =>
       Effect.suspend(() => {
@@ -262,10 +243,8 @@ const make = (options: RuntimeOptions = {}) =>
     /** What the runtime takes: seeds.json's support, with what it refuses taken from the adapter and the farm's policy laid over it. */
     function support(id: string) {
       const f = supportOf(id);
-      return {
-        ...f,
-        refused: { ...registry.get(id)?.refusedSessionOptions, ...f.refused } as Record<string, string>,
-      };
+      const refused: Record<string, string> = { ...registry.get(id)?.refusedSessionOptions, ...f.refused };
+      return { ...f, refused };
     }
 
     /** What a probe found, as the farm shows it: its preset, support and today's spend laid over. */
@@ -360,25 +339,24 @@ const make = (options: RuntimeOptions = {}) =>
             ...(item.enabled !== undefined ? { enabled: item.enabled } : {}),
           })),
         ],
-        { concurrency: "unbounded" },
+        { concurrency: 4 },
       );
       return { info: { ...info, models, usage, skills, mcpServers, tools }, found, read: 0 };
     });
 
     const known = (id: string) => runtimeIds().includes(id);
 
-    // One probe per runtime at a time, shared by whoever asks meanwhile; a refresh starts a new one, and the one started
-    // last is the one kept, so a slow full refresh never overwrites a newer one. A probe that failed is not kept: the
-    // next ask probes again.
+    // One probe per runtime at a time, shared by whoever asks meanwhile.
     const cache = yield* Cache.makeWith(
       (id: string) =>
         Effect.gen(function* () {
           const read = (probes.get(id) ?? 0) + 1;
           probes.set(id, read);
           // The settings are the farm's own, whatever stands in for the machine.
-          const next = options.probe
+          const customProbe = options.probe;
+          const next = customProbe
             ? yield* Effect.map(
-                Effect.promise(() => options.probe!(id)),
+                Effect.promise(() => customProbe(id)),
                 (i): Observation => ({ info: { ...i, settings: store.settings(id) }, read: 0 }),
               )
             : yield* probe(id);
@@ -416,8 +394,7 @@ const make = (options: RuntimeOptions = {}) =>
       const asked = (usageAsked.get(id) ?? 0) + 1;
       usageAsked.set(id, asked);
       const usage = yield* usageOf(id, runtime, before.found, before.info.settings);
-      // Kept unless a newer full probe replaced the one it read from, or a usage read asked later already landed. The
-      // cached observation itself may have been rebuilt meanwhile (a spend pushes a new total): that is no reason to drop it.
+      // Kept unless a newer full probe replaced the one it read from, or a usage read asked later already landed.
       const now = yield* held(id);
       if (closed || !now || now.read !== before.read || (usageTaken.get(id) ?? 0) > asked) return;
       usageTaken.set(id, asked);
@@ -426,7 +403,7 @@ const make = (options: RuntimeOptions = {}) =>
     });
 
     const each = (f: (id: string) => Effect.Effect<unknown>) =>
-      Effect.forEach(runtimeIds(), (id) => Effect.ignoreCause(f(id)), { concurrency: 4, discard: true });
+      Effect.forEach(runtimeIds(), (id) => Effect.ignoreCause(f(id), { log: "Warn" }), { concurrency: 4, discard: true });
 
     // In the background, so the first page load does not wait on every runtime.
     if (options.background ?? true)
@@ -459,14 +436,14 @@ const make = (options: RuntimeOptions = {}) =>
               relabeling.add(id);
               emit(
                 Effect.ensuring(
-                  Effect.ignoreCause(refresh(id)),
+                  Effect.ignoreCause(refresh(id), { log: "Warn" }),
                   Effect.sync(() => relabeling.delete(id)),
                 ),
               );
             }
             if (hit) return withSpend(hit.info);
             // In the service's own fiber set: one probe however many lists ask, and none outlives the service.
-            if (!closed && !probing.has(id)) emit(Effect.ignoreCause(out(id, Cache.get(cache, id))));
+            if (!closed && !probing.has(id)) emit(Effect.ignoreCause(out(id, Cache.get(cache, id)), { log: "Warn" }));
             return {
               id,
               preset: presetOf(id),
@@ -538,7 +515,7 @@ const make = (options: RuntimeOptions = {}) =>
       },
       usageSoon: (id) => {
         if (closed) return;
-        later(`usage:${id}`, Effect.delay(Effect.ignoreCause(refreshUsage(id)), usageAfterRunMs), { onlyIfMissing: true });
+        later(`usage:${id}`, Effect.delay(Effect.ignoreCause(refreshUsage(id), { log: "Warn" }), usageAfterRunMs), { onlyIfMissing: true });
       },
     });
   });

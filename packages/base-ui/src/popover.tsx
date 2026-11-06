@@ -1,6 +1,3 @@
-// Popover (Base UI's): a popup against its trigger with content to read or use, not modal. Opening gives it the focus;
-// Escape and the close button give it back to the trigger, a press outside leaves it where the press put it.
-
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createSignal, omit, onSettled, useContext } from "solid-js";
 

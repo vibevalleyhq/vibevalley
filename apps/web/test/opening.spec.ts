@@ -1,5 +1,3 @@
-// The bar a window starts on (public/opening.html): index.html carries the same one until the page is up, and the
-// desktop app shows it with the reason when the server could not start.
 import { expect, test } from "./fixtures";
 
 test("the page starts on the bar and drops it once it is up", async ({ page }) => {

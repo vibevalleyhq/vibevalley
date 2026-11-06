@@ -1,5 +1,3 @@
-// The Schemas of projects, their activity, languages and templates, GitHub (docs/subsystems/project.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";

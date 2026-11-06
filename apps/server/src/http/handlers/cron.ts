@@ -1,5 +1,3 @@
-// The answers of the cron endpoints (packages/protocol/src/cron/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import type { CronHandlers } from "@vibevalley/protocol/api";

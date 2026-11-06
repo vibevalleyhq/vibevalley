@@ -1,6 +1,3 @@
-// The morning after the hero's night: the harvest is in (copy.harvest, rhyming with the hero's verse). Big over a golden
-// field, rows of ripe plots sliding past the other way from each other as the band crosses the screen
-// (useScrollLinked), a few coins bobbing by the words.
 import type { Copy } from '../i18n/zh'
 import { JOB } from '../lib/story'
 import { CountUp, useOffScreen, useReveal, useScrollLinked } from './ui'
@@ -63,8 +60,7 @@ export default function Harvest({ copy, rows, coins, icons }: Props) {
   )
 }
 
-/** The story's job as the app's harvest list shows it: its commits, files and lines, counting up as it comes on screen,
- *  no conflicts, and the button that brings it in (here a picture of it). */
+/** The story's job as the app's harvest list shows it. */
 function HarvestList({ copy, icons }: { copy: Copy['harvest']['card']; icons: { harvest: string; check: string } }) {
   return (
     <div data-reveal={240} className="mx-auto mt-9 w-[min(480px,100%)] panel p-4 text-left text-bark-900">

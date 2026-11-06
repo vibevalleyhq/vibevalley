@@ -11,8 +11,7 @@ import type { Tone } from "./cards";
 import { type Stage, stageLabel, stages } from "./issue";
 import { toneVar } from "./Marks";
 
-/** An issue laid out as a page: what it is and the talk about it on the left, its properties and actions on the right.
- * Too narrow for two, the properties come after it: what is asked of the owner stays on the first screen. */
+/** An issue laid out as a page: what it is and the talk about it on the left, its properties and actions on the right. */
 export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; side: JSX.Element }) {
   return (
     <div class="@container">
@@ -55,8 +54,7 @@ export function Fold(props: { label: string; summary?: string | undefined; open?
           <span class="min-w-0 truncate text-xs text-muted">{props.summary}</span>
         </Show>
       </button>
-      {/* Mounted with the page and only hidden while folded: content first mounted by the click reads queries in flight,
-          and Solid holds that click's whole update until they land, so the fold would not open. */}
+      {/* Mounted with the page and only hidden while folded. */}
       <div class="pb-3 pl-5" hidden={!open()}>
         {props.children}
       </div>
@@ -64,7 +62,7 @@ export function Fold(props: { label: string; summary?: string | undefined; open?
   );
 }
 
-/** The properties asked about less often, behind 更多. */
+/** The properties asked about less often, behind More. */
 export function More(props: { children: JSX.Element }) {
   const [open, setOpen] = createSignal(false);
   return (
@@ -96,7 +94,7 @@ export function Note(props: { tone?: Tone; children: JSX.Element; class?: string
   );
 }
 
-/** 聊清楚 → 安排活 → 完成, the one it is at marked. */
+/** Draft -> Active -> Done, the one it is at marked. */
 export function Stages(props: { at: Stage }) {
   const ati = () => stages.indexOf(props.at);
   return (

@@ -191,10 +191,7 @@ const designTokens = defineRule({
 // Chinese punctuation too: a word joined to its neighbor with 「：」 or 「、」 in code reads as Chinese in an English farm.
 const han = /[\p{Script=Han}、，。：；（）！？「」【】〔〕]/u;
 
-/**
- * The catalog a file's words belong in: packages/i18n/locales/zh/<host>.<module>.json, the deepest that exists for the
- * file's place (apps/web/src/farm/phone/x.tsx: web.farm.phone, then web.farm, then web).
- */
+/** The catalog a file's words belong in. */
 export function catalogOf(filename: string): string {
   const at = /\/apps\/(server|web|desktop|mobile|cli)\/(?:src\/)?(.*)$/u.exec(filename.replaceAll("\\", "/"));
   const host = at?.[1];
@@ -906,8 +903,7 @@ const failureTone = defineRule({
   },
 });
 
-/** A subpath import names its file (package.json imports map exactly): the target with the extension it has on disk, or
- * its folder's index; as it was when nothing is found. */
+/** A subpath import names its file (package.json imports map exactly): the target with the extension it has on disk, or its folder's index. */
 function withExtension(filename: string, spec: string, target: string) {
   if (/\.[cm]?[jt]sx?$/u.test(spec)) return target;
   const base = resolve(dirname(filename), spec);

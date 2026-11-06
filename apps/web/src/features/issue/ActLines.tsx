@@ -8,10 +8,7 @@ import { Icon } from "#/ui/Icon.tsx";
 import { issueMove, issueMoveOf } from "./moves";
 import type { PendingWords } from "./write";
 
-/**
- * What the owner did here that the frame does not show yet: the status on its way (or refused, with why), and words
- * sent to the helper (or refused, to say again or take back into the box).
- */
+/** What the owner did here that the frame does not show yet. */
 export function ActLines(props: {
   issue: string;
   words?: readonly PendingWords[] | undefined;

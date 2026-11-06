@@ -1,7 +1,3 @@
-// Time for the code that lives outside Effect (the connectors, the journal, a call's host): read and waited
-// on the Clock of the service that made it, so that a test's TestClock moves it as it moves the services.
-// The one file in apps/server/src that may touch the wall clock (vibevalley/no-wall-clock): wallTime below.
-
 import { Clock, Effect, FiberSet, type Scope } from "effect";
 
 export interface Time {
@@ -13,8 +9,7 @@ export interface Time {
   readonly after: (ms: number, f: () => void) => () => void;
 }
 
-/** The Clock of the service that asks, as a Time: what it sleeps on runs with the service's own context, on fibers its
- * scope owns, so a timer still pending when the service closes is interrupted rather than fired into a closed service. */
+/** The Clock of the service that asks, as a Time. */
 export const timeHere: Effect.Effect<Time, never, Scope.Scope> = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const run = yield* FiberSet.makeRuntimePromise();
@@ -42,7 +37,7 @@ export const wallTime: Time = {
       }
       function abort() {
         clearTimeout(timer);
-        reject(signal!.reason);
+        reject(signal?.reason);
       }
       signal?.addEventListener("abort", abort, { once: true });
     }),
@@ -54,13 +49,11 @@ export const wallTime: Time = {
   },
 };
 
-/** A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and
- * it keeps nothing alive. The fallback when p has not settled by then, or when it fails. */
+/** A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and it keeps nothing alive. */
 export const withinRealTime = <A>(p: Promise<A>, ms: number, fallback: A): Promise<A> =>
   Promise.race([p.catch(() => fallback), new Promise<A>((resolve) => setTimeout(() => resolve(fallback), ms).unref())]);
 
-/** A deadline on a real process (a command's timeout, the grace before SIGKILL): runs f after ms of real time, whatever
- * the Clock says. unref: it does not keep the process alive. Returns what cancels it. */
+/** A deadline on a real process (a command's timeout, the grace before SIGKILL): runs f after ms of real time, whatever the Clock says. */
 export const afterRealTime = (ms: number, f: () => void, options: { readonly unref?: boolean } = {}): (() => void) => {
   const timer = setTimeout(f, Math.max(0, ms));
   if (options.unref === true) timer.unref();

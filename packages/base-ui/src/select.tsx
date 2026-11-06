@@ -1,8 +1,3 @@
-// Select (Base UI's): one value picked from a list under a button. The trigger shows the chosen item's label (from
-// `items`, or what Value's children make of the value). Opening puts the focus on the chosen option (else the first);
-// the arrows, Home, End and letters move along the options, Enter or Space or a click picks one and closes the list.
-// Escape, picking and Tab give the focus back to the trigger; a press outside leaves it where the press put it.
-
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createSignal, omit, Show, useContext } from "solid-js";
 

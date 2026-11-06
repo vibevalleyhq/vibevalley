@@ -1,6 +1,3 @@
-// The graph both a task graph's tasks and an agent's own todos are: nodes that wait for
-// other nodes. What a node is, and what settles it, is the caller's; these say only what the edges allow.
-
 interface DagNode {
   readonly id: string;
   readonly after: readonly string[];
@@ -9,7 +6,7 @@ interface DagNode {
 /** Ids are ASCII only. */
 export const dagIDValid = (id: string) => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$/u.test(id);
 
-/** id is the node at fault; other the id it names (a missing one); circle the nodes waiting on one another. */
+/** id is the node at fault. other the id it names (a missing one). */
 type DagProblem =
   | { readonly kind: "duplicate"; readonly id: string }
   | { readonly kind: "self"; readonly id: string }
@@ -37,7 +34,7 @@ export function dagProblems(nodes: readonly DagNode[]): DagProblem[] {
   return problems;
 }
 
-/** Longest path from a node that waits for nothing. A node caught in a circle is in no layer; an edge to an unknown node or to itself is ignored. */
+/** Longest path from a node that waits for nothing. A node caught in a circle is in no layer. */
 export function dagLayers(nodes: readonly DagNode[]): string[][] {
   const known = new Set(nodes.map((n) => n.id));
   const depth = new Map<string, number>();

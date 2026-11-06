@@ -10,4 +10,5 @@ import { followAppearance } from "./state/prefs";
 if (isRemote(location.hostname) && !isPaired(document.cookie) && location.pathname !== "/pair") location.replace("/pair");
 
 followAppearance();
-render(() => <App />, document.getElementById("root")!);
+const root = document.getElementById("root");
+if (root) render(() => <App />, root);

@@ -1,7 +1,3 @@
-// The phone's calls: the calls are the server's inbox; which were answered or hung up on, the
-// call log, and which rings now are the page's, kept for this page's life. The phone and the chat's call button are one
-// call (features/voice/call.ts): answering a ring opens it, and while it is on nothing rings: the orchestrator says it on the call.
-
 import { type Accessor, createEffect, onSettled } from "solid-js";
 
 import type { InboxItem, StateFrame } from "@vibevalley/protocol";
@@ -131,7 +127,7 @@ export class PhoneCalls {
       log: [{ call, answered, at: this.host.now() }, ...this.state.log].slice(0, logKeep),
     });
     this.host.play(answered ? "voiceOn" : "voiceOff");
-    // Answered, the phone stays out: the call is on it, and the page unfolds it to 田头, where what is said shows.
+    // Answered, the phone stays out: the call is on it, and the page unfolds it to the farm chat, where what is said shows.
     if (this.state.ringing?.id === call.id) {
       if (answered) this.silence();
       else this.endRing();

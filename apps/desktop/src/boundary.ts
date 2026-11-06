@@ -1,13 +1,17 @@
-// What the page may do to this machine through the window and the bridge: it is the server's page, but whatever it is
-// made to load runs with the same reach, so the window and each host call keep to these rules.
-
 import { isAbsolute, normalize, relative, sep } from "node:path";
+
+/** On macOS the window has no title bar. The preload hands this to the page (Host.titleBar). */
+export const titleBar = { top: 28, left: 76 };
+
+export const trafficLights = { x: 12, y: 8 };
+
+/** The workbench's page in either theme (apps/web style.css). */
+export const ground = (dark: boolean) => (dark ? "#151413" : "#fcfcfb");
 
 /** The window's page runs sandboxed, apart from the preload, with no Node. */
 export const pageWebPreferences = (preload: string) => ({ preload, contextIsolation: true, sandbox: true, nodeIntegration: false }) as const;
 
-/** Where a navigation goes: the server's own origin stays in the window, a web link opens in the browser, anything
- * else (file:, javascript:, a custom scheme) goes nowhere. */
+/** Where a navigation goes: the server's own origin stays in the window, a web link opens in the browser, anything else goes nowhere. */
 export function navigationOf(to: string, server: string | undefined): "stay" | "browser" | "block" {
   const target = URL.canParse(to) ? new URL(to) : undefined;
   if (!target) return "block";

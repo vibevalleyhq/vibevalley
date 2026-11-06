@@ -1,6 +1,3 @@
-// protocol is the contract: a rule here is one the page runs too. A rule only the server runs belongs to its module in
-// apps/server/src, so every export here is imported outside the server, or used by one that is.
-
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -11,7 +8,7 @@ import { edgesOf, exportsOf } from "@vibevalley/testkit/source";
 const root = join(import.meta.dirname, "../../../..");
 const here = import.meta.dirname;
 /** What runs beside the server: the page and the shells around it. */
-const outside = ["apps/web/src", "apps/web/test", "apps/mobile/src", "apps/desktop/src", "packages/engine/src"];
+const outside = ["apps/web/src", "apps/web/test", "apps/mobile/src", "apps/desktop/src", "packages/artifact/src", "packages/engine/src", "packages/pkm/src"];
 
 function files(dir: string): string[] {
   let names: string[];

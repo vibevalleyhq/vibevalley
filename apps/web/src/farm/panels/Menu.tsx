@@ -1,5 +1,3 @@
-// The Esc menu: go on, back to the title, sounds on or off, the other places, and what can be clicked in the yard.
-
 import { For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

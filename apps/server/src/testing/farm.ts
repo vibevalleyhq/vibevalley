@@ -1,6 +1,3 @@
-// The whole farm on a free port, for what drives it from outside: the command line's tests (apps/cli) point their
-// --server at it. @vibevalley/server/testing.
-
 import { Effect, Layer } from "effect";
 
 import { app } from "#/http/app.ts";
@@ -10,7 +7,7 @@ import { testConfig } from "./layers.ts";
 import { helper, installedOnly } from "./worker.ts";
 import { quietApp } from "./world.ts";
 
-export { lookIn, memoriesOf } from "#/errors.ts";
+export { lookIn, memoriesOf } from "#/base/errors.ts";
 
 /** The whole farm on a free port: its address. */
 export const farm = Effect.gen(function* () {

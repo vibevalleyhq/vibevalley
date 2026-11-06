@@ -12,8 +12,7 @@ interface Place {
   readonly h: number;
 }
 
-/** Two to five choices, one of them taken: a thumb on the page colour slides under the taken one (docs/style/design.md,
- * 分段). */
+/** Two to five choices, one of them taken: a thumb on the page colour slides under the taken one. */
 export function Segmented<T extends string>(props: {
   value: T;
   options: { value: T; label: string; icon?: IconName | undefined; disabled?: boolean | undefined; title?: string | undefined }[];

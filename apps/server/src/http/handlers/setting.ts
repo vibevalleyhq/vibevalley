@@ -1,10 +1,8 @@
-// The answers of the setting endpoints (packages/protocol/src/setting/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import type { SettingHandlers } from "@vibevalley/protocol/api";
 
-import { refused } from "#/errors.ts";
+import { refused } from "#/base/errors.ts";
 import { Setting } from "#/setting/setting.ts";
 
 export const settingHandlers = Effect.gen(function* () {

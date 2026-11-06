@@ -25,7 +25,7 @@ Workspace（工作目录，一张大地图）
 
 1. 主人或管家写下一张**工单**，选一个 **agent 档案**和一个**项目**，派出去。
 2. 服务端开一个 **Session**：档案在一个 runtime 上接的这份活。档案开了 worktree 时，它在这张工单的 worktree 里、工单的分支上干（`vibevalley/issue-<工单号>`）；没开时在项目目录里干。
-3. 每次 **run** 从一次触发开始（派出去、一条 comment、计划走到下一步、定时任务），到一次汇报结束；中间每一**步**都记下来。
+3. 每次 **run** 从一次触发开始（派出去、一条 comment、前置子工单完成、定时任务），到一次汇报结束；中间每一**步**都记下来。
 4. 主人看**改动**，决定**完成**还是**取消**。完成是工单的结论，交付另记：本地合进主分支、PR 合入、保留分支或没有改动要合；取消是不再做，分支上有提交就留着（[完成和交付](docs/subsystems/issue.md#完成和交付)）。
 
 说话都在**频道**里，结构照 Discord：频道 → 消息 → 挂在消息下面的串，每张工单一个串。现在只有一个人：主人，没有成员和权限；在频道里说话的是主人、管家和档案（经它的 Session）。同时干活的 Session 有上限，派不出去的排队。
@@ -53,9 +53,11 @@ Workspace（工作目录，一张大地图）
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |
 | 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 |
 | 完成 | 动作 `complete`；工单的 `status` 是 `done` | 主人对工单的结论；交付由 `delivered` 另记。合并只是交付的一种，PR 合入后才完成（[完成和交付](docs/subsystems/issue.md#完成和交付)） |
+| 父子工单 | `Issue.parent`、`blockedBy`（拆单输入 `IssueChildDraft`） | 一件大活拆成有先后的子工单：每张子工单是普通工单，前置做完后派发，过了检查先合进父工单分支，最后由父工单统一验收、合进主分支 |
 | 频道 | `Channel`（`type: channel`、`direct`、`thread`） | 说话的地方，照 Discord：频道、私聊和串都是 channel；有一个默认频道（`default`，农场画成田头），主人和管家有一个私聊（`peer`），串挂在一个频道（`parent`）的一条消息（`root`）下面；外面的聊天软件经连接器接到一个频道上 |
 | 工单串 | `type: thread`、`subjectKind: issue` | 一张工单下的对话，相当于 Linear 的评论 |
-| 计划 | `TaskGraph`：带 `graph` 的父工单 | 一件大活拆成的一张 DAG：每件是带 `task` 的子工单，先后是 `blockedBy`；每件合进计划分支，最后合进主分支 |
+| 稿子 | `Artifact`（正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的块稿子，或交上来一稿一稿换的网页 |
+| 笔记 | `Pkm`（`PkmPage`、`PkmBlock`） | 主人的大纲知识库：按 PARA 文件夹与日记组织的 Markdown 页面 |
 | 定时任务 | `Cron` | 一张工单的一种触发：一个定时任务一张工单，派给一个档案或管家，每次到点是它的一次 run |
 | Inbox | `InboxItem` | 要你处理的事，从核心状态现算 |
 | 记忆 | `Memory` | 一个档案记得的事 |
@@ -78,7 +80,5 @@ Workspace（工作目录，一张大地图）
 | 等级 | 一共提交了多少次 |
 | 金币、连胜、成就 | 从账本里的真实事件折出来 |
 | 院子里的建筑 | 各个页面的入口 |
-
-核心状态里还混着金币和成就；见[提案](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)。
 
 一块地上可以有几个帮工（做过这块地的都在「地上的人」里），锄头在现在干活的那个手上；@ 谁就让谁下地、几个人分工、派一个看地的，还没做（[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)）。

@@ -1,5 +1,3 @@
-// Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
-
 import { createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { Toolbar } from "@vibevalley/base-ui";
@@ -69,9 +67,10 @@ export function MessageBody(props: { m: ChatMessage }) {
   const [long, setLong] = createSignal(false);
   const [open, setOpen] = createSignal(false);
   onSettled(() => {
-    if (!box) return;
-    const watch = new ResizeObserver(() => setLong(box!.scrollHeight > foldPx + 40));
-    watch.observe(box);
+    const el = box;
+    if (!el) return;
+    const watch = new ResizeObserver(() => setLong(el.scrollHeight > foldPx + 40));
+    watch.observe(el);
     return () => watch.disconnect();
   });
   return (
@@ -569,7 +568,11 @@ function LinkedCard(props: { at: LinkedMessage }) {
       class="flex max-w-lg cursor-pointer flex-col gap-0.5 rounded-md border-l-4 border-wheat bg-side px-3 py-2 text-left hover:bg-hover"
     >
       <span class="flex items-baseline gap-2 text-xs text-muted">
-        <span class="font-semibold text-ink">{m() ? nameOf(m()!) : `#${props.at.number}`}</span>
+        <span class="font-semibold text-ink">
+          <Show when={m()} fallback={`#${props.at.number}`}>
+            {(said) => nameOf(said())}
+          </Show>
+        </span>
         <span>{channelLabel(where())}</span>
         <Show when={m()}>{(said) => <span>{workbenchClock(said().at)}</span>}</Show>
       </span>

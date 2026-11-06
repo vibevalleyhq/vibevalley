@@ -1,8 +1,3 @@
-// The runtimes the farm knows (presets.json): their order, names and looks, what each takes before it is probed, and the
-// settings a new one starts with, in the farm's language. presets.en.json says the same but for its words (agent/seed.test.ts).
-// And the rules over them: what a session would be sent with, why a profile cannot be sent now, and which profile a task
-// goes to.
-
 import { Schema } from "effect";
 
 import { list, t } from "@vibevalley/i18n";

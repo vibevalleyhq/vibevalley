@@ -1,5 +1,3 @@
-// The inbox's kinds the golden files have no case of.
-
 import { expect, test } from "vite-plus/test";
 
 import type { WorkspaceState, Issue, Session } from "@vibevalley/protocol";

@@ -12,8 +12,7 @@ import { selfTools, subagentTool } from "./self.ts";
 import { memoryStore } from "./todoStore.ts";
 import { todoTools } from "./todoTools.ts";
 
-// The model is shown these bytes, and they lead every request: a change here is a change in the prompt, made on purpose
-// (VIBEVALLEY_GOLDEN=update rewrites testdata/declared.json; look at the diff).
+// The model is shown these bytes, and they lead every request. look at the diff).
 const file = join(import.meta.dirname, "testdata", "declared.json");
 const update = process.env.VIBEVALLEY_GOLDEN === "update";
 

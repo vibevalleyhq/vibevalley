@@ -1,6 +1,3 @@
-// What tests run the services on: a configuration in a temporary home and an in-memory database; and waiting in a test for
-// what the farm does (the core state's transitions here, the rest re-exported from @vibevalley/testkit's).
-
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -56,8 +53,7 @@ export const offline = Layer.succeed(
   HttpClient.make((request) => Effect.die(new Error(`no network in tests: ${request.method} ${request.url}`))),
 );
 
-/** What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. It
- * waits on the core's transitions, not by asking again; the deadline is real time, as for waitFor. */
+/** What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. */
 export const whenState = <A>(pick: (state: WorkspaceState) => A | undefined | false, what: string | (() => string), ms = 5_000) =>
   Effect.scoped(
     Effect.gen(function* () {

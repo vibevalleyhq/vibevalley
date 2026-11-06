@@ -1,5 +1,3 @@
-// The shapes of progress, achievements, the ledger and the farm's view (docs/subsystems/game.md).
-
 import type { SessionId } from "../common/shapes";
 import type { Doing } from "../session/shapes";
 
@@ -263,4 +261,13 @@ export interface LedgerEntryTitled {
 export interface ChooseTitleRequest {
   achievement?: string;
   tier?: number;
+}
+
+export interface FactProgressChanged {
+  type: "progressChanged";
+  at: number;
+  progress?: Progress;
+  news?: ProgressNews;
+  commits?: CommitCount;
+  station?: { readonly id: SessionId; readonly station: number };
 }

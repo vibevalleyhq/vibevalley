@@ -1,17 +1,16 @@
-// The workspace packages the server runs on: the ones apps/server/package.json lists as workspace:*, and theirs in
-// turn. The packaged app copies them beside the server (scripts/package.ts); in development a change in one restarts it
-// (dev.ts). Read from the package.json files, so a package added later is in both without a list to keep.
-
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-interface Manifest {
-  readonly name: string;
-  readonly dependencies?: Record<string, string>;
-}
+import { Schema } from "effect";
 
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a workspace package's own package.json
-const manifest = (dir: string) => JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as Manifest;
+const Manifest = Schema.fromJsonString(
+  Schema.Struct({
+    name: Schema.String,
+    dependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  }),
+);
+
+const manifest = (dir: string) => Schema.decodeSync(Manifest)(readFileSync(join(dir, "package.json"), "utf8"));
 
 /** name → folder under packages/. */
 function workspacePackages(repo: string): Map<string, string> {

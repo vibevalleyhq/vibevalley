@@ -46,8 +46,7 @@ const withCron = (issues: readonly T.Issue[], cron: string) => {
 };
 
 describe("an issue", () => {
-  // Done is the owner's verdict; what it delivers follows the issue: nothing to take in touches no git, a branch can be
-  // kept unmerged, and only commits go into the main branch.
+  // Done is the owner's verdict.
   it.live("completes by what it delivers: nothing, a kept branch, or a merge", () => {
     const f = farm();
     return Effect.gen(function* () {
@@ -506,8 +505,7 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // An answer issue is read only: its conclusion is read into the issue, whatever the round changed goes, and completing it
-  // delivers nothing. An answer that cannot be read is a round not done: 接着修 says what was wrong with it.
+  // An answer issue is read only: its conclusion is read into the issue, whatever the round changed goes, and completing it delivers nothing.
   it.live("answers with a conclusion and leaves nothing on its branch", () => {
     const gates = [Promise.withResolvers<void>(), Promise.withResolvers<void>(), Promise.withResolvers<void>()];
     const turns: NonNullable<Parameters<typeof helper>[0]> = [];

@@ -1,5 +1,3 @@
-// The shapes of crons (docs/subsystems/cron.md).
-
 import type { ActorKind } from "../common/shapes";
 
 /** Told apart by `kind`. */
@@ -64,4 +62,16 @@ export interface CronWhenExpr {
 
 export interface CronUpdate {
   enabled?: boolean;
+}
+
+export interface FactCronChanged {
+  type: "cronChanged";
+  at: number;
+  cron: Cron;
+}
+
+export interface FactCronRemoved {
+  type: "cronRemoved";
+  at: number;
+  id: string;
 }

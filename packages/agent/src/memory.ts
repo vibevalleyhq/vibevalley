@@ -1,10 +1,10 @@
-// VibeValley's own agent's memory: MEMORY.md in its home, one line a note, and
-// archive/, the folded-away conversation word for word, so a summary that lost a detail can be looked up again.
-
 import { createHash } from "node:crypto";
 import { appendFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
+import { Effect } from "effect";
+
+import { agentFailed, type AgentFailed } from "./core/errors.ts";
 import { memory as memoryWords } from "./prompts.ts";
 
 /** Cut from the top when the prompt carries it: the newest notes matter most. */
@@ -31,17 +31,20 @@ interface MemorySnapshot {
 }
 
 export interface MemoryPort {
-  readonly read: () => Promise<{ readonly prompt: string; readonly lines: readonly string[] }>;
-  readonly remember: (note: string) => Promise<void>;
-  readonly rewrite: (content: string) => Promise<number>;
+  readonly read: () => Effect.Effect<{ readonly prompt: string; readonly lines: readonly string[] }>;
+  readonly remember: (note: string) => Effect.Effect<void, AgentFailed>;
+  readonly rewrite: (content: string) => Effect.Effect<number, AgentFailed>;
 }
 
 export const fileMemory = (home: string, now: () => number): MemoryPort => ({
-  read: async () => ({ prompt: (await readMemory(home)).prompt, lines: await memoryFileLines(home) }),
-  remember: async (note) => {
-    await remember(home, note, new Date(now()));
-  },
-  rewrite: async (content) => (await rewriteMemory(home, content)).lineCount,
+  read: () =>
+    Effect.promise(async () => {
+      const [snap, lines] = await Promise.all([readMemory(home), memoryFileLines(home)]);
+      return { prompt: snap.prompt, lines };
+    }),
+  remember: (note) => Effect.tryPromise({ try: () => remember(home, note, new Date(now())), catch: agentFailed }).pipe(Effect.asVoid),
+  rewrite: (content) =>
+    Effect.tryPromise({ try: () => rewriteMemory(home, content), catch: (e): AgentFailed => agentFailed(e) }).pipe(Effect.map((s) => s.lineCount)),
 });
 
 export const parseMemoryLines = (text: string): MemoryLine[] =>
@@ -59,7 +62,7 @@ function memoryLine(line: string): MemoryLine | undefined {
   const text = line.trim();
   if (text === "" || text.startsWith("#")) return undefined;
   const m = datedLine.exec(text);
-  return m ? { id: lineID(text), date: m[1]!, text: m[2]! } : { id: lineID(text), text: text.replace(bulletHead, "") };
+  return m?.[1] && m[2] ? { id: lineID(text), date: m[1], text: m[2] } : { id: lineID(text), text: text.replace(bulletHead, "") };
 }
 
 /** updatedAt: the file's modification time, 0 when there is none. */
@@ -125,9 +128,11 @@ const localDate = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() +
 
 export async function remember(home: string, note: string, now: Date): Promise<MemoryLine> {
   await mkdir(home, { recursive: true });
-  const line = `- ${localDate(now)} ${note.replace(/\s*\n\s*/gu, " ").trim()}`;
+  const date = localDate(now);
+  const cleaned = note.replace(/\s*\n\s*/gu, " ").trim();
+  const line = `- ${date} ${cleaned}`;
   await appendFile(memoryFile(home), line + "\n");
-  return memoryLine(line)!;
+  return { id: lineID(line), date, text: cleaned };
 }
 
 async function rewriteMemory(home: string, text: string): Promise<MemorySnapshot> {

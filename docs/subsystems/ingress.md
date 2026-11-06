@@ -1,45 +1,47 @@
 # Ingress
 
-## 一句话
-
-把 GitHub、连接器、语音等外部输入读成 `Trigger`；内部派工、定时与巡查由所属模块直接交给 Mailbox。
+`Ingress` 是输入流水线的第一层：将 GitHub PR 事件、外部聊天连接器、语音通话等异构外部输入校验、去重并标准化为不可变的 `Trigger`，写入 `mailbox_trigger` 后交由 [Mailbox](docs/subsystems/mailbox.md) 路由投递。
 
 ## 管什么，不管什么
 
-- **管**：来源的校验、去重、触发者/收件人/回复位置的标准化；读成的 Trigger 经信箱的 `keepSourceTrigger` 记进 `mailbox_trigger`（表归信箱：派工、定时、巡查的 Trigger 也记在那里）。
-- **不管**：谁该听到、叫不叫醒（[信箱](docs/subsystems/mailbox.md)）、工单怎么变（[工单](docs/subsystems/issue.md)）、会话怎么跑（[帮工](docs/subsystems/session.md)）。
+| 管 | 不管（谁管） |
+|---|---|
+| 外部事件（GitHub CI/Review、连接器、语音、电话播报）的 Schema 校验、按 `(source, key)` 幂等去重与标准化 | 收件人路由、三道刹车与会话唤醒（[Mailbox](docs/subsystems/mailbox.md)） |
+| GitHub PR 检查、评审与行内评论的分页拉取、指纹比对（`ingress_github`）与机器人评审轮次归并（`botRoundKey`） | 工单状态流转与 PR 合并/关闭结局判定（[工单](docs/subsystems/issue.md)） |
 
 ## 在哪
 
-- `apps/server/src/ingress/ingress.ts` 是服务；`github.ts` 把 PR 检查和评审读成事件；聊天由 Channel 的 `route.ts` 标准化。
-- Trigger 与 payload 存在信箱的 `mailbox_trigger`；来源自己的观察位置在 `ingress_github` 等表。
-- 入口是 `Ingress.accept`（一条来源事件）、`Ingress.owner`（主人的话）、`Ingress.record`（只记下不派发）；状态帧里的 `StateFrame` 不直接暴露它。
+| 位置 | 职责 |
+|---|---|
+| `apps/server/src/ingress/ingress.ts` | `Ingress` 服务（`accept`、`owner`、`record`、`say`）与幂等去重 |
+| `apps/server/src/ingress/github.ts` | GitHub GraphQL/REST 分页拉取、CI 指纹（`ingress_github` 表）与评审线程归一化 |
+| `apps/server/src/mailbox/payload.ts` | 将标准化后的 `Trigger` 与原始载荷写入 `mailbox_trigger` 表 |
 
 ## 模型和不变量
 
-- **一个 Trigger 只产生一次**：`(source, key)` 唯一；重复读到的来源事件返回已有 Trigger，不再写库。
-- **控制字段有类型**：`TriggerMeta` 与 `TriggerContext` 的字段由 protocol 的 Schema 解码；来源原始数据只放 payload。频道只提供投递需要的元数据，不复制整份消息元数据。
-- **载荷不可变**：`text`/`data` 与 Trigger 在同一行的不同列保存，之后的处理只读。
-- **不替别人做决定**：Trigger 的 `addressed`、`threads` 只是来源给的地址，真正的路由和刹车在 Mailbox。
+- **一个 `(source, key)` 只产生一条 `Trigger`**：重复到达的外部事件直接返回已存 `Trigger`，不重复写库或触发下游路由。
+- **控制头与原始载荷分离且不可变**：
+  - `TriggerMeta` 与 `TriggerContext` 经协议 Schema 严格解码。
+  - 大段原始文本或结构化数据存入同行独立的 payload 列，写入后只读（供 `vv://trigger/<id>` 按需分页拉取）。
+- **GitHub 快照完整性与同轮评审归并**：
+  - 拉取 PR 的检查、评审、评论与评审线程时，任一分页请求失败即放弃本次快照，不将残缺列表当成空结果。
+  - 同一次 Review 及其附带的多条行内评论共享同一个 `botRoundKey`，只消耗一次 `maxBotReviewRounds` 额度。
 
 ## 怎么走
 
-1. 来源产生 `SourceEvent`；`Ingress.accept` 校验并去重。
-2. 经 `keepSourceTrigger` 写进 `mailbox_trigger`，把 `Trigger` 交给 Mailbox。
-3. GitHub 由 `refreshGitHub` 周期拉取；连接器/语音由 `owner` 或 `say` 进入。
-4. 未路由的持久信件由 Mailbox 重放；聊天消息由 Channel 重放并重新计算受众。Ingress 不推进工单排队。
+1. 外部来源产生 `SourceEvent`（连接器/语音调用 `Ingress.owner`，GitHub 轮询调用 `refreshGitHub`）。
+2. `Ingress.accept` 按 `(source, key)` 去重，调用 `keepSourceTrigger` 写入 `mailbox_trigger`。
+3. 调用 `Mailbox.receive` 推进路由；若进程在写库后、路由前退出，下次启动或轮询时自动重放未路由的 `Trigger`。
 
 ## 和谁打交道
 
-- 依赖 Channel（主人说的话）、Mailbox（路由）、Issue/Project（来源对应的实体）。
-- Resource 经 `read` 拉取载荷。Mailbox、Issue 使用 protocol 的 Trigger 形状，不依赖 Ingress 服务。
-- 反向只经 `Trigger` 形状和数据库，不 import 上层。
+- **信箱、频道与项目（`mailbox`、`channel`、`project`）**：通过 `Project` 调 `gh` 接口，通过 `Channel` 落库主人消息，将 `Trigger` 交给 `Mailbox`。
+- **资源（`resource`）**：向 `Resource.read` 提供 `vv://trigger/<id>` 与 `vv://github/...` 线程载荷读取。
 
 ## 为什么这样
 
-- **来源只标准化一次。** 七个入口各写一套校验和去重，规则会分叉；一张 Trigger 让后面只认一种输入。
-- **原因和载荷分开。** 去重只需要 `(source, key)`；把大段 GitHub/聊天载荷放同一列会让 Trigger 查询变重。
+- **入口只标准化一次，原因与大载荷分离**：七种异构来源在入口处统一收敛为带类型的 `Trigger`；大段 GitHub diff 留在 payload 列按需拉取，保持投递队列轻量。
 
 ## 怎么验证
 
-- `ingress/ingress.test.ts`、`flows/ingress.test.ts`、`base/base.test.ts`。
+- `apps/server/src/ingress/ingress.test.ts`、`apps/server/src/flows/ingress.test.ts`：`(source, key)` 幂等去重、GitHub CI 指纹变化、同轮 Review 归并与断点重放测试。

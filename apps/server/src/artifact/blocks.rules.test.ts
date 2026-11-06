@@ -26,7 +26,7 @@ const block = (b: Partial<Wire<Block>> & Pick<Wire<Block>, "id" | "orderKey" | "
 const under = (b: Block, parent: string): Block => branded<Block>({ ...b, parentId: parent });
 
 describe("text", () => {
-  // Offsets are code points: 中 is one, 👍 one (two UTF-16 units), 👍🏽 two, é written as e and a combining accent two.
+  // Offsets are code points: 👍 one (two UTF-16 units), 👍🏽 two, é written as e and a combining accent two.
   it.each([
     ["chinese", [span("你好世界")], 2, "你好", "世界"],
     ["emoji", [span("a👍b")], 2, "a👍", "b"],

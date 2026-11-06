@@ -1,12 +1,3 @@
-// The DeepSeek Harness runtime: `dsh --profile acp` (DeepSeek Harness's automation ACP
-// server, dsh 0.2.1-rc.2, ACP v1) driven through oar's own ACP layer. npm oar has no dsh, and its ACP layer is not in
-// its exports: it is loaded from oar's dist by path, which holds only while oar is pinned to the version it was read
-// from (0.68.2, package.json).
-//
-// What the server offers, probed 2026-10-17: initialize with no auth methods, session/new, session/resume, session/list
-// and session/close, one prompt at a time, session/cancel, and session/set_config_option with a `model` select grouped
-// by provider and a `reasoning_effort` select in the thought_level category (off, low, high, max).
-
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 
@@ -75,9 +66,7 @@ const deepseek = "deepseek-official";
 
 const isDeepseek = (provider: string) => provider === deepseek || provider === "deepseek-account";
 
-/** The `model` option's value for a model: dsh values it by the JSON pair ["provider","model"]. "deepseek-flash" is
- * DeepSeek's; "provider/model" is that provider's; an empty model or a pair is left as it is. The retired name
- * "deepseek-v4-flash" is the same model as "deepseek-flash" (DeepSeek serves and bills it as flash). */
+/** The `model` option's value for a model: dsh values it by the JSON pair ["provider","model"]. "deepseek-flash" is DeepSeek's. */
 export function optionValue(given: string): string {
   const model = given.trim();
   if (model === "" || model.startsWith("[")) return model;
@@ -110,24 +99,53 @@ const modelName = (value: string) => {
 
 /** The choice's name, with the release dsh's own selector badges it with: DeepSeek's deepseek-flash is
  * DeepSeek-V4.1-Flash-1017, the API's only Flash model name. */
-function displayName(id: string, choice: Record<string, unknown>): string {
-  const name = typeof choice.name === "string" ? choice.name : "";
+function displayName(id: string, name: string): string {
   const slash = id.indexOf("/");
   return slash >= 0 && isDeepseek(id.slice(0, slash)) && id.slice(slash + 1) === "deepseek-flash" && name === "DeepSeek-V4.1-Flash" ? name + "-1017" : name;
 }
 
-type Rec = Record<string, unknown>;
-const records = (v: unknown): Rec[] => (Array.isArray(v) ? v.filter(Predicate.isObject) : []);
+const OptionLeaf = Schema.Struct({
+  value: Schema.optionalKey(Schema.String),
+  name: Schema.optionalKey(Schema.String),
+});
+type OptionLeaf = typeof OptionLeaf.Type;
 
-/** A session/new response's models; undefined when it has no `model` config option. dsh has no model-list method: the
- * catalog rides on every new session as the `model` option, its choices grouped by provider or flat. The effort menu
- * is the thought_level option, the same for every model; `off` is a toggle, not a level, and is dropped. */
+const OptionGroup = Schema.Struct({
+  value: Schema.optionalKey(Schema.String),
+  name: Schema.optionalKey(Schema.String),
+  options: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+});
+
+const ConfigOption = Schema.Struct({
+  id: Schema.optionalKey(Schema.String),
+  category: Schema.optionalKey(Schema.String),
+  currentValue: Schema.optionalKey(Schema.Unknown),
+  options: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+});
+
+const SessionNewResponse = Schema.Struct({
+  sessionId: Schema.optionalKey(Schema.String),
+  configOptions: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+});
+
+const decodeItems = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, items: readonly unknown[] | undefined): S["Type"][] => {
+  if (!items) return [];
+  const decode = Schema.decodeUnknownOption(schema);
+  return items.flatMap((item) => {
+    const r = decode(item);
+    return r._tag === "Some" ? [r.value] : [];
+  });
+};
+
+/** A session/new response's models. undefined when it has no `model` config option. */
 export function projectModels(response: unknown): ModelEntry[] | undefined {
-  const options = records(Predicate.isObject(response) && "configOptions" in response ? response.configOptions : undefined);
+  const parsed = Schema.decodeUnknownOption(SessionNewResponse)(response);
+  if (parsed._tag === "None") return undefined;
+  const options = decodeItems(ConfigOption, parsed.value.configOptions);
   const model = options.find((o) => o.id === "model");
   if (!model) return undefined;
   const thinking = options.find((o) => o.category === "thought_level");
-  const levels = records(thinking?.options)
+  const levels = decodeItems(OptionLeaf, thinking?.options)
     .map((o) => effortLevelOf(o.value))
     .filter((l): l is string => l !== undefined && l !== "off");
   const current = effortLevelOf(thinking?.currentValue);
@@ -135,13 +153,13 @@ export function projectModels(response: unknown): ModelEntry[] | undefined {
   const currentId = canonicalModelId(modelId(typeof model.currentValue === "string" ? model.currentValue : ""));
   const entries: ModelEntry[] = [];
   const index = new Map<string, number>();
-  const add = (choice: Rec) => {
-    const value = typeof choice.value === "string" ? choice.value : "";
+  const add = (choice: OptionLeaf) => {
+    const value = choice.value ?? "";
     if (!value) return;
     const id = canonicalModelId(modelId(value));
     const entry: ModelEntry = {
       id,
-      displayName: displayName(id, choice),
+      displayName: displayName(id, choice.name ?? ""),
       ...(levels.length > 0 ? { effortLevels: levels } : {}),
       ...(defaultEffort ? { defaultEffort } : {}),
       ...(id === currentId ? { default: true as const } : {}),
@@ -155,20 +173,19 @@ export function projectModels(response: unknown): ModelEntry[] | undefined {
     index.set(id, entries.length);
     entries.push(entry);
   };
-  for (const choice of records(model.options)) {
-    const group = records(choice.options);
-    if (Array.isArray(choice.options)) for (const inner of group) add(inner);
+  for (const choice of decodeItems(OptionGroup, model.options)) {
+    if (choice.options !== undefined) for (const inner of decodeItems(OptionLeaf, choice.options)) add(inner);
     else add(choice);
   }
   return entries;
 }
 
 /** A throwaway session in the listing's cwd, for its model option: initialize, session/new, session/close. */
-async function readNewSession(command: string, cwd: string, timeoutMs: number): Promise<Rec> {
+async function readNewSession(command: string, cwd: string, timeoutMs: number): Promise<unknown> {
   const child = spawn(command, ["--profile", "acp"], { cwd, stdio: ["pipe", "pipe", "ignore"] });
   const lines = createInterface({ input: child.stdout });
   let next = 0;
-  const waiting = new Map<number, { resolve: (v: Rec) => void; reject: (e: Error) => void }>();
+  const waiting = new Map<number, { resolve: (v: Record<string, unknown>) => void; reject: (e: Error) => void }>();
   lines.on("line", (line) => {
     // A line that is no JSON-RPC answer is a log.
     const m = rpcAnswer(line);
@@ -178,8 +195,8 @@ async function readNewSession(command: string, cwd: string, timeoutMs: number): 
     if (m.error) w.reject(Object.assign(new Error(m.error.message ?? "ACP error"), { code: m.error.code }));
     else w.resolve(m.result ?? {});
   });
-  const request = (method: string, params: Rec) =>
-    new Promise<Rec>((resolve, reject) => {
+  const request = (method: string, params: Record<string, unknown>) =>
+    new Promise<Record<string, unknown>>((resolve, reject) => {
       const id = ++next;
       const cancel = afterRealTime(timeoutMs, () => reject(new Error(`${method} timed out`)));
       waiting.set(id, {
@@ -198,8 +215,9 @@ async function readNewSession(command: string, cwd: string, timeoutMs: number): 
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
     });
     const response = await request("session/new", { cwd, mcpServers: [] });
+    const decoded = Schema.decodeOption(SessionNewResponse)(response);
     // Best effort: the list is in hand, and the process is killed next.
-    if (typeof response.sessionId === "string") await request("session/close", { sessionId: response.sessionId }).catch(() => undefined);
+    if (decoded._tag === "Some" && decoded.value.sessionId) await Promise.allSettled([request("session/close", { sessionId: decoded.value.sessionId })]);
     return response;
   } finally {
     child.kill();
@@ -236,7 +254,7 @@ export const dshRuntime = defineRuntime({
   listModels: async (installation, options): Promise<ListModelsResult> => {
     if (installation.via !== "executable" || !("command" in installation))
       return { kind: "unsupported", reason: "dsh model listing requires the dsh executable" };
-    let response: Rec;
+    let response: unknown;
     try {
       response = await readNewSession(installation.command, listingCwd(options ?? {}), options?.timeoutMs ?? 30_000);
     } catch (e) {

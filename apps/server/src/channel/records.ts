@@ -1,7 +1,3 @@
-// The chat as it is kept: the model in memory over the database, the lock every change takes, who sits where, names and
-// targets, the frames the page reads, threads, read cursors and a message's rows. The other parts of Channel change the
-// chat through these, so the model is told each change in one place.
-
 import { Clock, Effect, PubSub, Semaphore } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -12,10 +8,10 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { head } from "#/base/clip.ts";
+import { refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Core } from "#/core/core.ts";
-import { refused } from "#/errors.ts";
 import { Db } from "#/infra/db.ts";
 import { type InboxMessage, unreadSummaryOf } from "#/mailbox/envelope.ts";
 import { Session } from "#/session/session.ts";
@@ -73,7 +69,7 @@ export const channelRecords = Effect.gen(function* () {
   });
   /** A transaction that tells the model what it changes as it goes: if it fails, those changes are not in the database,
    * so the model is read again from it. */
-  const tx = <A, E>(work: Effect.Effect<A, E>) => db.inTx(work).pipe(Effect.onError(() => Effect.ignoreCause(reload)));
+  const tx = <A, E>(work: Effect.Effect<A, E>) => db.inTx(work).pipe(Effect.onError(() => Effect.ignoreCause(reload, { log: "Warn" })));
   const lock = yield* Semaphore.make(1);
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
   // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
@@ -149,7 +145,7 @@ export const channelRecords = Effect.gen(function* () {
   };
   const talkSession = (channel: string) => presentSessions().find((h) => directOfSession(h) === channel);
   const channelOfSession = (h: T.Session) => directOfSession(h) ?? (h.channel && channelName(h.channel) !== undefined ? h.channel : model.defaultId());
-  const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? row.parent_id! : row.id);
+  const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? (row.parent_id ?? row.id) : row.id);
   /** Where the owner talks with peer alone, from either side. */
   const directWith = (who: string, other: string) => {
     const peer = who === ownerId ? other : other === ownerId ? who : "";
@@ -227,8 +223,7 @@ export const channelRecords = Effect.gen(function* () {
     const row = model.channel(id);
     if (row) {
       const channel = yield* counted(row);
-      // A metadata change can read a message's number before the message's own fact is applied; keep the state's
-      // last number at what was published, so that fact is still news.
+      // A metadata change can read a message's number before the message's own fact is applied.
       const published = model.publishedNumber(id);
       const last = published !== undefined && (channel.lastNumber ?? 0) > published ? published : channel.lastNumber;
       yield* core.apply({ type: "channelChanged", channel: { ...channel, ...(last === undefined ? {} : { lastNumber: last }) } });

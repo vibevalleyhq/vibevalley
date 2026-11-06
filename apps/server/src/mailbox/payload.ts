@@ -6,7 +6,7 @@ import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { compactCard } from "#/base/clip.ts";
-import { refused } from "#/errors.ts";
+import { refused } from "#/base/errors.ts";
 import { type Db, causeMessage } from "#/infra/db.ts";
 import { senderKind } from "#/mailbox/envelope.ts";
 import type { InboxMessage, OrchestratorNews } from "#/mailbox/envelope.ts";

@@ -1,12 +1,10 @@
 import { defineConfig } from "vite-plus";
 import { configDefaults } from "vite-plus/test/config";
 
-// VIBEVALLEY_GOLDEN=update makes a run write the golden data (vp run golden:update -- ai): a run with it set never
-// replays one without. budgets prints the test pyramid's shape, as the server's run does.
+// VIBEVALLEY_GOLDEN=update makes a run write the golden data (vp run golden:update -- ai): a run with it set never replays one without.
 export default defineConfig({
   test: { include: ["src/**/*.test.ts"], reporters: [...configDefaults.reporters, "@vibevalley/testkit/budgets"] },
-  // The types other packages check against (package.json's exports: types is dist/, default the source every run
-  // compiles), declarations only, with maps back to the source for the editor.
+  // The types other packages check against (package.json's exports.
   pack: {
     entry: ["src/client.ts", "src/llm.ts", "src/messages.ts", "src/models.ts", "src/response.ts", "src/testing.ts", "src/tools.ts"],
     outDir: "dist",

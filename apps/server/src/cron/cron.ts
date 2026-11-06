@@ -7,12 +7,12 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import type { Actor } from "#/base/actor.ts";
+import { messageOf, type ApiError, missing, refused, lookIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { jsonOrNone } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
-import { messageOf, type ApiError, missing, refused, lookIn } from "#/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
@@ -21,7 +21,7 @@ import { Mailbox } from "#/mailbox/mailbox.ts";
 import { recordTrigger, unroutedCronTriggers } from "#/mailbox/payload.ts";
 import * as q from "#db/cron.sql.ts";
 
-import { afterRun, cronProblem, dueCrons, dueText, isMissed, needsOK, whenText } from "./when.ts";
+import { afterRun, cronProblem, dueCrons, dueText, givenZone, isMissed, needsOK, whenText } from "./when.ts";
 
 export interface Due {
   readonly id: string;
@@ -54,15 +54,7 @@ export class Cron extends Context.Service<
 /** $TZ when it names a zone, else the system's. */
 function localZone(): string {
   const tz = process.env.TZ;
-  if (tz) {
-    try {
-      new Intl.DateTimeFormat("en", { timeZone: tz });
-      return tz;
-    } catch {
-      // Not a zone: the system's.
-    }
-  }
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return tz && givenZone(tz) ? tz : Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 const make = Effect.gen(function* () {

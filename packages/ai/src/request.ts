@@ -1,6 +1,3 @@
-// A chat/completions request for DeepSeek, as pi-ai 1.3.0's openai-completions builds one for it
-// (testdata/deepseek.jsonl.gz holds what pi-ai sent; a change here is a change in what the model reads and caches).
-
 import type { AssistantMessage, Context, ImageContent, Message, TextContent, ToolCall, Usage } from "./messages.ts";
 import { clampThinkingLevel, type Model, type ThinkingLevel } from "./models.ts";
 
@@ -48,7 +45,8 @@ function chatMessages(model: Model, context: Context): Record<string, unknown>[]
   if (context.system.length > 0) out.push({ role: "system", content: sanitizeSurrogates(context.system) });
   const messages = replayable(model, context.messages);
   for (let i = 0; i < messages.length; i++) {
-    const m = messages[i]!;
+    const m = messages[i];
+    if (!m) continue;
     switch (m.role) {
       case "user": {
         if (typeof m.content === "string") {
@@ -114,8 +112,7 @@ function assistantMessage(model: Model, m: AssistantMessage): Record<string, unk
 
 const dataUrl = (c: ImageContent) => `data:${c.mimeType};base64,${c.data}`;
 
-/** What is sent, as pi-ai's transformMessages leaves it: images a model cannot read become a note, thinking from another
- * model goes, a turn that failed or was stopped is not replayed, and a call that got no result gets one. */
+/** What is sent, as pi-ai's transformMessages leaves it. */
 function replayable(model: Model, messages: readonly Message[]): Message[] {
   const out: Message[] = [];
   let pending: readonly ToolCall[] = [];

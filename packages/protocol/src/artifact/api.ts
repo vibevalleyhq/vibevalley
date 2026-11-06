@@ -1,6 +1,3 @@
-// The endpoints of artifacts: their answers (ArtifactHandlers) and their lines in the table (api.ts puts the
-// concepts together).
-
 import { type Effect, Schema } from "effect";
 
 import { type ApiError, type Endpoint, input } from "../endpoint";
@@ -20,11 +17,9 @@ export interface ArtifactHandlers<R = never> {
   readonly "artifact.content.get": (a: T.ArtifactReadRequest) => Effect.Effect<T.ArtifactContent, ApiError, R>;
   /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
   readonly "artifact.create": (a: T.ArtifactRequest) => Effect.Effect<T.Artifact, ApiError, R>;
-  /** An html one's new version over the latest; the old ones stay. Announced like the first. A blocks one is changed
-   * block by block instead. */
+  /** An html one's new version over the latest. the old ones stay. */
   readonly "artifact.version.create": (a: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError, R>;
-  /** The owner's words in place of some in an html one's page: the next version, the rest of its bytes as they were.
-   * Refused when the words are not found once in the page's own text, cross an element, or the version is not the latest. */
+  /** The owner's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
   readonly "artifact.html.edit": (a: T.ArtifactHtmlEdit) => Effect.Effect<T.Artifact, ApiError, R>;
   /** Its title, as the owner renames it. */
   readonly "artifact.update": (a: { readonly id: T.ArtifactId; readonly title: string }) => Effect.Effect<T.Artifact, ApiError, R>;

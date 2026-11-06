@@ -1,12 +1,10 @@
-// Real git repositories for tests.
-
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { tempDir } from "@vibevalley/testkit/temp";
 
-/** Runs git in dir as a test user; its output, trimmed. A failure throws with what git said. */
+/** Runs git in dir as a test user. its output, trimmed. */
 export const gitSync = (dir: string, ...args: string[]) =>
   execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@vibevalley.test", ...args], {
     cwd: dir,
@@ -14,7 +12,7 @@ export const gitSync = (dir: string, ...args: string[]) =>
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
 
-/** Runs git in dir as dir's own config says (no test user); its output, trimmed. A failure throws with what git said. */
+/** Runs git in dir as dir's own config says (no test user). its output, trimmed. */
 export const gitIn = (dir: string, ...args: string[]) => gitInEnv(dir, {}, ...args);
 
 /** gitIn with these in its environment (a commit's dates). */
@@ -28,8 +26,7 @@ export function projectsDir(): string {
   return root;
 }
 
-/** Each kind of repository made once in this process and copied after: a git command is a process (about 20 ms), and
- * most tests want the same one-commit repository. A copy has the same commits, ids included; nothing compares them. */
+/** Each kind of repository made once in this process and copied after. A copy has the same commits, ids included. */
 const templates = new Map<string, string>();
 
 /** A repository with `mine` commits by the test user, `others` by someone else. */
@@ -48,8 +45,7 @@ function made(dir: string, mine: number, others: number) {
   mkdirSync(dir, { recursive: true });
   gitSync(dir, "init", "-q", "-b", "main");
   gitSync(dir, "config", "user.email", "test@vibevalley.test");
-  // No maintenance in the background after a commit: it takes .git/objects/maintenance.lock in the template while it is
-  // being copied, and a copy (which inherits this config) would race the test's own git the same way.
+  // No maintenance in the background after a commit.
   gitSync(dir, "config", "maintenance.auto", "false");
   gitSync(dir, "config", "gc.auto", "0");
   for (let i = 0; i < mine; i++) gitSync(dir, "commit", "-q", "--allow-empty", "-m", `mine ${i}`);

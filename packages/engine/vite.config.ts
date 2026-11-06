@@ -2,8 +2,7 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   test: { include: ["test/**/*.test.ts"] },
-  // The types other packages check against (package.json's exports: types is dist/, default the source every run
-  // compiles), declarations only, with maps back to the source for the editor.
+  // The types other packages check against (package.json's exports.
   pack: {
     entry: ["src/pixi/index.ts", "src/nav/index.ts", "src/audio/index.ts", "src/clock.ts", "src/framing.ts"],
     outDir: "dist",

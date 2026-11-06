@@ -1,8 +1,3 @@
-// Menu (Base UI's): a list of actions under a button. Opened from the keyboard, the focus starts on the first item
-// (ArrowUp: the last); opened by a click, on the menu itself. Inside, the arrows move along the items (wrapping, passing
-// over disabled ones), letters jump to an item, Enter or Space or a click runs it and closes the menu. Escape, choosing
-// an item and Tab give the focus back to the trigger; a press outside leaves it where the press put it.
-
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createSignal, createUniqueId, omit, useContext } from "solid-js";
 

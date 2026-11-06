@@ -9,7 +9,7 @@
 | 管家 | 管家 | 它的工具：打了 ✓ 的每个接口是它的一个工具（`channel.message.list` 是 `channel_message_list`），`apps/server/src/tool` 照这一列给 |
 | 帮工 | 在干活的帮工 | 经 `/mcp` 拿的工具，同上 |
 
-`GET /api/v1/state`、`GET /api/v1/events` 和 `GET /api/v1/live` 是 SSE，不在 `endpoints` 里：主人和连进来的设备都能读；`/state` 给折好的帧，`/live` 只给页面要的三种 side event，`/events` 留给命令行和调试。接口都在 `/api/v1` 下；不兼容改动和 v1 的保留见 [接口版本](docs/subsystems/core.md#为什么这样)。
+`GET /api/v1/state`、`GET /api/v1/events` 和 `GET /api/v1/live` 是 SSE，不在 `endpoints` 里：主人和连进来的设备都能读；`/state` 给折好的帧，`/live` 只给页面要的三种 side event，`/events` 留给调试。接口都在 `/api/v1` 下；不兼容改动和 v1 的保留见 [接口版本](docs/subsystems/core.md#为什么这样)。
 
 ## server
 

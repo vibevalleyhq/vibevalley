@@ -1,7 +1,3 @@
-// Each struct Schema in <concept>/schema.ts has exactly the keys of its interface in <concept>/shapes.ts. `Schema.Codec<T.X>` cannot see
-// this: an optional key named differently on each side (draft against refining) still compiles, and encoding then
-// drops the field from every frame and every state.json read.
-
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 import { expect, test } from "vite-plus/test";

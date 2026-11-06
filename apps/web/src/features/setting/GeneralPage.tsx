@@ -1,5 +1,3 @@
-// 通用: the farm's language, and where this machine's page opens.
-
 import { t } from "@vibevalley/i18n";
 
 import { setStart, StartValues, usePrefs } from "#/state/prefs.ts";

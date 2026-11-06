@@ -1,12 +1,3 @@
-// Lan access (连接到本机). The main server listens on loopback alone; lan access is a second listener
-// on every interface, shut until the owner opens it. Through it go the endpoints marked remote and the state and side-event
-// streams, never /mcp, and only with a paired device's key (a Bearer header, or the cookie a paired browser keeps):
-// sessions run commands on this machine without asking. The page itself goes through to anyone, as it holds nothing of
-// the farm's; a browser pairs on its /pair, the link the owner's QR code says. Opening
-// it, pairing and forgetting devices are this machine's alone. The database keeps only each key's SHA-256. The listener
-// speaks plain HTTP: a key can be overheard on the network it is open on. What it lets through it hands to the loopback
-// server, saying which device asks.
-
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { connect, type Socket } from "node:net";
@@ -32,8 +23,8 @@ import {
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
 
+import { lookIn, messageOf, missing } from "#/base/errors.ts";
 import { code as newCode, newId } from "#/base/ids.ts";
-import { lookIn, messageOf, missing } from "#/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { callbackLog } from "#/infra/log.ts";
@@ -186,8 +177,7 @@ const make = (options: LanOptions = {}) =>
     let port = 0;
     let problem = "";
     let pairing: Pairing | undefined;
-    // Opening binds the port after its write: a shut that came in between would find no server yet and leave the one
-    // bound after it listening. One open or shut at a time.
+    // Opening binds the port after its write: a shut that came in between would find no server yet and leave the one bound after it listening.
     const opening = yield* Semaphore.make(1);
     let upstream = "";
     /** What cuts each of a device's open connections; forgetting the device cuts them. */
@@ -303,8 +293,7 @@ const make = (options: LanOptions = {}) =>
       res.on("close", () => fiber.interruptUnsafe());
     };
 
-    /** The page's WebSocket from a paired device: the upgrade goes to the loopback server as it came, saying which
-     * device asks, and bytes go both ways until either side closes; forgetting the device or shutting ends it. */
+    /** The page's WebSocket from a paired device. forgetting the device or shutting ends it. */
     const tunnel = (req: IncomingMessage, client: Socket, head: Buffer) => {
       const refuse = (status: string) => void client.end(`HTTP/1.1 ${status}\r\nconnection: close\r\n\r\n`);
       if (!upstream) return refuse("503 Service Unavailable");

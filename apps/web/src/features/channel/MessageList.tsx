@@ -47,8 +47,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
     (reason) => toast(reason, "bad"),
   );
   let log: HTMLDivElement | undefined;
-  // The message an address points at: older pages are read until it is among them, then it is scrolled to and lit up a
-  // while. A string, so a change elsewhere in the list does not scroll again.
+  // The message an address points at: older pages are read until it is among them, then it is scrolled to and lit up a while.
   const [lit, setLit] = createSignal<number>();
   createEffect(
     () => {
@@ -170,7 +169,14 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
                 </span>
               }
             >
-              <button type="button" onClick={() => void followed.loadOlder(id()!)} class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink">
+              <button
+                type="button"
+                onClick={() => {
+                  const ch = id();
+                  if (ch) void followed.loadOlder(ch);
+                }}
+                class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink"
+              >
                 {t("web.channel.messages.older")}
               </button>
             </Show>
@@ -365,8 +371,7 @@ function Frame(props: {
 }
 
 /** A dispatch: one line until it is opened, then the whole task in its place. */
-/** A dispatch said as what it is for the owner: who went to which issue. The words the helper was given, its brief and how
- * to report, stay folded: they are the helper's, not the owner's to read. */
+/** A dispatch said as what it is for the owner: who went to which issue. */
 function Dispatch(props: { m: ChatMessage }) {
   const core = useCore();
   const [open, setOpen] = createSignal(false);
@@ -391,7 +396,7 @@ function Dispatch(props: { m: ChatMessage }) {
             >
               {(i) => (
                 <p class="flex min-w-0 items-baseline gap-1.5 text-base">
-                  <span class="shrink-0">{t("web.channel.messages.sentTo", { who: sent()!.name })}</span>
+                  <span class="shrink-0">{t("web.channel.messages.sentTo", { who: sent()?.name ?? "" })}</span>
                   <A href={`/issues/${i().id}`} data-testid="dispatch-issue" class="min-w-0 truncate font-medium text-water hover:underline">
                     #{i().number} {i().title}
                   </A>
@@ -452,7 +457,7 @@ export function MessageRow(props: {
   return (
     <Frame
       face={<SenderFace m={props.m} />}
-      dot={session() && <Dot tone={phaseDot(session()!.phase)} size={11} />}
+      dot={<Show when={session()}>{(s) => <Dot tone={phaseDot(s().phase)} size={11} />}</Show>}
       name={props.m.fromKind === "owner" ? t("web.channel.messages.owner") : props.m.name}
       meta={`${who() ? `${who()}  ` : ""}${workbenchClock(props.m.at)}${meta() ? `  ${meta()}` : ""}`}
       continues={props.continues}

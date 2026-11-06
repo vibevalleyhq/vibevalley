@@ -11,11 +11,7 @@ export interface Picture {
   readonly name: string;
 }
 
-/**
- * Pictures over the page, one at a time (docs/style/design.md, 附件): it grows in from where the picture was, ← and →
- * go through the others of the same message, Escape or a click beside the picture closes it; the original opens in a tab.
- * at: the one shown, or none while closed.
- */
+/** Pictures over the page, one at a time (docs/style/design.md). the original opens in a tab. */
 export function Lightbox(props: { pictures: readonly Picture[]; at: number | undefined; onAt: (at: number | undefined) => void }) {
   const m = createModal(
     () => props.at !== undefined,
@@ -58,7 +54,7 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
               <Show when={count() > 1}>
                 <IconButton icon="previous" label={t("web.base.lightbox.prev")} onClick={() => go(-1)} />
                 <span class="px-1 text-xs text-muted">
-                  {props.at! + 1} / {count()}
+                  {(props.at ?? 0) + 1} / {count()}
                 </span>
                 <IconButton icon="next" label={t("web.base.lightbox.next")} onClick={() => go(1)} />
               </Show>

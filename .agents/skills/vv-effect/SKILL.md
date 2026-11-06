@@ -1,11 +1,21 @@
 ---
 name: vv-effect
-description: 在 VibeValley 里写、改、评审 Effect v4 的代码（apps/server、packages/agent、packages/ai，以及页面的中间层 apps/web/src/state 上的 Effect Atom，effect 4.0.5）：先读包里自带的官方指南，再照本仓库的约定写：服务是 Context.Service 的类、库经 Db、文件经 FileSystem、时间经 Clock、Promise 只在库的一次调用上且写 { try, catch }、错误打标签按 catchTag 接、服务的方法用 Effect.fn 命名、测试用 it.effect 和 TestClock；哪些已经由 effect:check、vibevalley/* lint 和逃生口的棘轮拦着。用在：写或改任何用到 Effect 的代码；页面上主人做一件事要先显示结果（乐观更新）、要等服务端确认、要记住一个选择、要一个全页面共享的值（意图、act()、defineStored、defineAtom，Atom 只在 state/）（服务、layer、错误、Stream、Schedule、Schema、测试）；评审一段 Effect 代码；effect:check 报了诊断不知道怎么改；不确定一个 API 在 v4 叫什么（Context.Tag、Effect.Service、catchAll、Either、Layer.scoped 这些 v3 名字都不在了）；主人说「Effect 的最佳实践」「这段 Effect 写得对不对」。
+description: 在 VibeValley 里写、改、评审 Effect v4 的代码（apps/server、packages/agent、packages/ai，以及页面的中间层 apps/web/src/state 上的 Effect Atom，effect 4.1.2）：先读包里自带的官方指南，再照本仓库的约定写：服务是 Context.Service 的类、库经 Db、文件经 FileSystem、时间经 Clock、Promise 只在库的一次调用上且写 { try, catch }、错误打标签按 catchTag 接、服务的方法用 Effect.fn 命名、测试用 it.effect 和 TestClock；哪些已经由 effect:check、vibevalley/* lint 和逃生口的棘轮拦着。用在：写或改任何用到 Effect 的代码；页面上主人做一件事要先显示结果（乐观更新）、要等服务端确认、要记住一个选择、要一个全页面共享的值（意图、act()、defineStored、defineAtom，Atom 只在 state/）（服务、layer、错误、Stream、Schedule、Schema、测试）；评审一段 Effect 代码；effect:check 报了诊断不知道怎么改；不确定一个 API 在 v4 叫什么（Context.Tag、Effect.Service、catchAll、Either、Layer.scoped 这些 v3 名字都不在了）；主人说「Effect 的最佳实践」「这段 Effect 写得对不对」「建议怎么写、不建议怎么写」。
 ---
 
 # 在这个仓库写 Effect
 
-Effect 的写法有两层来源：官方指南（随安装的版本走）和本仓库在它之上加的约定。agent 的训练数据大多是 v3，社区的 skill 和文章里还有 v4 测试版的名字（`ServiceMap.Service`、`Schema.TaggedErrorClass`、`effect/unstable/*`），这些在 4.0.5 里都不存在；凭记忆写，最常见的结果是编不过，或者编过了但用的是旧的语义。
+Effect 的写法有两层来源：官方指南（随安装的版本走）和本仓库在它之上加的约定。agent 的训练数据大多是 v3，社区的 skill 和文章里还有 v4 测试版的名字（`ServiceMap.Service`、`Schema.TaggedErrorClass`、`effect/unstable/*`），这些在 4.1.2 里都不存在；凭记忆写，最常见的结果是编不过，或者编过了但用的是旧的语义。
+
+## 器、术、道
+
+| 层 | 是什么 | 在哪 |
+|---|---|---|
+| 道 | 为什么这样写：15 条原则（失败是值、依赖是契约、资源成对、时间经服务、命名的函数就是 span、交界收窄、进门解码、重试有上限、看着别扭先往上看一层……），每条落到哪些写法 | [references/principles.md](.agents/skills/vv-effect/references/principles.md) |
+| 术 | 怎么写：41 个案例，每个一对「不建议 / 建议」的代码，配为什么和谁拦着；不少取自这个仓库自己的代码 | [references/cases.md](.agents/skills/vv-effect/references/cases.md) |
+| 器 | 拿什么查：去哪儿查 API、哪个检查拦什么、怎么读报错、测试和观测用什么、加一条检查写在哪 | [references/tools.md](.agents/skills/vv-effect/references/tools.md) |
+
+写代码时先翻「术」找最像的一条；案例里没有、或两条打架时回到「道」；报错看不懂、要查 API、要加检查时看「器」。
 
 ## 1. 先读什么
 
@@ -67,4 +77,4 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 7. **重试和轮询**：手写的 `while` 加 `sleep` 换成 `Effect.retry`、`Effect.repeat` 和 `Schedule`，时间才拨得动。
 8. **追踪**：服务方法的名字 lint 看得见的它查，它看不见的（从别的对象拿来的、解构出来的）读代码看；边界（接口、外部进程、库的写、队列的交接）上有 span。
 
-查到的照 [vv-simplify](.agents/skills/vv-simplify/SKILL.md) 的格式列出来：每处带文件和行号、怎么改、靠哪个测试证明没变坏。常见的反模式、它们为什么会被写出来、怎么发现，见 [references/practices.md](.agents/skills/vv-effect/references/practices.md)。
+查到的照 [vv-simplify](.agents/skills/vv-simplify/SKILL.md) 的格式列出来：每处带文件和行号、怎么改、靠哪个测试证明没变坏。常见的反模式、它们为什么会被写出来、怎么发现，见 [references/practices.md](.agents/skills/vv-effect/references/practices.md)。拿不准怎么写时，先在 [references/cases.md](.agents/skills/vv-effect/references/cases.md) 找最像的一条。

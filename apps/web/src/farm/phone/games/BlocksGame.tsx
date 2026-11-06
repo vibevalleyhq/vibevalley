@@ -1,6 +1,3 @@
-// 方块 on the phone: the rules are farm/phone/games/blocks.ts; here the clock, the pad and the drawing.
-// Leaving the game (or putting the phone away) pauses it where it is.
-
 import { createEffect, createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";

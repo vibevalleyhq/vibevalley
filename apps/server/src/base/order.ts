@@ -4,7 +4,7 @@ export function compareText(a: string, b: string): number {
   const x = [...a];
   const y = [...b];
   for (let i = 0; i < Math.min(x.length, y.length); i++) {
-    const d = x[i]!.codePointAt(0)! - y[i]!.codePointAt(0)!;
+    const d = (x[i]?.codePointAt(0) ?? 0) - (y[i]?.codePointAt(0) ?? 0);
     if (d !== 0) return d < 0 ? -1 : 1;
   }
   return x.length < y.length ? -1 : x.length > y.length ? 1 : 0;

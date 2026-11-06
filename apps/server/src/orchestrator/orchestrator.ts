@@ -11,10 +11,11 @@ import { Agent, modelClient, noDeepSeekKey } from "#/agent/agent.ts";
 import { traitsOf } from "#/agent/prompts.ts";
 import { orchestrator } from "#/base/actor.ts";
 import { head } from "#/base/clip.ts";
+import { type ApiError, refused } from "#/base/errors.ts";
+import { ownersLanguage } from "#/base/prompts.ts";
 import { Channel, type OrchestratorNews } from "#/channel/channel.ts";
 import { Cron } from "#/cron/cron.ts";
 import { nextRun } from "#/cron/when.ts";
-import { type ApiError, refused } from "#/errors.ts";
 import { agentHome, projectsDir, ServerConfig } from "#/infra/config.ts";
 import { localeMinute } from "#/infra/time.ts";
 import { Ingress } from "#/ingress/ingress.ts";
@@ -22,7 +23,6 @@ import type { Picked } from "#/mailbox/envelope.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
 import { Pkm } from "#/pkm/pkm.ts";
 import { Project } from "#/project/project.ts";
-import { ownersLanguage } from "#/prompts.ts";
 import { runtimeLabel } from "#/runtime/presets.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 import { type AgentHost, type Caller, type NotAnswered } from "#/session/host.ts";
@@ -214,7 +214,7 @@ const make = (options: OrchestratorOptions = {}) =>
             const p = assessed.agent;
             let line = situationWords.agent(p.name, p.id, runtimeLabel(p.runtime), traitsOf(p));
             if (p.enabled && assessed.blocking.length === 0) line += situationWords.quota(quotaText(assessed.info));
-            else if (assessed.blocking.length > 0) line += situationWords.blocked(assessed.blocking[0]!.text);
+            else if (assessed.blocking[0]) line += situationWords.blocked(assessed.blocking[0].text);
             else line += situationWords.disabled;
             lines.push(line);
           }),
@@ -249,8 +249,7 @@ const make = (options: OrchestratorOptions = {}) =>
         );
       });
 
-    // The situation for the next input: the whole of it, or what changed since the input before. An input given while
-    // the agent is busy may be taken after one given later, so it carries the whole, and the one after it does too.
+    // The situation for the next input: the whole of it, or what changed since the input before.
     const situationNow = (me: Instance, busy: boolean, channel: string) =>
       Effect.map(situation(channel), (now) => {
         const shownNow = !busy && me.shown !== "" ? situationDelta(me.shown, now) : now;
@@ -316,8 +315,7 @@ const make = (options: OrchestratorOptions = {}) =>
         return false;
       });
 
-    /** Every input comes in here. false: the orchestrator could not start, and the channel was told why, once. It
-     * never fails: an input that could not be taken is logged, and a caller waiting on it is failed instead of left open. */
+    /** Every input comes in here. false: the orchestrator could not start, and the channel was told why, once. */
     const take = (i: Intake): Effect.Effect<boolean> =>
       taking(i).pipe(
         Effect.catchCause((cause) =>

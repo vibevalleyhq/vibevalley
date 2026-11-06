@@ -1,7 +1,3 @@
-// What a page test may take (docs/subsystems/foundation.md, the test pyramid): a run ends with the page layer's size and
-// each test over twice its budget, slowest first. It does not fail the run: times differ by machine, and a slow page
-// test is a design to look at (what it waits for), not a broken one.
-
 import type { Reporter, TestCase, TestResult } from "@playwright/test/reporter";
 
 const budgetMs = 3_000;

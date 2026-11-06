@@ -17,14 +17,11 @@ type Loose = Record<string, unknown>;
 /** `args: { open: false }` is read as open: boolean, not as the type false, so the story can set it to true. */
 type Widen<A> = { [K in keyof A]: A[K] extends boolean ? boolean : A[K] extends string ? string : A[K] extends number ? number : A[K] };
 
-/** One side of a state grid: an argument and the values it takes along that side, or the interaction states (rest,
- * hover, focus, pressed), forced without the pointer (pseudo.ts). */
+/** One side of a state grid: an argument and the values it takes along that side, or the interaction states, forced without the pointer (pseudo.ts). */
 export type Axis<A> = readonly [name: keyof A & string, values: readonly (string | number | boolean)[]] | "pseudo";
 
 export interface Story<A extends Loose = Args> {
-  /** Called once each time the story opens; `args` is a store, read it inside JSX to follow the panel. `set` lets the
-   * component write back (a toggle that was clicked), so the panel and the component agree. A method, so a story of
-   * its own arguments fits where any story goes. */
+  /** Called once each time the story opens. `args` is a store, read it inside JSX to follow the panel. */
   render(args: Widen<A>, set: (patch: Partial<Widen<A>>) => void): JSX.Element;
   readonly args?: A;
   readonly controls?: { readonly [K in keyof A]?: ControlOf<A[K]> };
@@ -37,10 +34,10 @@ export interface Story<A extends Loose = Args> {
 }
 
 export interface Stories {
-  /** Where the stories sit in the tree, as a path: "组件/工作台/Button". */
+  /** Where the stories sit in the tree, as a path: "Components/Workbench/Button". */
   readonly title: string;
   readonly stories: Readonly<Record<string, Story>>;
-  /** The themes the parts follow; a skin with colours of its own (the pixel farm) is drawn in its one. Both by default. */
+  /** The themes the parts follow. a skin with colours of its own (the pixel farm) is drawn in its one. */
   readonly themes?: readonly ("light" | "dark")[];
   /** Classes for the frames' ground and type, for parts that are only ever drawn on one (the farm's paper). */
   readonly frame?: string;

@@ -1,6 +1,3 @@
-// What a run recalls, with no model: the server picks at the start of each
-// turn, and the agent page shows the same pick ahead of time. Characters are UTF-16 units.
-
 import { maybe } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { dayMs, memoryKeep } from "@vibevalley/protocol";
@@ -107,7 +104,7 @@ export function memoryIsNewNote(memories: readonly Pick<T.Memory, "kind" | "text
 
 export const noteMaxChars = noteMax;
 
-/** What memory_search questions. agent "": every profile (only the orchestrator may ask so); project "": every project; kind "": any. */
+/** What memory_search questions. agent "": every profile (only the orchestrator may ask so). */
 export interface SearchQuery {
   readonly agent: string;
   readonly project: string;
@@ -132,10 +129,7 @@ export const inProject = (scope: T.MemoryScope, project: string) =>
 export const searchLimit = 10;
 export const localName = "local";
 
-/**
- * The memories matching q.text best first: the full-text index's rank, words in common, the whole query as written, then
- * this project's before the rest and the newest first. A query with no words lists the newest.
- */
+/** The memories matching q.text best first. A query with no words lists the newest. */
 export function search(memories: readonly T.Memory[], q: SearchQuery, matches: Readonly<Record<string, number>>): Found[] {
   const limit = q.limit > 0 ? q.limit : searchLimit;
   const terms = termsOf(q.text);
@@ -170,10 +164,7 @@ export function foundText(result: SearchResult, q: SearchQuery): string {
   return lines.join("\n");
 }
 
-// The words a memory and a turn are compared by: Chinese as gse cuts it, its search cut
-// and its every-word cut together, so a phrase cut two ways (表名单数: 表/名单/数, 单数) is found either way, single
-// characters left out; Latin words, numbers and code whole (a path or a version one word: db/migrations, v1.2.3). Stop
-// words are left out: they match everything.
+// The words a memory and a turn are compared by. Latin words, numbers and code whole (a path or a version one word: db/migrations, v1.2.3).
 
 /** Raised when the cut or the dictionary changes: every memory's terms are then cut again (recutTerms). */
 export const termsVersion = 1;

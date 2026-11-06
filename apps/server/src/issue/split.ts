@@ -1,5 +1,3 @@
-// A parent split into children, and the children's work merged back into the parent's branch as each is reviewed.
-
 import { Clock, Effect, Semaphore } from "effect";
 
 import { dagIDValid, dagProblems } from "@vibevalley/agent/dag";
@@ -10,9 +8,9 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
 import { actsForOwner, type Actor } from "#/base/actor.ts";
+import { missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
-import { missing, lookIn, reasonOf, refused } from "#/errors.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
@@ -47,7 +45,8 @@ export const issueSplitting = (r: IssueRecords) =>
           return yield* Effect.fail(refused(t("server.issue.split.notCurrent")));
       } else if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
       if (isClosed(parent.status)) return yield* Effect.fail(refused(t("server.issue.dependencies.closedParent")));
-      if (!parent.project) return yield* Effect.fail(refused(t("server.issue.noProject")));
+      const parentProject = parent.project;
+      if (!parentProject) return yield* Effect.fail(refused(t("server.issue.noProject")));
       if ((yield* everyIssue).some((item) => item.parent === parent.id)) return yield* Effect.fail(refused(t("server.issue.split.already")));
       if (
         drafts.length === 0 ||
@@ -56,8 +55,9 @@ export const issueSplitting = (r: IssueRecords) =>
         dagProblems(drafts.map((draft) => ({ id: draft.id, after: draft.needs ?? [] }))).length > 0
       )
         return yield* Effect.fail(refused(t("server.issue.split.invalid", { max: maxChildren })));
-      const ids = new Map(drafts.map((draft) => [draft.id, issueId(newId())]));
-      const rows = yield* Effect.forEach(drafts, (draft) =>
+      const withIds = drafts.map((draft) => ({ draft, childId: issueId(newId()) }));
+      const ids = new Map(withIds.map(({ draft, childId }) => [draft.id, childId]));
+      const rows = yield* Effect.forEach(withIds, ({ draft, childId }) =>
         Effect.gen(function* () {
           const named = draft.agent?.trim() || assignedAgentOf(parent);
           const agent = store.agents().find((candidate) => candidate.id === named || candidate.name === named);
@@ -72,13 +72,16 @@ export const issueSplitting = (r: IssueRecords) =>
             title: childTitle,
             description,
             parent: parent.id,
-            project: parent.project!,
+            project: parentProject,
             agent: agent.id,
             priority: parent.priority,
-            blockedBy: (draft.needs ?? []).map((need) => ids.get(need)!),
+            blockedBy: (draft.needs ?? []).flatMap((need) => {
+              const dep = ids.get(need);
+              return dep ? [dep] : [];
+            }),
             constraints: { acceptance: draft.acceptance === true, scope: draft.scope ?? [], frozen: [], ...(check ? { check } : {}) },
           };
-          return { id: ids.get(draft.id)!, req };
+          return { id: childId, req };
         }),
       );
       const session = latestSessionIdOf(parent);
@@ -147,53 +150,56 @@ export const issueSplitting = (r: IssueRecords) =>
     }, splitting.withPermits(1));
 
     const joining = yield* Semaphore.make(1);
-    const joinChildren = joining.withPermits(1)(
-      Effect.gen(function* () {
-        const all = yield* everyIssue;
-        yield* Effect.forEach(
-          all.filter((item) => item.parent !== undefined && item.stage.state === "reviewing"),
-          (child) =>
-            Effect.gen(function* () {
-              const parent = yield* get(child.parent!);
-              if (!parent.project || isClosed(parent.status)) return;
-              const session = latestSessionIdOf(child);
-              if (!session || !sessions.present(session)) return;
-              const parentSession = latestSessionIdOf(parent);
-              const parentWorker = parentSession ? sessions.sessionOf(parentSession) : undefined;
-              if (parentWorker && isBusy(parentWorker)) return;
-              const result = yield* Effect.result(
-                sessions.handOver(
-                  session,
-                  "completed",
-                  (place) =>
-                    Effect.gen(function* () {
-                      const constraints = yield* verifyChild(projects, child, parent, all, place);
-                      if (constraints) yield* db.run(q.setIssueConstraints({ id: child.id, constraints: JSON.stringify(constraints) }));
-                      const mergeIntoParent = (target: Workplace) => projects.mergeInto(place, issueBranch(parent.number), target.cwd);
-                      const merged =
-                        parentSession && sessions.present(parentSession)
-                          ? yield* sessions
-                              .withIdleWorkplace(parentSession, mergeIntoParent)
-                              .pipe(Effect.mapError((error) => (error._tag === "MergeFailure" ? error : MergeFailure.error(reasonOf(error)))))
-                          : yield* Effect.flatMap(projects.workplace(parent.project!, parent.number, true, ""), mergeIntoParent);
-                      yield* complete(child.id, "merged_into_parent");
-                      return merged;
-                    }),
-                  "helper",
+    const joinChildren = Effect.fn("Issue.joinChildren")(function* () {
+      const all = yield* everyIssue;
+      yield* Effect.forEach(
+        all.filter((item): item is T.Issue & { readonly parent: T.IssueId } => item.parent !== undefined && item.stage.state === "reviewing"),
+        (child) =>
+          Effect.gen(function* () {
+            const parent = yield* get(child.parent);
+            const parentProject = parent.project;
+            if (!parentProject || isClosed(parent.status)) return;
+            const session = latestSessionIdOf(child);
+            if (!session || !sessions.present(session)) return;
+            const parentSession = latestSessionIdOf(parent);
+            const parentWorker = parentSession ? sessions.sessionOf(parentSession) : undefined;
+            if (parentWorker && isBusy(parentWorker)) return;
+            yield* sessions
+              .handOver(
+                session,
+                "completed",
+                (place) =>
+                  Effect.gen(function* () {
+                    const constraints = yield* verifyChild(projects, child, parent, all, place);
+                    if (constraints) yield* db.run(q.setIssueConstraints({ id: child.id, constraints: JSON.stringify(constraints) }));
+                    const mergeIntoParent = (target: Workplace) => projects.mergeInto(place, issueBranch(parent.number), target.cwd);
+                    const merged =
+                      parentSession && sessions.present(parentSession)
+                        ? yield* sessions
+                            .withIdleWorkplace(parentSession, mergeIntoParent)
+                            .pipe(Effect.mapError((error) => (error._tag === "MergeFailure" ? error : MergeFailure.error(reasonOf(error)))))
+                        : yield* Effect.flatMap(projects.workplace(parentProject, parent.number, true, ""), mergeIntoParent);
+                    yield* complete(child.id, "merged_into_parent");
+                    return merged;
+                  }),
+                "helper",
+              )
+              .pipe(
+                Effect.tap(() => setConflict(child.id, undefined)),
+                Effect.catch((failure) =>
+                  Effect.andThen(
+                    failure._tag === "NotTakenIn" && failure.failure.kind === "conflict"
+                      ? setConflict(child.id, { base: failure.failure.base, files: [...failure.failure.files] })
+                      : Effect.void,
+                    asked(child.id, [{ question: failure._tag === "NotTakenIn" ? failure.message : reasonOf(failure), options: [] }]),
+                  ),
                 ),
               );
-              if (result._tag === "Failure") {
-                const failure = result.failure;
-                if (failure._tag === "NotTakenIn" && failure.failure.kind === "conflict")
-                  yield* setConflict(child.id, { base: failure.failure.base, files: [...failure.failure.files] });
-                yield* asked(child.id, [{ question: failure._tag === "NotTakenIn" ? failure.message : reasonOf(failure), options: [] }]);
-              } else yield* setConflict(child.id, undefined);
-              yield* publish(parent.id);
-            }),
-          { discard: true },
-        );
-      }),
-    );
+            yield* publish(parent.id);
+          }),
+        { discard: true },
+      );
+    }, joining.withPermits(1));
 
     return { split, joinChildren };
   });

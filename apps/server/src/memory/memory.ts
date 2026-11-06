@@ -1,6 +1,7 @@
 import { Clock, Context, Effect, Layer, Schema } from "effect";
 import { HttpClient } from "effect/http";
 
+import { agentFailed } from "@vibevalley/agent/core/errors";
 import { archiveFiles, type MemoryPort, parseMemoryLines, readArchive, searchArchive } from "@vibevalley/agent/memory";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -10,8 +11,8 @@ import { sessionId } from "@vibevalley/protocol/schema";
 import { Agent } from "#/agent/agent.ts";
 import type { Actor } from "#/base/actor.ts";
 import { clip } from "#/base/clip.ts";
+import { type ApiError, memoriesOf, missing, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { type ApiError, memoriesOf, missing, refused } from "#/errors.ts";
 import { agentHome, ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
@@ -101,7 +102,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       ...(timeoutMs !== undefined ? { timeoutMs } : {}),
     });
     // What an older cut left is cut again in the background.
-    yield* Effect.forkScoped(Effect.andThen(loadSegmenter, local.recutTerms));
+    yield* Effect.forkScoped(Effect.andThen(loadSegmenter(), local.recutTerms));
     const homeOf = (agent: string) => agentHome(config, agent);
 
     const list = Effect.fn("Memory.list")(function* (agent: string) {
@@ -132,30 +133,28 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       return m;
     });
 
-    const runPromise = Effect.runPromiseWith(yield* Effect.context());
     const shape = Memory.of({
       forAgent: (agent, session) => {
         const by = agents.isOrchestrator(agent) ? { kind: "orchestrator" as const, forOwner: false } : { kind: "session" as const, id: session };
         return {
           read: () =>
-            runPromise(
-              Effect.gen(function* () {
-                const notes = (yield* local.list(agent)).filter((note) => note.kind === "note").toReversed();
+            Effect.map(
+              local.list(agent).pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memory of ${agent} could not be read: ${String(e)}`), []))),
+              (all) => {
+                const notes = all.filter((note) => note.kind === "note").toReversed();
                 const lines = notes.map((note) => (note.author === "owner" ? fromOwner : "") + note.text);
                 return { lines, prompt: carriedMemory(lines) };
-              }),
+              },
             ),
-          remember: (text) => runPromise(Effect.asVoid(local.write({ agent, text, project: "", by }))),
+          remember: (text) => Effect.asVoid(local.write({ agent, text, project: "", by }).pipe(Effect.mapError(agentFailed))),
           rewrite: (text) =>
-            runPromise(
-              Effect.gen(function* () {
-                const owners = new Set((yield* local.list(agent)).filter((note) => note.author === "owner").map((note) => note.text));
-                const notes = parseMemoryLines(text)
-                  .map((line) => line.text)
-                  .filter((line) => !owners.has(line) && !(line.startsWith(fromOwner) && owners.has(line.slice(fromOwner.length).trim())));
-                return yield* local.rewrite(agent, notes, by);
-              }),
-            ),
+            Effect.gen(function* () {
+              const owners = new Set((yield* local.list(agent)).filter((note) => note.author === "owner").map((note) => note.text));
+              const notes = parseMemoryLines(text)
+                .map((line) => line.text)
+                .filter((line) => !owners.has(line) && !(line.startsWith(fromOwner) && owners.has(line.slice(fromOwner.length).trim())));
+              return yield* local.rewrite(agent, notes, by);
+            }).pipe(Effect.mapError(agentFailed)),
         };
       },
       memoriesOf: Effect.fn("Memory.memoriesOf")(function* (agent) {
@@ -221,9 +220,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     return shape;
   });
 
-// This farm's own memories, rows in the memory table: what each agent noted (its
-// explicit notes (from issue_report or the owner) and one line for each issue it worked. A memory that cannot be read or written never
-// stops a run: it is logged, and the run goes on without it.
+// This farm's own memories, rows in the memory table.
 
 /** One finished run, everything about it; each provider keeps what it uses. */
 export interface FinishedRun {
@@ -237,7 +234,7 @@ export interface FinishedRun {
   readonly summary: string;
 }
 
-/** What a run recalls by. peek only questions: nothing is counted as recalled (the 记性 tab's preview). */
+/** What a run recalls by. peek only questions: nothing is counted as recalled (the Memory tab's preview). */
 export interface RecallCue {
   readonly agent: string;
   readonly session?: string;
@@ -247,7 +244,7 @@ export interface RecallCue {
   readonly peek?: boolean;
 }
 
-/** A memory written outside a run: the owner's, from the 记性 tab, the orchestrator's for a profile, or a session's own. */
+/** A memory written outside a run: the owner's, from the Memory tab, the orchestrator's for a profile, or a session's own. */
 export interface Note {
   readonly agent: string;
   readonly text: string;
@@ -316,8 +313,7 @@ const makeMemoryStore = Effect.gen(function* () {
       const rows = yield* db.attempt(q.matchMemories({ words, agent }));
       return Object.fromEntries(rows.map((r) => [r.id, r.score ?? 0]));
     },
-    (effect, agent) =>
-      effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`searching ${agent}'s memories: ${String(e)}`), {} as Record<string, number>))),
+    (effect, agent) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`searching ${agent}'s memories: ${String(e)}`), {}))),
   );
 
   /** What a run would recall; nothing is counted as recalled until markRecalled. */
@@ -334,7 +330,7 @@ const makeMemoryStore = Effect.gen(function* () {
       });
       return pick(all, picked);
     },
-    (effect, cue) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), [] as T.Memory[]))),
+    (effect, cue) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), []))),
   );
 
   const markRecalled = (ids: readonly string[]) =>
@@ -375,7 +371,7 @@ const makeMemoryStore = Effect.gen(function* () {
       const fading = new Set(nextForgotten(all, fadingSoon));
       return all.map((m) => ({ ...m, fading: fading.has(m.id) }));
     },
-    (effect, agent) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memories of ${agent}: ${String(e)}`), [] as T.Memory[]))),
+    (effect, agent) => effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memories of ${agent}: ${String(e)}`), []))),
   );
 
   const write = Effect.fnUntraced(function* (n: Note) {

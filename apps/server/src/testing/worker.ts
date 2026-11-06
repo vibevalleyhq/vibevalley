@@ -1,6 +1,3 @@
-// The helper the farm's tests hire (the flows, and the page's tests through VIBEVALLEY_TEST_RUNTIMES): oar's scripted
-// runtime over a real git worktree, doing what the words of its brief say. No binary, login or model.
-
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -22,8 +19,7 @@ const sessionGit = (cwd: string, ...args: string[]) =>
 
 const version = /写版本(\w)/u;
 
-/** Turns held by 慢慢 or 发呆 until the test lets them go on (releaseHeld), 1.5 s pass, or they are stopped: a test acts
- * while a session is busy, then says when it may finish, instead of waiting out a timer. */
+/** Turns held by slow or idle until the test lets them go on (releaseHeld), 1.5 s pass, or they are stopped. */
 const held = new Set<() => void>();
 
 /** Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. */
@@ -57,8 +53,7 @@ const hold = (turn: ScriptedTurn) =>
     );
   });
 
-/** A drafting session: 慢慢 is held (releaseHeld), 顺手提交 changes and commits what it should not, 乱写 hands back no
- * block; the answer 用 8797 makes the second version, which asks nothing. */
+/** A drafting session: slow is held (releaseHeld), extra-commit changes and commits what it should not, garbled hands back no block. */
 async function draft(turn: ScriptedTurn, input: string) {
   if (input.includes("慢慢") && (await hold(turn))) return;
   if (input.includes("乱写")) return turn.say("看了一圈，不知道写什么。\n\n结论：没写出来");
@@ -84,8 +79,7 @@ async function draft(turn: ScriptedTurn, input: string) {
   );
 }
 
-/** An answer issue's round (or 接着修 on one whose answer could not be read): 顺手提交 changes and commits what it should
- * not, 乱写 hands back no block; else a conclusion that rests on clock.ts. */
+/** An answer issue's round (or fix-up on one whose answer could not be read): extra-commit changes and commits what it should not, garbled hands back no block. */
 async function answer(turn: ScriptedTurn, input: string) {
   const cwd = turn.options.cwd;
   if (input.includes("顺手提交")) {
@@ -101,10 +95,7 @@ async function answer(turn: ScriptedTurn, input: string) {
   turn.say("查过了。\n\n```json\n" + JSON.stringify(found) + "\n```\n\n结论：查清楚了");
 }
 
-/** The helper every flow hires: what it does is in the words of its brief (the part after the reminders). 只起草工单 drafts;
- * 必败 fails; 发呆 is held (releaseHeld); 写版本X commits same.ts as X; 有冲突 merges main and settles same.ts; 提交 commits
- * clock.ts; 先问清楚 asks the owner until 用 8797 is said (给选项: with 用 8787 and 用 8797 to pick); 记一笔 notes two
- * memories. It answers with its brief and persona, and says of each numbered criterion that it was met. */
+/** The helper every flow hires: what it does is in the words of its brief (the part after the reminders). draft-only drafts. */
 export const helper = (turns: ScriptedTurn[] = [], before?: (turn: ScriptedTurn, input: string, turnNumber: number) => Promise<void>): Runtime =>
   scriptedRuntime({
     id: "pi",

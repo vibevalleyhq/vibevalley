@@ -1,8 +1,3 @@
-// The owner's notes (docs/subsystems/pkm.md): a vault of Logseq-style pages in PARA folders. The files are the truth: the
-// pages are read into memory the first time they are asked for and read again when their file changed on disk, so the
-// owner may keep editing them in another editor. The database holds only what the files do not: the remarks' status and
-// the rewrites proposed for blocks (pkm_comment), and each file a change wrote, for undo (pkm_change).
-
 import { join } from "node:path";
 
 import { Clock, Context, Effect, FileSystem, Layer, Option, Ref, Semaphore } from "effect";
@@ -13,8 +8,8 @@ import { ownerId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { flatBlocks, slugOf } from "@vibevalley/protocol/rules";
 
+import { type ApiError, Inconsistent, lookIn, missing, reasonOf, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { type ApiError, Inconsistent, lookIn, missing, reasonOf, refused } from "#/errors.ts";
 import { pkmDir, ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { termsList } from "#/memory/recall.ts";
@@ -58,8 +53,7 @@ export class Pkm extends Context.Service<
     readonly move: (req: T.PkmMoveRequest) => Effect.Effect<T.PkmPage, ApiError>;
     readonly apply: (req: T.PkmMutation) => Effect.Effect<T.PkmPage, ApiError>;
     readonly search: (req: T.PkmSearchRequest) => Effect.Effect<T.PkmSearchHit[]>;
-    /** text read as an outline (outlineOf). page: at that page's end as it is; none: today's journal, each top block a
-     * LATER tagged #inbox. by: the agent's name when an agent notes it, said after the words; none for the owner's own. */
+    /** text read as an outline (outlineOf). page: at that page's end as it is. */
     readonly capture: (text: string, by?: string, page?: string) => Effect.Effect<T.PkmPage, ApiError>;
     readonly source: (ref: string) => Effect.Effect<T.PkmSource, ApiError>;
     readonly sourceUpdate: (req: T.PkmSourceUpdate) => Effect.Effect<T.PkmPage, ApiError>;
@@ -262,9 +256,7 @@ export const make = Effect.gen(function* () {
 
   const textAt = (file: string) => fs.readFileString(abs(file)).pipe(Effect.option, Effect.map(Option.getOrUndefined));
 
-  /** Writes page as its file (from: where its file was, when it moves), says the change for undo and holds the page as
-   * written: the blocks whose id the file now says are written ones. A block another page now refers to gets its id
-   * written into that page too, so the ref still finds it when the files are read again. */
+  /** Writes page as its file, says the change for undo and holds the page as written: the blocks whose id the file now says are written ones. */
   const write = (page: Page, what: string, from: string = page.file): Effect.Effect<Page, ApiError> =>
     Effect.gen(function* () {
       const held = yield* vault();

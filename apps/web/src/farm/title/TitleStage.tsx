@@ -1,9 +1,6 @@
 import { Schema } from "effect";
 import { createEffect, createSignal, For, Show } from "solid-js";
-// The title's picture, alive: the scene on a stage kept at its own 3:2 and covering the screen, slowly panning; on it,
-// in the scene's own coordinates (farm/title/layers.ts), clouds, chimney smoke, swaying plants, seeds off the
-// dandelions, fireflies at dusk and night, and on the hill the farmer (breathing; a lantern at night) with the chosen
-// pet. The motions are style.css's title-*.
+// The title's picture, alive: the scene on a stage kept at its own 3:2 and covering the screen, slowly panning.
 
 import { TitleManifest } from "#/base/manifests.ts";
 import { ready, useQuery } from "#/infra/query.ts";

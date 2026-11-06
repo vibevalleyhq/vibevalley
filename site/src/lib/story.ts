@@ -1,8 +1,3 @@
-// How a job grows, told along a strip of field as the page scrolls (How.tsx): four places in a row, each with its plot
-// (the job at that step), its thing (the ticket board, the seeder, the workbench, the crates) and what the helper does
-// there. Everything is in the field's own pixels (an art pixel each); the page draws the field two or three times over.
-// The page's scroll through the story runs 0 to 1: a quarter for each place, the first 30% of it walking there.
-
 /** A picture in the field: its address, size, and the point it stands on (from apps/web/public/pixel/sprites.json). */
 export interface Art {
   src: string
@@ -42,7 +37,7 @@ export interface Place {
 }
 
 export const PLACES: readonly Place[] = [
-  // Say it: the owner's words on the board; the helper reads them. The plot is still bare.
+  // Say it: the owner's words on the board. the helper reads them.
   { at: 96, plot: 168, thing: { name: 'prop-board', x: 96 }, stages: [[0, 'plot-empty']] },
   // Sow it: seeds into the bare plot, beside the seeder.
   {
@@ -124,8 +119,7 @@ export function momentAt(p: number): Moment {
   return { place, working: true, work: (local - 0.3) / 0.7, x: to }
 }
 
-/** A plot's stage at a moment: bare (or as the last place left it) until the helper gets there, then as the work goes,
- *  and as it was left once the helper has moved on. */
+/** A plot's stage at a moment: bare until the helper gets there, then as the work goes, and as it was left once the helper has moved on. */
 export function stageOf(i: number, now: Moment): PlotStage {
   const stages = PLACES[i]!.stages
   if (now.place < i || (now.place === i && !now.working)) return stages[0]![1]
@@ -152,8 +146,7 @@ export function workAt(place: number, work: number): { poses: Pose[]; bubble?: B
 /** The job the story grows, the same as the harvest list's: what its branch comes to. */
 export const JOB = { commits: 3, files: 4, plus: 142, minus: 12, tests: 18 } as const
 
-/** Its branch at a moment of the story: forked off main while the work is handed out, its commits and lines coming as
- *  the helper works (the tests running at the end of it), merged back into main once the harvest is stamped. */
+/** Its branch at a moment of the story. */
 export function branchAt(now: Moment) {
   const work = now.place === 2 ? (now.working ? now.work : 0) : now.place > 2 ? 1 : 0
   const typed = Math.min(1, work / 0.85)

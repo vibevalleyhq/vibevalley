@@ -8,8 +8,7 @@ import { type Frames, frames, rawFrame } from "#/infra/frame.ts";
 import { farmCommands } from "./commands";
 import { farmProject } from "./store";
 
-// One project's farm: the frame with only that project's sessions on it (protocol's farmOf), for what the farm page
-// draws and does with its beds. The rest of the frame (the inbox, the chat, the level, the effects) is the whole farm's.
+// One project's farm: the frame with only that project's sessions on it (protocol's farmOf), for what the farm page draws and does with its beds.
 const made = new WeakMap<StateFrame, { project: string; frame: StateFrame }>();
 
 /** The same frame and project give back the same object, so a reader comparing frames sees no change. */
@@ -43,12 +42,7 @@ export function rawFarmFrame(): Accessor<StateFrame | undefined> {
   return createMemo(() => farmFrameOf(raw(), farmProject()));
 }
 
-/**
- * The frames store with only this farm's sessions, for the farm's DOM (FarmPage provides it to the parts that draw the
- * beds; the chat and the title read the whole farm's). The frame is the store's own, seen through a proxy that answers
- * state.sessions with this farm's: a copy made on each frame would be a new object every time, and every reader of it
- * would run again for any change at all, where reading through the store runs only those whose part changed.
- */
+/** The frames store with only this farm's sessions, for the farm's DOM (FarmPage provides it to the parts that draw the beds. */
 export function createFarmFrames(outer: Frames, project: Accessor<string>): Frames {
   const sessions = createMemo(() => outer.frame?.state.sessions.filter((h) => farmOf(h) === project()) ?? [], {
     equals: (a, b) => a.length === b.length && a.every((h, i) => h === b[i]),

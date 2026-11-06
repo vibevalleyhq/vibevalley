@@ -36,7 +36,7 @@ const messageHref = (at: { readonly channel: string; readonly number?: number })
 
 const rail = defineStored("artifact.rail", Schema.Boolean, true);
 
-/** The one just made with 新建: its title is selected to be typed over when it opens. */
+/** The one just made with New: its title is selected to be typed over when it opens. */
 const justMade = defineAtom<string | undefined>(undefined);
 
 /** `rest` is the path after /artifacts/. */

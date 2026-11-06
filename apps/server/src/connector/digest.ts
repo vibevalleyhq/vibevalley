@@ -1,6 +1,5 @@
 import { t } from "@vibevalley/i18n";
-// What the chat apps are sent: which farm messages reach the owner, as plain text, cut
-// to what each app takes; a digest of what waited; the pairing words.
+// What the chat apps are sent: which farm messages reach the owner, as plain text, cut to what each app takes. a digest of what waited.
 import type * as T from "@vibevalley/protocol";
 import { slice } from "@vibevalley/protocol/rules";
 

@@ -1,8 +1,3 @@
-// Development only (vp run desktop:dev sets VIBEVALLEY_DEV=1, never a packaged app): the window reloads when the page
-// is built again (vp build --watch writes apps/web/dist), and the server starts again, on the same port, when its code
-// or a workspace package it runs on changes; the window then comes back on the place it showed. A restart waits while a
-// helper is working: it would cut the round off (the farm working on its own code is changing that code).
-
 import { type FSWatcher, watch } from "node:fs";
 import { join } from "node:path";
 

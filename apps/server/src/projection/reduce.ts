@@ -1,5 +1,3 @@
-// The farm's core state, in motion: reduce folds one fact into the state with each module's rules; the recorded runs of
-// facts (core/testdata/reduce.jsonl.gz) hold it to the same answers. It never changes what it is given.
 import type * as T from "@vibevalley/protocol";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 
@@ -10,7 +8,7 @@ import { sessionOf, withSession } from "#/session/roster.ts";
 
 const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 
-/** A fact that changes nothing says so (false), and is not sent; facts about sessions not on the farm change nothing. The issues' statuses follow whatever changed. */
+/** A fact that changes nothing says so (false), and is not sent. facts about sessions not on the farm change nothing. */
 export function reduce(state: T.WorkspaceState, fact: T.Fact): [T.WorkspaceState, boolean] {
   const [next, changed] = fold(state, fact);
   return changed && (next.issues !== state.issues || next.sessions !== state.sessions) ? [withIssueStatuses(next), true] : [next, changed];

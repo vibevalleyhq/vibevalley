@@ -1,6 +1,3 @@
-// The desktop app: starts the server (server.ts) and shows the page it serves. The page reaches the machine only
-// through the host interface the preload gives it (@vibevalley/protocol/host); nothing of Electron or Node reaches it otherwise.
-
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -16,13 +13,11 @@ import { devMode } from "./dev";
 import { serveHost } from "./host";
 import { startIsland } from "./island";
 import { reasonOf } from "./lines";
-import { followSavedLocale } from "./locale";
 import { claimMachine, releaseMachine } from "./machine";
-import { setAppMenu } from "./menu";
-import { appPaths, currentChannel, farmHome } from "./paths";
+import { menuBar, setAppMenu } from "./menu";
+import { appPaths, currentChannel, farmHome, followSavedLocale } from "./paths";
 import { probe } from "./probe";
 import { shellPath, type ServerKeeper, serverKeeper } from "./server";
-import { menuBar } from "./tray";
 import { type Updater, updater } from "./update";
 import { mainWindow } from "./window";
 
@@ -56,7 +51,6 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   // The server needs nothing of Electron's: started here, it comes up while Electron gets ready and opens the window.
-  // How the start went is kept as a value, said in the window once there is one.
   const starting = shellPath(paths.shellPath, process.env).then(async ({ path }) => {
     const keeper = serverKeeper(paths, serverEnvOf(currentChannel(), path ? { ...process.env, PATH: path } : process.env));
     server = keeper;
@@ -123,7 +117,7 @@ if (!app.requestSingleInstanceLock()) {
     window.opening();
     const started = await starting;
     if ("failed" in started) {
-      // Said in the window in place of the bar; closing it quits. Closed already, the box says it.
+      // Said in the window in place of the bar. closing it quits.
       const open = window.current();
       if (!open) {
         dialog.showErrorBox(t("desktop.cannotStart"), reasonOf(started.failed));
@@ -149,8 +143,7 @@ if (!app.requestSingleInstanceLock()) {
     app.on("will-quit", island.stop);
     if (!app.isPackaged && process.env.VIBEVALLEY_DEV === "1")
       app.on("will-quit", devMode({ web: paths.web, repo: join(app.getAppPath(), "..", ".."), server: keeper, window }));
-    // Only a packaged app of a released stage updates itself: run from the repository the executable is Electron's own,
-    // and a package made between tags (dev) has no releases.
+    // Only a packaged app of a released stage updates itself.
     const stage = currentChannel();
     if (app.isPackaged && stage !== "dev") {
       updates = updater({

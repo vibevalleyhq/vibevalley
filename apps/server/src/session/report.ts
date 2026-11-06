@@ -1,5 +1,3 @@
-// Lengths are UTF-16 units.
-
 import type { FailedTurn, FailureClass, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
 
@@ -35,11 +33,14 @@ export function failureText(f: FailedTurn): string {
 function conclusion(text: string, min: number): string {
   const blocks = text.trim().split(/\n{2,}/u);
   let tail = "";
-  for (let i = blocks.length - 1; i >= 0 && tail.length < min; i--) tail = tail ? blocks[i] + "\n\n" + tail : blocks[i]!;
+  for (let i = blocks.length - 1; i >= 0 && tail.length < min; i--) {
+    const block = blocks[i] ?? "";
+    tail = tail ? block + "\n\n" + tail : block;
+  }
   return tail;
 }
 
-/** What an undeclared report says in short. Questions may also come from its 要问主人 lines. */
+/** What an undeclared report says in short. Questions may also come from its question lines. */
 export const summaryOf = (text: string) => conclusion(text, 80);
 
 /** A pull request's description: the verdict, else the whole reply. */

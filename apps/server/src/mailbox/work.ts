@@ -6,7 +6,7 @@ import { assignedAgentOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
-import { type ApiError, missing, lookIn, refused } from "#/errors.ts";
+import { type ApiError, Inconsistent, missing, lookIn, refused } from "#/base/errors.ts";
 import { Db, causeMessage } from "#/infra/db.ts";
 import { channelType, senderKind, type ChannelRouteResult } from "#/mailbox/envelope.ts";
 import { NotRecorded, Session } from "#/session/session.ts";
@@ -221,7 +221,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
     }, writtenLocked);
 
     const hand = Effect.fn("Mailbox.hand")(function* (session: string, envelope: string, launch: string, at: number) {
-      yield* db.attempt(qd.markHanded({ session_id: session, envelope_id: envelope, launch, handed_at: at }));
+      yield* db.run(qd.markHanded({ session_id: session, envelope_id: envelope, launch, handed_at: at }));
       open.handed(session, envelope, launch);
     }, writtenLocked);
 
@@ -229,7 +229,7 @@ export const makeWorkMailbox = (options: WorkOptions) =>
       const prepared = yield* Effect.forEach(rows, (talk) =>
         Effect.gen(function* () {
           const recorded = yield* db.one(qr.triggerById({ id: talk.row.envelope_id }));
-          if (!recorded) return yield* Effect.die(new Error("Private message trigger is missing"));
+          if (!recorded) return yield* Effect.die(new Inconsistent({ message: `talk ${talk.row.envelope_id} has no recorded trigger` }));
           const trigger = yield* Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(recorded.trigger_json).pipe(
             Effect.mapError((cause) => new NotRecorded({ message: causeMessage(cause), cause })),
           );

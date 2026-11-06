@@ -1,7 +1,3 @@
-// A blocks artifact's blocks, changed only by batches of ops (ops.ts), from the owner over HTTP and from helpers through
-// their tools, all down the same pipeline. One batch at a time for every artifact: an artifact's batches are serial and
-// its seq goes up in order. Part of the Artifact service (artifact.ts), which owns the artifact's row.
-
 import { Clock, Duration, Effect, Option, PubSub, Schedule, Schema, Semaphore, Stream } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
@@ -10,11 +6,11 @@ import type * as T from "@vibevalley/protocol";
 import { keyBetween, isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
+import { type ApiError, lookIn, refused, messageOf } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { jsonOf } from "#/base/json.ts";
 import { scopedPubSub } from "#/base/pubsub.ts";
 import { bounded } from "#/core/core.ts";
-import { type ApiError, lookIn, refused, messageOf } from "#/errors.ts";
 import { Db } from "#/infra/db.ts";
 import * as qa from "#db/artifact.sql.ts";
 import * as qb from "#db/artifact_block.sql.ts";
@@ -42,7 +38,7 @@ interface BlockStore {
   /** Markdown read into blocks, inserted as one batch by actor at the end of what is there. */
   readonly fill: (id: T.ArtifactId, markdown: string, actor: string) => Effect.Effect<void, ApiError>;
   readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;
-  /** A batch of ops from actor (the owner, or a helper's profile id), in order, in one transaction. A batch id seen before is answered as it was, with its blocks as they are now. */
+  /** A batch of ops from actor (the owner, or a helper's profile id), in order, in one transaction. */
   readonly submit: (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Effect.Effect<T.BlockAck, ApiError>;
   /** A new block at the end of the top level, as actor; text is inline Markdown (code takes it as it is). */
   readonly append: (
@@ -511,7 +507,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       yield* db.run(qs.resolveArtifactSuggestion({ id: suggestion, status: "accepted", resolved_at: yield* Clock.currentTimeMillis, resolved_by: actor }));
       const updated = yield* db.one(qs.artifactSuggestionByID({ id: suggestion }));
       yield* publishSuggestions(artifact);
-      return suggestionOf(updated!);
+      return suggestionOf(updated ?? row);
     }, lock.withPermits(1));
 
     const rejectSuggestion = Effect.fn("Artifact.rejectSuggestion")(function* (artifact: T.ArtifactId, suggestion: string, actor: string) {
@@ -521,7 +517,7 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
       yield* db.run(qs.resolveArtifactSuggestion({ id: suggestion, status: "rejected", resolved_at: yield* Clock.currentTimeMillis, resolved_by: actor }));
       const updated = yield* db.one(qs.artifactSuggestionByID({ id: suggestion }));
       yield* publishSuggestions(artifact);
-      return suggestionOf(updated!);
+      return suggestionOf(updated ?? row);
     }, lock.withPermits(1));
 
     const suggestionStream = (id: T.ArtifactId): Stream.Stream<T.SuggestionEvent, ApiError> =>
@@ -631,11 +627,11 @@ export const makeBlockStore = (found: (id: T.ArtifactId) => Effect.Effect<qa.Art
           { discard: true },
         );
         yield* Effect.forEach(writers, ({ writer, section }) => Effect.andThen(wait(section / 3), demoWrite(artifact, writer, headings, section)), {
-          concurrency: "unbounded",
+          concurrency: 4,
           discard: true,
         });
       },
-      (e) => e.pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => (demoOn = false)))),
+      (e) => e.pipe(Effect.ignore({ log: "Warn" }), Effect.ensuring(Effect.sync(() => (demoOn = false)))),
     );
 
     const demo = Effect.fn("Artifact.demo")(function* (id: T.ArtifactId, helpers: readonly T.Agent[]) {

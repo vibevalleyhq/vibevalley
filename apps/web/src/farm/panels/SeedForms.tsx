@@ -1,7 +1,3 @@
-// Sowing an empty bed and watering a helper's: the sowing form sows in the farm's current project (the sign by the
-// mast), offers its seeds (its templates and recent words) and who sows; the watering form takes a
-// few words to the helper.
-
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 

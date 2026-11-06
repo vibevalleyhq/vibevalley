@@ -1,6 +1,3 @@
-// What the page's retries rely on at the HTTP handlers: a request key does its work once, a reply's seq is shown by the
-// frame at that seq, and a set sent twice is one change.
-
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer, Queue, Stream } from "effect";
 
@@ -10,7 +7,7 @@ import { Agent } from "#/agent/agent.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Connector } from "#/connector/connector.ts";
 import { Core } from "#/core/core.ts";
-import { handlers } from "#/handlers.ts";
+import { handlers } from "#/http/handlers.ts";
 import { Lan } from "#/lan/lan.ts";
 import { Orchestrator } from "#/orchestrator/orchestrator.ts";
 import { Voice } from "#/voice/voice.ts";

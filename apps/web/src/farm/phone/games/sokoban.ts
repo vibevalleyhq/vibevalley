@@ -1,5 +1,3 @@
-// 推箱子: push the crates of harvest onto the marks; every step can be taken back.
-
 import { t } from "@vibevalley/i18n";
 
 export interface Warehouse {

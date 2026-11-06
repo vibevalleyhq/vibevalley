@@ -1,5 +1,3 @@
-// Where it stands and what may be done is the server's Issue.stage, worded by src/features/issue/overview.ts.
-
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, Errored, For, Loading, Show, untrack } from "solid-js";
 
@@ -619,8 +617,7 @@ function Fold(props: { label: string; children: JSX.Element }) {
         <SpriteIcon name="button-next" size={12} class={open() ? "rotate-90" : ""} />
         <span class="text-[13px] text-bark-800 group-hover:text-bark-900">{props.label}</span>
       </button>
-      {/* Mounted with the dialog and only hidden while folded: content first mounted by the click reads queries in
-          flight, and Solid holds that click's whole update until they land, so the fold would not open. */}
+      {/* Mounted with the dialog and only hidden while folded. */}
       <div class="pb-3" hidden={!open()}>
         <Errored fallback={<p class="text-[12px] text-bark-500">{t("web.farm.unread")}</p>}>
           <Loading fallback={<p class="text-[12px] text-bark-500">{t("web.farm.reading")}</p>}>{props.children}</Loading>

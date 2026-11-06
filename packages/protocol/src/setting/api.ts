@@ -1,6 +1,3 @@
-// The endpoints of settings: their answers (SettingHandlers) and their lines in the table (api.ts puts the
-// concepts together).
-
 import { type Effect } from "effect";
 
 import { type ApiError, type Endpoint } from "../endpoint";

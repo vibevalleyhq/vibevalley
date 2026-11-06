@@ -1,8 +1,3 @@
-// Artifact (docs/subsystems/artifact.md): what the owner and the agents leave for people to read. A blocks one is written
-// together, block by block (blocks.ts); an html one is handed in whole, each version kept once by its sha256 under the
-// home directory's artifacts/. A hand-in is announced where it belongs by its maker, with its card; its comments are the
-// replies to that message, nothing of their own.
-
 import { createHash } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -15,9 +10,9 @@ import { ownerId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { head } from "#/base/clip.ts";
+import { type ApiError, lookIn, missing, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
-import { type ApiError, lookIn, missing, refused } from "#/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { writeOnce } from "#/infra/files.ts";
@@ -29,8 +24,7 @@ import { htmlCheck, htmlProblem } from "./check.ts";
 import { htmlEdit } from "./edit.ts";
 import { artifactProblem } from "./policy.ts";
 
-/** Who makes it. from: who says so in the channel (the owner, a session, an orchestrator); by: who it is kept as made by
- * (the owner, or the profile the session works as), and who writes its blocks. */
+/** Who makes it. from: who says so in the channel (the owner, a session, an orchestrator). */
 interface Maker {
   readonly from: string;
   readonly by: string;
@@ -45,8 +39,7 @@ export class Artifact extends Context.Service<
     readonly content: (id: T.ArtifactId, version?: number) => Effect.Effect<T.ArtifactContent & { readonly body: T.ArtifactBody }, ApiError>;
     /** An html version's file on disk, for the route that serves it; undefined when there is none. */
     readonly file: (id: T.ArtifactId, version: number) => Effect.Effect<string | undefined>;
-    /** Without content, an empty blocks one, not announced. With content, a hand-in: html kept whole, Markdown read into
-     * blocks, announced with its card. issue is the caller's to give (a helper's own issue), never looked up here. */
+    /** Without content, an empty blocks one, not announced. With content, a hand-in: html kept whole, Markdown read into blocks, announced with its card. */
     readonly create: (maker: Maker, req: T.ArtifactRequest) => Effect.Effect<T.Artifact, ApiError>;
     /** An html one's next version; a blocks one is refused, it is changed block by block. */
     readonly version: (maker: Maker, req: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError>;
@@ -54,7 +47,7 @@ export class Artifact extends Context.Service<
     readonly htmlEdit: (maker: Maker, req: T.ArtifactHtmlEdit) => Effect.Effect<T.Artifact, ApiError>;
     readonly rename: (id: T.ArtifactId, title: string) => Effect.Effect<T.Artifact, ApiError>;
     readonly previewRemove: (id: T.ArtifactId) => Effect.Effect<T.Preview, ApiError>;
-    /** It and its versions or blocks go; a content file goes when no other version keeps it. Its cards stay in the channel. */
+    /** It and its versions or blocks go. a content file goes when no other version keeps it. */
     readonly remove: (id: T.ArtifactId) => Effect.Effect<void, ApiError>;
     readonly blocks: (id: T.ArtifactId) => Effect.Effect<T.BlockSnapshot, ApiError>;
     readonly markdown: (id: T.ArtifactId) => Effect.Effect<string, ApiError>;

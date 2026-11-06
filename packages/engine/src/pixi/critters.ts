@@ -1,9 +1,3 @@
-// Little animals that keep a scene alive, as behaviours: flutterers (butterflies) wander about a home and rest now
-// and then; a flock (birds) crosses the scene in a loose V, each with its shadow on the ground below; blinkers
-// (fireflies) drift about a home and blink, each a small light. Their pictures are two frames that flap (glyph
-// rows, or pictures tinted by the critter's colour: draw them white to take it); what they look like and where they
-// live is the game's. Positions are whole pixels.
-
 import { Container, Sprite, Texture } from "pixi.js";
 
 import type { Point } from "../nav";
@@ -150,7 +144,7 @@ interface BlinkerOptions {
 }
 
 interface Blinkers {
-  /** Moves them on; `shown` (0..1) fades them in. Their lights, for the light. */
+  /** Moves them on. `shown` (0..1) fades them in. */
   readonly update: (t: number, shown: number) => PointLight[];
 }
 

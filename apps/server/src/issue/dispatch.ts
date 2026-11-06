@@ -1,5 +1,3 @@
-// Sending an issue to work: hiring its session, the orchestrator's turn on it, the queue, a reopen and a cron's run.
-
 import { Clock, Effect, Option, Semaphore } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
@@ -7,11 +5,11 @@ import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, closedText, cut, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
+import { type ApiError, Inconsistent, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import type { Due } from "#/cron/cron.ts";
-import { type ApiError, Inconsistent, missing, lookIn, reasonOf, refused } from "#/errors.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
@@ -77,24 +75,32 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
       const room = yield* sessions.makeRoom(agent.runtime, where);
       if ("refused" in room) return { refused: room.refused };
       const evicted = room.evicted ?? "";
-      const prepared = yield* Effect.result(
-        opt.issue
+      let refusal = "";
+      const recorded = yield* Effect.option(
+        (opt.issue
           ? get(opt.issue)
           : attemptAdd({ title: brief, project: where, agent: agent.id }, explicitMandate()).pipe(
               // The database failing (a full disk) is told as a refusal; a request it cannot encode is a bug.
               Effect.catchTags({ SqlError: (e) => Effect.fail(refused(causeMessage(e))), SchemaError: Effect.die }),
-            ),
+            )
+        ).pipe(
+          Effect.mapError((e) => t("server.issue.notRecorded", { name: agent.name, why: reasonOf(e) })),
+          Effect.tapError((why) => Effect.sync(() => (refusal = why))),
+        ),
       );
-      if (prepared._tag === "Failure") return { refused: t("server.issue.notRecorded", { name: agent.name, why: reasonOf(prepared.failure) }) };
-      const issue = prepared.success;
+      if (Option.isNone(recorded)) return { refused: refusal };
+      const issue = recorded.value;
       const all = yield* everyIssue;
       const blocked = blockedIssues(issue, all);
       if (blocked.length > 0) return { refused: t("server.issue.dependencies.waiting", { issues: list(blocked) }) };
       const parent = issue.parent ? yield* Effect.option(get(issue.parent)) : Option.none();
       const base = opt.base ?? (Option.isSome(parent) ? issueBranch(parent.value.number) : undefined);
       if (Option.isSome(parent)) {
-        const place = yield* Effect.result(projects.workplace(where, parent.value.number, true, ""));
-        if (place._tag === "Failure") return { refused: place.failure.message };
+        const placeError = yield* projects.workplace(where, parent.value.number, true, "").pipe(
+          Effect.as(""),
+          Effect.catch((e) => Effect.succeed(e.message)),
+        );
+        if (placeError) return { refused: placeError };
       }
       // A draft's session is not one of the issue's sessions: the issue stays unsent.
       const constraints = workConstraints(
@@ -260,39 +266,37 @@ export const issueDispatch = (r: IssueRecords, joinChildren: IssueSplitting["joi
     /** In the board's order: one that cannot go any more leaves the queue. */
     const refreshQueue = Effect.fn("Issue.refreshQueue")(function* () {
       const inputs = yield* mailbox.queuedInputs;
-      yield* joinChildren.pipe(bestEffort("vibevalley: child issues could not be merged"));
+      yield* joinChildren().pipe(bestEffort("vibevalley: child issues could not be merged"));
       const all = yield* everyIssue;
       for (const issue of all) {
         if (issue.status !== "todo" || isForOrchestrator(issue, store.isOrchestrator)) continue;
         if (blockedIssues(issue, all).length > 0) continue;
         const title = cut(issue.title, 40);
-        const sent = yield* Effect.result(
-          Effect.gen(function* () {
-            const [, agent, project] = yield* ready(issue.id);
-            if (sessions.noRoom(agent.runtime, project)) return "";
-            const issueInputs = inputs.filter((item) => item.issue === issue.id).map((item) => item.trigger);
-            const input = issueInputs[0];
-            if (!input) return "";
-            const by: T.RunTrigger = {
-              ...(input.meta.trigger ?? { kind: "issue" }),
-              message: input.id,
-            };
-            return yield* send(issue, agent, project, input.replyChannel ?? chat.defaultChannel(), by, issueInputs).pipe(
-              Effect.catch((error) => Effect.as(core.notice("warn", t("server.issue.queuedStuck", { title, why: reasonOf(error) })), "")),
+        yield* Effect.gen(function* () {
+          const [, agent, project] = yield* ready(issue.id);
+          if (sessions.noRoom(agent.runtime, project)) return "";
+          const issueInputs = inputs.filter((item) => item.issue === issue.id).map((item) => item.trigger);
+          const input = issueInputs[0];
+          if (!input) return "";
+          const by: T.RunTrigger = {
+            ...(input.meta.trigger ?? { kind: "issue" }),
+            message: input.id,
+          };
+          return yield* send(issue, agent, project, input.replyChannel ?? chat.defaultChannel(), by, issueInputs).pipe(
+            Effect.catch((error) => Effect.as(core.notice("warn", t("server.issue.queuedStuck", { title, why: reasonOf(error) })), "")),
+          );
+        }).pipe(
+          Effect.tap((session) => (session !== "" ? core.notice("info", t("server.issue.queuedStarted", { title, session })) : Effect.void)),
+          Effect.catch((failure) => {
+            const why = reasonOf(failure);
+            return queueRow(issue.id, false, chat.defaultChannel()).pipe(
+              Effect.matchEffect({
+                onFailure: () => core.notice("warn", t("server.issue.queuedStuck", { title, why })),
+                onSuccess: () => core.notice("warn", t("server.issue.queuedBack", { title, why })),
+              }),
             );
           }),
         );
-        if (sent._tag === "Success") {
-          if (sent.success !== "") yield* core.notice("info", t("server.issue.queuedStarted", { title, session: sent.success }));
-          continue;
-        }
-        const why = reasonOf(sent.failure);
-        const left = yield* Effect.result(queueRow(issue.id, false, chat.defaultChannel()));
-        if (left._tag === "Failure") {
-          yield* core.notice("warn", t("server.issue.queuedStuck", { title, why }));
-          continue;
-        }
-        yield* core.notice("warn", t("server.issue.queuedBack", { title, why }));
       }
     }, trying.withPermits(1));
 

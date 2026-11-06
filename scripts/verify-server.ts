@@ -13,8 +13,7 @@ export interface VerificationResult {
   address: string;
 }
 
-/** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json): what a test farm
- * starts with, as a farm whose agent.starters names them. */
+/** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json). */
 const errorCode = (error: unknown): unknown => (typeof error === "object" && error !== null && "code" in error ? error.code : undefined);
 
 const starters = () =>
@@ -60,8 +59,7 @@ export function readyAddress(line: string, pid: number): string | undefined {
 
 // The validation command owns assertions and fixtures; this owner isolates and releases its server and child process groups.
 export interface VerificationOptions {
-  /** pi is the scripted helper the server's tests hire (apps/server/src/testing/worker.ts), doing what the words of its
-   * job say, and no other runtime is installed: issues can be sent and handed back without a key or a real agent. */
+  /** pi is the scripted helper the server's tests hire, doing what the words of its job say, and no other runtime is installed: issues can be sent and handed back without a key or a real agent. */
   readonly scriptedHelper?: boolean;
 }
 
@@ -144,8 +142,7 @@ export async function runVerification(command: string[] = [], options: Verificat
   };
   try {
     if (interrupted) throw new Error("verification interrupted before startup");
-    // vpx execs node in its own process, so the receipt's pid is the child's; it logs to stdout.
-    // The built page, when there is one, so vv-acceptance can screenshot it on the same server.
+    // vpx execs node in its own process, so the receipt's pid is the child's. it logs to stdout.
     const web = join(root, "apps", "web", "dist");
     const serverErr = openSync(join(evidence, "server.stderr.log"), "w");
     const spawned = spawn(
@@ -211,7 +208,7 @@ export async function runVerification(command: string[] = [], options: Verificat
       /* oxlint-enable eslint/no-await-in-loop */
     }
     if (!address || !existsSync(join(evidence, "health.json"))) throw new Error(`server did not become healthy; see ${log}`);
-    const run = command.length > 0 ? command : [cli, "api", "call", "server.health.get"];
+    const run = command.length > 0 ? command : [cli, "issue", "list"];
     const task = launch(run, root, "command", { ...env, VIBEVALLEY_SERVER: address, VIBEVALLEY_VERIFY_CLI: cli });
     code = await task.exited;
     if (interrupted) code = 130;
@@ -234,11 +231,7 @@ export async function runVerification(command: string[] = [], options: Verificat
     process.off("SIGTERM", interrupt);
     writeFileSync(
       join(evidence, "result.json"),
-      JSON.stringify(
-        { code, address, stopped: failures.length === 0, command: command[0] ?? "api call server.health.get", cleanupErrors: failures.map(String) },
-        null,
-        2,
-      ),
+      JSON.stringify({ code, address, stopped: failures.length === 0, command: command[0] ?? "issue list", cleanupErrors: failures.map(String) }, null, 2),
     );
     if (failures.length === 0) for (const path of [home, work, binaries]) rmSync(path, { recursive: true, force: true });
     console.log(`verification evidence: ${evidence}`);

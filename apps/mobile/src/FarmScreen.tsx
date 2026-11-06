@@ -1,6 +1,3 @@
-// The farm: the page the paired computer serves, in a WebView, with this phone as its host (@vibevalley/protocol/host's
-// mobileBridge): the page posts what it asks as text, and the shell answers and pushes by calling fromNativeKey in it.
-
 import { type ComponentType, type Ref, useEffect, useRef } from "react";
 import { StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,8 +8,7 @@ import { fromNativeKey } from "@vibevalley/protocol/host";
 
 import type { Farm } from "./farm";
 import { nativeHost } from "./host";
-import { isPairPage, keyScript } from "./pairing";
-import { colors } from "./style";
+import { colors, isPairPage, keyScript } from "./pairing";
 
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the package types its props as WebViewProps & P with P = undefined, which is never: the props it takes, as they are
 const Web = WebView as unknown as ComponentType<WebViewProps & { ref?: Ref<WebView<object>> }>;

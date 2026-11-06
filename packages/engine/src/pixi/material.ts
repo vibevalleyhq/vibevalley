@@ -1,7 +1,3 @@
-// What a painted pixel looks like it is made of, from its colour alone: water, leaves (grass, bushes, trees), soil,
-// stone, or something else (roofs, wood, cloth). Rough on purpose: it picks how a click answers (a splash, leaves,
-// dust), not anything that matters. Pure.
-
 export type Material = "water" | "leaves" | "soil" | "stone" | "other";
 
 export function materialOf(r: number, g: number, b: number): Material {

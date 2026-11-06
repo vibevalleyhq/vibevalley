@@ -1,7 +1,3 @@
-// DeepSeek caches by prefix: a request is cheap up to the first character that differs from the request before. The
-// prompt's start (tools, then the system prompt) is hashed part by part on every request, so a change between two
-// compactions, which costs the whole conversation at full price, is told and can be traced to its part.
-
 import { createHash } from "node:crypto";
 
 import type { ToolDeclaration } from "@vibevalley/ai/messages";

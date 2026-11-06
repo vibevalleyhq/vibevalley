@@ -1,6 +1,3 @@
-// A farm's home on disk as every program on this machine finds it (README.md): which folder, where its server listens
-// (server.json), its language (settings.json) and the desktop app's socket.
-
 import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -54,8 +51,7 @@ export function announced(home: string): string | undefined {
 
 const settings = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ locale: Schema.optionalKey(Schema.String) })));
 
-/** The language saved in the home's settings.json (the server's, apps/server/src/setting), for a program that speaks
- * before it reaches the server: the command line, the desktop app's menus. */
+/** The language saved in the home's settings.json (the server's, apps/server/src/setting), for a program that speaks before it reaches the server. */
 export function savedLocale(home: string): Locale {
   const saved = Option.flatMap(Option.fromNullishOr(read(join(home, "settings.json"))), settings);
   return Option.isSome(saved) && saved.value.locale === "en" ? "en" : "zh";

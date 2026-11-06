@@ -1,5 +1,3 @@
-// For the stories only; the product never imports it.
-
 import type { SessionEvent, SessionEventType, ToolAction } from "@vibevalley/protocol";
 
 const start = Date.now() - 9 * 60_000;

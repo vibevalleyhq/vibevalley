@@ -1,5 +1,3 @@
-// The memory tree's memories are made up (src/tree/mock.ts) until the server sums them up.
-
 import { expect, test } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {

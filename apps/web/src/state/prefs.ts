@@ -1,8 +1,3 @@
-// This machine's choices, not the farm's: who the next job goes to and where the last one went, the pet by the
-// orchestrator's door (its look is its profile's), and how the workbench looks and where the page opens. A phone and a
-// desktop may want them apart, so they are kept on the machine (stored.ts), not in settings.json. One key, which
-// public/opening.html also reads for the theme and the start before any script runs.
-
 import { Schema } from "effect";
 import type { Accessor } from "solid-js";
 
@@ -70,9 +65,7 @@ export const usePrefs =
 
 const dark = () => window.matchMedia("(prefers-color-scheme: dark)");
 
-// The theme goes on <html> as data-theme ("system" worked out from the system's own) and is told to the host so its own
-// parts follow; the interface size is --workbench-zoom, which only the workbench's shell reads (the farm keeps its
-// whole-number scaling).
+// The theme goes on <html> as data-theme ("system" worked out from the system's own) and is told to the host so its own parts follow.
 function apply() {
   const { theme, scale } = prefsNow();
   const root = document.documentElement;

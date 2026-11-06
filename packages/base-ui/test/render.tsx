@@ -1,5 +1,3 @@
-// Renders a component into the page for one test, and settles Solid's queued updates after each step.
-
 import { render } from "@solidjs/web";
 import type { JSX } from "@solidjs/web";
 import { flush } from "solid-js";

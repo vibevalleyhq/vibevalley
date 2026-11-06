@@ -1,6 +1,3 @@
-// What a message's words become (ui/richText.ts): code with its language, colours, a copy button and a fold; Mermaid
-// drawn by Pele with nothing in it that runs; only safe links; #12 to its issue; task lists; long messages folded.
-
 import { messageId } from "@vibevalley/protocol/schema";
 
 import { expect, test } from "./fixtures";

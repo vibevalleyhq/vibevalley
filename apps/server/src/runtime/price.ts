@@ -1,7 +1,3 @@
-// What a run costs and what each runtime spent today: a model's price per million tokens, in dollars, charged in the
-// farm's yuan, and the running total for the day kept in the database. VibeValley's own agent and DeepSeek Harness are
-// priced by the farm's models (ai/models.ts); pi by pi-ai's built-in list, which is pi's own. No other runtime is priced.
-
 import { getBuiltinModel, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
 import { Clock, Effect, Fiber, Queue, Semaphore } from "effect";
 
@@ -61,7 +57,7 @@ const builtinCost = getBuiltinModel as unknown as (provider: string, model: stri
 function piPrice(model: string): Price | undefined {
   const slash = model.indexOf("/");
   if (slash >= 0) return priceOf(builtinCost(model.slice(0, slash), model.slice(slash + 1))?.cost);
-  for (const provider of [...getBuiltinProviders()].map((p) => (typeof p === "string" ? p : (p as { id: string }).id)).toSorted()) {
+  for (const provider of [...getBuiltinProviders()].filter(Boolean).toSorted()) {
     const found = builtinCost(provider, model);
     if (found !== undefined) return priceOf(found.cost);
   }
@@ -81,8 +77,7 @@ export function price(runtime: string, model: string, pi: PiDefault): Price | un
       return piPrice(model);
     }
     case "dsh": {
-      // dsh names a model provider/model; only DeepSeek's own is priced here. The retired name it still lists,
-      // deepseek-v4-flash, is folded into deepseek-flash by the dsh adapter before a session names it.
+      // dsh names a model provider/model. only DeepSeek's own is priced here.
       const slash = model.indexOf("/");
       if (slash >= 0 && model.slice(0, slash) === "deepseek-official") return priceOf(getModel("deepseek", model.slice(slash + 1))?.cost);
       return undefined;

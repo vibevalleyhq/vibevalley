@@ -1,6 +1,3 @@
-// The atlas's pictures as Pixi textures, sized in art pixels: loaded at the atlas's density, so a texture's width is
-// its art width and the scene drawn at that density keeps every picture pixel.
-
 import { Assets, Texture, TextureStyle } from "pixi.js";
 
 import type { SpriteAtlas } from "#/ui/pixel/atlas.ts";

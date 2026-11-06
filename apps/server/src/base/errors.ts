@@ -1,0 +1,76 @@
+import { Effect, Predicate, Schema } from "effect";
+
+import { t } from "@vibevalley/i18n";
+import type { ApiError, Next } from "@vibevalley/protocol/api";
+
+export type { ApiError, Next };
+
+export const refused = (reason: string, next?: readonly Next[]): ApiError => ({ _tag: "Refused", reason, ...(next && next.length > 0 ? { next } : {}) });
+
+/** What a hint to list the ones that are names (server.lookIn in the catalog). */
+type LookIn =
+  | "issue"
+  | "session"
+  | "project"
+  | "runtime"
+  | "agent"
+  | "skill"
+  | "template"
+  | "cron"
+  | "device"
+  | "archive"
+  | "channel"
+  | "graph"
+  | "memories"
+  | "artifact"
+  | "pkm";
+
+/** Something asked for by id or name is not there. next is required: where to look for the ones that are (lookIn). */
+export const missing = (what: string, next: readonly Next[]): ApiError => ({ _tag: "Missing", what, ...(next.length > 0 ? { next } : {}) });
+
+/** Where to find the ones that are there, as the command that lists them. */
+// say is read when the error is made, in the locale of the moment.
+const listed = (key: LookIn, run?: readonly string[]): Next => ({
+  get say() {
+    return t(`server.lookIn.${key}`);
+  },
+  ...(run ? { run: [...run] } : {}),
+});
+
+export const lookIn = {
+  issue: listed("issue", ["issue", "list"]),
+  session: listed("session", ["session", "list"]),
+  project: listed("project", ["project", "list"]),
+  runtime: listed("runtime", ["runtime", "list"]),
+  agent: listed("agent", ["agent", "list"]),
+  skill: listed("skill"),
+  template: listed("template"),
+  cron: listed("cron", ["cron", "list"]),
+  device: listed("device"),
+  archive: listed("archive"),
+  channel: listed("channel", ["channel", "list"]),
+  artifact: listed("artifact", ["artifact", "list"]),
+  pkm: listed("pkm", ["pkm", "page", "list"]),
+} satisfies Record<string, Next>;
+
+/** Where an agent's memories are listed. */
+export const memoriesOf = (agent: string): Next => ({ say: t("server.lookIn.memories"), run: ["memory", "list", agent] });
+
+/** An error's words, whatever its tag. */
+export const reasonOf = (e: ApiError): string =>
+  "reason" in e && typeof e.reason === "string" ? e.reason : "what" in e && typeof e.what === "string" ? e.what : e._tag;
+
+/** What a thrown or rejected value says: an Error's message, anything else as text. */
+export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** A failed system call's code (ENOENT, EPERM…), or undefined for anything else. */
+export const errnoOf = (e: unknown): string | undefined => (e instanceof Error && "code" in e && typeof e.code === "string" ? e.code : undefined);
+
+/** A defect, never an expected failure: the farm's own records disagree with each other, or a caller broke a rule it is held to. */
+export class Inconsistent extends Schema.TaggedError<Inconsistent, { readonly brand: unique symbol }>()("Inconsistent", { message: Schema.String }) {}
+
+/** A lookup's answer, or Missing (what was not found, and where to look) when it found none. */
+export const orMissing =
+  (what: string, look: readonly Next[]) =>
+  <A, E, R>(found: Effect.Effect<A | undefined, E, R>): Effect.Effect<A, E | ApiError, R> =>
+    Effect.filterOrFail(found, Predicate.isNotUndefined, () => missing(what, look));

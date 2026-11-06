@@ -1,10 +1,3 @@
-/**
- * The share card (og:image) for a language: the farm at dusk, cropped to 1200×630, with the hero's words on a shade
- * at the left, as the page's first screen has them. The words are the pixel font's glyphs turned into SVG paths
- * (opentype.js), so drawing them needs no font installed: sharp's own text goes through fontconfig, which does not
- * pick up a font file it is handed.
- */
-
 import opentype from 'opentype.js'
 import sharp from 'sharp'
 import type { Copy } from '../src/i18n/zh'

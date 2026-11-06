@@ -1,6 +1,3 @@
-// Accordion (Base UI's): a stack of sections, each a header with a trigger and a panel it opens. One open at a time
-// unless `multiple`; the arrow keys, Home and End move among the triggers. The value is the list of open items.
-
 import type { JSX } from "@solidjs/web";
 import { createContext, createUniqueId, omit, Show, useContext } from "solid-js";
 

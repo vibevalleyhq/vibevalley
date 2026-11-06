@@ -1,7 +1,3 @@
-// The farm's HUD and panels (src/farm/hud, src/farm/panels) against a real server: the tools by key, each panel opened
-// from the HUD and closed with Esc, and sowing an empty plot. Nothing here sends a real coding agent out: profiles run
-// "nobody", and the server has no model key.
-
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";

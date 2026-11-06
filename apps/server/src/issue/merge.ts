@@ -5,9 +5,9 @@ import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
+import { type ApiError, missing, lookIn, reasonOf, refused } from "#/base/errors.ts";
 import type { Channel } from "#/channel/channel.ts";
 import type { Core } from "#/core/core.ts";
-import { type ApiError, missing, lookIn, reasonOf, refused } from "#/errors.ts";
 import type { Db } from "#/infra/db.ts";
 import { issueBranch, type Project } from "#/project/project.ts";
 import { type Merged, MergeFailure, type ProjectError, type Workplace } from "#/project/workplace.ts";
@@ -118,7 +118,7 @@ export function merging(d: MergeDeps) {
       yield* sessions
         .handOver(id, closed, (place) => projects.finishPullRequest(place.project, issue.number))
         .pipe(Effect.catchTag("NotTakenIn", (e) => Effect.fail(refused(e.failure.reasonText))));
-    else yield* projects.finishPullRequest(issue.project!, issue.number).pipe(Effect.mapError((e) => refused(e.message)));
+    else if (issue.project) yield* projects.finishPullRequest(issue.project, issue.number).pipe(Effect.mapError((e) => refused(e.message)));
     yield* db.inTx(
       Effect.andThen(
         db.run(
@@ -132,19 +132,15 @@ export function merging(d: MergeDeps) {
     yield* publish(issue.id);
   });
 
-  const refreshPullRequests = prLock.withPermits(1)(
-    Effect.gen(function* () {
-      for (const issue of yield* list) {
-        if (issue.pullRequest?.state !== "open" || !issue.project) continue;
-        const state = yield* Effect.result(projects.pullRequestState(issue.project, issue.pullRequest.number));
-        const done = state._tag === "Failure" ? state : state.success === "open" ? undefined : yield* Effect.result(finishPullRequest(issue, state.success));
-        if (done?._tag === "Failure")
-          yield* Effect.logWarning(
-            `vibevalley: refresh pull requests: issue #${issue.number}: ${done.failure instanceof Error ? done.failure.message : reasonOf(done.failure)}`,
-          );
-      }
-    }),
-  );
+  const refreshPullRequests = Effect.fn("Issue.refreshPullRequests")(function* () {
+    for (const issue of yield* list) {
+      if (issue.pullRequest?.state !== "open" || !issue.project) continue;
+      yield* projects.pullRequestState(issue.project, issue.pullRequest.number).pipe(
+        Effect.flatMap((state) => (state === "open" ? Effect.void : finishPullRequest(issue, state))),
+        Effect.catch((e) => Effect.logWarning(`vibevalley: refresh pull requests: issue #${issue.number}: ${e instanceof Error ? e.message : reasonOf(e)}`)),
+      );
+    }
+  }, prLock.withPermits(1));
 
   const submit = Effect.fn("Issue.submitWorkingPullRequest")(function* (id: string, session: string, summary?: string) {
     const submitted = yield* sessions

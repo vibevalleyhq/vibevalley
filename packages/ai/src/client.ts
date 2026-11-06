@@ -1,5 +1,3 @@
-// A model to talk to: the model, the service that carries the request, and the key, asked for at each request.
-
 import { type Effect, Schema } from "effect";
 
 import type { Llm } from "./llm.ts";

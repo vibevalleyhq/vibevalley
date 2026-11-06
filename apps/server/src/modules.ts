@@ -1,9 +1,3 @@
-// The server's thirteen modules, lowest first: a module uses the ones before it and never one after
-// (docs/subsystems/foundation.md). Each entry is the folders and root files under src/ it
-// is made of; modules.test.ts reads every import against this table, and services.ts assembles the modules in this order.
-// Platform's ground is two folders: base (pure: ids, JSON, ordering, redaction) imports nothing else under src, and
-// infra (the config, the database, files, the home's lease, logs, time) talks to the process and the machine.
-
 export interface Module {
   readonly name: string;
   /** Folders and files directly under src/. */
@@ -11,7 +5,7 @@ export interface Module {
 }
 
 export const modules: readonly Module[] = [
-  { name: "Platform", parts: ["base", "infra", "core", "setting", "errors.ts", "words.ts", "prompts.ts", "assets.ts"] },
+  { name: "Platform", parts: ["base", "infra", "core", "setting"] },
   { name: "Agents", parts: ["agent", "runtime", "memory"] },
   { name: "Source Control", parts: ["project"] },
   { name: "Agent Sessions", parts: ["executor", "session"] },
@@ -25,7 +19,7 @@ export const modules: readonly Module[] = [
   { name: "Gamification", parts: ["game"] },
   {
     name: "Gateway",
-    parts: ["http", "mcp", "lan", "connector", "voice", "handlers.ts", "chat.ts", "chat", "main.ts", "services.ts", "modules.ts", "projection"],
+    parts: ["http", "mcp", "lan", "connector", "voice", "chat", "projection", "main.ts", "services.ts", "modules.ts"],
   },
 ];
 
@@ -34,6 +28,6 @@ export const outside = ["testing", "flows"];
 
 /** The module a path under src/ (forward slashes) is part of; undefined outside every module. */
 export function moduleOf(path: string): Module | undefined {
-  const top = path.split("/")[0]!;
+  const top = path.split("/")[0] ?? "";
   return modules.find((m) => m.parts.includes(top));
 }

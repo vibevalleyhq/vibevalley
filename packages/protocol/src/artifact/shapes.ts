@@ -1,13 +1,6 @@
-// The shapes of artifacts, their blocks and suggestions (docs/subsystems/artifact.md).
-
 import type { ArtifactId, BlockId, IssueId, SuggestionId } from "../common/shapes";
 
-/**
- * What a block is, which says what its attrs and text hold: heading (Attrs.Level 1 to 3), todo (Attrs.Checked), code
- * (Attrs.Language; its text has no marks), divider (no text), image (Attrs.Src, Width, Height, Alt; no text), issue_ref
- * (Attrs.IssueID; no text), memory_item (Attrs.MemoryID, and text). A numbered block's number is not stored: the client
- * counts the run of numbered siblings it is in.
- */
+/** What a block is, which says what its attrs and text hold: heading (Attrs.Level 1 to 3), todo (Attrs.Checked), code (Attrs.Language. */
 export const BlockTypeValues = [
   "paragraph",
   "heading",
@@ -23,8 +16,7 @@ export const BlockTypeValues = [
 ] as const;
 export type BlockType = (typeof BlockTypeValues)[number];
 
-/** What the owner and the agents leave for people to read (docs/subsystems/artifact.md). Its body is blocks, written
- * together block by block, or html, a whole page handed in version by version and run sandboxed. */
+/** What the owner and the agents leave for people to read (docs/subsystems/artifact.md). */
 export const ArtifactBodyValues = ["blocks", "html"] as const;
 export type ArtifactBody = (typeof ArtifactBodyValues)[number];
 
@@ -81,9 +73,7 @@ export interface Artifact {
   updated: number;
 }
 
-/** Without content, an empty blocks artifact to write in, not announced (the owner's 新建). With content, a hand-in:
- * announced in channel, the caller's own place when absent (a helper's issue thread, the channel the orchestrator answers);
- * issue: the issue it is for, a helper's own when absent. */
+/** Without content, an empty blocks artifact to write in, not announced (the owner's New). */
 export interface ArtifactRequest {
   title: string;
   kind?: ArtifactKind;
@@ -99,9 +89,7 @@ export interface ArtifactVersionRequest {
   note?: string;
 }
 
-/** Some words in an HTML artifact's page, as the W3C Web Annotation TextQuoteSelector says them: the words, and up to
- * 32 characters of the page's text on each side to tell one of them from another like it. Text is the page's text
- * nodes outside <script> and <style>; whitespace is not compared as written. */
+/** Some words in an HTML artifact's page, as the W3C Web Annotation TextQuoteSelector says them. Text is the page's text nodes outside <script> and <style>. */
 export interface HtmlAnchor {
   kind: "text";
   exact: string;

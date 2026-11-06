@@ -1,5 +1,3 @@
-// The Schemas of what several concepts share: ids, who did a thing, outcomes, spending, previews: each typed by its shape (Codec<T.X>).
-
 import { Brand, Schema } from "effect";
 
 import type { Codec } from "../codec";

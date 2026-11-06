@@ -1,6 +1,4 @@
-// The farm's models over the wire: a request (request.ts) out, its stream read (response.ts) back, as pi-ai's events.
-
-import { Clock, Context, Effect, Layer, Stream, Predicate, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Option, Predicate, Schema, Stream } from "effect";
 import { HttpClient, HttpClientRequest } from "effect/http";
 
 import type { AssistantMessage, Context as LlmContext } from "./messages.ts";
@@ -17,8 +15,7 @@ export interface StreamOptions extends RequestOptions {
   readonly apiKey: string;
 }
 
-/** The model could not be asked or its answer not read: no connection, a refusal by status, a broken stream. What the
- * model did answer (content filtered, no finish) ends the stream as an error event instead, as pi-ai's does. */
+/** The model could not be asked or its answer not read: no connection, a refusal by status, a broken stream. */
 export class LlmError extends Schema.TaggedError<LlmError, { readonly brand: unique symbol }>()("LlmError", {
   reason: Schema.Literals(["network", "status", "stream"]),
   /** The HTTP status, for status. */
@@ -60,14 +57,14 @@ export const failedMessage = (model: Model, timestamp: number, e: LlmError): Ass
   errorMessage: e.message,
 });
 
+const ErrorBody = Schema.fromJsonString(Schema.Struct({ error: Schema.Record(Schema.String, Schema.Unknown) }));
+const decodeErrorBody = Schema.decodeUnknownOption(ErrorBody);
+const decodeStreamChunk = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
+
 /** As pi-ai words a refusal: the status and the body's error object, else its text. */
 function statusMessage(status: number, text: string): string {
-  try {
-    const body: unknown = JSON.parse(text);
-    if (Predicate.isObject(body) && Predicate.isObject(body.error)) return `${status}: ${JSON.stringify(body.error)}`;
-  } catch {
-    // Not JSON: the text as it came.
-  }
+  const parsed = decodeErrorBody(text);
+  if (Option.isSome(parsed)) return `${status}: ${JSON.stringify(parsed.value.error)}`;
   return `${status} ${text.trim() || "status code (no body)"}`;
 }
 
@@ -97,8 +94,9 @@ export const make = Effect.gen(function* () {
           Stream.splitLines,
           Stream.mapEffect((line) => {
             const data = sse.line(line);
-            if (data === undefined) return Effect.succeed([] as AssistantMessageEvent[]);
-            return Effect.try({ try: () => JSON.parse(data) as unknown, catch: () => failed("stream", `Not JSON in the stream: ${data.slice(0, 200)}`) }).pipe(
+            if (data === undefined) return Effect.succeed<AssistantMessageEvent[]>([]);
+            return decodeStreamChunk(data).pipe(
+              Effect.mapError(() => failed("stream", `Not JSON in the stream: ${data.slice(0, 200)}`)),
               Effect.flatMap((chunk) => {
                 const error: unknown = Predicate.hasProperty(chunk, "error") ? chunk.error : undefined;
                 return error !== undefined && error !== null

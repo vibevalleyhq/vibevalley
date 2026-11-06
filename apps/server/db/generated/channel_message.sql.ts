@@ -903,7 +903,8 @@ export const ownerReadReports = Effect.fn("OwnerReadReports")(function* () {
 })
 
 export const UnroutedChannelMessagesParams = Schema.Struct({
-
+  ["after_channel"]: Schema.String,
+  ["after_number"]: Schema.Int,
 })
 export type UnroutedChannelMessagesParams = typeof UnroutedChannelMessagesParams.Type
 
@@ -930,13 +931,13 @@ export const UnroutedChannelMessagesResult = Schema.Struct({
 export type UnroutedChannelMessagesResult = typeof UnroutedChannelMessagesResult.Type
 
 
-export const UnroutedChannelMessagesSql = "-- name: UnroutedChannelMessages :many\nselect m.id as envelope_id, m.number, m.channel_id, m.sender_id, m.kind, m.body, m.meta, m.reply_number, m.created_at,\n       p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       cast(coalesce(ch.name, c.name, '') as text) as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join mailbox_trigger r on r.id = m.id\nwhere r.routed_at is null and m.deleted_at is null\norder by m.channel_id, m.number\nlimit 1000;"
+export const UnroutedChannelMessagesSql = "-- name: UnroutedChannelMessages :many\nselect m.id as envelope_id, m.number, m.channel_id, m.sender_id, m.kind, m.body, m.meta, m.reply_number, m.created_at,\n       p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       cast(coalesce(ch.name, c.name, '') as text) as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join mailbox_trigger r on r.id = m.id\nwhere r.routed_at is null and m.deleted_at is null\n  and (m.channel_id, m.number) > (?1, ?2)\norder by m.channel_id, m.number\nlimit 1000;"
 
-export const unroutedChannelMessages = Effect.fn("UnroutedChannelMessages")(function* () {
+export const unroutedChannelMessages = Effect.fn("UnroutedChannelMessages")(function* (params: UnroutedChannelMessagesParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
     Request: UnroutedChannelMessagesParams,
     Result: UnroutedChannelMessagesResult,
-    execute: () => sql.unsafe(UnroutedChannelMessagesSql, []),
-  })({})
+    execute: (p) => sql.unsafe(UnroutedChannelMessagesSql, [p["after_channel"], p["after_number"]]),
+  })(params)
 })

@@ -1,5 +1,3 @@
-// The cron and cron tests: the golden files have no cron, and these pin the clock changes. A cron is made Monday 2026-10-12 08:00 in Shanghai.
-
 process.env.TZ = "Asia/Shanghai";
 
 import { expect, test } from "vite-plus/test";

@@ -1,6 +1,3 @@
-// The server's recorded cases, by module: src/<module>/testdata/*.jsonl.gz (first recorded from the server's Go version).
-// Reading, comparing and updating them is @vibevalley/testkit's.
-
 import { resolve } from "node:path";
 
 import { goldenCasesAt } from "@vibevalley/testkit/golden";

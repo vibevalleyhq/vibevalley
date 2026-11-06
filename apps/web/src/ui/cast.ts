@@ -1,6 +1,3 @@
-// A helper's look: the words for its animal and clothes, a random
-// one for a new profile, and the drawing for each pose.
-
 import { t } from "@vibevalley/i18n";
 import { BuildValues, type Crop, HeadValues, type Look, type Outfit, OutfitValues, type Species, SpeciesValues } from "@vibevalley/protocol";
 
@@ -27,7 +24,7 @@ export const swatches = {
   eye: ["#a6f4ff", "#ffd25e", "#9dffb0", "#ff9de2", "#ffffff", "#ff7a5c"],
 } as const;
 
-const one = <T>(items: readonly T[], random: () => number) => items[Math.floor(random() * items.length)]!;
+const one = <T>(items: readonly [T, ...T[]], random: () => number): T => items[Math.floor(random() * items.length)] ?? items[0];
 
 export function randomLook(random: () => number = Math.random): Look {
   return {
@@ -55,7 +52,7 @@ export interface Cast {
 }
 
 export const castOf = (look: Look | undefined, agentId: string): Cast => ({
-  species: look?.species ?? SpeciesValues[hash(agentId) % SpeciesValues.length]!,
+  species: look?.species ?? SpeciesValues[hash(agentId) % SpeciesValues.length] ?? "cat",
   outfit: look?.outfit ?? "farmer",
 });
 

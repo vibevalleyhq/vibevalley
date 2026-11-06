@@ -1,12 +1,9 @@
-// Talking to the orchestrator: the server hands out the call (appId, channel, uid, one token) and starts Agora's
-// conversational AI agent in it; the page only joins, on the host's line (the phone's) or Agora's Web SDK (webRtc, below).
-// The microphone stays open, as on the phone: the agent hears when you stop, and you can talk over it. Muting is a button.
-// What was said comes over the RTC data stream as captions (captions.ts) and goes to the farm's chat (voice.heard/said).
-
 import { t } from "@vibevalley/i18n";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
 import type { Rtc, RtcLine } from "@vibevalley/protocol/host";
+import { type VoiceDriver, type VoicePhase, type VoiceTurn, voiceTurnsOfCaptions } from "@vibevalley/voice";
+import { MossLine } from "@vibevalley/voice/moss";
 
 import { messageOf } from "#/base/format.ts";
 import { api, reasonOf } from "#/infra/api.ts";
@@ -15,8 +12,94 @@ import { prefsNow } from "#/state/prefs.ts";
 
 import { LiveCaptions } from "./captions";
 
-// A call's line on Agora's Web SDK, loaded when a call starts: the page's own, where the host carries none (the desktop,
-// a browser). The phone's shell carries its own (@vibevalley/protocol/host's rtc), which goes on with the screen locked.
+// A call's line on MOSS Live over local WebSocket (/api/v1/voice/moss/line): needs no Agora credentials or tunnel.
+const mossRtc: Rtc = async (_grant, on) => {
+  const moss = new MossLine({
+    closed: () => t("web.voice.moss.closed"),
+    noMic: () => t("web.voice.call.noMic"),
+    formatError: messageOf,
+  });
+  let connected = false;
+  let gone = false;
+  let lastMic = 0;
+  let lastMoss = 0;
+  let lastState = "";
+  let nextTurnId = 1;
+  const turnIds = new Map<number, number>();
+  const sentTurns = new Map<number, { text: string; done: boolean }>();
+
+  return new Promise<RtcLine>((resolve, reject) => {
+    const off = moss.subscribe(() => {
+      if (gone) return;
+      if (moss.micLevel !== lastMic || moss.mossLevel !== lastMoss) {
+        lastMic = moss.micLevel;
+        lastMoss = moss.mossLevel;
+        on.levels(lastMic, lastMoss);
+      }
+      const nextState = moss.mossLevel > 0 ? "speaking" : "listening";
+      if (connected && nextState !== lastState) {
+        lastState = nextState;
+        on.stream(JSON.stringify({ object: "message.state", state: nextState }));
+      }
+      moss.turns.forEach((turn, idx) => {
+        let turnId = turnIds.get(idx);
+        if (turnId === undefined) {
+          turnId = nextTurnId++;
+          turnIds.set(idx, turnId);
+        }
+        const prev = sentTurns.get(idx);
+        if (prev && prev.text === turn.text && prev.done === turn.done) return;
+        sentTurns.set(idx, { text: turn.text, done: turn.done });
+        if (turn.who === "owner") {
+          on.stream(
+            JSON.stringify({
+              object: "user.transcription",
+              turn_id: turnId,
+              text: turn.text,
+              final: turn.done,
+            }),
+          );
+        } else {
+          on.stream(
+            JSON.stringify({
+              object: "assistant.transcription",
+              turn_id: turnId,
+              text: turn.text,
+              turn_status: turn.done ? 1 : 0,
+            }),
+          );
+        }
+      });
+
+      if (!connected && moss.phase === "live") {
+        connected = true;
+        on.joined();
+        resolve({
+          mute: async (muted) => {
+            moss.mute(muted);
+          },
+          renew: async () => {},
+          leave: async () => {
+            gone = true;
+            off();
+            moss.end();
+          },
+        });
+      } else if (moss.phase === "idle") {
+        off();
+        if (!connected) {
+          reject(new Error(moss.problem || t("web.voice.moss.closed")));
+        } else if (!gone) {
+          if (moss.problem) on.problem(moss.problem);
+          on.left();
+        }
+      }
+    });
+    void moss.start({ persona: "", instructions: "" });
+  });
+};
+
+// A call's line on Agora's Web SDK, loaded when a call starts: the page's own, where the host carries none (the desktop, a browser).
 const webRtc: Rtc = async (grant, on) => {
   const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
   AgoraRTC.setLogLevel(3);
@@ -55,8 +138,7 @@ const webRtc: Rtc = async (grant, on) => {
     client.enableAudioVolumeIndicator();
     // Joined with the number the uid string holds: the agent listens to that uid only.
     await client.join(grant.appId, grant.channel, grant.token, Number(grant.uid));
-    // Echo cancellation, noise suppression and gain on, as a quiet laptop microphone otherwise reaches the agent too
-    // quietly for its voice detection to hear anyone talk.
+    // Echo cancellation, noise suppression and gain on, as a quiet laptop microphone otherwise reaches the agent too quietly for its voice detection to hear anyone talk.
     mic = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
     await client.publish(mic);
   } catch (e) {
@@ -72,7 +154,7 @@ const webRtc: Rtc = async (grant, on) => {
   };
 };
 
-export type CallPhase = "idle" | "connecting" | "live" | "ending";
+export type CallPhase = VoicePhase;
 
 // Rejects the Promise a call's setup races against when the owner hangs up; the page's call code is not Effect.
 // @effect-diagnostics-next-line extendsNativeError:off
@@ -80,12 +162,12 @@ class Cancelled extends Error {}
 
 const sendKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
 
-export class VoiceCall {
+export class VoiceCall implements VoiceDriver<string | undefined, "owner" | "orchestrator"> {
   phase: CallPhase = "idle";
   muted = false;
   agentHere = false;
   problem = "";
-  /** The 设置 section the problem is fixed in, when the server says a setting does. */
+  /** The Settings section the problem is fixed in, when the server says a setting does. */
   problemAt: VoiceFix | undefined = undefined;
   /** 0..100: the microphone's level and the orchestrator's. */
   micLevel = 0;
@@ -107,6 +189,18 @@ export class VoiceCall {
     this.agentPick = agentPick;
     this.captions.onHeard = (text) => this.caption(text, true);
     this.captions.onAnswered = (text) => this.caption(text, false);
+  }
+
+  get inputLevel(): number {
+    return this.micLevel;
+  }
+
+  get outputLevel(): number {
+    return this.orchestratorLevel;
+  }
+
+  get turns(): readonly VoiceTurn<"owner" | "orchestrator">[] {
+    return voiceTurnsOfCaptions(this.captions.turns);
   }
 
   get agentState() {
@@ -144,7 +238,7 @@ export class VoiceCall {
   private caption(text: string, owner: boolean) {
     if (this.phase === "idle" || this.phase === "ending") return;
     const c = { text, owner, ...(owner ? { picked: this.agentPick(), key: sendKey() } : {}) };
-    if (this.agentId) this.send(this.agentId, c);
+    if (this.agentId) this.send(agentIdOf(this.agentId), c);
     else this.pending.push(c);
   }
 
@@ -172,8 +266,9 @@ export class VoiceCall {
       const session = await until(api.voice.grant.create());
       let line: RtcLine | undefined;
       const mine = () => !cancelled && this.line === line;
+      const transport = session.appId === "moss" ? mossRtc : (currentHost().rtc ?? webRtc);
       line = await until(
-        (currentHost().rtc ?? webRtc)(session, {
+        transport(session, {
           joined: () => mine() && ((this.agentHere = true), this.changed()),
           left: () => mine() && ((this.agentHere = false), this.changed()),
           stream: (text) => mine() && this.captions.feed(text) && this.changed(),
@@ -190,7 +285,7 @@ export class VoiceCall {
               if (!mine()) return;
               try {
                 const fresh = await api.voice.grant.renew({ channel: session.channel, uid: session.uid });
-                if (mine()) await line!.renew(fresh.token);
+                if (mine()) await line?.renew(fresh.token);
               } catch (e) {
                 if (!mine()) return;
                 this.problem = t("web.voice.call.renew", { why: reasonOf(e) });
@@ -206,6 +301,7 @@ export class VoiceCall {
         }),
       );
       this.line = line;
+      if (session.appId === "moss") this.agentHere = true;
       const agent = await until(
         api.voice.call.start({ channel: session.channel, uid: session.uid, ...(about ? { about } : {}) }).then(async (a) => {
           if (cancelled) {
@@ -273,6 +369,8 @@ export class VoiceCall {
     await line?.leave().catch(() => undefined);
   }
 }
+
+const agentIdOf = (id: string) => id;
 
 /** The farm's one call; what is said in it goes to the helper picked in the farm's chat, if one is. */
 export const voiceCall = new VoiceCall(() => {

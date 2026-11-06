@@ -51,8 +51,7 @@ export class Core extends Context.Service<
     readonly session: (id: string) => T.Session | undefined;
     /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
     readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
-    /** How many commits apply has folded: one more with each that changed the state. A reply read after its service
-     * applied its facts carries it, and the first frame whose seq is at least it shows the change. */
+    /** How many commits apply has folded: one more with each that changed the state. */
     readonly seq: () => number;
     readonly setCommits: (commits: T.CommitCount) => Effect.Effect<void>;
     /** The farm opens when the owner starts it or says something: the call goes live unless it is already. */
@@ -122,8 +121,7 @@ const make = Effect.gen(function* () {
     if (isFact(e)) PubSub.publishUnsafe(changes, undefined);
   };
 
-  // Every fact goes through here: a span each would bury the traces in folds. The fold and what it tells happen in the
-  // one modify, so the transitions go out in the order the state changed.
+  // Every fact goes through here: a span each would bury the traces in folds.
   const apply = Effect.fnUntraced(function* (...facts: FactIn[]) {
     const at = yield* Clock.currentTimeMillis;
     yield* SubscriptionRef.modify(held, (h) => {

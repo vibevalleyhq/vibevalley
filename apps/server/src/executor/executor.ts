@@ -3,13 +3,13 @@ import { join, resolve } from "node:path";
 import type { ControlOutcome, Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { applyTaskEvent, initialStatus, initialTasks, observeSessionView, reduceStatus, stallOf, type TaskMap } from "@botiverse/oar/observe";
-import { Clock, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Schema } from "effect";
+import { Clock, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Option, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
 
-import { type ApiError, messageOf, reasonOf, refused } from "#/errors.ts";
+import { type ApiError, messageOf, reasonOf, refused } from "#/base/errors.ts";
 import { projectsDir, ServerConfig } from "#/infra/config.ts";
 import { probeInstallation, Runtime } from "#/runtime/runtime.ts";
 
@@ -74,8 +74,7 @@ const notClosed = (cause: unknown) => new NotClosed({ message: messageOf(cause),
 const running = Metric.gauge("vibevalley.sessions.running", { description: "Runtime sessions open now (the helpers' and the orchestrators')" });
 const closeWaitMs = 15_000;
 
-/** Calls onStall once a turn has had no record for stallMs, folded from the session's first record as its events are:
- * oar's observeStalls hears only records from when it subscribes, and misses a turn that went quiet before that. */
+/** Calls onStall once a turn has had no record for stallMs, folded from the session's first record as its events are. */
 export function watchStalls(
   session: RuntimeSession,
   stallMs: number,
@@ -173,7 +172,7 @@ const make = Effect.gen(function* () {
       forkHere(
         close.pipe(
           Effect.onExit((exit) => Deferred.done(closing, exit)),
-          Effect.ignore,
+          Effect.ignore({ log: "Debug" }),
         ),
       );
       return Deferred.await(closing);
@@ -246,11 +245,12 @@ const make = Effect.gen(function* () {
       const id = owner.id;
       const prior = allocations.get(id);
       if (prior) return { refused: prior.failure ?? t("server.session.life.notReturned"), retained: true };
-      const resolved = yield* Effect.result(runtimes.resolve(agent));
-      if (resolved._tag === "Failure") return { refused: reasonOf(resolved.failure), retained: false };
+      let refusal = "";
+      const resolved = yield* Effect.option(runtimes.resolve(agent).pipe(Effect.tapError((e) => Effect.sync(() => (refusal = reasonOf(e))))));
+      if (Option.isNone(resolved)) return { refused: refusal, retained: false };
+      const r = resolved.value;
       const raced = allocations.get(id);
       if (raced) return { refused: raced.failure ?? t("server.session.life.notReturned"), retained: true };
-      const r = resolved.success;
       const base = r.runtime;
       const resources = new Set<RuntimeSession>();
       const mine: OarRuntime = {
@@ -313,7 +313,7 @@ const make = Effect.gen(function* () {
         yield* Effect.logInfo(`vibevalley: ${verb} ${id} (${agent.name}): ${agent.runtime}${how}, in ${cwd}`);
         return { execution: view(allocation) };
       });
-      return yield* opening.pipe(Effect.onExit((exit) => (exit._tag === "Failure" ? Effect.ignore(closeOwned(allocation)) : Effect.void)));
+      return yield* opening.pipe(Effect.onExit((exit) => (exit._tag === "Failure" ? Effect.ignore(closeOwned(allocation), { log: "Warn" }) : Effect.void)));
     }),
     deliver: Effect.fn("Executor.deliver")(function* (id, text, inputId) {
       const agent = allocations.get(id)?.agent;

@@ -1,10 +1,9 @@
-// What every endpoint shares: who may call it, how a refusal is written, the line it has in the table (Endpoint), and
-// the input made of its ids and its body (input). The concepts' endpoints are in <concept>/api.ts.
-
-import { Schema } from "effect";
+import { Predicate, Schema } from "effect";
 
 import type { Handlers } from "./api";
-import { type VoiceFix, VoiceFixValues } from "./shapes";
+import { pathOf, type VoiceFix, VoiceFixValues } from "./shapes";
+
+export { pathOf };
 
 export type Caller = "owner" | "remote" | "orchestrator" | "session";
 
@@ -28,13 +27,13 @@ export interface Missing {
   readonly next?: readonly Next[];
 }
 
-/** A 设置 section a voice problem is fixed in (the page's /settings/<section>). */
+/** A Settings section a voice problem is fixed in (the page's /settings/<section>). */
 export type { VoiceFix } from "./shapes";
 
 export interface VoiceUnavailable {
   readonly _tag: "VoiceUnavailable";
   readonly reason: string;
-  /** Where in 设置 the owner fixes it, when a setting does. */
+  /** Where in Settings the owner fixes it, when a setting does. */
   readonly settings?: VoiceFix;
 }
 
@@ -101,11 +100,16 @@ export interface Endpoint {
   readonly input: Schema.Codec<unknown> | undefined;
   readonly result: Schema.Codec<unknown> | undefined;
   readonly can: readonly Caller[];
-  /** It changes what cannot be taken back (deletes, merges, closes, sends helpers home): its dry run is this endpoint,
-   * which takes the same input and answers a Preview without changing anything (the command line's --dry-run). */
+  /** It changes what cannot be taken back (deletes, merges, closes, sends helpers home). */
   readonly dryRun?: keyof Handlers;
 }
 
 export const input = (ids: Schema.Struct.Fields, body?: Schema.Codec<unknown>): Schema.Codec<unknown> =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every body is a Struct in schema.ts, typed Codec<T.X> there to tie it to its shape
   Schema.Struct({ ...ids, ...(body ? (body as unknown as Schema.Struct<Schema.Struct.Fields>).fields : {}) }) as unknown as Schema.Codec<unknown>;
+
+/** The fields an endpoint's input takes, what it is about among them; none when it takes nothing. */
+export const fieldsOf = (e: Endpoint): readonly string[] => {
+  const s: unknown = e.input;
+  return Predicate.hasProperty(s, "fields") && Predicate.isObject(s.fields) ? Object.keys(s.fields) : [];
+};

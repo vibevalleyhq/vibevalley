@@ -1,6 +1,3 @@
-// A chat/completions stream read into an assistant message, as pi-ai 1.3.0's openai-completions reads DeepSeek's
-// (testdata/deepseek.jsonl.gz holds what pi-ai made of each stream), with pi-ai's events on the way.
-
 import { Predicate } from "effect";
 
 import type { AssistantMessage, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
@@ -22,7 +19,7 @@ export type AssistantMessageEvent =
   | { readonly type: "done"; readonly reason: "stop" | "length" | "toolUse"; readonly message: AssistantMessage }
   | { readonly type: "error"; readonly reason: "error" | "aborted"; readonly error: AssistantMessage };
 
-/** Server-sent events' data, one string an event; [DONE] ends them. Feed it lines; a blank line closes an event. */
+/** Server-sent events' data, one string an event. [DONE] ends them. */
 export class SseData {
   private data: string[] = [];
   done = false;
@@ -53,12 +50,6 @@ type Block =
   | { kind: "thinking"; thinking: string; signature: string }
   | { kind: "tool"; id: string; name: string; partial: string; arguments: Readonly<Record<string, unknown>>; argumentsError?: string; index?: number };
 
-interface ToolCallDelta {
-  readonly index?: number;
-  readonly id?: string;
-  readonly function?: { readonly name?: string; readonly arguments?: string };
-}
-
 const reasoningFields = ["reasoning_content", "reasoning", "reasoning_text"] as const;
 
 /** One response's chunks folded into its message; timestamp is when the request started. */
@@ -69,7 +60,7 @@ export class Fold {
   private readonly toolsByIndex = new Map<number, Extract<Block, { kind: "tool" }>>();
   private readonly toolsById = new Map<string, Extract<Block, { kind: "tool" }>>();
   private usage: Usage = zeroUsage();
-  private stopReason: StopReason | "pending" = "pending";
+  private stopReason: StopReason = "stop";
   private finished = false;
   private responseId: string | undefined;
   private responseModel: string | undefined;
@@ -89,25 +80,23 @@ export class Fold {
 
   /** A data event's JSON. */
   chunk(chunk: unknown): AssistantMessageEvent[] {
-    if (typeof chunk !== "object" || chunk === null) return [];
-    const c = chunk as { id?: unknown; model?: unknown; usage?: RawUsage; choices?: unknown };
-    if (typeof c.id === "string" && !this.responseId) this.responseId = c.id;
-    if (typeof c.model === "string" && c.model.length > 0 && c.model !== this.model.id) this.responseModel ??= c.model;
-    if (c.usage) this.usage = usageOf(c.usage, this.model);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- OpenAI's chunk as the provider sends it, not decoded on the hot path
-    const choice = Array.isArray(c.choices) ? (c.choices[0] as Choice | undefined) : undefined;
-    if (!choice) return [];
-    if (!c.usage && choice.usage) this.usage = usageOf(choice.usage, this.model);
-    if (choice.finish_reason) {
-      this.rawStopReason = choice.finish_reason;
-      const [reason, error] = stopReasonOf(choice.finish_reason);
+    if (!Predicate.isObject(chunk)) return [];
+    if (typeof chunk.id === "string" && !this.responseId) this.responseId = chunk.id;
+    if (typeof chunk.model === "string" && chunk.model.length > 0 && chunk.model !== this.model.id) this.responseModel ??= chunk.model;
+    if (Predicate.isObject(chunk.usage)) this.usage = usageOf(chunk.usage, this.model);
+    const firstChoice: unknown = Array.isArray(chunk.choices) ? chunk.choices[0] : undefined;
+    if (!Predicate.isObject(firstChoice)) return [];
+    if (!Predicate.isObject(chunk.usage) && Predicate.isObject(firstChoice.usage)) this.usage = usageOf(firstChoice.usage, this.model);
+    if (typeof firstChoice.finish_reason === "string" && firstChoice.finish_reason.length > 0) {
+      this.rawStopReason = firstChoice.finish_reason;
+      const [reason, error] = stopReasonOf(firstChoice.finish_reason);
       this.stopReason = reason;
       if (error) this.errorMessage = error;
       this.finished = true;
     }
     const events: AssistantMessageEvent[] = [];
-    const delta = choice.delta;
-    if (!delta) return events;
+    const delta = firstChoice.delta;
+    if (!Predicate.isObject(delta)) return events;
     // Thinking before the text: a proxy may put both in one delta, and the thinking block comes first.
     const field = reasoningFields.find((f) => typeof delta[f] === "string" && delta[f].length > 0);
     const piece = field === undefined ? undefined : delta[field];
@@ -127,20 +116,22 @@ export class Fold {
       this.text.text += delta.content;
       events.push({ type: "text_delta", contentIndex: this.blocks.indexOf(this.text), delta: delta.content, partial: this.message() });
     }
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- OpenAI's chunk as the provider sends it, not decoded on the hot path
-    for (const call of Array.isArray(delta.tool_calls) ? (delta.tool_calls as ToolCallDelta[]) : []) {
-      const block = this.toolBlock(call, events);
-      if (!block.id && call.id) {
-        block.id = call.id;
-        this.toolsById.set(call.id, block);
+    for (const call of Array.isArray(delta.tool_calls) ? delta.tool_calls.filter(Predicate.isObject) : []) {
+      const fn = Predicate.isObject(call.function) ? call.function : undefined;
+      const id = typeof call.id === "string" ? call.id : undefined;
+      const name = typeof fn?.name === "string" ? fn.name : undefined;
+      const args = typeof fn?.arguments === "string" ? fn.arguments : "";
+      const block = this.toolBlock(typeof call.index === "number" ? call.index : undefined, id, name, events);
+      if (!block.id && id) {
+        block.id = id;
+        this.toolsById.set(id, block);
       }
-      if (!block.name && call.function?.name) block.name = call.function.name;
-      const piece = call.function?.arguments ?? "";
-      if (piece) {
-        block.partial += piece;
+      if (!block.name && name) block.name = name;
+      if (args) {
+        block.partial += args;
         block.arguments = streamingArguments(block.partial, block.arguments);
       }
-      events.push({ type: "toolcall_delta", contentIndex: this.blocks.indexOf(block), delta: piece, partial: this.message() });
+      events.push({ type: "toolcall_delta", contentIndex: this.blocks.indexOf(block), delta: args, partial: this.message() });
     }
     return events;
   }
@@ -148,10 +139,10 @@ export class Fold {
   /** The stream ended: each block closes, then done, or error when the model's answer was not a complete one. */
   end(): AssistantMessageEvent[] {
     const events = this.blocks.map((b) => this.closed(b));
+    if (!this.finished) return [...events, this.failed("Stream ended without finish_reason", false)];
     const reason = this.stopReason;
     if (reason === "error" || reason === "aborted")
       return [...events, this.failed(this.errorMessage || "Provider returned an error stop reason", reason === "aborted")];
-    if (!this.finished || reason === "pending") return [...events, this.failed("Stream ended without finish_reason", false)];
     return [...events, { type: "done", reason, message: this.message() }];
   }
 
@@ -170,8 +161,7 @@ export class Fold {
       provider: this.model.provider,
       model: this.model.id,
       usage: this.usage,
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- pending only while streaming; a partial message is not read for it
-      stopReason: this.stopReason as StopReason,
+      stopReason: this.stopReason,
       timestamp: this.timestamp,
       ...(this.responseId !== undefined ? { responseId: this.responseId } : {}),
       ...(this.responseModel !== undefined ? { responseModel: this.responseModel } : {}),
@@ -185,21 +175,25 @@ export class Fold {
     return { type, contentIndex: this.blocks.length - 1, partial: this.message() };
   }
 
-  private toolBlock(call: ToolCallDelta, events: AssistantMessageEvent[]): Extract<Block, { kind: "tool" }> {
-    const index = typeof call.index === "number" ? call.index : undefined;
+  private toolBlock(
+    index: number | undefined,
+    id: string | undefined,
+    name: string | undefined,
+    events: AssistantMessageEvent[],
+  ): Extract<Block, { kind: "tool" }> {
     let block = index !== undefined ? this.toolsByIndex.get(index) : undefined;
-    if (!block && call.id) block = this.toolsById.get(call.id);
+    if (!block && id) block = this.toolsById.get(id);
     if (!block) {
-      block = { kind: "tool", id: call.id || "", name: call.function?.name ?? "", partial: "", arguments: {}, ...(index !== undefined ? { index } : {}) };
+      block = { kind: "tool", id: id || "", name: name ?? "", partial: "", arguments: {}, ...(index !== undefined ? { index } : {}) };
       if (index !== undefined) this.toolsByIndex.set(index, block);
-      if (call.id) this.toolsById.set(call.id, block);
+      if (id) this.toolsById.set(id, block);
       events.push(this.opened("toolcall_start", block));
     }
     if (index !== undefined && block.index === undefined) {
       block.index = index;
       this.toolsByIndex.set(index, block);
     }
-    if (call.id) this.toolsById.set(call.id, block);
+    if (id) this.toolsById.set(id, block);
     return block;
   }
 
@@ -241,35 +235,23 @@ function toolCallOf(b: Extract<Block, { kind: "tool" }>): ToolCall {
   };
 }
 
-interface Choice {
-  readonly finish_reason?: string | null;
-  readonly usage?: RawUsage;
-  readonly delta?: Record<string, unknown> & { readonly content?: string | null; readonly tool_calls?: unknown };
-}
-
-interface RawUsage {
-  readonly prompt_tokens?: number;
-  readonly completion_tokens?: number;
-  readonly cached_tokens?: number;
-  /** DeepSeek's cache hits. */
-  readonly prompt_cache_hit_tokens?: number;
-  readonly prompt_tokens_details?: { readonly cached_tokens?: number; readonly cache_write_tokens?: number };
-  readonly completion_tokens_details?: { readonly reasoning_tokens?: number };
-}
+const numberField = (v: unknown) => (typeof v === "number" ? v : undefined);
 
 /** input is the prompt not read from the cache; output already counts reasoning. */
-function usageOf(raw: RawUsage, model: Model): Usage {
-  const prompt = raw.prompt_tokens ?? 0;
-  const cacheRead = raw.prompt_tokens_details?.cached_tokens ?? raw.prompt_cache_hit_tokens ?? raw.cached_tokens ?? 0;
-  const cacheWrite = raw.prompt_tokens_details?.cache_write_tokens ?? 0;
+function usageOf(raw: Record<string, unknown>, model: Model): Usage {
+  const promptDetails = Predicate.isObject(raw.prompt_tokens_details) ? raw.prompt_tokens_details : undefined;
+  const completionDetails = Predicate.isObject(raw.completion_tokens_details) ? raw.completion_tokens_details : undefined;
+  const prompt = numberField(raw.prompt_tokens) ?? 0;
+  const cacheRead = numberField(promptDetails?.cached_tokens) ?? numberField(raw.prompt_cache_hit_tokens) ?? numberField(raw.cached_tokens) ?? 0;
+  const cacheWrite = numberField(promptDetails?.cache_write_tokens) ?? 0;
   const input = Math.max(0, prompt - cacheRead - cacheWrite);
-  const output = raw.completion_tokens ?? 0;
+  const output = numberField(raw.completion_tokens) ?? 0;
   const usage = {
     input,
     output,
     cacheRead,
     cacheWrite,
-    reasoning: raw.completion_tokens_details?.reasoning_tokens ?? 0,
+    reasoning: numberField(completionDetails?.reasoning_tokens) ?? 0,
     totalTokens: input + output + cacheRead + cacheWrite,
   };
   return { ...usage, cost: costOf(model, usage) };
@@ -308,7 +290,8 @@ function repairJson(json: string): string {
   let out = "";
   let inString = false;
   for (let i = 0; i < json.length; i++) {
-    const ch = json[i]!;
+    const ch = json[i];
+    if (ch === undefined) break;
     if (!inString) {
       out += ch;
       if (ch === '"') inString = true;
@@ -338,7 +321,7 @@ function repairJson(json: string): string {
       out += "\\\\";
       continue;
     }
-    const code = ch.codePointAt(0)!;
+    const code = ch.charCodeAt(0);
     out += code <= 0x1f ? (controlEscapes[ch] ?? `\\u${code.toString(16).padStart(4, "0")}`) : ch;
   }
   return out;

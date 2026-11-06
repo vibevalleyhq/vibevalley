@@ -1,6 +1,3 @@
-// A message written: its rows in one transaction, then settled (who follows it, whom it is for, handed to the mailbox),
-// then published with its link previews read after it is out.
-
 import { Clock, Effect, FiberSet } from "effect";
 import { HttpClient } from "effect/http";
 
@@ -8,8 +5,8 @@ import type * as T from "@vibevalley/protocol";
 import { everyone, ownerId } from "@vibevalley/protocol";
 
 import { Agent } from "#/agent/agent.ts";
+import { Inconsistent } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { Inconsistent } from "#/errors.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
@@ -212,7 +209,7 @@ export const channelWriting = (r: ChannelRecords) =>
                 Effect.provideService(HttpClient.HttpClient, http),
                 Effect.catchCause((cause) => Effect.as(Effect.logWarning("a link preview was not read", cause), undefined)),
               ),
-            { concurrency: "unbounded" },
+            { concurrency: 4 },
           )).filter((e): e is T.Embed => e !== undefined);
           yield* locked(
             Effect.gen(function* () {

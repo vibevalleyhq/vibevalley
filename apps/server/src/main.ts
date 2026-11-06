@@ -1,12 +1,3 @@
-// The vibevalley server: the farm over HTTP on loopback. The desktop app starts it on a free
-// port and reads where from --ready-json; run alone, it is the server.
-//
-//	vpx src/main.ts                        # port from the configuration (127.0.0.1:8787)
-//	vpx src/main.ts --config dev.yaml      # this file, not $VIBEVALLEY_HOME/vibevalley.yaml
-//	vpx src/main.ts --web ../web/dist      # also the page at /
-//
-// The configuration is loadConfig's: the YAML file, then VIBEVALLEY_* in the environment.
-
 import { parseArgs } from "node:util";
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
@@ -37,8 +28,7 @@ const testRuntimesAsked = process.env.VIBEVALLEY_TEST_RUNTIMES === "1";
 redactOutput(process.stdout);
 redactOutput(process.stderr);
 
-// The page's tests (apps/web/test/fixtures.ts) never ask this machine's coding agents: pi is the scripted helper the
-// server's tests hire, and it is the only runtime installed. Never set otherwise; loaded only then.
+// The page's tests (apps/web/test/fixtures.ts) never ask this machine's coding agents. Never set otherwise.
 const testRuntimes = Effect.gen(function* () {
   const { helper, installedOnly } = yield* Effect.promise(() => import("./testing/worker.ts"));
   const { registryOf } = yield* Effect.promise(() => import("./runtime/runtime.ts"));

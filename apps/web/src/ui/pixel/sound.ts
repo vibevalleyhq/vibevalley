@@ -1,7 +1,3 @@
-// The pixel skins' sounds, synthesized from recipes (no audio files); when the farm plays them is farm/cues.ts.
-// Levels come in three steps of loudness: clicks about -28, work on the beds and state changes about -24, rewards about -20. Kept below speech on
-// purpose: once voice is on, the microphone sits next to these.
-
 import { Schema } from "effect";
 
 import { createSynth, type Pen, type Recipe, type Synth } from "@vibevalley/engine/audio";
@@ -54,7 +50,7 @@ export const SOUNDS = {
   open: (pen) => pen.noise({ filter: "bandpass", freq: 700, to: 2600, q: 1.4, dur: 0.22, gain: 0.72, attack: 0.08 }),
   // …and closing: the same swish falling.
   close: (pen) => pen.noise({ filter: "bandpass", freq: 2400, to: 650, q: 1.4, dur: 0.2, gain: 0.62, attack: 0.05 }),
-  // 浇水: water pouring, then drops landing on the soil.
+  // water pouring, then drops landing on the soil.
   water: (pen) => {
     pen.noise({ filter: "bandpass", freq: 900, to: 1500, q: 1.1, dur: 0.75, gain: 0.53, attack: 0.12 });
     pen.noise({ filter: "highpass", freq: 5000, dur: 0.6, gain: 0.1, attack: 0.1 });
@@ -64,25 +60,25 @@ export const SOUNDS = {
       pen.tone({ at, freq, to: freq * 0.55, dur: 0.06, gain: 0.23 });
     }
   },
-  // 杀虫: two quick pumps of the sprayer.
+  // two quick pumps of the sprayer.
   spray: (pen) => {
     for (const at of [0, 0.22]) {
       pen.noise({ at, filter: "highpass", freq: 3800, dur: 0.17, gain: 0.23, attack: 0.01 });
       pen.noise({ at, filter: "bandpass", freq: 6500, q: 2, dur: 0.12, gain: 0.1 });
     }
   },
-  // 除草: a root pulled out of the ground, and the leaves rustling.
+  // a root pulled out of the ground, and the leaves rustling.
   weed: (pen) => {
     pen.tone({ freq: 210, to: 90, dur: 0.12, gain: 1.61 });
     grains(pen, { at: 0.04, span: 0.22, count: 7, freq: 2600, gain: 0.56 });
   },
-  // 收获: a rustle of stalks, then a little chime.
+  // a rustle of stalks, then a little chime.
   harvest: (pen) => {
     grains(pen, { span: 0.25, count: 9, freq: 3200, gain: 0.16 });
     pen.bell({ at: 0.18, freq: 1047, dur: 0.6, gain: 0.19 });
     pen.bell({ at: 0.28, freq: 1319, dur: 0.7, gain: 0.16 });
   },
-  // 铲除: the shovel biting into soil, and the soil falling back.
+  // the shovel biting into soil, and the soil falling back.
   shovel: (pen) => {
     pen.noise({ filter: "lowpass", freq: 450, dur: 0.16, gain: 1.79, attack: 0.004 });
     pen.tone({ freq: 120, to: 55, dur: 0.16, gain: 1.49 });

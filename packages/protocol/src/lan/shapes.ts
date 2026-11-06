@@ -1,5 +1,3 @@
-// The shapes of pairing and devices for lan access (docs/subsystems/lan.md).
-
 /** The cookie a paired browser keeps its lan key in; the lan listener takes it as it takes the Bearer header. */
 export const lanKeyCookie = "vibevalley_lan_key";
 

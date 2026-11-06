@@ -1,6 +1,3 @@
-// Each session's thread: opened as it is hired, handed on, closed as it leaves, its report posted there; and the chat's
-// startup, which reopens them and routes what was written but not yet routed.
-
 import { Clock, Effect } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -77,10 +74,7 @@ export const sessionThreads = (r: ChannelRecords, w: ChannelWriting) =>
       });
     });
 
-    /**
-     * The issue already has its thread (reopened, or sent to another session): the next session is told of in it and follows
-     * it, in one transaction, so a restart neither says it twice nor leaves it out.
-     */
+    /** The issue already has its thread (reopened, or sent to another session). */
     const handedOn = Effect.fn("Channel.handedOn")(function* (h: T.Session, thread: string) {
       const followers = model.followers(thread);
       if (followers.includes(h.id)) return;
@@ -153,10 +147,14 @@ export const sessionThreads = (r: ChannelRecords, w: ChannelWriting) =>
     }, locked);
     const start = Effect.gen(function* () {
       yield* locked(Effect.forEach(presentSessions(), (h) => openThread(h).pipe(bestEffort(`chat: ${h.id}'s thread`)), { discard: true }));
+      // Each row once, in order: one that cannot be routed stays unrouted, and is not fetched again.
+      let after = { after_channel: "", after_number: 0 };
       while (true) {
-        const rows = yield* db.run(qm.unroutedChannelMessages());
-        if (rows.length === 0) break;
+        const rows = yield* db.run(qm.unroutedChannelMessages(after));
+        const last = rows.at(-1);
+        if (!last) break;
         yield* Effect.forEach(rows, (row) => replayDelivery(row).pipe(bestEffort(`chat: route ${row.envelope_id}`)), { discard: true });
+        after = { after_channel: last.channel_id, after_number: last.number };
       }
     });
     yield* Effect.addFinalizer(() =>

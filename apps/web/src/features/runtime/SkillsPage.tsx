@@ -1,6 +1,3 @@
-// 技能: the skills the runtimes on this machine carry, read-only, and VibeValley's own, which
-// a profile picks; /settings/skills/<id>, installed:<name> for an installed one, new for a new one.
-
 import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
@@ -38,8 +35,10 @@ export function SkillsPage(props: { id?: string | undefined }) {
   const installed = () => installedSkills(catalog());
   const own = () => ready(skills, []);
   const creating = () => props.id === "new";
-  const shownInstalled = () =>
-    props.id?.startsWith(installedPrefix) === true ? installed().find((s) => s.name === props.id!.slice(installedPrefix.length)) : undefined;
+  const shownInstalled = () => {
+    const id = props.id;
+    return id?.startsWith(installedPrefix) === true ? installed().find((s) => s.name === id.slice(installedPrefix.length)) : undefined;
+  };
   const selected = () =>
     creating() || shownInstalled() ? undefined : (own().find((s) => s.id === props.id) ?? (installed().length > 0 ? undefined : own()[0]));
   const first = () => (props.id === undefined ? installed()[0] : undefined);

@@ -1,9 +1,3 @@
-// The server for the desktop app (apps/server): started as a child process on a port it picks (VIBEVALLEY_PORT=0), ready
-// when it prints its address as one JSON line (--ready-json, ServerReady), stopped with SIGTERM so it saves on the way out.
-// Packaged, it is the bundle (apps/server's `vp pack`, dist/main.mjs) on Electron's own Node (ELECTRON_RUN_AS_NODE), with
-// its dependencies' node_modules beside it; run from the repository, it is the source through vpx, as `vp run start` runs
-// it (paths.ts says which).
-
 import { execFile, spawn } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -22,8 +16,7 @@ const stopTimeoutMs = 8_000;
 /** How long the login shell has to say its PATH. */
 const shellPathTimeoutMs = 5_000;
 
-/** The PATH a terminal has. An app opened from Finder or at login gets launchd's short one, which has none of pi,
- * claude or codex; the login shell's is the one the owner installed them on. Unanswered, the app's own. */
+/** The PATH a terminal has. An app opened from Finder or at login gets launchd's short one, which has none of pi, claude or codex. */
 function loginShellPath(env: NodeJS.ProcessEnv): Promise<string | undefined> {
   const sh = env.SHELL || "/bin/zsh";
   return new Promise((resolve) => {
@@ -35,11 +28,7 @@ function loginShellPath(env: NodeJS.ProcessEnv): Promise<string | undefined> {
   });
 }
 
-/**
- * The PATH to start the server with: the login shell's as it said it last time, kept in `kept`, so the server does not
- * wait on the shell (a profile can take a second or more); the shell is asked again all the same and its answer kept for
- * the next start. With none kept yet (the first start) it waits. A tool installed since is found from the next start.
- */
+/** The PATH to start the server with: the login shell's as it said it last time, kept in `kept`, so the server does not wait on the shell. */
 export async function shellPath(
   kept: string,
   env: NodeJS.ProcessEnv,
@@ -180,7 +169,12 @@ export function serverKeeper(
       }
     },
     stop: async () => {
-      const it = running ?? (await starting?.catch(() => undefined));
+      const it =
+        running ??
+        (await starting?.then(
+          (s) => s,
+          () => undefined,
+        ));
       running = undefined;
       await it?.stop();
     },

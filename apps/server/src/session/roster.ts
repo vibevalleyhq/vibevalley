@@ -13,9 +13,10 @@ export function sessionOnIssue(state: T.WorkspaceState, issue: string): T.Sessio
 /** The very same state when there is no such session. */
 export function withSession(state: T.WorkspaceState, id: string, change: (h: T.Session) => T.Session): [T.WorkspaceState, boolean] {
   const i = state.sessions.findIndex((h) => h.id === id);
-  if (i < 0) return [state, false];
+  const current = state.sessions[i];
+  if (i < 0 || !current) return [state, false];
   const sessions = [...state.sessions];
-  sessions[i] = change(sessions[i]!);
+  sessions[i] = change(current);
   return [{ ...state, sessions }, true];
 }
 

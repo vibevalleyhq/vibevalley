@@ -1,8 +1,3 @@
-// The page's middle layer stands on Effect's Atom (effect/reactivity). Its API is marked unstable, so only state/ imports it
-// (lint vibevalley/atom-door): a change in it is fixed here and in intent.ts, and features read atoms through what these
-// files export. Effect's own Solid binding (@effect/atom-solid) wants solid-js 1, and its reads suspend; this one is a
-// subscription read as a signal (createExternal), so a value an atom has not got yet never holds up the state frames.
-
 import { Atom, AtomRegistry } from "effect/reactivity";
 import { type Accessor, createContext, createEffect, createSignal, useContext } from "solid-js";
 
@@ -12,11 +7,7 @@ import { type Frames, frames, type FramesSource, type Link } from "#/infra/frame
 
 export const createRegistry = (): AtomRegistry.AtomRegistry => AtomRegistry.make();
 
-/**
- * The page's one registry. Root gives it, and the page's own values (defineAtom, defineStored) live in it, since plain
- * code (a toast said from a rule, a pref set from a key) writes them with no component around. Tests make their own for
- * intents (state/testing.ts).
- */
+/** The page's one registry. */
 export const pageRegistry: AtomRegistry.AtomRegistry = createRegistry();
 
 /** Every atom's value lives in one registry for the page; the page's own unless a test or a story gives another. */
@@ -42,10 +33,7 @@ export interface PageAtom<A> {
   readonly subscribe: (changed: () => void) => () => void;
 }
 
-/**
- * The atom held for the page's life, with a signal that only counts its changes: a read returns the registry's value
- * itself, so code that sets and reads at once (an event handler) sees the new value before Solid's next flush.
- */
+/** The atom held for the page's life, with a signal that only counts its changes. */
 export function onPage<A>(atom: Atom.Writable<A>): PageAtom<A> {
   const kept = Atom.keepAlive(atom);
   const [changes, setChanges] = createSignal(0);
@@ -65,11 +53,7 @@ export function onPage<A>(atom: Atom.Writable<A>): PageAtom<A> {
 /** A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). */
 export const defineAtom = <A>(initial: A): PageAtom<A> => onPage(Atom.make(initial));
 
-/**
- * A choice held in the address (`?name=value`), so a reload or a link shown to someone opens on it: read while the
- * component lives, read again from the address when it comes back. The address changes a moment after the last set,
- * as a new entry, so back undoes it.
- */
+/** A choice held in the address (`?name=value`), so a reload or a link shown to someone opens on it. */
 export function useSearchParam(name: string): [Accessor<string>, (value: string) => void] {
   const atom = searchParams(name);
   return [useAtom(atom, pageRegistry), (value) => pageRegistry.set(atom, value)];
@@ -92,19 +76,13 @@ export const framesAtom: Atom.Atom<Frames> = Atom.readable((get) => {
 export type Answer<T> = { readonly state: "waiting" } | { readonly state: "done"; readonly value: T } | { readonly state: "failed"; readonly reason: string };
 
 interface Reader<K> {
-  /** Reads after the wait; undefined reads nothing and tells undefined. Any answer to an earlier ask is dropped. */
+  /** Reads after the wait. undefined reads nothing and tells undefined. */
   readonly request: (key: K | undefined) => void;
   /** Drops whatever is on its way. */
   readonly stop: () => void;
 }
 
-/**
- * The answer to the newest ask only, a failure told as a failure rather than "nothing found".
- *
- * A read is asked again as the owner types (a search) or as the place changes (a channel's pins): an answer to an older
- * ask may come last and would otherwise put what was asked before back on screen. Framework-free, for the test: `told`
- * hears each state of the newest ask only.
- */
+/** The answer to the newest ask only, a failure told as a failure rather than "nothing found". */
 export function latestReader<K, T>(read: (key: K) => Promise<T>, waitMs: number, told: (answer: Answer<T> | undefined) => void): Reader<K> {
   let asked = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;

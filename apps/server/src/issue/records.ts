@@ -1,6 +1,3 @@
-// An issue's rows and the assignments held in memory: reading one, writing its columns, and publishing it to the board.
-// The other parts of Issue read and write through these, so the assignments are loaded and changed in one place.
-
 import { Clock, Effect } from "effect";
 
 import { t } from "@vibevalley/i18n";
@@ -9,9 +6,9 @@ import { assignedAgentOf, executionsOf, latestSessionIdOf } from "@vibevalley/pr
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
+import { type ApiError, Inconsistent, missing, lookIn, refused } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { Core } from "#/core/core.ts";
-import { type ApiError, Inconsistent, missing, lookIn, refused } from "#/errors.ts";
 import { causeMessage, Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
 import { Mailbox } from "#/mailbox/mailbox.ts";
@@ -192,7 +189,7 @@ export const issueRecords = Effect.gen(function* () {
   const asked = (id: string, questions: readonly T.Question[] | undefined) =>
     Effect.andThen(db.run(q.setIssueQuestions({ id, questions: jsonOrNull(openQuestions(questions), openQuestions(questions).length > 0) })), publish(id));
 
-  /** An answer issue's round: one that got through gives its conclusion (none readable leaves the issue stuck on it); whatever it changed goes, so the issue never delivers a change. */
+  /** An answer issue's round: one that got through gives its conclusion (none readable leaves the issue stuck on it). */
   const answered = Effect.fn("Issue.answered")(function* (id: string, session: string, outcome: T.Outcome, answer: T.IssueAnswer | undefined) {
     const item = yield* get(id);
     if (item.deliver !== "answer" || latestSessionIdOf(item) !== session) return;

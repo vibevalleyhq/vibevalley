@@ -1,7 +1,3 @@
-// 种田 2048 on the phone: the rules are farm/phone/games/merge.ts; here the pad, swipes and the drawing, each stage a
-// 12×12 picture. The field is kept while the phone is away or a call comes in. Arrows (or a swipe on the field) slide,
-// B takes one slide back, A starts, goes on after 丰收, and asks before starting over.
-
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -17,7 +13,6 @@ const best = kept(0);
 
 /** 12×12: `#` ink, `+` dark, `o` mid, `.` light. */
 const pictures: readonly (readonly string[])[] = [
-  // 种子
   [
     "            ",
     "            ",
@@ -32,7 +27,6 @@ const pictures: readonly (readonly string[])[] = [
     " +o++++o++o ",
     "++++++++++++",
   ],
-  // 芽
   [
     "            ",
     "            ",
@@ -47,7 +41,6 @@ const pictures: readonly (readonly string[])[] = [
     " +o+++++o++ ",
     "++++++++++++",
   ],
-  // 叶
   [
     "            ",
     "     #      ",
@@ -62,7 +55,6 @@ const pictures: readonly (readonly string[])[] = [
     " +o+++++o++ ",
     "++++++++++++",
   ],
-  // 花
   [
     "   ## ##    ",
     "  #..#..#   ",
@@ -77,7 +69,6 @@ const pictures: readonly (readonly string[])[] = [
     " +o+++++o++ ",
     "++++++++++++",
   ],
-  // 麦子
   [
     "  .   .   . ",
     " #o# #o# #o#",
@@ -92,7 +83,6 @@ const pictures: readonly (readonly string[])[] = [
     " ++o++++o+++",
     "++++++++++++",
   ],
-  // 胡萝卜
   [
     "  #  #  #   ",
     "   # # #    ",
@@ -107,7 +97,6 @@ const pictures: readonly (readonly string[])[] = [
     "     #o#    ",
     "     ##     ",
   ],
-  // 麦捆
   [
     "  o. o. .o  ",
     " #o#o#o#o#  ",
@@ -122,7 +111,6 @@ const pictures: readonly (readonly string[])[] = [
     " #+#+#+#+#  ",
     "            ",
   ],
-  // 一筐
   [
     "            ",
     "    ####    ",
@@ -137,7 +125,6 @@ const pictures: readonly (readonly string[])[] = [
     "            ",
     "            ",
   ],
-  // 一车
   [
     "            ",
     "  o.oo.o    ",
@@ -152,7 +139,6 @@ const pictures: readonly (readonly string[])[] = [
     " ##    ##   ",
     "            ",
   ],
-  // 粮仓
   [
     "     ##     ",
     "    #++#    ",
@@ -167,7 +153,6 @@ const pictures: readonly (readonly string[])[] = [
     " #o.#..#.o# ",
     "############",
   ],
-  // 丰收
   [
     "    ####    ",
     "  ##oooo##  ",
@@ -212,7 +197,7 @@ const swipeAt = 16;
 export function MergeGame() {
   const [g, setG] = game.use();
   const [top, setTop] = best.use();
-  /** 丰收 just came up: the field waits for A. */
+  /** the top crop just came up: the field waits for A. */
   const [cheer, setCheer] = createSignal(false);
   /** A pressed mid-game: start over? */
   const [asking, setAsking] = createSignal(false);

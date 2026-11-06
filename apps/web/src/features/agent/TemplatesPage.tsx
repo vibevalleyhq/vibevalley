@@ -1,6 +1,3 @@
-// 模板: every template a profile installs from, the orchestrators' first; a card shows its whole recipe before it is
-// installed, and a folder on this machine can be added beside the built-in ones. /agents/templates.
-
 import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 

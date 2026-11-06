@@ -1,6 +1,3 @@
-// The routes served by web-standard handlers: a session's tools over MCP at /mcp, and
-// the orchestrator as an OpenAI model at /v1/chat/completions.
-
 import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 

@@ -1,5 +1,3 @@
-// The answers of the game endpoints (packages/protocol/src/game/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import type { GameHandlers } from "@vibevalley/protocol/api";

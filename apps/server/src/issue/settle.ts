@@ -1,5 +1,3 @@
-// A status move settled before anything changes: who takes it on, what it delivers, and the move in words for a dry run.
-
 import { Clock, Effect } from "effect";
 
 import { list, t } from "@vibevalley/i18n";
@@ -8,7 +6,7 @@ import { IssueStatusValues } from "@vibevalley/protocol";
 import { assignmentOf, assignedAgentOf, isOneOf, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { Agent } from "#/agent/agent.ts";
-import { lookIn, refused } from "#/errors.ts";
+import { lookIn, refused } from "#/base/errors.ts";
 import { issueBranch, Project } from "#/project/project.ts";
 import { Runtime } from "#/runtime/runtime.ts";
 import { conflictBrief } from "#/session/briefing.ts";
@@ -43,8 +41,7 @@ export const issueSettling = (r: IssueRecords, d: Pick<IssueDispatch, "readyOf">
           })
         : Effect.succeed(0);
 
-    /** The profile that takes an issue on as it moves to todo; undefined when it is the one it has. Refused before anything
-     * moves, so a handover never leaves its session gone and no one sent. */
+    /** The profile that takes an issue on as it moves to todo. undefined when it is the one it has. */
     const takerOf = Effect.fn("Issue.takerOf")(function* (issue: T.Issue, to: T.IssueStatus, key: string) {
       const a = store.named(key.trim());
       if (!a) return yield* Effect.fail(refused(t("server.issue.noProfileNamed", { key }), [lookIn.agent]));
@@ -57,8 +54,7 @@ export const issueSettling = (r: IssueRecords, d: Pick<IssueDispatch, "readyOf">
       return a;
     });
 
-    /** The issue as a move would see it once the owner's unsaved fields are saved (issue.status saves them first);
-     * refused as saving them would be: only how it is accepted and what it delivers change once it is sent. */
+    /** The issue as a move would see it once the owner's unsaved fields are saved (issue.status saves them first). */
     const withEdit = Effect.fn("Issue.withEdit")(function* (issue: T.Issue, edit: T.IssueUpdate | undefined) {
       if (!edit) return issue;
       const reworded = Object.keys(edit).some((k) => k !== "deliver");
@@ -79,8 +75,7 @@ export const issueSettling = (r: IssueRecords, d: Pick<IssueDispatch, "readyOf">
       return { ...issue, ...Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)), assignments };
     });
 
-    /** The move and what it settles before anything changes; refused as the move itself would be. setStatus carries it out,
-     * previewStatus says it in words: one judgment, so a dry run never promises what the move would refuse. */
+    /** The move and what it settles before anything changes. refused as the move itself would be. */
     const settledMove = Effect.fn("Issue.settledMove")(function* (issue: T.Issue, to: T.IssueStatus, text: string, opt: StatusOptions) {
       if (!isOneOf(IssueStatusValues, to)) return yield* Effect.fail(refused(t("server.issue.noStatus", { to })));
       const taker = opt.agent ? yield* takerOf(issue, to, opt.agent) : undefined;

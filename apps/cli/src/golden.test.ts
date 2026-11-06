@@ -1,7 +1,3 @@
-// The command line's recorded answers (testdata/cli.jsonl.gz): the help of the root, every group and a few commands, and
-// what typical mistakes, refusals and dry runs print, exit code and all. A command added, renamed or reworded shows up
-// as a diff here; `vp run golden:update cli` writes the new answers back, to be read before kept.
-
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "@effect/vitest";
@@ -36,10 +32,9 @@ describe("the command line's answers", () => {
           }
           case "dry": {
             const r = yield* cli([...at, "--dry-run"]);
-            // A task command's dry run is lines of text; api call's is the endpoint's JSON.
             answers.set(c.line, {
               code: r.code,
-              out: r.out === "" ? null : r.out.startsWith("{") ? (JSON.parse(r.out) as unknown) : r.out.split("\n"),
+              out: r.out === "" ? null : r.out.split("\n"),
               error: r.failure,
             });
             break;

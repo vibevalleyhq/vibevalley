@@ -1,14 +1,3 @@
-/**
- * What a commit message, and a pull request's title, body and branch, must be (docs/development.md#分支提交和-pr). The
- * commit-msg hook runs it on the message file; CI runs it on a pull request's title, body and branch: squash merging
- * makes the title the commit's subject and the body its message.
- *
- *   vpx scripts/commit-msg.ts <message file>
- *   vpx scripts/commit-msg.ts --title <text>
- *   vpx scripts/commit-msg.ts --body <text>
- *   vpx scripts/commit-msg.ts --branch <name>
- */
-
 import { readFileSync } from "node:fs";
 
 /** In code points, as the subject is read: a Chinese character counts once. */

@@ -140,7 +140,7 @@ describe("a call's agent", () => {
       const got = vendorsFor(v, none, deepseek, line);
       return "_tag" in got ? got.reason : "";
     };
-    // Where 设置 fixes it, for the page's jump there.
+    // Where Settings fixes it, for the page's jump there.
     const fixedIn = (v: VoiceSettings, deepseek = "") => {
       const got = vendorsFor(v, none, deepseek);
       return "_tag" in got ? got.settings : undefined;
@@ -454,8 +454,7 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
-  // An issue handed back while the owner is on the call: the orchestrator's words about it are read out on the call, queued
-  // after what is being said; with no call on, nothing is read.
+  // An issue handed back while the owner is on the call: the orchestrator's words about it are read out on the call, queued after what is being said.
   it.live("tells the owner on the call when an issue comes to want the owner", () => {
     const capture = new Capture();
     return Effect.gen(function* () {
@@ -837,5 +836,40 @@ describe("voice", () => {
       yield* voice.dictate("AAAA", "wav");
       expect(sent[2]).toMatchObject({ url: "https://api.mosi.cn/v1/audio/transcriptions", auth: "Bearer sk-moss-test" });
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture())), Effect.provideService(FetchHttpClient.Fetch, fetch));
+  });
+
+  it.live("runs a farm call over MOSS Live without Agora credentials or tunnel, routing heard, said, and speak", () => {
+    const capture = new Capture();
+    return Effect.gen(function* () {
+      const setting = yield* Setting;
+      const voice = yield* Voice;
+      const sql = yield* SqlClient.SqlClient;
+      yield* Effect.orDie(setting.save({ voice: { answer: { vendor: "moss" } } }));
+      expect(yield* Effect.flip(voice.session())).toMatchObject({
+        _tag: "VoiceUnavailable",
+        settings: "moss",
+      });
+      yield* Effect.orDie(setting.save({ mossKey: "sk-moss-call-key" }));
+      const grant = yield* voice.session();
+      expect(grant.appId).toBe("moss");
+      const renewed = yield* voice.renew(grant.channel, grant.uid);
+      expect(renewed.appId).toBe("moss");
+      const call = yield* voice.start(grant.channel, grant.uid);
+      expect(call.agentId.startsWith("moss-")).toBe(true);
+      expect(capture.urls).toEqual([]);
+      expect(voice.lines()).toBe(0);
+
+      yield* voice.heard(call.agentId, "帮我看一下工单", "", "moss-voice-1");
+      yield* voice.said(call.agentId, "好，我这就去查。");
+      expect(yield* voice.speak("41 号工单做完了。")).toBe(true);
+
+      const rows = yield* sql<{ body: string }>`select body from channel_message order by rowid`;
+      expect(rows.map((r) => r.body)).toContain("帮我看一下工单");
+      expect(rows.map((r) => r.body)).toContain("好，我这就去查。");
+      expect(rows.map((r) => r.body)).toContain("41 号工单做完了。");
+
+      yield* voice.stop(call.agentId);
+      expect(yield* voice.speak("挂断后不再播报")).toBe(false);
+    }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 });

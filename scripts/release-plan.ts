@@ -1,10 +1,3 @@
-/**
- * What `vp run release <stage>` tags, worked out from the tags already there and the branch it runs on (scripts/
- * release.ts runs it; .agents/notes/proposed/process/2026-11-04-alpha-beta-release.md says why). Alphas are tagged on
- * main; the first beta of x.y cuts release/x.y from main, and every later beta and the release are tagged on it. The
- * versions' order is the desktop's (apps/desktop/src/releases.ts), so what is tagged is what an app updates to.
- */
-
 import { newer } from "@vibevalley/desktop/releases";
 
 export type Stage = "alpha" | "beta" | "final";

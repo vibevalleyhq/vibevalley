@@ -1,8 +1,3 @@
-// An agent's loop: ask the model, run the tools it calls, ask again, until it answers without one; lines sent while it
-// works go in between turns. As pi-agent-core's Agent does it, in its shapes and the order of its events
-// (agent/brain/loop.test.ts holds the brain to that order), with Effect underneath: a run is a fiber of the agent's
-// scope, stopping it is a Deferred the model's stream and the tools race, a turn's tools are fibers side by side.
-
 import { Cause, Clock, Deferred, Effect, FiberSet, Option, Predicate, Ref, type Scope, Stream } from "effect";
 
 import { failedMessage, type LlmError, type Llm } from "@vibevalley/ai/llm";
@@ -25,8 +20,7 @@ export interface Tool {
   readonly name: string;
   readonly description: string;
   readonly parameters: JsonSchema;
-  /** args are coerced and checked against parameters first. A failure is a failed result with its message; being
-   * interrupted is the run being stopped. */
+  /** args are coerced and checked against parameters first. A failure is a failed result with its message. */
   readonly execute: (args: unknown, call: { readonly id: string }) => Effect.Effect<ToolResult, ToolFailed>;
 }
 
@@ -67,8 +61,7 @@ export interface AgentOptions<A> {
   /** Asked before each request, so a key changed meanwhile is used at once. */
   readonly apiKey: () => string;
   readonly toLlm: (messages: readonly AgentMessage<A>[]) => Context;
-  /** Before each request: what it is asked with instead (a fold, say), for the rest of the run. Stopping the run
-   * interrupts it; the request then ends at once, aborted. */
+  /** Before each request: what it is asked with instead (a fold, say), for the rest of the run. Stopping the run interrupts it. */
   readonly prepareRequest?: (messages: readonly AgentMessage<A>[], stopped: boolean) => Effect.Effect<readonly AgentMessage<A>[] | undefined>;
   /** After each turn's tools: end ends the run, continue asks once more when nothing else would. */
   readonly finishTurn?: (turn: Turn<A>) => Effect.Effect<"end" | "continue" | undefined>;
@@ -225,22 +218,22 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
             ? call.argumentsError
               ? { refused: `Invalid arguments for tool "${call.name}": ${call.argumentsError}` }
               : toolArguments(call.name, call.arguments, tool.parameters)
-            : undefined;
-          const immediate = !tool
-            ? errorResult(`Tool ${call.name} not found`)
-            : "refused" in read!
-              ? errorResult(read.refused)
-              : (yield* Deferred.isDone(stop))
-                ? errorResult(operationAborted)
-                : undefined;
-          if (immediate) {
-            const outcome: Outcome = { call, result: immediate, isError: true };
-            yield* ended(call, immediate, true);
+            : { refused: `Tool ${call.name} not found` };
+          if ("refused" in read) {
+            const outcome: Outcome = { call, result: errorResult(read.refused), isError: true };
+            yield* ended(call, outcome.result, true);
             entries.push(outcome);
             if (yield* Deferred.isDone(stop)) break;
             continue;
           }
-          const args = read && "ok" in read ? read.ok : undefined;
+          if (yield* Deferred.isDone(stop)) {
+            const outcome: Outcome = { call, result: errorResult(operationAborted), isError: true };
+            yield* ended(call, outcome.result, true);
+            entries.push(outcome);
+            break;
+          }
+          if (!tool) continue;
+          const args = read.ok;
           entries.push(
             Effect.gen(function* () {
               if (yield* Deferred.isDone(stop)) {
@@ -250,7 +243,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
               }
               const started = yield* Clock.currentTimeMillis;
               const ran = yield* Effect.raceFirst(
-                tool!.execute(args, { id: call.id }).pipe(
+                tool.execute(args, { id: call.id }).pipe(
                   Effect.map((r) => ({ result: r, isError: r.isError === true })),
                   Effect.catch((e) => Effect.succeed({ result: errorResult(e.message), isError: true })),
                 ),
@@ -310,8 +303,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
         let continuing = false;
         outer: while (true) {
           let more = true;
-          // asked grows by new arrays, not pushes: each version is handed out (prepareRequest, answer, finishTurn), and one
-          // already handed out must not change under its holder.
+          // asked grows by new arrays, not pushes.
           // oxlint-disable-next-line oxc/no-accumulating-spread -- see above.
           while (more || pending.length > 0) {
             if (!first) {

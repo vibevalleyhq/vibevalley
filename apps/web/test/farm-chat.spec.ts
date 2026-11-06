@@ -1,7 +1,3 @@
-// The farm's chat, the unfolded phone's right screen, and a plot's issue (src/farm/chat, src/farm/issue). The chat runs
-// against the real server (it has no model key: the orchestrator answers that it has none; its pi is the scripted helper,
-// fixtures.ts); the plot's test serves a frame with a helper in place of the state stream.
-
 import type { Page } from "@playwright/test";
 
 import type { Agent, Issue, StateFrame, SessionView } from "@vibevalley/protocol";
@@ -205,8 +201,7 @@ test("a click on a helper's plot opens its issue: its state, the acts and the fo
   await expect(view.getByTestId("issue-now")).toHaveAttribute("data-state", "reviewing");
   await expect(view.locator('[data-act="complete"]').first()).toBeVisible();
   await expect(view.locator('[data-act="reject"]')).toBeVisible();
-  // Each fold opens whatever was opened before it: content first mounted by a click once held the whole update while
-  // its queries were in flight, and the fold stayed shut.
+  // Each fold opens whatever was opened before it.
   const folds = view.getByTestId("fold");
   for (let i = 0; i < (await folds.count()); i++) {
     await folds.nth(i).click();

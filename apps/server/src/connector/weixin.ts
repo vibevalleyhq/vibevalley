@@ -1,6 +1,3 @@
-// WeChat, written from the official client (@tencent-weixin/openclaw-weixin 2.4.10, MIT). Only
-// text: pictures, voice and files arrive as a word in brackets (voice with WeChat's own transcript).
-
 import { randomBytes, randomUUID } from "node:crypto";
 
 import { Effect, Schema, Predicate } from "effect";
@@ -198,6 +195,7 @@ export class WeixinClient implements WeixinApi {
     return this.request("get_qrcode_status", HttpClientRequest.get(endpoint(base, q)), "", false, QrStatusResponse).pipe(
       Effect.timeout(35_000),
       Effect.map((s) => (s.status ? s : { status: "wait" })),
+      Effect.tapError((e) => Effect.logDebug("weixin qr poll failed", e)),
       Effect.catch(() => Effect.as(Effect.sleep(2_000), { status: "wait" })),
     );
   }

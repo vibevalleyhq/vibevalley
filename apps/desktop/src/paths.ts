@@ -1,12 +1,13 @@
-// Where the desktop app finds what it runs and keeps. In the repository the server is apps/server, the page
-// apps/web/dist and the island apps/island's release build (scripts/build.ts); a packaged app has them in its resources
-// (server/, web/, island/).
-
 import { join } from "node:path";
 
 import { app } from "electron";
 
+import { savedLocale } from "@vibevalley/home";
+import { setLocale } from "@vibevalley/i18n";
+
 import { channelOf, farmHomeOf } from "./channel";
+
+export const followSavedLocale = (home: string) => setLocale(savedLocale(home));
 
 interface AppPaths {
   /** The farm's home (VIBEVALLEY_HOME): settings.json, the database, the logs. */

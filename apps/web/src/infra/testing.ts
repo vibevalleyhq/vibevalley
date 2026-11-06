@@ -1,5 +1,3 @@
-// For the rules' tests: frames that come from the test, not from a server.
-
 import type { StateFrame } from "@vibevalley/protocol";
 
 import type { Frames, FramesSource } from "./frame";

@@ -1,11 +1,9 @@
-// The answers of the session endpoints (packages/protocol/src/session/api.ts): each forwards to the service that owns the rule.
-
 import { Effect } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type { SessionHandlers } from "@vibevalley/protocol/api";
 
-import { missing, lookIn, orMissing } from "#/errors.ts";
+import { missing, lookIn, orMissing } from "#/base/errors.ts";
 import { Session } from "#/session/session.ts";
 
 export const sessionHandlers = Effect.gen(function* () {

@@ -1,6 +1,3 @@
-// The endpoints of the game: their answers (GameHandlers) and their lines in the table (api.ts puts the
-// concepts together).
-
 import { type Effect, Schema } from "effect";
 
 import { type ApiError, type Endpoint } from "../endpoint";

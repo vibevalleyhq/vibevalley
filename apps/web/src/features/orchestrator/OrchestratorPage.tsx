@@ -1,7 +1,3 @@
-// 管家: who an orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong), 旧账 (the conversation it
-// folded away) and, for the default one that answers the phone, 声音 (what it says on a call). /orchestrator/<tab> is
-// the default orchestrator's, /orchestrator/<profile id>/<tab> another's.
-
 import { Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -67,7 +63,7 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
         <h1 class="text-2xl font-semibold">{profile()?.name || t("web.orchestrator.orchestrator.title")}</h1>
         <p class="text-sm text-muted">
           {t("web.orchestrator.orchestrator.intro")}
-          {look() ? t("web.orchestrator.orchestrator.look", { name: look()!.name }) : ""}{" "}
+          {look() ? t("web.orchestrator.orchestrator.look", { name: look()?.name ?? "" }) : ""}{" "}
           <A href={`/agents/${encodeURIComponent(props.agent)}`} class="underline">
             {t("web.orchestrator.orchestrator.profile")}
           </A>

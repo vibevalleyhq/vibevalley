@@ -1,6 +1,3 @@
-// Dictation through Chromium's fake microphone: the page records it, the server hands the WAV to a transcriber (a fake
-// one here, answering as OpenAI's transcription API does), and the words land in the field it was started from.
-
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 

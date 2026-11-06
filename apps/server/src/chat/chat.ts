@@ -1,7 +1,3 @@
-// The conversations in a terminal: VibeValley's own agent (DeepSeek, with the coding tools, skills, memory, sessions,
-// reminders and the MCP servers in a config file), and any runtime on this machine. What is typed while it works joins
-// the turn, Ctrl+C stops the turn, and again (idle) quits.
-
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
@@ -21,7 +17,7 @@ import { homeOf } from "@vibevalley/home";
 import { t, currentLocale } from "@vibevalley/i18n";
 
 import { modelClient } from "#/agent/agent.ts";
-import { messageOf } from "#/errors.ts";
+import { messageOf } from "#/base/errors.ts";
 import { loadConfig } from "#/infra/config.ts";
 import { dshRuntime } from "#/runtime/dsh.ts";
 import { registryOf } from "#/runtime/runtime.ts";
@@ -266,11 +262,11 @@ export const runtimeChat = (id: string, values: RuntimeChat): Effect.Effect<void
             const text = typedIn.text;
             if (text === "/exit") return yield* new Quit();
             if (!text) return busy ? undefined : write("› ");
-            if (!busy) return yield* FiberHandle.run(turns, Effect.ignore(turnOf(text)), { onlyIfMissing: false });
+            if (!busy) return yield* FiberHandle.run(turns, Effect.ignore(turnOf(text), { log: "Warn" }), { onlyIfMissing: false });
             const steering = session.steer ? session.steer(text) : session.queue(text);
             yield* Effect.tryPromise({ try: () => steering, catch: messageOf }).pipe(
               Effect.map((r) => said(r, "notSent")),
-              Effect.ignore,
+              Effect.ignore({ log: "Warn" }),
             );
           }),
         );

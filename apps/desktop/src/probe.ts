@@ -1,5 +1,3 @@
-// Only the Playwright test (apps/desktop/test) starts the app with VIBEVALLEY_DESKTOP_PROBE=1: a shipped app carries none.
-
 import type { Notice, TraySummary } from "@vibevalley/protocol/host";
 
 import type { IslandProbe } from "./island";

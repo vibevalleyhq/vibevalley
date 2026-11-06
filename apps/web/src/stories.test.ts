@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
-import { levels } from "./storyLevels";
+import { levels } from "#/storyLevels.ts";
 
 const ui = join(import.meta.dirname, "ui");
 

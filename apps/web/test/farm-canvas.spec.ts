@@ -1,8 +1,3 @@
-// The village canvas (src/farm/canvas): it runs without errors, the cursor follows the tool and what it points at, and
-// helpers walk in, work and light their lanterns at night. Tests cannot start real helpers (no model, no coding agent),
-// so the helpers come from a frame the test serves in place of the state stream: the real server's first frame with
-// sessions added.
-
 import type { Page } from "@playwright/test";
 
 import type { StateFrame, SessionView } from "@vibevalley/protocol";
@@ -100,8 +95,7 @@ test("helpers walk in, work their plots and the library, and light lanterns at n
   await page.clock.install();
   await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
-  // From the gate to their places at 42 art pixels a second: the page's clock jumps there (a frame takes the whole step),
-  // not drawn frame by frame and not waited out.
+  // From the gate to their places at 42 art pixels a second.
   await page.clock.fastForward(9000);
   await page.screenshot({ path: test.info().outputPath("day.png") });
   await page.goto("/farm?tod=0.95");

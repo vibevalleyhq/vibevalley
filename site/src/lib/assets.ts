@@ -1,7 +1,3 @@
-// The game's small pixel pictures the page shows (apps/web/public/pixel: icons, plots, the helpers' frames…), as they are:
-// a few KB each, and PNG keeps their pixels exact. Only the pages read these; the islands get the pictures' addresses.
-// The big pictures (the title scene, the screenshots) go through images.ts, which compresses them.
-
 import sizes from '@game/pixel/sprites.json'
 import { byName } from './files'
 import { BUBBLES, FRONT, MARKS, PLOTS, POSES, THINGS, type Art, type StoryArt } from './story'
@@ -52,8 +48,7 @@ function pixelSprite(name: string): Art {
   return { src: pixelArt(name), w: size.w, h: size.h, ax: size.ax ?? Math.round(size.w / 2), ay: size.ay ?? size.h - 1 }
 }
 
-/** Every picture the field in How.tsx draws: the helper's poses (the bear in its farmer's clothes), the things, the
- *  plots, the bubbles, the coins and the stamp, the grass in front. */
+/** Every picture the field in How.tsx draws. */
 export function storyArt(): StoryArt {
   const art: Partial<StoryArt> = {}
   for (const pose of POSES) art[pose] = pixelSprite(`bear-farmer-${pose}`)

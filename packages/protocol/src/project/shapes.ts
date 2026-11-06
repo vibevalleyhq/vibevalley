@@ -1,5 +1,3 @@
-// The shapes of projects, their activity, languages and templates, GitHub (docs/subsystems/project.md).
-
 export interface ProjectActivity {
   project: string;
   at: number;

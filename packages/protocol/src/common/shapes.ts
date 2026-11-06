@@ -1,5 +1,3 @@
-// The shapes of what several concepts share: ids, who did a thing, outcomes, spending, previews.
-
 import type { Brand } from "effect";
 
 /** An issue's id (not its number). */
@@ -14,17 +12,16 @@ export type BlockId = string & Brand.Brand<"BlockId">;
 export type SuggestionId = string & Brand.Brand<"SuggestionId">;
 export type MessageId = string & Brand.Brand<"MessageId">;
 
-/** The built-in orchestrator's profile id: it cannot be deleted or made a helper, so a farm always has an orchestrator, and
- * what names none goes to it (the phone, a child issue's news, a channel with no orchestrator of its own). */
+/** The built-in orchestrator's profile id. */
 export const defaultOrchestrator = "orchestrator";
 
 /** The runtime of VibeValley's own agent: the only one an orchestrator runs on. */
 export const orchestratorRuntime = "vibevalley";
 
-/** The owner's participant id: who @主人 is. */
+/** The owner's participant id: who the owner mention is. */
 export const ownerId = "owner";
 
-/** Who @所有人 is. */
+/** Who the everyone mention is. */
 export const everyone = "everyone";
 
 /** The first channel, made default when the farm has none; then a name like any other, stored and in its address. */
@@ -51,8 +48,7 @@ export interface Spent {
   cny?: number;
 }
 
-/** A change with nothing to answer but when it shows (issue.comment.create): the seq of the core's fold read once it was
- * made, so the first frame whose seq is at least this one shows whatever it changed. */
+/** A change with nothing to answer but when it shows (issue.comment.create). */
 export interface Applied {
   seq: number;
 }

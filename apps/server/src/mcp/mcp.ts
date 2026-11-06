@@ -1,8 +1,3 @@
-// A session's tools over MCP at /mcp. The tools are tool's; this serves them and says which session
-// is calling: the bearer token each session is handed names it, and its profile and project are where it works in the
-// core state, never the caller's to choose. Every answer is words a model acts on, a refusal too ("没成：……").
-// Stateless: each request is served by a server of its own, so nothing is kept between calls.
-
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -12,7 +7,7 @@ import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
 import { coerceArguments } from "@vibevalley/ai/tools";
 
 import { session } from "#/base/actor.ts";
-import { messageOf } from "#/errors.ts";
+import { messageOf } from "#/base/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Session } from "#/session/session.ts";
 import type { Caller } from "#/tool/schemas.ts";
@@ -95,7 +90,7 @@ const make = (options: McpOptions = {}) =>
               await server.connect(transport);
               return server;
             }),
-            (server) => Effect.ignore(Effect.tryPromise({ try: () => server.close(), catch: messageOf })),
+            (server) => Effect.ignore(Effect.tryPromise({ try: () => server.close(), catch: messageOf }), { log: "Debug" }),
           );
           return yield* Effect.promise(() => transport.handleRequest(request));
         }),

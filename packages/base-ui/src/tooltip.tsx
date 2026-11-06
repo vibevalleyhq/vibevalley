@@ -1,7 +1,3 @@
-// Tooltip (Base UI's): a few words about its trigger, shown after the pointer rests on it or at once when the keyboard
-// focuses it, gone when either leaves, on a press or on Escape. Once one has shown, the next opens without the wait,
-// so moving along a toolbar reads each button's tip. Its trigger is described by it while it shows.
-
 import { dynamic, type JSX } from "@solidjs/web";
 import { createContext, createEffect, omit, onCleanup, useContext } from "solid-js";
 

@@ -1,7 +1,3 @@
-// Tabs (Base UI's): a tab list and the panel of the selected tab. The list is one tab stop: arrows move along it
-// (Home, End, wrapping), and Enter or Space selects, or the focus selects too with activateOnFocus. With no value given
-// the first tab is selected. Tabs and panels find each other by value: tab's aria-controls, panel's aria-labelledby.
-
 import { dynamic } from "@solidjs/web";
 import { createContext, createSignal, createUniqueId, omit, onSettled, Show, useContext } from "solid-js";
 

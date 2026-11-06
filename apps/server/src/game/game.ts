@@ -1,8 +1,3 @@
-// The game: the ledger the farm's progress folds from, the commits that make its level, and the
-// plot the owner planted for the next helper. Entries the farm's facts tell of are recorded watching them (entriesFor);
-// what the owner does that is no fact (a review, a call, a title) where it happens. The ledger never stops the farm: an
-// entry that cannot be written is logged, and the farm goes on.
-
 import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, Stream, Option } from "effect";
 
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";

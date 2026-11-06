@@ -1,7 +1,3 @@
-// The workbench's issue page answers the owner's questions in order: what it is, where it stands, the one thing asked of
-// the owner, how far it is. The first test sends a real helper (the server's scripted runtime, doing what its job's
-// words say); the rest serve a frame and the issue's history with one in place, for states it does not reach.
-
 import type { Page, Route } from "@playwright/test";
 
 import type { Agent, Changes, Issue, IssueHistory, IssueStage, IssueTimeline, StateFrame, SessionView } from "@vibevalley/protocol";
@@ -92,8 +88,7 @@ const scripted: Agent = {
   look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
 };
 
-// The test helper's words (apps/server/src/testing/helper.ts): 先问清楚 asks which port, 给选项 with options, and the
-// answer 用 8797 lets it go on and hand back.
+// The test helper's words (apps/server/src/testing/helper.ts).
 const asksWithOptions = "打卡页先问清楚，给选项";
 const answer = "用 8797";
 

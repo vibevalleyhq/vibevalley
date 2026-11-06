@@ -12,7 +12,7 @@ export function autofocus() {
   };
 }
 
-/** The time, a new reading every `ms`: for "3 分钟前" that keeps up without anything else changing. */
+/** The time, a new reading every `ms`: for "3m ago" that keeps up without anything else changing. */
 export function useNow(ms = 30_000): Accessor<number> {
   const [now, setNow] = createSignal(Date.now());
   useInterval(() => setNow(Date.now()), ms);
@@ -50,11 +50,7 @@ export function createSettled<T>(value: Accessor<T>, ms = 250): Accessor<T> {
   return settled;
 }
 
-/**
- * Closes a popup when the pointer goes down outside `box` while `open`: a menu folds when you click elsewhere. Returns
- * the ref for the box (the popup and what opens it, so the opener's own click still toggles). Escape is the page's to
- * give: on the farm it opens the menu.
- */
+/** Closes a popup when the pointer goes down outside `box` while `open`: a menu folds when you click elsewhere. */
 export function useClickAway(open: Accessor<boolean>, close: () => void) {
   let box: HTMLElement | undefined;
   createEffect(open, (on) => {
@@ -74,7 +70,3 @@ export function variant<T, K extends keyof T, const V extends T[K]>(value: T, ke
   const is = (v: T): v is Extract<T, Record<K, V>> => v[key] === tag;
   return is(value) ? value : undefined;
 }
-
-/** A JSON object's fields, each still to be checked; undefined for anything that is not an object. */
-export const recordOf = (v: unknown): Record<string, unknown> | undefined =>
-  typeof v === "object" && v !== null && !Array.isArray(v) ? Object.fromEntries(Object.entries(v)) : undefined;

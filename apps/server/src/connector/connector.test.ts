@@ -49,8 +49,7 @@ class Inbox<A> {
 /** Until the test opens the gate; a login called off first is interrupted there. */
 const past = (g: { readonly opened: Promise<void> }) => Effect.promise(() => g.opened);
 
-/** The three apps, played: what they are sent is kept; restricted, they refuse a reply as an expired window does, but
- * one to a message the owner has just sent (opened), as the real window opens again. */
+/** The three apps, played: what they are sent is kept. */
 class Script {
   readonly sent: Sent[] = [];
   restricted = false;
@@ -134,7 +133,7 @@ const feishuMsg = (from: string, text: string, chatType = "p2p"): FeishuMessage 
   parentId: "",
 });
 
-/** The orchestrator, played: what it hears goes into the channel, and it answers 收到 at once. */
+/** The orchestrator, played: what it hears goes into the channel, and it answers acknowledged at once. */
 const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: number; retryMostMs?: number } = {}) =>
   Connector.layer({ weixin: script.weixin, feishu: script.feishu, qq: script.qq, ...retry }).pipe(
     Layer.provideMerge(echoing),
@@ -436,8 +435,7 @@ describe("the chat apps", () => {
       yield* qqPaired(script);
       const before = listens;
       script.qqIn.push(qqMsg("owner-openid", "断开"));
-      // A failed receive is tried again after its backoff on the farm's Clock: moved through each time it is asked, as
-      // the test cannot see when the backoff starts. The same account listens once more.
+      // A failed receive is tried again after its backoff on the farm's Clock: moved through each time it is asked, as the test cannot see when the backoff starts.
       yield* waitFor(
         Effect.map(TestClock.adjust(2_000), () => listens),
         (n) => n > before,

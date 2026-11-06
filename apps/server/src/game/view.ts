@@ -1,7 +1,3 @@
-// What the farm draws of the core state: levels, plots,
-// the effects a fact sets off, and the achievements in words.
-// Where each session stands and what it has been doing is here too: no business rule reads a session's play.
-
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
@@ -132,10 +128,7 @@ const badgeRest = (): T.Badge => ({ text: t("server.game.badge.rest"), tone: "re
 const badgeReview = (): T.Badge => ({ text: t("shared.stage.reviewing"), tone: "wait" });
 const badgeQuestions = (): T.Badge => ({ text: t("shared.stage.asking"), tone: "wait" });
 
-/**
- * A plot is a picture of its issue's stage, never a second reading of it: the crop and the badge say where the
- * issue stands (issueStageOf decides that, and in what order); the session only adds how far this round has grown.
- */
+/** A plot is a picture of its issue's stage, never a second reading of it. the session only adds how far this round has grown. */
 export function plotOf(h: T.Session, issue: T.Issue | undefined, play: T.SessionPlay): T.PlotView {
   if (!issue) return plotOfSession(h, play);
   const a = issue.stage;
@@ -257,8 +250,8 @@ export function achievementInWords(a: AchievementDef): T.Achievement {
 }
 
 function tierTitle(a: AchievementDef, tier: number): string {
-  const titles = a.tierTitles ?? [];
-  if (tier >= 1 && tier <= titles.length) return titles[tier - 1]!;
+  const custom = tier >= 1 ? a.tierTitles?.[tier - 1] : undefined;
+  if (custom !== undefined) return custom;
   return tier === 2 ? t("server.game.tier.silver", { title: a.title }) : tier === 3 ? t("server.game.tier.gold", { title: a.title }) : a.title;
 }
 

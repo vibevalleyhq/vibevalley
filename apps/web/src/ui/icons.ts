@@ -79,8 +79,7 @@ import {
 
 import type { SessionAction } from "@vibevalley/protocol";
 
-// The workbench's icons, one picture to a meaning: name an icon by what it means where it is used, so that one meaning
-// looks the same on every page. The pixel skins (farm, tree, ui/pixel) draw theirs with SpriteIcon.
+// The workbench's icons, one picture to a meaning: name an icon by what it means where it is used, so that one meaning looks the same on every page.
 
 export const icons = {
   // Places.

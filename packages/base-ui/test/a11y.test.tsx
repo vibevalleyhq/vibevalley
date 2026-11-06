@@ -1,5 +1,3 @@
-// Each component, closed and open, as axe reads it: the roles, names and states the parts write are allowed and whole.
-
 import { test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 

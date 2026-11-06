@@ -1,8 +1,4 @@
-/**
- * The workbench's design tokens as its classes may name them (docs/style/design.md): what a class string writes off the
- * ladders. scripts/oxlint-plugin.ts's design-tokens rule reports each; the pixel skin and the avatars are drawn and keep
- * their own values (vite.config.ts says where the rule runs).
- */
+/** The workbench's design tokens as its classes may name them (docs/style/design.md): what a class string writes off the ladders. */
 
 /** A token kind, as the rule's message names what to use instead. */
 export type TokenKind = "radius" | "type" | "motion" | "layer" | "disabled" | "shadow";

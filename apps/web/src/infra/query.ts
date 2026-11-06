@@ -1,5 +1,3 @@
-// QueryObserver owns cache, fetching and retry policy; this adapter publishes its settled snapshots without suspending
-// the state stream's updates while a REST read is in flight.
 import { QueryClient, QueryObserver, type QueryKey, type QueryObserverOptions, type QueryObserverResult } from "@tanstack/solid-query";
 import { Schema } from "effect";
 import { type Accessor, createEffect, createSignal, onSettled, untrack } from "solid-js";
@@ -12,10 +10,7 @@ import type { FramesSource } from "./frame";
 /** REST reads besides the state stream (history, changes, …); a frame that changes what they show invalidates them. */
 export const queries = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
 
-/**
- * What changed while the state stream was lost reached no REST read either (they are invalidated by frames): each is
- * read again once the stream is back, whether or not the browser thought it was offline (navigator.onLine).
- */
+/** What changed while the state stream was lost reached no REST read either (they are invalidated by frames). */
 export function refetchOnRelink(source: FramesSource, client: QueryClient = queries) {
   let was = source.get().link;
   return source.subscribe(() => {

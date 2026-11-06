@@ -1,10 +1,3 @@
-/**
- * vpx packages/health/src/cli.ts --config <file> [--check | --write | --json]
- *
- * With no mode, prints the report. --check fails when an escape count is off the ratchet (up: new escapes; down: lower
- * the ratchet with --write) or a hot-by-design reason names a file that is gone. --write keeps today's escape counts.
- */
-
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";

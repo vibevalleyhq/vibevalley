@@ -1,10 +1,9 @@
-// Where it stands (and what the owner may do) is the server's Issue.stage: this only words it.
-
 import { t } from "@vibevalley/i18n";
-import type { Issue, IssueStage, Session, SessionEvent, IssueStageKind, DoingView, SessionView } from "@vibevalley/protocol";
+import type { DoingView, Issue, IssueStage, IssueStageKind, Session, SessionEvent, SessionView } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
+import { sessionId } from "@vibevalley/protocol/schema";
 
-import { tookText, spanText } from "#/base/format.ts";
+import { spanText, tookText } from "#/base/format.ts";
 
 import type { Tone } from "./cards";
 import { endedAt, issueTitle } from "./issue";
@@ -86,9 +85,23 @@ function ownerQuestion(stage: IssueStage, issue: Issue, head: Session): OwnerQue
   }
 }
 
+const emptySession = (issue: Issue): Session => ({
+  id: sessionId(issue.id),
+  role: "worker",
+  name: "",
+  agent: "",
+  runtime: "",
+  phase: { _tag: "resting" },
+  hiredAt: issue.createdAt,
+  brief: issue.title,
+  runs: 0,
+  refining: false,
+});
+
 /** `sessions` oldest first; `session` the one on the farm now, if any. */
 export function issueState(issue: Issue, sessions: Session[], session: SessionView | undefined, issues: Issue[]) {
-  const head = session ?? sessions[sessions.length - 1]!;
+  const head = session ?? sessions.at(-1) ?? emptySession(issue);
+  const first = sessions[0] ?? head;
   const parent = issues.find((item) => item.id === issue.parent);
   const stage = issue.stage;
   const current = session ? doingOf(session) : nothing;
@@ -135,20 +148,20 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
       n: sessions.length,
       line: sessions.map((r) => t("web.issue.issue.historyItem", { name: r.name, id: r.id })).join(" → "),
     }),
-    /** 在等你 · 3 分钟了 · Claude 师傅 · 第 2 轮 · 共用 4 分钟 · ¥0.42; cny is all the issue's runs when known. Under a
-     * minute is 刚刚, and the time in all is left out then: two "under a minute"s said nothing. */
+    /** status summary line. cny is all the issue's runs when known. */
     statusLine(now: number, cny?: number) {
       const s = session ?? head;
       const runs = Math.round(s.runs);
       const waited = stage.since !== undefined ? now - stage.since : undefined;
-      const used = (endedAt(head) ?? now) - sessions[0]!.hiredAt;
+      const used = (endedAt(head) ?? now) - first.hiredAt;
+      const spentCny = cny ?? s.spent?.cny;
       return [
         t(`shared.stage.${stage.state}`),
         ...(waited === undefined ? [] : [waited < 60_000 ? t("web.issue.issue.justNow") : t("web.issue.issue.since", { span: spanText(waited) })]),
         head.name,
         ...(runs > 0 ? [t("web.issue.issue.ran", { n: runs })] : []),
         ...(used >= 60_000 ? [t("web.issue.issue.used", { span: spanText(used) })] : []),
-        ...((cny ?? s.spent?.cny) !== undefined ? [`¥${(cny ?? s.spent!.cny!).toFixed(2)}`] : []),
+        ...(spentCny !== undefined ? [`¥${spentCny.toFixed(2)}`] : []),
       ].join(" · ");
     },
     usedLine(steps: SessionEvent[], now: number) {
@@ -166,5 +179,5 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
   };
 }
 
-/** The empty 干活过程 says why. */
+/** The empty work log says why. */
 export const noStepsText = (head: Session) => (endedAt(head) === undefined ? t("web.issue.issue.noSteps") : t("web.issue.issue.stepsGone"));

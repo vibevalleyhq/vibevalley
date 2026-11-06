@@ -1,6 +1,3 @@
-// What a Mac has one of (the global shortcut, the island at the notch) goes to the channel opened first (channel.ts): a
-// file in the user's temporary folder names its process. One whose process is gone is taken over.
-
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

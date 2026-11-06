@@ -1,8 +1,3 @@
-// Waiting in a test for what runs in the background: asked again until it holds, or a defect that says what it waited
-// for. The asks thin out (1, 2, 5, 15, then every 30 ms): a wait of a second asks some forty times, not a thousand, and
-// each ask may be a query on the one database connection the work itself needs. The asking is on real time, apart from Effect's Clock: a test that moves a TestClock still waits
-// this way for real work (git, a database, an agent's turn).
-
 import { Effect } from "effect";
 
 const gaps = [1, 2, 5, 15, 30];
@@ -43,8 +38,7 @@ export const until = (ok: () => boolean | Promise<boolean>, what: string | (() =
     ),
   );
 
-/** until for a test written with promises (a fake runtime, a fake model): once ok holds, asked again as waitFor does on
- * real time, or rejected with what it waited for. */
+/** until for a test written with promises (a fake runtime, a fake model). */
 export const whenTrue = async (ok: () => boolean | Promise<boolean>, what: string, ms = 5_000): Promise<void> => {
   const deadline = performance.now() + ms;
   /* oxlint-disable eslint/no-await-in-loop -- a poll: each try waits for the one before */
@@ -70,8 +64,6 @@ export const gate = () => {
   return { opened, open };
 };
 
-/** One turn of the event loop: whatever was set going before it (a publish taken by a forked reader, a promise already
- * resolved) has run. For "nothing came of it" when what could have come would have been set going already; it is not a
- * wait for time. */
+/** One turn of the event loop: whatever was set going before it (a publish taken by a forked reader, a promise already resolved) has run. */
 export const nextTurn = () => new Promise<void>((resolve) => setImmediate(resolve));
 export const aTurn = Effect.promise(nextTurn);

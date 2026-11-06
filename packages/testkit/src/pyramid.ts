@@ -1,9 +1,3 @@
-// The layers of the test pyramid (docs/subsystems/foundation.md), for the server and the packages it runs on: a test
-// file's layer is what it reaches through everything it imports, type-only imports aside, into the workspace's packages
-// too (an import of @vibevalley/agent/coding reaches a child process as a relative import would). Under src/flows it is a flow; one whose imports reach a database, a
-// child process or the network is a module test; one that stays in the process is a rule test. The budgets, the shape
-// printed after a run and the boundaries checked in pyramid.test.ts all ask this one function.
-
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
 
@@ -61,8 +55,7 @@ function exported(exports: Readonly<Record<string, string>>, sub: string): strin
   return undefined;
 }
 
-/** The layers of the files under root (a package's folder); paths are relative to it, as src/x/y.test.ts, and a
- * workspace package's files are reached as ../../packages/…. */
+/** The layers of the files under root (a package's folder). */
 export function pyramid(root: string) {
   const packages = workspacePackages(root);
   /** Where an import of a workspace package leads, relative to root; undefined for anything else. */

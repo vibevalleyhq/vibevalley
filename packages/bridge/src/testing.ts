@@ -1,5 +1,3 @@
-// A message goes through JSON, as over a WebView, and arrives at once: a test awaits the call it made, not the clock.
-
 import type { Link } from "./index";
 
 export function linkPair(): readonly [Link, Link] {

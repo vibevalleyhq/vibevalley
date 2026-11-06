@@ -1,8 +1,3 @@
-/**
- * This repository's say in its health readings (packages/health): what is production code, how files group into areas,
- * and which files are hot by design. `vp run health` prints the report; `vp run health:verify` holds the escape ratchet.
- */
-
 import type { Health } from "@vibevalley/health/readings";
 import { moduleOf } from "@vibevalley/server/modules";
 

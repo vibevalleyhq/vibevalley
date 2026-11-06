@@ -1,9 +1,3 @@
-// EverOS (github.com/EverMind-AI/EverOS) over its HTTP API, /api/v2. It is given whole
-// runs and extracts memories itself with a model: memory/add takes a session's messages, memory/flush makes it extract
-// them (here when the session leaves the farm), memory/search reads back. What a helper says is the agent's (agent_id,
-// read back as agent_cases), what it was asked is the owner's (user_id, read back as episodes). Every message is redacted
-// first: a helper's words may carry a key.
-
 import { createHash } from "node:crypto";
 
 import { Clock, Effect, Schema } from "effect";
@@ -195,7 +189,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       };
     }),
     list: () => Effect.fail(new SourceError({ message: t("server.memory.everosList") })),
-    // The brief once per session, then what the helper said; a failed run says so. A stopped run leaves nothing.
+    // The brief once per session, then what the helper said. a failed run says so.
     syncTurn: Effect.fnUntraced(function* (run) {
       if (c.write !== true || run.outcome === "interrupted") return;
       const at = yield* Clock.currentTimeMillis;

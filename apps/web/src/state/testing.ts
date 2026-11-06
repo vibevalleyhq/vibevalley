@@ -1,5 +1,3 @@
-// For the rules' tests: a registry whose frames come from the test (infra/testing.ts), not from a server.
-
 import { type TestFrames, testFrames } from "#/infra/testing.ts";
 
 import { createRegistry, framesSource } from "./atom";

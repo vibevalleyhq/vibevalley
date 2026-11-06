@@ -1,5 +1,3 @@
-// How the tools word what they found.
-
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues, PriorityValues } from "@vibevalley/protocol";
@@ -28,7 +26,7 @@ function tail(s: string, n: number): string {
   const chars = [...s];
   let units = 0;
   for (let i = chars.length - 1; i >= 0; i--) {
-    units += chars[i]!.length;
+    units += (chars[i] ?? "").length;
     if (units > n) return chars.slice(i + 1).join("");
   }
   return s;

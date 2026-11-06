@@ -4,8 +4,8 @@ import type * as T from "@vibevalley/protocol";
 import { ownerId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
+import { type ApiError } from "#/base/errors.ts";
 import { jsonOrNone } from "#/base/json.ts";
-import { type ApiError } from "#/errors.ts";
 import { type InboxMessage, type Meta, metaOf, type Picked, senderKind } from "#/mailbox/envelope.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 
@@ -27,9 +27,9 @@ export const reactionsText = (r: Reactions) => {
   return kept.length > 0 ? JSON.stringify(Object.fromEntries(kept)) : null;
 };
 
-export const messageKind = (kind: string): T.MessageKind => (kind === "dispatch" || kind === "report" || kind === "notice" ? kind : "chat");
-export const subjectKind = (kind: string | null): T.SubjectKind | undefined => (kind === "issue" || kind === "talk" ? kind : undefined);
-export const notifyOf = (n: string): T.Notify => (n === "mentions" || n === "none" ? n : "all");
+export const messageKind = (kind: string): T.MessageKind => (Schema.is(S.MessageKind)(kind) ? kind : "chat");
+export const subjectKind = (kind: string | null): T.SubjectKind | undefined => (kind !== null && Schema.is(S.SubjectKind)(kind) ? kind : undefined);
+export const notifyOf = (n: string): T.Notify => (Schema.is(S.Notify)(n) ? n : "all");
 
 export function toMessage(row: MsgRow): T.ChatMessage {
   const meta = metaOf(row.meta);
@@ -141,7 +141,7 @@ export interface ThreadSubject {
   readonly owner: string;
 }
 
-/** What a session's work is talked about under: the issue it works, so every session on one issue shares a thread; a session sent for no issue has a talk thread of its own. */
+/** What a session's work is talked about under: the issue it works, so every session on one issue shares a thread. */
 export const subjectOf = (h: T.Session): ThreadSubject => (h.issue ? { kind: "issue", id: h.issue, owner: h.id } : { kind: "talk", id: h.id, owner: h.id });
 
 export interface Write {
@@ -208,8 +208,7 @@ export interface ChannelService {
   /** The channel's id for a channel given by id or as a target ("#name", a thread), or from's own place when "": a
    * session's own thread, else the default channel. */
   readonly placeOf: (from: string, channel: string) => Effect.Effect<string, ApiError>;
-  /** Words that announce an artifact (artifact/), with its card, said as from (the owner, a session or an orchestrator) in
-   * a channel placeOf names. Never held for unseen messages, as speak's are: it answers none of them. */
+  /** Words that announce an artifact (artifact/), with its card, said as from (the owner, a session or an orchestrator) in a channel placeOf names. */
   readonly announce: (from: string, channel: string, text: string, card: T.ArtifactCard) => Effect.Effect<T.ChatMessage, ApiError>;
   /** Words said on a call, kept in the default channel as they were said; they wake no one. */
   readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
@@ -231,8 +230,7 @@ export interface ChannelService {
   readonly threadOfSession: (session: string) => Effect.Effect<string | undefined>;
   /** The channels the core state holds now. */
   readonly now: () => T.Chat | undefined;
-  /** What is said in a channel after the message numbered after, then what is said there from now on; Reset when
-   * more than catchUpMax were missed. A follower too slow for what is said ends, and comes back with its number. */
+  /** What is said in a channel after the message numbered after, then what is said there from now on. Reset when more than catchUpMax were missed. */
   readonly follow: (channel: string, after: number) => Stream.Stream<T.ChannelEvent, ApiError>;
   /** The turn reports anywhere after the one with this id, or the newest logKeep when absent, then each from now on. */
   readonly reports: (after?: string) => Stream.Stream<T.ChannelEvent>;
@@ -252,8 +250,7 @@ export interface ChannelService {
   /** How much of a place counts for the owner: none when it or its channel is set to none, else its own level, else its channel's. */
   readonly notifyOf: (id: string) => T.Notify;
   readonly direct: (agent: string) => Effect.Effect<string, ApiError>;
-  /** The orchestrator a place is looked after by: a channel's own, its thread's channel's, a direct channel's peer when
-   * that is an orchestrator, else the default one. */
+  /** The orchestrator a place is looked after by. */
   readonly orchestratorOf: (channel: string) => string;
   readonly markUnread: (channel: string, number: number) => Effect.Effect<void, ApiError>;
   /** The channel a place is in: a thread's, or the default one for a direct channel, which holds no work. */

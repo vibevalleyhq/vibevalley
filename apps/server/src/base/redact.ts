@@ -1,7 +1,3 @@
-// Secrets as they show up in free text: a token by its own shape, or the value after a
-// name that says it is one. The server's log (redactOutput) and whatever memory sends outside the farm both go through
-// redact.
-
 import { Brand } from "effect";
 
 import { head } from "./clip.ts";
@@ -38,8 +34,7 @@ export function redact(text: string): RedactedString {
 /** Its first n UTF-16 units, trimmed: cut after redacting, as a secret cut first may no longer look like one. */
 export const redactedHead = (text: RedactedString, n: number): RedactedString => redactedString(head(text.trim(), n));
 
-/** Everything the process writes to stream goes through redact first: the server's log, and what a library prints. A
- * secret split across two writes gets through; console writes a line at a time. */
+/** Everything the process writes to stream goes through redact first: the server's log, and what a library prints. */
 export function redactOutput(stream: NodeJS.WriteStream) {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every overload of write takes the chunk first and passes the rest on
   const write = stream.write.bind(stream) as (chunk: unknown, ...rest: unknown[]) => boolean;

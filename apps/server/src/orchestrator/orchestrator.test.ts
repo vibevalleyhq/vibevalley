@@ -92,8 +92,7 @@ const farm = (f: Reply = respond, config: ServerConfig["Service"] = testConfig()
   return { requests, layer: orchestrating };
 };
 
-/** Everything handed to the orchestrator before this is taken once this is: it takes one input at a time. So a test that
- * says nothing more came of something waits for this, not for a while. */
+/** Everything handed to the orchestrator before this is taken once this is: it takes one input at a time. */
 const marked = (f: { readonly requests: readonly Request[] }) =>
   Effect.gen(function* () {
     const ingress = yield* Ingress;

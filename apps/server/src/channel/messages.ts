@@ -1,4 +1,3 @@
-// The chat in the core state.
 import type * as T from "@vibevalley/protocol";
 
 import { compactCard } from "#/base/clip.ts";
@@ -10,7 +9,7 @@ import type { InputContext } from "#/mailbox/payload.ts";
 import { chatNamed } from "./mentions.ts";
 
 export { targetOf };
-/** The database keeps them all; the state these many. What is said in them is the rooms' (Channel.follow). */
+/** The database keeps them all. the state these many. */
 export const keepChannels = 100;
 
 const isTop = (c: T.Channel) => c.type !== "thread";
@@ -19,9 +18,7 @@ const emptyChat = (): T.Chat => ({ channels: [], ownerMentions: [] });
 
 export const withOwnerMentions = (chat: T.Chat | undefined, ownerMentions: T.OwnerMention[]): T.Chat => ({ ...(chat ?? emptyChat()), ownerMentions });
 
-/** A message said: news when its number is past what the state knows of its channel, or when the state does not
- * keep that channel (the game and the owner's other channels hear of it all the same); its channel's
- * lastNumber moves to it. A message said before, again (a restart's), is no news. */
+/** A message said: news when its number is past what the state knows of its channel, or when the state does not keep that channel. */
 export function withMessage(chat: T.Chat | undefined, m: T.ChatMessage): [T.Chat | undefined, boolean] {
   const c = chat?.channels.find((x) => x.id === m.channel);
   if (!chat || !c) return [chat, true];

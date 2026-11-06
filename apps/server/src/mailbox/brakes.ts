@@ -43,9 +43,7 @@ export const hopLimit = 4;
 export const agentWakeCooldownMs = 60_000;
 export const wakeBreaker = 3;
 
-// The wake breaker: a helper whose launches fail wakeBreaker times running, each before it says a word, is not woken
-// again (the audience leaves it out, kick does not hand it messages) until someone speaks to it by name or it leaves.
-// Speaking again only clears the count: a tripped breaker stays tripped until it is reset.
+// The wake breaker: a helper whose launches fail wakeBreaker times running, each before it says a word, is not woken again until someone speaks to it by name or it leaves.
 export class WakeBreaker {
   private readonly failures = new Map<string, number>();
   private readonly open = new Set<string>();

@@ -1,9 +1,6 @@
-// The farm skin's classes and pixel sizes, framework-free: the kit's components and the rules draw with them.
-
 export const cx = (...parts: (string | false | undefined)[]) => parts.filter(Boolean).join(" ");
 
-// One weight and no synthesised bold or italics: the pixel font has neither. Line heights are Tailwind's for each size;
-// the skin changes the size, not the line height. Sharp at 12 and 24 px only.
+// One weight and no synthesised bold or italics: the pixel font has neither. Line heights are Tailwind's for each size.
 const pixel = "font-pixel font-normal [font-synthesis:none] tracking-normal";
 
 export const pxText = {
@@ -27,12 +24,10 @@ export const pxFocus = "outline-none focus-visible:outline-2 focus-visible:outli
 /** The 2 px cream-300 line inside a box: an inset shadow, so it takes no room from what is inside. */
 export const pxRing = "shadow-[inset_0_0_0_2px_var(--color-cream-300)]";
 
-// One edge with the corners left out and a soft drop that shows only past the corner: an inner rim and a thick
-// bottom band on top of them read as a double, heavy frame.
+// One edge with the corners left out and a soft drop that shows only past the corner.
 export const pxWindow =
   "shadow-[0_-2px_0_0_var(--color-bark-500),0_2px_0_0_var(--color-bark-500),-2px_0_0_0_var(--color-bark-500),2px_0_0_0_var(--color-bark-500),2px_2px_0_0_var(--color-px-drop)]";
 
-// A light rim inside, a 4 px cream-300 band at the foot, a 2 px ink outline with the corners left out, and a drop 2 px
-// right and 4 px down that shows past the corner.
+// A light rim inside, a 4 px cream-300 band at the foot, a 2 px ink outline with the corners left out, and a drop 2 px right and 4 px down that shows past the corner.
 export const pxFrame =
   "shadow-[inset_0_0_0_2px_var(--color-rim),inset_0_-4px_0_0_var(--color-cream-300),0_-2px_0_0_var(--color-px-ink),0_2px_0_0_var(--color-px-ink),-2px_0_0_0_var(--color-px-ink),2px_0_0_0_var(--color-px-ink),2px_4px_0_0_var(--color-px-drop)]";

@@ -1,7 +1,3 @@
-// The seeds (seeds.json, template_catalog.json): the achievements and the issue templates, in the farm's language (a
-// profile's templates are folders, template.ts; the runtimes' presets are runtime/presets.ts). The .en files say the same
-// as the Chinese but for their words (seed.test.ts).
-
 import { Schema } from "effect";
 
 import type * as T from "@vibevalley/protocol";
@@ -28,8 +24,7 @@ const AchievementDef = Schema.Struct({
 export type AchievementDef = typeof AchievementDef.Type;
 
 const Seeds = Schema.Struct({ achievements: Schema.Array(AchievementDef) });
-/** A template as template_catalog.json writes it: done may still hold {test}, {lint} and {build}; its text is made when
- * it is filled for a project (issue/brief.ts filledTemplate). */
+/** A template as template_catalog.json writes it: done may still hold {test}, {lint} and {build}. */
 const WrittenTemplate = Schema.Struct({ id: Schema.String, title: Schema.String, done: Schema.String });
 export type WrittenTemplate = typeof WrittenTemplate.Type;
 const WrittenKind = Schema.Struct({ id: Schema.String, name: Schema.String, icon: Schema.String, templates: Schema.Array(WrittenTemplate) });

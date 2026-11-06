@@ -1,6 +1,3 @@
-// Past its budget the older part of the conversation is folded into a summary. The older part is cut where a user's
-// message begins, so a tool call and its result stay together.
-
 import { Effect } from "effect";
 
 import { complete, type ModelClient } from "@vibevalley/ai/client";
@@ -21,14 +18,14 @@ export const summaryInPlace = compactionWords.summaryInPlace;
 const spoke = (m: BrainMessage) => m.role === "assistant" && messageText(m).trim() !== "";
 const opens = (m: BrainMessage | undefined) => m?.role === "user" || m?.role === "custom";
 
-/** Where a user's (or custom) message begins, at least keepRecent messages from the end, and further back until at least
- * keepSaid assistant messages with words in them follow; 0 for nowhere. */
+/** Where a user's (or custom) message begins, at least keepRecent messages from the end, and further back until at least keepSaid assistant messages with words in them follow. */
 export function cutPoint(messages: readonly BrainMessage[], keepRecent: number, keepSaid: number): number {
   let cut = messages.length - keepRecent;
   let said = messages.slice(Math.max(cut, 0)).filter(spoke).length;
   while (cut > 0 && (cut >= messages.length || !opens(messages[cut]) || said < keepSaid)) {
     cut--;
-    if (cut >= 0 && cut < messages.length && spoke(messages[cut]!)) said++;
+    const m = messages[cut];
+    if (m && spoke(m)) said++;
   }
   return Math.max(cut, 0);
 }

@@ -7,8 +7,8 @@ import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { Agent } from "#/agent/agent.ts";
+import { type ApiError, refused, missing, lookIn } from "#/base/errors.ts";
 import { Core } from "#/core/core.ts";
-import { type ApiError, refused, missing, lookIn } from "#/errors.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Db } from "#/infra/db.ts";
 import { bestEffort } from "#/infra/log.ts";
@@ -254,7 +254,8 @@ export class Mailbox extends Context.Service<
           let after = 0;
           while (true) {
             const rows = yield* db.run(qr.unroutedTriggers({ after }));
-            if (rows.length === 0) return;
+            const last = rows.at(-1);
+            if (!last) return;
             yield* Effect.forEach(
               rows,
               (row) =>
@@ -263,7 +264,7 @@ export class Mailbox extends Context.Service<
                 ),
               { discard: true },
             );
-            after = rows.at(-1)!.seq;
+            after = last.seq;
           }
         }),
         insert: work.insert,

@@ -1,5 +1,3 @@
-// A tool that fails throws (or fails, as an Effect): the model reads the error's message as a failed result.
-
 import { Effect, Schema } from "effect";
 
 import { type JsonSchema, parametersOf } from "@vibevalley/ai/tools";
@@ -28,59 +26,56 @@ interface ToolContext {
   readonly signal: AbortSignal;
 }
 
-interface TextToolSpec<P> {
+interface TextToolSpec {
   readonly name: string;
   readonly description: string;
   readonly parameters: JsonSchema;
-  readonly run: (params: P, tc: ToolContext) => string | Promise<string>;
+  readonly run: (params: unknown, tc: ToolContext) => string | Promise<string>;
 }
 
 const answered = (text: string) => ({ content: [{ type: "text" as const, text: clip(text) }] });
 
-export const textTool = <P>(spec: TextToolSpec<P>): Tool => ({
+export const textTool = (spec: TextToolSpec): Tool => ({
   name: spec.name,
   description: spec.description,
   parameters: spec.parameters,
   execute: (params, call) =>
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the loop checked the arguments against parameters before execute
-    Effect.map(Effect.tryPromise({ try: async (signal) => spec.run(params as P, { callId: call.id, signal }), catch: toolFailed }), answered),
+    Effect.map(Effect.tryPromise({ try: async (signal) => spec.run(params, { callId: call.id, signal }), catch: toolFailed }), answered),
 });
 
-interface EffectToolSpec<P> extends Omit<TextToolSpec<P>, "run"> {
+interface EffectToolSpec extends Omit<TextToolSpec, "run"> {
   /** A failure's message is the failed result the model reads. */
-  readonly run: (params: P) => Effect.Effect<string, ToolFailed>;
+  readonly run: (params: unknown) => Effect.Effect<string, ToolFailed>;
 }
 
-export const effectTool = <P>(spec: EffectToolSpec<P>): Tool => ({
+export const effectTool = (spec: EffectToolSpec): Tool => ({
   name: spec.name,
   description: spec.description,
   parameters: spec.parameters,
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the loop checked the arguments against parameters before execute
-  execute: (params) => Effect.map(spec.run(params as P), answered),
+  execute: (params) => Effect.map(spec.run(params), answered),
 });
 
-interface SchemaToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<TextToolSpec<S["Type"]>, "parameters"> {
+interface SchemaToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<TextToolSpec, "parameters" | "run"> {
   readonly parameters: S;
+  readonly run: (params: S["Type"], tc: ToolContext) => string | Promise<string>;
 }
 
-/** A tool whose parameters are a Schema: the model is shown parametersOf, and the arguments are read by the Schema
- * before run (a refusal is the failed result the model reads). */
-export function schemaTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: SchemaToolSpec<S>): Tool {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a tool's Struct decodes with no services
-  const read = Schema.decodeUnknownSync(spec.parameters as unknown as Schema.Codec<S["Type"]>);
-  return textTool<unknown>({ ...spec, parameters: parametersOf(spec.parameters), run: (p, tc) => spec.run(read(p), tc) });
+/** A tool whose parameters are a Schema. */
+export function schemaTool<S extends Schema.Struct<Schema.Struct.Fields> & Schema.Codec<S["Type"]>>(spec: SchemaToolSpec<S>): Tool {
+  const read = Schema.decodeUnknownSync(spec.parameters);
+  return textTool({ ...spec, parameters: parametersOf(spec.parameters), run: (p, tc) => spec.run(read(p), tc) });
 }
 
-interface SchemaEffectToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<EffectToolSpec<S["Type"]>, "parameters"> {
+interface SchemaEffectToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<EffectToolSpec, "parameters" | "run"> {
   readonly parameters: S;
+  readonly run: (params: S["Type"]) => Effect.Effect<string, ToolFailed>;
 }
 
-export function schemaEffectTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: SchemaEffectToolSpec<S>): Tool {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a tool's Struct decodes with no services
-  const read = Schema.decodeUnknownSync(spec.parameters as unknown as Schema.Codec<S["Type"]>);
-  return effectTool<unknown>({
+export function schemaEffectTool<S extends Schema.Struct<Schema.Struct.Fields> & Schema.Codec<S["Type"]>>(spec: SchemaEffectToolSpec<S>): Tool {
+  const read = Schema.decodeUnknownEffect(spec.parameters);
+  return effectTool({
     ...spec,
     parameters: parametersOf(spec.parameters),
-    run: (p) => Effect.flatMap(Effect.try({ try: () => read(p), catch: toolFailed }), spec.run),
+    run: (p) => Effect.flatMap(Effect.mapError(read(p), toolFailed), spec.run),
   });
 }

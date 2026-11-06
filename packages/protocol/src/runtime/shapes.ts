@@ -1,5 +1,3 @@
-// The shapes of the coding agents on this machine: presets, what each supports, installation, usage (docs/subsystems/agent.md).
-
 import type { Look } from "../agent/shapes";
 
 export const sessionSystemPrompt = "systemPrompt";

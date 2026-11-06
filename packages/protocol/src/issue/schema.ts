@@ -1,11 +1,9 @@
-// The Schemas of issues: status, acts, history, reports, the board (docs/subsystems/issue.md): each typed by its shape (Codec<T.X>).
-
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
 import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
 import { Commit, UncommittedItem } from "../project/schema";
-import { IssueAnswer, Session } from "../session/schema";
+import { IssueAnswer, PhaseResting, Session } from "../session/schema";
 import * as T from "../shapes";
 
 export const Conflict: Codec<T.Conflict> = Schema.Struct({
@@ -274,4 +272,31 @@ export const IssueStatusRequest: Codec<T.IssueStatusRequest> = Schema.Struct({
   agent: Schema.optionalKey(Schema.String),
   edit: Schema.optionalKey(IssueUpdate),
   requestKey: Schema.optionalKey(Schema.String),
+});
+
+export const FactSessionReported: Codec<T.FactSessionReported> = Schema.Struct({
+  type: Schema.Literal("sessionReported"),
+  at: Schema.Finite,
+  id: SessionId,
+  run: Schema.optionalKey(Schema.String),
+  outcome: Outcome,
+  phase: Schema.optionalKey(PhaseResting),
+  summary: Schema.String,
+  runs: Schema.Finite,
+  spent: Schema.optionalKey(Spent),
+  questions: Schema.mutable(Schema.Array(Question)),
+  checks: Schema.mutable(Schema.Array(CriterionCheck)),
+  answer: Schema.optionalKey(IssueAnswer),
+});
+
+export const FactIssueChanged: Codec<T.FactIssueChanged> = Schema.Struct({
+  type: Schema.Literal("issueChanged"),
+  at: Schema.Finite,
+  issue: Issue,
+});
+
+export const FactIssueRemoved: Codec<T.FactIssueRemoved> = Schema.Struct({
+  type: Schema.Literal("issueRemoved"),
+  at: Schema.Finite,
+  id: IssueId,
 });

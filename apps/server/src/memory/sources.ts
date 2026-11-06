@@ -1,15 +1,10 @@
-// Where memories live: this farm's database, always there and
-// first, and a memory service outside it (Nowledge Mem, EverOS), modeled on Hermes's MemoryProvider. Every read asks them
-// all at once and takes their answers in turns; a source outside the farm that fails or is slow gives nothing, with a line
-// in the log; writes to one go in the background, in order.
-
 import { Cause, Clock, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Ref, Schema, Scope, SynchronizedRef } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { messageOf } from "#/errors.ts";
+import { messageOf } from "#/base/errors.ts";
 import type { MemorySourceConfig } from "#/setting/memorySources.ts";
 
 import type { FinishedRun, MemoryStore, Note, RecallCue } from "./memory.ts";
@@ -146,13 +141,13 @@ export function localSource(m: MemoryStore, profiles: () => string[]): Source {
 const idOf = (one: Source, id: string) => (one.name === localName || id === "" ? id : `${one.name}:${id}`);
 
 /** Which source an id is from, and the id as that source knows it. */
-function owner(all: readonly Source[], id: string): [Source, string] {
+function owner(all: readonly [Source, ...Source[]], id: string): [Source, string] {
   const colon = id.indexOf(":");
   if (colon >= 0) {
     const named = all.find((s) => s.name === id.slice(0, colon));
     if (named) return [named, id.slice(colon + 1)];
   }
-  return [all[0]!, id];
+  return [all[0], id];
 }
 
 /** The cue as one source gets it: only its own ids to skip, as it knows them. */
@@ -175,9 +170,9 @@ export function interleave<T>(groups: readonly (readonly T[])[], text: (item: T)
   for (let rank = 0; ; rank++) {
     let more = false;
     for (const g of groups) {
-      if (rank >= g.length) continue;
+      const one = g[rank];
+      if (one === undefined) continue;
       more = true;
-      const one = g[rank]!;
       const terms = termsOf(text(one));
       if (texts.includes(text(one)) || seen.some((item) => memoryLikeness(item, terms) >= 0.8)) continue;
       if (!keep(one)) continue;
@@ -214,7 +209,7 @@ const within = <A>(e: Effect.Effect<A, SourceError>, ms: number) =>
 
 /** The sources as one setting made them. Its scope holds what it does: the operations still going and the writer. */
 interface Generation {
-  readonly all: Source[];
+  readonly all: readonly [Source, ...Source[]];
   readonly off: T.MemorySourceInfo[];
   readonly scope: Scope.Closeable;
   readonly operations: FiberSet.FiberSet;
@@ -256,8 +251,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
     const forkHere = yield* FiberSet.makeRuntime();
     /** Every generation not yet stopped, the current one among them, for the service's end. */
     const generations = new Set<Generation>();
-    /** The current generation and the settings it was made for; none once the service has stopped. Changed in one
-     * step, so two asks after a change make one new generation. */
+    /** The current generation and the settings it was made for. none once the service has stopped. */
     const held = yield* SynchronizedRef.make<{ readonly key: string; readonly gen: Generation } | undefined>(undefined);
     const stopped = yield* Ref.make(false);
 
@@ -282,11 +276,11 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         }),
       ));
 
-    const generation = Effect.fnUntraced(function* (sources: Source[], off: T.MemorySourceInfo[]) {
+    const generation = Effect.fnUntraced(function* (sources: [Source, ...Source[]], off: T.MemorySourceInfo[]) {
       const scope = yield* Scope.make();
       const operations = yield* Scope.provide(FiberSet.make(), scope);
       const writes = yield* Queue.dropping<Effect.Effect<void>, Cause.Done>(writeQueue);
-      const writer = yield* Effect.forkIn(Effect.ignore(Effect.forever(Effect.flatten(Queue.take(writes)))), scope);
+      const writer = yield* Effect.forkIn(Effect.ignore(Effect.forever(Effect.flatten(Queue.take(writes))), { log: "Debug" }), scope);
       return { all: sources, off, scope, operations, writes, writer } satisfies Generation;
     });
 
@@ -297,7 +291,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         const key = JSON.stringify(now);
         if (h && h.key === key) return [h.gen, h] as const;
         if (h) retire(h.gen, "memory sources changed; outside operation canceled");
-        const all = [local];
+        const all: [Source, ...Source[]] = [local];
         const off: T.MemorySourceInfo[] = [];
         for (const c of now) {
           const name = c.kind;
@@ -343,14 +337,16 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
           Effect.catchCause((cause) => Effect.as(Effect.logWarning(line(Cause.pretty(cause))), otherwise)),
         );
 
-    const readAll = <T>(g: Generation, what: string, ask: (one: Source) => Effect.Effect<T[], SourceError>, all = g.all) =>
-      Effect.forEach(
+    const readAll = <T>(g: Generation, what: string, ask: (one: Source) => Effect.Effect<T[], SourceError>, all: readonly Source[] = g.all) => {
+      const empty: T[] = [];
+      return Effect.forEach(
         all,
-        (one) => logged((why) => `memory from ${one.name} for ${what}: ${why}`)(one === local ? ask(one) : leased(g, within(ask(one), timeoutMs)), [] as T[]),
+        (one) => logged((why) => `memory from ${one.name} for ${what}: ${why}`)(one === local ? ask(one) : leased(g, within(ask(one), timeoutMs)), empty),
         {
           concurrency: "unbounded",
         },
       );
+    };
 
     const enqueue = (what: string, write: (one: Source) => Effect.Effect<unknown, SourceError>) =>
       Effect.flatMap(snapshot, (g) =>
@@ -423,8 +419,8 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
             readAll(g, `the memories of ${agent}`, (one) => one.list(agent), listing),
             (groups) => ({
               memories: groups.flatMap((listed, i) => {
-                const one = listing[i]!;
-                return listed.map((m) => ({ ...m, id: idOf(one, m.id), ...(one.name !== localName ? { source: one.name } : {}) }));
+                const one = listing[i];
+                return one ? listed.map((m) => ({ ...m, id: idOf(one, m.id), ...(one.name !== localName ? { source: one.name } : {}) })) : [];
               }),
               sources: infoOf(g),
             }),
