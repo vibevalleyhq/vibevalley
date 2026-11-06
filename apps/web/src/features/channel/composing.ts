@@ -23,7 +23,6 @@ export type Said = Omit<SayRequest, "sendKey">;
 
 const arrived = (key: string, messages: readonly Pick<ChatMessage, "sendKey">[]) => messages.some((m) => m.sendKey === key);
 
-/** Every line the owner says in a channel: from either composer, the repo map, an artifact's reply, a suggestion. */
 export const chatSay = defineIntent<Said, void>({
   send: (body, key) => api.channel.message.send({ ...body, sendKey: key }),
   // The channel is followed while the line is kept, so its copy is seen even after the window that sent it closed.

@@ -80,7 +80,6 @@ export function streaksOf(calendar: Calendar): Streaks {
   return { total: days.reduce((n, d) => n + d.commits, 0), days: days.filter((d) => d.commits > 0).length, longest, current, ...(busiest ? { busiest } : {}) };
 }
 
-/** How long ago the newest commit was, as the repo list, its card and the map's crops show it. */
 export type Recency = "never" | "day" | "week" | "month" | "quarter" | "older";
 
 export function recencyOf(last: number | undefined, now: number): Recency {

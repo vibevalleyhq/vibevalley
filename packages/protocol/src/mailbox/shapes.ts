@@ -13,11 +13,10 @@ export const TriggerAddressingValues = ["direct", "mention", "thread_owner", "un
 export type TriggerAddressing = (typeof TriggerAddressingValues)[number];
 
 export const TriggerKindValues = ["ci", "review", "comment"] as const;
-/** What a GitHub trigger is: a check, a review, or a comment. */
 export type TriggerKind = (typeof TriggerKindValues)[number];
 
 export const VoiceModeValues = ["dictated", "conversation", "api"] as const;
-/** How words came in: dictated, on a call, or through the API. */
+/** "conversation": on a call. */
 export type VoiceMode = (typeof VoiceModeValues)[number];
 
 export interface TriggerActor {

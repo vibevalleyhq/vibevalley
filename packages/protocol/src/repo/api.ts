@@ -13,7 +13,6 @@ export interface RepoHandlers<R = never> {
   readonly "repo.validate": (a: T.NewRepo) => Effect.Effect<T.Validation, ApiError, R>;
   readonly "repo.create": (a: T.NewRepo) => Effect.Effect<T.RepoSummary, ApiError, R>;
   readonly "repo.language.list": (a: { readonly id: string }) => Effect.Effect<T.RepoLanguages, ApiError, R>;
-  /** The issue templates for the repo: its stack, the titles sent out there before, and the template catalog filled in for it. */
   readonly "repo.template.list": (a: { readonly id: string }) => Effect.Effect<T.RepoTemplates, ApiError, R>;
   readonly "repo.activity.get": (a: { readonly id: string }) => Effect.Effect<T.RepoActivity, ApiError, R>;
 }

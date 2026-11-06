@@ -462,7 +462,6 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // A seed sown from the farm's form carries its profile and repo: the orchestrator is told both, beside the words.
   it.live("is told the sowing form's pick", () => {
     const f = farm();
     return Effect.gen(function* () {

@@ -84,7 +84,6 @@ describe("a refined issue", () => {
       const sessions = yield* Session;
       const core = yield* Core;
       yield* (yield* Agent).save(lab());
-      // It names no one: whoever was last sent to work in the repo drafts it.
       const before = mustHire(yield* issues.hire(lab(), "看看仓库", "board"));
       yield* w.nextReport;
       yield* sessions.dismiss(before.id);

@@ -32,7 +32,7 @@ export const issueSettling = (r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
     const sessions = yield* Session;
     const { unsent, changesOf } = r;
     const { readyOf } = d;
-    /** The commits on the issue's branch that the main branch does not have; none for one without a repo or branch. */
+    /** The commits on the issue's branch that the main branch does not have. */
     const commitsOf = (issue: T.Issue) =>
       issue.repo
         ? Effect.mapBoth(repos.branchChanges(issue.repo, issueBranch(issue.number)), {

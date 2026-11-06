@@ -241,7 +241,6 @@ export interface ChannelService {
   readonly channels: () => Effect.Effect<Info[]>;
   readonly openChannel: (name: string, description: string, repo: string) => Effect.Effect<Info, ApiError>;
   /** description undefined or empty: as it was; repo undefined: as it was, empty: none. */
-  /** Each field given changes: a channel's description, repo, name, group and place; a thread's title. */
   readonly updateChannel: (id: string, upd: T.ChannelUpdate) => Effect.Effect<void, ApiError>;
   /** Archived or not; as it already is, nothing changes. */
   readonly archive: (id: string, on: boolean) => Effect.Effect<void, ApiError>;

@@ -260,7 +260,7 @@ const make = (hooks: RepoHooks = {}) =>
         .describe(repo, cwd, branch)
         .pipe(Effect.mapError((e) => new RepoError({ message: reason(e), cause: e })));
 
-    /** The repo's own setup for a new worktree: .vibevalley/setup (installing what it needs), run outside the repo's turn and with the check's time limit. */
+    /** Run outside the repo's turn, with the check's time limit. */
     const repoSetup = Effect.fn("Repo.repoSetup")(function* (cwd: string) {
       const file = join(cwd, ".vibevalley", "setup");
       if (!(yield* lexists(file))) return;
@@ -275,7 +275,7 @@ const make = (hooks: RepoHooks = {}) =>
       if ((yield* repository(cwd).status) !== "") return yield* MergeFailure.error(t("server.repo.commit.uncommitted"));
     });
 
-    /** Commit and check outside the repo's turn; publication rechecks the head and conflicts in it. */
+    /** Checks run outside the repo lock; publication rechecks the head and conflicts under it. */
     const checkMerge = Effect.fn("Repo.checkMerge")(function* (place: Workplace, branch: string, target: string) {
       yield* requireCommitted(place.cwd);
       const path = join(root, place.repo);

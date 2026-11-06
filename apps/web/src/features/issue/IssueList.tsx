@@ -18,7 +18,6 @@ import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark
 import type { NewIssueAt } from "./NewIssue";
 
 /** The quick add, with the group's repo or helper when grouped by one. */
-/** where: the group's repo or helper the new issue starts in. */
 export type ListAdd = (where: NewIssueAt) => void;
 
 /** The issues as rows, grouped as the owner picked: Linear's list. A row opens the issue as a card does. */

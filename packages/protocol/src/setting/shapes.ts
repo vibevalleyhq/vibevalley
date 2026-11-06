@@ -24,7 +24,6 @@ export interface SettingsStatus {
   file: string;
   /** The farm's home ($VIBEVALLEY_HOME) and the server's version, for About. */
   home: string;
-  /** Where the current space keeps its repositories, worktrees and notes. */
   paths: SpacePaths;
   version: string;
   locale: Locale;

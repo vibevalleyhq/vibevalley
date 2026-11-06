@@ -54,7 +54,7 @@ export interface MemoryRequest {
   requestKey?: string;
 }
 
-/** Where a memory holds: for every repo, one repo, or a source that does not say. */
+/** "unknown": the source did not declare a scope. */
 export type MemoryScope = { kind: "global" } | { kind: "repo"; repo: string } | { kind: "unknown" };
 
 /** A memory a search found, with the source it came from and how well it matched. */

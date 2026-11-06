@@ -22,7 +22,7 @@ const CustomMessageSchema = Schema.Struct({
   role: Schema.Literal("custom"),
   customType: Schema.String,
   content: UserContentSchema,
-  /** pi's display: false is hidden. */
+  /** false: hidden. */
   display: Schema.Boolean,
   details: Schema.optionalKey(Schema.Unknown),
   timestamp: Schema.Finite,

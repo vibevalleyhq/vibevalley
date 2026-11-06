@@ -37,7 +37,6 @@ import { makeResponses } from "./response.ts";
 import { deepseekModel, intake, orchestratorInboxLines, quotaText, situationDelta, type Source } from "./situation.ts";
 
 const keepEvents = 1000;
-/** The owner's repo pages the situation shows; notesRecalled is how many note blocks an input's words call up. */
 const notesShown = 8;
 const notesRecalled = 3;
 /** A run cut off longer ago than this is left: what it was for has likely moved on. */

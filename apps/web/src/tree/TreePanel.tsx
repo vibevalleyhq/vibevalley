@@ -247,7 +247,6 @@ function Section(props: { title: string; icon?: string; aside?: JSX.Element; chi
   );
 }
 
-/** What is under the pointer: whose, which repo, what it says. */
 export function Tip(props: { hover: SceneHover; tree: MemoryTree; agentName: (id: string) => string; now: number }) {
   const m = () => props.hover.item;
   const ties = () => tieWords(m().kind, tiesOf(props.tree.links, m().id));

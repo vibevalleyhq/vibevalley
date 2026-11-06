@@ -37,11 +37,11 @@ export interface ReposSkin {
   readonly Map: Component;
   /** Over one repo's overview. */
   readonly Head: Component<{ name: string }>;
-  /** A repo's picture in the list, a sprite's name. */
+  /** A sprite's name. */
   readonly picture: (repo: string) => string;
 }
 
-/** The pixel art the overview shows for a recency: the map's crops, so a repo looks the same in both. */
+/** The map's crops, so a repo looks the same in both. */
 const recencyPicture: Record<Recency, string> = {
   never: "plot-empty",
   day: "plot-flowering",
@@ -126,7 +126,6 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
   );
 }
 
-/** One repo: the skin's head and its details. */
 function RepoPanel(props: { name: string; repos: () => RepoSummary[]; now: number; Head: ReposSkin["Head"] }) {
   const repo = createMemo<RepoSummary | undefined>((last) => props.repos().find((p) => p.name === props.name) ?? last);
   return (

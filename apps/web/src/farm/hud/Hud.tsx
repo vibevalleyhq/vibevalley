@@ -55,7 +55,6 @@ function HudTap(props: { label: string; testid?: string; onClick: () => void; se
 /** Where the sign's post stands, in the village's pixels: on the grass right of the mast (village.ldtk: its top at 18, 73). */
 const signFoot = { x: 44, y: 104 };
 
-/** The repo sign by the mast: whose farm this is (every plot here is that repo's); a click goes back to the repos' map to enter another island. */
 function RepoSign() {
   const screen = useFarm((s) => s.screen);
   const repo = farmRepo;

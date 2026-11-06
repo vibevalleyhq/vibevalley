@@ -6,7 +6,6 @@ test("a new plot is opened, shows on the map and opens its own farm", async ({ p
   await page.getByTestId("new-repo").click();
   const dialog = page.getByTestId("new-repo-dialog");
   await dialog.getByTestId("repo-how").locator('[data-key="new"]').click();
-  // The server's check refuses a name that is not a folder's.
   await dialog.getByTestId("repo-name").fill("../bad name");
   await dialog.getByTestId("submit").click();
   await expect(dialog.getByRole("alert")).not.toBeEmpty();

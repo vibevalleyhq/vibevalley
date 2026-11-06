@@ -48,7 +48,7 @@ const places: Record<string, (rest: Rest) => JSX.Element> = {
   pkm: (rest) => <PkmPage rest={rest()} />,
 };
 
-/** `/farm`: the farm entered last on this machine (trusted while the repos are still coming). */
+/** The farm entered last on this machine, trusted while the repos are still loading. */
 function FarmHome() {
   const repos = useRepos();
   const last = lastFarmRepo();

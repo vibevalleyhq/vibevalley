@@ -331,7 +331,6 @@ export class VibeValleyApi {
       list: (a: { id: string }): Promise<T.RepoLanguages> => this.call<T.RepoLanguages>("/api/v1/repo/language/list", a),
     },
     template: {
-      /** The issue templates for the repo: its stack, the titles sent out there before, and the template catalog filled in for it. */
       list: (a: { id: string }): Promise<T.RepoTemplates> => this.call<T.RepoTemplates>("/api/v1/repo/template/list", a),
     },
     activity: {

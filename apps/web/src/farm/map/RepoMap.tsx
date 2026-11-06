@@ -282,7 +282,6 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
   const at = () => plotsIn(yard(), props.island.spots.length);
   const down = () => props.cellHeight - pic().h;
   const open = () => router.navigate(`/repos/${encodeURIComponent(props.island.repo)}`);
-  // into this repo's own farm.
   const enter = () => router.navigate(`/farm/${encodeURIComponent(props.island.repo)}`);
   const has = (n: string) => props.atlas.has(n);
   const s = () => props.scale;
@@ -598,7 +597,6 @@ function IslandDetail(props: { island: Island }) {
   );
 }
 
-/** The head over one repo's overview: its island, when it has one. */
 function IslandHead(props: { name: string }) {
   const islands = useIslands();
   const island = () => islands().find((i) => i.repo === props.name);

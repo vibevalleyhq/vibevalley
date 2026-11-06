@@ -95,7 +95,6 @@ export const ToolResultMessageSchema = Schema.Struct({
   content: Schema.Array(Schema.Union([TextContentSchema, ImageContentSchema])),
   isError: Schema.Boolean,
   timestamp: Schema.Finite,
-  /** How long the tool ran. */
   durationMs: Schema.optionalKey(Schema.Finite),
 });
 export type ToolResultMessage = typeof ToolResultMessageSchema.Type;

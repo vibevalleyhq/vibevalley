@@ -17,7 +17,7 @@ export const emptyPlay = (): T.SessionPlay => ({ station: -1, history: [], tools
 
 export const playOf = (plays: Readonly<Record<string, T.SessionPlay>> | undefined, id: string): T.SessionPlay => plays?.[id] ?? emptyPlay();
 
-/** A free bed on `repo`'s farm: `prefer` when it is free there, else the first free one, else -1. */
+/** -1 when no station on this repo's farm is free. */
 export function freeStation(plays: Readonly<Record<string, T.SessionPlay>> | undefined, sessions: readonly T.Session[], repo: string, prefer?: number): number {
   const taken = new Set(sessions.filter((h) => farmOf(h) === repo).map((h) => playOf(plays, h.id).station));
   if (prefer !== undefined && prefer >= 0 && prefer < maxRunning && !taken.has(prefer)) return prefer;

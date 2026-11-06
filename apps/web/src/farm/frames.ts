@@ -8,7 +8,6 @@ import { type Frames, frames, rawFrame } from "#/infra/frame.ts";
 import { farmCommands } from "./commands";
 import { farmRepo } from "./store";
 
-// One repo's farm: the frame with only that repo's sessions on it (protocol's farmOf), for what the farm page draws and does with its beds.
 const made = new WeakMap<StateFrame, { repo: string; frame: StateFrame }>();
 
 /** The same frame and repo give back the same object, so a reader comparing frames sees no change. */

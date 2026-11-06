@@ -106,7 +106,7 @@
 | `defaults` | `config.ts` |  |
 | `ConfigError` | `config.ts` | Why the configuration cannot be read: the file, or a key's value. |
 | `loadConfig` | `config.ts` | file: the YAML to read, which must be there. empty is home/vibevalley.yaml, read if it is there. |
-| `pkmDir` | `config.ts` | The notes' vault: <workRoot>/pkm unless the owner put it elsewhere. |
+| `pkmDir` | `config.ts` |  |
 | `dbDir` | `config.ts` | The database's folder, or "memory". |
 | `serverAddress` | `config.ts` | The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. |
 | `reposDir` | `config.ts` | Where the space's repositories are: each folder in it is one. |
@@ -155,7 +155,7 @@
 | `gitSync` | `git.ts` | Runs git in dir as a test user. its output, trimmed. |
 | `gitIn` | `git.ts` | Runs git in dir as dir's own config says (no test user). its output, trimmed. |
 | `gitInEnv` | `git.ts` | gitIn with these in its environment (a commit's dates). |
-| `reposDir` | `git.ts` | A repositories folder of its own, under a work root of its own. |
+| `reposDir` | `git.ts` |  |
 | `repo` | `git.ts` | A repository with `mine` commits by the test user, `others` by someone else. |
 | `write` | `git.ts` |  |
 | `goldenCases` | `golden.ts` | The cases of a module's file, by the module's folder under src. |

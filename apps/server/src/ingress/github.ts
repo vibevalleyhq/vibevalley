@@ -248,7 +248,7 @@ export const githubInputs = (accept: (event: SourceEvent) => Effect.Effect<T.Tri
     const snapshot = githubSnapshot(repos);
     const polling = yield* Semaphore.make(1);
 
-    /** A failed Actions job's last lines, fetched with gh so the helper need not open the browser. */
+    /** Fetch logs via gh so helpers need no browser. */
     const jobLog = Effect.fnUntraced(function* (repo: string, url: string) {
       const job = actionsJobOf(url);
       if (!job) return "";

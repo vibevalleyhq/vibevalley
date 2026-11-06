@@ -193,7 +193,6 @@ export const loadConfig = Effect.fnUntraced(function* (
   };
 });
 
-/** The notes' vault: <workRoot>/pkm unless the owner put it elsewhere. */
 export const pkmDir = (c: ServerConfig["Service"]) => c.pkm.root || join(c.workRoot, "pkm");
 
 /** The database's folder, or "memory". */

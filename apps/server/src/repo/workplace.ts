@@ -77,7 +77,6 @@ export function pullRequestText(text: string): { readonly title: string; readonl
 
 const emptyStack: RepoStack = { name: "", label: "" };
 
-/** Commands the repo has none of are left out, as the Go leaves out an empty one. */
 const withCommands = ({ test, lint, build, ...s }: RepoStack): RepoStack => ({
   ...s,
   ...(test ? { test } : {}),

@@ -170,14 +170,12 @@ export const issueLifecycle = Effect.gen(function* () {
   const add = (req: T.IssueRequest, mandate: T.IssueMandate, cron?: string) =>
     attemptAdd(req, mandate, cron).pipe(Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }));
 
-  /** Removes the issue row, reloads assignment state, and publishes issueRemoved. */
   const remove = Effect.fn("Issue.remove")(function* (id: string) {
     yield* db.run(q.removeIssue({ id }));
     yield* reloadAssignments;
     yield* core.apply({ type: "issueRemoved", id: issueId(id) });
   });
 
-  /** On the board before another unsent issue, or last; only unsent issues have a place. */
   const place = Effect.fn("Issue.place")(function* (id: string, before: string) {
     const order: string[] = (yield* everyIssue).filter((item) => executionsOf(item).length === 0 && item.id !== id).map((item) => item.id);
     const at = order.indexOf(before);
@@ -295,7 +293,6 @@ export const issueLifecycle = Effect.gen(function* () {
   const asked = (id: string, questions: readonly T.Question[] | undefined) =>
     Effect.andThen(db.run(q.setIssueQuestions({ id, questions: jsonOrNull(openQuestions(questions), openQuestions(questions).length > 0) })), publish(id));
 
-  /** Records a worker session's report (questions, checks, and answer conclusion if applicable) and publishes once. */
   const recordReport = Effect.fn("Issue.recordReport")(function* (
     sessionId: string,
     outcome: T.Outcome,
@@ -331,7 +328,7 @@ export const issueLifecycle = Effect.gen(function* () {
   const judged = (id: string, at: number, findings: readonly T.Finding[]) =>
     Effect.andThen(db.run(q.reviewIssue({ id, reviewed_at: at > 0 ? at : null, findings: jsonOrNull(findings, findings.length > 0) })), publish(id));
 
-  /** The owner's word answers what it asked, and starts a round that the last acceptance did not see. */
+  /** A new owner reply invalidates the previous acceptance. */
   const ownerSaid = Effect.fn("Issue.ownerSaid")(function* (id: string) {
     const item = yield* get(id);
     yield* db.inTx(

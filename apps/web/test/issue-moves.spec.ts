@@ -30,7 +30,6 @@ const fox: Agent = {
 const lane = (page: Page, key: string) => page.locator(`[data-testid="lane"][data-key="${key}"]`);
 const card = (page: Page, key: string, id: string) => lane(page, key).locator(`[data-testid="issue-card"][data-key="${id}"]`);
 
-/** A to-do with a helper and a repo, so Start may send it out. */
 async function startable(api: VibeValleyApi, name: string) {
   const helper = await api.agent.create({ ...fox, name });
   const repo = await api.repo.create({ name });
