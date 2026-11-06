@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { ControlOutcome, Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { applyTaskEvent, initialStatus, initialTasks, observeSessionView, reduceStatus, stallOf, type TaskMap } from "@botiverse/oar/observe";
-import { Clock, Config as Keys, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Option, Schema } from "effect";
+import { Clock, Config, Context, Deferred, Effect, Exit, FiberMap, FiberSet, Layer, Metric, Option, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -148,8 +148,8 @@ export class Executor extends Context.Service<
 const make = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const inherited = {
-    NO_PROXY: yield* Keys.String("NO_PROXY").pipe(Keys.withDefault("")),
-    no_proxy: yield* Keys.String("no_proxy").pipe(Keys.withDefault("")),
+    NO_PROXY: yield* Config.String("NO_PROXY").pipe(Config.withDefault("")),
+    no_proxy: yield* Config.String("no_proxy").pipe(Config.withDefault("")),
   };
   const runtimes = yield* Runtime;
   const clock = yield* Clock.Clock;
