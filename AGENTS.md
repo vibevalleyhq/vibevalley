@@ -11,7 +11,7 @@ apps/server/               服务端（Effect v4，Node 24；仓库里用 vpx �
                            规则，组装时交给 core）；VibeValley 自己的 agent 在 packages/agent，这里只组装它（runtime/vibevalley.ts 是
                            oar 的 vibevalley runtime）；base 是不碰外面的地基（id、JSON、排序、脱敏），infra 是和进程、机器打交道的
                            （配置、库、文件、家目录的租约、日志、时间）；services.ts 按次序把它们组装起来，
-                           handlers.ts 把 http/handlers/<概念>.ts 合成全部接口的处理，http/ 是路由、流和 /mcp；chat.ts 是终端里的对话（和农机直接聊、
+                           handlers.ts 把 http/handlers/<概念>.ts 合成全部接口的处理，http/ 是路由、流和 /mcp；chat/main.ts 是终端里的对话（和农机直接聊、
                            自己的 agent），由命令行交出终端来跑
 apps/server/db/            库（SQLite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，
                            generated/ 是 scripts/sqlite-generate.ts 从它们写出的

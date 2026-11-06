@@ -4,6 +4,7 @@
   "type": "module",
   "imports": {
     "#/*": "./src/*",
+    "#package": "./package.json",
     "#db/*": "./db/generated/*"
   },
   "exports": {
