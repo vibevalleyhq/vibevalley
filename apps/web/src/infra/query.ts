@@ -3,7 +3,7 @@ import { Predicate, Schema } from "effect";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { CursorManifest, SpriteManifest, TitleManifest } from "#/base/manifests.ts";
+import { CursorManifest, SpriteManifest } from "#/base/manifests.ts";
 
 import { api } from "./api";
 import type { FramesSource } from "./frame";
@@ -36,13 +36,6 @@ export const cursorsQuery = defineQuery({
   schema: CursorManifest,
   key: () => ["cursors"],
   fetch: async (_: void, { signal }): Promise<unknown> => (await fetch("/cursors/cursors.json", { signal })).json(),
-  staleTime: Infinity,
-  ...retryRead,
-});
-export const titleSpritesQuery = defineQuery({
-  schema: TitleManifest,
-  key: () => ["title-sprites"],
-  fetch: async (_: void, { signal }): Promise<unknown> => (await fetch("/title/sprites.json", { signal })).json(),
   staleTime: Infinity,
   ...retryRead,
 });

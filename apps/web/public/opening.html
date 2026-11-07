@@ -1,11 +1,15 @@
 <!doctype html>
-<!-- The opening markers are embedded in index.html by vite.config.ts. Electron also loads this file before its server starts. -->
+<!-- The opening markers are inlined into index.html by vite.config.ts; Electron loads this file before its server starts. -->
 <html lang="zh-Hans">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VibeValley</title>
     <style>
+      @font-face {
+        font-family: "FusionPixel";
+        src: url("fonts/fusion-pixel-12px-proportional-zh_hans.otf");
+      }
       html,
       body {
         margin: 0;
@@ -16,138 +20,194 @@
   <body>
     <!-- opening -->
     <style>
-      /* These colors mirror the pixel tokens in style.css; this page also runs without the application stylesheet. */
       #opening {
         position: fixed;
         inset: 0;
         z-index: 2147483647;
-        display: grid;
-        place-items: center;
-        overflow: auto;
-        background: #2b3320;
-        color: #eedcb2;
-        font: 12px "FusionPixel", "PingFang SC", sans-serif;
+        overflow: hidden;
+        background: #151413;
+        color: #f7e8c4;
+        font: 12px/1.5 "FusionPixel", "PingFang SC", sans-serif;
         user-select: none;
+      }
+      #opening .scene {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        image-rendering: pixelated;
+      }
+      #opening[data-scene="day"] .scene {
+        object-position: 65% center;
       }
       #opening::after {
         content: "";
         position: absolute;
-        inset: auto 0 0;
-        height: 12px;
-        border-top: 4px solid #567c31;
-        background: #2f1f13;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 40%, #15141344 65%, #151413dd);
       }
       #opening .column {
+        position: absolute;
+        z-index: 1;
+        bottom: max(32px, 6%);
+        left: 50%;
+        width: min(400px, calc(100% - 64px));
+        transform: translateX(-50%);
         display: flex;
         flex-direction: column;
         align-items: center;
-        box-sizing: border-box;
-        width: min(384px, 100%);
-        padding: 32px;
+        gap: 16px;
+      }
+      #opening .brand {
+        margin: 0;
         text-align: center;
-      }
-      #opening .face {
-        width: 128px;
-        height: 128px;
-        image-rendering: pixelated;
-      }
-      #opening .name {
-        margin: 20px 0 32px;
-        font-size: 36px;
-        line-height: 1;
-        color: #faf1d9;
+        white-space: nowrap;
+        font: 48px/1.2 "FusionPixel", monospace;
         text-shadow: 3px 3px 0 #2f1f13;
+      }
+      #opening .runway {
+        position: relative;
+        width: 100%;
+        margin-top: 64px;
+        --progress: 0%;
       }
       #opening .bar {
         box-sizing: border-box;
-        position: relative;
-        overflow: hidden;
-        width: min(256px, 100%);
-        height: 16px;
-        padding: 2px;
-        border: 2px solid #2f1f13;
-        background: #2f1f1399;
-        box-shadow: 2px 2px 0 #3a2a1899;
+        height: 20px;
+        padding: 3px;
+        border: 3px solid #2f1f13;
+        background: #292f20;
+        box-shadow: 0 0 0 2px #eedcb2, 0 5px 0 2px #2f1f13;
       }
       #opening .fill {
+        width: var(--progress);
+        height: 100%;
+        background: repeating-linear-gradient(90deg, #a4c66c 0 8px, #86ad50 8px 10px);
+        box-shadow: inset 0 2px #d9e5a2;
+        transition: width 180ms steps(8);
+      }
+      #opening .sprite-position {
         position: absolute;
-        top: 2px;
-        bottom: 2px;
-        width: 30%;
-        background: #74a046;
-        animation: opening-walk 1.4s steps(14) infinite;
+        left: clamp(32px, var(--progress), calc(100% - 32px));
+        bottom: 10px;
+        transform: translateX(-50%);
+        transition: left 180ms steps(8);
+        pointer-events: none;
       }
-      #opening .words,
-      #opening .problem {
-        margin-top: 16px;
-        line-height: 2;
-        color: #e2c995;
+      #opening .sprite {
+        display: block;
+        width: 80px;
+        height: 96px;
+        background-size: 500% auto;
+        background-position: 0% center;
+        background-repeat: no-repeat;
+        image-rendering: pixelated;
+        animation: opening-breathe 1.4s steps(2) infinite;
       }
+      #opening[data-mood="working"] .sprite { background-position-x: 25%; animation: opening-step 500ms steps(2) infinite; }
+      #opening[data-mood="excited"] .sprite { background-position-x: 50%; animation: opening-step 350ms steps(2) infinite; }
+      #opening[data-mood="happy"] .sprite { background-position-x: 75%; animation: opening-jump 240ms steps(4); }
+      #opening[data-mood="confused"] .sprite { background-position-x: 100%; animation: none; }
+      #opening .words { text-shadow: 1px 1px 0 #2f1f13; }
       #opening .problem {
+        box-sizing: border-box;
+        width: 100%;
+        max-height: 25vh;
+        padding: 12px;
+        overflow-y: auto;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
-        width: 100%;
+        text-align: left;
+        user-select: text;
+        background: #151413e6;
       }
-      @keyframes opening-walk {
-        from {
-          left: -30%;
-        }
-        to {
-          left: 100%;
-        }
+      @keyframes opening-breathe { 50% { transform: translateY(2px); } }
+      @keyframes opening-step { 50% { transform: translateY(-3px); } }
+      @keyframes opening-jump { 50% { transform: translateY(-12px); } }
+      @media (max-width: 600px) {
+        #opening[data-scene="day"] .scene,
+        #opening[data-scene="night"] .scene { object-position: 80% center; }
+        #opening .brand { font-size: 36px; }
+        #opening .column { bottom: max(28px, env(safe-area-inset-bottom)); }
+      }
+      @media (max-height: 500px) {
+        #opening .brand { font-size: 24px; }
+        #opening .column { bottom: 24px; gap: 8px; }
+        #opening .runway { margin-top: 48px; }
+        #opening .sprite { width: 64px; height: 77px; }
       }
       @media (prefers-reduced-motion: reduce) {
-        #opening .fill {
-          animation: none;
-          left: 35%;
-        }
+        #opening .sprite { animation: none !important; }
+        #opening .sprite-position, #opening .fill { transition: none; }
       }
     </style>
     <div id="opening">
+      <img class="scene" alt="" fetchpriority="high" />
       <div class="column">
-        <img class="face" alt="" width="128" height="128" />
-        <span class="name">VibeValley</span>
-        <div class="bar" role="progressbar"><div class="fill"></div></div>
-        <span class="words" role="status"></span>
+        <p class="brand"></p>
+        <div class="runway">
+          <span class="sprite-position" aria-hidden="true"><span class="sprite"></span></span>
+          <div class="bar" role="progressbar"><div class="fill"></div></div>
+        </div>
+        <span class="words"></span>
       </div>
     </div>
     <script>
-      // Catalog text is substituted by vite.config.ts; Electron passes the locale in the file URL.
-      const openingWords = "__OPENING_WORDS__";
-      const openingLocale = document.documentElement.dataset.locale ?? new URLSearchParams(location.search).get("locale");
-      const said = openingWords[openingLocale] ?? openingWords.zh;
-      document.querySelector("#opening .bar").setAttribute("aria-label", said.label);
-      document.querySelector("#opening .words").textContent = said.waking;
-      const openingPrefs = (() => {
-        try {
-          return JSON.parse(localStorage.getItem("vibevalley.prefs") ?? "{}") ?? {};
-        } catch {
-          return {};
+      {
+        // The build replaces the catalog marker for both file:// and HTTP entry points.
+        const openingWords = "__OPENING_WORDS__";
+        const locale = document.documentElement.dataset.locale ?? new URLSearchParams(location.search).get("locale");
+        const said = openingWords[locale] ?? openingWords.zh;
+        const cover = document.getElementById("opening");
+        const bar = cover.querySelector(".bar");
+        const words = cover.querySelector(".words");
+        const runway = cover.querySelector(".runway");
+        cover.querySelector(".brand").textContent = said.name;
+        document.title = said.name;
+        bar.setAttribute("aria-label", said.label);
+        const paint = () => {
+          const phase = cover.dataset.phase;
+          const progress = Math.max(0, Math.min(100, Number(cover.dataset.progress ?? 0)));
+          runway.style.setProperty("--progress", progress + "%");
+          cover.dataset.mood = phase === "failed" || phase === "waiting" ? "confused" : phase === "ready" ? "happy" : progress >= 70 ? "excited" : progress > 0 ? "working" : "sleepy";
+          if (phase === "failed") bar.removeAttribute("role");
+          else if (progress > 0) {
+            bar.setAttribute("aria-valuemin", "0");
+            bar.setAttribute("aria-valuemax", "100");
+            bar.setAttribute("aria-valuenow", String(progress));
+          }
+          words.textContent = said[phase] ?? said.waking;
+        };
+        cover.addEventListener("opening-update", paint);
+        const prefs = (() => {
+          try { return JSON.parse(localStorage.getItem("vibevalley.prefs") ?? "{}") ?? {}; }
+          catch { return {}; }
+        })();
+        const farm = /^\/(farm|tree)(\/|$)/.test(location.pathname) || (location.pathname === "/" && prefs.start === "farm");
+        const dark = prefs.theme === "dark" || (prefs.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        cover.dataset.look = farm ? "farm" : "desk";
+        cover.dataset.theme = dark ? "dark" : "light";
+        if (location.protocol !== "file:") document.documentElement.dataset.theme = cover.dataset.theme;
+        const hour = new Date().getHours();
+        const scene = hour >= 5 && hour < 10 ? "morning" : hour >= 10 && hour < 18 ? "day" : "night";
+        cover.dataset.scene = scene;
+        cover.dataset.phase = "starting";
+        // file:// resolves beside this page; nested server routes resolve from the root.
+        const root = location.protocol === "file:" ? "" : "/";
+        cover.querySelector(".scene").src = root + "brand/opening-" + scene + ".webp";
+        cover.querySelector(".sprite").style.backgroundImage = 'url("' + root + 'brand/opening-sprite.webp")';
+        const problem = location.pathname.endsWith("/opening.html") ? new URLSearchParams(location.search).get("problem") : null;
+        if (problem) cover.dataset.phase = "failed";
+        paint();
+        if (problem) {
+          words.className = "problem";
+          words.setAttribute("role", "alert");
+          words.textContent = said.cannotStart.replace("{why}", problem);
         }
-      })();
-      const openingFarm = /^\/(farm|tree)(\/|$)/.test(location.pathname) || (location.pathname === "/" && openingPrefs.start === "farm");
-      const openingDark = openingPrefs.theme === "dark" || (openingPrefs.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
-      const openingCover = document.getElementById("opening");
-      openingCover.dataset.look = openingFarm ? "farm" : "desk";
-      openingCover.dataset.theme = openingDark ? "dark" : "light";
-      if (location.protocol !== "file:") document.documentElement.dataset.theme = openingCover.dataset.theme;
-      // Asset URLs must work both from Electron's file URL and from nested application routes.
-      const openingAssets = location.protocol === "file:" ? "" : "/";
-      document.querySelector("#opening .face").src = openingAssets + "icons/app-64.png";
-      const openingFont = new FontFace("FusionPixel", `url("${openingAssets}fonts/fusion-pixel-12px-proportional-zh_hans.otf")`);
-      document.fonts.add(openingFont);
-      openingFont.load().catch(() => undefined);
-    </script>
-    <!-- /opening -->
-    <script>
-      const problem = new URLSearchParams(location.search).get("problem");
-      if (problem) {
-        document.querySelector("#opening .bar").remove();
-        const words = document.querySelector("#opening .words");
-        words.className = "problem";
-        words.setAttribute("role", "alert");
-        words.textContent = said.cannotStart.replace("{why}", problem);
       }
     </script>
+    <!-- /opening -->
   </body>
 </html>

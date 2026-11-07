@@ -207,7 +207,6 @@
     "repos": "Repos",
     "catalog": "Catalog",
     "resume": "Resume",
-    "home": "Back to the title",
     "soundOn": "Sound on",
     "soundOff": "Sound off",
     "elsewhere": "Go elsewhere",
@@ -491,15 +490,6 @@
     "moving": "Moving into the village {done}/{total}",
     "lights": "Lighting up…",
     "entering": "Entering the village"
-  },
-  "title": {
-    "start": "New game",
-    "continue": "Continue",
-    "keyFirst": "Fill in the key first: the manager needs a DeepSeek API key to work. Fill it in under Settings.",
-    "label": "VibeValley title screen",
-    "name": "VibeValley",
-    "tagline": "A crew of little animals who write code, waiting for your jobs",
-    "nothingToContinue": "No farm to continue yet: start a new game first."
   },
   "debug": {
     "title": "Debug console",

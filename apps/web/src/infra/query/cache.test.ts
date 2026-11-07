@@ -30,6 +30,28 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+test("regression: startup errors include only enabled consumers and clear after confirmed data", async () => {
+  const c = client();
+  const query = defineQuery({
+    schema: Schema.Finite,
+    key: () => ["startup"],
+    fetch: (): Promise<number> => Promise.reject(new Error("unavailable")),
+  });
+  await expect(c.fetch(query())).rejects.toThrow("unavailable");
+  expect(c.hasActiveErrors()).toBe(false);
+  const watcher = c.subscribe(query(), () => undefined, { enabled: true, interval: false });
+  await expect(c.fetch(query())).rejects.toThrow("unavailable");
+  expect(c.hasActiveErrors()).toBe(true);
+  watcher.update({ enabled: false, interval: false });
+  expect(c.hasActiveErrors()).toBe(false);
+  watcher.update({ enabled: true, interval: false });
+  await expect(c.fetch(query())).rejects.toThrow("unavailable");
+  expect(c.hasActiveErrors()).toBe(true);
+  c.setData(query(), () => ({ value: 1 }));
+  expect(c.hasActiveErrors()).toBe(false);
+  watcher.stop();
+});
+
 test("deduplicates leases and isolates clients and typed key segments", async () => {
   const work = deferred<string>();
   const fetch = vi.fn(() => work.promise);

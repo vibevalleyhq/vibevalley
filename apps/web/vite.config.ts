@@ -7,7 +7,19 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 import type { Plugin } from "vite-plus";
 
 // The bar's words in every language, from the catalogs: the bar shows before any script of the page, so it cannot call t().
-const openingKeys = { waking: "web.opening.waking", label: "web.opening.label", cannotStart: "web.opening.cannotStart" } as const;
+const openingKeys = {
+  name: "web.opening.name",
+  waking: "web.opening.waking",
+  label: "web.opening.label",
+  cannotStart: "web.opening.cannotStart",
+  starting: "web.opening.starting",
+  connecting: "web.opening.connecting",
+  reading: "web.opening.reading",
+  loading: "web.opening.loading",
+  ready: "web.opening.ready",
+  waiting: "web.opening.waiting",
+  failed: "web.opening.failed",
+} as const;
 const openingWords = () => {
   const locales = join(import.meta.dirname, "../../packages/i18n/locales");
   const words: Record<string, Record<string, string>> = {};

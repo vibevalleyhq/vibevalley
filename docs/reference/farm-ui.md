@@ -50,7 +50,7 @@
 18. **图纸桌**（院内图纸桌）：直接打开工作台工单页（`/issues`）。
 19. **地图**（`/repos` 的「全部」，[截图](docs/images/map.png)）：每个仓库对应一座小岛，岛上地块对应进行中工单与空位（`RepoSummary.maxSessions`），院门外种子袋代表排队工单。
 20. **设置**（`/settings/<分区>`）：左栏提供搜索框与分组导航（「选项」通用、外观、模型、关于；「帮工」记性、技能；「语音」通话线路、MOSS Live、听写；「连接」GitHub、聊天软件、设备），右栏按卡片展示设置项（`SettingsGroup`、`SettingRow`、`KeyRow`），标明农场级或本机级生效范围。
-21. **首页**（`apps/web/src/farm/title/`）：按当前钟点渲染清晨、白天、黄昏或夜晚动态场景及管家与宠物，提供「开始游戏」「继续游戏」「设置」（[客户端](docs/subsystems/app.md#怎么走)）。
+21. **开机加载**：场景图、单独绘制的品牌名和加载状态，准备好后直接进入农场；时段与退场条件见[客户端](docs/subsystems/app.md#怎么走)。
 22. **管家页**（`/orchestrator` 与 `/orchestrator/<档案 id>`）：分「记性」「轨迹」（支持标记「这一轮做错了」）「旧账」与默认管家专属的「声音」四个页签（[管家](docs/subsystems/orchestrator.md)、[语音](docs/subsystems/voice.md)）。
 
 **工作台外壳**（`apps/web/src/app/Shell.tsx`）：最左为安静的导航栏（管家头像回农场、聊天、工单、稿子 `/artifacts`、笔记 `/pkm`、仓库、帮工、农具、图鉴、设置）。

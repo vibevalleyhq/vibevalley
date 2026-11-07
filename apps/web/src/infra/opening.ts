@@ -2,71 +2,141 @@ import { frames } from "./frame";
 import type { QueryClient } from "./query";
 import { waitForReads } from "./query/activity";
 
-/** Past this the page shows as it is: a read that hangs keeps its own loading words, not a cover. */
-const longest = 2000;
+type Phase = "connecting" | "reading" | "loading" | "ready" | "waiting" | "failed";
+type Report = (phase: Phase, progress?: number) => void;
 
-const nextFrame = () => new Promise<void>((done) => requestAnimationFrame(() => done()));
-
-function firstFrame(signal: AbortSignal) {
-  return new Promise<void>((done) => {
+function until(check: () => boolean, subscribe: (check: () => void) => () => void, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return Promise.resolve(false);
+  if (check()) return Promise.resolve(true);
+  return new Promise((done) => {
     let stop: (() => void) | undefined;
-    let over = false;
-    const check = () => {
-      const f = frames.get();
-      if (over || (!signal.aborted && !f.frame && f.link !== "lost")) return;
-      over = true;
+    let finished = false;
+    const finish = (ready: boolean) => {
+      if (finished) return;
+      finished = true;
       stop?.();
-      signal.removeEventListener("abort", check);
-      done();
+      signal.removeEventListener("abort", aborted);
+      done(ready);
     };
-    stop = frames.subscribe(check);
-    signal.addEventListener("abort", check, { once: true });
-    check();
+    const aborted = () => finish(false);
+    signal.addEventListener("abort", aborted, { once: true });
+    stop = subscribe(() => {
+      if (check()) finish(true);
+    });
+    if (finished) stop();
+    else if (signal.aborted) aborted();
+    else if (check()) finish(true);
   });
 }
 
-async function pageReady(client: QueryClient, signal: AbortSignal) {
-  await firstFrame(signal);
-  // A place shown on the frame mounts now and starts its reads; one read's answer can start the next.
-  for (let round = 0; round < 3; round++) {
-    /* oxlint-disable eslint/no-await-in-loop -- frames come one after another, and one read's answer can start the next */
-    await nextFrame();
-    if (signal.aborted) return;
-    await waitForReads(client, signal);
-    /* oxlint-enable eslint/no-await-in-loop */
-  }
-  await Promise.all([...document.images].filter((i) => !i.complete).map((i) => i.decode().catch(() => undefined)));
-}
-
-/** Once the page has mounted: takes the cover away when the page is ready, in one fade. */
-export async function reveal(client: QueryClient, signal: AbortSignal) {
-  const cover = document.getElementById("opening");
-  if (!cover) return;
-  if (cover.dataset.look === "farm") return cover.remove();
-  const timeout = new AbortController();
-  const waiting = AbortSignal.any([signal, timeout.signal]);
-  let timer: ReturnType<typeof setTimeout> | undefined;
+async function limited(ms: number, signal: AbortSignal, run: (signal: AbortSignal) => Promise<boolean>): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
   try {
-    await Promise.race([
-      pageReady(client, waiting),
-      new Promise<void>((done) => {
-        timer = setTimeout(done, longest);
-        waiting.addEventListener("abort", () => done(), { once: true });
-      }),
-    ]);
+    return await run(AbortSignal.any([signal, controller.signal]));
   } finally {
     clearTimeout(timer);
-    timeout.abort();
+    controller.abort();
   }
+}
+
+async function pageReady(client: QueryClient, report: Report, signal: AbortSignal) {
+  report("connecting", 10);
+  if (!(await until(() => !!frames.get().frame || frames.get().link === "lost", frames.subscribe, signal)) || !frames.get().frame) return false;
+  report("reading", 30);
+  for (let round = 0; round < 3; round++) {
+    /* oxlint-disable eslint/no-await-in-loop -- a mounted read can start another read on the next frame */
+    let painted = false;
+    if (
+      !(await until(
+        () => painted,
+        (check) => {
+          const frame = requestAnimationFrame(() => {
+            painted = true;
+            check();
+          });
+          return () => cancelAnimationFrame(frame);
+        },
+        signal,
+      ))
+    )
+      return false;
+    await waitForReads(client, signal);
+    if (signal.aborted) return false;
+    /* oxlint-enable eslint/no-await-in-loop */
+  }
+  report("loading", 50);
+  const pictures = [...document.images].filter((image) => image.loading !== "lazy");
+  const loaded = await until(
+    () => {
+      const done = pictures.filter((image) => image.complete).length;
+      report("loading", pictures.length === 0 ? 70 : 50 + (20 * done) / pictures.length);
+      return done === pictures.length;
+    },
+    (check) => {
+      for (const image of pictures) {
+        image.addEventListener("load", check);
+        image.addEventListener("error", check);
+      }
+      return () => {
+        for (const image of pictures) {
+          image.removeEventListener("load", check);
+          image.removeEventListener("error", check);
+        }
+      };
+    },
+    signal,
+  );
+  return loaded && pictures.every((image) => image.naturalWidth > 0);
+}
+
+async function contentReady(report: Report, signal: AbortSignal) {
+  const ready = await until(
+    () => {
+      const pending = document.querySelectorAll<HTMLElement>('[data-opening="pending"]');
+      if (pending.length === 0) return true;
+      const progress = Math.min(...[...pending].map((node) => Number(node.dataset.openingProgress ?? 0)));
+      report("loading", 70 + 25 * Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0)));
+      return false;
+    },
+    (check) => {
+      const observer = new MutationObserver(check);
+      observer.observe(document.getElementById("root") ?? document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["data-opening", "data-opening-progress"],
+      });
+      return () => observer.disconnect();
+    },
+    signal,
+  );
+  return ready && document.querySelector('[data-opening="failed"]') === null;
+}
+
+export async function reveal(client: QueryClient, signal: AbortSignal) {
+  const cover = document.getElementById("opening");
+  if (!cover || signal.aborted) return;
+  const report: Report = (phase, progress) => {
+    cover.dataset.phase = phase;
+    if (progress !== undefined) cover.dataset.progress = String(Math.round(Math.max(Number(cover.dataset.progress ?? 0), progress)));
+    cover.dispatchEvent(new Event("opening-update"));
+  };
+  const page = await limited(2000, signal, (waiting) => pageReady(client, report, waiting));
   if (signal.aborted) return;
-  // What came in under the cover (a dialog opened by the address, a list's first rows) is already in: it shows where it ends, not coming in a second time.
-  for (const a of document.getAnimations()) {
-    const target = a.effect instanceof KeyframeEffect ? a.effect.target : null;
+  const content = await limited(15_000, signal, (waiting) => contentReady(report, waiting));
+  if (signal.aborted) return;
+  const failed = document.querySelector('[data-opening="failed"]') !== null || client.hasActiveErrors();
+  const phase = failed ? "failed" : page && content ? "ready" : "waiting";
+  report(phase, phase === "ready" ? 100 : undefined);
+  // Finish entrance animations underneath before uncovering the mounted page.
+  for (const animation of document.getAnimations()) {
+    const target = animation.effect instanceof KeyframeEffect ? animation.effect.target : null;
     if (target && cover.contains(target)) continue;
-    if (Number.isFinite(a.effect?.getComputedTiming().endTime ?? Infinity)) a.finish();
+    if (Number.isFinite(animation.effect?.getComputedTiming().endTime ?? Infinity)) animation.finish();
   }
   cover.style.pointerEvents = "none";
   const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  await cover.animate([{ opacity: 1 }, { opacity: 0 }], { duration: still ? 0 : 180, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "forwards" }).finished;
+  await cover.animate([{ opacity: 1 }, { opacity: 0 }], { duration: still ? 0 : 240, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "forwards" }).finished;
   cover.remove();
 }

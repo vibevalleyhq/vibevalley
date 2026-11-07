@@ -68,15 +68,11 @@ export interface FarmUi {
   readonly chatShown: string | undefined;
   readonly phoneOpen: boolean;
   readonly friendsOpen: boolean;
-  readonly titleOpen: boolean;
   readonly bedFx: readonly BedFx[];
   /** Rewards shown in the FX layer for a few seconds each. */
   readonly rewards: readonly GameEffectReward[];
   readonly screen: VillageScreen | undefined;
 }
-
-/** The title screen was closed once on this machine: it does not open by itself again (Playwright sets it to start past it). */
-const titleSeen = defineStored("title.seen", Schema.Boolean, false);
 
 /** The repo whose farm was on the page last ("" for the sessions without one), the one `/farm` opens; null before any. */
 const lastFarm = defineStored("farm.repo", Schema.NullOr(Schema.String), null);
@@ -92,7 +88,6 @@ const farmUi = defineAtom<FarmUi>({
   chatShown: undefined,
   phoneOpen: false,
   friendsOpen: false,
-  titleOpen: !titleSeen.get(),
   bedFx: [],
   rewards: [],
   screen: undefined,
@@ -174,12 +169,6 @@ export const farm = {
   showChat: (channel: string | undefined) => set({ chatShown: channel, chatOpen: true, phoneOpen: true }),
   phoneOpen: (open: boolean) => set(open ? { phoneOpen: true } : { phoneOpen: false, chatOpen: false }),
   friendsOpen: (open: boolean) => set({ friendsOpen: open }),
-  /** Leaves the title screen; it does not show again on this machine. */
-  closeTitle: () => {
-    set({ titleOpen: false });
-    titleSeen.set(true);
-  },
-  showTitle: () => set({ titleOpen: true }),
   /** Plays a bed's effect for a moment: the canvas draws it, the sounds hear it. */
   bedFx: (bed: number, kind: BedFxKind, text?: string) => {
     const fx: BedFx = omitUndefined({ id: ++nextFx, bed, kind, text });
@@ -196,7 +185,6 @@ export const farm = {
   setRepo: (repo: string) => lastFarm.set(repo),
 };
 
-/** For tests and leaving the page: everything but the title's seen flag back to the start. */
 export function resetFarm() {
   set({
     overlays: [],

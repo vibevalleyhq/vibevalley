@@ -14,8 +14,6 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width, height } });
 const errors: string[] = [];
 page.on("pageerror", (e) => errors.push(e.message));
-// The title screen comes once a machine: seen, so the farm itself is drawn.
-await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
 for (const path of pages) {
   /* oxlint-disable eslint/no-await-in-loop -- one page, shown one path at a time */
   await page.goto(server + path);

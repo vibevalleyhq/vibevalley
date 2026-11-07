@@ -5,10 +5,6 @@ import { type Agent, pathOf, type VibeValleyApi } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
 test.use({ farm: "farm-actions" });
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
-});
-
 const scripted: Agent = {
   id: "",
   name: "fox",

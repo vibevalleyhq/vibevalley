@@ -2,10 +2,6 @@ import { expect, test } from "./fixtures";
 
 test.use({ farm: "farm-canvas" });
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
-});
-
 test("the village draws at integer scale and runs without rendering errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
@@ -19,6 +15,8 @@ test("the village draws at integer scale and runs without rendering errors", asy
   // 384 art pixels fit three times in the space beside the rail at 1280px.
   await expect(canvas).toHaveCSS("width", "1152px");
   await page.clock.runFor(1000);
+  await expect(page.locator("#opening")).toHaveCount(0);
+  await expect(page.getByTestId("title")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

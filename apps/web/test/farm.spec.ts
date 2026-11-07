@@ -1,11 +1,6 @@
 import { expect, gate, test } from "./fixtures";
 
-// The title screen shows on a machine's first visit; these tests start past it.
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
-});
-
-test("the opening hands off to the village's loading bar before its pictures arrive", async ({ page }) => {
+test("the opening tracks the village's loading bar until its pictures arrive", async ({ page }) => {
   // The pictures wait until the bar has been seen.
   const pictures = gate();
   await page.route("**/pixel/*.png", async (route) => {
@@ -17,10 +12,13 @@ test("the opening hands off to the village's loading bar before its pictures arr
   const bar = page.getByTestId("village-loading");
   await expect(bar).toBeVisible();
   await expect(bar).toHaveAttribute("aria-valuenow", /^\d+$/u);
-  await expect(page.locator("#opening")).toHaveCount(0);
+  await expect(page.locator("#opening")).toBeVisible();
+  await expect(page.locator("#opening")).toHaveAttribute("data-mood", "excited");
+  expect(Number(await page.locator("#opening").getAttribute("data-progress"))).toBeLessThan(100);
   pictures.open();
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
   await expect(bar).toHaveCount(0);
+  await expect(page.locator("#opening")).toHaveCount(0);
 });
 
 test("the farm links to the workbench, and the workbench back to the farm", async ({ page }) => {

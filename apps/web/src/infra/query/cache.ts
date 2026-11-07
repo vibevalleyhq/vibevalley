@@ -17,6 +17,7 @@ type EntryBase = {
   readonly key: QueryKey;
   readonly definition: object;
   invalidate(): Promise<unknown>;
+  hasActiveError(): boolean;
   clear(): void;
   dispose(): void;
 };
@@ -118,6 +119,7 @@ class Entry<T> implements EntryBase {
   });
   private keep = (value: T): T => (this.record && this.same(this.record.value, value) ? this.record.value : value);
   private active = () => [...this.watchers.values()].some((d) => d.enabled);
+  hasActiveError = () => this.active() && this.failed;
   private notify = () => {
     for (const observer of this.watchers.keys()) observer.notify();
   };
@@ -346,6 +348,7 @@ export function createQueryClient() {
       );
     },
     fetching: () => scope.active,
+    hasActiveErrors: () => [...scope.entries.values()].some((entry) => entry.hasActiveError()),
     subscribeActivity: (listener: () => void) => {
       scope.activity.add(listener);
       return () => {

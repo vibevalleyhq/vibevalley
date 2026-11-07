@@ -1,7 +1,15 @@
 {
   "opening": {
-    "waking": "叫醒 VibeValley……",
-    "label": "叫醒 VibeValley",
-    "cannotStart": "VibeValley 起不来：{why}"
+    "name": "码农谷物语",
+    "waking": "加载中……",
+    "label": "正在加载码农谷物语",
+    "cannotStart": "码农谷物语起不来：{why}",
+    "starting": "正在唤醒农场……",
+    "connecting": "正在连接……",
+    "reading": "正在准备工作台……",
+    "loading": "加载中……",
+    "ready": "准备好了",
+    "waiting": "还在等待连接……",
+    "failed": "加载遇到问题"
   }
 }

@@ -4,10 +4,6 @@ import { expect, test } from "./fixtures";
 
 test.use({ farm: "farm-hud" });
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
-});
-
 /** A repo's farm, or the farm of the sessions without one. */
 async function openFarm(page: Page, repo = "") {
   await page.goto(`/farm/${repo}`);

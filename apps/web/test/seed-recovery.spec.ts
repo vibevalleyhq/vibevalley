@@ -7,7 +7,6 @@ import { expect, test } from "./fixtures";
 const draft = "keep the idea I just wrote";
 
 async function openBag(page: Page, repo: string) {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
   await page.goto(`/farm/${repo}`);
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   const box = (await page.getByTestId("village").locator("canvas").boundingBox())!;

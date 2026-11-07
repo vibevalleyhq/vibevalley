@@ -100,7 +100,6 @@ test("the desktop app shows the live board and sends a notice", async () => {
     socket.destroy();
 
     await page.screenshot({ path: test.info().outputPath("desktop.png") });
-    await page.evaluate(() => localStorage.setItem("vibevalley.title.seen", "true"));
     await page.goto(server + "/farm/");
     await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true");
     await expect(page.getByTestId("rail")).toBeVisible();
@@ -134,6 +133,8 @@ test("the window opens on the bar at once, and says there why the server could n
     await expect(page).toHaveURL(/\/opening\.html\?.*\bproblem=/u);
     await expect(page.getByRole("alert")).toBeVisible();
     await expect(page.getByRole("progressbar")).toHaveCount(0);
+    await expect(page.locator("#opening .scene")).toHaveJSProperty("naturalWidth", 1672);
+    await page.screenshot({ path: test.info().outputPath("opening-failure.png") });
     // The window shows on its first ready-to-show, which may come after the page is drawn hidden: wait for it.
     await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([true]);
   } finally {

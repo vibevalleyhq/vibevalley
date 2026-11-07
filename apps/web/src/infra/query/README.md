@@ -66,6 +66,7 @@ Key 只允许字符串、有限数字、布尔和 null 组成的只读元组；�
 | `client.invalidate({ prefix })` | 按 key 段失效一组 |
 | `client.invalidate()` | 当前作用域全部失效 |
 | `client.fetching()`、`subscribeActivity()` | 给启动遮罩读请求活动，不暴露内部缓存容器 |
+| `client.hasActiveErrors()` | 仅判断有 enabled 订阅的查询是否失败，防止启动遮罩将失败报为完成；不把无人订阅的旧错误算进来 |
 | `client.clear()`、`dispose()` | 清缓存并使旧响应失效；dispose 还永久关闭实例 |
 
 `invalidate` 返回本批活跃刷新尝试的结果汇总。失败保留在各查询中，不制造无人处理的 rejection，也不把局部失败描述成全部成功。`setData` 不能存业务乐观覆盖层；已有调用处要区分服务端确认结果与仍待确认的编辑。

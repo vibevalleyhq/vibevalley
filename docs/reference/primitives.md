@@ -204,7 +204,6 @@
 | `spanText` | `format.ts` | How long, in round words: rounded relative duration. |
 | `SpriteManifest` | `manifests.ts` |  |
 | `CursorManifest` | `manifests.ts` |  |
-| `TitleManifest` | `manifests.ts` |  |
 | `pinyinLoaded` | `search.ts` | Settles once pinyin matches too (tests wait on it). |
 | `spelled` | `search.ts` | The text holds the query, ignoring case, or spells it in pinyin; query is lower case. |
 | `matches` | `search.ts` | Every word of the query is somewhere in the texts (spelled), ignoring case; an empty query matches everything. |
@@ -256,11 +255,10 @@
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `currentHost` | `host.ts` |  |
-| `reveal` | `opening.ts` | Once the page has mounted: takes the cover away when the page is ready, in one fade. |
+| `reveal` | `opening.ts` |  |
 | `retryRead` | `query.ts` |  |
 | `refetchOnRelink` | `query.ts` |  |
 | `cursorsQuery` | `query.ts` |  |
-| `titleSpritesQuery` | `query.ts` |  |
 | `agentsQuery` | `query.ts` |  |
 | `templatesQuery` | `query.ts` |  |
 | `reposQuery` | `query.ts` |  |

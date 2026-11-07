@@ -15,7 +15,6 @@ import { IssueView } from "./issue/IssueView";
 import { Panels } from "./panels/Panels";
 import { feedPhoneCalls } from "./phone/calls";
 import { farm, useFarm } from "./store";
-import { TitleScreen } from "./title/TitleScreen";
 import { farmKeys } from "./tools";
 
 /** `repo`: whose farm ("" for the sessions without a repo). */
@@ -28,7 +27,6 @@ export function FarmPage(props: { repo: string }) {
     (repo) => farm.setRepo(repo),
   );
   const raw = rawFarmFrame();
-  const titleOpen = useFarm((s) => s.titleOpen);
   farmKeys();
   feedPhoneCalls(raw);
   // A call starting (the chat's call button, a ring answered, the desktop's shortcut) brings the phone out unfolded. Folded during the call, it stays folded.
@@ -59,9 +57,6 @@ export function FarmPage(props: { repo: string }) {
         <p role="status" class="absolute inset-x-0 top-1/3 text-center text-cream-200">
           {frames.link === "lost" ? t("web.farm.page.lost") : t("web.farm.page.waiting")}
         </p>
-      </Show>
-      <Show when={titleOpen()}>
-        <TitleScreen />
       </Show>
       <DebugPanel />
     </div>

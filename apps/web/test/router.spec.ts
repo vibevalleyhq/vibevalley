@@ -19,7 +19,6 @@ test("regression: invalid issue search never silently chooses the first value", 
 });
 
 test("regression: the farm stays inside the same application shell across navigation and history", async ({ page, api }) => {
-  await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
   await api.repo.create({ name: "router-farm" });
   await page.goto("/issues");
   const rail = page.getByTestId("rail");
@@ -74,9 +73,10 @@ test("regression: an invalid encoded route and an unknown page never become a wr
   }
 });
 
-test("regression: the first-visit title does not capture Enter on the application navigation", async ({ page }) => {
+test("regression: direct farm entry preserves keyboard navigation in the application shell", async ({ page }) => {
   await page.goto("/farm/");
-  await expect(page.getByTestId("title")).toBeVisible();
+  await expect(page.locator("#opening")).toHaveCount(0);
+  await expect(page.getByTestId("title")).toHaveCount(0);
   const issues = page.getByTestId("rail").locator('[data-place="issues"]');
   await issues.focus();
   await page.keyboard.press("Enter");
@@ -84,16 +84,16 @@ test("regression: the first-visit title does not capture Enter on the applicatio
   await expect(page.getByTestId("issue-search")).toBeVisible();
 });
 
-test("regression: a null model-key source keeps the title open and never starts the orchestrator", async ({ page, api }) => {
+test("regression: direct farm entry without a model key never starts the orchestrator", async ({ page, api }) => {
   expect((await api.setting.get()).deepseekApiKey.source).toBeNull();
   const requests: string[] = [];
   page.on("request", (request) => {
     if (request.url().endsWith("/api/v1/orchestrator/open")) requests.push(request.url());
   });
   await page.goto("/farm/");
-  const title = page.getByTestId("title");
-  await title.locator('[data-key="start"]').click();
-  await expect(title.getByRole("status")).toBeVisible();
+  await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true");
+  await expect(page.locator("#opening")).toHaveCount(0);
+  await expect(page.getByTestId("title")).toHaveCount(0);
   expect(requests).toEqual([]);
 });
 

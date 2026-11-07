@@ -41,11 +41,7 @@ test("a locked bed says when it clears; the hand sows an empty bed", () => {
   expect(aimTool("hand", beds[0]!, undefined, { crop: "empty" }, 3)).toEqual({ ok: true, text: "播种" });
 });
 
-test("the title, once closed, stays closed on this machine; the farm entered is the one /farm opens next", () => {
-  farm.showTitle();
-  farm.closeTitle();
-  resetFarm();
-  expect(farmState().titleOpen).toBe(false);
+test("the farm entered is the one /farm opens next", () => {
   farm.setRepo("clock-in");
   expect(farmRepo()).toBe("clock-in");
   expect(lastFarmRepo()).toBe("clock-in");

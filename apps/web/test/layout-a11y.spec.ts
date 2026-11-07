@@ -9,7 +9,6 @@ for (const width of [1440, 390])
   test(`farm and opening layouts fit ${width}px`, async ({ page }, info) => {
     const check = diagnosticsOf(page);
     await page.setViewportSize({ width, height: 844 });
-    await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
     await test.step("audit: farm layout", async () => {
       await page.goto("/farm/");
       await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
