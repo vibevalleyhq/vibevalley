@@ -1,42 +1,20 @@
+import { type DeepSeekModel, deepseekModels } from "@vibevalley/provider/deepseek/models";
+
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 /** The order pi-ai clamps a level in: a level a model lacks becomes the next one up, else the next one down. */
 const thinkingLevels: readonly ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
-export interface Model {
-  readonly id: string;
-  readonly name: string;
+export interface Model extends DeepSeekModel {
   readonly api: "openai-completions";
   readonly provider: "deepseek";
-  readonly baseUrl: string;
-  readonly reasoning: boolean;
-  readonly input: readonly ("text" | "image")[];
-  /** Dollars per million tokens. */
-  readonly cost: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number };
-  readonly contextWindow: number;
-  readonly maxTokens: number;
   /** What a level is sent as (reasoning_effort): a level not here goes as itself. */
   readonly thinkingLevelMap?: Readonly<Partial<Record<ThinkingLevel, string | null>>>;
 }
 
-const deepseek = (id: string, name: string, cost: Model["cost"]): Model => ({
-  id,
-  name,
-  api: "openai-completions",
-  provider: "deepseek",
-  baseUrl: "https://api.deepseek.com",
-  reasoning: true,
-  input: ["text"],
-  cost,
-  contextWindow: 1_000_000,
-  maxTokens: 384_000,
-  thinkingLevelMap: { minimal: "high", low: "high", medium: "high", high: "high", xhigh: "max", max: "max" },
-});
-
-export const models: readonly [Model, ...Model[]] = [
-  deepseek("deepseek-flash", "DeepSeek V4.1 Flash", { input: 0.14, output: 0.28, cacheRead: 0.028, cacheWrite: 0 }),
-  deepseek("deepseek-v4-pro", "DeepSeek V4 Pro", { input: 1.74, output: 3.48, cacheRead: 0.145, cacheWrite: 0 }),
-];
+const modelOf = (model: DeepSeekModel): Model => ({ ...model, api: "openai-completions", provider: "deepseek" });
+const [first, ...rest] = deepseekModels;
+export const models: readonly [Model, ...Model[]] = [modelOf(first), ...rest.map(modelOf)];
 
 export const getModel = (provider: string, id: string) => models.find((m) => m.provider === provider && m.id === id);
 

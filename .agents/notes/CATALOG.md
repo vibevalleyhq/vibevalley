@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（24 篇）
+## proposed（23 篇）
 
 ### feature
 
@@ -19,7 +19,6 @@
 
 ### architecture
 
-- 2026-11-07 [Provider 与 AI 收敛现有模型和语音库](.agents/notes/proposed/architecture/2026-11-07-provider-ai-consolidation.md)
 - 2026-11-06 [Space 隔离单元（repos、worktrees、pkm）与 VibeValley 自举开发全链路收敛步骤](.agents/notes/proposed/architecture/2026-11-06-space-isolation-and-self-hosting.md)
 - 2026-11-06 [Space 核心业务概念模型（Space、Repo、Worktree、Issue、Pkm 与执行体）](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md)
 - 2026-11-06 [边界与 Schema 约束准则、扫描脚本与全仓收敛清单](.agents/notes/proposed/architecture/2026-11-06-schema-at-boundaries.md)

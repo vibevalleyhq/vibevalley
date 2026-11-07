@@ -3,6 +3,22 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./deepseek/models": {
+      "types": "./dist/deepseek/models.d.ts",
+      "default": "./src/deepseek/models.ts"
+    },
+    "./deepseek/request": {
+      "types": "./dist/deepseek/request.d.ts",
+      "default": "./src/deepseek/request.ts"
+    },
+    "./deepseek/response": {
+      "types": "./dist/deepseek/response.d.ts",
+      "default": "./src/deepseek/response.ts"
+    },
+    "./deepseek/server": {
+      "types": "./dist/deepseek/server.d.ts",
+      "default": "./src/deepseek/server.ts"
+    },
     "./agora/server": {
       "types": "./dist/agora/server.d.ts",
       "default": "./src/agora/server.ts"
