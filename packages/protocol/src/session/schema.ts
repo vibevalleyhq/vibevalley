@@ -57,6 +57,12 @@ export const LastRun: Codec<T.LastRun> = Schema.Struct({
   answer: Schema.optionalKey(IssueAnswer),
 });
 
+export const ToolConnection: Codec<T.ToolConnection> = Schema.Struct({
+  server: Schema.String,
+  status: Schema.Literals(T.ToolConnectionStatusValues),
+  reason: Schema.optionalKey(Schema.String),
+});
+
 const sessionFields = {
   id: SessionId,
   role: Schema.Literals(T.AgentRoleValues),
@@ -74,6 +80,7 @@ const sessionFields = {
   channel: Schema.optionalKey(Schema.String),
   issue: Schema.optionalKey(IssueId),
   refining: Schema.Boolean,
+  toolConnections: Schema.optionalKey(Schema.mutable(Schema.Array(ToolConnection))),
 };
 
 export const Session: Codec<T.Session> = Schema.Struct({ ...sessionFields, phase: Phase });
@@ -110,6 +117,7 @@ export const SessionEvent: Codec<T.SessionEvent> = Schema.Struct({
   output: Schema.optionalKey(Schema.String),
   ok: Schema.optionalKey(Schema.Boolean),
   tokens: Schema.optionalKey(EventTokens),
+  connection: Schema.optionalKey(ToolConnection),
 });
 
 export const RunTriggerKind: Codec<T.RunTriggerKind> = Schema.Literals(T.RunTriggerKindValues);
@@ -157,4 +165,17 @@ export const FactSessionLeft: Codec<T.FactSessionLeft> = Schema.Struct({
   id: SessionId,
   closed: Schema.optionalKey(SessionClose),
   merged: Schema.optionalKey(Schema.Finite),
+});
+
+export const FactSessionToolChanged: Codec<T.FactSessionToolChanged> = Schema.Struct({
+  type: Schema.Literal("sessionToolChanged"),
+  at: Schema.Finite,
+  id: SessionId,
+  connection: ToolConnection,
+});
+
+export const FactSessionToolsReset: Codec<T.FactSessionToolsReset> = Schema.Struct({
+  type: Schema.Literal("sessionToolsReset"),
+  at: Schema.Finite,
+  id: SessionId,
 });

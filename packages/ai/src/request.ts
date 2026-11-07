@@ -1,4 +1,6 @@
-import type { AssistantMessage, Context, ImageContent, Message, TextContent, ToolCall, Usage } from "./messages.ts";
+import { type DeepSeekContent, type DeepSeekInput, type DeepSeekMessage, encodeDeepSeekRequest } from "@vibevalley/provider/deepseek/request";
+
+import type { AssistantMessage, Context, ImageContent, Message, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
 import { clampThinkingLevel, type Model, type ThinkingLevel } from "./models.ts";
 
 export interface RequestOptions {
@@ -10,38 +12,37 @@ export interface RequestOptions {
 
 const userImageOmitted = "(image omitted: model does not support images)";
 const toolImageOmitted = "(tool image omitted: model does not support images)";
-const reasoningFields = new Set(["reasoning", "reasoning_content", "reasoning_text"]);
 
 /** Unpaired surrogates fail the provider's JSON; paired ones (emoji) stay: with u, a pair is one code point the class does not take. */
 const sanitizeSurrogates = (text: string) => text.replace(/[\uD800-\uDFFF]/gu, "");
 
 export function requestBody(model: Model, context: Context, options: RequestOptions = {}): Record<string, unknown> {
+  return encodeDeepSeekRequest(model.id, requestInput(model, context, options));
+}
+
+export function requestInput(model: Model, context: Context, options: RequestOptions = {}): DeepSeekInput {
   const clamped = options.reasoning ? clampThinkingLevel(model, options.reasoning) : undefined;
   const effort = clamped === "off" ? undefined : clamped;
-  const body: Record<string, unknown> = {
-    model: model.id,
+  return {
     messages: chatMessages(model, context),
-    stream: true,
-    stream_options: { include_usage: true },
-    max_tokens: clampMaxTokens(model, context, options.maxTokens ?? model.maxTokens),
+    maxTokens: clampMaxTokens(model, context, options.maxTokens ?? model.maxTokens),
+    ...(context.tools.length > 0
+      ? { tools: context.tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })) }
+      : hasToolHistory(context.messages)
+        ? { tools: [] }
+        : {}),
+    ...(options.toolChoice ? { toolChoice: options.toolChoice } : {}),
+    reasoning: model.reasoning,
+    ...(model.reasoning && (effort || model.thinkingLevelMap?.off !== null) ? { thinking: !!effort } : {}),
+    ...(model.reasoning && effort ? { effort: model.thinkingLevelMap?.[effort] ?? effort } : {}),
   };
-  if (context.tools.length > 0)
-    body.tools = context.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } }));
-  else if (hasToolHistory(context.messages)) body.tools = [];
-  if (options.toolChoice) body.tool_choice = options.toolChoice;
-  if (model.reasoning) {
-    if (effort) body.thinking = { type: "enabled" };
-    else if (model.thinkingLevelMap?.off !== null) body.thinking = { type: "disabled" };
-    if (effort) body.reasoning_effort = model.thinkingLevelMap?.[effort] ?? effort;
-  }
-  return body;
 }
 
 const hasToolHistory = (messages: readonly Message[]) =>
   messages.some((m) => m.role === "toolResult" || (m.role === "assistant" && m.content.some((c) => c.type === "toolCall")));
 
-function chatMessages(model: Model, context: Context): Record<string, unknown>[] {
-  const out: Record<string, unknown>[] = [];
+function chatMessages(model: Model, context: Context): DeepSeekMessage[] {
+  const out: DeepSeekMessage[] = [];
   if (context.system.length > 0) out.push({ role: "system", content: sanitizeSurrogates(context.system) });
   const messages = replayable(model, context.messages);
   for (let i = 0; i < messages.length; i++) {
@@ -55,18 +56,18 @@ function chatMessages(model: Model, context: Context): Record<string, unknown>[]
         }
         const parts = m.content
           .filter((c) => c.type !== "text" || c.text.length > 0)
-          .map((c) => (c.type === "text" ? { type: "text", text: sanitizeSurrogates(c.text) } : { type: "image_url", image_url: { url: dataUrl(c) } }));
+          .map((c): DeepSeekContent => (c.type === "text" ? { type: "text", text: sanitizeSurrogates(c.text) } : { type: "image", url: dataUrl(c) }));
         if (parts.length > 0) out.push({ role: "user", content: parts });
         break;
       }
       case "assistant": {
-        const said = assistantMessage(model, m);
+        const said = assistantMessage(m);
         if (said) out.push(said);
         break;
       }
       case "toolResult": {
         // A turn's results go together; images, for a model that reads them, follow as one user message.
-        const images: Record<string, unknown>[] = [];
+        const images: DeepSeekContent[] = [];
         let j = i;
         for (let r = messages[j]; r?.role === "toolResult"; r = messages[++j]) {
           const text = r.content
@@ -77,10 +78,9 @@ function chatMessages(model: Model, context: Context): Record<string, unknown>[]
           out.push({
             role: "tool",
             content: sanitizeSurrogates(text || (hasImages ? "(see attached image)" : "(no tool output)")),
-            tool_call_id: r.toolCallId,
+            toolCallId: r.toolCallId,
           });
-          if (hasImages && model.input.includes("image"))
-            for (const c of r.content) if (c.type === "image") images.push({ type: "image_url", image_url: { url: dataUrl(c) } });
+          if (hasImages && model.input.includes("image")) for (const c of r.content) if (c.type === "image") images.push({ type: "image", url: dataUrl(c) });
         }
         i = j - 1;
         if (images.length > 0) out.push({ role: "user", content: [{ type: "text", text: "Attached image(s) from tool result:" }, ...images] });
@@ -91,23 +91,21 @@ function chatMessages(model: Model, context: Context): Record<string, unknown>[]
   return out;
 }
 
-function assistantMessage(model: Model, m: AssistantMessage): Record<string, unknown> | undefined {
-  const said: Record<string, unknown> = { role: "assistant", content: null };
+function assistantMessage(m: AssistantMessage): DeepSeekMessage | undefined {
   const text = m.content
     .filter((c): c is TextContent => c.type === "text" && c.text.trim().length > 0)
     .map((c) => sanitizeSurrogates(c.text))
     .join("");
-  const thinking = m.content.filter((c) => c.type === "thinking" && c.thinking.trim().length > 0);
+  const thinking = m.content.filter((c): c is ThinkingContent => c.type === "thinking" && c.thinking.trim().length > 0);
   const calls = m.content.filter((c): c is ToolCall => c.type === "toolCall");
-  if (text.length > 0) said.content = text;
-  const signature = thinking[0]?.type === "thinking" ? thinking[0].thinkingSignature : undefined;
-  if (signature && reasoningFields.has(signature)) said[signature] = thinking.map((c) => (c.type === "thinking" ? c.thinking : "")).join("\n");
-  if (calls.length > 0)
-    said.tool_calls = calls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.arguments) } }));
-  // DeepSeek wants it on every assistant message once thinking is in play.
-  if (model.reasoning && said.reasoning_content === undefined) said.reasoning_content = "";
-  if ((said.content === null || said.content === "") && said.tool_calls === undefined) return undefined;
-  return said;
+  if (text.length === 0 && calls.length === 0) return undefined;
+  const signature = thinking[0]?.thinkingSignature;
+  return {
+    role: "assistant",
+    content: text || null,
+    ...(signature ? { reasoning: { signature, text: thinking.map((c) => c.thinking).join("\n") } } : {}),
+    calls: calls.map((c) => ({ id: c.id, name: c.name, arguments: JSON.stringify(c.arguments) })),
+  };
 }
 
 const dataUrl = (c: ImageContent) => `data:${c.mimeType};base64,${c.data}`;

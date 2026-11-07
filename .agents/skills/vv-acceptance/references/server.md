@@ -52,6 +52,40 @@
 
 4. 页面也改了的，在同一个子命令末尾接上 [page.md](.agents/skills/vv-acceptance/references/page.md) 的截图命令。
 
+### 真实帮工的 CLI 与连接观测
+
+仅在主人已授权真实农机验收时执行；需要本机 Codex 登录，会消耗模型额度。普通规则先跑服务端的 `src/runtime/access.test.ts`、`src/session/worker.test.ts`、`src/flows/worker-cli.test.ts`、`src/issue/watch.test.ts`，以及 CLI 的 `src/issue-watch*.test.ts`、`src/worker.test.ts`。在各包目录运行 `env -u OAR_SUBAGENT_DEPTH vp test run <文件>`，根目录的测试配置只收集 scripts。
+
+1. 把下列脚本存到独立临时证据目录的 `worker.sh`。它只创建沙箱项目，凭证文件只写入假令牌，不读取真实令牌。
+
+```sh
+#!/bin/sh
+set -eu
+vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
+vv runtime list --format json
+vv repo create acceptance --format json
+agent_id=$(vv agent create acceptance --runtime codex --format json | jq -r .id)
+vv agent list --format json | jq --arg id "$agent_id" '.[] | select(.id == $id) | .mcpServers=[{type:"http",name:"acceptance-broken",url:"http://127.0.0.1:1/mcp",headers:{}}]' > "$VIBEVALLEY_HOME/agent.json"
+curl --noproxy '*' -fsS -H 'Content-Type: application/json' --data-binary "@$VIBEVALLEY_HOME/agent.json" "$VIBEVALLEY_SERVER/api/v1/agent/update"
+printf '{"endpoint":"%s/mcp","token":"invalid-acceptance-token"}' "$VIBEVALLEY_SERVER" > "$VIBEVALLEY_HOME/invalid.json"
+chmod 600 "$VIBEVALLEY_HOME/invalid.json"
+set +e
+apps/cli/node_modules/.bin/vpx apps/cli/src/worker.ts --worker-access-file "$VIBEVALLEY_HOME/invalid.json" doctor
+invalid_code=$?
+set -e
+echo "invalid credential exit=$invalid_code"
+test "$invalid_code" -ne 0
+vv issue create 'Verify isolated worker access' --repo acceptance --agent "$agent_id" --description 'This is an authorized acceptance test. Do not edit code or commit. Use the absolute required worker CLI from your launch instructions. Run doctor, then print only NO_PROXY and no_proxy (no other environment variables). Check both contain 127.0.0.1,localhost,::1. Call the worker CLI report with {"summary":"isolated worker CLI acceptance passed","prSubmit":false,"checks":[{"criterion":0,"result":"met","proof":"doctor returned 0 and both loopback bypass variables include required hosts"}]}. Do not call MCP tools; this verifies the independent CLI. Do not launch other agents.' --format json
+vv issue status 1 todo --format json
+vv issue watch 1 --jsonl
+vv issue show 1 --format json
+vv session list --format json
+```
+
+2. 在仓库根目录执行 `env -u NO_PROXY -u no_proxy -u OAR_SUBAGENT_DEPTH vpx scripts/verify-server.ts -- sh <证据目录>/worker.sh`，保存命令、HEAD、stdout、stderr 和退出码。沙箱独立分配服务端及语音端口，不复用桌面服务。清除代理例外变量只影响这条验收命令；需要既有代理条目的合并规则由最低层回归测试覆盖。
+3. 核对输出：非法凭证退出码为 3；watch 的 `state.sessions[].toolConnections` 中 `acceptance-broken` 为 `failed`，对应 `run/error` 事件含 `connection.status: failed`；Codex 经绝对 CLI 的 doctor 和 report 都返回成功，两个代理例外变量都有三个回环地址，最后 `settled: true`。agent 只用 CLI 交活；可选 MCP 的失败不应阻塞该入口。没有连接事件时只能判 unknown。
+4. 核对 `result.json` 的 `code: 0`、`stopped: true` 和空 `cleanupErrors`。健康检查、agent 自述或单独的命令退出码不能替代上述轨迹与状态。日志留在临时目录，不放进会随 worktree 删除的 dist。
+
 ## 证据
 
 - 只用命令行走的，附上每条命令打出的 JSON（`command.stdout.log`）。

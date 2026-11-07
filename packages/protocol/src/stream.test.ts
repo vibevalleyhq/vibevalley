@@ -18,6 +18,42 @@ const settle = () => vi.advanceTimersByTimeAsync(0);
 
 const notice = { type: "notice", at: 1, level: "info", text: "hi" };
 
+test.each([false, true])("regression: LF and CRLF frames arrive once in order across chunks (fragmented: %s)", async (fragmented) => {
+  vi.useFakeTimers();
+  const server = serverStream();
+  const abort = new AbortController();
+  const heard: unknown[] = [];
+  const ended = readStream(
+    "",
+    livePath,
+    (f) => heard.push(f),
+    abort.signal,
+    () => Promise.resolve(server.response),
+  ).catch((e: unknown) => e);
+  const events = [notice, { ...notice, at: 2 }, { ...notice, at: 3 }];
+  const frames = events.map((event, i) => `data: ${JSON.stringify(event)}${i === 1 ? "\r\n\r\n" : "\n\n"}`);
+  try {
+    if (fragmented) {
+      for (const [index, frame] of frames.entries()) {
+        for (const [offset, character] of [...frame].entries()) {
+          server.write(character);
+          // oxlint-disable-next-line eslint/no-await-in-loop -- verify delivery before the next network chunk arrives
+          await settle();
+          expect(heard).toEqual(events.slice(0, index + Number(offset === frame.length - 1)));
+        }
+      }
+    } else {
+      server.write(frames.join(""));
+      await settle();
+      expect(heard).toEqual(events);
+    }
+  } finally {
+    abort.abort();
+    await ended;
+  }
+  expect(String(await ended)).toContain("aborted");
+});
+
 test("a stream that only pings is alive; one silent past the limit is given up as dead", async () => {
   vi.useFakeTimers();
   const server = serverStream();

@@ -3,6 +3,30 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./realtime/turns": {
+      "types": "./dist/realtime/turns.d.ts",
+      "default": "./src/realtime/turns.ts"
+    },
+    "./audio": {
+      "types": "./dist/audio.d.ts",
+      "default": "./src/audio.ts"
+    },
+    "./realtime/moss": {
+      "types": "./dist/realtime/moss.d.ts",
+      "default": "./src/realtime/moss.ts"
+    },
+    "./realtime/moss-session": {
+      "types": "./dist/realtime/moss-session.d.ts",
+      "default": "./src/realtime/moss-session.ts"
+    },
+    "./realtime/playback": {
+      "types": "./dist/realtime/playback.d.ts",
+      "default": "./src/realtime/playback.ts"
+    },
+    "./transcription": {
+      "types": "./dist/transcription.d.ts",
+      "default": "./src/transcription.ts"
+    },
     "./client": {
       "types": "./dist/client.d.ts",
       "default": "./src/client.ts"
@@ -33,6 +57,8 @@
     }
   },
   "dependencies": {
+    "@vibevalley/provider": "workspace:*",
+    "ai": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {

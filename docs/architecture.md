@@ -88,12 +88,13 @@ flowchart LR
 
 ## 事件流
 
-服务端提供三条 SSE 流（每 20 秒发送一次心跳，容量 64，积压超限断开重连）：
+服务端提供三条全局 SSE 流和一条工单观察流（每 20 秒发送一次心跳，容量 64，积压超限断开重连）：
 
 | 路径 | 连接初值 | 后续推送 | 消费者 |
 |---|---|---|---|
 | `GET /api/v1/state` | 当前 `StateFrame` | 200ms 窗口合并后的 `StateFrame` | 页面、`issue show --watch` |
 | `GET /api/v1/live` | 无 | `LiveEvent`（`SessionEvent`、`Notice`、`Runtime`） | 页面 |
+| `GET /api/v1/issue/watch/:id` | 工单状态与有界保留轨迹 | `IssueWatch` 状态、轨迹和缺口 | `issue watch` |
 | `GET /api/v1/events` | `snapshot`（`SpaceState`） | `ServerEvent`（每条 `Fact` 及 `LiveEvent`） | 调试 |
 
 ## HTTP 接口
@@ -101,7 +102,7 @@ flowchart LR
 `packages/protocol/src/api.ts` 汇总各概念的 `endpoints`。每个接口定义 `op`（如 `issue.status.update`，对应 `POST /api/v1/issue/status/update`）、`about`、输入与输出的 Schema，以及权限集合 `can`（`owner`、`remote`、`orchestrator`）。
 
 - 所有命令接口均使用 `POST /api/v1/<路径>`，参数统一放在 JSON 请求体中。
-- 除三条 SSE 流外，另有 `GET /api/v1/attachment/<id>`（聊天附件）、`GET /api/v1/artifact/<id>/<version>`（网页稿子）、`GET /api/v1/rpc`（频道与稿子订阅 WebSocket）、`/mcp`（帮工工具）和 `POST /v1/chat/completions`（语音管家入口）。
+- 除上述 SSE 流外，另有 `GET /api/v1/attachment/<id>`（聊天附件）、`GET /api/v1/artifact/<id>/<version>`（网页稿子）、`GET /api/v1/rpc`（频道与稿子订阅 WebSocket）、`/mcp`（帮工工具）和 `POST /v1/chat/completions`（语音管家入口）。
 - 「连接到本机」仅放行 `can` 含 `remote` 的接口与流（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/lan.md)）。
 
 ## 存了什么

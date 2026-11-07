@@ -20,7 +20,11 @@ const starters = () =>
   (JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "server", "src", "agent", "templates", "index.json"), "utf8")) as string[])
     .filter((id) => id !== "orchestrator")
     .join(",");
-const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !secret.test(k)));
+const cleanEnv = () => ({
+  ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !secret.test(k))),
+  VIBEVALLEY_VOICE_LINE_PORT: "0",
+  VIBEVALLEY_LAN_PORT: "0",
+});
 
 test("the desktop app shows the live board and sends a notice", async () => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));

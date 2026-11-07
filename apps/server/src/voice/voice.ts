@@ -1,14 +1,15 @@
 import { type AgoraClient } from "agora-agents";
-import { Clock, Context, Effect, Fiber, FiberSet, Layer, Queue, type Scope, Stream } from "effect";
+import { Clock, Context, Effect, Fiber, FiberSet, Layer, Queue, Schema, type Scope, Stream } from "effect";
 import { HttpClient } from "effect/http";
 import type { Socket } from "effect/socket";
 
+import { type AudioFailure, type TranscriptionFailed, transcriptionAudio, transcribeAudio } from "@vibevalley/ai/transcription";
 import { t } from "@vibevalley/i18n";
 import { type AgoraGrant, type Dictated, defaultOrchestrator, type Validation, type VoiceCall } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
-import { decodeMossFrame, extractMossToolCall, mossOrchestratorTool } from "@vibevalley/voice/moss";
-import { type MossLink, type MossTransport, relay, verifyMoss } from "@vibevalley/voice/moss-server";
-import { mossTranscription, type TranscriptionFailure, transcribeAudio } from "@vibevalley/voice/transcribe";
+import { decodeMossFrame } from "@vibevalley/provider/moss";
+import { type MossLink, type MossTransport, verifyMoss } from "@vibevalley/provider/moss/server";
+import { mossTranscription, transcriptionModel, TranscriptionRequestError } from "@vibevalley/provider/transcription";
 
 import { messageOf } from "#/base/errors.ts";
 import { Channel } from "#/channel/channel.ts";
@@ -41,6 +42,8 @@ import {
   voiceUnknown,
 } from "./agora.ts";
 import { type LineFailed, makeVoiceLine, type Tunnel, tunnelAnswers } from "./line.ts";
+import { relay } from "./moss-relay.ts";
+import { extractMossToolCall, mossOrchestratorTool } from "./moss-tools.ts";
 import { mossInstructions, noticeLine, onCallLine } from "./prompts.ts";
 
 export { agentFor, type CallLine, clientOf, retrying, speakPieces, tokenSeconds, tunnelAnswers, vendorsFor, voiceAgentUid, voiceUnknown };
@@ -54,7 +57,7 @@ const aborted = (signal: AbortSignal) =>
     return Effect.sync(() => signal.removeEventListener("abort", done));
   });
 
-const mapTranscriptionFailure = (e: TranscriptionFailure): ApiError => {
+const mapTranscriptionFailure = (e: AudioFailure | TranscriptionFailed): ApiError => {
   switch (e._tag) {
     case "UnsupportedFormat":
       return { _tag: "Refused", reason: t("server.voice.dictation.format", { format: JSON.stringify(e.format) }) };
@@ -62,14 +65,20 @@ const mapTranscriptionFailure = (e: TranscriptionFailure): ApiError => {
       return { _tag: "Refused", reason: t("server.voice.dictation.empty") };
     case "AudioTooLong":
       return { _tag: "Refused", reason: t("server.voice.dictation.tooLong") };
-    case "Unreachable":
-      return unavailable(t("server.voice.dictation.unreachable", { why: e.why }), "dictation");
-    case "Cut":
-      return unavailable(t("server.voice.dictation.cut", { why: e.why }), "call");
-    case "HttpStatus":
-      return unavailable(t("server.voice.dictation.status", { status: e.status, detail: e.detail }));
-    case "InvalidResponse":
-      return unavailable(t("server.voice.dictation.shape"));
+    case "TranscriptionFailed": {
+      const cause = e.cause;
+      if (!Schema.is(TranscriptionRequestError)(cause)) return unavailable(t("server.voice.dictation.unreachable", { why: messageOf(cause) }), "dictation");
+      switch (cause.reason) {
+        case "Unreachable":
+          return unavailable(t("server.voice.dictation.unreachable", { why: cause.message }), "dictation");
+        case "Cut":
+          return unavailable(t("server.voice.dictation.cut", { why: cause.message }), "call");
+        case "HttpStatus":
+          return unavailable(t("server.voice.dictation.status", { status: cause.status ?? 0, detail: cause.message }));
+        case "InvalidResponse":
+          return unavailable(t("server.voice.dictation.shape"));
+      }
+    }
   }
 };
 
@@ -599,11 +608,11 @@ const make = (options: VoiceOptions = {}) =>
         if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "dictation"));
         if (d.via === "moss" && d.key === "") return yield* Effect.fail(unavailable(t("server.voice.dictation.noMossKey"), "dictation"));
         const { url, model } = d.via === "moss" ? mossTranscription : d;
-        return yield* transcribeAudio({ url, model, key: d.key, audio64, format: given }).pipe(
-          Effect.provideService(HttpClient.HttpClient, httpClient),
-          Effect.mapError(mapTranscriptionFailure),
-        );
-      }),
+        const input = yield* transcriptionAudio(audio64, given).pipe(Effect.mapError(mapTranscriptionFailure));
+        const selected = yield* transcriptionModel({ url, model, key: d.key }, input.format).pipe(Effect.provideService(HttpClient.HttpClient, httpClient));
+        const result = yield* transcribeAudio(selected, input.audio).pipe(Effect.mapError(mapTranscriptionFailure));
+        return { text: result.text };
+      }, Effect.scoped),
       lines: voiceLine.lines,
       speak: Effect.fn("Voice.speak")(function* (text) {
         const on = liveCall();

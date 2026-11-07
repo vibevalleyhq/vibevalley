@@ -17,11 +17,12 @@
 
 | 位置 | 职责 |
 |---|---|
-| [`packages/voice/`](packages/voice/README.md) | 独立语音引擎与协议适配包（`@vibevalley/voice`）：MOSS Live 帧 Schema、播放时钟 `Playback`、双向中继 `relay`、握手校验 `verifyMoss`、WAV 编码与 `/audio/transcriptions` 转写 `transcribeAudio`、声网 ConvoAI 与字幕分片重组 `LiveCaptions` |
+| [`packages/provider/`](packages/provider/README.md) | 显式转写模型、MOSS 帧与鉴权连接、Agora SDK/RTC token、字幕分片；无应用设置、业务工具或 UI |
+| [`packages/ai/`](packages/ai/README.md) | Core 转写调用、WAV/RMS、MOSS 会话与 `Playback` 样本级打断对账；浏览器入口不加载服务端模型工厂 |
 | `apps/server/src/voice/voice.ts` | 农场侧薄消费层：绑定 `Setting`、`Orchestrator`、`Channel`、`Inbox`、`Ingress`、`Core`，管理 RTC 授予与通话内 `speak` |
 | `apps/server/src/voice/line.ts` | 语音线路（`8788` 回环监听）与 `cloudflared` 隧道管理 |
 | `apps/server/src/setting/voice.ts` | 语音默认配置 `defaultVoice`、校验 `voiceProblem` 与差异提取 `voiceOverrides` |
-| `apps/web/src/features/voice/` | 浏览器侧薄消费层与 UI：`call.ts`、`dictation.ts`、`mossLine.ts`（消费 `@vibevalley/voice`）、`DictationButton.tsx`、`VoiceForm.tsx`、`MossPlayground.tsx` |
+| `apps/web/src/features/voice/` | `call.ts`、`dictation.ts`、`moss-line.ts` 管设备与宿主，`moss-worker.ts`/`moss-worklets.ts` 保持 PCM 绕开 UI 主线程；`captions.ts` 管展示轮次，`contract.ts` 定义应用会话接口；表单与 playground 留在此处 |
 | `apps/mobile/src/rtc.ts` | 手机壳原生声网 RTC 适配（锁屏不断线） |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`voice.*` 及 `GET /api/v1/voice/moss/line`）。
@@ -29,7 +30,7 @@
 ## 模型和不变量
 
 - **声网 SDK 严格收敛在三处**：
-  - 服务端仅在 `voice/voice.ts` 调 `agora-token` 与 `agora-agents`。
+  - 服务端仅经 `packages/provider/src/agora/server.ts` 调 `agora-token` 与 `agora-agents`；应用 voice 管授予和通话编排。
   - Web 端仅在 `features/voice/call.ts` 动态加载 `agora-rtc-sdk-ng`；手机端仅在 `apps/mobile/src/rtc.ts` 调 `react-native-agora`。
 - **授予（`AgoraGrant`）绑定凭据快照与单次认领**：`voice.grant.create` 生成 `channel + uid`、签发 3600 秒令牌并快照当时的 Agora 凭据。同一份授予只能被 `voice.call.start` 认领一次，续期与挂断均使用该快照。
 - **一通电话固定建立时的接听模式**：
@@ -67,6 +68,9 @@
 - **语音线路只取最新一句 `user` 输入，历史以管家会话为准**：避免声网侧因插话截断或缺失频道文字而产生第二份不一致历史。
 - **听写走轻量 HTTP 转写，不走实时 RTC**：单次录音转文字无需双向流；服务端转发既保护 API Key，又让配对手机能复用本机运行的本地识别服务。
 
+- **SDK 实时会话不替代专有媒体运行**：`ai@7.0.164` 的框架无关 session 可以托管自定义 transport，但其 `stopPlayback()` 只是转调，播放结束不产生 MOSS 的 chunk/run/turn 回执，也不能提供 Worklet 的样本级 cut。SDK 内置播放只记录 AudioContext 时间，连续 PCM 的 `audio-chunk` 没有 run/chunk 字段；放进 raw 也不会触发这些对账。保留 AI 的 `moss-session`、`Playback` 和应用 Worklet，不再包一层没有接管职责的 session。
+- **声网托管通话不等于通用 WebRTC**：SDK transport 扩展仍需应用的声网 RTC 实现；其实时 session 明确拒绝 `session-started` 的 `delegationMode: provider`。保留 Provider 的声网协议/客户端、应用的通话编排与宿主媒体，不将托管模式改为客户端工具执行。`packages/ai/src/realtime/sdk.test.ts` 用安装的 SDK 与假 transport 验证这两个边界；不把该测试当作真实厂商或设备互通验收。
+
 ## 还没做的
 
 - 本机 WebSocket 直连实时语音模型，免除公网隧道：[自己的实时模型经本机 WebSocket 接电话](.agents/notes/proposed/feature/2026-10-27-realtime-calls-over-websocket.md)。
@@ -74,5 +78,6 @@
 
 ## 怎么验证
 
+- `packages/provider/src/moss.test.ts`、`packages/ai/src/realtime/moss.test.ts`、`sdk.test.ts`：握手、tagged-v1、完成回执、样本级打断与 SDK 替代边界。
 - `apps/server/src/voice/voice.test.ts`、`moss.test.ts`、`http/moss.test.ts`：授予认领、多事项合并播报、512 字节切段、挂断拒收字幕与 MOSS 中继测试。
 - `apps/web/src/features/voice/captions.test.ts`、`apps/web/test/voice.spec.ts`、`farm-phone.spec.ts`：分块字幕拼接、缺钥匙提示、听写与来电接听测试。

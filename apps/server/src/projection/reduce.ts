@@ -20,6 +20,13 @@ function fold(state: T.SpaceState, f: T.Fact): [T.SpaceState, boolean] {
       if (state.call === f.state && state.callReason === f.reason) return [state, false];
       return [{ ...state, call: f.state, callReason: f.reason }, true];
     }
+    case "sessionToolsReset":
+      return withSession(state, f.id, (session) => ({ ...session, toolConnections: [] }));
+    case "sessionToolChanged":
+      return withSession(state, f.id, (session) => ({
+        ...session,
+        toolConnections: [...(session.toolConnections ?? []).filter((connection) => connection.server !== f.connection.server), f.connection],
+      }));
     case "sessionPhaseChanged": {
       const session = sessionOf(state, f.id);
       if (

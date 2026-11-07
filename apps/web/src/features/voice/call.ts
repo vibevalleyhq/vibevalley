@@ -2,15 +2,15 @@ import { t } from "@vibevalley/i18n";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
 import type { Rtc, RtcLine } from "@vibevalley/protocol/host";
-import { type VoiceDriver, type VoicePhase, type VoiceTurn, voiceTurnsOfCaptions } from "@vibevalley/voice";
-import { MossLine } from "@vibevalley/voice/moss";
 
 import { messageOf } from "#/base/format.ts";
 import { api, reasonOf } from "#/infra/api.ts";
 import { currentHost } from "#/infra/host.ts";
 import { prefsNow } from "#/state/prefs.ts";
 
-import { LiveCaptions } from "./captions";
+import { LiveCaptions, voiceTurnsOfCaptions } from "./captions";
+import { type VoiceDriver, type VoicePhase, type VoiceTurn } from "./contract.ts";
+import { MossLine } from "./moss-line.ts";
 
 // A call's line on MOSS Live over local WebSocket (/api/v1/voice/moss/line): needs no Agora credentials or tunnel.
 const mossRtc: Rtc = async (_grant, on) => {

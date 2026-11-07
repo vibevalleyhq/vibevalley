@@ -1,22 +1,23 @@
 # VibeValley 自己的 agent
 
-`Brain` 是仓库自研的进程内 agent，由 `packages/ai`（DeepSeek 客户端）和 `packages/agent` 组成，支撑管家、`vibevalley` 农机帮工、CLI 对话与子帮手四种宿主。
+`Brain` 是仓库自研的进程内 agent，由 `packages/provider`（厂商接入）、`packages/ai`（模型调用与消息桥）和 `packages/agent` 组成，支撑管家、`vibevalley` 农机帮工、CLI 对话与子帮手四种宿主。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| DeepSeek 请求拼装、SSE 流解析、工具 JSON Schema 生成与参数修补（`@vibevalley/ai`） | 模型名称选择与 API Key 存储（[档案和农机](docs/subsystems/agent.md)、[设置和配置](docs/subsystems/setting.md)） |
+| DeepSeek 协议与连接（`@vibevalley/provider`）、agent 历史重放、工具 JSON Schema 生成与消息/参数修补（`@vibevalley/ai`） | 模型名称选择与 API Key 存储（[档案和农机](docs/subsystems/agent.md)、[设置和配置](docs/subsystems/setting.md)） |
 | 单轮模型⇄工具循环（`loop.ts`）：并发跑工具、插话（`steer`）、追问（`followUp`）与中断（`abort`） | 输入何时送入、是否含主人授权、回合如何记入 `session_run`（[管家](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
 | 对话 `.jsonl` 持久化、三段式提示与前缀哈希校验、空闲/超限压缩、断点续跑 | 农场业务工具集（`apps/server/src/tool`）与跨档案数据库记忆（[记性](docs/subsystems/memory.md)） |
 | 内置工具：技能按需加载、`MemoryPort`、归档检索、子帮手、自身任务（`Todo`）、提醒与编码工具 | |
 
 ## 在哪
 
-三层单向依赖（由 `vite.config.ts` 的 `no-restricted-imports` 守护）：`packages/ai` → `packages/agent/src/core` → `packages/agent/src` → `apps/server` 组装层。
+单向依赖（由 `vite.config.ts` 的 `no-restricted-imports` 守护）：`packages/provider` → `packages/ai` → `packages/agent/src/core` → `packages/agent/src` → `apps/server` 组装层。箭头右边使用左边。
 
 | 位置 | 职责 |
 |---|---|
+| `packages/provider/src/deepseek/` | 模型目录、请求编码、SSE 分帧与厂商增量、显式 HTTP 连接 |
 | `packages/ai/src/` | `models.ts`、`client.ts`（`ModelClient`）、`llm.ts`（`Llm` 服务）、`request.ts`、`response.ts`、`tools.ts`、`testing.ts` |
 | `packages/agent/src/core/` | `loop.ts`（单轮纤程循环与取消竞态）、`tool.ts`（`schemaTool`、`effectTool`）、`prompts.ts` |
 | `packages/agent/src/brain.ts`、`session.ts`、`compaction.ts`、`prefix.ts` | `makeBrain` 入口、`.jsonl` 读写、上下文压缩与前缀分段 SHA-256 校验 |
@@ -25,6 +26,13 @@
 | `apps/server/src/session/host.ts`、`runtime/vibevalley.ts`、`chat/main.ts` | 管家宿主 `AgentHost`、oar 农机适配（含 `runtime_todo` 表存储）与 CLI 终端对话 |
 
 ## 模型和不变量
+
+### 模型边界
+
+- Provider 的 `deepseekModel` 只收显式 model/baseUrl/key，使用调用者的 Effect HttpClient；不读环境、登录或农场配置，不重试、不换供应商。返回 DeepSeek 增量和带标签错误，不依赖 agent 消息。
+- AI 的 `Llm` 保留 `start`、thinking/text/tool 增量、`done/error`，失败保留已到达的内容；消费结束或打断时释放响应 reader。`ModelClient` 每次请求读取调用者提供的当前 key。
+- 历史重放、缺失工具结果补齐、图片降级、上下文预算、工具参数修补与成本计算留在 AI；模型目录、wire 字段、usage 和 finish reason 解码归 Provider。黄金数据不因分层而重录。
+- 官方 `@ai-sdk/deepseek@3.0.80` 不是现有桥的等价替代：离线 fixture 中它将纯工具 assistant 的 `content: null` 编为 `""`，忽略 `reasoning_text` 与 choice 内 usage。现有流还接受迟到的工具 ID。为保持这些契约，语言保留单一专有适配器，不加 SDK 旁路；SDK Core 用于转写，不接管 agent 循环。
 
 ### 四种宿主配置（`BrainOptions`）
 
@@ -81,7 +89,7 @@
 
 ## 为什么这样
 
-- **自研 Effect 模型层与循环，黄金数据对齐 `pi-ai`**：只接 DeepSeek 一家模型，用 Effect 纤程与 `Deferred` 实现可控取消与插话，用录制的黄金数据保证协议与参数转换一致。
+- **厂商接入与 agent 契约分开，黄金数据对齐 `pi-ai`**：语言只接 DeepSeek，协议留在 Provider；AI 和循环继续用 Effect 作用域保证取消与插话，用录制的黄金数据保证请求与响应不变。
 - **包与服务端解耦，一份 `Brain` 配置出四种用法**：`packages/ai` 与 `packages/agent` 不依赖农场协议或词典，通过 `BrainOptions` 组合工具集与存储端口。
 - **严守前缀不变与空闲压缩**：将动态时间、现状和新增记忆全部后置到当轮输入中，并在空闲 10 分钟后复用原前缀写摘要，最大化 DeepSeek 缓存命中率。
 
@@ -91,6 +99,7 @@
 
 ## 怎么验证
 
-- `packages/ai/src/deepseek.test.ts`、`tools.test.ts`、`llm.test.ts`：请求体、流解析与参数修补黄金数据测试。
+- `packages/provider/src/deepseek/deepseek.test.ts`：请求编码、SSE 与代理字段/usage 的独立解码。
+- `packages/ai/src/deepseek.test.ts`、`tools.test.ts`、`llm.test.ts`：请求/响应黄金数据、参数修补、UTF-8 分片、迟到工具 ID、密钥替换、单请求、错误部分内容与 reader 取消。
 - `packages/agent/src/loop.test.ts`、`core/loop.test.ts`、`brain.test.ts`、`todo.test.ts`：工具并发、插话/排队、前缀哈希、空闲压缩、断点续跑与子帮手 DAG 测试。
 - `apps/server/src/runtime/vibevalley.test.ts`、`orchestrator/openai.test.ts`：oar 农机适配、任务表持久化与 OpenAI 协议入口测试。

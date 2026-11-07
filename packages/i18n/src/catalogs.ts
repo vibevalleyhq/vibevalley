@@ -51,6 +51,8 @@ export const catalogs = {
         runtime: "农机",
         role: "档案角色",
         duty: "职责说明",
+        follow: "交回后继续观察新一轮",
+        jsonl: "输出独立的版本化 JSONL 事件流",
       },
       command: {
         root: "VibeValley 的命令行，一条命令一个操作：答复是短文字，--format json 给接口的形状；在终端里对话用 chat",
@@ -89,6 +91,7 @@ export const catalogs = {
           review: "验收交回来的活：通过或不通过；完成另用 issue status 挪到 done",
           status: "挪工单的状态：todo 是派活或再来一轮，done 是完成，canceled 是关掉；能不能挪由服务端说",
           timeline: "工单的时间线和花费",
+          watch: "观察工单状态和执行轨迹",
         },
         memory: { create: "给一份档案记一条记性", delete: "删掉档案的一条记性", list: "列出一份档案的记性", search: "搜记性；不指定档案就搜全部" },
         repo: { list: "列出仓库", create: "新建仓库（--repo 从 GitHub 克隆）" },
@@ -414,6 +417,7 @@ export const catalogs = {
         pkmPageSave: { run: 'vibevalley pkm page save 读书 "- 置身事内"', about: "新建或更新「读书」这一页" },
         agentCreate: { about: "新建一份用 Claude Code 的档案" },
         agentDelete: { about: "先试删，看会删掉什么" },
+        issueObserve: { about: "以 JSONL 跟随工单执行" },
       },
       issue: {
         can: "能做：",
@@ -428,6 +432,10 @@ export const catalogs = {
         deleted: "删掉了 {issue}",
         passOrFail: "给 --pass 或 --fail，只给一个",
         stage: "现在：{stage}",
+        watchGap: "{session} 的 seq {before} 之前历史已截断",
+        watchMissing: "工单 {issue} 已不在观察范围",
+        watchFormat: "issue watch 请用 --jsonl；--format json 保留单文档语义",
+        watchUnavailable: "{session} 已无保留轨迹，历史不可恢复",
       },
       more: "还有更多：{flag}",
       session: { stopped: "停下了帮工 {session}" },
@@ -436,6 +444,17 @@ export const catalogs = {
       "repo.publish": "将已有分支发布为 GitHub PR 或 GitLab MR",
       "repo.check": "仓库检查：{check}",
       "repo.preview": "预览：将 {branch} 的 {sha} 发布到 {base}；尚未运行检查",
+      worker: {
+        about: "以当前帮工会话交活、提交 PR 或读取上下文",
+        failed: "帮工接入失败：检查会话凭证、服务连接和操作授权",
+        report:
+          "交回当前会话的报告。JSON 必填 summary（字符串）；可选 prSubmit（布尔，默认 false；true 需主人明确授权）、questions（question 字符串、options 字符串数组）、checks（criterion 从 0 开始、result 为 met/unmet/unsure、proof 字符串）、remember（text 字符串、scope 为 repo/all）、answer（conclusion 字符串，evidence/next/unsure 字符串数组）。省略的数组默认空。不接受切换会话身份；报告绑定凭证文件的会话。",
+        pr: "提交当前会话的 PR，须获主人明确授权。JSON 可选 summary 字符串。",
+        context: "读取当前工单串。JSON 可选 id（频道或串）、before（消息号）、limit（数量）、unread（布尔）。",
+        read: "读取上下文资源。JSON 必填 uri（vv:// 资源地址）。 可选 offset、limit（整数）。",
+        doctor: "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",
+        json: "工具输入的 JSON 对象；参数格式见本命令说明。",
+      },
     },
     desktop: {
       open: "打开 VibeValley",
@@ -1314,6 +1333,8 @@ export const catalogs = {
         noIssue: "这个会话不关联工单，不能交付或清理工单的改动。",
         contextKept: "上下文目录保留在 {cwd}：{why}",
         contextHasFiles: "目录里已有文件",
+        workerUnavailable: "必需的帮工 CLI 无法执行；本轮未启动",
+        workerAuthenticationFailed: "帮工 CLI 的会话认证请求失败；本轮未启动，请检查服务监听与会话接入",
       },
       conflictBrief:
         "把 {base} 合进你的分支时有冲突（{files}）。请在你的分支上运行 git merge {base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。",
@@ -3969,6 +3990,8 @@ export const catalogs = {
         runtime: "The runtime",
         role: "The profile's role",
         duty: "What the profile does",
+        follow: "Keep observing after handoff",
+        jsonl: "Write the versioned JSONL event stream",
       },
       command: {
         root: "VibeValley's command line, one operation a command: answers are short text, --format json gives the protocol's shape; chat talks in the terminal",
@@ -4017,6 +4040,7 @@ export const catalogs = {
           review: "Review what was handed back: pass or fail; completing it is issue status … done",
           status: "Move an issue's status: todo sends it out or for another round, done completes it, canceled closes it; the server says which it takes",
           timeline: "An issue's timeline and cost",
+          watch: "Observe issue state and execution history",
         },
         memory: {
           create: "Keep a memory for a profile",
@@ -4397,6 +4421,7 @@ export const catalogs = {
         pkmPageSave: { run: 'vibevalley pkm page save Reading "- bulbs"', about: "Create or update the Reading page" },
         agentCreate: { about: "Create a profile on Claude Code" },
         agentDelete: { about: "Try it first: what it would delete" },
+        issueObserve: { about: "Follow execution as JSONL" },
       },
       issue: {
         can: "What can be done:",
@@ -4411,6 +4436,10 @@ export const catalogs = {
         deleted: "Deleted {issue}",
         passOrFail: "Give --pass or --fail, one of them",
         stage: "Now: {stage}",
+        watchGap: "{session}: history before seq {before} is unavailable",
+        watchMissing: "Issue {issue} is no longer available",
+        watchFormat: "Use --jsonl for issue watch; --format json remains a single document",
+        watchUnavailable: "{session}: no retained journal is available",
       },
       more: "There is more: {flag}",
       session: { stopped: "Stopped helper {session}" },
@@ -4419,6 +4448,18 @@ export const catalogs = {
       "repo.publish": "Publish an existing branch as a GitHub PR or GitLab MR",
       "repo.check": "Repository check: {check}",
       "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run",
+      worker: {
+        about: "Report, submit a PR or read context as the current helper session",
+        failed: "Helper access failed: check session credentials, connectivity and operation authorization",
+        report:
+          "Report as the current session. JSON requires summary (string). Optional: prSubmit (boolean, default false; true needs explicit owner authorization), questions (question string, options string array), checks (criterion zero-based number, result met/unmet/unsure, proof string), remember (text string, scope repo/all), answer (conclusion string, evidence/next/unsure string arrays). Omitted arrays default to empty. Credentials bind identity; arguments cannot select another session.",
+        pr: "Submit the current session PR with explicit owner authorization. JSON accepts optional summary string.",
+        context: "Read the current issue thread. Optional JSON fields: id (channel/thread), before (message number), limit (count), unread (boolean).",
+        read: "Read a context resource. JSON requires uri (vv:// resource address). Optional offset and limit (integers).",
+        doctor:
+          "Authenticate a read-only session_list call to check credentials and tool access; this does not prove the coding agent loaded optional MCP. JSON defaults to an empty object.",
+        json: "Tool input as a JSON object; see the command description for fields.",
+      },
     },
     desktop: {
       open: "Open VibeValley",
@@ -5325,6 +5366,8 @@ export const catalogs = {
         noIssue: "This session has no issue whose changes can be delivered or discarded.",
         contextKept: "Context directory kept at {cwd}: {why}",
         contextHasFiles: "The directory already contains files",
+        workerUnavailable: "Required helper CLI cannot execute; launch blocked",
+        workerAuthenticationFailed: "Helper CLI session authentication failed; launch blocked, check the server listener and session access",
       },
       conflictBrief:
         "Merging {base} into your branch conflicts ({files}). On your branch, run git merge {base}, resolve the conflicts, run the tests, and commit. In your conclusion, say how each conflict was settled.",
@@ -8181,6 +8224,7 @@ export interface Messages {
   "cli.command.issue.show": undefined;
   "cli.command.issue.status": undefined;
   "cli.command.issue.timeline": undefined;
+  "cli.command.issue.watch": undefined;
   "cli.command.memory.create": undefined;
   "cli.command.memory.delete": undefined;
   "cli.command.memory.list": undefined;
@@ -8245,6 +8289,7 @@ export interface Messages {
   "cli.example.issueDone.about": undefined;
   "cli.example.issueEdit.about": undefined;
   "cli.example.issueList.about": undefined;
+  "cli.example.issueObserve.about": undefined;
   "cli.example.issueReviewFail.about": undefined;
   "cli.example.issueReviewFail.run": undefined;
   "cli.example.issueReviewPass.about": undefined;
@@ -8312,10 +8357,12 @@ export interface Messages {
   "cli.flag.every": undefined;
   "cli.flag.fail": undefined;
   "cli.flag.finding": undefined;
+  "cli.flag.follow": undefined;
   "cli.flag.format": undefined;
   "cli.flag.issue": undefined;
   "cli.flag.issueStatus": undefined;
   "cli.flag.issueWatch": undefined;
+  "cli.flag.jsonl": undefined;
   "cli.flag.key": undefined;
   "cli.flag.limit": undefined;
   "cli.flag.marker": undefined;
@@ -8372,6 +8419,10 @@ export interface Messages {
   "cli.issue.spent": { readonly cny: string | number; readonly tokens: string | number };
   "cli.issue.stage": { readonly stage: string | number };
   "cli.issue.timeout": { readonly issue: string | number; readonly seconds: string | number };
+  "cli.issue.watchFormat": undefined;
+  "cli.issue.watchGap": { readonly before: string | number; readonly session: string | number };
+  "cli.issue.watchMissing": { readonly issue: string | number };
+  "cli.issue.watchUnavailable": { readonly session: string | number };
   "cli.memory.deleted": { readonly memory: string | number };
   "cli.more": { readonly flag: string | number };
   "cli.next.help": undefined;
@@ -8550,6 +8601,14 @@ export interface Messages {
   "cli.repo.preview": { readonly base: string | number; readonly branch: string | number; readonly sha: string | number };
   "cli.repo.publish": undefined;
   "cli.session.stopped": { readonly session: string | number };
+  "cli.worker.about": undefined;
+  "cli.worker.context": undefined;
+  "cli.worker.doctor": undefined;
+  "cli.worker.failed": undefined;
+  "cli.worker.json": undefined;
+  "cli.worker.pr": undefined;
+  "cli.worker.read": undefined;
+  "cli.worker.report": undefined;
   "desktop.cannotStart": undefined;
   "desktop.commandLine.taken": { readonly link: string | number };
   "desktop.exited": { readonly code: string | number };
@@ -9346,6 +9405,8 @@ export interface Messages {
   "server.session.life.stillHasHelper": undefined;
   "server.session.life.stillWorking": { readonly name: string | number };
   "server.session.life.stoppedNeedsYou": { readonly name: string | number; readonly why: string | number };
+  "server.session.life.workerAuthenticationFailed": undefined;
+  "server.session.life.workerUnavailable": undefined;
   "server.session.log.clipped": { readonly n: string | number };
   "server.session.log.exited": { readonly runtime: string | number };
   "server.session.log.exitedCode": { readonly code: string | number; readonly runtime: string | number };

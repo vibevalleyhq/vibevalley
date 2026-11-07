@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { Effect, Exit, FileSystem, Schema, Scope } from "effect";
 
 import { t } from "@vibevalley/i18n";
-import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
+import type { EventTokens, Outcome, SessionEvent, SessionEventType, ToolConnection } from "@vibevalley/protocol";
 import { cut } from "@vibevalley/protocol/rules";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 
@@ -217,6 +217,11 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
     add({ type: "tool/result", text: "", call: n, ok, ...(output.trim() ? { output: clipOutput(output.trimEnd()) } : {}) }, from);
   }
 
+  function connection(connection: ToolConnection) {
+    if (connection.status === "failed" || connection.status === "cancelled")
+      add({ type: "run/error", text: connection.reason ?? connection.server, connection });
+  }
+
   function note(kind: SessionEventType, text: string, from?: From) {
     add({ type: kind, text }, from);
   }
@@ -233,7 +238,7 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
     disk.soon(body);
     closed = true;
   }
-  return { events, runStarted, runEnded, asked, said, thought, toolStarted, toolInput, toolEnded, note, usage, close };
+  return { events, runStarted, runEnded, asked, said, thought, toolStarted, toolInput, toolEnded, note, connection, usage, close };
 }
 
 /** Nothing that leads out of the folder. */

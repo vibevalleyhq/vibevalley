@@ -1,7 +1,9 @@
+import { dictateRate, encodeWavBase64, float32RmsLevel as rmsLevel } from "@vibevalley/ai/audio";
 import { t } from "@vibevalley/i18n";
-import { dictateRate, dictateWorkletCode, encodeWavBase64, insertDictated, rmsLevel } from "@vibevalley/voice/transcribe";
 
 import { api, reasonOf } from "#/infra/api.ts";
+
+import { dictateWorkletCode, insertDictated } from "./dictation-input.ts";
 
 export { insertDictated };
 

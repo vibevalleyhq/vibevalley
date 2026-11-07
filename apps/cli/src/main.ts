@@ -18,6 +18,7 @@ import { pkmCommand } from "./commands/pkm.ts";
 import { repoCommand } from "./commands/repo.ts";
 import { runtimeCommand } from "./commands/runtime.ts";
 import { sessionCommand } from "./commands/session.ts";
+import { WorkerAccessFlag, workerCommand } from "./commands/worker.ts";
 import { DryRunFlag, FormatFlag, ServerFlag } from "./farm.ts";
 import { Ended, err, exit, Failure, out, printFailure } from "./output.ts";
 
@@ -26,6 +27,7 @@ const version = "0.1.0";
 const root = Command.make("vibevalley").pipe(
   Command.withDescription(t("cli.command.root")),
   Command.withSubcommands([
+    workerCommand,
     issueCommand,
     pkmCommand,
     channelCommand,
@@ -40,7 +42,7 @@ const root = Command.make("vibevalley").pipe(
     doctorCommand,
     appCommand,
   ]),
-  Command.withGlobalFlags([ServerFlag, DryRunFlag, FormatFlag]),
+  Command.withGlobalFlags([ServerFlag, DryRunFlag, FormatFlag, WorkerAccessFlag]),
 );
 
 /** What the parser said was wrong, as one failure: every mistake's words, and the help of the command it was in. */

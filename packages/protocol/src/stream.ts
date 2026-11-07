@@ -72,15 +72,15 @@ export async function readStream<P extends keyof Streams>(
       if (done) throw new Error(`${url}: ended`);
       heard();
       buffer += value;
-      let end: number;
-      while ((end = buffer.indexOf("\n\n")) >= 0) {
+      let separator: RegExpExecArray | null;
+      while ((separator = /\r?\n\r?\n/u.exec(buffer)) !== null) {
         const data = buffer
-          .slice(0, end)
-          .split("\n")
+          .slice(0, separator.index)
+          .split(/\r?\n/u)
           .filter((line) => line.startsWith("data: "))
           .map((line) => line.slice(6))
           .join("\n");
-        buffer = buffer.slice(end + 2);
+        buffer = buffer.slice(separator.index + separator[0].length);
         if (!data) continue;
         const decoded = decoders[path](data);
         if (Exit.isFailure(decoded)) throw new Error(`${url}: a frame not in its shape: ${Cause.pretty(decoded.cause)}`);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import { keyBetween } from "@vibevalley/protocol/rules";
 import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
 import {
@@ -22,6 +23,7 @@ describe("@vibevalley/artifact domain engine", () => {
     const aid = artifactId("00000000-0000-4000-a000-000000000001");
     const b1 = blockId("00000000-0000-4000-a000-000000000011");
     const b2 = blockId("00000000-0000-4000-a000-000000000012");
+    const firstKey = keyBetween("", "");
     const page = new Page(aid, "owner", 1000, []);
 
     expect(
@@ -29,7 +31,7 @@ describe("@vibevalley/artifact domain engine", () => {
         op: "insert_block",
         block: {
           id: b1,
-          orderKey: "a1",
+          orderKey: firstKey,
           type: "heading",
           attrs: { level: 2 },
           text: inlineSpans("Hello **world**"),
@@ -42,7 +44,7 @@ describe("@vibevalley/artifact domain engine", () => {
         op: "insert_block",
         block: {
           id: b2,
-          orderKey: "a1",
+          orderKey: keyBetween(firstKey, ""),
           type: "todo",
           attrs: { checked: true },
           text: inlineSpans("Ship `@vibevalley/artifact`"),

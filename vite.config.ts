@@ -76,7 +76,7 @@ export default defineConfig({
       "server:check": [
         "vp run packages:build",
         "vp check",
-        "vp run --filter @vibevalley/protocol --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/voice --filter @vibevalley/pkm --filter @vibevalley/artifact test",
+        "vp run --filter @vibevalley/protocol --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact test",
         "vp run effect:check",
         "vp run --filter @vibevalley/server db:check",
         "vp run --filter @vibevalley/server test",
@@ -98,7 +98,7 @@ export default defineConfig({
         "effect-tsgo diagnostics --project apps/cli/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/agent/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/ai/tsconfig.json --strict",
-        "effect-tsgo diagnostics --project packages/voice/tsconfig.json --strict",
+        "effect-tsgo diagnostics --project packages/provider/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/pkm/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/artifact/tsconfig.json --strict",
         "effect-tsgo diagnostics --project packages/protocol/tsconfig.json --strict",
@@ -365,6 +365,36 @@ export default defineConfig({
               patterns: [
                 { group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: refused.packageToApp },
                 { group: ["@vibevalley/agent", "@vibevalley/agent/*"], message: refused.aiToAgent },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        files: ["packages/provider/src/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                { group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: refused.packageToApp },
+                {
+                  group: [
+                    "@vibevalley/ai",
+                    "@vibevalley/ai/*",
+                    "@vibevalley/agent",
+                    "@vibevalley/agent/*",
+                    "@vibevalley/protocol",
+                    "@vibevalley/protocol/*",
+                    "@vibevalley/i18n",
+                    "ai",
+                  ],
+                  message: says(
+                    "providers only own vendor protocols",
+                    "keep application policy in apps and capability execution in packages/ai",
+                    "packages/provider/README.md",
+                  ),
+                },
               ],
             },
           ],
@@ -650,6 +680,16 @@ export default defineConfig({
                   message: refused.useQuery,
                 },
                 { name: "bun:test", message: refused.bunTest },
+              ],
+              patterns: [
+                {
+                  group: ["@vibevalley/provider/*/server", "@vibevalley/provider/transcription", "@vibevalley/ai/transcription", "ai", "@ai-sdk/*"],
+                  message: says(
+                    "the page must not load server model factories or the SDK Core",
+                    "use browser-safe audio/realtime exports and call the server API for transcription",
+                    "packages/provider/README.md",
+                  ),
+                },
               ],
             },
           ],

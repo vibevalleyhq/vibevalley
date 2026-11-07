@@ -46,6 +46,7 @@
 
 - **客户端拥有连接的完整生命周期**：`packages/protocol/src/stream.ts` 在坏帧、回调抛错、HTTP 拒绝、取消和静默超时退出时中止请求并释放 reader；清理失败不覆盖原始错误。重连不留下旧连接。
 - **有界中继与心跳**：每条连接配容量 64 的有界 relay，每 20 秒发 `: ping` 心跳。积压满 64 条时主动断开连接并释放源订阅，客户端重连后重新拿快照或最新帧。
+- **客户端分帧**：`packages/protocol/src/stream.ts` 的 `readStream` 接受 LF 和 CRLF 空行分隔的事件；换行和空行可跨网络 chunk。完整帧经该流已有的 Schema 解码后按顺序回调一次；取消、静默超时或坏帧会终止读取。
 - **写接口返回 `seq` 对齐画面帧**：工单写接口（`issue.create`、`issue.update`、`issue.status.update`、`issue.comment.create`）在 `Core.apply` 后返回当前 `seq`，页面以 `frame.seq >= reply.seq` 作为意图结算条件。
 
 ### HTTP 接口与命令行

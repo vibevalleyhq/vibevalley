@@ -14,6 +14,7 @@
   "dependencies": {
     "@solidjs/web": "catalog:",
     "@tanstack/solid-query": "catalog:",
+    "@vibevalley/ai": "workspace:*",
     "@vibevalley/artifact": "workspace:*",
     "@vibevalley/base-ui": "workspace:*",
     "@vibevalley/bridge": "workspace:*",
@@ -21,8 +22,8 @@
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/pkm": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
+    "@vibevalley/provider": "workspace:*",
     "@vibevalley/stories": "workspace:*",
-    "@vibevalley/voice": "workspace:*",
     "agora-rtc-sdk-ng": "catalog:",
     "effect": "catalog:",
     "hast-util-to-dom": "catalog:",

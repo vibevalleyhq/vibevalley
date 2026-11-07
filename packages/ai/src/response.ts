@@ -1,5 +1,7 @@
 import { Predicate } from "effect";
 
+import { type DeepSeekChunk, decodeDeepSeekChunk, SseData } from "@vibevalley/provider/deepseek/response";
+
 import type { AssistantMessage, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
 import type { Model } from "./models.ts";
@@ -19,38 +21,10 @@ export type AssistantMessageEvent =
   | { readonly type: "done"; readonly reason: "stop" | "length" | "toolUse"; readonly message: AssistantMessage }
   | { readonly type: "error"; readonly reason: "error" | "aborted"; readonly error: AssistantMessage };
 
-/** Server-sent events' data, one string an event. [DONE] ends them. */
-export class SseData {
-  private data: string[] = [];
-  done = false;
-
-  line(line: string): string | undefined {
-    if (this.done) return undefined;
-    const l = line.endsWith("\r") ? line.slice(0, -1) : line;
-    if (l === "") {
-      if (this.data.length === 0) return undefined;
-      const data = this.data.join("\n");
-      this.data = [];
-      if (data.startsWith("[DONE]")) {
-        this.done = true;
-        return undefined;
-      }
-      return data;
-    }
-    if (l.startsWith(":")) return undefined;
-    const colon = l.indexOf(":");
-    const field = colon < 0 ? l : l.slice(0, colon);
-    if (field === "data") this.data.push(colon < 0 ? "" : l.slice(colon + 1).replace(/^ /u, ""));
-    return undefined;
-  }
-}
-
 type Block =
   | { kind: "text"; text: string }
   | { kind: "thinking"; thinking: string; signature: string }
   | { kind: "tool"; id: string; name: string; partial: string; arguments: Readonly<Record<string, unknown>>; argumentsError?: string; index?: number };
-
-const reasoningFields = ["reasoning_content", "reasoning", "reasoning_text"] as const;
 
 /** One response's chunks folded into its message; timestamp is when the request started. */
 export class Fold {
@@ -78,50 +52,37 @@ export class Fold {
     return { type: "start", partial: this.message() };
   }
 
-  /** A data event's JSON. */
-  chunk(chunk: unknown): AssistantMessageEvent[] {
-    if (!Predicate.isObject(chunk)) return [];
-    if (typeof chunk.id === "string" && !this.responseId) this.responseId = chunk.id;
-    if (typeof chunk.model === "string" && chunk.model.length > 0 && chunk.model !== this.model.id) this.responseModel ??= chunk.model;
-    if (Predicate.isObject(chunk.usage)) this.usage = usageOf(chunk.usage, this.model);
-    const firstChoice: unknown = Array.isArray(chunk.choices) ? chunk.choices[0] : undefined;
-    if (!Predicate.isObject(firstChoice)) return [];
-    if (!Predicate.isObject(chunk.usage) && Predicate.isObject(firstChoice.usage)) this.usage = usageOf(firstChoice.usage, this.model);
-    if (typeof firstChoice.finish_reason === "string" && firstChoice.finish_reason.length > 0) {
-      this.rawStopReason = firstChoice.finish_reason;
-      const [reason, error] = stopReasonOf(firstChoice.finish_reason);
-      this.stopReason = reason;
-      if (error) this.errorMessage = error;
+  chunk(chunk: DeepSeekChunk): AssistantMessageEvent[] {
+    if (chunk.id !== undefined && !this.responseId) this.responseId = chunk.id;
+    if (chunk.model !== undefined && chunk.model !== this.model.id) this.responseModel ??= chunk.model;
+    if (chunk.usage) this.usage = { ...chunk.usage, cost: costOf(this.model, chunk.usage) };
+    if (chunk.finish) {
+      this.rawStopReason = chunk.finish.raw;
+      this.stopReason = chunk.finish.reason === "tool" ? "toolUse" : chunk.finish.reason;
+      if (chunk.finish.error) this.errorMessage = chunk.finish.error;
       this.finished = true;
     }
     const events: AssistantMessageEvent[] = [];
-    const delta = firstChoice.delta;
-    if (!Predicate.isObject(delta)) return events;
-    // Thinking before the text: a proxy may put both in one delta, and the thinking block comes first.
-    const field = reasoningFields.find((f) => typeof delta[f] === "string" && delta[f].length > 0);
-    const piece = field === undefined ? undefined : delta[field];
-    if (field !== undefined && typeof piece === "string") {
+    // A delta can contain both: the agent's thinking block must precede its text.
+    if (chunk.thinking) {
       if (!this.thinking) {
-        this.thinking = { kind: "thinking", thinking: "", signature: field };
+        this.thinking = { kind: "thinking", thinking: "", signature: chunk.thinking.signature };
         events.push(this.opened("thinking_start", this.thinking));
       }
-      this.thinking.thinking += piece;
-      events.push({ type: "thinking_delta", contentIndex: this.blocks.indexOf(this.thinking), delta: piece, partial: this.message() });
+      this.thinking.thinking += chunk.thinking.text;
+      events.push({ type: "thinking_delta", contentIndex: this.blocks.indexOf(this.thinking), delta: chunk.thinking.text, partial: this.message() });
     }
-    if (typeof delta.content === "string" && delta.content.length > 0) {
+    if (chunk.text) {
       if (!this.text) {
         this.text = { kind: "text", text: "" };
         events.push(this.opened("text_start", this.text));
       }
-      this.text.text += delta.content;
-      events.push({ type: "text_delta", contentIndex: this.blocks.indexOf(this.text), delta: delta.content, partial: this.message() });
+      this.text.text += chunk.text;
+      events.push({ type: "text_delta", contentIndex: this.blocks.indexOf(this.text), delta: chunk.text, partial: this.message() });
     }
-    for (const call of Array.isArray(delta.tool_calls) ? delta.tool_calls.filter(Predicate.isObject) : []) {
-      const fn = Predicate.isObject(call.function) ? call.function : undefined;
-      const id = typeof call.id === "string" ? call.id : undefined;
-      const name = typeof fn?.name === "string" ? fn.name : undefined;
-      const args = typeof fn?.arguments === "string" ? fn.arguments : "";
-      const block = this.toolBlock(typeof call.index === "number" ? call.index : undefined, id, name, events);
+    for (const call of chunk.calls) {
+      const { id, name, arguments: args } = call;
+      const block = this.toolBlock(call.index, id, name, events);
       if (!block.id && id) {
         block.id = id;
         this.toolsById.set(id, block);
@@ -235,28 +196,6 @@ function toolCallOf(b: Extract<Block, { kind: "tool" }>): ToolCall {
   };
 }
 
-const numberField = (v: unknown) => (typeof v === "number" ? v : undefined);
-
-/** input is the prompt not read from the cache; output already counts reasoning. */
-function usageOf(raw: Record<string, unknown>, model: Model): Usage {
-  const promptDetails = Predicate.isObject(raw.prompt_tokens_details) ? raw.prompt_tokens_details : undefined;
-  const completionDetails = Predicate.isObject(raw.completion_tokens_details) ? raw.completion_tokens_details : undefined;
-  const prompt = numberField(raw.prompt_tokens) ?? 0;
-  const cacheRead = numberField(promptDetails?.cached_tokens) ?? numberField(raw.prompt_cache_hit_tokens) ?? numberField(raw.cached_tokens) ?? 0;
-  const cacheWrite = numberField(promptDetails?.cache_write_tokens) ?? 0;
-  const input = Math.max(0, prompt - cacheRead - cacheWrite);
-  const output = numberField(raw.completion_tokens) ?? 0;
-  const usage = {
-    input,
-    output,
-    cacheRead,
-    cacheWrite,
-    reasoning: numberField(completionDetails?.reasoning_tokens) ?? 0,
-    totalTokens: input + output + cacheRead + cacheWrite,
-  };
-  return { ...usage, cost: costOf(model, usage) };
-}
-
 /** As pi-ai's calculateCost, the same operations in the same order, so the floating point agrees. */
 function costOf(model: Model, u: Omit<Usage, "cost">): Usage["cost"] {
   const r = model.cost;
@@ -265,21 +204,6 @@ function costOf(model: Model, u: Omit<Usage, "cost">): Usage["cost"] {
   const cacheRead = (r.cacheRead / 1000000) * u.cacheRead;
   const cacheWrite = (r.cacheWrite * u.cacheWrite) / 1000000;
   return { input, output, cacheRead, cacheWrite, total: input + output + cacheRead + cacheWrite };
-}
-
-function stopReasonOf(reason: string): [StopReason, string?] {
-  switch (reason) {
-    case "stop":
-    case "end":
-      return ["stop"];
-    case "length":
-      return ["length"];
-    case "function_call":
-    case "tool_calls":
-      return ["toolUse"];
-    default:
-      return ["error", `Provider finish_reason: ${reason}`];
-  }
 }
 
 const jsonEscapes = new Set(['"', "\\", "/", "b", "f", "n", "r", "t"]);
@@ -368,7 +292,7 @@ export function responseOf(model: Model, sse: string, timestamp = 0): AssistantM
   const data = new SseData();
   for (const line of sse.split("\n")) {
     const d = data.line(line);
-    if (d !== undefined) fold.chunk(JSON.parse(d));
+    if (d !== undefined) fold.chunk(decodeDeepSeekChunk(JSON.parse(d)));
   }
   const last = fold.end().at(-1);
   if (!last) return fold.message();

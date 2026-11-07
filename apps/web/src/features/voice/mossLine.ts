@@ -1,7 +1,10 @@
+import { heard, levelOf, type MossQos, type MossSetup, type MossTurn } from "@vibevalley/ai/realtime/moss-session";
+import { Playback } from "@vibevalley/ai/realtime/playback";
 import { t } from "@vibevalley/i18n";
-import { heard, levelOf, MossLine, type MossQos, type MossSetup, type MossTurn, Playback } from "@vibevalley/voice/moss";
 
 import { messageOf } from "#/base/format.ts";
+
+import { MossLine } from "./moss-line.ts";
 
 export { heard, levelOf, MossLine, type MossQos, type MossSetup, type MossTurn, Playback };
 

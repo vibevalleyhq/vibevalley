@@ -122,3 +122,9 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 - `apps/server/src/issue/recorded.test.ts`、`apps/server/src/core/golden.test.ts`：状态派生、合法挪动、时间线与模板填充黄金数据。
 - `apps/server/src/issue/issue.test.ts`、`apps/server/src/flows/issue.test.ts`、`apps/server/src/flows/refinement.test.ts`、`apps/server/src/flows/pull_request.test.ts`：派活、起草、父子拆单、检查与 PR 流程。
 - `apps/web/test/issues.spec.ts`、`apps/web/test/farm-actions.spec.ts`：工作台看板与农场工单操作端到端测试。
+
+## 观察执行
+
+`GET /api/v1/issue/watch/:id` 是本机的 SSE 观察流，CLI `issue watch` 使用它。路由只解析工单引用；`issue/watch.ts` 先订阅 Core 实时事件，再读取 `Core.states` 折好的工单和会话，补最近 8 个会话的保留轨迹。历史以批次发送（每批最多 241 条），实时发送 `SessionEvent`；新会话和进入交回阶段时补读历史，使尚未推送的末尾草稿也在退出前交出。`gap.before` 标明保留历史的起点；归档会话没有保留日志时发送不带 `before` 的 `gap`。`omittedSessions` 标明省略的较早会话数。
+
+观察流复用 Core 的 64 项有界缓冲，积压超限关闭连接，客户端重连补读。客户端只按会话、事件 `seq`、`revision` 去重，不比较不同连接的 Core 帧序号；宿主重启不改变轨迹的持久序号。状态来自服务端；`stageWantsOwner`、完成和取消决定 `settled`，CLI 不重新判断业务进度。观察订阅的作用域关闭只释放队列与连接，不调用会话停止。JSONL 字段和退出方式见 [CLI](apps/cli/README.md#观察工单执行)。

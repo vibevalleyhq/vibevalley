@@ -3,7 +3,7 @@ import { Schema } from "effect";
 import type { Codec } from "../codec";
 import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
 import { Commit, UncommittedItem } from "../repo/schema";
-import { IssueAnswer, PhaseResting, Session } from "../session/schema";
+import { IssueAnswer, PhaseResting, Session, SessionEvent } from "../session/schema";
 import * as T from "../shapes";
 import { IssueReportMemoryScopeValues } from "./shapes";
 
@@ -301,3 +301,18 @@ export const FactIssueRemoved: Codec<T.FactIssueRemoved> = Schema.Struct({
   at: Schema.Finite,
   id: IssueId,
 });
+
+export const IssueWatch: Codec<T.IssueWatch> = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("history"), session: Schema.String, events: Schema.mutable(Schema.Array(SessionEvent)) }),
+  Schema.Struct({
+    kind: Schema.Literal("state"),
+    issue: Issue,
+    sessions: Schema.mutable(Schema.Array(Session)),
+    sessionIds: Schema.mutable(Schema.Array(Schema.String)),
+    settled: Schema.Boolean,
+    omittedSessions: Schema.Int,
+  }),
+  Schema.Struct({ kind: Schema.Literal("event"), session: Schema.String, event: SessionEvent }),
+  Schema.Struct({ kind: Schema.Literal("gap"), session: Schema.String, before: Schema.optionalKey(Schema.Int) }),
+  Schema.Struct({ kind: Schema.Literal("missing"), issue: Schema.String }),
+]);

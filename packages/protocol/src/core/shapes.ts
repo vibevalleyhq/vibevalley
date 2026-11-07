@@ -5,7 +5,16 @@ import type { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, 
 import type { InboxItem } from "../inbox/shapes";
 import type { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/shapes";
 import type { RuntimeInfo } from "../runtime/shapes";
-import type { FactSessionChanged, FactSessionLeft, FactSessionPhaseChanged, Session, SessionEvent, SessionView } from "../session/shapes";
+import type {
+  FactSessionToolChanged,
+  FactSessionToolsReset,
+  FactSessionChanged,
+  FactSessionLeft,
+  FactSessionPhaseChanged,
+  Session,
+  SessionEvent,
+  SessionView,
+} from "../session/shapes";
 import type { CallState, FactCallChanged } from "../voice/shapes";
 
 /** Every endpoint is a POST at its op, named as in api.ts. */
@@ -65,6 +74,8 @@ export interface Health {
 /** Told apart by `type`. */
 export type Fact =
   | FactCallChanged
+  | FactSessionToolChanged
+  | FactSessionToolsReset
   | FactSessionPhaseChanged
   | FactMessageChanged
   | FactChannelChanged

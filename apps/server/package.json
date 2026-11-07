@@ -35,7 +35,7 @@
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/pkm": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
-    "@vibevalley/voice": "workspace:*",
+    "@vibevalley/provider": "workspace:*",
     "agora-agents": "catalog:",
     "effect": "catalog:",
     "yaml": "catalog:"

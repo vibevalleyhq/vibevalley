@@ -15,6 +15,7 @@ import { Mcp } from "#/mcp/mcp.ts";
 import { type GitHubRun, type RepoHooks } from "#/repo/repo.ts";
 import { registryOf } from "#/runtime/runtime.ts";
 import { agentSessions, agents, collaboration, ingress, issues, mailbox, platform, resources, type ServiceOptions, sourceControl } from "#/services.ts";
+import { WorkerAccess, type workerAccess } from "#/session/worker.ts";
 import { Tool } from "#/tool/tool.ts";
 
 import { repo } from "./git.ts";
@@ -31,6 +32,7 @@ export const quietApp = {
 } satisfies ServiceOptions;
 
 export interface WorldOptions {
+  readonly workerAccess?: typeof workerAccess;
   readonly config?: ServerConfig["Service"];
   /** The runtimes sessions run on; each is probed as installed. */
   readonly runtimes?: readonly Runtime[];
@@ -59,7 +61,27 @@ export function worldBelowIngress(options: WorldOptions = {}) {
     repo: { gh: noGitHub, ...options.repoHooks },
   };
   const below = platform(config);
-  return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), agentSessions, mailbox, collaboration, issues);
+  return said.pipe(
+    Layer.provideMerge(below),
+    agents(o),
+    sourceControl(o),
+    on(
+      Layer.succeed(
+        WorkerAccess,
+        options.workerAccess ??
+          Effect.succeed({
+            executableAvailable: Effect.succeed(true),
+            command: "worker",
+            prepare: () => Effect.succeed({ authenticated: true, command: "worker" }),
+            revoke: () => Effect.void,
+          }),
+      ),
+    ),
+    agentSessions,
+    mailbox,
+    collaboration,
+    issues,
+  );
 }
 
 /** The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds

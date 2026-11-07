@@ -31,10 +31,11 @@ packages/protocol/         契约：一个概念一个文件夹 src/<概念>/（
 packages/base-ui/          无样式的组件（照 Base UI 的 Solid 2 版）：键盘、焦点、ARIA、开合和选中的状态、浮层的定位；样子在 apps/web/src/ui
 packages/engine/           像素农场的引擎：Pixi 的舞台、寻路、音效合成、日钟、按整数倍放大
 packages/i18n/             对主人说的话：locales/<语言>/<宿主.模块>.json 的词典，代码里 t("key")；src/catalogs.ts 由 i18n:gen 写出
-packages/ai/               模型：DeepSeek 的请求和流、消息形状、模型表和价格、工具参数的 Schema、照脚本回答的测试模型
+packages/ai/               模型能力与无框架运行：Provider 到现有 Llm/ModelClient 的消息桥、历史重放和预算、工具 Schema、脚本模型；Core 转写、WAV 和 MOSS 播放对账
 packages/agent/            VibeValley 自己的 agent：core/ 是循环和工具，其余是 Brain（对话、压缩、技能、记性、帮手、自己的任务）；
                            不认识农场，lint 查方向（ai ← agent ← apps/server）
-packages/voice/            语音引擎与协议：MOSS Live 实时双向帧 Schema、播放时钟与中继、WAV 编码与听写转写、声网 ConvoAI 与字幕拼块
+packages/provider/         厂商接入：DeepSeek 目录/协议/显式连接、转写模型、MOSS wire/鉴权、声网 SDK/RTC token/字幕分片；不依赖 ai、agent、protocol 或应用
+                           AI 能力调用、WAV 和 MOSS 无框架运行在 packages/ai；通话编排、页面中继、采集/播放设备归 apps 的 voice
 packages/pkm/              知识库与双链大纲引擎：Logseq 风格 Markdown 解析与打印、PARA 目录规则、双链图谱与嵌入展开、前端大纲键盘编辑与框选状态机
 packages/artifact/         稿子（块文档与 HTML 页）引擎：块操作并发状态机 Page、Markdown 双向互转、HTML CSP 沙箱与 AST 检查、前端协同编辑器 BlockEditor
 packages/bridge/           宿主之间的调用：一份契约（每个调用的入参、出参，每个推送的载荷，都是 Schema），两头由它生成，传输是各宿主的适配器

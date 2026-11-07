@@ -1,5 +1,5 @@
 import type { SessionOptions } from "@botiverse/oar";
-import { Clock, Effect, FiberMap, Predicate, Schema } from "effect";
+import { Clock, Effect, Exit, FiberMap, Predicate, Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -17,10 +17,11 @@ import { Repo } from "#/repo/repo.ts";
 import { type Merged, MergeFailure, type RepoError, type Workplace } from "#/repo/workplace.ts";
 
 import { briefBreak, instructions, noRoom, notTakenIn, recallBlock, type SessionLimits, type Settle, toOarMcp, withRecall } from "./briefing.ts";
-import { channelRules, restartedContextNote, restartedNote, workplaceRules } from "./prompts.ts";
+import { workerInstructions, channelRules, restartedContextNote, restartedNote, workplaceRules } from "./prompts.ts";
 import type { Hand, SessionRegistry } from "./registry.ts";
 import type { Delivered, DeliveryInput } from "./signals.ts";
 import type { SessionWatch } from "./watch.ts";
+import { WorkerAccess } from "./worker.ts";
 
 /** Work that did not go in (see handOver); the session stays. */
 export class NotTakenIn extends Schema.TaggedError<NotTakenIn, { readonly brand: unique symbol }>()("NotTakenIn", {
@@ -46,6 +47,7 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
     const memories = yield* Memory;
     const repos = yield* Repo;
     const executor = yield* Executor;
+    const cli = yield* (yield* WorkerAccess).pipe(Effect.orElseSucceed(() => undefined));
     const clock = yield* Clock.Clock;
     const {
       flushRuns,
@@ -65,6 +67,8 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
       closeExecution,
     } = r;
     const { closedLaunch, attach } = wt;
+    const revokeAccess = (hand: Hand) =>
+      Effect.sync(() => revokeToken(hand)).pipe(Effect.andThen(cli ? cli.revoke(hand.id).pipe(Effect.ignore({ log: "Warn" })) : Effect.void));
     const open = Effect.fnUntraced(function* (
       agent: T.Agent,
       owner: T.Session,
@@ -73,34 +77,43 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
       input: string,
       resume: string,
     ): Effect.fn.Return<Started> {
-      const text = [
-        instructions(agent, store.skills()),
-        owner.issue
-          ? workplaceRules(place, yield* repos.houseRules(), owner.id, repos.usesPullRequests(place.repo))
-          : channelRules(place.cwd, owner.channel ?? "", owner.id),
-      ]
-        .filter((s) => s !== "")
-        .join("\n\n");
-      const mcp = [
-        { name: "vibevalley", type: "http" as const, url: mcpEndpoint.url, headers: { authorization: "Bearer " + issueToken(hand) } },
-        ...agent.mcpServers.map(toOarMcp),
-      ];
-      const options: Partial<SessionOptions> = {
-        mcpServers: mcp,
-        ...(text && agent.personaMode === "append" ? { appendSystemPrompt: text } : {}),
-        ...(text && agent.personaMode === "replace" ? { systemPrompt: text } : {}),
-        ...(agent.disallowedTools.length > 0 ? { disallowedTools: agent.disallowedTools } : {}),
-      };
-      const opened = yield* executor.start({
-        agent,
-        owner,
-        cwd: place.cwd,
-        input: text && agent.personaMode === "prompt" ? text + briefBreak + input : input,
-        resume,
-        options,
-      });
-      if (opened.retained === true) yield* core.notice("error", opened.refused);
-      return opened;
+      if (!cli || !(yield* cli.executableAvailable)) return { refused: t("server.session.life.workerUnavailable"), retained: false };
+      return yield* Effect.gen(function* () {
+        const token = issueToken(hand);
+        const access = yield* cli.prepare(hand.id, mcpEndpoint.url, token).pipe(Effect.orElseSucceed(() => undefined));
+        if (access?.authenticated !== true) {
+          return { refused: t("server.session.life.workerAuthenticationFailed"), retained: false };
+        }
+        const text = [
+          workerInstructions(access.command),
+          instructions(agent, store.skills()),
+          owner.issue
+            ? workplaceRules(place, yield* repos.houseRules(), owner.id, repos.usesPullRequests(place.repo))
+            : channelRules(place.cwd, owner.channel ?? "", owner.id),
+        ]
+          .filter((s) => s !== "")
+          .join("\n\n");
+        const mcp = [
+          { name: "vibevalley", type: "http" as const, url: mcpEndpoint.url, headers: { authorization: "Bearer " + token } },
+          ...agent.mcpServers.map(toOarMcp),
+        ];
+        const options: Partial<SessionOptions> = {
+          mcpServers: mcp,
+          ...(text && agent.personaMode === "append" ? { appendSystemPrompt: text } : {}),
+          ...(text && agent.personaMode === "replace" ? { systemPrompt: text } : {}),
+          ...(agent.disallowedTools.length > 0 ? { disallowedTools: agent.disallowedTools } : {}),
+        };
+        const opened = yield* executor.start({
+          agent,
+          owner,
+          cwd: place.cwd,
+          input: text && agent.personaMode === "prompt" ? text + briefBreak + input : input,
+          resume,
+          options,
+        });
+        if (opened.retained === true) yield* core.notice("error", opened.refused);
+        return opened;
+      }).pipe(Effect.onExit((result) => (Exit.isFailure(result) || !result.value.execution ? revokeAccess(hand) : Effect.void)));
     });
 
     const leave = Effect.fn("Session.leave")(function* (h: Hand, closed: T.SessionClose, merged: number) {
@@ -110,7 +123,7 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
       yield* trajectories.finish(h.id);
       yield* ended(h.id, closed);
       closedLaunch(h);
-      revokeToken(h);
+      yield* revokeAccess(h);
       hands.delete(h.id);
       const session = core.session(h.id);
       if (session) yield* memories.endSession({ agent: session.agent, session: h.id, repo: h.place.repo });
@@ -277,5 +290,5 @@ export const sessionLaunch = (r: SessionRegistry, wt: SessionWatch) =>
         }),
       );
     });
-    return { open, leave, rest, accessWorkplace, capacity, roomFor, remind, deliver, handOver };
+    return { open, leave, rest, revokeAccess, accessWorkplace, capacity, roomFor, remind, deliver, handOver };
   });

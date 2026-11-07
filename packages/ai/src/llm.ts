@@ -1,11 +1,13 @@
-import { Clock, Context, Effect, Layer, Option, Predicate, Schema, Stream } from "effect";
-import { HttpClient, HttpClientRequest } from "effect/http";
+import { Clock, Context, Effect, Layer, Predicate, Schema, Stream } from "effect";
+import { HttpClient } from "effect/http";
+
+import { deepseekModel } from "@vibevalley/provider/deepseek/server";
 
 import type { AssistantMessage, Context as LlmContext } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
 import type { Model } from "./models.ts";
-import { type RequestOptions, requestBody } from "./request.ts";
-import { type AssistantMessageEvent, Fold, SseData } from "./response.ts";
+import { type RequestOptions, requestInput } from "./request.ts";
+import { type AssistantMessageEvent, Fold } from "./response.ts";
 
 // messages.ts keeps pi-ai's shapes as interfaces, not schemas; the fold builds this value itself, so its role is enough to
 // tell it apart.
@@ -57,17 +59,6 @@ export const failedMessage = (model: Model, timestamp: number, e: LlmError): Ass
   errorMessage: e.message,
 });
 
-const ErrorBody = Schema.fromJsonString(Schema.Struct({ error: Schema.Record(Schema.String, Schema.Unknown) }));
-const decodeErrorBody = Schema.decodeUnknownOption(ErrorBody);
-const decodeStreamChunk = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
-
-/** As pi-ai words a refusal: the status and the body's error object, else its text. */
-function statusMessage(status: number, text: string): string {
-  const parsed = decodeErrorBody(text);
-  if (Option.isSome(parsed)) return `${status}: ${JSON.stringify(parsed.value.error)}`;
-  return `${status} ${text.trim() || "status code (no body)"}`;
-}
-
 export const make = Effect.gen(function* () {
   const http = yield* HttpClient.HttpClient;
 
@@ -75,41 +66,23 @@ export const make = Effect.gen(function* () {
     Stream.unwrap(
       Effect.gen(function* () {
         const fold = new Fold(model, yield* Clock.currentTimeMillis);
-        const failed = (reason: LlmError["reason"], message: string) => new LlmError({ reason, message, partial: fold.message() });
-        const request = HttpClientRequest.post(`${model.baseUrl}/chat/completions`).pipe(
-          HttpClientRequest.bearerToken(options.apiKey),
-          HttpClientRequest.bodyJsonUnsafe(requestBody(model, context, options)),
+        const language = yield* deepseekModel({ model: model.id, baseUrl: model.baseUrl, key: options.apiKey }).pipe(
+          Effect.provideService(HttpClient.HttpClient, http),
         );
-        const res = yield* http
-          .execute(request)
-          .pipe(Effect.mapError((e) => new LlmError({ reason: "network", message: `Connection error: ${e.message}`, cause: e })));
-        if (res.status >= 400) {
-          const text = yield* res.text.pipe(Effect.orElseSucceed(() => ""));
-          return yield* new LlmError({ reason: "status", status: res.status, message: statusMessage(res.status, text) });
-        }
-        const sse = new SseData();
-        const events = res.stream.pipe(
-          Stream.mapError((e) => failed("stream", `The stream broke: ${e.message}`)),
-          Stream.decodeText(),
-          Stream.splitLines,
-          Stream.mapEffect((line) => {
-            const data = sse.line(line);
-            if (data === undefined) return Effect.succeed<AssistantMessageEvent[]>([]);
-            return decodeStreamChunk(data).pipe(
-              Effect.mapError(() => failed("stream", `Not JSON in the stream: ${data.slice(0, 200)}`)),
-              Effect.flatMap((chunk) => {
-                const error: unknown = Predicate.hasProperty(chunk, "error") ? chunk.error : undefined;
-                return error !== undefined && error !== null
-                  ? Effect.fail(
-                      failed(
-                        "stream",
-                        typeof error === "object" && "message" in error && typeof error.message === "string" ? error.message : JSON.stringify(error),
-                      ),
-                    )
-                  : Effect.succeed(fold.chunk(chunk));
+        const source = yield* language.stream(requestInput(model, context, options)).pipe(
+          Effect.mapError(
+            (e) =>
+              new LlmError({
+                reason: e.reason,
+                message: e.message,
+                ...(e.status !== undefined ? { status: e.status } : {}),
+                ...(e.cause !== undefined ? { cause: e.cause } : {}),
               }),
-            );
-          }),
+          ),
+        );
+        const events = source.pipe(
+          Stream.mapError((e) => new LlmError({ reason: e.reason, message: e.message, partial: fold.message() })),
+          Stream.map((chunk) => fold.chunk(chunk)),
           Stream.flattenIterable,
         );
         return Stream.make(fold.start()).pipe(Stream.concat(events), Stream.concat(Stream.suspend(() => Stream.fromIterable(fold.end()))));
