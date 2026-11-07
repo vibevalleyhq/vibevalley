@@ -12,6 +12,25 @@ const failure = async (status: number, text: string) => {
 };
 
 describe("the API client error boundary", () => {
+  it("regression: per-request cancellation reaches the transport without canceling another request", async () => {
+    const signals: (AbortSignal | undefined)[] = [];
+    const api = new VibeValleyApi("http://farm", (_url, init) => {
+      const signal = init.signal ?? undefined;
+      signals.push(signal);
+      return signal
+        ? new Promise<Response>((_resolve, reject) => {
+            signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+          })
+        : Promise.resolve(new Response('{"ok":true,"version":"test"}'));
+    });
+    const controller = new AbortController();
+    const pending = api.server.health.get({ signal: controller.signal });
+    const failure = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    controller.abort();
+    await failure;
+    expect(await api.server.health.get()).toEqual({ ok: true, version: "test" });
+    expect(signals).toEqual([controller.signal, undefined]);
+  });
   it("keeps the status and original text of a non-JSON failure", async () => {
     const error = await failure(502, " proxy down\n");
     expect([error.status, error.tag, error.reason, error.body, error.error]).toEqual([502, undefined, "proxy down", " proxy down\n", undefined]);

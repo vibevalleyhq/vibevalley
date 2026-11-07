@@ -20,7 +20,7 @@ import { aria } from "#/base/dom.tsx";
 import { MemoryPanel } from "#/features/memory/index.ts";
 import { useSkills } from "#/features/runtime/index.ts";
 import { ready, useRuntimes } from "#/infra/query.ts";
-import { A } from "#/ui/A.tsx";
+import { Link as A } from "#/infra/router.ts";
 import { Button } from "#/ui/Button.tsx";
 import { ChipsInput, KeyValueEditor } from "#/ui/Chips.tsx";
 import { Select, TextArea, TextInput } from "#/ui/Field.tsx";

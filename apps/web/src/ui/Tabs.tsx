@@ -2,7 +2,8 @@ import { For, Show } from "solid-js";
 
 import { Tabs as Base } from "@vibevalley/base-ui";
 
-import { A } from "./A";
+import { Link as A } from "#/infra/router.ts";
+
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 

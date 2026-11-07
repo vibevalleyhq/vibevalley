@@ -1,14 +1,12 @@
 import type { JSX } from "@solidjs/web";
-import { Schema } from "effect";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
 import { aria } from "#/base/dom.tsx";
 import { numberText } from "#/base/format.ts";
-import { CursorManifest, SpriteManifest } from "#/base/manifests.ts";
 import { spelled } from "#/base/search.ts";
-import { ready, useQuery } from "#/infra/query.ts";
+import { cursorsQuery, ready, useQuery, useSprites } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
@@ -20,12 +18,16 @@ import { Tabs } from "#/ui/Tabs.tsx";
 import { CursorTile, Detail, fitScale, type Ground, grounds, groundStyle, Img } from "./CatalogDetail";
 import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, shelfOf, shelves } from "./shelves";
 
-const usePictures = () =>
-  useQuery(() => ({
-    queryKey: ["pictures"],
-    queryFn: async () => picturesOf(Schema.decodeUnknownSync(SpriteManifest)(await (await fetch("/pixel/sprites.json")).json())),
-    staleTime: Infinity,
-  }));
+const usePictures = () => {
+  const query = useSprites();
+  return {
+    ...query,
+    data: () => {
+      const manifest = query.data();
+      return manifest ? picturesOf(manifest) : undefined;
+    },
+  };
+};
 
 const shelfTabs = [
   { id: "sprites", label: t("web.catalog.tab.sprites"), to: "/catalog" },
@@ -217,14 +219,7 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
 function Cursors(props: { tabs: JSX.Element }) {
   const [ground, setGround] = createSignal<Ground>("check");
   const [query, setQuery] = createSignal("");
-  const cursors = useQuery(() => ({
-    queryKey: ["cursors"],
-    queryFn: async () => {
-      const r = await fetch("/cursors/cursors.json");
-      return r.ok ? Schema.decodeUnknownSync(CursorManifest)(await r.json()) : null;
-    },
-    staleTime: Infinity,
-  }));
+  const cursors = useQuery(cursorsQuery);
   const data = () => ready(cursors, undefined);
   const all = () => {
     const q = query().trim().toLowerCase();

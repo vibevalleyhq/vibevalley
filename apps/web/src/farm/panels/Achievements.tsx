@@ -7,9 +7,8 @@ import { aria, useClickAway } from "#/base/dom.tsx";
 import { commands } from "#/farm/frames.ts";
 import { thousands } from "#/farm/hud/readout.ts";
 import { beds } from "#/farm/world/plots.ts";
-import { api } from "#/infra/api.ts";
 import { useCore, useFrames } from "#/infra/frame.ts";
-import { ready, useQuery } from "#/infra/query.ts";
+import { achievementsQuery, ready, useQuery } from "#/infra/query.ts";
 import { createPixelAct, numberText, SpriteIcon } from "#/ui/pixel/index.ts";
 
 import { tint, Tinted } from "./rows";
@@ -106,7 +105,7 @@ function Heading(props: { text: string; aside?: string | undefined }) {
 export function Achievements() {
   const core = useCore();
   const frames = useFrames();
-  const catalogQuery = useQuery(() => ({ queryKey: ["achievements"], queryFn: () => api.game.achievement.list(), staleTime: Infinity }));
+  const catalogQuery = useQuery(achievementsQuery);
   const catalog = () => ready(catalogQuery, []);
   const p = () => core()?.progress ?? emptyProgress;
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);

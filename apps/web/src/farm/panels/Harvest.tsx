@@ -24,10 +24,10 @@ export function HarvestReview(props: { session: Session; onDone: () => void }) {
   const changes = useIssueChanges(() => issueOf(props.session));
   return (
     <Switch>
-      <Match when={changes.isSuccess ? changes.data : undefined}>
+      <Match when={changes.status() === "success" ? changes.data() : undefined}>
         {(data) => <ReadyView session={props.session} changes={data()} onDone={() => props.onDone()} />}
       </Match>
-      <Match when={changes.error}>
+      <Match when={changes.error()}>
         {(error) => (
           <div class="flex flex-col items-start gap-3">
             <Tinted color={tint("#c84a3a", 0.12)}>

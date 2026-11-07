@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -6,16 +7,23 @@ import { wallClockText } from "#/base/format.ts";
 import { followed, issueThreadOf, useFollowed } from "#/features/channel/index.ts";
 import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { useQuery, ready } from "#/infra/query.ts";
+import { defineQuery, retryRead, useQuery, ready } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Markdown } from "#/ui/Markdown.tsx";
 
 import { SheetLabel } from "./Sheet";
 
+const conversationQuery = defineQuery({
+  schema: Schema.NullOr(Schema.String),
+  key: (id: string) => ["issues", "conversation", id],
+  fetch: (id, context) => api.issue.conversation.get({ id }, context),
+  ...retryRead,
+});
+
 export function IssueThread(props: { issue: string }) {
   const core = useCore();
-  const location = useQuery(() => ({ queryKey: ["issues", "conversation", props.issue], queryFn: () => api.issue.conversation.get({ id: props.issue }) }));
+  const location = useQuery(() => conversationQuery(props.issue));
   const thread = () => issueThreadOf(core()?.chat, props.issue)?.id ?? ready(location, undefined) ?? undefined;
   const feed = useFollowed(thread);
   const act = createAct();

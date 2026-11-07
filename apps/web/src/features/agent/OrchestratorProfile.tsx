@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { Radio, RadioGroup } from "@vibevalley/base-ui";
@@ -8,8 +7,8 @@ import { same } from "@vibevalley/protocol/rules";
 
 import { orchestratorHref, orchestratorLooks } from "#/features/orchestrator/index.ts";
 import { api } from "#/infra/api.ts";
-import { useRouter } from "#/infra/router.ts";
-import { A } from "#/ui/A.tsx";
+import { useQueryClient } from "#/infra/query.ts";
+import { useRouter, Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
@@ -58,7 +57,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
     const body = { ...d, name: d.name.trim() || t("web.agent.orchestrator.newName") };
     return saving.run(async () => {
       const got = isNew ? await api.agent.create(body) : await api.agent.update(body);
-      await client.invalidateQueries({ queryKey: ["agents"] });
+      await client.invalidate({ prefix: ["agents"] });
       setDraft(got);
       if (isNew) router.navigate(`/agents/${encodeURIComponent(got.id)}`);
     });
@@ -67,7 +66,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
     const id = draft().id;
     return act.run(async () => {
       await api.agent.delete({ id });
-      await client.invalidateQueries({ queryKey: ["agents"] });
+      await client.invalidate({ prefix: ["agents"] });
       router.navigate("/agents");
     });
   };

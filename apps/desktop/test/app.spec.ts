@@ -100,6 +100,16 @@ test("the desktop app shows the live board and sends a notice", async () => {
     socket.destroy();
 
     await page.screenshot({ path: test.info().outputPath("desktop.png") });
+    await page.evaluate(() => localStorage.setItem("vibevalley.title.seen", "true"));
+    await page.goto(server + "/farm/");
+    await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true");
+    await expect(page.getByTestId("rail")).toBeVisible();
+    await expect(page.getByTestId("desk")).toHaveCount(0);
+    const farm = await page.getByTestId("farm").boundingBox();
+    const rail = await page.getByTestId("rail").boundingBox();
+    if (!farm || !rail) throw new Error("Farm and navigation must have visible bounds inside Electron");
+    expect(farm.x).toBeGreaterThanOrEqual(rail.x + rail.width);
+    await page.screenshot({ path: test.info().outputPath("desktop-farm.png") });
   } finally {
     await app.close();
   }

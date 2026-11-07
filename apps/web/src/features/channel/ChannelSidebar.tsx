@@ -187,7 +187,7 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
       class="absolute top-full right-0 z-30 mt-1 flex max-h-80 w-56 origin-top-right animate-pop-in flex-col gap-0.5 overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float"
     >
       <p class="px-2 py-1 text-xs font-semibold text-muted">{t("web.channel.direct.pick")}</p>
-      <Show when={!all.isPending && agents().length === 0}>
+      <Show when={all.status() === "success" && agents().length === 0}>
         <p class="px-2 py-1 text-sm text-muted">{t("web.channel.direct.none")}</p>
       </Show>
       <For each={agents()} keyed={(a) => a.id}>

@@ -26,7 +26,7 @@ const hasFarm = (core: SpaceState | undefined) =>
   (core.sessions.some((s) => s.role !== "orchestrator") || (core.chat?.channels ?? []).some((c) => (c.lastNumber ?? 0) > 0) || (core.progress?.coins ?? 0) > 0);
 
 /** The orchestrator cannot think without DeepSeek's key. */
-const orchestratorReady = (status: SettingsStatus | undefined) => status?.deepseekApiKey.source !== undefined;
+const orchestratorReady = (status: SettingsStatus | undefined) => status !== undefined && status.deepseekApiKey.source !== null;
 
 export function TitleScreen() {
   const router = useRouter();
@@ -61,6 +61,7 @@ export function TitleScreen() {
 
   onSettled(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || (e.target instanceof Element && e.target.closest("a, button, input, textarea, select, [contenteditable]"))) return;
       const open = items().filter((i) => i.enabled);
       const here = open.findIndex((i) => i.id === at());
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {

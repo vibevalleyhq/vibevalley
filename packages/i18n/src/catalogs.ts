@@ -1778,6 +1778,7 @@ export const catalogs = {
       },
     },
     "web.base": {
+      route: { missing: "这个页面不存在", invalid: "这个地址无效", home: "返回应用" },
       place: {
         chat: { label: "聊天", hint: "频道和串" },
         issues: { label: "工单", hint: "每张工单从写下到关上" },
@@ -1800,7 +1801,21 @@ export const catalogs = {
       owner: "主",
       orchestrator: "管家",
       unreachable: "暂时连不上服务端，请等它恢复后重试。",
+      query: { invalidResponse: "返回的数据格式不符，已有的有效结果已保留。" },
+      table: {
+        columns: "显示的列",
+        stale: "新页还在读取，当前显示的是上一次的结果，暂时不能操作这些行。",
+        selectPage: "选择本页",
+        selectRow: "选择行 {id}",
+        empty: "暂无数据",
+        previous: "上一页",
+        next: "下一页",
+        page: "第 {n} 页",
+      },
       form: {
+        invalid: "请检查这一项。",
+        validationUnavailable: "暂时无法校验，输入已保留。",
+        deliveryUnknown: "请求可能已送达，但还没收到确认。输入已保留，请先查看保存结果再决定是否重试。",
         asking: "在问服务端……",
         unreachable: "问不到服务端：{why}",
         none: "还没有",
@@ -5834,6 +5849,7 @@ export const catalogs = {
       },
     },
     "web.base": {
+      route: { missing: "This page does not exist", invalid: "This address is invalid", home: "Back to the app" },
       place: {
         chat: { label: "Chat", hint: "Channels and threads" },
         issues: { label: "Tickets", hint: "Every ticket from written to closed" },
@@ -5865,7 +5881,22 @@ export const catalogs = {
       owner: "Me",
       orchestrator: "Manager",
       unreachable: "The server cannot be reached for now: try again when it is back.",
+      query: { invalidResponse: "The response does not match the expected data format. The last valid result has been kept." },
+      table: {
+        columns: "Columns",
+        stale: "Showing the previous result while the requested page loads. Row actions are unavailable.",
+        selectPage: "Select this page",
+        selectRow: "Select row {id}",
+        empty: "No rows",
+        previous: "Previous page",
+        next: "Next page",
+        page: "Page {n}",
+      },
       form: {
+        invalid: "Check this field.",
+        validationUnavailable: "Validation is unavailable. Your input has been kept.",
+        deliveryUnknown:
+          "The request may have arrived, but no confirmation was received. Your input has been kept; check the saved result before trying again.",
         asking: "Asking the server…",
         unreachable: "The server cannot be asked: {why}",
         none: "None yet",
@@ -9916,11 +9947,13 @@ export interface Messages {
   "web.base.file.pdf": undefined;
   "web.base.file.remove": { readonly name: string | number };
   "web.base.form.asking": undefined;
+  "web.base.form.deliveryUnknown": undefined;
   "web.base.form.example": { readonly value: string | number };
   "web.base.form.from.config": undefined;
   "web.base.form.from.settings": undefined;
   "web.base.form.fromOnly": { readonly from: string | number };
   "web.base.form.inUse": { readonly from: string | number; readonly hint: string | number };
+  "web.base.form.invalid": undefined;
   "web.base.form.keepEmpty": undefined;
   "web.base.form.keepKey": { readonly label: string | number };
   "web.base.form.never": undefined;
@@ -9934,6 +9967,7 @@ export interface Messages {
   "web.base.form.undo": undefined;
   "web.base.form.unreachable": { readonly why: string | number };
   "web.base.form.unset": undefined;
+  "web.base.form.validationUnavailable": undefined;
   "web.base.intent.offline": undefined;
   "web.base.intent.timedOut": undefined;
   "web.base.lightbox.close": undefined;
@@ -9964,6 +9998,7 @@ export interface Messages {
   "web.base.place.runtimes.label": undefined;
   "web.base.place.settings.hint": undefined;
   "web.base.place.settings.label": undefined;
+  "web.base.query.invalidResponse": undefined;
   "web.base.rail": undefined;
   "web.base.reading": undefined;
   "web.base.rich.copied": undefined;
@@ -9977,6 +10012,9 @@ export interface Messages {
   "web.base.rich.more": undefined;
   "web.base.rich.taskDone": undefined;
   "web.base.rich.taskOpen": undefined;
+  "web.base.route.home": undefined;
+  "web.base.route.invalid": undefined;
+  "web.base.route.missing": undefined;
   "web.base.runtime": { readonly name: string | number };
   "web.base.secret.hide": undefined;
   "web.base.secret.peek": undefined;
@@ -10006,6 +10044,14 @@ export interface Messages {
   "web.base.shortcuts.say.tool": undefined;
   "web.base.shortcuts.say.voice": undefined;
   "web.base.shortcuts.title": undefined;
+  "web.base.table.columns": undefined;
+  "web.base.table.empty": undefined;
+  "web.base.table.next": undefined;
+  "web.base.table.page": { readonly n: string | number };
+  "web.base.table.previous": undefined;
+  "web.base.table.selectPage": undefined;
+  "web.base.table.selectRow": { readonly id: string | number };
+  "web.base.table.stale": undefined;
   "web.base.time.clock": { readonly am: boolean; readonly hh: string | number; readonly mm: string | number };
   "web.base.time.date": { readonly d: string | number; readonly m: string | number; readonly y: string | number };
   "web.base.time.day": { readonly d: string | number; readonly m: string | number; readonly weekday: string | number };

@@ -4,7 +4,7 @@ import { t } from "@vibevalley/i18n";
 import type { SessionId, SessionView } from "@vibevalley/protocol";
 import { defaultOf } from "@vibevalley/protocol/rules";
 
-import { farmState, useFarm } from "#/farm/store.ts";
+import { useFarm } from "#/farm/store.ts";
 import { aimTool } from "#/farm/tools.ts";
 import { useVillage } from "#/farm/world/load.ts";
 import type { Village } from "#/farm/world/load.ts";
@@ -225,17 +225,15 @@ export function Overlay() {
 function Heads(props: { sessions: readonly SessionView[]; village: Village }) {
   const screen = useFarm((s) => s.screen);
   const placed = new Map<SessionId, HTMLDivElement>();
-  const place = () => {
-    const sc = farmState().screen;
-    if (!sc) return;
-    for (const [id, el] of placed) {
-      const feet = sc.helperAt(id);
-      el.style.visibility = feet ? "visible" : "hidden";
-      if (feet) el.style.transform = `translate(${Math.round(feet.x)}px, ${Math.round(feet.y - 31 * sc.scale - 2)}px) translate(-50%, -100%)`;
-    }
-  };
   createEffect(screen, (sc) => {
     if (!sc) return;
+    const place = () => {
+      for (const [id, el] of placed) {
+        const feet = sc.helperAt(id);
+        el.style.visibility = feet ? "visible" : "hidden";
+        if (feet) el.style.transform = `translate(${Math.round(feet.x)}px, ${Math.round(feet.y - 31 * sc.scale - 2)}px) translate(-50%, -100%)`;
+      }
+    };
     place();
     return sc.onFrame(place);
   });

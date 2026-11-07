@@ -1,14 +1,5 @@
 import { expect, test } from "./fixtures";
 
-test("the page starts on the bar and drops it once it is up", async ({ page }) => {
-  const html = await (await page.request.get("/issues")).text();
-  expect(html).toContain('id="opening"');
-  expect(html).not.toContain("<!-- opening -->");
-  await page.goto("/issues");
-  await expect(page.getByTestId("desk")).toHaveAttribute("data-place", "issues");
-  await expect(page.locator("#opening")).toHaveCount(0);
-});
-
 test("the workbench's cover is its own ground in the owner's theme, and stays until the first frame or a while", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme: "dark" })));
   // No frame comes: the cover holds, then lets the page show as it is.
@@ -24,9 +15,13 @@ test("the workbench's cover is its own ground in the owner's theme, and stays un
   await expect(cover).toHaveCount(0, { timeout: 3000 });
 });
 
-test("a dialog the address opens is there when the cover goes, not coming in again", async ({ page, api }) => {
+test("the delivered opening covers a deep-linked page until it is ready, without replaying its dialog animation", async ({ page, api }) => {
+  const html = await (await page.request.get("/issues")).text();
+  expect(html).toContain('id="opening"');
+  expect(html).not.toContain("<!-- opening -->");
   const issue = await api.issue.create({ title: "an issue to open" });
   await page.goto(`/issues/${issue.id}`);
+  await expect(page.getByTestId("desk")).toHaveAttribute("data-place", "issues");
   await expect(page.locator("#opening")).toHaveCount(0);
   const running = await page.evaluate(
     () => document.getAnimations().filter((a) => a.playState === "running" && Number.isFinite(a.effect?.getComputedTiming().endTime ?? Infinity)).length,
@@ -34,18 +29,14 @@ test("a dialog the address opens is there when the cover goes, not coming in aga
   expect(running).toBe(0);
 });
 
-test("the farm's cover is the village's bar, handed to the farm at once", async ({ page }) => {
-  const html = await (await page.request.get("/farm")).text();
-  expect(html).toContain('id="opening"');
-  await page.goto("/farm");
-  await expect(page.locator("#opening")).toHaveCount(0);
+test("the opening has indeterminate progress and reduced motion, or a launch error in place of its bar", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/opening.html");
   await expect(page.locator("#opening")).toHaveAttribute("data-look", "desk");
-});
-
-test("the opening page walks its bar, or says why the farm did not start in place of it", async ({ page }) => {
-  await page.goto("/opening.html");
   await expect(page.getByRole("progressbar")).toBeVisible();
+  await expect(page.getByRole("progressbar")).not.toHaveAttribute("aria-valuenow");
+  await expect(page.locator("#opening .fill")).toHaveCSS("animation-name", "none");
+  expect(await page.locator("#opening .face").evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
   const why = "server exited (1), log at /tmp/x.log";
   await page.goto("/opening.html?problem=" + encodeURIComponent(why));
   await expect(page.getByRole("alert")).toContainText(why);

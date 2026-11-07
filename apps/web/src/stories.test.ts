@@ -7,9 +7,7 @@ import { levels } from "#/storyLevels.ts";
 
 const ui = join(import.meta.dirname, "ui");
 
-const without: Record<string, string> = {
-  "A.tsx": "a link that moves the router: it draws a plain <a>",
-};
+const without: Record<string, string> = {};
 
 test("every part in ui/ has stories, or a reason not to", () => {
   const missing = readdirSync(ui, { recursive: true, encoding: "utf8" })

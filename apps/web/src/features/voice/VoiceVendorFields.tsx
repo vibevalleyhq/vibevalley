@@ -21,7 +21,7 @@ import {
 } from "@vibevalley/protocol";
 
 import { aria, variant } from "#/base/dom.tsx";
-import { A } from "#/ui/A.tsx";
+import { Link as A } from "#/infra/router.ts";
 import { TextArea, TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { Card } from "#/ui/layout.tsx";

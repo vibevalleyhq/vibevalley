@@ -12,7 +12,7 @@ import { clock, farm } from "#/farm/store.ts";
 import { typing } from "#/farm/tools.ts";
 import { api } from "#/infra/api.ts";
 import { orchestratorMood, useCore, useFrames, rawFrame, subscribeLive } from "#/infra/frame.ts";
-import { ready, useQuery } from "#/infra/query.ts";
+import { achievementsQuery as achievementCatalog, ready, useQuery } from "#/infra/query.ts";
 import { createPixelAct } from "#/ui/pixel/index.ts";
 import { playSound, SOUND_GROUPS, SOUND_LABEL } from "#/ui/pixel/sound.ts";
 
@@ -89,7 +89,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
   const core = useCore();
   const frames = useFrames();
   const day = createExternal(clock.subscribe, clock.day, { always: true });
-  const achievementsQuery = useQuery(() => ({ queryKey: ["achievements"], queryFn: () => api.game.achievement.list() }));
+  const achievementsQuery = useQuery(achievementCatalog);
   const achievements = () => ready(achievementsQuery, []);
   const [next, setNext] = createSignal(0);
   const act = createPixelAct(t("web.farm.debug.title"));

@@ -24,7 +24,7 @@ test("a device the owner lets in opens the farm through the lan listener", async
     await page.goto(pairing!.link);
     await expect(page.getByTestId("pair-name")).toHaveValue("iPhone");
     await page.getByTestId("pair-ask").click();
-    await expect(page.getByRole("status")).toBeVisible();
+    await expect(page.getByRole("main").getByRole("status")).toBeVisible();
     await expect.poll(async () => (await api.lan.get()).pairing?.asking).toBe("iPhone");
     await api.lan.pairing.answer({ allow: true });
     await expect(page).toHaveURL(url + "/chat");

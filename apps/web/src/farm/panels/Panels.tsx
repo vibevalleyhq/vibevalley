@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import { useQueryClient } from "@tanstack/solid-query";
 import { For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -12,7 +11,7 @@ import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "#/fea
 import { orchestratorLookOf } from "#/infra/agents.ts";
 import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { ready, useAgents } from "#/infra/query.ts";
+import { useQueryClient, ready, useAgents } from "#/infra/query.ts";
 import { setPet, usePrefs } from "#/state/prefs.ts";
 import { createPixelAct, FarmDialog, type FarmDialogSize, SpriteIcon } from "#/ui/pixel/index.ts";
 
@@ -161,7 +160,7 @@ function OrchestratorLooks() {
       const me = (await api.agent.list()).find((a) => a.id === defaultOrchestrator);
       if (!me) return;
       await api.agent.update({ ...me, look: { ...me.look, orchestrator: look } });
-      await client.invalidateQueries({ queryKey: ["agents"] });
+      await client.invalidate({ prefix: ["agents"] });
     });
   const pet = usePrefs((p) => p.pet);
   const has = (name: string) => loaded().village?.atlas.has(name) ?? false;

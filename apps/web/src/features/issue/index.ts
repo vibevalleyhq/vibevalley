@@ -1,3 +1,4 @@
+export { issueSearch } from "./navigation";
 export { IssuesPage } from "./IssuesPage";
 export { actionOf, createIssueActs, perform } from "./acts";
 export { issueDeliver, shownDeliver } from "./write";

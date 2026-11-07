@@ -1,9 +1,7 @@
-import { Schema } from "effect";
 import { createEffect, createSignal, For, Show } from "solid-js";
 // The title's picture, alive: the scene on a stage kept at its own 3:2 and covering the screen, slowly panning.
 
-import { TitleManifest } from "#/base/manifests.ts";
-import { ready, useQuery } from "#/infra/query.ts";
+import { titleSpritesQuery, ready, useQuery } from "#/infra/query.ts";
 import { usePrefs } from "#/state/prefs.ts";
 
 import {
@@ -31,11 +29,7 @@ const pct = (n: number) => `${(n * 100).toFixed(3)}%`;
 const timing = (i: number) => `${-(i * puffSeconds) / puffs.length}s`;
 
 export function TitleStage(props: { scene: TitleScene }) {
-  const sizesQuery = useQuery(() => ({
-    queryKey: ["title-sprites"],
-    queryFn: async () => Schema.decodeUnknownSync(TitleManifest)(await (await fetch("/title/sprites.json")).json()),
-    staleTime: Infinity,
-  }));
+  const sizesQuery = useQuery(titleSpritesQuery);
   const lit = () => light[props.scene];
   return (
     <div aria-hidden="true" class="title-stage">

@@ -1,56 +1,64 @@
 import { frames } from "./frame";
-import { queries } from "./query";
+import type { QueryClient } from "./query";
+import { waitForReads } from "./query/activity";
 
 /** Past this the page shows as it is: a read that hangs keeps its own loading words, not a cover. */
 const longest = 2000;
 
 const nextFrame = () => new Promise<void>((done) => requestAnimationFrame(() => done()));
 
-function firstFrame() {
+function firstFrame(signal: AbortSignal) {
   return new Promise<void>((done) => {
     let stop: (() => void) | undefined;
     let over = false;
     const check = () => {
       const f = frames.get();
-      if (over || (!f.frame && f.link !== "lost")) return;
+      if (over || (!signal.aborted && !f.frame && f.link !== "lost")) return;
       over = true;
       stop?.();
+      signal.removeEventListener("abort", check);
       done();
     };
     stop = frames.subscribe(check);
+    signal.addEventListener("abort", check, { once: true });
     check();
   });
 }
 
-function readsDone() {
-  return new Promise<void>((done) => {
-    if (queries.isFetching() === 0) return done();
-    const stop = queries.getQueryCache().subscribe(() => {
-      if (queries.isFetching() > 0) return;
-      stop();
-      done();
-    });
-  });
-}
-
-async function pageReady() {
-  await firstFrame();
+async function pageReady(client: QueryClient, signal: AbortSignal) {
+  await firstFrame(signal);
   // A place shown on the frame mounts now and starts its reads; one read's answer can start the next.
   for (let round = 0; round < 3; round++) {
     /* oxlint-disable eslint/no-await-in-loop -- frames come one after another, and one read's answer can start the next */
     await nextFrame();
-    await readsDone();
+    if (signal.aborted) return;
+    await waitForReads(client, signal);
     /* oxlint-enable eslint/no-await-in-loop */
   }
   await Promise.all([...document.images].filter((i) => !i.complete).map((i) => i.decode().catch(() => undefined)));
 }
 
 /** Once the page has mounted: takes the cover away when the page is ready, in one fade. */
-export async function reveal() {
+export async function reveal(client: QueryClient, signal: AbortSignal) {
   const cover = document.getElementById("opening");
   if (!cover) return;
   if (cover.dataset.look === "farm") return cover.remove();
-  await Promise.race([pageReady(), new Promise((done) => setTimeout(done, longest))]);
+  const timeout = new AbortController();
+  const waiting = AbortSignal.any([signal, timeout.signal]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      pageReady(client, waiting),
+      new Promise<void>((done) => {
+        timer = setTimeout(done, longest);
+        waiting.addEventListener("abort", () => done(), { once: true });
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    timeout.abort();
+  }
+  if (signal.aborted) return;
   // What came in under the cover (a dialog opened by the address, a list's first rows) is already in: it shows where it ends, not coming in a second time.
   for (const a of document.getAnimations()) {
     const target = a.effect instanceof KeyframeEffect ? a.effect.target : null;

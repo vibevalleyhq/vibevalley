@@ -8,9 +8,15 @@ import { edgesOf } from "@vibevalley/testkit/source";
 const dir = join(import.meta.dirname, "../test");
 const allowed = /^(\.\/[\w-]+|@playwright\/test(\/reporter)?|@axe-core\/playwright|@vibevalley\/protocol(\/schema)?|node:[\w/]+)$/u;
 
-test("page tests reach the system only through the browser, Playwright and the protocol", () => {
+test("browser imports accept fixtures but refuse product and test-runner shortcuts", () => {
+  for (const spec of ["./stories-fixtures", "./fixtures", "@playwright/test", "@vibevalley/protocol/schema"]) expect(allowed.test(spec), spec).toBe(true);
+  for (const spec of ["#/features/issue/IssuesPage", "../src/infra/query", "vite-plus/test", "./projects.test", "./projects.test.ts"])
+    expect(allowed.test(spec), spec).toBe(false);
+});
+
+test("browser specs and fixtures reach the system only through the browser, Playwright and the protocol", () => {
   const crossing = readdirSync(dir)
-    .filter((f) => f.endsWith(".ts"))
+    .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
     .flatMap((f) =>
       edgesOf(f, readFileSync(join(dir, f), "utf8"))
         .map((e) => e.from)
@@ -19,6 +25,6 @@ test("page tests reach the system only through the browser, Playwright and the p
     );
   expect(
     crossing,
-    "a page test goes in only as a user's browser does: through the fixtures, Playwright and the protocol's shapes. Fix: drive it through the page (fixtures.ts for the server it talks to); a judgement the page makes is a pure function in features/<concept> with its own vitest test. See docs/subsystems/foundation.md",
+    "a browser spec or fixture goes in only as a user's browser does: through the fixtures, Playwright and the protocol's shapes. Fix: drive it through the page (stories-fixtures.ts for components, fixtures.ts for integration); Node-only infrastructure checks belong in *.test.ts, which browser specs and fixtures cannot import. See docs/subsystems/foundation.md",
   ).toEqual([]);
 });

@@ -75,414 +75,486 @@ export class VibeValleyApi {
 
   readonly server = {
     health: {
-      get: (): Promise<T.Health> => this.call<T.Health>("/api/v1/server/health/get", undefined),
+      get: (options?: { signal?: AbortSignal }): Promise<T.Health> => this.call<T.Health>("/api/v1/server/health/get", undefined, options),
     },
   };
 
   readonly orchestrator = {
-    open: (): Promise<void> => this.call<void>("/api/v1/orchestrator/open", undefined),
+    open: (options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/orchestrator/open", undefined, options),
     /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */
-    stop: (a: { agent?: string }): Promise<void> => this.call<void>("/api/v1/orchestrator/stop", a),
+    stop: (a: { agent?: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/orchestrator/stop", a, options),
     archive: {
-      list: (a: { agent?: string; q?: string }): Promise<T.ArchiveListing> => this.call<T.ArchiveListing>("/api/v1/orchestrator/archive/list", a),
-      get: (a: { agent?: string; name: string }): Promise<string> => this.call<string>("/api/v1/orchestrator/archive/get", a),
+      list: (a: { agent?: string; q?: string }, options?: { signal?: AbortSignal }): Promise<T.ArchiveListing> =>
+        this.call<T.ArchiveListing>("/api/v1/orchestrator/archive/list", a, options),
+      get: (a: { agent?: string; name: string }, options?: { signal?: AbortSignal }): Promise<string> =>
+        this.call<string>("/api/v1/orchestrator/archive/get", a, options),
     },
     eval: {
       /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */
-      create: (a: T.OrchestratorEvalRequest): Promise<T.OrchestratorEval> => this.call<T.OrchestratorEval>("/api/v1/orchestrator/eval/create", a),
+      create: (a: T.OrchestratorEvalRequest, options?: { signal?: AbortSignal }): Promise<T.OrchestratorEval> =>
+        this.call<T.OrchestratorEval>("/api/v1/orchestrator/eval/create", a, options),
     },
   };
 
   readonly setting = {
-    get: (): Promise<T.SettingsStatus> => this.call<T.SettingsStatus>("/api/v1/setting/get", undefined),
+    get: (options?: { signal?: AbortSignal }): Promise<T.SettingsStatus> => this.call<T.SettingsStatus>("/api/v1/setting/get", undefined, options),
     /** The first thing Save would refuse in these settings, without saving them. */
-    validate: (a: T.SettingsUpdate): Promise<T.Validation> => this.call<T.Validation>("/api/v1/setting/validate", a),
-    update: (a: T.SettingsUpdate): Promise<T.SettingsStatus> => this.call<T.SettingsStatus>("/api/v1/setting/update", a),
+    validate: (a: T.SettingsUpdate, options?: { signal?: AbortSignal }): Promise<T.Validation> =>
+      this.call<T.Validation>("/api/v1/setting/validate", a, options),
+    update: (a: T.SettingsUpdate, options?: { signal?: AbortSignal }): Promise<T.SettingsStatus> =>
+      this.call<T.SettingsStatus>("/api/v1/setting/update", a, options),
   };
 
   readonly channel = {
-    create: (a: T.ChannelRequest): Promise<string> => this.call<string>("/api/v1/channel/create", a),
-    update: (a: { id: string } & T.ChannelUpdate): Promise<void> => this.call<void>("/api/v1/channel/update", a),
-    markRead: (a: { id: string } & T.ChatReadRequest): Promise<void> => this.call<void>("/api/v1/channel/markRead", a),
+    create: (a: T.ChannelRequest, options?: { signal?: AbortSignal }): Promise<string> => this.call<string>("/api/v1/channel/create", a, options),
+    update: (a: { id: string } & T.ChannelUpdate, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/update", a, options),
+    markRead: (a: { id: string } & T.ChatReadRequest, options?: { signal?: AbortSignal }): Promise<void> =>
+      this.call<void>("/api/v1/channel/markRead", a, options),
     /** A channel nothing points at any more, with its threads and messages. */
-    delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/channel/delete", a),
+    delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/delete", a, options),
     /** What channel.delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/channel/previewDelete", a),
+    previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+      this.call<T.Preview>("/api/v1/channel/previewDelete", a, options),
     /** The owner's read moved back to just before this message. */
-    markUnread: (a: { id: string } & T.ChatReadRequest): Promise<void> => this.call<void>("/api/v1/channel/markUnread", a),
+    markUnread: (a: { id: string } & T.ChatReadRequest, options?: { signal?: AbortSignal }): Promise<void> =>
+      this.call<void>("/api/v1/channel/markUnread", a, options),
     /** Every channel and direct channel, the default first. */
-    list: (): Promise<T.Channel[]> => this.call<T.Channel[]>("/api/v1/channel/list", undefined),
+    list: (options?: { signal?: AbortSignal }): Promise<T.Channel[]> => this.call<T.Channel[]>("/api/v1/channel/list", undefined, options),
     message: {
-      send: (a: T.SayRequest): Promise<void> => this.call<void>("/api/v1/channel/message/send", a),
+      send: (a: T.SayRequest, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/message/send", a, options),
       /** What deleteTask would do, refused as it would be; nothing changes. */
-      list: (a: { id: string; before?: number; limit?: number }): Promise<T.ChatMessage[]> => this.call<T.ChatMessage[]>("/api/v1/channel/message/list", a),
+      list: (a: { id: string; before?: number; limit?: number }, options?: { signal?: AbortSignal }): Promise<T.ChatMessage[]> =>
+        this.call<T.ChatMessage[]>("/api/v1/channel/message/list", a, options),
       /** The owner's own words, changed; nobody is told again. */
-      update: (a: T.MessageEdit): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/message/update", a),
+      update: (a: T.MessageEdit, options?: { signal?: AbortSignal }): Promise<T.ChatMessage> =>
+        this.call<T.ChatMessage>("/api/v1/channel/message/update", a, options),
       /** Any message: its words go, its number stays, and what it still had to hand is dropped. */
-      delete: (a: { id: T.MessageId }): Promise<void> => this.call<void>("/api/v1/channel/message/delete", a),
+      delete: (a: { id: T.MessageId }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/message/delete", a, options),
       /** What channel.message.delete would do, refused as it would be; nothing changes. */
-      previewDelete: (a: { id: T.MessageId }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/channel/message/previewDelete", a),
-      search: (a: T.MessageSearch): Promise<T.MessageHit[]> => this.call<T.MessageHit[]>("/api/v1/channel/message/search", a),
+      previewDelete: (a: { id: T.MessageId }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+        this.call<T.Preview>("/api/v1/channel/message/previewDelete", a, options),
+      search: (a: T.MessageSearch, options?: { signal?: AbortSignal }): Promise<T.MessageHit[]> =>
+        this.call<T.MessageHit[]>("/api/v1/channel/message/search", a, options),
     },
     default: {
       /** The channel what names none goes to from now on: a connector's, a call's. */
-      set: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/channel/default/set", a),
+      set: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/default/set", a, options),
     },
     reaction: {
       /** The owner's reaction on or off; as it already is, nothing changes. */
-      set: (a: T.ReactionSet): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/reaction/set", a),
+      set: (a: T.ReactionSet, options?: { signal?: AbortSignal }): Promise<T.ChatMessage> =>
+        this.call<T.ChatMessage>("/api/v1/channel/reaction/set", a, options),
     },
     pin: {
       /** The message pinned or not; as it already is, nothing changes. */
-      set: (a: { id: T.MessageId; on: boolean }): Promise<T.ChatMessage> => this.call<T.ChatMessage>("/api/v1/channel/pin/set", a),
+      set: (a: { id: T.MessageId; on: boolean }, options?: { signal?: AbortSignal }): Promise<T.ChatMessage> =>
+        this.call<T.ChatMessage>("/api/v1/channel/pin/set", a, options),
       /** A channel's pinned messages, newest pinned first. */
-      list: (a: { id: string }): Promise<T.ChatMessage[]> => this.call<T.ChatMessage[]>("/api/v1/channel/pin/list", a),
+      list: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.ChatMessage[]> =>
+        this.call<T.ChatMessage[]>("/api/v1/channel/pin/list", a, options),
     },
     thread: {
       /** The thread under a message, made if it has none: its id. requestKey: as IssueRequest's. */
-      create: (a: { id: T.MessageId; requestKey?: string }): Promise<string> => this.call<string>("/api/v1/channel/thread/create", a),
+      create: (a: { id: T.MessageId; requestKey?: string }, options?: { signal?: AbortSignal }): Promise<string> =>
+        this.call<string>("/api/v1/channel/thread/create", a, options),
     },
     archive: {
       /** Out of the sidebar and the thread lists (on), or back. its messages and address stay. */
-      set: (a: T.OnSet): Promise<void> => this.call<void>("/api/v1/channel/archive/set", a),
+      set: (a: T.OnSet, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/archive/set", a, options),
     },
     direct: {
       /** The owner's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
-      create: (a: { agent: string }): Promise<string> => this.call<string>("/api/v1/channel/direct/create", a),
+      create: (a: { agent: string }, options?: { signal?: AbortSignal }): Promise<string> => this.call<string>("/api/v1/channel/direct/create", a, options),
     },
     notify: {
-      set: (a: T.NotifyRequest): Promise<void> => this.call<void>("/api/v1/channel/notify/set", a),
+      set: (a: T.NotifyRequest, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/notify/set", a, options),
     },
     unread: {
       /** The places the caller has not read all of, the newest first. */
-      list: (): Promise<T.ChannelUnread[]> => this.call<T.ChannelUnread[]>("/api/v1/channel/unread/list", undefined),
+      list: (options?: { signal?: AbortSignal }): Promise<T.ChannelUnread[]> => this.call<T.ChannelUnread[]>("/api/v1/channel/unread/list", undefined, options),
     },
     attachment: {
-      create: (a: T.AttachmentUpload): Promise<T.Attachment> => this.call<T.Attachment>("/api/v1/channel/attachment/create", a),
+      create: (a: T.AttachmentUpload, options?: { signal?: AbortSignal }): Promise<T.Attachment> =>
+        this.call<T.Attachment>("/api/v1/channel/attachment/create", a, options),
     },
   };
 
   readonly cron = {
-    create: (a: T.CronRequest): Promise<T.Cron> => this.call<T.Cron>("/api/v1/cron/create", a),
-    list: (): Promise<T.Cron[]> => this.call<T.Cron[]>("/api/v1/cron/list", undefined),
+    create: (a: T.CronRequest, options?: { signal?: AbortSignal }): Promise<T.Cron> => this.call<T.Cron>("/api/v1/cron/create", a, options),
+    list: (options?: { signal?: AbortSignal }): Promise<T.Cron[]> => this.call<T.Cron[]>("/api/v1/cron/list", undefined, options),
     /** Only what the body gives changes. */
-    update: (a: { id: string } & T.CronUpdate): Promise<void> => this.call<void>("/api/v1/cron/update", a),
-    delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/cron/delete", a),
+    update: (a: { id: string } & T.CronUpdate, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/cron/update", a, options),
+    delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/cron/delete", a, options),
     /** What delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/cron/previewDelete", a),
+    previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+      this.call<T.Preview>("/api/v1/cron/previewDelete", a, options),
   };
 
   readonly voice = {
     /** A line heard on the call that is on, without its id: refused unless one call is. */
-    hear: (a: { text: string; agent?: string; sendKey?: string }): Promise<void> => this.call<void>("/api/v1/voice/hear", a),
-    dictate: (a: T.DictateRequest): Promise<T.Dictated> => this.call<T.Dictated>("/api/v1/voice/dictate", a),
+    hear: (a: { text: string; agent?: string; sendKey?: string }, options?: { signal?: AbortSignal }): Promise<void> =>
+      this.call<void>("/api/v1/voice/hear", a, options),
+    dictate: (a: T.DictateRequest, options?: { signal?: AbortSignal }): Promise<T.Dictated> => this.call<T.Dictated>("/api/v1/voice/dictate", a, options),
     moss: {
       /** Whether MOSS Live takes the key: a session is attached and closed again, nothing is said. */
-      verify: (a: T.MossVerifyRequest): Promise<T.Validation> => this.call<T.Validation>("/api/v1/voice/moss/verify", a),
+      verify: (a: T.MossVerifyRequest, options?: { signal?: AbortSignal }): Promise<T.Validation> =>
+        this.call<T.Validation>("/api/v1/voice/moss/verify", a, options),
     },
     grant: {
-      create: (): Promise<T.AgoraGrant> => this.call<T.AgoraGrant>("/api/v1/voice/grant/create", undefined),
-      renew: (a: T.VoiceGrantRenew): Promise<T.AgoraGrant> => this.call<T.AgoraGrant>("/api/v1/voice/grant/renew", a),
+      create: (options?: { signal?: AbortSignal }): Promise<T.AgoraGrant> => this.call<T.AgoraGrant>("/api/v1/voice/grant/create", undefined, options),
+      renew: (a: T.VoiceGrantRenew, options?: { signal?: AbortSignal }): Promise<T.AgoraGrant> =>
+        this.call<T.AgoraGrant>("/api/v1/voice/grant/renew", a, options),
     },
     call: {
-      start: (a: T.VoiceCallStart): Promise<T.VoiceCall> => this.call<T.VoiceCall>("/api/v1/voice/call/start", a),
-      stop: (a: T.VoiceCall): Promise<void> => this.call<void>("/api/v1/voice/call/stop", a),
-      hear: (a: T.VoiceHeard): Promise<void> => this.call<void>("/api/v1/voice/call/hear", a),
-      say: (a: T.VoiceSaid): Promise<void> => this.call<void>("/api/v1/voice/call/say", a),
+      start: (a: T.VoiceCallStart, options?: { signal?: AbortSignal }): Promise<T.VoiceCall> => this.call<T.VoiceCall>("/api/v1/voice/call/start", a, options),
+      stop: (a: T.VoiceCall, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/voice/call/stop", a, options),
+      hear: (a: T.VoiceHeard, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/voice/call/hear", a, options),
+      say: (a: T.VoiceSaid, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/voice/call/say", a, options),
     },
   };
 
   readonly issue = {
     /** The open issues by default, the newest first; the filter narrows them. */
-    list: (a: T.IssueFilter): Promise<T.Issue[]> => this.call<T.Issue[]>("/api/v1/issue/list", a),
+    list: (a: T.IssueFilter, options?: { signal?: AbortSignal }): Promise<T.Issue[]> => this.call<T.Issue[]>("/api/v1/issue/list", a, options),
     /** A verdict on what was handed back; a pass only makes it ready, completing it is issue.status.update to done. */
-    review: (a: { id: string } & T.IssueReviewRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/review", a),
+    review: (a: { id: string } & T.IssueReviewRequest, options?: { signal?: AbortSignal }): Promise<T.Issue> =>
+      this.call<T.Issue>("/api/v1/issue/review", a, options),
     /** The issue becomes a parent issue and the split's issues its children, started at once. */
-    split: (a: { id: string } & T.IssueSplitRequest): Promise<string> => this.call<string>("/api/v1/issue/split", a),
-    get: (a: { id: string }): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/get", a),
-    create: (a: T.IssueRequest): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/create", a),
-    update: (a: { id: string } & T.IssueUpdate): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/update", a),
-    delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/issue/delete", a),
+    split: (a: { id: string } & T.IssueSplitRequest, options?: { signal?: AbortSignal }): Promise<string> =>
+      this.call<string>("/api/v1/issue/split", a, options),
+    get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/get", a, options),
+    create: (a: T.IssueRequest, options?: { signal?: AbortSignal }): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/create", a, options),
+    update: (a: { id: string } & T.IssueUpdate, options?: { signal?: AbortSignal }): Promise<T.AppliedIssue> =>
+      this.call<T.AppliedIssue>("/api/v1/issue/update", a, options),
+    delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/issue/delete", a, options),
     /** What issue.delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/issue/previewDelete", a),
+    previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+      this.call<T.Preview>("/api/v1/issue/previewDelete", a, options),
     /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then leaves. */
-    refine: (a: { id: string } & T.IssueRefineRequest): Promise<T.Issue> => this.call<T.Issue>("/api/v1/issue/refine", a),
+    refine: (a: { id: string } & T.IssueRefineRequest, options?: { signal?: AbortSignal }): Promise<T.Issue> =>
+      this.call<T.Issue>("/api/v1/issue/refine", a, options),
     conversation: {
-      get: (a: { id: string }): Promise<string | null> => this.call<string | null>("/api/v1/issue/conversation/get", a),
+      get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<string | null> =>
+        this.call<string | null>("/api/v1/issue/conversation/get", a, options),
     },
     comment: {
       /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
-      create: (a: { id: string } & T.CommentRequest): Promise<T.Applied> => this.call<T.Applied>("/api/v1/issue/comment/create", a),
+      create: (a: { id: string } & T.CommentRequest, options?: { signal?: AbortSignal }): Promise<T.Applied> =>
+        this.call<T.Applied>("/api/v1/issue/comment/create", a, options),
     },
     diff: {
-      get: (a: { id: string }): Promise<T.Changes> => this.call<T.Changes>("/api/v1/issue/diff/get", a),
+      get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Changes> => this.call<T.Changes>("/api/v1/issue/diff/get", a, options),
     },
     history: {
       /** One joined read of issues and their real sessions, including explicit missing records. */
-      list: (): Promise<T.IssueHistory[]> => this.call<T.IssueHistory[]>("/api/v1/issue/history/list", undefined),
+      list: (options?: { signal?: AbortSignal }): Promise<T.IssueHistory[]> => this.call<T.IssueHistory[]>("/api/v1/issue/history/list", undefined, options),
     },
     run: {
-      list: (a: { id: string }): Promise<T.Run[]> => this.call<T.Run[]>("/api/v1/issue/run/list", a),
+      list: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Run[]> => this.call<T.Run[]>("/api/v1/issue/run/list", a, options),
     },
     timeline: {
       /** The issue's milestones, newest first, and what all its runs cost. */
-      get: (a: { id: string }): Promise<T.IssueTimeline> => this.call<T.IssueTimeline>("/api/v1/issue/timeline/get", a),
+      get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.IssueTimeline> =>
+        this.call<T.IssueTimeline>("/api/v1/issue/timeline/get", a, options),
     },
     status: {
       /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is another round (the words are the findings. */
-      update: (a: { id: string } & T.IssueStatusRequest): Promise<T.AppliedIssue> => this.call<T.AppliedIssue>("/api/v1/issue/status/update", a),
+      update: (a: { id: string } & T.IssueStatusRequest, options?: { signal?: AbortSignal }): Promise<T.AppliedIssue> =>
+        this.call<T.AppliedIssue>("/api/v1/issue/status/update", a, options),
       /** What issue.status.update would do with the same body, refused as it would be; nothing changes. */
-      previewUpdate: (a: { id: string } & T.IssueStatusRequest): Promise<T.Preview> => this.call<T.Preview>("/api/v1/issue/status/previewUpdate", a),
+      previewUpdate: (a: { id: string } & T.IssueStatusRequest, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+        this.call<T.Preview>("/api/v1/issue/status/previewUpdate", a, options),
     },
   };
 
   readonly session = {
     /** Stops a session's turn; it stays, and a comment starts the next. */
-    stop: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/session/stop", a),
-    list: (a: { agent?: string }): Promise<T.Session[]> => this.call<T.Session[]>("/api/v1/session/list", a),
-    get: (a: { id: string }): Promise<T.Session> => this.call<T.Session>("/api/v1/session/get", a),
+    stop: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/session/stop", a, options),
+    list: (a: { agent?: string }, options?: { signal?: AbortSignal }): Promise<T.Session[]> => this.call<T.Session[]>("/api/v1/session/list", a, options),
+    get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Session> => this.call<T.Session>("/api/v1/session/get", a, options),
     event: {
       /** Its log, oldest first. run gives one run's only. */
-      list: (a: { id: string; run?: string }): Promise<T.SessionEvent[]> => this.call<T.SessionEvent[]>("/api/v1/session/event/list", a),
+      list: (a: { id: string; run?: string }, options?: { signal?: AbortSignal }): Promise<T.SessionEvent[]> =>
+        this.call<T.SessionEvent[]>("/api/v1/session/event/list", a, options),
     },
   };
 
   readonly artifact = {
     /** The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given. */
-    list: (a: T.ArtifactListRequest): Promise<T.Artifact[]> => this.call<T.Artifact[]>("/api/v1/artifact/list", a),
-    get: (a: { id: T.ArtifactId }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/get", a),
+    list: (a: T.ArtifactListRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact[]> => this.call<T.Artifact[]>("/api/v1/artifact/list", a, options),
+    get: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/get", a, options),
     /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
-    create: (a: T.ArtifactRequest): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/create", a),
+    create: (a: T.ArtifactRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/create", a, options),
     /** Its title, as the owner renames it. */
-    update: (a: { id: T.ArtifactId; title: string }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/update", a),
-    delete: (a: { id: T.ArtifactId }): Promise<void> => this.call<void>("/api/v1/artifact/delete", a),
-    previewDelete: (a: { id: T.ArtifactId }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/artifact/previewDelete", a),
+    update: (a: { id: T.ArtifactId; title: string }, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
+      this.call<T.Artifact>("/api/v1/artifact/update", a, options),
+    delete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/artifact/delete", a, options),
+    previewDelete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+      this.call<T.Preview>("/api/v1/artifact/previewDelete", a, options),
     /** A batch of ops, as the owner: taken in order, in one transaction, one batch at a time. */
-    submit: (a: { id: T.ArtifactId } & T.BlockSubmit): Promise<T.BlockAck> => this.call<T.BlockAck>("/api/v1/artifact/submit", a),
+    submit: (a: { id: T.ArtifactId } & T.BlockSubmit, options?: { signal?: AbortSignal }): Promise<T.BlockAck> =>
+      this.call<T.BlockAck>("/api/v1/artifact/submit", a, options),
     /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
      * one already running is refused. */
-    demo: (a: { id: T.ArtifactId }): Promise<void> => this.call<void>("/api/v1/artifact/demo", a),
+    demo: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/artifact/demo", a, options),
     content: {
       /** Its words: an html one's version as made, a blocks one's Markdown now (its version is its seq). What an agent reads
        * to make the next one. */
-      get: (a: T.ArtifactReadRequest): Promise<T.ArtifactContent> => this.call<T.ArtifactContent>("/api/v1/artifact/content/get", a),
+      get: (a: T.ArtifactReadRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactContent> =>
+        this.call<T.ArtifactContent>("/api/v1/artifact/content/get", a, options),
     },
     version: {
       /** An html one's new version over the latest. the old ones stay. */
-      create: (a: T.ArtifactVersionRequest): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/version/create", a),
+      create: (a: T.ArtifactVersionRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
+        this.call<T.Artifact>("/api/v1/artifact/version/create", a, options),
     },
     html: {
       /** The owner's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
-      edit: (a: T.ArtifactHtmlEdit): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/html/edit", a),
+      edit: (a: T.ArtifactHtmlEdit, options?: { signal?: AbortSignal }): Promise<T.Artifact> => this.call<T.Artifact>("/api/v1/artifact/html/edit", a, options),
     },
     block: {
       /** A blocks artifact and every live block (no tombstones), in order. */
-      list: (a: { id: T.ArtifactId }): Promise<T.BlockSnapshot> => this.call<T.BlockSnapshot>("/api/v1/artifact/block/list", a),
+      list: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.BlockSnapshot> =>
+        this.call<T.BlockSnapshot>("/api/v1/artifact/block/list", a, options),
       /** One block inserted, as one batch of one op. */
-      create: (a: { id: T.ArtifactId } & T.BlockCreate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/create", a),
+      create: (a: { id: T.ArtifactId } & T.BlockCreate, options?: { signal?: AbortSignal }): Promise<T.BlockOpResult> =>
+        this.call<T.BlockOpResult>("/api/v1/artifact/block/create", a, options),
       /** One block's words, type or attrs changed, as one batch. */
-      update: (a: { id: T.ArtifactId } & T.BlockUpdate): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/update", a),
+      update: (a: { id: T.ArtifactId } & T.BlockUpdate, options?: { signal?: AbortSignal }): Promise<T.BlockOpResult> =>
+        this.call<T.BlockOpResult>("/api/v1/artifact/block/update", a, options),
       /** One block and its children put in their tombstones. */
-      delete: (a: { id: T.ArtifactId } & T.BlockDelete): Promise<T.BlockOpResult> => this.call<T.BlockOpResult>("/api/v1/artifact/block/delete", a),
-      previewDelete: (a: { id: T.ArtifactId } & T.BlockDelete): Promise<T.Preview> => this.call<T.Preview>("/api/v1/artifact/block/previewDelete", a),
+      delete: (a: { id: T.ArtifactId } & T.BlockDelete, options?: { signal?: AbortSignal }): Promise<T.BlockOpResult> =>
+        this.call<T.BlockOpResult>("/api/v1/artifact/block/delete", a, options),
+      previewDelete: (a: { id: T.ArtifactId } & T.BlockDelete, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+        this.call<T.Preview>("/api/v1/artifact/block/previewDelete", a, options),
     },
     suggestion: {
       /** The open and resolved suggestions on an artifact, oldest first. */
-      list: (a: { id: T.ArtifactId }): Promise<T.Suggestion[]> => this.call<T.Suggestion[]>("/api/v1/artifact/suggestion/list", a),
+      list: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion[]> =>
+        this.call<T.Suggestion[]>("/api/v1/artifact/suggestion/list", a, options),
       /** A change an agent proposes to a block the owner wrote. */
-      create: (a: { id: T.ArtifactId } & T.SuggestionCreate): Promise<T.Suggestion> => this.call<T.Suggestion>("/api/v1/artifact/suggestion/create", a),
+      create: (a: { id: T.ArtifactId } & T.SuggestionCreate, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
+        this.call<T.Suggestion>("/api/v1/artifact/suggestion/create", a, options),
       /** The owner takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
-      accept: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }): Promise<T.Suggestion> => this.call<T.Suggestion>("/api/v1/artifact/suggestion/accept", a),
-      reject: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }): Promise<T.Suggestion> => this.call<T.Suggestion>("/api/v1/artifact/suggestion/reject", a),
+      accept: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
+        this.call<T.Suggestion>("/api/v1/artifact/suggestion/accept", a, options),
+      reject: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
+        this.call<T.Suggestion>("/api/v1/artifact/suggestion/reject", a, options),
     },
     markdown: {
       /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
-      get: (a: { id: T.ArtifactId }): Promise<T.ArtifactMarkdown> => this.call<T.ArtifactMarkdown>("/api/v1/artifact/markdown/get", a),
+      get: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.ArtifactMarkdown> =>
+        this.call<T.ArtifactMarkdown>("/api/v1/artifact/markdown/get", a, options),
     },
   };
 
   readonly game = {
     achievement: {
       /** Every achievement, as the board has them. */
-      list: (): Promise<T.Achievement[]> => this.call<T.Achievement[]>("/api/v1/game/achievement/list", undefined),
+      list: (options?: { signal?: AbortSignal }): Promise<T.Achievement[]> => this.call<T.Achievement[]>("/api/v1/game/achievement/list", undefined, options),
     },
     title: {
-      set: (a: T.ChooseTitleRequest): Promise<void> => this.call<void>("/api/v1/game/title/set", a),
+      set: (a: T.ChooseTitleRequest, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/game/title/set", a, options),
     },
   };
 
   readonly runtime = {
-    list: (): Promise<T.RuntimeInfo[]> => this.call<T.RuntimeInfo[]>("/api/v1/runtime/list", undefined),
-    refresh: (a: { id: string }): Promise<T.RuntimeInfo> => this.call<T.RuntimeInfo>("/api/v1/runtime/refresh", a),
+    list: (options?: { signal?: AbortSignal }): Promise<T.RuntimeInfo[]> => this.call<T.RuntimeInfo[]>("/api/v1/runtime/list", undefined, options),
+    refresh: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.RuntimeInfo> => this.call<T.RuntimeInfo>("/api/v1/runtime/refresh", a, options),
     setting: {
-      update: (a: { id: string } & T.RuntimeSettings): Promise<T.RuntimeInfo> => this.call<T.RuntimeInfo>("/api/v1/runtime/setting/update", a),
+      update: (a: { id: string } & T.RuntimeSettings, options?: { signal?: AbortSignal }): Promise<T.RuntimeInfo> =>
+        this.call<T.RuntimeInfo>("/api/v1/runtime/setting/update", a, options),
     },
   };
 
   readonly repo = {
-    list: (): Promise<T.RepoSummary[]> => this.call<T.RepoSummary[]>("/api/v1/repo/list", undefined),
+    list: (options?: { signal?: AbortSignal }): Promise<T.RepoSummary[]> => this.call<T.RepoSummary[]>("/api/v1/repo/list", undefined, options),
     /** The first thing Create would refuse in this repo, without making it. */
-    validate: (a: T.NewRepo): Promise<T.Validation> => this.call<T.Validation>("/api/v1/repo/validate", a),
-    create: (a: T.NewRepo): Promise<T.RepoSummary> => this.call<T.RepoSummary>("/api/v1/repo/create", a),
+    validate: (a: T.NewRepo, options?: { signal?: AbortSignal }): Promise<T.Validation> => this.call<T.Validation>("/api/v1/repo/validate", a, options),
+    create: (a: T.NewRepo, options?: { signal?: AbortSignal }): Promise<T.RepoSummary> => this.call<T.RepoSummary>("/api/v1/repo/create", a, options),
     pr: {
-      submit: (a: T.SubmitBranch): Promise<T.BranchPublication> => this.call<T.BranchPublication>("/api/v1/repo/pr/submit", a),
+      submit: (a: T.SubmitBranch, options?: { signal?: AbortSignal }): Promise<T.BranchPublication> =>
+        this.call<T.BranchPublication>("/api/v1/repo/pr/submit", a, options),
     },
     language: {
-      list: (a: { id: string }): Promise<T.RepoLanguages> => this.call<T.RepoLanguages>("/api/v1/repo/language/list", a),
+      list: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.RepoLanguages> =>
+        this.call<T.RepoLanguages>("/api/v1/repo/language/list", a, options),
     },
     template: {
-      list: (a: { id: string }): Promise<T.RepoTemplates> => this.call<T.RepoTemplates>("/api/v1/repo/template/list", a),
+      list: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.RepoTemplates> =>
+        this.call<T.RepoTemplates>("/api/v1/repo/template/list", a, options),
     },
     activity: {
-      get: (a: { id: string }): Promise<T.RepoActivity> => this.call<T.RepoActivity>("/api/v1/repo/activity/get", a),
+      get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.RepoActivity> =>
+        this.call<T.RepoActivity>("/api/v1/repo/activity/get", a, options),
     },
   };
 
   readonly github = {
-    get: (): Promise<T.GitHubStatus> => this.call<T.GitHubStatus>("/api/v1/github/get", undefined),
-    refresh: (): Promise<T.GitHubStatus> => this.call<T.GitHubStatus>("/api/v1/github/refresh", undefined),
+    get: (options?: { signal?: AbortSignal }): Promise<T.GitHubStatus> => this.call<T.GitHubStatus>("/api/v1/github/get", undefined, options),
+    refresh: (options?: { signal?: AbortSignal }): Promise<T.GitHubStatus> => this.call<T.GitHubStatus>("/api/v1/github/refresh", undefined, options),
   };
 
   readonly agent = {
-    list: (): Promise<T.Agent[]> => this.call<T.Agent[]>("/api/v1/agent/list", undefined),
+    list: (options?: { signal?: AbortSignal }): Promise<T.Agent[]> => this.call<T.Agent[]>("/api/v1/agent/list", undefined, options),
     /** The issues of each profile as it would be dispatched now; a draft not saved yet too. */
-    validate: (a: T.AgentValidateRequest): Promise<T.AgentValidation[]> => this.call<T.AgentValidation[]>("/api/v1/agent/validate", a),
+    validate: (a: T.AgentValidateRequest, options?: { signal?: AbortSignal }): Promise<T.AgentValidation[]> =>
+      this.call<T.AgentValidation[]>("/api/v1/agent/validate", a, options),
     /** Create allocates an identity; callers with an existing identity use save. */
-    create: (a: T.Agent): Promise<T.Agent> => this.call<T.Agent>("/api/v1/agent/create", a),
-    update: (a: T.Agent): Promise<T.Agent> => this.call<T.Agent>("/api/v1/agent/update", a),
-    delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/agent/delete", a),
+    create: (a: T.Agent, options?: { signal?: AbortSignal }): Promise<T.Agent> => this.call<T.Agent>("/api/v1/agent/create", a, options),
+    update: (a: T.Agent, options?: { signal?: AbortSignal }): Promise<T.Agent> => this.call<T.Agent>("/api/v1/agent/update", a, options),
+    delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/agent/delete", a, options),
     /** What delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/agent/previewDelete", a),
+    previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+      this.call<T.Preview>("/api/v1/agent/previewDelete", a, options),
     template: {
       /** The templates a profile can be installed from: the built-in ones, then those added on this machine. */
-      list: (): Promise<T.AgentTemplate[]> => this.call<T.AgentTemplate[]>("/api/v1/agent/template/list", undefined),
+      list: (options?: { signal?: AbortSignal }): Promise<T.AgentTemplate[]> => this.call<T.AgentTemplate[]>("/api/v1/agent/template/list", undefined, options),
       /** A new profile from a template; installing one again makes another. */
-      install: (a: { id: string }): Promise<T.Agent> => this.call<T.Agent>("/api/v1/agent/template/install", a),
+      install: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Agent> => this.call<T.Agent>("/api/v1/agent/template/install", a, options),
       /** A profile made again from its template's version now. */
-      update: (a: { agent: string }): Promise<T.Agent> => this.call<T.Agent>("/api/v1/agent/template/update", a),
+      update: (a: { agent: string }, options?: { signal?: AbortSignal }): Promise<T.Agent> => this.call<T.Agent>("/api/v1/agent/template/update", a, options),
       /** A template folder on this machine copied in beside the built-in ones; nothing is installed. */
-      add: (a: { path: string }): Promise<T.AgentTemplate> => this.call<T.AgentTemplate>("/api/v1/agent/template/add", a),
+      add: (a: { path: string }, options?: { signal?: AbortSignal }): Promise<T.AgentTemplate> =>
+        this.call<T.AgentTemplate>("/api/v1/agent/template/add", a, options),
       /** An added template gone; the profiles installed from it stay. */
-      delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/agent/template/delete", a),
+      delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/agent/template/delete", a, options),
       /** What deleting the template would do, refused as it would be; nothing changes. */
-      previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/agent/template/previewDelete", a),
+      previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+        this.call<T.Preview>("/api/v1/agent/template/previewDelete", a, options),
     },
   };
 
   readonly skill = {
-    list: (): Promise<T.Skill[]> => this.call<T.Skill[]>("/api/v1/skill/list", undefined),
+    list: (options?: { signal?: AbortSignal }): Promise<T.Skill[]> => this.call<T.Skill[]>("/api/v1/skill/list", undefined, options),
     /** Create allocates an identity; callers with an existing identity use save. */
-    create: (a: T.Skill): Promise<T.Skill> => this.call<T.Skill>("/api/v1/skill/create", a),
-    update: (a: T.Skill): Promise<T.Skill> => this.call<T.Skill>("/api/v1/skill/update", a),
-    delete: (a: { id: string }): Promise<void> => this.call<void>("/api/v1/skill/delete", a),
+    create: (a: T.Skill, options?: { signal?: AbortSignal }): Promise<T.Skill> => this.call<T.Skill>("/api/v1/skill/create", a, options),
+    update: (a: T.Skill, options?: { signal?: AbortSignal }): Promise<T.Skill> => this.call<T.Skill>("/api/v1/skill/update", a, options),
+    delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/skill/delete", a, options),
     /** What delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/skill/previewDelete", a),
+    previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+      this.call<T.Preview>("/api/v1/skill/previewDelete", a, options),
   };
 
   readonly pkm = {
-    search: (a: T.PkmSearchRequest): Promise<T.PkmSearchHit[]> => this.call<T.PkmSearchHit[]>("/api/v1/pkm/search", a),
+    search: (a: T.PkmSearchRequest, options?: { signal?: AbortSignal }): Promise<T.PkmSearchHit[]> =>
+      this.call<T.PkmSearchHit[]>("/api/v1/pkm/search", a, options),
     /** Into today's journal as LATER lines tagged #inbox (an agent's says who noted it), or at the end of a page. */
-    capture: (a: T.PkmCaptureRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/capture", a),
+    capture: (a: T.PkmCaptureRequest, options?: { signal?: AbortSignal }): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/capture", a, options),
     /** Puts back the file the last change wrote. */
-    undo: (): Promise<T.PkmUndo> => this.call<T.PkmUndo>("/api/v1/pkm/undo", undefined),
+    undo: (options?: { signal?: AbortSignal }): Promise<T.PkmUndo> => this.call<T.PkmUndo>("/api/v1/pkm/undo", undefined, options),
     /** Reads again every file that changed on disk. */
-    scan: (): Promise<T.PkmScan> => this.call<T.PkmScan>("/api/v1/pkm/scan", undefined),
+    scan: (options?: { signal?: AbortSignal }): Promise<T.PkmScan> => this.call<T.PkmScan>("/api/v1/pkm/scan", undefined, options),
     page: {
       /** Every page in the vault, newest first; files changed on disk are read again first. */
-      list: (): Promise<T.PkmVault> => this.call<T.PkmVault>("/api/v1/pkm/page/list", undefined),
+      list: (options?: { signal?: AbortSignal }): Promise<T.PkmVault> => this.call<T.PkmVault>("/api/v1/pkm/page/list", undefined, options),
       /** The page with its ((refs)) read out, the blocks linking to it and its open remarks; read again from its file when that changed. */
-      get: (a: T.PkmPageRef): Promise<T.PkmPageView> => this.call<T.PkmPageView>("/api/v1/pkm/page/get", a),
+      get: (a: T.PkmPageRef, options?: { signal?: AbortSignal }): Promise<T.PkmPageView> => this.call<T.PkmPageView>("/api/v1/pkm/page/get", a, options),
       /** Makes the page, or sets the props and tier of the one with that title (its file moves to the tier's folder). */
-      save: (a: T.PkmPageRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/page/save", a),
-      move: (a: T.PkmMoveRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/page/move", a),
-      rename: (a: T.PkmRenameRequest): Promise<T.PkmRename> => this.call<T.PkmRename>("/api/v1/pkm/page/rename", a),
+      save: (a: T.PkmPageRequest, options?: { signal?: AbortSignal }): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/page/save", a, options),
+      move: (a: T.PkmMoveRequest, options?: { signal?: AbortSignal }): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/page/move", a, options),
+      rename: (a: T.PkmRenameRequest, options?: { signal?: AbortSignal }): Promise<T.PkmRename> =>
+        this.call<T.PkmRename>("/api/v1/pkm/page/rename", a, options),
       /** The page as plain Markdown: refs read out, links and remarks taken off. */
-      export: (a: T.PkmPageRef): Promise<T.PkmMarkdown> => this.call<T.PkmMarkdown>("/api/v1/pkm/page/export", a),
+      export: (a: T.PkmPageRef, options?: { signal?: AbortSignal }): Promise<T.PkmMarkdown> => this.call<T.PkmMarkdown>("/api/v1/pkm/page/export", a, options),
     },
     block: {
       /** The ops in order on the page as its file is now, written back once. */
-      apply: (a: T.PkmMutation): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/block/apply", a),
+      apply: (a: T.PkmMutation, options?: { signal?: AbortSignal }): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/block/apply", a, options),
     },
     source: {
       /** The page's file as written, ids and all, with when it was written. */
-      get: (a: T.PkmPageRef): Promise<T.PkmSource> => this.call<T.PkmSource>("/api/v1/pkm/source/get", a),
+      get: (a: T.PkmPageRef, options?: { signal?: AbortSignal }): Promise<T.PkmSource> => this.call<T.PkmSource>("/api/v1/pkm/source/get", a, options),
       /** The page written anew from its file's text; refused when the file changed after it was read. */
-      update: (a: T.PkmSourceUpdate): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/source/update", a),
+      update: (a: T.PkmSourceUpdate, options?: { signal?: AbortSignal }): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/source/update", a, options),
     },
     journal: {
       /** The journal of a day, made empty when it has none yet. */
-      open: (a: T.PkmJournalRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/journal/open", a),
+      open: (a: T.PkmJournalRequest, options?: { signal?: AbortSignal }): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/journal/open", a, options),
     },
     radar: {
-      get: (a: { staleDays?: number }): Promise<T.PkmRadar> => this.call<T.PkmRadar>("/api/v1/pkm/radar/get", a),
+      get: (a: { staleDays?: number }, options?: { signal?: AbortSignal }): Promise<T.PkmRadar> => this.call<T.PkmRadar>("/api/v1/pkm/radar/get", a, options),
     },
     comment: {
-      list: (a: { page?: string }): Promise<T.PkmComment[]> => this.call<T.PkmComment[]>("/api/v1/pkm/comment/list", a),
+      list: (a: { page?: string }, options?: { signal?: AbortSignal }): Promise<T.PkmComment[]> =>
+        this.call<T.PkmComment[]>("/api/v1/pkm/comment/list", a, options),
       /** A rewrite of a block for the owner to accept: it keeps every [[link]] and ((ref)) the block had. */
-      suggest: (a: T.PkmProposalRequest): Promise<T.PkmProposal> => this.call<T.PkmProposal>("/api/v1/pkm/comment/suggest", a),
+      suggest: (a: T.PkmProposalRequest, options?: { signal?: AbortSignal }): Promise<T.PkmProposal> =>
+        this.call<T.PkmProposal>("/api/v1/pkm/comment/suggest", a, options),
       /** Accepted, the suggested text replaces the block's and its remarks come off; rejected, the block stays. */
-      resolve: (a: T.PkmResolveRequest): Promise<T.PkmPage> => this.call<T.PkmPage>("/api/v1/pkm/comment/resolve", a),
+      resolve: (a: T.PkmResolveRequest, options?: { signal?: AbortSignal }): Promise<T.PkmPage> =>
+        this.call<T.PkmPage>("/api/v1/pkm/comment/resolve", a, options),
     },
     clip: {
-      create: (a: T.PkmClipRequest): Promise<T.PkmClip> => this.call<T.PkmClip>("/api/v1/pkm/clip/create", a),
+      create: (a: T.PkmClipRequest, options?: { signal?: AbortSignal }): Promise<T.PkmClip> => this.call<T.PkmClip>("/api/v1/pkm/clip/create", a, options),
     },
     cluster: {
       /** A resource page of ((refs)) to the inbox, journal and resource blocks about the topic. */
-      create: (a: T.PkmClusterRequest): Promise<T.PkmCluster> => this.call<T.PkmCluster>("/api/v1/pkm/cluster/create", a),
+      create: (a: T.PkmClusterRequest, options?: { signal?: AbortSignal }): Promise<T.PkmCluster> =>
+        this.call<T.PkmCluster>("/api/v1/pkm/cluster/create", a, options),
     },
   };
 
   readonly memory = {
     /** An agent's memories from the database and its configured sources. */
-    list: (a: { agent: string }): Promise<T.MemoryList> => this.call<T.MemoryList>("/api/v1/memory/list", a),
+    list: (a: { agent: string }, options?: { signal?: AbortSignal }): Promise<T.MemoryList> => this.call<T.MemoryList>("/api/v1/memory/list", a, options),
     /** What the agent would recall for this repo and input. */
-    recall: (a: { agent: string; repo?: string; text?: string }): Promise<T.RecallPreview> => this.call<T.RecallPreview>("/api/v1/memory/recall", a),
-    create: (a: { agent: string } & T.MemoryRequest): Promise<T.Memory> => this.call<T.Memory>("/api/v1/memory/create", a),
+    recall: (a: { agent: string; repo?: string; text?: string }, options?: { signal?: AbortSignal }): Promise<T.RecallPreview> =>
+      this.call<T.RecallPreview>("/api/v1/memory/recall", a, options),
+    create: (a: { agent: string } & T.MemoryRequest, options?: { signal?: AbortSignal }): Promise<T.Memory> =>
+      this.call<T.Memory>("/api/v1/memory/create", a, options),
     /** Memories whose words match, from every source the agent has; none named is every profile's. */
-    search: (a: { agent?: string; repo?: string; text?: string }): Promise<T.MemorySearch> => this.call<T.MemorySearch>("/api/v1/memory/search", a),
-    delete: (a: { agent: string; memory: string }): Promise<void> => this.call<void>("/api/v1/memory/delete", a),
+    search: (a: { agent?: string; repo?: string; text?: string }, options?: { signal?: AbortSignal }): Promise<T.MemorySearch> =>
+      this.call<T.MemorySearch>("/api/v1/memory/search", a, options),
+    delete: (a: { agent: string; memory: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/memory/delete", a, options),
     /** What delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { agent: string; memory: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/memory/previewDelete", a),
+    previewDelete: (a: { agent: string; memory: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+      this.call<T.Preview>("/api/v1/memory/previewDelete", a, options),
   };
 
   readonly connector = {
-    list: (): Promise<T.ConnectorStatus[]> => this.call<T.ConnectorStatus[]>("/api/v1/connector/list", undefined),
-    login: (a: { id: T.ConnectorID } & T.ConnectorLogin): Promise<T.ConnectorStatus> => this.call<T.ConnectorStatus>("/api/v1/connector/login", a),
-    verify: (a: { id: T.ConnectorID } & T.VerifyRequest): Promise<T.ConnectorStatus> => this.call<T.ConnectorStatus>("/api/v1/connector/verify", a),
-    logout: (a: { id: T.ConnectorID }): Promise<T.ConnectorStatus> => this.call<T.ConnectorStatus>("/api/v1/connector/logout", a),
+    list: (options?: { signal?: AbortSignal }): Promise<T.ConnectorStatus[]> => this.call<T.ConnectorStatus[]>("/api/v1/connector/list", undefined, options),
+    login: (a: { id: T.ConnectorID } & T.ConnectorLogin, options?: { signal?: AbortSignal }): Promise<T.ConnectorStatus> =>
+      this.call<T.ConnectorStatus>("/api/v1/connector/login", a, options),
+    verify: (a: { id: T.ConnectorID } & T.VerifyRequest, options?: { signal?: AbortSignal }): Promise<T.ConnectorStatus> =>
+      this.call<T.ConnectorStatus>("/api/v1/connector/verify", a, options),
+    logout: (a: { id: T.ConnectorID }, options?: { signal?: AbortSignal }): Promise<T.ConnectorStatus> =>
+      this.call<T.ConnectorStatus>("/api/v1/connector/logout", a, options),
     channel: {
-      set: (a: { id: T.ConnectorID } & T.ConnectorsChannelRequest): Promise<T.ConnectorStatus> =>
-        this.call<T.ConnectorStatus>("/api/v1/connector/channel/set", a),
+      set: (a: { id: T.ConnectorID } & T.ConnectorsChannelRequest, options?: { signal?: AbortSignal }): Promise<T.ConnectorStatus> =>
+        this.call<T.ConnectorStatus>("/api/v1/connector/channel/set", a, options),
     },
   };
 
   readonly lan = {
-    get: (): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/get", undefined),
-    update: (a: T.SetOpenRequest): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/update", a),
-    pair: (a: T.LanPairRequest): Promise<T.LanPaired> => this.call<T.LanPaired>("/api/v1/lan/pair", a),
+    get: (options?: { signal?: AbortSignal }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/get", undefined, options),
+    update: (a: T.SetOpenRequest, options?: { signal?: AbortSignal }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/update", a, options),
+    pair: (a: T.LanPairRequest, options?: { signal?: AbortSignal }): Promise<T.LanPaired> => this.call<T.LanPaired>("/api/v1/lan/pair", a, options),
     pairing: {
-      start: (): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/pairing/start", undefined),
-      stop: (): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/pairing/stop", undefined),
+      start: (options?: { signal?: AbortSignal }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/pairing/start", undefined, options),
+      stop: (options?: { signal?: AbortSignal }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/pairing/stop", undefined, options),
       /** What stopPairing would do, refused as it would be; nothing changes. */
-      previewStop: (): Promise<T.Preview> => this.call<T.Preview>("/api/v1/lan/pairing/previewStop", undefined),
-      answer: (a: T.AnswerPairingRequest): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/pairing/answer", a),
+      previewStop: (options?: { signal?: AbortSignal }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/lan/pairing/previewStop", undefined, options),
+      answer: (a: T.AnswerPairingRequest, options?: { signal?: AbortSignal }): Promise<T.LanStatus> =>
+        this.call<T.LanStatus>("/api/v1/lan/pairing/answer", a, options),
     },
     device: {
-      delete: (a: { id: string }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/device/delete", a),
+      delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/device/delete", a, options),
       /** What deleteDevice would do, refused as it would be; nothing changes. */
-      previewDelete: (a: { id: string }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/lan/device/previewDelete", a),
+      previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+        this.call<T.Preview>("/api/v1/lan/device/previewDelete", a, options),
     },
     me: {
-      get: (): Promise<T.LanDevice> => this.call<T.LanDevice>("/api/v1/lan/me/get", undefined),
+      get: (options?: { signal?: AbortSignal }): Promise<T.LanDevice> => this.call<T.LanDevice>("/api/v1/lan/me/get", undefined, options),
     },
   };
 
   /** R is the answer api.ts gives the path; each method above names it. */
-  private async call<R>(path: string, input: unknown): Promise<R> {
-    const res = await this.fetcher(
-      this.base + path,
-      input === undefined ? { method: "POST" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) },
-    );
+  private async call<R>(path: string, input: unknown, options?: { signal?: AbortSignal }): Promise<R> {
+    const res = await this.fetcher(this.base + path, {
+      ...(input === undefined ? { method: "POST" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+      ...options,
+    });
     const text = await res.text();
     if (!res.ok) {
       let decoded: unknown;

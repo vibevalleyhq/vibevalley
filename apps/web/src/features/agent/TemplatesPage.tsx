@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
@@ -6,9 +5,8 @@ import type { AgentTemplate, RuntimeInfo } from "@vibevalley/protocol";
 
 import { aria } from "#/base/dom.tsx";
 import { api } from "#/infra/api.ts";
-import { ready, useAgentTemplates, useRuntimes } from "#/infra/query.ts";
-import { useRouter } from "#/infra/router.ts";
-import { A } from "#/ui/A.tsx";
+import { useQueryClient, ready, useAgentTemplates, useRuntimes } from "#/infra/query.ts";
+import { useRouter, Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
@@ -29,7 +27,7 @@ export function TemplatesPage() {
     const at = path().trim();
     return adding.run(async () => {
       const got = await api.agent.template.add({ path: at });
-      await client.invalidateQueries({ queryKey: ["agent-templates"] });
+      await client.invalidate({ prefix: ["agent-templates"] });
       setPath("");
       toast(t("web.agent.templates.added", { name: got.name }));
     });
@@ -90,7 +88,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
     const id = template().id;
     return act.run(async () => {
       const made = await api.agent.template.install({ id });
-      await Promise.all([client.invalidateQueries({ queryKey: ["agents"] }), client.invalidateQueries({ queryKey: ["agent-templates"] })]);
+      await Promise.all([client.invalidate({ prefix: ["agents"] }), client.invalidate({ prefix: ["agent-templates"] })]);
       router.navigate(`/agents/${encodeURIComponent(made.id)}`);
     });
   };
@@ -98,7 +96,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
     const id = template().id;
     return act.run(async () => {
       await api.agent.template.delete({ id });
-      await client.invalidateQueries({ queryKey: ["agent-templates"] });
+      await client.invalidate({ prefix: ["agent-templates"] });
     });
   };
   return (

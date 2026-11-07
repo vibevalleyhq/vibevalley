@@ -261,7 +261,7 @@ export function IssueDetail(props: {
             )}
           </Match>
           <Match when={s().showsChanges}>
-            <p class="text-sm text-muted">{changesQuery.isPending ? t("web.issue.reading") : t("web.issue.detail.changesUnread")}</p>
+            <p class="text-sm text-muted">{changesQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.changesUnread")}</p>
           </Match>
         </Switch>
         <Show when={props.issue.pullRequest}>
@@ -278,7 +278,10 @@ export function IssueDetail(props: {
 
       <section aria-label={t("web.issue.detail.story")} data-testid="issue-story">
         <SheetLabel>{t("web.issue.detail.story")}</SheetLabel>
-        <Show when={timeline()} fallback={<p class="text-xs text-faint">{timelineQuery.isPending ? t("web.issue.reading") : t("web.issue.detail.unread")}</p>}>
+        <Show
+          when={timeline()}
+          fallback={<p class="text-xs text-faint">{timelineQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.unread")}</p>}
+        >
           {(line) => <Story milestones={line().milestones} />}
         </Show>
         <div class="mt-3 border-t border-line">

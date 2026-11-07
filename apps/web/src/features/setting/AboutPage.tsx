@@ -40,7 +40,7 @@ export function AboutPage() {
     <SettingsPage title={t("web.setting.nav.about")}>
       <Show
         when={ready(settings, undefined)}
-        fallback={<Quiet>{settings.error ? t("web.base.form.unreachable", { why: reasonOf(settings.error) }) : t("web.base.form.asking")}</Quiet>}
+        fallback={<Quiet>{settings.error() ? t("web.base.form.unreachable", { why: reasonOf(settings.error()) }) : t("web.base.form.asking")}</Quiet>}
       >
         {(s) => (
           <>

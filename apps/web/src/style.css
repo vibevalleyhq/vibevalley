@@ -49,7 +49,7 @@
   --shiki-token-keyword: #a8452f;
   --shiki-token-string: #4c7a2d;
   --shiki-token-string-expression: #4c7a2d;
-  --shiki-token-constant: #3a76a3;
+  --shiki-token-constant: var(--wb-water);
   --shiki-token-function: #8a5a1c;
 }
 

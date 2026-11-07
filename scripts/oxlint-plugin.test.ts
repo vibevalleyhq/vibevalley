@@ -323,6 +323,7 @@ tester.run("stored-door", rule("stored-door"), {
 tester.run("act-door", rule("act-door"), {
   valid: [
     { code: "act.run(() => api.issue.update({ id }));", filename: page("features/issue/IssueDetail.tsx") },
+    { code: "act.attempt(() => api.skill.create(body));", filename: page("features/runtime/SkillsPage.tsx") },
     { code: "void act.run(async () => { const got = await api.skill.create(body); keep(got); });", filename: page("features/runtime/SkillsPage.tsx") },
     { code: "act.run(() => Promise.all(xs.map((x) => api.session.stop({ id: x }))));", filename: page("farm/debug/DebugPanel.tsx") },
     {
@@ -333,6 +334,7 @@ tester.run("act-door", rule("act-door"), {
   ],
   invalid: [
     { code: "api.issue.update({ id, deliver });", filename: page("features/issue/IssueDetail.tsx"), errors: [{ messageId: "act" }] },
+    { code: "attempt(() => api.skill.create(body));", filename: page("features/runtime/SkillsPage.tsx"), errors: [{ messageId: "act" }] },
     { code: "const run = (f) => f(); run(() => api.cron.delete({ id }));", filename: page("features/channel/Tabs.tsx"), errors: [{ messageId: "act" }] },
     { code: "api.orchestrator.stop({ agent }).catch(() => {});", filename: page("farm/chat/Composer.tsx"), errors: [{ messageId: "act" }] },
   ],

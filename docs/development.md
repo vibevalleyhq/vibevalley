@@ -40,7 +40,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 
 - `vp check`：全仓格式（oxfmt）、lint（oxlint，带类型）与类型检查；`vp check --fix` 自动格式化。
 - `vp run server:check`：`vp check`、`packages/protocol` 规则、`apps/server` SQL 生成检查与 vitest（黄金数据在 `apps/server/src/core/testdata`）。
-- `vp run web:check`：`vp check`、前端规则 vitest 与页面构建；`vp run --filter @vibevalley/web e2e` 构建页面并运行 Playwright（每个 worker 独立服务端与临时家目录）。
+- `vp run web:check`：`vp check`、前端规则 vitest 与页面构建；浏览器改动先跑对应的 `e2e:component`、`e2e:integration` 或 `e2e:audit`，交付节点用 `vp run --filter @vibevalley/web e2e` 做全量自动检查。各入口只构建需要的产物，真实集成用隔离服务端与临时家目录；纯截图另跑 `e2e:visual` 并看图，见 [页面命令](apps/web/README.md#commands)。
 - `vp run desktop:test`：Playwright 启动完整 Electron 应用。
 - `vp run docs:verify`：校验 Note、skill、文档链接与旧名字。
 

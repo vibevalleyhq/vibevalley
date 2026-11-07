@@ -1,4 +1,9 @@
 {
+  "route": {
+    "missing": "这个页面不存在",
+    "invalid": "这个地址无效",
+    "home": "返回应用"
+  },
   "place": {
     "chat": {
       "label": "聊天",
@@ -55,7 +60,21 @@
   "owner": "主",
   "orchestrator": "管家",
   "unreachable": "暂时连不上服务端，请等它恢复后重试。",
+  "query": { "invalidResponse": "返回的数据格式不符，已有的有效结果已保留。" },
+  "table": {
+    "columns": "显示的列",
+    "stale": "新页还在读取，当前显示的是上一次的结果，暂时不能操作这些行。",
+    "selectPage": "选择本页",
+    "selectRow": "选择行 {id}",
+    "empty": "暂无数据",
+    "previous": "上一页",
+    "next": "下一页",
+    "page": "第 {n} 页"
+  },
   "form": {
+    "invalid": "请检查这一项。",
+    "validationUnavailable": "暂时无法校验，输入已保留。",
+    "deliveryUnknown": "请求可能已送达，但还没收到确认。输入已保留，请先查看保存结果再决定是否重试。",
     "asking": "在问服务端……",
     "unreachable": "问不到服务端：{why}",
     "none": "还没有",

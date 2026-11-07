@@ -99,10 +99,10 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
   };
   return (
     <Switch>
-      <Match when={changes.isPending}>
+      <Match when={changes.status() === "pending"}>
         <p class="py-10 text-center text-sm text-muted">{t("web.issue.changes.reading")}</p>
       </Match>
-      <Match when={changes.error}>
+      <Match when={changes.error()}>
         {(error) => (
           <div>
             <Note tone="berry">

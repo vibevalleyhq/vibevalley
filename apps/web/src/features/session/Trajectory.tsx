@@ -1,14 +1,16 @@
 import type { JSX } from "@solidjs/web";
+import { Schema } from "effect";
 import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
 import { omitUndefined, oneLine } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
 
 import { aria, autofocus, Keyed, useNow } from "#/base/dom.tsx";
 import { ago } from "#/base/format.ts";
 import { api, reasonOf } from "#/infra/api.ts";
-import { ready, useQuery } from "#/infra/query.ts";
+import { defineQuery, retryRead, ready, useQuery } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
 import { TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
@@ -516,8 +518,14 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
 }
 
 /** The helpers an agent sent, a list to pick from beside the picked one's trajectory. */
+const sessionsQuery = defineQuery({
+  schema: Schema.mutable(Schema.Array(S.Session)),
+  key: (agent: string) => ["sessions", agent],
+  fetch: (agent, context) => api.session.list({ agent }, context),
+  ...retryRead,
+});
 export function TrajectoryList(props: { agent: string }) {
-  const heads = useQuery(() => ({ queryKey: ["sessions", props.agent], queryFn: () => api.session.list({ agent: props.agent }) }));
+  const heads = useQuery(() => sessionsQuery(props.agent));
   const [picked, setPicked] = createSignal<string>();
   const now = useNow();
   const list = () => ready(heads, undefined);
@@ -526,7 +534,7 @@ export function TrajectoryList(props: { agent: string }) {
     return all?.find((h) => h.id === (picked() ?? all[0]?.id));
   };
   return (
-    <Show when={list()} fallback={<Quiet>{heads.error ? reasonOf(heads.error) : t("web.base.reading")}</Quiet>}>
+    <Show when={list()} fallback={<Quiet>{heads.error() ? reasonOf(heads.error()) : t("web.base.reading")}</Quiet>}>
       {(all) => (
         <Show when={all().length > 0} fallback={<Quiet>{t("web.session.trajectory.neverSent")}</Quiet>}>
           <div class="flex h-full min-h-0 flex-col gap-3 md:flex-row">

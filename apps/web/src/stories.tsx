@@ -1,13 +1,12 @@
-import { render } from "@solidjs/web";
-import { QueryClientProvider } from "@tanstack/solid-query";
-import { createSignal, Loading } from "solid-js";
+import { render, type JSX } from "@solidjs/web";
+import { Loading } from "solid-js";
 
 import { LocaleValues } from "@vibevalley/i18n";
 import { StoriesApp, type Stories } from "@vibevalley/stories";
 
 import { FramesContext } from "./infra/frame";
-import { queries } from "./infra/query";
-import { RouterContext, type Router } from "./infra/router";
+import { agentsQuery, templatesQuery, reposQuery, runtimesQuery, createQueryClient, QueryProvider } from "./infra/query";
+import { memoryHistory, Router } from "./infra/router";
 import { fakeFetch } from "./infra/storyApi";
 import { createRegistry, RegistryContext } from "./state/atom";
 import { order } from "./storyLevels";
@@ -17,16 +16,14 @@ import "./stories.css";
 const found = import.meta.glob<{ default: Stories }>("./**/*.stories.tsx", { eager: true });
 
 window.fetch = fakeFetch(window.fetch.bind(window));
-queries.setDefaultOptions({ queries: { retry: false, staleTime: Infinity, refetchInterval: false } });
-const fresh = () => {
-  queries.clear();
-  for (const key of ["agents", "agent-templates", "repos", "runtimes"]) queries.setQueryData([key], []);
-};
-
-const still = (): Router => {
-  const [path, setPath] = createSignal("/");
-  return { path, navigate: (to) => setPath(to) };
-};
+function StoryQueries(props: { children: JSX.Element }) {
+  const client = createQueryClient();
+  client.setData(agentsQuery(), () => ({ value: [] }));
+  client.setData(templatesQuery(), () => ({ value: [] }));
+  client.setData(reposQuery(), () => ({ value: [] }));
+  client.setData(runtimesQuery(), () => ({ value: [] }));
+  return <QueryProvider client={client}>{props.children}</QueryProvider>;
+}
 
 const dark = window.matchMedia("(prefers-color-scheme: dark)");
 const follow = () => (document.documentElement.dataset.theme = dark.matches ? "dark" : "light");
@@ -41,17 +38,16 @@ if (root)
         stories={Object.values(found).map((m) => m.default)}
         order={order}
         locales={LocaleValues}
-        prepare={fresh}
         wrap={(story) => (
-          <RouterContext value={still()}>
+          <Router history={memoryHistory()}>
             <FramesContext value={{ frame: undefined, link: "open", count: 0 }}>
               <RegistryContext value={createRegistry()}>
-                <QueryClientProvider client={queries}>
+                <StoryQueries>
                   <Loading>{story()}</Loading>
-                </QueryClientProvider>
+                </StoryQueries>
               </RegistryContext>
             </FramesContext>
-          </RouterContext>
+          </Router>
         )}
       />
     ),

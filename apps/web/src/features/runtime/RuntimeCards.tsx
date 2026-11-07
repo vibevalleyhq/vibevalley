@@ -14,13 +14,16 @@ import {
   type UsageWindow,
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
 
 import { variant } from "#/base/dom.tsx";
 import { momentText, yuan } from "#/base/format.ts";
 import { api } from "#/infra/api.ts";
+import { defineColumns, useTable } from "#/infra/table.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { KeyValueEditor } from "#/ui/Chips.tsx";
+import { DataTable, tableCell } from "#/ui/DataTable.tsx";
 import { Select, TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { Card, Quiet, Toggle } from "#/ui/layout.tsx";
@@ -320,6 +323,29 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
 }
 
 export function ModelsCard(props: { info: RuntimeInfo }) {
+  const column = defineColumns(S.ModelEntry);
+  const name = column("name", { value: (model) => model.id, compare: (a, b) => a.localeCompare(b), hideable: false });
+  const effort = column("effort", { value: (model) => model.effortLevels.join(" · "), compare: (a, b) => a.localeCompare(b) });
+  const table = useTable({ mode: "local", rows: () => props.info.models ?? [], rowId: (model) => model.id, columns: [name, effort] });
+  const cells = {
+    name: tableCell(
+      name,
+      () => t("web.runtime.models"),
+      (value, model) => (
+        <>
+          <span class="font-mono text-sm">{value()}</span>
+          <Show when={model().isDefault}>
+            <span class="ml-2 rounded bg-ok-soft px-1.5 text-xs text-ok-ink">{t("web.runtime.default")}</span>
+          </Show>
+        </>
+      ),
+    ),
+    effort: tableCell(
+      effort,
+      () => t("web.runtime.effort"),
+      (value) => <span class="text-sm text-muted">{value() || "—"}</span>,
+    ),
+  };
   return (
     <Card
       title={t("web.runtime.models")}
@@ -329,31 +355,7 @@ export function ModelsCard(props: { info: RuntimeInfo }) {
         when={props.info.models}
         fallback={<Quiet>{props.info.installation.status === "available" ? t("web.runtime.noModels") : t("web.runtime.afterInstall")}</Quiet>}
       >
-        {(models) => (
-          <table class="w-full text-left">
-            <thead>
-              <tr class="text-xs font-medium text-muted">
-                <th class="pb-2 font-medium">{t("web.runtime.models")}</th>
-                <th class="pb-2 font-medium">{t("web.runtime.effort")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={models()}>
-                {(m) => (
-                  <tr class="border-t border-line">
-                    <td class="py-1.5">
-                      <span class="font-mono text-sm">{m.id}</span>
-                      <Show when={m.isDefault}>
-                        <span class="ml-2 rounded bg-ok-soft px-1.5 text-xs text-ok-ink">{t("web.runtime.default")}</span>
-                      </Show>
-                    </td>
-                    <td class="py-1.5 text-sm text-muted">{m.effortLevels.length === 0 ? "—" : m.effortLevels.join(" · ")}</td>
-                  </tr>
-                )}
-              </For>
-            </tbody>
-          </table>
-        )}
+        <DataTable table={table} cells={cells} caption={t("web.runtime.models")} columnControls testid="runtime-models" />
       </Show>
     </Card>
   );

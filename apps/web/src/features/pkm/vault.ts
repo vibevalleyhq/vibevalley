@@ -1,26 +1,22 @@
+import * as S from "@vibevalley/protocol/schema";
+
 import { api } from "#/infra/api.ts";
-import { queries, useQuery } from "#/infra/query.ts";
+import { defineQuery, retryRead, useQuery, type QueryClient } from "#/infra/query.ts";
 
 const fresh = 5_000;
-
-export const usePkmVault = () => useQuery(() => ({ queryKey: ["pkm", "vault"], queryFn: () => api.pkm.page.list(), refetchInterval: fresh }));
-
-/** quiet: while a block is being written the page is not read again on its own; the edits' answers bring it. */
+const vaultQuery = defineQuery({ schema: S.PkmVault, key: () => ["pkm", "vault"], fetch: (_: void, context) => api.pkm.page.list(context), ...retryRead });
+export const pkmPageQuery = defineQuery({
+  schema: S.PkmPageView,
+  key: (page: string) => ["pkm", "page", page],
+  fetch: (page, context) => api.pkm.page.get({ page }, context),
+});
+const radarQuery = defineQuery({ schema: S.PkmRadar, key: () => ["pkm", "radar"], fetch: (_: void, context) => api.pkm.radar.get({}, context), ...retryRead });
+export const usePkmVault = () => useQuery(vaultQuery, { interval: () => fresh });
+/** Pause polling while editing; confirmed writes update the cached page. */
 export const usePkmPage = (slug: () => string, quiet: () => boolean = () => false) =>
-  useQuery(() => ({
-    queryKey: ["pkm", "page", slug()],
-    queryFn: () => api.pkm.page.get({ page: slug() }),
-    refetchInterval: quiet() ? false : fresh,
-    retry: false,
-  }));
-
-export const usePkmRadar = () => useQuery(() => ({ queryKey: ["pkm", "radar"], queryFn: () => api.pkm.radar.get({}), refetchInterval: 30_000 }));
-
-/** After a change: every notes read again, the open page first. */
-export const refreshPkm = () => queries.invalidateQueries({ queryKey: ["pkm"] });
-
-export const refreshVault = () =>
-  Promise.all([queries.invalidateQueries({ queryKey: ["pkm", "vault"] }), queries.invalidateQueries({ queryKey: ["pkm", "radar"] })]);
-
-/** A page's address; block: the block to show and light up on it. */
+  useQuery(() => pkmPageQuery(slug()), { interval: () => (quiet() ? false : fresh) });
+export const usePkmRadar = () => useQuery(radarQuery, { interval: () => 30_000 });
+export const refreshPkm = (client: QueryClient) => client.invalidate({ prefix: ["pkm"] });
+export const refreshVault = (client: QueryClient) =>
+  Promise.all([client.invalidate({ prefix: ["pkm", "vault"] }), client.invalidate({ prefix: ["pkm", "radar"] })]);
 export const pkmHref = (slug: string, block?: string) => `/pkm/${encodeURIComponent(slug)}${block ? `?b=${encodeURIComponent(block)}` : ""}`;

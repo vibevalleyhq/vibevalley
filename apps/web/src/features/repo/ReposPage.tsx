@@ -2,10 +2,11 @@ import { type Component, createMemo, createSignal, For, Match, Show, Switch, unt
 
 import { t } from "@vibevalley/i18n";
 import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 
 import { useNow } from "#/base/dom.tsx";
 import { api } from "#/infra/api.ts";
-import { ready, useRepos, useQuery } from "#/infra/query.ts";
+import { defineQuery, retryRead, ready, useRepos, useQuery } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Dialog } from "#/ui/Dialog.tsx";
@@ -18,18 +19,19 @@ import { dateText, type Recency, recencyOf, recencyText, since } from "./calenda
 import { type Asked, CommitCalendar, Hands, Languages, NewRepoForm, Stat } from "./RepoPanels";
 import { languageShares, number, sortRepos } from "./repos";
 
-const useSurvey = (repo: () => string) => ({
-  languages: useQuery(() => ({
-    queryKey: ["repo-languages", repo()],
-    queryFn: () => api.repo.language.list({ id: repo() }),
-    placeholderData: (p: RepoLanguages | undefined) => p,
-  })),
-  activity: useQuery(() => ({
-    queryKey: ["repo-activity", repo()],
-    queryFn: () => api.repo.activity.get({ id: repo() }),
-    placeholderData: (p: RepoActivity | undefined) => p,
-  })),
+const languagesQuery = defineQuery({
+  schema: S.RepoLanguages,
+  key: (id: string) => ["repo-languages", id],
+  fetch: (id, context) => api.repo.language.list({ id }, context),
+  ...retryRead,
 });
+const activityQuery = defineQuery({
+  schema: S.RepoActivity,
+  key: (id: string) => ["repo-activity", id],
+  fetch: (id, context) => api.repo.activity.get({ id }, context),
+  ...retryRead,
+});
+const useSurvey = (repo: () => string) => ({ languages: useQuery(() => languagesQuery(repo())), activity: useQuery(() => activityQuery(repo())) });
 
 /** What a skin draws on this page; app/ hands it in, since a feature never reads a skin. */
 export interface ReposSkin {
@@ -184,8 +186,8 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
     const count = languageCount();
     return count !== undefined ? t("web.repo.kinds", { n: count }) : notCounted() ? t("web.repo.uncounted") : "…";
   };
-  const busy = () => props.languages.isFetching || props.activity.isFetching;
-  const notCounted = () => !!props.languages.error;
+  const busy = () => props.languages.fetching() || props.activity.fetching();
+  const notCounted = () => !!props.languages.error();
   return (
     <section class="flex flex-wrap items-center gap-4 rounded-lg border border-line bg-page p-4">
       <span class="flex size-24 shrink-0 items-center justify-center rounded-lg bg-hover">
@@ -225,8 +227,7 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
           aria-label={t("web.repo.recount")}
           disabled={busy()}
           onClick={() => {
-            void props.languages.refetch();
-            void props.activity.refetch();
+            void Promise.allSettled([props.languages.refetch(), props.activity.refetch()]);
           }}
           class="cursor-pointer rounded-md border border-line p-1.5 hover:bg-hover disabled:opacity-50"
         >
