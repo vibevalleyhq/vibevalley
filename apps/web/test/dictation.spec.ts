@@ -1,7 +1,23 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 
-import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
+
+import { expect, test, settled } from "./fixtures";
+
+async function countAudio(page: Page) {
+  await page.addInitScript(() => {
+    const Real = AudioWorkletNode;
+    window.heard = 0;
+    window.AudioWorkletNode = class extends Real {
+      constructor(...a: ConstructorParameters<typeof AudioWorkletNode>) {
+        super(...a);
+        this.port.addEventListener("message", () => (window.heard = (window.heard ?? 0) + 1));
+      }
+    };
+    localStorage.setItem("vibevalley.title.seen", "true");
+  });
+}
 
 const said = "hello there";
 
@@ -26,18 +42,7 @@ test("dictation records the microphone as 16 kHz WAV and puts the words in the f
   try {
     const { port } = transcriber.address() as AddressInfo;
     await api.setting.update({ dictation: { via: "own", url: `http://127.0.0.1:${port}/v1`, model: "whisper" } });
-    // What the capture worklet hands the page is counted, so the recording stops once there is something to send.
-    await page.addInitScript(() => {
-      const Real = AudioWorkletNode;
-      window.heard = 0;
-      window.AudioWorkletNode = class extends Real {
-        constructor(...a: ConstructorParameters<typeof AudioWorkletNode>) {
-          super(...a);
-          this.port.addEventListener("message", () => (window.heard = (window.heard ?? 0) + 1));
-        }
-      };
-      localStorage.setItem("vibevalley.title.seen", "true");
-    });
+    await countAudio(page);
     await page.goto("/chat");
     const dictate = page.getByTestId("dictate");
     await expect(dictate).toBeEnabled();
@@ -77,3 +82,42 @@ test("Esc while the box listens drops the recording: nothing is sent and the box
   await expect(page.getByTestId("dictation-problem")).toBeHidden();
   await expect(page.getByTestId("send")).toBeVisible();
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`dictation failure preserves the draft in ${theme} on a narrow screen`, async ({ page, api }, info) => {
+    let uploads = 0;
+    const transcriber = createServer((req, res) => {
+      req.resume();
+      req.on("end", () => {
+        uploads++;
+        res.writeHead(503, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: { message: "local transcription fixture unavailable" } }));
+      });
+    });
+    await new Promise<void>((resolve) => transcriber.listen(0, "127.0.0.1", resolve));
+    try {
+      const address = transcriber.address();
+      if (address === null || typeof address === "string") throw new Error("fixture did not bind a port");
+      await api.setting.update({ dictation: { via: "own", url: `http://127.0.0.1:${address.port}/v1`, model: "fixture" } });
+      await countAudio(page);
+      await page.addInitScript((theme) => localStorage.setItem("vibevalley.prefs", JSON.stringify({ theme })), theme);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/chat");
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      const input = page.getByTestId("composer-input");
+      await input.fill("preserved draft");
+      const dictate = page.getByTestId("dictate");
+      await dictate.click();
+      await expect.poll(() => page.evaluate(() => window.heard ?? 0)).toBeGreaterThan(2);
+      await dictate.click();
+      await expect(page.getByTestId("dictation-problem")).toBeVisible();
+      await expect(input).toHaveValue("preserved draft");
+      expect(uploads).toBe(1);
+      await settled(page);
+      await page.screenshot({ path: info.outputPath(`dictation-${theme}-390.png`), fullPage: true });
+    } finally {
+      transcriber.closeAllConnections();
+      transcriber.close();
+    }
+  });
+}

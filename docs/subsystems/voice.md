@@ -17,11 +17,12 @@
 
 | 位置 | 职责 |
 |---|---|
-| [`packages/voice/`](packages/voice/README.md) | 独立语音引擎与协议适配包（`@vibevalley/voice`）：MOSS Live 帧 Schema、播放时钟 `Playback`、双向中继 `relay`、握手校验 `verifyMoss`、WAV 编码与 `/audio/transcriptions` 转写 `transcribeAudio`、声网 ConvoAI 与字幕分片重组 `LiveCaptions` |
+| [`packages/provider/`](packages/provider/README.md) | 显式转写模型、MOSS 帧与鉴权连接、Agora SDK/RTC token、字幕分片；无应用设置、业务工具或 UI |
+| [`packages/ai/`](packages/ai/README.md) | Core 转写调用、WAV/RMS、MOSS 会话与 `Playback` 样本级打断对账；浏览器入口不加载服务端模型工厂 |
 | `apps/server/src/voice/voice.ts` | 农场侧薄消费层：绑定 `Setting`、`Orchestrator`、`Channel`、`Inbox`、`Ingress`、`Core`，管理 RTC 授予与通话内 `speak` |
 | `apps/server/src/voice/line.ts` | 语音线路（`8788` 回环监听）与 `cloudflared` 隧道管理 |
 | `apps/server/src/setting/voice.ts` | 语音默认配置 `defaultVoice`、校验 `voiceProblem` 与差异提取 `voiceOverrides` |
-| `apps/web/src/features/voice/` | 浏览器侧薄消费层与 UI：`call.ts`、`dictation.ts`、`mossLine.ts`（消费 `@vibevalley/voice`）、`DictationButton.tsx`、`VoiceForm.tsx`、`MossPlayground.tsx` |
+| `apps/web/src/features/voice/` | `call.ts`、`dictation.ts`、`moss-line.ts` 管设备与宿主，`moss-worker.ts`/`moss-worklets.ts` 保持 PCM 绕开 UI 主线程；`captions.ts` 管展示轮次，`contract.ts` 定义应用会话接口；表单与 playground 留在此处 |
 | `apps/mobile/src/rtc.ts` | 手机壳原生声网 RTC 适配（锁屏不断线） |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`voice.*` 及 `GET /api/v1/voice/moss/line`）。

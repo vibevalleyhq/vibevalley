@@ -13,6 +13,8 @@ packages:
 catalogMode: strict
 
 catalog:
+  "@ai-sdk/provider": "4.0.36"
+  ai: "7.0.164"
   "@formatjs/intl-getcanonicallocales": "3.3.0"
   "@formatjs/intl-locale": "5.4.2"
   "@formatjs/intl-pluralrules": "7.0.2"
@@ -206,6 +208,8 @@ minimumReleaseAgeExclude:
   - "@tsrs/linux-x64-musl@0.21.0-ts7.1.0-beta"
   - "@tsrs/win32-x64@0.21.0-ts7.1.0-beta"
   - tsrs@0.21.0-ts7.1.0-beta
+  - "@ai-sdk/gateway@4.0.137"
+  - ai@7.0.164
 
 # effect-tsgo looks up every integration before any command and stops at one it cannot resolve: here oxlint-tsgolint
 # through vite-plus is packages/tsrs, which has no tsgolint binary. Drop this once @effect/tsgo skips it on its own.

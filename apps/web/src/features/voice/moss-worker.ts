@@ -1,13 +1,7 @@
-import { decodeMossFrame, levelOf, unpackPcm16 } from "./protocol.ts";
+import { pcm16RmsLevel as levelOf } from "@vibevalley/ai/audio";
+import { decodeMossFrame, unpackPcm16 } from "@vibevalley/provider/moss";
 
-/**
- * Dedicated Web Worker script (`mossRelayWorkerCode`):
- * - Owns the `WebSocket` connection to `/api/v1/voice/moss/line`.
- * - Connects directly to `CaptureWorklet` and `PlaybackWorklet` via transferred `MessagePort`s.
- * - Uplink 641-byte `tagged-v1` frames flow `CaptureWorklet -> Worker -> WebSocket` without touching the UI main thread.
- * - Downlink 48 kHz PCM `ArrayBuffer` chunks flow `WebSocket -> Worker -> PlaybackWorklet` via zero-copy transferable buffers,
- *   while only lightweight numeric metadata (`byteLength`, `samples`, `level`, `bufferedAmount`) goes to the UI main thread.
- */
+// Only metadata reaches the UI thread; PCM transfers directly between the socket and the audio ports.
 const mossRelayWorkerCode = `
 let ws = null;
 let opened = false;
@@ -168,10 +162,6 @@ function isObject(value: unknown): value is { readonly [key: string]: unknown } 
   return typeof value === "object" && value !== null;
 }
 
-/**
- * Spawns a dedicated Web Worker (or falls back to in-process WebSocket if Worker is unavailable)
- * to run the MOSS WebSocket and connect directly to the Capture and Playback AudioWorklets.
- */
 export function openMossRelayBridge(url: string, handlers: MossRelayHandlers): MossRelayBridge {
   if (typeof Worker !== "undefined" && typeof Blob !== "undefined" && typeof URL.createObjectURL === "function") {
     workerBlobUrl ??= URL.createObjectURL(new Blob([mossRelayWorkerCode], { type: "text/javascript" }));
@@ -238,7 +228,6 @@ export function openMossRelayBridge(url: string, handlers: MossRelayHandlers): M
     };
   }
 
-  // Fallback when Web Worker is not available in the current environment.
   const ws = new WebSocket(url);
   ws.binaryType = "arraybuffer";
   let opened = false;

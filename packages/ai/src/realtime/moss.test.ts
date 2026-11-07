@@ -1,76 +1,10 @@
-import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { describe, expect, it } from "vite-plus/test";
 
-import { type MossEvents, type MossTransport, verifyMoss } from "./moss-server.ts";
-import {
-  heard,
-  levelOf,
-  mossAudioTag,
-  MossEngine,
-  mossFrameSamples,
-  mossTaggedFrameBytes,
-  type MossTurn,
-  Playback,
-  packTaggedAudio,
-  unpackPcm16,
-} from "./moss.ts";
+import { mossAudioTag, mossFrameSamples, mossTaggedFrameBytes, packTaggedAudio, unpackPcm16 } from "@vibevalley/provider/moss";
 
-/** A MOSS that answers the way script says, after the socket opens; status is what plain HTTPS answers. */
-const fake = (script: (on: MossEvents, sent: string[]) => void, status: MossTransport["status"] = () => Effect.succeed({ code: 400, body: "" })) => {
-  const log = { sent: [] as string[], closed: 0, asked: 0 };
-  const transport: MossTransport = {
-    connect: (_key, on) => {
-      queueMicrotask(() => script(on, log.sent));
-      return { send: (frame) => log.sent.push(typeof frame === "string" ? frame : "<binary>"), close: () => log.closed++ };
-    },
-    status: (key) => {
-      log.asked++;
-      return status(key);
-    },
-  };
-  return { transport, log };
-};
-
-describe("checking a MOSS Live key", () => {
-  it.effect("attaches a session, closes it at once, and asks nothing more", () =>
-    Effect.gen(function* () {
-      const { transport, log } = fake((on, sent) => {
-        on.open();
-        if (sent.includes(JSON.stringify({ action: "attach_session" }))) on.text(JSON.stringify({ action: "session_attached", data: { session_id: "s1" } }));
-      });
-      expect(yield* verifyMoss("sk-good", transport)).toEqual({ kind: "ok" });
-      expect([log.closed, log.asked]).toEqual([1, 0]);
-    }),
-  );
-
-  it.effect("says a refused key is refused, from what plain HTTPS answers", () =>
-    Effect.gen(function* () {
-      const body = JSON.stringify({ error: { type: "permission_error", message: "iam api key auth failed" } });
-      const { transport } = fake(
-        (on) => on.down(""),
-        () => Effect.succeed({ code: 403, body }),
-      );
-      expect(yield* verifyMoss("sk-bad", transport)).toEqual({ kind: "refused", why: "iam api key auth failed" });
-    }),
-  );
-
-  it.effect("tells unreachable from refused, and passes on MOSS's own error", () =>
-    Effect.gen(function* () {
-      const offline = fake(
-        (on) => on.down(""),
-        () => Effect.fail("Error: getaddrinfo ENOTFOUND api.mosi.cn"),
-      );
-      expect((yield* verifyMoss("sk-x", offline.transport)).kind).toBe("unreachable");
-      const erring = fake((on) => {
-        on.open();
-        on.text(
-          JSON.stringify({ action: "error", data: { type: "error", error: { code: "invalid_public_request", message: "invalid or unsupported request" } } }),
-        );
-      });
-      expect(yield* verifyMoss("sk-x", erring.transport)).toEqual({ kind: "failed", why: "invalid or unsupported request" });
-    }),
-  );
-});
+import { heard, levelOf, type MossTurn } from "./moss-session.ts";
+import { MossEngine } from "./moss.ts";
+import { Playback } from "./playback.ts";
 
 describe("heard", () => {
   it("revises a turn's words in place and starts a line for the next turn", () => {
@@ -241,23 +175,5 @@ describe("MossEngine end-to-end session state machine", () => {
       turn_id: "t1",
       played_audio_ms: 50,
     });
-  });
-
-  it("extracts ask_orchestrator tool calls from MOSS frames", async () => {
-    const { extractMossToolCall } = await import("./moss.ts");
-    const frame = JSON.stringify({
-      action: "response.function_call_arguments.done",
-      data: {
-        call_id: "call-1",
-        name: "ask_orchestrator",
-        arguments: JSON.stringify({ question: "地里有哪些帮工在忙？" }),
-      },
-    });
-    expect(extractMossToolCall(frame)).toEqual({
-      callId: "call-1",
-      name: "ask_orchestrator",
-      question: "地里有哪些帮工在忙？",
-    });
-    expect(extractMossToolCall(JSON.stringify({ action: "session_attached" }))).toBeUndefined();
   });
 });

@@ -1,13 +1,6 @@
-import { mossAudioTag, mossFrameSamples, mossTaggedFrameBytes } from "./protocol.ts";
+import { mossAudioTag, mossFrameSamples, mossTaggedFrameBytes } from "@vibevalley/provider/moss";
 
-/**
- * Microphone capture AudioWorkletProcessor ("vibevalley-moss-capture"):
- * - Runs at 16 kHz on the WebAudio rendering thread.
- * - Slices incoming Float32 samples into 320-sample (20 ms) frames.
- * - Computes RMS loudness (0..100) and packs the 641-byte `tagged-v1` binary frame directly on the audio thread.
- * - If connected to the transport Worker via `{ type: "connect", port }`, transfers `{ type: "mic_frame", frame, level }`
- *   straight to the Worker port without waking the UI main thread; otherwise posts raw PCM buffers to `this.port`.
- */
+// MOSS requires 320 samples per tagged-v1 frame, including silence while muted.
 export const mossCaptureWorkletCode = `registerProcessor("vibevalley-moss-capture", class extends AudioWorkletProcessor {
   pcm = new Int16Array(${mossFrameSamples});
   at = 0;
@@ -54,12 +47,7 @@ export const mossCaptureWorkletCode = `registerProcessor("vibevalley-moss-captur
   }
 });`;
 
-/**
- * Speaker ring-buffer playback AudioWorkletProcessor ("vibevalley-moss-playback"):
- * - Runs at 48 kHz on the WebAudio rendering thread.
- * - Queues 16-bit PCM chunks sent from the transport Worker (or main thread) and converts Int16 -> Float32 in-place.
- * - Reports exact sample-accurate `chunk_ended` events and flushes immediately on `cut` with exact `partialMs` played.
- */
+// Cut acknowledgements use consumed samples, not queued duration.
 export const mossPlaybackWorkletCode = `registerProcessor("vibevalley-moss-playback", class extends AudioWorkletProcessor {
   queue = [];
   bufferedSamples = 0;

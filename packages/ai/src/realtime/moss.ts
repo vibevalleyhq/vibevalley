@@ -1,19 +1,7 @@
+import { decodeMossFrame, mossOutRate, packTaggedAudio, unpackPcm16 } from "@vibevalley/provider/moss";
+
+import { heard, levelOf, type MossEvent, type MossPhase, type MossQos, type MossSetup, type MossTurn, noQos, noisyMossActions } from "./moss-session.ts";
 import { type Piece, Playback, type PlaybackAction, type Queued } from "./playback.ts";
-import {
-  decodeMossFrame,
-  heard,
-  levelOf,
-  type MossEvent,
-  mossOutRate,
-  type MossPhase,
-  type MossQos,
-  type MossSetup,
-  type MossTurn,
-  noQos,
-  noisyMossActions,
-  packTaggedAudio,
-  unpackPcm16,
-} from "./protocol.ts";
 
 export type MossOutboundAction =
   | PlaybackAction

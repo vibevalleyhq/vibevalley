@@ -1,20 +1,16 @@
+import { MossEngine } from "@vibevalley/ai/realtime/moss";
+import { type MossEvent, type MossMessages, type MossPhase, type MossQos, type MossSetup, type MossTurn, noQos } from "@vibevalley/ai/realtime/moss-session";
 import { mossLinePath } from "@vibevalley/protocol";
+import { mossInRate, mossOutRate } from "@vibevalley/provider/moss";
 
-import type { VoiceDriver } from "../core/contract.ts";
-import { MossEngine } from "./engine.ts";
-import { type MossEvent, mossInRate, type MossMessages, mossOutRate, type MossPhase, type MossQos, type MossSetup, type MossTurn, noQos } from "./protocol.ts";
-import { openMossRelayBridge, type MossRelayBridge } from "./worker.ts";
-import { mossCaptureWorkletCode, mossPlaybackWorkletCode } from "./worklets.ts";
+import type { VoiceDriver } from "./contract.ts";
+import { openMossRelayBridge, type MossRelayBridge } from "./moss-worker.ts";
+import { mossCaptureWorkletCode, mossPlaybackWorkletCode } from "./moss-worklets.ts";
 
 let captureUrl: string | undefined;
 let playbackUrl: string | undefined;
 
-/**
- * Thin reactive MOSS Live controller implementing the unified `VoiceDriver` contract:
- * - Delegates all protocol framing, playback progress accounting, and transcript assembly to `MossEngine`.
- * - Connects `CaptureWorklet` (16 kHz) and `PlaybackWorklet` (48 kHz ring buffer) directly to the `MossRelayBridge`
- *   Web Worker via `MessageChannel` ports so zero audio bytes pass through the UI main thread.
- */
+// Transfer audio ports directly: PCM must not pass through the UI thread.
 export class MossLine implements VoiceDriver<MossSetup, "owner" | "moss"> {
   phase: MossPhase = "idle";
   problem: string | undefined = undefined;
