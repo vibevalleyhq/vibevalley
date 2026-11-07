@@ -69,6 +69,7 @@
 
 ## 还没做的
 
+- 授权、责任、恢复与交付共同约束提示词：[让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)。
 - 按档案配 `toolsets`、管家加载技能与 `/` 调用：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
 - 按动作分档授权与跨轮同意：[管家的授权](.agents/notes/proposed/feature/2026-10-21-orchestrator-authorization.md)。
 - 仓库健康度、早报、工单关系与分拣建议：[管家给主人报告](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)。

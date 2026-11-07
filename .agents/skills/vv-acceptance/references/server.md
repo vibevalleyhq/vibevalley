@@ -63,7 +63,7 @@
 set -eu
 vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
 vv runtime list --format json
-vv project create acceptance --format json
+vv repo create acceptance --format json
 agent_id=$(vv agent create acceptance --runtime codex --format json | jq -r .id)
 vv agent list --format json | jq --arg id "$agent_id" '.[] | select(.id == $id) | .mcpServers=[{type:"http",name:"acceptance-broken",url:"http://127.0.0.1:1/mcp",headers:{}}]' > "$VIBEVALLEY_HOME/agent.json"
 curl --noproxy '*' -fsS -H 'Content-Type: application/json' --data-binary "@$VIBEVALLEY_HOME/agent.json" "$VIBEVALLEY_SERVER/api/v1/agent/update"
@@ -75,7 +75,7 @@ invalid_code=$?
 set -e
 echo "invalid credential exit=$invalid_code"
 test "$invalid_code" -ne 0
-vv issue create 'Verify isolated worker access' --project acceptance --agent "$agent_id" --description 'This is an authorized acceptance test. Do not edit code or commit. Use the absolute required worker CLI from your launch instructions. Run doctor, then print only NO_PROXY and no_proxy (no other environment variables). Check both contain 127.0.0.1,localhost,::1. Call the worker CLI report with {"summary":"isolated worker CLI acceptance passed","prSubmit":false,"checks":[{"criterion":0,"result":"met","proof":"doctor returned 0 and both loopback bypass variables include required hosts"}]}. Do not call MCP tools; this verifies the independent CLI. Do not launch other agents.' --format json
+vv issue create 'Verify isolated worker access' --repo acceptance --agent "$agent_id" --description 'This is an authorized acceptance test. Do not edit code or commit. Use the absolute required worker CLI from your launch instructions. Run doctor, then print only NO_PROXY and no_proxy (no other environment variables). Check both contain 127.0.0.1,localhost,::1. Call the worker CLI report with {"summary":"isolated worker CLI acceptance passed","prSubmit":false,"checks":[{"criterion":0,"result":"met","proof":"doctor returned 0 and both loopback bypass variables include required hosts"}]}. Do not call MCP tools; this verifies the independent CLI. Do not launch other agents.' --format json
 vv issue status 1 todo --format json
 vv issue watch 1 --jsonl
 vv issue show 1 --format json

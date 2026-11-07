@@ -140,4 +140,4 @@ The observer replays retained records from `afterSeq: -1`, then reads live recor
 
 派工前先确认 CLI 可执行，再以该会话凭证运行只读 `doctor` 认证请求；任何一步失败都拒绝启动。该探测证明服务端至 CLI 的认证链路，帮工仍须在自己的 shell 中先运行 `doctor`，失败报告阻塞。可选 MCP 的连接状态独立观察，没有证据仍是 unknown。
 
-`session/worker.ts` 是进程、凭证文件与认证探测的外部边界；普通模块测试通过 `WorkerAccess` 替换此边界，集成测试运行真实 CLI 与 HTTP。MCP 的异常与错误结果均带 `isError`；CLI 据此非零退出，不匹配本地化文案，服务器拒绝原因脱敏后限制为 8000 字符。命令参数见 [CLI](apps/cli/README.md#帮工会话命令)。
+`session/worker.ts` 是进程、凭证文件与认证探测的外部边界；源码使用绝对 Node、Vite+ 加载器和 `apps/cli/src/worker.ts`，打包后使用同级 CLI 包的 `dist/worker.mjs`。两个入口都应通过同一会话认证门槛；仅源码测试不能证明桌面包可派工。普通模块测试通过 `WorkerAccess` 替换此边界，集成测试运行真实 CLI 与 HTTP。MCP 的异常与错误结果均带 `isError`；CLI 据此非零退出，不匹配本地化文案，服务器拒绝原因脱敏后限制为 8000 字符。命令参数见 [CLI](apps/cli/README.md#帮工会话命令)。
