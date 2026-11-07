@@ -824,17 +824,17 @@ function apiVerb(callee: ESTree.Node): string | undefined {
   return at.type === "Identifier" && at.name === "api" ? callee.property.name : undefined;
 }
 
-const isRunOf = (call: unknown, fn: object): boolean => {
+const isActionOf = (call: unknown, fn: object): boolean => {
   if (typeof call !== "object" || call === null || !("type" in call) || call.type !== "CallExpression") return false;
   if (!("arguments" in call) || !Array.isArray(call.arguments) || !call.arguments.includes(fn) || !("callee" in call)) return false;
   const callee = call.callee;
   if (typeof callee !== "object" || callee === null || !("type" in callee) || callee.type !== "MemberExpression" || !("property" in callee)) return false;
   const property = callee.property;
-  return typeof property === "object" && property !== null && "name" in property && property.name === "run";
+  return typeof property === "object" && property !== null && "name" in property && (property.name === "run" || property.name === "attempt");
 };
 
-function insideRun(node: { parent?: unknown }): boolean {
-  for (let owner = ownerOf(node); owner; owner = ownerOf(owner.fn)) if (isRunOf(owner.parent, owner.fn)) return true;
+function insideAction(node: { parent?: unknown }): boolean {
+  for (let owner = ownerOf(node); owner; owner = ownerOf(owner.fn)) if (isActionOf(owner.parent, owner.fn)) return true;
   return false;
 }
 
@@ -843,7 +843,7 @@ const actDoor = defineRule({
     messages: {
       act: says(
         "`api.{{call}}` changes something on the server straight from a component: it has no busy, no refusal in the error tone, and goes out while the state stream is lost",
-        "hand it to an Act (`const act = createAct()` from ui/act.ts, `createPixelAct()` in a skin; `act.run(() => api.{{call}}(…))`), or, when the page shows the change before the server has it, send it through an intent defined in the feature's .ts (`defineIntent`, state/intent.ts) with an overlay of its own",
+        "hand it to an Act (`const act = createAct()` from ui/act.ts, `createPixelAct()` in a skin; `act.run(() => api.{{call}}(…))`, or `act.attempt(…)` for an explicit receipt), or, when the page shows the change before the server has it, send it through an intent defined in the feature's .ts (`defineIntent`, state/intent.ts) with an overlay of its own",
         "apps/web/src/ui/act.ts",
       ),
     },
@@ -852,7 +852,7 @@ const actDoor = defineRule({
     return {
       CallExpression(node) {
         const verb = apiVerb(node.callee);
-        if (verb === undefined || readVerbs.has(verb) || verb.startsWith("preview") || insideRun(node)) return;
+        if (verb === undefined || readVerbs.has(verb) || verb.startsWith("preview") || insideAction(node)) return;
         context.report({
           node,
           messageId: "act",

@@ -12,10 +12,11 @@ import {
   type SettingsUpdate,
 } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
 
 import { api, reasonOf } from "#/infra/api.ts";
-import { ready, useQuery, useSettings } from "#/infra/query.ts";
-import { saveSettings } from "#/infra/settings.ts";
+import { defineQuery, retryRead, ready, useQuery, useSettings } from "#/infra/query.ts";
+import { useSaveSettings } from "#/infra/settings.ts";
 import { createAct } from "#/ui/act.ts";
 import { TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
@@ -23,9 +24,11 @@ import { IconButton } from "#/ui/IconButton.tsx";
 import { KeyField, SaveBar } from "#/ui/KeyField.tsx";
 import { Quiet, SecretInput, Toggle } from "#/ui/layout.tsx";
 import { Segmented } from "#/ui/Segmented.tsx";
-import { KeyRow, SettingRow, SettingsGroup } from "#/ui/settings.tsx";
+import { SettingRow, SettingsGroup } from "#/ui/settings.tsx";
 import { Hint, Tip } from "#/ui/Tip.tsx";
 import { toast } from "#/ui/toasts.ts";
+
+import { DeepseekForm } from "./DeepseekForm";
 
 type SettingsPart = "deepseek" | "memory";
 
@@ -83,18 +86,23 @@ export function SettingsForm(props: { part: SettingsPart }) {
   const settings = useSettings();
   return (
     <Pick fallback={<Quiet>{t("web.base.form.asking")}</Quiet>}>
-      <Match when={settings.error}>{(e) => <Quiet>{t("web.base.form.unreachable", { why: reasonOf(e()) })}</Quiet>}</Match>
-      <Match when={ready(settings, undefined)}>{(status) => <Form part={props.part} status={untrack(status)} />}</Match>
+      <Match when={settings.error()}>{(e) => <Quiet>{t("web.base.form.unreachable", { why: reasonOf(e()) })}</Quiet>}</Match>
+      <Match when={ready(settings, undefined)}>
+        {(status) => (
+          <Show when={props.part === "deepseek"} fallback={<MemoryForm status={untrack(status)} />}>
+            <DeepseekForm status={untrack(status)} />
+          </Show>
+        )}
+      </Match>
     </Pick>
   );
 }
 
-function Form(props: { part: SettingsPart; status: SettingsStatus }) {
+function MemoryForm(props: { status: SettingsStatus }) {
+  const saveSettings = useSaveSettings();
   // A plain copy: the form starts from it once, and reading the store's fields later would be untracked reads.
   const start = untrack(() => snapshot(props.status));
   const [status, setStatus] = createSignal(start);
-  const [deepseek, setDeepseek] = createSignal("");
-  const [removing, setRemoving] = createSignal(false);
   const [sources, setSources] = createSignal(draftsOf(start));
   const [error, setError] = createSignal<string>();
   const act = createAct(setError);
@@ -102,18 +110,14 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
 
   const setSource = (kind: MemorySourceKind, change: Partial<SourceDraft>, touched = true) =>
     setSources((all) => all.map((d) => (d.kind === kind ? { ...d, ...change, changed: d.changed || touched } : d)));
-  const dirty = () => deepseek().trim() !== "" || removing() || sources().some((d) => d.changed);
+  const dirty = () => sources().some((d) => d.changed);
   const undo = () => {
-    setDeepseek("");
-    setRemoving(false);
     setSources(draftsOf(status()).map((d, i) => ({ ...d, open: sources()[i]?.open ?? false })));
     setError(undefined);
   };
 
   const submit = async () => {
     const update: SettingsUpdate = omitUndefined({
-      // A key removed and not typed again goes as "" (the server forgets it).
-      deepseekApiKey: deepseek().trim() ? deepseek().trim() : removing() ? "" : undefined,
       memorySources: !sources().some((d) => d.changed)
         ? undefined
         : sources()
@@ -133,8 +137,6 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
     await act.run(async () => {
       const now = await saveSettings(update);
       setStatus(now);
-      setDeepseek("");
-      setRemoving(false);
       setSources(draftsOf(now));
       toast(t("web.setting.keys.saved"));
     });
@@ -148,29 +150,11 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
         if (!busy() && dirty()) void submit();
       }}
     >
-      <Show when={props.part === "deepseek"}>
-        <SettingsGroup title="DeepSeek">
-          <KeyRow
-            label="API Key"
-            testid="deepseek-key"
-            hint={t("web.setting.models.deepseekHint")}
-            status={status().deepseekApiKey}
-            value={deepseek()}
-            onInput={setDeepseek}
-            removing={removing()}
-            onRemove={setRemoving}
-            placeholder={t("web.setting.keys.deepseekHint")}
-            link={{ href: "https://platform.deepseek.com/api_keys", label: "platform.deepseek.com" }}
-          />
-        </SettingsGroup>
-      </Show>
-      <Show when={props.part === "memory"}>
-        <SettingsGroup>
-          <For each={sources()} keyed={(d) => d.kind}>
-            {(d) => <SourceField draft={d()} set={(change, touched) => setSource(d().kind, change, touched)} />}
-          </For>
-        </SettingsGroup>
-      </Show>
+      <SettingsGroup>
+        <For each={sources()} keyed={(d) => d.kind}>
+          {(d) => <SourceField draft={d()} set={(change, touched) => setSource(d().kind, change, touched)} />}
+        </For>
+      </SettingsGroup>
       <Show when={dirty() || error()}>
         <SaveBar
           dirty={dirty()}
@@ -292,13 +276,14 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
 }
 
 /** What the server found of gh (github.status); the refresh asks it to look again. */
+const githubQuery = defineQuery({ schema: S.GitHubStatus, key: () => ["github"], fetch: (_: void, context) => api.github.get(context), ...retryRead });
 export function GitHub() {
   const [refreshed, setRefreshed] = createSignal<GitHubStatus>();
   const [error, setError] = createSignal<string>();
   // A refusal shows under the status it was asked about.
   const act = createAct(setError);
   const busy = act.busy;
-  const status = useQuery(() => ({ queryKey: ["github"], queryFn: () => api.github.get() }));
+  const status = useQuery(githubQuery);
   const now = () => refreshed() ?? ready(status, undefined);
   const recheck = () => {
     setError(undefined);
@@ -306,7 +291,7 @@ export function GitHub() {
   };
   return (
     <div class="flex flex-col gap-2">
-      <Pick fallback={<Quiet>{status.error ? t("web.base.form.unreachable", { why: reasonOf(status.error) }) : t("web.base.form.asking")}</Quiet>}>
+      <Pick fallback={<Quiet>{status.error() ? t("web.base.form.unreachable", { why: reasonOf(status.error()) }) : t("web.base.form.asking")}</Quiet>}>
         <Match when={now()}>
           {(s) => (
             <SettingsGroup>
@@ -332,6 +317,7 @@ export function GitHub() {
 
 /** The farm's language: the page's words, what the orchestrator and the helpers answer in, what goes to the chat apps. */
 export function LanguageChoice() {
+  const saveSettings = useSaveSettings();
   const [error, setError] = createSignal<string>();
   const act = createAct(setError);
   const busy = act.busy;

@@ -7,8 +7,7 @@ import { ArchivePanel, OrchestratorMemoryPanel } from "#/features/memory/index.t
 import { TrajectoryLog } from "#/features/session/index.ts";
 import { VoiceForm } from "#/features/voice/index.ts";
 import { useAgent } from "#/infra/agents.ts";
-import { useRouter } from "#/infra/router.ts";
-import { A } from "#/ui/A.tsx";
+import { useRouter, Link as A } from "#/infra/router.ts";
 import { OrchestratorFace } from "#/ui/Face.tsx";
 import { Tabs } from "#/ui/Tabs.tsx";
 

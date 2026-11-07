@@ -7,7 +7,7 @@ import { ConnectorsPage } from "#/features/connector/index.ts";
 import { LanPage } from "#/features/lan/index.ts";
 import { SkillsPage } from "#/features/runtime/index.ts";
 import { MossPlayground, VoiceForm } from "#/features/voice/index.ts";
-import { A, Navigate } from "#/ui/A.tsx";
+import { Link as A, Navigate } from "#/infra/router.ts";
 import { TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";

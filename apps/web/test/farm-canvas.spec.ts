@@ -1,68 +1,12 @@
-import type { Page } from "@playwright/test";
-
-import type { StateFrame, SessionView } from "@vibevalley/protocol";
-import { readStream, statePath } from "@vibevalley/protocol";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
-
 import { expect, test } from "./fixtures";
+
+test.use({ farm: "farm-canvas" });
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
 });
 
-async function firstFrame(url: string): Promise<StateFrame> {
-  const abort = new AbortController();
-  return new Promise<StateFrame>((resolve, reject) => {
-    readStream(url, statePath, (f) => (resolve(f), abort.abort()), abort.signal).catch((e) => abort.signal.aborted || reject(e));
-  });
-}
-
-const helper = (id: string, station: number, phase: SessionView["phase"], crop: string): { session: SessionView; crop: string; station: number } => ({
-  session: {
-    id: sessionId(id),
-    role: "worker",
-    name: `帮工${id}`,
-    agent: `agent-${id}`,
-    runtime: "nobody",
-    brief: "",
-    hiredAt: 0,
-    runs: 1,
-    phase,
-    refining: false,
-    phaseText: "",
-    issue: issueId(`issue-${id}`),
-  },
-  crop,
-  station,
-});
-
-/** The real frame with four helpers: one hands-on at its plot, one reading at the library, one ripe, one withered. */
-function withHelpers(frame: StateFrame): StateFrame {
-  const doing = (action: string) => ({ _tag: "working", since: 0, doing: { action, label: action } }) as SessionView["phase"];
-  const helpers = [
-    helper("a", 0, doing("edit_file"), "leafy"),
-    helper("b", 1, doing("read_file"), "sprout"),
-    helper("c", 2, { _tag: "done" }, "wheat"),
-    helper("d", 4, { _tag: "resting" }, "withered"),
-  ];
-  return {
-    ...frame,
-    state: { ...frame.state, sessions: helpers.map((h) => h.session) },
-    view: {
-      ...frame.view,
-      plots: Object.fromEntries(helpers.map((h) => [h.session.issue ?? h.session.id, { crop: h.crop } as never])),
-      plays: Object.fromEntries(helpers.map((h) => [h.session.id, { station: h.station, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] }])),
-    },
-  };
-}
-
-async function serveFrame(page: Page, frame: StateFrame) {
-  await page.route("**/api/v1/state", (route) =>
-    route.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: `data: ${JSON.stringify(frame)}\n\n` }),
-  );
-}
-
-test("the village runs for a while without errors", async ({ page }) => {
+test("the village draws at integer scale and runs without rendering errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   page.on("pageerror", (e) => errors.push(e.message));
@@ -70,6 +14,10 @@ test("the village runs for a while without errors", async ({ page }) => {
   await page.clock.install();
   await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
+  const canvas = page.getByTestId("farm").locator("canvas");
+  await expect(canvas).toBeVisible();
+  // 384 art pixels fit three times in the space beside the rail at 1280px.
+  await expect(canvas).toHaveCSS("width", "1152px");
   await page.clock.runFor(1000);
   expect(errors).toEqual([]);
 });
@@ -87,19 +35,4 @@ test("the cursor is the tool's, and says whether it can be used where it points"
   // The watering can on an empty plot: nothing to water.
   await page.keyboard.press("2");
   await expect(village).toHaveCSS("cursor", /water-no/u);
-});
-
-test("helpers walk in, work their plots and the library, and light lanterns at night", async ({ page, server }) => {
-  const frame = withHelpers(await firstFrame(server.url));
-  await serveFrame(page, frame);
-  await page.clock.install();
-  await page.goto("/farm/");
-  await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
-  // From the gate to their places at 42 art pixels a second.
-  await page.clock.fastForward(9000);
-  await page.screenshot({ path: test.info().outputPath("day.png") });
-  await page.goto("/farm?tod=0.95");
-  await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
-  await page.clock.fastForward(9000);
-  await page.screenshot({ path: test.info().outputPath("night.png") });
 });

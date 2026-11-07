@@ -1,30 +1,39 @@
-import { useQueryClient } from "@tanstack/solid-query";
+import { Schema } from "effect";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { list as listed, t } from "@vibevalley/i18n";
 import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 
 import { Keyed } from "#/base/dom.tsx";
 import { matches } from "#/base/search.ts";
 import { api, reasonOf } from "#/infra/api.ts";
-import { ready, useAgents, useQuery, useRuntimes } from "#/infra/query.ts";
-import { useRouter } from "#/infra/router.ts";
-import { A } from "#/ui/A.tsx";
+import { useForm, type Submission } from "#/infra/form.ts";
+import { defineQuery, retryRead, useQueryClient, ready, useAgents, useQuery, useRuntimes } from "#/infra/query.ts";
+import { useRouter, Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
 import { AgentFace } from "#/ui/Face.tsx";
-import { Field, TextArea, TextInput } from "#/ui/Field.tsx";
+import { TextArea, TextInput } from "#/ui/Field.tsx";
+import { Form, FormField, formControl, formMessages } from "#/ui/Form.tsx";
 import { Card, Empty } from "#/ui/layout.tsx";
 import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
 import { runtimeName } from "#/ui/RuntimeBadge.tsx";
 
 import { type InstalledSkill, installedSkills } from "./quota";
+import { SkillInput } from "./skill-form";
 
 const installedPrefix = "installed:";
 const skillPath = (id?: string) => (id === undefined ? "/settings/skills" : `/settings/skills/${encodeURIComponent(id)}`);
 
-export const useSkills = () => useQuery(() => ({ queryKey: ["skills"], queryFn: () => api.skill.list() }));
+const skillsQuery = defineQuery({
+  schema: Schema.mutable(Schema.Array(S.Skill)),
+  key: () => ["skills"],
+  fetch: (_: void, context) => api.skill.list(context),
+  ...retryRead,
+});
+export const useSkills = () => useQuery(skillsQuery);
 
 export function SkillsPage(props: { id?: string | undefined }) {
   const router = useRouter();
@@ -64,10 +73,10 @@ export function SkillsPage(props: { id?: string | undefined }) {
           value={query()}
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
-        <Show when={runtimes.error}>
+        <Show when={runtimes.error()}>
           <p class="px-2 text-xs text-berry">
             {t("web.runtime.library.noRuntimes")}
-            {reasonOf(runtimes.error)}
+            {reasonOf(runtimes.error())}
           </p>
         </Show>
         <h3 class="px-2 pt-2 text-xs font-semibold text-muted">{t("web.runtime.library.installed", { count: count(list().length, installed().length) })}</h3>
@@ -173,31 +182,41 @@ function InstalledCard(props: { skill: InstalledSkill; catalog: readonly Runtime
   );
 }
 
-const empty: Skill = { id: "", name: "", description: "", body: "" };
-const same = (a: Skill, b: Skill) => a.name === b.name && a.description === b.description && a.body === b.body;
+const empty = { name: "", description: "", body: "" };
 
 function SkillEditor(props: { skill?: Skill }) {
   // Keyed by the skill: the draft starts from the one it was opened on.
   const skill = untrack(() => props.skill);
-  const [draft, setDraft] = createSignal(skill ?? empty);
+  let savedId = skill?.id;
   const act = createAct();
   const busy = act.busy;
   const router = useRouter();
   const client = useQueryClient();
   const allAgents = useAgents();
   const agents = () => ready(allAgents, []).filter((a) => skill !== undefined && a.skills.includes(skill.id));
-  const dirty = () => !skill || !same(skill, draft());
-  // Deleting a skill takes it off the profiles that carried it, so both lists come back.
-  const refresh = () => Promise.all([client.invalidateQueries({ queryKey: ["skills"] }), client.invalidateQueries({ queryKey: ["agents"] })]);
-  const save = () => {
-    const body = { ...draft(), name: draft().name.trim() };
-    return act.run(async () => {
-      const saved = skill ? await api.skill.update(body) : await api.skill.create(body);
-      await refresh();
-      setDraft(saved);
-      if (!skill) router.navigate(skillPath(saved.id));
-    });
-  };
+  const refresh = () => Promise.all([client.invalidate({ prefix: ["skills"] }), client.invalidate({ prefix: ["agents"] })]);
+  const form = useForm({
+    schema: SkillInput,
+    defaultValues: skill ? { name: skill.name, description: skill.description, body: skill.body } : empty,
+    messages: formMessages,
+    onSubmit: async (value, attempt): Promise<Submission<Skill>> => {
+      const result = await act.attempt(() => (savedId ? api.skill.update({ ...value, id: savedId }) : api.skill.create({ ...value, id: "" })));
+      if (result.kind === "accepted") {
+        savedId = result.receipt.id;
+        const reset = form.reset(
+          { name: result.receipt.name, description: result.receipt.description, body: result.receipt.body },
+          { ifRevision: attempt.revision },
+        );
+        const savedRevision = untrack(form.revision);
+        await refresh();
+        if (!skill && reset && untrack(form.revision) === savedRevision) router.navigate(skillPath(result.receipt.id));
+      }
+      return result;
+    },
+  });
+  const name = form.field(["name"]);
+  const description = form.field(["description"]);
+  const body = form.field(["body"]);
   const remove = (s: Skill) =>
     act.run(async () => {
       await api.skill.delete({ id: s.id });
@@ -206,71 +225,76 @@ function SkillEditor(props: { skill?: Skill }) {
     });
 
   return (
-    <Card
-      title={draft().name || t("web.runtime.library.newSkill")}
-      class="max-w-3xl"
-      action={
-        <div class="flex flex-wrap items-center gap-2">
-          <Show when={skill}>
-            {(s) => (
-              <ConfirmButton
-                label={t("web.base.form.remove")}
-                question={agents().length > 0 ? t("web.runtime.library.inUse", { n: agents().length }) : t("web.runtime.library.removeIt")}
-                disabled={busy()}
-                testid="delete"
-                onConfirm={() => remove(s())}
-              />
-            )}
-          </Show>
-          <Button tone="primary" data-testid="save" disabled={busy() || !dirty() || !draft().name.trim() || !draft().body.trim()} onClick={() => void save()}>
-            {t("web.base.form.save")}
-          </Button>
-        </div>
-      }
-    >
-      <Field label={t("web.runtime.library.name")}>
-        <TextInput
-          data-testid="skill-name"
-          aria-label={t("web.runtime.library.nameLabel")}
-          placeholder={t("web.runtime.library.nameHint")}
-          value={draft().name}
-          onInput={(e) => setDraft({ ...draft(), name: e.currentTarget.value })}
-        />
-      </Field>
-      <Field label={t("web.runtime.library.when")} hint={t("web.runtime.library.whenHint")}>
-        <TextInput
-          data-testid="skill-description"
-          aria-label={t("web.runtime.library.description")}
-          placeholder={t("web.runtime.library.descriptionHint")}
-          value={draft().description}
-          onInput={(e) => setDraft({ ...draft(), description: e.currentTarget.value })}
-        />
-      </Field>
-      <Field label={t("web.runtime.library.body")} hint={t("web.runtime.library.bodyHint")}>
-        <TextArea
-          data-testid="skill-body"
-          aria-label={t("web.runtime.library.body")}
-          rows={14}
-          placeholder={t("web.runtime.library.bodyExample")}
-          value={draft().body}
-          onInput={(e) => setDraft({ ...draft(), body: e.currentTarget.value })}
-        />
-      </Field>
-      <div data-testid="skill-users" data-count={agents().length} class="flex flex-col gap-1.5">
-        <span class="text-xs font-medium text-muted">{t("web.runtime.library.who")}</span>
-        <Show when={agents().length > 0} fallback={<p class="text-xs text-muted">{t("web.runtime.library.nobody")}</p>}>
-          <div class="flex flex-wrap gap-2">
-            <For each={agents()}>
-              {(a) => (
-                <A href={`/agents/${encodeURIComponent(a.id)}`} class="flex items-center gap-1.5 rounded-md bg-hover py-1 pr-3 pl-1 hover:bg-selected">
-                  <AgentFace agentId={a.id} runtime={a.runtime} look={a.look} size={26} />
-                  <span class="text-sm font-medium">{a.name}</span>
-                </A>
+    <Form form={form} testid="skill-form">
+      <Card
+        title={name.value() || t("web.runtime.library.newSkill")}
+        class="max-w-3xl"
+        action={
+          <div class="flex flex-wrap items-center gap-2">
+            <Show when={skill}>
+              {(s) => (
+                <ConfirmButton
+                  label={t("web.base.form.remove")}
+                  question={agents().length > 0 ? t("web.runtime.library.inUse", { n: agents().length }) : t("web.runtime.library.removeIt")}
+                  disabled={busy()}
+                  testid="delete"
+                  onConfirm={() => remove(s())}
+                />
               )}
-            </For>
+            </Show>
+            <Button type="submit" tone="primary" data-testid="save" disabled={busy() || form.submitting() || !form.dirty()}>
+              {t("web.base.form.save")}
+            </Button>
           </div>
-        </Show>
-      </div>
-    </Card>
+        }
+      >
+        <FormField field={name} label={t("web.runtime.library.name")}>
+          <TextInput
+            data-testid="skill-name"
+            aria-label={t("web.runtime.library.nameLabel")}
+            placeholder={t("web.runtime.library.nameHint")}
+            {...formControl(name)}
+            value={name.value()}
+            onInput={(e) => name.setValue(e.currentTarget.value)}
+          />
+        </FormField>
+        <FormField field={description} label={t("web.runtime.library.when")} hint={t("web.runtime.library.whenHint")}>
+          <TextInput
+            data-testid="skill-description"
+            aria-label={t("web.runtime.library.description")}
+            placeholder={t("web.runtime.library.descriptionHint")}
+            {...formControl(description)}
+            value={description.value()}
+            onInput={(e) => description.setValue(e.currentTarget.value)}
+          />
+        </FormField>
+        <FormField field={body} label={t("web.runtime.library.body")} hint={t("web.runtime.library.bodyHint")}>
+          <TextArea
+            data-testid="skill-body"
+            aria-label={t("web.runtime.library.body")}
+            rows={14}
+            placeholder={t("web.runtime.library.bodyExample")}
+            {...formControl(body)}
+            value={body.value()}
+            onInput={(e) => body.setValue(e.currentTarget.value)}
+          />
+        </FormField>
+        <div data-testid="skill-users" data-count={agents().length} class="flex flex-col gap-1.5">
+          <span class="text-xs font-medium text-muted">{t("web.runtime.library.who")}</span>
+          <Show when={agents().length > 0} fallback={<p class="text-xs text-muted">{t("web.runtime.library.nobody")}</p>}>
+            <div class="flex flex-wrap gap-2">
+              <For each={agents()}>
+                {(a) => (
+                  <A href={`/agents/${encodeURIComponent(a.id)}`} class="flex items-center gap-1.5 rounded-md bg-hover py-1 pr-3 pl-1 hover:bg-selected">
+                    <AgentFace agentId={a.id} runtime={a.runtime} look={a.look} size={26} />
+                    <span class="text-sm font-medium">{a.name}</span>
+                  </A>
+                )}
+              </For>
+            </div>
+          </Show>
+        </div>
+      </Card>
+    </Form>
   );
 }

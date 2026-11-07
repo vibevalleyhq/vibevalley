@@ -218,9 +218,6 @@ catalogs:
     '@tailwindcss/vite':
       specifier: ^4.3.4
       version: 4.3.4
-    '@tanstack/solid-query':
-      specifier: 6.0.0-rc.5
-      version: 6.0.0-rc.5
     '@types/node':
       specifier: ^26.6.6
       version: 26.6.6
@@ -656,9 +653,6 @@ importers:
       '@solidjs/web':
         specifier: 'catalog:'
         version: 2.0.0-rc.21(solid-js@2.0.0-rc.21)
-      '@tanstack/solid-query':
-        specifier: 'catalog:'
-        version: 6.0.0-rc.5(@solidjs/web@2.0.0-rc.21(solid-js@2.0.0-rc.21))(solid-js@2.0.0-rc.21)
       '@vibevalley/ai':
         specifier: workspace:*
         version: link:../../packages/ai
@@ -3229,15 +3223,6 @@ packages:
     resolution: {integrity: sha512-wGukGWb8SVuN7+FJvSS7M5eSJWDIWwVSvUvj1q41eTIhGPsS2DAgFWjA7YURJNwjHSgty59Hz8iMUiyO+YMHBQ==}
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
-
-  '@tanstack/query-core@5.101.4':
-    resolution: {integrity: sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw==}
-
-  '@tanstack/solid-query@6.0.0-rc.5':
-    resolution: {integrity: sha512-O9lD2JRgaN2ZS4ROBPL6HLPbPJ4FvnUsVe7j6FSxhE3GI8a5ntZbAj5zrTtmny6rSzhdcBuMB38R53tHIuXJkw==}
-    peerDependencies:
-      '@solidjs/web': '>=2.0.0-rc.13 <3.0.0'
-      solid-js: '>=2.0.0-rc.13 <3.0.0'
 
   '@testing-library/dom@10.4.2':
     resolution: {integrity: sha512-yzr2S9HyAIdhz2/6qHgbs665Q7PKVcDF05vsOlHPxG1mo36gKVesdYVeDLnXgfjJ03CrKRk08knc6+E/9m8v2Q==}
@@ -9680,14 +9665,6 @@ snapshots:
       '@tailwindcss/oxide': 4.3.4
       tailwindcss: 4.3.4
       vite: '@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)'
-
-  '@tanstack/query-core@5.101.4': {}
-
-  '@tanstack/solid-query@6.0.0-rc.5(@solidjs/web@2.0.0-rc.21(solid-js@2.0.0-rc.21))(solid-js@2.0.0-rc.21)':
-    dependencies:
-      '@solidjs/web': 2.0.0-rc.21(solid-js@2.0.0-rc.21)
-      '@tanstack/query-core': 5.101.4
-      solid-js: 2.0.0-rc.21
 
   '@testing-library/dom@10.4.2':
     dependencies:

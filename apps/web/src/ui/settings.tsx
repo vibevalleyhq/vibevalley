@@ -84,6 +84,7 @@ export function KeyRow(props: {
   status: KeyStatus;
   value: string;
   onInput: (value: string) => void;
+  control?: Pick<JSX.InputHTMLAttributes<HTMLInputElement>, "id" | "aria-invalid" | "aria-describedby" | "onBlur">;
   removing: boolean;
   onRemove: (removing: boolean) => void;
   link?: { readonly href: string; readonly label: string };
@@ -96,6 +97,7 @@ export function KeyRow(props: {
       <KeyMark status={props.status} removing={props.removing} />
       <div class={["w-64 max-w-full", { "pointer-events-none opacity-40": props.removing }]}>
         <SecretInput
+          {...props.control}
           data-testid="secret"
           aria-label={props.label}
           placeholder={props.placeholder ?? t("web.base.form.keepEmpty")}

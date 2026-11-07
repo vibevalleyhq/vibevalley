@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import { useQueryClient } from "@tanstack/solid-query";
 import { createMemo, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -10,8 +9,8 @@ import { useSkills } from "#/features/runtime/index.ts";
 import { useAgentProblems, useOrchestrators, useWorkAgents } from "#/infra/agents.ts";
 import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { ready, useRuntimes } from "#/infra/query.ts";
-import { A } from "#/ui/A.tsx";
+import { useQueryClient, ready, useRuntimes } from "#/infra/query.ts";
+import { Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { hexColor } from "#/ui/cast.ts";
 import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
@@ -180,7 +179,7 @@ export function AgentCard(props: {
     return act.run(async () => {
       const latest = (await api.agent.list()).find((a) => a.id === id);
       if (latest) await api.agent.update({ ...latest, enabled: !enabled });
-      await client.invalidateQueries({ queryKey: ["agents"] });
+      await client.invalidate({ prefix: ["agents"] });
     });
   };
   return (

@@ -1,4 +1,3 @@
-import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
@@ -8,7 +7,7 @@ import { githubRepository } from "@vibevalley/protocol/rules";
 import { autofocus } from "#/base/dom.tsx";
 import { useWorkAgents } from "#/infra/agents.ts";
 import { api, reasonOf } from "#/infra/api.ts";
-import { ready } from "#/infra/query.ts";
+import { type QueryResult, useQueryClient, ready } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { AgentFace } from "#/ui/Face.tsx";
@@ -20,7 +19,7 @@ import { Segmented } from "#/ui/Segmented.tsx";
 import { calendarOf, type CalendarDay, dayText, streaksOf } from "./calendar";
 import { langIcon, languageShares, number, percent } from "./repos";
 
-export type Asked<A> = QueryObserverResult<A>;
+export type Asked<A> = QueryResult<A>;
 
 export function Stat(props: { label: string; value: string }) {
   return (
@@ -90,8 +89,8 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
           </>
         }
       >
-        <Match when={props.languages.error && !data()}>
-          <NotCounted reason={reasonOf(props.languages.error)} />
+        <Match when={props.languages.error() && !data()}>
+          <NotCounted reason={reasonOf(props.languages.error())} />
         </Match>
         <Match when={!data()}>
           <div class="h-12 rounded-md bg-hover" />
@@ -144,10 +143,10 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
   };
   return (
     <Show
-      when={!(props.activity.error && !worked())}
+      when={!(props.activity.error() && !worked())}
       fallback={
         <Card title={t("web.repo.calendar")} action={aside()}>
-          <p class="text-sm">{reasonOf(props.activity.error)}</p>
+          <p class="text-sm">{reasonOf(props.activity.error())}</p>
         </Card>
       }
     >
@@ -295,7 +294,7 @@ export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
         return;
       }
       const made = await api.repo.create(request);
-      await client.invalidateQueries({ queryKey: ["repos"] });
+      await client.invalidate({ prefix: ["repos"] });
       done(made);
     });
   };

@@ -1,48 +1,128 @@
-import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
-import { extname, join, normalize } from "node:path";
-
-import AxeBuilder from "@axe-core/playwright";
-
-import { expect, test as base } from "./fixtures";
-
-const types: Record<string, string> = {
-  ".html": "text/html",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-  ".woff2": "font/woff2",
-  ".json": "application/json",
-  ".wasm": "application/wasm",
-};
-
-const test = base.extend<object, { stories: string }>({
-  stories: [
-    async ({ farm: _farm }, use) => {
-      const root = join(process.env.VIBEVALLEY_TEST_OUT!, "stories");
-      const server = createServer((req, res) => {
-        const path = normalize(decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname)).replace(/^(\.\.[/\\])+/u, "");
-        let file = join(root, path);
-        if (!existsSync(file) || statSync(file).isDirectory()) file = join(root, "index.html");
-        res.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream" });
-        createReadStream(file).pipe(res);
-      });
-      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-      await use(`http://127.0.0.1:${(server.address() as AddressInfo).port}`);
-      server.close();
-    },
-    { scope: "worker" },
-  ],
-  baseURL: async ({ stories }, use) => use(stories),
-});
+import { diagnosticsOf } from "./browser";
+import { expect, test } from "./stories-fixtures";
 
 // Wide enough for two frames of a page-sized part side by side, with the tree and the arguments.
 test.use({ viewport: { width: 1680, height: 1000 } });
 
 const key = (k: string) => `[data-testid="story-link"][data-key="${k}"]`;
 const folder = (path: string) => `[data-testid="story-folder"][data-key="${path}"]`;
+
+test("regression: schema routing rejects invalid params and repeated scalar search without falling through", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "交互/路由:Schema", theme: "light", w: "400" })}`);
+  await expect(page.getByTestId("typed-values")).toHaveAttribute("data-id", "1");
+  await page.getByTestId("typed-update").click();
+  await expect(page.getByTestId("typed-values")).toHaveAttribute("data-page", "2");
+  await expect(page.getByTestId("typed-values")).toHaveAttribute("data-tags", "a,b");
+  await expect(page.getByTestId("typed-location")).toHaveText("/typed/1?foreign=keep&page=2&tags=a&tags=b#anchor");
+  await page.getByTestId("typed-bad-param").click();
+  await expect(page.getByTestId("typed-invalid")).toBeVisible();
+  await expect(page.getByTestId("typed-fallback")).toHaveCount(0);
+  await page.getByTestId("typed-bad-search").click();
+  await expect(page.getByTestId("typed-invalid")).toBeVisible();
+  await page.getByTestId("typed-restore").click();
+  await expect(page.getByTestId("typed-values")).toHaveAttribute("data-id", "2");
+  check();
+});
+
+test("regression: owned queries share demand without sharing story clients or previous identities", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "交互/查询:Lifecycle", theme: "both", w: "400" })}`);
+  const first = page.getByTestId("story-frame").first();
+  const second = page.getByTestId("story-frame").nth(1);
+  await expect(first.getByTestId("query-calls")).toHaveText("1");
+  await expect(second.getByTestId("query-calls")).toHaveText("1");
+  await first.getByTestId("query-resolve").click();
+  await expect(first.getByTestId("query-one")).toHaveAttribute("data-current", "1");
+  await expect(first.getByTestId("query-two")).toHaveAttribute("data-current", "1");
+  await expect(second.getByTestId("query-one")).not.toHaveAttribute("data-current");
+  await second.getByTestId("query-invalid").click();
+  await expect(second.getByTestId("query-one")).toHaveAttribute("data-status", "error");
+  await expect(second.getByTestId("query-one")).not.toHaveAttribute("data-current");
+  await second.getByTestId("query-next").click();
+  await expect(second.getByTestId("query-calls")).toHaveText("2");
+  await second.getByTestId("query-resolve").click();
+  await expect(second.getByTestId("query-one")).toHaveAttribute("data-current", "2");
+  await expect(first.getByTestId("query-one")).toHaveAttribute("data-current", "1");
+  await first.getByTestId("query-next").click();
+  await expect(first.getByTestId("query-one")).not.toHaveAttribute("data-current");
+  await expect(first.getByTestId("query-one")).toHaveAttribute("data-previous", "1");
+  await first.getByTestId("query-unmount").click();
+  await expect(first.getByTestId("query-aborts")).toHaveText("0");
+  await first.getByTestId("query-toggle").click();
+  await expect(first.getByTestId("query-aborts")).toHaveText("1");
+  await first.getByTestId("query-resolve").click();
+  await expect(first.getByTestId("query-one")).not.toHaveAttribute("data-current");
+  await first.getByTestId("query-toggle").click();
+  await expect(first.getByTestId("query-calls")).toHaveText("3");
+  await first.getByTestId("query-resolve").click();
+  await expect(first.getByTestId("query-one")).toHaveAttribute("data-current", "2");
+  check();
+});
+
+test("regression: schema form keeps later edits and unknown delivery", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Form:Receipts", theme: "light", w: "400" })}`);
+  const name = page.getByTestId("form-name");
+  await page.getByTestId("form-submit").click();
+  await expect(name).toHaveAttribute("aria-invalid", "true");
+  await expect(name).toBeFocused();
+  await expect(page.getByTestId("form-writes")).toHaveText("0");
+  await name.fill("First");
+  await page.getByTestId("form-submit").click();
+  await expect(page.getByTestId("form-writes")).toHaveText("1");
+  await name.fill("Later edit");
+  await page.getByTestId("form-accepted").click();
+  await expect(name).toHaveValue("Later edit");
+  await expect(page.getByTestId("form-writes")).toHaveAttribute("data-dirty", "true");
+  await page.getByTestId("form-submit").click();
+  await page.getByTestId("form-unknown").click();
+  await expect(page.getByTestId("form-demo").locator("[data-form-summary]")).toBeVisible();
+  await expect(name).toHaveValue("Later edit");
+  await expect(page.getByTestId("form-writes")).toHaveText("2");
+  check();
+});
+
+test("owned table connects sorting, pagination, selection, hiding and filtering to the DOM", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/DataTable:Local", theme: "light", w: "400" })}`);
+  const rows = page.getByTestId("table-row");
+  await expect(rows).toHaveCount(25);
+  await rows.first().getByTestId("table-select-row").click();
+  await expect(page.getByTestId("table-select-page")).toHaveAttribute("aria-checked", "mixed");
+  await page.getByTestId("table-select-page").click();
+  await expect(page.getByTestId("table-selected")).toHaveText("25");
+  await page.locator('[data-testid="table-sort"][data-key="count"]').click();
+  await expect(rows.first()).toHaveAttribute("data-key", "999");
+  await expect(page.locator('th[data-column="count"]')).toHaveAttribute("aria-sort", "ascending");
+  await page.getByTestId("table-next").click();
+  await expect(rows.first()).toHaveAttribute("data-key", "974");
+  await page.locator('[data-testid="table-column"][data-key="count"]').click();
+  await expect(page.locator('th[data-column="count"]')).toHaveCount(0);
+  await page.getByTestId("table-filter").click();
+  await expect(rows).toHaveCount(3);
+  await expect(page.getByTestId("table-selected")).toHaveText("25");
+  check();
+});
+
+test("regression: a remote table never acts on a previous query page", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/DataTable:Remote", theme: "dark", w: "400" })}`);
+  await page.getByTestId("table-deliver").click();
+  await expect(page.getByTestId("data-table")).toHaveAttribute("data-stale", "false");
+  await expect(page.getByTestId("table-row").first()).toHaveAttribute("data-key", "0");
+  await page.getByTestId("table-next").click();
+  await expect(page.getByTestId("data-table")).toHaveAttribute("data-stale", "true");
+  await expect(page.getByTestId("table-row").first()).toHaveAttribute("data-key", "0");
+  await expect(page.getByTestId("table-select-page")).toBeDisabled();
+  await expect(page.getByTestId("data-table").locator("tbody")).toHaveAttribute("inert");
+  await page.getByTestId("table-deliver").click();
+  await expect(page.getByTestId("data-table")).toHaveAttribute("data-stale", "false");
+  await expect(page.getByTestId("table-row").first()).toHaveAttribute("data-key", "2");
+  await page.getByTestId("table-select-page").click();
+  await expect(page.getByTestId("table-selected")).toHaveText("2");
+  check();
+});
 
 test("the viewer opens a story from the address, in folders, and keeps the view in it", async ({ page }) => {
   await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Button:Tones", theme: "dark", w: "400" })}`);
@@ -105,36 +185,57 @@ test("the language comes from the address, before the parts draw", async ({ page
   await expect(page.getByTestId("story-lang").locator('[data-value="en"]')).toHaveAttribute("aria-checked", "true");
 });
 
-// One test per stories file, so they spread over the workers; the titles are read off the files, as the viewer is not
-// loaded here.
-const titles = readdirSync(join(import.meta.dirname, "..", "src"), { recursive: true, encoding: "utf8" })
-  .filter((f) => f.endsWith(".stories.tsx"))
-  .map((f) => /title: "([^"]+)"/u.exec(readFileSync(join(import.meta.dirname, "..", "src", f), "utf8"))?.[1] ?? f);
-
-for (const title of titles)
-  test(`${title}: each story draws in each of its themes with nothing for axe to find`, async ({ page }) => {
-    await page.goto("/");
-    // A search opens every folder it finds something in.
-    await page.getByTestId("stories-search").fill(title);
-    const keys = await page.locator(`[data-testid="story-link"][data-key^="${title}:"]`).evaluateAll((links) => links.map((a) => a.getAttribute("data-key")!));
-    expect(keys.length, `no stories titled ${title}`).toBeGreaterThan(0);
-    const found: string[] = [];
-    for (const key of keys) {
-      await page.goto(`/?${new URLSearchParams({ s: key, theme: "both", w: "full" })}`);
-      await expect(page.getByTestId("story-frame").first()).toBeVisible();
-      if ((await page.getByTestId("story-error").count()) !== 0) found.push(`${key}: ${await page.getByTestId("story-error").first().innerText()}`);
-      // Measured once things have moved in; a pulse that never ends is not waited for.
-      await page.evaluate(() =>
-        Promise.all(
-          document
-            .getAnimations()
-            .filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime ?? Infinity))
-            .map((a) => a.finished.catch(() => undefined)),
-        ),
-      );
-      const { violations } = await new AxeBuilder({ page }).include('[data-testid="story-canvas"]').withTags(["wcag2a", "wcag2aa"]).analyze();
-      for (const v of violations)
-        found.push(`${key} ${v.id}: ${v.nodes.map((n) => `${n.target.join(" ")} ${n.any.map((c) => c.message).join(" ")}`).join(", ")}`);
-    }
-    expect(found).toEqual([]);
+test("regression: route instances survive parameter changes and links retain native behavior", async ({ page }) => {
+  const diagnostics: string[] = [];
+  page.on("console", (message) => {
+    if (/\[(STRICT_|REACTIVITY_|NO_OWNER_|REACTIVE_WRITE_)/u.test(message.text())) diagnostics.push(message.text());
   });
+  await page.goto(`/?${new URLSearchParams({ s: "交互/路由:Navigation", theme: "light", w: "full" })}`);
+  const detail = page.getByTestId("router-detail");
+  const layout = page.getByTestId("router-layout");
+  const originalDetail = await detail.elementHandle();
+  const originalLayout = await layout.elementHandle();
+  await page.getByTestId("router-two").click();
+  await expect(detail).toHaveAttribute("data-key", "two");
+  expect(await detail.evaluate((current, original) => current === original, originalDetail)).toBe(true);
+  await expect(page.getByTestId("router-two")).toHaveAttribute("aria-current", "page");
+  await page.getByTestId("router-prevent").click();
+  await expect(page.getByTestId("router-prevented")).toHaveText("1");
+  await expect(detail).toHaveAttribute("data-key", "two");
+  await page.getByTestId("router-replace").click();
+  await expect(detail).toHaveAttribute("data-key", "replaced");
+  await page.getByTestId("router-back").click();
+  await expect(detail).toHaveAttribute("data-key", "one");
+  await page.getByTestId("router-forward").click();
+  await expect(detail).toHaveAttribute("data-key", "replaced");
+  await page.getByTestId("router-anchor").click();
+  await page.getByTestId("router-search").click();
+  await expect(page.getByTestId("router-location")).toHaveText("/demo/replaced?repo=one&tag=a&tag=b#router-bottom");
+  await page.getByTestId("router-other").click();
+  await expect(page.getByTestId("router-other-page")).toBeVisible();
+  expect(await layout.evaluate((current, original) => current === original, originalLayout)).toBe(true);
+  expect(await originalDetail?.evaluate((element) => element.isConnected)).toBe(false);
+  const popup = page.waitForEvent("popup");
+  await page.getByTestId("router-new").click();
+  await (await popup).close();
+  await expect(page.getByTestId("router-other-page")).toBeVisible();
+  const downloaded = page.waitForEvent("download");
+  await page.getByTestId("router-download").click();
+  await (await downloaded).cancel();
+  await expect(page.getByTestId("router-other-page")).toBeVisible();
+  expect(diagnostics).toEqual([]);
+});
+
+test("regression: runtime model columns use model ids for sorting and visibility", async ({ page }) => {
+  const check = diagnosticsOf(page);
+  await page.goto(`/?${new URLSearchParams({ s: "界面/农机/详情:能用", theme: "light", w: "400" })}`);
+  const table = page.getByTestId("runtime-models");
+  await expect(table.getByTestId("table-row")).toHaveCount(2);
+  await table.locator('[data-testid="table-sort"][data-key="name"]').click();
+  await table.locator('[data-testid="table-sort"][data-key="name"]').click();
+  await expect(table.getByTestId("table-row").first()).toHaveAttribute("data-key", "sonnet");
+  await expect(table.locator('th[data-column="name"]')).toHaveAttribute("aria-sort", "descending");
+  await table.locator('[data-testid="table-column"][data-key="effort"]').click();
+  await expect(table.locator('th[data-column="effort"]')).toHaveCount(0);
+  check();
+});

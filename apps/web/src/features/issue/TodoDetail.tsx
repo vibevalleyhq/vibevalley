@@ -9,7 +9,7 @@ import { ago, wallClockText } from "#/base/format.ts";
 import { IssueArtifacts } from "#/features/artifact/index.ts";
 import { useWorkAgents } from "#/infra/agents.ts";
 import { api } from "#/infra/api.ts";
-import { ready, queries, useRepos } from "#/infra/query.ts";
+import { ready, useQueryClient, useRepos } from "#/infra/query.ts";
 import { useIntents } from "#/state/intent.ts";
 import { rememberPick } from "#/state/prefs.ts";
 import { createAct } from "#/ui/act.ts";
@@ -407,13 +407,14 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
 }
 
 function NewRepoDialog(props: { onClose: () => void; onMade: (name: string) => void }) {
+  const queries = useQueryClient();
   const [name, setName] = createSignal("");
   const act = createAct();
   const make = async () => {
     const wanted = name().trim();
     const made = await act.run(() => api.repo.create({ name: wanted }));
     if (!made) return;
-    await queries.invalidateQueries({ queryKey: ["repos"] });
+    await queries.invalidate({ prefix: ["repos"] });
     props.onMade(made.name);
   };
   return (

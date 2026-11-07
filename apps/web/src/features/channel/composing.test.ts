@@ -1,9 +1,10 @@
-import { createRoot, flush } from "solid-js";
+import { children, createRenderEffect, createRoot, flush, untrack } from "solid-js";
 import type * as solid from "solid-js";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 
 import { api } from "#/infra/api.ts";
 import { frames } from "#/infra/frame.ts";
+import { QueryProvider } from "#/infra/query.ts";
 import { testFrames } from "#/infra/testing.ts";
 import { framesSource, pageRegistry } from "#/state/atom.ts";
 import { type Intent, intentsIn } from "#/state/intent.ts";
@@ -14,7 +15,10 @@ import { followed } from "./follow";
 
 vi.mock("solid-js", () => vi.importActual<typeof solid>("../../../node_modules/solid-js/dist/solid.js"));
 // A line's channel is followed while the line is kept; these tests have no server to follow.
-beforeEach(() => void vi.spyOn(followed, "subscribe").mockReturnValue(() => {}));
+beforeEach(() => {
+  vi.spyOn(followed, "subscribe").mockReturnValue(() => {});
+  vi.spyOn(api.agent, "list").mockResolvedValue([]);
+});
 afterEach(() => {
   vi.restoreAllMocks();
   pageRegistry.set(framesSource, frames);
@@ -27,11 +31,23 @@ function setup(target: ReturnType<ComposerWays["target"]> = { id: "channel" }) {
   let dispose = () => {};
   const box = createRoot((stop) => {
     dispose = stop;
-    return createComposer(
-      () => undefined,
-      () => undefined,
-      { target: () => target, says, failed, told },
-    );
+    let composer: ReturnType<typeof createComposer> | undefined;
+    const content = QueryProvider({
+      get children() {
+        composer = untrack(() =>
+          createComposer(
+            () => undefined,
+            () => undefined,
+            { target: () => target, says, failed, told },
+          ),
+        );
+        return undefined;
+      },
+    });
+    const rendered = children(() => content);
+    createRenderEffect(rendered, () => {});
+    if (!composer) throw new Error("Composer provider did not mount");
+    return composer;
   });
   flush();
   const type = (text: string) => {

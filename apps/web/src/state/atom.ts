@@ -53,14 +53,6 @@ export function onPage<A>(atom: Atom.Writable<A>): PageAtom<A> {
 /** A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). */
 export const defineAtom = <A>(initial: A): PageAtom<A> => onPage(Atom.make(initial));
 
-/** A choice held in the address (`?name=value`), so a reload or a link shown to someone opens on it. */
-export function useSearchParam(name: string): [Accessor<string>, (value: string) => void] {
-  const atom = searchParams(name);
-  return [useAtom(atom, pageRegistry), (value) => pageRegistry.set(atom, value)];
-}
-
-const searchParams = Atom.family((name: string) => Atom.searchParam(name));
-
 export const framesSource: Atom.Writable<FramesSource> = Atom.keepAlive(Atom.make<FramesSource>(frames));
 
 /** Whether the state stream is up now, read from its source: reading framesAtom here would open and close the stream. */

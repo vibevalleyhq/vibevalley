@@ -4,9 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 
-import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { type Issue, type IssueAct, type IssueAction, readStream, type SessionId, type StateFrame, statePath, VibeValleyApi } from "@vibevalley/protocol";
+
+import { test as base, expect } from "./browser";
 
 interface Server {
   url: string;
@@ -71,31 +73,6 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
     },
     { scope: "worker" },
   ],
-  // An error that escapes the page fails the test: Solid stops updating the whole page after one (REACTIVITY_HALTED), so the page would go on looking alive.
-  page: async ({ page }, use) => {
-    const escaped: string[] = [];
-    page.on("pageerror", (e) => {
-      escaped.push(e.message);
-      if (process.env.VIBEVALLEY_WEB_DEV === "1") console.log(`[page stack] ${e.stack}`);
-      if (process.env.CI) console.log(`[page] ${e.message}`);
-    });
-    if (process.env.CI)
-      page.on("console", (m) => {
-        if (m.type() === "error") console.log(`[page] ${m.text()}`);
-      });
-    // On Solid's development build (vp run e2e:dev), what it warns of goes to the run's output, each untracked read with the stack that made it.
-    if (process.env.VIBEVALLEY_WEB_DEV === "1")
-      await page.addInitScript(() => {
-        const warn = console.warn.bind(console);
-        console.warn = (...a: unknown[]) => warn(...a, String(a[0]).includes("STRICT_READ") ? new Error().stack : "");
-      });
-    if (process.env.VIBEVALLEY_WEB_DEV === "1")
-      page.on("console", (m) => {
-        if (m.type() === "warning" || m.type() === "error") console.log(`[solid ${m.type()}] ${m.text().replaceAll("\n", " ⏎ ")}`);
-      });
-    await use(page);
-    expect(escaped, "errors that escaped the page").toEqual([]);
-  },
   baseURL: async ({ server }, use) => use(server.url),
   api: async ({ server }, use) => use(new VibeValleyApi(server.url)),
 });

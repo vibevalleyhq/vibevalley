@@ -10,12 +10,11 @@ import { ago } from "#/base/format.ts";
 import { spelled } from "#/base/search.ts";
 import { api, reasonOf } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { queries, ready } from "#/infra/query.ts";
-import { useRouter, useSearch } from "#/infra/router.ts";
+import { useQueryClient, ready } from "#/infra/query.ts";
+import { useRouter, useSearch, Link as A } from "#/infra/router.ts";
 import { defineAtom } from "#/state/atom.ts";
 import { type IntentType, sendOnce, useIntents } from "#/state/intent.ts";
 import { defineStored } from "#/state/stored.ts";
-import { A } from "#/ui/A.tsx";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { TextArea } from "#/ui/Field.tsx";
@@ -45,6 +44,7 @@ const justMade = defineAtom<string | undefined>(undefined);
 type ChatSay = IntentType<Omit<SayRequest, "sendKey">, void>;
 
 export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
+  const queries = useQueryClient();
   const router = useRouter();
   const now = useNow();
   const all = useArtifacts(() => ({}));
@@ -61,7 +61,7 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
     making.run(async () => {
       const made = await api.artifact.create({ title: t("web.artifact.page.untitled"), kind: "markdown" });
       justMade.set(made.id);
-      await queries.invalidateQueries({ queryKey: ["artifacts"] });
+      await queries.invalidate({ prefix: ["artifacts"] });
       router.navigate(artifactHref(made.id));
     });
   const groups = () => {
@@ -101,10 +101,10 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
           {/* Beside the search, not a green button over the page being read: a new one is not what this page is for. */}
           <IconButton icon="add" label={t("web.artifact.page.new")} testid="new-artifact" disabled={making.busy()} onClick={() => void create()} />
         </div>
-        <Show when={all.error}>
-          <p class="px-2 text-xs text-berry">{reasonOf(all.error)}</p>
+        <Show when={all.error()}>
+          <p class="px-2 text-xs text-berry">{reasonOf(all.error())}</p>
         </Show>
-        <Show when={all.isSuccess && list().length === 0}>
+        <Show when={all.status() === "success" && list().length === 0}>
           <p class="px-2 text-xs text-muted lg:hidden">{t("web.artifact.page.none")}</p>
         </Show>
         <Show when={list().length > 0 && shown().length === 0}>
@@ -164,7 +164,7 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
         <Show
           when={open()}
           fallback={
-            <Show when={all.isSuccess}>
+            <Show when={all.status() === "success"}>
               <Empty
                 icon="artifacts"
                 action={
@@ -191,7 +191,7 @@ function Opened(props: { id: string; say: ChatSay }) {
     <Show
       when={ready(found, undefined)}
       fallback={
-        <Show when={found.isError}>
+        <Show when={found.status() === "error"}>
           <Empty icon="artifacts">{t("web.artifact.page.gone")}</Empty>
         </Show>
       }
@@ -203,6 +203,7 @@ function Opened(props: { id: string; say: ChatSay }) {
 
 /** The title, typed over in place: Enter or leaving it renames, Escape puts it back. */
 function Title(props: { artifact: Artifact }) {
+  const queries = useQueryClient();
   const [text, setText] = createSignal(untrack(() => props.artifact.title));
   // Taken while the component is made: a ref runs where the props may not be read yet.
   const initialFresh = untrack(justMade.get) === untrack(() => props.artifact.id);
@@ -217,7 +218,7 @@ function Title(props: { artifact: Artifact }) {
     }
     const done = await act.run(async () => {
       await api.artifact.update({ id, title });
-      void queries.invalidateQueries({ queryKey: ["artifacts"] });
+      void queries.invalidate({ prefix: ["artifacts"] });
       return true;
     });
     if (done !== true) setText(props.artifact.title);
@@ -253,6 +254,7 @@ function Title(props: { artifact: Artifact }) {
 }
 
 function Shown(props: { artifact: Artifact; say: ChatSay }) {
+  const queries = useQueryClient();
   const search = useSearch();
   const router = useRouter();
   const core = useCore();
@@ -277,7 +279,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
       // Away first: refreshed, this view's own read fails and it is gone before it could move on.
       router.navigate("/artifacts");
       toast(t("web.artifact.page.deleted", { title }));
-      void queries.invalidateQueries({ queryKey: ["artifacts"] });
+      void queries.invalidate({ prefix: ["artifacts"] });
     });
   };
   const openTab = () => {

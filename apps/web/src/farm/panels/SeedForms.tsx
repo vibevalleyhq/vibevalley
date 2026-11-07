@@ -4,6 +4,7 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type RepoTemplates, type Session } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
 
 import { aria } from "#/base/dom.tsx";
 import { commands } from "#/farm/frames.ts";
@@ -13,12 +14,19 @@ import { createWriteKey, writeIssue } from "#/features/issue/index.ts";
 import { useWorkAgents } from "#/infra/agents.ts";
 import { api, reasonOf, newSendKey } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { ready, useRepos, useQuery } from "#/infra/query.ts";
+import { defineQuery, retryRead, ready, useRepos, useQuery } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { usePrefs } from "#/state/prefs.ts";
 import { AgentFace } from "#/ui/Face.tsx";
 import { createPixelAct, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
+
+const repoTemplatesQuery = defineQuery({
+  schema: S.RepoTemplates,
+  key: (id: string) => ["templates", id],
+  fetch: (id, context) => api.repo.template.list({ id }, context),
+  ...retryRead,
+});
 
 const xs = "text-[12px] text-bark-600";
 /** Who picks the helper when the owner does not. */
@@ -80,11 +88,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
   const writeKey = createWriteKey();
   let words: HTMLTextAreaElement | undefined;
 
-  const templates = useQuery(() => ({
-    queryKey: ["templates", repo()],
-    queryFn: () => api.repo.template.list({ id: repo()! }),
-    enabled: !!repo(),
-  }));
+  const templates = useQuery(() => repoTemplatesQuery(repo() ?? ""), { enabled: () => !!repo() });
   const sower = () => who() ?? (agents().some((a) => a.id === pick()) ? pick() : byOrchestrator);
   const agentOf = (w: string) => (w === byOrchestrator ? undefined : w);
   const canSow = () => text().trim() !== "";
@@ -149,17 +153,17 @@ export function SowForm(props: { station: number; onDone: () => void }) {
           </div>
           <div class="mt-3 flex flex-col">
             <Switch>
-              <Match when={templates.isPending && !!repo()}>
+              <Match when={templates.status() === "pending" && !!repo()}>
                 <p class={["mt-2.5", xs]}>{t("web.farm.sow.rummaging")}</p>
               </Match>
-              <Match when={templates.error}>
+              <Match when={templates.error()}>
                 {(e) => (
                   <div class="mt-2.5 flex flex-wrap items-center gap-2">
                     <p role="alert" class="text-[12px] text-berry">
                       {t("web.farm.sow.noSeeds")}
                       {reasonOf(e())}
                     </p>
-                    <PxButton size="sm" data-testid="seeds-retry" disabled={templates.isFetching} onClick={() => void templates.refetch()}>
+                    <PxButton size="sm" data-testid="seeds-retry" disabled={templates.fetching()} onClick={() => void templates.refetch()}>
                       {t("web.farm.sow.retry")}
                     </PxButton>
                   </div>

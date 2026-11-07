@@ -4,12 +4,13 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { type Memory, type MemorySourceInfo, memoryKeep } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
 
 import { aria, useNow } from "#/base/dom.tsx";
 import { ago } from "#/base/format.ts";
 import { api, createRequestKey, reasonOf } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { queries, ready, useRepos, useQuery } from "#/infra/query.ts";
+import { defineQuery, retryRead, useQueryClient, ready, useRepos, useQuery } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Select, TextArea, TextInput } from "#/ui/Field.tsx";
@@ -20,18 +21,35 @@ const everywhere = "*";
 
 const item = "rounded-md border border-line bg-page";
 
-const useMemory = (agent: () => string) => useQuery(() => ({ queryKey: ["memory", agent()], queryFn: () => api.memory.list({ agent: agent() }) }));
-
-const reload = (agent: string) => queries.invalidateQueries({ queryKey: ["memory", agent] });
+const memoryQuery = defineQuery({
+  schema: S.MemoryList,
+  key: (agent: string) => ["memory", agent],
+  fetch: (agent, context) => api.memory.list({ agent }, context),
+  ...retryRead,
+});
+const recallQuery = defineQuery({
+  schema: S.RecallPreview,
+  key: (a: { agent: string; repo: string; text: string; version: number }) => ["recall", a.agent, a.repo, a.text, a.version],
+  fetch: (a, context) => api.memory.recall({ agent: a.agent, repo: a.repo, text: a.text }, context),
+  ...retryRead,
+});
+const archiveQuery = defineQuery({
+  schema: S.ArchiveListing,
+  key: (a: { agent: string; q: string }) => ["archive", a.agent, a.q],
+  fetch: (a, context) => api.orchestrator.archive.list(omitUndefined({ agent: a.agent, q: a.q || undefined }), context),
+  ...retryRead,
+});
+const useMemory = (agent: () => string) => useQuery(() => memoryQuery(agent()));
 
 /** Forgetting a memory, from either panel: a refusal in the error tone. */
 function createForget(agent: () => string) {
+  const queries = useQueryClient();
   const act = createAct();
   return (id: string) =>
     void act.run(async () => {
       const at = agent();
       await api.memory.delete({ agent: at, memory: id });
-      await reload(at);
+      await queries.invalidate({ key: ["memory", at] });
     });
 }
 
@@ -211,11 +229,9 @@ function RecallPreview(props: { agent: string }) {
   const [text, setText] = createSignal("");
   const where = () => repo() || repos()[0] || "";
   const memory = useMemory(() => props.agent);
-  const previewQuery = useQuery(() => ({
-    queryKey: ["recall", props.agent, where(), text(), memory.dataUpdatedAt],
-    queryFn: () => api.memory.recall({ agent: props.agent, repo: where(), text: text() }),
-    enabled: where() !== "",
-  }));
+  const previewQuery = useQuery(() => recallQuery({ agent: props.agent, repo: where(), text: text(), version: memory.snapshot().record?.updatedAt ?? 0 }), {
+    enabled: () => where() !== "",
+  });
   const preview = () => ready(previewQuery, undefined);
   const lines = () => preview()?.lines ?? [];
   return (
@@ -288,10 +304,7 @@ export function ArchivePanel(props: { agent: string }) {
   const [query, setQuery] = createSignal("");
   const [asked, setAsked] = createSignal<string>();
   const [open, setOpen] = createSignal<{ name: string; text: string }>();
-  const listing = useQuery(() => ({
-    queryKey: ["archive", props.agent, asked() ?? ""],
-    queryFn: () => api.orchestrator.archive.list(omitUndefined({ agent: props.agent, q: asked() || undefined })),
-  }));
+  const listing = useQuery(() => archiveQuery({ agent: props.agent, q: asked() ?? "" }));
   const now = useNow();
   const show = async (name: string) => {
     if (open()?.name === name) return setOpen(undefined);
@@ -340,7 +353,7 @@ export function ArchivePanel(props: { agent: string }) {
         </Section>
       </Show>
       <Section title={t("web.memory.memory.compacted")} count={data()?.files.length ?? 0} testid="archive">
-        <Show when={data()?.files} fallback={<Quiet>{listing.error ? reasonOf(listing.error) : t("web.base.reading")}</Quiet>}>
+        <Show when={data()?.files} fallback={<Quiet>{listing.error() ? reasonOf(listing.error()) : t("web.base.reading")}</Quiet>}>
           {(files) => (
             <Show when={files().length > 0} fallback={<Quiet>{t("web.memory.memory.noArchive")}</Quiet>}>
               <For each={files()} keyed={(f) => f.name}>
@@ -372,6 +385,7 @@ export function ArchivePanel(props: { agent: string }) {
 }
 
 function WriteNote(props: { agent: string; withRepo?: boolean }) {
+  const queries = useQueryClient();
   const [text, setText] = createSignal("");
   const [repo, setRepo] = createSignal("");
   const [error, setError] = createSignal<string>();
@@ -387,7 +401,7 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
     const done = await act.run(async () => {
       await api.memory.create(omitUndefined({ agent, text: words, repo: at, requestKey: key.now() }));
       key.used();
-      await reload(agent);
+      await queries.invalidate({ key: ["memory", agent] });
       return true;
     });
     if (done === true) setText("");

@@ -2,6 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 
 import { expect, test } from "./fixtures";
 
+test.use({ farm: "a11y" });
+
 const sections = ["general", "appearance", "models", "about", "memory", "skills", "call", "moss", "dictation", "github", "chat", "devices"];
 
 for (const theme of ["light", "dark"] as const)
@@ -24,24 +26,25 @@ for (const theme of ["light", "dark"] as const)
       ...sections.map((s) => `/settings/${s}`),
     ];
     const found: string[] = [];
-    for (const path of paths) {
-      await page.goto(path);
-      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-      await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
-      // The opening bar is gone once the page is up. measured before that, its fading words read as low contrast.
-      await expect(page.locator("#opening")).toHaveCount(0, { timeout: 15_000 });
-      // Measured once things have moved in (a dialog fading in reads as low contrast); a pulse that never ends is not waited for.
-      await page.evaluate(() =>
-        Promise.all(
-          document
-            .getAnimations()
-            .filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime ?? Infinity))
-            .map((a) => a.finished.catch(() => undefined)),
-        ),
-      );
-      const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
-      for (const v of violations)
-        found.push(`${path} ${v.id}: ${v.nodes.map((n) => `${n.target.join(" ")} ${n.any.map((c) => c.message).join(" ")}`).join(", ")}`);
-    }
+    for (const path of paths)
+      await test.step(`audit: ${path}`, async () => {
+        await page.goto(path);
+        await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+        await expect(page.getByTestId("link")).toHaveAttribute("data-state", "open");
+        // The opening bar is gone once the page is up. measured before that, its fading words read as low contrast.
+        await expect(page.locator("#opening")).toHaveCount(0, { timeout: 15_000 });
+        // Measured once things have moved in (a dialog fading in reads as low contrast); a pulse that never ends is not waited for.
+        await page.evaluate(() =>
+          Promise.all(
+            document
+              .getAnimations()
+              .filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime ?? Infinity))
+              .map((a) => a.finished.catch(() => undefined)),
+          ),
+        );
+        const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+        for (const v of violations)
+          found.push(`${path} ${v.id}: ${v.nodes.map((n) => `${n.target.join(" ")} ${n.any.map((c) => c.message).join(" ")}`).join(", ")}`);
+      });
     expect(found).toEqual([]);
   });

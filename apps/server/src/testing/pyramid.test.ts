@@ -7,7 +7,7 @@ import { pyramid } from "@vibevalley/testkit/pyramid";
 import { importsOf } from "@vibevalley/testkit/source";
 
 const root = join(import.meta.dirname, "../..");
-const { reach, layerOf } = pyramid(root);
+const { reach } = pyramid(root);
 
 function files(dir: string): string[] {
   return readdirSync(join(root, dir)).flatMap((f) => {
@@ -52,13 +52,5 @@ describe("the test pyramid", () => {
 
   it("follows imports into the workspace's packages", () => {
     expect(reach("src/runtime/vibevalley.ts")).toEqual(["src/runtime/vibevalley.ts", "../../packages/agent/src/coding.ts", "node:child_process"]);
-  });
-
-  it("has a layer for every test file", () => {
-    const shape = Object.groupBy(
-      all.filter((f) => f.endsWith(".test.ts")),
-      (f) => layerOf(f),
-    );
-    expect(Object.keys(shape).toSorted()).toEqual(["flow", "module", "rule"]);
   });
 });

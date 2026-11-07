@@ -50,7 +50,7 @@ Effect 的写法有两层来源：官方指南（随安装的版本走）和本�
 | 主人做的事要先显示结果，等服务端确认 | 一种意图（`state/intent.ts` 的 `defineIntent`）：按请求 key 存，画面经这个 feature 的纯函数覆盖层看（只改主人改的那个字段），帧显示了才结算（`bySeq` 比 `StateFrame.seq`），失败留着可重试（同一个 key），断线时排队 | Atom 自带的 `optimistic`、Solid 2 的 `createOptimistic`：它们答复一回来就撤，而我们的真相在之后的帧里，会先弹回去再跳过去 |
 | 其余调用接口的动作 | `ui/act.ts` 的 `createAct`：忙的计数一定清，拒绝用出错的语气，断线时拒绝 | 组件里直接 `api.…`（lint `vibevalley/act-door`）；`toast(reasonOf(e))` 不带出错的语气（`vibevalley/failure-tone`） |
 | 要记住的选择（本机的偏好、看板的样子、窗格宽度） | `state/stored.ts` 的 `defineStored(名字, Schema, 默认值)`：经 Schema 解码、按字段退回默认值、跨标签页跟着变 | 直接读写 `localStorage`（`vibevalley/stored-door`） |
-| 值得放进地址的选择（看板的筛选） | `useSearchParam` | 一个刷新就丢的信号 |
+| 值得放进地址的选择（看板的筛选） | Router 的 `useSearchValues`，用 `search` 定义 Codec | 一个刷新就丢的信号 |
 | 全页面共享的值 | `state/atom.ts` 的 `defineAtom`，读的时候 `useAtom` 不挂起，帧照常流 | 模块级的 `createSignal`、`createStore`（`vibevalley/page-store`） |
 | 只有搜索、置顶这类最新一次的回答算数 | `state/atom.ts` 的 `useLatest` | 自己比对请求的先后 |
 

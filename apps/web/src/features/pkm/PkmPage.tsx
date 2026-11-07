@@ -5,9 +5,8 @@ import type { PkmPageSummary } from "@vibevalley/protocol";
 
 import { Keyed } from "#/base/dom.tsx";
 import { api } from "#/infra/api.ts";
-import { ready } from "#/infra/query.ts";
-import { useSearch } from "#/infra/router.ts";
-import { A } from "#/ui/A.tsx";
+import { ready, useQueryClient } from "#/infra/query.ts";
+import { useSearch, Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Icon } from "#/ui/Icon.tsx";
 
@@ -47,13 +46,14 @@ const daysShown = 5;
 
 /** Today's journal first (made if there is none), to write in at once; then the earlier days that have one. */
 function Days(props: { pages: readonly PkmPageSummary[] }) {
+  const queries = useQueryClient();
   const today = dayKey(Date.now());
   const act = createAct();
   const [opened, setOpened] = createSignal<string>();
   onSettled(() => {
     void act.run(async () => {
       setOpened((await api.pkm.journal.open({ day: today })).slug);
-      void refreshVault();
+      void refreshVault(queries);
     });
   });
   const before = () =>

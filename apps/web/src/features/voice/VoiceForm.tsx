@@ -1,4 +1,3 @@
-import { keepPreviousData } from "@tanstack/solid-query";
 import { createSignal, Show, snapshot, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -14,11 +13,12 @@ import {
   type VoiceSettings,
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
 
 import { createSettled, Keyed, variant } from "#/base/dom.tsx";
 import { api, reasonOf } from "#/infra/api.ts";
-import { ready, useQuery, useSettings } from "#/infra/query.ts";
-import { saveSettings } from "#/infra/settings.ts";
+import { defineQuery, ready, useQuery, useSettings } from "#/infra/query.ts";
+import { useSaveSettings } from "#/infra/settings.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Select, TextInput } from "#/ui/Field.tsx";
@@ -63,7 +63,7 @@ export function VoiceForm(props: { part: VoicePart; view?: LineView }) {
   return (
     <Show
       when={ready(settings, undefined)}
-      fallback={<Quiet>{settings.error ? t("web.voice.voice.noSettings", { why: reasonOf(settings.error) }) : t("web.base.form.asking")}</Quiet>}
+      fallback={<Quiet>{settings.error() ? t("web.voice.voice.noSettings", { why: reasonOf(settings.error()) }) : t("web.base.form.asking")}</Quiet>}
     >
       {(status) => <Keyed key={status().file}>{() => <Form status={untrack(status)} part={props.part} view={props.view ?? "call"} />}</Keyed>}
     </Show>
@@ -71,17 +71,20 @@ export function VoiceForm(props: { part: VoicePart; view?: LineView }) {
 }
 
 /** What the server says is wrong with the draft, asked a moment after it last changed. */
+const problemQuery = defineQuery({
+  schema: S.Validation,
+  key: (a: { input: SettingsUpdate; token: string }) => ["settings-check", a.token],
+  fetch: (a, context) => api.setting.validate(a.input, context),
+  gcTime: 0,
+});
 function useProblem(update: () => SettingsUpdate) {
   const asked = createSettled(update);
-  const check = useQuery(() => ({
-    queryKey: ["settings-check", JSON.stringify(asked())],
-    queryFn: () => api.setting.validate(asked()),
-    placeholderData: keepPreviousData,
-  }));
+  const check = useQuery(() => problemQuery({ input: asked(), token: crypto.randomUUID() }));
   return () => ready(check, undefined)?.problem;
 }
 
 function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }) {
+  const saveSettings = useSaveSettings();
   // A plain copy: the form starts from it once, and reading the store's fields later would be untracked reads.
   const start = untrack(() => snapshot(props.status));
   const [draft, setDraft] = createSignal<VoiceSettings>(start.voice);

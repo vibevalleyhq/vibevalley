@@ -6,8 +6,8 @@ import { t } from "@vibevalley/i18n";
 
 import { aria } from "#/base/dom.tsx";
 import { currentHost } from "#/infra/host.ts";
+import { Link as A } from "#/infra/router.ts";
 
-import { A } from "./A";
 import { TextInput } from "./Field";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";

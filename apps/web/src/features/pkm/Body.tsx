@@ -4,7 +4,7 @@ import { For } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import type { PkmTransclusion } from "@vibevalley/protocol";
 
-import { A } from "#/ui/A.tsx";
+import { Link as A } from "#/infra/router.ts";
 
 import { type Piece, piecesOf } from "./outline";
 import { pkmHref } from "./vault";

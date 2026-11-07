@@ -1,4 +1,5 @@
-import { A } from "./A";
+import { Link as A } from "#/infra/router.ts";
+
 import { Icon, type IconSize } from "./Icon";
 import type { IconName } from "./icons";
 import { Tip } from "./Tip";

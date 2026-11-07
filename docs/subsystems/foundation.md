@@ -80,18 +80,24 @@
 
 ### 测试金字塔
 
-测试按 import 依赖自动分入五层（`@vibevalley/testkit/pyramid`），在能验证行为的最低层编写：
+一个行为在能发现它出错的最低层充分测试；高一层只验证新增的接线风险，不重演下层的全部分支。类型推导、Encoded/Type 与受控状态互斥先由静态检查验证。`@vibevalley/testkit/pyramid` 沿 import 链区分规则、模块和流程；浏览器项目按入口区分组件、真实集成和扫描，不把所有 Chromium 测试都算成页面集成。
 
 | 层 | 入口 | 真实部分 | 替身端口 | 预算 | 位置 |
 |---|---|---|---|---|---|
 | 规则 | 纯函数 | 被测代码 | 无 | 20ms | 不碰库、进程、网络的 `*.test.ts` |
 | 模块 | 模块服务接口 | 当前及下层模块、内存库、真 git | `scriptedRuntime`、假 `Llm`、假聊天/声网 | 300ms | `apps/server/src/<模块>/*.test.ts` |
 | 流程 | `flows/farm.ts` | 全部服务端模块与真 git | 同上 | 2s | `apps/server/src/flows/*.test.ts` |
-| 页面 | HTTP 与 SSE | 真服务端进程 + Chromium | 脚本化帮工、无外部密钥 | 3s | `apps/web/test/*.spec.ts` |
+| 浏览器组件 | 组件 DOM 与 owner | Chromium、Solid、真实组件 | 故事数据，无服务端 | 3s | `apps/web/test/stories.spec.ts` |
+| 页面 | HTTP 与 SSE | 真服务端进程 + Chromium | 脚本化帮工、无外部密钥 | 3s | `apps/web/test/projects.ts` 的 integration 项目 |
 | 宿主 | `host.ts` | Electron、移动模拟器 | — | — | `apps/desktop/test`、`apps/mobile` |
+| 真模型 | 模型请求与工具循环 | 指定的真实模型 | 隔离农场 | — | 管家 evals，花钱前先问主人 |
 
 - **不靠睡眠等待**：禁止在测试中写死 `setTimeout`、`Effect.sleep` 或 `waitForTimeout`（`vibevalley/no-test-sleep` 检查）；等待状态用 `until`、`waitFor`、`whenState`，时间窗口用 `TestClock` 拨进。
 - **页面测试按 `data-testid` 定位**：禁止用界面中文文案或 CSS 类名做选择器（`vibevalley/no-copy-selector` 检查）；每页在浅色与深色主题下通过 `apps/web/test/a11y.spec.ts` 检查。
+- **分开行为、无障碍和视觉验收**：故事与页面的双主题扫描归 audit；主题不影响的提交、重试和排序流程只执行一次。纯截图归 visual，出图不证明图里的行为正确。故事扫描每个场景完整导航，等查看器本轮 axe 结果，不再重复注入；动态错误态另行扫描。故事窄屏使用查看器支持的 400px 并断言实际宽度，真实页面另测 390px。
+- **运行入口决定准备什么**：组件只构建故事，集成与视觉只构建应用，audit 构建两者；每轮产物和家目录隔离。`e2e` 保留全量自动检查，`e2e:visual` 单独出图；命令见 [页面 README](apps/web/README.md#commands)。改一层先跑这一层，公共基础设施改动收尾再跑广域确认。CI 没有完整页面 E2E，不把未执行的全量当成通过。
+- **用例的前提也要隔离**：要求空农场、唯一记录或初始配置的文件声明独立 farm；共享农场里的记录使用独立名字。不能靠重试避开其他用例留下的数据。
+- **报告不代替覆盖判断**：浏览器按项目报告累计耗时和尝试数，不冒充墙钟时间；批量 audit 按场景计预算，不把几十页合起来算一页。预算不因慢而放宽，测试数和覆盖率不设减量目标；删改 regression 要点名说明由谁接替。分类器有类型导入、别名、动态导入、包导出与循环的正反例，文件分组有三类不构成分类正确的证据。
 - **确定性 I/O 预算**：`Db` 与 git 入口记录查询、事务与命令次数，拦截高频路径的 N+1 退化。
 
 ### 话放在哪

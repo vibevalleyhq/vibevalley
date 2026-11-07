@@ -54,7 +54,7 @@ function method(e: (typeof endpoints)[number], indent: string): string {
       indent
     : "";
   const input = e.input === undefined ? "undefined" : "a";
-  return `${indent}${doc}${name}: (${args}): Promise<${sig.result}> => this.call<${sig.result}>(${JSON.stringify(pathOf(e.op))}, ${input}),`;
+  return `${indent}${doc}${name}: (${args ? args + ", " : ""}options?: { signal?: AbortSignal }): Promise<${sig.result}> => this.call<${sig.result}>(${JSON.stringify(pathOf(e.op))}, ${input}, options),`;
 }
 
 // module → its own ops and its nouns' (issue.create, issue.status.update).
@@ -146,11 +146,11 @@ export class VibeValleyApi {
   }
 ${[...groups].map(groupText).join("")}
   /** R is the answer api.ts gives the path; each method above names it. */
-  private async call<R>(path: string, input: unknown): Promise<R> {
-    const res = await this.fetcher(
-      this.base + path,
-      input === undefined ? { method: "POST" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) },
-    );
+  private async call<R>(path: string, input: unknown, options?: { signal?: AbortSignal }): Promise<R> {
+    const res = await this.fetcher(this.base + path, {
+      ...(input === undefined ? { method: "POST" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+      ...options,
+    });
     const text = await res.text();
     if (!res.ok) {
       let decoded: unknown;

@@ -45,7 +45,7 @@ export function FarmPage(props: { repo: string }) {
   });
   // Drawn: the workbench's dark theme does not reach in (style.css).
   return (
-    <div data-theme="light" class="fixed inset-0 overflow-hidden bg-ground font-pixel text-[12px] text-bark-900 select-none" data-testid="farm">
+    <div data-theme="light" class="relative isolate h-full overflow-hidden bg-ground font-pixel text-[12px] text-bark-900 select-none" data-testid="farm">
       <FarmSounds />
       <FramesContext value={scoped}>
         <VillageCanvas />

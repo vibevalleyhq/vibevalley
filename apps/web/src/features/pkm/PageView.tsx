@@ -5,10 +5,9 @@ import { t } from "@vibevalley/i18n";
 import type { PkmBacklink, PkmComment, PkmPageSummary, PkmPageView, PkmTier } from "@vibevalley/protocol";
 
 import { api } from "#/infra/api.ts";
-import { ready } from "#/infra/query.ts";
-import { useRouter } from "#/infra/router.ts";
+import { ready, useQueryClient } from "#/infra/query.ts";
+import { useRouter, Link as A } from "#/infra/router.ts";
 import { defineStored } from "#/state/stored.ts";
-import { A } from "#/ui/A.tsx";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Select } from "#/ui/Field.tsx";
@@ -23,7 +22,7 @@ import { Calendar } from "./Calendar";
 import { daysUntil, dayKey, titleFor } from "./days";
 import { tierOrder, wordDiff } from "./outline";
 import { Outline } from "./OutlineView";
-import { pkmHref, refreshPkm, usePkmPage } from "./vault";
+import { pkmHref, refreshPkm as refreshQueries, usePkmPage } from "./vault";
 
 /** A tier as a group of pages (the sidebar's heads): Projects. */
 export const tierLabel = (tier: PkmTier) => t(`web.pkm.tier.${tier}`);
@@ -40,7 +39,7 @@ export function Opened(props: { slug: string; pages: readonly PkmPageSummary[]; 
     <Show
       when={ready(found, undefined)}
       fallback={
-        <Show when={found.isError}>
+        <Show when={found.status() === "error"}>
           <Empty icon="file">{t("web.pkm.gone")}</Empty>
         </Show>
       }
@@ -106,6 +105,8 @@ function Shown(props: {
 }
 
 function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined }) {
+  const client = useQueryClient();
+  const refreshPkm = () => refreshQueries(client);
   const router = useRouter();
   const page = () => props.view.page;
   const act = createAct();
@@ -288,6 +289,8 @@ function Comments(props: { view: PkmPageView }) {
 }
 
 function CommentCard(props: { comment: PkmComment; body: string; slug: string }) {
+  const client = useQueryClient();
+  const refreshPkm = () => refreshQueries(client);
   const router = useRouter();
   const act = createAct();
   const resolve = (accept: boolean) => {

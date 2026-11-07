@@ -7,13 +7,16 @@
   },
   "scripts": {
     "dev": "vp dev",
-    "e2e": "vp run build && playwright test",
+    "e2e": "playwright test",
+    "e2e:component": "playwright test --config playwright.component.config.ts",
+    "e2e:integration": "playwright test --config playwright.integration.config.ts",
+    "e2e:audit": "playwright test --config playwright.audit.config.ts",
+    "e2e:visual": "playwright test --config playwright.visual.config.ts",
     "e2e:dev": "VIBEVALLEY_WEB_DEV=1 playwright test",
     "stories": "vp dev --config vite.stories.config.ts"
   },
   "dependencies": {
     "@solidjs/web": "catalog:",
-    "@tanstack/solid-query": "catalog:",
     "@vibevalley/ai": "workspace:*",
     "@vibevalley/artifact": "workspace:*",
     "@vibevalley/base-ui": "workspace:*",

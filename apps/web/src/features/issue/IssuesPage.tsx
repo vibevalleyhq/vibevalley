@@ -10,8 +10,7 @@ import { inField, pressed } from "#/base/shortcuts.ts";
 import { useOrchestrators } from "#/infra/agents.ts";
 import { api, reasonOf } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { useRouter } from "#/infra/router.ts";
-import { useSearchParam } from "#/state/atom.ts";
+import { useRouter, useSearchValues } from "#/infra/router.ts";
 import { useIntents } from "#/state/intent.ts";
 import { rememberPick } from "#/state/prefs.ts";
 import { createAct } from "#/ui/act.ts";
@@ -31,6 +30,7 @@ import { issueIs } from "./issue";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { issueMove, movedCards, sendMove } from "./moves";
+import { issueSearch } from "./navigation";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 import { createWriteKey, writeIssue } from "./write";
@@ -44,14 +44,14 @@ export function IssuesPage(props: { rest: string }) {
   const id = () => props.rest || undefined;
   // The repo and the helper are in the address, so a reload or a link keeps the board as filtered; the words typed
   // are not, being half a thought.
-  const [repo, setRepo] = useSearchParam("repo");
-  const [agent, setAgent] = useSearchParam("agent");
+  const [searchValues, setSearchValues] = useSearchValues(issueSearch);
+  const repo = () => searchValues().repo ?? "";
+  const agent = () => searchValues().agent ?? "";
   const [query, setQuery] = createSignal("");
   const filter = (): BoardFilter => ({ query: query(), repo: repo(), agent: agent() });
   const setFilter = (f: BoardFilter) => {
     setQuery(f.query);
-    setRepo(f.repo);
-    setAgent(f.agent);
+    setSearchValues(() => ({ repo: f.repo || undefined, agent: f.agent || undefined }), { replace: true });
   };
   const [older, setOlder] = createSignal(false);
   const [closing, setClosing] = createSignal<Closing>();
@@ -135,7 +135,7 @@ export function IssuesPage(props: { rest: string }) {
 
   // An issue is a page of its own (docs/style/design.md): the board and the list give way to it, and Escape or Issues comes back.
   return (
-    <div class="relative flex h-full flex-col">
+    <div data-testid="issues-page" class="relative flex h-full flex-col">
       <Show
         when={id()}
         keyed

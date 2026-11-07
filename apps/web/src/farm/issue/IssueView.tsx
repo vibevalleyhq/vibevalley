@@ -357,7 +357,7 @@ function IssueBody(props: {
           </Show>
           <Show when={s().showsChanges && props.issue.deliver !== "answer"}>
             <Fold label={madeLabel()}>
-              <Show when={changed()} fallback={<p class={body}>{changes.isPending ? t("web.farm.reading") : t("web.farm.plot.changesUnread")}</p>}>
+              <Show when={changed()} fallback={<p class={body}>{changes.status() === "pending" ? t("web.farm.reading") : t("web.farm.plot.changesUnread")}</p>}>
                 {(c) => (
                   <div class="flex flex-col">
                     <p class={body}>{changesLine(c())}</p>
@@ -382,7 +382,7 @@ function IssueBody(props: {
             </Fold>
           </Show>
           <Fold label={t("web.farm.plot.story")}>
-            <Show when={timeline()} fallback={<p class={xs}>{timelineQuery.isPending ? t("web.farm.reading") : t("web.farm.unread")}</p>}>
+            <Show when={timeline()} fallback={<p class={xs}>{timelineQuery.status() === "pending" ? t("web.farm.reading") : t("web.farm.unread")}</p>}>
               {(line) => (
                 <For each={line().milestones}>
                   {(m) => (

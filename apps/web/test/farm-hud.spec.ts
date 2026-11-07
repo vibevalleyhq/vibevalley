@@ -2,6 +2,8 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
 
+test.use({ farm: "farm-hud" });
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
 });
@@ -78,7 +80,7 @@ test("a repo's farm names it on the sign; an empty plot sows in it, and a draft 
   await expect(page).toHaveURL(/\/repos$/u);
 });
 
-test("/farm opens the farm entered last, and a farm with no repo sends sowing to the map", async ({ page, api }) => {
+test("regression: /farm opens the farm entered last, and a farm with no repo sends sowing to the map", async ({ page, api }) => {
   await api.repo.create({ name: "farm-home" });
   // A device that never entered a farm still lands on one: going back to the farm never strands it on the map.
   await page.goto("/farm");
