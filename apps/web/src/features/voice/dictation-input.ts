@@ -18,7 +18,7 @@ export const dictateWorkletCode = `registerProcessor("vibevalley-capture", class
   }
 });`;
 
-/** Dictated words at the caret, or at the end: a space only between two Latin words, as Chinese runs on without one. */
+// A space only between adjacent Latin words: Chinese runs on without one.
 export function insertDictated(value: string, start: number, end: number, words: string) {
   const before = value.slice(0, start);
   const ascii = /[A-Za-z0-9]/u;

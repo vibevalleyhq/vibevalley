@@ -1,7 +1,6 @@
 import { pcm16RmsLevel } from "../audio.ts";
 import { appendVoiceTurn, type VoiceTurn } from "./turns.ts";
 
-/** One side's words in a MOSS turn; specialization of the core `VoiceTurn`. */
 export type MossTurn = VoiceTurn<"owner" | "moss">;
 
 /** The turns with a turn's words so far (MOSS sends them whole each time). A new turn starts a new line. */

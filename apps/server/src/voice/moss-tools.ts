@@ -16,7 +16,6 @@ export interface MossToolCall {
   readonly question: string;
 }
 
-/** Extracts an `ask_orchestrator` tool call from a MOSS / realtime WebSocket JSON frame when present. */
 export function extractMossToolCall(raw: string): MossToolCall | undefined {
   const decoded = decodeMossFrame(raw);
   if (decoded._tag === "None") return undefined;
@@ -32,7 +31,6 @@ export function extractMossToolCall(raw: string): MossToolCall | undefined {
   return question ? { callId, name, question } : undefined;
 }
 
-/** Tool definition registered on MOSS / realtime sessions so the voice model delegates farm operations to the Orchestrator. */
 export const mossOrchestratorTool = {
   type: "function",
   name: "ask_orchestrator",

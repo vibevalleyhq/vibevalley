@@ -3,7 +3,6 @@ import { Socket } from "effect/socket";
 
 import { type MossLink, type MossTransport, nodeMossTransport } from "@vibevalley/provider/moss/server";
 
-/** Optional hooks allowing the server to bridge an active MOSS line with the farm's Orchestrator and call state. */
 export interface MossRelayHooks {
   /** Invoked when the upstream MOSS WebSocket opens; may return a cleanup function invoked when the relay ends. */
   readonly onOpen?: (link: MossLink, sendToPage: (frame: string) => void) => (() => void) | void;
@@ -16,8 +15,7 @@ export interface MossRelayHooks {
 /** Where MOSS's frames go to the page, and where a closing goes: one queue, so they keep their order. */
 type Down = string | Uint8Array | Socket.CloseEvent;
 
-/** A page's line to MOSS Live, until either side closes: every frame passes as it is, both ways. What the page sends
- * before MOSS has opened waits for it. */
+/** The page's frames wait in a queue until MOSS opens. */
 export const relay = (
   page: Socket.Socket,
   key: string,

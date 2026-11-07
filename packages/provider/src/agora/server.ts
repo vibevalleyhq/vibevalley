@@ -77,7 +77,7 @@ export const sign = (c: AgoraCredentials, channel: string, uid: string) => ({
   token: RtcTokenBuilder.buildTokenWithRtm(c.appId, c.appCertificate, channel, uid, RtcRole.PUBLISHER, tokenSeconds, tokenSeconds),
 });
 
-/** prefix-<ms>-<6 random>: the quickstart's timestamp-plus-random shape. */
+/** now is in milliseconds. */
 export const newChannel = (now: number) =>
   `vibevalley-${now}-${Array.from({ length: 6 }, () => "0123456789abcdefghijklmnopqrstuvwxyz"[randomInt(36)]).join("")}`;
 export const newUid = () => String(randomInt(9_999_000) + 1000);

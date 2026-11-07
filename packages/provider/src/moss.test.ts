@@ -3,7 +3,6 @@ import { Effect } from "effect";
 
 import { type MossEvents, type MossTransport, verifyMoss } from "./moss/server.ts";
 
-/** A MOSS that answers the way script says, after the socket opens; status is what plain HTTPS answers. */
 const fake = (script: (on: MossEvents, sent: string[]) => void, status: MossTransport["status"] = () => Effect.succeed({ code: 400, body: "" })) => {
   const log = { sent: [] as string[], closed: 0, asked: 0 };
   const transport: MossTransport = {

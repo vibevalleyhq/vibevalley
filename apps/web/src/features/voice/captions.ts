@@ -14,7 +14,6 @@ export interface Caption {
   interrupted: boolean;
 }
 
-/** Maps Agora RTC captions onto the unified core `VoiceTurn` contract. */
 export function voiceTurnsOfCaptions(turns: readonly Caption[]): VoiceTurn<"owner" | "orchestrator">[] {
   return turns.map((c) => ({
     who: c.speaker === "you" ? "owner" : "orchestrator",
@@ -24,7 +23,6 @@ export function voiceTurnsOfCaptions(turns: readonly Caption[]): VoiceTurn<"owne
   }));
 }
 
-/** A line said on a call as the farm chat has it: whose, and its words. */
 export interface SpokenLine {
   readonly speaker: Speaker;
   readonly text: string;
@@ -33,7 +31,6 @@ export interface SpokenLine {
 /** How long a finished turn's caption waits for its line in the farm chat before it goes. */
 export const captionLinger = 8_000;
 
-/** The captions to draw live in the farm chat during a call, before their turns are lines there. */
 export function liveCaptions(turns: readonly Caption[], spoken: readonly SpokenLine[], now: number): Caption[] {
   return turns.filter((c) => {
     if (!c.text.trim()) return false;

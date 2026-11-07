@@ -43,7 +43,7 @@ const base64Of = (bytes: Uint8Array): string => {
   return btoa(s);
 };
 
-/** Concatenates recorded Float32Array chunks and encodes them as a base64 WAV string; undefined when no samples were recorded. */
+/** Returns undefined when no samples were recorded. */
 export function encodeWavBase64(chunks: readonly Float32Array[], sampleRate = dictateRate): string | undefined {
   const total = chunks.reduce((n, c) => n + c.length, 0);
   if (total === 0) return undefined;

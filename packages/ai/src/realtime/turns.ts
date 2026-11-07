@@ -5,7 +5,6 @@ export interface VoiceTurn<Who extends string> {
   readonly done: boolean;
 }
 
-/** Pure reducer updating or appending a speaker's turn in place; an empty text is ignored and a settled turn starts a new line next time. */
 export function appendVoiceTurn<Who extends string>(turns: readonly VoiceTurn<Who>[], who: Who, key: string, text: string, done: boolean): VoiceTurn<Who>[] {
   if (text === "") return [...turns];
   let last: VoiceTurn<Who> | undefined;

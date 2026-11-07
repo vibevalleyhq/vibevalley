@@ -6,7 +6,6 @@ export type VoiceSpeaker = "owner" | "moss" | "orchestrator";
 
 export type VoiceTurn<Who extends string = VoiceSpeaker> = TranscriptTurn<Who>;
 
-/** Provider-agnostic reactive contract for a live two-way voice session (implemented by MOSS Live and Agora). */
 export interface VoiceDriver<Setup = void, Who extends string = VoiceSpeaker> {
   readonly phase: VoicePhase;
   readonly muted: boolean;
