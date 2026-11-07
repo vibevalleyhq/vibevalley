@@ -5,7 +5,7 @@ export default defineConfig({
   test: { include: ["src/**/*.test.ts"], testTimeout: 30_000, env: { TZ: "Asia/Shanghai" } },
   // The packaged app's command line (apps/desktop/scripts/package.ts): src/main.ts and everything it uses in one module for Node 24.
   pack: {
-    entry: ["src/main.ts"],
+    entry: ["src/main.ts", "src/worker.ts"],
     format: "esm",
     platform: "node",
     target: "node24",

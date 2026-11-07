@@ -43,3 +43,19 @@ From source, prefix the command with `vp run --filter @vibevalley/cli start`. Bu
 The command calls `repo.pr.submit` on the server. It does not run Git, gh, or glab locally.
 The checkout may be outside the space. A published response includes the confirmed URL and the check status;
 `not-run` means that `.vibevalley/check` was absent. See [repository publication](docs/subsystems/repo.md).
+
+## 帮工会话命令
+
+帮工使用启动说明里的绝对命令（独立 worker 入口，含 `--worker-access-file <path>`），不依赖登录 shell 的 PATH。凭证文件由服务端管理，不读取、打印或复制其内容。先运行 `doctor`；失败就报告阻塞。它验证会话身份和工具调用，不代表编码 agent 加载了可选 MCP。
+
+| 子命令 | JSON 参数 |
+|---|---|
+| `report` | 必填 `summary`；可选 `prSubmit`、`questions`、`checks`、`remember`、`answer`。完整字段和类型见 `report --help` |
+| `pr-submit` | 可选 `summary`；需要主人明确授权 |
+| `context` | 省略参数读当前工单串；可选 `id`、`before`、`limit`、`unread` |
+| `read` | 必填 `uri`，可选 `offset`、`limit` |
+| `doctor` | 无参数，认证调用只读会话列表 |
+
+例如在完整命令后追加 `report '{"summary":"完成","prSubmit":false,"checks":[{"criterion":0,"result":"met","proof":"tests passed"}]}'`。参数不能选择其他会话。缺失、无效或撤销凭证不会回退主人 HTTP；工具拒绝返回非零退出码，stderr 保留有界且脱敏的原因。
+
+源码入口带绝对 Node 和 Vite+ 加载器路径；桌面包入口为 `Resources/cli/dist/worker.mjs`，仅此次 CLI 调用设置 `ELECTRON_RUN_AS_NODE=1`。生命周期与启动门槛见[会话](docs/subsystems/session.md)。

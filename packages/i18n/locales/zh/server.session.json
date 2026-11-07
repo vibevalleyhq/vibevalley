@@ -110,7 +110,9 @@
     "minutes": "{n} 分钟",
     "noIssue": "这个会话不关联工单，不能交付或清理工单的改动。",
     "contextKept": "上下文目录保留在 {cwd}：{why}",
-    "contextHasFiles": "目录里已有文件"
+    "contextHasFiles": "目录里已有文件",
+    "workerUnavailable": "必需的帮工 CLI 无法执行；本轮未启动",
+    "workerAuthenticationFailed": "帮工 CLI 的会话认证请求失败；本轮未启动，请检查服务监听与会话接入"
   },
   "conflictBrief": "把 {base} 合进你的分支时有冲突（{files}）。请在你的分支上运行 git merge {base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。"
 }

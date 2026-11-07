@@ -7,16 +7,16 @@ import { HttpClient, HttpClientRequest } from "effect/http";
 
 import { connect } from "@vibevalley/bridge";
 import { socketLink } from "@vibevalley/bridge/socket";
-import { announced, controlSocketOf, homeOf, savedLocale } from "@vibevalley/home";
-import { setLocale, t } from "@vibevalley/i18n";
+import { announced, controlSocketOf, homeOf } from "@vibevalley/home";
+import { t } from "@vibevalley/i18n";
 import { type Preview, VibeValleyApi, type VibeValleyApiError } from "@vibevalley/protocol";
 import { ApiError } from "@vibevalley/protocol/api";
 import { desktopControl } from "@vibevalley/protocol/host";
 
-import { exit, Failure, type Next, out, printBody } from "./output.ts";
+import { DryRunFlag, show } from "./format.ts";
+export { DryRunFlag, FormatFlag, show } from "./format.ts";
 
-// The command line speaks the farm's language: the locale saved in the home's settings.json.
-setLocale(savedLocale(homeOf()));
+import { exit, Failure, type Next } from "./output.ts";
 
 const fallbackServer = "http://127.0.0.1:8787";
 /** The server using this machine's home (its server.json), else the configured default port. */
@@ -30,16 +30,6 @@ export const ServerFlag = GlobalFlag.Setting("server")({
     // The rule, not this machine's address: help reads the same everywhere, and so does its golden data.
     Flag.withDescription(t("cli.flag.server", { fallback: fallbackServer })),
   ),
-});
-
-/** --dry-run: a command that changes what cannot be taken back answers what it would do (its endpoint's dryRun) and changes nothing. */
-export const DryRunFlag = GlobalFlag.Setting("dry-run")({
-  flag: Flag.Boolean("dry-run").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.dryRun"))),
-});
-
-/** --format: text (the default) is short lines to read, json the protocol's shape for whatever parses it. */
-export const FormatFlag = GlobalFlag.Setting("format")({
-  flag: Flag.Literals("format", ["text", "json"]).pipe(Flag.withDefault("text" as const), Flag.withDescription(t("cli.flag.format"))),
 });
 
 /** Shared CLI argument and flag builders. */
@@ -129,10 +119,6 @@ function failureFrom(base: string, e: unknown): Failure {
 /** One question to the farm at --server, typed by the endpoint it calls. */
 export const ask = <A>(use: (api: VibeValleyApi) => Promise<A>) =>
   Effect.flatMap(ServerFlag, (base) => Effect.tryPromise({ try: () => use(new VibeValleyApi(base)), catch: (e) => failureFrom(base, e) }));
-
-/** The answer as --format says: text by its own lines, json as the protocol has it. */
-export const show = <A>(value: A, text: (value: A) => string) =>
-  Effect.flatMap(FormatFlag, (format) => (format === "json" ? printBody(JSON.stringify(value ?? null)) : out(text(value))));
 
 /** A change, or with --dry-run what it would do: by the endpoint's own dry run where it has one; a change with none is
  * refused rather than made. */

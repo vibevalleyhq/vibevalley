@@ -120,16 +120,20 @@ export const sessionRegistry = Effect.gen(function* () {
   const launchOf = (id: string) => `${id}#${++launches}`;
   let closing = false;
 
-  // Tokens tell sessions apart and guard nothing (sessions already run unsandboxed here), so they live on the hand.
-  const issueToken = (h: Hand) => {
-    const token = "hb_" + h.id + "_" + randomBytes(18).toString("base64url");
-    h.token = token;
-    return token;
-  };
+  const tokens = new Map<string, string>();
+  yield* Effect.addFinalizer(() => Effect.sync(() => tokens.clear()));
   const revokeToken = (h: Hand) => {
+    tokens.delete(h.token);
     h.token = "";
   };
-  const who = (token: string) => (token === "" ? "" : ([...hands.values()].find((h) => h.token === token)?.id ?? ""));
+  const issueToken = (h: Hand) => {
+    revokeToken(h);
+    const token = "hb_" + h.id + "_" + randomBytes(18).toString("base64url");
+    h.token = token;
+    tokens.set(token, h.id);
+    return token;
+  };
+  const who = (token: string) => tokens.get(token) ?? "";
 
   // A session's own row keeps what taking it up again needs, so it goes with the database.
   const handRow = (h: Hand) => {

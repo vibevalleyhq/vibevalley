@@ -131,3 +131,13 @@
 The runtime boundary decodes Codex 0.167.0 `mcpServer/startupStatus/updated` parameters with Schema. oar 0.86.0 has no neutral MCP startup event: its inventories are independent workspace queries, and tool-call events describe calls rather than connection readiness. Other runtimes stay `unknown`. Only root-session records for configured servers are accepted. An explicit native `threadId` must match the session. The Codex protocol permits missing or null `threadId` for startup notifications; these are observed on the dedicated session process. Errors are redacted and capped at 2000 characters. The raw notification stays inside the runtime adapter.
 
 The observer replays retained records from `afterSeq: -1`, then reads live records. Detach and close unsubscribe it. A new execution resets the prior connection observations. Session writes failed or cancelled connections to the bounded journal as `run/error` with a structured `connection`. Every observation emits `sessionToolChanged`; projection/reduce replaces only that server’s entry. `sessionToolsReset` clears observations on a new execution or reattachment; resuming a turn on the same execution keeps them. Restarted sessions have no observations until attached. Watch consumers use these shared fields; they do not parse vendor notifications. oar replay covers retained records only, and journal retention remains 240 events.
+
+## 帮工 CLI 接入
+
+帮工 CLI 与 MCP 共用 Session 签发的令牌和同一工具执行路径，交活及 PR 授权仍由领域服务处理。令牌在启动前登记，重新启动时轮换，离场或启动认证失败时撤销；未知身份不回退主人。令牌索引只管凭证，不保存第二份会话状态。
+
+服务端为每个会话写入临时凭证文件：父目录权限 `0700`，文件 `0600`，内容只有回环 MCP 地址和令牌。启动说明只含绝对可执行路径、加载器和凭证文件路径，不含秘密；CLI 自己读文件。离场删除文件，服务作用域结束删除整个目录。文件方案不依赖农机传递秘密环境变量，`ELECTRON_RUN_AS_NODE` 只作用于 CLI 子进程。
+
+派工前先确认 CLI 可执行，再以该会话凭证运行只读 `doctor` 认证请求；任何一步失败都拒绝启动。该探测证明服务端至 CLI 的认证链路，帮工仍须在自己的 shell 中先运行 `doctor`，失败报告阻塞。可选 MCP 的连接状态独立观察，没有证据仍是 unknown。
+
+`session/worker.ts` 是进程、凭证文件与认证探测的外部边界；普通模块测试通过 `WorkerAccess` 替换此边界，集成测试运行真实 CLI 与 HTTP。MCP 的异常与错误结果均带 `isError`；CLI 据此非零退出，不匹配本地化文案，服务器拒绝原因脱敏后限制为 8000 字符。命令参数见 [CLI](apps/cli/README.md#帮工会话命令)。

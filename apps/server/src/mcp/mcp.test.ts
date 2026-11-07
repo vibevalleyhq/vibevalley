@@ -27,7 +27,7 @@ import { Mcp } from "./mcp.ts";
 const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 
 interface Answer {
-  readonly result?: { readonly content?: { readonly text: string }[]; readonly tools?: { readonly name: string }[] };
+  readonly result?: { readonly isError?: boolean; readonly content?: { readonly text: string }[]; readonly tools?: { readonly name: string }[] };
   readonly error?: unknown;
 }
 
@@ -53,6 +53,7 @@ const client = (mcp: Mcp["Service"], token: string) => {
   };
   const call = (method: string, params: unknown) => post({ jsonrpc: "2.0", id: ++id, method, params });
   return {
+    result: (name: string, args: Record<string, unknown> = {}) => call("tools/call", { name, arguments: args }),
     init: () => call("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } }),
     list: async () => ((await call("tools/list", {})).result?.tools ?? []).map((t) => t.name),
     tool: async (name: string, args: Record<string, unknown> = {}) =>
@@ -78,6 +79,24 @@ const hired = (core: Core["Service"], s: Partial<T.Session> & { id: string }) =>
   });
 
 describe("mcp", () => {
+  it.live("regression: a preflight identity can diagnose but cannot report or mutate", () =>
+    Effect.gen(function* () {
+      const c = client(yield* Mcp, "pending");
+      expect((yield* Effect.promise(() => c.result("session_list"))).result?.isError).not.toBe(true);
+      expect((yield* Effect.promise(() => c.result("issue_report", { summary: "not registered" }))).result?.isError).toBe(true);
+      expect((yield* Effect.promise(() => c.result("channel_message_send", { text: "not registered" }))).result?.isError).toBe(true);
+      expect((yield* Said).all()).toEqual([]);
+    }).pipe(Effect.scoped, Effect.provide(world({ who: () => "pending" }))),
+  );
+  it.live("regression: rejected MCP calls expose machine-readable failure without executing business", () =>
+    Effect.gen(function* () {
+      const mcp = yield* Mcp;
+      for (const token of ["", "invalid", "revoked"]) {
+        const answer = yield* Effect.promise(() => client(mcp, token).result("issue_report", { summary: "forged" }));
+        expect(answer.result?.isError).toBe(true);
+      }
+    }).pipe(Effect.scoped, Effect.provide(world())),
+  );
   it.live("gives a session its tools, as itself", () => {
     const tokens: string[] = [];
     const proceed = Promise.withResolvers<void>();
@@ -86,6 +105,7 @@ describe("mcp", () => {
       turn: async (turn) => {
         for (const s of turn.options.mcpServers ?? [])
           if (s.name === "vibevalley" && "headers" in s) tokens.push((s.headers.authorization ?? "").replace(/^Bearer /u, ""));
+        expect(turn.options.env?.VIBEVALLEY_WORKER_TOKEN).toBeUndefined();
         await proceed.promise;
         turn.say("做完了");
       },
@@ -135,9 +155,12 @@ describe("mcp", () => {
       );
       expect(yield* Effect.promise(() => c.tool("issue_handback", { envelope: extra.id, reason: "不是当前工单" }))).toContain("重新分流");
       expect(mailbox.pending(id).some((input) => input.envelope_id === extra.id)).toBe(false);
+      expect((yield* Effect.promise(() => c.result("issue_pr_submit"))).result?.isError).toBe(true);
       expect(yield* Effect.promise(() => c.tool("issue_pr_submit"))).toContain("没有主人明确授予");
       expect(
-        yield* Effect.promise(() => c.tool("issue_report", { summary: "需要端口", questions: [{ question: "端口用哪个？", options: ["8787", "8788"] }] })),
+        yield* Effect.promise(() =>
+          c.tool("issue_report", { session: "another-session", summary: "需要端口", questions: [{ question: "端口用哪个？", options: ["8787", "8788"] }] }),
+        ),
       ).toContain("报告已记录");
       proceed.resolve();
       const issue = got.session!.issue!;
@@ -154,6 +177,9 @@ describe("mcp", () => {
       expect(yield* Effect.promise(() => c.tool("channel_message_list"))).toContain("从 MCP 说一句");
       expect(yield* Effect.promise(() => client(mcp, "").tool("session_list"))).toContain("没认出你是谁");
       expect(yield* Effect.promise(() => client(mcp, "hb_w1_forged").tool("channel_message_send", { text: "冒名" }))).toContain("没认出你是谁");
+      yield* (yield* Session).dismiss(id);
+      expect((yield* Effect.promise(() => c.result("channel_message_send", { text: "revoked" }))).result?.isError).toBe(true);
+      expect(saidIn(thread!).some((message) => ["revoked", "冒名"].includes(message.text))).toBe(false);
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [pi], repos: ["chat-j"] })));
   });
 
@@ -322,7 +348,7 @@ describe("mcp", () => {
       expect(found).toContain("pnpm test");
       expect(found).not.toContain("make check");
       expect(yield* tool("memory_search", { text: "部署" })).toContain("没有搜到「部署」");
-      expect(yield* Effect.promise(() => client(mcp, "w9").tool("memory_search", { text: "测试" }))).toContain("你不在场");
+      expect((yield* Effect.promise(() => client(mcp, "w9").result("memory_search", { text: "测试" }))).result?.isError).toBe(true);
     }).pipe(Effect.scoped, Effect.provide(world({ who: (token) => token }))),
   );
 

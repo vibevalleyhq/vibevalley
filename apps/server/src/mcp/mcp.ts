@@ -8,6 +8,7 @@ import { coerceArguments } from "@vibevalley/ai/tools";
 
 import { session } from "#/base/actor.ts";
 import { messageOf } from "#/base/errors.ts";
+import { redact, redactedHead } from "#/base/redact.ts";
 import { ServerConfig } from "#/infra/config.ts";
 import { Session } from "#/session/session.ts";
 import type { Caller } from "#/tool/schemas.ts";
@@ -40,19 +41,22 @@ const make = (options: McpOptions = {}) =>
     // A call runs on this service's fibers: it ends with the service.
     const runHere = yield* FiberSet.makeRuntimePromise();
 
-    // A session no longer in the fields still talks; its profile and repo are empty.
     const callerOf = (id: string): Caller => {
       const h = sessions.sessionOf(id);
       return { agent: h?.agent ?? "", session: id, repo: h?.repo ?? "", here: "", picked: "", envelope: "", actor: session(id) };
     };
 
-    const call = async (tool: LoopTool, args: unknown): Promise<string> => {
+    const call = async (tool: LoopTool, args: unknown, token: string): Promise<ReturnType<typeof text> & { isError?: boolean }> => {
       try {
         // Coerced as the brain's calls are; each tool's Schema then reads or refuses them.
         const r = await runHere(tool.execute(coerceArguments(args ?? {}, tool.parameters), { id: "" }));
-        return r.content.map((c) => (c.type === "text" ? c.text : "")).join("");
+        const content = r.content.map((c) => (c.type === "text" ? c.text : "")).join("");
+        return {
+          ...text(r.isError === true ? redactedHead(redact(content.replaceAll(token, "[redacted]")), 8000) : content),
+          ...(r.isError !== undefined ? { isError: r.isError } : {}),
+        };
       } catch (e) {
-        return failedCall(messageOf(e));
+        return { ...text(redactedHead(redact(failedCall(messageOf(e)).replaceAll(token, "[redacted]")), 8000)), isError: true };
       }
     };
 
@@ -74,10 +78,11 @@ const make = (options: McpOptions = {}) =>
         }));
         server.setRequestHandler(CallToolRequestSchema, async (req) => {
           const tool = list.find((t) => t.name === req.params.name);
-          if (!tool) return text(noTool(req.params.name));
+          if (!tool) return { ...text(noTool(req.params.name)), isError: true };
           // Tools are never called for a caller nobody knows.
-          if (!id) return text(failedCall(unknownCaller));
-          return text(await call(tool, req.params.arguments));
+          if (!id || who(token) !== id || (!sessions.sessionOf(id) && tool.name !== "session_list"))
+            return { ...text(failedCall(unknownCaller)), isError: true };
+          return call(tool, req.params.arguments, token);
         });
         return server;
       };

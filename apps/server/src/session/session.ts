@@ -191,7 +191,6 @@ const make = Effect.gen(function* () {
     hands,
     executions,
     launchOf,
-    revokeToken,
     who,
     keepHands,
     register,
@@ -429,7 +428,7 @@ const make = Effect.gen(function* () {
           Effect.gen(function* () {
             yield* trajectories.finish(id);
             if (retained) return { refused: why, retainedWork: true };
-            revokeToken(h);
+            yield* l.revokeAccess(h);
             const result = yield* releasePlace;
             released = true;
             if (result.kept) yield* core.notice("warn", result.reason);
@@ -499,7 +498,7 @@ const make = Effect.gen(function* () {
               if (stopFailed) return;
             }
             if (registeredRow) yield* forget(id);
-            revokeToken(h);
+            yield* l.revokeAccess(h);
             const result = yield* releasePlace;
             if (result.kept) yield* core.notice("warn", result.reason);
           });

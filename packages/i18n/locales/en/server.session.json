@@ -110,7 +110,9 @@
     "minutes": "{n} min",
     "noIssue": "This session has no issue whose changes can be delivered or discarded.",
     "contextKept": "Context directory kept at {cwd}: {why}",
-    "contextHasFiles": "The directory already contains files"
+    "contextHasFiles": "The directory already contains files",
+    "workerUnavailable": "Required helper CLI cannot execute; launch blocked",
+    "workerAuthenticationFailed": "Helper CLI session authentication failed; launch blocked, check the server listener and session access"
   },
   "conflictBrief": "Merging {base} into your branch conflicts ({files}). On your branch, run git merge {base}, resolve the conflicts, run the tests, and commit. In your conclusion, say how each conflict was settled."
 }

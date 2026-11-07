@@ -436,6 +436,17 @@ export const catalogs = {
       "repo.publish": "将已有分支发布为 GitHub PR 或 GitLab MR",
       "repo.check": "仓库检查：{check}",
       "repo.preview": "预览：将 {branch} 的 {sha} 发布到 {base}；尚未运行检查",
+      worker: {
+        about: "以当前帮工会话交活、提交 PR 或读取上下文",
+        failed: "帮工接入失败：检查会话凭证、服务连接和操作授权",
+        report:
+          "交回当前会话的报告。JSON 必填 summary（字符串）；可选 prSubmit（布尔，默认 false；true 需主人明确授权）、questions（question 字符串、options 字符串数组）、checks（criterion 从 0 开始、result 为 met/unmet/unsure、proof 字符串）、remember（text 字符串、scope 为 repo/all）、answer（conclusion 字符串，evidence/next/unsure 字符串数组）。省略的数组默认空。不接受切换会话身份；报告绑定凭证文件的会话。",
+        pr: "提交当前会话的 PR，须获主人明确授权。JSON 可选 summary 字符串。",
+        context: "读取当前工单串。JSON 可选 id（频道或串）、before（消息号）、limit（数量）、unread（布尔）。",
+        read: "读取上下文资源。JSON 必填 uri（vv:// 资源地址）。 可选 offset、limit（整数）。",
+        doctor: "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",
+        json: "工具输入的 JSON 对象；参数格式见本命令说明。",
+      },
     },
     desktop: {
       open: "打开 VibeValley",
@@ -1314,6 +1325,8 @@ export const catalogs = {
         noIssue: "这个会话不关联工单，不能交付或清理工单的改动。",
         contextKept: "上下文目录保留在 {cwd}：{why}",
         contextHasFiles: "目录里已有文件",
+        workerUnavailable: "必需的帮工 CLI 无法执行；本轮未启动",
+        workerAuthenticationFailed: "帮工 CLI 的会话认证请求失败；本轮未启动，请检查服务监听与会话接入",
       },
       conflictBrief:
         "把 {base} 合进你的分支时有冲突（{files}）。请在你的分支上运行 git merge {base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。",
@@ -4419,6 +4432,18 @@ export const catalogs = {
       "repo.publish": "Publish an existing branch as a GitHub PR or GitLab MR",
       "repo.check": "Repository check: {check}",
       "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run",
+      worker: {
+        about: "Report, submit a PR or read context as the current helper session",
+        failed: "Helper access failed: check session credentials, connectivity and operation authorization",
+        report:
+          "Report as the current session. JSON requires summary (string). Optional: prSubmit (boolean, default false; true needs explicit owner authorization), questions (question string, options string array), checks (criterion zero-based number, result met/unmet/unsure, proof string), remember (text string, scope repo/all), answer (conclusion string, evidence/next/unsure string arrays). Omitted arrays default to empty. Credentials bind identity; arguments cannot select another session.",
+        pr: "Submit the current session PR with explicit owner authorization. JSON accepts optional summary string.",
+        context: "Read the current issue thread. Optional JSON fields: id (channel/thread), before (message number), limit (count), unread (boolean).",
+        read: "Read a context resource. JSON requires uri (vv:// resource address). Optional offset and limit (integers).",
+        doctor:
+          "Authenticate a read-only session_list call to check credentials and tool access; this does not prove the coding agent loaded optional MCP. JSON defaults to an empty object.",
+        json: "Tool input as a JSON object; see the command description for fields.",
+      },
     },
     desktop: {
       open: "Open VibeValley",
@@ -5325,6 +5350,8 @@ export const catalogs = {
         noIssue: "This session has no issue whose changes can be delivered or discarded.",
         contextKept: "Context directory kept at {cwd}: {why}",
         contextHasFiles: "The directory already contains files",
+        workerUnavailable: "Required helper CLI cannot execute; launch blocked",
+        workerAuthenticationFailed: "Helper CLI session authentication failed; launch blocked, check the server listener and session access",
       },
       conflictBrief:
         "Merging {base} into your branch conflicts ({files}). On your branch, run git merge {base}, resolve the conflicts, run the tests, and commit. In your conclusion, say how each conflict was settled.",
@@ -8550,6 +8577,14 @@ export interface Messages {
   "cli.repo.preview": { readonly base: string | number; readonly branch: string | number; readonly sha: string | number };
   "cli.repo.publish": undefined;
   "cli.session.stopped": { readonly session: string | number };
+  "cli.worker.about": undefined;
+  "cli.worker.context": undefined;
+  "cli.worker.doctor": undefined;
+  "cli.worker.failed": undefined;
+  "cli.worker.json": undefined;
+  "cli.worker.pr": undefined;
+  "cli.worker.read": undefined;
+  "cli.worker.report": undefined;
   "desktop.cannotStart": undefined;
   "desktop.commandLine.taken": { readonly link: string | number };
   "desktop.exited": { readonly code: string | number };
@@ -9346,6 +9381,8 @@ export interface Messages {
   "server.session.life.stillHasHelper": undefined;
   "server.session.life.stillWorking": { readonly name: string | number };
   "server.session.life.stoppedNeedsYou": { readonly name: string | number; readonly why: string | number };
+  "server.session.life.workerAuthenticationFailed": undefined;
+  "server.session.life.workerUnavailable": undefined;
   "server.session.log.clipped": { readonly n: string | number };
   "server.session.log.exited": { readonly runtime: string | number };
   "server.session.log.exitedCode": { readonly code: string | number; readonly runtime: string | number };

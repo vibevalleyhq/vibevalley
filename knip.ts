@@ -29,7 +29,8 @@ const config: KnipConfig = {
     },
     "apps/cli": {
       // main.ts runs through vpx (`vp run start`, the acceptance sandbox) and is the pack block's entry.
-      entry: ["src/main.ts"],
+      // Session launches worker.ts directly; the desktop package includes its standalone worker.mjs bundle.
+      entry: ["src/main.ts", "src/worker.ts"],
       project: ["src/**/*.ts"],
     },
     "apps/web": {

@@ -778,5 +778,15 @@
   },
   "repo.publish": "Publish an existing branch as a GitHub PR or GitLab MR",
   "repo.check": "Repository check: {check}",
-  "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run"
+  "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run",
+  "worker": {
+    "about": "Report, submit a PR or read context as the current helper session",
+    "failed": "Helper access failed: check session credentials, connectivity and operation authorization",
+    "report": "Report as the current session. JSON requires summary (string). Optional: prSubmit (boolean, default false; true needs explicit owner authorization), questions (question string, options string array), checks (criterion zero-based number, result met/unmet/unsure, proof string), remember (text string, scope repo/all), answer (conclusion string, evidence/next/unsure string arrays). Omitted arrays default to empty. Credentials bind identity; arguments cannot select another session.",
+    "pr": "Submit the current session PR with explicit owner authorization. JSON accepts optional summary string.",
+    "context": "Read the current issue thread. Optional JSON fields: id (channel/thread), before (message number), limit (count), unread (boolean).",
+    "read": "Read a context resource. JSON requires uri (vv:// resource address). Optional offset and limit (integers).",
+    "doctor": "Authenticate a read-only session_list call to check credentials and tool access; this does not prove the coding agent loaded optional MCP. JSON defaults to an empty object.",
+    "json": "Tool input as a JSON object; see the command description for fields."
+  }
 }

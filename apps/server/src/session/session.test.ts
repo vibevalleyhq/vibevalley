@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Session as RuntimeSession } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import { Cause, Clock, Effect, Exit, Fiber, Stream } from "effect";
+import { Cause, Clock, Effect, Exit, Fiber, FileSystem, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
@@ -463,4 +463,188 @@ describe("sessions", () => {
       Effect.provide(world({ config: { ...testConfig(), repo: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
     );
   });
+});
+
+it.live("regression: failed CLI authentication revokes the credential and starts no worker", () => {
+  let started = 0;
+  let token = "";
+  let revoked = 0;
+  const runtime = scriptedRuntime({
+    id: "pi",
+    turn: async (turn) => {
+      started++;
+      turn.say("unexpected");
+    },
+  });
+  return Effect.gen(function* () {
+    const sessions = yield* Session;
+    const hired = yield* sessions.send(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("probe"), number: 1 } }, worktree: true });
+    expect(hired.session).toBeUndefined();
+    expect(hired.refused).toContain("认证请求失败");
+    expect(started).toBe(0);
+    expect(token).not.toBe("");
+    expect(sessions.who(token)).toBe("");
+    expect(revoked).toBeGreaterThan(0);
+  }).pipe(
+    Effect.scoped,
+    Effect.provide(
+      world({
+        runtimes: [runtime],
+        repos: ["demo"],
+        workerAccess: Effect.succeed({
+          command: "worker",
+          executableAvailable: Effect.succeed(true),
+          prepare: (_id, _endpoint, credential) =>
+            Effect.sync(() => {
+              token = credential;
+              return { authenticated: false, command: "worker" };
+            }),
+          revoke: () =>
+            Effect.sync(() => {
+              revoked++;
+            }),
+        }),
+      }),
+    ),
+  );
+});
+
+it.live("regression: session service shutdown revokes issued credentials", () => {
+  let token = "";
+  const runtime = scriptedRuntime({
+    id: "pi",
+    turn: async (turn) => {
+      turn.say("ready");
+    },
+  });
+  return Effect.gen(function* () {
+    const who = yield* Effect.scoped(
+      Effect.gen(function* () {
+        const sessions = yield* Session;
+        const result = yield* sessions.send(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("scope"), number: 1 } }, worktree: true });
+        expect(result.session).toBeDefined();
+        expect(sessions.who(token)).not.toBe("");
+        return sessions.who;
+      }).pipe(
+        Effect.provide(
+          world({
+            runtimes: [runtime],
+            repos: ["demo"],
+            workerAccess: Effect.succeed({
+              command: "worker",
+              executableAvailable: Effect.succeed(true),
+              prepare: (_id, _endpoint, credential) =>
+                Effect.sync(() => {
+                  token = credential;
+                  return { authenticated: true, command: "worker" };
+                }),
+              revoke: () => Effect.void,
+            }),
+          }),
+        ),
+      ),
+    );
+    expect(who(token)).toBe("");
+  });
+});
+
+for (const mode of ["refused", "failed", "interrupted"] as const) {
+  it.live(`regression: worker credentials are revoked when executor startup is ${mode}`, () => {
+    let token = "";
+    let file = "";
+    const entered = Promise.withResolvers<void>();
+    const released = Promise.withResolvers<void>();
+    const base = scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        turn.say("unexpected");
+      },
+    });
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        entered.resolve();
+        if (mode === "failed") throw new Error("startup failed");
+        await released.promise;
+        return base.session(...args);
+      },
+    };
+    const access = Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const directory = yield* fs.makeTempDirectoryScoped();
+      file = join(directory, "access.json");
+      return {
+        command: "worker",
+        executableAvailable: Effect.succeed(true),
+        prepare: (_id: string, _endpoint: string, credential: string) =>
+          Effect.gen(function* () {
+            token = credential;
+            yield* fs.writeFileString(file, credential, { mode: 0o600 });
+            return { authenticated: true, command: "worker" };
+          }),
+        revoke: () => fs.remove(file, { force: true }),
+      };
+    });
+    return Effect.gen(function* () {
+      const sessions = yield* Session;
+      const agent = { ...starter("lab"), effort: "", runtime: mode === "refused" ? "missing" : "pi" };
+      const send = sessions.send(agent, "work", "demo", { context: { kind: "issue", issue: { id: issueId("probe"), number: 1 } }, worktree: true });
+      if (mode === "interrupted") {
+        const starting = yield* Effect.forkChild(send);
+        yield* Effect.promise(() => entered.promise);
+        const stopping = yield* Effect.forkChild(Fiber.interrupt(starting));
+        yield* Effect.yieldNow;
+        released.resolve();
+        yield* Fiber.join(stopping);
+      } else {
+        const result = yield* send;
+        expect(result.session).toBeUndefined();
+        expect(result.refused).toBeDefined();
+      }
+      expect(token).not.toBe("");
+      expect(sessions.who(token)).toBe("");
+      expect(existsSync(file)).toBe(false);
+    }).pipe(Effect.scoped, Effect.provide(world({ workerAccess: access, runtimes: [runtime], repos: ["demo"] })));
+  });
+}
+
+it.live("regression: reopening a session rotates its credential before delivering the next turn", () => {
+  const tokens: string[] = [];
+  const runtime = scriptedRuntime({
+    id: "pi",
+    turn: async (turn) => {
+      turn.say("ready");
+    },
+  });
+  return Effect.gen(function* () {
+    const sessions = yield* Session;
+    yield* (yield* Agent).save(lab());
+    const result = yield* sessions.send(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("rotation"), number: 1 } }, worktree: true });
+    const id = result.session!.id;
+    yield* until(() => sessions.sessionOf(id)?.phase._tag !== "working", "first turn ended");
+    expect(yield* sessions.suspend(id)).toBe(true);
+    expect((yield* sessions.deliver(id, "again", { trigger: { kind: "comment" }, envelopeIds: [], byOwnerComment: true })).kind).toBe("run");
+    expect(tokens.length).toBe(2);
+    expect(tokens[1] !== tokens[0]).toBe(true);
+    expect(sessions.who(tokens[0]!)).toBe("");
+    expect(sessions.who(tokens[1]!)).toBe(id);
+  }).pipe(
+    Effect.scoped,
+    Effect.provide(
+      world({
+        runtimes: [runtime],
+        repos: ["demo"],
+        workerAccess: Effect.succeed({
+          command: "worker",
+          executableAvailable: Effect.succeed(true),
+          prepare: (_id, _endpoint, token) =>
+            Effect.sync(() => {
+              tokens.push(token);
+              return { authenticated: true, command: "worker" };
+            }),
+          revoke: () => Effect.void,
+        }),
+      }),
+    ),
+  );
 });

@@ -778,5 +778,15 @@
   },
   "repo.publish": "将已有分支发布为 GitHub PR 或 GitLab MR",
   "repo.check": "仓库检查：{check}",
-  "repo.preview": "预览：将 {branch} 的 {sha} 发布到 {base}；尚未运行检查"
+  "repo.preview": "预览：将 {branch} 的 {sha} 发布到 {base}；尚未运行检查",
+  "worker": {
+    "about": "以当前帮工会话交活、提交 PR 或读取上下文",
+    "failed": "帮工接入失败：检查会话凭证、服务连接和操作授权",
+    "report": "交回当前会话的报告。JSON 必填 summary（字符串）；可选 prSubmit（布尔，默认 false；true 需主人明确授权）、questions（question 字符串、options 字符串数组）、checks（criterion 从 0 开始、result 为 met/unmet/unsure、proof 字符串）、remember（text 字符串、scope 为 repo/all）、answer（conclusion 字符串，evidence/next/unsure 字符串数组）。省略的数组默认空。不接受切换会话身份；报告绑定凭证文件的会话。",
+    "pr": "提交当前会话的 PR，须获主人明确授权。JSON 可选 summary 字符串。",
+    "context": "读取当前工单串。JSON 可选 id（频道或串）、before（消息号）、limit（数量）、unread（布尔）。",
+    "read": "读取上下文资源。JSON 必填 uri（vv:// 资源地址）。 可选 offset、limit（整数）。",
+    "doctor": "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",
+    "json": "工具输入的 JSON 对象；参数格式见本命令说明。"
+  }
 }
